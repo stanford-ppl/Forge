@@ -49,7 +49,7 @@ trait SimpleVectorDSL extends MetaDSLApplication {
     val vnew = op (Vector) ("apply", static, List(T), List(MInt), Vector, codegenerated, effect = mutable)
     val vlength = op (Vector) ("length", infix, List(T), List(Vector), MInt, codegenerated)    
     val vapply = op (Vector) ("apply", infix, List(T), List(Vector,MInt), T, codegenerated)
-    val vupdate = op (Vector) ("update", infix, List(T), List(Vector,MInt,T), MUnit, codegenerated)
+    val vupdate = op (Vector) ("update", infix, List(T), List(Vector,MInt,T), MUnit, codegenerated, effect = write(0))
     val vplus = op (Vector) ("+", infix, List(T withBound TNumeric), List(Vector,Vector), Vector, zip((T,T,T,Vector), (0,1), "(a,b) => a+b"))
         
     /**

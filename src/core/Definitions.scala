@@ -58,7 +58,7 @@ trait Definitions extends DerivativeTypes {
    */  
   object pure extends EffectType
   object mutable extends EffectType  
-  case class write(args: Rep[DSLType]*) extends EffectType
+  case class write(args: Int*) extends EffectType
   
   /**
    * Delite op types

@@ -72,6 +72,7 @@ trait MetaDSLCodeGenBase extends GenericCodegen {
   def makeEffectAnnotation(effect: EffectType) = effect match {
     case `pure` => "reflectPure"
     case `mutable` => "reflectMutable"
+    case write(args @ _*) => "reflectWrite(" + args.map(a => opArgPrefix + a).mkString(",") + ")"
   }
   
   def makeTpeArgsWithBounds(args: List[Rep[TypeArg]]): String = {

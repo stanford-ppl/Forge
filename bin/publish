@@ -1,0 +1,10 @@
+#!/bin/bash
+
+echo "sbt compile"
+sbt compile
+echo "metac ppl.dsl.meta.examples.SimpleVectorDSLRunner"
+metac ppl.dsl.meta.examples.SimpleVectorDSLRunner
+echo "rm -rf ../delite2/dsls/simplevector"
+rm -rf ../delite2/dsls/simplevector
+echo "cp -r build/simplevector ../delite2/dsls/"
+cp -r build/simplevector ../delite2/dsls/

@@ -1,4 +1,4 @@
-package ppl.dsl.meta
+package ppl.dsl.forge
 package core
 
 /**
@@ -8,7 +8,7 @@ package core
  */
 
 trait DerivativeTypes {
-  this: MetaDSL =>
+  this: Forge =>
   
   abstract class Ops {
     def name: String

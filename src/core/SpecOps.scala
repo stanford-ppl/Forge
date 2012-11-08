@@ -1,4 +1,4 @@
-package ppl.dsl.meta
+package ppl.dsl.forge
 package core
 
 import java.io.{PrintWriter}
@@ -11,7 +11,7 @@ import scala.virtualization.lms.internal._
  * functionality required to specify a DSL.
  */
 trait SpecOps extends Base {
-  this: MetaDSL =>
+  this: Forge =>
 
   /**
    * DSLOp
@@ -46,7 +46,7 @@ trait SpecOps extends Base {
 }
 
 trait SpecOpsExp extends SpecOps {
-  this: MetaDSLExp =>
+  this: ForgeExp =>
 
   /**
    * DSLOp

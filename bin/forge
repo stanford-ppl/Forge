@@ -106,7 +106,7 @@ def stage(runner, params, opts):
     #print exec
     ecode = os.system(java_cmd)
     if ecode != 0:
-        err("MetaDSL compilation failed")
+        err("Forge compilation failed")
 
 if __name__ == "__main__":
     main()

@@ -1,8 +1,8 @@
-package ppl.dsl.meta
+package ppl.dsl.forge
 package core
 
 trait Definitions extends DerivativeTypes {
-  this: MetaDSL =>
+  this: Forge =>
 
   /**
    * String constants

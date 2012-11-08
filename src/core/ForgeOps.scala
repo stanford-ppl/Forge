@@ -1,4 +1,4 @@
-package ppl.dsl.meta
+package ppl.dsl.forge
 package core
 
 import java.io.{PrintWriter}
@@ -7,29 +7,29 @@ import scala.virtualization.lms.common._
 import scala.virtualization.lms.internal._
 import scala.collection.mutable.{ArrayBuffer,HashMap}
 
-trait MetaDSLOps extends Base {
-  this: MetaDSL =>
+trait ForgeOps extends Base {
+  this: Forge =>
     
-  def tpeArg(name: String, ctxBounds: List[TypeClass] = List()) = metadsl_tpearg(name, ctxBounds) // TODO: type bounds
-  def tpe(name: String, tpeArgs: List[Rep[TypeArg]] = List()) = metadsl_tpe(name, tpeArgs)
-  def data(tpe: Rep[DSLType], tpeArgs: List[Rep[TypeArg]], fields: (String, Rep[DSLType])*) = metadsl_data(tpe, tpeArgs, fields)
-  def op(tpe: Rep[DSLType])(name: String, style: MethodType, tpeArgs: List[Rep[TypeArg]], args: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = metadsl_op(tpe,name,style,tpeArgs,args,implicitArgs,retTpe,opTpe,effect)
-  def codegen(op: Rep[DSLOp])(generator: CodeGenerator, rule: String) = metadsl_codegen(op,generator,rule)
+  def tpeArg(name: String, ctxBounds: List[TypeClass] = List()) = forge_tpearg(name, ctxBounds) // TODO: type bounds
+  def tpe(name: String, tpeArgs: List[Rep[TypeArg]] = List()) = forge_tpe(name, tpeArgs)
+  def data(tpe: Rep[DSLType], tpeArgs: List[Rep[TypeArg]], fields: (String, Rep[DSLType])*) = forge_data(tpe, tpeArgs, fields)
+  def op(tpe: Rep[DSLType])(name: String, style: MethodType, tpeArgs: List[Rep[TypeArg]], args: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = forge_op(tpe,name,style,tpeArgs,args,implicitArgs,retTpe,opTpe,effect)
+  def codegen(op: Rep[DSLOp])(generator: CodeGenerator, rule: String) = forge_codegen(op,generator,rule)
     
-  def infix_is(tpe: Rep[DSLType], dc: DeliteCollection) = metadsl_isdelitecollection(tpe, dc)  
+  def infix_is(tpe: Rep[DSLType], dc: DeliteCollection) = forge_isdelitecollection(tpe, dc)  
   case class DeliteCollection(val tpeArg: Rep[TypeArg], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp])
   
-  def metadsl_tpearg(name: String, ctxBounds: List[TypeClass]): Rep[TypeArg]
-  def metadsl_tpe(name: String, tpeArgs: List[Rep[TypeArg]]): Rep[DSLType]    
-  def metadsl_data(tpe: Rep[DSLType], tpeArgs: List[Rep[TypeArg]], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]  
-  def metadsl_op(tpe: Rep[DSLType], name: String, style: MethodType, tpeArgs: List[Rep[TypeArg]], args: List[Rep[DSLType]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType): Rep[DSLOp]
-  def metadsl_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: String): Rep[CodeGenRule]
+  def forge_tpearg(name: String, ctxBounds: List[TypeClass]): Rep[TypeArg]
+  def forge_tpe(name: String, tpeArgs: List[Rep[TypeArg]]): Rep[DSLType]    
+  def forge_data(tpe: Rep[DSLType], tpeArgs: List[Rep[TypeArg]], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]  
+  def forge_op(tpe: Rep[DSLType], name: String, style: MethodType, tpeArgs: List[Rep[TypeArg]], args: List[Rep[DSLType]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType): Rep[DSLOp]
+  def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: String): Rep[CodeGenRule]
   
-  def metadsl_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection): Rep[Unit]
+  def forge_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection): Rep[Unit]
 }
 
-trait MetaDSLOpsExp extends MetaDSLOps with BaseExp {
-  this: MetaDSLExp  =>
+trait ForgeOpsExp extends ForgeOps with BaseExp {
+  this: ForgeExp  =>
 
   /*
    * Compiler state
@@ -47,11 +47,11 @@ trait MetaDSLOpsExp extends MetaDSLOps with BaseExp {
   // no higher-kinded fun yet
   case class TpeArg(name: String, ctxBounds: List[TypeClass]) extends Def[TypeArg]
    
-  def metadsl_tpearg(name: String, ctxBounds: List[TypeClass]) = TpeArg(name, ctxBounds)
+  def forge_tpearg(name: String, ctxBounds: List[TypeClass]) = TpeArg(name, ctxBounds)
      
   case class Tpe(name: String, tpeArgs: List[Rep[TypeArg]]) extends Def[DSLType]
   
-  def metadsl_tpe(name: String, tpeArgs: List[Rep[TypeArg]]) = {
+  def forge_tpe(name: String, tpeArgs: List[Rep[TypeArg]]) = {
     val t = Tpe(name, tpeArgs)
     Tpes += t
     t
@@ -59,7 +59,7 @@ trait MetaDSLOpsExp extends MetaDSLOps with BaseExp {
   
   case class Data(tpe: Rep[DSLType], tpeArgs: List[Rep[TypeArg]], fields: Seq[(String, Exp[DSLType])]) extends Def[DSLData]
   
-  def metadsl_data(tpe: Rep[DSLType], tpeArgs: List[Rep[TypeArg]], fields: Seq[(String, Exp[DSLType])]) = {
+  def forge_data(tpe: Rep[DSLType], tpeArgs: List[Rep[TypeArg]], fields: Seq[(String, Exp[DSLType])]) = {
     val d = Data(tpe, tpeArgs, fields)
     DataStructs += d
     d
@@ -67,7 +67,7 @@ trait MetaDSLOpsExp extends MetaDSLOps with BaseExp {
   
   case class Op(tpe: Rep[DSLType], name: String, style: MethodType, tpeArgs: List[Rep[TypeArg]], args: List[Rep[DSLType]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType) extends Def[DSLOp]
   
-  def metadsl_op(tpe: Rep[DSLType], name: String, style: MethodType, tpeArgs: List[Rep[TypeArg]], args: List[Rep[DSLType]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType) = {
+  def forge_op(tpe: Rep[DSLType], name: String, style: MethodType, tpeArgs: List[Rep[TypeArg]], args: List[Rep[DSLType]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType) = {
     val o = Op(tpe, name, style, tpeArgs, args, implicitArgs, retTpe, opTpe, effect)
     val grp = OpsGrp.getOrElseUpdate(tpe, new DSLOps {
       def name = tpe.name + "Ops"
@@ -79,7 +79,7 @@ trait MetaDSLOpsExp extends MetaDSLOps with BaseExp {
   
   case class CodeGenDecl(tpe: Rep[DSLType], op: Rep[DSLOp], generator: CodeGenerator, rule: String) extends Def[CodeGenRule]
   
-  def metadsl_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: String) = {
+  def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: String) = {
     val c = CodeGenDecl(op.tpe, op, generator, rule)
     if (CodeGenRules.get(op.tpe).exists(_.exists(_.op == op))) err("multiple code generators declared for op " + op.name)
     
@@ -88,7 +88,7 @@ trait MetaDSLOpsExp extends MetaDSLOps with BaseExp {
     c
   }
   
-  def metadsl_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection) = {
+  def forge_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection) = {
     // verify the dc functions match our expectations
     if ((dc.alloc.args != List(MInt) || dc.alloc.retTpe != tpe))
       // TODO: how should this work? alloc can really map to anything.. e.g can have other fields that get mapped from the inputs in arbitrary ways
@@ -107,8 +107,8 @@ trait MetaDSLOpsExp extends MetaDSLOps with BaseExp {
 }
 
 
-trait ScalaGenMetaDSLOps extends ScalaGenBase {
-  val IR: MetaDSLOpsExp
+trait ScalaGenForgeOps extends ScalaGenBase {
+  val IR: ForgeOpsExp
   import IR._
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {

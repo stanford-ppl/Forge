@@ -1,4 +1,4 @@
-package ppl.dsl.meta
+package ppl.dsl.forge
 package templates
 
 import java.io.PrintWriter

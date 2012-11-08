@@ -1,4 +1,4 @@
-package ppl.dsl.meta
+package ppl.dsl.forge
 package core
 
 import java.io.{PrintWriter}
@@ -22,7 +22,7 @@ import scala.virtualization.lms.util.OverloadHack
  */
 
 trait FieldOps extends Base with OverloadHack {
-  this: MetaDSL =>
+  this: Forge =>
   
   /**
    * DSLType
@@ -51,7 +51,7 @@ trait FieldOps extends Base with OverloadHack {
 }
 
 trait FieldOpsExp extends FieldOps {
-  this: MetaDSLExp =>
+  this: ForgeExp =>
  
   /**
    * TypeArg

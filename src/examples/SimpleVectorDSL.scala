@@ -1,11 +1,11 @@
-package ppl.dsl.meta
+package ppl.dsl.forge
 package examples
 
-import core.{MetaDSLApplication,MetaDSLApplicationRunner}
+import core.{ForgeApplication,ForgeApplicationRunner}
 
-object SimpleVectorDSLRunner extends MetaDSLApplicationRunner with SimpleVectorDSL
+object SimpleVectorDSLRunner extends ForgeApplicationRunner with SimpleVectorDSL
 
-trait SimpleVectorDSL extends MetaDSLApplication {
+trait SimpleVectorDSL extends ForgeApplication {
   /**
    * The name of your DSL. This is the name that will be used in generated files,
    * package declarations, etc.

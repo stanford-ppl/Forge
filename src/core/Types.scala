@@ -1,7 +1,7 @@
-package ppl.dsl.meta
+package ppl.dsl.forge
 
 /*
- * Types used for declaring new objects inside a MetaDSL specification
+ * Types used for declaring new objects inside a Forge specification
  */
  abstract class TypeClass {
    def name: String

@@ -34,9 +34,9 @@ trait SpecOps extends Base {
   def infix_tpeName(x: Rep[DSLOp]): String
 
   /**
-   * TypeArg
+   * TypePar
    */
-  def infix_withBound(a: Rep[TypeArg], b: TypeClass): Rep[TypeArg]
+  def infix_withBound(a: Rep[TypePar], b: TypeClass): Rep[TypePar]
   
   /**
    * Misc
@@ -52,19 +52,19 @@ trait SpecOpsExp extends SpecOps {
    * DSLOp
    */
   def dslop_tpeinstance_access(x: Rep[DSLOp], i: Int) = x match {
-    case Def(Op(tpe,name,style,tpeArgs,args,implArgs,retTpe,opTpe,eff)) => unquote("remap(" + opIdentifierPrefix + "." + TManifest.prefix + tpeArgs(i).name + ")")
+    case Def(Op(tpe,name,style,tpePars,args,implArgs,retTpe,opTpe,eff)) => unquote("remap(" + opIdentifierPrefix + "." + TManifest.prefix + tpePars(i).name + ")")
   }  
   
   def dslop_quotedarginstance_access(x: Rep[DSLOp], i: Int) = x match {
-    case Def(Op(tpe,name,style,tpeArgs,args,implArgs,retTpe,opTpe,eff)) => unquote("quote(" + opArgPrefix + i + ")")
+    case Def(Op(tpe,name,style,tpePars,args,implArgs,retTpe,opTpe,eff)) => unquote("quote(" + opArgPrefix + i + ")")
   }
   
   def infix_tpeName(x: Rep[DSLOp]) = x match {
-    case Def(Op(tpe,name,style,tpeArgs,args,implArgs,retTpe,opTpe,eff)) => tpe.name
+    case Def(Op(tpe,name,style,tpePars,args,implArgs,retTpe,opTpe,eff)) => tpe.name
   }  
   
   /**
-   * TypeArg
+   * TypePar
    */
-  def infix_withBound(a: Rep[TypeArg], b: TypeClass) = tpeArg(a.name, b :: a.ctxBounds)
+  def infix_withBound(a: Rep[TypePar], b: TypeClass) = tpePar(a.name, b :: a.ctxBounds)
 }

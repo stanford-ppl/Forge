@@ -34,7 +34,7 @@ trait DeliteGenOps extends BaseGenOps {
   }  
   
   def makeOpSimpleNodeNameWithArgs(o: Rep[DSLOp]) = makeOpNodeName(o) + makeOpArgs(o)
-  def makeOpNodeNameWithArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String = makeOpArgs) = makeOpNodeName(o) + makeTpeArgs(o.tpeArgs) + makeArgs(o) + makeOpImplicitArgs(o)
+  def makeOpNodeNameWithArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String = makeOpArgs) = makeOpNodeName(o) + makeTpeArgs(o.tpePars) + makeArgs(o) + makeOpImplicitArgs(o)
     
   def emitOpExp(ops: DSLOps, stream: PrintWriter) {
     emitBlockComment("IR Definitions", stream)   
@@ -45,7 +45,7 @@ trait DeliteGenOps extends BaseGenOps {
     
     def emitOpNodeHeader(o: Rep[DSLOp], opStr: String) {
       stream.println(" extends " + opStr + " {") 
-      for (targ <- o.tpeArgs) {
+      for (targ <- o.tpePars) {
         for (b <- targ.ctxBounds) {
           stream.println("   val " + b.prefix + targ.name + " = implicitly[" + b.name + "[" + targ.name + "]]")
         }
@@ -58,7 +58,7 @@ trait DeliteGenOps extends BaseGenOps {
     
     // IR nodes
     for (o <- unique(ops.ops)) { 
-      stream.print("  case class " + makeOpNodeName(o) + makeTpeArgsWithBounds(o.tpeArgs))
+      stream.print("  case class " + makeOpNodeName(o) + makeTpeArgsWithBounds(o.tpePars))
       if (o.opTpe == codegenerated) stream.print(makeOpArgsWithType(o, blockify))
       else stream.print(makeOpArgsWithType(o))    
       stream.print(makeOpImplicitArgsWithType(o,true))
@@ -84,7 +84,7 @@ trait DeliteGenOps extends BaseGenOps {
     
     // methods that construct nodes
     for (o <- unique(ops.ops)) { 
-      stream.print("  def " + makeOpMethodName(o) + makeTpeArgsWithBounds(o.tpeArgs))
+      stream.print("  def " + makeOpMethodName(o) + makeTpeArgsWithBounds(o.tpePars))
       stream.print(makeOpArgsWithType(o))
       stream.print(makeOpImplicitArgsWithOverloadWithType(o))
       stream.print(" = {")
@@ -143,7 +143,7 @@ trait DeliteGenOps extends BaseGenOps {
     for (o <- unique(ops.ops)) {
       // helpful identifiers
       val xformArgs = "(" + o.args.zipWithIndex.map(t => "f(" + opArgPrefix + t._2 + ")").mkString(",") + ")" 
-      val implicits = (o.tpeArgs.flatMap(t => t.ctxBounds.map(b => opIdentifierPrefix + "." + b.prefix + t.name)) ++ /*implicitArgsWithOverload(o)*/o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
+      val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => opIdentifierPrefix + "." + b.prefix + t.name)) ++ /*implicitArgsWithOverload(o)*/o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
       
       o.opTpe match {
         case `codegenerated` =>

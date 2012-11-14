@@ -57,7 +57,7 @@ trait ScalaOps extends ForgeApplication {
     /* 
     val Var = grp("Variables")
     
-    val T = tpeArg("T")
+    val T = tpePar("T")
     val newVar1 = op (Var) ("__newVar", direct, List(T), List(T), MVar(T), codegenerated, effect = simple)
     val pluseq = op (Var) ("+=", infix, List(T), List(MVar(T), T), MUnit, codegenerated, effect = write(0))
     
@@ -68,7 +68,7 @@ trait ScalaOps extends ForgeApplication {
   
   def numerics() = {
     val Num = grp("Numeric")    
-    val T = tpeArg("T")    
+    val T = tpePar("T")    
     
     lift (Num) (T withBound TNumeric)
         
@@ -80,7 +80,7 @@ trait ScalaOps extends ForgeApplication {
   
   def ordering() = {
     val Ord = grp("Ordering")
-    val T = tpeArg("T")
+    val T = tpePar("T")
     
     val lt = op (Ord) ("<", infix, List(T withBound TOrdering), List(T,T), MBoolean, codegenerated)    
     val gt = op (Ord) (">", infix, List(T withBound TOrdering), List(T,T), MBoolean, codegenerated)    
@@ -95,7 +95,7 @@ trait ScalaOps extends ForgeApplication {
     
     // overloaded variants of string concat
     val CString = tpe("String", stage = now) 
-    val T = tpeArg("T") 
+    val T = tpePar("T") 
 
     // most of these variants collapse to the a common back-end implementation:
     
@@ -115,6 +115,10 @@ trait ScalaOps extends ForgeApplication {
     val concat9 = op (Str) ("+", infix, List(), List(MString, CString), MString, codegenerated)
     val concat10 = op (Str) ("+", infix, List(), List(CString, MString), MString, codegenerated)
     
+    // testing type instances
+    // val VString = tpeInst(MVar(T), List(MString))
+    // val concat11 = op (Str) ("+", infix, List(), List(VString, VString), MString, codegenerated)
+    
     // TODO: we would like overloaded variants to possibly use the same codegen impl instead of being redundant here    
     // most of the concat codegens are not used, but it is not easy to tell which ones will "make it"
     // should overloading be more explicit in the spec to avoid this problem? (an 'overloaded' parameter?)
@@ -130,5 +134,6 @@ trait ScalaOps extends ForgeApplication {
     codegen (concat8) ($cala, scalaStrConcat(concat8))
     codegen (concat9) ($cala, scalaStrConcat(concat9))
     codegen (concat10) ($cala, scalaStrConcat(concat10))
+    // codegen (concat11) ($cala, scalaStrConcat(concat11))
   }
 }

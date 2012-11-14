@@ -45,7 +45,7 @@ trait LibGenPackages extends BaseGenPackages {
     emitBlockComment("dsl types", stream, indent=2)
     for (tpe <- Tpes) {
       if (OpsGrp.contains(tpe) && !isPrimitiveType(tpe)) {
-        stream.println("  def m_" + tpe.name + makeTpeArgsWithBounds(tpe.tpeArgs) + " = manifest[" + quote(tpe) + "]")      
+        stream.println("  def m_" + tpe.name + makeTpeArgsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")      
       }
     }    
     stream.println("}")

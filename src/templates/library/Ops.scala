@@ -24,8 +24,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       b = b.replaceAllLiterally(o.quotedArg(i), opArgPrefix + i)
     }    
     var c = b
-    for (i <- 0 until o.tpeArgs.length) {
-      c = c.replaceAllLiterally(o.tpeInstance(i), o.tpeArgs.apply(i).name)
+    for (i <- 0 until o.tpePars.length) {
+      c = c.replaceAllLiterally(o.tpeInstance(i), o.tpePars.apply(i).name)
     }    
     
     val quotePattern = new Regex("""quote\((.*?)\)""", "body")
@@ -44,7 +44,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         check(zip, o)          
         val dc = DeliteCollections(o.args.apply(0))        
         emitWithIndent("def func: (" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + ") => " + quote(zip.tpePars._3) + " = " + zip.func, stream, indent)            
-        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpeArgs(dc.alloc.tpeArgs) + "(" + makeOpMethodNameWithArgs(dc.size) + ")", stream, indent)
+        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpeArgs(dc.alloc.tpePars) + "(" + makeOpMethodNameWithArgs(dc.size) + ")", stream, indent)
         emitWithIndent("for (i <- 0 until " + makeOpMethodNameWithArgs(dc.size) + ") {", stream, indent)            
         emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(" + opArgPrefix+zip.argIndices._1 + ", i)," + makeOpMethodName(dc.apply) + "(" + opArgPrefix+zip.argIndices._2 + ", i)))", stream, indent+2)
         emitWithIndent("}", stream, indent)            
@@ -57,16 +57,16 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       val tpe = grpAsTpe(ops.grp)
       val data = DataStructs.filter(_.tpe == tpe).apply(0) // TODO
       stream.print("class " + data.tpe.name)
-      stream.print(makeTpeArgsWithBounds(data.tpeArgs))
+      stream.print(makeTpeArgsWithBounds(data.tpePars))
       stream.print("(")  
       stream.print(makeFieldArgs(data))
       stream.print(") {")
       stream.println()
       stream.println(makeFieldsWithInitArgs(data))
       for (o <- unique(ops.ops) if o.style == infix) {       
-        stream.print("  def " + o.name + makeTpeArgsWithBounds(o.tpeArgs.tail))
+        stream.print("  def " + o.name + makeTpeArgsWithBounds(o.tpePars.tail))
         stream.print("(" + o.args.tail.zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repify(t._1)).mkString(",") + ")") 
-        stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpeArgs, without = data.tpeArgs))
+        stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = data.tpePars))
         stream.println(" = {")
         // cheat a little bit for consistency: the codegen rule may refer to this arg
         emitWithIndent("val " + opArgPrefix + 0 + " = this", stream, 4)
@@ -78,7 +78,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     }      
     
     for (o <- unique(ops.ops)) {       
-      stream.print("  def " + makeOpMethodName(o) + makeTpeArgsWithBounds(o.tpeArgs))
+      stream.print("  def " + makeOpMethodName(o) + makeTpeArgsWithBounds(o.tpePars))
       stream.print(makeOpArgsWithType(o))
       stream.print(makeOpImplicitArgsWithOverloadWithType(o))
       stream.println(" = {")      

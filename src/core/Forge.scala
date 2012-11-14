@@ -54,12 +54,14 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   }
   
   def grpIsTpe(grp: Rep[DSLGroup]) = grp match {
-    case t@Def(Tpe(n,targs,s)) => true
-    case t@Def(TpeArg(n,ctx)) => true
+    case Def(Tpe(n,targs,s)) => true
+    case Def(TpeInst(t,args,s)) => true
+    case Def(TpeArg(n,ctx)) => true
     case _ => false
   }
   def grpAsTpe(grp: Rep[DSLGroup]): Rep[DSLType] = grp match {
     case t@Def(Tpe(n,targs,s)) => t.asInstanceOf[Rep[DSLType]]
+    case t@Def(TpeInst(hk,args,s)) => t.asInstanceOf[Rep[DSLType]]
     case t@Def(TpeArg(n,ctx)) => t.asInstanceOf[Rep[DSLType]]
     // case _ => err(grp.name + " is not a DSLType")
   }
@@ -102,27 +104,29 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
       if (args == List(byName)) " => " + repify(ret)
       else "(" + args.map(repify).mkString(",") + ") => " + repify(ret)        
     case Def(Tpe("Var", arg, stage)) => repify(arg(0))
+    case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2, s2)) => repify(a2(0))
     case _ => "Rep[" + quote(a) + "]"           
   }
   def repifySome(a: Exp[Any]): String = a match {  
     case Def(Tpe(name, arg, `now`)) => quote(a)
     case Def(Tpe("Var", arg, stage)) => varify(arg(0))
+    case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2, s2)) => varify(a2(0))
     case _ => repify(a)
   }
   
-  def makeTpeArgsWithBounds(args: List[Rep[TypeArg]]): String = {
+  def makeTpeArgsWithBounds(args: List[Rep[TypePar]]): String = {
     if (args.length < 1) return ""    
     val args2 = args.map { a => a.name + (if (a.ctxBounds != Nil) ":" + a.ctxBounds.map(_.name).mkString(":") else "") }
     "[" + args2.mkString(",") + "]"
-  }
-  
-  def makeTpeArgs(args: List[Rep[TypeArg]]): String = {
+  }  
+  def makeTpeArgs(args: List[Rep[TypePar]]): String = {
     if (args.length < 1) return ""
     "[" + args.map(_.name).mkString(",") + "]"
   }
   
   override def quote(x: Exp[Any]) : String = x match {
     case Def(Tpe(s,args,stage)) => s + makeTpeArgs(args)
+    case Def(TpeInst(t,args,s)) => t.name + "[" + args.map(quote).mkString(",") + "]"
     case Def(TpeArg(s,ctx)) => s 
     case _ => super.quote(x)
   }  

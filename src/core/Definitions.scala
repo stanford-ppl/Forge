@@ -24,19 +24,8 @@ trait Definitions {
   lazy val byName = tpe("Thunk")
   def MThunk(ret: Rep[DSLType]) = ftpe(List(byName), ret)
   def MFunction(args: List[Rep[DSLType]], ret: Rep[DSLType]) = ftpe(args,ret)  
-  // TODO: need to handle concrete type instances (e.g. Var[Int]) properly
-  // tpeArg/tpeArgs should get renamed to tpePar/tpePars. Should be able
-  // to instantiate a tpe with n tpePars with n tpeArgs.
-  object MVar {
-    def apply(tpeArg: Rep[TypeArg]) = tpe("Var", List(tpeArg)) 
-    // TODO: quote is only available inside code generators..
-    // def apply(tp: Rep[DSLType]) = tpe("Var" + quote(tp)) // a concrete instance
-  }
-  object MArray {
-    def apply(tpeArg: Rep[TypeArg]) = tpe("Array", List(tpeArg)) 
-    // def apply(tp: Rep[DSLType]) = tpe("Array" + quote(tp)) 
-  }
-  
+  def MVar(tpePar: Rep[TypePar]) = tpe("Var", List(tpePar)) 
+  def MArray(tpePar: Rep[TypePar]) = tpe("Array", List(tpePar))   
   lazy val MSourceContext = tpe("SourceContext")
   
   /**

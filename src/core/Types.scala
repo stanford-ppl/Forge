@@ -9,7 +9,7 @@ package ppl.dsl.forge
  }
 abstract class DSLGroup 
 abstract class DSLType extends DSLGroup
-abstract class TypeArg extends DSLType
+abstract class TypePar extends DSLType
 abstract class DSLData
 abstract class DSLStruct
 abstract class DSLOp

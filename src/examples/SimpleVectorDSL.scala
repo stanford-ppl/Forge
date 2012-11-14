@@ -5,30 +5,22 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 
 object SimpleVectorDSLRunner extends ForgeApplicationRunner with SimpleVectorDSL
 
-trait SimpleVectorDSL extends ForgeApplication {
+trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
   /**
    * The name of your DSL. This is the name that will be used in generated files,
    * package declarations, etc.
    */
   def dslName = "SimpleVector"
-  
-  /**
-   * The LMS common ops that you want made available inside the application
-   */
-  override def lmsAppOps = List(equalOps, ifThenElseOps, variableOps, whileOps, functionOps, implicitOps, 
-                                numericOps, orderingOps, stringOps, booleanOps, primitiveOps, miscOps,
-                                tupleOps, mathOps, castingOps, objectOps, arrayOps)
-  
-  /**
-   * The LMS common ops that you want made available inside the generated compiler, 
-   * in addition to LMSAppOps
-   */
-  override def lmsCompOps = List(rangeOps)
-  
+    
   /**
    * The specification is the DSL definition (types, data structures, ops, code generators)
    */
   def specification() = {
+    /**
+     * Include Scala ops
+     */
+     addScalaOps()
+    
     /**
      * Types
      */
@@ -38,7 +30,7 @@ trait SimpleVectorDSL extends ForgeApplication {
     /**
      * Data structures
      */
-    data(Vector, List(T), ("_length", MInt), ("_data", MArray(List(T))))
+    data(Vector, List(T), ("_length", MInt), ("_data", MArray(T)))
         
     /**
      * Ops

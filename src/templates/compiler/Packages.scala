@@ -18,55 +18,39 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("trait " + dsl + "ApplicationCompiler extends " + dsl + "Application with DeliteApplication with " + dsl+"Exp")
   }
 
-  def emitScalaPackageDefinitions(appOps: List[LMSOps], compOps: List[LMSOps], stream: PrintWriter) {
-    val allOps = appOps union compOps  
-    emitBlockComment("compiler packages", stream)
-    
-    val opsPkg = dsl + "ScalaOpsPkg"    
-    val opsPkgExp = opsPkg + "Exp"
-    stream.println("trait " + opsPkgExp + " extends " + opsPkg + " with BaseExp")
-    for (op <- allOps) {
-      stream.print(" with " + op.opt)
-    }
-    stream.println()
-    stream.println()
-  
-    // Code generators for Scala ops
-    for (g <- generators) {
-      val selectedOps = allOps.filter(_.targets.contains(g))
-      stream.println("trait " + dsl + g.name + "CodeGenPkg extends " + g.name + "GenBase")
-      for (op <- selectedOps) {
-        stream.print(" with " + g.name + "Gen" + op.name)
-      }
-      stream.println()
-      stream.println("  { val IR: " + opsPkgExp + " }")  
-      stream.println()
-    }
-  }  
-
-  def emitDSLPackageDefinitions(dslOps: List[Ops], lmsCompOps: List[LMSOps], stream: PrintWriter) {
+  def emitDSLPackageDefinitions(appOps: List[DSLOps], compOps: List[DSLOps], stream: PrintWriter) {
     emitBlockComment("dsl compiler definition", stream)
   
     // compiler
     stream.println("trait " + dsl + "Compiler extends " + dsl)
-    for (op <- lmsCompOps) {
-      stream.print(" with " + op.name)
+    for (op <- compOps) {
+      stream.print(" with " + op.name + "Ops")
     }
     stream.println(" { this: " + dsl + "Application with " + dsl + "Exp => }")
     stream.println()
   
     // exp
-    stream.println("trait " + dsl + "Exp extends " + dsl + "Compiler with " + dsl + "ScalaOpsPkgExp")
-    for (op <- dslOps) {
-      stream.print(" with " + op.exp)
+    stream.println("trait " + dsl + "Exp extends " + dsl + "Compiler")
+    for (op <- appOps) {
+      stream.print(" with " + op.name + "Exp")
     }
+    for (e <- Externs) {
+      stream.print(" with " + e.ops.name + "Exp")
+    }    
     stream.println(" with DeliteOpsExp with DeliteAllOverridesExp {")
     stream.println(" this: DeliteApplication with " + dsl + "Application => ")
     stream.println()
-    for ((tpe,ops) <- OpsGrp) {
-      stream.print("  abstract class " + quote(tpe))
-      if (DeliteCollections.contains(tpe)) stream.println(" extends DeliteCollection[" + DeliteCollections(tpe).tpeArg.name + "]") else stream.println()
-      stream.println("  def m_" + tpe.name + makeTpeArgsWithBounds(tpe.tpeArgs) + " = manifest[" + quote(tpe) + "]")      
+    emitBlockComment("disambiguations for LMS classes pulled in by Delite", stream, indent=2)
+    // TODO: generalize
+    stream.println("  override def __whileDo(cond: => Exp[Boolean], body: => Rep[Unit])(implicit pos: SourceContext) = delite_while(cond, body)")      
+    stream.println()
+    emitBlockComment("dsl types", stream, indent=2)
+    for (tpe <- Tpes) {
+      if (OpsGrp.contains(tpe) && !isPrimitiveType(tpe)) {
+        stream.print("  abstract class " + quote(tpe))
+        if (DeliteCollections.contains(tpe)) stream.println(" extends DeliteCollection[" + DeliteCollections(tpe).tpeArg.name + "]") else stream.println()
+        stream.println("  def m_" + tpe.name + makeTpeArgsWithBounds(tpe.tpeArgs) + " = manifest[" + quote(tpe) + "]")      
+      }
     }
     stream.println()
     stream.println("  def getCodeGenPkg(t: Target{val IR: " + dsl + "Exp.this.type}): GenericFatCodegen{val IR: " + dsl + "Exp.this.type} = {")
@@ -115,15 +99,19 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("}")
   }
 
-  def emitDSLCodeGeneratorPackageDefinitions(dslOps: List[Ops], stream: PrintWriter) {
+  def emitDSLCodeGeneratorPackageDefinitions(dslOps: List[DSLOps], stream: PrintWriter) {
     emitBlockComment("code generators", stream)    
     emitBaseCodegen(stream)
     stream.println()
     for (g <- generators) {
-      stream.println("trait " + dsl + "Codegen" + g.name + " extends " + dsl + "CodegenBase with " + dsl + g.name + "CodeGenPkg")
+      stream.println("trait " + dsl + "Codegen" + g.name + " extends " + dsl + "CodegenBase")
       for (op <- dslOps) {
         if (op.targets.contains(g))
           stream.print(" with " + g.name + "Gen" + op.name)
+      }
+      for (e <- Externs) {
+        if (e.ops.targets.contains(g))
+          stream.print(" with " + g.name + "Gen" + e.ops.name)        
       }
       stream.println(" with " + g.name + "GenDeliteOps with Delite" + g.name + "GenAllOverrides {" )
       stream.println("  val IR: DeliteApplication with " + dsl + "Exp")

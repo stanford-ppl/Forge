@@ -19,19 +19,20 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     stream.println("}")
   }
 
-  def emitScalaPackageDefinitionsBase(appOps: List[LMSOps], compOps: List[LMSOps], stream: PrintWriter) {
-    val allOps = appOps union compOps
-  
-    emitBlockComment("packages", stream)
-  
+  def emitDSLPackageDefinitionsBase(appOps: List[DSLOps], compOps: List[DSLOps], stream: PrintWriter) {
+    emitBlockComment("dsl definition", stream)
+    
     // Lift
     stream.println("trait " + dsl + "Lift")
-    val liftOps = appOps.filter(_.lift.isDefined)
+    val liftOps = Lifts.keys.toList
     if (liftOps.length > 0) {
-      stream.print("  extends " + liftOps.head.lift.get)
+      stream.print("  extends Lift" + liftOps.head.name)
     }
-    for (op <- liftOps.drop(1)) {
-      stream.print(" with " + op.lift.get)
+    for (grp <- liftOps.tail) {
+      stream.print(" with Lift" + grp.name)
+    }
+    for (e <- Externs if e.withLift) {
+      stream.print(" with Lift" + e.ops.grp.name)
     }
     stream.print(" {")
     stream.println("  this: " + dsl + " =>")
@@ -39,30 +40,22 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     stream.println()
     stream.println()
   
-    // Scala ops included in app
-    val opsPkg = dsl + "ScalaOpsPkg"
-    stream.println("trait " + opsPkg + " extends Base")
+    // dsl interface    
+    stream.println("trait " + dsl + " extends Base")
     for (op <- appOps) {
       stream.print(" with " + op.name)
     }
-    stream.println()
-    stream.println()    
-  }  
-
-  def emitDSLPackageDefinitionsBase(dslOps: List[Ops], lmsCompOps: List[LMSOps], stream: PrintWriter) {
-    emitBlockComment("dsl definition", stream)
-  
-    // dsl interface    
-    stream.println("trait " + dsl + " extends " + dsl + "ScalaOpsPkg")
-    for (op <- dslOps) {
-      stream.print(" with " + op.name)
-    }
+    for (e <- Externs) {
+      stream.print(" with " + e.ops.name)
+    }    
     stream.println(" { this: " + dsl + "Application => ")
     stream.println()
     emitBlockComment("abstract types", stream)
-    for ((tpe,ops) <- OpsGrp) {
-      stream.println("  type " + quote(tpe))      
-      stream.println("  implicit def m_" + tpe.name + makeTpeArgsWithBounds(tpe.tpeArgs) + ": Manifest[" + quote(tpe) + "]")
+    for (tpe <- Tpes) {
+      if (OpsGrp.contains(tpe) && !isPrimitiveType(tpe)) {
+        stream.println("  type " + quote(tpe))      
+        stream.println("  implicit def m_" + tpe.name + makeTpeArgsWithBounds(tpe.tpeArgs) + ": Manifest[" + quote(tpe) + "]")
+      }
     }    
     stream.println("}")
     stream.println()  

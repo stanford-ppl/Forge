@@ -12,6 +12,16 @@ trait LibGenImports extends BaseGenImports {
   val IR: ForgeApplicationRunner with ForgeExp 
   import IR._
       
+  def emitScalaMathImports(stream: PrintWriter) {
+    stream.println("import scala.math.Ordering.Implicits._")
+    stream.println("import scala.math.Numeric.Implicits._")
+  } 
+     
+  override def emitScalaImports(stream: PrintWriter) {
+    super.emitScalaImports(stream)
+    emitScalaMathImports(stream)
+  }
+        
   override def emitDSLImports(stream: PrintWriter) {
     super.emitDSLImports(stream)
     stream.println("import " + packageName + "._")

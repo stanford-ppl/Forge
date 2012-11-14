@@ -4,6 +4,8 @@ package templates
 import java.io.PrintWriter
 
 object Utilities {
+  val nl = System.getProperty("line.separator")
+  
   def emitWithIndent(s: String, stream: PrintWriter, indent: Int = 0) = stream.println(" "*indent + s)
   def emitWithIndentInline(s: String, stream: PrintWriter, indent: Int = 0) = stream.print(" "*indent + s)
   

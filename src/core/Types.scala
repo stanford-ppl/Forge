@@ -7,17 +7,20 @@ package ppl.dsl.forge
    def name: String
    def prefix: String
  }
-abstract class DSLType 
+abstract class DSLGroup 
+abstract class DSLType extends DSLGroup
 abstract class TypeArg extends DSLType
 abstract class DSLData
 abstract class DSLStruct
 abstract class DSLOp
+abstract class LiftStm
 abstract class RewriteRule
 abstract class CodeGenRule
 
 /**
  * Types representing built-in constructs
  */
+abstract class StageTag
 abstract class MethodType
 abstract class EffectType
 abstract class OpType

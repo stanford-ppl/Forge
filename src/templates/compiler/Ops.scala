@@ -17,18 +17,29 @@ trait DeliteGenOps extends BaseGenOps {
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
   import IR._
 
-  def baseExpCls(tpe: Rep[DSLType]) = {
+  def baseExpCls(grp: Rep[DSLGroup]) = {
     // in order of decreasing inclusiveness
-    if (DeliteCollections.contains(tpe)) "DeliteCollectionOpsExp"
-    else if (lmsAppOps contains variableOps) "VariablesExp with BaseFatExp" 
+    if (grp.isInstanceOf[Rep[DSLType]] && DeliteCollections.contains(grp.asInstanceOf[Rep[DSLType]])) "DeliteCollectionOpsExp"
     else if (OpsGrp.exists(g => g._2.ops.exists(o => o.effect != pure))) "BaseFatExp with EffectExp"
     else "BaseFatExp"
   }
+  
+  // IR node names
+  def makeOpNodeName(o: Rep[DSLOp]) = {
+    val i = nameClashId(o)    
+    o.style match {
+      case `static` => o.grp.name + i + "Object_" + o.name.capitalize
+      case _ => o.grp.name + i + "_" + o.name.capitalize
+    }
+  }  
+  
+  def makeOpSimpleNodeNameWithArgs(o: Rep[DSLOp]) = makeOpNodeName(o) + makeOpArgs(o)
+  def makeOpNodeNameWithArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String = makeOpArgs) = makeOpNodeName(o) + makeTpeArgs(o.tpeArgs) + makeArgs(o) + makeOpImplicitArgs(o)
     
-  def emitOpExp(tpe: Rep[DSLType], ops: DSLOps, stream: PrintWriter) {
+  def emitOpExp(ops: DSLOps, stream: PrintWriter) {
     emitBlockComment("IR Definitions", stream)   
     stream.println()
-    stream.println("trait " + tpe.name + "OpsExp extends " + tpe.name + "Ops with " + baseExpCls(tpe) + " {")
+    stream.println("trait " + ops.grp.name + "OpsExp extends " + ops.grp.name + "Ops with " + baseExpCls(ops.grp) + " {")
     stream.println("  this: " + dsl + "Exp => ")
     stream.println()
     
@@ -46,25 +57,25 @@ trait DeliteGenOps extends BaseGenOps {
     }
     
     // IR nodes
-    for (o <- ops.ops) { 
-      stream.print("  case class " + makeOpNodeName(tpe,o) + makeTpeArgsWithBounds(o.tpeArgs))
-      stream.print(makeOpArgsWithType(o))
+    for (o <- unique(ops.ops)) { 
+      stream.print("  case class " + makeOpNodeName(o) + makeTpeArgsWithBounds(o.tpeArgs))
+      if (o.opTpe == codegenerated) stream.print(makeOpArgsWithType(o, blockify))
+      else stream.print(makeOpArgsWithType(o))    
       stream.print(makeOpImplicitArgsWithType(o,true))
+      
       o.opTpe match {
         case `codegenerated` =>           
           emitOpNodeHeader(o, "Def[" + quote(o.retTpe) + "]") 
         case zip:Zip => 
-          // sanity checking
-          if (zip.tpePars.productIterator.exists(a => a.isInstanceOf[TypeArg] && !o.tpeArgs.contains(a))) err("zipWith op with undefined type arg: " + o.name)
-          if (zip.argIndices.productIterator.asInstanceOf[Iterator[Int]].exists(a => a < 0 || a > o.args.length)) err("zipWith op with illegal arg parameter: " + o.name)
-          
+          check(zip, o)          
+          val dc = DeliteCollections(o.args.apply(0))
           emitOpNodeHeader(o, "DeliteOpZipWith[" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + "," + quote(zip.tpePars._3) + "," + quote(zip.tpePars._4) + "]")            
           stream.println()
           stream.println("   val inA = " + opArgPrefix + zip.argIndices._1)
           stream.println("   val inB = " + opArgPrefix + zip.argIndices._2)
           stream.println("   def func = " + zip.func)
-          stream.println("   override def alloc(len: Exp[Int]) = " + makeOpMethodName(tpe, DeliteCollections(tpe).alloc) + "(len)")
-          stream.println("   val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(tpe, DeliteCollections(o.args.apply(0)).size) + ")")
+          stream.println("   override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + "(len)")
+          stream.println("   val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
       }
       emitOpNodeFooter(o)        
       stream.println()        
@@ -72,46 +83,97 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println()
     
     // methods that construct nodes
-    for (o <- ops.ops) { 
-      stream.print("  def " + makeOpMethodName(tpe,o) + makeTpeArgsWithBounds(o.tpeArgs))
+    for (o <- unique(ops.ops)) { 
+      stream.print("  def " + makeOpMethodName(o) + makeTpeArgsWithBounds(o.tpeArgs))
       stream.print(makeOpArgsWithType(o))
-      stream.print(makeOpImplicitArgsWithType(o))
-      stream.print(" = " + makeEffectAnnotation(o.effect) + "(" + makeOpNodeNameWithArgs(tpe,o) + ")")
-      stream.println()
+      stream.print(makeOpImplicitArgsWithOverloadWithType(o))
+      stream.print(" = {")
+      val summary = scala.collection.mutable.ArrayBuffer[String]()
+      // TODO: we need syms methods for func args..
+      if (o.opTpe == codegenerated) {
+        for ((arg,i) <- o.args.zipWithIndex) {
+          arg match {
+            case Def(FTpe(args, ret)) =>
+              stream.println()
+              emitWithIndent("val b_" + i + " = reifyEffects(" + opArgPrefix + i + ")", stream, 4)
+              emitWithIndent("val sb_" + i + " = summarizeEffects(b_" + i + ")", stream, 4)
+              summary += "sb_"+i
+            case _ =>
+          }
+        }
+      }
+      
+      def summarizeEffects(s: scala.collection.mutable.ArrayBuffer[String]): String = {
+        if (s.length == 0) ""
+        else {
+          val rest = summarizeEffects(s.tail)
+          if (rest == "") s.head            
+          else s.head + " andThen ((" + rest + " andThen " + s.head + ").star)"             
+        }
+      }
+      
+      def makeOpNodeNameWithModifiedArgs(o: Rep[DSLOp]) = {
+        makeOpNodeNameWithArgs(o, o => "(" + o.args.zipWithIndex.map(t => t._1 match {
+          case Def(FTpe(args, ret)) => "b_" + t._2
+          case _ => opArgPrefix + t._2
+        }).mkString(",") + ")")
+      }
+      
+      if (summary.length > 0) {
+        if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
+        emitWithIndent(makeEffectAnnotation(o.effect) + "(" + makeOpNodeNameWithModifiedArgs(o) + ", " + summarizeEffects(summary) + ")", stream, 4)
+      }
+      else {
+        stream.print("    " + makeEffectAnnotation(o.effect) + "(" + makeOpNodeNameWithArgs(o) + ")")
+      }
+      
+      emitWithIndent("}", stream, 2)
     }
     
     stream.println()
-    emitMirrors(tpe, ops, stream)
+    emitMirrors(ops, stream)
     stream.println()    
-    emitDeliteCollection(tpe, stream)      
+    emitDeliteCollection(ops.grp, stream)      
     stream.println("}")      
   }
   
-  def emitMirrors(tpe: Rep[DSLType], ops: DSLOps, stream: PrintWriter) {
+  def emitMirrors(ops: DSLOps, stream: PrintWriter) {
     emitBlockComment("Mirroring", stream, indent=2)
     stream.println("  override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = (e match {")
-    for (o <- ops.ops) {
+    for (o <- unique(ops.ops)) {
       // helpful identifiers
       val xformArgs = "(" + o.args.zipWithIndex.map(t => "f(" + opArgPrefix + t._2 + ")").mkString(",") + ")" 
-      val implicits = (o.tpeArgs.flatMap(t => t.ctxBounds.map(b => opIdentifierPrefix + "." + b.prefix + t.name)) ++ o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
+      val implicits = (o.tpeArgs.flatMap(t => t.ctxBounds.map(b => opIdentifierPrefix + "." + b.prefix + t.name)) ++ /*implicitArgsWithOverload(o)*/o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
       
       o.opTpe match {
         case `codegenerated` =>
-          stream.print("    case " + makeOpNodeNameWithArgs(tpe,o) + " => ")
-          // pure version uses smart constructor
-          stream.print(makeOpMethodName(tpe,o) + xformArgs)
-          stream.println("(mtype(manifest[A]), pos)")            
+          stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + " => ")
+          // pure version with no func args uses smart constructor
+          if (!hasFuncArgs(o)) {
+            stream.print(makeOpMethodName(o) + xformArgs)
+            stream.print("(" + implicits)          
+            // we may need to supply an explicit Overload parameter for the smart constructor
+            // relies on conventions established in implicitArgsWithOverload (e.g., guaranteed to always be the last implicit)
+            val id = nameClashId(o)
+            if (id != "") stream.print(",implicitly[Overloaded" + id + "]")  
+            stream.println(")")
+          }
+          else {
+            stream.print("reflectPure(" + makeOpNodeName(o) + xformArgs + "(" + implicits + "))")
+            stream.println("(mtype(manifest[A]), pos)")
+          }
+          
           // effectful version
-          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpNodeNameWithArgs(tpe,o) + ", u, es) => reflectMirrored(Reflect(" + makeOpNodeName(tpe,o) + xformArgs + "(" + implicits + ")")
+          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + ", u, es) => reflectMirrored(Reflect(" + makeOpNodeName(o) + xformArgs + "(" + implicits + ")")
           stream.print(", mapOver(f,u), f(es)))")
           stream.println("(mtype(manifest[A]))")
         case _:DeliteOpType => 
           // pure delite op version
-          stream.print("    case " + opIdentifierPrefix + "@" + makeOpNodeNameWithArgs(tpe,o) + " => ")
-          stream.print("reflectPure(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(tpe,o) + xformArgs + "(" + implicits + "))")
+          stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + " => ")
+          stream.print("reflectPure(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + "))")
           stream.println("(mtype(manifest[A]), pos)")
           // effectful delite op version
-          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpNodeNameWithArgs(tpe,o) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(tpe,o) + xformArgs + "(" + implicits + ")")
+          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + ")")
           stream.print(", mapOver(f,u), f(es)))")
           stream.println("(mtype(manifest[A]))")
       }        
@@ -120,46 +182,54 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println("  }).asInstanceOf[Exp[A]]")
   }
   
-  def emitDeliteCollection(tpe: Rep[DSLType], stream: PrintWriter) {
-    if (DeliteCollections.contains(tpe)) {
-      emitBlockComment("Delite collection", stream, indent=2)
-      val dc = DeliteCollections(tpe)        
-      val isTpe = "is"+tpe.name
-      def asTpe = "as"+tpe.name
-      stream.println("  def " + isTpe + "[A](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = isSubtype(x.tp.erasure,classOf["+tpe.name+"[A]])")
-      stream.println("  def " + asTpe + "[A](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = x.asInstanceOf[Exp["+tpe.name+"[A]]]")
-      stream.println()
-      stream.println("  override def dc_size[A:Manifest](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = {")
-      stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(tpe, dc.size) + "(" + asTpe + "(x))") 
-      stream.println("    else super.dc_size(x)")
-      stream.println("  }")
-      stream.println()
-      stream.println("  override def dc_apply[A:Manifest](x: Exp[DeliteCollection[A]], n: Exp[Int])(implicit ctx: SourceContext) = {")
-      stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(tpe, dc.apply) + "(" + asTpe + "(x), n)")
-      stream.println("    else super.dc_apply(x,n)")
-      stream.println("  }")
-      stream.println()
-      stream.println("  override def dc_update[A:Manifest](x: Exp[DeliteCollection[A]], n: Exp[Int], y: Exp[A])(implicit ctx: SourceContext) = {")
-      stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(tpe, dc.update) + "(" + asTpe + "(x), n, y)") 
-      stream.println("    else super.dc_update(x,n,y)")
-      stream.println("  }")
+  def emitDeliteCollection(grp: Rep[DSLGroup], stream: PrintWriter) {
+    try {
+      val tpe = grpAsTpe(grp)
+      if (DeliteCollections.contains(tpe)) {
+        emitBlockComment("Delite collection", stream, indent=2)
+        val dc = DeliteCollections(tpe)        
+        val isTpe = "is"+tpe.name
+        def asTpe = "as"+tpe.name
+        stream.println("  def " + isTpe + "[A](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = isSubtype(x.tp.erasure,classOf["+tpe.name+"[A]])")
+        stream.println("  def " + asTpe + "[A](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = x.asInstanceOf[Exp["+tpe.name+"[A]]]")
+        stream.println()
+        stream.println("  override def dc_size[A:Manifest](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = {")
+        stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dc.size) + "(" + asTpe + "(x))") 
+        stream.println("    else super.dc_size(x)")
+        stream.println("  }")
+        stream.println()
+        stream.println("  override def dc_apply[A:Manifest](x: Exp[DeliteCollection[A]], n: Exp[Int])(implicit ctx: SourceContext) = {")
+        stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dc.apply) + "(" + asTpe + "(x), n)")
+        stream.println("    else super.dc_apply(x,n)")
+        stream.println("  }")
+        stream.println()
+        stream.println("  override def dc_update[A:Manifest](x: Exp[DeliteCollection[A]], n: Exp[Int], y: Exp[A])(implicit ctx: SourceContext) = {")
+        stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dc.update) + "(" + asTpe + "(x), n, y)") 
+        stream.println("    else super.dc_update(x,n,y)")
+        stream.println("  }")
+      }
     }
+    catch { case _ => }
   }
   
-  def emitOpCodegen(tpe: Rep[DSLType], ops: DSLOps, stream: PrintWriter) {        
-    if (CodeGenRules(tpe).length > 0){
+  def emitOpCodegen(ops: DSLOps, stream: PrintWriter) {        
+    if (CodeGenRules(ops.grp).length > 0){
+      val uniqueOps = unique(ops.ops)
       emitBlockComment("Code generators", stream)   
       stream.println()
       for (g <- generators) { 
-        val rules = CodeGenRules(tpe).filter(_.generator == g)
+        val rules = CodeGenRules(ops.grp).filter(_.generator == g)
         if (rules.length > 0) {
-          stream.println("trait " + g.name + "Gen" + tpe.name + "Ops extends " + g.name + "GenFat {")
-          stream.println("  val IR: " + tpe.name + "OpsExp")
+          stream.println("trait " + g.name + "Gen" + ops.grp.name + "Ops extends " + g.name + "GenFat {")
+          stream.println("  val IR: " + ops.grp.name + "OpsExp")
           stream.println("  import IR._")
           stream.println()
           stream.println("  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {")
-          for (r <- rules) {
-            stream.println("    case " + opIdentifierPrefix + "@" + makeOpNodeNameWithArgs(r.tpe, r.op) + " => emitValDef(sym, " + r.rule + ")")
+          for (r <- rules if uniqueOps.contains(r.op)) {
+            if (r.isSimple)
+              stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(r.op) + " => emitValDef(sym, " + r.rule + ")")
+            else 
+              stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(r.op) + " => " + r.rule)
           }
           stream.println("    case _ => super.emitNode(sym, rhs)")
           stream.println("  }")

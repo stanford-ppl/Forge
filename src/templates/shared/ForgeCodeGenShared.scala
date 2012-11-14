@@ -10,7 +10,7 @@ import scala.virtualization.lms.internal.{GenericFatCodegen, GenericCodegen}
 
 import core._
 
-trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with BaseGenOps with BaseGenImports {  
+trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with BaseGenLifts with BaseGenOps with BaseGenImports {  
   val IR: ForgeApplicationRunner with ForgeExp  
   import IR._
   
@@ -30,9 +30,7 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     dslStream.println()
     emitApplicationRunnerBase(dslStream)
     dslStream.println()    
-    emitScalaPackageDefinitionsBase(lmsAppOps, lmsCompOps, dslStream)
-    dslStream.println()    
-    emitDSLPackageDefinitionsBase(OpsGrp.values.toList, lmsCompOps, dslStream)
+    emitDSLPackageDefinitionsBase(OpsGrp.values.toList, List(), dslStream)
     dslStream.println()
     dslStream.close()
   }  
@@ -41,16 +39,20 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     val opsDir = dslDir + File.separator + "ops"
     Directory(Path(opsDir)).createDirectory()
     
-    // 1 file per tpe, includes only abstract Ops
-    for ((tpe,ops) <- OpsGrp) {
-      val stream = new PrintWriter(new FileWriter(opsDir+File.separator+tpe.name+"Ops"+".scala"))
+    // 1 file per grp, includes only abstract Ops
+    for ((grp,ops) <- OpsGrp) {
+      val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"Ops"+".scala"))
       stream.println("package " + packageName + ".ops")
       stream.println()
       emitScalaReflectImports(stream)
       emitLMSImports(stream)
       emitDSLImports(stream)
       stream.println()
-      emitOpSyntax(tpe, ops, stream)        
+      if (Lifts.contains(grp)) {
+        emitLifts(grp, Lifts(grp), stream)
+        stream.println()
+      }
+      emitOpSyntax(ops, stream)        
       stream.close()
     }                
   }  

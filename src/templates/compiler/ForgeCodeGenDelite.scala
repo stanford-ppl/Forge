@@ -20,7 +20,13 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
   def makeEffectAnnotation(effect: EffectType) = effect match {
     case `pure` => "reflectPure"
     case `mutable` => "reflectMutable"
+    case `simple` => "reflectEffect"
     case write(args @ _*) => "reflectWrite(" + args.map(a => opArgPrefix + a).mkString(",") + ")"
+  }
+  
+  def blockify(a: Exp[Any]): String = a match {
+    case Def(FTpe(args,ret)) => "Block[" + quote(ret) + "]"
+    case _ => repify(a)
   }
   
   def emitDSLImplementation() = {
@@ -38,9 +44,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     dslStream.println()
     emitApplicationRunner(dslStream)
     dslStream.println()    
-    emitScalaPackageDefinitions(lmsAppOps, lmsCompOps, dslStream)
-    dslStream.println()    
-    emitDSLPackageDefinitions(OpsGrp.values.toList, lmsCompOps, dslStream)
+    emitDSLPackageDefinitions(OpsGrp.values.toList, List(), dslStream)
     dslStream.println()
     emitDSLCodeGeneratorPackageDefinitions(OpsGrp.values.toList, dslStream)
     dslStream.close()    
@@ -57,8 +61,8 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     Directory(Path(opsDir)).createDirectory()
     
     // 1 file per tpe, includes Ops, OpsExp, and Gen      
-    for ((tpe,ops) <- OpsGrp) {
-      val stream = new PrintWriter(new FileWriter(opsDir+File.separator+tpe.name+"OpsExp"+".scala"))
+    for ((grp,ops) <- OpsGrp) {
+      val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsExp"+".scala"))
       stream.println("package " + packageName + ".ops")
       stream.println()
       emitScalaReflectImports(stream)
@@ -66,9 +70,9 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
       emitDeliteOpsImports(stream)
       emitDSLImports(stream)
       stream.println()
-      emitOpExp(tpe, ops, stream)
+      emitOpExp(ops, stream)
       stream.println()
-      emitOpCodegen(tpe, ops, stream)        
+      emitOpCodegen(ops, stream)        
       stream.close()
     }                
   }    

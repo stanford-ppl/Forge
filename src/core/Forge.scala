@@ -9,8 +9,6 @@ import scala.virtualization.lms.internal.{GenericFatCodegen, GenericCodegen}
 
 trait ForgeApplication extends Forge with ForgeLift {
   def dslName: String
-  def lmsAppOps: List[LMSOps] = List()
-  def lmsCompOps: List[LMSOps] = List()
   def specification(): Rep[Unit]    
 }
 
@@ -38,15 +36,38 @@ trait ForgeScalaCodeGenPkg extends ScalaGenEffect
 /**
  * This the trait that every Forge application must extend.
  */
-trait Forge extends ForgeScalaOpsPkg with DerivativeTypes with Definitions with ForgeOps with SpecOps {
+trait Forge extends ForgeScalaOpsPkg with Definitions with ForgeOps with SpecOps {
   this: ForgeApplication =>
 }
 
 /**
  * These are the corresponding IR nodes for Forge.
  */
-trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with ForgeOpsExp with FieldOpsExp with SpecOpsExp {
+trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with DefinitionsExp with ForgeOpsExp with FieldOpsExp with SpecOpsExp {
   this: ForgeApplication =>
+  
+  // -- IR helpers
+  
+  def isPrimitiveType(t: Rep[DSLType]) = t match {
+    case `MInt` | `MDouble` | `MBoolean` | `MString` | `MUnit` => true
+    case _ => false
+  }
+  
+  def grpIsTpe(grp: Rep[DSLGroup]) = grp match {
+    case t@Def(Tpe(n,targs,s)) => true
+    case t@Def(TpeArg(n,ctx)) => true
+    case _ => false
+  }
+  def grpAsTpe(grp: Rep[DSLGroup]): Rep[DSLType] = grp match {
+    case t@Def(Tpe(n,targs,s)) => t.asInstanceOf[Rep[DSLType]]
+    case t@Def(TpeArg(n,ctx)) => t.asInstanceOf[Rep[DSLType]]
+    // case _ => err(grp.name + " is not a DSLType")
+  }
+  
+  def hasFuncArgs(o: Rep[DSLOp]) = o.args.exists(a => a match {
+    case Def(FTpe(args,ret)) => true
+    case _ => false
+  })  
 }
 
 trait ForgeUtilities {  
@@ -69,7 +90,26 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     
   def buildDir: String
   lazy val dslDir = buildDir + File.separator + "src" + File.separator + dsl.toLowerCase() + File.separator
-    
+      
+  // -- code gen helpers
+  
+  def varify(a: Exp[Any]): String = a match {
+    case Def(FTpe(args,ret)) => err("variables in function tpe")
+    case _ => "Var[" + quote(a) + "]" 
+  }
+  def repify(a: Exp[Any]): String = a match {
+    case Def(FTpe(args,ret)) => 
+      if (args == List(byName)) " => " + repify(ret)
+      else "(" + args.map(repify).mkString(",") + ") => " + repify(ret)        
+    case Def(Tpe("Var", arg, stage)) => repify(arg(0))
+    case _ => "Rep[" + quote(a) + "]"           
+  }
+  def repifySome(a: Exp[Any]): String = a match {  
+    case Def(Tpe(name, arg, `now`)) => quote(a)
+    case Def(Tpe("Var", arg, stage)) => varify(arg(0))
+    case _ => repify(a)
+  }
+  
   def makeTpeArgsWithBounds(args: List[Rep[TypeArg]]): String = {
     if (args.length < 1) return ""    
     val args2 = args.map { a => a.name + (if (a.ctxBounds != Nil) ":" + a.ctxBounds.map(_.name).mkString(":") else "") }
@@ -81,12 +121,9 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     "[" + args.map(_.name).mkString(",") + "]"
   }
   
-  def varify(a: Exp[Any]) = "Var[" + quote(a) + "]"
-  def repify(a: Exp[Any]) = "Rep[" + quote(a) + "]"
-  
   override def quote(x: Exp[Any]) : String = x match {
-    case Def(Tpe(s, args)) => s + makeTpeArgs(args)
-    case Def(TpeArg(s, ctx)) => s 
+    case Def(Tpe(s,args,stage)) => s + makeTpeArgs(args)
+    case Def(TpeArg(s,ctx)) => s 
     case _ => super.quote(x)
   }  
 }

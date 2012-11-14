@@ -24,7 +24,9 @@ trait BaseGenImports extends ForgeCodeGenBase {
   }
     
   def emitLMSImports(stream: PrintWriter) {
-    stream.println("import scala.virtualization.lms.common._")    
+    stream.println("import scala.virtualization.lms.common.{Base,BaseExp,EffectExp,BaseFatExp}")    
+    stream.println("import scala.virtualization.lms.common.{ScalaGenBase,ScalaGenEffect,ScalaGenFat}")    
+    stream.println("import scala.virtualization.lms.util._")
     stream.println("import scala.virtualization.lms.internal._")
   }
   
@@ -32,6 +34,7 @@ trait BaseGenImports extends ForgeCodeGenBase {
     // stream.println("import " + dsl.toLowerCase() + "._")
     stream.println("import " + dsl.toLowerCase() + ".shared._")
     stream.println("import " + dsl.toLowerCase() + ".shared.ops._")        
+    stream.println("import " + dsl.toLowerCase() + ".extern._")
   }  
   
   def emitAllImports(stream: PrintWriter) {

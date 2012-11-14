@@ -11,7 +11,7 @@ import scala.virtualization.lms.internal.{GenericFatCodegen, GenericCodegen}
 import core._
 import shared._
 
-trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages with BaseGenOps with LibGenImports {  
+trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages with BaseGenOps with LibGenImports with LibGenOps {  
   val IR: ForgeApplicationRunner with ForgeExp  
   import IR._
   
@@ -31,7 +31,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     dslStream.println()
     emitApplicationRunner(dslStream)
     dslStream.println()    
-    emitDSLPackageDefinitions(lmsAppOps, lmsCompOps, dslStream)
+    emitDSLPackageDefinitions(OpsGrp.values.toList, List(), dslStream)
     dslStream.println()    
     dslStream.close()
   }  
@@ -49,22 +49,32 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     grpStream.println()
     grpStream.print("trait " + dsl + "Classes extends ")
     var first = true
-    for ((tpe,ops) <- OpsGrp) {
-      val wrapper = tpe.name + "Wrapper"
+    for ((grp,ops) <- OpsGrp) {
+      val wrapper = grp.name + "Wrapper"
       if (first) grpStream.print(wrapper) else grpStream.print(" with " + wrapper)
+      first = false
       
-      val stream = new PrintWriter(new FileWriter(clsDir+File.separator+tpe.name+".scala"))            
+      val stream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+".scala"))            
       stream.println("package " + packageName + ".classes")
       emitScalaReflectImports(stream)
+      emitScalaMathImports(stream)      
       emitLMSImports(stream)
       emitDSLImports(stream)      
       stream.println()
       stream.println("trait " + wrapper + " {")
-      // TODO: call template to emit class definition for op, including methods
+      stream.println( "  this: " + dsl + "Base with " + dsl + "Classes => ")
+      stream.println()
+      emitClass(ops, stream)
       stream.println("}")
       stream.println()
       stream.close()
     }                
+    for (e <- Externs) {
+      grpStream.print(" with " + e.ops.grp.name + "Wrapper")
+    }    
+    grpStream.println("{")
+    grpStream.println("  this: " + dsl + "Lib => ")
+    grpStream.println("}")
     grpStream.println()
     grpStream.close()
   }    

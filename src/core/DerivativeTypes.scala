@@ -8,18 +8,12 @@ package core
  */
 
 trait DerivativeTypes {
-  this: Forge =>
+  this: ForgeExp =>
   
-  abstract class Ops {
-    def name: String
-    def exp = name + "Exp"
-    def opt = exp
-    def targets: List[CodeGenerator] = generators
-    def lift: Option[String] = None
-  }
-  
-  abstract class LMSOps extends Ops
-  abstract class DSLOps extends Ops {
+  abstract class DSLOps {
+    val grp: Rep[DSLGroup]
+    lazy val name = grp.name + "Ops"
     var ops = List[Rep[DSLOp]]()
-  }     
+    def targets: List[CodeGenerator] = generators
+  }
 }

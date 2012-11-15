@@ -28,42 +28,22 @@ trait ScalaOps extends ForgeApplication {
     val Misc = grp("Misc")
     
     val println = op (Misc) ("println", direct, List(), List(MString), MUnit, codegenerated, effect = simple)
-    codegen (println) ($cala, quote("println(" + println.quotedArg(0) + ")"))
+    codegen (println) ($cala, "println(" + println.quotedArg(0) + ")")
     
-    extern(grp("While"))
-    /*
-    val whileDo = op (Misc) ("__whileDo", direct, List(), List(MThunk(MBoolean),MThunk(MUnit)), MUnit, codegenerated, effect = simple)    
-    
-    // TODO: need some kind of templating engine 
-    // TODO: need syms for functions    
-    // TODO: how can we express this in a way that is reversible?
-    //  - need abstractions for stream.print, sym, emitBlock, getBlockResult...
-    codegen (whileDo) ($cala, (nl +
-      "      stream.print(\"val " + unquote("quote(sym)") + " = while ({\")" + nl +
-      "      emitBlock(" + opArgPrefix + 0 + ")" + nl + 
-      "      stream.print(quote(getBlockResult(" + opArgPrefix + 0 + ")))" + nl +
-      "      stream.print(\"}) {\")" + nl +
-      "      emitBlock(" + opArgPrefix + 1 + ")" + nl + 
-      "      stream.print(quote(getBlockResult(" + opArgPrefix + 1 + ")))" + nl +
-      "      stream.println(\"}\")"
-    ), isSimple = false)               
-    */
+    val whileDo = op (Misc) ("__whileDo", direct, List(), List(MThunk(MBoolean),MThunk(MUnit)), MUnit, codegenerated, effect = simple)        
+    val stream = ForgePrinter()    
+    codegen (whileDo) ($cala, stream.printLines(
+      "while ({",
+        blockResult(whileDo, 0),
+      "}) {",
+        blockResult(whileDo, 1),
+      "}"
+    ), isSimple = false)        
   }
   
   def variables() = {
     // lots of quirks in the LMS file, just plug in external implementation for now
-    extern(grp("Var"), withLift = true)
-    
-    /* 
-    val Var = grp("Variables")
-    
-    val T = tpePar("T")
-    val newVar1 = op (Var) ("__newVar", direct, List(T), List(T), MVar(T), codegenerated, effect = simple)
-    val pluseq = op (Var) ("+=", infix, List(T), List(MVar(T), T), MUnit, codegenerated, effect = write(0))
-    
-    codegen (newVar1) ($cala, "emitVarDef(sym.asInstanceOf[Sym[Variable[Any]]], quote(" + opArgPrefix + 0 + "))", isSimple = false)
-    codegen (pluseq) ($cala, quote(pluseq.quotedArg(0) + " += " + pluseq.quotedArg(1)))
-    */
+    extern(grp("Var"), withLift = true)    
   }
   
   def numerics() = {
@@ -74,8 +54,8 @@ trait ScalaOps extends ForgeApplication {
         
     val plus = op (Num) ("+", infix, List(T withBound TNumeric), List(T,T), T, codegenerated)    
     val times = op (Num) ("*", infix, List(T withBound TNumeric), List(T,T), T, codegenerated)    
-    codegen (plus) ($cala, quote(plus.quotedArg(0) + " + " + plus.quotedArg(1)))
-    codegen (times) ($cala, quote(times.quotedArg(0) + " * " + times.quotedArg(1)))
+    codegen (plus) ($cala, plus.quotedArg(0) + " + " + plus.quotedArg(1))
+    codegen (times) ($cala, times.quotedArg(0) + " * " + times.quotedArg(1))
   }
   
   def ordering() = {
@@ -85,8 +65,8 @@ trait ScalaOps extends ForgeApplication {
     val lt = op (Ord) ("<", infix, List(T withBound TOrdering), List(T,T), MBoolean, codegenerated)    
     val gt = op (Ord) (">", infix, List(T withBound TOrdering), List(T,T), MBoolean, codegenerated)    
     
-    codegen (lt) ($cala, quote(lt.quotedArg(0) + " < " + lt.quotedArg(1)))    
-    codegen (gt) ($cala, quote(gt.quotedArg(0) + " > " + gt.quotedArg(1)))    
+    codegen (lt) ($cala, lt.quotedArg(0) + " < " + lt.quotedArg(1))    
+    codegen (gt) ($cala, gt.quotedArg(0) + " > " + gt.quotedArg(1))
   }
   
   def strings() = {
@@ -115,15 +95,11 @@ trait ScalaOps extends ForgeApplication {
     val concat9 = op (Str) ("+", infix, List(), List(MString, CString), MString, codegenerated)
     val concat10 = op (Str) ("+", infix, List(), List(CString, MString), MString, codegenerated)
     
-    // testing type instances
-    // val VString = tpeInst(MVar(T), List(MString))
-    // val concat11 = op (Str) ("+", infix, List(), List(VString, VString), MString, codegenerated)
-    
     // TODO: we would like overloaded variants to possibly use the same codegen impl instead of being redundant here    
     // most of the concat codegens are not used, but it is not easy to tell which ones will "make it"
     // should overloading be more explicit in the spec to avoid this problem? (an 'overloaded' parameter?)
     // at the very least, we should check for inconsistent codegen rules (or impls) between overloaded variants that collapse to the same thing
-    def scalaStrConcat(o: Rep[DSLOp]) = quote(o.quotedArg(0)+".toString + " + o.quotedArg(1)+".toString")
+    def scalaStrConcat(o: Rep[DSLOp]) = o.quotedArg(0)+".toString + " + o.quotedArg(1)+".toString"
     codegen (concat) ($cala, scalaStrConcat(concat))
     codegen (concat2) ($cala, scalaStrConcat(concat2))
     codegen (concat3) ($cala, scalaStrConcat(concat3))
@@ -134,6 +110,5 @@ trait ScalaOps extends ForgeApplication {
     codegen (concat8) ($cala, scalaStrConcat(concat8))
     codegen (concat9) ($cala, scalaStrConcat(concat9))
     codegen (concat10) ($cala, scalaStrConcat(concat10))
-    // codegen (concat11) ($cala, scalaStrConcat(concat11))
   }
 }

@@ -22,32 +22,7 @@ import scala.virtualization.lms.util.OverloadHack
  */
 
 trait FieldOps extends Base with OverloadHack {
-  this: Forge =>
-  
-  /**
-   * DSLType
-   */  
-  // def infix_name(x: Rep[DSLType]): String
-  // def infix_tpePars(x: Rep[DSLType]): List[TpeArg]
-
-  /**
-   * DSLOp
-   */
-  // def infix_args(x: Rep[DSLOp]): List[Rep[DSLType]]
-  // def infix_tpe(x: Rep[DSLOp]): Rep[DSLType]
-  // def infix_name(x: Rep[DSLOp])(implicit o: Overloaded1): String
-  // def infix_style(x: Rep[DSLOp]): MethodType
-  // def infix_tpePars(x: Rep[DSLOp])(implicit o: Overloaded1): List[TpeArg]
-  // def infix_retTpe(x: Rep[DSLOp]): Rep[DSLType]
-  // def infix_opTpe(x: Rep[DSLOp]): OpType 
-  
-  /**
-   * CodeGenRule
-   */
-  // def infix_generator(x: Rep[CodeGenRule]): CodeGenerator 
-  // def infix_tpe(x: Rep[CodeGenRule])(implicit o: Overloaded1): Rep[DSLType]
-  // def infix_op(x: Rep[CodeGenRule]): Rep[DSLOp]
-  // def infix_rule(x: Rep[CodeGenRule]): String
+  this: Forge =>  
 }
 
 trait FieldOpsExp extends FieldOps {
@@ -57,11 +32,11 @@ trait FieldOpsExp extends FieldOps {
    * TypePar
    */
   def infix_ctxBounds(x: Rep[TypePar]): List[TypeClass] = x match {
-    case Def(TpeArg(name,ctx)) if (ctx.contains(TManifest)) => ctx
-    case Def(TpeArg(name,ctx)) => TManifest :: ctx
+    case Def(TpePar(name,ctx)) if (ctx.contains(TManifest)) => ctx
+    case Def(TpePar(name,ctx)) => TManifest :: ctx
   }
   def infix_name(x: Rep[TypePar]) = x match {
-    case Def(TpeArg(name,ctx)) => name
+    case Def(TpePar(name,ctx)) => name
   }  
   
   /**
@@ -71,18 +46,18 @@ trait FieldOpsExp extends FieldOps {
     case Def(Tpe(name,tpePars,stage)) => name
     case Def(TpeInst(t,args,stage)) => infix_name(t)(o)
     case Def(FTpe(args,ret)) => "Function"
-    case Def(TpeArg(name,ctx)) => name        
+    case Def(TpePar(name,ctx)) => name        
   }  
   def infix_tpePars(x: Exp[DSLType]) = x match {
     case Def(Tpe(s,tpePars,stage)) => tpePars
     case Def(TpeInst(t,args,stage)) => Nil
-    case Def(TpeArg(name,ctx)) => Nil
+    case Def(TpePar(name,ctx)) => Nil
     case Def(FTpe(args,ret)) => Nil
   }
   def infix_stage(x: Exp[DSLType]) = x match {
     case Def(Tpe(s,tpePars,stage)) => stage
     case Def(TpeInst(t,args,stage)) => stage
-    case Def(TpeArg(name,ctx)) => future
+    case Def(TpePar(name,ctx)) => future
     case Def(FTpe(args,ret)) => future
   }  
     

@@ -21,6 +21,15 @@ trait BaseGenOps extends ForgeCodeGenBase {
     else "Base"
   }
   
+  /**
+   * Quoting for formatted code-gen
+   */  
+   override def quote(x: Exp[Any]) : String = x match {
+     case Def(QuoteBlockResult(name,List(byName),ret)) => name
+     case Def(QuoteBlockResult(name,args,ret)) => name + makeArgs(args)
+     case _ => super.quote(x)
+   }  
+  
   // used with overloading
   // if after converting Ts and Vars to Reps there are duplicates, remove them   
   def unique(ops: List[Rep[DSLOp]]): List[Rep[DSLOp]] = {
@@ -39,9 +48,11 @@ trait BaseGenOps extends ForgeCodeGenBase {
   }
     
   // normal args
-  def makeOpArgs(o: Rep[DSLOp]) = "(" + o.args.zipWithIndex.map(t => opArgPrefix + t._2).mkString(",") + ")"
-  def makeOpFutureArgs(o: Rep[DSLOp]) = "(" + o.args.zipWithIndex.map(t => { val arg = opArgPrefix + t._2; if (t._1.stage == now) "unit("+arg+")" else arg }).mkString(",") + ")"
-  def makeOpArgsWithType(o: Rep[DSLOp], map: Rep[DSLType] => String = repify) = "(" + o.args.zipWithIndex.map(t => opArgPrefix + t._2 + ": " + map(t._1)).mkString(",") + ")"
+  def simpleArgName(t: (Rep[DSLType], Int)): String = opArgPrefix + t._2
+  def makeArgs(args: List[Rep[DSLType]], makeArgName: ((Rep[DSLType],Int)) => String = simpleArgName) = "(" + args.zipWithIndex.map(makeArgName).mkString(",") + ")"
+  def makeOpArgs(o: Rep[DSLOp]) = makeArgs(o.args)
+  def makeOpFutureArgs(o: Rep[DSLOp]) = makeArgs(o.args, t => { val arg = opArgPrefix + t._2; if (t._1.stage == now) "unit("+arg+")" else arg })
+  def makeOpArgsWithType(o: Rep[DSLOp], typify: Rep[DSLType] => String = repify) = makeArgs(o.args, t => opArgPrefix + t._2 + ": " + typify(t._1))
   def makeOpArgsWithNowType(o: Rep[DSLOp]) = makeOpArgsWithType(o, repifySome)
   
   // untyped implicit args
@@ -102,7 +113,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
   }
   
   // method names
-  def makeFullArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String) = makeTpeArgs(o.tpePars) + makeArgs(o) + (if (needDisambiguate(o)) makeOpImplicitArgsWithOverload(o) else "")  
+  def makeFullArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String) = makeTpePars(o.tpePars) + makeArgs(o) + (if (needDisambiguate(o)) makeOpImplicitArgsWithOverload(o) else "")  
   def makeOpMethodName(o: Rep[DSLOp]) = {
     // adding the nameClashId is another way to avoid chaining the Overload implicit, but the weird method names that result are confusing
     val i = "" //nameClashId(o)    
@@ -115,7 +126,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
   def makeOpMethodNameWithFutureArgs(o: Rep[DSLOp]) = makeOpMethodName(o) + makeFullArgs(o, makeOpFutureArgs)
     
   def makeSimpleMethod(o: Rep[DSLOp]) = {
-    "def " + o.name + makeTpeArgsWithBounds(o.tpePars) + makeOpArgsWithNowType(o) + makeOpImplicitArgsWithOverloadWithType(o) + " = " + makeOpMethodNameWithFutureArgs(o)
+    "def " + o.name + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithNowType(o) + makeOpImplicitArgsWithOverloadWithType(o) + " = " + makeOpMethodNameWithFutureArgs(o)
   }
   
   
@@ -168,23 +179,23 @@ trait BaseGenOps extends ForgeCodeGenBase {
       // set up a pimp-my-library style promotion
       // can only do this on DSL types
       val tpe = grpAsTpe(ops.grp)                
-      pimpStream.appendLine("  implicit def repTo" + tpe.name + "Ops" + makeTpeArgsWithBounds(tpe.tpePars) + "(x: " + repify(tpe) + ") = new " + tpe.name + "OpsCls(x)")
+      pimpStream.appendLine("  implicit def repTo" + tpe.name + "Ops" + makeTpeParsWithBounds(tpe.tpePars) + "(x: " + repify(tpe) + ") = new " + tpe.name + "OpsCls(x)")
       if (OpsGrp.exists(g => g._2.ops.exists(o => o.name == "__newVar"))) {
-        pimpStream.appendLine("  implicit def varTo" + tpe.name + "Ops" + makeTpeArgsWithBounds(tpe.tpePars) + "(x: " + varify(tpe) + ") = new " + tpe.name + "OpsCls(readVar(x))")
+        pimpStream.appendLine("  implicit def varTo" + tpe.name + "Ops" + makeTpeParsWithBounds(tpe.tpePars) + "(x: " + varify(tpe) + ") = new " + tpe.name + "OpsCls(readVar(x))")
       }
       pimpStream.appendLine("")
-      pimpStream.appendLine("  class " + tpe.name + "OpsCls" + makeTpeArgsWithBounds(tpe.tpePars) + "(val " + opArgPrefix + "0: " + repify(tpe) + ") {")
+      pimpStream.appendLine("  class " + tpe.name + "OpsCls" + makeTpeParsWithBounds(tpe.tpePars) + "(val " + opArgPrefix + "0: " + repify(tpe) + ") {")
     }
     
     for (o <- infixOps) {
       if (noInfixList.contains(o.name)) {
         val tpe = grpAsTpe(ops.grp)
         val otherArgs = "(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repifySome(t._1)).mkString(",") + ")"
-        pimpStream.appendLine("    def " + o.name + makeTpeArgsWithBounds(o.tpePars.diff(tpe.tpePars)) + otherArgs
+        pimpStream.appendLine("    def " + o.name + makeTpeParsWithBounds(o.tpePars.diff(tpe.tpePars)) + otherArgs
           + (makeImplicitArgsWithCtxBoundsWithType(implicitArgsWithOverload(o), o.tpePars, without = tpe.tpePars)) + " = " + makeOpMethodNameWithFutureArgs(o))
       }
       else {
-        stream.print("  def infix_" + o.name + makeTpeArgsWithBounds(o.tpePars))
+        stream.print("  def infix_" + o.name + makeTpeParsWithBounds(o.tpePars))
         stream.print(makeOpArgsWithNowType(o))
         stream.print(makeOpImplicitArgsWithOverloadWithType(o))
         stream.println(" = " + makeOpMethodNameWithFutureArgs(o))        
@@ -199,7 +210,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     
     // abstract methods
     for (o <- unique(ops.ops)) {
-      stream.print("  def " + makeOpMethodName(o) + makeTpeArgsWithBounds(o.tpePars))
+      stream.print("  def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars))
       stream.print(makeOpArgsWithType(o))
       stream.print(makeOpImplicitArgsWithOverloadWithType(o) + ": " + repify(o.retTpe))
       stream.println()

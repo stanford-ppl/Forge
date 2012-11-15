@@ -10,6 +10,7 @@ import scala.virtualization.lms.internal.{GenericFatCodegen, GenericCodegen}
 
 import core._
 import shared._
+import Utilities._
 
 trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with DeliteGenDataStructures with DeliteGenOps with DeliteGenImports {  
   val IR: ForgeApplicationRunner with ForgeExp  
@@ -28,7 +29,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     case Def(FTpe(args,ret)) => "Block[" + quote(ret) + "]"
     case _ => repify(a)
   }
-  
+    
   def emitDSLImplementation() = {
     Directory(Path(dslDir)).createDirectory()    
     emitDSLDefinition()

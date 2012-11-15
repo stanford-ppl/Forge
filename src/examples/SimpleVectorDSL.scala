@@ -52,10 +52,10 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     /**
      * Code generators
      */
-    codegen (vnew) ($cala, quote("new "+vnew.tpeName+"["+vnew.tpeInstance(0)+"]("+vnew.quotedArg(0)+", new Array["+vnew.tpeInstance(0)+"]("+vnew.quotedArg(0)+"))"))
-    codegen (vlength) ($cala, quote(vapply.quotedArg(0) + "._length"))
-    codegen (vapply) ($cala, quote(vapply.quotedArg(0) + "._data.apply(" + vapply.quotedArg(1) + ")"))
-    codegen (vupdate) ($cala, quote(vupdate.quotedArg(0) + "._data.update(" + vupdate.quotedArg(1) + ", " + vupdate.quotedArg(2) + ")"))
+    codegen (vnew) ($cala, "new "+vnew.tpeName+"["+vnew.tpeInstance(0)+"]("+vnew.quotedArg(0)+", new Array["+vnew.tpeInstance(0)+"]("+vnew.quotedArg(0)+"))")
+    codegen (vlength) ($cala, vapply.quotedArg(0) + "._length")
+    codegen (vapply) ($cala, vapply.quotedArg(0) + "._data.apply(" + vapply.quotedArg(1) + ")")
+    codegen (vupdate) ($cala, vupdate.quotedArg(0) + "._data.update(" + vupdate.quotedArg(1) + ", " + vupdate.quotedArg(2) + ")")
         
     ()
   }

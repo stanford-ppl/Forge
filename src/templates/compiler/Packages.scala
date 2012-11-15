@@ -49,7 +49,7 @@ trait DeliteGenPackages extends BaseGenPackages {
       if (OpsGrp.contains(tpe) && !isPrimitiveType(tpe)) {
         stream.print("  abstract class " + quote(tpe))
         if (DeliteCollections.contains(tpe)) stream.println(" extends DeliteCollection[" + DeliteCollections(tpe).tpePar.name + "]") else stream.println()
-        stream.println("  def m_" + tpe.name + makeTpeArgsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")      
+        stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")      
       }
     }
     stream.println()

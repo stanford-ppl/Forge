@@ -11,30 +11,33 @@ trait ForgeOps extends Base {
   this: Forge =>
     
   def grp(name: String) = forge_grp(name)  
-  def tpePar(name: String, ctxBounds: List[TypeClass] = List()) = forge_tpearg(name, ctxBounds) // TODO: type bounds
+  def tpePar(name: String, ctxBounds: List[TypeClass] = List()) = forge_tpepar(name, ctxBounds) // TODO: type bounds
   def tpe(name: String, tpePars: List[Rep[TypePar]] = List(), stage: StageTag = future) = forge_tpe(name, tpePars, stage)
   def tpeInst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]] = List(), stage: StageTag = future) = forge_tpeinst(hkTpe, tpeArgs, stage)
   def ftpe(args: List[Rep[DSLType]], ret: Rep[DSLType]) = forge_ftpe(args, ret)
   def lift(grp: Rep[DSLGroup])(tpe: Rep[DSLType]) = forge_lift(grp, tpe)
   def data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: (String, Rep[DSLType])*) = forge_data(tpe, tpePars, fields)
   def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = forge_op(grp,name,style,tpePars,args,implicitArgs,retTpe,opTpe,effect)
-  def codegen(op: Rep[DSLOp])(generator: CodeGenerator, rule: String, isSimple: Boolean = true) = forge_codegen(op,generator,rule,isSimple)
+  def codegen(op: Rep[DSLOp])(generator: CodeGenerator, rule: Rep[String], isSimple: Boolean = true) = forge_codegen(op,generator,rule,isSimple)
   def extern(grp: Rep[DSLGroup], withLift: Boolean = false, targets: List[CodeGenerator] = generators) = forge_extern(grp, withLift, targets)
+  
+  def infix_withBound(a: Rep[TypePar], b: TypeClass) = forge_withBound(a,b)
     
   def infix_is(tpe: Rep[DSLType], dc: DeliteCollection) = forge_isdelitecollection(tpe, dc)  
   case class DeliteCollection(val tpePar: Rep[TypePar], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp])
 
   def forge_grp(name: String): Rep[DSLGroup]  
-  def forge_tpearg(name: String, ctxBounds: List[TypeClass]): Rep[TypePar]
+  def forge_tpepar(name: String, ctxBounds: List[TypeClass]): Rep[TypePar]
   def forge_tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag): Rep[DSLType]    
   def forge_tpeinst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]], stage: StageTag): Rep[DSLType]    
   def forge_ftpe(args: List[Rep[DSLType]], ret: Rep[DSLType]): Rep[DSLType]
   def forge_lift(grp: Rep[DSLGroup], tpe: Rep[DSLType]): Rep[Unit]
   def forge_data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]  
   def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLType]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType): Rep[DSLOp]
-  def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: String, isSimple: Boolean): Rep[CodeGenRule]
+  def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String], isSimple: Boolean): Rep[CodeGenRule]
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
   
+  def forge_withBound(a: Rep[TypePar], b: TypeClass): Rep[TypePar]
   def forge_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection): Rep[Unit]
 }
 
@@ -61,11 +64,14 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   
   def forge_grp(name: String) = Grp(name)
   
-  /* TpeArg represents a named type parameter for another DSLType */
+  /* TpePar represents a named type parameter for another DSLType */
   // no higher-kinded fun yet
-  case class TpeArg(name: String, ctxBounds: List[TypeClass]) extends Def[TypePar]
+  case class TpePar(name: String, ctxBounds: List[TypeClass]) extends Def[TypePar]
    
-  def forge_tpearg(name: String, ctxBounds: List[TypeClass]) = TpeArg(name, ctxBounds)
+  def forge_tpepar(name: String, ctxBounds: List[TypeClass]) = TpePar(name, ctxBounds)
+  
+  /* Adds a bound to a type parameter by constructing a new type parameter */
+  def forge_withBound(a: Rep[TypePar], b: TypeClass) = tpePar(a.name, b :: a.ctxBounds)
    
   /* A DSLType */    
   case class Tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag) extends Def[DSLType]
@@ -121,9 +127,9 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   }
   
   /* A code gen rule - this is the imperative code defining how to implement a particular op */
-  case class CodeGenDecl(op: Rep[DSLOp], generator: CodeGenerator, rule: String, isSimple: Boolean) extends Def[CodeGenRule]
+  case class CodeGenDecl(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String], isSimple: Boolean) extends Def[CodeGenRule]
   
-  def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: String, isSimple: Boolean) = {
+  def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String], isSimple: Boolean) = {
     val c = CodeGenDecl(op, generator, rule, isSimple)
     if (CodeGenRules.get(op.grp).exists(_.exists(_.op == op))) err("multiple code generators declared for op " + op.grp + op.name)
     
@@ -131,7 +137,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
     buf += c
     c
   }
-  
+    
   /* Establishes that the given tpe implements the DeliteCollection interface */
   def forge_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection) = {
     // verify the dc functions match our expectations

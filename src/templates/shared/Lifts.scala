@@ -23,8 +23,8 @@ trait BaseGenLifts extends ForgeCodeGenBase {
       stream.print("  implicit def " + grp.name + tpe.name + "ToRep")
       // tpe could be a type arg!       
       tpe match {
-        case Def(TpeArg(n,b)) => stream.print(makeTpeArgsWithBounds(List(tpe.asInstanceOf[Exp[TypePar]])))
-        case _ => stream.print(makeTpeArgsWithBounds(tpe.tpePars))         
+        case Def(TpePar(n,b)) => stream.print(makeTpeParsWithBounds(List(tpe.asInstanceOf[Exp[TypePar]])))
+        case _ => stream.print(makeTpeParsWithBounds(tpe.tpePars))         
       }
       stream.println("(x: " + quote(tpe) + ") = unit(x)")
     }

@@ -7,6 +7,8 @@ import scala.reflect.SourceContext
 import scala.virtualization.lms.common._
 import scala.virtualization.lms.internal.{GenericFatCodegen, GenericCodegen}
 
+import format._
+
 trait ForgeApplication extends Forge with ForgeLift {
   def dslName: String
   def specification(): Rep[Unit]    
@@ -36,14 +38,14 @@ trait ForgeScalaCodeGenPkg extends ScalaGenEffect
 /**
  * This the trait that every Forge application must extend.
  */
-trait Forge extends ForgeScalaOpsPkg with Definitions with ForgeOps with SpecOps {
+trait Forge extends ForgeScalaOpsPkg with Definitions with ForgeOps with FieldOps with QuoteOps with PrinterOps {
   this: ForgeApplication =>
 }
 
 /**
  * These are the corresponding IR nodes for Forge.
  */
-trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with DefinitionsExp with ForgeOpsExp with FieldOpsExp with SpecOpsExp {
+trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with DefinitionsExp with ForgeOpsExp with FieldOpsExp with QuoteOpsExp with PrinterOpsExp {
   this: ForgeApplication =>
   
   // -- IR helpers
@@ -56,13 +58,13 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   def grpIsTpe(grp: Rep[DSLGroup]) = grp match {
     case Def(Tpe(n,targs,s)) => true
     case Def(TpeInst(t,args,s)) => true
-    case Def(TpeArg(n,ctx)) => true
+    case Def(TpePar(n,ctx)) => true
     case _ => false
   }
   def grpAsTpe(grp: Rep[DSLGroup]): Rep[DSLType] = grp match {
     case t@Def(Tpe(n,targs,s)) => t.asInstanceOf[Rep[DSLType]]
     case t@Def(TpeInst(hk,args,s)) => t.asInstanceOf[Rep[DSLType]]
-    case t@Def(TpeArg(n,ctx)) => t.asInstanceOf[Rep[DSLType]]
+    case t@Def(TpePar(n,ctx)) => t.asInstanceOf[Rep[DSLType]]
     // case _ => err(grp.name + " is not a DSLType")
   }
   
@@ -114,20 +116,20 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     case _ => repify(a)
   }
   
-  def makeTpeArgsWithBounds(args: List[Rep[TypePar]]): String = {
+  def makeTpeParsWithBounds(args: List[Rep[TypePar]]): String = {
     if (args.length < 1) return ""    
     val args2 = args.map { a => a.name + (if (a.ctxBounds != Nil) ":" + a.ctxBounds.map(_.name).mkString(":") else "") }
     "[" + args2.mkString(",") + "]"
   }  
-  def makeTpeArgs(args: List[Rep[TypePar]]): String = {
+  def makeTpePars(args: List[Rep[TypePar]]): String = {
     if (args.length < 1) return ""
     "[" + args.map(_.name).mkString(",") + "]"
   }
   
   override def quote(x: Exp[Any]) : String = x match {
-    case Def(Tpe(s,args,stage)) => s + makeTpeArgs(args)
+    case Def(Tpe(s,args,stage)) => s + makeTpePars(args)
     case Def(TpeInst(t,args,s)) => t.name + "[" + args.map(quote).mkString(",") + "]"
-    case Def(TpeArg(s,ctx)) => s 
+    case Def(TpePar(s,ctx)) => s 
     case _ => super.quote(x)
   }  
 }

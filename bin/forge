@@ -9,7 +9,7 @@ import os, sys
 import math
 
 USER_HOME = os.getenv("HOME")
-META_HOME = os.getenv("META_HOME")
+FORGE_HOME = os.getenv("FORGE_HOME")
 LMS_HOME = os.getenv("LMS_HOME")
 SCALA_VIRT_HOME = os.getenv("SCALA_VIRT_HOME")
 JAVA_HOME = os.getenv("JAVA_HOME")
@@ -28,13 +28,13 @@ def warn(s):
 def main():
     usage = "usage: %prog <dsl runner> [staging args] [options]"
     parser = OptionParser(usage)
-    parser.add_option("-v", "--verbose", dest="verbose", action="store_true", default=False, help="print metac environment settings")
+    parser.add_option("-v", "--verbose", dest="verbose", action="store_true", default=False, help="print forge environment settings")
     parser.add_option("--nb", dest="no_blas", action="store_true", default=False, help="disable blas calls")
     parser.add_option("-d", "--dest", action="store", dest="build_dir", default=os.getenv("PWD"), help="output location for generated files")
 
     (opts, args) = parser.parse_args()
     if len(args) < 1:
-        parser.error("a dsl runner must be passed to metac as an argument")
+        parser.error("a dsl runner must be passed to forge as an argument")
     
     initialize()
     checkEnv()
@@ -44,20 +44,20 @@ def initialize():
     pass
 
 def checkEnv():
-    global META_HOME
+    global FORGE_HOME
     global USER_HOME
     global JAVA_HOME
     global SCALA_VIRT_HOME
     global LMS_HOME
      
-    if META_HOME is None:
+    if FORGE_HOME is None:
         #try to check if it is the current directory
         script_path = os.path.dirname(__file__)
         cand_home = os.path.split(script_path)[0]
-        if os.path.isfile(cand_home + "/meta.key"):
-            META_HOME = cand_home
+        if os.path.isfile(cand_home + "/forge.key"):
+            FORGE_HOME = cand_home
         else:
-            err("The META_HOME environment variable must be defined") 
+            err("The FORGE_HOME environment variable must be defined") 
 
     if JAVA_HOME is None:
         err("The JAVA_HOME environment variable must be defined.")
@@ -69,7 +69,7 @@ def checkEnv():
         SCALA_VIRT_HOME = scala_virt_home 
     
     if LMS_HOME is None:
-          lms_home = META_HOME + "/lib_managed/jars/EPFL/" + lms_version + "/"
+          lms_home = FORGE_HOME + "/lib_managed/jars/EPFL/" + lms_version + "/"
           if not os.path.isdir(lms_home):
               err("couldn't find the LMS library at: " + lms_home + ". Please set the LMS_HOME environment variable.")
           LMS_HOME = lms_home
@@ -77,7 +77,7 @@ def checkEnv():
 def printEnv():
     print("======== REQUIRED METADSL ENVIRONMENT VARIABLES =========")
     print("USER_HOME = " + USER_HOME)
-    print("META_HOME = " + META_HOME)
+    print("FORGE_HOME = " + FORGE_HOME)
     print("JAVA_HOME = " + JAVA_HOME)
     print("SCALA_VIRT_HOME = " + SCALA_VIRT_HOME) 
     print("LMS_HOME = " + LMS_HOME)
@@ -89,7 +89,7 @@ def stage(runner, params, opts):
     #add classpaths 
     cp = " -cp "
     cp = cp + LMS_HOME + "/*" + os.pathsep
-    cp = cp + META_HOME + "/target/" + scala_major_id + "/classes" + os.pathsep
+    cp = cp + FORGE_HOME + "/target/" + scala_major_id + "/classes" + os.pathsep
     
     #scala-virt cp
     cp = cp + SCALA_VIRT_HOME + "/scala-library.jar" + os.pathsep

@@ -1,0 +1,22 @@
+#!/usr/bin/env python
+
+import os, sys
+from sys import argv
+
+import delitecommon
+
+## a forwarder to the delite script in DELITE_HOME
+def main():  
+    usage = "usage: %prog <dsl runner> [delite args]"
+
+    if len(argv) < 2:
+        exit("a dsl runner must be passed as an argument")
+ 
+    dslRunner = argv[1]
+    delitecommon.checkDeliteEnv()
+
+    DELITE_HOME = delitecommon.DELITE_HOME
+    os.system(DELITE_HOME + "/bin/delite " + dslRunner + " " + " ".join(argv[2:len(argv)]))
+
+if __name__ == "__main__":
+    main()

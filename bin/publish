@@ -1,10 +1,134 @@
-#!/bin/bash
+#!/usr/bin/env python
 
-echo "sbt compile"
-sbt compile
-echo "forge ppl.dsl.forge.examples.SimpleVectorDSLRunner"
-forge ppl.dsl.forge.examples.SimpleVectorDSLRunner
-echo "rm -rf ../delite2/dsls/simplevector"
-rm -rf ../delite2/dsls/simplevector
-echo "cp -r build/simplevector ../delite2/dsls/"
-cp -r build/simplevector ../delite2/dsls/
+from optparse import OptionParser
+from time import localtime, strftime
+from string import *
+import ConfigParser
+import os, sys, shutil
+import stat
+import math
+
+FORGE_HOME = os.getenv("FORGE_HOME")
+FORGE_GENERATED = "build" # TODO
+
+def err(s):
+    exit("error: " + s)
+
+def warn(s):
+    print("warn: " + s)
+
+def main():
+    usage = "usage: %prog <dsl name> [options]"
+    parser = OptionParser(usage)
+    parser.add_option("-d", "--dest", action="store", dest="build_dir", default=os.getenv("PWD")+"/published/", help="directory to publish generated DSL")
+
+    (opts, args) = parser.parse_args()
+    if len(args) < 1:
+        parser.error("a dsl name must be passed to publish as an argument")
+    
+    initialize()
+    checkEnv()
+    publish(args[0], opts)
+ 
+def initialize():
+    pass
+
+def checkEnv():
+    global FORGE_HOME
+
+    if FORGE_HOME is None:
+        #try to check if it is the current directory
+        script_path = os.path.dirname(__file__)
+        cand_home = os.path.split(script_path)[0]
+        if os.path.isfile(cand_home + "/forge.key"):
+            FORGE_HOME = cand_home
+        else:
+            err("The FORGE_HOME environment variable must be defined") 
+ 
+def printEnv():
+    print("======== REQUIRED FORGE PUBLISH ENVIRONMENT VARIABLES =========")
+    print("FORGE_HOME = " + FORGE_HOME)
+
+def sbtBuildFile(dsl):
+    s = Template("""
+import sbt._
+import Keys._
+
+object ${dslName}Build extends Build {
+  val virtualization_lms_core = "EPFL" % "lms_2.10" % "0.2"
+  val delite_framework = "stanford-ppl" % "framework_2.10" % "0.1-SNAPSHOT"
+  val delite_runtime = "stanford-ppl" % "runtime_2.10" % "0.1-SNAPSHOT"
+
+  val virtScala = "2.10.0-M1-virtualized" 
+  val virtBuildSettingsBase = Defaults.defaultSettings ++ Seq(
+    organization := "stanford-ppl",
+    scalaOrganization := "org.scala-lang",
+    scalaVersion := virtScala,
+    publishArtifact in (Compile, packageDoc) := false,
+    libraryDependencies += virtualization_lms_core,
+    libraryDependencies += delite_framework,
+    libraryDependencies += delite_runtime,
+    // needed for scala.tools, which is apparently not included in sbt's built in version
+    libraryDependencies += "org.scala-lang" % "scala-library" % virtScala,
+    libraryDependencies += "org.scala-lang" % "scala-compiler" % virtScala,
+    libraryDependencies += "org.apache.commons" % "commons-math" % "2.2",
+    // used in delitec to access jars
+    retrieveManaged := true,
+    scalacOptions += "-Yno-generic-signatures",
+    scalacOptions += "-Yvirtualize"
+  )
+
+  val virtBuildSettings = virtBuildSettingsBase ++ Seq(
+    scalaSource in Compile <<= baseDirectory(_ / "src")
+  )
+
+
+  // build targets
+  lazy val _${dslName} = Project("${dslName}", file("${dslName}vector"), settings = virtBuildSettings) dependsOn(${dslName}Apps)
+  lazy val ${dslName}Extern = Project("${dslName}-extern", file("extern"), settings = virtBuildSettings)
+  lazy val ${dslName}Shared = Project("${dslName}-shared", file("shared"), settings = virtBuildSettings) dependsOn(${dslName}Extern)
+  lazy val ${dslName}Comp = Project("${dslName}-comp", file("compiler"), settings = virtBuildSettings) dependsOn(${dslName}Shared)
+  lazy val ${dslName}Lib = Project("${dslName}-lib", file("library"), settings = virtBuildSettings) dependsOn(${dslName}Shared)
+
+  lazy val ${dslName}Apps = Project("${dslName}-apps", file("apps"), settings = virtBuildSettings) dependsOn(${dslName}Comp, ${dslName}Lib)
+}
+""")
+    return s.substitute(dslName=dsl)
+ 
+def publish(dsl, opts):
+    if not os.path.isdir(FORGE_HOME + "/" + FORGE_GENERATED + "/" + dsl):
+        err("could not find generated DSL " + dsl + ". (did you forget to run forge?)")
+
+    build_dir = opts.build_dir + "/" + dsl + "/"
+
+    print "== Publishing " + dsl + " to " + build_dir
+    if os.path.exists(build_dir):
+        shutil.rmtree(build_dir)
+
+    # source code
+    shutil.copytree(FORGE_GENERATED + "/" + dsl, build_dir)
+    shutil.copytree(FORGE_HOME + "/extern/" + dsl, build_dir + "/extern/")
+    shutil.copytree(FORGE_HOME + "/apps/" + dsl, build_dir + "/apps/")
+
+    # sbt project
+    os.mkdir(build_dir + "/project/")
+    buildFile = open(build_dir + "/project/Build.scala", 'w')
+    buildFile.write(sbtBuildFile(dsl))
+    buildFile.close()
+    
+    # executable scripts
+    os.mkdir(build_dir + "/bin/")
+    out_delitec = build_dir+"/bin/delitec"
+    shutil.copyfile(FORGE_HOME + "/static/delitec-wrapper", out_delitec)
+    os.chmod(out_delitec, stat.S_IXUSR | os.stat(out_delitec)[stat.ST_MODE])
+
+    out_delite = build_dir+"/bin/delite"
+    shutil.copyfile(FORGE_HOME + "/static/delite-wrapper", out_delite)
+    os.chmod(out_delite, stat.S_IXUSR | os.stat(out_delite)[stat.ST_MODE])
+
+    shutil.copyfile(FORGE_HOME + "/static/delitecommon-wrapper.py", build_dir+"/bin/delitecommon.py")
+
+    print "  Finished. Don't forget to run 'sbt publish-local' from your DELITE_HOME for the framework and runtime modules before compiling your new DSL."
+  
+if __name__ == "__main__":
+    main()

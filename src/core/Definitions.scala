@@ -15,6 +15,7 @@ trait Definitions {
    * Built-in types
    */  
   
+  // concrete types (M stands for "Meta")
   lazy val MAny = tpe("Any")
   lazy val MInt = tpe("Int")
   lazy val MDouble = tpe("Double")
@@ -24,9 +25,12 @@ trait Definitions {
   lazy val byName = tpe("Thunk")
   def MThunk(ret: Rep[DSLType]) = ftpe(List(byName), ret)
   def MFunction(args: List[Rep[DSLType]], ret: Rep[DSLType]) = ftpe(args,ret)  
-  def MVar(tpePar: Rep[TypePar]) = tpe("Var", List(tpePar)) 
-  def MArray(tpePar: Rep[TypePar]) = tpe("Array", List(tpePar))   
   lazy val MSourceContext = tpe("SourceContext")
+  
+  // generic types
+  // should these return a different Forge type (e.g. Rep[TypeConstructor] or Rep[GenericType]) than concrete types?
+  def GVar(tpePar: Rep[TypePar]) = tpe("Var", List(tpePar)) 
+  def GArray(tpePar: Rep[TypePar]) = tpe("Array", List(tpePar))     
   
   /**
    * stage tags - only 2 stages

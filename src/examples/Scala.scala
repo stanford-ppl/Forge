@@ -82,14 +82,14 @@ trait ScalaOps extends ForgeApplication {
     // maps to Rep[String], Rep[Any]
     val concat = op (Str) ("+", infix, List(T), List(CString, T), MString, codegenerated)
     val concat2 = op (Str) ("+", infix, List(T), List(MString, T), MString, codegenerated)
-    val concat3 = op (Str) ("+", infix, List(T), List(CString, MVar(T)), MString, codegenerated)
-    val concat4 = op (Str) ("+", infix, List(T), List(MString, MVar(T)), MString, codegenerated)
+    val concat3 = op (Str) ("+", infix, List(T), List(CString, GVar(T)), MString, codegenerated)
+    val concat4 = op (Str) ("+", infix, List(T), List(MString, GVar(T)), MString, codegenerated)
     
     // Rep[Any], Rep[String]
     val concat5 = op (Str) ("+", infix, List(T), List(T, CString), MString, codegenerated)
     val concat6 = op (Str) ("+", infix, List(T), List(T, MString), MString, codegenerated)
-    val concat7 = op (Str) ("+", infix, List(T), List(MVar(T), CString), MString, codegenerated)
-    val concat8 = op (Str) ("+", infix, List(T), List(MVar(T), MString), MString, codegenerated)
+    val concat7 = op (Str) ("+", infix, List(T), List(GVar(T), CString), MString, codegenerated)
+    val concat8 = op (Str) ("+", infix, List(T), List(GVar(T), MString), MString, codegenerated)
     
     // Rep[String], Rep[String]
     val concat9 = op (Str) ("+", infix, List(), List(MString, CString), MString, codegenerated)

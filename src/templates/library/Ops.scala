@@ -49,7 +49,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     val rules = CodeGenRules(o.grp)
     o.opTpe match {
       case `codegenerated` => 
-        emitWithIndent(inline(o, quote(rules.find(_.op == o).get.rule)), stream, indent) 
+        val rule = rules.find(_.op == o).map(_.rule).getOrElse(err("could not find codegen rule for op: " + o.name))
+        emitWithIndent(inline(o, quote(rule)), stream, indent) 
       case zip:Zip =>
         check(zip, o)          
         val dc = DeliteCollections(o.args.apply(0))        
@@ -74,8 +75,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       stream.println()
       stream.println(makeFieldsWithInitArgs(data))
       for (o <- unique(ops.ops) if o.style == infix) {       
-        stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.tail))
-        stream.print("(" + o.args.tail.zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repify(t._1)).mkString(",") + ")") 
+        stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
+        stream.print("(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repify(t._1)).mkString(",") + ")") 
         stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = data.tpePars))
         stream.println(" = {")
         // cheat a little bit for consistency: the codegen rule may refer to this arg
@@ -94,7 +95,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       stream.println(" = {")      
       o.style match {
         case `static` => emitOp(o, stream, indent=4)
-        case `infix` if grpIsTpe(ops.grp) => emitWithIndent(opArgPrefix + 0 + "." + o.name + "(" + o.args.tail.zipWithIndex.map(t => opArgPrefix + (t._2+1)).mkString(",") + ")", stream, 4)
+        case `infix` if grpIsTpe(ops.grp) => emitWithIndent(opArgPrefix + 0 + "." + o.name + "(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1)).mkString(",") + ")", stream, 4)
         case `infix` => emitOp(o, stream, indent=4)
         case `direct` => emitOp(o, stream, indent=4)        
       }

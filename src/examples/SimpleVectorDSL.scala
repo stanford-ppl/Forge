@@ -30,7 +30,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     /**
      * Data structures
      */
-    data(Vector, List(T), ("_length", MInt), ("_data", MArray(T)))
+    data(Vector, List(T), ("_length", MInt), ("_data", GArray(T)))
         
     /**
      * Ops
@@ -52,11 +52,14 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     /**
      * Code generators
      */
+      
+    // TODO: how do we refer to other methods or codegenerators inside a particular codegen impl? e.g. vfoo uses vlength
+    //  -- perhaps related to SingleTask question
+   
     codegen (vnew) ($cala, "new "+vnew.tpeName+"["+vnew.tpeInstance(0)+"]("+vnew.quotedArg(0)+", new Array["+vnew.tpeInstance(0)+"]("+vnew.quotedArg(0)+"))")
     codegen (vlength) ($cala, vapply.quotedArg(0) + "._length")
     codegen (vapply) ($cala, vapply.quotedArg(0) + "._data.apply(" + vapply.quotedArg(1) + ")")
     codegen (vupdate) ($cala, vupdate.quotedArg(0) + "._data.update(" + vupdate.quotedArg(1) + ", " + vupdate.quotedArg(2) + ")")
-        
     ()
   }
 }

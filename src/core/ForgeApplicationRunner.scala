@@ -55,6 +55,6 @@ trait ForgeApplicationRunner extends ForgeApplication with ForgeExp {
       c.emitDSLImplementation()
     }
     
-    info("DSL generation complete. Please run ... to compile the generated files against Delite and check for errors.")    
+    info("DSL generation complete. Please run publish and compile the generated files against Delite to check for errors.")    
   }  
 }

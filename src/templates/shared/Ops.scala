@@ -24,6 +24,12 @@ trait BaseGenOps extends ForgeCodeGenBase {
   /**
    * Quoting for formatted code-gen
    */  
+      
+   def replaceWildcards(s: String) = {
+     // currently only 1 wildcard
+     s.replaceAll(qu, "\"")
+   }
+   
    override def quote(x: Exp[Any]) : String = x match {
      case Def(QuoteBlockResult(name,List(byName),ret)) => name
      case Def(QuoteBlockResult(name,args,ret)) => name + makeArgs(args)

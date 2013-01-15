@@ -10,6 +10,7 @@ trait Definitions {
   val opIdentifierPrefix = "mn"
   val opArgPrefix = "__arg"
   val implicitOpArgPrefix = "__imp"
+  val qu = "__quote"
   
   /**
    * Built-in types
@@ -90,18 +91,31 @@ trait Definitions {
   object codegenerated extends OpType
   
   abstract class DeliteOpType extends OpType
+
+  // def forge_single(tpePar: Rep[DSLType], func: String): DeliteOpType
+  // object single {
+  //   def apply(tpePar: Rep[DSLType], func: String) = forge_single(tpePar, func)
+  // }
   
-  case class Zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: String) extends DeliteOpType
+  /**
+   * ZipWith
+   * 
+   * tpePars: [A,B,R,C[R]]
+   * argIndices: index of op arguments that correspond to zip arguments inA, inB (first and second collection respectively)
+   * func: string representation of a zip function (a: A, b: B) => R
+   */
+  def forge_zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: String): DeliteOpType
   object zip {
     // def apply[T](x: (T,T) => T)
-    def apply(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), x: String) = Zip(tpePars, argIndices, x)
+    def apply(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), zipArgIndices: (Int,Int), func: String) = forge_zip(tpePars, zipArgIndices, func)
   }
-    
-                         
+                             
 }
 
 
 trait DefinitionsExp extends Definitions with DerivativeTypes {
   this: ForgeExp =>
-  
+    
+  case class Zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: String) extends DeliteOpType  
+  def forge_zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: String) = Zip(tpePars,argIndices,func)
 }

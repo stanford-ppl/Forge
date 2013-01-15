@@ -18,32 +18,27 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
   import IR._
   
-  override def quote(x: Exp[Any]) : String = x match {
-    case Def(PrintLines(p, lines)) => 
-      lines.map(l => (" "*4)+inlineStr(quote(l))).mkString(nl) 
+  override def quote(x: Exp[Any]) : String = x match {    
+    case Def(PrintLines(p, lines)) =>    
+      // since this is called from emitWithIndent, the first line has an extra indent
+      lines.map(l => (" "*4)+quote(l)).mkString(nl) 
+      
+    case Const(s: String) => replaceWildcards(s) // don't add quotes 
+    
     case _ => super.quote(x)
   }  
-  
+    
   def inline(o: Rep[DSLOp], rule: String) = {
     var b = rule
     for (i <- 0 until o.args.length) {
-      b = b.replaceAllLiterally(o.quotedArg(i), opArgPrefix + i)
+      b = b.replaceAllLiterally(quote(o.quotedArg(i)), opArgPrefix + i)
     }    
     var c = b
     for (i <- 0 until o.tpePars.length) {
-      c = c.replaceAllLiterally(o.tpeInstance(i), o.tpePars.apply(i).name)
+      c = c.replaceAllLiterally(quote(o.tpeInstance(i)), o.tpePars.apply(i).name)
     }    
-    inlineStr(c)
-  }
-  
-  def inlineStr(s: String) = {
-    var x = s
-    val quotePattern = new Regex("""quote\((.*?)\)""", "body")
-    x = quotePattern replaceAllIn (x, m => m.group("body"))
-    
-    if (x.startsWith("\"") && x.endsWith("\"")) (x.slice(1,x.length-1))
-    else x    
-  }
+    c
+  }  
   
   def emitOp(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) {
     val rules = CodeGenRules(o.grp)

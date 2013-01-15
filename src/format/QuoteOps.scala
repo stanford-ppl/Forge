@@ -12,6 +12,13 @@ import core._
  * 
  * They also provide pass-throughs for some user-facing field accesses that are
  * required for codegen formatting.
+ * 
+ * There is a general issue with this architecture in terms of mixing staged and
+ * unstaged strings: since Forge does not currently schedule program ops (i.e. through LMS),
+ * only statically resolvable Exps can be used (if we cannot statically resolve a string
+ * during quoting, we throw an error). The Exps are still useful for specifying different
+ * implementations for different code generators (e.g. via quote), as opposed to everything
+ * being a concrete string up front.
  */
 trait QuoteOps extends Base {
   this: Forge =>
@@ -41,8 +48,15 @@ trait QuoteOps extends Base {
   /**
    * Util
    */ 
-  def quotes(s: String) = "\""+s+"\""  
-  def unquotes(s: String) = "\"+"+s+"+\""
+  
+  // def quotes(s: String) = "\""+s+"\""  
+  // def unquotes(s: String) = "\"+"+s+"+\""
+  
+  // wildcards are used to insert the quotations *after* quoting, since quoting can actually change \"
+  // it would be nice if, instead of using string wildcards, we could use symbols here, e.g. Quotes(s) and Unquotes(s)
+  // the reason we don't is that it's harder to process these symbols outside-in, i.e. what we want to do is run quote on the entire string and then replace the wildcards
+  def quotes(s: String) = qu+s+qu
+  def unquotes(s: String) = qu+"+"+s+"+"+qu  
 }
 
 trait QuoteOpsExp extends QuoteOps {

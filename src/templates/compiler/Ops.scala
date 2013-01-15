@@ -24,7 +24,7 @@ trait DeliteGenOps extends BaseGenOps {
     else "BaseFatExp"
   }
   
-  override def quote(x: Exp[Any]) : String = x match {
+  override def quote(x: Exp[Any]): String = x match {
     case Def(PrintLines(p,lines)) =>
       val body = lines.flatMap(l => quote(l).split(nl))      
       // how do we decide whether to add stream.println?
@@ -41,6 +41,9 @@ trait DeliteGenOps extends BaseGenOps {
     case Def(QuoteBlockResult(name,args,ret)) =>
       "emitBlock(" + name + ")" + nl + 
       "quote(getBlockResult(" + name + "))" 
+      
+    case Const(s: String) => replaceWildcards(super.quote(s)) // quote first, then insert wildcards
+    
     case _ => super.quote(x)
   }  
   

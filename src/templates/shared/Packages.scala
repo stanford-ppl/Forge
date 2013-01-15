@@ -28,7 +28,7 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     if (liftOps.length > 0) {
       stream.print("  extends Lift" + liftOps.head.name)
     }
-    for (grp <- liftOps.tail) {
+    for (grp <- liftOps.drop(1)) {
       stream.print(" with Lift" + grp.name)
     }
     for (e <- Externs if e.withLift) {

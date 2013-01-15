@@ -16,7 +16,7 @@ JAVA_HOME = os.getenv("JAVA_HOME")
 
 scala_virt_version = "scala-2.10.0-M1-virtualized"
 scala_major_id = '.'.join(scala_virt_version.split('.')[0:2]) 
-lms_version = "lms_2.10.0-M1-virtualized"
+lms_version = "lms_2.10"
 props = {}
 
 def err(s):
@@ -101,7 +101,7 @@ def stage(runner, params, opts):
     if opts.verbose:
        printEnv()
 
-    print "==  Generating DSL with options: " + str(opts)
+    print "== Generating DSL with options: " + str(opts)
     java_cmd = JAVA_HOME + "/bin/java " + java_opts + " " + runner + " " + ' '.join(params)
     #print exec
     ecode = os.system(java_cmd)

@@ -6,6 +6,8 @@ import templates.Utilities.nl
 
 trait ScalaOps extends ForgeApplication {
   
+  // TODO: need arrays for command line args
+  
   def addScalaOps() = {
     proxies()
     misc()
@@ -38,7 +40,7 @@ trait ScalaOps extends ForgeApplication {
       "}) {",
         blockResult(whileDo, 1),
       "}"
-    ), isSimple = false)        
+    ))        
   }
   
   def variables() = {
@@ -77,7 +79,7 @@ trait ScalaOps extends ForgeApplication {
     val CString = tpe("String", stage = now) 
     val T = tpePar("T") 
 
-    // most of these variants collapse to the a common back-end implementation:
+    // most of these variants collapse to a common back-end implementation:
     
     // maps to Rep[String], Rep[Any]
     val concat = op (Str) ("+", infix, List(T), List(CString, T), MString, codegenerated)

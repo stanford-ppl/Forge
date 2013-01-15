@@ -13,6 +13,13 @@ trait PrinterOps extends Base {
   /**
    * Output formatters
    */  
+  
+  /**
+   * Using a named Printer for printLines instead of a static method in case we eventually want
+   * to add state to make the formatting more flexible, i.e. addLines and/or removeLines methods.
+   * This would allow users to compose streams over time instead of in a single method call, but
+   * is it really necessary?
+   */
   abstract class ForgePrinter
   
   object ForgePrinter {

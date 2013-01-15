@@ -128,7 +128,7 @@ def publish(dsl, opts):
 
     shutil.copyfile(FORGE_HOME + "/static/delitecommon-wrapper.py", build_dir+"/bin/delitecommon.py")
 
-    print "  Finished. Don't forget to run 'sbt publish-local' from your DELITE_HOME for the framework and runtime modules before compiling your new DSL."
+    print "[forge]: Publishing complete. Don't forget to run 'sbt publish-local' from your DELITE_HOME for the framework and runtime modules before compiling your new DSL."
   
 if __name__ == "__main__":
     main()

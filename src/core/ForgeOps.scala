@@ -18,7 +18,7 @@ trait ForgeOps extends Base {
   def lift(grp: Rep[DSLGroup])(tpe: Rep[DSLType]) = forge_lift(grp, tpe)
   def data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: (String, Rep[DSLType])*) = forge_data(tpe, tpePars, fields)
   def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = forge_op(grp,name,style,tpePars,args,implicitArgs,retTpe,opTpe,effect)
-  def codegen(op: Rep[DSLOp])(generator: CodeGenerator, rule: Rep[String], isSimple: Boolean = true) = forge_codegen(op,generator,rule,isSimple)
+  def codegen(op: Rep[DSLOp])(generator: CodeGenerator, rule: Rep[String]) = forge_codegen(op,generator,rule)
   def extern(grp: Rep[DSLGroup], withLift: Boolean = false, targets: List[CodeGenerator] = generators) = forge_extern(grp, withLift, targets)
   
   def infix_withBound(a: Rep[TypePar], b: TypeClass) = forge_withBound(a,b)
@@ -34,7 +34,7 @@ trait ForgeOps extends Base {
   def forge_lift(grp: Rep[DSLGroup], tpe: Rep[DSLType]): Rep[Unit]
   def forge_data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]  
   def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLType]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType): Rep[DSLOp]
-  def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String], isSimple: Boolean): Rep[CodeGenRule]
+  def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String]): Rep[CodeGenRule]
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
   
   def forge_withBound(a: Rep[TypePar], b: TypeClass): Rep[TypePar]
@@ -129,7 +129,11 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   /* A code gen rule - this is the imperative code defining how to implement a particular op */
   case class CodeGenDecl(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String], isSimple: Boolean) extends Def[CodeGenRule]
   
-  def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String], isSimple: Boolean) = {
+  def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String]) = {
+    val isSimple = rule match {
+      case Def(PrintLines(x, l)) => false
+      case _ => true
+    }
     val c = CodeGenDecl(op, generator, rule, isSimple)
     if (CodeGenRules.get(op.grp).exists(_.exists(_.op == op))) err("multiple code generators declared for op " + op.grp + op.name)
     

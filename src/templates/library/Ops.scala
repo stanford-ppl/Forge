@@ -27,27 +27,38 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     
     case _ => super.quote(x)
   }  
-    
-  def inline(o: Rep[DSLOp], rule: String) = {
-    var b = rule
-    for (i <- 0 until o.args.length) {
-      b = b.replaceAllLiterally(quote(o.quotedArg(i)), opArgPrefix + i)
-    }    
-    var c = b
-    for (i <- 0 until o.tpePars.length) {
-      c = c.replaceAllLiterally(quote(o.tpeInstance(i)), o.tpePars.apply(i).name)
-    }    
-    c
-  }  
   
+  def emitSingleTaskImpls(opsGrp: DSLOps, stream: PrintWriter) {
+    emitBlockComment("SingleTask Impls", stream)   
+    stream.println()
+    stream.println("trait " + opsGrp.grp.name + "WrapperImpl {")
+    stream.println("  this: " + dsl + "Application => ")
+    stream.println()    
+    for (o <- unique(opsGrp.ops)) { 
+      o.opTpe match {
+        case single:SingleTask => 
+          check(o)
+          stream.print("  " + makeOpImplMethodSignature(o))
+          stream.println(" = {")
+          stream.println(inline(o, quote(single.func)))
+          stream.println("  }")
+          stream.println()
+        case _ =>
+      }
+    }
+    stream.println("}")
+  }
+      
   def emitOp(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) {
     val rules = CodeGenRules(o.grp)
     o.opTpe match {
       case `codegenerated` => 
         val rule = rules.find(_.op == o).map(_.rule).getOrElse(err("could not find codegen rule for op: " + o.name))
         emitWithIndent(inline(o, quote(rule)), stream, indent) 
+      case single:SingleTask => 
+        emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
       case zip:Zip =>
-        check(zip, o)          
+        check(o)          
         val dc = DeliteCollections(o.args.apply(0))        
         emitWithIndent("def func: (" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + ") => " + quote(zip.tpePars._3) + " = " + zip.func, stream, indent)            
         emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(dc.alloc.tpePars) + "(" + makeOpMethodNameWithArgs(dc.size) + ")", stream, indent)
@@ -58,9 +69,9 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     }    
   }
   
-  def emitClass(ops: DSLOps, stream: PrintWriter) {
-    if (grpIsTpe(ops.grp)) {
-      val tpe = grpAsTpe(ops.grp)
+  def emitClass(opsGrp: DSLOps, stream: PrintWriter) {
+    if (grpIsTpe(opsGrp.grp)) {
+      val tpe = grpAsTpe(opsGrp.grp)
       val data = DataStructs.filter(_.tpe == tpe).apply(0) // TODO
       stream.print("class " + data.tpe.name)
       stream.print(makeTpeParsWithBounds(data.tpePars))
@@ -69,7 +80,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       stream.print(") {")
       stream.println()
       stream.println(makeFieldsWithInitArgs(data))
-      for (o <- unique(ops.ops) if o.style == infix) {       
+      for (o <- unique(opsGrp.ops) if o.style == infix) {       
         stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
         stream.print("(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repify(t._1)).mkString(",") + ")") 
         stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = data.tpePars))
@@ -83,14 +94,14 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       stream.println()
     }      
     
-    for (o <- unique(ops.ops)) {       
+    for (o <- unique(opsGrp.ops)) {       
       stream.print("  def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars))
       stream.print(makeOpArgsWithType(o))
       stream.print(makeOpImplicitArgsWithOverloadWithType(o))
       stream.println(" = {")      
       o.style match {
         case `static` => emitOp(o, stream, indent=4)
-        case `infix` if grpIsTpe(ops.grp) => emitWithIndent(opArgPrefix + 0 + "." + o.name + "(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1)).mkString(",") + ")", stream, 4)
+        case `infix` if grpIsTpe(opsGrp.grp) => emitWithIndent(opArgPrefix + 0 + "." + o.name + "(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1)).mkString(",") + ")", stream, 4)
         case `infix` => emitOp(o, stream, indent=4)
         case `direct` => emitOp(o, stream, indent=4)        
       }

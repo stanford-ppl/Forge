@@ -28,5 +28,13 @@ trait HelloSimple extends SimpleVectorApplication {
       println("v3(" + i + "): " + v3(i))
       i += 1
     }
+
+    println("v4 = v3.slice(3,5)")
+    val v4 = v3.slice(3,5)
+    i = 0
+    while (i < v4.length) {
+      println("v4(" + i + "): " + v4(i))
+      i += 1
+    }    
   }
 }

@@ -47,18 +47,18 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     val vupdate = op (Vector) ("update", infix, List(T), List(Vector,MInt,T), MUnit, codegenerated, effect = write(0))
     val vplus = op (Vector) ("+", infix, List(T withBound TNumeric), List(Vector,Vector), Vector, zip((T,T,T,Vector), (0,1), "(a,b) => a+b"))
     
-    /*
-    val vslice = op (Vector) ("slice", infix, List(T), List(Vector, MInt, MInt), Vector, 
-      single { stream.printLines(
-        "val out = Vector[T](__arg2 - __arg1)",
-        "var i = 0",        
-        "while (i < out.length) {",
-        "  out(i) = __arg0(i-__arg1)",
+    val vslice = op (Vector) ("slice", infix, List(T), List(Vector, MInt, MInt), Vector, single(Vector, { 
+      stream.printLines(
+        "val st = __arg1",
+        "val en = __arg2",
+        "val out = Vector[T](en - st)",
+        "var i = st",        
+        "while (i < en) {",
+        "  out(i-st) = __arg0(i)",
         "  i += 1",
         "}",
         "out"
-      )}        
-    */
+      )}))        
               
     /**
      * DeliteCollectionification
@@ -73,8 +73,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     codegen (vnew) ($cala, "new "+vnew.tpeName+"["+vnew.tpeInstance(0)+"]("+vnew.quotedArg(0)+", new Array["+vnew.tpeInstance(0)+"]("+vnew.quotedArg(0)+"))")
     codegen (vlength) ($cala, vapply.quotedArg(0) + "._length")
     codegen (vapply) ($cala, vapply.quotedArg(0) + "._data.apply(" + vapply.quotedArg(1) + ")")
-    codegen (vupdate) ($cala, vupdate.quotedArg(0) + "._data.update(" + vupdate.quotedArg(1) + ", " + vupdate.quotedArg(2) + ")")
-    
+    codegen (vupdate) ($cala, vupdate.quotedArg(0) + "._data.update(" + vupdate.quotedArg(1) + ", " + vupdate.quotedArg(2) + ")")    
     ()
   }
 }

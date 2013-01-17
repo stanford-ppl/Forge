@@ -30,7 +30,7 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     dslStream.println()
     emitApplicationRunnerBase(dslStream)
     dslStream.println()    
-    emitDSLPackageDefinitionsBase(OpsGrp.values.toList, List(), dslStream)
+    emitDSLPackageDefinitionsBase(OpsGrp.values.toList, dslStream)
     dslStream.println()
     dslStream.close()
   }  

@@ -18,24 +18,26 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("trait " + dsl + "ApplicationCompiler extends " + dsl + "Application with DeliteApplication with " + dsl+"Exp")
   }
 
-  def emitDSLPackageDefinitions(appOps: List[DSLOps], compOps: List[DSLOps], stream: PrintWriter) {
+  def emitDSLPackageDefinitions(opsGrps: List[DSLOps], stream: PrintWriter) {
     emitBlockComment("dsl compiler definition", stream)
   
     // compiler
     stream.println("trait " + dsl + "Compiler extends " + dsl)
-    for (op <- compOps) {
-      stream.print(" with " + op.name + "Ops")
+    for (opsGrp <- opsGrps) {
+      stream.print(" with " + opsGrp.name)
+      if (opsGrp.ops.exists(_.opTpe.isInstanceOf[SingleTask]))
+        stream.print(" with " + opsGrp.name + "Impl")      
     }
     stream.println(" { this: " + dsl + "Application with " + dsl + "Exp => }")
     stream.println()
   
     // exp
     stream.println("trait " + dsl + "Exp extends " + dsl + "Compiler")
-    for (op <- appOps) {
-      stream.print(" with " + op.name + "Exp")
+    for (opsGrp <- opsGrps) {
+      stream.print(" with " + opsGrp.name + "Exp")
     }
     for (e <- Externs) {
-      stream.print(" with " + e.ops.name + "Exp")
+      stream.print(" with " + e.opsGrp.name + "Exp")
     }    
     stream.println(" with DeliteOpsExp with DeliteAllOverridesExp {")
     stream.println(" this: DeliteApplication with " + dsl + "Application => ")
@@ -72,7 +74,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("  def dsmap(line: String) = line")
     stream.println("  override def emitDataStructures(path: String) {")
     stream.println("    val s = File.separator")
-    stream.println("    val dsRoot = Config.homeDir + s+\"dsls\"+s+\""+dsl.toLowerCase()+"\"+s+\"compiler\"+s+\"src\"+s+\""+dsl.toLowerCase()+"\"+s+\"datastruct\"+s+this.toString")
+    stream.println("    val dsRoot = System.getProperty(\"user.dir\")+s+\"compiler\"+s+\"src\"+s+\""+dsl.toLowerCase()+"\"+s+\"datastruct\"+s+this.toString")
     stream.println()
     stream.println("    val dsDir = Directory(Path(dsRoot))")
     stream.println("    val outDir = Directory(Path(path))")
@@ -110,8 +112,8 @@ trait DeliteGenPackages extends BaseGenPackages {
           stream.print(" with " + g.name + "Gen" + op.name)
       }
       for (e <- Externs) {
-        if (e.ops.targets.contains(g))
-          stream.print(" with " + g.name + "Gen" + e.ops.name)        
+        if (e.opsGrp.targets.contains(g))
+          stream.print(" with " + g.name + "Gen" + e.opsGrp.name)        
       }
       stream.println(" with " + g.name + "GenDeliteOps with Delite" + g.name + "GenAllOverrides {" )
       stream.println("  val IR: DeliteApplication with " + dsl + "Exp")

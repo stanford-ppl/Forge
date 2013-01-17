@@ -31,7 +31,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     dslStream.println()
     emitApplicationRunner(dslStream)
     dslStream.println()    
-    emitDSLPackageDefinitions(OpsGrp.values.toList, List(), dslStream)
+    emitDSLPackageDefinitions(OpsGrp.values.toList, dslStream)
     dslStream.println()    
     dslStream.close()
   }  
@@ -49,7 +49,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     grpStream.println()
     grpStream.print("trait " + dsl + "Classes extends ")
     var first = true
-    for ((grp,ops) <- OpsGrp) {
+    for ((grp,opsGrp) <- OpsGrp) {
       val wrapper = grp.name + "Wrapper"
       if (first) grpStream.print(wrapper) else grpStream.print(" with " + wrapper)
       first = false
@@ -64,19 +64,34 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
       stream.println("trait " + wrapper + " {")
       stream.println( "  this: " + dsl + "Base with " + dsl + "Classes => ")
       stream.println()
-      emitClass(ops, stream)
+      emitClass(opsGrp, stream)
       stream.println("}")
       stream.println()
       stream.close()
+      
+      // because front-end types are not in scope (to prevent unintentional recursive calls and ambiguities),
+      // we need to factor single tasks out to a separate trait in the library version also
+      if (opsGrp.ops.exists(_.opTpe.isInstanceOf[SingleTask])) {
+        val implStream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+"WrapperImpl"+".scala"))
+        implStream.println("package " + packageName + ".classes")       
+        implStream.println()
+        emitScalaReflectImports(implStream) 
+        emitDSLImports(implStream)
+        implStream.println()
+        emitSingleTaskImpls(opsGrp, implStream)
+        implStream.close()      
+        
+        grpStream.print(" with " + grp.name + "WrapperImpl")              
+      }
     }       
     for (d <- DataStructs.map(_.tpe) diff OpsGrp.keys.filter(grpIsTpe).map(grpAsTpe).toSeq) {
       warn("(library) ignoring data definition for " + d.name + " since it cannot be instantiated in app code (it has no accompanying ops)")
-    }         
+    }             
     for (e <- Externs) {
-      grpStream.print(" with " + e.ops.grp.name + "Wrapper")
+      grpStream.print(" with " + e.opsGrp.grp.name + "Wrapper")
     }    
     grpStream.println("{")
-    grpStream.println("  this: " + dsl + "Lib => ")
+    grpStream.println("  this: " + dsl + "Lib with " + dsl + "Application => ")
     grpStream.println("}")
     grpStream.println()
     grpStream.close()

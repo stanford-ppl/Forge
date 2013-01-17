@@ -45,7 +45,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     dslStream.println()
     emitApplicationRunner(dslStream)
     dslStream.println()    
-    emitDSLPackageDefinitions(OpsGrp.values.toList, List(), dslStream)
+    emitDSLPackageDefinitions(OpsGrp.values.toList, dslStream)
     dslStream.println()
     emitDSLCodeGeneratorPackageDefinitions(OpsGrp.values.toList, dslStream)
     dslStream.close()    
@@ -61,8 +61,8 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     val opsDir = dslDir + File.separator + "ops"
     Directory(Path(opsDir)).createDirectory()
     
-    // 1 file per tpe, includes Ops, OpsExp, and Gen      
-    for ((grp,ops) <- OpsGrp) {
+    // 1 file per tpe, includes Ops, OpsExp, and Gen, plus an additional Impl file if the group contains SingleTask ops      
+    for ((grp,opsGrp) <- OpsGrp) {
       val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsExp"+".scala"))
       stream.println("package " + packageName + ".ops")
       stream.println()
@@ -71,9 +71,20 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
       emitDeliteOpsImports(stream)
       emitDSLImports(stream)
       stream.println()
-      emitOpExp(ops, stream)
+      emitOpExp(opsGrp, stream)
       stream.println()
-      emitOpCodegen(ops, stream)        
+      if (opsGrp.ops.exists(_.opTpe.isInstanceOf[SingleTask])) {
+        val implStream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsImpl"+".scala"))
+        implStream.println("package " + packageName + ".ops")        
+        implStream.println()
+        emitScalaReflectImports(implStream)
+        implStream.println("import " + packageName + "." + dsl + "Compiler")
+        implStream.println("import " + dsl.toLowerCase() + ".shared." + dsl + "Lift") // TODO: not encapsulated        
+        implStream.println()
+        emitSingleTaskImpls(opsGrp, implStream)
+        implStream.close()
+      }
+      emitOpCodegen(opsGrp, stream)        
       stream.close()
     }                
   }    

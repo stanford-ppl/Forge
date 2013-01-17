@@ -161,14 +161,14 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   }
   
   /* A reference to an external ops group */
-  case class Extern(ops: DSLOps, withLift: Boolean) extends Def[Unit]
+  case class Extern(opsGrp: DSLOps, withLift: Boolean) extends Def[Unit]
   
   def forge_extern(_grp: Rep[DSLGroup], withLift: Boolean, _targets: List[CodeGenerator]) = {
-    val ops = new DSLOps {
+    val opsGrp = new DSLOps {
       val grp = _grp
       override def targets = _targets
     }
-    val e = Extern(ops, withLift)
+    val e = Extern(opsGrp, withLift)
     if (!Externs.contains(e)) Externs += e
     e
   }

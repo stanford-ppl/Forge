@@ -24,7 +24,7 @@ trait LibGenPackages extends BaseGenPackages {
     stream.println("}")
   }
 
-  def emitDSLPackageDefinitions(appOps: List[DSLOps], compOps: List[DSLOps], stream: PrintWriter) {
+  def emitDSLPackageDefinitions(ops: List[DSLOps], stream: PrintWriter) {
     emitBlockComment("dsl library definition", stream)
     
     // base trait sets Rep[T] to T and mixes in the necessary portions of the front-end, without

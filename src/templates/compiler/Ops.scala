@@ -23,8 +23,18 @@ trait DeliteGenOps extends BaseGenOps {
     else if (OpsGrp.exists(g => g._2.ops.exists(o => o.effect != pure))) "BaseFatExp with EffectExp"
     else "BaseFatExp"
   }
+
+  var quoteLiterally = false  
+  def quoteLiteral(x: Exp[Any]): String = {
+    val save = quoteLiterally
+    quoteLiterally = true
+    val z = quote(x)
+    quoteLiterally = save
+    z
+  }    
   
   override def quote(x: Exp[Any]): String = x match {
+    case Def(PrintLines(p,lines)) if quoteLiterally => lines.map(l => (" "*4)+quote(l)).mkString(nl)    
     case Def(PrintLines(p,lines)) =>
       val body = lines.flatMap(l => quote(l).split(nl))      
       // how do we decide whether to add stream.println?
@@ -41,7 +51,8 @@ trait DeliteGenOps extends BaseGenOps {
     case Def(QuoteBlockResult(name,args,ret)) =>
       "emitBlock(" + name + ")" + nl + 
       "quote(getBlockResult(" + name + "))" 
-      
+    
+    case Const(s: String) if quoteLiterally => replaceWildcards(s) // no quotes      
     case Const(s: String) => replaceWildcards(super.quote(s)) // quote first, then insert wildcards
     
     case _ => super.quote(x)
@@ -58,14 +69,49 @@ trait DeliteGenOps extends BaseGenOps {
   
   def makeOpSimpleNodeNameWithArgs(o: Rep[DSLOp]) = makeOpNodeName(o) + makeOpArgs(o)
   def makeOpNodeNameWithArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String = makeOpArgs) = makeOpNodeName(o) + makeTpePars(o.tpePars) + makeArgs(o) + makeOpImplicitArgs(o)
-    
-  def emitOpExp(ops: DSLOps, stream: PrintWriter) {
+      
+  def emitSingleTaskImpls(opsGrp: DSLOps, stream: PrintWriter) {
+    emitBlockComment("SingleTask Impls", stream)   
+    stream.println()
+    stream.println("trait " + opsGrp.name + "Impl {")
+    stream.println("  this: " + dsl + "Compiler with " + dsl + "Lift => ")
+    stream.println()    
+    for (o <- unique(opsGrp.ops)) { 
+      o.opTpe match {
+        case single:SingleTask => 
+          stream.print("  " + makeOpImplMethodSignature(o))
+          stream.println(" = {")
+          stream.println(inline(o, quoteLiteral(single.func)))
+          stream.println("  }")
+          stream.println()
+        case _ =>
+      }
+    }
+    stream.println("}")
+  }
+  
+  def emitOpExp(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("IR Definitions", stream)   
     stream.println()
-    stream.println("trait " + ops.grp.name + "OpsExp extends " + ops.grp.name + "Ops with " + baseExpCls(ops.grp) + " {")
+    stream.println("trait " + opsGrp.name + "Exp extends " + opsGrp.name + " with " + baseExpCls(opsGrp.grp) + " {")
     stream.println("  this: " + dsl + "Exp => ")
     stream.println()
+       
+    val uniqueOps = unique(opsGrp.ops)
     
+    emitIRNodes(uniqueOps, stream)
+    stream.println()
+    emitNodeConstructors(uniqueOps, stream)
+    stream.println()
+    emitSyms(uniqueOps, stream)
+    stream.println()
+    emitMirrors(uniqueOps, stream)
+    stream.println()    
+    emitDeliteCollection(opsGrp.grp, stream)      
+    stream.println("}")      
+  }
+      
+  def emitIRNodes(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
     def emitOpNodeHeader(o: Rep[DSLOp], opStr: String) {
       stream.println(" extends " + opStr + " {") 
       for (targ <- o.tpePars) {
@@ -80,7 +126,7 @@ trait DeliteGenOps extends BaseGenOps {
     }
     
     // IR nodes
-    for (o <- unique(ops.ops)) { 
+    for (o <- uniqueOps) { 
       stream.print("  case class " + makeOpNodeName(o) + makeTpeParsWithBounds(o.tpePars))
       if (o.opTpe == codegenerated) stream.print(makeOpArgsWithType(o, blockify))
       else stream.print(makeOpArgsWithType(o))    
@@ -89,8 +135,11 @@ trait DeliteGenOps extends BaseGenOps {
       o.opTpe match {
         case `codegenerated` =>           
           emitOpNodeHeader(o, "Def[" + quote(o.retTpe) + "]") 
+        case single:SingleTask =>
+          check(o)
+          emitOpNodeHeader(o, "DeliteOpSingleTask[" + quote(single.retTpe) + "](reifyEffectsHere("+makeOpImplMethodNameWithArgs(o)+"))")
         case zip:Zip => 
-          check(zip, o)          
+          check(o)          
           val dc = DeliteCollections(o.args.apply(0))
           emitOpNodeHeader(o, "DeliteOpZipWith[" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + "," + quote(zip.tpePars._3) + "," + quote(zip.tpePars._4) + "]")            
           stream.println()
@@ -103,14 +152,13 @@ trait DeliteGenOps extends BaseGenOps {
       emitOpNodeFooter(o)        
       stream.println()        
     }      
-    stream.println()
-    
+    stream.println()    
+  }
+  
+  def emitNodeConstructors(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
     // methods that construct nodes
-    for (o <- unique(ops.ops)) { 
-      stream.print("  def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars))
-      stream.print(makeOpArgsWithType(o))
-      stream.print(makeOpImplicitArgsWithOverloadWithType(o))
-      stream.print(" = {")
+    for (o <- uniqueOps) { 
+      stream.println("  " + makeOpMethodSignature(o) + " = {")
       val summary = scala.collection.mutable.ArrayBuffer[String]()
       // TODO: we need syms methods for func args..
       if (o.opTpe == codegenerated) {
@@ -151,19 +199,11 @@ trait DeliteGenOps extends BaseGenOps {
       }
       
       emitWithIndent("}", stream, 2)
-    }
-    
-    stream.println()
-    emitSyms(ops, stream)
-    stream.println()
-    emitMirrors(ops, stream)
-    stream.println()    
-    emitDeliteCollection(ops.grp, stream)      
-    stream.println("}")      
+    }    
   }
-    
-  def emitSyms(ops: DSLOps, stream: PrintWriter) {
-    if (unique(ops.ops).exists(o => o.args.exists(t => t match { case Def(FTpe(a,b)) => true; case _ => false}))) {
+  
+  def emitSyms(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
+    if (uniqueOps.exists(o => o.args.exists(t => t match { case Def(FTpe(a,b)) => true; case _ => false}))) {
       emitBlockComment("Syms", stream, indent=2)
       
       var symsBuf      = "override def syms(e: Any): List[Sym[Any]] = e match {" + nl
@@ -179,7 +219,7 @@ trait DeliteGenOps extends BaseGenOps {
         else ""
       }
             
-      for (o <- unique(ops.ops) if o.opTpe == codegenerated) { 
+      for (o <- uniqueOps if o.opTpe == codegenerated) { 
         symsBuf += makeSym(o, "syms") 
         boundSymsBuf += makeSym(o, "effectSyms") 
         symsFreqBuf += makeSym(o, "freqNormal") // TODO: how do we know?
@@ -193,10 +233,10 @@ trait DeliteGenOps extends BaseGenOps {
     }
   }
   
-  def emitMirrors(ops: DSLOps, stream: PrintWriter) {
+  def emitMirrors(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
     emitBlockComment("Mirroring", stream, indent=2)
     stream.println("  override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = (e match {")
-    for (o <- unique(ops.ops)) {
+    for (o <- uniqueOps) {
       // helpful identifiers
       val xformArgs = "(" + o.args.zipWithIndex.map(t => "f(" + opArgPrefix + t._2 + ")").mkString(",") + ")" 
       val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => opIdentifierPrefix + "." + b.prefix + t.name)) ++ /*implicitArgsWithOverload(o)*/o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
@@ -267,17 +307,17 @@ trait DeliteGenOps extends BaseGenOps {
     }
     catch { case _ => }
   }
-  
-  def emitOpCodegen(ops: DSLOps, stream: PrintWriter) {        
-    if (CodeGenRules(ops.grp).length > 0){
-      val uniqueOps = unique(ops.ops)
+    
+  def emitOpCodegen(opsGrp: DSLOps, stream: PrintWriter) {        
+    if (CodeGenRules(opsGrp.grp).length > 0){
+      val uniqueOps = unique(opsGrp.ops)
       emitBlockComment("Code generators", stream)   
       stream.println()
       for (g <- generators) { 
-        val rules = CodeGenRules(ops.grp).filter(_.generator == g)
+        val rules = CodeGenRules(opsGrp.grp).filter(_.generator == g)
         if (rules.length > 0) {
-          stream.println("trait " + g.name + "Gen" + ops.grp.name + "Ops extends " + g.name + "GenFat {")
-          stream.println("  val IR: " + ops.grp.name + "OpsExp")
+          stream.println("trait " + g.name + "Gen" + opsGrp.name + " extends " + g.name + "GenFat {")
+          stream.println("  val IR: " + opsGrp.name + "Exp")
           stream.println("  import IR._")
           stream.println()
           stream.println("  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {")

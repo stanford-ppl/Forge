@@ -52,7 +52,7 @@ trait DeliteGenOps extends BaseGenOps {
       "emitBlock(" + name + ")" + nl + 
       "quote(getBlockResult(" + name + "))" 
     
-    case Const(s: String) if quoteLiterally => replaceWildcards(s) // no quotes      
+    case Const(s: String) if quoteLiterally => s // no quotes, wildcards will be replaced later in inline
     case Const(s: String) => replaceWildcards(super.quote(s)) // quote first, then insert wildcards
     
     case _ => super.quote(x)
@@ -81,7 +81,7 @@ trait DeliteGenOps extends BaseGenOps {
         case single:SingleTask => 
           stream.print("  " + makeOpImplMethodSignature(o))
           stream.println(" = {")
-          stream.println(inline(o, quoteLiteral(single.func)))
+          stream.println(inline(o, single.func, quoteLiteral))
           stream.println("  }")
           stream.println()
         case _ =>
@@ -138,15 +138,25 @@ trait DeliteGenOps extends BaseGenOps {
         case single:SingleTask =>
           check(o)
           emitOpNodeHeader(o, "DeliteOpSingleTask[" + quote(single.retTpe) + "](reifyEffectsHere("+makeOpImplMethodNameWithArgs(o)+"))")
+        case map:Map =>
+          check(o)
+          val dc = DeliteCollections(map.tpePars._3)
+          emitOpNodeHeader(o, "DeliteOpMap[" + quote(map.tpePars._1) + "," + quote(map.tpePars._2) + "," + makeTpeInst(map.tpePars._3, map.tpePars._2) + "]")            
+          stream.println()
+          stream.println("   val in = " + opArgPrefix + map.argIndex)
+          stream.println("   def func = " + inline(o,map.func,quoteLiteral))
+          // TODO: this isn't quite right. how do we know which of dc.allocs tpePars is the one that corresponds to our return tpe, e.g. map.tpePars._2?
+          stream.println("   override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, map.tpePars._1, map.tpePars._2)) + "(len)")
+          stream.println("   val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")          
         case zip:Zip => 
           check(o)          
-          val dc = DeliteCollections(o.args.apply(0))
-          emitOpNodeHeader(o, "DeliteOpZipWith[" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + "," + quote(zip.tpePars._3) + "," + quote(zip.tpePars._4) + "]")            
+          val dc = DeliteCollections(zip.tpePars._4)
+          emitOpNodeHeader(o, "DeliteOpZipWith[" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + "," + quote(zip.tpePars._3) + "," + makeTpeInst(zip.tpePars._4,zip.tpePars._3) + "]")            
           stream.println()
           stream.println("   val inA = " + opArgPrefix + zip.argIndices._1)
           stream.println("   val inB = " + opArgPrefix + zip.argIndices._2)
-          stream.println("   def func = " + zip.func)
-          stream.println("   override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + "(len)")
+          stream.println("   def func = " + inline(o,zip.func,quoteLiteral))
+          stream.println("   override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, zip.tpePars._1, zip.tpePars._3)) + "(len)")
           stream.println("   val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
       }
       emitOpNodeFooter(o)        

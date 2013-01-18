@@ -105,8 +105,15 @@ trait Definitions {
   
   /**
    * Map
+   * 
+   * @param tpePars   [A,R,C[R]]
+   * @param argIndex  index of op argument that correspond to map argument in (collection to be mapped)
+   * @param func      string representation of a map function a: A => R
    */
-  
+   def forge_map(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, func: String): DeliteOpType
+   object map {
+     def apply(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), mapArgIndex: Int, func: String) = forge_map(tpePars, mapArgIndex, func)
+   }  
    
   /**
    * ZipWith
@@ -136,6 +143,9 @@ trait DefinitionsExp extends Definitions with DerivativeTypes {
   
   case class SingleTask(retTpe: Rep[DSLType], func: Rep[String]) extends DeliteOpType
   def forge_single(retTpe: Rep[DSLType], func: Rep[String]) = SingleTask(retTpe, func)
+  
+  case class Map(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, func: String) extends DeliteOpType  
+  def forge_map(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, func: String) = Map(tpePars, argIndex, func)
     
   case class Zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: String) extends DeliteOpType  
   def forge_zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: String) = Zip(tpePars, argIndices, func)

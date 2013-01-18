@@ -36,5 +36,13 @@ trait HelloSimple extends SimpleVectorApplication {
       println("v4(" + i + "): " + v4(i))
       i += 1
     }    
+    
+    println("v5 = v4*5")
+    val v5 = v4*5
+    i = 0
+    while (i < v5.length) {
+      println("v5(" + i + "): " + v5(i))
+      i += 1
+    }        
   }
 }

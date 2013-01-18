@@ -29,14 +29,16 @@ trait QuoteOps extends Base {
   implicit def dslOpToPublicOps(x: Rep[DSLOp]) = new {
     def tpeInstance(i: Int) = quote_tpeinstance(x,i)
     def tpeName = quote_tpename(x)
-    def quotedArg(i: Int) = quote_quotedarginstance(x,i)
+    def quotedArg(i: Int) = quote_quotedarginstance(/*x,*/i)
     // def arg(i: Int) = quote_arginstance(x,i)
   }
-  
+
+  def quotedArg(i: Int) = quote_quotedarginstance(i)
   def quote_tpeinstance(x: Rep[DSLOp], i: Int): String
   def quote_tpename(x: Rep[DSLOp]): String  
   // def quote_arginstance(x: Rep[DSLOp], i: Int): Rep[DSLType]
-  def quote_quotedarginstance(x: Rep[DSLOp], i: Int): String
+  // def quote_quotedarginstance(x: Rep[DSLOp], i: Int): String
+  def quote_quotedarginstance(i: Int): String
        
   /**
    * Function tpes
@@ -68,7 +70,8 @@ trait QuoteOpsExp extends QuoteOps {
   def quote_tpeinstance(x: Rep[DSLOp], i: Int) = unquotes("remap(" + opIdentifierPrefix + "." + TManifest.prefix + x.tpePars.apply(i).name + ")")
   def quote_tpename(x: Rep[DSLOp]) = x.grp.name
   // def quote_arginstance(x: Rep[DSLOp], i: Int) = x.args.apply(i)
-  def quote_quotedarginstance(x: Rep[DSLOp], i: Int) = unquotes("quote(" + opArgPrefix + i + ")")
+  // def quote_quotedarginstance(x: Rep[DSLOp], i: Int) = unquotes("quote(" + opArgPrefix + i + ")")
+  def quote_quotedarginstance(i: Int) = unquotes("quote(" + opArgPrefix + i + ")")
   
   /**
    * Function types

@@ -25,16 +25,15 @@ trait BaseGenOps extends ForgeCodeGenBase {
    * Quoting for formatted code-gen
    */  
     
-   def inline(o: Rep[DSLOp], rule: String) = {
-     var b = rule
+   def inline(o: Rep[DSLOp], str: Exp[String], quoter: Exp[Any] => String = quote) = {     
+     var b = quoter(str)
      for (i <- 0 until o.args.length) {
-       b = b.replaceAllLiterally(quote(o.quotedArg(i)), opArgPrefix + i)
+       b = b.replaceAllLiterally(quoter(o.quotedArg(i)), opArgPrefix + i)
      }    
-     var c = b
      for (i <- 0 until o.tpePars.length) {
-       c = c.replaceAllLiterally(quote(o.tpeInstance(i)), o.tpePars.apply(i).name)
+       b = b.replaceAllLiterally(quoter(o.tpeInstance(i)), o.tpePars.apply(i).name)
      }    
-     c
+     b
    }  
       
    def replaceWildcards(s: String) = {
@@ -157,9 +156,18 @@ trait BaseGenOps extends ForgeCodeGenBase {
   def check(o: Rep[DSLOp]) { 
     o.opTpe match {
       case single:SingleTask => // nothing to check
+      case map:Map =>
+        val col = o.args.apply(map.argIndex)
+        if (DeliteCollections.get(col).isEmpty) err("map argument " + col.name + " is not a DeliteCollection")
+        if (map.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("map op with undefined type arg: " + o.name)
+        if (map.argIndex < 0 || map.argIndex > o.args.length) err("map op with illegal arg parameter: " + o.name)
       case zip:Zip =>
-       if (zip.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("zipWith op with undefined type arg: " + o.name)
-       if (zip.argIndices.productIterator.asInstanceOf[Iterator[Int]].exists(a => a < 0 || a > o.args.length)) err("zipWith op with illegal arg parameter: " + o.name)
+        val colA = o.args.apply(zip.argIndices._1)
+        val colB = o.args.apply(zip.argIndices._2)
+        if (DeliteCollections.get(colA).isEmpty) err("zip argument " + colA.name + " is not a DeliteCollection")
+        if (DeliteCollections.get(colB).isEmpty) err("zip argument " + colB.name + " is not a DeliteCollection")
+        if (zip.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("zipWith op with undefined type arg: " + o.name)
+        if (zip.argIndices.productIterator.asInstanceOf[Iterator[Int]].exists(a => a < 0 || a > o.args.length)) err("zipWith op with illegal arg parameter: " + o.name)
     }
   }
   

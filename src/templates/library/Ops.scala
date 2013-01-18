@@ -40,7 +40,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
           check(o)
           stream.print("  " + makeOpImplMethodSignature(o))
           stream.println(" = {")
-          stream.println(inline(o, quote(single.func)))
+          stream.println(inline(o, single.func))
           stream.println("  }")
           stream.println()
         case _ =>
@@ -54,14 +54,24 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     o.opTpe match {
       case `codegenerated` => 
         val rule = rules.find(_.op == o).map(_.rule).getOrElse(err("could not find codegen rule for op: " + o.name))
-        emitWithIndent(inline(o, quote(rule)), stream, indent) 
+        emitWithIndent(inline(o, rule), stream, indent) 
       case single:SingleTask => 
         emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
+      case map:Map =>
+        check(o)
+        val dc = DeliteCollections(map.tpePars._3)        
+        emitWithIndent("def func: " + quote(map.tpePars._1) + " => " + quote(map.tpePars._2) + " = " + inline(o, map.func), stream, indent)            
+        // TODO: this isn't quite right. how do we know which of dc.allocs tpePars is the one that corresponds to our return tpe, e.g. map.tpePars._2?
+        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, map.tpePars._1, map.tpePars._2)) + "(" + makeOpMethodNameWithArgs(dc.size) + ")", stream, indent)
+        emitWithIndent("for (i <- 0 until " + makeOpMethodNameWithArgs(dc.size) + ") {", stream, indent)            
+        emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(" + opArgPrefix+map.argIndex + ", i)))", stream, indent+2)
+        emitWithIndent("}", stream, indent)            
+        emitWithIndent("out", stream, indent)                
       case zip:Zip =>
         check(o)          
-        val dc = DeliteCollections(o.args.apply(0))        
-        emitWithIndent("def func: (" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + ") => " + quote(zip.tpePars._3) + " = " + zip.func, stream, indent)            
-        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(dc.alloc.tpePars) + "(" + makeOpMethodNameWithArgs(dc.size) + ")", stream, indent)
+        val dc = DeliteCollections(zip.tpePars._4)        
+        emitWithIndent("def func: (" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + ") => " + quote(zip.tpePars._3) + " = " + inline(o, zip.func), stream, indent)            
+        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, zip.tpePars._1, zip.tpePars._3)) + "(" + makeOpMethodNameWithArgs(dc.size) + ")", stream, indent)
         emitWithIndent("for (i <- 0 until " + makeOpMethodNameWithArgs(dc.size) + ") {", stream, indent)            
         emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(" + opArgPrefix+zip.argIndices._1 + ", i)," + makeOpMethodName(dc.apply) + "(" + opArgPrefix+zip.argIndices._2 + ", i)))", stream, indent+2)
         emitWithIndent("}", stream, indent)            

@@ -76,6 +76,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
         implStream.println("package " + packageName + ".classes")       
         implStream.println()
         emitScalaReflectImports(implStream) 
+        emitScalaMathImports(implStream)
         emitDSLImports(implStream)
         implStream.println()
         emitSingleTaskImpls(opsGrp, implStream)

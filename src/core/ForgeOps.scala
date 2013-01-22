@@ -24,8 +24,10 @@ trait ForgeOps extends Base {
   def infix_withBound(a: Rep[TypePar], b: TypeClass) = forge_withBound(a,b)
     
   def infix_is(tpe: Rep[DSLType], dc: DeliteCollection) = forge_isdelitecollection(tpe, dc)  
-  case class DeliteCollection(val tpePar: Rep[TypePar], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp])
+  case class DeliteCollection(val tpeArg: Rep[DSLType], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp])
 
+  def lookup(grpName: String, opName: String): Option[Rep[DSLOp]]
+  
   def forge_grp(name: String): Rep[DSLGroup]  
   def forge_tpepar(name: String, ctxBounds: List[TypeClass]): Rep[TypePar]
   def forge_tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag): Rep[DSLType]    
@@ -54,6 +56,13 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   val CodeGenRules = HashMap[Exp[DSLGroup],ArrayBuffer[Exp[CodeGenRule]]]()
   val DeliteCollections = HashMap[Exp[DSLType], DeliteCollection]()
   val Externs = ArrayBuffer[Extern]()
+  
+  /**
+   * Convenience method providing access to defined ops in other modules
+   */  
+  def lookup(grpName: String, opName: String): Option[Rep[DSLOp]] = {
+    OpsGrp.find(t => t._1.name == grpName).flatMap(_._2.ops.find(_.name == opName))
+  }
        
   /**
    * IR Definitions
@@ -151,10 +160,10 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
       err("dcAlloc must take a single argument of type " + MInt.name + " and return an instance of " + tpe.name)
     if ((dc.size.args != List(tpe)) || (dc.size.retTpe != MInt))
       err("dcSize must take a single argument of type " + tpe.name + " and return an MInt")
-    if ((dc.apply.args != List(tpe, MInt)) || (dc.apply.retTpe != dc.tpePar))
-      err("dcApply must take two arguments of type(" + tpe.name + ", " + MInt.name + ") and return a " + dc.tpePar.name)
-    if ((dc.update.args != List(tpe, MInt, dc.tpePar)) || (dc.update.retTpe != MUnit))
-      err("dcUpdate must take arguments of type (" + tpe.name + ", " + MInt.name + ", " + dc.tpePar.name + ") and return " + MUnit.name)
+    if ((dc.apply.args != List(tpe, MInt)) || (dc.apply.retTpe != dc.tpeArg))
+      err("dcApply must take two arguments of type(" + tpe.name + ", " + MInt.name + ") and return a " + dc.tpeArg.name)
+    if ((dc.update.args != List(tpe, MInt, dc.tpeArg)) || (dc.update.retTpe != MUnit))
+      err("dcUpdate must take arguments of type (" + tpe.name + ", " + MInt.name + ", " + dc.tpeArg.name + ") and return " + MUnit.name)
     
     DeliteCollections += (tpe -> dc)
     ()

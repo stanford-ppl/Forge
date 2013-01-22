@@ -51,6 +51,12 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
       
     val vplus = op (Vector) ("+", infix, List(T withBound TNumeric), List(Vector,Vector), Vector, zip((T,T,T,Vector), (0,1), "(a,b) => a+b"))
     
+    val vsum = op (Vector) ("sum", infix, List(T withBound TNumeric), List(Vector), T, reduce((T,Vector), 0, lookup("Numeric","zero").get, "(a,b) => a+b"))
+    
+    val vprint = op (Vector) ("pprint", infix, List(T), List(Vector), MUnit, foreach((T,Vector), 0, "a => println(a)")) // will print out of order in parallel, but hey
+     
+    // val vfilter = op (Vector) ("filter", infix, List(T), List(Vector,MFunction(List(T), MBoolean)), Vector, filter((T,T,Vector), 0, "e => " + quotedArg(1) + "(e)", "e => e"))
+    
     val vslice = op (Vector) ("slice", infix, List(T), List(Vector, MInt, MInt), Vector, single(Vector, { 
       // inside single tasks we use normal DSL code just like applications would (modulo arg names)
       stream.printLines(

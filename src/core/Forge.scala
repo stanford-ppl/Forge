@@ -126,8 +126,11 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     "[" + args.map(_.name).mkString(",") + "]"
   }
   
+  // TODO: tpeArg should be a List that is the same length as the tpePars in hkTpe
   def makeTpeInst(hkTpe: Rep[DSLType], tpeArg: Rep[DSLType]) = hkTpe match {
-    case Def(Tpe(s,args,stage)) => s + "[" + quote(tpeArg) + "]"
+    case Def(Tpe(s,Nil,stage)) => s // rather lenient, might get strange results in an improperly specified dsl
+    case Def(Tpe(s,List(z),stage)) => s + "[" + quote(tpeArg) + "]"
+    case Def(Tpe(s,args,stage)) => err("tried to instantiate tpe " + hkTpe.name + " with arg " + tpeArg.name + ", but " + hkTpe.name + " requires " + args.length + " type parameters")
   }
   
   def instTpePar(tpePars: List[Rep[TypePar]], par: Rep[DSLType], tpeArg: Rep[DSLType]): List[Rep[DSLType]] = {

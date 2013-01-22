@@ -29,7 +29,7 @@ trait ScalaOps extends ForgeApplication {
   def misc() = {
     val Misc = grp("Misc")
     
-    val println = op (Misc) ("println", direct, List(), List(MString), MUnit, codegenerated, effect = simple)
+    val println = op (Misc) ("println", direct, List(), List(MAny), MUnit, codegenerated, effect = simple)
     codegen (println) ($cala, "println(" + println.quotedArg(0) + ")")
     
     val whileDo = op (Misc) ("__whileDo", direct, List(), List(MThunk(MBoolean),MThunk(MUnit)), MUnit, codegenerated, effect = simple)        
@@ -54,9 +54,11 @@ trait ScalaOps extends ForgeApplication {
     
     lift (Num) (T withBound TNumeric)
         
+    val zero = op (Num) ("zero", infix, List(T withBound TNumeric), List(), T, codegenerated)
     val plus = op (Num) ("+", infix, List(T withBound TNumeric), List(T,T), T, codegenerated)    
     val minus = op (Num) ("-", infix, List(T withBound TNumeric), List(T,T), T, codegenerated)     
     val times = op (Num) ("*", infix, List(T withBound TNumeric), List(T,T), T, codegenerated)    
+    codegen (zero) ($cala, "implicitly[Numeric["+zero.tpeInstance(0)+"]].zero")
     codegen (plus) ($cala, plus.quotedArg(0) + " + " + plus.quotedArg(1))
     codegen (minus) ($cala, minus.quotedArg(0) + " - " + minus.quotedArg(1))
     codegen (times) ($cala, times.quotedArg(0) + " * " + times.quotedArg(1))

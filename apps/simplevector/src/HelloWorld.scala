@@ -12,6 +12,7 @@ trait HelloSimple extends SimpleVectorApplication {
     val v1 = Vector[Int](10)
     val v2 = Vector[Int](10)
     
+    // defs
     var i = 0    
     while (i < v1.length) {
       v1(i) = i*2
@@ -21,6 +22,7 @@ trait HelloSimple extends SimpleVectorApplication {
       i += 1
     }
     
+    // zip
     val v3 = v1+v2
     i = 0
     println("v3 = v1+v2")
@@ -29,6 +31,7 @@ trait HelloSimple extends SimpleVectorApplication {
       i += 1
     }
 
+    // single
     println("v4 = v3.slice(3,5)")
     val v4 = v3.slice(3,5)
     i = 0
@@ -37,12 +40,29 @@ trait HelloSimple extends SimpleVectorApplication {
       i += 1
     }    
     
+    // map
     println("v5 = v4*5")
     val v5 = v4*5
     i = 0
     while (i < v5.length) {
       println("v5(" + i + "): " + v5(i))
       i += 1
-    }        
+    }      
+    
+    // reduce
+    println("v5.sum:")
+    val z = v5.sum
+    println(z)
+    
+    // foreach
+    println("v1.pprint:")
+    v1.pprint
+    
+    // filter
+    // TODO: not working yet
+    //
+    // println("v6 = v1.filter(_ < 5)")
+    // val v6 = v1.filter(_ < 5)
+    // v6.pprint
   }
 }

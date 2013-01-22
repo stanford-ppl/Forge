@@ -76,6 +76,35 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(" + opArgPrefix+zip.argIndices._1 + ", i)," + makeOpMethodName(dc.apply) + "(" + opArgPrefix+zip.argIndices._2 + ", i)))", stream, indent+2)
         emitWithIndent("}", stream, indent)            
         emitWithIndent("out", stream, indent)        
+      case reduce:Reduce =>
+        check(o)
+        val dc = DeliteCollections(reduce.tpePars._2)        
+        emitWithIndent("def func: (" + quote(reduce.tpePars._1) + "," + quote(reduce.tpePars._1) + ") => " + quote(reduce.tpePars._1) + " = " + inline(o, reduce.func), stream, indent)                    
+        emitWithIndent("var acc = " + makeOpMethodNameWithArgs(reduce.zero), stream, indent)
+        emitWithIndent("for (i <- 0 until " + makeOpMethodNameWithArgs(dc.size) + ") {", stream, indent)            
+        emitWithIndent("acc = " + " func(acc, " + makeOpMethodName(dc.apply) + "(" + opArgPrefix+reduce.argIndex + ", i))", stream, indent+2)
+        emitWithIndent("}", stream, indent)            
+        emitWithIndent("acc", stream, indent)                      
+      case filter:Filter =>
+        check(o)
+        val dc = DeliteCollections(filter.tpePars._3)        
+        emitWithIndent("def func: " + quote(filter.tpePars._1) + " => " + quote(filter.tpePars._2) + " = " + inline(o, filter.func), stream, indent)            
+        emitWithIndent("def cond: " + quote(filter.tpePars._1) + " => " + quote(MBoolean) + " = " + inline(o, filter.cond), stream, indent)            
+        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, filter.tpePars._1, filter.tpePars._2)) + "(0)", stream, indent)
+        emitWithIndent("for (i <- 0 until " + makeOpMethodNameWithArgs(dc.size) + ") {", stream, indent)            
+        emitWithIndent("if (cond(i)) {", stream, indent+2)
+        emitWithIndent("// TODO: dc_append", stream, indent+4)
+        // emitWithIndent(makeOpMethodName(dc.append) + "(out, func(" + makeOpMethodName(dc.apply) + "(" + opArgPrefix+map.argIndex + ", i)))", stream, indent+4)
+        emitWithIndent("}", stream, indent+2)            
+        emitWithIndent("}", stream, indent)            
+        emitWithIndent("out", stream, indent)                      
+      case foreach:Foreach =>
+        check(o)
+        val dc = DeliteCollections(foreach.tpePars._2)        
+        emitWithIndent("def func: " + quote(foreach.tpePars._1) + " => " + quote(MUnit) + " = " + inline(o, foreach.func), stream, indent)            
+        emitWithIndent("for (i <- 0 until " + makeOpMethodNameWithArgs(dc.size) + ") {", stream, indent)            
+        emitWithIndent("func(" + makeOpMethodName(dc.apply) + "(" + opArgPrefix+foreach.argIndex + ", i))", stream, indent+2)
+        emitWithIndent("}", stream, indent)            
     }    
   }
   

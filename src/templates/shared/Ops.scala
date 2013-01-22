@@ -152,6 +152,8 @@ trait BaseGenOps extends ForgeCodeGenBase {
   
   /**
    * Delite op sanity checking
+   * 
+   * These are mostly repetitive right now, but we could specialize the error checking more (or generalize it to be more concise).
    */
   def check(o: Rep[DSLOp]) { 
     o.opTpe match {
@@ -168,6 +170,22 @@ trait BaseGenOps extends ForgeCodeGenBase {
         if (DeliteCollections.get(colB).isEmpty) err("zip argument " + colB.name + " is not a DeliteCollection")
         if (zip.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("zipWith op with undefined type arg: " + o.name)
         if (zip.argIndices.productIterator.asInstanceOf[Iterator[Int]].exists(a => a < 0 || a > o.args.length)) err("zipWith op with illegal arg parameter: " + o.name)
+      case reduce:Reduce =>
+        val col = o.args.apply(reduce.argIndex)
+        if (DeliteCollections.get(col).isEmpty) err("reduce argument " + col.name + " is not a DeliteCollection")
+        if (reduce.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("reduce op with undefined type arg: " + o.name)
+        if (reduce.argIndex < 0 || reduce.argIndex > o.args.length) err("reduce op with illegal arg parameter: " + o.name)        
+        if (reduce.zero.retTpe != reduce.tpePars._1) err("reduce op with illegal zero parameter: " + o.name)
+      case filter:Filter =>
+        val col = o.args.apply(filter.argIndex)
+        if (DeliteCollections.get(col).isEmpty) err("filter argument " + col.name + " is not a DeliteCollection")
+        if (filter.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("filter op with undefined type arg: " + o.name)
+        if (filter.argIndex < 0 || filter.argIndex > o.args.length) err("filter op with illegal arg parameter: " + o.name)      
+      case foreach:Foreach =>
+        val col = o.args.apply(foreach.argIndex)
+        if (DeliteCollections.get(col).isEmpty) err("foreach argument " + col.name + " is not a DeliteCollection")
+        if (foreach.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("foreach op with undefined type arg: " + o.name)
+        if (foreach.argIndex < 0 || foreach.argIndex > o.args.length) err("foreach op with illegal arg parameter: " + o.name)      
     }
   }
   

@@ -48,7 +48,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println()
     emitBlockComment("dsl types", stream, indent=2)
     for (tpe <- Tpes) {
-      if (OpsGrp.contains(tpe) && !isPrimitiveType(tpe)) {
+      if (OpsGrp.contains(tpe) && !IR.isPrimitiveType(tpe)) {
         stream.print("  abstract class " + quote(tpe))
         if (DeliteCollections.contains(tpe)) stream.println(" extends DeliteCollection[" + DeliteCollections(tpe).tpeArg.name + "]") else stream.println()
         stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")      

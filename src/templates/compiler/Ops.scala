@@ -338,7 +338,7 @@ trait DeliteGenOps extends BaseGenOps {
         stream.println("  }")
         stream.println()
         stream.println("  override def dc_update[A:Manifest](x: Exp[DeliteCollection[A]], n: Exp[Int], y: Exp[A])(implicit ctx: SourceContext) = {")
-        val a = if (dc.tpeArg.isInstanceOf[Rep[TypePar]]) "A" else quote(dc.tpeArg) // hack!
+        val a = if (dc.tpeArg.tp.erasure == classOf[TypePar]) "A" else quote(dc.tpeArg) // hack!
         stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dc.update) + "(" + asTpe + "(x), n, y.asInstanceOf[Exp["+a+"]])") 
         stream.println("    else super.dc_update(x,n,y)")
         stream.println("  }")

@@ -34,8 +34,7 @@ trait BaseGenImports extends ForgeCodeGenBase {
     // stream.println("import " + dsl.toLowerCase() + "._")
     stream.println("import " + dsl.toLowerCase() + ".shared._")
     stream.println("import " + dsl.toLowerCase() + ".shared.ops._")        
-    if (Externs.length > 0)
-      stream.println("import " + dsl.toLowerCase() + ".extern._")
+    stream.println("import " + dsl.toLowerCase() + ".shared.extern._")
   }  
   
   def emitAllImports(stream: PrintWriter) {

@@ -27,6 +27,9 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     val T = tpePar("T")
     val Vector = tpe("Vector", List(T)) 
     
+    // TODO: define tpeAliases
+    // tpeAlias(Vector, "V")
+    
     /**
      * Data structures
      */

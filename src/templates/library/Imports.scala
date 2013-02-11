@@ -26,5 +26,6 @@ trait LibGenImports extends BaseGenImports {
     super.emitDSLImports(stream)
     stream.println("import " + packageName + "._")
     stream.println("import " + packageName + ".classes._")
+    stream.println("import " + dsl.toLowerCase() + ".library.extern._")    
   }   
 }

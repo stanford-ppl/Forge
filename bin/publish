@@ -84,17 +84,21 @@ object ${dslName}Build extends Build {
 
 
   // build targets
-  lazy val _${dslName} = Project("${dslName}", file("${dslName}vector"), settings = virtBuildSettings) dependsOn(${dslName}Apps)
-  lazy val ${dslName}Extern = Project("${dslName}-extern", file("extern"), settings = virtBuildSettings)
-  lazy val ${dslName}Shared = Project("${dslName}-shared", file("shared"), settings = virtBuildSettings) dependsOn(${dslName}Extern)
+  lazy val ${dslName}Shared = Project("${dslName}-shared", file("shared"), settings = virtBuildSettings)
   lazy val ${dslName}Comp = Project("${dslName}-comp", file("compiler"), settings = virtBuildSettings) dependsOn(${dslName}Shared)
   lazy val ${dslName}Lib = Project("${dslName}-lib", file("library"), settings = virtBuildSettings) dependsOn(${dslName}Shared)
 
-  lazy val ${dslName}Apps = Project("${dslName}-apps", file("apps"), settings = virtBuildSettings) dependsOn(${dslName}Comp, ${dslName}Lib)
+  lazy val _${dslName}Apps = Project("${dslName}-apps", file("apps"), settings = virtBuildSettings) dependsOn(${dslName}Comp, ${dslName}Lib)
 }
 """)
     return s.substitute(dslName=dsl)
  
+def writeEmptyExtern(dest, pkgName):
+  os.mkdir(dest)
+  dummyFile = open(dest + "/Extern.scala", 'w') 
+  dummyFile.write("package " + pkgName)
+  dummyFile.close()
+  
 def publish(dsl, opts):
     if not os.path.isdir(FORGE_HOME + "/" + FORGE_GENERATED + "/" + dsl):
         err("could not find generated DSL " + dsl + ". (did you forget to run forge?)")
@@ -106,8 +110,16 @@ def publish(dsl, opts):
         shutil.rmtree(build_dir)
 
     # source code
-    shutil.copytree(FORGE_GENERATED + "/" + dsl, build_dir)
-    shutil.copytree(FORGE_HOME + "/extern/" + dsl, build_dir + "/extern/")
+    shutil.copytree(FORGE_GENERATED + "/" + dsl, build_dir)    
+
+    for t in ['shared','compiler','library']:
+        src = FORGE_HOME + "/extern/" + dsl + "/" + t + "/src/"
+        dest = build_dir + "/" + t + "/src/" + dsl + "/extern/"
+        if os.path.exists(src):
+          shutil.copytree(src, dest)    
+        else:
+          writeEmptyExtern(dest, dsl + "." + t + "." + "extern")
+          
     shutil.copytree(FORGE_HOME + "/apps/" + dsl, build_dir + "/apps/")
 
     # sbt project

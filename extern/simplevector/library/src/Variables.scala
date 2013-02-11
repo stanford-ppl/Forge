@@ -1,31 +1,11 @@
-package simplevector.extern
+package simplevector.library.extern
 
 import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common._
-import ppl.delite.framework.codegen.delite.overrides._
-import ppl.delite.framework.ops.DeliteOpsExp
+import simplevector.library.SimpleVectorBase
 
-/**
- * Although here we are currently simply aliasing existing LMS implementations,
- * a typical external implementation would be fully self-contained in this file.
- */
-
-// For front-end (shared) implementation
-trait LiftVar extends LiftVariables {
-  this: VarOps =>
-}
-trait VarOps extends Variables
-
-// For compiler (LMS) implementation
-trait VarOpsExp extends VariablesExp
-trait ScalaGenVarOps extends ScalaGenVariables with DeliteScalaGenVariables { val IR: VariablesExp with DeliteOpsExp }
-trait CudaGenVarOps extends CudaGenVariables
-trait OpenCLGenVarOps extends OpenCLGenVariables
-trait CGenVarOps extends CGenVariables
-
-// For interpeter (library) implementation
-trait VarWrapper extends BaseWrapper {
+trait VarWrapper extends SimpleVectorBase {
   type Var[+T] = Variable[T @uncheckedVariance]  
   
   class Variable[T:Manifest](elem: T) {

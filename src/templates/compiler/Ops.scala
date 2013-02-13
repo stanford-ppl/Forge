@@ -19,19 +19,10 @@ trait DeliteGenOps extends BaseGenOps {
 
   def baseExpCls(grp: Rep[DSLGroup]) = {
     // in order of decreasing inclusiveness
-    if (grp.isInstanceOf[Rep[DSLType]] && DeliteCollections.contains(grp.asInstanceOf[Rep[DSLType]])) "DeliteCollectionOpsExp"
+    if (grpIsTpe(grp) && DeliteCollections.contains(grpAsTpe(grp))) "DeliteCollectionOpsExp"
     else if (OpsGrp.exists(g => g._2.ops.exists(o => o.effect != pure))) "BaseFatExp with EffectExp"
     else "BaseFatExp"
   }
-
-  var quoteLiterally = false  
-  def quoteLiteral(x: Exp[Any]): String = {
-    val save = quoteLiterally
-    quoteLiterally = true
-    val z = quote(x)
-    quoteLiterally = save
-    z
-  }    
   
   override def quote(x: Exp[Any]): String = x match {
     case Def(PrintLines(p,lines)) if quoteLiterally => lines.map(l => (" "*4)+quote(l)).mkString(nl)    
@@ -43,7 +34,7 @@ trait DeliteGenOps extends BaseGenOps {
         !s.startsWith("emit")
       }      
       val body2 = body map { l => if (addPrint(l)) "stream.println("+l+")" else l }      
-      val result = ("stream.println(\"val " + unquotes("quote(sym)") + " = {\")" :: body2) :+ "stream.println(\"}\")"
+      val result = ("stream.println(\"val \"+quote(sym)+\" = {\")" :: body2) :+ "stream.println(\"}\")"
           
       // add indentation and newline
       nl + result.map(r => (" "*6)+r).mkString(nl)
@@ -51,6 +42,8 @@ trait DeliteGenOps extends BaseGenOps {
     case Def(QuoteBlockResult(name,args,ret)) =>
       "emitBlock(" + name + ")" + nl + 
       "quote(getBlockResult(" + name + "))" 
+    
+    case Def(QuoteSeq(i)) => "Seq("+unquotes(opArgPrefix+i+".map(quote).mkString("+quotes(",")+")")+")"
     
     case Const(s: String) if quoteLiterally => s // no quotes, wildcards will be replaced later in inline
     case Const(s: String) => replaceWildcards(super.quote(s)) // quote first, then insert wildcards
@@ -104,6 +97,8 @@ trait DeliteGenOps extends BaseGenOps {
     emitNodeConstructors(uniqueOps, stream)
     stream.println()
     emitSyms(uniqueOps, stream)
+    stream.println()
+    emitAliasInfo(uniqueOps, stream)    
     stream.println()
     emitMirrors(uniqueOps, stream)
     stream.println()    
@@ -202,7 +197,7 @@ trait DeliteGenOps extends BaseGenOps {
       if (o.opTpe == codegenerated) {
         for ((arg,i) <- o.args.zipWithIndex) {
           arg match {
-            case Def(FTpe(args, ret)) =>
+            case Def(FTpe(args,ret,freq)) =>
               stream.println()
               emitWithIndent("val b_" + i + " = reifyEffects(" + opArgPrefix + i + ")", stream, 4)
               emitWithIndent("val sb_" + i + " = summarizeEffects(b_" + i + ")", stream, 4)
@@ -223,14 +218,15 @@ trait DeliteGenOps extends BaseGenOps {
       
       def makeOpNodeNameWithModifiedArgs(o: Rep[DSLOp]) = {
         makeOpNodeNameWithArgs(o, o => "(" + o.args.zipWithIndex.map(t => t._1 match {
-          case Def(FTpe(args, ret)) => "b_" + t._2
+          case Def(FTpe(args,ret,freq)) => "b_" + t._2
           case _ => opArgPrefix + t._2
         }).mkString(",") + ")")
       }
       
       if (summary.length > 0) {
-        if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
-        emitWithIndent(makeEffectAnnotation(o.effect) + "(" + makeOpNodeNameWithModifiedArgs(o) + ", " + summarizeEffects(summary) + ")", stream, 4)
+        // if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
+        val prologue = if (o.effect == simple) " andAlso Simple()" else ""
+        emitWithIndent(makeEffectAnnotation(simple) + "(" + makeOpNodeNameWithModifiedArgs(o) + ", " + summarizeEffects(summary) + prologue + ")", stream, 4)
       }
       else {
         stream.print("    " + makeEffectAnnotation(o.effect) + "(" + makeOpNodeNameWithArgs(o) + ")")
@@ -241,17 +237,17 @@ trait DeliteGenOps extends BaseGenOps {
   }
   
   def emitSyms(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
-    if (uniqueOps.exists(o => o.args.exists(t => t match { case Def(FTpe(a,b)) => true; case _ => false}))) {
+    if (uniqueOps.exists(o => o.args.exists(t => t match { case Def(FTpe(a,b,freq)) => true; case _ => false}))) {
       emitBlockComment("Syms", stream, indent=2)
       
       var symsBuf      = "override def syms(e: Any): List[Sym[Any]] = e match {" + nl
       var boundSymsBuf = "override def boundSyms(e: Any): List[Sym[Any]] = e match {" + nl
       var symsFreqBuf  = "override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {" + nl 
       
-      def makeSym(o: Rep[DSLOp], wrap: String) = {
-        val symsArgs = o.args.zipWithIndex.collect { case (Def(FTpe(args, ret)), i) => i }
+      def makeSym(o: Rep[DSLOp], wrap: String, addFreq: Boolean = false) = {
+        val symsArgs = o.args.zipWithIndex.collect { case (Def(FTpe(args,ret,freq)), i) => (freq,i) }
         if (symsArgs.length > 0) {
-          val symsArgsStr = symsArgs.map(i => wrap + "(" + opArgPrefix + i + ")").mkString(":::")
+          val symsArgsStr = symsArgs.map { case (f,i) => wrap + (if (addFreq) makeFrequencyAnnotation(f) else "") + "(" + opArgPrefix + i + ")" }.mkString(":::")
           "    case " + makeOpSimpleNodeNameWithArgs(o) + " => " + symsArgsStr + nl
         }
         else ""
@@ -260,7 +256,7 @@ trait DeliteGenOps extends BaseGenOps {
       for (o <- uniqueOps if o.opTpe == codegenerated) { 
         symsBuf += makeSym(o, "syms") 
         boundSymsBuf += makeSym(o, "effectSyms") 
-        symsFreqBuf += makeSym(o, "freqNormal") // TODO: how do we know?
+        symsFreqBuf += makeSym(o, "", addFreq = true) 
       }
     
       symsBuf      += "    case _ => super.syms(e)" + nl + "  }"
@@ -268,6 +264,46 @@ trait DeliteGenOps extends BaseGenOps {
       symsFreqBuf  += "    case _ => super.symsFreq(e)" + nl + "  }"
       
       for (buf <- List(symsBuf,boundSymsBuf,symsFreqBuf)) emitWithIndent(buf,stream,2)                  
+    }
+  }
+  
+  def emitAliasInfo(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
+    if (uniqueOps.exists(o => o.aliasHint != nohint)) {          
+      emitBlockComment("Aliases / Sharing", stream, indent=2)
+      
+      var aliasBuf    = "override def aliasSyms(e: Any): List[Sym[Any]] = e match {" + nl
+      var containBuf  = "override def containSyms(e: Any): List[Sym[Any]] = e match {" + nl
+      var extractBuf  = "override def extractSyms(e: Any): List[Sym[Any]] = e match {" + nl
+      var copyBuf     = "override def copySyms(e: Any): List[Sym[Any]] = e match {" + nl
+      
+      def makeAliasAnnotation(o: Rep[DSLOp], args: List[Int]) = {
+        val rhs = if (args == Nil) "Nil" else args.map(i => "syms(" + opArgPrefix + i + ")").mkString(":::")        
+        "    case " + makeOpSimpleNodeNameWithArgs(o) + " => " + rhs + nl
+      }
+      
+      def makeAllAliasAnnotations(o: Rep[DSLOp], aliasSyms: Option[List[Int]], containSyms: Option[List[Int]], extractSyms: Option[List[Int]], copySyms: Option[List[Int]]) = {
+        aliasSyms.foreach   { l => aliasBuf   += makeAliasAnnotation(o,l) }
+        containSyms.foreach { l => containBuf += makeAliasAnnotation(o,l) }
+        extractSyms.foreach { l => extractBuf += makeAliasAnnotation(o,l) }
+        copySyms.foreach    { l => copyBuf    += makeAliasAnnotation(o,l) }                    
+      }
+      
+      for (o <- uniqueOps if o.aliasHint != nohint) {
+        o.aliasHint match {
+          case AliasCopies(z) =>
+            if (o.args.length == z.length) makeAllAliasAnnotations(o, Some(Nil), Some(Nil), Some(Nil), Some(z)) // == aliasesNone
+            else makeAllAliasAnnotations(o, None, None, None, Some(z))
+            
+          case AliasInfo(al,co,ex,cp) => makeAllAliasAnnotations(o,al,co,ex,cp)
+        }
+      }
+              
+      aliasBuf   += "    case _ => super.aliasSyms(e)" + nl + "  }"
+      containBuf += "    case _ => super.containSyms(e)" + nl + "  }"
+      extractBuf += "    case _ => super.extractSyms(e)" + nl + "  }"
+      copyBuf    += "    case _ => super.copySyms(e)" + nl + "  }"
+      
+      for (buf <- List(aliasBuf,containBuf,extractBuf,copyBuf)) emitWithIndent(buf,stream,2)                  
     }
   }
   

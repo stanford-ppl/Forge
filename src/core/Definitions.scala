@@ -1,7 +1,7 @@
 package ppl.dsl.forge
 package core
 
-trait Definitions {
+trait Definitions extends DerivativeTypes {
   this: Forge =>
 
   /**
@@ -11,11 +11,10 @@ trait Definitions {
   val opArgPrefix = "__arg"
   val implicitOpArgPrefix = "__imp"
   val qu = "__quote"
-  
+    
   /**
    * Built-in types
-   */  
-  
+   */    
   // concrete types (M stands for "Meta")
   lazy val MAny = tpe("Any")
   lazy val MInt = tpe("Int")
@@ -24,14 +23,19 @@ trait Definitions {
   lazy val MString = tpe("String")
   lazy val MUnit = tpe("Unit")
   lazy val byName = tpe("Thunk")
-  def MThunk(ret: Rep[DSLType]) = ftpe(List(byName), ret)
-  def MFunction(args: List[Rep[DSLType]], ret: Rep[DSLType]) = ftpe(args,ret)  
+  def MThunk(ret: Rep[DSLType], freq: Frequency = normal) = ftpe(List(byName),ret,freq)
+  def MFunction(args: List[Rep[DSLType]], ret: Rep[DSLType], freq: Frequency = normal) = ftpe(args,ret,freq)
   lazy val MSourceContext = tpe("SourceContext")
   
   // generic types
   // should these return a different Forge type (e.g. Rep[TypeConstructor] or Rep[GenericType]) than concrete types?
   def GVar(tpePar: Rep[TypePar]) = tpe("Var", List(tpePar)) 
   def GArray(tpePar: Rep[TypePar]) = tpe("Array", List(tpePar))     
+  
+  /**
+   * DSLType placeholders
+   */
+  def varArgs(tpeArg: Rep[DSLType]): Rep[DSLType]  
   
   /**
    * stage tags - only 2 stages
@@ -85,6 +89,28 @@ trait Definitions {
   object simple extends EffectType
   case class write(args: Int*) extends EffectType
   
+  /**
+   * Alias hints
+   */
+  object nohint extends AliasHint  
+  case class AliasInfo(aliases: Option[List[Int]], contains: Option[List[Int]], extracts: Option[List[Int]], copies: Option[List[Int]]) extends AliasHint
+  case class AliasCopies(args: List[Int]) extends AliasHint
+  
+  // generic alias hint constructor
+  def info(aliases: Option[List[Int]], contains: Option[List[Int]], extracts: Option[List[Int]], copies: Option[List[Int]]) = AliasInfo(aliases, contains, extracts, copies)
+  
+  // convenience methods for constructing common alias hints
+  def copies(arg: Int): AliasHint = copies(List(arg))
+  def copies(args: List[Int]) = AliasCopies(args)
+  // others? aliasesSome(..)?
+  
+  /**
+   * Frequency annotations for code motion
+   */
+  object normal extends Frequency
+  object hot extends Frequency
+  object cold extends Frequency
+   
   /**
    * Delite op types
    */
@@ -169,9 +195,21 @@ trait Definitions {
 }
 
 
-trait DefinitionsExp extends Definitions with DerivativeTypes {
+trait DefinitionsExp extends Definitions with DerivativeTypesExp {
   this: ForgeExp =>
   
+  /**
+   * DSLType placeholders
+   */
+  
+   // T*
+   case class VarArgs(tpeArg: Rep[DSLType]) extends Def[DSLType]
+   def varArgs(tpeArg: Rep[DSLType]) = VarArgs(tpeArg)    
+    
+   
+  /**
+   * Delite ops
+   */
   case class SingleTask(retTpe: Rep[DSLType], func: Rep[String]) extends DeliteOpType
   def forge_single(retTpe: Rep[DSLType], func: Rep[String]) = SingleTask(retTpe, func)
   
@@ -189,4 +227,5 @@ trait DefinitionsExp extends Definitions with DerivativeTypes {
   
   case class Foreach(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) extends DeliteOpType  
   def forge_foreach(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) = Foreach(tpePars, argIndex, func)    
+    
 }

@@ -98,6 +98,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("    }")
     stream.println("    res")
     stream.println("  }")
+    stream.println()
     stream.println("}")
   }
 

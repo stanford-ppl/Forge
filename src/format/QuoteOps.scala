@@ -39,7 +39,13 @@ trait QuoteOps extends Base {
   // def quote_arginstance(x: Rep[DSLOp], i: Int): Rep[DSLType]
   // def quote_quotedarginstance(x: Rep[DSLOp], i: Int): String
   def quote_quotedarginstance(i: Int): String
-       
+
+  // convenience method for handling Seq[_] in code generators
+  // TODO: instead of providing multiple methods, e.g. quotedArg and quotedSeq, should we have a more generic quote?
+  //  quote(i) as Seq
+  //  quote(anew.args(0)) // type is VarArgs
+  def quotedSeq(i: Int): Rep[String]
+  
   /**
    * Function tpes
    */
@@ -74,13 +80,18 @@ trait QuoteOpsExp extends QuoteOps {
   def quote_quotedarginstance(i: Int) = unquotes("quote(" + opArgPrefix + i + ")")
   
   /**
+   * Sequences
+   */  
+  case class QuoteSeq(arg: Int) extends Def[String]
+  def quotedSeq(arg: Int) = QuoteSeq(arg)
+  
+  /**
    * Function types
-   */
-    
+   */    
   case class QuoteBlockResult(name: String, args: List[Rep[DSLType]], ret: Rep[DSLType]) extends Def[String]
   
   def quote_blockresult(x: Rep[DSLOp], argIndex: Int) = x.args.apply(argIndex) match {
-    case Def(FTpe(args,ret)) => QuoteBlockResult(opArgPrefix + argIndex,args,ret)
+    case Def(FTpe(args,ret,freq)) => QuoteBlockResult(opArgPrefix + argIndex,args,ret)
     case _ => err("cannot quote block result of non-function type " + x.name)
   }
 }

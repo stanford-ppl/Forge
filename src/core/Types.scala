@@ -3,10 +3,10 @@ package ppl.dsl.forge
 /*
  * Types used for declaring new objects inside a Forge specification
  */
- abstract class TypeClass {
-   def name: String
-   def prefix: String
- }
+abstract class TypeClass {
+  def name: String
+  def prefix: String
+}
 abstract class DSLGroup 
 abstract class DSLType extends DSLGroup
 abstract class TypePar extends DSLType
@@ -23,6 +23,8 @@ abstract class CodeGenRule
 abstract class StageTag
 abstract class MethodType
 abstract class EffectType
+abstract class AliasHint
+abstract class Frequency
 abstract class OpType
 abstract class DeliteType
 abstract class CodeGenerator {

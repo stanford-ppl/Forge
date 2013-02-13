@@ -8,8 +8,13 @@ package core
  */
 
 trait DerivativeTypes {
-  this: ForgeExp =>
+  this: Forge =>
   
+}
+
+trait DerivativeTypesExp {
+  this: ForgeExp =>
+
   abstract class DSLOps {
     val grp: Rep[DSLGroup]
     lazy val name = grp.name + "Ops"

@@ -25,8 +25,14 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     case write(args @ _*) => "reflectWrite(" + args.map(a => opArgPrefix + a).mkString(",") + ")"
   }
   
+  def makeFrequencyAnnotation(freq: Frequency) = freq match {
+    case `normal` => "freqNormal"
+    case `hot` => "freqHot"
+    case `cold` => "freqCold"
+  }
+  
   def blockify(a: Exp[Any]): String = a match {
-    case Def(FTpe(args,ret)) => "Block[" + quote(ret) + "]"
+    case Def(FTpe(args,ret,freq)) => "Block[" + quote(ret) + "]"
     case _ => repify(a)
   }
     

@@ -17,11 +17,23 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
   import IR._
+
+  // inline 'unquotes' calls as well in the library version
+  // is this always the right thing to do? probably not! how do we know?
+  // override def inline(o: Rep[DSLOp], str: Exp[String], quoter: Exp[Any] => String = quote) = {     
+  //   var x = super.inline(o, str, quoter)
+  //   val quotePattern = new Regex("""\"\+(.*?)\+\"""", "body")
+  //   x = quotePattern replaceAllIn (x, m => m.group("body"))
+  //   x
+  // }
   
-  override def quote(x: Exp[Any]) : String = x match {    
+  override def quote(x: Exp[Any]): String = x match {    
     case Def(PrintLines(p, lines)) =>    
       // since this is called from emitWithIndent, the first line has an extra indent
       lines.map(l => (" "*4)+quote(l)).mkString(nl) 
+      
+    // case Def(QuoteSeq(i)) => "("+opArgPrefix+i+": _*)"  // not exactly a quoted sequence..
+    case Def(QuoteSeq(i)) => opArgPrefix+i
       
     case Const(s: String) => replaceWildcards(s) // don't add quotes 
     
@@ -111,27 +123,34 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   def emitClass(opsGrp: DSLOps, stream: PrintWriter) {
     if (grpIsTpe(opsGrp.grp)) {
       val tpe = grpAsTpe(opsGrp.grp)
-      val data = DataStructs.filter(_.tpe == tpe).apply(0) // TODO
-      stream.print("class " + data.tpe.name)
-      stream.print(makeTpeParsWithBounds(data.tpePars))
-      stream.print("(")  
-      stream.print(makeFieldArgs(data))
-      stream.print(") {")
-      stream.println()
-      stream.println(makeFieldsWithInitArgs(data))
-      for (o <- unique(opsGrp.ops) if o.style == infix) {       
-        stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
-        stream.print("(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repify(t._1)).mkString(",") + ")") 
-        stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = data.tpePars))
-        stream.println(" = {")
-        // cheat a little bit for consistency: the codegen rule may refer to this arg
-        emitWithIndent("val " + opArgPrefix + 0 + " = this", stream, 4)
-        emitOp(o, stream, indent=4)
-        stream.println("  }")
+      val d = DataStructs.find(_.tpe == tpe)
+      d.foreach { data => 
+        stream.print("class " + data.tpe.name)
+        stream.print(makeTpeParsWithBounds(data.tpePars))
+        stream.print("(")  
+        stream.print(makeFieldArgs(data))
+        stream.print(") {")
+        stream.println()
+        stream.println(makeFieldsWithInitArgs(data))
+        for (o <- unique(opsGrp.ops) if o.style == infix) {       
+          stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
+          stream.print("(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repify(t._1)).mkString(",") + ")") 
+          stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = data.tpePars))
+          stream.println(" = {")
+          // cheat a little bit for consistency: the codegen rule may refer to this arg
+          emitWithIndent("val " + opArgPrefix + 0 + " = this", stream, 4)
+          emitOp(o, stream, indent=4)
+          stream.println("  }")
+        }
+        stream.println("}")
+        stream.println()
       }
-      stream.println("}")
-      stream.println()
-    }      
+      if (d.isEmpty && !isPrimitiveType(tpe)) {
+        // what should we actually do here? let the user define a lib type in this case?
+        warn("no data structure found for tpe " + tpe.name + ". emitting type alias " + quote(tpe) + " = scala." + quote(tpe) + ", which may be nonsense.")
+        stream.println("  type " + quote(tpe) + " = scala." + quote(tpe))
+      }
+    }
     
     for (o <- unique(opsGrp.ops)) {       
       stream.print("  def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars))
@@ -140,7 +159,10 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       stream.println(" = {")      
       o.style match {
         case `static` => emitOp(o, stream, indent=4)
-        case `infix` if grpIsTpe(opsGrp.grp) => emitWithIndent(opArgPrefix + 0 + "." + o.name + "(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1)).mkString(",") + ")", stream, 4)
+        case `infix` if grpIsTpe(opsGrp.grp) && DataStructs.exists(_.tpe == grpAsTpe(opsGrp.grp)) => 
+          val args = o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1)).mkString(",")
+          val argsWithParen = if (args == "") args else "(" + args + ")"
+          emitWithIndent(opArgPrefix + 0 + "." + o.name + argsWithParen, stream, 4)
         case `infix` => emitOp(o, stream, indent=4)
         case `direct` => emitOp(o, stream, indent=4)        
       }

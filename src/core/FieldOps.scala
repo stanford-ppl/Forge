@@ -45,20 +45,23 @@ trait FieldOpsExp extends FieldOps {
   def infix_name(x: Exp[DSLType])(implicit o: Overloaded1): String = x match {
     case Def(Tpe(name,tpePars,stage)) => name
     case Def(TpeInst(t,args,stage)) => infix_name(t)(o)
-    case Def(FTpe(args,ret)) => "Function"
+    case Def(FTpe(args,ret,freq)) => "Function"
     case Def(TpePar(name,ctx)) => name        
+    case Def(VarArgs(t)) => "*" + infix_name(t)(o)
   }  
   def infix_tpePars(x: Exp[DSLType]) = x match {
     case Def(Tpe(s,tpePars,stage)) => tpePars
     case Def(TpeInst(t,args,stage)) => Nil
     case Def(TpePar(name,ctx)) => Nil
-    case Def(FTpe(args,ret)) => Nil
+    case Def(FTpe(args,ret,freq)) => Nil
+    case Def(VarArgs(t)) => Nil
   }
   def infix_stage(x: Exp[DSLType]) = x match {
     case Def(Tpe(s,tpePars,stage)) => stage
     case Def(TpeInst(t,args,stage)) => stage
     case Def(TpePar(name,ctx)) => future
-    case Def(FTpe(args,ret)) => future
+    case Def(FTpe(args,ret,freq)) => future
+    case Def(VarArgs(t)) => future
   }  
     
   
@@ -67,7 +70,7 @@ trait FieldOpsExp extends FieldOps {
    */
   def infix_name(x: Exp[DSLGroup])(implicit o: Overloaded2): String = x match {
     case Def(Grp(name)) => name    
-    case y: Exp[DSLType] => y.name
+    case _ if grpIsTpe(x) => grpAsTpe(x).name
   }  
   
   
@@ -75,32 +78,35 @@ trait FieldOpsExp extends FieldOps {
    * DSLOp
    */
   def infix_args(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff)) => args
+    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff,alias)) => args
   }
   def infix_implicitArgs(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff)) => implArgs
+    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff,alias)) => implArgs
   }  
   def infix_grp(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff)) => grp
+    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff,alias)) => grp
   }
   def infix_name(x: Exp[DSLOp])(implicit o: Overloaded3) = x match {
-    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff)) => name
+    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff,alias)) => name
   }  
   def infix_style(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff)) => style
+    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff,alias)) => style
   }  
   def infix_tpePars(x: Exp[DSLOp])(implicit o: Overloaded1) = x match {
-    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff)) => tpePars
+    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff,alias)) => tpePars
   }  
   def infix_retTpe(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff)) => retTpe
+    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff,alias)) => retTpe
   }  
   def infix_opTpe(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff)) => opTpe
+    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff,alias)) => opTpe
   }  
   def infix_effect(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff)) => eff
+    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff,alias)) => eff
   }    
+  def infix_aliasHint(x: Exp[DSLOp]) = x match {
+    case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff,alias)) => alias
+  }      
   
   /**
    * CodeGenRule

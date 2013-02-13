@@ -35,6 +35,15 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     dslStream.close()
   }  
     
+  def emitOpsHeader(stream: PrintWriter) {
+    stream.println("package " + packageName + ".ops")
+    stream.println()
+    emitScalaReflectImports(stream)
+    emitLMSImports(stream)
+    emitDSLImports(stream)
+    stream.println()
+  }
+  
   def emitOps() {
     val opsDir = dslDir + File.separator + "ops"
     Directory(Path(opsDir)).createDirectory()
@@ -42,17 +51,21 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     // 1 file per grp, includes only abstract Ops
     for ((grp,ops) <- OpsGrp) {
       val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"Ops"+".scala"))
-      stream.println("package " + packageName + ".ops")
-      stream.println()
-      emitScalaReflectImports(stream)
-      emitLMSImports(stream)
-      emitDSLImports(stream)
-      stream.println()
+      emitOpsHeader(stream)
       if (Lifts.contains(grp)) {
         emitLifts(grp, Lifts(grp), stream)
         stream.println()
       }
       emitOpSyntax(ops, stream)        
+      stream.close()
+    }
+    
+    // emit any lifts that did not have a corresponding ops
+    for ((grp,a) <- Lifts.filterNot(p => OpsGrp.contains(p._1))) {
+      val stream = new PrintWriter(new FileWriter(opsDir+File.separator+"Lift"+grp.name+".scala"))
+      emitOpsHeader(stream)
+      emitLifts(grp, Lifts(grp), stream)
+      stream.println()
       stream.close()
     }                
   }  

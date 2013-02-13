@@ -64,5 +64,7 @@ trait HelloSimple extends SimpleVectorApplication {
     // println("v6 = v1.filter(_ < 5)")
     // val v6 = v1.filter(_ < 5)
     // v6.pprint
+  
   }
+   
 }

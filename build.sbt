@@ -20,7 +20,7 @@ scalacOptions += "-Yvirtualize"
 
 //scalacOptions += "-Yvirtpatmat"
 
-//scalacOptions in Compile ++= Seq(/*Unchecked, */Deprecation)
+scalacOptions in Compile ++= Seq("-unchecked", "-deprecation")
 
 // needed for scala.tools, which is apparently not included in sbt's built in version
 libraryDependencies += "org.scala-lang" % "scala-library" % virtScala

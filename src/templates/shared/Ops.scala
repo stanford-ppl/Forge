@@ -17,7 +17,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
    * Utility methods
    */  
   def baseOpsCls(grp: Rep[DSLGroup]) = {
-    if (OpsGrp(grp).ops.exists(o => nameClashes(o).length > 1)) "Base with OverloadHack"
+    if (OpsGrp(grp).ops.exists(o => nameClashesUniversal(o).length > 1)) "Base with OverloadHack"
     else "Base"
   }
   
@@ -106,9 +106,10 @@ trait BaseGenOps extends ForgeCodeGenBase {
   def makeOpImplicitArgsWithOverloadWithType(o: Rep[DSLOp], asVals: Boolean = false) = makeImplicitArgsWithType(implicitArgsWithOverload(o), asVals)
   
   // overload name clash resolution using implicit hack
-  def nameClashes(o: Rep[DSLOp]) = OpsGrp.values.toList.flatMap(g => g.ops.filter(_.name == o.name))
+  def nameClashesGrp(o: Rep[DSLOp]) = OpsGrp(o.grp).ops.filter(_.name == o.name) 
+  def nameClashesUniversal(o: Rep[DSLOp]) = OpsGrp.values.toList.flatMap(g => g.ops.filter(_.name == o.name))
   def nameClashId(o: Rep[DSLOp]) = {
-    val clashes = nameClashes(o)
+    val clashes = nameClashesUniversal(o)
     if (clashes.length > 1) (clashes.indexOf(o)+1).toString else ""    
   }
   def implicitArgsWithOverload(o: Rep[DSLOp]) = {    
@@ -120,17 +121,19 @@ trait BaseGenOps extends ForgeCodeGenBase {
       o.implicitArgs
     }
   }      
-  def needDisambiguate(o: Rep[DSLOp]) = {
+  def needDisambiguate(o: Rep[DSLOp], clasher: Rep[DSLOp] => List[Rep[DSLOp]] = nameClashesGrp) = {
     // TODO: when do we need to disambiguate implicit args? (explicitly pass them). the fundamental reason is if there are
     // multiple possible implicits in scope.. how do we know? should we just always pass them explicitly? (this could improve staging performance, too)
      
     // the issue with nameClashes is that if the receiver method (e.g. string_+) also requires overload implicits, the ones from OverloadHack are also in scope
     // we should be able to solve this by de-prioritizing the OverloadHack vals somehow
-    (nameClashes(o).length > 1 && unique(OpsGrp(o.grp).ops).contains(o)) // inefficient!! -> should refactor things so that we can store this with the op when it is created.
+    (clasher(o).length > 1 && unique(OpsGrp(o.grp).ops).contains(o)) // inefficient!! -> should refactor things so that we can store this with the op when it is created.
   }
   
   // method names
-  def makeFullArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String) = makeTpePars(o.tpePars) + makeArgs(o) + (if (needDisambiguate(o)) makeOpImplicitArgsWithOverload(o) else "")  
+  def makeFullArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String, clasher: Rep[DSLOp] => List[Rep[DSLOp]] = nameClashesGrp) = {
+    makeTpePars(o.tpePars) + makeArgs(o) + (if (needDisambiguate(o,clasher)) makeOpImplicitArgsWithOverload(o) else "")  
+  }
   def makeOpMethodName(o: Rep[DSLOp]) = {
     // adding the nameClashId is another way to avoid chaining the Overload implicit, but the weird method names that result are confusing
     val i = "" //nameClashId(o)    
@@ -140,7 +143,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
   }
   def makeOpMethodNameWithArgs(o: Rep[DSLOp]) = makeOpMethodName(o) + makeFullArgs(o, makeOpArgs)
-  def makeOpMethodNameWithFutureArgs(o: Rep[DSLOp]) = makeOpMethodName(o) + makeFullArgs(o, makeOpFutureArgs)
+  def makeOpMethodNameWithFutureArgs(o: Rep[DSLOp]) = makeOpMethodName(o) + makeFullArgs(o, makeOpFutureArgs, nameClashesUniversal) // front-end can name clash with anything
   def makeOpMethodSignature(o: Rep[DSLOp]) = "def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithOverloadWithType(o)
   def makeSyntaxMethod(o: Rep[DSLOp]) = {
     "def " + o.name + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithNowType(o) + makeOpImplicitArgsWithOverloadWithType(o) + " = " + makeOpMethodNameWithFutureArgs(o)

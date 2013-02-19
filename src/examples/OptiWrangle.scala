@@ -42,6 +42,20 @@ trait OptiWrangle extends ForgeApplication with ScalaOps {
     val table_cut_helper = op (Table) ("table_cut_helper", infix, List(), List(Table, AS, MString), AS, codegenerated)
     codegen (table_cut_helper) ($cala, quotedArg(1) + " map (x => x.replaceAll("+quotedArg(2)+", \"\"))")
     
+    val table_drop = op (Table) ("drop", infix, List(), List(Table, MInt), Table, map((AS, AS, Table), 0, "e => "+quotedArg(0)+".table_drop_helper(e, "+quotedArg(1)+")"))
+    val table_drop_helper = op (Table) ("table_drop_helper", infix, List(), List(Table, AS, MInt), AS, codegenerated)
+    codegen (table_drop_helper) ($cala, quotedArg(1) + ".take("+quotedArg(2)+") ++ "+quotedArg(1)+".drop("+quotedArg(2)+"+1)")
+
+    // a filter operation
+    //val table_delete = op (Table) ("delete", infix, List(), List(Table, MInt, MString, MInt), Table, map((AS, AS, Table), 0, "e => "+quotedArg(0)+".table_delete_helper(e, "+quotedArg(1)+", "+quotedArg(2)+", "+quotedArg(3)+")"))
+    //codegen (table_delete_helper) ($cala, quotedArg(1) + "" )
+
+    val table_delete = op (Table) ("delete", infix, List(), List(Table, MInt, MString, MInt), Table, codegenerated) 
+    codegen (table_delete) ($cala, stream.printLines("val newarr = " +quotedArg(0) + "._data filter (x => !(x("+quotedArg(1)+").indexOf("+quotedArg(2)+") == "+quotedArg(3)+"))",
+    "new " + table_delete.tpeName +"(newarr.length, newarr)"
+    ))
+  
+
     val table_fromFile = op (Table) ("apply", static, List(), List(MString, MString), Table, codegenerated)    
     codegen (table_fromFile) ($cala, stream.printLines(
       "import io.Source",
@@ -56,10 +70,11 @@ trait OptiWrangle extends ForgeApplication with ScalaOps {
       "var i = 0",
       "while (i < "+quotedArg(0)+".length) {",
       " var j = 0",
-      " while (j < "+quotedArg(0)+".length) {",
+      " while (j < "+quotedArg(0)+"(i).length-1) {",
       "   pw.write("+quotedArg(0)+"(i).apply(j)+"+quotedArg(2)+")",
       "   j += 1",
       " }",
+      " pw.write("+quotedArg(0)+"(i).apply(j))",
       " pw.write(\"\\n\")",
       " i += 1",
       "}",

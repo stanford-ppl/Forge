@@ -30,18 +30,23 @@ trait OptiWrangle extends ForgeApplication with ScalaOps {
     val table_apply = op (Table) ("apply", infix, List(), List(Table, MInt), AS, codegenerated)
     val table_update = op (Table) ("update", infix, List(), List(Table, MInt, AS), MUnit, codegenerated, effect= write(0))
 
+    val table_copy = op (Table) ("apply", static, List(), List(MInt, AAS, AS), Table, codegenerated)
 
     codegen (table_new) ($cala, "new "+table_new.tpeName+"("+quotedArg(0)+", new Array[Array[String]]("+quotedArg(0)+"), new Array[String]("+quotedArg(0)+"))")
     codegen (table_length) ($cala, quotedArg(0) + "._length")
     codegen (table_apply) ($cala, quotedArg(0) + "._data.apply("+quotedArg(1)+")")
     codegen (table_update) ($cala, quotedArg(0) + "._data.update("+quotedArg(1)+", "+quotedArg(2)+")")
 
+    codegen (table_copy) ($cala, "new "+table_copy.tpeName+"("+quotedArg(0)+","+quotedArg(1)+","+quotedArg(2)+")")
+
     Table is DeliteCollection(AS, table_new, table_length, table_apply, table_update)
 
     // global helpers // accessors
     val table_getData = op (Table) ("data", infix, List(), List(Table), AAS, codegenerated)
-    val table_getHeader = op (Table) ("header", infix, List(), List(Table), AAS, codegenerated)
+    val table_getData_row = op (Table) ("data", infix, List(), List(Table, MInt), AS, codegenerated)
+    val table_getHeader = op (Table) ("header", infix, List(), List(Table), AS, codegenerated)
     codegen (table_getData) ($cala, quotedArg(0) + "._data")
+    codegen (table_getData_row) ($cala, quotedArg(0) + "._data("+quotedArg(1)+")")
     codegen (table_getHeader) ($cala, quotedArg(0) + "._header")
 
     val table_headerIndex = op (Table) ("headerIndex", infix, List(), List(Table, MString), MInt, codegenerated)
@@ -88,7 +93,7 @@ trait OptiWrangle extends ForgeApplication with ScalaOps {
 
     val table_promote = op (Table) ("promote", infix, List(), List(Table, MInt), Table, single(Table, {
       stream.printLines(
-        "val newHeader = " + quotedArg(0) + "._data()("+quotedArg(1)+")",
+        "val newHeader = " + quotedArg(0) + ".data("+quotedArg(1)+")",
         "val newTable = "+quotedArg(0) +".delete("+quotedArg(1)+")",
         "newTable.setHeader(newHeader)",
         "newTable"
@@ -96,7 +101,7 @@ trait OptiWrangle extends ForgeApplication with ScalaOps {
  
     val table_setHeader = op (Table) ("setHeader", infix, List(), List(Table, AS), Table, single(Table, {
     stream.printLines(
-      "new "+table_new.tpeName+"("+quotedArg(0)+"._length,"+quotedArg(0)+"._data,"+quotedArg(1)+")" 
+      "Table("+quotedArg(0)+".length(),"+quotedArg(0)+".data(),"+quotedArg(1)+")"
     )}))
 
     // todo - autodetect headers or lack-there-of

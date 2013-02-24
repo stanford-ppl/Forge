@@ -72,7 +72,9 @@ trait ScalaOps extends ForgeApplication {
     val Misc = grp("Misc")
     
     val println = op (Misc) ("println", direct, List(), List(MAny), MUnit, codegenerated, effect = simple)
+    val println2 = op (Misc) ("println", direct, List(), List(), MUnit, codegenerated, effect = simple)
     codegen (println) ($cala, "println(" + println.quotedArg(0) + ")")
+    codegen (println2) ($cala, "println()")
     
     val whileDo = op (Misc) ("__whileDo", direct, List(), List(MThunk(MBoolean),MThunk(MUnit)), MUnit, codegenerated, effect = simple)        
     val stream = ForgePrinter()    

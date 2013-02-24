@@ -63,7 +63,7 @@ trait OptiWrangle extends ForgeApplication with ScalaOps {
     //val table_cut = op (Table) ("cut", infix, List(), List(Table, MString, MString, MInt, MString, MString, MInt, MInt), Table, 
   //map((AS, AS, Table), 0, "e => "+quotedArg(0)+".table_cut_all_helper(e, "+quotedArg(1)+")"))
 
-    val table_cut_all = op (Table) ("cut_all", infix, List(), List(Table, MString), Table, map((AS, AS, Table), 0, "e => "+quotedArg(0)+".table_cut_all_helper(e, "+quotedArg(1)+")"))
+    val table_cut_all = op (Table) ("cut", infix, List(), List(Table, MString), Table, map((AS, AS, Table), 0, "e => "+quotedArg(0)+".table_cut_all_helper(e, "+quotedArg(1)+")"))
     
     val table_cut_all_helper = op (Table) ("table_cut_all_helper", infix, List(), List(Table, AS, MString), AS, codegenerated)
     codegen (table_cut_all_helper) ($cala, quotedArg(1) + " map (x => x.replaceAll("+quotedArg(2)+", \"\"))")
@@ -74,7 +74,7 @@ trait OptiWrangle extends ForgeApplication with ScalaOps {
     codegen (table_drop_helper) ($cala, quotedArg(1) + ".take("+quotedArg(2)+") ++ "+quotedArg(1)+".drop("+quotedArg(2)+"+1)")
 
     // drop by column name (header)
-    val table_drop_header = op (Table) ("drop", infix, List(), List(Table, MString), Table, single(Table, {quotedArg(0)+".drop("+quotedArg(0)+".headerIndex("+quotedArg(1)+"))"}))
+    //val table_drop_header = op (Table) ("drop", infix, List(), List(Table, MString), Table, single(Table, {quotedArg(0)+".drop("+quotedArg(0)+".headerIndex("+quotedArg(1)+"))"}))
 
     // a filter operation
     //val table_delete = op (Table) ("delete", infix, List(), List(Table, MInt, MString, MInt), Table, map((AS, AS, Table), 0, "e => "+quotedArg(0)+".table_delete_helper(e, "+quotedArg(1)+", "+quotedArg(2)+", "+quotedArg(3)+")"))
@@ -94,8 +94,7 @@ trait OptiWrangle extends ForgeApplication with ScalaOps {
     val table_promote = op (Table) ("promote", infix, List(), List(Table, MInt), Table, single(Table, {
       stream.printLines(
         "val newHeader = " + quotedArg(0) + ".data("+quotedArg(1)+")",
-        "val newTable = "+quotedArg(0) +".delete("+quotedArg(1)+")",
-        "newTable.setHeader(newHeader)",
+        "val newTable = "+quotedArg(0) +".delete("+quotedArg(1)+").setHeader(newHeader)",
         "newTable"
     )}))
  
@@ -116,7 +115,16 @@ trait OptiWrangle extends ForgeApplication with ScalaOps {
     val table_writeToFile = op (Table) ("write", infix, List(), List(Table, MString, MString), MUnit, codegenerated)
     codegen (table_writeToFile) ($cala, stream.printLines(
       "import java.io._",
+      "println(\"Well at least it got called \")",
       "val pw = new PrintWriter(new File("+quotedArg(1)+"))",
+      "var headerIndex = 0",
+      "var header = " + quotedArg(0) + ".header()",
+      "while (headerIndex < header.length-1) { ",
+      " pw.write(header(headerIndex)+"+quotedArg(2)+")",
+      " headerIndex += 1",
+      "}",
+      "pw.write(header(headerIndex))",
+      "pw.write(\"\\n\")",
       "var i = 0",
       "while (i < "+quotedArg(0)+".length) {",
       " var j = 0",
@@ -130,6 +138,10 @@ trait OptiWrangle extends ForgeApplication with ScalaOps {
       "}",
       "pw.close()"
     ))
+
+    val testMessage = "\"Accessed Test\""
+    val test = op (Table) ("test", infix, List(), List(Table), MUnit, codegenerated)
+    codegen (test) ($cala, "println("+testMessage+")")
 
     ()
   }

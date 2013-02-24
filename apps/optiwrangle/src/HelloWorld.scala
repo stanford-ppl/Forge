@@ -16,13 +16,17 @@ trait HelloSimple extends OptiWrangleApplication {
     println("The result is: " + tal2(0).apply(0))
   
     //val inFile = "/afs/cs.stanford.edu/u/gibbons4/data/hello.csv"
-    val inFile = "/afs/cs.stanford.edu/u/gibbons4/data/Flickr_10--130_to_25--120_pulled_2012-10-01.csv"
+    val inFile = "/afs/cs.stanford.edu/u/gibbons4/data/flickr.in.csv"
     val tff = Table(inFile, ",")
     val tfc = tff.cut("\"")
     val tfdrop = tfc.drop(0)
     val tfdelete = tfdrop.delete(1, "-126.", 0)
-  
+    val tfdr = tfdelete.delete(3)
+    val tfp = tfdr.promote(0) 
+ 
     val outFile = "/afs/cs.stanford.edu/u/gibbons4/data/flickr.out.csv"
-    tfdelete.write(outFile, ",")  
+    tfp.write(outFile, ",")  
+
+    tfp.test()
   } 
 }

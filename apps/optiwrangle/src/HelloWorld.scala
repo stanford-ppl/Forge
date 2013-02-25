@@ -23,10 +23,9 @@ trait HelloSimple extends OptiWrangleApplication {
     val tfdelete = tfdrop.delete(1, "-126.", 0)
     val tfdr = tfdelete.delete(3)
     val tfp = tfdr.promote(0) 
- 
-    val outFile = "/afs/cs.stanford.edu/u/gibbons4/data/flickr.out.csv"
-    tfp.write(outFile, ",")  
+    val tfe = tfp.extract(2, "121") 
 
-    tfp.test()
+    val outFile = "/afs/cs.stanford.edu/u/gibbons4/data/flickr.out.csv"
+    tfe.write(outFile, ",")  
   } 
 }

@@ -56,7 +56,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     
     val vsum = op (Vector) ("sum", infix, List(T withBound TNumeric), List(Vector), T, reduce((T,Vector), 0, lookup("Numeric","zero").get, "(a,b) => a+b"))
     
-    val vprint = op (Vector) ("pprint", infix, List(T), List(Vector), MUnit, foreach((T,Vector), 0, "a => println(a)")) // will print out of order in parallel, but hey
+    val vprint = op (Vector) ("pprint", infix, List(T), List(Vector), MUnit, foreach((T,Vector), 0, "a => println(a)"), effect = simple) // will print out of order in parallel, but hey
      
     // val vfilter = op (Vector) ("filter", infix, List(T), List(Vector,MFunction(List(T), MBoolean)), Vector, filter((T,T,Vector), 0, "e => " + quotedArg(1) + "(e)", "e => e"))
     

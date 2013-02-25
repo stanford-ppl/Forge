@@ -131,6 +131,10 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
       case _ => // ok
     }
     
+    if (retTpe == MUnit && effect == pure) {
+      warn("op " + name + " has return type " + MUnit.name + " but no effects, so it is a no-op")
+    }
+    
     val o = Op(_grp, name, style, tpePars, args, implicitArgs, retTpe, opTpe, effect, aliasHint)
     val opsGrp = OpsGrp.getOrElseUpdate(_grp, new DSLOps {
       val grp = _grp

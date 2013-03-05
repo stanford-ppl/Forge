@@ -102,6 +102,8 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     case Def(FTpe(args,ret,freq)) => err("variables in function tpe")
     case _ => "Var[" + quote(a) + "]" 
   }
+  // gibbons4 - kinda hacky
+  def repify(xa: (String, Exp[Any])): String = repify(xa._2)
   def repify(a: Exp[Any]): String = a match {
     case Def(FTpe(args,ret,freq)) => 
       if (args == List(byName)) " => " + repify(ret)

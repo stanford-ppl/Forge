@@ -40,15 +40,16 @@ trait ArrayPlay extends SimpleVectorApplication {
     }
     c(0) = 3.toString
     c(1) = (-1*i).toString
+/*
     val d = c.map(addOne)
     out(0) = d.Clone
    
     println("out(0)(0) = " + out(0).apply(0)) // gets confused when we chain the applies.. :/
     println("out(0)(1) = " + out(0).apply(1)) // gets confused when we chain the applies.. :/
     println("out(0)(2) = " + out(0).apply(2)) // gets confused when we chain the applies.. :/
-
     // test args:
     if (args.length > 0) println("got arg: " + args(0))
+*/
   }
 
   def addOne(x: String) : String = x + " one"

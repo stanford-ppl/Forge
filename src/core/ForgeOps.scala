@@ -14,10 +14,13 @@ trait ForgeOps extends Base {
   def tpePar(name: String, ctxBounds: List[TypeClass] = List()) = forge_tpepar(name, ctxBounds) // TODO: type bounds
   def tpe(name: String, tpePars: List[Rep[TypePar]] = List(), stage: StageTag = future) = forge_tpe(name, tpePars, stage)
   def tpeInst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]] = List(), stage: StageTag = future) = forge_tpeinst(hkTpe, tpeArgs, stage)
-  def ftpe(args: List[Rep[DSLType]], ret: Rep[DSLType], freq: Frequency) = forge_ftpe(args, ret, freq)
+  def ftpe(args: List[(String, Rep[DSLType])], ret: Rep[DSLType], freq: Frequency) = forge_ftpe(args, ret, freq)
   def lift(grp: Rep[DSLGroup])(tpe: Rep[DSLType]) = forge_lift(grp, tpe)
   def data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: (String, Rep[DSLType])*) = forge_data(tpe, tpePars, fields)
-  def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = forge_op(grp,name,style,tpePars,args,implicitArgs,retTpe,opTpe,effect,aliasHint)
+  // Provides default names for parameters
+  def defaultNames(args: List[Rep[DSLType]]) : List[(String, Rep[DSLType])] = (0 until args.length).zip(args).map{case(x, y) => ("__arg"+x, y)}.toList
+  def unnamed_op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = forge_op(grp,name,style,tpePars,defaultNames(args),implicitArgs,retTpe,opTpe,effect,aliasHint)
+  def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[(String, Rep[DSLType])], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = forge_op(grp,name,style,tpePars,args,implicitArgs,retTpe,opTpe,effect,aliasHint)
   def codegen(op: Rep[DSLOp])(generator: CodeGenerator, rule: Rep[String]) = forge_codegen(op,generator,rule)
   def extern(grp: Rep[DSLGroup], withLift: Boolean = false, targets: List[CodeGenerator] = generators) = forge_extern(grp, withLift, targets)
   
@@ -32,10 +35,10 @@ trait ForgeOps extends Base {
   def forge_tpepar(name: String, ctxBounds: List[TypeClass]): Rep[TypePar]
   def forge_tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag): Rep[DSLType]    
   def forge_tpeinst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]], stage: StageTag): Rep[DSLType]    
-  def forge_ftpe(args: List[Rep[DSLType]], ret: Rep[DSLType], freq: Frequency): Rep[DSLType]
+  def forge_ftpe(args: List[(String, Rep[DSLType])], ret: Rep[DSLType], freq: Frequency): Rep[DSLType]
   def forge_lift(grp: Rep[DSLGroup], tpe: Rep[DSLType]): Rep[Unit]
   def forge_data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]  
-  def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLType]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
+  def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[(String, Rep[DSLType])], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
   def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String]): Rep[CodeGenRule]
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
   def forge_withBound(a: Rep[TypePar], b: TypeClass): Rep[TypePar]
@@ -101,9 +104,9 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   }
     
   /* A function of Rep arguments */
-  case class FTpe(args: List[Rep[DSLType]], ret: Rep[DSLType], freq: Frequency) extends Def[DSLType]
+  case class FTpe(args: List[(String, Rep[DSLType])], ret: Rep[DSLType], freq: Frequency) extends Def[DSLType]
   
-  def forge_ftpe(args: List[Rep[DSLType]], ret: Rep[DSLType], freq: Frequency) = FTpe(args,ret,freq)
+  def forge_ftpe(args: List[(String, Rep[DSLType])], ret: Rep[DSLType], freq: Frequency) = FTpe(args,ret,freq)
   
   /* A statement declaring a type to lift in a particular scope (group) */
   def forge_lift(grp: Rep[DSLGroup], tpe: Rep[DSLType]) = {
@@ -122,12 +125,12 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   }
   
   /* An operator - this represents a method or IR node */
-  case class Op(grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLType]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint) extends Def[DSLOp]
+  case class Op(grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[(String, Rep[DSLType])], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint) extends Def[DSLOp]
   
-  def forge_op(_grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLType]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint) = {
+  def forge_op(_grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[(String, Rep[DSLType])], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint) = {
     args match {
-      case a :: Def(VarArgs(z)) :: b if b != Nil => err("a var args op parameter must be the final one")
-      case Def(VarArgs(z)) :: b if b != Nil => err("a var args op parameter must be the final one.")
+      case a :: (_, Def(VarArgs(z))) :: b if b != Nil => err("a var args op parameter must be the final one")
+      case (_, Def(VarArgs(z))) :: b if b != Nil => err("a var args op parameter must be the final one.")
       case _ => // ok
     }
     

@@ -134,11 +134,11 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         stream.println(makeFieldsWithInitArgs(data))
         for (o <- unique(opsGrp.ops) if o.style == infix) {       
           stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
-          stream.print("(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repify(t._1)).mkString(",") + ")") 
+          stream.print("(" + o.args.map(t => t._1 + ": " + repify(t._2)).mkString(",") + ")") 
           stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = data.tpePars))
           stream.println(" = {")
           // cheat a little bit for consistency: the codegen rule may refer to this arg
-          emitWithIndent("val " + opArgPrefix + 0 + " = this", stream, 4)
+          //emitWithIndent("val " + opArgPrefix + 0 + " = this", stream, 4)
           emitOp(o, stream, indent=4)
           stream.println("  }")
         }
@@ -160,9 +160,9 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       o.style match {
         case `static` => emitOp(o, stream, indent=4)
         case `infix` if grpIsTpe(opsGrp.grp) && DataStructs.exists(_.tpe == grpAsTpe(opsGrp.grp)) => 
-          val args = o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1)).mkString(",")
+          val args = o.args.map(t => t._1).mkString(",")
           val argsWithParen = if (args == "") args else "(" + args + ")"
-          emitWithIndent(opArgPrefix + 0 + "." + o.name + argsWithParen, stream, 4)
+          //emitWithIndent(opArgPrefix + 0 + "." + o.name + argsWithParen, stream, 4)
         case `infix` => emitOp(o, stream, indent=4)
         case `direct` => emitOp(o, stream, indent=4)        
       }

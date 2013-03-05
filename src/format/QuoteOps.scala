@@ -88,10 +88,10 @@ trait QuoteOpsExp extends QuoteOps {
   /**
    * Function types
    */    
-  case class QuoteBlockResult(name: String, args: List[Rep[DSLType]], ret: Rep[DSLType]) extends Def[String]
+  case class QuoteBlockResult(name: String, args: List[(String, Rep[DSLType])], ret: Rep[DSLType]) extends Def[String]
   
   def quote_blockresult(x: Rep[DSLOp], argIndex: Int) = x.args.apply(argIndex) match {
-    case Def(FTpe(args,ret,freq)) => QuoteBlockResult(opArgPrefix + argIndex,args,ret)
+    case Def(FTpe(args,ret,freq)) => QuoteBlockResult(args.apply(argIndex)._1,args,ret)
     case _ => err("cannot quote block result of non-function type " + x.name)
   }
 }

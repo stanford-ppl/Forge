@@ -18,7 +18,7 @@ trait ForgeOps extends Base {
   def lift(grp: Rep[DSLGroup])(tpe: Rep[DSLType]) = forge_lift(grp, tpe)
   def data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: (String, Rep[DSLType])*) = forge_data(tpe, tpePars, fields)
   // Provides default names for parameters
-  def defaultNames(args: List[Rep[DSLType]]) : List[(String, Rep[DSLType])] = (0 until args.length).zip(args).map{case(x, y) => ("__arg"+x, y)}.toList
+  def defaultNames(args: List[Rep[DSLType]]) : List[(String, Rep[DSLType])] = args.zipWithIndex.map{case(x, y) => (opArgPrefix+y, x)}.toList
   def unnamed_op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = forge_op(grp,name,style,tpePars,defaultNames(args),implicitArgs,retTpe,opTpe,effect,aliasHint)
   def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[(String, Rep[DSLType])], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = forge_op(grp,name,style,tpePars,args,implicitArgs,retTpe,opTpe,effect,aliasHint)
   def codegen(op: Rep[DSLOp])(generator: CodeGenerator, rule: Rep[String]) = forge_codegen(op,generator,rule)
@@ -163,10 +163,12 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
     c
   }
     
+  // TODO gibbons4
   /* Establishes that the given tpe implements the DeliteCollection interface */
   def forge_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection) = {
     // verify the dc functions match our expectations
-    if ((dc.alloc.args != List(MInt) || dc.alloc.retTpe != tpe))
+/*
+    if ((dc.alloc.args != List((String, MInt)) || dc.alloc.retTpe != tpe))
       // TODO: how should this work? alloc can really map to anything.. e.g can have other fields that get mapped from the inputs in arbitrary ways
       // needs to be specified in the zip in some context attached to the alloc method?      
       err("dcAlloc must take a single argument of type " + MInt.name + " and return an instance of " + tpe.name)
@@ -176,7 +178,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
       err("dcApply must take two arguments of type(" + tpe.name + ", " + MInt.name + ") and return a " + dc.tpeArg.name)
     if ((dc.update.args != List(tpe, MInt, dc.tpeArg)) || (dc.update.retTpe != MUnit))
       err("dcUpdate must take arguments of type (" + tpe.name + ", " + MInt.name + ", " + dc.tpeArg.name + ") and return " + MUnit.name)
-    
+  */  
     DeliteCollections += (tpe -> dc)
     ()
   }

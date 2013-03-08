@@ -27,9 +27,9 @@ trait BaseGenOps extends ForgeCodeGenBase {
     
    def inline(o: Rep[DSLOp], str: Exp[String], quoter: Exp[Any] => String = quote) = {     
      var b = quoter(str)
-     //for (i <- 0 until o.args.length) {
-     //  b = b.replaceAllLiterally(quoter(o.quotedArg(i)), opArgPrefix + i)
-     //}    
+     for (i <- 0 until o.args.length) {
+       b = b.replaceAllLiterally(quoter(o.quotedArg(i)), o.args.apply(i)._1)
+     }    
      for (i <- 0 until o.tpePars.length) {
        b = b.replaceAllLiterally(quoter(o.tpeInstance(i)), o.tpePars.apply(i).name)
      }    
@@ -143,6 +143,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
   }
   def makeOpMethodNameWithArgs(o: Rep[DSLOp]) = makeOpMethodName(o) + makeFullArgs(o, makeOpArgs)
+  def makeOpMethodNameWithNamedArgs(o: Rep[DSLOp], args: List[(String, Rep[DSLType])]) = makeOpMethodName(o) + makeArgs(args)
   def makeOpMethodNameWithFutureArgs(o: Rep[DSLOp]) = makeOpMethodName(o) + makeFullArgs(o, makeOpFutureArgs, nameClashesUniversal) // front-end can name clash with anything
   def makeOpMethodSignature(o: Rep[DSLOp]) = "def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithOverloadWithType(o)
   def makeSyntaxMethod(o: Rep[DSLOp]) = {
@@ -235,13 +236,13 @@ trait BaseGenOps extends ForgeCodeGenBase {
         pimpStream.appendLine("  implicit def varTo" + tpe.name + "Ops" + makeTpeParsWithBounds(tpe.tpePars) + "(x: " + varify(tpe) + ") = new " + tpe.name + "OpsCls(readVar(x))")
       }
       pimpStream.appendLine("")
-      pimpStream.appendLine("  class " + tpe.name + "OpsCls" + makeTpeParsWithBounds(tpe.tpePars) + "(val " + opArgPrefix + "0: " + repify(tpe) + ") {") // not sure about this one
+      pimpStream.appendLine("  class " + tpe.name + "OpsCls" + makeTpeParsWithBounds(tpe.tpePars) + "(val " + "what_is_this_todo_gibbons4"  + ": " + repify(tpe) + ") {") // not sure about this one
     }
     
     for (o <- infixOps) {
       if (noInfixList.contains(o.name)) {
         val tpe = grpAsTpe(opsGrp.grp)
-        val otherArgs = "(" + o.args.map(t => t._1 + ": " + repifySome(t._1)).mkString(",") + ")"
+        val otherArgs = "(" + o.args.map(t => t._1 + ": " + repifySome(t._2)).mkString(",") + ")"
         pimpStream.appendLine("    def " + o.name + makeTpeParsWithBounds(o.tpePars.diff(tpe.tpePars)) + otherArgs
           + (makeImplicitArgsWithCtxBoundsWithType(implicitArgsWithOverload(o), o.tpePars, without = tpe.tpePars)) + " = " + makeOpMethodNameWithFutureArgs(o))
       }

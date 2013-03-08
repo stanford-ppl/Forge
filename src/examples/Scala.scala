@@ -40,6 +40,7 @@ trait ScalaOps extends ForgeApplication {
     val aapply = unnamed_op (Arr) ("apply", infix, List(T), List(Arr,MInt), T, codegenerated)
     val aupdate = unnamed_op (Arr) ("update", infix, List(T), List(Arr,MInt,T), MUnit, codegenerated, effect = write(0))    
     //val amap = unnamed_op (Arr) ("a_map", infix, List(T,R), List(Arr,MFunction(List(T),R)), GArray(R), map((T,R,Arr), 0, "e => "+quotedArg(1)+"(e)"))
+    /*
     val amap = unnamed_op (Arr) ("map", infix, List(T,R), List(Arr,MFunction(List(T),R)), GArray(R), single(GArray(R), {stream.printLines(
       "val length = " + quotedArg(0) + ".length()",
       "val arx = Array.empty[R](length)",
@@ -50,7 +51,7 @@ trait ScalaOps extends ForgeApplication {
       "}",
       "arx"
     )}))
-
+*/
     // the alias hint tells Delite that this operation copies its inputs, avoiding conservative mutable sharing errors     
     val aclone = unnamed_op (Arr) ("Clone", infix, List(T), List(Arr), Arr, codegenerated, aliasHint = copies(0))            
 

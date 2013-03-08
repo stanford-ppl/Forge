@@ -49,7 +49,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     val vapply = unnamed_op (Vector) ("apply", infix, List(T), List(Vector,MInt), T, codegenerated)
     val vupdate = unnamed_op (Vector) ("update", infix, List(T), List(Vector,MInt,T), MUnit, codegenerated, effect = write(0))
     
-    val vminusScala = op (Vector) ("-", infix, List(T withBound TNumeric), List(("object", Vector), ("subtract", T)), Vector, map((T, T, Vector), 0, "e => e-"+quotedArg(1)))
+    val vminusScala = op (Vector) ("-", infix, List(T withBound TNumeric), List(("self", Vector), ("subtract", T)), Vector, map((T, T, Vector), 0, "e => e-"+quotedArg(1)))
 
     val vtimesScalar = unnamed_op (Vector) ("*", infix, List(T withBound TNumeric), List(Vector,T), Vector, map((T,T,Vector), 0, "e => e*"+quotedArg(1)))
     // val vfoo = unnamed_op (Vector) ("foo", infix, List(T), List(Vector,T), tpeInst(Vector,List(MDouble)), map((T,MDouble,Vector), 0, "e => 0.0")) // problem: primitive lifting isn't in scope in the ops

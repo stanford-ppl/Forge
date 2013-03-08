@@ -103,11 +103,12 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     case _ => "Var[" + quote(a) + "]" 
   }
   // gibbons4 - kinda hacky
-  def repify(xa: (String, Exp[Any])): String = repify(xa._2)
+  def repify(a: (String, Exp[Any])): String = repify(a._2)
   def repify(a: Exp[Any]): String = a match {
-    case Def(FTpe(args,ret,freq)) => 
-      if (args == List(byName)) " => " + repify(ret)
-      else "(" + args.map(repify).mkString(",") + ") => " + repify(ret)        
+    case Def(FTpe(args,ret,freq)) => { 
+      if (args.length > 0 && args.apply(0)._2 == byName) " => " + repify(ret)
+      else "(" + args.map(repify).mkString(",") + ") => " + repify(ret)
+    }
     case Def(Tpe("Var", arg, stage)) => repify(arg(0))
     case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2, s2)) => repify(a2(0))
     case Def(VarArgs(t)) => "Seq[" + repify(t) + "]"

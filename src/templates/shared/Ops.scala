@@ -236,13 +236,13 @@ trait BaseGenOps extends ForgeCodeGenBase {
         pimpStream.appendLine("  implicit def varTo" + tpe.name + "Ops" + makeTpeParsWithBounds(tpe.tpePars) + "(x: " + varify(tpe) + ") = new " + tpe.name + "OpsCls(readVar(x))")
       }
       pimpStream.appendLine("")
-      pimpStream.appendLine("  class " + tpe.name + "OpsCls" + makeTpeParsWithBounds(tpe.tpePars) + "(val " + "what_is_this_todo_gibbons4"  + ": " + repify(tpe) + ") {") // not sure about this one
+      pimpStream.appendLine("  class " + tpe.name + "OpsCls" + makeTpeParsWithBounds(tpe.tpePars) + "(val " + opArgPrefix+0  + ": " + repify(tpe) + ") {") // todo gibbons4 cheating
     }
     
     for (o <- infixOps) {
       if (noInfixList.contains(o.name)) {
         val tpe = grpAsTpe(opsGrp.grp)
-        val otherArgs = "(" + o.args.map(t => t._1 + ": " + repifySome(t._2)).mkString(",") + ")"
+        val otherArgs = "(" + o.args.drop(1).map(t => t._1 + ": " + repifySome(t._2)).mkString(",") + ")"
         pimpStream.appendLine("    def " + o.name + makeTpeParsWithBounds(o.tpePars.diff(tpe.tpePars)) + otherArgs
           + (makeImplicitArgsWithCtxBoundsWithType(implicitArgsWithOverload(o), o.tpePars, without = tpe.tpePars)) + " = " + makeOpMethodNameWithFutureArgs(o))
       }

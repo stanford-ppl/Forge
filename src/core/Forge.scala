@@ -70,7 +70,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   }
   
   def hasFuncArgs(o: Rep[DSLOp]) = o.args.exists(a => a match {
-    case Def(FTpe(args,ret,freq)) => true
+    case (_, Def(FTpe(args,ret,freq))) => true
     case _ => false
   })  
 }

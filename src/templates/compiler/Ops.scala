@@ -198,9 +198,9 @@ trait DeliteGenOps extends BaseGenOps {
       if (o.opTpe == codegenerated) {
         for ((arg,i) <- o.args.zipWithIndex) {
           arg match {
-            case Def(FTpe(args,ret,freq)) =>
-              stream.println()
-              emitWithIndent("val b_" + i + " = reifyEffects("+arg+")", stream, 4) // Todo - surely wrong gibbons4
+            case (x, Def(FTpe(args,ret,freq))) =>
+              stream.println() // here as in every where else arg._1 duplicates x
+              emitWithIndent("val b_" + i + " = reifyEffects("+arg._1+")", stream, 4) 
               emitWithIndent("val sb_" + i + " = summarizeEffects(b_" + i + ")", stream, 4)
               summary += "sb_"+i
             case _ =>
@@ -219,7 +219,7 @@ trait DeliteGenOps extends BaseGenOps {
       
       def makeOpNodeNameWithModifiedArgs(o: Rep[DSLOp]) = {
         makeOpNodeNameWithArgs(o, o => "(" + o.args.zipWithIndex.map(t => t._1 match {
-          case Def(FTpe(args,ret,freq)) => "b_" + t._1 // not sure about this gibbons4 TODO
+          case (_, Def(FTpe(args,ret,freq))) => "b_" + t._2 // not sure about this gibbons4 TODO
           case _ => t._1 //opArgPrefix + t._2
         }).mkString(",") + ")")
       }
@@ -237,6 +237,7 @@ trait DeliteGenOps extends BaseGenOps {
     }    
   }
   
+  // todo maybe it should be (_, Def(FTpe))
   def emitSyms(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
     if (uniqueOps.exists(o => o.args.exists(t => t match { case Def(FTpe(a,b,freq)) => true; case _ => false}))) {
       emitBlockComment("Syms", stream, indent=2)
@@ -316,6 +317,7 @@ trait DeliteGenOps extends BaseGenOps {
       val xformArgs = "(" + o.args.map(t => "f(" + t._1 + ")").mkString(",") + ")" 
       val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => opIdentifierPrefix + "." + b.prefix + t.name)) ++ /*implicitArgsWithOverload(o)*/o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
       
+      //gibbons4 MkeOpSimpleNodeNameWithArgs is still cheating
       o.opTpe match {
         case `codegenerated` =>
           stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + " => ")

@@ -57,7 +57,9 @@ trait HelloSimple extends SimpleVectorApplication {
     // foreach
     println("v1.pprint:")
     v1.pprint
-    
+ 
+    (v3-v2).pprint
+   
     // filter
     // TODO: not working yet
     //

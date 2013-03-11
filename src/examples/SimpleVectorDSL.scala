@@ -44,25 +44,25 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
      * We could simplify this by reusing templates even more, i.e. specializing for different types
      * (e.g. accept a list of binary zip ops that only differentiate in function applied)
      */           
-    val vnew = unnamed_op (Vector) ("apply", static, List(T), List(MInt), Vector, codegenerated, effect = mutable)
-    val vlength = unnamed_op (Vector) ("length", infix, List(T), List(Vector), MInt, codegenerated)    
-    val vapply = unnamed_op (Vector) ("apply", infix, List(T), List(Vector,MInt), T, codegenerated)
-    val vupdate = unnamed_op (Vector) ("update", infix, List(T), List(Vector,MInt,T), MUnit, codegenerated, effect = write(0))
+    val vnew = op (Vector) ("apply", static, List(T), List(MInt), Vector, codegenerated, effect = mutable)
+    val vlength = op (Vector) ("length", infix, List(T), List(Vector), MInt, codegenerated)    
+    val vapply = op (Vector) ("apply", infix, List(T), List(Vector,MInt), T, codegenerated)
+    val vupdate = op (Vector) ("update", infix, List(T), List(Vector,MInt,T), MUnit, codegenerated, effect = write(0))
     
     val vminusScala = op (Vector) ("-", infix, List(T withBound TNumeric), List(("self", Vector), ("subtract", T)), Vector, map((T, T, Vector), 0, "e => e-"+quotedArg(1)))
 
-    val vtimesScalar = unnamed_op (Vector) ("*", infix, List(T withBound TNumeric), List(Vector,T), Vector, map((T,T,Vector), 0, "e => e*"+quotedArg(1)))
-    // val vfoo = unnamed_op (Vector) ("foo", infix, List(T), List(Vector,T), tpeInst(Vector,List(MDouble)), map((T,MDouble,Vector), 0, "e => 0.0")) // problem: primitive lifting isn't in scope in the ops
+    val vtimesScalar = op (Vector) ("*", infix, List(T withBound TNumeric), List(Vector,T), Vector, map((T,T,Vector), 0, "e => e*"+quotedArg(1)))
+    // val vfoo = op (Vector) ("foo", infix, List(T), List(Vector,T), tpeInst(Vector,List(MDouble)), map((T,MDouble,Vector), 0, "e => 0.0")) // problem: primitive lifting isn't in scope in the ops
       
-    val vplus = unnamed_op (Vector) ("+", infix, List(T withBound TNumeric), List(Vector,Vector), Vector, zip((T,T,T,Vector), (0,1), "(a,b) => a+b"))
+    val vplus = op (Vector) ("+", infix, List(T withBound TNumeric), List(Vector,Vector), Vector, zip((T,T,T,Vector), (0,1), "(a,b) => a+b"))
     
-    val vsum = unnamed_op (Vector) ("sum", infix, List(T withBound TNumeric), List(Vector), T, reduce((T,Vector), 0, lookup("Numeric","zero").get, "(a,b) => a+b"))
+    val vsum = op (Vector) ("sum", infix, List(T withBound TNumeric), List(Vector), T, reduce((T,Vector), 0, lookup("Numeric","zero").get, "(a,b) => a+b"))
     
-    val vprint = unnamed_op (Vector) ("pprint", infix, List(T), List(Vector), MUnit, foreach((T,Vector), 0, "a => println(a)"), effect = simple) // will print out of order in parallel, but hey
+    val vprint = op (Vector) ("pprint", infix, List(T), List(Vector), MUnit, foreach((T,Vector), 0, "a => println(a)"), effect = simple) // will print out of order in parallel, but hey
      
-    // val vfilter = unnamed_op (Vector) ("filter", infix, List(T), List(Vector,MFunction(List(T), MBoolean)), Vector, filter((T,T,Vector), 0, "e => " + quotedArg(1) + "(e)", "e => e"))
+    // val vfilter = op (Vector) ("filter", infix, List(T), List(Vector,MFunction(List(T), MBoolean)), Vector, filter((T,T,Vector), 0, "e => " + quotedArg(1) + "(e)", "e => e"))
     /*
-    val vslice = unnamed_op (Vector) ("slice", infix, List(T), List(Vector, MInt, MInt), Vector, single(Vector, { 
+    val vslice = op (Vector) ("slice", infix, List(T), List(Vector, MInt, MInt), Vector, single(Vector, { 
       // inside single tasks we use normal DSL code just like applications would (modulo arg names)
       stream.printLines(
         "val st = " + quotedArg(1),

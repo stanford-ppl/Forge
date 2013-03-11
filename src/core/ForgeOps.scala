@@ -17,9 +17,6 @@ trait ForgeOps extends Base {
   def ftpe(args: List[(String, Rep[DSLType])], ret: Rep[DSLType], freq: Frequency) = forge_ftpe(args, ret, freq)
   def lift(grp: Rep[DSLGroup])(tpe: Rep[DSLType]) = forge_lift(grp, tpe)
   def data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: (String, Rep[DSLType])*) = forge_data(tpe, tpePars, fields)
-  // Provides default names for parameters
-  def defaultNames(args: List[Rep[DSLType]]) : List[(String, Rep[DSLType])] = args.zipWithIndex.map{case(x, y) => (opArgPrefix+y, x)}.toList
-  def unnamed_op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = forge_op(grp,name,style,tpePars,defaultNames(args),implicitArgs,retTpe,opTpe,effect,aliasHint)
   def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[(String, Rep[DSLType])], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = forge_op(grp,name,style,tpePars,args,implicitArgs,retTpe,opTpe,effect,aliasHint)
   def codegen(op: Rep[DSLOp])(generator: CodeGenerator, rule: Rep[String]) = forge_codegen(op,generator,rule)
   def extern(grp: Rep[DSLGroup], withLift: Boolean = false, targets: List[CodeGenerator] = generators) = forge_extern(grp, withLift, targets)
@@ -114,7 +111,13 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
     if (!buf.contains(tpe)) buf += tpe
     ()
   }
-    
+   
+  /* An argument to a DSL function ~ name: Type = default */
+/*
+  case class Arg(name: String, tpe: Rep[DSLType], default: String) extends Def[DSLArg]
+ 
+  def forge_arg()
+*/
   /* A back-end data structure */
   case class Data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: Seq[(String, Exp[DSLType])]) extends Def[DSLData]
   

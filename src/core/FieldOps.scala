@@ -63,12 +63,24 @@ trait FieldOpsExp extends FieldOps {
     case Def(FTpe(args,ret,freq)) => future
     case Def(VarArgs(t)) => future
   }  
-    
-  
+ 
+  /**
+  * DSLArg
+  */   
+  def infix_name(x: Exp[DSLArg])(implicit o: Overloaded2): String = x match  {
+    case Def(Arg(name,tpe,default)) => name
+  }
+  def infix_tpe(x: Exp[DSLArg])(implicit o: Overloaded1): Exp[DSLType] = x match  {
+    case Def(Arg(name,tpe,default)) => tpe
+  }
+  def infix_default(x: Exp[DSLArg]) = x match  {
+    case Def(Arg(name,tpe,default)) => default
+  }
+
   /**
    * DSLGroup
    */
-  def infix_name(x: Exp[DSLGroup])(implicit o: Overloaded2): String = x match {
+  def infix_name(x: Exp[DSLGroup])(implicit o: Overloaded3): String = x match {
     case Def(Grp(name)) => name    
     case _ if grpIsTpe(x) => grpAsTpe(x).name
   }  
@@ -86,7 +98,7 @@ trait FieldOpsExp extends FieldOps {
   def infix_grp(x: Exp[DSLOp]) = x match {
     case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff,alias)) => grp
   }
-  def infix_name(x: Exp[DSLOp])(implicit o: Overloaded3) = x match {
+  def infix_name(x: Exp[DSLOp])(implicit o: Overloaded4) = x match {
     case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff,alias)) => name
   }  
   def infix_style(x: Exp[DSLOp]) = x match {

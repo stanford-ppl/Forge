@@ -53,7 +53,20 @@ trait HelloSimple extends SimpleVectorApplication {
     println("v5.sum:")
     val z = v5.sum
     println(z)
-    
+ 
+    val pp = v5.basic()
+    val pq = v5.basic(2)
+    val pr = v5.basic(2, 3)
+    val ps = v5.basic(y=4, z=5)
+    val pt = v5.basic(z=6, y=7)
+    val pu = v5.basic(y=8)
+    val pv = v5.basic(z=9)
+
+    println("2 and 10?")
+    println(pp + " " + pv)
+
+    //val yyy = v5.set(3)
+   
     // foreach
     println("v1.pprint:")
     v1.pprint

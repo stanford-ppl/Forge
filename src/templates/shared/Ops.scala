@@ -28,7 +28,8 @@ trait BaseGenOps extends ForgeCodeGenBase {
    def inline(o: Rep[DSLOp], str: Exp[String], quoter: Exp[Any] => String = quote) = {     
      var b = quoter(str)
      for (i <- 0 until o.args.length) {
-       b = b.replaceAllLiterally(quoter(o.quotedArg(i)), opArgPrefix + i)
+       val name = o.args.apply(i).name
+       b = b.replaceAllLiterally(quoter(o.quotedArg(i)), name) // TODO
      }    
      for (i <- 0 until o.tpePars.length) {
        b = b.replaceAllLiterally(quoter(o.tpeInstance(i)), o.tpePars.apply(i).name)
@@ -55,7 +56,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     
     // add to filtered only if canonical version doesn't already exist
     for (o <- ops) {
-      val t = o.name + makeOpArgsWithType(o) + makeOpImplicitArgs(o)
+      val t = o.name + makeOpTypeSignature(o) + makeOpImplicitArgs(o)
       if (!canonical.contains(t)) {
         filtered += o
         canonical += t
@@ -65,13 +66,22 @@ trait BaseGenOps extends ForgeCodeGenBase {
   }
     
   // normal args
-  def simpleArgName(t: (Rep[DSLType], Int)): String = opArgPrefix + t._2
-  def makeArgs(args: List[Rep[DSLType]], makeArgName: ((Rep[DSLType],Int)) => String = simpleArgName) = "(" + args.zipWithIndex.map(makeArgName).mkString(",") + ")"
+  /*
+  def simpleArgName(t: Rep[DSLArg]): String = t match {
+    case Def(Arg(name, _, _)) => name
+    case _ => err("unnamed Simple arg")
+  }
+  */
+  def simpleArgName(t: Rep[DSLArg]): String = t.name
+  def makeArgs(args: List[Rep[DSLArg]], makeArgName: (Rep[DSLArg] => String) = simpleArgName) = "(" + args.map(makeArgName).mkString(",") + ")"
   def makeOpArgs(o: Rep[DSLOp]) = makeArgs(o.args)
-  def makeOpFutureArgs(o: Rep[DSLOp]) = makeArgs(o.args, t => { val arg = opArgPrefix + t._2; if (t._1.stage == now) "unit("+arg+")" else arg })
-  def makeOpArgsWithType(o: Rep[DSLOp], typify: Rep[DSLType] => String = repify) = makeArgs(o.args, t => opArgPrefix + t._2 + ": " + typify(t._1))
+  def makeOpFutureArgs(o: Rep[DSLOp]) = makeArgs(o.args, t => { val arg = simpleArgName(t); if (t.tpe.stage == now) "unit("+arg+")" else arg })
+  def makeOpArgsWithType(o: Rep[DSLOp], typify: Rep[DSLType] => String = repify) = makeArgs(o.args, t => argify(t, typify))
+  def makeOpTypeSignature(o: Rep[DSLOp], typify: Rep[DSLType] => String = repify) = makeArgs(o.args, t => argify(t, typify))
   def makeOpArgsWithNowType(o: Rep[DSLOp]) = makeOpArgsWithType(o, repifySome)
-  
+  def makeOpArgsWithDefaults(o: Rep[DSLOp], typify: Rep[DSLType] => String = repify) = makeArgs(o.args, t => argify(t, typify))
+  def makeOpArgsWithNowDefault(o: Rep[DSLOp]) = makeOpArgsWithDefaults(o, repifySome)
+
   // untyped implicit args
   def makeImplicitCtxBounds(tpePars: List[Rep[TypePar]]) = {
     tpePars.flatMap(a => a.ctxBounds.map(b => "implicitly["+b.name+"["+quote(a)+"]]")).mkString(",")
@@ -162,30 +172,30 @@ trait BaseGenOps extends ForgeCodeGenBase {
     o.opTpe match {
       case single:SingleTask => // nothing to check
       case map:Map =>
-        val col = o.args.apply(map.argIndex)
+        val col = o.args.apply(map.argIndex).tpe
         if (DeliteCollections.get(col).isEmpty) err("map argument " + col.name + " is not a DeliteCollection")
         if (map.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("map op with undefined type arg: " + o.name)
         if (map.argIndex < 0 || map.argIndex > o.args.length) err("map op with illegal arg parameter: " + o.name)
       case zip:Zip =>
-        val colA = o.args.apply(zip.argIndices._1)
-        val colB = o.args.apply(zip.argIndices._2)
+        val colA = o.args.apply(zip.argIndices._1).tpe
+        val colB = o.args.apply(zip.argIndices._2).tpe
         if (DeliteCollections.get(colA).isEmpty) err("zip argument " + colA.name + " is not a DeliteCollection")
         if (DeliteCollections.get(colB).isEmpty) err("zip argument " + colB.name + " is not a DeliteCollection")
         if (zip.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("zipWith op with undefined type arg: " + o.name)
         if (zip.argIndices.productIterator.asInstanceOf[Iterator[Int]].exists(a => a < 0 || a > o.args.length)) err("zipWith op with illegal arg parameter: " + o.name)
       case reduce:Reduce =>
-        val col = o.args.apply(reduce.argIndex)
+        val col = o.args.apply(reduce.argIndex).tpe
         if (DeliteCollections.get(col).isEmpty) err("reduce argument " + col.name + " is not a DeliteCollection")
         if (reduce.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("reduce op with undefined type arg: " + o.name)
         if (reduce.argIndex < 0 || reduce.argIndex > o.args.length) err("reduce op with illegal arg parameter: " + o.name)        
         if (reduce.zero.retTpe != reduce.tpePars._1) err("reduce op with illegal zero parameter: " + o.name)
       case filter:Filter =>
-        val col = o.args.apply(filter.argIndex)
+        val col = o.args.apply(filter.argIndex).tpe
         if (DeliteCollections.get(col).isEmpty) err("filter argument " + col.name + " is not a DeliteCollection")
         if (filter.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("filter op with undefined type arg: " + o.name)
         if (filter.argIndex < 0 || filter.argIndex > o.args.length) err("filter op with illegal arg parameter: " + o.name)      
       case foreach:Foreach =>
-        val col = o.args.apply(foreach.argIndex)
+        val col = o.args.apply(foreach.argIndex).tpe
         if (DeliteCollections.get(col).isEmpty) err("foreach argument " + col.name + " is not a DeliteCollection")
         if (foreach.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("foreach op with undefined type arg: " + o.name)
         if (foreach.argIndex < 0 || foreach.argIndex > o.args.length) err("foreach op with illegal arg parameter: " + o.name)      
@@ -241,7 +251,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     for (o <- infixOps) {
       if (noInfixList.contains(o.name)) {
         val tpe = grpAsTpe(opsGrp.grp)
-        val otherArgs = "(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repifySome(t._1)).mkString(",") + ")"
+        val otherArgs = "(" + o.args.drop(1).map(t => t.name + ": " + repifySome(t.tpe) /*+ " = " + unit(t.default)*/).mkString(",") + ")" // TODO
         pimpStream.appendLine("    def " + o.name + makeTpeParsWithBounds(o.tpePars.diff(tpe.tpePars)) + otherArgs
           + (makeImplicitArgsWithCtxBoundsWithType(implicitArgsWithOverload(o), o.tpePars, without = tpe.tpePars)) + " = " + makeOpMethodNameWithFutureArgs(o))
       }

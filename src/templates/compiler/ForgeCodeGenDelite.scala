@@ -22,7 +22,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     case `pure` => "reflectPure"
     case `mutable` => "reflectMutable"
     case `simple` => "reflectEffect"
-    case write(args @ _*) => "reflectWrite(" + args.map(a => opArgPrefix + a).mkString(",") + ")"
+    case write(args @ _*) => "reflectWrite(" + args.map(a => opArgPrefix + a).mkString(",") + ")" // TODO
   }
   
   def makeFrequencyAnnotation(freq: Frequency) = freq match {
@@ -32,6 +32,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
   }
   
   def blockify(a: Exp[Any]): String = a match {
+    case Def(Arg(name, tpe, default)) => blockify(tpe)
     case Def(FTpe(args,ret,freq)) => "Block[" + quote(ret) + "]"
     case _ => repify(a)
   }

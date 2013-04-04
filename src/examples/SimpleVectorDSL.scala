@@ -49,6 +49,8 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     val vapply = op (Vector) ("apply", infix, List(T), List(Vector,MInt), T, codegenerated)
     val vupdate = op (Vector) ("update", infix, List(T), List(Vector,MInt,T), MUnit, codegenerated, effect = write(0))
     
+    val vminusScala = op (Vector) ("-", infix, List(T withBound TNumeric), List(("self", Vector), ("subtract", T)), Vector, map((T, T, Vector), 0, "e => e-"+quotedArg(1)))
+
     val vtimesScalar = op (Vector) ("*", infix, List(T withBound TNumeric), List(Vector,T), Vector, map((T,T,Vector), 0, "e => e*"+quotedArg(1)))
     // val vfoo = op (Vector) ("foo", infix, List(T), List(Vector,T), tpeInst(Vector,List(MDouble)), map((T,MDouble,Vector), 0, "e => 0.0")) // problem: primitive lifting isn't in scope in the ops
       
@@ -59,7 +61,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     val vprint = op (Vector) ("pprint", infix, List(T), List(Vector), MUnit, foreach((T,Vector), 0, "a => println(a)"), effect = simple) // will print out of order in parallel, but hey
      
     // val vfilter = op (Vector) ("filter", infix, List(T), List(Vector,MFunction(List(T), MBoolean)), Vector, filter((T,T,Vector), 0, "e => " + quotedArg(1) + "(e)", "e => e"))
-    
+    /*
     val vslice = op (Vector) ("slice", infix, List(T), List(Vector, MInt, MInt), Vector, single(Vector, { 
       // inside single tasks we use normal DSL code just like applications would (modulo arg names)
       stream.printLines(
@@ -73,7 +75,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
         "}",
         "out"
       )}))        
-              
+      */        
     /**
      * DeliteCollectionification
      * This enables a tpe to be passed in as the collection type of a Delite op

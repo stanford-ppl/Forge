@@ -70,7 +70,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   }
   
   def hasFuncArgs(o: Rep[DSLOp]) = o.args.exists(a => a match {
-    case Def(FTpe(args,ret,freq)) => true
+    case (_, Def(FTpe(args,ret,freq))) => true
     case _ => false
   })  
 }
@@ -102,10 +102,13 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     case Def(FTpe(args,ret,freq)) => err("variables in function tpe")
     case _ => "Var[" + quote(a) + "]" 
   }
+  // gibbons4 - kinda hacky
+  def repify(a: (String, Exp[Any])): String = repify(a._2)
   def repify(a: Exp[Any]): String = a match {
-    case Def(FTpe(args,ret,freq)) => 
-      if (args == List(byName)) " => " + repify(ret)
-      else "(" + args.map(repify).mkString(",") + ") => " + repify(ret)        
+    case Def(FTpe(args,ret,freq)) => { 
+      if (args.length > 0 && args.apply(0)._2 == byName) " => " + repify(ret)
+      else "(" + args.map(repify).mkString(",") + ") => " + repify(ret)
+    }
     case Def(Tpe("Var", arg, stage)) => repify(arg(0))
     case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2, s2)) => repify(a2(0))
     case Def(VarArgs(t)) => "Seq[" + repify(t) + "]"

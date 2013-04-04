@@ -26,8 +26,9 @@ trait ScalaOps extends ForgeApplication {
   }
 
   def arrays() = {
+    val stream = ForgePrinter()    
     val T = tpePar("T")
-    // val R = tpePar("R")
+    val R = tpePar("R")
     val Arr = GArray(T)
     
     // can't overload 'apply', because varArgs(T) is ambiguous with MInt
@@ -35,10 +36,22 @@ trait ScalaOps extends ForgeApplication {
     val anew2 = op (Arr) ("apply", static, List(T), List(varArgs(T)), Arr, codegenerated)
     
     val alength = op (Arr) ("length", infix, List(T), List(Arr), MInt, codegenerated)    
+    val aplength = op (Arr) ("plength", infix, List(T), List(Arr,MFunction(List(MInt),MInt)), MInt, single(MInt, { stream.printLines(quotedArg(1)+"(3)")}))    
     val aapply = op (Arr) ("apply", infix, List(T), List(Arr,MInt), T, codegenerated)
     val aupdate = op (Arr) ("update", infix, List(T), List(Arr,MInt,T), MUnit, codegenerated, effect = write(0))    
-    // val amap = op (Arr) ("map", infix, List(T,R), List(Arr,MFunction(List(T),R)), GArray(R), map((T,R,Arr), 0, "e => "+quotedArg(1)+"(e)"))
-    
+    //val amap = op (Arr) ("a_map", infix, List(T,R), List(Arr,MFunction(List(T),R)), GArray(R), map((T,R,Arr), 0, "e => "+quotedArg(1)+"(e)"))
+    /*
+    val amap = op (Arr) ("map", infix, List(T,R), List(Arr,MFunction(List(T),R)), GArray(R), single(GArray(R), {stream.printLines(
+      "val length = " + quotedArg(0) + ".length()",
+      "val arx = Array.empty[R](length)",
+      "var i = 0 ",
+      "while(i < length) {",
+        "arx(i) = "+quotedArg(1)+"("+quotedArg(0)+"(i))",
+        "i += 1",
+      "}",
+      "arx"
+    )}))
+*/
     // the alias hint tells Delite that this operation copies its inputs, avoiding conservative mutable sharing errors     
     val aclone = op (Arr) ("Clone", infix, List(T), List(Arr), Arr, codegenerated, aliasHint = copies(0))            
 
@@ -127,7 +140,12 @@ trait ScalaOps extends ForgeApplication {
     // overloaded variants of string concat
     val CString = tpe("String", stage = now) 
     val T = tpePar("T") 
-
+/*
+    val replaceAll = op (Str) ("replaceAll", infix, List(), List(MString, MString, MString), MString, codegenerated)
+    val replaceAll2 = op (Str) ("replaceAll", infix, List(), List(CString, MString, MString), MString, codegenerated)
+    codegen (replaceAll) ($cala, quotedArg(0)+".replaceAll("+quotedArg(1)+", "+quotedArg(2)+")")
+    codegen (replaceAll2) ($cala, quotedArg(0)+".replaceAll("+quotedArg(1)+", "+quotedArg(2)+")")
+*/
     // most of these variants collapse to a common back-end implementation:
     
     // maps to Rep[String], Rep[Any]

@@ -25,7 +25,7 @@ trait DeliteGenOps extends BaseGenOps {
   }
   
   override def quote(x: Exp[Any]): String = x match {
-    case Def(PrintLines(p,lines)) if quoteLiterally => lines.map(l => (" "*4)+quote(l)).mkString(nl)    
+    case Def(PrintLines(p,lines)) if quoteLiterally => lines.map(l => (" "*4)+quote(l)).mkString(nl)  
     case Def(PrintLines(p,lines)) =>
       val body = lines.flatMap(l => quote(l).split(nl))      
       // how do we decide whether to add stream.println?
@@ -41,13 +41,13 @@ trait DeliteGenOps extends BaseGenOps {
       
     case Def(QuoteBlockResult(name,args,ret)) =>
       "emitBlock(" + name + ")" + nl + 
-      "quote(getBlockResult(" + name + "))" 
+      "quote(getBlockResult(" + name + "))"
  
     // TODO   
-    case Def(QuoteSeq(i)) => "Seq("+unquotes(opArgPrefix+i+".map(quote).mkString("+quotes(",sheesh")+")")+")"
+    case Def(QuoteSeq(i)) => "Seq("+unquotes(opArgPrefix+i+".map(quote).mkString("+quotes(",/*gibbons4*/")+")")+")"
     
-    case Const(s: String) if quoteLiterally => s // no quotes, wildcards will be replaced later in inline
-    case Const(s: String) => replaceWildcards(super.quote(s)) // quote first, then insert wildcards
+    case Const(s: String) if quoteLiterally => s  // no quotes, wildcards will be replaced later in inline
+    case Const(s: String) => replaceWildcards(super.quote(s))  // quote first, then insert wildcards
     
     case _ => super.quote(x)
   }  

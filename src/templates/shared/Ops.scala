@@ -28,8 +28,9 @@ trait BaseGenOps extends ForgeCodeGenBase {
    def inline(o: Rep[DSLOp], str: Exp[String], quoter: Exp[Any] => String = quote) = {     
      var b = quoter(str)
      for (i <- 0 until o.args.length) {
-       val name = o.args.apply(i).name
-       b = b.replaceAllLiterally(quoter(o.quotedArg(i)), name) // TODO
+       val name = o.args.apply(i).name 
+       b = b.replaceAllLiterally(quoter(o.quotedArg(name)), name) 
+       //b = b.replaceAllLiterally(quoter(o.quotedArg(i)), name) // TODO eliminate need for this
      }    
      for (i <- 0 until o.tpePars.length) {
        b = b.replaceAllLiterally(quoter(o.tpeInstance(i)), o.tpePars.apply(i).name)

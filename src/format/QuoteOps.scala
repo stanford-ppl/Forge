@@ -30,15 +30,17 @@ trait QuoteOps extends Base {
     def tpeInstance(i: Int) = quote_tpeinstance(x,i)
     def tpeName = quote_tpename(x)
     def quotedArg(i: Int) = quote_quotedarginstance(/*x,*/i)
-    // def arg(i: Int) = quote_arginstance(x,i)
+    def quotedArg(name: String) = quote_quotedarginstance(name)
   }
 
   def quotedArg(i: Int) = quote_quotedarginstance(i)
+  def quotedArg(name: String) = quote_quotedarginstance(name)
   def quote_tpeinstance(x: Rep[DSLOp], i: Int): String
   def quote_tpename(x: Rep[DSLOp]): String  
   // def quote_arginstance(x: Rep[DSLOp], i: Int): Rep[DSLType]
   // def quote_quotedarginstance(x: Rep[DSLOp], i: Int): String
   def quote_quotedarginstance(i: Int): String
+  def quote_quotedarginstance(name: String): String
 
   // convenience method for handling Seq[_] in code generators
   // TODO: instead of providing multiple methods, e.g. quotedArg and quotedSeq, should we have a more generic quote?
@@ -78,6 +80,7 @@ trait QuoteOpsExp extends QuoteOps {
   // def quote_arginstance(x: Rep[DSLOp], i: Int) = x.args.apply(i)
   // def quote_quotedarginstance(x: Rep[DSLOp], i: Int) = unquotes("quote(" + opArgPrefix + i + ")")
   def quote_quotedarginstance(i: Int) = unquotes("quote(" + opArgPrefix + i + ")")
+  def quote_quotedarginstance(name: String) = unquotes("quote(" + name + ")")
   
   /**
    * Sequences

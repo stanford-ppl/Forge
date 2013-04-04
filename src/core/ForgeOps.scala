@@ -18,7 +18,7 @@ trait ForgeOps extends Base {
   def arg(name: String, tpe: Rep[DSLType], default: Option[String]= None) = forge_arg(name, tpe, default)
   def lift(grp: Rep[DSLGroup])(tpe: Rep[DSLType]) = forge_lift(grp, tpe)
   def data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: (String, Rep[DSLType])*) = forge_data(tpe, tpePars, fields)
-  implicit def namedTpeToArg(name: String, tpe: Rep[DSLType]) : Rep[DSLArg] = forge_arg(name, tpe, None)
+  implicit def namedTpeToArg(arg: (String, Rep[DSLType])) : Rep[DSLArg] = forge_arg(arg._1, arg._2, None)
   implicit def namedTpeWithDefaultToArg(arg: (String, Rep[DSLType], String)) : Rep[DSLArg] = forge_arg(arg._1, arg._2, Some(arg._3))
   def anyToArg(a: (Any, Int)) : Rep[DSLArg] = forge_anyToArg(a)
   def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args:  List[Rep[Any]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = forge_op(grp,name,style,tpePars,args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,retTpe,opTpe,effect,aliasHint)

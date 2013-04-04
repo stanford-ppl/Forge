@@ -164,7 +164,8 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     case Def(Tpe(s,args,stage)) => s + makeTpePars(args) 
     case Def(TpeInst(t,args,s)) => t.name + "[" + args.map(quote).mkString(",") + "]"
     case Def(TpePar(s,ctx)) => s 
-    case Def(StringPlus(a,b)) => quote(quoteLiteral(a)+quoteLiteral(b))
+    case Def(StringPlus(a,b)) => quote(quoteLiteral(a)+quoteLiteral(b)) 
+    case Def(Arg(name,tpe,default)) => quote(name)
     case s@Sym(n) => err("could not resolve symbol " + findDefinition(s).toString + ". All Forge symbols must currently be statically resolvable.")
     case _ => super.quote(x)
   }  

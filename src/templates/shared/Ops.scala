@@ -57,7 +57,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     
     // add to filtered only if canonical version doesn't already exist
     for (o <- ops) {
-      val t = o.name + makeOpTypeSignature(o) + makeOpImplicitArgs(o)
+      val t = o.name + makeOpArgsWithType(o) + makeOpImplicitArgs(o)
       if (!canonical.contains(t)) {
         filtered += o
         canonical += t
@@ -78,7 +78,6 @@ trait BaseGenOps extends ForgeCodeGenBase {
   def makeOpArgs(o: Rep[DSLOp]) = makeArgs(o.args)
   def makeOpFutureArgs(o: Rep[DSLOp]) = makeArgs(o.args, t => { val arg = simpleArgName(t); if (t.tpe.stage == now) "unit("+arg+")" else arg })
   def makeOpArgsWithType(o: Rep[DSLOp], typify: Rep[DSLType] => String = repify) = makeArgs(o.args, t => argify(t, typify))
-  def makeOpTypeSignature(o: Rep[DSLOp], typify: Rep[DSLType] => String = repify) = makeArgs(o.args, t => argify(t, typify))
   def makeOpArgsWithNowType(o: Rep[DSLOp]) = makeOpArgsWithType(o, repifySome)
   def makeOpArgsWithDefaults(o: Rep[DSLOp], typify: Rep[DSLType] => String = repify) = makeArgs(o.args, t => argify(t, typify))
   def makeOpArgsWithNowDefault(o: Rep[DSLOp]) = makeOpArgsWithDefaults(o, repifySome)

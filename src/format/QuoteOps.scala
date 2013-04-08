@@ -77,16 +77,15 @@ trait QuoteOpsExp extends QuoteOps {
    */
   def quote_tpeinstance(x: Rep[DSLOp], i: Int) = unquotes("remap(" + opIdentifierPrefix + "." + TManifest.prefix + x.tpePars.apply(i).name + ")")
   def quote_tpename(x: Rep[DSLOp]) = x.grp.name
-  // def quote_arginstance(x: Rep[DSLOp], i: Int) = x.args.apply(i)
-  // def quote_quotedarginstance(x: Rep[DSLOp], i: Int) = unquotes("quote(" + opArgPrefix + i + ")")
   def quote_quotedarginstance(i: Int) = unquotes("quote(" + opArgPrefix + i + ")")
   def quote_quotedarginstance(name: String) = unquotes("quote(" + name + ")")
   
   /**
    * Sequences
    */  
-  case class QuoteSeq(arg: Int) extends Def[String]
-  def quotedSeq(arg: Int) = QuoteSeq(arg)
+  case class QuoteSeq(arg: String) extends Def[String]
+  def quotedSeq(arg: Int) = QuoteSeq(opArgPrefix + arg)
+  def quotedSeq(arg: String) = QuoteSeq(arg)
   
   /**
    * Function types

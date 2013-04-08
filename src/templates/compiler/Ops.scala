@@ -44,7 +44,7 @@ trait DeliteGenOps extends BaseGenOps {
       "quote(getBlockResult(" + name + "))"
  
     // TODO   
-    case Def(QuoteSeq(i)) => "Seq("+unquotes(opArgPrefix+i+".map(quote).mkString("+quotes(",/*gibbons4*/")+")")+")"
+    case Def(QuoteSeq(argName)) => "Seq("+unquotes(argName+".map(quote).mkString("+quotes(",")+")")+")"
     
     case Const(s: String) if quoteLiterally => s  // no quotes, wildcards will be replaced later in inline
     case Const(s: String) => replaceWildcards(super.quote(s))  // quote first, then insert wildcards

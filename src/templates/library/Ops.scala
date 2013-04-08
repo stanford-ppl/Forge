@@ -32,8 +32,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       // since this is called from emitWithIndent, the first line has an extra indent
       lines.map(l => (" "*4)+quote(l)).mkString(nl) 
       
-    // case Def(QuoteSeq(i)) => "("+opArgPrefix+i+": _*)"  // not exactly a quoted sequence..
-    case Def(QuoteSeq(i)) => opArgPrefix+i
+    // case Def(QuoteSeq(i)) => "("+i+": _*)"  // not exactly a quoted sequence..
+    case Def(QuoteSeq(argName)) => argName
       
     case Const(s: String) => replaceWildcards(s) // don't add quotes 
     

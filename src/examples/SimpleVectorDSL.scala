@@ -57,7 +57,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     val vbasic = op (Vector) ("basic", infix, List(T), List(Vector, ("y", MInt, "1"), ("z", MInt, "1")), MInt, codegenerated)
     codegen (vbasic) ($cala, quotedArg("y")+ "+3+" + quotedArg("z"))
  
-    val vset = op (Vector) ("set", infix, List(T/* withBound TNumeric*/), List(Vector, ("x", MInt), ("z", MInt, "3")), tpeInst(Vector, List(MInt)), map ((T,MInt,Vector), 0, "y  => "+quotedArg("x") + " + " + quotedArg("z")))
+    val vset = op (Vector) ("set", infix, List(T withBound TNumeric), List(Vector, ("x", MInt), ("z", MInt, "3")), tpeInst(Vector, List(MInt)), map ((T,MInt,Vector), 0, "y  => "+quotedArg("x") + " + " + quotedArg("z")))
 
     val vplus = op (Vector) ("+", infix, List(T withBound TNumeric), List(Vector,Vector), Vector, zip((T,T,T,Vector), (0,1), "(a,b) => a+b"))
     

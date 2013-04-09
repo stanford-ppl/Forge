@@ -145,7 +145,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         stream.println("}")
         stream.println()
       }
-      if (d.isEmpty && !isPrimitiveType(tpe)) {
+      if (d.isEmpty && !isForgePrimitiveType(tpe)) {
         // what should we actually do here? let the user define a lib type in this case?
         warn("no data structure found for tpe " + tpe.name + ". emitting type alias " + quote(tpe) + " = scala." + quote(tpe) + ", which may be nonsense.")
         stream.println("  type " + quote(tpe) + " = scala." + quote(tpe))

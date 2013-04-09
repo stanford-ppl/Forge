@@ -4,11 +4,7 @@ organization := "Stanford_PPL"
 
 retrieveManaged := true
 
-resolvers += ScalaToolsSnapshots
-
-resolvers += dropboxScalaTestRepo
-
-scalaOrganization := "org.scala-lang"
+scalaOrganization := "org.scala-lang.virtualized"
 
 scalaVersion := virtScala
 
@@ -22,14 +18,15 @@ scalacOptions += "-Yvirtualize"
 
 scalacOptions in Compile ++= Seq("-unchecked", "-deprecation")
 
-// needed for scala.tools, which is apparently not included in sbt's built in version
-libraryDependencies += "org.scala-lang" % "scala-library" % virtScala
+libraryDependencies += "org.scala-lang.virtualized" % "scala-library" % virtScala
 
-libraryDependencies += "org.scala-lang" % "scala-compiler" % virtScala
-
-//libraryDependencies += scalaTest
+libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % virtScala
 
 libraryDependencies += virtualization_lms_core
+
+libraryDependencies += "org.scala-lang" % "scala-actors" % virtScala // for ScalaTest
+
+libraryDependencies += scalaTest
 
 // tests are not thread safe
 parallelExecution in Test := false

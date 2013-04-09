@@ -55,22 +55,22 @@ import sbt._
 import Keys._
 
 object ${dslName}Build extends Build {
-  val virtualization_lms_core = "EPFL" % "lms_2.10" % "0.2"
+  val virtualization_lms_core = "EPFL" % "lms_2.10.0" % "0.3-SNAPSHOT"
   val delite_framework = "stanford-ppl" % "framework_2.10" % "0.1-SNAPSHOT"
   val delite_runtime = "stanford-ppl" % "runtime_2.10" % "0.1-SNAPSHOT"
 
-  val virtScala = "2.10.0-M1-virtualized" 
+  val virtScala = "2.10.0" 
   val virtBuildSettingsBase = Defaults.defaultSettings ++ Seq(
     organization := "stanford-ppl",
-    scalaOrganization := "org.scala-lang",
+    scalaOrganization := "org.scala-lang.virtualized",
     scalaVersion := virtScala,
     publishArtifact in (Compile, packageDoc) := false,
     libraryDependencies += virtualization_lms_core,
     libraryDependencies += delite_framework,
     libraryDependencies += delite_runtime,
     // needed for scala.tools, which is apparently not included in sbt's built in version
-    libraryDependencies += "org.scala-lang" % "scala-library" % virtScala,
-    libraryDependencies += "org.scala-lang" % "scala-compiler" % virtScala,
+    libraryDependencies += "org.scala-lang.virtualized" % "scala-library" % virtScala,
+    libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % virtScala,
     libraryDependencies += "org.apache.commons" % "commons-math" % "2.2",
     // used in delitec to access jars
     retrieveManaged := true,

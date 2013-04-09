@@ -50,7 +50,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   
   // -- IR helpers
   
-  def isPrimitiveType(t: Rep[DSLType]) = t match {
+  def isForgePrimitiveType(t: Rep[DSLType]) = t match {
     case `MInt` | `MDouble` | `MBoolean` | `MString` | `MUnit` => true
     case Def(Tpe("Array",_,_)) => true
     case _ => false

@@ -18,17 +18,11 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
   
   lazy val packageName = dsl.toLowerCase() + ".compiler"
   
-  def makeEffectAnnotation(effect: EffectType) = effect match {
+  def makeEffectAnnotation(effect: EffectType, o: Rep[DSLOp]) = effect match {
     case `pure` => "reflectPure"
     case `mutable` => "reflectMutable"
     case `simple` => "reflectEffect"
-    case write(args @ _*) => {
-      val namedArgs = args.map(x => x match {
-        case arg: Int => opArgPrefix + arg
-        case arg: String => arg
-      })
-      "reflectWrite(" + args.mkString(",") + ")" 
-    }
+    case write(args @ _*) => "reflectWrite(" + args.map(i => o.args.apply(i).name).mkString(",") + ")"
   }
   
   def makeFrequencyAnnotation(freq: Frequency) = freq match {

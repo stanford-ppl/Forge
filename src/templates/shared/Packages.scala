@@ -52,7 +52,7 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     stream.println()
     emitBlockComment("abstract types", stream)
     for (tpe <- Tpes) {
-      if (OpsGrp.contains(tpe) && !isPrimitiveType(tpe)) {
+      if (OpsGrp.contains(tpe) && !isForgePrimitiveType(tpe)) {
         stream.println("  type " + quote(tpe))      
         stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + ": Manifest[" + quote(tpe) + "]")
       }

@@ -49,9 +49,9 @@ trait Definitions extends DerivativeTypes {
   object $cala extends CodeGenerator { def name = "Scala" }  // odd things happen if you try to re-use the existing object name 'scala'
   object cuda extends CodeGenerator { def name = "Cuda" }  
   object opencl extends CodeGenerator { def name = "OpenCL" }  
-  object c extends CodeGenerator { def name = "C" }  
+  object cpp extends CodeGenerator { def name = "C" }  
   
-  val generators = List($cala, cuda, opencl, c)
+  val generators = List($cala, cuda, opencl, cpp)
   
   /**
    * Type classes
@@ -60,14 +60,17 @@ trait Definitions extends DerivativeTypes {
   object TManifest extends TypeClass {
     def name = "Manifest"
     def prefix = "_m"
+    def wrapper = Some("mtype")
   }
   object TNumeric extends TypeClass {
     def name = "Numeric"
     def prefix = "_num"
+    def wrapper = Some("ntype") 
   }
   object TOrdering extends TypeClass {
     def name = "Ordering"
     def prefix = "_ord"
+    def wrapper = Some("otype")
   }
 
   

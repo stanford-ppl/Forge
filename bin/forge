@@ -14,9 +14,10 @@ LMS_HOME = os.getenv("LMS_HOME")
 SCALA_VIRT_HOME = os.getenv("SCALA_VIRT_HOME")
 JAVA_HOME = os.getenv("JAVA_HOME")
 
-scala_virt_version = "scala-2.10.0-M1-virtualized"
+scala_virt_prefix = "org.scala-lang.virtualized."
+scala_virt_version = "scala-2.10.0"
 scala_major_id = '.'.join(scala_virt_version.split('.')[0:2]) 
-lms_version = "lms_2.10"
+lms_version = "lms_2.10.0"
 props = {}
 
 def err(s):
@@ -63,9 +64,9 @@ def checkEnv():
         err("The JAVA_HOME environment variable must be defined.")
 
     if SCALA_VIRT_HOME is None:
-        scala_virt_home = USER_HOME + "/.sbt/boot/" + scala_virt_version + "/lib/"
+        scala_virt_home = USER_HOME + "/.sbt/boot/" + scala_virt_prefix + scala_virt_version + "/lib/"
         if not os.path.isdir(scala_virt_home):
-            err("couldn't find scala virtualized at: " + scala_virt_home + ". Please set the SCALA_VIRT_HOME environment variable.")
+            err("couldn't find scala virtualized at: " + scala_virt_prefix + scala_virt_home + ". Please set the SCALA_VIRT_HOME environment variable.")
         SCALA_VIRT_HOME = scala_virt_home 
     
     if LMS_HOME is None:
@@ -93,7 +94,8 @@ def stage(runner, params, opts):
     
     #scala-virt cp
     cp = cp + SCALA_VIRT_HOME + "/scala-library.jar" + os.pathsep
-    cp = cp + SCALA_VIRT_HOME + "/scala-compiler.jar"
+    cp = cp + SCALA_VIRT_HOME + "/scala-compiler.jar" + os.pathsep
+    cp = cp + SCALA_VIRT_HOME + "/scala-reflect.jar" 
 
     java_opts = java_opts + cp
     #os.putenv("JAVA_OPTS", java_opts)

@@ -46,6 +46,8 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
      * We could simplify this by reusing templates even more, i.e. specializing for different types
      * (e.g. accept a list of binary zip ops that only differentiate in function applied)
      */           
+    // val vnew = op (Vector) ("apply", methodTpe(static), tpePars(T), args(MInt), retTpe(Vector), codegenerated, effect = mutable)
+        
     val vnew = op (Vector) ("apply", static, List(T), List(MInt), Vector, codegenerated, effect = mutable)
     val vlength = op (Vector) ("length", infix, List(T), List(Vector), MInt, codegenerated)    
     val vapply = op (Vector) ("apply", infix, List(T), List(Vector,MInt), T, codegenerated)

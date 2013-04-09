@@ -13,7 +13,7 @@ trait DeliteGenImports extends BaseGenImports {
   import IR._
     
   def emitDeliteCollectionImport(stream: PrintWriter) {
-    stream.println("import ppl.delite.framework.datastruct.scala.DeliteCollection")
+    stream.println("import ppl.delite.framework.ops.DeliteCollection")
   }
 
   def emitDeliteOpsImports(stream: PrintWriter) {
@@ -27,7 +27,7 @@ trait DeliteGenImports extends BaseGenImports {
     stream.println("import ppl.delite.framework.codegen.Target")
     stream.println("import ppl.delite.framework.codegen.scala.TargetScala")
     stream.println("import ppl.delite.framework.codegen.cuda.TargetCuda")
-    stream.println("import ppl.delite.framework.codegen.c.TargetC")
+    stream.println("import ppl.delite.framework.codegen.cpp.TargetCpp")
     stream.println("import ppl.delite.framework.codegen.opencl.TargetOpenCL")
     stream.println("import ppl.delite.framework.ops._")
     stream.println("import ppl.delite.framework.datastructures._")

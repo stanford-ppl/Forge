@@ -6,6 +6,7 @@ package ppl.dsl.forge
 abstract class TypeClass {
   def name: String
   def prefix: String
+  def wrapper: Option[String]
 }
 abstract class DSLGroup 
 abstract class DSLType extends DSLGroup

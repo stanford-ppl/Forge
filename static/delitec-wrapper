@@ -5,9 +5,6 @@ from sys import argv
 
 import delitecommon
 
-scala_virt_version = "scala-2.10.0-M1-virtualized"
-scala_major_id = '.'.join(scala_virt_version.split('.')[0:2])
-
 comps = ['apps','extern','shared','library','compiler']
 
 ## a forwarder to the delitec script in DELITE_HOME with neccesary classpaths for this forge-generated DSL

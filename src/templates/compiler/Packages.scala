@@ -18,6 +18,11 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("trait " + dsl + "ApplicationCompiler extends " + dsl + "Application with DeliteApplication with " + dsl+"Exp")
   }
 
+  def targetName(g: CodeGenerator) = g match {
+    case `cpp` => "Cpp" // only one that doesn't follow the convention of TargetX and XGen...
+    case _ => g.name
+  }
+  
   def emitDSLPackageDefinitions(opsGrps: List[DSLOps], stream: PrintWriter) {
     emitBlockComment("dsl compiler definition", stream)
   
@@ -48,7 +53,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println()
     emitBlockComment("dsl types", stream, indent=2)
     for (tpe <- Tpes) {
-      if (OpsGrp.contains(tpe) && !isPrimitiveType(tpe)) {
+      if (OpsGrp.contains(tpe) && !isForgePrimitiveType(tpe)) {
         stream.print("  abstract class " + quote(tpe))
         if (DeliteCollections.contains(tpe)) stream.println(" extends DeliteCollection[" + quote(DeliteCollections(tpe).tpeArg) + "]") else stream.println()
         stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")      
@@ -58,7 +63,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("  def getCodeGenPkg(t: Target{val IR: " + dsl + "Exp.this.type}): GenericFatCodegen{val IR: " + dsl + "Exp.this.type} = {")
     stream.println("    t match {")  
     for (g <- generators) {
-      stream.println("      case _:Target" + g.name + " => new " + dsl + "Codegen" + g.name + "{val IR: " + dsl + "Exp.this.type = " + dsl + "Exp.this}")      
+      stream.println("      case _:Target" + targetName(g) + " => new " + dsl + "Codegen" + g.name + "{val IR: " + dsl + "Exp.this.type = " + dsl + "Exp.this}")      
     }
     stream.println("      case _ => throw new RuntimeException(\"" + dsl + " does not support this target\")")
     stream.println("    }")

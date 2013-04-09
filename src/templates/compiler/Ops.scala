@@ -63,6 +63,14 @@ trait DeliteGenOps extends BaseGenOps {
   def makeOpSimpleNodeNameWithArgs(o: Rep[DSLOp]) = makeOpNodeName(o) + makeOpArgs(o)
   def makeOpSimpleNodeNameWithArgs(o_method: Rep[DSLOp], o_args: Rep[DSLOp]) = makeOpNodeName(o_method) + makeOpArgs(o_args)
   def makeOpNodeNameWithArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String = makeOpArgs) = makeOpNodeName(o) + makeTpePars(o.tpePars) + makeArgs(o) + makeOpImplicitArgs(o)
+  
+  def makeTpeClsPar(b: TypeClass, t: Rep[DSLType]) = {
+    val body = opIdentifierPrefix + "." + b.prefix + t.name
+    b.wrapper match {
+      case Some(w) => w + "(" + body + ")"
+      case None => body      
+    }
+  }
       
   def emitSingleTaskImpls(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("SingleTask Impls", stream)   
@@ -228,10 +236,10 @@ trait DeliteGenOps extends BaseGenOps {
       if (summary.length > 0) {
         // if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
         val prologue = if (o.effect == simple) " andAlso Simple()" else ""
-        emitWithIndent(makeEffectAnnotation(simple) + "(" + makeOpNodeNameWithModifiedArgs(o) + ", " + summarizeEffects(summary) + prologue + ")", stream, 4)
+        emitWithIndent(makeEffectAnnotation(simple,o) + "(" + makeOpNodeNameWithModifiedArgs(o) + ", " + summarizeEffects(summary) + prologue + ")", stream, 4)
       }
       else {
-        stream.print("    " + makeEffectAnnotation(o.effect) + "(" + makeOpNodeNameWithArgs(o) + ")")
+        stream.print("    " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeNameWithArgs(o) + ")")
       }
       
       emitWithIndent("}", stream, 2)
@@ -315,7 +323,7 @@ trait DeliteGenOps extends BaseGenOps {
     for (o <- uniqueOps) {
       // helpful identifiers
       val xformArgs = "(" + o.args.map(t => "f(" + t.name + ")").mkString(",") + ")" 
-      val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => opIdentifierPrefix + "." + b.prefix + t.name)) ++ o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
+      val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++ o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
       
       o.opTpe match {
         case `codegenerated` =>
@@ -376,13 +384,13 @@ trait DeliteGenOps extends BaseGenOps {
         stream.println("  }")
         stream.println()
         stream.println("  override def dc_update[A:Manifest](x: Exp[DeliteCollection[A]], n: Exp[Int], y: Exp[A])(implicit ctx: SourceContext) = {")
-        val a = if (dc.tpeArg.tp.erasure == classOf[TypePar]) "A" else quote(dc.tpeArg) // hack!
+        val a = if (dc.tpeArg.tp.runtimeClass == classOf[TypePar]) "A" else quote(dc.tpeArg) // hack!
         stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dc.update) + "(" + asTpe + "(x), n, y.asInstanceOf[Exp["+a+"]])") 
         stream.println("    else super.dc_update(x,n,y)")
         stream.println("  }")
       }
     }
-    catch { case _ => }
+    catch { case _ : MatchError => }
   }
     
   def emitOpCodegen(opsGrp: DSLOps, stream: PrintWriter) {        

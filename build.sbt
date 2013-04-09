@@ -27,7 +27,7 @@ libraryDependencies += "org.scala-lang" % "scala-library" % virtScala
 
 libraryDependencies += "org.scala-lang" % "scala-compiler" % virtScala
 
-libraryDependencies += scalaTest
+//libraryDependencies += scalaTest
 
 libraryDependencies += virtualization_lms_core
 

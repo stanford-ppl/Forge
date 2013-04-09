@@ -23,8 +23,8 @@ trait Definitions extends DerivativeTypes {
   lazy val MString = tpe("String")
   lazy val MUnit = tpe("Unit")
   lazy val byName = tpe("Thunk")
-  def MThunk(ret: Rep[DSLType], freq: Frequency = normal) = ftpe(List(byName),ret,freq)
-  def MFunction(args: List[Rep[DSLType]], ret: Rep[DSLType], freq: Frequency = normal) = ftpe(args,ret,freq)
+  def MThunk(ret: Rep[DSLType], freq: Frequency = normal) = ftpe(List(forge_arg("", byName, None)),ret,freq) // TODO
+  def MFunction(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency = normal) = ftpe(args,ret,freq)
   lazy val MSourceContext = tpe("SourceContext")
   
   // generic types
@@ -204,9 +204,8 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
   
    // T*
    case class VarArgs(tpeArg: Rep[DSLType]) extends Def[DSLType]
-   def varArgs(tpeArg: Rep[DSLType]) = VarArgs(tpeArg)    
-    
-   
+   def varArgs(tpeArg: Rep[DSLType]) = VarArgs(tpeArg)  
+
   /**
    * Delite ops
    */

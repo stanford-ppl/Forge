@@ -26,7 +26,9 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
      */
     val T = tpePar("T")
     val Vector = tpe("Vector", List(T)) 
-    
+    // gets generated in FrontEnd
+    //val IntVector = tpeInst(Vector, List(MInt)) 
+   
     // TODO: define tpeAliases
     // tpeAlias(Vector, "V")
     
@@ -50,8 +52,13 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     val vupdate = op (Vector) ("update", infix, List(T), List(Vector,MInt,T), MUnit, codegenerated, effect = write(0))
     
     val vtimesScalar = op (Vector) ("*", infix, List(T withBound TNumeric), List(Vector,T), Vector, map((T,T,Vector), 0, "e => e*"+quotedArg(1)))
-    // val vfoo = op (Vector) ("foo", infix, List(T), List(Vector,T), tpeInst(Vector,List(MDouble)), map((T,MDouble,Vector), 0, "e => 0.0")) // problem: primitive lifting isn't in scope in the ops
-      
+    val vfoo = op (Vector) ("foo", infix, List(T), List(Vector,T), tpeInst(Vector,List(MDouble)), map((T,MDouble,Vector), 0, "e => unit(0.0)")) // problem: primitive lifting isn't in scope in the ops
+     
+    val vbasic = op (Vector) ("basic", infix, List(T), List(Vector, ("y", MInt, "1"), ("z", MInt, "1")), MInt, codegenerated)
+    codegen (vbasic) ($cala, quotedArg("y")+ "+3+" + quotedArg("z"))
+ 
+    val vset = op (Vector) ("set", infix, List(T withBound TNumeric), List(Vector, ("x", MInt), ("z", MInt, "3")), tpeInst(Vector, List(MInt)), map ((T,MInt,Vector), 0, "y  => "+quotedArg("x") + " + " + quotedArg("z")))
+
     val vplus = op (Vector) ("+", infix, List(T withBound TNumeric), List(Vector,Vector), Vector, zip((T,T,T,Vector), (0,1), "(a,b) => a+b"))
     
     val vsum = op (Vector) ("sum", infix, List(T withBound TNumeric), List(Vector), T, reduce((T,Vector), 0, lookup("Numeric","zero").get, "(a,b) => a+b"))

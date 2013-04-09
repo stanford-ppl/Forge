@@ -70,7 +70,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   }
   
   def hasFuncArgs(o: Rep[DSLOp]) = o.args.exists(a => a match {
-    case Def(FTpe(args,ret,freq)) => true
+    case Def(Arg(_, Def(FTpe(args,ret,freq)), _)) => true
     case _ => false
   })  
 }
@@ -99,19 +99,23 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
   // -- code gen helpers
   
   def varify(a: Exp[Any]): String = a match {
+    case Def(Arg(name, tpe, default)) => varify(tpe)
     case Def(FTpe(args,ret,freq)) => err("variables in function tpe")
     case _ => "Var[" + quote(a) + "]" 
   }
   def repify(a: Exp[Any]): String = a match {
-    case Def(FTpe(args,ret,freq)) => 
-      if (args == List(byName)) " => " + repify(ret)
-      else "(" + args.map(repify).mkString(",") + ") => " + repify(ret)        
+    case Def(Arg(name, tpe, default)) => repify(tpe)
+    case Def(FTpe(args,ret,freq)) => args match {
+      case List(Def(Arg(_,byName,_))) => " => " + repify(ret)
+      case _ => "(" + args.map(repify).mkString(",") + ") => " + repify(ret)        
+    }
     case Def(Tpe("Var", arg, stage)) => repify(arg(0))
     case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2, s2)) => repify(a2(0))
     case Def(VarArgs(t)) => "Seq[" + repify(t) + "]"
     case _ => "Rep[" + quote(a) + "]"           
   }
   def repifySome(a: Exp[Any]): String = a match {  
+    case Def(Arg(name, tpe, default)) => repifySome(tpe)
     case Def(Tpe(name, arg, `now`)) => quote(a)
     case Def(Tpe("Var", arg, stage)) => varify(arg(0))
     case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2, s2)) => varify(a2(0))
@@ -119,6 +123,13 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     case _ => repify(a)
   }
   
+  def argify(a: Exp[DSLArg], typify: Exp[DSLType] => String = repify): String = a match {
+    case Def(Arg(name, tpe, default)) => default match {
+      case Some(d) => name + ": " + typify(tpe) + " = " + "unit("+d+")"
+      case None => name + ": " + typify(tpe)
+    }
+  }
+
   def makeTpeParsWithBounds(args: List[Rep[TypePar]]): String = {
     if (args.length < 1) return ""    
     val args2 = args.map { a => a.name + (if (a.ctxBounds != Nil) ":" + a.ctxBounds.map(_.name).mkString(":") else "") }
@@ -150,10 +161,11 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
   }    
   
   override def quote(x: Exp[Any]) : String = x match {
-    case Def(Tpe(s,args,stage)) => s + makeTpePars(args)
+    case Def(Tpe(s,args,stage)) => s + makeTpePars(args) 
     case Def(TpeInst(t,args,s)) => t.name + "[" + args.map(quote).mkString(",") + "]"
     case Def(TpePar(s,ctx)) => s 
-    case Def(StringPlus(a,b)) => quote(quoteLiteral(a)+quoteLiteral(b))
+    case Def(StringPlus(a,b)) => quote(quoteLiteral(a)+quoteLiteral(b)) 
+    case Def(Arg(name,tpe,default)) => quote(name)
     case s@Sym(n) => err("could not resolve symbol " + findDefinition(s).toString + ". All Forge symbols must currently be statically resolvable.")
     case _ => super.quote(x)
   }  

@@ -10,6 +10,7 @@ abstract class TypeClass {
 abstract class DSLGroup 
 abstract class DSLType extends DSLGroup
 abstract class TypePar extends DSLType
+abstract class DSLArg
 abstract class DSLData
 abstract class DSLStruct
 abstract class DSLOp

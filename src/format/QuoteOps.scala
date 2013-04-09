@@ -30,15 +30,17 @@ trait QuoteOps extends Base {
     def tpeInstance(i: Int) = quote_tpeinstance(x,i)
     def tpeName = quote_tpename(x)
     def quotedArg(i: Int) = quote_quotedarginstance(/*x,*/i)
-    // def arg(i: Int) = quote_arginstance(x,i)
+    def quotedArg(name: String) = quote_quotedarginstance(name)
   }
 
   def quotedArg(i: Int) = quote_quotedarginstance(i)
+  def quotedArg(name: String) = quote_quotedarginstance(name)
   def quote_tpeinstance(x: Rep[DSLOp], i: Int): String
   def quote_tpename(x: Rep[DSLOp]): String  
   // def quote_arginstance(x: Rep[DSLOp], i: Int): Rep[DSLType]
   // def quote_quotedarginstance(x: Rep[DSLOp], i: Int): String
   def quote_quotedarginstance(i: Int): String
+  def quote_quotedarginstance(name: String): String
 
   // convenience method for handling Seq[_] in code generators
   // TODO: instead of providing multiple methods, e.g. quotedArg and quotedSeq, should we have a more generic quote?
@@ -75,23 +77,23 @@ trait QuoteOpsExp extends QuoteOps {
    */
   def quote_tpeinstance(x: Rep[DSLOp], i: Int) = unquotes("remap(" + opIdentifierPrefix + "." + TManifest.prefix + x.tpePars.apply(i).name + ")")
   def quote_tpename(x: Rep[DSLOp]) = x.grp.name
-  // def quote_arginstance(x: Rep[DSLOp], i: Int) = x.args.apply(i)
-  // def quote_quotedarginstance(x: Rep[DSLOp], i: Int) = unquotes("quote(" + opArgPrefix + i + ")")
   def quote_quotedarginstance(i: Int) = unquotes("quote(" + opArgPrefix + i + ")")
+  def quote_quotedarginstance(name: String) = unquotes("quote(" + name + ")")
   
   /**
    * Sequences
    */  
-  case class QuoteSeq(arg: Int) extends Def[String]
-  def quotedSeq(arg: Int) = QuoteSeq(arg)
+  case class QuoteSeq(arg: String) extends Def[String]
+  def quotedSeq(arg: Int) = QuoteSeq(opArgPrefix + arg)
+  def quotedSeq(arg: String) = QuoteSeq(arg)
   
   /**
    * Function types
    */    
-  case class QuoteBlockResult(name: String, args: List[Rep[DSLType]], ret: Rep[DSLType]) extends Def[String]
+  case class QuoteBlockResult(name: String, args: List[Rep[DSLArg]], ret: Rep[DSLType]) extends Def[String]
   
   def quote_blockresult(x: Rep[DSLOp], argIndex: Int) = x.args.apply(argIndex) match {
-    case Def(FTpe(args,ret,freq)) => QuoteBlockResult(opArgPrefix + argIndex,args,ret)
+    case Def(Arg(name, Def(FTpe(args,ret,freq)), d2)) => QuoteBlockResult(name,args,ret)
     case _ => err("cannot quote block result of non-function type " + x.name)
   }
 }

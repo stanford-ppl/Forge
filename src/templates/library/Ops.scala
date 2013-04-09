@@ -138,7 +138,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
           stream.print("(" + o.args.drop(1).map(t => argify(t, repify)).mkString(",") + ")")  
           stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = data.tpePars))
           stream.println(" = {")
-          emitWithIndent("val " + opArgPrefix + 0 + " = this", stream, 4)
+          emitWithIndent("val " + o.args.apply(0).name + " = this", stream, 4)
           emitOp(o, stream, indent=4)
           stream.println("  }")
         }

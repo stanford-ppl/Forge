@@ -43,7 +43,6 @@ trait DeliteGenOps extends BaseGenOps {
       "emitBlock(" + name + ")" + nl + 
       "quote(getBlockResult(" + name + "))"
  
-    // TODO   
     case Def(QuoteSeq(argName)) => "Seq("+unquotes(argName+".map(quote).mkString("+quotes(",")+")")+")"
     
     case Const(s: String) if quoteLiterally => s  // no quotes, wildcards will be replaced later in inline
@@ -315,9 +314,8 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println("  override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = (e match {")
     for (o <- uniqueOps) {
       // helpful identifiers
-      // TODO
       val xformArgs = "(" + o.args.map(t => "f(" + t.name + ")").mkString(",") + ")" 
-      val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => opIdentifierPrefix + "." + b.prefix + t.name)) ++ /*implicitArgsWithOverload(o)*/o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
+      val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => opIdentifierPrefix + "." + b.prefix + t.name)) ++ o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
       
       o.opTpe match {
         case `codegenerated` =>

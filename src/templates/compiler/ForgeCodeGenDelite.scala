@@ -22,7 +22,13 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     case `pure` => "reflectPure"
     case `mutable` => "reflectMutable"
     case `simple` => "reflectEffect"
-    case write(args @ _*) => "reflectWrite(" + args.map(a => opArgPrefix + a).mkString(",") + ")" // TODO
+    case write(args @ _*) => {
+      val namedArgs = args.map(x => x match {
+        case arg: Int => opArgPrefix + arg
+        case arg: String => arg
+      })
+      "reflectWrite(" + args.mkString(",") + ")" 
+    }
   }
   
   def makeFrequencyAnnotation(freq: Frequency) = freq match {

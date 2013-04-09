@@ -32,8 +32,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       // since this is called from emitWithIndent, the first line has an extra indent
       lines.map(l => (" "*4)+quote(l)).mkString(nl) 
       
-    // case Def(QuoteSeq(i)) => "("+opArgPrefix+i+": _*)"  // not exactly a quoted sequence..
-    case Def(QuoteSeq(i)) => opArgPrefix+i
+    // case Def(QuoteSeq(i)) => "("+i+": _*)"  // not exactly a quoted sequence..
+    case Def(QuoteSeq(argName)) => argName
       
     case Const(s: String) => replaceWildcards(s) // don't add quotes 
     
@@ -74,18 +74,18 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         val dc = DeliteCollections(map.tpePars._3)        
         emitWithIndent("def func: " + quote(map.tpePars._1) + " => " + quote(map.tpePars._2) + " = " + inline(o, map.func), stream, indent)            
         // TODO: this isn't quite right. how do we know which of dc.allocs tpePars is the one that corresponds to our return tpe, e.g. map.tpePars._2?
-        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, map.tpePars._1, map.tpePars._2)) + "(" + makeOpMethodNameWithArgs(dc.size) + ")", stream, indent)
-        emitWithIndent("for (i <- 0 until " + makeOpMethodNameWithArgs(dc.size) + ") {", stream, indent)            
-        emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(" + opArgPrefix+map.argIndex + ", i)))", stream, indent+2)
+        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, map.tpePars._1, map.tpePars._2)) + "(" + makeOpMethodName(dc.size) + "(" + o.args.apply(map.argIndex).name +")" + ")", stream, indent) // TODO - makeArg
+        emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(map.argIndex).name + ")" + ") {", stream, indent)            
+        emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(" + o.args.apply(map.argIndex).name + ", i)))", stream, indent+2)
         emitWithIndent("}", stream, indent)            
         emitWithIndent("out", stream, indent)                
       case zip:Zip =>
         check(o)          
         val dc = DeliteCollections(zip.tpePars._4)        
         emitWithIndent("def func: (" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + ") => " + quote(zip.tpePars._3) + " = " + inline(o, zip.func), stream, indent)            
-        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, zip.tpePars._1, zip.tpePars._3)) + "(" + makeOpMethodNameWithArgs(dc.size) + ")", stream, indent)
-        emitWithIndent("for (i <- 0 until " + makeOpMethodNameWithArgs(dc.size) + ") {", stream, indent)            
-        emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(" + opArgPrefix+zip.argIndices._1 + ", i)," + makeOpMethodName(dc.apply) + "(" + opArgPrefix+zip.argIndices._2 + ", i)))", stream, indent+2)
+        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, zip.tpePars._1, zip.tpePars._3)) + "(" + makeOpMethodName(dc.size) + "(" + o.args.apply(zip.argIndices._1).name + ")" + ")", stream, indent)
+        emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(zip.argIndices._1).name + ")" + ") {", stream, indent)   
+        emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(" + o.args.apply(zip.argIndices._1).name + ", i)," + makeOpMethodName(dc.apply) + "(" + o.args.apply(zip.argIndices._2).name + ", i)))", stream, indent+2)
         emitWithIndent("}", stream, indent)            
         emitWithIndent("out", stream, indent)        
       case reduce:Reduce =>
@@ -93,8 +93,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         val dc = DeliteCollections(reduce.tpePars._2)        
         emitWithIndent("def func: (" + quote(reduce.tpePars._1) + "," + quote(reduce.tpePars._1) + ") => " + quote(reduce.tpePars._1) + " = " + inline(o, reduce.func), stream, indent)                    
         emitWithIndent("var acc = " + makeOpMethodNameWithArgs(reduce.zero), stream, indent)
-        emitWithIndent("for (i <- 0 until " + makeOpMethodNameWithArgs(dc.size) + ") {", stream, indent)            
-        emitWithIndent("acc = " + " func(acc, " + makeOpMethodName(dc.apply) + "(" + opArgPrefix+reduce.argIndex + ", i))", stream, indent+2)
+        emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(reduce.argIndex).name + ")" + ") {", stream, indent)            
+        emitWithIndent("acc = " + " func(acc, " + makeOpMethodName(dc.apply) + "(" + o.args.apply(reduce.argIndex).name + ", i))", stream, indent+2)
         emitWithIndent("}", stream, indent)            
         emitWithIndent("acc", stream, indent)                      
       case filter:Filter =>
@@ -103,7 +103,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         emitWithIndent("def func: " + quote(filter.tpePars._1) + " => " + quote(filter.tpePars._2) + " = " + inline(o, filter.func), stream, indent)            
         emitWithIndent("def cond: " + quote(filter.tpePars._1) + " => " + quote(MBoolean) + " = " + inline(o, filter.cond), stream, indent)            
         emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, filter.tpePars._1, filter.tpePars._2)) + "(0)", stream, indent)
-        emitWithIndent("for (i <- 0 until " + makeOpMethodNameWithArgs(dc.size) + ") {", stream, indent)            
+        emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(filter.argIndex).name + ")"  + ") {", stream, indent)
         emitWithIndent("if (cond(i)) {", stream, indent+2)
         emitWithIndent("// TODO: dc_append", stream, indent+4)
         // emitWithIndent(makeOpMethodName(dc.append) + "(out, func(" + makeOpMethodName(dc.apply) + "(" + opArgPrefix+map.argIndex + ", i)))", stream, indent+4)
@@ -114,8 +114,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         check(o)
         val dc = DeliteCollections(foreach.tpePars._2)        
         emitWithIndent("def func: " + quote(foreach.tpePars._1) + " => " + quote(MUnit) + " = " + inline(o, foreach.func), stream, indent)            
-        emitWithIndent("for (i <- 0 until " + makeOpMethodNameWithArgs(dc.size) + ") {", stream, indent)            
-        emitWithIndent("func(" + makeOpMethodName(dc.apply) + "(" + opArgPrefix+foreach.argIndex + ", i))", stream, indent+2)
+        emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(foreach.argIndex).name + ")" + ") {", stream, indent)            
+        emitWithIndent("func(" + makeOpMethodName(dc.apply) + "(" + o.args.apply(foreach.argIndex).name + ", i))", stream, indent+2)
         emitWithIndent("}", stream, indent)            
     }    
   }
@@ -134,11 +134,11 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         stream.println(makeFieldsWithInitArgs(data))
         for (o <- unique(opsGrp.ops) if o.style == infix) {       
           stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
-          stream.print("(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repify(t._1)).mkString(",") + ")") 
+          //stream.print("(" + o.args/*.drop(1)*/.map(t => t.name + ": " + repify(t.tpe) + " = " + unit(t.default)).mkString(",") + ")") TODO 
+          stream.print("(" + o.args.drop(1).map(t => argify(t, repify)).mkString(",") + ")")  
           stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = data.tpePars))
           stream.println(" = {")
-          // cheat a little bit for consistency: the codegen rule may refer to this arg
-          emitWithIndent("val " + opArgPrefix + 0 + " = this", stream, 4)
+          emitWithIndent("val " + o.args.apply(0).name + " = this", stream, 4)
           emitOp(o, stream, indent=4)
           stream.println("  }")
         }
@@ -160,9 +160,10 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       o.style match {
         case `static` => emitOp(o, stream, indent=4)
         case `infix` if grpIsTpe(opsGrp.grp) && DataStructs.exists(_.tpe == grpAsTpe(opsGrp.grp)) => 
-          val args = o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1)).mkString(",")
+          //val args = o.args/*.drop(1)*/.map(t => t.name)).mkString(",")
+          val args = o.args.drop(1).map(t => t.name).mkString(",")
           val argsWithParen = if (args == "") args else "(" + args + ")"
-          emitWithIndent(opArgPrefix + 0 + "." + o.name + argsWithParen, stream, 4)
+          emitWithIndent(o.args.apply(0).name + "." + o.name + argsWithParen, stream, 4)
         case `infix` => emitOp(o, stream, indent=4)
         case `direct` => emitOp(o, stream, indent=4)        
       }

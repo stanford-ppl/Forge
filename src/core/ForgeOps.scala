@@ -14,10 +14,14 @@ trait ForgeOps extends Base {
   def tpePar(name: String, ctxBounds: List[TypeClass] = List()) = forge_tpepar(name, ctxBounds) // TODO: type bounds
   def tpe(name: String, tpePars: List[Rep[TypePar]] = List(), stage: StageTag = future) = forge_tpe(name, tpePars, stage)
   def tpeInst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]] = List(), stage: StageTag = future) = forge_tpeinst(hkTpe, tpeArgs, stage)
-  def ftpe(args: List[Rep[DSLType]], ret: Rep[DSLType], freq: Frequency) = forge_ftpe(args, ret, freq)
+  def ftpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency) = forge_ftpe(args, ret, freq)
+  def arg(name: String, tpe: Rep[DSLType], default: Option[String]= None) = forge_arg(name, tpe, default)
   def lift(grp: Rep[DSLGroup])(tpe: Rep[DSLType]) = forge_lift(grp, tpe)
   def data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: (String, Rep[DSLType])*) = forge_data(tpe, tpePars, fields)
-  def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = forge_op(grp,name,style,tpePars,args,implicitArgs,retTpe,opTpe,effect,aliasHint)
+  implicit def namedTpeToArg(arg: (String, Rep[DSLType])) : Rep[DSLArg] = forge_arg(arg._1, arg._2, None)
+  implicit def namedTpeWithDefaultToArg(arg: (String, Rep[DSLType], String)) : Rep[DSLArg] = forge_arg(arg._1, arg._2, Some(arg._3))
+  def anyToArg(a: (Any, Int)) : Rep[DSLArg] = forge_anyToArg(a)
+  def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args:  List[Rep[Any]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = forge_op(grp,name,style,tpePars,args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,retTpe,opTpe,effect,aliasHint)
   def codegen(op: Rep[DSLOp])(generator: CodeGenerator, rule: Rep[String]) = forge_codegen(op,generator,rule)
   def extern(grp: Rep[DSLGroup], withLift: Boolean = false, targets: List[CodeGenerator] = generators) = forge_extern(grp, withLift, targets)
   
@@ -32,10 +36,12 @@ trait ForgeOps extends Base {
   def forge_tpepar(name: String, ctxBounds: List[TypeClass]): Rep[TypePar]
   def forge_tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag): Rep[DSLType]    
   def forge_tpeinst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]], stage: StageTag): Rep[DSLType]    
-  def forge_ftpe(args: List[Rep[DSLType]], ret: Rep[DSLType], freq: Frequency): Rep[DSLType]
+  def forge_arg(name: String, tpe: Rep[DSLType], default: Option[String]): Rep[DSLArg]
+  def forge_anyToArg(a: (Any, Int)): Rep[DSLArg]
+  def forge_ftpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency): Rep[DSLType]
   def forge_lift(grp: Rep[DSLGroup], tpe: Rep[DSLType]): Rep[Unit]
   def forge_data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]  
-  def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLType]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
+  def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
   def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String]): Rep[CodeGenRule]
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
   def forge_withBound(a: Rep[TypePar], b: TypeClass): Rep[TypePar]
@@ -101,9 +107,9 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   }
     
   /* A function of Rep arguments */
-  case class FTpe(args: List[Rep[DSLType]], ret: Rep[DSLType], freq: Frequency) extends Def[DSLType]
+  case class FTpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency) extends Def[DSLType]
   
-  def forge_ftpe(args: List[Rep[DSLType]], ret: Rep[DSLType], freq: Frequency) = FTpe(args,ret,freq)
+  def forge_ftpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency) = FTpe(args,ret,freq)
   
   /* A statement declaring a type to lift in a particular scope (group) */
   def forge_lift(grp: Rep[DSLGroup], tpe: Rep[DSLType]) = {
@@ -111,7 +117,16 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
     if (!buf.contains(tpe)) buf += tpe
     ()
   }
-    
+   
+  /* An argument to a DSL function */
+  case class Arg(name: String, tpe: Rep[DSLType], default: Option[String]) extends Def[DSLArg]
+
+  def forge_arg(name: String, tpe: Rep[DSLType], default: Option[String]) = Arg(name, tpe, default)
+  def forge_anyToArg(a: (Any, Int)) : Rep[DSLArg] = a._1 match {
+    case Def(Arg(_,_,_)) => a._1.asInstanceOf[Rep[DSLArg]]
+    case _ => forge_arg(opArgPrefix+a._2, a._1.asInstanceOf[Rep[DSLType]], None)
+  }
+
   /* A back-end data structure */
   case class Data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: Seq[(String, Exp[DSLType])]) extends Def[DSLData]
   
@@ -122,12 +137,14 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   }
   
   /* An operator - this represents a method or IR node */
-  case class Op(grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLType]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint) extends Def[DSLOp]
+  case class Op(grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint) extends Def[DSLOp]
   
-  def forge_op(_grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLType]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint) = {
+  def forge_op(_grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint) = {
     args match {
-      case a :: Def(VarArgs(z)) :: b if b != Nil => err("a var args op parameter must be the final one")
-      case Def(VarArgs(z)) :: b if b != Nil => err("a var args op parameter must be the final one.")
+      case a :: Def(Arg(_, Def(VarArgs(z)), _)) :: b if b != Nil => err("a var args op parameter must be the final one")
+      case Def(Arg(_, Def(VarArgs(z)), _)) :: b if b != Nil => err("a var args op parameter must be the final one.")
+      //case a :: Def(VarArgs(z)) :: b if b != Nil => err("a var args op parameter must be the final one")
+      //case Def(VarArgs(z)) :: b if b != Nil => err("a var args op parameter must be the final one.")
       case _ => // ok
     }
     
@@ -162,18 +179,19 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
     
   /* Establishes that the given tpe implements the DeliteCollection interface */
   def forge_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection) = {
+    /*
     // verify the dc functions match our expectations
-    if ((dc.alloc.args != List(MInt) || dc.alloc.retTpe != tpe))
+    if ((dc.alloc.args.size != 1 || dc.alloc.args.apply(0).tpe != MInt || dc.alloc.retTpe != tpe))
       // TODO: how should this work? alloc can really map to anything.. e.g can have other fields that get mapped from the inputs in arbitrary ways
       // needs to be specified in the zip in some context attached to the alloc method?      
       err("dcAlloc must take a single argument of type " + MInt.name + " and return an instance of " + tpe.name)
-    if ((dc.size.args != List(tpe)) || (dc.size.retTpe != MInt))
+    if (dc.size.args.size != 1 || dc.size.args.apply(0).tpe != tpe || (dc.size.retTpe != MInt))
       err("dcSize must take a single argument of type " + tpe.name + " and return an MInt")
-    if ((dc.apply.args != List(tpe, MInt)) || (dc.apply.retTpe != dc.tpeArg))
+    if (dc.apply.args.size != 2 || (dc.apply.args.apply(0).tpe, dc.apply.args(1).tpe) != (tpe, MInt) || (dc.apply.retTpe != dc.tpeArg))
       err("dcApply must take two arguments of type(" + tpe.name + ", " + MInt.name + ") and return a " + dc.tpeArg.name)
-    if ((dc.update.args != List(tpe, MInt, dc.tpeArg)) || (dc.update.retTpe != MUnit))
+    if (dc.update.args.size != 3 || (dc.update.args.apply(0).tpe, dc.update.args.apply(1).tpe, dc.update.args.apply(2).tpe) != (tpe, MInt, dc.tpeArg) || (dc.update.retTpe != MUnit))
       err("dcUpdate must take arguments of type (" + tpe.name + ", " + MInt.name + ", " + dc.tpeArg.name + ") and return " + MUnit.name)
-    
+    */
     DeliteCollections += (tpe -> dc)
     ()
   }

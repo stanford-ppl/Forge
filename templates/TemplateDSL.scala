@@ -25,7 +25,8 @@ trait HUMAN_DSL_NAMEDSL extends ForgeApplication with ScalaOps {
      * Types
      */
     val T = tpePar("T")
-    
+    val ParType = tpe("ParType", List(T))
+
     /**
      * Data structures
      */

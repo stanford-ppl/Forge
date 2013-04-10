@@ -23,6 +23,6 @@ if [ -z "$FORGE_HOME" -a "${FORGE_HOME+xxx}" = "xxx" ]; then echo FORGE_HOME is 
 
 rm -rf $FORGE_HOME/apps/$lowerCaseDSL
 rm -rf $FORGE_HOME/extern/$lowerCaseDSL
-rm -f $FORGE_HOME/src/examples/$lowerCaseDSL
+rm -f $FORGE_HOME/src/examples/${lowerCaseDSL}.scala
 
 echo "Tear down complete"

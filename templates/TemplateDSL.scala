@@ -29,7 +29,7 @@ trait HUMAN_DSL_NAMEDSL extends ForgeApplication with ScalaOps {
     /**
      * Data structures
      */
-    data(/*Type*/, List(T), ("_length", MInt), ("_data", GArray(T)))
+    data(ParType, List(T), ("_length", MInt), ("_data", GArray(T)))
     
     /* Generic formatting instance */
     val stream = ForgePrinter()
@@ -38,10 +38,10 @@ trait HUMAN_DSL_NAMEDSL extends ForgeApplication with ScalaOps {
      * Ops
      */           
         
-    val vnew = op (/* Type */) ("apply", static, List(T), List(MInt), /* Type */, codegenerated, effect = mutable)
-    val vlength = op (/* Type */) ("length", infix, List(T), List(/* Type */), MInt, codegenerated)    
-    val vapply = op (/* Type */) ("apply", infix, List(T), List(/* Type */,MInt), T, codegenerated)
-    val vupdate = op (/* Type */) ("update", infix, List(T), List(/* Type */,MInt,T), MUnit, codegenerated, effect = write(0))
+    val vnew = op (ParType) ("apply", static, List(T), List(MInt), ParType, codegenerated, effect = mutable)
+    val vlength = op (ParType) ("length", infix, List(T), List(ParType), MInt, codegenerated)    
+    val vapply = op (ParType) ("apply", infix, List(T), List(ParType,MInt), T, codegenerated)
+    val vupdate = op (ParType) ("update", infix, List(T), List(ParType,MInt,T), MUnit, codegenerated, effect = write(0))
     
     /**
      * DeliteCollectionification

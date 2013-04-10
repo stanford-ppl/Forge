@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# check input 
+
+EXPECTED_ARGS=1
+E_BADARGS=65
+
+if [ $# -ne $EXPECTED_ARGS ]
+then
+  echo "Usage: `basename $0` MyDslName"
+  exit $E_BADARGS
+fi
+
+fullname="$1"
+lowerCaseDSL=${fullname,,}
+
+# check FORGE_HOME exists
+
+if [ -z "${FORGE_HOME+xxx}" ]; then echo FORGE_HOME is not defined; fi
+if [ -z "$FORGE_HOME" -a "${FORGE_HOME+xxx}" = "xxx" ]; then echo FORGE_HOME is set but empty; fi
+
+# create necessary directories
+
+rm -rf $FORGE_HOME/apps/$lowerCaseDSL
+rm -rf $FORGE_HOME/extern/$lowerCaseDSL
+rm -f $FORGE_HOME/src/examples/$lowerCaseDSL
+
+echo "Tear down complete"

@@ -47,7 +47,7 @@ trait HUMAN_DSL_NAMEDSL extends ForgeApplication with ScalaOps {
      * DeliteCollectionification
      * This enables a tpe to be passed in as the collection type of a Delite op
      */
-    /* Par Type */ is DeliteCollection(T, vnew, vlength, vapply, vupdate)
+    ParType is DeliteCollection(T, vnew, vlength, vapply, vupdate)
     
     /**
      * Code generators

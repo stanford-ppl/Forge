@@ -4,6 +4,7 @@
 
 EXPECTED_ARGS=1
 E_BADARGS=65
+E_COLDFEET=66
 
 if [ $# -ne $EXPECTED_ARGS ]
 then
@@ -14,6 +15,15 @@ fi
 fullname="$1"
 lowerCaseDSL=${fullname,,}
 
+echo "Are you aware that this will remove your DSL, and this action cannot be undone? [y / N]"
+read FEARLESS
+
+if [ "$FEARLESS" != "y" ]
+then
+  echo "Abandoning tear down: $fullname will not be deleted"
+  exit $E_COLDFEET
+fi
+
 # check FORGE_HOME exists
 
 if [ -z "${FORGE_HOME+xxx}" ]; then echo FORGE_HOME is not defined; fi
@@ -23,6 +33,6 @@ if [ -z "$FORGE_HOME" -a "${FORGE_HOME+xxx}" = "xxx" ]; then echo FORGE_HOME is 
 
 rm -rf $FORGE_HOME/apps/$lowerCaseDSL
 rm -rf $FORGE_HOME/extern/$lowerCaseDSL
-rm -f $FORGE_HOME/src/examples/${lowerCaseDSL}.scala
+rm -f $FORGE_HOME/src/examples/${fullname}.scala
 
 echo "Tear down complete"

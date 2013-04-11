@@ -30,17 +30,16 @@ to the root of the Delite repository.
 2. Compile Forge using `sbt compile` from the root of the Forge repository. The SimpleVectorDSL
 example can then be run using:
 
-`bin/forge ppl.dsl.forge.examples.SimpleVectorDSLRunner`
-`bin/publish simplevector`
-`cd published/simplevector/`
-`sbt compile`
+    bin/forge ppl.dsl.forge.examples.SimpleVectorDSLRunner
+    bin/publish simplevector
+    cd published/simplevector/
+    sbt compile
 
 3. Run the sample application (apps/simplevector/src/HelloWorld.scala)
 
 Interpreter (library mode):
 
-`bin/delitec HelloSimpleInterpreter`
-
+    bin/delitec HelloSimpleInterpreter
 
 Compiler (Delite mode):
 
@@ -53,7 +52,7 @@ Creating a new DSL
 You can create a new DSL from our sample templates
 using
 
-`bin/initialize NewDSLName [--test]`
+    bin/initialize NewDSLName [--test]
 
 This creates a DSL file in `src/examples`, a Hello World application in apps/, and the basic extern/ files. The DSL includes an example of a parallel data structure.
 
@@ -67,4 +66,4 @@ The option `--test` will attempt to compile everything using
 
 You can undo these actions using
 
-`bin/teardown NewDSLName`
+    bin/teardown NewDSLName

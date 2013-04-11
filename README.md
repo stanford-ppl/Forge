@@ -54,7 +54,7 @@ using
 
     bin/initialize NewDSLName [--test]
 
-This creates a DSL file in `src/examples`, a Hello World application in apps/, and the basic extern/ files. The DSL includes an example of a parallel data structure.
+This creates a DSL file in `src/examples`, a Hello World application in `apps/`, and the basic `extern/` files. The DSL includes an example of a parallel data structure.
 
 The option `--test` will attempt to compile everything using
 

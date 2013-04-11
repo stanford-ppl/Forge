@@ -44,9 +44,8 @@ Interpreter (library mode):
 
 Compiler (Delite mode):
 
-`bin/delitec HelloSimpleCompiler`
-
-`bin/delite HelloSimpleCompiler`
+```bin/delitec HelloSimpleCompiler
+bin/delite HelloSimpleCompiler```
 
 Creating a new DSL
 ==================
@@ -60,15 +59,11 @@ This creates a DSL file in `src/examples`, a Hello World application in apps/, a
 
 The option `--test` will attempt to compile everything using
 
-`sbt compile`
-
-`bin/forge ppl.dsl.forge.examples.NewDSLNameRunner`
-
-`bin/publish newdslname`
-
-`cd published/newdslname`
-
-`sbt compile`
+```sbt compile
+bin/forge ppl.dsl.forge.examples.NewDSLNameRunner
+bin/publish newdslname
+cd published/newdslname
+sbt compile```
 
 You can undo these actions using
 

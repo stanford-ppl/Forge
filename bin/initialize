@@ -31,9 +31,9 @@ mkdir -p ./extern/$lowerCaseDSL/
 
 # copy over template DSLs
 
-cp ./templates/TemplateDSL.scala ./src/examples/${fullname}.scala
-cp -r ./templates/apps/ ./apps/$lowerCaseDSL/ 
-cp -r ./templates/extern/ ./extern/$lowerCaseDSL/ 
+cp ./static/TemplateDSL.scala ./src/examples/${fullname}.scala
+cp -r ./static/apps/* ./apps/$lowerCaseDSL/ 
+cp -r ./static/extern/* ./extern/$lowerCaseDSL/ 
 
 # Insert DSL name in the appropriate place
 
@@ -51,10 +51,13 @@ find ./src/examples -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$low
 if [ "$2" == "--test" ] 
 then
   sbt compile
-  ./bin/forge ppl.dsl.forge.examples.${fullname}Runner
+  ./bin/forge ppl.dsl.forge.examples.${fullname}DSLRunner
   ./bin/publish $lowerCaseDSL
   cd published/$lowerCaseDSL
   sbt compile
+  bin/delitec HelloWorldInterpreter
+  bin/delitec HelloWorldCompiler
+  bin/delite HelloWorldCompiler.deg
 fi
 
 cd $CURR_DIR

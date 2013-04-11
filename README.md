@@ -63,6 +63,9 @@ The option `--test` will attempt to compile everything using
     bin/publish newdslname
     cd published/newdslname
     sbt compile
+    bin/delitec HelloWorldInterpreter
+    bin/delitec HelloWorldCompiler
+    bin/delite HelloWorldCompiler.deg
 
 You can undo these actions using
 

@@ -49,7 +49,7 @@ Compiler (Delite mode):
 Creating a new DSL
 ==================
 
-You can create a new DSL from our sample templates
+You can create a new DSL from our templates
 using
 
     bin/initialize NewDSLName [--test]

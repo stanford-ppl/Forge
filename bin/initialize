@@ -1,0 +1,64 @@
+#!/bin/bash
+
+# check input - perhaps add support for --name $NAME --test --dir $DIR <-- like $FORGE_HOME/src/examples
+
+EXPECTED_ARGS=1
+E_BADARGS=65
+
+if [ $# -lt $EXPECTED_ARGS ]
+then
+  echo "Usage: `basename $0` MyDslName"
+  exit $E_BADARGS
+fi
+
+fullname="$1"
+lowerCaseDSL=${fullname,,}
+
+# check FORGE_HOME exists
+
+if [ -z "${FORGE_HOME+xxx}" ]; then echo FORGE_HOME is not defined; fi
+if [ -z "$FORGE_HOME" -a "${FORGE_HOME+xxx}" = "xxx" ]; then echo FORGE_HOME is set but empty; fi
+
+CURR_DIR=`pwd`
+
+cd $FORGE_HOME
+
+# create necessary directories
+
+mkdir -p ./apps/$lowerCaseDSL/src
+mkdir ./extern/$lowerCaseDSL/
+mkdir -p ./extern/$lowerCaseDSL/
+
+# copy over template DSLs
+
+cp ./static/TemplateDSL.scala ./src/examples/${fullname}.scala
+cp -r ./static/apps/* ./apps/$lowerCaseDSL/ 
+cp -r ./static/extern/* ./extern/$lowerCaseDSL/ 
+
+# Insert DSL name in the appropriate place
+
+find ./apps/$lowerCaseDSL -type f -print0 | xargs -0 sed -i "s/HUMAN_DSL_NAME/$fullname/g"
+find ./apps/$lowerCaseDSL -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$lowerCaseDSL/g"
+
+find ./extern/$lowerCaseDSL -type f -print0 | xargs -0 sed -i "s/HUMAN_DSL_NAME/$fullname/g"
+find ./extern/$lowerCaseDSL -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$lowerCaseDSL/g"
+
+find ./src/examples/ -type f -print0 | xargs -0 sed -i "s/HUMAN_DSL_NAME/$fullname/g"
+find ./src/examples -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$lowerCaseDSL/g"
+
+# test compilation
+# todo - check errors?
+if [ "$2" == "--test" ] 
+then
+  sbt compile
+  ./bin/forge ppl.dsl.forge.examples.${fullname}DSLRunner
+  ./bin/publish $lowerCaseDSL
+  cd published/$lowerCaseDSL
+  sbt compile
+  bin/delitec HelloWorldInterpreter
+  bin/delitec HelloWorldCompiler
+  bin/delite HelloWorldCompiler.deg
+fi
+
+cd $CURR_DIR
+echo "Initialization complete"

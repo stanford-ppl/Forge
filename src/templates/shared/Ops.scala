@@ -76,6 +76,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
   def simpleArgName(t: Rep[DSLArg]): String = t.name
   def makeArgs(args: List[Rep[DSLArg]], makeArgName: (Rep[DSLArg] => String) = simpleArgName) = "(" + args.map(makeArgName).mkString(",") + ")"
   def makeOpArgs(o: Rep[DSLOp]) = makeArgs(o.args)
+  def makeOpAnonArgs(o: Rep[DSLOp]) = makeArgs(o.args.zipWithIndex.map{ case (a,i) => arg(opArgPrefix + i, a.tpe, a.default) })
   def makeOpFutureArgs(o: Rep[DSLOp]) = makeArgs(o.args, t => { val arg = simpleArgName(t); if (t.tpe.stage == now) "unit("+arg+")" else arg })
   def makeOpArgsWithType(o: Rep[DSLOp], typify: Rep[DSLType] => String = repify) = makeArgs(o.args, t => argify(t, typify))
   def makeOpArgsWithNowType(o: Rep[DSLOp]) = makeOpArgsWithType(o, repifySome)
@@ -230,44 +231,49 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
     
     // infix ops
-    val infixOps = opsGrp.ops.filter(e=>e.style==infix)
+    val allInfixOps = opsGrp.ops.filter(e=>e.style==infix)
     
     // certain ops (e.g. "apply" cannot be expressed with infix notation right now), so we use implicits as a workaround
-    val needPimpClass = (noInfixList intersect infixOps.map(_.name)).nonEmpty
-    val pimpStream = new StringBuilder()
-    def infix_appendLine(x: StringBuilder, y: String) = x.append(y + System.getProperty("line.separator"))
-    if (needPimpClass) {
+    def noInfix(o: Rep[DSLOp]) = {
+      // blacklist
+      if (noInfixList.contains(o.name)) true
+      else (o.args.exists { a => a.tpe match {
+        // infix with function args doesn't always resolve correctly
+        case Def(FTpe(fargs,fret,freq)) => true
+        case _ => false
+      }})
+    }
+    
+    val (pimpOps, infixOps) = allInfixOps.partition(noInfix)
+    if (pimpOps.nonEmpty) {
       // set up a pimp-my-library style promotion
       // can only do this on DSL types
       val tpe = grpAsTpe(opsGrp.grp)                
-      pimpStream.appendLine("  implicit def repTo" + tpe.name + "Ops" + makeTpeParsWithBounds(tpe.tpePars) + "(x: " + repify(tpe) + ") = new " + tpe.name + "OpsCls(x)")
+      stream.println("  implicit def repTo" + tpe.name + "Ops" + makeTpeParsWithBounds(tpe.tpePars) + "(x: " + repify(tpe) + ") = new " + tpe.name + "OpsCls(x)")
       if (OpsGrp.exists(g => g._2.ops.exists(o => o.name == "__newVar"))) {
-        pimpStream.appendLine("  implicit def varTo" + tpe.name + "Ops" + makeTpeParsWithBounds(tpe.tpePars) + "(x: " + varify(tpe) + ") = new " + tpe.name + "OpsCls(readVar(x))")
+        stream.println("  implicit def varTo" + tpe.name + "Ops" + makeTpeParsWithBounds(tpe.tpePars) + "(x: " + varify(tpe) + ") = new " + tpe.name + "OpsCls(readVar(x))")
       }
-      pimpStream.appendLine("")
-      pimpStream.appendLine("  class " + tpe.name + "OpsCls" + makeTpeParsWithBounds(tpe.tpePars) + "(val " + opArgPrefix + "0: " + repify(tpe) + ") {")
-    }
+      stream.println("")
+      stream.println("  class " + tpe.name + "OpsCls" + makeTpeParsWithBounds(tpe.tpePars) + "(val " + opArgPrefix + "0: " + repify(tpe) + ") {")
     
-    for (o <- infixOps) {
-      if (noInfixList.contains(o.name)) {
+      for (o <- pimpOps) {
         val tpe = grpAsTpe(opsGrp.grp)
         val otherArgs = "(" + o.args.drop(1).map(t => t.name + ": " + repifySome(t.tpe) /*+ " = " + unit(t.default)*/).mkString(",") + ")" // TODO
-        pimpStream.appendLine("    def " + o.name + makeTpeParsWithBounds(o.tpePars.diff(tpe.tpePars)) + otherArgs
+        stream.println("    def " + o.name + makeTpeParsWithBounds(o.tpePars.diff(tpe.tpePars)) + otherArgs
           + (makeImplicitArgsWithCtxBoundsWithType(implicitArgsWithOverload(o), o.tpePars, without = tpe.tpePars)) + " = " + makeOpMethodNameWithFutureArgs(o))
-      }
-      else {
-        stream.print("  def infix_" + o.name + makeTpeParsWithBounds(o.tpePars))
-        stream.print(makeOpArgsWithNowType(o))
-        stream.print(makeOpImplicitArgsWithOverloadWithType(o))
-        stream.println(" = " + makeOpMethodNameWithFutureArgs(o))        
-      }
+      }        
+      stream.println("  }")
+    }    
+    stream.println()
+    
+    for (o <- infixOps) {
+      stream.print("  def infix_" + o.name + makeTpeParsWithBounds(o.tpePars))
+      stream.print(makeOpArgsWithNowType(o))
+      stream.print(makeOpImplicitArgsWithOverloadWithType(o))
+      stream.println(" = " + makeOpMethodNameWithFutureArgs(o))        
     }
     stream.println()      
     
-    if (needPimpClass) {
-      pimpStream.appendLine("  }")
-      stream.println(pimpStream)
-    }
     
     // abstract methods
     for (o <- unique(opsGrp.ops)) {

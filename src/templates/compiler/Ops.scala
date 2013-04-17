@@ -61,7 +61,7 @@ trait DeliteGenOps extends BaseGenOps {
   }  
   
   def makeOpSimpleNodeNameWithArgs(o: Rep[DSLOp]) = makeOpNodeName(o) + makeOpArgs(o)
-  def makeOpSimpleNodeNameWithArgs(o_method: Rep[DSLOp], o_args: Rep[DSLOp]) = makeOpNodeName(o_method) + makeOpArgs(o_args)
+  def makeOpSimpleNodeNameWithAnonArgs(o: Rep[DSLOp]) = makeOpNodeName(o) + makeOpAnonArgs(o)  
   def makeOpNodeNameWithArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String = makeOpArgs) = makeOpNodeName(o) + makeTpePars(o.tpePars) + makeArgs(o) + makeOpImplicitArgs(o)
   
   def makeTpeClsPar(b: TypeClass, t: Rep[DSLType]) = {
@@ -320,14 +320,15 @@ trait DeliteGenOps extends BaseGenOps {
   def emitMirrors(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
     emitBlockComment("Mirroring", stream, indent=2)
     stream.println("  override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = (e match {")
+          
     for (o <- uniqueOps) {
       // helpful identifiers
-      val xformArgs = "(" + o.args.map(t => "f(" + t.name + ")").mkString(",") + ")" 
+      val xformArgs = "(" + o.args.zipWithIndex.map(t => "f(" + opArgPrefix + t._2 + ")").mkString(",") + ")" 
       val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++ o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
       
       o.opTpe match {
         case `codegenerated` =>
-          stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + " => ")
+          stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
           // pure version with no func args uses smart constructor
           if (!hasFuncArgs(o)) {
             stream.print(makeOpMethodName(o) + xformArgs)
@@ -344,16 +345,16 @@ trait DeliteGenOps extends BaseGenOps {
           }
           
           // effectful version
-          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + ", u, es) => reflectMirrored(Reflect(" + makeOpNodeName(o) + xformArgs + "(" + implicits + ")")
+          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(" + makeOpNodeName(o) + xformArgs + "(" + implicits + ")")
           stream.print(", mapOver(f,u), f(es)))")
           stream.println("(mtype(manifest[A]))")
         case _:DeliteOpType => 
           // pure delite op version
-          stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + " => ")
+          stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
           stream.print("reflectPure(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + "))")
           stream.println("(mtype(manifest[A]), pos)")
           // effectful delite op version
-          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + ")")
+          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + ")")
           stream.print(", mapOver(f,u), f(es)))")
           stream.println("(mtype(manifest[A]))")
       }        

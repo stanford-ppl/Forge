@@ -56,6 +56,9 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     val vtimesScalar = op (Vector) ("*", infix, List(T withBound TNumeric), List(Vector,T), Vector, map((T,T,Vector), 0, "e => e*"+quotedArg(1)))
     val vfoo = op (Vector) ("foo", infix, List(T), List(Vector,T), tpeInst(Vector,List(MDouble)), map((T,MDouble,Vector), 0, "e => unit(0.0)")) // problem: primitive lifting isn't in scope in the ops
      
+    // uses a function arg inside a delite op
+    val vbar = op (Vector) ("bar", infix, List(T), List(Vector,("f", MFunction(List(("x",T)),T))), tpeInst(Vector,List(T)), map((T,T,Vector), 0, "e => "+quotedArg("f")+"(e)")) 
+      
     val vbasic = op (Vector) ("basic", infix, List(T), List(Vector, ("y", MInt, "1"), ("z", MInt, "1")), MInt, codegenerated)
     codegen (vbasic) ($cala, quotedArg("y")+ "+3+" + quotedArg("z"))
  

@@ -106,7 +106,7 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
   def repify(a: Exp[Any]): String = a match {
     case Def(Arg(name, tpe, default)) => repify(tpe)
     case Def(FTpe(args,ret,freq)) => args match {
-      case List(Def(Arg(_,byName,_))) => " => " + repify(ret)
+      case List(Def(Arg(_,`byName`,_))) => " => " + repify(ret)
       case _ => "(" + args.map(repify).mkString(",") + ") => " + repify(ret)        
     }
     case Def(Tpe("Var", arg, stage)) => repify(arg(0))

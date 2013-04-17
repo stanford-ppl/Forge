@@ -18,7 +18,7 @@ trait HelloSimple extends SimpleVectorApplication {
       v1(i) = i*2
       v2(i) = i
       println("v1(" + i + "): " + v1(i))
-      println("v1(" + i + "): " + v2(i))
+      println("v2(" + i + "): " + v2(i))
       i += 1
     }
     
@@ -54,6 +54,7 @@ trait HelloSimple extends SimpleVectorApplication {
     val z = v5.sum
     println(z)
  
+    // basic
     val pp = v5.basic()
     val pq = v5.basic(2)
     val pr = v5.basic(2, 3)
@@ -75,6 +76,11 @@ trait HelloSimple extends SimpleVectorApplication {
     println(all_ones(0))
     println("5?")
     println(v5.set(x=2).apply(0))
+    
+    // bar
+    val vb = v2.bar(e => e*3)
+    println("vb: ")
+    vb.pprint
    
     // foreach
     println("v1.pprint:")

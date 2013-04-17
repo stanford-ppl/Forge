@@ -30,21 +30,21 @@ to the root of the Delite repository.
 2. Compile Forge using `sbt compile` from the root of the Forge repository. The SimpleVectorDSL
 example can then be run using:
 
-    bin/forge ppl.dsl.forge.examples.SimpleVectorDSLRunner
-    bin/publish simplevector
-    cd published/simplevector/
-    sbt compile
+        bin/forge ppl.dsl.forge.examples.SimpleVectorDSLRunner
+        bin/publish simplevector
+        cd published/simplevector/
+        sbt compile
 
 3. Run the sample application (apps/simplevector/src/HelloWorld.scala)
 
-Interpreter (library mode):
+    Interpreter (library mode):
 
-    bin/delitec HelloSimpleInterpreter
+        bin/delitec HelloSimpleInterpreter
 
-Compiler (Delite mode):
+    Compiler (Delite mode):
 
-    bin/delitec HelloSimpleCompiler
-    bin/delite HelloSimpleCompiler
+        bin/delitec HelloSimpleCompiler
+        bin/delite HelloSimpleCompiler
 
 Creating a new DSL
 ==================

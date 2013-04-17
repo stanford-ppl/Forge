@@ -26,11 +26,10 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
      */
     val T = tpePar("T")
     val Vector = tpe("Vector", List(T)) 
-    // gets generated in FrontEnd
-    //val IntVector = tpeInst(Vector, List(MInt)) 
-   
-    // TODO: define tpeAliases
-    // tpeAlias(Vector, "V")
+    // val IntVector = tpeInst(Vector, List(MInt)) 
+       
+    tpeAlias("V", Vector)
+    tpeAlias("VI", tpeInst(Vector, List(MInt)))    
     
     /**
      * Data structures

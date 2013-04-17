@@ -125,12 +125,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       val tpe = grpAsTpe(opsGrp.grp)
       val d = DataStructs.find(_.tpe == tpe)
       d.foreach { data => 
-        stream.print("class " + data.tpe.name)
-        stream.print(makeTpeParsWithBounds(data.tpePars))
-        stream.print("(")  
-        stream.print(makeFieldArgs(data))
-        stream.print(") {")
-        stream.println()
+        stream.println("class " + data.tpe.name + makeTpeParsWithBounds(data.tpePars) + "(" + makeFieldArgs(data) + ") {")
         stream.println(makeFieldsWithInitArgs(data))
         for (o <- unique(opsGrp.ops) if o.style == infix) {       
           stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
@@ -146,9 +141,9 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         stream.println()
       }
       if (d.isEmpty && !isForgePrimitiveType(tpe)) {
-        // what should we actually do here? let the user define a lib type in this case?
-        warn("no data structure found for tpe " + tpe.name + ". emitting type alias " + quote(tpe) + " = scala." + quote(tpe) + ", which may be nonsense.")
-        stream.println("  type " + quote(tpe) + " = scala." + quote(tpe))
+        warn("no data structure found for tpe " + tpe.name + ". emitting empty class declaration") 
+        stream.println("  class " + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + "() {}")
+        stream.println()
       }
     }
     

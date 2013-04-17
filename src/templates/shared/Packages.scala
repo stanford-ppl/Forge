@@ -50,13 +50,20 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     }    
     stream.println(" { this: " + dsl + "Application => ")
     stream.println()
-    emitBlockComment("abstract types", stream)
+    emitBlockComment("abstract types", stream, indent=2)
     for (tpe <- Tpes) {
       if (OpsGrp.contains(tpe) && !isForgePrimitiveType(tpe)) {
         stream.println("  type " + quote(tpe))      
         stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + ": Manifest[" + quote(tpe) + "]")
       }
     }    
+    if (TpeAliases.length > 0) {
+      stream.println()
+      emitBlockComment("type aliases", stream, indent=2)
+      for (alias <- TpeAliases) {
+        stream.println("  type " + alias.name + makeTpePars(alias.tpe.tpePars) + " = " + quote(alias.tpe))
+      }
+    }
     stream.println("}")
     stream.println()  
   }

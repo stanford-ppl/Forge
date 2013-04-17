@@ -28,21 +28,31 @@ trait FieldOps extends Base with OverloadHack {
 trait FieldOpsExp extends FieldOps {
   this: ForgeExp =>
  
+ /**
+  *  TypeAlias
+  */
+  def infix_name(x: Exp[TypeAlias]): String = x match {
+    case Def(TpeAlias(name,tpe)) => name
+  }
+  def infix_tpe(x: Exp[TypeAlias]): Exp[DSLType] = x match {
+    case Def(TpeAlias(name,tpe)) => tpe
+  }
+
   /**
    * TypePar
    */
-  def infix_ctxBounds(x: Rep[TypePar]): List[TypeClass] = x match {
+  def infix_ctxBounds(x: Exp[TypePar]): List[TypeClass] = x match {
     case Def(TpePar(name,ctx)) if (ctx.contains(TManifest)) => ctx
     case Def(TpePar(name,ctx)) => TManifest :: ctx
   }
-  def infix_name(x: Rep[TypePar]) = x match {
+  def infix_name(x: Exp[TypePar])(implicit o: Overloaded1) = x match {
     case Def(TpePar(name,ctx)) => name
   }  
   
   /**
    * DSLType
    */
-  def infix_name(x: Exp[DSLType])(implicit o: Overloaded1): String = x match {
+  def infix_name(x: Exp[DSLType])(implicit o: Overloaded2): String = x match {
     case Def(Tpe(name,tpePars,stage)) => name
     case Def(TpeInst(t,args,stage)) => infix_name(t)(o)
     case Def(FTpe(args,ret,freq)) => "Function"
@@ -67,7 +77,7 @@ trait FieldOpsExp extends FieldOps {
   /**
   * DSLArg
   */   
-  def infix_name(x: Exp[DSLArg])(implicit o: Overloaded2): String = x match  {
+  def infix_name(x: Exp[DSLArg])(implicit o: Overloaded3): String = x match  {
     case Def(Arg(name,tpe,default)) => name
   }
   def infix_tpe(x: Exp[DSLArg])(implicit o: Overloaded1): Exp[DSLType] = x match  {
@@ -80,7 +90,7 @@ trait FieldOpsExp extends FieldOps {
   /**
    * DSLGroup
    */
-  def infix_name(x: Exp[DSLGroup])(implicit o: Overloaded3): String = x match {
+  def infix_name(x: Exp[DSLGroup])(implicit o: Overloaded4): String = x match {
     case Def(Grp(name)) => name    
     case _ if grpIsTpe(x) => grpAsTpe(x).name
   }  
@@ -98,7 +108,7 @@ trait FieldOpsExp extends FieldOps {
   def infix_grp(x: Exp[DSLOp]) = x match {
     case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff,alias)) => grp
   }
-  def infix_name(x: Exp[DSLOp])(implicit o: Overloaded4) = x match {
+  def infix_name(x: Exp[DSLOp])(implicit o: Overloaded5) = x match {
     case Def(Op(grp,name,style,tpePars,args,implArgs,retTpe,opTpe,eff,alias)) => name
   }  
   def infix_style(x: Exp[DSLOp]) = x match {

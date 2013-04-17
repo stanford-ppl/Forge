@@ -11,6 +11,7 @@ trait ForgeOps extends Base {
   this: Forge =>
     
   def grp(name: String) = forge_grp(name)  
+  def tpeAlias(name: String, tpe: Rep[DSLType]) = forge_tpealias(name, tpe)
   def tpePar(name: String, ctxBounds: List[TypeClass] = List()) = forge_tpepar(name, ctxBounds) // TODO: type bounds
   def tpe(name: String, tpePars: List[Rep[TypePar]] = List(), stage: StageTag = future) = forge_tpe(name, tpePars, stage)
   def tpeInst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]] = List(), stage: StageTag = future) = forge_tpeinst(hkTpe, tpeArgs, stage)
@@ -36,6 +37,7 @@ trait ForgeOps extends Base {
   def lookup(grpName: String, opName: String): Option[Rep[DSLOp]]
   
   def forge_grp(name: String): Rep[DSLGroup]  
+  def forge_tpealias(name: String, tpe: Rep[DSLType]): Rep[TypeAlias]
   def forge_tpepar(name: String, ctxBounds: List[TypeClass]): Rep[TypePar]
   def forge_tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag): Rep[DSLType]    
   def forge_tpeinst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]], stage: StageTag): Rep[DSLType]    
@@ -58,6 +60,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
    * Compiler state
    */
   val Lifts = HashMap[Exp[DSLGroup],ArrayBuffer[Exp[DSLType]]]()
+  val TpeAliases = ArrayBuffer[Exp[TypeAlias]]()
   val Tpes = ArrayBuffer[Exp[DSLType]]()
   val DataStructs = ArrayBuffer[Exp[DSLData]]()
   val OpsGrp = HashMap[Exp[DSLGroup],DSLOps]()  
@@ -81,6 +84,15 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   
   def forge_grp(name: String) = Grp(name)
   
+  /* TpeAlias is a DSL-time type alias for a DSLType */
+  case class TpeAlias(name: String, tpe: Rep[DSLType]) extends Def[TypeAlias]
+  
+  def forge_tpealias(name: String, tpe: Rep[DSLType]) = {
+    val ta = TpeAlias(name,tpe)  
+    if (!TpeAliases.contains(ta)) TpeAliases += ta
+    ta
+  }
+     
   /* TpePar represents a named type parameter for another DSLType */
   // no higher-kinded fun yet
   case class TpePar(name: String, ctxBounds: List[TypeClass]) extends Def[TypePar]

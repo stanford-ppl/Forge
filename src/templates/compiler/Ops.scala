@@ -130,7 +130,7 @@ trait DeliteGenOps extends BaseGenOps {
     }
     
     // IR nodes
-    for (o <- uniqueOps) { 
+    for (o <- uniqueOps if !o.opTpe.isInstanceOf[Composite]) { 
       stream.print("  case class " + makeOpNodeName(o) + makeTpeParsWithBounds(o.tpePars))
       if (o.opTpe == codegenerated) stream.print(makeOpArgsWithType(o, blockify))
       else stream.print(makeOpArgsWithType(o))    
@@ -232,14 +232,24 @@ trait DeliteGenOps extends BaseGenOps {
           case _ => err("making an op name with modified args that isn't an arg") 
         }).mkString(",") + ")")
       }
+
+      val hasEffects = summary.length > 0
       
-      if (summary.length > 0) {
-        // if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
-        val prologue = if (o.effect == simple) " andAlso Simple()" else ""
-        emitWithIndent(makeEffectAnnotation(simple,o) + "(" + makeOpNodeNameWithModifiedArgs(o) + ", " + summarizeEffects(summary) + prologue + ")", stream, 4)
-      }
-      else {
-        stream.print("    " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeNameWithArgs(o) + ")")
+      o.opTpe match {
+        case c:Composite if hasEffects => err("cannot have effects with composite ops currently")
+        case c:Composite =>
+          // composite ops are currently inlined
+
+          // in the future, to support pattern matching and optimization, we should implement these as abstract IR nodes
+          // and use lowering transformers
+          emitWithIndent(inline(o, c.func, quoteLiteral), stream, 4)        
+            
+        case _ if hasEffects =>
+          // if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
+          val prologue = if (o.effect == simple) " andAlso Simple()" else ""
+          emitWithIndent(makeEffectAnnotation(simple,o) + "(" + makeOpNodeNameWithModifiedArgs(o) + ", " + summarizeEffects(summary) + prologue + ")", stream, 4)
+        case _ => 
+          stream.print("    " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeNameWithArgs(o) + ")")        
       }
       
       emitWithIndent("}", stream, 2)
@@ -321,7 +331,7 @@ trait DeliteGenOps extends BaseGenOps {
     emitBlockComment("Mirroring", stream, indent=2)
     stream.println("  override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = (e match {")
           
-    for (o <- uniqueOps) {
+    for (o <- uniqueOps if !o.opTpe.isInstanceOf[Composite]) {
       // helpful identifiers
       val xformArgs = "(" + o.args.zipWithIndex.map(t => "f(" + opArgPrefix + t._2 + ")").mkString(",") + ")" 
       val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++ o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")

@@ -131,6 +131,17 @@ trait Definitions extends DerivativeTypes {
   object single {
     def apply(retTpe: Rep[DSLType], func: Rep[String]) = forge_single(retTpe, func)
   }
+
+  /**
+   * Composite
+   * 
+   * @param retTpe    R, the return type of the function
+   * @param func      string representation of the function ( => R)
+   */
+  def forge_composite(retTpe: Rep[DSLType], func: Rep[String]): DeliteOpType
+  object composite {
+    def apply(retTpe: Rep[DSLType], func: Rep[String]) = forge_composite(retTpe, func)
+  }
   
   /**
    * Map
@@ -214,6 +225,9 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
    */
   case class SingleTask(retTpe: Rep[DSLType], func: Rep[String]) extends DeliteOpType
   def forge_single(retTpe: Rep[DSLType], func: Rep[String]) = SingleTask(retTpe, func)
+
+  case class Composite(retTpe: Rep[DSLType], func: Rep[String]) extends DeliteOpType
+  def forge_composite(retTpe: Rep[DSLType], func: Rep[String]) = Composite(retTpe, func)
   
   case class Map(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) extends DeliteOpType  
   def forge_map(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) = Map(tpePars, argIndex, func)

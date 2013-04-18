@@ -30,7 +30,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
      for (i <- 0 until o.args.length) {
        val name = o.args.apply(i).name 
        b = b.replaceAllLiterally(quoter(o.quotedArg(name)), name) 
-       //b = b.replaceAllLiterally(quoter(o.quotedArg(i)), name) // TODO eliminate need for this
+       // b = b.replaceAllLiterally(quoter(o.quotedArg(i)), name) // TODO eliminate need for this
      }    
      for (i <- 0 until o.tpePars.length) {
        b = b.replaceAllLiterally(quoter(o.tpeInstance(i)), o.tpePars.apply(i).name)
@@ -259,8 +259,8 @@ trait BaseGenOps extends ForgeCodeGenBase {
       for (o <- pimpOps) {
         val tpe = grpAsTpe(opsGrp.grp)
         val otherArgs = "(" + o.args.drop(1).map(t => t.name + ": " + repifySome(t.tpe) /*+ " = " + unit(t.default)*/).mkString(",") + ")" // TODO
-        stream.println("    def " + o.name + makeTpeParsWithBounds(o.tpePars.diff(tpe.tpePars)) + otherArgs
-          + (makeImplicitArgsWithCtxBoundsWithType(implicitArgsWithOverload(o), o.tpePars, without = tpe.tpePars)) + " = " + makeOpMethodNameWithFutureArgs(o))
+        stream.println("    def " + o.name + makeTpeParsWithBounds(o.tpePars.filter(p => tpe.tpePars.contains(p.name))) + otherArgs
+          + (makeImplicitArgsWithCtxBoundsWithType(implicitArgsWithOverload(o), o.tpePars, without = tpe.tpePars)) + " = " + makeOpMethodNameWithFutureArgs(o))          
       }        
       stream.println("  }")
     }    

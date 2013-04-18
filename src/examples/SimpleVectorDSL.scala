@@ -56,8 +56,19 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     val vfoo = op (Vector) ("foo", infix, List(T), List(Vector,T), tpeInst(Vector,List(MDouble)), map((T,MDouble,Vector), 0, "e => unit(0.0)")) // problem: primitive lifting isn't in scope in the ops
      
     // uses a function arg inside a delite op
-    val vbar = op (Vector) ("bar", infix, List(T), List(Vector,("f", MFunction(List(("x",T)),T))), tpeInst(Vector,List(T)), map((T,T,Vector), 0, "e => "+quotedArg("f")+"(e)")) 
-      
+    val vbar = op (Vector) ("bar", infix, List(T), List(Vector,("f", MFunction(List(("x",T)),T))), Vector, map((T,T,Vector), 0, "e => "+quotedArg("f")+"(e)")) 
+
+    // generic map, reduce functions for vector
+    val mapper = MFunction(List(("x",T)),T)  // better syntax for functions would be nice
+    val reducer = MFunction(List(("a",T),("b",T)),T)      
+    val vmap = op (Vector) ("map", infix, List(T), List(Vector,mapper), Vector, map((T,T,Vector), 0, "e => "+quotedArg(1)+"(e)"))    
+    val vreduce = op (Vector) ("reduce", infix, List(T withBound TNumeric), List(Vector,reducer), T, reduce((T,Vector), 0, lookup("Numeric","zero").get, "(a,b) => "+quotedArg(1)+"(a,b)"))
+  
+    // a composite op
+    val vmapreduce = op (Vector) ("mapreduce", infix, List(T withBound TNumeric), List(Vector,mapper,reducer), T, composite(Vector, {
+      quotedArg(0)+".map("+quotedArg(1)+").reduce("+quotedArg(2)+")"
+    }))
+    
     val vbasic = op (Vector) ("basic", infix, List(T), List(Vector, ("y", MInt, "1"), ("z", MInt, "1")), MInt, codegenerated)
     codegen (vbasic) ($cala, quotedArg("y")+ "+3+" + quotedArg("z"))
  

@@ -86,6 +86,13 @@ trait HelloSimple extends SimpleVectorApplication {
     println("v1.pprint:")
     v1.pprint
     
+    // map,reduce,mapreduce
+    val vc = vb.map(e => e+2)
+    println("vc.pprint:")
+    vc.pprint
+    val vc2 = vc.mapreduce(e => e-1, (a,b) => a+b)
+    println("vc2: " + vc2)
+    
     // filter
     // TODO: not working yet
     //

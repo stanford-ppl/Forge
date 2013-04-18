@@ -69,6 +69,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         emitWithIndent(inline(o, rule), stream, indent) 
       case single:SingleTask => 
         emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
+      case composite:Composite =>
+        emitWithIndent(inline(o, composite.func), stream, indent)
       case map:Map =>
         check(o)
         val dc = DeliteCollections(map.tpePars._3)        

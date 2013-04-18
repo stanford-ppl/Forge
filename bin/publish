@@ -21,6 +21,7 @@ def main():
     usage = "usage: %prog <dsl name> [options]"
     parser = OptionParser(usage)
     parser.add_option("-d", "--dest", action="store", dest="build_dir", default=os.getenv("PWD")+"/published/", help="directory to publish generated DSL")
+    parser.add_option("-c", "--clean", action="store_true", dest="build_clean", default=False, help="nuke the build directory if it already exists")
 
     (opts, args) = parser.parse_args()
     if len(args) < 1:
@@ -87,14 +88,12 @@ object ${dslName}Build extends Build {
   lazy val ${dslName}Shared = Project("${dslName}-shared", file("shared"), settings = virtBuildSettings)
   lazy val ${dslName}Comp = Project("${dslName}-comp", file("compiler"), settings = virtBuildSettings) dependsOn(${dslName}Shared)
   lazy val ${dslName}Lib = Project("${dslName}-lib", file("library"), settings = virtBuildSettings) dependsOn(${dslName}Shared)
-
-  lazy val _${dslName}Apps = Project("${dslName}-apps", file("apps"), settings = virtBuildSettings) dependsOn(${dslName}Comp, ${dslName}Lib)
+  lazy val ${dslName}Apps = Project("${dslName}-apps", file("apps"), settings = virtBuildSettings) dependsOn(${dslName}Comp, ${dslName}Lib)
 }
 """)
     return s.substitute(dslName=dsl)
  
 def writeEmptyExtern(dest, pkgName):
-  os.mkdir(dest)
   dummyFile = open(dest + "/Extern.scala", 'w') 
   dummyFile.write("package " + pkgName)
   dummyFile.close()
@@ -106,39 +105,46 @@ def publish(dsl, opts):
     build_dir = opts.build_dir + "/" + dsl + "/"
 
     print "== Publishing " + dsl + " to " + build_dir
-    if os.path.exists(build_dir):
+    if os.path.exists(build_dir) and opts.build_clean:
         shutil.rmtree(build_dir)
+    if not os.path.exists(build_dir):
+        os.makedirs(build_dir)
 
     # source code
-    shutil.copytree(FORGE_GENERATED + "/" + dsl, build_dir)    
+    os.system("rsync -r " + FORGE_GENERATED + "/" + dsl + "/" + " " + build_dir)
 
     for t in ['shared','compiler','library']:
         src = FORGE_HOME + "/extern/" + dsl + "/" + t + "/src/"
         dest = build_dir + "/" + t + "/src/" + dsl + "/extern/"
-        if os.path.exists(src):
-          shutil.copytree(src, dest)    
+        if os.path.exists(src) and os.path.exists(dest):
+            os.system("rsync -r " + src + " " + dest)
+        elif os.path.exists(src):
+            shutil.copytree(src, dest) 
         else:
-          writeEmptyExtern(dest, dsl + "." + t + "." + "extern")
+            os.mkdir(dest)
+            writeEmptyExtern(dest, dsl + "." + t + "." + "extern")
           
-    shutil.copytree(FORGE_HOME + "/apps/" + dsl, build_dir + "/apps/")
+    os.system("rsync -r " + FORGE_HOME + "/apps/" + dsl + "/" + " " + build_dir + "/apps/")
 
     # sbt project
-    os.mkdir(build_dir + "/project/")
-    buildFile = open(build_dir + "/project/Build.scala", 'w')
-    buildFile.write(sbtBuildFile(dsl))
-    buildFile.close()
+    if not os.path.exists(build_dir + "/project/"):
+        os.mkdir(build_dir + "/project/")
+        buildFile = open(build_dir + "/project/Build.scala", 'w')
+        buildFile.write(sbtBuildFile(dsl))
+        buildFile.close()
     
     # executable scripts
-    os.mkdir(build_dir + "/bin/")
-    out_delitec = build_dir+"/bin/delitec"
-    shutil.copyfile(FORGE_HOME + "/static/delitec-wrapper", out_delitec)
-    os.chmod(out_delitec, stat.S_IXUSR | os.stat(out_delitec)[stat.ST_MODE])
+    if not os.path.exists(build_dir + "/bin/"):
+        os.mkdir(build_dir + "/bin/")
+        out_delitec = build_dir+"/bin/delitec"
+        shutil.copyfile(FORGE_HOME + "/static/delitec-wrapper", out_delitec)
+        os.chmod(out_delitec, stat.S_IXUSR | os.stat(out_delitec)[stat.ST_MODE])
 
-    out_delite = build_dir+"/bin/delite"
-    shutil.copyfile(FORGE_HOME + "/static/delite-wrapper", out_delite)
-    os.chmod(out_delite, stat.S_IXUSR | os.stat(out_delite)[stat.ST_MODE])
+        out_delite = build_dir+"/bin/delite"
+        shutil.copyfile(FORGE_HOME + "/static/delite-wrapper", out_delite)
+        os.chmod(out_delite, stat.S_IXUSR | os.stat(out_delite)[stat.ST_MODE])
 
-    shutil.copyfile(FORGE_HOME + "/static/delitecommon-wrapper.py", build_dir+"/bin/delitecommon.py")
+        shutil.copyfile(FORGE_HOME + "/static/delitecommon-wrapper.py", build_dir+"/bin/delitecommon.py")
 
     print "[forge]: Publishing complete. Don't forget to run 'sbt publish-local' from your DELITE_HOME for the framework and runtime modules before compiling your new DSL."
   

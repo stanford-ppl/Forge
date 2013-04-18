@@ -1,0 +1,85 @@
+#!/bin/bash
+# runs forge, publish, and sbt compile for the generated DSL (incrementally)
+
+# exit if any part of the script fails
+set -e
+
+EXPECTED_ARGS=2
+E_BADARGS=65
+E_NOHOME=66
+      
+usage() {
+  echo "Usage: `basename $0` [-h] [-c] [-s step] [-r fully.qualified.ApplicationRunner] fully.qualified.DSLRunner DSLName"
+  echo "Note that `basename $0` requires options to be specified before required arguments."
+  echo "  -h        show this message"
+  echo "  -c        perform a clean build"
+  echo "  -s <n>    skip to step n in the update process"
+  echo "  -r <app>  run the specified application after compiling"
+  exit $E_BADARGS
+}
+
+if [ $# -lt $EXPECTED_ARGS ]; then usage; fi
+
+# check FORGE_HOME exists
+if [ -z "${FORGE_HOME+xxx}" ]; then echo error: FORGE_HOME is not defined; exit $E_NOHOME; fi
+if [ -z "$FORGE_HOME" -a "${FORGE_HOME+xxx}" = "xxx" ]; then echo error: FORGE_HOME is set but empty; exit $E_NOHOME; fi
+
+
+APP_RUNNER=""
+CLEAN=""
+NUM_STEPS=4
+SKIP=0
+
+while getopts “hcs:r:” option
+do
+  case $option in
+    h) usage;;
+    c) CLEAN=" -c";;
+    s) SKIP=$OPTARG;;
+    r) APP_RUNNER="$OPTARG"
+       NUM_STEPS=$(($NUM_STEPS+1))
+       ;;       
+  esac
+done
+shift $(($OPTIND - 1))
+
+pushd .
+
+cd $FORGE_HOME
+DSL_RUNNER=$1
+DSL_NAME=$2
+
+if [ $SKIP -le 1 ];
+then
+  echo "sbt compile (1/$NUM_STEPS)"
+  sbt compile
+fi
+
+if [ $SKIP -le 2 ];
+then
+  echo "forge $DSL_RUNNER (2/$NUM_STEPS)"
+  forge $DSL_RUNNER
+fi
+
+if [ $SKIP -le 3 ];
+then
+  echo "publish $DSL_NAME $CLEAN (3/$NUM_STEPS)"
+  bin/publish $DSL_NAME $CLEAN
+fi  
+
+echo "cd published/$DSL_NAME/" 
+cd "published/$DSL_NAME/"
+
+if [ $SKIP -le 4 ];
+then
+  echo "sbt compile (4/$NUM_STEPS)"
+  sbt compile
+fi
+
+if [ $SKIP -le 5 ]  && [ "$APP_RUNNER" != "" ];
+then
+  echo "bin/delitec $APP_RUNNER"
+  bin/delitec $APP_RUNNER
+fi
+
+popd

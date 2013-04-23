@@ -24,7 +24,7 @@ trait LibGenPackages extends BaseGenPackages {
     stream.println("}")
   }
 
-  def emitDSLPackageDefinitions(ops: List[DSLOps], stream: PrintWriter) {
+  def emitDSLPackageDefinitions(opsGrps: List[DSLOps], stream: PrintWriter) {
     emitBlockComment("dsl library definition", stream)
     
     // base trait sets Rep[T] to T and mixes in the necessary portions of the front-end, without
@@ -46,8 +46,17 @@ trait LibGenPackages extends BaseGenPackages {
     stream.println("}")    
     stream.println()
     
+    // compiler ops mixes in an application ops with compiler only ops
+    stream.println("trait " + dsl + "CompilerOps extends " + dsl + "Application with DeliteCompatibility")
+    for (opsGrp <- opsGrps) {
+      if (opsGrp.ops.exists(_.style == compiler))
+        stream.print(" with " + opsGrp.grp.name + "CompilerOps")      
+    }      
+    stream.println()
+    stream.println()
+    
     // library impl brings all of the library types in scope
-    stream.println("trait " + dsl + "Lib extends " + dsl + "Base with DeliteCompatibility with " + dsl + "Classes {")
+    stream.println("trait " + dsl + "Lib extends " + dsl + "Base with " + dsl + "CompilerOps with " + dsl + "Classes {")
     stream.println("  this: " + dsl + "Application => ")
     stream.println()
     stream.println("  // override required due to mix-in")

@@ -80,7 +80,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
         emitScalaMathImports(implStream)
         emitDSLImports(implStream)
         implStream.println()
-        emitSingleTaskImpls(opsGrp, implStream)
+        emitImpls(opsGrp, implStream)
         implStream.close()      
         
         grpStream.print(" with " + grp.name + "WrapperImpl")              

@@ -17,6 +17,10 @@ trait DeliteGenOps extends BaseGenOps {
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
   import IR._
 
+  def baseOpsCls(opsGrp: DSLOps) = {
+    if (opsGrp.ops.exists(_.style == compiler)) opsGrp.grp.name + "CompilerOps" 
+    else opsGrp.name    
+  }
   def baseExpCls(grp: Rep[DSLGroup]) = {
     // in order of decreasing inclusiveness
     if (grpIsTpe(grp) && DeliteCollections.contains(grpAsTpe(grp))) "DeliteCollectionOpsExp"
@@ -25,7 +29,7 @@ trait DeliteGenOps extends BaseGenOps {
   }
   
   override def quote(x: Exp[Any]): String = x match {
-    case Def(PrintLines(p,lines)) if quoteLiterally => lines.map(l => (" "*4)+quote(l)).mkString(nl)  
+    case Def(PrintLines(p,lines)) if quoteLiterally => super.quote(x)
     case Def(PrintLines(p,lines)) =>
       val body = lines.flatMap(l => quote(l).split(nl))      
       // how do we decide whether to add stream.println?
@@ -56,6 +60,7 @@ trait DeliteGenOps extends BaseGenOps {
     val i = nameClashId(o)    
     o.style match {
       case `static` => o.grp.name + i + "Object_" + sanitize(o.name).capitalize
+      case `compiler` => o.name.capitalize
       case _ => o.grp.name + i + "_" + sanitize(o.name).capitalize
     }
   }  
@@ -79,30 +84,22 @@ trait DeliteGenOps extends BaseGenOps {
     }
   }
         
-  def emitSingleTaskImpls(opsGrp: DSLOps, stream: PrintWriter) {
-    emitBlockComment("SingleTask Impls", stream)   
+  def emitImpls(opsGrp: DSLOps, stream: PrintWriter) {
+    emitBlockComment("SingleTask and Composite Impls", stream)   
     stream.println()
     stream.println("trait " + opsGrp.name + "Impl {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Lift => ")
     stream.println()    
-    for (o <- unique(opsGrp.ops)) { 
-      o.opTpe match {
-        case single:SingleTask => 
-          stream.print("  " + makeOpImplMethodSignature(o))
-          stream.println(" = {")
-          stream.println(inline(o, single.func, quoteLiteral))
-          stream.println("  }")
-          stream.println()
-        case _ =>
-      }
-    }
+    emitSingleTaskImplMethods(opsGrp, stream, 2)
+    emitCompositeImplMethods(opsGrp, stream, 2)
     stream.println("}")
   }
   
   def emitOpExp(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("IR Definitions", stream)   
     stream.println()
-    stream.println("trait " + opsGrp.name + "Exp extends " + opsGrp.name + " with " + baseExpCls(opsGrp.grp) + " {")
+    
+    stream.println("trait " + opsGrp.name + "Exp extends " + baseOpsCls(opsGrp) + " with " + baseExpCls(opsGrp.grp) + " {")
     stream.println("  this: " + dsl + "Exp => ")
     stream.println()
        
@@ -244,13 +241,12 @@ trait DeliteGenOps extends BaseGenOps {
       
       o.opTpe match {
         case c:Composite if hasEffects => err("cannot have effects with composite ops currently")
-        case c:Composite =>
-          // composite ops are currently inlined
-
-          // in the future, to support pattern matching and optimization, we should implement these as abstract IR nodes
-          // and use lowering transformers
-          emitWithIndent(inline(o, c.func, quoteLiteral), stream, 4)        
-            
+        // composite ops are currently inlined
+        // in the future, to support pattern matching and optimization, we should implement these as abstract IR nodes
+        // and use lowering transformers        
+        case c:Composite => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
+                          // emitWithIndent(inline(o, c.func, quoteLiteral), stream, 4)        
+                                      
         case _ if hasEffects =>
           // if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
           val prologue = if (o.effect == simple) " andAlso Simple()" else ""

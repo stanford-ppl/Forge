@@ -27,11 +27,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   //   x
   // }
   
-  override def quote(x: Exp[Any]): String = x match {    
-    case Def(PrintLines(p, lines)) =>    
-      // since this is called from emitWithIndent, the first line has an extra indent
-      lines.map(l => (" "*4)+quote(l)).mkString(nl) 
-      
+  override def quote(x: Exp[Any]): String = x match {          
     // case Def(QuoteSeq(i)) => "("+i+": _*)"  // not exactly a quoted sequence..
     case Def(QuoteSeq(argName)) => argName
       
@@ -44,24 +40,14 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     case _ => super.quote(x)
   }  
   
-  def emitSingleTaskImpls(opsGrp: DSLOps, stream: PrintWriter) {
-    emitBlockComment("SingleTask Impls", stream)   
+  def emitImpls(opsGrp: DSLOps, stream: PrintWriter) {
+    emitBlockComment("SingleTask and Composite Impls", stream)   
     stream.println()
     stream.println("trait " + opsGrp.grp.name + "WrapperImpl {")
-    stream.println("  this: " + dsl + "Application with DeliteCompatibility => ")
+    stream.println("  this: " + dsl + "Application with " + dsl + "CompilerOps => ")
     stream.println()    
-    for (o <- unique(opsGrp.ops)) { 
-      o.opTpe match {
-        case single:SingleTask => 
-          check(o)
-          stream.print("  " + makeOpImplMethodSignature(o))
-          stream.println(" = {")
-          stream.println(inline(o, single.func))
-          stream.println("  }")
-          stream.println()
-        case _ =>
-      }
-    }
+    emitSingleTaskImplMethods(opsGrp, stream, 2)
+    emitCompositeImplMethods(opsGrp, stream, 2)
     stream.println("}")
   }
       
@@ -74,7 +60,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       case single:SingleTask => 
         emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
       case composite:Composite =>
-        emitWithIndent(inline(o, composite.func), stream, indent)
+        emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
       case map:Map =>
         check(o)
         val dc = DeliteCollections(map.tpePars._3)        
@@ -165,8 +151,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
           val args = o.args.drop(1).map(t => t.name).mkString(",")
           val argsWithParen = if (args == "") args else "(" + args + ")"
           emitWithIndent(o.args.apply(0).name + "." + o.name + argsWithParen, stream, 4)
-        case `infix` => emitOp(o, stream, indent=4)
-        case `direct` => emitOp(o, stream, indent=4)        
+        case `infix` | `direct` | `compiler` => emitOp(o, stream, indent=4)
       }
       stream.println("  }")        
     }

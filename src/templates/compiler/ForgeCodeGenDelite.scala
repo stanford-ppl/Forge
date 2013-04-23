@@ -73,7 +73,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     val opsDir = dslDir + File.separator + "ops"
     Directory(Path(opsDir)).createDirectory()
     
-    // 1 file per tpe, includes Ops, OpsExp, and Gen, plus an additional Impl file if the group contains SingleTask ops      
+    // 1 file per tpe, includes Ops, OpsExp, and Gen, plus an additional Impl file if the group contains SingleTask and Composite ops      
     for ((grp,opsGrp) <- OpsGrp) {
       val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsExp"+".scala"))
       stream.println("package " + packageName + ".ops")
@@ -93,7 +93,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
         implStream.println("import " + packageName + "." + dsl + "Compiler")
         implStream.println("import " + dsl.toLowerCase() + ".shared." + dsl + "Lift") // TODO: not encapsulated        
         implStream.println()
-        emitSingleTaskImpls(opsGrp, implStream)
+        emitImpls(opsGrp, implStream)
         implStream.close()
       }
       emitOpCodegen(opsGrp, stream)        

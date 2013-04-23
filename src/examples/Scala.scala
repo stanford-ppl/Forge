@@ -15,6 +15,7 @@ trait ScalaOps extends ForgeApplication {
     ordering()
     strings()
     math()
+    booleans()
   }
     
   /**
@@ -176,5 +177,10 @@ trait ScalaOps extends ForgeApplication {
     
     codegen (maxInt) ($cala, "scala.math.max(" + quotedArg(0) + ", " + quotedArg(1) + ")")
     codegen (maxDbl) ($cala, "scala.math.max(" + quotedArg(0) + ", " + quotedArg(1) + ")")
+  }
+  
+  def booleans() = {
+    val Bool = grp("Boolean")
+    lift (Bool) (MBoolean)    
   }
 }

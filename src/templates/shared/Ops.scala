@@ -44,6 +44,10 @@ trait BaseGenOps extends ForgeCodeGenBase {
    }
    
    override def quote(x: Exp[Any]) : String = x match {
+     case Def(PrintLines(p, lines)) =>    
+       // since this is called from emitWithIndent, the first line has an extra indent
+       // without saving this value in the dynamic scope, we don't know what the indent was though.. guess '4' for now
+       quote(lines(0)) + nl + lines.drop(1).map(l => (" "*4)+quote(l)).mkString(nl)      
      case Def(QuoteBlockResult(name,List(byName),ret)) => name
      case Def(QuoteBlockResult(name,args,ret)) => name + makeArgs(args)
      case _ => super.quote(x)
@@ -104,7 +108,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     tpePars.flatMap(a => a.ctxBounds.diff(withoutBounds).map(b => ephemeralTpe(b.name+"["+quote(a)+"]"))).distinct 
   }  
   def makeImplicitArgsWithCtxBoundsWithType(implicitArgs: List[Rep[DSLType]], tpePars: List[Rep[TypePar]], without: List[Rep[TypePar]] = Nil, asVals: Boolean = false) = {
-    makeImplicitArgsWithType(implicitCtxBoundsWithType(tpePars, without) ++ implicitArgs, asVals)    
+    makeImplicitArgsWithType(implicitArgs ++ implicitCtxBoundsWithType(tpePars, without), asVals)    
   }
   
   // typed implicit args without context bounds
@@ -157,6 +161,9 @@ trait BaseGenOps extends ForgeCodeGenBase {
     val i = "" //nameClashId(o)    
     o.style match {
       case `static` => o.grp.name.toLowerCase + i + "_object_" + sanitize(o.name).toLowerCase
+      case `compiler` => 
+        if (o.name != sanitize(o.name)) err("compiler op name has special characters that require reformatting: " + o.name)
+        o.name // should be callable directly from impl code
       case _ => o.grp.name.toLowerCase + i + "_" + sanitize(o.name).toLowerCase
     }
   }
@@ -169,7 +176,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
   
   def makeOpImplMethodName(o: Rep[DSLOp]) = makeOpMethodName(o) + "_impl"
   def makeOpImplMethodNameWithArgs(o: Rep[DSLOp]) = makeOpImplMethodName(o) + nameClashId(o) + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o)
-  def makeOpImplMethodSignature(o: Rep[DSLOp]) = "def " + makeOpImplMethodName(o) + nameClashId(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithType(o)  
+  def makeOpImplMethodSignature(o: Rep[DSLOp]) = "def " + makeOpImplMethodName(o) + nameClashId(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithType(o) + ": " + repify(o.retTpe) 
   
   /**
    * Delite op sanity checking
@@ -210,6 +217,33 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
   }
   
+  /**
+   * Common implementations for Single tasks and Composites
+   */    
+  def emitImplMethod(o: Rep[DSLOp], func: Rep[String], stream: PrintWriter, indent: Int = 0) {
+    emitWithIndent(makeOpImplMethodSignature(o) + " = {", stream, indent)
+    emitWithIndent(inline(o, func, quoteLiteral), stream, indent+2)
+    emitWithIndent("}", stream, indent)
+    stream.println()    
+  }
+  def emitSingleTaskImplMethods(opsGrp: DSLOps, stream: PrintWriter, indent: Int = 0) {
+    for (o <- unique(opsGrp.ops)) { 
+      o.opTpe match {
+        case single:SingleTask => emitImplMethod(o,single.func,stream,indent)
+        case _ =>
+      }
+    }    
+  }  
+  def emitCompositeImplMethods(opsGrp: DSLOps, stream: PrintWriter, indent: Int = 0) {
+    for (o <- unique(opsGrp.ops)) { 
+      o.opTpe match {
+        case composite:Composite => emitImplMethod(o,composite.func,stream,indent)
+        case _ =>
+      }
+    }    
+  }
+  
+   
   /**
    * Front-end codegen
    */
@@ -283,10 +317,23 @@ trait BaseGenOps extends ForgeCodeGenBase {
     
     
     // abstract methods
-    for (o <- unique(opsGrp.ops)) {
+    for (o <- unique(opsGrp.ops.filter(e=>e.style != compiler))) {
       stream.println("  " + makeOpMethodSignature(o) + ": " + repify(o.retTpe))
     }
     
     stream.println("}")
+    
+    // compiler ops
+    val compilerOps = opsGrp.ops.filter(e=>e.style == compiler)
+    if (!compilerOps.isEmpty) {
+      stream.println("trait " + opsGrp.grp.name + "CompilerOps extends " + opsGrp.name + " {")
+      stream.println("  this: " + dsl + " => ")
+      stream.println()    
+      for (o <- compilerOps) {
+        stream.println("  " + makeOpMethodSignature(o) + ": " + repify(o.retTpe))
+      }      
+      stream.println("}")
+      stream.println()
+    }
   }
 }

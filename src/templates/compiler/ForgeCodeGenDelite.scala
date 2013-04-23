@@ -45,7 +45,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
   def emitDSLImplementation() = {
     Directory(Path(dslDir)).createDirectory()    
     emitDSLDefinition()
-    emitDataStructures()
+    // emitDataStructures()
     emitOps()
   }
   
@@ -63,11 +63,11 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     dslStream.close()    
   }
   
-  def emitDataStructures() {
-    val dataDir = dslDir + File.separator + "datastruct"
-    Directory(Path(dataDir)).createDirectory()
-    emitStructs(dataDir)    
-  }
+  // def emitDataStructures() {
+  //   val dataDir = dslDir + File.separator + "datastruct"
+  //   Directory(Path(dataDir)).createDirectory()
+  //   emitStructs(dataDir)    
+  // }
   
   def emitOps() {
     val opsDir = dslDir + File.separator + "ops"

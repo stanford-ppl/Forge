@@ -39,9 +39,7 @@ trait LibGenPackages extends BaseGenPackages {
     stream.println("trait DeliteCompatibility extends Base {")
     emitBlockComment("functionality that exists in Delite for DeliteArrays that we need an equivalent library implementation for", stream, indent=2)
     stream.println("  type DeliteArray[T] = Array[T]")
-    // TODO: switch back to darray_copy when we implement data(..) to generate Delite structs instead of concrete back-end structs
-    // stream.println("  def darray_copy[T:Manifest](src: Rep[Array[T]], srcPos: Rep[Int], dest: Rep[Array[T]], destPos: Rep[Int], size: Rep[Int]): Rep[Unit]")
-    stream.println("  def darray_unsafe_copy[T:Manifest](src: Rep[Array[T]], srcPos: Rep[Int], dest: Rep[Array[T]], destPos: Rep[Int], size: Rep[Int]): Rep[Unit]")
+    stream.println("  def darray_copy[T:Manifest](src: Rep[Array[T]], srcPos: Rep[Int], dest: Rep[Array[T]], destPos: Rep[Int], size: Rep[Int]): Rep[Unit]")
     stream.println("  def darray_new[T:Manifest](n: Rep[Int]): Rep[Array[T]]")        
     stream.println("}")    
     stream.println()
@@ -70,8 +68,7 @@ trait LibGenPackages extends BaseGenPackages {
     }        
     stream.println()
     emitBlockComment("delite compatibility implementations", stream, indent=2)
-    // stream.println("  def darray_copy[T:Manifest](src: Array[T], srcPos: Int, dest: Array[T], destPos: Int, size: Int): Unit = {")
-    stream.println("  def darray_unsafe_copy[T:Manifest](src: Array[T], srcPos: Int, dest: Array[T], destPos: Int, size: Int): Unit = {")
+    stream.println("  def darray_copy[T:Manifest](src: Array[T], srcPos: Int, dest: Array[T], destPos: Int, size: Int): Unit = {")
     stream.println("    System.arraycopy(src,srcPos,dest,destPos,size)")
     stream.println("  }")    
     stream.println("  def darray_new[T:Manifest](n: Int): Array[T] = new Array[T](n)")        

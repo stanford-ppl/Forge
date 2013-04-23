@@ -179,13 +179,28 @@ trait BaseGenOps extends ForgeCodeGenBase {
   def makeOpImplMethodSignature(o: Rep[DSLOp]) = "def " + makeOpImplMethodName(o) + nameClashId(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithType(o) + ": " + repify(o.retTpe) 
   
   /**
-   * Delite op sanity checking
+   * Op sanity checking
    * 
    * These are mostly repetitive right now, but we could specialize the error checking more (or generalize it to be more concise).
    */
   def check(o: Rep[DSLOp]) { 
     o.opTpe match {
-      case single:SingleTask => // nothing to check
+      case Allocates(data,init) =>
+        if ((data.fields.map(_._1).diff(init.keys.toSeq)).length > 0) {
+          err("allocator " + o.name + " does not have the same fields as data definition for " + data.tpe.name)
+        }
+      case Getter(structArgIndex,field) =>
+        if (structArgIndex > o.args.length) err("arg index " + structArgIndex + " does not exist for op " + o.name)
+        val struct = o.args.apply(structArgIndex).tpe
+        val data = DataStructs.find(_.tpe == struct)
+        if (data.isEmpty) err("no struct definitions found for arg index " + structArgIndex + " in op " + o.name)
+        if (!data.get.fields.map(_.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)
+      case Setter(structArgIndex,field,value) =>
+        if (structArgIndex > o.args.length) err("arg index " + structArgIndex + " does not exist for op " + o.name)
+        val struct = o.args.apply(structArgIndex).tpe
+        val data = DataStructs.find(_.tpe == struct)
+        if (data.isEmpty) err("no struct definitions found for arg index " + structArgIndex + " in op " + o.name)
+        if (!data.get.fields.map(_.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)        
       case map:Map =>
         val col = o.args.apply(map.argIndex).tpe
         if (DeliteCollections.get(col).isEmpty) err("map argument " + col.name + " is not a DeliteCollection")
@@ -214,6 +229,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
         if (DeliteCollections.get(col).isEmpty) err("foreach argument " + col.name + " is not a DeliteCollection")
         if (foreach.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("foreach op with undefined type arg: " + o.name)
         if (foreach.argIndex < 0 || foreach.argIndex > o.args.length) err("foreach op with illegal arg parameter: " + o.name)      
+      case _ => // nothing to check
     }
   }
   
@@ -247,6 +263,11 @@ trait BaseGenOps extends ForgeCodeGenBase {
   /**
    * Front-end codegen
    */
+  
+  def checkOps(opsGrp: DSLOps) {
+    for (o <- unique(opsGrp.ops)) check(o)
+  }
+  
   def emitOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("Operations", stream)
     stream.println()

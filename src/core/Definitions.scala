@@ -131,11 +131,46 @@ trait Definitions extends DerivativeTypes {
   object cold extends Frequency
      
   /**
-   * Delite op types
-   */
+   * Op types
+   */   
   object codegenerated extends OpType
-  
   abstract class DeliteOpType extends OpType
+  
+  /**
+   * Composite
+   * 
+   * @param retTpe    R, the return type of the function
+   * @param func      string representation of the function ( => R)
+   */
+  def forge_composite(retTpe: Rep[DSLType], func: Rep[String]): OpType
+  object composite {
+    def apply(retTpe: Rep[DSLType], func: Rep[String]) = forge_composite(retTpe, func)
+  }
+  
+  /**
+   * Getters / setters for DSL structs
+   */
+  def forge_getter(structArgIndex: Int, field: String): OpType
+  object getter {
+    def apply(structArgIndex: Int, field: String) = forge_getter(structArgIndex,field)
+  }
+  
+  def forge_setter(structArgIndex: Int, field: String, value: Rep[String]): OpType
+  object setter {
+    def apply(structArgIndex: Int, field: String, value: Rep[String]) = forge_setter(structArgIndex,field,value)
+  }
+  
+  /**
+   * Allocates
+   * 
+   * @param data     The data struct that this op allocates
+   * @param init     A sequence of tuples (fieldName, initialValue)
+   */ 
+  def forge_allocates(data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]): DeliteOpType
+  object allocates {
+    def apply(data: Rep[DSLData], init: (String,Rep[String])*) = forge_allocates(data, init.toMap)
+  }
+  
 
   /**
    * SingleTask
@@ -146,17 +181,6 @@ trait Definitions extends DerivativeTypes {
   def forge_single(retTpe: Rep[DSLType], func: Rep[String]): DeliteOpType
   object single {
     def apply(retTpe: Rep[DSLType], func: Rep[String]) = forge_single(retTpe, func)
-  }
-
-  /**
-   * Composite
-   * 
-   * @param retTpe    R, the return type of the function
-   * @param func      string representation of the function ( => R)
-   */
-  def forge_composite(retTpe: Rep[DSLType], func: Rep[String]): DeliteOpType
-  object composite {
-    def apply(retTpe: Rep[DSLType], func: Rep[String]) = forge_composite(retTpe, func)
   }
   
   /**
@@ -244,15 +268,24 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
    // 
    // def parBuffer = ParBuffer()
    // def parFlat = ParFlat()
+  
+  case class Getter(structArgIndex: Int, field: String) extends OpType
+  def forge_getter(structArgIndex: Int, field: String) = Getter(structArgIndex,field)
+  
+  case class Setter(structArgIndex: Int, field: String, value: Rep[String]) extends OpType
+  def forge_setter(structArgIndex: Int, field: String, value: Rep[String]) = Setter(structArgIndex,field,value)
 
+  case class Composite(retTpe: Rep[DSLType], func: Rep[String]) extends OpType
+  def forge_composite(retTpe: Rep[DSLType], func: Rep[String]) = Composite(retTpe, func)
+  
   /**
    * Delite ops
    */
+  case class Allocates(data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]) extends DeliteOpType
+  def forge_allocates(data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]) = Allocates(data,init)
+   
   case class SingleTask(retTpe: Rep[DSLType], func: Rep[String]) extends DeliteOpType
   def forge_single(retTpe: Rep[DSLType], func: Rep[String]) = SingleTask(retTpe, func)
-
-  case class Composite(retTpe: Rep[DSLType], func: Rep[String]) extends DeliteOpType
-  def forge_composite(retTpe: Rep[DSLType], func: Rep[String]) = Composite(retTpe, func)
   
   case class Map(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) extends DeliteOpType  
   def forge_map(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) = Map(tpePars, argIndex, func)

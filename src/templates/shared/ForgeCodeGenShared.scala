@@ -50,6 +50,8 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     
     // 1 file per grp, includes only abstract Ops
     for ((grp,ops) <- OpsGrp) {
+      checkOps(ops)
+      
       val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"Ops"+".scala"))
       emitOpsHeader(stream)
       if (Lifts.contains(grp)) {

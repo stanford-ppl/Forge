@@ -158,6 +158,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   def forge_data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: Seq[(String, Exp[DSLType])]) = {
     val d: Exp[DSLData] = Data(tpe, tpePars, fields)
     if (!DataStructs.contains(d)) DataStructs += d
+    if (DataStructs.map(_.tpe).distinct.length < DataStructs.length) err("multiple data structures declared for type " + tpe.name)        
     d
   }
   
@@ -180,7 +181,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
     val o = Op(_grp, name, style, tpePars, args, implicitArgs, retTpe, opTpe, effect, aliasHint)
     val opsGrp = OpsGrp.getOrElseUpdate(_grp, new DSLOps {
       val grp = _grp
-      override def targets: List[CodeGenerator] = if (opTpe == codegenerated) List($cala) else List() // TODO 
+      override def targets: List[CodeGenerator] = Nil
     })
     opsGrp.ops ::= o
     o
@@ -195,10 +196,24 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
       case _ => true
     }
     val c = CodeGenDecl(op, generator, rule, isSimple)
-    if (CodeGenRules.get(op.grp).exists(_.exists(_.op == op))) err("multiple code generators declared for op " + op.name + " in group " + op.grp.name)
+    if (CodeGenRules.get(op.grp).exists(_.exists(_.op == op))) err("multiple code generators declared for op " + op.name + " in group " + op.grp.name)    
+    if (DataStructs.exists(d => op.args.exists(_.tpe == d.tpe)))
+      err("(op " + op.name + ") code generated ops should not have struct types as inputs, since structs may be eliminated at compile time. consider passing in one or more fields of the struct as input(s) to the op instead.")
     
     val buf = CodeGenRules.getOrElseUpdate(op.grp, new ArrayBuffer[Exp[CodeGenRule]]())
     buf += c
+    
+    // also may need to update opsGrp targets
+    val opsGrp = OpsGrp.getOrElse(op.grp, err("couldn't find group " + op.grp.name + " for code generator declared on op " + op.name))
+    if (!opsGrp.targets.contains(generator)) {
+      val updatedGrp = new DSLOps {
+        val grp = op.grp
+        override def targets: List[CodeGenerator] = generator :: opsGrp.targets
+      }
+      updatedGrp.ops = opsGrp.ops
+      OpsGrp(op.grp) = updatedGrp
+    }
+            
     c
   }
     

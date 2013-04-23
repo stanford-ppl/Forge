@@ -33,11 +33,8 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     
     /**
      * Data structures
-     */
-    
-    // TODO: generate Delite struct case classes instead of back-end data structures 
-    // to remove effect errors
-    data(Vector, List(T), ("_length", MInt), ("_data", DArray(T)))
+     */    
+    val vdata = data(Vector, List(T), ("_length", MInt), ("_data", DArray(T)))
     
     /* Generic formatting instance */
     val stream = ForgePrinter()
@@ -48,12 +45,20 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
      * We could simplify this by reusing templates even more, i.e. specializing for different types
      * (e.g. accept a list of binary zip ops that only differentiate in function applied)
      */           
+    
+    // does wrapping the op arguments in specifiers make things any clearer?    
     // val vnew = op (Vector) ("apply", methodTpe(static), tpePars(T), args(MInt), retTpe(Vector), codegenerated, effect = mutable)
         
-    val vnew = op (Vector) ("apply", static, List(T), List(MInt), Vector, codegenerated, effect = mutable)
-    val vlength = op (Vector) ("length", infix, List(T), List(Vector), MInt, codegenerated)    
-    val vapply = op (Vector) ("apply", infix, List(T), List(Vector,MInt), T, codegenerated)
-    val vupdate = op (Vector) ("update", infix, List(T), List(Vector,MInt,T), MUnit, codegenerated, effect = write(0))
+    val vnew = op (Vector) ("apply", static, List(T), List(MInt), Vector, allocates(vdata, 
+      ("_length" -> quotedArg(0)), ("_data" -> ("darray_new[T]("+quotedArg(0)+")"))
+    ), effect = mutable)
+      
+    val vapply = op (Vector) ("apply", infix, List(T), List(Vector,MInt), T, composite(T, {
+      "vector_raw_data("+quotedArg(0)+").apply("+quotedArg(1)+")"
+    }))
+    val vupdate = op (Vector) ("update", infix, List(T), List(Vector,MInt,T), MUnit, composite(MUnit, {
+      "vector_raw_data("+quotedArg(0)+").update("+quotedArg(1)+","+quotedArg(2)+")"
+    }), effect = write(0))
     
     val vtimesScalar = op (Vector) ("*", infix, List(T withBound TNumeric), List(Vector,T), Vector, map((T,T,Vector), 0, "e => e*"+quotedArg(1)))
     val vfoo = op (Vector) ("foo", infix, List(T), List(Vector,T), tpeInst(Vector,List(MDouble)), map((T,MDouble,Vector), 0, "e => unit(0.0)")) // problem: primitive lifting isn't in scope in the ops
@@ -75,7 +80,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
       quotedArg(0)+".map("+quotedArg(1)+").reduce("+quotedArg(2)+")"
     }))
     
-    val vbasic = op (Vector) ("basic", infix, List(T), List(Vector, ("y", MInt, "1"), ("z", MInt, "1")), MInt, codegenerated)
+    val vbasic = op (Vector) ("basic", infix, List(), List(MInt, ("y", MInt, "1"), ("z", MInt, "1")), MInt, codegenerated)
     codegen (vbasic) ($cala, quotedArg("y")+ "+3+" + quotedArg("z"))
  
     val vset = op (Vector) ("set", infix, List(T withBound TNumeric), List(Vector, ("x", MInt), ("z", MInt, "3")), tpeInst(Vector, List(MInt)), map ((T,MInt,Vector), 0, "y  => "+quotedArg("x") + " + " + quotedArg("z")))
@@ -100,7 +105,14 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
         "out"
       )}))        
                      
-    // data manipulation
+    // -- getters and setters
+  
+    val vrawdata = op (Vector) ("vector_raw_data", compiler, List(T), List(Vector), DArray(T), getter(0, "_data"))
+    val vsetrawdata = op (Vector) ("vector_set_raw_data", compiler, List(T), List(Vector, DArray(T)), MUnit, setter(0, "_data", quotedArg(1)), effect = write(0))
+    val vlength = op (Vector) ("length", infix, List(T), List(Vector), MInt, getter(0, "_length"))    
+    val vsetsize = op (Vector) ("vector_set_size", compiler, List(T), List(Vector,MInt), MUnit, setter(0, "_length", quotedArg(1)), effect = write(0))
+    
+    // -- data manipulation
     
     // TODO: try to make SimpleVector use DeliteArrayBuffer instead of defining its own buffer methods
     // what should the dc methods do then? just call the underlying the _data methods..
@@ -114,14 +126,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     val vappend = op (Vector) ("append", infix, List(T), List(Vector,MInt,T), MUnit, single(MUnit, {
       quotedArg(0)+".insert("+quotedArg(0)+".length, "+quotedArg(2)+")"
     }), effect = write(0))
-    
-    // vector_ methods are the Delite convention for methods only available inside the compiler (not part of the public interface)
-    
-    val vrawdata = op (Vector) ("vector_raw_data", compiler, List(T), List(Vector), DArray(T), codegenerated)
-    codegen (vrawdata) ($cala, quotedArg(0) + "._data")
-
-    val vsetrawdata = op (Vector) ("vector_set_raw_data", compiler, List(T), List(Vector, DArray(T)), MUnit, codegenerated, effect = write(0))
-    codegen (vsetrawdata) ($cala, quotedArg(0) + "._data = " + quotedArg(1))
+        
     
     op (Vector) ("vector_insertspace", compiler, List(T), List(Vector,MInt,MInt), MUnit, single(MUnit, {
       val v = quotedArg(0)
@@ -131,7 +136,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
       stream.printLines(        
         "vector_ensureextra("+v+","+len+")",
         "val data = vector_raw_data("+v+")",
-        "darray_unsafe_copy(data, "+pos+", data, "+pos+" + "+len+", "+v+".length - "+pos+")",
+        "darray_copy(data, "+pos+", data, "+pos+" + "+len+", "+v+".length - "+pos+")",
         "vector_set_size("+v+", "+v+".length + "+len+")"
     )}), effect = write(0))
     
@@ -153,7 +158,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
         "var n = Math.max(4, data.length * 2)",
         "while (n < "+minLen+") n = n*2",
         "val d = darray_new[T](n)",
-        "darray_unsafe_copy(data, 0, d, 0, "+v+".length)",        
+        "darray_copy(data, 0, d, 0, "+v+".length)",        
         "vector_set_raw_data("+v+", d.unsafeImmutable)"    
     )}), effect = write(0))        
             
@@ -170,10 +175,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     // val vparallelization = op (Vector) ("vector_parallelization", direct, List(T), List(Vector,MBoolean), DeliteParallelStrategy, composite(DeliteParallelStrategy, {
     //     "if (" + quotedArg(1) + ") " + quote(parBuffer) + " else " + quote(parFlat)
     // }))
-    
-    val vsetsize = op (Vector) ("vector_set_size", compiler, List(T), List(Vector,MInt), MUnit, codegenerated, effect = write(0))
-    codegen (vsetsize) ($cala, quotedArg(0) + "._length = " + quotedArg(1))
-    
+        
     val vappendable = op (Vector) ("vector_appendable", compiler, List(T), List(Vector,MInt,T), MBoolean, single(MBoolean, {
       "true" 
     }))
@@ -181,22 +183,11 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     val vcopy = op (Vector) ("vector_copy", compiler, List(T), List(Vector,MInt,Vector,MInt,MInt), MUnit, single(MUnit, {
       val src = "vector_raw_data(" + quotedArg(0) + ")"
       val dest = "vector_raw_data(" + quotedArg(2) + ")"
-      "darray_unsafe_copy("+src+","+quotedArg(1)+","+dest+","+quotedArg(3)+","+quotedArg(4)+")"
+      "darray_copy("+src+","+quotedArg(1)+","+dest+","+quotedArg(3)+","+quotedArg(4)+")"
     }), effect = write(2))
     
     Vector is DeliteCollectionBuffer(T, vnew, vlength, vapply, vupdate, /*vparallelization,*/ vsetsize, vappendable, vappend, vcopy)
-    
-    
-    /**
-     * Code generators
-     */
-
-    // TODO: how do we refer to other methods or codegenerators inside a particular codegen impl? e.g. vfoo uses vlength   
-    codegen (vnew) ($cala, "new "+vnew.tpeName+"["+vnew.tpeInstance(0)+"]("+quotedArg(0)+", new Array["+vnew.tpeInstance(0)+"]("+quotedArg(0)+"))")
-    codegen (vlength) ($cala, quotedArg(0) + "._length")
-    codegen (vapply) ($cala, quotedArg(0) + "._data.apply(" + quotedArg(1) + ")")
-    codegen (vupdate) ($cala, quotedArg(0) + "._data.update(" + quotedArg(1) + ", " + quotedArg(2) + ")")            
-    
+        
     ()    
   }
 }

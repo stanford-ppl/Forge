@@ -55,13 +55,13 @@ trait HelloSimple extends SimpleVectorApplication {
     println(z)
  
     // basic
-    val pp = v5.basic()
-    val pq = v5.basic(2)
-    val pr = v5.basic(2, 3)
-    val ps = v5.basic(y=4, z=5)
-    val pt = v5.basic(z=6, y=7)
-    val pu = v5.basic(y=8)
-    val pv = v5.basic(z=9)
+    val pp = 5.basic()
+    val pq = 5.basic(2)
+    val pr = 5.basic(2, 3)
+    val ps = 5.basic(y=4, z=5)
+    val pt = 5.basic(z=6, y=7)
+    val pu = 5.basic(y=8)
+    val pv = 5.basic(z=9)
 
     println("5 and 13?")
     println(pp + " " + pv)

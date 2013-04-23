@@ -11,6 +11,11 @@ import core._
 import shared.BaseGenDataStructures
 import Utilities._
 
+/**
+ * This file is deprecated in favor of using Delite structs. Is there any reason
+ * we should keep it around? (Do we ever need concrete platform-specific data structures?)
+ */
+
 // should we try to make use of LMS platform-specific generators here? anything we can gain?
 trait DeliteGenDataStructures extends BaseGenDataStructures { 
   this: ForgeCodeGenDelite =>

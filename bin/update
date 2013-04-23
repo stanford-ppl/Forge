@@ -15,6 +15,7 @@ usage() {
   echo "  -c        perform a clean build"
   echo "  -s <n>    skip to step n in the update process"
   echo "  -r <app>  run the specified application after compiling"
+  echo "  -d        run delite after compiling"
   exit $E_BADARGS
 }
 
@@ -29,14 +30,18 @@ APP_RUNNER=""
 CLEAN=""
 NUM_STEPS=4
 SKIP=0
+DELITE=false
 
-while getopts “hcs:r:” option
+while getopts “hcs:r:d” option
 do
   case $option in
     h) usage;;
     c) CLEAN=" -c";;
     s) SKIP=$OPTARG;;
     r) APP_RUNNER="$OPTARG"
+       NUM_STEPS=$(($NUM_STEPS+1))
+       ;;       
+    d) DELITE=true
        NUM_STEPS=$(($NUM_STEPS+1))
        ;;       
   esac
@@ -80,6 +85,12 @@ if [ $SKIP -le 5 ]  && [ "$APP_RUNNER" != "" ];
 then
   echo "bin/delitec $APP_RUNNER"
   bin/delitec $APP_RUNNER
+fi
+
+if [ $SKIP -le 6 ] && [ $DELITE == true ] && [ "$APP_RUNNER" != "" ];
+then
+  echo "bin/delite $APP_RUNNER"
+  bin/delite $APP_RUNNER
 fi
 
 popd

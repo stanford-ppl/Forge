@@ -55,14 +55,21 @@ trait DeliteGenOps extends BaseGenOps {
   def makeOpNodeName(o: Rep[DSLOp]) = {
     val i = nameClashId(o)    
     o.style match {
-      case `static` => o.grp.name + i + "Object_" + o.name.capitalize
-      case _ => o.grp.name + i + "_" + o.name.capitalize
+      case `static` => o.grp.name + i + "Object_" + sanitize(o.name).capitalize
+      case _ => o.grp.name + i + "_" + sanitize(o.name).capitalize
     }
   }  
   
   def makeOpSimpleNodeNameWithArgs(o: Rep[DSLOp]) = makeOpNodeName(o) + makeOpArgs(o)
   def makeOpSimpleNodeNameWithAnonArgs(o: Rep[DSLOp]) = makeOpNodeName(o) + makeOpAnonArgs(o)  
   def makeOpNodeNameWithArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String = makeOpArgs) = makeOpNodeName(o) + makeTpePars(o.tpePars) + makeArgs(o) + makeOpImplicitArgs(o)
+  
+  // TODO: tpeArg should be a List that is the same length as the tpePars in hkTpe
+  def makeTpeInst(hkTpe: Rep[DSLType], tpeArg: Rep[DSLType]) = hkTpe match {
+    case Def(Tpe(s,Nil,stage)) => s // rather lenient, might get strange results in an improperly specified dsl
+    case Def(Tpe(s,List(z),stage)) => s + "[" + quote(tpeArg) + "]"
+    case Def(Tpe(s,args,stage)) => err("tried to instantiate tpe " + hkTpe.name + " with arg " + tpeArg.name + ", but " + hkTpe.name + " requires " + args.length + " type parameters")
+  }  
   
   def makeTpeClsPar(b: TypeClass, t: Rep[DSLType]) = {
     val body = opIdentifierPrefix + "." + b.prefix + t.name
@@ -71,7 +78,7 @@ trait DeliteGenOps extends BaseGenOps {
       case None => body      
     }
   }
-      
+        
   def emitSingleTaskImpls(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("SingleTask Impls", stream)   
     stream.println()
@@ -399,6 +406,41 @@ trait DeliteGenOps extends BaseGenOps {
         stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dc.update) + "(" + asTpe + "(x), n, y.asInstanceOf[Exp["+a+"]])") 
         stream.println("    else super.dc_update(x,n,y)")
         stream.println("  }")
+        
+        if (dc.isInstanceOf[DeliteCollectionBuffer]) {
+          val dcb = dc.asInstanceOf[DeliteCollectionBuffer]
+          stream.println()          
+          stream.println("  override def dc_parallelization[A:Manifest](x: Exp[DeliteCollection[A]], hasConditions: Boolean)(implicit ctx: SourceContext) = {")
+          // stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.parallelization) + "(" + asTpe + "(x), hasConditions)") 
+          stream.println("    if (" + isTpe + "(x)) { if (hasConditions) ParSimpleBuffer else ParFlat } // TODO: always generating this right now") 
+          stream.println("    else super.dc_parallelization(x, hasConditions)")
+          stream.println("  }")          
+          stream.println()
+          stream.println("  override def dc_set_logical_size[A:Manifest](x: Exp[DeliteCollection[A]], y: Exp[Int])(implicit ctx: SourceContext) = {")
+          stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.setSize) + "(" + asTpe + "(x), y)")
+          stream.println("    else super.dc_set_logical_size(x,y)")
+          stream.println("  }")
+          stream.println()
+          stream.println("  override def dc_appendable[A:Manifest](x: Exp[DeliteCollection[A]], i: Exp[Int], y: Exp[A])(implicit ctx: SourceContext) = {")
+          stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.appendable) + "(" + asTpe + "(x), i, y)")
+          stream.println("    else super.dc_appendable(x,i,y)")
+          stream.println("  }")          
+          stream.println()
+          stream.println("  override def dc_append[A:Manifest](x: Exp[DeliteCollection[A]], i: Exp[Int], y: Exp[A])(implicit ctx: SourceContext) = {")
+          stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.append) + "(" + asTpe + "(x), i, y)")
+          stream.println("    else super.dc_append(x,i,y)")
+          stream.println("  }")          
+          stream.println()
+          stream.println("  override def dc_alloc[A:Manifest,CA<:DeliteCollection[A]:Manifest](x: Exp[CA], size: Exp[Int])(implicit ctx: SourceContext) = {")
+          stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.alloc) + "[A](size).asInstanceOf[Exp[CA]]")
+          stream.println("    else super.dc_alloc[A,CA](x,size)")
+          stream.println("  }")          
+          stream.println()
+          stream.println("  override def dc_copy[A:Manifest](src: Exp[DeliteCollection[A]], srcPos: Exp[Int], dst: Exp[DeliteCollection[A]], dstPos: Exp[Int], size: Exp[Int])(implicit ctx: SourceContext) = {")
+          stream.println("    if (" + isTpe + "(src) && " + isTpe + "(dst)) " + makeOpMethodName(dcb.copy) + "(" + asTpe + "(src), srcPos, " + asTpe + "(dst), dstPos, size)")
+          stream.println("    else super.dc_copy(src,srcPos,dst,dstPos,size)")
+          stream.println("  }")                    
+        }
       }
     }
     catch { case _ : MatchError => }

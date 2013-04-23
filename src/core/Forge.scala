@@ -51,8 +51,9 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   // -- IR helpers
   
   def isForgePrimitiveType(t: Rep[DSLType]) = t match {
-    case `MInt` | `MDouble` | `MBoolean` | `MString` | `MUnit` => true
-    case Def(Tpe("Array",_,_)) => true
+    case `MInt` | `MDouble` | `MBoolean` | `MString` | `MUnit` | `MAny` | `MSourceContext` | `byName` => true
+    case `CInt` | `CDouble` | `CBoolean` | `CString` | `CUnit` | `CAny` => true
+    case Def(Tpe("Array",_,_)) | Def(Tpe("Var",_,_)) | Def(Tpe("Overloaded",_,_)) => true
     case _ => false
   }
   
@@ -67,6 +68,11 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case t@Def(TpeInst(hk,args,s)) => t.asInstanceOf[Rep[DSLType]]
     case t@Def(TpePar(n,ctx)) => t.asInstanceOf[Rep[DSLType]]
     // case _ => err(grp.name + " is not a DSLType")
+  }
+  
+  def isTpeInst(tpe: Rep[DSLType]) = tpe match {
+    case Def(TpeInst(_,_,_)) => true
+    case _ => false
   }
   
   def hasFuncArgs(o: Rep[DSLOp]) = o.args.exists(a => a match {
@@ -139,14 +145,7 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     if (args.length < 1) return ""
     "[" + args.map(_.name).mkString(",") + "]"
   }
-  
-  // TODO: tpeArg should be a List that is the same length as the tpePars in hkTpe
-  def makeTpeInst(hkTpe: Rep[DSLType], tpeArg: Rep[DSLType]) = hkTpe match {
-    case Def(Tpe(s,Nil,stage)) => s // rather lenient, might get strange results in an improperly specified dsl
-    case Def(Tpe(s,List(z),stage)) => s + "[" + quote(tpeArg) + "]"
-    case Def(Tpe(s,args,stage)) => err("tried to instantiate tpe " + hkTpe.name + " with arg " + tpeArg.name + ", but " + hkTpe.name + " requires " + args.length + " type parameters")
-  }
-  
+    
   def instTpePar(tpePars: List[Rep[TypePar]], par: Rep[DSLType], tpeArg: Rep[DSLType]): List[Rep[DSLType]] = {
     tpePars.map(e => if (e.name == par.name) tpeArg else e)
   }
@@ -169,6 +168,14 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     case s@Sym(n) => err("could not resolve symbol " + findDefinition(s).toString + ". All Forge symbols must currently be statically resolvable.")
     case _ => super.quote(x)
   }  
+  
+  /**
+   * Used for data structure generation
+   */
+  def quotePrimitive(x: Exp[Any]) : String = x match {
+    case Def(Tpe("DeliteArray",args,stage)) => "Array" + makeTpePars(args) 
+    case Def(Tpe(_,_,_)) => quote(x)
+  }
 }
 
 /**

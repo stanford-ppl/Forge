@@ -32,7 +32,12 @@ trait ForgeOps extends Base {
   def infix_withBound(a: Rep[TypePar], b: TypeClass) = forge_withBound(a,b)
     
   def infix_is(tpe: Rep[DSLType], dc: DeliteCollection) = forge_isdelitecollection(tpe, dc)  
-  case class DeliteCollection(val tpeArg: Rep[DSLType], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp])
+  case class DeliteCollection(val tpeArg: Rep[DSLType], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp]) extends DeliteCollectionType
+  def infix_is(tpe: Rep[DSLType], dc: DeliteCollectionBuffer) = forge_isdelitecollection_buffer(tpe,dc)
+  case class DeliteCollectionBuffer(
+    val tpeArg: Rep[DSLType], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp],
+    /*val parallelization: Rep[DSLOp],*/ val setSize: Rep[DSLOp], val appendable: Rep[DSLOp], val append: Rep[DSLOp], val copy: Rep[DSLOp]
+  ) extends DeliteCollectionType
 
   def lookup(grpName: String, opName: String): Option[Rep[DSLOp]]
   
@@ -51,6 +56,7 @@ trait ForgeOps extends Base {
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
   def forge_withBound(a: Rep[TypePar], b: TypeClass): Rep[TypePar]
   def forge_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection): Rep[Unit]
+  def forge_isdelitecollection_buffer(tpe: Rep[DSLType], dc: DeliteCollectionBuffer): Rep[Unit]
 }
 
 trait ForgeOpsExp extends ForgeOps with BaseExp {
@@ -65,7 +71,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   val DataStructs = ArrayBuffer[Exp[DSLData]]()
   val OpsGrp = HashMap[Exp[DSLGroup],DSLOps]()  
   val CodeGenRules = HashMap[Exp[DSLGroup],ArrayBuffer[Exp[CodeGenRule]]]()
-  val DeliteCollections = HashMap[Exp[DSLType], DeliteCollection]()
+  val DeliteCollections = HashMap[Exp[DSLType], DeliteCollectionType]()
   val Externs = ArrayBuffer[Extern]()
   
   /**
@@ -109,6 +115,10 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
     val t: Exp[DSLType] = Tpe(name, tpePars, stage)
     if (!Tpes.contains(t)) Tpes += t
     t
+  }
+  // creates a tpe, but doesn't add it to the IR state (only available inside Forge for now)
+  def ephemeralTpe(name: String, tpePars: List[Rep[TypePar]] = List(), stage: StageTag = future): Exp[DSLType] = {
+    Tpe(name, tpePars, stage)
   }
   
   /* A DSLType instance of a higher-kinded type */
@@ -194,19 +204,26 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
     
   /* Establishes that the given tpe implements the DeliteCollection interface */
   def forge_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection) = {
-    /*
     // verify the dc functions match our expectations
-    if ((dc.alloc.args.size != 1 || dc.alloc.args.apply(0).tpe != MInt || dc.alloc.retTpe != tpe))
-      // TODO: how should this work? alloc can really map to anything.. e.g can have other fields that get mapped from the inputs in arbitrary ways
-      // needs to be specified in the zip in some context attached to the alloc method?      
-      err("dcAlloc must take a single argument of type " + MInt.name + " and return an instance of " + tpe.name)
-    if (dc.size.args.size != 1 || dc.size.args.apply(0).tpe != tpe || (dc.size.retTpe != MInt))
-      err("dcSize must take a single argument of type " + tpe.name + " and return an MInt")
-    if (dc.apply.args.size != 2 || (dc.apply.args.apply(0).tpe, dc.apply.args(1).tpe) != (tpe, MInt) || (dc.apply.retTpe != dc.tpeArg))
-      err("dcApply must take two arguments of type(" + tpe.name + ", " + MInt.name + ") and return a " + dc.tpeArg.name)
-    if (dc.update.args.size != 3 || (dc.update.args.apply(0).tpe, dc.update.args.apply(1).tpe, dc.update.args.apply(2).tpe) != (tpe, MInt, dc.tpeArg) || (dc.update.retTpe != MUnit))
-      err("dcUpdate must take arguments of type (" + tpe.name + ", " + MInt.name + ", " + dc.tpeArg.name + ") and return " + MUnit.name)
-    */
+    
+    // -- below causes scalac typer crash :(
+    // if ((dc.alloc.args.size != 1 || dc.alloc.args.apply(0).tpe != MInt || dc.alloc.retTpe != tpe))
+    //   // TODO: how should this work? alloc can really map to anything.. e.g can have other fields that get mapped from the inputs in arbitrary ways
+    //   // needs to be specified in the zip in some context attached to the alloc method?      
+    //   err("dcAlloc must take a single argument of type " + MInt.name + " and return an instance of " + tpe.name)
+    // if (dc.size.args.size != 1 || dc.size.args.apply(0).tpe != tpe || (dc.size.retTpe != MInt))
+    //   err("dcSize must take a single argument of type " + tpe.name + " and return an MInt")
+    // if (dc.apply.args.size != 2 || (dc.apply.args.apply(0).tpe, dc.apply.args(1).tpe) != (tpe, MInt) || (dc.apply.retTpe != dc.tpeArg))
+    //   err("dcApply must take two arguments of type(" + tpe.name + ", " + MInt.name + ") and return a " + dc.tpeArg.name)
+    // if (dc.update.args.size != 3 || (dc.update.args.apply(0).tpe, dc.update.args.apply(1).tpe, dc.update.args.apply(2).tpe) != (tpe, MInt, dc.tpeArg) || (dc.update.retTpe != MUnit))
+    //   err("dcUpdate must take arguments of type (" + tpe.name + ", " + MInt.name + ", " + dc.tpeArg.name + ") and return " + MUnit.name)
+    
+    DeliteCollections += (tpe -> dc)
+    ()
+  }
+  
+  /* Establishes that the given tpe implements the DeliteCollectionBuffer interface */
+  def forge_isdelitecollection_buffer(tpe: Rep[DSLType], dc: DeliteCollectionBuffer) = {
     DeliteCollections += (tpe -> dc)
     ()
   }

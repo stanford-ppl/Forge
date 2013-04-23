@@ -101,7 +101,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
   // 'without' is used to subtract bounds that are already in scope
   def implicitCtxBoundsWithType(tpePars: List[Rep[TypePar]], without: List[Rep[TypePar]] = Nil) = {
     val withoutBounds = without.flatMap(a => a.ctxBounds)
-    tpePars.flatMap(a => a.ctxBounds.diff(withoutBounds).map(b => tpe(b.name+"["+quote(a)+"]"))).distinct // a little hacky to use tpe like this
+    tpePars.flatMap(a => a.ctxBounds.diff(withoutBounds).map(b => ephemeralTpe(b.name+"["+quote(a)+"]"))).distinct 
   }  
   def makeImplicitArgsWithCtxBoundsWithType(implicitArgs: List[Rep[DSLType]], tpePars: List[Rep[TypePar]], without: List[Rep[TypePar]] = Nil, asVals: Boolean = false) = {
     makeImplicitArgsWithType(implicitCtxBoundsWithType(tpePars, without) ++ implicitArgs, asVals)    
@@ -126,7 +126,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
   def implicitArgsWithOverload(o: Rep[DSLOp]) = {    
     val i = nameClashId(o)
     if (i != "") {
-      o.implicitArgs :+ tpe("Overloaded" + i)
+      o.implicitArgs :+ ephemeralTpe("Overloaded" + i)
     }
     else {
       o.implicitArgs
@@ -141,7 +141,14 @@ trait BaseGenOps extends ForgeCodeGenBase {
     (clasher(o).length > 1 && unique(OpsGrp(o.grp).ops).contains(o)) // inefficient!! -> should refactor things so that we can store this with the op when it is created.
   }
   
-  // method names
+  // method names   
+  def specialCharacters = scala.collection.immutable.Map("=" -> "eq", "<" -> "lt", ">" -> "gt")
+  def sanitize(x: String) = {
+    var out = x
+    specialCharacters.keys.foreach { k => if (x.contains(k)) out = out.replace(k, specialCharacters(k)) }
+    out
+  }
+  
   def makeFullArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String, clasher: Rep[DSLOp] => List[Rep[DSLOp]] = nameClashesGrp) = {
     makeTpePars(o.tpePars) + makeArgs(o) + (if (needDisambiguate(o,clasher)) makeOpImplicitArgsWithOverload(o) else "")  
   }
@@ -149,8 +156,8 @@ trait BaseGenOps extends ForgeCodeGenBase {
     // adding the nameClashId is another way to avoid chaining the Overload implicit, but the weird method names that result are confusing
     val i = "" //nameClashId(o)    
     o.style match {
-      case `static` => o.grp.name.toLowerCase + i + "_object_" + o.name.toLowerCase
-      case _ => o.grp.name.toLowerCase + i + "_" + o.name.toLowerCase
+      case `static` => o.grp.name.toLowerCase + i + "_object_" + sanitize(o.name).toLowerCase
+      case _ => o.grp.name.toLowerCase + i + "_" + sanitize(o.name).toLowerCase
     }
   }
   def makeOpMethodNameWithArgs(o: Rep[DSLOp]) = makeOpMethodName(o) + makeFullArgs(o, makeOpArgs)
@@ -192,7 +199,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
         if (reduce.zero.retTpe != reduce.tpePars._1) err("reduce op with illegal zero parameter: " + o.name)
       case filter:Filter =>
         val col = o.args.apply(filter.argIndex).tpe
-        if (DeliteCollections.get(col).isEmpty) err("filter argument " + col.name + " is not a DeliteCollection")
+        if (DeliteCollections.get(col).isEmpty || !DeliteCollections.get(col).forall(_.isInstanceOf[DeliteCollectionBuffer])) err("filter argument " + col.name + " is not a DeliteCollectionBuffer")
         if (filter.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("filter op with undefined type arg: " + o.name)
         if (filter.argIndex < 0 || filter.argIndex > o.args.length) err("filter op with illegal arg parameter: " + o.name)      
       case foreach:Foreach =>

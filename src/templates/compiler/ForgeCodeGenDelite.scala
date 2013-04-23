@@ -18,6 +18,11 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
   
   lazy val packageName = dsl.toLowerCase() + ".compiler"
   
+  def isDelitePrimitiveType(t: Rep[DSLType]) = t match {
+    case Def(Tpe("DeliteArray",_,_)) => true
+    case _ => false
+  }
+  
   def makeEffectAnnotation(effect: EffectType, o: Rep[DSLOp]) = effect match {
     case `pure` => "reflectPure"
     case `mutable` => "reflectMutable"

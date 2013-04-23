@@ -29,7 +29,7 @@ abstract class EffectType
 abstract class AliasHint
 abstract class Frequency
 abstract class OpType
-abstract class DeliteType
 abstract class CodeGenerator {
   def name: String
 }
+abstract class DeliteParallelStrategy extends DSLType

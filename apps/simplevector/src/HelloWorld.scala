@@ -94,12 +94,9 @@ trait HelloSimple extends SimpleVectorApplication {
     println("vc2: " + vc2)
     
     // filter
-    // TODO: not working yet
-    //
-    // println("v6 = v1.filter(_ < 5)")
-    // val v6 = v1.filter(_ < 5)
-    // v6.pprint
-  
+    println("v6 = v1.filter(_ < 5)")
+    val v6 = v1.filter(_ < 5)
+    v6.pprint  
   }
    
 }

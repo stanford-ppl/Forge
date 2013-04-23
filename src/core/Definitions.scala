@@ -15,13 +15,19 @@ trait Definitions extends DerivativeTypes {
   /**
    * Built-in types
    */    
-  // concrete types (M stands for "Meta")
+  // concrete types (M stands for "Meta", C stands for "Current").. these aren't exactly consistent
   lazy val MAny = tpe("Any")
+  lazy val CAny = tpe("Any", stage = now)
   lazy val MInt = tpe("Int")
+  lazy val CInt = tpe("Int", stage = now)
   lazy val MDouble = tpe("Double")
+  lazy val CDouble = tpe("Double", stage = now)
   lazy val MBoolean = tpe("Boolean")
+  lazy val CBoolean = tpe("Boolean", stage = now)
   lazy val MString = tpe("String")
+  lazy val CString = tpe("String", stage = now)   
   lazy val MUnit = tpe("Unit")
+  lazy val CUnit = tpe("Unit", stage = now)
   lazy val byName = tpe("Thunk")
   def MThunk(ret: Rep[DSLType], freq: Frequency = normal) = ftpe(List(forge_arg("", byName, None)),ret,freq) // TODO
   def MFunction(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency = normal) = ftpe(args,ret,freq)
@@ -32,10 +38,19 @@ trait Definitions extends DerivativeTypes {
   def GVar(tpePar: Rep[TypePar]) = tpe("Var", List(tpePar)) 
   def GArray(tpePar: Rep[TypePar]) = tpe("Array", List(tpePar))     
   
+  // DeliteArray
+  def DArray(tpePar: Rep[TypePar]) = tpe("DeliteArray", List(tpePar))
+  
   /**
    * DSLType placeholders
    */
   def varArgs(tpeArg: Rep[DSLType]): Rep[DSLType]  
+  
+  /**
+   * Delite parallel strategies
+   */  
+  // def parBuffer: Rep[DeliteParallelStrategy]
+  // def parFlat: Rep[DeliteParallelStrategy]
   
   /**
    * stage tags - only 2 stages
@@ -113,7 +128,7 @@ trait Definitions extends DerivativeTypes {
   object normal extends Frequency
   object hot extends Frequency
   object cold extends Frequency
-   
+     
   /**
    * Delite op types
    */
@@ -205,7 +220,7 @@ trait Definitions extends DerivativeTypes {
    def forge_foreach(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]): DeliteOpType
    object foreach {
      def apply(tpePars: (Rep[DSLType],Rep[DSLType]), foreachArgIndex: Int, func: Rep[String]) = forge_foreach(tpePars, foreachArgIndex, func)
-   }    
+   }       
 }
 
 
@@ -219,6 +234,15 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
    // T*
    case class VarArgs(tpeArg: Rep[DSLType]) extends Def[DSLType]
    def varArgs(tpeArg: Rep[DSLType]) = VarArgs(tpeArg)  
+   
+  /**
+   * Delite parallel strategies
+   */  
+   // case class ParBuffer() extends Def[DeliteParallelStrategy]
+   // case class ParFlat() extends Def[DeliteParallelStrategy]
+   // 
+   // def parBuffer = ParBuffer()
+   // def parFlat = ParFlat()
 
   /**
    * Delite ops

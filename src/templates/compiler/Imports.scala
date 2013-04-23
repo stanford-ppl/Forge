@@ -12,12 +12,13 @@ trait DeliteGenImports extends BaseGenImports {
   val IR: ForgeApplicationRunner with ForgeExp 
   import IR._
     
-  def emitDeliteCollectionImport(stream: PrintWriter) {
+  def emitDeliteCollectionImports(stream: PrintWriter) {
     stream.println("import ppl.delite.framework.ops.DeliteCollection")
+    stream.println("import ppl.delite.framework.datastructures._")
   }
 
   def emitDeliteOpsImports(stream: PrintWriter) {
-    emitDeliteCollectionImport(stream)
+    emitDeliteCollectionImports(stream)
     stream.println("import ppl.delite.framework.ops.{DeliteOpsExp, DeliteCollectionOpsExp}")
     stream.println("import ppl.delite.framework.Util._")
   }
@@ -38,6 +39,13 @@ trait DeliteGenImports extends BaseGenImports {
     emitDelitePackageImports(stream)
     emitDeliteOpsImports(stream)
   }
+  
+  override def emitLMSImports(stream: PrintWriter) {
+    // needed by DeliteArray
+    stream.println("import scala.virtualization.lms.common.{ScalaGenPrimitiveOps,CGenPrimitiveOps,CudaGenPrimitiveOps,OpenCLGenPrimitiveOps}")    
+    stream.println("import scala.virtualization.lms.common.{ScalaGenObjectOps,CGenObjectOps,CudaGenObjectOps,OpenCLGenObjectOps}")    
+    super.emitLMSImports(stream)
+  }  
   
   override def emitDSLImports(stream: PrintWriter) {
     super.emitDSLImports(stream)

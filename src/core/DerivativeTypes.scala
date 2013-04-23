@@ -10,6 +10,13 @@ package core
 trait DerivativeTypes {
   this: Forge =>
   
+  abstract class DeliteCollectionType {
+    val tpeArg: Rep[DSLType]
+    val alloc: Rep[DSLOp]
+    val size: Rep[DSLOp]
+    val apply: Rep[DSLOp]
+    val update: Rep[DSLOp]
+  }
 }
 
 trait DerivativeTypesExp {

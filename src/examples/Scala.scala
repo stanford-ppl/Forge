@@ -14,6 +14,7 @@ trait ScalaOps extends ForgeApplication {
     numerics()
     ordering()
     strings()
+    math()
   }
     
   /**
@@ -78,14 +79,17 @@ trait ScalaOps extends ForgeApplication {
     val T = tpePar("T")
     val ifThenElse = op (Misc) ("__ifThenElse", direct, List(T), List(MThunk(MBoolean),MThunk(T,cold),MThunk(T,cold)), T, codegenerated) 
     codegen (ifThenElse) ($cala, stream.printLines(
-      "if (",
+      "if ({",
         blockResult(ifThenElse, 0),
-      "){",
+      "}){",
         blockResult(ifThenElse, 1),
       "} else {",
         blockResult(ifThenElse, 2),
       "}"
     ))    
+    
+    val immutable = op (Misc) ("unsafeImmutable", infix, List(T), List(T), T, codegenerated, aliasHint = copies(0))
+    codegen (immutable) ($cala, quotedArg(0))
   }
   
   def variables() = {
@@ -110,7 +114,7 @@ trait ScalaOps extends ForgeApplication {
   }
   
   def ordering() = {
-    val Ord = grp("Ordering")
+    val Ord = grp("Ordering2") // Ordering gets pulled in by DeliteArrayOps, need to disambiguate
     val T = tpePar("T")
     
     val lt = op (Ord) ("<", infix, List(T withBound TOrdering), List(T,T), MBoolean, codegenerated)    
@@ -125,7 +129,6 @@ trait ScalaOps extends ForgeApplication {
     lift (Str) (MString)
     
     // overloaded variants of string concat
-    val CString = tpe("String", stage = now) 
     val T = tpePar("T") 
 
     // most of these variants collapse to a common back-end implementation:
@@ -163,5 +166,15 @@ trait ScalaOps extends ForgeApplication {
     codegen (concat9) ($cala, scalaStrConcat(concat9))
     codegen (concat10) ($cala, scalaStrConcat(concat10))
     codegen (concat11) ($cala, scalaStrConcat(concat11))
+  }
+  
+  def math() = {
+    val Math = grp("Math")
+    
+    val maxInt = op (Math) ("max", static, List(), List(MInt,MInt), MInt, codegenerated)
+    val maxDbl = op (Math) ("max", static, List(), List(MDouble,MDouble), MDouble, codegenerated)
+    
+    codegen (maxInt) ($cala, "scala.math.max(" + quotedArg(0) + ", " + quotedArg(1) + ")")
+    codegen (maxDbl) ($cala, "scala.math.max(" + quotedArg(0) + ", " + quotedArg(1) + ")")
   }
 }

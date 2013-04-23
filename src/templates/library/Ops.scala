@@ -37,6 +37,10 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       
     case Const(s: String) => replaceWildcards(s) // don't add quotes 
     
+    // remap DeliteArray to Array
+    case Def(Tpe("DeliteArray",args,stage)) => "Array" + makeTpePars(args) 
+    case Def(TpeInst(t,args,s)) if t.name == "DeliteArray" => "Array[" + args.map(quote).mkString(",") + "]"
+    
     case _ => super.quote(x)
   }  
   
@@ -44,7 +48,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     emitBlockComment("SingleTask Impls", stream)   
     stream.println()
     stream.println("trait " + opsGrp.grp.name + "WrapperImpl {")
-    stream.println("  this: " + dsl + "Application => ")
+    stream.println("  this: " + dsl + "Application with DeliteCompatibility => ")
     stream.println()    
     for (o <- unique(opsGrp.ops)) { 
       o.opTpe match {
@@ -101,14 +105,14 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         emitWithIndent("acc", stream, indent)                      
       case filter:Filter =>
         check(o)
-        val dc = DeliteCollections(filter.tpePars._3)        
+        val dc = DeliteCollections(filter.tpePars._3).asInstanceOf[DeliteCollectionBuffer]        
         emitWithIndent("def func: " + quote(filter.tpePars._1) + " => " + quote(filter.tpePars._2) + " = " + inline(o, filter.func), stream, indent)            
         emitWithIndent("def cond: " + quote(filter.tpePars._1) + " => " + quote(MBoolean) + " = " + inline(o, filter.cond), stream, indent)            
         emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, filter.tpePars._1, filter.tpePars._2)) + "(0)", stream, indent)
         emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(filter.argIndex).name + ")"  + ") {", stream, indent)
-        emitWithIndent("if (cond(i)) {", stream, indent+2)
-        emitWithIndent("// TODO: dc_append", stream, indent+4)
-        // emitWithIndent(makeOpMethodName(dc.append) + "(out, func(" + makeOpMethodName(dc.apply) + "(" + opArgPrefix+map.argIndex + ", i)))", stream, indent+4)
+        emitWithIndent("val e = " + makeOpMethodName(dc.apply) + "(" + opArgPrefix+filter.argIndex + ", i)", stream, indent)
+        emitWithIndent("if (cond(e)) {", stream, indent+2)
+        emitWithIndent(makeOpMethodName(dc.append) + "(out, i, func(e))", stream, indent+4)
         emitWithIndent("}", stream, indent+2)            
         emitWithIndent("}", stream, indent)            
         emitWithIndent("out", stream, indent)                      
@@ -143,7 +147,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         stream.println()
       }
       if (d.isEmpty && !isForgePrimitiveType(tpe)) {
-        warn("no data structure found for tpe " + tpe.name + ". emitting empty class declaration") 
+        warn("(library) no data structure found for tpe " + tpe.name + ". emitting empty class declaration") 
         stream.println("  class " + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + "() {}")
         stream.println()
       }

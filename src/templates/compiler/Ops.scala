@@ -166,8 +166,8 @@ trait DeliteGenOps extends BaseGenOps {
         case Def(Map(tpePars, argIndex, func)) =>
           //val dc = DeliteCollections(o.args.apply(argIndex).tpe)
           DeliteCollections foreach(x => println(x._1))
-          val dc = DeliteCollections(o.retTpe) // todo gibbons4
-          emitOpNodeHeader(o, "DeliteOpMap[" + quote(tpePars._1) + "," + quote(tpePars._2) + "," + makeTpeInst(o.retTpe, tpePars._2) + "]")            
+          val dc = DeliteCollections(o.args.apply(0).tpe) // todo gibbons4 "A vector only maps to a vector"
+          emitOpNodeHeader(o, "DeliteOpMap[" + quote(tpePars._1) + "," + quote(tpePars._2) + "," + makeTpeInst(o.args.apply(0).tpe, tpePars._2) + "]")            
           stream.println()
           stream.println("    val in = " + o.args.apply(argIndex).name)
           stream.println("    def func = " + inline(o,func,quoteLiteral))
@@ -175,8 +175,8 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._2)) + "(len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")          
         case Def(Zip(tpePars, argIndices, func)) => 
-          val dc = DeliteCollections(o.retTpe)
-          emitOpNodeHeader(o, "DeliteOpZipWith[" + quote(tpePars._1) + "," + quote(tpePars._2) + "," + quote(o.retTpe) + "," + makeTpeInst(o.retTpe,tpePars._3) + "]")            
+          val dc = DeliteCollections(o.args.apply(0).tpe)
+          emitOpNodeHeader(o, "DeliteOpZipWith[" + quote(tpePars._1) + "," + quote(tpePars._2) + "," + quote(tpePars._3) + "," + makeTpeInst(o.args.apply(0).tpe,tpePars._3) + "]")            
           stream.println()
           stream.println("    val inA = " + o.args.apply(argIndices._1).name)
           stream.println("    val inB = " + o.args.apply(argIndices._2).name)
@@ -193,7 +193,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
         case Def(Filter(tpePars, argIndex, cond, func)) =>
           val dc = DeliteCollections(o.args.apply(argIndex).tpe)
-          emitOpNodeHeader(o, "DeliteOpFilter[" + quote(tpePars._1) + "," + quote(tpePars._2) + "," + quote(o.retTpe) + "]")            
+          emitOpNodeHeader(o, "DeliteOpFilter[" + quote(tpePars._1) + "," + quote(tpePars._2) + "," + quote(o.args.apply(0).tpe) + "]")            
           stream.println()
           stream.println("    val in = " + o.args.apply(argIndex).name)
           stream.println("    def cond = " + inline(o,cond,quoteLiteral))

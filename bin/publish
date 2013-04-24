@@ -93,11 +93,6 @@ object ${dslName}Build extends Build {
 """)
     return s.substitute(dslName=dsl)
  
-def writeEmptyExtern(dest, pkgName):
-  dummyFile = open(dest + "/Extern.scala", 'w') 
-  dummyFile.write("package " + pkgName)
-  dummyFile.close()
-  
 def publish(dsl, opts):
     if not os.path.isdir(FORGE_HOME + "/" + FORGE_GENERATED + "/" + dsl):
         err("could not find generated DSL " + dsl + ". (did you forget to run forge?)")
@@ -114,15 +109,16 @@ def publish(dsl, opts):
     os.system("rsync -r " + FORGE_GENERATED + "/" + dsl + "/" + " " + build_dir)
 
     for t in ['shared','compiler','library']:
+        static = FORGE_HOME + "/static/extern/" + t + "/src/"
         src = FORGE_HOME + "/extern/" + dsl + "/" + t + "/src/"
         dest = build_dir + "/" + t + "/src/" + dsl + "/extern/"
-        if os.path.exists(src) and os.path.exists(dest):
-            os.system("rsync -r " + src + " " + dest)
-        elif os.path.exists(src):
-            shutil.copytree(src, dest) 
-        else:
+        if not os.path.exists(dest):
             os.mkdir(dest)
-            writeEmptyExtern(dest, dsl + "." + t + "." + "extern")
+        if os.path.exists(src):
+            os.system("rsync -r " + src + " " + dest)
+        os.system("rsync -r " + static + " " + dest)
+        os.system("find " + dest + " -type f -print0 | xargs -0 sed -i \"s/HUMAN_DSL_NAME/"+dsl+"/g\"")
+        os.system("find " + dest + " -type f -print0 | xargs -0 sed -i \"s/LOWERCASE_DSL_NAME/"+dsl.lower()+"/g\"")
           
     os.system("rsync -r " + FORGE_HOME + "/apps/" + dsl + "/" + " " + build_dir + "/apps/")
 

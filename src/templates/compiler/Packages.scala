@@ -25,7 +25,7 @@ trait DeliteGenPackages extends BaseGenPackages {
   
   def emitDSLPackageDefinitions(opsGrps: List[DSLOps], stream: PrintWriter) {
     emitBlockComment("dsl compiler definition", stream)
-  
+      
     // compiler
     stream.println("trait " + dsl + "Compiler extends " + dsl)
     for (opsGrp <- opsGrps) {
@@ -35,10 +35,12 @@ trait DeliteGenPackages extends BaseGenPackages {
       if (opsGrp.ops.exists(_.style == compiler))
         stream.print(" with " + opsGrp.grp.name + "CompilerOps")           
     }
-    stream.println(" with DeliteArrayCompilerOps {")
+    for (e <- Externs) {
+      stream.print(" with " + e.opsGrp.grp.name + "CompilerOps")          
+    }    
+    stream.println(" {")
     stream.println("  this: " + dsl + "Application with " + dsl + "Exp => ")
-    stream.println()
-    stream.println("  type DeliteArray[T] = ppl.delite.framework.datastructures.DeliteArray[T]")
+    stream.println()    
     stream.println("}")
     stream.println()
   
@@ -50,22 +52,21 @@ trait DeliteGenPackages extends BaseGenPackages {
     for (e <- Externs) {
       stream.print(" with " + e.opsGrp.name + "Exp")
     }    
-    stream.println(" with DeliteArrayFatExp with DeliteOpsExp with DeliteAllOverridesExp {")
+    stream.println(" with DeliteOpsExp with DeliteAllOverridesExp {")
     stream.println(" this: DeliteApplication with " + dsl + "Application => ")
     stream.println()
     emitBlockComment("disambiguations for LMS classes pulled in by Delite", stream, indent=2)
 
     // TODO: generalize    
     stream.println("  override def infix_unsafeImmutable[A:Manifest](lhs: Rep[A])(implicit pos: SourceContext) = object_unsafe_immutable(lhs)")    
-    stream.println("  override def __whileDo(cond: => Exp[Boolean], body: => Rep[Unit])(implicit pos: SourceContext) = delite_while(cond, body)")      
+    stream.println("  override def __whileDo(cond: => Exp[Boolean], body: => Rep[Unit])(implicit pos: SourceContext) = delite_while(cond, body)")  
+        
     stream.println()
     emitBlockComment("dsl types", stream, indent=2)
     for (tpe <- Tpes) {      
       if (!isTpeInst(tpe) && !isForgePrimitiveType(tpe)) {
-        if (!isDelitePrimitiveType(tpe)) {
-          stream.print("  abstract class " + quote(tpe))
-          if (DeliteCollections.contains(tpe)) stream.println(" extends DeliteCollection[" + quote(DeliteCollections(tpe).tpeArg) + "]") else stream.println()
-        }
+        stream.print("  abstract class " + quote(tpe))
+        if (DeliteCollections.contains(tpe)) stream.println(" extends DeliteCollection[" + quote(DeliteCollections(tpe).tpeArg) + "]") else stream.println()
         stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")      
       }
     }
@@ -131,8 +132,7 @@ trait DeliteGenPackages extends BaseGenPackages {
         if (e.opsGrp.targets.contains(g))
           stream.print(" with " + g.name + "Gen" + e.opsGrp.name)        
       }
-      stream.println(" with " + g.name + "GenPrimitiveOps with " + g.name + "GenObjectOps") // needed by Delite, pulled in by DeliteArray
-      stream.println(" with " + g.name + "GenDeliteArrayOps with " + g.name + "GenDeliteOps with Delite" + g.name + "GenAllOverrides {" )
+      stream.println(" with " + g.name + "GenDeliteOps with Delite" + g.name + "GenAllOverrides {" )
       stream.println("  val IR: DeliteApplication with " + dsl + "Exp")
       // TODO: generalize, other targets can have remaps too, need to be encoded somehow
       // store dsmap and remap inside the generator itself?

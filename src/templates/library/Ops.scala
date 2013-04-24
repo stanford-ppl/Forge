@@ -29,14 +29,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   
   override def quote(x: Exp[Any]): String = x match {          
     // case Def(QuoteSeq(i)) => "("+i+": _*)"  // not exactly a quoted sequence..
-    case Def(QuoteSeq(argName)) => argName
-      
-    case Const(s: String) => replaceWildcards(s) // don't add quotes 
-    
-    // remap DeliteArray to Array
-    case Def(Tpe("DeliteArray",args,stage)) => "Array" + makeTpePars(args) 
-    case Def(TpeInst(t,args,s)) if t.name == "DeliteArray" => "Array[" + args.map(quote).mkString(",") + "]"
-    
+    case Def(QuoteSeq(argName)) => argName      
+    case Const(s: String) => replaceWildcards(s) // don't add quotes     
     case _ => super.quote(x)
   }  
   

@@ -47,12 +47,12 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     emitLMSImports(grpStream)
     emitDSLImports(grpStream)    
     grpStream.println()
-    grpStream.print("trait " + dsl + "Classes extends DeliteCompatibility")
-    // var first = true
+    grpStream.print("trait " + dsl + "Classes extends ")
+    var first = true
     for ((grp,opsGrp) <- OpsGrp) {
       val wrapper = grp.name + "Wrapper"
-      /*if (first) grpStream.print(wrapper) else*/ grpStream.print(" with " + wrapper)
-      // first = false
+      if (first) grpStream.print(wrapper) else grpStream.print(" with " + wrapper)
+      first = false
       
       val stream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+".scala"))            
       stream.println("package " + packageName + ".classes")

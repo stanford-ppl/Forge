@@ -39,14 +39,7 @@ trait DeliteGenImports extends BaseGenImports {
     emitDelitePackageImports(stream)
     emitDeliteOpsImports(stream)
   }
-  
-  override def emitLMSImports(stream: PrintWriter) {
-    // needed by DeliteArray
-    stream.println("import scala.virtualization.lms.common.{ScalaGenPrimitiveOps,CGenPrimitiveOps,CudaGenPrimitiveOps,OpenCLGenPrimitiveOps}")    
-    stream.println("import scala.virtualization.lms.common.{ScalaGenObjectOps,CGenObjectOps,CudaGenObjectOps,OpenCLGenObjectOps}")    
-    super.emitLMSImports(stream)
-  }  
-  
+    
   override def emitDSLImports(stream: PrintWriter) {
     super.emitDSLImports(stream)
     stream.println("import " + packageName + "._")

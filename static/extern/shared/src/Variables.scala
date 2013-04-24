@@ -15,3 +15,4 @@ trait LiftVar extends LiftVariables {
   this: VarOps =>
 }
 trait VarOps extends Variables
+trait VarCompilerOps extends VarOps

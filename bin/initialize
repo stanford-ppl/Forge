@@ -33,15 +33,11 @@ mkdir -p ./extern/$lowerCaseDSL/
 
 cp ./static/TemplateDSL.scala ./src/examples/${fullname}.scala
 cp -r ./static/apps/* ./apps/$lowerCaseDSL/ 
-cp -r ./static/extern/* ./extern/$lowerCaseDSL/ 
 
 # Insert DSL name in the appropriate place
 
 find ./apps/$lowerCaseDSL -type f -print0 | xargs -0 sed -i "s/HUMAN_DSL_NAME/$fullname/g"
 find ./apps/$lowerCaseDSL -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$lowerCaseDSL/g"
-
-find ./extern/$lowerCaseDSL -type f -print0 | xargs -0 sed -i "s/HUMAN_DSL_NAME/$fullname/g"
-find ./extern/$lowerCaseDSL -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$lowerCaseDSL/g"
 
 find ./src/examples/ -type f -print0 | xargs -0 sed -i "s/HUMAN_DSL_NAME/$fullname/g"
 find ./src/examples -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$lowerCaseDSL/g"

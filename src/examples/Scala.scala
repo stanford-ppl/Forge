@@ -8,9 +8,7 @@ trait ScalaOps extends ForgeApplication {
   
   def addScalaOps() = {
     proxies()
-    arrays()
     misc()
-    variables()
     numerics()
     ordering()
     strings()
@@ -26,37 +24,6 @@ trait ScalaOps extends ForgeApplication {
   def proxies() = {
     // proxy(scala.collection.immutable.Array)      
   }
-
-  def arrays() = {
-    val T = tpePar("T")
-    // val R = tpePar("R")
-    val Arr = GArray(T)
-    
-    // can't overload 'apply', because varArgs(T) is ambiguous with MInt
-    val anew = op (Arr) ("empty", static, List(T), List(MInt), Arr, codegenerated, effect = mutable)
-    val anew2 = op (Arr) ("apply", static, List(T), List(varArgs(T)), Arr, codegenerated)
-    
-    val alength = op (Arr) ("length", infix, List(T), List(Arr), MInt, codegenerated)    
-    val aapply = op (Arr) ("apply", infix, List(T), List(Arr,MInt), T, codegenerated)
-    val aupdate = op (Arr) ("update", infix, List(T), List(Arr,MInt,T), MUnit, codegenerated, effect = write(0))    
-    // val amap = op (Arr) ("map", infix, List(T,R), List(Arr,MFunction(List(T),R)), GArray(R), map((T,R,Arr), 0, "e => "+quotedArg(1)+"(e)"))
-    
-    // the alias hint tells Delite that this operation copies its inputs, avoiding conservative mutable sharing errors     
-    val aclone = op (Arr) ("Clone", infix, List(T), List(Arr), Arr, codegenerated, aliasHint = copies(0))            
-
-    // Arrays cannot be DeliteCollection right now because Delite expects us to use native
-    // Scala arrays for some things (e.g. args); therefore we cannot shadow the native type with our own.
-    // We could fix this in Delite by making DeliteCollection a type class instead of a subtype.
-    
-    // Arr is DeliteCollection(T, anew, alength, aapply, aupdate)
-    
-    codegen (anew) ($cala, "new "+anew.tpeName+"["+anew.tpeInstance(0)+"]("+quotedArg(0)+")")
-    codegen (anew2) ($cala, quotedSeq(0)+".toArray")  // arg0: Seq[Rep[T]], so we use the quote method quoteSeq
-    codegen (alength) ($cala, quotedArg(0) + ".length")
-    codegen (aapply) ($cala, quotedArg(0) + ".apply(" + quotedArg(1) + ")")
-    codegen (aupdate) ($cala, quotedArg(0) + ".update(" + quotedArg(1) + ", " + quotedArg(2) + ")")                
-    codegen (aclone) ($cala, quotedArg(0) + ".clone")
-  }  
   
   def misc() = {
     val Misc = grp("Misc")
@@ -91,11 +58,6 @@ trait ScalaOps extends ForgeApplication {
     
     val immutable = op (Misc) ("unsafeImmutable", infix, List(T), List(T), T, codegenerated, aliasHint = copies(0))
     codegen (immutable) ($cala, quotedArg(0))
-  }
-  
-  def variables() = {
-    // lots of quirks in the LMS file, just plug in external implementation for now
-    extern(grp("Var"), withLift = true)    
   }
   
   def numerics() = {
@@ -137,14 +99,14 @@ trait ScalaOps extends ForgeApplication {
     // maps to Rep[String], Rep[Any]
     val concat = op (Str) ("+", infix, List(T), List(CString, T), MString, codegenerated)
     val concat2 = op (Str) ("+", infix, List(T), List(MString, T), MString, codegenerated)
-    val concat3 = op (Str) ("+", infix, List(T), List(CString, GVar(T)), MString, codegenerated)
-    val concat4 = op (Str) ("+", infix, List(T), List(MString, GVar(T)), MString, codegenerated)
+    val concat3 = op (Str) ("+", infix, List(T), List(CString, MVar(T)), MString, codegenerated)
+    val concat4 = op (Str) ("+", infix, List(T), List(MString, MVar(T)), MString, codegenerated)
     
     // Rep[Any], Rep[String]
     val concat5 = op (Str) ("+", infix, List(T), List(T, CString), MString, codegenerated)
     val concat6 = op (Str) ("+", infix, List(T), List(T, MString), MString, codegenerated)
-    val concat7 = op (Str) ("+", infix, List(T), List(GVar(T), CString), MString, codegenerated)
-    val concat8 = op (Str) ("+", infix, List(T), List(GVar(T), MString), MString, codegenerated)
+    val concat7 = op (Str) ("+", infix, List(T), List(MVar(T), CString), MString, codegenerated)
+    val concat8 = op (Str) ("+", infix, List(T), List(MVar(T), MString), MString, codegenerated)
     
     // Rep[String], Rep[String]
     val concat9 = op (Str) ("+", infix, List(), List(MString, CString), MString, codegenerated)

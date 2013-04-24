@@ -71,16 +71,17 @@ trait ForgeOps extends Base {
   def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String]): Rep[CodeGenRule]
   
   // in progress gibbons4
-  def forge_getter(structArgIndex: Int, field: String): Rep[DeliteRule]
-  def forge_setter(structArgIndex: Int, field: String, value: Rep[String]): Rep[DeliteRule]
-  def forge_allocates(data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]): Rep[DeliteRule]
-  def forge_single(func: Rep[String]): Rep[DeliteRule]
-  def forge_composite(func: Rep[String]): Rep[DeliteRule]
-  def forge_map(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]): Rep[DeliteRule]
-  def forge_zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String]): Rep[DeliteRule]
-  def forge_reduce(tpePars: (Rep[DSLType]), argIndex: Int, zero: Rep[DSLOp], func: Rep[String]): Rep[DeliteRule]
-  def forge_filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]): Rep[DeliteRule]
-  def forge_foreach(tpePars: (Rep[DSLType]), argIndex: Int, func: Rep[String]): Rep[DeliteRule]
+  // todo - do the have to be Rep[Map] etc.
+  def forge_getter(op: Rep[DSLOp], structArgIndex: Int, field: String): Rep[DeliteRule]
+  def forge_setter(op: Rep[DSLOp], structArgIndex: Int, field: String, value: Rep[String]): Rep[DeliteRule]
+  def forge_allocates(op: Rep[DSLOp], data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]): Rep[DeliteRule]
+  def forge_single(op: Rep[DSLOp], func: Rep[String]): Rep[DeliteRule]
+  def forge_composite(op: Rep[DSLOp], func: Rep[String]): Rep[DeliteRule]
+  def forge_map(op: Rep[DSLOp], tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]): Rep[DeliteRule]
+  def forge_zip(op: Rep[DSLOp], tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String]): Rep[DeliteRule]
+  def forge_reduce(op: Rep[DSLOp], tpePars: (Rep[DSLType]), argIndex: Int, zero: Rep[DSLOp], func: Rep[String]): Rep[DeliteRule]
+  def forge_filter(op: Rep[DSLOp], tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]): Rep[DeliteRule]
+  def forge_foreach(op: Rep[DSLOp], tpePars: (Rep[DSLType]), argIndex: Int, func: Rep[String]): Rep[DeliteRule]
 
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
   def forge_withBound(a: Rep[TypePar], b: TypeClass): Rep[TypePar]
@@ -244,10 +245,21 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
       OpsGrp(op.grp) = updatedGrp
     }
             
+    //addRule(c)
     c
   }
     
   // work in progress - gibbons4
+  // could just put the Op in the DeliteRule instead of in this HashMap thing. Any reason not to?
+
+  /** Helper function to DeliteRule(s) */
+  // gibbons4 todo - Def[DeliteRule] ? Exp ? who knows
+  def addRule(op: Rep[DSLOp], rule: Rep[DeliteRule]) = {
+    if (DeliteRules.contains(op)) err("multiple rules declared for op " + op.name) 
+    DeliteRules.put(op, rule)   
+    rule
+  }
+
   /**
    * Delite parallel strategies
    */
@@ -257,41 +269,41 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
    // def parBuffer = ParBuffer()
    // def parFlat = ParFlat()
   case class Getter(structArgIndex: Int, field: String) extends Def[DeliteRule]
-  def forge_getter(structArgIndex: Int, field: String) = Getter(structArgIndex,field)
+  def forge_getter(op: Rep[DSLOp], structArgIndex: Int, field: String) = addRule(Getter(structArgIndex,field))
 
   case class Setter(structArgIndex: Int, field: String, value: Rep[String]) extends Def[DeliteRule]
-  def forge_setter(structArgIndex: Int, field: String, value: Rep[String]) = Setter(structArgIndex,field,value)
+  def forge_setter(op: Rep[DSLOp], structArgIndex: Int, field: String, value: Rep[String]) = addRule(Setter(structArgIndex,field,value))
 
   case class Composite(func: Rep[String]) extends Def[DeliteRule]
-  def forge_composite(func: Rep[String]) = Composite(func)
+  def forge_composite(op: Rep[DSLOp], func: Rep[String]) = addRule(Composite(func))
 
   /**
    * Delite ops
    */
   case class Allocates(data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]) extends Def[DeliteRule]
-  def forge_allocates(data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]) = Allocates(data,init)
+  def forge_allocates(op: Rep[DSLOp], data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]) = addRule(Allocates(data,init))
 
   case class SingleTask(func: Rep[String]) extends Def[DeliteRule]
-  def forge_single(func: Rep[String]) = SingleTask(func)
+  def forge_single(op: Rep[DSLOp], func: Rep[String]) = addRule(SingleTask(func))
 
   /**
   * Delite parallel patterns
   */
 
   case class Map(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) extends Def[DeliteRule]
-  def forge_map(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) = Map(tpePars, argIndex, func)
+  def forge_map(op: Rep[DSLOp], tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) = addRule(Map(tpePars, argIndex, func))
 
   case class Zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String]) extends Def[DeliteRule]
-  def forge_zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String]) = Zip(tpePars, argIndices, func)
+  def forge_zip(op: Rep[DSLOp], tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String]) = addRule(Zip(tpePars, argIndices, func))
 
   case class Reduce(tpePars: (Rep[DSLType]), argIndex: Int, zero: Rep[DSLOp], func: Rep[String]) extends Def[DeliteRule]
-  def forge_reduce(tpePars: (Rep[DSLType]), argIndex: Int, zero: Rep[DSLOp], func: Rep[String]) = Reduce(tpePars, argIndex, zero, func)
+  def forge_reduce(op: Rep[DSLOp], tpePars: (Rep[DSLType]), argIndex: Int, zero: Rep[DSLOp], func: Rep[String]) = addRule(Reduce(tpePars, argIndex, zero, func))
 
   case class Filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]) extends Def[DeliteRule]
-  def forge_filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]) = Filter(tpePars, argIndex, cond, func)
+  def forge_filter(op: Rep[DSLOp], tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]) = addRule(Filter(tpePars, argIndex, cond, func))
 
   case class Foreach(tpePars: (Rep[DSLType]), argIndex: Int, func: Rep[String]) extends Def[DeliteRule]
-  def forge_foreach(tpePars: (Rep[DSLType]), argIndex: Int, func: Rep[String]) = Foreach(tpePars, argIndex, func)
+  def forge_foreach(op: Rep[DSLOp], tpePars: (Rep[DSLType]), argIndex: Int, func: Rep[String]) = addRule(Foreach(tpePars, argIndex, func))
 
   /* Establishes that the given tpe implements the DeliteCollection interface */
   def forge_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection) = {

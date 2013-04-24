@@ -125,7 +125,9 @@ trait DeliteGenOps extends BaseGenOps {
       
   def emitIRNodes(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
     def hasIRNode(o: Rep[DSLOp]) = DeliteRules(o) match {
-      case _:Rep[Composite] | _:Rep[Getter] | _:Rep[Setter] => false
+      case Def(Composite(func)) => false
+      case Def(Getter(structArgIndex, field)) => false
+      case Def(Setter(structArgIndex, field, value)) => false
       case _ => true
     }
     
@@ -145,8 +147,10 @@ trait DeliteGenOps extends BaseGenOps {
     // IR nodes
     for (o <- uniqueOps if hasIRNode(o)) { 
       stream.print("  case class " + makeOpNodeName(o) + makeTpeParsWithBounds(o.tpePars))
-      if (DeliteRules(o).isInstanceOf[Rep[CodeGenDecl]]) stream.print(makeOpArgsWithType(o, blockify))
-      else stream.print(makeOpArgsWithType(o))    
+      DeliteRules(o) match {
+        case Def(CodeGenDecl(generator, rule, isSimple)) => stream.print(makeOpArgsWithType(o, blockify))
+        case _ => stream.print(makeOpArgsWithType(o))    
+      }
       stream.print(makeOpImplicitArgsWithType(o,true))
       
       DeliteRules(o) match {
@@ -216,18 +220,20 @@ trait DeliteGenOps extends BaseGenOps {
       stream.println("  " + makeOpMethodSignature(o) + " = {")
       val summary = scala.collection.mutable.ArrayBuffer[String]()
       // TODO: we need syms methods for func args..
-      println(DeliteRules(o).isInstanceOf[Rep[CodeGenDecl]] + "\n\n")
-      if (DeliteRules(o).isInstanceOf[Rep[CodeGenDecl]]) {
-        for (arg <- o.args) {
-          arg match {
-            case Def(Arg(name, Def(FTpe(args,ret,freq)), d2)) =>
-              stream.println()
-              emitWithIndent("val b_" + name + " = reifyEffects(" + name + ")", stream, 4)
-              emitWithIndent("val sb_" + name + " = summarizeEffects(b_" + name + ")", stream, 4)
-              summary += "sb_"+name
-            case _ =>
+      DeliteRules(o) match {
+        case Def(CodeGenDecl(generator, rule, isSimple)) => 
+          for (arg <- o.args) {
+            arg match {
+              case Def(Arg(name, Def(FTpe(args,ret,freq)), d2)) =>
+                stream.println()
+                emitWithIndent("val b_" + name + " = reifyEffects(" + name + ")", stream, 4)
+                emitWithIndent("val sb_" + name + " = summarizeEffects(b_" + name + ")", stream, 4)
+                summary += "sb_"+name
+              case _ =>
+            }
           }
-        }
+          case _ => 
+        //}
       }
       
       def summarizeEffects(s: scala.collection.mutable.ArrayBuffer[String]): String = {
@@ -252,8 +258,8 @@ trait DeliteGenOps extends BaseGenOps {
       // composite ops, getters and setters are currently inlined
       // in the future, to support pattern matching and optimization, we should implement these as abstract IR nodes and use lowering transformers
       DeliteRules(o) match {
-        case c:Rep[Composite] if hasEffects => err("cannot have effects with composite ops currently")
-        case c:Rep[Composite] => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
+        case Def(Composite(func)) if hasEffects => err("cannot have effects with composite ops currently")
+        case Def(Composite(func)) => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
         case g@Def(Getter(structArgIndex,field)) => 
           val fieldTpe = DataStructs.find(_.tpe == o.args.apply(structArgIndex).tpe).get.fields.find(t => t._1 == field).get.tpe
           emitWithIndent("field["+quote(fieldTpe)+"]("+inline(o,quotedArg(structArgIndex),quoteLiteral)+",\""+field+"\")", stream, 4)        
@@ -289,10 +295,14 @@ trait DeliteGenOps extends BaseGenOps {
         else ""
       }
             
-      for (o <- uniqueOps if DeliteRules(o).isInstanceOf[Rep[CodeGenDecl]]) { 
-        symsBuf += makeSym(o, "syms") 
-        boundSymsBuf += makeSym(o, "effectSyms") 
-        symsFreqBuf += makeSym(o, "", addFreq = true) 
+      for (o <- uniqueOps) { 
+        DeliteRules(o) match {
+          case Def(CodeGenDecl(generator, rule, isSimple)) =>
+            symsBuf += makeSym(o, "syms") 
+            boundSymsBuf += makeSym(o, "effectSyms") 
+            symsFreqBuf += makeSym(o, "", addFreq = true) 
+          case _ =>
+        }
       }
     
       symsBuf      += "    case _ => super.syms(e)" + nl + "  }"
@@ -353,7 +363,7 @@ trait DeliteGenOps extends BaseGenOps {
       val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++ o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
       
       DeliteRules(o) match {
-        case _:Rep[CodeGenDecl] =>
+        case Def(CodeGenDecl(generator, rule, isSimple)) =>
           stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
           // pure version with no func args uses smart constructor
           if (!hasFuncArgs(o)) {

@@ -17,8 +17,8 @@ abstract class DSLData
 abstract class DSLStruct
 abstract class DSLOp
 abstract class LiftStm
-abstract class RewriteRule
-abstract class CodeGenRule
+//abstract class RewriteRule
+//abstract class CodeGenRule
 abstract class DeliteRule // other names to consider, DSLOp, DSLRule
 
 /**

@@ -67,11 +67,10 @@ trait ForgeOps extends Base {
   def forge_lift(grp: Rep[DSLGroup], tpe: Rep[DSLType]): Rep[Unit]
   def forge_data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]  
   def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
-  // todo - codegen could probably just be a DeliteRule
-  def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String]): Rep[CodeGenRule]
-  
+
   // in progress gibbons4
   // todo - do the have to be Rep[Map] etc.
+  def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String]): Rep[DeliteRule]
   def forge_getter(op: Rep[DSLOp], structArgIndex: Int, field: String): Rep[DeliteRule]
   def forge_setter(op: Rep[DSLOp], structArgIndex: Int, field: String, value: Rep[String]): Rep[DeliteRule]
   def forge_allocates(op: Rep[DSLOp], data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]): Rep[DeliteRule]
@@ -100,7 +99,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   val Tpes = ArrayBuffer[Exp[DSLType]]()
   val DataStructs = ArrayBuffer[Exp[DSLData]]()
   val OpsGrp = HashMap[Exp[DSLGroup],DSLOps]()  
-  val CodeGenRules = HashMap[Exp[DSLGroup],ArrayBuffer[Exp[CodeGenRule]]]()
+  val CodeGenRules = HashMap[Exp[DSLGroup],ArrayBuffer[Exp[DeliteRule]]]()
   val DeliteRules = HashMap[Exp[DSLOp],Exp[DeliteRule]]()
   val DeliteCollections = HashMap[Exp[DSLType], DeliteCollectionType]()
   val Externs = ArrayBuffer[Extern]()
@@ -219,19 +218,20 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   }
   
   /* A code gen rule - this is the imperative code defining how to implement a particular op */
-  case class CodeGenDecl(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String], isSimple: Boolean) extends Def[CodeGenRule]
+  case class CodeGenDecl(generator: CodeGenerator, rule: Rep[String], isSimple: Boolean) extends Def[DeliteRule]
   
   def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String]) = {
     val isSimple = rule match {
       case Def(PrintLines(x, l)) => false
       case _ => true
     }
-    val c = CodeGenDecl(op, generator, rule, isSimple)
-    if (CodeGenRules.get(op.grp).exists(_.exists(_.op == op))) err("multiple code generators declared for op " + op.name + " in group " + op.grp.name)    
+    val c = CodeGenDecl(generator, rule, isSimple)
+    // todo gibbons4 is this right
+    if (CodeGenRules.get(op.grp).exists(_ == c)) err("multiple code generators declared for op " + op.name + " in group " + op.grp.name)    
     if (DataStructs.exists(d => op.args.exists(_.tpe == d.tpe)))
       err("(op " + op.name + ") code generated ops should not have struct types as inputs, since structs may be eliminated at compile time. consider passing in one or more fields of the struct as input(s) to the op instead.")
     
-    val buf = CodeGenRules.getOrElseUpdate(op.grp, new ArrayBuffer[Exp[CodeGenRule]]())
+    val buf = CodeGenRules.getOrElseUpdate(op.grp, new ArrayBuffer[Exp[DeliteRule]]())
     buf += c
     
     // also may need to update opsGrp targets
@@ -245,8 +245,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
       OpsGrp(op.grp) = updatedGrp
     }
             
-    //addRule(c)
-    c
+    addRule(op, c)
   }
     
   // work in progress - gibbons4

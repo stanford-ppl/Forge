@@ -128,19 +128,16 @@ trait FieldOpsExp extends FieldOps {
   }      
   
   /**
-   * CodeGenRule
+   * DeliteRule
    */
-  def infix_generator(x: Exp[CodeGenRule]) = x match {
-    case Def(CodeGenDecl(op,gen,rule,s)) => gen
+  def infix_generator(x: Exp[DeliteRule]) = x match {
+    case Def(CodeGenDecl(gen,rule,s)) => gen
   }  
-  def infix_op(x: Exp[CodeGenRule]) = x match {
-    case Def(CodeGenDecl(op,gen,rule,s)) => op
-  }      
-  def infix_rule(x: Exp[CodeGenRule]) = x match {
-    case Def(CodeGenDecl(op,gen,rule,s)) => rule
+  def infix_rule(x: Exp[DeliteRule]) = x match {
+    case Def(CodeGenDecl(gen,rule,s)) => rule
   }        
-  def infix_isSimple(x: Exp[CodeGenRule]) = x match {
-    case Def(CodeGenDecl(op,gen,rule,s)) => s
+  def infix_isSimple(x: Exp[DeliteRule]) = x match {
+    case Def(CodeGenDecl(gen,rule,s)) => s
   }        
   
   /**

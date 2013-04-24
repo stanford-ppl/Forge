@@ -262,10 +262,10 @@ trait DeliteGenOps extends BaseGenOps {
       DeliteRules(o) match {
         case Def(Composite(func)) if hasEffects => err("cannot have effects with composite ops currently")
         case Def(Composite(func)) => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
-        case g@Def(Getter(structArgIndex,field)) => 
+        case Def(Getter(structArgIndex,field)) => 
           val fieldTpe = DataStructs.find(_.tpe == o.args.apply(structArgIndex).tpe).get.fields.find(t => t._1 == field).get.tpe
           emitWithIndent("field["+quote(fieldTpe)+"]("+inline(o,quotedArg(structArgIndex),quoteLiteral)+",\""+field+"\")", stream, 4)        
-        case s@Def(Setter(structArgIndex,field,value)) => 
+        case Def(Setter(structArgIndex,field,value)) => 
           val fieldTpe = DataStructs.find(_.tpe == o.args.apply(structArgIndex).tpe).get.fields.find(t => t._1 == field).get.tpe
           emitWithIndent("field_update["+quote(fieldTpe)+"]("+inline(o,quotedArg(structArgIndex),quoteLiteral)+",\""+field+"\","+inline(o,value,quoteLiteral)+")", stream, 4)        
         case _ if hasEffects =>

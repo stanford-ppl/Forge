@@ -184,7 +184,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
    * These are mostly repetitive right now, but we could specialize the error checking more (or generalize it to be more concise).
    */
   def check(o: Rep[DSLOp]) { 
-    DeliteRules(o) match {
+    Rules(o) match {
       case Def(Allocates(data,init)) =>
         if ((data.fields.map(_._1).diff(init.keys.toSeq)).length > 0) {
           err("allocator " + o.name + " does not have the same fields as data definition for " + data.tpe.name)
@@ -244,7 +244,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
   }
   def emitSingleTaskImplMethods(opsGrp: DSLOps, stream: PrintWriter, indent: Int = 0) {
     for (o <- unique(opsGrp.ops)) { 
-      DeliteRules(o) match {
+      Rules(o) match {
         case Def(SingleTask(func)) => emitImplMethod(o,func,stream,indent)
         case _ =>
       }
@@ -252,7 +252,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
   }  
   def emitCompositeImplMethods(opsGrp: DSLOps, stream: PrintWriter, indent: Int = 0) {
     for (o <- unique(opsGrp.ops)) { 
-      DeliteRules(o) match {
+      Rules(o) match {
         case Def(Composite(func)) => emitImplMethod(o,func,stream,indent)
         case _ =>
       }

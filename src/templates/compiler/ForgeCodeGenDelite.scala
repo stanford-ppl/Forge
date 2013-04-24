@@ -86,7 +86,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
       emitOpExp(opsGrp, stream)
       stream.println()
       // todo - fruitless type test... gibbons4 - style decision
-      if(opsGrp.ops.map(o => DeliteRules(o) match {
+      if(opsGrp.ops.map(o => Rules(o) match {
         case Def(SingleTask(func)) => true
         case _ => false
       }).reduce(_ || _)) {

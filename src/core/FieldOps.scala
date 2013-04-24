@@ -128,41 +128,41 @@ trait FieldOpsExp extends FieldOps {
   }      
   
   /**
-   * DeliteRule
+   * Rule
    */
-  def infix_generator(x: Exp[DeliteRule]) = x match {
+  def infix_generator(x: Exp[Rule]) = x match {
     case Def(CodeGenDecl(gen,rule,s)) => gen
   }  
-  def infix_rule(x: Exp[DeliteRule]) = x match {
+  def infix_rule(x: Exp[Rule]) = x match {
     case Def(CodeGenDecl(gen,rule,s)) => rule
   }        
-  def infix_isSimple(x: Exp[DeliteRule]) = x match {
+  def infix_isSimple(x: Exp[Rule]) = x match {
     case Def(CodeGenDecl(gen,rule,s)) => s
   }        
   
   /**
-  * DeliteRule
+  * Rule
   * gibbons4 - should this be split into each rule
   * also - have to return same type. disregard errors?
   */
-  def structArgIndex(x: Exp[DeliteRule]) = x match {
+  def structArgIndex(x: Exp[Rule]) = x match {
     case Def(Getter(structArgIndex, field)) => structArgIndex
     case Def(Setter(structArgIndex, field, value)) => structArgIndex
-    //case _ => err("Called a DeliteRule with non-existant field : structArgIndex")
+    //case _ => err("Called a Rule with non-existant field : structArgIndex")
   }
 
-  def field(x: Exp[DeliteRule]) = x match {
+  def field(x: Exp[Rule]) = x match {
     case Def(Getter(structArgIndex, field)) => field
     case Def(Setter(structArgIndex, field, value)) => field 
-    //case _ => err("Called a DeliteRule with non-existant field : field") // todo - equivocaion gibbons4
+    //case _ => err("Called a Rule with non-existant field : field") // todo - equivocaion gibbons4
   }
 
-  def value(x: Exp[DeliteRule]) = x match {
+  def value(x: Exp[Rule]) = x match {
     case Def(Setter(structArgIndex, field, value)) => value
-    //case _ => err("Called a DeliteRule with non-existant field : ")
+    //case _ => err("Called a Rule with non-existant field : ")
   }
 
-  def func(x: Exp[DeliteRule]) = x match {
+  def func(x: Exp[Rule]) = x match {
     case Def(Composite(func)) => func
     case Def(SingleTask(func)) => func
     case Def(Map(tpePars, argIndex, func)) => func
@@ -170,49 +170,49 @@ trait FieldOpsExp extends FieldOps {
     case Def(Reduce(tpePars, argIndex, zero, func)) => func
     case Def(Filter(tpePars, argIndex, cond, func)) => func
     case Def(Foreach(tpePars, argIndex, func)) => func
-    //case _ => err("Called a DeliteRule with non-existant field : ")
+    //case _ => err("Called a Rule with non-existant field : ")
   }
 
-  def data(x: Exp[DeliteRule]) = x match {
+  def data(x: Exp[Rule]) = x match {
     case Def(Allocates(data, init)) => data
-    //case _ => err("Called a DeliteRule with non-existant field : ")
+    //case _ => err("Called a Rule with non-existant field : ")
   }
 
-  def init(x: Exp[DeliteRule]) = x match {
+  def init(x: Exp[Rule]) = x match {
     case Def(Allocates(data, init)) => init
-    //case _ => err("Called a DeliteRule with non-existant field : ")
+    //case _ => err("Called a Rule with non-existant field : ")
   }
 
-  def tpePars(x: Exp[DeliteRule]) = x match {
+  def tpePars(x: Exp[Rule]) = x match {
     case Def(Map(tpePars, argIndex, func)) => tpePars
     case Def(Zip(tpePars, argIndices, func)) => tpePars
     case Def(Reduce(tpePars, argIndex, zero, func)) => tpePars
     case Def(Filter(tpePars, argIndex, cond, func)) => tpePars
     case Def(Foreach(tpePars, argIndex, func)) => tpePars
-    //case _ => err("Called a DeliteRule with non-existant field : ")
+    //case _ => err("Called a Rule with non-existant field : ")
   }
 
-  def argIndex(x: Exp[DeliteRule]) = x match {
+  def argIndex(x: Exp[Rule]) = x match {
     case Def(Map(tpePars, argIndex, func)) => argIndex
     case Def(Reduce(tpePars, argIndex, zero, func)) => argIndex
     case Def(Filter(tpePars, argIndex, cond, func)) => argIndex
     case Def(Foreach(tpePars, argIndex, func)) => argIndex
-    //case _ => err("Called a DeliteRule with non-existant field : ")
+    //case _ => err("Called a Rule with non-existant field : ")
   }
 
-  def argIndices(x: Exp[DeliteRule]) = x match {
+  def argIndices(x: Exp[Rule]) = x match {
     case Def(Zip(tpePars, argIndices, func)) => argIndices
-    //case _ => err("Called a DeliteRule with non-existant field : ")
+    //case _ => err("Called a Rule with non-existant field : ")
   }
 
-  def zero(x: Exp[DeliteRule]) = x match {
+  def zero(x: Exp[Rule]) = x match {
     case Def(Reduce(tpePars, argIndex, zero, func)) => zero
-    //case _ => err("Called a DeliteRule with non-existant field : ")
+    //case _ => err("Called a Rule with non-existant field : ")
   }
 
-  def cond(x: Exp[DeliteRule]) = x match {
+  def cond(x: Exp[Rule]) = x match {
     case Def(Filter(tpePars, argIndex, cond, func)) => cond
-    //case _ => err("Called a DeliteRule with non-existant field : ")
+    //case _ => err("Called a Rule with non-existant field : ")
   }
 
   /**

@@ -53,10 +53,10 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       
   def emitOp(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) {
     val rules = CodeGenRules(o.grp)
-    DeliteRules(o) match {
+    Rules(o) match {
       // gibbons4 - sort of confused why this check is here at all
       case Def(CodeGenDecl(generator, rule, isSimple)) => 
-        val rule = rules.find(_ == o).map(_o => DeliteRules(o).rule).getOrElse(err("could not find codegen rule for op: " + o.name))
+        val rule = rules.find(_ == o).map(_o => Rules(o).rule).getOrElse(err("could not find codegen rule for op: " + o.name))
         emitWithIndent(inline(o, rule), stream, indent)  // todo
       case Def(Getter(structArgIndex,field)) =>
         emitWithIndent(inline(o, quotedArg(structArgIndex)) + "." + field, stream, indent)

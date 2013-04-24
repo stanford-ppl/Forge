@@ -124,7 +124,7 @@ trait DeliteGenOps extends BaseGenOps {
   }
       
   def emitIRNodes(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
-    def hasIRNode(o: Rep[DSLOp]) = DeliteRules(o) match {
+    def hasIRNode(o: Rep[DSLOp]) = Rules(o) match {
       case Def(Composite(func)) => false
       case Def(Getter(structArgIndex, field)) => false
       case Def(Setter(structArgIndex, field, value)) => false
@@ -147,13 +147,13 @@ trait DeliteGenOps extends BaseGenOps {
     // IR nodes
     for (o <- uniqueOps if hasIRNode(o)) { 
       stream.print("  case class " + makeOpNodeName(o) + makeTpeParsWithBounds(o.tpePars))
-      DeliteRules(o) match {
+      Rules(o) match {
         case Def(CodeGenDecl(generator, rule, isSimple)) => stream.print(makeOpArgsWithType(o, blockify))
         case _ => stream.print(makeOpArgsWithType(o))    
       }
       stream.print(makeOpImplicitArgsWithType(o,true))
       
-      DeliteRules(o) match {
+      Rules(o) match {
         case Def(CodeGenDecl(generator, rule, isSimple)) =>           
           emitOpNodeHeader(o, "Def[" + quote(o.retTpe) + "]") 
         case Def(SingleTask(function)) =>
@@ -221,7 +221,7 @@ trait DeliteGenOps extends BaseGenOps {
       stream.println("  " + makeOpMethodSignature(o) + " = {")
       val summary = scala.collection.mutable.ArrayBuffer[String]()
       // TODO: we need syms methods for func args..
-      DeliteRules(o) match {
+      Rules(o) match {
         case Def(CodeGenDecl(generator, rule, isSimple)) => 
           for (arg <- o.args) {
             arg match {
@@ -258,7 +258,7 @@ trait DeliteGenOps extends BaseGenOps {
       
       // composite ops, getters and setters are currently inlined
       // in the future, to support pattern matching and optimization, we should implement these as abstract IR nodes and use lowering transformers
-      DeliteRules(o) match {
+      Rules(o) match {
         case Def(Composite(func)) if hasEffects => err("cannot have effects with composite ops currently")
         case Def(Composite(func)) => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
         case Def(Getter(structArgIndex,field)) => 
@@ -297,7 +297,7 @@ trait DeliteGenOps extends BaseGenOps {
       }
             
       for (o <- uniqueOps) { 
-        DeliteRules(o) match {
+        Rules(o) match {
           case Def(CodeGenDecl(generator, rule, isSimple)) =>
             symsBuf += makeSym(o, "syms") 
             boundSymsBuf += makeSym(o, "effectSyms") 
@@ -363,7 +363,7 @@ trait DeliteGenOps extends BaseGenOps {
       val xformArgs = "(" + o.args.zipWithIndex.map(t => "f(" + opArgPrefix + t._2 + ")").mkString(",") + ")" 
       val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++ o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
       
-      DeliteRules(o) match {
+      Rules(o) match {
         case Def(CodeGenDecl(generator, rule, isSimple)) =>
           stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
           // pure version with no func args uses smart constructor
@@ -386,7 +386,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.print(", mapOver(f,u), f(es)))")
           stream.println("(mtype(manifest[A]))")
         // todo DeliteOpType
-        case _:Rep[DeliteRule] => 
+        case _:Rep[Rule] => 
           // pure delite op version
           stream.print("LOLLOL    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
           stream.print("reflectPure(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + "))")
@@ -498,7 +498,7 @@ trait DeliteGenOps extends BaseGenOps {
       emitBlockComment("Code generators", stream)   
       stream.println()
       for (g <- generators) { 
-        val rules = CodeGenRules(opsGrp.grp).filter(o => DeliteRules(o).generator == g)
+        val rules = CodeGenRules(opsGrp.grp).filter(o => Rules(o).generator == g)
         if (rules.length > 0) {
           stream.println("trait " + g.name + "Gen" + opsGrp.name + " extends " + g.name + "GenFat {")
           stream.println("  val IR: " + opsGrp.name + "Exp")
@@ -506,7 +506,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println()
           stream.println("  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {")
           for (o <- rules if uniqueOps.contains(o)) {
-            val r = DeliteRules(o)
+            val r = Rules(o)
             if (r.isSimple)
               stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + " => emitValDef(sym, " + quote(r.rule) + ")")
             else 

@@ -72,7 +72,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
       
       // because front-end types are not in scope (to prevent unintentional recursive calls and ambiguities),
       // we need to factor single tasks out to a separate trait in the library version also
-      if (opsGrp.ops.exists(o => DeliteRules(o).isInstanceOf[Def[SingleTask]])) {
+      if (opsGrp.ops.map(o => DeliteRules(o) match {case Def(SingleTask(func)) => true ; case _ => false})reduce(_ || _)) {
         val implStream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+"WrapperImpl"+".scala"))
         implStream.println("package " + packageName + ".classes")       
         implStream.println()

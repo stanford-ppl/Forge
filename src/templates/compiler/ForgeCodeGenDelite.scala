@@ -85,8 +85,11 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
       stream.println()
       emitOpExp(opsGrp, stream)
       stream.println()
-      // todo - fruitless type test... gibbons4
-      if (opsGrp.ops.exists(o => DeliteRules(o).isInstanceOf[Def[SingleTask]])) {
+      // todo - fruitless type test... gibbons4 - style decision
+      if(opsGrp.ops.map(o => DeliteRules(o) match {
+        case Def(SingleTask(func)) => true
+        case _ => false
+      }).reduce(_ || _)) {
         val implStream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsImpl"+".scala"))
         implStream.println("package " + packageName + ".ops")        
         implStream.println()

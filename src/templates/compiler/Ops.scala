@@ -165,7 +165,6 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val elems = copyTransformedElems(collection.Seq(" + elems.mkString(",") + "))")
         case Def(Map(tpePars, argIndex, func)) =>
           //val dc = DeliteCollections(o.args.apply(argIndex).tpe)
-          println("HI: " + o.retTpe + "\n\n\n")
           DeliteCollections foreach(x => println(x._1))
           val dc = DeliteCollections(o.retTpe) // todo gibbons4
           emitOpNodeHeader(o, "DeliteOpMap[" + quote(tpePars._1) + "," + quote(tpePars._2) + "," + makeTpeInst(o.retTpe, tpePars._2) + "]")            
@@ -389,7 +388,7 @@ trait DeliteGenOps extends BaseGenOps {
         // todo DeliteOpType
         case _:Rep[DeliteRule] => 
           // pure delite op version
-          stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
+          stream.print("LOLLOL    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
           stream.print("reflectPure(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + "))")
           stream.println("(mtype(manifest[A]), pos)")
           // effectful delite op version

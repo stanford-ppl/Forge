@@ -20,6 +20,7 @@ abstract class LiftStm
 //abstract class RewriteRule
 //abstract class CodeGenRule
 abstract class Rule // other names to consider, DSLOp, DSLRule
+abstract class DeliteRule extends Rule
 
 /**
  * Types representing built-in constructs

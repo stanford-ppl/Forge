@@ -385,16 +385,15 @@ trait DeliteGenOps extends BaseGenOps {
           stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(" + makeOpNodeName(o) + xformArgs + "(" + implicits + ")")
           stream.print(", mapOver(f,u), f(es)))")
           stream.println("(mtype(manifest[A]))")
-        // todo DeliteOpType
-        case _:Rep[Rule] => 
-          // pure delite op version
-          stream.print("LOLLOL    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
-          stream.print("reflectPure(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + "))")
-          stream.println("(mtype(manifest[A]), pos)")
-          // effectful delite op version
-          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + ")")
-          stream.print(", mapOver(f,u), f(es)))")
-          stream.println("(mtype(manifest[A]))")
+        // todo gibbons4 DeliteOpType
+        //case _:Rep[DeliteRule] => 
+        case Def(SingleTask(f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
+        case Def(Allocates(d,i)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
+        case Def(Map(t,i,f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
+        case Def(Zip(t,i,f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
+        case Def(Reduce(t,i,z,f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
+        case Def(Filter(t,i,c,f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
+        case Def(Foreach(t,i,f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
         case _ => // no mirror  
       }        
     }
@@ -402,6 +401,17 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println("  }).asInstanceOf[Exp[A]]")
   }
   
+  def emitDeliteRuleMirror(o: Rep[DSLOp], stream: PrintWriter, xformArgs: String, implicits: String) {
+   // pure delite op version
+   stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
+   stream.print("reflectPure(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + "))")
+   stream.println("(mtype(manifest[A]), pos)")
+   // effectful delite op version
+   stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + ")")
+   stream.print(", mapOver(f,u), f(es)))")
+   stream.println("(mtype(manifest[A]))")
+  }
+
   def emitDeliteCollection(grp: Rep[DSLGroup], stream: PrintWriter) {
     try {
       val tpe = grpAsTpe(grp)

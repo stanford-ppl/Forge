@@ -55,40 +55,40 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     })
       
     val vapply = op (Vector) ("apply", infix, List(T), List(Vector,MInt), T)
-    composite (vapply) (T, {
+    composite (vapply) ({
       "vector_raw_data("+quotedArg(0)+").apply("+quotedArg(1)+")"
     })
 
     val vupdate = op (Vector) ("update", infix, List(T), List(Vector,MInt,T), MUnit, effect = write(0))
-    composite (vupdate) (MUnit, {
+    composite (vupdate) ({
       "vector_raw_data("+quotedArg(0)+").update("+quotedArg(1)+","+quotedArg(2)+")"
     })
     
     val vtimesScalar = op (Vector) ("*", infix, List(T withBound TNumeric), List(Vector,T), Vector)
-    map (vtimesScalar) ((T,T,Vector), 0, "e => e*"+quotedArg(1))
+    map (vtimesScalar) ((T,T), 0, "e => e*"+quotedArg(1))
 
     val vfoo = op (Vector) ("foo", infix, List(T), List(Vector,T), tpeInst(Vector,List(MDouble))) 
-    map (vfoo) ((T,MDouble,Vector), 0, "e => unit(0.0)") // problem: primitive lifting isn't in scope in the ops
+    map (vfoo) ((T,MDouble), 0, "e => unit(0.0)") // problem: primitive lifting isn't in scope in the ops
      
     // uses a function arg inside a delite op
     val vbar = op (Vector) ("bar", infix, List(T), List(Vector,("f", MFunction(List(("x",T)),T))), Vector) 
-    map((T,T,Vector), 0, "e => "+quotedArg("f")+"(e)")
+    map((T,T), 0, "e => "+quotedArg("f")+"(e)")
 
     // generic map, reduce functions for vector
     val mapper = MFunction(List(("x",T)),T)  // better syntax for functions would be nice
     val reducer = MFunction(List(("a",T),("b",T)),T)      
     val vmap = op (Vector) ("map", infix, List(T), List(Vector,mapper), Vector) 
-    map (vmap) ((T,T,Vector), 0, "e => "+quotedArg(1)+"(e)")
+    map (vmap) ((T,T), 0, "e => "+quotedArg(1)+"(e)")
     val vreduce = op (Vector) ("reduce", infix, List(T withBound TNumeric), List(Vector,reducer), T) 
-    reduce (vreduce) ((T,Vector), 0, lookup("Numeric","zero").get, "(a,b) => "+quotedArg(1)+"(a,b)")
+    reduce (vreduce) ((T), 0, lookup("Numeric","zero").get, "(a,b) => "+quotedArg(1)+"(a,b)")
   
     val cond = MFunction(List(("x",T)),MBoolean)
     val vfilter = op (Vector) ("filter", infix, List(T), List(Vector,cond), Vector) 
-    filter (vfilter) ((T,T,Vector), 0, "e => " + quotedArg(1) + "(e)", "e => e")
+    filter (vfilter) ((T,T), 0, "e => " + quotedArg(1) + "(e)", "e => e")
     
     // a composite op
     val vmapreduce = op (Vector) ("mapreduce", infix, List(T withBound TNumeric), List(Vector,mapper,reducer), T) 
-    composite (vmapreduce) (Vector, {
+    composite (vmapreduce) ({
       quotedArg(0)+".map("+quotedArg(1)+").reduce("+quotedArg(2)+")"
     })
     
@@ -96,20 +96,20 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     codegen (vbasic) ($cala, quotedArg("y")+ "+3+" + quotedArg("z"))
  
     val vset = op (Vector) ("set", infix, List(T withBound TNumeric), List(Vector, ("x", MInt), ("z", MInt, "3")), tpeInst(Vector, List(MInt))) 
-    map (vset) ((T,MInt,Vector), 0, "y  => "+quotedArg("x") + " + " + quotedArg("z"))
+    map (vset) ((T,MInt), 0, "y  => "+quotedArg("x") + " + " + quotedArg("z"))
 
     val vplus = op (Vector) ("+", infix, List(T withBound TNumeric), List(Vector,Vector), Vector) 
-    zip (vplus) ((T,T,T,Vector), (0,1), "(a,b) => a+b")
+    zip (vplus) ((T,T,T), (0,1), "(a,b) => a+b")
     
     val vsum = op (Vector) ("sum", infix, List(T withBound TNumeric), List(Vector), T) 
-    reduce (vsum) ((T,Vector), 0, lookup("Numeric","zero").get, "(a,b) => a+b")
+    reduce (vsum) ((T), 0, lookup("Numeric","zero").get, "(a,b) => a+b")
     
     // will print out of order in parallel, but hey
     val vprint = op (Vector) ("pprint", infix, List(T), List(Vector), MUnit, effect = simple) 
-    foreach (vprint) ((T,Vector), 0, "a => println(a)") 
+    foreach (vprint) ((T), 0, "a => println(a)") 
          
     val vslice = op (Vector) ("slice", infix, List(T), List(Vector, MInt, MInt), Vector) 
-    single (vslice) (Vector, { 
+    single (vslice) ({ 
       // inside single tasks we use normal DSL code just like applications would (modulo arg names)
       stream.printLines(
         "val st = " + quotedArg(1),
@@ -143,20 +143,20 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     // what should the dc methods do then? just call the underlying the _data methods..
         
     val vinsert = op (Vector) ("insert", infix, List(T), List(Vector,MInt,T), MUnit, effect = write(0))
-    single (vinsert) (MUnit, {
+    single (vinsert) ({
       stream.printLines(
         "vector_insertspace("+quotedArg(0)+","+quotedArg(1)+",1)",
         quotedArg(0)+"("+quotedArg(1)+") = " + quotedArg(2)
     )})
 
     val vappend = op (Vector) ("append", infix, List(T), List(Vector,MInt,T), MUnit, effect = write(0))
-    single (vappend) (MUnit, {
+    single (vappend) ({
       quotedArg(0)+".insert("+quotedArg(0)+".length, "+quotedArg(2)+")"
     })
         
     
     val vinsertspace = op (Vector) ("vector_insertspace", compiler, List(T), List(Vector,MInt,MInt), MUnit, effect = write(0))
-    single (vinsertspace) (MUnit, {
+    single (vinsertspace) ({
       val v = quotedArg(0)
       val pos = quotedArg(1)
       val len = quotedArg(2)
@@ -169,7 +169,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     )})
     
     val vensureextra = op (Vector) ("vector_ensureextra", compiler, List(T), List(Vector,MInt), MUnit, effect = write(0)) 
-    single (vensureextra) (MUnit, {
+    single (vensureextra) ({
       val v = quotedArg(0)
       val extra = quotedArg(1)
       stream.printLines(        
@@ -180,7 +180,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     )})
     
     val vrealloc = op (Vector) ("vector_realloc", compiler, List(T), List(Vector,MInt), MUnit, effect = write(0))
-    single (vrealloc) (MUnit, {
+    single (vrealloc) ({
       val v = quotedArg(0)
       val minLen = quotedArg(1)
       stream.printLines(        
@@ -206,12 +206,12 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     // }))
         
     val vappendable = op (Vector) ("vector_appendable", compiler, List(T), List(Vector,MInt,T), MBoolean)
-    single (vappendable) (MBoolean, {
+    single (vappendable) ({
       "true" 
     })
 
     val vcopy = op (Vector) ("vector_copy", compiler, List(T), List(Vector,MInt,Vector,MInt,MInt), MUnit, effect = write(2))
-    single (vcopy) (MUnit, {
+    single (vcopy) ({
       val src = "vector_raw_data(" + quotedArg(0) + ")"
       val dest = "vector_raw_data(" + quotedArg(2) + ")"
       "darray_copy("+src+","+quotedArg(1)+","+dest+","+quotedArg(3)+","+quotedArg(4)+")"

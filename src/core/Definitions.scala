@@ -133,8 +133,8 @@ trait Definitions extends DerivativeTypes {
   /**
    * Op types
    */   
-  object codegenerated extends OpType
-  abstract class DeliteOpType extends OpType
+  //object codegenerated extends OpType
+  //abstract class DeliteOpType extends OpType
   
   /**
    * Composite
@@ -142,14 +142,17 @@ trait Definitions extends DerivativeTypes {
    * @param retTpe    R, the return type of the function
    * @param func      string representation of the function ( => R)
    */
+/*
   def forge_composite(retTpe: Rep[DSLType], func: Rep[String]): OpType
   object composite {
     def apply(retTpe: Rep[DSLType], func: Rep[String]) = forge_composite(retTpe, func)
   }
-  
+*/
+
   /**
    * Getters / setters for DSL structs
    */
+/*
   def forge_getter(structArgIndex: Int, field: String): OpType
   object getter {
     def apply(structArgIndex: Int, field: String) = forge_getter(structArgIndex,field)
@@ -159,18 +162,20 @@ trait Definitions extends DerivativeTypes {
   object setter {
     def apply(structArgIndex: Int, field: String, value: Rep[String]) = forge_setter(structArgIndex,field,value)
   }
-  
+*/
+
   /**
    * Allocates
    * 
    * @param data     The data struct that this op allocates
    * @param init     A sequence of tuples (fieldName, initialValue)
    */ 
+/*
   def forge_allocates(data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]): DeliteOpType
   object allocates {
     def apply(data: Rep[DSLData], init: (String,Rep[String])*) = forge_allocates(data, init.toMap)
   }
-  
+*/
 
   /**
    * SingleTask
@@ -178,11 +183,13 @@ trait Definitions extends DerivativeTypes {
    * @param retTpe    R, the return type of the function
    * @param func      string representation of the function ( => R)
    */
+/*
   def forge_single(retTpe: Rep[DSLType], func: Rep[String]): DeliteOpType
   object single {
     def apply(retTpe: Rep[DSLType], func: Rep[String]) = forge_single(retTpe, func)
   }
-  
+*/  
+
   /**
    * Map
    * 
@@ -190,10 +197,12 @@ trait Definitions extends DerivativeTypes {
    * @param argIndex  index of op argument that correspond to map argument in (collection to be mapped)
    * @param func      string representation of a map function A => R
    */
+/*
    def forge_map(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]): DeliteOpType
    object map {
      def apply(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), mapArgIndex: Int, func: Rep[String]) = forge_map(tpePars, mapArgIndex, func)
    }  
+   */
    
   /**
    * ZipWith
@@ -202,11 +211,13 @@ trait Definitions extends DerivativeTypes {
    * @param argIndices    index of op arguments that correspond to zip arguments inA, inB (first and second collection respectively)
    * @param func          string representation of a zip function (A, B) => R
    */
+/*
   def forge_zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String]): DeliteOpType
   object zip {
     // def apply[T](x: (T,T) => T)
     def apply(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), zipArgIndices: (Int,Int), func: Rep[String]) = forge_zip(tpePars, zipArgIndices, func)
   }
+   */
   
   /**
    * Reduce
@@ -214,10 +225,12 @@ trait Definitions extends DerivativeTypes {
    * @param tpePars   [A,C[A]]
    * @param func      string representation of a reduce function (A, A) => A
    */
+/*
    def forge_reduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, zero: Rep[DSLOp], func: Rep[String]): DeliteOpType
    object reduce {
      def apply(tpePars: (Rep[DSLType],Rep[DSLType]), redArgIndex: Int, zero: Rep[DSLOp], func: Rep[String]) = forge_reduce(tpePars, redArgIndex, zero, func)
    }
+   */
     
   /**
    * Filter
@@ -229,10 +242,12 @@ trait Definitions extends DerivativeTypes {
    * @param cond      string representation of predicate function A => Boolean
    * @param func      string representation of a map function A => R
    */
+/*
    def forge_filter(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]): DeliteOpType
    object filter {
      def apply(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), filterArgIndex: Int, cond: Rep[String], func: Rep[String]) = forge_filter(tpePars, filterArgIndex, cond, func)
    }  
+   */
    
   
   /**
@@ -242,11 +257,13 @@ trait Definitions extends DerivativeTypes {
    * @param argIndex  index of op argument that correspond to foreach argument in 
    * @param func      string representation of a foreach function A => Unit
    */
+/*
    def forge_foreach(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]): DeliteOpType
    object foreach {
      def apply(tpePars: (Rep[DSLType],Rep[DSLType]), foreachArgIndex: Int, func: Rep[String]) = forge_foreach(tpePars, foreachArgIndex, func)
    }       
 }
+   */
 
 
 trait DefinitionsExp extends Definitions with DerivativeTypesExp {
@@ -268,7 +285,7 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
    // 
    // def parBuffer = ParBuffer()
    // def parFlat = ParFlat()
-  
+  /*
   case class Getter(structArgIndex: Int, field: String) extends OpType
   def forge_getter(structArgIndex: Int, field: String) = Getter(structArgIndex,field)
   
@@ -277,10 +294,11 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
 
   case class Composite(retTpe: Rep[DSLType], func: Rep[String]) extends OpType
   def forge_composite(retTpe: Rep[DSLType], func: Rep[String]) = Composite(retTpe, func)
-  
+  */
   /**
    * Delite ops
    */
+/*
   case class Allocates(data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]) extends DeliteOpType
   def forge_allocates(data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]) = Allocates(data,init)
    
@@ -301,5 +319,5 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
   
   case class Foreach(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) extends DeliteOpType  
   def forge_foreach(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) = Foreach(tpePars, argIndex, func)    
-    
+  */  
 }

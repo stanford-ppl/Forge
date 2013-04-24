@@ -19,6 +19,7 @@ abstract class DSLOp
 abstract class LiftStm
 abstract class RewriteRule
 abstract class CodeGenRule
+abstract class DeliteRule // other names to consider, DSLOp, DSLRule
 
 /**
  * Types representing built-in constructs
@@ -28,7 +29,7 @@ abstract class MethodType
 abstract class EffectType
 abstract class AliasHint
 abstract class Frequency
-abstract class OpType
+//abstract class OpType
 abstract class CodeGenerator {
   def name: String
 }

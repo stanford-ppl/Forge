@@ -23,10 +23,25 @@ trait ForgeOps extends Base {
   implicit def namedTpeToArg(arg: (String, Rep[DSLType])): Rep[DSLArg] = forge_arg(arg._1, arg._2, None)
   implicit def namedTpeWithDefaultToArg(arg: (String, Rep[DSLType], String)): Rep[DSLArg] = forge_arg(arg._1, arg._2, Some(arg._3))
   def anyToArg(a: (Any, Int)): Rep[DSLArg] = forge_anyToArg(a)
-  def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[Any]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = 
-    forge_op(grp,name,style,tpePars,args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,retTpe,opTpe,effect,aliasHint)
+  def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[Any]], retTpe: Rep[DSLType], effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = 
+    forge_op(grp,name,style,tpePars,args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,retTpe,effect,aliasHint)
   
   def codegen(op: Rep[DSLOp])(generator: CodeGenerator, rule: Rep[String]) = forge_codegen(op,generator,rule)
+
+  // in progress gibbons4
+  // todo - OpType versus DeliteOpType
+  // todo - change arg as being int index to string name. 
+  def composite(op: Rep[DSLOp])(retTpe: Rep[DSLType], func: Rep[String]) = forge_composite(op, retType, func)
+  def getter(op: Rep[DSLOp])(structArgIndex: Int, field: String) = forge_getter(structArgIndex,field)
+  def setter(op: Rep[DSLOp])(structArgIndex: Int, field: String, value: Rep[String]) = forge_setter(op, structArgIndex,field,value)
+  def allocates(op: Rep[DSLOp])(data: Rep[DSLData], init: (String, Rep[String])*) = forge_allocates(op, data, init.toMap)
+  def single(op: Rep[DSLOp])(retTpe: Rep[DSLType], func: Rep[String]) = forge_single(op, retTpe, func)
+  def map(op: Rep[DSLOp])(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) = forge_map(op, tpePars, mapArgIndex, func)
+  def zip(op: Rep[DSLOp])(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String]) = forge_zip(op, tpePars, zipArgIndices, func)
+  def reduce(op: Rep[DSLOp])(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, zero: Rep[DSLOp], func: Rep[String]) = forge_reduce(op, tpePars, redArgIndex, zero, func)
+  def filter(op: Rep[DSLOp])(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]) = forge_filter(op, tpePars, filterArgIndex, cond, func)
+  def foreach(op: Rep[DSLOp])(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) = forge_foreach(op, tpePars, foreachArgIndex, func)
+
   def extern(grp: Rep[DSLGroup], withLift: Boolean = false, targets: List[CodeGenerator] = generators) = forge_extern(grp, withLift, targets)
   
   def infix_withBound(a: Rep[TypePar], b: TypeClass) = forge_withBound(a,b)
@@ -51,8 +66,21 @@ trait ForgeOps extends Base {
   def forge_ftpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency): Rep[DSLType]
   def forge_lift(grp: Rep[DSLGroup], tpe: Rep[DSLType]): Rep[Unit]
   def forge_data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]  
-  def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
+  def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
+  // todo - codegen could probably just be a DeliteRule
   def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String]): Rep[CodeGenRule]
+  
+  // in progress gibbons4
+  def forge_getter(structArgIndex: Int, field: String): Rep[DeliteRule]
+  def forge_setter(structArgIndex: Int, field: String, value: Rep[String]): Rep[DeliteRule]
+  def forge_allocates(data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]): Rep[DeliteRule]
+  def forge_single(retTpe: Rep[DSLType], func: Rep[String]): Rep[DeliteRule]
+  def forge_map(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]): Rep[DeliteRule]
+  def forge_zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String]): Rep[DeliteRule]
+  def forge_reduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, zero: Rep[DSLOp], func: Rep[String]): Rep[DeliteRule]
+  def forge_filter(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]): Rep[DeliteRule]
+  def forge_foreach(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]): Rep[DeliteRule]
+
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
   def forge_withBound(a: Rep[TypePar], b: TypeClass): Rep[TypePar]
   def forge_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection): Rep[Unit]
@@ -71,6 +99,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   val DataStructs = ArrayBuffer[Exp[DSLData]]()
   val OpsGrp = HashMap[Exp[DSLGroup],DSLOps]()  
   val CodeGenRules = HashMap[Exp[DSLGroup],ArrayBuffer[Exp[CodeGenRule]]]()
+  val DeliteRules = HashMap[Exp[DSLOp],Exp[DeliteRule]]()
   val DeliteCollections = HashMap[Exp[DSLType], DeliteCollectionType]()
   val Externs = ArrayBuffer[Extern]()
   
@@ -163,9 +192,9 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   }
   
   /* An operator - this represents a method or IR node */
-  case class Op(grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint) extends Def[DSLOp]
+  case class Op(grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint) extends Def[DSLOp]
   
-  def forge_op(_grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint) = {
+  def forge_op(_grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint) = {
     args match {
       case a :: Def(Arg(_, Def(VarArgs(z)), _)) :: b if b != Nil => err("a var args op parameter must be the final one")
       case Def(Arg(_, Def(VarArgs(z)), _)) :: b if b != Nil => err("a var args op parameter must be the final one.")
@@ -178,7 +207,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
       warn("op " + name + " has return type " + MUnit.name + " but no effects, so it is a no-op")
     }
     
-    val o = Op(_grp, name, style, tpePars, args, implicitArgs, retTpe, opTpe, effect, aliasHint)
+    val o = Op(_grp, name, style, tpePars, args, implicitArgs, retTpe, effect, aliasHint)
     val opsGrp = OpsGrp.getOrElseUpdate(_grp, new DSLOps {
       val grp = _grp
       override def targets: List[CodeGenerator] = Nil

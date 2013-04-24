@@ -262,8 +262,8 @@ trait Definitions extends DerivativeTypes {
    object foreach {
      def apply(tpePars: (Rep[DSLType],Rep[DSLType]), foreachArgIndex: Int, func: Rep[String]) = forge_foreach(tpePars, foreachArgIndex, func)
    }       
-}
    */
+}
 
 
 trait DefinitionsExp extends Definitions with DerivativeTypesExp {

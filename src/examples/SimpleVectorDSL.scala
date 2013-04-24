@@ -47,12 +47,13 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
      */           
     
     // does wrapping the op arguments in specifiers make things any clearer?    
-    // val vnew = op (Vector) ("apply", methodTpe(static), tpePars(T), args(MInt), retTpe(Vector), codegenerated, effect = mutable)
-        
+    // val vnew = op (Vector) ("apply", methodTpe(static), tpePars(T), args(MInt), retTpe(Vector), effect = mutable)
+     
+    // unfortunately, no braces allowed here   
     val vnew = op (Vector) ("apply", static, List(T), List(MInt), Vector, effect = mutable)
-    allocates (vnew) (vdata, {
+    allocates (vnew) (vdata, 
       ("_length" -> quotedArg(0)), ("_data" -> ("darray_new[T]("+quotedArg(0)+")"))
-    })
+    )
       
     val vapply = op (Vector) ("apply", infix, List(T), List(Vector,MInt), T)
     composite (vapply) ({
@@ -72,7 +73,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
      
     // uses a function arg inside a delite op
     val vbar = op (Vector) ("bar", infix, List(T), List(Vector,("f", MFunction(List(("x",T)),T))), Vector) 
-    map((T,T), 0, "e => "+quotedArg("f")+"(e)")
+    map (vbar) ((T,T), 0, "e => "+quotedArg("f")+"(e)")
 
     // generic map, reduce functions for vector
     val mapper = MFunction(List(("x",T)),T)  // better syntax for functions would be nice
@@ -134,8 +135,8 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     val vlength = op (Vector) ("length", infix, List(T), List(Vector), MInt) 
     getter (vlength) (0, "_length")
 
-    val vsetsize = op (Vector) ("vector_set_size", compiler, List(T), List(Vector,MInt), MUnit) 
-    setter (vsetsize) (0, "_length", quotedArg(1)), effect = write(0)
+    val vsetsize = op (Vector) ("vector_set_size", compiler, List(T), List(Vector,MInt), MUnit, effect = write(0))
+    setter (vsetsize) (0, "_length", quotedArg(1))
     
     // -- data manipulation
     

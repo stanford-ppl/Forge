@@ -33,16 +33,16 @@ trait ScalaOps extends ForgeApplication {
     val Arr = GArray(T)
     
     // can't overload 'apply', because varArgs(T) is ambiguous with MInt
-    val anew = op (Arr) ("empty", static, List(T), List(MInt), Arr, codegenerated, effect = mutable)
-    val anew2 = op (Arr) ("apply", static, List(T), List(varArgs(T)), Arr, codegenerated)
+    val anew = op (Arr) ("empty", static, List(T), List(MInt), Arr, effect = mutable)
+    val anew2 = op (Arr) ("apply", static, List(T), List(varArgs(T)), Arr)
     
-    val alength = op (Arr) ("length", infix, List(T), List(Arr), MInt, codegenerated)    
-    val aapply = op (Arr) ("apply", infix, List(T), List(Arr,MInt), T, codegenerated)
-    val aupdate = op (Arr) ("update", infix, List(T), List(Arr,MInt,T), MUnit, codegenerated, effect = write(0))    
+    val alength = op (Arr) ("length", infix, List(T), List(Arr), MInt)    
+    val aapply = op (Arr) ("apply", infix, List(T), List(Arr,MInt), T)
+    val aupdate = op (Arr) ("update", infix, List(T), List(Arr,MInt,T), MUnit, effect = write(0))    
     // val amap = op (Arr) ("map", infix, List(T,R), List(Arr,MFunction(List(T),R)), GArray(R), map((T,R,Arr), 0, "e => "+quotedArg(1)+"(e)"))
     
     // the alias hint tells Delite that this operation copies its inputs, avoiding conservative mutable sharing errors     
-    val aclone = op (Arr) ("Clone", infix, List(T), List(Arr), Arr, codegenerated, aliasHint = copies(0))            
+    val aclone = op (Arr) ("Clone", infix, List(T), List(Arr), Arr, aliasHint = copies(0))            
 
     // Arrays cannot be DeliteCollection right now because Delite expects us to use native
     // Scala arrays for some things (e.g. args); therefore we cannot shadow the native type with our own.
@@ -61,12 +61,12 @@ trait ScalaOps extends ForgeApplication {
   def misc() = {
     val Misc = grp("Misc")
     
-    val println = op (Misc) ("println", direct, List(), List(MAny), MUnit, codegenerated, effect = simple)
-    val println2 = op (Misc) ("println", direct, List(), List(), MUnit, codegenerated, effect = simple)
+    val println = op (Misc) ("println", direct, List(), List(MAny), MUnit, effect = simple)
+    val println2 = op (Misc) ("println", direct, List(), List(), MUnit, effect = simple)
     codegen (println) ($cala, "println(" + println.quotedArg(0) + ")")
     codegen (println2) ($cala, "println()")
     
-    val whileDo = op (Misc) ("__whileDo", direct, List(), List(MThunk(MBoolean),MThunk(MUnit)), MUnit, codegenerated, effect = simple)        
+    val whileDo = op (Misc) ("__whileDo", direct, List(), List(MThunk(MBoolean),MThunk(MUnit)), MUnit, effect = simple)        
     val stream = ForgePrinter()    
     codegen (whileDo) ($cala, stream.printLines(
       "while ({",
@@ -78,7 +78,7 @@ trait ScalaOps extends ForgeApplication {
     
     // TODO: something is broken with IfThenElse here; bound symbols (effects) are getting hoisted if the frequencies are not set to cold.
     val T = tpePar("T")
-    val ifThenElse = op (Misc) ("__ifThenElse", direct, List(T), List(MThunk(MBoolean),MThunk(T,cold),MThunk(T,cold)), T, codegenerated) 
+    val ifThenElse = op (Misc) ("__ifThenElse", direct, List(T), List(MThunk(MBoolean),MThunk(T,cold),MThunk(T,cold)), T) 
     codegen (ifThenElse) ($cala, stream.printLines(
       "if ({",
         blockResult(ifThenElse, 0),
@@ -89,7 +89,7 @@ trait ScalaOps extends ForgeApplication {
       "}"
     ))    
     
-    val immutable = op (Misc) ("unsafeImmutable", infix, List(T), List(T), T, codegenerated, aliasHint = copies(0))
+    val immutable = op (Misc) ("unsafeImmutable", infix, List(T), List(T), T, aliasHint = copies(0))
     codegen (immutable) ($cala, quotedArg(0))
   }
   
@@ -104,10 +104,10 @@ trait ScalaOps extends ForgeApplication {
     
     lift (Num) (T withBound TNumeric)
         
-    val zero = op (Num) ("zero", infix, List(T withBound TNumeric), List(), T, codegenerated)
-    val plus = op (Num) ("+", infix, List(T withBound TNumeric), List(T,T), T, codegenerated)    
-    val minus = op (Num) ("-", infix, List(T withBound TNumeric), List(T,T), T, codegenerated)     
-    val times = op (Num) ("*", infix, List(T withBound TNumeric), List(T,T), T, codegenerated)    
+    val zero = op (Num) ("zero", infix, List(T withBound TNumeric), List(), T)
+    val plus = op (Num) ("+", infix, List(T withBound TNumeric), List(T,T), T)    
+    val minus = op (Num) ("-", infix, List(T withBound TNumeric), List(T,T), T)     
+    val times = op (Num) ("*", infix, List(T withBound TNumeric), List(T,T), T)    
     codegen (zero) ($cala, "implicitly[Numeric["+zero.tpeInstance(0)+"]].zero")
     codegen (plus) ($cala, plus.quotedArg(0) + " + " + plus.quotedArg(1))
     codegen (minus) ($cala, minus.quotedArg(0) + " - " + minus.quotedArg(1))
@@ -118,8 +118,8 @@ trait ScalaOps extends ForgeApplication {
     val Ord = grp("Ordering2") // Ordering gets pulled in by DeliteArrayOps, need to disambiguate
     val T = tpePar("T")
     
-    val lt = op (Ord) ("<", infix, List(T withBound TOrdering), List(T,T), MBoolean, codegenerated)    
-    val gt = op (Ord) (">", infix, List(T withBound TOrdering), List(T,T), MBoolean, codegenerated)    
+    val lt = op (Ord) ("<", infix, List(T withBound TOrdering), List(T,T), MBoolean)    
+    val gt = op (Ord) (">", infix, List(T withBound TOrdering), List(T,T), MBoolean)    
     
     codegen (lt) ($cala, lt.quotedArg(0) + " < " + lt.quotedArg(1))    
     codegen (gt) ($cala, gt.quotedArg(0) + " > " + gt.quotedArg(1))
@@ -135,21 +135,21 @@ trait ScalaOps extends ForgeApplication {
     // most of these variants collapse to a common back-end implementation:
     
     // maps to Rep[String], Rep[Any]
-    val concat = op (Str) ("+", infix, List(T), List(CString, T), MString, codegenerated)
-    val concat2 = op (Str) ("+", infix, List(T), List(MString, T), MString, codegenerated)
-    val concat3 = op (Str) ("+", infix, List(T), List(CString, GVar(T)), MString, codegenerated)
-    val concat4 = op (Str) ("+", infix, List(T), List(MString, GVar(T)), MString, codegenerated)
+    val concat = op (Str) ("+", infix, List(T), List(CString, T), MString)
+    val concat2 = op (Str) ("+", infix, List(T), List(MString, T), MString)
+    val concat3 = op (Str) ("+", infix, List(T), List(CString, GVar(T)), MString)
+    val concat4 = op (Str) ("+", infix, List(T), List(MString, GVar(T)), MString)
     
     // Rep[Any], Rep[String]
-    val concat5 = op (Str) ("+", infix, List(T), List(T, CString), MString, codegenerated)
-    val concat6 = op (Str) ("+", infix, List(T), List(T, MString), MString, codegenerated)
-    val concat7 = op (Str) ("+", infix, List(T), List(GVar(T), CString), MString, codegenerated)
-    val concat8 = op (Str) ("+", infix, List(T), List(GVar(T), MString), MString, codegenerated)
+    val concat5 = op (Str) ("+", infix, List(T), List(T, CString), MString)
+    val concat6 = op (Str) ("+", infix, List(T), List(T, MString), MString)
+    val concat7 = op (Str) ("+", infix, List(T), List(GVar(T), CString), MString)
+    val concat8 = op (Str) ("+", infix, List(T), List(GVar(T), MString), MString)
     
     // Rep[String], Rep[String]
-    val concat9 = op (Str) ("+", infix, List(), List(MString, CString), MString, codegenerated)
-    val concat10 = op (Str) ("+", infix, List(), List(CString, MString), MString, codegenerated)
-    val concat11 = op (Str) ("+", infix, List(), List(MString, MString), MString, codegenerated)
+    val concat9 = op (Str) ("+", infix, List(), List(MString, CString), MString)
+    val concat10 = op (Str) ("+", infix, List(), List(CString, MString), MString)
+    val concat11 = op (Str) ("+", infix, List(), List(MString, MString), MString)
     
     // TODO: we would like overloaded variants to possibly use the same codegen impl instead of being redundant here    
     // most of the concat codegens are not used, but it is not easy to tell which ones will "make it"
@@ -172,8 +172,8 @@ trait ScalaOps extends ForgeApplication {
   def math() = {
     val Math = grp("Math")
     
-    val maxInt = op (Math) ("max", static, List(), List(MInt,MInt), MInt, codegenerated)
-    val maxDbl = op (Math) ("max", static, List(), List(MDouble,MDouble), MDouble, codegenerated)
+    val maxInt = op (Math) ("max", static, List(), List(MInt,MInt), MInt)
+    val maxDbl = op (Math) ("max", static, List(), List(MDouble,MDouble), MDouble)
     
     codegen (maxInt) ($cala, "scala.math.max(" + quotedArg(0) + ", " + quotedArg(1) + ")")
     codegen (maxDbl) ($cala, "scala.math.max(" + quotedArg(0) + ", " + quotedArg(1) + ")")

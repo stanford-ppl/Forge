@@ -38,9 +38,9 @@ trait ForgeOps extends Base {
   def single(op: Rep[DSLOp])(func: Rep[String]) = forge_single(op, func)
   def map(op: Rep[DSLOp])(tpePars: (Rep[DSLType],Rep[DSLType]), mapArgIndex: Int, func: Rep[String]) = forge_map(op, tpePars, mapArgIndex, func)
   def zip(op: Rep[DSLOp])(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), zipArgIndices: (Int,Int), func: Rep[String]) = forge_zip(op, tpePars, zipArgIndices, func)
-  def reduce(op: Rep[DSLOp])(tpePars: (Rep[DSLType]), reduceArgIndex: Int, zero: Rep[DSLOp], func: Rep[String]) = forge_reduce(op, tpePars, reduceArgIndex, zero, func)
+  def reduce(op: Rep[DSLOp])(tpePars: Rep[DSLType], reduceArgIndex: Int, zero: Rep[DSLOp], func: Rep[String]) = forge_reduce(op, tpePars, reduceArgIndex, zero, func)
   def filter(op: Rep[DSLOp])(tpePars: (Rep[DSLType],Rep[DSLType]), filterArgIndex: Int, cond: Rep[String], func: Rep[String]) = forge_filter(op, tpePars, filterArgIndex, cond, func)
-  def foreach(op: Rep[DSLOp])(tpePars: (Rep[DSLType]), foreachArgIndex: Int, func: Rep[String]) = forge_foreach(op, tpePars, foreachArgIndex, func)
+  def foreach(op: Rep[DSLOp])(tpePars: Rep[DSLType], foreachArgIndex: Int, func: Rep[String]) = forge_foreach(op, tpePars, foreachArgIndex, func)
 
   def extern(grp: Rep[DSLGroup], withLift: Boolean = false, targets: List[CodeGenerator] = generators) = forge_extern(grp, withLift, targets)
   
@@ -78,9 +78,9 @@ trait ForgeOps extends Base {
   def forge_composite(op: Rep[DSLOp], func: Rep[String]): Rep[DeliteRule]
   def forge_map(op: Rep[DSLOp], tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]): Rep[DeliteRule]
   def forge_zip(op: Rep[DSLOp], tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String]): Rep[DeliteRule]
-  def forge_reduce(op: Rep[DSLOp], tpePars: (Rep[DSLType]), argIndex: Int, zero: Rep[DSLOp], func: Rep[String]): Rep[DeliteRule]
+  def forge_reduce(op: Rep[DSLOp], tpePars: Rep[DSLType], argIndex: Int, zero: Rep[DSLOp], func: Rep[String]): Rep[DeliteRule]
   def forge_filter(op: Rep[DSLOp], tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]): Rep[DeliteRule]
-  def forge_foreach(op: Rep[DSLOp], tpePars: (Rep[DSLType]), argIndex: Int, func: Rep[String]): Rep[DeliteRule]
+  def forge_foreach(op: Rep[DSLOp], tpePars: Rep[DSLType], argIndex: Int, func: Rep[String]): Rep[DeliteRule]
 
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
   def forge_withBound(a: Rep[TypePar], b: TypeClass): Rep[TypePar]
@@ -99,7 +99,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   val Tpes = ArrayBuffer[Exp[DSLType]]()
   val DataStructs = ArrayBuffer[Exp[DSLData]]()
   val OpsGrp = HashMap[Exp[DSLGroup],DSLOps]()  
-  val CodeGenRules = HashMap[Exp[DSLGroup],ArrayBuffer[Exp[DeliteRule]]]()
+  val CodeGenRules = HashMap[Exp[DSLGroup],ArrayBuffer[Exp[DSLOp]]]()
   val DeliteRules = HashMap[Exp[DSLOp],Exp[DeliteRule]]()
   val DeliteCollections = HashMap[Exp[DSLType], DeliteCollectionType]()
   val Externs = ArrayBuffer[Extern]()
@@ -227,12 +227,12 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
     }
     val c = CodeGenDecl(generator, rule, isSimple)
     // todo gibbons4 is this right
-    if (CodeGenRules.get(op.grp).exists(_ == c)) err("multiple code generators declared for op " + op.name + " in group " + op.grp.name)    
+    if (CodeGenRules.get(op.grp).exists(_.exists(o => DeliteRules(o) == op))) err("multiple code generators declared for op " + op.name + " in group " + op.grp.name)    
     if (DataStructs.exists(d => op.args.exists(_.tpe == d.tpe)))
       err("(op " + op.name + ") code generated ops should not have struct types as inputs, since structs may be eliminated at compile time. consider passing in one or more fields of the struct as input(s) to the op instead.")
     
-    val buf = CodeGenRules.getOrElseUpdate(op.grp, new ArrayBuffer[Exp[DeliteRule]]())
-    buf += c
+    val buf = CodeGenRules.getOrElseUpdate(op.grp, new ArrayBuffer[Exp[DSLOp]]())
+    buf += op
     
     // also may need to update opsGrp targets
     val opsGrp = OpsGrp.getOrElse(op.grp, err("couldn't find group " + op.grp.name + " for code generator declared on op " + op.name))
@@ -295,14 +295,14 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   case class Zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String]) extends Def[DeliteRule]
   def forge_zip(op: Rep[DSLOp], tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String]) = addRule(op, Zip(tpePars, argIndices, func))
 
-  case class Reduce(tpePars: (Rep[DSLType]), argIndex: Int, zero: Rep[DSLOp], func: Rep[String]) extends Def[DeliteRule]
-  def forge_reduce(op: Rep[DSLOp], tpePars: (Rep[DSLType]), argIndex: Int, zero: Rep[DSLOp], func: Rep[String]) = addRule(op, Reduce(tpePars, argIndex, zero, func))
+  case class Reduce(tpePars: Rep[DSLType], argIndex: Int, zero: Rep[DSLOp], func: Rep[String]) extends Def[DeliteRule]
+  def forge_reduce(op: Rep[DSLOp], tpePars: Rep[DSLType], argIndex: Int, zero: Rep[DSLOp], func: Rep[String]) = addRule(op, Reduce(tpePars, argIndex, zero, func))
 
   case class Filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]) extends Def[DeliteRule]
   def forge_filter(op: Rep[DSLOp], tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]) = addRule(op, Filter(tpePars, argIndex, cond, func))
 
-  case class Foreach(tpePars: (Rep[DSLType]), argIndex: Int, func: Rep[String]) extends Def[DeliteRule]
-  def forge_foreach(op: Rep[DSLOp], tpePars: (Rep[DSLType]), argIndex: Int, func: Rep[String]) = addRule(op, Foreach(tpePars, argIndex, func))
+  case class Foreach(tpePars: Rep[DSLType], argIndex: Int, func: Rep[String]) extends Def[DeliteRule]
+  def forge_foreach(op: Rep[DSLOp], tpePars: Rep[DSLType], argIndex: Int, func: Rep[String]) = addRule(op, Foreach(tpePars, argIndex, func))
 
   /* Establishes that the given tpe implements the DeliteCollection interface */
   def forge_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection) = {

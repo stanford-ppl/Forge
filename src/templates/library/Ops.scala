@@ -56,7 +56,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     DeliteRules(o) match {
       // gibbons4 - sort of confused why this check is here at all
       case Def(CodeGenDecl(generator, rule, isSimple)) => 
-        val rule = rules.find(_ == o).map(_.rule).getOrElse(err("could not find codegen rule for op: " + o.name))
+        val rule = rules.find(_ == o).map(_o => DeliteRules(o).rule).getOrElse(err("could not find codegen rule for op: " + o.name))
         emitWithIndent(inline(o, rule), stream, indent)  // todo
       case Def(Getter(structArgIndex,field)) =>
         emitWithIndent(inline(o, quotedArg(structArgIndex)) + "." + field, stream, indent)
@@ -70,7 +70,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       case Def(Composite(func)) =>
         emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
       case Def(Map(tpePars, argIndex, func)) =>
-        val dc = DeliteCollections(tpePars._3)        
+        val dc = DeliteCollections(o.retTpe)        
         emitWithIndent("def func: " + quote(tpePars._1) + " => " + quote(tpePars._2) + " = " + inline(o, func), stream, indent)            
         // TODO: this isn't quite right. how do we know which of dc.allocs tpePars is the one that corresponds to our return tpe, e.g. tpePars._2?
         emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._2)) + "(" + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndex).name +")" + ")", stream, indent) // TODO - makeArg
@@ -79,7 +79,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         emitWithIndent("}", stream, indent)            
         emitWithIndent("out", stream, indent)                
       case Def(Zip(tpePars, argIndices, func)) =>
-        val dc = DeliteCollections(tpePars._4)        
+        val dc = DeliteCollections(o.retTpe)        
         emitWithIndent("def func: (" + quote(tpePars._1) + "," + quote(tpePars._2) + ") => " + quote(tpePars._3) + " = " + inline(o, func), stream, indent)            
         emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._3)) + "(" + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndices._1).name + ")" + ")", stream, indent)
         emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndices._1).name + ")" + ") {", stream, indent)   
@@ -87,15 +87,15 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         emitWithIndent("}", stream, indent)            
         emitWithIndent("out", stream, indent)        
       case Def(Reduce(tpePars, argIndex, zero, func)) =>
-        val dc = DeliteCollections(tpePars._2)        
-        emitWithIndent("def func: (" + quote(tpePars._1) + "," + quote(tpePars._1) + ") => " + quote(tpePars._1) + " = " + inline(o, func), stream, indent)                    
+        val dc = DeliteCollections(o.retTpe)        
+        emitWithIndent("def func: (" + quote(tpePars) + "," + quote(tpePars) + ") => " + quote(tpePars) + " = " + inline(o, func), stream, indent)                    
         emitWithIndent("var acc = " + makeOpMethodNameWithArgs(zero), stream, indent)
         emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndex).name + ")" + ") {", stream, indent)            
         emitWithIndent("acc = " + " func(acc, " + makeOpMethodName(dc.apply) + "(" + o.args.apply(argIndex).name + ", i))", stream, indent+2)
         emitWithIndent("}", stream, indent)            
         emitWithIndent("acc", stream, indent)                      
       case Def(Filter(tpePars, argIndex, cond, func)) =>
-        val dc = DeliteCollections(tpePars._3).asInstanceOf[DeliteCollectionBuffer]        
+        val dc = DeliteCollections(o.retTpe).asInstanceOf[DeliteCollectionBuffer]        
         emitWithIndent("def func: " + quote(tpePars._1) + " => " + quote(tpePars._2) + " = " + inline(o, func), stream, indent)            
         emitWithIndent("def cond: " + quote(tpePars._1) + " => " + quote(MBoolean) + " = " + inline(o, cond), stream, indent)            
         emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._2)) + "(0)", stream, indent)
@@ -107,8 +107,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         emitWithIndent("}", stream, indent)            
         emitWithIndent("out", stream, indent)                      
       case Def(Foreach(tpePars, argIndex, func)) =>
-        val dc = DeliteCollections(tpePars._2)        
-        emitWithIndent("def func: " + quote(tpePars._1) + " => " + quote(MUnit) + " = " + inline(o, func), stream, indent)            
+        val dc = DeliteCollections(o.retTpe)        
+        emitWithIndent("def func: " + quote(tpePars) + " => " + quote(MUnit) + " = " + inline(o, func), stream, indent)            
         emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndex).name + ")" + ") {", stream, indent)            
         emitWithIndent("func(" + makeOpMethodName(dc.apply) + "(" + o.args.apply(argIndex).name + ", i))", stream, indent+2)
         emitWithIndent("}", stream, indent)            

@@ -92,7 +92,7 @@ trait FieldOpsExp extends FieldOps {
    */
   def infix_name(x: Exp[DSLGroup])(implicit o: Overloaded4): String = x match {
     case Def(Grp(name)) => name    
-    //case _ if grpIsTpe(x) => grpAsTpe(x).name
+    case _ if grpIsTpe(x) => grpAsTpe(x).name
   }  
   
   

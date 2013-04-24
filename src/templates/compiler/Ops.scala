@@ -160,7 +160,8 @@ trait DeliteGenOps extends BaseGenOps {
           val elems = if (o.effect == mutable) elemsPure map { case (k,v) => (k, "var_new("+v+").e") } else elemsPure
           stream.println("    val elems = copyTransformedElems(collection.Seq(" + elems.mkString(",") + "))")
         case Def(Map(tpePars, argIndex, func)) =>
-          val dc = DeliteCollections(o.retTpe)
+          //val dc = DeliteCollections(o.args.apply(argIndex).tpe)
+          val dc = DeliteCollections(o.retTpe) // todo gibbons4
           emitOpNodeHeader(o, "DeliteOpMap[" + quote(tpePars._1) + "," + quote(tpePars._2) + "," + makeTpeInst(o.retTpe, tpePars._2) + "]")            
           stream.println()
           stream.println("    val in = " + o.args.apply(argIndex).name)
@@ -178,7 +179,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._3)) + "(len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
         case Def(Reduce(tpePars, argIndex, zero, func)) =>
-          val dc = DeliteCollections(o.retTpe)
+          val dc = DeliteCollections(o.args.apply(argIndex).tpe)
           emitOpNodeHeader(o, "DeliteOpReduce[" + quote(tpePars) + "]")            
           stream.println()
           stream.println("    val in = " + o.args.apply(argIndex).name)
@@ -186,7 +187,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    def zero = " + makeOpMethodNameWithArgs(zero))
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
         case Def(Filter(tpePars, argIndex, cond, func)) =>
-          val dc = DeliteCollections(o.retTpe)
+          val dc = DeliteCollections(o.args.apply(argIndex).tpe)
           emitOpNodeHeader(o, "DeliteOpFilter[" + quote(tpePars._1) + "," + quote(tpePars._2) + "," + quote(o.retTpe) + "]")            
           stream.println()
           stream.println("    val in = " + o.args.apply(argIndex).name)
@@ -195,7 +196,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._2)) + "(len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")                          
         case Def(Foreach(tpePars, argIndex, func)) =>
-          val dc = DeliteCollections(o.retTpe)
+          val dc = DeliteCollections(o.args.apply(argIndex).tpe)
           emitOpNodeHeader(o, "DeliteOpForeach[" + quote(tpePars) + "]")            
           stream.println()
           stream.println("    val in = " + o.args.apply(argIndex).name)
@@ -215,6 +216,7 @@ trait DeliteGenOps extends BaseGenOps {
       stream.println("  " + makeOpMethodSignature(o) + " = {")
       val summary = scala.collection.mutable.ArrayBuffer[String]()
       // TODO: we need syms methods for func args..
+      println(DeliteRules(o).isInstanceOf[Rep[CodeGenDecl]] + "\n\n")
       if (DeliteRules(o).isInstanceOf[Rep[CodeGenDecl]]) {
         for (arg <- o.args) {
           arg match {

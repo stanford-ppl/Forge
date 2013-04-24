@@ -70,7 +70,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       case Def(Composite(func)) =>
         emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
       case Def(Map(tpePars, argIndex, func)) =>
-        val dc = DeliteCollections(o.retTpe)        
+        val dc = DeliteCollections(o.args.apply(argIndex).tpe)        
         emitWithIndent("def func: " + quote(tpePars._1) + " => " + quote(tpePars._2) + " = " + inline(o, func), stream, indent)            
         // TODO: this isn't quite right. how do we know which of dc.allocs tpePars is the one that corresponds to our return tpe, e.g. tpePars._2?
         emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._2)) + "(" + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndex).name +")" + ")", stream, indent) // TODO - makeArg
@@ -79,7 +79,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         emitWithIndent("}", stream, indent)            
         emitWithIndent("out", stream, indent)                
       case Def(Zip(tpePars, argIndices, func)) =>
-        val dc = DeliteCollections(o.retTpe)        
+        val dc = DeliteCollections(o.retTpe)
         emitWithIndent("def func: (" + quote(tpePars._1) + "," + quote(tpePars._2) + ") => " + quote(tpePars._3) + " = " + inline(o, func), stream, indent)            
         emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._3)) + "(" + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndices._1).name + ")" + ")", stream, indent)
         emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndices._1).name + ")" + ") {", stream, indent)   
@@ -87,7 +87,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         emitWithIndent("}", stream, indent)            
         emitWithIndent("out", stream, indent)        
       case Def(Reduce(tpePars, argIndex, zero, func)) =>
-        val dc = DeliteCollections(o.retTpe)        
+        val dc = DeliteCollections(o.args.apply(argIndex).tpe)        
         emitWithIndent("def func: (" + quote(tpePars) + "," + quote(tpePars) + ") => " + quote(tpePars) + " = " + inline(o, func), stream, indent)                    
         emitWithIndent("var acc = " + makeOpMethodNameWithArgs(zero), stream, indent)
         emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndex).name + ")" + ") {", stream, indent)            
@@ -95,7 +95,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         emitWithIndent("}", stream, indent)            
         emitWithIndent("acc", stream, indent)                      
       case Def(Filter(tpePars, argIndex, cond, func)) =>
-        val dc = DeliteCollections(o.retTpe).asInstanceOf[DeliteCollectionBuffer]        
+        val dc = DeliteCollections(o.args.apply(argIndex).tpe).asInstanceOf[DeliteCollectionBuffer]        
         emitWithIndent("def func: " + quote(tpePars._1) + " => " + quote(tpePars._2) + " = " + inline(o, func), stream, indent)            
         emitWithIndent("def cond: " + quote(tpePars._1) + " => " + quote(MBoolean) + " = " + inline(o, cond), stream, indent)            
         emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._2)) + "(0)", stream, indent)
@@ -107,7 +107,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         emitWithIndent("}", stream, indent)            
         emitWithIndent("out", stream, indent)                      
       case Def(Foreach(tpePars, argIndex, func)) =>
-        val dc = DeliteCollections(o.retTpe)        
+        val dc = DeliteCollections(o.args.apply(argIndex).tpe)        
         emitWithIndent("def func: " + quote(tpePars) + " => " + quote(MUnit) + " = " + inline(o, func), stream, indent)            
         emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndex).name + ")" + ") {", stream, indent)            
         emitWithIndent("func(" + makeOpMethodName(dc.apply) + "(" + o.args.apply(argIndex).name + ", i))", stream, indent+2)

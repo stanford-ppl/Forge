@@ -219,7 +219,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     })
     
     Vector is DeliteCollectionBuffer(T, vnew, vlength, vapply, vupdate, /*vparallelization,*/ vsetsize, vappendable, vappend, vcopy)
-        
+ 
     ()    
   }
 }

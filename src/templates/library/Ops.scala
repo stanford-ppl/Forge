@@ -46,64 +46,64 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   }
       
   def emitOp(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) {
-    val rules = CodeGenRules(o.grp)
-    o.opTpe match {
-      case `codegenerated` => 
-        val rule = rules.find(_.op == o).map(_.rule).getOrElse(err("could not find codegen rule for op: " + o.name))
-        emitWithIndent(inline(o, rule), stream, indent) 
-      case Getter(structArgIndex,field) =>
+    Rules(o) match {
+      case Def(CodeGenDecl(generator, rule, isSimple)) => 
+        val rules = CodeGenRules(o.grp)
+        val rule = rules.find(_ == o).map(_o => Rules(o) match {case Def(CodeGenDecl(g, r, s)) => r}).getOrElse(err("could not find codegen rule for op: " + o.name))
+        emitWithIndent(inline(o, rule), stream, indent)  
+      case Def(Getter(structArgIndex,field)) =>
         emitWithIndent(inline(o, quotedArg(structArgIndex)) + "." + field, stream, indent)
-      case Setter(structArgIndex,field,value) =>
+      case Def(Setter(structArgIndex,field,value)) =>
         emitWithIndent(inline(o, quotedArg(structArgIndex)) + "." + field + " = " + inline(o,value), stream, indent)
-      case Allocates(data,init) =>        
+      case Def(Allocates(data,init)) =>        
         val initialVals = data.fields.map(f => inline(o,init(f._1))).mkString(",")              
         emitWithIndent("new " + quote(data.tpe) + "(" + initialVals + ")", stream, indent)
-      case single:SingleTask => 
+      case Def(SingleTask(func)) => 
         emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
-      case composite:Composite =>
+      case Def(Composite(func)) =>
         emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
-      case map:Map =>
-        val dc = DeliteCollections(map.tpePars._3)        
-        emitWithIndent("def func: " + quote(map.tpePars._1) + " => " + quote(map.tpePars._2) + " = " + inline(o, map.func), stream, indent)            
-        // TODO: this isn't quite right. how do we know which of dc.allocs tpePars is the one that corresponds to our return tpe, e.g. map.tpePars._2?
-        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, map.tpePars._1, map.tpePars._2)) + "(" + makeOpMethodName(dc.size) + "(" + o.args.apply(map.argIndex).name +")" + ")", stream, indent) // TODO - makeArg
-        emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(map.argIndex).name + ")" + ") {", stream, indent)            
-        emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(" + o.args.apply(map.argIndex).name + ", i)))", stream, indent+2)
+      case Def(Map(tpePars, argIndex, func)) =>
+        val dc = DeliteCollections(o.args.apply(argIndex).tpe)        
+        emitWithIndent("def func: " + quote(tpePars._1) + " => " + quote(tpePars._2) + " = " + inline(o, func), stream, indent)            
+        // TODO: this isn't quite right. how do we know which of dc.allocs tpePars is the one that corresponds to our return tpe, e.g. tpePars._2?
+        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._2)) + "(" + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndex).name +")" + ")", stream, indent) // TODO - makeArg
+        emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndex).name + ")" + ") {", stream, indent)            
+        emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(" + o.args.apply(argIndex).name + ", i)))", stream, indent+2)
         emitWithIndent("}", stream, indent)            
         emitWithIndent("out", stream, indent)                
-      case zip:Zip =>
-        val dc = DeliteCollections(zip.tpePars._4)        
-        emitWithIndent("def func: (" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + ") => " + quote(zip.tpePars._3) + " = " + inline(o, zip.func), stream, indent)            
-        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, zip.tpePars._1, zip.tpePars._3)) + "(" + makeOpMethodName(dc.size) + "(" + o.args.apply(zip.argIndices._1).name + ")" + ")", stream, indent)
-        emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(zip.argIndices._1).name + ")" + ") {", stream, indent)   
-        emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(" + o.args.apply(zip.argIndices._1).name + ", i)," + makeOpMethodName(dc.apply) + "(" + o.args.apply(zip.argIndices._2).name + ", i)))", stream, indent+2)
+      case Def(Zip(tpePars, argIndices, func)) =>
+        val dc = DeliteCollections(o.retTpe)
+        emitWithIndent("def func: (" + quote(tpePars._1) + "," + quote(tpePars._2) + ") => " + quote(tpePars._3) + " = " + inline(o, func), stream, indent)            
+        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._3)) + "(" + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndices._1).name + ")" + ")", stream, indent)
+        emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndices._1).name + ")" + ") {", stream, indent)   
+        emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(" + o.args.apply(argIndices._1).name + ", i)," + makeOpMethodName(dc.apply) + "(" + o.args.apply(argIndices._2).name + ", i)))", stream, indent+2)
         emitWithIndent("}", stream, indent)            
         emitWithIndent("out", stream, indent)        
-      case reduce:Reduce =>
-        val dc = DeliteCollections(reduce.tpePars._2)        
-        emitWithIndent("def func: (" + quote(reduce.tpePars._1) + "," + quote(reduce.tpePars._1) + ") => " + quote(reduce.tpePars._1) + " = " + inline(o, reduce.func), stream, indent)                    
-        emitWithIndent("var acc = " + makeOpMethodNameWithArgs(reduce.zero), stream, indent)
-        emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(reduce.argIndex).name + ")" + ") {", stream, indent)            
-        emitWithIndent("acc = " + " func(acc, " + makeOpMethodName(dc.apply) + "(" + o.args.apply(reduce.argIndex).name + ", i))", stream, indent+2)
+      case Def(Reduce(tpePars, argIndex, zero, func)) =>
+        val dc = DeliteCollections(o.args.apply(argIndex).tpe)        
+        emitWithIndent("def func: (" + quote(tpePars) + "," + quote(tpePars) + ") => " + quote(tpePars) + " = " + inline(o, func), stream, indent)                    
+        emitWithIndent("var acc = " + makeOpMethodNameWithArgs(zero), stream, indent)
+        emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndex).name + ")" + ") {", stream, indent)            
+        emitWithIndent("acc = " + " func(acc, " + makeOpMethodName(dc.apply) + "(" + o.args.apply(argIndex).name + ", i))", stream, indent+2)
         emitWithIndent("}", stream, indent)            
         emitWithIndent("acc", stream, indent)                      
-      case filter:Filter =>
-        val dc = DeliteCollections(filter.tpePars._3).asInstanceOf[DeliteCollectionBuffer]        
-        emitWithIndent("def func: " + quote(filter.tpePars._1) + " => " + quote(filter.tpePars._2) + " = " + inline(o, filter.func), stream, indent)            
-        emitWithIndent("def cond: " + quote(filter.tpePars._1) + " => " + quote(MBoolean) + " = " + inline(o, filter.cond), stream, indent)            
-        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, filter.tpePars._1, filter.tpePars._2)) + "(0)", stream, indent)
-        emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(filter.argIndex).name + ")"  + ") {", stream, indent)
-        emitWithIndent("val e = " + makeOpMethodName(dc.apply) + "(" + opArgPrefix+filter.argIndex + ", i)", stream, indent)
+      case Def(Filter(tpePars, argIndex, cond, func)) =>
+        val dc = DeliteCollections(o.args.apply(argIndex).tpe).asInstanceOf[DeliteCollectionBuffer]        
+        emitWithIndent("def func: " + quote(tpePars._1) + " => " + quote(tpePars._2) + " = " + inline(o, func), stream, indent)            
+        emitWithIndent("def cond: " + quote(tpePars._1) + " => " + quote(MBoolean) + " = " + inline(o, cond), stream, indent)            
+        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._2)) + "(0)", stream, indent)
+        emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndex).name + ")"  + ") {", stream, indent)
+        emitWithIndent("val e = " + makeOpMethodName(dc.apply) + "(" + opArgPrefix+argIndex + ", i)", stream, indent)
         emitWithIndent("if (cond(e)) {", stream, indent+2)
         emitWithIndent(makeOpMethodName(dc.append) + "(out, i, func(e))", stream, indent+4)
         emitWithIndent("}", stream, indent+2)            
         emitWithIndent("}", stream, indent)            
         emitWithIndent("out", stream, indent)                      
-      case foreach:Foreach =>
-        val dc = DeliteCollections(foreach.tpePars._2)        
-        emitWithIndent("def func: " + quote(foreach.tpePars._1) + " => " + quote(MUnit) + " = " + inline(o, foreach.func), stream, indent)            
-        emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(foreach.argIndex).name + ")" + ") {", stream, indent)            
-        emitWithIndent("func(" + makeOpMethodName(dc.apply) + "(" + o.args.apply(foreach.argIndex).name + ", i))", stream, indent+2)
+      case Def(Foreach(tpePars, argIndex, func)) =>
+        val dc = DeliteCollections(o.args.apply(argIndex).tpe)        
+        emitWithIndent("def func: " + quote(tpePars) + " => " + quote(MUnit) + " = " + inline(o, func), stream, indent)            
+        emitWithIndent("for (i <- 0 until " + makeOpMethodName(dc.size) + "(" + o.args.apply(argIndex).name + ")" + ") {", stream, indent)            
+        emitWithIndent("func(" + makeOpMethodName(dc.apply) + "(" + o.args.apply(argIndex).name + ", i))", stream, indent+2)
         emitWithIndent("}", stream, indent)            
     }    
   }

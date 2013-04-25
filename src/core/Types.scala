@@ -17,8 +17,10 @@ abstract class DSLData
 abstract class DSLStruct
 abstract class DSLOp
 abstract class LiftStm
-abstract class RewriteRule
-abstract class CodeGenRule
+//abstract class RewriteRule
+abstract class Rule // other names to consider, DSLOp, DSLRule, OpTpe
+abstract class DeliteRule extends Rule
+abstract class CodeGenRule extends Rule
 
 /**
  * Types representing built-in constructs
@@ -28,7 +30,6 @@ abstract class MethodType
 abstract class EffectType
 abstract class AliasHint
 abstract class Frequency
-abstract class OpType
 abstract class CodeGenerator {
   def name: String
 }

@@ -184,51 +184,51 @@ trait BaseGenOps extends ForgeCodeGenBase {
    * These are mostly repetitive right now, but we could specialize the error checking more (or generalize it to be more concise).
    */
   def check(o: Rep[DSLOp]) { 
-    o.opTpe match {
-      case Allocates(data,init) =>
+    Rules(o) match {
+      case Def(Allocates(data,init)) =>
         if ((data.fields.map(_._1).diff(init.keys.toSeq)).length > 0) {
           err("allocator " + o.name + " does not have the same fields as data definition for " + data.tpe.name)
         }
-      case Getter(structArgIndex,field) =>
+      case Def(Getter(structArgIndex,field)) =>
         if (structArgIndex > o.args.length) err("arg index " + structArgIndex + " does not exist for op " + o.name)
         val struct = o.args.apply(structArgIndex).tpe
         val data = DataStructs.find(_.tpe == struct)
         if (data.isEmpty) err("no struct definitions found for arg index " + structArgIndex + " in op " + o.name)
         if (!data.get.fields.map(_.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)
-      case Setter(structArgIndex,field,value) =>
+      case Def(Setter(structArgIndex,field,value)) =>
         if (structArgIndex > o.args.length) err("arg index " + structArgIndex + " does not exist for op " + o.name)
         val struct = o.args.apply(structArgIndex).tpe
         val data = DataStructs.find(_.tpe == struct)
         if (data.isEmpty) err("no struct definitions found for arg index " + structArgIndex + " in op " + o.name)
         if (!data.get.fields.map(_.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)        
-      case map:Map =>
-        val col = o.args.apply(map.argIndex).tpe
+      case Def(Map(tpePars, argIndex, func)) =>
+        val col = o.args.apply(argIndex).tpe
         if (DeliteCollections.get(col).isEmpty) err("map argument " + col.name + " is not a DeliteCollection")
-        if (map.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("map op with undefined type arg: " + o.name)
-        if (map.argIndex < 0 || map.argIndex > o.args.length) err("map op with illegal arg parameter: " + o.name)
-      case zip:Zip =>
-        val colA = o.args.apply(zip.argIndices._1).tpe
-        val colB = o.args.apply(zip.argIndices._2).tpe
+        if (tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("map op with undefined type arg: " + o.name)
+        if (argIndex < 0 || argIndex > o.args.length) err("map op with illegal arg parameter: " + o.name)
+      case Def(Zip(tpePars, argIndices, func)) =>
+        val colA = o.args.apply(argIndices._1).tpe
+        val colB = o.args.apply(argIndices._2).tpe
         if (DeliteCollections.get(colA).isEmpty) err("zip argument " + colA.name + " is not a DeliteCollection")
         if (DeliteCollections.get(colB).isEmpty) err("zip argument " + colB.name + " is not a DeliteCollection")
-        if (zip.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("zipWith op with undefined type arg: " + o.name)
-        if (zip.argIndices.productIterator.asInstanceOf[Iterator[Int]].exists(a => a < 0 || a > o.args.length)) err("zipWith op with illegal arg parameter: " + o.name)
-      case reduce:Reduce =>
-        val col = o.args.apply(reduce.argIndex).tpe
+        if (tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("zipWith op with undefined type arg: " + o.name)
+        if (argIndices.productIterator.asInstanceOf[Iterator[Int]].exists(a => a < 0 || a > o.args.length)) err("zipWith op with illegal arg parameter: " + o.name)
+      case Def(Reduce(tpePars, argIndex, zero, func)) =>
+        val col = o.args.apply(argIndex).tpe
         if (DeliteCollections.get(col).isEmpty) err("reduce argument " + col.name + " is not a DeliteCollection")
-        if (reduce.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("reduce op with undefined type arg: " + o.name)
-        if (reduce.argIndex < 0 || reduce.argIndex > o.args.length) err("reduce op with illegal arg parameter: " + o.name)        
-        if (reduce.zero.retTpe != reduce.tpePars._1) err("reduce op with illegal zero parameter: " + o.name)
-      case filter:Filter =>
-        val col = o.args.apply(filter.argIndex).tpe
+        if (tpePars.isInstanceOf[TypePar] && !o.tpePars.contains(tpePars)) err("reduce op with undefined type arg: " + o.name)
+        if (argIndex < 0 || argIndex > o.args.length) err("reduce op with illegal arg parameter: " + o.name)        
+        if (zero.retTpe != tpePars) err("reduce op with illegal zero parameter: " + o.name)
+      case Def(Filter(tpePars, argIndex, cond, func)) =>
+        val col = o.args.apply(argIndex).tpe
         if (DeliteCollections.get(col).isEmpty || !DeliteCollections.get(col).forall(_.isInstanceOf[DeliteCollectionBuffer])) err("filter argument " + col.name + " is not a DeliteCollectionBuffer")
-        if (filter.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("filter op with undefined type arg: " + o.name)
-        if (filter.argIndex < 0 || filter.argIndex > o.args.length) err("filter op with illegal arg parameter: " + o.name)      
-      case foreach:Foreach =>
-        val col = o.args.apply(foreach.argIndex).tpe
+        if (tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("filter op with undefined type arg: " + o.name)
+        if (argIndex < 0 || argIndex > o.args.length) err("filter op with illegal arg parameter: " + o.name)      
+      case Def(Foreach(tpePars, argIndex, func)) =>
+        val col = o.args.apply(argIndex).tpe
         if (DeliteCollections.get(col).isEmpty) err("foreach argument " + col.name + " is not a DeliteCollection")
-        if (foreach.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("foreach op with undefined type arg: " + o.name)
-        if (foreach.argIndex < 0 || foreach.argIndex > o.args.length) err("foreach op with illegal arg parameter: " + o.name)      
+        if (tpePars.isInstanceOf[TypePar] && !o.tpePars.contains(tpePars)) err("foreach op with undefined type arg: " + o.name)
+        if (argIndex < 0 || argIndex > o.args.length) err("foreach op with illegal arg parameter: " + o.name)      
       case _ => // nothing to check
     }
   }
@@ -244,16 +244,16 @@ trait BaseGenOps extends ForgeCodeGenBase {
   }
   def emitSingleTaskImplMethods(opsGrp: DSLOps, stream: PrintWriter, indent: Int = 0) {
     for (o <- unique(opsGrp.ops)) { 
-      o.opTpe match {
-        case single:SingleTask => emitImplMethod(o,single.func,stream,indent)
+      Rules(o) match {
+        case Def(SingleTask(func)) => emitImplMethod(o,func,stream,indent)
         case _ =>
       }
     }    
   }  
   def emitCompositeImplMethods(opsGrp: DSLOps, stream: PrintWriter, indent: Int = 0) {
     for (o <- unique(opsGrp.ops)) { 
-      o.opTpe match {
-        case composite:Composite => emitImplMethod(o,composite.func,stream,indent)
+      Rules(o) match {
+        case Def(Composite(func)) => emitImplMethod(o,func,stream,indent)
         case _ =>
       }
     }    

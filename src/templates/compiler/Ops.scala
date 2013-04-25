@@ -124,8 +124,10 @@ trait DeliteGenOps extends BaseGenOps {
   }
       
   def emitIRNodes(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
-    def hasIRNode(o: Rep[DSLOp]) = o.opTpe match {
-      case _:Composite | _:Getter | _:Setter => false
+    def hasIRNode(o: Rep[DSLOp]) = Rules(o) match {
+      case Def(Composite(func)) => false
+      case Def(Getter(structArgIndex, field)) => false
+      case Def(Setter(structArgIndex, field, value)) => false
       case _ => true
     }
     
@@ -145,61 +147,63 @@ trait DeliteGenOps extends BaseGenOps {
     // IR nodes
     for (o <- uniqueOps if hasIRNode(o)) { 
       stream.print("  case class " + makeOpNodeName(o) + makeTpeParsWithBounds(o.tpePars))
-      if (o.opTpe == codegenerated) stream.print(makeOpArgsWithType(o, blockify))
-      else stream.print(makeOpArgsWithType(o))    
+      Rules(o) match {
+        case Def(CodeGenDecl(generator, rule, isSimple)) => stream.print(makeOpArgsWithType(o, blockify))
+        case _ => stream.print(makeOpArgsWithType(o))    
+      }
       stream.print(makeOpImplicitArgsWithType(o,true))
       
-      o.opTpe match {
-        case `codegenerated` =>           
+      Rules(o) match {
+        case Def(CodeGenDecl(generator, rule, isSimple)) =>           
           emitOpNodeHeader(o, "Def[" + quote(o.retTpe) + "]") 
-        case single:SingleTask =>
-          emitOpNodeHeader(o, "DeliteOpSingleTask[" + quote(single.retTpe) + "](reifyEffectsHere("+makeOpImplMethodNameWithArgs(o)+"))")
-        case Allocates(data,init) =>
+        case Def(SingleTask(function)) =>
+          emitOpNodeHeader(o, "DeliteOpSingleTask[" + quote(o.retTpe) + "](reifyEffectsHere("+makeOpImplMethodNameWithArgs(o)+"))")
+        case Def(Allocates(data,init)) =>
           emitOpNodeHeader(o, "DeliteStruct[" + quote(o.retTpe) + "]")
           val elemsPure = init map { case (k,v) => ("\""+k+"\"", inline(o,v,quoteLiteral)) }
           val elems = if (o.effect == mutable) elemsPure map { case (k,v) => (k, "var_new("+v+").e") } else elemsPure
           stream.println("    val elems = copyTransformedElems(collection.Seq(" + elems.mkString(",") + "))")
-        case map:Map =>
-          val dc = DeliteCollections(map.tpePars._3)
-          emitOpNodeHeader(o, "DeliteOpMap[" + quote(map.tpePars._1) + "," + quote(map.tpePars._2) + "," + makeTpeInst(map.tpePars._3, map.tpePars._2) + "]")            
+        case Def(Map(tpePars, argIndex, func)) =>
+          //val dc = DeliteCollections(o.args.apply(argIndex).tpe)
+          val dc = DeliteCollections(o.args.apply(0).tpe) 
+          emitOpNodeHeader(o, "DeliteOpMap[" + quote(tpePars._1) + "," + quote(tpePars._2) + "," + makeTpeInst(o.args.apply(0).tpe, tpePars._2) + "]")            
           stream.println()
-          stream.println("    val in = " + o.args.apply(map.argIndex).name)
-          stream.println("    def func = " + inline(o,map.func,quoteLiteral))
-          // TODO: this isn't quite right. how do we know which of dc.allocs tpePars is the one that corresponds to our return tpe, e.g. map.tpePars._2?
-          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, map.tpePars._1, map.tpePars._2)) + "(len)")
+          stream.println("    val in = " + o.args.apply(argIndex).name)
+          stream.println("    def func = " + inline(o,func,quoteLiteral))
+          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._2)) + "(len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")          
-        case zip:Zip => 
-          val dc = DeliteCollections(zip.tpePars._4)
-          emitOpNodeHeader(o, "DeliteOpZipWith[" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + "," + quote(zip.tpePars._3) + "," + makeTpeInst(zip.tpePars._4,zip.tpePars._3) + "]")            
+        case Def(Zip(tpePars, argIndices, func)) => 
+          val dc = DeliteCollections(o.args.apply(0).tpe)
+          emitOpNodeHeader(o, "DeliteOpZipWith[" + quote(tpePars._1) + "," + quote(tpePars._2) + "," + quote(tpePars._3) + "," + makeTpeInst(o.args.apply(0).tpe,tpePars._3) + "]")            
           stream.println()
-          stream.println("    val inA = " + o.args.apply(zip.argIndices._1).name)
-          stream.println("    val inB = " + o.args.apply(zip.argIndices._2).name)
-          stream.println("    def func = " + inline(o,zip.func,quoteLiteral))
-          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, zip.tpePars._1, zip.tpePars._3)) + "(len)")
+          stream.println("    val inA = " + o.args.apply(argIndices._1).name)
+          stream.println("    val inB = " + o.args.apply(argIndices._2).name)
+          stream.println("    def func = " + inline(o,func,quoteLiteral))
+          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._3)) + "(len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
-        case reduce:Reduce =>
-          val dc = DeliteCollections(reduce.tpePars._2)
-          emitOpNodeHeader(o, "DeliteOpReduce[" + quote(reduce.tpePars._1) + "]")            
+        case Def(Reduce(tpePars, argIndex, zero, func)) =>
+          val dc = DeliteCollections(o.args.apply(argIndex).tpe)
+          emitOpNodeHeader(o, "DeliteOpReduce[" + quote(tpePars) + "]")            
           stream.println()
-          stream.println("    val in = " + o.args.apply(reduce.argIndex).name)
-          stream.println("    def func = " + inline(o,reduce.func,quoteLiteral))
-          stream.println("    def zero = " + makeOpMethodNameWithArgs(reduce.zero))
+          stream.println("    val in = " + o.args.apply(argIndex).name)
+          stream.println("    def func = " + inline(o,func,quoteLiteral))
+          stream.println("    def zero = " + makeOpMethodNameWithArgs(zero))
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
-        case filter:Filter =>
-          val dc = DeliteCollections(filter.tpePars._3)
-          emitOpNodeHeader(o, "DeliteOpFilter[" + quote(filter.tpePars._1) + "," + quote(filter.tpePars._2) + "," + quote(filter.tpePars._3) + "]")            
+        case Def(Filter(tpePars, argIndex, cond, func)) =>
+          val dc = DeliteCollections(o.args.apply(argIndex).tpe)
+          emitOpNodeHeader(o, "DeliteOpFilter[" + quote(tpePars._1) + "," + quote(tpePars._2) + "," + quote(o.args.apply(0).tpe) + "]")            
           stream.println()
-          stream.println("    val in = " + o.args.apply(filter.argIndex).name)
-          stream.println("    def cond = " + inline(o,filter.cond,quoteLiteral))
-          stream.println("    def func = " + inline(o,filter.func,quoteLiteral))
-          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, filter.tpePars._1, filter.tpePars._2)) + "(len)")
+          stream.println("    val in = " + o.args.apply(argIndex).name)
+          stream.println("    def cond = " + inline(o,cond,quoteLiteral))
+          stream.println("    def func = " + inline(o,func,quoteLiteral))
+          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._2)) + "(len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")                          
-        case foreach:Foreach =>
-          val dc = DeliteCollections(foreach.tpePars._2)
-          emitOpNodeHeader(o, "DeliteOpForeach[" + quote(foreach.tpePars._1) + "]")            
+        case Def(Foreach(tpePars, argIndex, func)) =>
+          val dc = DeliteCollections(o.args.apply(argIndex).tpe)
+          emitOpNodeHeader(o, "DeliteOpForeach[" + quote(tpePars) + "]")            
           stream.println()
-          stream.println("    val in = " + o.args.apply(foreach.argIndex).name)
-          stream.println("    def func = " + inline(o,foreach.func,quoteLiteral))
+          stream.println("    val in = " + o.args.apply(argIndex).name)
+          stream.println("    def func = " + inline(o,func,quoteLiteral))
           stream.println("    def sync = n => unit(List())")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")                  
       }
@@ -215,17 +219,20 @@ trait DeliteGenOps extends BaseGenOps {
       stream.println("  " + makeOpMethodSignature(o) + " = {")
       val summary = scala.collection.mutable.ArrayBuffer[String]()
       // TODO: we need syms methods for func args..
-      if (o.opTpe == codegenerated) {
-        for (arg <- o.args) {
-          arg match {
-            case Def(Arg(name, Def(FTpe(args,ret,freq)), d2)) =>
-              stream.println()
-              emitWithIndent("val b_" + name + " = reifyEffects(" + name + ")", stream, 4)
-              emitWithIndent("val sb_" + name + " = summarizeEffects(b_" + name + ")", stream, 4)
-              summary += "sb_"+name
-            case _ =>
+      Rules(o) match {
+        case Def(CodeGenDecl(generator, rule, isSimple)) => 
+          for (arg <- o.args) {
+            arg match {
+              case Def(Arg(name, Def(FTpe(args,ret,freq)), d2)) =>
+                stream.println()
+                emitWithIndent("val b_" + name + " = reifyEffects(" + name + ")", stream, 4)
+                emitWithIndent("val sb_" + name + " = summarizeEffects(b_" + name + ")", stream, 4)
+                summary += "sb_"+name
+              case _ =>
+            }
           }
-        }
+          case _ => 
+        //}
       }
       
       def summarizeEffects(s: scala.collection.mutable.ArrayBuffer[String]): String = {
@@ -249,13 +256,13 @@ trait DeliteGenOps extends BaseGenOps {
       
       // composite ops, getters and setters are currently inlined
       // in the future, to support pattern matching and optimization, we should implement these as abstract IR nodes and use lowering transformers
-      o.opTpe match {
-        case c:Composite if hasEffects => err("cannot have effects with composite ops currently")
-        case c:Composite => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
-        case g@Getter(structArgIndex,field) => 
+      Rules(o) match {
+        case Def(Composite(func)) if hasEffects => err("cannot have effects with composite ops currently")
+        case Def(Composite(func)) => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
+        case Def(Getter(structArgIndex,field)) => 
           val fieldTpe = DataStructs.find(_.tpe == o.args.apply(structArgIndex).tpe).get.fields.find(t => t._1 == field).get.tpe
           emitWithIndent("field["+quote(fieldTpe)+"]("+inline(o,quotedArg(structArgIndex),quoteLiteral)+",\""+field+"\")", stream, 4)        
-        case s@Setter(structArgIndex,field,value) => 
+        case Def(Setter(structArgIndex,field,value)) => 
           val fieldTpe = DataStructs.find(_.tpe == o.args.apply(structArgIndex).tpe).get.fields.find(t => t._1 == field).get.tpe
           emitWithIndent("field_update["+quote(fieldTpe)+"]("+inline(o,quotedArg(structArgIndex),quoteLiteral)+",\""+field+"\","+inline(o,value,quoteLiteral)+")", stream, 4)        
         case _ if hasEffects =>
@@ -287,10 +294,14 @@ trait DeliteGenOps extends BaseGenOps {
         else ""
       }
             
-      for (o <- uniqueOps if o.opTpe == codegenerated) { 
-        symsBuf += makeSym(o, "syms") 
-        boundSymsBuf += makeSym(o, "effectSyms") 
-        symsFreqBuf += makeSym(o, "", addFreq = true) 
+      for (o <- uniqueOps) { 
+        Rules(o) match {
+          case Def(CodeGenDecl(generator, rule, isSimple)) =>
+            symsBuf += makeSym(o, "syms") 
+            boundSymsBuf += makeSym(o, "effectSyms") 
+            symsFreqBuf += makeSym(o, "", addFreq = true) 
+          case _ =>
+        }
       }
     
       symsBuf      += "    case _ => super.syms(e)" + nl + "  }"
@@ -350,8 +361,8 @@ trait DeliteGenOps extends BaseGenOps {
       val xformArgs = "(" + o.args.zipWithIndex.map(t => "f(" + opArgPrefix + t._2 + ")").mkString(",") + ")" 
       val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++ o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
       
-      o.opTpe match {
-        case `codegenerated` =>
+      Rules(o) match {
+        case Def(CodeGenDecl(generator, rule, isSimple)) =>
           stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
           // pure version with no func args uses smart constructor
           if (!hasFuncArgs(o)) {
@@ -372,15 +383,14 @@ trait DeliteGenOps extends BaseGenOps {
           stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(" + makeOpNodeName(o) + xformArgs + "(" + implicits + ")")
           stream.print(", mapOver(f,u), f(es)))")
           stream.println("(mtype(manifest[A]))")
-        case _:DeliteOpType => 
-          // pure delite op version
-          stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
-          stream.print("reflectPure(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + "))")
-          stream.println("(mtype(manifest[A]), pos)")
-          // effectful delite op version
-          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + ")")
-          stream.print(", mapOver(f,u), f(es)))")
-          stream.println("(mtype(manifest[A]))")
+        //case Def(_: DeliteRule) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
+        case Def(SingleTask(f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
+        case Def(Allocates(d,i)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
+        case Def(Map(t,i,f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
+        case Def(Zip(t,i,f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
+        case Def(Reduce(t,i,z,f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
+        case Def(Filter(t,i,c,f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
+        case Def(Foreach(t,i,f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
         case _ => // no mirror  
       }        
     }
@@ -388,6 +398,17 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println("  }).asInstanceOf[Exp[A]]")
   }
   
+  def emitDeliteRuleMirror(o: Rep[DSLOp], stream: PrintWriter, xformArgs: String, implicits: String) {
+   // pure delite op version
+   stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
+   stream.print("reflectPure(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + "))")
+   stream.println("(mtype(manifest[A]), pos)")
+   // effectful delite op version
+   stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + ")")
+   stream.print(", mapOver(f,u), f(es)))")
+   stream.println("(mtype(manifest[A]))")
+  }
+
   def emitDeliteCollection(grp: Rep[DSLGroup], stream: PrintWriter) {
     try {
       val tpe = grpAsTpe(grp)
@@ -484,18 +505,21 @@ trait DeliteGenOps extends BaseGenOps {
       emitBlockComment("Code generators", stream)   
       stream.println()
       for (g <- generators) { 
-        val rules = CodeGenRules(opsGrp.grp).filter(_.generator == g)
+        val rules = CodeGenRules(opsGrp.grp).filter(o => Rules(o) match {case Def(CodeGenDecl(generator, rule, isSimple)) => generator == g})
         if (rules.length > 0) {
           stream.println("trait " + g.name + "Gen" + opsGrp.name + " extends " + g.name + "GenFat {")
           stream.println("  val IR: " + opsGrp.name + "Exp")
           stream.println("  import IR._")
           stream.println()
           stream.println("  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {")
-          for (r <- rules if uniqueOps.contains(r.op)) {
-            if (r.isSimple)
-              stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(r.op) + " => emitValDef(sym, " + quote(r.rule) + ")")
-            else 
-              stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(r.op) + " => " + quote(r.rule))
+          for (o <- rules if uniqueOps.contains(o)) {
+            val r = Rules(o) match {
+              case Def(CodeGenDecl(generator, rule, isSimple)) =>
+                if (isSimple)
+                  stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + " => emitValDef(sym, " + quote(rule) + ")")
+                else 
+                  stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + " => " + quote(rule))
+            }
           }
           stream.println("    case _ => super.emitNode(sym, rhs)")
           stream.println("  }")

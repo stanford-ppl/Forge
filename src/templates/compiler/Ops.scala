@@ -386,7 +386,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.print(", mapOver(f,u), f(es)))")
           stream.println("(mtype(manifest[A]))")
         // todo gibbons4 DeliteOpType
-        //case _:Rep[DeliteRule] => 
+        //case Def(x: DeliteRule) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
         case Def(SingleTask(f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
         case Def(Allocates(d,i)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
         case Def(Map(t,i,f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)

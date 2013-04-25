@@ -46,11 +46,10 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   }
       
   def emitOp(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) {
-    val rules = CodeGenRules(o.grp)
-    o.opTpe match {
-      case `codegenerated` => 
-        val rule = rules.find(_.op == o).map(_.rule).getOrElse(err("could not find codegen rule for op: " + o.name))
-        emitWithIndent(inline(o, rule), stream, indent) 
+    Impls(o) match {
+      case codegen:CodeGen => 
+        val rule = codegen.decls.getOrElse($cala, err("could not find Scala codegen rule for op: " + o.name))
+        emitWithIndent(inline(o, rule.decl), stream, indent) 
       case Getter(structArgIndex,field) =>
         emitWithIndent(inline(o, quotedArg(structArgIndex)) + "." + field, stream, indent)
       case Setter(structArgIndex,field,value) =>

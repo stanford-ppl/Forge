@@ -30,7 +30,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("trait " + dsl + "Compiler extends " + dsl)
     for (opsGrp <- opsGrps) {
       stream.print(" with " + opsGrp.name)
-      if (opsGrp.ops.exists(_.opTpe.isInstanceOf[SingleTask]))
+      if (opsGrp.ops.exists(o => Impls(o).isInstanceOf[SingleTask]))
         stream.print(" with " + opsGrp.name + "Impl")     
       if (opsGrp.ops.exists(_.style == compiler))
         stream.print(" with " + opsGrp.grp.name + "CompilerOps")           

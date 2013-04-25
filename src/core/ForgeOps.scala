@@ -13,6 +13,7 @@ trait ForgeOps extends Base {
   def grp(name: String) = forge_grp(name)  
   def tpeAlias(name: String, tpe: Rep[DSLType]) = forge_tpealias(name, tpe)
   def tpePar(name: String, ctxBounds: List[TypeClass] = List()) = forge_tpepar(name, ctxBounds) // TODO: type bounds
+  def infix_withBound(a: Rep[TypePar], b: TypeClass) = forge_withBound(a,b)  
   def tpe(name: String, tpePars: List[Rep[TypePar]] = List(), stage: StageTag = future) = forge_tpe(name, tpePars, stage)
   def tpeInst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]] = List(), stage: StageTag = future) = forge_tpeinst(hkTpe, tpeArgs, stage)
   def ftpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency) = forge_ftpe(args, ret, freq)
@@ -23,14 +24,12 @@ trait ForgeOps extends Base {
   implicit def namedTpeToArg(arg: (String, Rep[DSLType])): Rep[DSLArg] = forge_arg(arg._1, arg._2, None)
   implicit def namedTpeWithDefaultToArg(arg: (String, Rep[DSLType], String)): Rep[DSLArg] = forge_arg(arg._1, arg._2, Some(arg._3))
   def anyToArg(a: (Any, Int)): Rep[DSLArg] = forge_anyToArg(a)
-  def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[Any]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = 
-    forge_op(grp,name,style,tpePars,args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,retTpe,opTpe,effect,aliasHint)
+  def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[Any]], retTpe: Rep[DSLType], effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = 
+    forge_op(grp,name,style,tpePars,args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,retTpe,effect,aliasHint)
   
-  def codegen(op: Rep[DSLOp])(generator: CodeGenerator, rule: Rep[String]) = forge_codegen(op,generator,rule)
+  def impl(op: Rep[DSLOp])(rule: OpType) = forge_impl(op,rule)  
   def extern(grp: Rep[DSLGroup], withLift: Boolean = false, targets: List[CodeGenerator] = generators) = forge_extern(grp, withLift, targets)
-  
-  def infix_withBound(a: Rep[TypePar], b: TypeClass) = forge_withBound(a,b)
-    
+      
   def infix_is(tpe: Rep[DSLType], dc: DeliteCollection) = forge_isdelitecollection(tpe, dc)  
   case class DeliteCollection(val tpeArg: Rep[DSLType], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp]) extends DeliteCollectionType
   def infix_is(tpe: Rep[DSLType], dc: DeliteCollectionBuffer) = forge_isdelitecollection_buffer(tpe,dc)
@@ -51,8 +50,8 @@ trait ForgeOps extends Base {
   def forge_ftpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency): Rep[DSLType]
   def forge_lift(grp: Rep[DSLGroup], tpe: Rep[DSLType]): Rep[Unit]
   def forge_data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]  
-  def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
-  def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String]): Rep[CodeGenRule]
+  def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
+  def forge_impl(op: Rep[DSLOp], rule: OpType): Rep[Unit]
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
   def forge_withBound(a: Rep[TypePar], b: TypeClass): Rep[TypePar]
   def forge_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection): Rep[Unit]
@@ -70,7 +69,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   val Tpes = ArrayBuffer[Exp[DSLType]]()
   val DataStructs = ArrayBuffer[Exp[DSLData]]()
   val OpsGrp = HashMap[Exp[DSLGroup],DSLOps]()  
-  val CodeGenRules = HashMap[Exp[DSLGroup],ArrayBuffer[Exp[CodeGenRule]]]()
+  val Impls = HashMap[Exp[DSLOp],OpType]() 
   val DeliteCollections = HashMap[Exp[DSLType], DeliteCollectionType]()
   val Externs = ArrayBuffer[Extern]()
   
@@ -163,9 +162,9 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   }
   
   /* An operator - this represents a method or IR node */
-  case class Op(grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint) extends Def[DSLOp]
+  case class Op(grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint) extends Def[DSLOp]
   
-  def forge_op(_grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], opTpe: OpType, effect: EffectType, aliasHint: AliasHint) = {
+  def forge_op(_grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint) = {
     args match {
       case a :: Def(Arg(_, Def(VarArgs(z)), _)) :: b if b != Nil => err("a var args op parameter must be the final one")
       case Def(Arg(_, Def(VarArgs(z)), _)) :: b if b != Nil => err("a var args op parameter must be the final one.")
@@ -178,7 +177,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
       warn("op " + name + " has return type " + MUnit.name + " but no effects, so it is a no-op")
     }
     
-    val o = Op(_grp, name, style, tpePars, args, implicitArgs, retTpe, opTpe, effect, aliasHint)
+    val o = Op(_grp, name, style, tpePars, args, implicitArgs, retTpe, effect, aliasHint)
     val opsGrp = OpsGrp.getOrElseUpdate(_grp, new DSLOps {
       val grp = _grp
       override def targets: List[CodeGenerator] = Nil
@@ -187,34 +186,46 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
     o
   }
   
-  /* A code gen rule - this is the imperative code defining how to implement a particular op */
-  case class CodeGenDecl(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String], isSimple: Boolean) extends Def[CodeGenRule]
-  
-  def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String]) = {
-    val isSimple = rule match {
-      case Def(PrintLines(x, l)) => false
-      case _ => true
+  /**
+   * Add an op implementation rule
+   */
+  def forge_impl(op: Rep[DSLOp], rule: OpType) = {        
+    (Impls.get(op),rule) match {
+      // only codegen rules may have multiple declarations
+      case (Some(current@CodeGen(d1)),add@CodeGen(d2)) =>
+        for ((g,d) <- add.decls) {          
+          if (current.decls.contains(g))
+            warn("op " + op.name + " already has codegen rule defined at " + quotePos(current.decls(g).decl) + " for generator " + g.name + ". it is being replaced with rule defined at " + quotePos(d.decl))
+          current.decls(g) = d        
+        }
+      case (Some(x),y) => 
+        warn("op " + op.name + " already has implementation rule " + x + ". It is being overwritten with " + rule)                  
+        Impls(op) = rule      
+      case _ =>
+        Impls(op) = rule            
     }
-    val c = CodeGenDecl(op, generator, rule, isSimple)
-    if (CodeGenRules.get(op.grp).exists(_.exists(_.op == op))) err("multiple code generators declared for op " + op.name + " in group " + op.grp.name)    
+    
+    // no matter what branch we took, we may need to reconcile codegen rules
+    if (rule.isInstanceOf[CodeGen])
+      reconcileCodegenRule(op,rule.asInstanceOf[CodeGen])    
+  }
+        
+  // vet codegen rules and update the ops list if necessary
+  def reconcileCodegenRule(op: Rep[DSLOp], rule: CodeGen) {
     if (DataStructs.exists(d => op.args.exists(_.tpe == d.tpe)))
       err("(op " + op.name + ") code generated ops should not have struct types as inputs, since structs may be eliminated at compile time. consider passing in one or more fields of the struct as input(s) to the op instead.")
-    
-    val buf = CodeGenRules.getOrElseUpdate(op.grp, new ArrayBuffer[Exp[CodeGenRule]]())
-    buf += c
-    
+
     // also may need to update opsGrp targets
     val opsGrp = OpsGrp.getOrElse(op.grp, err("couldn't find group " + op.grp.name + " for code generator declared on op " + op.name))
-    if (!opsGrp.targets.contains(generator)) {
+    val newTargets = rule.decls.map{case (g,r) => g}.toList
+    if (!newTargets.diff(opsGrp.targets).isEmpty) {
       val updatedGrp = new DSLOps {
         val grp = op.grp
-        override def targets: List[CodeGenerator] = generator :: opsGrp.targets
+        override def targets: List[CodeGenerator] = (newTargets union opsGrp.targets).distinct
       }
       updatedGrp.ops = opsGrp.ops
       OpsGrp(op.grp) = updatedGrp
     }
-            
-    c
   }
     
   /* Establishes that the given tpe implements the DeliteCollection interface */

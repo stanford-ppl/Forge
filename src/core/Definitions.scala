@@ -130,8 +130,15 @@ trait Definitions extends DerivativeTypes {
   /**
    * Op types
    */   
-  object codegenerated extends OpType
   abstract class DeliteOpType extends OpType
+  
+  /**
+   * Codegenerated
+   */
+  def forge_codegen(generator: CodeGenerator, rule: Rep[String], isSimple: Boolean): OpType
+  object codegen {
+    def apply(generator: CodeGenerator, rule: Rep[String], isSimple: Boolean = true) = forge_codegen(generator,rule,isSimple)
+  }
   
   /**
    * Composite
@@ -263,6 +270,16 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
    // 
    // def parBuffer = ParBuffer()
    // def parFlat = ParFlat()
+
+  case class CodeGenDecl(decl: Rep[String], isSimple: Boolean)    
+  case class CodeGen(decls: scala.collection.mutable.HashMap[CodeGenerator,CodeGenDecl]) extends OpType
+  def forge_codegen(generator: CodeGenerator, rule: Rep[String], isSimple: Boolean) = {
+    val isSimple = rule match {
+      case Def(PrintLines(x, l)) => false
+      case _ => true
+    }
+    CodeGen(scala.collection.mutable.HashMap(generator -> CodeGenDecl(rule, isSimple)))    
+  }
   
   case class Getter(structArgIndex: Int, field: String) extends OpType
   def forge_getter(structArgIndex: Int, field: String) = Getter(structArgIndex,field)

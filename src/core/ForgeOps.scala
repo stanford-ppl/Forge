@@ -28,9 +28,6 @@ trait ForgeOps extends Base {
   
   def codegen(op: Rep[DSLOp])(generator: CodeGenerator, rule: Rep[String]) = forge_codegen(op,generator,rule)
 
-  // in progress gibbons4
-  // todo - OpType versus DeliteOpType
-  // todo - change arg as being int index to string name. 
   def composite(op: Rep[DSLOp])(func: Rep[String]) = forge_composite(op, func)
   def getter(op: Rep[DSLOp])(structArgIndex: Int, field: String) = forge_getter(op, structArgIndex,field)
   def setter(op: Rep[DSLOp])(structArgIndex: Int, field: String, value: Rep[String]) = forge_setter(op, structArgIndex,field,value)
@@ -68,8 +65,6 @@ trait ForgeOps extends Base {
   def forge_data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]  
   def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
 
-  // in progress gibbons4
-  // todo - do the have to be Rep[Map] etc.
   def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String]): Rep[Rule]
   def forge_getter(op: Rep[DSLOp], structArgIndex: Int, field: String): Rep[Rule]
   def forge_setter(op: Rep[DSLOp], structArgIndex: Int, field: String, value: Rep[String]): Rep[Rule]
@@ -218,7 +213,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   }
   
   /* A code gen rule - this is the imperative code defining how to implement a particular op */
-  case class CodeGenDecl(generator: CodeGenerator, rule: Rep[String], isSimple: Boolean) extends Def[Rule]
+  case class CodeGenDecl(generator: CodeGenerator, rule: Rep[String], isSimple: Boolean) extends Def[CodeGenRule]
   
   def forge_codegen(op: Rep[DSLOp], generator: CodeGenerator, rule: Rep[String]) = {
     val isSimple = rule match {
@@ -226,7 +221,6 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
       case _ => true
     }
     val c = CodeGenDecl(generator, rule, isSimple)
-    // todo gibbons4 is this right
     if (CodeGenRules.get(op.grp).exists(_.exists(o => Rules(o) == op))) err("multiple code generators declared for op " + op.name + " in group " + op.grp.name)    
     if (DataStructs.exists(d => op.args.exists(_.tpe == d.tpe)))
       err("(op " + op.name + ") code generated ops should not have struct types as inputs, since structs may be eliminated at compile time. consider passing in one or more fields of the struct as input(s) to the op instead.")
@@ -248,11 +242,10 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
     addRule(op, c)
   }
     
-  // work in progress - gibbons4
-  // could just put the Op in the Rule instead of in this HashMap thing. Any reason not to?
+  // gibbons4 
+  //could just put the Op in the Rule instead of in this HashMap thing. Any reason not to?
 
   /** Helper function to Rule(s) */
-  // gibbons4 todo - Def[Rule] ? Exp ? who knows
   def addRule(op: Rep[DSLOp], rule: Rep[Rule]) = {
     if (Rules.contains(op)) err("multiple rules declared for op " + op.name) 
     Rules.put(op, rule)   

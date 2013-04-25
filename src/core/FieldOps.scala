@@ -128,92 +128,17 @@ trait FieldOpsExp extends FieldOps {
   }      
   
   /**
-   * Rule
+   * CodeGenRule
    */
-  def infix_generator(x: Exp[Rule]) = x match {
+  def infix_generator(x: Exp[CodeGenRule]) = x match {
     case Def(CodeGenDecl(gen,rule,s)) => gen
   }  
-  def infix_rule(x: Exp[Rule]) = x match {
+  def infix_rule(x: Exp[CodeGenRule]) = x match {
     case Def(CodeGenDecl(gen,rule,s)) => rule
   }        
-  def infix_isSimple(x: Exp[Rule]) = x match {
+  def infix_isSimple(x: Exp[CodeGenRule]) = x match {
     case Def(CodeGenDecl(gen,rule,s)) => s
   }        
-  
-  /**
-  * Rule
-  * gibbons4 - should this be split into each rule
-  * also - have to return same type. disregard errors?
-  */
-  def structArgIndex(x: Exp[Rule]) = x match {
-    case Def(Getter(structArgIndex, field)) => structArgIndex
-    case Def(Setter(structArgIndex, field, value)) => structArgIndex
-    //case _ => err("Called a Rule with non-existant field : structArgIndex")
-  }
-
-  def field(x: Exp[Rule]) = x match {
-    case Def(Getter(structArgIndex, field)) => field
-    case Def(Setter(structArgIndex, field, value)) => field 
-    //case _ => err("Called a Rule with non-existant field : field") // todo - equivocaion gibbons4
-  }
-
-  def value(x: Exp[Rule]) = x match {
-    case Def(Setter(structArgIndex, field, value)) => value
-    //case _ => err("Called a Rule with non-existant field : ")
-  }
-
-  def func(x: Exp[Rule]) = x match {
-    case Def(Composite(func)) => func
-    case Def(SingleTask(func)) => func
-    case Def(Map(tpePars, argIndex, func)) => func
-    case Def(Zip(tpePars, argIndices, func)) => func
-    case Def(Reduce(tpePars, argIndex, zero, func)) => func
-    case Def(Filter(tpePars, argIndex, cond, func)) => func
-    case Def(Foreach(tpePars, argIndex, func)) => func
-    //case _ => err("Called a Rule with non-existant field : ")
-  }
-
-  def data(x: Exp[Rule]) = x match {
-    case Def(Allocates(data, init)) => data
-    //case _ => err("Called a Rule with non-existant field : ")
-  }
-
-  def init(x: Exp[Rule]) = x match {
-    case Def(Allocates(data, init)) => init
-    //case _ => err("Called a Rule with non-existant field : ")
-  }
-
-  def tpePars(x: Exp[Rule]) = x match {
-    case Def(Map(tpePars, argIndex, func)) => tpePars
-    case Def(Zip(tpePars, argIndices, func)) => tpePars
-    case Def(Reduce(tpePars, argIndex, zero, func)) => tpePars
-    case Def(Filter(tpePars, argIndex, cond, func)) => tpePars
-    case Def(Foreach(tpePars, argIndex, func)) => tpePars
-    //case _ => err("Called a Rule with non-existant field : ")
-  }
-
-  def argIndex(x: Exp[Rule]) = x match {
-    case Def(Map(tpePars, argIndex, func)) => argIndex
-    case Def(Reduce(tpePars, argIndex, zero, func)) => argIndex
-    case Def(Filter(tpePars, argIndex, cond, func)) => argIndex
-    case Def(Foreach(tpePars, argIndex, func)) => argIndex
-    //case _ => err("Called a Rule with non-existant field : ")
-  }
-
-  def argIndices(x: Exp[Rule]) = x match {
-    case Def(Zip(tpePars, argIndices, func)) => argIndices
-    //case _ => err("Called a Rule with non-existant field : ")
-  }
-
-  def zero(x: Exp[Rule]) = x match {
-    case Def(Reduce(tpePars, argIndex, zero, func)) => zero
-    //case _ => err("Called a Rule with non-existant field : ")
-  }
-
-  def cond(x: Exp[Rule]) = x match {
-    case Def(Filter(tpePars, argIndex, cond, func)) => cond
-    //case _ => err("Called a Rule with non-existant field : ")
-  }
 
   /**
    * DSLData

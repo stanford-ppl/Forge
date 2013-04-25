@@ -165,13 +165,11 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val elems = copyTransformedElems(collection.Seq(" + elems.mkString(",") + "))")
         case Def(Map(tpePars, argIndex, func)) =>
           //val dc = DeliteCollections(o.args.apply(argIndex).tpe)
-          DeliteCollections foreach(x => println(x._1))
-          val dc = DeliteCollections(o.args.apply(0).tpe) // todo gibbons4 "A vector only maps to a vector"
+          val dc = DeliteCollections(o.args.apply(0).tpe) 
           emitOpNodeHeader(o, "DeliteOpMap[" + quote(tpePars._1) + "," + quote(tpePars._2) + "," + makeTpeInst(o.args.apply(0).tpe, tpePars._2) + "]")            
           stream.println()
           stream.println("    val in = " + o.args.apply(argIndex).name)
           stream.println("    def func = " + inline(o,func,quoteLiteral))
-          // TODO: this isn't quite right. how do we know which of dc.allocs tpePars is the one that corresponds to our return tpe, e.g. tpePars._2?
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, tpePars._1, tpePars._2)) + "(len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")          
         case Def(Zip(tpePars, argIndices, func)) => 
@@ -385,8 +383,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(" + makeOpNodeName(o) + xformArgs + "(" + implicits + ")")
           stream.print(", mapOver(f,u), f(es)))")
           stream.println("(mtype(manifest[A]))")
-        // todo gibbons4 DeliteOpType
-        //case Def(x: DeliteRule) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
+        //case Def(_: DeliteRule) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
         case Def(SingleTask(f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
         case Def(Allocates(d,i)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
         case Def(Map(t,i,f)) => emitDeliteRuleMirror(o, stream, xformArgs, implicits)
@@ -508,7 +505,7 @@ trait DeliteGenOps extends BaseGenOps {
       emitBlockComment("Code generators", stream)   
       stream.println()
       for (g <- generators) { 
-        val rules = CodeGenRules(opsGrp.grp).filter(o => Rules(o).generator == g)
+        val rules = CodeGenRules(opsGrp.grp).filter(o => Rules(o) match {case Def(CodeGenDecl(generator, rule, isSimple)) => generator == g})
         if (rules.length > 0) {
           stream.println("trait " + g.name + "Gen" + opsGrp.name + " extends " + g.name + "GenFat {")
           stream.println("  val IR: " + opsGrp.name + "Exp")
@@ -516,11 +513,13 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println()
           stream.println("  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {")
           for (o <- rules if uniqueOps.contains(o)) {
-            val r = Rules(o)
-            if (r.isSimple)
-              stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + " => emitValDef(sym, " + quote(r.rule) + ")")
-            else 
-              stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + " => " + quote(r.rule))
+            val r = Rules(o) match {
+              case Def(CodeGenDecl(generator, rule, isSimple)) =>
+                if (isSimple)
+                  stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + " => emitValDef(sym, " + quote(rule) + ")")
+                else 
+                  stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(o) + " => " + quote(rule))
+            }
           }
           stream.println("    case _ => super.emitNode(sym, rhs)")
           stream.println("  }")

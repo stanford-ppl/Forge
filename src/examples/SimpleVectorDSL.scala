@@ -52,7 +52,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     // unfortunately, no braces allowed here   
     val vnew = op (Vector) ("apply", static, List(T), List(MInt), Vector, effect = mutable)
     allocates (vnew) (vdata, 
-      ("_length" -> quotedArg(0)), ("_data" -> ("array_new[T]("+quotedArg(0)+")"))
+      ("_length" -> quotedArg(0)), ("_data" -> ("array_empty[T]("+quotedArg(0)+")"))
     )
       
     val vapply = op (Vector) ("apply", infix, List(T), List(Vector,MInt), T)

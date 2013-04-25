@@ -119,7 +119,6 @@ def publish(dsl, opts):
         if os.path.exists(src):
             os.system("rsync -r " + src + " " + dest)
         os.system("rsync -r " + static + " " + dest)
-        print 'using human name : ' + human
         os.system("find " + dest + " -type f -print0 | xargs -0 sed -i \"s/HUMAN_DSL_NAME/"+human+"/g\"")
         os.system("find " + dest + " -type f -print0 | xargs -0 sed -i \"s/LOWERCASE_DSL_NAME/"+dsl+"/g\"")
           

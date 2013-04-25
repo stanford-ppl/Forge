@@ -38,19 +38,19 @@ trait ForgeApplicationRunner extends ForgeApplication with ForgeExp {
     // shared
     val sharedCodegen = new ForgeCodeGenShared {
       val IR: ForgeApplicationRunner.this.type = ForgeApplicationRunner.this 
-      val buildDir = build + File.separator + dsl.toLowerCase() + File.separator + "shared" 
+      val buildDir = build + File.separator + dsl + File.separator + "shared" 
     }
     
     // library (interpreter)
     val libraryCodegen = new ForgeCodeGenInterpreter { 
       val IR: ForgeApplicationRunner.this.type = ForgeApplicationRunner.this 
-      val buildDir = build + File.separator + dsl.toLowerCase() + File.separator + "library" 
+      val buildDir = build + File.separator + dsl + File.separator + "library" 
     }
     
     // delite
     val deliteCodegen = new ForgeCodeGenDelite { 
       val IR: ForgeApplicationRunner.this.type = ForgeApplicationRunner.this 
-      val buildDir = build + File.separator + dsl.toLowerCase() + File.separator + "compiler" 
+      val buildDir = build + File.separator + dsl + File.separator + "compiler" 
     }
 
     val codeGenerators = List(sharedCodegen, libraryCodegen, deliteCodegen)

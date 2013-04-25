@@ -94,6 +94,8 @@ object ${dslName}Build extends Build {
     return s.substitute(dslName=dsl)
  
 def publish(dsl, opts):
+    human = dsl
+    dsl = dsl.lower()
     if not os.path.isdir(FORGE_HOME + "/" + FORGE_GENERATED + "/" + dsl):
         err("could not find generated DSL " + dsl + ". (did you forget to run forge?)")
 
@@ -117,8 +119,9 @@ def publish(dsl, opts):
         if os.path.exists(src):
             os.system("rsync -r " + src + " " + dest)
         os.system("rsync -r " + static + " " + dest)
-        os.system("find " + dest + " -type f -print0 | xargs -0 sed -i \"s/HUMAN_DSL_NAME/"+dsl+"/g\"")
-        os.system("find " + dest + " -type f -print0 | xargs -0 sed -i \"s/LOWERCASE_DSL_NAME/"+dsl.lower()+"/g\"")
+        print 'using human name : ' + human
+        os.system("find " + dest + " -type f -print0 | xargs -0 sed -i \"s/HUMAN_DSL_NAME/"+human+"/g\"")
+        os.system("find " + dest + " -type f -print0 | xargs -0 sed -i \"s/LOWERCASE_DSL_NAME/"+dsl+"/g\"")
           
     os.system("rsync -r " + FORGE_HOME + "/apps/" + dsl + "/" + " " + build_dir + "/apps/")
 

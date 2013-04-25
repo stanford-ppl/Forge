@@ -35,21 +35,16 @@ trait LibGenPackages extends BaseGenPackages {
     stream.println()
     stream.println("}")    
     stream.println()
-    
-    stream.println("trait DeliteCompatibility extends Base {")
-    emitBlockComment("functionality that exists in Delite for DeliteArrays that we need an equivalent library implementation for", stream, indent=2)
-    stream.println("  type DeliteArray[T] = Array[T]")
-    stream.println("  def darray_copy[T:Manifest](src: Rep[Array[T]], srcPos: Rep[Int], dest: Rep[Array[T]], destPos: Rep[Int], size: Rep[Int]): Rep[Unit]")
-    stream.println("  def darray_new[T:Manifest](n: Rep[Int]): Rep[Array[T]]")        
-    stream.println("}")    
-    stream.println()
-    
+        
     // compiler ops mixes in an application ops with compiler only ops
-    stream.println("trait " + dsl + "CompilerOps extends " + dsl + "Application with DeliteCompatibility")
+    stream.println("trait " + dsl + "CompilerOps extends " + dsl + "Application")
     for (opsGrp <- opsGrps) {
       if (opsGrp.ops.exists(_.style == compiler))
-        stream.print(" with " + opsGrp.grp.name + "CompilerOps")      
+        stream.print(" with " + opsGrp.grp.name + "CompilerOps")          
     }      
+    for (e <- Externs) {
+      stream.print(" with " + e.opsGrp.grp.name + "CompilerOps")          
+    }
     stream.println()
     stream.println()
     
@@ -67,11 +62,6 @@ trait LibGenPackages extends BaseGenPackages {
       }
     }        
     stream.println()
-    emitBlockComment("delite compatibility implementations", stream, indent=2)
-    stream.println("  def darray_copy[T:Manifest](src: Array[T], srcPos: Int, dest: Array[T], destPos: Int, size: Int): Unit = {")
-    stream.println("    System.arraycopy(src,srcPos,dest,destPos,size)")
-    stream.println("  }")    
-    stream.println("  def darray_new[T:Manifest](n: Int): Array[T] = new Array[T](n)")        
     stream.println("}")
   }  
 }

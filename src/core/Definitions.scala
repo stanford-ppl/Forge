@@ -35,11 +35,8 @@ trait Definitions extends DerivativeTypes {
   
   // generic types
   // should these return a different Forge type (e.g. Rep[TypeConstructor] or Rep[GenericType]) than concrete types?
-  def GVar(tpePar: Rep[TypePar]) = tpe("Var", List(tpePar)) 
-  def GArray(tpePar: Rep[TypePar]) = tpe("Array", List(tpePar))     
-  
-  // DeliteArray
-  def DArray(tpePar: Rep[TypePar]) = tpe("DeliteArray", List(tpePar))
+  def MVar(tpePar: Rep[TypePar]) = tpe("Var", List(tpePar)) 
+  def MArray(tpePar: Rep[TypePar]) = tpe("ForgeArray", List(tpePar))     
   
   /**
    * DSLType placeholders
@@ -234,8 +231,6 @@ trait Definitions extends DerivativeTypes {
     
   /**
    * Filter
-   * 
-   * TODO: This is broken! We are missing DeliteCollection buffer functionality that is required for Filters.
    * 
    * @param tpePars   [A,R,C[R]]
    * @param argIndex  index of op argument that correspond to filter argument in (collection to be filtered)

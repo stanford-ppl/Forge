@@ -19,7 +19,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     /**
      * Include Scala ops
      */
-     addScalaOps()
+     addScalaOps() 
         
     /**
      * Types
@@ -34,7 +34,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     /**
      * Data structures
      */    
-    val vdata = data(Vector, List(T), ("_length", MInt), ("_data", DArray(T)))
+    val vdata = data(Vector, List(T), ("_length", MInt), ("_data", MArray(T)))
     
     /* Generic formatting instance */
     val stream = ForgePrinter()
@@ -52,7 +52,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     // unfortunately, no braces allowed here   
     val vnew = op (Vector) ("apply", static, List(T), List(MInt), Vector, effect = mutable)
     allocates (vnew) (vdata, 
-      ("_length" -> quotedArg(0)), ("_data" -> ("darray_new[T]("+quotedArg(0)+")"))
+      ("_length" -> quotedArg(0)), ("_data" -> ("array_new[T]("+quotedArg(0)+")"))
     )
       
     val vapply = op (Vector) ("apply", infix, List(T), List(Vector,MInt), T)
@@ -126,10 +126,10 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
                      
     // -- getters and setters
   
-    val vrawdata = op (Vector) ("vector_raw_data", compiler, List(T), List(Vector), DArray(T)) 
+    val vrawdata = op (Vector) ("vector_raw_data", compiler, List(T), List(Vector), MArray(T)) 
     getter (vrawdata) (0, "_data")
 
-    val vsetrawdata = op (Vector) ("vector_set_raw_data", compiler, List(T), List(Vector, DArray(T)), MUnit, effect = write(0))
+    val vsetrawdata = op (Vector) ("vector_set_raw_data", compiler, List(T), List(Vector, MArray(T)), MUnit, effect = write(0))
     setter (vsetrawdata) (0, "_data", quotedArg(1))
 
     val vlength = op (Vector) ("length", infix, List(T), List(Vector), MInt) 
@@ -165,7 +165,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
       stream.printLines(        
         "vector_ensureextra("+v+","+len+")",
         "val data = vector_raw_data("+v+")",
-        "darray_copy(data, "+pos+", data, "+pos+" + "+len+", "+v+".length - "+pos+")",
+        "array_copy(data, "+pos+", data, "+pos+" + "+len+", "+v+".length - "+pos+")",
         "vector_set_size("+v+", "+v+".length + "+len+")"
     )})
     
@@ -175,7 +175,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
       val extra = quotedArg(1)
       stream.printLines(        
         "val data = vector_raw_data("+v+")",
-        "if (data.length - "+v+".length < "+extra+") {",
+        "if (array_length(data) - "+v+".length < "+extra+") {",
         "  vector_realloc("+v+", "+v+".length + "+extra+")",
         "}"
     )})
@@ -186,12 +186,12 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
       val minLen = quotedArg(1)
       stream.printLines(        
         "val data = vector_raw_data("+v+")",
-        "var n = Math.max(4, data.length * 2)",
+        "var n = Math.max(4, array_length(data) * 2)",
         "while (n < "+minLen+") n = n*2",
-        "val d = darray_new[T](n)",
-        "darray_copy(data, 0, d, 0, "+v+".length)",        
-        "vector_set_raw_data("+v+", d.unsafeImmutable)"    
-    )})
+        "val d = array_empty[T](n)",
+        "array_copy(data, 0, d, 0, "+v+".length)",        
+        "vector_set_raw_data("+v+", array_asimmutable(d))"    
+    )})        
             
     /**
      * DeliteCollectionification
@@ -215,7 +215,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     single (vcopy) ({
       val src = "vector_raw_data(" + quotedArg(0) + ")"
       val dest = "vector_raw_data(" + quotedArg(2) + ")"
-      "darray_copy("+src+","+quotedArg(1)+","+dest+","+quotedArg(3)+","+quotedArg(4)+")"
+      "array_copy("+src+","+quotedArg(1)+","+dest+","+quotedArg(3)+","+quotedArg(4)+")"
     })
     
     Vector is DeliteCollectionBuffer(T, vnew, vlength, vapply, vupdate, /*vparallelization,*/ vsetsize, vappendable, vappend, vcopy)

@@ -53,7 +53,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   def isForgePrimitiveType(t: Rep[DSLType]) = t match {
     case `MInt` | `MDouble` | `MBoolean` | `MString` | `MUnit` | `MAny` | `MSourceContext` | `byName` => true
     case `CInt` | `CDouble` | `CBoolean` | `CString` | `CUnit` | `CAny` => true
-    case Def(Tpe("Array",_,_)) | Def(Tpe("Var",_,_)) | Def(Tpe("Overloaded",_,_)) => true
+    case Def(Tpe("ForgeArray",_,_)) | Def(Tpe("Var",_,_)) | Def(Tpe("Overloaded",_,_)) => true
     case _ => false
   }
   
@@ -167,15 +167,7 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     case Def(Arg(name,tpe,default)) => quote(name)
     case s@Sym(n) => err("could not resolve symbol " + findDefinition(s).toString + ". All Forge symbols must currently be statically resolvable.")
     case _ => super.quote(x)
-  }  
-  
-  /**
-   * Used for data structure generation
-   */
-  def quotePrimitive(x: Exp[Any]) : String = x match {
-    case Def(Tpe("DeliteArray",args,stage)) => "Array" + makeTpePars(args) 
-    case Def(Tpe(_,_,_)) => quote(x)
-  }
+  }    
 }
 
 /**

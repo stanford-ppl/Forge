@@ -30,7 +30,7 @@ trait HUMAN_DSL_NAMEDSL extends ForgeApplication with ScalaOps {
     /**
      * Data structures
      */
-    data(ParType, List(T), ("_length", MInt), ("_data", GArray(T)))
+    data(ParType, List(T), ("_length", MInt), ("_data", MArray(T)))
     
     /* Generic formatting instance */
     val stream = ForgePrinter()

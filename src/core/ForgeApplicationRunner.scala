@@ -18,10 +18,14 @@ trait ForgeApplicationRunner extends ForgeApplication with ForgeExp {
   final def main(args: Array[String]) {
     info("DSL Being Staged:[" + this.getClass.getName + "] (" + dsl + ")")
 
+    // -- stage forge primitives
+    extern(grp("ForgeArray"))
+    extern(grp("Var"), withLift = true)    
+
     // -- stage the specification to build the Forge IR
     // this has the side effect of populating all of the internal Forge collections
     val y = specification()
-    
+        
     // -- run sanity checkers
     // TODO: implement these!
     //  1) all ops that are declared as delite ops have delite collection input/outputs

@@ -480,7 +480,7 @@ trait DeliteGenOps extends BaseGenOps {
   
   def emitStructMethods(grp: Rep[DSLGroup], stream: PrintWriter) {
     def wrapManifest(t: Rep[DSLType]) = t match {
-      case Def(Tpe("DeliteArray",args,stage)) => "darrayManifest(m.typeArguments(0))"
+      case Def(Tpe("Array",args,stage)) => "darrayManifest(m.typeArguments(0))"
       case _ => "manifest[" + quote(t) + "]"
     }
     

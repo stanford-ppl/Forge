@@ -34,9 +34,9 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     /**
      * Data structures
      */    
-    data(Vector, List(T), ("_length", MInt), ("_data", MArray(T)))
+    data(Vector, ("_length", MInt), ("_data", MArray(T)))
     
-    /* Generic formatting instance */
+    /* Generic formatter */
     val stream = ForgePrinter()
         
     /**
@@ -47,9 +47,29 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     // doesn't rewrite correctly if we use "withTpe (Vector) {", but works if we use:
     val VectorOps = withTpe (Vector)
     VectorOps {
-      "abcdef" is (static, List(T), List(MInt), Vector, effect = mutable) implements {
-        allocates(Vector, quotedArg(0), "array_empty[T]("+quotedArg(0)+")")            
+      "sum" is (infix, (T withBound TNumeric), Vector, T) implements {
+        reduce((T,Vector), 0, lookup("Numeric","zero").get, "(a,b) => a+b")
       }
+
+      "pprint" is (infix, T, Vector, MUnit, effect = simple) implements {
+        foreach((T,Vector), 0, "a => println(a)") // will print out of order in parallel, but hey
+      }
+      
+      "slice" is (infix, T, (Vector, MInt, MInt), Vector) implements {
+        single { 
+          // inside single tasks we use normal DSL code just like applications would (modulo arg names)
+          stream.printLines(
+            "val st = " + quotedArg(1),
+            "val en = " + quotedArg(2),
+            "val out = Vector[T](en - st)",
+            "var i = st",        
+            "while (i < en) {",
+            "  out(i-st) = "+quotedArg(0)+"(i)",
+            "  i += 1",
+            "}",
+            "out"
+          )
+        }}              
     }
     /* -- */
     
@@ -102,26 +122,26 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     val vplus = op (Vector) ("+", infix, List(T withBound TNumeric), List(Vector,Vector), Vector)
     impl (vplus) (zip((T,T,T), (0,1), "(a,b) => a+b"))
     
-    val vsum = op (Vector) ("sum", infix, List(T withBound TNumeric), List(Vector), T)
-    impl (vsum) (reduce((T,Vector), 0, lookup("Numeric","zero").get, "(a,b) => a+b"))
-    
-    val vprint = op (Vector) ("pprint", infix, List(T), List(Vector), MUnit, effect = simple)
-    impl (vprint) (foreach((T,Vector), 0, "a => println(a)")) // will print out of order in parallel, but hey
-         
-    val vslice = op (Vector) ("slice", infix, List(T), List(Vector, MInt, MInt), Vector)
-    impl (vslice) (single { 
-      // inside single tasks we use normal DSL code just like applications would (modulo arg names)
-      stream.printLines(
-        "val st = " + quotedArg(1),
-        "val en = " + quotedArg(2),
-        "val out = Vector[T](en - st)",
-        "var i = st",        
-        "while (i < en) {",
-        "  out(i-st) = "+quotedArg(0)+"(i)",
-        "  i += 1",
-        "}",
-        "out"
-      )})        
+    // val vsum = op (Vector) ("sum", infix, List(T withBound TNumeric), List(Vector), T)
+    // impl (vsum) (reduce((T,Vector), 0, lookup("Numeric","zero").get, "(a,b) => a+b"))
+    // 
+    // val vprint = op (Vector) ("pprint", infix, List(T), List(Vector), MUnit, effect = simple)
+    // impl (vprint) (foreach((T,Vector), 0, "a => println(a)")) // will print out of order in parallel, but hey
+    //      
+    // val vslice = op (Vector) ("slice", infix, List(T), List(Vector, MInt, MInt), Vector)
+    // impl (vslice) (single { 
+    //   // inside single tasks we use normal DSL code just like applications would (modulo arg names)
+    //   stream.printLines(
+    //     "val st = " + quotedArg(1),
+    //     "val en = " + quotedArg(2),
+    //     "val out = Vector[T](en - st)",
+    //     "var i = st",        
+    //     "while (i < en) {",
+    //     "  out(i-st) = "+quotedArg(0)+"(i)",
+    //     "  i += 1",
+    //     "}",
+    //     "out"
+    //   )})        
                      
     // -- getters and setters
   

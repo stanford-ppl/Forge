@@ -132,13 +132,10 @@ trait FieldOpsExp extends FieldOps {
    * DSLData
    */
   def infix_tpe(x: Exp[DSLData])(implicit o: Overloaded2) = x match {
-    case Def(Data(tpe,tpePars,fields)) => tpe
+    case Def(Data(tpe,fields)) => tpe
   }  
-  def infix_tpePars(x: Exp[DSLData])(implicit o: Overloaded2) = x match {
-    case Def(Data(tpe,tpePars,fields)) => tpePars
-  }    
   def infix_fields(x: Exp[DSLData]) = x match {
-    case Def(Data(tpe,tpePars,fields)) => fields
+    case Def(Data(tpe,fields)) => fields
   }    
  
 }

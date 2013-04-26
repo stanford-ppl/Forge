@@ -112,13 +112,13 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       val tpe = grpAsTpe(opsGrp.grp)
       val d = DataStructs.get(tpe)
       d.foreach { data => 
-        stream.println("class " + data.tpe.name + makeTpeParsWithBounds(data.tpePars) + "(" + makeFieldArgs(data) + ") {")
+        stream.println("class " + data.tpe.name + makeTpeParsWithBounds(data.tpe.tpePars) + "(" + makeFieldArgs(data) + ") {")
         stream.println(makeFieldsWithInitArgs(data))
         for (o <- unique(opsGrp.ops) if o.style == infix && o.args.apply(0).tpe == tpe) {       
           stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
           //stream.print("(" + o.args/*.drop(1)*/.map(t => t.name + ": " + repify(t.tpe) + " = " + unit(t.default)).mkString(",") + ")") TODO 
           stream.print("(" + o.args.drop(1).map(t => argify(t, repify)).mkString(",") + ")")  
-          stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = data.tpePars))
+          stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = data.tpe.tpePars))
           stream.println(" = {")
           emitWithIndent("val " + o.args.apply(0).name + " = this", stream, 4)
           emitOp(o, stream, indent=4)

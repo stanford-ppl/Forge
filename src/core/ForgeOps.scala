@@ -19,7 +19,7 @@ trait ForgeOps extends Base {
   def ftpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency) = forge_ftpe(args, ret, freq)
   def arg(name: String, tpe: Rep[DSLType], default: Option[String] = None) = forge_arg(name, tpe, default)
   def lift(grp: Rep[DSLGroup])(tpe: Rep[DSLType]) = forge_lift(grp, tpe)
-  def data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: (String, Rep[DSLType])*) = forge_data(tpe, tpePars, fields)
+  def data(tpe: Rep[DSLType], fields: (String, Rep[DSLType])*) = forge_data(tpe, fields)
   
   implicit def namedTpeToArg(arg: (String, Rep[DSLType])): Rep[DSLArg] = forge_arg(arg._1, arg._2, None)
   implicit def namedTpeWithDefaultToArg(arg: (String, Rep[DSLType], String)): Rep[DSLArg] = forge_arg(arg._1, arg._2, Some(arg._3))
@@ -49,7 +49,7 @@ trait ForgeOps extends Base {
   def forge_anyToArg(a: (Any, Int)): Rep[DSLArg]
   def forge_ftpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency): Rep[DSLType]
   def forge_lift(grp: Rep[DSLGroup], tpe: Rep[DSLType]): Rep[Unit]
-  def forge_data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]  
+  def forge_data(tpe: Rep[DSLType], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]  
   def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
   def forge_impl(op: Rep[DSLOp], rule: OpType): Rep[Unit]
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
@@ -62,7 +62,18 @@ trait ForgeSugar extends ForgeOps {
   this: Forge =>
   
   /**
-   * Use Scala-Virtualized scopes to enable syntatic sugar for ops scoped on a particular DSLType
+   * Sugar available everywhere inside Forge
+   */
+  def infix_implements(o: Rep[DSLOp], rule: OpType) = forge_impl(o,rule)      
+   
+  implicit def singleToList[T](t: Rep[T]): List[Rep[T]] = List(t)
+  implicit def tuple2ToList[T](t: (Rep[T],Rep[T])): List[Rep[T]] = List(t._1,t._2)
+  implicit def tuple3ToList[T](t: (Rep[T],Rep[T],Rep[T])): List[Rep[T]] = List(t._1,t._2,t._3)
+  implicit def tuple4ToList[T](t: (Rep[T],Rep[T],Rep[T],Rep[T])): List[Rep[T]] = List(t._1,t._2,t._3)
+  implicit def tuple5ToList[T](t: (Rep[T],Rep[T],Rep[T],Rep[T],Rep[T])): List[Rep[T]] = List(t._1,t._2,t._3,t._4,t._5)  
+  
+  /**
+   * Uses Scala-Virtualized scopes to enable sugar for ops scoped on a particular DSLType
    */
   var _tpeScopeBox: Rep[DSLType] = null
   def withTpe(tpe: Rep[DSLType]) = {
@@ -74,13 +85,14 @@ trait ForgeSugar extends ForgeOps {
   }  
   
   trait TpeScope {
+    def data(fields: (String, Rep[DSLType])*) 
+      = forge_data(_tpeScopeBox, fields)
+      
     def op(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[Any]], retTpe: Rep[DSLType], effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext))
       = forge_op(_tpeScopeBox,name,style,tpePars,args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,retTpe,effect,aliasHint)      
       
     def infix_is(s: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[Any]], retTpe: Rep[DSLType], effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext))
       = forge_op(_tpeScopeBox,s,style,tpePars,args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,retTpe,effect,aliasHint)      
-
-    def infix_implements(o: Rep[DSLOp], rule: OpType) = forge_impl(o,rule)      
   }
   
   trait TpeScopeRunner extends TpeScope {
@@ -183,10 +195,10 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   }
 
   /* A back-end data structure */
-  case class Data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: Seq[(String, Exp[DSLType])]) extends Def[DSLData]
+  case class Data(tpe: Rep[DSLType], fields: Seq[(String, Exp[DSLType])]) extends Def[DSLData]
   
-  def forge_data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: Seq[(String, Exp[DSLType])]) = {
-    val d: Exp[DSLData] = Data(tpe, tpePars, fields)
+  def forge_data(tpe: Rep[DSLType], fields: Seq[(String, Exp[DSLType])]) = {
+    val d: Exp[DSLData] = Data(tpe, fields)
     if (DataStructs.contains(tpe)) err("multiple data structures declared for type " + tpe.name)        
     else DataStructs(tpe) = d
     d

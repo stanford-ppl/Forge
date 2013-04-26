@@ -23,8 +23,8 @@ trait DeliteGenOps extends BaseGenOps {
   }
   def baseExpCls(grp: Rep[DSLGroup]) = {
     // in order of decreasing inclusiveness
-    if (grpIsTpe(grp) && DeliteCollections.contains(grpAsTpe(grp)) && DataStructs.contains(grpAsTpe(grp))) "DeliteCollectionOpsExp with DeliteStructsExp"
-    else if (grpIsTpe(grp) && DeliteCollections.contains(grpAsTpe(grp))) "DeliteCollectionOpsExp"
+    if (grpIsTpe(grp) && ForgeCollections.contains(grpAsTpe(grp)) && DataStructs.contains(grpAsTpe(grp))) "DeliteCollectionOpsExp with DeliteStructsExp"
+    else if (grpIsTpe(grp) && ForgeCollections.contains(grpAsTpe(grp))) "DeliteCollectionOpsExp"
     else if (grpIsTpe(grp) && DataStructs.contains(grpAsTpe(grp))) "DeliteStructsExp"
     else if (OpsGrp.exists(g => g._2.ops.exists(o => o.effect != pure))) "BaseFatExp with EffectExp"
     else "BaseFatExp"
@@ -162,7 +162,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val elems = copyTransformedElems(collection.Seq(" + elems.mkString(",") + "))")
         case map:Map =>
           val colTpe = getHkTpe(o.retTpe)
-          val dc = DeliteCollections(colTpe)
+          val dc = ForgeCollections(colTpe)
           emitOpNodeHeader(o, "DeliteOpMap[" + quote(map.tpePars._1) + "," + quote(map.tpePars._2) + "," + makeTpeInst(colTpe, map.tpePars._2) + "]")            
           stream.println()
           stream.println("    val in = " + o.args.apply(map.argIndex).name)
@@ -172,7 +172,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")          
         case zip:Zip => 
           val colTpe = getHkTpe(o.retTpe)
-          val dc = DeliteCollections(colTpe)
+          val dc = ForgeCollections(colTpe)
           emitOpNodeHeader(o, "DeliteOpZipWith[" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + "," + quote(zip.tpePars._3) + "," + makeTpeInst(colTpe,zip.tpePars._3) + "]")            
           stream.println()
           stream.println("    val inA = " + o.args.apply(zip.argIndices._1).name)
@@ -182,7 +182,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
         case reduce:Reduce =>
           val colTpe = getHkTpe(reduce.tpePars._2)
-          val dc = DeliteCollections(colTpe)
+          val dc = ForgeCollections(colTpe)
           emitOpNodeHeader(o, "DeliteOpReduce[" + quote(reduce.tpePars._1) + "]")            
           stream.println()
           stream.println("    val in = " + o.args.apply(reduce.argIndex).name)
@@ -191,7 +191,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
         case filter:Filter =>
           val colTpe = getHkTpe(o.retTpe)
-          val dc = DeliteCollections(colTpe)
+          val dc = ForgeCollections(colTpe)
           emitOpNodeHeader(o, "DeliteOpFilter[" + quote(filter.tpePars._1) + "," + quote(filter.tpePars._2) + "," + quote(colTpe) + "]")            
           stream.println()
           stream.println("    val in = " + o.args.apply(filter.argIndex).name)
@@ -201,7 +201,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")                          
         case foreach:Foreach =>
           val colTpe = getHkTpe(foreach.tpePars._2)
-          val dc = DeliteCollections(colTpe)
+          val dc = ForgeCollections(colTpe)
           emitOpNodeHeader(o, "DeliteOpForeach[" + quote(foreach.tpePars._1) + "]")            
           stream.println()
           stream.println("    val in = " + o.args.apply(foreach.argIndex).name)
@@ -397,9 +397,9 @@ trait DeliteGenOps extends BaseGenOps {
   def emitDeliteCollection(grp: Rep[DSLGroup], stream: PrintWriter) {
     try {
       val tpe = grpAsTpe(grp)
-      if (DeliteCollections.contains(tpe)) {
+      if (ForgeCollections.contains(tpe)) {
         emitBlockComment("Delite collection", stream, indent=2)
-        val dc = DeliteCollections(tpe)        
+        val dc = ForgeCollections(tpe)        
         val isTpe = "is"+tpe.name
         def asTpe = "as"+tpe.name
         stream.println("  def " + isTpe + "[A](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = isSubtype(x.tp.erasure,classOf["+makeTpeInst(tpe, tpePar("A"))+"])")
@@ -421,8 +421,8 @@ trait DeliteGenOps extends BaseGenOps {
         stream.println("    else super.dc_update(x,n,y)")
         stream.println("  }")
         
-        if (dc.isInstanceOf[DeliteCollectionBuffer]) {
-          val dcb = dc.asInstanceOf[DeliteCollectionBuffer]
+        if (dc.isInstanceOf[ParallelCollectionBuffer]) {
+          val dcb = dc.asInstanceOf[ParallelCollectionBuffer]
           stream.println()          
           stream.println("  override def dc_parallelization[A:Manifest](x: Exp[DeliteCollection[A]], hasConditions: Boolean)(implicit ctx: SourceContext) = {")
           // stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.parallelization) + "(" + asTpe + "(x), hasConditions)") 

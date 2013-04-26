@@ -10,7 +10,7 @@ package core
 trait DerivativeTypes {
   this: Forge =>
   
-  abstract class DeliteCollectionType {
+  abstract class ForgeCollectionType {
     val tpeArg: Rep[DSLType]
     val alloc: Rep[DSLOp]
     val size: Rep[DSLOp]

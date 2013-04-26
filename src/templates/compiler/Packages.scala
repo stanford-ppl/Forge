@@ -66,7 +66,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     for (tpe <- Tpes) {      
       if (!isTpeInst(tpe) && !isForgePrimitiveType(tpe)) {
         stream.print("  abstract class " + quote(tpe))
-        if (DeliteCollections.contains(tpe)) stream.println(" extends DeliteCollection[" + quote(DeliteCollections(tpe).tpeArg) + "]") else stream.println()
+        if (ForgeCollections.contains(tpe)) stream.println(" extends DeliteCollection[" + quote(ForgeCollections(tpe).tpeArg) + "]") else stream.println()
         stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")      
       }
     }

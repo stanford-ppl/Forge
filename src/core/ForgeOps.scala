@@ -30,13 +30,13 @@ trait ForgeOps extends Base {
   def impl(op: Rep[DSLOp])(rule: OpType) = forge_impl(op,rule)  
   def extern(grp: Rep[DSLGroup], withLift: Boolean = false, targets: List[CodeGenerator] = generators) = forge_extern(grp, withLift, targets)
       
-  def infix_is(tpe: Rep[DSLType], dc: DeliteCollection) = forge_isdelitecollection(tpe, dc)  
-  case class DeliteCollection(val tpeArg: Rep[DSLType], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp]) extends DeliteCollectionType
-  def infix_is(tpe: Rep[DSLType], dc: DeliteCollectionBuffer) = forge_isdelitecollection_buffer(tpe,dc)
-  case class DeliteCollectionBuffer(
+  def infix_is(tpe: Rep[DSLType], dc: ParallelCollection) = forge_isparallelcollection(tpe, dc)  
+  case class ParallelCollection(val tpeArg: Rep[DSLType], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp]) extends ForgeCollectionType
+  def infix_is(tpe: Rep[DSLType], dc: ParallelCollectionBuffer) = forge_isparallelcollection_buffer(tpe,dc)
+  case class ParallelCollectionBuffer(
     val tpeArg: Rep[DSLType], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp],
     /*val parallelization: Rep[DSLOp],*/ val setSize: Rep[DSLOp], val appendable: Rep[DSLOp], val append: Rep[DSLOp], val copy: Rep[DSLOp]
-  ) extends DeliteCollectionType
+  ) extends ForgeCollectionType
 
   def lookup(grpName: String, opName: String): Option[Rep[DSLOp]]
   
@@ -54,8 +54,8 @@ trait ForgeOps extends Base {
   def forge_impl(op: Rep[DSLOp], rule: OpType): Rep[Unit]
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
   def forge_withBound(a: Rep[TypePar], b: TypeClass): Rep[TypePar]
-  def forge_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection): Rep[Unit]
-  def forge_isdelitecollection_buffer(tpe: Rep[DSLType], dc: DeliteCollectionBuffer): Rep[Unit]
+  def forge_isparallelcollection(tpe: Rep[DSLType], dc: ParallelCollection): Rep[Unit]
+  def forge_isparallelcollection_buffer(tpe: Rep[DSLType], dc: ParallelCollectionBuffer): Rep[Unit]
 }
 
 trait ForgeOpsExp extends ForgeOps with BaseExp {
@@ -70,7 +70,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   val DataStructs = HashMap[Exp[DSLType],Exp[DSLData]]()
   val OpsGrp = HashMap[Exp[DSLGroup],DSLOps]()  
   val Impls = HashMap[Exp[DSLOp],OpType]() 
-  val DeliteCollections = HashMap[Exp[DSLType], DeliteCollectionType]()
+  val ForgeCollections = HashMap[Exp[DSLType], ForgeCollectionType]()
   val Externs = ArrayBuffer[Extern]()
   
   /**
@@ -228,8 +228,8 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
     }
   }
     
-  /* Establishes that the given tpe implements the DeliteCollection interface */
-  def forge_isdelitecollection(tpe: Rep[DSLType], dc: DeliteCollection) = {
+  /* Establishes that the given tpe implements the ParallelCollection interface */
+  def forge_isparallelcollection(tpe: Rep[DSLType], dc: ParallelCollection) = {
     // verify the dc functions match our expectations
     
     // -- below causes scalac typer crash :(
@@ -244,13 +244,13 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
     // if (dc.update.args.size != 3 || (dc.update.args.apply(0).tpe, dc.update.args.apply(1).tpe, dc.update.args.apply(2).tpe) != (tpe, MInt, dc.tpeArg) || (dc.update.retTpe != MUnit))
     //   err("dcUpdate must take arguments of type (" + tpe.name + ", " + MInt.name + ", " + dc.tpeArg.name + ") and return " + MUnit.name)
     
-    DeliteCollections += (tpe -> dc)
+    ForgeCollections += (tpe -> dc)
     ()
   }
   
-  /* Establishes that the given tpe implements the DeliteCollectionBuffer interface */
-  def forge_isdelitecollection_buffer(tpe: Rep[DSLType], dc: DeliteCollectionBuffer) = {
-    DeliteCollections += (tpe -> dc)
+  /* Establishes that the given tpe implements the ParallelCollectionBuffer interface */
+  def forge_isparallelcollection_buffer(tpe: Rep[DSLType], dc: ParallelCollectionBuffer) = {
+    ForgeCollections += (tpe -> dc)
     ()
   }
   

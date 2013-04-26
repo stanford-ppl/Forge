@@ -179,18 +179,10 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
             
                   
     /**
-     * DeliteCollectionification
+     * ParallelCollectionification
      * This enables a tpe to be passed in as the collection type of a Delite op
      */
     
-    // Vector is DeliteCollection(T, vnew, vlength, vapply, vupdate)
-    
-    // what is this going to do in the library? should we have a different way of passing the parallelization strategy in the DeliteCollectionBuffer
-    // that does not require an op?
-    // val vparallelization = op (Vector) ("vector_parallelization", direct, List(T), List(Vector,MBoolean), DeliteParallelStrategy, composite(DeliteParallelStrategy, {
-    //     "if (" + quotedArg(1) + ") " + quote(parBuffer) + " else " + quote(parFlat)
-    // }))
-        
     val vappendable = op (Vector) ("vector_appendable", compiler, List(T), List(Vector,MInt,T), MBoolean)
     impl (vappendable) (single("true"))
 
@@ -201,7 +193,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
       "array_copy("+src+","+quotedArg(1)+","+dest+","+quotedArg(3)+","+quotedArg(4)+")"
     })
     
-    Vector is DeliteCollectionBuffer(T, vnew, vlength, vapply, vupdate, /*vparallelization,*/ vsetsize, vappendable, vappend, vcopy)
+    Vector is ParallelCollectionBuffer(T, vnew, vlength, vapply, vupdate, vsetsize, vappendable, vappend, vcopy)
         
     ()    
   }

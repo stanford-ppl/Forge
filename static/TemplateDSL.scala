@@ -45,10 +45,10 @@ trait HUMAN_DSL_NAMEDSL extends ForgeApplication with ScalaOps {
     val vupdate = op (ParType) ("update", infix, List(T), List(ParType,MInt,T), MUnit, codegenerated, effect = write(0))
     
     /**
-     * DeliteCollectionification
+     * ParallelCollectionification
      * This enables a tpe to be passed in as the collection type of a Delite op
      */
-    ParType is DeliteCollection(T, vnew, vlength, vapply, vupdate)
+    ParType is ParallelCollection(T, vnew, vlength, vapply, vupdate)
     
     /**
      * Code generators

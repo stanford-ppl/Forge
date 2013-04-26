@@ -209,30 +209,30 @@ trait BaseGenOps extends ForgeCodeGenBase {
         if (!data.get.fields.map(_.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)        
       case map:Map =>
         val col = o.args.apply(map.argIndex).tpe
-        if (DeliteCollections.get(col).isEmpty) err("map argument " + col.name + " is not a DeliteCollection")
+        if (ForgeCollections.get(col).isEmpty) err("map argument " + col.name + " is not a ParallelCollection")
         if (map.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("map op with undefined type par: " + o.name)
         if (map.argIndex < 0 || map.argIndex > o.args.length) err("map op with illegal arg parameter: " + o.name)
       case zip:Zip =>
         val colA = o.args.apply(zip.argIndices._1).tpe
         val colB = o.args.apply(zip.argIndices._2).tpe
-        if (DeliteCollections.get(colA).isEmpty) err("zip argument " + colA.name + " is not a DeliteCollection")
-        if (DeliteCollections.get(colB).isEmpty) err("zip argument " + colB.name + " is not a DeliteCollection")
+        if (ForgeCollections.get(colA).isEmpty) err("zip argument " + colA.name + " is not a ParallelCollection")
+        if (ForgeCollections.get(colB).isEmpty) err("zip argument " + colB.name + " is not a ParallelCollection")
         if (zip.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("zipWith op with undefined type parg: " + o.name)
         if (zip.argIndices.productIterator.asInstanceOf[Iterator[Int]].exists(a => a < 0 || a > o.args.length)) err("zipWith op with illegal arg parameter: " + o.name)
       case reduce:Reduce =>
         val col = o.args.apply(reduce.argIndex).tpe
-        if (DeliteCollections.get(col).isEmpty) err("reduce argument " + col.name + " is not a DeliteCollection")
+        if (ForgeCollections.get(col).isEmpty) err("reduce argument " + col.name + " is not a ParallelCollection")
         if (reduce.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("reduce op with undefined type par: " + o.name)
         if (reduce.argIndex < 0 || reduce.argIndex > o.args.length) err("reduce op with illegal arg parameter: " + o.name)        
         if (reduce.zero.retTpe != reduce.tpePars._1) err("reduce op with illegal zero parameter: " + o.name)
       case filter:Filter =>
         val col = o.args.apply(filter.argIndex).tpe
-        if (DeliteCollections.get(col).isEmpty || !DeliteCollections.get(col).forall(_.isInstanceOf[DeliteCollectionBuffer])) err("filter argument " + col.name + " is not a DeliteCollectionBuffer")
+        if (ForgeCollections.get(col).isEmpty || !ForgeCollections.get(col).forall(_.isInstanceOf[ParallelCollectionBuffer])) err("filter argument " + col.name + " is not a ParallelCollectionBuffer")
         if (filter.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("filter op with undefined type par: " + o.name)
         if (filter.argIndex < 0 || filter.argIndex > o.args.length) err("filter op with illegal arg parameter: " + o.name)      
       case foreach:Foreach =>
         val col = o.args.apply(foreach.argIndex).tpe
-        if (DeliteCollections.get(col).isEmpty) err("foreach argument " + col.name + " is not a DeliteCollection")
+        if (ForgeCollections.get(col).isEmpty) err("foreach argument " + col.name + " is not a ParallelCollection")
         if (foreach.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("foreach op with undefined type par: " + o.name)
         if (foreach.argIndex < 0 || foreach.argIndex > o.args.length) err("foreach op with illegal arg parameter: " + o.name)      
       case _ => // nothing to check

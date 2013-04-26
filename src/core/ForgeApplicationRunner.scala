@@ -31,6 +31,10 @@ trait ForgeApplicationRunner extends ForgeApplication with ForgeExp {
     //  1) all ops that are declared as delite ops have delite collection input/outputs
     // check(y)
 
+    // if (Config.debug) {
+      // println(globalDefs.mkString("\n"))
+    // }
+    
     Directory(Path(build)).deleteRecursively() 
     
     // -- run code generators

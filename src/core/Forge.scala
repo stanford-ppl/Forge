@@ -38,7 +38,7 @@ trait ForgeScalaCodeGenPkg extends ScalaGenEffect
 /**
  * This the trait that every Forge application must extend.
  */
-trait Forge extends ForgeScalaOpsPkg with Definitions with ForgeOps with FieldOps with QuoteOps with PrinterOps {
+trait Forge extends ForgeScalaOpsPkg with Definitions with ForgeSugar with FieldOps with QuoteOps with PrinterOps {
   this: ForgeApplication =>
 }
 

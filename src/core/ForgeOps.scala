@@ -58,7 +58,38 @@ trait ForgeOps extends Base {
   def forge_isparallelcollection_buffer(tpe: Rep[DSLType], dc: ParallelCollectionBuffer): Rep[Unit]
 }
 
-trait ForgeOpsExp extends ForgeOps with BaseExp {
+trait ForgeSugar extends ForgeOps {
+  this: Forge =>
+  
+  /**
+   * Use Scala-Virtualized scopes to enable syntatic sugar for ops scoped on a particular DSLType
+   */
+  var _tpeScopeBox: Rep[DSLType] = null
+  def withTpe(tpe: Rep[DSLType]) = {
+    _tpeScopeBox = tpe
+    new ChainTpe(tpe)
+  }
+  class ChainTpe(tpe: Rep[DSLType]) {
+    def apply(block: => Unit) = new Scope[TpeScope, TpeScopeRunner, Unit](block)
+  }  
+  
+  trait TpeScope {
+    def op(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[Any]], retTpe: Rep[DSLType], effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext))
+      = forge_op(_tpeScopeBox,name,style,tpePars,args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,retTpe,effect,aliasHint)      
+      
+    def infix_is(s: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[Any]], retTpe: Rep[DSLType], effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext))
+      = forge_op(_tpeScopeBox,s,style,tpePars,args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,retTpe,effect,aliasHint)      
+
+    def infix_implements(o: Rep[DSLOp], rule: OpType) = forge_impl(o,rule)      
+  }
+  
+  trait TpeScopeRunner extends TpeScope {
+    def apply: Any
+    apply
+  }    
+}
+
+trait ForgeOpsExp extends ForgeSugar with BaseExp {
   this: ForgeExp  =>
 
   /*

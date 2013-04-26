@@ -41,10 +41,18 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
         
     /**
      * Ops
-     * 
-     * We could simplify this by reusing templates even more, i.e. specializing for different types
-     * (e.g. accept a list of binary zip ops that only differentiate in function applied)
      */               
+    
+    /* Proof of concept / experimental syntatic sugar */
+    // doesn't rewrite correctly if we use "withTpe (Vector) {", but works if we use:
+    val VectorOps = withTpe (Vector)
+    VectorOps {
+      "abcdef" is (static, List(T), List(MInt), Vector, effect = mutable) implements {
+        allocates(Vector, quotedArg(0), "array_empty[T]("+quotedArg(0)+")")            
+      }
+    }
+    /* -- */
+    
     val vnew = op (Vector) ("apply", static, List(T), List(MInt), Vector, effect = mutable)
     impl (vnew) (allocates(Vector, quotedArg(0), "array_empty[T]("+quotedArg(0)+")"))
     

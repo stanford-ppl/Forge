@@ -30,7 +30,7 @@ trait Definitions extends DerivativeTypes {
   lazy val CUnit = tpe("Unit", stage = now)
   lazy val byName = tpe("Thunk")
   def MThunk(ret: Rep[DSLType], freq: Frequency = normal) = ftpe(List(forge_arg("", byName, None)),ret,freq) // TODO
-  def MFunction(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency = normal) = ftpe(args,ret,freq)
+  def MFunction(args: List[Rep[Any]], ret: Rep[DSLType], freq: Frequency = normal) = ftpe(args.zipWithIndex.map(anyToArg),ret,freq)
   lazy val MSourceContext = tpe("SourceContext")
   
   // generic types

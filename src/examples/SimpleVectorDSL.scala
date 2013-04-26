@@ -55,7 +55,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
         foreach((T,Vector), 0, "a => println(a)") // will print out of order in parallel, but hey
       }
       
-      "slice" is (infix, T, (Vector, MInt, MInt), Vector) implements {
+      "slice" is (infix, T, (Vector, MInt, MInt), Vector) implements 
         single { 
           // inside single tasks we use normal DSL code just like applications would (modulo arg names)
           stream.printLines(
@@ -69,7 +69,11 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
             "}",
             "out"
           )
-        }}              
+        }
+       
+      "map" is (infix, T, (Vector, T ==> T), Vector) implements {
+         map((T,T), 0, "e => "+quotedArg(1)+"(e)")
+      }
     }
     /* -- */
     
@@ -86,8 +90,9 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
       "array_update(vector_raw_data("+quotedArg(0)+"),"+quotedArg(1)+","+quotedArg(2)+")"
     })
     
-    val vtimesScalar = op (Vector) ("*", infix, List(T withBound TNumeric), List(Vector,T), Vector)
-    impl (vtimesScalar) (map((T,T), 0, "e => e*"+quotedArg(1)))
+    op (Vector) ("*", infix, (T withBound TNumeric), (Vector,T), Vector) implements {
+      map((T,T), 0, "e => e*"+quotedArg(1))
+    }
     
     val vfoo = op (Vector) ("foo", infix, List(T), List(Vector,T), tpeInst(Vector,List(MDouble)))
     impl (vfoo) (map((T,MDouble), 0, "e => unit(0.0)")) // problem: primitive lifting isn't in scope in the ops
@@ -97,20 +102,17 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     impl (vbar) (map((T,T), 0, "e => "+quotedArg("f")+"(e)")) 
 
     // generic map, reduce functions for vector
-    val mapper = MFunction(List(("x",T)),T)  // better syntax for functions would be nice
-    val reducer = MFunction(List(("a",T),("b",T)),T)      
-    val vmap = op (Vector) ("map", infix, List(T), List(Vector,mapper), Vector)
-    impl (vmap) (map((T,T), 0, "e => "+quotedArg(1)+"(e)"))
+    // val vmap = op (Vector) ("map", infix, List(T), List(Vector,T ==> T), Vector)
+    // impl (vmap) (map((T,T), 0, "e => "+quotedArg(1)+"(e)"))
         
-    val vreduce = op (Vector) ("reduce", infix, List(T withBound TNumeric), List(Vector,reducer), T)
+    val vreduce = op (Vector) ("reduce", infix, List(T withBound TNumeric), List(Vector,(T,T) ==> T), T)
     impl (vreduce) (reduce((T,Vector), 0, lookup("Numeric","zero").get, "(a,b) => "+quotedArg(1)+"(a,b)"))
   
-    val cond = MFunction(List(("x",T)),MBoolean)
-    val vfilter = op (Vector) ("filter", infix, List(T), List(Vector,cond), Vector)
+    val vfilter = op (Vector) ("filter", infix, List(T), List(Vector,T ==> MBoolean), Vector)
     impl (vfilter) (filter((T,T), 0, "e => " + quotedArg(1) + "(e)", "e => e"))
     
     // a composite op
-    val vmapreduce = op (Vector) ("mapreduce", infix, List(T withBound TNumeric), List(Vector,mapper,reducer), T)
+    val vmapreduce = op (Vector) ("mapreduce", infix, List(T withBound TNumeric), List(Vector,T ==> T,(T,T) ==> T), T)
     impl (vmapreduce) (composite { quotedArg(0)+".map("+quotedArg(1)+").reduce("+quotedArg(2)+")" })
     
     val vbasic = op (Vector) ("basic", infix, List(), List(MInt, ("y", MInt, "1"), ("z", MInt, "1")), MInt)

@@ -67,7 +67,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   val Lifts = HashMap[Exp[DSLGroup],ArrayBuffer[Exp[DSLType]]]()
   val TpeAliases = ArrayBuffer[Exp[TypeAlias]]()
   val Tpes = ArrayBuffer[Exp[DSLType]]()
-  val DataStructs = ArrayBuffer[Exp[DSLData]]()
+  val DataStructs = HashMap[Exp[DSLType],Exp[DSLData]]()
   val OpsGrp = HashMap[Exp[DSLGroup],DSLOps]()  
   val Impls = HashMap[Exp[DSLOp],OpType]() 
   val DeliteCollections = HashMap[Exp[DSLType], DeliteCollectionType]()
@@ -156,8 +156,8 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
   
   def forge_data(tpe: Rep[DSLType], tpePars: List[Rep[TypePar]], fields: Seq[(String, Exp[DSLType])]) = {
     val d: Exp[DSLData] = Data(tpe, tpePars, fields)
-    if (!DataStructs.contains(d)) DataStructs += d
-    if (DataStructs.map(_.tpe).distinct.length < DataStructs.length) err("multiple data structures declared for type " + tpe.name)        
+    if (DataStructs.contains(tpe)) err("multiple data structures declared for type " + tpe.name)        
+    else DataStructs(tpe) = d
     d
   }
   
@@ -212,7 +212,7 @@ trait ForgeOpsExp extends ForgeOps with BaseExp {
         
   // vet codegen rules and update the ops list if necessary
   def reconcileCodegenRule(op: Rep[DSLOp], rule: CodeGen) {
-    if (DataStructs.exists(d => op.args.exists(_.tpe == d.tpe)))
+    if (op.args.exists(a => DataStructs.contains(a.tpe)))
       err("(op " + op.name + ") code generated ops should not have struct types as inputs, since structs may be eliminated at compile time. consider passing in one or more fields of the struct as input(s) to the op instead.")
 
     // also may need to update opsGrp targets

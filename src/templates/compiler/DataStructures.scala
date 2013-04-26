@@ -26,7 +26,7 @@ trait DeliteGenDataStructures extends BaseGenDataStructures {
   def emitScalaStructs(path: String) {
     val scalaPath = path+File.separator+"scala"+File.separator
     Directory(Path(scalaPath)).createDirectory()
-    for (s <- DataStructs) {        
+    for ((t,s) <- DataStructs) {        
       val stream = new PrintWriter(new FileWriter(scalaPath+s.tpe.name+".scala"))
       stream.println("package " + packageName + ".datastruct.scala")
       stream.println()

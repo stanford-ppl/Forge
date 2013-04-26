@@ -54,9 +54,9 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         emitWithIndent(inline(o, quotedArg(structArgIndex)) + "." + field, stream, indent)
       case Setter(structArgIndex,field,value) =>
         emitWithIndent(inline(o, quotedArg(structArgIndex)) + "." + field + " = " + inline(o,value), stream, indent)
-      case Allocates(data,init) =>        
-        val initialVals = data.fields.map(f => inline(o,init(f._1))).mkString(",")              
-        emitWithIndent("new " + quote(data.tpe) + "(" + initialVals + ")", stream, indent)
+      case Allocates(tpe,init) =>        
+        val initialVals = init.map(i => inline(o,i)).mkString(",")              
+        emitWithIndent("new " + quote(tpe) + "(" + initialVals + ")", stream, indent)
       case single:SingleTask => 
         emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
       case composite:Composite =>
@@ -110,7 +110,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   def emitClass(opsGrp: DSLOps, stream: PrintWriter) {
     if (grpIsTpe(opsGrp.grp)) {
       val tpe = grpAsTpe(opsGrp.grp)
-      val d = DataStructs.find(_.tpe == tpe)
+      val d = DataStructs.get(tpe)
       d.foreach { data => 
         stream.println("class " + data.tpe.name + makeTpeParsWithBounds(data.tpePars) + "(" + makeFieldArgs(data) + ") {")
         stream.println(makeFieldsWithInitArgs(data))
@@ -141,7 +141,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       stream.println(" = {")      
       o.style match {
         case `static` => emitOp(o, stream, indent=4)
-        case `infix` if grpIsTpe(opsGrp.grp) && DataStructs.exists(_.tpe == grpAsTpe(opsGrp.grp) && o.args.apply(0).tpe == grpAsTpe(opsGrp.grp)) => 
+        case `infix` if grpIsTpe(opsGrp.grp) && DataStructs.contains(grpAsTpe(opsGrp.grp)) && o.args.apply(0).tpe == grpAsTpe(opsGrp.grp) => 
           //val args = o.args/*.drop(1)*/.map(t => t.name)).mkString(",")
           val args = o.args.drop(1).map(t => t.name).mkString(",")
           val argsWithParen = if (args == "") args else "(" + args + ")"

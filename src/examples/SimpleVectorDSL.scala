@@ -34,7 +34,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     /**
      * Data structures
      */    
-    val vdata = data(Vector, List(T), ("_length", MInt), ("_data", MArray(T)))
+    data(Vector, List(T), ("_length", MInt), ("_data", MArray(T)))
     
     /* Generic formatting instance */
     val stream = ForgePrinter()
@@ -46,7 +46,7 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
      * (e.g. accept a list of binary zip ops that only differentiate in function applied)
      */               
     val vnew = op (Vector) ("apply", static, List(T), List(MInt), Vector, effect = mutable)
-    impl (vnew) (allocates(vdata, ("_length" -> quotedArg(0)), ("_data" -> ("array_empty[T]("+quotedArg(0)+")"))))  
+    impl (vnew) (allocates(Vector, quotedArg(0), "array_empty[T]("+quotedArg(0)+")"))
     
     val vapply = op (Vector) ("apply", infix, List(T), List(Vector,MInt), T)
     impl (vapply) (composite {

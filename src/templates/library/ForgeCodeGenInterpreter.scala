@@ -86,7 +86,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
         grpStream.print(" with " + grp.name + "WrapperImpl")              
       }
     }       
-    for (d <- DataStructs.map(_.tpe) diff OpsGrp.keys.filter(grpIsTpe).map(grpAsTpe).toSeq) {
+    for (d <- DataStructs.keys.toSeq diff OpsGrp.keys.filter(grpIsTpe).map(grpAsTpe).toSeq) {
       warn("(library) ignoring data definition for " + d.name + " since it cannot be instantiated in app code (it has no accompanying ops)")
     }             
     for (e <- Externs) {

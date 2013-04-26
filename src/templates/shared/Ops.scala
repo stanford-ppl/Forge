@@ -190,20 +190,21 @@ trait BaseGenOps extends ForgeCodeGenBase {
   def check(o: Rep[DSLOp]) {
     if (!Impls.contains(o)) err("op " + o.name + " has no impl") 
     Impls(o) match {
-      case Allocates(data,init) =>
-        if ((data.fields.map(_._1).diff(init.keys.toSeq)).length > 0) {
-          err("allocator " + o.name + " does not have the same fields as data definition for " + data.tpe.name)
-        }
+      case Allocates(tpe,init) =>
+        if (!DataStructs.contains(tpe)) err("op " + o.name + " allocates tpe " + tpe.name + " with no corresponding data definition")
+        val data = DataStructs(tpe)
+        if (init.length != data.fields.length)
+          err("allocator " + o.name + " has a different number of fields than the data definition for " + tpe.name)
       case Getter(structArgIndex,field) =>
         if (structArgIndex > o.args.length) err("arg index " + structArgIndex + " does not exist for op " + o.name)
         val struct = o.args.apply(structArgIndex).tpe
-        val data = DataStructs.find(_.tpe == struct)
+        val data = DataStructs.get(struct)
         if (data.isEmpty) err("no struct definitions found for arg index " + structArgIndex + " in op " + o.name)
         if (!data.get.fields.map(_.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)
       case Setter(structArgIndex,field,value) =>
         if (structArgIndex > o.args.length) err("arg index " + structArgIndex + " does not exist for op " + o.name)
         val struct = o.args.apply(structArgIndex).tpe
-        val data = DataStructs.find(_.tpe == struct)
+        val data = DataStructs.get(struct)
         if (data.isEmpty) err("no struct definitions found for arg index " + structArgIndex + " in op " + o.name)
         if (!data.get.fields.map(_.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)        
       case map:Map =>

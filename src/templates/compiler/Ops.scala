@@ -23,9 +23,9 @@ trait DeliteGenOps extends BaseGenOps {
   }
   def baseExpCls(grp: Rep[DSLGroup]) = {
     // in order of decreasing inclusiveness
-    if (grpIsTpe(grp) && DeliteCollections.contains(grpAsTpe(grp)) && DataStructs.exists(_.tpe == grpAsTpe(grp))) "DeliteCollectionOpsExp with DeliteStructsExp"
+    if (grpIsTpe(grp) && DeliteCollections.contains(grpAsTpe(grp)) && DataStructs.contains(grpAsTpe(grp))) "DeliteCollectionOpsExp with DeliteStructsExp"
     else if (grpIsTpe(grp) && DeliteCollections.contains(grpAsTpe(grp))) "DeliteCollectionOpsExp"
-    else if (grpIsTpe(grp) && DataStructs.exists(_.tpe == grpAsTpe(grp))) "DeliteStructsExp"
+    else if (grpIsTpe(grp) && DataStructs.contains(grpAsTpe(grp))) "DeliteStructsExp"
     else if (OpsGrp.exists(g => g._2.ops.exists(o => o.effect != pure))) "BaseFatExp with EffectExp"
     else "BaseFatExp"
   }
@@ -154,9 +154,10 @@ trait DeliteGenOps extends BaseGenOps {
           emitOpNodeHeader(o, "Def[" + quote(o.retTpe) + "]") 
         case single:SingleTask =>
           emitOpNodeHeader(o, "DeliteOpSingleTask[" + quote(o.retTpe) + "](reifyEffectsHere("+makeOpImplMethodNameWithArgs(o)+"))")
-        case Allocates(data,init) =>
+        case Allocates(tpe,init) =>
           emitOpNodeHeader(o, "DeliteStruct[" + quote(o.retTpe) + "]")
-          val elemsPure = init map { case (k,v) => ("\""+k+"\"", inline(o,v,quoteLiteral)) }
+          val data = DataStructs(tpe)
+          val elemsPure = data.fields.zip(init) map { case ((name,t),i) => ("\""+name+"\"", inline(o,i,quoteLiteral)) }
           val elems = if (o.effect == mutable) elemsPure map { case (k,v) => (k, "var_new("+v+").e") } else elemsPure
           stream.println("    val elems = copyTransformedElems(collection.Seq(" + elems.mkString(",") + "))")
         case map:Map =>
@@ -258,10 +259,10 @@ trait DeliteGenOps extends BaseGenOps {
         case c:Composite if hasEffects => err("cannot have effects with composite ops currently")
         case c:Composite => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
         case g@Getter(structArgIndex,field) => 
-          val fieldTpe = DataStructs.find(_.tpe == o.args.apply(structArgIndex).tpe).get.fields.find(t => t._1 == field).get.tpe
+          val fieldTpe = DataStructs(o.args.apply(structArgIndex).tpe).fields.find(t => t._1 == field).get.tpe
           emitWithIndent("field["+quote(fieldTpe)+"]("+inline(o,quotedArg(structArgIndex),quoteLiteral)+",\""+field+"\")", stream, 4)        
         case s@Setter(structArgIndex,field,value) => 
-          val fieldTpe = DataStructs.find(_.tpe == o.args.apply(structArgIndex).tpe).get.fields.find(t => t._1 == field).get.tpe
+          val fieldTpe = DataStructs(o.args.apply(structArgIndex).tpe).fields.find(t => t._1 == field).get.tpe
           emitWithIndent("field_update["+quote(fieldTpe)+"]("+inline(o,quotedArg(structArgIndex),quoteLiteral)+",\""+field+"\","+inline(o,value,quoteLiteral)+")", stream, 4)        
         case _ if hasEffects =>
           // if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
@@ -467,8 +468,8 @@ trait DeliteGenOps extends BaseGenOps {
     
     try {
       val tpe = grpAsTpe(grp)
-      if (DataStructs.exists(_.tpe == tpe)) {
-        val d = DataStructs.find(_.tpe == tpe).get
+      if (DataStructs.contains(tpe)) {
+        val d = DataStructs(tpe)
         val fields = d.fields.map { case (fieldName,fieldType) => ("\""+fieldName+"\"", wrapManifest(fieldType)) }
         val erasureCls = makeTpeInst(tpe, tpePar("_"))        
         

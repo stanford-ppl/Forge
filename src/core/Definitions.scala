@@ -170,9 +170,9 @@ trait Definitions extends DerivativeTypes {
    * @param data     The data struct that this op allocates
    * @param init     A sequence of tuples (fieldName, initialValue)
    */ 
-  def forge_allocates(data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]): DeliteOpType
+  def forge_allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]): DeliteOpType
   object allocates {
-    def apply(data: Rep[DSLData], init: (String,Rep[String])*) = forge_allocates(data, init.toMap)
+    def apply(tpe: Rep[DSLType], init: Rep[String]*) = forge_allocates(tpe, init)
   }
   
 
@@ -293,8 +293,8 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
   /**
    * Delite ops
    */
-  case class Allocates(data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]) extends DeliteOpType
-  def forge_allocates(data: Rep[DSLData], init: scala.collection.immutable.Map[String,Rep[String]]) = Allocates(data,init)
+  case class Allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]) extends DeliteOpType
+  def forge_allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]) = Allocates(tpe,init)
    
   case class SingleTask(func: Rep[String]) extends DeliteOpType
   def forge_single(func: Rep[String]) = SingleTask(func)

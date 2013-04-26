@@ -75,6 +75,11 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case _ => false
   }
   
+  def getHkTpe(tpe: Rep[DSLType]) = tpe match {
+    case Def(TpeInst(hkTpe,_,_)) => hkTpe
+    case _ => tpe
+  }
+  
   def hasFuncArgs(o: Rep[DSLOp]) = o.args.exists(a => a match {
     case Def(Arg(_, Def(FTpe(args,ret,freq)), _)) => true
     case _ => false

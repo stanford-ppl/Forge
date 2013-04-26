@@ -183,6 +183,10 @@ trait BaseGenOps extends ForgeCodeGenBase {
    * 
    * These are mostly repetitive right now, but we could specialize the error checking more (or generalize it to be more concise).
    */
+  def validTpePar(o: Rep[DSLOp], tpePar: Rep[DSLType]) = tpePar match {
+    case Def(TpePar(name,_)) => o.tpePars.exists(_.name == name)
+    case _ => true
+  }
   def check(o: Rep[DSLOp]) {
     if (!Impls.contains(o)) err("op " + o.name + " has no impl") 
     Impls(o) match {
@@ -205,30 +209,30 @@ trait BaseGenOps extends ForgeCodeGenBase {
       case map:Map =>
         val col = o.args.apply(map.argIndex).tpe
         if (DeliteCollections.get(col).isEmpty) err("map argument " + col.name + " is not a DeliteCollection")
-        if (map.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("map op with undefined type arg: " + o.name)
+        if (map.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("map op with undefined type par: " + o.name)
         if (map.argIndex < 0 || map.argIndex > o.args.length) err("map op with illegal arg parameter: " + o.name)
       case zip:Zip =>
         val colA = o.args.apply(zip.argIndices._1).tpe
         val colB = o.args.apply(zip.argIndices._2).tpe
         if (DeliteCollections.get(colA).isEmpty) err("zip argument " + colA.name + " is not a DeliteCollection")
         if (DeliteCollections.get(colB).isEmpty) err("zip argument " + colB.name + " is not a DeliteCollection")
-        if (zip.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("zipWith op with undefined type arg: " + o.name)
+        if (zip.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("zipWith op with undefined type parg: " + o.name)
         if (zip.argIndices.productIterator.asInstanceOf[Iterator[Int]].exists(a => a < 0 || a > o.args.length)) err("zipWith op with illegal arg parameter: " + o.name)
       case reduce:Reduce =>
         val col = o.args.apply(reduce.argIndex).tpe
         if (DeliteCollections.get(col).isEmpty) err("reduce argument " + col.name + " is not a DeliteCollection")
-        if (reduce.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("reduce op with undefined type arg: " + o.name)
+        if (reduce.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("reduce op with undefined type par: " + o.name)
         if (reduce.argIndex < 0 || reduce.argIndex > o.args.length) err("reduce op with illegal arg parameter: " + o.name)        
         if (reduce.zero.retTpe != reduce.tpePars._1) err("reduce op with illegal zero parameter: " + o.name)
       case filter:Filter =>
         val col = o.args.apply(filter.argIndex).tpe
         if (DeliteCollections.get(col).isEmpty || !DeliteCollections.get(col).forall(_.isInstanceOf[DeliteCollectionBuffer])) err("filter argument " + col.name + " is not a DeliteCollectionBuffer")
-        if (filter.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("filter op with undefined type arg: " + o.name)
+        if (filter.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("filter op with undefined type par: " + o.name)
         if (filter.argIndex < 0 || filter.argIndex > o.args.length) err("filter op with illegal arg parameter: " + o.name)      
       case foreach:Foreach =>
         val col = o.args.apply(foreach.argIndex).tpe
         if (DeliteCollections.get(col).isEmpty) err("foreach argument " + col.name + " is not a DeliteCollection")
-        if (foreach.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("foreach op with undefined type arg: " + o.name)
+        if (foreach.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("foreach op with undefined type par: " + o.name)
         if (foreach.argIndex < 0 || foreach.argIndex > o.args.length) err("foreach op with illegal arg parameter: " + o.name)      
       case _ => // nothing to check
     }

@@ -53,41 +53,13 @@ trait HelloSimple extends SimpleVectorApplication {
     println("v5.sum:")
     val z = v5.sum
     println(z)
- 
-    // basic
-    val pp = 5.basic()
-    val pq = 5.basic(2)
-    val pr = 5.basic(2, 3)
-    val ps = 5.basic(y=4, z=5)
-    val pt = 5.basic(z=6, y=7)
-    val pu = 5.basic(y=8)
-    val pv = 5.basic(z=9)
-
-    println("5 and 13?")
-    println(pp + " " + pv)
-
-    val vdouble = Vector[Double](3)   
-    val vdz = vdouble.foo(77.7)
-    println("0?")
-    println(vdz(0))
-
-    val all_ones = v5.set(1, 2)
-    println("3?")
-    println(all_ones(0))
-    println("5?")
-    println(v5.set(x=2).apply(0))
     
-    // bar
-    val vb = v2.bar(e => e*3)
-    println("vb: ")
-    vb.pprint
-   
     // foreach
     println("v1.pprint:")
     v1.pprint
     
     // map,reduce,mapreduce
-    val vc = vb.map(e => e+2)
+    val vc = v1.map(e => e+2)
     println("vc.pprint:")
     vc.pprint
     val vc2 = vc.mapreduce(e => e-1, (a,b) => a+b)

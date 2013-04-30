@@ -23,6 +23,9 @@ import scala.virtualization.lms.util.OverloadHack
 
 trait FieldOps extends Base with OverloadHack {
   this: Forge =>  
+  
+  // needed for lookup
+  def infix_name(x: Rep[DSLType])(implicit o: Overloaded2): String 
 }
 
 trait FieldOpsExp extends FieldOps {

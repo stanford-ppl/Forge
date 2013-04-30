@@ -38,7 +38,9 @@ trait ForgeOps extends Base {
     /*val parallelization: Rep[DSLOp],*/ val setSize: Rep[DSLOp], val appendable: Rep[DSLOp], val append: Rep[DSLOp], val copy: Rep[DSLOp]
   ) extends ForgeCollectionType
 
-  def lookup(grpName: String, opName: String): Option[Rep[DSLOp]]
+  implicit def forceOpOption(o: Option[Rep[DSLOp]]): Rep[DSLOp]
+  def lookup(grpName: String, opName: String): Option[Rep[DSLOp]] = forge_lookup(grpName,opName,0)
+  def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup(grpName,opName,index)
   
   def forge_grp(name: String): Rep[DSLGroup]  
   def forge_tpealias(name: String, tpe: Rep[DSLType]): Rep[TypeAlias]
@@ -56,6 +58,7 @@ trait ForgeOps extends Base {
   def forge_withBound(a: Rep[TypePar], b: TypeClass): Rep[TypePar]
   def forge_isparallelcollection(tpe: Rep[DSLType], dc: ParallelCollection): Rep[Unit]
   def forge_isparallelcollection_buffer(tpe: Rep[DSLType], dc: ParallelCollectionBuffer): Rep[Unit]
+  def forge_lookup(grpName: String, opName: String, overloadedIndex: Int): Option[Rep[DSLOp]]  
 }
 
 trait ForgeSugar extends ForgeOps {
@@ -92,6 +95,8 @@ trait ForgeSugar extends ForgeOps {
   }  
   
   trait TpeScope {
+    // it appears that shadowing the Forge op with the simpler version makes the general version inaccessible unless we explicitly define it
+    
     def data(fields: (String, Rep[DSLType])*) 
       = forge_data(_tpeScopeBox, fields)
       
@@ -100,6 +105,16 @@ trait ForgeSugar extends ForgeOps {
       
     def infix_is(s: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[Any]], retTpe: Rep[DSLType], effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext))
       = forge_op(_tpeScopeBox,s,style,tpePars,args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,retTpe,effect,aliasHint)      
+  
+    abstract class ParallelizeKey
+    object parallelize extends ParallelizeKey
+    def infix_as(p: ParallelizeKey, dc: ParallelCollection) = forge_isparallelcollection(_tpeScopeBox, dc)  
+    def infix_as(p: ParallelizeKey, dc: ParallelCollectionBuffer) = forge_isparallelcollection_buffer(_tpeScopeBox, dc)  
+    
+    def lookup(opName: String) = forge_lookup(_tpeScopeBox.name,opName,0)
+    def lookup(grpName: String, opName: String) = forge_lookup(grpName,opName,0)    
+    def lookupOverloaded(opName: String, index: Int) = forge_lookup(_tpeScopeBox.name,opName,index)
+    def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup(grpName,opName,index)
   }
   
   trait TpeScopeRunner extends TpeScope {
@@ -127,8 +142,22 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   /**
    * Convenience method providing access to defined ops in other modules
    */  
-  def lookup(grpName: String, opName: String): Option[Rep[DSLOp]] = {
-    OpsGrp.find(t => t._1.name == grpName).flatMap(_._2.ops.find(_.name == opName))
+   
+  // this unsafe implicit is provided only to simplify the common case 
+  def forceOpOption(o: Option[Rep[DSLOp]]): Rep[DSLOp] = {
+    if (o.isEmpty) (err("Empty option " + o + " used as in place of an op argument"))
+    o.get
+  }
+  
+  def forge_lookup(grpName: String, opName: String, overloadedIndex: Int): Option[Rep[DSLOp]] = {
+    val matches = OpsGrp.find(t => t._1.name == grpName).map(_._2.ops.filter(_.name == opName))
+    if (matches.isDefined) {
+      if (overloadedIndex > matches.get.length-1) err("lookup failed: no op exists in grp " + grpName + " with name " + opName + " and index " + overloadedIndex)
+      Some(matches.get(overloadedIndex))
+    }
+    else {
+      None
+    }
   }
        
   /**

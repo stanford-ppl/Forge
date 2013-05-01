@@ -35,8 +35,8 @@ trait Definitions extends DerivativeTypes {
   
   // generic types
   // should these return a different Forge type (e.g. Rep[TypeConstructor] or Rep[GenericType]) than concrete types?
-  def MVar(tpePar: Rep[TypePar]) = tpe("Var", List(tpePar)) 
-  def MArray(tpePar: Rep[TypePar]) = tpe("ForgeArray", List(tpePar))     
+  lazy val MVar = tpe("Var", tpePar("A"))
+  lazy val MArray = tpe("ForgeArray", tpePar("A"))
   
   /**
    * DSLType placeholders
@@ -89,10 +89,10 @@ trait Definitions extends DerivativeTypes {
   /**
    * Method syntax types
    */
-  object static extends MethodType
+  object static extends MethodType  
   object infix extends MethodType
   object direct extends MethodType
-  object compiler extends MethodType
+  object compiler extends MethodType  
   
   // blacklist for op names that cannot be expressed with infix methods
   val noInfixList = List("apply", "update") 

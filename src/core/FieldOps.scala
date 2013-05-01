@@ -24,8 +24,12 @@ import scala.virtualization.lms.util.OverloadHack
 trait FieldOps extends Base with OverloadHack {
   this: Forge =>  
   
+  // TODO: hide these behind a forge cmd in ForgeOps
+  
   // needed for lookup
   def infix_name(x: Rep[DSLType])(implicit o: Overloaded2): String 
+  // needed for isSimple
+  def infix_tpePars(x: Rep[DSLType]): List[Rep[TypePar]]
 }
 
 trait FieldOpsExp extends FieldOps {

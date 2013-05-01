@@ -259,11 +259,13 @@ trait DeliteGenOps extends BaseGenOps {
         case c:Composite if hasEffects => err("cannot have effects with composite ops currently")
         case c:Composite => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
         case g@Getter(structArgIndex,field) => 
-          val fieldTpe = DataStructs(o.args.apply(structArgIndex).tpe).fields.find(t => t._1 == field).get.tpe
-          emitWithIndent("field["+quote(fieldTpe)+"]("+inline(o,quotedArg(structArgIndex),quoteLiteral)+",\""+field+"\")", stream, 4)        
-        case s@Setter(structArgIndex,field,value) => 
-          val fieldTpe = DataStructs(o.args.apply(structArgIndex).tpe).fields.find(t => t._1 == field).get.tpe
-          emitWithIndent("field_update["+quote(fieldTpe)+"]("+inline(o,quotedArg(structArgIndex),quoteLiteral)+",\""+field+"\","+inline(o,value,quoteLiteral)+")", stream, 4)        
+          val struct = o.args.apply(structArgIndex)
+          val fieldTpe = DataStructs(getHkTpe(struct.tpe)).fields.find(t => t._1 == field).get.tpe
+          emitWithIndent("field["+quote(fieldTpe)+"]("+inline(o,quotedArg(struct.name),quoteLiteral)+",\""+field+"\")", stream, 4)        
+        case s@Setter(structArgIndex,field,value) =>
+          val struct = o.args.apply(structArgIndex) 
+          val fieldTpe = DataStructs(getHkTpe(struct.tpe)).fields.find(t => t._1 == field).get.tpe
+          emitWithIndent("field_update["+quote(fieldTpe)+"]("+inline(o,quotedArg(struct.name),quoteLiteral)+",\""+field+"\","+inline(o,value,quoteLiteral)+")", stream, 4)        
         case _ if hasEffects =>
           // if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
           val prologue = if (o.effect == simple) " andAlso Simple()" else ""

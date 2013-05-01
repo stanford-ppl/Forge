@@ -9,13 +9,17 @@ import scala.collection.mutable.{ArrayBuffer,HashMap}
 
 trait ForgeOps extends Base {
   this: Forge =>
-    
+      
+  def infix_withBound(a: Rep[TypePar], b: TypeClass) = forge_withbound(a,b)
+  implicit class TpeClassOps(a: TypeClass) {
+    def apply(b: Rep[TypePar]*) = forge_typeclasson(a,b.toList)
+  }
+  
   def grp(name: String) = forge_grp(name)  
   def tpeAlias(name: String, tpe: Rep[DSLType]) = forge_tpealias(name, tpe)
-  def tpePar(name: String, ctxBounds: List[TypeClass] = List()) = forge_tpepar(name, ctxBounds) // TODO: type bounds
-  def infix_withBound(a: Rep[TypePar], b: TypeClass) = forge_withBound(a,b)  
+  def tpePar(name: String, ctxBounds: List[TypeClass] = List()) = forge_tpepar(name, ctxBounds) // TODO: type bounds    
   def tpe(name: String, tpePars: List[Rep[TypePar]] = List(), stage: StageTag = future) = forge_tpe(name, tpePars, stage)
-  def tpeInst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]] = List(), stage: StageTag = future) = forge_tpeinst(hkTpe, tpeArgs, stage)
+  def tpeInst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]] = List(), stage: StageTag = future) = forge_tpeinst(hkTpe, tpeArgs, stage)    
   def ftpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency) = forge_ftpe(args, ret, freq)
   def arg(name: String, tpe: Rep[DSLType], default: Option[String] = None) = forge_arg(name, tpe, default)
   def lift(grp: Rep[DSLGroup])(tpe: Rep[DSLType]) = forge_lift(grp, tpe)
@@ -24,7 +28,7 @@ trait ForgeOps extends Base {
   implicit def namedTpeToArg(arg: (String, Rep[DSLType])): Rep[DSLArg] = forge_arg(arg._1, arg._2, None)
   implicit def namedTpeWithDefaultToArg(arg: (String, Rep[DSLType], String)): Rep[DSLArg] = forge_arg(arg._1, arg._2, Some(arg._3))
   def anyToArg(a: (Any, Int)): Rep[DSLArg] = forge_anyToArg(a)
-  def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[Any]], retTpe: Rep[DSLType], effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext)) = 
+  def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[Any]], retTpe: Rep[DSLType], implicitArgs: List[Rep[DSLType]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = 
     forge_op(grp,name,style,tpePars,args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,retTpe,effect,aliasHint)
   
   def impl(op: Rep[DSLOp])(rule: OpType) = forge_impl(op,rule)  
@@ -45,6 +49,8 @@ trait ForgeOps extends Base {
   def forge_grp(name: String): Rep[DSLGroup]  
   def forge_tpealias(name: String, tpe: Rep[DSLType]): Rep[TypeAlias]
   def forge_tpepar(name: String, ctxBounds: List[TypeClass]): Rep[TypePar]
+  def forge_withbound(a: Rep[TypePar], b: TypeClass): Rep[TypePar] 
+  def forge_typeclasson(a: TypeClass, b: List[Rep[TypePar]]): Rep[DSLType] 
   def forge_tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag): Rep[DSLType]    
   def forge_tpeinst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]], stage: StageTag): Rep[DSLType]    
   def forge_arg(name: String, tpe: Rep[DSLType], default: Option[String]): Rep[DSLArg]
@@ -55,13 +61,12 @@ trait ForgeOps extends Base {
   def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
   def forge_impl(op: Rep[DSLOp], rule: OpType): Rep[Unit]
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
-  def forge_withBound(a: Rep[TypePar], b: TypeClass): Rep[TypePar]
   def forge_isparallelcollection(tpe: Rep[DSLType], dc: ParallelCollection): Rep[Unit]
   def forge_isparallelcollection_buffer(tpe: Rep[DSLType], dc: ParallelCollectionBuffer): Rep[Unit]
   def forge_lookup(grpName: String, opName: String, overloadedIndex: Int): Option[Rep[DSLOp]]  
 }
 
-trait ForgeSugar extends ForgeOps {
+trait ForgeSugar extends ForgeOps with ForgeUtilities {
   this: Forge =>
   
   /**
@@ -70,7 +75,7 @@ trait ForgeSugar extends ForgeOps {
   implicit def singleToList[T](t: Rep[T]): List[Rep[T]] = List(t)
   implicit def tuple2ToList[T](t: (Rep[T],Rep[T])): List[Rep[T]] = List(t._1,t._2)
   implicit def tuple3ToList[T](t: (Rep[T],Rep[T],Rep[T])): List[Rep[T]] = List(t._1,t._2,t._3)
-  implicit def tuple4ToList[T](t: (Rep[T],Rep[T],Rep[T],Rep[T])): List[Rep[T]] = List(t._1,t._2,t._3)
+  implicit def tuple4ToList[T](t: (Rep[T],Rep[T],Rep[T],Rep[T])): List[Rep[T]] = List(t._1,t._2,t._3,t._4)
   implicit def tuple5ToList[T](t: (Rep[T],Rep[T],Rep[T],Rep[T],Rep[T])): List[Rep[T]] = List(t._1,t._2,t._3,t._4,t._5)  
 
   implicit def namedArgToList(t: (String,Rep[DSLType])): List[Rep[DSLArg]] = List(namedTpeToArg(t))
@@ -79,9 +84,19 @@ trait ForgeSugar extends ForgeOps {
   implicit def namedArg4ToList(t: ((String,Rep[DSLType]),(String,Rep[DSLType]),(String,Rep[DSLType]),(String,Rep[DSLType]))): List[Rep[DSLArg]] = List(namedTpeToArg(t._1),namedTpeToArg(t._2),namedTpeToArg(t._3),namedTpeToArg(t._4))
   implicit def namedArg5ToList(t: ((String,Rep[DSLType]),(String,Rep[DSLType]),(String,Rep[DSLType]),(String,Rep[DSLType]),(String,Rep[DSLType]))): List[Rep[DSLArg]] = List(namedTpeToArg(t._1),namedTpeToArg(t._2),namedTpeToArg(t._3),namedTpeToArg(t._4),namedTpeToArg(t._5))
 
+  implicit def defaultArgToList(t: (String,Rep[DSLType],String)): List[Rep[DSLArg]] = List(namedTpeWithDefaultToArg(t))
+  implicit def defaultArg2ToList(t: ((String,Rep[DSLType],String),(String,Rep[DSLType],String))): List[Rep[DSLArg]] = List(namedTpeWithDefaultToArg(t._1),namedTpeWithDefaultToArg(t._2))
+  implicit def defaultArg3ToList(t: ((String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String))): List[Rep[DSLArg]] = List(namedTpeWithDefaultToArg(t._1),namedTpeWithDefaultToArg(t._2),namedTpeWithDefaultToArg(t._3))
+  implicit def defaultArg4ToList(t: ((String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String))): List[Rep[DSLArg]] = List(namedTpeWithDefaultToArg(t._1),namedTpeWithDefaultToArg(t._2),namedTpeWithDefaultToArg(t._3),namedTpeWithDefaultToArg(t._4))
+  implicit def defaultArg5ToList(t: ((String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String))): List[Rep[DSLArg]] = List(namedTpeWithDefaultToArg(t._1),namedTpeWithDefaultToArg(t._2),namedTpeWithDefaultToArg(t._3),namedTpeWithDefaultToArg(t._4),namedTpeWithDefaultToArg(t._5))
+  
   def infix_implements(o: Rep[DSLOp], rule: OpType) = forge_impl(o,rule)      
   def infix_==>(args: List[Rep[Any]], ret: Rep[DSLType]) = MFunction(args,ret)
-  
+        
+  implicit class TpeOps(hkTpe: Rep[DSLType]) {
+    def apply(tpeArgs: Rep[DSLType]*) = tpeInst(hkTpe, tpeArgs.toList)
+  }
+    
   /**
    * Uses Scala-Virtualized scopes to enable sugar for ops scoped on a particular DSLType
    */
@@ -99,12 +114,21 @@ trait ForgeSugar extends ForgeOps {
     
     def data(fields: (String, Rep[DSLType])*) 
       = forge_data(_tpeScopeBox, fields)
+          
+    // 'is' is a sugared version of 'op' designed to be declared inside a tpe scope 
+    // it automatically imports the enclosing type as a type parameter and an instance of that type as the first argument, exported under 'self' 
+    def infix_is(s: String, style: MethodType, args: List[Rep[Any]], retTpe: Rep[DSLType], implicitArgs: List[Rep[DSLType]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
+      val t = _tpeScopeBox
       
-    def op(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[Any]], retTpe: Rep[DSLType], effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext))
-      = forge_op(_tpeScopeBox,name,style,tpePars,args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,retTpe,effect,aliasHint)      
+      if (style == static) {
+        warn("op " + s + ": static methods should normally be not be declared with 'is'")
+      }
       
-    def infix_is(s: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[Any]], retTpe: Rep[DSLType], effect: EffectType = pure, aliasHint: AliasHint = nohint, implicitArgs: List[Rep[DSLType]] = List(MSourceContext))
-      = forge_op(_tpeScopeBox,s,style,tpePars,args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,retTpe,effect,aliasHint)      
+      val amendedTpePars = (t.tpePars ::: addTpePars).distinct
+      val amendedArgs = namedTpeToArg("self",tpeInst(t,t.tpePars)) :: args.zipWithIndex.map(t => anyToArg(t._1,t._2+1)).asInstanceOf[List[Rep[DSLArg]]] // arg numbering starts at 1
+      
+      forge_op(_tpeScopeBox,s,style,amendedTpePars,amendedArgs,implicitArgs,retTpe,effect,aliasHint)        
+    }      
   
     abstract class ParallelizeKey
     object parallelize extends ParallelizeKey
@@ -185,8 +209,10 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   def forge_tpepar(name: String, ctxBounds: List[TypeClass]) = TpePar(name, ctxBounds)
   
   /* Adds a bound to a type parameter by constructing a new type parameter */
-  def forge_withBound(a: Rep[TypePar], b: TypeClass) = tpePar(a.name, b :: a.ctxBounds)
-   
+  def forge_withbound(a: Rep[TypePar], b: TypeClass) = tpePar(a.name, b :: a.ctxBounds)
+  
+  def forge_typeclasson(a: TypeClass, b: List[Rep[TypePar]]) = ephemeralTpe(a.name, b)
+
   /* A DSLType */    
   case class Tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag) extends Def[DSLType]
   
@@ -256,8 +282,11 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     if (retTpe == MUnit && effect == pure) {
       warn("op " + name + " has return type " + MUnit.name + " but no effects, so it is a no-op")
     }
+        
+    // always add source context
+    val amendedImplicitArgs = (MSourceContext :: implicitArgs).distinct 
     
-    val o = Op(_grp, name, style, tpePars, args, implicitArgs, retTpe, effect, aliasHint)
+    val o = Op(_grp, name, style, tpePars, args, amendedImplicitArgs, retTpe, effect, aliasHint)
     val opsGrp = OpsGrp.getOrElseUpdate(_grp, new DSLOps {
       val grp = _grp
       override def targets: List[CodeGenerator] = Nil
@@ -317,11 +346,11 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     //   // TODO: how should this work? alloc can really map to anything.. e.g can have other fields that get mapped from the inputs in arbitrary ways
     //   // needs to be specified in the zip in some context attached to the alloc method?      
     //   err("dcAlloc must take a single argument of type " + MInt.name + " and return an instance of " + tpe.name)
-    // if (dc.size.args.size != 1 || dc.size.args.apply(0).tpe != tpe || (dc.size.retTpe != MInt))
+    // if (dc.size.args.size != 1 || getHkTpe(dc.size.args.apply(0).tpe) != tpe || (dc.size.retTpe != MInt))
     //   err("dcSize must take a single argument of type " + tpe.name + " and return an MInt")
-    // if (dc.apply.args.size != 2 || (dc.apply.args.apply(0).tpe, dc.apply.args(1).tpe) != (tpe, MInt) || (dc.apply.retTpe != dc.tpeArg))
+    // if (dc.apply.args.size != 2 || (getHkTpe(dc.apply.args.apply(0).tpe), dc.apply.args(1).tpe) != (tpe, MInt) || (dc.apply.retTpe != dc.tpeArg))
     //   err("dcApply must take two arguments of type(" + tpe.name + ", " + MInt.name + ") and return a " + dc.tpeArg.name)
-    // if (dc.update.args.size != 3 || (dc.update.args.apply(0).tpe, dc.update.args.apply(1).tpe, dc.update.args.apply(2).tpe) != (tpe, MInt, dc.tpeArg) || (dc.update.retTpe != MUnit))
+    // if (dc.update.args.size != 3 || (getHkTpe(dc.update.args.apply(0).tpe), dc.update.args.apply(1).tpe, dc.update.args.apply(2).tpe) != (tpe, MInt, dc.tpeArg) || (dc.update.retTpe != MUnit))
     //   err("dcUpdate must take arguments of type (" + tpe.name + ", " + MInt.name + ", " + dc.tpeArg.name + ") and return " + MUnit.name)
     
     ForgeCollections += (tpe -> dc)

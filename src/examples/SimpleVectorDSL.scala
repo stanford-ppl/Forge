@@ -32,61 +32,65 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
   
   
   def addVectorOps() {            
-    val T = tpePar("T")
-    // val Vector = tpe("Vector", numTpePars = 1) 
-    val Vector = tpe("Vector", T)
+    // generic type parameters we will use 
+    val T = tpePar("T") 
+    val R = tpePar("R")
+    
+    val Vector = tpe("Vector", T) 
   
     // doesn't rewrite correctly if we use "withTpe (Vector) {", but works if we use:
     val VectorOps = withTpe (Vector)
           
-    VectorOps {            
+    VectorOps {                  
       // data fields     
       data(("_length", MInt), ("_data", MArray(T)))
 
 
       // allocation
-      "apply" is (static, T, (MInt), Vector, effect = mutable) implements allocates(Vector, quotedArg(0), "array_empty[T]("+quotedArg(0)+")")
+      op (Vector) ("apply", static, T, (MInt), Vector(T), effect = mutable) implements allocates(Vector, quotedArg(0), "array_empty[T]("+quotedArg(0)+")")
       
             
       // getters and setters
-      "vector_raw_data" is (compiler, T, (Vector), MArray(T)) implements getter(0, "_data")
-      "vector_set_raw_data" is (compiler, T, (Vector, MArray(T)), MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
-      "length" is (infix, T, (Vector), MInt) implements getter(0, "_length")
-      "vector_set_length" is (compiler, T, (Vector,MInt), MUnit, effect = write(0)) implements setter(0, "_length", quotedArg(1))      
+      "vector_raw_data" is (compiler, Nil, MArray(T)) implements getter(0, "_data")
+      "vector_set_raw_data" is (compiler, (MArray(T)), MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
+      "length" is (infix, Nil, MInt) implements getter(0, "_length")
+      "vector_set_length" is (compiler, (MInt), MUnit, effect = write(0)) implements setter(0, "_length", quotedArg(1))      
       
       
       // data ops             
-      "apply" is (infix, T, (Vector,MInt), T) implements composite {
-        "array_apply(vector_raw_data("+quotedArg(0)+"),"+quotedArg(1)+")"
+      "apply" is (infix, (MInt), T) implements composite {
+        "array_apply(vector_raw_data("+quotedArg("self")+"),"+quotedArg(1)+")"
       }      
-      "update" is (infix, T, (Vector,MInt,T), MUnit, effect = write(0)) implements composite {
-        "array_update(vector_raw_data("+quotedArg(0)+"),"+quotedArg(1)+","+quotedArg(2)+")"
+      // example named arg
+      "update" is (infix, (("i",MInt),("e",T)), MUnit, effect = write(0)) implements composite {
+        "array_update(vector_raw_data("+quotedArg("self")+"),"+quotedArg("i")+","+quotedArg("e")+")"
       }
-      "slice" is (infix, T, (Vector, MInt, MInt), Vector) implements single {
+      // example named, default arg. List is currently explicitly needed when mixing arg types.
+      "slice" is (infix, List(("start",MInt,"0"),("end",MInt)), Vector(T)) implements single {
         // inside single tasks we use normal DSL code just like applications would (modulo arg names)
         stream.printLines(
-          "val st = " + quotedArg(1),
-          "val en = " + quotedArg(2),
+          "val st = " + quotedArg("start"),
+          "val en = " + quotedArg("end"),
           "val out = Vector[T](en - st)",
           "var i = st",        
           "while (i < en) {",
-          "  out(i-st) = "+quotedArg(0)+"(i)",
+          "  out(i-st) = "+quotedArg("self")+"(i)",
           "  i += 1",
           "}",
           "out"
         )
       }      
-      "insert" is (infix, T, (Vector,MInt,T), MUnit, effect = write(0)) implements single {
+      "insert" is (infix, (MInt,T), MUnit, effect = write(0)) implements single {
         stream.printLines(
-          "vector_insertspace("+quotedArg(0)+","+quotedArg(1)+",1)",
-          quotedArg(0)+"("+quotedArg(1)+") = " + quotedArg(2)
+          "vector_insertspace("+quotedArg("self")+","+quotedArg(1)+",1)",
+          quotedArg("self")+"("+quotedArg(1)+") = " + quotedArg(2)
         )
       }
-      "append" is (infix, T, (Vector,MInt,T), MUnit, effect = write(0)) implements single {
-        quotedArg(0)+".insert("+quotedArg(0)+".length, "+quotedArg(2)+")"
+      "append" is (infix, (MInt,T), MUnit, effect = write(0)) implements single {
+        quotedArg("self")+".insert("+quotedArg("self")+".length, "+quotedArg(2)+")"
       }        
-      "vector_insertspace" is (compiler, T, List(Vector,MInt,MInt), MUnit, effect = write(0)) implements single {
-        val v = quotedArg(0)
+      "vector_insertspace" is (compiler, (MInt,MInt), MUnit, effect = write(0)) implements single {
+        val v = quotedArg("self")
         val pos = quotedArg(1)
         val len = quotedArg(2)
         // can clean this up using string interpolation.. but how does that interact with stream.printLines? can we get rid of stream.printLines?
@@ -97,8 +101,8 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
           "vector_set_length("+v+", "+v+".length + "+len+")"
         )
       }
-      "vector_ensureextra" is (compiler, T, (Vector,MInt), MUnit, effect = write(0)) implements single {
-        val v = quotedArg(0)
+      "vector_ensureextra" is (compiler, (MInt), MUnit, effect = write(0)) implements single {
+        val v = quotedArg("self")
         val extra = quotedArg(1)
         stream.printLines(        
           "val data = vector_raw_data("+v+")",
@@ -107,8 +111,8 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
           "}"
         )
       }
-      "vector_realloc" is (compiler, T, (Vector,MInt), MUnit, effect = write(0)) implements single {
-        val v = quotedArg(0)
+      "vector_realloc" is (compiler, (MInt), MUnit, effect = write(0)) implements single {
+        val v = quotedArg("self")
         val minLen = quotedArg(1)
         stream.printLines(        
           "val data = vector_raw_data("+v+")",
@@ -122,31 +126,31 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
       
       
       // math      
-      "+" is (infix, (T withBound TNumeric), (Vector,Vector), Vector) implements zip((T,T,T), (0,1), "(a,b) => a+b")
-      "*" is (infix, (T withBound TNumeric), (Vector,T), Vector) implements map((T,T), 0, "e => e*"+quotedArg(1))      
-      "sum" is (infix, (T withBound TNumeric), Vector, T) implements reduce((T,Vector), 0, lookup("Numeric","zero"), "(a,b) => a+b")
+      "+" is (infix, (Vector(T)), Vector(T), TNumeric(T)) implements zip((T,T,T), (0,1), "(a,b) => a+b")
+      "*" is (infix, (T), Vector(T), TNumeric(T)) implements map((T,T), 0, "e => e*"+quotedArg(1))      
+      "sum" is (infix, Nil, T, TNumeric(T)) implements reduce((T,Vector), 0, lookup("Numeric","zero"), "(a,b) => a+b")
              
       // bulk        
-      "map" is (infix, T, (Vector, T ==> T), Vector) implements map((T,T), 0, "e => "+quotedArg(1)+"(e)")
-      "reduce" is (infix, (T withBound TNumeric), (Vector,(T,T) ==> T), T) implements reduce((T,Vector), 0, lookup("Numeric","zero"), {
+      "map" is (infix, (T ==> R), Vector(R), addTpePars = R) implements map((T,R), 0, "e => "+quotedArg(1)+"(e)")
+      "reduce" is (infix, ((T,T) ==> T), T, TNumeric(T)) implements reduce((T,Vector), 0, lookup("Numeric","zero"), {
         "(a,b) => "+quotedArg(1)+"(a,b)"
       })
-      "filter" is (infix, T, (Vector,T ==> MBoolean), Vector) implements filter((T,T), 0, "e => " + quotedArg(1) + "(e)", "e => e")
-      "mapreduce" is (infix, (T withBound TNumeric), (Vector,T ==> T,(T,T) ==> T), T) implements composite {
-        quotedArg(0)+".map("+quotedArg(1)+").reduce("+quotedArg(2)+")"
+      "filter" is (infix, (T ==> MBoolean), Vector(T)) implements filter((T,T), 0, "e => " + quotedArg(1) + "(e)", "e => e")
+      "mapreduce" is (infix, (T ==> T,(T,T) ==> T), T, TNumeric(T)) implements composite {
+        quotedArg("self")+".map("+quotedArg(1)+").reduce("+quotedArg(2)+")"
       }
       
       
       // misc      
       // will print out of order in parallel, but hey
-      "pprint" is (infix, T, Vector, MUnit, effect = simple) implements foreach((T,Vector), 0, "a => println(a)") 
+      "pprint" is (infix, Nil, MUnit, effect = simple) implements foreach((T,Vector), 0, "a => println(a)") 
       
             
       // parallel collectionification
       // This enables a tpe to be passed in as the collection type of a Delite op      
-      "vector_appendable" is (compiler, T, (Vector,MInt,T), MBoolean) implements single("true")
-      "vector_copy" is (compiler, T, (Vector,MInt,Vector,MInt,MInt), MUnit, effect = write(2)) implements single {
-        val src = "vector_raw_data(" + quotedArg(0) + ")"
+      "vector_appendable" is (compiler, (MInt,T), MBoolean) implements single("true")
+      "vector_copy" is (compiler, (MInt,Vector(T),MInt,MInt), MUnit, effect = write(2)) implements single {
+        val src = "vector_raw_data(" + quotedArg("self") + ")"
         val dest = "vector_raw_data(" + quotedArg(2) + ")"
         "array_copy("+src+","+quotedArg(1)+","+dest+","+quotedArg(3)+","+quotedArg(4)+")"
       }

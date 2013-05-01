@@ -114,7 +114,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
   // typed implicit args without context bounds
   def makeImplicitArgsWithType(implicitArgs: List[Rep[DSLType]], asVals: Boolean = false) = {
     val prefix = if (asVals == true) "val " else ""
-    if (implicitArgs.length > 0) "(implicit " + implicitArgs.zipWithIndex.map(t => prefix + implicitOpArgPrefix + t._2 + ": " + t._1.name).mkString(",") + ")"
+    if (implicitArgs.length > 0) "(implicit " + implicitArgs.zipWithIndex.map(t => prefix + implicitOpArgPrefix + t._2 + ": " + quote(t._1)).mkString(",") + ")"
     else ""    
   } 
   def makeOpImplicitArgsWithType(o: Rep[DSLOp], asVals: Boolean = false) = makeImplicitArgsWithType(o.implicitArgs, asVals)
@@ -197,41 +197,41 @@ trait BaseGenOps extends ForgeCodeGenBase {
           err("allocator " + o.name + " has a different number of fields than the data definition for " + tpe.name)
       case Getter(structArgIndex,field) =>
         if (structArgIndex > o.args.length) err("arg index " + structArgIndex + " does not exist for op " + o.name)
-        val struct = o.args.apply(structArgIndex).tpe
+        val struct = getHkTpe(o.args.apply(structArgIndex).tpe)
         val data = DataStructs.get(struct)
         if (data.isEmpty) err("no struct definitions found for arg index " + structArgIndex + " in op " + o.name)
         if (!data.get.fields.map(_.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)
       case Setter(structArgIndex,field,value) =>
         if (structArgIndex > o.args.length) err("arg index " + structArgIndex + " does not exist for op " + o.name)
-        val struct = o.args.apply(structArgIndex).tpe
+        val struct = getHkTpe(o.args.apply(structArgIndex).tpe)
         val data = DataStructs.get(struct)
         if (data.isEmpty) err("no struct definitions found for arg index " + structArgIndex + " in op " + o.name)
         if (!data.get.fields.map(_.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)        
       case map:Map =>
-        val col = o.args.apply(map.argIndex).tpe
+        val col = getHkTpe(o.args.apply(map.argIndex).tpe)
         if (ForgeCollections.get(col).isEmpty) err("map argument " + col.name + " is not a ParallelCollection")
         if (map.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("map op with undefined type par: " + o.name)
         if (map.argIndex < 0 || map.argIndex > o.args.length) err("map op with illegal arg parameter: " + o.name)
       case zip:Zip =>
-        val colA = o.args.apply(zip.argIndices._1).tpe
-        val colB = o.args.apply(zip.argIndices._2).tpe
+        val colA = getHkTpe(o.args.apply(zip.argIndices._1).tpe)
+        val colB = getHkTpe(o.args.apply(zip.argIndices._2).tpe)
         if (ForgeCollections.get(colA).isEmpty) err("zip argument " + colA.name + " is not a ParallelCollection")
         if (ForgeCollections.get(colB).isEmpty) err("zip argument " + colB.name + " is not a ParallelCollection")
         if (zip.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("zipWith op with undefined type parg: " + o.name)
         if (zip.argIndices.productIterator.asInstanceOf[Iterator[Int]].exists(a => a < 0 || a > o.args.length)) err("zipWith op with illegal arg parameter: " + o.name)
       case reduce:Reduce =>
-        val col = o.args.apply(reduce.argIndex).tpe
+        val col = getHkTpe(o.args.apply(reduce.argIndex).tpe)
         if (ForgeCollections.get(col).isEmpty) err("reduce argument " + col.name + " is not a ParallelCollection")
         if (reduce.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("reduce op with undefined type par: " + o.name)
         if (reduce.argIndex < 0 || reduce.argIndex > o.args.length) err("reduce op with illegal arg parameter: " + o.name)        
         if (reduce.zero.retTpe != reduce.tpePars._1) err("reduce op with illegal zero parameter: " + o.name)
       case filter:Filter =>
-        val col = o.args.apply(filter.argIndex).tpe
+        val col = getHkTpe(o.args.apply(filter.argIndex).tpe)
         if (ForgeCollections.get(col).isEmpty || !ForgeCollections.get(col).forall(_.isInstanceOf[ParallelCollectionBuffer])) err("filter argument " + col.name + " is not a ParallelCollectionBuffer")
         if (filter.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("filter op with undefined type par: " + o.name)
         if (filter.argIndex < 0 || filter.argIndex > o.args.length) err("filter op with illegal arg parameter: " + o.name)      
       case foreach:Foreach =>
-        val col = o.args.apply(foreach.argIndex).tpe
+        val col = getHkTpe(o.args.apply(foreach.argIndex).tpe)
         if (ForgeCollections.get(col).isEmpty) err("foreach argument " + col.name + " is not a ParallelCollection")
         if (foreach.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("foreach op with undefined type par: " + o.name)
         if (foreach.argIndex < 0 || foreach.argIndex > o.args.length) err("foreach op with illegal arg parameter: " + o.name)      
@@ -322,12 +322,12 @@ trait BaseGenOps extends ForgeCodeGenBase {
         stream.println("  implicit def varTo" + tpe.name + "Ops" + makeTpeParsWithBounds(tpe.tpePars) + "(x: " + varify(tpe) + ") = new " + tpe.name + "OpsCls(readVar(x))")
       }
       stream.println("")
-      stream.println("  class " + tpe.name + "OpsCls" + makeTpeParsWithBounds(tpe.tpePars) + "(val " + opArgPrefix + "0: " + repify(tpe) + ") {")
+      stream.println("  class " + tpe.name + "OpsCls" + makeTpeParsWithBounds(tpe.tpePars) + "(val self: " + repify(tpe) + ") {")
     
       for (o <- pimpOps) {
         val tpe = grpAsTpe(opsGrp.grp)
         val otherArgs = "(" + o.args.drop(1).map(t => t.name + ": " + repifySome(t.tpe) /*+ " = " + unit(t.default)*/).mkString(",") + ")" // TODO
-        stream.println("    def " + o.name + makeTpeParsWithBounds(o.tpePars.filter(p => tpe.tpePars.contains(p.name))) + otherArgs
+        stream.println("    def " + o.name + makeTpeParsWithBounds(o.tpePars.filterNot(p => tpe.tpePars.map(_.name).contains(p.name))) + otherArgs
           + (makeImplicitArgsWithCtxBoundsWithType(implicitArgsWithOverload(o), o.tpePars, without = tpe.tpePars)) + " = " + makeOpMethodNameWithFutureArgs(o))          
       }        
       stream.println("  }")

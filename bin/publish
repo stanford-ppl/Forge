@@ -111,7 +111,7 @@ def publish(dsl, opts):
     for t in ['shared','compiler','library']:
         static = FORGE_HOME + "/static/extern/" + t + "/src/"
         src = FORGE_HOME + "/extern/" + dsl + "/" + t + "/src/"
-        dest = build_dir + "/" + t + "/src/" + dsl + "/extern/"
+        dest = build_dir + "/" + t + "/src/" + dsl.lower() + "/extern/"
         if not os.path.exists(dest):
             os.mkdir(dest)
         if os.path.exists(src):

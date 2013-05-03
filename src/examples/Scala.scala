@@ -34,27 +34,25 @@ trait ScalaOps extends ForgeApplication {
     impl (println2) (codegen($cala, "println()"))
     
     val whileDo = op (Misc) ("__whileDo", direct, List(), List(MThunk(MBoolean),MThunk(MUnit)), MUnit, effect = simple)        
-    val stream = ForgePrinter()    
-    impl (whileDo) (codegen($cala, stream.printLines(
-      "while ({",
-        blockResult(whileDo, 0),
-      "}) {",
-        blockResult(whileDo, 1),
-      "}"
-    )))
     
-    // TODO: something is broken with IfThenElse here; bound symbols (effects) are getting hoisted if the frequencies are not set to cold.
+    // function (block) arguments should be referenced using $b[<arg name>]
+    impl (whileDo) (codegen($cala, ${
+      while ({ $b[0] }) {
+        $b[1]
+      }
+    }))
+    
+    // TODO: something is broken with IfThenElse here; bound symbols (effects) are getting hoisted if the frequencies are not set to cold.    
     val T = tpePar("T")
     val ifThenElse = op (Misc) ("__ifThenElse", direct, List(T), List(MThunk(MBoolean),MThunk(T,cold),MThunk(T,cold)), T) 
-    impl (ifThenElse) (codegen($cala, stream.printLines(
-      "if ({",
-        blockResult(ifThenElse, 0),
-      "}){",
-        blockResult(ifThenElse, 1),
-      "} else {",
-        blockResult(ifThenElse, 2),
-      "}"
-    )))    
+    impl (ifThenElse) (codegen($cala, ${
+      if ({ $b[0] }) {
+        $b[1]
+      } 
+      else {
+        $b[2]
+      }
+    }))
     
     val immutable = op (Misc) ("unsafeImmutable", infix, List(T), List(T), T, aliasHint = copies(0))
     impl (immutable) (codegen($cala, quotedArg(0)))

@@ -31,14 +31,10 @@ trait HUMAN_DSL_NAMEDSL extends ForgeApplication with ScalaOps {
      * Data structures
      */
     data(ParType, List(T), ("_length", MInt), ("_data", MArray(T)))
-    
-    /* Generic formatting instance */
-    val stream = ForgePrinter()
-        
+                
     /**
      * Ops
-     */           
-        
+     */                   
     val vnew = op (ParType) ("apply", static, List(T), List(MInt), ParType, codegenerated, effect = mutable)
     val vlength = op (ParType) ("length", infix, List(T), List(ParType), MInt, codegenerated)    
     val vapply = op (ParType) ("apply", infix, List(T), List(ParType,MInt), T, codegenerated)
@@ -52,8 +48,7 @@ trait HUMAN_DSL_NAMEDSL extends ForgeApplication with ScalaOps {
     
     /**
      * Code generators
-     */
-      
+     */      
     codegen (vnew) ($cala, "new "+vnew.tpeName+"["+vnew.tpeInstance(0)+"]("+quotedArg(0)+", new Array["+vnew.tpeInstance(0)+"]("+quotedArg(0)+"))")
     codegen (vlength) ($cala, quotedArg(0) + "._length")
     codegen (vapply) ($cala, quotedArg(0) + "._data.apply(" + quotedArg(1) + ")")

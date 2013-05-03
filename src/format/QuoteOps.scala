@@ -29,18 +29,20 @@ trait QuoteOps extends Base {
   implicit def dslOpToPublicOps(x: Rep[DSLOp]) = new {
     def tpeInstance(i: Int) = quote_tpeinstance(x,i)
     def tpeName = quote_tpename(x)
-    def quotedArg(i: Int) = quote_quotedarginstance(/*x,*/i)
+    def quotedArg(i: Int) = quote_quotedarginstance(opArgPrefix+i)
     def quotedArg(name: String) = quote_quotedarginstance(name)
   }
 
-  def quotedArg(i: Int) = quote_quotedarginstance(i)
+  def quotedArg(i: Int) = quote_quotedarginstance(opArgPrefix+i)
+  def quotedArg(i: Int, op: Rep[DSLOp]) = quote_quotedarginstance_withop(opArgPrefix+i,op)
   def quotedArg(name: String) = quote_quotedarginstance(name)
+  def quotedArg(name: String, op: Rep[DSLOp]) = quote_quotedarginstance_withop(name,op)
+  
+  // these need to return String and use wildcards instead of Rep[String] in order to interoperate properly with string interpolation
   def quote_tpeinstance(x: Rep[DSLOp], i: Int): String
   def quote_tpename(x: Rep[DSLOp]): String  
-  // def quote_arginstance(x: Rep[DSLOp], i: Int): Rep[DSLType]
-  // def quote_quotedarginstance(x: Rep[DSLOp], i: Int): String
-  def quote_quotedarginstance(i: Int): String
   def quote_quotedarginstance(name: String): String
+  def quote_quotedarginstance_withop(name: String, op: Rep[DSLOp]): String
 
   // convenience method for handling Seq[_] in code generators
   // TODO: instead of providing multiple methods, e.g. quotedArg and quotedSeq, should we have a more generic quote?
@@ -48,12 +50,6 @@ trait QuoteOps extends Base {
   //  quote(anew.args(0)) // type is VarArgs
   def quotedSeq(i: Int): Rep[String]
   
-  /**
-   * Function tpes
-   */
-  def blockResult(x: Rep[DSLOp], argIndex: Int) = quote_blockresult(x,argIndex)
-  
-  def quote_blockresult(x: Rep[DSLOp], argIndex: Int): Rep[String]
 
   /**
    * Util
@@ -75,25 +71,24 @@ trait QuoteOpsExp extends QuoteOps {
   /**
    * DSLOp accessors
    */
+  
+  // Function block args require the op to be passed (in order to extract the arguments to the function) to be quoted correctly
+  // investigate: can we remove this dependency to simplify the preprocessor?
+  case class QuoteBlockResult(name: String, args: List[Rep[DSLArg]], ret: Rep[DSLType]) extends Def[String]
+    
   def quote_tpeinstance(x: Rep[DSLOp], i: Int) = unquotes("remap(" + opIdentifierPrefix + "." + TManifest.prefix + x.tpePars.apply(i).name + ")")
   def quote_tpename(x: Rep[DSLOp]) = x.grp.name
-  def quote_quotedarginstance(i: Int) = unquotes("quote(" + opArgPrefix + i + ")")
   def quote_quotedarginstance(name: String) = unquotes("quote(" + name + ")")
+  def quote_quotedarginstance_withop(name: String, op: Rep[DSLOp]) = op.args.find(_.name == name) match {
+    case None => err("could not quote arg - no arg name " + name + " in op " + op.name)   
+    case Some(Def(Arg(name, Def(FTpe(args,ret,freq)), d2))) => symMarker + toAtom(QuoteBlockResult(name,args,ret)).asInstanceOf[Sym[Any]].id + symMarker
+    case _ => quote_quotedarginstance(name)
+  }
   
   /**
    * Sequences
    */  
   case class QuoteSeq(arg: String) extends Def[String]
   def quotedSeq(arg: Int) = QuoteSeq(opArgPrefix + arg)
-  def quotedSeq(arg: String) = QuoteSeq(arg)
-  
-  /**
-   * Function types
-   */    
-  case class QuoteBlockResult(name: String, args: List[Rep[DSLArg]], ret: Rep[DSLType]) extends Def[String]
-  
-  def quote_blockresult(x: Rep[DSLOp], argIndex: Int) = x.args.apply(argIndex) match {
-    case Def(Arg(name, Def(FTpe(args,ret,freq)), d2)) => QuoteBlockResult(name,args,ret)
-    case _ => err("cannot quote block result of non-function type " + x.name)
-  }
+  def quotedSeq(arg: String) = QuoteSeq(arg)  
 }

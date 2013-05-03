@@ -29,7 +29,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   
   override def quote(x: Exp[Any]): String = x match {          
     // case Def(QuoteSeq(i)) => "("+i+": _*)"  // not exactly a quoted sequence..
-    case Def(QuoteSeq(argName)) => argName      
+    case Def(QuoteSeq(argName)) => argName         
     case Const(s: String) => replaceWildcards(s) // don't add quotes     
     case _ => super.quote(x)
   }  
@@ -39,9 +39,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     stream.println()
     stream.println("trait " + opsGrp.grp.name + "WrapperImpl {")
     stream.println("  this: " + dsl + "Application with " + dsl + "CompilerOps => ")
-    stream.println()    
-    emitSingleTaskImplMethods(opsGrp, stream, 2)
-    emitCompositeImplMethods(opsGrp, stream, 2)
+    stream.println()        
+    emitAllImplMethods(opsGrp, stream, 2)    
     stream.println("}")
   }
       
@@ -49,7 +48,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     Impls(o) match {
       case codegen:CodeGen => 
         val rule = codegen.decls.getOrElse($cala, err("could not find Scala codegen rule for op: " + o.name))
-        emitWithIndent(inline(o, rule.decl), stream, indent) 
+        inline(o, rule.decl, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent) }
       case Getter(structArgIndex,field) =>
         emitWithIndent(inline(o, quotedArg(o.args.apply(structArgIndex).name)) + "." + field, stream, indent)
       case Setter(structArgIndex,field,value) =>

@@ -11,6 +11,7 @@ trait Definitions extends DerivativeTypes {
   val opArgPrefix = "__arg"
   val implicitOpArgPrefix = "__imp"
   val qu = "__quote"
+  val symMarker = "__sym"
     
   /**
    * Built-in types
@@ -135,9 +136,9 @@ trait Definitions extends DerivativeTypes {
   /**
    * Codegenerated
    */
-  def forge_codegen(generator: CodeGenerator, rule: Rep[String], isSimple: Boolean): OpType
+  def forge_codegen(generator: CodeGenerator, rule: Rep[String]): OpType
   object codegen {
-    def apply(generator: CodeGenerator, rule: Rep[String], isSimple: Boolean = true) = forge_codegen(generator,rule,isSimple)
+    def apply(generator: CodeGenerator, rule: Rep[String]) = forge_codegen(generator,rule)
   }
   
   /**
@@ -271,14 +272,10 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
    // def parBuffer = ParBuffer()
    // def parFlat = ParFlat()
 
-  case class CodeGenDecl(decl: Rep[String], isSimple: Boolean)    
+  case class CodeGenDecl(decl: Rep[String])    
   case class CodeGen(decls: scala.collection.mutable.HashMap[CodeGenerator,CodeGenDecl]) extends OpType
-  def forge_codegen(generator: CodeGenerator, rule: Rep[String], isSimple: Boolean) = {
-    val isSimple = rule match {
-      case Def(PrintLines(x, l)) => false
-      case _ => true
-    }
-    CodeGen(scala.collection.mutable.HashMap(generator -> CodeGenDecl(rule, isSimple)))    
+  def forge_codegen(generator: CodeGenerator, rule: Rep[String]) = {
+    CodeGen(scala.collection.mutable.HashMap(generator -> CodeGenDecl(rule)))    
   }
   
   case class Getter(structArgIndex: Int, field: String) extends OpType

@@ -31,23 +31,9 @@ trait DeliteGenOps extends BaseGenOps {
   }
   
   override def quote(x: Exp[Any]): String = x match {
-    case Def(PrintLines(p,lines)) if quoteLiterally => super.quote(x)
-    case Def(PrintLines(p,lines)) =>
-      val body = lines.flatMap(l => quote(l).split(nl))      
-      // how do we decide whether to add stream.println?
-      def addPrint(s: String) = {
-        // hack! (or heuristic, if the glass is half full)
-        !s.startsWith("emit")
-      }      
-      val body2 = body map { l => if (addPrint(l)) "stream.println("+l+")" else l }      
-      val result = ("stream.println(\"val \"+quote(sym)+\" = {\")" :: body2) :+ "stream.println(\"}\")"
-          
-      // add indentation and newline
-      nl + result.map(r => (" "*6)+r).mkString(nl)
-      
     case Def(QuoteBlockResult(name,args,ret)) =>
-      "emitBlock(" + name + ")" + nl + 
-      "quote(getBlockResult(" + name + "))"
+      "\"" + nl + "emitBlock(" + name + ")" +
+      nl + "quote(getBlockResult(" + name + "))" + nl + "\""    
  
     case Def(QuoteSeq(argName)) => "Seq("+unquotes(argName+".map(quote).mkString("+quotes(",")+")")+")"
     
@@ -92,8 +78,7 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println("trait " + opsGrp.name + "Impl {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Lift => ")
     stream.println()    
-    emitSingleTaskImplMethods(opsGrp, stream, 2)
-    emitCompositeImplMethods(opsGrp, stream, 2)
+    emitAllImplMethods(opsGrp, stream, 2)
     stream.println("}")
   }
   
@@ -500,10 +485,18 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println()
           stream.println("  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {")
           for ((op,r) <- generatorRules) {
-            if (r.isSimple)
-              stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(op) + " => emitValDef(sym, " + quote(r.decl) + ")")
-            else 
-              stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(op) + " => " + quote(r.decl))
+            stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(op) + " => ")
+            val body = quote(r.decl).trim.split(nl).toList
+            // how do we decide whether to add stream.println?
+            def addPrint(s: String) = {
+              // hack! (or heuristic, if the glass is half full)
+              !s.startsWith("emit")
+            }      
+            // use stream.print, since the new lines from the original interpolated code block are still there
+            val body2 = body map { l => if (addPrint(l)) "stream.print("+l+")" else l }      
+            val result = ("stream.println(\"val \"+quote(sym)+\" = {\")" :: body2) :+ "stream.println(\"}\")"
+            result.foreach { line => emitWithIndent(line, stream, 6) }   
+            stream.println()              
           }
           stream.println("    case _ => super.emitNode(sym, rhs)")
           stream.println("  }")

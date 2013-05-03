@@ -28,7 +28,7 @@ trait FieldOps extends Base with OverloadHack {
   
   // needed for lookup
   def infix_name(x: Rep[DSLType])(implicit o: Overloaded2): String 
-  // needed for isSimple
+  // needed for is
   def infix_tpePars(x: Rep[DSLType]): List[Rep[TypePar]]
 }
 

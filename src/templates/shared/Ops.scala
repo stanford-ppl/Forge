@@ -39,15 +39,22 @@ trait BaseGenOps extends ForgeCodeGenBase {
    }  
       
    def replaceWildcards(s: String) = {
-     // currently only 1 wildcard
-     s.replaceAll(qu, "\"")
+     var o = s
+     o = s.replaceAll(qu, "\"")
+     
+     // splice in the quoted symbol. we use a wildcard instead of an expression tree here
+     // because string interpolation does not have a corresponding IR node.
+     while (o.contains(symMarker)) {
+       val st = o.indexOf(symMarker)
+       val end = o.indexOf(symMarker, st+1)
+       val symNum: Int = o.slice(st+symMarker.length, end).toInt
+       val sym = globalDefs.find(_.lhs.apply(0).id == symNum).get.lhs.apply(0)
+       o = o.slice(0,st) + quoteLiteral(sym) + o.slice(end+symMarker.length,o.length)
+     }
+     o
    }
    
    override def quote(x: Exp[Any]) : String = x match {
-     case Def(PrintLines(p, lines)) =>    
-       // since this is called from emitWithIndent, the first line has an extra indent
-       // without saving this value in the dynamic scope, we don't know what the indent was though.. guess '4' for now
-       quote(lines(0)) + nl + lines.drop(1).map(l => (" "*4)+quote(l)).mkString(nl)      
      case Def(QuoteBlockResult(name,List(byName),ret)) => name
      case Def(QuoteBlockResult(name,args,ret)) => name + makeArgs(args)
      case _ => super.quote(x)
@@ -244,25 +251,20 @@ trait BaseGenOps extends ForgeCodeGenBase {
    */    
   def emitImplMethod(o: Rep[DSLOp], func: Rep[String], stream: PrintWriter, indent: Int = 0) {
     emitWithIndent(makeOpImplMethodSignature(o) + " = {", stream, indent)
-    emitWithIndent(inline(o, func, quoteLiteral), stream, indent+2)
+    inline(o, func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent+2 )}
+    // emitWithIndent(inline(o, func, quoteLiteral), stream, indent+2)
     emitWithIndent("}", stream, indent)
     stream.println()    
   }
-  def emitSingleTaskImplMethods(opsGrp: DSLOps, stream: PrintWriter, indent: Int = 0) {
+  
+  def emitAllImplMethods(opsGrp: DSLOps, stream: PrintWriter, indent: Int = 0) {
     for (o <- unique(opsGrp.ops)) { 
       Impls(o) match {
         case single:SingleTask => emitImplMethod(o,single.func,stream,indent)
-        case _ =>
-      }
-    }    
-  }  
-  def emitCompositeImplMethods(opsGrp: DSLOps, stream: PrintWriter, indent: Int = 0) {
-    for (o <- unique(opsGrp.ops)) { 
-      Impls(o) match {
         case composite:Composite => emitImplMethod(o,composite.func,stream,indent)
-        case _ =>
+        case _ => 
       }
-    }    
+    }        
   }
   
    

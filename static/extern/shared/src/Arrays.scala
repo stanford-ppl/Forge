@@ -11,6 +11,7 @@ trait ForgeArrayOps extends Base {
    * We use ForgeArray[T] instead of T so we don't get any subtle errors related to shadowing Array[T]
    */
   type ForgeArray[T]
+  implicit def forgeArrayManifest[T:Manifest]: Manifest[ForgeArray[T]]
 }
 trait ForgeArrayCompilerOps extends ForgeArrayOps {  
   
@@ -18,7 +19,7 @@ trait ForgeArrayCompilerOps extends ForgeArrayOps {
    * There are some unfortunate scalac typer crashes when we try to use the nicer front-end from DSLs :(
    */
   object Array {
-    def empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext) = array_empty(__arg0)
+    def empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext) = array_empty[T](__arg0)
     def copy[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int],__arg2: Rep[ForgeArray[T]],__arg3: Rep[Int],__arg4: Rep[Int])(implicit __imp0: SourceContext) = array_copy(__arg0,__arg1,__arg2,__arg3,__arg4)
   }
   

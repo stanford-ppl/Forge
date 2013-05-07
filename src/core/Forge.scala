@@ -143,12 +143,12 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
 
   def makeTpeParsWithBounds(args: List[Rep[TypePar]]): String = {
     if (args.length < 1) return ""    
-    val args2 = args.map { a => a.name + (if (a.ctxBounds != Nil) ":" + a.ctxBounds.map(_.name).mkString(":") else "") }
+    val args2 = args.map { a => quote(a) + (if (a.ctxBounds != Nil) ":" + a.ctxBounds.map(_.name).mkString(":") else "") }
     "[" + args2.mkString(",") + "]"
   }  
   def makeTpePars(args: List[Rep[DSLType]]): String = {
     if (args.length < 1) return ""
-    "[" + args.map(_.name).mkString(",") + "]"
+    "[" + args.map(quote).mkString(",") + "]"
   }
     
   def instTpePar(tpePars: List[Rep[TypePar]], par: Rep[DSLType], tpeArg: Rep[DSLType]): List[Rep[DSLType]] = {
@@ -166,7 +166,7 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
   
   override def quote(x: Exp[Any]) : String = x match {
     case Def(Tpe(s,args,stage)) => s + makeTpePars(args) 
-    case Def(TpeInst(t,args,s)) => t.name + "[" + args.map(quote).mkString(",") + "]"
+    case Def(TpeInst(t,args,s)) => t.name + makeTpePars(args)
     case Def(TpePar(s,ctx)) => s 
     case Def(StringPlus(a,b)) => quote(quoteLiteral(a)+quoteLiteral(b)) 
     case Def(Arg(name,tpe,default)) => quote(name)

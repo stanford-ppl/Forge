@@ -24,7 +24,7 @@ object ForgeBuild extends Build with ForgePreprocessor {
 
 trait ForgePreprocessor {
   var preprocessorEnabled = true
-  var preprocessorDebug = true
+  var preprocessorDebug = false
   
   // investigate: should the preprocessor be implemented using parser combinators or some other strategy?
   

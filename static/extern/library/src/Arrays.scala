@@ -7,6 +7,7 @@ import LOWERCASE_DSL_NAME.library.HUMAN_DSL_NAMEBase
 
 trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
   type ForgeArray[T] = scala.Array[T]
+  implicit def forgeArrayManifest[T:Manifest] = manifest[Array[T]]
   
   def array_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[T]] 
     = new ForgeArray[T](__arg0)

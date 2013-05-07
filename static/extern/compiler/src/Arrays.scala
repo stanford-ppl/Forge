@@ -12,6 +12,7 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
   this: DeliteOpsExp =>
   
   type ForgeArray[T] = DeliteArray[T]
+  implicit def forgeArrayManifest[T:Manifest] = manifest[DeliteArray[T]]
   
   def array_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[T]] 
     = darray_new[T](__arg0)

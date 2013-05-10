@@ -168,11 +168,19 @@ trait ForgePreprocessor {
       var endBlock = false      
       val args = new HashSet[String]()
       val argMap = new HashMap[String,String]()
+      val startCommentIndices = new ArrayBuffer[Int]()
+      val endCommentIndices = new ArrayBuffer[Int]()
       
       // scan the block forwards, collecting identifiers
       var scope: CommentScope = NoComment
       while (i < input.length-1 && !endBlock) {
         val (nextI, nextScope) = scanComment(scope, i, input)
+        if (scope == NoComment && nextScope != NoComment) {
+          startCommentIndices += i
+        }
+        else if (scope != NoComment && nextScope == NoComment) {
+          endCommentIndices += nextI
+        }
         i = nextI; scope = nextScope;      
         
         if (scope == NoComment) {
@@ -191,9 +199,6 @@ trait ForgePreprocessor {
             args += new String(input.slice(i+1,j))
             i = j-1
           }
-        }
-        else if (input(i) == '$') {
-          err("found preprocessor character $ inside comment in a formatted block, which will not quote correctly.")
         }
         
         i += 1  
@@ -247,8 +252,16 @@ trait ForgePreprocessor {
       }
       output ++= (indentInterior + "s\"\"\"").getBytes
       
-      // remap args inside the input block
-      var strBlock = new String(input.slice(start, i-1))
+      // cut out comments
+      val strBlockBuf = new StringBuilder()
+      var j = start
+      for (k <- 0 until startCommentIndices.length) {
+        strBlockBuf ++= new String(input.slice(j, startCommentIndices(k)))
+        if (endCommentIndices.length > k) j = endCommentIndices(k)
+      }
+      strBlockBuf ++= new String(input.slice(j, i-1))
+      var strBlock = strBlockBuf.toString
+      // remap args inside the input block      
       for (a <- args) {
         if (argMap.contains(a)) {
           strBlock = strBlock.replace("$"+a, "$"+argMap(a))

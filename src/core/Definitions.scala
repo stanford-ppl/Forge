@@ -127,6 +127,16 @@ trait Definitions extends DerivativeTypes {
   object normal extends Frequency
   object hot extends Frequency
   object cold extends Frequency
+    
+  /**
+   * Parallel collections
+   */
+  case class ParallelCollection(val tpeArg: Rep[DSLType], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp]) extends ForgeCollectionType
+  case class ParallelCollectionBuffer(
+    val tpeArg: Rep[DSLType], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp],
+    /*val parallelization: Rep[DSLOp],*/ val setSize: Rep[DSLOp], val appendable: Rep[DSLOp], val append: Rep[DSLOp], val copy: Rep[DSLOp]
+  ) extends ForgeCollectionType
+  
      
   /**
    * Op types

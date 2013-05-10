@@ -63,7 +63,7 @@ fi
 if [ $SKIP -le 2 ];
 then
   echo "forge $DSL_RUNNER (2/$NUM_STEPS)"
-  forge $DSL_RUNNER
+  bin/forge $DSL_RUNNER
 fi
 
 if [ $SKIP -le 3 ];

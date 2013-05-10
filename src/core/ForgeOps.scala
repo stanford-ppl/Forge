@@ -28,19 +28,20 @@ trait ForgeOps extends Base {
   implicit def namedTpeToArg(arg: (String, Rep[DSLType])): Rep[DSLArg] = forge_arg(arg._1, arg._2, None)
   implicit def namedTpeWithDefaultToArg(arg: (String, Rep[DSLType], String)): Rep[DSLArg] = forge_arg(arg._1, arg._2, Some(arg._3))
   def anyToArg(a: (Any, Int)): Rep[DSLArg] = forge_anyToArg(a)
-  def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[Any]], retTpe: Rep[DSLType], implicitArgs: List[Rep[DSLType]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = 
-    forge_op(grp,name,style,tpePars,args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,retTpe,effect,aliasHint)
   
+  case class MethodSignature(args: List[Rep[Any]], retTpe: Rep[DSLType])  
+  def op(grp: Rep[DSLGroup])(name: String, style: MethodType, tpePars: List[Rep[TypePar]], signature: MethodSignature, implicitArgs: List[Rep[DSLType]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = 
+    forge_op(grp,name,style,tpePars,signature.args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,signature.retTpe,effect,aliasHint)  
+      
   def impl(op: Rep[DSLOp])(rule: OpType) = forge_impl(op,rule)  
   def extern(grp: Rep[DSLGroup], withLift: Boolean = false, targets: List[CodeGenerator] = generators) = forge_extern(grp, withLift, targets)
-      
-  def infix_is(tpe: Rep[DSLType], dc: ParallelCollection) = forge_isparallelcollection(tpe, dc)  
-  case class ParallelCollection(val tpeArg: Rep[DSLType], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp]) extends ForgeCollectionType
-  def infix_is(tpe: Rep[DSLType], dc: ParallelCollectionBuffer) = forge_isparallelcollection_buffer(tpe,dc)
-  case class ParallelCollectionBuffer(
-    val tpeArg: Rep[DSLType], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp],
-    /*val parallelization: Rep[DSLOp],*/ val setSize: Rep[DSLOp], val appendable: Rep[DSLOp], val append: Rep[DSLOp], val copy: Rep[DSLOp]
-  ) extends ForgeCollectionType
+
+  case class ParallelizeKey(tpe: Rep[DSLType]) 
+  object parallelize {
+    def apply(tpe: Rep[DSLType]) = ParallelizeKey(tpe) 
+  }  
+  def infix_as(p: ParallelizeKey, dc: ParallelCollection) = forge_isparallelcollection(p.tpe, dc)  
+  def infix_as(p: ParallelizeKey, dc: ParallelCollectionBuffer) = forge_isparallelcollection_buffer(p.tpe, dc)    
 
   implicit def forceOpOption(o: Option[Rep[DSLOp]]): Rep[DSLOp]
   def lookup(grpName: String, opName: String): Option[Rep[DSLOp]] = forge_lookup(grpName,opName,0)
@@ -59,18 +60,18 @@ trait ForgeOps extends Base {
   def forge_lift(grp: Rep[DSLGroup], tpe: Rep[DSLType]): Rep[Unit]
   def forge_data(tpe: Rep[DSLType], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]  
   def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
-  def forge_impl(op: Rep[DSLOp], rule: OpType): Rep[Unit]
+  def forge_impl(op: Rep[DSLOp], rule: OpType): Rep[DSLOp]
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
   def forge_isparallelcollection(tpe: Rep[DSLType], dc: ParallelCollection): Rep[Unit]
   def forge_isparallelcollection_buffer(tpe: Rep[DSLType], dc: ParallelCollectionBuffer): Rep[Unit]
   def forge_lookup(grpName: String, opName: String, overloadedIndex: Int): Option[Rep[DSLOp]]  
 }
 
-trait ForgeSugar extends ForgeOps with ForgeUtilities {
+trait ForgeSugarLowPriority extends ForgeOps with ForgeUtilities {
   this: Forge =>
-  
+
   /**
-   * Sugar available everywhere inside Forge
+   * These allow users to specify argument lists as tuples instead of lists (for a small enough number of arguments)
    */
   implicit def singleToList[T](t: Rep[T]): List[Rep[T]] = List(t)
   implicit def tuple2ToList[T](t: (Rep[T],Rep[T])): List[Rep[T]] = List(t._1,t._2)
@@ -88,8 +89,17 @@ trait ForgeSugar extends ForgeOps with ForgeUtilities {
   implicit def defaultArg2ToList(t: ((String,Rep[DSLType],String),(String,Rep[DSLType],String))): List[Rep[DSLArg]] = List(namedTpeWithDefaultToArg(t._1),namedTpeWithDefaultToArg(t._2))
   implicit def defaultArg3ToList(t: ((String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String))): List[Rep[DSLArg]] = List(namedTpeWithDefaultToArg(t._1),namedTpeWithDefaultToArg(t._2),namedTpeWithDefaultToArg(t._3))
   implicit def defaultArg4ToList(t: ((String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String))): List[Rep[DSLArg]] = List(namedTpeWithDefaultToArg(t._1),namedTpeWithDefaultToArg(t._2),namedTpeWithDefaultToArg(t._3),namedTpeWithDefaultToArg(t._4))
-  implicit def defaultArg5ToList(t: ((String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String))): List[Rep[DSLArg]] = List(namedTpeWithDefaultToArg(t._1),namedTpeWithDefaultToArg(t._2),namedTpeWithDefaultToArg(t._3),namedTpeWithDefaultToArg(t._4),namedTpeWithDefaultToArg(t._5))
+  implicit def defaultArg5ToList(t: ((String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String))): List[Rep[DSLArg]] = List(namedTpeWithDefaultToArg(t._1),namedTpeWithDefaultToArg(t._2),namedTpeWithDefaultToArg(t._3),namedTpeWithDefaultToArg(t._4),namedTpeWithDefaultToArg(t._5))  
+}
+
+trait ForgeSugar extends ForgeSugarLowPriority {
+  this: Forge =>
   
+  /**
+   * Sugar available everywhere inside Forge
+   */
+  
+  def infix_::(retTpe: Rep[DSLType], args: List[Rep[Any]]) = MethodSignature(args, retTpe)
   def infix_implements(o: Rep[DSLOp], rule: OpType) = forge_impl(o,rule)      
   def infix_==>(args: List[Rep[Any]], ret: Rep[DSLType]) = MFunction(args,ret)
         
@@ -117,7 +127,7 @@ trait ForgeSugar extends ForgeOps with ForgeUtilities {
           
     // 'is' is a sugared version of 'op' designed to be declared inside a tpe scope 
     // it automatically imports the enclosing type as a type parameter and an instance of that type as the first argument, exported under 'self' 
-    def infix_is(s: String, style: MethodType, args: List[Rep[Any]], retTpe: Rep[DSLType], implicitArgs: List[Rep[DSLType]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
+    def infix_is(s: String, style: MethodType, signature: MethodSignature, implicitArgs: List[Rep[DSLType]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
       val t = _tpeScopeBox
       
       if (style == static) {
@@ -125,15 +135,12 @@ trait ForgeSugar extends ForgeOps with ForgeUtilities {
       }
       
       val amendedTpePars = (t.tpePars ::: addTpePars).distinct
-      val amendedArgs = namedTpeToArg("self",tpeInst(t,t.tpePars)) :: args.zipWithIndex.map(t => anyToArg(t._1,t._2+1)).asInstanceOf[List[Rep[DSLArg]]] // arg numbering starts at 1
+      val amendedArgs = namedTpeToArg("self",tpeInst(t,t.tpePars)) :: signature.args.zipWithIndex.map(t => anyToArg(t._1,t._2+1)).asInstanceOf[List[Rep[DSLArg]]] // arg numbering starts at 1
       
-      forge_op(_tpeScopeBox,s,style,amendedTpePars,amendedArgs,implicitArgs,retTpe,effect,aliasHint)        
+      forge_op(_tpeScopeBox,s,style,amendedTpePars,amendedArgs,implicitArgs,signature.retTpe,effect,aliasHint)        
     }      
-  
-    abstract class ParallelizeKey
-    object parallelize extends ParallelizeKey
-    def infix_as(p: ParallelizeKey, dc: ParallelCollection) = forge_isparallelcollection(_tpeScopeBox, dc)  
-    def infix_as(p: ParallelizeKey, dc: ParallelCollectionBuffer) = forge_isparallelcollection_buffer(_tpeScopeBox, dc)  
+
+    val parallelize = ParallelizeKey(_tpeScopeBox)
     
     def lookup(opName: String) = forge_lookup(_tpeScopeBox.name,opName,0)
     def lookup(grpName: String, opName: String) = forge_lookup(grpName,opName,0)    
@@ -317,6 +324,9 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     // no matter what branch we took, we may need to reconcile codegen rules
     if (rule.isInstanceOf[CodeGen])
       reconcileCodegenRule(op,rule.asInstanceOf[CodeGen])    
+      
+    // return the op so that users can bind it if they want
+    op
   }
         
   // vet codegen rules and update the ops list if necessary

@@ -25,7 +25,7 @@ trait DeliteGenOps extends BaseGenOps {
     // in order of decreasing inclusiveness
     if (grpIsTpe(grp) && ForgeCollections.contains(grpAsTpe(grp)) && DataStructs.contains(grpAsTpe(grp))) "DeliteCollectionOpsExp with DeliteStructsExp"
     else if (grpIsTpe(grp) && ForgeCollections.contains(grpAsTpe(grp))) "DeliteCollectionOpsExp"
-    else if (grpIsTpe(grp) && DataStructs.contains(grpAsTpe(grp))) "DeliteStructsExp"
+    else if (grpIsTpe(grp) && DataStructs.contains(grpAsTpe(grp))) "BaseFatExp with DeliteStructsExp"
     else if (OpsGrp.exists(g => g._2.ops.exists(o => o.effect != pure))) "BaseFatExp with EffectExp"
     else "BaseFatExp"
   }

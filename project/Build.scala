@@ -352,6 +352,7 @@ trait ForgePreprocessor {
       for (k <- 0 until startCommentIndices.length) {
         strBlockBuf ++= new String(input.slice(j, startCommentIndices(k)))
         if (endCommentIndices.length > k) j = endCommentIndices(k)
+        if (input.slice(startCommentIndices(k),endCommentIndices(k)).contains('\n')) strBlockBuf += '\n'
       }
       strBlockBuf ++= new String(input.slice(j, i-1))      
       var strBlock = strBlockBuf.toString

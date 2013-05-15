@@ -33,7 +33,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
        // b = b.replaceAllLiterally(quoter(o.quotedArg(i)), name) // TODO eliminate need for this
      }    
      for (i <- 0 until o.tpePars.length) {
-       b = b.replaceAllLiterally(quoter(o.tpeInstance(i)), o.tpePars.apply(i).name)
+       b = b.replaceAllLiterally(quoter(quotedTpe(i,o)), o.tpePars.apply(i).name)
      }    
      b
    }  

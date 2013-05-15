@@ -68,7 +68,7 @@ trait ScalaOps extends ForgeApplication {
     val plus = op (Num) ("+", infix, List(T withBound TNumeric), List(T,T) :: T)    
     val minus = op (Num) ("-", infix, List(T withBound TNumeric), List(T,T) :: T)     
     val times = op (Num) ("*", infix, List(T withBound TNumeric), List(T,T) :: T)    
-    impl (zero) (codegen($cala, "implicitly[Numeric["+zero.tpeInstance(0)+"]].zero"))
+    impl (zero) (codegen($cala, "implicitly[Numeric["+quotedTpe(0,zero)+"]].zero"))
     impl (plus) (codegen($cala, quotedArg(0) + " + " + quotedArg(1)))
     impl (minus) (codegen($cala, quotedArg(0) + " - " + quotedArg(1)))
     impl (times) (codegen($cala, quotedArg(0) + " * " + quotedArg(1)))

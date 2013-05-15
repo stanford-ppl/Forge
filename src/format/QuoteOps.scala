@@ -27,19 +27,21 @@ trait QuoteOps extends Base {
    * DSLOp accessors
    */
   implicit def dslOpToPublicOps(x: Rep[DSLOp]) = new {
-    def tpeInstance(i: Int) = quote_tpeinstance(x,i)
     def tpeName = quote_tpename(x)
   }
 
   def quotedArg(i: Int) = quote_quotedarginstance(opArgPrefix+i)
   def quotedArg(name: String) = quote_quotedarginstance(name)
+  def quotedTpe(i: Int, op: Rep[DSLOp]) = quote_tpeinstance(i, op)
+  def quotedTpe(name: String, op: Rep[DSLOp]) = quote_tpeinstance(name, op)
   def quotedBlock(i: Int, op: Rep[DSLOp], capturedArgs: List[String]) = quote_quotedblock(opArgPrefix+i, op, capturedArgs)
   def quotedBlock(name: String, op: Rep[DSLOp], capturedArgs: List[String]) = quote_quotedblock(name, op, capturedArgs)
   
   // these need to return String and use wildcards instead of Rep[String] in order to interoperate properly with string interpolation
-  def quote_tpeinstance(x: Rep[DSLOp], i: Int): String
   def quote_tpename(x: Rep[DSLOp]): String  
   def quote_quotedarginstance(name: String): String
+  def quote_tpeinstance(i: Int, op: Rep[DSLOp]): String
+  def quote_tpeinstance(name: String, op: Rep[DSLOp]): String  
   def quote_quotedblock(name: String, op: Rep[DSLOp], capturedArgs: List[String]): String
 
   // convenience method for handling Seq[_] in code generators
@@ -70,13 +72,21 @@ trait QuoteOpsExp extends QuoteOps {
    * DSLOp accessors
    */
   
+  def quote_tpename(x: Rep[DSLOp]) = x.grp.name
+      
+  def quote_tpeinstance(i: Int, op: Rep[DSLOp]) = unquotes("remap(" + opIdentifierPrefix + "." + TManifest.prefix + op.tpePars.apply(i).name + ")")
+  def quote_tpeinstance(name: String, op: Rep[DSLOp]) = {
+    val i = op.tpePars.indexWhere(_.name == name)
+    if (i < 0) err("no tpe par " + name + " in op " + op.name)    
+    quote_tpeinstance(i, op)
+  }
+    
+  def quote_quotedarginstance(name: String) = unquotes("quote(" + name + ")")
+  
   // Function block args require the op to be passed (in order to extract the arguments to the function) to be quoted correctly
   // investigate: can we remove this dependency to simplify the preprocessor?
   case class QuoteBlockResult(func: Rep[DSLArg], args: List[Rep[DSLArg]], ret: Rep[DSLType], capturedArgs: List[String]) extends Def[String]
-    
-  def quote_tpeinstance(x: Rep[DSLOp], i: Int) = unquotes("remap(" + opIdentifierPrefix + "." + TManifest.prefix + x.tpePars.apply(i).name + ")")
-  def quote_tpename(x: Rep[DSLOp]) = x.grp.name
-  def quote_quotedarginstance(name: String) = unquotes("quote(" + name + ")")
+  
   def quote_quotedblock(name: String, op: Rep[DSLOp], capturedArgs: List[String]) = op.args.find(_.name == name) match {
     case None => err("could not quote arg - no arg name " + name + " in op " + op.name)   
     case Some(a@Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2))) => 

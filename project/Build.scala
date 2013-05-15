@@ -24,7 +24,7 @@ object ForgeBuild extends Build with ForgePreprocessor {
 
 trait ForgePreprocessor {
   var preprocessorEnabled = true
-  var preprocessorDebug = true
+  var preprocessorDebug = false
   
   // investigate: should the preprocessor be implemented using parser combinators or some other strategy?
   
@@ -196,12 +196,44 @@ trait ForgePreprocessor {
       j      
     }
     
+    def endOfTypeArgName(arg: String) = arg.indexOf(']')
+    def parseTypeArgument(start: Int, input: Array[Byte], tpeArgs: ArrayBuffer[String]): Int = {
+      var j = start+2 // skip ahead of opening bracket
+      while (j < input.length && input(j) != ']') {
+        if (input(j) == '[')
+          err("higher-kinded type arguments are not currently allowed in formatted blocks")
+        j += 1  
+      }
+      
+      // a sketch, similar to parseBlockArguments, for allowing higher-kinded type args:
+      // var bracketScope = 1      
+      // while (j < input.length && bracketScope != 0)) {
+      //   // check for higher-kinded type arguments
+      //   if (j+2 < input.length && input(j) == '$' && input(j+1) == 't' && input(j+2) == '[')
+      //     j = parseTypeArgument(j+1, input, args)
+      //   else
+      //     j += 1
+      //     
+      //   if (input(j) == '[') bracketScope += 1
+      //   else if (input(j) == ']') bracketScope -= 1        
+      // }
+      
+      j += 1
+      val tpeArg = new String(input.slice(start, j))
+      if (!tpeArgs.contains(tpeArg)) {
+        tpeArgs += tpeArg
+      }
+      j
+    }
+    
     def writeFormattedBlock(start: Int, input: Array[Byte], output: ArrayBuffer[Byte]): Int = {
       var i = start
       var bracketScope = 1
       var endBlock = false      
       val args = new ArrayBuffer[String]()
       val argMap = new HashMap[String,String]()
+      val tpeArgs = new ArrayBuffer[String]()
+      val tpeArgMap = new HashMap[String,String]()
       val startCommentIndices = new ArrayBuffer[Int]()
       val endCommentIndices = new ArrayBuffer[Int]()
       
@@ -228,15 +260,17 @@ trait ForgePreprocessor {
           }        
         
           if (input(i) == '$') { // found identifier
-            val j = parseBlockArguments(i+1, input, args)
+            val j = 
+              if (i+2 < input.length && input(i+1) == 't' && input(i+2) == '[')
+                parseTypeArgument(i+1, input, tpeArgs)
+              else
+                parseBlockArguments(i+1, input, args) 
             i = j-1
           }
         }
         
         i += 1  
       }
-      
-      // println("got parsed args: " + args) // REMOVE 
       
       // look for block functions that require us to have the op identifier
       // we don't do this in general because it's not necessary and doesn't play well with overloading
@@ -294,23 +328,47 @@ trait ForgePreprocessor {
           output ++= (indentInterior + "val " + argMap(a) + " = quotedArg("+quoteArgName(a)+")" + nl).getBytes
         }
       }
+      
+      // process type args in a similar way, but because we don't allow higher-kinded args now, only one pass is required
+      for (t <- tpeArgs) {
+        val t2 = t.slice(2,endOfTypeArgName(t))
+        val z: String = "tpe"+t2 
+        tpeArgMap += (t -> z)          
+        try {          
+          val i = t2.toInt                    
+          output ++= (indentInterior + "val " + z + " = quotedTpe("+t2+", "+enclosingOp.get+")" + nl).getBytes                           
+        }
+        catch {
+          case _:NumberFormatException => 
+            output ++= (indentInterior + "val " + z + " = quotedTpe(\""+t2+"\", "+enclosingOp.get+")" + nl).getBytes                           
+        }         
+      }
+
       output ++= (indentInterior + "s\"\"\"").getBytes
       
-      // cut out comments
+      // swallow comments
       val strBlockBuf = new StringBuilder()
       var j = start
       for (k <- 0 until startCommentIndices.length) {
         strBlockBuf ++= new String(input.slice(j, startCommentIndices(k)))
         if (endCommentIndices.length > k) j = endCommentIndices(k)
       }
-      strBlockBuf ++= new String(input.slice(j, i-1))
+      strBlockBuf ++= new String(input.slice(j, i-1))      
       var strBlock = strBlockBuf.toString
+      
       // remap args inside the input block, outside-in      
       for (a <- args.reverse) {
         if (argMap.contains(a)) {
           strBlock = strBlock.replace("$"+a, "$"+argMap(a))
         }
       }
+      // remap tpe args
+      for (t <- tpeArgs) {
+        if (tpeArgMap.contains(t)) {
+          strBlock = strBlock.replace("$"+t, "$"+tpeArgMap(t))
+        }        
+      }
+      
       // swallow the indentation, since we'll re-indent inside Forge anyways
       strBlock = strBlock.replace(indent, "").trim
       

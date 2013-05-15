@@ -38,7 +38,7 @@ trait DeliteGenOps extends BaseGenOps {
       if (!isThunk(func.tpe)) {
         for (a <- args) {
           // have to be careful about automatic string lifting here
-          val add: String = (nl + "\"" + "val " + replaceWildcards(quotedArg(boundArgName(func,a))) + " = " + replaceWildcards(captured(i)) + "\"") 
+          val add: String = (nl + "\"" + "val " + replaceWildcards(quotedArg(boundArgName(func,a))) + " = " + replaceWildcards(captured(i)) + "\\n\"") 
           boundStr += add
           i += 1
         }
@@ -46,9 +46,9 @@ trait DeliteGenOps extends BaseGenOps {
       // the new-line formatting is admittedly weird; we are using a mixed combination of actual new-lines (for string splitting at Forge)
       // and escaped new-lines (for string splitting at Delite), based on how we received strings from string interpolation.
       // FIX: using inconsistent newline character, not platform independent
-      "{ \\n\"" + boundStr + 
-         nl + "emitBlock(" + func.name + ")" +
-         nl + "\"\\n\"+quote(getBlockResult(" + func.name + "))+\"\\n\"" + nl + " \" } \\n"
+      "{ \"" + boundStr + 
+       nl + "emitBlock(" + func.name + ")" +
+       nl + "quote(getBlockResult(" + func.name + "))+\"\\n\"" + nl + " \" } "
        
     case Def(QuoteSeq(argName)) => "Seq("+unquotes(argName+".map(quote).mkString("+quotes(",")+")")+")"
     

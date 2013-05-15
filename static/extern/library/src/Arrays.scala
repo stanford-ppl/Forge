@@ -21,6 +21,9 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
     = __arg0.length
   def array_asimmutable[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = __arg0
+    
+  def scala_array_apply[T:Manifest](__arg0: Rep[Array[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[T] 
+    = array_apply(__arg0,__arg1)
 }
 
 

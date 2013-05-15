@@ -31,10 +31,25 @@ trait DeliteGenOps extends BaseGenOps {
   }
   
   override def quote(x: Exp[Any]): String = x match {
-    case Def(QuoteBlockResult(name,args,ret)) =>
-      "\"" + nl + "emitBlock(" + name + ")" +
-      nl + "quote(getBlockResult(" + name + "))" + nl + "\""    
- 
+    case Def(QuoteBlockResult(func,args,ret,captured)) =>
+      // bind function args to captured args
+      var boundStr: String = ""
+      var i = 0
+      if (!isThunk(func.tpe)) {
+        for (a <- args) {
+          // have to be careful about automatic string lifting here
+          val add: String = (nl + "\"" + "val " + replaceWildcards(quotedArg(boundArgName(func,a))) + " = " + replaceWildcards(captured(i)) + "\"") 
+          boundStr += add
+          i += 1
+        }
+      }            
+      // the new-line formatting is admittedly weird; we are using a mixed combination of actual new-lines (for string splitting at Forge)
+      // and escaped new-lines (for string splitting at Delite), based on how we received strings from string interpolation.
+      // FIX: using inconsistent newline character, not platform independent
+      "{ \\n\"" + boundStr + 
+         nl + "emitBlock(" + func.name + ")" +
+         nl + "\"\\n\"+quote(getBlockResult(" + func.name + "))+\"\\n\"" + nl + " \" } \\n"
+       
     case Def(QuoteSeq(argName)) => "Seq("+unquotes(argName+".map(quote).mkString("+quotes(",")+")")+")"
     
     case Const(s: String) if quoteLiterally => s  // no quotes, wildcards will be replaced later in inline
@@ -52,10 +67,29 @@ trait DeliteGenOps extends BaseGenOps {
       case _ => o.grp.name + i + "_" + sanitize(o.name).capitalize
     }
   }  
-  
-  def makeOpSimpleNodeNameWithArgs(o: Rep[DSLOp]) = makeOpNodeName(o) + makeOpArgs(o)
-  def makeOpSimpleNodeNameWithAnonArgs(o: Rep[DSLOp]) = makeOpNodeName(o) + makeOpAnonArgs(o)  
-  def makeOpNodeNameWithArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String = makeOpArgs) = makeOpNodeName(o) + makeTpePars(o.tpePars) + makeArgs(o) + makeOpImplicitArgs(o)
+
+  // non-thunk functions use bound sym inputs, so we need to add the bound syms to the args  
+  // we need both the func name and the func arg name to completely disambiguate the bound symbol, but the unique name gets quite long..
+  // could use a local numbering scheme inside each op. should also consider storing the bound syms inside the case class body, instead of the parameter list, which could simplify things.
+  def boundArgName(func: Rep[DSLArg], arg: Rep[DSLArg]) = "f_" + func.name  + "_" + simpleArgName(arg)
+  def makeArgsWithBoundSyms(args: List[Rep[DSLArg]], opType: OpType) = 
+    makeArgs(args, t => t match {
+      case Def(Arg(name, f@Def(FTpe(fargs,ret,freq)), d2)) if opType.isInstanceOf[CodeGen] && !isThunk(f) => (simpleArgName(t) :: fargs.map(a => boundArgName(t,a))).mkString(",")
+      case _ => simpleArgName(t)
+  })
+  def makeArgsWithBoundSymsWithType(args: List[Rep[DSLArg]], opType: OpType, typify: Rep[DSLType] => String = repify) = 
+    makeArgs(args, t => t match {
+      case Def(Arg(name, f@Def(FTpe(fargs,ret,freq)), d2)) if opType.isInstanceOf[CodeGen] && !isThunk(f) => ((simpleArgName(t) + ": " + typify(t.tpe)) :: fargs.map(a => boundArgName(t,a) + ": " + typify(a.tpe))).mkString(",")
+      case _ => argify(t, typify)
+  })  
+      
+  def makeOpSimpleNodeNameWithArgs(o: Rep[DSLOp]) = makeOpNodeName(o) + makeArgsWithBoundSyms(o.args, Impls(o))
+  def makeOpSimpleNodeNameWithAnonArgs(o: Rep[DSLOp]) = {
+    // scalac typer error unless we break up the expression
+    val z = o.args.zipWithIndex.map{ case (a,i) => arg(opArgPrefix + i, a.tpe, a.default) }
+    makeOpNodeName(o) + makeArgsWithBoundSyms(z, Impls(o))
+    // makeOpNodeName(o) + makeArgsWithBoundSyms(o.args.zipWithIndex.map{ case (a,i) => arg(opArgPrefix + i, a.tpe, a.default) })
+  }
   
   // TODO: tpeArg should be a List that is the same length as the tpePars in hkTpe
   def makeTpeInst(hkTpe: Rep[DSLType], tpeArg: Rep[DSLType]) = hkTpe match {
@@ -130,7 +164,7 @@ trait DeliteGenOps extends BaseGenOps {
     // IR nodes
     for (o <- uniqueOps if hasIRNode(o)) { 
       stream.print("  case class " + makeOpNodeName(o) + makeTpeParsWithBounds(o.tpePars))
-      if (Impls(o).isInstanceOf[CodeGen]) stream.print(makeOpArgsWithType(o, blockify))
+      if (Impls(o).isInstanceOf[CodeGen]) stream.print(makeArgsWithBoundSymsWithType(o.args, Impls(o), blockify))
       else stream.print(makeOpArgsWithType(o))    
       stream.print(makeOpImplicitArgsWithType(o,true))
       
@@ -205,13 +239,17 @@ trait DeliteGenOps extends BaseGenOps {
     for (o <- uniqueOps) { 
       stream.println("  " + makeOpMethodSignature(o) + " = {")
       val summary = scala.collection.mutable.ArrayBuffer[String]()
-      // TODO: we need syms methods for func args..
+      
       if (Impls(o).isInstanceOf[CodeGen]) {
         for (arg <- o.args) {
           arg match {
-            case Def(Arg(name, Def(FTpe(args,ret,freq)), d2)) =>
+            case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) =>
               stream.println()
-              emitWithIndent("val b_" + name + " = reifyEffects(" + name + ")", stream, 4)
+              for (s <- args if s.tpe != byName) {
+                emitWithIndent("val " + boundArgName(arg,s) + " = fresh[" + quote(s.tpe) + "]", stream, 4)              
+              }              
+              val fargs = if (!isThunk(f)) "(" + makeArgs(args, a => boundArgName(arg,a)) + ")" else ""
+              emitWithIndent("val b_" + name + " = reifyEffects(" + name + fargs + ")", stream, 4)
               emitWithIndent("val sb_" + name + " = summarizeEffects(b_" + name + ")", stream, 4)
               summary += "sb_"+name
             case _ =>
@@ -228,20 +266,11 @@ trait DeliteGenOps extends BaseGenOps {
         }
       }
       
-      def makeOpNodeNameWithModifiedArgs(o: Rep[DSLOp]) = {
-        makeOpNodeNameWithArgs(o, o => "(" + o.args.map(t => t match {
-          case Def(Arg(name, Def(FTpe(args,ret,freq)), d2)) => "b_" + name
-          case Def(Arg(name, _, _)) => name
-          case _ => err("making an op name with modified args that isn't an arg") 
-        }).mkString(",") + ")")
-      }
-
       val hasEffects = summary.length > 0
       
-      // composite ops, getters and setters are currently inlined
+      // composites, getters and setters are currently inlined
       // in the future, to support pattern matching and optimization, we should implement these as abstract IR nodes and use lowering transformers
       Impls(o) match {
-        case c:Composite if hasEffects => err("cannot have effects with composite ops currently")
         case c:Composite => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
         case g@Getter(structArgIndex,field) => 
           val struct = o.args.apply(structArgIndex)
@@ -254,9 +283,15 @@ trait DeliteGenOps extends BaseGenOps {
         case _ if hasEffects =>
           // if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
           val prologue = if (o.effect == simple) " andAlso Simple()" else ""
-          emitWithIndent(makeEffectAnnotation(simple,o) + "(" + makeOpNodeNameWithModifiedArgs(o) + ", " + summarizeEffects(summary) + prologue + ")", stream, 4)
+          val args = "(" + o.args.flatMap(a => a match {
+            case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) => 
+              val freshSyms = if (isThunk(f)) Nil else args.map(b => boundArgName(a,b)) 
+              ("b_" + name) :: freshSyms
+            case Def(Arg(name, _, _)) => List(name)          
+          }).mkString(",") + ")"
+          emitWithIndent(makeEffectAnnotation(simple,o) + "(" + makeOpNodeName(o) + makeTpePars(o.tpePars) + args + makeOpImplicitArgs(o) + ", " + summarizeEffects(summary) + prologue + ")", stream, 4)
         case _ => 
-          stream.print("    " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeNameWithArgs(o) + ")")        
+          emitWithIndent(makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o) + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)        
       }
       
       emitWithIndent("}", stream, 2)
@@ -272,9 +307,10 @@ trait DeliteGenOps extends BaseGenOps {
       var symsFreqBuf  = "override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {" + nl 
       
       def makeSym(o: Rep[DSLOp], wrap: String, addFreq: Boolean = false) = {
-        val symsArgs = o.args.collect { case Def(Arg(name, Def(FTpe(args,ret,freq)), d2)) => (freq,name) }
+        val symsArgs = o.args.collect { case t@Def(Arg(name, Def(FTpe(args,ret,freq)), d2)) => (freq,name,args.filterNot(_.tpe == byName).map(a => boundArgName(t,a))) }
         if (symsArgs.length > 0) {
-          val symsArgsStr = symsArgs.map { case (f,name) => wrap + (if (addFreq) makeFrequencyAnnotation(f) else "") + "(" + name + ")" }.mkString(":::")
+          var symsArgsStr = symsArgs.map { case (f,name,bound) => wrap + (if (addFreq) makeFrequencyAnnotation(f) else "") + "(" + name + ")" }.mkString(":::")
+          if (wrap == "effectSyms") symsArgsStr += " ::: List(" + symsArgs.flatMap(t => t._3.map(e => e + ".asInstanceOf[Sym[Any]]")).mkString(",") + ")"
           "    case " + makeOpSimpleNodeNameWithArgs(o) + " => " + symsArgsStr + nl
         }
         else ""
@@ -340,7 +376,11 @@ trait DeliteGenOps extends BaseGenOps {
           
     for (o <- uniqueOps) {
       // helpful identifiers
-      val xformArgs = "(" + o.args.zipWithIndex.map(t => "f(" + opArgPrefix + t._2 + ")").mkString(",") + ")" 
+      val xformArgs = "(" + o.args.zipWithIndex.flatMap(t => t._1 match {
+        case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if Impls(o).isInstanceOf[CodeGen] && !isThunk(f) => name :: args.map(a => boundArgName(t._1,a) /*+ ".asInstanceOf[Sym[Any]]"*/)           
+        case Def(Arg(name, _, _)) => List("f(" + opArgPrefix + t._2 + ")")
+      }).mkString(",") + ")"
+      
       val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++ o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
       
       Impls(o) match {

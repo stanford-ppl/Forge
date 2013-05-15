@@ -84,6 +84,11 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case Def(Arg(_, Def(FTpe(args,ret,freq)), _)) => true
     case _ => false
   })  
+  
+  def isThunk(f: Rep[DSLType]) = f match {
+    case Def(FTpe(List(Def(Arg(_,`byName`,_))),ret,freq)) => true
+    case _ => false
+  }
 }
 
 trait ForgeUtilities {  

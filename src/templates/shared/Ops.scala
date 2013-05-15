@@ -29,7 +29,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
      var b = quoter(str)
      for (i <- 0 until o.args.length) {
        val name = o.args.apply(i).name 
-       b = b.replaceAllLiterally(quoter(o.quotedArg(name)), name) 
+       b = b.replaceAllLiterally(quoter(quotedArg(name)), name) 
        // b = b.replaceAllLiterally(quoter(o.quotedArg(i)), name) // TODO eliminate need for this
      }    
      for (i <- 0 until o.tpePars.length) {
@@ -55,8 +55,8 @@ trait BaseGenOps extends ForgeCodeGenBase {
    }
    
    override def quote(x: Exp[Any]) : String = x match {
-     case Def(QuoteBlockResult(name,List(byName),ret)) => name
-     case Def(QuoteBlockResult(name,args,ret)) => name + makeArgs(args)
+     case Def(QuoteBlockResult(func,args,ret,captured)) if (isThunk(func.tpe)) => func.name
+     case Def(QuoteBlockResult(func,args,ret,captured)) => func.name + "(" + replaceWildcards(captured.mkString(",")) + ")"
      case _ => super.quote(x)
    }  
   
@@ -78,16 +78,9 @@ trait BaseGenOps extends ForgeCodeGenBase {
   }
     
   // normal args
-  /*
-  def simpleArgName(t: Rep[DSLArg]): String = t match {
-    case Def(Arg(name, _, _)) => name
-    case _ => err("unnamed Simple arg")
-  }
-  */
   def simpleArgName(t: Rep[DSLArg]): String = t.name
   def makeArgs(args: List[Rep[DSLArg]], makeArgName: (Rep[DSLArg] => String) = simpleArgName) = "(" + args.map(makeArgName).mkString(",") + ")"
   def makeOpArgs(o: Rep[DSLOp]) = makeArgs(o.args)
-  def makeOpAnonArgs(o: Rep[DSLOp]) = makeArgs(o.args.zipWithIndex.map{ case (a,i) => arg(opArgPrefix + i, a.tpe, a.default) })
   def makeOpFutureArgs(o: Rep[DSLOp]) = makeArgs(o.args, t => { val arg = simpleArgName(t); if (t.tpe.stage == now) "unit("+arg+")" else arg })
   def makeOpArgsWithType(o: Rep[DSLOp], typify: Rep[DSLType] => String = repify) = makeArgs(o.args, t => argify(t, typify))
   def makeOpArgsWithNowType(o: Rep[DSLOp]) = makeOpArgsWithType(o, repifySome)

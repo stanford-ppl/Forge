@@ -30,14 +30,14 @@ trait ScalaOps extends ForgeApplication {
     
     val println = op (Misc) ("println", direct, List(), List(MAny) :: MUnit, effect = simple)
     val println2 = op (Misc) ("println", direct, List(), List() :: MUnit, effect = simple)
-    impl (println) (codegen($cala, "println(" + println.quotedArg(0) + ")"))
+    impl (println) (codegen($cala, "println(" + quotedArg(0) + ")"))
     impl (println2) (codegen($cala, "println()"))
     
     val whileDo = op (Misc) ("__whileDo", direct, List(), List(MThunk(MBoolean),MThunk(MUnit)) :: MUnit, effect = simple)        
     
     // function (block) arguments should be referenced using $b[<arg name>]
     impl (whileDo) (codegen($cala, ${
-      while ({ $b[0] }) {
+      while ($b[0]) {
         $b[1]
       }
     }))
@@ -46,7 +46,7 @@ trait ScalaOps extends ForgeApplication {
     val T = tpePar("T")
     val ifThenElse = op (Misc) ("__ifThenElse", direct, List(T), List(MThunk(MBoolean),MThunk(T,cold),MThunk(T,cold)) :: T) 
     impl (ifThenElse) (codegen($cala, ${
-      if ({ $b[0] }) {
+      if ($b[0]) {
         $b[1]
       } 
       else {
@@ -69,9 +69,9 @@ trait ScalaOps extends ForgeApplication {
     val minus = op (Num) ("-", infix, List(T withBound TNumeric), List(T,T) :: T)     
     val times = op (Num) ("*", infix, List(T withBound TNumeric), List(T,T) :: T)    
     impl (zero) (codegen($cala, "implicitly[Numeric["+zero.tpeInstance(0)+"]].zero"))
-    impl (plus) (codegen($cala, plus.quotedArg(0) + " + " + plus.quotedArg(1)))
-    impl (minus) (codegen($cala, minus.quotedArg(0) + " - " + minus.quotedArg(1)))
-    impl (times) (codegen($cala, times.quotedArg(0) + " * " + times.quotedArg(1)))
+    impl (plus) (codegen($cala, quotedArg(0) + " + " + quotedArg(1)))
+    impl (minus) (codegen($cala, quotedArg(0) + " - " + quotedArg(1)))
+    impl (times) (codegen($cala, quotedArg(0) + " * " + quotedArg(1)))
   }
   
   def ordering() = {
@@ -81,8 +81,8 @@ trait ScalaOps extends ForgeApplication {
     val lt = op (Ord) ("<", infix, List(T withBound TOrdering), List(T,T) :: MBoolean)    
     val gt = op (Ord) (">", infix, List(T withBound TOrdering), List(T,T) :: MBoolean)    
     
-    impl (lt) (codegen($cala, lt.quotedArg(0) + " < " + lt.quotedArg(1)))    
-    impl (gt) (codegen($cala, gt.quotedArg(0) + " > " + gt.quotedArg(1)))
+    impl (lt) (codegen($cala, quotedArg(0) + " < " + quotedArg(1)))    
+    impl (gt) (codegen($cala, quotedArg(0) + " > " + quotedArg(1)))
   }
   
   def strings() = {
@@ -115,7 +115,7 @@ trait ScalaOps extends ForgeApplication {
     // most of the concat codegens are not used, but it is not easy to tell which ones will "make it"
     // should overloading be more explicit in the spec to avoid this problem? (an 'overloaded' parameter?)
     // at the very least, we should check for inconsistent codegen rules (or impls) between overloaded variants that collapse to the same thing
-    def scalaStrConcat(o: Rep[DSLOp]) = o.quotedArg(0)+".toString + " + o.quotedArg(1)+".toString"
+    def scalaStrConcat(o: Rep[DSLOp]) = quotedArg(0)+".toString + " + quotedArg(1)+".toString"
     impl (concat) (codegen($cala, scalaStrConcat(concat)))
     impl (concat2) (codegen($cala, scalaStrConcat(concat)))
     impl (concat3) (codegen($cala, scalaStrConcat(concat)))

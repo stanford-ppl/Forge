@@ -24,7 +24,7 @@ object ForgeBuild extends Build with ForgePreprocessor {
 
 trait ForgePreprocessor {
   var preprocessorEnabled = true
-  var preprocessorDebug = false
+  var preprocessorDebug = true
   
   // investigate: should the preprocessor be implemented using parser combinators or some other strategy?
   
@@ -160,13 +160,47 @@ trait ForgePreprocessor {
       }      
     }     
     
-    def isBlockArg(arg: String) = { arg.startsWith("b[") && arg.endsWith("]") }
+    def isBlockArg(arg: String) = arg.startsWith("b[")
+    def endOfBlockArgName(arg: String) = if (arg.contains('(')) arg.indexOf('(') - 1 else arg.indexOf(']')
+    def getCapturedArgs(arg: String, argMap: HashMap[String,String]) = {
+      if (arg.contains('(')) arg.slice(arg.indexOf('(')+1,arg.lastIndexOf(')')).split(",").map("s\"\"\""+mapNestedArgs(_,argMap)+"\"\"\"") 
+      else Array[String]()
+    }
+    def mapNestedArgs(arg: String, argMap: HashMap[String,String]): String = {
+      assert(arg.length > 0)
+      arg(0) + argMap.getOrElse(arg.drop(1),arg.drop(1)) // still has $ at this point
+    }
+    
+    def parseBlockArguments(start: Int, input: Array[Byte], args: ArrayBuffer[String]): Int = {
+      var j = start
+      while (j < input.length && !endOfWord(input(j))) j += 1
+      
+      var arg = new String(input.slice(start,j))
+      if (isBlockArg(arg) && input(j) == '(') {
+        // add captured parameters as well
+        var c = j
+        var parenScope = 1
+        while (c < input.length && parenScope != 0) {          
+          if (input(c) == '$') c = parseBlockArguments(c+1, input, args)        
+          else c += 1
+                    
+          if (input(c) == '(') parenScope += 1
+          else if (input(c) == ')') parenScope -= 1          
+        }
+        arg = arg + new String(input.slice(j, c+1))
+        j = c+1
+      }
+      if (!args.contains(arg)) { // slow, but order matters here
+        args += arg
+      }
+      j      
+    }
     
     def writeFormattedBlock(start: Int, input: Array[Byte], output: ArrayBuffer[Byte]): Int = {
       var i = start
       var bracketScope = 1
       var endBlock = false      
-      val args = new HashSet[String]()
+      val args = new ArrayBuffer[String]()
       val argMap = new HashMap[String,String]()
       val startCommentIndices = new ArrayBuffer[Int]()
       val endCommentIndices = new ArrayBuffer[Int]()
@@ -194,15 +228,15 @@ trait ForgePreprocessor {
           }        
         
           if (input(i) == '$') { // found identifier
-            var j = i
-            while (j < input.length && !endOfWord(input(j))) j += 1
-            args += new String(input.slice(i+1,j))
+            val j = parseBlockArguments(i+1, input, args)
             i = j-1
           }
         }
         
         i += 1  
       }
+      
+      // println("got parsed args: " + args) // REMOVE 
       
       // look for block functions that require us to have the op identifier
       // we don't do this in general because it's not necessary and doesn't play well with overloading
@@ -221,34 +255,44 @@ trait ForgePreprocessor {
       val indentInterior = "  " + indent 
       val nl = System.getProperty("line.separator")
       output ++= ("{" + nl).getBytes        
+        
+      // need to add fix up block args and a prefix for positional args  
+      // we do this in 2 passes to handle nested args
       for (a <- args) {
-        // need to add fix up block args and a prefix for positional args
         try {
           if (isBlockArg(a)) {
-            val a2 = a.slice(2,a.length-1)
+            val a2 = a.slice(2,endOfBlockArgName(a))
             val i = a2.toInt
-            val z: String = "arg"+a2 // wtf?
+            val z: String = "arg"+a2 // wtf? scala compiler error unless we break up z like this
             argMap += (a -> z)
-            output ++= (indentInterior + "val arg" + a2 + " = quotedArg("+a2+", "+enclosingOp.get+")" + nl).getBytes                    
           }
           else {
             val i = a.toInt
-            val z: String = "arg"+a // wtf?
+            val z: String = "arg"+a 
             argMap += (a -> z)
-            output ++= (indentInterior + "val arg" + a + " = quotedArg("+a+")" + nl).getBytes                    
           }
         }
         catch {
           case _:NumberFormatException => 
             if (isBlockArg(a)) {
-              val a2 = a.slice(2,a.length-1)
+              val a2 = a.slice(2,endOfBlockArgName(a))
               argMap += (a -> a2)
-              output ++= (indentInterior + "val " + a2 + " = quotedArg(\""+a2+"\", "+enclosingOp.get+")" + nl).getBytes
             }
             else {
-              output ++= (indentInterior + "val " + a + " = quotedArg(\""+a+"\")" + nl).getBytes
+              argMap += (a -> a)
             }
         }        
+      }
+      
+      for (a <- args) {
+        def quoteArgName(t: String) = if (argMap(a).startsWith("arg")) t else "\""+t+"\""        
+        if (isBlockArg(a)) {
+          val a2 = a.slice(2,endOfBlockArgName(a))
+          output ++= (indentInterior + "val " + argMap(a) + " = quotedBlock("+quoteArgName(a2)+", "+enclosingOp.get+", List("+getCapturedArgs(a,argMap).mkString(",")+"))" + nl).getBytes                    
+        }
+        else {
+          output ++= (indentInterior + "val " + argMap(a) + " = quotedArg("+quoteArgName(a)+")" + nl).getBytes
+        }
       }
       output ++= (indentInterior + "s\"\"\"").getBytes
       
@@ -261,8 +305,8 @@ trait ForgePreprocessor {
       }
       strBlockBuf ++= new String(input.slice(j, i-1))
       var strBlock = strBlockBuf.toString
-      // remap args inside the input block      
-      for (a <- args) {
+      // remap args inside the input block, outside-in      
+      for (a <- args.reverse) {
         if (argMap.contains(a)) {
           strBlock = strBlock.replace("$"+a, "$"+argMap(a))
         }

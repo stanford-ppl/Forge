@@ -96,7 +96,7 @@ trait ForgePreprocessor {
      * this when the preprocessor encounters a block symbol, $b{..}
      */
     abstract class OpEncoding
-    case class OpFromIs(name: String) extends OpEncoding {
+    case class OpFromTpeScope(name: String) extends OpEncoding {
       override def toString = "lookup(\""+name+"\")"
     }    
     case class OpFromImpl(binding: String) extends OpEncoding {
@@ -107,7 +107,7 @@ trait ForgePreprocessor {
     }    
     
     def scanBackToOp(start: Int, input: Array[Byte]): OpEncoding = {
-      val words = Array("is","op","impl") // enclosing op definers
+      val words = Array("static","infix","direct","compiler","impl") // enclosing op definers
       var i = start
       var foundWord = ""
       val maxWordLength = words.map(_.length).max
@@ -120,31 +120,35 @@ trait ForgePreprocessor {
       }
       
       foundWord match {
-        case "is" => 
-          // scan backwards to extract the name
-          while (i > 1 && input(i) != '"') i -= 1
-          val endNameIndex = i          
-          i -= 1
-          while (i > 1 && input(i) != '"') i -= 1
-          val startNameIndex = i          
+        case "static" | "infix" | "direct" | "compiler"  => 
+          var inTpeScope = true
+          var startGrpIndex = -1
+          var endGrpIndex = -1
           
-          if (endNameIndex == 0 || (startNameIndex == 0 && input(i) != '"')) err("could not find preceding op name before 'is' declaration")
-          OpFromIs(new String(input.slice(startNameIndex+1,endNameIndex)))
-        
-        case "op" =>
-          // scan forwards to extract the grp and op name
+          // scan forwards to extract the grp name, only if we are not in a tpe scope
           while (i < start && input(i) != '(') i += 1
-          val startGrpIndex = i
-          while (i < start && input(i) != ')') i += 1
-          val endGrpIndex = i
+          if (input(i+1) != '"') {
+            inTpeScope = false
+            startGrpIndex = i
+            while (i < start && input(i) != ')') i += 1
+            endGrpIndex = i
+          }
+          
+          // scan forwards to extract the op name
           while (i < start && input(i) != '"') i += 1
           val startNameIndex = i
           i += 1
           while (i < start && input(i) != '"') i += 1
           val endNameIndex = i
+          if (endNameIndex == start) err("could not find op name following op declaration")
           
-          if (endNameIndex == start) err("could not find grp name or op name following 'op' declaration")
-          OpFromOp(new String(input.slice(startGrpIndex+1,endGrpIndex)), new String(input.slice(startNameIndex+1,endNameIndex)))
+          if (!inTpeScope) {
+            if (startGrpIndex == -1 || endGrpIndex == -1) err("could not find grp name following op declaration")
+            OpFromOp(new String(input.slice(startGrpIndex+1,endGrpIndex)), new String(input.slice(startNameIndex+1,endNameIndex)))
+          }
+          else {
+            OpFromTpeScope(new String(input.slice(startNameIndex+1,endNameIndex)))
+          }          
         
         case "impl" =>  
           // scan forwards to extract the op name binding
@@ -277,8 +281,8 @@ trait ForgePreprocessor {
       val enclosingOp = 
         if (args.exists(isBlockArg)) {        
           // scan backwards until the lexically enclosing op identifier, which can be one of:
-          //   <name> is ...
-          //   op (grp) (name, ....)
+          //   static | direct | infix | compiler (grp) (name, ....)
+          //   static | direct | infix | compiler (name) (....)
           //   impl (binding) (...)      
           Some(scanBackToOp(i, input))
         }

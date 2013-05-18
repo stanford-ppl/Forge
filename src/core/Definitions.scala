@@ -90,10 +90,10 @@ trait Definitions extends DerivativeTypes {
   /**
    * Method syntax types
    */
-  object static extends MethodType  
-  object infix extends MethodType
-  object direct extends MethodType
-  object compiler extends MethodType  
+  object staticMethod extends MethodType  
+  object infixMethod extends MethodType
+  object directMethod extends MethodType
+  object compilerMethod extends MethodType  
   
   // blacklist for op names that cannot be expressed with infix methods
   val noInfixList = List("apply", "update") 

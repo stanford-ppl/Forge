@@ -32,7 +32,7 @@ trait DeliteGenPackages extends BaseGenPackages {
       stream.print(" with " + opsGrp.name)
       if (opsGrp.ops.exists(o => Impls(o).isInstanceOf[SingleTask] || Impls(o).isInstanceOf[Composite]))
         stream.print(" with " + opsGrp.name + "Impl")     
-      if (opsGrp.ops.exists(_.style == compiler))
+      if (opsGrp.ops.exists(_.style == compilerMethod))
         stream.print(" with " + opsGrp.grp.name + "CompilerOps")           
     }
     for (e <- Externs) {

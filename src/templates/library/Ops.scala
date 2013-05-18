@@ -113,7 +113,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       d.foreach { data => 
         stream.println("class " + data.tpe.name + makeTpeParsWithBounds(data.tpe.tpePars) + "(" + makeFieldArgs(data) + ") {")
         stream.println(makeFieldsWithInitArgs(data))
-        for (o <- unique(opsGrp.ops) if o.style == infix && o.args.length > 1 && getHkTpe(o.args.apply(0).tpe) == tpe) {       
+        for (o <- unique(opsGrp.ops) if o.style == infixMethod && o.args.length > 1 && getHkTpe(o.args.apply(0).tpe) == tpe) {       
           stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
           //stream.print("(" + o.args/*.drop(1)*/.map(t => t.name + ": " + repify(t.tpe) + " = " + unit(t.default)).mkString(",") + ")") TODO 
           stream.print("(" + o.args.drop(1).map(t => argify(t, repify)).mkString(",") + ")")  
@@ -139,13 +139,13 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       stream.print(makeOpImplicitArgsWithOverloadWithType(o))
       stream.println(" = {")      
       o.style match {
-        case `static` => emitOp(o, stream, indent=4)
-        case `infix` if grpIsTpe(opsGrp.grp) && DataStructs.contains(grpAsTpe(opsGrp.grp)) && o.args.length > 1 => 
+        case `staticMethod` => emitOp(o, stream, indent=4)
+        case `infixMethod` if grpIsTpe(opsGrp.grp) && DataStructs.contains(grpAsTpe(opsGrp.grp)) && o.args.length > 1 => 
           //val args = o.args/*.drop(1)*/.map(t => t.name)).mkString(",")
           val args = o.args.drop(1).map(t => t.name).mkString(",")
           val argsWithParen = if (args == "") args else "(" + args + ")"
           emitWithIndent(o.args.apply(0).name + "." + o.name + argsWithParen, stream, 4)
-        case `infix` | `direct` | `compiler` => emitOp(o, stream, indent=4)
+        case `infixMethod` | `directMethod` | `compilerMethod` => emitOp(o, stream, indent=4)
       }
       stream.println("  }")        
     }

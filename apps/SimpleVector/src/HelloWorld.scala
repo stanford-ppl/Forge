@@ -69,6 +69,13 @@ trait HelloSimple extends SimpleVectorApplication {
     println("v6 = v1.filter(_ < 5)")
     val v6 = v1.filter(_ < 5)
     v6.pprint  
+    
+    // foo
+    val fooResult = foo[Int](i => i+100, 2, 13, i => i + 5, 0.7, d => d)
+    // a0 == a1 == ... an = 118
+    // z == 0.7
+    // y = 15
+    println("fooResult: " + fooResult)
   }
    
 }

@@ -39,7 +39,7 @@ trait LibGenPackages extends BaseGenPackages {
     // compiler ops mixes in an application ops with compiler only ops
     stream.println("trait " + dsl + "CompilerOps extends " + dsl + "Application")
     for (opsGrp <- opsGrps) {
-      if (opsGrp.ops.exists(_.style == compiler))
+      if (opsGrp.ops.exists(_.style == compilerMethod))
         stream.print(" with " + opsGrp.grp.name + "CompilerOps")          
     }      
     for (e <- Externs) {

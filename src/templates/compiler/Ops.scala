@@ -18,7 +18,7 @@ trait DeliteGenOps extends BaseGenOps {
   import IR._
 
   def baseOpsCls(opsGrp: DSLOps) = {
-    if (opsGrp.ops.exists(_.style == compiler)) opsGrp.grp.name + "CompilerOps" 
+    if (opsGrp.ops.exists(_.style == compilerMethod)) opsGrp.grp.name + "CompilerOps" 
     else opsGrp.name    
   }
   def baseExpCls(grp: Rep[DSLGroup]) = {
@@ -62,8 +62,8 @@ trait DeliteGenOps extends BaseGenOps {
   def makeOpNodeName(o: Rep[DSLOp]) = {
     val i = nameClashId(o)    
     o.style match {
-      case `static` => o.grp.name + i + "Object_" + sanitize(o.name).capitalize
-      case `compiler` => o.name.capitalize
+      case `staticMethod` => o.grp.name + i + "Object_" + sanitize(o.name).capitalize
+      case `compilerMethod` => o.name.capitalize
       case _ => o.grp.name + i + "_" + sanitize(o.name).capitalize
     }
   }  

@@ -160,8 +160,8 @@ trait BaseGenOps extends ForgeCodeGenBase {
     // adding the nameClashId is another way to avoid chaining the Overload implicit, but the weird method names that result are confusing
     val i = "" //nameClashId(o)    
     o.style match {
-      case `static` => o.grp.name.toLowerCase + i + "_object_" + sanitize(o.name).toLowerCase
-      case `compiler` => 
+      case `staticMethod` => o.grp.name.toLowerCase + i + "_object_" + sanitize(o.name).toLowerCase
+      case `compilerMethod` => 
         if (o.name != sanitize(o.name)) err("compiler op name has special characters that require reformatting: " + o.name)
         o.name // should be callable directly from impl code
       case _ => o.grp.name.toLowerCase + i + "_" + sanitize(o.name).toLowerCase
@@ -277,7 +277,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     stream.println()
         
     // static ops
-    val staticOps = opsGrp.ops.filter(e=>e.style==static)
+    val staticOps = opsGrp.ops.filter(e=>e.style==staticMethod)
     if (staticOps.length > 0) {
       stream.println("  object " + opsGrp.grp.name + " {")
       for (o <- staticOps) {        
@@ -288,13 +288,13 @@ trait BaseGenOps extends ForgeCodeGenBase {
     stream.println()
     
     // direct ops
-    val directOps = opsGrp.ops.filter(e=>e.style==direct)
+    val directOps = opsGrp.ops.filter(e=>e.style==directMethod)
     for (o <- directOps) {
       stream.println("  " + makeSyntaxMethod(o))
     }
     
     // infix ops
-    val allInfixOps = opsGrp.ops.filter(e=>e.style==infix)
+    val allInfixOps = opsGrp.ops.filter(e=>e.style==infixMethod)
     
     // certain ops (e.g. "apply" cannot be expressed with infix notation right now), so we use implicits as a workaround
     def noInfix(o: Rep[DSLOp]) = {
@@ -339,14 +339,14 @@ trait BaseGenOps extends ForgeCodeGenBase {
     
     
     // abstract methods
-    for (o <- unique(opsGrp.ops.filter(e=>e.style != compiler))) {
+    for (o <- unique(opsGrp.ops.filter(e=>e.style != compilerMethod))) {
       stream.println("  " + makeOpMethodSignature(o) + ": " + repify(o.retTpe))
     }
     
     stream.println("}")
     
     // compiler ops
-    val compilerOps = opsGrp.ops.filter(e=>e.style == compiler)
+    val compilerOps = opsGrp.ops.filter(e=>e.style == compilerMethod)
     if (!compilerOps.isEmpty) {
       stream.println("trait " + opsGrp.grp.name + "CompilerOps extends " + opsGrp.name + " {")
       stream.println("  this: " + dsl + " => ")

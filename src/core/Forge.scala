@@ -7,11 +7,19 @@ import scala.reflect.SourceContext
 import scala.virtualization.lms.common._
 import scala.virtualization.lms.internal.{GenericFatCodegen, GenericCodegen}
 
+import library._
 import format._
 
-trait ForgeApplication extends Forge with ForgeLift {
+trait ForgeApplication extends Forge with ForgeLift with ForgeLib {
   def dslName: String
   def specification(): Rep[Unit]    
+}
+
+/**
+ * These are libraries written in Forge that are available to be imported by DSL authors.
+ */
+trait ForgeLib extends ScalaOps {
+  this: ForgeApplication =>
 }
 
 /**
@@ -40,6 +48,10 @@ trait ForgeScalaCodeGenPkg extends ScalaGenEffect
  */
 trait Forge extends ForgeScalaOpsPkg with Definitions with ForgeSugar with FieldOps with QuoteOps {
   this: ForgeApplication =>
+  
+  // exposed to end-users, but obfuscated, for what it's worth
+  def forge_err(s: String)(implicit ctx: SourceContext): Unit
+  def forge_warn(s: String)(implicit ctx: SourceContext): Unit
 }
 
 /**
@@ -51,32 +63,58 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   // -- IR helpers
   
   def isForgePrimitiveType(t: Rep[DSLType]) = t match {
-    case `MInt` | `MDouble` | `MBoolean` | `MString` | `MUnit` | `MAny` | `MSourceContext` | `byName` => true
-    case `CInt` | `CDouble` | `CBoolean` | `CString` | `CUnit` | `CAny` => true
+    case `MInt` | `MFloat` | `MDouble` | `MBoolean` | `MString` | `MUnit` | `MAny` | `MNothing` | `MSourceContext` | `byName` => true
+    // case `CInt` | `CFloat` | `CDouble` | `CBoolean` | `CString` | `CUnit` | `CAny` | `CNothing` => true
+    case Def(Tpe(_,_,`now`)) => true // is there any reason to ever generate an abstract type for a 'now' type?
     case Def(Tpe("ForgeArray",_,_)) | Def(Tpe("Var",_,_)) | Def(Tpe("Overloaded",_,_)) => true
     case _ => false
   }
   
   def grpIsTpe(grp: Rep[DSLGroup]) = grp match {
     case Def(Tpe(n,targs,s)) => true
-    case Def(TpeInst(t,args,s)) => true
-    case Def(TpePar(n,ctx)) => true
+    case Def(TpeInst(t,args)) => true
+    case Def(TpePar(n,ctx,s)) => true
+    case Def(TpeClass(n,sig,targs)) => true
+    case Def(TpeClassInst(n,targs,t)) => true
     case _ => false
   }
   def grpAsTpe(grp: Rep[DSLGroup]): Rep[DSLType] = grp match {
     case t@Def(Tpe(n,targs,s)) => t.asInstanceOf[Rep[DSLType]]
-    case t@Def(TpeInst(hk,args,s)) => t.asInstanceOf[Rep[DSLType]]
-    case t@Def(TpePar(n,ctx)) => t.asInstanceOf[Rep[DSLType]]
+    case t@Def(TpeInst(hk,args)) => t.asInstanceOf[Rep[DSLType]]
+    case t@Def(TpePar(n,ctx,s)) => t.asInstanceOf[Rep[DSLType]]
+    case t@Def(TpeClass(n,sig,targs)) => t.asInstanceOf[Rep[DSLType]]
+    case t@Def(TpeClassInst(n,targs,t2)) => t.asInstanceOf[Rep[DSLType]]
     // case _ => err(grp.name + " is not a DSLType")
   }
-  
-  def isTpeInst(tpe: Rep[DSLType]) = tpe match {
-    case Def(TpeInst(_,_,_)) => true
+
+  def isTpePar(tpe: Rep[DSLType]) = tpe match {
+    case Def(TpePar(_,_,_)) => true
     case _ => false
   }
   
+  def isTpeInst(tpe: Rep[DSLType]) = tpe match {
+    case Def(TpeInst(_,_)) => true
+    case _ => false
+  }
+  
+  def isTpeClass(grp: Rep[DSLGroup]) = grp match {
+    case Def(TpeClass(_,_,_)) => true
+    case _ => false
+  }  
+  def asTpeClass(grp: Rep[DSLGroup]) = grp match {
+    case t@Def(TpeClass(_,_,_)) => t.asInstanceOf[Rep[DSLTypeClass]]
+  }
+  
+  def isTpeClassInst(grp: Rep[DSLGroup]) = grp match {
+    case Def(TpeClassInst(_,_,_)) => true
+    case _ => false
+  }  
+  def asTpeClassInst(grp: Rep[DSLGroup]) = grp match {
+    case t@Def(TpeClassInst(_,_,_)) => t.asInstanceOf[Rep[DSLTypeClassInst]]
+  }  
+  
   def getHkTpe(tpe: Rep[DSLType]) = tpe match {
-    case Def(TpeInst(hkTpe,_,_)) => hkTpe
+    case Def(TpeInst(hkTpe,_)) => hkTpe
     case _ => tpe
   }
   
@@ -92,13 +130,19 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
 }
 
 trait ForgeUtilities {  
+  this: ForgeExp =>
+  
   def err(s: String)(implicit ctx: SourceContext) = {
     println("[forge error]: " + s)
-    println("  at " + (ctx.fileName.split("/").last + ":" + ctx.line)) 
+    // println("  at " + (ctx.fileName.split("/").last + ":" + ctx.line)) 
+    println("  at " + quotePos(fresh[Nothing].withPos(List(ctx)))) 
     sys.exit(1)
   }
   def warn(s: String) = println("[forge warning]: " + s)  
   def info(s: String) = println("[forge]: " + s)
+  
+  def forge_err(s: String)(implicit ctx: SourceContext) = err(s)
+  def forge_warn(s: String)(implicit ctx: SourceContext) = warn(s)
 }
 
 
@@ -126,7 +170,8 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
       case _ => "(" + args.map(repify).mkString(",") + ") => " + repify(ret)        
     }
     case Def(Tpe("Var", arg, stage)) => repify(arg(0))
-    case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2, s2)) => repify(a2(0))
+    case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2)) => repify(a2(0))
+    case Def(TpeClass(_,_,_)) | Def(TpeClassInst(_,_,_)) => quote(a)
     case Def(VarArgs(t)) => "Seq[" + repify(t) + "]"
     case _ => "Rep[" + quote(a) + "]"           
   }
@@ -134,18 +179,21 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     case Def(Arg(name, tpe, default)) => repifySome(tpe)
     case Def(Tpe(name, arg, `now`)) => quote(a)
     case Def(Tpe("Var", arg, stage)) => varify(arg(0))
-    case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2, s2)) => varify(a2(0))
+    case Def(TpePar(name, ctx, `now`)) => quote(a)
+    case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2)) => varify(a2(0))
+    case Def(TpeInst(Def(Tpe(name, args, `now`)), args2)) => name + (if (!args2.isEmpty) "[" + args2.map(repifySome).mkString(",") + "]" else "") // is this the right thing to do?
     case Def(VarArgs(t)) => repifySome(t) + "*"
     case _ => repify(a)
   }
   
   def argify(a: Exp[DSLArg], typify: Exp[DSLType] => String = repify): String = a match {
-    case Def(Arg(name, tpe, default)) => default match {
-      case Some(d) => name + ": " + typify(tpe) + " = " + "unit("+d+")"
-      case None => name + ": " + typify(tpe)
-    }
+    // tpe instances will have Rep parameters, so we don't want to repify the outer tpe. goes hand-in-hand with the question in repifySome
+    case Def(Arg(name, tpe@Def(TpeInst(Def(Tpe(n, args, `now`)), args2)), Some(d))) => name + ": " + repifySome(tpe) + " = " + "unit("+d+")"
+    case Def(Arg(name, tpe@Def(TpeInst(Def(Tpe(n, args, `now`)), args2)), None)) => name + ": " + repifySome(tpe)
+    case Def(Arg(name, tpe, Some(d))) => name + ": " + typify(tpe) + " = " + "unit("+d+")"    
+    case Def(Arg(name, tpe, None)) => name + ": " + typify(tpe)
   }
-
+  
   def makeTpeParsWithBounds(args: List[Rep[TypePar]]): String = {
     if (args.length < 1) return ""    
     val args2 = args.map { a => quote(a) + (if (a.ctxBounds != Nil) ":" + a.ctxBounds.map(_.name).mkString(":") else "") }
@@ -154,10 +202,6 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
   def makeTpePars(args: List[Rep[DSLType]]): String = {
     if (args.length < 1) return ""
     "[" + args.map(quote).mkString(",") + "]"
-  }
-    
-  def instTpePar(tpePars: List[Rep[TypePar]], par: Rep[DSLType], tpeArg: Rep[DSLType]): List[Rep[DSLType]] = {
-    tpePars.map(e => if (e.name == par.name) tpeArg else e)
   }
   
   var quoteLiterally = false  
@@ -171,8 +215,11 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
   
   override def quote(x: Exp[Any]) : String = x match {
     case Def(Tpe(s,args,stage)) => s + makeTpePars(args) 
-    case Def(TpeInst(t,args,s)) => t.name + makeTpePars(args)
-    case Def(TpePar(s,ctx)) => s 
+    case Def(TpeInst(t,args)) => t.name + makeTpePars(args)
+    case Def(TpePar(s,ctx,stage)) => s 
+    case Def(TpeClass(s,sig,args)) => s + makeTpePars(args) 
+    case Def(TpeClassInst(s,args,t)) => quote(t)
+    case Def(FTpe(args,ret,freq)) => "(" + args.map(a => quote(a.tpe)).mkString(",") + ") => " + quote(ret)
     case Def(StringPlus(a,b)) => quote(quoteLiteral(a)+quoteLiteral(b)) 
     case Def(Arg(name,tpe,default)) => quote(name)
     case s@Sym(n) => err("could not resolve symbol " + findDefinition(s).toString + ". All Forge symbols must currently be statically resolvable.")

@@ -1,4 +1,4 @@
-package LOWERCASE_DSL_NAME.compiler.extern
+package LOWERCASE_DSL_NAME.compiler
 
 import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}

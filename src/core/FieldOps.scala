@@ -48,12 +48,12 @@ trait FieldOpsExp extends FieldOps {
   /**
    * TypePar
    */
-  def infix_ctxBounds(x: Exp[TypePar]): List[TypeClass] = x match {
-    case Def(TpePar(name,ctx)) if (ctx.contains(TManifest)) => ctx
-    case Def(TpePar(name,ctx)) => TManifest :: ctx
+  def infix_ctxBounds(x: Exp[TypePar]): List[TypeClassSignature] = x match {
+    case Def(TpePar(name,ctx,s)) if (ctx.contains(TManifest)) => ctx
+    case Def(TpePar(name,ctx,s)) => TManifest :: ctx
   }
   def infix_name(x: Exp[TypePar])(implicit o: Overloaded1) = x match {
-    case Def(TpePar(name,ctx)) => name
+    case Def(TpePar(name,ctx,s)) => name
   }  
   
   /**
@@ -61,25 +61,45 @@ trait FieldOpsExp extends FieldOps {
    */
   def infix_name(x: Exp[DSLType])(implicit o: Overloaded2): String = x match {
     case Def(Tpe(name,tpePars,stage)) => name
-    case Def(TpeInst(t,args,stage)) => infix_name(t)(o)
+    case Def(TpeInst(t,args)) => infix_name(t)(o)
+    case Def(TpeClass(name,sig,tpePars)) => name
+    case Def(TpeClassInst(name,tpePars,t)) => name
     case Def(FTpe(args,ret,freq)) => "Function"
-    case Def(TpePar(name,ctx)) => name        
+    case Def(TpePar(name,ctx,s)) => name        
     case Def(VarArgs(t)) => "*" + infix_name(t)(o)
   }  
   def infix_tpePars(x: Exp[DSLType]) = x match {
     case Def(Tpe(s,tpePars,stage)) => tpePars
-    case Def(TpeInst(t,args,stage)) => Nil
-    case Def(TpePar(name,ctx)) => Nil
+    case Def(TpeInst(t,args)) => Nil
+    case Def(TpePar(name,ctx,s)) => Nil
+    case Def(TpeClass(name,sig,tpePars)) => tpePars
+    case Def(TpeClassInst(name,tpePars,t)) => tpePars
     case Def(FTpe(args,ret,freq)) => Nil
     case Def(VarArgs(t)) => Nil
   }
   def infix_stage(x: Exp[DSLType]) = x match {
     case Def(Tpe(s,tpePars,stage)) => stage
-    case Def(TpeInst(t,args,stage)) => stage
-    case Def(TpePar(name,ctx)) => future
+    case Def(TpeInst(Def(Tpe(s,tpePars,stage)),args)) => stage
+    case Def(TpePar(name,ctx,stage)) => stage
+    case Def(TpeClass(name,sig,pars)) => future
+    case Def(TpeClassInst(name,tpePars,t)) => future
     case Def(FTpe(args,ret,freq)) => future
     case Def(VarArgs(t)) => future
   }  
+  
+  /**
+   * DSLTypeClass
+   */
+   def infix_signature(x: Exp[DSLTypeClass]): TypeClassSignature = x match {
+     case Def(TpeClass(name,sig,tpePars)) => sig
+   }
+  
+  /**
+   * DSLTypeClassInst
+   */
+  def infix_tpe(x: Exp[DSLTypeClassInst])(implicit o: Overloaded1): Exp[DSLType] = x match {
+    case Def(TpeClassInst(name,tpePars,t)) => t
+  }
  
   /**
   * DSLArg
@@ -87,7 +107,7 @@ trait FieldOpsExp extends FieldOps {
   def infix_name(x: Exp[DSLArg])(implicit o: Overloaded3): String = x match  {
     case Def(Arg(name,tpe,default)) => name
   }
-  def infix_tpe(x: Exp[DSLArg])(implicit o: Overloaded1): Exp[DSLType] = x match  {
+  def infix_tpe(x: Exp[DSLArg])(implicit o: Overloaded2): Exp[DSLType] = x match  {
     case Def(Arg(name,tpe,default)) => tpe
   }
   def infix_default(x: Exp[DSLArg]) = x match  {
@@ -138,7 +158,7 @@ trait FieldOpsExp extends FieldOps {
   /**
    * DSLData
    */
-  def infix_tpe(x: Exp[DSLData])(implicit o: Overloaded2) = x match {
+  def infix_tpe(x: Exp[DSLData])(implicit o: Overloaded3) = x match {
     case Def(Data(tpe,fields)) => tpe
   }  
   def infix_fields(x: Exp[DSLData]) = x match {

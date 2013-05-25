@@ -10,16 +10,19 @@ import scala.collection.mutable.{ArrayBuffer,HashMap}
 trait ForgeOps extends Base {
   this: Forge =>
       
-  def infix_withBound(a: Rep[TypePar], b: TypeClass) = forge_withbound(a,b)
-  implicit class TpeClassOps(a: TypeClass) {
+  def infix_withBound(a: Rep[TypePar], b: TypeClassSignature) = forge_withbound(a,b)
+  implicit class TpeClassOps(a: TypeClassSignature) {
     def apply(b: Rep[TypePar]*) = forge_typeclasson(a,b.toList)
   }
   
   def grp(name: String) = forge_grp(name)  
   def tpeAlias(name: String, tpe: Rep[DSLType]) = forge_tpealias(name, tpe)
-  def tpePar(name: String, ctxBounds: List[TypeClass] = List()) = forge_tpepar(name, ctxBounds) // TODO: type bounds    
+  def tpePar(name: String, ctxBounds: List[TypeClassSignature] = List(), stage: StageTag = future) = forge_tpepar(name, ctxBounds, stage) // TODO: type bounds    
+  def ephemeralTpe(name: String, tpePars: List[Rep[TypePar]] = List(), stage: StageTag = future) = forge_ephemeral_tpe(name, tpePars, stage)
   def tpe(name: String, tpePars: List[Rep[TypePar]] = List(), stage: StageTag = future) = forge_tpe(name, tpePars, stage)
-  def tpeInst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]] = List(), stage: StageTag = future) = forge_tpeinst(hkTpe, tpeArgs, stage)    
+  def tpeInst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]] = List()) = forge_tpeinst(hkTpe, tpeArgs)    
+  def tpeClass(name: String, signature: TypeClassSignature, tpePars: List[Rep[TypePar]] = List()) = forge_tpeclass(name, signature, tpePars)
+  def tpeClassInst(name: String, tpePars: List[Rep[TypePar]], tpeClass: Rep[DSLType]) = forge_tpeclassinst(name, tpePars, tpeClass)
   def ftpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency) = forge_ftpe(args, ret, freq)
   def arg(name: String, tpe: Rep[DSLType], default: Option[String] = None) = forge_arg(name, tpe, default)
   def lift(grp: Rep[DSLGroup])(tpe: Rep[DSLType]) = forge_lift(grp, tpe)
@@ -28,16 +31,19 @@ trait ForgeOps extends Base {
   implicit def namedTpeToArg(arg: (String, Rep[DSLType])): Rep[DSLArg] = forge_arg(arg._1, arg._2, None)
   implicit def namedTpeWithDefaultToArg(arg: (String, Rep[DSLType], String)): Rep[DSLArg] = forge_arg(arg._1, arg._2, Some(arg._3))
   def anyToArg(a: (Any, Int)): Rep[DSLArg] = forge_anyToArg(a)
+  def anyToImplicitArg(a: (Any, Int)): Rep[DSLArg] = forge_anyToImplicitArg(a)
   
   case class MethodSignature(args: List[Rep[Any]], retTpe: Rep[DSLType])  
-  def static(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignature, implicitArgs: List[Rep[DSLType]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = 
-      forge_op(grp,name,staticMethod,tpePars,signature.args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,signature.retTpe,effect,aliasHint)
-  def infix(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignature, implicitArgs: List[Rep[DSLType]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = 
-      forge_op(grp,name,infixMethod,tpePars,signature.args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,signature.retTpe,effect,aliasHint)  
-  def direct(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignature, implicitArgs: List[Rep[DSLType]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = 
-      forge_op(grp,name,directMethod,tpePars,signature.args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,signature.retTpe,effect,aliasHint)  
-  def compiler(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignature, implicitArgs: List[Rep[DSLType]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = 
-      forge_op(grp,name,compilerMethod,tpePars,signature.args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs,signature.retTpe,effect,aliasHint)  
+  def static(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = 
+      forge_op(grp,name,staticMethod,tpePars,signature.args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs.zipWithIndex.map(anyToImplicitArg).asInstanceOf[List[Rep[DSLArg]]],signature.retTpe,effect,aliasHint)
+  def infix(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = 
+      forge_op(grp,name,infixMethod,tpePars,signature.args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs.zipWithIndex.map(anyToImplicitArg).asInstanceOf[List[Rep[DSLArg]]],signature.retTpe,effect,aliasHint)  
+  def direct(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = 
+      forge_op(grp,name,directMethod,tpePars,signature.args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs.zipWithIndex.map(anyToImplicitArg).asInstanceOf[List[Rep[DSLArg]]],signature.retTpe,effect,aliasHint)  
+  def compiler(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = 
+      forge_op(grp,name,compilerMethod,tpePars,signature.args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs.zipWithIndex.map(anyToImplicitArg).asInstanceOf[List[Rep[DSLArg]]],signature.retTpe,effect,aliasHint)  
+  def fimplicit(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = 
+      forge_op(grp,name,implicitMethod,tpePars,signature.args.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]],implicitArgs.zipWithIndex.map(anyToImplicitArg).asInstanceOf[List[Rep[DSLArg]]],signature.retTpe,effect,aliasHint)    
   
   def impl(op: Rep[DSLOp])(rule: OpType) = forge_impl(op,rule)  
   def extern(grp: Rep[DSLGroup], withLift: Boolean = false, targets: List[CodeGenerator] = generators) = forge_extern(grp, withLift, targets)
@@ -49,31 +55,39 @@ trait ForgeOps extends Base {
   def infix_as(p: ParallelizeKey, dc: ParallelCollection) = forge_isparallelcollection(p.tpe, dc)  
   def infix_as(p: ParallelizeKey, dc: ParallelCollectionBuffer) = forge_isparallelcollection_buffer(p.tpe, dc)    
 
-  implicit def forceOpOption(o: Option[Rep[DSLOp]]): Rep[DSLOp]
-  def lookup(grpName: String, opName: String): Option[Rep[DSLOp]] = forge_lookup(grpName,opName,0)
-  def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup(grpName,opName,index)
+  implicit def forceOpOption(o: Option[Rep[DSLOp]])(implicit ctx: SourceContext): Rep[DSLOp]
+  def lookupTpe(tpeName: String, stage: StageTag = future): Option[Rep[DSLType]] = forge_lookup_tpe(tpeName,stage)
+  def lookupGrp(grpName: String): Option[Rep[DSLGroup]] = forge_lookup_grp(grpName)
+  def lookupOp(grpName: String, opName: String): Option[Rep[DSLOp]] = forge_lookup_op(grpName,opName,0)
+  def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup_op(grpName,opName,index)
   
   def forge_grp(name: String): Rep[DSLGroup]  
   def forge_tpealias(name: String, tpe: Rep[DSLType]): Rep[TypeAlias]
-  def forge_tpepar(name: String, ctxBounds: List[TypeClass]): Rep[TypePar]
-  def forge_withbound(a: Rep[TypePar], b: TypeClass): Rep[TypePar] 
-  def forge_typeclasson(a: TypeClass, b: List[Rep[TypePar]]): Rep[DSLType] 
+  def forge_tpepar(name: String, ctxBounds: List[TypeClassSignature], stage: StageTag): Rep[TypePar]
+  def forge_withbound(a: Rep[TypePar], b: TypeClassSignature): Rep[TypePar] 
+  def forge_typeclasson(a: TypeClassSignature, b: List[Rep[TypePar]]): Rep[DSLType] 
   def forge_tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag): Rep[DSLType]    
-  def forge_tpeinst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]], stage: StageTag): Rep[DSLType]    
+  def forge_ephemeral_tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag): Rep[DSLType]
+  def forge_tpeinst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]]): Rep[DSLType]    
+  def forge_tpeclass(name: String, signature: TypeClassSignature, tpePars: List[Rep[TypePar]]): Rep[DSLTypeClass]
+  def forge_tpeclassinst(name: String, tpePars: List[Rep[TypePar]], tpe: Rep[DSLType]): Rep[DSLTypeClassInst]
   def forge_arg(name: String, tpe: Rep[DSLType], default: Option[String]): Rep[DSLArg]
   def forge_anyToArg(a: (Any, Int)): Rep[DSLArg]
+  def forge_anyToImplicitArg(a: (Any, Int)): Rep[DSLArg]
   def forge_ftpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency): Rep[DSLType]
   def forge_lift(grp: Rep[DSLGroup], tpe: Rep[DSLType]): Rep[Unit]
   def forge_data(tpe: Rep[DSLType], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]  
-  def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
+  def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
   def forge_impl(op: Rep[DSLOp], rule: OpType): Rep[DSLOp]
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
   def forge_isparallelcollection(tpe: Rep[DSLType], dc: ParallelCollection): Rep[Unit]
   def forge_isparallelcollection_buffer(tpe: Rep[DSLType], dc: ParallelCollectionBuffer): Rep[Unit]
-  def forge_lookup(grpName: String, opName: String, overloadedIndex: Int): Option[Rep[DSLOp]]  
+  def forge_lookup_tpe(tpeName: String, stage: StageTag): Option[Rep[DSLType]]  
+  def forge_lookup_grp(grpName: String): Option[Rep[DSLGroup]]  
+  def forge_lookup_op(grpName: String, opName: String, overloadedIndex: Int): Option[Rep[DSLOp]]  
 }
 
-trait ForgeSugarLowPriority extends ForgeOps with ForgeUtilities {
+trait ForgeSugarLowPriority extends ForgeOps {
   this: Forge =>
 
   /**
@@ -140,30 +154,34 @@ trait ForgeSugar extends ForgeSugarLowPriority {
     
     // sugared version of op declarations
     // automatically imports the enclosing type as a type parameter and an instance of that type as the first argument, exported under 'self'     
-    def static(name: String)(signature: MethodSignature, implicitArgs: List[Rep[DSLType]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
-      warn("declaring static method inside tpe scope - argument of type " + _tpeScopeBox.name + " is added as first parameter. is this what you meant?")
+    def static(name: String)(signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
+      forge_warn("declaring static method inside tpe scope - argument of type " + _tpeScopeBox.name + " is added as first parameter. is this what you meant?")
       val (amendedTpePars, amendedArgs) = tpeOpArgs(addTpePars, signature.args)
-      forge_op(_tpeScopeBox,name,staticMethod,amendedTpePars,amendedArgs,implicitArgs,signature.retTpe,effect,aliasHint)
+      forge_op(_tpeScopeBox,name,staticMethod,amendedTpePars,amendedArgs,implicitArgs.zipWithIndex.map(anyToImplicitArg),signature.retTpe,effect,aliasHint)
     }
-    def infix(name: String)(signature: MethodSignature, implicitArgs: List[Rep[DSLType]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
+    def infix(name: String)(signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
       val (amendedTpePars, amendedArgs) = tpeOpArgs(addTpePars, signature.args)
-      forge_op(_tpeScopeBox,name,infixMethod,amendedTpePars,amendedArgs,implicitArgs,signature.retTpe,effect,aliasHint)  
+      forge_op(_tpeScopeBox,name,infixMethod,amendedTpePars,amendedArgs,implicitArgs.zipWithIndex.map(anyToImplicitArg),signature.retTpe,effect,aliasHint)  
     }
-    def direct(name: String)(signature: MethodSignature, implicitArgs: List[Rep[DSLType]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
+    def direct(name: String)(signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
       val (amendedTpePars, amendedArgs) = tpeOpArgs(addTpePars, signature.args)
-      forge_op(_tpeScopeBox,name,directMethod,amendedTpePars,amendedArgs,implicitArgs,signature.retTpe,effect,aliasHint)  
+      forge_op(_tpeScopeBox,name,directMethod,amendedTpePars,amendedArgs,implicitArgs.zipWithIndex.map(anyToImplicitArg),signature.retTpe,effect,aliasHint)  
     }
-    def compiler(name: String)(signature: MethodSignature, implicitArgs: List[Rep[DSLType]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
+    def compiler(name: String)(signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
       val (amendedTpePars, amendedArgs) = tpeOpArgs(addTpePars, signature.args)
-      forge_op(_tpeScopeBox,name,compilerMethod,amendedTpePars,amendedArgs,implicitArgs,signature.retTpe,effect,aliasHint)  
+      forge_op(_tpeScopeBox,name,compilerMethod,amendedTpePars,amendedArgs,implicitArgs.zipWithIndex.map(anyToImplicitArg),signature.retTpe,effect,aliasHint)  
     }          
+    def fimplicit(name: String)(signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
+      val (amendedTpePars, amendedArgs) = tpeOpArgs(addTpePars, signature.args)
+      forge_op(_tpeScopeBox,name,implicitMethod,amendedTpePars,amendedArgs,implicitArgs.zipWithIndex.map(anyToImplicitArg),signature.retTpe,effect,aliasHint)  
+    }              
 
     val parallelize = ParallelizeKey(_tpeScopeBox)
     
-    def lookup(opName: String) = forge_lookup(_tpeScopeBox.name,opName,0)
-    def lookup(grpName: String, opName: String) = forge_lookup(grpName,opName,0)    
-    def lookupOverloaded(opName: String, index: Int) = forge_lookup(_tpeScopeBox.name,opName,index)
-    def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup(grpName,opName,index)
+    def lookupOp(opName: String) = forge_lookup_op(_tpeScopeBox.name,opName,0)
+    def lookupOp(grpName: String, opName: String) = forge_lookup_op(grpName,opName,0)    
+    def lookupOverloaded(opName: String, index: Int) = forge_lookup_op(_tpeScopeBox.name,opName,index)
+    def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup_op(grpName,opName,index)
   }
   
   trait TpeScopeRunner extends TpeScope {
@@ -193,12 +211,16 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
    */  
    
   // this unsafe implicit is provided only to simplify the common case 
-  def forceOpOption(o: Option[Rep[DSLOp]]): Rep[DSLOp] = {
-    if (o.isEmpty) (err("Empty option " + o + " used as in place of an op argument"))
+  def forceOpOption(o: Option[Rep[DSLOp]])(implicit ctx: SourceContext): Rep[DSLOp] = {
+    if (o.isEmpty) (err("Empty option " + o + " used in place of an op argument"))
     o.get
   }
   
-  def forge_lookup(grpName: String, opName: String, overloadedIndex: Int): Option[Rep[DSLOp]] = {
+  def forge_lookup_tpe(tpeName: String, stage: StageTag) = Tpes.find(t => t.name == tpeName && t.stage == stage)
+  
+  def forge_lookup_grp(grpName: String) = Tpes.find(_.name == grpName).orElse(OpsGrp.find(t => t._1.name == grpName).map(_._1))
+  
+  def forge_lookup_op(grpName: String, opName: String, overloadedIndex: Int): Option[Rep[DSLOp]] = {
     val matches = OpsGrp.find(t => t._1.name == grpName).map(_._2.ops.filter(_.name == opName))
     if (matches.isDefined) {
       if (overloadedIndex > matches.get.length-1) err("lookup failed: no op exists in grp " + grpName + " with name " + opName + " and index " + overloadedIndex)
@@ -229,14 +251,14 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
      
   /* TpePar represents a named type parameter for another DSLType */
   // no higher-kinded fun yet
-  case class TpePar(name: String, ctxBounds: List[TypeClass]) extends Def[TypePar]
+  case class TpePar(name: String, ctxBounds: List[TypeClassSignature], stage: StageTag) extends Def[TypePar]
    
-  def forge_tpepar(name: String, ctxBounds: List[TypeClass]) = TpePar(name, ctxBounds)
+  def forge_tpepar(name: String, ctxBounds: List[TypeClassSignature], stage: StageTag) = TpePar(name, ctxBounds, stage)
   
   /* Adds a bound to a type parameter by constructing a new type parameter */
-  def forge_withbound(a: Rep[TypePar], b: TypeClass) = tpePar(a.name, b :: a.ctxBounds)
+  def forge_withbound(a: Rep[TypePar], b: TypeClassSignature) = tpePar(a.name, b :: a.ctxBounds)
   
-  def forge_typeclasson(a: TypeClass, b: List[Rep[TypePar]]) = ephemeralTpe(a.name, b)
+  def forge_typeclasson(a: TypeClassSignature, b: List[Rep[TypePar]]) = ephemeralTpe(a.name, b, stage = now)
 
   /* A DSLType */    
   case class Tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag) extends Def[DSLType]
@@ -246,19 +268,37 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     if (!Tpes.contains(t)) Tpes += t
     t
   }
-  // creates a tpe, but doesn't add it to the IR state (only available inside Forge for now)
-  def ephemeralTpe(name: String, tpePars: List[Rep[TypePar]] = List(), stage: StageTag = future): Exp[DSLType] = {
+  
+  // creates a tpe, but doesn't add it to the IR state 
+  def forge_ephemeral_tpe(name: String, tpePars: List[Rep[TypePar]] = List(), stage: StageTag = future): Exp[DSLType] = {
     Tpe(name, tpePars, stage)
   }
   
   /* A DSLType instance of a higher-kinded type */
-  case class TpeInst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]], stage: StageTag) extends Def[DSLType]
+  case class TpeInst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]]) extends Def[DSLType]
     
-  def forge_tpeinst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]], stage: StageTag) = {
+  def forge_tpeinst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]]) = {
     if (tpeArgs.length != hkTpe.tpePars.length) err("cannot instantiate tpe " + hkTpe.name + " with args " + tpeArgs + " - not enough arguments")
-    val t: Exp[DSLType] = TpeInst(hkTpe, tpeArgs, stage)
-    if (!Tpes.contains(t)) Tpes += t
+    val t: Exp[DSLType] = TpeInst(hkTpe, tpeArgs)
+    // if (!Tpes.contains(t)) Tpes += t
     t
+  }
+  
+  /* A DSL-defined type class */
+  case class TpeClass(name: String, signature: TypeClassSignature, tpePars: List[Rep[TypePar]]) extends Def[DSLTypeClass]
+  
+  def forge_tpeclass(name: String, signature: TypeClassSignature, tpePars: List[Rep[TypePar]]) = {
+    TpeClass(name, signature, tpePars)
+  }
+  
+  /* A DSL-defined type class instance */
+  case class TpeClassInst(name: String, tpePars: List[Rep[TypePar]], tpe: Rep[DSLType]) extends Def[DSLTypeClassInst] 
+  
+  def forge_tpeclassinst(name: String, tpePars: List[Rep[TypePar]], tpe: Rep[DSLType]) = {
+    getHkTpe(tpe) match {
+      case Def(TpeClass(_,_,_)) => TpeClassInst(name, tpePars, tpe)
+      case _ => err("cannot instantiate tpe class instance from tpe " + name + " - not a tpe class")
+    }
   }
     
   /* A function of Rep arguments */
@@ -281,6 +321,10 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     case Def(Arg(_,_,_)) => a._1.asInstanceOf[Rep[DSLArg]]
     case _ => forge_arg(opArgPrefix+a._2, a._1.asInstanceOf[Rep[DSLType]], None)
   }
+  def forge_anyToImplicitArg(a: (Any, Int)) : Rep[DSLArg] = a._1 match {
+    case Def(Arg(_,_,_)) => a._1.asInstanceOf[Rep[DSLArg]]
+    case _ => forge_arg(implicitOpArgPrefix+a._2, a._1.asInstanceOf[Rep[DSLType]], None)
+  }  
 
   /* A back-end data structure */
   case class Data(tpe: Rep[DSLType], fields: Seq[(String, Exp[DSLType])]) extends Def[DSLData]
@@ -293,9 +337,9 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   }
   
   /* An operator - this represents a method or IR node */
-  case class Op(grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint) extends Def[DSLOp]
+  case class Op(grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint) extends Def[DSLOp]
   
-  def forge_op(_grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLType]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint) = {
+  def forge_op(_grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint) = {
     args match {
       case a :: Def(Arg(_, Def(VarArgs(z)), _)) :: b if b != Nil => err("a var args op parameter must be the final one")
       case Def(Arg(_, Def(VarArgs(z)), _)) :: b if b != Nil => err("a var args op parameter must be the final one.")
@@ -309,7 +353,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     }
         
     // always add source context
-    val amendedImplicitArgs = (MSourceContext :: implicitArgs).distinct 
+    val amendedImplicitArgs = (arg("__pos",MSourceContext) :: implicitArgs).distinct 
     
     val o = Op(_grp, name, style, tpePars, args, amendedImplicitArgs, retTpe, effect, aliasHint)
     val opsGrp = OpsGrp.getOrElseUpdate(_grp, new DSLOps {
@@ -367,28 +411,35 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     
   /* Establishes that the given tpe implements the ParallelCollection interface */
   def forge_isparallelcollection(tpe: Rep[DSLType], dc: ParallelCollection) = {
-    // verify the dc functions match our expectations
-    
-    // -- below causes scalac typer crash :(
-    // if ((dc.alloc.args.size != 1 || dc.alloc.args.apply(0).tpe != MInt || dc.alloc.retTpe != tpe))
-    //   // TODO: how should this work? alloc can really map to anything.. e.g can have other fields that get mapped from the inputs in arbitrary ways
-    //   // needs to be specified in the zip in some context attached to the alloc method?      
-    //   err("dcAlloc must take a single argument of type " + MInt.name + " and return an instance of " + tpe.name)
-    // if (dc.size.args.size != 1 || getHkTpe(dc.size.args.apply(0).tpe) != tpe || (dc.size.retTpe != MInt))
-    //   err("dcSize must take a single argument of type " + tpe.name + " and return an MInt")
-    // if (dc.apply.args.size != 2 || (getHkTpe(dc.apply.args.apply(0).tpe), dc.apply.args(1).tpe) != (tpe, MInt) || (dc.apply.retTpe != dc.tpeArg))
-    //   err("dcApply must take two arguments of type(" + tpe.name + ", " + MInt.name + ") and return a " + dc.tpeArg.name)
-    // if (dc.update.args.size != 3 || (getHkTpe(dc.update.args.apply(0).tpe), dc.update.args.apply(1).tpe, dc.update.args.apply(2).tpe) != (tpe, MInt, dc.tpeArg) || (dc.update.retTpe != MUnit))
-    //   err("dcUpdate must take arguments of type (" + tpe.name + ", " + MInt.name + ", " + dc.tpeArg.name + ") and return " + MUnit.name)
-    
+    checkDcFunctions(tpe, dc)
+    if (ForgeCollections.contains(tpe)) err("type " + tpe.name + " is already a parallel collection")
     ForgeCollections += (tpe -> dc)
     ()
   }
   
   /* Establishes that the given tpe implements the ParallelCollectionBuffer interface */
   def forge_isparallelcollection_buffer(tpe: Rep[DSLType], dc: ParallelCollectionBuffer) = {
+    checkDcFunctions(tpe, dc)
+    if (ForgeCollections.contains(tpe)) err("type " + tpe.name + " is already a parallel collection")
     ForgeCollections += (tpe -> dc)
     ()
+  }
+  
+  def checkDcFunctions(tpe: Rep[DSLType], dc: ForgeCollectionType) {
+    // verify the dc functions match our expectations
+    
+    if (dc.alloc.args.size != 2 || getHkTpe(dc.alloc.args.apply(0).tpe) != getHkTpe(tpe) || dc.alloc.args.apply(1).tpe != MInt 
+      || ((getHkTpe(dc.alloc.retTpe) != getHkTpe(tpe)) && (getHkTpe(dc.alloc.retTpe) != MNothing)))
+      err("dcAlloc must take two arguments (" + tpe.name + ", " + MInt.name + ") and return an instance of " + tpe.name)
+    if (dc.alloc.tpePars.length > 2) 
+      warn("dcAlloc with more than 2 type parameters has undefined semantics. Consider trying to rewrite your alloc method to be in the form alloc[A,R](in: C[A], size: Int): C[R]")    
+    if (dc.size.args.size != 1 || getHkTpe(dc.size.args.apply(0).tpe) != getHkTpe(tpe) || (dc.size.retTpe != MInt))
+      err("dcSize must take a single argument of type " + tpe.name + " and return an MInt")
+    if (dc.apply.args.size != 2 || ((getHkTpe(dc.apply.args.apply(0).tpe), dc.apply.args.apply(1).tpe) != (getHkTpe(tpe), MInt)) || (dc.apply.retTpe != dc.tpeArg))
+      err("dcApply must take two arguments of type(" + tpe.name + ", " + MInt.name + ") and return a " + dc.tpeArg.name)
+    if (dc.update.args.size != 3 || ((getHkTpe(dc.update.args.apply(0).tpe), dc.update.args.apply(1).tpe, dc.update.args.apply(2).tpe) != (getHkTpe(tpe), MInt, dc.tpeArg)) 
+      || ((dc.update.retTpe != MUnit) && (dc.update.retTpe != MNothing))) 
+      err("dcUpdate must take arguments of type (" + tpe.name + ", " + MInt.name + ", " + dc.tpeArg.name + ") and return " + MUnit.name)    
   }
   
   /* A reference to an external ops group */

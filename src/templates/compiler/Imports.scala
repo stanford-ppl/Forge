@@ -44,7 +44,7 @@ trait DeliteGenImports extends BaseGenImports {
     super.emitDSLImports(stream)
     stream.println("import " + packageName + "._")
     stream.println("import " + packageName + ".ops._")
-    stream.println("import " + dsl.toLowerCase() + ".compiler.extern._")        
+    // stream.println("import " + dsl.toLowerCase() + ".compiler.extern._")        
   }  
  
   override def emitAllImports(stream: PrintWriter) {

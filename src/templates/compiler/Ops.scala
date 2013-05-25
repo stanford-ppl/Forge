@@ -26,8 +26,7 @@ trait DeliteGenOps extends BaseGenOps {
     if (grpIsTpe(grp) && ForgeCollections.contains(grpAsTpe(grp)) && DataStructs.contains(grpAsTpe(grp))) "DeliteCollectionOpsExp with DeliteStructsExp"
     else if (grpIsTpe(grp) && ForgeCollections.contains(grpAsTpe(grp))) "DeliteCollectionOpsExp"
     else if (grpIsTpe(grp) && DataStructs.contains(grpAsTpe(grp))) "BaseFatExp with DeliteStructsExp"
-    else if (OpsGrp.exists(g => g._2.ops.exists(o => o.effect != pure))) "BaseFatExp with EffectExp"
-    else "BaseFatExp"
+    else "BaseFatExp with EffectExp" // we use codegen *GenFat, which requires EffectExp
   }
   
   override def quote(x: Exp[Any]): String = x match {
@@ -72,6 +71,7 @@ trait DeliteGenOps extends BaseGenOps {
   // we need both the func name and the func arg name to completely disambiguate the bound symbol, but the unique name gets quite long..
   // could use a local numbering scheme inside each op. should also consider storing the bound syms inside the case class body, instead of the parameter list, which could simplify things.
   def boundArgName(func: Rep[DSLArg], arg: Rep[DSLArg]) = "f_" + func.name  + "_" + simpleArgName(arg)
+  def boundArgAnonName(func: Rep[DSLArg], arg: Rep[DSLArg], i: Int) = "f_" + opArgPrefix + i + "_" + simpleArgName(arg)
   def makeArgsWithBoundSyms(args: List[Rep[DSLArg]], opType: OpType) = 
     makeArgs(args, t => t match {
       case Def(Arg(name, f@Def(FTpe(fargs,ret,freq)), d2)) if opType.isInstanceOf[CodeGen] && !isThunk(f) => (simpleArgName(t) :: fargs.map(a => boundArgName(t,a))).mkString(",")
@@ -98,7 +98,7 @@ trait DeliteGenOps extends BaseGenOps {
     case Def(Tpe(s,args,stage)) => err("tried to instantiate tpe " + hkTpe.name + " with arg " + tpeArg.name + ", but " + hkTpe.name + " requires " + args.length + " type parameters")
   }  
   
-  def makeTpeClsPar(b: TypeClass, t: Rep[DSLType]) = {
+  def makeTpeClsPar(b: TypeClassSignature, t: Rep[DSLType]) = {
     val body = opIdentifierPrefix + "." + b.prefix + t.name
     b.wrapper match {
       case Some(w) => w + "(" + body + ")"
@@ -106,13 +106,26 @@ trait DeliteGenOps extends BaseGenOps {
     }
   }
         
+  def emitImplMethod(o: Rep[DSLOp], func: Rep[String], stream: PrintWriter, indent: Int = 0) {
+    emitWithIndent(makeOpImplMethodSignature(o) + " = {", stream, indent)
+    inline(o, func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent+2 )}
+    emitWithIndent("}", stream, indent)
+    stream.println()    
+  }
+
   def emitImpls(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("SingleTask and Composite Impls", stream)   
     stream.println()
     stream.println("trait " + opsGrp.name + "Impl {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Lift => ")
     stream.println()    
-    emitAllImplMethods(opsGrp, stream, 2)
+    for (o <- unique(opsGrp.ops)) { 
+      Impls(o) match {
+        case single:SingleTask => emitImplMethod(o,single.func,stream,2)
+        case composite:Composite => emitImplMethod(o,composite.func,stream,2)
+        case _ => 
+      }
+    }            
     stream.println("}")
   }
   
@@ -152,7 +165,7 @@ trait DeliteGenOps extends BaseGenOps {
       stream.println(" extends " + opStr + " {") 
       for (targ <- o.tpePars) {
         for (b <- targ.ctxBounds) {
-          stream.println("   val " + b.prefix + targ.name + " = implicitly[" + b.name + "[" + targ.name + "]]")
+          stream.println("    val " + b.prefix + targ.name + " = implicitly[" + b.name + "[" + targ.name + "]]")
         }
       }
     }
@@ -186,8 +199,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println()
           stream.println("    val in = " + o.args.apply(map.argIndex).name)
           stream.println("    def func = " + inline(o,map.func,quoteLiteral))
-          // TODO: this isn't quite right. how do we know which of dc.allocs tpePars is the one that corresponds to our return tpe, e.g. map.tpePars._2?
-          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, map.tpePars._1, map.tpePars._2)) + "(len)")
+          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instAllocReturnTpe(dc.alloc.tpePars, map.tpePars._2)) + "(in, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")          
         case zip:Zip => 
           val colTpe = getHkTpe(o.retTpe)
@@ -197,33 +209,33 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val inA = " + o.args.apply(zip.argIndices._1).name)
           stream.println("    val inB = " + o.args.apply(zip.argIndices._2).name)
           stream.println("    def func = " + inline(o,zip.func,quoteLiteral))
-          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, zip.tpePars._1, zip.tpePars._3)) + "(len)")
+          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instAllocReturnTpe(dc.alloc.tpePars, zip.tpePars._3)) + "(inA, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
         case reduce:Reduce =>
-          val colTpe = getHkTpe(reduce.tpePars._2)
-          val dc = ForgeCollections(colTpe)
-          emitOpNodeHeader(o, "DeliteOpReduce[" + quote(reduce.tpePars._1) + "]")            
+          val col = o.args.apply(reduce.argIndex)
+          val dc = ForgeCollections(getHkTpe(col.tpe))
+          emitOpNodeHeader(o, "DeliteOpReduce[" + quote(reduce.tpePar) + "]")            
           stream.println()
-          stream.println("    val in = " + o.args.apply(reduce.argIndex).name)
+          stream.println("    val in = " + col.name)
           stream.println("    def func = " + inline(o,reduce.func,quoteLiteral))
           stream.println("    def zero = " + makeOpMethodNameWithArgs(reduce.zero))
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
         case filter:Filter =>
           val colTpe = getHkTpe(o.retTpe)
           val dc = ForgeCollections(colTpe)
-          emitOpNodeHeader(o, "DeliteOpFilter[" + quote(filter.tpePars._1) + "," + quote(filter.tpePars._2) + "," + quote(colTpe) + "]")            
+          emitOpNodeHeader(o, "DeliteOpFilter[" + quote(filter.tpePars._1) + "," + quote(filter.tpePars._2) + "," + makeTpeInst(colTpe,filter.tpePars._2) + "]")            
           stream.println()
           stream.println("    val in = " + o.args.apply(filter.argIndex).name)
           stream.println("    def cond = " + inline(o,filter.cond,quoteLiteral))
           stream.println("    def func = " + inline(o,filter.func,quoteLiteral))
-          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, filter.tpePars._1, filter.tpePars._2)) + "(len)")
+          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(dc.alloc) + makeTpePars(instAllocReturnTpe(dc.alloc.tpePars, filter.tpePars._2)) + "(in, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")                          
         case foreach:Foreach =>
-          val colTpe = getHkTpe(foreach.tpePars._2)
-          val dc = ForgeCollections(colTpe)
-          emitOpNodeHeader(o, "DeliteOpForeach[" + quote(foreach.tpePars._1) + "]")            
+          val col = o.args.apply(foreach.argIndex)
+          val dc = ForgeCollections(getHkTpe(col.tpe))
+          emitOpNodeHeader(o, "DeliteOpForeach[" + quote(foreach.tpePar) + "]")            
           stream.println()
-          stream.println("    val in = " + o.args.apply(foreach.argIndex).name)
+          stream.println("    val in = " + col.name)
           stream.println("    def func = " + inline(o,foreach.func,quoteLiteral))
           stream.println("    def sync = n => unit(List())")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")                  
@@ -307,8 +319,11 @@ trait DeliteGenOps extends BaseGenOps {
       var symsFreqBuf  = "override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {" + nl 
       
       def makeSym(o: Rep[DSLOp], wrap: String, addFreq: Boolean = false) = {
-        val symsArgs = o.args.collect { case t@Def(Arg(name, Def(FTpe(args,ret,freq)), d2)) => (freq,name,args.filterNot(_.tpe == byName).map(a => boundArgName(t,a))) }
-        if (symsArgs.length > 0) {
+        val symsArgs = o.args.collect { 
+          case t@Def(Arg(name, Def(FTpe(args,ret,freq)), d2)) => (freq,name,args.filterNot(_.tpe == byName).map(a => boundArgName(t,a)))
+          case Def(Arg(name,tpe,d2)) => (normal,name,Nil)
+        }          
+        if (hasFuncArgs(o)) {
           var symsArgsStr = symsArgs.map { case (f,name,bound) => wrap + (if (addFreq) makeFrequencyAnnotation(f) else "") + "(" + name + ")" }.mkString(":::")
           if (wrap == "effectSyms") symsArgsStr += " ::: List(" + symsArgs.flatMap(t => t._3.map(e => e + ".asInstanceOf[Sym[Any]]")).mkString(",") + ")"
           "    case " + makeOpSimpleNodeNameWithArgs(o) + " => " + symsArgsStr + nl
@@ -377,11 +392,11 @@ trait DeliteGenOps extends BaseGenOps {
     for (o <- uniqueOps) {
       // helpful identifiers
       val xformArgs = "(" + o.args.zipWithIndex.flatMap(t => t._1 match {
-        case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if Impls(o).isInstanceOf[CodeGen] && !isThunk(f) => name :: args.map(a => boundArgName(t._1,a) /*+ ".asInstanceOf[Sym[Any]]"*/)           
-        case Def(Arg(name, _, _)) => List("f(" + opArgPrefix + t._2 + ")")
+        case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if Impls(o).isInstanceOf[CodeGen] && !isThunk(f) => "f("+opArgPrefix+t._2+")" :: args.map(a => boundArgAnonName(t._1,a,t._2) /*+ ".asInstanceOf[Sym[Any]]"*/)           
+        case Def(Arg(name, _, _)) => List("f("+opArgPrefix+t._2+")")
       }).mkString(",") + ")"
       
-      val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++ o.implicitArgs.zipWithIndex.map(t => opIdentifierPrefix + "." + implicitOpArgPrefix + t._2)).mkString(",")
+      val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++ o.implicitArgs.map(a => opIdentifierPrefix + "." + a.name)).mkString(",")
       
       Impls(o) match {
         case codegen:CodeGen =>
@@ -473,7 +488,9 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("  }")          
           stream.println()
           stream.println("  override def dc_alloc[A:Manifest,CA<:DeliteCollection[A]:Manifest](x: Exp[CA], size: Exp[Int])(implicit ctx: SourceContext) = {")
-          stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.alloc) + "[A](size).asInstanceOf[Exp[CA]]")
+          // HACK: dc_alloc in Delite only has 1 tpe parameter, but dc_alloc in the DSLs can have arbitrarily many (and 1 is in fact insufficient). what should the semantics here be?
+          // should we require that dc_alloc in Forge has 2 or less type parameters? i.e., at most [Input,Output]? what else could it need? higher-kinded things won't work...
+          stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.alloc) + makeTpePars(dcb.alloc.tpePars.map(t => tpePar("A"))) + "(" + asTpe + "(x), size).asInstanceOf[Exp[CA]]")
           stream.println("    else super.dc_alloc[A,CA](x,size)")
           stream.println("  }")          
           stream.println()
@@ -488,8 +505,8 @@ trait DeliteGenOps extends BaseGenOps {
   }
   
   def emitStructMethods(grp: Rep[DSLGroup], stream: PrintWriter) {
-    def wrapManifest(t: Rep[DSLType]) = t match {
-      case Def(Tpe("Array",args,stage)) => "darrayManifest(m.typeArguments(0))"
+    def wrapManifest(t: Rep[DSLType]) = getHkTpe(t) match {
+      case Def(Tpe("ForgeArray",args,stage)) => "darrayManifest(m.typeArguments(0))"
       case _ => "manifest[" + quote(t) + "]"
     }
     
@@ -497,8 +514,8 @@ trait DeliteGenOps extends BaseGenOps {
       val tpe = grpAsTpe(grp)
       if (DataStructs.contains(tpe)) {
         val d = DataStructs(tpe)
-        val fields = d.fields.map { case (fieldName,fieldType) => ("\""+fieldName+"\"", wrapManifest(fieldType)) }
-        val erasureCls = makeTpeInst(tpe, tpePar("_"))        
+        val fields = d.fields.zipWithIndex.map { case ((fieldName,fieldType),i) => ("\""+fieldName+"\"", if (isTpePar(fieldType)) "m.typeArguments("+i+")" else wrapManifest(fieldType)) }
+        val erasureCls = tpe.name + (if (!tpe.tpePars.isEmpty) "[" + tpe.tpePars.map(t => "_").mkString(",") + "]" else "") 
         
         emitBlockComment("Delite struct", stream, indent=2)
         stream.println("  override def unapplyStructType[T:Manifest]: Option[(StructTag[T], List[(String,Manifest[_])])] = {")

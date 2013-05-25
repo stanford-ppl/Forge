@@ -1,4 +1,4 @@
-package LOWERCASE_DSL_NAME.shared.extern
+package LOWERCASE_DSL_NAME.shared
 
 import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}
@@ -14,5 +14,5 @@ import scala.virtualization.lms.common._
 trait LiftVar extends LiftVariables {
   this: VarOps =>
 }
-trait VarOps extends Variables
+trait VarOps extends Variables 
 trait VarCompilerOps extends VarOps

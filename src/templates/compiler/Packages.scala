@@ -29,7 +29,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     // compiler
     stream.println("trait " + dsl + "Compiler extends " + dsl)
     for (opsGrp <- opsGrps) {
-      stream.print(" with " + opsGrp.name)
+      // stream.print(" with " + opsGrp.name)
       if (opsGrp.ops.exists(o => Impls(o).isInstanceOf[SingleTask] || Impls(o).isInstanceOf[Composite]))
         stream.print(" with " + opsGrp.name + "Impl")     
       if (opsGrp.ops.exists(_.style == compilerMethod))
@@ -58,13 +58,16 @@ trait DeliteGenPackages extends BaseGenPackages {
     emitBlockComment("disambiguations for LMS classes pulled in by Delite", stream, indent=2)
 
     // TODO: generalize    
+    stream.println("  override def infix_unary_!(x: Rep[Boolean])(implicit pos: SourceContext) = boolean_negate(x)")
+    stream.println("  override def infix_&&(lhs: Rep[Boolean], rhs: Rep[Boolean])(implicit pos: SourceContext) = boolean_and(lhs,rhs)")
+    stream.println("  override def infix_||(lhs: Rep[Boolean], rhs: Rep[Boolean])(implicit pos: SourceContext) = boolean_or(lhs,rhs)")        
     stream.println("  override def infix_unsafeImmutable[A:Manifest](lhs: Rep[A])(implicit pos: SourceContext) = object_unsafe_immutable(lhs)")    
     stream.println("  override def __whileDo(cond: => Exp[Boolean], body: => Rep[Unit])(implicit pos: SourceContext) = delite_while(cond, body)")  
         
     stream.println()
     emitBlockComment("dsl types", stream, indent=2)
     for (tpe <- Tpes) {      
-      if (!isTpeInst(tpe) && !isForgePrimitiveType(tpe)) {
+      if (!isForgePrimitiveType(tpe)) {
         stream.print("  abstract class " + quote(tpe))
         if (ForgeCollections.contains(tpe)) stream.println(" extends DeliteCollection[" + quote(ForgeCollections(tpe).tpeArg) + "]") else stream.println()
         stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")      

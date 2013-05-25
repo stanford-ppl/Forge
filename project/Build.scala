@@ -61,7 +61,7 @@ trait ForgePreprocessor {
     }
     
     def endOfWord(c: Byte): Boolean = c match {
-      case ' ' | ',' | '.' | '+' | ')' | '}' | '(' | '{' | '\n' => true  // fixme: platform-specific line sep
+      case ' ' | ',' | '.' | '+' | '*' | '-' | '/' | ')' | '}' | '(' | '{' | '\n' => true  // fixme: platform-specific line sep
       case _ => false
     }
     
@@ -97,13 +97,13 @@ trait ForgePreprocessor {
      */
     abstract class OpEncoding
     case class OpFromTpeScope(name: String) extends OpEncoding {
-      override def toString = "lookup(\""+name+"\")"
+      override def toString = "lookupOp(\""+name+"\")"
     }    
     case class OpFromImpl(binding: String) extends OpEncoding {
       override def toString = binding
     }
     case class OpFromOp(grp: String, name: String) extends OpEncoding {
-      override def toString = "lookup(\""+grp+"\",\""+name+"\")"
+      override def toString = "lookupOp(\""+grp+"\",\""+name+"\")"
     }    
     
     def scanBackToOp(start: Int, input: Array[Byte]): OpEncoding = {
@@ -279,7 +279,7 @@ trait ForgePreprocessor {
       // look for block functions that require us to have the op identifier
       // we don't do this in general because it's not necessary and doesn't play well with overloading
       val enclosingOp = 
-        if (args.exists(isBlockArg)) {        
+        if (args.exists(isBlockArg) || !tpeArgs.isEmpty) {        
           // scan backwards until the lexically enclosing op identifier, which can be one of:
           //   static | direct | infix | compiler (grp) (name, ....)
           //   static | direct | infix | compiler (name) (....)

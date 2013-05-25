@@ -46,15 +46,16 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
   
   def emitDSLDefinition() {    
     val dslStream = new PrintWriter(new FileWriter(dslDir+dsl+".scala"))    
+    val genOps = OpsGrp.filterNot(t => isTpeClass(t._1) || isTpeClassInst(t._1)).values.toList
     dslStream.println("package " + packageName)
     dslStream.println()
     emitAllImports(dslStream)
     dslStream.println()
     emitApplicationRunner(dslStream)
     dslStream.println()    
-    emitDSLPackageDefinitions(OpsGrp.values.toList, dslStream)
+    emitDSLPackageDefinitions(genOps, dslStream)
     dslStream.println()
-    emitDSLCodeGeneratorPackageDefinitions(OpsGrp.values.toList, dslStream)
+    emitDSLCodeGeneratorPackageDefinitions(genOps, dslStream)
     dslStream.close()    
   }
   
@@ -69,7 +70,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     Directory(Path(opsDir)).createDirectory()
     
     // 1 file per tpe, includes Ops, OpsExp, and Gen, plus an additional Impl file if the group contains SingleTask and Composite ops      
-    for ((grp,opsGrp) <- OpsGrp) {
+    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp)) {
       val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsExp"+".scala"))
       stream.println("package " + packageName + ".ops")
       stream.println()

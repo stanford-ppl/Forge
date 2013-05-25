@@ -21,6 +21,8 @@ trait Definitions extends DerivativeTypes {
   lazy val CAny = tpe("Any", stage = now)
   lazy val MInt = tpe("Int")
   lazy val CInt = tpe("Int", stage = now)
+  lazy val MFloat = tpe("Float")
+  lazy val CFloat = tpe("Float", stage = now)  
   lazy val MDouble = tpe("Double")
   lazy val CDouble = tpe("Double", stage = now)
   lazy val MBoolean = tpe("Boolean")
@@ -29,10 +31,12 @@ trait Definitions extends DerivativeTypes {
   lazy val CString = tpe("String", stage = now)   
   lazy val MUnit = tpe("Unit")
   lazy val CUnit = tpe("Unit", stage = now)
+  lazy val MNothing = tpe("Nothing")
+  lazy val CNothing = tpe("Nothing", stage = now)
   lazy val byName = tpe("Thunk")
   def MThunk(ret: Rep[DSLType], freq: Frequency = normal) = ftpe(List(forge_arg("", byName, None)),ret,freq) // TODO
   def MFunction(args: List[Rep[Any]], ret: Rep[DSLType], freq: Frequency = normal) = ftpe(args.zipWithIndex.map(anyToArg),ret,freq)
-  lazy val MSourceContext = tpe("SourceContext")
+  lazy val MSourceContext = tpe("SourceContext", stage = now)
   
   // generic types
   // should these return a different Forge type (e.g. Rep[TypeConstructor] or Rep[GenericType]) than concrete types?
@@ -70,17 +74,22 @@ trait Definitions extends DerivativeTypes {
    * Type classes
    * DSLs can extend these by adding their own
    */
-  object TManifest extends TypeClass {
+  object TManifest extends TypeClassSignature {
     def name = "Manifest"
     def prefix = "_m"
     def wrapper = Some("mtype")
   }
-  object TNumeric extends TypeClass {
+  object TNumeric extends TypeClassSignature {
     def name = "Numeric"
     def prefix = "_num"
     def wrapper = Some("ntype") 
   }
-  object TOrdering extends TypeClass {
+  object TFractional extends TypeClassSignature {
+    def name = "Fractional"
+    def prefix = "_frac"
+    def wrapper = Some("frtype") 
+  }  
+  object TOrdering extends TypeClassSignature {
     def name = "Ordering"
     def prefix = "_ord"
     def wrapper = Some("otype")
@@ -94,9 +103,10 @@ trait Definitions extends DerivativeTypes {
   object infixMethod extends MethodType
   object directMethod extends MethodType
   object compilerMethod extends MethodType  
+  object implicitMethod extends MethodType
   
   // blacklist for op names that cannot be expressed with infix methods
-  val noInfixList = List("apply", "update") 
+  var noInfixList = List("apply", "update") 
   
   /**
    * Effect types
@@ -226,12 +236,12 @@ trait Definitions extends DerivativeTypes {
   /**
    * Reduce
    * 
-   * @param tpePars   [A,C[A]]
+   * @param tpePars   A
    * @param func      string representation of a reduce function (A, A) => A
    */
-   def forge_reduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, zero: Rep[DSLOp], func: Rep[String]): DeliteOpType
+   def forge_reduce(tpePar: Rep[DSLType], argIndex: Int, zero: Rep[DSLOp], func: Rep[String]): DeliteOpType
    object reduce {
-     def apply(tpePars: (Rep[DSLType],Rep[DSLType]), redArgIndex: Int, zero: Rep[DSLOp], func: Rep[String]) = forge_reduce(tpePars, redArgIndex, zero, func)
+     def apply(tpePar: Rep[DSLType], redArgIndex: Int, zero: Rep[DSLOp], func: Rep[String]) = forge_reduce(tpePar, redArgIndex, zero, func)
    }
     
   /**
@@ -251,13 +261,13 @@ trait Definitions extends DerivativeTypes {
   /**
    * Foreach
    * 
-   * @param tpePars   [A,C[A]]
+   * @param tpePar    A
    * @param argIndex  index of op argument that correspond to foreach argument in 
    * @param func      string representation of a foreach function A => Unit
    */
-   def forge_foreach(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]): DeliteOpType
+   def forge_foreach(tpePar: Rep[DSLType], argIndex: Int, func: Rep[String]): DeliteOpType
    object foreach {
-     def apply(tpePars: (Rep[DSLType],Rep[DSLType]), foreachArgIndex: Int, func: Rep[String]) = forge_foreach(tpePars, foreachArgIndex, func)
+     def apply(tpePar: Rep[DSLType], foreachArgIndex: Int, func: Rep[String]) = forge_foreach(tpePar, foreachArgIndex, func)
    }       
 }
 
@@ -312,13 +322,13 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
   case class Zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String]) extends DeliteOpType  
   def forge_zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String]) = Zip(tpePars, argIndices, func)
   
-  case class Reduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, zero: Rep[DSLOp], func: Rep[String]) extends DeliteOpType
-  def forge_reduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, zero: Rep[DSLOp], func: Rep[String]) = Reduce(tpePars, argIndex, zero, func)
+  case class Reduce(tpePar: Rep[DSLType], argIndex: Int, zero: Rep[DSLOp], func: Rep[String]) extends DeliteOpType
+  def forge_reduce(tpePar: Rep[DSLType], argIndex: Int, zero: Rep[DSLOp], func: Rep[String]) = Reduce(tpePar, argIndex, zero, func)
   
   case class Filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]) extends DeliteOpType  
   def forge_filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]) = Filter(tpePars, argIndex, cond, func)  
   
-  case class Foreach(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) extends DeliteOpType  
-  def forge_foreach(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) = Foreach(tpePars, argIndex, func)    
+  case class Foreach(tpePar: Rep[DSLType], argIndex: Int, func: Rep[String]) extends DeliteOpType  
+  def forge_foreach(tpePar: Rep[DSLType], argIndex: Int, func: Rep[String]) = Foreach(tpePar, argIndex, func)    
     
 }

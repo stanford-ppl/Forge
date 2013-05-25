@@ -1,4 +1,4 @@
-package LOWERCASE_DSL_NAME.shared.extern
+package LOWERCASE_DSL_NAME.shared
 
 import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}
@@ -16,8 +16,13 @@ trait ForgeArrayOps extends Base {
   /* Required for apps to be able use 'args' */
   implicit class ScalaArrayOps[T:Manifest](x: Rep[Array[T]]) {
     def apply(n: Rep[Int])(implicit ctx: SourceContext) = scala_array_apply(x,n)
+    def length = scala_array_length(x)
   }
+  // the implicit class method 'length' is not working for an unknown reason, possibly related to the problem mentioned in ForgeArrayCompilerOps below
+  // omitting SourceContext is a hacky way to avoid conflicts with Forge DSLs without using an arbitrary Overloaded parameter
+  def infix_length[T:Manifest](x: Rep[Array[T]]) = scala_array_length(x)
   def scala_array_apply[T:Manifest](x: Rep[Array[T]], n: Rep[Int])(implicit __imp0: SourceContext): Rep[T]
+  def scala_array_length[T:Manifest](x: Rep[Array[T]])(implicit __imp0: SourceContext): Rep[Int]
 }
 trait ForgeArrayCompilerOps extends ForgeArrayOps {    
   /**
@@ -31,7 +36,7 @@ trait ForgeArrayCompilerOps extends ForgeArrayOps {
   implicit class ForgeArrayOps[T:Manifest](x: Rep[ForgeArray[T]]) {
     def update(n: Rep[Int], y: Rep[T])(implicit ctx: SourceContext) = array_update(x,n,y)
     def apply(n: Rep[Int])(implicit ctx: SourceContext) = array_apply(x,n)
-    def asImmutable(implicit ctx: SourceContext) = array_asimmutable(x)
+    def Clone(implicit ctx: SourceContext) = array_clone(x)
   }
   
   def array_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
@@ -39,7 +44,10 @@ trait ForgeArrayCompilerOps extends ForgeArrayOps {
   def array_update[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int],__arg2: Rep[T])(implicit __imp0: SourceContext): Rep[Unit]
   def array_apply[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[T]
   def array_length[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[Int]          
-  def array_asimmutable[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+  def array_clone[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+  def array_sort[T:Manifest:Ordering](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+  def array_fromseq[T:Manifest](__arg0: Seq[Rep[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
   
   def scala_array_apply[T:Manifest](__arg0: Rep[Array[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[T] 
+  def scala_array_length[T:Manifest](__arg0: Rep[Array[T]])(implicit __imp0: SourceContext): Rep[Int] 
 }

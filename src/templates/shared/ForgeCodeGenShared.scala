@@ -10,7 +10,7 @@ import scala.virtualization.lms.internal.{GenericFatCodegen, GenericCodegen}
 
 import core._
 
-trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with BaseGenLifts with BaseGenOps with BaseGenImports {  
+trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with BaseGenLifts with BaseGenOps with BaseGenImports with BaseGenTypeClasses {  
   val IR: ForgeApplicationRunner with ForgeExp  
   import IR._
   
@@ -21,22 +21,24 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     Directory(Path(dslDir)).createDirectory()
     emitDSLDefinition()
     emitOps()
+    emitTypeClasses()
   }
   
   def emitDSLDefinition() {
+    val genOps = OpsGrp.filterNot(t => isTpeClassInst(t._1)).values.toList
     dslStream.println("package " + packageName)
     dslStream.println()
     emitAllImports(dslStream)
     dslStream.println()
     emitApplicationRunnerBase(dslStream)
     dslStream.println()    
-    emitDSLPackageDefinitionsBase(OpsGrp.values.toList, dslStream)
+    emitDSLPackageDefinitionsBase(genOps, dslStream)
     dslStream.println()
     dslStream.close()
   }  
     
-  def emitOpsHeader(stream: PrintWriter) {
-    stream.println("package " + packageName + ".ops")
+  def emitHeader(pkgName: String, stream: PrintWriter) {
+    stream.println("package " + pkgName)
     stream.println()
     emitScalaReflectImports(stream)
     emitLMSImports(stream)
@@ -49,11 +51,11 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     Directory(Path(opsDir)).createDirectory()
     
     // 1 file per grp, includes only abstract Ops
-    for ((grp,ops) <- OpsGrp) {
+    for ((grp,ops) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp)) {
       checkOps(ops)
       
       val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"Ops"+".scala"))
-      emitOpsHeader(stream)
+      emitHeader(packageName + ".ops", stream)
       if (Lifts.contains(grp)) {
         emitLifts(grp, Lifts(grp), stream)
         stream.println()
@@ -65,11 +67,23 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     // emit any lifts that did not have a corresponding ops
     for ((grp,a) <- Lifts.filterNot(p => OpsGrp.contains(p._1))) {
       val stream = new PrintWriter(new FileWriter(opsDir+File.separator+"Lift"+grp.name+".scala"))
-      emitOpsHeader(stream)
+      emitHeader(packageName + ".ops", stream)
       emitLifts(grp, Lifts(grp), stream)
       stream.println()
       stream.close()
     }                
+  }
+  
+  def emitTypeClasses() {
+    val typeClassDir = dslDir + File.separator + "typeclass"
+    Directory(Path(typeClassDir)).createDirectory()
+        
+    for ((grp,ops) <- OpsGrp if isTpeClass(grp)) {
+      val stream = new PrintWriter(new FileWriter(typeClassDir+File.separator+grp.name+"Ops"+".scala"))
+      emitHeader(packageName + ".typeclass", stream)
+      emitTpeClass(grp, ops, stream)
+      stream.close()
+    }
   }  
   
 }

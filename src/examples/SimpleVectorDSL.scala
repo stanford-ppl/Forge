@@ -5,7 +5,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 
 object SimpleVectorDSLRunner extends ForgeApplicationRunner with SimpleVectorDSL
 
-trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
+trait SimpleVectorDSL extends ForgeApplication {
   /**
    * The name of your DSL. This is the name that will be used in generated files,
    * package declarations, etc.
@@ -19,16 +19,16 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
     /**
      * Include Scala ops
      */
-    addScalaOps() 
+    importScalaOps() 
     
     /**
      * The main portion of our DSL
      */        
-    addVectorOps()
+    importVectorOps()    
   }
   
   
-  def addVectorOps() {            
+  def importVectorOps() {            
     // generic type parameters we will use 
     val T = tpePar("T") 
     val R = tpePar("R")
@@ -99,19 +99,19 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
         while (n < $minLen) n = n*2
         val d = array_empty[T](n)
         array_copy(data, 0, d, 0, $self.length)
-        vector_set_raw_data($self, array_asimmutable(d))
+        vector_set_raw_data($self, d.unsafeImmutable)
       }        
       
       
       // math      
       infix ("+") (Vector(T) :: Vector(T), TNumeric(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a+b })
       infix ("*") (T :: Vector(T), TNumeric(T)) implements map((T,T), 0, "e => e*"+quotedArg(1))      
-      infix ("sum") (Nil :: T, TNumeric(T)) implements reduce((T,Vector), 0, lookup("Numeric","zero"), ${ (a,b) => a+b })
+      infix ("sum") (Nil :: T, TNumeric(T)) implements reduce(T, 0, lookupOp("Numeric","zero"), ${ (a,b) => a+b })
              
       // bulk        
       infix ("map") ((T ==> R) :: Vector(R), addTpePars = R) implements map((T,R), 0, ${ e => $1(e) })
       
-      infix ("reduce") (((T,T) ==> T) :: T, TNumeric(T)) implements reduce((T,Vector), 0, lookup("Numeric","zero"), ${
+      infix ("reduce") (((T,T) ==> T) :: T, TNumeric(T)) implements reduce(T, 0, lookupOp("Numeric","zero"), ${
         (a,b) => $1(a,b)
       })
       
@@ -121,14 +121,19 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
         $self.map($1).reduce($2)
       }
       
-      
+            
       // misc      
       // will print out of order in parallel, but hey
-      infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach((T,Vector), 0, ${a => println(a)}) 
+      infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println(a)}) 
       
             
       // parallel collectionification
       // This enables a tpe to be passed in as the collection type of a Delite op      
+      
+      // by convention, the return tpe of alloc must be its last tpe parameter, if it has any
+      compiler ("vector_raw_alloc") (MInt :: Vector(R), addTpePars = R) implements single ${
+        Vector[R]($1)
+      }      
       compiler ("vector_appendable") ((MInt,T) :: MBoolean) implements single("true")
       compiler ("vector_copy") ((MInt,Vector(T),MInt,MInt) :: MUnit, effect = write(2)) implements single ${
         val src = vector_raw_data($self)
@@ -136,9 +141,9 @@ trait SimpleVectorDSL extends ForgeApplication with ScalaOps {
         array_copy(src, $1, dest, $3, $4)
       }
 
-      parallelize as ParallelCollectionBuffer(T, lookupOverloaded("apply",1), lookup("length"), lookupOverloaded("apply",0), lookup("update"), lookup("vector_set_length"), lookup("vector_appendable"), lookup("append"), lookup("vector_copy"))            
-    }                    
-  
+      parallelize as ParallelCollectionBuffer(T, lookupOp("vector_raw_alloc"), lookupOp("length"), lookupOverloaded("apply",0), lookupOp("update"), lookupOp("vector_set_length"), lookupOp("vector_appendable"), lookupOp("append"), lookupOp("vector_copy"))            
+    } 
+    
     ()    
   }
 }

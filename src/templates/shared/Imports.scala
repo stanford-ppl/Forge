@@ -34,7 +34,10 @@ trait BaseGenImports extends ForgeCodeGenBase {
     // stream.println("import " + dsl.toLowerCase() + "._")
     stream.println("import " + dsl.toLowerCase() + ".shared._")
     stream.println("import " + dsl.toLowerCase() + ".shared.ops._")        
-    stream.println("import " + dsl.toLowerCase() + ".shared.extern._")
+    if (OpsGrp.exists(t => isTpeClass(t._1))) {
+      stream.println("import " + dsl.toLowerCase() + ".shared.typeclass._")        
+    }
+    // stream.println("import " + dsl.toLowerCase() + ".shared.extern._")
   }  
   
   def emitAllImports(stream: PrintWriter) {

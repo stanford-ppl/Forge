@@ -106,8 +106,9 @@ trait Definitions extends DerivativeTypes {
   object implicitMethod extends MethodType
   
   // blacklist for op names that cannot be expressed with infix methods
-  var noInfixList = List("apply", "update") 
-  
+  // we also blacklist some operators for improved compilation performance
+  var noInfixList = List("apply", "update", /*"+",*/ "-", "*", "/", "<", ">")  // string + doesn't resolve correctly in the compiler version using only implicits
+    
   // blacklist for op names that need to be overridden in instance methods
   var overrideList = Set("toString", "hashCode", "equals")
     

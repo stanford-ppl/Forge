@@ -39,27 +39,7 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
           stream.println(" = " + makeOpMethodName(o) + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgsWithOverload(o))        
         }
       }
-    }
-    
-    // hard-coded cases to disambiguate EmbeddedControls (any better way?) Even more annoying that we need all the combinations.
-    stream.println("  def infix_<(__arg0: Rep[Int], __arg1: Rep[Int]): Rep[Boolean] = super.infix_<(__arg0,__arg1)")
-    stream.println("  def infix_<(__arg0: Rep[Int], __arg1: Rep[Float]): Rep[Boolean] = super.infix_<(__arg0.toFloat,__arg1)")
-    stream.println("  def infix_<(__arg0: Rep[Int], __arg1: Rep[Double]): Rep[Boolean] = super.infix_<(__arg0.toDouble,__arg1)")
-    stream.println("  def infix_<(__arg0: Rep[Float], __arg1: Rep[Int]): Rep[Boolean] = super.infix_<(__arg0,__arg1.toFloat)")
-    stream.println("  def infix_<(__arg0: Rep[Float], __arg1: Rep[Float]): Rep[Boolean] = super.infix_<(__arg0,__arg1)")
-    stream.println("  def infix_<(__arg0: Rep[Float], __arg1: Rep[Double]): Rep[Boolean] = super.infix_<(__arg0.toDouble,__arg1)")
-    stream.println("  def infix_<(__arg0: Rep[Double], __arg1: Rep[Int]): Rep[Boolean] = super.infix_<(__arg0,__arg1.toDouble)")
-    stream.println("  def infix_<(__arg0: Rep[Double], __arg1: Rep[Float]): Rep[Boolean] = super.infix_<(__arg0,__arg1.toDouble)")
-    stream.println("  def infix_<(__arg0: Rep[Double], __arg1: Rep[Double]): Rep[Boolean] = super.infix_<(__arg0,__arg1)")
-    stream.println("  def infix_>(__arg0: Rep[Int], __arg1: Rep[Int]): Rep[Boolean] = super.infix_>(__arg0,__arg1)")
-    stream.println("  def infix_>(__arg0: Rep[Int], __arg1: Rep[Float]): Rep[Boolean] = super.infix_>(__arg0.toFloat,__arg1)")
-    stream.println("  def infix_>(__arg0: Rep[Int], __arg1: Rep[Double]): Rep[Boolean] = super.infix_>(__arg0.toDouble,__arg1)")
-    stream.println("  def infix_>(__arg0: Rep[Float], __arg1: Rep[Int]): Rep[Boolean] = super.infix_>(__arg0,__arg1.toFloat)")
-    stream.println("  def infix_>(__arg0: Rep[Float], __arg1: Rep[Float]): Rep[Boolean] = super.infix_>(__arg0,__arg1)")
-    stream.println("  def infix_>(__arg0: Rep[Float], __arg1: Rep[Double]): Rep[Boolean] = super.infix_>(__arg0.toDouble,__arg1)")
-    stream.println("  def infix_>(__arg0: Rep[Double], __arg1: Rep[Int]): Rep[Boolean] = super.infix_>(__arg0,__arg1.toDouble)")
-    stream.println("  def infix_>(__arg0: Rep[Double], __arg1: Rep[Float]): Rep[Boolean] = super.infix_>(__arg0,__arg1.toDouble)")
-    stream.println("  def infix_>(__arg0: Rep[Double], __arg1: Rep[Double]): Rep[Boolean] = super.infix_>(__arg0,__arg1)")    
+    }    
     stream.println("}")
   }
 

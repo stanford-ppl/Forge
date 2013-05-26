@@ -133,7 +133,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
   def makeImplicitArgsWithCtxBoundsWithType(implicitArgs: List[Rep[DSLArg]], tpePars: List[Rep[TypePar]], without: List[Rep[TypePar]] = Nil, asVals: Boolean = false) = {
     val addArgs = implicitCtxBoundsWithType(tpePars, without)
     val l = implicitArgs.length
-    makeImplicitArgsWithType(implicitArgs ++ addArgs.zip(l until l+addArgs.length).map(anyToArg), asVals)    
+    makeImplicitArgsWithType(implicitArgs ++ addArgs.zip(l until l+addArgs.length).map(anyToImplicitArg), asVals)    
   }
   
   // typed implicit args without context bounds
@@ -346,25 +346,39 @@ trait BaseGenOps extends ForgeCodeGenBase {
     val (pimpOps, infixOps) = allInfixOps.partition(noInfix)
     if (pimpOps.nonEmpty) {
       // set up a pimp-my-library style promotion
-      val tpes = if (grpIsTpe(opsGrp.grp)) List(grpAsTpe(opsGrp.grp)) else pimpOps.map(_.args.apply(0).tpe).distinct
+      val ops = pimpOps.filterNot(o => getHkTpe(o.args.apply(0).tpe).name == "Var" || o.args.apply(0).tpe.stage == now)
+      val tpes = ops.map(_.args.apply(0).tpe).distinct
       for (tpe <- tpes) {
         val name = if (grpIsTpe(opsGrp.grp)) tpe.name else opsGrp.grp.name + tpe.name
         val tpePars = tpe match {
-          case Def(TpePar(n,cb,_)) => List(tpe.asInstanceOf[Rep[TypePar]])
+          case Def(TpeInst(_,args)) => args.filter(isTpePar).asInstanceOf[List[Rep[TypePar]]]
+          case Def(TpePar(_,_,_)) => List(tpe.asInstanceOf[Rep[TypePar]])
           case _ => tpe.tpePars          
         }
-        stream.println("  implicit def repTo" + name + "Ops" + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ") = new " + name + "OpsCls(x)")
-        if (OpsGrp.exists(g => g._2.ops.exists(o => o.name == "__newVar"))) {
-          stream.println("  implicit def varTo" + name + "Ops" + makeTpeParsWithBounds(tpePars) + "(x: " + varify(tpe) + ") = new " + name + "OpsCls(readVar(x))")
+        val tpeArgs = tpe match {
+          case Def(TpeInst(hk,args)) => args.filterNot(isTpePar)
+          case _ => Nil
+        }
+        
+        val opsClsName = name + tpeArgs.map(_.name).mkString("") + "OpsCls"
+        stream.println("  implicit def repTo" + name + "Ops" + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ") = new " + opsClsName + "(x)")
+        if (pimpOps.exists(o => o.args.apply(0).tpe.stage == now)) {
+          stream.println("  implicit def liftTo" + name + "Ops" + makeTpeParsWithBounds(tpePars) + "(x: " + quote(tpe) + ") = new " + opsClsName + "(unit(x))")
+        }
+        // we provide the Var conversion even if no lhs var is declared, since it is essentially a chained implicit with readVar
+        if (Tpes.exists(t => getHkTpe(t).name == "Var")) {
+          stream.println("  implicit def varTo" + name + "Ops" + makeTpeParsWithBounds(tpePars) + "(x: " + varify(tpe) + ") = new " + opsClsName + "(readVar(x))")
         }
         stream.println("")
-        stream.println("  class " + name + "OpsCls" + makeTpeParsWithBounds(tpePars) + "(val self: " + repify(tpe) + ") {")
+        stream.println("  class " + opsClsName + makeTpeParsWithBounds(tpePars) + "(val self: " + repify(tpe) + ") {")
     
-        for (o <- pimpOps if o.args.apply(0).tpe.name == tpe.name) {
+        for (o <- ops if quote(o.args.apply(0).tpe) == quote(tpe)) {
           // TODO: this should use makeOpArgsWithNowType, but there is no easy way to drop an argument right now
           val otherArgs = makeArgs(o.args.drop(1), t => t.name + ": " + repifySome(t.tpe) /*+ " = " + unit(t.default)*/, o.effect != pure)
-          stream.println("    def " + o.name + makeTpeParsWithBounds(o.tpePars.filterNot(p => tpePars.map(_.name).contains(p.name))) + otherArgs
-            + (makeImplicitArgsWithCtxBoundsWithType(implicitArgsWithOverload(o), o.tpePars, without = tpePars)) + " = " + makeOpMethodNameWithFutureArgs(o, a => if (a.name ==  o.args.apply(0).name) "self" else simpleArgName(a)))
+          val hkTpePars = if (isTpePar(tpe)) tpePars else getHkTpe(tpe).tpePars                  
+          val otherTpePars = o.tpePars.filterNot(p => hkTpePars.map(_.name).contains(p.name))
+          stream.println("    def " + o.name + makeTpeParsWithBounds(otherTpePars) + otherArgs
+            + (makeImplicitArgsWithCtxBoundsWithType(implicitArgsWithOverload(o), o.tpePars diff otherTpePars, without = hkTpePars)) + " = " + makeOpMethodNameWithFutureArgs(o, a => if (a.name ==  o.args.apply(0).name) "self" else simpleArgName(a)))
         }
         stream.println("  }")
       }

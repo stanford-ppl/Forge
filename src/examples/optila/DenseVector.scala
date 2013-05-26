@@ -158,15 +158,17 @@ trait DenseVectorOps {
       }       
       // TODO: DenseMatrix
       // infix ("replicate") ((MInt,MInt) :: DenseMatrix(A))
-      infix ("mkString") (("sep",MString,"\"\"") :: MString) implements single ${
-        var s = ""
-        for (i <- 0 until $self.length) {
+      infix ("mkString") (("sep",MString,"\" \"") :: MString) implements single ${
+        var s = "["
+        for (i <- 0 until $self.length-1) {
           s = s + $self(i)
           s = s + $sep
         }
-        s            
+        s = s + $self($self.length-1) + "]"
+        if ($self.isRow) s
+        else s + "'"
       }
-      
+      infix ("toString") (Nil :: MString) implements composite ${ $self.mkString }
       
       /**
        * Data operations

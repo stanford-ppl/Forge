@@ -16,6 +16,7 @@ usage() {
   echo "  -s <n>    skip to step n in the update process"
   echo "  -r <app>  run the specified application after compiling"
   echo "  -d        run delite after compiling"
+  echo "  -i        run interactive shell after compiling"
   exit $E_BADARGS
 }
 
@@ -31,8 +32,9 @@ CLEAN=""
 NUM_STEPS=4
 SKIP=0
 DELITE=false
+INTERACTIVE=false
 
-while getopts “hcs:r:d” option
+while getopts “hcs:r:di” option
 do
   case $option in
     h) usage;;
@@ -44,9 +46,18 @@ do
     d) DELITE=true
        NUM_STEPS=$(($NUM_STEPS+1))
        ;;       
+    i) INTERACTIVE=true
+       NUM_STEPS=$(($NUM_STEPS+1))
+       ;;
   esac
 done
 shift $(($OPTIND - 1))
+
+if [ $INTERACTIVE == true ] && [ "$APP_RUNNER" != "" ];
+then
+  echo error: interactive mode and application mode cannot be run at the same time
+  exit $E_BADARGS
+fi  
 
 pushd .
 
@@ -79,6 +90,12 @@ if [ $SKIP -le 4 ];
 then
   echo "sbt compile (4/$NUM_STEPS)"
   sbt compile
+fi
+
+if [ $SKIP -le 5 ] && [ $INTERACTIVE == true ];
+then
+  echo "sbt \"; console\""
+  sbt "; console"
 fi
 
 if [ $SKIP -le 5 ]  && [ "$APP_RUNNER" != "" ];

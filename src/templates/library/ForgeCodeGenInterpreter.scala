@@ -29,7 +29,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     dslStream.println()
     emitAllImports(dslStream)
     dslStream.println()
-    emitApplicationRunner(dslStream)
+    emitApplicationRunner(OpsGrp.values.toList, dslStream)
     dslStream.println()    
     emitDSLPackageDefinitions(OpsGrp.values.toList, dslStream)
     dslStream.println()    

@@ -49,5 +49,8 @@ trait GDA extends OptiMLApplication {
     // testing flatten
     val vflat = DenseVector.flatten((DenseVector(rowA,rowB)))
     vflat.pprint
+    
+    val v = z.map(e => e+1)
+    v.pprint
   }
 }

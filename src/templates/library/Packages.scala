@@ -5,22 +5,61 @@ package library
 import java.io.PrintWriter
 import scala.virtualization.lms.common._
 import core._
-import shared.BaseGenPackages
+import shared.{BaseGenPackages,BaseGenOps}
 import Utilities._
 
-trait LibGenPackages extends BaseGenPackages {  
+trait LibGenPackages extends BaseGenPackages with BaseGenOps {  
   this: ForgeCodeGenInterpreter =>
   
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
   import IR._
  
-  def emitApplicationRunner(stream: PrintWriter) {
+  def emitApplicationRunner(opsGrps: List[DSLOps], stream: PrintWriter) {
     stream.println("trait " + dsl + "ApplicationInterpreter extends " + dsl + "Application with " + dsl+"Lib {")
     stream.println("  var args: Rep[Array[String]] = _")
     stream.println("  final def main(argsIn: Array[String]) {")
     stream.println("    this.args = argsIn")  
     stream.println("    main()")
     stream.println("  }")    
+    stream.println()
+    
+    emitBlockComment("Dismabiguations for interpreter mode", stream, indent=2)
+    for (opsGrp <- opsGrps if !isTpeClass(opsGrp.grp) && !isTpeClassInst(opsGrp.grp)) {
+      for (o <- unique(opsGrp.ops) if (nameClashesUniversal(o).length > 1) && !o.args.exists(a => getHkTpe(a.tpe).name == "Var")) {        
+        var prefix = ""
+        if (o.style == infixMethod && !noInfixList.contains(o.name))
+          prefix = "  override def infix_"
+        else if (o.style == directMethod)
+          prefix = "  override def "
+
+        if (prefix != "") {
+          stream.print(prefix + o.name + makeTpeParsWithBounds(o.tpePars))
+          stream.print(makeOpArgsWithType(o))
+          stream.print(makeOpImplicitArgsWithOverloadWithType(o))
+          stream.println(" = " + makeOpMethodName(o) + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgsWithOverload(o))        
+        }
+      }
+    }
+    
+    // hard-coded cases to disambiguate EmbeddedControls (any better way?) Even more annoying that we need all the combinations.
+    stream.println("  def infix_<(__arg0: Rep[Int], __arg1: Rep[Int]): Rep[Boolean] = super.infix_<(__arg0,__arg1)")
+    stream.println("  def infix_<(__arg0: Rep[Int], __arg1: Rep[Float]): Rep[Boolean] = super.infix_<(__arg0.toFloat,__arg1)")
+    stream.println("  def infix_<(__arg0: Rep[Int], __arg1: Rep[Double]): Rep[Boolean] = super.infix_<(__arg0.toDouble,__arg1)")
+    stream.println("  def infix_<(__arg0: Rep[Float], __arg1: Rep[Int]): Rep[Boolean] = super.infix_<(__arg0,__arg1.toFloat)")
+    stream.println("  def infix_<(__arg0: Rep[Float], __arg1: Rep[Float]): Rep[Boolean] = super.infix_<(__arg0,__arg1)")
+    stream.println("  def infix_<(__arg0: Rep[Float], __arg1: Rep[Double]): Rep[Boolean] = super.infix_<(__arg0.toDouble,__arg1)")
+    stream.println("  def infix_<(__arg0: Rep[Double], __arg1: Rep[Int]): Rep[Boolean] = super.infix_<(__arg0,__arg1.toDouble)")
+    stream.println("  def infix_<(__arg0: Rep[Double], __arg1: Rep[Float]): Rep[Boolean] = super.infix_<(__arg0,__arg1.toDouble)")
+    stream.println("  def infix_<(__arg0: Rep[Double], __arg1: Rep[Double]): Rep[Boolean] = super.infix_<(__arg0,__arg1)")
+    stream.println("  def infix_>(__arg0: Rep[Int], __arg1: Rep[Int]): Rep[Boolean] = super.infix_>(__arg0,__arg1)")
+    stream.println("  def infix_>(__arg0: Rep[Int], __arg1: Rep[Float]): Rep[Boolean] = super.infix_>(__arg0.toFloat,__arg1)")
+    stream.println("  def infix_>(__arg0: Rep[Int], __arg1: Rep[Double]): Rep[Boolean] = super.infix_>(__arg0.toDouble,__arg1)")
+    stream.println("  def infix_>(__arg0: Rep[Float], __arg1: Rep[Int]): Rep[Boolean] = super.infix_>(__arg0,__arg1.toFloat)")
+    stream.println("  def infix_>(__arg0: Rep[Float], __arg1: Rep[Float]): Rep[Boolean] = super.infix_>(__arg0,__arg1)")
+    stream.println("  def infix_>(__arg0: Rep[Float], __arg1: Rep[Double]): Rep[Boolean] = super.infix_>(__arg0.toDouble,__arg1)")
+    stream.println("  def infix_>(__arg0: Rep[Double], __arg1: Rep[Int]): Rep[Boolean] = super.infix_>(__arg0,__arg1.toDouble)")
+    stream.println("  def infix_>(__arg0: Rep[Double], __arg1: Rep[Float]): Rep[Boolean] = super.infix_>(__arg0,__arg1.toDouble)")
+    stream.println("  def infix_>(__arg0: Rep[Double], __arg1: Rep[Double]): Rep[Boolean] = super.infix_>(__arg0,__arg1)")    
     stream.println("}")
   }
 

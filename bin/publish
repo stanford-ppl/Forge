@@ -76,7 +76,8 @@ object ${dslName}Build extends Build {
     // used in delitec to access jars
     retrieveManaged := true,
     scalacOptions += "-Yno-generic-signatures",
-    scalacOptions += "-Yvirtualize"
+    scalacOptions += "-Yvirtualize",
+    initialCommands in console += "import ${dslNameLowerCase}.library._; val ${dslName} = new ${dslName}ApplicationInterpreter { def main() = {} }; import ${dslName}._"
   )
 
   val virtBuildSettings = virtBuildSettingsBase ++ Seq(
@@ -91,8 +92,8 @@ object ${dslName}Build extends Build {
   lazy val ${dslName}Apps = Project("${dslName}-apps", file("apps"), settings = virtBuildSettings) dependsOn(${dslName}Comp, ${dslName}Lib)
 }
 """)
-    return s.substitute(dslName=dsl)
- 
+    return s.substitute(dslName=dsl, dslNameLowerCase=dsl.lower())
+
 def publish(dsl, opts):
     generatedRoot = FORGE_HOME + "/" + FORGE_GENERATED + "/" + dsl + "/"
     if not os.path.isdir(generatedRoot):

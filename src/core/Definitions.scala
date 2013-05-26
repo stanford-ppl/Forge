@@ -108,6 +108,9 @@ trait Definitions extends DerivativeTypes {
   // blacklist for op names that cannot be expressed with infix methods
   var noInfixList = List("apply", "update") 
   
+  // blacklist for op names that need to be overridden in instance methods
+  var overrideList = Set("toString", "hashCode", "equals")
+    
   /**
    * Effect types
    */  

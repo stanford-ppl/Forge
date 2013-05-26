@@ -146,8 +146,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       d.foreach { data => 
         stream.println("class " + data.tpe.name + makeTpeParsWithBounds(data.tpe.tpePars) + "(" + makeFieldArgs(data) + ") {")
         stream.println(makeFieldsWithInitArgs(data))
-        for (o <- unique(opsGrp.ops) if o.style == infixMethod && o.args.length > 1 && quote(o.args.apply(0).tpe) == quote(tpe)) {       
-          stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
+        for (o <- unique(opsGrp.ops) if o.style == infixMethod && o.args.length > 0 && quote(o.args.apply(0).tpe) == quote(tpe)) {       
+          stream.print("  "+makeDefWithOverride(o)+" " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
           //stream.print("(" + o.args/*.drop(1)*/.map(t => t.name + ": " + repify(t.tpe) + " = " + unit(t.default)).mkString(",") + ")") TODO 
           stream.print("(" + o.args.drop(1).map(t => argify(t, repify)).mkString(",") + ")")  
           stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = data.tpe.tpePars))

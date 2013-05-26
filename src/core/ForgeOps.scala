@@ -352,8 +352,8 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
       warn("op " + name + " has return type " + MUnit.name + " but no effects, so it is a no-op")
     }
         
-    // always add source context
-    val amendedImplicitArgs = (arg("__pos",MSourceContext) :: implicitArgs).distinct 
+    // always add source context, unless it's an overridden method
+    val amendedImplicitArgs = if (overrideList.contains(name)) implicitArgs else (arg("__pos",MSourceContext) :: implicitArgs).distinct
     
     val o = Op(_grp, name, style, tpePars, args, amendedImplicitArgs, retTpe, effect, aliasHint)
     val opsGrp = OpsGrp.getOrElseUpdate(_grp, new DSLOps {

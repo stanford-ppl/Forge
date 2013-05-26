@@ -176,15 +176,16 @@ trait BaseGenOps extends ForgeCodeGenBase {
   }
   
   // method names   
-  def specialCharacters = scala.collection.immutable.Map("+" -> "pl", "-" -> "sub", "/" -> "div", "*" -> "mul", "=" -> "eq", "<" -> "lt", ">" -> "gt", "&" -> "and", "|" -> "or", "!" -> "bang", ":" -> "cln")
+  val specialCharacters = scala.collection.immutable.Map("+" -> "pl", "-" -> "sub", "/" -> "div", "*" -> "mul", "=" -> "eq", "<" -> "lt", ">" -> "gt", "&" -> "and", "|" -> "or", "!" -> "bang", ":" -> "cln")
   def sanitize(x: String) = {
     var out = x
     specialCharacters.keys.foreach { k => if (x.contains(k)) out = out.replace(k, specialCharacters(k)) }
     out
   }
   
-  def makeFullArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String, clasher: Rep[DSLOp] => List[Rep[DSLOp]] = nameClashesGrp) = {
-    makeTpePars(o.tpePars) + makeArgs(o) + (if (needDisambiguate(o,clasher)) makeOpImplicitArgsWithOverload(o) else "")  
+  def makeDefWithOverride(o: Rep[DSLOp]) = {
+    if (overrideList.contains(o.name)) "override def"
+    else "def"
   }
   def makeOpMethodName(o: Rep[DSLOp]) = {
     // adding the nameClashId is another way to avoid chaining the Overload implicit, but the weird method names that result are confusing
@@ -197,6 +198,9 @@ trait BaseGenOps extends ForgeCodeGenBase {
       case _ => o.grp.name.toLowerCase + i + "_" + sanitize(o.name).toLowerCase
     }
   }
+  def makeFullArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String, clasher: Rep[DSLOp] => List[Rep[DSLOp]] = nameClashesGrp) = {
+    makeTpePars(o.tpePars) + makeArgs(o) + (if (needDisambiguate(o,clasher)) makeOpImplicitArgsWithOverload(o) else "")  
+  }  
   def makeOpMethodNameWithArgs(o: Rep[DSLOp]) = makeOpMethodName(o) + makeFullArgs(o, o => makeOpArgs(o))
   def makeOpMethodNameWithFutureArgs(o: Rep[DSLOp], makeArgName: Rep[DSLArg] => String = simpleArgName) = makeOpMethodName(o) + makeFullArgs(o, k => makeOpFutureArgs(k,makeArgName), nameClashesUniversal) // front-end can name clash with anything
   def makeOpMethodSignature(o: Rep[DSLOp]) = "def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithOverloadWithType(o)

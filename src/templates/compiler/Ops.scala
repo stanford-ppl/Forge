@@ -396,7 +396,8 @@ trait DeliteGenOps extends BaseGenOps {
         case Def(Arg(name, _, _)) => List("f("+opArgPrefix+t._2+")")
       }).mkString(",") + ")"
       
-      val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++ o.implicitArgs.map(a => opIdentifierPrefix + "." + a.name)).mkString(",")
+      val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++ o.implicitArgs.map(a => opIdentifierPrefix + "." + a.name))
+      val implicitsWithParens = if (implicits.length == 0) "" else implicits.mkString("(",",",")")
       
       Impls(o) match {
         case codegen:CodeGen =>
@@ -404,29 +405,29 @@ trait DeliteGenOps extends BaseGenOps {
           // pure version with no func args uses smart constructor
           if (!hasFuncArgs(o)) {
             stream.print(makeOpMethodName(o) + xformArgs)
-            stream.print("(" + implicits)          
+            stream.print("(" + implicits.mkString(","))          
             // we may need to supply an explicit Overload parameter for the smart constructor
             // relies on conventions established in implicitArgsWithOverload (e.g., guaranteed to always be the last implicit)
             val id = nameClashId(o)
-            if (id != "") stream.print(",implicitly[Overloaded" + id + "]")  
+            if (id != "") stream.print(",implicitly[Overload" + id + "]")  
             stream.println(")")
           }
           else {
-            stream.print("reflectPure(" + makeOpNodeName(o) + xformArgs + "(" + implicits + "))")
+            stream.print("reflectPure(" + makeOpNodeName(o) + xformArgs + implicitsWithParens + ")")
             stream.println("(mtype(manifest[A]), pos)")
           }
           
           // effectful version
-          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(" + makeOpNodeName(o) + xformArgs + "(" + implicits + ")")
+          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(" + makeOpNodeName(o) + xformArgs + implicitsWithParens)
           stream.print(", mapOver(f,u), f(es)))")
           stream.println("(mtype(manifest[A]))")
         case _:DeliteOpType => 
           // pure delite op version
           stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
-          stream.print("reflectPure(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + "))")
+          stream.print("reflectPure(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + implicitsWithParens + ")")
           stream.println("(mtype(manifest[A]), pos)")
           // effectful delite op version
-          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + "(" + implicits + ")")
+          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + implicitsWithParens)
           stream.print(", mapOver(f,u), f(es)))")
           stream.println("(mtype(manifest[A]))")
         case _ => // no mirror  

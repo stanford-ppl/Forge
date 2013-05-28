@@ -7,7 +7,9 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 object OptiLADSLRunner extends ForgeApplicationRunner with OptiLADSL       
 
 trait OptiLADSL extends ForgeApplication 
-  with BasicMathOps with RandomOps with ArithOps with DenseVectorOps with IndexVectorOps {
+  with BasicMathOps with RandomOps with ArithOps 
+  with DenseVectorOps with IndexVectorOps with DenseVectorViewOps
+  with DenseMatrixOps {
     
   def dslName = "OptiLA"
   
@@ -21,21 +23,7 @@ trait OptiLADSL extends ForgeApplication
     importStrings()
     importMath()
     importTuples()
-    
-    // Code generation can be an alternative to subtyping for achieving code re-use:
-    /*
-    def VectorImmutableInterface(tpe: Rep[DSLType]) = {
-      val VectorImmOps = withTpe(tpe)
-      // requirement: _data has a superset of the fields of Vector. can we check?
-      VectorImmOps {
-        "reduce" is ..
-        "map" is ..
-      }
-    }
-    addVectorImmutableOps(DenseVector)
-    addVectorImmutableOps(IndexVector)
-    */    
-    
+        
     // OptiLA ops
     // note that the order matters with respect to 'lookup' calls
     
@@ -61,12 +49,34 @@ trait OptiLADSL extends ForgeApplication
     importBasicMathOps()
     importRandomOps() 
     importArithOps()
+        
+    // override default string formatting
+    // numericPrecision is a global defined in extern
+    val strConcatWithNumerics = {
+      val a = quotedArg(0)
+      val b = quotedArg(1)
+      val f1 = "(\"%.\"+Global.numericPrecision+\"f\").format("+a+")" // can't escape quotes inside string interpolation scope
+      val f2 = "(\"%.\"+Global.numericPrecision+\"f\").format("+b+")"
+s"""
+val a1 = if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) $f1 else $a.toString
+val b1 = if ($b.isInstanceOf[Double] || $b.isInstanceOf[Float]) $f2 else $b.toString
+a1+b1
+"""
+    }    
+    // the ones that matter are the first that resolve to a unique tpe combination
+    impl (lookupOverloaded("String","+",0)) (codegen($cala, strConcatWithNumerics))
+    impl (lookupOverloaded("String","+",4)) (codegen($cala, strConcatWithNumerics))
+    impl (lookupOverloaded("String","+",8)) (codegen($cala, strConcatWithNumerics))
+    
     
     // needed by both DenseVector and IndexVector (need a better solution w.r.t. lookup, as this is awkward)
     // one option is to declare all tpes first, and only use them in the respective ops (similar to Delite)
     val DenseVector = tpe("DenseVector", tpePar("T")) 
+    val DenseMatrix = tpe("DenseMatrix", tpePar("T"))
     
     importIndexVectorOps()
-    importDenseVectorOps()           
+    importDenseVectorOps()    
+    importDenseVectorViewOps()
+    importDenseMatrixOps()       
   }  
 }

@@ -14,6 +14,9 @@ trait GDA extends OptiMLApplication {
   def main() = {
     // if (args.length < 2) printUsage
     
+    // val mu0_num = sumRowsIf(0,m) { !y(_) } { x(_) }
+    // val mu0_num = sum(x(y.find(!_)))
+    
     // testing:
     val z = DenseVector.zeros(10)
     z.pprint    

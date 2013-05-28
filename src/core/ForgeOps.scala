@@ -55,10 +55,9 @@ trait ForgeOps extends Base {
   def infix_as(p: ParallelizeKey, dc: ParallelCollection) = forge_isparallelcollection(p.tpe, dc)  
   def infix_as(p: ParallelizeKey, dc: ParallelCollectionBuffer) = forge_isparallelcollection_buffer(p.tpe, dc)    
 
-  implicit def forceOpOption(o: Option[Rep[DSLOp]])(implicit ctx: SourceContext): Rep[DSLOp]
-  def lookupTpe(tpeName: String, stage: StageTag = future): Option[Rep[DSLType]] = forge_lookup_tpe(tpeName,stage)
-  def lookupGrp(grpName: String): Option[Rep[DSLGroup]] = forge_lookup_grp(grpName)
-  def lookupOp(grpName: String, opName: String): Option[Rep[DSLOp]] = forge_lookup_op(grpName,opName,0)
+  def lookupTpe(tpeName: String, stage: StageTag = future) = forge_lookup_tpe(tpeName,stage)
+  def lookupGrp(grpName: String) = forge_lookup_grp(grpName)
+  def lookupOp(grpName: String, opName: String) = forge_lookup_op(grpName,opName,0)
   def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup_op(grpName,opName,index)
   
   def forge_grp(name: String): Rep[DSLGroup]  
@@ -82,9 +81,9 @@ trait ForgeOps extends Base {
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
   def forge_isparallelcollection(tpe: Rep[DSLType], dc: ParallelCollection): Rep[Unit]
   def forge_isparallelcollection_buffer(tpe: Rep[DSLType], dc: ParallelCollectionBuffer): Rep[Unit]
-  def forge_lookup_tpe(tpeName: String, stage: StageTag): Option[Rep[DSLType]]  
-  def forge_lookup_grp(grpName: String): Option[Rep[DSLGroup]]  
-  def forge_lookup_op(grpName: String, opName: String, overloadedIndex: Int): Option[Rep[DSLOp]]  
+  def forge_lookup_tpe(tpeName: String, stage: StageTag): Rep[DSLType]
+  def forge_lookup_grp(grpName: String): Rep[DSLGroup]  
+  def forge_lookup_op(grpName: String, opName: String, overloadedIndex: Int): Rep[DSLOp]
 }
 
 trait ForgeSugarLowPriority extends ForgeOps {
@@ -209,26 +208,41 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   /**
    * Convenience method providing access to defined ops in other modules
    */  
-   
-  // this unsafe implicit is provided only to simplify the common case 
-  def forceOpOption(o: Option[Rep[DSLOp]])(implicit ctx: SourceContext): Rep[DSLOp] = {
-    if (o.isEmpty) (err("Empty option " + o + " used in place of an op argument"))
-    o.get
+     
+  def forge_lookup_tpe(tpeName: String, stage: StageTag): Rep[DSLType] = {
+    val t = Tpes.find(t => t.name == tpeName && t.stage == stage)
+    if (t.isEmpty) {
+      err("lookup failed: no tpe exists with name " + tpeName + " and stage " + stage)
+    }
+    t.get
   }
   
-  def forge_lookup_tpe(tpeName: String, stage: StageTag) = Tpes.find(t => t.name == tpeName && t.stage == stage)
-  
-  def forge_lookup_grp(grpName: String) = Tpes.find(_.name == grpName).orElse(OpsGrp.find(t => t._1.name == grpName).map(_._1))
-  
-  def forge_lookup_op(grpName: String, opName: String, overloadedIndex: Int): Option[Rep[DSLOp]] = {
-    val matches = OpsGrp.find(t => t._1.name == grpName).map(_._2.ops.filter(_.name == opName))
-    if (matches.isDefined) {
-      if (overloadedIndex > matches.get.length-1) err("lookup failed: no op exists in grp " + grpName + " with name " + opName + " and index " + overloadedIndex)
-      Some(matches.get(overloadedIndex))
+  def forge_lookup_grp(grpName: String): Rep[DSLGroup] = {
+    val t = Tpes.find(_.name == grpName).orElse(OpsGrp.find(t => t._1.name == grpName).map(_._1))
+    if (t.isEmpty) {
+      err("lookup failed: no grp exists with name " + grpName)
     }
-    else {
-      None
+    t.get    
+  }
+
+  def forge_lookup_op(grpName: String, opName: String, overloadedIndex: Int): Rep[DSLOp] = {
+    val matches = OpsGrp.find(t => t._1.name == grpName).map(_._2.ops.filter(_.name == opName)) 
+    if (matches.isEmpty || (matches.isDefined && overloadedIndex > matches.get.length-1)) {
+      warn("lookup failed: no op exists in grp " + grpName + " with name " + opName + " and index " + overloadedIndex)
+      val grp = OpsGrp.find(t => t._1.name == grpName)
+      if (grp.isEmpty) {
+        println("  no grp " + grpName + " exists")
+      }
+      else {
+        println("  ops in grp " + grpName + " are: ")
+        for ((o,i) <- grp.get._2.ops.zipWithIndex) {
+          println("    " + o.name + o.args.map(_.tpe.name).mkString("(",",",")") + " (index " + i + ")")
+        }
+      }
+      err("lookup failed")
     }
+
+    matches.get(overloadedIndex) 
   }
        
   /**
@@ -355,12 +369,12 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     // always add source context, unless it's an overridden method
     val amendedImplicitArgs = if (overrideList.contains(name)) implicitArgs else (arg("__pos",MSourceContext) :: implicitArgs).distinct
     
-    val o = Op(_grp, name, style, tpePars, args, amendedImplicitArgs, retTpe, effect, aliasHint)
     val opsGrp = OpsGrp.getOrElseUpdate(_grp, new DSLOps {
       val grp = _grp
       override def targets: List[CodeGenerator] = Nil
     })
-    opsGrp.ops ::= o
+    val o = toAtom(Op(_grp, name, style, tpePars, args, amendedImplicitArgs, retTpe, effect, aliasHint))    
+    opsGrp.ops :+=  o // append is required for lookups in declaration order    
     o
   }
   

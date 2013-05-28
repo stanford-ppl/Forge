@@ -263,7 +263,7 @@ trait ForgePreprocessor {
             endBlock = true
           }        
         
-          if (input(i) == '$') { // found identifier
+          if (input(i) == '$' && input(i-1) != '\\') { // found identifier
             val j = 
               if (i+2 < input.length && input(i+1) == 't' && input(i+2) == '[')
                 parseTypeArgument(i+1, input, tpeArgs)
@@ -373,6 +373,8 @@ trait ForgePreprocessor {
           strBlock = strBlock.replace("$"+t, "$"+tpeArgMap(t))
         }        
       }
+      // replace escaped $
+      strBlock = strBlock.replace("\\$", "$")
       
       // swallow the indentation, since we'll re-indent inside Forge anyways
       strBlock = strBlock.replace(indent, "").trim

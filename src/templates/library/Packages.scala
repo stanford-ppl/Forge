@@ -27,7 +27,7 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
     for (opsGrp <- opsGrps if !isTpeClass(opsGrp.grp) && !isTpeClassInst(opsGrp.grp)) {
       for (o <- unique(opsGrp.ops) if (nameClashesUniversal(o).length > 1) && !o.args.exists(a => getHkTpe(a.tpe).name == "Var")) {        
         var prefix = ""
-        if (o.style == infixMethod && !noInfixList.contains(o.name))
+        if (o.style == infixMethod && !noInfix(o))
           prefix = "  override def infix_"
         else if (o.style == directMethod)
           prefix = "  override def "
@@ -38,8 +38,14 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
           stream.print(makeOpImplicitArgsWithOverloadWithType(o))
           stream.println(" = " + makeOpMethodName(o) + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgsWithOverload(o))        
         }
-      }
-    }    
+      }      
+    }
+    
+    // overrides for embedded controls
+    stream.println("  override def __newVar[T](x: T) = super.__newVar(x)")    
+    // TODO: this is ambiguous and unresolvable for some reason, even when supplying explicit arguments. possibly due to the thunks?
+    // stream.println("  override def __whileDo(c: => Boolean, b: => Unit): Unit = super.__whileDo(c,b)")
+
     stream.println("}")
   }
 
@@ -48,7 +54,7 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
     
     // base trait sets Rep[T] to T and mixes in the necessary portions of the front-end, without
     // bringing the abstract impls in scope, since they can cause a recursive loop in the library    
-    stream.println("trait " + dsl + "Base extends Base with OverloadHack {")
+    stream.println("trait " + dsl + "Base extends Base with GenOverloadHack {")
     stream.println("  type Rep[+T] = T")
     stream.println("  protected def unit[T:Manifest](x: T) = x")
     stream.println()

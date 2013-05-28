@@ -146,7 +146,9 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       d.foreach { data => 
         stream.println("class " + data.tpe.name + makeTpeParsWithBounds(data.tpe.tpePars) + "(" + makeFieldArgs(data) + ") {")
         stream.println(makeFieldsWithInitArgs(data))
-        for (o <- unique(opsGrp.ops) if o.style == infixMethod && o.args.length > 0 && quote(o.args.apply(0).tpe) == quote(tpe)) {       
+        // Actually emitting the infix methods as instance methods, while a little more readable, makes the interpreter methods
+        // ambiguous with the op conversions unless they already exist on every instance and must be overridden (e.g. toString)
+        for (o <- unique(opsGrp.ops) if overrideList.contains(o.name) && o.style == infixMethod && o.args.length > 0 && quote(o.args.apply(0).tpe) == quote(tpe)) {       
           stream.print("  "+makeDefWithOverride(o)+" " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
           //stream.print("(" + o.args/*.drop(1)*/.map(t => t.name + ": " + repify(t.tpe) + " = " + unit(t.default)).mkString(",") + ")") TODO 
           stream.print("(" + o.args.drop(1).map(t => argify(t, repify)).mkString(",") + ")")  
@@ -169,7 +171,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     for (o <- unique(opsGrp.ops)) {       
       stream.println("  " + makeOpMethodSignature(o) + " = {")
       o.style match {
-        case `infixMethod` if grpIsTpe(opsGrp.grp) && DataStructs.contains(grpAsTpe(opsGrp.grp)) && o.args.length > 1 && quote(o.args.apply(0).tpe) == quote(opsGrp.grp) => 
+        case `infixMethod` if overrideList.contains(o.name) && grpIsTpe(opsGrp.grp) && DataStructs.contains(grpAsTpe(opsGrp.grp)) && o.args.length > 1 && quote(o.args.apply(0).tpe) == quote(opsGrp.grp) => 
           //val args = o.args/*.drop(1)*/.map(t => t.name)).mkString(",")
           val args = o.args.drop(1).map(t => t.name).mkString(",")
           val argsWithParen = if (args == "") args else "(" + args + ")"

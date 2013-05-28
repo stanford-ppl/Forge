@@ -52,6 +52,15 @@ trait Forge extends ForgeScalaOpsPkg with Definitions with ForgeSugar with Field
   // exposed to end-users, but obfuscated, for what it's worth
   def forge_err(s: String)(implicit ctx: SourceContext): Unit
   def forge_warn(s: String)(implicit ctx: SourceContext): Unit
+  
+  // exposed since DSL developers may also need to introspect
+  def isTpePar(tpe: Rep[DSLType]): Boolean
+  def asTpePar(tpe: Rep[DSLType]): Rep[TypePar]
+  def isTpeInst(tpe: Rep[DSLType]): Boolean
+  def isTpeClass(grp: Rep[DSLGroup]): Boolean
+  def asTpeClass(grp: Rep[DSLGroup]): Rep[DSLTypeClass]
+  def isTpeClassInst(grp: Rep[DSLGroup]): Boolean
+  def asTpeClassInst(grp: Rep[DSLGroup]): Rep[DSLTypeClassInst]
 }
 
 /**
@@ -90,7 +99,10 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   def isTpePar(tpe: Rep[DSLType]) = tpe match {
     case Def(TpePar(_,_,_)) => true
     case _ => false
-  }
+  }  
+  def asTpePar(tpe: Rep[DSLType]) = tpe match {
+    case t@Def(TpePar(_,_,_)) => t.asInstanceOf[Rep[TypePar]]
+  }  
   
   def isTpeInst(tpe: Rep[DSLType]) = tpe match {
     case Def(TpeInst(_,_)) => true

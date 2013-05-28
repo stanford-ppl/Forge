@@ -17,7 +17,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
    * Utility methods
    */  
   def baseOpsCls(grp: Rep[DSLGroup]) = {
-    if (OpsGrp(grp).ops.exists(o => nameClashesUniversal(o).length > 1)) "Base with OverloadHack"
+    if (OpsGrp(grp).ops.exists(o => nameClashesUniversal(o).length > 1)) "Base with GenOverloadHack"
     else "Base"
   }
   
@@ -158,7 +158,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
   def implicitArgsWithOverload(o: Rep[DSLOp]) = {    
     val i = nameClashId(o)
     if (i != "") {
-      o.implicitArgs :+ anyToImplicitArg(ephemeralTpe("Overloaded" + i, stage = now), o.implicitArgs.length)
+      o.implicitArgs :+ anyToImplicitArg(ephemeralTpe("Overload" + i, stage = now), o.implicitArgs.length)
     }
     else {
       o.implicitArgs
@@ -282,6 +282,17 @@ trait BaseGenOps extends ForgeCodeGenBase {
     for (o <- unique(opsGrp.ops)) check(o)
   }
   
+  // certain ops (e.g. "apply" cannot be expressed with infix notation right now), so we use implicits as a workaround
+  def noInfix(o: Rep[DSLOp]) = {
+    // blacklist
+    if (noInfixList.contains(o.name)) true
+    else (o.args.exists { a => a.tpe match {
+      // infix with function args doesn't always resolve correctly
+      case Def(FTpe(fargs,fret,freq)) => true
+      case _ => false
+    }})
+  }
+  
   def emitOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("Operations", stream)
     stream.println()
@@ -331,18 +342,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     
     // infix ops
     val allInfixOps = opsGrp.ops.filter(e=>e.style==infixMethod)
-    
-    // certain ops (e.g. "apply" cannot be expressed with infix notation right now), so we use implicits as a workaround
-    def noInfix(o: Rep[DSLOp]) = {
-      // blacklist
-      if (noInfixList.contains(o.name)) true
-      else (o.args.exists { a => a.tpe match {
-        // infix with function args doesn't always resolve correctly
-        case Def(FTpe(fargs,fret,freq)) => true
-        case _ => false
-      }})
-    }
-    
+        
     val (pimpOps, infixOps) = allInfixOps.partition(noInfix)
     if (pimpOps.nonEmpty) {
       // set up a pimp-my-library style promotion
@@ -360,14 +360,15 @@ trait BaseGenOps extends ForgeCodeGenBase {
           case _ => Nil
         }
         
+        val grpName = opsGrp.grp.name
         val opsClsName = name + tpeArgs.map(_.name).mkString("") + "OpsCls"
-        stream.println("  implicit def repTo" + name + "Ops" + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ") = new " + opsClsName + "(x)")
+        stream.println("  implicit def " + grpName + "RepTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ") = new " + opsClsName + "(x)")
         if (pimpOps.exists(o => o.args.apply(0).tpe.stage == now)) {
-          stream.println("  implicit def liftTo" + name + "Ops" + makeTpeParsWithBounds(tpePars) + "(x: " + quote(tpe) + ") = new " + opsClsName + "(unit(x))")
+          stream.println("  implicit def " + grpName + "LiftTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + quote(tpe) + ") = new " + opsClsName + "(unit(x))")
         }
         // we provide the Var conversion even if no lhs var is declared, since it is essentially a chained implicit with readVar
         if (Tpes.exists(t => getHkTpe(t).name == "Var")) {
-          stream.println("  implicit def varTo" + name + "Ops" + makeTpeParsWithBounds(tpePars) + "(x: " + varify(tpe) + ") = new " + opsClsName + "(readVar(x))")
+          stream.println("  implicit def " + grpName + "VarTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + varify(tpe) + ") = new " + opsClsName + "(readVar(x))")
         }
         stream.println("")
         stream.println("  class " + opsClsName + makeTpeParsWithBounds(tpePars) + "(val self: " + repify(tpe) + ") {")

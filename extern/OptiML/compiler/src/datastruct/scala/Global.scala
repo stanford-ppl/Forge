@@ -18,4 +18,5 @@ object Global {
   val INITIAL_SEED = 100
   var randRef = new scala.util.Random(INITIAL_SEED)
   var intRandRef = new scala.util.Random(INITIAL_SEED)
+  var numericPrecision = 4
 }

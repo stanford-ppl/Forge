@@ -22,6 +22,7 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     emitDSLDefinition()
     emitOps()
     emitTypeClasses()
+    emitOverloadHack()
   }
   
   def emitDSLDefinition() {
@@ -84,6 +85,33 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
       emitTpeClass(grp, ops, stream)
       stream.close()
     }
-  }  
+  } 
+  
+  def emitOverloadHack() {
+    val stream = new PrintWriter(new FileWriter(dslDir+"GenOverloadHack"+".scala"))    
+    
+    var numOverloaded = 0
+    for ((grp,opsGrp) <- OpsGrp) {
+      for (o <- opsGrp.ops) {
+        val clashes = nameClashesUniversal(o)
+        if (clashes.length > numOverloaded) numOverloaded = clashes.length
+      }
+    }  
+    
+    stream.println("package " + packageName)
+    stream.println()
+    stream.println("trait GenOverloadHack {")    
+    // slightly different name to avoid conflicts with LMS  
+    for (i <- 0 to numOverloaded) {
+      stream.println("  class Overload"+i)
+    }
+    stream.println()
+    // seperated for generated code readability
+    for (i <- 0 to numOverloaded) {
+      stream.println("  implicit val overload" + i + " = new Overload" + i)
+    }    
+    stream.println("}")
+    stream.close()
+  } 
   
 }

@@ -260,7 +260,7 @@ trait DeliteGenOps extends BaseGenOps {
               for (s <- args if s.tpe != byName) {
                 emitWithIndent("val " + boundArgName(arg,s) + " = fresh[" + quote(s.tpe) + "]", stream, 4)              
               }              
-              val fargs = if (!isThunk(f)) "(" + makeArgs(args, a => boundArgName(arg,a)) + ")" else ""
+              val fargs = if (!isThunk(f)) makeArgs(args, a => boundArgName(arg,a)) else ""
               emitWithIndent("val b_" + name + " = reifyEffects(" + name + fargs + ")", stream, 4)
               emitWithIndent("val sb_" + name + " = summarizeEffects(b_" + name + ")", stream, 4)
               summary += "sb_"+name

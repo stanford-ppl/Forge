@@ -120,7 +120,7 @@ trait SimpleVectorDSL extends ForgeApplication {
       infix ("mapreduce") ((T ==> T,(T,T) ==> T) :: T, TNumeric(T)) implements composite ${
         $self.map($1).reduce($2)
       }
-      
+                  
             
       // misc      
       // will print out of order in parallel, but hey
@@ -141,8 +141,26 @@ trait SimpleVectorDSL extends ForgeApplication {
         array_copy(src, $1, dest, $3, $4)
       }
 
-      parallelize as ParallelCollectionBuffer(T, lookupOp("vector_raw_alloc"), lookupOp("length"), lookupOverloaded("apply",1), lookupOp("update"), lookupOp("vector_set_length"), lookupOp("vector_appendable"), lookupOp("append"), lookupOp("vector_copy"))            
+      parallelize as ParallelCollectionBuffer(T, lookupOp("vector_raw_alloc"), lookupOp("length"), lookupOverloaded("apply",1), lookupOp("update"), lookupOp("vector_set_length"), lookupOp("vector_appendable"), lookupOp("append"), lookupOp("vector_copy"))                        
     } 
+    
+    /* Testing: some codegen op that takes a block with arguments */
+    val z = direct (Vector) ("foo", T, List(MInt ==> T, MInt, MThunk(MInt), (MInt,MInt) ==> MInt, MDouble, MDouble ==> MDouble) :: T) implements codegen($cala, ${
+      var i = 0
+      val a = new Array[$t[T]](100)
+
+      while (i < 100) {
+        a(i) = $b[0]($b[3]($b[2],$b[2]))        
+        a(i) = $b[0]($b[3]($1,$1))        
+        i += 1
+      }
+      println("a(5) = " + a(5))
+      val z = $b[5]($b[4])    
+      val y = $b[2]+$1  
+      println("z = " + z)
+      println("y = " + y)
+      a(5)
+    })          
     
     ()    
   }

@@ -167,12 +167,16 @@ trait ForgePreprocessor {
     def isBlockArg(arg: String) = arg.startsWith("b[")
     def endOfBlockArgName(arg: String) = if (arg.contains('(')) arg.indexOf('(') - 1 else arg.indexOf(']')
     def getCapturedArgs(arg: String, argMap: HashMap[String,String]) = {
-      if (arg.contains('(')) arg.slice(arg.indexOf('(')+1,arg.lastIndexOf(')')).split(",").map("s\"\"\""+mapNestedArgs(_,argMap)+"\"\"\"") 
+      if (arg.contains('(')) {
+        val s = arg.slice(arg.indexOf('(')+1,arg.lastIndexOf(')'))
+        if (argMap.contains(s.drop(1))) Array(mapNestedArgs(s,argMap))
+        else s.split(",").map(mapNestedArgs(_,argMap)) 
+      }
       else Array[String]()
     }
     def mapNestedArgs(arg: String, argMap: HashMap[String,String]): String = {
       assert(arg.length > 0)
-      arg(0) + argMap.getOrElse(arg.drop(1),arg.drop(1)) // still has $ at this point
+      "s\"\"\"" + arg(0) + argMap.getOrElse(arg.drop(1),arg.drop(1)) + "\"\"\"" // still has $ at this point
     }
     
     def parseBlockArguments(start: Int, input: Array[Byte], args: ArrayBuffer[String]): Int = {
@@ -296,19 +300,21 @@ trait ForgePreprocessor {
         
       // need to add fix up block args and a prefix for positional args  
       // we do this in 2 passes to handle nested args
+      var argId = 1 // use a unique id, since blocks with different arguments need a different id
       for (a <- args) {
         try {
           if (isBlockArg(a)) {
             val a2 = a.slice(2,endOfBlockArgName(a))
             val i = a2.toInt
-            val z: String = "arg"+a2 // wtf? scala compiler error unless we break up z like this
+            val z: String = "arg"+argId // wtf? scala compiler error unless we break up z like this
             argMap += (a -> z)
           }
           else {
             val i = a.toInt
-            val z: String = "arg"+a 
+            val z: String = "arg"+argId 
             argMap += (a -> z)
           }
+          argId += 1
         }
         catch {
           case _:NumberFormatException => 

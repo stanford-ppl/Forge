@@ -477,14 +477,15 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.setSize) + "(" + asTpe + "(x), y)")
           stream.println("    else super.dc_set_logical_size(x,y)")
           stream.println("  }")
-          stream.println()
-          stream.println("  override def dc_appendable[A:Manifest](x: Exp[DeliteCollection[A]], i: Exp[Int], y: Exp[A])(implicit ctx: SourceContext) = {")
-          stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.appendable) + "(" + asTpe + "(x), i, y)")
+          stream.println()          
+          val appendTpe = if (isTpePar(dcb.appendable.args.apply(2).tpe)) "y" else "y.asInstanceOf[Exp["+quote(dcb.appendable.args.apply(2).tpe)+"]]"
+          stream.println("  override def dc_appendable[A:Manifest](x: Exp[DeliteCollection[A]], i: Exp[Int], y: Exp[A])(implicit ctx: SourceContext) = {")          
+          stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.appendable) + "(" + asTpe + "(x), i, "+appendTpe+")")
           stream.println("    else super.dc_appendable(x,i,y)")
           stream.println("  }")          
           stream.println()
           stream.println("  override def dc_append[A:Manifest](x: Exp[DeliteCollection[A]], i: Exp[Int], y: Exp[A])(implicit ctx: SourceContext) = {")
-          stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.append) + "(" + asTpe + "(x), i, y)")
+          stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.append) + "(" + asTpe + "(x), i, "+appendTpe+")")
           stream.println("    else super.dc_append(x,i,y)")
           stream.println("  }")          
           stream.println()
@@ -506,8 +507,9 @@ trait DeliteGenOps extends BaseGenOps {
   }
   
   def emitStructMethods(grp: Rep[DSLGroup], stream: PrintWriter) {
-    def wrapManifest(t: Rep[DSLType]) = getHkTpe(t) match {
-      case Def(Tpe("ForgeArray",args,stage)) => "darrayManifest(m.typeArguments(0))"
+    def wrapManifest(t: Rep[DSLType]) = t match {
+      case Def(TpeInst(Def(Tpe("ForgeArray",args,stage)), List(p))) if (isTpePar(p)) => "darrayManifest(m.typeArguments(0))"
+      case Def(TpeInst(Def(Tpe("ForgeArray",args,stage)), List(p))) => "darrayManifest(manifest["+quote(p)+"])"
       case _ => "manifest[" + quote(t) + "]"
     }
     

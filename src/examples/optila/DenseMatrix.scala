@@ -32,7 +32,7 @@ trait DenseMatrixOps {
     }
     static (DenseMatrix) ("diag", T withBound TArith, (MInt, DenseVector(T)) :: DenseMatrix(T)) implements single ${ densematrix_fromfunc($0, $0, (i,j) =>
       if (i == j) $1(i)
-      else implicitly[Arith[T]].zero
+      else implicitly[Arith[T]].empty
     )}
     static (DenseMatrix) ("identity", Nil, (MInt,MInt) :: DenseMatrix(MDouble)) implements single ${ densematrix_fromfunc($0, $1, (i,j) =>
       if (i == j) 1.0
@@ -78,7 +78,7 @@ trait DenseMatrixOps {
       infix ("apply") (MInt :: DenseVectorView(T)) implements composite ${ $self.getRow($1) }           
       infix ("rowIndices") (Nil :: IndexVector) implements composite ${ IndexVector(unit(0), $self.numRows) }
       infix ("colIndices") (Nil :: IndexVector) implements composite ${ IndexVector(unit(0), $self.numCols, unit(false)) } 
-      infix ("vview") ((MInt, MInt, MInt, MBoolean) :: DenseVectorView(T)) implements composite ${ DenseVectorView[T](densematrix_raw_data($self), $1, $2, $3, $4) }
+      infix ("vview") ((MInt, MInt, MInt, MBoolean) :: DenseVectorView(T)) implements composite ${ DenseVectorView[T](densematrix_raw_data($self).unsafeImmutable, $1, $2, $3, $4) } // read-only right now
       infix ("getRow") (MInt :: DenseVectorView(T)) implements composite ${ $self.vview($1*$self.numCols, unit(1), $self.numCols, unit(true)) }
       infix ("getCol") (MInt :: DenseVectorView(T)) implements composite ${ $self.vview($1, unit(1), $self.numRows, unit(false)) }
       infix ("slice") ((("startRow",MInt),("endRow",MInt),("startCol",MInt),("endCol",MInt)) :: DenseMatrix(T)) implements single ${
@@ -104,13 +104,16 @@ trait DenseMatrixOps {
       /**
        * Miscellaneous
        */
-       infix ("pprint") (Nil :: MUnit, effect = simple) implements composite ${ println($self.toString) }      
+       // $self.toString doesn't work in Delite, since there is no 'self' instance      
+       infix ("pprint") (Nil :: MUnit, effect = simple) implements composite ${ println(densematrix_tostring($self)) } 
        infix ("toString") (Nil :: MString) implements single ${
          var s = ""         
          for (i <- 0 until $self.numRows-1) {
-           s = s + $self(i).toString + "\\n"
+           s = s + densevector_tostring($self(i)) + "\\n"
          }
-         s + $self($self.numRows-1).toString
+         if ($self.numRows > 0)
+           s + densevector_tostring($self($self.numRows-1))
+         else "[ ]"
        }
        
        infix ("t") (Nil :: DenseMatrix(T)) implements single ${
@@ -283,6 +286,8 @@ trait DenseMatrixOps {
       /**
        * Math
        */
+        
+       // TODO: inverse
        infix ("+") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a+b })
        infix ("+") (T :: DenseMatrix(T), TArith(T)) implements map((T,T), 0, ${ e => e+$1 })    
          // infix ("+") (DenseMatrix(B) :: DenseMatrix(T), (TArith(T), B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a+b })  
@@ -307,7 +312,6 @@ trait DenseMatrixOps {
          indices.foreach { i => densematrix_raw_update($self,i,densematrix_raw_apply($self,i)-$1) }
        }       
       
-       // TODO: MatrixMultiply, Matrix*Vector, inverse
        infix ("*:*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a*b })
        infix ("*") (T :: DenseMatrix(T), TArith(T)) implements map((T,T), 0, ${ e => e*$1 })    
          // infix ("*") (DenseMatrix(B) :: DenseMatrix(T), (TArith(T), B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a*b })  
@@ -319,6 +323,30 @@ trait DenseMatrixOps {
          val indices = IndexVector(0,$self.size)
          indices.foreach { i => densematrix_raw_update($self,i,densematrix_raw_apply($self,i)*$1) }
        }
+       infix ("*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements single ${
+         if ($self.numCols != $1.numRows) fatal("dimension mismatch: matrix multiply")
+         // naive
+         val yT = $1.t
+         val out = DenseMatrix[T]($self.numRows, $1.numCols)
+         for (rowIdx <- 0 until $self.numRows) {
+           for (i <- 0 until $1.numCols) {
+             var acc = $self(rowIdx, 0) * yT(i, 0)
+             for (j <- 1 until yT.numCols) {
+               acc += $self(rowIdx, j) * yT(i, j)
+             }
+             out(rowIdx, i) = acc
+           }
+         }
+         out.unsafeImmutable         
+       }
+       infix ("*") (DenseVector(T) :: DenseVector(T), TArith(T)) implements single ${
+        if ($self.numCols != $1.length || $1.isRow) fatal("dimension mismatch: matrix * vector")
+        val out = DenseVector[T]($self.numRows, false)
+        for (rowIdx <- 0 until $self.numRows) {
+          out(rowIdx) = $self(rowIdx) *:* $1
+        }
+        out.unsafeImmutable
+       }       
        
        infix ("/") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a/b })
        infix ("/") (T :: DenseMatrix(T), TArith(T)) implements map((T,T), 0, ${ e => e/$1 })    
@@ -332,7 +360,7 @@ trait DenseMatrixOps {
          indices.foreach { i => densematrix_raw_update($self,i,densematrix_raw_apply($self,i)/$1) }
        }
        
-       direct ("sum") (Nil :: T, TArith(T)) implements reduce(T, 0, lookupOp("Arith","zero"), ${ (a,b) => a+b })
+       direct ("sum") (Nil :: T, TArith(T)) implements reduce(T, 0, lookupOp("Arith","empty"), ${ (a,b) => a+b })
        direct ("abs") (Nil :: DenseMatrix(T), TArith(T)) implements map((T,T), 0, ${ e => e.abs })
        direct ("exp") (Nil :: DenseMatrix(T), TArith(T)) implements map((T,T), 0, ${ e => e.exp })       
 
@@ -395,7 +423,8 @@ trait DenseMatrixOps {
     // Add DenseMatrix to Arith
     val Arith = lookupGrp("Arith").asInstanceOf[Rep[DSLTypeClass]]
     val DenseMatrixArith = tpeClassInst("ArithDenseMatrix", T withBound TArith, Arith(DenseMatrix(T)))
-    infix (DenseMatrixArith) ("zero", T withBound TArith, Nil :: DenseMatrix(T)) implements composite ${ DenseMatrix[T](unit(0),unit(0)) } // TODO: not right -- zero needs to take an argument to implement the same semantics
+    infix (DenseMatrixArith) ("zero", T withBound TArith, DenseMatrix(T) :: DenseMatrix(T)) implements composite ${ DenseMatrix[T]($0.numRows,$0.numCols).unsafeImmutable }
+    infix (DenseMatrixArith) ("empty", T withBound TArith, Nil :: DenseMatrix(T)) implements composite ${ DenseMatrix[T](unit(0),unit(0)).unsafeImmutable } 
     infix (DenseMatrixArith) ("+", T withBound TArith, (DenseMatrix(T),DenseMatrix(T)) :: DenseMatrix(T)) implements composite ${ densematrix_pl($0,$1) }
     infix (DenseMatrixArith) ("-", T withBound TArith, (DenseMatrix(T),DenseMatrix(T)) :: DenseMatrix(T)) implements composite ${ densematrix_sub($0,$1) }
     infix (DenseMatrixArith) ("*", T withBound TArith, (DenseMatrix(T),DenseMatrix(T)) :: DenseMatrix(T)) implements composite ${ densematrix_mulclnmul($0,$1) } 

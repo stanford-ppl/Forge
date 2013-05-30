@@ -25,6 +25,7 @@ trait IndexVectorOps {
       infix ("length") (Nil :: MInt) implements composite ${ indexvector_end($self) - indexvector_start($self) }
       infix ("isRow") (Nil :: MBoolean) implements getter(0, "_isRow")
       infix ("apply") (MInt :: MInt) implements composite ${ indexvector_start($self) + $1 }      
+      infix ("toDense") (Nil :: DenseVector(MInt)) implements composite ${ indexToDense($self) }
             
       // should be parallel, so the conversion can fuse with the consumer
       // is this fast and robust enough to capture parallel operators over index vectors?

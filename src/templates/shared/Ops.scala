@@ -17,8 +17,8 @@ trait BaseGenOps extends ForgeCodeGenBase {
    * Utility methods
    */  
   def baseOpsCls(grp: Rep[DSLGroup]) = {
-    if (OpsGrp(grp).ops.exists(o => nameClashesUniversal(o).length > 1)) "Base with GenOverloadHack"
-    else "Base"
+    // GenOverloadHack should be mixed in by package traits only
+    "Base"
   }
   
   /**
@@ -43,11 +43,11 @@ trait BaseGenOps extends ForgeCodeGenBase {
      }    
      b
    }  
-      
+  
    def replaceWildcards(s: String) = {
      var o = s
      o = s.replaceAll(qu, "\"")
-     
+
      // splice in the quoted symbol. we use a wildcard instead of an expression tree here
      // because string interpolation does not have a corresponding IR node.
      while (o.contains(symMarker)) {
@@ -59,7 +59,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
      }
      o
    }
-   
+          
    override def quote(x: Exp[Any]) : String = x match {
      case Def(QuoteBlockResult(func,args,ret,captured)) if (isThunk(func.tpe)) => func.name
      case Def(QuoteBlockResult(func,args,ret,captured)) => func.name + "(" + replaceWildcards(captured.mkString(",")) + ")"
@@ -286,11 +286,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
   def noInfix(o: Rep[DSLOp]) = {
     // blacklist
     if (noInfixList.contains(o.name)) true
-    else (o.args.exists { a => a.tpe match {
-      // infix with function args doesn't always resolve correctly
-      case Def(FTpe(fargs,fret,freq)) => true
-      case _ => false
-    }})
+    else (hasFuncArgs(o)) // infix with function args doesn't always resolve correctly
   }
   
   def emitOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {

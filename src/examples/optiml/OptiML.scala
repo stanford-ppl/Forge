@@ -14,6 +14,7 @@ trait OptiMLDSL extends OptiLADSL {
     // include OptiLA
     super.specification()
     
-    // optiml ops to come
+    // our first OptiML ops are extern, sad
+    extern(grp("Sum"))
   }  
 }

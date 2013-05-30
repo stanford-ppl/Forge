@@ -28,7 +28,7 @@ trait DeliteGenOps extends BaseGenOps {
     else if (grpIsTpe(grp) && DataStructs.contains(grpAsTpe(grp))) "BaseFatExp with DeliteStructsExp"
     else "BaseFatExp with EffectExp" // we use codegen *GenFat, which requires EffectExp
   }
-  
+    
   override def quote(x: Exp[Any]): String = x match {
     case Def(QuoteBlockResult(func,args,ret,captured)) =>
       // bind function args to captured args
@@ -55,8 +55,8 @@ trait DeliteGenOps extends BaseGenOps {
     case Const(s: String) => replaceWildcards(super.quote(s))  // quote first, then insert wildcards
     
     case _ => super.quote(x)
-  }  
-  
+  } 
+    
   // IR node names
   def makeOpNodeName(o: Rep[DSLOp]) = {
     val i = nameClashId(o)    

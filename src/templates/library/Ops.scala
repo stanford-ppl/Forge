@@ -122,17 +122,25 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     }            
     stream.println("}")
   }
-      
+
+  def emitOverloadShadows(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) {
+    val i = nameClashId(o)
+    if (i != "") emitWithIndent("def " + implicitOpArgPrefix + o.implicitArgs.length + " = ()", stream, indent)  
+  }
+  
   def emitOp(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) {
     Impls(o) match {
       case codegen:CodeGen => 
         val rule = codegen.decls.getOrElse($cala, err("could not find Scala codegen rule for op: " + o.name))
         inline(o, rule.decl, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent) }      
       case Getter(structArgIndex,field) =>
+        emitOverloadShadows(o, stream, indent)
         emitWithIndent(inline(o, quotedArg(o.args.apply(structArgIndex).name)) + "." + field, stream, indent)
       case Setter(structArgIndex,field,value) =>
+        emitOverloadShadows(o, stream, indent)
         emitWithIndent(inline(o, quotedArg(o.args.apply(structArgIndex).name)) + "." + field + " = " + inline(o,value), stream, indent)
       case Allocates(tpe,init) =>        
+        emitOverloadShadows(o, stream, indent)
         val initialVals = init.map(i => inline(o,i)).mkString(",")              
         emitWithIndent("new " + quote(tpe) + "(" + initialVals + ")", stream, indent)
       case _ => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)

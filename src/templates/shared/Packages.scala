@@ -41,7 +41,7 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     stream.println()
   
     // dsl interface    
-    stream.println("trait " + dsl + " extends Base")
+    stream.println("trait " + dsl + " extends Base with GenOverloadHack")
     for (opsGrp <- opsGrps) {
       stream.print(" with " + opsGrp.name)
     }

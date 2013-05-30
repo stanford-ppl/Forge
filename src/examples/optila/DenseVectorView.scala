@@ -27,7 +27,8 @@ trait DenseVectorViewOps {
       infix ("length") (Nil :: MInt) implements getter(0, "_length")
       infix ("isRow") (Nil :: MBoolean) implements getter(0, "_isRow")
       infix ("apply") (MInt :: T) implements composite ${ array_apply(densevectorview_data($self), densevectorview_start($self) + $1*densevectorview_stride($self)) }      
-                  
+      infix ("toDense") (Nil :: DenseVector(T)) implements composite ${ viewToDense($self) }
+            
       fimplicit ("viewToDense") (Nil :: DenseVector(T)) implements composite ${
         val out = DenseVector[T]($self.length, $self.isRow)
         // out.zip[T,T]($self, (a,b) => b)

@@ -87,3 +87,30 @@ trait CGenForgeArrayOps extends CGenDeliteArrayOps with CGenObjectOps {
     case _ => super.emitNode(sym, rhs)
   }
 }
+
+
+trait ForgeArrayBufferOpsExp extends DeliteArrayBufferOpsExp {
+  this: DeliteArrayOpsExpOpt with DeliteOpsExp =>
+
+  type ForgeArrayBuffer[T] = DeliteArrayBuffer[T]
+
+  def array_buffer_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
+    = darray_buffer_new[T](__arg0)
+  def array_buffer_copy[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[Int],__arg2: Rep[ForgeArrayBuffer[T]],__arg3: Rep[Int],__arg4: Rep[Int])(implicit __imp0: SourceContext): Rep[Unit]
+    = darray_copy(darray_buffer_raw_data(asDeliteArrayBuffer(__arg0)), __arg1, darray_buffer_raw_data(asDeliteArrayBuffer(__arg2)), __arg3, __arg4)
+  def array_buffer_update[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[Int],__arg2: Rep[T])(implicit __imp0: SourceContext): Rep[Unit]
+    = darray_buffer_update(__arg0,__arg1,__arg2)
+  def array_buffer_apply[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[T]
+    = darray_buffer_apply(__arg0,__arg1)
+  def array_buffer_length[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[Int]
+    = darray_buffer_length(__arg0)
+  def array_buffer_set_length[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[Unit]
+    = darray_buffer_set_length(__arg0,__arg1)
+  def array_buffer_append[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[T])(implicit __imp0: SourceContext): Rep[Unit]
+    = darray_buffer_append(__arg0,__arg1)
+}
+trait ScalaGenForgeArrayBufferOps extends ScalaGenDeliteArrayBufferOps with ScalaGenOrderingOps with ScalaGenPrimitiveOps with ScalaGenObjectOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp }
+trait CudaGenForgeArrayBufferOps extends CudaGenDeliteArrayBufferOps with CudaGenOrderingOps with CudaGenPrimitiveOps with CudaGenObjectOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp }
+trait OpenCLGenForgeArrayBufferOps // TODO
+trait CGenForgeArrayBufferOps // TODO
+

@@ -7,7 +7,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 object OptiLADSLRunner extends ForgeApplicationRunner with OptiLADSL       
 
 trait OptiLADSL extends ForgeApplication 
-  with BasicMathOps with RandomOps with ArithOps 
+  with BasicMathOps with RandomOps with ArithOps with IOOps 
   with DenseVectorOps with IndexVectorOps with DenseVectorViewOps
   with DenseMatrixOps {
     
@@ -64,9 +64,9 @@ a1+b1
 """
     }    
     // the ones that matter are the first that resolve to a unique tpe combination
-    impl (lookupOverloaded("String","+",0)) (codegen($cala, strConcatWithNumerics))
-    impl (lookupOverloaded("String","+",4)) (codegen($cala, strConcatWithNumerics))
-    impl (lookupOverloaded("String","+",8)) (codegen($cala, strConcatWithNumerics))
+    impl (lookupOverloaded("FString","+",0)) (codegen($cala, strConcatWithNumerics))
+    impl (lookupOverloaded("FString","+",4)) (codegen($cala, strConcatWithNumerics))
+    impl (lookupOverloaded("FString","+",8)) (codegen($cala, strConcatWithNumerics))
     
     
     // needed by both DenseVector and IndexVector (need a better solution w.r.t. lookup, as this is awkward)
@@ -75,8 +75,9 @@ a1+b1
     val DenseMatrix = tpe("DenseMatrix", tpePar("T"))
     
     importIndexVectorOps()
-    importDenseVectorOps()    
     importDenseVectorViewOps()
-    importDenseMatrixOps()       
+    importDenseVectorOps()        
+    importDenseMatrixOps()      
+    importIOOps() 
   }  
 }

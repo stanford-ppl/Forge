@@ -10,50 +10,51 @@ trait GDA extends OptiMLApplication {
     println("Usage: GDA <input data file> <output label data file>")
     exit(-1)
   }
-
+  
   def main() = {
-    // if (args.length < 2) printUsage
+    if (args.length < 2) printUsage
     
-    // val mu0_num = sumRowsIf(0,m) { !y(_) } { x(_) }
-    // val mu0_num = sum(x(y.find(!_)))
-    
-    // testing:
-    val z = DenseVector.zeros(10)
-    z.pprint    
-    val zf = DenseVector.zerosf(10)
-    zf.pprint    
-    val o = DenseVector.ones(10)
-    o.pprint    
-    val u = DenseVector.uniform(0,1.0,10)
-    u.pprint    
-    val r = DenseVector.rand(10)
-    r.pprint
-    
-    val rowA = DenseVector(11., 22., 33.)
-    val rowB = DenseVector(-5.3, -17.2, -131.)
-    val rowD = DenseVector(-1.1, -6.2)
-    val colC = DenseVector(7., 3.2, 13.3).t
+    val x = readMatrix(args(0))
+    val y = readVector(args(1)).map(d => if (d <= 0.0) false else true)
+    // tic()
 
-    // A*B piecewise
-    val ansVec = rowA*rowB
-    ansVec.pprint
-    // collect(check(ansVec, DenseVector(-58.3, -378.4, -4323.)))    
+    /* number of training samples */
+    val m = y.length
+
+    /* dimensionality of training data */
+    val n = x.numCols
+
+    /* phi, mu0, mu1, and sigma parameterize the GDA model, where we assume the
+     * input features are continuous-valued random variables with a multivariate
+     * normal distribution.
+     *
+     * phi is a scalar, mu0 and mu1 are n dimensional vectors,
+     * where n is the width of x, and sigma is an n x n matrix.
+     */
+    val y_zeros = y count { _ == false } 
+    val y_ones = y count { _ == true }
+    val mu0_num = sumRowsIf(0,m) { !y(_) } { x(_) } 
+    val mu1_num = sumRowsIf(0,m) { y(_) } { x(_) } 
     
-    val y = (o+5)+u
-    y.pprint
-    
-    println("y(5): " + y(5))
-    println("ys: ")
-    val ys = y.slice(3,6)
-    ys.pprint
-        
-    println("ys dot ys: " + (ys *:* ys))
-    
-    // testing flatten
-    val vflat = DenseVector.flatten((DenseVector(rowA,rowB)))
-    vflat.pprint
-    
-    val v = z.map(e => e+1)
-    v.pprint
+    val phi = 1./m * y_ones
+    val mu0 = mu0_num / y_zeros
+    val mu1 = mu1_num / y_ones
+
+    /* calculate covariance matrix sigma */
+    /* x(i) is a row vector for us, while it is defined a column vector in the formula */
+    val sigma = sum(0, m) { i =>
+      if (y(i) == false){
+        (((x(i)-mu0).t) ** (x(i)-mu0))
+      }
+      else{
+        (((x(i)-mu1).t) ** (x(i)-mu1))
+      }
+    }
+
+    // toc(sigma)
+    println("  phi = " + phi)
+    println("  mu0 = " ); mu0.pprint
+    println("  mu1 = " ); mu1.pprint
+    println("  sigma = "); sigma.sliceRows(0,10).pprint    
   }
 }

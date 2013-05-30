@@ -285,12 +285,24 @@ trait ScalaOps {
   }
   
   def importStrings() = {
-    val Str = grp("String")
+    val Str = grp("FString")
     lift (Str) (MString)
     
     // overloaded variants of string concat
     val T = tpePar("T") 
 
+    infix (Str) ("toInt", Nil, MString :: MInt) implements codegen($cala, ${ $0.toInt })
+    infix (Str) ("toFloat", Nil, MString :: MFloat) implements codegen($cala, ${ $0.toFloat })
+    infix (Str) ("toDouble", Nil, MString :: MDouble) implements codegen($cala, ${ $0.toDouble })
+    
+    // not much we can do here to use "split" as long as Delite brings in LMS' version, since we can't overload on the return type
+    // we should refactor LMS/Delite to only use the StringOpsExp trait and not StringOps
+    infix (Str) ("fsplit", Nil, ((MString,MString) :: MArray(MString))) implements codegen($cala, ${
+      $0.split($1)
+    })
+    
+    infix (Str) ("trim", Nil, MString :: MString) implements codegen($cala, ${ $0.trim })
+    
     // most of these variants collapse to a common back-end implementation:
     
     // maps to Rep[String], Rep[Any]

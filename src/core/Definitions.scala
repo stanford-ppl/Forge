@@ -42,6 +42,7 @@ trait Definitions extends DerivativeTypes {
   // should these return a different Forge type (e.g. Rep[TypeConstructor] or Rep[GenericType]) than concrete types?
   lazy val MVar = tpe("Var", tpePar("A"))
   lazy val MArray = tpe("ForgeArray", tpePar("A"))
+  lazy val MArrayBuffer = tpe("ForgeArrayBuffer", tpePar("A"))
   
   /**
    * DSLType placeholders
@@ -57,8 +58,8 @@ trait Definitions extends DerivativeTypes {
   /**
    * stage tags - only 2 stages
    */
-  object future extends StageTag
-  object now extends StageTag
+  object future extends StageTag { override def toString = "future" }
+  object now extends StageTag { override def toString = "now" }
   
   /**
    * code generators
@@ -106,8 +107,8 @@ trait Definitions extends DerivativeTypes {
   object implicitMethod extends MethodType
   
   // blacklist for op names that cannot be expressed with infix methods
-  // we also blacklist some operators for improved compilation performance
-  var noInfixList = List("apply", "update", /*"+",*/ "-", "*", "/", "<", ">")  // string + doesn't resolve correctly in the compiler version using only implicits
+  // we also blacklist some operators for improved compilation performance and to avoid ambiguities in the REPL version
+  var noInfixList = List("apply", "update", /*"+",*/ "-", "*", "/", "<", ">", "<=", ">=")  // string + doesn't resolve correctly in the compiler version using only implicits
     
   // blacklist for op names that need to be overridden in instance methods
   var overrideList = Set("toString", "hashCode", "equals")

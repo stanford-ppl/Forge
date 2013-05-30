@@ -24,7 +24,8 @@ trait ArithOps {
     val Arith = tpeClass("Arith", TArith, T)
                 
     // Arith type class interface
-    infix (Arith) ("zero", T, Nil :: T)
+    infix (Arith) ("zero", T, T :: T)
+    infix (Arith) ("empty", T, Nil :: T)
     infix (Arith) ("+", T, (T,T) :: T) 
     infix (Arith) ("-", T, (T,T) :: T) 
     infix (Arith) ("*", T, (T,T) :: T) 
@@ -34,7 +35,8 @@ trait ArithOps {
     
     // primitive implementations
     val DoubleArith = tpeClassInst("ArithDouble", Nil, Arith(MDouble))
-    infix (DoubleArith) ("zero", Nil, Nil :: MDouble) implements composite ${ unit(0.0) }
+    infix (DoubleArith) ("zero", Nil, MDouble :: MDouble) implements composite ${ unit(0.0) }
+    infix (DoubleArith) ("empty", Nil, Nil :: MDouble) implements composite ${ unit(0.0) }
     infix (DoubleArith) ("+", Nil, (MDouble,MDouble) :: MDouble) implements composite ${ forge_double_plus($0,$1) }
     infix (DoubleArith) ("-", Nil, (MDouble,MDouble) :: MDouble) implements composite ${ forge_double_minus($0,$1) }
     infix (DoubleArith) ("*", Nil, (MDouble,MDouble) :: MDouble) implements composite ${ forge_double_times($0,$1) } 
@@ -43,7 +45,8 @@ trait ArithOps {
     infix (DoubleArith) ("exp", Nil, MDouble :: MDouble) implements composite ${ basicmath_exp($0) }     
     
     val FloatArith = tpeClassInst("ArithFloat", Nil, Arith(MFloat))
-    infix (FloatArith) ("zero", Nil, Nil :: MFloat) implements composite ${ unit(0f) }
+    infix (FloatArith) ("zero", Nil, MFloat :: MFloat) implements composite ${ unit(0f) }
+    infix (FloatArith) ("empty", Nil, Nil :: MFloat) implements composite ${ unit(0f) }
     infix (FloatArith) ("+", Nil, (MFloat,MFloat) :: MFloat) implements composite ${ forge_float_plus($0,$1) }
     infix (FloatArith) ("-", Nil, (MFloat,MFloat) :: MFloat) implements composite ${ forge_float_minus($0,$1) }
     infix (FloatArith) ("*", Nil, (MFloat,MFloat) :: MFloat) implements composite ${ forge_float_times($0,$1) } 
@@ -52,7 +55,8 @@ trait ArithOps {
     infix (FloatArith) ("exp", Nil, MFloat :: MFloat) implements composite ${ basicmath_exp($0).toInt }         
     
     val IntArith = tpeClassInst("ArithInt", Nil, Arith(MInt))
-    infix (IntArith) ("zero", Nil, Nil :: MInt) implements composite ${ unit(0) }
+    infix (IntArith) ("zero", Nil, MInt :: MInt) implements composite ${ unit(0) }
+    infix (IntArith) ("empty", Nil, Nil :: MInt) implements composite ${ unit(0) }
     infix (IntArith) ("+", Nil, (MInt,MInt) :: MInt) implements composite ${ forge_int_plus($0,$1) }
     infix (IntArith) ("-", Nil, (MInt,MInt) :: MInt) implements composite ${ forge_int_minus($0,$1) }
     infix (IntArith) ("*", Nil, (MInt,MInt) :: MInt) implements composite ${ forge_int_times($0,$1) } 

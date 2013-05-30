@@ -43,6 +43,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     // trait to group all of the ops together
     val grpStream = new PrintWriter(new FileWriter(clsDir+File.separator+dsl+"Classes.scala"))    
     grpStream.println("package " + packageName + ".classes")
+    grpStream.println()
     emitScalaReflectImports(grpStream)
     emitLMSImports(grpStream)
     emitDSLImports(grpStream)    
@@ -61,6 +62,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
       
         val stream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+".scala"))            
         stream.println("package " + packageName + ".classes")
+        stream.println()
         emitScalaReflectImports(stream)
         emitScalaMathImports(stream)      
         emitLMSImports(stream)

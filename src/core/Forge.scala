@@ -73,9 +73,10 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   
   def isForgePrimitiveType(t: Rep[DSLType]) = t match {
     case `MInt` | `MFloat` | `MDouble` | `MBoolean` | `MString` | `MUnit` | `MAny` | `MNothing` | `MSourceContext` | `byName` => true
-    // case `CInt` | `CFloat` | `CDouble` | `CBoolean` | `CString` | `CUnit` | `CAny` | `CNothing` => true
-    case Def(Tpe(_,_,`now`)) => true // is there any reason to ever generate an abstract type for a 'now' type?
-    case Def(Tpe("ForgeArray",_,_)) | Def(Tpe("Var",_,_)) | Def(Tpe("Overloaded",_,_)) => true
+    case Def(Tpe(_,_,`now`)) => true 
+    case Def(Tpe("ForgeArray",_,_)) | Def(Tpe("ForgeArrayBuffer",_,_)) => true
+    case Def(Tpe("Var",_,_)) => true
+    case Def(Tpe("Overloaded",_,_)) => true
     case _ => false
   }
   
@@ -129,11 +130,14 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case Def(TpeInst(hkTpe,_)) => hkTpe
     case _ => tpe
   }
-  
-  def hasFuncArgs(o: Rep[DSLOp]) = o.args.exists(a => a match {
-    case Def(Arg(_, Def(FTpe(args,ret,freq)), _)) => true
+
+  def isFuncArg(a: Rep[DSLArg]) = a match {
+    case Def(Arg(_, Def(FTpe(args,ret,freq)),_)) => true
     case _ => false
-  })  
+  }
+  def hasFuncArgs(o: Rep[DSLOp]) = { 
+    o.args.exists(isFuncArg) || o.implicitArgs.exists(isFuncArg)
+  }  
   
   def isThunk(f: Rep[DSLType]) = f match {
     case Def(FTpe(List(Def(Arg(_,`byName`,_))),ret,freq)) => true
@@ -200,9 +204,9 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
   
   def argify(a: Exp[DSLArg], typify: Exp[DSLType] => String = repify): String = a match {
     // tpe instances will have Rep parameters, so we don't want to repify the outer tpe. goes hand-in-hand with the question in repifySome
-    case Def(Arg(name, tpe@Def(TpeInst(Def(Tpe(n, args, `now`)), args2)), Some(d))) => name + ": " + repifySome(tpe) + " = " + "unit("+d+")"
+    case Def(Arg(name, tpe@Def(TpeInst(Def(Tpe(n, args, `now`)), args2)), Some(d))) => name + ": " + repifySome(tpe) + " = " + "unit("+escape(d)+")"
     case Def(Arg(name, tpe@Def(TpeInst(Def(Tpe(n, args, `now`)), args2)), None)) => name + ": " + repifySome(tpe)
-    case Def(Arg(name, tpe, Some(d))) => name + ": " + typify(tpe) + " = " + "unit("+d+")"    
+    case Def(Arg(name, tpe, Some(d))) => name + ": " + typify(tpe) + " = " + "unit("+escape(d)+")"    
     case Def(Arg(name, tpe, None)) => name + ": " + typify(tpe)
   }
   
@@ -215,7 +219,16 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     if (args.length < 1) return ""
     "[" + args.map(quote).mkString(",") + "]"
   }
-  
+
+  // TODO: we should do this for regular op impls as well (issue 22), but it seems to interact differently with string interpolation (need to investigate)
+  // the issue is that string interp returns us a string with quoted newlines which we *do not want* to escape further -- although escapes inside quotes
+  // in the original string should be further escaped.
+  def escape(s: String) = {
+    var o = s    
+    // we lose user backslashes in the code gen step
+    o.replace("\\", "\\\\")    
+  }
+    
   var quoteLiterally = false  
   def quoteLiteral(x: Exp[Any]): String = {
     val save = quoteLiterally

@@ -35,6 +35,28 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
     = array_length(__arg0)
 }
 
+trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
+  type ForgeArrayBuffer[T] = scala.collection.mutable.ArrayBuffer[T]
+
+  def array_buffer_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
+    = (new scala.collection.mutable.ArrayBuffer[T]()) ++ (new Array[T](__arg0))
+  def array_buffer_copy[T:Manifest](src: Rep[ForgeArrayBuffer[T]], srcPos: Rep[Int], dest: Rep[ForgeArrayBuffer[T]], destPos: Rep[Int], length: Rep[Int])(implicit __imp0: SourceContext): Rep[Unit] = {
+    for (i <- 0 until length) {
+      dest(destPos+i) = src(srcPos+i)
+    }
+  }
+  def array_buffer_update[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[Int],__arg2: Rep[T])(implicit __imp0: SourceContext): Rep[Unit]
+    = __arg0(__arg1) = __arg2
+  def array_buffer_apply[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[T]
+    = __arg0(__arg1)
+  def array_buffer_length[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[Int]
+    = __arg0.length
+  def array_buffer_set_length[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[Unit]
+    = __arg0.slice(0,__arg1)
+  def array_buffer_append[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[T])(implicit __imp0: SourceContext): Rep[Unit]
+    = { __arg0 += __arg1 }
+}
+
 
 
 

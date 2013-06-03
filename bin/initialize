@@ -25,19 +25,18 @@ cd $FORGE_HOME
 
 # create necessary directories
 
-mkdir -p ./apps/$lowerCaseDSL/src
-mkdir ./extern/$lowerCaseDSL/
-mkdir -p ./extern/$lowerCaseDSL/
+#appsHome = "./apps/$fullname"
+mkdir -p ./apps/$fullname/src # remove src here? TODO
 
 # copy over template DSLs
 
 cp ./static/TemplateDSL.scala ./src/examples/${fullname}.scala
-cp -r ./static/apps/* ./apps/$lowerCaseDSL/ 
+cp -r ./static/apps/* ./apps/$fullname/ 
 
 # Insert DSL name in the appropriate place
 
-find ./apps/$lowerCaseDSL -type f -print0 | xargs -0 sed -i "s/HUMAN_DSL_NAME/$fullname/g"
-find ./apps/$lowerCaseDSL -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$lowerCaseDSL/g"
+find ./apps/$fullname -type f -print0 | xargs -0 sed -i "s/HUMAN_DSL_NAME/$fullname/g"
+find ./apps/$fullname -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$lowerCaseDSL/g"
 
 find ./src/examples/ -type f -print0 | xargs -0 sed -i "s/HUMAN_DSL_NAME/$fullname/g"
 find ./src/examples -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$lowerCaseDSL/g"
@@ -46,11 +45,8 @@ find ./src/examples -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$low
 # todo - check errors?
 if [ "$2" == "--test" ] 
 then
-  sbt compile
-  ./bin/forge ppl.dsl.forge.examples.${fullname}DSLRunner
-  ./bin/publish $lowerCaseDSL
-  cd published/$lowerCaseDSL
-  sbt compile
+  ./bin/update ppl.dsl.forge.examples.${fullname}DSLRunner ${fullname}
+  cd published/${fullname}
   bin/delitec HelloWorldInterpreter
   bin/delitec HelloWorldCompiler
   bin/delite HelloWorldCompiler.deg

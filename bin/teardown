@@ -13,7 +13,6 @@ then
 fi
 
 fullname="$1"
-lowerCaseDSL=${fullname,,}
 
 echo "Are you aware that this will remove your DSL, and this action cannot be undone? [y / N]"
 read FEARLESS
@@ -31,8 +30,7 @@ if [ -z "$FORGE_HOME" -a "${FORGE_HOME+xxx}" = "xxx" ]; then echo FORGE_HOME is 
 
 # create necessary directories
 
-rm -rf $FORGE_HOME/apps/$lowerCaseDSL
-rm -rf $FORGE_HOME/extern/$lowerCaseDSL
+rm -rf $FORGE_HOME/apps/$fullname/
 rm -f $FORGE_HOME/src/examples/${fullname}.scala
 
 echo "Tear down complete"

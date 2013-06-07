@@ -9,7 +9,7 @@ trait DenseVectorViewOps {
  
   def importDenseVectorViewOps() {
     val T = tpePar("T")
-    val DenseVectorView = tpe("DenseVectorView", T) 
+    val DenseVectorView = lookupTpe("DenseVectorView") // tpe("DenseVectorView", T) 
     val DenseVector = lookupTpe("DenseVector")
   
     // data fields     
@@ -17,7 +17,7 @@ trait DenseVectorViewOps {
   
     // static methods
     static (DenseVectorView) ("apply", T, ((MArray(T), MInt ,MInt, MInt, MBoolean) :: DenseVectorView)) implements allocates(DenseVectorView, ${$0}, ${$1}, ${$2}, ${$3}, ${$4})
-        
+
     val DenseVectorViewOps = withTpe(DenseVectorView)
     DenseVectorViewOps {
       compiler ("densevectorview_data") (Nil :: MArray(T)) implements getter(0, "_data")
@@ -27,28 +27,23 @@ trait DenseVectorViewOps {
       infix ("length") (Nil :: MInt) implements getter(0, "_length")
       infix ("isRow") (Nil :: MBoolean) implements getter(0, "_isRow")
       infix ("apply") (MInt :: T) implements composite ${ array_apply(densevectorview_data($self), densevectorview_start($self) + $1*densevectorview_stride($self)) }      
-      infix ("toDense") (Nil :: DenseVector(T)) implements composite ${ viewToDense($self) }
+      infix ("toDense") (Nil :: DenseVector(T)) implements composite ${ $self.map(e => e) }
             
-      fimplicit ("viewToDense") (Nil :: DenseVector(T)) implements composite ${
-        val out = DenseVector[T]($self.length, $self.isRow)
-        // out.zip[T,T]($self, (a,b) => b)
-        for (i <- 0 until $self.length) {
-          out(i) = $self(i)
-        }        
-        out.unsafeImmutable
+      fimplicit ("viewToDense") (Nil :: DenseVector(T)) implements composite ${ 
+        Console.println("(performance warning): automatic conversion from DenseVectorView to DenseVector")
+        $self.toDense 
       }
-      
-      fimplicit ("chainViewToDenseOps") (Nil :: ephemeralTpe("DenseVectorOpsCls[T]", stage = now)) implements composite ${
-        DenseVectorRepToDenseVectorOpsCls(viewToDense($self))
+      fimplicit ("chainViewToDenseOps") (Nil :: ephemeralTpe("DenseVectorDenseVectorOpsCls[T]", stage = now)) implements composite ${
+        repToDenseVectorDenseVectorOpsCls(viewToDense($self))
       }
-            
+       
       compiler ("densevectorview_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("DenseVectorViews cannot be allocated from a parallel op") }
       compiler ("densevectorview_illegalupdate") ((MInt, T) :: MNothing, effect = simple) implements composite ${ fatal("DenseVectorViews cannot be updated") }
       
       parallelize as ParallelCollection(T, lookupOp("densevectorview_illegalalloc"), lookupOp("length"), lookupOverloaded("apply",1), lookupOp("densevectorview_illegalupdate"))            
     }
     
-    // allows us to perform a number of simple accessor operations without converting to a DenseVector first
+    // allows us to perform operations without converting to a DenseVector first
     addVectorCommonOps(DenseVectorView,T)
   }
 }

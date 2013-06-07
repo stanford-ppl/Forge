@@ -53,8 +53,14 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     emitBlockComment("abstract types", stream, indent=2)
     for (tpe <- Tpes) {
       if (!isForgePrimitiveType(tpe)) {
-        stream.println("  type " + quote(tpe))      
-        stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + ": Manifest[" + quote(tpe) + "]")
+        if (DataStructs.contains(tpe)) {
+          stream.println("  type " + quote(tpe))      
+          stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + ": Manifest[" + quote(tpe) + "]")
+        }
+        else {
+          stream.println("  abstract class " + quote(tpe))      
+          stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]") // needed?
+        }
       }
     }    
     if (TpeAliases.length > 0) {

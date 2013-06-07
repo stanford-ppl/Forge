@@ -147,7 +147,7 @@ trait ForgeSugar extends ForgeSugarLowPriority {
     private def tpeOpArgs(addTpePars: List[Rep[TypePar]], args: List[Rep[Any]]) = {
       val t = _tpeScopeBox
       val amendedTpePars = (t.tpePars ::: addTpePars).distinct
-      val amendedArgs = namedTpeToArg("self",tpeInst(t,t.tpePars)) :: args.zipWithIndex.map(t => anyToArg(t._1,t._2+1)).asInstanceOf[List[Rep[DSLArg]]] // arg numbering starts at 1
+      val amendedArgs = namedTpeToArg("self",t) :: args.zipWithIndex.map(t => anyToArg(t._1,t._2+1)).asInstanceOf[List[Rep[DSLArg]]] // arg numbering starts at 1
       (amendedTpePars, amendedArgs)
     }
     
@@ -442,9 +442,10 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   def checkDcFunctions(tpe: Rep[DSLType], dc: ForgeCollectionType) {
     // verify the dc functions match our expectations
     
-    if (dc.alloc.args.size != 2 || getHkTpe(dc.alloc.args.apply(0).tpe) != getHkTpe(tpe) || dc.alloc.args.apply(1).tpe != MInt 
+    if (dc.alloc.args.size != 2 || dc.alloc.tpePars.size > 2 /*getHkTpe(dc.alloc.args.apply(0).tpe) != getHkTpe(tpe) */|| dc.alloc.args.apply(1).tpe != MInt 
       || ((getHkTpe(dc.alloc.retTpe) != getHkTpe(tpe)) && (getHkTpe(dc.alloc.retTpe) != MNothing)))
-      err("dcAlloc must take two arguments (" + tpe.name + ", " + MInt.name + ") and return an instance of " + tpe.name)
+      // err("dcAlloc must take two arguments (" + tpe.name + ", " + MInt.name + ") and return an instance of " + tpe.name)
+      err("dcAlloc must take at most two type parameters, two arguments ([Col], " + MInt.name + ") and return an instance of " + tpe.name)
     if (dc.alloc.tpePars.length > 2) 
       warn("dcAlloc with more than 2 type parameters has undefined semantics. Consider trying to rewrite your alloc method to be in the form alloc[A,R](in: C[A], size: Int): C[R]")    
     if (dc.size.args.size != 1 || getHkTpe(dc.size.args.apply(0).tpe) != getHkTpe(tpe) || (dc.size.retTpe != MInt))

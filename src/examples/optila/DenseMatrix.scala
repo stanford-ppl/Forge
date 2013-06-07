@@ -55,7 +55,7 @@ trait DenseMatrixOps {
     static (DenseMatrix) ("onesf", Nil, (MInt,MInt) :: DenseMatrix(MFloat)) implements single ${ densematrix_fromfunc($0, $1, (i,j) => 1f ) }
     static (DenseMatrix) ("rand", Nil, (MInt,MInt) :: DenseMatrix(MDouble)) implements single ${ densematrix_fromfunc($0, $1, (i,j) => random[Double] ) }
     static (DenseMatrix) ("randf", Nil, (MInt,MInt) :: DenseMatrix(MFloat)) implements single ${ densematrix_fromfunc($0, $1, (i,j) => random[Float] ) }
-    
+        
     val DenseMatrixOps = withTpe (DenseMatrix)          
     DenseMatrixOps {                                        
       /**
@@ -109,10 +109,10 @@ trait DenseMatrixOps {
        infix ("toString") (Nil :: MString) implements single ${
          var s = ""         
          for (i <- 0 until $self.numRows-1) {
-           s = s + densevector_tostring($self(i)) + "\\n"
+           s = s + densevectorview_tostring($self(i)) + "\\n"
          }
          if ($self.numRows > 0)
-           s + densevector_tostring($self($self.numRows-1))
+           s + densevectorview_tostring($self($self.numRows-1))
          else "[ ]"
        }
        
@@ -127,8 +127,8 @@ trait DenseMatrixOps {
          out.unsafeImmutable         
        }
        
-       infix ("Clone") (Nil :: DenseMatrix(T)) implements map((T,T), 0, "e => e")
-       infix ("mutable") (Nil :: DenseMatrix(T), effect = mutable) implements single ${
+       infix ("Clone") (Nil :: DenseMatrix(T), aliasHint = copies(0)) implements map((T,T), 0, "e => e")
+       infix ("mutable") (Nil :: DenseMatrix(T), effect = mutable, aliasHint = copies(0)) implements single ${
          val out = DenseMatrix[T]($self.numRows, $self.numCols)        
          for (i <- 0 until $self.numRows) {
            for (j <- 0 until $self.numCols) {

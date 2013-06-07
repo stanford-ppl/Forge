@@ -9,7 +9,7 @@ E_BADARGS=65
 E_NOHOME=66
       
 usage() {
-  echo "Usage: `basename $0` [-h] [-c] [-s step] [-r fully.qualified.ApplicationRunner] fully.qualified.DSLRunner DSLName"
+  echo "Usage: `basename $0` [-h] [-c] [-s step] [-i | -r fully.qualified.ApplicationRunner] fully.qualified.DSLRunner DSLName"
   echo "Note that `basename $0` requires options to be specified before required arguments."
   echo "  -h        show this message"
   echo "  -c        perform a clean build"

@@ -8,7 +8,7 @@ trait IndexVectorOps {
   this: OptiLADSL => 
  
   def importIndexVectorOps() {
-    val IndexVector = tpe("IndexVector") 
+    val IndexVector = lookupTpe("IndexVector") 
     val DenseVector = lookupTpe("DenseVector")
   
     // data fields     
@@ -16,7 +16,7 @@ trait IndexVectorOps {
   
     // static methods
     static (IndexVector) ("apply", Nil, MethodSignature(List(MInt,MInt,("isRow",MBoolean,"true")), IndexVector)) implements allocates(IndexVector, quotedArg(0), quotedArg(1), quotedArg(2))
-        
+                          
     val IndexVectorOps = withTpe(IndexVector)
     IndexVectorOps {
       compiler ("indexvector_start") (Nil :: MInt) implements getter(0, "_start")
@@ -25,40 +25,32 @@ trait IndexVectorOps {
       infix ("length") (Nil :: MInt) implements composite ${ indexvector_end($self) - indexvector_start($self) }
       infix ("isRow") (Nil :: MBoolean) implements getter(0, "_isRow")
       infix ("apply") (MInt :: MInt) implements composite ${ indexvector_start($self) + $1 }      
-      infix ("toDense") (Nil :: DenseVector(MInt)) implements composite ${ indexToDense($self) }
+      infix ("t") (Nil :: IndexVector) implements allocates(IndexVector, ${indexvector_start($self)}, ${indexvector_end($self)}, ${!(indexvector_isrow($self))})
+      infix ("toDense") (Nil :: DenseVector(MInt)) implements composite ${ $self.map(e => e) }
             
-      // should be parallel, so the conversion can fuse with the consumer
+      // parallel, so the conversion can fuse with the consumer
       // is this fast and robust enough to capture parallel operators over index vectors?
-      fimplicit ("indexToDense") (Nil :: DenseVector(MInt)) implements composite ${
-        val out = DenseVector[Int]($self.length, $self.isRow)
-                
-        // TODO: vector zip currently requires a DenseVector arg
-        // out.zip[Int,Int]($self, (e,i) => $self(i))
-        for (i <- 0 until $self.length) {
-          out(i) = $self(i)
-        }
-        out.unsafeImmutable
+      fimplicit ("indexToDense") (Nil :: DenseVector(MInt)) implements composite ${ 
+        Console.println("(performance warning): automatic conversion from IndexVector to DenseVector")
+        $self.toDense 
       }
       
       // naming is by convention here, a little brittle. would it be better to put this in extern?
-      fimplicit ("chainIndexToDenseOps") (Nil :: ephemeralTpe("DenseVectorOpsCls[Int]", stage = now)) implements composite ${
-        DenseVectorRepToDenseVectorOpsCls(indexToDense($self))
+      fimplicit ("chainIndexToDenseOps") (Nil :: ephemeralTpe("DenseVectorDenseVectorOpsCls[Int]", stage = now)) implements composite ${
+        repToDenseVectorDenseVectorOpsCls(indexToDense($self))
       }      
-      fimplicit ("chainIndexToDenseIntOps") (Nil :: ephemeralTpe("DenseVectorIntOpsCls", stage = now)) implements composite ${
-        DenseVectorRepToDenseVectorIntOpsCls(indexToDense($self))
+      fimplicit ("chainIndexToDenseIntOps") (Nil :: ephemeralTpe("DenseVectorDenseVectorIntOpsCls", stage = now)) implements composite ${
+        repToDenseVectorDenseVectorIntOpsCls(indexToDense($self))
       }
             
-      // TODO: need indexed loop pattern to do this efficiently (without allocating a dense IndexVector)
-      // infix ("foreach") ((MInt ==> MUnit) :: MUnit, effect = simple) implements foreach(MInt, 0, ${ e => $1(e) })
-      
-      compiler ("indexvector_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("IndexVectors cannot be allocated from a parallel op") }
+      compiler ("indexvector_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("IndexVectors cannot be allocated from a parallel op") }      
       compiler ("indexvector_illegalupdate") ((MInt, MInt) :: MNothing, effect = simple) implements composite ${ fatal("IndexVectors cannot be updated") }
       
       // IndexVectors can't be mapped over, but they can be zipped with or reduced
       parallelize as ParallelCollection(MInt, lookupOp("indexvector_illegalalloc"), lookupOp("length"), lookupOverloaded("apply",1), lookupOp("indexvector_illegalupdate"))            
     }
     
-    // allows us to perform a number of simple accessor operations without converting to a DenseVector first
+    // allows us to perform operations without converting to a DenseVector first
     addVectorCommonOps(IndexVector,MInt)
   }
 }

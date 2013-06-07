@@ -6,97 +6,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 
 trait DenseVectorOps {
   this: OptiLADSL => 
- 
-  /**
-   * Code generation can be an alternative to subtyping for achieving code re-use:
-   * 
-   * This interface represents a convenient set of vector accessor functions. 
-   * They require v to define length, isRow, and apply. (should we programatically encode this somehow?)
-   */
-  def addVectorCommonOps(v: Rep[DSLType], T: Rep[DSLType]) {
-    val DenseVector = lookupTpe("DenseVector")
-    
-    // have to be careful about the type argument name we use in single and composite since T is being passed in
-    // We splice this name into blocks using the escaped \$ to inform the preprocessor that the value already exists.
-    val TT = T.name
-    
-    val VectorCommonOps = withTpe(v)
-    VectorCommonOps {
-      infix ("isEmpty") (Nil :: MBoolean) implements single ${ $self.length == 0 }
-      infix ("first") (Nil :: T) implements single ${ $self(0) }
-      infix ("last") (Nil :: T) implements single ${ $self($self.length - 1) }
-      infix ("slice") ((("start",MInt),("end",MInt)) :: DenseVector(T)) implements single ${
-        val out = DenseVector[\$TT]($end - $start, $self.isRow)
-        for (i <- $start until $end) {
-          out(i-$start) = $self(i)
-        }
-        out.unsafeImmutable
-      }                                   
-      infix ("drop") (MInt :: DenseVector(T)) implements composite ${ $self.slice($1, $self.length) }
-      infix ("take") (MInt :: DenseVector(T)) implements composite ${ $self.slice(unit(0), $1) }
-      infix ("contains") (T :: MBoolean) implements single ${
-        var found = false
-        var i = 0
-        while (i < $self.length && !found) {
-          if ($self(i) == $1) {
-            found = true            
-          }
-          i += 1
-        }
-        found
-      }
-      infix ("distinct") (Nil :: DenseVector(T)) implements single ${
-        val out = DenseVector[\$TT](0, $self.isRow)
-        for (i <- 0 until $self.length) {
-          // slow -- should use a hashmap when it's available as a primitive
-          if (!out.contains($self(i))) out <<= $self(i)
-        }
-        out.unsafeImmutable
-      }
-    
-      infix ("toString") (Nil :: MString) implements single ${    
-        var s = ""
-        if ($self.length == 0) {
-          "[ ]"
-        }
-        else if ($self.isRow) { 
-          s = s + "["
-          for (i <- 0 until $self.length - 1) {
-            s = s + $self(i) + " "
-          }
-          s = s + $self($self.length-1)
-          s = s + "]"
-        }
-        else {
-          for (i <- 0 until $self.length - 1) {
-            s = s + "[" + $self(i) + "]\\n"
-          }
-          s = s + $self($self.length-1)
-        }
-        s
-      }
-      
-      infix ("pprint") (Nil :: MUnit, effect = simple) implements composite ${ println(densevector_tostring($self)) } // $self.toString doesn't work in Delite      
-      
-      // we can also perform reductions generically, since they don't require allocation (this is important for mapRowsToVector with VectorView)
-      // Arith is only required if T is actually a tpePar here, but now this bifurcation is kind of annoying. furthermore, even composites need
-      // to be here to avoid the conversion, which is unfortunate.
-      if (isTpePar(T)) {
-        val A = TArith(asTpePar(T))
-        direct ("sum") (Nil :: T, A) implements reduce(T, 0, lookupOp("Arith","empty"), ${ (a,b) => a+b })      
-        infix ("reduce") (((T,T) ==> T) :: T, A) implements reduce(T, 0, lookupOp("Arith","empty"), ${ (a,b) => $1(a,b) })            
-      }
-      else {
-        compiler ("zeroT") (Nil :: T) implements composite ${ 0.asInstanceOf[\$TT] }
-        direct ("sum") (Nil :: T) implements reduce(T, 0, lookupOp("zeroT"), ${ (a,b) => a+b })      
-        infix ("reduce") (((T,T) ==> T) :: T) implements reduce(T, 0, lookupOp("zeroT"), ${ (a,b) => $1(a,b) })                    
-      }
-    }
-  }
-  
-  /**
-   * The main DenseVector specification.
-   */
+
   def importDenseVectorOps() {
     val T = tpePar("T") 
     val R = tpePar("R")
@@ -165,25 +75,29 @@ trait DenseVectorOps {
         (accum,result.unsafeImmutable)      
       }
     } 
+
+    // a non-type-safe way of passing the metadata required to allocate a DenseVector in a parallel op
+    // ideally we would encode this is as a type class, but it's not clear we would get an instance of this type class in dc_alloc
+    val CR = tpePar("CR")
+    compiler (DenseVector) ("densevector_raw_alloc", (R,CR), (CR,MInt) :: DenseVector(R)) implements composite ${
+      val ms = manifest[CR].toString
+      val simpleName = ms.drop(ms.lastIndexOf("\$\$")+1)         
+      val isRow = simpleName match {
+        case s if s.startsWith("IndexVector") => indexvector_isrow($0.asInstanceOf[Rep[IndexVector]])
+        case s if s.startsWith("DenseVectorView") => densevectorview_isrow($0.asInstanceOf[Rep[DenseVectorView[Any]]])
+        case s if s.startsWith("DenseVector") => densevector_isrow($0.asInstanceOf[Rep[DenseVector[Any]]])
+      }
+      DenseVector[R]($1, isRow) 
+    }        
           
     val DenseVectorOps = withTpe (DenseVector)          
     DenseVectorOps {                                        
-      /**
-       * Conversions
-       */       
-      infix ("toBoolean") (Nil :: DenseVector(MBoolean), ("conv",T ==> MBoolean)) implements map((T,MBoolean), 0, ${$conv})
-      infix ("toDouble") (Nil :: DenseVector(MDouble), ("conv",T ==> MDouble)) implements map((T,MDouble), 0, ${$conv})
-      infix ("toFloat") (Nil :: DenseVector(MFloat), ("conv",T ==> MFloat)) implements map((T,MFloat), 0, ${$conv})
-      infix ("toInt") (Nil :: DenseVector(MInt), ("conv",T ==> MInt)) implements map((T,MInt), 0, ${$conv})
-       
-            
       /**
        * Accessors
        */
       infix ("length") (Nil :: MInt) implements getter(0, "_length")
       infix ("isRow") (Nil :: MBoolean) implements getter(0, "_isRow")
       infix ("apply") (MInt :: T) implements composite ${ array_apply(densevector_raw_data($self), $1) }                        
-      infix ("indices") (Nil :: IndexVector) implements composite ${ IndexVector(unit(0), $self.length) } 
       
       
       /**
@@ -193,8 +107,8 @@ trait DenseVectorOps {
       infix ("mt") (Nil :: MUnit, effect = write(0)) implements composite ${
         densevector_set_isrow($0, !$0.isRow)
       }
-      infix ("Clone") (Nil :: DenseVector(T)) implements map((T,T), 0, "e => e")
-      infix ("mutable") (Nil :: DenseVector(T), effect = mutable) implements single ${
+      infix ("Clone") (Nil :: DenseVector(T), aliasHint = copies(0)) implements map((T,T), 0, "e => e")
+      infix ("mutable") (Nil :: DenseVector(T), effect = mutable, aliasHint = copies(0)) implements single ${
         val out = DenseVector[T]($self.length, $self.isRow)        
         for (i <- 0 until out.length) {
           out(i) = $self(i)
@@ -313,10 +227,8 @@ trait DenseVectorOps {
       
       /**
        * Math
-       */                    
-      infix ("+") (DenseVector(T) :: DenseVector(T), TArith(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a+b })
-      // infix ("+") (DenseVector(B) :: DenseVector(T), (TArith(T), B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a+b })
-      infix ("+") (T :: DenseVector(T), TArith(T)) implements map((T,T), 0, ${ e => e+$1 })      
+       */   
+       
       infix ("+=") (DenseVector(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${
         $self.indices.foreach { i => $self(i) = $self(i) + $1(i) }
       }
@@ -328,9 +240,6 @@ trait DenseVectorOps {
         $self.indices.foreach { i => $self(i) = $self(i) + $1(i) }
       }
             
-      infix ("*") (DenseVector(T) :: DenseVector(T), TArith(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a*b })
-      // infix ("*") (DenseVector(B) :: DenseVector(T), (TArith(T), B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a*b })
-      infix ("*") (T :: DenseVector(T), TArith(T)) implements map((T,T), 0, ${ e => e*$1 })
       infix ("*=") (DenseVector(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${
         $self.indices.foreach { i => $self(i) = $self(i) * $1(i) }
       }
@@ -340,27 +249,7 @@ trait DenseVectorOps {
       infix ("*=") (DenseVectorView(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${
         $self.indices.foreach { i => $self(i) = $self(i) * $1(i) }
       }   
-      // TODO: need to make this efficient on DenseVectorView (i.e. do not require materializing dense first)                
-      // need to extend reduce with an optional map function, and then we can reduce over the indices
-      infix ("*:*") (DenseVector(T) :: T, TArith(T)) implements composite ${ sum($self*$1) } 
-      infix ("*") (DenseMatrix(T) :: DenseVector(T), TArith(T)) implements composite ${
-        if (!$self.isRow) fatal("dimension mismatch: vector * matrix")
-        $1.t.mapRowsToVector { row => row *:* $self.t }        
-      }
-      infix ("**") (DenseVector(T) :: DenseMatrix(T), TArith(T)) implements composite ${
-        if ($self.isRow || !$1.isRow) fatal ("dimension mismatch: vector outer product")
-        val out = DenseMatrix[T]($self.length, $1.length)
-        for (i <- 0 until $self.length ){
-          for (j <- 0 until $1.length ){
-            out(i,j) = $self(i)*$1(j)
-          }
-        }
-        out.unsafeImmutable            
-      }
       
-      infix ("-") (DenseVector(T) :: DenseVector(T), TArith(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a-b })
-      // infix ("-") (DenseVector(B) :: DenseVector(T), (TArith(T), B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a-b })
-      infix ("-") (T :: DenseVector(T), TArith(T)) implements map((T,T), 0, ${ e => e-$1 })
       infix ("-=") (DenseVector(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${
         $self.indices.foreach { i => $self(i) = $self(i) - $1(i) }
       }
@@ -371,9 +260,6 @@ trait DenseVectorOps {
         $self.indices.foreach { i => $self(i) = $self(i) - $1(i) }
       }      
       
-      infix ("/") (DenseVector(T) :: DenseVector(T), TArith(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a/b })
-      // infix ("/") (DenseVector(B) :: DenseVector(T), (TArith(T), B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a/b })
-      infix ("/") (T :: DenseVector(T), TArith(T)) implements map((T,T), 0, ${ e => e/$1 })
       infix ("/=") (DenseVector(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${
         $self.indices.foreach { i => $self(i) = $self(i) / $1(i) }
       }
@@ -383,9 +269,6 @@ trait DenseVectorOps {
       infix ("/=") (DenseVectorView(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${
         $self.indices.foreach { i => $self(i) = $self(i) / $1(i) }
       }      
-      
-      direct ("abs") (Nil :: DenseVector(T), TArith(T)) implements map((T,T), 0, ${ e => e.abs })
-      direct ("exp") (Nil :: DenseVector(T), TArith(T)) implements map((T,T), 0, ${ e => e.exp })
       
       
       /**
@@ -409,44 +292,11 @@ trait DenseVectorOps {
       }
       infix (":>") (DenseVector(T) :: DenseVector(MBoolean), TOrdering(T)) implements zip((T,T,MBoolean), (0,1), ${ (a,b) => a > b })
       infix (":<") (DenseVector(T) :: DenseVector(MBoolean), TOrdering(T)) implements zip((T,T,MBoolean), (0,1), ${ (a,b) => a < b })
-      
-             
-      /**
-       * Bulk (except for reductions, which are in VectorCommonOps)
-       */
-      infix ("map") ((T ==> R) :: DenseVector(R), addTpePars = R) implements map((T,R), 0, ${ e => $1(e) })      
-      infix ("zip") (((DenseVector(B), (T,B) ==> R)) :: DenseVector(R), addTpePars = (B,R)) implements zip((T,B,R), (0,1), ${ (a,b) => $2(a,b) })
-      infix ("filter") ((T ==> MBoolean) :: DenseVector(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})
-      infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements foreach(T, 0, ${ e => $1(e) })
-      infix ("find") ((T ==> MBoolean) :: DenseVector(MInt)) implements composite ${ $self.indices.filter(i => $1($self(i))) }
-      infix ("count") ((T ==> MBoolean) :: MInt) implements composite ${
-        sum(densevector_filter_map[T,Int]($self, $1, e => unit(1)))
-      }
-      compiler ("densevector_filter_map") (((T ==> MBoolean), (T ==> R)) :: DenseVector(R), addTpePars = R) implements filter((T,R), 0, ${ e => $1(e) }, ${ e => $2(e) })
-      
-      infix ("partition") (("pred",(T ==> MBoolean)) :: Tuple2(DenseVector(T),DenseVector(T))) implements composite ${
-        val outT = DenseVector[T](0, $self.isRow)
-        val outF = DenseVector[T](0, $self.isRow)
-        for (i <- 0 until $self.length) {
-          val x = $self(i)
-          if (pred(x)) outT <<= x
-          else outF <<= x
-        }
-        (outT.unsafeImmutable, outF.unsafeImmutable)        
-      }
-      infix ("flatMap") ((T ==> DenseVector(R)) :: DenseVector(R), addTpePars = R) implements composite ${
-        DenseVector.flatten($self.map($1))
-      }       
-      // TODO
-      // infix ("groupBy") (((T ==> R)) :: DenseVector(DenseVector(T))) 
-            
+                                    
                         
       /**
        * Required for parallel collection       
-       */
-      compiler ("densevector_raw_alloc") (MInt :: DenseVector(R), addTpePars = R) implements single ${
-        DenseVector[R]($1, $self.isRow)
-      }
+       */                  
       compiler ("densevector_appendable") ((MInt,T) :: MBoolean) implements single("true")
       compiler ("densevector_append") ((MInt,T) :: MUnit, effect = write(0)) implements single ${
         $self.insert($self.length, $2)
@@ -459,8 +309,7 @@ trait DenseVectorOps {
 
       parallelize as ParallelCollectionBuffer(T, lookupOp("densevector_raw_alloc"), lookupOp("length"), lookupOverloaded("apply",2), lookupOp("update"), lookupOp("densevector_set_length"), lookupOp("densevector_appendable"), lookupOp("densevector_append"), lookupOp("densevector_copy"))            
     } 
-    
-    
+        
     // Add DenseVector to Arith
     val Arith = lookupGrp("Arith").asInstanceOf[Rep[DSLTypeClass]]
     val DenseVectorArith = tpeClassInst("ArithDenseVector", T withBound TArith, Arith(DenseVector(T)))
@@ -486,7 +335,7 @@ trait DenseVectorOps {
     val DenseVector = lookupTpe("DenseVector")
     
     // the conversions here will be costly unless things fuse. alternatively, we could convert element by element.
-
+    // TODO: unfortunately, these have priority over operators defined in VectorCommonOps, so they can sometimes force conversions.
     infix (DenseVector) ("+", Nil, (MInt,DenseVector(MInt)) :: DenseVector(MInt)) implements composite ${ densevector_pl[Int]($1,$0) }
     infix (DenseVector) ("+", Nil, (MInt,DenseVector(MFloat)) :: DenseVector(MFloat)) implements composite ${ densevector_pl[Float]($1,$0.toFloat) }
     infix (DenseVector) ("+", Nil, (MInt,DenseVector(MDouble)) :: DenseVector(MDouble)) implements composite ${ densevector_pl[Double]($1,$0.toDouble) }

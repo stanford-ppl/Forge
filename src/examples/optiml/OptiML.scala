@@ -7,7 +7,9 @@ import core.ForgeApplicationRunner
 
 object OptiMLDSLRunner extends ForgeApplicationRunner with OptiMLDSL
 
-trait OptiMLDSL extends OptiLADSL {
+trait OptiMLDSL extends OptiLADSL
+  with VecMatConstructor {
+    
   override def dslName = "OptiML"
   
   override def specification() = {
@@ -16,5 +18,6 @@ trait OptiMLDSL extends OptiLADSL {
     
     // our first OptiML ops are extern, sad
     extern(grp("Sum"))
+    importVecMatConstructor()
   }  
 }

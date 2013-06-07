@@ -8,7 +8,7 @@ object OptiLADSLRunner extends ForgeApplicationRunner with OptiLADSL
 
 trait OptiLADSL extends ForgeApplication 
   with BasicMathOps with RandomOps with ArithOps with IOOps 
-  with DenseVectorOps with IndexVectorOps with DenseVectorViewOps
+  with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps
   with DenseMatrixOps {
     
   def dslName = "OptiLA"
@@ -69,10 +69,11 @@ a1+b1
     impl (lookupOverloaded("FString","+",8)) (codegen($cala, strConcatWithNumerics))
     
     
-    // needed by both DenseVector and IndexVector (need a better solution w.r.t. lookup, as this is awkward)
-    // one option is to declare all tpes first, and only use them in the respective ops (similar to Delite)
+    // declare all tpes first, so that they are available to all ops (similar to Delite)
     val DenseVector = tpe("DenseVector", tpePar("T")) 
+    val DenseVectorView = tpe("DenseVectorView", tpePar("T"))
     val DenseMatrix = tpe("DenseMatrix", tpePar("T"))
+    val IndexVector = tpe("IndexVector") 
     
     importIndexVectorOps()
     importDenseVectorViewOps()

@@ -30,7 +30,7 @@ trait CanSumOps extends Base {
   implicit def canSumView[A:Manifest:Arith]: CanSum[DenseVector[A],DenseVectorView[A]] = new CanSum[DenseVector[A],DenseVectorView[A]] {
     def accA(acc: Rep[DenseVector[A]], y: Rep[DenseVectorView[A]])(implicit ctx: SourceContext) = { densevector_pleq(acc,y); acc }
     def accR(acc: Rep[DenseVector[A]], y: Rep[DenseVector[A]])(implicit ctx: SourceContext) = { densevector_pleq(acc,y); acc }
-    def mutableA(lhs: Rep[DenseVectorView[A]])(implicit ctx: SourceContext) = densevector_mutable(lhs)
+    def mutableA(lhs: Rep[DenseVectorView[A]])(implicit ctx: SourceContext) = lhs.toDense.mutable
     def mutableR(lhs: Rep[DenseVector[A]])(implicit ctx: SourceContext) = densevector_mutable(lhs)
   }
 

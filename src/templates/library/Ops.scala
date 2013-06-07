@@ -57,25 +57,33 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         case composite:Composite =>
           inline(o, composite.func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent+2 )}
         case map:Map =>
-          val dc = ForgeCollections(getHkTpe(o.retTpe))        
+          val outDc = ForgeCollections(getHkTpe(o.retTpe))        
+          val in = o.args.apply(map.argIndex)
+          val inDc = ForgeCollections(getHkTpe(in.tpe))
           emitWithIndent("def func: " + repify(map.tpePars._1) + " => " + repify(map.tpePars._2) + " = " + inline(o, map.func), stream, indent+2)            
-          emitWithIndent("val in = " + o.args.apply(map.argIndex).name, stream, indent+2)
-          emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instAllocReturnTpe(dc.alloc.tpePars, map.tpePars._2)) + "(in, " + makeOpMethodName(dc.size) + "(in)" + ")", stream, indent+2) // TODO - makeArg
+          emitWithIndent("val in = " + in.name, stream, indent+2)
+          // TODO: why not just makeTpePars(o.retTpe.tpePars)? and sanity check with map.tpePars._2:
+          //  need to call the dcAlloc function, which may have different tpe pars than the output..
+          emitWithIndent("val out = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,map.tpePars._2)) + "(in, " + makeOpMethodName(inDc.size) + "(in)" + ")", stream, indent+2) // TODO - makeArg
           emitWithIndent("var i = 0", stream, indent+2)  
-          emitWithIndent("while (i < " + makeOpMethodName(dc.size) + "(in)" + ") {", stream, indent+2)            
-          emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(in, i)))", stream, indent+4)
+          emitWithIndent("while (i < " + makeOpMethodName(inDc.size) + "(in)" + ") {", stream, indent+2)            
+          emitWithIndent(makeOpMethodName(outDc.update) + "(out, i, func(" + makeOpMethodName(inDc.apply) + "(in, i)))", stream, indent+4)
           emitWithIndent("i += 1", stream, indent+4)
           emitWithIndent("}", stream, indent+2)            
           emitWithIndent("out", stream, indent+2)                
         case zip:Zip =>
-          val dc = ForgeCollections(getHkTpe(o.retTpe))        
+          val outDc = ForgeCollections(getHkTpe(o.retTpe))       
+          val inA = o.args.apply(zip.argIndices._1) 
+          val inB = o.args.apply(zip.argIndices._2) 
+          val inADc = ForgeCollections(getHkTpe(inA.tpe))
+          val inBDc = ForgeCollections(getHkTpe(inB.tpe))
           emitWithIndent("def func: (" + repify(zip.tpePars._1) + "," + repify(zip.tpePars._2) + ") => " + repify(zip.tpePars._3) + " = " + inline(o, zip.func), stream, indent+2)            
-          emitWithIndent("val inA = " + o.args.apply(zip.argIndices._1).name, stream, indent+2)
-          emitWithIndent("val inB = " + o.args.apply(zip.argIndices._2).name, stream, indent+2)
-          emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instAllocReturnTpe(dc.alloc.tpePars, zip.tpePars._3)) + "(inA, " + makeOpMethodName(dc.size) + "(inA)" + ")", stream, indent+2)
+          emitWithIndent("val inA = " + inA.name, stream, indent+2)
+          emitWithIndent("val inB = " + inB.name, stream, indent+2)
+          emitWithIndent("val out = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,inA.tpe,zip.tpePars._3)) + "(inA, " + makeOpMethodName(inADc.size) + "(inA)" + ")", stream, indent+2)
           emitWithIndent("var i = 0", stream, indent+2)  
-          emitWithIndent("while (i < " + makeOpMethodName(dc.size) + "(inA)" + ") {", stream, indent+2)   
-          emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(inA, i)," + makeOpMethodName(dc.apply) + "(inB, i)))", stream, indent+4)
+          emitWithIndent("while (i < " + makeOpMethodName(inADc.size) + "(inA)" + ") {", stream, indent+2)   
+          emitWithIndent(makeOpMethodName(outDc.update) + "(out, i, func(" + makeOpMethodName(inADc.apply) + "(inA, i)," + makeOpMethodName(inBDc.apply) + "(inB, i)))", stream, indent+4)
           emitWithIndent("i += 1", stream, indent+4)
           emitWithIndent("}", stream, indent+2)            
           emitWithIndent("out", stream, indent+2)        
@@ -92,16 +100,18 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
           emitWithIndent("}", stream, indent+2)            
           emitWithIndent("acc", stream, indent+2)                      
         case filter:Filter =>
-          val dc = ForgeCollections(getHkTpe(o.retTpe)).asInstanceOf[ParallelCollectionBuffer]        
+          val outDc = ForgeCollections(getHkTpe(o.retTpe)).asInstanceOf[ParallelCollectionBuffer]        
+          val in = o.args.apply(filter.argIndex)
+          val inDc = ForgeCollections(getHkTpe(in.tpe))
           emitWithIndent("def func: " + repify(filter.tpePars._1) + " => " + repify(filter.tpePars._2) + " = " + inline(o, filter.func), stream, indent+2)            
           emitWithIndent("def cond: " + repify(filter.tpePars._1) + " => " + repify(MBoolean) + " = " + inline(o, filter.cond), stream, indent+2)            
-          emitWithIndent("val in = " + o.args.apply(filter.argIndex).name, stream, indent+2)
-          emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instAllocReturnTpe(dc.alloc.tpePars, filter.tpePars._2)) + "(in,0)", stream, indent+2)
+          emitWithIndent("val in = " + in.name, stream, indent+2)          
+          emitWithIndent("val out = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,filter.tpePars._2)) + "(in,0)", stream, indent+2)
           emitWithIndent("var i = 0", stream, indent+2)  
-          emitWithIndent("while (i < " + makeOpMethodName(dc.size) + "(in)"  + ") {", stream, indent+2)
-          emitWithIndent("val e = " + makeOpMethodName(dc.apply) + "(in, i)", stream, indent+4)
+          emitWithIndent("while (i < " + makeOpMethodName(inDc.size) + "(in)"  + ") {", stream, indent+2)
+          emitWithIndent("val e = " + makeOpMethodName(inDc.apply) + "(in, i)", stream, indent+4)
           emitWithIndent("if (cond(e)) {", stream, indent+4)
-          emitWithIndent(makeOpMethodName(dc.append) + "(out, i, func(e))", stream, indent+6)
+          emitWithIndent(makeOpMethodName(outDc.append) + "(out, i, func(e))", stream, indent+6)
           emitWithIndent("}", stream, indent+4)            
           emitWithIndent("i += 1", stream, indent+4)
           emitWithIndent("}", stream, indent+2)            
@@ -170,9 +180,10 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         stream.println()
       }
       if (d.isEmpty && !isForgePrimitiveType(tpe)) {
-        warn("(library) no data structure found for tpe " + tpe.name + ". emitting empty class declaration") 
-        stream.println("  class " + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + "() {}")
-        stream.println()
+        // do nothing -- abstract class will have been generated in the front-end
+        // warn("(library) no data structure found for tpe " + tpe.name + ". emitting empty class declaration") 
+        // stream.println("  class " + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + "() {}")
+        // stream.println()
       }
     }
     

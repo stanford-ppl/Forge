@@ -70,10 +70,15 @@ trait BaseGenOps extends ForgeCodeGenBase {
   /**
    * For dc_alloc. By convention, dc_alloc's return tpe par must be its last tpe par, if it has one.
    */
-   def instAllocReturnTpe(tpePars: List[Rep[TypePar]], tpeArg: Rep[DSLType]): List[Rep[DSLType]] = {
-     if (tpePars.length > 0) tpePars.dropRight(1) :+ tpeArg
-     else tpePars
-   }  
+  def instAllocReturnTpe(o: Rep[DSLOp], colTpePar: Rep[DSLType], elemTpePar: Rep[DSLType]): List[Rep[DSLType]] = {
+    // dc_alloc is context sensitive: if the first argument is a tpe parameter, we assume a type signature of [R,CR]. otherwise, we assume a signature of [_,R]
+    // note that dc_alloc always takes exactly 2 arguments (a collection and a size). this is still a bit hokey.
+    if (o.tpePars.length > 0) {
+      val colTpe = o.args.apply(0).tpe
+      if (isTpePar(colTpe)) List(elemTpePar,colTpePar) else o.tpePars.dropRight(1).map(p => if (p == colTpe.tpePars.apply(0)) colTpePar.tpePars.apply(0) else p) :+ elemTpePar
+    }
+    else Nil
+  }
   
   // used with overloading
   // if after converting Ts and Vars to Reps there are duplicates, remove them   
@@ -261,7 +266,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
         if (reduce.zero.retTpe != reduce.tpePar) err("reduce op with illegal zero parameter: " + o.name)
       case filter:Filter =>
         val col = getHkTpe(o.args.apply(filter.argIndex).tpe)
-        if (ForgeCollections.get(col).isEmpty || !ForgeCollections.get(col).forall(_.isInstanceOf[ParallelCollectionBuffer])) err("filter argument " + col.name + " is not a ParallelCollectionBuffer")
+        if (ForgeCollections.get(col).isEmpty || !ForgeCollections.get(getHkTpe(o.retTpe)).forall(_.isInstanceOf[ParallelCollectionBuffer])) err("filter return type " + col.name + " is not a ParallelCollectionBuffer")
         if (filter.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("filter op with undefined type par: " + o.name)
         if (filter.argIndex < 0 || filter.argIndex > o.args.length) err("filter op with illegal arg parameter: " + o.name)      
       case foreach:Foreach =>
@@ -345,7 +350,6 @@ trait BaseGenOps extends ForgeCodeGenBase {
       val ops = pimpOps.filterNot(o => getHkTpe(o.args.apply(0).tpe).name == "Var" || o.args.apply(0).tpe.stage == now)
       val tpes = ops.map(_.args.apply(0).tpe).distinct
       for (tpe <- tpes) {
-        val name = if (grpIsTpe(opsGrp.grp)) tpe.name else opsGrp.grp.name + tpe.name
         val tpePars = tpe match {
           case Def(TpeInst(_,args)) => args.filter(isTpePar).asInstanceOf[List[Rep[TypePar]]]
           case Def(TpePar(_,_,_)) => List(tpe.asInstanceOf[Rep[TypePar]])
@@ -355,16 +359,15 @@ trait BaseGenOps extends ForgeCodeGenBase {
           case Def(TpeInst(hk,args)) => args.filterNot(isTpePar)
           case _ => Nil
         }
-        
-        val grpName = opsGrp.grp.name
-        val opsClsName = name + tpeArgs.map(_.name).mkString("") + "OpsCls"
-        stream.println("  implicit def " + grpName + "RepTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ") = new " + opsClsName + "(x)")
+
+        val opsClsName = opsGrp.grp.name + tpe.name + tpeArgs.map(_.name).mkString("") + "OpsCls"
+        stream.println("  implicit def repTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ") = new " + opsClsName + "(x)")
         if (pimpOps.exists(o => o.args.apply(0).tpe.stage == now)) {
-          stream.println("  implicit def " + grpName + "LiftTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + quote(tpe) + ") = new " + opsClsName + "(unit(x))")
+          stream.println("  implicit def liftTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + quote(tpe) + ") = new " + opsClsName + "(unit(x))")
         }
         // we provide the Var conversion even if no lhs var is declared, since it is essentially a chained implicit with readVar
         if (Tpes.exists(t => getHkTpe(t).name == "Var")) {
-          stream.println("  implicit def " + grpName + "VarTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + varify(tpe) + ") = new " + opsClsName + "(readVar(x))")
+          stream.println("  implicit def varTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + varify(tpe) + ") = new " + opsClsName + "(readVar(x))")
         }
         stream.println("")
         stream.println("  class " + opsClsName + makeTpeParsWithBounds(tpePars) + "(val self: " + repify(tpe) + ") {")

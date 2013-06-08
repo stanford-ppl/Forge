@@ -360,7 +360,7 @@ trait DenseMatrixOps {
          indices.foreach { i => densematrix_raw_update($self,i,densematrix_raw_apply($self,i)/$1) }
        }
        
-       direct ("sum") (Nil :: T, TArith(T)) implements reduce(T, 0, lookupOp("Arith","empty"), ${ (a,b) => a+b })
+       direct ("sum") (Nil :: T, TArith(T)) implements reduce(T, 0, ${ implicitly[Arith[T]].empty }, ${ (a,b) => a+b })
        direct ("abs") (Nil :: DenseMatrix(T), TArith(T)) implements map((T,T), 0, ${ e => e.abs })
        direct ("exp") (Nil :: DenseMatrix(T), TArith(T)) implements map((T,T), 0, ${ e => e.exp })       
 
@@ -373,10 +373,10 @@ trait DenseMatrixOps {
         */
       
       // TODO: HasMinMax, TupleReduce?
-      // infix ("min" (Nil :: T, TOrdering(T))) implements reduce(T, 0, lookupOp("HasMinMax","min"), ${ if (a < b) a else b }) 
-      // infix ("minIndex" (Nil :: T, TOrdering(T))) implements reduce(T, 0, lookupOp("HasMinMax","min"), ${ }) 
-      // infix ("max" (Nil :: T, TOrdering(T))) implements reduce(T, 0, lookupOp("HasMinMax","max"), ${ if (a > b) a else b }) 
-      // infix ("maxIndex" (Nil :: T, TOrdering(T))) implements reduce(T, 0, lookupOp("HasMinMax","max"), ${ })              
+      // infix ("min" (Nil :: T, TOrdering(T))) implements reduce(T, 0, ${implicitly[HasMinMax[T]].min}, ${ if (a < b) a else b }) 
+      // infix ("minIndex" (Nil :: T, TOrdering(T))) implements reduce(T, 0, ${implicitly[HasMinMax[T]].min}, ${ }) 
+      // infix ("max" (Nil :: T, TOrdering(T))) implements reduce(T, 0, ${implicitly[HasMinMax[T]].max}, ${ if (a > b) a else b }) 
+      // infix ("maxIndex" (Nil :: T, TOrdering(T))) implements reduce(T, 0, ${implicitly[HasMinMax[T]].max}, ${ })              
        infix (":>") (DenseMatrix(T) :: DenseMatrix(MBoolean), TOrdering(T)) implements zip((T,T,MBoolean), (0,1), ${ (a,b) => a > b })
        infix (":<") (DenseMatrix(T) :: DenseMatrix(MBoolean), TOrdering(T)) implements zip((T,T,MBoolean), (0,1), ${ (a,b) => a < b })
         

@@ -55,6 +55,8 @@ trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
     = __arg0.slice(0,__arg1)
   def array_buffer_append[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[T])(implicit __imp0: SourceContext): Rep[Unit]
     = { __arg0 += __arg1 }
+  def array_buffer_indexof[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[T])(implicit __imp0: SourceContext): Rep[Int]
+    = __arg0.indexOf(__arg1)
 }
 
 

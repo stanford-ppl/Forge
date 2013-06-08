@@ -66,9 +66,15 @@ trait HelloSimple extends SimpleVectorApplication {
     println("vc2: " + vc2)
     
     // filter
-    println("v6 = v1.filter(_ < 5)")
-    val v6 = v1.filter(_ < 5)
-    v6.pprint  
+    // println("v6 = v1.filter(_ < 5)")
+    // val v6 = v1.filter(_ < 5)
+    // v6.pprint  
+    
+    // hashfilterreduce
+    println("v7 = v2.hashreduce(e => e % 2 == 0, e => e*10, (a,b) => a+b)")
+    val v7 = v2.hashreduce[Boolean,Int](e => e % 2 == 0, e => e*10, (a,b) => a+b)
+    // should be 2 elements (one for even group, one for odd group)
+    v7.pprint
     
     // foo
     val fooResult = foo[Int](i => i+100, 2, 13, (a,b) => a + 5, 0.7, d => d)

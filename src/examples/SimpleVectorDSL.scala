@@ -106,21 +106,22 @@ trait SimpleVectorDSL extends ForgeApplication {
       // math      
       infix ("+") (Vector(T) :: Vector(T), TNumeric(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a+b })
       infix ("*") (T :: Vector(T), TNumeric(T)) implements map((T,T), 0, "e => e*"+quotedArg(1))      
-      infix ("sum") (Nil :: T, TNumeric(T)) implements reduce(T, 0, lookupOp("Numeric","zero"), ${ (a,b) => a+b })
+      infix ("sum") (Nil :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${ (a,b) => a+b })
              
       // bulk        
       infix ("map") ((T ==> R) :: Vector(R), addTpePars = R) implements map((T,R), 0, ${ e => $1(e) })
       
-      infix ("reduce") (((T,T) ==> T) :: T, TNumeric(T)) implements reduce(T, 0, lookupOp("Numeric","zero"), ${
+      infix ("reduce") (((T,T) ==> T) :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${
         (a,b) => $1(a,b)
       })
       
       infix ("filter") ((T ==> MBoolean) :: Vector(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})
       
-      infix ("mapreduce") ((T ==> T,(T,T) ==> T) :: T, TNumeric(T)) implements composite ${
-        $self.map($1).reduce($2)
-      }
-                  
+      infix ("mapreduce") ((T ==> T,(T,T) ==> T) :: T, TNumeric(T)) implements mapReduce((T,T), 0, ${e => $1(e)}, ${numeric_zero[T]}, ${(a,b) => $2(a,b)})
+
+      val K = tpePar("K")
+      val V = tpePar("V")
+      infix ("hashreduce") ((T ==> K,T ==> V,(V,V) ==> V) :: Vector(V), TNumeric(V), addTpePars = (K,V)) implements hashFilterReduce((T,K,V), 0, ${e => unit(true)}, ${e => $1(e)}, ${e => $2(e)}, ${numeric_zero[V]}, ${(a,b) => $3(a,b)})
             
       // misc      
       // will print out of order in parallel, but hey

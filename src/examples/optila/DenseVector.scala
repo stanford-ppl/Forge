@@ -277,10 +277,10 @@ trait DenseVectorOps {
       infix ("sort") (Nil :: DenseVector(T), TOrdering(T)) implements allocates(DenseVector, ${densevector_length($0)}, ${!(densevector_isrow($0))}, ${array_sort(densevector_raw_data($0))})
 
       // TODO: HasMinMax, TupleReduce?
-      // infix ("min" (Nil :: T, TOrdering(T))) implements reduce(T, 0, lookupOp("HasMinMax","min"), ${ if (a < b) a else b }) 
-      // infix ("minIndex" (Nil :: T, TOrdering(T))) implements reduce(T, 0, lookupOp("HasMinMax","min"), ${ }) 
-      // infix ("max" (Nil :: T, TOrdering(T))) implements reduce(T, 0, lookupOp("HasMinMax","max"), ${ if (a > b) a else b }) 
-      // infix ("maxIndex" (Nil :: T, TOrdering(T))) implements reduce(T, 0, lookupOp("HasMinMax","max"), ${ }) 
+      // infix ("min" (Nil :: T, TOrdering(T))) implements reduce(T, 0, ${implicitly[HasMinMax[T]].min}, ${ if (a < b) a else b }) 
+      // infix ("minIndex" (Nil :: T, TOrdering(T))) implements reduce(T, 0, ${implicitly[HasMinMax[T]].min}, ${ }) 
+      // infix ("max" (Nil :: T, TOrdering(T))) implements reduce(T, 0, ${implicitly[HasMinMax[T]].max}, ${ if (a > b) a else b }) 
+      // infix ("maxIndex" (Nil :: T, TOrdering(T))) implements reduce(T, 0, ${implicitly[HasMinMax[T]].max}, ${ }) 
       
       infix ("median") (Nil :: T, (TNumeric(T),TOrdering(T))) implements single ${ 
         val x = $self.sort

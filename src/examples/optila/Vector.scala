@@ -25,11 +25,17 @@ trait VectorOps {
     val Tuple2 = lookupTpe("Tup2")    
     val B = tpePar("B")
     val R = tpePar("R")        
-        
+                    
     // have to be careful about the type argument name we use in single and composite since T is being passed in
     // We splice this name into blocks using the escaped \$ to inform the preprocessor that the value already exists.
     val TT = T.name
     
+    // we can also perform bulk operations generically, returning a DenseVector result for each operation
+    // Arith is only required if T is actually a tpePar here, so we need to be careful.
+    if (!isTpePar(T)) compiler (v) ("zeroT", Nil, Nil :: T) implements composite ${ 0.asInstanceOf[\$TT] }          
+    val AZ = if (isTpePar(T)) (List(TArith(asTpePar(T))), "implicitly[Arith[T]].empty") else (Nil, "zeroT")
+    val A = AZ._1; val Z = AZ._2; // can't use capital letters with tuple return pattern matching        
+          
     val VectorCommonOps = withTpe(v)
     VectorCommonOps {
       /**
@@ -101,12 +107,6 @@ trait VectorOps {
       
       infix ("pprint") (Nil :: MUnit, effect = simple) implements composite ${ println(infix_toString($self)) } // $self.toString doesn't work in Delite      
       
-      // we can also perform bulk operations generically, returning a DenseVector result for each operation
-      // Arith is only required if T is actually a tpePar here, so we need to be careful.
-      if (!isTpePar(T)) compiler ("zeroT") (Nil :: T) implements composite ${ 0.asInstanceOf[\$TT] }      
-      val AZ = if (isTpePar(T)) (List(TArith(asTpePar(T))), lookupOp("Arith","empty")) else (Nil, lookupOp("zeroT"))
-      val A = AZ._1; val Z = AZ._2; // can't use capital letters with tuple return pattern matching
-
 
       /**
        * Math

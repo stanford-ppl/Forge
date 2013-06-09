@@ -21,7 +21,7 @@ trait LogReg extends OptiMLApplication {
     println("x.numCols: " + x.numCols)
     println("y.length:  " + y.length)
 
-    // tic()
+    tic()
     val theta = DenseVector.zeros(x.numCols)
 
     // gradient descent with logistic function    
@@ -42,7 +42,7 @@ trait LogReg extends OptiMLApplication {
       z
     }  
 
-    // toc(w)
+    toc(w)
     println("w:")
     w.pprint        
   }

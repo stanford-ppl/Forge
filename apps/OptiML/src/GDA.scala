@@ -16,7 +16,7 @@ trait GDA extends OptiMLApplication {
     
     val x = readMatrix(args(0))
     val y = readVector(args(1)).map(d => if (d <= 0.0) false else true)
-    // tic()
+    tic()
 
     /* number of training samples */
     val m = y.length
@@ -51,7 +51,7 @@ trait GDA extends OptiMLApplication {
       }
     }
 
-    // toc(sigma)
+    toc(sigma)
     println("  phi = " + phi)
     println("  mu0 = " ); mu0.pprint
     println("  mu1 = " ); mu1.pprint

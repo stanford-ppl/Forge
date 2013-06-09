@@ -270,8 +270,14 @@ trait ScalaOps {
     val BC = tpePar("B", stage = now)
     
     direct (Ord) ("__equal", (A,B), (A,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
+    direct (Ord) ("__equal", (A,B), (MVar(A),B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
+    direct (Ord) ("__equal", (A,B), (A,MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
     direct (Ord) ("__equal", (A,BC), (A,BC) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
     direct (Ord) ("__equal", (AC,B), (AC,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
+    
+    infix (Ord) ("!=", (A,B), (A,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
+    infix (Ord) ("!=", (A,BC), (A,BC) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
+    infix (Ord) ("!=", (AC,B), (AC,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
     
     val lt = infix (Ord) ("<", List(A withBound TOrdering), List(A,A) :: MBoolean)    
     val lte = infix (Ord) ("<=", List(A withBound TOrdering), List(A,A) :: MBoolean)    

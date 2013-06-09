@@ -39,9 +39,9 @@ trait IndexVectorOps {
       fimplicit ("chainIndexToDenseOps") (Nil :: ephemeralTpe("DenseVectorDenseVectorOpsCls[Int]", stage = now)) implements composite ${
         repToDenseVectorDenseVectorOpsCls(indexToDense($self))
       }      
-      fimplicit ("chainIndexToDenseIntOps") (Nil :: ephemeralTpe("DenseVectorDenseVectorIntOpsCls", stage = now)) implements composite ${
-        repToDenseVectorDenseVectorIntOpsCls(indexToDense($self))
-      }
+      // fimplicit ("chainIndexToDenseIntOps") (Nil :: ephemeralTpe("DenseVectorDenseVectorIntOpsCls", stage = now)) implements composite ${
+      //   repToDenseVectorDenseVectorIntOpsCls(indexToDense($self))
+      // }
             
       compiler ("indexvector_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("IndexVectors cannot be allocated from a parallel op") }      
       compiler ("indexvector_illegalupdate") ((MInt, MInt) :: MNothing, effect = simple) implements composite ${ fatal("IndexVectors cannot be updated") }

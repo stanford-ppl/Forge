@@ -107,10 +107,12 @@ trait BaseGenOps extends ForgeCodeGenBase {
       "(" + args.map(makeArgName).mkString(",") + ")"
     }
   }
+  def makeArgsWithType(args: List[Rep[DSLArg]], typify: Rep[DSLType] => String = repify, addParen: Boolean = true) = makeArgs(args, t => argify(t, typify), addParen)
+  def makeArgsWithNowType(args: List[Rep[DSLArg]], addParen: Boolean = true) = makeArgsWithType(args, repifySome, addParen)
   def makeOpArgs(o: Rep[DSLOp], addParen: Boolean = true) = makeArgs(o.args, addParen = addParen)
   def makeOpFutureArgs(o: Rep[DSLOp], makeArgName: (Rep[DSLArg] => String)) = makeArgs(o.args, t => { val arg = makeArgName(t); if (t.tpe.stage == now && !isTpeInst(t.tpe)) "unit("+arg+")" else arg })
-  def makeOpArgsWithType(o: Rep[DSLOp], typify: Rep[DSLType] => String = repify, addParen: Boolean = true) = makeArgs(o.args, t => argify(t, typify), addParen)
-  def makeOpArgsWithNowType(o: Rep[DSLOp], addParen: Boolean = true) = makeOpArgsWithType(o, repifySome, addParen)
+  def makeOpArgsWithType(o: Rep[DSLOp], typify: Rep[DSLType] => String = repify, addParen: Boolean = true) = makeArgsWithType(o.args, typify, addParen)
+  def makeOpArgsWithNowType(o: Rep[DSLOp], addParen: Boolean = true) = makeArgsWithNowType(o.args, addParen)
   // not used -- still needed?
   // def makeOpArgsWithDefaults(o: Rep[DSLOp], typify: Rep[DSLType] => String = repify) = makeArgs(o.args, t => argify(t, typify))
   // def makeOpArgsWithNowDefault(o: Rep[DSLOp]) = makeOpArgsWithDefaults(o, repifySome)
@@ -209,8 +211,11 @@ trait BaseGenOps extends ForgeCodeGenBase {
   def makeOpMethodNameWithArgs(o: Rep[DSLOp]) = makeOpMethodName(o) + makeFullArgs(o, o => makeOpArgs(o))
   def makeOpMethodNameWithFutureArgs(o: Rep[DSLOp], makeArgName: Rep[DSLArg] => String = simpleArgName) = makeOpMethodName(o) + makeFullArgs(o, k => makeOpFutureArgs(k,makeArgName), nameClashesUniversal) // front-end can name clash with anything
   def makeOpMethodSignature(o: Rep[DSLOp]) = "def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithOverloadWithType(o)
-  def makeSyntaxMethod(o: Rep[DSLOp]) = {
-    "def " + o.name + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithNowType(o, o.effect != pure) + makeOpImplicitArgsWithOverloadWithType(o) + " = " + makeOpMethodNameWithFutureArgs(o)
+  def makeSyntaxMethod(o: Rep[DSLOp], withReturnTpe: Boolean = false) = {
+    // adding the return type increases verbosity in the generated code, so we omit it by default
+    val ret = if (withReturnTpe) ": " + repifySome(o.retTpe) else ""
+    val curriedArgs = o.curriedArgs.map(a => makeArgsWithNowType(a)).mkString("")
+    "def " + o.name + makeTpeParsWithBounds(o.tpePars) + makeArgsWithNowType(o.firstArgs, o.effect != pure) + curriedArgs + makeOpImplicitArgsWithOverloadWithType(o) + ret + " = " + makeOpMethodNameWithFutureArgs(o)
   }
   
   def makeOpImplMethodName(o: Rep[DSLOp]) = makeOpMethodName(o) + "_impl"
@@ -299,9 +304,8 @@ trait BaseGenOps extends ForgeCodeGenBase {
   
   // certain ops (e.g. "apply" cannot be expressed with infix notation right now), so we use implicits as a workaround
   def noInfix(o: Rep[DSLOp]) = {
-    // blacklist
-    if (noInfixList.contains(o.name)) true
-    else (hasFuncArgs(o)) // infix with function args doesn't always resolve correctly
+    // blacklist or curried args or function args (in the latter two cases, infix doesn't always resolve correctly)
+    noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o)
   }
   
   def emitOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
@@ -315,7 +319,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
       stream.println("  this: " + dsl + " => ")
       stream.println()
       for (o <- implicitOps) {
-        stream.println("  implicit " + makeSyntaxMethod(o))
+        stream.println("  implicit " + makeSyntaxMethod(o, withReturnTpe = true))
       }
       stream.println()
       // we separate these just for generated code readability      
@@ -383,11 +387,11 @@ trait BaseGenOps extends ForgeCodeGenBase {
         stream.println("  class " + opsClsName + makeTpeParsWithBounds(tpePars) + "(val self: " + repify(tpe) + ") {")
     
         for (o <- ops if quote(o.args.apply(0).tpe) == quote(tpe)) {
-          // TODO: this should use makeOpArgsWithNowType, but there is no easy way to drop an argument right now
-          val otherArgs = makeArgs(o.args.drop(1), t => t.name + ": " + repifySome(t.tpe) /*+ " = " + unit(t.default)*/, o.effect != pure)
+          val otherArgs = makeArgsWithNowType(o.firstArgs.drop(1))
+          val curriedArgs = o.curriedArgs.map(a => makeArgsWithNowType(a)).mkString("")
           val hkTpePars = if (isTpePar(tpe)) tpePars else getHkTpe(tpe).tpePars                  
           val otherTpePars = o.tpePars.filterNot(p => hkTpePars.map(_.name).contains(p.name))
-          stream.println("    def " + o.name + makeTpeParsWithBounds(otherTpePars) + otherArgs
+          stream.println("    def " + o.name + makeTpeParsWithBounds(otherTpePars) + otherArgs + curriedArgs
             + (makeImplicitArgsWithCtxBoundsWithType(implicitArgsWithOverload(o), o.tpePars diff otherTpePars, without = hkTpePars)) + " = " + makeOpMethodNameWithFutureArgs(o, a => if (a.name ==  o.args.apply(0).name) "self" else simpleArgName(a)))
         }
         stream.println("  }")

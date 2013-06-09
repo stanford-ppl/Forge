@@ -107,11 +107,15 @@ trait Definitions extends DerivativeTypes {
   object implicitMethod extends MethodType
   
   // blacklist for op names that cannot be expressed with infix methods
-  // we also blacklist some operators for improved compilation performance and to avoid ambiguities in the REPL version
+  // we also blacklist some operators for improved compilation performance or to avoid ambiguities in the REPL version
+  // unfortunately, blacklisting arithmetic operators causes some erroneous type errors in application code for combinations that should work. however, using infix does appear to have a significant compilation cost
   var noInfixList = List("apply", "update", /*"+",*/ "-", "*", "/", "<", ">", "<=", ">=")  // string + doesn't resolve correctly in the compiler version using only implicits
     
   // blacklist for op names that need to be overridden in instance methods
   var overrideList = Set("toString", "hashCode", "equals")
+  
+  // blacklist for op names that need the SourceContext implicit parameter to be surpressed (usually because they construct an object with an apply method)
+  var noSourceContextList = List[String]()
     
   /**
    * Effect types

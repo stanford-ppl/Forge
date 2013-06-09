@@ -27,6 +27,7 @@ abstract class CodeGenRule
  */
 abstract class StageTag
 abstract class MethodType
+abstract class MethodSignatureType
 abstract class EffectType
 abstract class AliasHint
 abstract class Frequency

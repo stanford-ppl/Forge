@@ -88,7 +88,7 @@ trait BaseGenTypeClasses extends BaseGenOps {
       stream.println("  implicit class " + tpeCls.name + "2" + tpeCls.name + "Ops" + makeTpeParsWithBounds(boundedTpePars) + "(self: " + repify(tpeCls.tpePars.apply(0)) + ") {")
       for (o <- opsGrp.ops) {      
         // again, quite redundant with shared/Ops.scala
-        val otherArgs = makeArgs(o.args.drop(1), t => argify(t, repify), addParen = o.effect != pure)
+        val otherArgs = makeArgsWithNowType(o.firstArgs.drop(1))
         stream.println("    def " + o.name + makeTpeParsWithBounds(o.tpePars.filterNot(p => tpeCls.tpePars.map(_.name).contains(p.name))) + otherArgs
           + (makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = tpeCls.tpePars)) 
           + " = " + makeOpMethodName(o) + makeTpePars(o.tpePars) + makeArgs(o.args, a => if (a.name == o.args.apply(0).name) "self" else simpleArgName(a)))

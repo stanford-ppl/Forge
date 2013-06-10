@@ -33,6 +33,7 @@ trait DeliteGenImports extends BaseGenImports {
     stream.println("import ppl.delite.framework.ops._")
     stream.println("import ppl.delite.framework.datastructures._")
     stream.println("import ppl.delite.framework.codegen.delite.overrides._")
+    stream.println("import ppl.delite.framework.transform._")
   }
 
   def emitDeliteImports(stream: PrintWriter) {

@@ -43,7 +43,7 @@ trait ForgeOps extends Base {
   def infix_curriedArgs(signature: MethodSignatureType) = signature match {
     case MethodSignature(_, _) => Nil.asInstanceOf[List[List[Rep[DSLArg]]]]
     case CurriedMethodSignature(args, _) => 
-      // if (args.drop(1).exists(_.exists { case Def(Arg(_,_,Some(x))) => true; case _ => false })) err("curried arguments cannot have default values")
+      // if (args.drop(1).exists(_.exists { case Def(Arg(_,_,Some(x))) => true; case _ => false })) forge_err("curried arguments cannot have default values")
       args.drop(1).map(a => a.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]])
   }
   def infix_retTpe(signature: MethodSignatureType) = signature match {
@@ -403,12 +403,12 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
       // only codegen rules may have multiple declarations
       case (Some(current@CodeGen(d1)),add@CodeGen(d2)) =>
         for ((g,d) <- add.decls) {          
-          if (current.decls.contains(g))
+          if (current.decls.contains(g) && Config.verbosity > 0)
             warn("op " + op.name + " already has codegen rule defined at " + quotePos(current.decls(g).decl) + " for generator " + g.name + ". it is being replaced with rule defined at " + quotePos(d.decl))
           current.decls(g) = d        
         }
       case (Some(x),y) => 
-        warn("op " + op.name + " already has implementation rule " + x + ". It is being overwritten with " + rule)                  
+        if (Config.verbosity > 0) warn("op " + op.name + " already has implementation rule " + x + ". It is being overwritten with " + rule)                  
         Impls(op) = rule      
       case _ =>
         Impls(op) = rule            

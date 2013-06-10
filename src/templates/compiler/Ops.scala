@@ -557,6 +557,31 @@ trait DeliteGenOps extends BaseGenOps {
         stream.println("    if (m.erasure == classOf["+erasureCls+"]) Some((classTag(m), collection.immutable.List("+fields.mkString(",")+")))")  
         stream.println("    else super.unapplyStructType(m)")
         stream.println("  }")
+        
+        if (ForgeCollections.contains(tpe)) {
+          val dc = ForgeCollections(tpe)
+          val arrayFields = d.fields.filter(t => getHkTpe(t._2) == MArray)          
+          if (arrayFields.length != 1 && Config.verbosity > 0) {
+            warn("could not infer data field for struct " + tpe.name)
+          }
+          val sizeField = Impls.get(dc.size).map(i => if (i.isInstanceOf[Getter]) i.asInstanceOf[Getter].field else None)
+          if (sizeField.isEmpty && Config.verbosity > 0) {
+            warn("could not infer size field for struct " + tpe.name)
+          }
+          if (arrayFields.length == 1 && sizeField.isDefined) {
+            val isTpe = "is"+tpe.name            
+            stream.println()
+            stream.println("  override def dc_data_field[A:Manifest](x: Exp[DeliteCollection[A]]) = {")
+            stream.println("    if ("+isTpe+"(x)) \"" + arrayFields(0)._1 + "\"")
+            stream.println("    else super.dc_data_field(x)")
+            stream.println("  }")
+            stream.println()
+            stream.println("  override def dc_size_field[A:Manifest](x: Exp[DeliteCollection[A]]) = {")
+            stream.println("    if ("+isTpe+"(x)) \"" + sizeField.get + "\"")
+            stream.println("    else super.dc_size_field(x)")
+            stream.println("  }")            
+          }          
+        }
       }
     }
     catch { case _ : MatchError => }

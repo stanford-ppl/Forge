@@ -52,7 +52,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     for (e <- Externs) {
       stream.print(" with " + e.opsGrp.name + "Exp")
     }    
-    stream.println(" with DeliteOpsExp with DeliteAllOverridesExp {")
+    stream.println(" with DeliteOpsExp with DeliteAllOverridesExp with MultiloopSoATransformExp {")
     stream.println(" this: DeliteApplication with " + dsl + "Application => ")
     stream.println()
     emitBlockComment("disambiguations for LMS classes pulled in by Delite", stream, indent=2)
@@ -64,6 +64,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("  override def infix_unsafeImmutable[A:Manifest](lhs: Rep[A])(implicit pos: SourceContext) = object_unsafe_immutable(lhs)")    
     stream.println("  override def infix_trim(lhs: Rep[String])(implicit pos: SourceContext) = string_trim(lhs)")    
     stream.println("  override def __whileDo(cond: => Exp[Boolean], body: => Rep[Unit])(implicit pos: SourceContext) = delite_while(cond, body)")  
+    stream.println("  override def __ifThenElse[T:Manifest](cond: Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false)")
     stream.println("  implicit def repToOrderingOps[A:Manifest:Ordering](x: Rep[A]) = repOrderingToOrderingOps(x)")
     stream.println("  implicit def varToOrderingOps[A:Manifest:Ordering](x: Var[A]) = varOrderingToOrderingOps(x)")    
         

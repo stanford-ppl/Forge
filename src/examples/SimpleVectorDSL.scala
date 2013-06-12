@@ -21,6 +21,9 @@ trait SimpleVectorDSL extends ForgeApplication {
      */
     importScalaOps() 
     
+    importAuto[java.lang.String]
+
+
     /**
      * The main portion of our DSL
      */        

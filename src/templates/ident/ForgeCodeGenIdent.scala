@@ -30,7 +30,7 @@ trait ForgeCodeGenIdent extends ForgeCodeGenBackend with LibGenPackages with Bas
     dslStream.println()
     dslStream.println("object " + dsl + "DSLRunner extends ForgeApplicationRunner with " + dsl + "DSL")
     dslStream.println()
-    dslStream.println("trait " + dsl + "DSL extends ForgeApplication{")
+    dslStream.println("trait " + dsl + "DSL extends ForgeApplication { this: ppl.dsl.forge.core.ForgeOpsExp => ")
     dslStream.println("/**")
     dslStream.println(" * The name of your DSL. This is the name that will be used in generated files,")
     dslStream.println(" * package declarations, etc.")
@@ -41,6 +41,8 @@ trait ForgeCodeGenIdent extends ForgeCodeGenBackend with LibGenPackages with Bas
     dslStream.println(" * The specification is the DSL definition (types, data structures, ops)")
     dslStream.println(" */")
     dslStream.println("def specification() = {")
+
+
 
     // internals go here
     emitClasses(dslStream)

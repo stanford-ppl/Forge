@@ -262,20 +262,58 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         // stream.println()
       }
       stream.println("val " + opsGrp.name + " = withTpe (" + opsGrp.name.dropRight(3)/*hack*/ + ")")
+      stream.println(opsGrp.grp.name + " {")
     } else {
-      stream.println("val " + opsGrp.name + " = grp (\"" + opsGrp.name + "\")")
+      val Def(Grp(name)) = opsGrp.grp
+      stream.println("val " + name + " = grp (\"" + name + "\")")
+      stream.println(";{")
     }
 
 
 
     stream.println()
-    stream.println(opsGrp.name + " {")
     //val VectorOps = withTpe (Vector)
     
     for (o <- unique(opsGrp.ops)) {       
       stream.println("// " + o.name)
-      stream.println()
-      stream.println(zzz(o))
+      stream.println("// " + zzz(o))
+
+/*
+
+  case class Op(grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], curriedArgs: List[List[Rep[DSLArg]]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint) extends Def[DSLOp]
+  
+  def forge_op(_grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], 
+  args: List[Rep[DSLArg]], curriedArgs: List[List[Rep[DSLArg]]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], 
+  effect: EffectType, aliasHint: AliasHint) = {
+*/
+
+      def forge_op0(style: String)(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], 
+        args: List[Rep[DSLArg]], curriedArgs: List[List[Rep[DSLArg]]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], 
+        effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
+        // need to reverse:
+        //           signature.args,signature.curriedArgs,implicitArgs.zipWithIndex.map(anyToImplicitArg).asInstanceOf[List[Rep[DSLArg]]],signature.retTpe
+
+        val signature = if (curriedArgs.isEmpty) MethodSignature(args,retTpe)
+                        else CurriedMethodSignature(curriedArgs,retTpe)
+
+        forge_op1(style)(grp.name)(zzz(name),zzz(tpePars),zzz(signature),zzz(implicitArgs),zzz(effect),zzz(aliasHint))
+      }
+      def forge_op1(style: String)(grp: String)(name: String, tpePars: String, signature: String, implicitArgs: String, effect: String, aliasHint: String) = 
+          stream.println(s"$style ($grp)($name, $tpePars, $signature, $implicitArgs, $effect, $aliasHint)")
+
+      val Def(op: Op) = o
+
+      val key = op.style match {
+        case `staticMethod`   => "static"
+        case `infixMethod`    => "infix"
+        case `directMethod`   => "direct"
+        case `compilerMethod` => "compiler"
+        case `implicitMethod` => "fimplicit"
+      }
+
+      forge_op0(key)(op.grp)(op.name, op.tpePars, op.args, op.curriedArgs, op.implicitArgs, op.retTpe, op.effect, op.aliasHint)
+
+
       stream.println()
 
 

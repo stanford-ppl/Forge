@@ -217,15 +217,16 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
 
   def zzz(x:Any): String = x match {
     case x: String => "\"" + x + "\""
-    case x: Rep[Any] => zzz(Def.unapply(x).get)
+    case x: Rep[Any] => "toAtom("+zzz(Def.unapply(x).get)+")"
     case xs: List[Any] => "List(" + xs.map(zzz).mkString(",") + ")"
-    case xs: Seq[Any] => "Seq(" + xs.map(zzz).mkString(",") + ")"
+    case xs: Seq[Any] => "Seq(" + xs.map(zzz).mkString(",") + "):_*"
     case xs: Product if xs.productArity == 0 => xs.productPrefix
     case xs: Product => xs.productPrefix + "(" + xs.productIterator.map(zzz).mkString(",") + ")"
     case _ => ""+x
   }
 
   def emitClass(opsGrp: DSLOps, stream: PrintWriter) {
+    var scope = false
     if (grpIsTpe(opsGrp.grp)) {
       val tpe = grpAsTpe(opsGrp.grp)
       val d = DataStructs.get(tpe)
@@ -261,23 +262,21 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         // stream.println("  class " + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + "() {}")
         // stream.println()
       }
-      stream.println("val " + opsGrp.name + " = withTpe (" + opsGrp.name.dropRight(3)/*hack*/ + ")")
-      stream.println(opsGrp.grp.name + " {")
+      stream.println("val " + opsGrp.name + " = withTpe (" + opsGrp.grp.name + ")")
+      stream.println(opsGrp.name + " {")
+      scope = true
     } else {
-      val Def(Grp(name)) = opsGrp.grp
-      stream.println("val " + name + " = grp (\"" + name + "\")")
-      stream.println(";{")
+      stream.println("val " + opsGrp.grp.name + " = grp (\"" + opsGrp.grp.name + "\")")
     }
-
 
 
     stream.println()
     //val VectorOps = withTpe (Vector)
     
-    for (o <- unique(opsGrp.ops)) {       
+    for (o <- unique(opsGrp.ops)) { 
+
       stream.println("// " + o.name)
       stream.println("// " + zzz(o))
-
 /*
 
   case class Op(grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], curriedArgs: List[List[Rep[DSLArg]]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint) extends Def[DSLOp]
@@ -287,7 +286,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   effect: EffectType, aliasHint: AliasHint) = {
 */
 
-      def forge_op0(style: String)(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], 
+      def forge_op0(style: String, hg: Boolean)(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], 
         args: List[Rep[DSLArg]], curriedArgs: List[List[Rep[DSLArg]]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], 
         effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
         // need to reverse:
@@ -296,22 +295,24 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         val signature = if (curriedArgs.isEmpty) MethodSignature(args,retTpe)
                         else CurriedMethodSignature(curriedArgs,retTpe)
 
-        forge_op1(style)(grp.name)(zzz(name),zzz(tpePars),zzz(signature),zzz(implicitArgs),zzz(effect),zzz(aliasHint))
+        forge_op1(style,hg)(grp.name)(zzz(name),zzz(tpePars),zzz(signature),zzz(implicitArgs),zzz(effect),zzz(aliasHint))
       }
-      def forge_op1(style: String)(grp: String)(name: String, tpePars: String, signature: String, implicitArgs: String, effect: String, aliasHint: String) = 
-          stream.println(s"$style ($grp)($name, $tpePars, $signature, $implicitArgs, $effect, $aliasHint)")
+      def forge_op1(style: String, hg: Boolean)(grp: String)(name: String, tpePars: String, signature: String, implicitArgs: String, effect: String, aliasHint: String) = 
+          if (!scope) stream.println(s"$style ($grp)($name, $tpePars, $signature, $implicitArgs, $effect, $aliasHint)")
+          else    stream.println(s"$style ($name)($signature, $implicitArgs, $tpePars, $effect, $aliasHint)")
+          // is tpePars == addTpePars ??
 
       val Def(op: Op) = o
 
-      val key = op.style match {
-        case `staticMethod`   => "static"
-        case `infixMethod`    => "infix"
-        case `directMethod`   => "direct"
-        case `compilerMethod` => "compiler"
-        case `implicitMethod` => "fimplicit"
+      val (key,hg) = op.style match {
+        case `staticMethod`   => ("static",true)
+        case `infixMethod`    => ("infix",true)
+        case `directMethod`   => ("direct",true)
+        case `compilerMethod` => ("compiler",false)
+        case `implicitMethod` => ("fimplicit",false)
       }
 
-      forge_op0(key)(op.grp)(op.name, op.tpePars, op.args, op.curriedArgs, op.implicitArgs, op.retTpe, op.effect, op.aliasHint)
+      forge_op0(key,hg)(op.grp)(op.name, op.tpePars, op.args, op.curriedArgs, op.implicitArgs, op.retTpe, op.effect, op.aliasHint)
 
 
       stream.println()
@@ -329,7 +330,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       }
       stream.println("  }")   */     
     }
-    stream.println("}")
+
+    if (scope) stream.println("}")
         
   }
 }

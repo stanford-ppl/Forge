@@ -47,6 +47,8 @@ trait ForgeCodeGenIdent extends ForgeCodeGenBackend with LibGenPackages with Bas
     // internals go here
     emitClasses(dslStream)
 
+    dslStream.println("()")
+
     dslStream.println("}")
     dslStream.println("}")
     dslStream.close()
@@ -93,7 +95,17 @@ trait ForgeCodeGenIdent extends ForgeCodeGenBackend with LibGenPackages with Bas
         // stream.println("trait " + wrapper + " extends " + grp.name + "Ops with " + dsl + "Base {")
         //stream.println( "  this: " + dsl + "Base with " + dsl + "Classes => ")
         //stream.println()
+
+        stream.println("def spec" + grp.name + "() = {")
+
         emitClass(opsGrp, stream)
+
+        stream.println("}")
+        stream.println("spec" + grp.name + "()")
+
+        stream.println()
+        stream.println()
+        
         //stream.println("}")
         //stream.println()
         //stream.close()

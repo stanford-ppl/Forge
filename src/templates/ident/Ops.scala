@@ -220,6 +220,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     case x: Rep[Any] => zzz(Def.unapply(x).get)
     case xs: List[Any] => "List(" + xs.map(zzz).mkString(",") + ")"
     case xs: Seq[Any] => "Seq(" + xs.map(zzz).mkString(",") + ")"
+    case xs: Product if xs.productArity == 0 => xs.productPrefix
     case xs: Product => xs.productPrefix + "(" + xs.productIterator.map(zzz).mkString(",") + ")"
     case _ => ""+x
   }

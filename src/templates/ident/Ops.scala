@@ -44,6 +44,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   
   def emitImpls(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("SingleTask and Composite Impls", stream)   
+    return //XX
     stream.println()
     stream.println("trait " + opsGrp.grp.name + "WrapperImpl {")
     stream.println("  this: " + dsl + "Application with " + dsl + "CompilerOps => ")
@@ -189,32 +190,58 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   def emitOp(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) {
     Impls(o) match {
       case codegen:CodeGen => 
+        emitWithIndent("compiler (\"" + o.name + "\")", stream, indent)
         val rule = codegen.decls.getOrElse($cala, err("could not find Scala codegen rule for op: " + o.name))
         inline(o, rule.decl, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent) }      
       case Getter(structArgIndex,field) =>
+        emitWithIndent("getter (\"" + o.name + "\")", stream, indent)
         emitOverloadShadows(o, stream, indent)
         emitWithIndent(inline(o, quotedArg(o.args.apply(structArgIndex).name)) + "." + field, stream, indent)
       case Setter(structArgIndex,field,value) =>
+        emitWithIndent("setter (\"" + o.name + "\")", stream, indent)
         emitOverloadShadows(o, stream, indent)
         emitWithIndent(inline(o, quotedArg(o.args.apply(structArgIndex).name)) + "." + field + " = " + inline(o,value), stream, indent)
       case Allocates(tpe,init) =>        
+        // static (Vector) ("apply", T, MInt :: Vector(T), effect = mutable) implements allocates(Vector, ${$0}, ${ array_empty[T]($0) })
+        emitWithIndent("static (\"" + o.name + "\")", stream, indent)
         emitOverloadShadows(o, stream, indent)
-        val initialVals = init.map(i => inline(o,i)).mkString(",")              
+        val initialVals = init.map(i => inline(o,i)).mkString(",")
         emitWithIndent("new " + quote(tpe) + "(" + initialVals + ")", stream, indent)
       case _ => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
     }
   }
   
+  def xx[T](x:Rep[T]): Def[T] = Def.unapply(x).get
+  def xxx[T](x:List[Rep[T]]): List[Def[T]] = x.map(xx)
+
+
+  def zzz(x:Any): String = x match {
+    case x: String => "\"" + x + "\""
+    case x: Rep[Any] => zzz(Def.unapply(x).get)
+    case xs: List[Any] => "List(" + xs.map(zzz).mkString(",") + ")"
+    case xs: Seq[Any] => "Seq(" + xs.map(zzz).mkString(",") + ")"
+    case xs: Product => xs.productPrefix + "(" + xs.productIterator.map(zzz).mkString(",") + ")"
+    case _ => ""+x
+  }
+
   def emitClass(opsGrp: DSLOps, stream: PrintWriter) {
     if (grpIsTpe(opsGrp.grp)) {
       val tpe = grpAsTpe(opsGrp.grp)
       val d = DataStructs.get(tpe)
       d.foreach { data => 
-        stream.println("class " + data.tpe.name + makeTpeParsWithBounds(data.tpe.tpePars) + "(" + makeFieldArgs(data) + ") {")
-        stream.println(makeFieldsWithInitArgs(data))
+
+        stream.println("val " + data.tpe.name + " = " + zzz(data.tpe))
+        stream.println()
+        stream.println("data(" + data.tpe.name + ", " + zzz(data.fields) + ")")
+        stream.println()
+
+        //stream.println("class " + data.tpe.name + makeTpeParsWithBounds(data.tpe.tpePars) + "(" + makeFieldArgs(data) + ") {")
+        //stream.println(makeFieldsWithInitArgs(data))
         // Actually emitting the infix methods as instance methods, while a little more readable, makes the interpreter methods
         // ambiguous with the op conversions unless they already exist on every instance and must be overridden (e.g. toString)
-        for (o <- unique(opsGrp.ops) if overrideList.contains(o.name) && o.style == infixMethod && o.args.length > 0 && quote(o.args.apply(0).tpe) == quote(tpe)) {       
+        /*for (o <- unique(opsGrp.ops) if overrideList.contains(o.name) && o.style == infixMethod && o.args.length > 0 && quote(o.args.apply(0).tpe) == quote(tpe)) {       
+          stream.println("// xxx " + o.name)
+
           stream.print("  "+makeDefWithOverride(o)+" " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
           //stream.print("(" + o.args/*.drop(1)*/.map(t => t.name + ": " + repify(t.tpe) + " = " + unit(t.default)).mkString(",") + ")") TODO 
           stream.print("(" + o.args.drop(1).map(t => argify(t, repify)).mkString(",") + ")")  
@@ -225,7 +252,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
           stream.println("  }")
         }
         stream.println("}")
-        stream.println()
+        stream.println()*/
       }
       if (d.isEmpty && !isForgePrimitiveType(tpe)) {
         // do nothing -- abstract class will have been generated in the front-end
@@ -233,21 +260,37 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         // stream.println("  class " + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + "() {}")
         // stream.println()
       }
+      stream.println("val " + opsGrp.name + " = withTpe (" + opsGrp.name.dropRight(3)/*hack*/ + ")")
+    } else {
+      stream.println("val " + opsGrp.name + " = grp (\"" + opsGrp.name + "\")")
     }
+
+
+
+    stream.println()
+    stream.println(opsGrp.name + " {")
+    //val VectorOps = withTpe (Vector)
     
     for (o <- unique(opsGrp.ops)) {       
-      stream.println("  " + makeOpMethodSignature(o) + " = {")
+      stream.println("// " + o.name)
+      stream.println()
+      stream.println(zzz(o))
+      stream.println()
+
+
+      /*stream.println("  " + makeOpMethodSignature(o) + " = {")
       o.style match {
-        case `infixMethod` if overrideList.contains(o.name) && grpIsTpe(opsGrp.grp) && DataStructs.contains(grpAsTpe(opsGrp.grp)) && o.args.length > 1 && quote(o.args.apply(0).tpe) == quote(opsGrp.grp) => 
+        /*case `infixMethod` if overrideList.contains(o.name) && grpIsTpe(opsGrp.grp) && DataStructs.contains(grpAsTpe(opsGrp.grp)) && o.args.length > 1 && quote(o.args.apply(0).tpe) == quote(opsGrp.grp) => 
           //val args = o.args/*.drop(1)*/.map(t => t.name)).mkString(",")
-          val args = o.args.drop(1).map(t => t.name).mkString(",")
+          val args = o.args.map(t => t.name).mkString(",")
           val argsWithParen = if (args == "") args else "(" + args + ")"
-          emitWithIndent(o.args.apply(0).name + "." + o.name + argsWithParen, stream, 4)
+          emitWithIndent("infix (\"" + o.name + "\")" + o.args.apply(0).name + "." + o.name + argsWithParen, stream, 4)
+          emitWithIndent(o.args.apply(0).name + "." + o.name + argsWithParen, stream, 4)*/
         case _ => emitOp(o, stream, indent=4)
       }
-      stream.println("  }")        
+      stream.println("  }")   */     
     }
-    stream.println()    
+    stream.println("}")
         
   }
 }

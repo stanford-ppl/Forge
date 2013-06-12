@@ -89,7 +89,8 @@ object ${dslName}Build extends Build {
   lazy val ${dslName}Shared = Project("${dslName}-shared", file("shared"), settings = virtBuildSettings)
   lazy val ${dslName}Comp = Project("${dslName}-comp", file("compiler"), settings = virtBuildSettings) dependsOn(${dslName}Shared)
   lazy val ${dslName}Lib = Project("${dslName}-lib", file("library"), settings = virtBuildSettings) dependsOn(${dslName}Shared)
-  lazy val ${dslName}Apps = Project("${dslName}-apps", file("apps"), settings = virtBuildSettings) dependsOn(${dslName}Comp, ${dslName}Lib)
+  lazy val ${dslName}Ident = Project("${dslName}-ident", file("ident"), settings = virtBuildSettings) dependsOn(${dslName}Shared)
+  lazy val ${dslName}Apps = Project("${dslName}-apps", file("apps"), settings = virtBuildSettings) dependsOn(${dslName}Comp, ${dslName}Lib, ${dslName}Ident)
 }
 """)
     return s.substitute(dslName=dsl, dslNameLowerCase=dsl.lower())

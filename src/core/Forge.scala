@@ -72,7 +72,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   // -- IR helpers
   
   def isForgePrimitiveType(t: Rep[DSLType]) = t match {
-    case `MInt` | `MFloat` | `MDouble` | `MBoolean` | `MString` | `MUnit` | `MAny` | `MNothing` | `MSourceContext` | `byName` => true
+    case `MInt` | `MFloat` | `MDouble` | `MBoolean` | `MChar` | `MString` | `MUnit` | `MAny` | `MNothing` | `MSourceContext` | `byName` => true
     case Def(Tpe(_,_,`now`)) => true 
     case Def(Tpe("ForgeArray",_,_)) | Def(Tpe("ForgeArrayBuffer",_,_)) => true
     case Def(Tpe("Var",_,_)) => true

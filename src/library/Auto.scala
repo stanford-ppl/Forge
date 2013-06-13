@@ -13,7 +13,6 @@ trait AutoOps {
   this: ForgeApplication =>
   
   def importAuto[T:ru.TypeTag] = {
-    // TODO
 
     def ftpe(tp: ru.Type) = tpe(tp.typeSymbol.name.toString) // package names?
 
@@ -34,20 +33,31 @@ trait AutoOps {
         val mt0 = m.asTerm.typeSignature
         val ispoly = mt0.takesTypeArgs
 
-        val mt = if (!ispoly) mt0.asInstanceOf[ru.MethodType] 
-                  else mt0.asInstanceOf[ru.PolyType].resultType.asInstanceOf[ru.MethodType]
+        try {
 
-        val args = for (param <- mt.params) yield {
-            val tp = param.typeSignature
-            ftpe(tp)
+            val mt = if (!ispoly) mt0.asInstanceOf[ru.MethodTypeApi] 
+                      else mt0.asInstanceOf[ru.PolyType].resultType.asInstanceOf[ru.MethodType]
+
+            // TODO: type parameters
+
+            val params = for (param <- mt.params) yield {
+                val tp = param.typeSignature
+                ftpe(tp)
+            }
+
+            val args = for (i <- 0 until params.length) yield quotedArg(i+1)
+            val argsStr = if (args.isEmpty) "" else args.mkString("(",", ",")")
+
+            val ret = ftpe(mt.resultType)
+
+            infix (Grp) (m.name.toString, Nil, ((Tpe :: params)) :: ret, Nil, simple) implements 
+                (codegen($cala, quotedArg(0) + "." + m.name + argsStr))
+
+            // TODO: overloading?? --> duplicate codegen warning
+        } catch {
+            case ex: ClassCastException => println(ex) // FIXME: NullaryMethodType not yet handled ...
         }
 
-        val ret = ftpe(mt.resultType)
-
-        infix (Grp) (m.name.toString, Nil, ((Tpe :: args)) :: ret, Nil, simple) implements 
-            (codegen($cala, quotedArg(0) + "." + m.name))
-
-        // overloading?? --> duplicate codegen warning
 
     }
 

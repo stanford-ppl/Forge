@@ -24,6 +24,7 @@ trait IdentGenOps extends BaseGenOps with BaseGenDataStructures {
   def zzz(x:Any): String = x match {
     case x: String => "\"" + x + "\""
     case x: Rep[Any] => "toAtom("+zzz(Def.unapply(x).get)+")"
+    case Nil => "Nil"
     case xs: List[Any] => "List(" + xs.map(zzz).mkString(",") + ")"
     case xs: Seq[Any] => "Seq(" + xs.map(zzz).mkString(",") + "):_*"
     case xs: Product if xs.productArity == 0 => xs.productPrefix

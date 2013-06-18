@@ -60,16 +60,16 @@ trait Definitions extends DerivativeTypes {
   /**
    * stage tags - only 2 stages
    */
-  object future extends StageTag { override def toString = "future" }
-  object now extends StageTag { override def toString = "now" }
+  case object future extends StageTag { override def toString = "future" }
+  case object now extends StageTag { override def toString = "now" }
   
   /**
    * code generators
    */  
-  object $cala extends CodeGenerator { def name = "Scala" }  // odd things happen if you try to re-use the existing object name 'scala'
-  object cuda extends CodeGenerator { def name = "Cuda" }  
-  object opencl extends CodeGenerator { def name = "OpenCL" }  
-  object cpp extends CodeGenerator { def name = "C" }  
+  case object $cala extends CodeGenerator { def name = "Scala" }  // odd things happen if you try to re-use the existing object name 'scala'
+  case object cuda extends CodeGenerator { def name = "Cuda" }  
+  case object opencl extends CodeGenerator { def name = "OpenCL" }  
+  case object cpp extends CodeGenerator { def name = "C" }  
   
   val generators = List($cala, cuda, opencl, cpp)
   
@@ -77,22 +77,22 @@ trait Definitions extends DerivativeTypes {
    * Type classes
    * DSLs can extend these by adding their own
    */
-  object TManifest extends TypeClassSignature {
+  case object TManifest extends TypeClassSignature {
     def name = "Manifest"
     def prefix = "_m"
     def wrapper = Some("mtype")
   }
-  object TNumeric extends TypeClassSignature {
+  case object TNumeric extends TypeClassSignature {
     def name = "Numeric"
     def prefix = "_num"
     def wrapper = Some("ntype") 
   }
-  object TFractional extends TypeClassSignature {
+  case object TFractional extends TypeClassSignature {
     def name = "Fractional"
     def prefix = "_frac"
     def wrapper = Some("frtype") 
   }  
-  object TOrdering extends TypeClassSignature {
+  case object TOrdering extends TypeClassSignature {
     def name = "Ordering"
     def prefix = "_ord"
     def wrapper = Some("otype")
@@ -102,11 +102,11 @@ trait Definitions extends DerivativeTypes {
   /**
    * Method syntax types
    */
-  object staticMethod extends MethodType  
-  object infixMethod extends MethodType
-  object directMethod extends MethodType
-  object compilerMethod extends MethodType  
-  object implicitMethod extends MethodType
+  case object staticMethod extends MethodType
+  case object infixMethod extends MethodType
+  case object directMethod extends MethodType
+  case object compilerMethod extends MethodType
+  case object implicitMethod extends MethodType
   
   // blacklist for op names that cannot be expressed with infix methods
   // we also blacklist some operators for improved compilation performance or to avoid ambiguities in the REPL version
@@ -122,15 +122,15 @@ trait Definitions extends DerivativeTypes {
   /**
    * Effect types
    */  
-  object pure extends EffectType
-  object mutable extends EffectType  
-  object simple extends EffectType
+  case object pure extends EffectType
+  case object mutable extends EffectType  
+  case object simple extends EffectType
   case class write(args: Int*) extends EffectType
   
   /**
    * Alias hints
    */
-  object nohint extends AliasHint  
+  case object nohint extends AliasHint  
   case class AliasInfo(aliases: Option[List[Int]], contains: Option[List[Int]], extracts: Option[List[Int]], copies: Option[List[Int]]) extends AliasHint
   case class AliasCopies(args: List[Int]) extends AliasHint
   
@@ -145,9 +145,9 @@ trait Definitions extends DerivativeTypes {
   /**
    * Frequency annotations for code motion
    */
-  object normal extends Frequency
-  object hot extends Frequency
-  object cold extends Frequency
+  case object normal extends Frequency
+  case object hot extends Frequency
+  case object cold extends Frequency
     
   /**
    * Parallel collections

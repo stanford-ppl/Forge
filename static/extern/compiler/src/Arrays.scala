@@ -6,6 +6,7 @@ import scala.virtualization.lms.common._
 import ppl.delite.framework.codegen.delite.overrides._
 import ppl.delite.framework.ops.DeliteOpsExp
 import ppl.delite.framework.datastructures._
+import ppl.delite.framework.Config
 
 // For compiler (Delite) implementation
 trait ForgeArrayOpsExp extends DeliteArrayFatExp {
@@ -38,15 +39,19 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
     }
     out.unsafeImmutable
   }
-        
+  def array_string_split(__arg0: Rep[String], __arg1: Rep[String])(implicit __imp0: SourceContext): Rep[ForgeArray[String]]
+    = reflectPure(ArrayStringSplit(__arg0, __arg1))
+
   // avoid mixing in LMS Array ops due to conflicts. alternatively, we could refactor LMS array ops to 
   // put ArrayApply and ArrayLength in an isolated trait that we can use.
   case class ArrayApply[T:Manifest](a: Exp[Array[T]], n: Exp[Int]) extends Def[T]
   case class ArrayLength[T:Manifest](a: Exp[Array[T]]) extends Def[Int]
+  case class ArrayStringSplit(str: Exp[String], split: Exp[String]) extends Def[DeliteArray[String]]
   
   override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = (e match {
     case ArrayApply(a,x) => scala_array_apply(f(a),f(x))(mtype(manifest[A]),pos)
     case ArrayLength(a) => scala_array_length(f(a))(mtype(manifest[A]),pos)
+    case ArrayStringSplit(a,b) => array_string_split(f(a),f(b))(pos)
     case _ => super.mirror(e,f)
   }).asInstanceOf[Exp[A]] // why??
   
@@ -62,6 +67,8 @@ trait ScalaGenForgeArrayOps extends ScalaGenDeliteArrayOps with ScalaGenPrimitiv
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case ArrayApply(x,n) => emitValDef(sym, "" + quote(x) + "(" + quote(n) + ")")
     case ArrayLength(x) => emitValDef(sym, "" + quote(x) + ".length")
+    case ArrayStringSplit(a,b) if Config.generateSerializable => emitValDef(sym, "new ppl.delite.runtime.data.LocalDeliteArrayObject[String](" + quote(a) + ".split(" + quote(b) + "))")
+    case ArrayStringSplit(a,b) => emitValDef(sym, quote(a) + ".split(" + quote(b) + ")")
     case _ => super.emitNode(sym,rhs)
   }
 }

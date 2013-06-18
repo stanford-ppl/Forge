@@ -70,15 +70,17 @@ trait ScalaOps {
     impl (int_minus) (codegen($cala, ${$0 - $1}))
     impl (int_minus) (codegen(cuda, ${$0 - $1}))
     impl (int_minus) (codegen(cpp, ${$0 - $1}))
-    val (int_times) = direct (Prim) ("forge_int_times", Nil, (MInt,MInt) :: MInt) 
+    val int_times = direct (Prim) ("forge_int_times", Nil, (MInt,MInt) :: MInt) 
     impl (int_times) (codegen($cala, ${$0 * $1}))
     impl (int_times) (codegen(cuda, ${$0 * $1}))
     impl (int_times) (codegen(cpp, ${$0 * $1}))
-    val (int_divide) = direct (Prim) ("forge_int_divide", Nil, (MInt,MInt) :: MInt) 
+    val int_divide = direct (Prim) ("forge_int_divide", Nil, (MInt,MInt) :: MInt) 
     impl (int_divide) (codegen($cala, ${$0 / $1}))
     impl (int_divide) (codegen(cuda, ${$0 / $1}))
     impl (int_divide) (codegen(cpp, ${$0 / $1}))
 
+    direct (Prim) ("forge_int_shift_left", Nil, (MInt,MInt) :: MInt) implements codegen($cala, ${$0 << $1})
+    
     direct (Prim) ("forge_float_plus", Nil, (MFloat,MFloat) :: MFloat) implements codegen($cala, ${$0 + $1})
     direct (Prim) ("forge_float_minus", Nil, (MFloat,MFloat) :: MFloat) implements codegen($cala, ${$0 - $1})
     direct (Prim) ("forge_float_times", Nil, (MFloat,MFloat) :: MFloat) implements codegen($cala, ${$0 * $1})
@@ -214,6 +216,8 @@ trait ScalaOps {
     infix (Prim) ("/", Nil, (MDouble,MInt) :: MDouble) implements composite ${ forge_double_divide($0,$1.toDouble) }
     infix (Prim) ("/", Nil, (MDouble,MFloat) :: MDouble) implements composite ${ forge_double_divide($0,$1.toDouble) }
     infix (Prim) ("/", Nil, (MDouble,MDouble) :: MDouble) implements composite ${ forge_double_divide($0,$1) }
+
+    infix (Prim) ("<<",Nil, (MInt,MInt) :: MInt) implements composite ${ forge_int_shift_left($0,$1) }
   }
   
   def importMisc() = {
@@ -333,11 +337,12 @@ trait ScalaOps {
     
     // not much we can do here to use "split" as long as Delite brings in LMS' version, since we can't overload on the return type
     // we should refactor LMS/Delite to only use the StringOpsExp trait and not StringOps
-    infix (Str) ("fsplit", Nil, ((MString,MString) :: MArray(MString))) implements codegen($cala, ${
-      $0.split($1)
-    })
+    infix (Str) ("fsplit", Nil, ((MString,MString) :: MArray(MString))) implements composite ${
+      array_string_split($0,$1)  
+    }
     
     infix (Str) ("trim", Nil, MString :: MString) implements codegen($cala, ${ $0.trim })
+    infix (Str) ("fcharAt", Nil, (MString,MInt) :: MChar) implements codegen($cala, ${ $0.charAt($1) })
     
     // most of these variants collapse to a common back-end implementation:
     

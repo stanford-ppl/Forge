@@ -62,20 +62,44 @@ trait ScalaOps {
     
     // specialized versions for primitives     
     // the forge_ prefix is to avoid conflicting with LMS primitive ops
-    direct (Prim) ("forge_int_plus", Nil, (MInt,MInt) :: MInt) implements codegen($cala, ${$0 + $1})
-    direct (Prim) ("forge_int_minus", Nil, (MInt,MInt) :: MInt) implements codegen($cala, ${$0 - $1})
-    direct (Prim) ("forge_int_times", Nil, (MInt,MInt) :: MInt) implements codegen($cala, ${$0 * $1})
-    direct (Prim) ("forge_int_divide", Nil, (MInt,MInt) :: MInt) implements codegen($cala, ${$0 / $1})
-    
+    val int_plus = direct (Prim) ("forge_int_plus", Nil, (MInt,MInt) :: MInt) 
+    impl (int_plus) (codegen($cala, ${$0 + $1}))
+    impl (int_plus) (codegen(cuda, ${$0 + $1}))
+    impl (int_plus) (codegen(cpp, ${$0 + $1}))
+    val int_minus = direct (Prim) ("forge_int_minus", Nil, (MInt,MInt) :: MInt) 
+    impl (int_minus) (codegen($cala, ${$0 - $1}))
+    impl (int_minus) (codegen(cuda, ${$0 - $1}))
+    impl (int_minus) (codegen(cpp, ${$0 - $1}))
+    val (int_times) = direct (Prim) ("forge_int_times", Nil, (MInt,MInt) :: MInt) 
+    impl (int_times) (codegen($cala, ${$0 * $1}))
+    impl (int_times) (codegen(cuda, ${$0 * $1}))
+    impl (int_times) (codegen(cpp, ${$0 * $1}))
+    val (int_divide) = direct (Prim) ("forge_int_divide", Nil, (MInt,MInt) :: MInt) 
+    impl (int_divide) (codegen($cala, ${$0 / $1}))
+    impl (int_divide) (codegen(cuda, ${$0 / $1}))
+    impl (int_divide) (codegen(cpp, ${$0 / $1}))
+
     direct (Prim) ("forge_float_plus", Nil, (MFloat,MFloat) :: MFloat) implements codegen($cala, ${$0 + $1})
     direct (Prim) ("forge_float_minus", Nil, (MFloat,MFloat) :: MFloat) implements codegen($cala, ${$0 - $1})
     direct (Prim) ("forge_float_times", Nil, (MFloat,MFloat) :: MFloat) implements codegen($cala, ${$0 * $1})
     direct (Prim) ("forge_float_divide", Nil, (MFloat,MFloat) :: MFloat) implements codegen($cala, ${$0 / $1})    
     
-    direct (Prim) ("forge_double_plus", Nil, (MDouble,MDouble) :: MDouble) implements codegen($cala, ${$0 + $1})
-    direct (Prim) ("forge_double_minus", Nil, (MDouble,MDouble) :: MDouble) implements codegen($cala, ${$0 - $1})
-    direct (Prim) ("forge_double_times", Nil, (MDouble,MDouble) :: MDouble) implements codegen($cala, ${$0 * $1})
-    direct (Prim) ("forge_double_divide", Nil, (MDouble,MDouble) :: MDouble) implements codegen($cala, ${$0 / $1})        
+    val double_plus = direct (Prim) ("forge_double_plus", Nil, (MDouble,MDouble) :: MDouble) 
+    impl (double_plus) (codegen($cala, ${$0 + $1}))
+    impl (double_plus) (codegen(cuda, ${$0 + $1}))
+    impl (double_plus) (codegen(cpp, ${$0 + $1}))
+    val double_minus = direct (Prim) ("forge_double_minus", Nil, (MDouble,MDouble) :: MDouble)
+    impl (double_minus) (codegen($cala, ${$0 - $1}))
+    impl (double_minus) (codegen(cuda, ${$0 - $1}))
+    impl (double_minus) (codegen(cpp, ${$0 - $1}))
+    val double_times = direct (Prim) ("forge_double_times", Nil, (MDouble,MDouble) :: MDouble)
+    impl (double_times) (codegen($cala, ${$0 * $1}))
+    impl (double_times) (codegen(cuda, ${$0 * $1}))
+    impl (double_times) (codegen(cpp, ${$0 * $1}))
+    val double_divide = direct (Prim) ("forge_double_divide", Nil, (MDouble,MDouble) :: MDouble)        
+    impl (double_divide) (codegen($cala, ${$0 / $1}))
+    impl (double_divide) (codegen(cuda, ${$0 / $1}))
+    impl (double_divide) (codegen(cpp, ${$0 / $1}))
     
     // can we auto-generate these? the tricky part is the bodies, which require explicit conversions..
     // infix (Prim) ("+", Nil, enumerate(CInt,MInt,CFloat,MFloat,CDouble,MDouble)) implements codegen($cala, quotedArg(0) + " + " + quotedArg(1))    
@@ -197,7 +221,10 @@ trait ScalaOps {
     
     direct (Misc) ("exit", Nil, MInt :: MUnit, effect = simple) implements codegen($cala, ${sys.exit($0)})
     direct (Misc) ("print", Nil, MAny :: MUnit, effect = simple) implements codegen($cala, ${print($0)})
-    direct (Misc) ("fatal", Nil, MString :: MNothing, effect = simple) implements codegen($cala, ${throw new Exception($0)})
+    val fatal = direct (Misc) ("fatal", Nil, MString :: MNothing, effect = simple) 
+    impl (fatal) (codegen($cala, ${throw new Exception($0)}))
+    impl (fatal) (codegen(cuda, ${assert(0)}))
+    impl (fatal) (codegen(cpp, ${assert(0)}))
     
     val println = direct (Misc) ("println", List(), List(MAny) :: MUnit, effect = simple)
     val println2 = direct (Misc) ("println", List(), List() :: MUnit, effect = simple)
@@ -275,7 +302,10 @@ trait ScalaOps {
     direct (Ord) ("__equal", (A,BC), (A,BC) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
     direct (Ord) ("__equal", (AC,B), (AC,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
     
-    infix (Ord) ("!=", (A,B), (A,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
+    val neq = infix (Ord) ("!=", (A,B), (A,B) :: MBoolean) 
+    impl (neq) (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
+    impl (neq) (codegen(cuda, quotedArg(0) + " != " + quotedArg(1)))
+    impl (neq) (codegen(cpp, quotedArg(0) + " != " + quotedArg(1)))
     infix (Ord) ("!=", (A,BC), (A,BC) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
     infix (Ord) ("!=", (AC,B), (AC,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
     
@@ -362,6 +392,20 @@ trait ScalaOps {
     impl (exp) (codegen($cala, "java.lang.Math.exp(" + quotedArg(0) + ")"))
     impl (log) (codegen($cala, "java.lang.Math.log(" + quotedArg(0) + ")"))
     impl (abs) (codegen($cala, "java.lang.Math.abs(" + quotedArg(0) + ")"))
+
+    impl (maxInt) (codegen(cuda, "(" + quotedArg(0) + ">" + quotedArg(1) + ")?" + quotedArg(0) + ":" + quotedArg(1)))
+    impl (maxDbl) (codegen(cuda, "(" + quotedArg(0) + ">" + quotedArg(1) + ")?" + quotedArg(0) + ":" + quotedArg(1)))
+    impl (ceil) (codegen(cuda, "ceil(" + quotedArg(0) + ")"))
+    impl (exp) (codegen(cuda, "exp(" + quotedArg(0) + ")"))
+    impl (log) (codegen(cuda, "log(" + quotedArg(0) + ")"))
+    impl (abs) (codegen(cuda, "abs(" + quotedArg(0) + ")"))
+    
+    impl (maxInt) (codegen(cpp, "(" + quotedArg(0) + ">" + quotedArg(1) + ")?" + quotedArg(0) + ":" + quotedArg(1)))
+    impl (maxDbl) (codegen(cpp, "(" + quotedArg(0) + ">" + quotedArg(1) + ")?" + quotedArg(0) + ":" + quotedArg(1)))
+    impl (ceil) (codegen(cpp, "ceil(" + quotedArg(0) + ")"))
+    impl (exp) (codegen(cpp, "exp(" + quotedArg(0) + ")"))
+    impl (log) (codegen(cpp, "log(" + quotedArg(0) + ")"))
+    impl (abs) (codegen(cpp, "abs(" + quotedArg(0) + ")"))
   }  
   
   // tuples need some work, the tricks bordering on hacks in here are pretty unsatisfying

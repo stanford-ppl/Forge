@@ -139,6 +139,8 @@ trait DeliteGenPackages extends BaseGenPackages {
         if (e.opsGrp.targets.contains(g))
           stream.print(" with " + g.name + "Gen" + e.opsGrp.name)        
       }
+      if (g == cuda) stream.println(" with DeliteCppHostTransfer with DeliteCudaDeviceTransfer ")
+      if (g == cpp) stream.println(" with DeliteCppHostTransfer ")
       stream.println(" with " + g.name + "GenDeliteOps with Delite" + g.name + "GenAllOverrides {" )
       stream.println("  val IR: DeliteApplication with " + dsl + "Exp")
       // TODO: generalize, other targets can have remaps too, need to be encoded somehow

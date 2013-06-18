@@ -608,10 +608,25 @@ trait DeliteGenOps extends BaseGenOps {
               // hack! (or heuristic, if the glass is half full)
               !s.startsWith("emit")
             }      
-            // use stream.print, since the new lines from the original interpolated code block are still there
             val body2 = body map { l => if (addPrint(l)) "stream.print("+l+")" else l }      
-            val result = ("stream.println(\"val \"+quote(sym)+\" = {\")" :: body2) :+ "stream.println(\"}\")"
-            result.foreach { line => emitWithIndent(line, stream, 6) }   
+            // use stream.print, since the new lines from the original interpolated code block are still there
+            g match {
+              case `$cala` =>
+                val result = ("stream.println(\"val \"+quote(sym)+\" = {\")" :: body2) :+ "stream.println(\"}\")"
+                result.foreach { line => emitWithIndent(line, stream, 6) }   
+              case `cuda` | `cpp` =>
+                if(isForgeUnitType(op.retTpe) || isForgeNothingType(op.retTpe)) {
+                  body2.foreach { line => emitWithIndent(line, stream, 6) }
+                  emitWithIndent("stream.println(\";\")", stream, 6)
+                }
+                else {
+                  body2.take(body2.length-1).foreach { line => emitWithIndent(line, stream, 6) }  
+                  emitWithIndent("stream.print(remap(sym.tp) + \" \" + quote(sym) + \" = \")", stream, 6)
+                  emitWithIndent(body2.last, stream, 6)
+                  emitWithIndent("stream.println(\";\")", stream, 6)
+                }
+              case _ => throw new RuntimeException("Not supported codgen:" + g.toString)
+            }
             stream.println()              
           }
           stream.println("    case _ => super.emitNode(sym, rhs)")

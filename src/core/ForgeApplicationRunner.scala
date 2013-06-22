@@ -34,10 +34,6 @@ trait ForgeApplicationRunner extends ForgeApplication with ForgeExp {
     // TODO: implement these!
     //  1) all ops that are declared as delite ops have delite collection input/outputs
     // check(y)
-
-    // if (Config.debug) {
-      // println(globalDefs.mkString("\n"))
-    // }
     
     Directory(Path(build)).deleteRecursively() 
     
@@ -67,7 +63,10 @@ trait ForgeApplicationRunner extends ForgeApplication with ForgeExp {
       val buildDir = build + File.separator + dsl + File.separator + "ident" 
     }
 
-    val codeGenerators = List(sharedCodegen, libraryCodegen, deliteCodegen, identCodegen)
+    var codeGenerators: List[ForgeCodeGenBackend{val IR: ForgeApplicationRunner.this.type; val buildDir: String}] = List(sharedCodegen)
+    if (Config.genLib) codeGenerators :+= libraryCodegen  
+    if (Config.genDelite) codeGenerators :+= deliteCodegen
+    if (Config.genIdent) codeGenerators :+= identCodegen
     
     for (c <- codeGenerators) {    
       c.emitDSLImplementation()

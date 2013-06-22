@@ -79,16 +79,6 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case Def(Tpe("Overloaded",_,_)) => true
     case _ => false
   }
-
-  def isForgeUnitType(t: Rep[DSLType]) = t match {
-    case `MUnit` => true
-    case _ => false
-  }
-
-  def isForgeNothingType(t: Rep[DSLType]) = t match {
-    case `MNothing` => true
-    case _ => false
-  }
   
   def grpIsTpe(grp: Rep[DSLGroup]) = grp match {
     case Def(Tpe(n,targs,s)) => true

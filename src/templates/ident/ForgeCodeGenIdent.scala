@@ -10,6 +10,7 @@ import scala.virtualization.lms.internal.{GenericFatCodegen, GenericCodegen}
 
 import core._
 import shared._
+import Utilities._
 
 trait ForgeCodeGenIdent extends ForgeCodeGenBackend with BaseGenOps with IdentGenOps {  
   val IR: ForgeApplicationRunner with ForgeExp  
@@ -31,39 +32,28 @@ trait ForgeCodeGenIdent extends ForgeCodeGenBackend with BaseGenOps with IdentGe
     dslStream.println("object " + dsl + "DSLRunner extends ForgeApplicationRunner with " + dsl + "DSL")
     dslStream.println()
     dslStream.println("trait " + dsl + "DSL extends ForgeApplication { this: ppl.dsl.forge.core.ForgeOpsExp => ")
-    dslStream.println("/**")
-    dslStream.println(" * The name of your DSL. This is the name that will be used in generated files,")
-    dslStream.println(" * package declarations, etc.")
-    dslStream.println(" */")
-    dslStream.println("def dslName = \"SimpleVector\"")
-    dslStream.println("")
-    dslStream.println("/**")
-    dslStream.println(" * The specification is the DSL definition (types, data structures, ops)")
-    dslStream.println(" */")
-    dslStream.println("def specification() = {")
+    emitBlockComment("The name of your DSL. This is the name that will be used in generated files, package declarations, etc.", dslStream, indent=2)    
+    emitWithIndent("def dslName = \""+dslName+"\"", dslStream, indent=2) 
+    dslStream.println()
+    emitBlockComment("The specification is the DSL definition (types, data structures, ops)", dslStream, indent=2)    
+    emitWithIndent("def specification() = {", dslStream, indent=2)
 
     // internals go here
     emitClasses(dslStream)
 
-    dslStream.println("()")
-
-    dslStream.println("}")
+    emitWithIndent("()", dslStream, indent=2)
+    emitWithIndent("}", dslStream, indent=2)
     dslStream.println("}")
     dslStream.close()
   }  
     
   def emitClasses(stream: PrintWriter) {
     for ((grp,opsGrp) <- OpsGrp) {
-
-      stream.println("// "+grp.name + " / " + opsGrp.name)
-
-      stream.println("def spec" + grp.name + "() = {")
-
-      emitClass(opsGrp, stream)
-
-      stream.println("}")
-      stream.println("spec" + grp.name + "()")
-
+      emitWithIndent("// "+grp.name + " / " + opsGrp.name, stream, indent=4)      
+      emitWithIndent("def spec" + grp.name + "() = {", stream, indent=4)
+      emitClass(opsGrp, stream)      
+      emitWithIndent("}", stream, indent=4)
+      emitWithIndent("spec" + grp.name + "()", stream, indent=4)
       stream.println()
       stream.println()
     }

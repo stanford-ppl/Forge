@@ -111,7 +111,9 @@ def publish(dsl, opts):
     # source code
     os.system("rsync -r " + FORGE_GENERATED + "/" + dsl + "/" + " " + build_dir)
 
-    for t in ['shared','compiler','library']:
+    all_targets = ['shared','compiler','library']
+    targets = [t for t in all_targets if os.path.exists(build_dir + t + "/src/")]
+    for t in targets:
         static = FORGE_HOME + "/static/extern/" + t + "/src/"
         src = FORGE_HOME + "/extern/" + dsl + "/" + t + "/src/"
 
@@ -123,7 +125,7 @@ def publish(dsl, opts):
             if os.path.exists(generatedRoot + f):
                 err("extern file " + f + " conflicts with generated file " + generatedRoot + f)
 
-        dest = build_dir + "/" + t + "/src/" + dsl.lower() + "/"
+        dest = build_dir + t + "/src/" + dsl.lower() + "/"
         if not os.path.exists(dest):
             os.mkdir(dest)
         if os.path.exists(src):

@@ -9,11 +9,13 @@ E_BADARGS=65
 E_NOHOME=66
       
 usage() {
-  echo "Usage: `basename $0` [-h] [-c] [-s step] [-i | -r fully.qualified.ApplicationRunner] fully.qualified.DSLRunner DSLName"
+  echo "Usage: `basename $0` [-h] [-c] [-s step] [-f] [-g delite | lib] [-i | -r fully.qualified.ApplicationRunner] fully.qualified.DSLRunner DSLName"
   echo "Note that `basename $0` requires options to be specified before required arguments."
   echo "  -h        show this message"
   echo "  -c        perform a clean build"
   echo "  -s <n>    skip to step n in the update process"
+  echo "  -f        (re-)generate forge specification"
+  echo "  -g <gen>  generate only the specified version"
   echo "  -r <app>  run the specified application after compiling"
   echo "  -d        run delite after compiling"
   echo "  -i        run interactive shell after compiling"
@@ -33,13 +35,17 @@ NUM_STEPS=4
 SKIP=0
 DELITE=false
 INTERACTIVE=false
+IDENT=false
+TARGET=""
 
-while getopts “hcs:r:di” option
+while getopts “hcs:fg:r:di” option
 do
   case $option in
     h) usage;;
     c) CLEAN=" -c";;
     s) SKIP=$OPTARG;;
+    f) IDENT=true;;
+    g) TARGET="$OPTARG";;
     r) APP_RUNNER="$OPTARG"
        NUM_STEPS=$(($NUM_STEPS+1))
        ;;       
@@ -48,7 +54,7 @@ do
        ;;       
     i) INTERACTIVE=true
        NUM_STEPS=$(($NUM_STEPS+1))
-       ;;
+       ;;       
   esac
 done
 shift $(($OPTIND - 1))
@@ -71,10 +77,23 @@ then
   sbt compile
 fi
 
+FORGE_FLAGS=""
 if [ $SKIP -le 2 ];
 then
-  echo "forge $DSL_RUNNER (2/$NUM_STEPS)"
-  bin/forge $DSL_RUNNER
+  if [ $IDENT == true ];
+  then
+    FORGE_FLAGS="--ident"
+  fi
+  if [ "$TARGET" == "lib" ];
+  then
+    FORGE_FLAGS="$FORGE_FLAGS --no-delite"
+  elif [ "$TARGET" = "delite" ];
+  then
+    FORGE_FLAGS="$FORGE_FLAGS --no-lib"
+  fi
+
+  echo "forge $DSL_RUNNER $FORGE_FLAGS (2/$NUM_STEPS)"
+  bin/forge $DSL_RUNNER $FORGE_FLAGS
 fi
 
 if [ $SKIP -le 3 ];

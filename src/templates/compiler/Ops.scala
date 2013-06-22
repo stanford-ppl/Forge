@@ -614,8 +614,8 @@ trait DeliteGenOps extends BaseGenOps {
               case `$cala` =>
                 val result = ("stream.println(\"val \"+quote(sym)+\" = {\")" :: body2) :+ "stream.println(\"}\")"
                 result.foreach { line => emitWithIndent(line, stream, 6) }   
-              case `cuda` | `cpp` =>
-                if(isForgeUnitType(op.retTpe) || isForgeNothingType(op.retTpe)) {
+              case `cuda` | `cpp` =>                
+                if (op.retTpe == MUnit || op.retTpe == MNothing) {                  
                   body2.foreach { line => emitWithIndent(line, stream, 6) }
                   emitWithIndent("stream.println(\";\")", stream, 6)
                 }

@@ -34,29 +34,30 @@ trait IdentGenOps extends BaseGenOps with BaseGenDataStructures {
 
   def emitClass(opsGrp: DSLOps, stream: PrintWriter) {
     var scope = false
+    val baseIndent = 4
     if (grpIsTpe(opsGrp.grp)) {
       val tpe = grpAsTpe(opsGrp.grp)
       val d = DataStructs.get(tpe)
       d.foreach { data => 
-        stream.println("val " + data.tpe.name + " = " + zzz(data.tpe))
+        emitWithIndent("val " + data.tpe.name + " = " + zzz(data.tpe), stream, baseIndent)
         stream.println()
-        stream.println("data(" + data.tpe.name + ", " + zzz(data.fields) + ")")
+        emitWithIndent("data(" + data.tpe.name + ", " + zzz(data.fields) + ")", stream, baseIndent)
         stream.println()
       }
-      stream.println("val " + opsGrp.name + " = withTpe (" + opsGrp.grp.name + ")")
-      stream.println(opsGrp.name + " {")
+      emitWithIndent("val " + opsGrp.name + " = withTpe (" + opsGrp.grp.name + ")", stream, baseIndent)
+      emitWithIndent(opsGrp.name + " {", stream, baseIndent)
       scope = true
     } else {
-      stream.println("val " + opsGrp.grp.name + " = grp (\"" + opsGrp.grp.name + "\")")
+      emitWithIndent("val " + opsGrp.grp.name + " = grp (\"" + opsGrp.grp.name + "\")", stream, baseIndent)
     }
-
 
     stream.println()
     
-    for (o <- unique(opsGrp.ops)) { 
+    val scopeIndent = if (scope) baseIndent+2 else baseIndent
 
-      stream.println("// " + o.name)
-      stream.println("// " + zzz(o))
+    for (o <- unique(opsGrp.ops)) { 
+      emitWithIndent("// " + o.name, stream, scopeIndent)
+      emitWithIndent("// " + zzz(o), stream, scopeIndent)
 
       def forge_op0(style: String, hg: Boolean)(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], 
         args: List[Rep[DSLArg]], curriedArgs: List[List[Rep[DSLArg]]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], 
@@ -70,8 +71,8 @@ trait IdentGenOps extends BaseGenOps with BaseGenDataStructures {
         forge_op1(style,hg)(grp.name)(zzz(name),zzz(tpePars),zzz(signature),zzz(implicitArgs),zzz(effect),zzz(aliasHint))
       }
       def forge_op1(style: String, hg: Boolean)(grp: String)(name: String, tpePars: String, signature: String, implicitArgs: String, effect: String, aliasHint: String) = 
-          if (!scope) stream.println(s"$style ($grp)($name, $tpePars, $signature, $implicitArgs, $effect, $aliasHint)")
-          else    stream.println(s"$style ($name)($signature, $implicitArgs, $tpePars, $effect, $aliasHint)")
+          if (!scope) emitWithIndent(s"$style ($grp)($name, $tpePars, $signature, $implicitArgs, $effect, $aliasHint)", stream, scopeIndent)
+          else emitWithIndent(s"$style ($name)($signature, $implicitArgs, $tpePars, $effect, $aliasHint)", stream, scopeIndent)
           // is tpePars == addTpePars ??
 
       val Def(op: Op) = o
@@ -91,7 +92,7 @@ trait IdentGenOps extends BaseGenOps with BaseGenDataStructures {
       stream.println()
     }
 
-    if (scope) stream.println("}")
+    if (scope) emitWithIndent("}", stream, baseIndent)
         
   }
 }

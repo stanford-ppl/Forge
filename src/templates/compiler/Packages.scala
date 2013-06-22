@@ -57,24 +57,21 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println()
     emitBlockComment("disambiguations for LMS classes pulled in by Delite", stream, indent=2)
 
-    // TODO: generalize    
+    // TODO: generalize -- these depend on certain Scala.scala operations being imported, which may not be the case
     stream.println("  override def infix_unary_!(x: Rep[Boolean])(implicit pos: SourceContext) = boolean_negate(x)")
     stream.println("  override def infix_&&(lhs: Rep[Boolean], rhs: Rep[Boolean])(implicit pos: SourceContext) = boolean_and(lhs,rhs)")
     stream.println("  override def infix_||(lhs: Rep[Boolean], rhs: Rep[Boolean])(implicit pos: SourceContext) = boolean_or(lhs,rhs)")        
     stream.println("  override def infix_unsafeImmutable[A:Manifest](lhs: Rep[A])(implicit pos: SourceContext) = object_unsafe_immutable(lhs)")    
     stream.println("  override def infix_trim(lhs: Rep[String])(implicit pos: SourceContext) = string_trim(lhs)")    
     stream.println("  override def __whileDo(cond: => Exp[Boolean], body: => Rep[Unit])(implicit pos: SourceContext) = delite_while(cond, body)")  
-    //delite and lms if-then-else doesn't use by-name-parameter for cond
+    // delite and lms if-then-else don't use by-name-parameter for cond
     stream.println("  override def __ifThenElse[T:Manifest](cond: Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false)")
     stream.println("  override def __ifThenElse[T:Manifest](cond: => Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false)")
     stream.println("  implicit def repToOrderingOps[A:Manifest:Ordering](x: Rep[A]) = repOrderingToOrderingOps(x)")
     stream.println("  implicit def varToOrderingOps[A:Manifest:Ordering](x: Var[A]) = varOrderingToOrderingOps(x)")    
-
     stream.println("  // forward to LMS primitive ops to make stencil analysis detect intervals")
     stream.println("  override def primitive2_forge_int_plus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = int_plus(__arg0, __arg1)")
-    stream.println("  override def primitive2_pl(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext,__imp1: Overload35) = int_plus(__arg0, __arg1)")
     stream.println("  override def primitive2_forge_int_times(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = int_times(__arg0, __arg1)")
-    stream.println("  override def primitive2_mul(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext,__imp1: Overload37) = int_times(__arg0, __arg1)")
 
     stream.println()
     emitBlockComment("dsl types", stream, indent=2)

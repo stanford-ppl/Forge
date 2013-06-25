@@ -80,12 +80,12 @@ trait SimpleIntVectorDSL extends ForgeApplication {
       // math      
       infix ("+") (Vector :: Vector) implements zip((MInt,MInt,MInt), (0,1), ${ (a,b) => forge_int_plus(a,b) }) // unfortunate conflict with Delite PrimitiveOps unless we specify (TODO: need more disambiguations)
       infix ("*") (MInt :: Vector) implements map((MInt,MInt), 0, "e => e*"+quotedArg(1))      
-      infix ("sum") (Nil :: MInt) implements reduce(MInt, 0, ${unit(0)}, ${ (a,b) => forge_int_plus(a,b) })
+      infix ("sum") (Nil :: MInt) implements reduce(MInt, 0, ${0}, ${ (a,b) => forge_int_plus(a,b) })
              
       // bulk        
       infix ("map") ((MInt ==> MInt) :: Vector) implements map((MInt,MInt), 0, ${ e => $1(e) })
       
-      infix ("reduce") (((MInt,MInt) ==> MInt) :: MInt) implements reduce(MInt, 0, ${unit(0)}, ${
+      infix ("reduce") (((MInt,MInt) ==> MInt) :: MInt) implements reduce(MInt, 0, ${0}, ${
         (a,b) => $1(a,b)
       })
       

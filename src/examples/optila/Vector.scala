@@ -62,7 +62,7 @@ trait VectorOps {
         out.unsafeImmutable
       }                                   
       infix ("drop") (MInt :: DenseVector(T)) implements composite ${ $self.slice($1, $self.length) }
-      infix ("take") (MInt :: DenseVector(T)) implements composite ${ $self.slice(unit(0), $1) }
+      infix ("take") (MInt :: DenseVector(T)) implements composite ${ $self.slice(0, $1) }
       infix ("contains") (T :: MBoolean) implements single ${
         var found = false
         var i = 0
@@ -168,7 +168,7 @@ trait VectorOps {
       val filterMap = v.name.toLowerCase + "_densevector_filter_map"      
       compiler (filterMap) (((T ==> MBoolean), (T ==> R)) :: DenseVector(R), addTpePars = R) implements filter((T,R), 0, ${ e => $1(e) }, ${ e => $2(e) })      
       infix ("count") ((T ==> MBoolean) :: MInt) implements composite ${
-        sum(\$filterMap($self, $1, (e: Rep[\$TT]) => unit(1)))
+        sum(\$filterMap($self, $1, (e: Rep[\$TT]) => 1))
       }      
       
       infix ("partition") (("pred",(T ==> MBoolean)) :: Tuple2(DenseVector(T),DenseVector(T))) implements single ${

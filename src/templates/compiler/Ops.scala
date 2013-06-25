@@ -105,24 +105,53 @@ trait DeliteGenOps extends BaseGenOps {
       case None => body      
     }
   }
-        
-  def emitImplMethod(o: Rep[DSLOp], func: Rep[String], stream: PrintWriter, indent: Int = 0) {
-    emitWithIndent(makeOpImplMethodSignature(o) + " = {", stream, indent)
+
+  def makeFuncSignature(argTpePars: List[Rep[DSLType]], retTpePar: Rep[DSLType]) = {
+    val argStr = if (argTpePars == Nil) "" else argTpePars.map(t => "Rep["+quote(t)+"]").mkString("(",",",")") + " => "
+    Some(argStr + "Rep[" + quote(retTpePar) + "]")
+  }
+
+  def emitImplMethod(o: Rep[DSLOp], func: Rep[String], postfix: String, returnTpe: Option[String], stream: PrintWriter, indent: Int = 2) {    
+    emitWithIndent(makeOpImplMethodSignature(o, postfix, returnTpe) + " = {", stream, indent)
     inline(o, func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent+2 )}
     emitWithIndent("}", stream, indent)
     stream.println()    
   }
 
   def emitImpls(opsGrp: DSLOps, stream: PrintWriter) {
-    emitBlockComment("SingleTask and Composite Impls", stream)   
+    emitBlockComment("Op Impls", stream)   
     stream.println()
     stream.println("trait " + opsGrp.name + "Impl {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Lift => ")
     stream.println()    
     for (o <- unique(opsGrp.ops)) { 
       Impls(o) match {
-        case single:SingleTask => emitImplMethod(o,single.func,stream,2)
-        case composite:Composite => emitImplMethod(o,composite.func,stream,2)
+        case single:SingleTask => 
+          emitImplMethod(o, single.func, "", None, stream)
+        case composite:Composite => 
+          emitImplMethod(o, composite.func, "", None, stream)
+        case map:Map => 
+          emitImplMethod(o, map.func, "_map", makeFuncSignature(map.tpePars._1, map.tpePars._2), stream)          
+        case zip:Zip => 
+          emitImplMethod(o, zip.func, "_zip", makeFuncSignature((zip.tpePars._1, zip.tpePars._2), zip.tpePars._3), stream)    
+        case reduce:Reduce => 
+          emitImplMethod(o, reduce.func, "_reduce", makeFuncSignature((reduce.tpePar, reduce.tpePar), reduce.tpePar), stream)          
+          emitImplMethod(o, reduce.zero, "_zero", makeFuncSignature(Nil, reduce.tpePar), stream)          
+        case mapreduce:MapReduce =>
+          emitImplMethod(o, mapreduce.map, "_map",  makeFuncSignature(mapreduce.tpePars._1, mapreduce.tpePars._2), stream)          
+          emitImplMethod(o, mapreduce.reduce, "_reduce", makeFuncSignature((mapreduce.tpePars._2, mapreduce.tpePars._2), mapreduce.tpePars._2), stream)          
+          emitImplMethod(o, mapreduce.zero, "_zero", makeFuncSignature(Nil, mapreduce.tpePars._2), stream)          
+        case filter:Filter =>
+          emitImplMethod(o, filter.cond, "_cond", makeFuncSignature(filter.tpePars._1, MBoolean), stream)          
+          emitImplMethod(o, filter.func, "_map", makeFuncSignature(filter.tpePars._1, filter.tpePars._2), stream)          
+        case hfr:HashFilterReduce =>
+          emitImplMethod(o, hfr.cond, "_cond", makeFuncSignature(hfr.tpePars._1, MBoolean), stream)          
+          emitImplMethod(o, hfr.key, "_key", makeFuncSignature(hfr.tpePars._1, hfr.tpePars._2), stream)          
+          emitImplMethod(o, hfr.map, "_map",  makeFuncSignature(hfr.tpePars._1, hfr.tpePars._3), stream)          
+          emitImplMethod(o, hfr.zero, "_zero",  makeFuncSignature(Nil, hfr.tpePars._3), stream)          
+          emitImplMethod(o, hfr.reduce, "_reduce", makeFuncSignature((hfr.tpePars._3, hfr.tpePars._3), hfr.tpePars._3), stream)          
+        case foreach:Foreach =>
+          emitImplMethod(o, foreach.func, "_func", makeFuncSignature(foreach.tpePar, MUnit), stream)          
         case _ => 
       }
     }            
@@ -200,7 +229,7 @@ trait DeliteGenOps extends BaseGenOps {
           emitOpNodeHeader(o, "DeliteOpMap[" + quote(map.tpePars._1) + "," + quote(map.tpePars._2) + "," + makeTpeInst(colTpe, map.tpePars._2) + "]")            
           stream.println()
           stream.println("    val in = " + in.name)
-          stream.println("    def func = " + inline(o,map.func,quoteLiteral))
+          stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_map"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,map.tpePars._2)) + "(in, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(inDc.size) + ")")          
         case zip:Zip => 
@@ -212,7 +241,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println()
           stream.println("    val inA = " + inA.name)
           stream.println("    val inB = " + o.args.apply(zip.argIndices._2).name)
-          stream.println("    def func = " + inline(o,zip.func,quoteLiteral))
+          stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_zip"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,inA.tpe,zip.tpePars._3)) + "(inA, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(inDc.size) + ")")
         case reduce:Reduce =>
@@ -221,8 +250,8 @@ trait DeliteGenOps extends BaseGenOps {
           emitOpNodeHeader(o, "DeliteOpReduce[" + quote(reduce.tpePar) + "]")            
           stream.println()
           stream.println("    val in = " + col.name)
-          stream.println("    def func = " + inline(o,reduce.func,quoteLiteral))
-          stream.println("    def zero = " + inline(o,reduce.zero,quoteLiteral))
+          stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_reduce"))
+          stream.println("    def zero = " + makeOpImplMethodNameWithArgs(o, "_zero"))
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
         case mapreduce:MapReduce =>
           val col = o.args.apply(mapreduce.argIndex)
@@ -230,9 +259,9 @@ trait DeliteGenOps extends BaseGenOps {
           emitOpNodeHeader(o, "DeliteOpMapReduce[" + quote(mapreduce.tpePars._1) + "," + quote(mapreduce.tpePars._2) + "]")            
           stream.println()
           stream.println("    val in = " + col.name)
-          stream.println("    def map = " + inline(o,mapreduce.map,quoteLiteral))
-          stream.println("    def zero = " + inline(o,mapreduce.zero,quoteLiteral))
-          stream.println("    def reduce = " + inline(o,mapreduce.reduce,quoteLiteral))          
+          stream.println("    def map = " + makeOpImplMethodNameWithArgs(o, "_map"))
+          stream.println("    def zero = " + makeOpImplMethodNameWithArgs(o, "_zero"))
+          stream.println("    def reduce = " + makeOpImplMethodNameWithArgs(o, "_reduce"))
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")        
         case filter:Filter =>
           val colTpe = getHkTpe(o.retTpe)
@@ -242,8 +271,8 @@ trait DeliteGenOps extends BaseGenOps {
           emitOpNodeHeader(o, "DeliteOpFilter[" + quote(filter.tpePars._1) + "," + quote(filter.tpePars._2) + "," + makeTpeInst(colTpe,filter.tpePars._2) + "]")            
           stream.println()
           stream.println("    val in = " + in.name)
-          stream.println("    def cond = " + inline(o,filter.cond,quoteLiteral))
-          stream.println("    def func = " + inline(o,filter.func,quoteLiteral))
+          stream.println("    def cond = " + makeOpImplMethodNameWithArgs(o, "_cond"))
+          stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_map"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,filter.tpePars._2)) + "(in, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(inDc.size) + ")")                          
         case hfr:HashFilterReduce =>
@@ -254,11 +283,11 @@ trait DeliteGenOps extends BaseGenOps {
           emitOpNodeHeader(o, "DeliteOpHashFilterReduce[" + quote(hfr.tpePars._1) + "," + quote(hfr.tpePars._2) + "," + quote(hfr.tpePars._3) + "," + makeTpeInst(colTpe,hfr.tpePars._3) + "]")            
           stream.println()
           stream.println("    val in = " + in.name)
-          stream.println("    def cond = " + inline(o,hfr.cond,quoteLiteral))
-          stream.println("    def keyFunc = " + inline(o,hfr.key,quoteLiteral))
-          stream.println("    def mapFunc = " + inline(o,hfr.map,quoteLiteral))
-          stream.println("    def zero = " + inline(o,hfr.zero,quoteLiteral))
-          stream.println("    def reduceFunc = " + inline(o,hfr.reduce,quoteLiteral))                    
+          stream.println("    def cond = " + makeOpImplMethodNameWithArgs(o, "_cond"))
+          stream.println("    def keyFunc = " + makeOpImplMethodNameWithArgs(o, "_key"))
+          stream.println("    def mapFunc = " + makeOpImplMethodNameWithArgs(o, "_map"))
+          stream.println("    def zero = " + makeOpImplMethodNameWithArgs(o, "_zero"))
+          stream.println("    def reduceFunc = " + makeOpImplMethodNameWithArgs(o, "_reduce"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,hfr.tpePars._3)) + "(in, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(inDc.size) + ")")                                  
         case foreach:Foreach =>
@@ -267,7 +296,7 @@ trait DeliteGenOps extends BaseGenOps {
           emitOpNodeHeader(o, "DeliteOpForeach[" + quote(foreach.tpePar) + "]")            
           stream.println()
           stream.println("    val in = " + col.name)
-          stream.println("    def func = " + inline(o,foreach.func,quoteLiteral))
+          stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_func"))
           stream.println("    def sync = n => unit(List())")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")                  
       }

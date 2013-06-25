@@ -219,8 +219,10 @@ trait BaseGenOps extends ForgeCodeGenBase {
   }
   
   def makeOpImplMethodName(o: Rep[DSLOp]) = makeOpMethodName(o) + "_impl"
-  def makeOpImplMethodNameWithArgs(o: Rep[DSLOp]) = makeOpImplMethodName(o) + nameClashId(o) + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o)
-  def makeOpImplMethodSignature(o: Rep[DSLOp]) = "def " + makeOpImplMethodName(o) + nameClashId(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithType(o) + ": " + repifySome(o.retTpe) 
+  def makeOpImplMethodNameWithArgs(o: Rep[DSLOp], postfix: String = "") = makeOpImplMethodName(o) + nameClashId(o) + postfix + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o)  
+  def makeOpImplMethodSignature(o: Rep[DSLOp], postfix: String = "", returnTpe: Option[String] = None) = {
+    "def " + makeOpImplMethodName(o) + nameClashId(o) + postfix + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithType(o) + ": " + (returnTpe getOrElse repifySome(o.retTpe))
+  }
   
   /**
    * Op sanity checking

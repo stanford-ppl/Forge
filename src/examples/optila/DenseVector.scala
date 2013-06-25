@@ -177,7 +177,7 @@ trait DenseVectorOps {
         densevector_insertspace($self, $1, $2.length)
         $self.copyFrom($1, $2)     
       }
-      infix ("remove") (MInt :: MUnit, effect = write(0)) implements composite ${ $self.removeAll($1, unit(1)) }
+      infix ("remove") (MInt :: MUnit, effect = write(0)) implements composite ${ $self.removeAll($1, 1) }
       infix ("removeAll") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
         val data = densevector_raw_data($self)
         array_copy(data, $pos + $len, data, $pos, $self.length - ($pos + $len))
@@ -383,9 +383,9 @@ trait DenseVectorOps {
     infix (DenseVector) ("-", Nil, (DenseVector(MDouble),DenseVector(MFloat)) :: DenseVector(MDouble)) implements composite ${ densevector_sub[Double]($0,$1.toDouble) }
     infix (DenseVector) ("-", Nil, (DenseVector(MDouble),DenseVector(MDouble)) :: DenseVector(MDouble)) implements composite ${ densevector_sub[Double]($0,$1) }    
     
-    infix (DenseVector) ("unary_-", Nil, (DenseVector(MInt)) :: DenseVector(MInt)) implements composite ${ densevector_mul[Int]($0,unit(-1)) }
-    infix (DenseVector) ("unary_-", Nil, (DenseVector(MFloat)) :: DenseVector(MFloat)) implements composite ${ densevector_mul[Float]($0,unit(-1f)) }
-    infix (DenseVector) ("unary_-", Nil, (DenseVector(MDouble)) :: DenseVector(MDouble)) implements composite ${ densevector_mul[Double]($0,unit(-1.0)) }
+    infix (DenseVector) ("unary_-", Nil, (DenseVector(MInt)) :: DenseVector(MInt)) implements composite ${ densevector_mul[Int]($0,-1) }
+    infix (DenseVector) ("unary_-", Nil, (DenseVector(MFloat)) :: DenseVector(MFloat)) implements composite ${ densevector_mul[Float]($0,-1f) }
+    infix (DenseVector) ("unary_-", Nil, (DenseVector(MDouble)) :: DenseVector(MDouble)) implements composite ${ densevector_mul[Double]($0,-1.0) }
     infix (DenseVector) ("*", Nil, (MInt,DenseVector(MInt)) :: DenseVector(MInt)) implements composite ${ densevector_mul[Int]($1,$0) }
     infix (DenseVector) ("*", Nil, (MInt,DenseVector(MFloat)) :: DenseVector(MFloat)) implements composite ${ densevector_mul[Float]($1,$0.toFloat) }
     infix (DenseVector) ("*", Nil, (MInt,DenseVector(MDouble)) :: DenseVector(MDouble)) implements composite ${ densevector_mul[Double]($1,$0.toDouble) }

@@ -122,7 +122,7 @@ trait SimpleVectorDSL extends ForgeApplication {
 
       val K = tpePar("K")
       val V = tpePar("V")
-      infix ("hashreduce") ((T ==> K,T ==> V,(V,V) ==> V) :: Vector(V), TNumeric(V), addTpePars = (K,V)) implements hashFilterReduce((T,K,V), 0, ${e => unit(true)}, ${e => $1(e)}, ${e => $2(e)}, ${numeric_zero[V]}, ${(a,b) => $3(a,b)})
+      infix ("hashreduce") ((T ==> K,T ==> V,(V,V) ==> V) :: Vector(V), TNumeric(V), addTpePars = (K,V)) implements hashFilterReduce((T,K,V), 0, ${e => true}, ${e => $1(e)}, ${e => $2(e)}, ${numeric_zero[V]}, ${(a,b) => $3(a,b)})
             
       // misc      
       // will print out of order in parallel, but hey

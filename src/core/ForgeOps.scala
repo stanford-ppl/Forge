@@ -152,7 +152,7 @@ trait ForgeSugar extends ForgeSugarLowPriority {
     new ChainTpe(tpe)
   }
   class ChainTpe(tpe: Rep[DSLType]) {
-    def apply(block: => Unit) = new Scope[TpeScope, TpeScopeRunner, Unit](block)
+    def apply[R](block: => R) = new Scope[TpeScope, TpeScopeRunner[R], R](block)
   }  
   
   trait TpeScope {
@@ -200,9 +200,9 @@ trait ForgeSugar extends ForgeSugarLowPriority {
     def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup_op(grpName,opName,index)
   }
   
-  trait TpeScopeRunner extends TpeScope {
-    def apply: Any
-    apply
+  trait TpeScopeRunner[R] extends TpeScope {
+    def apply: R
+    val result = apply
     _tpeScopeBox = null // reset
   }    
 }

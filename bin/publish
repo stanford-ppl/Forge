@@ -56,11 +56,11 @@ import sbt._
 import Keys._
 
 object ${dslName}Build extends Build {
-  val virtualization_lms_core = "EPFL" % "lms_2.10.0" % "0.3-SNAPSHOT"
+  val virtualization_lms_core = "EPFL" % "lms_2.10.2-RC1" % "0.3-SNAPSHOT"
   val delite_framework = "stanford-ppl" % "framework_2.10" % "0.1-SNAPSHOT"
   val delite_runtime = "stanford-ppl" % "runtime_2.10" % "0.1-SNAPSHOT"
 
-  val virtScala = "2.10.0" 
+  val virtScala = "2.10.2-RC1"
   val virtBuildSettingsBase = Defaults.defaultSettings ++ Seq(
     organization := "stanford-ppl",
     scalaOrganization := "org.scala-lang.virtualized",

@@ -2,6 +2,8 @@ import optiql.compiler._
 import optiql.library._
 import optiql.shared._
 
+import scala.virtualization.lms.common.Record
+
 object Q1Compiler extends OptiQLApplicationCompiler with Q1
 object Q1Interpreter extends OptiQLApplicationInterpreter with Q1
 
@@ -37,8 +39,8 @@ trait Q1 extends OptiQLApplication {
       val l_extendedprice = array_apply(fields, 5).toDouble
       val l_discount = array_apply(fields, 6).toDouble
       val l_tax = array_apply(fields, 7).toDouble
-      val l_returnflag = fstring_fcharat(array_apply(fields, 8), 0) //.fcharAt crashes
-      val l_linestatus = fstring_fcharat(array_apply(fields, 9), 0)
+      val l_returnflag = infix_fcharAt(array_apply(fields, 8), 0) //.fcharAt doesn't resolve for some reason
+      val l_linestatus = infix_fcharAt(array_apply(fields, 9), 0)
       val l_shipdate = Date(array_apply(fields, 10))
       val l_commitdate = Date(array_apply(fields, 11))
       val l_receiptdate = Date(array_apply(fields, 12))
@@ -70,8 +72,8 @@ trait Q1 extends OptiQLApplication {
       val lineStatus = g.key._2
       val sumQty = g.value.Sum(_.l_quantity)
       val sumBasePrice = g.value.Sum(_.l_extendedprice)      
-      val sumDiscountedPrice = g.value.Sum(l => l.l_extendedprice * (unit(1.0d) - l.l_discount))  // crashes without unit
-      val sumCharge = g.value.Sum(l => l.l_extendedprice * (unit(1.0d) - l.l_discount) * (unit(1.0d) + l.l_tax))  // crashes without unit
+      val sumDiscountedPrice = g.value.Sum(l => l.l_extendedprice * (1.0d - l.l_discount))  
+      val sumCharge = g.value.Sum(l => l.l_extendedprice * (1.0d - l.l_discount) * (unit(1.0d) + l.l_tax))  // unit required for + for some reason (infix fails to resolve otherwise)
       val avgQty = g.value.Average(_.l_quantity)
       val avgPrice = g.value.Average(_.l_extendedprice)
       val avgDiscount = g.value.Average(_.l_discount)

@@ -6,7 +6,7 @@ import ConfigParser
 DELITE_HOME = os.getenv("DELITE_HOME")
 
 scala_virt_prefix = "org.scala-lang.virtualized."
-scala_virt_version = "scala-2.10.0"
+scala_virt_version = "scala-2.10.2-RC1"
 scala_major_id = '.'.join(scala_virt_version.split('.')[0:2]) 
 script_path = os.path.dirname(__file__)
 script_home = os.path.split(script_path)[0]

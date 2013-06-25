@@ -17,7 +17,7 @@ trait OptiQLDSL extends ForgeApplication with TableOps with DateOps {
    * The specification is the DSL definition (types, data structures, ops)
    */
   def specification() = {
-    extern(grp("OptiQLRecord"))
+    extern(grp("Rewrite"))
     //extern(grp("QueryOpts"))
     importScalaOps()      
     importTableOps() 

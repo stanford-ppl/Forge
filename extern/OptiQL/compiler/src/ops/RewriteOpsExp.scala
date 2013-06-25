@@ -5,7 +5,7 @@ import scala.reflect.{RefinedManifest,SourceContext}
 import optiql.compiler._
 import optiql.shared.ops._
 
-trait OptiQLRecordOpsExp extends OptiQLRecordOps with TableOpsExp {
+trait RewriteOpsExp extends RewriteOps with TableOpsExp {
   this: OptiQLExp => 
 
   def upgradeInt[R:Manifest](value: Rep[Int]): Rep[R] = value.asInstanceOf[Rep[R]]
@@ -47,7 +47,7 @@ trait OptiQLRecordOpsExp extends OptiQLRecordOps with TableOpsExp {
     }).asInstanceOf[(Exp[N],Exp[N])=>Exp[N]]
 
     def rewriteAverage[N](value: Exp[Any]) = (value match {
-      case Def(d@Table_Average(_,_)) => (a:Exp[N],count:Exp[Int]) => fractional_div(a, count.asInstanceOf[Exp[N]])(mtype(d._mR),frtype(d._fracR),mtype(d._mR),ctx,implicitly[Rep[N]=>Rep[N]],implicitly[Overload28])
+      case Def(d@Table_Average(_,_)) => (a:Exp[N],count:Exp[Int]) => fractional_div(a, count.asInstanceOf[Exp[N]])(mtype(d._mR),frtype(d._fracR),mtype(d._mR),ctx,implicitly[Rep[N]=>Rep[N]],implicitly[Overload1])
       case _ => (a:Exp[N],count:Exp[N]) => a
     }).asInstanceOf[(Exp[N],Exp[Int])=>Exp[N]]
 
@@ -88,7 +88,7 @@ trait OptiQLRecordOpsExp extends OptiQLRecordOps with TableOpsExp {
 }
 
 // these need to exist for externs, even though we don't need them
-trait ScalaGenOptiQLRecordOps
-trait CudaGenOptiQLRecordOps
-trait OpenCLGenOptiQLRecordOps 
-trait CGenOptiQLRecordOps
+trait ScalaGenRewriteOps
+trait CudaGenRewriteOps
+trait OpenCLGenRewriteOps 
+trait CGenRewriteOps

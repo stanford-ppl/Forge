@@ -12,6 +12,13 @@ trait ForgeArrayOps extends Base {
   type ForgeArray[T]
   implicit def forgeArrayManifest[T:Manifest]: Manifest[ForgeArray[T]]
   
+  /**
+   * Applications may need direct access to ForgeArrays, if, for example, they use string fsplit
+   * How do we allow DSLs to only optionally include the Array API for end users?
+   */
+  def array_apply[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[T]
+  def array_length[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[Int]          
+
   /* Required for apps to be able use 'args' */
   implicit class ScalaArrayOps[T:Manifest](x: Rep[Array[T]]) {
     def apply(n: Rep[Int])(implicit ctx: SourceContext) = scala_array_apply(x,n)
@@ -41,8 +48,6 @@ trait ForgeArrayCompilerOps extends ForgeArrayOps {
   def array_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
   def array_copy[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int],__arg2: Rep[ForgeArray[T]],__arg3: Rep[Int],__arg4: Rep[Int])(implicit __imp0: SourceContext): Rep[Unit]
   def array_update[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int],__arg2: Rep[T])(implicit __imp0: SourceContext): Rep[Unit]
-  def array_apply[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[T]
-  def array_length[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[Int]          
   def array_clone[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
   def array_sort[T:Manifest:Ordering](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
   def array_fromseq[T:Manifest](__arg0: Seq[Rep[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]

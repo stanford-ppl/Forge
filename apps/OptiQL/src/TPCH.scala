@@ -29,22 +29,22 @@ trait Q1 extends OptiQLApplication {
   def fromLine(line: Rep[String]): Rep[LineItem] = {
     val fields = line.fsplit("\\Q" + "|" + "\\E")
     new Record {
-      val l_orderkey = { date_object_apply(farray_apply(fields, 10).asInstanceOf[Rep[String]]); farray_apply(fields, 0).toInt } //array.apply isn't exposed to user code
-      val l_partkey = farray_apply(fields, 1).toInt
-      val l_suppkey = farray_apply(fields, 2).toInt
-      val l_linenumber = farray_apply(fields, 3).toInt
-      val l_quantity = farray_apply(fields, 4).toDouble
-      val l_extendedprice = farray_apply(fields, 5).toDouble
-      val l_discount = farray_apply(fields, 6).toDouble
-      val l_tax = farray_apply(fields, 7).toDouble
-      val l_returnflag = fstring_fcharat(farray_apply(fields, 8), 0) //.fcharAt crashes
-      val l_linestatus = fstring_fcharat(farray_apply(fields, 9), 0)
-      val l_shipdate = Date(farray_apply(fields, 10))
-      val l_commitdate = Date(farray_apply(fields, 11))
-      val l_receiptdate = Date(farray_apply(fields, 12))
-      val l_shipinstruct = farray_apply(fields, 13)
-      val l_shipmode = farray_apply(fields, 14)
-      val l_comment = farray_apply(fields, 15)
+      val l_orderkey = { date_object_apply(array_apply(fields, 10).asInstanceOf[Rep[String]]); array_apply(fields, 0).toInt } 
+      val l_partkey = array_apply(fields, 1).toInt
+      val l_suppkey = array_apply(fields, 2).toInt
+      val l_linenumber = array_apply(fields, 3).toInt
+      val l_quantity = array_apply(fields, 4).toDouble
+      val l_extendedprice = array_apply(fields, 5).toDouble
+      val l_discount = array_apply(fields, 6).toDouble
+      val l_tax = array_apply(fields, 7).toDouble
+      val l_returnflag = fstring_fcharat(array_apply(fields, 8), 0) //.fcharAt crashes
+      val l_linestatus = fstring_fcharat(array_apply(fields, 9), 0)
+      val l_shipdate = Date(array_apply(fields, 10))
+      val l_commitdate = Date(array_apply(fields, 11))
+      val l_receiptdate = Date(array_apply(fields, 12))
+      val l_shipinstruct = array_apply(fields, 13)
+      val l_shipmode = array_apply(fields, 14)
+      val l_comment = array_apply(fields, 15)
     }
   }
 
@@ -69,9 +69,9 @@ trait Q1 extends OptiQLApplication {
       val returnFlag = g.key._1
       val lineStatus = g.key._2
       val sumQty = g.value.Sum(_.l_quantity)
-      val sumBasePrice = g.value.Sum(_.l_extendedprice)
-      val sumDiscountedPrice = g.value.Sum(l => primitive2_mul(l.l_extendedprice, (primitive2_sub(1.0, l.l_discount))))//(manifest[Double],implicitly[Numeric[Double]],implicitly[SourceContext])                // FIXME: ambiguous numeric ops problem and compiler crash in 2.10.0
-      val sumCharge = g.value.Sum(l=> primitive2_mul(l.l_extendedprice, primitive2_mul(primitive2_sub(1.0d, l.l_discount), primitive2_pl(1.0d, l.l_tax))))//(manifest[Double],implicitly[Numeric[Double]],implicitly[SourceContext])   // FIXME: ambiguous numeric ops problem and compiler crash in 2.10.0
+      val sumBasePrice = g.value.Sum(_.l_extendedprice)      
+      val sumDiscountedPrice = g.value.Sum(l => l.l_extendedprice * (unit(1.0d) - l.l_discount))  // crashes without unit
+      val sumCharge = g.value.Sum(l => l.l_extendedprice * (unit(1.0d) - l.l_discount) * (unit(1.0d) + l.l_tax))  // crashes without unit
       val avgQty = g.value.Average(_.l_quantity)
       val avgPrice = g.value.Average(_.l_extendedprice)
       val avgDiscount = g.value.Average(_.l_discount)

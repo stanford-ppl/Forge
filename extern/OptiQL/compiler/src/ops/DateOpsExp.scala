@@ -49,9 +49,9 @@ trait DateOpsExp extends DateCompilerOps with BaseFatExp with DeliteStructsExp {
 
   def date_object_apply_impl5(__arg0: Rep[String])(implicit __pos: SourceContext): Rep[Date] = {
     val tokens = fstring_fsplit(__arg0,unit("-"))
-    val year = fstring_toint(farray_apply(tokens,unit(0)))
-    val month = fstring_toint(farray_apply(tokens,unit(1)))
-    val day = fstring_toint(farray_apply(tokens,unit(2)))
+    val year = fstring_toint(array_apply(tokens,unit(0)))
+    val month = fstring_toint(array_apply(tokens,unit(1)))
+    val day = fstring_toint(array_apply(tokens,unit(2)))
     Date(primitive2_pl(primitive2_ltlt(year, unit(9)), primitive2_pl(primitive2_ltlt(month, unit(5)), day)))
   }
 

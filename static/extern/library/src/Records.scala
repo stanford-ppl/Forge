@@ -1,14 +1,13 @@
-package optiql.library.classes
+package LOWERCASE_DSL_NAME.library
 
-import optiql.shared.ops._
-import optiql.library._
-import optiql.library.classes._
+import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}
+import scala.virtualization.lms.common._
 import scala.collection.mutable.HashMap
 
-trait OptiQLRecordWrapper extends OptiQLRecordOps {
-  this: OptiQLBase with OptiQLClasses => 
-
+trait RecordWrapper extends HUMAN_DSL_NAMEBase {
+  this: StructOps =>
+  
   class RecordImpl extends Record {
     val fields: HashMap[String,Any] = new HashMap()
   }
@@ -35,21 +34,8 @@ trait OptiQLRecordWrapper extends OptiQLRecordOps {
         sys.error("field " + field + " does not exist")
     }
   }
-
-  def upgradeInt[R:Manifest](value: Rep[Int]): Rep[R] = value.toDouble.asInstanceOf[Rep[R]]
-
-  def groupByHackImpl[K:Manifest,V:Manifest](self: Rep[Table[V]], keySelector: Rep[V] => Rep[K])(implicit pos: SourceContext): Rep[Table[Tup2[K,Table[V]]]] = {
-    val map = self.data.take(self.size).groupBy(keySelector)
-    
-    val pairs = new scala.collection.mutable.ArrayBuffer[Tup2[K,Table[V]]]
-    for ((key,v) <- map) {
-      val values = v.toArray
-      pairs += new Tup2(key, new Table(v.length, v))
-    }
-
-    new Table(pairs.length, pairs.toArray)
-  }
-
-  def zeroType[T:Manifest]: Rep[T] = null.asInstanceOf[Rep[T]]
-
 }
+
+
+
+

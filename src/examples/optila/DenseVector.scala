@@ -79,9 +79,8 @@ trait DenseVectorOps {
     // a non-type-safe way of passing the metadata required to allocate a DenseVector in a parallel op
     // ideally we would encode this is as a type class, but it's not clear we would get an instance of this type class in dc_alloc
     val CR = tpePar("CR")
-    compiler (DenseVector) ("densevector_raw_alloc", (R,CR), (CR,MInt) :: DenseVector(R)) implements composite ${
-      val ms = manifest[CR].toString
-      val simpleName = ms.drop(ms.lastIndexOf("\$\$")+1)         
+    compiler (DenseVector) ("densevector_raw_alloc", (R,CR), (CR,MInt) :: DenseVector(R)) implements composite ${      
+      val simpleName = manifest[CR].erasure.getSimpleName
       val isRow = simpleName match {
         case s if s.startsWith("IndexVector") => indexvector_isrow($0.asInstanceOf[Rep[IndexVector]])
         case s if s.startsWith("DenseVectorView") => densevectorview_isrow($0.asInstanceOf[Rep[DenseVectorView[Any]]])

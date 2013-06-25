@@ -56,7 +56,7 @@ import sbt._
 import Keys._
 
 object ${dslName}Build extends Build {
-  val virtualization_lms_core = "EPFL" % "lms_2.10.2-RC1" % "0.3-SNAPSHOT"
+  val virtualization_lms_core = "EPFL" % "lms_2.10" % "0.3-SNAPSHOT"
   val delite_framework = "stanford-ppl" % "framework_2.10" % "0.1-SNAPSHOT"
   val delite_runtime = "stanford-ppl" % "runtime_2.10" % "0.1-SNAPSHOT"
 

@@ -289,7 +289,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   /* Adds a bound to a type parameter by constructing a new type parameter */
   def forge_withbound(a: Rep[TypePar], b: TypeClassSignature) = tpePar(a.name, b :: a.ctxBounds)
   
-  def forge_typeclasson(a: TypeClassSignature, b: List[Rep[TypePar]]) = ephemeralTpe(a.name, b, stage = now)
+  def forge_typeclasson(a: TypeClassSignature, b: List[Rep[TypePar]]) = tpeClass(a.name, a, b)
 
   /* A DSLType */    
   case class Tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag) extends Def[DSLType]

@@ -99,7 +99,7 @@ trait DeliteGenOps extends BaseGenOps {
   }  
   
   def makeTpeClsPar(b: TypeClassSignature, t: Rep[DSLType]) = {
-    val body = opIdentifierPrefix + "." + b.prefix + t.name
+    val body = opIdentifierPrefix + "." + b.prefix + quote(t)
     b.wrapper match {
       case Some(w) => w + "(" + body + ")"
       case None => body      
@@ -456,7 +456,11 @@ trait DeliteGenOps extends BaseGenOps {
         case Def(Arg(name, _, _)) => List("f("+opArgPrefix+t._2+")")
       }).mkString(",") + ")"
       
-      val implicits = (o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++ o.implicitArgs.map(a => opIdentifierPrefix + "." + a.name))
+      val implicits = o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++
+                      o.implicitArgs.map { a => 
+                         val argName = opIdentifierPrefix + "." + a.name
+                         if (isTpeClass(a.tpe)) asTpeClass(a.tpe).signature.wrapper.getOrElse("") + "(" + argName + ")" else argName 
+                      }
       val implicitsWithParens = if (implicits.length == 0) "" else implicits.mkString("(",",",")")
       
       Impls(o) match {

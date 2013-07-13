@@ -207,7 +207,7 @@ trait DeliteGenOps extends BaseGenOps {
     for (o <- uniqueOps if hasIRNode(o)) { 
       stream.print("  case class " + makeOpNodeName(o) + makeTpeParsWithBounds(o.tpePars))
       if (Impls(o).isInstanceOf[CodeGen]) stream.print(makeArgsWithBoundSymsWithType(o.args, Impls(o), blockify))
-      else stream.print(makeOpArgsWithType(o))    
+      else stream.print(makeOpArgsWithType(o))
       stream.print(makeOpImplicitArgsWithType(o,true))
       
       Impls(o) match {
@@ -574,6 +574,9 @@ trait DeliteGenOps extends BaseGenOps {
     def wrapManifest(t: Rep[DSLType]) = t match {
       case Def(TpeInst(Def(Tpe("ForgeArray",args,stage)), List(p))) if (isTpePar(p)) => "darrayManifest(m.typeArguments(0))"
       case Def(TpeInst(Def(Tpe("ForgeArray",args,stage)), List(p))) => "darrayManifest(manifest["+quote(p)+"])"
+      // do we need an equivalent of darrayManifest for each DSL type to preserve the type arguments? does it matter?
+      // case Def(TpeInst(Def(Tpe(name,args,stage)), ps)) if ps != Nil => "manifest[" + name + ps.zipWithIndex.map(a => if (!isTpePar(a._1)) quote(a._1) else "m.typeArguments(" + a._2 + ")").mkString("[",",","]") + "]"
+      case Def(TpeInst(Def(Tpe(name,args,stage)), ps)) if ps != Nil => "manifest[" + name + ps.map(a => "_").mkString("[",",","]") + "]"
       case _ => "manifest[" + quote(t) + "]"
     }
     

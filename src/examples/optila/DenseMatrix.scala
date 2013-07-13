@@ -40,6 +40,7 @@ trait DenseMatrixOps {
     )}    
     
     // helper
+    compiler (DenseMatrix) ("densematrix_fromarray", T, (MArray(T), MInt, MInt) :: DenseMatrix(T)) implements allocates(DenseMatrix, ${$1}, ${$2}, ${$0})
     compiler (DenseMatrix) ("densematrix_fromfunc", T, (MInt, MInt, (MInt,MInt) ==> T) :: DenseMatrix(T)) implements single ${
       val out = DenseMatrix[T]($0, $1)
       for (i <- 0 until out.numRows) {

@@ -20,7 +20,10 @@ trait VarWrapper extends HUMAN_DSL_NAMEBase {
   def var_new[T:Manifest](init: Rep[T])(implicit pos: SourceContext): Var[T] = new Variable(init)
   def var_assign[T:Manifest](lhs: Var[T], rhs: Rep[T])(implicit pos: SourceContext): Rep[Unit] = lhs.set(rhs)
   
-  def var_plusequals[T:Manifest](lhs: Var[T], rhs: Rep[T])(implicit pos: SourceContext): Rep[Unit] = lhs.set((lhs.get.asInstanceOf[Int] + rhs.asInstanceOf[Int]).asInstanceOf[T])
+  def var_plusequals[T:Manifest](lhs: Var[T], rhs: Rep[T])(implicit pos: SourceContext): Rep[Unit] = manifest[T] match {
+    case Manifest.Int => lhs.set((lhs.get.asInstanceOf[Int] + rhs.asInstanceOf[Int]).asInstanceOf[T])
+    case Manifest.Double => lhs.set((lhs.get.asInstanceOf[Double] + rhs.asInstanceOf[Double]).asInstanceOf[T])
+  }    
   def var_minusequals[T:Manifest](lhs: Var[T], rhs: Rep[T])(implicit pos: SourceContext): Rep[Unit] = lhs.set((lhs.get.asInstanceOf[Int] - rhs.asInstanceOf[Int]).asInstanceOf[T])
   def var_timesequals[T:Manifest](lhs: Var[T], rhs: Rep[T])(implicit pos: SourceContext): Rep[Unit] = lhs.set((lhs.get.asInstanceOf[Int] * rhs.asInstanceOf[Int]).asInstanceOf[T])
   def var_divideequals[T:Manifest](lhs: Var[T], rhs: Rep[T])(implicit pos: SourceContext): Rep[Unit] = lhs.set((lhs.get.asInstanceOf[Int] / rhs.asInstanceOf[Int]).asInstanceOf[T])  

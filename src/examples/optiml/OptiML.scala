@@ -7,18 +7,26 @@ import core.ForgeApplicationRunner
 
 object OptiMLDSLRunner extends ForgeApplicationRunner with OptiMLDSL
 
-trait OptiMLDSL extends OptiLADSL {
+trait OptiMLDSL extends OptiLADSL
+  with SetOps {
     
   override def dslName = "OptiML"
   
   override def specification() = {
     // include OptiLA
     super.specification()
+
+    // disallow "while"
+    // this has the unfortunate side-effect of breaking even internally used whiles, which are lifted the same way...
+    // we could get around this by only overriding while inside a new trait that is only mixed in at the Application level (sort of a de-lift)
     
-    // our first OptiML ops are extern, sad
+    // val whileDo = lookupOp("Misc","__whileDo")
+    // impl (whileDo) (composite ${ fatal("illegal operation: 'while'. try using 'untilconverged' instead") })
+    
     extern(grp("Sum"))
     importVecMatConstructor()
     importUntilConverged()
+    importSetOps()
   } 
   
   def importVecMatConstructor() {

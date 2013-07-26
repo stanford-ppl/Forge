@@ -131,8 +131,8 @@ def publish(dsl, opts):
         if os.path.exists(src):
             os.system("rsync -r " + src + " " + dest)
         os.system("rsync -r " + static + " " + dest)
-        os.system("find " + dest + " -type f -print0 | xargs -0 sed -i \"s/HUMAN_DSL_NAME/"+dsl+"/g\"")
-        os.system("find " + dest + " -type f -print0 | xargs -0 sed -i \"s/LOWERCASE_DSL_NAME/"+dsl.lower()+"/g\"")
+        os.system("find " + dest + " -type f -print0 | xargs -0 sed -i \"\" 's/HUMAN_DSL_NAME/"+dsl+"/g'")
+        os.system("find " + dest + " -type f -print0 | xargs -0 sed -i \"\" 's/LOWERCASE_DSL_NAME/"+dsl.lower()+"/g'")
           
     os.system("rsync -r " + FORGE_HOME + "/apps/" + dsl + "/" + " " + build_dir + "/apps/")
 

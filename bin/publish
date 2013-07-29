@@ -7,6 +7,7 @@ import ConfigParser
 import os, sys, shutil
 import stat
 import math
+import fileinput
 
 FORGE_HOME = os.getenv("FORGE_HOME")
 FORGE_GENERATED = "build" # TODO
@@ -131,8 +132,10 @@ def publish(dsl, opts):
         if os.path.exists(src):
             os.system("rsync -r " + src + " " + dest)
         os.system("rsync -r " + static + " " + dest)
-        os.system("find " + dest + " -type f -print0 | xargs -0 sed -i \"s/HUMAN_DSL_NAME/"+dsl+"/g\"")
-        os.system("find " + dest + " -type f -print0 | xargs -0 sed -i \"s/LOWERCASE_DSL_NAME/"+dsl.lower()+"/g\"")
+        # perform name replacement on all generated files
+        replfiles = [d + "/" + f for (d, n, fs) in os.walk(dest) for f in fs]
+        for line in fileinput.input(replfiles, inplace = 1):
+            print line.replace("HUMAN_DSL_NAME", dsl).replace("LOWERCASE_DSL_NAME", dsl.lower())
           
     os.system("rsync -r " + FORGE_HOME + "/apps/" + dsl + "/" + " " + build_dir + "/apps/")
 

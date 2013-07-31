@@ -111,8 +111,10 @@ trait Definitions extends DerivativeTypes {
   // blacklist for op names that cannot be expressed with infix methods
   // we also blacklist some operators for improved compilation performance or to avoid ambiguities in the REPL version
   // unfortunately, blacklisting arithmetic operators causes some erroneous type errors in application code for combinations that should work. however, using infix does appear to have a significant compilation cost
+  // the two lists used below are used interchangeably depending on the configuration (normal or fast compile mode)
   var noInfixList = List("apply", "update", /*"+",*/ "-", "*", "/", "<", ">", "<=", ">=")  // string + doesn't resolve correctly in the compiler version using only implicits
-    
+  var mustInfixList = List("+"/*,"-","*","/"*/,"!=","length","toString") 
+
   // blacklist for op names that need to be overridden in instance methods
   var overrideList = Set("toString", "hashCode", "equals")
   
@@ -181,6 +183,20 @@ trait Definitions extends DerivativeTypes {
   def forge_composite(func: Rep[String]): OpType
   object composite {
     def apply(func: Rep[String]) = forge_composite(func)
+  }
+
+  /**
+   * Redirect
+   *
+   * Similar to composite, except no abstract methods will be created (the unrolling happens in the front-end).
+   * As a consequence, no DSL implicit conversions are in scope for a redirect.
+   * 
+   * @param retTpe    R, the return type of the function
+   * @param func      string representation of the function ( => R)
+   */
+  def forge_redirect(func: Rep[String]): OpType
+  object redirect {
+    def apply(func: Rep[String]) = forge_redirect(func)
   }
   
   /**
@@ -359,6 +375,9 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
 
   case class Composite(func: Rep[String]) extends OpType
   def forge_composite(func: Rep[String]) = Composite(func)
+
+  case class Redirect(func: Rep[String]) extends OpType
+  def forge_redirect(func: Rep[String]) = Redirect(func)
   
   /**
    * Delite ops

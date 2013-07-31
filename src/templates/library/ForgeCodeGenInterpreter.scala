@@ -94,7 +94,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
         }
       }
     }       
-    for (d <- DataStructs.keys.toSeq diff OpsGrp.keys.filter(grpIsTpe).map(grpAsTpe).toSeq) {
+    for (d <- DataStructs.keys.toSeq diff OpsGrp.values.flatMap(_.ops).map(_.grp).filter(grpIsTpe).map(grpAsTpe).toSeq) {
       warn("(library) ignoring data definition for " + d.name + " since it cannot be instantiated in app code (it has no accompanying ops)")
     }             
     for (e <- Externs) {

@@ -21,11 +21,11 @@ trait DeliteGenOps extends BaseGenOps {
     if (opsGrp.ops.exists(_.style == compilerMethod)) opsGrp.grp.name + "CompilerOps" 
     else opsGrp.name    
   }
-  def baseExpCls(grp: Rep[DSLGroup]) = {
+  def baseExpCls(opsGrp: DSLOps) = {
     // in order of decreasing inclusiveness
-    if (grpIsTpe(grp) && ForgeCollections.contains(grpAsTpe(grp)) && DataStructs.contains(grpAsTpe(grp))) "DeliteCollectionOpsExp with DeliteStructsExp"
-    else if (grpIsTpe(grp) && ForgeCollections.contains(grpAsTpe(grp))) "DeliteCollectionOpsExp"
-    else if (grpIsTpe(grp) && DataStructs.contains(grpAsTpe(grp))) "BaseFatExp with DeliteStructsExp"
+    if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && ForgeCollections.contains(grpAsTpe(o.grp)) && DataStructs.contains(grpAsTpe(o.grp)))) "DeliteCollectionOpsExp with DeliteStructsExp"
+    else if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && ForgeCollections.contains(grpAsTpe(o.grp)))) "DeliteCollectionOpsExp"
+    else if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && DataStructs.contains(grpAsTpe(o.grp)))) "BaseFatExp with DeliteStructsExp"
     else "BaseFatExp with EffectExp" // we use codegen *GenFat, which requires EffectExp
   }
     
@@ -162,7 +162,7 @@ trait DeliteGenOps extends BaseGenOps {
     emitBlockComment("IR Definitions", stream)   
     stream.println()
     
-    stream.println("trait " + opsGrp.name + "Exp extends " + baseOpsCls(opsGrp) + " with " + baseExpCls(opsGrp.grp) + " {")
+    stream.println("trait " + opsGrp.name + "Exp extends " + baseOpsCls(opsGrp) + " with " + baseExpCls(opsGrp) + " {")
     stream.println("  this: " + dsl + "Exp => ")
     stream.println()
        
@@ -178,15 +178,15 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println()
     emitMirrors(uniqueOps, stream)
     stream.println()    
-    emitDeliteCollection(opsGrp.grp, stream)   
+    emitDeliteCollection(opsGrp, stream)   
     stream.println()
-    emitStructMethods(opsGrp.grp, stream)   
+    emitStructMethods(opsGrp, stream)   
     stream.println("}")      
   }
       
   def emitIRNodes(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
     def hasIRNode(o: Rep[DSLOp]) = Impls(o) match {
-      case _:Composite | _:Getter | _:Setter => false
+      case _:Composite | _:Redirect | _:Getter | _:Setter => false
       case _ => true
     }
     
@@ -308,7 +308,7 @@ trait DeliteGenOps extends BaseGenOps {
   
   def emitNodeConstructors(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
     // methods that construct nodes
-    for (o <- uniqueOps) { 
+    for (o <- uniqueOps if !Impls(o).isInstanceOf[Redirect]) { 
       stream.println("  " + makeOpMethodSignature(o) + " = {")
       val summary = scala.collection.mutable.ArrayBuffer[String]()
       
@@ -469,12 +469,18 @@ trait DeliteGenOps extends BaseGenOps {
           // pure version with no func args uses smart constructor
           if (!hasFuncArgs(o)) {
             stream.print(makeOpMethodName(o) + xformArgs)
-            stream.print("(" + implicits.mkString(","))          
-            // we may need to supply an explicit Overload parameter for the smart constructor
-            // relies on conventions established in implicitArgsWithOverload (e.g., guaranteed to always be the last implicit)
             val id = nameClashId(o)
-            if (id != "") stream.print(",implicitly[Overload" + id + "]")  
-            stream.println(")")
+            if (id != "" || implicits.length > 0) {
+              stream.print("(")
+              if (implicits.length > 0) stream.print(implicits.mkString(","))                        
+              // we may need to supply an explicit Overload parameter for the smart constructor
+              // relies on conventions established in implicitArgsWithOverload (e.g., guaranteed to always be the last implicit)            
+              if (id != "" /*&& !Config.fastCompile*/) {
+                if (implicits.length > 0) stream.print(",")
+                stream.print("implicitly[Overload" + id + "]")  
+              }
+              stream.println(")")
+            }
           }
           else {
             stream.print("reflectPure(" + makeOpNodeName(o) + xformArgs + implicitsWithParens + ")")
@@ -501,76 +507,108 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println("  }).asInstanceOf[Exp[A]]")
   }
   
-  def emitDeliteCollection(grp: Rep[DSLGroup], stream: PrintWriter) {
-    try {
-      val tpe = grpAsTpe(grp)
-      if (ForgeCollections.contains(tpe)) {
-        emitBlockComment("Delite collection", stream, indent=2)
+  def emitDeliteCollection(opsGrp: DSLOps, stream: PrintWriter) {
+    val classes = opsGrpTpes(opsGrp)
+    if (classes.length > 0 && classes.exists(c => ForgeCollections.contains(c))) {
+      emitBlockComment("Delite collection", stream, indent=2)
+      var dcSizeStream = ""
+      var dcApplyStream = ""
+      var dcUpdateStream = ""
+      var dcParallelizationStream = ""
+      var dcSetLogicalSizeStream = ""
+      var dcAppendableStream = ""
+      var dcAppendStream = ""
+      var dcAllocStream = ""
+      var dcCopyStream = ""
+
+      var firstCol = true
+      var firstBuf = true
+      for (tpe <- classes if ForgeCollections.contains(tpe)) {                    
         val dc = ForgeCollections(tpe)        
         val isTpe = "is"+tpe.name
         def asTpe = "as"+tpe.name
         val colTpe = makeTpeInst(tpe, tpePar("A"))
+        val a = if (dc.tpeArg.tp.runtimeClass == classOf[TypePar]) "A" else quote(dc.tpeArg) // hack!
+
         stream.println("  def " + isTpe + "[A](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = isSubtype(x.tp.erasure,classOf["+makeTpeInst(tpe, tpePar("A"))+"])")
         stream.println("  def " + asTpe + "[A](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = x.asInstanceOf[Exp["+colTpe+"]]")
         stream.println()
-        stream.println("  override def dc_size[A:Manifest](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = {")
-        stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dc.size) + "(" + asTpe + "(x))") 
+        
+        val prefix = if (firstCol) "    if " else "    else if "
+        dcSizeStream +=   prefix + "(" + isTpe + "(x)) " + makeOpMethodName(dc.size) + "(" + asTpe + "(x))" + nl 
+        dcApplyStream +=  prefix + "(" + isTpe + "(x)) " + makeOpMethodName(dc.apply) + "(" + asTpe + "(x), n).asInstanceOf[Exp[A]]" + nl        
+        dcUpdateStream += prefix + "(" + isTpe + "(x)) " + makeOpMethodName(dc.update) + "(" + asTpe + "(x), n, y.asInstanceOf[Exp["+a+"]])" + nl
+        
+        if (dc.isInstanceOf[ParallelCollectionBuffer]) {
+          val dcb = dc.asInstanceOf[ParallelCollectionBuffer]
+          val appendTpe = if (isTpePar(dcb.appendable.args.apply(2).tpe)) "y" else "y.asInstanceOf[Exp["+quote(dcb.appendable.args.apply(2).tpe)+"]]"            
+          val allocTpePars = instAllocReturnTpe(dcb.alloc, ephemeralTpe(tpe.name, List(tpePar("A"))), tpePar("A"))
+          val prefix = if (firstBuf) "    if " else "    else if "
+
+          // dcParallelizationStream += "    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.parallelization) + "(" + asTpe + "(x), hasConditions)" + nl 
+          dcParallelizationStream += prefix + "(" + isTpe + "(x)) { if (hasConditions) ParSimpleBuffer else ParFlat } // TODO: always generating this right now" + nl
+          dcSetLogicalSizeStream +=  prefix + "(" + isTpe + "(x)) " + makeOpMethodName(dcb.setSize) + "(" + asTpe + "(x), y)" + nl
+          dcAppendableStream +=      prefix + "(" + isTpe + "(x)) " + makeOpMethodName(dcb.appendable) + "(" + asTpe + "(x), i, "+appendTpe+")" + nl
+          dcAppendStream +=          prefix + "(" + isTpe + "(x)) " + makeOpMethodName(dcb.append) + "(" + asTpe + "(x), i, "+appendTpe+")" + nl          
+          dcAllocStream +=           prefix + "(" + isTpe + "(x)) " + makeOpMethodName(dcb.alloc) + makeTpePars(allocTpePars) + "(" + asTpe + "(x), size).asInstanceOf[Exp[CA]]" + nl
+          dcCopyStream +=            prefix + "(" + isTpe + "(src) && " + isTpe + "(dst)) " + makeOpMethodName(dcb.copy) + "(" + asTpe + "(src), srcPos, " + asTpe + "(dst), dstPos, size)" + nl
+          firstBuf = false
+        }
+        firstCol = false
+      }
+      
+      if (!firstCol) {
+        stream.println("  override def dc_size[A:Manifest](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = {")    
+        stream.print(dcSizeStream)
         stream.println("    else super.dc_size(x)")
         stream.println("  }")
         stream.println()
         stream.println("  override def dc_apply[A:Manifest](x: Exp[DeliteCollection[A]], n: Exp[Int])(implicit ctx: SourceContext) = {")
-        stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dc.apply) + "(" + asTpe + "(x), n).asInstanceOf[Exp[A]]")
+        stream.print(dcApplyStream)
         stream.println("    else super.dc_apply(x,n)")
         stream.println("  }")
         stream.println()
         stream.println("  override def dc_update[A:Manifest](x: Exp[DeliteCollection[A]], n: Exp[Int], y: Exp[A])(implicit ctx: SourceContext) = {")
-        val a = if (dc.tpeArg.tp.runtimeClass == classOf[TypePar]) "A" else quote(dc.tpeArg) // hack!
-        stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dc.update) + "(" + asTpe + "(x), n, y.asInstanceOf[Exp["+a+"]])") 
+        stream.print(dcUpdateStream)
         stream.println("    else super.dc_update(x,n,y)")
+        stream.println("  }")    
+        stream.println()          
+      }
+      if (!firstBuf) {
+        stream.println("  override def dc_parallelization[A:Manifest](x: Exp[DeliteCollection[A]], hasConditions: Boolean)(implicit ctx: SourceContext) = {")
+        stream.print(dcParallelizationStream)
+        stream.println("    else super.dc_parallelization(x, hasConditions)")
+        stream.println("  }")          
+        stream.println()
+        stream.println("  override def dc_set_logical_size[A:Manifest](x: Exp[DeliteCollection[A]], y: Exp[Int])(implicit ctx: SourceContext) = {")
+        stream.print(dcSetLogicalSizeStream)
+        stream.println("    else super.dc_set_logical_size(x,y)")
         stream.println("  }")
-        
-        if (dc.isInstanceOf[ParallelCollectionBuffer]) {
-          val dcb = dc.asInstanceOf[ParallelCollectionBuffer]
-          stream.println()          
-          stream.println("  override def dc_parallelization[A:Manifest](x: Exp[DeliteCollection[A]], hasConditions: Boolean)(implicit ctx: SourceContext) = {")
-          // stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.parallelization) + "(" + asTpe + "(x), hasConditions)") 
-          stream.println("    if (" + isTpe + "(x)) { if (hasConditions) ParSimpleBuffer else ParFlat } // TODO: always generating this right now") 
-          stream.println("    else super.dc_parallelization(x, hasConditions)")
-          stream.println("  }")          
-          stream.println()
-          stream.println("  override def dc_set_logical_size[A:Manifest](x: Exp[DeliteCollection[A]], y: Exp[Int])(implicit ctx: SourceContext) = {")
-          stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.setSize) + "(" + asTpe + "(x), y)")
-          stream.println("    else super.dc_set_logical_size(x,y)")
-          stream.println("  }")
-          stream.println()          
-          val appendTpe = if (isTpePar(dcb.appendable.args.apply(2).tpe)) "y" else "y.asInstanceOf[Exp["+quote(dcb.appendable.args.apply(2).tpe)+"]]"
-          stream.println("  override def dc_appendable[A:Manifest](x: Exp[DeliteCollection[A]], i: Exp[Int], y: Exp[A])(implicit ctx: SourceContext) = {")          
-          stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.appendable) + "(" + asTpe + "(x), i, "+appendTpe+")")
-          stream.println("    else super.dc_appendable(x,i,y)")
-          stream.println("  }")          
-          stream.println()
-          stream.println("  override def dc_append[A:Manifest](x: Exp[DeliteCollection[A]], i: Exp[Int], y: Exp[A])(implicit ctx: SourceContext) = {")
-          stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.append) + "(" + asTpe + "(x), i, "+appendTpe+")")
-          stream.println("    else super.dc_append(x,i,y)")
-          stream.println("  }")          
-          stream.println()
-          stream.println("  override def dc_alloc[A:Manifest,CA<:DeliteCollection[A]:Manifest](x: Exp[CA], size: Exp[Int])(implicit ctx: SourceContext) = {")
-          val allocTpePars = instAllocReturnTpe(dcb.alloc, ephemeralTpe(tpe.name, List(tpePar("A"))), tpePar("A"))
-          stream.println("    if (" + isTpe + "(x)) " + makeOpMethodName(dcb.alloc) + makeTpePars(allocTpePars) + "(" + asTpe + "(x), size).asInstanceOf[Exp[CA]]")
-          stream.println("    else super.dc_alloc[A,CA](x,size)")
-          stream.println("  }")          
-          stream.println()
-          stream.println("  override def dc_copy[A:Manifest](src: Exp[DeliteCollection[A]], srcPos: Exp[Int], dst: Exp[DeliteCollection[A]], dstPos: Exp[Int], size: Exp[Int])(implicit ctx: SourceContext) = {")
-          stream.println("    if (" + isTpe + "(src) && " + isTpe + "(dst)) " + makeOpMethodName(dcb.copy) + "(" + asTpe + "(src), srcPos, " + asTpe + "(dst), dstPos, size)")
-          stream.println("    else super.dc_copy(src,srcPos,dst,dstPos,size)")
-          stream.println("  }")                    
-        }
+        stream.println()     
+        stream.println("  override def dc_appendable[A:Manifest](x: Exp[DeliteCollection[A]], i: Exp[Int], y: Exp[A])(implicit ctx: SourceContext) = {")         
+        stream.print(dcAppendableStream)
+        stream.println("    else super.dc_appendable(x,i,y)")
+        stream.println("  }")          
+        stream.println()
+        stream.println("  override def dc_append[A:Manifest](x: Exp[DeliteCollection[A]], i: Exp[Int], y: Exp[A])(implicit ctx: SourceContext) = {")      
+        stream.print(dcAppendStream)
+        stream.println("    else super.dc_append(x,i,y)")
+        stream.println("  }")          
+        stream.println()
+        stream.println("  override def dc_alloc[A:Manifest,CA<:DeliteCollection[A]:Manifest](x: Exp[CA], size: Exp[Int])(implicit ctx: SourceContext) = {")
+        stream.print(dcAllocStream)
+        stream.println("    else super.dc_alloc[A,CA](x,size)")
+        stream.println("  }")          
+        stream.println()
+        stream.println("  override def dc_copy[A:Manifest](src: Exp[DeliteCollection[A]], srcPos: Exp[Int], dst: Exp[DeliteCollection[A]], dstPos: Exp[Int], size: Exp[Int])(implicit ctx: SourceContext) = {")
+        stream.print(dcCopyStream)
+        stream.println("    else super.dc_copy(src,srcPos,dst,dstPos,size)")
+        stream.println("  }")                    
       }
     }
-    catch { case _ : MatchError => }
   }
   
-  def emitStructMethods(grp: Rep[DSLGroup], stream: PrintWriter) {
+  def emitStructMethods(opsGrp: DSLOps, stream: PrintWriter) {
     def wrapManifest(t: Rep[DSLType]) = t match {
       case Def(TpeInst(Def(Tpe("ForgeArray",args,stage)), List(p))) if (isTpePar(p)) => "darrayManifest(m.typeArguments(0))"
       case Def(TpeInst(Def(Tpe("ForgeArray",args,stage)), List(p))) => "darrayManifest(manifest["+quote(p)+"])"
@@ -579,48 +617,64 @@ trait DeliteGenOps extends BaseGenOps {
       case Def(TpeInst(Def(Tpe(name,args,stage)), ps)) if ps != Nil => "manifest[" + name + ps.map(a => "_").mkString("[",",","]") + "]"
       case _ => "manifest[" + quote(t) + "]"
     }
-    
-    try {
-      val tpe = grpAsTpe(grp)
-      if (DataStructs.contains(tpe)) {
+        
+    val classes = opsGrpTpes(opsGrp)
+    if (classes.length > 0 && classes.exists(c => DataStructs.contains(c))) {
+      emitBlockComment("Delite struct", stream, indent=2)
+      var structStream = ""
+      var first = true
+      for (tpe <- classes if DataStructs.contains(tpe)) {          
         val d = DataStructs(tpe)
         val fields = d.fields.zipWithIndex.map { case ((fieldName,fieldType),i) => ("\""+fieldName+"\"", if (isTpePar(fieldType)) "m.typeArguments("+i+")" else wrapManifest(fieldType)) }
-        val erasureCls = tpe.name + (if (!tpe.tpePars.isEmpty) "[" + tpe.tpePars.map(t => "_").mkString(",") + "]" else "") 
-        
-        emitBlockComment("Delite struct", stream, indent=2)
+        val erasureCls = tpe.name + (if (!tpe.tpePars.isEmpty) "[" + tpe.tpePars.map(t => "_").mkString(",") + "]" else "")           
+        val prefix = if (first) "    if " else "    else if "   
+        structStream += prefix + "(m.erasure == classOf["+erasureCls+"]) Some((classTag(m), collection.immutable.List("+fields.mkString(",")+")))" + nl 
+        first = false
+      }
+
+      if (!first) {
         stream.println("  override def unapplyStructType[T:Manifest]: Option[(StructTag[T], List[(String,Manifest[_])])] = {")
         stream.println("    val m = manifest[T]")        
-        stream.println("    if (m.erasure == classOf["+erasureCls+"]) Some((classTag(m), collection.immutable.List("+fields.mkString(",")+")))")  
+        stream.print(structStream)
         stream.println("    else super.unapplyStructType(m)")
         stream.println("  }")
-        
-        if (ForgeCollections.contains(tpe)) {
-          val dc = ForgeCollections(tpe)
-          val arrayFields = d.fields.filter(t => getHkTpe(t._2) == MArray)          
-          if (arrayFields.length != 1 && Config.verbosity > 0) {
-            warn("could not infer data field for struct " + tpe.name)
-          }
-          val sizeField = Impls.get(dc.size).map(i => if (i.isInstanceOf[Getter]) i.asInstanceOf[Getter].field else None)
-          if (sizeField.isEmpty && Config.verbosity > 0) {
-            warn("could not infer size field for struct " + tpe.name)
-          }
-          if (arrayFields.length == 1 && sizeField.isDefined) {
-            val isTpe = "is"+tpe.name            
-            stream.println()
-            stream.println("  override def dc_data_field[A:Manifest](x: Exp[DeliteCollection[A]]) = {")
-            stream.println("    if ("+isTpe+"(x)) \"" + arrayFields(0)._1 + "\"")
-            stream.println("    else super.dc_data_field(x)")
-            stream.println("  }")
-            stream.println()
-            stream.println("  override def dc_size_field[A:Manifest](x: Exp[DeliteCollection[A]]) = {")
-            stream.println("    if ("+isTpe+"(x)) \"" + sizeField.get + "\"")
-            stream.println("    else super.dc_size_field(x)")
-            stream.println("  }")            
-          }          
+      }
+
+      var dcDataFieldStream = ""
+      var dcSizeFieldStream = ""
+      first = true
+      for (tpe <- classes if DataStructs.contains(tpe) && ForgeCollections.contains(tpe)) {
+        val d = DataStructs(tpe)
+        val dc = ForgeCollections(tpe)          
+        val arrayFields = d.fields.filter(t => getHkTpe(t._2) == MArray)          
+        if (arrayFields.length != 1 && Config.verbosity > 0) {
+          warn("could not infer data field for struct " + tpe.name)
+        }
+        val sizeField = Impls.get(dc.size).map(i => if (i.isInstanceOf[Getter]) i.asInstanceOf[Getter].field else None)
+        if (sizeField.isEmpty && Config.verbosity > 0) {
+          warn("could not infer size field for struct " + tpe.name)
+        }       
+        if (arrayFields.length == 1 && sizeField.isDefined) {
+          val isTpe = "is"+tpe.name       
+          val prefix = if (first) "    if " else "    else if "   
+          dcDataFieldStream += prefix + "("+isTpe+"(x)) \"" + arrayFields(0)._1 + "\"" + nl
+          dcSizeFieldStream += prefix + "("+isTpe+"(x)) \"" + sizeField.get + "\"" + nl   
+          first = false
         }
       }
-    }
-    catch { case _ : MatchError => }
+
+      if (!first) {
+        stream.println("  override def dc_data_field[A:Manifest](x: Exp[DeliteCollection[A]]) = {")  
+        stream.print(dcDataFieldStream)
+        stream.println("    else super.dc_data_field(x)")
+        stream.println("  }")
+        stream.println()
+        stream.println("  override def dc_size_field[A:Manifest](x: Exp[DeliteCollection[A]]) = {")
+        stream.print(dcSizeFieldStream)
+        stream.println("    else super.dc_size_field(x)")
+        stream.println("  }")            
+      }
+    }    
   }
     
   def emitOpCodegen(opsGrp: DSLOps, stream: PrintWriter) {        

@@ -36,9 +36,14 @@ trait ForgeApplicationRunner extends ForgeApplication with ForgeExp {
     //  1) all ops that are declared as delite ops have delite collection input/outputs
     // check(y)
     
-    Directory(Path(build)).deleteRecursively() 
+    // -- fast compile mode
+    if (Config.fastCompile) {
+      flattenIR()
+    }    
     
     // -- run code generators
+
+    Directory(Path(build)).deleteRecursively() 
     
     // shared
     val sharedCodegen = new ForgeCodeGenShared {

@@ -33,10 +33,7 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
           prefix = "  override def "
 
         if (prefix != "") {
-          stream.print(prefix + o.name + makeTpeParsWithBounds(o.tpePars))
-          stream.print(makeOpArgsWithType(o))
-          stream.print(makeOpImplicitArgsWithOverloadWithType(o))
-          stream.println(" = " + makeOpMethodName(o) + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgsWithOverload(o))        
+          stream.println(makeSyntaxMethod(o, prefix))
         }
       }      
     }

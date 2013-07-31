@@ -2,7 +2,7 @@ package ppl.dsl.forge
 package examples
 package optila
 
-import core.{ForgeApplication,ForgeApplicationRunner}
+import core.{ForgeApplication,ForgeApplicationRunner,Config}
 
 trait IndexVectorOps {
   this: OptiLADSL => 
@@ -36,11 +36,12 @@ trait IndexVectorOps {
       }
       
       // naming is by convention here, a little brittle. would it be better to put this in extern?
-      fimplicit ("chainIndexToDenseOps") (Nil :: ephemeralTpe("DenseVectorDenseVectorOpsCls[Int]", stage = now)) implements composite ${
-        repToDenseVectorDenseVectorOpsCls(indexToDense($self))
+      val grpName = if (Config.fastCompile) "$Flat" else "DenseVector"
+      fimplicit ("chainIndexToDenseOps") (Nil :: ephemeralTpe(grpName+"DenseVectorOpsCls[Int]", stage = now)) implements composite ${
+        repTo\${grpName}DenseVectorOpsCls(indexToDense($self))
       }      
-      fimplicit ("chainIndexToDenseIntOps") (Nil :: ephemeralTpe("DenseVectorDenseVectorIntOpsCls", stage = now)) implements composite ${
-        repToDenseVectorDenseVectorIntOpsCls(indexToDense($self))
+      fimplicit ("chainIndexToDenseIntOps") (Nil :: ephemeralTpe(grpName+"DenseVectorIntOpsCls", stage = now)) implements composite ${
+        repTo\${grpName}DenseVectorIntOpsCls(indexToDense($self))
       }
             
       compiler ("indexvector_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("IndexVectors cannot be allocated from a parallel op") }      

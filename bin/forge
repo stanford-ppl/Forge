@@ -32,6 +32,7 @@ def main():
     parser.add_option("-v", "--verbose", dest="verbose", action="store_true", default=False, help="print forge environment settings")
     parser.add_option("--nb", dest="no_blas", action="store_true", default=False, help="disable blas calls")
     parser.add_option("-d", "--dest", dest="build_dir", action="store", default=os.getenv("PWD"), help="output location for generated files")
+    parser.add_option("--fastc", dest="fast_compile", action="store_true", default=False, help="try to generate faster compiling code")
     parser.add_option("--ident", dest="gen_ident", action="store_true", default=False, help="enable identity generation (re-generate a Forge spec)")
     parser.add_option("--no-delite", dest="gen_delite", action="store_false", default=True, help="disable delite generation")
     parser.add_option("--no-lib", dest="gen_lib", action="store_false", default=True, help="disable library generation")
@@ -89,6 +90,8 @@ def printEnv():
 def stage(runner, params, opts):
     java_opts = os.getenv("JAVA_OPTS", "")
     java_opts = java_opts + " -server" 
+    if opts.fast_compile == True:
+      java_opts = java_opts + " -Dforge.fast.compile=true"
     if opts.gen_ident == True:
       java_opts = java_opts + " -Dforge.gen.ident=true"
     if opts.gen_delite == False:

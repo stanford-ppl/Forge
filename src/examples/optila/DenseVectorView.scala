@@ -2,7 +2,7 @@ package ppl.dsl.forge
 package examples
 package optila
 
-import core.{ForgeApplication,ForgeApplicationRunner}
+import core.{ForgeApplication,ForgeApplicationRunner,Config}
 
 trait DenseVectorViewOps {
   this: OptiLADSL => 
@@ -33,8 +33,9 @@ trait DenseVectorViewOps {
         Console.println("(performance warning): automatic conversion from DenseVectorView to DenseVector")
         $self.toDense 
       }
-      fimplicit ("chainViewToDenseOps") (Nil :: ephemeralTpe("DenseVectorDenseVectorOpsCls[T]", stage = now)) implements composite ${
-        repToDenseVectorDenseVectorOpsCls(viewToDense($self))
+      val grpName = if (Config.fastCompile) "$Flat" else "DenseVector"
+      fimplicit ("chainViewToDenseOps") (Nil :: ephemeralTpe(grpName+"DenseVectorOpsCls[T]", stage = now)) implements composite ${
+        repTo\${grpName}DenseVectorOpsCls(viewToDense($self))
       }
        
       compiler ("densevectorview_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("DenseVectorViews cannot be allocated from a parallel op") }

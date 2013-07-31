@@ -4,6 +4,7 @@ package core
 import java.io.{File,PrintWriter,FileWriter}
 import scala.tools.nsc.io.{Directory,Path}
 import scala.reflect.SourceContext
+import scala.collection.mutable.{ArrayBuffer,HashSet,HashMap}
 import scala.virtualization.lms.common._
 import scala.virtualization.lms.internal.{GenericFatCodegen, GenericCodegen}
 
@@ -69,6 +70,34 @@ trait Forge extends ForgeScalaOpsPkg with Definitions with ForgeSugar with Field
 trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with DefinitionsExp with ForgeOpsExp with FieldOpsExp with QuoteOpsExp {
   this: ForgeApplication =>
   
+  // -- for fast compile mode
+
+  def flattenIR() {
+    val flat = grp("$Flat")
+    val newOps = new ArrayBuffer[Exp[DSLOp]]()    
+    val newTargets = new HashSet[CodeGenerator]()
+    val save = new HashMap[Exp[DSLGroup], DSLOps]() 
+    for ((grp,opsGrp) <- OpsGrp) {
+      if (isTpeClass(grp) || isTpeClassInst(grp)) {
+        save(grp) = opsGrp
+      }
+      else {
+        newOps ++= opsGrp.ops
+        newTargets ++= opsGrp.targets
+      }
+    }    
+    val newOpsGrp = new DSLOps {
+      val grp = flat      
+      override def targets: List[CodeGenerator] = newTargets.toList      
+    }
+    newOpsGrp.ops = newOps.toList
+    OpsGrp.clear()
+    OpsGrp(flat) = newOpsGrp
+    for ((grp,opsGrp) <- save) {      
+      OpsGrp(grp) = opsGrp
+    }
+  }
+
   // -- IR helpers
   
   def isForgePrimitiveType(t: Rep[DSLType]) = t match {
@@ -79,7 +108,16 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case Def(Tpe("Overloaded",_,_)) => true
     case _ => false
   }
+
+  def opsGrpTpes(opsGrp: DSLOps) = {
+    // assumption: all ops associated with a particular data structure belong to exactly 1 group
+    opsGrp.ops.collect { case o if (grpIsTpe(o.grp)) => grpAsTpe(o.grp) }.distinct
+  }
   
+  def opsGrpOf(o: Rep[DSLOp]) = {
+    OpsGrp.getOrElse(o.grp, OpsGrp.find(g => g._2.ops.contains(o)).map(_._2).get)
+  }
+
   def grpIsTpe(grp: Rep[DSLGroup]) = grp match {
     case Def(Tpe(n,targs,s)) => true
     case Def(TpeInst(t,args)) => true

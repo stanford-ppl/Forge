@@ -18,6 +18,7 @@ abstract class DSLArg
 abstract class DSLData
 abstract class DSLStruct
 abstract class DSLOp
+abstract class DSLIdentifier
 abstract class LiftStm
 abstract class RewriteRule
 abstract class CodeGenRule

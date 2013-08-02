@@ -102,7 +102,8 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   
   def isForgePrimitiveType(t: Rep[DSLType]) = t match {
     case `MInt` | `MFloat` | `MDouble` | `MBoolean` | `MChar` | `MString` | `MUnit` | `MAny` | `MNothing` | `MSourceContext` | `byName` => true
-    case Def(Tpe(_,_,`now`)) => true 
+    case `CInt` | `CFloat` | `CDouble` | `CBoolean` | `CChar` | `CString` | `CTuple2` | `CUnit` | `CAny` | `CNothing` => true        
+    // case Def(Tpe(_,_,`now`)) => true    
     case Def(Tpe("ForgeArray",_,_)) | Def(Tpe("ForgeArrayBuffer",_,_)) => true
     case Def(Tpe("Var",_,_)) => true
     case Def(Tpe("Overloaded",_,_)) => true
@@ -181,6 +182,8 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case Def(FTpe(List(Def(Arg(_,`byName`,_))),ret,freq)) => true
     case _ => false
   }
+
+  def isRedirect(o: Rep[DSLOp]) = Impls.contains(o) && Impls(o).isInstanceOf[Redirect]
 }
 
 trait ForgeUtilities {  
@@ -217,42 +220,49 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     case Def(FTpe(args,ret,freq)) => err("variables in function tpe")
     case _ => "Var[" + quote(a) + "]" 
   }
+
   def repify(a: Exp[Any]): String = a match {
     case Def(Arg(name, tpe, default)) => repify(tpe)
     case Def(FTpe(args,ret,freq)) => args match {
       case List(Def(Arg(_,`byName`,_))) => " => " + repify(ret)
       case _ => "(" + args.map(repify).mkString(",") + ") => " + repify(ret)        
     }
+    case Def(Tpe(name, arg, `compile`)) => quote(a)
     case Def(Tpe("Var", arg, stage)) => repify(arg(0))
-    case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2)) => repify(a2(0))
-    case Def(TpeClass(_,_,_)) | Def(TpeClassInst(_,_,_)) => quote(a)
+    case Def(TpeClass(_,_,_)) | Def(TpeClassInst(_,_,_)) => quote(a)        
+    case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2)) => repify(a2(0))    
+    case Def(TpeInst(Def(Tpe(name, args, `compile`)), args2)) => name + (if (!args2.isEmpty) "[" + args2.map(repifySome).mkString(",") + "]" else "") // implicits don't auto-convert things wrapped in an outer tpe, so we still use repifySome    
     case Def(VarArgs(t)) => "Seq[" + repify(t) + "]"
     case _ => "Rep[" + quote(a) + "]"           
   }
+
   def repifySome(a: Exp[Any]): String = a match {  
     case Def(Arg(name, tpe, default)) => repifySome(tpe)
+    case Def(FTpe(args,ret,freq)) => args match {
+      case List(Def(Arg(_,`byName`,_))) => " => " + repifySome(ret)
+      case _ => "(" + args.map(repifySome).mkString(",") + ") => " + repifySome(ret)        
+    }
     case Def(Tpe(name, arg, `now`)) => quote(a)
     case Def(Tpe("Var", arg, stage)) => varify(arg(0))
     case Def(TpePar(name, ctx, `now`)) => quote(a)
     case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2)) => varify(a2(0))
-    case Def(TpeInst(Def(Tpe(name, args, `now`)), args2)) => name + (if (!args2.isEmpty) "[" + args2.map(repifySome).mkString(",") + "]" else "") // is this the right thing to do?
+    case Def(TpeInst(Def(Tpe(name, args, `now` | `compile`)), args2)) => name + (if (!args2.isEmpty) "[" + args2.map(repifySome).mkString(",") + "]" else "") // is this the right thing to do?        
     case Def(VarArgs(t)) => repifySome(t) + "*"
     case _ => repify(a)
   }
   
   def argify(a: Exp[DSLArg], typify: Exp[DSLType] => String = repify): String = a match {
-    // tpe instances will have Rep parameters, so we don't want to repify the outer tpe. goes hand-in-hand with the question in repifySome
-    case Def(Arg(name, tpe@Def(TpeInst(Def(Tpe(n, args, `now`)), args2)), Some(d))) => name + ": " + repifySome(tpe) + " = " + "unit("+escape(d)+")"
-    case Def(Arg(name, tpe@Def(TpeInst(Def(Tpe(n, args, `now`)), args2)), None)) => name + ": " + repifySome(tpe)
     case Def(Arg(name, tpe, Some(d))) => name + ": " + typify(tpe) + " = " + "unit("+escape(d)+")"    
     case Def(Arg(name, tpe, None)) => name + ": " + typify(tpe)
   }
   
+
   def makeTpeParsWithBounds(args: List[Rep[TypePar]]): String = {
     if (args.length < 1) return ""    
     val args2 = args.map { a => quote(a) + (if (a.ctxBounds != Nil) ":" + a.ctxBounds.map(_.name).mkString(":") else "") }
     "[" + args2.mkString(",") + "]"
   }  
+  
   def makeTpePars(args: List[Rep[DSLType]]): String = {
     if (args.length < 1) return ""
     "[" + args.map(quote).mkString(",") + "]"

@@ -103,7 +103,7 @@ trait ForgePreprocessor {
       override def toString = binding
     }
     case class OpFromOp(grp: String, name: String) extends OpEncoding {
-      override def toString = "lookupOp(\""+grp+"\",\""+name+"\")"
+      override def toString = "lookupOp("+grp+",\""+name+"\")"
     }    
     
     def scanBackToOp(start: Int, input: Array[Byte]): OpEncoding = {

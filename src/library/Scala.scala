@@ -350,67 +350,105 @@ trait ScalaOps {
     val concat = infix (Str) ("+", List(T), List(CString, T) :: MString)
     val concat2 = infix (Str) ("+", List(T), List(MString, T) :: MString)
     val concat3 = infix (Str) ("+", List(T), List(CString, MVar(T)) :: MString)
-    val concat4 = infix (Str) ("+", List(T), List(MString, MVar(T)) :: MString)
+    val concat4 = infix (Str) ("+", List(T), List(MString, MVar(T)) :: MString)    
+    val concat5 = infix (Str) ("+", List(T), List(MVar(MString), T) :: MString)
+    val concat6 = infix (Str) ("+", List(T), List(MVar(MString), MVar(T)) :: MString)
     
     // Rep[Any], Rep[String]
-    val concat5 = infix (Str) ("+", List(T), List(T, CString) :: MString)
-    val concat6 = infix (Str) ("+", List(T), List(T, MString) :: MString)
-    val concat7 = infix (Str) ("+", List(T), List(MVar(T), CString) :: MString)
-    val concat8 = infix (Str) ("+", List(T), List(MVar(T), MString) :: MString)
+    val concat7 = infix (Str) ("+", List(T), List(T, CString) :: MString)
+    val concat8 = infix (Str) ("+", List(T), List(T, MString) :: MString)
+    val concat9 = infix (Str) ("+", List(T), List(MVar(T), CString) :: MString)
+    val concat10 = infix (Str) ("+", List(T), List(MVar(T), MString) :: MString)
+    val concat11 = infix (Str) ("+", List(T), List(MVar(T), MVar(MString)) :: MString)
     
     // Rep[String], Rep[String]
-    val concat9 = infix (Str) ("+", List(), List(MString, CString) :: MString)
-    val concat10 = infix (Str) ("+", List(), List(CString, MString) :: MString)
-    val concat11 = infix (Str) ("+", List(), List(MString, MString) :: MString)
+    // val concat9 = infix (Str) ("+", List(), List(MString, CString) :: MString)
+    val concat12 = infix (Str) ("+", List(), List(CString, MString) :: MString)
+    val concat13 = infix (Str) ("+", List(), List(MString, MString) :: MString)
+    val concat14 = infix (Str) ("+", List(), List(MString, MVar(MString)) :: MString)    
+    val concat15 = infix (Str) ("+", List(), List(MVar(MString), MString) :: MString)
+    val concat16 = infix (Str) ("+", List(), List(MVar(MString), MVar(MString)) :: MString)
+
     
     // TODO: we would like overloaded variants to possibly use the same codegen impl instead of being redundant here    
-    // most of the concat codegens are not used, but it is not easy to tell which ones will "make it"
+    // only the impl of the first declared canonical signature is actually used
     // should overloading be more explicit in the spec to avoid this problem? (an 'overloaded' parameter?)
     // at the very least, we should check for inconsistent codegen rules (or impls) between overloaded variants that collapse to the same thing
-    def scalaStrConcat(o: Rep[DSLOp]) = quotedArg(0)+".toString + " + quotedArg(1)+".toString"
-    impl (concat) (codegen($cala, scalaStrConcat(concat)))
-    impl (concat2) (codegen($cala, scalaStrConcat(concat)))
-    impl (concat3) (codegen($cala, scalaStrConcat(concat)))
-    impl (concat4) (codegen($cala, scalaStrConcat(concat)))
-    impl (concat5) (codegen($cala, scalaStrConcat(concat)))
-    impl (concat6) (codegen($cala, scalaStrConcat(concat)))
-    impl (concat7) (codegen($cala, scalaStrConcat(concat)))
-    impl (concat8) (codegen($cala, scalaStrConcat(concat)))
-    impl (concat9) (codegen($cala, scalaStrConcat(concat)))
-    impl (concat10) (codegen($cala, scalaStrConcat(concat)))
-    impl (concat11) (codegen($cala, scalaStrConcat(concat)))    
+    def scalaStrConcat = quotedArg(0)+".toString + " + quotedArg(1)+".toString"
+    for (o <- List(concat,concat2,concat3,concat4,concat5,concat6,concat7,concat8,concat9,concat10,concat11,concat12,concat13,concat14,concat15,concat16)) {    
+      impl (o) (codegen($cala, scalaStrConcat))    
+    }    
   }
   
   def importMath() = {
     val Math = grp("Math")
     
-    val maxInt = static (Math) ("max", List(), List(MInt,MInt) :: MInt)
-    val maxDbl = static (Math) ("max", List(), List(MDouble,MDouble) :: MDouble)
-    val ceil = static(Math) ("ceil", Nil, MDouble :: MDouble)
-    val exp = static(Math) ("exp", Nil, MDouble :: MDouble)
-    val log = static(Math) ("log", Nil, MDouble :: MDouble)
-    val abs = static(Math) ("abs", Nil, MDouble :: MDouble)
+    // (compile-time) constants
+    direct (Math) ("INF", Nil, Nil :: MDouble) implements redirect ${ unit(Double.PositiveInfinity) }
+    direct (Math) ("nINF", Nil, Nil :: MDouble) implements redirect ${ unit(Double.NegativeInfinity) }
+    direct (Math) ("Pi", Nil, Nil :: MDouble) implements redirect ${ unit(java.lang.Math.PI) }
+    direct (Math) ("E", Nil, Nil :: MDouble) implements redirect ${ unit(java.lang.Math.E) }
+  
+    // methods    
+    val abs = static (Math) ("abs", Nil, MDouble :: MDouble)
+    val exp = static (Math) ("exp", Nil, MDouble :: MDouble)
+    val log = static (Math) ("log", Nil, MDouble :: MDouble)
+    val log10 = static (Math) ("log10", Nil, MDouble :: MDouble)    
+    val sqrt = static (Math) ("sqrt", Nil, MDouble :: MDouble)
+    val ceil = static (Math) ("ceil", Nil, MDouble :: MDouble)
+    val floor = static (Math) ("floor", Nil, MDouble :: MDouble)    
+    val sin = static (Math) ("sin", Nil, MDouble :: MDouble)
+    val sinh = static (Math) ("sinh", Nil, MDouble :: MDouble)
+    val asin = static (Math) ("asin", Nil, MDouble :: MDouble)
+    val cos = static (Math) ("cos", Nil, MDouble :: MDouble)
+    val cosh = static (Math) ("cosh", Nil, MDouble :: MDouble)
+    val acos = static (Math) ("acos", Nil, MDouble :: MDouble)
+    val tan = static (Math) ("tan", Nil, MDouble :: MDouble)
+    val tanh = static (Math) ("tanh", Nil, MDouble :: MDouble)
+    val atan = static (Math) ("atan", Nil, MDouble :: MDouble)
+    val atan2 = static (Math) ("atan2", Nil, (MDouble, MDouble) :: MDouble)
+    val pow = static (Math) ("pow", Nil, (MDouble, MDouble) :: MDouble)
+    val max = static (Math) ("max", Nil, (MDouble,MDouble) :: MDouble)
+    val min = static (Math) ("min", Nil, (MDouble,MDouble) :: MDouble)  
     
-    impl (maxInt) (codegen($cala, "scala.math.max(" + quotedArg(0) + ", " + quotedArg(1) + ")"))
-    impl (maxDbl) (codegen($cala, "scala.math.max(" + quotedArg(0) + ", " + quotedArg(1) + ")"))
-    impl (ceil) (codegen($cala, "java.lang.Math.ceil(" + quotedArg(0) + ")"))
+    impl (abs) (codegen($cala, "java.lang.Math.abs(" + quotedArg(0) + ")"))
     impl (exp) (codegen($cala, "java.lang.Math.exp(" + quotedArg(0) + ")"))
     impl (log) (codegen($cala, "java.lang.Math.log(" + quotedArg(0) + ")"))
-    impl (abs) (codegen($cala, "java.lang.Math.abs(" + quotedArg(0) + ")"))
+    impl (log10) (codegen($cala, "java.lang.Math.log10(" + quotedArg(0) + ")"))
+    impl (sqrt) (codegen($cala, "java.lang.Math.sqrt(" + quotedArg(0) + ")"))
+    impl (ceil) (codegen($cala, "java.lang.Math.ceil(" + quotedArg(0) + ")"))
+    impl (floor) (codegen($cala, "java.lang.Math.floor(" + quotedArg(0) + ")"))
+    impl (sin) (codegen($cala, "java.lang.Math.sin(" + quotedArg(0) + ")"))
+    impl (sinh) (codegen($cala, "java.lang.Math.sinh(" + quotedArg(0) + ")"))
+    impl (asin) (codegen($cala, "java.lang.Math.asin(" + quotedArg(0) + ")"))
+    impl (cos) (codegen($cala, "java.lang.Math.cos(" + quotedArg(0) + ")"))
+    impl (cosh) (codegen($cala, "java.lang.Math.cosh(" + quotedArg(0) + ")"))
+    impl (acos) (codegen($cala, "java.lang.Math.acos(" + quotedArg(0) + ")"))
+    impl (tan) (codegen($cala, "java.lang.Math.tan(" + quotedArg(0) + ")"))
+    impl (tanh) (codegen($cala, "java.lang.Math.tanh(" + quotedArg(0) + ")"))
+    impl (atan) (codegen($cala, "java.lang.Math.atan(" + quotedArg(0) + ")"))
+    impl (atan2) (codegen($cala, "java.lang.Math.atan2(" + quotedArg(0) + ", " + quotedArg(1) + ")"))
+    impl (pow) (codegen($cala, "java.lang.Math.pow(" + quotedArg(0) + ", " + quotedArg(1) + ")"))
+    impl (max) (codegen($cala, "java.lang.Math.max(" + quotedArg(0) + ", " + quotedArg(1) + ")"))
+    impl (min) (codegen($cala, "java.lang.Math.min(" + quotedArg(0) + ", " + quotedArg(1) + ")"))
 
-    impl (maxInt) (codegen(cuda, "(" + quotedArg(0) + ">" + quotedArg(1) + ")?" + quotedArg(0) + ":" + quotedArg(1)))
-    impl (maxDbl) (codegen(cuda, "(" + quotedArg(0) + ">" + quotedArg(1) + ")?" + quotedArg(0) + ":" + quotedArg(1)))
-    impl (ceil) (codegen(cuda, "ceil(" + quotedArg(0) + ")"))
-    impl (exp) (codegen(cuda, "exp(" + quotedArg(0) + ")"))
-    impl (log) (codegen(cuda, "log(" + quotedArg(0) + ")"))
-    impl (abs) (codegen(cuda, "abs(" + quotedArg(0) + ")"))
-    
-    impl (maxInt) (codegen(cpp, "(" + quotedArg(0) + ">" + quotedArg(1) + ")?" + quotedArg(0) + ":" + quotedArg(1)))
-    impl (maxDbl) (codegen(cpp, "(" + quotedArg(0) + ">" + quotedArg(1) + ")?" + quotedArg(0) + ":" + quotedArg(1)))
-    impl (ceil) (codegen(cpp, "ceil(" + quotedArg(0) + ")"))
-    impl (exp) (codegen(cpp, "exp(" + quotedArg(0) + ")"))
-    impl (log) (codegen(cpp, "log(" + quotedArg(0) + ")"))
-    impl (abs) (codegen(cpp, "abs(" + quotedArg(0) + ")"))
+    for (g <- List(cuda, cpp)) {
+      impl (abs) (codegen(g, "abs(" + quotedArg(0) + ")"))
+      impl (exp) (codegen(g, "exp(" + quotedArg(0) + ")"))
+      impl (log) (codegen(g, "log(" + quotedArg(0) + ")"))
+      impl (sqrt) (codegen(g, "sqrt(" + quotedArg(0) + ")"))
+      impl (ceil) (codegen(g, "ceil(" + quotedArg(0) + ")"))
+      impl (floor) (codegen(g, "floor(" + quotedArg(0) + ")"))
+      impl (sin) (codegen(g, "sin(" + quotedArg(0) + ")"))
+      impl (cos) (codegen(g, "cos(" + quotedArg(0) + ")"))
+      impl (acos) (codegen(g, "acos(" + quotedArg(0) + ")"))
+      impl (tan) (codegen(g, "tan(" + quotedArg(0) + ")"))      
+      impl (atan) (codegen(g, "atan(" + quotedArg(0) + ")"))
+      impl (atan2) (codegen(g, "atan2(" + quotedArg(0) + ", " + quotedArg(1) + ")"))
+      impl (pow) (codegen(g, "pow(" + quotedArg(0) + ", " + quotedArg(1) + ")"))
+      impl (max) (codegen(g, "fmax(" + quotedArg(0) + ", " + quotedArg(1) + ")"))
+      impl (min) (codegen(g, "fmin(" + quotedArg(0) + ", " + quotedArg(1) + ")"))      
+    }    
   }  
   
   // tuples need some work, the tricks bordering on hacks in here are pretty unsatisfying
@@ -420,8 +458,7 @@ trait ScalaOps {
     val e = tpePar("_")
         
     // the abstract name needs to be different than the Scala name, since we don't want to shadow it. 
-    val Tuple2 = tpe("Tup2", (A,B))
-    val CTuple2 = tpe("Tuple2", (A,B), stage = now) 
+    val Tuple2 = tpe("Tup2", (A,B))    
             
     data(Tuple2, ("_1", A), ("_2", B))
     compiler (Tuple2) ("tuple2_get1", A, Tuple2(A,e) :: A) implements getter(0, "_1")

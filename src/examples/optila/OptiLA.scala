@@ -7,7 +7,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 object OptiLADSLRunner extends ForgeApplicationRunner with OptiLADSL       
 
 trait OptiLADSL extends ForgeApplication 
-  with BasicMathOps with RandomOps with ArithOps with IOOps 
+  with BasicMathOps with RandomOps with IOOps with ArithOps with StringableOps
   with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps
   with DenseMatrixOps {
     
@@ -23,6 +23,13 @@ trait OptiLADSL extends ForgeApplication
     importStrings()
     importMath()
     importTuples()
+
+    // OptiLA types
+    // declare all tpes first, so that they are available to all ops (similar to Delite)
+    val DenseVector = tpe("DenseVector", tpePar("T")) 
+    val DenseVectorView = tpe("DenseVectorView", tpePar("T"))
+    val DenseMatrix = tpe("DenseMatrix", tpePar("T"))
+    val IndexVector = tpe("IndexVector") 
         
     // OptiLA ops
     // note that the order matters with respect to 'lookup' calls
@@ -49,6 +56,7 @@ trait OptiLADSL extends ForgeApplication
     importBasicMathOps()
     importRandomOps() 
     importArithOps()
+    importStringableOps()
         
     // override default string formatting
     // numericPrecision is a global defined in extern
@@ -65,16 +73,9 @@ a1+b1
     }    
     // the ones that matter are the first that resolve to a unique tpe combination
     impl (lookupOverloaded("FString","+",0)) (codegen($cala, strConcatWithNumerics))
-    impl (lookupOverloaded("FString","+",4)) (codegen($cala, strConcatWithNumerics))
-    impl (lookupOverloaded("FString","+",8)) (codegen($cala, strConcatWithNumerics))
-    
-    
-    // declare all tpes first, so that they are available to all ops (similar to Delite)
-    val DenseVector = tpe("DenseVector", tpePar("T")) 
-    val DenseVectorView = tpe("DenseVectorView", tpePar("T"))
-    val DenseMatrix = tpe("DenseMatrix", tpePar("T"))
-    val IndexVector = tpe("IndexVector") 
-    
+    impl (lookupOverloaded("FString","+",6)) (codegen($cala, strConcatWithNumerics))
+    impl (lookupOverloaded("FString","+",11)) (codegen($cala, strConcatWithNumerics))
+          
     importIndexVectorOps()
     importDenseVectorViewOps()
     importDenseVectorOps()        

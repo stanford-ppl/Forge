@@ -135,7 +135,7 @@ def publish(dsl, opts):
         # perform name replacement on all generated files
         replfiles = [d + "/" + f for (d, n, fs) in os.walk(dest) for f in fs]
         for line in fileinput.input(replfiles, inplace = 1):
-            print line.replace("HUMAN_DSL_NAME", dsl).replace("LOWERCASE_DSL_NAME", dsl.lower())
+            sys.stdout.write(line.replace("HUMAN_DSL_NAME", dsl).replace("LOWERCASE_DSL_NAME", dsl.lower()))
           
     os.system("rsync -r " + FORGE_HOME + "/apps/" + dsl + "/" + " " + build_dir + "/apps/")
 

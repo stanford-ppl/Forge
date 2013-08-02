@@ -91,10 +91,16 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     val stream = new PrintWriter(new FileWriter(dslDir+"GenOverloadHack"+".scala"))    
     
     var numOverloaded = 0
+    var numRedirectOverloaded = 0
     for ((grp,opsGrp) <- OpsGrp) {
       for (o <- opsGrp.ops) {
         val clashes = nameClashesUniversal(o)
-        if (clashes.length > numOverloaded) numOverloaded = clashes.length
+        if (isRedirect(o)) {
+          if (clashes.length > numRedirectOverloaded) numRedirectOverloaded = clashes.length
+        }
+        else {
+          if (clashes.length > numOverloaded) numOverloaded = clashes.length 
+        }        
       }
     }  
     
@@ -105,10 +111,16 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     for (i <- 0 to numOverloaded) {
       stream.println("  class Overload"+i)
     }
+    for (i <- 0 to numRedirectOverloaded) {
+      stream.println("  class ROverload"+i)
+    }
     stream.println()
     // seperated for generated code readability
     for (i <- 0 to numOverloaded) {
       stream.println("  implicit val overload" + i + " = new Overload" + i)
+    }    
+    for (i <- 0 to numRedirectOverloaded) {
+      stream.println("  implicit val roverload" + i + " = new ROverload" + i)
     }    
     stream.println("}")
     stream.close()

@@ -24,9 +24,10 @@ trait ForgeOps extends Base {
   def tpeClass(name: String, signature: TypeClassSignature, tpePars: List[Rep[TypePar]] = List()) = forge_tpeclass(name, signature, tpePars)
   def tpeClassInst(name: String, tpePars: List[Rep[TypePar]], tpeClass: Rep[DSLType]) = forge_tpeclassinst(name, tpePars, tpeClass)
   def ftpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency) = forge_ftpe(args, ret, freq)
+  def identifier(tpe: Rep[DSLType])(name: String) = forge_identifier(name,tpe)
   def arg(name: String, tpe: Rep[DSLType], default: Option[String] = None) = forge_arg(name, tpe, default)
   def lift(grp: Rep[DSLGroup])(tpe: Rep[DSLType]) = forge_lift(grp, tpe)
-  def data(tpe: Rep[DSLType], fields: (String, Rep[DSLType])*) = forge_data(tpe, fields)
+  def data(tpe: Rep[DSLType], fields: (String, Rep[DSLType])*) = forge_data(tpe, fields)  
   
   implicit def namedTpeToArg(arg: (String, Rep[DSLType])): Rep[DSLArg] = forge_arg(arg._1, arg._2, None)
   implicit def namedTpeWithDefaultToArg(arg: (String, Rep[DSLType], String)): Rep[DSLArg] = forge_arg(arg._1, arg._2, Some(arg._3))
@@ -74,8 +75,9 @@ trait ForgeOps extends Base {
 
   def lookupTpe(tpeName: String, stage: StageTag = future) = forge_lookup_tpe(tpeName,stage)
   def lookupGrp(grpName: String) = forge_lookup_grp(grpName)
-  def lookupOp(grpName: String, opName: String) = forge_lookup_op(grpName,opName,0)
-  def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup_op(grpName,opName,index)
+  def lookupOp(grp: Rep[DSLGroup], opName: String) = forge_lookup_op(grp,opName,0)
+  def lookupOp(grpName: String, opName: String) = forge_lookup_op(lookupGrp(grpName),opName,0)
+  def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup_op(lookupGrp(grpName),opName,index)
   
   def forge_grp(name: String): Rep[DSLGroup]  
   def forge_tpealias(name: String, tpe: Rep[DSLType]): Rep[TypeAlias]
@@ -91,6 +93,7 @@ trait ForgeOps extends Base {
   def forge_anyToArg(a: (Any, Int)): Rep[DSLArg]
   def forge_anyToImplicitArg(a: (Any, Int)): Rep[DSLArg]
   def forge_ftpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency): Rep[DSLType]
+  def forge_identifier(name: String, tpe: Rep[DSLType]): Rep[DSLIdentifier]  
   def forge_lift(grp: Rep[DSLGroup], tpe: Rep[DSLType]): Rep[Unit]
   def forge_data(tpe: Rep[DSLType], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]  
   def forge_op(tpe: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], curriedArgs: List[List[Rep[DSLArg]]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
@@ -100,7 +103,7 @@ trait ForgeOps extends Base {
   def forge_isparallelcollection_buffer(tpe: Rep[DSLType], dc: ParallelCollectionBuffer): Rep[Unit]
   def forge_lookup_tpe(tpeName: String, stage: StageTag): Rep[DSLType]
   def forge_lookup_grp(grpName: String): Rep[DSLGroup]  
-  def forge_lookup_op(grpName: String, opName: String, overloadedIndex: Int): Rep[DSLOp]
+  def forge_lookup_op(grp: Rep[DSLGroup], opName: String, overloadedIndex: Int): Rep[DSLOp]
 }
 
 trait ForgeSugarLowPriority extends ForgeOps {
@@ -194,10 +197,11 @@ trait ForgeSugar extends ForgeSugarLowPriority {
 
     val parallelize = ParallelizeKey(_tpeScopeBox)
     
-    def lookupOp(opName: String) = forge_lookup_op(_tpeScopeBox.name,opName,0)
-    def lookupOp(grpName: String, opName: String) = forge_lookup_op(grpName,opName,0)    
-    def lookupOverloaded(opName: String, index: Int) = forge_lookup_op(_tpeScopeBox.name,opName,index)
-    def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup_op(grpName,opName,index)
+    def lookupOp(opName: String) = forge_lookup_op(_tpeScopeBox,opName,0)
+    def lookupOp(grp: Rep[DSLGroup], opName: String) = forge_lookup_op(grp,opName,0)
+    def lookupOp(grpName: String, opName: String) = forge_lookup_op(lookupGrp(grpName),opName,0)    
+    def lookupOverloaded(opName: String, index: Int) = forge_lookup_op(_tpeScopeBox,opName,index)
+    def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup_op(lookupGrp(grpName),opName,index)
   }
   
   trait TpeScopeRunner[R] extends TpeScope {
@@ -216,7 +220,8 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   val Lifts = HashMap[Exp[DSLGroup],ArrayBuffer[Exp[DSLType]]]()
   val TpeAliases = ArrayBuffer[Exp[TypeAlias]]()
   val Tpes = ArrayBuffer[Exp[DSLType]]()
-  val DataStructs = HashMap[Exp[DSLType],Exp[DSLData]]()
+  val Identifiers = ArrayBuffer[Exp[DSLIdentifier]]()
+  val DataStructs = HashMap[Exp[DSLType],Exp[DSLData]]()  
   val OpsGrp = HashMap[Exp[DSLGroup],DSLOps]()  
   val Impls = HashMap[Exp[DSLOp],OpType]() 
   val ForgeCollections = HashMap[Exp[DSLType], ForgeCollectionType]()
@@ -242,17 +247,17 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     t.get    
   }
 
-  def forge_lookup_op(grpName: String, opName: String, overloadedIndex: Int): Rep[DSLOp] = {
-    val matches = OpsGrp.find(t => t._1.name == grpName).map(_._2.ops.filter(_.name == opName)) 
+  def forge_lookup_op(grp: Rep[DSLGroup], opName: String, overloadedIndex: Int): Rep[DSLOp] = {
+    val matches = OpsGrp.get(grp).map(_.ops.filter(_.name == opName)) 
     if (matches.isEmpty || (matches.isDefined && overloadedIndex > matches.get.length-1)) {
-      warn("lookup failed: no op exists in grp " + grpName + " with name " + opName + " and index " + overloadedIndex)
-      val grp = OpsGrp.find(t => t._1.name == grpName)
-      if (grp.isEmpty) {
-        println("  no grp " + grpName + " exists")
+      warn("lookup failed: no op exists in grp " + grp.name + " with name " + opName + " and index " + overloadedIndex)
+      val opsGrp = OpsGrp.get(grp)
+      if (opsGrp.isEmpty) {
+        println("  grp " + grp.name + " has no ops defined")
       }
       else {
-        println("  ops in grp " + grpName + " are: ")
-        for ((o,i) <- grp.get._2.ops.zipWithIndex) {
+        println("  ops in grp " + grp.name + " are: ")
+        for ((o,i) <- opsGrp.get.ops.zipWithIndex) {
           println("    " + o.name + o.args.map(_.tpe.name).mkString("(",",",")") + " (index " + i + ")")
         }
       }
@@ -337,6 +342,20 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   
   def forge_ftpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency) = FTpe(args,ret,freq)
   
+  /* A singleton to represent an enumerated choice in the DSL. The enumeration is one possible value of 'tpe' */
+  case class Identifier(name: String, tpe: Rep[DSLType]) extends Def[DSLIdentifier]
+  def forge_identifier(name: String, tpe: Rep[DSLType]): Rep[DSLIdentifier] = {
+    if (tpe.tpePars != Nil) err("identifiers cannot have type parameters")
+    val id = Identifier(name,tpe)
+    if (Identifiers.exists(_.name == id.name)) {
+      err("identifier " + name + " already exists")
+    }
+    else {
+      Identifiers += id
+    }
+    id
+  }
+
   /* A statement declaring a type to lift in a particular scope (group) */
   def forge_lift(grp: Rep[DSLGroup], tpe: Rep[DSLType]) = {
     val buf = Lifts.getOrElseUpdate(grp, new ArrayBuffer[Exp[DSLType]]())

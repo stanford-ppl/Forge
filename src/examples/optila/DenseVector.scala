@@ -217,7 +217,7 @@ trait DenseVectorOps {
       }      
       compiler ("densevector_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = densevector_raw_data($self)
-        var n = Math.max(4, array_length(data)*2)
+        var n = max(4, array_length(data)*2)
         while (n < $minLen) n = n*2
         val d = array_empty[T](n)
         array_copy(data, 0, d, 0, $self.length)
@@ -274,14 +274,7 @@ trait DenseVectorOps {
       /**
        * Ordering
        */      
-      infix ("sort") (Nil :: DenseVector(T), TOrdering(T)) implements allocates(DenseVector, ${densevector_length($0)}, ${!(densevector_isrow($0))}, ${array_sort(densevector_raw_data($0))})
-
-      // TODO: HasMinMax, TupleReduce?
-      // infix ("min" (Nil :: T, TOrdering(T))) implements reduce(T, 0, ${implicitly[HasMinMax[T]].min}, ${ if (a < b) a else b }) 
-      // infix ("minIndex" (Nil :: T, TOrdering(T))) implements reduce(T, 0, ${implicitly[HasMinMax[T]].min}, ${ }) 
-      // infix ("max" (Nil :: T, TOrdering(T))) implements reduce(T, 0, ${implicitly[HasMinMax[T]].max}, ${ if (a > b) a else b }) 
-      // infix ("maxIndex" (Nil :: T, TOrdering(T))) implements reduce(T, 0, ${implicitly[HasMinMax[T]].max}, ${ }) 
-      
+      infix ("sort") (Nil :: DenseVector(T), TOrdering(T)) implements allocates(DenseVector, ${densevector_length($0)}, ${!(densevector_isrow($0))}, ${array_sort(densevector_raw_data($0))})      
       infix ("median") (Nil :: T, (TNumeric(T),TOrdering(T))) implements single ${ 
         val x = $self.sort
         val mid = x.length / 2
@@ -321,6 +314,7 @@ trait DenseVectorOps {
     infix (DenseVectorArith) ("/", T withBound TArith, (DenseVector(T),DenseVector(T)) :: DenseVector(T)) implements composite ${ densevector_div($0,$1) }          
     infix (DenseVectorArith) ("abs", T withBound TArith, DenseVector(T) :: DenseVector(T)) implements composite ${ densevector_abs($0) }
     infix (DenseVectorArith) ("exp", T withBound TArith, DenseVector(T) :: DenseVector(T)) implements composite ${ densevector_exp($0) }         
+    infix (DenseVectorArith) ("log", T withBound TArith, DenseVector(T) :: DenseVector(T)) implements composite ${ densevector_log($0) }         
         
     importDenseVectorPrimitiveOps()    
     addVectorCommonOps(DenseVector,T)

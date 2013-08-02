@@ -51,10 +51,9 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
     
     // base trait sets Rep[T] to T and mixes in the necessary portions of the front-end, without
     // bringing the abstract impls in scope, since they can cause a recursive loop in the library    
-    stream.println("trait " + dsl + "Base extends Base with GenOverloadHack {")
+    stream.println("trait " + dsl + "Base extends " + dsl + "Identifiers {")        
     stream.println("  type Rep[+T] = T")
-    stream.println("  protected def unit[T:Manifest](x: T) = x")
-    stream.println()
+    stream.println("  protected def unit[T:Manifest](x: T) = x")    
     stream.println("}")    
     stream.println()
         
@@ -78,10 +77,8 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
     stream.println("  override type Rep[+T] = T")
     stream.println()
     emitBlockComment("dsl types", stream, indent=2)
-    for (tpe <- Tpes) {
-      if (!isForgePrimitiveType(tpe)) {
-        stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")      
-      }
+    for (tpe <- Tpes if (!isForgePrimitiveType(tpe) && DataStructs.contains(tpe))) {       
+      stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")            
     }        
     stream.println()
     stream.println("}")

@@ -29,17 +29,18 @@ trait Definitions extends DerivativeTypes {
   lazy val CBoolean = tpe("Boolean", stage = now)
   lazy val MString = tpe("String")
   lazy val CString = tpe("String", stage = now)   
-  lazy val MUnit = tpe("Unit")
-  lazy val CUnit = tpe("Unit", stage = now)
-  lazy val MNothing = tpe("Nothing")
-  lazy val CNothing = tpe("Nothing", stage = now)
   lazy val MChar = tpe("Char")
   lazy val CChar = tpe("Char", stage = now)
+  lazy val CTuple2 = tpe("Tuple2", (tpePar("A"),tpePar("B")), stage = compile)
+  lazy val MUnit = tpe("Unit")
+  lazy val CUnit = tpe("Unit", stage = now)  
+  lazy val MNothing = tpe("Nothing")
+  lazy val CNothing = tpe("Nothing", stage = now)
   lazy val byName = tpe("Thunk")
   def MThunk(ret: Rep[DSLType], freq: Frequency = normal) = ftpe(List(forge_arg("", byName, None)),ret,freq) // TODO
   def MFunction(args: List[Rep[Any]], ret: Rep[DSLType], freq: Frequency = normal) = ftpe(args.zipWithIndex.map(anyToArg),ret,freq)
   lazy val MSourceContext = tpe("SourceContext", stage = now)
-  
+
   // generic types
   // should these return a different Forge type (e.g. Rep[TypeConstructor] or Rep[GenericType]) than concrete types?
   lazy val MVar = tpe("Var", tpePar("A"))
@@ -58,10 +59,14 @@ trait Definitions extends DerivativeTypes {
   // def parFlat: Rep[DeliteParallelStrategy]
   
   /**
-   * stage tags - only 2 stages
+   * stage tags - only 2 stages ('now' types get lifted into Reps, but 'compile' types never do)
+   * TBD: is the distinction between 'now' and 'compile' useful? should we ever promote 'now's to Reps?
+   *   'now's can theoretically enable us to simplify the back-end, since everything there can be Reps and therefore we need less combinations.
+   *   this should be cleaned up when we clean up how overloaded front-end variants map to a single back-end implementation.
    */
   case object future extends StageTag { override def toString = "future" }
   case object now extends StageTag { override def toString = "now" }
+  case object compile extends StageTag { override def toString = "compile" }
   
   /**
    * code generators

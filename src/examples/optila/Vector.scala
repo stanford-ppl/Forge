@@ -28,13 +28,15 @@ trait VectorOps {
                     
     // have to be careful about the type argument name we use in single and composite since T is being passed in
     // We splice this name into blocks using the escaped \$ to inform the preprocessor that the value already exists.
-    val TT = T.name
+    val TT = T.name    
     
     // we can also perform bulk operations generically, returning a DenseVector result for each operation
     // Arith is only required if T is actually a tpePar here, so we need to be careful.
     if (!isTpePar(T)) compiler (v) ("zeroT", Nil, Nil :: T) implements composite ${ 0.asInstanceOf[\$TT] }          
     val AZ = if (isTpePar(T)) (List(TArith(asTpePar(T))), "implicitly[Arith[T]].zero(self(unit(0)))") else (Nil, "zeroT")
     val A = AZ._1; val Z = AZ._2; // can't use capital letters with tuple return pattern matching        
+    val O = if (isTpePar(T)) List(TOrdering(asTpePar(T))) else Nil
+    val S = if (isTpePar(T)) List(TStringable(asTpePar(T))) else Nil
           
     val VectorCommonOps = withTpe(v)
     VectorCommonOps {
@@ -83,6 +85,28 @@ trait VectorOps {
         out.unsafeImmutable
       }
     
+      // we need two versions so that we can override toString in the lib, and use makeStr in Delite. sad.
+      infix ("makeString") (Nil :: MString, S) implements single ${    
+        var s = ""
+        if ($self.length == 0) {
+          "[ ]"
+        }
+        else if ($self.isRow) { 
+          s = s + "["
+          for (i <- 0 until $self.length - 1) {
+            s = s + $self(i).makeStr + " "
+          }
+          s = s + $self($self.length-1).makeStr
+          s = s + "]"
+        }
+        else {
+          for (i <- 0 until $self.length - 1) {
+            s = s + "[" + $self(i).makeStr + "]\\n"
+          }
+          s = s + "[" + $self($self.length-1).makeStr + "]"
+        }
+        s      
+      }
       infix ("toString") (Nil :: MString) implements single ${    
         var s = ""
         if ($self.length == 0) {
@@ -102,10 +126,10 @@ trait VectorOps {
           }
           s = s + "[" + $self($self.length-1) + "]"
         }
-        s
+        s      
       }
-      
-      infix ("pprint") (Nil :: MUnit, effect = simple) implements composite ${ println(infix_toString($self)) } // $self.toString doesn't work in Delite      
+            
+      infix ("pprint") (Nil :: MUnit, S, effect = simple) implements composite ${ println($self.makeStr) } // $self.toString doesn't work in Delite      
       
 
       /**
@@ -151,10 +175,38 @@ trait VectorOps {
       }
       infix ("/") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e/$1 })
       
-      direct ("abs") (Nil :: DenseVector(T), A) implements map((T,T), 0, ${ e => e.abs })
-      direct ("exp") (Nil :: DenseVector(T), A) implements map((T,T), 0, ${ e => e.exp })      
-      direct ("sum") (Nil :: T, A) implements reduce(T, 0, Z, ${ (a,b) => a+b })            
-            
+      infix ("abs") (Nil :: DenseVector(T), A) implements map((T,T), 0, ${ e => e.abs })
+      infix ("exp") (Nil :: DenseVector(T), A) implements map((T,T), 0, ${ e => e.exp })
+      infix ("log") (Nil :: DenseVector(T), A) implements map((T,T), 0, ${ e => e.exp })            
+      infix ("sum") (Nil :: T, A) implements reduce(T, 0, Z, ${ (a,b) => a+b })            
+      infix ("mean") (Nil :: MDouble, ("conv",T ==> MDouble)) implements composite ${ $self.map(conv).sum / $self.length }
+      infix ("min") (Nil :: T, O) implements reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a < b) a else b }) 
+      infix ("max") (Nil :: T, O) implements reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a > b) a else b }) 
+
+      // TODO: switch to reduce when TupleReduce is generalized
+      infix ("minIndex") (Nil :: MInt, O) implements single ${
+        var min = $self(0)
+        var minIndex = 0
+        for (i <- 0 until $self.length) {
+          if ($self(i) < min) {
+            min = $self(i)
+            minIndex = i
+          }
+        }
+        minIndex
+      }
+      infix ("maxIndex") (Nil :: MInt, O) implements single ${
+        var max = $self(0)
+        var maxIndex = 0
+        for (i <- 0 until $self.length) {
+          if ($self(i) > max) {
+            max = $self(i)
+            maxIndex = i
+          }
+        }
+        maxIndex
+      }
+
       
       /**
        * Bulk

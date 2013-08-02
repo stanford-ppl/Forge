@@ -36,7 +36,7 @@ trait FieldOpsExp extends FieldOps {
   this: ForgeExp =>
  
  /**
-  *  TypeAlias
+  * TypeAlias
   */
   def infix_name(x: Exp[TypeAlias]): String = x match {
     case Def(TpeAlias(name,tpe)) => name
@@ -122,7 +122,6 @@ trait FieldOpsExp extends FieldOps {
     case _ if grpIsTpe(x) => grpAsTpe(x).name
   }  
   
-  
   /**
    * DSLOp
    */
@@ -160,8 +159,7 @@ trait FieldOpsExp extends FieldOps {
   def infix_aliasHint(x: Exp[DSLOp]) = x match {
     case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => alias
   }      
-  
-  
+    
   /**
    * DSLData
    */
@@ -170,7 +168,18 @@ trait FieldOpsExp extends FieldOps {
   }  
   def infix_fields(x: Exp[DSLData]) = x match {
     case Def(Data(tpe,fields)) => fields
-  }    
+  }  
+
+ /**
+  * Identifier
+  */
+  def infix_name(x: Exp[DSLIdentifier])(implicit o: Overloaded6): String = x match {
+    case Def(Identifier(name,tpe)) => name
+  }
+  def infix_tpe(x: Exp[DSLIdentifier])(implicit o: Overloaded4): Exp[DSLType] = x match {
+    case Def(Identifier(name,tpe)) => tpe
+  }
+  
  
 }
 

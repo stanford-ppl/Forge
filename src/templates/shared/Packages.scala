@@ -41,28 +41,38 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     stream.println()
   
     // dsl interface    
-    stream.println("trait " + dsl + " extends Base with GenOverloadHack")
+    stream.println("trait " + dsl + "Identifiers extends Base with GenOverloadHack {")    
+    emitBlockComment("singleton identifiers", stream, indent=2)
+    for (id <- Identifiers) {
+      stream.println("  object " + id.name + " extends " + quote(id.tpe))
+    }        
+    stream.println()
+    emitBlockComment("types with no associated data structure", stream, indent=2)
+    for (tpe <- Tpes if !isForgePrimitiveType(tpe) && !DataStructs.contains(tpe)) {
+      stream.println("  abstract class " + quote(tpe))      
+      stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]") // needed?
+    }
+    stream.println("}")
+
+    stream.println()
+    stream.println("trait " + dsl + " extends " + dsl + "Identifiers")
     for (opsGrp <- opsGrps) {
       stream.print(" with " + opsGrp.name)
     }
     for (e <- Externs) {
       stream.print(" with " + e.opsGrp.name)
     }    
-    stream.println(" { this: " + dsl + "Application => ")
-    stream.println()
+    stream.println(" {")    
+    stream.println("  this: " + dsl + "Application => ")
+    stream.println()    
+    // abstract types are not included in the identifiers trait above because they can clash with either the class definitions or Scala
+    // types in the lib implementation, causing a nasty scalac typer crash. (occurs, for example, if we declare an abstract Vector type)
     emitBlockComment("abstract types", stream, indent=2)
-    for (tpe <- Tpes) {
-      if (!isForgePrimitiveType(tpe)) {
-        if (DataStructs.contains(tpe)) {
-          stream.println("  type " + quote(tpe))      
-          stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + ": Manifest[" + quote(tpe) + "]")
-        }
-        else {
-          stream.println("  abstract class " + quote(tpe))      
-          stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]") // needed?
-        }
-      }
-    }    
+    for (tpe <- Tpes if !isForgePrimitiveType(tpe) && DataStructs.contains(tpe)) {
+      stream.println("  type " + quote(tpe))      
+      stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + ": Manifest[" + quote(tpe) + "]")
+    }
+
     if (TpeAliases.length > 0) {
       stream.println()
       emitBlockComment("type aliases", stream, indent=2)
@@ -70,8 +80,9 @@ trait BaseGenPackages extends ForgeCodeGenBase {
         stream.println("  type " + alias.name + makeTpePars(alias.tpe.tpePars) + " = " + quote(alias.tpe))
       }
     }
+
+    stream.println()
     stream.println("}")
-    stream.println()  
   }
 
 }  

@@ -45,7 +45,8 @@ trait ForgeOps extends Base {
     case MethodSignature(_, _) => Nil.asInstanceOf[List[List[Rep[DSLArg]]]]
     case CurriedMethodSignature(args, _) => 
       // if (args.drop(1).exists(_.exists { case Def(Arg(_,_,Some(x))) => true; case _ => false })) forge_err("curried arguments cannot have default values")
-      args.drop(1).map(a => a.zipWithIndex.map(anyToArg).asInstanceOf[List[Rep[DSLArg]]])
+      val indices = args.scanLeft(0)((a,b) => a+b.length)      
+      args.zip(indices).drop(1).map(t => t._1.zipWithIndex.map(z => (z._1, z._2+t._2)).map(anyToArg).asInstanceOf[List[Rep[DSLArg]]])      
   }
   def infix_retTpe(signature: MethodSignatureType) = signature match {
     case MethodSignature(_, r) => r
@@ -256,8 +257,8 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
         println("  grp " + grp.name + " has no ops defined")
       }
       else {
-        println("  ops in grp " + grp.name + " are: ")
-        for ((o,i) <- opsGrp.get.ops.zipWithIndex) {
+        println("  ops in grp " + grp.name + " with name " + opName + " are: ")
+        for ((o,i) <- opsGrp.get.ops.filter(_.name == opName).zipWithIndex) {
           println("    " + o.name + o.args.map(_.tpe.name).mkString("(",",",")") + " (index " + i + ")")
         }
       }
@@ -398,7 +399,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
       case _ => // ok
     }
     
-    if (retTpe == MUnit && effect == pure) {
+    if (retTpe == MUnit && effect == pure && !args.exists(isFuncArg) && !curriedArgs.exists(_.exists(isFuncArg))) {
       warn("op " + name + " has return type " + MUnit.name + " but no effects, so it is a no-op")
     }
         

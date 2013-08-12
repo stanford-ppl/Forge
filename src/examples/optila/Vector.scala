@@ -52,7 +52,7 @@ trait VectorOps {
       /**
        * Accessors
        */
-      infix ("indices") (Nil :: IndexVector) implements composite ${ IndexVector(unit(0), $self.length) }       
+      infix ("indices") (Nil :: IndexVector) implements composite ${ IndexVector(unit(0), $self.length, $self.isRow) }       
       infix ("isEmpty") (Nil :: MBoolean) implements single ${ $self.length == 0 }
       infix ("first") (Nil :: T) implements single ${ $self(0) }
       infix ("last") (Nil :: T) implements single ${ $self($self.length - 1) }
@@ -163,7 +163,7 @@ trait VectorOps {
         // infix ("-") (rhs :: DenseVector(T), (A, B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a-b })
         // infix ("*") (rhs :: DenseVector(T), (A, B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a*b })
         // infix ("/") (rhs :: DenseVector(T), (A, B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a/b })
-        infix ("zip") (((rhs, (T,B) ==> R)) :: DenseVector(R), addTpePars = (B,R)) implements zip((T,B,R), (0,1), ${ (a,b) => $2(a,b) })
+        infix ("zip") (CurriedMethodSignature(List(List(rhs), List((T,B) ==> R)), DenseVector(R)), addTpePars = (B,R)) implements zip((T,B,R), (0,1), ${ (a,b) => $2(a,b) })
       }
            
       infix ("+") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e+$1 })      
@@ -177,7 +177,7 @@ trait VectorOps {
       
       infix ("abs") (Nil :: DenseVector(T), A) implements map((T,T), 0, ${ e => e.abs })
       infix ("exp") (Nil :: DenseVector(T), A) implements map((T,T), 0, ${ e => e.exp })
-      infix ("log") (Nil :: DenseVector(T), A) implements map((T,T), 0, ${ e => e.exp })            
+      infix ("log") (Nil :: DenseVector(T), A) implements map((T,T), 0, ${ e => e.log })            
       infix ("sum") (Nil :: T, A) implements reduce(T, 0, Z, ${ (a,b) => a+b })            
       infix ("mean") (Nil :: MDouble, ("conv",T ==> MDouble)) implements composite ${ $self.map(conv).sum / $self.length }
       infix ("min") (Nil :: T, O) implements reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a < b) a else b }) 
@@ -212,10 +212,10 @@ trait VectorOps {
        * Bulk
        */
       infix ("map") ((T ==> R) :: DenseVector(R), addTpePars = R) implements map((T,R), 0, ${ e => $1(e) })      
-      infix ("reduce") (((T,T) ==> T) :: T, A) implements reduce(T, 0, Z, ${ (a,b) => $1(a,b) })
+      infix ("reduce") (((T,T) ==> T) :: T, A) implements reduce(T, 0, Z, ${ (a,b) => $1(a,b) })      
       infix ("filter") ((T ==> MBoolean) :: DenseVector(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})
-      infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements foreach(T, 0, ${ e => $1(e) })
-      infix ("find") ((T ==> MBoolean) :: DenseVector(MInt)) implements composite ${ $self.indices.filter(i => $1($self(i))) }
+      infix ("foreach") ((T ==> MUnit) :: MUnit) implements foreach(T, 0, ${ e => $1(e) })
+      infix ("find") ((T ==> MBoolean) :: IndexVector) implements composite ${ IndexVector($self.indices.filter(i => $1($self(i)))) }
       
       val filterMap = v.name.toLowerCase + "_densevector_filter_map"      
       compiler (filterMap) (((T ==> MBoolean), (T ==> R)) :: DenseVector(R), addTpePars = R) implements filter((T,R), 0, ${ e => $1(e) }, ${ e => $2(e) })      
@@ -233,9 +233,25 @@ trait VectorOps {
         }
         (outT.unsafeImmutable, outF.unsafeImmutable)        
       }
+      
       infix ("flatMap") ((T ==> DenseVector(R)) :: DenseVector(R), addTpePars = R) implements composite ${
         DenseVector.flatten($self.map($1))
       }
+
+      // TODO: need to implement with a DeliteOp
+      infix ("scan") (CurriedMethodSignature(List(List(("zero", R)), List((R,T) ==> R)), DenseVector(R)), addTpePars = R) implements single ${
+        val out = DenseVector[R]($self.length, $self.isRow)        
+        out(0) = $2($zero,$self(0))        
+        var i = 1        
+        while (i < $self.length) {
+          out(i) = $2(out(i-1), $self(i))
+          i += 1          
+        }
+        out.unsafeImmutable
+      }
+
+      infix ("prefixSum") (Nil :: DenseVector(T), A) implements composite ${ $self.scan(\$Z)((a,b) => a+b) }
+
       // TODO
       // infix ("groupBy") (((T ==> R)) :: DenseVector(DenseVector(T)))                          
     }

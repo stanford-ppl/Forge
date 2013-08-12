@@ -363,7 +363,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
       }
       stream.println()
       // we separate these just for generated code readability      
-      for (o <- implicitOps) {
+      for (o <- implicitOps if !Impls(o).isInstanceOf[Redirect]) {
         stream.println("  " + makeOpMethodSignature(o, withReturnTpe = Some(true)))
       }
       stream.println("}")

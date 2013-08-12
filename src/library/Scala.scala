@@ -235,7 +235,7 @@ trait ScalaOps {
     impl (println) (codegen($cala, "println(" + quotedArg(0) + ")"))
     impl (println2) (codegen($cala, "println()"))
     
-    val whileDo = direct (Misc) ("__whileDo", List(), List(MThunk(MBoolean),MThunk(MUnit)) :: MUnit, effect = simple)        
+    val whileDo = direct (Misc) ("__whileDo", List(), List(MThunk(MBoolean),MThunk(MUnit)) :: MUnit)        
     
     // function (block) arguments should be referenced using $b[<arg name>]
     impl (whileDo) (codegen($cala, ${

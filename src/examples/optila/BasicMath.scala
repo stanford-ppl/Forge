@@ -44,33 +44,26 @@ trait BasicMathOps {
     val DenseMatrix = lookupTpe("DenseMatrix")
 
     for (V <- List(DenseVector(T),DenseVectorView(T),IndexVector,DenseMatrix(T))) {    	    	
-    	val A = if (V != IndexVector) List(TArith(T)) else Nil    	
-    	val O = if (V != IndexVector) List(TOrdering(T)) else Nil
-    	val C = if (V != IndexVector) List(arg("conv",T ==> MDouble)) else Nil
-    	val P = if (V != IndexVector) List(T) else Nil    
-    	val R1 = if (V == DenseMatrix(T)) DenseMatrix(T) else if (V == IndexVector) DenseVector(MInt) else DenseVector(T)
-    	val R2 = if (V != IndexVector) T else MInt
+      val A = if (V != IndexVector) List(TArith(T)) else Nil    	
+      val O = if (V != IndexVector) List(TOrdering(T)) else Nil
+      val C = if (V != IndexVector) List(arg("conv",T ==> MDouble)) else Nil
+      val P = if (V != IndexVector) List(T) else Nil    
+      val R1 = if (V == DenseMatrix(T)) DenseMatrix(T) else if (V == IndexVector) DenseVector(MInt) else DenseVector(T)
+      val R2 = if (V != IndexVector) T else MInt
 
-    	direct (Math) ("abs", P, V :: R1, A) implements redirect ${ $0.abs }    	
-    	direct (Math) ("exp", P, V :: R1, A) implements redirect ${ $0.exp }    	
-    	direct (Math) ("log", P, V :: R1, A) implements redirect ${ $0.log }
-    	direct (Math) ("square", P, V :: R1, A) implements composite ${ $0.map(e => e*e) }   	    	    	    		    		    	       	    	 
-    	direct (Math) ("sum", P, V :: R2, A) implements redirect ${ $0.sum }    	    	
-    	direct (Math) ("mean", P, V :: MDouble, C) implements redirect ${ $0.mean }    	
-    	direct (Math) ("min", P, V :: R2, O) implements redirect ${ $0.min }    	    		
-    	direct (Math) ("max", P, V :: R2, O) implements redirect ${ $0.max }    	
+      direct (Math) ("abs", P, V :: R1, A) implements redirect ${ $0.abs }    	
+      direct (Math) ("exp", P, V :: R1, A) implements redirect ${ $0.exp }    	
+      direct (Math) ("log", P, V :: R1, A) implements redirect ${ $0.log }
+      direct (Math) ("square", P, V :: R1, A) implements composite ${ $0.map(e => e*e) }   	    	    	    		    		    	       	    	 
+      direct (Math) ("sum", P, V :: R2, A) implements redirect ${ $0.sum }    	    	
+      direct (Math) ("mean", P, V :: MDouble, C) implements redirect ${ $0.mean }    	
+      direct (Math) ("min", P, V :: R2, O) implements redirect ${ $0.min }    	    		
+      direct (Math) ("max", P, V :: R2, O) implements redirect ${ $0.max }    	
 
-    	// only DenseVector has sort, and therefore median, defined right now
-    	if (V == DenseVector(T)) {    		
-    		direct (Math) ("median", T, V :: T, (TNumeric(T),TOrdering(T))) implements redirect ${ $0.median }    	    		
-    	}
+      // only DenseVector has sort, and therefore median, defined right now
+      if (V == DenseVector(T)) {    		
+     	direct (Math) ("median", T, V :: T, (TNumeric(T),TOrdering(T))) implements redirect ${ $0.median }    	    		
+      }
     }    
-
-    // -- operations on sequences 
-    direct (Math) ("sum", T, varArgs(T) :: T, TArith(T)) implements composite ${ densevector_fromarray(array_fromseq($0),true).sum }    	    	
-    direct (Math) ("mean", T, varArgs(T) :: MDouble, ("conv",T ==> MDouble)) implements composite ${ densevector_fromarray(array_fromseq($0),true).mean }    	    		    		
-    direct (Math) ("min", T, varArgs(T) :: T, TOrdering(T)) implements composite ${ densevector_fromarray(array_fromseq($0),true).min }    	    		
-    direct (Math) ("max", T, varArgs(T) :: T, TOrdering(T)) implements composite ${ densevector_fromarray(array_fromseq($0),true).max }    	   
-    direct (Math) ("median", T, varArgs(T) :: T, (TNumeric(T),TOrdering(T))) implements composite ${ densevector_fromarray(array_fromseq($0),true).median }  
   }
 }

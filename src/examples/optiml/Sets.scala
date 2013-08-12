@@ -7,10 +7,11 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 trait SetOps {
   this: OptiMLDSL => 
  
-  def importSetOps() {
+  def importSetOps() {    
     val DenseMatrix = lookupTpe("DenseMatrix")
     val DenseVector = lookupTpe("DenseVector")
     val DenseVectorView = lookupTpe("DenseVectorView")
+    val IndexVector = lookupTpe("IndexVector")
 
     val D = tpePar("D")
     val L = tpePar("L")
@@ -34,7 +35,8 @@ trait SetOps {
         infix ("data") (Nil :: DenseMatrix(D)) implements getter(0, "_data")
 
         infix ("apply") ((MInt,MInt) :: D) implements composite ${ $self.data.apply($1,$2) }                        
-        infix ("apply") (MInt :: DenseVectorView(D)) implements composite ${ $self.data.apply($1) }         
+        infix ("apply") (MInt :: DenseVectorView(D)) implements composite ${ $self.data.apply($1) }   
+        // infix ("apply") (IndexVector :: t) implements composite ${ TrainingSet($self.data.apply($1),$self.labels.apply($1)) }   // scalac typer crash...
 
         infix ("numSamples") (Nil :: MInt) implements composite ${ $self.data.numRows }
         infix ("numFeatures") (Nil :: MInt) implements composite ${ $self.data.numCols }        

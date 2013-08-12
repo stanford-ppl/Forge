@@ -31,7 +31,7 @@ trait Definitions extends DerivativeTypes {
   lazy val CString = tpe("String", stage = now)   
   lazy val MChar = tpe("Char")
   lazy val CChar = tpe("Char", stage = now)
-  lazy val CTuple2 = tpe("Tuple2", (tpePar("A"),tpePar("B")), stage = compile)
+  lazy val CTuple2 = tpe("Tuple2", (tpePar("A"),tpePar("B")), stage = compile)  
   lazy val MUnit = tpe("Unit")
   lazy val CUnit = tpe("Unit", stage = now)  
   lazy val MNothing = tpe("Nothing")
@@ -133,6 +133,7 @@ trait Definitions extends DerivativeTypes {
   case object mutable extends EffectType  
   case object simple extends EffectType
   case class write(args: Int*) extends EffectType
+  case object global extends EffectType
   
   /**
    * Alias hints

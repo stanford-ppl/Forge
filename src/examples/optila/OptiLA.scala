@@ -44,8 +44,8 @@ trait OptiLADSL extends ForgeApplication
     compiler (Range) ("infix_until", Nil, (MInt,MInt) :: Range) implements allocates(Range, quotedArg(0), quotedArg(1))
     
     // this is a little convoluted unfortunately (because of the restriction on passing structs to codegen nodes)
-    compiler (Range) ("infix_foreach", Nil, (Range, MInt ==> MUnit) :: MUnit, effect = simple) implements composite ${ range_foreach(range_start($0), range_end($0), $1) }    
-    compiler (Range) ("range_foreach", Nil, (("start",MInt),("end",MInt),("func",MInt ==> MUnit)) :: MUnit, effect = simple) implements codegen($cala, ${
+    compiler (Range) ("infix_foreach", Nil, (Range, MInt ==> MUnit) :: MUnit) implements composite ${ range_foreach(range_start($0), range_end($0), $1) }    
+    compiler (Range) ("range_foreach", Nil, (("start",MInt),("end",MInt),("func",MInt ==> MUnit)) :: MUnit) implements codegen($cala, ${
       var i = $start
       while (i < $end) {
         $b[func](i)

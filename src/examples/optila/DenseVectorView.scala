@@ -31,6 +31,7 @@ trait DenseVectorViewOps {
             
       fimplicit ("viewToDense") (Nil :: DenseVector(T)) implements composite ${ 
         Console.println("(performance warning): automatic conversion from DenseVectorView to DenseVector")
+        // Console.println("  at " + quotePos(fresh[Nothing].withPos(List(implicitly[SourceContext])))) 
         $self.toDense 
       }
       val grpName = if (Config.fastCompile) "$Flat" else "DenseVector"

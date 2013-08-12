@@ -20,6 +20,14 @@ trait DenseVectorOps {
     // data fields     
     data(DenseVector, ("_length", MInt), ("_isRow", MBoolean), ("_data", MArray(T)))      
   
+    // operations on sequences are made available via tuple conversions to DenseVector -- unfortunately we have to do it for every arity
+    for (arity <- (2 until 23)) {            
+      val pars = (0 until arity).map(i => T).toList      
+      val elems = (0 until arity).map(i => "unit(t._" + (i+1)+")").mkString(",")
+      val TT = tpe("Tuple" + arity, pars, stage = compile)
+      fimplicit (DenseVector) ("tupleToDense" + arity, T, (("t",TT) :: DenseVector(T))) implements redirect ${ DenseVector[T](\$elems) } 
+    }    
+
     // static methods
     static (DenseVector) ("apply", T, (MInt, MBoolean) :: DenseVector(T), effect = mutable) implements allocates(DenseVector, ${$0}, ${$1}, ${array_empty[T]($0)})
     static (DenseVector) ("apply", T, varArgs(T) :: DenseVector(T)) implements allocates(DenseVector, ${unit($0.length)}, ${unit(true)}, ${array_fromseq($0)})
@@ -97,8 +105,13 @@ trait DenseVectorOps {
        */
       infix ("length") (Nil :: MInt) implements getter(0, "_length")
       infix ("isRow") (Nil :: MBoolean) implements getter(0, "_isRow")
-      infix ("apply") (MInt :: T) implements composite ${ array_apply(densevector_raw_data($self), $1) }                        
-      
+      infix ("apply") (MInt :: T) implements composite ${ array_apply(densevector_raw_data($self), $1) }      
+      infix ("apply") (IndexVector :: DenseVector(T)) implements composite ${ 
+        // foreach instead of map to preserve orientation of original vector without an extra copy to transpose       
+        val out = DenseVector[T]($self.length, $self.isRow)
+        $1 foreach { i => out(i) = $self(i) }
+        out.unsafeImmutable      
+      }                        
       
       /**
        * Miscellaneous

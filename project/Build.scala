@@ -61,7 +61,7 @@ trait ForgePreprocessor {
     }
     
     def endOfWord(c: Byte): Boolean = c match {
-      case ' ' | ',' | '.' | '+' | '*' | '-' | '/' | ')' | '}' | '(' | '{' | '\n' => true  // fixme: platform-specific line sep
+      case ' ' | ',' | '.' | ':' | '+' | '*' | '-' | '/' | ')' | '}' | '(' | '{' | '\n' => true  // fixme: platform-specific line sep
       case _ => false
     }
     

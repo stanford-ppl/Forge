@@ -15,69 +15,69 @@ import templates.ident.ForgeCodeGenIdent
 trait ForgeApplicationRunner extends ForgeApplication with ForgeExp {
   val dsl = dslName.filterNot(_ == ' ').capitalize
   val build = "build" // TODO: make configurable
-  
+
   final def main(args: Array[String]) {
     info("DSL Being Staged:[" + this.getClass.getName + "] (" + dsl + ")")
 
     // -- stage forge primitives
     extern(grp("ForgeArray"))
     extern(grp("ForgeArrayBuffer"))
-    extern(grp("Var"), withLift = true)    
+    extern(grp("Var"), withLift = true)
     extern(grp("Record"))
     extern(grp("InputOutput"))
-    extern(grp("Profiling"))    
+    extern(grp("Profiling"))
 
     // -- stage the specification to build the Forge IR
     // this has the side effect of populating all of the internal Forge collections
     val y = specification()
-        
+
     // -- run sanity checkers
     // TODO: implement these!
     //  1) all ops that are declared as delite ops have delite collection input/outputs
     // check(y)
-    
+
     // -- fast compile mode
     if (Config.fastCompile) {
       flattenIR()
-    }    
-    
+    }
+
     // -- run code generators
 
-    Directory(Path(build)).deleteRecursively() 
-    
+    Directory(Path(build)).deleteRecursively()
+
     // shared
     val sharedCodegen = new ForgeCodeGenShared {
-      val IR: ForgeApplicationRunner.this.type = ForgeApplicationRunner.this 
-      val buildDir = build + File.separator + dsl + File.separator + "shared" 
+      val IR: ForgeApplicationRunner.this.type = ForgeApplicationRunner.this
+      val buildDir = build + File.separator + dsl + File.separator + "shared"
     }
-    
+
     // library (interpreter)
-    val libraryCodegen = new ForgeCodeGenInterpreter { 
-      val IR: ForgeApplicationRunner.this.type = ForgeApplicationRunner.this 
-      val buildDir = build + File.separator + dsl + File.separator + "library" 
+    val libraryCodegen = new ForgeCodeGenInterpreter {
+      val IR: ForgeApplicationRunner.this.type = ForgeApplicationRunner.this
+      val buildDir = build + File.separator + dsl + File.separator + "library"
     }
-    
+
     // delite
-    val deliteCodegen = new ForgeCodeGenDelite { 
-      val IR: ForgeApplicationRunner.this.type = ForgeApplicationRunner.this 
-      val buildDir = build + File.separator + dsl + File.separator + "compiler" 
+    val deliteCodegen = new ForgeCodeGenDelite {
+      val IR: ForgeApplicationRunner.this.type = ForgeApplicationRunner.this
+      val buildDir = build + File.separator + dsl + File.separator + "compiler"
     }
 
     // identity
-    val identCodegen = new ForgeCodeGenIdent { 
-      val IR: ForgeApplicationRunner.this.type = ForgeApplicationRunner.this 
-      val buildDir = build + File.separator + dsl + File.separator + "ident" 
+    val identCodegen = new ForgeCodeGenIdent {
+      val IR: ForgeApplicationRunner.this.type = ForgeApplicationRunner.this
+      val buildDir = build + File.separator + dsl + File.separator + "ident"
     }
 
     var codeGenerators: List[ForgeCodeGenBackend{val IR: ForgeApplicationRunner.this.type; val buildDir: String}] = List(sharedCodegen)
-    if (Config.genLib) codeGenerators :+= libraryCodegen  
+    if (Config.genLib) codeGenerators :+= libraryCodegen
     if (Config.genDelite) codeGenerators :+= deliteCodegen
     if (Config.genIdent) codeGenerators :+= identCodegen
-    
-    for (c <- codeGenerators) {    
+
+    for (c <- codeGenerators) {
       c.emitDSLImplementation()
     }
-    
-    info("DSL generation complete. Please run publish and compile the generated files against Delite to check for errors.")    
-  }  
+
+    info("DSL generation complete. Please run publish and compile the generated files against Delite to check for errors.")
+  }
 }

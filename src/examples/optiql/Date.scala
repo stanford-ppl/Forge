@@ -5,16 +5,16 @@ package optiql
 import core.{ForgeApplication,ForgeApplicationRunner}
 
 trait DateOps {
-  this: OptiQLDSL => 
-  
+  this: OptiQLDSL =>
+
   def importDateOps() {
 
     val Date = tpe("Date")
-    data(Date, ("value", MInt))  
+    data(Date, ("value", MInt))
 
     static (Date) ("apply", Nil, MInt :: Date) implements allocates (Date, ${$0})
 
-    static (Date) ("apply", Nil, MString :: Date) implements single ${ 
+    static (Date) ("apply", Nil, MString :: Date) implements single ${
       val tokens = $0.fsplit("-")
       val year = tokens(0).toInt
       val month = tokens(1).toInt
@@ -22,7 +22,7 @@ trait DateOps {
       Date((year << 9) + (month << 5) + day)
     }
 
-    val DateOps = withTpe (Date)      
+    val DateOps = withTpe (Date)
     DateOps {
 
       compiler ("date_value") (Nil :: MInt) implements getter(0, "value")
@@ -41,4 +41,4 @@ trait DateOps {
 
     }
   }
-}   
+}

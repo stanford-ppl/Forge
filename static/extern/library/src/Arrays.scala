@@ -7,8 +7,8 @@ import scala.virtualization.lms.common._
 trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
   type ForgeArray[T] = scala.Array[T]
   implicit def forgeArrayManifest[T:Manifest] = manifest[Array[T]]
-  
-  def array_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[T]] 
+
+  def array_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = new ForgeArray[T](__arg0)
   def array_copy[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int],__arg2: Rep[ForgeArray[T]],__arg3: Rep[Int],__arg4: Rep[Int])(implicit __imp0: SourceContext): Rep[Unit]
     = System.arraycopy(__arg0,__arg1,__arg2,__arg3,__arg4)
@@ -16,7 +16,7 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
     = __arg0(__arg1) = __arg2
   def array_apply[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[T]
     = __arg0(__arg1)
-  def array_length[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[Int]          
+  def array_length[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[Int]
     = __arg0.length
   def array_clone[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = __arg0.clone
@@ -31,9 +31,9 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
   def array_string_split(__arg0: Rep[String], __arg1: Rep[String])(implicit __imp0: SourceContext): Rep[ForgeArray[String]]
     = __arg0.split(__arg1)
 
-  def scala_array_apply[T:Manifest](__arg0: Rep[Array[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[T] 
+  def scala_array_apply[T:Manifest](__arg0: Rep[Array[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[T]
     = array_apply(__arg0,__arg1)
-  def scala_array_length[T:Manifest](__arg0: Rep[Array[T]])(implicit __imp0: SourceContext): Rep[Int] 
+  def scala_array_length[T:Manifest](__arg0: Rep[Array[T]])(implicit __imp0: SourceContext): Rep[Int]
     = array_length(__arg0)
 }
 

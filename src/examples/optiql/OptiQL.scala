@@ -12,15 +12,15 @@ trait OptiQLDSL extends ForgeApplication with TableOps with DateOps {
    * package declarations, etc.
    */
   def dslName = "OptiQL"
-  
+
   /**
    * The specification is the DSL definition (types, data structures, ops)
    */
   def specification() = {
     extern(grp("Rewrite"))
     //extern(grp("QueryOpts"))
-    importScalaOps()      
-    importTableOps() 
+    importScalaOps()
+    importTableOps()
     //importDateOps()
     extern(grp("Date"))
   }

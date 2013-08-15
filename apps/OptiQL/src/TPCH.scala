@@ -31,7 +31,7 @@ trait Q1 extends OptiQLApplication {
   def fromLine(line: Rep[String]): Rep[LineItem] = {
     val fields = line.fsplit("\\Q" + "|" + "\\E")
     new Record {
-      val l_orderkey = { date_object_apply(array_apply(fields, 10).asInstanceOf[Rep[String]]); array_apply(fields, 0).toInt } 
+      val l_orderkey = { date_object_apply(array_apply(fields, 10).asInstanceOf[Rep[String]]); array_apply(fields, 0).toInt }
       val l_partkey = array_apply(fields, 1).toInt
       val l_suppkey = array_apply(fields, 2).toInt
       val l_linenumber = array_apply(fields, 3).toInt
@@ -56,7 +56,7 @@ trait Q1 extends OptiQLApplication {
   }
 
   def loadLineItems(tpchDataPath: Rep[String]) = Table.fromFile(tpchDataPath+"/lineitem.tbl", fromLine)
-    
+
   def main() = {
     println("TPCH Query 1")
     if (args.length < 1) printUsage
@@ -64,23 +64,23 @@ trait Q1 extends OptiQLApplication {
     query(lineItems)
   }
 
-  def query(lineItems: Rep[Table[LineItem]]) = {  
+  def query(lineItems: Rep[Table[LineItem]]) = {
     tic(lineItems)
-    
+
     val q = lineItems Where(_.l_shipdate <= Date("1998-12-01")) GroupBy(l => (l.l_returnflag,l.l_linestatus)) Select(g => new Record {
       val returnFlag = g.key._1
       val lineStatus = g.key._2
       val sumQty = g.value.Sum(_.l_quantity)
-      val sumBasePrice = g.value.Sum(_.l_extendedprice)      
-      val sumDiscountedPrice = g.value.Sum(l => l.l_extendedprice * (1.0d - l.l_discount))  
+      val sumBasePrice = g.value.Sum(_.l_extendedprice)
+      val sumDiscountedPrice = g.value.Sum(l => l.l_extendedprice * (1.0d - l.l_discount))
       val sumCharge = g.value.Sum(l => l.l_extendedprice * (1.0d - l.l_discount) * (unit(1.0d) + l.l_tax))  // unit required for + for some reason (infix fails to resolve otherwise)
       val avgQty = g.value.Average(_.l_quantity)
       val avgPrice = g.value.Average(_.l_extendedprice)
       val avgDiscount = g.value.Average(_.l_discount)
       val countOrder = g.value.Count
     }) OrderBy(_.returnFlag) ThenBy(_.lineStatus)
-    
+
     toc(q)
     println(q)
-  }    
+  }
 }

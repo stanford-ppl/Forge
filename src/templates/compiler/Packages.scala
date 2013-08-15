@@ -8,12 +8,12 @@ import core._
 import shared.BaseGenPackages
 import Utilities._
 
-trait DeliteGenPackages extends BaseGenPackages {  
+trait DeliteGenPackages extends BaseGenPackages {
   this: ForgeCodeGenDelite =>
-  
+
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
   import IR._
- 
+
   def emitApplicationRunner(stream: PrintWriter) {
     stream.println("trait " + dsl + "ApplicationCompiler extends " + dsl + "Application with DeliteApplication with " + dsl+"Exp")
   }
@@ -22,28 +22,28 @@ trait DeliteGenPackages extends BaseGenPackages {
     case `cpp` => "Cpp" // only one that doesn't follow the convention of TargetX and XGen...
     case _ => g.name
   }
-  
+
   def emitDSLPackageDefinitions(opsGrps: List[DSLOps], stream: PrintWriter) {
     emitBlockComment("dsl compiler definition", stream)
-      
+
     // compiler
     stream.println("trait " + dsl + "Compiler extends " + dsl)
     for (opsGrp <- opsGrps) {
       // stream.print(" with " + opsGrp.name)
       if (opsGrp.ops.exists(o => Impls(o).isInstanceOf[SingleTask] || Impls(o).isInstanceOf[Composite]))
-        stream.print(" with " + opsGrp.name + "Impl")     
+        stream.print(" with " + opsGrp.name + "Impl")
       if (opsGrp.ops.exists(_.style == compilerMethod))
-        stream.print(" with " + opsGrp.grp.name + "CompilerOps")           
+        stream.print(" with " + opsGrp.grp.name + "CompilerOps")
     }
     for (e <- Externs) {
-      stream.print(" with " + e.opsGrp.grp.name + "CompilerOps")          
-    }    
+      stream.print(" with " + e.opsGrp.grp.name + "CompilerOps")
+    }
     stream.println(" {")
     stream.println("  this: " + dsl + "Application with " + dsl + "Exp => ")
-    stream.println()    
+    stream.println()
     stream.println("}")
     stream.println()
-  
+
     // exp
     stream.println("trait " + dsl + "Exp extends " + dsl + "Compiler")
     for (opsGrp <- opsGrps) {
@@ -51,7 +51,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     }
     for (e <- Externs) {
       stream.print(" with " + e.opsGrp.name + "Exp")
-    }    
+    }
     stream.println(" with DeliteOpsExp with DeliteAllOverridesExp with MultiloopSoATransformExp {")
     stream.println(" this: DeliteApplication with " + dsl + "Application => ")
     stream.println()
@@ -60,31 +60,31 @@ trait DeliteGenPackages extends BaseGenPackages {
     // TODO: generalize -- these depend on certain Scala.scala operations being imported, which may not be the case
     stream.println("  override def infix_unary_!(x: Rep[Boolean])(implicit pos: SourceContext) = boolean_negate(x)")
     stream.println("  override def infix_&&(lhs: Rep[Boolean], rhs: Rep[Boolean])(implicit pos: SourceContext) = boolean_and(lhs,rhs)")
-    stream.println("  override def infix_||(lhs: Rep[Boolean], rhs: Rep[Boolean])(implicit pos: SourceContext) = boolean_or(lhs,rhs)")        
-    stream.println("  override def infix_unsafeImmutable[A:Manifest](lhs: Rep[A])(implicit pos: SourceContext) = object_unsafe_immutable(lhs)")    
-    stream.println("  override def infix_trim(lhs: Rep[String])(implicit pos: SourceContext) = string_trim(lhs)")    
-    stream.println("  override def __whileDo(cond: => Exp[Boolean], body: => Rep[Unit])(implicit pos: SourceContext) = delite_while(cond, body)")  
+    stream.println("  override def infix_||(lhs: Rep[Boolean], rhs: Rep[Boolean])(implicit pos: SourceContext) = boolean_or(lhs,rhs)")
+    stream.println("  override def infix_unsafeImmutable[A:Manifest](lhs: Rep[A])(implicit pos: SourceContext) = object_unsafe_immutable(lhs)")
+    stream.println("  override def infix_trim(lhs: Rep[String])(implicit pos: SourceContext) = string_trim(lhs)")
+    stream.println("  override def __whileDo(cond: => Exp[Boolean], body: => Rep[Unit])(implicit pos: SourceContext) = delite_while(cond, body)")
     // delite and lms if-then-else don't use by-name-parameter for cond
     stream.println("  override def __ifThenElse[T:Manifest](cond: Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false)")
     stream.println("  override def __ifThenElse[T:Manifest](cond: => Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false)")
     stream.println("  implicit def repToOrderingOps[A:Manifest:Ordering](x: Rep[A]) = repOrderingToOrderingOps(x)")
-    stream.println("  implicit def varToOrderingOps[A:Manifest:Ordering](x: Var[A]) = varOrderingToOrderingOps(x)")    
+    stream.println("  implicit def varToOrderingOps[A:Manifest:Ordering](x: Var[A]) = varOrderingToOrderingOps(x)")
     stream.println("  // forward to LMS primitive ops to make stencil analysis detect intervals")
     stream.println("  override def primitive2_forge_int_plus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = int_plus(__arg0, __arg1)")
     stream.println("  override def primitive2_forge_int_times(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = int_times(__arg0, __arg1)")
 
     stream.println()
     emitBlockComment("dsl types", stream, indent=2)
-    for (tpe <- Tpes if (!isForgePrimitiveType(tpe) && DataStructs.contains(tpe))) {             
+    for (tpe <- Tpes if (!isForgePrimitiveType(tpe) && DataStructs.contains(tpe))) {
       stream.print("  abstract class " + quote(tpe))
       if (ForgeCollections.contains(tpe)) stream.println(" extends DeliteCollection[" + quote(ForgeCollections(tpe).tpeArg) + "]") else stream.println()
-      stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")      
+      stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")
     }
     stream.println()
     stream.println("  def getCodeGenPkg(t: Target{val IR: " + dsl + "Exp.this.type}): GenericFatCodegen{val IR: " + dsl + "Exp.this.type} = {")
-    stream.println("    t match {")  
+    stream.println("    t match {")
     for (g <- generators) {
-      stream.println("      case _:Target" + targetName(g) + " => new " + dsl + "Codegen" + g.name + "{val IR: " + dsl + "Exp.this.type = " + dsl + "Exp.this}")      
+      stream.println("      case _:Target" + targetName(g) + " => new " + dsl + "Codegen" + g.name + "{val IR: " + dsl + "Exp.this.type = " + dsl + "Exp.this}")
     }
     stream.println("      case _ => throw new RuntimeException(\"" + dsl + " does not support this target\")")
     stream.println("    }")
@@ -129,7 +129,7 @@ trait DeliteGenPackages extends BaseGenPackages {
   }
 
   def emitDSLCodeGeneratorPackageDefinitions(dslOps: List[DSLOps], stream: PrintWriter) {
-    emitBlockComment("code generators", stream)    
+    emitBlockComment("code generators", stream)
     emitBaseCodegen(stream)
     stream.println()
     for (g <- generators) {
@@ -140,7 +140,7 @@ trait DeliteGenPackages extends BaseGenPackages {
       }
       for (e <- Externs) {
         if (e.opsGrp.targets.contains(g))
-          stream.print(" with " + g.name + "Gen" + e.opsGrp.name)        
+          stream.print(" with " + g.name + "Gen" + e.opsGrp.name)
       }
       if (g == cuda) stream.println(" with DeliteCppHostTransfer with DeliteCudaDeviceTransfer ")
       if (g == cpp) stream.println(" with DeliteCppHostTransfer ")
@@ -167,6 +167,6 @@ trait DeliteGenPackages extends BaseGenPackages {
       }
       stream.println("}")
     }
-  }  
-  
+  }
+
 }

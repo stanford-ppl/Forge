@@ -3,13 +3,13 @@ package core
 
 /**
  * These are types that need to be mixed in to the IR.
- * 
+ *
  * The downside is that if a DSL needs to use these types, they must explicitly import them.
  */
 
 trait DerivativeTypes {
   this: Forge =>
-  
+
   abstract class ForgeCollectionType {
     val tpeArg: Rep[DSLType]
     val alloc: Rep[DSLOp]

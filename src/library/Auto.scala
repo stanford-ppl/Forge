@@ -11,7 +11,7 @@ import scala.reflect.runtime.{universe => ru}
  */
 trait AutoOps {
   this: ForgeApplication =>
-  
+
   def importAuto[T:ru.TypeTag] = {
 
     def ftpe(tp: ru.Type) = tpe(tp.typeSymbol.name.toString) // package names?
@@ -35,7 +35,7 @@ trait AutoOps {
 
         try {
 
-            val mt = if (!ispoly) mt0.asInstanceOf[ru.MethodTypeApi] 
+            val mt = if (!ispoly) mt0.asInstanceOf[ru.MethodTypeApi]
                       else mt0.asInstanceOf[ru.PolyType].resultType.asInstanceOf[ru.MethodType]
 
             // TODO: type parameters
@@ -50,7 +50,7 @@ trait AutoOps {
 
             val ret = ftpe(mt.resultType)
 
-            infix (Grp) (m.name.toString, Nil, ((Tpe :: params)) :: ret, Nil, simple) implements 
+            infix (Grp) (m.name.toString, Nil, ((Tpe :: params)) :: ret, Nil, simple) implements
                 (codegen($cala, quotedArg(0) + "." + m.name + argsStr))
 
             // TODO: overloading?? --> duplicate codegen warning
@@ -62,5 +62,5 @@ trait AutoOps {
     }
 
   }
-    
+
 }

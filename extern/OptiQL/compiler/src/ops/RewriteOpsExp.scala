@@ -6,7 +6,7 @@ import optiql.compiler._
 import optiql.shared.ops._
 
 trait RewriteOpsExp extends RewriteOps with TableOpsExp {
-  this: OptiQLExp => 
+  this: OptiQLExp =>
 
   def upgradeInt[R:Manifest](value: Rep[Int]): Rep[R] = value.asInstanceOf[Rep[R]]
 
@@ -53,7 +53,7 @@ trait RewriteOpsExp extends RewriteOps with TableOpsExp {
 
 
     val funcs = resultSelector(fresh[T]) match {
-      case Def(Struct(tag: StructTag[R], elems)) => 
+      case Def(Struct(tag: StructTag[R], elems)) =>
         val valueFunc = (a:Exp[A]) => struct[R](tag, elems map { case (key, value) => (key, rewriteMap(value)(a)) })
         val reduceFunc = (a:Exp[R],b:Exp[R]) => struct[R](tag, elems map { case (key, value) => (key, rewriteReduce(value)(field(a,key)(value.tp,ctx), field(b,key)(value.tp,ctx))) })
         val averageFunc = (a:Exp[R],count:Exp[Int]) => struct[R](tag, elems map { case (key, value) => (key, rewriteAverage(value)(field(a,key)(value.tp,ctx), count)) })
@@ -64,14 +64,14 @@ trait RewriteOpsExp extends RewriteOps with TableOpsExp {
 
     if (failed) None else Some(funcs)
   }
-  
+
   override def table_select[A:Manifest,R:Manifest](self: Rep[Table[A]], resultSelector: (Rep[A]) => Rep[R])(implicit __pos: SourceContext): Exp[Table[R]] = self match {
     case Def(g@Table_GroupByWhere(origS: Exp[Table[a]], keySelector, cond)) => hashReduce(resultSelector, keySelector)(g.mT,g.mK,manifest[A],manifest[R]) match {
-      case Some((valueFunc, reduceFunc, averageFunc)) => 
+      case Some((valueFunc, reduceFunc, averageFunc)) =>
         val hr = groupByReduce(origS, keySelector, valueFunc, reduceFunc, cond)(g.mT,g.mK,manifest[R],implicitly[SourceContext])
         val count = groupByReduce(origS, keySelector, (e:Exp[a]) => unit(1), (a:Exp[Int],b:Exp[Int])=>primitive2_pl(a,b), cond)(g.mT,g.mK,manifest[Int],implicitly[SourceContext])
         bulkDivide(hr, count, averageFunc)(manifest[R],implicitly[SourceContext])
-      case None => 
+      case None =>
         Console.println("ERROR: unable to fuse GroupBy-Select")
         return super.table_select(self, resultSelector)
     }
@@ -90,5 +90,5 @@ trait RewriteOpsExp extends RewriteOps with TableOpsExp {
 // these need to exist for externs, even though we don't need them
 trait ScalaGenRewriteOps
 trait CudaGenRewriteOps
-trait OpenCLGenRewriteOps 
+trait OpenCLGenRewriteOps
 trait CGenRewriteOps

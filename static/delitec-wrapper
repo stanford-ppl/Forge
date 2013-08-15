@@ -8,16 +8,16 @@ import delitecommon
 comps = ['apps','extern','shared','library','compiler']
 
 ## a forwarder to the delitec script in DELITE_HOME with neccesary classpaths for this forge-generated DSL
-def main():  
+def main():
     usage = "usage: %prog <dsl runner> [delitec args]"
 
     if len(argv) < 2:
         exit("a dsl runner must be passed as an argument")
- 
+
     dslRunner = argv[1]
     delitecommon.checkDeliteEnv()
 
-    scala_major_id = delitecommon.scala_major_id 
+    scala_major_id = delitecommon.scala_major_id
     script_home = delitecommon.script_home
     DELITE_HOME = delitecommon.DELITE_HOME
 
@@ -25,8 +25,8 @@ def main():
     cp = ""
     for comp in comps:
       cp = cp + script_home + "/" + comp + "/target/" + scala_major_id + "/classes" + os.pathsep
-    
-    old_cp = os.getenv("CLASSPATH", "") 
+
+    old_cp = os.getenv("CLASSPATH", "")
     os.putenv("CLASSPATH", old_cp + os.pathsep + cp)
 
     os.system(DELITE_HOME + "/bin/delitec " + dslRunner + " " + " ".join(argv[2:len(argv)]))

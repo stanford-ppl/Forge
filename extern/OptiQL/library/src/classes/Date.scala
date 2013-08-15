@@ -14,7 +14,7 @@ import optiql.library._
 import optiql.library.classes._
 
 trait DateWrapper extends DateOps {
-  this: OptiQLBase with OptiQLClasses => 
+  this: OptiQLBase with OptiQLClasses =>
 
   class DateImpl(__value: Int) extends Date {
     var value = __value

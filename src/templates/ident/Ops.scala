@@ -12,13 +12,13 @@ import core._
 import shared.{BaseGenOps,BaseGenDataStructures}
 import Utilities._
 
-trait IdentGenOps extends BaseGenOps with BaseGenDataStructures {  
+trait IdentGenOps extends BaseGenOps with BaseGenDataStructures {
   this: ForgeCodeGenIdent =>
-  
+
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
   import IR._
 
-  // TODO: cleanup  
+  // TODO: cleanup
   def xx[T](x:Rep[T]): Def[T] = Def.unapply(x).get
   def xxx[T](x:List[Rep[T]]): List[Def[T]] = x.map(xx)
   def zzz(x:Any): String = x match {
@@ -38,7 +38,7 @@ trait IdentGenOps extends BaseGenOps with BaseGenDataStructures {
     if (grpIsTpe(opsGrp.grp)) {
       val tpe = grpAsTpe(opsGrp.grp)
       val d = DataStructs.get(tpe)
-      d.foreach { data => 
+      d.foreach { data =>
         emitWithIndent("val " + data.tpe.name + " = " + zzz(data.tpe), stream, baseIndent)
         stream.println()
         emitWithIndent("data(" + data.tpe.name + ", " + zzz(data.fields) + ")", stream, baseIndent)
@@ -52,15 +52,15 @@ trait IdentGenOps extends BaseGenOps with BaseGenDataStructures {
     }
 
     stream.println()
-    
+
     val scopeIndent = if (scope) baseIndent+2 else baseIndent
 
-    for (o <- unique(opsGrp.ops)) { 
+    for (o <- unique(opsGrp.ops)) {
       emitWithIndent("// " + o.name, stream, scopeIndent)
       emitWithIndent("// " + zzz(o), stream, scopeIndent)
 
-      def forge_op0(style: String, hg: Boolean)(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], 
-        args: List[Rep[DSLArg]], curriedArgs: List[List[Rep[DSLArg]]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], 
+      def forge_op0(style: String, hg: Boolean)(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]],
+        args: List[Rep[DSLArg]], curriedArgs: List[List[Rep[DSLArg]]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType],
         effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
 
         // TODO: reverse engineer method signatures
@@ -70,7 +70,7 @@ trait IdentGenOps extends BaseGenOps with BaseGenDataStructures {
 
         forge_op1(style,hg)(grp.name)(zzz(name),zzz(tpePars),zzz(signature),zzz(implicitArgs),zzz(effect),zzz(aliasHint))
       }
-      def forge_op1(style: String, hg: Boolean)(grp: String)(name: String, tpePars: String, signature: String, implicitArgs: String, effect: String, aliasHint: String) = 
+      def forge_op1(style: String, hg: Boolean)(grp: String)(name: String, tpePars: String, signature: String, implicitArgs: String, effect: String, aliasHint: String) =
           if (!scope) emitWithIndent(s"$style ($grp)($name, $tpePars, $signature, $implicitArgs, $effect, $aliasHint)", stream, scopeIndent)
           else emitWithIndent(s"$style ($name)($signature, $implicitArgs, $tpePars, $effect, $aliasHint)", stream, scopeIndent)
           // is tpePars == addTpePars ??
@@ -93,6 +93,6 @@ trait IdentGenOps extends BaseGenOps with BaseGenDataStructures {
     }
 
     if (scope) emitWithIndent("}", stream, baseIndent)
-        
+
   }
 }

@@ -27,11 +27,11 @@ def main():
     (opts, args) = parser.parse_args()
     if len(args) < 1:
         parser.error("a dsl name must be passed to publish as an argument")
-    
+
     initialize()
     checkEnv()
     publish(args[0], opts)
- 
+
 def initialize():
     pass
 
@@ -45,8 +45,8 @@ def checkEnv():
         if os.path.isfile(cand_home + "/forge.key"):
             FORGE_HOME = cand_home
         else:
-            err("The FORGE_HOME environment variable must be defined") 
- 
+            err("The FORGE_HOME environment variable must be defined")
+
 def printEnv():
     print("======== REQUIRED FORGE PUBLISH ENVIRONMENT VARIABLES =========")
     print("FORGE_HOME = " + FORGE_HOME)
@@ -136,7 +136,7 @@ def publish(dsl, opts):
         replfiles = [d + "/" + f for (d, n, fs) in os.walk(dest) for f in fs]
         for line in fileinput.input(replfiles, inplace = 1):
             sys.stdout.write(line.replace("HUMAN_DSL_NAME", dsl).replace("LOWERCASE_DSL_NAME", dsl.lower()))
-          
+
     os.system("rsync -r " + FORGE_HOME + "/apps/" + dsl + "/" + " " + build_dir + "/apps/")
 
     # sbt project
@@ -145,7 +145,7 @@ def publish(dsl, opts):
         buildFile = open(build_dir + "/project/Build.scala", 'w')
         buildFile.write(sbtBuildFile(dsl))
         buildFile.close()
-    
+
     # executable scripts
     if not os.path.exists(build_dir + "/bin/"):
         os.mkdir(build_dir + "/bin/")
@@ -160,6 +160,6 @@ def publish(dsl, opts):
         shutil.copyfile(FORGE_HOME + "/static/delitecommon-wrapper.py", build_dir+"/bin/delitecommon.py")
 
     print "[forge]: Publishing complete. Don't forget to run 'sbt publish-local' from your DELITE_HOME for the framework and runtime modules before compiling your new DSL."
-  
+
 if __name__ == "__main__":
     main()

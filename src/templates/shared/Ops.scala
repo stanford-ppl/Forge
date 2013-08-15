@@ -9,41 +9,41 @@ import scala.virtualization.lms.common._
 import core._
 import Utilities._
 
-trait BaseGenOps extends ForgeCodeGenBase {  
+trait BaseGenOps extends ForgeCodeGenBase {
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
   import IR._
 
   /**
    * Utility methods
-   */  
+   */
   def baseOpsCls(grp: Rep[DSLGroup]) = {
     // GenOverloadHack should be mixed in by package traits only
     "Base"
   }
-  
+
   /**
    * Quoting for formatted code-gen
-   */  
-    
-  def inline(o: Rep[DSLOp], str: Exp[String], quoter: Exp[Any] => String = quote) = {     
+   */
+
+  def inline(o: Rep[DSLOp], str: Exp[String], quoter: Exp[Any] => String = quote) = {
     var b = quoter(str)
     for (i <- 0 until o.args.length) {
-      val name = o.args.apply(i).name 
+      val name = o.args.apply(i).name
       b = b.replaceAllLiterally(quoter(quotedArg(name)), name)
-      // allow named args to be referred to by position as well 
-      b = b.replaceAllLiterally(quoter(quotedArg(i)), name) 
-    }    
+      // allow named args to be referred to by position as well
+      b = b.replaceAllLiterally(quoter(quotedArg(i)), name)
+    }
     for (i <- 0 until o.implicitArgs.length) {
-      val name = o.implicitArgs.apply(i).name 
+      val name = o.implicitArgs.apply(i).name
       // implicit args can only be quoted by name so there is no ambiguity
       b = b.replaceAllLiterally(quoter(quotedArg(name)), name)
-    }         
+    }
     for (i <- 0 until o.tpePars.length) {
       b = b.replaceAllLiterally(quoter(quotedTpe(i,o)), o.tpePars.apply(i).name)
-    }    
+    }
     b
-  }  
-  
+  }
+
   def replaceWildcards(s: String) = {
     var o = s
     o = s.replaceAll(qu, "\"")
@@ -59,14 +59,14 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
     o
   }
-          
+
   override def quote(x: Exp[Any]) : String = x match {
     case Def(QuoteBlockResult(func,args,ret,captured)) if (isThunk(func.tpe)) => func.name
     case Def(QuoteBlockResult(func,args,ret,captured)) => func.name + "(" + replaceWildcards(captured.mkString(",")) + ")"
-    case Const(s: String) if quoteLiterally => replaceWildcards(s) // don't add quotes          
+    case Const(s: String) if quoteLiterally => replaceWildcards(s) // don't add quotes
     case _ => super.quote(x)
-  }  
-   
+  }
+
   /**
    * For dc_alloc. By convention, dc_alloc's return tpe par must be its last tpe par, if it has one.
    */
@@ -79,35 +79,35 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
     else Nil
   }
-  
+
   // used with overloading
   // if after converting Ts and Vars to Reps there are duplicates, remove them.
   def unique(ops: List[Rep[DSLOp]]) = uniqueMap(ops)._1
   def uniqueMap(ops: List[Rep[DSLOp]]) = {
     // we maintain a separate ArrayBuffer along with the map to retain order
     val filtered = scala.collection.mutable.ArrayBuffer[Rep[DSLOp]]()
-    val canonicalMap = scala.collection.mutable.HashMap[String,Rep[DSLOp]]()        
+    val canonicalMap = scala.collection.mutable.HashMap[String,Rep[DSLOp]]()
     // add to filtered only if canonical version doesn't already exist
     for (o <- ops) {
       val t = canonicalize(o)
-      if (!canonicalMap.contains(t)) {        
+      if (!canonicalMap.contains(t)) {
         filtered += o
         canonicalMap(t) = o
       }
     }
     (filtered.toList,canonicalMap)
-  }  
-  def canonicalize(o: Rep[DSLOp]) = o.grp.name + o.name + makeOpArgsWithType(o) + makeOpImplicitArgs(o)  
+  }
+  def canonicalize(o: Rep[DSLOp]) = o.grp.name + o.name + makeOpArgsWithType(o) + makeOpImplicitArgs(o)
   // precomputed for performance
   lazy val allOps = OpsGrp.values.toList.flatMap(g => g.ops)
   lazy val allOpsCanonicalMap = uniqueMap(allOps)._2
   def canonical(o: Rep[DSLOp]): Rep[DSLOp] = allOpsCanonicalMap.getOrElse(canonicalize(o), err("no canonical version of " + o.name + " found"))
-    
+
   // normal args
   def simpleArgName(t: Rep[DSLArg]): String = t.name
   def makeArgs(args: List[Rep[DSLArg]], makeArgName: (Rep[DSLArg] => String) = simpleArgName, addParen: Boolean = true) = {
     if (args.length == 0 && !addParen) {
-      ""      
+      ""
     }
     else {
       "(" + args.map(makeArgName).mkString(",") + ")"
@@ -126,49 +126,49 @@ trait BaseGenOps extends ForgeCodeGenBase {
   // untyped implicit args
   def makeImplicitCtxBounds(tpePars: List[Rep[TypePar]]) = {
     tpePars.flatMap(a => a.ctxBounds.map(b => "implicitly["+b.name+"["+quote(a)+"]]")).mkString(",")
-  }  
-  def makeOpImplicitCtxBounds(o: Rep[DSLOp]) = makeImplicitCtxBounds(o.tpePars)    
+  }
+  def makeOpImplicitCtxBounds(o: Rep[DSLOp]) = makeImplicitCtxBounds(o.tpePars)
   def makeImplicitArgs(implicitArgs: List[Rep[DSLArg]], ctxBoundsStr: String = "") = {
     // ctxBounds must come before regular implicits
     val ctxBounds2 = if (ctxBoundsStr == "") "" else ctxBoundsStr+","
     if (implicitArgs.length > 0) "(" + ctxBounds2 + implicitArgs.map(_.name).mkString(",") + ")"
-    else ""    
+    else ""
   }
   def makeOpImplicitArgs(o: Rep[DSLOp]) = makeImplicitArgs(o.implicitArgs, makeOpImplicitCtxBounds(o)) // explicitly passing implicits requires passing ctxBounds, too
   def makeOpImplicitArgsWithOverload(o: Rep[DSLOp], asVals: Boolean = false) = makeImplicitArgs(implicitArgsWithOverload(o), makeOpImplicitCtxBounds(o))
-  
+
   // typed implicit args with context bounds (only needed for instance methods)
   // 'without' is used to subtract bounds that are already in scope
   def implicitCtxBoundsWithType(tpePars: List[Rep[TypePar]], without: List[Rep[TypePar]] = Nil) = {
     val withoutBounds = without.flatMap(a => a.ctxBounds)
-    tpePars.flatMap(a => a.ctxBounds.diff(withoutBounds).map(b => ephemeralTpe(b.name+"["+quote(a)+"]", stage = now))).distinct 
-  }  
+    tpePars.flatMap(a => a.ctxBounds.diff(withoutBounds).map(b => ephemeralTpe(b.name+"["+quote(a)+"]", stage = now))).distinct
+  }
   def makeImplicitArgsWithCtxBoundsWithType(implicitArgs: List[Rep[DSLArg]], tpePars: List[Rep[TypePar]], without: List[Rep[TypePar]] = Nil, asVals: Boolean = false) = {
     val addArgs = implicitCtxBoundsWithType(tpePars, without)
     val l = implicitArgs.length
-    makeImplicitArgsWithType(implicitArgs ++ addArgs.zip(l until l+addArgs.length).map(anyToImplicitArg), asVals)    
+    makeImplicitArgsWithType(implicitArgs ++ addArgs.zip(l until l+addArgs.length).map(anyToImplicitArg), asVals)
   }
-  
+
   // typed implicit args without context bounds
   def makeImplicitArgsWithType(implicitArgs: List[Rep[DSLArg]], asVals: Boolean = false) = {
     val prefix = if (asVals == true) "val " else ""
-    if (implicitArgs.length > 0) "(implicit " + implicitArgs.map(t => prefix + t.name + ": " + repifySome(t.tpe)).mkString(",") + ")"
-    else ""    
-  } 
+    if (implicitArgs.length > 0) "(implicit " + implicitArgs.map(t => prefix + argify(t,repifySome)).mkString(",") + ")"
+    else ""
+  }
   def makeOpImplicitArgsWithType(o: Rep[DSLOp], asVals: Boolean = false) = makeImplicitArgsWithType(o.implicitArgs, asVals)
   def makeOpImplicitArgsWithOverloadWithType(o: Rep[DSLOp], asVals: Boolean = false) = makeImplicitArgsWithType(implicitArgsWithOverload(o), asVals)
-  
+
   // overload name clash resolution using implicit hack
-  // problem: the local numbering of a signature can overlap with the same Overloaded# as one of the unique targets, causing an ambiguity  
-  // def nameClash(o1: Rep[DSLOp], o2: Rep[DSLOp]) = o1.name == o2.name && o1.args.length == o2.args.length && (o1.args.zip(o2.args).forall(t => getHkTpe(t._1.tpe).name == getHkTpe(t._2.tpe).name || (t._1.tpe.stage == future && t._2.tpe.stage == future)))  
+  // problem: the local numbering of a signature can overlap with the same Overloaded# as one of the unique targets, causing an ambiguity
+  // def nameClash(o1: Rep[DSLOp], o2: Rep[DSLOp]) = o1.name == o2.name && o1.args.length == o2.args.length && (o1.args.zip(o2.args).forall(t => getHkTpe(t._1.tpe).name == getHkTpe(t._2.tpe).name || (t._1.tpe.stage == future && t._2.tpe.stage == future)))
   def nameClash(o1: Rep[DSLOp], o2: Rep[DSLOp]) = o1.style == o2.style && o1.name == o2.name // forces a global numbering
   def nameClashesGrp(o: Rep[DSLOp]) = opsGrpOf(o).ops.filter(o2 => o.grp.name == o2.grp.name && nameClash(o,o2))
-  def nameClashesUniversal(o: Rep[DSLOp]) = allOps.filter(o2 => nameClash(o,o2)) 
-  def nameClashId(o: Rep[DSLOp], clasher: Rep[DSLOp] => List[Rep[DSLOp]] = nameClashesUniversal) = {      
+  def nameClashesUniversal(o: Rep[DSLOp]) = allOps.filter(o2 => nameClash(o,o2))
+  def nameClashId(o: Rep[DSLOp], clasher: Rep[DSLOp] => List[Rep[DSLOp]] = nameClashesUniversal) = {
     val clashes = clasher(o)
-    if (clashes.length > 1) (clashes.indexOf(o)+1).toString else ""    
+    if (clashes.length > 1) (clashes.indexOf(o)+1).toString else ""
   }
-  def implicitArgsWithOverload(o: Rep[DSLOp]) = {    
+  def implicitArgsWithOverload(o: Rep[DSLOp]) = {
     val i = nameClashId(o)
     if (i != "") {
       // redirect overloads can clash with regular overloads since they don't get separate abstract methods
@@ -178,62 +178,62 @@ trait BaseGenOps extends ForgeCodeGenBase {
     else {
       o.implicitArgs
     }
-  }      
+  }
   def needDisambiguate(o: Rep[DSLOp], clasher: Rep[DSLOp] => List[Rep[DSLOp]] = nameClashesGrp) = {
     // TODO: when do we need to disambiguate implicit args? (explicitly pass them). the fundamental reason is if there are
     // multiple possible implicits in scope.. how do we know? should we just always pass them explicitly? (this could improve staging performance, too)
     // -- passing them all explicitly doesn't currently work because we collapse the back-end implementations, so not every front-end signature should pass an implicit
     //    in order to do this, we need to pass the implicits corresponding to the unique back-end signature
-     
+
     // the issue with nameClashes is that if the receiver method (e.g. string_+) also requires overload implicits, the ones from OverloadHack are also in scope
     // we should be able to solve this by de-prioritizing the OverloadHack vals somehow
     /*!Config.fastCompile &&*/ (clasher(o).length > 1 && unique(opsGrpOf(o).ops).contains(o)) // inefficient!! -> should refactor things so that we can store this with the op when it is created.
   }
-  
-  // method names   
+
+  // method names
   val specialCharacters = scala.collection.immutable.Map("+" -> "pl", "-" -> "sub", "/" -> "div", "*" -> "mul", "=" -> "eq", "<" -> "lt", ">" -> "gt", "&" -> "and", "|" -> "or", "!" -> "bang", ":" -> "cln")
   def sanitize(x: String) = {
     var out = x
     specialCharacters.keys.foreach { k => if (x.contains(k)) out = out.replace(k, specialCharacters(k)) }
     out
   }
-  
+
   def makeDefWithOverride(o: Rep[DSLOp]) = {
     if (overrideList.contains(o.name)) "override def"
     else "def"
   }
   def makeOpMethodName(o: Rep[DSLOp]) = {
-    // adding the nameClashId is another way to avoid chaining the Overload implicit, but the weird method names that result are confusing    
-    val i = /*if (Config.fastCompile) nameClashId(canonical(o), nameClashesGrp) else*/ ""    
+    // adding the nameClashId is another way to avoid chaining the Overload implicit, but the weird method names that result are confusing
+    val i = /*if (Config.fastCompile) nameClashId(canonical(o), nameClashesGrp) else*/ ""
     o.style match {
       case `staticMethod` => o.grp.name.toLowerCase + "_object_" + sanitize(o.name).toLowerCase + i
-      case `compilerMethod` => 
+      case `compilerMethod` =>
         if (o.name != sanitize(o.name)) err("compiler op name has special characters that require reformatting: " + o.name)
         o.name // should be callable directly from impl code
       case _ => o.grp.name.toLowerCase + "_" + sanitize(o.name).toLowerCase + i
     }
   }
   def makeFullArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String, clasher: Rep[DSLOp] => List[Rep[DSLOp]] = nameClashesGrp) = {
-    makeTpePars(o.tpePars) + makeArgs(o) + (if (needDisambiguate(o,clasher)) makeOpImplicitArgsWithOverload(o) else "")  
-  }  
+    makeTpePars(o.tpePars) + makeArgs(o) + (if (needDisambiguate(o,clasher)) makeOpImplicitArgsWithOverload(o) else "")
+  }
   def makeOpMethodNameWithArgs(o: Rep[DSLOp]) = makeOpMethodName(o) + makeFullArgs(o, o => makeOpArgs(o))
   def makeOpMethodNameWithFutureArgs(o: Rep[DSLOp], makeArgName: Rep[DSLArg] => String = simpleArgName) = {
-    if (Impls(o).isInstanceOf[Redirect]) {      
-      var call = "{ " + inline(o, Impls(o).asInstanceOf[Redirect].func, quoteLiteral) + " }"       
-      for (i <- 0 until o.args.length) {        
-        call = call.replaceAllLiterally(o.args.apply(i).name, makeArgName(o.args.apply(i))) 
+    if (Impls(o).isInstanceOf[Redirect]) {
+      var call = "{ " + inline(o, Impls(o).asInstanceOf[Redirect].func, quoteLiteral) + " }"
+      for (i <- 0 until o.args.length) {
+        call = call.replaceAllLiterally(o.args.apply(i).name, makeArgName(o.args.apply(i)))
       }
       call
     }
     else {
-      makeOpMethodName(o) + makeFullArgs(o, k => makeOpFutureArgs(k,makeArgName), nameClashesUniversal) // front-end can name clash with anything  
-    }    
+      makeOpMethodName(o) + makeFullArgs(o, k => makeOpFutureArgs(k,makeArgName), nameClashesUniversal) // front-end can name clash with anything
+    }
   }
 
-  def makeOpMethodSignature(o: Rep[DSLOp], withReturnTpe: Option[Boolean] = None) = {    
+  def makeOpMethodSignature(o: Rep[DSLOp], withReturnTpe: Option[Boolean] = None) = {
     val addRet = withReturnTpe.getOrElse(Config.fastCompile)
-    val ret = if (addRet || isRedirect(o)) ": " + repifySome(o.retTpe) else ""  
-    // if (Config.fastCompile) { 
+    val ret = if (addRet || isRedirect(o)) ": " + repifySome(o.retTpe) else ""
+    // if (Config.fastCompile) {
     //   "def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithType(o) + ret
     // }
     // else {
@@ -241,22 +241,22 @@ trait BaseGenOps extends ForgeCodeGenBase {
     // }
   }
   def makeSyntaxMethod(o: Rep[DSLOp], prefix: String = "def ", withReturnTpe: Option[Boolean] = None) = {
-    // adding the return type increases verbosity in the generated code, so we omit it by default    
+    // adding the return type increases verbosity in the generated code, so we omit it by default
     val addRet = withReturnTpe.getOrElse(Config.fastCompile)
-    val ret = if (addRet || isRedirect(o)) ": " + repifySome(o.retTpe) else ""      
+    val ret = if (addRet || isRedirect(o)) ": " + repifySome(o.retTpe) else ""
     val curriedArgs = o.curriedArgs.map(a => makeArgsWithNowType(a)).mkString("")
     prefix + o.name + makeTpeParsWithBounds(o.tpePars) + makeArgsWithNowType(o.firstArgs, o.effect != pure) + curriedArgs + makeOpImplicitArgsWithOverloadWithType(o) + ret + " = " + makeOpMethodNameWithFutureArgs(o)
   }
-  
+
   def makeOpImplMethodName(o: Rep[DSLOp]) = makeOpMethodName(o) + "_impl"
-  def makeOpImplMethodNameWithArgs(o: Rep[DSLOp], postfix: String = "") = makeOpImplMethodName(o) + nameClashId(o) + postfix + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o)  
+  def makeOpImplMethodNameWithArgs(o: Rep[DSLOp], postfix: String = "") = makeOpImplMethodName(o) + nameClashId(o) + postfix + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o)
   def makeOpImplMethodSignature(o: Rep[DSLOp], postfix: String = "", returnTpe: Option[String] = None) = {
     "def " + makeOpImplMethodName(o) + nameClashId(o) + postfix + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithType(o) + ": " + (returnTpe getOrElse repifySome(o.retTpe))
   }
-  
+
   /**
    * Op sanity checking
-   * 
+   *
    * These are mostly repetitive right now, but we could specialize the error checking more (or generalize it to be more concise).
    */
   def validTpePar(o: Rep[DSLOp], tpePar: Rep[DSLType]) = tpePar match {
@@ -264,7 +264,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     case _ => true
   }
   def check(o: Rep[DSLOp]) {
-    if (!Impls.contains(o)) err("op " + o.name + " has no impl") 
+    if (!Impls.contains(o)) err("op " + o.name + " has no impl")
     Impls(o) match {
       case Allocates(tpe,init) =>
         if (!DataStructs.contains(tpe)) err("op " + o.name + " allocates tpe " + tpe.name + " with no corresponding data definition")
@@ -282,7 +282,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
         val struct = getHkTpe(o.args.apply(structArgIndex).tpe)
         val data = DataStructs.get(struct)
         if (data.isEmpty) err("no struct definitions found for arg index " + structArgIndex + " in op " + o.name)
-        if (!data.get.fields.map(_.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)        
+        if (!data.get.fields.map(_.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)
       case map:Map =>
         val col = getHkTpe(o.args.apply(map.argIndex).tpe)
         if (ForgeCollections.get(col).isEmpty) err("map argument " + col.name + " is not a ParallelCollection")
@@ -299,58 +299,58 @@ trait BaseGenOps extends ForgeCodeGenBase {
         val col = getHkTpe(o.args.apply(reduce.argIndex).tpe)
         if (ForgeCollections.get(col).isEmpty) err("reduce argument " + col.name + " is not a ParallelCollection")
         if (!validTpePar(o,reduce.tpePar)) err("reduce op with undefined type par: " + o.name)
-        if (reduce.argIndex < 0 || reduce.argIndex > o.args.length) err("reduce op with illegal arg parameter: " + o.name)        
+        if (reduce.argIndex < 0 || reduce.argIndex > o.args.length) err("reduce op with illegal arg parameter: " + o.name)
         // if (reduce.zero.retTpe != reduce.tpePar) err("reduce op with illegal zero parameter: " + o.name)
       case mapreduce:MapReduce =>
         val col = getHkTpe(o.args.apply(mapreduce.argIndex).tpe)
         if (ForgeCollections.get(col).isEmpty) err("mapreduce argument " + col.name + " is not a ParallelCollection")
         if (mapreduce.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("mapreduce op with undefined type par: " + o.name)
-        if (mapreduce.argIndex < 0 || mapreduce.argIndex > o.args.length) err("mapreduce op with illegal arg parameter: " + o.name)        
+        if (mapreduce.argIndex < 0 || mapreduce.argIndex > o.args.length) err("mapreduce op with illegal arg parameter: " + o.name)
       case filter:Filter =>
         val col = getHkTpe(o.args.apply(filter.argIndex).tpe)
         if (ForgeCollections.get(col).isEmpty || !ForgeCollections.get(getHkTpe(o.retTpe)).forall(_.isInstanceOf[ParallelCollectionBuffer])) err("filter return type " + col.name + " is not a ParallelCollectionBuffer")
         if (filter.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("filter op with undefined type par: " + o.name)
-        if (filter.argIndex < 0 || filter.argIndex > o.args.length) err("filter op with illegal arg parameter: " + o.name)      
+        if (filter.argIndex < 0 || filter.argIndex > o.args.length) err("filter op with illegal arg parameter: " + o.name)
       case hfr:HashFilterReduce =>
         val col = getHkTpe(o.args.apply(hfr.argIndex).tpe)
         if (ForgeCollections.get(col).isEmpty || !ForgeCollections.get(getHkTpe(o.retTpe)).forall(_.isInstanceOf[ParallelCollectionBuffer])) err("hashFilterReduce return type " + col.name + " is not a ParallelCollectionBuffer")
         if (hfr.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("hashFilterReduce op with undefined type par: " + o.name)
-        if (hfr.argIndex < 0 || hfr.argIndex > o.args.length) err("hashFilterReduce op with illegal arg parameter: " + o.name)            
+        if (hfr.argIndex < 0 || hfr.argIndex > o.args.length) err("hashFilterReduce op with illegal arg parameter: " + o.name)
       case foreach:Foreach =>
         val col = getHkTpe(o.args.apply(foreach.argIndex).tpe)
         if (ForgeCollections.get(col).isEmpty) err("foreach argument " + col.name + " is not a ParallelCollection")
         if (!validTpePar(o,foreach.tpePar)) err("foreach op with undefined type par: " + o.name)
-        if (foreach.argIndex < 0 || foreach.argIndex > o.args.length) err("foreach op with illegal arg parameter: " + o.name)      
+        if (foreach.argIndex < 0 || foreach.argIndex > o.args.length) err("foreach op with illegal arg parameter: " + o.name)
       case _ => // nothing to check
     }
   }
-      
-   
+
+
   /**
    * Front-end codegen
    */
-  
+
   def checkOps(opsGrp: DSLOps) {
     for (o <- unique(opsGrp.ops)) check(o)
   }
-  
+
   // certain ops (e.g. "apply" cannot be expressed with infix notation right now), so we use implicits as a workaround
   def noInfix(o: Rep[DSLOp]) = {
     if (Config.fastCompile) {
       // default implicit mode (appears empirically slightly faster than infix)
-      (!mustInfixList.contains(o.name)) && o.args.length > 0 
+      (!mustInfixList.contains(o.name)) && o.args.length > 0
     }
     else {
       // default infix mode (slightly easier to understand what's happening, also fails to apply less than implicits)
-      // blacklist or curried args or function args (in the latter two cases, infix doesn't always resolve correctly)    
+      // blacklist or curried args or function args (in the latter two cases, infix doesn't always resolve correctly)
       noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o)
     }
   }
-  
+
   def emitOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("Operations", stream)
     stream.println()
-    
+
     // implicits go in a base class for lower priority
     val implicitOps = opsGrp.ops.filter(e=>e.style==implicitMethod)
     if (!implicitOps.isEmpty) {
@@ -362,31 +362,31 @@ trait BaseGenOps extends ForgeCodeGenBase {
         stream.println("  implicit " + makeSyntaxMethod(o, withReturnTpe = Some(true)))
       }
       stream.println()
-      // we separate these just for generated code readability      
+      // we separate these just for generated code readability
       for (o <- implicitOps if !Impls(o).isInstanceOf[Redirect]) {
         stream.println("  " + makeOpMethodSignature(o, withReturnTpe = Some(true)))
       }
       stream.println("}")
       stream.println()
     }
-    
+
     val base = if (implicitOps.length > 0) opsGrp.name + "Base" else baseOpsCls(opsGrp.grp)
     stream.println("trait " + opsGrp.name + " extends " + base + " {")
     stream.println("  this: " + dsl + " => ")
     stream.println()
-        
+
     // static ops
     val staticOps = opsGrp.ops.filter(e=>e.style==staticMethod)
     val objects = staticOps.groupBy(_.grp.name)
-    for ((name, ops) <- objects) {          
+    for ((name, ops) <- objects) {
       stream.println("  object " + name + " {")
-      for (o <- ops) {        
+      for (o <- ops) {
         stream.println("    " + makeSyntaxMethod(o))
       }
       stream.println("  }")
       stream.println()
-    }   
-        
+    }
+
     // direct ops
     val directOps = opsGrp.ops.filter(e=>e.style==directMethod)
     for (o <- directOps) {
@@ -394,22 +394,22 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
     if (directOps.length > 0) {
       stream.println()
-    }    
-    
+    }
+
     // infix ops
     val allInfixOps = opsGrp.ops.filter(e=>e.style==infixMethod)
-        
+
     val (pimpOps, infixOps) = allInfixOps.partition(noInfix)
     if (pimpOps.nonEmpty) {
       // set up a pimp-my-library style promotion
-      val ops = pimpOps.filterNot(o => getHkTpe(o.args.apply(0).tpe).name == "Var" || 
+      val ops = pimpOps.filterNot(o => getHkTpe(o.args.apply(0).tpe).name == "Var" ||
                                        (o.args.apply(0).tpe.stage == now && pimpOps.exists(o2 => o.args.apply(0).tpe.name == o2.args.apply(0).tpe.name && o2.args.apply(0).tpe.stage == future)))
       val tpes = ops.map(_.args.apply(0).tpe).distinct
       for (tpe <- tpes) {
         val tpePars = tpe match {
           case Def(TpeInst(_,args)) => args.filter(isTpePar).asInstanceOf[List[Rep[TypePar]]]
           case Def(TpePar(_,_,_)) => List(tpe.asInstanceOf[Rep[TypePar]])
-          case _ => tpe.tpePars          
+          case _ => tpe.tpePars
         }
         val tpeArgs = tpe match {
           case Def(TpeInst(hk,args)) => args.filterNot(isTpePar)
@@ -432,13 +432,13 @@ trait BaseGenOps extends ForgeCodeGenBase {
           }
         }
 
-        stream.println()        
+        stream.println()
         stream.println("  class " + opsClsName + makeTpeParsWithBounds(tpePars) + "(val self: " + repify(tpe) + ") {")
-    
+
         for (o <- ops if quote(o.args.apply(0).tpe) == quote(tpe)) {
           val otherArgs = makeArgsWithNowType(o.firstArgs.drop(1))
           val curriedArgs = o.curriedArgs.map(a => makeArgsWithNowType(a)).mkString("")
-          val hkTpePars = if (isTpePar(tpe)) tpePars else getHkTpe(tpe).tpePars                  
+          val hkTpePars = if (isTpePar(tpe)) tpePars else getHkTpe(tpe).tpePars
           val otherTpePars = o.tpePars.filterNot(p => hkTpePars.map(_.name).contains(p.name))
           val ret = if (Config.fastCompile) ": " + repifySome(o.retTpe) else ""
           stream.println("    def " + o.name + makeTpeParsWithBounds(otherTpePars) + otherArgs + curriedArgs
@@ -447,27 +447,27 @@ trait BaseGenOps extends ForgeCodeGenBase {
         stream.println("  }")
         stream.println()
       }
-      stream.println()              
-    }        
-    
+      stream.println()
+    }
+
     for (o <- infixOps) {
       stream.println(makeSyntaxMethod(o, prefix = "  def infix_"))
     }
-    stream.println()      
-        
+    stream.println()
+
     // abstract methods
-    for (o <- unique(opsGrp.ops.filter(e=>e.style != compilerMethod && e.style != implicitMethod && !Impls(e).isInstanceOf[Redirect]))) {      
+    for (o <- unique(opsGrp.ops.filter(e=>e.style != compilerMethod && e.style != implicitMethod && !Impls(e).isInstanceOf[Redirect]))) {
       stream.println("  " + makeOpMethodSignature(o, withReturnTpe = Some(true)))
     }
-    
+
     stream.println("}")
-    
+
     // compiler ops
     val compilerOps = opsGrp.ops.filter(e=>e.style == compilerMethod)
     if (!compilerOps.isEmpty) {
       stream.println("trait " + opsGrp.grp.name + "CompilerOps extends " + opsGrp.name + " {")
       stream.println("  this: " + dsl + " => ")
-      stream.println()    
+      stream.println()
       if (unique(compilerOps).length != compilerOps.length) err("non-unique compiler op variants (e.g. Var, T args) are not yet supported")
       for (o <- compilerOps) {
         if (Impls(o).isInstanceOf[Redirect]) {
@@ -475,8 +475,8 @@ trait BaseGenOps extends ForgeCodeGenBase {
         }
         else {
           stream.println("  " + makeOpMethodSignature(o, withReturnTpe = Some(true)))
-        }        
-      }      
+        }
+      }
       stream.println("}")
       stream.println()
     }

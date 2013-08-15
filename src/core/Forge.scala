@@ -13,7 +13,7 @@ import format._
 
 trait ForgeApplication extends Forge with ForgeLift with ForgeLib {
   def dslName: String
-  def specification(): Rep[Unit]    
+  def specification(): Rep[Unit]
 }
 
 /**
@@ -32,15 +32,15 @@ trait ForgeLift extends LiftString with LiftBoolean with LiftNumeric with LiftPr
 
 trait ForgeScalaOpsPkg extends Base
   with ImplicitOps with OrderingOps with StringOps with ArrayOps
-  with BooleanOps with PrimitiveOps with TupleOps with CastingOps 
+  with BooleanOps with PrimitiveOps with TupleOps with CastingOps
 
-trait ForgeScalaOpsPkgExp extends ForgeScalaOpsPkg 
-  with ImplicitOpsExp with OrderingOpsExp with StringOpsExp  with ArrayOpsExp 
-  with BooleanOpsExp with PrimitiveOpsExp with TupleOpsExp with CastingOpsExp 
+trait ForgeScalaOpsPkgExp extends ForgeScalaOpsPkg
+  with ImplicitOpsExp with OrderingOpsExp with StringOpsExp  with ArrayOpsExp
+  with BooleanOpsExp with PrimitiveOpsExp with TupleOpsExp with CastingOpsExp
 
 trait ForgeScalaCodeGenPkg extends ScalaGenEffect
-  with ScalaGenImplicitOps with ScalaGenOrderingOps with ScalaGenStringOps  with ScalaGenArrayOps 
-  with ScalaGenBooleanOps with ScalaGenPrimitiveOps with ScalaGenTupleOps with ScalaGenCastingOps 
+  with ScalaGenImplicitOps with ScalaGenOrderingOps with ScalaGenStringOps  with ScalaGenArrayOps
+  with ScalaGenBooleanOps with ScalaGenPrimitiveOps with ScalaGenTupleOps with ScalaGenCastingOps
   { val IR: ForgeScalaOpsPkgExp  }
 
 
@@ -49,11 +49,11 @@ trait ForgeScalaCodeGenPkg extends ScalaGenEffect
  */
 trait Forge extends ForgeScalaOpsPkg with Definitions with ForgeSugar with FieldOps with QuoteOps {
   this: ForgeApplication =>
-  
+
   // exposed to end-users, but obfuscated, for what it's worth
   def forge_err(s: String)(implicit ctx: SourceContext): Unit
   def forge_warn(s: String)(implicit ctx: SourceContext): Unit
-  
+
   // exposed since DSL developers may also need to introspect
   def isTpePar(tpe: Rep[DSLType]): Boolean
   def asTpePar(tpe: Rep[DSLType]): Rep[TypePar]
@@ -69,14 +69,14 @@ trait Forge extends ForgeScalaOpsPkg with Definitions with ForgeSugar with Field
  */
 trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with DefinitionsExp with ForgeOpsExp with FieldOpsExp with QuoteOpsExp {
   this: ForgeApplication =>
-  
+
   // -- for fast compile mode
 
   def flattenIR() {
     val flat = grp("$Flat")
-    val newOps = new ArrayBuffer[Exp[DSLOp]]()    
+    val newOps = new ArrayBuffer[Exp[DSLOp]]()
     val newTargets = new HashSet[CodeGenerator]()
-    val save = new HashMap[Exp[DSLGroup], DSLOps]() 
+    val save = new HashMap[Exp[DSLGroup], DSLOps]()
     for ((grp,opsGrp) <- OpsGrp) {
       if (isTpeClass(grp) || isTpeClassInst(grp)) {
         save(grp) = opsGrp
@@ -85,25 +85,25 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
         newOps ++= opsGrp.ops
         newTargets ++= opsGrp.targets
       }
-    }    
+    }
     val newOpsGrp = new DSLOps {
-      val grp = flat      
-      override def targets: List[CodeGenerator] = newTargets.toList      
+      val grp = flat
+      override def targets: List[CodeGenerator] = newTargets.toList
     }
     newOpsGrp.ops = newOps.toList
     OpsGrp.clear()
     OpsGrp(flat) = newOpsGrp
-    for ((grp,opsGrp) <- save) {      
+    for ((grp,opsGrp) <- save) {
       OpsGrp(grp) = opsGrp
     }
   }
 
   // -- IR helpers
-  
+
   def isForgePrimitiveType(t: Rep[DSLType]) = t match {
     case `MInt` | `MFloat` | `MDouble` | `MBoolean` | `MChar` | `MString` | `MUnit` | `MAny` | `MNothing` | `MSourceContext` | `byName` => true
-    case `CInt` | `CFloat` | `CDouble` | `CBoolean` | `CChar` | `CString` | `CUnit` | `CAny` | `CNothing` => true        
-    // case Def(Tpe(_,_,`now`)) => true    
+    case `CInt` | `CFloat` | `CDouble` | `CBoolean` | `CChar` | `CString` | `CUnit` | `CAny` | `CNothing` => true
+    // case Def(Tpe(_,_,`now`)) => true
     case Def(Tpe(name,_,_)) if name.startsWith("Tuple") => true
     case Def(Tpe("ForgeArray",_,_)) | Def(Tpe("ForgeArrayBuffer",_,_)) => true
     case Def(Tpe("Var",_,_)) => true
@@ -115,7 +115,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     // assumption: all ops associated with a particular data structure belong to exactly 1 group
     opsGrp.ops.collect { case o if (grpIsTpe(o.grp)) => grpAsTpe(o.grp) }.distinct
   }
-  
+
   def opsGrpOf(o: Rep[DSLOp]) = {
     OpsGrp.getOrElse(o.grp, OpsGrp.find(g => g._2.ops.contains(o)).map(_._2).get)
   }
@@ -140,32 +140,32 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   def isTpePar(tpe: Rep[DSLType]) = tpe match {
     case Def(TpePar(_,_,_)) => true
     case _ => false
-  }  
+  }
   def asTpePar(tpe: Rep[DSLType]) = tpe match {
     case t@Def(TpePar(_,_,_)) => t.asInstanceOf[Rep[TypePar]]
-  }  
-  
+  }
+
   def isTpeInst(tpe: Rep[DSLType]) = tpe match {
     case Def(TpeInst(_,_)) => true
     case _ => false
   }
-  
+
   def isTpeClass(grp: Rep[DSLGroup]) = grp match {
     case Def(TpeClass(_,_,_)) => true
     case _ => false
-  }  
+  }
   def asTpeClass(grp: Rep[DSLGroup]) = grp match {
     case t@Def(TpeClass(_,_,_)) => t.asInstanceOf[Rep[DSLTypeClass]]
   }
-  
+
   def isTpeClassInst(grp: Rep[DSLGroup]) = grp match {
     case Def(TpeClassInst(_,_,_)) => true
     case _ => false
-  }  
+  }
   def asTpeClassInst(grp: Rep[DSLGroup]) = grp match {
     case t@Def(TpeClassInst(_,_,_)) => t.asInstanceOf[Rep[DSLTypeClassInst]]
-  }  
-  
+  }
+
   def getHkTpe(tpe: Rep[DSLType]) = tpe match {
     case Def(TpeInst(hkTpe,_)) => hkTpe
     case _ => tpe
@@ -175,10 +175,10 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case Def(Arg(_, Def(FTpe(args,ret,freq)),_)) => true
     case _ => false
   }
-  def hasFuncArgs(o: Rep[DSLOp]) = { 
+  def hasFuncArgs(o: Rep[DSLOp]) = {
     o.args.exists(isFuncArg) || o.implicitArgs.exists(isFuncArg)
-  }  
-  
+  }
+
   def isThunk(f: Rep[DSLType]) = f match {
     case Def(FTpe(List(Def(Arg(_,`byName`,_))),ret,freq)) => true
     case _ => false
@@ -187,18 +187,18 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   def isRedirect(o: Rep[DSLOp]) = Impls.contains(o) && Impls(o).isInstanceOf[Redirect]
 }
 
-trait ForgeUtilities {  
+trait ForgeUtilities {
   this: ForgeExp =>
-  
+
   def err(s: String)(implicit ctx: SourceContext) = {
     println("[forge error]: " + s)
-    // println("  at " + (ctx.fileName.split("/").last + ":" + ctx.line)) 
-    println("  at " + quotePos(fresh[Nothing].withPos(List(ctx)))) 
+    // println("  at " + (ctx.fileName.split("/").last + ":" + ctx.line))
+    println("  at " + quotePos(fresh[Nothing].withPos(List(ctx))))
     sys.exit(1)
   }
-  def warn(s: String) = println("[forge warning]: " + s)  
+  def warn(s: String) = println("[forge warning]: " + s)
   def info(s: String) = println("[forge]: " + s)
-  
+
   def forge_err(s: String)(implicit ctx: SourceContext) = err(s)
   def forge_warn(s: String)(implicit ctx: SourceContext) = warn(s)
 }
@@ -210,60 +210,61 @@ trait ForgeUtilities {
 trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
   val IR: ForgeApplicationRunner with ForgeExp
   import IR._
-    
+
   def buildDir: String
   lazy val dslDir = buildDir + File.separator + "src" + File.separator + dsl.toLowerCase() + File.separator
-      
+
   // -- code gen helpers
-  
+
   def varify(a: Exp[Any]): String = a match {
     case Def(Arg(name, tpe, default)) => varify(tpe)
     case Def(FTpe(args,ret,freq)) => err("variables in function tpe")
-    case _ => "Var[" + quote(a) + "]" 
+    case _ => "Var[" + quote(a) + "]"
   }
 
   def repify(a: Exp[Any]): String = a match {
     case Def(Arg(name, tpe, default)) => repify(tpe)
     case Def(FTpe(args,ret,freq)) => args match {
       case List(Def(Arg(_,`byName`,_))) => " => " + repify(ret)
-      case _ => "(" + args.map(repify).mkString(",") + ") => " + repify(ret)        
+      case _ => "(" + args.map(repify).mkString(",") + ") => " + repify(ret)
     }
     case Def(Tpe(name, arg, `compile`)) => quote(a)
     case Def(Tpe("Var", arg, stage)) => repify(arg(0))
-    case Def(TpeClass(_,_,_)) | Def(TpeClassInst(_,_,_)) => quote(a)        
-    case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2)) => repify(a2(0))    
-    case Def(TpeInst(Def(Tpe(name, args, `compile`)), args2)) => name + (if (!args2.isEmpty) "[" + args2.map(repifySome).mkString(",") + "]" else "") // implicits don't auto-convert things wrapped in an outer tpe, so we still use repifySome    
+    case Def(TpeClass(_,_,_)) | Def(TpeClassInst(_,_,_)) => quote(a)
+    case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2)) => repify(a2(0))
+    case Def(TpeInst(Def(Tpe(name, args, `compile`)), args2)) => name + (if (!args2.isEmpty) "[" + args2.map(repifySome).mkString(",") + "]" else "") // implicits don't auto-convert things wrapped in an outer tpe, so we still use repifySome
     case Def(VarArgs(t)) => "Seq[" + repify(t) + "]"
-    case _ => "Rep[" + quote(a) + "]"           
+    case _ => "Rep[" + quote(a) + "]"
   }
 
-  def repifySome(a: Exp[Any]): String = a match {  
+  def repifySome(a: Exp[Any]): String = a match {
     case Def(Arg(name, tpe, default)) => repifySome(tpe)
     case Def(FTpe(args,ret,freq)) => args match {
       case List(Def(Arg(_,`byName`,_))) => " => " + repifySome(ret)
-      case _ => "(" + args.map(repifySome).mkString(",") + ") => " + repifySome(ret)        
+      case _ => "(" + args.map(repifySome).mkString(",") + ") => " + repifySome(ret)
     }
     case Def(Tpe(name, arg, `now`)) => quote(a)
     case Def(Tpe("Var", arg, stage)) => varify(arg(0))
     case Def(TpePar(name, ctx, `now`)) => quote(a)
     case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2)) => varify(a2(0))
-    case Def(TpeInst(Def(Tpe(name, args, `now` | `compile`)), args2)) => name + (if (!args2.isEmpty) "[" + args2.map(repifySome).mkString(",") + "]" else "") // is this the right thing to do?        
+    case Def(TpeInst(Def(Tpe(name, args, `now` | `compile`)), args2)) => name + (if (!args2.isEmpty) "[" + args2.map(repifySome).mkString(",") + "]" else "") // is this the right thing to do?
     case Def(VarArgs(t)) => repifySome(t) + "*"
     case _ => repify(a)
   }
-  
+
   def argify(a: Exp[DSLArg], typify: Exp[DSLType] => String = repify): String = a match {
-    case Def(Arg(name, tpe, Some(d))) => name + ": " + typify(tpe) + " = " + "unit("+escape(d)+")"    
+    case Def(Arg(name, tpe@Def(FTpe(args,ret,freq)), Some(d))) => name + ": " + typify(tpe) + " = " + escape(d)
+    case Def(Arg(name, tpe, Some(d))) => name + ": " + typify(tpe) + " = " + "unit("+escape(d)+")"
     case Def(Arg(name, tpe, None)) => name + ": " + typify(tpe)
   }
-  
+
 
   def makeTpeParsWithBounds(args: List[Rep[TypePar]]): String = {
-    if (args.length < 1) return ""    
+    if (args.length < 1) return ""
     val args2 = args.map { a => quote(a) + (if (a.ctxBounds != Nil) ":" + a.ctxBounds.map(_.name).mkString(":") else "") }
     "[" + args2.mkString(",") + "]"
-  }  
-  
+  }
+
   def makeTpePars(args: List[Rep[DSLType]]): String = {
     if (args.length < 1) return ""
     "[" + args.map(quote).mkString(",") + "]"
@@ -273,32 +274,32 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
   // the issue is that string interp returns us a string with quoted newlines which we *do not want* to escape further -- although escapes inside quotes
   // in the original string should be further escaped.
   def escape(s: String) = {
-    var o = s    
+    var o = s
     // we lose user backslashes in the code gen step
-    o.replace("\\", "\\\\")    
+    o.replace("\\", "\\\\")
   }
-    
-  var quoteLiterally = false  
+
+  var quoteLiterally = false
   def quoteLiteral(x: Exp[Any]): String = {
     val save = quoteLiterally
     quoteLiterally = true
     val z = quote(x)
     quoteLiterally = save
     z
-  }    
-  
+  }
+
   override def quote(x: Exp[Any]) : String = x match {
-    case Def(Tpe(s,args,stage)) => s + makeTpePars(args) 
+    case Def(Tpe(s,args,stage)) => s + makeTpePars(args)
     case Def(TpeInst(t,args)) => t.name + makeTpePars(args)
-    case Def(TpePar(s,ctx,stage)) => s 
-    case Def(TpeClass(s,sig,args)) => s + makeTpePars(args) 
+    case Def(TpePar(s,ctx,stage)) => s
+    case Def(TpeClass(s,sig,args)) => s + makeTpePars(args)
     case Def(TpeClassInst(s,args,t)) => quote(t)
     case Def(FTpe(args,ret,freq)) => "(" + args.map(a => quote(a.tpe)).mkString(",") + ") => " + quote(ret)
-    case Def(StringPlus(a,b)) => quote(quoteLiteral(a)+quoteLiteral(b)) 
+    case Def(StringPlus(a,b)) => quote(quoteLiteral(a)+quoteLiteral(b))
     case Def(Arg(name,tpe,default)) => quote(name)
     case s@Sym(n) => err("could not resolve symbol " + findDefinition(s).toString + ". All Forge symbols must currently be statically resolvable.")
     case _ => super.quote(x)
-  }    
+  }
 }
 
 /**
@@ -306,7 +307,7 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
  * from the specification.
  */
 trait ForgeCodeGenBackend extends ForgeCodeGenBase with ForgeScalaCodeGenPkg with ScalaGenForgeOps {
-  val IR: ForgeApplicationRunner with ForgeExp  
-  
+  val IR: ForgeApplicationRunner with ForgeExp
+
   def emitDSLImplementation(): Unit
 }

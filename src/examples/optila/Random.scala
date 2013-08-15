@@ -21,6 +21,14 @@ trait RandomOps {
         case _ => sys.error("no random implementation available for type " + mA.toString) 
       }
     }
+
+    direct (Rand) ("randomGaussian", Nil, Nil :: MDouble) implements codegen($cala, ${
+      Global.randRef.nextGaussian()
+    })
+
+    direct (Rand) ("reseed", Nil, Nil :: MUnit, effect = simple) implements codegen($cala, ${
+      Global.randRef.setSeed(Global.INITIAL_SEED)
+    })
     
     compiler (Rand) ("optila_rand_double", Nil, Nil :: MDouble, effect = simple) implements codegen($cala, ${
       Global.randRef.nextDouble()

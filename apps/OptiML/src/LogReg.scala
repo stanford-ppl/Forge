@@ -29,7 +29,7 @@ trait LogReg extends OptiMLApplication {
     
     val w = untilconverged(theta, maxIter = 30) { cur => 
       val gradient = sum((0::x.numRows) { i =>        
-        x(i)*(y(i) - 1.0 / (1.0 + exp(-cur *:* x(i))))
+        x(i)*(y(i) - sigmoid(cur *:* x(i)))
       })
             
       // println("gradient: ")

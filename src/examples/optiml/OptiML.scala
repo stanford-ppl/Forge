@@ -9,9 +9,9 @@ object OptiMLDSLRunner extends ForgeApplicationRunner with OptiMLDSL
 
 trait OptiMLDSL extends OptiLADSL
   with SetOps {
-    
+
   override def dslName = "OptiML"
-  
+
   override def specification() = {
     // include OptiLA
     super.specification()
@@ -19,17 +19,17 @@ trait OptiMLDSL extends OptiLADSL
     // disallow "while"
     // this has the unfortunate side-effect of breaking even internally used whiles, which are lifted the same way...
     // we could get around this by only overriding while inside a new trait that is only mixed in at the Application level (sort of a de-lift)
-    
+
     // val whileDo = lookupOp("Misc","__whileDo")
     // compiler (whileDo) lookupImpl("Misc","__whileDo").apply(0)
     // impl (whileDo) (composite ${ fatal("illegal operation: 'while'. try using 'untilconverged' instead") })
-    
+
     extern(grp("Sum"))
     importVecMatConstructor()
     importUntilConverged()
     importSetOps()
-  } 
-  
+  }
+
   def importVecMatConstructor() {
     val DenseVector = lookupTpe("DenseVector")
     val IndexVector = lookupTpe("IndexVector")
@@ -37,14 +37,14 @@ trait OptiMLDSL extends OptiLADSL
 
     // vector constructor (0 :: end) { ... }
     noSourceContextList ::= "::" // surpress SourceContext implicit because it interferes with the 'apply' method being immediately callable
-    infix (IndexVector) ("::", Nil, ((("end", MInt), ("start", MInt)) :: IndexVector)) implements composite ${ IndexVector($start, $end) }    
+    infix (IndexVector) ("::", Nil, ((("end", MInt), ("start", MInt)) :: IndexVector)) implements composite ${ IndexVector($start, $end) }
 
     // should add apply directly to IndexVector, otherwise we have issues with ambiguous implicit conversions
-    infix (IndexVector) ("apply", T, (IndexVector, MInt ==> T)  :: DenseVector(T)) implements composite ${ $0.map($1) }   
+    infix (IndexVector) ("apply", T, (IndexVector, MInt ==> T)  :: DenseVector(T)) implements composite ${ $0.map($1) }
 
     // matrix constructor (0::numRows,0::numCols) { ... }
-    val DenseMatrix = lookupTpe("DenseMatrix")    
-    
+    val DenseMatrix = lookupTpe("DenseMatrix")
+
     infix (IndexVector) ("apply", T, (CTuple2(IndexVector,IndexVector), (MInt,MInt) ==> T) :: DenseMatrix(T)) implements composite ${
       val (rowIndices,colIndices) = $0
       val out = DenseMatrix[T](rowIndices.length,colIndices.length)
@@ -53,7 +53,7 @@ trait OptiMLDSL extends OptiLADSL
           out(i,j) = $1(i,j)
         }
       }
-      out.unsafeImmutable      
+      out.unsafeImmutable
     }
 
     val IndexWildcard = tpe("IndexWildcard", stage = compile)
@@ -95,7 +95,7 @@ trait OptiMLDSL extends OptiLADSL
         println("Maximum iterations exceeded")
       }
 
-      cur      
+      cur
     }
   }
 
@@ -110,11 +110,11 @@ trait OptiMLDSL extends OptiLADSL
 
     // don't kick in when polymorphic, for unknown reasons
     // fimplicit (DenseVector) ("dist", T, (DenseVector(T),DenseVector(T)) :: MDouble, ("conv", T ==> MDouble)) implements composite ${ sum(abs($0.toDouble - $1.toDouble)) }
-    // fimplicit (DenseMatrix) ("dist", T, (DenseMatrix(T),DenseMatrix(T)) :: MDouble, ("conv", T ==> MDouble)) implements composite ${ sum(abs($0.toDouble - $1.toDouble)) }    
+    // fimplicit (DenseMatrix) ("dist", T, (DenseMatrix(T),DenseMatrix(T)) :: MDouble, ("conv", T ==> MDouble)) implements composite ${ sum(abs($0.toDouble - $1.toDouble)) }
 
     fimplicit (Prim) ("dist", Nil, (MDouble,MDouble) :: MDouble) implements composite ${ abs($0-$1) }
     fimplicit (DenseVector) ("dist", Nil, (DenseVector(MDouble),DenseVector(MDouble)) :: MDouble) implements composite ${ sum(abs($0 - $1)) }
-    fimplicit (DenseMatrix) ("dist", Nil, (DenseMatrix(MDouble),DenseMatrix(MDouble)) :: MDouble) implements composite ${ sum(abs($0 - $1)) }      
+    fimplicit (DenseMatrix) ("dist", Nil, (DenseMatrix(MDouble),DenseMatrix(MDouble)) :: MDouble) implements composite ${ sum(abs($0 - $1)) }
 
     val DMetric = tpe("DistanceMetric", stage = compile)
     identifier (DMetric) ("ABS")
@@ -122,7 +122,7 @@ trait OptiMLDSL extends OptiLADSL
     identifier (DMetric) ("EUC")
 
     for (TP <- List(DenseVector,DenseMatrix)) {
-      direct (TP) ("dist", Nil, (TP(MDouble),TP(MDouble),DMetric) :: MDouble) implements composite ${ 
+      direct (TP) ("dist", Nil, (TP(MDouble),TP(MDouble),DMetric) :: MDouble) implements composite ${
         $2 match {
           case ABS => dist($0,$1)
           case SQUARE => sum(square($0 - $1))
@@ -130,5 +130,5 @@ trait OptiMLDSL extends OptiLADSL
         }
       }
     }
-  }   
+  }
 }

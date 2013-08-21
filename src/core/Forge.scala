@@ -296,7 +296,8 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     case Def(TpeClassInst(s,args,t)) => quote(t)
     case Def(FTpe(args,ret,freq)) => "(" + args.map(a => quote(a.tpe)).mkString(",") + ") => " + quote(ret)
     case Def(StringPlus(a,b)) => quote(quoteLiteral(a)+quoteLiteral(b))
-    case Def(Arg(name,tpe,default)) => quote(name)
+    case Def(Arg(name,Def(Tpe(s,_,_)),default)) if s.startsWith("Overload") => s.toLowerCase // convention established in GenOverloadHack.scala (TODO: use constant name)
+    case Def(Arg(name,tpe,default)) => name
     case s@Sym(n) => err("could not resolve symbol " + findDefinition(s).toString + ". All Forge symbols must currently be statically resolvable.")
     case _ => super.quote(x)
   }

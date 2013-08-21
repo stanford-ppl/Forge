@@ -59,11 +59,13 @@ trait DeliteGenOps extends BaseGenOps {
 
   // IR node names
   def makeOpNodeName(o: Rep[DSLOp]) = {
-    val i = nameClashId(o)
-    o.style match {
-      case `staticMethod` => o.grp.name + i + "Object_" + sanitize(o.name).capitalize
-      case `compilerMethod` => o.name.capitalize
-      case _ => o.grp.name + i + "_" + sanitize(o.name).capitalize
+    Labels.get(o).map(_.capitalize).getOrElse {
+      val i = nameClashId(o)
+      o.style match {
+        case `staticMethod` => o.grp.name + i + "Object_" + sanitize(o.name).capitalize
+        case `compilerMethod` => o.name.capitalize
+        case _ => o.grp.name + i + "_" + sanitize(o.name).capitalize
+      }
     }
   }
 
@@ -469,15 +471,15 @@ trait DeliteGenOps extends BaseGenOps {
           // pure version with no func args uses smart constructor
           if (!hasFuncArgs(o)) {
             stream.print(makeOpMethodName(o) + xformArgs)
-            val id = nameClashId(o)
-            if (id != "" || implicits.length > 0) {
+            if (needOverload(o) || implicits.length > 0) {
               stream.print("(")
               if (implicits.length > 0) stream.print(implicits.mkString(","))
               // we may need to supply an explicit Overload parameter for the smart constructor
               // relies on conventions established in implicitArgsWithOverload (e.g., guaranteed to always be the last implicit)
-              if (id != "" /*&& !Config.fastCompile*/) {
+              if (needOverload(o)) {
+                val overload = implicitArgsWithOverload(o).last
                 if (implicits.length > 0) stream.print(",")
-                stream.print("implicitly[Overload" + id + "]")
+                stream.print(quote(overload))
               }
               stream.println(")")
             }

@@ -80,9 +80,13 @@ trait BaseGenOps extends ForgeCodeGenBase {
     else Nil
   }
 
-  // used with overloading
+  /**
+   * Overloading resolution
+   */
+
   // if after converting Ts and Vars to Reps there are duplicates, remove them.
   def unique(ops: List[Rep[DSLOp]]) = uniqueMap(ops)._1
+
   def uniqueMap(ops: List[Rep[DSLOp]]) = {
     // we maintain a separate ArrayBuffer along with the map to retain order
     val filtered = scala.collection.mutable.ArrayBuffer[Rep[DSLOp]]()
@@ -97,14 +101,57 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
     (filtered.toList,canonicalMap)
   }
+
   def canonicalize(o: Rep[DSLOp]) = o.grp.name + o.name + makeOpArgsWithType(o) + makeOpImplicitArgs(o)
+
   // precomputed for performance
   lazy val allOps = OpsGrp.values.toList.flatMap(g => g.ops)
   lazy val allOpsCanonicalMap = uniqueMap(allOps)._2
   def canonical(o: Rep[DSLOp]): Rep[DSLOp] = allOpsCanonicalMap.getOrElse(canonicalize(o), err("no canonical version of " + o.name + " found"))
 
-  // normal args
+  // overload name clash resolution using implicit hack
+  // we need overloads for both front-end signatures (e.g., "+", universal) as well as abstract methods (e.g. vector_plus, grp), but the actual overload implicit used may differ in each case.
+  // problem: the local numbering of a signature can overlap with the same Overloaded# as one of the unique targets, causing an ambiguity
+  // def nameClash(o1: Rep[DSLOp], o2: Rep[DSLOp]) = o1.name == o2.name && o1.args.length == o2.args.length && (o1.args.zip(o2.args).forall(t => getHkTpe(t._1.tpe).name == getHkTpe(t._2.tpe).name || (t._1.tpe.stage == future && t._2.tpe.stage == future)))
+  def nameClash(o1: Rep[DSLOp], o2: Rep[DSLOp]) = o1.style == o2.style && o1.name == o2.name // forces a global numbering
+
+  def nameClashesGrp(o: Rep[DSLOp]) = opsGrpOf(o).ops.filter(o2 => o.grp.name == o2.grp.name && nameClash(o,o2))
+
+  def nameClashesUniversal(o: Rep[DSLOp]) = allOps.filter(o2 => nameClash(o,o2))
+
+  def nameClashId(o: Rep[DSLOp], clasher: Rep[DSLOp] => List[Rep[DSLOp]] = nameClashesUniversal) = {
+    val clashes = clasher(o)
+    if (clashes.length > 1) (clashes.indexOf(o)+1).toString else ""
+  }
+
+  // refers to the back-end method signature
+  // front-end overloads are added in an ad-hoc way right now, by always calling implicitArgsWithOverload
+  def needOverload(o: Rep[DSLOp]) = {
+    /*!Config.fastCompile &&*/ (!Labels.contains(o) && nameClashesGrp(o).length > 1)
+  }
+
+  // useCanonical should be false if we're referring to the front-end signature (e.g. '+') but true if we're
+  // referring to the back-end signature (e.g. 'vector_plus')
+  def implicitArgsWithOverload(o: Rep[DSLOp], useCanonical: Boolean = false) = {
+    val o1 = if (useCanonical) canonical(o) else o
+    val i = nameClashId(o1)
+    if (i != "") {
+      // redirect overloads can clash with regular overloads since they don't get separate abstract methods
+      val overloadName = if (isRedirect(o)) "ROverload" else "Overload"
+      o.implicitArgs :+ anyToImplicitArg(ephemeralTpe(overloadName + i, stage = now), o.implicitArgs.length)
+    }
+    else {
+      o.implicitArgs
+    }
+  }
+
+
+  /**
+   * Op argument formatting
+   */
+
   def simpleArgName(t: Rep[DSLArg]): String = t.name
+
   def makeArgs(args: List[Rep[DSLArg]], makeArgName: (Rep[DSLArg] => String) = simpleArgName, addParen: Boolean = true) = {
     if (args.length == 0 && !addParen) {
       ""
@@ -113,29 +160,47 @@ trait BaseGenOps extends ForgeCodeGenBase {
       "(" + args.map(makeArgName).mkString(",") + ")"
     }
   }
+
   def makeArgsWithType(args: List[Rep[DSLArg]], typify: Rep[DSLType] => String = repify, addParen: Boolean = true) = makeArgs(args, t => argify(t, typify), addParen)
+
   def makeArgsWithNowType(args: List[Rep[DSLArg]], addParen: Boolean = true) = makeArgsWithType(args, repifySome, addParen)
+
   def makeOpArgs(o: Rep[DSLOp], addParen: Boolean = true) = makeArgs(o.args, addParen = addParen)
+
   def makeOpFutureArgs(o: Rep[DSLOp], makeArgName: (Rep[DSLArg] => String)) = makeArgs(o.args, t => { val arg = makeArgName(t); if (t.tpe.stage == now && !isTpeInst(t.tpe)) "unit("+arg+")" else arg })
+
   def makeOpArgsWithType(o: Rep[DSLOp], typify: Rep[DSLType] => String = repify, addParen: Boolean = true) = makeArgsWithType(o.args, typify, addParen)
+
   def makeOpArgsWithNowType(o: Rep[DSLOp], addParen: Boolean = true) = makeArgsWithNowType(o.args, addParen)
-  // not used -- still needed?
-  // def makeOpArgsWithDefaults(o: Rep[DSLOp], typify: Rep[DSLType] => String = repify) = makeArgs(o.args, t => argify(t, typify))
-  // def makeOpArgsWithNowDefault(o: Rep[DSLOp]) = makeOpArgsWithDefaults(o, repifySome)
+
+  def makeFullArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String) = {
+    // we always pass implicit arguments explicitly (in practice, less issues arise this way)
+    val implicitArgs = if (needOverload(o)) makeOpImplicitArgsWithOverload(o, useCanonical = true) else makeOpImplicitArgs(o)
+    makeTpePars(o.tpePars) + makeArgs(o) + implicitArgs
+  }
+
+
+  /**
+   * Op implicit argument formatting
+   */
 
   // untyped implicit args
   def makeImplicitCtxBounds(tpePars: List[Rep[TypePar]]) = {
     tpePars.flatMap(a => a.ctxBounds.map(b => "implicitly["+b.name+"["+quote(a)+"]]")).mkString(",")
   }
+
   def makeOpImplicitCtxBounds(o: Rep[DSLOp]) = makeImplicitCtxBounds(o.tpePars)
+
   def makeImplicitArgs(implicitArgs: List[Rep[DSLArg]], ctxBoundsStr: String = "") = {
     // ctxBounds must come before regular implicits
     val ctxBounds2 = if (ctxBoundsStr == "") "" else ctxBoundsStr+","
-    if (implicitArgs.length > 0) "(" + ctxBounds2 + implicitArgs.map(_.name).mkString(",") + ")"
+    if (implicitArgs.length > 0) "(" + ctxBounds2 + implicitArgs.map(quote).mkString(",") + ")"
     else ""
   }
+
   def makeOpImplicitArgs(o: Rep[DSLOp]) = makeImplicitArgs(o.implicitArgs, makeOpImplicitCtxBounds(o)) // explicitly passing implicits requires passing ctxBounds, too
-  def makeOpImplicitArgsWithOverload(o: Rep[DSLOp], asVals: Boolean = false) = makeImplicitArgs(implicitArgsWithOverload(o), makeOpImplicitCtxBounds(o))
+
+  def makeOpImplicitArgsWithOverload(o: Rep[DSLOp], asVals: Boolean = false, useCanonical: Boolean = false) = makeImplicitArgs(implicitArgsWithOverload(o, useCanonical), makeOpImplicitCtxBounds(o))
 
   // typed implicit args with context bounds (only needed for instance methods)
   // 'without' is used to subtract bounds that are already in scope
@@ -143,6 +208,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     val withoutBounds = without.flatMap(a => a.ctxBounds)
     tpePars.flatMap(a => a.ctxBounds.diff(withoutBounds).map(b => ephemeralTpe(b.name+"["+quote(a)+"]", stage = now))).distinct
   }
+
   def makeImplicitArgsWithCtxBoundsWithType(implicitArgs: List[Rep[DSLArg]], tpePars: List[Rep[TypePar]], without: List[Rep[TypePar]] = Nil, asVals: Boolean = false) = {
     val addArgs = implicitCtxBoundsWithType(tpePars, without)
     val l = implicitArgs.length
@@ -155,42 +221,16 @@ trait BaseGenOps extends ForgeCodeGenBase {
     if (implicitArgs.length > 0) "(implicit " + implicitArgs.map(t => prefix + argify(t,repifySome)).mkString(",") + ")"
     else ""
   }
+
   def makeOpImplicitArgsWithType(o: Rep[DSLOp], asVals: Boolean = false) = makeImplicitArgsWithType(o.implicitArgs, asVals)
-  def makeOpImplicitArgsWithOverloadWithType(o: Rep[DSLOp], asVals: Boolean = false) = makeImplicitArgsWithType(implicitArgsWithOverload(o), asVals)
 
-  // overload name clash resolution using implicit hack
-  // problem: the local numbering of a signature can overlap with the same Overloaded# as one of the unique targets, causing an ambiguity
-  // def nameClash(o1: Rep[DSLOp], o2: Rep[DSLOp]) = o1.name == o2.name && o1.args.length == o2.args.length && (o1.args.zip(o2.args).forall(t => getHkTpe(t._1.tpe).name == getHkTpe(t._2.tpe).name || (t._1.tpe.stage == future && t._2.tpe.stage == future)))
-  def nameClash(o1: Rep[DSLOp], o2: Rep[DSLOp]) = o1.style == o2.style && o1.name == o2.name // forces a global numbering
-  def nameClashesGrp(o: Rep[DSLOp]) = opsGrpOf(o).ops.filter(o2 => o.grp.name == o2.grp.name && nameClash(o,o2))
-  def nameClashesUniversal(o: Rep[DSLOp]) = allOps.filter(o2 => nameClash(o,o2))
-  def nameClashId(o: Rep[DSLOp], clasher: Rep[DSLOp] => List[Rep[DSLOp]] = nameClashesUniversal) = {
-    val clashes = clasher(o)
-    if (clashes.length > 1) (clashes.indexOf(o)+1).toString else ""
-  }
-  def implicitArgsWithOverload(o: Rep[DSLOp]) = {
-    val i = nameClashId(o)
-    if (i != "") {
-      // redirect overloads can clash with regular overloads since they don't get separate abstract methods
-      val overloadName = if (isRedirect(o)) "ROverload" else "Overload"
-      o.implicitArgs :+ anyToImplicitArg(ephemeralTpe(overloadName + i, stage = now), o.implicitArgs.length)
-    }
-    else {
-      o.implicitArgs
-    }
-  }
-  def needDisambiguate(o: Rep[DSLOp], clasher: Rep[DSLOp] => List[Rep[DSLOp]] = nameClashesGrp) = {
-    // TODO: when do we need to disambiguate implicit args? (explicitly pass them). the fundamental reason is if there are
-    // multiple possible implicits in scope.. how do we know? should we just always pass them explicitly? (this could improve staging performance, too)
-    // -- passing them all explicitly doesn't currently work because we collapse the back-end implementations, so not every front-end signature should pass an implicit
-    //    in order to do this, we need to pass the implicits corresponding to the unique back-end signature
+  def makeOpImplicitArgsWithOverloadWithType(o: Rep[DSLOp], asVals: Boolean = false, useCanonical: Boolean = false) = makeImplicitArgsWithType(implicitArgsWithOverload(o, useCanonical), asVals)
 
-    // the issue with nameClashes is that if the receiver method (e.g. string_+) also requires overload implicits, the ones from OverloadHack are also in scope
-    // we should be able to solve this by de-prioritizing the OverloadHack vals somehow
-    /*!Config.fastCompile &&*/ (clasher(o).length > 1 && unique(opsGrpOf(o).ops).contains(o)) // inefficient!! -> should refactor things so that we can store this with the op when it is created.
-  }
 
-  // method names
+  /**
+   * Op method names
+   */
+
   val specialCharacters = scala.collection.immutable.Map("+" -> "pl", "-" -> "sub", "/" -> "div", "*" -> "mul", "=" -> "eq", "<" -> "lt", ">" -> "gt", "&" -> "and", "|" -> "or", "!" -> "bang", ":" -> "cln")
   def sanitize(x: String) = {
     var out = x
@@ -202,21 +242,23 @@ trait BaseGenOps extends ForgeCodeGenBase {
     if (overrideList.contains(o.name)) "override def"
     else "def"
   }
+
   def makeOpMethodName(o: Rep[DSLOp]) = {
-    // adding the nameClashId is another way to avoid chaining the Overload implicit, but the weird method names that result are confusing
-    val i = /*if (Config.fastCompile) nameClashId(canonical(o), nameClashesGrp) else*/ ""
-    o.style match {
-      case `staticMethod` => o.grp.name.toLowerCase + "_object_" + sanitize(o.name).toLowerCase + i
-      case `compilerMethod` =>
-        if (o.name != sanitize(o.name)) err("compiler op name has special characters that require reformatting: " + o.name)
-        o.name // should be callable directly from impl code
-      case _ => o.grp.name.toLowerCase + "_" + sanitize(o.name).toLowerCase + i
-    }
+    Labels.getOrElse(o, {
+      // adding the nameClashId is another way to avoid chaining the Overload implicit, but the weird method names that result are confusing
+      val i = /*if (Config.fastCompile) nameClashId(canonical(o), nameClashesGrp) else*/ ""
+      o.style match {
+        case `staticMethod` => o.grp.name.toLowerCase + "_object_" + sanitize(o.name).toLowerCase + i
+        case `compilerMethod` =>
+          if (o.name != sanitize(o.name)) err("compiler op name has special characters that require reformatting: " + o.name)
+          o.name // should be callable directly from impl code
+        case _ => o.grp.name.toLowerCase + "_" + sanitize(o.name).toLowerCase + i
+      }
+    })
   }
-  def makeFullArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String, clasher: Rep[DSLOp] => List[Rep[DSLOp]] = nameClashesGrp) = {
-    makeTpePars(o.tpePars) + makeArgs(o) + (if (needDisambiguate(o,clasher)) makeOpImplicitArgsWithOverload(o) else "")
-  }
+
   def makeOpMethodNameWithArgs(o: Rep[DSLOp]) = makeOpMethodName(o) + makeFullArgs(o, o => makeOpArgs(o))
+
   def makeOpMethodNameWithFutureArgs(o: Rep[DSLOp], makeArgName: Rep[DSLArg] => String = simpleArgName) = {
     if (Impls(o).isInstanceOf[Redirect]) {
       var call = "{ " + inline(o, Impls(o).asInstanceOf[Redirect].func, quoteLiteral) + " }"
@@ -226,20 +268,22 @@ trait BaseGenOps extends ForgeCodeGenBase {
       call
     }
     else {
-      makeOpMethodName(o) + makeFullArgs(o, k => makeOpFutureArgs(k,makeArgName), nameClashesUniversal) // front-end can name clash with anything
+      makeOpMethodName(o) + makeFullArgs(o, k => makeOpFutureArgs(k,makeArgName))
     }
   }
 
   def makeOpMethodSignature(o: Rep[DSLOp], withReturnTpe: Option[Boolean] = None) = {
     val addRet = withReturnTpe.getOrElse(Config.fastCompile)
     val ret = if (addRet || isRedirect(o)) ": " + repifySome(o.retTpe) else ""
+    val implicitArgs = if (needOverload(o)) makeOpImplicitArgsWithOverloadWithType(o, useCanonical = true) else makeOpImplicitArgsWithType(o)
     // if (Config.fastCompile) {
     //   "def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithType(o) + ret
     // }
     // else {
-      "def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithOverloadWithType(o) + ret
+      "def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + implicitArgs + ret
     // }
   }
+
   def makeSyntaxMethod(o: Rep[DSLOp], prefix: String = "def ", withReturnTpe: Option[Boolean] = None) = {
     // adding the return type increases verbosity in the generated code, so we omit it by default
     val addRet = withReturnTpe.getOrElse(Config.fastCompile)
@@ -248,21 +292,26 @@ trait BaseGenOps extends ForgeCodeGenBase {
     prefix + o.name + makeTpeParsWithBounds(o.tpePars) + makeArgsWithNowType(o.firstArgs, o.effect != pure) + curriedArgs + makeOpImplicitArgsWithOverloadWithType(o) + ret + " = " + makeOpMethodNameWithFutureArgs(o)
   }
 
-  def makeOpImplMethodName(o: Rep[DSLOp]) = makeOpMethodName(o) + "_impl"
-  def makeOpImplMethodNameWithArgs(o: Rep[DSLOp], postfix: String = "") = makeOpImplMethodName(o) + nameClashId(o) + postfix + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o)
+  def makeOpImplMethodName(o: Rep[DSLOp]) = makeOpMethodName(o) + "_impl" + nameClashId(o)
+
+  def makeOpImplMethodNameWithArgs(o: Rep[DSLOp], postfix: String = "") = makeOpImplMethodName(o) + postfix + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o)
+
   def makeOpImplMethodSignature(o: Rep[DSLOp], postfix: String = "", returnTpe: Option[String] = None) = {
-    "def " + makeOpImplMethodName(o) + nameClashId(o) + postfix + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithType(o) + ": " + (returnTpe getOrElse repifySome(o.retTpe))
+    "def " + makeOpImplMethodName(o) + postfix + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithType(o) + ": " + (returnTpe getOrElse repifySome(o.retTpe))
   }
+
 
   /**
    * Op sanity checking
    *
    * These are mostly repetitive right now, but we could specialize the error checking more (or generalize it to be more concise).
    */
+
   def validTpePar(o: Rep[DSLOp], tpePar: Rep[DSLType]) = tpePar match {
     case Def(TpePar(name,_,_)) => o.tpePars.exists(_.name == name)
     case _ => true
   }
+
   def check(o: Rep[DSLOp]) {
     if (!Impls.contains(o)) err("op " + o.name + " has no impl")
     Impls(o) match {

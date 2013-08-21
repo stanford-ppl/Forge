@@ -80,6 +80,8 @@ trait ForgeOps extends Base {
   def lookupOp(grpName: String, opName: String) = forge_lookup_op(lookupGrp(grpName),opName,0)
   def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup_op(lookupGrp(grpName),opName,index)
 
+  def label(op: Rep[DSLOp], name: String) = forge_label(op,name)
+
   def forge_grp(name: String): Rep[DSLGroup]
   def forge_tpealias(name: String, tpe: Rep[DSLType]): Rep[TypeAlias]
   def forge_tpepar(name: String, ctxBounds: List[TypeClassSignature], stage: StageTag): Rep[TypePar]
@@ -105,6 +107,7 @@ trait ForgeOps extends Base {
   def forge_lookup_tpe(tpeName: String, stage: StageTag): Rep[DSLType]
   def forge_lookup_grp(grpName: String): Rep[DSLGroup]
   def forge_lookup_op(grp: Rep[DSLGroup], opName: String, overloadedIndex: Int): Rep[DSLOp]
+  def forge_label(op: Rep[DSLOp], name: String): Rep[Unit]
 }
 
 trait ForgeSugarLowPriority extends ForgeOps {
@@ -227,6 +230,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   val Impls = HashMap[Exp[DSLOp],OpType]()
   val ForgeCollections = HashMap[Exp[DSLType], ForgeCollectionType]()
   val Externs = ArrayBuffer[Extern]()
+  val Labels = HashMap[Exp[DSLOp],String]()
 
   /**
    * Convenience method providing access to defined ops in other modules
@@ -505,6 +509,13 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     val e = Extern(opsGrp, withLift)
     if (!Externs.contains(e)) Externs += e
     e
+  }
+
+  /* Specifies a unique name to assign to the op's method/case class for overriding and pattern matching */
+  def forge_label(op: Rep[DSLOp], name: String) = {
+    if (Labels.contains(op)) warn("overriding existing label " + Labels(op) + " with new label " + name)
+    Labels(op) = name
+    ()
   }
 }
 

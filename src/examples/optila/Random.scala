@@ -22,7 +22,7 @@ trait RandomOps {
       }
     }
 
-    direct (Rand) ("randomGaussian", Nil, Nil :: MDouble) implements codegen($cala, ${
+    direct (Rand) ("randomGaussian", Nil, Nil :: MDouble, effect = simple) implements codegen($cala, ${
       Global.randRef.nextGaussian()
     })
 

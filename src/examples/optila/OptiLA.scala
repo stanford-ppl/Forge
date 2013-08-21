@@ -81,5 +81,8 @@ a1+b1
     importDenseVectorOps()
     importDenseMatrixOps()
     importIOOps()
+
+    // native libs
+    extern(grp("BLAS"))
   }
 }

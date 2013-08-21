@@ -40,7 +40,7 @@ trait IOOps {
         }
       }
       val numCols = array_length(readFirstLine(path).trim.fsplit(delim))
-      densematrix_fromarray(a, array_length(a) / numCols, numCols)//.unsafeImmutable (needed?)
+      densematrix_fromarray(a, array_length(a) / numCols, numCols).unsafeImmutable // unsafeImmutable needed due to struct unwrapping Reflect(Reflect(..)) bug (see LAInputReaderOps.scala line 46 in Delite)
     }
 
     compiler (IO) ("readFirstLine", Nil, ("path",MString) :: MString) implements codegen($cala, ${

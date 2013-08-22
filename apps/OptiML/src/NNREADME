@@ -1,0 +1,71 @@
+Author: Saunders Hayes (sbdhayes@cs.stanford.edu) - feel free to email me for questions or bugs
+
+Pervasive Parallelism Laboratory (PPL)
+Stanford University
+2013
+
+
+This neural network classifier implements a classic feedforward neural network using a logistic
+activation function and backpropagation. There are three layers in this network, the input layer, 
+the hidden layer, and the output layer. 
+
+Tunable parameters:
+ 		-"learningRate": defaults to 0.001
+ 		-"numIterations": defaults to 5000
+ 		-"numHidNeurons": defaults to the mean of the inputs (features) and outputs (number of different labels)
+
+
+Command line usage: - Note that the optional parameters are only optional if the later ones are also omitted
+
+NNCompiler <training set filename> <labels filename> <generalization set filename>
+<generalization set labels> <test set filename> <test set output labels filename> 
+<optional numIterations> <optional learningRate> <optional numHiddenNeurons>
+
+Example usages: 
+
+bin/delite NNCompiler shuffledTrainingSet trainingSetLabels generalizationSet
+generalizationSetLabels testSet outputFiles/testSetLabels 50000 0.002 4
+
+bin/delite NNCompiler shuffledTrainingSet trainingSetLabels generalizationSet
+generalizationSetLabels testSet outputFiles/testSetLabels 8000 0.01
+
+bin/delite NNCompiler shuffledTrainingSet trainingSetLabels generalizationSet
+generalizationSetLabels testSet outputFiles/testSetLabels 30000 
+
+
+Training set, test set, or generalization set file format: 
+
+Each row of the file is a new data point with features as columns. Each feature 
+is separated by whitespace. Every data point must have the same number of features. 
+The training set, test set, and generalization set must have data points with the
+same number of features. It is recommended that you use 60%, 20%, 20% respectively 
+for the training set, generalization set, and test set and that you randomize the 
+data before training the network (especially if it is in labeled order).
+
+
+Labels file format: 
+
+A label file must match the number of rows to its corresponding data file (each 
+row in the label file corresponds to a row in the training/generalization set).
+The labels must be consistent in how many outputs are expected. 
+
+
+Labels for the neural network:
+
+The neural network can be trained to expect any number of label outputs. 
+For example if you had 8 different labels classes they could be viewed as the 
+following labels for the network
+
+0.0000 0.0000 0.0000 - class1
+1.0000 0.0000 0.0000 - class2
+0.0000 1.0000 0.0000 - class3
+0.0000 0.0000 1.0000 - class4
+1.0000 1.0000 0.0000 - class5 
+0.0000 1.0000 1.0000 - class6
+1.0000 0.0000 1.0000 - class7
+1.0000 1.0000 1.0000 - class8
+
+The network in this case only needs three outputs to represent 8 classes, however
+you could use more outputs to represent the 8 classes as this may improve performance.
+
+

@@ -8,7 +8,7 @@ import core.ForgeApplicationRunner
 object OptiMLDSLRunner extends ForgeApplicationRunner with OptiMLDSL
 
 trait OptiMLDSL extends OptiLADSL
-  with SetOps {
+  with SetOps with BufferableOps {
 
   override def dslName = "OptiML"
 
@@ -25,9 +25,10 @@ trait OptiMLDSL extends OptiLADSL
     // impl (whileDo) (composite ${ fatal("illegal operation: 'while'. try using 'untilconverged' instead") })
 
     extern(grp("Sum"))
+    importBufferableOps()
+    importSetOps()
     importVecMatConstructor()
     importUntilConverged()
-    importSetOps()
   }
 
   def importVecMatConstructor() {
@@ -77,7 +78,7 @@ trait OptiMLDSL extends OptiLADSL
     val Control = grp("Control")
     val T = tpePar("T")
 
-    // for now, "block" should not mutate the input, but always produce a new copy. we should optimize this to use a scratchpad and only keep two copies in memory.
+    // "block" should not mutate the input, but always produce a new copy. in this version, block can change the structure of the input across iterations (e.g. increase its size)
     direct (Control) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, ".001"), ("maxIter", MInt, "1000")), ("block", T ==> T)), T), ("diff", (T,T) ==> MDouble)) implements composite ${
       var delta = scala.Double.MaxValue
       var cur = x
@@ -97,6 +98,32 @@ trait OptiMLDSL extends OptiLADSL
 
       cur
     }
+
+    // double-buffered untilconverged. 'block' must not change the structure of the input across iterations. can we enforce this with a monad? (e.g. Fix(T)?)
+    direct (Control) ("untilconverged_buffered", T withBound TBufferable, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, ".001"), ("maxIter", MInt, "1000")), ("block", T ==> T)), T), ("diff", (T,T) ==> MDouble)) implements composite ${
+      val bufA = x.mutable
+      val bufB = x.mutable
+      x.write(bufA)
+
+      var delta = scala.Double.MaxValue
+      var iter = 0
+
+      while (abs(delta) > tol && (iter < maxIter)){
+        // if all goes well, everything fuses (what about the delta function?)
+        val cur = block(bufA)
+        cur.write(bufB)
+        delta = diff(bufA,bufB)
+        bufB.write(bufA)
+        iter += 1
+      }
+
+      if (iter == maxIter){
+        println("Maximum iterations exceeded")
+      }
+
+      bufA
+    }
+
   }
 
   def importDistanceMetrics() {

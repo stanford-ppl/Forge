@@ -23,8 +23,8 @@ trait DenseVectorOps {
     // operations on literal sequences are made available via tuple conversions to DenseVector
     // non-literal sequences don't work and require explicit conversion to DenseVector first, due to the implicit ambiguity problem below
     for (arity <- (2 until 23)) {
-      val pars = (0 until arity).map(i => T).toList
-      val elems = (0 until arity).map(i => "unit(t._" + (i+1)+")").mkString(",")
+      val pars = (1 to arity).map(i => T).toList
+      val elems = (1 to arity).map(i => "unit(t._"+i+")").mkString(",")
       val TT = tpe("Tuple" + arity, pars, stage = compile)
       fimplicit (DenseVector) ("tupleToDense" + arity, T, (("t",TT) :: DenseVector(T))) implements redirect ${ DenseVector[T](\$elems) }
 

@@ -35,6 +35,8 @@ trait RBM extends OptiMLApplication {
     val numDims = trainingData.numCols
     val numBatches = trainingData.numRows / numCases
 
+    tic(trainingData)
+
     // Initialize symmetric weights and biases
     val visHid = (DenseMatrix.randn(numDims, numHiddenUnits) * 0.1)
     val hidBiases = DenseVector.zeros(numHiddenUnits)
@@ -44,18 +46,22 @@ trait RBM extends OptiMLApplication {
     val hidBiasInc = DenseVector.zeros(numHiddenUnits)
     val visBiasInc = DenseVector.zeros(numDims)
 
-    tic()
     val errSum: Rep[Double] = 0.0 // needed because all arguments in the tuple must be explicitly Reps
     var epochErrSum = 0.0
     var epoch = 0
     var batch = 0
 
-    implicit def diffRBM(t1: Rep[Tup7[Double,DenseMatrix[Double],DenseMatrix[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double]]],
-                         t2: Rep[Tup7[Double,DenseMatrix[Double],DenseMatrix[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double]]]) = dist(t1._1,t2._1)
+    // implicit def diffRBM(t1: Rep[Tup7[Double,DenseMatrix[Double],DenseMatrix[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double]]],
+    //                      t2: Rep[Tup7[Double,DenseMatrix[Double],DenseMatrix[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double]]]) = dist(t1._1,t2._1)
 
-    untilconverged((errSum,visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases), maxIter = numBatches*maxEpoch) {
+    implicit def diffRBM(t1: Rep[Tup6[DenseMatrix[Double],DenseMatrix[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double]]],
+                         t2: Rep[Tup6[DenseMatrix[Double],DenseMatrix[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double]]]) = unit(10.0) // always run until maxIter
+
+    // val p = untilconverged((errSum,visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases), maxIter = numBatches*maxEpoch) {
+    val p = untilconverged_buffered((visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases), maxIter = numBatches*maxEpoch) {
       params =>
-      val (errSum,visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases) = t7(params)
+      // val (errSum,visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases) = t7(params)
+      val (visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases) = t6(params)
 
       //println("Epoch: " + epoch + ", Batch: " + batch)
       // Positive phase
@@ -95,9 +101,10 @@ trait RBM extends OptiMLApplication {
         epochErrSum = 0.0
       }
 
-      (nextErrSum, nextVisHidInc, nextVisHid, nextVisBiasInc, nextVisBiases, nextHidBiasInc, nextHidBiases)
+      // (nextErrSum, nextVisHidInc, nextVisHid, nextVisBiasInc, nextVisBiases, nextHidBiasInc, nextHidBiases)
+      (nextVisHidInc, nextVisHid, nextVisBiasInc, nextVisBiases, nextHidBiasInc, nextHidBiases)
     }
 
-    toc()
+    toc(p)
   }
 }

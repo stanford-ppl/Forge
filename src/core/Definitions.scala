@@ -14,6 +14,11 @@ trait Definitions extends DerivativeTypes {
   val symMarker = "__sym"
 
   /**
+   * Other constants
+   */
+  val maxTuples = 10
+
+  /**
    * Built-in types
    */
   // concrete types (M stands for "Meta", C stands for "Current").. these aren't exactly consistent

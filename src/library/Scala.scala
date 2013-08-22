@@ -458,7 +458,7 @@ trait ScalaOps {
     val e = tpePar("_")
 
     // only go to 10 for the sake of compile-time overhead (for now)
-    for (arity <- (2 until 10)) {
+    for (arity <- (2 until maxTuples)) {
       val pars = (0 until arity).map(i => tpePar(('A'.toInt+i).toChar.toString)).toList
       val elems = (0 until arity).map(i => "_" + (i+1))
 

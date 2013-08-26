@@ -25,6 +25,7 @@ trait BufferableOps {
     // Bufferable type class interface
     infix (Bufferable) ("mutable", T, T :: T, effect = mutable)
     infix (Bufferable) ("write", T, (T,T) :: MUnit, effect = write(1))
+    infix (Bufferable) ("size", T, T :: MInt)
 
     // OptiLA types
     val DenseVector = lookupTpe("DenseVector")
@@ -35,16 +36,25 @@ trait BufferableOps {
     infix (DenseVectorBufferable) ("write", T, (DenseVector(T),DenseVector(T)) :: MUnit, effect = write(1)) implements composite ${
       $0.indices foreach { i => $1(i) = $0(i) }
     }
+    infix (DenseVectorBufferable) ("size", T, DenseVector(T) :: MInt) implements composite ${ $0.length }
 
     val DenseMatrixBufferable = tpeClassInst("BufferableDenseMatrix", T, Bufferable(DenseMatrix(T)))
     infix (DenseMatrixBufferable) ("mutable", T, DenseMatrix(T) :: DenseMatrix(T), effect = mutable) implements composite ${ DenseMatrix[T]($0.numRows, $0.numCols) }
     infix (DenseMatrixBufferable) ("write", T, (DenseMatrix(T),DenseMatrix(T)) :: MUnit, effect = write(1)) implements composite ${
-      $0.rowIndices foreach { i =>
-        $0.colIndices foreach { j =>
-          $1(i,j) = $0(i,j)
-        }
+      // can fuse with flat matrix loops
+      (unit(0)::$0.size) foreach { i =>
+        // need to access the matrix array directly at index i (instead of using normal accessor which computes an offset)
+        densematrix_raw_update($1,i,densematrix_raw_apply($0,i))
       }
+
+      // can fuse with nested matrix loops
+      // $0.rowIndices foreach { i =>
+      //   $0.colIndices foreach { j =>
+      //     $1(i,j) = $0(i,j)
+      //   }
+      // }
     }
+    infix (DenseMatrixBufferable) ("size", T, DenseMatrix(T) :: MInt) implements composite ${ $0.size }
 
     // tuples of bufferables
     for (arity <- 2 until maxTuples) {
@@ -57,6 +67,10 @@ trait BufferableOps {
 
       val writeTupBufStr = (1 to arity).map(i => "t1._"+i+".write(t2._"+i+")").mkString("\n")
       infix (TupBuf) ("write", pars, (("t1",Tup),("t2",Tup)) :: MUnit, effect = write(1)) implements composite ${ \$writeTupBufStr }
+
+      // val sizeTupBufStr = (1 to arity).map(i => "t._"+i+".size").mkString("+") // scalac typer crash
+      val sizeTupBufStr = (1 to arity).map(i => "bufferable_size(t._"+i+")").mkString("+")
+      infix (TupBuf) ("size", pars, ("t",Tup) :: MInt) implements composite ${ \$sizeTupBufStr }
     }
 
   }

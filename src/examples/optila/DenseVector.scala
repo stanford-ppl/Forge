@@ -40,20 +40,16 @@ trait DenseVectorOps {
 
     // helper
     compiler (DenseVector) ("densevector_fromarray", T, (MArray(T), MBoolean) :: DenseVector(T)) implements allocates(DenseVector, ${array_length($0)}, ${$1}, ${$0})
-    compiler (DenseVector) ("densevector_fromfunc", T, (MInt, MInt ==> T) :: DenseVector(T)) implements single ${
-      val out = DenseVector[T]($0, true)
-      for (i <- 0 until out.length) {
-        out(i) = $1(i)
-      }
-      out.unsafeImmutable
+    compiler (DenseVector) ("densevector_fromfunc", T, (MInt, MInt ==> T) :: DenseVector(T)) implements composite ${
+      (0::$0) { i => $1(i) }
     }
-    static (DenseVector) ("zeros", Nil, MInt :: DenseVector(MDouble)) implements single ${ densevector_fromfunc($0, i => 0.0 )}
-    static (DenseVector) ("zerosf", Nil, MInt :: DenseVector(MFloat)) implements single ${ densevector_fromfunc($0, i => 0f )}
-    static (DenseVector) ("ones", Nil, MInt :: DenseVector(MDouble)) implements single ${ densevector_fromfunc($0, i => 1.0) }
-    static (DenseVector) ("onesf", Nil, MInt :: DenseVector(MFloat)) implements single ${ densevector_fromfunc($0, i => 1f) }
-    static (DenseVector) ("rand", Nil, MInt :: DenseVector(MDouble)) implements single ${ densevector_fromfunc($0, i => random[Double]) }
-    static (DenseVector) ("randf", Nil, MInt :: DenseVector(MFloat)) implements single ${ densevector_fromfunc($0, i => random[Float]) }
-    static (DenseVector) ("uniform", Nil, MethodSignature(List(("start", MInt), ("step_size", MDouble), ("end", MInt), ("isRow", MBoolean, "true")), DenseVector(MDouble))) implements single ${
+    static (DenseVector) ("zeros", Nil, MInt :: DenseVector(MDouble)) implements composite ${ densevector_fromfunc($0, i => 0.0 )}
+    static (DenseVector) ("zerosf", Nil, MInt :: DenseVector(MFloat)) implements composite ${ densevector_fromfunc($0, i => 0f )}
+    static (DenseVector) ("ones", Nil, MInt :: DenseVector(MDouble)) implements composite ${ densevector_fromfunc($0, i => 1.0) }
+    static (DenseVector) ("onesf", Nil, MInt :: DenseVector(MFloat)) implements composite ${ densevector_fromfunc($0, i => 1f) }
+    static (DenseVector) ("rand", Nil, MInt :: DenseVector(MDouble)) implements composite ${ densevector_fromfunc($0, i => random[Double]) }
+    static (DenseVector) ("randf", Nil, MInt :: DenseVector(MFloat)) implements composite ${ densevector_fromfunc($0, i => random[Float]) }
+    static (DenseVector) ("uniform", Nil, MethodSignature(List(("start", MInt), ("step_size", MDouble), ("end", MInt), ("isRow", MBoolean, "true")), DenseVector(MDouble))) implements composite ${
       val length = ceil(($end-$start)/$step_size)
       densevector_fromfunc(length, i => $step_size*i + $start)
     }

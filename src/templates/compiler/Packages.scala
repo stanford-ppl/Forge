@@ -69,8 +69,9 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("  override def __ifThenElse[T:Manifest](cond: => Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false)")
     stream.println("  implicit def repToOrderingOps[A:Manifest:Ordering](x: Rep[A]) = repOrderingToOrderingOps(x)")
     stream.println("  implicit def varToOrderingOps[A:Manifest:Ordering](x: Var[A]) = varOrderingToOrderingOps(x)")
-    stream.println("  // forward to LMS primitive ops to make stencil analysis detect intervals")
+    stream.println("  // forward to LMS primitive ops to make stencil analysis detect intervals (and get constant folding rewrites)")
     stream.println("  override def primitive2_forge_int_plus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = int_plus(__arg0, __arg1)")
+    stream.println("  override def primitive2_forge_int_minus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = int_minus(__arg0, __arg1)")
     stream.println("  override def primitive2_forge_int_times(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = int_times(__arg0, __arg1)")
 
     stream.println()

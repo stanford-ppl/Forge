@@ -17,7 +17,7 @@ trait IndexVectorOps {
     // static methods
     static (IndexVector) ("apply", Nil, (MInt,MInt) :: IndexVector) implements redirect ${ IndexVector($0,$1,unit(true)) }
     static (IndexVector) ("apply", Nil, (MInt,MInt,MBoolean) :: IndexVector) implements
-      allocates(IndexVector, ${ array_empty[Int](unit(0)) }, quotedArg(0), quotedArg(1), quotedArg(2), ${ unit(true) })
+      allocates(IndexVector, ${ array_empty_imm[Int](unit(0)) }, quotedArg(0), quotedArg(1), quotedArg(2), ${ unit(true) })
 
     static (IndexVector) ("apply", Nil, DenseVector(MInt) :: IndexVector) implements redirect ${ IndexVector($0,$0.isRow) }
     static (IndexVector) ("apply", Nil, (DenseVector(MInt), MBoolean) :: IndexVector) implements

@@ -48,13 +48,27 @@ trait OptiMLDSL extends OptiLADSL
 
     infix (IndexVector) ("apply", T, (CTuple2(IndexVector,IndexVector), (MInt,MInt) ==> T) :: DenseMatrix(T)) implements composite ${
       val (rowIndices,colIndices) = $0
-      val out = DenseMatrix[T](rowIndices.length,colIndices.length)
-      rowIndices foreach { i =>
-        colIndices foreach { j =>
-          out(i,j) = $1(i,j)
-        }
+
+      // can fuse with flat matrix loops
+      val v = (0::rowIndices.length*colIndices.length).toDense
+      val indices = densematrix_fromarray(densevector_raw_data(v),rowIndices.length,colIndices.length)
+      indices map { i =>
+        val rowIndex = i / colIndices.length
+        val colIndex = i % colIndices.length
+        $1(rowIndex,colIndex)
       }
-      out.unsafeImmutable
+
+      // could fuse with nested matrix loops (loops over rowIndices), but not with loops directly over individual matrix elements -- like map!
+      // it seems best for us to be consistent: matrix loops should either all be flat or all be nested. which one? should we use lowerings?
+      // however, mutable version also supresses fusion due to unsafeImmutable...
+
+      // val out = DenseMatrix[T](rowIndices.length,colIndices.length)
+      // rowIndices foreach { i =>
+      //   colIndices foreach { j =>
+      //     out(i,j) = $1(i,j)
+      //   }
+      // }
+      // out.unsafeImmutable
     }
 
     val IndexWildcard = tpe("IndexWildcard", stage = compile)
@@ -62,7 +76,7 @@ trait OptiMLDSL extends OptiLADSL
 
     infix (IndexVector) ("apply", T, (CTuple2(IndexVector,IndexWildcard), MInt ==> DenseVector(T)) :: DenseMatrix(T)) implements composite ${
       val rowIndices = $0._1
-      val first = $1(rowIndices(0)) // better be pure, because we ignore it to main normal loop size below
+      val first = $1(rowIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
       val out = DenseMatrix[T](rowIndices.length,first.length)
       rowIndices foreach { i =>
         out(i) = $1(i)
@@ -99,10 +113,11 @@ trait OptiMLDSL extends OptiLADSL
       cur
     }
 
-    // double-buffered untilconverged. 'block' must not change the structure of the input across iterations. can we enforce this with a monad? (e.g. Fix(T)?)
+    // double-buffered untilconverged. 'block' must not change the structure of the input across iterations.
     direct (Control) ("untilconverged_buffered", T withBound TBufferable, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, ".001"), ("maxIter", MInt, "1000")), ("block", T ==> T)), T), ("diff", (T,T) ==> MDouble)) implements composite ${
       val bufA = x.mutable
       val bufB = x.mutable
+      // val bufSize = bufferable_size(bufA)
       x.write(bufA)
 
       var delta = scala.Double.MaxValue
@@ -110,10 +125,27 @@ trait OptiMLDSL extends OptiLADSL
 
       while (abs(delta) > tol && (iter < maxIter)){
         // if all goes well, everything fuses (what about the delta function?)
+        // can't single buffer because we can't DCE the writes to the first buffer even if we fuse
+
+        // FIXME: simple tests fuse, but RBM gets the wrong answer when we pass in .unsafeImmutable, with or without fusion
+        // apparently unsafeImmutable on structs is not always safe (can bypass rewrites?)
+        // val cur = block(bufA.unsafeImmutable)
         val cur = block(bufA)
+
+        // doesn't supress fusion, so then will only run after cur.write(bufB), which may be too late
+        // however, it seems it will prevent DCEing cur, so commented out for now...
+        // if (bufferable_size(cur) != bufSize) {
+        //   fatal("untilconverged buffer changed size")
+        // }
+
         cur.write(bufB)
         delta = diff(bufA,bufB)
+
+        // fusion-friendly copy instead of swap (using vars is nested mutable and using a branch causes a control dependency)
+        // cur.write(bufB) should always be able to fuse, but bufB.write(bufA) should only fuse if block pipelines its input reads
+        // currently, though, this never fuses, since bufB is mutable which prevents it (and bufB.unsafeImmutable also prevents it)
         bufB.write(bufA)
+
         iter += 1
       }
 

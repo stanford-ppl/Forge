@@ -40,7 +40,8 @@ trait LAPACKOpsExp extends LAPACKOps with LinAlgOpsExp {
   override def linsolve[T:Arith:Manifest](a: Rep[DenseMatrix[T]], b: Rep[DenseVector[T]])(implicit __pos: SourceContext): Rep[DenseVector[T]] = {
     if (useLAPACK && (manifest[T] == manifest[Double] || manifest[T] == manifest[Float])) { 
       // a, b will be overwritten with answers
-      reflectPure(Native_linsolve(a.mutable,b.mutable)) 
+      val out = reflectPure(Native_linsolve(a.mutable,b.mutable)) 
+      out.take(a.numCols) // answer is written in the first n entries of b
     }
     else super.linsolve(a,b)
   }
@@ -66,8 +67,7 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
    */
   override def emitExternalNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case e@Native_linsolve(a,b) =>
-      // M = A^t.numCols, N = A^t.numRows
-      val args = scala.List("%1$s._data", "%2$s._data", "%1$s._numCols", "%1$s._numRows")
+      val args = scala.List("%1$s._data", "%2$s._data", "%1$s._numRows", "%1$s._numCols")
                  .map { _.format(quote(a), quote(b)) }
       emitMethodCall(sym, e, MKL, args)
     case _ => super.emitExternalNode(sym,rhs)

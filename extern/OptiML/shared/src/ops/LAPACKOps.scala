@@ -10,8 +10,7 @@ import optiml.shared._
 import optiml.shared.ops._
 import optiml.shared.typeclass._
 
-// TODO: BLAS and LAPACK extern files should be moved to extern/OptiLA, and sourced from there.
-trait BLASOps {
-  lazy val useBLAS = System.getProperty("optiml.use.blas", "false").toBoolean
+trait LAPACKOps {
+  lazy val useLAPACK = System.getProperty("optiml.use.lapack", "false").toBoolean
 }
-trait BLASCompilerOps extends BLASOps
+trait LAPACKCompilerOps extends LAPACKOps

@@ -1,7 +1,9 @@
-package optiml.shared.ops
+package optiml.library.classes
 
 import scala.tools.nsc.io._
 import scala.reflect.{Manifest,SourceContext}
+import scala.math.Ordering.Implicits._
+import scala.math.Numeric.Implicits._
 import scala.virtualization.lms.common.{Base,BaseExp,EffectExp,BaseFatExp}
 import scala.virtualization.lms.common.{ScalaGenBase,ScalaGenEffect,ScalaGenFat}
 import scala.virtualization.lms.util._
@@ -9,9 +11,7 @@ import scala.virtualization.lms.internal._
 import optiml.shared._
 import optiml.shared.ops._
 import optiml.shared.typeclass._
+import optiml.library._
+import optiml.library.classes._
 
-// TODO: BLAS and LAPACK extern files should be moved to extern/OptiLA, and sourced from there.
-trait BLASOps {
-  lazy val useBLAS = System.getProperty("optiml.use.blas", "false").toBoolean
-}
-trait BLASCompilerOps extends BLASOps
+trait LAPACKWrapper

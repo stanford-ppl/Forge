@@ -9,7 +9,8 @@ object OptiLADSLRunner extends ForgeApplicationRunner with OptiLADSL
 trait OptiLADSL extends ForgeApplication
   with BasicMathOps with RandomOps with IOOps with ArithOps with StringableOps
   with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps
-  with DenseMatrixOps {
+  with DenseMatrixOps
+  with LinAlgOps {
 
   def dslName = "OptiLA"
 
@@ -43,6 +44,7 @@ trait OptiLADSL extends ForgeApplication
     noInfixList :::= List("infix_foreach")
     compiler (Range) ("infix_until", Nil, (MInt,MInt) :: Range) implements allocates(Range, quotedArg(0), quotedArg(1))
 
+    // infix_foreach must be compiler only both so that it is not used improperly and to not interfere with other codegen nodes in the library
     // this is a little convoluted unfortunately (because of the restriction on passing structs to codegen nodes)
     compiler (Range) ("infix_foreach", Nil, (Range, MInt ==> MUnit) :: MUnit) implements composite ${ range_foreach(range_start($0), range_end($0), $1) }
     compiler (Range) ("range_foreach", Nil, (("start",MInt),("end",MInt),("func",MInt ==> MUnit)) :: MUnit) implements codegen($cala, ${
@@ -81,8 +83,10 @@ a1+b1
     importDenseVectorOps()
     importDenseMatrixOps()
     importIOOps()
+    importLinAlgOps()
 
     // native libs
     extern(grp("BLAS"))
+    extern(grp("LAPACK"))
   }
 }

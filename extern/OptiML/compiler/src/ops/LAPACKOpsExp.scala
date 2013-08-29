@@ -31,18 +31,17 @@ trait LAPACKOpsExp extends LAPACKOps with LinAlgOpsExp {
   case class Native_linsolve[T:Manifest](a: Rep[DenseMatrix[T]],b: Rep[DenseVector[T]])(implicit val __pos: SourceContext,val __imp0: Arith[T]) extends DeliteOpExternal[DenseVector[T]] {
     val _mT = implicitly[Manifest[T]]
 
-    // will be overwritten with answers
-    val inA = a.t // must be column-major
-    val inB = b.mutable
-
-    override def inputs = scala.List(inA,inB)
-    def alloc = inB
+    override def inputs = scala.List(a,b)
+    def alloc = b
     val funcName = "linsolve"
   }
 
   // TODO: we also want an AX = B version where X and B are matrices
   override def linsolve[T:Arith:Manifest](a: Rep[DenseMatrix[T]], b: Rep[DenseVector[T]])(implicit __pos: SourceContext): Rep[DenseVector[T]] = {
-    if (useLAPACK && (manifest[T] == manifest[Double] || manifest[T] == manifest[Float])) { reflectPure(Native_linsolve(a,b)) }
+    if (useLAPACK && (manifest[T] == manifest[Double] || manifest[T] == manifest[Float])) { 
+      // a, b will be overwritten with answers
+      reflectPure(Native_linsolve(a.mutable,b.mutable)) 
+    }
     else super.linsolve(a,b)
   }
 
@@ -93,12 +92,9 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
           j%1$s *A_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)A, &copy));
           j%1$s *b_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)b, &copy));
 
-          %1s[2*M*N] work;
-          int workSize = 2*M*N;
-          int NRHS = 1;
-          int info;
+          MKL_INT m = M, n = N, nrhs = 1, lda = N, ldb = 1, info;
 
-          %2$s('N', &M, &N, &NRHS, A_ptr, &M, b_ptr, &M, &work, &workSize, &info);
+          info = LAPACKE_%2$s(LAPACK_ROW_MAJOR, 'N', m, n, nrhs, A_ptr, lda, b_ptr, ldb);
 
           (*env)->ReleasePrimitiveArrayCritical(env, A, A_ptr, 0);
           (*env)->ReleasePrimitiveArrayCritical(env, b, b_ptr, 0);

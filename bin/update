@@ -13,6 +13,7 @@ usage() {
   echo "Note that `basename $0` requires options to be specified before required arguments."
   echo "  -h        show this message"
   echo "  -c        perform a clean build"
+  echo "  -C        clean only extern files"
   echo "  -s <n>    skip to step n in the update process"
   echo "  -f        (re-)generate forge specification"
   echo "  -g <gen>  generate only the specified version"
@@ -31,6 +32,7 @@ if [ -z "$FORGE_HOME" -a "${FORGE_HOME+xxx}" = "xxx" ]; then echo error: FORGE_H
 
 APP_RUNNER=""
 CLEAN=""
+CLEAN_EXTERN=""
 NUM_STEPS=4
 SKIP=0
 DELITE=false
@@ -38,11 +40,12 @@ INTERACTIVE=false
 IDENT=false
 TARGET=""
 
-while getopts “hcs:fg:r:di” option
+while getopts “hcCs:fg:r:di” option
 do
   case $option in
     h) usage;;
     c) CLEAN=" -c";;
+    C) CLEAN_EXTERN=" --clean-extern";;
     s) SKIP=$OPTARG;;
     f) IDENT=true;;
     g) TARGET="$OPTARG";;
@@ -98,8 +101,8 @@ fi
 
 if [ $SKIP -le 3 ];
 then
-  echo "publish $DSL_NAME $CLEAN (3/$NUM_STEPS)"
-  bin/publish $DSL_NAME $CLEAN
+  echo "publish $DSL_NAME $CLEAN $CLEAN_EXTERN (3/$NUM_STEPS)"
+  bin/publish $DSL_NAME $CLEAN $CLEAN_EXTERN
 fi
 
 echo "cd published/$DSL_NAME/"

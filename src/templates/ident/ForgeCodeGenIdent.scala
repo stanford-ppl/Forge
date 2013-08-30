@@ -16,7 +16,7 @@ trait ForgeCodeGenIdent extends ForgeCodeGenBackend with BaseGenOps with IdentGe
   val IR: ForgeApplicationRunner with ForgeExp
   import IR._
 
-  lazy val packageName = dsl.toLowerCase() + ".ident"
+  lazy val targetName = "ident"
 
   def emitDSLImplementation() {
     Directory(Path(dslDir)).createDirectory()

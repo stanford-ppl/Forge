@@ -211,8 +211,10 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
   val IR: ForgeApplicationRunner with ForgeExp
   import IR._
 
-  def buildDir: String
-  lazy val dslDir = buildDir + File.separator + "src" + File.separator + dsl.toLowerCase() + File.separator
+  def targetName: String
+  lazy val packageName = dsl.toLowerCase() + "." + targetName
+  lazy val buildDir = build + File.separator + dsl + File.separator + targetName
+  lazy val dslDir = buildDir + File.separator + "src" + File.separator + dsl.toLowerCase() + File.separator + targetName + File.separator
 
   // -- code gen helpers
 

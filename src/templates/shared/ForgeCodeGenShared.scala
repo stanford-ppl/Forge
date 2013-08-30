@@ -15,7 +15,7 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
   import IR._
 
   lazy val dslStream = new PrintWriter(new FileWriter(dslDir+"Frontend.scala"))
-  lazy val packageName = dsl.toLowerCase() + ".shared"
+  lazy val targetName = "shared"
 
   def emitDSLImplementation() {
     Directory(Path(dslDir)).createDirectory()

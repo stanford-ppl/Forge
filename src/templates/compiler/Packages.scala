@@ -94,6 +94,7 @@ trait DeliteGenPackages extends BaseGenPackages {
   }
 
   private def emitBaseCodegen(stream: PrintWriter) {
+    val packageDir = packageName.split("\\.").map(s => "\""+s+"\"").mkString("+s+")
     stream.println("trait " + dsl + "CodegenBase extends GenericFatCodegen {")
     stream.println("  val IR: DeliteApplication with " + dsl + "Exp")
     stream.println("  override def initialDefs = IR.deliteGenerator.availableDefs")
@@ -101,7 +102,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("  def dsmap(line: String) = line")
     stream.println("  override def emitDataStructures(path: String) {")
     stream.println("    val s = File.separator")
-    stream.println("    val dsRoot = System.getProperty(\"user.dir\")+s+\"compiler\"+s+\"src\"+s+\""+dsl.toLowerCase()+"\"+s+\"datastruct\"+s+this.toString")
+    stream.println("    val dsRoot = System.getProperty(\"user.dir\")+s+\"compiler\"+s+\"src\"+s+"+packageDir+"+s+\"datastruct\"+s+this.toString")
     stream.println()
     stream.println("    val dsDir = Directory(Path(dsRoot))")
     stream.println("    val outDir = Directory(Path(path))")

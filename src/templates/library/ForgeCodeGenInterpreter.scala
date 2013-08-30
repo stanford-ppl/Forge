@@ -15,7 +15,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
   val IR: ForgeApplicationRunner with ForgeExp
   import IR._
 
-  lazy val packageName = dsl.toLowerCase() + ".library"
+  lazy val targetName = "library"
 
   def emitDSLImplementation() {
     Directory(Path(dslDir)).createDirectory()

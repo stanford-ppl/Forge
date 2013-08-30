@@ -102,7 +102,7 @@ trait OptiMLDSL extends OptiLADSL
         val prev = cur
         val next = block(cur)
         iter += 1
-        delta = diff(next,prev)
+        delta = diff(prev,next)
         cur = next
       }
 

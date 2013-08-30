@@ -16,7 +16,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
   val IR: ForgeApplicationRunner with ForgeExp
   import IR._
 
-  lazy val packageName = dsl.toLowerCase() + ".compiler"
+  lazy val targetName = "compiler"
 
   def makeEffectAnnotation(effect: EffectType, o: Rep[DSLOp]) = effect match {
     case `pure` => "reflectPure"

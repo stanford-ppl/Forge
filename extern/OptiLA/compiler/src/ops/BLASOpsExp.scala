@@ -1,4 +1,4 @@
-package optiml.compiler.ops
+package optila.compiler.ops
 
 import scala.tools.nsc.io._
 import scala.reflect.{Manifest,SourceContext}
@@ -15,11 +15,11 @@ import ppl.delite.framework.Config
 import ppl.delite.framework.extern.codegen.scala.ScalaGenExternalBase
 import ppl.delite.framework.extern.lib.MKL
 
-import optiml.shared._
-import optiml.shared.ops._
-import optiml.shared.typeclass._
-import optiml.compiler._
-import optiml.compiler.ops._
+import optila.shared._
+import optila.shared.ops._
+import optila.shared.typeclass._
+import optila.compiler._
+import optila.compiler.ops._
 
 /**
  * Currently, native operations are entirely specified in external files. This has more boilerplate compared to using
@@ -34,7 +34,7 @@ import optiml.compiler.ops._
  */
 
 trait BLASOpsExp extends BLASOps with DenseMatrixOpsExp {
-  this: OptiMLExp =>
+  this: OptiLAExp =>
 
   /**
    * Intercept BLAS-able operations
@@ -79,7 +79,7 @@ trait OpenCLGenBLASOps
 trait CGenBLASOps
 
 trait ScalaGenBLASOps extends ScalaGenExternalBase {
-  val IR: BLASOpsExp with OptiMLExp
+  val IR: BLASOpsExp with OptiLAExp
   import IR._
 
   // TODO: 'BLAS' is a Delite object right now, but to use it in the library impl, this needs to be refactored.

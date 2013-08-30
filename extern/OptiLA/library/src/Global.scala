@@ -1,4 +1,4 @@
-package optiml.library
+package optila.library
 
 /* Global values used in generated OptiLA code.
  *

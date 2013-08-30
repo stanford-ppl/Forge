@@ -149,26 +149,27 @@ def publish_dsl_extern(dsl, build_dir, scratch_dir, final_name):
     # we need to mirror the package layout convention defined in Forge
     all_targets = ['shared','compiler','library']
     targets = [t for t in all_targets if os.path.exists(build_dir + t + "/src/")]
+    tmp_dest = scratch_dir + dsl + "_extern/"            
     for t in targets:
         dest_root = t + "/"
         dest = dest_root + "src/" + final_name.lower() + "/" + t + "/"
         src_root = extern_dir + "/" + t  + "/"
         src = src_root + "src/"
-        
-        # dependencies need to have dsl names remapped
+               
         if dsl != final_name:
-            tmp_dest = scratch_dir + dsl + "_extern/"            
             if not os.path.exists(tmp_dest + dest):
                   os.makedirs(tmp_dest + dest)
             os.system("rsync -r " + src + " " + tmp_dest + dest)    
             os.system("rsync -q " + src_root + "*" + " " + tmp_dest + dest_root) 
-            rename_all(tmp_dest, {dsl: final_name, dsl.lower(): final_name.lower()})
-            os.system("rsync -r " + tmp_dest + " " + build_dir)
         else:
             os.system("rsync -r " + src + " " + build_dir + "/" + dest)    
             os.system("rsync -q " + src_root + "*" + " " + build_dir + "/" + dest_root) 
- 
 
+    if dsl != final_name:
+        # dependencies need to have dsl names remapped
+        rename_all(tmp_dest, {dsl: final_name, dsl.lower(): final_name.lower()})
+        os.system("rsync -r " + tmp_dest + " " + build_dir) 
+ 
 def publish(dsl, opts):
     global FORGE_HOME
     global FORGE_GENERATED

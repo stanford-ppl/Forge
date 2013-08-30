@@ -313,6 +313,8 @@ trait ScalaOps {
     impl (neq) (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
     impl (neq) (codegen(cuda, quotedArg(0) + " != " + quotedArg(1)))
     impl (neq) (codegen(cpp, quotedArg(0) + " != " + quotedArg(1)))
+    infix (Ord) ("!=", (A,B), (MVar(A),B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
+    infix (Ord) ("!=", (A,B), (A,MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
     infix (Ord) ("!=", (A,BC), (A,BC) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
     infix (Ord) ("!=", (AC,B), (AC,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
 
@@ -482,6 +484,9 @@ trait ScalaOps {
 
       // val makeTupleStr = "make_tuple"+arity+"("+elems.map(e => "$0."+e).mkString("(",",",")")+")"
       // fimplicit (TT) ("chain_make_tuple"+arity+"_var", pars, TT(pars: _*) :: CT(pars: _*)) implements composite ${ \$makeTupleStr }
+
+      val makeTupleStrStr = "\"(\"+" + (1 to arity).map(i => "t._"+i).mkString("+\",\"+") + "+\")\""
+      infix (TT) ("toString", pars, ("t",TT(pars: _*)) :: MString) implements composite ${ \$makeTupleStrStr }
     }
 
     // add implicits for Var combinations inside Tuple2s. We don't do this for all of them,

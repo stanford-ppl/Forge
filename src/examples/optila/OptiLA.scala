@@ -82,11 +82,65 @@ a1+b1
     importDenseVectorViewOps()
     importDenseVectorOps()
     importDenseMatrixOps()
+    importVecMatConstructor()
     importIOOps()
     importLinAlgOps()
 
     // native libs
     extern(grp("BLAS"))
     extern(grp("LAPACK"))
+  }
+
+  def importVecMatConstructor() {
+    val DenseVector = lookupTpe("DenseVector")
+    val IndexVector = lookupTpe("IndexVector")
+    val DenseMatrix = lookupTpe("DenseMatrix")
+    val T = tpePar("T")
+
+    // vector constructor (0 :: end) { ... }
+    noSourceContextList ::= "::" // surpress SourceContext implicit because it interferes with the 'apply' method being immediately callable
+    infix (IndexVector) ("::", Nil, ((("end", MInt), ("start", MInt)) :: IndexVector)) implements composite ${ IndexVector($start, $end) }
+
+    // should add apply directly to IndexVector, otherwise we have issues with ambiguous implicit conversions
+    infix (IndexVector) ("apply", T, (IndexVector, MInt ==> T)  :: DenseVector(T)) implements composite ${ $0.map($1) }
+
+    // matrix constructor (0::numRows,0::numCols) { ... }
+    infix (IndexVector) ("apply", T, (CTuple2(IndexVector,IndexVector), (MInt,MInt) ==> T) :: DenseMatrix(T)) implements composite ${
+      val (rowIndices,colIndices) = $0
+
+      // can fuse with flat matrix loops
+      val v = (0::rowIndices.length*colIndices.length).toDense
+      val indices = densematrix_fromarray(densevector_raw_data(v),rowIndices.length,colIndices.length)
+      indices map { i =>
+        val rowIndex = i / colIndices.length
+        val colIndex = i % colIndices.length
+        $1(rowIndex,colIndex)
+      }
+
+      // could fuse with nested matrix loops (loops over rowIndices), but not with loops directly over individual matrix elements -- like map!
+      // it seems best for us to be consistent: matrix loops should either all be flat or all be nested. which one? should we use lowerings?
+      // however, mutable version also supresses fusion due to unsafeImmutable...
+
+      // val out = DenseMatrix[T](rowIndices.length,colIndices.length)
+      // rowIndices foreach { i =>
+      //   colIndices foreach { j =>
+      //     out(i,j) = $1(i,j)
+      //   }
+      // }
+      // out.unsafeImmutable
+    }
+
+    val IndexWildcard = tpe("IndexWildcard", stage = compile)
+    identifier (IndexWildcard) ("*")
+
+    infix (IndexVector) ("apply", T, (CTuple2(IndexVector,IndexWildcard), MInt ==> DenseVector(T)) :: DenseMatrix(T)) implements composite ${
+      val rowIndices = $0._1
+      val first = $1(rowIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
+      val out = DenseMatrix[T](rowIndices.length,first.length)
+      rowIndices foreach { i =>
+        out(i) = $1(i)
+      }
+      out.unsafeImmutable
+    }
   }
 }

@@ -216,11 +216,12 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         stream.println(makeFieldsWithInitArgs(data))
         // Actually emitting the infix methods as instance methods, while a little more readable, makes the interpreter methods
         // ambiguous with the op conversions unless they already exist on every instance and must be overridden (e.g. toString)
-        for (o <- unique(opsGrp.ops) if overrideList.contains(o.name) && o.style == infixMethod && o.args.length > 0 && quote(o.args.apply(0).tpe) == quote(tpe)) {
-          stream.print("  "+makeDefWithOverride(o)+" " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
+        for (o <- unique(opsGrp.ops) if overrideList.contains(o.name) && !Impls(o).isInstanceOf[Redirect] && o.style == infixMethod && o.args.length > 0 && quote(o.args.apply(0).tpe) == quote(tpe)) {
+          val otherTpePars = o.tpePars.filterNot(p => data.tpe.tpePars.map(_.name).contains(p.name))
+          stream.print("  "+makeDefWithOverride(o)+" " + o.name + makeTpeParsWithBounds(otherTpePars))
           //stream.print("(" + o.args/*.drop(1)*/.map(t => t.name + ": " + repify(t.tpe) + " = " + unit(t.default)).mkString(",") + ")") TODO
           stream.print("(" + o.args.drop(1).map(t => argify(t, repify)).mkString(",") + ")")
-          stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = data.tpe.tpePars))
+          stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars diff otherTpePars, without = data.tpe.tpePars))
           stream.println(" = {")
           emitWithIndent("val " + o.args.apply(0).name + " = this", stream, 4)
           emitOp(o, stream, indent=4)

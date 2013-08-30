@@ -58,5 +58,15 @@ trait StringableOps {
 
     val DenseMatrixStringable = tpeClassInst("StringableDenseMatrix", T withBound TStringable, Stringable(DenseMatrix(T)))
     infix (DenseMatrixStringable) ("makeStr", Nil, DenseMatrix(T) :: MString) implements composite ${ $0.makeString }
+
+    // tuples of stringables
+    for (arity <- 2 until maxTuples) {
+      val Tup = lookupTpe("Tup"+arity)
+      val pars = (0 until arity).map(i => tpePar(('A'.toInt+i).toChar.toString) withBound TStringable).toList
+      val TupStringable = tpeClassInst("StringableTup"+arity, pars, Stringable(Tup))
+
+      val makeTupStr = "\"(\"+" + (1 to arity).map(i => "t._"+i+".makeStr").mkString("+\",\"+") + "+\")\""
+      infix (TupStringable) ("makeStr", pars, ("t",Tup) :: MString) implements composite ${ \$makeTupStr }
+    }
   }
 }

@@ -5,18 +5,8 @@
 set -e
 E_NOHOME=66
 
-# check env
-if [ -z "${FORGE_HOME+xxx}" ]; then echo error: FORGE_HOME is not defined; exit $E_NOHOME; fi
-if [ -z "$FORGE_HOME" -a "${FORGE_HOME+xxx}" = "xxx" ]; then echo error: FORGE_HOME is set but empty; exit $E_NOHOME; fi
-
-if [ -z "${DELITE_HOME+xxx}" ]; then echo error: DELITE_HOME is not defined; exit $E_NOHOME; fi
-if [ -z "$DELITE_HOME" -a "${DELITE_HOME+xxx}" = "xxx" ]; then echo error: DELITE_HOME is set but empty; exit $E_NOHOME; fi
-
-if [ -z "${LMS_HOME+xxx}" ]; then echo error: LMS_HOME is not defined; exit $E_NOHOME; fi
-if [ -z "$LMS_HOME" -a "${LMS_HOME+xxx}" = "xxx" ]; then echo error: LMS_HOME is set but empty; exit $E_NOHOME; fi
-
 usage() {
-  echo "Usage: `basename $0`"
+  echo "Usage: `basename $0` [-d <dsl> | -h]. Requires the FORGE_HOME, DELITE_HOME, and LMS_HOME environment variables to be set."
   echo "  -d \"fully.qualified.DSLApplicationRunner DSLName\"       generate dsl <DSLName> after upgrading"
   echo "  -h                                                      print usage"
   exit $E_BADARGS
@@ -34,6 +24,16 @@ do
   esac
 done
 shift $(($OPTIND - 1))
+
+# check env
+if [ -z "${FORGE_HOME+xxx}" ]; then echo error: FORGE_HOME is not defined; exit $E_NOHOME; fi
+if [ -z "$FORGE_HOME" -a "${FORGE_HOME+xxx}" = "xxx" ]; then echo error: FORGE_HOME is set but empty; exit $E_NOHOME; fi
+
+if [ -z "${DELITE_HOME+xxx}" ]; then echo error: DELITE_HOME is not defined; exit $E_NOHOME; fi
+if [ -z "$DELITE_HOME" -a "${DELITE_HOME+xxx}" = "xxx" ]; then echo error: DELITE_HOME is set but empty; exit $E_NOHOME; fi
+
+if [ -z "${LMS_HOME+xxx}" ]; then echo error: LMS_HOME is not defined; exit $E_NOHOME; fi
+if [ -z "$LMS_HOME" -a "${LMS_HOME+xxx}" = "xxx" ]; then echo error: LMS_HOME is set but empty; exit $E_NOHOME; fi
 
 echo "Are you sure you want to upgrade the LMS, Delite, and Forge repositories to their latest version? [Y/n]"
 read ans

@@ -77,7 +77,6 @@ def checkEnv():
           lms_home = FORGE_HOME + "/lib_managed/jars/EPFL/" + lms_version + "/"
           if not os.path.isdir(lms_home):
               err("couldn't find the LMS library at: " + lms_home + ". Please set the LMS_HOME environment variable.")
-          LMS_HOME = lms_home
 
 def printEnv():
     print("======== REQUIRED METADSL ENVIRONMENT VARIABLES =========")
@@ -101,7 +100,10 @@ def stage(runner, params, opts):
 
     #add classpaths
     cp = " -cp "
-    cp = cp + LMS_HOME + "/*" + os.pathsep
+    if LMS_HOME is None:
+        cp = cp + FORGE_HOME + "/lib_managed/jars/EPFL/" + lms_version + "/*" + os.pathsep
+    else:
+        cp = cp + LMS_HOME + "/target/" + scala_major_id + "/classes" + os.pathsep
     cp = cp + FORGE_HOME + "/target/" + scala_major_id + "/classes" + os.pathsep
 
     #scala-virt cp

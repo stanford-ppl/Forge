@@ -522,6 +522,7 @@ trait DenseMatrixOps {
    */
   def importDenseMatrixPrimitiveOps() {
     val DenseMatrix = lookupTpe("DenseMatrix")
+    val DenseVector = lookupTpe("DenseVector")
 
     // the conversions here will be costly unless things fuse. alternatively, we could convert element by element.
 
@@ -602,6 +603,15 @@ trait DenseMatrixOps {
     infix (DenseMatrix) ("*", Nil, (DenseMatrix(MDouble),DenseMatrix(MInt)) :: DenseMatrix(MDouble)) implements redirect ${ densematrix_matmult[Double]($0,$1.toDouble) }
     infix (DenseMatrix) ("*", Nil, (DenseMatrix(MDouble),DenseMatrix(MFloat)) :: DenseMatrix(MDouble)) implements redirect ${ densematrix_matmult[Double]($0,$1.toDouble) }
     infix (DenseMatrix) ("*", Nil, (DenseMatrix(MDouble),DenseMatrix(MDouble)) :: DenseMatrix(MDouble)) implements redirect ${ densematrix_matmult[Double]($0,$1) }
+    infix (DenseMatrix) ("*", Nil, (DenseMatrix(MInt),DenseVector(MInt)) :: DenseVector(MInt)) implements redirect ${ densematrix_matvecmult[Int]($0,$1) }
+    infix (DenseMatrix) ("*", Nil, (DenseMatrix(MInt),DenseVector(MFloat)) :: DenseVector(MFloat)) implements redirect ${ densematrix_matvecmult[Float]($0.toFloat,$1) }
+    infix (DenseMatrix) ("*", Nil, (DenseMatrix(MInt),DenseVector(MDouble)) :: DenseVector(MDouble)) implements redirect ${ densematrix_matvecmult[Double]($0.toDouble,$1) }
+    infix (DenseMatrix) ("*", Nil, (DenseMatrix(MFloat),DenseVector(MInt)) :: DenseVector(MFloat)) implements redirect ${ densematrix_matvecmult[Float]($0,$1.toFloat) }
+    infix (DenseMatrix) ("*", Nil, (DenseMatrix(MFloat),DenseVector(MFloat)) :: DenseVector(MFloat)) implements redirect ${ densematrix_matvecmult[Float]($0,$1) }
+    infix (DenseMatrix) ("*", Nil, (DenseMatrix(MFloat),DenseVector(MDouble)) :: DenseVector(MDouble)) implements redirect ${ densematrix_matvecmult[Double]($0.toDouble,$1) }
+    infix (DenseMatrix) ("*", Nil, (DenseMatrix(MDouble),DenseVector(MInt)) :: DenseVector(MDouble)) implements redirect ${ densematrix_matvecmult[Double]($0,$1.toDouble) }
+    infix (DenseMatrix) ("*", Nil, (DenseMatrix(MDouble),DenseVector(MFloat)) :: DenseVector(MDouble)) implements redirect ${ densematrix_matvecmult[Double]($0,$1.toDouble) }
+    infix (DenseMatrix) ("*", Nil, (DenseMatrix(MDouble),DenseVector(MDouble)) :: DenseVector(MDouble)) implements redirect ${ densematrix_matvecmult[Double]($0,$1) }
     infix (DenseMatrix) ("*:*", Nil, (DenseMatrix(MInt),DenseMatrix(MInt)) :: DenseMatrix(MInt)) implements redirect ${ densematrix_mulclnmul[Int]($0,$1) }
     infix (DenseMatrix) ("*:*", Nil, (DenseMatrix(MInt),DenseMatrix(MFloat)) :: DenseMatrix(MFloat)) implements redirect ${ densematrix_mulclnmul[Float]($0.toFloat,$1) }
     infix (DenseMatrix) ("*:*", Nil, (DenseMatrix(MInt),DenseMatrix(MDouble)) :: DenseMatrix(MDouble)) implements redirect ${ densematrix_mulclnmul[Double]($0.toDouble,$1) }

@@ -16,7 +16,7 @@ JAVA_HOME = os.getenv("JAVA_HOME")
 
 scala_virt_prefix = "org.scala-lang.virtualized."
 scala_virt_version = "scala-2.10.2-RC1"
-scala_major_id = '.'.join(scala_virt_version.split('.')[0:2]) 
+scala_major_id = '.'.join(scala_virt_version.split('.')[0:2])
 lms_version = "lms_2.10"
 props = {}
 
@@ -40,11 +40,11 @@ def main():
     (opts, args) = parser.parse_args()
     if len(args) < 1:
         parser.error("a dsl runner must be passed to forge as an argument")
-    
+
     initialize()
     checkEnv()
     stage(args[0], args[1:len(args)], opts)
- 
+
 def initialize():
     pass
 
@@ -54,7 +54,7 @@ def checkEnv():
     global JAVA_HOME
     global SCALA_VIRT_HOME
     global LMS_HOME
-     
+
     if FORGE_HOME is None:
         #try to check if it is the current directory
         script_path = os.path.dirname(__file__)
@@ -62,7 +62,7 @@ def checkEnv():
         if os.path.isfile(cand_home + "/forge.key"):
             FORGE_HOME = cand_home
         else:
-            err("The FORGE_HOME environment variable must be defined") 
+            err("The FORGE_HOME environment variable must be defined")
 
     if JAVA_HOME is None:
         err("The JAVA_HOME environment variable must be defined.")
@@ -71,25 +71,24 @@ def checkEnv():
         scala_virt_home = USER_HOME + "/.sbt/boot/" + scala_virt_prefix + scala_virt_version + "/lib/"
         if not os.path.isdir(scala_virt_home):
             err("couldn't find scala virtualized at: " + scala_virt_prefix + scala_virt_home + ". Please set the SCALA_VIRT_HOME environment variable.")
-        SCALA_VIRT_HOME = scala_virt_home 
-    
+        SCALA_VIRT_HOME = scala_virt_home
+
     if LMS_HOME is None:
           lms_home = FORGE_HOME + "/lib_managed/jars/EPFL/" + lms_version + "/"
           if not os.path.isdir(lms_home):
               err("couldn't find the LMS library at: " + lms_home + ". Please set the LMS_HOME environment variable.")
-          LMS_HOME = lms_home
 
 def printEnv():
     print("======== REQUIRED METADSL ENVIRONMENT VARIABLES =========")
     print("USER_HOME = " + USER_HOME)
     print("FORGE_HOME = " + FORGE_HOME)
     print("JAVA_HOME = " + JAVA_HOME)
-    print("SCALA_VIRT_HOME = " + SCALA_VIRT_HOME) 
+    print("SCALA_VIRT_HOME = " + SCALA_VIRT_HOME)
     print("LMS_HOME = " + LMS_HOME)
 
 def stage(runner, params, opts):
     java_opts = os.getenv("JAVA_OPTS", "")
-    java_opts = java_opts + " -server" 
+    java_opts = java_opts + " -server"
     if opts.fast_compile == True:
       java_opts = java_opts + " -Dforge.fast.compile=true"
     if opts.gen_ident == True:
@@ -98,16 +97,19 @@ def stage(runner, params, opts):
       java_opts = java_opts + " -Dforge.gen.delite=false"
     if opts.gen_lib == False:
       java_opts = java_opts + " -Dforge.gen.lib=false"
-    
-    #add classpaths 
+
+    #add classpaths
     cp = " -cp "
-    cp = cp + LMS_HOME + "/*" + os.pathsep
+    if LMS_HOME is None:
+        cp = cp + FORGE_HOME + "/lib_managed/jars/EPFL/" + lms_version + "/*" + os.pathsep
+    else:
+        cp = cp + LMS_HOME + "/target/" + scala_major_id + "/classes" + os.pathsep
     cp = cp + FORGE_HOME + "/target/" + scala_major_id + "/classes" + os.pathsep
-    
+
     #scala-virt cp
     cp = cp + SCALA_VIRT_HOME + "/scala-library.jar" + os.pathsep
     cp = cp + SCALA_VIRT_HOME + "/scala-compiler.jar" + os.pathsep
-    cp = cp + SCALA_VIRT_HOME + "/scala-reflect.jar" 
+    cp = cp + SCALA_VIRT_HOME + "/scala-reflect.jar"
 
     java_opts = java_opts + cp
     #os.putenv("JAVA_OPTS", java_opts)

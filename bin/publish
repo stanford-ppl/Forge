@@ -23,15 +23,16 @@ def main():
     parser = OptionParser(usage)
     parser.add_option("-d", "--dest", action="store", dest="build_dir", default=os.getenv("PWD")+"/published/", help="directory to publish generated DSL")
     parser.add_option("-c", "--clean", action="store_true", dest="build_clean", default=False, help="nuke the build directory if it already exists")
+    parser.add_option("--clean-extern", action="store_true", dest="extern_clean", default=False, help="always republish extern files")
 
     (opts, args) = parser.parse_args()
     if len(args) < 1:
         parser.error("a dsl name must be passed to publish as an argument")
-    
+
     initialize()
     checkEnv()
     publish(args[0], opts)
- 
+
 def initialize():
     pass
 
@@ -45,8 +46,8 @@ def checkEnv():
         if os.path.isfile(cand_home + "/forge.key"):
             FORGE_HOME = cand_home
         else:
-            err("The FORGE_HOME environment variable must be defined") 
- 
+            err("The FORGE_HOME environment variable must be defined")
+
 def printEnv():
     print("======== REQUIRED FORGE PUBLISH ENVIRONMENT VARIABLES =========")
     print("FORGE_HOME = " + FORGE_HOME)
@@ -62,7 +63,7 @@ object ${dslName}Build extends Build {
   val delite_runtime = "stanford-ppl" % "runtime_2.10" % "0.1-SNAPSHOT"
 
   val virtScala = "2.10.2-RC1"
-  val virtBuildSettingsBase = Defaults.defaultSettings ++ Seq(
+  val virtBuildSettingsBase = Project.defaultSettings ++ Seq(
     organization := "stanford-ppl",
     scalaOrganization := "org.scala-lang.virtualized",
     scalaVersion := virtScala,
@@ -96,9 +97,85 @@ object ${dslName}Build extends Build {
 """)
     return s.substitute(dslName=dsl, dslNameLowerCase=dsl.lower())
 
+def get_files(path):
+    return [d + "/" + f for (d, n, fs) in os.walk(path) for f in fs] 
+
+def check_conflict(base_dir, generated_dir):
+    base = set(get_files(base_dir))
+    gen = set(get_files(generated_dir))
+    intersect = base.intersection(gen)
+    if (len(intersect) != 0):
+        for f in intersect:
+            err("extern file " + f + " conflicts with generated file")
+
+def rename_all(src, mappings):
+    replfiles = get_files(src)
+    infiles = fileinput.FileInput(replfiles, inplace = 1)
+    for line in infiles:
+        for orig,repl in mappings.iteritems():
+          line = line.replace(orig,repl)          
+        sys.stdout.write(line)
+
+def publish_static_extern(dsl, build_dir, scratch_dir):
+    static_dir = FORGE_HOME + "/static/extern/"
+    check_conflict(static_dir, build_dir)
+
+    # copy and perform name replacement of static extern files on the fly        
+    os.system("rsync -r " + static_dir + " " + scratch_dir)
+    rename_all(scratch_dir, {'HUMAN_DSL_NAME': dsl, 'LOWERCASE_DSL_NAME': dsl.lower()})
+    
+    # we need to mirror the package layout convention defined in Forge
+    all_targets = ['shared','compiler','library']
+    targets = [t for t in all_targets if os.path.exists(build_dir + t + "/src/")]
+    for t in targets:
+        dest_root = t + "/"
+        dest = dest_root + "src/" + dsl.lower() + "/" + t + "/"
+        src_root = scratch_dir + "/" + t  + "/"
+        src = src_root + "src/" 
+        os.system("rsync -r " + src + " " + build_dir + "/" + dest)    
+        os.system("rsync -q " + src_root + "*" + " " + build_dir + "/" + dest_root) 
+
+def publish_dsl_extern(dsl, build_dir, scratch_dir, final_name):
+    extern_dir = FORGE_HOME + "/extern/" + dsl + "/"  
+    if not os.path.exists(extern_dir):
+        return
+    check_conflict(extern_dir, build_dir)
+
+    # recursively publish dependencies
+    if os.path.exists(extern_dir + ".dependencies"):
+        for line in open(extern_dir + ".dependencies"):
+          publish_dsl_extern(line.rstrip("\n"), build_dir, scratch_dir, final_name)
+
+    # we need to mirror the package layout convention defined in Forge
+    all_targets = ['shared','compiler','library']
+    targets = [t for t in all_targets if os.path.exists(build_dir + t + "/src/")]
+    tmp_dest = scratch_dir + dsl + "_extern/"            
+    for t in targets:
+        dest_root = t + "/"
+        dest = dest_root + "src/" + final_name.lower() + "/" + t + "/"
+        src_root = extern_dir + "/" + t  + "/"
+        src = src_root + "src/"
+               
+        if dsl != final_name:
+            if not os.path.exists(tmp_dest + dest):
+                  os.makedirs(tmp_dest + dest)
+            os.system("rsync -r " + src + " " + tmp_dest + dest)    
+            os.system("rsync -q " + src_root + "*" + " " + tmp_dest + dest_root) 
+        else:
+            os.system("rsync -r " + src + " " + build_dir + "/" + dest)    
+            os.system("rsync -q " + src_root + "*" + " " + build_dir + "/" + dest_root) 
+
+    if dsl != final_name:
+        # dependencies need to have dsl names remapped
+        rename_all(tmp_dest, {dsl: final_name, dsl.lower(): final_name.lower()})
+        os.system("rsync -r " + tmp_dest + " " + build_dir) 
+ 
 def publish(dsl, opts):
-    generatedRoot = FORGE_HOME + "/" + FORGE_GENERATED + "/" + dsl + "/"
-    if not os.path.isdir(generatedRoot):
+    global FORGE_HOME
+    global FORGE_GENERATED
+
+    generated_root = FORGE_HOME + "/" + FORGE_GENERATED + "/" + dsl + "/"
+    if not os.path.isdir(generated_root):
         err("could not find generated DSL " + dsl + ". (did you forget to run forge?)")
 
     build_dir = opts.build_dir + "/" + dsl + "/"
@@ -112,31 +189,17 @@ def publish(dsl, opts):
     # source code
     os.system("rsync -r " + FORGE_GENERATED + "/" + dsl + "/" + " " + build_dir)
 
-    all_targets = ['shared','compiler','library']
-    targets = [t for t in all_targets if os.path.exists(build_dir + t + "/src/")]
-    for t in targets:
-        static = FORGE_HOME + "/static/extern/" + t + "/src/"
-        src = FORGE_HOME + "/extern/" + dsl + "/" + t + "/src/"
-
-        # check for extern conflicts
-        check = os.listdir(static)
-        if (os.path.exists(src)):
-            check = check + os.listdir(src)
-        for f in check:
-            if os.path.exists(generatedRoot + f):
-                err("extern file " + f + " conflicts with generated file " + generatedRoot + f)
-
-        dest = build_dir + t + "/src/" + dsl.lower() + "/"
-        if not os.path.exists(dest):
-            os.mkdir(dest)
-        if os.path.exists(src):
-            os.system("rsync -r " + src + " " + dest)
-        os.system("rsync -r " + static + " " + dest)
-        # perform name replacement on all generated files
-        replfiles = [d + "/" + f for (d, n, fs) in os.walk(dest) for f in fs]
-        for line in fileinput.input(replfiles, inplace = 1):
-            sys.stdout.write(line.replace("HUMAN_DSL_NAME", dsl).replace("LOWERCASE_DSL_NAME", dsl.lower()))
-          
+    # extern
+    scratch_dir = FORGE_GENERATED + "/.scratch/"
+    # in the common case, extern dependencies don't change - so we
+    # only republish it if the scratch directory does not exist                
+    if not os.path.exists(scratch_dir) or opts.extern_clean:
+        if not os.path.exists(scratch_dir):
+            os.makedirs(scratch_dir)
+        publish_static_extern(dsl, build_dir, scratch_dir)
+        publish_dsl_extern(dsl, build_dir, scratch_dir, dsl)
+    
+    # apps
     os.system("rsync -r " + FORGE_HOME + "/apps/" + dsl + "/" + " " + build_dir + "/apps/")
 
     # sbt project
@@ -145,7 +208,7 @@ def publish(dsl, opts):
         buildFile = open(build_dir + "/project/Build.scala", 'w')
         buildFile.write(sbtBuildFile(dsl))
         buildFile.close()
-    
+
     # executable scripts
     if not os.path.exists(build_dir + "/bin/"):
         os.mkdir(build_dir + "/bin/")
@@ -160,6 +223,6 @@ def publish(dsl, opts):
         shutil.copyfile(FORGE_HOME + "/static/delitecommon-wrapper.py", build_dir+"/bin/delitecommon.py")
 
     print "[forge]: Publishing complete. Don't forget to run 'sbt publish-local' from your DELITE_HOME for the framework and runtime modules before compiling your new DSL."
-  
+
 if __name__ == "__main__":
     main()

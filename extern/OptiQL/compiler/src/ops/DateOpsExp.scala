@@ -20,7 +20,7 @@ import optiql.compiler.ops._
  */
 
 trait DateOpsExp extends DateCompilerOps with BaseFatExp with DeliteStructsExp {
-  this: OptiQLExp => 
+  this: OptiQLExp =>
 
   case class Date5Object_Apply(__arg0: Rep[String])(implicit val __pos: SourceContext) extends DeliteOpSingleTask[Date](reifyEffectsHere(date_object_apply_impl5(__arg0)(__pos)))
 
@@ -110,5 +110,5 @@ trait ScalaGenDateOps extends ScalaGenDeliteStruct {
   }
 }
 trait CudaGenDateOps
-trait OpenCLGenDateOps 
+trait OpenCLGenDateOps
 trait CGenDateOps

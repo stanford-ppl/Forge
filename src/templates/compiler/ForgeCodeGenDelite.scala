@@ -12,12 +12,12 @@ import core._
 import shared._
 import Utilities._
 
-trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with DeliteGenDataStructures with DeliteGenOps with DeliteGenImports {  
-  val IR: ForgeApplicationRunner with ForgeExp  
+trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with DeliteGenDataStructures with DeliteGenOps with DeliteGenImports {
+  val IR: ForgeApplicationRunner with ForgeExp
   import IR._
-  
-  lazy val packageName = dsl.toLowerCase() + ".compiler"
-    
+
+  lazy val targetName = "compiler"
+
   def makeEffectAnnotation(effect: EffectType, o: Rep[DSLOp]) = effect match {
     case `pure` => "reflectPure"
     case `mutable` => "reflectMutable"
@@ -25,52 +25,52 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     case write(args @ _*) => "reflectWrite(" + args.map(i => o.args.apply(i).name).mkString(",") + ")"
     case `global` => err("TODO")
   }
-  
+
   def makeFrequencyAnnotation(freq: Frequency) = freq match {
     case `normal` => "freqNormal"
     case `hot` => "freqHot"
     case `cold` => "freqCold"
   }
-  
+
   def blockify(a: Exp[Any]): String = a match {
     case Def(Arg(name, tpe, default)) => blockify(tpe)
     case Def(FTpe(args,ret,freq)) => "Block[" + quote(ret) + "]"
     case _ => repify(a)
   }
-    
+
   def emitDSLImplementation() = {
-    Directory(Path(dslDir)).createDirectory()    
+    Directory(Path(dslDir)).createDirectory()
     emitDSLDefinition()
     // emitDataStructures()
     emitOps()
   }
-  
-  def emitDSLDefinition() {    
-    val dslStream = new PrintWriter(new FileWriter(dslDir+dsl+".scala"))    
+
+  def emitDSLDefinition() {
+    val dslStream = new PrintWriter(new FileWriter(dslDir+dsl+".scala"))
     val genOps = OpsGrp.filterNot(t => isTpeClass(t._1) || isTpeClassInst(t._1)).values.toList
     dslStream.println("package " + packageName)
     dslStream.println()
     emitAllImports(dslStream)
     dslStream.println()
     emitApplicationRunner(dslStream)
-    dslStream.println()    
+    dslStream.println()
     emitDSLPackageDefinitions(genOps, dslStream)
     dslStream.println()
     emitDSLCodeGeneratorPackageDefinitions(genOps, dslStream)
-    dslStream.close()    
+    dslStream.close()
   }
-  
+
   // def emitDataStructures() {
   //   val dataDir = dslDir + File.separator + "datastruct"
   //   Directory(Path(dataDir)).createDirectory()
-  //   emitStructs(dataDir)    
+  //   emitStructs(dataDir)
   // }
-  
+
   def emitOps() {
     val opsDir = dslDir + File.separator + "ops"
     Directory(Path(opsDir)).createDirectory()
-    
-    // 1 file per tpe, includes Ops, OpsExp, and Gen, plus an additional Impl file if the group contains SingleTask and Composite ops      
+
+    // 1 file per tpe, includes Ops, OpsExp, and Gen, plus an additional Impl file if the group contains SingleTask and Composite ops
     for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp)) {
       val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsExp"+".scala"))
       stream.println("package " + packageName + ".ops")
@@ -84,18 +84,18 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
       stream.println()
       if (opsGrp.ops.exists(o => Impls(o).isInstanceOf[SingleTask] || Impls(o).isInstanceOf[Composite])) {
         val implStream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsImpl"+".scala"))
-        implStream.println("package " + packageName + ".ops")        
+        implStream.println("package " + packageName + ".ops")
         implStream.println()
         emitScalaReflectImports(implStream)
         implStream.println("import " + packageName + "." + dsl + "Compiler")
-        implStream.println("import " + dsl.toLowerCase() + ".shared." + dsl + "Lift") // TODO: not encapsulated        
+        implStream.println("import " + dsl.toLowerCase() + ".shared." + dsl + "Lift") // TODO: not encapsulated
         implStream.println()
         emitImpls(opsGrp, implStream)
         implStream.close()
       }
-      emitOpCodegen(opsGrp, stream)        
+      emitOpCodegen(opsGrp, stream)
       stream.close()
-    }                
-  }    
+    }
+  }
 }
 

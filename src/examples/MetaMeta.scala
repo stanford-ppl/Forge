@@ -11,9 +11,9 @@ object MetaMetaDSLRunner extends ForgeApplicationRunner with MetaMetaDSL
  */
 trait MetaMetaDSL extends ForgeApplication {
   def dslName = "MetaMeta"
-  
+
   def specification() = {
     importAuto[java.lang.String]
   }
 }
- 
+

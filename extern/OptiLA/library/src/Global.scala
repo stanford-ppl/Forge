@@ -1,4 +1,4 @@
-package optiml.compiler.datastruct.scala
+package optila.library
 
 /* Global values used in generated OptiLA code.
  *

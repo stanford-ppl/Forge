@@ -6,7 +6,7 @@ import scala.virtualization.lms.common._
 
 trait ProfilingWrapper extends HUMAN_DSL_NAMEBase {
   val componentTimes = scala.collection.mutable.HashMap[String,Long]()
-  
+
   def forge_profile_start(component: Rep[String], deps: Seq[Rep[Any]])(implicit ctx: SourceContext): Rep[Unit] = {
     componentTimes(component) = System.currentTimeMillis()
   }

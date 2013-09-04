@@ -31,7 +31,7 @@ mkdir -p ./apps/$fullname/src # remove src here? TODO
 # copy over template DSLs
 
 cp ./static/TemplateDSL.scala ./src/examples/${fullname}.scala
-cp -r ./static/apps/* ./apps/$fullname/ 
+cp -r ./static/apps/* ./apps/$fullname/
 
 # Insert DSL name in the appropriate place
 
@@ -43,7 +43,7 @@ find ./src/examples -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$low
 
 # test compilation
 # todo - check errors?
-if [ "$2" == "--test" ] 
+if [ "$2" == "--test" ]
 then
   ./bin/update ppl.dsl.forge.examples.${fullname}DSLRunner ${fullname}
   cd published/${fullname}

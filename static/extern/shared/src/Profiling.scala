@@ -11,6 +11,6 @@ trait ProfilingOps extends Base {
   def toc(component: Rep[String], deps: Rep[Any]*)(implicit ctx: SourceContext) = forge_profile_stop(component, deps)
 
   def forge_profile_start(component: Rep[String], deps: Seq[Rep[Any]])(implicit ctx: SourceContext): Rep[Unit]
-  def forge_profile_stop(component: Rep[String], deps: Seq[Rep[Any]])(implicit ctx: SourceContext): Rep[Unit]  
+  def forge_profile_stop(component: Rep[String], deps: Seq[Rep[Any]])(implicit ctx: SourceContext): Rep[Unit]
 }
 trait ProfilingCompilerOps extends ProfilingOps

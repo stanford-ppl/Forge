@@ -6,12 +6,12 @@ from sys import argv
 import delitecommon
 
 ## a forwarder to the delite script in DELITE_HOME
-def main():  
+def main():
     usage = "usage: %prog <dsl runner> [delite args]"
 
     if len(argv) < 2:
         exit("a dsl runner must be passed as an argument")
- 
+
     dslRunner = argv[1]
     delitecommon.checkDeliteEnv()
 

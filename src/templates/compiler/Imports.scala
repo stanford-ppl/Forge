@@ -6,12 +6,12 @@ import java.io.PrintWriter
 import core._
 import shared.BaseGenImports
 
-trait DeliteGenImports extends BaseGenImports {  
+trait DeliteGenImports extends BaseGenImports {
   this: ForgeCodeGenDelite =>
-  
-  val IR: ForgeApplicationRunner with ForgeExp 
+
+  val IR: ForgeApplicationRunner with ForgeExp
   import IR._
-    
+
   def emitDeliteCollectionImports(stream: PrintWriter) {
     stream.println("import ppl.delite.framework.ops.DeliteCollection")
     stream.println("import ppl.delite.framework.datastructures._")
@@ -40,17 +40,17 @@ trait DeliteGenImports extends BaseGenImports {
     emitDelitePackageImports(stream)
     emitDeliteOpsImports(stream)
   }
-    
+
   override def emitDSLImports(stream: PrintWriter) {
     super.emitDSLImports(stream)
     stream.println("import " + packageName + "._")
     stream.println("import " + packageName + ".ops._")
-    // stream.println("import " + dsl.toLowerCase() + ".compiler.extern._")        
-  }  
- 
+    // stream.println("import " + dsl.toLowerCase() + ".compiler.extern._")
+  }
+
   override def emitAllImports(stream: PrintWriter) {
     super.emitAllImports(stream)
     emitLMSImports(stream)
-    emitDeliteImports(stream)   
-  } 
+    emitDeliteImports(stream)
+  }
 }

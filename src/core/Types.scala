@@ -8,7 +8,7 @@ abstract class TypeClassSignature {
   def prefix: String
   def wrapper: Option[String]
 }
-abstract class DSLGroup 
+abstract class DSLGroup
 abstract class DSLType extends DSLGroup
 abstract class DSLTypeClass extends DSLType
 abstract class DSLTypeClassInst extends DSLType

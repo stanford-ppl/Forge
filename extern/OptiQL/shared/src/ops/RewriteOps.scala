@@ -5,7 +5,7 @@ import optiql.shared._
 import optiql.shared.ops._
 import scala.reflect.{Manifest,SourceContext}
 
-trait RewriteOps 
+trait RewriteOps
 trait RewriteCompilerOps extends RewriteOps {
   this: OptiQL =>
 

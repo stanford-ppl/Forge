@@ -9,29 +9,29 @@ import core.{ForgeApplication,ForgeApplicationRunner}
  * This type class is necessary because the correct toString is not callable from within Delite.
  */
 trait StringableOps {
-  this: OptiLADSL => 
+  this: OptiLADSL =>
 
   object TStringable extends TypeClassSignature {
     def name = "Stringable"
     def prefix = "_str"
-    def wrapper = Some("strtype") 
-  }    
-  
+    def wrapper = Some("strtype")
+  }
+
   def importStringableOps() {
     val T = tpePar("T")
-    
+
     val Stringable = tpeClass("Stringable", TStringable, T)
-                
+
     // Stringable type class interface
-    infix (Stringable) ("makeStr", T, T :: MString)    
-    
+    infix (Stringable) ("makeStr", T, T :: MString)
+
     // primitive implementations
     val DoubleStringable = tpeClassInst("StringableDouble", Nil, Stringable(MDouble))
     infix (DoubleStringable) ("makeStr", Nil, MDouble :: MString) implements composite ${ "" + $0 }
 
     val FloatStringable = tpeClassInst("StringableFloat", Nil, Stringable(MFloat))
     infix (FloatStringable) ("makeStr", Nil, MFloat :: MString) implements composite ${ "" + $0 }
-    
+
     val IntStringable = tpeClassInst("StringableInt", Nil, Stringable(MInt))
     infix (IntStringable) ("makeStr", Nil, MInt :: MString) implements composite ${ "" + $0 }
 
@@ -58,5 +58,15 @@ trait StringableOps {
 
     val DenseMatrixStringable = tpeClassInst("StringableDenseMatrix", T withBound TStringable, Stringable(DenseMatrix(T)))
     infix (DenseMatrixStringable) ("makeStr", Nil, DenseMatrix(T) :: MString) implements composite ${ $0.makeString }
+
+    // tuples of stringables
+    for (arity <- 2 until maxTuples) {
+      val Tup = lookupTpe("Tup"+arity)
+      val pars = (0 until arity).map(i => tpePar(('A'.toInt+i).toChar.toString) withBound TStringable).toList
+      val TupStringable = tpeClassInst("StringableTup"+arity, pars, Stringable(Tup))
+
+      val makeTupStr = "\"(\"+" + (1 to arity).map(i => "t._"+i+".makeStr").mkString("+\",\"+") + "+\")\""
+      infix (TupStringable) ("makeStr", pars, ("t",Tup) :: MString) implements composite ${ \$makeTupStr }
+    }
   }
 }

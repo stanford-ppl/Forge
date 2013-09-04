@@ -1,0 +1,105 @@
+#!/bin/bash
+# upgrades the current LMS, Delite and Forge distribution
+
+# exit if any part of the script fails
+set -e
+E_NOHOME=66
+
+usage() {
+  echo "Usage: `basename $0` [-d <dsl> | -h]. Requires the FORGE_HOME, DELITE_HOME, and LMS_HOME environment variables to be set."
+  echo "  -d \"fully.qualified.DSLApplicationRunner DSLName\"       generate dsl <DSLName> after upgrading"
+  echo "  -h                                                      print usage"
+  exit $E_BADARGS
+}
+
+DSL_ARG=""
+
+while getopts “d:h” option
+do
+  case $option in
+    d) DSL_ARG="$OPTARG"
+       ;;
+    h) usage
+       ;;
+  esac
+done
+shift $(($OPTIND - 1))
+
+# check env
+if [ -z "${FORGE_HOME+xxx}" ]; then echo error: FORGE_HOME is not defined; exit $E_NOHOME; fi
+if [ -z "$FORGE_HOME" -a "${FORGE_HOME+xxx}" = "xxx" ]; then echo error: FORGE_HOME is set but empty; exit $E_NOHOME; fi
+
+if [ -z "${DELITE_HOME+xxx}" ]; then echo error: DELITE_HOME is not defined; exit $E_NOHOME; fi
+if [ -z "$DELITE_HOME" -a "${DELITE_HOME+xxx}" = "xxx" ]; then echo error: DELITE_HOME is set but empty; exit $E_NOHOME; fi
+
+if [ -z "${LMS_HOME+xxx}" ]; then echo error: LMS_HOME is not defined; exit $E_NOHOME; fi
+if [ -z "$LMS_HOME" -a "${LMS_HOME+xxx}" = "xxx" ]; then echo error: LMS_HOME is set but empty; exit $E_NOHOME; fi
+
+echo "Are you sure you want to upgrade the LMS, Delite, and Forge repositories to their latest version? [Y/n]"
+read ans
+if [ "$ans" != "Y" ];
+then
+  exit
+fi  
+
+# begin upgrade
+pushd .
+
+# LMS
+echo "cd $LMS_HOME"
+cd "$LMS_HOME"
+echo "git pull"
+git pull
+echo "sbt publish-local"
+sbt publish-local
+
+# Delite
+echo "cd $DELITE_HOME"
+cd "$DELITE_HOME"
+echo "git pull"
+git pull
+echo "sbt \"; update; project runtime; publish-local; project framework; publish-local\""
+sbt "; update; project runtime; publish-local; project framework; publish-local"
+
+# Forge
+echo "cd $FORGE_HOME"
+cd "$FORGE_HOME"
+echo "git pull"
+git pull
+echo "sbt update"
+sbt update
+
+# dsl
+if [ "$DSL_ARG" != "" ];
+then
+  DSL_RUNNER=`echo "$DSL_ARG" | cut -d " " -f 1`
+  DSL_NAME=`echo "$DSL_ARG" | cut -d " " -f 2`
+  if [ "$DSL_RUNNER" == "" ] || [ "$DSL_NAME" == "" ];
+  then
+    echo "invalid DSL arguments: $DSL_RUNNER, $DSL_NAME"
+    exit $E_BADARGS
+  fi
+
+  # backup previous published DSL directory, if it exists
+  BUILD_DIR="published" $TODO
+  DSL_DIR="$BUILD_DIR/$DSL_NAME"
+  BACKUP_DIR="$BUILD_DIR/backup"
+  if [ -e "$DSL_DIR" ];
+  then
+    echo "backing up previous version $DSL_DIR to $BACKUP_DIR/$DSL_NAME"
+    if [ ! -e "$BACKUP_DIR" ];
+    then
+      echo "mkdir -p \"$BACKUP_DIR\""
+      mkdir -p "$BACKUP_DIR"
+    fi
+    echo "cp -r \"$DSL_DIR\" \"$BACKUP_DIR/$DSL_NAME\""
+    cp -r "$DSL_DIR" "$BACKUP_DIR/$DSL_NAME"
+  fi
+
+  echo "bin/update -c $DSL_RUNNER $DSL_NAME"
+  bin/update -c "$DSL_RUNNER" "$DSL_NAME"
+fi
+
+echo "[forge]: upgrade complete!"
+
+popd

@@ -17,16 +17,16 @@ import Utilities._
  */
 
 // should we try to make use of LMS platform-specific generators here? anything we can gain?
-trait DeliteGenDataStructures extends BaseGenDataStructures { 
+trait DeliteGenDataStructures extends BaseGenDataStructures {
   this: ForgeCodeGenDelite =>
-   
+
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
   import IR._
-    
+
   def emitScalaStructs(path: String) {
     val scalaPath = path+File.separator+"scala"+File.separator
     Directory(Path(scalaPath)).createDirectory()
-    for ((t,s) <- DataStructs) {        
+    for ((t,s) <- DataStructs) {
       val stream = new PrintWriter(new FileWriter(scalaPath+s.tpe.name+".scala"))
       stream.println("package " + packageName + ".datastruct.scala")
       stream.println()
@@ -36,13 +36,13 @@ trait DeliteGenDataStructures extends BaseGenDataStructures {
       stream.close()
     }
   }
-  
+
   def emitStructs(path: String) {
     for (g <- generators) {
       g match {
         case `$cala` => emitScalaStructs(path)
         case _ => // not implemented yet
-      }        
+      }
     }
   }
 }

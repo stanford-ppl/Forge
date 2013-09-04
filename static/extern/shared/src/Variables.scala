@@ -14,5 +14,5 @@ import scala.virtualization.lms.common._
 trait LiftVar extends LiftVariables {
   this: VarOps =>
 }
-trait VarOps extends Variables 
+trait VarOps extends Variables
 trait VarCompilerOps extends VarOps

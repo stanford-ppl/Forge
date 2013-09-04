@@ -7,7 +7,7 @@ import scala.collection.mutable.HashMap
 
 trait RecordWrapper extends HUMAN_DSL_NAMEBase {
   this: StructOps =>
-  
+
   class RecordImpl extends Record {
     val fields: HashMap[String,Any] = new HashMap()
   }
@@ -30,7 +30,7 @@ trait RecordWrapper extends HUMAN_DSL_NAMEBase {
       case Some(f) =>
         //println("found field " + f)
         f.asInstanceOf[Rep[T]]
-      case None => 
+      case None =>
         sys.error("field " + field + " does not exist")
     }
   }

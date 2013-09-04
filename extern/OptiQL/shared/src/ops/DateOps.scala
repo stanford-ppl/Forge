@@ -41,7 +41,7 @@ trait DateOps extends Base with GenOverloadHack {
   def date_gteq(self: Rep[Date],__arg0: Rep[Date])(implicit __pos: SourceContext,__imp1: Overload1): Rep[Boolean]
 }
 trait DateCompilerOps extends DateOps {
-  this: OptiQL => 
+  this: OptiQL =>
 
   def date_value(self: Rep[Date])(implicit __pos: SourceContext): Rep[Int]
 }

@@ -5,15 +5,15 @@ import optiml.shared._
 object GDACompiler extends OptiMLApplicationCompiler with GDA
 object GDAInterpreter extends OptiMLApplicationInterpreter with GDA
 
-trait GDA extends OptiMLApplication { 
+trait GDA extends OptiMLApplication {
   def printUsage = {
     println("Usage: GDA <input data file> <output label data file>")
     exit(-1)
   }
-  
+
   def main() = {
     if (args.length < 2) printUsage
-    
+
     val x = readMatrix(args(0))
     val y = readVector(args(1)).map(d => if (d <= 0.0) false else true)
     tic()
@@ -31,11 +31,11 @@ trait GDA extends OptiMLApplication {
      * phi is a scalar, mu0 and mu1 are n dimensional vectors,
      * where n is the width of x, and sigma is an n x n matrix.
      */
-    val y_zeros = y count { _ == false } 
+    val y_zeros = y count { _ == false }
     val y_ones = y count { _ == true }
-    val mu0_num = sumRowsIf(0,m) { !y(_) } { x(_) } 
-    val mu1_num = sumRowsIf(0,m) { y(_) } { x(_) } 
-    
+    val mu0_num = sumRowsIf(0,m) { !y(_) } { x(_) }
+    val mu1_num = sumRowsIf(0,m) { y(_) } { x(_) }
+
     val phi = 1./m * y_ones
     val mu0 = mu0_num / y_zeros
     val mu1 = mu1_num / y_ones
@@ -55,6 +55,6 @@ trait GDA extends OptiMLApplication {
     println("  phi = " + phi)
     println("  mu0 = " ); mu0.pprint
     println("  mu1 = " ); mu1.pprint
-    println("  sigma = "); sigma.sliceRows(0,10).pprint    
+    println("  sigma = "); sigma.sliceRows(0,10).pprint
   }
 }

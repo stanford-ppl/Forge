@@ -13,49 +13,50 @@ trait PDIPSolver extends OptiMLApplication {
 
   def main() = {
 
-    // if (args.length != 9) {
-    //   print_usage
-    // }
-
-    // val c = readVector(args(0))
-    // val G = readMatrix(args(1))
-    // val h = readVector(args(2))
-    // val A = readMatrix(args(3))
-    // val b = readVector(args(4))
-
-    // val n = c.length
-    // val m = h.length
-    // val p = b.length
-
-    // val x0 = readVector(args(5))
-    // val s0 = readVector(args(6))
-    // val y0 = readVector(args(7))
-    val z0 = if(args.length == 1) {
-      readVector(args(8))
-    }
-    else {
-      DenseVector.zeros(5)
+    if (args.length != 9) {
+      print_usage
     }
 
-    println(z0.length)
+    val c = readVector(args(0))
+    val G = readMatrix(args(1))
+    val h = readVector(args(2))
+    val A = readMatrix(args(3))
+    val b = readVector(args(4))
 
-    // if((G.numCols != c.length)||(A.numCols != c.length)||(G.numRows != h.length)||(A.numRows != b.length)) {
-    //   println("error: matrix size mismatch")
-    // }
+    val n = c.length
+    val m = h.length
+    val p = b.length
 
-    // if((x0.length != n)||(s0.length != m)) {
-    //   println("error: primal start size mismatch")
-    // }
+    val x0 = readVector(args(5))
+    val s0 = readVector(args(6))
+    val y0 = readVector(args(7))
+    val z0 = readVector(args(8))
 
-    // if((y0.length != p)||(z0.length != m)) {
-    //   println("error: dual start size mismatch")
-    // }
-    
-    // var iters = 0
+    if((G.numCols != c.length)||(A.numCols != c.length)||(G.numRows != h.length)||(A.numRows != b.length)) {
+      println("error: matrix size mismatch")
+      println("c := " + c.length)
+      println("G := " + G.numCols + " x " + G.numRows)
+      println("h := " + h.length)
+      println("A := " + A.numCols + " x " + A.numRows)
+      println("b := " + b.length)
+      exit(-1)
+    }
 
-    // while(iters < 1000) {
-    //   println("iters: " + iters)
-    //   iters = iters + 1
-    // }
+    if((x0.length != n)||(s0.length != m)) {
+      println("error: primal start size mismatch")
+      exit(-1)
+    }
+
+    if((y0.length != p)||(z0.length != m)) {
+      println("error: dual start size mismatch")
+      exit(-1)
+    }
+
+    var iters = 0
+
+    while(iters < 10) {
+      println("iters: " + iters)
+      iters = iters + 1
+    }
   }
 }

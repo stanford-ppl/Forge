@@ -52,29 +52,15 @@ trait PDIPSolver extends OptiMLApplication {
       exit(-1)
     }
 
-    println("point A")
-    var rc = 1+z0.t*s0
-    println("point B")
-    var ri = h-G*x0-s0
-    println("point C")
-    var re = b-A*x0
-    println("point D")
-    var rd0 = G.t*z0
-    println("point D1")
-    var rd1 = A.t*y0
-    println("point D2")
-    var rd2 = rd0+rd1
-    println("point D3")
-    println(c)
-    println(rd2)
-    var rd = c+rd2
-    println("point E")
-    var ro = -(c.t*x0+h.t*z0+b.t*y0+1)
-    println("point F")
+    val rc = 1.0+z0*:*s0
+    val ri = h-G*x0-s0
+    val re = b-A*x0
+    val rd = c+G.t*z0+A.t*y0
+    val ro = -(c*:*x0+h*:*z0+b*:*y0+1.0)
 
-    var nrmh = max(1.0,norm(h))
-    var nrmb = max(1.0,norm(b))
-    var nrmc = max(1.0,norm(c))
+    val nrmh = max(1.0,norm(h))
+    val nrmb = max(1.0,norm(b))
+    val nrmc = max(1.0,norm(c))
 
     println(rc)
     println(ri)

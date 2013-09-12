@@ -46,6 +46,7 @@ trait DenseMatrixOps {
       if (i == j) 1.0
       else 0.0
     )}
+    static (DenseMatrix) ("identity", Nil, MInt :: DenseMatrix(MDouble)) implements redirect ${ DenseMatrix.identity($0,$0) }
 
     // helper
     compiler (DenseMatrix) ("densematrix_fromarray", T, (MArray(T), MInt, MInt) :: DenseMatrix(T)) implements allocates(DenseMatrix, ${$1}, ${$2}, ${$0})
@@ -60,6 +61,13 @@ trait DenseMatrixOps {
     static (DenseMatrix) ("randf", Nil, (MInt,MInt) :: DenseMatrix(MFloat)) implements composite ${ densematrix_fromfunc($0, $1, (i,j) => random[Float] )}
     static (DenseMatrix) ("randn", Nil, (MInt,MInt) :: DenseMatrix(MDouble)) implements composite ${ densematrix_fromfunc($0, $1, (i,j) => randomGaussian )}
     static (DenseMatrix) ("randnf", Nil, (MInt,MInt) :: DenseMatrix(MFloat)) implements composite ${ densematrix_fromfunc($0, $1, (i,j) => randomGaussian.toFloat )}
+
+    // TODO: generalize this (and the static diag above) to kth diagonal
+    // direct (DenseMatrix) ("diag", T, MethodSignature(List(("x",DenseMatrix(T)),("k",MInt,"0")), DenseVector(T)) implements composite ${
+    direct (DenseMatrix) ("diag", T, DenseMatrix(T) :: DenseVector(T)) implements composite ${
+      val indices = (0::$0.numRows) { i => i + i*$0.numCols }
+      indices.t map { i => densematrix_raw_apply($0,i) }
+    }
 
     val DenseMatrixOps = withTpe (DenseMatrix)
     DenseMatrixOps {
@@ -270,6 +278,15 @@ trait DenseMatrixOps {
         }
         densematrix_set_raw_data($self, outData.unsafeImmutable)
         densematrix_set_numcols($self, newCols)
+      }
+
+      infix ("trim") (Nil :: MUnit, effect = write(0)) implements single ${
+        val data = densematrix_raw_data($self)
+        if ($self.size < array_length(data)) {
+          val d = array_empty[T]($self.size)
+          array_copy(data, 0, d, 0, $self.size)
+          densematrix_set_raw_data($self, d.unsafeImmutable)
+        }
       }
 
       compiler ("densematrix_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${

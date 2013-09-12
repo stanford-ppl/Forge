@@ -86,7 +86,7 @@ then
   BACKUP_DIR="$BUILD_DIR/backup"
   if [ -e "$DSL_DIR" ];
   then
-    echo "backing up previous version $DSL_DIR to $BACKUP_DIR/$DSL_NAME"
+    echo "[forge]: backing up previous version $DSL_DIR to $BACKUP_DIR/$DSL_NAME"
     if [ ! -e "$BACKUP_DIR" ];
     then
       echo "mkdir -p \"$BACKUP_DIR\""

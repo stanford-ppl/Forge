@@ -56,7 +56,7 @@ which is automatically copied to the generated DSL directory during publishing.
 
 To generate a DSL and move it to an external location (e.g. OptiML):
 
-        bin/update ppl.dsl.forge.examples.OptiMLDSLRunner OptiML
+        bin/update ppl.dsl.forge.examples.optiml.OptiMLDSLRunner OptiML
         mv published/OptiML <destination>
      
 The destination will now contain the generated DSL, and you can add applications directly
@@ -75,15 +75,15 @@ To run a DSL application located in `<FORGE_HOME>/apps/<DSL>/src/`, (e.g. Logist
 
 * Interpreter: 
 
-        bin/update -r "LogRegInterpreter <args>" ppl.dsl.forge.examples.OptiMLDSLRunner OptiML
+        bin/update -r "LogRegInterpreter <args>" ppl.dsl.forge.examples.optiml.OptiMLDSLRunner OptiML
 
 * Compiler:
 
-        bin/update -d -r "LogRegCompiler <args>" ppl.dsl.forge.examples.OptiMLDSLRunner OptiML
+        bin/update -d -r "LogRegCompiler <args>" ppl.dsl.forge.examples.optiml.OptiMLDSLRunner OptiML
 
 * Interactive:
         
-        bin/update -i ppl.dsl.forge.examples.OptiMLDSLRunner OptiML
+        bin/update -i ppl.dsl.forge.examples.optiml.OptiMLDSLRunner OptiML
 
 If the DSL has already been generated, you can supply the `-s 3` parameter to `update` to skip
 immediately to the publishing step.

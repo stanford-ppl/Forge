@@ -62,15 +62,26 @@ trait PDIPSolver extends OptiMLApplication {
     val nrmb = max(1.0,norm(b))
     val nrmc = max(1.0,norm(c))
 
-    println(rc)
-    println(ri)
-    println(re)
-    println(rd)
-    println(ro)
+    val tau0 = 1.0
+    val lambda0 = 1.0
+    val theta0 = 1.0
+    val u0 = DenseVector(tau0) << z0
+    val v0 = y0 << x0 << DenseVector(theta0)
+    val w0 = DenseVector(lambda0) << s0
 
-    println(nrmh)
-    println(nrmb)
-    println(nrmc)
+    val dimu = m+1
+    val dimv = p+n+1
+    val dimw = m+1
+
+    val result = untilconverged((x0,s0,y0,z0,u0,v0,w0,false), maxIter = 100) { 
+      cur: Tuple8[Rep[DenseVector[Double]], Rep[DenseVector[Double]], Rep[DenseVector[Double]], Rep[DenseVector[Double]], Rep[DenseVector[Double]], Rep[DenseVector[Double]], Rep[DenseVector[Double]], Rep[Boolean]] =>
+      val (x, s, y, z, u, v, w, ocx) = cur
+      println(norm(x))
+      (x, s, y, z, u, v, w)
+    } { (co, cn) =>
+      val (x, s, y, z, u, v, w, ocx: Rep[Boolean]) = cn
+      if(ocx) 0.0 else 1.0
+    }
   }
 
   def norm(x: Rep[DenseVector[Double]]) = {

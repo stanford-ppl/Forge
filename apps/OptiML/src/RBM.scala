@@ -58,6 +58,8 @@ trait RBM extends OptiMLApplication {
                          t2: Rep[Tup6[DenseMatrix[Double],DenseMatrix[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double]]]) = unit(10.0) // always run until maxIter
 
     // val p = untilconverged((errSum,visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases), maxIter = numBatches*maxEpoch) {
+
+    // inside REPL, not distinguishing between Rep[Tup] and Tuple correctly -- make_tupleX must be called explicitly
     val p = untilconverged_buffered((visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases), maxIter = numBatches*maxEpoch) {
       params =>
       // val (errSum,visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases) = t7(params)

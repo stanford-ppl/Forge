@@ -149,13 +149,7 @@ trait PDIPSolver extends OptiMLApplication {
       val lambda = w(0)
       val s = w.slice(1, m+1)
 
-      println(G.numRows)
-      println(G.numCols)
-      println(A.numRows)
-      println(A.numCols)
-
-      val GA = G.mutable
-      GA.insertAllRows(0, A.mutable)
+      val GA = G.mutable.insertAllRows(G.numRows, A.mutable)
 
       (u, v, w, DenseVector(iters + 1.0))
     }

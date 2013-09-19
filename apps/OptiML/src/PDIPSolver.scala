@@ -149,7 +149,15 @@ trait PDIPSolver extends OptiMLApplication {
       val lambda = w(0)
       val s = w.slice(1, m+1)
 
-      val GA = G.mutable.insertAllRows(G.numRows, A.mutable)
+      val (solx1, soly1, solz1) =  kkt_sol(s / z, G, A, c, -b, -h) 
+      val (solx2, soly2, solz2) =  kkt_sol(s / z, G, A, -rd, re, ri);
+      val Gx = solx1 << solx2
+      val Gy = soly1 << soly2
+      val Gz = solz1 << solz2
+
+      // compute T = H22 - H21*(H11\H12)
+      //T = [-lambda/tau, ro; -ro, 0] + ...
+      //    [-h', -b', -c'; ri', re', rd'] * [Gz;Gy;Gx];
 
       (u, v, w, DenseVector(iters + 1.0))
     }
@@ -158,6 +166,12 @@ trait PDIPSolver extends OptiMLApplication {
   def kkt_sol(d: Rep[DenseVector[Double]], G: Rep[DenseMatrix[Double]], A: Rep[DenseMatrix[Double]], rx: Rep[DenseVector[Double]], ry: Rep[DenseVector[Double]], rz: Rep[DenseVector[Double]]) = {
     val r = rx << ry << rz
 
+    val GA = G << A
+    val DGA = (DenseMatrix.diag(GA.numRows, (-d) << DenseVector.zeros(A.numRows)) <<| GA) << (GA.t <<| DenseMatrix.zeros(A.numCols, A.numCols))
+
+    val xyz = DGA \ r
+
+    (xyz.slice(0, G.numRows), xyz.slice(G.numRows, G.numRows + A.numRows), xyz.slice(G.numRows + A.numRows, G.numRows + A.numRows + A.numCols))
   }
 
   def norm(x: Rep[DenseVector[Double]]) = {

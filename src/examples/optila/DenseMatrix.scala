@@ -213,9 +213,27 @@ trait DenseMatrixOps {
       }
 
       infix ("<<") (DenseVector(T) :: DenseMatrix(T)) implements single ${
-        val out = DenseMatrix[T](0, $self.numCols)
+        val out = DenseMatrix[T](0, 0)
         out <<= $self
         out <<= $1
+        out.unsafeImmutable
+      }
+      infix ("<<") (DenseMatrix(T) :: DenseMatrix(T)) implements single ${
+        val out = DenseMatrix[T](0, 0)
+        out <<= $self
+        out <<= $1
+        out.unsafeImmutable
+      }
+      infix ("<<|") (DenseVector(T) :: DenseMatrix(T)) implements single ${
+        val out = DenseMatrix[T](0, 0)
+        out.insertAllCols(0, $self)
+        out.insertCol($self.numCols, $1)
+        out.unsafeImmutable
+      }
+      infix ("<<|") (DenseMatrix(T) :: DenseMatrix(T)) implements single ${
+        val out = DenseMatrix[T](0, 0)
+        out.insertAllCols(0, $self)
+        out.insertAllCols($self.numCols, $1)
         out.unsafeImmutable
       }
       infix ("<<=") (DenseVector(T) :: MUnit, effect = write(0)) implements composite ${ $self.insertRow($self.numRows, $1) }
@@ -234,9 +252,10 @@ trait DenseMatrixOps {
       infix ("insertAllRows") ((("pos",MInt),("xs",DenseMatrix(T))) :: MUnit, effect=write(0)) implements single ${
         val idx = $pos*$self.numCols
         if ($self.size == 0) densematrix_set_numcols($self, $xs.numCols)
-        densematrix_insertspace($self, idx, $self.size)
+        val sz = $self.numCols*xs.numRows
+        densematrix_insertspace($self, idx, sz)
         val data = densematrix_raw_data($self)
-        for (i <- idx until idx+$self.size){
+        for (i <- idx until idx+sz){
           array_update(data,i,densematrix_raw_apply($xs, i-idx))
         }
         densematrix_set_numrows($self, $self.numRows+$xs.numRows)

@@ -151,13 +151,35 @@ trait PDIPSolver extends OptiMLApplication {
 
       val (solx1, soly1, solz1) =  kkt_sol(s / z, G, A, c, -b, -h) 
       val (solx2, soly2, solz2) =  kkt_sol(s / z, G, A, -rd, re, ri);
-      val Gx = solx1 << solx2
-      val Gy = soly1 << soly2
-      val Gz = solz1 << solz2
+      val Gx = DenseMatrix(solx1).t <<| DenseMatrix(solx2).t
+      val Gy = DenseMatrix(soly1).t <<| DenseMatrix(soly2).t
+      val Gz = DenseMatrix(solz1).t <<| DenseMatrix(solz2).t
+      val Gzyx = Gz << Gy << Gx
 
       // compute T = H22 - H21*(H11\H12)
-      //T = [-lambda/tau, ro; -ro, 0] + ...
-      //    [-h', -b', -c'; ri', re', rd'] * [Gz;Gy;Gx];
+      val T0 = DenseMatrix(DenseVector(-lambda/tau, ro), DenseVector(-ro, 0.0))
+      val Ta = (-DenseMatrix(h) <<| -DenseMatrix(b) <<| -DenseMatrix(c)) << (DenseMatrix(ri) <<| DenseMatrix(re) <<| DenseMatrix(rd))
+      val T = T0 + Ta * Gzyx
+
+      val r1 = -s*z
+      val r2 = -tau*lambda
+      val r3 = -(h*:*z + b*:*y + c*:*x + ro*theta + lambda)
+      val r4 = -(-h*tau + G*x + ri*theta + s)
+      val r5 = -(-b*tau + A*x + re*theta)
+      val r6 = -(-c*tau - G.t*z - A.t*y + rd*theta)
+      val r7 = rc - (-ro*tau - ri*:*z - re*:*y - rd*:*x)
+      val (dx1,dy1,dz1) = kkt_sol(s/z,G,A,-r6,r5,r4-(r1/z));
+      val sol = (T \ (DenseVector(r3-r2/tau, r7) + Ta * (dz1 << dy1 << dx1))).t
+      val dz = dz1 - Gz*sol
+      val dy = dy1 - Gy*sol
+      val dx = dx1 - Gx*sol
+      val dtau = sol(0)
+      val dtheta = sol(1)
+      val ds = (r1-s*dz)/z
+      val dlambda = (r2-lambda*dtau)/tau
+      val du = DenseVector(dtau).t << dz
+      val dv = dy << dx << DenseVector(dtheta).t
+      val dw = DenseVector(dlambda).t << ds
 
       (u, v, w, DenseVector(iters + 1.0))
     }
@@ -169,7 +191,7 @@ trait PDIPSolver extends OptiMLApplication {
     val GA = G << A
     val DGA = (DenseMatrix.diag(GA.numRows, (-d) << DenseVector.zeros(A.numRows)) <<| GA) << (GA.t <<| DenseMatrix.zeros(A.numCols, A.numCols))
 
-    val xyz = DGA \ r
+    val xyz = (DGA \ r)
 
     (xyz.slice(0, G.numRows), xyz.slice(G.numRows, G.numRows + A.numRows), xyz.slice(G.numRows + A.numRows, G.numRows + A.numRows + A.numCols))
   }

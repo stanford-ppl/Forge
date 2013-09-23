@@ -13,13 +13,13 @@ trait PDIPSolver extends OptiMLApplication {
 
   def main() = {
 
-    val MAXITERS = 100;
-    val ABSTOL = 1e-8;
-    val RELTOL = 1e-8;
-    val FEASTOL = 1e-8;
-    val MINSLACK = 1e-8;      
-    val STEP = 0.99;
-    val EXPON = 3;
+    val MAXITERS = 100
+    val ABSTOL = 1e-8
+    val RELTOL = 1e-8
+    val FEASTOL = 1e-8
+    val MINSLACK = 1e-8
+    val STEP = 0.99
+    val EXPON = 3.0
 
     if (args.length != 9) {
       print_usage
@@ -79,7 +79,10 @@ trait PDIPSolver extends OptiMLApplication {
 
     val dimu = m+1
     val dimv = p+n+1
-    val dimw = m+1
+    val dimw = m+1    
+
+    //println("\n%16s%14s".format("duality gap", "residuals"))
+    //println("%9s%8s%10s%6s".format("abs.", "rel.", "primal", "dual"))
 
     implicit def diffPDIP(t1: Rep[Tup4[DenseVector[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double]]],
                           t2: Rep[Tup4[DenseVector[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double]]]) = {
@@ -117,7 +120,7 @@ trait PDIPSolver extends OptiMLApplication {
       val hpres = max(norm(hresi), norm(hrese))
       val hdres = norm(hresd)
       
-      println("%02.0f:% 7.0e% 8.0e% 8.0e% 8.0e ".format(iters - 1.0, absgap, relgap, pres, dres))
+      //println("%02.0f:% 7.0e% 8.0e% 8.0e% 8.0e ".format(iters - 1.0, absgap, relgap, pres, dres))
 
       if ((pres <= FEASTOL)&&(dres <= FEASTOL)&&((absgap <= ABSTOL)||(relgap <= RELTOL))) {
         // optimal
@@ -150,7 +153,7 @@ trait PDIPSolver extends OptiMLApplication {
       val s = w.slice(1, m+1)
 
       val (solx1, soly1, solz1) =  kkt_sol(s / z, G, A, c, -b, -h) 
-      val (solx2, soly2, solz2) =  kkt_sol(s / z, G, A, -rd, re, ri);
+      val (solx2, soly2, solz2) =  kkt_sol(s / z, G, A, -rd, re, ri)
       val Gx = DenseMatrix(solx1).t <<| DenseMatrix(solx2).t
       val Gy = DenseMatrix(soly1).t <<| DenseMatrix(soly2).t
       val Gz = DenseMatrix(solz1).t <<| DenseMatrix(solz2).t
@@ -181,19 +184,123 @@ trait PDIPSolver extends OptiMLApplication {
       val dv = dy << dx << DenseVector(dtheta).t
       val dw = DenseVector(dlambda).t << ds
 
-      (u, v, w, DenseVector(iters + 1.0))
+      val step = 1.0 / ((-du/u) << (-dw/w)).max
+      val mu = (u*:*w)/(m+1)
+      val muaff = ((u + step*du)*:*(w + step*dw))/(m+1)
+      val sigma = pow(muaff/mu, EXPON)
+
+      val rr1 = -ds*dz + sigma*mu
+      val rr2 = sigma*mu - dtau*dlambda
+      val rr3 = 0.0
+      val rr4 = DenseVector.zeros(r4.length).t
+      val rr5 = DenseVector.zeros(r5.length).t
+      val rr6 = DenseVector.zeros(r6.length).t
+      val rr7 = 0.0
+      val (ddx1,ddy1,ddz1) = kkt_sol(s/z,G,A,-rr6,rr5,rr4-(rr1/z))
+      val tmpl = Ta * (ddz1 << ddy1 << ddx1)
+      val ssol = (T \ (DenseVector(rr3-rr2/tau, rr7) + tmpl)).t
+      val dzc = ddz1 - Gz*ssol
+      val dyc = ddy1 - Gy*ssol
+      val dxc = ddx1 - Gx*ssol
+      val dtauc = ssol(0)
+      val dthetac = ssol(1)
+      val dsc = (rr1-s*dzc)/z
+      val dlambdac = (rr2-lambda*dtauc)/tau
+      val duc = DenseVector(dtauc).t << dzc
+      val dvc = dyc << dxc << DenseVector(dthetac).t
+      val dwc = DenseVector(dlambdac).t << dsc
+
+      val ddu = du+duc
+      val ddv = dv+dvc
+      val ddw = dw+dwc
+      val sstep = min(STEP/((-du/u) << (-dw/w)).max, 1.0)
+      val u_next = u + sstep*ddu
+      val v_next = v + sstep*ddv
+      val w_next = w + sstep*ddw
+
+      (u_next, v_next, w_next, DenseVector(iters + 1.0))
+    }
+
+    val (u, v, w, viters) = t4(result)
+
+    val tau = u(0)
+    val z = u.slice(1, m+1)
+    val y = v.slice(0, p)
+    val x = v.slice(p, p+n)
+    val theta = v(p+n)
+    val lambda = w(0)
+    val s = w.slice(1, m+1)
+
+    val pcost = (c*:*x) / tau  
+    val dcost = -(h*:*z + b*:*y)/ tau  
+    val absgap = (u*:*w) / (tau*tau)
+    val relgap = if (dcost > 0.0) {
+      absgap / dcost
+    } 
+    else if (pcost < 0.0) {
+      absgap / (-pcost)
+    }
+    else {
+      Double.PositiveInfinity
+    }
+    val hresi = G*x+s
+    val resi = h - hresi/tau
+    val hrese = A*x
+    val rese = b-hrese/tau
+    val hresd = G.t*z + A.t*y
+    val resd = c+hresd/tau
+    val pres = max(norm(resi)/nrmh, norm(rese)/nrmb)
+    val dres = norm(resd)/nrmc
+    val hpres = max(norm(hresi), norm(hrese))
+    val hdres = norm(hresd)
+
+    if ((pres <= FEASTOL)&&(dres <= FEASTOL)&&((absgap <= ABSTOL)||(relgap <= RELTOL))) {
+      // optimal
+      println("optimal")
+      println("\nx")
+      println(x / tau)
+      println("\ns")
+      println(s / tau)
+      println("\nz")
+      println(z / tau)
+      println("\ny")
+      println(y / tau)
+    }
+    else if ((h*:*z+b*:*y < 0.0)&&(hdres/abs(h*:*z+b*:*y)<= FEASTOL)) {
+      // primal infeasible
+      println("primal infeasible")
+      val t = abs(h*:*z+b*:*y)
+      println("\nt = " + t.toString + "\n")
+      println("\nz")
+      println(z / t)
+      println("\ny")
+      println(y / t)
+    }
+    else if ((c*:*x < 0.0)&&(hpres/abs(c*:*x) <= FEASTOL)) {
+      // dual infeasible
+      println("dual infeasible")
+      val t = abs(c*:*x)
+      println("\nt = " + t.toString + "\n")
+      println("\nx")
+      println(x / t)
+      println("\ns")
+      println(s / t)
+    }
+    else {
+      // did not converge
+      println("did not converge\n")
     }
   }
 
   def kkt_sol(d: Rep[DenseVector[Double]], G: Rep[DenseMatrix[Double]], A: Rep[DenseMatrix[Double]], rx: Rep[DenseVector[Double]], ry: Rep[DenseVector[Double]], rz: Rep[DenseVector[Double]]) = {
-    val r = rx << ry << rz
+    val r = rz << ry << rx
 
     val GA = G << A
     val DGA = (DenseMatrix.diag(GA.numRows, (-d) << DenseVector.zeros(A.numRows)) <<| GA) << (GA.t <<| DenseMatrix.zeros(A.numCols, A.numCols))
 
     val xyz = (DGA \ r)
 
-    (xyz.slice(0, G.numRows), xyz.slice(G.numRows, G.numRows + A.numRows), xyz.slice(G.numRows + A.numRows, G.numRows + A.numRows + A.numCols))
+    (xyz.slice(G.numRows + A.numRows, G.numRows + A.numRows + A.numCols), xyz.slice(G.numRows, G.numRows + A.numRows), xyz.slice(0, G.numRows))
   }
 
   def norm(x: Rep[DenseVector[Double]]) = {

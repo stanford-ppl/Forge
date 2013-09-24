@@ -136,37 +136,8 @@ trait DenseVectorOps {
       infix ("mt") (Nil :: MUnit, effect = write(0)) implements composite ${
         densevector_set_isrow($0, !$0.isRow)
       }
-      infix ("Clone") (Nil :: DenseVector(T), aliasHint = copies(0)) implements map((T,T), 0, "e => e")
-      infix ("mutable") (Nil :: DenseVector(T), effect = mutable, aliasHint = copies(0)) implements single ${
-        val out = DenseVector[T]($self.length, $self.isRow)
-        for (i <- 0 until out.length) {
-          out(i) = $self(i)
-        }
-        out
-      }
-      infix ("replicate") ((MInt,MInt) :: DenseMatrix(T)) implements single ${
-        if ($self.isRow) {
-          val out = DenseMatrix[T]($1, $2*$self.length)
-          for (col <- 0 until $2*$self.length){
-            val colToJ = col % $self.length
-            for (rI <- 0 until $1) {
-              out(rI, col) = $self(colToJ)
-            }
-          }
-          out.unsafeImmutable
-        }
-        else {
-          val out = DenseMatrix[T]($1*$self.length, $2)
-          for (row <- 0 until $1*$self.length){
-            val rowToI = row % $self.length
-            for (cI <- 0 until $2) {
-              out(row, cI) = $self(rowToI)
-            }
-          }
-          out.unsafeImmutable
-        }
-      }
 
+      infix ("Clone") (Nil :: DenseVector(T), aliasHint = copies(0)) implements map((T,T), 0, "e => e")
 
       /**
        * Data operations
@@ -179,6 +150,17 @@ trait DenseVectorOps {
       infix ("update") ((("i",MInt),("e",T)) :: MUnit, effect = write(0)) implements composite ${
         array_update(densevector_raw_data($self), $i, $e)
       }
+      infix ("update") ((("indices",IndexVector),("v",DenseVector(T))) :: MUnit, effect = write(0)) implements single ${
+        if (indices.length != v.length) fatal("dimension mismatch: bulk vector update")
+
+        // cannot be parallel unless indices contains only disjoint indices (why is why we use 'single' here)
+        // however, maybe this should be a property that we guarantee of all IndexVectors
+        (0::indices.length) foreach { i =>
+          if (indices(i) < 0 || indices(i) >= $self.length) fatal("index out of bounds: bulk vector update")
+          array_update(densevector_raw_data($self), indices(i), v(i))
+        }
+      }
+
       infix ("<<") (T :: DenseVector(T)) implements single ${
         val out = DenseVector[T](0,$self.isRow)
         out <<= $self

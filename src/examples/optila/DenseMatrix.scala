@@ -62,12 +62,10 @@ trait DenseMatrixOps {
     static (DenseMatrix) ("randn", Nil, (MInt,MInt) :: DenseMatrix(MDouble)) implements composite ${ densematrix_fromfunc($0, $1, (i,j) => randomGaussian )}
     static (DenseMatrix) ("randnf", Nil, (MInt,MInt) :: DenseMatrix(MFloat)) implements composite ${ densematrix_fromfunc($0, $1, (i,j) => randomGaussian.toFloat )}
 
-    // TODO: generalize this (and the static diag above) to kth diagonal
-    // direct (DenseMatrix) ("diag", T, MethodSignature(List(("x",DenseMatrix(T)),("k",MInt,"0")), DenseVector(T)) implements composite ${
-    direct (DenseMatrix) ("diag", T, DenseMatrix(T) :: DenseVector(T)) implements composite ${
-      val indices = (0::$0.numRows) { i => i + i*$0.numCols }
-      indices.t map { i => densematrix_raw_apply($0,i) }
-    }
+    // these are provided for convenience for MATLAB-ians
+    direct (DenseMatrix) ("diag", T, DenseMatrix(T) :: DenseVector(T)) implements redirect ${ $0.diag }
+    direct (DenseMatrix) ("triu", T withBound TArith, DenseMatrix(T) :: DenseMatrix(T)) implements redirect ${ $0.triu }
+    direct (DenseMatrix) ("tril", T withBound TArith, DenseMatrix(T) :: DenseMatrix(T)) implements redirect ${ $0.tril }
 
     val DenseMatrixOps = withTpe (DenseMatrix)
     DenseMatrixOps {
@@ -128,6 +126,23 @@ trait DenseMatrixOps {
           }
         }
         out.unsafeImmutable
+      }
+
+      // TODO: generalize the following (and the static diag above) to kth diagonal
+      // infix ("diag") (MethodSignature(List(("x",DenseMatrix(T)),("k",MInt,"0")), DenseVector(T)) implements composite ${
+      infix ("diag") (Nil :: DenseVector(T)) implements composite ${
+        val indices = (0::$self.numRows) { i => i + i*$self.numCols }
+        indices.t map { i => densematrix_raw_apply($self,i) }
+       }
+      infix ("triu") (Nil :: DenseMatrix(T), TArith(T)) implements composite ${
+        (0::$self.numRows, 0::$self.numCols) { (i,j) =>
+          if (i <= j) $self(i,j) else implicitly[Arith[T]].empty
+        }
+      }
+      infix ("tril") (Nil :: DenseMatrix(T), TArith(T)) implements composite ${
+        (0::$self.numRows, 0::$self.numCols) { (i,j) =>
+          if (i >= j) $self(i,j) else implicitly[Arith[T]].empty
+        }
       }
 
 

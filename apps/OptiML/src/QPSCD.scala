@@ -13,6 +13,7 @@ object QPSCDInterpreter extends OptiMLApplicationInterpreter with QPSCD {
 
 trait QPSCD extends OptiMLApplication {
   val HOGWILD = System.getProperty("qpscd.hogwild","false").toBoolean
+  val NUM_EPOCHS = 100
 
   type BQP = Record {
     val Q: DenseMatrix[Double]
@@ -71,9 +72,9 @@ trait QPSCD extends OptiMLApplication {
    * Performs 1 SCD Epoch on the given bqp
    * Assumes the bqp is normalized so diagonal entries are 1.
    *
-   * @param x the variable of optimization
-   * @param bqp the boxed QP to operate on
-   * @param perm the permutation to use
+   * @param x         the variable of optimization
+   * @param bqp       the boxed QP to operate on
+   * @param perm      the permutation to use
    */
   def boundQPSCDEpoch(x: Rep[DenseVector[Double]], bqp: Rep[BQP], perm: Rep[IndexVector]) = {
     if (HOGWILD) {
@@ -97,15 +98,16 @@ trait QPSCD extends OptiMLApplication {
   }
 
   def printUsage() {
-    println("Usage: QPSCD <input data folder>")
+    println("Usage: QPSCD <input data folder> <output file>")
     println("<input data folder> must contain files named Q.csv, p.csv, lb.csv, ub.csv")
     exit(-1)
   }
 
   def main() = {
-    if (args.length < 1) printUsage()
+    if (args.length < 2) printUsage()
 
     val in = args(0)
+    val out = args(1)
     val Q = readMatrix(in + "/Q.csv", ",")
     val p = readVector(in + "/p.csv")
     val lb = readVector(in + "/lb.csv")
@@ -113,7 +115,7 @@ trait QPSCD extends OptiMLApplication {
 
     val x = DenseVector.zeros(p.length)
     val perm = shuffle(0::p.length)
-    val bqp = newBQP(Q, p, lb, ub, diag(Q))
+    val bqp = newBQP(Q, p, lb, ub, Q.diag)
 
     println("finished loading input. Q: " + Q.numRows + " x " + Q.numCols + ", p: " + p.length + ", lb: " + lb.length + ", ub: " + ub.length)
     if (HOGWILD) println("HogWild!")
@@ -128,20 +130,21 @@ trait QPSCD extends OptiMLApplication {
       if (HOGWILD) {
         var i = 0
         val xm = x.mutable
-        while (i < 1000) {
+        while (i < NUM_EPOCHS) {
           boundQPSCDEpoch(xm, bqp, perm)
           i += 1
         }
         xm
       }
       else {
-        untilconverged_buffered(x, minIter = 999) { x =>
+        untilconverged_buffered(x, minIter = NUM_EPOCHS-1) { x =>
           boundQPSCDEpoch(x, bqp, perm)
         }
       }
 
     toc(x_star)
-    println("found x_star: ")
-    x_star.pprint
+    writeVector(x_star, out)
+    // println("found x_star: ")
+    // x_star.pprint
   }
 }

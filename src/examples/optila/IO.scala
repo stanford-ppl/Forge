@@ -15,10 +15,16 @@ trait IOOps {
 
     // -- input
 
-    direct (IO) ("readVector", Nil, ("path",MString) :: DenseVector(MDouble)) implements composite ${ readVector[Double]($path, v => v(0).toDouble) }
+    compiler (IO) ("optila_todouble", Nil, MString :: MDouble) implements single ${
+      if ($0 == "Inf") INF
+      else if ($0 == "-Inf") nINF
+      else $0.toDouble
+    }
 
-    direct (IO) ("readMatrix", Nil, ("path", MString) :: DenseMatrix(MDouble)) implements composite ${ readMatrix[Double]($path, s => s.toDouble) }
-    direct (IO) ("readMatrix", Nil, (("path", MString), ("delim", MString)) :: DenseMatrix(MDouble)) implements composite ${ readMatrix[Double]($path, s => s.toDouble, $delim) }
+    direct (IO) ("readVector", Nil, ("path",MString) :: DenseVector(MDouble)) implements composite ${ readVector[Double]($path, v => optila_todouble(v(0))) }
+
+    direct (IO) ("readMatrix", Nil, ("path", MString) :: DenseMatrix(MDouble)) implements composite ${ readMatrix[Double]($path, s => optila_todouble(s)) }
+    direct (IO) ("readMatrix", Nil, (("path", MString), ("delim", MString)) :: DenseMatrix(MDouble)) implements composite ${ readMatrix[Double]($path, s => optila_todouble(s), $delim) }
 
     val Elem = tpePar("Elem")
 

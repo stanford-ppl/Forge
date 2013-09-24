@@ -78,6 +78,10 @@ a1+b1
     impl (lookupOverloaded("FString","+",6)) (codegen($cala, strConcatWithNumerics))
     impl (lookupOverloaded("FString","+",11)) (codegen($cala, strConcatWithNumerics))
 
+    compiler (lookupGrp("FString")) ("optila_padspace", Nil, MString :: MString) implements composite ${
+      if ($0.startsWith("-")) "  " + $0 else "   " + $0
+    }
+
     importIndexVectorOps()
     importDenseVectorViewOps()
     importDenseVectorOps()

@@ -150,7 +150,7 @@ trait DenseMatrixOps {
        * Miscellaneous
        */
        // $self.toString doesn't work in Delite, since there is no 'self' instance
-       infix ("pprint") (Nil :: MUnit, TStringable(T), effect = simple) implements composite ${ println($self.makeStr) }
+       infix ("pprint") (Nil :: MUnit, TStringable(T), effect = simple) implements composite ${ println($self.makeStr + "\\n") }
        infix ("makeString") (Nil :: MString, TStringable(T)) implements single ${
          var s = ""
          for (i <- 0 until $self.numRows-1) {

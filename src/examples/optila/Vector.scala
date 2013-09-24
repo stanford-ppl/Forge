@@ -151,7 +151,7 @@ trait VectorOps {
         s
       }
 
-      infix ("pprint") (Nil :: MUnit, S, effect = simple) implements composite ${ println($self.makeStr) } // $self.toString doesn't work in Delite
+      infix ("pprint") (Nil :: MUnit, S, effect = simple) implements composite ${ println($self.makeStr + "\\n") } // $self.toString doesn't work in Delite
 
 
       /**

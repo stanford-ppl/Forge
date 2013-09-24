@@ -25,7 +25,9 @@ trait LAPACKHelperOps {
     val P_indices = (0::numRows).mutable
     var i = 0
     while (i < ipiv.length) {
-      val swap = P_indices(i)
+      // FIXME: scheduling bug in LMS/Delite if swap is a val instead of var
+      var swap = P_indices(i)
+      // val swap = P_indices(i)
       P_indices(i) = P_indices(ipiv(i)-1)
       P_indices(ipiv(i)-1) = swap
       i += 1

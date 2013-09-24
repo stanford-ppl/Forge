@@ -38,13 +38,13 @@ trait LAPACKOpsExp extends LAPACKOps with LinAlgOpsExp {
   case class Native_lu(a: Rep[DenseMatrix[Double]], ipiv: Rep[DenseVector[Int]])(implicit val __pos: SourceContext) extends DeliteOpExternal[DenseMatrix[Double]] {
     override def inputs = scala.List(a,ipiv)
     def alloc = a
-    val funcName = "linalg_lu"
+    val funcName = "lu"
   }
 
   case class Native_chol(a: Rep[DenseMatrix[Double]], tri: Rep[Char])(implicit val __pos: SourceContext) extends DeliteOpExternal[DenseMatrix[Double]] {
     override def inputs = scala.List(a,tri)
     def alloc = a
-    val funcName = "linalg_chol"
+    val funcName = "chol"
   }
 
   // TODO: we also want an AX = B version where X and B are matrices
@@ -73,7 +73,7 @@ trait LAPACKOpsExp extends LAPACKOps with LinAlgOpsExp {
     if (useLAPACK) {
       check_chol(a,tri)
 
-      val t = if (equals(tri, unit("upper"))) unit('U') else unit('L')
+      val t = if (ordering2___equal(tri, unit("upper"))) unit('U') else unit('L')
       val out = reflectPure(Native_chol(a.mutable, t))
       postprocess_chol(out, tri)
     }
@@ -154,7 +154,7 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
         {
           jboolean copy;
           j%1$s *A_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)A, &copy));
-          jint *ipiv_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)ipiv, &copy));
+          jint *ipiv_ptr = (jint*)((*env)->GetPrimitiveArrayCritical(env, (jarray)ipiv, &copy));
 
           MKL_INT m = M, n = N, lda = N, info;
 

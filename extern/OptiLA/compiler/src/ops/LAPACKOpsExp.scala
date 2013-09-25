@@ -29,21 +29,21 @@ trait LAPACKOpsExp extends LAPACKOps with LinAlgOpsExp {
    * Intercept LAPACK-able operations
    */
 
-  case class Native_linsolve(a: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]])(implicit val __pos: SourceContext) extends DeliteOpExternal[DenseVector[Double]] {
+  case class Native_linsolve(a: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]])(implicit val __pos: SourceContext) extends DeliteOpExternal[Unit] {
     override def inputs = scala.List(a,b)
-    def alloc = b
+    def alloc = Const(())
     val funcName = "linsolve"
   }
 
-  case class Native_lu(a: Rep[DenseMatrix[Double]], ipiv: Rep[DenseVector[Int]])(implicit val __pos: SourceContext) extends DeliteOpExternal[DenseMatrix[Double]] {
+  case class Native_lu(a: Rep[DenseMatrix[Double]], ipiv: Rep[DenseVector[Int]])(implicit val __pos: SourceContext) extends DeliteOpExternal[Unit] {
     override def inputs = scala.List(a,ipiv)
-    def alloc = a
+    def alloc = Const(())
     val funcName = "lu"
   }
 
-  case class Native_chol(a: Rep[DenseMatrix[Double]], tri: Rep[Char])(implicit val __pos: SourceContext) extends DeliteOpExternal[DenseMatrix[Double]] {
+  case class Native_chol(a: Rep[DenseMatrix[Double]], tri: Rep[Char])(implicit val __pos: SourceContext) extends DeliteOpExternal[Unit] {
     override def inputs = scala.List(a,tri)
-    def alloc = a
+    def alloc = Const(())
     val funcName = "chol"
   }
 
@@ -53,8 +53,9 @@ trait LAPACKOpsExp extends LAPACKOps with LinAlgOpsExp {
       // a, b will be overwritten with answers
       val outB = DenseVector[Double](max(a.numRows,a.numCols), unit(false))
       outB(unit(0)::b.length) = b(unit(0)::b.length)
-      val out = reflectWrite(outB)(Native_linsolve(a.mutable, outB))
-      out.take(a.numCols) // answer is written in the first n entries of b
+      val alloc = a.mutable
+      reflectWrite(alloc,outB)(Native_linsolve(alloc, outB))
+      outB.take(a.numCols) // answer is written in the first n entries of b
     }
     else super.linsolve(a,b)
   }
@@ -63,8 +64,9 @@ trait LAPACKOpsExp extends LAPACKOps with LinAlgOpsExp {
     if (useLAPACK) {
       val piv_len = if (a.numRows < a.numCols) a.numRows else a.numCols
       val ipiv = DenseVector[Int](piv_len, unit(false))
-      val out = reflectWrite(ipiv)(Native_lu(a.mutable, ipiv))
-      postprocess_lu(out, ipiv)
+      val alloc = a.mutable
+      reflectWrite(alloc,ipiv)(Native_lu(alloc, ipiv))
+      postprocess_lu(alloc, ipiv)
     }
     else super.linalg_lu(a)
   }
@@ -74,8 +76,9 @@ trait LAPACKOpsExp extends LAPACKOps with LinAlgOpsExp {
       check_chol(a,tri)
 
       val t = if (ordering2___equal(tri, unit("upper"))) unit('U') else unit('L')
-      val out = reflectPure(Native_chol(a.mutable, t))
-      postprocess_chol(out, tri)
+      val alloc = a.mutable
+      reflectWrite(alloc)(Native_chol(alloc, t))
+      postprocess_chol(alloc, tri)
     }
     else super.linalg_chol(a, tri)
   }
@@ -130,14 +133,11 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
         scala.List("j%1$sArray A", "j%1$sArray b", "jint M", "jint N") map { _.format(tp.toLowerCase) },
         """
         {
-          #define max(x,y) (((x) > (y)) ? (x) : (y))
-
           jboolean copy;
           j%1$s *A_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)A, &copy));
           j%1$s *b_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)b, &copy));
 
-          MKL_INT m = M, n = N, nrhs = 1, lda = N, info;
-          MKL_INT ldb = max(m,n);
+          MKL_INT m = M, n = N, nrhs = 1, lda = N, ldb = 1, info;
 
           info = LAPACKE_dgels(LAPACK_ROW_MAJOR, 'N', m, n, nrhs, A_ptr, lda, b_ptr, ldb);
 

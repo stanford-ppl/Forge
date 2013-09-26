@@ -14,6 +14,7 @@ import format._
 trait ForgeApplication extends Forge with ForgeLift with ForgeLib {
   def dslName: String
   def specification(): Rep[Unit]
+  def addREPLOverride = false // DSLs can override this to true if they need a REPL override trait
 }
 
 /**

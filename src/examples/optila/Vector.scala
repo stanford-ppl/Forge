@@ -253,7 +253,7 @@ trait VectorOps {
           if (pred(x)) outT <<= x
           else outF <<= x
         }
-        (outT.unsafeImmutable, outF.unsafeImmutable)
+        pack((outT.unsafeImmutable, outF.unsafeImmutable))
       }
 
       infix ("flatMap") ((T ==> DenseVector(R)) :: DenseVector(R), addTpePars = R) implements composite ${

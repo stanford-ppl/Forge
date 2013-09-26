@@ -17,7 +17,7 @@ trait ForgeOps extends Base {
 
   def grp(name: String) = forge_grp(name)
   def tpeAlias(name: String, tpe: Rep[DSLType]) = forge_tpealias(name, tpe)
-  def tpePar(name: String, ctxBounds: List[TypeClassSignature] = List(), stage: StageTag = future) = forge_tpepar(name, ctxBounds, stage) // TODO: type bounds
+  def tpePar(name: String, ctxBounds: List[TypeClassSignature] = List(TManifest), stage: StageTag = future) = forge_tpepar(name, ctxBounds, stage) // TODO: type bounds
   def ephemeralTpe(name: String, tpePars: List[Rep[TypePar]] = List(), stage: StageTag = future) = forge_ephemeral_tpe(name, tpePars, stage)
   def tpe(name: String, tpePars: List[Rep[TypePar]] = List(), stage: StageTag = future) = forge_tpe(name, tpePars, stage)
   def tpeInst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]] = List()) = forge_tpeinst(hkTpe, tpeArgs)

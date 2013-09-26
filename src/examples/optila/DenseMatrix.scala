@@ -23,6 +23,7 @@ trait DenseMatrixOps {
     // static methods
     static (DenseMatrix) ("apply", T, (MInt, MInt) :: DenseMatrix(T), effect = mutable) implements allocates(DenseMatrix, ${$0}, ${$1}, ${array_empty[T]($0*$1)})
 
+    // matrix from vector of vectors
     for (v <- List(DenseVector(T),DenseVectorView(T))) {
       static (DenseMatrix) ("apply", T, (DenseVector(v)) :: DenseMatrix(T)) implements composite ${
         val numRows = $0.length
@@ -30,14 +31,64 @@ trait DenseMatrixOps {
         (0::numRows, 0::numCols) { (i,j) => $0(i).apply(j) }
       }
     }
+
+    // matrix from variable number of vectors (rows)
     static (DenseMatrix) ("apply", T, varArgs(DenseVector(T)) :: DenseMatrix(T)) implements single ${
       val out = DenseMatrix[T](0, 0)
       // don't lift the range over the current stage Seq[DenseVector[T]]
-      for (i: Int <- scala.collection.immutable.Range(0,__arg0.length)) {
+      for (i: Int <- scala.collection.immutable.Range(0,$0.length)) {
         out <<= $0(i)
       }
       out.unsafeImmutable
     }
+
+    // block matrix constructor
+    // we can't reuse "apply", because it is ambiguous with the row constructor above
+    static (DenseMatrix) ("block", T, varArgs(DenseVector(DenseMatrix(T))) :: DenseMatrix(T)) implements single ${
+      // precompute output size
+      var totalNumRows = 0
+      var totalNumCols = 0
+      val seq = array_fromseq($0)
+      for (i <- 0 until array_length(seq)) {
+        val subMatRow = array_apply(seq,i)
+        val numRows = subMatRow(0).numRows
+        var numCols = subMatRow(0).numCols
+        for (j <- 1 until subMatRow.length) {
+          if (subMatRow(j).numRows != numRows) fatal("dimension mismatch in block matrix constructor: " + subMatRow(j).numRows + " != " + numRows)
+          numCols += subMatRow(j).numCols
+        }
+        totalNumRows += numRows
+        if (i == 0) {
+          totalNumCols = numCols
+        }
+        else if (numCols != totalNumCols) {
+          fatal("dimension mismatch in block matrix constructor: row " + i + " has wrong number of cols " + numCols + " (expected " + totalNumCols + ")")
+          () // FIXME: these extra ()s are needed to convince the embedding that the branch returns a Rep[Unit]. why?
+        }
+        ()
+      }
+
+      // write blocks
+      val out = DenseMatrix[T](totalNumRows, totalNumCols)
+      var rowIdx = 0
+      var colIdx = 0
+      for (i <- 0 until array_length(seq)) {
+        val subMatRow = array_apply(seq,i)
+        colIdx = 0
+        for (j <- 0 until subMatRow.length) {
+          for (k <- 0 until subMatRow(j).numRows) {
+            for (l <- 0 until subMatRow(j).numCols) {
+              out(rowIdx+k, colIdx+l) = subMatRow(j).apply(k,l)
+            }
+          }
+          colIdx += subMatRow(j).numCols
+        }
+        rowIdx += subMatRow(0).numRows
+      }
+
+      out.unsafeImmutable
+    }
+
     static (DenseMatrix) ("diag", T withBound TArith, (MInt, DenseVector(T)) :: DenseMatrix(T)) implements single ${ densematrix_fromfunc($0, $0, (i,j) =>
       if (i == j) $1(i)
       else implicitly[Arith[T]].empty
@@ -253,6 +304,8 @@ trait DenseMatrixOps {
       }
       infix ("<<=") (DenseVector(T) :: MUnit, effect = write(0)) implements composite ${ $self.insertRow($self.numRows, $1) }
       infix ("<<=") (DenseMatrix(T) :: MUnit, effect = write(0)) implements composite ${ $self.insertAllRows($self.numRows, $1) }
+      infix ("<<|=") (DenseVector(T) :: MUnit, effect = write(0)) implements composite ${ $self.insertCol($self.numCols, $1) }
+      infix ("<<|=") (DenseMatrix(T) :: MUnit, effect = write(0)) implements composite ${ $self.insertAllCols($self.numCols, $1) }
 
       infix ("insertRow") ((("pos",MInt),("y",DenseVector(T))) :: MUnit, effect=write(0)) implements single ${
         val idx = $pos*$self.numCols
@@ -482,7 +535,7 @@ trait DenseMatrixOps {
              }
            }
          }
-         (minRow,minCol)
+         pack((minRow,minCol))
        }
        infix ("maxIndex") (Nil :: Tuple2(MInt,MInt), TOrdering(T)) implements composite ${
          var max = $self(0,0)
@@ -497,7 +550,7 @@ trait DenseMatrixOps {
              }
            }
          }
-         (maxRow,maxCol)
+         pack((maxRow,maxCol))
        }
 
        infix (":>") (DenseMatrix(T) :: DenseMatrix(MBoolean), TOrdering(T)) implements zip((T,T,MBoolean), (0,1), ${ (a,b) => a > b })

@@ -15,6 +15,10 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
   import IR._
 
   def emitApplicationRunner(opsGrps: List[DSLOps], stream: PrintWriter) {
+    stream.println("trait " + dsl + "REPL extends " + dsl + "ApplicationInterpreter")
+    if (addREPLOverride) stream.println("  with " + dsl + "REPLOverrides")
+
+    stream.println()
     stream.println("trait " + dsl + "ApplicationInterpreter extends " + dsl + "Application with " + dsl+"Lib {")
     stream.println("  var args: Rep[Array[String]] = _")
     stream.println("  final def main(argsIn: Array[String]) {")

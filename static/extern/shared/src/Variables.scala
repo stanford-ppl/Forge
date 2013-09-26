@@ -14,5 +14,15 @@ import scala.virtualization.lms.common._
 trait LiftVar extends LiftVariables {
   this: VarOps =>
 }
-trait VarOps extends Variables
-trait VarCompilerOps extends VarOps
+trait VarOps extends Variables {
+  this: ReppableOps =>
+
+  implicit def canReppableVariable[A:Manifest]: Reppable[Var[A],A] = new Reppable[Var[A],A] {
+    def view(__arg0: Var[A])(implicit __pos: SourceContext) = {
+      readVar(__arg0)
+    }
+  }
+}
+trait VarCompilerOps extends VarOps {
+  this: ReppableOps =>
+}

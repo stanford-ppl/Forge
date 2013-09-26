@@ -314,6 +314,19 @@ trait BaseGenOps extends ForgeCodeGenBase {
 
   def check(o: Rep[DSLOp]) {
     if (!Impls.contains(o)) err("op " + o.name + " has no impl")
+
+    // arguments to DeliteOpType ops should always be Rep, List, or Seq (or the transformer in mirror will have a hard time)
+    def validOpArgs(a: Rep[DSLArg]) = {
+      a.tpe.stage == future || isFuncArg(a) || isThunk(a.tpe) || a.tpe.name.startsWith("List") || a.tpe.name.startsWith("Seq")
+    }
+
+    Impls(o) match {
+      case _:DeliteOpType =>
+        if (o.args.exists(a => !validOpArgs(a))) err("op " + o.name + " is a Delite op, but has non-Rep arguments")
+      case _ =>
+    }
+
+    // op-specific checks
     Impls(o) match {
       case Allocates(tpe,init) =>
         if (!DataStructs.contains(tpe)) err("op " + o.name + " allocates tpe " + tpe.name + " with no corresponding data definition")

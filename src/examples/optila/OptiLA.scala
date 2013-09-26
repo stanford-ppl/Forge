@@ -7,12 +7,15 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 object OptiLADSLRunner extends ForgeApplicationRunner with OptiLADSL
 
 trait OptiLADSL extends ForgeApplication
-  with BasicMathOps with RandomOps with IOOps with ArithOps with StringableOps
+  with ArithOps with StringableOps
+  with BasicMathOps with RandomOps with IOOps
   with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps
   with DenseMatrixOps
   with LinAlgOps {
 
   def dslName = "OptiLA"
+
+  override def addREPLOverride = true
 
   def specification() = {
     // our selection of Scala ops

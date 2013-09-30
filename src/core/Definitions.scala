@@ -110,7 +110,11 @@ trait Definitions extends DerivativeTypes {
     def prefix = "_ord"
     def wrapper = Some("otype")
   }
-
+  object TReppable extends TypeClassSignature {
+    def name = "Reppable"
+    def prefix = "_rep"
+    def wrapper = Some("rtype")
+  }
 
   /**
    * Method syntax types

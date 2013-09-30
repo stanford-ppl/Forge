@@ -306,8 +306,11 @@ trait ScalaOps {
     direct (Ord) ("__equal", (A,B), (A,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
     direct (Ord) ("__equal", (A,B), (MVar(A),B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
     direct (Ord) ("__equal", (A,B), (A,MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
+    direct (Ord) ("__equal", (A,B), (MVar(A),MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
     direct (Ord) ("__equal", (A,BC), (A,BC) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
+    direct (Ord) ("__equal", (A,BC), (MVar(A),BC) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
     direct (Ord) ("__equal", (AC,B), (AC,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
+    direct (Ord) ("__equal", (AC,B), (AC,MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
 
     val neq = infix (Ord) ("!=", (A,B), (A,B) :: MBoolean)
     impl (neq) (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
@@ -315,8 +318,11 @@ trait ScalaOps {
     impl (neq) (codegen(cpp, quotedArg(0) + " != " + quotedArg(1)))
     infix (Ord) ("!=", (A,B), (MVar(A),B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
     infix (Ord) ("!=", (A,B), (A,MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
+    infix (Ord) ("!=", (A,B), (MVar(A),MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
     infix (Ord) ("!=", (A,BC), (A,BC) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
+    infix (Ord) ("!=", (A,BC), (MVar(A),BC) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
     infix (Ord) ("!=", (AC,B), (AC,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
+    infix (Ord) ("!=", (AC,B), (AC,MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
 
     val lt = infix (Ord) ("<", List(A withBound TOrdering), List(A,A) :: MBoolean)
     val lte = infix (Ord) ("<=", List(A withBound TOrdering), List(A,A) :: MBoolean)
@@ -348,6 +354,7 @@ trait ScalaOps {
 
     infix (Str) ("trim", Nil, MString :: MString) implements codegen($cala, ${ $0.trim })
     infix (Str) ("fcharAt", Nil, (MString,MInt) :: MChar) implements codegen($cala, ${ $0.charAt($1) })
+    infix (Str) ("startsWith", Nil, (MString,MString) :: MBoolean) implements codegen($cala, ${ $0.startsWith($1) })
 
     // most of these variants collapse to a common back-end implementation:
 
@@ -388,9 +395,9 @@ trait ScalaOps {
   def importMath() = {
     val Math = grp("Math")
 
-    // (compile-time) constants
-    direct (Math) ("INF", Nil, Nil :: MDouble) implements redirect ${ unit(Double.PositiveInfinity) }
-    direct (Math) ("nINF", Nil, Nil :: MDouble) implements redirect ${ unit(Double.NegativeInfinity) }
+    // constants
+    direct (Math) ("INF", Nil, Nil :: MDouble) implements codegen($cala, "Double.PositiveInfinity")
+    direct (Math) ("nINF", Nil, Nil :: MDouble) implements codegen($cala, "Double.NegativeInfinity")
     direct (Math) ("Pi", Nil, Nil :: MDouble) implements redirect ${ unit(java.lang.Math.PI) }
     direct (Math) ("E", Nil, Nil :: MDouble) implements redirect ${ unit(java.lang.Math.E) }
 
@@ -471,31 +478,30 @@ trait ScalaOps {
       for (i <- 0 until arity) {
         val concrete = pars.zipWithIndex.map(t => if (t._2 == i) t._1 else e)
         infix (TT) ("_"+(i+1), pars(i), TT(concrete: _*) :: pars(i)) implements getter(0, elems(i))
-        // compiler (TT) ("tuple"+arity+"_get"+(i+1), pars(i), TT(concrete: _*) :: pars(i)) implements getter(0, elems(i))
       }
 
       val CT = tpe("Tuple"+arity, pars, stage = compile)
-      // val unpackTupleStr = "(" + elems.zipWithIndex.map(t => "tuple"+arity+"_get"+(t._2+1)+"(t)").mkString("(",",",")") + ")"
       val unpackTupleStr = "(" + elems.zipWithIndex.map(t => "tup"+arity+"__"+(t._2+1)+"(t)").mkString("(",",",")") + ")"
-      val parStr = elems.map(e => unit("t."+e))
+      val parStr = elems.map(e => "t."+e)
 
-      fimplicit (TT) ("t"+arity, pars, ("t",TT(pars: _*)) :: CT(pars: _*)) implements composite ${ \$unpackTupleStr }
-      fimplicit (TT) ("make_tuple"+arity, pars, ("t",CT(pars: _*)) :: TT(pars: _*)) implements allocates(TT, parStr: _*)
+      direct (TT) ("unpack", pars, ("t",TT(pars: _*)) :: CT(pars: _*)) implements composite ${ \$unpackTupleStr }
+      direct (TT) ("pack", pars, ("t",CT(pars: _*)) :: TT(pars: _*)) implements composite ("internal_pack" + arity + "(" + parStr.mkString(",") + ")")
 
-      // val makeTupleStr = "make_tuple"+arity+"("+elems.map(e => "$0."+e).mkString("(",",",")")+")"
-      // fimplicit (TT) ("chain_make_tuple"+arity+"_var", pars, TT(pars: _*) :: CT(pars: _*)) implements composite ${ \$makeTupleStr }
+      // internal_pack is necessary so that we don't store a stage = now type (CT) in a Delite IR node, which expects Reps.
+      val argStr = (0 until pars.length).map(i => unit(quotedArg(i)))
+      compiler (TT) ("internal_pack" + arity, pars, (pars :: TT(pars: _*))) implements allocates(TT, argStr: _*)
 
       val makeTupleStrStr = "\"(\"+" + (1 to arity).map(i => "t._"+i).mkString("+\",\"+") + "+\")\""
       infix (TT) ("toString", pars, ("t",TT(pars: _*)) :: MString) implements composite ${ \$makeTupleStrStr }
     }
 
-    // add implicits for Var combinations inside Tuple2s. We don't do this for all of them,
+    // add pack for Var combinations inside Tuple2s. We don't do this for all of them,
     // since the number of T,Var[T],Rep[T] combinations is exponential in the size of the tuple
     val Tuple2 = lookupTpe("Tup2")
     val A = tpePar("A")
     val B = tpePar("B")
-    fimplicit (Tuple2) ("chain_make_tuple2_var", (A,B), CTuple2(MVar(A),B) :: Tuple2(A,B)) implements composite ${ make_tuple2(($0._1,$0._2)) }
-    fimplicit (Tuple2) ("chain_make_tuple2_var", (A,B), CTuple2(A,MVar(B)) :: Tuple2(A,B)) implements composite ${ make_tuple2(($0._1,$0._2)) }
-    fimplicit (Tuple2) ("chain_make_tuple2_var", (A,B), CTuple2(MVar(A),MVar(B)) :: Tuple2(A,B)) implements composite ${ make_tuple2(($0._1,$0._2)) }
+    direct (Tuple2) ("pack", (A,B), CTuple2(MVar(A),B) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
+    direct (Tuple2) ("pack", (A,B), CTuple2(A,MVar(B)) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
+    direct (Tuple2) ("pack", (A,B), CTuple2(MVar(A),MVar(B)) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
   }
 }

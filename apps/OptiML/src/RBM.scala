@@ -60,10 +60,10 @@ trait RBM extends OptiMLApplication {
     // val p = untilconverged((errSum,visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases), maxIter = numBatches*maxEpoch) {
 
     // inside REPL, not distinguishing between Rep[Tup] and Tuple correctly -- make_tupleX must be called explicitly
-    val p = untilconverged_buffered((visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases), maxIter = numBatches*maxEpoch) {
+    val p = untilconverged_buffered(pack(visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases), maxIter = numBatches*maxEpoch) {
       params =>
-      // val (errSum,visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases) = t7(params)
-      val (visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases) = t6(params)
+      // val (errSum,visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases) = unpack(params)
+      val (visHidInc,visHid,visBiasInc,visBiases,hidBiasInc,hidBiases) = unpack(params)
 
       //println("Epoch: " + epoch + ", Batch: " + batch)
       // Positive phase
@@ -103,8 +103,8 @@ trait RBM extends OptiMLApplication {
         epochErrSum = 0.0
       }
 
-      // (nextErrSum, nextVisHidInc, nextVisHid, nextVisBiasInc, nextVisBiases, nextHidBiasInc, nextHidBiases)
-      (nextVisHidInc, nextVisHid, nextVisBiasInc, nextVisBiases, nextHidBiasInc, nextHidBiases)
+      // pack(nextErrSum, nextVisHidInc, nextVisHid, nextVisBiasInc, nextVisBiases, nextHidBiasInc, nextHidBiases)
+      pack(nextVisHidInc, nextVisHid, nextVisBiasInc, nextVisBiases, nextHidBiasInc, nextHidBiases)
     }
 
     toc(p)

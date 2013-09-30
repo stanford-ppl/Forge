@@ -79,6 +79,37 @@ trait VectorOps {
         out.unsafeImmutable
       }
 
+      infix ("mutable") (Nil :: DenseVector(T), effect = mutable, aliasHint = copies(0)) implements single ${
+        val out = DenseVector[\$TT]($self.length, $self.isRow)
+        for (i <- 0 until out.length) {
+          out(i) = $self(i)
+        }
+        out
+      }
+
+      infix ("replicate") ((MInt,MInt) :: DenseMatrix(T)) implements single ${
+        if ($self.isRow) {
+          val out = DenseMatrix[\$TT]($1, $2*$self.length)
+          for (col <- 0 until $2*$self.length){
+            val colToJ = col % $self.length
+            for (rI <- 0 until $1) {
+              out(rI, col) = $self(colToJ)
+            }
+          }
+          out.unsafeImmutable
+        }
+        else {
+          val out = DenseMatrix[\$TT]($1*$self.length, $2)
+          for (row <- 0 until $1*$self.length){
+            val rowToI = row % $self.length
+            for (cI <- 0 until $2) {
+              out(row, cI) = $self(rowToI)
+            }
+          }
+          out.unsafeImmutable
+        }
+      }
+
       // we need two versions so that we can override toString in the lib, and use makeStr in Delite. sad.
       infix ("makeString") (Nil :: MString, S) implements single ${
         var s = ""
@@ -86,18 +117,16 @@ trait VectorOps {
           "[ ]"
         }
         else if ($self.isRow) {
-          s = s + "["
           for (i <- 0 until $self.length - 1) {
-            s = s + $self(i).makeStr + " "
+            s = s + optila_padspace($self(i).makeStr)
           }
-          s = s + $self($self.length-1).makeStr
-          s = s + "]"
+          s = s + optila_padspace($self($self.length-1).makeStr)
         }
         else {
           for (i <- 0 until $self.length - 1) {
-            s = s + "[" + $self(i).makeStr + "]\\n"
+            s = s + optila_padspace($self(i).makeStr) + "\\n"
           }
-          s = s + "[" + $self($self.length-1).makeStr + "]"
+          s = s + optila_padspace($self($self.length-1).makeStr)
         }
         s
       }
@@ -107,23 +136,22 @@ trait VectorOps {
           "[ ]"
         }
         else if ($self.isRow) {
-          s = s + "["
           for (i <- 0 until $self.length - 1) {
-            s = s + $self(i) + " "
+            // make sure to force strConcatWithNumerics to kick in
+            s = s + optila_padspace("" + $self(i))
           }
-          s = s + $self($self.length-1)
-          s = s + "]"
+          s = s + optila_padspace("" + $self($self.length-1))
         }
         else {
           for (i <- 0 until $self.length - 1) {
-            s = s + "[" + $self(i) + "]\\n"
+            s = s + optila_padspace("" + $self(i)) + "\\n"
           }
-          s = s + "[" + $self($self.length-1) + "]"
+          s = s + optila_padspace("" + $self($self.length-1))
         }
         s
       }
 
-      infix ("pprint") (Nil :: MUnit, S, effect = simple) implements composite ${ println($self.makeStr) } // $self.toString doesn't work in Delite
+      infix ("pprint") (Nil :: MUnit, S, effect = simple) implements composite ${ println($self.makeStr + "\\n") } // $self.toString doesn't work in Delite
 
 
       /**
@@ -225,7 +253,7 @@ trait VectorOps {
           if (pred(x)) outT <<= x
           else outF <<= x
         }
-        (outT.unsafeImmutable, outF.unsafeImmutable)
+        pack((outT.unsafeImmutable, outF.unsafeImmutable))
       }
 
       infix ("flatMap") ((T ==> DenseVector(R)) :: DenseVector(R), addTpePars = R) implements composite ${

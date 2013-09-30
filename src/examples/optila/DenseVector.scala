@@ -21,17 +21,23 @@ trait DenseVectorOps {
     data(DenseVector, ("_length", MInt), ("_isRow", MBoolean), ("_data", MArray(T)))
 
     // operations on literal sequences are made available via tuple conversions to DenseVector
-    // non-literal sequences don't work and require explicit conversion to DenseVector first, due to the implicit ambiguity problem below
     for (arity <- (2 until 23)) {
-      val pars = (1 to arity).map(i => T).toList
-      val elems = (1 to arity).map(i => "unit(t._"+i+")").mkString(",")
-      val TT = tpe("Tuple" + arity, pars, stage = compile)
-      fimplicit (DenseVector) ("tupleToDense" + arity, T, (("t",TT) :: DenseVector(T))) implements redirect ${ DenseVector[T](\$elems) }
+      // we use "Reppable" to allow heterogeneous tuples (that vary in A, Rep[A], and Var[A]) to still be converted
+      val pars = tpePar("A") :: (1 until arity).map(i => tpePar(('A'.toInt+i).toChar.toString, Nil)).toList
+      val impls = (1 until arity).map(i => TReppable(pars(i),pars(0))).toList
 
-      // problem: makes implicit conversions to TupNs ambiguous due to type erasure (Rep[_])
-      // val elems2 = (0 until arity).map(i => "t._" + (i+1)).mkString(",")
-      // val TT2 = tpeInst(tpe("Tuple" + arity, pars, stage = compile), pars)
-      // fimplicit (DenseVector) ("repTupleToDense" + arity, T, (("t",TT2) :: DenseVector(T))) implements redirect ${ DenseVector[T](\$elems2) }
+      // we need a version where A (the return type) is A, Rep[A], and Var[A] in order to get type inference to "always" work
+      // using a different type parameter to specify the return type (like RR) almost works, but isn't always inferred
+      val elems = ((2 to arity).map(i => implicitOpArgPrefix + (i-2) + ".view(t._"+i+")").toList).mkString(",")
+      val TT = tpe("Tuple" + arity, pars, stage = compile)
+      fimplicit (DenseVector) ("tupleToDense" + arity, pars, (("t",TT) :: DenseVector(pars(0))), impls) implements redirect ${ DenseVector[A](unit(t._1),\$elems) }
+
+      // we hack the first argument to be Rep[A] or Var[A] as needed here.
+      val TR = tpe("Tuple" + arity, tpePar("Rep[A]") :: pars.drop(1), stage = compile)
+      fimplicit (DenseVector) ("repTupleToDense" + arity, pars, (("t",TR) :: DenseVector(pars(0))), impls) implements redirect ${ DenseVector[A](t._1,\$elems) }
+
+      val TV = tpe("Tuple" + arity, tpePar("Var[A]") :: pars.drop(1), stage = compile)
+      fimplicit (DenseVector) ("varTupleToDense" + arity, pars, (("t",TV) :: DenseVector(pars(0))), impls) implements redirect ${ DenseVector[A](readVar(t._1),\$elems) }
     }
 
     // static methods
@@ -60,7 +66,7 @@ trait DenseVectorOps {
       }
       else {
         val sizes = $pieces map { e => e.length }
-        val (total,begins) = t2(densevector_precumulate[Int](sizes, 0, (_: Rep[Int]) + (_: Rep[Int])))
+        val (total,begins) = unpack(densevector_precumulate[Int](sizes, 0, (_: Rep[Int]) + (_: Rep[Int])))
         val result = DenseVector[T](total, $pieces.isRow)
         for (i <- 0 until $pieces.length) {
           result.copyFrom(begins(i), $pieces(i))
@@ -74,7 +80,7 @@ trait DenseVectorOps {
     val Tuple2 = lookupTpe("Tup2")
     compiler (DenseVector) ("densevector_precumulate", T, ((("v",DenseVector(T)), ("identity",T), ("func",(T,T) ==> T)) :: Tuple2(T,DenseVector(T)))) implements composite ${
       if ($v.length == 0) {
-        ($identity,DenseVector[T](0,$v.isRow).unsafeImmutable)
+        pack(($identity,DenseVector[T](0,$v.isRow).unsafeImmutable))
       }
       else {
         val result = DenseVector[T](0, $v.isRow)
@@ -83,7 +89,7 @@ trait DenseVectorOps {
           result <<= accum
           accum = $func(accum, $v(i))
         }
-        (accum,result.unsafeImmutable)
+        pack((accum,result.unsafeImmutable))
       }
     }
 
@@ -136,37 +142,17 @@ trait DenseVectorOps {
       infix ("mt") (Nil :: MUnit, effect = write(0)) implements composite ${
         densevector_set_isrow($0, !$0.isRow)
       }
-      infix ("Clone") (Nil :: DenseVector(T), aliasHint = copies(0)) implements map((T,T), 0, "e => e")
-      infix ("mutable") (Nil :: DenseVector(T), effect = mutable, aliasHint = copies(0)) implements single ${
-        val out = DenseVector[T]($self.length, $self.isRow)
-        for (i <- 0 until out.length) {
-          out(i) = $self(i)
-        }
-        out
-      }
-      infix ("replicate") ((MInt,MInt) :: DenseMatrix(T)) implements single ${
+
+      infix ("toMat") (Nil :: DenseMatrix(T)) implements composite ${
         if ($self.isRow) {
-          val out = DenseMatrix[T]($1, $2*$self.length)
-          for (col <- 0 until $2*$self.length){
-            val colToJ = col % $self.length
-            for (rI <- 0 until $1) {
-              out(rI, col) = $self(colToJ)
-            }
-          }
-          out.unsafeImmutable
+          DenseMatrix($self)
         }
         else {
-          val out = DenseMatrix[T]($1*$self.length, $2)
-          for (row <- 0 until $1*$self.length){
-            val rowToI = row % $self.length
-            for (cI <- 0 until $2) {
-              out(row, cI) = $self(rowToI)
-            }
-          }
-          out.unsafeImmutable
+          DenseMatrix[T](0,0) <<| $self
         }
       }
 
+      infix ("Clone") (Nil :: DenseVector(T), aliasHint = copies(0)) implements map((T,T), 0, "e => e")
 
       /**
        * Data operations
@@ -179,6 +165,17 @@ trait DenseVectorOps {
       infix ("update") ((("i",MInt),("e",T)) :: MUnit, effect = write(0)) implements composite ${
         array_update(densevector_raw_data($self), $i, $e)
       }
+      infix ("update") ((("indices",IndexVector),("v",DenseVector(T))) :: MUnit, effect = write(0)) implements single ${
+        if (indices.length != v.length) fatal("dimension mismatch: bulk vector update")
+
+        // cannot be parallel unless indices contains only disjoint indices (why is why we use 'single' here)
+        // however, maybe this should be a property that we guarantee of all IndexVectors
+        (0::indices.length) foreach { i =>
+          if (indices(i) < 0 || indices(i) >= $self.length) fatal("index out of bounds: bulk vector update")
+          array_update(densevector_raw_data($self), indices(i), v(i))
+        }
+      }
+
       infix ("<<") (T :: DenseVector(T)) implements single ${
         val out = DenseVector[T](0,$self.isRow)
         out <<= $self

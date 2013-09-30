@@ -106,8 +106,7 @@ trait BaseGenTypeClasses extends BaseGenOps {
           + makeOpArgsWithType(o) + makeImplicitArgsWithType(o.implicitArgs)
           + ": " + repify(o.retTpe) + " = implicitly["+quote(tpeCls)+"]." + o.name + makeOpArgs(o, addParen = o.effect != pure))
       }
-
-      stream.println("}")
     }
+    stream.println("}")
   }
 }

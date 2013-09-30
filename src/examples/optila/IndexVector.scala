@@ -71,6 +71,16 @@ trait IndexVectorOps {
       }
 
       infix ("t") (Nil :: IndexVector) implements allocates(IndexVector, ${indexvector_raw_data($self)}, ${indexvector_start($self)}, ${indexvector_end($self)}, ${!(indexvector_isrow($self))}, ${indexvector_is_range($self)})
+
+      infix ("Clone") (Nil :: IndexVector, aliasHint = copies(0)) implements composite ${
+        if (indexvector_is_range($self)) {
+          IndexVector(indexvector_start($self),indexvector_end($self),$self.isRow)
+        }
+        else {
+          indexvector_fromarray(array_clone(indexvector_raw_data($self)), $self.isRow)
+        }
+      }
+
       infix ("toDense") (Nil :: DenseVector(MInt)) implements composite ${ $self.map(e => e) }
 
       // parallel, so the conversion can fuse with the consumer

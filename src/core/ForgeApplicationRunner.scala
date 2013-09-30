@@ -26,6 +26,7 @@ trait ForgeApplicationRunner extends ForgeApplication with ForgeExp {
     extern(grp("Record"))
     extern(grp("InputOutput"))
     extern(grp("Profiling"))
+    extern(grp("Reppable"))
 
     // -- stage the specification to build the Forge IR
     // this has the side effect of populating all of the internal Forge collections

@@ -79,7 +79,7 @@ object ${dslName}Build extends Build {
     retrieveManaged := true,
     scalacOptions += "-Yno-generic-signatures",
     scalacOptions += "-Yvirtualize",
-    initialCommands in console += "import ${dslNameLowerCase}.library._; val ${dslName} = new ${dslName}ApplicationInterpreter { def main() = {} }; import ${dslName}._"
+    initialCommands in console += "import ${dslNameLowerCase}.library._; val ${dslName} = new ${dslName}REPL { def main() = {} }; import ${dslName}._"
   )
 
   val virtBuildSettings = virtBuildSettingsBase ++ Seq(

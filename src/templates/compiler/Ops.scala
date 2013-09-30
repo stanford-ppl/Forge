@@ -186,11 +186,12 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println("}")
   }
 
+  def hasIRNode(o: Rep[DSLOp]) = Impls(o) match {
+    case _:Composite | _:Redirect | _:Getter | _:Setter => false
+    case _ => true
+  }
+
   def emitIRNodes(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
-    def hasIRNode(o: Rep[DSLOp]) = Impls(o) match {
-      case _:Composite | _:Redirect | _:Getter | _:Setter => false
-      case _ => true
-    }
 
     def emitOpNodeHeader(o: Rep[DSLOp], opStr: String) {
       stream.println(" extends " + opStr + " {")
@@ -408,7 +409,7 @@ trait DeliteGenOps extends BaseGenOps {
   }
 
   def emitAliasInfo(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
-    if (uniqueOps.exists(o => o.aliasHint != nohint)) {
+    if (uniqueOps.exists(o => hasIRNode(o) && o.aliasHint != nohint)) {
       emitBlockComment("Aliases / Sharing", stream, indent=2)
 
       var aliasBuf    = "override def aliasSyms(e: Any): List[Sym[Any]] = e match {" + nl
@@ -428,7 +429,7 @@ trait DeliteGenOps extends BaseGenOps {
         copySyms.foreach    { l => copyBuf    += makeAliasAnnotation(o,l) }
       }
 
-      for (o <- uniqueOps if o.aliasHint != nohint) {
+      for (o <- uniqueOps if hasIRNode(o) && o.aliasHint != nohint) {
         o.aliasHint match {
           case AliasCopies(z) =>
             if (o.args.length == z.length) makeAllAliasAnnotations(o, Some(Nil), Some(Nil), Some(Nil), Some(z)) // == aliasesNone

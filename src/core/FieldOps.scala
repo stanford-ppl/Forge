@@ -49,8 +49,7 @@ trait FieldOpsExp extends FieldOps {
    * TypePar
    */
   def infix_ctxBounds(x: Exp[TypePar]): List[TypeClassSignature] = x match {
-    case Def(TpePar(name,ctx,s)) if (ctx.contains(TManifest)) => ctx
-    case Def(TpePar(name,ctx,s)) => TManifest :: ctx
+    case Def(TpePar(name,ctx,s)) => ctx
   }
   def infix_name(x: Exp[TypePar])(implicit o: Overloaded1) = x match {
     case Def(TpePar(name,ctx,s)) => name

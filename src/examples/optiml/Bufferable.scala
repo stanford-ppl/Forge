@@ -62,7 +62,7 @@ trait BufferableOps {
       val pars = (0 until arity).map(i => tpePar(('A'.toInt+i).toChar.toString) withBound TBufferable).toList
       val TupBuf = tpeClassInst("BufferableTup"+arity, pars, Bufferable(Tup))
 
-      val makeTupBufStr = "make_tuple" + arity + (1 to arity).map(i => "t._"+i+".mutable").mkString("((",",","))")
+      val makeTupBufStr = "pack" + (1 to arity).map(i => "t._"+i+".mutable").mkString("((",",","))")
       infix (TupBuf) ("mutable", pars, ("t",Tup) :: Tup, effect = mutable) implements composite ${ \$makeTupBufStr }
 
       val writeTupBufStr = (1 to arity).map(i => "t1._"+i+".write(t2._"+i+")").mkString("\n")

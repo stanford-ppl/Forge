@@ -32,6 +32,9 @@ trait DenseVectorViewOps {
         DenseVectorView(densevectorview_data($self), densevectorview_start($self)+$start*densevectorview_stride($self), densevectorview_stride($self), $end-$start, $self.isRow)
       }
 
+      // should we allow people to make clones of actual VectorViews? the semantics seem confusing
+      infix ("Clone") (Nil :: DenseVector(T), aliasHint = copies(0)) implements redirect ${ $self.toDense }
+
       infix ("toDense") (Nil :: DenseVector(T)) implements composite ${ $self.map(e => e) }
 
       fimplicit ("viewToDense") (Nil :: DenseVector(T)) implements composite ${

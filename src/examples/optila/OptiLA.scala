@@ -7,12 +7,15 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 object OptiLADSLRunner extends ForgeApplicationRunner with OptiLADSL
 
 trait OptiLADSL extends ForgeApplication
-  with BasicMathOps with RandomOps with IOOps with ArithOps with StringableOps
+  with ArithOps with StringableOps
+  with BasicMathOps with RandomOps with IOOps
   with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps
   with DenseMatrixOps
   with LinAlgOps {
 
   def dslName = "OptiLA"
+
+  override def addREPLOverride = true
 
   def specification() = {
     // our selection of Scala ops
@@ -77,6 +80,10 @@ a1+b1
     impl (lookupOverloaded("FString","+",0)) (codegen($cala, strConcatWithNumerics))
     impl (lookupOverloaded("FString","+",6)) (codegen($cala, strConcatWithNumerics))
     impl (lookupOverloaded("FString","+",11)) (codegen($cala, strConcatWithNumerics))
+
+    compiler (lookupGrp("FString")) ("optila_padspace", Nil, MString :: MString) implements composite ${
+      if ($0.startsWith("-")) "  " + $0 else "   " + $0
+    }
 
     importIndexVectorOps()
     importDenseVectorViewOps()

@@ -86,7 +86,7 @@ trait PDIPSolver extends OptiMLApplication {
 
     implicit def diffPDIP(t1: Rep[Tup4[DenseVector[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double]]],
                           t2: Rep[Tup4[DenseVector[Double],DenseVector[Double],DenseVector[Double],DenseVector[Double]]]) = {
-      val (u, v, w, viters) = t4(t2)
+      val (u, v, w, viters) = unpack(t2)
       val iters = viters(0)
 
       val tau = u(0)
@@ -140,8 +140,8 @@ trait PDIPSolver extends OptiMLApplication {
       }
     }
 
-    val result = untilconverged((u0,v0,w0,DenseVector(0.0)), maxIter = MAXITERS) { cur =>
-      val (u, v, w, viters) = t4(cur)
+    val result = untilconverged(pack(u0,v0,w0,DenseVector(0.0)), maxIter = MAXITERS) { cur =>
+      val (u, v, w, viters) = unpack(cur)
       val iters = viters(0)
       
       val tau = u(0)
@@ -172,7 +172,7 @@ trait PDIPSolver extends OptiMLApplication {
       val r6 = -(-c*tau - G.t*z - A.t*y + rd*theta)
       val r7 = rc - (-ro*tau - ri*:*z - re*:*y - rd*:*x)
       val (dx1,dy1,dz1) = kkt_sol(s/z,G,A,-r6,r5,r4-(r1/z));
-      val sol = (T \ (DenseVector(r3-r2/tau, r7) + Ta * (dz1 << dy1 << dx1))).t
+      val sol = (T \ (DenseVector(r3-r2/tau, r7) + Ta * (dz1 << dy1 << dx1)))
       val dz = dz1 - Gz*sol
       val dy = dy1 - Gy*sol
       val dx = dx1 - Gx*sol
@@ -198,7 +198,7 @@ trait PDIPSolver extends OptiMLApplication {
       val rr7 = 0.0
       val (ddx1,ddy1,ddz1) = kkt_sol(s/z,G,A,-rr6,rr5,rr4-(rr1/z))
       val tmpl = Ta * (ddz1 << ddy1 << ddx1)
-      val ssol = (T \ (DenseVector(rr3-rr2/tau, rr7) + tmpl)).t
+      val ssol = (T \ (DenseVector(rr3-rr2/tau, rr7) + tmpl))
       val dzc = ddz1 - Gz*ssol
       val dyc = ddy1 - Gy*ssol
       val dxc = ddx1 - Gx*ssol
@@ -218,10 +218,10 @@ trait PDIPSolver extends OptiMLApplication {
       val v_next = v + sstep*ddv
       val w_next = w + sstep*ddw
 
-      (u_next, v_next, w_next, DenseVector(iters + 1.0))
+      pack(u_next, v_next, w_next, DenseVector(iters + 1.0))
     }
 
-    val (u, v, w, viters) = t4(result)
+    val (u, v, w, viters) = unpack(result)
 
     val tau = u(0)
     val z = u.slice(1, m+1)

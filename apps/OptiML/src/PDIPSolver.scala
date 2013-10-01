@@ -154,14 +154,14 @@ trait PDIPSolver extends OptiMLApplication {
 
       val (solx1, soly1, solz1) =  kkt_sol(s / z, G, A, c, -b, -h) 
       val (solx2, soly2, solz2) =  kkt_sol(s / z, G, A, -rd, re, ri)
-      val Gx = DenseMatrix(solx1).t <<| DenseMatrix(solx2).t
-      val Gy = DenseMatrix(soly1).t <<| DenseMatrix(soly2).t
-      val Gz = DenseMatrix(solz1).t <<| DenseMatrix(solz2).t
+      val Gx = solx1.toMat <<| solx2.toMat
+      val Gy = soly1.toMat <<| soly2.toMat
+      val Gz = solz1.toMat <<| solz2.toMat
       val Gzyx = Gz << Gy << Gx
 
       // compute T = H22 - H21*(H11\H12)
       val T0 = DenseMatrix(DenseVector(-lambda/tau, ro), DenseVector(-ro, 0.0))
-      val Ta = (-DenseMatrix(h) <<| -DenseMatrix(b) <<| -DenseMatrix(c)) << (DenseMatrix(ri) <<| DenseMatrix(re) <<| DenseMatrix(rd))
+      val Ta = (-h.toMat.t <<| -b.toMat.t <<| -c.toMat.t) << (ri.toMat.t <<| re.toMat.t <<| rd.toMat.t)
       val T = T0 + Ta * Gzyx
 
       val r1 = -s*z

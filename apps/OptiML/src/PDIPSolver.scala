@@ -21,9 +21,9 @@ trait PDIPSolver extends OptiMLApplication {
     val STEP = 0.99
     val EXPON = 3.0
 
-    if (args.length != 9) {
-      print_usage
-    }
+    // if (args.length != 9) {
+    //   print_usage
+    // }
 
     val c = readVector(args(0)).t
     val G = readMatrix(args(1))
@@ -40,25 +40,25 @@ trait PDIPSolver extends OptiMLApplication {
     val y0 = readVector(args(7)).t
     val z0 = readVector(args(8)).t
 
-    if((G.numCols != c.length)||(A.numCols != c.length)||(G.numRows != h.length)||(A.numRows != b.length)) {
-      println("error: matrix size mismatch")
-      println("c := " + c.length)
-      println("G := " + G.numCols + " x " + G.numRows)
-      println("h := " + h.length)
-      println("A := " + A.numCols + " x " + A.numRows)
-      println("b := " + b.length)
-      exit(-1)
-    }
+    // if((G.numCols != c.length)||(A.numCols != c.length)||(G.numRows != h.length)||(A.numRows != b.length)) {
+    //   println("error: matrix size mismatch")
+    //   println("c := " + c.length)
+    //   println("G := " + G.numCols + " x " + G.numRows)
+    //   println("h := " + h.length)
+    //   println("A := " + A.numCols + " x " + A.numRows)
+    //   println("b := " + b.length)
+    //   exit(-1)
+    // }
 
-    if((x0.length != n)||(s0.length != m)) {
-      println("error: primal start size mismatch")
-      exit(-1)
-    }
+    // if((x0.length != n)||(s0.length != m)) {
+    //   println("error: primal start size mismatch")
+    //   exit(-1)
+    // }
 
-    if((y0.length != p)||(z0.length != m)) {
-      println("error: dual start size mismatch")
-      exit(-1)
-    }
+    // if((y0.length != p)||(z0.length != m)) {
+    //   println("error: dual start size mismatch")
+    //   exit(-1)
+    // }
 
     val rc = 1.0+z0*:*s0
     val ri = h-G*x0-s0

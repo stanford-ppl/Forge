@@ -107,7 +107,7 @@ trait PDIPSolver extends OptiMLApplication {
         absgap / (-pcost)
       }
       else {
-        Double.PositiveInfinity
+        INF
       }
       val hresi = G*x+s
       val resi = h - hresi/tau
@@ -241,7 +241,7 @@ trait PDIPSolver extends OptiMLApplication {
       absgap / (-pcost)
     }
     else {
-      Double.PositiveInfinity
+      INF
     }
     val hresi = G*x+s
     val resi = h - hresi/tau
@@ -258,13 +258,13 @@ trait PDIPSolver extends OptiMLApplication {
       // optimal
       println("optimal")
       println("\nx")
-      println(x / tau)
+      (x / tau).pprint
       println("\ns")
-      println(s / tau)
+      (s / tau).pprint
       println("\nz")
-      println(z / tau)
+      (z / tau).pprint
       println("\ny")
-      println(y / tau)
+      (y / tau).pprint
     }
     else if ((h*:*z+b*:*y < 0.0)&&(hdres/abs(h*:*z+b*:*y)<= FEASTOL)) {
       // primal infeasible
@@ -272,9 +272,9 @@ trait PDIPSolver extends OptiMLApplication {
       val t = abs(h*:*z+b*:*y)
       println("\nt = " + t.toString + "\n")
       println("\nz")
-      println(z / t)
+      (z / t).pprint
       println("\ny")
-      println(y / t)
+      (y / t).pprint
     }
     else if ((c*:*x < 0.0)&&(hpres/abs(c*:*x) <= FEASTOL)) {
       // dual infeasible
@@ -282,9 +282,9 @@ trait PDIPSolver extends OptiMLApplication {
       val t = abs(c*:*x)
       println("\nt = " + t.toString + "\n")
       println("\nx")
-      println(x / t)
+      (x / t).pprint
       println("\ns")
-      println(s / t)
+      (s / t).pprint
     }
     else {
       // did not converge

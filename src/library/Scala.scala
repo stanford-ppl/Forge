@@ -50,60 +50,63 @@ trait ScalaOps {
     lift (Prim) (MFloat)
     lift (Prim) (MDouble)
 
-    infix (Prim) ("toInt", T withBound TNumeric, T :: MInt) implements codegen($cala, ${ $0.toInt })
-    infix (Prim) ("toFloat", T withBound TNumeric, T :: MFloat) implements codegen($cala, ${ $0.toFloat })
-    infix (Prim) ("toDouble", T withBound TNumeric, T :: MDouble) implements codegen($cala, ${ $0.toDouble })
+    val toInt = infix (Prim) ("toInt", T withBound TNumeric, T :: MInt)
+    val toFloat = infix (Prim) ("toFloat", T withBound TNumeric, T :: MFloat)
+    val toDouble = infix (Prim) ("toDouble", T withBound TNumeric, T :: MDouble)
+    
+    impl (toInt) (codegen($cala, ${ $0.toInt }))
+    impl (toFloat) (codegen($cala, ${ $0.toFloat }))
+    impl (toDouble) (codegen($cala, ${ $0.toDouble }))
+
+    for (g <- List(cuda, cpp)) {
+      impl (toInt) (codegen(g, ${ (int) $0 }))
+      impl (toFloat) (codegen(g, ${ (float) $0 }))
+      impl (toDouble) (codegen(g, ${ (double) $0 }))
+    }
 
     fimplicit (Prim) ("repInt2ToRepDouble", Nil, MInt :: MDouble) implements composite ${ $0.toDouble }
     fimplicit (Prim) ("repInt2ToRepFloat", Nil, MInt :: MFloat) implements composite ${ $0.toFloat }
     fimplicit (Prim) ("repFloat2ToRepDouble", Nil, MFloat :: MDouble) implements composite ${ $0.toDouble }
 
-    infix (Prim) ("%", Nil, (MInt,MInt) :: MInt) implements codegen($cala, ${$0 % $1})
-
     // specialized versions for primitives
     // the forge_ prefix is to avoid conflicting with LMS primitive ops
     val int_plus = direct (Prim) ("forge_int_plus", Nil, (MInt,MInt) :: MInt)
-    impl (int_plus) (codegen($cala, ${$0 + $1}))
-    impl (int_plus) (codegen(cuda, ${$0 + $1}))
-    impl (int_plus) (codegen(cpp, ${$0 + $1}))
     val int_minus = direct (Prim) ("forge_int_minus", Nil, (MInt,MInt) :: MInt)
-    impl (int_minus) (codegen($cala, ${$0 - $1}))
-    impl (int_minus) (codegen(cuda, ${$0 - $1}))
-    impl (int_minus) (codegen(cpp, ${$0 - $1}))
     val int_times = direct (Prim) ("forge_int_times", Nil, (MInt,MInt) :: MInt)
-    impl (int_times) (codegen($cala, ${$0 * $1}))
-    impl (int_times) (codegen(cuda, ${$0 * $1}))
-    impl (int_times) (codegen(cpp, ${$0 * $1}))
     val int_divide = direct (Prim) ("forge_int_divide", Nil, (MInt,MInt) :: MInt)
-    impl (int_divide) (codegen($cala, ${$0 / $1}))
-    impl (int_divide) (codegen(cuda, ${$0 / $1}))
-    impl (int_divide) (codegen(cpp, ${$0 / $1}))
-
-    direct (Prim) ("forge_int_shift_left", Nil, (MInt,MInt) :: MInt) implements codegen($cala, ${$0 << $1})
-
-    direct (Prim) ("forge_float_plus", Nil, (MFloat,MFloat) :: MFloat) implements codegen($cala, ${$0 + $1})
-    direct (Prim) ("forge_float_minus", Nil, (MFloat,MFloat) :: MFloat) implements codegen($cala, ${$0 - $1})
-    direct (Prim) ("forge_float_times", Nil, (MFloat,MFloat) :: MFloat) implements codegen($cala, ${$0 * $1})
-    direct (Prim) ("forge_float_divide", Nil, (MFloat,MFloat) :: MFloat) implements codegen($cala, ${$0 / $1})
-
+    val int_shift_left = direct (Prim) ("forge_int_shift_left", Nil, (MInt,MInt) :: MInt) 
+    val int_mod = infix (Prim) ("%", Nil, (MInt,MInt) :: MInt) 
+    
+    val float_plus = direct (Prim) ("forge_float_plus", Nil, (MFloat,MFloat) :: MFloat) 
+    val float_minus = direct (Prim) ("forge_float_minus", Nil, (MFloat,MFloat) :: MFloat) 
+    val float_times = direct (Prim) ("forge_float_times", Nil, (MFloat,MFloat) :: MFloat) 
+    val float_divide = direct (Prim) ("forge_float_divide", Nil, (MFloat,MFloat) :: MFloat)
+    
     val double_plus = direct (Prim) ("forge_double_plus", Nil, (MDouble,MDouble) :: MDouble)
-    impl (double_plus) (codegen($cala, ${$0 + $1}))
-    impl (double_plus) (codegen(cuda, ${$0 + $1}))
-    impl (double_plus) (codegen(cpp, ${$0 + $1}))
     val double_minus = direct (Prim) ("forge_double_minus", Nil, (MDouble,MDouble) :: MDouble)
-    impl (double_minus) (codegen($cala, ${$0 - $1}))
-    impl (double_minus) (codegen(cuda, ${$0 - $1}))
-    impl (double_minus) (codegen(cpp, ${$0 - $1}))
     val double_times = direct (Prim) ("forge_double_times", Nil, (MDouble,MDouble) :: MDouble)
-    impl (double_times) (codegen($cala, ${$0 * $1}))
-    impl (double_times) (codegen(cuda, ${$0 * $1}))
-    impl (double_times) (codegen(cpp, ${$0 * $1}))
     val double_divide = direct (Prim) ("forge_double_divide", Nil, (MDouble,MDouble) :: MDouble)
-    impl (double_divide) (codegen($cala, ${$0 / $1}))
-    impl (double_divide) (codegen(cuda, ${$0 / $1}))
-    impl (double_divide) (codegen(cpp, ${$0 / $1}))
 
-    // can we auto-generate these? the tricky part is the bodies, which require explicit conversions..
+    for (g <- List($cala, cuda, cpp)) {
+      impl (int_plus) (codegen(g, ${$0 + $1}))
+      impl (int_minus) (codegen(g, ${$0 - $1}))
+      impl (int_times) (codegen(g, ${$0 * $1}))
+      impl (int_divide) (codegen(g, ${$0 / $1}))
+      impl (int_shift_left) (codegen(g, ${$0 << $1}))
+
+      impl (float_plus) (codegen(g, ${$0 + $1}))
+      impl (float_minus) (codegen(g, ${$0 - $1}))
+      impl (float_times) (codegen(g, ${$0 * $1}))
+      impl (float_divide) (codegen(g, ${$0 / $1}))
+
+      impl (double_plus) (codegen(g, ${$0 + $1}))
+      impl (double_minus) (codegen(g, ${$0 - $1}))
+      impl (double_times) (codegen(g, ${$0 * $1}))
+      impl (double_divide) (codegen(g, ${$0 / $1}))
+
+      impl (int_mod) (codegen(g, ${$0 % $1}))
+    }
+
     // infix (Prim) ("+", Nil, enumerate(CInt,MInt,CFloat,MFloat,CDouble,MDouble)) implements codegen($cala, quotedArg(0) + " + " + quotedArg(1))
     infix (Prim) ("+", Nil, (CInt,MInt) :: MInt) implements redirect ${ forge_int_plus(unit($0),$1) }
     infix (Prim) ("+", Nil, (CInt,MFloat) :: MFloat) implements redirect ${ forge_float_plus(unit($0.toFloat),$1) }
@@ -303,7 +306,10 @@ trait ScalaOps {
     val AC = tpePar("A", stage = now)
     val BC = tpePar("B", stage = now)
 
-    direct (Ord) ("__equal", (A,B), (A,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
+    val eq = direct (Ord) ("__equal", (A,B), (A,B) :: MBoolean) 
+    impl (eq) (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
+    impl (eq) (codegen(cuda, quotedArg(0) + " == " + quotedArg(1)))
+    impl (eq) (codegen(cpp, quotedArg(0) + " == " + quotedArg(1)))
     direct (Ord) ("__equal", (A,B), (MVar(A),B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
     direct (Ord) ("__equal", (A,B), (A,MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
     direct (Ord) ("__equal", (A,B), (MVar(A),MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
@@ -329,10 +335,12 @@ trait ScalaOps {
     val gt = infix (Ord) (">", List(A withBound TOrdering), List(A,A) :: MBoolean)
     val gte = infix (Ord) (">=", List(A withBound TOrdering), List(A,A) :: MBoolean)
 
-    impl (lt) (codegen($cala, quotedArg(0) + " < " + quotedArg(1)))
-    impl (lte) (codegen($cala, quotedArg(0) + " <= " + quotedArg(1)))
-    impl (gt) (codegen($cala, quotedArg(0) + " > " + quotedArg(1)))
-    impl (gte) (codegen($cala, quotedArg(0) + " >= " + quotedArg(1)))
+    for (g <- List($cala, cuda, cpp)) {
+      impl (lt) (codegen(g, quotedArg(0) + " < " + quotedArg(1)))
+      impl (lte) (codegen(g, quotedArg(0) + " <= " + quotedArg(1)))
+      impl (gt) (codegen(g, quotedArg(0) + " > " + quotedArg(1)))
+      impl (gte) (codegen(g, quotedArg(0) + " >= " + quotedArg(1)))
+    }
   }
 
   def importStrings() = {

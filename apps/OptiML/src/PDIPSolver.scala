@@ -307,4 +307,60 @@ trait PDIPSolver extends OptiMLApplication {
     //sqrt(sum((0::x.length) { i => x(i) * x(i) }))
     sqrt(x *:* x)
   }
+
+  def normalize(x: Rep[DenseVector[Double]]): (Rep[Double], Rep[DenseVector[Double]]) = {
+    val n = norm(x)
+    (n, x / n)
+  }
+
+  def inv2x2(x: Rep[DenseMatrix[Double]]): Rep[DenseMatrix[Double]] = {
+    val a = x(0,0)
+    val b = x(0,1)
+    val c = x(1,0)
+    val d = x(1,1)
+
+    val det = a*d - b*c
+
+    DenseMatrix((d/det, -b/det), (-c/det, a/det))
+  }
+
+  def lsqr(A: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]]): Rep[DenseVector[Double]] = {
+    val (beta0, u0) = normalize(b)
+    val (alpha0, v0) = normalize(A.t * u0)
+    val w0 = v0
+    val x0 = DenseVector.zeros(A.numCols).t
+    val phihat0 = beta0
+    val rhohat0 = alpha0
+
+    implicit def diffLSQR(t1: Rep[Tup7[DenseVector[Double],Double,DenseVector[Double],DenseVector[Double],DenseVector[Double],Double,Double]],
+                          t2: Rep[Tup7[DenseVector[Double],Double,DenseVector[Double],DenseVector[Double],DenseVector[Double],Double,Double]]) = {
+      val (u,alpha,v,w,x,phihat,rhohat) = unpack(t2)
+      //println(norm(A*x-b))
+      norm(A*x-b)
+    }
+
+    val result = untilconverged(pack(u0,alpha0,v0,w0,x0,phihat0,rhohat0), maxIter = 100) { cur =>
+      val (u,alpha,v,w,x,phihat,rhohat) = unpack(cur)
+
+      val (beta_, u_) = normalize(A * v - alpha * u)
+      val (alpha_, v_) = normalize(A.t * u_ - beta_ * v)
+
+      val rho = sqrt(rhohat * rhohat + beta_ * beta_)
+      val c = rhohat / rho
+      val s = beta_ / rho
+      val theta_ = s * alpha_
+      val rhohat_ = -c * alpha_
+      val phi = c * phihat
+      val phihat_ = s * phihat
+
+      val x_ = x + (phi / rho) * w
+      val w_ = v_ - (theta_ / rho) * w
+
+      pack(u_,alpha_,v_,w_,x_,phihat_,rhohat_)
+    }
+
+    val (u_opt,alpha_opt,v_opt,w_opt,x_opt,phihat_opt,rhohat_opt) = unpack(result)
+
+    x_opt
+  }
 }

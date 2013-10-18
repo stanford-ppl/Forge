@@ -61,6 +61,7 @@ object ${dslName}Build extends Build {
   val virtualization_lms_core = "EPFL" % "lms_2.10" % "0.3-SNAPSHOT"
   val delite_framework = "stanford-ppl" % "framework_2.10" % "0.1-SNAPSHOT"
   val delite_runtime = "stanford-ppl" % "runtime_2.10" % "0.1-SNAPSHOT"
+  val delite_tests = "stanford-ppl" % "delite-test_2.10" % "0.1-SNAPSHOT"
 
   val virtScala = "2.10.2-RC1"
   val virtBuildSettingsBase = Project.defaultSettings ++ Seq(
@@ -71,6 +72,7 @@ object ${dslName}Build extends Build {
     libraryDependencies += virtualization_lms_core,
     libraryDependencies += delite_framework,
     libraryDependencies += delite_runtime,
+    libraryDependencies += delite_tests,
     // needed for scala.tools, which is apparently not included in sbt's built in version
     libraryDependencies += "org.scala-lang.virtualized" % "scala-library" % virtScala,
     libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % virtScala,
@@ -86,13 +88,17 @@ object ${dslName}Build extends Build {
     scalaSource in Compile <<= baseDirectory(_ / "src")
   )
 
-
   // build targets
   lazy val ${dslName}Shared = Project("${dslName}-shared", file("shared"), settings = virtBuildSettings)
   lazy val ${dslName}Comp = Project("${dslName}-comp", file("compiler"), settings = virtBuildSettings) dependsOn(${dslName}Shared)
   lazy val ${dslName}Lib = Project("${dslName}-lib", file("library"), settings = virtBuildSettings) dependsOn(${dslName}Shared)
   lazy val ${dslName}Ident = Project("${dslName}-ident", file("ident"), settings = virtBuildSettings) dependsOn(${dslName}Shared)
   lazy val ${dslName}Apps = Project("${dslName}-apps", file("apps"), settings = virtBuildSettings) dependsOn(${dslName}Comp, ${dslName}Lib, ${dslName}Ident)
+  lazy val ${dslName}Tests = Project("${dslName}-tests", file("tests"), settings = virtBuildSettingsBase ++ Seq(
+    scalaSource in Test <<= baseDirectory(_ / "src"),
+    parallelExecution in Test := false,
+    concurrentRestrictions in Test += Tags.limitAll(1) // don't run anything in parallel
+  )) dependsOn(${dslName}Comp, ${dslName}Lib)
 }
 """)
     return s.substitute(dslName=dsl, dslNameLowerCase=dsl.lower())
@@ -200,7 +206,14 @@ def publish(dsl, opts):
         publish_dsl_extern(dsl, build_dir, scratch_dir, dsl)
     
     # apps
-    os.system("rsync -r " + FORGE_HOME + "/apps/" + dsl + "/" + " " + build_dir + "/apps/")
+    apps_dir = FORGE_HOME + "/apps/" + dsl + "/"
+    if os.path.exists(apps_dir):
+        os.system("rsync -r " + apps_dir + " " + build_dir + "/apps/")
+
+    # tests
+    tests_dir = FORGE_HOME + "/tests/" + dsl + "/"
+    if os.path.exists(tests_dir):
+        os.system("rsync -r " + tests_dir + " " + build_dir + "/tests/")
 
     # sbt project
     if not os.path.exists(build_dir + "/project/"):

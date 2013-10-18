@@ -13,7 +13,9 @@ import ppl.delite.framework.Util._
 
 import ppl.delite.framework.Config
 import ppl.delite.framework.extern.codegen.scala.ScalaGenExternalBase
+import ppl.delite.framework.extern.codegen.cuda.CudaGenExternalBase
 import ppl.delite.framework.extern.lib.MKL
+import ppl.delite.framework.extern.lib.cuBLAS
 
 import optila.shared._
 import optila.shared.ops._
@@ -39,42 +41,98 @@ trait BLASOpsExp extends BLASOps with DenseMatrixOpsExp {
   /**
    * Intercept BLAS-able operations
    */
-  case class Native_matMult[T:Manifest](self: Rep[DenseMatrix[T]],__arg0: Rep[DenseMatrix[T]])(implicit val __pos: SourceContext,val __imp0: Arith[T]) extends DeliteOpExternal[DenseMatrix[T]] {
+
+  case class Native_matMult[T:Manifest](xR: Rep[Int], xC: Rep[Int], x: Rep[ForgeArray[T]], yR: Rep[Int], yC: Rep[Int], y: Rep[ForgeArray[T]])(implicit val __pos: SourceContext,val __imp0: Arith[T]) extends DeliteOpExternal[ForgeArray[T]] {
     val _mT = implicitly[Manifest[T]]
 
-    override def inputs = scala.List(self,__arg0)
-    def alloc = DenseMatrix[T](self.numRows, __arg0.numCols)
+    override def inputs = scala.List(xR,xC,x,yR,yC,y)
+    def alloc = Array.empty[T](xR * yC)
     val funcName = "matMult"
   }
 
-  case class Native_matTimesVec[T:Manifest](self: Rep[DenseMatrix[T]],__arg0: Rep[DenseVector[T]])(implicit val __pos: SourceContext,val __imp0: Arith[T]) extends DeliteOpExternal[DenseVector[T]] {
+  case class Native_matTimesVec[T:Manifest](xR: Rep[Int], xC: Rep[Int], x: Rep[ForgeArray[T]],y: Rep[ForgeArray[T]])(implicit val __pos: SourceContext,val __imp0: Arith[T]) extends DeliteOpExternal[ForgeArray[T]] {
     val _mT = implicitly[Manifest[T]]
 
-    override def inputs = scala.List(self,__arg0)
-    def alloc = DenseVector[T](self.numRows, unit(false))
+    override def inputs = scala.List(xR,xC,x,y)
+    def alloc = Array.empty[T](xR)
     val funcName = "matTimesVec"
   }
 
   override def densematrix_matmult[T:Manifest](self: Rep[DenseMatrix[T]],__arg0: Rep[DenseMatrix[T]])(implicit __pos: SourceContext,__imp0: Arith[T]): Rep[DenseMatrix[T]] = {
-    if (useBLAS && Config.useBlas && (manifest[T] == manifest[Double] || manifest[T] == manifest[Float])) reflectPure(Native_matMult(self,__arg0))
+    if (useBLAS && Config.useBlas && (manifest[T] == manifest[Double] || manifest[T] == manifest[Float])) densematrix_fromarray(Native_matMult(self.numRows,self.numCols,densematrix_raw_data(self),__arg0.numRows,__arg0.numCols,densematrix_raw_data(__arg0)),self.numRows,__arg0.numCols)
     else super.densematrix_matmult(self,__arg0)
   }
   override def densematrix_matvecmult[T:Manifest](self: Rep[DenseMatrix[T]],__arg0: Rep[DenseVector[T]])(implicit __pos: SourceContext,__imp0: Arith[T]): Rep[DenseVector[T]] = {
-    if (useBLAS && Config.useBlas && (manifest[T] == manifest[Double] || manifest[T] == manifest[Float])) reflectPure(Native_matTimesVec(self,__arg0))
+    if (useBLAS && Config.useBlas && (manifest[T] == manifest[Double] || manifest[T] == manifest[Float])) densevector_fromarray(Native_matTimesVec(self.numRows,self.numCols,densematrix_raw_data(self),densevector_raw_data(__arg0)),unit(false))
     else super.densematrix_matvecmult(self,__arg0)
   }
 
   override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = (e match {
-    case e@Native_matMult(a,b) => reflectPure(new { override val original = Some(f,e) } with Native_matMult(f(a),f(b))(e._mT,pos,e.__imp0))(mtype(manifest[A]),pos)
-    case e@Native_matTimesVec(a,b) => reflectPure(new { override val original = Some(f,e) } with Native_matTimesVec(f(a),f(b))(e._mT,pos,e.__imp0))(mtype(manifest[A]),pos)
+    case e@Native_matMult(xR,xC,x,yR,yC,y) => reflectPure(new { override val original = Some(f,e) } with Native_matMult(f(xR),f(xC),f(x),f(yR),f(yC),f(y))(e._mT,pos,e.__imp0))(mtype(manifest[A]),pos)
+    case e@Native_matTimesVec(xR,xC,x,y) => reflectPure(new { override val original = Some(f,e) } with Native_matTimesVec(f(xR),f(xC),f(x),f(y))(e._mT,pos,e.__imp0))(mtype(manifest[A]),pos)
 
-    case Reflect(e@Native_matMult(a,b), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_matMult(f(a),f(b))(e._mT,pos,e.__imp0), mapOver(f,u), f(es)))(mtype(manifest[A]))
-    case Reflect(e@Native_matTimesVec(a,b), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_matTimesVec(f(a),f(b))(e._mT,pos,e.__imp0), mapOver(f,u), f(es)))(mtype(manifest[A]))
+    case Reflect(e@Native_matMult(xR,xC,x,yR,yC,y), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_matMult(f(xR),f(xC),f(x),f(yR),f(yC),f(y))(e._mT,pos,e.__imp0), mapOver(f,u), f(es)))(mtype(manifest[A]))
+    case Reflect(e@Native_matTimesVec(xR,xC,x,y), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_matTimesVec(f(xR),f(xC),f(x),f(y))(e._mT,pos,e.__imp0), mapOver(f,u), f(es)))(mtype(manifest[A]))
     case _ => super.mirror(e,f)
   }).asInstanceOf[Exp[A]]
 }
 
-trait CudaGenBLASOps
+trait CudaGenBLASOps extends CudaGenExternalBase {
+  val IR: BLASOpsExp with OptiLAExp
+  import IR._
+
+  override def emitExternalNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case e@Native_matMult(xR,xC,x,yR,yC,y) =>
+      val args = scala.List("'n'", "'n'", "%1$s", "%2$s", "%3$s", "1.0", "%4$s->data", "%1$s", "%5$s->data", "%6$s", "0.0", "%7$s->data", "%1$s")
+                 .map { _.format(quote(yC), quote(xR), quote(yR), quote(y), quote(x), quote(xC), quote(sym)) }
+      emitMethodCall(sym, e, cuBLAS, args)
+      registerKernel(scala.List(sym))
+
+    case e@Native_matTimesVec(xR,xC,x,y) =>
+      val args = scala.List("'t'", "%1$s", "%2$s", "%3$s->data", "%4$s->data", "%5$s->data")
+                 .map { _.format(quote(xC), quote(xR), quote(x), quote(y), quote(sym)) }
+      emitMethodCall(sym, e, cuBLAS, args)
+      registerKernel(scala.List(sym))
+
+
+    case _ => super.emitExternalNode(sym, rhs)
+  }
+
+  override def emitExternalLib(rhs: Def[Any]): Unit = rhs match {
+    case e@Native_matMult(xR,xC,x,yR,yC,y) =>
+      val tp = remap(e._mT)
+      val func = tp match {
+        case "double" => "cublasDgemm"
+        case "float" => "cublasSgemm"
+      }
+      emitInterfaceAndMethod(cuBLAS, e.funcName, scala.List("char n1", "char n2", "int mat2_col", "int mat1_row", "int mat2_row", tp+" a", "%1$s* mat2".format(tp), "int mat2_col_b", "%1$s* mat1".format(tp), "int mat1_col", tp+" b", "%1$s* mat3".format(tp), "int mat3_col"), "", 
+"""
+{
+  // HJ TODO: use a real stream
+  //cublasSetKernelStream(stream);
+  %1$s(n1, n2, mat2_col, mat1_row, mat2_row, a, mat2, mat2_col_b, mat1, mat1_col, b, mat3, mat3_col);
+}""".format(func)) 
+
+    case e@Native_matTimesVec(xR,xC,x,y) =>
+      val tp = remap(e._mT)
+      val func = tp match {
+        case "double" => "cublasDgemv"
+        case "float" => "cublasSgemv"
+      }
+      emitInterfaceAndMethod(cuBLAS, e.funcName, scala.List("char transpose", "int mat_col", "int mat_row", "%1$s* mat1".format(tp), "%1$s* vec2".format(tp), "%1$s* vec3".format(tp)), "", 
+"""
+{
+  // HJ TODO: use a real stream
+  //cublasSetKernelStream(stream);
+  %1$s(transpose, mat_col, mat_row, 1.0, mat1, mat_col, vec2, 1, 0.0, vec3, 1);
+}""".format(func))
+
+
+    case _ => super.emitExternalLib(rhs)
+  }
+
+}
+
 trait OpenCLGenBLASOps
 trait CGenBLASOps
 
@@ -93,21 +151,21 @@ trait ScalaGenBLASOps extends ScalaGenExternalBase {
    * JNI implementation
    */
   override def emitExternalNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case e@Native_matMult(x,y) =>
-      val args = scala.List("%1$s._data", "%2$s._data", "%3$s._data", "%1$s._numRows", "%1$s._numCols", "%2$s._numCols")
-                 .map { _.format(quote(x), quote(y), quote(sym)) }
+    case e@Native_matMult(xR,xC,x,yR,yC,y) =>
+      val args = scala.List("%1$s", "%2$s", "%3$s", "%4$s", "%5$s", "%6$s")
+                 .map { _.format(quote(x), quote(y), quote(sym), quote(xR), quote(xC), quote(yC)) }
       emitMethodCall(sym, e, MKL, args)
 
-    case e@Native_matTimesVec(x,y) =>
-      val args = scala.List("%1$s._data", "%2$s._data", "%3$s._data", "%1$s._numRows", "%1$s._numCols", "0", "1")
-                 .map { _.format(quote(x), quote(y), quote(sym)) }
+    case e@Native_matTimesVec(xR,xC,x,y) =>
+      val args = scala.List("%1$s", "%2$s", "%3$s", "%4$s", "%5$s", "0", "1")
+                 .map { _.format(quote(x), quote(y), quote(sym), quote(xR), quote(xC)) }
       emitMethodCall(sym, e, MKL, args)
     case _ => super.emitExternalNode(sym,rhs)
   }
 
   override def emitExternalLib(rhs: Def[Any]): Unit = rhs match {
 
-    case e@Native_matMult(x,y) =>
+    case e@Native_matMult(xR,xC,x,yR,yC,y) =>
       val tp = e._mT.toString
       val func = tp match {
         case "Double" => "cblas_dgemm"
@@ -131,7 +189,7 @@ trait ScalaGenBLASOps extends ScalaGenExternalBase {
         }""".format(tp.toLowerCase, func))
 
 
-    case e@Native_matTimesVec(x,y) =>
+    case e@Native_matTimesVec(xR,xC,x,y) =>
       val tp = e._mT.toString
       val func = tp match {
         case "Double" => "cblas_dgemv"

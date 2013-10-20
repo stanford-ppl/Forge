@@ -42,9 +42,15 @@ trait ScalaOps {
 
     // why do these conflict with Delite Boolean ops and not the others in Prim?
     // the reason seems to be because of the combination of overloaded parameters that already exist in the LMS versions of the other ops. (i.e., we got lucky)
-    infix (Prim) ("unary_!", Nil, MBoolean :: MBoolean) implements codegen($cala, "!" + quotedArg(0))
-    infix (Prim) ("||", Nil, (MBoolean, MBoolean) :: MBoolean) implements codegen($cala, quotedArg(0) + " || " + quotedArg(1))
-    infix (Prim) ("&&", Nil, (MBoolean, MBoolean) :: MBoolean) implements codegen($cala, quotedArg(0) + " && " + quotedArg(1))
+    val not = infix (Prim) ("unary_!", Nil, MBoolean :: MBoolean) 
+    val or = infix (Prim) ("||", Nil, (MBoolean, MBoolean) :: MBoolean) 
+    val and = infix (Prim) ("&&", Nil, (MBoolean, MBoolean) :: MBoolean)
+
+    for (g <- List($cala, cuda, cpp)) {
+      impl (not) (codegen(g, "!" + quotedArg(0))) 
+      impl (or) (codegen(g, quotedArg(0) + " || " + quotedArg(1)))
+      impl (and) (codegen(g, quotedArg(0) + " && " + quotedArg(1)))
+    }
 
     lift (Prim) (MInt)
     lift (Prim) (MFloat)
@@ -93,6 +99,7 @@ trait ScalaOps {
       impl (int_times) (codegen(g, ${$0 * $1}))
       impl (int_divide) (codegen(g, ${$0 / $1}))
       impl (int_shift_left) (codegen(g, ${$0 << $1}))
+      impl (int_mod) (codegen(g, ${$0 % $1}))
 
       impl (float_plus) (codegen(g, ${$0 + $1}))
       impl (float_minus) (codegen(g, ${$0 - $1}))
@@ -102,9 +109,7 @@ trait ScalaOps {
       impl (double_plus) (codegen(g, ${$0 + $1}))
       impl (double_minus) (codegen(g, ${$0 - $1}))
       impl (double_times) (codegen(g, ${$0 * $1}))
-      impl (double_divide) (codegen(g, ${$0 / $1}))
-
-      impl (int_mod) (codegen(g, ${$0 % $1}))
+      impl (double_divide) (codegen(g, ${$0 / $1}))  
     }
 
     // infix (Prim) ("+", Nil, enumerate(CInt,MInt,CFloat,MFloat,CDouble,MDouble)) implements codegen($cala, quotedArg(0) + " + " + quotedArg(1))
@@ -229,12 +234,14 @@ trait ScalaOps {
   def importMisc() = {
     val Misc = grp("Misc")
 
-    direct (Misc) ("exit", Nil, MInt :: MUnit, effect = simple) implements codegen($cala, ${sys.exit($0)})
-    direct (Misc) ("print", Nil, MAny :: MUnit, effect = simple) implements codegen($cala, ${print($0)})
+    val exit = direct (Misc) ("exit", Nil, MInt :: MUnit, effect = simple)
+    impl (exit) (codegen($cala, ${sys.exit($0)}))
+    
+    val print = direct (Misc) ("print", Nil, MAny :: MUnit, effect = simple)
+    impl (print) (codegen($cala, ${print($0)}))
+
     val fatal = direct (Misc) ("fatal", Nil, MString :: MNothing, effect = simple)
     impl (fatal) (codegen($cala, ${throw new Exception($0)}))
-    impl (fatal) (codegen(cuda, ${assert(0)}))
-    impl (fatal) (codegen(cpp, ${assert(0)}))
 
     val println = direct (Misc) ("println", List(), List(MAny) :: MUnit, effect = simple)
     val println2 = direct (Misc) ("println", List(), List() :: MUnit, effect = simple)
@@ -264,6 +271,15 @@ trait ScalaOps {
 
     val immutable = infix (Misc) ("unsafeImmutable", List(T), List(T) :: T, aliasHint = copies(0))
     impl (immutable) (codegen($cala, quotedArg(0)))
+    
+    for (g <- List(cuda, cpp)) {
+      impl (exit) (codegen(g, ${exit($0)}))
+      impl (print) (codegen(g, ${std::cout << $0}))
+      impl (fatal) (codegen(g, ${assert(0)}))
+      impl (println) (codegen(g, ${std::cout << $0 << std::endl}))
+      impl (println2) (codegen(g, ${std::cout << std::endl}))
+      impl (immutable) (codegen(g, ${$0}))
+    }
   }
 
   def importCasts() = {
@@ -274,8 +290,14 @@ trait ScalaOps {
     // these don't work as infix_ methods
     noInfixList :::= List("AsInstanceOf", "IsInstanceOf")
 
-    infix (Cast) ("AsInstanceOf", (A,B), A :: B) implements codegen($cala, ${ $0.asInstanceOf[$t[B]] })
-    infix (Cast) ("IsInstanceOf", (A,B), A :: MBoolean) implements codegen($cala, ${ $0.isInstanceOf[$t[B]] })
+    val asinstance = infix (Cast) ("AsInstanceOf", (A,B), A :: B) 
+    impl (asinstance) (codegen($cala, ${ $0.asInstanceOf[$t[B]] }))
+    impl (asinstance) (codegen(cuda, ${ ($t[B])$0 }))
+    impl (asinstance) (codegen(cpp, ${ ($t[B])$0 }))
+
+    val isinstance = infix (Cast) ("IsInstanceOf", (A,B), A :: MBoolean) 
+    impl (isinstance) (codegen($cala, ${ $0.isInstanceOf[$t[B]] }))
+    // todo: how to implement isinstance for clike targets?
   }
 
   def importNumerics() = {
@@ -456,13 +478,18 @@ trait ScalaOps {
       impl (abs) (codegen(g, "abs(" + quotedArg(0) + ")"))
       impl (exp) (codegen(g, "exp(" + quotedArg(0) + ")"))
       impl (log) (codegen(g, "log(" + quotedArg(0) + ")"))
+      impl (log10) (codegen(g, "log10(" + quotedArg(0) + ")"))
       impl (sqrt) (codegen(g, "sqrt(" + quotedArg(0) + ")"))
       impl (ceil) (codegen(g, "ceil(" + quotedArg(0) + ")"))
       impl (floor) (codegen(g, "floor(" + quotedArg(0) + ")"))
       impl (sin) (codegen(g, "sin(" + quotedArg(0) + ")"))
+      impl (sinh) (codegen(g, "sinh(" + quotedArg(0) + ")"))
+      impl (asin) (codegen(g, "asin(" + quotedArg(0) + ")"))
       impl (cos) (codegen(g, "cos(" + quotedArg(0) + ")"))
+      impl (cosh) (codegen(g, "cosh(" + quotedArg(0) + ")"))
       impl (acos) (codegen(g, "acos(" + quotedArg(0) + ")"))
       impl (tan) (codegen(g, "tan(" + quotedArg(0) + ")"))
+      impl (tanh) (codegen(g, "tan(" + quotedArg(0) + ")"))
       impl (atan) (codegen(g, "atan(" + quotedArg(0) + ")"))
       impl (atan2) (codegen(g, "atan2(" + quotedArg(0) + ", " + quotedArg(1) + ")"))
       impl (pow) (codegen(g, "pow(" + quotedArg(0) + ", " + quotedArg(1) + ")"))

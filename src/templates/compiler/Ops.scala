@@ -725,7 +725,7 @@ trait DeliteGenOps extends BaseGenOps {
                 }
                 else {
                   body2.take(body2.length-1).foreach { line => emitWithIndent(line, stream, 6) }
-                  emitWithIndent("stream.print(remap(sym.tp) + \" \" + quote(sym) + \" = \")", stream, 6)
+                  emitWithIndent("stream.print(remapWithRef(sym.tp) + \" \" + quote(sym) + \" = \")", stream, 6)
                   emitWithIndent(body2.last, stream, 6)
                   emitWithIndent("stream.println(\";\")", stream, 6)
                 }

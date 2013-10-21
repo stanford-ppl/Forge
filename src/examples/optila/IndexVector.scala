@@ -86,7 +86,7 @@ trait IndexVectorOps {
       // parallel, so the conversion can fuse with the consumer
       // is this fast and robust enough to capture parallel operators over index vectors?
       fimplicit ("indexToDense") (Nil :: DenseVector(MInt)) implements composite ${
-        Console.println("(performance warning): automatic conversion from IndexVector to DenseVector")
+        if (Settings.verbose > 0) println("(performance warning): automatic conversion from IndexVector to DenseVector")
         $self.toDense
       }
 

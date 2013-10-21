@@ -49,7 +49,6 @@ trait VectorOps {
       infix ("toFloat") (Nil :: DenseVector(MFloat), ("conv",T ==> MFloat)) implements map((T,MFloat), 0, ${$conv})
       infix ("toInt") (Nil :: DenseVector(MInt), ("conv",T ==> MInt)) implements map((T,MInt), 0, ${$conv})
 
-
       /**
        * Accessors
        */
@@ -242,7 +241,9 @@ trait VectorOps {
       val filterMap = v.name.toLowerCase + "_densevector_filter_map"
       compiler (filterMap) (((T ==> MBoolean), (T ==> R)) :: DenseVector(R), addTpePars = R) implements filter((T,R), 0, ${ e => $1(e) }, ${ e => $2(e) })
       infix ("count") ((T ==> MBoolean) :: MInt) implements composite ${
-        sum(\$filterMap($self, $1, (e: Rep[\$TT]) => 1))
+        val x = \$filterMap($self, $1, (e: Rep[\$TT]) => 1)
+        if (x.length > 0) sum(x)
+        else 0
       }
 
       infix ("partition") (("pred",(T ==> MBoolean)) :: Tuple2(DenseVector(T),DenseVector(T))) implements single ${

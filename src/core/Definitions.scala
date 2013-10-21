@@ -158,8 +158,14 @@ trait Definitions extends DerivativeTypes {
   def info(aliases: Option[List[Int]], contains: Option[List[Int]], extracts: Option[List[Int]], copies: Option[List[Int]]) = AliasInfo(aliases, contains, extracts, copies)
 
   // convenience methods for constructing common alias hints
+  def aliases(arg: Int): AliasHint = aliases(List(arg))
+  def aliases(args: List[Int]) =  info(Some(args),None,None,None)
+  def contains(arg: Int): AliasHint = contains(List(arg))
+  def contains(args: List[Int]) =  info(None,Some(args),None,None)
+  def extracts(arg: Int): AliasHint = extracts(List(arg))
+  def extracts(args: List[Int]) =  info(None,None,Some(args),None)
   def copies(arg: Int): AliasHint = copies(List(arg))
-  def copies(args: List[Int]) = AliasCopies(args)
+  def copies(args: List[Int]) = AliasCopies(args)  // TODO: why do we have a separate constructor for this?
   // others? aliasesSome(..)?
 
   /**
@@ -309,10 +315,11 @@ trait Definitions extends DerivativeTypes {
    * @param map         string representation of a function A => R
    * @param zero        string representation of a function => R
    * @param reduce      string representation of a reduce function (R, R) => R
+   * @param cond        optional string representatin of a condition function A => Boolean
    */
-   def forge_mapreduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String]): DeliteOpType
+   def forge_mapreduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]]): DeliteOpType
    object mapReduce {
-     def apply(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String]) = forge_mapreduce(tpePars, argIndex, map, zero, reduce)
+     def apply(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]] = None) = forge_mapreduce(tpePars, argIndex, map, zero, reduce, cond)
    }
 
   /**
@@ -415,8 +422,8 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
   case class Reduce(tpePar: Rep[DSLType], argIndex: Int, zero: Rep[String], func: Rep[String]) extends DeliteOpType
   def forge_reduce(tpePar: Rep[DSLType], argIndex: Int, zero: Rep[String], func: Rep[String]) = Reduce(tpePar, argIndex, zero, func)
 
-  case class MapReduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String]) extends DeliteOpType
-  def forge_mapreduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String]) = MapReduce(tpePars, argIndex, map, zero, reduce)
+  case class MapReduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]]) extends DeliteOpType
+  def forge_mapreduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]]) = MapReduce(tpePars, argIndex, map, zero, reduce, cond)
 
   case class Filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]) extends DeliteOpType
   def forge_filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]) = Filter(tpePars, argIndex, cond, func)

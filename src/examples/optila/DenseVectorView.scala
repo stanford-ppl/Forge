@@ -32,13 +32,13 @@ trait DenseVectorViewOps {
         DenseVectorView(densevectorview_data($self), densevectorview_start($self)+$start*densevectorview_stride($self), densevectorview_stride($self), $end-$start, $self.isRow)
       }
 
-      // should we allow people to make clones of actual VectorViews? the semantics seem confusing
-      infix ("Clone") (Nil :: DenseVector(T), aliasHint = copies(0)) implements redirect ${ $self.toDense }
+      // clones return a DenseVector, so that we do not retain the same underlying pointer
+      infix ("Clone") (Nil :: DenseVector(T)) implements redirect ${ $self.toDense }
 
       infix ("toDense") (Nil :: DenseVector(T)) implements composite ${ $self.map(e => e) }
 
       fimplicit ("viewToDense") (Nil :: DenseVector(T)) implements composite ${
-        Console.println("(performance warning): automatic conversion from DenseVectorView to DenseVector")
+        if (Settings.verbose > 0) println("(performance warning): automatic conversion from DenseVectorView to DenseVector")
         // Console.println("  at " + quotePos(fresh[Nothing].withPos(List(implicitly[SourceContext]))))
         $self.toDense
       }

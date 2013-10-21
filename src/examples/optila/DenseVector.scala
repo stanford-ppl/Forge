@@ -126,14 +126,7 @@ trait DenseVectorOps {
         val out = $1.map(i => $self(i))
         if ($self.isRow != $1.isRow) out.t else out // preserve orientation of original vector
       }
-
-      infix ("slice") ((("start",MInt),("end",MInt)) :: DenseVector(T)) implements single ${
-        val out = DenseVector[T]($end - $start, $self.isRow)
-        for (i <- $start until $end) {
-          out(i-$start) = $self(i)
-        }
-        out.unsafeImmutable
-      }
+      infix ("slice") ((("start",MInt),("end",MInt)) :: DenseVector(T)) implements redirect ${ $self(start::end) }
 
       /**
        * Miscellaneous
@@ -165,13 +158,21 @@ trait DenseVectorOps {
       infix ("update") ((("i",MInt),("e",T)) :: MUnit, effect = write(0)) implements composite ${
         array_update(densevector_raw_data($self), $i, $e)
       }
+
+      infix ("update") ((("indices",IndexVector),("e",T)) :: MUnit, effect = write(0)) implements single ${
+        (0::indices.length) foreach { i =>
+          // if (indices(i) < 0 || indices(i) >= $self.length) fatal("index out of bounds: bulk vector update")
+          array_update(densevector_raw_data($self), indices(i), e)
+        }
+      }
+
       infix ("update") ((("indices",IndexVector),("v",DenseVector(T))) :: MUnit, effect = write(0)) implements single ${
         if (indices.length != v.length) fatal("dimension mismatch: bulk vector update")
 
         // cannot be parallel unless indices contains only disjoint indices (why is why we use 'single' here)
         // however, maybe this should be a property that we guarantee of all IndexVectors
         (0::indices.length) foreach { i =>
-          if (indices(i) < 0 || indices(i) >= $self.length) fatal("index out of bounds: bulk vector update")
+          // if (indices(i) < 0 || indices(i) >= $self.length) fatal("index out of bounds: bulk vector update")
           array_update(densevector_raw_data($self), indices(i), v(i))
         }
       }
@@ -192,6 +193,10 @@ trait DenseVectorOps {
         }
         out.unsafeImmutable
       }
+
+      // workaround for type inference failing in DenseVectorSuite line 159
+      noInfixList :::= List("<<=","<<|=")
+
       infix ("<<=") (T :: MUnit, effect = write(0)) implements composite ${ $self.insert($self.length,$1) }
       infix ("<<=") (DenseVector(T) :: MUnit, effect = write(0)) implements composite ${ $self.insertAll($self.length,$1) }
 
@@ -321,6 +326,16 @@ trait DenseVectorOps {
       }
       infix (":>") (DenseVector(T) :: DenseVector(MBoolean), TOrdering(T)) implements zip((T,T,MBoolean), (0,1), ${ (a,b) => a > b })
       infix (":<") (DenseVector(T) :: DenseVector(MBoolean), TOrdering(T)) implements zip((T,T,MBoolean), (0,1), ${ (a,b) => a < b })
+
+      for (rhs <- List(DenseVector(T),DenseVectorView(T))) {
+        direct ("__equal") (rhs :: MBoolean) implements composite ${
+          if ($self.length != $1.length || $self.isRow != $1.isRow) false
+          else {
+            val c = $self.indices.count(i => $self(i) != $1(i))
+            c == 0
+          }
+        }
+      }
 
       // TODO: switch to generic vector groupBy using Delite op
       infix ("groupBy") (((T ==> R)) :: DenseVector(DenseVector(T)), addTpePars = R) implements composite ${

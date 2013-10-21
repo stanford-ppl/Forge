@@ -21,6 +21,9 @@ trait IOOps {
       else $0.toDouble
     }
 
+    // TODO: for fusion and cluster execution, reads should be pure. however, in that case we need a different way to order them with respect to writes / deletes.
+    // one solution would be to implicitly convert strings to mutable file objects, and (manually) CSE future conversions to return the original mutable object.
+
     direct (IO) ("readVector", Nil, ("path",MString) :: DenseVector(MDouble)) implements composite ${ readVector[Double]($path, v => optila_todouble(v(0))) }
 
     direct (IO) ("readMatrix", Nil, ("path", MString) :: DenseMatrix(MDouble)) implements composite ${ readMatrix[Double]($path, s => optila_todouble(s)) }
@@ -29,7 +32,7 @@ trait IOOps {
     val Elem = tpePar("Elem")
 
     // whitespace delimited by default
-    direct (IO) ("readVector", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> Elem),("delim",MString,"\"\\s+\"")), DenseVector(Elem))) implements composite ${
+    direct (IO) ("readVector", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> Elem),("delim",MString,"\"\\s+\"")), DenseVector(Elem)), effect = simple) implements single ${
       val a = ForgeFileReader.readLines($path){ line =>
         val tokens = line.trim.fsplit(delim)
         val tokenVector = (0::array_length(tokens)) { i => tokens(i) }
@@ -38,7 +41,7 @@ trait IOOps {
       densevector_fromarray(a, true)
     }
 
-    direct (IO) ("readMatrix", Elem, MethodSignature(List(("path",MString),("schemaBldr",MString ==> Elem),("delim",MString,"\"\\s+\"")), DenseMatrix(Elem))) implements composite ${
+    direct (IO) ("readMatrix", Elem, MethodSignature(List(("path",MString),("schemaBldr",MString ==> Elem),("delim",MString,"\"\\s+\"")), DenseMatrix(Elem)), effect = simple) implements single ${
       val a = ForgeFileReader.readLinesUnstructured($path){ (line:Rep[String], buf:Rep[ForgeArrayBuffer[Elem]]) =>
         val tokens = line.trim.fsplit(delim)
         for (i <- 0 until array_length(tokens)) {
@@ -85,5 +88,15 @@ trait IOOps {
       }
       xfs.close()
     })
+
+
+    // -- utility
+
+    direct (IO) ("deleteFile", Nil, MString :: MUnit, effect = simple) implements codegen($cala, ${
+      val f = new java.io.File($0)
+      if (f.exists) f.delete()
+      ()
+    })
+
   }
 }

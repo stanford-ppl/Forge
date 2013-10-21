@@ -34,6 +34,8 @@ trait OptiLADSL extends ForgeApplication
     val DenseVectorView = tpe("DenseVectorView", tpePar("T"))
     val DenseMatrix = tpe("DenseMatrix", tpePar("T"))
     val IndexVector = tpe("IndexVector")
+    val IndexWildcard = tpe("IndexWildcard", stage = compile)
+    identifier (IndexWildcard) ("*")
 
     // OptiLA ops
     // note that the order matters with respect to 'lookup' calls
@@ -101,6 +103,7 @@ a1+b1
   def importVecMatConstructor() {
     val DenseVector = lookupTpe("DenseVector")
     val IndexVector = lookupTpe("IndexVector")
+    val DenseVectorView = lookupTpe("DenseVectorView")
     val DenseMatrix = lookupTpe("DenseMatrix")
     val T = tpePar("T")
 
@@ -116,11 +119,11 @@ a1+b1
       val (rowIndices,colIndices) = $0
 
       // can fuse with flat matrix loops
-      val v = (0::rowIndices.length*colIndices.length).toDense
+      val v = (0::(rowIndices.length*colIndices.length)).toDense
       val indices = densematrix_fromarray(densevector_raw_data(v),rowIndices.length,colIndices.length)
       indices map { i =>
-        val rowIndex = i / colIndices.length
-        val colIndex = i % colIndices.length
+        val rowIndex = rowIndices(i / colIndices.length)
+        val colIndex = colIndices(i % colIndices.length)
         $1(rowIndex,colIndex)
       }
 
@@ -137,17 +140,32 @@ a1+b1
       // out.unsafeImmutable
     }
 
-    val IndexWildcard = tpe("IndexWildcard", stage = compile)
-    identifier (IndexWildcard) ("*")
+    val IndexWildcard = lookupTpe("IndexWildcard", stage = compile)
 
-    infix (IndexVector) ("apply", T, (CTuple2(IndexVector,IndexWildcard), MInt ==> DenseVector(T)) :: DenseMatrix(T)) implements composite ${
-      val rowIndices = $0._1
-      val first = $1(rowIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
-      val out = DenseMatrix[T](rowIndices.length,first.length)
-      rowIndices foreach { i =>
-        out(i) = $1(i)
+    // specifying both DenseVector and DenseVectorViews as rhs arguments seems to make this ambiguous;
+    // one alternative is to use an IsVector type class for the function return type, instead of overloading.
+    // currently, we just let DenseVectorViews implicitly convert to DenseVector, which will cause overhead
+    // in the lib implementation, but should fuse away in the Delite implementation.
+    for (rhs <- List(DenseVector(T)/*, DenseVectorView(T))*/)) {
+      infix (IndexVector) ("apply", T, (CTuple2(IndexVector,IndexWildcard), MInt ==> rhs) :: DenseMatrix(T)) implements composite ${
+        val rowIndices = $0._1
+        val first = $1(rowIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
+        val out = DenseMatrix[T](rowIndices.length,first.length)
+        (0::rowIndices.length) foreach { i =>
+          out(i) = $1(rowIndices(i))
+        }
+        out.unsafeImmutable
       }
-      out.unsafeImmutable
+
+      infix (IndexVector) ("apply", T, (CTuple2(IndexWildcard,IndexVector), MInt ==> rhs) :: DenseMatrix(T)) implements composite ${
+        val colIndices = $0._2
+        val first = $1(colIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
+        val out = DenseMatrix[T](first.length, colIndices.length)
+        (0::colIndices.length) foreach { j =>
+          out.updateCol(j, $1(colIndices(j)))
+        }
+        out.unsafeImmutable
+      }
     }
   }
 }

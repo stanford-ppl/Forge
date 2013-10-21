@@ -7,7 +7,7 @@ object LogRegInterpreter extends OptiMLApplicationInterpreter with LogReg
 
 trait LogReg extends OptiMLApplication {
   def print_usage = {
-    println("Usage: LogReg <input matrix file> <output vector file>")
+    println("Usage: LogReg <input training data file> <input training label file>")
     exit(-1)
   }
 

@@ -1,5 +1,5 @@
 package ppl.dsl.forge
-package examples
+package dsls
 package optila
 
 import core.{ForgeApplication,ForgeApplicationRunner}
@@ -11,7 +11,7 @@ trait VectorOps {
    * Code generation can be an alternative to subtyping for achieving code re-use:
    *
    * This interface represents a convenient set of vector accessor functions.
-   * They require v to define length, isRow, and apply, and v must be a ParallelCollection (which is checked at Forge stage-time)
+   * They require v to define length, isRow, slice and apply, and v must be a ParallelCollection (which is checked at Forge stage-time)
    *
    * The trade-off here is compile-time vs. run-time: we are generating more code, but do not require an implicit conversion (which
    * previously copied into a DenseVector) to expose the common API. Note that in the Delite case the conversion should fuse anyway,

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Forge</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <!-- Le styles -->
+    <link href="css/bootstrap.css" rel="stylesheet">
+    <style>
+      body {
+        padding-top: 60px; /* 60px to make the container go all the way to the bottom of the topbar */
+      }
+    </style>
+    <link href="http://stanford.edu/~bholtz/bootstrap/forge/bootstrap-responsive.css" rel="stylesheet">
+
+    <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="./js/html5shiv.js"></script>
+    <![endif]-->
+
+    <!-- Fav and touch icons -->
+    <link rel="apple-touch-icon-precomposed" sizes="144x144" href="http://getbootstrap.com/2.3.2/assets/ico/apple-touch-icon-144-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="114x114" href="http://getbootstrap.com/2.3.2/assets/ico/apple-touch-icon-114-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="72x72" href="http://getbootstrap.com/2.3.2/assets/ico/apple-touch-icon-72-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" href="http://getbootstrap.com/2.3.2/assets/ico/apple-touch-icon-57-precomposed.png">
+    <link rel="shortcut icon" href="http://getbootstrap.com/2.3.2/assets/ico/favicon.png">
+  <style type="text/css"></style></head>
+
+  <body>
+
+    <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container">
+          <a class="brand" href="aboutForge.html">Forge</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <ul class="nav nav-tabs">
+	<li>
+	  <a href="aboutForge.html">About Forge</a>
+	</li>
+	<li><a href="installingForge.html">Installing Forge</a></li>
+	<li><a href="documentation.html">Documentation</a></li>
+	<li class="dropdown active">
+	  <a class="dropdown-toggle" 
+	     data-toggle="dropdown"
+	     href="simpleVector.html#">
+	    Examples
+	    <b class="caret"></b>
+	  </a>
+	  <ul class="dropdown-menu">
+	    <li><a href="simpleVector.html">SimpleVector</a></li>
+	    <li><a href="simpleProfile.html">SimpleProfile</a></li>
+	    <li><a href="optiml.html">OptiML</a></li>
+	  </ul>
+	</li>
+	<li><a class="" href="http://github.com/stanford-ppl/Forge/">Forge on GitHub</a></li>
+
+      </ul>
+
+      <div class="span12">
+	<h3>SimpleVector</h3>
+	<p>Let's look at simple DSL example. First we start with some boilerplate:</p>
+	<pre>package ppl.dsl.forge
+package examples
+import core.{ForgeApplication,ForgeApplicationRunner}
+
+object SimpleVectorDSLRunner extends ForgeApplicationRunner with SimpleVectorDSL
+</pre>
+        <p> With this heading, we decelare the <code>SimpleVectorDSLRunner</code> that will be
+        called to publish our language. Now we need to fill in the <code>SimpleVectorDSL</code> with
+          the actual specification for the language. Let's add </p>
+	<p> Remember, in order to fully specify a Forge DSL, we need to implement the
+	  methods <code>dslName</code> and <code>specification</code>. The former is simple:</p>
+	<pre>trait SimpleVectorDSL extends ForgeApplication {
+  def dslName = "SimpleVector"</pre>
+        <p> The latter is more complicated:</p>
+	<pre>  def specification() = {
+    importScalaOps()
+    importVectorOps()
+  }</pre>
+	<p>The builtin <code>importScalaOps</code> function brings into the specification Scala
+	operations. The meat of the specification will live in <code>importVectorOps</code>. First
+	  we need to declare some generic type parameters for use later in the specification and
+	the <code>Vector</code> type that will be the primary data structure in the new DSL. Note
+	  that the <code>Vector</code> type is a generic with parameter <code>T</code>.</p>
+	<pre>  def importVectorOps() {
+    val T = tpePar("T")
+    val R = tpePar("R")
+    val Vector = tpe("Vector", T)
+</pre>
+	<p>Now we need to associate data with our new <code>Vector</code> type. We use
+	the <code>data</code> function to add the vector's length, in the Forge int
+	  type <code>MInt</code>, and the vector data, in the Forge array type <code>MArray</code>.</p>
+	<pre>    data(Vector, ("_length", MInt), ("_data", MArray(T)))</pre>
+	<p>Simple so far, but now we need to provide a way to allocate a new <code>Vector</code> and
+	  give it some functionality. Let's break down the allocation:</p>
+	<pre>    static (Vector) ("apply", T, MInt :: Vector(T), effect = mutable) implements allocates(Vector, ${$0}, ${ array_empty[T]{$0} })</pre>
+	<ul> 
+	  <li> <code>static</code> specifies the user syntax of the function, specifically that the
+	  function is called as <code>Vector(args)</code>.</li>
+	  <li> <code>(Vector)</code> indicates that the function is a member of the "Vector" group.</li>
+	  <li> <code>("apply", T, MInt :: Vector(T), effect = mutable)</code> gives the name of the
+	    function (<code>apply</code>), its type parameters (<code>T</code>), its type signature
+	    (<code>MInt :: Vector(T)</code>), and a compiler hint (the function has effect mutable).</li>
+	  <li> <code>implements</code> is the keyword that signals the specification of the implementation.</li>
+	  <li> <code>allocates(Vector, ${$0}, ${ array_empty[T]{$0} })</code> specifies that the function is an
+	    allocation of the <code>Vector</code> type. The <code>$0</code> is the first argment to
+	    the function, so the allocation takes a length and creates a <code>Vector</code> with
+	    that length, backed by an <code>MArray[T]</code> of that length.</li>
+	</ul>
+	<p> Now we add some simple geting and setting functionality, using the <code>withTpe</code> function to
+	  prespecify the function group of each function.</p>
+	<pre>    val VectorOps = withTpe (Vector)
+    VectorOps {
+      compiler ("vector_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
+      compiler ("vector_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements 
+          setter(0, "_data", quotedArg(1))
+      infix ("length") (Nil :: MInt) implements getter(0, "_length")
+      compiler ("vector_set_length") (MInt :: MUnit, effect = write(0)) implements 
+          setter(0, "_length", quotedArg(1))</pre>
+	<p> Recall that <code>compiler</code> indicates that the function is available only to the
+	DSL author, not to DSL users, and <code>infix</code> indicates that the function can be used
+	  as <code>myVector.length()</code>.</p>
+	<p> More additions to <code>VectorOps</code> make use of the <code>composite</code>
+	  implementation and named arguments: </p>
+	<pre>      infix ("apply") (MInt :: T) implements composite ${array_apply(vector_raw_data($self), $1) }
+      infix ("update") ((("index",MInt),("element",T)) :: MUnit, effect = write(0)) implements 
+          composite ${array_update(vector_raw_data($self), $index, $element)</pre>
+	<p>As an example, if we want a slice method for our vectors, we want a default
+	  argument. This requires an explicit call to <code>MethodSignature</code>, which we have up
+	  to now used implicitly. We will also use the <code>single</code> implementation, which provides a
+	  block of Scala code to be executed serially.</p>
+	<pre>      infix ("slice") (MethodSignature(List(("start",MInt,"0"),("end",MInt)), Vector(T))) implements 
+      single ${
+        val out = Vector[T]($end - $start)
+        var i = $start
+        while (i < $end) {
+          out(i-$start) = $self(i)
+          i += 1
+        }
+        out
+      }  </pre>
+       <p> Next we might want to add some basic math operations to the <code>Vector</code>
+	 type. These are nicely handled with builtin Forge functional operators:</p>
+       <pre>      infix ("+") (Vector(T) :: Vector(T), TNumeric(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a+b })
+      infix ("*") (T :: Vector(T), TNumeric(T)) implements map((T,T), 0, "e => e*"+quotedArg(1))
+      infix ("sum") (Nil :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${ (a,b) => a+b })</pre>
+      <p>How about some functional operators. We can leverage the built in Forge implementation
+      of <code>filter</code> and <code>reduce</code> to add the corresponding functionality in our
+      DSL.</p>
+	<pre>      infix ("reduce") (((T,T) ==> T) :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${
+        (a,b) => $1(a,b)
+      })
+
+      infix ("filter") ((T ==> MBoolean) :: Vector(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})
+</pre>
+
+<p>Last but most importantly, we need to parallelize our ops with the <></p>
+<pre>      parallelize as ParallelCollectionBuffer(T, lookupOp("lengt), lookupOverloaded("apply",1), lookupOp("update"))</pre>
+<p> Now all we have to do is put it all together, and we have a super cool, super basic vector DSL! Congrats!
+</div>
+    
+
+    </div> <!-- /container -->
+
+    <!-- Le javascript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="js/jquery-2.0.3.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+
+  
+
+</body></html>

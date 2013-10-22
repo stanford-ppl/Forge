@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Forge</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <!-- Le styles -->
+    <link href="css/bootstrap.css" rel="stylesheet">
+    <style>
+      body {
+        padding-top: 60px; /* 60px to make the container go all the way to the bottom of the topbar */
+      }
+    </style>
+    <link href="http://stanford.edu/~bholtz/bootstrap/forge/bootstrap-responsive.css" rel="stylesheet">
+
+    <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="./js/html5shiv.js"></script>
+    <![endif]-->
+
+    <!-- Fav and touch icons -->
+    <link rel="apple-touch-icon-precomposed" sizes="144x144" href="http://getbootstrap.com/2.3.2/assets/ico/apple-touch-icon-144-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="114x114" href="http://getbootstrap.com/2.3.2/assets/ico/apple-touch-icon-114-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="72x72" href="http://getbootstrap.com/2.3.2/assets/ico/apple-touch-icon-72-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" href="http://getbootstrap.com/2.3.2/assets/ico/apple-touch-icon-57-precomposed.png">
+    <link rel="shortcut icon" href="http://getbootstrap.com/2.3.2/assets/ico/favicon.png">
+  <style type="text/css"></style></head>
+
+  <body>
+
+    <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container">
+          <a class="brand" href="aboutForge.html">Forge</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <ul class="nav nav-tabs">
+	<li>
+	  <a href="aboutForge.html">About Forge</a>
+	</li>
+	<li><a href="installingForge.html">Installing Forge</a></li>
+	<li class="active"><a href="documentation.html">Documentation</a></li>
+	<li class="dropdown">
+	  <a class="dropdown-toggle" 
+	     data-toggle="dropdown"
+	     href="documentation.html#">
+	    Examples
+	    <b class="caret"></b>
+	  </a>
+	  <ul class="dropdown-menu">
+	    <li><a href="simpleVector.html">SimpleVector</a></li>
+	    <li><a href="simpleProfile.html">SimpleProfile</a></li>
+	    <li><a href="optiml.html">OptiML</a></li>
+	  </ul>
+	</li>
+	<li><a class="" href="http://github.com/stanford-ppl/Forge/">Forge on GitHub</a></li>
+
+      </ul>
+
+      <div>
+	<div>
+	    <h3>Using an existing Forge DSL</h3>
+	    <p>
+		To use a Forge DSL that comes packaged with the Forge repository (e.g. OptiML, OptiQL),
+		you can generate the DSL and then cd into the published folder (or move it to another location) and use
+		it as normal, or you can put your applications in the <code>&lt;FORGE_HOME&gt;/apps/&lt;DSL&gt;/src/</code> folder, which is
+		automatically copied to the generated DSL directory during publishing.
+	    </p>
+	    <p>
+		To generate a DSL and move it to an external location (e.g. OptiML):
+	    </p>
+	    <p>
+		<pre>bin/update ppl.dsl.forge.examples.optiml.OptiMLDSLRunner OptiML
+mv published/OptiML &lt;destination&gt;</pre>
+	    </p>
+	    <p>
+		The destination will now contain the generated DSL, and you can add applications directly in the <code>apps</code> folder,
+		and compile and run them using
+	    </p>
+	    <p>
+		<pre>sbt compile
+bin/delitec &lt;fully.qualified.appObject&gt;
+bin/delite &lt;fully.qualified.appObject&gt;</pre>
+	    </p>
+	    <p>
+		You can also enter interactive mode using
+	    </p>
+	    <p>
+		<pre>sbt "; console"</pre>
+	    </p>
+	    <p>
+		To run a DSL application located in <code>&lt;FORGE_HOME&gt;/apps/&lt;DSL&gt;/src/</code>, (e.g. Logistic Regression):
+	    </p>
+	    <p>
+		<ul>
+		    <li>
+			Interpreter: <br><code>bin/update -r "LogRegInterpreter &lt;args&gt;" ppl.dsl.forge.examples.optiml.OptiMLDSLRunner OptiML</code>
+		    </li>
+		    <li>
+			Compiler: <br><code>bin/update -r -d "LogRegInterpreter &lt;args&gt;" ppl.dsl.forge.examples.optiml.OptiMLDSLRunner OptiML</code>
+		    </li>
+		    <li>
+			Interactive: <br><code>bin/update -i ppl.dsl.forge.examples.optiml.OptiMLDSLRunner OptiML</code>
+		    </li>
+		</ul>
+	    </p>
+	    <p>
+		If the DSL has already been generated, you can supply the <code>-s 3</code> parameter to <code>update</code> to skip immediately to
+		the publishing step.
+	    </p>
+	</div>
+	<div>
+	    <h3>Creating a new DSL</h3>
+	    <p>
+		You can create a new DSL from our templates using
+	    </p>
+	    <p>
+		<pre>bin/initialize NewDSLName [--test]</pre>
+	    </p>
+	    <p>
+		This creates a DSL file in <code>src/examples</code>, a Hello World application in <code>apps/</code>, and the basic
+		<code>extern/</code> files. The DSL includes an example of a parallel data structure.
+	    </p>
+	    <p>
+		The option <code>--test</code> will attempt to compile everything using
+	    </p>
+	    <p>
+		<pre>sbt compile
+bin/forge ppl.dsl.forge.examples.NewDSLNameRunner
+bin/publish newdslname
+cd published/newdslname
+sbt compile
+bin/delitec HelloWorldInterpreter
+bin/delitec HelloWorldCompiler
+bin/delite HelloWorldCompiler.deg</pre>
+	    </p>
+	    <p>
+		You can undo these actions using
+	    </p>
+	    <p>
+		<pre>bin/teardown NewDSLName</pre>
+	    </p>
+	</div>
+    </div> <!-- /container -->
+
+    <!-- Le javascript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="js/jquery-2.0.3.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+
+  
+
+</body></html>

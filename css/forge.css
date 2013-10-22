@@ -1,0 +1,21 @@
+.algorithm {
+    padding: 0.2em 0;
+    margin: 1.2em 0;
+}
+
+.algorithm .name {
+    font-size: 1.4em;
+    padding-bottom: 0.2em;
+}
+
+.algorithm .name.complete {
+    color: green;
+}
+
+.algorithm .name.inprog {
+    color: orange;
+}
+
+.algorithm .name.unborn {
+    color: red;
+}

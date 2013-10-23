@@ -22,6 +22,10 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
     = __arg0.length
   def array_clone[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = __arg0.clone
+  def array_take[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int]): Rep[ForgeArray[T]]
+    = __arg0.take(__arg1)
+  def array_map[T:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]], __arg1: Rep[T] => Rep[R])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]
+    = __arg0.map(__arg1)
   def array_sort[T:Manifest:Ordering](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]] = {
     val d = array_empty[T](__arg0.length)
     array_copy(__arg0,0,d,0,__arg0.length)

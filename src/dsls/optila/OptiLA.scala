@@ -9,7 +9,7 @@ object OptiLADSLRunner extends ForgeApplicationRunner with OptiLADSL
 trait OptiLADSL extends ForgeApplication
   with ArithOps with StringableOps
   with BasicMathOps with RandomOps with IOOps
-  with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps
+  with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps with SparseVectorOps
   with DenseMatrixOps
   with LinAlgOps {
 
@@ -36,6 +36,7 @@ trait OptiLADSL extends ForgeApplication
     val IndexVector = tpe("IndexVector")
     val IndexWildcard = tpe("IndexWildcard", stage = compile)
     identifier (IndexWildcard) ("*")
+    val SparseVector = tpe("SparseVector", tpePar("T"))
 
     // OptiLA ops
     // note that the order matters with respect to 'lookup' calls
@@ -91,6 +92,7 @@ a1+b1
     importDenseVectorViewOps()
     importDenseVectorOps()
     importDenseMatrixOps()
+    importSparseVectorOps()
     importVecMatConstructor()
     importIOOps()
     importLinAlgOps()

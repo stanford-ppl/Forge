@@ -99,7 +99,7 @@ trait CombinedVecMatArithmetic extends ForgeTestModule with LinearAlgebraTestsCo
   }
 }
 
-trait LinearAlgebraTestsCommon extends OptiMLApplication with GenOverloadHack {
+trait DenseLinearAlgebraTestsCommon extends OptiMLApplication with GenOverloadHack {
   this: ForgeTestModule =>
 
   ////////////////
@@ -137,13 +137,13 @@ trait LinearAlgebraTestsCommon extends OptiMLApplication with GenOverloadHack {
 }
 
 
-class LinearAlgebraSuiteInterpreter extends ForgeSuiteInterpreter {
+class DenseLinearAlgebraSuiteInterpreter extends ForgeSuiteInterpreter {
   def testSimpleDenseVector() { runTest(SimpleDenseVectorArithmeticRunnerI) }
   def testSimpleDenseMatrix() { runTest(SimpleDenseMatrixArithmeticRunnerI) }
   def testCombinedVecMat() { runTest(CombinedVecMatArithmeticRunnerI) }
 }
 
-class LinearAlgebraSuiteCompiler extends ForgeSuiteCompiler {
+class DenseLinearAlgebraSuiteCompiler extends ForgeSuiteCompiler {
   def testSimpleDenseVector() { runTest(SimpleDenseVectorArithmeticRunnerC) }
   def testSimpleDenseMatrix() { runTest(SimpleDenseMatrixArithmeticRunnerC) }
   def testCombinedVecMat() { runTest(CombinedVecMatArithmeticRunnerC) }

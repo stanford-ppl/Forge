@@ -69,6 +69,20 @@ trait BasicMathOps {
       }
     }
 
+    val SparseVector = lookupTpe("SparseVector")
+    // val SparseMatrix = lookupTpe("SparseMatrix")
+
+    for (V <- List(SparseVector(T)/*, SparseMatrix(T)*/)) {
+      val R = /*if (V == SparseMatrix(T)) SparseMatrix(T) else*/ SparseVector(T)
+      direct (Math) ("abs", T, V :: R, TArith(T)) implements redirect ${ $0.abs }
+      direct (Math) ("square", T, V :: R, TArith(T)) implements composite ${ $0.mapnz(e => e*e) }
+      direct (Math) ("sum", T, V :: T, TArith(T)) implements redirect ${ $0.sum }
+      direct (Math) ("mean", T, V :: MDouble, ("conv",T ==> MDouble)) implements redirect ${ $0.mean }
+      direct (Math) ("min", T, V :: T, TOrdering(T)) implements redirect ${ $0.min }
+      direct (Math) ("max", T, V :: T, TOrdering(T)) implements redirect ${ $0.max }
+    }
+
+
     // -- math on sequences
     // can't have a sequence-based sum, because it makes sum(0,n) { i => ... } ambiguous for int arguments
     // direct (Math) ("sum", T, varArgs(T) :: T, TArith(T)) implements composite ${ densevector_fromarray(array_fromseq($0),true).sum }

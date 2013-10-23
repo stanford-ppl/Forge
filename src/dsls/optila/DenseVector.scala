@@ -16,6 +16,7 @@ trait DenseVectorOps {
     val IndexVector = lookupTpe("IndexVector")
     val DenseVectorView = lookupTpe("DenseVectorView")
     val DenseMatrix = lookupTpe("DenseMatrix")
+    val SparseVector = lookupTpe("SparseVector")
 
     // data fields
     data(DenseVector, ("_length", MInt), ("_isRow", MBoolean), ("_data", MArray(T)))
@@ -45,6 +46,7 @@ trait DenseVectorOps {
     static (DenseVector) ("apply", T, varArgs(T) :: DenseVector(T)) implements allocates(DenseVector, ${unit($0.length)}, ${unit(true)}, ${array_fromseq($0)})
 
     // helper
+    compiler (DenseVector) ("densevector_alloc_raw", T, (MInt, MBoolean, MArray(T)) :: DenseVector(T)) implements allocates(DenseVector, ${$0}, ${$1}, ${$2})
     compiler (DenseVector) ("densevector_fromarray", T, (MArray(T), MBoolean) :: DenseVector(T)) implements allocates(DenseVector, ${array_length($0)}, ${$1}, ${$0})
     compiler (DenseVector) ("densevector_fromfunc", T, (MInt, MInt ==> T) :: DenseVector(T)) implements composite ${
       (0::$0) { i => $1(i) }
@@ -96,7 +98,7 @@ trait DenseVectorOps {
     // a non-type-safe way of passing the metadata required to allocate a DenseVector in a parallel op
     // ideally we would encode this is as a type class, but it's not clear we would get an instance of this type class in dc_alloc
     val CR = tpePar("CR")
-    compiler (DenseVector) ("densevector_raw_alloc", (R,CR), (CR,MInt) :: DenseVector(R)) implements composite ${
+    compiler (DenseVector) ("densevector_dc_alloc", (R,CR), (CR,MInt) :: DenseVector(R)) implements composite ${
       val simpleName = manifest[CR].erasure.getSimpleName
       val isRow = simpleName match {
         case s if s.startsWith("IndexVector") => indexvector_isrow($0.asInstanceOf[Rep[IndexVector]])
@@ -178,8 +180,7 @@ trait DenseVectorOps {
       }
 
       infix ("<<") (T :: DenseVector(T)) implements single ${
-        val out = DenseVector[T](0,$self.isRow)
-        out <<= $self
+        val out = $self.mutable
         out <<= $1
         out.unsafeImmutable
       }
@@ -327,7 +328,7 @@ trait DenseVectorOps {
       infix (":>") (DenseVector(T) :: DenseVector(MBoolean), TOrdering(T)) implements zip((T,T,MBoolean), (0,1), ${ (a,b) => a > b })
       infix (":<") (DenseVector(T) :: DenseVector(MBoolean), TOrdering(T)) implements zip((T,T,MBoolean), (0,1), ${ (a,b) => a < b })
 
-      for (rhs <- List(DenseVector(T),DenseVectorView(T))) {
+      for (rhs <- List(DenseVector(T),DenseVectorView(T),IndexVector)) {
         direct ("__equal") (rhs :: MBoolean) implements composite ${
           if ($self.length != $1.length || $self.isRow != $1.isRow) false
           else {
@@ -336,6 +337,8 @@ trait DenseVectorOps {
           }
         }
       }
+
+      direct ("__equal") (SparseVector(T) :: MBoolean) implements composite ${ $self == $1.toDense }
 
       // TODO: switch to generic vector groupBy using Delite op
       infix ("groupBy") (((T ==> R)) :: DenseVector(DenseVector(T)), addTpePars = R) implements composite ${
@@ -358,7 +361,7 @@ trait DenseVectorOps {
         array_copy(src, $1, dest, $3, $4)
       }
 
-      parallelize as ParallelCollectionBuffer(T, lookupOp("densevector_raw_alloc"), lookupOp("length"), lookupOverloaded("apply",2), lookupOp("update"), lookupOp("densevector_set_length"), lookupOp("densevector_appendable"), lookupOp("densevector_append"), lookupOp("densevector_copy"))
+      parallelize as ParallelCollectionBuffer(T, lookupOp("densevector_dc_alloc"), lookupOp("length"), lookupOverloaded("apply",2), lookupOp("update"), lookupOp("densevector_set_length"), lookupOp("densevector_appendable"), lookupOp("densevector_append"), lookupOp("densevector_copy"))
     }
 
     // Add DenseVector to Arith

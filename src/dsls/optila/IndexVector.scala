@@ -83,6 +83,9 @@ trait IndexVectorOps {
 
       infix ("toDense") (Nil :: DenseVector(MInt)) implements composite ${ $self.map(e => e) }
 
+      direct ("__equal") (IndexVector :: MBoolean) implements composite ${ $self.toDense == $1 }
+      direct ("__equal") (DenseVector(MInt) :: MBoolean) implements composite ${ $1 == $self }
+
       // parallel, so the conversion can fuse with the consumer
       // is this fast and robust enough to capture parallel operators over index vectors?
       fimplicit ("indexToDense") (Nil :: DenseVector(MInt)) implements composite ${

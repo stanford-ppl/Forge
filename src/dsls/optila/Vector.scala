@@ -22,6 +22,7 @@ trait VectorOps {
     val DenseVector = lookupTpe("DenseVector")
     val DenseVectorView = lookupTpe("DenseVectorView")
     val DenseMatrix = lookupTpe("DenseMatrix")
+    val SparseVector = lookupTpe("SparseVector")
     val Tuple2 = lookupTpe("Tup2")
     val B = tpePar("B")
     val R = tpePar("R")
@@ -54,8 +55,8 @@ trait VectorOps {
        */
       infix ("indices") (Nil :: IndexVector) implements composite ${ IndexVector(unit(0), $self.length, $self.isRow) }
       infix ("isEmpty") (Nil :: MBoolean) implements single ${ $self.length == 0 }
-      infix ("first") (Nil :: T) implements single ${ $self(0) }
-      infix ("last") (Nil :: T) implements single ${ $self($self.length - 1) }
+      infix ("first") (Nil :: T) implements composite ${ $self(0) }
+      infix ("last") (Nil :: T) implements composite ${ $self($self.length - 1) }
       infix ("drop") (MInt :: V) implements composite ${ $self.slice($1, $self.length) }
       infix ("take") (MInt :: V) implements composite ${ $self.slice(0, $1) }
       infix ("contains") (T :: MBoolean) implements single ${
@@ -163,7 +164,7 @@ trait VectorOps {
         infix ("-") (rhs :: DenseVector(T), A) implements zip((T,T,T), (0,1), ${ (a,b) => a-b })
         infix ("*") (rhs :: DenseVector(T), A) implements zip((T,T,T), (0,1), ${ (a,b) => a*b })
         infix ("*:*") (rhs :: T, A) implements composite ${
-          if ($self.length != $1.length) fatal("dimension mismatch: vector dot product")
+          // if ($self.length != $1.length) fatal("dimension mismatch: vector dot product")
           sum($self*$1)
         }
         infix ("**") (rhs :: DenseMatrix(T), A) implements composite ${
@@ -179,6 +180,15 @@ trait VectorOps {
         infix ("/") (rhs :: DenseVector(T), A) implements zip((T,T,T), (0,1), ${ (a,b) => a/b })
       }
 
+      for (rhs <- List(SparseVector(T)/*,SparseVectorView(T)*/)) {
+        infix ("+") (rhs :: DenseVector(T), A) implements composite ${ $self + $1.toDense }
+        infix ("-") (rhs :: DenseVector(T), A) implements composite ${ $self - $1.toDense }
+        infix ("*") (rhs :: DenseVector(T), A) implements composite ${ $self * $1.toDense }
+        infix ("*:*") (rhs :: T, A) implements composite ${ $self *:* $1.toDense }
+        infix ("**") (rhs :: DenseMatrix(T), A) implements composite ${ $self ** $1.toDense }
+        infix ("/") (rhs :: DenseVector(T), A) implements composite ${ $self / $1.toDense }
+      }
+
       for (rhs <- List(DenseVector(B),DenseVectorView(B))) {
         // infix ("+") (rhs :: DenseVector(T), (A, B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a+b })
         // infix ("-") (rhs :: DenseVector(T), (A, B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a-b })
@@ -191,7 +201,7 @@ trait VectorOps {
       infix ("-") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e-$1 })
       infix ("*") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e*$1 })
       infix ("*") (DenseMatrix(T) :: DenseVector(T), A) implements composite ${
-        if (!$self.isRow) fatal("dimension mismatch: vector * matrix")
+        // if (!$self.isRow) fatal("dimension mismatch: vector * matrix")
         $1.t.mapRowsToVector { row => $self *:* row }
       }
       infix ("/") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e/$1 })

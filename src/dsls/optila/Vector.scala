@@ -23,6 +23,7 @@ trait VectorOps {
     val DenseVectorView = lookupTpe("DenseVectorView")
     val DenseMatrix = lookupTpe("DenseMatrix")
     val SparseVector = lookupTpe("SparseVector")
+    val SparseVectorView = lookupTpe("SparseVectorView")
     val Tuple2 = lookupTpe("Tup2")
     val B = tpePar("B")
     val R = tpePar("R")
@@ -114,7 +115,7 @@ trait VectorOps {
       infix ("makeString") (Nil :: MString, S) implements single ${
         var s = ""
         if ($self.length == 0) {
-          "[ ]"
+          s = "[ ]"
         }
         else if ($self.isRow) {
           for (i <- 0 until $self.length - 1) {
@@ -133,7 +134,7 @@ trait VectorOps {
       infix ("toString") (Nil :: MString) implements single ${
         var s = ""
         if ($self.length == 0) {
-          "[ ]"
+          s = "[ ]"
         }
         else if ($self.isRow) {
           for (i <- 0 until $self.length - 1) {
@@ -180,7 +181,7 @@ trait VectorOps {
         infix ("/") (rhs :: DenseVector(T), A) implements zip((T,T,T), (0,1), ${ (a,b) => a/b })
       }
 
-      for (rhs <- List(SparseVector(T)/*,SparseVectorView(T)*/)) {
+      for (rhs <- List(SparseVector(T),SparseVectorView(T))) {
         infix ("+") (rhs :: DenseVector(T), A) implements composite ${ $self + $1.toDense }
         infix ("-") (rhs :: DenseVector(T), A) implements composite ${ $self - $1.toDense }
         infix ("*") (rhs :: DenseVector(T), A) implements composite ${ $self * $1.toDense }

@@ -102,11 +102,12 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   // -- IR helpers
 
   def isForgePrimitiveType(t: Rep[DSLType]) = t match {
-    case `MInt` | `MFloat` | `MDouble` | `MBoolean` | `MChar` | `MString` | `MUnit` | `MAny` | `MNothing` | `MSourceContext` | `byName` => true
-    case `CInt` | `CFloat` | `CDouble` | `CBoolean` | `CChar` | `CString` | `CUnit` | `CAny` | `CNothing` => true
+    case `MInt` | `MLong` | `MFloat` | `MDouble` | `MBoolean` | `MChar` | `MString` | `MUnit` | `MAny` | `MNothing` | `MSourceContext` | `byName` => true
+    case `CInt` | `CLong` | `CFloat` | `CDouble` | `CBoolean` | `CChar` | `CString` | `CUnit` | `CAny` | `CNothing` => true
     // case Def(Tpe(_,_,`now`)) => true
     case Def(Tpe(name,_,_)) if name.startsWith("Tuple") => true
     case Def(Tpe("ForgeArray",_,_)) | Def(Tpe("ForgeArrayBuffer",_,_)) => true
+    case Def(Tpe("HashMap",_,_)) => true
     case Def(Tpe("Var",_,_)) => true
     case Def(Tpe("Overloaded",_,_)) => true
     case _ => false

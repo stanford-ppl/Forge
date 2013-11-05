@@ -9,8 +9,8 @@ object OptiLADSLRunner extends ForgeApplicationRunner with OptiLADSL
 trait OptiLADSL extends ForgeApplication
   with ArithOps with StringableOps
   with BasicMathOps with RandomOps with IOOps
-  with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps with SparseVectorOps
-  with DenseMatrixOps
+  with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps with SparseVectorOps with SparseVectorViewOps
+  with DenseMatrixOps with SparseMatrixOps
   with LinAlgOps {
 
   def dslName = "OptiLA"
@@ -27,16 +27,21 @@ trait OptiLADSL extends ForgeApplication
     importStrings()
     importMath()
     importTuples()
+    importHashMap()
 
     // OptiLA types
     // declare all tpes first, so that they are available to all ops (similar to Delite)
-    val DenseVector = tpe("DenseVector", tpePar("T"))
-    val DenseVectorView = tpe("DenseVectorView", tpePar("T"))
-    val DenseMatrix = tpe("DenseMatrix", tpePar("T"))
+    val T = tpePar("T")
+    val DenseVector = tpe("DenseVector", T)
+    val DenseVectorView = tpe("DenseVectorView", T)
+    val DenseMatrix = tpe("DenseMatrix", T)
     val IndexVector = tpe("IndexVector")
     val IndexWildcard = tpe("IndexWildcard", stage = compile)
     identifier (IndexWildcard) ("*")
-    val SparseVector = tpe("SparseVector", tpePar("T"))
+    val SparseVector = tpe("SparseVector", T)
+    val SparseVectorView = tpe("SparseVectorView", T)
+    val SparseMatrix = tpe("SparseMatrix", T)
+    val SparseMatrixBuildable = tpe("SparseMatrixBuildable", T)
 
     // OptiLA ops
     // note that the order matters with respect to 'lookup' calls
@@ -93,6 +98,8 @@ a1+b1
     importDenseVectorOps()
     importDenseMatrixOps()
     importSparseVectorOps()
+    importSparseVectorViewOps()
+    importSparseMatrixOps()
     importVecMatConstructor()
     importIOOps()
     importLinAlgOps()
@@ -124,9 +131,8 @@ a1+b1
       val v = (0::(rowIndices.length*colIndices.length)).toDense
       val indices = densematrix_fromarray(densevector_raw_data(v),rowIndices.length,colIndices.length)
       indices map { i =>
-        val rowIndex = rowIndices(i / colIndices.length)
-        val colIndex = colIndices(i % colIndices.length)
-        $1(rowIndex,colIndex)
+        val (rowIndex, colIndex) = unpack(matrix_shapeindex(i, colIndices.length))
+        $1(rowIndices(rowIndex),colIndices(colIndex))
       }
 
       // could fuse with nested matrix loops (loops over rowIndices), but not with loops directly over individual matrix elements -- like map!

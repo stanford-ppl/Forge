@@ -5,7 +5,7 @@ import ppl.tests.scalatest._
 
 object SimpleDenseVectorArithmeticRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SimpleDenseVectorArithmetic
 object SimpleDenseVectorArithmeticRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SimpleDenseVectorArithmetic
-trait SimpleDenseVectorArithmetic extends ForgeTestModule with LinearAlgebraTestsCommon {
+trait SimpleDenseVectorArithmetic extends ForgeTestModule with DenseLinearAlgebraTestsCommon {
   def main() = {
     // TODO: these can't be factored out right now because they throw an NPE when the test is being initialized
     val rowA = DenseVector(11., 22., 33.)
@@ -31,7 +31,7 @@ trait SimpleDenseVectorArithmetic extends ForgeTestModule with LinearAlgebraTest
 
 object SimpleDenseMatrixArithmeticRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SimpleDenseMatrixArithmetic
 object SimpleDenseMatrixArithmeticRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SimpleDenseMatrixArithmetic
-trait SimpleDenseMatrixArithmetic extends ForgeTestModule with LinearAlgebraTestsCommon {
+trait SimpleDenseMatrixArithmetic extends ForgeTestModule with DenseLinearAlgebraTestsCommon {
   def main() = {
     val rowA = DenseVector(11., 22., 33.)
     val rowB = DenseVector(-5.3, -17.2, -131.)
@@ -70,7 +70,7 @@ trait SimpleDenseMatrixArithmetic extends ForgeTestModule with LinearAlgebraTest
 
 object CombinedVecMatArithmeticRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with CombinedVecMatArithmetic
 object CombinedVecMatArithmeticRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with CombinedVecMatArithmetic
-trait CombinedVecMatArithmetic extends ForgeTestModule with LinearAlgebraTestsCommon {
+trait CombinedVecMatArithmetic extends ForgeTestModule with DenseLinearAlgebraTestsCommon {
   def main() = {
     val rowA = DenseVector(11., 22., 33.)
     val rowB = DenseVector(-5.3, -17.2, -131.)

@@ -26,6 +26,8 @@ trait Definitions extends DerivativeTypes {
   lazy val CAny = tpe("Any", stage = now)
   lazy val MInt = tpe("Int")
   lazy val CInt = tpe("Int", stage = now)
+  lazy val MLong = tpe("Long")
+  lazy val CLong = tpe("Long", stage = now)
   lazy val MFloat = tpe("Float")
   lazy val CFloat = tpe("Float", stage = now)
   lazy val MDouble = tpe("Double")
@@ -54,6 +56,7 @@ trait Definitions extends DerivativeTypes {
   lazy val MVar = tpe("Var", tpePar("A"))
   lazy val MArray = tpe("ForgeArray", tpePar("A"))
   lazy val MArrayBuffer = tpe("ForgeArrayBuffer", tpePar("A"))
+  lazy val MHashMap = tpe("HashMap",(tpePar("K"),tpePar("V"))) // using real HashMap type because we have no struct or primitive Forge HashMap yet
 
   /**
    * DSLType placeholders

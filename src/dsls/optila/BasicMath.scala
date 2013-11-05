@@ -70,10 +70,10 @@ trait BasicMathOps {
     }
 
     val SparseVector = lookupTpe("SparseVector")
-    // val SparseMatrix = lookupTpe("SparseMatrix")
+    val SparseMatrix = lookupTpe("SparseMatrix")
 
-    for (V <- List(SparseVector(T)/*, SparseMatrix(T)*/)) {
-      val R = /*if (V == SparseMatrix(T)) SparseMatrix(T) else*/ SparseVector(T)
+    for (V <- List(SparseVector(T), SparseMatrix(T))) {
+      val R = if (V == SparseMatrix(T)) SparseMatrix(T) else SparseVector(T)
       direct (Math) ("abs", T, V :: R, TArith(T)) implements redirect ${ $0.abs }
       direct (Math) ("square", T, V :: R, TArith(T)) implements composite ${ $0.mapnz(e => e*e) }
       direct (Math) ("sum", T, V :: T, TArith(T)) implements redirect ${ $0.sum }

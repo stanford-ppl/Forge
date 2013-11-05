@@ -23,6 +23,7 @@ trait ScalaOps {
     importStrings()
     importMath()
     importTuples()
+    importHashMap()
   }
 
   /**
@@ -59,15 +60,18 @@ trait ScalaOps {
     val toInt = infix (Prim) ("toInt", T withBound TNumeric, T :: MInt)
     val toFloat = infix (Prim) ("toFloat", T withBound TNumeric, T :: MFloat)
     val toDouble = infix (Prim) ("toDouble", T withBound TNumeric, T :: MDouble)
+    val toLong = infix (Prim) ("toLong", T withBound TNumeric, T :: MLong)
 
     impl (toInt) (codegen($cala, ${ $0.toInt }))
     impl (toFloat) (codegen($cala, ${ $0.toFloat }))
     impl (toDouble) (codegen($cala, ${ $0.toDouble }))
+    impl (toLong) (codegen($cala, ${ $0.toLong }))
 
     for (g <- List(cuda, cpp)) {
       impl (toInt) (codegen(g, ${ (int) $0 }))
       impl (toFloat) (codegen(g, ${ (float) $0 }))
       impl (toDouble) (codegen(g, ${ (double) $0 }))
+      impl (toLong) (codegen(g, ${ (long) $0 }))
     }
 
     fimplicit (Prim) ("repInt2ToRepDouble", Nil, MInt :: MDouble) implements composite ${ $0.toDouble }
@@ -94,6 +98,14 @@ trait ScalaOps {
     val double_times = direct (Prim) ("forge_double_times", Nil, (MDouble,MDouble) :: MDouble)
     val double_divide = direct (Prim) ("forge_double_divide", Nil, (MDouble,MDouble) :: MDouble)
 
+    val long_plus = direct (Prim) ("forge_long_plus", Nil, (MLong, MLong) :: MLong)
+    val long_binary_and = direct (Prim) ("forge_long_and", Nil, (MLong,MLong) :: MLong)
+    val long_binary_or = direct (Prim) ("forge_long_or", Nil, (MLong,MLong) :: MLong)
+    val long_shift_right_unsigned = direct (Prim) ("forge_long_shift_right_unsigned", Nil, (MLong,MInt) :: MLong)
+    val long_shift_left = direct (Prim) ("forge_long_shift_left", Nil, (MLong,MInt) :: MLong)
+    impl (long_shift_right_unsigned) (codegen($cala, ${ $0 >>> $1 }))
+    impl (long_shift_left) (codegen($cala, ${ $0 << $1 }))
+
     for (g <- List($cala, cuda, cpp)) {
       impl (int_plus) (codegen(g, ${$0 + $1}))
       impl (int_minus) (codegen(g, ${$0 - $1}))
@@ -112,6 +124,10 @@ trait ScalaOps {
       impl (double_minus) (codegen(g, ${$0 - $1}))
       impl (double_times) (codegen(g, ${$0 * $1}))
       impl (double_divide) (codegen(g, ${$0 / $1}))
+
+      impl (long_plus) (codegen(g, ${$0 + $1}))
+      impl (long_binary_and) (codegen(g, ${$0 & $1}))
+      impl (long_binary_or) (codegen(g, ${$0 | $1}))
     }
 
     // infix (Prim) ("+", Nil, enumerate(CInt,MInt,CFloat,MFloat,CDouble,MDouble)) implements codegen($cala, quotedArg(0) + " + " + quotedArg(1))
@@ -231,6 +247,12 @@ trait ScalaOps {
     infix (Prim) ("/", Nil, (MDouble,MDouble) :: MDouble) implements redirect ${ forge_double_divide($0,$1) }
 
     infix (Prim) ("<<",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_left($0,$1) }
+
+    infix (Prim) ("+", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_plus($0,$1) }
+    infix (Prim) ("&", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_and($0,$1) }
+    infix (Prim) ("|", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_or($0,$1) }
+    infix (Prim) (">>>", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_shift_right_unsigned($0,$1) }
+    infix (Prim) ("<<", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_shift_left($0,$1) }
   }
 
   def importMisc() = {
@@ -540,5 +562,25 @@ trait ScalaOps {
     direct (Tuple2) ("pack", (A,B), CTuple2(MVar(A),B) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
     direct (Tuple2) ("pack", (A,B), CTuple2(A,MVar(B)) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
     direct (Tuple2) ("pack", (A,B), CTuple2(MVar(A),MVar(B)) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
+  }
+
+  // temporary until DeliteHashMap is ready
+  def importHashMap() = {
+    val K = tpePar("K")
+    val V = tpePar("V")
+
+    // we need a primitive HashMap type..
+    // val HashMap = tpe("FHashMap", (K,V))
+
+    direct (MHashMap) ("FHashMap", (K,V), Nil :: MHashMap(K,V), effect = mutable) implements codegen($cala, ${ new scala.collection.mutable.HashMap[$t[K],$t[V]]() })
+
+    val HashMapOps = withTpe(MHashMap)
+    HashMapOps {
+      infix ("apply") (K :: V) implements codegen($cala, ${ $self($1) })
+      infix ("update") ((K,V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $self.put($1,$2); () })
+      // can we avoid the toArray?
+      infix ("keys") (Nil :: MArray(K)) implements codegen($cala, ${ $self.keySet.toArray })
+      // infix ("keys") (Nil :: MArray(K)) implements codegen($cala, ${ scala.collection.JavaConverters.asScalaSetConverter($self.keySet).asScala.toArray })
+    }
   }
 }

@@ -14,9 +14,11 @@ trait SparseVectorOps {
     val B = tpePar("B")
 
     val DenseVector = lookupTpe("DenseVector")
+    val DenseVectorView = lookupTpe("DenseVectorView")
     val DenseMatrix = lookupTpe("DenseMatrix")
     val IndexVector = lookupTpe("IndexVector")
     val SparseVector = lookupTpe("SparseVector")
+    val SparseVectorView = lookupTpe("SparseVectorView")
 
     // data fields
     data(SparseVector, ("_length", MInt), ("_isRow", MBoolean), ("_data", MArray(T)), ("_indices", MArray(MInt)), ("_nnz", MInt))
@@ -28,9 +30,9 @@ trait SparseVectorOps {
     compiler (SparseVector) ("sparsevector_alloc_raw", T, (MInt, MBoolean, MArray(T), MArray(MInt), MInt) :: SparseVector(T)) implements
       allocates(SparseVector, ${$0}, ${$1}, ${$2}, ${$3}, ${$4})
 
-    compiler (SparseVector) ("sparsevector_fromfunc", T, (MInt, IndexVector, MInt ==> T) :: SparseVector(T)) implements composite ${
-      val sorted = $1.sort
-      sparsevector_alloc_raw($0, true, densevector_raw_data(sorted.map($2)), densevector_raw_data(sorted), sorted.length)
+    compiler (SparseVector) ("sparsevector_fromfunc", T, (MInt, MBoolean, IndexVector, MInt ==> T) :: SparseVector(T)) implements composite ${
+      val sorted = $2.sort
+      sparsevector_alloc_raw($0, $1, densevector_raw_data(sorted.map($3)), densevector_raw_data(sorted), sorted.length)
     }
     static (SparseVector) ("zeros", Nil, MInt :: SparseVector(MDouble)) implements redirect ${ SparseVector[Double]($0, unit(true)) }
     static (SparseVector) ("zerosf", Nil, MInt :: SparseVector(MFloat)) implements redirect ${ SparseVector[Float]($0, unit(true)) }
@@ -38,13 +40,13 @@ trait SparseVectorOps {
       val density = 1.0 - sparsity
       val nnz = floor(density*length)
       val indices = shuffle(0::length).take(nnz)
-      sparsevector_fromfunc($0, indices, i => random[Double])
+      sparsevector_fromfunc($0, true, indices, i => random[Double])
     }
     static (SparseVector) ("randf", Nil, (("length", MInt), ("sparsity", MDouble)) :: SparseVector(MFloat)) implements composite ${
       val density = 1.0 - sparsity
       val nnz = floor(density*length)
       val indices = shuffle(0::length).take(nnz)
-      sparsevector_fromfunc($0, indices, i => random[Float])
+      sparsevector_fromfunc($0, true, indices, i => random[Float])
     }
 
     compiler (SparseVector) ("bsearch", Nil, (("a",MArray(MInt)),("_start",MInt),("_end",MInt),("pos",MInt)) :: MInt) implements single ${
@@ -96,11 +98,11 @@ trait SparseVectorOps {
      * sparse-sparse math ops should be at most O(nnz1+nnz2). how should they be parallelized?
      * would it be easier if we represented the sparse vectors as hashmaps? (e.g., and chunk one of the key sets)
      */
-    compiler (SparseVector) ("zipUnion", (A,B,R), MethodSignature(List(("annz",MInt),("aIndices",MArray(MInt)),("aData",MArray(A)),("bnnz",MInt),("bIndices",MArray(MInt)),("bData",MArray(B)),("outIndices",MArray(MInt)),("outData",MArray(R)),("f",(A,B) ==> R)), MInt), effect = write(6,7)) implements single ${
+    compiler (SparseVector) ("zipUnion", (A,B,R), MethodSignature(List(("nnzInit",MInt),("aIdxInit",MInt),("annz",MInt),("aIndices",MArray(MInt)),("aData",MArray(A)),("bIdxInit",MInt),("bnnz",MInt),("bIndices",MArray(MInt)),("bData",MArray(B)),("outIndices",MArray(MInt)),("outData",MArray(R)),("f",(A,B) ==> R)), MInt), effect = write(9,10)) implements single ${
       // need to zip only places where either va and vb are non-zero
-      var aIdx = 0
-      var bIdx = 0
-      var nnz = 0
+      var nnz = nnzInit
+      var aIdx = aIdxInit
+      var bIdx = bIdxInit
       while (aIdx < annz || bIdx < bnnz) {
         // add to output from A or B, maintaining sorted order
         if (aIdx < annz && bIdx < bnnz) {
@@ -142,11 +144,11 @@ trait SparseVectorOps {
       nnz
     }
 
-    compiler (SparseVector) ("zipIntersect", (A,B,R), MethodSignature(List(("annz",MInt),("aIndices",MArray(MInt)),("aData",MArray(A)),("bnnz",MInt),("bIndices",MArray(MInt)),("bData",MArray(B)),("outIndices",MArray(MInt)),("outData",MArray(R)),("f",(A,B) ==> R)), MInt), effect = write(6,7)) implements single ${
+    compiler (SparseVector) ("zipIntersect", (A,B,R), MethodSignature(List(("nnzInit",MInt),("aIdxInit",MInt),("annz",MInt),("aIndices",MArray(MInt)),("aData",MArray(A)),("bIdxInit",MInt),("bnnz",MInt),("bIndices",MArray(MInt)),("bData",MArray(B)),("outIndices",MArray(MInt)),("outData",MArray(R)),("f",(A,B) ==> R)), MInt), effect = write(9,10)) implements single ${
       // need to zip only places where both va and vb are non-zero
-      var aIdx = 0
-      var bIdx = 0
-      var nnz = 0
+      var nnz = nnzInit
+      var aIdx = aIdxInit
+      var bIdx = bIdxInit
       while (aIdx < annz && bIdx < bnnz) {
         // add to output from A and B, maintaining sorted order
         if (array_apply(aIndices,aIdx) < array_apply(bIndices,bIdx)) {
@@ -175,7 +177,11 @@ trait SparseVectorOps {
       infix ("isRow") (Nil :: MBoolean) implements getter(0, "_isRow")
       infix ("nnz") (Nil :: MInt) implements getter(0, "_nnz")
 
-      infix ("nz") (Nil :: DenseVector(T)) implements composite ${ densevector_alloc_raw($self.nnz, $self.isRow, sparsevector_raw_data($self)) }
+      infix ("nz") (Nil :: DenseVectorView(T), aliasHint = contains(0)) implements single ${
+        // densevector_alloc_raw($self.nnz, $self.isRow, sparsevector_raw_data($self))
+        DenseVectorView[T](sparsevector_raw_data($self), 0, 1, $self.nnz, $self.isRow)
+      }
+
       infix ("indices") (Nil :: IndexVector) implements composite ${ indexvector_fromarray(array_take(sparsevector_raw_indices($self), $self.nnz), $self.isRow) }
 
       compiler ("sparsevector_find_offset") (("pos",MInt) :: MInt) implements composite ${
@@ -259,7 +265,7 @@ trait SparseVectorOps {
         val data = sparsevector_raw_data($self)
         var s = ""
         if ($self.nnz == 0) {
-          "[ ]"
+          s = "[ ]"
         }
         else if ($self.isRow) {
           for (i <- 0 until $self.nnz-1) {
@@ -280,7 +286,7 @@ trait SparseVectorOps {
         val data = sparsevector_raw_data($self)
         var s = ""
         if ($self.nnz == 0) {
-          "[ ]"
+          s = "[ ]"
         }
         else if ($self.isRow) {
           for (i <- 0 until $self.nnz-1) {
@@ -496,7 +502,7 @@ trait SparseVectorOps {
         val outIndices = array_empty[Int]($self.nnz+$1.nnz) // upper bound
         val outData = array_empty[R]($self.nnz+$1.nnz)
 
-        val nnz = zipUnion($self.nnz, sparsevector_raw_indices($self), sparsevector_raw_data($self), $1.nnz, sparsevector_raw_indices($1), sparsevector_raw_data($1), outIndices, outData, $2)
+        val nnz = zipUnion(0, 0, $self.nnz, sparsevector_raw_indices($self), sparsevector_raw_data($self), 0, $1.nnz, sparsevector_raw_indices($1), sparsevector_raw_data($1), outIndices, outData, $2)
         sparsevector_alloc_raw($self.length, $self.isRow, outData.unsafeImmutable, outIndices.unsafeImmutable, nnz)
       }
 
@@ -504,7 +510,7 @@ trait SparseVectorOps {
         val outIndices = array_empty[Int]($self.nnz) // upper bound
         val outData = array_empty[R]($self.nnz)
 
-        val nnz = zipIntersect($self.nnz, sparsevector_raw_indices($self), sparsevector_raw_data($self), $1.nnz, sparsevector_raw_indices($1), sparsevector_raw_data($1), outIndices, outData, $2)
+        val nnz = zipIntersect(0, 0, $self.nnz, sparsevector_raw_indices($self), sparsevector_raw_data($self), 0, $1.nnz, sparsevector_raw_indices($1), sparsevector_raw_data($1), outIndices, outData, $2)
         sparsevector_alloc_raw($self.length, $self.isRow, outData.unsafeImmutable, outIndices.unsafeImmutable, nnz)
       }
 
@@ -547,32 +553,33 @@ trait SparseVectorOps {
       infix ("/") (T :: SparseVector(T), TArith(T)) implements composite ${ $self.mapnz(e => e/$1) }
 
       infix ("abs") (Nil :: SparseVector(T), TArith(T)) implements composite ${ $self.mapnz { e => e.abs } }
-      infix ("sum") (Nil :: T, TArith(T)) implements composite ${ $self.reducenz { (a,b) => a+b } }
+      infix ("sum") (Nil :: T, TArith(T)) implements composite ${ $self.nz.sum }
       infix ("mean") (Nil :: MDouble, ("conv",T ==> MDouble)) implements composite ${ $self.mapnz(conv).sum / $self.length }
-      infix ("min") (Nil :: T, TOrdering(T)) implements composite ${
-        val min = $self.nz.min
-        if (min > defaultValue[T]) defaultValue[T] else min
-      }
-      infix ("max") (Nil :: T, TOrdering(T)) implements composite ${
-        val max = $self.nz.max
-        if (max < defaultValue[T]) defaultValue[T] else max
-      }
-
 
       /**
        * Ordering
        */
 
+      infix ("min") (Nil :: T, TOrdering(T)) implements composite ${
+        val min = $self.nz.min
+        if (min > defaultValue[T]) defaultValue[T] else min
+      }
+
+      infix ("max") (Nil :: T, TOrdering(T)) implements composite ${
+        val max = $self.nz.max
+        if (max < defaultValue[T]) defaultValue[T] else max
+      }
+
       direct ("__equal") (DenseVector(T) :: MBoolean) implements composite ${ $self.toDense == $1 }
 
-      for (rhs <- List(SparseVector(T)/*,SparseVectorView(T)*/)) {
-        direct ("__equal") (rhs :: MBoolean) implements composite ${
-          if ($self.length != $1.length || $self.nnz != $1.nnz || $self.isRow != $1.isRow) false
-          else {
-            val dataEqual = densevector_alloc_raw($self.nnz, true, sparsevector_raw_data($self)) == densevector_alloc_raw($1.nnz, true, sparsevector_raw_data($1))
-            val indexEqual = densevector_alloc_raw($self.nnz, true, sparsevector_raw_indices($self)) == densevector_alloc_raw($1.nnz, true, sparsevector_raw_indices($1))
-            dataEqual && indexEqual
-          }
+      direct ("__equal") (SparseVectorView(T) :: MBoolean) implements composite ${ $1 == $self }
+
+      direct ("__equal") (SparseVector(T) :: MBoolean) implements composite ${
+        if ($self.length != $1.length || $self.nnz != $1.nnz || $self.isRow != $1.isRow) false
+        else {
+          val dataEqual = densevector_alloc_raw($self.nnz, true, sparsevector_raw_data($self)) == densevector_alloc_raw($1.nnz, true, sparsevector_raw_data($1))
+          val indexEqual = densevector_alloc_raw($self.nnz, true, sparsevector_raw_indices($self)) == densevector_alloc_raw($1.nnz, true, sparsevector_raw_indices($1))
+          dataEqual && indexEqual
         }
       }
 

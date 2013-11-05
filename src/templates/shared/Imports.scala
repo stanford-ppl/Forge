@@ -16,6 +16,7 @@ trait BaseGenImports extends ForgeCodeGenBase {
   def emitScalaReflectImports(stream: PrintWriter) {
     stream.println("import scala.tools.nsc.io._")
     stream.println("import scala.reflect.{Manifest,SourceContext}")
+    stream.println("import scala.collection.mutable.HashMap") // temporary until Delite HashMap arrives
   }
 
   def emitScalaImports(stream: PrintWriter) {

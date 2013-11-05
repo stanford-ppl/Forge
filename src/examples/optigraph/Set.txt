@@ -1,0 +1,19 @@
+Create a set using a hash map.
+A set has the qualities of:
+	unique elements
+	no order
+Can use hash map (order function) to give the set an order.
+
+A set of nodes or edges
+	add
+	addSet
+	remove
+	removeSet
+	clear -- clear the whole set
+	*contains* --main case for using a hash map
+	size(field)
+	data(field)
+	items -> returns all items in the set as an array
+
+Need a method that will find all neighbors of function.
+	

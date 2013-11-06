@@ -211,6 +211,7 @@ trait VectorOps {
       infix ("exp") (Nil :: DenseVector(T), A) implements map((T,T), 0, ${ e => e.exp })
       infix ("log") (Nil :: DenseVector(T), A) implements map((T,T), 0, ${ e => e.log })
       infix ("sum") (Nil :: T, A) implements reduce(T, 0, Z, ${ (a,b) => a+b })
+      infix ("prod") (Nil :: T, A) implements reduce(T, 0, ${unit(1.asInstanceOf[\$TT])}, ${ (a,b) => a*b })
       infix ("mean") (Nil :: MDouble, ("conv",T ==> MDouble)) implements composite ${ $self.map(conv).sum / $self.length }
       infix ("min") (Nil :: T, O) implements reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a < b) a else b })
       infix ("max") (Nil :: T, O) implements reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a > b) a else b })

@@ -32,6 +32,25 @@ trait IndexVectorOps {
       d.unsafeImmutable
     }
 
+    // index helpers
+    for (arity <- 2 to 6) {
+      val Tup = tpeInst(lookupTpe("Tuple"+arity, stage = compile), (0 until arity).map(i => MInt).toList)
+
+      // unroll during staging to specialize for each arity
+      val d = (2 to arity).map(k => "dims._" + k)
+      val s1 = d.scanRight("1")((a,b) => a + "*" + b)
+
+      val s2 = s1.zipWithIndex.map(t => "inds._"+(t._2+1) + "*" + t._1)
+      val retFlat = s2.mkString(" + ")
+      // e.g. for index (i,j,k,l) and dims (a,b,c,d), returns (i*b*c*d + j*c*d + k*d + l)
+      direct (IndexVector) ("flatten", Nil, (("inds",Tup),("dims",Tup)) :: MInt) implements redirect ${ \$retFlat }
+
+      val s3 = s1.zipWithIndex.map(t => "(i / " + t._1 + ") % dims._" + (t._2+1))
+      val retTuple = s3.mkString("(",",",")")
+      // e.g. for index i and dims (a,b,c,d), returns [i/dcb % a, i/dc % b, i/d % c, i/1 % d]
+      direct (IndexVector) ("unflatten", Nil, (("i",MInt),("dims",Tup)) :: Tup) implements redirect ${ \$retTuple }
+    }
+
     val IndexVectorOps = withTpe(IndexVector)
     IndexVectorOps {
       compiler ("indexvector_start") (Nil :: MInt) implements getter(0, "_start")

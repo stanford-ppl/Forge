@@ -42,6 +42,7 @@ trait Definitions extends DerivativeTypes {
   lazy val CTuple3 = tpe("Tuple3", (tpePar("A"),tpePar("B"),tpePar("C")), stage = compile)
   lazy val CTuple4 = tpe("Tuple4", (tpePar("A"),tpePar("B"),tpePar("C"),tpePar("D")), stage = compile)
   lazy val CTuple5 = tpe("Tuple5", (tpePar("A"),tpePar("B"),tpePar("C"),tpePar("D"),tpePar("E")), stage = compile)
+  lazy val CTuple6 = tpe("Tuple6", List(tpePar("A"),tpePar("B"),tpePar("C"),tpePar("D"),tpePar("E"),tpePar("F")), stage = compile)
   lazy val MUnit = tpe("Unit")
   lazy val CUnit = tpe("Unit", stage = now)
   lazy val MNothing = tpe("Nothing")

@@ -28,13 +28,11 @@ trait GraphCollectionOps {
 		compiler ("gc_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
 		compiler ("gc_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
 	
-		//array_length(data)	
 		compiler ("length")(Nil :: MInt) implements getter(0,"_length")
 		compiler ("gc_set_length")(MInt :: MUnit, effect = write(0)) implements setter(0, "_length",${$1})
 		
 		infix("apply")(MInt :: T) implements composite ${array_apply(gc_raw_data($self),$1)}
 		
-	
 		compiler("gc_copy")((MInt,GraphCollection(T),MInt,MInt) :: MUnit, effect = write(2) ) implements composite ${
 			val src = gc_raw_data($self)
 			val dest = gc_raw_data($2) //fixme should be $2 but for some reason that won't work
@@ -44,23 +42,26 @@ trait GraphCollectionOps {
 		compiler("gc_update")( (("id",MInt),("n",T)) :: MUnit, effect=write(0)) implements single ${
 			array_update(gc_raw_data($self),$id,$n)
 		}	
+
 		compiler("gc_raw_alloc")(MInt :: GraphCollection(R), addTpePars = R, effect=mutable) implements single ${
 			GraphCollection[R]($1)
 		}
-		compiler ("gc_appendable") ((MInt,T) :: MBoolean) implements single("true")
-		
+
+		compiler ("gc_appendable") ((MInt,T) :: MBoolean) implements single("true")		
+
 		compiler ("gc_append") ((MInt,T) :: MUnit, effect = write(0)) implements single ${
-        	 //gc_insert($self, $1, $2)
+        	 gc_insert($self, $1, $2)
       	}
-      	/*
+      	
         infix ("append") (T :: MUnit, effect = write(0)) implements single ${
         	gc_insert($self, length($self), $1)
       	}
+
       	compiler("gc_insert") ((MInt,T) :: MUnit, effect = write(0)) implements single ${
         	gc_insertspace($self,$1,1)
         	gc_update($self, $1, $2)
       	} 
-      	*/
+      	
       	compiler ("gc_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
 	        gc_ensureextra($self,$len)
 	        val data = gc_raw_data($self)

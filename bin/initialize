@@ -12,7 +12,7 @@ then
 fi
 
 fullname="$1"
-lowerCaseDSL=${fullname,,}
+lowerCaseDSL="optigraph"
 
 # check FORGE_HOME exists
 
@@ -35,11 +35,17 @@ cp -r ./static/apps/* ./apps/$fullname/
 
 # Insert DSL name in the appropriate place
 
-find ./apps/$fullname -type f -print0 | xargs -0 sed -i "s/HUMAN_DSL_NAME/$fullname/g"
-find ./apps/$fullname -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$lowerCaseDSL/g"
+dest=".apps/$fullname"
+os.system("find " + $dest + " -type f -print0 | xargs -0 sed -i \"\" 's/HUMAN_DSL_NAME/"+dsl+"/g'")
+os.system("find " + $dest + " -type f -print0 | xargs -0 sed -i \"\" 's/LOWERCASE_DSL_NAME/"+dsl.lower()+"/g'")
 
-find ./src/examples/ -type f -print0 | xargs -0 sed -i "s/HUMAN_DSL_NAME/$fullname/g"
-find ./src/examples -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$lowerCaseDSL/g"
+dest="./src/examples"
+os.system("find " + $dest + " -type f -print0 | xargs -0 sed -i \"\" 's/HUMAN_DSL_NAME/"+dsl+"/g'")
+os.system("find " + $dest + " -type f -print0 | xargs -0 sed -i \"\" 's/LOWERCASE_DSL_NAME/"+dsl.lower()+"/g'")
+#find ./apps/$fullname -type f -print0 | xargs -0 sed -i "s/HUMAN_DSL_NAME/$fullname/g"
+#find ./apps/$fullname -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$lowerCaseDSL/g"
+#find ./src/examples/ -type f -print0 | xargs -0 sed -i "s/HUMAN_DSL_NAME/$fullname/g"
+#find ./src/examples -type f -print0 | xargs -0 sed -i "s/LOWERCASE_DSL_NAME/$lowerCaseDSL/g"
 
 # test compilation
 # todo - check errors?

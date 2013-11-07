@@ -5,11 +5,6 @@ package optigraph
 import core.{ForgeApplication,ForgeApplicationRunner}
 
 trait GraphOps{
-/*
-	myop implements codegen $cala ${
-		new java.util.concurrent.atomic.AtomicIntegerArray
-	}
-*/
   this: OptiGraphDSL =>
    
   def importGraphOps() {
@@ -34,8 +29,7 @@ trait GraphOps{
       	Graph(nodes,edges)
     }
     
-    val GraphOps = withTpe(Graph)
-    
+    val GraphOps = withTpe(Graph)     
     GraphOps{
     	infix ("node_neighbors") (MInt :: ArrayView) implements composite ${
 			val id = $1

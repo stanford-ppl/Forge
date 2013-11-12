@@ -7,7 +7,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 // This object lets us build our DSL
 object OptiGraphDSLRunner extends ForgeApplicationRunner with OptiGraphDSL
 
-trait OptiGraphDSL extends ForgeApplication with NodeViewOps with ArrayViewOps with AtomicIntArrayOps with GraphOps with GraphCollectionOps with NodeOps with EdgeOps {
+trait OptiGraphDSL extends ForgeApplication with NodeViewOps with ArrayViewOps with AtomicIntArrayOps with GraphOps with GraphCollectionOps with NodeDataOps with NodeOps with EdgeOps {
   /**
    * The name of our DSL. This is the name that will be used in generated files,
    * package declarations, etc.
@@ -18,7 +18,6 @@ trait OptiGraphDSL extends ForgeApplication with NodeViewOps with ArrayViewOps w
    * The specification is the DSL definition (types, data structures, ops, code generators)
    */
   def specification() = {
-    //extern(grp("BitMap"))
     /**
      * Include Scala ops
      */
@@ -28,6 +27,7 @@ trait OptiGraphDSL extends ForgeApplication with NodeViewOps with ArrayViewOps w
      * The main portion of our DSL
      */
     importNodeViewOps()
+    importNodeDataOps()
     importArrayViewOps()
     importAtomicIntArrayOps()
 	  importNodeOps()

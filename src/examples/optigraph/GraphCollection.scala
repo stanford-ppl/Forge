@@ -33,15 +33,15 @@ trait GraphCollectionOps {
 		
 		infix("apply")(MInt :: T) implements composite ${array_apply(gc_raw_data($self),$1)}
 		
+		infix("update")( (("id",MInt),("n",T)) :: MUnit, effect=write(0)) implements composite ${
+			array_update(gc_raw_data($self),$id,$n)
+		}
+
 		compiler("gc_copy")((MInt,GraphCollection(T),MInt,MInt) :: MUnit, effect = write(2) ) implements composite ${
 			val src = gc_raw_data($self)
 			val dest = gc_raw_data($2) //fixme should be $2 but for some reason that won't work
 			array_copy(src, $1, dest, $3, $4)
 		}
-
-		compiler("gc_update")( (("id",MInt),("n",T)) :: MUnit, effect=write(0)) implements single ${
-			array_update(gc_raw_data($self),$id,$n)
-		}	
 
 		compiler("gc_raw_alloc")(MInt :: GraphCollection(R), addTpePars = R, effect=mutable) implements single ${
 			GraphCollection[R]($1)
@@ -59,7 +59,7 @@ trait GraphCollectionOps {
 
       	compiler("gc_insert") ((MInt,T) :: MUnit, effect = write(0)) implements single ${
         	gc_insertspace($self,$1,1)
-        	gc_update($self, $1, $2)
+        	$self($1) = $2
       	} 
       	
       	compiler ("gc_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
@@ -93,7 +93,7 @@ trait GraphCollectionOps {
 
 		infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println(a)})
 
-		parallelize as ParallelCollectionBuffer(T,lookupOp("gc_raw_alloc"),lookupOp("length"),lookupOverloaded("apply",2),lookupOp("gc_update"),lookupOp("gc_set_length"),lookupOp("gc_appendable"),lookupOp("gc_append"),lookupOp("gc_copy"))
+		parallelize as ParallelCollectionBuffer(T,lookupOp("gc_raw_alloc"),lookupOp("length"),lookupOverloaded("apply",2),lookupOp("update"),lookupOp("gc_set_length"),lookupOp("gc_appendable"),lookupOp("gc_append"),lookupOp("gc_copy"))
     }	
   } 
 }

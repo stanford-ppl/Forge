@@ -29,7 +29,7 @@ trait ArrayViewOps {
       compiler ("arrayview_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("Arrayviews cannot be allocated from a parallel op") }
       compiler ("arrayview_illegalupdate") ((MInt, MInt) :: MNothing, effect = simple) implements composite ${ fatal("Arrayviews cannot be updated") }
 
-      infix ("foreach") ((MInt ==> MUnit) :: MUnit) implements foreach(MInt, 0, ${a => $1(a)})
+      infix ("foreach") ((MInt ==> MUnit) :: MUnit, effect = simple) implements foreach(MInt, 0, ${a => $1(a)})
       infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(MInt, 0, ${a => println(a)})
 
       parallelize as ParallelCollection(MInt, lookupOp("arrayview_illegalalloc"), lookupOp("length"), lookupOverloaded("apply",1), lookupOp("arrayview_illegalupdate"))

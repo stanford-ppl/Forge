@@ -42,11 +42,9 @@ trait IOOps {
     }
 
     direct (IO) ("readMatrix", Elem, MethodSignature(List(("path",MString),("schemaBldr",MString ==> Elem),("delim",MString,"\"\\s+\"")), DenseMatrix(Elem)), effect = simple) implements single ${
-      val a = ForgeFileReader.readLinesUnstructured($path){ (line:Rep[String], buf:Rep[ForgeArrayBuffer[Elem]]) =>
+      val a = ForgeFileReader.readLinesFlattened($path){ line:Rep[String] =>
         val tokens = line.trim.fsplit(delim)
-        for (i <- 0 until array_length(tokens)) {
-          array_buffer_append(buf, schemaBldr(tokens(i)))
-        }
+        array_fromfunction(array_length(tokens), i => schemaBldr(tokens(i)))
       }
       val numCols = array_length(readFirstLine(path).trim.fsplit(delim))
       densematrix_fromarray(a, array_length(a) / numCols, numCols).unsafeImmutable // unsafeImmutable needed due to struct unwrapping Reflect(Reflect(..)) bug (see LAInputReaderOps.scala line 46 in Delite)

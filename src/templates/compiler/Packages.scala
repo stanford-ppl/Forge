@@ -66,8 +66,8 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("  override def infix_startsWith(lhs: Rep[String], rhs: Rep[String])(implicit pos: SourceContext) = fstring_startswith(lhs,rhs)")
     stream.println("  override def __whileDo(cond: => Exp[Boolean], body: => Rep[Unit])(implicit pos: SourceContext) = delite_while(cond, body)")
     // delite and lms if-then-else don't use by-name-parameter for cond
-    stream.println("  override def __ifThenElse[T:Manifest](cond: Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false)")
-    stream.println("  override def __ifThenElse[T:Manifest](cond: => Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false)")
+    stream.println("  override def __ifThenElse[T:Manifest](cond: Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")
+    stream.println("  override def __ifThenElse[T:Manifest](cond: => Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")
     stream.println("  implicit def repToOrderingOps[A:Manifest:Ordering](x: Rep[A]) = repOrderingToOrderingOps(x)")
     stream.println("  implicit def varToOrderingOps[A:Manifest:Ordering](x: Var[A]) = varOrderingToOrderingOps(x)")
     stream.println("  // forward to LMS primitive ops to make stencil analysis detect intervals (and get constant folding rewrites)")

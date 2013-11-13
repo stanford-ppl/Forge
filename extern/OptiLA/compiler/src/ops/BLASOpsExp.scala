@@ -38,6 +38,8 @@ import optila.compiler.ops._
 trait BLASOpsExp extends BLASOps with DenseMatrixOpsExp {
   this: OptiLAExp =>
 
+  def MIN_SIZE = unit(100)
+
   /**
    * Intercept BLAS-able operations
    */
@@ -59,9 +61,17 @@ trait BLASOpsExp extends BLASOps with DenseMatrixOpsExp {
   }
 
   override def densematrix_matmult[T:Manifest](self: Rep[DenseMatrix[T]],__arg0: Rep[DenseMatrix[T]])(implicit __pos: SourceContext,__imp0: Arith[T]): Rep[DenseMatrix[T]] = {
-    if (useBLAS && Config.useBlas && (manifest[T] == manifest[Double] || manifest[T] == manifest[Float])) densematrix_fromarray(Native_matMult(self.numRows,self.numCols,densematrix_raw_data(self),__arg0.numRows,__arg0.numCols,densematrix_raw_data(__arg0)),self.numRows,__arg0.numCols)
+    if (useBLAS && Config.useBlas && (manifest[T] == manifest[Double] || manifest[T] == manifest[Float])) {
+      if (densematrix_size(self) > MIN_SIZE && densematrix_size(__arg0) > MIN_SIZE) {
+        densematrix_fromarray(Native_matMult(self.numRows,self.numCols,densematrix_raw_data(self),__arg0.numRows,__arg0.numCols,densematrix_raw_data(__arg0)),self.numRows,__arg0.numCols)
+      }
+      else {
+        super.densematrix_matmult(self,__arg0)
+      }
+    }
     else super.densematrix_matmult(self,__arg0)
   }
+
   override def densematrix_matvecmult[T:Manifest](self: Rep[DenseMatrix[T]],__arg0: Rep[DenseVector[T]])(implicit __pos: SourceContext,__imp0: Arith[T]): Rep[DenseVector[T]] = {
     if (useBLAS && Config.useBlas && (manifest[T] == manifest[Double] || manifest[T] == manifest[Float])) densevector_fromarray(Native_matTimesVec(self.numRows,self.numCols,densematrix_raw_data(self),densevector_raw_data(__arg0)),unit(false))
     else super.densematrix_matvecmult(self,__arg0)
@@ -105,13 +115,13 @@ trait CudaGenBLASOps extends CudaGenExternalBase {
         case "double" => "cublasDgemm"
         case "float" => "cublasSgemm"
       }
-      emitInterfaceAndMethod(cuBLAS, e.funcName, scala.List("char n1", "char n2", "int mat2_col", "int mat1_row", "int mat2_row", tp+" a", "%1$s* mat2".format(tp), "int mat2_col_b", "%1$s* mat1".format(tp), "int mat1_col", tp+" b", "%1$s* mat3".format(tp), "int mat3_col"), "", 
+      emitInterfaceAndMethod(cuBLAS, e.funcName, scala.List("char n1", "char n2", "int mat2_col", "int mat1_row", "int mat2_row", tp+" a", "%1$s* mat2".format(tp), "int mat2_col_b", "%1$s* mat1".format(tp), "int mat1_col", tp+" b", "%1$s* mat3".format(tp), "int mat3_col"), "",
 """
 {
   // HJ TODO: use a real stream
   //cublasSetKernelStream(stream);
   %1$s(n1, n2, mat2_col, mat1_row, mat2_row, a, mat2, mat2_col_b, mat1, mat1_col, b, mat3, mat3_col);
-}""".format(func)) 
+}""".format(func))
 
     case e@Native_matTimesVec(xR,xC,x,y) =>
       val tp = remap(e._mT)
@@ -119,7 +129,7 @@ trait CudaGenBLASOps extends CudaGenExternalBase {
         case "double" => "cublasDgemv"
         case "float" => "cublasSgemv"
       }
-      emitInterfaceAndMethod(cuBLAS, e.funcName, scala.List("char transpose", "int mat_col", "int mat_row", "%1$s* mat1".format(tp), "%1$s* vec2".format(tp), "%1$s* vec3".format(tp)), "", 
+      emitInterfaceAndMethod(cuBLAS, e.funcName, scala.List("char transpose", "int mat_col", "int mat_row", "%1$s* mat1".format(tp), "%1$s* vec2".format(tp), "%1$s* vec3".format(tp)), "",
 """
 {
   // HJ TODO: use a real stream

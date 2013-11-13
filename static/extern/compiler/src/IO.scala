@@ -11,8 +11,16 @@ import ppl.delite.framework.datastructures._
 trait InputOutputOpsExp extends DeliteFileReaderOpsExp {
   this: ForgeArrayOpsExp with ForgeArrayBufferOpsExp =>
 
+  def forge_filereader_readlines[A:Manifest](path: Rep[String], f: Rep[String] => Rep[A]): Rep[ForgeArray[A]] = {
+    DeliteNewFileReader.readLines[A](path)(f)
+  }
+
+  def forge_filereader_readlines_flattened[A:Manifest](path: Rep[String], f: Rep[String] => Rep[ForgeArray[A]]): Rep[ForgeArray[A]] = {
+    DeliteNewFileReader.readLinesFlattened[A](path)(f)
+  }
+
   def forge_filereader_readlines_unstructured[A:Manifest](path: Rep[String], append: (Rep[String], Rep[ForgeArrayBuffer[A]]) => Rep[Unit]): Rep[ForgeArray[A]] = {
-    dfr_readLines[A](path, append)
+    DeliteFileReader.readLinesUnstructured[A](path)(append)
   }
 }
 

@@ -45,7 +45,7 @@ trait IndexVectorOps {
       // e.g. for index (i,j,k,l) and dims (a,b,c,d), returns (i*b*c*d + j*c*d + k*d + l)
       direct (IndexVector) ("flatten", Nil, (("inds",Tup),("dims",Tup)) :: MInt) implements redirect ${ \$retFlat }
 
-      val s3 = s1.zipWithIndex.map(t => "(i / " + t._1 + ") % dims._" + (t._2+1))
+      val s3 = s1.zipWithIndex.map(t => "(i / (" + t._1 + ")) % dims._" + (t._2+1))
       val retTuple = s3.mkString("(",",",")")
       // e.g. for index i and dims (a,b,c,d), returns [i/dcb % a, i/dc % b, i/d % c, i/1 % d]
       direct (IndexVector) ("unflatten", Nil, (("i",MInt),("dims",Tup)) :: Tup) implements redirect ${ \$retTuple }

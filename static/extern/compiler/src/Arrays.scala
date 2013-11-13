@@ -44,6 +44,8 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
     = darray_filter(__arg0,__arg1)
   def array_sort[T:Manifest:Ordering](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = darray_sort(__arg0)
+  def array_fromfunction[T:Manifest](__arg0: Rep[Int],__arg1: Rep[Int] => Rep[T])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+    = darray_fromfunction(__arg0,__arg1)
   def array_fromseq[T:Manifest](__arg0: Seq[Rep[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]] = {
     val out = darray_new[T](unit(__arg0.length))
     for (i <- 0 until __arg0.length) {
@@ -51,23 +53,23 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
     }
     out.unsafeImmutable
   }
-  def array_string_split(__arg0: Rep[String], __arg1: Rep[String])(implicit __imp0: SourceContext): Rep[ForgeArray[String]]
-    = reflectPure(ArrayStringSplit(__arg0, __arg1))
+  def array_string_split(__arg0: Rep[String],__arg1: Rep[String],__arg2: Rep[Int] = unit(0))(implicit __imp0: SourceContext): Rep[ForgeArray[String]]
+    = reflectPure(ArrayStringSplit(__arg0, __arg1, __arg2))
 
   // avoid mixing in LMS Array ops due to conflicts. alternatively, we could refactor LMS array ops to
   // put ArrayApply and ArrayLength in an isolated trait that we can use.
   case class ArrayApply[T:Manifest](a: Exp[Array[T]], n: Exp[Int]) extends Def[T]
   case class ArrayLength[T:Manifest](a: Exp[Array[T]]) extends Def[Int]
-  case class ArrayStringSplit(str: Exp[String], split: Exp[String]) extends Def[DeliteArray[String]]
+  case class ArrayStringSplit(str: Exp[String], split: Exp[String], lim: Exp[Int]) extends Def[DeliteArray[String]]
 
   override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = (e match {
     case ArrayApply(a,x) => scala_array_apply(f(a),f(x))(mtype(manifest[A]),pos)
     case ArrayLength(a) => scala_array_length(f(a))(mtype(manifest[A]),pos)
-    case ArrayStringSplit(a,b) => array_string_split(f(a),f(b))(pos)
+    case ArrayStringSplit(a,b,l) => array_string_split(f(a),f(b),f(l))(pos)
 
     case Reflect(ArrayApply(a,x), u, es) => reflectMirrored(Reflect(ArrayApply(f(a),f(x))(mtype(manifest[A])), mapOver(f,u), f(es)))(mtype(manifest[A]))
     case Reflect(ArrayLength(a), u, es) => reflectMirrored(Reflect(ArrayLength(f(a))(mtype(manifest[A])), mapOver(f,u), f(es)))(mtype(manifest[A]))
-    case Reflect(ArrayStringSplit(a,b), u, es) => reflectMirrored(Reflect(ArrayStringSplit(f(a),f(b)), mapOver(f,u), f(es)))(mtype(manifest[A]))
+    case Reflect(ArrayStringSplit(a,b,l), u, es) => reflectMirrored(Reflect(ArrayStringSplit(f(a),f(b),f(l)), mapOver(f,u), f(es)))(mtype(manifest[A]))
     case _ => super.mirror(e,f)
   }).asInstanceOf[Exp[A]] // why??
 
@@ -83,8 +85,9 @@ trait ScalaGenForgeArrayOps extends ScalaGenDeliteArrayOps with ScalaGenPrimitiv
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case ArrayApply(x,n) => emitValDef(sym, "" + quote(x) + "(" + quote(n) + ")")
     case ArrayLength(x) => emitValDef(sym, "" + quote(x) + ".length")
-    case ArrayStringSplit(a,b) if Config.generateSerializable => emitValDef(sym, "new ppl.delite.runtime.data.LocalDeliteArrayObject[String](" + quote(a) + ".split(" + quote(b) + "))")
-    case ArrayStringSplit(a,b) => emitValDef(sym, quote(a) + ".split(" + quote(b) + ")")
+    // TODO
+    case ArrayStringSplit(a,b,l) if Config.generateSerializable => emitValDef(sym, "new ppl.delite.runtime.data.LocalDeliteArrayObject[String](" + quote(a) + ".split(" + quote(b) + "))")
+    case ArrayStringSplit(a,b,l) => emitValDef(sym, quote(a) + ".split(" + quote(b) + ", " + quote(l) + ")")
     case _ => super.emitNode(sym,rhs)
   }
 }
@@ -113,7 +116,7 @@ trait CGenForgeArrayOps extends CGenDeliteArrayOps with CGenObjectOps {
 
 
 trait ForgeArrayBufferOpsExp extends DeliteArrayBufferOpsExp {
-  this: DeliteArrayOpsExpOpt with DeliteOpsExp =>
+  this: DeliteArrayOpsExpOpt with DeliteOpsExp with DeliteMapOpsExp =>
 
   type ForgeArrayBuffer[T] = DeliteArrayBuffer[T]
 

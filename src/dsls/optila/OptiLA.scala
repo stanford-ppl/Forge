@@ -71,26 +71,32 @@ trait OptiLADSL extends ForgeApplication
     importArithOps()
     importStringableOps()
 
-    // override default string formatting
-    // numericPrecision is a global defined in extern
+    // override default string formatting (numericPrecision is a global defined in extern)
     val strConcatWithNumerics = {
       val a = quotedArg(0)
       val b = quotedArg(1)
-      val f1 = "(\"%.\"+Global.numericPrecision+\"f\").format("+a+")" // can't escape quotes inside string interpolation scope
-      val f2 = "(\"%.\"+Global.numericPrecision+\"f\").format("+b+")"
+      val f = "(\"% .\"+Global.numericPrecision+\"g\")" // can't escape quotes inside string interpolation scope
+
 s"""
-val a1 = if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) $f1 else $a.toString
-val b1 = if ($b.isInstanceOf[Double] || $b.isInstanceOf[Float]) $f2 else $b.toString
+def numericStr[A](x: A) = {
+  val s = $f.format(x)
+  val padPrefix = (Global.numericPrecision+6) - s.length
+  if (padPrefix > 0) " "*padPrefix + s else s
+}
+val a1 = if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else $a.toString
+val b1 = if ($b.isInstanceOf[Double] || $b.isInstanceOf[Float]) numericStr($b) else $b.toString
 a1+b1
 """
     }
+
     // the ones that matter are the first that resolve to a unique tpe combination
     impl (lookupOverloaded("FString","+",0)) (codegen($cala, strConcatWithNumerics))
     impl (lookupOverloaded("FString","+",6)) (codegen($cala, strConcatWithNumerics))
     impl (lookupOverloaded("FString","+",11)) (codegen($cala, strConcatWithNumerics))
 
     compiler (lookupGrp("FString")) ("optila_padspace", Nil, MString :: MString) implements composite ${
-      if ($0.startsWith("-")) "  " + $0 else "   " + $0
+      "  " + $0
+      // if ($0.startsWith("-")) "  " + $0 else "   " + $0
     }
 
     importIndexVectorOps()

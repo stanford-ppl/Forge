@@ -87,8 +87,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
         implStream.println("package " + packageName + ".ops")
         implStream.println()
         emitScalaReflectImports(implStream)
-        implStream.println("import " + packageName + "." + dsl + "Compiler")
-        implStream.println("import " + dsl.toLowerCase() + ".shared." + dsl + "Lift") // TODO: not encapsulated
+        emitDSLImports(implStream)
         implStream.println()
         emitImpls(opsGrp, implStream)
         implStream.close()

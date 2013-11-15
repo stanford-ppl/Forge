@@ -1,5 +1,5 @@
 package ppl.dsl.forge
-package examples
+package dsls
 package optiml
 
 import core.{ForgeApplication,ForgeApplicationRunner}

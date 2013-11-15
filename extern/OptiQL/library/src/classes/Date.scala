@@ -48,7 +48,7 @@ trait DateWrapper extends DateOps {
     val year = fstring_toint(array_apply(tokens,unit(0)))
     val month = fstring_toint(array_apply(tokens,unit(1)))
     val day = fstring_toint(array_apply(tokens,unit(2)))
-    Date(primitive2_pl(primitive2_ltlt(year, unit(9)), primitive2_pl(primitive2_ltlt(month, unit(5)), day)))
+    Date(primitive2_forge_int_plus(primitive2_forge_int_shift_left(year, unit(9)), primitive2_forge_int_plus(primitive2_forge_int_shift_left(month, unit(5)), day)))
   }
 
   def date_lt_impl1(self: Rep[Date],__arg0: Rep[Date])(implicit __pos: SourceContext): Rep[Boolean] = {

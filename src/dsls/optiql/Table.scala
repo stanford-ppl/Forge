@@ -1,5 +1,5 @@
 package ppl.dsl.forge
-package examples
+package dsls
 package optiql
 
 import core.{ForgeApplication,ForgeApplicationRunner}
@@ -28,9 +28,9 @@ trait TableOps {
 
     //(K,V) pairs for Tables
     val Tuple2 = lookupTpe("Tup2")
-    fimplicit (Tuple2) ("pair_to_value", (K,V), Tuple2(K,Table(V)) :: Table(V)) implements composite ${ tuple2_get2($0) } //TODO: this isn't kicking in
-    infix (Tuple2) ("key", (K,V), Tuple2(K,Table(V)) :: K) implements composite ${ tuple2_get1($0) }
-    infix (Tuple2) ("value", (K,V), Tuple2(K,Table(V)) :: Table(V)) implements composite ${ tuple2_get2($0) }
+    fimplicit (Tuple2) ("pair_to_value", (K,V), Tuple2(K,Table(V)) :: Table(V)) implements composite ${ tup2__2($0) } //TODO: this isn't kicking in
+    infix (Tuple2) ("key", (K,V), Tuple2(K,Table(V)) :: K) implements composite ${ tup2__1($0) }
+    infix (Tuple2) ("value", (K,V), Tuple2(K,Table(V)) :: Table(V)) implements composite ${ tup2__2($0) }
 
     val TableOps = withTpe (Table)
     TableOps {
@@ -126,7 +126,7 @@ trait TableOps {
 
       compiler ("table_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = table_raw_data($self)
-        var n = Math.max(4, array_length(data)*2)
+        var n = Math.max(4, array_length(data)*2).toInt
         while (n < $minLen) n = n*2
         val d = array_empty[A](n)
         array_copy(data, 0, d, 0, table_size($self))

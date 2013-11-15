@@ -56,7 +56,7 @@ which is automatically copied to the generated DSL directory during publishing.
 
 To generate a DSL and move it to an external location (e.g. OptiML):
 
-        bin/update ppl.dsl.forge.examples.optiml.OptiMLDSLRunner OptiML
+        bin/update ppl.dsl.forge.dsls.optiml.OptiMLDSLRunner OptiML
         mv published/OptiML <destination>
      
 The destination will now contain the generated DSL, and you can add applications directly
@@ -75,42 +75,15 @@ To run a DSL application located in `<FORGE_HOME>/apps/<DSL>/src/`, (e.g. Logist
 
 * Interpreter: 
 
-        bin/update -r "LogRegInterpreter <args>" ppl.dsl.forge.examples.optiml.OptiMLDSLRunner OptiML
+        bin/update -r "LogRegInterpreter <args>" ppl.dsl.forge.dsls.optiml.OptiMLDSLRunner OptiML
 
 * Compiler:
 
-        bin/update -d -r "LogRegCompiler <args>" ppl.dsl.forge.examples.optiml.OptiMLDSLRunner OptiML
+        bin/update -d -r "LogRegCompiler <args>" ppl.dsl.forge.dsls.optiml.OptiMLDSLRunner OptiML
 
 * Interactive:
         
-        bin/update -i ppl.dsl.forge.examples.optiml.OptiMLDSLRunner OptiML
+        bin/update -i ppl.dsl.forge.dsls.optiml.OptiMLDSLRunner OptiML
 
 If the DSL has already been generated, you can supply the `-s 3` parameter to `update` to skip
 immediately to the publishing step.
-
-    
-
-Creating a new DSL
-==================
-
-You can create a new DSL from our templates
-using
-
-    bin/initialize NewDSLName [--test]
-
-This creates a DSL file in `src/examples`, a Hello World application in `apps/`, and the basic `extern/` files. The DSL includes an example of a parallel data structure.
-
-The option `--test` will attempt to compile everything using
-
-    sbt compile
-    bin/forge ppl.dsl.forge.examples.NewDSLNameRunner
-    bin/publish newdslname
-    cd published/newdslname
-    sbt compile
-    bin/delitec HelloWorldInterpreter
-    bin/delitec HelloWorldCompiler
-    bin/delite HelloWorldCompiler.deg
-
-You can undo these actions using
-
-    bin/teardown NewDSLName

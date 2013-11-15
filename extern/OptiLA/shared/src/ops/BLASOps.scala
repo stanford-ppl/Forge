@@ -10,8 +10,7 @@ import optila.shared._
 import optila.shared.ops._
 import optila.shared.typeclass._
 
-// TODO: BLAS and LAPACK extern files should be moved to extern/OptiLA, and sourced from there.
 trait BLASOps {
-  lazy val useBLAS = System.getProperty("optila.use.blas", "false").toBoolean
+  lazy val useBLAS = System.getProperty("optila.use.blas", "true").toBoolean
 }
 trait BLASCompilerOps extends BLASOps

@@ -143,6 +143,9 @@ trait DeliteGenOps extends BaseGenOps {
           emitImplMethod(o, mapreduce.map, "_map",  makeFuncSignature(mapreduce.tpePars._1, mapreduce.tpePars._2), stream)
           emitImplMethod(o, mapreduce.reduce, "_reduce", makeFuncSignature((mapreduce.tpePars._2, mapreduce.tpePars._2), mapreduce.tpePars._2), stream)
           emitImplMethod(o, mapreduce.zero, "_zero", makeFuncSignature(Nil, mapreduce.tpePars._2), stream)
+          if (mapreduce.cond.isDefined) {
+            emitImplMethod(o, mapreduce.cond.get, "_cond", makeFuncSignature(mapreduce.tpePars._1, MBoolean), stream)
+          }
         case filter:Filter =>
           emitImplMethod(o, filter.cond, "_cond", makeFuncSignature(filter.tpePars._1, MBoolean), stream)
           emitImplMethod(o, filter.func, "_map", makeFuncSignature(filter.tpePars._1, filter.tpePars._2), stream)
@@ -259,12 +262,24 @@ trait DeliteGenOps extends BaseGenOps {
         case mapreduce:MapReduce =>
           val col = o.args.apply(mapreduce.argIndex)
           val dc = ForgeCollections(getHkTpe(col.tpe))
-          emitOpNodeHeader(o, "DeliteOpMapReduce[" + quote(mapreduce.tpePars._1) + "," + quote(mapreduce.tpePars._2) + "]")
+          if (mapreduce.cond.isDefined) {
+            emitOpNodeHeader(o, "DeliteOpFilterReduce[" + quote(mapreduce.tpePars._1) + "," + quote(mapreduce.tpePars._2) + "]")
+          }
+          else {
+            emitOpNodeHeader(o, "DeliteOpMapReduce[" + quote(mapreduce.tpePars._1) + "," + quote(mapreduce.tpePars._2) + "]")
+          }
           stream.println()
           stream.println("    val in = " + col.name)
-          stream.println("    def map = " + makeOpImplMethodNameWithArgs(o, "_map"))
           stream.println("    def zero = " + makeOpImplMethodNameWithArgs(o, "_zero"))
           stream.println("    def reduce = " + makeOpImplMethodNameWithArgs(o, "_reduce"))
+          // kind of silly, but DeliteOpFilterReduce and DeliteOpMapReduce have different names for the mapping function
+          if (mapreduce.cond.isDefined) {
+            stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_map"))
+            stream.println("    def cond = " + makeOpImplMethodNameWithArgs(o, "_cond"))
+          }
+          else {
+            stream.println("    def map = " + makeOpImplMethodNameWithArgs(o, "_map"))
+          }
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
         case filter:Filter =>
           val colTpe = getHkTpe(o.retTpe)
@@ -714,7 +729,7 @@ trait DeliteGenOps extends BaseGenOps {
                 }
                 else {
                   body2.take(body2.length-1).foreach { line => emitWithIndent(line, stream, 6) }
-                  emitWithIndent("stream.print(remap(sym.tp) + \" \" + quote(sym) + \" = \")", stream, 6)
+                  emitWithIndent("stream.print(remapWithRef(sym.tp) + \" \" + quote(sym) + \" = \")", stream, 6)
                   emitWithIndent(body2.last, stream, 6)
                   emitWithIndent("stream.println(\";\")", stream, 6)
                 }

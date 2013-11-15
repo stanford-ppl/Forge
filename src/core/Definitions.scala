@@ -26,6 +26,8 @@ trait Definitions extends DerivativeTypes {
   lazy val CAny = tpe("Any", stage = now)
   lazy val MInt = tpe("Int")
   lazy val CInt = tpe("Int", stage = now)
+  lazy val MLong = tpe("Long")
+  lazy val CLong = tpe("Long", stage = now)
   lazy val MFloat = tpe("Float")
   lazy val CFloat = tpe("Float", stage = now)
   lazy val MDouble = tpe("Double")
@@ -40,6 +42,7 @@ trait Definitions extends DerivativeTypes {
   lazy val CTuple3 = tpe("Tuple3", (tpePar("A"),tpePar("B"),tpePar("C")), stage = compile)
   lazy val CTuple4 = tpe("Tuple4", (tpePar("A"),tpePar("B"),tpePar("C"),tpePar("D")), stage = compile)
   lazy val CTuple5 = tpe("Tuple5", (tpePar("A"),tpePar("B"),tpePar("C"),tpePar("D"),tpePar("E")), stage = compile)
+  lazy val CTuple6 = tpe("Tuple6", List(tpePar("A"),tpePar("B"),tpePar("C"),tpePar("D"),tpePar("E"),tpePar("F")), stage = compile)
   lazy val MUnit = tpe("Unit")
   lazy val CUnit = tpe("Unit", stage = now)
   lazy val MNothing = tpe("Nothing")
@@ -54,6 +57,7 @@ trait Definitions extends DerivativeTypes {
   lazy val MVar = tpe("Var", tpePar("A"))
   lazy val MArray = tpe("ForgeArray", tpePar("A"))
   lazy val MArrayBuffer = tpe("ForgeArrayBuffer", tpePar("A"))
+  lazy val MHashMap = tpe("HashMap",(tpePar("K"),tpePar("V"))) // using real HashMap type because we have no struct or primitive Forge HashMap yet
 
   /**
    * DSLType placeholders
@@ -158,8 +162,14 @@ trait Definitions extends DerivativeTypes {
   def info(aliases: Option[List[Int]], contains: Option[List[Int]], extracts: Option[List[Int]], copies: Option[List[Int]]) = AliasInfo(aliases, contains, extracts, copies)
 
   // convenience methods for constructing common alias hints
+  def aliases(arg: Int): AliasHint = aliases(List(arg))
+  def aliases(args: List[Int]) =  info(Some(args),None,None,None)
+  def contains(arg: Int): AliasHint = contains(List(arg))
+  def contains(args: List[Int]) =  info(None,Some(args),None,None)
+  def extracts(arg: Int): AliasHint = extracts(List(arg))
+  def extracts(args: List[Int]) =  info(None,None,Some(args),None)
   def copies(arg: Int): AliasHint = copies(List(arg))
-  def copies(args: List[Int]) = AliasCopies(args)
+  def copies(args: List[Int]) = AliasCopies(args)  // TODO: why do we have a separate constructor for this?
   // others? aliasesSome(..)?
 
   /**
@@ -309,10 +319,11 @@ trait Definitions extends DerivativeTypes {
    * @param map         string representation of a function A => R
    * @param zero        string representation of a function => R
    * @param reduce      string representation of a reduce function (R, R) => R
+   * @param cond        optional string representatin of a condition function A => Boolean
    */
-   def forge_mapreduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String]): DeliteOpType
+   def forge_mapreduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]]): DeliteOpType
    object mapReduce {
-     def apply(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String]) = forge_mapreduce(tpePars, argIndex, map, zero, reduce)
+     def apply(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]] = None) = forge_mapreduce(tpePars, argIndex, map, zero, reduce, cond)
    }
 
   /**
@@ -415,8 +426,8 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
   case class Reduce(tpePar: Rep[DSLType], argIndex: Int, zero: Rep[String], func: Rep[String]) extends DeliteOpType
   def forge_reduce(tpePar: Rep[DSLType], argIndex: Int, zero: Rep[String], func: Rep[String]) = Reduce(tpePar, argIndex, zero, func)
 
-  case class MapReduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String]) extends DeliteOpType
-  def forge_mapreduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String]) = MapReduce(tpePars, argIndex, map, zero, reduce)
+  case class MapReduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]]) extends DeliteOpType
+  def forge_mapreduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]]) = MapReduce(tpePars, argIndex, map, zero, reduce, cond)
 
   case class Filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]) extends DeliteOpType
   def forge_filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]) = Filter(tpePars, argIndex, cond, func)

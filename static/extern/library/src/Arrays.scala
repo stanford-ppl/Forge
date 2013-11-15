@@ -22,16 +22,29 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
     = __arg0.length
   def array_clone[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = __arg0.clone
+  def array_take[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int]): Rep[ForgeArray[T]]
+    = __arg0.take(__arg1)
+  def array_map[T:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]], __arg1: Rep[T] => Rep[R])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]
+    = __arg0.map(__arg1)
+  def array_zip[T:Manifest,B:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[ForgeArray[B]], __arg2: (Rep[T],Rep[B]) => Rep[R])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]
+    = __arg0.zip(__arg1).map(t => __arg2(t._1,t._2))
+  def array_reduce[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: (Rep[T],Rep[T]) => Rep[T],__arg2: Rep[T])(implicit __imp0: SourceContext): Rep[T]
+    = if (array_length(__arg0) == 0) __arg2 else __arg0.reduce(__arg1)
+  def array_filter[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[T] => Rep[Boolean])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+    = __arg0.filter(__arg1)
   def array_sort[T:Manifest:Ordering](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]] = {
     val d = array_empty[T](__arg0.length)
     array_copy(__arg0,0,d,0,__arg0.length)
     scala.util.Sorting.quickSort(d)
     d
   }
+  def array_fromfunction[T:Manifest](__arg0: Rep[Int],__arg1: Rep[Int] => Rep[T])(implicit __imp0: SourceContext): Rep[ForgeArray[T]] = {
+    Array.tabulate[T](__arg0)(__arg1)
+  }
   def array_fromseq[T:Manifest](__arg0: Seq[Rep[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = __arg0.toArray
-  def array_string_split(__arg0: Rep[String], __arg1: Rep[String])(implicit __imp0: SourceContext): Rep[ForgeArray[String]]
-    = __arg0.split(__arg1)
+  def array_string_split(__arg0: Rep[String],__arg1: Rep[String],__arg2: Rep[Int] = unit(0))(implicit __imp0: SourceContext): Rep[ForgeArray[String]]
+    = __arg0.split(__arg1,__arg2)
 
   def scala_array_apply[T:Manifest](__arg0: Rep[Array[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[T]
     = array_apply(__arg0,__arg1)

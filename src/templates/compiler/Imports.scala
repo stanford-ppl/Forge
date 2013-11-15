@@ -36,9 +36,14 @@ trait DeliteGenImports extends BaseGenImports {
     stream.println("import ppl.delite.framework.transform._")
   }
 
+  def emitDeliteTestImports(stream: PrintWriter) {
+    stream.println("import ppl.tests.scalatest._")
+  }
+
   def emitDeliteImports(stream: PrintWriter) {
     emitDelitePackageImports(stream)
     emitDeliteOpsImports(stream)
+    emitDeliteTestImports(stream)
   }
 
   override def emitDSLImports(stream: PrintWriter) {

@@ -10,14 +10,16 @@ object TestBFSInterpreter extends OptiGraphApplicationInterpreter with TestBFS
 
 trait TestBFS extends OptiGraphApplication {
   def main() = {
+   
     println("OptiGraph Test 1")
     val g = Graph.fromFile("nodeOffsets.txt","edgeList.txt", fromLine) 
+    println("Directed: " + g.is_directed())
     println("Number of Nodes: " + g.get_num_nodes)
     val n1 = g.get_node_from_id(9)
     println("node id1: " + n1())
-    //val n2 = g.get_node_from_id(10)
+    val n2 = g.get_node_from_id(10)
 
-    /*ß
+    /*
     val collection = g.node_neighbors(4)
     val len = collection.length()
     println("printing edge stuff4")
@@ -57,5 +59,5 @@ trait TestBFS extends OptiGraphApplication {
     */ 
   }
 def fromLine(line: Rep[String]): Rep[Int] = {line.toInt}
-def nodeComputation(node: Rep[Node], nd: Rep[NodeData[Int]]) : Rep[Int] = {nd(node())+5}
+def nodeComputation(node: Rep[Node], nd: Rep[NodeData[Int]], gc:Rep[GraphCollection[Int]]) : Rep[Int] = {nd(node())+5}
 }

@@ -1,5 +1,5 @@
 package ppl.dsl.forge
-package dsls 
+package	dsls 
 package optigraph
 
 import core.{ForgeApplication,ForgeApplicationRunner}
@@ -20,18 +20,29 @@ trait GraphOps{
 	//////////////////////////////////////////////////////////////////////////////    
     val Graph = tpe("Graph") 
     val T = tpePar("T")
-    data(Graph,("_numNodes",MInt),("_nodes",MArray(MInt)),("_numEdges",MInt),("_edges",MArray(MInt))) 
+    data(Graph,("_directed",MBoolean),("_numNodes",MInt),("_nodes",MArray(MInt)),("_numEdges",MInt),("_edges",MArray(MInt)),("_rNodes",MArray(MInt)),("_rEdges",MArray(MInt))) 
 
-    static(Graph)("apply", Nil, (MArray(MInt),MArray(MInt)) :: Graph) implements allocates(Graph,${array_length($0)}, ${$0}, ${array_length($1)}, ${$1})
+    static (Graph) ("fromFile", Nil, (MString,MString,MString,MString,MString ==> MInt) :: Graph ) implements composite ${
+      	val nodes = ForgeFileReader.readLines($0)($4)
+      	val edges = ForgeFileReader.readLines($1)($4)
+      	val rnodes = ForgeFileReader.readLines($2)($4)
+      	val redges = ForgeFileReader.readLines($3)($4)
+      	Graph(true,nodes,edges,rnodes,redges)
+    }    
     static (Graph) ("fromFile", Nil, (MString,MString, MString ==> MInt) :: Graph ) implements composite ${
       	val nodes = ForgeFileReader.readLines($0)($2)
       	val edges = ForgeFileReader.readLines($1)($2)
-      	Graph(nodes,edges)
+      	Graph(false,nodes,edges)
     }
+    static(Graph)("apply", Nil, (MBoolean,MArray(MInt),MArray(MInt),MArray(MInt),MArray(MInt)) :: Graph) implements allocates(Graph,${$0},${array_length($1)}, ${$1}, ${array_length($2)}, ${$2},${$3},${$4})
+    static(Graph)("apply", Nil, (MBoolean,MArray(MInt),MArray(MInt)) :: Graph) implements allocates(Graph,${$0},${array_length($1)}, ${$1}, ${array_length($2)}, ${$2},${ array_empty[Int](unit(0))},${array_empty[Int](unit(0))})
+
     
     val GraphOps = withTpe(Graph)     
     GraphOps{
-    	infix ("node_neighbors") (Node :: ArrayView) implements composite ${
+    	infix ("is_directed") (Nil :: MBoolean) implements getter(0,"_directed") 
+
+    	infix ("out_neighbors") (Node :: ArrayView(MInt)) implements composite ${
 			val id = $1()
 			//-1 implies no neighbors
 			var start = node_apply($self,id)
@@ -43,9 +54,47 @@ trait GraphOps{
 				start = 0
 				end = 0
 			}
-			ArrayView(edge_raw_data($self),start,1,end-start)
+			ArrayView[Int](edge_raw_data($self),start,1,end-start)
 		}
-		infix ("inBFS") ( (Node, ((Node,NodeData(T)) ==> T) ) :: NodeData(T), addTpePars=T) implements composite ${
+		infix ("in_neighbors") (Node :: ArrayView(MInt)) implements composite ${
+			val id = $1()
+			//-1 implies no neighbors
+			var start = r_node_apply($self,id)
+			var end = array_length(r_edge_raw_data($self))
+			if( (id+1) < array_length(r_node_raw_data($self)) ) {	
+				end = r_node_apply($self,(id+1))
+			}
+			if(start == -1 || end == -1){
+				start = 0
+				end = 0
+			}
+			ArrayView[Int](r_edge_raw_data($self),start,1,end-start)
+		}
+		//take in array view, filter it down to just nodes at a level down
+    	infix ("level_neighbors") ( (ArrayView(MInt),GraphCollection(MInt),MInt) :: GraphCollection(MInt)) implements composite ${
+			$1.filter{ e => $2(e)==$3 }
+		}
+		
+		/*
+		infix ("up_neighbors") ( (ArrayView(MInt),MInt) :: ) implements composite ${
+			val id = $1()
+			//-1 implies no neighbors
+			var start = r_node_apply($self,id)
+			var end = array_length(r_edge_raw_data($self))
+			if( (id+1) < array_length(r_node_raw_data($self)) ) {	
+				end = r_node_apply($self,(id+1))
+			}
+			if(start == -1 || end == -1){
+				start = 0
+				end = 0
+			}
+			ArrayView[Int](r_edge_raw_data($self),start,1,end-start)
+		}
+		*/
+		//infix ("sum") ((ArrayView(MInt),NodeData(T),GraphCollection(MInt),MInt) :: T, TNumeric(T), addTpePars=T) implements composite ${
+		//	$1.mapreduce(e => $2($1(e)), (a,b) => a+b,  f => $3(f)==$4)
+		//}
+		infix ("inBFS") ( (Node, ((Node,NodeData(T),GraphCollection(MInt)) ==> T) ) :: NodeData(T), addTpePars=T) implements composite ${
 			val levelArray = GraphCollection[Int]( $self.get_num_nodes())
 			val bitMap = AtomicIntArray( $self.get_num_nodes() )
 			val nodes = NodeView(node_raw_data($self),$self.get_num_nodes) 
@@ -58,37 +107,55 @@ trait GraphOps{
 			while(!finished){
 				finished = true
 				nodes.foreach{n =>	
-					if( levelArray(n) == level){
-						nd(n) = $2(Node(n),nd)
-						//println("Value for Node: " + n + " = " + myI)
-						val neighbor = $self.node_neighbors(Node(n))
+					if(levelArray(n) == level){
+						println("Node Forward: " + n + " Level: " + level )
+						val neighbor = $self.out_neighbors(Node(n))
 						neighbor.foreach{nghbr =>
 							if(testAtomic(bitMap,nghbr,0)){
 								if(testAndSetAtomic(bitMap,nghbr,0,1)){
 									levelArray(nghbr) = level+1
 									finished = false
 						}}}//end nghbr for each	
-					}}//end nodes for each
-				level = level + 1
-			}//end while	
-			levelArray.pprint
-			nd	
+						//println("trapped in up neighbors")
+						var up_nghbrs = $self.level_neighbors(neighbor,levelArray,level+1)
+						//println("trapped in gc print")
+						up_nghbrs.gc_print()
+					}
+				}//end nodes for each
+				level += 1
+			}//end while
+			println("")
+			val rBFS = true
+			///reverse BFS
+			while( level>=1 ){
+				nodes.foreach{n =>
+					if(levelArray(n) == level){
+						//perform computation
+						println("Node Reverse: " + n + " Level: " + level )
+					}
+				}
+				level -= 1
+			}
+			println("")
+			nd
 		}
-		
-		compiler ("node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_nodes")
-		compiler("node_apply")(MInt :: MInt) implements composite ${array_apply(node_raw_data($self),$1)}
-		
 		infix("get_node_from_id")(MInt :: Node) implements composite ${
 			//if($1 >= $self.get_num_nodes() || $1 < 0){
-			//	throw new AssertionError("Node ID is not in current graph.  Out of bounds.")
+			//	throw new RuntimeException("Node ID is not in current graph.  Out of bounds.")
 			//}
 			Node($1)
 		}
 
 		infix ("get_num_nodes")(Nil :: MInt) implements getter(0,"_numNodes")
+		compiler ("node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_nodes")
+		compiler("node_apply")(MInt :: MInt) implements composite ${array_apply(node_raw_data($self),$1)}
+		compiler ("r_node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_rNodes")
+		compiler("r_node_apply")(MInt :: MInt) implements composite ${array_apply(r_node_raw_data($self),$1)}
 		
-		compiler ("edge_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_edges")		
 		compiler ("get_num_edges")(Nil :: MInt) implements getter(0,"_numEdges")
+		compiler ("edge_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_edges")	
+		compiler ("r_edge_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_rEdges")		
+		
     }
   } 
 }

@@ -23,12 +23,17 @@ trait GraphCollectionOps {
     static(GraphCollection)("apply", T, MInt :: GraphCollection(T), effect=mutable) implements allocates(GraphCollection,${$0},${array_empty[T]($0)})
     static(GraphCollection)("apply", T, MArray(T) :: GraphCollection(T), effect=mutable) implements allocates(GraphCollection,${array_length($0)},${$0})
 
+    val CR = tpePar("CR")
+    compiler (GraphCollection) ("gc_alloc", (R,CR), (CR,MInt) :: GraphCollection(R)) implements composite ${
+      GraphCollection[R]($1)
+    }
+
     val GraphCollectionOps = withTpe(GraphCollection)
     GraphCollectionOps{	
 		compiler ("gc_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
 		compiler ("gc_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
 	
-		compiler ("length")(Nil :: MInt) implements getter(0,"_length")
+		compiler ("gc_length")(Nil :: MInt) implements getter(0,"_length")
 		compiler ("gc_set_length")(MInt :: MUnit, effect = write(0)) implements setter(0, "_length",${$1})
 		
 		infix("apply")(MInt :: T) implements composite ${array_apply(gc_raw_data($self),$1)}
@@ -43,6 +48,9 @@ trait GraphCollectionOps {
 			array_copy(src, $1, dest, $3, $4)
 		}
 
+		//compiler("gc_alloc") ((R,CR), (CR,MInt) :: GraphCollection(R)) implements composite ${
+      	//	GraphCollection[R]($1)
+      	//}
 		compiler("gc_raw_alloc")(MInt :: GraphCollection(R), addTpePars = R, effect=mutable) implements single ${
 			GraphCollection[R]($1)
 		}
@@ -54,7 +62,7 @@ trait GraphCollectionOps {
       	}
       	
         infix ("append") (T :: MUnit, effect = write(0)) implements single ${
-        	gc_insert($self, length($self), $1)
+        	gc_insert($self, gc_length($self), $1)
       	}
 
       	compiler("gc_insert") ((MInt,T) :: MUnit, effect = write(0)) implements single ${
@@ -65,14 +73,14 @@ trait GraphCollectionOps {
       	compiler ("gc_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
 	        gc_ensureextra($self,$len)
 	        val data = gc_raw_data($self)
-	        array_copy(data,$pos,data,$pos+$len,length($self)-$pos)
-	        gc_set_length($self,length($self)+$len)
+	        array_copy(data,$pos,data,$pos+$len,gc_length($self)-$pos)
+	        gc_set_length($self,gc_length($self)+$len)
 	    }
 
 	    compiler ("gc_ensureextra") (("extra",MInt) :: MUnit, effect = write(0)) implements single ${
 	        val data = gc_raw_data($self)
-	        if (array_length(data) - length($self) < $extra) {
-	          gc_realloc($self, length($self)+$extra)
+	        if (array_length(data) - gc_length($self) < $extra) {
+	          gc_realloc($self, gc_length($self)+$extra)
 	        }
 	    }
 	    
@@ -81,7 +89,7 @@ trait GraphCollectionOps {
 	        var n = Math.max(4, array_length(data)*2).toInt
 	        while (n < $minLen) n = n*2
 	        val d = array_empty[T](n)
-	        array_copy(data, 0, d, 0, length($self))
+	        array_copy(data, 0, d, 0, gc_length($self))
 	        gc_set_raw_data($self, d.unsafeImmutable)
 	    }
 
@@ -93,7 +101,15 @@ trait GraphCollectionOps {
 
 		infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println(a)})
 
-		parallelize as ParallelCollectionBuffer(T,lookupOp("gc_raw_alloc"),lookupOp("length"),lookupOverloaded("apply",2),lookupOp("update"),lookupOp("gc_set_length"),lookupOp("gc_appendable"),lookupOp("gc_append"),lookupOp("gc_copy"))
+		infix ("gc_print") (Nil :: MUnit, effect = simple) implements composite ${
+			var i = 0
+			while(i<gc_length($self)){
+				println("GraphCollection -- Index: " + i + " Data: " + $self(i))
+				i = i+1
+			}
+		}
+
+		parallelize as ParallelCollectionBuffer(T,lookupOp("gc_alloc"),lookupOp("gc_length"),lookupOverloaded("apply",2),lookupOp("update"),lookupOp("gc_set_length"),lookupOp("gc_appendable"),lookupOp("gc_append"),lookupOp("gc_copy"))
     }	
   } 
 }

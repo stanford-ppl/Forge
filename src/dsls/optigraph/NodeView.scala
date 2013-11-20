@@ -1,5 +1,5 @@
 package ppl.dsl.forge
-package	dsls 
+package dsls 
 package optigraph
 
 import core.{ForgeApplication,ForgeApplicationRunner,Config}

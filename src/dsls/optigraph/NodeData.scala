@@ -37,6 +37,10 @@ trait NodeDataOps {
 			array_update(nd_raw_data($self),$id,$n)
 		}
 
+		infix("nd_add")( (("id1",MInt),("id2",MInt)) :: T,TNumeric(T)) implements composite ${
+			$self(id1)+$self(id2)
+		}
+
 		compiler("nd_copy")((MInt,NodeData(T),MInt,MInt) :: MUnit, effect = write(2) ) implements composite ${
 			val src = nd_raw_data($self)
 			val dest = nd_raw_data($2) //fixme should be $2 but for some reason that won't work
@@ -86,14 +90,15 @@ trait NodeDataOps {
 	    }
 
 		infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println("NodeData: " + a)})
-/*
+
 		infix ("nd_print") (Nil :: MUnit, effect = simple) implements composite ${
-			val len = nd_length($self)-1
-			for(i <- 0 to len.toInt ){
+			var i = 0
+			while(i<nd_length($self)){
 				println("NodeData -- Index: " + i + " Data: " + $self(i))
+				i = i+1
 			}
 		}
-*/
+
 		parallelize as ParallelCollectionBuffer(T,lookupOp("nd_raw_alloc"),lookupOp("nd_length"),lookupOverloaded("apply",2),lookupOp("update"),lookupOp("nd_set_length"),lookupOp("nd_appendable"),lookupOp("nd_append"),lookupOp("nd_copy"))
     }	
   } 

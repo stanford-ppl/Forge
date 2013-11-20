@@ -1,5 +1,5 @@
 package ppl.dsl.forge
-package	dsls 
+package dsls 
 package optigraph
 
 import core.{ForgeApplication,ForgeApplicationRunner}
@@ -28,11 +28,11 @@ trait OptiGraphDSL extends ForgeApplication with NodeViewOps with ArrayViewOps w
      */
     importNodeViewOps()
     importNodeDataOps()
-    importArrayViewOps()
     importAtomicIntArrayOps()
 	  importNodeOps()
 	  importEdgeOps()
 	  importGraphCollectionOps()
+    importArrayViewOps()
     importGraphOps()
   }
 } 

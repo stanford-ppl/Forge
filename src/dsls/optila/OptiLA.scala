@@ -1,5 +1,5 @@
 package ppl.dsl.forge
-package examples
+package dsls
 package optila
 
 import core.{ForgeApplication,ForgeApplicationRunner}
@@ -9,8 +9,8 @@ object OptiLADSLRunner extends ForgeApplicationRunner with OptiLADSL
 trait OptiLADSL extends ForgeApplication
   with ArithOps with StringableOps
   with BasicMathOps with RandomOps with IOOps
-  with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps
-  with DenseMatrixOps
+  with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps with SparseVectorOps with SparseVectorViewOps
+  with DenseMatrixOps with SparseMatrixOps
   with LinAlgOps {
 
   def dslName = "OptiLA"
@@ -27,13 +27,21 @@ trait OptiLADSL extends ForgeApplication
     importStrings()
     importMath()
     importTuples()
+    importHashMap()
 
     // OptiLA types
     // declare all tpes first, so that they are available to all ops (similar to Delite)
-    val DenseVector = tpe("DenseVector", tpePar("T"))
-    val DenseVectorView = tpe("DenseVectorView", tpePar("T"))
-    val DenseMatrix = tpe("DenseMatrix", tpePar("T"))
+    val T = tpePar("T")
+    val DenseVector = tpe("DenseVector", T)
+    val DenseVectorView = tpe("DenseVectorView", T)
+    val DenseMatrix = tpe("DenseMatrix", T)
     val IndexVector = tpe("IndexVector")
+    val IndexWildcard = tpe("IndexWildcard", stage = compile)
+    identifier (IndexWildcard) ("*")
+    val SparseVector = tpe("SparseVector", T)
+    val SparseVectorView = tpe("SparseVectorView", T)
+    val SparseMatrix = tpe("SparseMatrix", T)
+    val SparseMatrixBuildable = tpe("SparseMatrixBuildable", T)
 
     // OptiLA ops
     // note that the order matters with respect to 'lookup' calls
@@ -63,32 +71,41 @@ trait OptiLADSL extends ForgeApplication
     importArithOps()
     importStringableOps()
 
-    // override default string formatting
-    // numericPrecision is a global defined in extern
+    // override default string formatting (numericPrecision is a global defined in extern)
     val strConcatWithNumerics = {
       val a = quotedArg(0)
       val b = quotedArg(1)
-      val f1 = "(\"%.\"+Global.numericPrecision+\"f\").format("+a+")" // can't escape quotes inside string interpolation scope
-      val f2 = "(\"%.\"+Global.numericPrecision+\"f\").format("+b+")"
+      val f = "(\"% .\"+Global.numericPrecision+\"g\")" // can't escape quotes inside string interpolation scope
+
 s"""
-val a1 = if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) $f1 else $a.toString
-val b1 = if ($b.isInstanceOf[Double] || $b.isInstanceOf[Float]) $f2 else $b.toString
+def numericStr[A](x: A) = {
+  val s = $f.format(x)
+  val padPrefix = (Global.numericPrecision+6) - s.length
+  if (padPrefix > 0) " "*padPrefix + s else s
+}
+val a1 = if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else $a.toString
+val b1 = if ($b.isInstanceOf[Double] || $b.isInstanceOf[Float]) numericStr($b) else $b.toString
 a1+b1
 """
     }
+
     // the ones that matter are the first that resolve to a unique tpe combination
     impl (lookupOverloaded("FString","+",0)) (codegen($cala, strConcatWithNumerics))
     impl (lookupOverloaded("FString","+",6)) (codegen($cala, strConcatWithNumerics))
     impl (lookupOverloaded("FString","+",11)) (codegen($cala, strConcatWithNumerics))
 
     compiler (lookupGrp("FString")) ("optila_padspace", Nil, MString :: MString) implements composite ${
-      if ($0.startsWith("-")) "  " + $0 else "   " + $0
+      "  " + $0
+      // if ($0.startsWith("-")) "  " + $0 else "   " + $0
     }
 
     importIndexVectorOps()
     importDenseVectorViewOps()
     importDenseVectorOps()
     importDenseMatrixOps()
+    importSparseVectorOps()
+    importSparseVectorViewOps()
+    importSparseMatrixOps()
     importVecMatConstructor()
     importIOOps()
     importLinAlgOps()
@@ -101,6 +118,7 @@ a1+b1
   def importVecMatConstructor() {
     val DenseVector = lookupTpe("DenseVector")
     val IndexVector = lookupTpe("IndexVector")
+    val DenseVectorView = lookupTpe("DenseVectorView")
     val DenseMatrix = lookupTpe("DenseMatrix")
     val T = tpePar("T")
 
@@ -116,12 +134,11 @@ a1+b1
       val (rowIndices,colIndices) = $0
 
       // can fuse with flat matrix loops
-      val v = (0::rowIndices.length*colIndices.length).toDense
+      val v = (0::(rowIndices.length*colIndices.length)).toDense
       val indices = densematrix_fromarray(densevector_raw_data(v),rowIndices.length,colIndices.length)
       indices map { i =>
-        val rowIndex = i / colIndices.length
-        val colIndex = i % colIndices.length
-        $1(rowIndex,colIndex)
+        val (rowIndex, colIndex) = unpack(matrix_shapeindex(i, colIndices.length))
+        $1(rowIndices(rowIndex),colIndices(colIndex))
       }
 
       // could fuse with nested matrix loops (loops over rowIndices), but not with loops directly over individual matrix elements -- like map!
@@ -137,17 +154,32 @@ a1+b1
       // out.unsafeImmutable
     }
 
-    val IndexWildcard = tpe("IndexWildcard", stage = compile)
-    identifier (IndexWildcard) ("*")
+    val IndexWildcard = lookupTpe("IndexWildcard", stage = compile)
 
-    infix (IndexVector) ("apply", T, (CTuple2(IndexVector,IndexWildcard), MInt ==> DenseVector(T)) :: DenseMatrix(T)) implements composite ${
-      val rowIndices = $0._1
-      val first = $1(rowIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
-      val out = DenseMatrix[T](rowIndices.length,first.length)
-      rowIndices foreach { i =>
-        out(i) = $1(i)
+    // specifying both DenseVector and DenseVectorViews as rhs arguments seems to make this ambiguous;
+    // one alternative is to use an IsVector type class for the function return type, instead of overloading.
+    // currently, we just let DenseVectorViews implicitly convert to DenseVector, which will cause overhead
+    // in the lib implementation, but should fuse away in the Delite implementation.
+    for (rhs <- List(DenseVector(T)/*, DenseVectorView(T))*/)) {
+      infix (IndexVector) ("apply", T, (CTuple2(IndexVector,IndexWildcard), MInt ==> rhs) :: DenseMatrix(T)) implements composite ${
+        val rowIndices = $0._1
+        val first = $1(rowIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
+        val out = DenseMatrix[T](rowIndices.length,first.length)
+        (0::rowIndices.length) foreach { i =>
+          out(i) = $1(rowIndices(i))
+        }
+        out.unsafeImmutable
       }
-      out.unsafeImmutable
+
+      infix (IndexVector) ("apply", T, (CTuple2(IndexWildcard,IndexVector), MInt ==> rhs) :: DenseMatrix(T)) implements composite ${
+        val colIndices = $0._2
+        val first = $1(colIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
+        val out = DenseMatrix[T](first.length, colIndices.length)
+        (0::colIndices.length) foreach { j =>
+          out.updateCol(j, $1(colIndices(j)))
+        }
+        out.unsafeImmutable
+      }
     }
   }
 }

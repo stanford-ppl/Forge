@@ -1,5 +1,5 @@
 package ppl.dsl.forge
-package examples
+package dsls
 package optiml
 
 import optila.OptiLADSL
@@ -102,6 +102,8 @@ trait OptiMLDSL extends OptiLADSL
   def importDistanceMetrics() {
     val DenseVector = lookupTpe("DenseVector")
     val DenseMatrix = lookupTpe("DenseMatrix")
+    val SparseVector = lookupTpe("SparseVector")
+
     // val Arith = lookupGrp("Arith")
     val Prim = lookupGrp("Primitive2")
     val T = tpePar("T")
@@ -111,17 +113,17 @@ trait OptiMLDSL extends OptiLADSL
     // don't kick in when polymorphic, for unknown reasons
     // fimplicit (DenseVector) ("dist", T, (DenseVector(T),DenseVector(T)) :: MDouble, ("conv", T ==> MDouble)) implements composite ${ sum(abs($0.toDouble - $1.toDouble)) }
     // fimplicit (DenseMatrix) ("dist", T, (DenseMatrix(T),DenseMatrix(T)) :: MDouble, ("conv", T ==> MDouble)) implements composite ${ sum(abs($0.toDouble - $1.toDouble)) }
-
+    fimplicit (Prim) ("dist", Nil, (MInt,MInt) :: MDouble) implements composite ${ abs($0-$1) }
     fimplicit (Prim) ("dist", Nil, (MDouble,MDouble) :: MDouble) implements composite ${ abs($0-$1) }
-    fimplicit (DenseVector) ("dist", Nil, (DenseVector(MDouble),DenseVector(MDouble)) :: MDouble) implements composite ${ sum(abs($0 - $1)) }
-    fimplicit (DenseMatrix) ("dist", Nil, (DenseMatrix(MDouble),DenseMatrix(MDouble)) :: MDouble) implements composite ${ sum(abs($0 - $1)) }
 
     val DMetric = tpe("DistanceMetric", stage = compile)
     identifier (DMetric) ("ABS")
     identifier (DMetric) ("SQUARE")
     identifier (DMetric) ("EUC")
 
-    for (TP <- List(DenseVector,DenseMatrix)) {
+    for (TP <- List(DenseVector,DenseMatrix,SparseVector)) {
+      fimplicit (TP) ("dist", Nil, (TP(MDouble),TP(MDouble)) :: MDouble) implements composite ${ sum(abs($0 - $1)) }
+
       direct (TP) ("dist", Nil, (TP(MDouble),TP(MDouble),DMetric) :: MDouble) implements composite ${
         $2 match {
           case ABS => dist($0,$1)

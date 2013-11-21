@@ -23,6 +23,7 @@ trait ScalaOps {
     importStrings()
     importMath()
     importTuples()
+    importHashMap()
   }
 
   /**
@@ -42,68 +43,93 @@ trait ScalaOps {
 
     // why do these conflict with Delite Boolean ops and not the others in Prim?
     // the reason seems to be because of the combination of overloaded parameters that already exist in the LMS versions of the other ops. (i.e., we got lucky)
-    infix (Prim) ("unary_!", Nil, MBoolean :: MBoolean) implements codegen($cala, "!" + quotedArg(0))
-    infix (Prim) ("||", Nil, (MBoolean, MBoolean) :: MBoolean) implements codegen($cala, quotedArg(0) + " || " + quotedArg(1))
-    infix (Prim) ("&&", Nil, (MBoolean, MBoolean) :: MBoolean) implements codegen($cala, quotedArg(0) + " && " + quotedArg(1))
+    val not = infix (Prim) ("unary_!", Nil, MBoolean :: MBoolean)
+    val or = infix (Prim) ("||", Nil, (MBoolean, MBoolean) :: MBoolean)
+    val and = infix (Prim) ("&&", Nil, (MBoolean, MBoolean) :: MBoolean)
+
+    for (g <- List($cala, cuda, cpp)) {
+      impl (not) (codegen(g, "!" + quotedArg(0)))
+      impl (or) (codegen(g, quotedArg(0) + " || " + quotedArg(1)))
+      impl (and) (codegen(g, quotedArg(0) + " && " + quotedArg(1)))
+    }
 
     lift (Prim) (MInt)
     lift (Prim) (MFloat)
     lift (Prim) (MDouble)
 
-    infix (Prim) ("toInt", T withBound TNumeric, T :: MInt) implements codegen($cala, ${ $0.toInt })
-    infix (Prim) ("toFloat", T withBound TNumeric, T :: MFloat) implements codegen($cala, ${ $0.toFloat })
-    infix (Prim) ("toDouble", T withBound TNumeric, T :: MDouble) implements codegen($cala, ${ $0.toDouble })
+    val toInt = infix (Prim) ("toInt", T withBound TNumeric, T :: MInt)
+    val toFloat = infix (Prim) ("toFloat", T withBound TNumeric, T :: MFloat)
+    val toDouble = infix (Prim) ("toDouble", T withBound TNumeric, T :: MDouble)
+    val toLong = infix (Prim) ("toLong", T withBound TNumeric, T :: MLong)
+
+    impl (toInt) (codegen($cala, ${ $0.toInt }))
+    impl (toFloat) (codegen($cala, ${ $0.toFloat }))
+    impl (toDouble) (codegen($cala, ${ $0.toDouble }))
+    impl (toLong) (codegen($cala, ${ $0.toLong }))
+
+    for (g <- List(cuda, cpp)) {
+      impl (toInt) (codegen(g, ${ (int) $0 }))
+      impl (toFloat) (codegen(g, ${ (float) $0 }))
+      impl (toDouble) (codegen(g, ${ (double) $0 }))
+      impl (toLong) (codegen(g, ${ (long) $0 }))
+    }
 
     fimplicit (Prim) ("repInt2ToRepDouble", Nil, MInt :: MDouble) implements composite ${ $0.toDouble }
     fimplicit (Prim) ("repInt2ToRepFloat", Nil, MInt :: MFloat) implements composite ${ $0.toFloat }
     fimplicit (Prim) ("repFloat2ToRepDouble", Nil, MFloat :: MDouble) implements composite ${ $0.toDouble }
 
-    infix (Prim) ("%", Nil, (MInt,MInt) :: MInt) implements codegen($cala, ${$0 % $1})
-
     // specialized versions for primitives
     // the forge_ prefix is to avoid conflicting with LMS primitive ops
     val int_plus = direct (Prim) ("forge_int_plus", Nil, (MInt,MInt) :: MInt)
-    impl (int_plus) (codegen($cala, ${$0 + $1}))
-    impl (int_plus) (codegen(cuda, ${$0 + $1}))
-    impl (int_plus) (codegen(cpp, ${$0 + $1}))
     val int_minus = direct (Prim) ("forge_int_minus", Nil, (MInt,MInt) :: MInt)
-    impl (int_minus) (codegen($cala, ${$0 - $1}))
-    impl (int_minus) (codegen(cuda, ${$0 - $1}))
-    impl (int_minus) (codegen(cpp, ${$0 - $1}))
     val int_times = direct (Prim) ("forge_int_times", Nil, (MInt,MInt) :: MInt)
-    impl (int_times) (codegen($cala, ${$0 * $1}))
-    impl (int_times) (codegen(cuda, ${$0 * $1}))
-    impl (int_times) (codegen(cpp, ${$0 * $1}))
     val int_divide = direct (Prim) ("forge_int_divide", Nil, (MInt,MInt) :: MInt)
-    impl (int_divide) (codegen($cala, ${$0 / $1}))
-    impl (int_divide) (codegen(cuda, ${$0 / $1}))
-    impl (int_divide) (codegen(cpp, ${$0 / $1}))
+    val int_shift_left = direct (Prim) ("forge_int_shift_left", Nil, (MInt,MInt) :: MInt)
+    val int_mod = infix (Prim) ("%", Nil, (MInt,MInt) :: MInt)
+    val int_bitwise_not = infix (Prim) ("unary_~", Nil, MInt :: MInt)
 
-    direct (Prim) ("forge_int_shift_left", Nil, (MInt,MInt) :: MInt) implements codegen($cala, ${$0 << $1})
-
-    direct (Prim) ("forge_float_plus", Nil, (MFloat,MFloat) :: MFloat) implements codegen($cala, ${$0 + $1})
-    direct (Prim) ("forge_float_minus", Nil, (MFloat,MFloat) :: MFloat) implements codegen($cala, ${$0 - $1})
-    direct (Prim) ("forge_float_times", Nil, (MFloat,MFloat) :: MFloat) implements codegen($cala, ${$0 * $1})
-    direct (Prim) ("forge_float_divide", Nil, (MFloat,MFloat) :: MFloat) implements codegen($cala, ${$0 / $1})
+    val float_plus = direct (Prim) ("forge_float_plus", Nil, (MFloat,MFloat) :: MFloat)
+    val float_minus = direct (Prim) ("forge_float_minus", Nil, (MFloat,MFloat) :: MFloat)
+    val float_times = direct (Prim) ("forge_float_times", Nil, (MFloat,MFloat) :: MFloat)
+    val float_divide = direct (Prim) ("forge_float_divide", Nil, (MFloat,MFloat) :: MFloat)
 
     val double_plus = direct (Prim) ("forge_double_plus", Nil, (MDouble,MDouble) :: MDouble)
-    impl (double_plus) (codegen($cala, ${$0 + $1}))
-    impl (double_plus) (codegen(cuda, ${$0 + $1}))
-    impl (double_plus) (codegen(cpp, ${$0 + $1}))
     val double_minus = direct (Prim) ("forge_double_minus", Nil, (MDouble,MDouble) :: MDouble)
-    impl (double_minus) (codegen($cala, ${$0 - $1}))
-    impl (double_minus) (codegen(cuda, ${$0 - $1}))
-    impl (double_minus) (codegen(cpp, ${$0 - $1}))
     val double_times = direct (Prim) ("forge_double_times", Nil, (MDouble,MDouble) :: MDouble)
-    impl (double_times) (codegen($cala, ${$0 * $1}))
-    impl (double_times) (codegen(cuda, ${$0 * $1}))
-    impl (double_times) (codegen(cpp, ${$0 * $1}))
     val double_divide = direct (Prim) ("forge_double_divide", Nil, (MDouble,MDouble) :: MDouble)
-    impl (double_divide) (codegen($cala, ${$0 / $1}))
-    impl (double_divide) (codegen(cuda, ${$0 / $1}))
-    impl (double_divide) (codegen(cpp, ${$0 / $1}))
 
-    // can we auto-generate these? the tricky part is the bodies, which require explicit conversions..
+    val long_plus = direct (Prim) ("forge_long_plus", Nil, (MLong, MLong) :: MLong)
+    val long_binary_and = direct (Prim) ("forge_long_and", Nil, (MLong,MLong) :: MLong)
+    val long_binary_or = direct (Prim) ("forge_long_or", Nil, (MLong,MLong) :: MLong)
+    val long_shift_right_unsigned = direct (Prim) ("forge_long_shift_right_unsigned", Nil, (MLong,MInt) :: MLong)
+    val long_shift_left = direct (Prim) ("forge_long_shift_left", Nil, (MLong,MInt) :: MLong)
+    impl (long_shift_right_unsigned) (codegen($cala, ${ $0 >>> $1 }))
+    impl (long_shift_left) (codegen($cala, ${ $0 << $1 }))
+
+    for (g <- List($cala, cuda, cpp)) {
+      impl (int_plus) (codegen(g, ${$0 + $1}))
+      impl (int_minus) (codegen(g, ${$0 - $1}))
+      impl (int_times) (codegen(g, ${$0 * $1}))
+      impl (int_divide) (codegen(g, ${$0 / $1}))
+      impl (int_shift_left) (codegen(g, ${$0 << $1}))
+      impl (int_mod) (codegen(g, ${$0 % $1}))
+      impl (int_bitwise_not) (codegen(g, ${~$0}))
+
+      impl (float_plus) (codegen(g, ${$0 + $1}))
+      impl (float_minus) (codegen(g, ${$0 - $1}))
+      impl (float_times) (codegen(g, ${$0 * $1}))
+      impl (float_divide) (codegen(g, ${$0 / $1}))
+
+      impl (double_plus) (codegen(g, ${$0 + $1}))
+      impl (double_minus) (codegen(g, ${$0 - $1}))
+      impl (double_times) (codegen(g, ${$0 * $1}))
+      impl (double_divide) (codegen(g, ${$0 / $1}))
+
+      impl (long_plus) (codegen(g, ${$0 + $1}))
+      impl (long_binary_and) (codegen(g, ${$0 & $1}))
+      impl (long_binary_or) (codegen(g, ${$0 | $1}))
+    }
+
     // infix (Prim) ("+", Nil, enumerate(CInt,MInt,CFloat,MFloat,CDouble,MDouble)) implements codegen($cala, quotedArg(0) + " + " + quotedArg(1))
     infix (Prim) ("+", Nil, (CInt,MInt) :: MInt) implements redirect ${ forge_int_plus(unit($0),$1) }
     infix (Prim) ("+", Nil, (CInt,MFloat) :: MFloat) implements redirect ${ forge_float_plus(unit($0.toFloat),$1) }
@@ -221,17 +247,25 @@ trait ScalaOps {
     infix (Prim) ("/", Nil, (MDouble,MDouble) :: MDouble) implements redirect ${ forge_double_divide($0,$1) }
 
     infix (Prim) ("<<",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_left($0,$1) }
+
+    infix (Prim) ("+", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_plus($0,$1) }
+    infix (Prim) ("&", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_and($0,$1) }
+    infix (Prim) ("|", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_or($0,$1) }
+    infix (Prim) (">>>", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_shift_right_unsigned($0,$1) }
+    infix (Prim) ("<<", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_shift_left($0,$1) }
   }
 
   def importMisc() = {
     val Misc = grp("Misc")
 
-    direct (Misc) ("exit", Nil, MInt :: MUnit, effect = simple) implements codegen($cala, ${sys.exit($0)})
-    direct (Misc) ("print", Nil, MAny :: MUnit, effect = simple) implements codegen($cala, ${print($0)})
+    val exit = direct (Misc) ("exit", Nil, MInt :: MUnit, effect = simple)
+    impl (exit) (codegen($cala, ${sys.exit($0)}))
+
+    val print = direct (Misc) ("print", Nil, MAny :: MUnit, effect = simple)
+    impl (print) (codegen($cala, ${print($0)}))
+
     val fatal = direct (Misc) ("fatal", Nil, MString :: MNothing, effect = simple)
     impl (fatal) (codegen($cala, ${throw new Exception($0)}))
-    impl (fatal) (codegen(cuda, ${assert(0)}))
-    impl (fatal) (codegen(cpp, ${assert(0)}))
 
     val println = direct (Misc) ("println", List(), List(MAny) :: MUnit, effect = simple)
     val println2 = direct (Misc) ("println", List(), List() :: MUnit, effect = simple)
@@ -261,6 +295,15 @@ trait ScalaOps {
 
     val immutable = infix (Misc) ("unsafeImmutable", List(T), List(T) :: T, aliasHint = copies(0))
     impl (immutable) (codegen($cala, quotedArg(0)))
+
+    for (g <- List(cuda, cpp)) {
+      impl (exit) (codegen(g, ${exit($0)}))
+      impl (print) (codegen(g, ${std::cout << $0}))
+      impl (fatal) (codegen(g, ${assert(0)}))
+      impl (println) (codegen(g, ${std::cout << $0 << std::endl}))
+      impl (println2) (codegen(g, ${std::cout << std::endl}))
+      impl (immutable) (codegen(g, ${$0}))
+    }
   }
 
   def importCasts() = {
@@ -271,8 +314,14 @@ trait ScalaOps {
     // these don't work as infix_ methods
     noInfixList :::= List("AsInstanceOf", "IsInstanceOf")
 
-    infix (Cast) ("AsInstanceOf", (A,B), A :: B) implements codegen($cala, ${ $0.asInstanceOf[$t[B]] })
-    infix (Cast) ("IsInstanceOf", (A,B), A :: MBoolean) implements codegen($cala, ${ $0.isInstanceOf[$t[B]] })
+    val asinstance = infix (Cast) ("AsInstanceOf", (A,B), A :: B)
+    impl (asinstance) (codegen($cala, ${ $0.asInstanceOf[$t[B]] }))
+    impl (asinstance) (codegen(cuda, ${ ($t[B])$0 }))
+    impl (asinstance) (codegen(cpp, ${ ($t[B])$0 }))
+
+    val isinstance = infix (Cast) ("IsInstanceOf", (A,B), A :: MBoolean)
+    impl (isinstance) (codegen($cala, ${ $0.isInstanceOf[$t[B]] }))
+    // todo: how to implement isinstance for clike targets?
   }
 
   def importNumerics() = {
@@ -303,7 +352,10 @@ trait ScalaOps {
     val AC = tpePar("A", stage = now)
     val BC = tpePar("B", stage = now)
 
-    direct (Ord) ("__equal", (A,B), (A,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
+    val eq = direct (Ord) ("__equal", (A,B), (A,B) :: MBoolean)
+    impl (eq) (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
+    impl (eq) (codegen(cuda, quotedArg(0) + " == " + quotedArg(1)))
+    impl (eq) (codegen(cpp, quotedArg(0) + " == " + quotedArg(1)))
     direct (Ord) ("__equal", (A,B), (MVar(A),B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
     direct (Ord) ("__equal", (A,B), (A,MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
     direct (Ord) ("__equal", (A,B), (MVar(A),MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
@@ -329,10 +381,12 @@ trait ScalaOps {
     val gt = infix (Ord) (">", List(A withBound TOrdering), List(A,A) :: MBoolean)
     val gte = infix (Ord) (">=", List(A withBound TOrdering), List(A,A) :: MBoolean)
 
-    impl (lt) (codegen($cala, quotedArg(0) + " < " + quotedArg(1)))
-    impl (lte) (codegen($cala, quotedArg(0) + " <= " + quotedArg(1)))
-    impl (gt) (codegen($cala, quotedArg(0) + " > " + quotedArg(1)))
-    impl (gte) (codegen($cala, quotedArg(0) + " >= " + quotedArg(1)))
+    for (g <- List($cala, cuda, cpp)) {
+      impl (lt) (codegen(g, quotedArg(0) + " < " + quotedArg(1)))
+      impl (lte) (codegen(g, quotedArg(0) + " <= " + quotedArg(1)))
+      impl (gt) (codegen(g, quotedArg(0) + " > " + quotedArg(1)))
+      impl (gte) (codegen(g, quotedArg(0) + " >= " + quotedArg(1)))
+    }
   }
 
   def importStrings() = {
@@ -409,6 +463,7 @@ trait ScalaOps {
     val sqrt = static (Math) ("sqrt", Nil, MDouble :: MDouble)
     val ceil = static (Math) ("ceil", Nil, MDouble :: MDouble)
     val floor = static (Math) ("floor", Nil, MDouble :: MDouble)
+    val round = static (Math) ("round", Nil, MDouble :: MLong)
     val sin = static (Math) ("sin", Nil, MDouble :: MDouble)
     val sinh = static (Math) ("sinh", Nil, MDouble :: MDouble)
     val asin = static (Math) ("asin", Nil, MDouble :: MDouble)
@@ -430,6 +485,7 @@ trait ScalaOps {
     impl (sqrt) (codegen($cala, "java.lang.Math.sqrt(" + quotedArg(0) + ")"))
     impl (ceil) (codegen($cala, "java.lang.Math.ceil(" + quotedArg(0) + ")"))
     impl (floor) (codegen($cala, "java.lang.Math.floor(" + quotedArg(0) + ")"))
+    impl (round) (codegen($cala, "java.lang.Math.round(" + quotedArg(0) + ")"))
     impl (sin) (codegen($cala, "java.lang.Math.sin(" + quotedArg(0) + ")"))
     impl (sinh) (codegen($cala, "java.lang.Math.sinh(" + quotedArg(0) + ")"))
     impl (asin) (codegen($cala, "java.lang.Math.asin(" + quotedArg(0) + ")"))
@@ -448,13 +504,19 @@ trait ScalaOps {
       impl (abs) (codegen(g, "abs(" + quotedArg(0) + ")"))
       impl (exp) (codegen(g, "exp(" + quotedArg(0) + ")"))
       impl (log) (codegen(g, "log(" + quotedArg(0) + ")"))
+      impl (log10) (codegen(g, "log10(" + quotedArg(0) + ")"))
       impl (sqrt) (codegen(g, "sqrt(" + quotedArg(0) + ")"))
       impl (ceil) (codegen(g, "ceil(" + quotedArg(0) + ")"))
       impl (floor) (codegen(g, "floor(" + quotedArg(0) + ")"))
+      impl (round) (codegen(g, "(long) round(" + quotedArg(0) + ")"))
       impl (sin) (codegen(g, "sin(" + quotedArg(0) + ")"))
+      impl (sinh) (codegen(g, "sinh(" + quotedArg(0) + ")"))
+      impl (asin) (codegen(g, "asin(" + quotedArg(0) + ")"))
       impl (cos) (codegen(g, "cos(" + quotedArg(0) + ")"))
+      impl (cosh) (codegen(g, "cosh(" + quotedArg(0) + ")"))
       impl (acos) (codegen(g, "acos(" + quotedArg(0) + ")"))
       impl (tan) (codegen(g, "tan(" + quotedArg(0) + ")"))
+      impl (tanh) (codegen(g, "tan(" + quotedArg(0) + ")"))
       impl (atan) (codegen(g, "atan(" + quotedArg(0) + ")"))
       impl (atan2) (codegen(g, "atan2(" + quotedArg(0) + ", " + quotedArg(1) + ")"))
       impl (pow) (codegen(g, "pow(" + quotedArg(0) + ", " + quotedArg(1) + ")"))
@@ -503,5 +565,25 @@ trait ScalaOps {
     direct (Tuple2) ("pack", (A,B), CTuple2(MVar(A),B) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
     direct (Tuple2) ("pack", (A,B), CTuple2(A,MVar(B)) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
     direct (Tuple2) ("pack", (A,B), CTuple2(MVar(A),MVar(B)) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
+  }
+
+  // temporary until DeliteHashMap is ready
+  def importHashMap() = {
+    val K = tpePar("K")
+    val V = tpePar("V")
+
+    // we need a primitive HashMap type..
+    // val HashMap = tpe("FHashMap", (K,V))
+
+    direct (MHashMap) ("FHashMap", (K,V), Nil :: MHashMap(K,V), effect = mutable) implements codegen($cala, ${ new scala.collection.mutable.HashMap[$t[K],$t[V]]() })
+
+    val HashMapOps = withTpe(MHashMap)
+    HashMapOps {
+      infix ("apply") (K :: V) implements codegen($cala, ${ $self($1) })
+      infix ("update") ((K,V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $self.put($1,$2); () })
+      // can we avoid the toArray?
+      infix ("keys") (Nil :: MArray(K)) implements codegen($cala, ${ $self.keySet.toArray })
+      // infix ("keys") (Nil :: MArray(K)) implements codegen($cala, ${ scala.collection.JavaConverters.asScalaSetConverter($self.keySet).asScala.toArray })
+    }
   }
 }

@@ -40,14 +40,14 @@ trait RewriteOpsExp extends RewriteOps with TableOpsExp {
     def rewriteReduce[N](value: Exp[Any]) = (value match {
       case Def(Field(s,"_1")) => (a:Exp[N],b:Exp[N]) => a
       case Def(Field(Def(Field(s,"_1")),index)) => (a:Exp[N],b:Exp[N]) => a
-      case Def(d@Table_Sum(_,_)) => (a:Exp[N],b:Exp[N]) => numeric_pl(a,b)(ntype(d._numR),mtype(d._mR),ctx,implicitly[Overload39])
-      case Def(d@Table_Average(_,_)) => (a:Exp[N],b:Exp[N]) => numeric_pl(a,b)(ntype(d._numR),mtype(d._mR),ctx,implicitly[Overload39])
-      case Def(d@Table_Count(s)) => (a:Exp[N],b:Exp[N]) => numeric_pl(a,b)(ntype(implicitly[Numeric[Int]]),mtype(manifest[Int]),ctx,implicitly[Overload39])
+      case Def(d@Table_Sum(_,_)) => (a:Exp[N],b:Exp[N]) => numeric_pl(a,b)(ntype(d._numR),mtype(d._mR),ctx)
+      case Def(d@Table_Average(_,_)) => (a:Exp[N],b:Exp[N]) => numeric_pl(a,b)(ntype(d._numR),mtype(d._mR),ctx)
+      case Def(d@Table_Count(s)) => (a:Exp[N],b:Exp[N]) => numeric_pl(a,b)(ntype(implicitly[Numeric[Int]]),mtype(manifest[Int]),ctx)
       case _ => failed = true; null
     }).asInstanceOf[(Exp[N],Exp[N])=>Exp[N]]
 
     def rewriteAverage[N](value: Exp[Any]) = (value match {
-      case Def(d@Table_Average(_,_)) => (a:Exp[N],count:Exp[Int]) => fractional_div(a, count.asInstanceOf[Exp[N]])(mtype(d._mR),frtype(d._fracR),mtype(d._mR),ctx,implicitly[Rep[N]=>Rep[N]],implicitly[Overload1])
+      case Def(d@Table_Average(_,_)) => (a:Exp[N],count:Exp[Int]) => fractional_div(a, count.asInstanceOf[Exp[N]])(mtype(d._mR),frtype(d._fracR),mtype(d._mR),ctx,implicitly[Rep[N]=>Rep[N]])
       case _ => (a:Exp[N],count:Exp[N]) => a
     }).asInstanceOf[(Exp[N],Exp[Int])=>Exp[N]]
 
@@ -69,7 +69,7 @@ trait RewriteOpsExp extends RewriteOps with TableOpsExp {
     case Def(g@Table_GroupByWhere(origS: Exp[Table[a]], keySelector, cond)) => hashReduce(resultSelector, keySelector)(g.mT,g.mK,manifest[A],manifest[R]) match {
       case Some((valueFunc, reduceFunc, averageFunc)) =>
         val hr = groupByReduce(origS, keySelector, valueFunc, reduceFunc, cond)(g.mT,g.mK,manifest[R],implicitly[SourceContext])
-        val count = groupByReduce(origS, keySelector, (e:Exp[a]) => unit(1), (a:Exp[Int],b:Exp[Int])=>primitive2_pl(a,b), cond)(g.mT,g.mK,manifest[Int],implicitly[SourceContext])
+        val count = groupByReduce(origS, keySelector, (e:Exp[a]) => unit(1), (a:Exp[Int],b:Exp[Int])=>primitive2_forge_int_plus(a,b), cond)(g.mT,g.mK,manifest[Int],implicitly[SourceContext])
         bulkDivide(hr, count, averageFunc)(manifest[R],implicitly[SourceContext])
       case None =>
         Console.println("ERROR: unable to fuse GroupBy-Select")

@@ -92,10 +92,8 @@ trait GraphOps{
 			ArrayView[Int](r_edge_raw_data($self),start,1,end-start)
 		}
 		*/
-		infix ("sum") ((ArrayView(MInt),NodeData(R),GraphCollection(MInt),MInt) :: R, TNumeric(R), addTpePars=R) implements composite ${
-			$1.mapreduce[R]( e => $2(e), (a,b) => a+b, {f => 
-				println("map reduce : " + $3(f) + " "  + $4)
-				($3(f)==$4)})
+		infix ("sum") ((ArrayView(MInt),NodeData(R),MInt==>MBoolean) :: R, TNumeric(R), addTpePars=R) implements composite ${
+			$1.mapreduce[R]( e => $2(e), (a,b) => a+b, $3)
 		}
 		infix ("inBFS") ( (Node, ((Node,NodeData(R),GraphCollection(MInt)) ==> R) ) :: NodeData(R), TNumeric(R), addTpePars=R, effect=simple) implements composite ${
 			val levelArray = GraphCollection[Int]( $self.get_num_nodes())

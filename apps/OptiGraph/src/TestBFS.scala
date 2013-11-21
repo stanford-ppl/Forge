@@ -52,7 +52,9 @@ trait TestBFS extends OptiGraphApplication {
             //println("asdf n: " + node() + " base: " + n1())
             if(node()==n1()){1}
             else{
-                g.sum(g.out_neighbors(node),nodeData,levelArray,levelArray(node())-1)
+                g.sum(g.out_neighbors(node),nodeData,{
+                        e => levelArray(e)==levelArray(node())-1
+                    })
             }
     })
 

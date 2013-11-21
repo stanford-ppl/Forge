@@ -34,7 +34,7 @@ trait ArrayViewOps {
       infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println(a)})
 
       val R = tpePar("R")
-      //infix ("mapreduce") ( (T ==> R,(R,R) ==> R, T==>MBoolean) :: R, TNumeric(R), addTpePars=(T,R)) implements mapReduce((T,R), 0, ${e => $1(e)}, ${numeric_zero[R]}, ${(a,b) => $2(a,b)}, Some(${c => $3(c)}) )
+      infix ("mapreduce") ( (T ==> R,(R,R) ==> R, T==>MBoolean) :: R, TNumeric(R), addTpePars=(T,R)) implements mapReduce((T,R), 0, ${e => $1(e)}, ${numeric_zero[R]}, ${(a,b) => $2(a,b)}, Some(${c => $3(c)}) )
       infix ("filter") ((T ==> MBoolean) :: GraphCollection(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})
 
       parallelize as ParallelCollection(T, lookupOp("arrayview_illegalalloc"), lookupOp("length"), lookupOverloaded("apply",1), lookupOp("arrayview_illegalupdate"))

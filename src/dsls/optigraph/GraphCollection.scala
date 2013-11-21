@@ -108,7 +108,7 @@ trait GraphCollectionOps {
 				i = i+1
 			}
 		}
-
+		
 		parallelize as ParallelCollectionBuffer(T,lookupOp("gc_alloc"),lookupOp("gc_length"),lookupOverloaded("apply",2),lookupOp("update"),lookupOp("gc_set_length"),lookupOp("gc_appendable"),lookupOp("gc_append"),lookupOp("gc_copy"))
     }	
   } 

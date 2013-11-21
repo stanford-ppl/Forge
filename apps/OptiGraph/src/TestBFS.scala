@@ -45,8 +45,18 @@ trait TestBFS extends OptiGraphApplication {
     collection.pprint
 */
     println("performing BFS")
-    val nd = g.inBFS(n1,nodeComputation)
-    nd.pprint
+    //val nd = g.inBFS(n1,nodeComputation)
+    
+    val nd = g.inBFS(n1,{
+        (node:Rep[Node],nodeData:Rep[NodeData[Int]],levelArray:Rep[GraphCollection[Int]]) => 
+            //println("asdf n: " + node() + " base: " + n1())
+            if(node()==n1()){1}
+            else{
+                g.sum(g.out_neighbors(node),nodeData,levelArray,levelArray(node())-1)
+            }
+    })
+
+    nd.nd_print
 
 /*
     val n3 = Node(3)
@@ -59,5 +69,8 @@ trait TestBFS extends OptiGraphApplication {
     */ 
   }
 def fromLine(line: Rep[String]): Rep[Int] = {line.toInt}
-def nodeComputation(node: Rep[Node], nd: Rep[NodeData[Int]], gc:Rep[GraphCollection[Int]]) : Rep[Int] = {nd(node())+5}
+//def nodeComputation(node: Rep[Node], nodeData: Rep[NodeData[Float]], levelArray:Rep[GraphCollection[Int]], level:Rep[Float]) : Rep[Int] = {
+//    g.sum( g.out_neighbors(node),nodeData ){ levelArray==level }
+//}
+//def nodeComputation(node: Rep[Node], nd: Rep[NodeData[Int]], gc:Rep[GraphCollection[Int]], level:Rep[Int]) : Rep[Int] = {nd(node())+5}
 }

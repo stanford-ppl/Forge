@@ -20,6 +20,7 @@ trait GraphOps{
 	//////////////////////////////////////////////////////////////////////////////    
     val Graph = tpe("Graph") 
     val T = tpePar("T")
+    val R = tpePar("R")
     data(Graph,("_directed",MBoolean),("_numNodes",MInt),("_nodes",MArray(MInt)),("_numEdges",MInt),("_edges",MArray(MInt)),("_rNodes",MArray(MInt)),("_rEdges",MArray(MInt))) 
 
     static (Graph) ("fromFile", Nil, (MString,MString,MString,MString,MString ==> MInt) :: Graph ) implements composite ${
@@ -91,14 +92,16 @@ trait GraphOps{
 			ArrayView[Int](r_edge_raw_data($self),start,1,end-start)
 		}
 		*/
-		//infix ("sum") ((ArrayView(MInt),NodeData(T),GraphCollection(MInt),MInt) :: T, TNumeric(T), addTpePars=T) implements composite ${
-		//	$1.mapreduce(e => $2($1(e)), (a,b) => a+b,  f => $3(f)==$4)
-		//}
-		infix ("inBFS") ( (Node, ((Node,NodeData(T),GraphCollection(MInt)) ==> T) ) :: NodeData(T), addTpePars=T) implements composite ${
+		infix ("sum") ((ArrayView(MInt),NodeData(R),GraphCollection(MInt),MInt) :: R, TNumeric(R), addTpePars=R) implements composite ${
+			$1.mapreduce[R]( e => $2(e), (a,b) => a+b, {f => 
+				println("map reduce : " + $3(f) + " "  + $4)
+				($3(f)==$4)})
+		}
+		infix ("inBFS") ( (Node, ((Node,NodeData(R),GraphCollection(MInt)) ==> R) ) :: NodeData(R), TNumeric(R), addTpePars=R, effect=simple) implements composite ${
 			val levelArray = GraphCollection[Int]( $self.get_num_nodes())
 			val bitMap = AtomicIntArray( $self.get_num_nodes() )
 			val nodes = NodeView(node_raw_data($self),$self.get_num_nodes) 
-			val nd = NodeData[T]($self.get_num_nodes())
+			val nd = NodeData[R]($self.get_num_nodes())
 
 			levelArray($1()) = 1
 			set(bitMap,$1(),1)
@@ -111,19 +114,28 @@ trait GraphOps{
 						println("Node Forward: " + n + " Level: " + level )
 						val neighbor = $self.out_neighbors(Node(n))
 						neighbor.foreach{nghbr =>
+							println("neighbor: " + nghbr )
 							if(testAtomic(bitMap,nghbr,0)){
 								if(testAndSetAtomic(bitMap,nghbr,0,1)){
 									levelArray(nghbr) = level+1
 									finished = false
 						}}}//end nghbr for each	
 						//println("trapped in up neighbors")
-						var up_nghbrs = $self.level_neighbors(neighbor,levelArray,level+1)
-						//println("trapped in gc print")
-						up_nghbrs.gc_print()
+						//var up_nghbrs = $self.level_neighbors(neighbor,levelArray,level+1)
+						//up_nghbrs.mapreduce()
+						//neighbor.mapreduce[R]( e => nd(e), (a,b) => a+b, f => true)
+
+						nd(n) = $2(Node(n),nd,levelArray)
+						//levelArray.gc_print
+						//val ndR = $self.sum(neighbor,nd,levelArray,level)//(levelArray(e)==(level-1))})
+
+						//println("node computation: " + nd(n) + " old comp: " + ndR)
+						//up_nghbrs.gc_print()
 					}
 				}//end nodes for each
 				level += 1
 			}//end while
+			levelArray.gc_print
 			println("")
 			val rBFS = true
 			///reverse BFS
@@ -131,7 +143,7 @@ trait GraphOps{
 				nodes.foreach{n =>
 					if(levelArray(n) == level){
 						//perform computation
-						println("Node Reverse: " + n + " Level: " + level )
+						//println("Node Reverse: " + n + " Level: " + level )
 					}
 				}
 				level -= 1

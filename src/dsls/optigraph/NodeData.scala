@@ -88,6 +88,8 @@ trait NodeDataOps {
 	        array_copy(data, 0, d, 0, nd_length($self))
 	        nd_set_raw_data($self, d.unsafeImmutable)
 	    }
+      	infix ("sum") (Nil :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${ (a,b) => a+b })
+		//infix ("sum") (Nil :: T, A) implements reduce(T, 0, Z, ${ (a,b) => a+b })
 
 		infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println("NodeData: " + a)})
 

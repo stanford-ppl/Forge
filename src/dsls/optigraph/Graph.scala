@@ -92,14 +92,15 @@ trait GraphOps{
 			ArrayView[Int](r_edge_raw_data($self),start,1,end-start)
 		}
 		*/
-		infix ("sum") ((ArrayView(MInt),NodeData(R),MInt==>MBoolean) :: R, TNumeric(R), addTpePars=R) implements composite ${
+		infix ("sum") ((ArrayView(MInt),NodeData(R),MInt==>MBoolean) :: R, TFractional(R), addTpePars=R) implements composite ${
 			$1.mapreduce[R]( e => $2(e), (a,b) => a+b, $3)
 		}
-		infix ("inBFS") ( (Node, ((Node,NodeData(R),GraphCollection(MInt)) ==> R) ) :: NodeData(R), TNumeric(R), addTpePars=R, effect=simple) implements composite ${
+		infix ("inBFS") ( (Node, ((Node,NodeData(R),GraphCollection(MInt)) ==> R), ((Node,NodeData(R),NodeData(R),GraphCollection(MInt)) ==> R) ) :: NodeData(R), TFractional(R), addTpePars=R, effect=simple) implements composite ${
 			val levelArray = GraphCollection[Int]( $self.get_num_nodes())
 			val bitMap = AtomicIntArray( $self.get_num_nodes() )
 			val nodes = NodeView(node_raw_data($self),$self.get_num_nodes) 
-			val nd = NodeData[R]($self.get_num_nodes())
+			val sigma = NodeData[R]($self.get_num_nodes())
+			val delta = NodeData[R]($self.get_num_nodes())
 
 			levelArray($1()) = 1
 			set(bitMap,$1(),1)
@@ -123,7 +124,7 @@ trait GraphOps{
 						//up_nghbrs.mapreduce()
 						//neighbor.mapreduce[R]( e => nd(e), (a,b) => a+b, f => true)
 
-						nd(n) = $2(Node(n),nd,levelArray)
+						sigma(n) = $2(Node(n),sigma,levelArray)
 						//levelArray.gc_print
 						//val ndR = $self.sum(neighbor,nd,levelArray,level)//(levelArray(e)==(level-1))})
 
@@ -135,25 +136,32 @@ trait GraphOps{
 			}//end while
 			levelArray.gc_print
 			println("")
+			println("Starting reverse")
 			val rBFS = true
 			///reverse BFS
 			while( level>=1 ){
 				nodes.foreach{n =>
 					if(levelArray(n) == level){
 						//perform computation
-						//println("Node Reverse: " + n + " Level: " + level )
+						println("Node Reverse: " + n + " Level: " + level )
+						delta(n) = $3(Node(n),sigma,delta,levelArray)
 					}
 				}
 				level -= 1
 			}
+			println("sigma")
+			sigma.nd_print
 			println("")
-			nd
+			delta
 		}
 		infix("get_node_from_id")(MInt :: Node) implements composite ${
 			//if($1 >= $self.get_num_nodes() || $1 < 0){
 			//	throw new RuntimeException("Node ID is not in current graph.  Out of bounds.")
 			//}
 			Node($1)
+		}
+		infix("nodes")(Nil :: NodeView) implements composite ${
+			NodeView(node_raw_data($self),$self.get_num_nodes) 
 		}
 
 		infix ("get_num_nodes")(Nil :: MInt) implements getter(0,"_numNodes")

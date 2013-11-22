@@ -12,10 +12,11 @@ trait TestBFS extends OptiGraphApplication {
   def main() = {
    
     println("OptiGraph Test 1")
-    val g = Graph.fromFile("nodeOffsets.txt","edgeList.txt", fromLine) 
+    //val g = Graph.fromFile("nodeOffsets.txt","edgeList.txt", fromLine) 
+    val g = Graph.fromFile("n1.txt","e1.txt", fromLine) 
     println("Directed: " + g.is_directed())
     println("Number of Nodes: " + g.get_num_nodes)
-    val n1 = g.get_node_from_id(9)
+    val n1 = g.get_node_from_id(0)
     println("node id1: " + n1())
     val n2 = g.get_node_from_id(10)
 
@@ -45,20 +46,35 @@ trait TestBFS extends OptiGraphApplication {
     collection.pprint
 */
     println("performing BFS")
+    val bc = NodeData[Double](g.get_num_nodes())
     //val nd = g.inBFS(n1,nodeComputation)
-    
-    val nd = g.inBFS(n1,{
-        (node:Rep[Node],nodeData:Rep[NodeData[Int]],levelArray:Rep[GraphCollection[Int]]) => 
+    (g.nodes).foreach{ n =>
+        val nd = g.inBFS(Node(n),{
+        (node:Rep[Node],nodeData:Rep[NodeData[Double]],levelArray:Rep[GraphCollection[Int]]) => 
             //println("asdf n: " + node() + " base: " + n1())
-            if(node()==n1()){1}
+            if(node()==n){1.0}
             else{
+                // sum(upNeighbors)
+                // sum(n.upNeighbors(levelArray))
                 g.sum(g.out_neighbors(node),nodeData,{
-                        e => levelArray(e)==levelArray(node())-1
+                        (e:Rep[Int]) => levelArray(e)==levelArray(node())-1
                     })
             }
-    })
+        },{
+        (node:Rep[Node],sigma:Rep[NodeData[Double]],delta:Rep[NodeData[Double]],levelArray:Rep[GraphCollection[Int]]) => 
+            (g.out_neighbors(node)).mapreduce[Double]( {w => 
+                                 //println("map : s(" + w +")= " + sigma(w) + " s("+node()+")= " + sigma(node()) + " delta(w)=" + delta(w))
+                                 (  sigma(node())/ sigma(w) * (1.0+delta(w)) )
+                                },
+                            { (a,b) => a+b}, 
+                            { e => ( (levelArray(e)==levelArray(node())-1) && (levelArray(node()) != 1) ) })
+        })
+        bc(n) = nd.sum()
+    }
+    
 
-    nd.nd_print
+    println("delta")
+    //nd.nd_print
 
 /*
     val n3 = Node(3)

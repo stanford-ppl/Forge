@@ -298,12 +298,12 @@ trait DeliteGenOps extends BaseGenOps {
           val outDc = ForgeCollections(colTpe)
           val in = o.args.apply(hfr.argIndex)
           val inDc = ForgeCollections(getHkTpe(in.tpe))
-          emitOpNodeHeader(o, "DeliteOpHashFilterReduce[" + quote(hfr.tpePars._1) + "," + quote(hfr.tpePars._2) + "," + quote(hfr.tpePars._3) + "," + makeTpeInst(colTpe,hfr.tpePars._3) + "]")
+          emitOpNodeHeader(o, "DeliteOpFilteredGroupByReduce[" + quote(hfr.tpePars._1) + "," + quote(hfr.tpePars._2) + "," + quote(hfr.tpePars._3) + "," + makeTpeInst(colTpe,hfr.tpePars._3) + "]")
           stream.println()
           stream.println("    val in = " + in.name)
           stream.println("    def cond = " + makeOpImplMethodNameWithArgs(o, "_cond"))
           stream.println("    def keyFunc = " + makeOpImplMethodNameWithArgs(o, "_key"))
-          stream.println("    def mapFunc = " + makeOpImplMethodNameWithArgs(o, "_map"))
+          stream.println("    def valFunc = " + makeOpImplMethodNameWithArgs(o, "_map"))
           stream.println("    def zero = " + makeOpImplMethodNameWithArgs(o, "_zero"))
           stream.println("    def reduceFunc = " + makeOpImplMethodNameWithArgs(o, "_reduce"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,hfr.tpePars._3)) + "(in, len)")
@@ -471,6 +471,10 @@ trait DeliteGenOps extends BaseGenOps {
       // helpful identifiers
       val xformArgs = "(" + o.args.zipWithIndex.flatMap(t => t._1 match {
         case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if Impls(o).isInstanceOf[CodeGen] && !isThunk(f) => "f("+opArgPrefix+t._2+")" :: args.map(a => boundArgAnonName(t._1,a,t._2) /*+ ".asInstanceOf[Sym[Any]]"*/)
+        // -- workaround for apparent scalac bug (GADT skolem type error), with separate cases for regular tpes and function tpes. this may be too restrictive and miss cases we haven't seen yet that also trigger the bug.
+        case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if isTpePar(o.retTpe) && args.forall(_.tpe == o.retTpe) && ret == o.retTpe => List("f("+opArgPrefix+t._2+".asInstanceOf[" + repify(f).replaceAllLiterally(repify(o.retTpe), "Rep[A]") + "])")
+        case Def(Arg(name, tpe, d2)) if !isFuncArg(t._1) && isTpePar(o.retTpe) && tpe.tpePars.length == 1 && tpe.tpePars.apply(0) == o.retTpe => List("f("+opArgPrefix+t._2+".asInstanceOf[Rep[" + tpe.name + "[A]]])")
+        // -- end workaround
         case Def(Arg(name, _, _)) => List("f("+opArgPrefix+t._2+")")
       }).mkString(",") + ")"
 

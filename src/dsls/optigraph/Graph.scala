@@ -44,7 +44,7 @@ trait GraphOps{
     	infix ("is_directed") (Nil :: MBoolean) implements getter(0,"_directed") 
 
     	infix ("out_neighbors") (Node :: ArrayView(MInt)) implements composite ${
-			val id = $1()
+			val id = $1.id
 			//-1 implies no neighbors
 			var start = node_apply($self,id)
 			var end = array_length(edge_raw_data($self))
@@ -58,7 +58,7 @@ trait GraphOps{
 			ArrayView[Int](edge_raw_data($self),start,1,end-start)
 		}
 		infix ("in_neighbors") (Node :: ArrayView(MInt)) implements composite ${
-			val id = $1()
+			val id = $1.id
 			//-1 implies no neighbors
 			var start = r_node_apply($self,id)
 			var end = array_length(r_edge_raw_data($self))
@@ -92,7 +92,7 @@ trait GraphOps{
 			ArrayView[Int](r_edge_raw_data($self),start,1,end-start)
 		}
 		*/
-		infix ("sum") ((ArrayView(MInt),NodeData(R),MInt==>MBoolean) :: R, TFractional(R), addTpePars=R) implements composite ${
+		infix ("sum") ((ArrayView(MInt),NodeData(R),MInt==>MBoolean) :: R, TNumeric(R), addTpePars=R) implements composite ${
 			$1.mapreduce[R]( e => $2(e), (a,b) => a+b, $3)
 		}
 		infix ("inBFS") ( (Node, ((Node,NodeData(R),GraphCollection(MInt)) ==> R), ((Node,NodeData(R),NodeData(R),GraphCollection(MInt)) ==> R) ) :: NodeData(R), TFractional(R), addTpePars=R, effect=simple) implements composite ${
@@ -102,8 +102,8 @@ trait GraphOps{
 			val sigma = NodeData[R]($self.get_num_nodes())
 			val delta = NodeData[R]($self.get_num_nodes())
 
-			levelArray($1()) = 1
-			set(bitMap,$1(),1)
+			levelArray($1.id) = 1
+			set(bitMap,$1.id,1)
 			var finished = false
 			var level =	1
 			while(!finished){

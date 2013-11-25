@@ -19,7 +19,7 @@ trait NodeOps {
 
 	val NodeOps = withTpe(Node)
 	NodeOps {
-		infix("apply") (Nil :: MInt) implements getter(0,"_id")
+		infix("id") (Nil :: MInt) implements getter(0,"_id")
 	}
   }
 }

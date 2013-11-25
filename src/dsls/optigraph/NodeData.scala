@@ -13,8 +13,11 @@ trait NodeDataOps {
 	// NodeData DECLARATION
 	//////////////////////////////////////////////////////////////////////////////
     val T = tpePar("T")
+    val V = tpePar("V")
+    val K = tpePar("K")
     val R = tpePar("R")
 	val NodeData = tpe("NodeData", T) 
+
     data(NodeData,("_length", MInt),("_data",MArray(T)))
     //order between data and static allocates is implicit and must be the same
    
@@ -89,9 +92,20 @@ trait NodeDataOps {
 	        nd_set_raw_data($self, d.unsafeImmutable)
 	    }
       	infix ("sum") (Nil :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${ (a,b) => a+b })
+
+		infix ("zip") (NodeData(T) :: NodeData(T), TNumeric(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a+b })
+
+		//infix ("+=") (NodeData(T) :: NodeData(T), TNumeric(T)) implements composite ${
+		//	val nodes = NodeView(nd_raw_data($self),$self.nd_length)
+		//	nodes.map($self,$1) 
+		//}
+      	//infix ("+=") (NodeData(T) :: NodeData(T), TNumeric(T)) implements map((T,T), 0, ${ e => $1(e) })
 		//infix ("sum") (Nil :: T, A) implements reduce(T, 0, Z, ${ (a,b) => a+b })
 
 		infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println("NodeData: " + a)})
+
+      	infix ("hashreduce") ((T ==> K,T ==> V,(V,V) ==> V) :: NodeData(V), TNumeric(V), addTpePars = (K,V)) implements hashFilterReduce((T,K,V), 0, ${e => true}, ${e => $1(e)}, ${e => $2(e)}, ${numeric_zero[V]}, ${(a,b) => $3(a,b)})
+
 
 		infix ("nd_print") (Nil :: MUnit, effect = simple) implements composite ${
 			var i = 0

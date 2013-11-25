@@ -26,13 +26,13 @@ trait OptiGraphDSL extends ForgeApplication with NodeViewOps with ArrayViewOps w
     /**
      * The main portion of our DSL
      */
-    importNodeViewOps()
     importNodeDataOps()
     importAtomicIntArrayOps()
 	  importNodeOps()
 	  importEdgeOps()
 	  importGraphCollectionOps()
     importArrayViewOps()
+    importNodeViewOps()
     importGraphOps()
   }
 } 

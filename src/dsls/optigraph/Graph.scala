@@ -37,6 +37,10 @@ trait GraphOps{
     }
     static(Graph)("apply", Nil, (MBoolean,MArray(MInt),MArray(MInt),MArray(MInt),MArray(MInt)) :: Graph) implements allocates(Graph,${$0},${array_length($1)}, ${$1}, ${array_length($2)}, ${$2},${$3},${$4})
     static(Graph)("apply", Nil, (MBoolean,MArray(MInt),MArray(MInt)) :: Graph) implements allocates(Graph,${$0},${array_length($1)}, ${$1}, ${array_length($2)}, ${$2},${ array_empty[Int](unit(0))},${array_empty[Int](unit(0))})
+	
+	direct(Graph) ("sum", R, (ArrayView(MInt), MInt==>R ,MInt==>MBoolean) :: R, TFractional(R)) implements composite ${
+			$0.mapreduce[R]( e => $1(e), (a,b) => a+b, $2)
+	}
 
     
     val GraphOps = withTpe(Graph)     
@@ -76,28 +80,9 @@ trait GraphOps{
 			$1.filter{ e => $2(e)==$3 }
 		}
 		
-		/*
-		infix ("up_neighbors") ( (ArrayView(MInt),MInt) :: ) implements composite ${
-			val id = $1()
-			//-1 implies no neighbors
-			var start = r_node_apply($self,id)
-			var end = array_length(r_edge_raw_data($self))
-			if( (id+1) < array_length(r_node_raw_data($self)) ) {	
-				end = r_node_apply($self,(id+1))
-			}
-			if(start == -1 || end == -1){
-				start = 0
-				end = 0
-			}
-			ArrayView[Int](r_edge_raw_data($self),start,1,end-start)
-		}
-		*/
-		infix ("sum") ((ArrayView(MInt),NodeData(R),MInt==>MBoolean) :: R, TNumeric(R), addTpePars=R) implements composite ${
-			$1.mapreduce[R]( e => $2(e), (a,b) => a+b, $3)
-		}
 		infix ("inBFS") ( (Node, ((Node,NodeData(R),GraphCollection(MInt)) ==> R), ((Node,NodeData(R),NodeData(R),GraphCollection(MInt)) ==> R) ) :: NodeData(R), TFractional(R), addTpePars=R, effect=simple) implements composite ${
-			val levelArray = GraphCollection[Int]( $self.get_num_nodes())
-			val bitMap = AtomicIntArray( $self.get_num_nodes() )
+			val levelArray = GraphCollection[Int]($self.get_num_nodes())
+			val bitMap = AtomicIntArray($self.get_num_nodes())
 			val nodes = NodeView(node_raw_data($self),$self.get_num_nodes) 
 			val sigma = NodeData[R]($self.get_num_nodes())
 			val delta = NodeData[R]($self.get_num_nodes())
@@ -119,17 +104,7 @@ trait GraphOps{
 									levelArray(nghbr) = level+1
 									finished = false
 						}}}//end nghbr for each	
-						//println("trapped in up neighbors")
-						//var up_nghbrs = $self.level_neighbors(neighbor,levelArray,level+1)
-						//up_nghbrs.mapreduce()
-						//neighbor.mapreduce[R]( e => nd(e), (a,b) => a+b, f => true)
-
 						sigma(n) = $2(Node(n),sigma,levelArray)
-						//levelArray.gc_print
-						//val ndR = $self.sum(neighbor,nd,levelArray,level)//(levelArray(e)==(level-1))})
-
-						//println("node computation: " + nd(n) + " old comp: " + ndR)
-						//up_nghbrs.gc_print()
 					}
 				}//end nodes for each
 				level += 1
@@ -160,8 +135,13 @@ trait GraphOps{
 			//}
 			Node($1)
 		}
-		infix("nodes")(Nil :: NodeView) implements composite ${
-			NodeView(node_raw_data($self),$self.get_num_nodes) 
+		infix("nodes")( ( ((NodeData(R),NodeData(R))==>NodeData(R)),(Node==>NodeData(R))) :: NodeData(R), TNumeric(R), addTpePars=R,effect=simple) implements composite ${
+			val ndes = NodeView(node_raw_data($self),$self.get_num_nodes)
+			var bc = NodeData[R]($self.get_num_nodes())
+			ndes.foreach{n =>
+				bc = $1(bc,$2(Node(n)))
+			}
+			bc
 		}
 
 		infix ("get_num_nodes")(Nil :: MInt) implements getter(0,"_numNodes")

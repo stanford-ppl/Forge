@@ -137,7 +137,7 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
           j%1$s *A_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)A, &copy));
           j%1$s *b_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)b, &copy));
 
-          MKL_INT m = M, n = N, nrhs = 1, lda = N, ldb = 1, info;
+          lapack_int m = M, n = N, nrhs = 1, lda = N, ldb = 1, info;
 
           info = LAPACKE_dgels(LAPACK_ROW_MAJOR, 'N', m, n, nrhs, A_ptr, lda, b_ptr, ldb);
 
@@ -156,7 +156,7 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
           j%1$s *A_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)A, &copy));
           jint *ipiv_ptr = (jint*)((*env)->GetPrimitiveArrayCritical(env, (jarray)ipiv, &copy));
 
-          MKL_INT m = M, n = N, lda = N, info;
+          lapack_int m = M, n = N, lda = N, info;
 
           info = LAPACKE_dgetrf(LAPACK_ROW_MAJOR, m, n, A_ptr, lda, ipiv_ptr);
 
@@ -175,7 +175,7 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
           jboolean copy;
           j%1$s *A_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)A, &copy));
 
-          MKL_INT n = N, lda = N, info;
+          lapack_int n = N, lda = N, info;
 
           info = LAPACKE_dpotrf(LAPACK_ROW_MAJOR, tri, n, A_ptr, lda);
 

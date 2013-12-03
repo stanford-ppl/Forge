@@ -16,6 +16,7 @@ trait NodeViewOps {
     val NodeView = tpe("NodeView")
     val NodeData = lookupTpe("NodeData")
     val T = tpePar("T")
+    val R = tpePar("R")
     // data fields
     data(NodeView, ("_data", MArray(MInt)), ("_length", MInt))
 
@@ -33,8 +34,7 @@ trait NodeViewOps {
       infix ("foreach") ((MInt ==> MUnit) :: MUnit, effect=simple) implements foreach(MInt, 0, ${a => $1(a)})
       infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(MInt, 0, ${a => println(a)})
 
-      //infix ("map") ( (NodeData(T),NodeData(T)) :: NodeData(T), TNumeric(T), addTpePars=T) implements map((MInt,T), 0, ${ e => $1(e)+$2(e) }) 
-
+      //infix ("map_tuples") ( (MInt ==> R) :: NodeData(R), addTpePars=R) implements map((MInt,R), 0, ${ e => $1(e) }) 
 
       parallelize as ParallelCollection(MInt, lookupOp("nodeview_illegalalloc"), lookupOp("length"), lookupOverloaded("apply",1), lookupOp("nodeview_illegalupdate"))
     }

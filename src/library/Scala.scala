@@ -571,7 +571,7 @@ trait ScalaOps {
   def importHashMap() = {
     val K = tpePar("K")
     val V = tpePar("V")
-
+    val Tuple2 = lookupTpe("Tup2")
     // we need a primitive HashMap type..
     // val HashMap = tpe("FHashMap", (K,V))
 
@@ -581,6 +581,8 @@ trait ScalaOps {
     HashMapOps {
       infix ("apply") (K :: V) implements codegen($cala, ${ $self($1) })
       infix ("update") ((K,V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $self.put($1,$2); () })
+      infix ("contains") (K :: MBoolean) implements codegen($cala, ${ $self.contains($1) })
+      //infix ("exists") ( ((K,V)==>MBoolean) :: Tuple2(K,V)) implements codegen($cala, ${ $self.exists($1) })
       // can we avoid the toArray?
       infix ("keys") (Nil :: MArray(K)) implements codegen($cala, ${ $self.keySet.toArray })
       // infix ("keys") (Nil :: MArray(K)) implements codegen($cala, ${ scala.collection.JavaConverters.asScalaSetConverter($self.keySet).asScala.toArray })

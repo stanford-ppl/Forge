@@ -18,29 +18,31 @@ trait TestBFS extends OptiGraphApplication {
 	println("Directed: " + g.is_directed)
 	println("Number of Nodes: " + g.get_num_nodes)
 	
-	//this needs to be fixed to a hash map
 	//you can't input 0 as a start node ID
 	//there is an issue with directed versus undirected right now
-	val n1 = g.get_node_from_id(0)
+	val n1 = g.get_node_from_id(3)
 
+	println("n1 ID: " + n1.id)
 
 	println("performing BFS")
 	var bc = NodeData[Double](g.get_num_nodes)
 	
+	//needs to be fixed so that in_neighbors and out_neighbors are hidden.  Should be
+	//up neighbors and down neighbors. external code needs to be generated.
 	bc = g.nodes(
 		{(bc_new:Rep[NodeData[Double]],bc_old:Rep[NodeData[Double]]) => bc_old.zip(bc_new)},
 		{ n =>
 		g.inBFS(n,{ (bfs_node:Rep[Node],sigma:Rep[NodeData[Double]],levelArray:Rep[GraphCollection[Int]]) =>
 			if(bfs_node.id==n.id){1.0}
 			else{
-				sum(g.out_neighbors(bfs_node),{w => sigma(w)},{ e:Rep[Int] => 
+				sum(g.in_neighbors(bfs_node),{w => sigma(w)},{ e:Rep[Int] => 
 					levelArray(e)==levelArray(bfs_node.id)-1})
 			}},
 			{(rbfs_node:Rep[Node],sigma:Rep[NodeData[Double]],delta:Rep[NodeData[Double]],levelArray:Rep[GraphCollection[Int]]) => 
 				sum(g.out_neighbors(rbfs_node), {w => 
-						(sigma(rbfs_node.id)/ sigma(w))*(1.0+delta(w))},
+						(sigma(rbfs_node.id)/ sigma(w))*(1.0+delta(w)) },
 					{e => 
-						((levelArray(e)==levelArray(rbfs_node.id)-1) && (levelArray(rbfs_node.id) != 1))})
+						(( levelArray(e)==(levelArray(rbfs_node.id)+1) ) && (levelArray(rbfs_node.id) != 1))})
 		})
 	})
 	println("bc")

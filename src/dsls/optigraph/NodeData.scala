@@ -78,14 +78,14 @@ trait NodeDataOps {
 			compiler ("nd_appendable") ((MInt,T) :: MBoolean) implements single("true")		
 
 			compiler ("nd_append") ((MInt,T) :: MUnit, effect = write(0)) implements single ${
-				 $self.nd_insert($self.nd_length, $2)
+				 nd_insert($self,$self.nd_length, $2)
 			}
 			
 			infix ("append") (T :: MUnit, effect = write(0)) implements single ${
-				$self.nd_insert($self.nd_length, $1)
+				nd_insert($self,$self.nd_length, $1)
 			}
 
-			infix("nd_insert") ((MInt,T) :: MUnit, effect = write(0)) implements single ${
+			compiler("nd_insert") ((MInt,T) :: MUnit, effect = write(0)) implements single ${
 				nd_insertspace($self,$1,1)
 				$self($1) = $2
 			} 
@@ -136,7 +136,7 @@ trait NodeDataOps {
 	    //infix ("foreach_tuple") ((T ==> MUnit) :: MUnit) implements foreach(T, 0, ${ e => $1(e) })
 	    infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements foreach(T, 0, ${ e => $1(e) })
 
-	    infix ("forloop") ((T ==> MUnit) :: MUnit) implements composite ${
+	    infix ("forloop") ((T ==> MUnit) :: MUnit, effect = simple) implements composite ${
 	    	var i = 0
 				while(i<$self.nd_length){
 					$1($self(i))

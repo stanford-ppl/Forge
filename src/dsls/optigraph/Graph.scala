@@ -28,10 +28,9 @@ trait GraphOps{
     static(Graph)("apply", Nil, (MethodSignature(List( ("directed",MBoolean),("count",MInt),("exID",MHashMap(MInt,MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("inNodes",MArray(MInt)),("inEdges",MArray(MInt)) )  , Graph) ) ) implements allocates(Graph,${$directed},${count}, ${$exID}, ${$outNodes}, ${outEdges},${$inNodes},${$inEdges})
    
     direct(Graph) ("sum", R, (ArrayView(MInt), MInt==>R ,MInt==>MBoolean) :: R, TFractional(R)) implements composite ${
-            $0.mapreduce[R]( e => $1(e), (a,b) => a+b, $2)
+      $0.mapreduce[R]( e => $1(e), (a,b) => a+b, $2)
     }
 
-    
     val GraphOps = withTpe(Graph)     
     GraphOps{
         infix ("is_directed") (Nil :: MBoolean) implements getter(0,"_directed") 
@@ -78,13 +77,12 @@ trait GraphOps{
             val sigma = NodeData[R]($self.get_num_nodes())
             val delta = NodeData[R]($self.get_num_nodes())
 
-            //println("Starting BFS on: " + internal_id_hash($self,$1.id) )
+            println("Starting BFS on: " + internal_id_hash($self,$1.id) )
             levelArray($1.id) = 1
             set(bitMap,$1.id,1)
-            var finished = false
+            var finished = AtomicBoolean(false)
             var level = 1
-            while(!finished){
-                finished = true
+            while(!getAndSet(finished,true)){
                 nodes.foreach{n =>  
                     if(levelArray(n) == level){
                         //println("Node Forward: " + internal_id_hash($self,n) + " Level: " + level )
@@ -94,15 +92,15 @@ trait GraphOps{
                             if(testAtomic(bitMap,nghbr,0)){
                                 if(testAndSetAtomic(bitMap,nghbr,0,1)){
                                     levelArray(nghbr) = level+1
-                                    finished = false
+                                    set(finished,false)
                         }}}//end nghbr for each 
                         sigma(n) = $2(Node(n),sigma,levelArray)
                     }
                 }//end nodes for each
                 level += 1
             }//end while
-            levelArray.gc_print
-            println("")
+            //levelArray.gc_print
+            //println("")
             println("Starting reverse")
             val rBFS = true
             ///reverse BFS
@@ -116,9 +114,9 @@ trait GraphOps{
                 }
                 level -= 1
             }
-            println("sigma")
-            sigma.nd_print
-            println("")
+            println("bfs finished")
+            //sigma.nd_print
+            //println("")
             delta
         }
      
@@ -135,9 +133,9 @@ trait GraphOps{
           var bc = NodeData[R]($self.get_num_nodes())
           ndes.foreach{n =>
                   bc = $1(bc,$2(Node(n)))
-                  println("delta")
-                  bc.nd_print
-                  println("")
+                  //println("delta")
+                  //bc.nd_print
+                  //println("")
           }
           bc
         }
@@ -191,93 +189,63 @@ trait GraphOps{
         /////////////////////////////////////////////////////////////
         //first figure out how many nodes we have and grab them
         val elems = FHashMap[Int,Int]()
-        val nodes = NodeData[Int](edge_data.nd_length*2)
+
+        val src_buckets = NodeData[NodeData[Int]](edge_data.nd_length*2)
+        val dst_buckets = NodeData[NodeData[Int]](edge_data.nd_length*2)
         var node_count = 0
         edge_data.forloop{ ed =>
           if(!elems.contains(ed._1)){
             elems(ed._1) = node_count
-            nodes(node_count) = ed._1
+            src_buckets(node_count) = NodeData[Int](0)
+            dst_buckets(node_count) = NodeData[Int](0)
             node_count += 1
           }
           if(!elems.contains(ed._2)){
             elems(ed._2) = node_count
-            nodes(node_count) = ed._2
+            src_buckets(node_count) = NodeData[Int](0)
+            dst_buckets(node_count) = NodeData[Int](0)
             node_count += 1
           }
-          println("node_count: " + node_count)
+          src_buckets(elems(ed._1)).append(ed._2)
+          dst_buckets(elems(ed._2)).append(ed._1)
         }
-        /*
-        nodes.resize(node_count)
-        println("Node input ID's")
-        nodes.nd_print
-        */
-        //////////////////////////////////////////////////////////////
-        val src = getGroupInput(nodes,edge_data.nd_length,{nde => edge_data.filter({w => nde==w._1}, {e => e._2})})
-        /*
-        println("printing src node array")
-        (src._1).nd_print 
-        println("printing src edge array")
-        (src._2).nd_print
-        */
-        //////////////////////////////////////////////////////////
-        val dst = getGroupInput(nodes,edge_data.nd_length,{nde => edge_data.filter({w => nde==w._2}, {e => e._1})})
-        /*
-        println("printing dst node array")
-        (dst._1).nd_print 
-        println("printing dst edge array")
-        (dst._2).nd_print
-        */
-        Graph(true,node_count,elems,(src._1).get_raw_data,(src._2).get_raw_data,(dst._1).get_raw_data,(dst._2).get_raw_data)
-    }
-    direct (Graph) ("getGroupInput", Nil, (NodeData(MInt),MInt,( MInt ==>NodeData(MInt) ) ) :: Tuple2(NodeData(MInt),NodeData(MInt)) ) implements composite ${
-      var first_node = true
-      var node_place = 0
-      var edge_place = 0
-      val node_array = NodeData[Int]($0.nd_length)
-      val edge_array = NodeData[Int]($1)
-      val visited_nodes = NodeData[Int]($0.nd_length)
+        src_buckets.resize(node_count)
+        dst_buckets.resize(node_count)
 
-      $0.forloop{ n =>
-        //loop through and see if we already processed this node
-        var seen = false
-        visited_nodes.forloop{ vs =>
-          if(vs==n){
-            seen = true
+        var node_place = 0
+        var src_edge_place = 0
+        val src_node_array = NodeData[Int](node_count+1)
+        val src_edge_array = NodeData[Int](edge_data.nd_length)
+
+        var dst_edge_place = 0
+        val dst_node_array = NodeData[Int](node_count+1)
+        val dst_edge_array = NodeData[Int](edge_data.nd_length)
+        //loops over all node ID's in hash map
+        while(node_place < node_count){
+          //////////////
+          val src_tmp = src_buckets(node_place).map({e => elems(e)})
+          src_node_array(node_place+1) = (src_node_array(node_place) + src_tmp.nd_length)
+          src_tmp.forloop{ edge =>
+            src_edge_array(src_edge_place) = edge
+            src_edge_place += 1
           }
-        }
-        if(!seen){
-          val tmp = $2(n)
-          if(first_node){
-            if(tmp.nd_length!=0){
-              first_node = false
-              node_array(node_place) = 0
-              node_array(node_place+1) = tmp.nd_length
-            }
-          }
-          else if( (tmp.nd_length==0)  &&  ((node_place+1)!=$0.nd_length) ){
-            node_array(node_place+1) = node_array(node_place)
-          }
-          else if ((node_place+1)!=$0.nd_length){
-            node_array(node_place+1) = node_array(node_place) + tmp.nd_length
-          }
-          tmp.forloop{ edge =>
-            var i = 0
-            var done = false
-            while(!done){
-              if(edge==$0(i)){
-                done = true
-              }
-              else{i += 1}
-            }
-            edge_array(edge_place) = i
-            edge_place += 1
-          }
-        
-          visited_nodes(node_place) = n
+          //
+          //Forge error?  it seems to never create a symbol for dst_tmp here which is annoying
+          val dst_tmp = dst_buckets(node_place).map({e => elems(e)})
+          dst_node_array(node_place+1) = dst_buckets(node_place).map({e => elems(e)}).nd_length + dst_node_array(node_place)
+          dst_buckets(node_place).map({e => elems(e)}).forloop{ edge =>
+            dst_edge_array(dst_edge_place) = edge
+            dst_edge_place += 1
+          }  
+          ////////////////
           node_place += 1
         }
-      }
-      pack(node_array,edge_array)
+        src_node_array.resize(node_count)
+        dst_node_array.resize(node_count)
+
+        println("finished file I/O")
+        Graph(true,node_count,elems,src_node_array.get_raw_data,src_edge_array.get_raw_data,dst_node_array.get_raw_data,dst_edge_array.get_raw_data)
     }
+
   } 
 }

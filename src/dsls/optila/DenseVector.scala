@@ -12,7 +12,7 @@ trait DenseVectorOps {
     val R = tpePar("R")
     val B = tpePar("B")
 
-    val DenseVector = lookupTpe("DenseVector") // tpe("DenseVector", T)
+    val DenseVector = lookupTpe("DenseVector")
     val IndexVector = lookupTpe("IndexVector")
     val DenseVectorView = lookupTpe("DenseVectorView")
     val DenseMatrix = lookupTpe("DenseMatrix")

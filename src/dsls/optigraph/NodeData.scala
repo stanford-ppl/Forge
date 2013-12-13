@@ -118,22 +118,19 @@ trait NodeDataOps {
 			infix ("zip_tuples") (NodeData(T) :: NodeData(Tuple2(T,T))) implements zip((T,T,Tuple2(T,T)), (0,1), ${ (a,b) => pack(a,b) })
 
 			infix ("map") ((T ==> R) :: NodeData(R), addTpePars = R) implements map((T,R), 0, ${ e => $1(e) })
-
-
-			//infix ("+=") (NodeData(T) :: NodeData(T), TNumeric(T)) implements composite ${
-			//	val nodes = NodeView(nd_raw_data($self),$self.nd_length)
-			//	nodes.map($self,$1) 
-			//}
-			//infix ("+=") (NodeData(T) :: NodeData(T), TNumeric(T)) implements map((T,T), 0, ${ e => $1(e) })
-			//infix ("sum") (Nil :: T, A) implements reduce(T, 0, Z, ${ (a,b) => a+b })
+      
+      //this is an absolutely horrible way of doing this but 
+      //only way I could get it past for now.
+      infix ("reduceND") ( (((T,T) ==> T),R):: T,addTpePars=R) implements reduce(T, 0, ${$2.asInstanceOf[Rep[T]]}, ${
+        (a,b) => $1(a,b)
+      })
 
 			infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println("NodeData: " + a)})
 
 			infix ("hashreduce") ((T ==> MBoolean,T ==> K,T ==> V,(V,V) ==> V) :: NodeData(V), TNumeric(V), addTpePars = (K,V)) implements hashFilterReduce((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)}, ${e => $3(e)}, ${numeric_zero[V]}, ${(a,b) => $4(a,b)})
-		  //infix ("filter") ( ((Tuple2(MInt,MInt) ==> MBoolean),(Tuple2(MInt,MInt) ==> MInt)) :: NodeData(MInt), addTpePars=K) implements filter((Tuple2(MInt,MInt),MInt), 0, ${w => $1(w)}, ${e => $2(e)})
+
 		  infix ("filter") ( ((T ==> MBoolean),(T ==> MInt)) :: NodeData(MInt), addTpePars=K) implements filter((T,MInt), 0, ${w => $1(w)}, ${e => $2(e)})
 
-	    //infix ("foreach_tuple") ((T ==> MUnit) :: MUnit) implements foreach(T, 0, ${ e => $1(e) })
 	    infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements foreach(T, 0, ${ e => $1(e) })
 
 	    infix ("forloop") ((T ==> MUnit) :: MUnit, effect = simple) implements composite ${

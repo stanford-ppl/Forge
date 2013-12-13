@@ -85,7 +85,7 @@ trait GraphOps{
             while(!getAndSet(finished,true)){
                 nodes.foreach{n =>  
                     if(levelArray(n) == level){
-                        //println("Node Forward: " + internal_id_hash($self,n) + " Level: " + level )
+                        //println("n: " + internal_id_hash($self,$1.id)  + " Node Forward: " + internal_id_hash($self,n) + " Level: " + level )
                         val neighbor = $self.out_neighbors(Node(n))
                         neighbor.foreach{nghbr =>
                             //println("neighbor: " + internal_id_hash($self,nghbr))
@@ -99,9 +99,12 @@ trait GraphOps{
                 }//end nodes for each
                 level += 1
             }//end while
-            //levelArray.gc_print
+            //println("sigma")
+            //sigma.nd_print
+            //println("level")
+            //levelArray.nd_print
             //println("")
-            println("Starting reverse")
+            //println("Starting reverse")
             val rBFS = true
             ///reverse BFS
             while( level>=1 ){
@@ -130,14 +133,12 @@ trait GraphOps{
 
         infix("nodes")( ( ((NodeData(R),NodeData(R))==>NodeData(R)),(Node==>NodeData(R))) :: NodeData(R), TNumeric(R), addTpePars=R,effect=simple) implements composite ${
           val ndes = NodeView(input_id_raw_data($self),$self.get_num_nodes)
-          var bc = NodeData[R]($self.get_num_nodes())
+          var bc_real = NodeData[NodeData[R]]($self.get_num_nodes())
+
           ndes.foreach{n =>
-                  bc = $1(bc,$2(Node(n)))
-                  //println("delta")
-                  //bc.nd_print
-                  //println("")
+            bc_real(n) = $2(Node(n))
           }
-          bc
+          bc_real.reduceND( ((a,b) => a.zip(b)),NodeData[R](0))
         }
 
         infix ("get_num_nodes")(Nil :: MInt) implements getter(0,"_numNodes")

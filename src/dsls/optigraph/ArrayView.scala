@@ -3,7 +3,8 @@ package	dsls
 package optigraph
 
 import core.{ForgeApplication,ForgeApplicationRunner,Config}
-
+//Differs from a node view because here you actually look at data
+//versus just return an index of the data
 trait ArrayViewOps {
   this: OptiGraphDSL =>
   def importArrayViewOps() {

@@ -4,11 +4,12 @@ package optigraph
 
 import core.{ForgeApplication,ForgeApplicationRunner}
 
-trait IOOps {
+trait IOGraphOps {
   this: OptiGraphDSL =>
 
-  def importIOOps() {
-  	val IO = grp("GraphIO")
+  def importIOGraphOps() {
+  	/*
+    val IO = grp("GraphIO")
   	val Graph = lookupTpe("Graph")
   	val NodeData = lookupTpe("NodeData")
   	val T = tpePar("T")
@@ -95,6 +96,6 @@ trait IOOps {
       println("finished file I/O")
       Graph(true,node_count,elems,src_node_array.get_raw_data,src_edge_array.get_raw_data,dst_node_array.get_raw_data,dst_edge_array.get_raw_data)
     }
-
+  */
   }
 }

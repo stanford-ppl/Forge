@@ -8,7 +8,7 @@ trait IOGraphOps {
   this: OptiGraphDSL =>
 
   def importIOGraphOps() {
-  	/*
+
     val IO = grp("GraphIO")
   	val Graph = lookupTpe("Graph")
   	val NodeData = lookupTpe("NodeData")
@@ -31,9 +31,9 @@ trait IOGraphOps {
 
   	direct (IO) ("graphFromEdgeList", Nil, MString :: Graph) implements composite ${
       val input_edges = ForgeFileReader.readLines($0)({line =>
-           val fields = line.fsplit("\t")
-           pack(fields(0).toInt,fields(1).toInt)
-        })
+        val fields = line.fsplit("\t")
+        pack(fields(0).toInt,fields(1).toInt)  
+      })
       //contains the input tuples
       val edge_data = NodeData(input_edges)
       /////////////////////////////////////////////////////////////
@@ -96,6 +96,5 @@ trait IOGraphOps {
       println("finished file I/O")
       Graph(true,node_count,elems,src_node_array.get_raw_data,src_edge_array.get_raw_data,dst_node_array.get_raw_data,dst_edge_array.get_raw_data)
     }
-  */
   }
 }

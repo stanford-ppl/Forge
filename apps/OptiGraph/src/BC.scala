@@ -3,10 +3,10 @@ import optigraph.library._
 import optigraph.shared._
 
 // This object lets us run the Delite version of the code
-object TestBFSCompiler extends OptiGraphApplicationCompiler with TestBFS
+object BCCompiler extends OptiGraphApplicationCompiler with BC
 
 // This object lets us run the Scala library version of the code
-object TestBFSInterpreter extends OptiGraphApplicationInterpreter with TestBFS
+object BCInterpreter extends OptiGraphApplicationInterpreter with BC
 
 trait BC extends OptiGraphApplication {
 	def main() = {

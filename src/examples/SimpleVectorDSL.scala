@@ -120,9 +120,34 @@ trait SimpleVectorDSL extends ForgeApplication {
 
       infix ("mapreduce") ((T ==> T,(T,T) ==> T) :: T, TNumeric(T)) implements mapReduce((T,T), 0, ${e => $1(e)}, ${numeric_zero[T]}, ${(a,b) => $2(a,b)})
 
+      infix ("flatMap") ((T ==> Vector(R)) :: Vector(R), addTpePars = R) implements flatMap((T,R), 0, ${ e => $1(e) })
+
       val K = tpePar("K")
       val V = tpePar("V")
-      infix ("hashreduce") ((T ==> K,T ==> V,(V,V) ==> V) :: Vector(V), TNumeric(V), addTpePars = (K,V)) implements hashFilterReduce((T,K,V), 0, ${e => true}, ${e => $1(e)}, ${e => $2(e)}, ${numeric_zero[V]}, ${(a,b) => $3(a,b)})
+
+      // the Forge 'groupBy' pattern is currently limited to returning an MHashMap(K,MArrayBuffer(V)), so we need to convert that to a DSL type to return
+      compiler ("groupby_helper") ((T ==> K,T ==> V) :: MHashMap(K, MArrayBuffer(V)), addTpePars = (K,V)) implements groupBy((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)})
+
+      infix ("groupBy") ((T ==> K,T ==> V) :: Vector(Vector(V)), addTpePars = (K,V)) implements composite ${
+        val map = groupby_helper($self, $1, $2)
+        val groups = fhashmap_values(map)
+        val out = Vector[Vector[V]](array_length(groups))
+        var i = 0
+        while (i < array_length(groups)) {
+          val inGroup = groups(i)
+          val outGroup = Vector[V](array_buffer_length(inGroup))
+          var j = 0
+          while (j < array_buffer_length(inGroup)) {
+            outGroup(j) = array_buffer_apply(inGroup, j)
+            j += 1
+          }
+          out(i) = outGroup.unsafeImmutable
+          i += 1
+        }
+        out.unsafeImmutable
+      }
+
+      infix ("groupByReduce") ((T ==> K,T ==> V,(V,V) ==> V) :: MHashMap(K,V), TNumeric(V), addTpePars = (K,V)) implements groupByReduce((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)}, ${numeric_zero[V]}, ${(a,b) => $3(a,b)})
 
       // misc
       // will print out of order in parallel, but hey
@@ -133,7 +158,7 @@ trait SimpleVectorDSL extends ForgeApplication {
       // This enables a tpe to be passed in as the collection type of a Delite op
 
       // by convention, the return tpe of alloc must be its last tpe parameter, if it has any
-      compiler ("vector_raw_alloc") (MInt :: Vector(R), addTpePars = R) implements single ${
+      compiler ("vector_raw_alloc") (MInt :: Vector(R), addTpePars = R, effect = mutable) implements composite ${
         Vector[R]($1)
       }
       compiler ("vector_appendable") ((MInt,T) :: MBoolean) implements single("true")

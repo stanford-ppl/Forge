@@ -105,9 +105,9 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case `MInt` | `MLong` | `MFloat` | `MDouble` | `MBoolean` | `MChar` | `MString` | `MUnit` | `MAny` | `MNothing` | `MSourceContext` | `byName` => true
     case `CInt` | `CLong` | `CFloat` | `CDouble` | `CBoolean` | `CChar` | `CString` | `CUnit` | `CAny` | `CNothing` => true
     // case Def(Tpe(_,_,`now`)) => true
+    case Def(Tpe(name,_,_)) if name.startsWith("scala") => true
     case Def(Tpe(name,_,_)) if name.startsWith("Tuple") => true
-    case Def(Tpe("ForgeArray",_,_)) | Def(Tpe("ForgeArrayBuffer",_,_)) => true
-    case Def(Tpe("HashMap",_,_)) => true
+    case Def(Tpe("ForgeArray",_,_)) | Def(Tpe("ForgeArrayBuffer",_,_)) | Def(Tpe("ForgeHashMap",_,_)) => true
     case Def(Tpe("Var",_,_)) => true
     case Def(Tpe("Overloaded",_,_)) => true
     case _ => false
@@ -177,6 +177,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case Def(Arg(_, Def(FTpe(args,ret,freq)),_)) => true
     case _ => false
   }
+
   def hasFuncArgs(o: Rep[DSLOp]) = {
     o.args.exists(isFuncArg) || o.implicitArgs.exists(isFuncArg)
   }

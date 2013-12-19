@@ -142,41 +142,101 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
           emitWithIndent("i += 1", stream, indent+4)
           emitWithIndent("}", stream, indent+2)
           emitWithIndent("out", stream, indent+2)
-        case hfr:HashFilterReduce =>
-          val outDc = ForgeCollections(getHkTpe(o.retTpe)).asInstanceOf[ParallelCollectionBuffer]
-          val in = o.args.apply(hfr.argIndex)
+        case flatmap:FlatMap =>
+          val outCol = getHkTpe(o.retTpe)
+          val outDc = ForgeCollections(outCol).asInstanceOf[ParallelCollectionBuffer]
+          val in = o.args.apply(flatmap.argIndex)
           val inDc = ForgeCollections(getHkTpe(in.tpe))
-          emitWithIndent("def cond: " + repify(hfr.tpePars._1) + " => " + repify(MBoolean) + " = " + inline(o, hfr.cond), stream, indent+2)
-          emitWithIndent("def key: " + repify(hfr.tpePars._1) + " => " + repify(hfr.tpePars._2) + " = " + inline(o, hfr.key), stream, indent+2)
-          emitWithIndent("def map: " + repify(hfr.tpePars._1) + " => " + repify(hfr.tpePars._3) + " = " + inline(o, hfr.map), stream, indent+2)
-          emitWithIndent("def reduce: (" + repify(hfr.tpePars._3) + "," + repify(hfr.tpePars._3) + ") => " + repify(hfr.tpePars._3) + " = " + inline(o, hfr.reduce), stream, indent+2)
+          emitWithIndent("def func: " + repify(flatmap.tpePars._1) + " => " + repify(tpeInst(outCol, flatmap.tpePars._2)) + " = " + inline(o, flatmap.func), stream, indent+2)
           emitWithIndent("val in = " + in.name, stream, indent+2)
-          emitWithIndent("val out = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,hfr.tpePars._3)) + "(in,0)", stream, indent+2)
-          // TODO: replace with staged HashMap when it's available OR refactor things so that the op implementation is in the class wrapper and the staged functions are in the impls
-          emitWithIndent("val indexMap = array_buffer_empty["+quote(hfr.tpePars._2)+"](0)", stream, indent+2)
-          // emitWithIndent("val indexMap = scala.collection.mutable.HashMap["+repify(hfr.tpePars._2)+",Rep[Int]]()", stream, indent+2)
-          emitWithIndent("var index = 0", stream, indent+2)
+          emitWithIndent("val out = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,flatmap.tpePars._2)) + "(in,0)", stream, indent+2)
+          emitWithIndent("var sz = 0", stream, indent+2)
           emitWithIndent("var i = 0", stream, indent+2)
-          emitWithIndent("while (i < " + makeOpMethodName(inDc.size) + "(in)"  + ") {", stream, indent+2)
+          emitWithIndent("while (i < " + makeOpMethodName(inDc.size) + "(in)) {", stream, indent+2)
           emitWithIndent("val e = " + makeOpMethodName(inDc.apply) + "(in, i)", stream, indent+4)
-          emitWithIndent("if (cond(e)) {", stream, indent+4)
-          emitWithIndent("val k = key(e)", stream, indent+6)
-          // emitWithIndent("if (!indexMap.contains(k)) {", stream, indent+6)
-          emitWithIndent("val ki = array_buffer_indexof(indexMap,k)", stream, indent+6)
-          emitWithIndent("if (ki < 0) {", stream, indent+6)
-          // emitWithIndent("indexMap(k) = index", stream, indent+8)
-          emitWithIndent("array_buffer_append(indexMap, k)", stream, indent+8)
-          emitWithIndent(makeOpMethodName(outDc.append) + "(out, index, map(e))", stream, indent+8)
-          emitWithIndent("index += 1", stream, indent+8)
-          emitWithIndent("}", stream, indent+6)
-          emitWithIndent("else {", stream, indent+6)
-          emitWithIndent("val cur = " + makeOpMethodName(outDc.apply) + "(out, ki)", stream, indent+8)
-          emitWithIndent(makeOpMethodName(outDc.update) + "(out, ki, reduce(cur, map(e)))", stream, indent+8)
-          emitWithIndent("}", stream, indent+6)
+          emitWithIndent("val buf = func(e)", stream, indent+4)
+          emitWithIndent("var j = 0", stream, indent+4)
+          emitWithIndent("while (j < " + makeOpMethodName(outDc.size) + "(buf)) {", stream, indent+4)
+          emitWithIndent(makeOpMethodName(outDc.append) + "(out, sz, buf(j))", stream, indent+6)
+          emitWithIndent("sz += 1", stream, indent+6)
+          emitWithIndent("j += 1", stream, indent+6)
           emitWithIndent("}", stream, indent+4)
           emitWithIndent("i += 1", stream, indent+4)
           emitWithIndent("}", stream, indent+2)
           emitWithIndent("out", stream, indent+2)
+        case gb:GroupBy =>
+          // val outerColTpe = getHkTpe(o.retTpe)
+          val outerColTpe = MArrayBuffer
+          val outDc = ForgeCollections(outerColTpe).asInstanceOf[ParallelCollectionBuffer]
+          val innerColTpe = getHkTpe(gb.tpePars._4)
+          val innerDc = ForgeCollections(innerColTpe).asInstanceOf[ParallelCollectionBuffer]
+          val in = o.args.apply(gb.argIndex)
+          val inDc = ForgeCollections(getHkTpe(in.tpe))
+          if (gb.cond.isDefined) {
+            emitWithIndent("def cond: " + repify(gb.tpePars._1) + " => " + repify(MBoolean) + " = " + inline(o, gb.cond.get), stream, indent+2)
+          }
+          emitWithIndent("def key: " + repify(gb.tpePars._1) + " => " + repify(gb.tpePars._2) + " = " + inline(o, gb.key), stream, indent+2)
+          emitWithIndent("def map: " + repify(gb.tpePars._1) + " => " + repify(gb.tpePars._3) + " = " + inline(o, gb.map), stream, indent+2)
+          emitWithIndent("val in = " + in.name, stream, indent+2)
+          emitWithIndent("val out = SHashMap["+quote(gb.tpePars._2)+","+quote(tpeInst(innerColTpe, gb.tpePars._3))+"]()", stream, indent+2)
+          emitWithIndent("var i = 0", stream, indent+2)
+          emitWithIndent("while (i < " + makeOpMethodName(inDc.size) + "(in)"  + ") {", stream, indent+2)
+          emitWithIndent("val e = " + makeOpMethodName(inDc.apply) + "(in, i)", stream, indent+4)
+          if (gb.cond.isDefined) {
+            emitWithIndent("if (cond(e)) {", stream, indent+4)
+          }
+          emitWithIndent("val k = key(e)", stream, indent+6)
+          emitWithIndent("if (!out.contains(k)) {", stream, indent+6)
+
+          // FIXME: passing 'in' to dc_alloc is a bit of a hack - what do we do when 'in' is not the same type as 'out'? currently (and only for groupby) we pass null.
+          // this is only safe when the output collection type is known to not use the input argument, such as the current case, ArrayBuffer.
+          // to really fix this, either the dc_alloc design needs to be revisited, or we need to use a different allocation mechanism than dc_alloc.
+          val innerDcArg = if (getHkTpe(in.tpe) == getHkTpe(innerColTpe)) "in" else "null.asInstanceOf["+repify(tpeInst(innerColTpe, gb.tpePars._3))+"]"
+
+          emitWithIndent("val bucket = " + makeOpMethodName(innerDc.alloc) + makeTpePars(instAllocReturnTpe(innerDc.alloc, in.tpe, gb.tpePars._3)) + "("+innerDcArg+",0)", stream, indent+8)
+          emitWithIndent(makeOpMethodName(innerDc.append) + "(bucket, 0, map(e))", stream, indent+8)
+          emitWithIndent("out(k) = bucket", stream, indent+8)
+          emitWithIndent("}", stream, indent+6)
+          emitWithIndent("else {", stream, indent+6)
+          emitWithIndent("val bucket = out(k)", stream, indent+8)
+          emitWithIndent(makeOpMethodName(innerDc.append) + "(bucket, " + makeOpMethodName(innerDc.size) + "(bucket), map(e))", stream, indent+8)
+          emitWithIndent("}", stream, indent+6)
+          if (gb.cond.isDefined) {
+            emitWithIndent("}", stream, indent+4)
+          }
+          emitWithIndent("i += 1", stream, indent+4)
+          emitWithIndent("}", stream, indent+2)
+          emitWithIndent("fhashmap_from_shashmap(out)", stream, indent+2) // convert to ForgeHashMap
+        case gbr:GroupByReduce =>
+          val in = o.args.apply(gbr.argIndex)
+          val inDc = ForgeCollections(getHkTpe(in.tpe))
+          if (gbr.cond.isDefined) {
+            emitWithIndent("def cond: " + repify(gbr.tpePars._1) + " => " + repify(MBoolean) + " = " + inline(o, gbr.cond.get), stream, indent+2)
+          }
+          emitWithIndent("def key: " + repify(gbr.tpePars._1) + " => " + repify(gbr.tpePars._2) + " = " + inline(o, gbr.key), stream, indent+2)
+          emitWithIndent("def map: " + repify(gbr.tpePars._1) + " => " + repify(gbr.tpePars._3) + " = " + inline(o, gbr.map), stream, indent+2)
+          emitWithIndent("def reduce: (" + repify(gbr.tpePars._3) + "," + repify(gbr.tpePars._3) + ") => " + repify(gbr.tpePars._3) + " = " + inline(o, gbr.reduce), stream, indent+2)
+          emitWithIndent("val in = " + in.name, stream, indent+2)
+          emitWithIndent("val out = SHashMap["+quote(gbr.tpePars._2)+","+quote(gbr.tpePars._3)+"]()", stream, indent+2)
+          emitWithIndent("var i = 0", stream, indent+2)
+          emitWithIndent("while (i < " + makeOpMethodName(inDc.size) + "(in)"  + ") {", stream, indent+2)
+          emitWithIndent("val e = " + makeOpMethodName(inDc.apply) + "(in, i)", stream, indent+4)
+          if (gbr.cond.isDefined) {
+            emitWithIndent("if (cond(e)) {", stream, indent+4)
+          }
+          emitWithIndent("val k = key(e)", stream, indent+6)
+          emitWithIndent("if (!out.contains(k)) {", stream, indent+6)
+          emitWithIndent("out(k) = map(e)", stream, indent+8)
+          emitWithIndent("}", stream, indent+6)
+          emitWithIndent("else {", stream, indent+6)
+          emitWithIndent("out(k) = reduce(out(k), map(e))", stream, indent+8)
+          emitWithIndent("}", stream, indent+6)
+          if (gbr.cond.isDefined) {
+            emitWithIndent("}", stream, indent+4)
+          }
+          emitWithIndent("i += 1", stream, indent+4)
+          emitWithIndent("}", stream, indent+2)
+          emitWithIndent("fhashmap_from_shashmap(out)", stream, indent+2)
         case foreach:Foreach =>
           val c = o.args.apply(foreach.argIndex)
           val dc = ForgeCollections(getHkTpe(c.tpe))
@@ -225,6 +285,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       d.foreach { data =>
         stream.println("class " + data.tpe.name + makeTpeParsWithBounds(data.tpe.tpePars) + "(" + makeFieldArgs(data) + ") {")
         stream.println(makeFieldsWithInitArgs(data))
+
         // Actually emitting the infix methods as instance methods, while a little more readable, makes the interpreter methods
         // ambiguous with the op conversions unless they already exist on every instance and must be overridden (e.g. toString)
         for (o <- unique(opsGrp.ops) if overrideList.contains(o.name) && !Impls(o).isInstanceOf[Redirect] && o.style == infixMethod && o.args.length > 0 && quote(o.args.apply(0).tpe) == quote(tpe)) {
@@ -238,9 +299,11 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
           emitOp(o, stream, indent=4)
           stream.println("  }")
         }
+
         stream.println("}")
         stream.println()
       }
+
       if (d.isEmpty && !isForgePrimitiveType(tpe)) {
         // do nothing -- abstract class will have been generated in the front-end
         // warn("(library) no data structure found for tpe " + tpe.name + ". emitting empty class declaration")

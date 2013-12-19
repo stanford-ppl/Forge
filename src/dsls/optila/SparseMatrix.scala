@@ -328,7 +328,7 @@ trait SparseMatrixOps {
         // build a hashmap containing the elements of the COO matrix,
         // with tuples mapped to longs and rowIndices in the high bits so we can sort by them.
         // TODO: switch to using a specialized HashMap impl to avoid boxing
-        val elems = FHashMap[Long,T]()
+        val elems = SHashMap[Long,T]()
 
         // remove duplicates by preferring elements further to the right in the array
         var i = 0

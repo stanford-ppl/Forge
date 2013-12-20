@@ -18,10 +18,9 @@ trait OptiQLDSL extends ForgeApplication with TableOps with DateOps {
    */
   def specification() = {
     extern(grp("Rewrite"))
-    //extern(grp("QueryOpts"))
     importScalaOps()
     importTableOps()
-    //importDateOps()
+    //importDateOps() //TODO: Dates within Records don't work when generated from Forge
     extern(grp("Date"))
   }
 }

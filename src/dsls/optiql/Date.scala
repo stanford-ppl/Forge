@@ -26,18 +26,19 @@ trait DateOps {
     DateOps {
 
       compiler ("date_value") (Nil :: MInt) implements getter(0, "value")
-      // compiler ("date_year") (Nil :: MInt) implements single ${ date_value($self) >>> 9 }
-      // compiler ("date_month") (Nil :: MInt) implements single ${ (date_value($self) >>> 5) & 0xf }
-      // compiler ("date_day") (Nil :: MInt) implements single ${ date_value($self) & 0x1f }
+      compiler ("date_year") (Nil :: MInt) implements single ${ date_value($self) >>> 9 }
+      compiler ("date_month") (Nil :: MInt) implements single ${ (date_value($self) >>> 5) & 0xf }
+      compiler ("date_day") (Nil :: MInt) implements single ${ date_value($self) & 0x1f }
 
       infix ("<") (Date :: MBoolean) implements single ${ date_value($self) < date_value($1) }
       infix ("<=") (Date :: MBoolean) implements single ${ date_value($self) <= date_value($1) }
       infix (">") (Date :: MBoolean) implements single ${ date_value($self) > date_value($1) }
       infix (">=") (Date :: MBoolean) implements single ${ date_value($self) >= date_value($1) }
+      infix ("!=") (Date :: MBoolean) implements single ${ date_value($self) != date_value($1) }
 
-      // infix ("toString") (Nil :: MString) implements single ${
-      //   date_year($self).ToString + "-" + date_month($self).ToString + "-" + date_day($self).ToString
-      // }
+      infix ("makeStr") (Nil :: MString) implements single ${
+        "" + date_year($self) + "-" + date_month($self) + "-" + date_day($self)
+      }
 
     }
   }

@@ -15,45 +15,77 @@ trait TableOps {
 
     val Table = tpe("Table", A)
 
-    // data
+    //internal data format
+    //TODO: this is equivalent to a DeliteArrayBuffer, we should be able to just use that
     data(Table, "size" -> MInt, "data" -> MArray(A))
+    
+    //static constructors
     static (Table) ("apply", A, MInt :: Table(A), effect = mutable) implements allocates(Table, ${$0}, ${array_empty[A]($0) })
     static (Table) ("apply", A, MArray(A) :: Table(A)) implements allocates(Table, ${array_length($0)}, ${$0})
+    static (Table) ("apply", A, (MArray(A), MInt) :: Table(A)) implements allocates(Table, ${$1}, ${$0})
+    //static (Table) ("apply", A, (MArrayBuffer(A)) :: Table(A)) implements allocates(Table, ${$0.length}, ${$0.})
     static (Table) ("apply", A, varArgs(A) :: Table(A)) implements allocates(Table, ${unit($0.length)}, ${array_fromseq($0)})
-
-    static (Table) ("fromFile", A, (MString, MString ==> A) :: Table(A)) implements single ${
+    static (Table) ("range", Nil, (MInt, MInt) :: Table(MInt)) implements composite ${
+      val a = array_fromfunction($1-$0, i => i + $0)
+      Table[Int](a)
+    }
+    
+    static (Table) ("fromFile", A, CurriedMethodSignature(List(List(MString), List(MString ==> A)), Table(A))) implements composite ${
       val a = ForgeFileReader.readLines($0)($1)
       Table[A](a)
     }
+
+    static (Table) ("fromFile", A, ("path"->MString, "separator"->MString) :: Table(A)) implements composite ${
+      val a = ForgeFileReader.readLines($path)(line => createRecord[A](array_string_split(line, $separator, -1)))
+      Table[A](a)
+    }
+
+    /*static (Table) ("fromString", A, ("data"->MString, "rowSeparator"->MString, "columnSeparator"->MString) :: Table(A)) implements composite ${
+      val jarray = array_string_split($data, $rowSeparator)
+      val a = array_fromfunction(jarray.length, i => createRecord[A](array_string_split(jarray(i), $columnSeparator, -1)))
+      Table[A](a)
+    }*/
 
     //(K,V) pairs for Tables
     val Tuple2 = lookupTpe("Tup2")
     fimplicit (Tuple2) ("pair_to_value", (K,V), Tuple2(K,Table(V)) :: Table(V)) implements composite ${ tup2__2($0) } //TODO: this isn't kicking in
     infix (Tuple2) ("key", (K,V), Tuple2(K,Table(V)) :: K) implements composite ${ tup2__1($0) }
-    infix (Tuple2) ("value", (K,V), Tuple2(K,Table(V)) :: Table(V)) implements composite ${ tup2__2($0) }
+    infix (Tuple2) ("values", (K,V), Tuple2(K,Table(V)) :: Table(V)) implements composite ${ tup2__2($0) }
 
     val TableOps = withTpe (Table)
     TableOps {
 
       // bulk collect ops
       infix ("Select") ("selector" -> (A ==> R) :: Table(R), addTpePars = R) implements map((A,R), 0, ${$selector})
+      infix ("SelectMany") ("selector" -> (A ==> Table(R)) :: Table(R), addTpePars = R) implements flatMap((A,R), 0, ${$selector}) 
       infix ("Where") ("predicate" -> (A ==> MBoolean) :: Table(A)) implements filter((A,A), 0, ${$predicate}, ${e => e})
 
-      //bulk bucket ops
+      //bulk bucketReduce ops
+      //TODO: composite op
       infix ("GroupBy") ("keySelector" -> (A ==> K) :: Table(Tuple2(K,Table(A))), addTpePars = K) implements single ${
         groupByHackImpl($self, $keySelector)
       }
 
-      // infix ("Distinct")
+      infix ("Distinct") ("keySelector" -> (A ==> K) :: Table(A), addTpePars = K) implements composite ${
+        val map = groupByReduceOp($self, $keySelector, (e:Rep[A]) => e, (a:Rep[A],b:Rep[A]) => a, (e:Rep[A]) => unit(true))
+        Table[A](fhashmap_values(map))
+      }
+      infix ("Distinct") (Nil :: Table(A)) implements composite ${ $0.Distinct((k:Rep[A]) => k) }
 
       //bulk reduce ops
       infix ("Sum") ("selector" -> (A ==> R) :: R, addTpePars = R withBound TNumeric) implements mapReduce((A,R), 0, ${$selector}, ${zeroType[R]}, ${(a,b) => a + b})
 
+      //TODO: composite op
       infix ("Average") ("selector" -> (A ==> R) :: R, addTpePars = R withBound TNumeric withBound TFractional) implements single ${
-        $self.Sum($selector) / upgradeInt(table_count($self)) //.asInstanceOf[Rep[R]] //TODO: ".Count" doesn't work
+        $self.Sum($selector) / upgradeInt[R](table_count($self))
       }
-      //infix ("Max") ("selector" -> (A ==> R) :: R, TOrdering(R), addTpePars = R) implements reduce(R, 0, null, ${(a,b) => a max b})
-      //infix ("Min") ("selector" -> (A ==> R) :: R, TOrdering(R), addTpePars = R) implements reduce(R, 0, null, ${(a,b) => a min b})
+
+      infix ("Max") ("selector" -> (A ==> R) :: R, addTpePars = R withBound TOrdering) implements mapReduce((A,R), 0, ${$selector}, ${minValue[R]}, ${(a,b) => a max b})
+      infix ("Min") ("selector" -> (A ==> R) :: R, addTpePars = R withBound TOrdering) implements mapReduce((A,R), 0, ${$selector}, ${maxValue[R]}, ${(a,b) => a min b})
+
+      infix ("Count") ("predicate" -> (A ==> MBoolean) :: MInt) implements mapReduce((A,MInt), 0, ${e => unit(1)}, ${unit(0)}, ${(a,b) => a + b}, Some(${$predicate}))
+      //infix ("First") ("predicate" -> (A ==> MBoolean) :: A) implements mapReduce((A,A), 0, ${e => e}, ${zeroType[A]}, ${(a,b) => a}, Some(${$predicate}))
+      //infix ("Last") ("predicate" -> (A ==> MBoolean) :: A) implements mapReduce((A,A), 0, ${e => e}, ${zeroType[A]}, ${(a,b) => b}, Some(${$predicate}))
 
       //simple ops that can also be implemented as a reduce
       infix ("Count") (Nil :: MInt) implements single ${ table_size($self) }
@@ -61,32 +93,45 @@ trait TableOps {
       infix ("Last") (Nil :: A) implements single ${ table_apply($self, table_size($self)-1) }
 
       //sorting ops
-      // infix ("OrderBy")
-      // infix ("OrderByDescending")
+      infix ("OrderBy") ("keySelector" -> (A ==> K) :: Table(A), addTpePars = K withBound TOrdering) implements composite ${
+        sortHackImpl($self, $keySelector, true)
+      }
+      infix ("OrderByDescending")("keySelector" -> (A ==> K) :: Table(A), addTpePars = K withBound TOrdering) implements composite ${
+        sortHackImpl($self, $keySelector, false)
+      }
+
       // infix ("ThenBy")
       // infix ("ThenbyDescending")
 
-      infix ("OrderBy") ("selector" -> (A ==> R) :: Table(A), addTpePars = R) implements single ${$self}
-      infix ("ThenBy") ("selector" -> (A ==> R) :: Table(A), addTpePars = R) implements single ${$self}
-
       //multi-table ops
       // infix ("Join")
-      // infix ("Union")
+
+      //printing ops
+      infix ("printAsTable") (("maxRows", MInt, "100") :: MUnit, effect = simple) implements codegen($cala, ${
+        TablePrinter.printAsTable($self, $maxRows)
+      })
+
+      infix ("writeAsJSON") (("path"->MString) :: MUnit, effect = simple) implements codegen($cala, ${
+        TablePrinter.writeAsJSON($self, $path)
+      })
 
       //internal transformed ops
-      // compiler("groupByReduce")(("keySelector" -> (A ==> K), "valueSelector" -> (A ==> V), "reducer" -> ((V,V) ==> V), "condition" -> (A ==> MBoolean)) :: Table(V), addTpePars = (K,V)) implements groupByReduce((A,K,V), 0, ${$keySelector}, ${$valueSelector}, ${zeroType[V]}, ${$reducer}, Some(${condition}))
+      compiler("groupByReduce")(("keySelector" -> (A ==> K), "valueSelector" -> (A ==> V), "reducer" -> ((V,V) ==> V), "condition" -> (A ==> MBoolean)) :: Table(V), addTpePars = (K,V)) implements composite ${
+        val map = groupByReduceOp($self, $keySelector, $valueSelector, $reducer, $condition)
+        Table[V](fhashmap_values(map))
+      }
+      compiler("groupByReduceOp")(("keySelector" -> (A ==> K), "valueSelector" -> (A ==> V), "reducer" -> ((V,V) ==> V), "condition" -> (A ==> MBoolean)) :: MHashMap(K,V), addTpePars = (K,V)) implements groupByReduce((A,K,V), 0, ${$keySelector}, ${$valueSelector}, ${zeroType[V]}, ${$reducer}, Some(${condition}))
       compiler("bulkDivide") (("counts" -> Table(MInt), "avgFunc" -> ((A,MInt) ==> A)) :: Table(A)) implements zip((A,MInt,A), (0,1), ${$avgFunc})
-
-      //misc ops
-      // infix ("toString") (Nil :: MString) implements codegen($cala, ${
-      // })
 
       //methods needed to implement Table as a Delite ParallelCollectionBufer
 
       //accessors
+      infix ("apply") (MInt :: A) implements composite ${ table_apply_internal($self, $1) }
+      infix ("size") (Nil :: MInt) implements composite ${ table_size_internal($self) }
+
       compiler ("table_raw_data") (Nil :: MArray(A)) implements getter(0, "data")
-      compiler ("table_size") (Nil :: MInt) implements getter(0, "size")
-      compiler ("table_apply") (MInt :: A) implements composite ${
+      compiler ("table_size_internal") (Nil :: MInt) implements getter(0, "size")
+      compiler ("table_apply_internal") (MInt :: A) implements composite ${
         array_apply(table_raw_data($self), $1)
       }
 
@@ -126,7 +171,7 @@ trait TableOps {
 
       compiler ("table_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = table_raw_data($self)
-        var n = Math.max(4, array_length(data)*2).toInt
+        var n = unit(4) max (array_length(data)*2)
         while (n < $minLen) n = n*2
         val d = array_empty[A](n)
         array_copy(data, 0, d, 0, table_size($self))
@@ -143,7 +188,7 @@ trait TableOps {
         array_copy(src, $1, dest, $3, $4)
       }
 
-      parallelize as ParallelCollectionBuffer(A, lookupOp("table_alloc"), lookupOp("table_size"), lookupOp("table_apply"), lookupOp("table_update"), lookupOp("table_set_size"), lookupOp("table_appendable"), lookupOp("table_dc_append"), lookupOp("table_copy"))
+      parallelize as ParallelCollectionBuffer(A, lookupOp("table_alloc"), lookupOp("table_size_internal"), lookupOp("table_apply_internal"), lookupOp("table_update"), lookupOp("table_set_size"), lookupOp("table_appendable"), lookupOp("table_dc_append"), lookupOp("table_copy"))
     }
   }
 }

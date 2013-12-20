@@ -283,7 +283,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     for (tpe <- classes) {
       val d = DataStructs.get(tpe)
       d.foreach { data =>
-        stream.println("class " + data.tpe.name + makeTpeParsWithBounds(data.tpe.tpePars) + "(" + makeFieldArgs(data) + ") {")
+        val classType = if (data.tpe.name.startsWith("Tup")) "case class " else "class " //sketchy, but we want our special tuples to retain value equality (like Scala tuples)
+        stream.println(classType + data.tpe.name + makeTpeParsWithBounds(data.tpe.tpePars) + "(" + makeFieldArgs(data) + ") {")
         stream.println(makeFieldsWithInitArgs(data))
 
         // Actually emitting the infix methods as instance methods, while a little more readable, makes the interpreter methods

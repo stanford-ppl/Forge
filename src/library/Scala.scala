@@ -85,6 +85,11 @@ trait ScalaOps {
     val int_times = direct (Prim) ("forge_int_times", Nil, (MInt,MInt) :: MInt)
     val int_divide = direct (Prim) ("forge_int_divide", Nil, (MInt,MInt) :: MInt)
     val int_shift_left = direct (Prim) ("forge_int_shift_left", Nil, (MInt,MInt) :: MInt)
+    val int_shift_right_unsigned = direct (Prim) ("forge_int_shift_right_unsigned", Nil, (MInt,MInt) :: MInt)
+    impl (int_shift_right_unsigned) (codegen($cala, ${ $0 >>> $1 }))
+    val int_binary_and = direct (Prim) ("forge_int_and", Nil, (MInt,MInt) :: MInt)
+    val int_binary_or = direct (Prim) ("forge_int_or", Nil, (MInt,MInt) :: MInt)
+
     val int_mod = infix (Prim) ("%", Nil, (MInt,MInt) :: MInt)
     val int_bitwise_not = infix (Prim) ("unary_~", Nil, MInt :: MInt)
 
@@ -114,6 +119,8 @@ trait ScalaOps {
       impl (int_shift_left) (codegen(g, ${$0 << $1}))
       impl (int_mod) (codegen(g, ${$0 % $1}))
       impl (int_bitwise_not) (codegen(g, ${~$0}))
+      impl (int_binary_and) (codegen(g, ${$0 & $1}))
+      impl (int_binary_or) (codegen(g, ${$0 | $1}))
 
       impl (float_plus) (codegen(g, ${$0 + $1}))
       impl (float_minus) (codegen(g, ${$0 - $1}))
@@ -247,6 +254,9 @@ trait ScalaOps {
     infix (Prim) ("/", Nil, (MDouble,MDouble) :: MDouble) implements redirect ${ forge_double_divide($0,$1) }
 
     infix (Prim) ("<<",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_left($0,$1) }
+    infix (Prim) (">>>",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_right_unsigned($0,$1) }
+    infix (Prim) ("&", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_and($0,$1) }
+    infix (Prim) ("|", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_or($0,$1) }
 
     infix (Prim) ("+", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_plus($0,$1) }
     infix (Prim) ("&", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_and($0,$1) }
@@ -376,6 +386,8 @@ trait ScalaOps {
     infix (Ord) ("!=", (AC,B), (AC,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
     infix (Ord) ("!=", (AC,B), (AC,MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
 
+    infix (Ord) ("min", List(A withBound TOrdering), List(A,A) :: A) implements (codegen($cala, quotedArg(0) + " min " + quotedArg(1)))
+    infix (Ord) ("max", List(A withBound TOrdering), List(A,A) :: A) implements (codegen($cala, quotedArg(0) + " max " + quotedArg(1)))
     val lt = infix (Ord) ("<", List(A withBound TOrdering), List(A,A) :: MBoolean)
     val lte = infix (Ord) ("<=", List(A withBound TOrdering), List(A,A) :: MBoolean)
     val gt = infix (Ord) (">", List(A withBound TOrdering), List(A,A) :: MBoolean)
@@ -397,6 +409,7 @@ trait ScalaOps {
     val T = tpePar("T")
 
     infix (Str) ("toInt", Nil, MString :: MInt) implements codegen($cala, ${ $0.toInt })
+    infix (Str) ("toLong", Nil, MString :: MLong) implements codegen ($cala, ${ $0.toLong })
     infix (Str) ("toFloat", Nil, MString :: MFloat) implements codegen($cala, ${ $0.toFloat })
     infix (Str) ("toDouble", Nil, MString :: MDouble) implements codegen($cala, ${ $0.toDouble })
 
@@ -409,6 +422,8 @@ trait ScalaOps {
     infix (Str) ("trim", Nil, MString :: MString) implements codegen($cala, ${ $0.trim })
     infix (Str) ("fcharAt", Nil, (MString,MInt) :: MChar) implements codegen($cala, ${ $0.charAt($1) })
     infix (Str) ("startsWith", Nil, (MString,MString) :: MBoolean) implements codegen($cala, ${ $0.startsWith($1) })
+    infix (Str) ("endsWith", Nil, (MString,MString) :: MBoolean) implements codegen($cala, ${ $0.endsWith($1) })
+    infix (Str) ("contains", Nil, (MString,MString) :: MBoolean) implements codegen($cala, ${ $0.contains($1) })
 
     // most of these variants collapse to a common back-end implementation:
 

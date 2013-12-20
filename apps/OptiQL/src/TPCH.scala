@@ -4,83 +4,84 @@ import optiql.shared._
 
 import scala.virtualization.lms.common.Record
 
-object Q1Compiler extends OptiQLApplicationCompiler with Q1
-object Q1Interpreter extends OptiQLApplicationInterpreter with Q1
+object TPCHQ1Interpreter extends OptiQLApplicationInterpreter with TPCHQ1Trait
+object TPCHQ1Compiler extends OptiQLApplicationCompiler with TPCHQ1Trait
+object TPCHQ6Interpreter extends OptiQLApplicationInterpreter with TPCHQ6Trait
+object TPCHQ6Compiler extends OptiQLApplicationCompiler with TPCHQ6Trait
 
-trait Q1 extends OptiQLApplication {
-
-  type LineItem = Record {
-    val l_orderkey: Int
-    val l_partkey: Int
-    val l_suppkey: Int
-    val l_linenumber: Int
-    val l_quantity: Double
-    val l_extendedprice: Double
-    val l_discount: Double
-    val l_tax: Double
-    val l_returnflag: Char
-    val l_linestatus: Char
-    val l_shipdate: Date
-    val l_commitdate: Date
-    val l_receiptdate: Date
-    val l_shipinstruct: String
-    val l_shipmode: String
-    val l_comment: String
-  }
-
-  def fromLine(line: Rep[String]): Rep[LineItem] = {
-    val fields = line.fsplit("\\Q" + "|" + "\\E")
-    new Record {
-      val l_orderkey = { date_object_apply(array_apply(fields, 10).asInstanceOf[Rep[String]]); array_apply(fields, 0).toInt }
-      val l_partkey = array_apply(fields, 1).toInt
-      val l_suppkey = array_apply(fields, 2).toInt
-      val l_linenumber = array_apply(fields, 3).toInt
-      val l_quantity = array_apply(fields, 4).toDouble
-      val l_extendedprice = array_apply(fields, 5).toDouble
-      val l_discount = array_apply(fields, 6).toDouble
-      val l_tax = array_apply(fields, 7).toDouble
-      val l_returnflag = infix_fcharAt(array_apply(fields, 8), 0) //.fcharAt doesn't resolve for some reason
-      val l_linestatus = infix_fcharAt(array_apply(fields, 9), 0)
-      val l_shipdate = Date(array_apply(fields, 10))
-      val l_commitdate = Date(array_apply(fields, 11))
-      val l_receiptdate = Date(array_apply(fields, 12))
-      val l_shipinstruct = array_apply(fields, 13)
-      val l_shipmode = array_apply(fields, 14)
-      val l_comment = array_apply(fields, 15)
-    }
-  }
+trait TPCHBaseTrait extends OptiQLApplication with Types {
 
   def printUsage = {
-    println("Usage: Q1 <input tpch directory>")
+    println("Usage: TPCHQ## <input directory>")
     exit(-1)
   }
 
-  def loadLineItems(tpchDataPath: Rep[String]) = Table.fromFile(tpchDataPath+"/lineitem.tbl", fromLine)
-
+  val queryName: String
+  
+  var tpchDataPath: Rep[String] = _
+  val sep = "\\|"
+  def loadLineItems() = Table.fromFile[LineItem](tpchDataPath+"/lineitem.tbl", sep)
+  def loadCustomers() = Table.fromFile[Customer](tpchDataPath+"/customer.tbl", sep)
+  def loadNations() = Table.fromFile[Nation](tpchDataPath+"/nation.tbl", sep)
+  def loadOrders() = Table.fromFile[Order](tpchDataPath+"/orders.tbl", sep)
+  def loadParts() = Table.fromFile[Part](tpchDataPath+"/part.tbl", sep)
+  def loadPartSuppliers() = Table.fromFile[PartSupplier](tpchDataPath+"/partsupp.tbl", sep)
+  def loadRegions() = Table.fromFile[Region](tpchDataPath+"/region.tbl", sep)
+  def loadSuppliers() = Table.fromFile[Supplier](tpchDataPath+"/supplier.tbl", sep)
+  
+  def query(): Rep[_]
+  
   def main() = {
-    println("TPCH Query 1")
+    println("TPC-H " + queryName)
     if (args.length < 1) printUsage
-    val lineItems = loadLineItems(args(0))
-    query(lineItems)
+    
+    tpchDataPath = args(0)
+    query()
   }
 
-  def query(lineItems: Rep[Table[LineItem]]) = {
-    tic(lineItems)
+}
 
-    val q = lineItems Where(_.l_shipdate <= Date("1998-12-01")) GroupBy(l => (l.l_returnflag,l.l_linestatus)) Select(g => new Record {
+
+trait TPCHQ1Trait extends TPCHBaseTrait {
+
+  val queryName = "Q1"  
+  def query() = {  
+
+    val lineItems = loadLineItems()         
+    tic(lineItems.size)
+
+    val q = lineItems Where(_.l_shipdate <= Date("1998-12-01")) GroupBy(l => pack(l.l_returnflag,l.l_linestatus)) Select(g => new Record { //FIXME: pack is not being applied implicitly
       val returnFlag = g.key._1
       val lineStatus = g.key._2
-      val sumQty = g.value.Sum(_.l_quantity)
-      val sumBasePrice = g.value.Sum(_.l_extendedprice)
-      val sumDiscountedPrice = g.value.Sum(l => l.l_extendedprice * (1.0d - l.l_discount))
-      val sumCharge = g.value.Sum(l => l.l_extendedprice * (1.0d - l.l_discount) * (unit(1.0d) + l.l_tax))  // unit required for + for some reason (infix fails to resolve otherwise)
-      val avgQty = g.value.Average(_.l_quantity)
-      val avgPrice = g.value.Average(_.l_extendedprice)
-      val avgDiscount = g.value.Average(_.l_discount)
-      val countOrder = g.value.Count
-    }) OrderBy(_.returnFlag) ThenBy(_.lineStatus)
-
+      val sumQty = g.values.Sum(_.l_quantity) //FIXME: values is not being applied implicitly
+      val sumBasePrice = g.values.Sum(_.l_extendedprice)
+      val sumDiscountedPrice = g.values.Sum(l => l.l_extendedprice * (1.0 - l.l_discount))
+      val sumCharge = g.values.Sum(l => l.l_extendedprice * (1.0 - l.l_discount) * infix_+(1.0, l.l_tax)) //FIXME: infix_+ fails to resolve automatically
+      val avgQty = g.values.Average(_.l_quantity)
+      val avgPrice = g.values.Average(_.l_extendedprice)
+      val avgDiscount = g.values.Average(_.l_discount)
+      val countOrder = g.values.Count
+    }) OrderBy(_.returnFlag)
+    
     toc(q)
-    println(q)
+    q.printAsTable()
+    q.writeAsJSON("out.json")
+  }    
+}
+
+
+trait TPCHQ6Trait extends TPCHBaseTrait {
+  val queryName = "Q6"
+
+  def query() = {
+    val lineItems = loadLineItems()
+    tic(lineItems.size)
+
+    //FIXME: infix_&& fails to resolve automatically
+    val q = lineItems Where (l => infix_&&(l.l_shipdate >= Date("1994-01-01"), infix_&&(l.l_shipdate < Date("1995-01-01"), infix_&&(l.l_discount >= 0.05, infix_&&(l.l_discount <= 0.07, l.l_quantity < 24))))) 
+    val revenue = q.Sum(l => l.l_extendedprice * l.l_discount)
+
+    toc(revenue)
+    println(revenue)
   }
 }

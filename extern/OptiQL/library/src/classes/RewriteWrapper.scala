@@ -9,8 +9,6 @@ import scala.collection.mutable.HashMap
 trait RewriteWrapper extends RewriteOps {
   this: OptiQLBase with OptiQLClasses =>
 
-  def upgradeInt[R:Manifest](value: Rep[Int]): Rep[R] = value.toDouble.asInstanceOf[Rep[R]]
-
   def groupByHackImpl[K:Manifest,V:Manifest](self: Rep[Table[V]], keySelector: Rep[V] => Rep[K])(implicit pos: SourceContext): Rep[Table[Tup2[K,Table[V]]]] = {
     val map = self.data.take(self.size).groupBy(keySelector)
 
@@ -23,6 +21,12 @@ trait RewriteWrapper extends RewriteOps {
     new Table(pairs.length, pairs.toArray)
   }
 
-  def zeroType[T:Manifest]: Rep[T] = null.asInstanceOf[Rep[T]]
+  def sortHackImpl[A:Manifest,K:Manifest:Ordering](self: Rep[Table[A]], keySelector: Rep[A] => Rep[K], ascending: Boolean)(implicit pos: SourceContext): Rep[Table[A]] = {
+    val data = if (ascending) 
+      self.data.take(self.size).sortWith((a,b) => implicitly[Ordering[K]].lt(keySelector(a), keySelector(b)))
+    else 
+      self.data.take(self.size).sortWith((a,b) => implicitly[Ordering[K]].lt(keySelector(b), keySelector(a)))
+    new Table(self.size, data)
+  }
 
 }

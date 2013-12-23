@@ -13,7 +13,7 @@ import ppl.delite.framework.Util._
 
 import ppl.delite.framework.Config
 import ppl.delite.framework.extern.codegen.scala.ScalaGenExternalBase
-import ppl.delite.framework.extern.lib.MKL
+import ppl.delite.framework.extern.lib.LAPACK
 
 import optila.shared._
 import optila.shared.ops._
@@ -110,17 +110,17 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
     case e@Native_linsolve(a,b) =>
       val args = scala.List("%1$s._data", "%2$s._data", "%1$s._numRows", "%1$s._numCols")
                  .map { _.format(quote(a), quote(b)) }
-      emitMethodCall(sym, e, MKL, args)
+      emitMethodCall(sym, e, LAPACK, args)
 
     case e@Native_lu(a,ipiv) =>
       val args = scala.List("%1$s._data", "%2$s._data", "%1$s._numRows", "%1$s._numCols")
                  .map { _.format(quote(a), quote(ipiv)) }
-      emitMethodCall(sym, e, MKL, args)
+      emitMethodCall(sym, e, LAPACK, args)
 
     case e@Native_chol(a,t) =>
       val args = scala.List("%1$s._data", "%1$s._numRows", "%1$s._numCols", "%2$s")
                  .map { _.format(quote(a), quote(t)) }
-      emitMethodCall(sym, e, MKL, args)
+      emitMethodCall(sym, e, LAPACK, args)
 
     case _ => super.emitExternalNode(sym,rhs)
   }
@@ -128,7 +128,7 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
   override def emitExternalLib(rhs: Def[Any]): Unit = rhs match {
     case e@Native_linsolve(a,b) =>
       val tp = "Double"
-      emitInterfaceAndMethod(MKL, e.funcName,
+      emitInterfaceAndMethod(LAPACK, e.funcName,
         scala.List("A:Array[%1$s]", "b:Array[%1$s]", "M:Int", "N:Int") map { _.format(tp) },
         scala.List("j%1$sArray A", "j%1$sArray b", "jint M", "jint N") map { _.format(tp.toLowerCase) },
         """
@@ -137,7 +137,7 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
           j%1$s *A_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)A, &copy));
           j%1$s *b_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)b, &copy));
 
-          MKL_INT m = M, n = N, nrhs = 1, lda = N, ldb = 1, info;
+          lapack_int m = M, n = N, nrhs = 1, lda = N, ldb = 1, info;
 
           info = LAPACKE_dgels(LAPACK_ROW_MAJOR, 'N', m, n, nrhs, A_ptr, lda, b_ptr, ldb);
 
@@ -147,7 +147,7 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
 
     case e@Native_lu(a,p) =>
       val tp = "Double"
-      emitInterfaceAndMethod(MKL, e.funcName,
+      emitInterfaceAndMethod(LAPACK, e.funcName,
         scala.List("A:Array[%1$s]", "ipiv:Array[Int]", "M:Int", "N:Int") map { _.format(tp) },
         scala.List("j%1$sArray A", "jintArray ipiv", "jint M", "jint N") map { _.format(tp.toLowerCase) },
         """
@@ -156,7 +156,7 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
           j%1$s *A_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)A, &copy));
           jint *ipiv_ptr = (jint*)((*env)->GetPrimitiveArrayCritical(env, (jarray)ipiv, &copy));
 
-          MKL_INT m = M, n = N, lda = N, info;
+          lapack_int m = M, n = N, lda = N, info;
 
           info = LAPACKE_dgetrf(LAPACK_ROW_MAJOR, m, n, A_ptr, lda, ipiv_ptr);
 
@@ -167,7 +167,7 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
 
     case e@Native_chol(a,t) =>
       val tp = "Double"
-      emitInterfaceAndMethod(MKL, e.funcName,
+      emitInterfaceAndMethod(LAPACK, e.funcName,
         scala.List("A:Array[%1$s]", "M:Int", "N:Int", "tri:Char") map { _.format(tp) },
         scala.List("j%1$sArray A", "jint M", "jint N", "jchar tri") map { _.format(tp.toLowerCase) },
         """
@@ -175,7 +175,7 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
           jboolean copy;
           j%1$s *A_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)A, &copy));
 
-          MKL_INT n = N, lda = N, info;
+          lapack_int n = N, lda = N, info;
 
           info = LAPACKE_dpotrf(LAPACK_ROW_MAJOR, tri, n, A_ptr, lda);
 

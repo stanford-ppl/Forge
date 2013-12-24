@@ -31,9 +31,12 @@ trait IOGraphOps {
 
   	direct (IO) ("graphFromEdgeList", Nil, MString :: Graph) implements composite ${
       val input_edges = ForgeFileReader.readLines($0)({line =>
-        val fields = line.fsplit("\t")
-        pack(fields(0).toInt,fields(1).toInt)  
+        //if(!line.startsWith("#")){
+          val fields = line.fsplit("\t")
+          pack(fields(0).toInt,fields(1).toInt) 
+        //} 
       })
+
       //contains the input tuples
       val edge_data = NodeData(input_edges)
       /////////////////////////////////////////////////////////////
@@ -43,6 +46,7 @@ trait IOGraphOps {
       val src_buckets = NodeData[NodeData[Int]](edge_data.nd_length*2)
       val dst_buckets = NodeData[NodeData[Int]](edge_data.nd_length*2)
       var node_count = 0
+
       edge_data.forloop{ ed =>
         if(!elems.contains(ed._1)){
           elems(ed._1) = node_count
@@ -70,6 +74,7 @@ trait IOGraphOps {
       var dst_edge_place = 0
       val dst_node_array = NodeData[Int](node_count+1)
       val dst_edge_array = NodeData[Int](edge_data.nd_length)
+
       //loops over all node ID's in hash map
       while(node_place < node_count){
         //////////////
@@ -92,7 +97,7 @@ trait IOGraphOps {
       }
       src_node_array.resize(node_count)
       dst_node_array.resize(node_count)
-
+      
       println("finished file I/O")
       Graph(true,node_count,elems,src_node_array.get_raw_data,src_edge_array.get_raw_data,dst_node_array.get_raw_data,dst_edge_array.get_raw_data)
     }

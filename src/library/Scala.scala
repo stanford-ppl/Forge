@@ -582,6 +582,8 @@ trait ScalaOps {
       infix ("apply") (K :: V) implements codegen($cala, ${ $self($1) })
       infix ("update") ((K,V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $self.put($1,$2); () })
       infix ("contains") (K :: MBoolean) implements codegen($cala, ${ $self.contains($1) })
+      infix ("isEmpty") (Nil :: MBoolean) implements codegen($cala, ${ $self.isEmpty })
+
       //infix ("filter") ( ((K,V)==>MBoolean) :: MHashMap) implements codegen($cala, ${ $self.filter($1) })
       //infix ("exists") ( ((K,V)==>MBoolean) :: Tuple2(K,V)) implements codegen($cala, ${ $self.exists($1) })
       // can we avoid the toArray?

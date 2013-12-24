@@ -117,7 +117,7 @@ trait GraphOps{
                 }
                 level -= 1
             }
-            println("bfs finished")
+            //println("bfs finished")
             //sigma.nd_print
             //println("")
             delta

@@ -31,13 +31,13 @@ trait BC extends OptiGraphApplication {
 		bc = g.nodes(
 			{(bc_new:Rep[NodeData[Double]],bc_old:Rep[NodeData[Double]]) => bc_old.zip(bc_new)},
 			{ n =>
-			g.inBFS(n,{ (bfs_node:Rep[Node],sigma:Rep[NodeData[Double]],levelArray:Rep[GraphCollection[Int]]) =>
+			g.inBFS(n,{ (bfs_node:Rep[Node],sigma:Rep[NodeData[Double]],levelArray:Rep[NodeData[Int]]) =>
 				if(bfs_node.id==n.id){1.0}
 				else{
 					sum(g.in_neighbors(bfs_node),{w => sigma(w)},{ e:Rep[Int] => 
 						levelArray(e)==levelArray(bfs_node.id)-1})
 				}},
-				{(rbfs_node:Rep[Node],sigma:Rep[NodeData[Double]],delta:Rep[NodeData[Double]],levelArray:Rep[GraphCollection[Int]]) => 
+				{(rbfs_node:Rep[Node],sigma:Rep[NodeData[Double]],delta:Rep[NodeData[Double]],levelArray:Rep[NodeData[Int]]) => 
 					sum(g.out_neighbors(rbfs_node), {w => 
 							(sigma(rbfs_node.id)/ sigma(w))*(1.0+delta(w)) },
 						{e => 

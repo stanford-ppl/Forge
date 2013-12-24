@@ -12,8 +12,8 @@ trait GraphOps{
     val Edge = lookupTpe("Edge")
     val NodeData = lookupTpe("NodeData")
     val GraphCollection = lookupTpe("GraphCollection")
-    val ArrayView = lookupTpe("ArrayView")
-    val NodeView = lookupTpe("NodeView")
+    val NodeDataView = lookupTpe("NodeDataView")
+    val NodeIdView = lookupTpe("NodeIdView")
     val Tuple2 = lookupTpe("Tup2")
 
     //////////////////////////////////////////////////////////////////////////////
@@ -27,7 +27,7 @@ trait GraphOps{
     data(Graph,("_directed",MBoolean),("_numNodes",MInt),("_inputIDs",MHashMap(MInt,MInt)),("_outNodes",MArray(MInt)),("_outEdges",MArray(MInt)),("_inNodes",MArray(MInt)),("_inEdges",MArray(MInt))) 
     static(Graph)("apply", Nil, (MethodSignature(List( ("directed",MBoolean),("count",MInt),("exID",MHashMap(MInt,MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("inNodes",MArray(MInt)),("inEdges",MArray(MInt)) )  , Graph) ) ) implements allocates(Graph,${$directed},${count}, ${$exID}, ${$outNodes}, ${outEdges},${$inNodes},${$inEdges})
    
-    direct(Graph) ("sum", R, (ArrayView(MInt), MInt==>R ,MInt==>MBoolean) :: R, TFractional(R)) implements composite ${
+    direct(Graph) ("sum", R, (NodeDataView(MInt), MInt==>R ,MInt==>MBoolean) :: R, TFractional(R)) implements composite ${
       $0.mapreduce[R]( e => $1(e), (a,b) => a+b, $2)
     }
 
@@ -35,7 +35,7 @@ trait GraphOps{
     GraphOps{
         infix ("is_directed") (Nil :: MBoolean) implements getter(0,"_directed") 
         
-        infix ("out_neighbors") (Node :: ArrayView(MInt)) implements composite ${
+        infix ("out_neighbors") (Node :: NodeDataView(MInt)) implements composite ${
             val id = $1.id
             //-1 implies no neighbors
             var start = out_node_apply($self,id)
@@ -47,10 +47,10 @@ trait GraphOps{
                 start = 0
                 end = 0
             }
-            ArrayView[Int](out_edge_raw_data($self),start,1,end-start)
+            NodeDataView[Int](out_edge_raw_data($self),start,1,end-start)
         }
            
-        infix ("in_neighbors") (Node :: ArrayView(MInt)) implements composite ${
+        infix ("in_neighbors") (Node :: NodeDataView(MInt)) implements composite ${
             val id = $1.id
             //-1 implies no neighbors
             var start = in_node_apply($self,id)
@@ -62,18 +62,20 @@ trait GraphOps{
                 start = 0
                 end = 0
             }
-            ArrayView[Int](in_edge_raw_data($self),start,1,end-start)
+            NodeDataView[Int](in_edge_raw_data($self),start,1,end-start)
         }
       
+        /*
         //take in array view, filter it down to just nodes at a level down
-        infix ("level_neighbors") ( (ArrayView(MInt),GraphCollection(MInt),MInt) :: GraphCollection(MInt)) implements composite ${
+        infix ("level_neighbors") ( (NodeDataView(MInt),GraphCollection(MInt),MInt) :: GraphCollection(MInt)) implements composite ${
             $1.filter{ e => $2(e)==$3 }
         }
+        */
   
-        infix ("inBFS") ( (Node, ((Node,NodeData(R),GraphCollection(MInt)) ==> R), ((Node,NodeData(R),NodeData(R),GraphCollection(MInt)) ==> R) ) :: NodeData(R), TFractional(R), addTpePars=R, effect=simple) implements composite ${
-            val levelArray = GraphCollection[Int]($self.get_num_nodes())
+        infix ("inBFS") ( (Node, ((Node,NodeData(R),NodeData(MInt)) ==> R), ((Node,NodeData(R),NodeData(R),NodeData(MInt)) ==> R) ) :: NodeData(R), TFractional(R), addTpePars=R, effect=simple) implements composite ${
+            val levelArray = NodeData[Int]($self.get_num_nodes())
             val bitMap = AtomicIntArray($self.get_num_nodes())
-            val nodes = NodeView(input_id_raw_data($self),$self.get_num_nodes) 
+            val nodes = NodeIdView(input_id_raw_data($self),$self.get_num_nodes) 
             val sigma = NodeData[R]($self.get_num_nodes())
             val delta = NodeData[R]($self.get_num_nodes())
 
@@ -132,7 +134,7 @@ trait GraphOps{
         }
 
         infix("nodes")( ( ((NodeData(R),NodeData(R))==>NodeData(R)),(Node==>NodeData(R))) :: NodeData(R), TNumeric(R), addTpePars=R,effect=simple) implements composite ${
-          val ndes = NodeView(input_id_raw_data($self),$self.get_num_nodes)
+          val ndes = NodeIdView(input_id_raw_data($self),$self.get_num_nodes)
           var bc_real = NodeData[NodeData[R]]($self.get_num_nodes())
 
           ndes.foreach{n =>

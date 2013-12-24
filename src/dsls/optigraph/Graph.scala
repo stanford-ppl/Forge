@@ -11,7 +11,6 @@ trait GraphOps{
     val Node = lookupTpe("Node")
     val Edge = lookupTpe("Edge")
     val NodeData = lookupTpe("NodeData")
-    val GraphCollection = lookupTpe("GraphCollection")
     val NodeDataView = lookupTpe("NodeDataView")
     val NodeIdView = lookupTpe("NodeIdView")
     val Tuple2 = lookupTpe("Tup2")

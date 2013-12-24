@@ -10,7 +10,7 @@ trait NodeDataViewOps {
   def importNodeDataViewOps() {
     val T = tpePar("T")
     val NodeDataView = tpe("NodeDataView",T)
-    val GraphCollection = lookupTpe("GraphCollection")
+    val NodeData = lookupTpe("NodeData")
 
     // data fields
     data(NodeDataView, ("_data", MArray(T)), ("_start", MInt), ("_stride", MInt), ("_length", MInt))
@@ -36,7 +36,7 @@ trait NodeDataViewOps {
 
       val R = tpePar("R")
       infix ("mapreduce") ( (T ==> R,(R,R) ==> R, T==>MBoolean) :: R, TNumeric(R), addTpePars=(T,R)) implements mapReduce((T,R), 0, ${e => $1(e)}, ${numeric_zero[R]}, ${(a,b) => $2(a,b)}, Some(${c => $3(c)}) )
-      infix ("filter") ((T ==> MBoolean) :: GraphCollection(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})
+      //infix ("filter") ((T ==> MBoolean) :: NodeData(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})
 
       parallelize as ParallelCollection(T, lookupOp("NodeDataView_illegalalloc"), lookupOp("length"), lookupOverloaded("apply",1), lookupOp("NodeDataView_illegalupdate"))
     }

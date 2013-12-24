@@ -25,6 +25,7 @@ trait BC extends OptiGraphApplication {
 		//println("n1 ID: " + n1.id)
 
 		println("performing Betweeness Centrality")
+		tic()
 		var bc = NodeData[Double](g.get_num_nodes)
 		//needs to be fixed so that in_neighbors and out_neighbors are hidden.  Should be
 		//up neighbors and down neighbors. external code needs to be generated.
@@ -44,6 +45,7 @@ trait BC extends OptiGraphApplication {
 							(( levelArray(e)==(levelArray(rbfs_node.id)+1) ) && (levelArray(rbfs_node.id) != 1))})
 			})
 		})
+		toc()
 		writeBCResults("bc.txt",g,bc)
 	//println("bc")
 	//bc.nd_print

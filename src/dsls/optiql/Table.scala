@@ -74,7 +74,7 @@ trait TableOps {
       // infix ("Union")
 
       //internal transformed ops
-      compiler("groupByReduce")(("keySelector" -> (A ==> K), "valueSelector" -> (A ==> V), "reducer" -> ((V,V) ==> V), "condition" -> (A ==> MBoolean)) :: Table(V), addTpePars = (K,V)) implements hashFilterReduce((A,K,V), 0, ${condition}, ${$keySelector}, ${$valueSelector}, ${zeroType[V]}, ${$reducer})
+      // compiler("groupByReduce")(("keySelector" -> (A ==> K), "valueSelector" -> (A ==> V), "reducer" -> ((V,V) ==> V), "condition" -> (A ==> MBoolean)) :: Table(V), addTpePars = (K,V)) implements groupByReduce((A,K,V), 0, ${$keySelector}, ${$valueSelector}, ${zeroType[V]}, ${$reducer}, Some(${condition}))
       compiler("bulkDivide") (("counts" -> Table(MInt), "avgFunc" -> ((A,MInt) ==> A)) :: Table(A)) implements zip((A,MInt,A), (0,1), ${$avgFunc})
 
       //misc ops

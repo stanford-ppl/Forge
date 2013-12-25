@@ -70,11 +70,29 @@ trait HelloSimple extends SimpleVectorApplication {
     // val v6 = v1.filter(_ < 5)
     // v6.pprint
 
-    // hashfilterreduce
-    println("v7 = v2.hashreduce(e => e % 2 == 0, e => e*10, (a,b) => a+b)")
-    val v7 = v2.hashreduce[Boolean,Int](e => e % 2 == 0, e => e*10, (a,b) => a+b)
+    // groupbyreduce
+    println("v7 = v2.groupByReduce(e => e % 2 == 0, e => e*10, (a,b) => a+b)")
+    val v7 = v2.groupByReduce[Boolean,Int](e => e % 2 == 0, e => e*10, (a,b) => a+b)
     // should be 2 elements (one for even group, one for odd group)
-    v7.pprint
+    println(v7(true))
+    println(v7(false))
+
+    // groupby
+    println("v8 = v2.groupBy(e => e % 2 == 0, e => e*10)")
+    val v8 = v2.groupBy(e => e % 2 == 0, e => e*10)
+    i = 0
+    while (i < v8.length) {
+      println("group " + i + ": ")
+      v8(i).pprint
+      i += 1
+    }
+
+    // flatmap
+    println("v9 = v2.flatMap(e => Vector[Int](5)")
+    val v9 = v2.flatMap(e => Vector[Int](5))
+    println("v9.length: " + v9.length)
+    println("v9: ")
+    v9.pprint
 
     // foo
     val fooResult = foo[Int](i => i+100, 2, 13, (a,b) => a + 5, 0.7, d => d)

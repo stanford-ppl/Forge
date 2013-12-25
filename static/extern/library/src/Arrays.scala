@@ -53,7 +53,10 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
 }
 
 trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
+  this: ForgeArrayWrapper =>
+
   type ForgeArrayBuffer[T] = scala.collection.mutable.ArrayBuffer[T]
+  implicit def forgeArrayBufferManifest[T:Manifest] = manifest[ForgeArrayBuffer[T]]
 
   def array_buffer_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
     = (new scala.collection.mutable.ArrayBuffer[T]()) ++ (new Array[T](__arg0))
@@ -74,6 +77,8 @@ trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
     = { __arg0 += __arg1 }
   def array_buffer_indexof[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[T])(implicit __imp0: SourceContext): Rep[Int]
     = __arg0.indexOf(__arg1)
+   def array_buffer_result[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+    = __arg0.toArray
 }
 
 

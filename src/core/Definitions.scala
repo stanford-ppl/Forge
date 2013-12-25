@@ -57,7 +57,7 @@ trait Definitions extends DerivativeTypes {
   lazy val MVar = tpe("Var", tpePar("A"))
   lazy val MArray = tpe("ForgeArray", tpePar("A"))
   lazy val MArrayBuffer = tpe("ForgeArrayBuffer", tpePar("A"))
-  lazy val MHashMap = tpe("HashMap",(tpePar("K"),tpePar("V"))) // using real HashMap type because we have no struct or primitive Forge HashMap yet
+  lazy val MHashMap = tpe("ForgeHashMap",(tpePar("K"),tpePar("V"))) // Forge HashMap (immutable)
 
   /**
    * DSLType placeholders
@@ -187,7 +187,6 @@ trait Definitions extends DerivativeTypes {
     val tpeArg: Rep[DSLType], val alloc: Rep[DSLOp], val size: Rep[DSLOp], val apply: Rep[DSLOp], val update: Rep[DSLOp],
     /*val parallelization: Rep[DSLOp],*/ val setSize: Rep[DSLOp], val appendable: Rep[DSLOp], val append: Rep[DSLOp], val copy: Rep[DSLOp]
   ) extends ForgeCollectionType
-
 
   /**
    * Op types
@@ -319,7 +318,7 @@ trait Definitions extends DerivativeTypes {
    * @param map         string representation of a function A => R
    * @param zero        string representation of a function => R
    * @param reduce      string representation of a reduce function (R, R) => R
-   * @param cond        optional string representatin of a condition function A => Boolean
+   * @param cond        optional string representation of a condition function A => Boolean
    */
    def forge_mapreduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]]): DeliteOpType
    object mapReduce {
@@ -340,21 +339,51 @@ trait Definitions extends DerivativeTypes {
    }
 
   /**
-   * HashFilterReduce
+   * FlatMap
+   *
+   * @param tpePars   [A,R]
+   * @param argIndex  index of op argument that correspond to input collection
+   * @param func      string representation of a function A => Col[R]
+   */
+   def forge_flatmap(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]): DeliteOpType
+   object flatMap {
+     def apply(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) = forge_flatmap(tpePars, argIndex, func)
+   }
+
+  /**
+   * GroupBy
+   *
+   * GroupBy returns a ForgeHashMap[K,ForgeArrayBuffer[V]]. Ideally, we would return a ForgeHashMap[K,CV],
+   * but there are issues with rewrites in Delite when we used a DSL type instead of ArrayBuffer.
+   *
+   * @param tpePars   [A,K,V] //[A,K,V,CV]
+   * @param argIndex  index of op argument that correspond to input collection
+   * @param key       string representation of a function A => K
+   * @param map       string representation of a function A => V
+   * @param cond      optional string representation of predicate function A => Boolean
+   */
+   def forge_groupby(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], cond: Option[Rep[String]] = None): DeliteOpType
+   object groupBy {
+     def apply(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]/*,Rep[DSLType]*/), hashArgIndex: Int, key: Rep[String], map: Rep[String], cond: Option[Rep[String]] = None) = forge_groupby(/*tpePars*/(tpePars._1,tpePars._2,tpePars._3,MArrayBuffer(tpePars._3)), hashArgIndex, key, map, cond)
+   }
+
+  /**
+   * GroupByReduce
+   *
+   * GroupByReduce returns a ForgeHashMap[K,V].
    *
    * @param tpePars   [A,K,V]
    * @param argIndex  index of op argument that correspond to input collection
-   * @param cond      string representation of predicate function A => Boolean
    * @param key       string representation of a function A => K
    * @param map       string representation of a function A => V
    * @param zero      string representation of a function => V
    * @param reduce    string representation of a reduce function (V, V) => V
+   * @param cond      optional string representation of predicate function A => Boolean
    */
-   def forge_hashfilterreduce(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String]): DeliteOpType
-   object hashFilterReduce {
-     def apply(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), hashArgIndex: Int, cond: Rep[String], key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String]) = forge_hashfilterreduce(tpePars, hashArgIndex, cond, key, map, zero, reduce)
+   def forge_groupby_reduce(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]] = None): DeliteOpType
+   object groupByReduce {
+     def apply(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), hashArgIndex: Int, key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]] = None) = forge_groupby_reduce(tpePars, hashArgIndex, key, map, zero, reduce, cond)
    }
-
 
   /**
    * Foreach
@@ -432,10 +461,15 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
   case class Filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]) extends DeliteOpType
   def forge_filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String]) = Filter(tpePars, argIndex, cond, func)
 
-  case class HashFilterReduce(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String]) extends DeliteOpType
-  def forge_hashfilterreduce(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String]) = HashFilterReduce(tpePars, argIndex, cond, key, map, zero, reduce)
+  case class FlatMap(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) extends DeliteOpType
+  def forge_flatmap(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String]) = FlatMap(tpePars, argIndex, func)
+
+  case class GroupBy(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], cond: Option[Rep[String]]) extends DeliteOpType
+  def forge_groupby(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], cond: Option[Rep[String]]) = GroupBy(tpePars, argIndex, key, map, cond)
+
+  case class GroupByReduce(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]]) extends DeliteOpType
+  def forge_groupby_reduce(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]]) = GroupByReduce(tpePars, argIndex, key, map, zero, reduce, cond)
 
   case class Foreach(tpePar: Rep[DSLType], argIndex: Int, func: Rep[String]) extends DeliteOpType
   def forge_foreach(tpePar: Rep[DSLType], argIndex: Int, func: Rep[String]) = Foreach(tpePar, argIndex, func)
-
 }

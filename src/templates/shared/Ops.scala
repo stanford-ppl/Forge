@@ -320,6 +320,9 @@ trait BaseGenOps extends ForgeCodeGenBase {
       a.tpe.stage == future || isFuncArg(a) || isThunk(a.tpe) || a.tpe.name.startsWith("List") || a.tpe.name.startsWith("Seq")
     }
 
+    def isParallelCollection(t: Rep[DSLType]) = ForgeCollections.contains(t)
+    def isParallelCollectionBuffer(t: Rep[DSLType]) = ForgeCollections.get(t).exists(_.isInstanceOf[ParallelCollectionBuffer])
+
     Impls(o) match {
       case _:DeliteOpType =>
         if (o.args.exists(a => !validOpArgs(a))) err("op " + o.name + " is a Delite op, but has non-Rep arguments")
@@ -347,40 +350,54 @@ trait BaseGenOps extends ForgeCodeGenBase {
         if (!data.get.fields.map(_.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)
       case map:Map =>
         val col = getHkTpe(o.args.apply(map.argIndex).tpe)
-        if (ForgeCollections.get(col).isEmpty) err("map argument " + col.name + " is not a ParallelCollection")
+        if (!isParallelCollection(col)) err("map argument " + col.name + " is not a ParallelCollection")
         if (map.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("map op with undefined type par: " + o.name)
         if (map.argIndex < 0 || map.argIndex > o.args.length) err("map op with illegal arg parameter: " + o.name)
       case zip:Zip =>
         val colA = getHkTpe(o.args.apply(zip.argIndices._1).tpe)
         val colB = getHkTpe(o.args.apply(zip.argIndices._2).tpe)
-        if (ForgeCollections.get(colA).isEmpty) err("zip argument " + colA.name + " is not a ParallelCollection")
-        if (ForgeCollections.get(colB).isEmpty) err("zip argument " + colB.name + " is not a ParallelCollection")
+        if (!isParallelCollection(colA)) err("zip argument " + colA.name + " is not a ParallelCollection")
+        if (!isParallelCollection(colB)) err("zip argument " + colB.name + " is not a ParallelCollection")
         if (zip.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("zipWith op with undefined type parg: " + o.name)
         if (zip.argIndices.productIterator.asInstanceOf[Iterator[Int]].exists(a => a < 0 || a > o.args.length)) err("zipWith op with illegal arg parameter: " + o.name)
       case reduce:Reduce =>
         val col = getHkTpe(o.args.apply(reduce.argIndex).tpe)
-        if (ForgeCollections.get(col).isEmpty) err("reduce argument " + col.name + " is not a ParallelCollection")
+        if (!isParallelCollection(col)) err("reduce argument " + col.name + " is not a ParallelCollection")
         if (!validTpePar(o,reduce.tpePar)) err("reduce op with undefined type par: " + o.name)
         if (reduce.argIndex < 0 || reduce.argIndex > o.args.length) err("reduce op with illegal arg parameter: " + o.name)
         // if (reduce.zero.retTpe != reduce.tpePar) err("reduce op with illegal zero parameter: " + o.name)
       case mapreduce:MapReduce =>
         val col = getHkTpe(o.args.apply(mapreduce.argIndex).tpe)
-        if (ForgeCollections.get(col).isEmpty) err("mapreduce argument " + col.name + " is not a ParallelCollection")
+        if (!isParallelCollection(col)) err("mapReduce argument " + col.name + " is not a ParallelCollection")
         if (mapreduce.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("mapreduce op with undefined type par: " + o.name)
         if (mapreduce.argIndex < 0 || mapreduce.argIndex > o.args.length) err("mapreduce op with illegal arg parameter: " + o.name)
       case filter:Filter =>
         val col = getHkTpe(o.args.apply(filter.argIndex).tpe)
-        if (ForgeCollections.get(col).isEmpty || !ForgeCollections.get(getHkTpe(o.retTpe)).forall(_.isInstanceOf[ParallelCollectionBuffer])) err("filter return type " + col.name + " is not a ParallelCollectionBuffer")
+        if (!isParallelCollection(col)) err("filter argument " + col.name + " is not a ParallelCollection")
+        if (!isParallelCollectionBuffer(getHkTpe(o.retTpe))) err("filter return type " + col.name + " is not a ParallelCollectionBuffer")
         if (filter.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("filter op with undefined type par: " + o.name)
         if (filter.argIndex < 0 || filter.argIndex > o.args.length) err("filter op with illegal arg parameter: " + o.name)
-      case hfr:HashFilterReduce =>
-        val col = getHkTpe(o.args.apply(hfr.argIndex).tpe)
-        if (ForgeCollections.get(col).isEmpty || !ForgeCollections.get(getHkTpe(o.retTpe)).forall(_.isInstanceOf[ParallelCollectionBuffer])) err("hashFilterReduce return type " + col.name + " is not a ParallelCollectionBuffer")
-        if (hfr.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("hashFilterReduce op with undefined type par: " + o.name)
-        if (hfr.argIndex < 0 || hfr.argIndex > o.args.length) err("hashFilterReduce op with illegal arg parameter: " + o.name)
+      case flatmap:FlatMap =>
+        val col = getHkTpe(o.args.apply(flatmap.argIndex).tpe)
+        if (!isParallelCollection(col)) err("flatmap argument " + col.name + " is not a ParallelCollection")
+        if (!isParallelCollectionBuffer(getHkTpe(o.retTpe))) err("flatmap return type " + col.name + " is not a ParallelCollectionBuffer")
+        if (flatmap.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("flatmap op with undefined type par: " + o.name)
+        if (flatmap.argIndex < 0 || flatmap.argIndex > o.args.length) err("flatmap op with illegal arg parameter: " + o.name)
+      case gb:GroupBy =>
+        val col = getHkTpe(o.args.apply(gb.argIndex).tpe)
+        if (!isParallelCollection(col)) err("groupBy argument " + col.name + " is not a ParallelCollection")
+        val innerCol = getHkTpe(gb.tpePars._4)
+        if (!isParallelCollectionBuffer(innerCol)) err("groupBy inner collection type " + innerCol.name + " is not a ParallelCollectionBuffer")
+        if (gb.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("groupBy op with undefined type par: " + o.name)
+        if (gb.argIndex < 0 || gb.argIndex > o.args.length) err("groupBy op with illegal arg parameter: " + o.name)
+      case gbr:GroupByReduce =>
+        val col = getHkTpe(o.args.apply(gbr.argIndex).tpe)
+        if (!isParallelCollection(col)) err("groupByReduce argument " + col.name + " is not a ParallelCollection")
+        if (gbr.tpePars.productIterator.exists(a => !validTpePar(o,a.asInstanceOf[Rep[DSLType]]))) err("groupByReduce op with undefined type par: " + o.name)
+        if (gbr.argIndex < 0 || gbr.argIndex > o.args.length) err("groupByReduce op with illegal arg parameter: " + o.name)
       case foreach:Foreach =>
         val col = getHkTpe(o.args.apply(foreach.argIndex).tpe)
-        if (ForgeCollections.get(col).isEmpty) err("foreach argument " + col.name + " is not a ParallelCollection")
+        if (!isParallelCollection(col)) err("foreach argument " + col.name + " is not a ParallelCollection")
         if (!validTpePar(o,foreach.tpePar)) err("foreach op with undefined type par: " + o.name)
         if (foreach.argIndex < 0 || foreach.argIndex > o.args.length) err("foreach op with illegal arg parameter: " + o.name)
       case _ => // nothing to check
@@ -478,7 +495,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
           case _ => Nil
         }
 
-        val opsClsName = opsGrp.grp.name + tpe.name + tpeArgs.map(_.name).mkString("") + "OpsCls"
+        val opsClsName = opsGrp.grp.name + tpe.name.replaceAll("\\.","") + tpeArgs.map(_.name).mkString("") + "OpsCls"
 
         if (tpe.stage == compile) {
           stream.println("  implicit def liftTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ") = new " + opsClsName + "(x)")

@@ -567,28 +567,22 @@ trait ScalaOps {
     direct (Tuple2) ("pack", (A,B), CTuple2(MVar(A),MVar(B)) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
   }
 
-  // temporary until DeliteHashMap is ready
+  // Forge's HashMap is not mutable, so a Scala HashMap can be used if updates are necessary.
   def importHashMap() = {
     val K = tpePar("K")
     val V = tpePar("V")
-    val Tuple2 = lookupTpe("Tup2")
-    // we need a primitive HashMap type..
-    // val HashMap = tpe("FHashMap", (K,V))
 
-    direct (MHashMap) ("FHashMap", (K,V), Nil :: MHashMap(K,V), effect = mutable) implements codegen($cala, ${ new scala.collection.mutable.HashMap[$t[K],$t[V]]() })
+    // in order to define lifted operations on an existing Scala type, we must place the lifted ops in a separate group
+    // to avoid Forge attempting to use the fully qualified type name in traits
+    val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
+    val HashMapOps = grp("SHashMap")
 
-    val HashMapOps = withTpe(MHashMap)
-    HashMapOps {
-      infix ("apply") (K :: V) implements codegen($cala, ${ $self($1) })
-      infix ("update") ((K,V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $self.put($1,$2); () })
-      infix ("contains") (K :: MBoolean) implements codegen($cala, ${ $self.contains($1) })
-      infix ("isEmpty") (Nil :: MBoolean) implements codegen($cala, ${ $self.isEmpty })
-
-      //infix ("filter") ( ((K,V)==>MBoolean) :: MHashMap) implements codegen($cala, ${ $self.filter($1) })
-      //infix ("exists") ( ((K,V)==>MBoolean) :: Tuple2(K,V)) implements codegen($cala, ${ $self.exists($1) })
-      // can we avoid the toArray?
-      infix ("keys") (Nil :: MArray(K)) implements codegen($cala, ${ $self.keySet.toArray })
-      // infix ("keys") (Nil :: MArray(K)) implements codegen($cala, ${ scala.collection.JavaConverters.asScalaSetConverter($self.keySet).asScala.toArray })
-    }
+    direct (HashMapOps) ("SHashMap", (K,V), Nil :: SHashMap(K,V), effect = mutable) implements codegen($cala, ${ new scala.collection.mutable.HashMap[$t[K],$t[V]]() })
+    infix (HashMapOps) ("apply", (K,V), (SHashMap, K) :: V) implements codegen($cala, ${ $0($1) })
+    infix (HashMapOps) ("update", (K,V), (SHashMap, K, V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $0.put($1,$2); () })
+    infix (HashMapOps) ("contains", (K,V), (SHashMap, K) :: MBoolean) implements codegen($cala, ${ $0.contains($1) })
+    // can we avoid the toArray?
+    infix (HashMapOps) ("keys", (K,V), SHashMap :: MArray(K)) implements codegen($cala, ${ $0.keySet.toArray })
+    // infix ("keys") (Nil :: MArray(K)) implements codegen($cala, ${ scala.collection.JavaConverters.asScalaSetConverter($self.keySet).asScala.toArray })
   }
 }

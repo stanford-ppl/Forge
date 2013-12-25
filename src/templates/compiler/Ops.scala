@@ -58,13 +58,13 @@ trait DeliteGenOps extends BaseGenOps {
   }
 
   // IR node names
-  def makeOpNodeName(o: Rep[DSLOp]) = {
+  def makeOpNodeName(o: Rep[DSLOp], suffix: String = "") = {
     Labels.get(o).map(_.capitalize).getOrElse {
       val i = nameClashId(o)
       o.style match {
-        case `staticMethod` => o.grp.name + i + "Object_" + sanitize(o.name).capitalize
-        case `compilerMethod` => o.name.capitalize
-        case _ => o.grp.name + i + "_" + sanitize(o.name).capitalize
+        case `staticMethod` => o.grp.name + i + "Object_" + sanitize(o.name).capitalize + suffix
+        case `compilerMethod` => o.name.capitalize + suffix
+        case _ => o.grp.name + i + "_" + sanitize(o.name).capitalize + suffix
       }
     }
   }
@@ -86,13 +86,14 @@ trait DeliteGenOps extends BaseGenOps {
   })
 
   def makeOpSimpleNodeNameWithArgs(o: Rep[DSLOp]) = makeOpNodeName(o) + makeArgsWithBoundSyms(o.args, Impls(o))
-  def makeOpSimpleNodeNameWithAnonArgs(o: Rep[DSLOp]) = {
+  def makeOpSimpleNodeNameWithAnonArgs(o: Rep[DSLOp], suffix: String = "") = {
     // scalac typer error unless we break up the expression
     val z = o.args.zipWithIndex.map{ case (a,i) => arg(opArgPrefix + i, a.tpe, a.default) }
-    makeOpNodeName(o) + makeArgsWithBoundSyms(z, Impls(o))
-    // makeOpNodeName(o) + makeArgsWithBoundSyms(o.args.zipWithIndex.map{ case (a,i) => arg(opArgPrefix + i, a.tpe, a.default) })
+    makeOpNodeName(o) + suffix + makeArgsWithBoundSyms(z, Impls(o))
+    // makeOpNodeName(o) + suffix + makeArgsWithBoundSyms(o.args.zipWithIndex.map{ case (a,i) => arg(opArgPrefix + i, a.tpe, a.default) })
   }
 
+  // TODO: is this code obsoleted by quote(tpeInst(hkTpe,tpeArg))?? TEST AND REMOVE
   // TODO: tpeArg should be a List that is the same length as the tpePars in hkTpe
   def makeTpeInst(hkTpe: Rep[DSLType], tpeArg: Rep[DSLType]) = hkTpe match {
     case Def(Tpe(s,Nil,stage)) => s // rather lenient, might get strange results in an improperly specified dsl
@@ -149,12 +150,23 @@ trait DeliteGenOps extends BaseGenOps {
         case filter:Filter =>
           emitImplMethod(o, filter.cond, "_cond", makeFuncSignature(filter.tpePars._1, MBoolean), stream)
           emitImplMethod(o, filter.func, "_map", makeFuncSignature(filter.tpePars._1, filter.tpePars._2), stream)
-        case hfr:HashFilterReduce =>
-          emitImplMethod(o, hfr.cond, "_cond", makeFuncSignature(hfr.tpePars._1, MBoolean), stream)
-          emitImplMethod(o, hfr.key, "_key", makeFuncSignature(hfr.tpePars._1, hfr.tpePars._2), stream)
-          emitImplMethod(o, hfr.map, "_map",  makeFuncSignature(hfr.tpePars._1, hfr.tpePars._3), stream)
-          emitImplMethod(o, hfr.zero, "_zero",  makeFuncSignature(Nil, hfr.tpePars._3), stream)
-          emitImplMethod(o, hfr.reduce, "_reduce", makeFuncSignature((hfr.tpePars._3, hfr.tpePars._3), hfr.tpePars._3), stream)
+        case flatmap:FlatMap =>
+          val outCol = getHkTpe(o.retTpe)
+          emitImplMethod(o, flatmap.func, "_func", makeFuncSignature(flatmap.tpePars._1, tpeInst(outCol, flatmap.tpePars._2)), stream)
+        case gb:GroupBy =>
+          if (gb.cond.isDefined) {
+            emitImplMethod(o, gb.cond.get, "_cond", makeFuncSignature(gb.tpePars._1, MBoolean), stream)
+          }
+          emitImplMethod(o, gb.key, "_key", makeFuncSignature(gb.tpePars._1, gb.tpePars._2), stream)
+          emitImplMethod(o, gb.map, "_map",  makeFuncSignature(gb.tpePars._1, gb.tpePars._3), stream)
+        case gbr:GroupByReduce =>
+          if (gbr.cond.isDefined) {
+            emitImplMethod(o, gbr.cond.get, "_cond", makeFuncSignature(gbr.tpePars._1, MBoolean), stream)
+          }
+          emitImplMethod(o, gbr.key, "_key", makeFuncSignature(gbr.tpePars._1, gbr.tpePars._2), stream)
+          emitImplMethod(o, gbr.map, "_map",  makeFuncSignature(gbr.tpePars._1, gbr.tpePars._3), stream)
+          emitImplMethod(o, gbr.zero, "_zero",  makeFuncSignature(Nil, gbr.tpePars._3), stream)
+          emitImplMethod(o, gbr.reduce, "_reduce", makeFuncSignature((gbr.tpePars._3, gbr.tpePars._3), gbr.tpePars._3), stream)
         case foreach:Foreach =>
           emitImplMethod(o, foreach.func, "_func", makeFuncSignature(foreach.tpePar, MUnit), stream)
         case _ =>
@@ -194,9 +206,15 @@ trait DeliteGenOps extends BaseGenOps {
     case _ => true
   }
 
-  def emitIRNodes(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
+  def hasMultipleIRNodes(o: Rep[DSLOp]) = Impls(o) match {
+    case _:GroupBy | _:GroupByReduce => true
+    case _ => false
+  }
 
-    def emitOpNodeHeader(o: Rep[DSLOp], opStr: String) {
+  /**
+   * Op helpers we use to compose IR nodes
+   */
+  def emitOpNodeHeader(o: Rep[DSLOp], opStr: String, stream: PrintWriter) {
       stream.println(" extends " + opStr + " {")
       for (targ <- o.tpePars) {
         for (b <- targ.ctxBounds) {
@@ -205,12 +223,64 @@ trait DeliteGenOps extends BaseGenOps {
       }
     }
 
-    def emitOpNodeFooter(o: Rep[DSLOp]) {
-      stream.println("  }")
+  def emitOpNodeFooter(o: Rep[DSLOp], stream: PrintWriter) {
+    stream.println("  }")
+  }
+
+  def emitGroupByCommonVals(o: Rep[DSLOp], in: Rep[DSLArg], cond: Option[Rep[String]], tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), stream: PrintWriter) {
+    val inDc = ForgeCollections(getHkTpe(in.tpe))
+    stream.println()
+    stream.println("    val in = " + in.name)
+    if (cond.isDefined) {
+      stream.println("    def cond = " + makeOpImplMethodNameWithArgs(o, "_cond"))
     }
+    else {
+      stream.println("    def cond: Exp["+quote(tpePars._1)+"] => Exp[Boolean] = null")
+    }
+    stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(inDc.size) + ")")
+    stream.println("    def keyFunc = " + makeOpImplMethodNameWithArgs(o, "_key"))
+  }
+
+  def emitGroupByCommonNodes(o: Rep[DSLOp], in: Rep[DSLArg], cond: Option[Rep[String]], tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), stream: PrintWriter) {
+    val inDc = ForgeCollections(getHkTpe(in.tpe))
+    val outerColTpe = MArray
+    val outDc = ForgeCollections(outerColTpe)
+
+    // keys
+    stream.print("  case class " + makeOpNodeName(o, "Keys") + makeTpeParsWithBounds(o.tpePars))
+    stream.print(makeOpArgsWithType(o))
+    stream.print(makeOpImplicitArgsWithType(o,true))
+    emitOpNodeHeader(o, "DeliteOpFilteredGroupByReduce[" + quote(tpePars._1) + "," + quote(tpePars._2) + "," + quote(tpePars._2) + "," + quote(tpeInst(outerColTpe, tpePars._2)) + "]", stream)
+    emitGroupByCommonVals(o, in, cond, tpePars, stream)
+    stream.println("    def valFunc = keyFunc")
+    stream.println("    def reduceFunc = (a,b) => a")
+    stream.println("    def zero = unit(null).asInstanceOf["+repify(tpePars._2)+"]")
+
+    // see comment about innerDcArg in library/Ops.scala
+    val keysDcArg = if (getHkTpe(in.tpe) == getHkTpe(outerColTpe)) "in" else "null.asInstanceOf["+repify(tpeInst(outerColTpe, tpePars._2))+"]"
+    stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,tpePars._2)) + "("+keysDcArg+", len)")
+
+    emitOpNodeFooter(o, stream)
+    stream.println()
+
+    // index
+    stream.print("  case class " + makeOpNodeName(o, "Index") + makeTpeParsWithBounds(o.tpePars))
+    stream.print(makeOpArgsWithType(o))
+    stream.print(makeOpImplicitArgsWithType(o,true))
+    emitOpNodeHeader(o, "DeliteOpBuildIndex[" + quote(tpePars._1) + "," + quote(tpePars._2) + ",DeliteIndex[" + quote(tpePars._2) + "]]", stream)
+    emitGroupByCommonVals(o, in, cond, tpePars, stream)
+    emitOpNodeFooter(o, stream)
+    stream.println()
+  }
+
+
+  /**
+   * IR node implementation for each op type
+   */
+  def emitIRNodes(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
 
     // IR nodes
-    for (o <- uniqueOps if hasIRNode(o)) {
+    for (o <- uniqueOps if hasIRNode(o) && !hasMultipleIRNodes(o)) {
       stream.print("  case class " + makeOpNodeName(o) + makeTpeParsWithBounds(o.tpePars))
       if (Impls(o).isInstanceOf[CodeGen]) stream.print(makeArgsWithBoundSymsWithType(o.args, Impls(o), blockify))
       else stream.print(makeOpArgsWithType(o))
@@ -218,11 +288,11 @@ trait DeliteGenOps extends BaseGenOps {
 
       Impls(o) match {
         case codegen:CodeGen =>
-          emitOpNodeHeader(o, "Def[" + quote(o.retTpe) + "]")
+          emitOpNodeHeader(o, "Def[" + quote(o.retTpe) + "]", stream)
         case single:SingleTask =>
-          emitOpNodeHeader(o, "DeliteOpSingleTask[" + quote(o.retTpe) + "](reifyEffectsHere("+makeOpImplMethodNameWithArgs(o)+"))")
+          emitOpNodeHeader(o, "DeliteOpSingleTask[" + quote(o.retTpe) + "](reifyEffectsHere("+makeOpImplMethodNameWithArgs(o)+"))", stream)
         case Allocates(tpe,init) =>
-          emitOpNodeHeader(o, "DeliteStruct[" + quote(o.retTpe) + "]")
+          emitOpNodeHeader(o, "DeliteStruct[" + quote(o.retTpe) + "]", stream)
           val data = DataStructs(tpe)
           val elemsPure = data.fields.zip(init) map { case ((name,t),i) => ("\""+name+"\"", inline(o,i,quoteLiteral)) }
           val elems = if (o.effect == mutable) elemsPure map { case (k,v) => (k, "var_new("+v+").e") } else elemsPure
@@ -232,7 +302,7 @@ trait DeliteGenOps extends BaseGenOps {
           val outDc = ForgeCollections(colTpe)
           val in = o.args.apply(map.argIndex)
           val inDc = ForgeCollections(getHkTpe(in.tpe))
-          emitOpNodeHeader(o, "DeliteOpMap[" + quote(map.tpePars._1) + "," + quote(map.tpePars._2) + "," + makeTpeInst(colTpe, map.tpePars._2) + "]")
+          emitOpNodeHeader(o, "DeliteOpMap[" + quote(map.tpePars._1) + "," + quote(map.tpePars._2) + "," + makeTpeInst(colTpe, map.tpePars._2) + "]", stream)
           stream.println()
           stream.println("    val in = " + in.name)
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_map"))
@@ -243,7 +313,7 @@ trait DeliteGenOps extends BaseGenOps {
           val outDc = ForgeCollections(colTpe)
           val inA = o.args.apply(zip.argIndices._1)
           val inDc = ForgeCollections(getHkTpe(inA.tpe))
-          emitOpNodeHeader(o, "DeliteOpZipWith[" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + "," + quote(zip.tpePars._3) + "," + makeTpeInst(colTpe,zip.tpePars._3) + "]")
+          emitOpNodeHeader(o, "DeliteOpZipWith[" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + "," + quote(zip.tpePars._3) + "," + makeTpeInst(colTpe,zip.tpePars._3) + "]", stream)
           stream.println()
           stream.println("    val inA = " + inA.name)
           stream.println("    val inB = " + o.args.apply(zip.argIndices._2).name)
@@ -253,7 +323,7 @@ trait DeliteGenOps extends BaseGenOps {
         case reduce:Reduce =>
           val col = o.args.apply(reduce.argIndex)
           val dc = ForgeCollections(getHkTpe(col.tpe))
-          emitOpNodeHeader(o, "DeliteOpReduce[" + quote(reduce.tpePar) + "]")
+          emitOpNodeHeader(o, "DeliteOpReduce[" + quote(reduce.tpePar) + "]", stream)
           stream.println()
           stream.println("    val in = " + col.name)
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_reduce"))
@@ -263,10 +333,10 @@ trait DeliteGenOps extends BaseGenOps {
           val col = o.args.apply(mapreduce.argIndex)
           val dc = ForgeCollections(getHkTpe(col.tpe))
           if (mapreduce.cond.isDefined) {
-            emitOpNodeHeader(o, "DeliteOpFilterReduce[" + quote(mapreduce.tpePars._1) + "," + quote(mapreduce.tpePars._2) + "]")
+            emitOpNodeHeader(o, "DeliteOpFilterReduce[" + quote(mapreduce.tpePars._1) + "," + quote(mapreduce.tpePars._2) + "]", stream)
           }
           else {
-            emitOpNodeHeader(o, "DeliteOpMapReduce[" + quote(mapreduce.tpePars._1) + "," + quote(mapreduce.tpePars._2) + "]")
+            emitOpNodeHeader(o, "DeliteOpMapReduce[" + quote(mapreduce.tpePars._1) + "," + quote(mapreduce.tpePars._2) + "]", stream)
           }
           stream.println()
           stream.println("    val in = " + col.name)
@@ -286,40 +356,92 @@ trait DeliteGenOps extends BaseGenOps {
           val outDc = ForgeCollections(colTpe)
           val in = o.args.apply(filter.argIndex)
           val inDc = ForgeCollections(getHkTpe(in.tpe))
-          emitOpNodeHeader(o, "DeliteOpFilter[" + quote(filter.tpePars._1) + "," + quote(filter.tpePars._2) + "," + makeTpeInst(colTpe,filter.tpePars._2) + "]")
+          emitOpNodeHeader(o, "DeliteOpFilter[" + quote(filter.tpePars._1) + "," + quote(filter.tpePars._2) + "," + makeTpeInst(colTpe,filter.tpePars._2) + "]", stream)
           stream.println()
           stream.println("    val in = " + in.name)
           stream.println("    def cond = " + makeOpImplMethodNameWithArgs(o, "_cond"))
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_map"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,filter.tpePars._2)) + "(in, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(inDc.size) + ")")
-        case hfr:HashFilterReduce =>
+        case flatmap:FlatMap =>
           val colTpe = getHkTpe(o.retTpe)
           val outDc = ForgeCollections(colTpe)
-          val in = o.args.apply(hfr.argIndex)
+          val in = o.args.apply(flatmap.argIndex)
           val inDc = ForgeCollections(getHkTpe(in.tpe))
-          emitOpNodeHeader(o, "DeliteOpFilteredGroupByReduce[" + quote(hfr.tpePars._1) + "," + quote(hfr.tpePars._2) + "," + quote(hfr.tpePars._3) + "," + makeTpeInst(colTpe,hfr.tpePars._3) + "]")
+          emitOpNodeHeader(o, "DeliteOpFlatMap[" + quote(flatmap.tpePars._1) + "," + quote(flatmap.tpePars._2) + "," + makeTpeInst(colTpe,flatmap.tpePars._2) + "]", stream)
           stream.println()
           stream.println("    val in = " + in.name)
-          stream.println("    def cond = " + makeOpImplMethodNameWithArgs(o, "_cond"))
-          stream.println("    def keyFunc = " + makeOpImplMethodNameWithArgs(o, "_key"))
-          stream.println("    def valFunc = " + makeOpImplMethodNameWithArgs(o, "_map"))
-          stream.println("    def zero = " + makeOpImplMethodNameWithArgs(o, "_zero"))
-          stream.println("    def reduceFunc = " + makeOpImplMethodNameWithArgs(o, "_reduce"))
-          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,hfr.tpePars._3)) + "(in, len)")
+          stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_func"))
+          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,flatmap.tpePars._2)) + "(in, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(inDc.size) + ")")
         case foreach:Foreach =>
           val col = o.args.apply(foreach.argIndex)
           val dc = ForgeCollections(getHkTpe(col.tpe))
-          emitOpNodeHeader(o, "DeliteOpForeach[" + quote(foreach.tpePar) + "]")
+          emitOpNodeHeader(o, "DeliteOpForeach[" + quote(foreach.tpePar) + "]", stream)
           stream.println()
           stream.println("    val in = " + col.name)
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_func"))
           stream.println("    def sync = n => unit(List())")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
       }
-      emitOpNodeFooter(o)
+      emitOpNodeFooter(o, stream)
       stream.println()
+    }
+
+    for (o <- uniqueOps if hasMultipleIRNodes(o)) {
+      Impls(o) match {
+        case gb:GroupBy =>
+          val in = o.args.apply(gb.argIndex)
+          val inDc = ForgeCollections(getHkTpe(in.tpe))
+          // val outerColTpe = getHkTpe(o.retTpe)
+          val outerColTpe = MArray
+          val outDc = ForgeCollections(outerColTpe)
+          val innerColTpe = getHkTpe(gb.tpePars._4)
+          val innerDc = ForgeCollections(innerColTpe)
+
+          emitGroupByCommonNodes(o, in, gb.cond, (gb.tpePars._1,gb.tpePars._2,gb.tpePars._3), stream)
+
+          // values
+          stream.print("  case class " + makeOpNodeName(o) + makeTpeParsWithBounds(o.tpePars))
+          stream.print(makeOpArgsWithType(o))
+          stream.print(makeOpImplicitArgsWithType(o,true))
+          emitOpNodeHeader(o, "DeliteOpFilteredGroupBy[" + quote(gb.tpePars._1) + "," + quote(gb.tpePars._2) + "," + quote(gb.tpePars._3) + "," + quote(tpeInst(innerColTpe, gb.tpePars._3)) + "," + makeTpeInst(outerColTpe,tpeInst(innerColTpe, gb.tpePars._3)) + "]", stream)
+          emitGroupByCommonVals(o, in, gb.cond, (gb.tpePars._1,gb.tpePars._2,gb.tpePars._3), stream)
+          stream.println("    def valFunc = " + makeOpImplMethodNameWithArgs(o, "_map"))
+
+          val innerDcArg = if (getHkTpe(in.tpe) == getHkTpe(innerColTpe)) "in" else "null.asInstanceOf["+repify(tpeInst(innerColTpe, gb.tpePars._3))+"]"
+          stream.println("    override def allocI(len: Exp[Int]) = " + makeOpMethodName(innerDc.alloc) + makeTpePars(instAllocReturnTpe(innerDc.alloc, in.tpe, gb.tpePars._3)) + "("+innerDcArg+", len)")
+
+          val outDcArg = if (getHkTpe(in.tpe) == getHkTpe(outerColTpe)) "in" else "null.asInstanceOf["+repify(tpeInst(outerColTpe, tpeInst(innerColTpe, gb.tpePars._3)))+"]"
+          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc, in.tpe, tpeInst(innerColTpe, gb.tpePars._3))) + "("+outDcArg+", len)")
+
+          emitOpNodeFooter(o, stream)
+          stream.println()
+
+        case gbr:GroupByReduce =>
+          val in = o.args.apply(gbr.argIndex)
+          val inDc = ForgeCollections(getHkTpe(in.tpe))
+          // val outerColTpe = getHkTpe(o.retTpe)
+          val outerColTpe = MArray
+          val outDc = ForgeCollections(outerColTpe)
+
+          emitGroupByCommonNodes(o, in, gbr.cond, gbr.tpePars, stream)
+
+          stream.print("  case class " + makeOpNodeName(o) + makeTpeParsWithBounds(o.tpePars))
+          stream.print(makeOpArgsWithType(o))
+          stream.print(makeOpImplicitArgsWithType(o,true))
+          emitOpNodeHeader(o, "DeliteOpFilteredGroupByReduce[" + quote(gbr.tpePars._1) + "," + quote(gbr.tpePars._2) + "," + quote(gbr.tpePars._3) + "," + makeTpeInst(outerColTpe,gbr.tpePars._3) + "]", stream)
+          emitGroupByCommonVals(o, in, gbr.cond, gbr.tpePars, stream)
+          stream.println("    def valFunc = " + makeOpImplMethodNameWithArgs(o, "_map"))
+          stream.println("    def zero = " + makeOpImplMethodNameWithArgs(o, "_zero"))
+          stream.println("    def reduceFunc = " + makeOpImplMethodNameWithArgs(o, "_reduce"))
+
+          val outDcArg = if (getHkTpe(in.tpe) == getHkTpe(outerColTpe)) "in" else "null.asInstanceOf["+repify(tpeInst(outerColTpe, gbr.tpePars._3))+"]"
+          stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,gbr.tpePars._3)) + "("+outDcArg+", len)")
+
+          emitOpNodeFooter(o, stream)
+          stream.println()
+      }
     }
     stream.println()
   }
@@ -370,6 +492,11 @@ trait DeliteGenOps extends BaseGenOps {
           val struct = o.args.apply(structArgIndex)
           val fieldTpe = DataStructs(getHkTpe(struct.tpe)).fields.find(t => t._1 == field).get.tpe
           emitWithIndent("field_update["+quote(fieldTpe)+"]("+inline(o,quotedArg(struct.name),quoteLiteral)+",\""+field+"\","+inline(o,value,quoteLiteral)+")", stream, 4)
+        case _:GroupBy | _:GroupByReduce =>
+          emitWithIndent("val keys = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o, "Keys") + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
+          emitWithIndent("val index = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o, "Index") + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
+          emitWithIndent("val values = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o) + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
+          emitWithIndent(makeEffectAnnotation(pure,o) + "(DeliteMapNewImm(keys, values, index, values.length))", stream, 4)
         case _ if hasEffects =>
           // if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
           val prologue = if (o.effect == simple) " andAlso Simple()" else ""
@@ -485,6 +612,18 @@ trait DeliteGenOps extends BaseGenOps {
                       }
       val implicitsWithParens = if (implicits.length == 0) "" else implicits.mkString("(",",",")")
 
+      def emitDelitePureMirror(suffix: String = "") {
+        stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o, suffix) + " => ")
+        stream.print("reflectPure(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o, suffix) + xformArgs + implicitsWithParens + ")")
+        stream.println("(mtype(manifest[A]), pos)")
+      }
+
+      def emitDeliteEffectfulMirror(suffix: String = "") {
+        stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o, suffix) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o, suffix) + xformArgs + implicitsWithParens)
+        stream.print(", mapOver(f,u), f(es)))")
+        stream.println("(mtype(manifest[A]))")
+      }
+
       Impls(o) match {
         case codegen:CodeGen =>
           stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
@@ -513,15 +652,16 @@ trait DeliteGenOps extends BaseGenOps {
           stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(" + makeOpNodeName(o) + xformArgs + implicitsWithParens)
           stream.print(", mapOver(f,u), f(es)))")
           stream.println("(mtype(manifest[A]))")
+        case _:GroupBy | _:GroupByReduce =>
+          emitDelitePureMirror("Keys")
+          emitDeliteEffectfulMirror("Keys")
+          emitDelitePureMirror("Index")
+          emitDeliteEffectfulMirror("Index")
+          emitDelitePureMirror()
+          emitDeliteEffectfulMirror()
         case _:DeliteOpType =>
-          // pure delite op version
-          stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
-          stream.print("reflectPure(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + implicitsWithParens + ")")
-          stream.println("(mtype(manifest[A]), pos)")
-          // effectful delite op version
-          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o) + xformArgs + implicitsWithParens)
-          stream.print(", mapOver(f,u), f(es)))")
-          stream.println("(mtype(manifest[A]))")
+          emitDelitePureMirror()
+          emitDeliteEffectfulMirror()
         case _ => // no mirror
       }
     }

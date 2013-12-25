@@ -116,9 +116,10 @@ trait CGenForgeArrayOps extends CGenDeliteArrayOps with CGenObjectOps {
 
 
 trait ForgeArrayBufferOpsExp extends DeliteArrayBufferOpsExp {
-  this: DeliteArrayOpsExpOpt with DeliteOpsExp with DeliteMapOpsExp =>
+  this: ForgeArrayOpsExp with DeliteArrayOpsExpOpt with DeliteOpsExp with DeliteMapOpsExp =>
 
   type ForgeArrayBuffer[T] = DeliteArrayBuffer[T]
+  implicit def forgeArrayBufferManifest[T:Manifest] = manifest[DeliteArrayBuffer[T]]
 
   def array_buffer_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
     = darray_buffer_new[T](__arg0)
@@ -136,6 +137,8 @@ trait ForgeArrayBufferOpsExp extends DeliteArrayBufferOpsExp {
     = darray_buffer_append(__arg0,__arg1)
   def array_buffer_indexof[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[T])(implicit __imp0: SourceContext): Rep[Int]
     = throw new UnsupportedOperationException("DeliteArrayBuffer indexOf not implemented yet")
+  def array_buffer_result[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+    = darray_buffer_result(__arg0)
 }
 trait ScalaGenForgeArrayBufferOps extends ScalaGenDeliteArrayBufferOps with ScalaGenOrderingOps with ScalaGenPrimitiveOps with ScalaGenObjectOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp }
 trait CudaGenForgeArrayBufferOps extends CudaGenDeliteArrayBufferOps with CudaGenOrderingOps with CudaGenPrimitiveOps with CudaGenObjectOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp }

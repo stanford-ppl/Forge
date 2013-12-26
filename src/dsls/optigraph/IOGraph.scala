@@ -41,7 +41,7 @@ trait IOGraphOps {
       val edge_data = NodeData(input_edges)
       /////////////////////////////////////////////////////////////
       //first figure out how many nodes we have and grab them
-      val elems = FHashMap[Int,Int]()
+      val elems = SHashMap[Int,Int]()
 
       val src_buckets = NodeData[NodeData[Int]](edge_data.nd_length*2)
       val dst_buckets = NodeData[NodeData[Int]](edge_data.nd_length*2)
@@ -97,9 +97,11 @@ trait IOGraphOps {
       }
       src_node_array.resize(node_count)
       dst_node_array.resize(node_count)
+
+      val elems_tmp = fhashmap_from_shashmap[Int,Int](elems)
       
       println("finished file I/O")
-      Graph(true,node_count,elems,src_node_array.get_raw_data,src_edge_array.get_raw_data,dst_node_array.get_raw_data,dst_edge_array.get_raw_data)
+      Graph(true,node_count,elems_tmp,src_node_array.get_raw_data,src_edge_array.get_raw_data,dst_node_array.get_raw_data,dst_edge_array.get_raw_data)
     }
   }
 }

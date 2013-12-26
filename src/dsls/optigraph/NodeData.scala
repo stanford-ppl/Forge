@@ -127,7 +127,7 @@ trait NodeDataOps {
 
 			infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println("NodeData: " + a)})
 
-			infix ("hashreduce") ((T ==> MBoolean,T ==> K,T ==> V,(V,V) ==> V) :: NodeData(V), TNumeric(V), addTpePars = (K,V)) implements hashFilterReduce((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)}, ${e => $3(e)}, ${numeric_zero[V]}, ${(a,b) => $4(a,b)})
+			//infix ("hashreduce") ((T ==> MBoolean,T ==> K,T ==> V,(V,V) ==> V) :: NodeData(V), TNumeric(V), addTpePars = (K,V)) implements hashFilterReduce((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)}, ${e => $3(e)}, ${numeric_zero[V]}, ${(a,b) => $4(a,b)})
 
 		  infix ("filter") ( ((T ==> MBoolean),(T ==> MInt)) :: NodeData(MInt), addTpePars=K) implements filter((T,MInt), 0, ${w => $1(w)}, ${e => $2(e)})
 

@@ -1,3 +1,10 @@
+/*//////////////////////////////////////////////////////////////
+Author: Christopher R. Aberger
+
+Description: Stores data asscoicated with nodes in an array 
+buffer indexed by internal node IDs
+*///////////////////////////////////////////////////////////////
+
 package ppl.dsl.forge
 package	dsls 
 package optigraph
@@ -5,151 +12,78 @@ package optigraph
 import core.{ForgeApplication,ForgeApplicationRunner}
 
 trait NodeDataOps {
-
   this: OptiGraphDSL =>
-   
   def importNodeDataOps() {
-	//////////////////////////////////////////////////////////////////////////////
-	// NodeData DECLARATION
-	//////////////////////////////////////////////////////////////////////////////
-	val T = tpePar("T")
-	val V = tpePar("V")
-	val K = tpePar("K")
-	val R = tpePar("R")
-	val Tuple2 = lookupTpe("Tup2")
-	val NodeData = tpe("NodeData", T) 
+  	val Tuple2 = lookupTpe("Tup2")
+		val T = tpePar("T")
+		val R = tpePar("R")
+		val NodeData = tpe("NodeData", T) 
 
-	data(NodeData,("_length", MInt),("_data",MArray(T)))
-	//order between data and static allocates is implicit and must be the same
-   
-	//pass in a Int to create graph that will indicate # of nodes
-	//edges is just *2 the # nodes, need to figure out dynamic allocation
-	static(NodeData)("apply", T, MInt :: NodeData(T), effect=mutable) implements allocates(NodeData,${$0},${array_empty[T]($0)})
-	static(NodeData)("apply", T, MArray(T) :: NodeData(T), effect=mutable) implements allocates(NodeData,${array_length($0)},${$0})
+		data(NodeData,("_data",MArrayBuffer(T)))
+		static(NodeData)("apply", T, MInt :: NodeData(T), effect=mutable) implements allocates(NodeData,${array_buffer_empty[T]($0)})
+		static(NodeData)("apply", T, MArrayBuffer(T) :: NodeData(T), effect=mutable) implements allocates(NodeData,${$0})
 
-	val NodeDataOps = withTpe(NodeData)
+		val NodeDataOps = withTpe(NodeData)
 		NodeDataOps{	
-			compiler ("nd_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
-			compiler ("nd_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
-			
-			infix ("get_raw_data") (Nil :: MArray(T)) implements single ${
-				nd_raw_data($self)
-			}
+			//////////////basic accessors//////////////////////////////
+			compiler ("nd_raw_data") (Nil :: MArrayBuffer(T)) implements getter(0, "_data")
+			infix("apply")(MInt :: T) implements composite ${array_buffer_apply(nd_raw_data($self),$1)}
+			infix("update")( (("id",MInt),("n",T)) :: MUnit, effect=write(0)) implements composite ${array_buffer_update(nd_raw_data($self),$id,$n)}
+			infix ("nd_length")(Nil :: MInt) implements single ${array_buffer_length(nd_raw_data($self))}
+			//the requirement of second argument (length) to the append in this case is useless but still nescessary
+      //could probably be cleaned up in forge
+      infix ("append") (T :: MUnit, effect = write(0)) implements single ${nd_append($self,$self.nd_length, $1)}
+			//method to get an array of data to outside world
+			infix ("get_raw_data") (Nil :: MArray(T)) implements single ${array_buffer_result(nd_raw_data($self))}
+      //allows arrays to be set to proper size, useful in file I/O not necessary after groupby
+      infix("resize")(MInt :: MUnit, effect = write(0)) implements composite ${
+        val data = nd_raw_data($self)
+        val d = array_buffer_empty[T]($1)
+        array_buffer_copy(data, 0, d, 0, $1)
+        nd_set_raw_data($self, d.unsafeImmutable)
+        nd_set_length($self,$1)
+      }
+      compiler ("nd_set_raw_data") (MArrayBuffer(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
 
-			infix("resize")(MInt :: MUnit, effect = write(0)) implements composite ${
-				val data = nd_raw_data($self)
-				val d = array_empty[T]($1)
-				array_copy(data, 0, d, 0, $1)
-				nd_set_raw_data($self, d.unsafeImmutable)
-				nd_set_length($self,$1)
-			}
 
-			infix ("nd_length")(Nil :: MInt) implements getter(0,"_length")
-			compiler ("nd_set_length")(MInt :: MUnit, effect = write(0)) implements setter(0, "_length",${$1})
-			
-			infix("apply")(MInt :: T) implements composite ${array_apply(nd_raw_data($self),$1)}
-			
-			infix("update")( (("id",MInt),("n",T)) :: MUnit, effect=write(0)) implements composite ${
-				array_update(nd_raw_data($self),$id,$n)
-			}
-
-			compiler("nd_update")( (("id",MInt),("n",T)) :: MUnit, effect=write(0)) implements composite ${
-				array_update(nd_raw_data($self),$id,$n)
-			}
-
-			infix("nd_add")( (("id1",MInt),("id2",MInt)) :: T,TNumeric(T)) implements composite ${
-				$self(id1)+$self(id2)
-			}
-
-			compiler("nd_copy")((MInt,NodeData(T),MInt,MInt) :: MUnit, effect = write(2) ) implements composite ${
-				val src = nd_raw_data($self)
-				val dest = nd_raw_data($2) //fixme should be $2 but for some reason that won't work
-				array_copy(src, $1, dest, $3, $4)
-			}
-
-			compiler("nd_raw_alloc")(MInt :: NodeData(R), addTpePars = R, effect=mutable) implements single ${
-				NodeData[R]($1)
-			}
-
-	    compiler ("nd_apply") (MInt :: T) implements composite ${
-				array_apply(nd_raw_data($self), $1)
-	    }
-
-			compiler ("nd_appendable") ((MInt,T) :: MBoolean) implements single("true")		
-
-			compiler ("nd_append") ((MInt,T) :: MUnit, effect = write(0)) implements single ${
-				 nd_insert($self,$self.nd_length, $2)
-			}
-			
-			infix ("append") (T :: MUnit, effect = write(0)) implements single ${
-				nd_insert($self,$self.nd_length, $1)
-			}
-
-			compiler("nd_insert") ((MInt,T) :: MUnit, effect = write(0)) implements single ${
-				nd_insertspace($self,$1,1)
-				$self($1) = $2
-			} 
-			
-			compiler ("nd_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
-				nd_ensureextra($self,$len)
-				val data = nd_raw_data($self)
-				array_copy(data,$pos,data,$pos+$len,$self.nd_length-$pos)
-				nd_set_length($self,$self.nd_length+$len)
-			}
-
-			compiler ("nd_ensureextra") (("extra",MInt) :: MUnit, effect = write(0)) implements single ${
-				val data = nd_raw_data($self)
-				if (array_length(data) - $self.nd_length < $extra) {
-				  nd_realloc($self, $self.nd_length+$extra)
-				}
-			}
-			
-			compiler ("nd_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
-				val data = nd_raw_data($self)
-				var n = Math.max(4, array_length(data)*2).toInt
-				while (n < $minLen) n = n*2
-				val d = array_empty[T](n)
-				array_copy(data, 0, d, 0, $self.nd_length)
-				nd_set_raw_data($self, d.unsafeImmutable)
-			}
+			///////////parallel operations////////////////////////////
 			infix ("sum") (Nil :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${ (a,b) => a+b })
-
 			infix ("zip") (NodeData(T) :: NodeData(T), TNumeric(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a+b })
-			infix ("zip_tuples") (NodeData(T) :: NodeData(Tuple2(T,T))) implements zip((T,T,Tuple2(T,T)), (0,1), ${ (a,b) => pack(a,b) })
-
 			infix ("map") ((T ==> R) :: NodeData(R), addTpePars = R) implements map((T,R), 0, ${ e => $1(e) })
-      
-      //this is an absolutely horrible way of doing this but 
-      //only way I could get it past for now.
+      infix ("filter") ( ((T ==> MBoolean),(T ==> MInt)) :: NodeData(MInt)) implements filter((T,MInt), 0, ${w => $1(w)}, ${e => $2(e)})
+	    infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements foreach(T, 0, ${ e => $1(e) })
+  		//FIXME figure out how to declare 0 so that this works
       infix ("reduceND") ( (((T,T) ==> T),R):: T,addTpePars=R) implements reduce(T, 0, ${$2.asInstanceOf[Rep[T]]}, ${
         (a,b) => $1(a,b)
       })
 
+      /////////////////////////debug operations (print serial & parallel)///////////////////////
 			infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println("NodeData: " + a)})
-
-			//infix ("hashreduce") ((T ==> MBoolean,T ==> K,T ==> V,(V,V) ==> V) :: NodeData(V), TNumeric(V), addTpePars = (K,V)) implements hashFilterReduce((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)}, ${e => $3(e)}, ${numeric_zero[V]}, ${(a,b) => $4(a,b)})
-
-		  infix ("filter") ( ((T ==> MBoolean),(T ==> MInt)) :: NodeData(MInt), addTpePars=K) implements filter((T,MInt), 0, ${w => $1(w)}, ${e => $2(e)})
-
-	    infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements foreach(T, 0, ${ e => $1(e) })
-
-	    infix ("forloop") ((T ==> MUnit) :: MUnit, effect = simple) implements composite ${
+		 	infix ("forloop") ((T ==> MUnit) :: MUnit, effect = simple) implements composite ${
 	    	var i = 0
 				while(i<$self.nd_length){
 					$1($self(i))
 					i = i+1
 				}
 	    }
-
-			infix ("nd_print") (Nil :: MUnit, effect = simple) implements composite ${
+	    infix ("print") (Nil :: MUnit, effect = simple) implements composite ${
 				var i = 0
 				while(i<$self.nd_length){
 					println("NodeData -- Index: " + i + " Data: " + $self(i))
 					i = i+1
 				}
 			}
-			
-			parallelize as ParallelCollectionBuffer(T,lookupOp("nd_raw_alloc"),lookupOp("nd_length"),lookupOp("nd_apply"),lookupOp("update"),lookupOp("nd_set_length"),lookupOp("nd_appendable"),lookupOp("nd_append"),lookupOp("nd_copy"))
-		}	
+
+			///////////////methods for parallel collection buffer declaration/////////////////////////
+			compiler("nd_raw_alloc")(MInt :: NodeData(R), addTpePars = R, effect=mutable) implements single ${NodeData[R]($1)}
+			compiler ("nd_apply") (MInt :: T) implements composite ${array_buffer_apply(nd_raw_data($self), $1)}
+	    compiler("nd_update")( (("id",MInt),("n",T)) :: MUnit, effect=write(0)) implements composite ${array_buffer_update(nd_raw_data($self),$id,$n)}
+			compiler ("nd_set_length")(MInt :: MUnit, effect = write(0)) implements single ${array_buffer_set_length(nd_raw_data($self),$1)}
+			compiler ("nd_appendable") ((MInt,T) :: MBoolean) implements single("true")	
+			compiler ("nd_append") ((MInt,T) :: MUnit, effect = write(0)) implements single ${array_buffer_append(nd_raw_data($self),$2)}
+			compiler("nd_copy") ((MInt,NodeData(T),MInt,MInt) :: MUnit, effect = write(2)) implements single ${array_buffer_copy(nd_raw_data($self),$1,nd_raw_data($2),$3,$4)}
+
+			parallelize as ParallelCollectionBuffer(T,lookupOp("nd_raw_alloc"),lookupOp("nd_length"),lookupOp("nd_apply"),lookupOp("nd_update"),lookupOp("nd_set_length"),lookupOp("nd_appendable"),lookupOp("nd_append"),lookupOp("nd_copy"))
+		}
   } 
 }

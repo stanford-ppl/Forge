@@ -13,46 +13,32 @@ trait BC extends OptiGraphApplication {
 		println("OptiGraph Test 1")
 		if (args.length < 1) printUsage
 		val g = graphFromEdgeList(args(0)) 
-		//val g = Graph.fromFile("n1.txt","e1.txt", fromLine) 
 		
-		println("Directed: " + g.is_directed)
-		println("Number of Nodes: " + g.get_num_nodes)
+		println("Directed: " + g.isDirected)
+		println("Number of Nodes: " + g.getNumNodes)
 		
 		//you can't input 0 as a start node ID
 		//there is an issue with directed versus undirected right now
-		
-		//val n1 = g.get_node_from_id(3)
-		//println("n1 ID: " + n1.id)
-
 		println("performing Betweeness Centrality")
 		tic("bc")
-		var bc = NodeData[Double](g.get_num_nodes)
-		//needs to be fixed so that in_neighbors and out_neighbors are hidden.  Should be
-		//up neighbors and down neighbors. external code needs to be generated.
-		bc = g.nodes(
-			{(bc_new:Rep[NodeData[Double]],bc_old:Rep[NodeData[Double]]) => bc_old.zip(bc_new)},
+    //FIXME: throws an error if you take out explicit type, why?
+		val bc = sum( g.nodes(
 			{ n =>
-			g.inBFS(n,{ (bfs_node:Rep[Node],sigma:Rep[NodeData[Double]],levelArray:Rep[NodeData[Int]]) =>
-				if(bfs_node.id==n.id){1.0}
-				else{
-					sum(g.in_neighbors(bfs_node),{w => sigma(w)},{ e:Rep[Int] => 
-						levelArray(e)==levelArray(bfs_node.id)-1})
-				}},
-				{(rbfs_node:Rep[Node],sigma:Rep[NodeData[Double]],delta:Rep[NodeData[Double]],levelArray:Rep[NodeData[Int]]) => 
-					sum(g.out_neighbors(rbfs_node), {w => 
-							(sigma(rbfs_node.id)/ sigma(w))*(1.0+delta(w)) },
-						{e => 
-							(( levelArray(e)==(levelArray(rbfs_node.id)+1) ) && (levelArray(rbfs_node.id) != 1))})
-			})
-		})
+  			g.inBFOrder(n,{ (bfs_node:Rep[Node],sigma:Rep[NodeData[Double]],levelArray:Rep[NodeData[Int]]) =>
+      				if(bfs_node.id==n.id){1.0}
+      				else{g.sumUpNbrs(bfs_node,levelArray,{w => sigma(w)})}
+          },
+  				{(rbfs_node:Rep[Node],sigma:Rep[NodeData[Double]],delta:Rep[NodeData[Double]],levelArray:Rep[NodeData[Int]]) => 
+              g.sumDownNbrs(rbfs_node,levelArray, {w => (sigma(rbfs_node.id)/ sigma(w))*(1.0+delta(w)) })
+          })
+		  }
+    ) )
+
 		toc("bc")
 		writeBCResults("bc.txt",g,bc)
-	//println("bc")
-	//bc.nd_print
-
 	}
 	def printUsage = {
-    println("Usage: Q1 <input edge list file>")
+    println("Usage: Q1 <path to input edge list file>")
     exit(-1)
   }
 }

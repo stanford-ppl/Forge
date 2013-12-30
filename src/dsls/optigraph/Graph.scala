@@ -162,7 +162,7 @@ trait GraphOps{
           ordered_ids(hash(keys(i))) = keys(i)
           i += 1
         }
-        ordered_ids.get_raw_data
+        ordered_ids.getRawDataArray
       }
       //gets the hash map stored
       compiler ("getHashMapKeys") (Nil :: MArray(MInt)) implements composite ${
@@ -213,7 +213,7 @@ trait GraphOps{
       //val result = $0.reduceND( ((a,b) => a.zip(b)),NodeData[R](0))
       var result = $0(0)
       var i = 1
-      while(i<$0.nd_length){
+      while(i<$0.length){
         result = result.zip($0(i))
         i += 1
       }

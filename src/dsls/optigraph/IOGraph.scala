@@ -20,7 +20,7 @@ trait IOGraphOps {
 
     direct (IO) ("writeBCResults", T, (("path",MString),("graph",Graph),("data",NodeData(T))) :: MUnit, TNumeric(T), effect = simple) implements composite ${
     	val ids = $graph.getOrderedNodeIDs
-    	writeGraphData($path,ids,data.get_raw_data,$data.nd_length)
+    	writeGraphData($path,ids,data.getRawDataArray,$data.length)
     }
     compiler (IO) ("writeGraphData", T, (("path",MString),("ids",MArray(MInt)),("data",MArray(T)),("length",MInt)) :: MUnit, TNumeric(T), effect = simple) implements codegen($cala, ${
       val xfs = new java.io.BufferedWriter(new java.io.FileWriter($path))
@@ -53,8 +53,8 @@ trait IOGraphOps {
       //first figure out how many nodes we have and grab them
       val elems = SHashMap[Int,Int]()
 
-      val src_buckets = NodeData[NodeData[Int]](edge_data.nd_length*2)
-      val dst_buckets = NodeData[NodeData[Int]](edge_data.nd_length*2)
+      val src_buckets = NodeData[NodeData[Int]](edge_data.length*2)
+      val dst_buckets = NodeData[NodeData[Int]](edge_data.length*2)
       var node_count = 0
 
       edge_data.forloop{ ed =>
@@ -79,17 +79,17 @@ trait IOGraphOps {
       var node_place = 0
       var src_edge_place = 0
       val src_node_array = NodeData[Int](node_count+1)
-      val src_edge_array = NodeData[Int](edge_data.nd_length)
+      val src_edge_array = NodeData[Int](edge_data.length)
 
       var dst_edge_place = 0
       val dst_node_array = NodeData[Int](node_count+1)
-      val dst_edge_array = NodeData[Int](edge_data.nd_length)
+      val dst_edge_array = NodeData[Int](edge_data.length)
 
       //loops over all node ID's in hash map
       while(node_place < node_count){
         //////////////
         val src_tmp = src_buckets(node_place).map({e => elems(e)})
-        src_node_array(node_place+1) = (src_node_array(node_place) + src_tmp.nd_length)
+        src_node_array(node_place+1) = (src_node_array(node_place) + src_tmp.length)
         src_tmp.forloop{ edge =>
           src_edge_array(src_edge_place) = edge
           src_edge_place += 1
@@ -97,7 +97,7 @@ trait IOGraphOps {
         //
         //Forge error?  it seems to never create a symbol for dst_tmp here which is annoying
         val dst_tmp = dst_buckets(node_place).map({e => elems(e)})
-        dst_node_array(node_place+1) = dst_buckets(node_place).map({e => elems(e)}).nd_length + dst_node_array(node_place)
+        dst_node_array(node_place+1) = dst_buckets(node_place).map({e => elems(e)}).length + dst_node_array(node_place)
         dst_buckets(node_place).map({e => elems(e)}).forloop{ edge =>
           dst_edge_array(dst_edge_place) = edge
           dst_edge_place += 1
@@ -110,7 +110,7 @@ trait IOGraphOps {
 
       val elems_tmp = fhashmap_from_shashmap[Int,Int](elems)
       println("finished file I/O")
-      Graph(true,node_count,elems_tmp,src_node_array.get_raw_data,src_edge_array.get_raw_data,dst_node_array.get_raw_data,dst_edge_array.get_raw_data)
+      Graph(true,node_count,elems_tmp,src_node_array.getRawDataArray,src_edge_array.getRawDataArray,dst_node_array.getRawDataArray,dst_edge_array.getRawDataArray)
     }
   }
 }

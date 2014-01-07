@@ -16,7 +16,7 @@ trait WranglerTableOps {
     val String = grp("String")
     val IO = grp("IO")
 
-    data(Table, "num_cols" -> MInt, "num_rows" -> MInt, "data" -> MArray(Tuple2(MString, MArray(MString))))
+    data(Table, "numCols" -> MInt, "numRows" -> MInt, "data" -> MArray(Tuple2(MString, MArray(MString))))
     static (Table) ("apply", Nil, Nil :: Table, effect = mutable) implements allocates (Table, "unit(0)", "unit(0)", ${array_empty[Tup2[String, ForgeArray[String]]](unit(0))})
     static (Table) ("apply", Nil, (MInt, MInt, MArray(Tuple2(MString, MArray(MString)))) :: Table, effect = mutable) implements allocates (Table, ${$0}, ${$1}, ${$2})
     static (Table) ("fromFile", Nil, (MString, MString ==> MBoolean) :: Table) implements single ${
@@ -75,7 +75,7 @@ trait WranglerTableOps {
           }
         })
 
-        Table.apply(numColsInNewTable, table_num_rows($self), newData)
+        Table(numColsInNewTable, table_num_rows($self), newData)
       }
 
       infix ("Translate") (MethodSignature(List(("direction", MString, "\"left\"")), Table)) implements composite ${
@@ -86,7 +86,7 @@ trait WranglerTableOps {
           tuple($self, get_col_name($self, c), newCol)
         })
 
-        Table.apply(numCurrCols, numCurrRows, newData)
+        Table(numCurrCols, numCurrRows, newData)
       }
 
       infix ("Fill") (MethodSignature(List(("direction", MString, "\"down\"")), Table)) implements composite ${
@@ -97,7 +97,7 @@ trait WranglerTableOps {
           tuple($self, get_col_name($self, c), newCol)
         })
 
-        Table.apply(numCurrCols, numCurrRows, newData)
+        Table(numCurrCols, numCurrRows, newData)
       }
 
       infix ("Drop") (("colName" -> MString) :: Table) implements composite ${
@@ -109,7 +109,7 @@ trait WranglerTableOps {
           else tuple($self, data(c + 1)._1, data(c + 1)._2)
         })
 
-        Table.apply(numCurrCols - 1, table_num_rows($self), newData)
+        Table(numCurrCols - 1, table_num_rows($self), newData)
       }
 
       infix ("SetName") (("currColName" -> MString, "newColName" -> MString) :: Table) implements composite ${
@@ -120,7 +120,7 @@ trait WranglerTableOps {
           else data(c)
         })
 
-        Table.apply(table_num_cols($self), table_num_rows($self), newData)
+        Table(table_num_cols($self), table_num_rows($self), newData)
       }
 
       infix ("Filter") (("cond" -> Condition) :: Table) implements composite ${
@@ -145,7 +145,7 @@ trait WranglerTableOps {
         })
 
         val numRowsInNewTable = array_length(indicesOfFilteredRows)
-        Table.apply(table_num_cols($self), numRowsInNewTable, newData)
+        Table(table_num_cols($self), numRowsInNewTable, newData)
       }
 
       infix ("Transpose") (MethodSignature(List(("incCurrHeadersAsCol", MBoolean, "true")), Table)) implements composite ${
@@ -155,7 +155,7 @@ trait WranglerTableOps {
           tuple($self, colName, transpose_row($self, r))
         })
 
-        Table.apply(numOfColsInNewTable, table_num_rows($self), newData)
+        Table(numOfColsInNewTable, table_num_rows($self), newData)
       }
 
       infix ("Merge") (MethodSignature(List(("colNames", MArray(MString)), ("delimiter", MString, "\" \"")), Table)) implements composite ${
@@ -171,7 +171,7 @@ trait WranglerTableOps {
           }
         })
 
-        Table.apply(numCurrCols + 1, table_num_rows($self), newData)
+        Table(numCurrCols + 1, table_num_rows($self), newData)
       }
 
       // ASSUMPTIONS:
@@ -229,7 +229,7 @@ trait WranglerTableOps {
           else expandedNonSelCols(c - numSelRows - 1)
         })
 
-        Table.apply(numColsInNewTable, numRowsInNewTable, newData)
+        Table(numColsInNewTable, numRowsInNewTable, newData)
       }
 
       // DEPRECATED: This implementation uses a hash map which is not thread safe. Need to rewrite the function using groupBy.
@@ -293,7 +293,7 @@ trait WranglerTableOps {
           array_update(colInNewTable, i, measureCol(r))
         })
 
-        Table.apply(numColsInNewTable, numRowsInNewTable, newData)
+        Table(numColsInNewTable, numRowsInNewTable, newData)
       }
       */
 
@@ -332,8 +332,8 @@ trait WranglerTableOps {
 
     	//getter and setter functions
     	compiler ("table_data") (Nil :: MArray(Tuple2(MString, MArray(MString)))) implements getter(0, "data")
-    	compiler ("table_num_cols") (Nil :: MInt) implements getter(0, "num_cols")
-      compiler ("table_num_rows") (Nil :: MInt) implements getter(0, "num_rows")
+    	compiler ("table_num_cols") (Nil :: MInt) implements getter(0, "numCols")
+      compiler ("table_num_rows") (Nil :: MInt) implements getter(0, "numRows")
 
   		compiler ("get_column_by_name") (MString :: MArray(MString)) implements composite ${
         val data = table_data($self)

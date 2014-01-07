@@ -47,18 +47,6 @@ trait GraphOps{
       }
       infix ("numNodes")(Nil :: MInt) implements getter(0,"_numNodes")
 
-      /*
-      //an operation performed over all nodes in graph, producing and array of data for each node
-      infix("nodes")( (Node==>NodeData(R)) :: NodeData(NodeData(R)), TFractional(R), addTpePars=R,effect=simple) implements composite ${
-        val ndes = NodeIdView(getHashMapKeys($self),$self.numNodes)
-        var node_comp = NodeData[NodeData[R]]($self.numNodes())
-        ndes.foreach{n =>
-          node_comp(n) = $1(Node(n))
-        }
-        node_comp
-      }
-      */
-
       //overloaded this method for pagerank, gets funky when you have NodeData(NodeData) like above
       infix("nodes")( (Node==>R) :: NodeData(R), addTpePars=R,effect=simple) implements composite ${
         val ndes = NodeIdView(getHashMapKeys($self),$self.numNodes)
@@ -72,16 +60,34 @@ trait GraphOps{
       //If i do just up neighbors I can't use a view and it will be more expensive
       //cannot perform a filter on a view class for some reason
       //I see good reason to not split this up here
-      infix ("sumUpNbrs") ( (Node,NodeData(MInt),MInt==>R) :: R, TFractional(R), addTpePars=R) implements composite ${
-        val inNbrs = $self.inNbrs($1)
+      infix ("sumUpNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
+        val inNbrs = $self.inNbrs(n)
         //only sum the outNeighbors a level up
-        sum(inNbrs,$3,e => $2(e)==($2($1.id)-1))
+        sum(inNbrs)(data){e => level(e)==(level(n.id)-1)}
       }
       //FIXME: hardcoded in not to sum the root
-      infix ("sumDownNbrs") ( (Node,NodeData(MInt),MInt==>R) :: R, TFractional(R), addTpePars=R) implements composite ${
-        val outNbrs = $self.outNbrs($1)
+      infix ("sumDownNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
+        val outNbrs = $self.outNbrs(n)
         //only sum the outNeighbors a level up
-        sum(outNbrs,$3,e => ($2(e)==($2($1.id)+1)) && ($2($1.id)!=1))
+        sum(outNbrs)(data){e => (level(e)==(level(n.id)+1))}
+      }
+      infix ("outDegree") (Node :: MInt) implements single ${
+        val id = $1.id
+        var end = array_length(out_edge_raw_data($self))
+        var start = out_node_apply($self,id)
+        if( (id+1) < array_length(out_node_raw_data($self)) ) {
+          end = out_node_apply($self,(id+1))
+        }
+        end - start 
+      }
+      infix ("inDegree") (Node :: MInt) implements single ${
+        val id = $1.id
+        var end = array_length(in_edge_raw_data($self))
+        var start = in_node_apply($self,id)
+        if( (id+1) < array_length(in_node_raw_data($self)) ) {
+          end = in_node_apply($self,(id+1))
+        }
+        end - start 
       }
       //get out neighbors
       infix ("outNbrs") (Node :: NodeDataView(MInt)) implements composite ${
@@ -90,11 +96,11 @@ trait GraphOps{
           var start = out_node_apply($self,id)
           var end = array_length(out_edge_raw_data($self))
           if( (id+1) < array_length(out_node_raw_data($self)) ) { 
-              end = out_node_apply($self,(id+1))
+            end = out_node_apply($self,(id+1))
           }
           if(start == -1 || end == -1){
-              start = 0
-              end = 0
+            start = 0
+            end = 0
           }
           NodeDataView[Int](out_edge_raw_data($self),start,1,end-start)
       }
@@ -114,16 +120,9 @@ trait GraphOps{
           }
           NodeDataView[Int](in_edge_raw_data($self),start,1,end-start)
       }
-    
-      /*
-      //take in array view, filter it down to just nodes at a level down
-      infix ("level_neighbors") ( (NodeDataView(MInt),GraphCollection(MInt),MInt) :: GraphCollection(MInt)) implements composite ${
-          $1.filter{ e => $2(e)==$3 }
-      }
-      */
 
       //perform BF traversal
-      infix ("inBFOrder") ( (Node, ((Node,NodeData(R),NodeData(MInt)) ==> R), ((Node,NodeData(R),NodeData(R),NodeData(MInt)) ==> R) ) :: NodeData(R), TFractional(R), addTpePars=R, effect=simple) implements composite ${
+      infix ("inBFOrder") ( CurriedMethodSignature(List(Node,((Node,NodeData(R),NodeData(MInt)) ==> R),((Node,NodeData(R),NodeData(R),NodeData(MInt)) ==> R)),NodeData(R)), TFractional(R), addTpePars=R, effect=simple) implements composite ${
         val levelArray = NodeData[Int]($self.numNodes)
         val bitMap = AtomicIntArray($self.numNodes)
         val nodes = NodeIdView(getHashMapKeys($self),$self.numNodes) 
@@ -215,10 +214,14 @@ trait GraphOps{
       compiler ("in_edge_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_inEdges")
       compiler("in_edge_apply")(MInt :: MInt) implements composite ${array_apply(in_edge_raw_data($self),$1)}
     }
+    //math_object_abs only works for a type of Double
+    direct(Graph) ("abs", Nil, MDouble :: MDouble) implements single ${math_object_abs($0)}
+    direct(Graph) ("abs", Nil, NodeData(MDouble) :: NodeData(MDouble)) implements single ${$0.map(e => math_object_abs(e))}
+
     //a couple of sum methods
-    direct(Graph) ("sum", R, (NodeDataView(MInt), MInt==>R ,MInt==>MBoolean) :: R, TFractional(R)) implements composite ${
-      $0.mapreduce[R]( e => $1(e), (a,b) => a+b, $2)
-    }
+    direct(Graph) ("sum", R, NodeData(R) :: R, TNumeric(R)) implements single ${$0.reduce((a,b) => a+b)}
+    direct(Graph) ("sum", R, CurriedMethodSignature(List(("nd_view",NodeDataView(MInt)), ("data",MInt==>R) ,("cond",MInt==>MBoolean)),R), TNumeric(R)) implements single ${nd_view.mapreduce[R]( e => data(e), (a,b) => a+b, cond)}
+    
     direct(Graph) ("sum", R, NodeData(NodeData(R)) :: NodeData(R), TFractional(R)) implements composite ${
       //FIXME: HACK
       //this does not work in library but we knew that.
@@ -226,7 +229,7 @@ trait GraphOps{
       var result = $0(0)
       var i = 1
       while(i<$0.length){
-        result = result.zip($0(i))
+        result = result+($0(i))
         i += 1
       }
       result

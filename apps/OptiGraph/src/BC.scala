@@ -18,24 +18,28 @@ trait BC extends OptiGraphApplication {
 		println("Number of Nodes: " + g.numNodes)
 		
 		//you can't input 0 as a start node ID
-		//there is an issue with directed versus undirected right now
+		//patch up undirected versus directed
+		//rbfs flag?
 		println("performing Betweeness Centrality")
 		tic("bc")
     //FIXME: throws an error if you take out explicit type, why?
 		val bc = sum( g.nodes(
 			{ n =>
-  			g.inBFOrder(n,{ (bfs_node:Rep[Node],sigma:Rep[NodeData[Double]],levelArray:Rep[NodeData[Int]]) =>
-      				if(bfs_node.id==n.id){1.0}
-      				else{g.sumUpNbrs(bfs_node,levelArray,{w => sigma(w)})}
-          },
-  				{(rbfs_node:Rep[Node],sigma:Rep[NodeData[Double]],delta:Rep[NodeData[Double]],levelArray:Rep[NodeData[Int]]) => 
-              g.sumDownNbrs(rbfs_node,levelArray, {w => (sigma(rbfs_node.id)/ sigma(w))*(1.0+delta(w)) })
-          })
+  			g.inBFOrder(n){ (bfsNode:Rep[Node],sigma:Rep[NodeData[Double]],levelArray:Rep[NodeData[Int]]) =>
+    				if(bfsNode.id==n.id){1.0}
+    				else{g.sumUpNbrs(bfsNode,levelArray){w => sigma(w)}}
+          }
+  				{(rbfsNode:Rep[Node],sigma:Rep[NodeData[Double]],delta:Rep[NodeData[Double]],levelArray:Rep[NodeData[Int]]) => 
+            if(levelArray(rbfsNode.id)!=1){ g.sumDownNbrs(rbfsNode,levelArray){w => 
+            	(sigma(rbfsNode.id)/ sigma(w))*(1.0+delta(w))}
+          	}
+          	else{0.0}
+          }
 		  }
     ))
-
+	
 		toc("bc")
-		writeBCResults("bc.txt",g,bc)
+		writeResults("bc.txt",g,bc)
 	}
 	def printUsage = {
     println("Usage: Q1 <path to input edge list file>")

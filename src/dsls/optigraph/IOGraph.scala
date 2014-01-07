@@ -18,7 +18,7 @@ trait IOGraphOps {
   	val NodeData = lookupTpe("NodeData")
   	val T = tpePar("T")
 
-    direct (IO) ("writeBCResults", T, (("path",MString),("graph",Graph),("data",NodeData(T))) :: MUnit, TNumeric(T), effect = simple) implements composite ${
+    direct (IO) ("writeResults", T, (("path",MString),("graph",Graph),("data",NodeData(T))) :: MUnit, TNumeric(T), effect = simple) implements composite ${
     	val ids = $graph.getOrderedNodeIDs
     	writeGraphData($path,ids,data.getRawDataArray,$data.length)
     }
@@ -95,7 +95,6 @@ trait IOGraphOps {
           src_edge_place += 1
         }
         //
-        //Forge error?  it seems to never create a symbol for dst_tmp here which is annoying
         val dst_tmp = dst_buckets(node_place).map({e => elems(e)})
         dst_node_array(node_place+1) = dst_buckets(node_place).map({e => elems(e)}).length + dst_node_array(node_place)
         dst_buckets(node_place).map({e => elems(e)}).forloop{ edge =>

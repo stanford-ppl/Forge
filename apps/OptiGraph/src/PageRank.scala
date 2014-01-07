@@ -22,20 +22,24 @@ trait PageRank extends OptiGraphApplication {
 		println("performing Betweeness Centrality")
 		tic("PageRank")
 
-    
-    val prInit = NodeData[Double](g.numNodes)
-    val threshold = 0.0
-    val damp = 0.0 
+    //matches parameters from snap
+    //initalize array to 1/numNodes
+    val prInit = (NodeData[Double](g.numNodes)).map(e => 1.0/g.numNodes)
+    val threshold = 0.0001 
+    val damp = 0.85
+    val maxItr = 100 
 
     val pr =
-     untilconverged(prInit, tol=threshold,minIter=1,maxIter=1000){  oldPr:Rep[NodeData[Double]] =>
-        g.nodes({ n =>
-           ((1.0 - damp) / g.numNodes) + damp * sum(g.inNbrs(n),{w => oldPr(w) / 3},{n =>true}) //need method for outDegree
+     untilconverged(prInit, tol=threshold,maxIter=maxItr){ oldPr =>
+      g.nodes({ n =>
+        oldPr.print
+        ((1.0 - damp) / g.numNodes) + damp * sum(g.inNbrs(n)){w => 
+          oldPr(w) / g.outDegree(Node(w))}{n =>true} 
         })
-    }{ (curPr:Rep[NodeData[Double]],oldPr:Rep[NodeData[Double]]) => damp-threshold } //need to add in sum and abs
+    }{(curPr,oldPr) => sum(abs(curPr-oldPr))}
     
 		toc("PageRank")
-		//writePageRankResults("PageRank.txt",g,pr)
+		writeResults("PageRank.txt",g,pr)
 	}
 	def printUsage = {
     println("Usage: Q1 <path to input edge list file>")

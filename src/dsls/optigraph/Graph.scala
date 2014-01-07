@@ -42,19 +42,31 @@ trait GraphOps{
       //given an ID return a node
       infix("getNodeFromID")(MInt :: Node) implements composite ${
           val internalID = getInternalID($self,$1)
-          if(internalID >= $self.getNumNodes() || internalID < 0) fatal("ERROR. ID: " + $1 + " does not exist in this graph!")
+          if(internalID >= $self.numNodes() || internalID < 0) fatal("ERROR. ID: " + $1 + " does not exist in this graph!")
           Node(internalID)
       }
-      infix ("getNumNodes")(Nil :: MInt) implements getter(0,"_numNodes")
+      infix ("numNodes")(Nil :: MInt) implements getter(0,"_numNodes")
 
+      /*
       //an operation performed over all nodes in graph, producing and array of data for each node
-      infix("nodes")( (Node==>NodeData(R)) :: NodeData(NodeData(R)), TNumeric(R), addTpePars=R,effect=simple) implements composite ${
-        val ndes = NodeIdView(getHashMapKeys($self),$self.getNumNodes)
-        var bc_real = NodeData[NodeData[R]]($self.getNumNodes())
+      infix("nodes")( (Node==>NodeData(R)) :: NodeData(NodeData(R)), TFractional(R), addTpePars=R,effect=simple) implements composite ${
+        val ndes = NodeIdView(getHashMapKeys($self),$self.numNodes)
+        var node_comp = NodeData[NodeData[R]]($self.numNodes())
         ndes.foreach{n =>
-          bc_real(n) = $1(Node(n))
+          node_comp(n) = $1(Node(n))
         }
-        bc_real
+        node_comp
+      }
+      */
+
+      //overloaded this method for pagerank, gets funky when you have NodeData(NodeData) like above
+      infix("nodes")( (Node==>R) :: NodeData(R), addTpePars=R,effect=simple) implements composite ${
+        val ndes = NodeIdView(getHashMapKeys($self),$self.numNodes)
+        var node_comp = NodeData[R]($self.numNodes())
+        ndes.foreach{n =>
+          node_comp(n) = $1(Node(n))
+        }
+        node_comp
       }
 
       //If i do just up neighbors I can't use a view and it will be more expensive
@@ -112,11 +124,11 @@ trait GraphOps{
 
       //perform BF traversal
       infix ("inBFOrder") ( (Node, ((Node,NodeData(R),NodeData(MInt)) ==> R), ((Node,NodeData(R),NodeData(R),NodeData(MInt)) ==> R) ) :: NodeData(R), TFractional(R), addTpePars=R, effect=simple) implements composite ${
-        val levelArray = NodeData[Int]($self.getNumNodes)
-        val bitMap = AtomicIntArray($self.getNumNodes)
-        val nodes = NodeIdView(getHashMapKeys($self),$self.getNumNodes) 
-        val forwardComp = NodeData[R]($self.getNumNodes)
-        val reverseComp = NodeData[R]($self.getNumNodes)
+        val levelArray = NodeData[Int]($self.numNodes)
+        val bitMap = AtomicIntArray($self.numNodes)
+        val nodes = NodeIdView(getHashMapKeys($self),$self.numNodes) 
+        val forwardComp = NodeData[R]($self.numNodes)
+        val reverseComp = NodeData[R]($self.numNodes)
 
         levelArray($1.id) = 1
         set(bitMap,$1.id,1)
@@ -155,10 +167,10 @@ trait GraphOps{
       //sorts it by internal place, essentially reverses the hashmap
       infix ("getOrderedNodeIDs") (Nil :: MArray(MInt)) implements composite ${
         var i = 0
-        val ordered_ids = NodeData[Int]($self.getNumNodes)
+        val ordered_ids = NodeData[Int]($self.numNodes)
         val keys = getHashMapKeys($self)
         val hash = getIDHashMap($self)
-        while(i < $self.getNumNodes){
+        while(i < $self.numNodes){
           ordered_ids(hash(keys(i))) = keys(i)
           i += 1
         }
@@ -219,5 +231,26 @@ trait GraphOps{
       }
       result
     }
+    // "block" should not mutate the input, but always produce a new copy. in this version, block can change the structure of the input across iterations (e.g. increase its size)
+    direct (Graph) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, ".001"), ("minIter", MInt, "1"), ("maxIter", MInt, "1000")), ("block", T ==> T), ("diff", (T,T) ==> MDouble)), T)) implements composite ${
+      var delta = scala.Double.MaxValue
+      var cur = x
+      var iter = 0
+
+      while ((math_object_abs(delta) > tol && iter < maxIter) || iter < minIter) {
+        val prev = cur
+        val next = block(cur)
+        iter += 1
+        delta = diff(prev,next)
+        cur = next
+      }
+
+      if (iter == maxIter){
+        println("Maximum iterations exceeded")
+      }
+
+      cur
+    }
+
   } 
 }

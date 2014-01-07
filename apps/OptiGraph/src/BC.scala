@@ -15,7 +15,7 @@ trait BC extends OptiGraphApplication {
 		val g = graphFromEdgeList(args(0)) 
 		
 		println("Directed: " + g.isDirected)
-		println("Number of Nodes: " + g.getNumNodes)
+		println("Number of Nodes: " + g.numNodes)
 		
 		//you can't input 0 as a start node ID
 		//there is an issue with directed versus undirected right now
@@ -32,7 +32,7 @@ trait BC extends OptiGraphApplication {
               g.sumDownNbrs(rbfs_node,levelArray, {w => (sigma(rbfs_node.id)/ sigma(w))*(1.0+delta(w)) })
           })
 		  }
-    ) )
+    ))
 
 		toc("bc")
 		writeBCResults("bc.txt",g,bc)

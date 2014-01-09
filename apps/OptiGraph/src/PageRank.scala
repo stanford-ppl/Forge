@@ -29,17 +29,17 @@ trait PageRank extends OptiGraphApplication {
     val damp = 0.85
     val maxItr = 100 
 
+    //FIXME: take out condition on sum, overloading doesn't seem to work
     val pr =
      untilconverged(prInit, tol=threshold,maxIter=maxItr){ oldPr =>
       g.nodes({ n =>
-        oldPr.print
         ((1.0 - damp) / g.numNodes) + damp * sum(g.inNbrs(n)){w => 
           oldPr(w) / g.outDegree(Node(w))}{n =>true} 
         })
     }{(curPr,oldPr) => sum(abs(curPr-oldPr))}
     
 		toc("PageRank")
-		writeResults("PageRank.txt",g,pr)
+		writeResults("pageRank.txt",g,pr)
 	}
 	def printUsage = {
     println("Usage: Q1 <path to input edge list file>")

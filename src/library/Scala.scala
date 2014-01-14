@@ -582,7 +582,8 @@ trait ScalaOps {
     infix (HashMapOps) ("update", (K,V), (SHashMap, K, V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $0.put($1,$2); () })
     infix (HashMapOps) ("contains", (K,V), (SHashMap, K) :: MBoolean) implements codegen($cala, ${ $0.contains($1) })
     // can we avoid the toArray?
-    infix (HashMapOps) ("keys", (K,V), SHashMap :: MArray(K)) implements codegen($cala, ${ $0.keySet.toArray })
+    infix (HashMapOps) ("keys", (K,V), SHashMap :: MArray(K)) implements codegen($cala, ${ $0.keys.toArray })
+    infix (HashMapOps) ("values", (K,V), SHashMap :: MArray(V)) implements codegen($cala, ${ $0.values.toArray })
     // infix ("keys") (Nil :: MArray(K)) implements codegen($cala, ${ scala.collection.JavaConverters.asScalaSetConverter($self.keySet).asScala.toArray })
   }
 }

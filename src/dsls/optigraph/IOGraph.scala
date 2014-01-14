@@ -49,6 +49,14 @@ trait IOGraphOps {
       }
       //contains the input tuples
       val edge_data = NodeData(input_edges_hack)
+      
+      val ed = NodeData(input_edges_hack)
+      var tt = 0
+      val src_ids = array_map[Tup2[Int,Int],Int](input_edges, e => e._1)
+      val dst_ids = array_map[Tup2[Int,Int],Int](input_edges, e => e._2)
+      //val comb = NodeData()
+      //alloc an array twice the size of these and then 
+
       /////////////////////////////////////////////////////////////
       //first figure out how many nodes we have and grab them
       val elems = SHashMap[Int,Int]()

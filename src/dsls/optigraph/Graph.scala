@@ -220,7 +220,7 @@ trait GraphOps{
 
     //a couple of sum methods
     direct(Graph) ("sum", R, NodeData(R) :: R, TNumeric(R)) implements single ${$0.reduce((a,b) => a+b)}
-    direct(Graph) ("sum", R, CurriedMethodSignature(List(("nd_view",NodeDataView(MInt)), ("data",MInt==>R) ,("cond",MInt==>MBoolean)),R), TNumeric(R)) implements single ${nd_view.mapreduce[R]( e => data(e), (a,b) => a+b, cond)}
+    direct(Graph) ("sum", R, CurriedMethodSignature(List(("nd_view",NodeDataView(MInt)), ("data",MInt==>R) ,("cond",MInt==>MBoolean,"e => unit(true)")),R), TNumeric(R)) implements single ${nd_view.mapreduce[R]( e => data(e), (a,b) => a+b, cond)}
     
     direct(Graph) ("sum", R, NodeData(NodeData(R)) :: NodeData(R), TFractional(R)) implements composite ${
       //FIXME: HACK

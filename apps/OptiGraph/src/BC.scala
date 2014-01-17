@@ -12,17 +12,30 @@ trait BC extends OptiGraphApplication {
 	def main() = {
 		println("OptiGraph Test 1")
 		if (args.length < 1) printUsage
-		val g = graphFromEdgeList(args(0)) 
+		
+		/*
+		graphFromEdgeList(args(0))
+		//val g = graphFromEdgeList(args(0)) 
 		
 		println("Directed: " + g.isDirected)
 		println("Number of Nodes: " + g.numNodes)
-		
+ 
 		//you can't input 0 as a start node ID
 		//patch up undirected versus directed
 		//rbfs flag?
+		//val n = g.getNodeFromID(78)
 		println("performing Betweeness Centrality")
-		tic("bc")
+		tic(g)
+	*/
+
     //FIXME: throws an error if you take out explicit type, why?
+
+    //val nd = NodeData(array_buffer_result(map))
+    //nd.print
+    //val nd = NodeData[Int](10)
+    //val to = nd.map(e => nd)
+		//nd.print
+    /*
 		val bc = sum( g.nodes(
 			{ n =>
   			g.inBFOrder(n){ (bfsNode:Rep[Node],sigma:Rep[NodeData[Double]],levelArray:Rep[NodeData[Int]]) =>
@@ -37,9 +50,10 @@ trait BC extends OptiGraphApplication {
           }
 		  }
     ))
-	
-		toc("bc")
-		writeResults("bc.txt",g,bc)
+		*/
+		//toc(bc)
+		//writeResults("bc.txt",g,bc)
+		println("done")
 	}
 	def printUsage = {
     println("Usage: Q1 <path to input edge list file>")

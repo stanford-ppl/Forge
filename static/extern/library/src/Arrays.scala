@@ -5,6 +5,8 @@ import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common._
 
 trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
+  this: ForgeHashMapWrapper =>
+
   type ForgeArray[T] = scala.Array[T]
   implicit def forgeArrayManifest[T:Manifest] = manifest[Array[T]]
 
@@ -30,6 +32,14 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
     = __arg0.zip(__arg1).map(t => __arg2(t._1,t._2))
   def array_reduce[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: (Rep[T],Rep[T]) => Rep[T],__arg2: Rep[T])(implicit __imp0: SourceContext): Rep[T]
     = if (array_length(__arg0) == 0) __arg2 else __arg0.reduce(__arg1)
+  def array_groupByReduce[T:Manifest,K:Manifest,V:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[T] => Rep[K], __arg2: Rep[T] => Rep[V], __arg3: (Rep[V],Rep[V]) => Rep[V])(implicit __imp0: SourceContext): Rep[ForgeHashMap[K,V]] = {
+    val grp = __arg0.groupBy[K](__arg1)
+    val hm = scala.collection.mutable.HashMap[K,V]()
+    grp.foreach{ a =>
+      hm.put(a._1,array_map(a._2,__arg2).reduce(__arg3))
+    }
+    hm
+  }
   def array_filter[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[T] => Rep[Boolean])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = __arg0.filter(__arg1)
   def array_sort[T:Manifest:Ordering](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]] = {
@@ -53,13 +63,17 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
 }
 
 trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
-  this: ForgeArrayWrapper =>
+  this: ForgeArrayWrapper with ForgeHashMapWrapper =>
 
   type ForgeArrayBuffer[T] = scala.collection.mutable.ArrayBuffer[T]
   implicit def forgeArrayBufferManifest[T:Manifest] = manifest[ForgeArrayBuffer[T]]
 
   def array_buffer_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
     = (new scala.collection.mutable.ArrayBuffer[T]()) ++ (new Array[T](__arg0))
+  def array_buffer_strict_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
+    = (new scala.collection.mutable.ArrayBuffer[T]()) ++ (new Array[T](__arg0))
+  def array_buffer_from_array_immutable[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
+    = (new scala.collection.mutable.ArrayBuffer[T]()) ++ (__arg0.toArray)
   def array_buffer_copy[T:Manifest](src: Rep[ForgeArrayBuffer[T]], srcPos: Rep[Int], dest: Rep[ForgeArrayBuffer[T]], destPos: Rep[Int], length: Rep[Int])(implicit __imp0: SourceContext): Rep[Unit] = {
     for (i <- 0 until length) {
       dest(destPos+i) = src(srcPos+i)
@@ -77,8 +91,16 @@ trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
     = { __arg0 += __arg1 }
   def array_buffer_indexof[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[T])(implicit __imp0: SourceContext): Rep[Int]
     = __arg0.indexOf(__arg1)
-   def array_buffer_result[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+  def array_buffer_result[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = __arg0.toArray
+  def array_buffer_map[T:Manifest,R:Manifest](__arg0: Rep[ForgeArrayBuffer[T]], __arg1: Rep[T] => Rep[R])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[R]]
+    = __arg0.map(__arg1)
+  def array_buffer_flatmap[T:Manifest,R:Manifest](__arg0: Rep[ForgeArrayBuffer[T]], __arg1: Rep[T] => Rep[ForgeArrayBuffer[R]])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[R]]
+    = __arg0.flatMap(__arg1)
+  def array_buffer_groupBy[T:Manifest,K:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[T] => Rep[K])(implicit __imp0: SourceContext): Rep[ForgeHashMap[K,ForgeArrayBuffer[T]]] ={
+    val grp = __arg0.groupBy[K](__arg1)
+    (new scala.collection.mutable.HashMap[K,ForgeArrayBuffer[T]]()) ++ (grp)
+  }
 }
 
 

@@ -10,7 +10,7 @@ import ppl.delite.framework.Config
 
 // For compiler (Delite) implementation
 trait ForgeArrayOpsExp extends DeliteArrayFatExp {
-  this: DeliteOpsExp =>
+  this: DeliteOpsExp with ForgeHashMapOpsExp =>
 
   type ForgeArray[T] = DeliteArray[T]
   implicit def forgeArrayManifest[T:Manifest] = manifest[DeliteArray[T]]
@@ -40,6 +40,8 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
     = darray_zipwith(__arg0,__arg1,__arg2)
   def array_reduce[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: (Rep[T],Rep[T]) => Rep[T],__arg2: Rep[T])(implicit __imp0: SourceContext): Rep[T]
     = darray_reduce(__arg0,__arg1,__arg2)
+  def array_groupByReduce[T:Manifest,K:Manifest,V:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[T] => Rep[K], __arg2: Rep[T] => Rep[V], __arg3: (Rep[V],Rep[V]) => Rep[V])(implicit __imp0: SourceContext): Rep[ForgeHashMap[K,V]]
+    = darray_groupByReduce(__arg0,__arg1,__arg2,__arg3)
   def array_filter[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[T] => Rep[Boolean])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = darray_filter(__arg0,__arg1)
   def array_sort[T:Manifest:Ordering](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
@@ -116,13 +118,17 @@ trait CGenForgeArrayOps extends CGenDeliteArrayOps with CGenObjectOps {
 
 
 trait ForgeArrayBufferOpsExp extends DeliteArrayBufferOpsExp {
-  this: ForgeArrayOpsExp with DeliteArrayOpsExpOpt with DeliteOpsExp with DeliteMapOpsExp =>
+  this: ForgeArrayOpsExp with DeliteArrayOpsExpOpt with DeliteOpsExp with DeliteMapOpsExp with ForgeHashMapOpsExp =>
 
   type ForgeArrayBuffer[T] = DeliteArrayBuffer[T]
   implicit def forgeArrayBufferManifest[T:Manifest] = manifest[DeliteArrayBuffer[T]]
 
   def array_buffer_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
     = darray_buffer_new[T](__arg0)
+  def array_buffer_strict_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
+    = darray_buffer_new[T](__arg0,__arg0)
+  def array_buffer_from_array_immutable[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
+    = darray_buffer_new_imm[T](__arg0,array_length(__arg0))
   def array_buffer_copy[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[Int],__arg2: Rep[ForgeArrayBuffer[T]],__arg3: Rep[Int],__arg4: Rep[Int])(implicit __imp0: SourceContext): Rep[Unit]
     = darray_copy(darray_buffer_raw_data(asDeliteArrayBuffer(__arg0)), __arg1, darray_buffer_raw_data(asDeliteArrayBuffer(__arg2)), __arg3, __arg4)
   def array_buffer_update[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[Int],__arg2: Rep[T])(implicit __imp0: SourceContext): Rep[Unit]
@@ -139,6 +145,13 @@ trait ForgeArrayBufferOpsExp extends DeliteArrayBufferOpsExp {
     = throw new UnsupportedOperationException("DeliteArrayBuffer indexOf not implemented yet")
   def array_buffer_result[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = darray_buffer_result(__arg0)
+  def array_buffer_map[T:Manifest,R:Manifest](__arg0: Rep[ForgeArrayBuffer[T]], __arg1: Rep[T] => Rep[R])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[R]]
+    = darray_buffer_map(__arg0,__arg1)
+  def array_buffer_flatmap[T:Manifest,R:Manifest](__arg0: Rep[ForgeArrayBuffer[T]], __arg1: Rep[T] => Rep[ForgeArrayBuffer[R]])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[R]]
+    = darray_buffer_flatmap(__arg0,__arg1)
+  def array_buffer_groupBy[T:Manifest,K:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[T] => Rep[K])(implicit __imp0: SourceContext): Rep[ForgeHashMap[K,ForgeArrayBuffer[T]]]
+    = darray_buffer_groupBy(__arg0,__arg1)
+
 }
 trait ScalaGenForgeArrayBufferOps extends ScalaGenDeliteArrayBufferOps with ScalaGenOrderingOps with ScalaGenPrimitiveOps with ScalaGenObjectOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp }
 trait CudaGenForgeArrayBufferOps extends CudaGenDeliteArrayBufferOps with CudaGenOrderingOps with CudaGenPrimitiveOps with CudaGenObjectOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp }

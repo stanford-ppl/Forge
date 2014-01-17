@@ -68,7 +68,7 @@ trait GraphOps{
       //FIXME: hardcoded in not to sum the root
       infix ("sumDownNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
         val outNbrs = $self.outNbrs(n)
-        //only sum the outNeighbors a level up
+        //only sum the outNeighbors a level down
         sum(outNbrs)(data){e => (level(e)==(level(n.id)+1))}
       }
       infix ("outDegree") (Node :: MInt) implements single ${
@@ -91,34 +91,34 @@ trait GraphOps{
       }
       //get out neighbors
       infix ("outNbrs") (Node :: NodeDataView(MInt)) implements composite ${
-          val id = $1.id
-          //-1 implies no neighbors
-          var start = out_node_apply($self,id)
-          var end = array_length(out_edge_raw_data($self))
-          if( (id+1) < array_length(out_node_raw_data($self)) ) { 
-            end = out_node_apply($self,(id+1))
-          }
-          if(start == -1 || end == -1){
-            start = 0
-            end = 0
-          }
-          NodeDataView[Int](out_edge_raw_data($self),start,1,end-start)
+        val id = $1.id
+        //-1 implies no neighbors
+        var start = out_node_apply($self,id)
+        var end = array_length(out_edge_raw_data($self))
+        if( (id+1) < array_length(out_node_raw_data($self)) ) { 
+          end = out_node_apply($self,(id+1))
+        }
+        if(start == -1 || end == -1){
+          start = 0
+          end = 0
+        }
+        NodeDataView[Int](out_edge_raw_data($self),start,1,end-start)
       }
       
       //get in neighbors   
       infix ("inNbrs") (Node :: NodeDataView(MInt)) implements composite ${
-          val id = $1.id
-          //-1 implies no neighbors
-          var start = in_node_apply($self,id)
-          var end = array_length(in_edge_raw_data($self))
-          if( (id+1) < array_length(in_node_raw_data($self)) ) {   
-              end = in_node_apply($self,(id+1))
-          }
-          if(start == -1 || end == -1){
-              start = 0
-              end = 0
-          }
-          NodeDataView[Int](in_edge_raw_data($self),start,1,end-start)
+        val id = $1.id
+        //-1 implies no neighbors
+        var start = in_node_apply($self,id)
+        var end = array_length(in_edge_raw_data($self))
+        if( (id+1) < array_length(in_node_raw_data($self)) ) {   
+            end = in_node_apply($self,(id+1))
+        }
+        if(start == -1 || end == -1){
+            start = 0
+            end = 0
+        }
+        NodeDataView[Int](in_edge_raw_data($self),start,1,end-start)
       }
 
       //perform BF traversal
@@ -173,7 +173,7 @@ trait GraphOps{
           ordered_ids(hash(keys(i))) = keys(i)
           i += 1
         }
-        ordered_ids.getRawDataArray
+        ordered_ids.getRawArray
       }
       //gets the hash map stored
       compiler ("getHashMapKeys") (Nil :: MArray(MInt)) implements composite ${
@@ -214,24 +214,26 @@ trait GraphOps{
       compiler ("in_edge_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_inEdges")
       compiler("in_edge_apply")(MInt :: MInt) implements composite ${array_apply(in_edge_raw_data($self),$1)}
     }
+  
     //math_object_abs only works for a type of Double
     direct(Graph) ("abs", Nil, MDouble :: MDouble) implements single ${math_object_abs($0)}
     direct(Graph) ("abs", Nil, NodeData(MDouble) :: NodeData(MDouble)) implements single ${$0.map(e => math_object_abs(e))}
 
     //a couple of sum methods
     direct(Graph) ("sum", R, NodeData(R) :: R, TNumeric(R)) implements single ${$0.reduce((a,b) => a+b)}
-    direct(Graph) ("sum", R, CurriedMethodSignature(List(("nd_view",NodeDataView(MInt)), ("data",MInt==>R) ,("cond",MInt==>MBoolean,"e => unit(true)")),R), TNumeric(R)) implements single ${nd_view.mapreduce[R]( e => data(e), (a,b) => a+b, cond)}
-    
+    direct(Graph) ("sum", R, CurriedMethodSignature(List(("nd_view",NodeDataView(MInt)), ("data",MInt==>R) ,("cond",MInt==>MBoolean)),R), TNumeric(R)) implements composite ${nd_view.mapreduce[R]( e => data(e), (a,b) => a+b, cond)}
     direct(Graph) ("sum", R, NodeData(NodeData(R)) :: NodeData(R), TFractional(R)) implements composite ${
       //FIXME: HACK
       //this does not work in library but we knew that.
-      //val result = $0.reduceND( ((a,b) => a.zip(b)),NodeData[R](0))
+      val result = $0.reduceND( ((a,b) => a.+(b)),NodeData[R](0))
+      /*
       var result = $0(0)
       var i = 1
       while(i<$0.length){
         result = result+($0(i))
         i += 1
       }
+      */
       result
     }
     // "block" should not mutate the input, but always produce a new copy. in this version, block can change the structure of the input across iterations (e.g. increase its size)
@@ -254,6 +256,5 @@ trait GraphOps{
 
       cur
     }
-
   } 
 }

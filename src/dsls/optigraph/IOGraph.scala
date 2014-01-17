@@ -16,11 +16,13 @@ trait IOGraphOps {
     val IO = grp("GraphIO")
   	val Graph = lookupTpe("Graph")
   	val NodeData = lookupTpe("NodeData")
+    val NodeIdView = lookupTpe("NodeIdView")
+
   	val T = tpePar("T")
 
     direct (IO) ("writeResults", T, (("path",MString),("graph",Graph),("data",NodeData(T))) :: MUnit, TNumeric(T), effect = simple) implements composite ${
     	val ids = $graph.getOrderedNodeIDs
-    	writeGraphData($path,ids,data.getRawDataArray,$data.length)
+    	writeGraphData($path,ids,data.getRawArray,$data.length)
     }
     compiler (IO) ("writeGraphData", T, (("path",MString),("ids",MArray(MInt)),("data",MArray(T)),("length",MInt)) :: MUnit, TNumeric(T), effect = simple) implements codegen($cala, ${
       val xfs = new java.io.BufferedWriter(new java.io.FileWriter($path))
@@ -32,92 +34,57 @@ trait IOGraphOps {
       xfs.close()
     })
 
-  	direct (IO) ("graphFromEdgeList", Nil, MString :: Graph) implements composite ${
+  	direct (IO) ("graphFromEdgeList", Nil, MString :: MUnit) implements composite ${
+      /*
+      val ab = array_buffer_strict_empty[Int](10)
+      val map = array_buffer_map[Int,ForgeArrayBuffer[Int]](ab, e => array_buffer_strict_empty[Int](2))
+      println("map length: " + array_buffer_length(map))
+      println(array_buffer_apply(map,0))
+      */
+      val nd = NodeData[Int](10).map(e => 2)
+      val mp = nd.map(e => nd)
+      mp.print
+      
+      /*
       val input_edges = ForgeFileReader.readLines($0)({line =>
         //if(!line.startsWith("#")){
           val fields = line.fsplit("\t")
           pack(fields(0).toInt,fields(1).toInt) 
         //} 
       })
-
-      //FIXME: HACK
-      val input_edges_hack = array_buffer_empty[Tup2[Int,Int]](array_length(input_edges))
-      var i = 0
-      while(i < array_length(input_edges)){
-        array_buffer_update(input_edges_hack,i,input_edges(i))
-        i += 1
-      }
       //contains the input tuples
-      val edge_data = NodeData(input_edges_hack)
+      val edge_data = NodeData[Tup2[Int,Int]](input_edges)
       
-      val ed = NodeData(input_edges_hack)
-      var tt = 0
-      val src_ids = array_map[Tup2[Int,Int],Int](input_edges, e => e._1)
-      val dst_ids = array_map[Tup2[Int,Int],Int](input_edges, e => e._2)
-      //val comb = NodeData()
-      //alloc an array twice the size of these and then 
+      //concat source id's and destination id's then get distinct with groupbyreduce
+      val src_ids = NodeData(array_map[Tup2[Int,Int],Int](input_edges, e => e._1))
+      val dst_ids = NodeData(array_map[Tup2[Int,Int],Int](input_edges, e => e._2))
+      val concat = src_ids.concat(dst_ids)
+      val disct = fhashmap_keys(concat.groupByReduce[Int,Int](e => e, e => e, (a,b) => a))
+      val distinct_ids = NodeData(disct)
 
-      /////////////////////////////////////////////////////////////
-      //first figure out how many nodes we have and grab them
-      val elems = SHashMap[Int,Int]()
-
-      val src_buckets = NodeData[NodeData[Int]](edge_data.length*2)
-      val dst_buckets = NodeData[NodeData[Int]](edge_data.length*2)
-      var node_count = 0
-
-      edge_data.forloop{ ed =>
-        if(!elems.contains(ed._1)){
-          elems(ed._1) = node_count
-          src_buckets(node_count) = NodeData[Int](0)
-          dst_buckets(node_count) = NodeData[Int](0)
-          node_count += 1
-        }
-        if(!elems.contains(ed._2)){
-          elems(ed._2) = node_count
-          src_buckets(node_count) = NodeData[Int](0)
-          dst_buckets(node_count) = NodeData[Int](0)
-          node_count += 1
-        }
-        src_buckets(elems(ed._1)).append(ed._2)
-        dst_buckets(elems(ed._2)).append(ed._1)
+      //set up the ID hash map
+      val numNodes = distinct_ids.length
+      val hm = SHashMap[Int,Int]()
+      val idView = NodeIdView(distinct_ids.getRawArray,numNodes)
+      idView.foreach{ id => hm(distinct_ids(id)) = id}
+      val idHashMap = distinct_ids.groupByReduce[Int,Int](e => e, e => hm(e), (a,b) => a)
+      
+      val src_groups = edge_data.groupBy(e => e._1, e => e._2)
+      val src_keys = NodeData(fhashmap_keys(src_groups))
+      val src_edge_array = src_keys.flatMap(e => src_groups(e)).map{n => fhashmap_get(idHashMap,n)}
+      val src_node_array = NodeData[Int](numNodes+1)
+      
+      val dst_groups = edge_data.groupBy(e => e._2, e => e._1)
+      val dst_keys = NodeData(fhashmap_keys(dst_groups))
+      val dst_edge_array = dst_keys.flatMap(e => dst_groups(e)).map{n => fhashmap_get(idHashMap,n)}
+      val dst_node_array = NodeData[Int](numNodes+1)
+      distinct_ids.foreach{ id => 
+        src_node_array(fhashmap_get(idHashMap,id)+1) = array_buffer_length(fhashmap_get(src_groups,id)) + src_node_array(fhashmap_get(idHashMap,id))
+        dst_node_array(fhashmap_get(idHashMap,id)+1) = array_buffer_length(fhashmap_get(dst_groups,id)) + dst_node_array(fhashmap_get(idHashMap,id))
       }
-      src_buckets.resize(node_count)
-      dst_buckets.resize(node_count)
 
-      var node_place = 0
-      var src_edge_place = 0
-      val src_node_array = NodeData[Int](node_count+1)
-      val src_edge_array = NodeData[Int](edge_data.length)
-
-      var dst_edge_place = 0
-      val dst_node_array = NodeData[Int](node_count+1)
-      val dst_edge_array = NodeData[Int](edge_data.length)
-
-      //loops over all node ID's in hash map
-      while(node_place < node_count){
-        //////////////
-        val src_tmp = src_buckets(node_place).map({e => elems(e)})
-        src_node_array(node_place+1) = (src_node_array(node_place) + src_tmp.length)
-        src_tmp.forloop{ edge =>
-          src_edge_array(src_edge_place) = edge
-          src_edge_place += 1
-        }
-        //
-        val dst_tmp = dst_buckets(node_place).map({e => elems(e)})
-        dst_node_array(node_place+1) = dst_buckets(node_place).map({e => elems(e)}).length + dst_node_array(node_place)
-        dst_buckets(node_place).map({e => elems(e)}).forloop{ edge =>
-          dst_edge_array(dst_edge_place) = edge
-          dst_edge_place += 1
-        }  
-        ////////////////
-        node_place += 1
-      }
-      src_node_array.resize(node_count)
-      dst_node_array.resize(node_count)
-
-      val elems_tmp = fhashmap_from_shashmap[Int,Int](elems)
       println("finished file I/O")
-      Graph(true,node_count,elems_tmp,src_node_array.getRawDataArray,src_edge_array.getRawDataArray,dst_node_array.getRawDataArray,dst_edge_array.getRawDataArray)
+      Graph(true,numNodes,idHashMap,src_node_array.getRawArray,src_edge_array.getRawArray,dst_node_array.getRawArray,dst_edge_array.getRawArray)
     }
   }
 }

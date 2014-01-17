@@ -20,5 +20,5 @@ trait AtomicIntArrayOps {
     	direct (AtomicIntArray) ("get", Nil, (AArray,MInt) :: MInt) implements codegen($cala, ${$0.get($1)})
 	    direct (AtomicIntArray) ("testAndSetAtomic", Nil, (AArray,MInt,MInt,MInt) :: MBoolean, effect=write(0)) implements codegen($cala, ${$0.compareAndSet($1,$2,$3)})
 	    direct (AtomicIntArray) ("set", Nil, (AArray,MInt,MInt) :: MUnit, effect=write(0)) implements codegen($cala, ${$0.set($1,$2)})
-	}
+  }
 }

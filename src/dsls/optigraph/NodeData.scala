@@ -23,7 +23,7 @@ trait NodeDataOps {
 
 		data(NodeData,("_data",MArrayBuffer(T)))
 		static(NodeData)("apply", T, MInt :: NodeData(T), effect = mutable) implements allocates(NodeData,${array_buffer_strict_empty[T]($0)})
-		static(NodeData)("apply", T, MArray(T) :: NodeData(T)) implements allocates(NodeData,${array_buffer_from_array_immutable($0)})
+		static(NodeData)("apply", T, MArray(T) :: NodeData(T)) implements allocates(NodeData,${array_buffer_new_imm($0)})
 		static(NodeData)("apply", T, MArrayBuffer(T) :: NodeData(T)) implements allocates(NodeData,${$0})
 
 		val NodeDataOps = withTpe(NodeData)

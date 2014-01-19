@@ -35,17 +35,6 @@ trait IOGraphOps {
     })
 
   	direct (IO) ("graphFromEdgeList", Nil, MString :: MUnit) implements composite ${
-      /*
-      val ab = array_buffer_strict_empty[Int](10)
-      val map = array_buffer_map[Int,ForgeArrayBuffer[Int]](ab, e => array_buffer_strict_empty[Int](2))
-      println("map length: " + array_buffer_length(map))
-      println(array_buffer_apply(map,0))
-      */
-      val nd = NodeData[Int](10).map(e => 2)
-      val mp = nd.map(e => nd)
-      mp.print
-      
-      /*
       val input_edges = ForgeFileReader.readLines($0)({line =>
         //if(!line.startsWith("#")){
           val fields = line.fsplit("\t")

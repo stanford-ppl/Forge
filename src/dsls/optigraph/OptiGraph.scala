@@ -29,12 +29,9 @@ trait OptiGraphDSL extends ForgeApplication with NodeDataOps
     /**
      * The main portion of our DSL
      */
-     /*
     importNodeOps()
     importEdgeOps()
-    */
     importNodeDataOps()
-    /*
     importNodeDataArrayOps()
     importAtomicBooleanOps()
     importAtomicIntArrayOps()
@@ -42,6 +39,5 @@ trait OptiGraphDSL extends ForgeApplication with NodeDataOps
     importNodeIdViewOps()
     importGraphOps()
     importIOGraphOps()
-    */
   }
 } 

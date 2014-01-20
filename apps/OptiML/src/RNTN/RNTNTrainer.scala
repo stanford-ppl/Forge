@@ -162,8 +162,8 @@ trait RNTNTrainer extends OptiMLApplication with RNTNOps with Utilities {
 		val testIndices  = readIndices(DATASET + "_testIndices.csv")
 		val devIndices   = readIndices(DATASET + "_devIndices.csv")
 
-		val numPhrases = allTrees.map(t => t.map(l => l.getCol(WORD).max).max).max + 1  	// allPhrases.length
-		val numTrees   = allTrees.length
+		val numWords = allTrees.map(tree => tree.map(l => l.getCol(WORD).max).max).max + 1  	// allPhrases.length
+		val numTrees = allTrees.length
 
 		//val trainPhrases = phrases(trainIndices)
 		val trainTrees = allTrees(trainIndices)
@@ -172,7 +172,7 @@ trait RNTNTrainer extends OptiMLApplication with RNTNOps with Utilities {
 		//val testPhrases  = phrases(testIndices)
 		val testTrees  = allTrees(testIndices)
 
-		println("Data loaded. " + numTrees + " phrase trees with " + numPhrases + " total phrases")
+		println("Data loaded. " + numTrees + " phrase trees with " + numWords + " total words")
  
 		// -------------------------------------------------------------------------------------//
 		//								Init Weights (intParams.m)						  		//
@@ -205,49 +205,47 @@ trait RNTNTrainer extends OptiMLApplication with RNTNOps with Utilities {
 		val WtF = DenseMatrix.randn(WORDSIZE*sizeWt, sizeWt) * (2*rangeWt) - rangeWt
 
 		// weights associated with individual phrases
-		val WvF = DenseMatrix.randn(WORDSIZE, numPhrases) * 0.1
+		val WvF = DenseMatrix.randn(WORDSIZE, numWords) * 0.1
 
-		val Wc = WcF.map(d => floor(d*10000 + 0.5).toDouble/10000)
-		val W  = WF.map(d => floor(d*10000 + 0.5).toDouble/10000)
-		val Wt = WtF.map(d => floor(d*10000 + 0.5).toDouble/10000)
-		val Wv = WvF.map(d => floor(d*10000 + 0.5).toDouble/10000)
+		val Wc = WcF.map(d => floor(d*10000 + 0.5).toDouble/10000).mutable
+		val W  = WF.map(d => floor(d*10000 + 0.5).toDouble/10000).mutable
+		val Wt = WtF.map(d => floor(d*10000 + 0.5).toDouble/10000).mutable
+		val Wv = WvF.map(d => floor(d*10000 + 0.5).toDouble/10000).mutable
 
-		//writeMatrix(Wcat, OUTPUT + "Wc_init.txt", delim)
-		//writeMatrix(W, OUTPUT + "W_init.txt", delim)
+		//writeMatrix(Wc, OUTPUT + "Wc_init.txt", delim)
+		//writeMatrix(W,  OUTPUT + "W_init.txt", delim)
 		//writeMatrix(Wt, OUTPUT + "Wt_init.txt", delim)
 		//writeMatrix(Wv, OUTPUT + "Wv_init.txt", delim)
 
-		val ssWc = DenseMatrix.zeros(Wc.numRows, Wc.numCols)
-		val ssW  = DenseMatrix.zeros(W.numRows,  W.numCols)
-		val ssWt = DenseMatrix.zeros(Wt.numRows, Wt.numCols)
-		val ssWv = DenseMatrix.zeros(Wv.numRows, Wv.numCols)
+		val ssWc = DenseMatrix[Double](Wc.numRows, Wc.numCols)
+		val ssW  = DenseMatrix[Double](W.numRows,  W.numCols)
+		val ssWt = DenseMatrix[Double](Wt.numRows, Wt.numCols)
+		val ssWv = DenseMatrix[Double](Wv.numRows, Wv.numCols)
 
-		println("Checking initial accuracy")
+		//println("Checking initial accuracy")
 		//evalOnTrees(trainTrees, Wc, W, Wt, Wv, 100)
 
 	   	var runIter = 1
-	   	val initParams = pack((Wc, W, Wt, Wv, ssWc, ssW, ssWt, ssWv))
-		val paramsFinal = untilconverged(initParams, tol = 0, maxIter = runsThroughData) {params =>
-			println("Starting run " + runIter + "/" + runsThroughData)
-			val newParams = trainOnTrees(trainTrees, params, batchSize)
+	   	while (runIter <= runsThroughData) {
+			println("Training run " + runIter + "/" + runsThroughData)
+			trainOnTrees(trainTrees, Wc, W, Wt, Wv, ssWc, ssW, ssWt, ssWv, batchSize)
 			println("Completed run " + runIter + "/" + runsThroughData)
 
 			println("Checking accuracy for run " + runIter + "/" + runsThroughData + "...")
-			evalOnTrees(trainTrees, newParams._1, newParams._2, newParams._3, newParams._4, 100)
+			evalOnTrees(trainTrees, Wc, W, Wt, Wv, 100)
 			println("Completed Accuracy check for run " + runIter + "/" + runsThroughData + "...")
 
 			runIter += 1
-			(newParams)		
 		}		
 
 		println("Running test set evaluation...")
-		evalOnTrees(testTrees, paramsFinal._1, paramsFinal._2, paramsFinal._3, paramsFinal._4, 100)
+		evalOnTrees(testTrees, Wc, W, Wt, Wv, 100)
 
 		println("Writing out results...")
-		writeMatrix(paramsFinal._1, OUTPUT + "Wc_final.txt", delim)
-		writeMatrix(paramsFinal._2, OUTPUT + "W_final.txt", delim)
-		writeMatrix(paramsFinal._3, OUTPUT + "Wt_final.txt", delim)
-		writeMatrix(paramsFinal._4, OUTPUT + "Wv_final.txt", delim)
+		writeMatrix(Wc, OUTPUT + "Wc_final.txt", delim)
+		writeMatrix(W,  OUTPUT + "W_final.txt", delim)
+		writeMatrix(Wt, OUTPUT + "Wt_final.txt", delim)
+		writeMatrix(Wv, OUTPUT + "Wv_final.txt", delim)
 
 		println("All done!")
 		toc("Entire Program")

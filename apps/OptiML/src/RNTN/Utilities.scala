@@ -33,34 +33,35 @@ trait Utilities extends OptiMLApplication {
 		if (verbose) println(message)
 	}
 
-    implicit def diff (
-    	v1: Rep[Tup8[DenseMatrix[Double], DenseMatrix[Double], DenseMatrix[Double], DenseMatrix[Double],
-    				 DenseMatrix[Double], DenseMatrix[Double], DenseMatrix[Double], DenseMatrix[Double]]],
-		v2: Rep[Tup8[DenseMatrix[Double], DenseMatrix[Double], DenseMatrix[Double], DenseMatrix[Double],
-    				 DenseMatrix[Double], DenseMatrix[Double], DenseMatrix[Double], DenseMatrix[Double]]]
-    ): Rep[Double] = 1.0    
+	def setMatrix(m: Rep[DenseMatrix[Double]], n: Rep[DenseMatrix[Double]]) {
+		(0::m.numRows) foreach { row =>
+	     		(0::m.numCols) foreach { col =>
+	        		m(row, col) = n(row, col)
+	      		}
+	    	}
+	} 
 
-   	def pack3D(m: Rep[DenseVector[DenseMatrix[Double]]]): Rep[DenseMatrix[Double]] = {
-   		val origRows   = m(0).numRows
-   		val origZ	   = m.length
-   		val packedRows = origZ*origRows
-   		(0::packedRows, *) {row => 
-   			val z = floor(row/packedRows)
-   			val y = row%origRows
-   			m(z).getRow(y)
-   		}
-   	}
+ 	def pack3D(m: Rep[DenseVector[DenseMatrix[Double]]]): Rep[DenseMatrix[Double]] = {
+		val origRows   = m(0).numRows
+ 		val origZ	   = m.length
+ 		val packedRows = origZ*origRows
+ 		(0::packedRows, *) {row => 
+ 			val z = floor(row/packedRows)
+ 			val y = row%origRows
+ 			m(z).getRow(y)
+ 		}
+ 	}
 
-   	def unpack3D(m: Rep[DenseMatrix[Double]], zDim: Rep[Int]): Rep[DenseVector[DenseMatrix[Double]]] = {
-   		val newNumRows = m.numRows/zDim
-   		(0::zDim) {z =>
-   			(0::newNumRows, *) {y =>
-   				m(z*newNumRows + y).toDense
-   			}
-   		}
-   	}
+ 	def unpack3D(m: Rep[DenseMatrix[Double]], zDim: Rep[Int]): Rep[DenseVector[DenseMatrix[Double]]] = {
+ 		val newNumRows = m.numRows/zDim
+ 		(0::zDim) {z =>
+ 			(0::newNumRows, *) {y =>
+ 				m(z*newNumRows + y).toDense
+ 			}
+ 		}
+ 	}
 
-   	def get3D(m: Rep[DenseMatrix[Double]], yRows: Rep[Int], row: Rep[Int]): Rep[DenseMatrix[Double]] = {
-   		m((yRows*row)::(yRows*(row + 1)), *)
-   	}
+ 	def get3D(m: Rep[DenseMatrix[Double]], yRows: Rep[Int], row: Rep[Int]): Rep[DenseMatrix[Double]] = {
+ 		m((yRows*row)::(yRows*(row + 1)), *)
+ 	}
 }

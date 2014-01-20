@@ -122,10 +122,9 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 		val dWt_tree = DenseMatrix[Double](WORDSIZE*WORDSIZE*2, WORDSIZE*2)
 		val dWv_tree = DenseMatrix[Double](WORDSIZE, Wv.numCols)
 
-		implicit def diff(t1: Rep[DenseVector[DenseVector[Double]]], t2: Rep[DenseVector[DenseVector[Double]]]): Rep[Double] = 1.0
-
 		var curLevel = 0
-		untilconverged(DenseVector[DenseVector[Double]](DenseVector.zeros(WORDSIZE).t), tol=0.0, maxIter=levels) { deltas =>
+		var deltas = DenseVector[DenseVector[Double]](DenseVector.zeros(WORDSIZE).t)
+		while (curLevel < levels) {
 			verbosePrint("				Backpropagating at level " + curLevel, VERBOSE)	
 			val level  = tree(curLevel)
 			val levelActs = acts(curLevel)
@@ -212,7 +211,7 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 			}
 
 			curLevel += 1
-			deltas_level.map(d => d)	// make deltas_level immutable. there's probably a better way to do this
+			deltas = deltas_level.map(d => d)	// make deltas_level immutable. there's probably a better way to do this
 		}	
 		verbosePrint("			Completed backward propagation of tree", VERBOSE)
 		(dWc_tree, dW_tree, dWt_tree, dWv_tree)
@@ -340,10 +339,16 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 	// -------------------------------------------------------------------------------------//
 	def trainOnTrees(
 		trees: 		Rep[DenseVector[DenseVector[DenseMatrix[Int]]]],
-		initParams: Rep[Tup8[DenseMatrix[Double], DenseMatrix[Double], DenseMatrix[Double], DenseMatrix[Double],
-    				 	     DenseMatrix[Double], DenseMatrix[Double], DenseMatrix[Double], DenseMatrix[Double]]],
+		Wc:   		Rep[DenseMatrix[Double]],	// NUMCLASSES X (WORDSIZE + 1)
+		W:	  		Rep[DenseMatrix[Double]],	// WORDSIZE X (WORDSIZE * 2 + 1)
+		Wt:   		Rep[DenseMatrix[Double]],	// WORDSIZE X [(WORDSIZE * 2) X (WORDSIZE * 2)]
+		Wv:		   	Rep[DenseMatrix[Double]], 	// WORDSIZE X allPhrases.length
+		ssWc:   	Rep[DenseMatrix[Double]],	// NUMCLASSES X (WORDSIZE + 1)
+		ssW:	  	Rep[DenseMatrix[Double]],	// WORDSIZE X (WORDSIZE * 2 + 1)
+		ssWt:   	Rep[DenseMatrix[Double]],	// WORDSIZE X [(WORDSIZE * 2) X (WORDSIZE * 2)]
+		ssWv:		Rep[DenseMatrix[Double]], 	// WORDSIZE X allPhrases.length
 		batchSize: 	Rep[Int]
-	) = {
+	) {
 		val numTrees   = trees.length
 		val numBatches = ceil(numTrees.toDouble/batchSize.toDouble)
 		println("Running " + numTrees + " trees in " + numBatches + " batches")
@@ -353,11 +358,8 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 		val randomTrain = randperm(numTrees, numTrees)
 
 		var batchIter = 0
-		untilconverged(initParams, tol = 0, maxIter = numBatches) { params =>
-			val Wc   = params._1; val W   = params._2; val Wt   = params._3; val Wv   = params._4
-			val ssWc = params._5; val ssW = params._6; val ssWt = params._7; val ssWv = params._8
-
-			verbosePrint("	Starting batch " + (batchIter + 1) + "/" + numBatches, VERBOSE)
+		while (batchIter < numBatches) {
+			//println("	Starting batch " + (batchIter + 1) + "/" + numBatches)
 			// Randomized batches from the dataset
 			val (batchTrees, batchWv, batchInds, batchMap) = createBatch(trees, Wv, batchIter, batchSize, randomTrain)
 
@@ -371,43 +373,44 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 			val dfBatchWvSq = dfBatchWv.map(e => e*e)
 
 			verbosePrint("		[TRAINING] Updating sums of squares...", VERBOSE)
-			val ssWc_new = if (ADAZERO && batchIter == 0) { dfWcSq } else { ssWc + dfWcSq }
-			val ssW_new  = if (ADAZERO && batchIter == 0) { dfWSq  } else { ssW + dfWSq   }
-			val ssWt_new = if (ADAZERO && batchIter == 0) { dfWtSq } else { ssWt + dfWtSq }
-			val ssWv_new = (*, 0::Wv.numCols) { word => 
-								val batchIndex = batchMap(word)
-								if (ADAZERO && batchIter == 0) {
-									if (batchIndex == -1) {DenseVector.zeros(Wv.numRows)}
-							 		else				  {dfBatchWvSq.getCol(batchIndex).toDense}
-								}
-								else {
-								 	if (batchIndex == -1) {ssWv.getCol(word).toDense}
-								 	else				  {ssWv.getCol(word) + dfBatchWvSq.getCol(batchIndex)}
-								}
-							} 
+			if (ADAZERO && batchIter == 0) {
+				setMatrix(ssWc, dfWcSq)
+				setMatrix(ssW, dfWSq)
+				setMatrix(ssWt, dfWtSq)
+				(0::Wv.numCols) foreach { word =>
+					val batchIndex = batchMap(word)
+					if (batchIndex == -1) {ssWv.updateCol(word, DenseVector.zeros(Wv.numRows))}
+					else				  {ssWv.updateCol(word, dfBatchWvSq.getCol(batchIndex).toDense)}
+				}
+			}
+			else {
+				ssWc += dfWcSq
+				ssW  += dfWSq
+				ssWt += dfWtSq
+				(batchInds) foreach { word =>
+					ssWv.updateCol(word, ssWv.getCol(word) + dfBatchWvSq.getCol(batchMap(word)))
+				}
+			}
 
 			verbosePrint("		[TRAINING] Calculating deltas for weights...", VERBOSE)
-			val dWc 	 = (dfWc * LR) / ssWc_new.map(e => sqrt(e) + ADAEPS)
-			val dW    	 = (dfW  * LR) / ssW_new.map(e => sqrt(e) + ADAEPS)
-			val dWt  	 = (dfWt * LR) / ssWt_new.map(e => sqrt(e) + ADAEPS)
-			val dBatchWv = (dfBatchWv * LR) / ssWv_new(*, batchInds).map(e => sqrt(e) + ADAEPS)
+			val dWc 	 = (dfWc * LR) / ssWc.map(e => sqrt(e) + ADAEPS)
+			val dW    	 = (dfW  * LR) / ssW.map(e => sqrt(e) + ADAEPS)
+			val dWt  	 = (dfWt * LR) / ssWt.map(e => sqrt(e) + ADAEPS)
+			val dBatchWv = (dfBatchWv * LR) / ssWv(*, batchInds).map(e => sqrt(e) + ADAEPS)
 
 			verbosePrint("		[TRAINING] Calculating new weights...", VERBOSE)
-			val Wc_new      = Wc - dWc
-			val W_new       = W  - dW
-			val Wt_new      = Wt - dWt
+			Wc -= dWc
+			W  -= dW
+			Wt -= dWt
 			val batchWv_new = batchWv - dBatchWv
 
 			verbosePrint("		[TRAINING] Calculating new Wv...", VERBOSE)
-			val Wv_new = (*, 0::Wv.numCols) { word => 
-				val batchIndex = batchMap(word)
-				if (batchIndex == -1) {Wv.getCol(word).toDense}
-				else				  {batchWv_new.getCol(batchIndex).toDense}
+			(batchInds) foreach { word =>
+				Wv.updateCol(word, batchWv_new.getCol(batchMap(word)))
 			}
 
 			batchIter += 1
-			pack((Wc_new, W_new, Wt_new, Wv_new, ssWc_new, ssW_new, ssWt_new, ssWv_new))
-		}	// end of untilconverged loop
+		}	// end of while loop
 	}
 
 	// -------------------------------------------------------------------------------------//
@@ -425,10 +428,9 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 		
 		val outs = DenseVector[DenseVector[DenseVector[Double]]](levels, true)
 
-		implicit def diff (v1: Rep[DenseVector[DenseVector[Double]]], v2: Rep[DenseVector[DenseVector[Double]]]): Rep[Double] = 1.0
-
 		var curLevel = maxLevel
-		untilconverged(DenseVector[DenseVector[Double]](), tol = 0.0, maxIter = levels) { kidsActs =>
+		var kidsActs = DenseVector[DenseVector[Double]]()
+		while (curLevel >= 0) {
 			val level 	 = tree(curLevel)
 			val numNodes = level.numRows
 			
@@ -438,7 +440,7 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 			outs(curLevel) = levelIO.map(_._2)
 			
 			curLevel -= 1
-			(levelIO.map(_._1))	// return activation for next stage of loop (next level of tree)
+			kidsActs = levelIO.map(_._1)	// return activation for next stage of loop (next level of tree)
 		}
 		(outs)	// return outputs
 	}
@@ -480,9 +482,9 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 		val percentAll   = correctNodes.toDouble / allBinaryTotal
 
 		toc("Current Batch")
-		println("--- Batch Results ---")
-		println("Root binary accuracy over all trees in batch: " + percentRoots + "  ( " + correctRoots + "/" + rootBinaryTotal + " )")
-		println("Node binary accuracy over all trees in batch: " + percentAll + "  (" + correctNodes + "/" + allBinaryTotal + " )")
+		verbosePrint("--- Batch Results ---", VERBOSE)
+		verbosePrint("Root binary accuracy over all trees in batch: " + percentRoots + "  ( " + correctRoots + "/" + rootBinaryTotal + " )", VERBOSE)
+		verbosePrint("Node binary accuracy over all trees in batch: " + percentAll + "  (" + correctNodes + "/" + allBinaryTotal + " )", VERBOSE)
 		pack( (correctNodes, correctRoots, allBinaryTotal, rootBinaryTotal) )
 	}
 
@@ -504,7 +506,7 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 		println("	Running batches...")
 		tic("All Batches")
 		val results = (0::numBatches) { batchIter =>
-			println("	Starting batch " + (batchIter + 1) + "/" + numBatches)
+			//println("	Starting batch " + (batchIter + 1) + "/" + numBatches)
 			// Randomized batches from the dataset
 			val (batchTrees, batchWv, batchInds, batchMap) = createBatch(trees, Wv, batchIter, batchSize, randomTrain)
 
@@ -522,6 +524,7 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 		println("-----------------Evaluation complete-----------------")
 		println("Root binary accuracy over all trees: " + percentRoots + "  ( " + correctRoots + "/" + numRoots + " )")
 		println("Node binary accuracy over all trees: " + percentAll + "  ( " + correctNodes + "/" + numNodes + " )")
+		println("-----------------------------------------------------")
 	}
 
 }

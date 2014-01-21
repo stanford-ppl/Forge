@@ -11,9 +11,9 @@ object PageRankInterpreter extends OptiGraphApplicationInterpreter with PageRank
 trait PageRank extends OptiGraphApplication {
 	def main() = {
 		
-    println("OptiGraph Test 1")
+		println("OptiGraph Test 1")
 	
-  	if (args.length < 1) printUsage
+		if (args.length < 1) printUsage
 		val g = graphFromEdgeList(args(0))
 
 		println("Directed: " + g.isDirected)
@@ -24,27 +24,27 @@ trait PageRank extends OptiGraphApplication {
 		println("performing Page Rank")
 		tic(g)
 
-    //matches parameters from snap
-    //initalize array to 1/numNodes
-    val prInit = NodeData[Double](g.numNodes).map(e => 1.0/g.numNodes)
-    val threshold = 0.0001 
-    val damp = 0.85
-    val maxItr = 100 
-    
-    val pr =
-     untilconverged(prInit, tol=threshold,maxIter=maxItr){ oldPr =>
-      g.nodes({ n =>
-        ((1.0 - damp) / g.numNodes) + damp * sum(g.inNbrs(n)){w => 
-          oldPr(w) / g.outDegree(Node(w))}{n =>true} 
-        })
-    }{(curPr,oldPr) => sum(abs(curPr-oldPr))}
-    
+		//matches parameters from snap
+		//initalize array to 1/numNodes
+		val prInit = NodeData[Double](g.numNodes).map(e => 1.0/g.numNodes)
+		val threshold = 0.0001 
+		val damp = 0.85
+		val maxItr = 100 
+		
+		val pr =
+		 untilconverged(prInit, tol=threshold,maxIter=maxItr){ oldPr =>
+			g.nodes({ n =>
+				((1.0 - damp) / g.numNodes) + damp * sum(g.inNbrs(n)){w => 
+					oldPr(w) / g.outDegree(Node(w))}{n =>true} 
+				})
+		}{(curPr,oldPr) => sum(abs(curPr-oldPr))}
+		
 		toc(pr)
 		writeResults("pageRank.txt",g,pr)
-    println("done")
+		println("done")
 	}
 	def printUsage = {
-    println("Usage: Q1 <path to input edge list file>")
-    exit(-1)
-  }
+		println("Usage: Q1 <path to input edge list file>")
+		exit(-1)
+	}
 }

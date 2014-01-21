@@ -72,6 +72,8 @@ trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
 
   def array_buffer_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
     = new scala.collection.mutable.ArrayBuffer[T]()
+  def array_buffer_immutable[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
+    = __arg0 
   def array_buffer_strict_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
     = (new scala.collection.mutable.ArrayBuffer[T]()) ++ (new Array[T](__arg0))
   def array_buffer_new_imm[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]

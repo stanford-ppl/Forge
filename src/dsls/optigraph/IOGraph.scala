@@ -57,7 +57,6 @@ trait IOGraphOps {
       val idView = NodeIdView(distinct_ids.getRawArray,numNodes)
       idView.foreach{ id => hm(distinct_ids(id)) = id}
       val idHashMap = distinct_ids.groupByReduce[Int,Int](e => e, e => hm(e), (a,b) => a)
-      
 
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       val src_keys = NodeData(fhashmap_keys(src_groups))

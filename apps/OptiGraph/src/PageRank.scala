@@ -12,7 +12,7 @@ trait PageRank extends OptiGraphApplication {
 	def main() = {
 		
     println("OptiGraph Test 1")
-	 /*
+	
   	if (args.length < 1) printUsage
 		val g = graphFromEdgeList(args(0))
 
@@ -41,7 +41,6 @@ trait PageRank extends OptiGraphApplication {
     
 		toc(pr)
 		writeResults("pageRank.txt",g,pr)
-    */
     println("done")
 	}
 	def printUsage = {

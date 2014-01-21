@@ -47,6 +47,12 @@ trait NodeDataOps {
 				nd_set_raw_data($self, d.unsafeImmutable)
 				nd_set_length($self,$1)
 			}
+			infix("concat")(NodeData(T) :: NodeData(T)) implements composite ${
+      	val result = array_empty[T]($0.length+$1.length)
+      	array_copy($0.getRawArray,0,result,0,$0.length)
+      	array_copy($1.getRawArray,0,result,$0.length,$1.length)
+      	NodeData(result)
+      }
 			compiler ("nd_set_raw_data") (MArrayBuffer(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
 
 			///////////parallel operations////////////////////////////

@@ -34,7 +34,7 @@ trait IOGraphOps {
       xfs.close()
     })
 
-  	direct (IO) ("graphFromEdgeList", Nil, MString :: MUnit) implements composite ${
+  	direct (IO) ("graphFromEdgeList", Nil, MString :: Graph) implements composite ${
       val input_edges = ForgeFileReader.readLines($0)({line =>
         //if(!line.startsWith("#")){
           val fields = line.fsplit("\t")
@@ -43,7 +43,7 @@ trait IOGraphOps {
       })
       //contains the input tuples
       val edge_data = NodeData[Tup2[Int,Int]](input_edges)
-      
+
       //concat source id's and destination id's then get distinct with groupbyreduce
       val src_ids = NodeData(array_map[Tup2[Int,Int],Int](input_edges, e => e._1))
       val dst_ids = NodeData(array_map[Tup2[Int,Int],Int](input_edges, e => e._2))
@@ -58,18 +58,21 @@ trait IOGraphOps {
       idView.foreach{ id => hm(distinct_ids(id)) = id}
       val idHashMap = distinct_ids.groupByReduce[Int,Int](e => e, e => hm(e), (a,b) => a)
       
+
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       val src_keys = NodeData(fhashmap_keys(src_groups))
-      val src_edge_array = src_keys.flatMap(e => src_groups(e)).map{n => fhashmap_get(idHashMap,n)}
-      val src_node_array = NodeData[Int](numNodes+1)
-      
+      val src_edge_array = src_keys.flatMap(e => NodeData(src_groups(e))).map{n => fhashmap_get(idHashMap,n)}
+      val src_node_array = NodeData[Int](numNodes)
+
       val dst_groups = edge_data.groupBy(e => e._2, e => e._1)
       val dst_keys = NodeData(fhashmap_keys(dst_groups))
-      val dst_edge_array = dst_keys.flatMap(e => dst_groups(e)).map{n => fhashmap_get(idHashMap,n)}
-      val dst_node_array = NodeData[Int](numNodes+1)
-      distinct_ids.foreach{ id => 
-        src_node_array(fhashmap_get(idHashMap,id)+1) = array_buffer_length(fhashmap_get(src_groups,id)) + src_node_array(fhashmap_get(idHashMap,id))
-        dst_node_array(fhashmap_get(idHashMap,id)+1) = array_buffer_length(fhashmap_get(dst_groups,id)) + dst_node_array(fhashmap_get(idHashMap,id))
+      val dst_edge_array = dst_keys.flatMap(e => NodeData(dst_groups(e))).map{n => fhashmap_get(idHashMap,n)}
+      val dst_node_array = NodeData[Int](numNodes)
+      distinct_ids.foreach{ id =>
+        if((fhashmap_get(idHashMap,id)+1)<(numNodes)){
+          src_node_array(fhashmap_get(idHashMap,id)+1) = array_buffer_length(fhashmap_get(src_groups,id)) + src_node_array(fhashmap_get(idHashMap,id))
+          dst_node_array(fhashmap_get(idHashMap,id)+1) = array_buffer_length(fhashmap_get(dst_groups,id)) + dst_node_array(fhashmap_get(idHashMap,id))
+        }
       }
 
       println("finished file I/O")

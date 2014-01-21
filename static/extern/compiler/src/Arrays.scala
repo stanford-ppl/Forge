@@ -127,6 +127,8 @@ trait ForgeArrayBufferOpsExp extends DeliteArrayBufferOpsExp {
 
   def array_buffer_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
     = darray_buffer_new[T](__arg0)
+  def array_buffer_immutable[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
+    = darray_buffer_immutable[T](__arg0)
   def array_buffer_strict_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
     = darray_buffer_new[T](__arg0,__arg0)
   def array_buffer_new_imm[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]

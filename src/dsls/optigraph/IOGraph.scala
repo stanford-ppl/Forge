@@ -24,11 +24,11 @@ trait IOGraphOps {
     	val ids = $graph.getOrderedNodeIDs
     	writeGraphData($path,ids,data.getRawArray,$data.length)
     }
-    compiler (IO) ("writeGraphData", T, (("path",MString),("ids",MArray(MInt)),("data",MArray(T)),("length",MInt)) :: MUnit, TNumeric(T), effect = simple) implements codegen($cala, ${
+    compiler (IO) ("writeGraphData", T, (("path",MString),("ids",MArray(MString)),("data",MArray(T)),("length",MInt)) :: MUnit, TNumeric(T), effect = simple) implements codegen($cala, ${
       val xfs = new java.io.BufferedWriter(new java.io.FileWriter($path))
       xfs.write("#node id\\tdata\\n")
       for (i <- 0 until $length) {
-        xfs.write($ids(i).toString + "\\t")
+        xfs.write($ids(i) + "\\t")
         xfs.write($data(i).toString + "\\n")
       }
       xfs.close()
@@ -38,23 +38,23 @@ trait IOGraphOps {
       val input_edges = ForgeFileReader.readLines($0)({line =>
         //if(!line.startsWith("#")){
           val fields = line.fsplit("\t")
-          pack(fields(0).toInt,fields(1).toInt) 
+          pack(fields(0),fields(1)) 
         //} 
       })
       //contains the input tuples
-      val edge_data = NodeData[Tup2[Int,Int]](input_edges)
+      val edge_data = NodeData[Tup2[String,String]](input_edges)
 
       //concat source id's and destination id's then get distinct with groupbyreduce
-      val src_ids = NodeData(array_map[Tup2[Int,Int],Int](input_edges, e => e._1))
-      val dst_ids = NodeData(array_map[Tup2[Int,Int],Int](input_edges, e => e._2))
+      val src_ids = NodeData(array_map[Tup2[String,String],String](input_edges, e => e._1))
+      val dst_ids = NodeData(array_map[Tup2[String,String],String](input_edges, e => e._2))
       val concat = src_ids.concat(dst_ids)
-      val disct = fhashmap_keys(concat.groupByReduce[Int,Int](e => e, e => e, (a,b) => a))
+      val disct = fhashmap_keys(concat.groupBy[String,String](e => e, e => e))
       val distinct_ids = NodeData(disct)
 
       //set up the ID hash map
       val numNodes = distinct_ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
-      val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
+      val idHashMap = idView.groupByReduce[String,Int](n => distinct_ids(n), n => n, (a,b) => a)
 
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       val src_keys = NodeData(fhashmap_keys(src_groups))

@@ -41,20 +41,15 @@ trait GraphOps{
       infix ("isDirected") (Nil :: MBoolean) implements getter(0,"_directed") 
       //given an ID return a node
       infix("getNodeFromID")(MInt :: Node) implements composite ${
-          val internalID = getInternalID($self,$1)
-          if(internalID >= $self.numNodes() || internalID < 0) fatal("ERROR. ID: " + $1 + " does not exist in this graph!")
-          Node(internalID)
+        val internalID = getInternalID($self,$1)
+        if(internalID >= $self.numNodes() || internalID < 0) fatal("ERROR. ID: " + $1 + " does not exist in this graph!")
+        Node(internalID)
       }
       infix ("numNodes")(Nil :: MInt) implements getter(0,"_numNodes")
 
       //overloaded this method for pagerank, gets funky when you have NodeData(NodeData) like above
-      infix("nodes")( (Node==>R) :: NodeData(R), addTpePars=R,effect=simple) implements composite ${
-        val ndes = NodeIdView(getHashMapKeys($self),$self.numNodes)
-        var node_comp = NodeData[R]($self.numNodes())
-        ndes.foreach{n =>
-          node_comp(n) = $1(Node(n))
-        }
-        node_comp
+      infix("nodes")( (Node==>R) :: NodeData(R), addTpePars=R) implements composite ${
+        NodeData[R](array_map[Int,R](array_fromfunction($self.numNodes,{n => n}), {n => $1(Node(n))}))
       }
 
       //If i do just up neighbors I can't use a view and it will be more expensive
@@ -135,29 +130,29 @@ trait GraphOps{
         var level = 1
 
         while(!getAndSet(finished,true)){
-            nodes.foreach{n =>  
-                if(levelArray(n) == level){
-                  val neighbor = $self.outNbrs(Node(n))
-                  neighbor.foreach{nghbr =>
-                      if(testAtomic(bitMap,nghbr,0)){
-                          if(testAndSetAtomic(bitMap,nghbr,0,1)){
-                              levelArray(nghbr) = level+1
-                              set(finished,false)
-                  }}}//end nghbr for each 
-                  forwardComp(n) = $2(Node(n),forwardComp,levelArray)
-                }
-            }//end nodes for each
-            level += 1
+          nodes.foreach{n =>  
+            if(levelArray(n) == level){
+              val neighbor = $self.outNbrs(Node(n))
+              neighbor.foreach{nghbr =>
+                if(testAtomic(bitMap,nghbr,0)){
+                  if(testAndSetAtomic(bitMap,nghbr,0,1)){
+                    levelArray(nghbr) = level+1
+                    set(finished,false)
+              }}}//end nghbr for each 
+              forwardComp(n) = $2(Node(n),forwardComp,levelArray)
+            }
+          }//end nodes for each
+          level += 1
         }//end while
         val rBFS = true
         ///reverse BFS
         while( level>=1 ){
-            nodes.foreach{n =>
-                if(levelArray(n) == level){
-                    reverseComp(n) = $3(Node(n),forwardComp,reverseComp,levelArray)
-                }
+          nodes.foreach{n =>
+            if(levelArray(n) == level){
+              reverseComp(n) = $3(Node(n),forwardComp,reverseComp,levelArray)
             }
-            level -= 1
+          }
+          level -= 1
         }
         reverseComp
       }
@@ -225,15 +220,14 @@ trait GraphOps{
     direct(Graph) ("sum", R, NodeData(NodeData(R)) :: NodeData(R), TFractional(R)) implements composite ${
       //FIXME: HACK
       //this does not work in library but we knew that.
-      val result = $0.reduceND( ((a,b) => a.+(b)),NodeData[R](0))
-      /*
+      //val result = $0.reduceND( ((a,b) => a.+(b)),NodeData[R](0))
+      
       var result = $0(0)
       var i = 1
       while(i<$0.length){
         result = result+($0(i))
         i += 1
       }
-      */
       result
     }
     // "block" should not mutate the input, but always produce a new copy. in this version, block can change the structure of the input across iterations (e.g. increase its size)
@@ -253,7 +247,6 @@ trait GraphOps{
       if (iter == maxIter){
         println("Maximum iterations exceeded")
       }
-
       cur
     }
   } 

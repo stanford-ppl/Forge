@@ -25,6 +25,7 @@ trait NodeDataOps {
 		static(NodeData)("apply", T, MInt :: NodeData(T), effect = mutable) implements allocates(NodeData,${array_buffer_immutable(array_buffer_strict_empty[T]($0))})
 		static(NodeData)("apply", T, MArray(T) :: NodeData(T)) implements allocates(NodeData,${array_buffer_new_imm($0)})
 		static(NodeData)("apply", T, MArrayBuffer(T) :: NodeData(T)) implements allocates(NodeData,${array_buffer_immutable($0)})
+		static(NodeData)("fromFunction", T, (MInt,(MInt ==> T)) :: NodeData(T)) implements allocates(NodeData,${array_buffer_new_imm(array_fromfunction($0,$1))})
 
 		val NodeDataOps = withTpe(NodeData)
 		NodeDataOps{	
@@ -48,11 +49,11 @@ trait NodeDataOps {
 				nd_set_length($self,$1)
 			}
 			infix("concat")(NodeData(T) :: NodeData(T)) implements composite ${
-      	val result = array_empty[T]($0.length+$1.length)
-      	array_copy($0.getRawArray,0,result,0,$0.length)
-      	array_copy($1.getRawArray,0,result,$0.length,$1.length)
-      	NodeData(result)
-      }
+				val result = array_empty[T]($0.length+$1.length)
+				array_copy($0.getRawArray,0,result,0,$0.length)
+				array_copy($1.getRawArray,0,result,$0.length,$1.length)
+				NodeData(result)
+			}
 			compiler ("nd_set_raw_data") (MArrayBuffer(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
 
 			///////////parallel operations////////////////////////////

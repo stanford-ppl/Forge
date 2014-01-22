@@ -10,12 +10,11 @@ object PageRankInterpreter extends OptiGraphApplicationInterpreter with PageRank
 
 trait PageRank extends OptiGraphApplication {
 	def main() = {
-		
-		println("OptiGraph Test 1")
+		println("PageRank")
 	
 		if (args.length < 1) printUsage
 		val g = graphFromEdgeList(args(0))
-
+		
 		println("Directed: " + g.isDirected)
 		println("Number of Nodes: " + g.numNodes)
 		
@@ -26,10 +25,10 @@ trait PageRank extends OptiGraphApplication {
 
 		//matches parameters from snap
 		//initalize array to 1/numNodes
-		val prInit = NodeData[Double](g.numNodes).map(e => 1.0/g.numNodes)
+		val prInit = NodeData.fromFunction[Double](g.numNodes,{e => 1.0/g.numNodes})
 		val threshold = 0.0001 
 		val damp = 0.85
-		val maxItr = 100 
+		val maxItr = 100
 		
 		val pr =
 		 untilconverged(prInit, tol=threshold,maxIter=maxItr){ oldPr =>

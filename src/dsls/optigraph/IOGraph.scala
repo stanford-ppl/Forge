@@ -53,10 +53,8 @@ trait IOGraphOps {
 
       //set up the ID hash map
       val numNodes = distinct_ids.length
-      val hm = SHashMap[Int,Int]()
-      val idView = NodeIdView(distinct_ids.getRawArray,numNodes)
-      idView.foreach{ id => hm(distinct_ids(id)) = id}
-      val idHashMap = distinct_ids.groupByReduce[Int,Int](e => e, e => hm(e), (a,b) => a)
+      val idView = NodeData(array_fromfunction(numNodes,{n => n}))
+      val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
 
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       val src_keys = NodeData(fhashmap_keys(src_groups))
@@ -67,11 +65,12 @@ trait IOGraphOps {
       val dst_keys = NodeData(fhashmap_keys(dst_groups))
       val dst_edge_array = dst_keys.flatMap(e => NodeData(dst_groups(e))).map{n => fhashmap_get(idHashMap,n)}
       val dst_node_array = NodeData[Int](numNodes)
-      distinct_ids.foreach{ id =>
-        if((fhashmap_get(idHashMap,id)+1)<(numNodes)){
-          src_node_array(fhashmap_get(idHashMap,id)+1) = array_buffer_length(fhashmap_get(src_groups,id)) + src_node_array(fhashmap_get(idHashMap,id))
-          dst_node_array(fhashmap_get(idHashMap,id)+1) = array_buffer_length(fhashmap_get(dst_groups,id)) + dst_node_array(fhashmap_get(idHashMap,id))
-        }
+
+      var i = 0
+      while(i < numNodes-1){
+        src_node_array(i+1) = array_buffer_length(fhashmap_get(src_groups,distinct_ids(i))) + src_node_array(i)
+        dst_node_array(i+1) = array_buffer_length(fhashmap_get(dst_groups,distinct_ids(i))) + dst_node_array(i)
+        i += 1
       }
 
       println("finished file I/O")

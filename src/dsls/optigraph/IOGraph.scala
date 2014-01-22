@@ -45,11 +45,13 @@ trait IOGraphOps {
       val edge_data = NodeData[Tup2[String,String]](input_edges)
 
       //concat source id's and destination id's then get distinct with groupbyreduce
+      //get distinct src and dst for the upcoming flatmap on each
       val src_ids = NodeData(array_map[Tup2[String,String],String](input_edges, e => e._1))
       val dst_ids = NodeData(array_map[Tup2[String,String],String](input_edges, e => e._2))
+
+      //get the overall disctinct could be repeats in src and dst
       val concat = src_ids.concat(dst_ids)
-      val disct = fhashmap_keys(concat.groupBy[String,String](e => e, e => e))
-      val distinct_ids = NodeData(disct)
+      val distinct_ids = NodeData(fhashmap_keys(concat.groupBy[String,String](e => e, e => e)))
 
       //set up the ID hash map
       val numNodes = distinct_ids.length
@@ -57,13 +59,17 @@ trait IOGraphOps {
       val idHashMap = idView.groupByReduce[String,Int](n => distinct_ids(n), n => n, (a,b) => a)
 
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
-      val src_keys = NodeData(fhashmap_keys(src_groups))
-      val src_edge_array = src_keys.flatMap(e => NodeData(src_groups(e))).map{n => fhashmap_get(idHashMap,n)}
+      //must filter down the ids we want to flat map to just the distinct src ids we want
+      //gets tricky because order of flatmap must match our internal id order other wise
+      //the edge array gets screwed up
+      //FIXME: support for string equality needs to be added to the contains
+      val src_ids_ordered = NodeData(array_sort(fhashmap_keys(src_ids.groupBy[Int,Int](e => fhashmap_get(idHashMap,e),e => fhashmap_get(idHashMap,e)))))
+      val src_edge_array = src_ids_ordered.flatMap{e => NodeData(src_groups(distinct_ids(e)))}.map{n => fhashmap_get(idHashMap,n)}
       val src_node_array = NodeData[Int](numNodes)
 
       val dst_groups = edge_data.groupBy(e => e._2, e => e._1)
-      val dst_keys = NodeData(fhashmap_keys(dst_groups))
-      val dst_edge_array = dst_keys.flatMap(e => NodeData(dst_groups(e))).map{n => fhashmap_get(idHashMap,n)}
+      val dst_ids_ordered = NodeData(array_sort(fhashmap_keys(dst_ids.groupBy[Int,Int](e => fhashmap_get(idHashMap,e),e => fhashmap_get(idHashMap,e)))))
+      val dst_edge_array = dst_ids_ordered.flatMap(e => NodeData(dst_groups(distinct_ids(e)))).map{n => fhashmap_get(idHashMap,n)}
       val dst_node_array = NodeData[Int](numNodes)
 
       var i = 0

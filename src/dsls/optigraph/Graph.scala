@@ -56,15 +56,13 @@ trait GraphOps{
       //cannot perform a filter on a view class for some reason
       //I see good reason to not split this up here
       infix ("sumUpNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
-        val inNbrs = $self.inNbrs(n)
-        //only sum the outNeighbors a level up
-        sum(inNbrs)(data){e => level(e)==(level(n.id)-1)}
+        //only sum in neighbors a level up
+        sum($self.inNbrs(n))(data){e => level(e)==(level(n.id)-1)}
       }
       //FIXME: hardcoded in not to sum the root
       infix ("sumDownNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
-        val outNbrs = $self.outNbrs(n)
         //only sum the outNeighbors a level down
-        sum(outNbrs)(data){e => (level(e)==(level(n.id)+1))}
+        sum($self.outNbrs(n))(data){e => (level(e)==(level(n.id)+1))}
       }
       infix ("outDegree") (Node :: MInt) implements single ${
         val id = $1.id
@@ -126,10 +124,16 @@ trait GraphOps{
 
         levelArray($1.id) = 1
         set(bitMap,$1.id,1)
-        var finished = AtomicBoolean(false)
+        
+        //error: illegal sharing of mutable objects Sym(2472 at Sym(2473)=Reflect(NewVar(Sym(2472)),Summary(false,false,false,false,true,false,List(Sym(2472)),List(Sym(2472)),List(),List()),List(Sym(2472)))
+        //var finished = AtomicBoolean(false)
+        var finished = false
+
         var level = 1
 
-        while(!getAndSet(finished,true)){
+        
+        while(!finished){//!getAndSet(finished,true)){
+          finished = true
           nodes.foreach{n =>  
             if(levelArray(n) == level){
               val neighbor = $self.outNbrs(Node(n))
@@ -137,13 +141,14 @@ trait GraphOps{
                 if(testAtomic(bitMap,nghbr,0)){
                   if(testAndSetAtomic(bitMap,nghbr,0,1)){
                     levelArray(nghbr) = level+1
-                    set(finished,false)
+                    finished = false//set(finished,false)
               }}}//end nghbr for each 
               forwardComp(n) = $2(Node(n),forwardComp,levelArray)
             }
           }//end nodes for each
           level += 1
         }//end while
+
         val rBFS = true
         ///reverse BFS
         while( level>=1 ){
@@ -154,7 +159,7 @@ trait GraphOps{
           }
           level -= 1
         }
-        reverseComp
+        NodeData(reverseComp.getRawArrayBuffer)
       }
 
       compiler ("getIDHashMap") (Nil :: MHashMap(MString,MInt)) implements getter(0, "_IDhash")

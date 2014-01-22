@@ -42,9 +42,13 @@ def main(argv):
 		fp_match = False if re.match(r'#.*', line, re.M|re.I) else True #probably a better way
 		if fp_match:
 			line_array = re.findall(fp,line)
-			if( abs ( (float(hashmap[line_array[0]])*float(scale)) - float(line_array[1]) ) > 0.001 ):
+			scaled_snap_number = float(hashmap[line_array[0]])*float(scale)
+			if(scaled_snap_number==0 and float(line_array[1]) != 0 ):
 				print "ERROR: Node " + line_array[0] + ' snap data: ' + hashmap[line_array[0]] + ' forge data: ' + line_array[1]
 				sys.exit(2)
+			if(scaled_snap_number != 0):
+				if( (abs ( scaled_snap_number - float(line_array[1]) )/scaled_snap_number) > 0.01 ):
+					print "ERROR: Node " + line_array[0] + ' snap data: ' + hashmap[line_array[0]] + ' forge data: ' + line_array[1]
 	print "Oh snap! Success!  All data matched snap output data!"
 
 if __name__ == "__main__":

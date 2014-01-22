@@ -43,7 +43,7 @@ trait PageRank extends OptiGraphApplication {
 		println("done")
 	}
 	def printUsage = {
-		println("Usage: Q1 <path to input edge list file>")
+		println("Usage: Q1 <path to input edge list file> <delimeter in edgelist>")
 		exit(-1)
 	}
 }

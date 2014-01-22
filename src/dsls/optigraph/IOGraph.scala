@@ -35,12 +35,16 @@ trait IOGraphOps {
     })
 
   	direct (IO) ("graphFromEdgeList", Nil, MString :: Graph) implements composite ${
+      println("here0")
       val input_edges = ForgeFileReader.readLines($0)({line =>
         //if(!line.startsWith("#")){
-          val fields = line.fsplit("\t")
+          val fields = line.fsplit(" ")
           pack(fields(0),fields(1)) 
         //} 
       })
+
+      println("here1")
+
       //contains the input tuples
       val edge_data = NodeData[Tup2[String,String]](input_edges)
 
@@ -58,6 +62,9 @@ trait IOGraphOps {
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       val idHashMap = idView.groupByReduce[String,Int](n => distinct_ids(n), n => n, (a,b) => a)
 
+      println("here2")
+
+
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       //must filter down the ids we want to flat map to just the distinct src ids we want
       //gets tricky because order of flatmap must match our internal id order other wise
@@ -67,15 +74,35 @@ trait IOGraphOps {
       val src_edge_array = src_ids_ordered.flatMap{e => NodeData(src_groups(distinct_ids(e)))}.map{n => fhashmap_get(idHashMap,n)}
       val src_node_array = NodeData[Int](numNodes)
 
+      println("here3")
+
+
       val dst_groups = edge_data.groupBy(e => e._2, e => e._1)
       val dst_ids_ordered = NodeData(array_sort(fhashmap_keys(dst_ids.groupBy[Int,Int](e => fhashmap_get(idHashMap,e),e => fhashmap_get(idHashMap,e)))))
       val dst_edge_array = dst_ids_ordered.flatMap(e => NodeData(dst_groups(distinct_ids(e)))).map{n => fhashmap_get(idHashMap,n)}
       val dst_node_array = NodeData[Int](numNodes)
 
+      println("here4")
+
       var i = 0
+      var src_array_index = 0
+      var dst_array_index = 0
       while(i < numNodes-1){
-        src_node_array(i+1) = array_buffer_length(fhashmap_get(src_groups,distinct_ids(i))) + src_node_array(i)
-        dst_node_array(i+1) = array_buffer_length(fhashmap_get(dst_groups,distinct_ids(i))) + dst_node_array(i)
+        if(src_ids_ordered(src_array_index)==i){
+          src_node_array(i+1) = array_buffer_length(fhashmap_get(src_groups,distinct_ids(i))) + src_node_array(i)
+          if((src_array_index+1) < src_ids_ordered.length) src_array_index += 1
+        }
+        else{
+          src_node_array(i+1) = src_node_array(i)
+        }
+        if(dst_ids_ordered(dst_array_index)==i){
+          dst_node_array(i+1) = array_buffer_length(fhashmap_get(dst_groups,distinct_ids(i))) + dst_node_array(i)
+          dst_array_index += 1
+          if((dst_array_index+1) < dst_ids_ordered.length) dst_array_index += 1
+        }
+        else{
+          dst_node_array(i+1) = dst_node_array(i)
+        }
         i += 1
       }
 

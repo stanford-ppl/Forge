@@ -47,8 +47,9 @@ def main(argv):
 				print "ERROR: Node " + line_array[0] + ' snap data: ' + hashmap[line_array[0]] + ' forge data: ' + line_array[1]
 				sys.exit(2)
 			if(scaled_snap_number != 0):
-				if( (abs ( scaled_snap_number - float(line_array[1]) )/scaled_snap_number) > 0.01 ):
-					print "ERROR: Node " + line_array[0] + ' snap data: ' + hashmap[line_array[0]] + ' forge data: ' + line_array[1]
+				perc_error = abs ( scaled_snap_number - float(line_array[1]) )/scaled_snap_number
+				if( perc_error > 0.01 ):
+					print "ERROR: Node " + line_array[0] + ' snap data: ' + hashmap[line_array[0]] + ' forge data: ' + line_array[1] + ' %ERROR: ' + str(perc_error*100)
 	print "Oh snap! Success!  All data matched snap output data!"
 
 if __name__ == "__main__":

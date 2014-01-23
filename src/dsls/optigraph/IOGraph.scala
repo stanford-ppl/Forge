@@ -86,7 +86,6 @@ trait IOGraphOps {
         }
         if(dst_ids_ordered(dst_array_index)==i){
           dst_node_array(i+1) = array_buffer_length(fhashmap_get(dst_groups,distinct_ids(i))) + dst_node_array(i)
-          dst_array_index += 1
           if((dst_array_index+1) < dst_ids_ordered.length) dst_array_index += 1
         }
         else{

@@ -32,15 +32,16 @@ trait PageRank extends OptiGraphApplication {
 		
 		val pr =
 		 untilconverged(prInit, tol=threshold,maxIter=maxItr){ oldPr =>
-			g.nodes({ n =>
-				(((1.0 - damp) / g.numNodes) + damp * sum(g.inNbrs(n)){w => 
-					oldPr(w) / g.outDegree(Node(w))}{n =>true})
+			val tmp = g.nodes({ n =>
+				  damp * sum(g.inNbrs(n)){w => oldPr(w) / g.outDegree(Node(w))}{n =>true}
 				})
+			val leaked = (1.0 - sum(tmp)) / g.numNodes
+			tmp.map(e => e + leaked)
 		}{(curPr,oldPr) => sum(abs(curPr-oldPr))}
 		
 		toc(pr)
 		writeResults("pageRank.txt",g,pr)
-		println("done")
+		println("done float")
 	}
 	def printUsage = {
 		println("Usage: Q1 <path to input edge list file> <delimeter in edgelist>")

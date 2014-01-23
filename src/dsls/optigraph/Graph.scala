@@ -49,7 +49,13 @@ trait GraphOps{
 
       //overloaded this method for pagerank, gets funky when you have NodeData(NodeData) like above
       infix("nodes")( (Node==>R) :: NodeData(R), addTpePars=R) implements composite ${
-        NodeData[R](array_map[Int,R](array_fromfunction($self.numNodes,{n => n}), {n => $1(Node(n))}))
+        //NodeData[R](array_map[Int,R](array_fromfunction($self.numNodes,{n => n}), {n => $1(Node(n))}))
+        val r = NodeData(array_fromfunction($self.numNodes,{n => n}))
+        val t = NodeData[R]($self.numNodes)
+        r.foreach{ n =>
+           t(n) = $1(Node(n))
+        }
+        t
       }
 
       //If i do just up neighbors I can't use a view and it will be more expensive

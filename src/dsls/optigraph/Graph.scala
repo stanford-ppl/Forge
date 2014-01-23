@@ -236,7 +236,7 @@ trait GraphOps{
       result
     }
     // "block" should not mutate the input, but always produce a new copy. in this version, block can change the structure of the input across iterations (e.g. increase its size)
-    direct (Graph) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, ".001"), ("minIter", MInt, "1"), ("maxIter", MInt, "1000")), ("block", T ==> T), ("diff", (T,T) ==> MDouble)), T)) implements composite ${
+    direct (Graph) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, ".0001"), ("minIter", MInt, "1"), ("maxIter", MInt, "100")), ("block", T ==> T), ("diff", (T,T) ==> MDouble)), T)) implements composite ${
       var delta = scala.Double.MaxValue
       var cur = x
       var iter = 0

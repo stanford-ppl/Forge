@@ -33,8 +33,8 @@ trait PageRank extends OptiGraphApplication {
 		val pr =
 		 untilconverged(prInit, tol=threshold,maxIter=maxItr){ oldPr =>
 			g.nodes({ n =>
-				((1.0 - damp) / g.numNodes) + damp * sum(g.inNbrs(n)){w => 
-					oldPr(w) / g.outDegree(Node(w))}{n =>true} 
+				(((1.0 - damp) / g.numNodes) + damp * sum(g.inNbrs(n)){w => 
+					oldPr(w) / g.outDegree(Node(w))}{n =>true})
 				})
 		}{(curPr,oldPr) => sum(abs(curPr-oldPr))}
 		

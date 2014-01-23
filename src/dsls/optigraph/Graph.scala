@@ -218,6 +218,8 @@ trait GraphOps{
     //math_object_abs only works for a type of Double
     direct(Graph) ("abs", Nil, MDouble :: MDouble) implements single ${math_object_abs($0)}
     direct(Graph) ("abs", Nil, NodeData(MDouble) :: NodeData(MDouble)) implements single ${$0.map(e => math_object_abs(e))}
+    direct(Graph) ("abs", Nil, MFloat :: MFloat) implements single ${if($0 > 0) $0 else $0 * -1}
+    direct(Graph) ("abs", Nil, NodeData(MFloat) :: NodeData(MFloat)) implements single ${$0.map(e => abs(e))}
 
     //a couple of sum methods
     direct(Graph) ("sum", R, NodeData(R) :: R, TNumeric(R)) implements single ${$0.reduce((a,b) => a+b)}

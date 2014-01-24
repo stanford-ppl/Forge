@@ -256,7 +256,7 @@ trait GraphOps{
         delta = diff(prev,next)
         cur = next
       }
-
+      println("Number of Iterations: " + iter)
       if (iter == maxIter){
         println("Maximum iterations exceeded")
       }

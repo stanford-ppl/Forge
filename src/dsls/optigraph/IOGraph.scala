@@ -45,6 +45,7 @@ trait IOGraphOps {
       //contains the input tuples
       val edge_data = NodeData[Tup2[String,String]](input_edges)
 
+      println("filereader finished: " + edge_data.length)
       tic("hashmap setup", edge_data)
 
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
@@ -60,6 +61,7 @@ trait IOGraphOps {
       val idHashMap = idView.groupByReduce[String,Int](n => distinct_ids(n), n => n, (a,b) => a)
       
       toc("hashmap setup", idHashMap)
+      println("hashmap setup: " + fhashmap_size(idHashMap))
       tic("flatmap", edge_data)
 
       //must filter down the ids we want to flat map to just the distinct src ids we want
@@ -75,6 +77,7 @@ trait IOGraphOps {
       val dst_node_array = NodeData[Int](numNodes)
 
       toc("flatmap", dst_edge_array)
+      println("flatmap done: " + dst_edge_array.length)
       tic("serial", dst_edge_array)
 
       var i = 0
@@ -98,7 +101,6 @@ trait IOGraphOps {
         i += 1
       }
       toc("serial", dst_array_index)
-
 
       println("finished file I/O")
       Graph(true,numNodes,idHashMap,src_node_array.getRawArray,src_edge_array.getRawArray,dst_node_array.getRawArray,dst_edge_array.getRawArray)

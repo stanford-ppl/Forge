@@ -70,15 +70,17 @@ trait IOGraphOps {
       //FIXME: support for string equality needs to be added to the contains
       val src_ids_ordered = NodeData(array_sort(array_map[String,Int](src_ids.getRawArray,e => fhashmap_get(idHashMap,e))))
       val src_edge_array = src_ids_ordered.flatMap{e => NodeData(src_groups(distinct_ids(e)))}.map{n => fhashmap_get(idHashMap,n)}
-      val src_node_array = NodeData[Int](numNodes)
 
       val dst_ids_ordered = NodeData(array_sort(array_map[String,Int](dst_ids.getRawArray,e => fhashmap_get(idHashMap,e))))
       val dst_edge_array = dst_ids_ordered.flatMap(e => NodeData(dst_groups(distinct_ids(e)))).map{n => fhashmap_get(idHashMap,n)}
-      val dst_node_array = NodeData[Int](numNodes)
 
       toc("flatmap", dst_edge_array)
       println("flatmap done: " + dst_edge_array.length)
       tic("serial", dst_edge_array)
+
+      /*
+      val src_node_array = NodeData[Int](numNodes)
+      val dst_node_array = NodeData[Int](numNodes)
 
       var i = 0
       var src_array_index = 0
@@ -100,10 +102,48 @@ trait IOGraphOps {
         }
         i += 1
       }
-      toc("serial", dst_array_index)
+      */
+      val serial_out = assignIndiciesSerial(numNodes,distinct_ids,src_groups,src_ids_ordered,dst_groups,dst_ids_ordered)
+      val src_node_array = serial_out(0)
+      val dst_node_array = serial_out(1)
+
+      toc("serial", dst_node_array)
 
       println("finished file I/O")
       Graph(true,numNodes,idHashMap,src_node_array.getRawArray,src_edge_array.getRawArray,dst_node_array.getRawArray,dst_edge_array.getRawArray)
     }
+
+    //This is a hack to see if it will fix scaling problem around this serial code
+    direct (IO) ("assignIndiciesSerial", Nil, MethodSignature(List(("numNodes",MInt),("distinct_ids",NodeData(MString)),("src_groups",MHashMap(MString,MArrayBuffer(MString))),("src_ids_ordered",NodeData(MInt)),("dst_groups",MHashMap(MString,MArrayBuffer(MString))),("dst_ids_ordered",NodeData(MInt))), NodeData(NodeData(MInt)))) implements single ${
+      val src_node_array = NodeData[Int](numNodes)
+      val dst_node_array = NodeData[Int](numNodes)
+      
+      var i = 0
+      var src_array_index = 0
+      var dst_array_index = 0
+      while(i < numNodes-1){
+        if(src_ids_ordered(src_array_index)==i){
+          src_node_array(i+1) = array_buffer_length(fhashmap_get(src_groups,distinct_ids(i))) + src_node_array(i)
+          if((src_array_index+1) < src_ids_ordered.length) src_array_index += 1
+        }
+        else{
+          src_node_array(i+1) = src_node_array(i)
+        }
+        if(dst_ids_ordered(dst_array_index)==i){
+          dst_node_array(i+1) = array_buffer_length(fhashmap_get(dst_groups,distinct_ids(i))) + dst_node_array(i)
+          if((dst_array_index+1) < dst_ids_ordered.length) dst_array_index += 1
+        }
+        else{
+          dst_node_array(i+1) = dst_node_array(i)
+        }
+        i += 1
+      }
+
+      val result = NodeData[NodeData[Int]](2)
+      result(0) = src_node_array
+      result(1) = dst_node_array
+      NodeData(result.getRawArray)
+    }
+
   }
 }

@@ -45,7 +45,7 @@ trait IOGraphOps {
       //contains the input tuples
       val edge_data = NodeData[Tup2[String,String]](input_edges)
 
-      println("Forge File Reader complete: " + edge_data.length)
+      tic("hashmap setup", edge_data)
 
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       val dst_groups = edge_data.groupBy(e => e._2, e => e._1)
@@ -58,8 +58,9 @@ trait IOGraphOps {
       val numNodes = distinct_ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       val idHashMap = idView.groupByReduce[String,Int](n => distinct_ids(n), n => n, (a,b) => a)
-
-      println("hashmap is setup: " + fhashmap_size(idHashMap))      
+      
+      toc("hashmap setup", idHashMap)
+      tic("flatmap", edge_data)
 
       //must filter down the ids we want to flat map to just the distinct src ids we want
       //gets tricky because order of flatmap must match our internal id order other wise
@@ -73,7 +74,8 @@ trait IOGraphOps {
       val dst_edge_array = dst_ids_ordered.flatMap(e => NodeData(dst_groups(distinct_ids(e)))).map{n => fhashmap_get(idHashMap,n)}
       val dst_node_array = NodeData[Int](numNodes)
 
-      println("dst edge array finished: " + dst_edge_array.print)
+      toc("flatmap", dst_edge_array)
+      tic("serial", dst_edge_array)
 
       var i = 0
       var src_array_index = 0

@@ -51,7 +51,7 @@ trait GraphOps{
       infix("nodes")( (Node==>R) :: NodeData(R), addTpePars=R) implements composite ${
         NodeData[R](array_map[Int,R](array_fromfunction($self.numNodes,{n => n}), {n => $1(Node(n))}))
         /*
-		val r = NodeData(array_fromfunction($self.numNodes,{n => n}))
+		    val r = NodeData(array_fromfunction($self.numNodes,{n => n}))
         val t = NodeData[R]($self.numNodes)
         r.foreach{ n =>
            t(n) = $1(Node(n))
@@ -73,13 +73,8 @@ trait GraphOps{
         sum($self.outNbrs(n))(data){e => (level(e)==(level(n.id)+1))}
       }
       infix ("outDegree") (Node :: MInt) implements single ${
-        val id = $1.id
-        var end = array_length(out_edge_raw_data($self))
-        var start = out_node_apply($self,id)
-        if( (id+1) < array_length(out_node_raw_data($self)) ) {
-          end = out_node_apply($self,(id+1))
-        }
-        end - start 
+        val end  = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1)) else array_length(out_edge_raw_data($self))
+        end - out_node_apply($self,$1.id) 
       }
       infix ("inDegree") (Node :: MInt) implements single ${
         val id = $1.id

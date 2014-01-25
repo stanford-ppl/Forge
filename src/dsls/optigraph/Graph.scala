@@ -77,16 +77,11 @@ trait GraphOps{
         end - out_node_apply($self,$1.id) 
       }
       infix ("inDegree") (Node :: MInt) implements single ${
-        val id = $1.id
-        var end = array_length(in_edge_raw_data($self))
-        var start = in_node_apply($self,id)
-        if( (id+1) < array_length(in_node_raw_data($self)) ) {
-          end = in_node_apply($self,(id+1))
-        }
-        end - start 
+        if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) else array_length(in_edge_raw_data($self))
+        end - in_node_apply($self,$1.id)
       }
       //get out neighbors
-      infix ("outNbrs") (Node :: NodeDataView(MInt)) implements composite ${
+      infix ("outNbrs") (Node :: NodeDataView(MInt)) implements single ${
         val id = $1.id
         //-1 implies no neighbors
         var start = out_node_apply($self,id)
@@ -102,7 +97,7 @@ trait GraphOps{
       }
       
       //get in neighbors   
-      infix ("inNbrs") (Node :: NodeDataView(MInt)) implements composite ${
+      infix ("inNbrs") (Node :: NodeDataView(MInt)) implements single ${
         val id = $1.id
         //-1 implies no neighbors
         var start = in_node_apply($self,id)

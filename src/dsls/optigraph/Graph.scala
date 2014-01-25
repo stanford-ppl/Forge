@@ -77,7 +77,7 @@ trait GraphOps{
         end - out_node_apply($self,$1.id) 
       }
       infix ("inDegree") (Node :: MInt) implements single ${
-        if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) else array_length(in_edge_raw_data($self))
+        val end = if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) else array_length(in_edge_raw_data($self))
         end - in_node_apply($self,$1.id)
       }
       //get out neighbors

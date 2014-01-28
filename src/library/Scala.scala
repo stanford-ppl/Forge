@@ -440,9 +440,12 @@ trait ScalaOps {
     // only the impl of the first declared canonical signature is actually used
     // should overloading be more explicit in the spec to avoid this problem? (an 'overloaded' parameter?)
     // at the very least, we should check for inconsistent codegen rules (or impls) between overloaded variants that collapse to the same thing
-    def scalaStrConcat = quotedArg(0)+".toString + " + quotedArg(1)+".toString"
     for (o <- List(concat,concat2,concat3,concat4,concat5,concat6,concat7,concat8,concat9,concat10,concat11,concat12,concat13,concat14,concat15,concat16)) {
-      impl (o) (codegen($cala, scalaStrConcat))
+      impl (o) (codegen($cala, ${
+        val a = if ($0 == null) "null" else $0.toString
+        val b = if ($1 == null) "null" else $1.toString
+        a + b
+      }))
     }
   }
 

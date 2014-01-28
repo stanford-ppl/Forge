@@ -75,6 +75,9 @@ trait NodeDataOps {
 
 			/////////////////////////debug operations (print serial & parallel)///////////////////////
 			infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println("NodeData: " + a)})
+			infix ("forindicies") ((MInt ==> MUnit) :: MUnit, effect = simple) implements composite ${
+				array_buffer_forIndices($self.getRawArrayBuffer,$1)
+			}
 			infix ("forloop") ((T ==> MUnit) :: MUnit, effect = simple) implements composite ${
 				var i = 0
 				while(i<$self.length){

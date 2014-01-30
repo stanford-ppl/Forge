@@ -32,8 +32,8 @@ trait GraphOps{
     val T = tpePar("T")
     val R = tpePar("R")
 
-    data(Graph,("_directed",MBoolean),("_numNodes",MInt),("_IDhash",MHashMap(MInt,MInt)),("_outNodes",MArray(MInt)),("_outEdges",MArray(MInt)),("_inNodes",MArray(MInt)),("_inEdges",MArray(MInt))) 
-    static(Graph)("apply", Nil, (MethodSignature(List( ("directed",MBoolean),("count",MInt),("exID",MHashMap(MInt,MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("inNodes",MArray(MInt)),("inEdges",MArray(MInt)) )  , Graph) ) ) implements allocates(Graph,${$directed},${count}, ${$exID}, ${$outNodes}, ${outEdges},${$inNodes},${$inEdges})
+    data(Graph,("_directed",MBoolean),("_numNodes",MInt),("_externalIDs",MArray(MInt)),("_outNodes",MArray(MInt)),("_outEdges",MArray(MInt)),("_inNodes",MArray(MInt)),("_inEdges",MArray(MInt))) 
+    static(Graph)("apply", Nil, (MethodSignature(List( ("directed",MBoolean),("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("inNodes",MArray(MInt)),("inEdges",MArray(MInt)) )  , Graph) ) ) implements allocates(Graph,${$directed},${count}, ${$exID}, ${$outNodes}, ${outEdges},${$inNodes},${$inEdges})
 
     val GraphOps = withTpe(Graph)     
     GraphOps{
@@ -41,9 +41,18 @@ trait GraphOps{
       infix ("isDirected") (Nil :: MBoolean) implements getter(0,"_directed") 
       //given an ID return a node
       infix("getNodeFromID")(MInt :: Node) implements composite ${
-        val internalID = getInternalID($self,$1)
-        if(internalID >= $self.numNodes() || internalID < 0) fatal("ERROR. ID: " + $1 + " does not exist in this graph!")
-        Node(internalID)
+        val exIDs = NodeData($self.getExternalIDs)
+        var i = 0
+        var result = -1
+        while( i < $self.numNodes ){
+          if( exIDs(i) ==  $1 ){
+            result = i
+            i = $self.numNodes
+          } 
+          else i += 1
+        }
+        if(result >= $self.numNodes() || result < 0) fatal("ERROR. ID: " + $1 + " does not exist in this graph!")
+        Node(result)
       }
       infix ("numNodes")(Nil :: MInt) implements getter(0,"_numNodes")
 
@@ -108,7 +117,7 @@ trait GraphOps{
       infix ("inBFOrder") ( CurriedMethodSignature(List(Node,((Node,NodeData(R),NodeData(MInt)) ==> R),((Node,NodeData(R),NodeData(R),NodeData(MInt)) ==> R)),NodeData(R)), TFractional(R), addTpePars=R, effect=simple) implements composite ${
         val levelArray = NodeData[Int]($self.numNodes)
         val bitMap = AtomicIntArray($self.numNodes)
-        val nodes = NodeIdView(getHashMapValues($self),$self.numNodes) 
+        val nodes = NodeIdView($self.getExternalIDs,$self.numNodes) 
         val forwardComp = NodeData[R]($self.numNodes)
         val reverseComp = NodeData[R]($self.numNodes)
 
@@ -151,47 +160,7 @@ trait GraphOps{
         NodeData(reverseComp.getRawArrayBuffer)
       }
 
-      compiler ("getIDHashMap") (Nil :: MHashMap(MInt,MInt)) implements getter(0, "_IDhash")
-      //sorts it by internal place, essentially reverses the hashmap
-      infix ("getOrderedNodeIDs") (Nil :: MArray(MInt)) implements composite ${
-        var i = 0
-        val ordered_ids = NodeData[Int]($self.numNodes)
-        val keys = getHashMapKeys($self)
-        val hash = getIDHashMap($self)
-        //array_map[Int,R](array_fromfunction($self.numNodes,{n => n}), {n => hash(keys(i))})
-        while(i < $self.numNodes){
-          ordered_ids(hash(keys(i))) = keys(i)
-          i += 1
-        }
-        ordered_ids.getRawArray
-      }
-      //gets the hash map stored
-      compiler ("getHashMapKeys") (Nil :: MArray(MInt)) implements composite ${
-        fhashmap_keys[Int,Int](getIDHashMap($self))
-      }
-      compiler ("getHashMapValues") (Nil :: MArray(MInt)) implements composite ${
-        fhashmap_values[Int,Int](getIDHashMap($self))
-      }
-      //normal hash
-      compiler("getInternalID")(MInt :: MInt) implements composite ${
-        val elems = getIDHashMap($self)
-        elems($1)
-      }
-      //only needed for debug purposes
-      compiler("getExternalID")(MInt :: MInt) implements composite ${
-        val elems = getIDHashMap($self)
-        val key_array = getHashMapKeys($self)
-        //why can't i do this? FIX Performance hit here
-        //val pair = elems.find((A:MInt,B:MInt) => B==$1)
-        //just doing sequentially for now need to fix
-        var done = false
-        var i = 0
-        while(!done){
-          if(elems(key_array(i)).equals($1)){done = true}
-          else{i += 1}
-        }
-        key_array(i)
-      }
+      infix ("getExternalIDs") (Nil :: MArray(MInt)) implements getter(0, "_externalIDs")
       
       compiler ("out_node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_outNodes")
       compiler("out_node_apply")(MInt :: MInt) implements composite ${array_apply(out_node_raw_data($self),$1)}

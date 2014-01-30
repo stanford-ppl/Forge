@@ -32,15 +32,15 @@ trait GraphOps{
     val T = tpePar("T")
     val R = tpePar("R")
 
-    data(Graph,("_directed",MBoolean),("_numNodes",MInt),("_IDhash",MHashMap(MString,MInt)),("_outNodes",MArray(MInt)),("_outEdges",MArray(MInt)),("_inNodes",MArray(MInt)),("_inEdges",MArray(MInt))) 
-    static(Graph)("apply", Nil, (MethodSignature(List( ("directed",MBoolean),("count",MInt),("exID",MHashMap(MString,MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("inNodes",MArray(MInt)),("inEdges",MArray(MInt)) )  , Graph) ) ) implements allocates(Graph,${$directed},${count}, ${$exID}, ${$outNodes}, ${outEdges},${$inNodes},${$inEdges})
+    data(Graph,("_directed",MBoolean),("_numNodes",MInt),("_IDhash",MHashMap(MInt,MInt)),("_outNodes",MArray(MInt)),("_outEdges",MArray(MInt)),("_inNodes",MArray(MInt)),("_inEdges",MArray(MInt))) 
+    static(Graph)("apply", Nil, (MethodSignature(List( ("directed",MBoolean),("count",MInt),("exID",MHashMap(MInt,MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("inNodes",MArray(MInt)),("inEdges",MArray(MInt)) )  , Graph) ) ) implements allocates(Graph,${$directed},${count}, ${$exID}, ${$outNodes}, ${outEdges},${$inNodes},${$inEdges})
 
     val GraphOps = withTpe(Graph)     
     GraphOps{
       //graph directed or not?
       infix ("isDirected") (Nil :: MBoolean) implements getter(0,"_directed") 
       //given an ID return a node
-      infix("getNodeFromID")(MString :: Node) implements composite ${
+      infix("getNodeFromID")(MInt :: Node) implements composite ${
         val internalID = getInternalID($self,$1)
         if(internalID >= $self.numNodes() || internalID < 0) fatal("ERROR. ID: " + $1 + " does not exist in this graph!")
         Node(internalID)
@@ -151,11 +151,11 @@ trait GraphOps{
         NodeData(reverseComp.getRawArrayBuffer)
       }
 
-      compiler ("getIDHashMap") (Nil :: MHashMap(MString,MInt)) implements getter(0, "_IDhash")
+      compiler ("getIDHashMap") (Nil :: MHashMap(MInt,MInt)) implements getter(0, "_IDhash")
       //sorts it by internal place, essentially reverses the hashmap
-      infix ("getOrderedNodeIDs") (Nil :: MArray(MString)) implements composite ${
+      infix ("getOrderedNodeIDs") (Nil :: MArray(MInt)) implements composite ${
         var i = 0
-        val ordered_ids = NodeData[String]($self.numNodes)
+        val ordered_ids = NodeData[Int]($self.numNodes)
         val keys = getHashMapKeys($self)
         val hash = getIDHashMap($self)
         //array_map[Int,R](array_fromfunction($self.numNodes,{n => n}), {n => hash(keys(i))})
@@ -166,19 +166,19 @@ trait GraphOps{
         ordered_ids.getRawArray
       }
       //gets the hash map stored
-      compiler ("getHashMapKeys") (Nil :: MArray(MString)) implements composite ${
-        fhashmap_keys[String,Int](getIDHashMap($self))
+      compiler ("getHashMapKeys") (Nil :: MArray(MInt)) implements composite ${
+        fhashmap_keys[Int,Int](getIDHashMap($self))
       }
       compiler ("getHashMapValues") (Nil :: MArray(MInt)) implements composite ${
-        fhashmap_values[String,Int](getIDHashMap($self))
+        fhashmap_values[Int,Int](getIDHashMap($self))
       }
       //normal hash
-      compiler("getInternalID")(MString :: MInt) implements composite ${
+      compiler("getInternalID")(MInt :: MInt) implements composite ${
         val elems = getIDHashMap($self)
         elems($1)
       }
       //only needed for debug purposes
-      compiler("getExternalID")(MInt :: MString) implements composite ${
+      compiler("getExternalID")(MInt :: MInt) implements composite ${
         val elems = getIDHashMap($self)
         val key_array = getHashMapKeys($self)
         //why can't i do this? FIX Performance hit here

@@ -41,16 +41,7 @@ trait GraphOps{
       infix ("isDirected") (Nil :: MBoolean) implements getter(0,"_directed") 
       //given an ID return a node
       infix("getNodeFromID")(MInt :: Node) implements composite ${
-        val exIDs = NodeData($self.getExternalIDs)
-        var i = 0
-        var result = -1
-        while( i < $self.numNodes ){
-          if( exIDs(i) ==  $1 ){
-            result = i
-            i = $self.numNodes
-          } 
-          else i += 1
-        }
+        val result = NodeIdView($self.getExternalIDs,$self.numNodes).mapreduce[Int]( i => i, (a,b) => a+b, i => $self.getExternalID(i)==$1)
         if(result >= $self.numNodes() || result < 0) fatal("ERROR. ID: " + $1 + " does not exist in this graph!")
         Node(result)
       }
@@ -161,6 +152,7 @@ trait GraphOps{
       }
 
       infix ("getExternalIDs") (Nil :: MArray(MInt)) implements getter(0, "_externalIDs")
+      infix ("getExternalID") (MInt :: MInt) implements single ${array_apply($self.getExternalIDs,$1)}
       
       compiler ("out_node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_outNodes")
       compiler("out_node_apply")(MInt :: MInt) implements composite ${array_apply(out_node_raw_data($self),$1)}

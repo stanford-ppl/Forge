@@ -20,9 +20,8 @@ trait IOGraphOps {
 
     val T = tpePar("T")
 
-    direct (IO) ("writeResults", T, (("path",MString),("graph",Graph),("data",NodeData(T))) :: MUnit, TNumeric(T), effect = simple) implements composite ${
-      val ids = $graph.getOrderedNodeIDs
-      writeGraphData($path,ids,data.getRawArray,$data.length)
+    direct (IO) ("writeResults", T, (("path",MString),("graph",Graph),("data",NodeData(T))) :: MUnit, TNumeric(T), effect = simple) implements single ${
+      writeGraphData($path,$graph.getExternalIDs,data.getRawArray,$data.length)
     }
     compiler (IO) ("writeGraphData", T, (("path",MString),("ids",MArray(MInt)),("data",MArray(T)),("length",MInt)) :: MUnit, TNumeric(T), effect = simple) implements codegen($cala, ${
       val xfs = new java.io.BufferedWriter(new java.io.FileWriter($path))
@@ -85,7 +84,7 @@ trait IOGraphOps {
       toc("serial", dst_node_array)
 
       println("finished file I/O")
-      Graph(true,numNodes,idHashMap,src_node_array.getRawArray,src_edge_array.getRawArray,dst_node_array.getRawArray,dst_edge_array.getRawArray)
+      Graph(true,numNodes,distinct_ids.getRawArray,src_node_array.getRawArray,src_edge_array.getRawArray,dst_node_array.getRawArray,dst_edge_array.getRawArray)
     }
 
     //This is a hack to see if it will fix scaling problem around this serial code

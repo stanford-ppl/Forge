@@ -32,8 +32,8 @@ trait GraphOps{
     val T = tpePar("T")
     val R = tpePar("R")
 
-    data(Graph,("_directed",MBoolean),("_numNodes",MInt),("_externalIDs",MArray(MInt)),("_outNodes",MArray(MInt)),("_outEdges",MArray(MInt)),("_inNodes",MArray(MInt)),("_inEdges",MArray(MInt))) 
-    static(Graph)("apply", Nil, (MethodSignature(List( ("directed",MBoolean),("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("inNodes",MArray(MInt)),("inEdges",MArray(MInt)) )  , Graph) ) ) implements allocates(Graph,${$directed},${count}, ${$exID}, ${$outNodes}, ${outEdges},${$inNodes},${$inEdges})
+    data(Graph,("_directed",MBoolean),("_numNodes",MInt),("_IDhash",MHashMap(MInt,MInt)),("_outNodes",MArray(MInt)),("_outEdges",MArray(MInt)),("_inNodes",MArray(MInt)),("_inEdges",MArray(MInt))) 
+    static(Graph)("apply", Nil, (MethodSignature(List( ("directed",MBoolean),("count",MInt),("exID",MHashMap(MInt,MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("inNodes",MArray(MInt)),("inEdges",MArray(MInt)) )  , Graph) ) ) implements allocates(Graph,${$directed},${count}, ${$exID}, ${$outNodes}, ${outEdges},${$inNodes},${$inEdges})
 
     val GraphOps = withTpe(Graph)     
     GraphOps{
@@ -41,15 +41,15 @@ trait GraphOps{
       infix ("isDirected") (Nil :: MBoolean) implements getter(0,"_directed") 
       //given an ID return a node
       infix("getNodeFromID")(MInt :: Node) implements composite ${
-        val result = NodeIdView($self.getExternalIDs,$self.numNodes).mapreduce[Int]( i => i, (a,b) => a+b, i => $self.getExternalID(i)==$1)
-        if(result >= $self.numNodes() || result < 0) fatal("ERROR. ID: " + $1 + " does not exist in this graph!")
-        Node(result)
+        val internalID = getInternalID($self,$1)
+        if(internalID >= $self.numNodes() || internalID < 0) fatal("ERROR. ID: " + $1 + " does not exist in this graph!")
+        Node(internalID)
       }
       infix ("numNodes")(Nil :: MInt) implements getter(0,"_numNodes")
 
       //overloaded this method for pagerank, gets funky when you have NodeData(NodeData) like above
       infix("nodes")( (Node==>R) :: NodeData(R), addTpePars=R) implements composite ${
-        NodeData[R](array_fromfunction($self.numNodes,{n => $1(Node(n))}))
+        NodeData[R](array_map[Int,R](array_fromfunction($self.numNodes,{n => n}), {n => $1(Node(n))}))
       }
 
       //If i do just up neighbors I can't use a view and it will be more expensive
@@ -108,7 +108,7 @@ trait GraphOps{
       infix ("inBFOrder") ( CurriedMethodSignature(List(Node,((Node,NodeData(R),NodeData(MInt)) ==> R),((Node,NodeData(R),NodeData(R),NodeData(MInt)) ==> R)),NodeData(R)), TFractional(R), addTpePars=R, effect=simple) implements composite ${
         val levelArray = NodeData[Int]($self.numNodes)
         val bitMap = AtomicIntArray($self.numNodes)
-        val nodes = NodeIdView($self.getExternalIDs,$self.numNodes) 
+        val nodes = NodeIdView(getHashMapValues($self),$self.numNodes) 
         val forwardComp = NodeData[R]($self.numNodes)
         val reverseComp = NodeData[R]($self.numNodes)
 
@@ -151,8 +151,47 @@ trait GraphOps{
         NodeData(reverseComp.getRawArrayBuffer)
       }
 
-      infix ("getExternalIDs") (Nil :: MArray(MInt)) implements getter(0, "_externalIDs")
-      infix ("getExternalID") (MInt :: MInt) implements single ${array_apply($self.getExternalIDs,$1)}
+      compiler ("getIDHashMap") (Nil :: MHashMap(MInt,MInt)) implements getter(0, "_IDhash")
+      //sorts it by internal place, essentially reverses the hashmap
+      infix ("getOrderedNodeIDs") (Nil :: MArray(MInt)) implements composite ${
+        var i = 0
+        val ordered_ids = NodeData[Int]($self.numNodes)
+        val keys = getHashMapKeys($self)
+        val hash = getIDHashMap($self)
+        //array_map[Int,R](array_fromfunction($self.numNodes,{n => n}), {n => hash(keys(i))})
+        while(i < $self.numNodes){
+          ordered_ids(hash(keys(i))) = keys(i)
+          i += 1
+        }
+        ordered_ids.getRawArray
+      }
+      //gets the hash map stored
+      compiler ("getHashMapKeys") (Nil :: MArray(MInt)) implements composite ${
+        fhashmap_keys[Int,Int](getIDHashMap($self))
+      }
+      compiler ("getHashMapValues") (Nil :: MArray(MInt)) implements composite ${
+        fhashmap_values[Int,Int](getIDHashMap($self))
+      }
+      //normal hash
+      compiler("getInternalID")(MInt :: MInt) implements composite ${
+        val elems = getIDHashMap($self)
+        elems($1)
+      }
+      //only needed for debug purposes
+      compiler("getExternalID")(MInt :: MInt) implements composite ${
+        val elems = getIDHashMap($self)
+        val key_array = getHashMapKeys($self)
+        //why can't i do this? FIX Performance hit here
+        //val pair = elems.find((A:MInt,B:MInt) => B==$1)
+        //just doing sequentially for now need to fix
+        var done = false
+        var i = 0
+        while(!done){
+          if(elems(key_array(i)).equals($1)){done = true}
+          else{i += 1}
+        }
+        key_array(i)
+      }
       
       compiler ("out_node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_outNodes")
       compiler("out_node_apply")(MInt :: MInt) implements composite ${array_apply(out_node_raw_data($self),$1)}
@@ -167,12 +206,12 @@ trait GraphOps{
   
     //math_object_abs only works for a type of Double
     direct(Graph) ("abs", Nil, MDouble :: MDouble) implements single ${math_object_abs($0)}
-    direct(Graph) ("abs", Nil, NodeData(MDouble) :: NodeData(MDouble)) implements composite ${$0.map(e => math_object_abs(e))}
+    direct(Graph) ("abs", Nil, NodeData(MDouble) :: NodeData(MDouble)) implements single ${$0.map(e => math_object_abs(e))}
     direct(Graph) ("abs", Nil, MFloat :: MFloat) implements single ${if($0 > 0) $0 else $0 * -1}
-    direct(Graph) ("abs", Nil, NodeData(MFloat) :: NodeData(MFloat)) implements composite ${$0.map(e => abs(e))}
+    direct(Graph) ("abs", Nil, NodeData(MFloat) :: NodeData(MFloat)) implements single ${$0.map(e => abs(e))}
 
     //a couple of sum methods
-    direct(Graph) ("sum", R, NodeData(R) :: R, TNumeric(R)) implements composite ${$0.reduce((a,b) => a+b)}
+    direct(Graph) ("sum", R, NodeData(R) :: R, TNumeric(R)) implements single ${$0.reduce((a,b) => a+b)}
     direct(Graph) ("sum", R, CurriedMethodSignature(List(("nd_view",NodeDataView(MInt)), ("data",MInt==>R) ,("cond",MInt==>MBoolean)),R), TNumeric(R)) implements composite ${nd_view.mapreduce[R]( e => data(e), (a,b) => a+b, cond)}
     direct(Graph) ("sum", R, NodeData(NodeData(R)) :: NodeData(R), TFractional(R)) implements composite ${
       //FIXME: HACK

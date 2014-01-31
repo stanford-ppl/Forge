@@ -65,42 +65,28 @@ trait GraphOps{
         sum($self.outNbrs(n))(data){e => (level(e)==(level(n.id)+1))}
       }
       infix ("outDegree") (Node :: MInt) implements single ${
-        val end  = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1)) else array_length(out_edge_raw_data($self))
+        val end  = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1)) 
+          else array_length(out_edge_raw_data($self))
         end - out_node_apply($self,$1.id) 
       }
       infix ("inDegree") (Node :: MInt) implements single ${
-        val end = if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) else array_length(in_edge_raw_data($self))
+        val end = if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) 
+            else array_length(in_edge_raw_data($self))
         end - in_node_apply($self,$1.id)
       }
       //get out neighbors
       infix ("outNbrs") (Node :: NodeDataView(MInt)) implements single ${
-        val id = $1.id
-        //-1 implies no neighbors
-        var start = out_node_apply($self,id)
-        var end = array_length(out_edge_raw_data($self))
-        if( (id+1) < array_length(out_node_raw_data($self)) ) { 
-          end = out_node_apply($self,(id+1))
-        }
-        if(start == -1 || end == -1){
-          start = 0
-          end = 0
-        }
+        val start = out_node_apply($self,$1.id)
+        val end = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1))
+              else array_length(out_edge_raw_data($self))
         NodeDataView[Int](out_edge_raw_data($self),start,1,end-start)
       }
       
       //get in neighbors   
       infix ("inNbrs") (Node :: NodeDataView(MInt)) implements single ${
-        val id = $1.id
-        //-1 implies no neighbors
-        var start = in_node_apply($self,id)
-        var end = array_length(in_edge_raw_data($self))
-        if( (id+1) < array_length(in_node_raw_data($self)) ) {   
-            end = in_node_apply($self,(id+1))
-        }
-        if(start == -1 || end == -1){
-            start = 0
-            end = 0
-        }
+        val start = in_node_apply($self,$1.id)
+        val end = if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) 
+            else array_length(in_edge_raw_data($self)) 
         NodeDataView[Int](in_edge_raw_data($self),start,1,end-start)
       }
 

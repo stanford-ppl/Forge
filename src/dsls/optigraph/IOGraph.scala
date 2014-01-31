@@ -68,10 +68,10 @@ trait IOGraphOps {
       //gets tricky because order of flatmap must match our internal id order other wise
       //the edge array gets screwed up
       val src_ids_ordered = NodeData(array_sort(array_map[Int,Int](src_ids.getRawArray,e => fhashmap_get(idHashMap,e))))
-      val src_edge_array = src_ids_ordered.flatMap{e => NodeData(src_groups(distinct_ids(e)))}.map{n => fhashmap_get(idHashMap,n)}
+      val src_edge_array = src_ids_ordered.flatMap{e => NodeData(src_groups(distinct_ids(e))).map(n => fhashmap_get(idHashMap,n))}
 
       val dst_ids_ordered = NodeData(array_sort(array_map[Int,Int](dst_ids.getRawArray,e => fhashmap_get(idHashMap,e))))
-      val dst_edge_array = dst_ids_ordered.flatMap(e => NodeData(dst_groups(distinct_ids(e)))).map{n => fhashmap_get(idHashMap,n)}
+      val dst_edge_array = dst_ids_ordered.flatMap(e => NodeData(dst_groups(distinct_ids(e))).map{n => fhashmap_get(idHashMap,n)})
 
       toc("flatmap", dst_edge_array)
       println("flatmap done: " + dst_edge_array.length)

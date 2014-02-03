@@ -79,7 +79,7 @@ trait GraphOps{
         val start = out_node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1))
               else array_length(out_edge_raw_data($self))
-        NodeDataView[Int](out_edge_raw_data($self),start,1,end-start)
+        NodeDataView[Int](out_edge_raw_data($self),start,end-start)
       }
       
       //get in neighbors   
@@ -87,7 +87,7 @@ trait GraphOps{
         val start = in_node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) 
             else array_length(in_edge_raw_data($self)) 
-        NodeDataView[Int](in_edge_raw_data($self),start,1,end-start)
+        NodeDataView[Int](in_edge_raw_data($self),start,end-start)
       }
 
       //perform BF traversal

@@ -29,7 +29,11 @@ trait NodeDataViewOps {
       infix ("mapreduce") ( (T ==> R,(R,R) ==> R, T==>MBoolean) :: R, TNumeric(R), addTpePars=(T,R)) implements mapReduce((T,R), 0, ${e => $1(e)}, ${numeric_zero[R]}, ${(a,b) => $2(a,b)}, Some(${c => $3(c)}) )
       infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements foreach(T, 0, ${a => $1(a)})
       infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println(a)})
-      infix ("NodeDataView_getRawArray") (Nil :: MArray(T)) implements getter(0, "_data")
+      infix ("getRawArray") (Nil :: MArray(T)) implements composite ${
+        val d = array_empty[T]($self.length)
+        array_copy(NodeDataView_data($self),NodeDataView_start($self),d,0,$self.length)
+        d
+      }
 
       compiler ("NodeDataView_data") (Nil :: MArray(T)) implements getter(0, "_data")
       compiler ("NodeDataView_start") (Nil :: MInt) implements getter(0, "_start")

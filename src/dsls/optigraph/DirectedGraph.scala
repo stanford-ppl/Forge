@@ -38,33 +38,12 @@ trait DirectedGraphOps{
     val DirectedGraphOps = withTpe(DirectedGraph)     
     DirectedGraphOps{
       infix ("isDirected") (Nil :: MBoolean) implements single ${true}
-      //If i do just up neighbors I can't use a view and it will be more expensive
-      //cannot perform a filter on a view class for some reason
-      //I see good reason to not split this up here
-      infix ("sumDownNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
-        //only sum in neighbors a level up
-        sum($self.outNbrs(n))(data){e => (level(e)==(level(n.id)+1))}
-      }
-      infix ("outDegree") (Node :: MInt) implements single ${
-        val end  = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1)) 
-          else array_length(out_edge_raw_data($self))
-        end - out_node_apply($self,$1.id) 
-      }
       //get out neighbors
       infix ("outNbrs") (Node :: NodeDataView(MInt)) implements single ${
         val start = out_node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1))
           else array_length(out_edge_raw_data($self))
         NodeDataView[Int](out_edge_raw_data($self),start,end-start)
-      }
-      infix ("sumUpNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
-        //only sum in neighbors a level up
-        sum($self.inNbrs(n))(data){e => level(e)==(level(n.id)-1)}
-      }
-      infix ("inDegree") (Node :: MInt) implements single ${
-        val end = if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) 
-            else array_length(in_edge_raw_data($self))
-        end - in_node_apply($self,$1.id)
       }
       //get in neighbors   
       infix ("inNbrs") (Node :: NodeDataView(MInt)) implements single ${
@@ -73,9 +52,42 @@ trait DirectedGraphOps{
             else array_length(in_edge_raw_data($self)) 
         NodeDataView[Int](in_edge_raw_data($self),start,end-start)
       }
+      infix ("outDegree") (Node :: MInt) implements single ${
+        val end  = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1)) 
+          else array_length(out_edge_raw_data($self))
+        end - out_node_apply($self,$1.id) 
+      }
+      infix ("inDegree") (Node :: MInt) implements single ${
+        val end = if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) 
+            else array_length(in_edge_raw_data($self))
+        end - in_node_apply($self,$1.id)
+      }
+      //If i do just up neighbors I can't use a view and it will be more expensive
+      //cannot perform a filter on a view class for some reason
+      //I see good reason to not split this up here
+      infix ("sumDownNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
+        //only sum in neighbors a level up
+        sum($self.outNbrs(n))(data){e => (level(e)==(level(n.id)+1))}
+      }
+      infix ("sumUpNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
+        //only sum in neighbors a level up
+        sum($self.inNbrs(n))(data){e => level(e)==(level(n.id)-1)}
+      }
 
-      infix ("getExternalIDs") (Nil :: MArray(MInt)) implements getter(0, "_externalIDs")
-      infix ("getExternalID") (MInt :: MInt) implements single ${array_apply($self.getExternalIDs,$1)}
+      infix ("neighbors") (Node :: NodeData(MInt)) implements composite ${
+        val inNbrs = NodeData($self.inNbrs($1).getRawArray)
+        val outNbrs = NodeData($self.outNbrs($1).getRawArray)
+        val concat = NodeData(array_fromfunction(2,{n=>n})).flatMap[Int](e => if(e==0) inNbrs else outNbrs)
+        NodeData(fhashmap_keys(concat.groupBy[Int,Int](e => e, e => e)))
+      }
+      //Input node ids
+      infix ("hasEdge") ((MInt,MInt) :: MBoolean) implements composite ${$self.hasEdge(Node($1),Node($2))}
+      infix ("hasEdge") ((Node,Node) :: MBoolean) implements composite ${
+        val inNbrs = NodeData($self.inNbrs($1).getRawArray).groupByReduce[Int,Int](e => e, e => e, (a,b) => a)
+        val outNbrs = NodeData($self.outNbrs($1).getRawArray).groupByReduce[Int,Int](e => e, e => e, (a,b) => a)
+        if(fhashmap_contains[Int,Int](inNbrs,$2.id) || fhashmap_contains[Int,Int](outNbrs,$2.id)) true 
+        else false
+      }
       
       //Out Node Accessors
       compiler ("out_node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_outNodes")

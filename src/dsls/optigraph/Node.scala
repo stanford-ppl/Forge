@@ -18,6 +18,9 @@ trait NodeOps {
 	val NodeOps = withTpe(Node)
 	NodeOps {
 		infix("id") (Nil :: MInt) implements getter(0,"_id")
+		infix(">") (Node :: MBoolean) implements single ${$0.id>$1.id}
+		infix("<") (Node :: MBoolean) implements single ${$0.id<$1.id}
+		infix("=") (Node :: MBoolean) implements single ${$0.id==$1.id}
 	}
   }
 }

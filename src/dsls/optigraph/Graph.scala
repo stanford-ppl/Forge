@@ -40,11 +40,18 @@ trait GraphOps{
         Node(result)
       }
       infix ("numNodes")(Nil :: MInt) implements getter(0,"_numNodes")
-
-      //overloaded this method for pagerank, gets funky when you have NodeData(NodeData) like above
+      infix ("foreachNode") ((Node ==> MUnit) :: MUnit, effect = simple) implements composite ${
+        NodeData(array_fromfunction($self.numNodes,{n => n})).foreach{ i =>
+          $1(Node(i))
+        }
+      }
       infix("nodes")( (Node==>R) :: NodeData(R), addTpePars=R) implements composite ${
         NodeData[R](array_fromfunction($self.numNodes,{n => $1(Node(n))}))
       }
+
+
+      infix ("getExternalIDs") (Nil :: MArray(MInt)) implements getter(0, "_externalIDs")
+      infix ("getExternalID") (MInt :: MInt) implements single ${array_apply($self.getExternalIDs,$1)}
       //perform BF traversal
       infix ("inBFOrder") ( CurriedMethodSignature(List(Node,((Node,NodeData(R),NodeData(MInt)) ==> R),((Node,NodeData(R),NodeData(R),NodeData(MInt)) ==> R)),NodeData(R)), TFractional(R), addTpePars=R, effect=simple) implements composite ${
         val levelArray = NodeData[Int]($self.numNodes)

@@ -1,8 +1,8 @@
 /*//////////////////////////////////////////////////////////////
 Author: Christopher R. Aberger
 
-Description: The main file for all graph operations.  Glues 
-togther all structures and declares graph operations visible
+Description: The main file for all Graph operations.  Glues 
+togther all structures and declares Graph operations visible
 to user.
 
 Data is stored as follows.  Internal ID #'s map to external ID's
@@ -19,7 +19,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 trait GraphOps{
   this: OptiGraphDSL =>
 
-  def importGraphOps() {
+  def addGraphCommonOps(g: Rep[DSLType]) {
     //previously declared types we use
     val Node = lookupTpe("Node")
     val Edge = lookupTpe("Edge")
@@ -27,22 +27,16 @@ trait GraphOps{
     val NodeDataView = lookupTpe("NodeDataView")
     val NodeIdView = lookupTpe("NodeIdView")
 
-    //Actual graph declaration
-    val Graph = tpe("Graph") 
+    //Actual Graph declaration
     val T = tpePar("T")
     val R = tpePar("R")
-
-    data(Graph,("_directed",MBoolean),("_numNodes",MInt),("_externalIDs",MArray(MInt)),("_outNodes",MArray(MInt)),("_outEdges",MArray(MInt)),("_inNodes",MArray(MInt)),("_inEdges",MArray(MInt))) 
-    static(Graph)("apply", Nil, (MethodSignature(List( ("directed",MBoolean),("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("inNodes",MArray(MInt)),("inEdges",MArray(MInt))), Graph))) implements allocates(Graph,${$directed},${count}, ${$exID}, ${$outNodes}, ${outEdges},${$inNodes},${$inEdges})
-
-    val GraphOps = withTpe(Graph)     
-    GraphOps{
-      //graph directed or not?
-      infix ("isDirected") (Nil :: MBoolean) implements getter(0,"_directed") 
+    val Graph = g
+    val GraphCommonOps = withTpe(Graph)
+    GraphCommonOps{
       //given an ID return a node
       infix("getNodeFromID")(MInt :: Node) implements composite ${
         val result = NodeIdView($self.getExternalIDs,$self.numNodes).mapreduce[Int]( i => i, (a,b) => a+b, i => $self.getExternalID(i)==$1)
-        if(result >= $self.numNodes() || result < 0) fatal("ERROR. ID: " + $1 + " does not exist in this graph!")
+        if(result >= $self.numNodes() || result < 0) fatal("ERROR. ID: " + $1 + " does not exist in this UndirectedGraph!")
         Node(result)
       }
       infix ("numNodes")(Nil :: MInt) implements getter(0,"_numNodes")
@@ -51,45 +45,6 @@ trait GraphOps{
       infix("nodes")( (Node==>R) :: NodeData(R), addTpePars=R) implements composite ${
         NodeData[R](array_fromfunction($self.numNodes,{n => $1(Node(n))}))
       }
-
-      //If i do just up neighbors I can't use a view and it will be more expensive
-      //cannot perform a filter on a view class for some reason
-      //I see good reason to not split this up here
-      infix ("sumUpNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
-        //only sum in neighbors a level up
-        sum($self.inNbrs(n))(data){e => level(e)==(level(n.id)-1)}
-      }
-      //FIXME: hardcoded in not to sum the root
-      infix ("sumDownNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
-        //only sum the outNeighbors a level down
-        sum($self.outNbrs(n))(data){e => (level(e)==(level(n.id)+1))}
-      }
-      infix ("outDegree") (Node :: MInt) implements single ${
-        val end  = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1)) 
-          else array_length(out_edge_raw_data($self))
-        end - out_node_apply($self,$1.id) 
-      }
-      infix ("inDegree") (Node :: MInt) implements single ${
-        val end = if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) 
-            else array_length(in_edge_raw_data($self))
-        end - in_node_apply($self,$1.id)
-      }
-      //get out neighbors
-      infix ("outNbrs") (Node :: NodeDataView(MInt)) implements single ${
-        val start = out_node_apply($self,$1.id)
-        val end = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1))
-              else array_length(out_edge_raw_data($self))
-        NodeDataView[Int](out_edge_raw_data($self),start,end-start)
-      }
-      
-      //get in neighbors   
-      infix ("inNbrs") (Node :: NodeDataView(MInt)) implements single ${
-        val start = in_node_apply($self,$1.id)
-        val end = if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) 
-            else array_length(in_edge_raw_data($self)) 
-        NodeDataView[Int](in_edge_raw_data($self),start,end-start)
-      }
-
       //perform BF traversal
       infix ("inBFOrder") ( CurriedMethodSignature(List(Node,((Node,NodeData(R),NodeData(MInt)) ==> R),((Node,NodeData(R),NodeData(R),NodeData(MInt)) ==> R)),NodeData(R)), TFractional(R), addTpePars=R, effect=simple) implements composite ${
         val levelArray = NodeData[Int]($self.numNodes)
@@ -136,21 +91,20 @@ trait GraphOps{
         }
         NodeData(reverseComp.getRawArrayBuffer)
       }
-
-      infix ("getExternalIDs") (Nil :: MArray(MInt)) implements getter(0, "_externalIDs")
-      infix ("getExternalID") (MInt :: MInt) implements single ${array_apply($self.getExternalIDs,$1)}
-      
-      compiler ("out_node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_outNodes")
-      compiler("out_node_apply")(MInt :: MInt) implements single ${array_apply(out_node_raw_data($self),$1)}
-      compiler ("out_edge_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_outEdges")
-      compiler("out_edge_apply")(MInt :: MInt) implements single ${array_apply(out_edge_raw_data($self),$1)}
-
-      compiler ("in_node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_inNodes")
-      compiler("in_node_apply")(MInt :: MInt) implements single ${array_apply(in_node_raw_data($self),$1)}
-      compiler ("in_edge_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_inEdges")
-      compiler("in_edge_apply")(MInt :: MInt) implements single ${array_apply(in_edge_raw_data($self),$1)}
     }
-  
+  }
+  //have to split this up from 
+  def importGraphAggregateOps(){
+    val Node = lookupTpe("Node")
+    val Edge = lookupTpe("Edge")
+    val NodeData = lookupTpe("NodeData")
+    val NodeDataView = lookupTpe("NodeDataView")
+    val NodeIdView = lookupTpe("NodeIdView")
+
+    //Actual Graph declaration
+    val T = tpePar("T")
+    val R = tpePar("R")
+    val Graph = tpePar("Graph")
     //math_object_abs only works for a type of Double
     direct(Graph) ("abs", Nil, MDouble :: MDouble) implements single ${math_object_abs($0)}
     direct(Graph) ("abs", Nil, NodeData(MDouble) :: NodeData(MDouble)) implements composite ${$0.map(e => math_object_abs(e))}

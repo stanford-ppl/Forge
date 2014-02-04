@@ -11,9 +11,9 @@ object BCInterpreter extends OptiGraphApplicationInterpreter with BC
 trait BC extends OptiGraphApplication {
   def main() = {
     println("OptiGraph Test 1")
-    if (args.length < 1) printUsage
-    
-    val g = graphFromEdgeList(args(0)) 
+    if (args.length < 2) printUsage
+
+    val g = undirectedGraphFromEdgeList(args(0))//if(args(0).equals("directed")) directedGraphFromEdgeList(args(1)) else undirectedGraphFromEdgeList(args(1))
     
     println("Directed: " + g.isDirected)
     println("Number of Nodes: " + g.numNodes)
@@ -35,11 +35,11 @@ trait BC extends OptiGraphApplication {
     }))
     
     toc(bc)
-    writeResults("bc.txt",g,bc)
+    writeResults(args(1),g.getExternalIDs,bc)
     println("done")
   }
   def printUsage = {
-    println("Usage: Q1 <path to input edge list file>")
+    println("Usage: BC <path to input edge list file> <path to output file (to be created)>")
     exit(-1)
   }
 }

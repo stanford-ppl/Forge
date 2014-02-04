@@ -14,14 +14,15 @@ trait IOGraphOps {
   this: OptiGraphDSL =>
   def importIOGraphOps() {
     val IO = grp("GraphIO")
-    val Graph = lookupTpe("Graph")
+    val DirectedGraph = lookupTpe("DirectedGraph")
+    val UndirectedGraph = lookupTpe("UndirectedGraph")
     val NodeData = lookupTpe("NodeData")
     val NodeIdView = lookupTpe("NodeIdView")
 
     val T = tpePar("T")
 
-    direct (IO) ("writeResults", T, (("path",MString),("graph",Graph),("data",NodeData(T))) :: MUnit, TNumeric(T), effect = simple) implements single ${
-      writeGraphData($path,$graph.getExternalIDs,data.getRawArray,$data.length)
+    direct (IO) ("writeResults", T, (("path",MString),("ids",MArray(MInt)),("data",NodeData(T))) :: MUnit, TNumeric(T), effect = simple) implements single ${
+      writeGraphData($path,ids,data.getRawArray,$data.length)
     }
     compiler (IO) ("writeGraphData", T, (("path",MString),("ids",MArray(MInt)),("data",MArray(T)),("length",MInt)) :: MUnit, TNumeric(T), effect = simple) implements codegen($cala, ${
       val xfs = new java.io.BufferedWriter(new java.io.FileWriter($path))
@@ -32,8 +33,72 @@ trait IOGraphOps {
       }
       xfs.close()
     })
+    //assume every edge is listed twice for undirected graphs
+    direct (IO) ("undirectedGraphFromEdgeList", Nil, MString :: UndirectedGraph) implements composite ${
+      val input_edges = ForgeFileReader.readLines($0)({line =>
+        //if(!line.startsWith("#")){
+          val fields = line.fsplit(" ")
+          pack(fields(0).toInt,fields(1).toInt) 
+        //} 
+      })
 
-    direct (IO) ("graphFromEdgeList", Nil, MString :: Graph) implements composite ${
+      //contains the input tuples
+      val edge_data = NodeData[Tup2[Int,Int]](input_edges)
+
+      println("filereader finished: " + edge_data.length)
+      tic("hashmap setup", edge_data)
+
+      val src_groups = edge_data.groupBy(e => e._1, e => e._2)
+      val src_ids = NodeData(fhashmap_keys(src_groups))
+      val distinct_ids = src_ids
+
+      //set up the ID hash map
+      val numNodes = distinct_ids.length
+      val idView = NodeData(array_fromfunction(numNodes,{n => n}))
+      val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
+      
+      toc("hashmap setup", idHashMap)
+      println("hashmap setup: " + fhashmap_size(idHashMap))
+      tic("flatmap", edge_data)
+
+      //must filter down the ids we want to flat map to just the distinct src ids we want
+      //gets tricky because order of flatmap must match our internal id order other wise
+      //the edge array gets screwed up
+      val src_ids_ordered = NodeData(array_sort(array_map[Int,Int](src_ids.getRawArray,e => fhashmap_get(idHashMap,e))))
+      val src_edge_array = src_ids_ordered.flatMap{e => NodeData(src_groups(distinct_ids(e))).map(n => fhashmap_get(idHashMap,n))}
+
+      toc("flatmap", src_edge_array)
+      println("flatmap done: " + src_edge_array.length)
+      tic("serial", src_edge_array)
+
+      val serial_out = assignIndiciesSerialUndirected(numNodes,distinct_ids,src_groups,src_ids_ordered)
+      toc("serial", serial_out)
+
+      println("finished file I/O")
+      UndirectedGraph(numNodes,distinct_ids.getRawArray,serial_out.getRawArray,src_edge_array.getRawArray)
+    }
+     direct (IO) ("assignIndiciesSerialUndirected", Nil, MethodSignature(List(("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt))),("src_ids_ordered",NodeData(MInt))),NodeData(MInt))) implements single ${
+      val src_node_array = NodeData[Int](numNodes)
+      val dst_node_array = NodeData[Int](numNodes)
+      
+      var i = 0
+      var src_array_index = 0
+      var dst_array_index = 0
+      while(i < numNodes-1){
+        if(src_ids_ordered(src_array_index)==i){
+          src_node_array(i+1) = array_buffer_length(fhashmap_get(src_groups,distinct_ids(i))) + src_node_array(i)
+          if((src_array_index+1) < src_ids_ordered.length) src_array_index += 1
+        }
+        else{
+          src_node_array(i+1) = src_node_array(i)
+        }
+        i += 1
+      }
+      NodeData(src_node_array.getRawArray)
+    }
+
+
+    direct (IO) ("directedGraphFromEdgeList", Nil, MString :: DirectedGraph) implements composite ${
       val input_edges = ForgeFileReader.readLines($0)({line =>
         //if(!line.startsWith("#")){
           val fields = line.fsplit(" ")
@@ -77,18 +142,16 @@ trait IOGraphOps {
       println("flatmap done: " + dst_edge_array.length)
       tic("serial", dst_edge_array)
 
-      val serial_out = assignIndiciesSerial(numNodes,distinct_ids,src_groups,src_ids_ordered,dst_groups,dst_ids_ordered)
+      val serial_out = assignIndiciesSerialDirected(numNodes,distinct_ids,src_groups,src_ids_ordered,dst_groups,dst_ids_ordered)
       val src_node_array = serial_out(0)
       val dst_node_array = serial_out(1)
 
       toc("serial", dst_node_array)
 
       println("finished file I/O")
-      Graph(true,numNodes,distinct_ids.getRawArray,src_node_array.getRawArray,src_edge_array.getRawArray,dst_node_array.getRawArray,dst_edge_array.getRawArray)
+      DirectedGraph(numNodes,distinct_ids.getRawArray,src_node_array.getRawArray,src_edge_array.getRawArray,dst_node_array.getRawArray,dst_edge_array.getRawArray)
     }
-
-    //This is a hack to see if it will fix scaling problem around this serial code
-    direct (IO) ("assignIndiciesSerial", Nil, MethodSignature(List(("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt))),("src_ids_ordered",NodeData(MInt)),("dst_groups",MHashMap(MInt,MArrayBuffer(MInt))),("dst_ids_ordered",NodeData(MInt))), NodeData(NodeData(MInt)))) implements single ${
+    direct (IO) ("assignIndiciesSerialDirected", Nil, MethodSignature(List(("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt))),("src_ids_ordered",NodeData(MInt)),("dst_groups",MHashMap(MInt,MArrayBuffer(MInt))),("dst_ids_ordered",NodeData(MInt))), NodeData(NodeData(MInt)))) implements single ${
       val src_node_array = NodeData[Int](numNodes)
       val dst_node_array = NodeData[Int](numNodes)
       
@@ -117,7 +180,6 @@ trait IOGraphOps {
       result(0) = src_node_array
       result(1) = dst_node_array
       NodeData(result.getRawArray)
-    }
-
+    }    
   }
 }

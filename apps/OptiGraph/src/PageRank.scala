@@ -12,8 +12,10 @@ trait PageRank extends OptiGraphApplication {
   def main() = {
     println("PageRank")
   
-    if (args.length < 1) printUsage
-    val g = graphFromEdgeList(args(0))
+    if (args.length < 2) printUsage
+
+    //Works for both directed and undirected, performance 
+    val g = directedGraphFromEdgeList(args(0))
     
     println("Directed: " + g.isDirected)
     println("Number of Nodes: " + g.numNodes)
@@ -37,11 +39,11 @@ trait PageRank extends OptiGraphApplication {
     }{(curPr,oldPr) => sum(abs(curPr-oldPr))}
     
     toc(pr)
-    writeResults("pageRank.txt",g,pr)
-    println("done float")
+    writeResults(args(2),g.getExternalIDs,pr)
+    println("wrote output to: " + args(1))
   }
   def printUsage = {
-    println("Usage: Q1 <path to input edge list file> <delimeter in edgelist>")
+    println("Usage: BC <path to input edge list file> <path to output file (to be created)>")
     exit(-1)
   }
 }

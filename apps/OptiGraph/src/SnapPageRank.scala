@@ -12,8 +12,9 @@ trait SnapPageRank extends OptiGraphApplication {
 	def main() = {
 		println("SnapPageRank")
 	
-		if (args.length < 1) printUsage
-		val g = graphFromEdgeList(args(0))
+		if (args.length < 2) printUsage
+
+    	val g = directedGraphFromEdgeList(args(0))//if(args(0).equals("directed")) directedGraphFromEdgeList(args(1)) else undirectedGraphFromEdgeList(args(1))
 		
 		println("Directed: " + g.isDirected)
 		println("Number of Nodes: " + g.numNodes)
@@ -38,11 +39,11 @@ trait SnapPageRank extends OptiGraphApplication {
 		}{(curPr,oldPr) => sum(abs(curPr-oldPr))}
 		
 		toc(pr)
-		writeResults("SnapPageRank.txt",g,pr)
+		writeResults(args(1),g.getExternalIDs,pr)
 		println("done float")
 	}
 	def printUsage = {
-		println("Usage: Q1 <path to input edge list file> <delimeter in edgelist>")
+		println("Usage: SnapPageRank <'directed' or 'undirected'> <path to input edge list file> <path to output file (to be created)>")
 		exit(-1)
 	}
 }

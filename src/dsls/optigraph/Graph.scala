@@ -33,7 +33,7 @@ trait GraphOps{
     val R = tpePar("R")
 
     data(Graph,("_directed",MBoolean),("_numNodes",MInt),("_externalIDs",MArray(MInt)),("_outNodes",MArray(MInt)),("_outEdges",MArray(MInt)),("_inNodes",MArray(MInt)),("_inEdges",MArray(MInt))) 
-    static(Graph)("apply", Nil, (MethodSignature(List( ("directed",MBoolean),("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("inNodes",MArray(MInt)),("inEdges",MArray(MInt)) )  , Graph) ) ) implements allocates(Graph,${$directed},${count}, ${$exID}, ${$outNodes}, ${outEdges},${$inNodes},${$inEdges})
+    static(Graph)("apply", Nil, (MethodSignature(List( ("directed",MBoolean),("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("inNodes",MArray(MInt)),("inEdges",MArray(MInt))), Graph))) implements allocates(Graph,${$directed},${count}, ${$exID}, ${$outNodes}, ${outEdges},${$inNodes},${$inEdges})
 
     val GraphOps = withTpe(Graph)     
     GraphOps{
@@ -160,19 +160,8 @@ trait GraphOps{
     //a couple of sum methods
     direct(Graph) ("sum", R, NodeData(R) :: R, TNumeric(R)) implements composite ${$0.reduce((a,b) => a+b)}
     direct(Graph) ("sum", R, CurriedMethodSignature(List(("nd_view",NodeDataView(MInt)), ("data",MInt==>R) ,("cond",MInt==>MBoolean)),R), TNumeric(R)) implements composite ${nd_view.mapreduce[R]( e => data(e), (a,b) => a+b, cond)}
-    direct(Graph) ("sum", R, NodeData(NodeData(R)) :: NodeData(R), TFractional(R)) implements composite ${
-      //FIXME: HACK
-      //this does not work in library but we knew that.
-      //val result = $0.reduceND( ((a,b) => a.+(b)),NodeData[R](0))
-      
-      var result = $0(0)
-      var i = 1
-      while(i<$0.length){
-        result = result+($0(i))
-        i += 1
-      }
-      result
-    }
+    direct(Graph) ("sum", R, NodeData(NodeData(R)) :: NodeData(R), TFractional(R)) implements composite ${$0.reduceNested( ((a,b) => a+b),NodeData[R]($0.length))}
+    
     // "block" should not mutate the input, but always produce a new copy. in this version, block can change the structure of the input across iterations (e.g. increase its size)
     direct (Graph) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, ".0001"), ("minIter", MInt, "1"), ("maxIter", MInt, "100")), ("block", T ==> T), ("diff", (T,T) ==> MDouble)), T)) implements composite ${
       var delta = scala.Double.MaxValue

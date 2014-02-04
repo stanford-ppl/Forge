@@ -33,8 +33,6 @@ trait NodeDataOps {
 			infix("apply")(MInt :: T) implements composite ${array_buffer_apply(nd_raw_data($self),$1)}
 			infix("update")( (("id",MInt),("n",T)) :: MUnit, effect=write(0)) implements composite ${array_buffer_update(nd_raw_data($self),$id,$n)}
 			infix ("length")(Nil :: MInt) implements single ${array_buffer_length(nd_raw_data($self))}
-			//the requirement of second argument (length) to the append in this case is useless but still nescessary
-			//could probably be cleaned up in forge
 			infix ("append") (T :: MUnit, effect = write(0)) implements composite ${nd_append($self,$self.length, $1)}
 			//method to get an array of data to outside world
 			infix ("getRawArray") (Nil :: MArray(T)) implements single ${array_buffer_result(nd_raw_data($self))}
@@ -65,10 +63,7 @@ trait NodeDataOps {
 			infix ("filter") ( ((T ==> MBoolean),(T ==> MInt)) :: NodeData(MInt)) implements filter((T,MInt), 0, ${w => $1(w)}, ${e => $2(e)})
 			infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements foreach(T, 0, ${ e => $1(e) })
 			infix ("reduce") (((T,T) ==> T) :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${ (a,b) => $1(a,b) })
-			//FIXME figure out how to declare 0 so that this works
-			infix ("reduceND") ( (((T,T) ==> T),R):: T,addTpePars=R) implements reduce(T, 0, ${$2.asInstanceOf[Rep[T]]}, ${
-				(a,b) => $1(a,b)
-			})
+			infix ("reduceNested") ( (((T,T) ==> T),R):: T,addTpePars=R) implements reduce(T, 0, ${$2.asInstanceOf[Rep[T]]}, ${(a,b) => $1(a,b)})
 			infix ("groupBy") ((T ==> K,T ==> V) :: MHashMap(K, MArrayBuffer(V)), addTpePars = (K,V)) implements groupBy((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)})
 			infix ("groupByReduce") ((T ==> K,T ==> V,(V,V) ==> V) :: MHashMap(K, V), TNumeric(V), addTpePars = (K,V)) implements groupByReduce((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)}, ${numeric_zero[V]}, ${(a,b) => $3(a,b)})
 

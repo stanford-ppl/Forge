@@ -39,7 +39,7 @@ trait PageRank extends OptiGraphApplication {
     }{(curPr,oldPr) => sum(abs(curPr-oldPr))}
     
     toc(pr)
-    writeResults(args(2),g.getExternalIDs,pr)
+    writeResults(args(1),g.getExternalIDs,pr)
     println("wrote output to: " + args(1))
   }
   def printUsage = {

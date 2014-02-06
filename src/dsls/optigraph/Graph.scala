@@ -49,7 +49,6 @@ trait GraphOps{
         NodeData[R](array_fromfunction($self.numNodes,{n => $1(Node(n))}))
       }
 
-
       infix ("getExternalIDs") (Nil :: MArray(MInt)) implements getter(0, "_externalIDs")
       infix ("getExternalID") (MInt :: MInt) implements single ${array_apply($self.getExternalIDs,$1)}
       //perform BF traversal

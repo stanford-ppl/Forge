@@ -26,6 +26,7 @@ trait UndirectedGraphOps{
     val NodeData = lookupTpe("NodeData")
     val NodeDataView = lookupTpe("NodeDataView")
     val NodeIdView = lookupTpe("NodeIdView")
+    val NodeSHash = lookupTpe("NodeSHash")
 
     //Actual UndirectedGraph declaration
     val UndirectedGraph = tpe("UndirectedGraph") 
@@ -39,6 +40,17 @@ trait UndirectedGraphOps{
     UndirectedGraphOps{
       //UndirectedGraph directed or not?
       infix ("isDirected") (Nil :: MBoolean) implements single ${false}
+      
+      infix ("neighbors") (MInt :: NodeSHash(MInt,MInt), effect = simple) implements composite ${
+        val hash = NodeSHash[Int,Int]
+        $self.outNbrs(Node($1)).serialForEach{n => hash.add(n,n)}
+        hash
+      }
+      infix ("neighbors") (Node :: NodeSHash(MInt,MInt), effect = simple) implements composite ${
+        val hash = NodeSHash[Int,Int]
+        $self.outNbrs($1).serialForEach{n => hash.add(n,n)}
+        hash
+      }
       infix ("sumDownNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
         //only sum in neighbors a level up
         sum($self.outNbrs(n))(data){e => (level(e)==(level(n.id)+1))}
@@ -62,12 +74,13 @@ trait UndirectedGraphOps{
       //get in neighbors   
       infix ("inNbrs") (Node :: NodeDataView(MInt)) implements single ${$self.outNbrs($1)}
       infix ("neighbors") (Node :: NodeData(MInt)) implements single ${NodeData($self.outNbrs($1).getRawArray)}
+      /*
       infix ("hasEdge") ((MInt,MInt) :: MBoolean) implements composite ${$self.hasEdge(Node($1),Node($2))}
       infix ("hasEdge") ((Node,Node) :: MBoolean) implements composite ${
         val outNbrs = NodeData($self.outNbrs($1).getRawArray).groupByReduce[Int,Int](e => e, e => e, (a,b) => a)
         if(fhashmap_contains[Int,Int](outNbrs,$2.id)) true else false
       }
-
+      */
       compiler ("node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_nodes")
       compiler("node_apply")(MInt :: MInt) implements single ${array_apply(node_raw_data($self),$1)}
       compiler ("edge_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_edges")

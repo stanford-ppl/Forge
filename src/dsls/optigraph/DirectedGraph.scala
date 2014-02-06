@@ -26,7 +26,7 @@ trait DirectedGraphOps{
     val NodeData = lookupTpe("NodeData")
     val NodeDataView = lookupTpe("NodeDataView")
     val NodeIdView = lookupTpe("NodeIdView")
-
+    val NodeSHash = lookupTpe("NodeSHash")
     //Actual DirectedGraph declaration
     val DirectedGraph = tpe("DirectedGraph") 
     val T = tpePar("T")
@@ -38,6 +38,13 @@ trait DirectedGraphOps{
     val DirectedGraphOps = withTpe(DirectedGraph)     
     DirectedGraphOps{
       infix ("isDirected") (Nil :: MBoolean) implements single ${true}
+      infix ("neighbors") (MInt :: NodeSHash(MInt,MInt), effect = simple) implements composite ${$self.neighbors(Node($1))}
+      infix ("neighbors") (Node :: NodeSHash(MInt,MInt), effect = simple) implements composite ${
+        val hash = NodeSHash[Int,Int]
+        $self.inNbrs($1).serialForEach{n => hash.add(n,n)}
+        $self.outNbrs($1).serialForEach{n => hash.add(n,n)}
+        hash
+      }
       //get out neighbors
       infix ("outNbrs") (Node :: NodeDataView(MInt)) implements single ${
         val start = out_node_apply($self,$1.id)
@@ -73,13 +80,7 @@ trait DirectedGraphOps{
         //only sum in neighbors a level up
         sum($self.inNbrs(n))(data){e => level(e)==(level(n.id)-1)}
       }
-
-      infix ("neighbors") (Node :: NodeData(MInt)) implements composite ${
-        val inNbrs = NodeData($self.inNbrs($1).getRawArray)
-        val outNbrs = NodeData($self.outNbrs($1).getRawArray)
-        val concat = NodeData(array_fromfunction(2,{n=>n})).flatMap[Int](e => if(e==0) inNbrs else outNbrs)
-        NodeData(fhashmap_keys(concat.groupBy[Int,Int](e => e, e => e)))
-      }
+      /*
       //Input node ids
       infix ("hasEdge") ((MInt,MInt) :: MBoolean) implements composite ${$self.hasEdge(Node($1),Node($2))}
       infix ("hasEdge") ((Node,Node) :: MBoolean) implements composite ${
@@ -88,7 +89,7 @@ trait DirectedGraphOps{
         if(fhashmap_contains[Int,Int](inNbrs,$2.id) || fhashmap_contains[Int,Int](outNbrs,$2.id)) true 
         else false
       }
-      
+      */
       //Out Node Accessors
       compiler ("out_node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_outNodes")
       compiler("out_node_apply")(MInt :: MInt) implements single ${array_apply(out_node_raw_data($self),$1)}

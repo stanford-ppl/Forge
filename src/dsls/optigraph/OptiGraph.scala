@@ -11,7 +11,7 @@ trait OptiGraphDSL extends ForgeApplication
     with GraphOps with DirectedGraphOps  with UndirectedGraphOps
     with NodeOps with EdgeOps  with NodeDataOps with NodeDataViewOps
     with NodeIdViewOps  with AtomicIntArrayOps with AtomicBooleanOps 
-    with IOGraphOps {
+    with NodeSHashOps with IOGraphOps {
   /**
    * The name of our DSL. This is the name that will be used in generated files,
    * package declarations, etc.
@@ -32,6 +32,7 @@ trait OptiGraphDSL extends ForgeApplication
     importNodeOps()
     importEdgeOps()
     importNodeDataOps()
+    importNodeSHashOps()
     importAtomicBooleanOps()
     importAtomicIntArrayOps()
     importNodeDataViewOps()

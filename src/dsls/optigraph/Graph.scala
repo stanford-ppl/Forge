@@ -30,9 +30,31 @@ trait GraphOps{
     //Actual Graph declaration
     val T = tpePar("T")
     val R = tpePar("R")
+    val K = tpePar("K")
+    val V = tpePar("V")
+    val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
     val Graph = g
     val GraphCommonOps = withTpe(Graph)
     GraphCommonOps{
+      infix ("getHeavyNodeHash") (Nil :: SHashMap(MInt,MInt)) implements getter(0, "_heavyNodes")
+      infix("funkyNodes")( (Node==>R) :: NodeData(R), TNumeric(R), addTpePars=R) implements composite ${
+        //parallel on from function 
+        val sHash = $self.getHeavyNodeHash
+        val data = array_fromfunction($self.numNodes,{n => 
+          if(!sHash.contains(n)) $1(Node(n))
+          else numeric_zero[R]
+        }).unsafeImmutable
+
+        //parallel on function passed in
+        val keys = sHash.keys
+        var i = 0
+        while(i < array_length(keys)){
+          println("Heavy")
+          array_update(data,array_apply(keys,i),$1(Node(array_apply(keys,i))))
+          i+=1
+        }
+        NodeData(data)
+      }
       //given an ID return a node
       infix("getNodeFromID")(MInt :: Node) implements composite ${
         val result = NodeIdView($self.getExternalIDs,$self.numNodes).mapreduce[Int]( i => i, (a,b) => a+b, i => $self.getExternalID(i)==$1)

@@ -31,9 +31,12 @@ trait DirectedGraphOps{
     val DirectedGraph = tpe("DirectedGraph") 
     val T = tpePar("T")
     val R = tpePar("R")
+    val K = tpePar("K")
+    val V = tpePar("V")
+    val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
 
-    data(DirectedGraph,("_numNodes",MInt),("_externalIDs",MArray(MInt)),("_outNodes",MArray(MInt)),("_outEdges",MArray(MInt)),("_inNodes",MArray(MInt)),("_inEdges",MArray(MInt))) 
-    static(DirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("inNodes",MArray(MInt)),("inEdges",MArray(MInt))), DirectedGraph))) implements allocates(DirectedGraph,${count}, ${$exID}, ${$outNodes}, ${outEdges},${$inNodes},${$inEdges})
+    data(DirectedGraph,("_numNodes",MInt),("_heavyNodes",SHashMap(MInt,MInt)),("_externalIDs",MArray(MInt)),("_outNodes",MArray(MInt)),("_outEdges",MArray(MInt)),("_inNodes",MArray(MInt)),("_inEdges",MArray(MInt))) 
+    static(DirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("shash",SHashMap(MInt,MInt)),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("inNodes",MArray(MInt)),("inEdges",MArray(MInt))), DirectedGraph))) implements allocates(DirectedGraph,${$count},${$shash},${$exID}, ${$outNodes}, ${outEdges},${$inNodes},${$inEdges})
 
     val DirectedGraphOps = withTpe(DirectedGraph)     
     DirectedGraphOps{

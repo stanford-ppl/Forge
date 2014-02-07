@@ -32,9 +32,12 @@ trait UndirectedGraphOps{
     val UndirectedGraph = tpe("UndirectedGraph") 
     val T = tpePar("T")
     val R = tpePar("R")
+    val K = tpePar("K")
+    val V = tpePar("V")
+    val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
 
-    data(UndirectedGraph,("_numNodes",MInt),("_externalIDs",MArray(MInt)),("_nodes",MArray(MInt)),("_edges",MArray(MInt))) 
-    static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt))), UndirectedGraph))) implements allocates(UndirectedGraph,${count},${$exID},${$outNodes},${outEdges})
+    data(UndirectedGraph,("_numNodes",MInt),("_heavyNodes",SHashMap(MInt,MInt)),("_externalIDs",MArray(MInt)),("_nodes",MArray(MInt)),("_edges",MArray(MInt))) 
+    static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("shash",SHashMap(MInt,MInt)),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt))), UndirectedGraph))) implements allocates(UndirectedGraph,${$count},${$shash},${$exID},${$outNodes},${outEdges})
 
     val UndirectedGraphOps = withTpe(UndirectedGraph)     
     UndirectedGraphOps{
@@ -81,6 +84,7 @@ trait UndirectedGraphOps{
         if(fhashmap_contains[Int,Int](outNbrs,$2.id)) true else false
       }
       */
+      //compiler ("heavy_node_hash") (Nil :: SHashMap(MInt,MInt)) implements getter(0, "_heavyNodes")
       compiler ("node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_nodes")
       compiler("node_apply")(MInt :: MInt) implements single ${array_apply(node_raw_data($self),$1)}
       compiler ("edge_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_edges")

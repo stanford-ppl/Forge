@@ -207,21 +207,35 @@ trait DenseMatrixOps {
        infix ("pprint") (Nil :: MUnit, TStringable(T), effect = simple) implements composite ${ println($self.makeStr + "\\n") }
        infix ("makeString") (Nil :: MString, TStringable(T)) implements single ${
          var s = ""
-         for (i <- 0 until $self.numRows-1) {
-           s = s + $self(i).makeStr + "\\n"
+         if ($self == null) {
+           s = "null"
          }
-         if ($self.numRows > 0)
-           s + $self($self.numRows-1).makeStr
-         else "[ ]"
+         else if ($self.numRows == 0) {
+           s = "[ ]"
+         }
+         else {
+           for (i <- 0 until $self.numRows-1) {
+             s = s + $self(i).makeStr + "\\n"
+           }
+           s = s + $self($self.numRows-1).makeStr
+         }
+         s
        }
        infix ("toString") (Nil :: MString) implements single ${
          var s = ""
-         for (i <- 0 until $self.numRows-1) {
-           s = s + densevectorview_tostring($self(i)) + "\\n"
+         if ($self == null) {
+           s = "null"
          }
-         if ($self.numRows > 0)
-           s + densevectorview_tostring($self($self.numRows-1))
-         else "[ ]"
+         else if ($self.numRows == 0) {
+           s = "[ ]"
+         }
+         else {
+           for (i <- 0 until $self.numRows-1) {
+             s = s + densevectorview_tostring($self(i)) + "\\n"
+           }
+           s = s + densevectorview_tostring($self($self.numRows-1))
+         }
+         s
        }
 
        infix ("t") (Nil :: DenseMatrix(T)) implements composite ${ (0::$self.numCols, 0::$self.numRows) { (i,j) => $self(j, i) } }

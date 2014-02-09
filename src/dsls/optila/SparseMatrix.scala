@@ -961,6 +961,10 @@ trait SparseMatrixOps {
         sparsevector_fromfunc($self.numRows, false, $self.nzRows, i => $1($self(i)))
       }
 
+      infix ("mapRowsToDenseVector") ((SparseVectorView(T) ==> R) :: DenseVector(R), addTpePars = R) implements composite ${
+         IndexVector(0, $self.numRows, false).map(i => $1($self.getRow(i)))
+       }
+
       infix ("mapColsToVector") ((SparseVectorView(T) ==> R) :: SparseVector(R), addTpePars = R) implements single ${
         sparsevector_fromfunc($self.numCols, true, $self.nzCols, i => $1($self.getCol(i)))
       }

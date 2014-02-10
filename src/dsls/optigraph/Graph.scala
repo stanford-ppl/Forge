@@ -43,7 +43,7 @@ trait GraphOps{
         val data = array_fromfunction($self.numNodes,{n => 
           if(!sHash.contains(n)) $1(Node(n))
           else numeric_zero[R]
-        }).unsafeImmutable
+        })
 
         //parallel on function passed in
         val keys = sHash.keys
@@ -67,7 +67,7 @@ trait GraphOps{
           $1(Node(i))
         }
       }
-      infix("nodes")( (Node==>R) :: NodeData(R), addTpePars=R) implements composite ${
+      infix("mapNodes")( (Node==>R) :: NodeData(R), addTpePars=R) implements composite ${
         NodeData[R](array_fromfunction($self.numNodes,{n => $1(Node(n))}))
       }
 

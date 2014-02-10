@@ -31,7 +31,7 @@ trait SnapPageRank extends OptiGraphApplication {
 		
 		val pr =
 		 untilconverged(prInit, tol=threshold,maxIter=maxItr){ oldPr =>
-			val tmp = g.nodes({ n =>
+			val tmp = g.mapNodes({ n =>
 				  damp * sum(g.inNbrs(n)){w => oldPr(w) / g.outDegree(Node(w))}{n =>true}
 				})
 			val leaked = (1.0 - sum(tmp)) / g.numNodes

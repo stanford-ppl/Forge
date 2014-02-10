@@ -21,7 +21,7 @@ trait BC extends OptiGraphApplication {
     println("performing Betweeness Centrality")
     tic(g)
   
-    val bc = sum( g.nodes( { n =>
+    val bc = sum( g.mapNodes( { n =>
       g.inBFOrder(n){ (bfsNode:Rep[Node],sigma:Rep[NodeData[Double]],levelArray:Rep[NodeData[Int]]) =>
         if(bfsNode.id==n.id){1.0}
         else{g.sumUpNbrs(bfsNode,levelArray){w => sigma(w)}}

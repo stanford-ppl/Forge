@@ -75,7 +75,10 @@ trait SparseMatrixOps {
         val data = sparsematrix_coo_data($self)
         var s = ""
 
-        if ($self.nnz == 0) {
+        if ($self == null) {
+          s = "null"
+        }
+        else if ($self.nnz == 0) {
           s = "[ ]"
         }
         else {
@@ -95,7 +98,10 @@ trait SparseMatrixOps {
         val data = sparsematrix_coo_data($self)
         var s = ""
 
-        if ($self.nnz == 0) {
+        if ($self == null) {
+          s = "null"
+        }
+        else if ($self.nnz == 0) {
           s = "[ ]"
         }
         else {
@@ -668,19 +674,27 @@ trait SparseMatrixOps {
         val data = sparsematrix_csr_data($self)
         var s = ""
 
-        for (i <- 0 until $self.numRows) {
-          val nnz = rowPtr(i+1) - rowPtr(i)
-          if (nnz > 0) {
-            s = s + "(" + i + "): "
-            for (j <- rowPtr(i) until rowPtr(i+1)-1) {
-              s = s + "(" + colIndices(j) + ", " + data(j).makeStr + "), "
-            }
-            val lineEnd = if (i == $self.numRows-1) "" else "\\n"
-            s = s + "(" + colIndices(rowPtr(i+1)-1) + ", " + data(rowPtr(i+1)-1).makeStr + ")" + lineEnd
-          }
+        if ($self == null) {
+          s = "null"
         }
-        if ($self.nnz > 0) s
-        else "[ ]"
+        else if ($self.nnz < 1) {
+          s = "[ ]"
+        }
+        else {
+          for (i <- 0 until $self.numRows) {
+            val nnz = rowPtr(i+1) - rowPtr(i)
+            if (nnz > 0) {
+              s = s + "(" + i + "): "
+              for (j <- rowPtr(i) until rowPtr(i+1)-1) {
+                s = s + "(" + colIndices(j) + ", " + data(j).makeStr + "), "
+              }
+              val lineEnd = if (i == $self.numRows-1) "" else "\\n"
+              s = s + "(" + colIndices(rowPtr(i+1)-1) + ", " + data(rowPtr(i+1)-1).makeStr + ")" + lineEnd
+            }
+          }
+          s
+        }
+        s
       }
 
       infix ("toString") (Nil :: MString) implements single ${
@@ -689,19 +703,26 @@ trait SparseMatrixOps {
         val data = sparsematrix_csr_data($self)
         var s = ""
 
-        for (i <- 0 until $self.numRows) {
-          val nnz = rowPtr(i+1) - rowPtr(i)
-          if (nnz > 0) {
-            s = s + "(" + i + "): "
-            for (j <- rowPtr(i) until rowPtr(i+1)-1) {
-              s = s + "(" + colIndices(j) + ", " + data(j) + "), "
+        if ($self == null) {
+          s = "null"
+        }
+        else if ($self.nnz < 1) {
+          s = "[ ]"
+        }
+        else {
+          for (i <- 0 until $self.numRows) {
+            val nnz = rowPtr(i+1) - rowPtr(i)
+            if (nnz > 0) {
+              s = s + "(" + i + "): "
+              for (j <- rowPtr(i) until rowPtr(i+1)-1) {
+                s = s + "(" + colIndices(j) + ", " + data(j) + "), "
+              }
+              val lineEnd = if (i == $self.numRows-1) "" else "\\n"
+              s = s + "(" + colIndices(rowPtr(i+1)-1) + ", " + data(rowPtr(i+1)-1) + ")" + lineEnd
             }
-            val lineEnd = if (i == $self.numRows-1) "" else "\\n"
-            s = s + "(" + colIndices(rowPtr(i+1)-1) + ", " + data(rowPtr(i+1)-1) + ")" + lineEnd
           }
         }
-        if ($self.nnz > 0) s
-        else "[ ]"
+        s
       }
 
 

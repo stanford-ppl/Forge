@@ -872,6 +872,10 @@ trait SparseMatrixOps {
       infix ("*:*") (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements composite ${ zipMatrixIntersect[T,T,T]($self, $1, (a,b) => a*b) }
       infix ("*:*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ $self.toDense * $1 }
       infix ("*") (T :: SparseMatrix(T), TArith(T)) implements composite ${ $self.mapnz(e => e*$1) }
+      infix ("*") (DenseVector(T) :: DenseVector(T), TArith(T)) implements composite ${
+        if ($self.numCols != $1.length || $1.isRow) fatal("dimension mismatch: matrix * vector")
+        $self.mapRowsToDenseVector { row => row *:* $1 } 
+      }
 
       // TODO
       // infix ("*") (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements single ${

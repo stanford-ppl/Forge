@@ -872,6 +872,10 @@ trait SparseMatrixOps {
       infix ("*:*") (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements composite ${ zipMatrixIntersect[T,T,T]($self, $1, (a,b) => a*b) }
       infix ("*:*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ $self.toDense * $1 }
       infix ("*") (T :: SparseMatrix(T), TArith(T)) implements composite ${ $self.mapnz(e => e*$1) }
+      infix ("*") (DenseVector(T) :: DenseVector(T), TArith(T)) implements composite ${
+        if ($self.numCols != $1.length || $1.isRow) fatal("dimension mismatch: matrix * vector")
+        $self.mapRowsToDenseVector { row => row *:* $1 } 
+      }
 
       // TODO
       // infix ("*") (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements single ${
@@ -960,6 +964,10 @@ trait SparseMatrixOps {
       infix ("mapRowsToVector") ((SparseVectorView(T) ==> R) :: SparseVector(R), addTpePars = R) implements single ${
         sparsevector_fromfunc($self.numRows, false, $self.nzRows, i => $1($self(i)))
       }
+
+      infix ("mapRowsToDenseVector") ((SparseVectorView(T) ==> R) :: DenseVector(R), addTpePars = R) implements composite ${
+         IndexVector(0, $self.numRows, false).map(i => $1($self.getRow(i)))
+       }
 
       infix ("mapColsToVector") ((SparseVectorView(T) ==> R) :: SparseVector(R), addTpePars = R) implements single ${
         sparsevector_fromfunc($self.numCols, true, $self.nzCols, i => $1($self.getCol(i)))

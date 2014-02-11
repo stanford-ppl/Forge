@@ -3,7 +3,7 @@ Author: Christopher R. Aberger
 
 Description: The main file for all DirectedGraph operations.  Glues 
 togther all structures and declares DirectedGraph operations visible
-to user.
+to user.  Inherits graph common ups.
 
 Data is stored as follows.  Internal ID #'s map to external ID's
 in the hashmap that is stored.  Internal ID's are 0 to # of nodes
@@ -43,6 +43,11 @@ trait DirectedGraphOps{
       infix ("isDirected") (Nil :: MBoolean) implements single ${true}
       infix ("inNeighborHash") (Node :: NodeSHash(MInt,MInt)) implements single ${
         val hash = NodeSHash[Int,Int]
+        $self.inNbrs($1).serialForEach{n => hash.add(n,n)}
+        hash
+      }
+      infix ("outNeighborHash") (Node :: NodeSHash(MInt,MInt)) implements single ${
+        val hash = NodeSHash[Int,Int]
         $self.outNbrs($1).serialForEach{n => hash.add(n,n)}
         hash
       }
@@ -71,9 +76,6 @@ trait DirectedGraphOps{
             else array_length(in_edge_raw_data($self))
         end - in_node_apply($self,$1.id)
       }
-      //If i do just up neighbors I can't use a view and it will be more expensive
-      //cannot perform a filter on a view class for some reason
-      //I see good reason to not split this up here
       infix ("sumDownNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
         //only sum in neighbors a level up
         sum($self.outNbrs(n))(data){e => (level(e)==(level(n.id)+1))}
@@ -82,7 +84,6 @@ trait DirectedGraphOps{
         //only sum in neighbors a level up
         sum($self.inNbrs(n))(data){e => level(e)==(level(n.id)-1)}
       }
-      /*
       //Input node ids
       infix ("hasEdge") ((MInt,MInt) :: MBoolean) implements composite ${$self.hasEdge(Node($1),Node($2))}
       infix ("hasEdge") ((Node,Node) :: MBoolean) implements composite ${
@@ -91,7 +92,6 @@ trait DirectedGraphOps{
         if(fhashmap_contains[Int,Int](inNbrs,$2.id) || fhashmap_contains[Int,Int](outNbrs,$2.id)) true 
         else false
       }
-      */
       //Out Node Accessors
       compiler ("out_node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_outNodes")
       compiler("out_node_apply")(MInt :: MInt) implements single ${array_apply(out_node_raw_data($self),$1)}

@@ -37,7 +37,7 @@ trait NodeSHashOps {
           i+=1
         }
       }
-
+      
       compiler ("nd_shash") (Nil :: SHashMap(K,V)) implements getter(0, "_data")
       compiler ("nd_shash_keys") (Nil :: MArray(K)) implements composite ${nd_shash($self).keys}
     }

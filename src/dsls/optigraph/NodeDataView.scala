@@ -35,7 +35,7 @@ trait NodeDataViewOps {
           i += 1
         }
       }
-
+      
       infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println(a)})
       infix ("getRawArray") (Nil :: MArray(T)) implements composite ${
         val d = array_empty[T]($self.length)

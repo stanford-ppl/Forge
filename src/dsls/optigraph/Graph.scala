@@ -5,10 +5,7 @@ Description: The main file for all Graph operations.  Glues
 togther all structures and declares Graph operations visible
 to user.
 
-Data is stored as follows.  Internal ID #'s map to external ID's
-in the hashmap that is stored.  Internal ID's are 0 to # of nodes
-so that data can be mapped in an array effeciently.  No restrictions
-on external ID"s except they cannot be 0.
+Common operations for both directed and undirected graphs.
 *///////////////////////////////////////////////////////////////
 package ppl.dsl.forge
 package dsls 

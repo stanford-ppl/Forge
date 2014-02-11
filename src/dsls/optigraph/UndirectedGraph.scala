@@ -3,12 +3,10 @@ Author: Christopher R. Aberger
 
 Description: The main file for all UndirectedGraph operations.  Glues 
 togther all structures and declares UndirectedGraph operations visible
-to user.
+to user. Inherits from Graph.scala
 
-Data is stored as follows.  Internal ID #'s map to external ID's
-in the hashmap that is stored.  Internal ID's are 0 to # of nodes
-so that data can be mapped in an array effeciently.  No restrictions
-on external ID"s except they cannot be 0.
+Data is stored the same as in a directed graph but we only store
+out edges. In an undirected graph in=out edges.
 *///////////////////////////////////////////////////////////////
 package ppl.dsl.forge
 package dsls 

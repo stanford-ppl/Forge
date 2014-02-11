@@ -41,14 +41,13 @@ trait DirectedGraphOps{
     val DirectedGraphOps = withTpe(DirectedGraph)     
     DirectedGraphOps{
       infix ("isDirected") (Nil :: MBoolean) implements single ${true}
-      infix ("neighbors") (MInt :: NodeSHash(MInt,MInt), effect = simple) implements composite ${$self.neighbors(Node($1))}
-      infix ("neighbors") (Node :: NodeSHash(MInt,MInt), effect = simple) implements composite ${
+      infix ("inNeighborHash") (Node :: NodeSHash(MInt,MInt)) implements single ${
         val hash = NodeSHash[Int,Int]
-        $self.inNbrs($1).serialForEach{n => hash.add(n,n)}
         $self.outNbrs($1).serialForEach{n => hash.add(n,n)}
         hash
       }
       //get out neighbors
+      infix ("outNbrs") (MInt :: NodeDataView(MInt)) implements single ${$self.outNbrs(Node($1))}
       infix ("outNbrs") (Node :: NodeDataView(MInt)) implements single ${
         val start = out_node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1))

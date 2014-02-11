@@ -44,12 +44,7 @@ trait UndirectedGraphOps{
       //UndirectedGraph directed or not?
       infix ("isDirected") (Nil :: MBoolean) implements single ${false}
       
-      infix ("neighbors") (MInt :: NodeSHash(MInt,MInt), effect = simple) implements composite ${
-        val hash = NodeSHash[Int,Int]
-        $self.outNbrs(Node($1)).serialForEach{n => hash.add(n,n)}
-        hash
-      }
-      infix ("neighbors") (Node :: NodeSHash(MInt,MInt), effect = simple) implements composite ${
+      infix ("neighborHash") (Node :: NodeSHash(MInt,MInt), effect = simple) implements composite ${
         val hash = NodeSHash[Int,Int]
         $self.outNbrs($1).serialForEach{n => hash.add(n,n)}
         hash
@@ -68,23 +63,17 @@ trait UndirectedGraphOps{
       }
       infix ("inDegree") (Node :: MInt) implements single ${$self.outDegree($1)}
       //get out neighbors
-      infix ("outNbrs") (Node :: NodeDataView(MInt)) implements single ${
+      infix ("outNbrs") (Node :: NodeDataView(MInt)) implements single ${get_nbrs($self,$1)} 
+      infix ("inNbrs") (Node :: NodeDataView(MInt)) implements single ${get_nbrs($self,$1)}
+      infix ("neighbors") (MInt :: NodeDataView(MInt)) implements single ${get_nbrs($self,Node($1))}
+      infix ("neighbors") (Node :: NodeDataView(MInt)) implements single ${get_nbrs($self,$1)}
+      compiler ("get_nbrs") (Node :: NodeDataView(MInt)) implements single ${
         val start = node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(node_raw_data($self)) ) node_apply($self,($1.id+1))
           else array_length(edge_raw_data($self))
         NodeDataView[Int](edge_raw_data($self),start,end-start)
       }
-      //get in neighbors   
-      infix ("inNbrs") (Node :: NodeDataView(MInt)) implements single ${$self.outNbrs($1)}
-      infix ("neighbors") (Node :: NodeData(MInt)) implements single ${NodeData($self.outNbrs($1).getRawArray)}
-      /*
-      infix ("hasEdge") ((MInt,MInt) :: MBoolean) implements composite ${$self.hasEdge(Node($1),Node($2))}
-      infix ("hasEdge") ((Node,Node) :: MBoolean) implements composite ${
-        val outNbrs = NodeData($self.outNbrs($1).getRawArray).groupByReduce[Int,Int](e => e, e => e, (a,b) => a)
-        if(fhashmap_contains[Int,Int](outNbrs,$2.id)) true else false
-      }
-      */
-      //compiler ("heavy_node_hash") (Nil :: SHashMap(MInt,MInt)) implements getter(0, "_heavyNodes")
+
       compiler ("node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_nodes")
       compiler("node_apply")(MInt :: MInt) implements single ${array_apply(node_raw_data($self),$1)}
       compiler ("edge_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_edges")

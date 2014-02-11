@@ -24,9 +24,10 @@ trait DirectedTriangleCounting extends OptiGraphApplication {
     tic(g)
     
     val t = g.mapNodes{ n =>
-      g.neighbors(n).mapreduce[Int]({ nbr =>
-        g.neighbors(n).mapreduce[Int]({ nbrOfNbr =>
-          if(g.neighbors(n).hasEdgeWith(nbrOfNbr)) 1
+      val inHash = g.inNeighborHash(n)
+      g.outNbrs(n).mapreduce[Int]({ nbr =>
+        g.outNbrs(nbr).mapreduce[Int]({ nbrOfNbr =>
+          if(inHash.hasEdgeWith(nbrOfNbr)) 1
           else 0
         },{(a,b) => a+b},{nbrOfNbr => nbrOfNbr>nbr})
       },{(a,b) => a+b},{e => true})

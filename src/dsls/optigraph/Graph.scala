@@ -37,20 +37,20 @@ trait GraphOps{
     val GraphCommonOps = withTpe(Graph)
     GraphCommonOps{
       infix ("getHeavyNodeHash") (Nil :: SHashMap(MInt,MInt)) implements getter(0, "_heavyNodes")
-      infix("funkyNodes")( (Node==>R) :: NodeData(R), TNumeric(R), addTpePars=R) implements composite ${
+      infix("mapLoadBalancedNodes")( (Node==>R) :: NodeData(R), TNumeric(R), addTpePars=R) implements composite ${
         //parallel on from function 
-        val sHash = $self.getHeavyNodeHash
-        val data = array_fromfunction($self.numNodes,{n => 
-          if(!sHash.contains(n)) $1(Node(n))
-          else numeric_zero[R]
+        val heavy = $self.getHeavyNodeHash
+        val data = array_buffer_strict_empty[R]($self.numNodes) 
+        array_buffer_forIndices(data,{n => 
+          if(!heavy.contains(n)) array_buffer_update(data,n,$1(Node(n)))
+          else array_buffer_update(data,n,numeric_zero[R])
         })
 
         //parallel on function passed in
-        val keys = sHash.keys
+        val keys = heavy.keys
         var i = 0
         while(i < array_length(keys)){
-          println("Heavy")
-          array_update(data,array_apply(keys,i),$1(Node(array_apply(keys,i))))
+          array_buffer_update(data,array_apply(keys,i),$1(Node(array_apply(keys,i))))
           i+=1
         }
         NodeData(data)

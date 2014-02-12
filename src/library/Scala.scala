@@ -409,8 +409,7 @@ trait ScalaOps {
     infix (Str) ("trim", Nil, MString :: MString) implements codegen($cala, ${ $0.trim })
     infix (Str) ("fcharAt", Nil, (MString,MInt) :: MChar) implements codegen($cala, ${ $0.charAt($1) })
     infix (Str) ("startsWith", Nil, (MString,MString) :: MBoolean) implements codegen($cala, ${ $0.startsWith($1) })
-    infix (Str) ("equals", Nil, (MString,MString) :: MBoolean) implements codegen($cala, ${ $0.equals($1) })
-
+    
     // most of these variants collapse to a common back-end implementation:
 
     // maps to Rep[String], Rep[Any]

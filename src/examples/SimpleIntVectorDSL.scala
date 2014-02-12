@@ -22,8 +22,6 @@ trait SimpleIntVectorDSL extends ForgeApplication {
     data(Vector, ("_length", MInt), ("_data", MArray(MInt)))
     static (Vector) ("apply", Nil, MInt :: Vector, effect = mutable) implements allocates(Vector, ${$0}, ${ array_empty[Int]($0) })
 
-    static (Vector) ("apply", Nil, MInt :: Vector, effect = mutable) implements allocates(Vector, ${$0}, ${ array_empty[Int]($0) })
-
     val VectorOps = withTpe (Vector)
     VectorOps {
       compiler ("vector_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_data")

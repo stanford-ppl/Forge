@@ -23,7 +23,6 @@ trait IOGraphOps {
     val Tuple2 = lookupTpe("Tup2")
     val Tuple3 = lookupTpe("Tup3")
 
-
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
 
     val T = tpePar("T")
@@ -84,7 +83,6 @@ trait IOGraphOps {
           if((src_array_index+1) < src_ids_ordered.length) src_array_index += 1
         }
         else src_node_array(i+1) = src_node_array(i)
-        //val poo = Math.sqrt(numNodes.toDouble)
         if(degree.toDouble > Math.sqrt(numNodes.toDouble)) sHash.update(i,distinct_ids(i))
         i += 1
       }

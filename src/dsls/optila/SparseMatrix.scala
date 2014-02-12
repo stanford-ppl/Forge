@@ -487,6 +487,10 @@ trait SparseMatrixOps {
       infix ("size") (Nil :: MInt) implements composite ${ $self.numRows*$self.numCols }
       infix ("nnz") (Nil :: MInt) implements getter(0, "_nnz")
 
+      compiler ("sparsematrix_data") (Nil :: MArray(T)) implements getter(0, "_data")
+      compiler ("sparsematrix_colIndices") (Nil :: MArray(MInt)) implements getter(0, "_colIndices")
+      compiler ("sparsematrix_rowPtr") (Nil :: MArray(MInt)) implements getter(0, "_rowPtr")
+
       infix ("nz") (MethodSignature(List(("asRow",MBoolean,"true")), DenseVector(T))) implements composite ${ densevector_alloc_raw($self.nnz, $1, sparsematrix_csr_data($self)) }
 
       compiler ("sparsematrix_csr_find_offset") ((("row",MInt),("col",MInt)) :: MInt) implements single ${
@@ -881,9 +885,23 @@ trait SparseMatrixOps {
       infix ("*:*") (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements composite ${ zipMatrixIntersect[T,T,T]($self, $1, (a,b) => a*b) }
       infix ("*:*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ $self.toDense * $1 }
       infix ("*") (T :: SparseMatrix(T), TArith(T)) implements composite ${ $self.mapnz(e => e*$1) }
+
       infix ("*") (DenseVector(T) :: DenseVector(T), TArith(T)) implements composite ${
         if ($self.numCols != $1.length || $1.isRow) fatal("dimension mismatch: matrix * vector")
-        $self.mapRowsToDenseVector { row => row *:* $1 } 
+        val s_rowPtr = sparsematrix_rowPtr($self)
+        val s_colIndices = sparsematrix_colIndices($self)
+        val s_data = sparsematrix_data($self)
+        IndexVector(0, $self.numRows, false) map {i => 
+          val rowStartIdx = s_rowPtr(i)
+          val rowEndIdx = if (i + 1 == $self.numRows) { self.nnz } else { s_rowPtr(i+1) }
+          (IndexVector(rowStartIdx, rowEndIdx) map {j => 
+            val col = s_colIndices(j)
+            val x = s_data(j)
+            val y = $1(col)
+            x * y
+          }).sum
+        }
+        //$self.mapRowsToDenseVector { row => row *:* $1 } 
       }
       infix ("*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${
         if ($self.numCols != $1.numRows) fatal("dimension mismatch: matrix * matrix")

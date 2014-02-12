@@ -543,7 +543,7 @@ trait SparseVectorOps {
 
       infix ("*:*") (SparseVector(T) :: T, TArith(T)) implements composite ${ sum($self*$1) }
       infix ("*:*") (DenseVector(T) :: T, TArith(T)) implements composite ${ $self.toDense *:* $1 }
-
+      
       // infix ("**") (SparseVector(T) :: SparseMatrix(T), TArith(T)) implements composite ${
       //   // if ($self.isRow || !$1.isRow) fatal ("dimension mismatch: vector outer product")
       //   val out = DenseMatrix[\$TT]($self.length, $1.length)

@@ -335,7 +335,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
         if (!DataStructs.contains(tpe)) err("op " + o.name + " allocates tpe " + tpe.name + " with no corresponding data definition")
         val data = DataStructs(tpe)
         if (init.length != data.fields.length)
-          err("allocator " + o.name + " has a different number of fields than the data definition for " + tpe.name)
+          err("allocator " + o.name + " has a different number of fields (" + init.length.toString + " vs " + data.fields.length.toString + ") than the data definition for " + tpe.name)
       case Getter(structArgIndex,field) =>
         if (structArgIndex > o.args.length) err("arg index " + structArgIndex + " does not exist for op " + o.name)
         val struct = getHkTpe(o.args.apply(structArgIndex).tpe)

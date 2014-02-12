@@ -17,6 +17,7 @@ trait SparseMatrixOps {
     val R = tpePar("R")
     val B = tpePar("B")
 
+    val DenseVector = lookupTpe("DenseVector")
     val SparseVector = lookupTpe("SparseVector")
     val DenseMatrix = lookupTpe("DenseMatrix")
     val SparseMatrix = lookupTpe("SparseMatrix")
@@ -25,7 +26,15 @@ trait SparseMatrixOps {
     // COO format
     data(SparseMatrixBuildable, ("_numRows", MInt), ("_numCols", MInt), ("_data", MArray(T)), ("_colIndices", MArray(MInt)), ("_rowIndices", MArray(MInt)), ("_nnz", MInt))
 
-    static (SparseMatrix) ("apply", T, (MInt, MInt) :: SparseMatrixBuildable(T), effect = mutable) implements allocates(SparseMatrixBuildable, ${$0}, ${$1}, ${array_empty[T](unit(32))}, ${array_empty[Int](unit(32))}, ${array_empty[Int](unit(32))}, ${unit(0)})
+    static (SparseMatrix) ("apply", T, (MInt, MInt) :: SparseMatrixBuildable(T), effect = mutable) implements 
+      allocates(SparseMatrixBuildable, ${$0}, ${$1}, ${array_empty[T](unit(32))}, ${array_empty[Int](unit(32))}, ${array_empty[Int](unit(32))}, ${unit(0)})
+
+    compiler (SparseMatrix) ("sparsematrix_alloc_raw", T, List(MInt, MInt, MArray(T), MArray(MInt), MArray(MInt), MInt) :: SparseMatrixBuildable(T)) implements
+      allocates(SparseMatrixBuildable, ${$0}, ${$1}, ${$2}, ${$3}, ${$4}, ${$5})
+
+    static (SparseMatrix) ("apply", T, (MInt, MInt, DenseVector(T), DenseVector(MInt), DenseVector(MInt)) :: SparseMatrixBuildable(T)) implements composite ${
+      sparsematrix_alloc_raw($0, $1, densevector_raw_data($2), densevector_raw_data($3), densevector_raw_data($4), $2.length)
+    }
 
     val SparseMatrixBuildableOps = withTpe(SparseMatrixBuildable)
     SparseMatrixBuildableOps {
@@ -875,6 +884,10 @@ trait SparseMatrixOps {
       infix ("*") (DenseVector(T) :: DenseVector(T), TArith(T)) implements composite ${
         if ($self.numCols != $1.length || $1.isRow) fatal("dimension mismatch: matrix * vector")
         $self.mapRowsToDenseVector { row => row *:* $1 } 
+      }
+      infix ("*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${
+        if ($self.numCols != $1.numRows) fatal("dimension mismatch: matrix * matrix")
+        $1.mapColsToMatrix($self.numRows, { col => $self * col })
       }
 
       // TODO

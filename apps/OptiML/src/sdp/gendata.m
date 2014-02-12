@@ -13,7 +13,7 @@ V = V / norm(V, 2);
 disp('writing c.dat');
 cf = fopen('c.dat', 'w');
 for i = 1:n
-  fprintf(cf, '%d %d %f\n', i-1, i-1, l(i) / 2);
+  fprintf(cf, '%d %d %f\n', i-1, i-1, l(i));
 end
 fclose(cf);
 

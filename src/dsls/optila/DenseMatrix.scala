@@ -632,6 +632,13 @@ trait DenseMatrixOps {
          }
          out.unsafeImmutable
        }
+       infix ("mapColsToMatrix") ((MInt, (DenseVectorView(T) ==> DenseVector(R))) :: DenseMatrix(R), addTpePars = R) implements composite ${
+         val out = DenseMatrix[R]($1, $self.numCols)
+         (0::$self.numCols) foreach { j =>
+           out.updateCol(j, $2($self.getCol(j)))
+         }
+         out.unsafeImmutable
+       }
 
        // in order to express this with the current Delite ops, we have to convert the matrix to a vector of vectors,
        // which is unfortunate. A vector of vectorviews would be somewhat better, but since Delite reduce requires

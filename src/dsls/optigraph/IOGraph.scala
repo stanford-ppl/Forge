@@ -40,14 +40,15 @@ trait IOGraphOps {
       xfs.close()
     })
     //assume every edge is listed twice for undirected graphs
-    direct (IO) ("undirectedGraphFromEdgeList", Nil, MString :: UndirectedGraph) implements composite ${
+    direct (IO) ("undirectedGraphFromEdgeList", Nil, (MString,MBoolean) :: UndirectedGraph) implements composite ${
       val input_edges = ForgeFileReader.readLines($0)({line =>
           val fields = line.fsplit(" ")
           pack(fields(0).toInt,fields(1).toInt) 
       })
-
-      //contains the input tuples
-      val edge_data = NodeData[Tup2[Int,Int]](input_edges)
+      //contains either duplicate edges or not
+      val edge_data = if($1) NodeData[Tup2[Int,Int]](input_edges).flatMap{e => 
+          NodeData[Tup2[Int,Int]](array_fromfunction(2,n => if(n==0) e else pack(e._2,e._1) ))}
+          else NodeData[Tup2[Int,Int]](input_edges)
 
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       val src_ids = NodeData(fhashmap_keys(src_groups))

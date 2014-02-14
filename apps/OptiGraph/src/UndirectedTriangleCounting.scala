@@ -26,12 +26,12 @@ trait UndirectedTriangleCounting extends OptiGraphApplication {
     
     val t = g.mapNodes{ n =>
       val nbrHash = g.neighborHash(n)
-      g.neighbors(n).mapreduce[Int]({ nbr =>
-        g.neighbors(nbr).mapreduce[Int]({ nbrOfNbr =>
-          if(nbrHash.hasEdgeWith(nbrOfNbr)) 1
+      g.neighbors(n).mapreduce[Int]({ smallNbr =>
+        g.neighbors(n).mapreduce[Int]({ bigNbr =>
+          if(nbrHash.hasEdgeWith(smallNbr)) 1
           else 0
-        },{(a,b) => a+b},{nbrOfNbr => nbrOfNbr>nbr})
-      },{(a,b) => a+b},{nbr => nbr > n.id})
+        },{(a,b) => a+b},{bigNbr => bigNbr>smallNbr})
+      },{(a,b) => a+b},{smallNbr => smallNbr > n.id})
     }.reduce{(a,b) => a+b}
 
     toc("Tcounting",t)

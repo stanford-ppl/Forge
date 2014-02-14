@@ -54,7 +54,7 @@ trait GraphOps{
       }
       //given an ID return a node
       infix("getNodeFromID")(MInt :: Node) implements composite ${
-        val result = NodeIdView($self.getExternalIDs,$self.numNodes).mapreduce[Int]( i => i, (a,b) => a+b, i => $self.getExternalID(i)==$1)
+        val result = NodeIdView($self.numNodes).mapreduce[Int]( i => i, (a,b) => a+b, i => $self.getExternalID(i)==$1)
         if(result >= $self.numNodes() || result < 0) fatal("ERROR. ID: " + $1 + " does not exist in this UndirectedGraph!")
         Node(result)
       }
@@ -67,14 +67,16 @@ trait GraphOps{
       infix("mapNodes")( (Node==>R) :: NodeData(R), addTpePars=R) implements composite ${
         NodeData[R](array_fromfunction($self.numNodes,{n => $1(Node(n))}))
       }
-
+      infix("sumOverNodes")( (Node==>R) :: R, TNumeric(R), addTpePars=R) implements composite ${
+        NodeIdView($self.numNodes).mapreduce[R]( e => $1(Node(e)), (a,b) => a+b, e => true)
+      }
       infix ("getExternalIDs") (Nil :: MArray(MInt)) implements getter(0, "_externalIDs")
       infix ("getExternalID") (MInt :: MInt) implements single ${array_apply($self.getExternalIDs,$1)}
       //perform BF traversal
       infix ("inBFOrder") ( CurriedMethodSignature(List(Node,((Node,NodeData(R),NodeData(MInt)) ==> R),((Node,NodeData(R),NodeData(R),NodeData(MInt)) ==> R)),NodeData(R)), TFractional(R), addTpePars=R, effect=simple) implements composite ${
         val levelArray = NodeData[Int]($self.numNodes)
         val bitMap = AtomicIntArray($self.numNodes)
-        val nodes = NodeIdView($self.getExternalIDs,$self.numNodes) 
+        val nodes = NodeIdView($self.numNodes) 
         val forwardComp = NodeData[R]($self.numNodes)
         val reverseComp = NodeData[R]($self.numNodes)
 

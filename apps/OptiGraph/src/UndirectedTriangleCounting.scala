@@ -22,19 +22,20 @@ trait UndirectedTriangleCounting extends OptiGraphApplication {
     println("Number of Nodes: " + g.numNodes)
     
     println("performing Traingle Counting")
-    tic("Tcounting",g)
+    tic("Triangle Counting",g)
     
-    val t = g.mapNodes{ n =>
+    val t = g.sumOverNodes{ n =>
+      //could probably clean up syntax to move hash inside DSL
       val nbrHash = g.neighborHash(n)
-      g.neighbors(n).mapreduce[Int]({ smallNbr =>
-        g.neighbors(n).mapreduce[Int]({ bigNbr =>
+      g.sumOverNbrs(n){ smallNbr =>
+        g.sumOverNbrs(n){ bigNbr =>
           if(nbrHash.hasEdgeWith(smallNbr)) 1
           else 0
-        },{(a,b) => a+b},{bigNbr => bigNbr>smallNbr})
-      },{(a,b) => a+b},{smallNbr => smallNbr > n.id})
-    }.reduce{(a,b) => a+b}
+        }{bigNbr => bigNbr>smallNbr}
+      }{smallNbr => smallNbr > n.id}
+    }
 
-    toc("Tcounting",t)
+    toc("Triangle Counting",t)
     println("Number of triangles " + t)
   }
   def printUsage = {

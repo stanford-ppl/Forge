@@ -44,12 +44,16 @@ trait UndirectedGraphOps{
       
       infix ("neighborHash") (Node :: NodeSHash(MInt,MInt), effect = simple) implements composite ${
         val hash = NodeSHash[Int,Int]
-        $self.outNbrs($1).serialForEach{n => hash.add(n,n)}
+        $self.neighbors($1).serialForEach{n => hash.add(n,n)}
         hash
+      }
+      //Perform a sum over the neighbors
+      infix ("sumOverNbrs") ( CurriedMethodSignature(List(("n",Node),("data",MInt==>R),("cond",MInt==>MBoolean)),R), TNumeric(R), addTpePars=R) implements composite ${
+        sum($self.neighbors(n))(data)(cond)
       }
       infix ("sumDownNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
         //only sum in neighbors a level up
-        sum($self.outNbrs(n))(data){e => (level(e)==(level(n.id)+1))}
+        sum($self.neighbors(n))(data){e => (level(e)==(level(n.id)+1))}
       }
       infix ("sumUpNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
         sum($self.inNbrs(n))(data){e => (level(e)==(level(n.id)-1))}

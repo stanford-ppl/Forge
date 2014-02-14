@@ -21,8 +21,8 @@ trait NodeIdViewOps {
     val R = tpePar("R")
     val NodeIdView = tpe("NodeIdView")
 
-    data(NodeIdView, ("_data", MArray(MInt)), ("_length", MInt))
-    static (NodeIdView) ("apply", Nil, (MArray(MInt),MInt) :: NodeIdView) implements allocates(NodeIdView, ${$0}, ${$1})
+    data(NodeIdView, ("_length", MInt))
+    static (NodeIdView) ("apply", Nil, (MInt) :: NodeIdView) implements allocates(NodeIdView, ${$0})
 
     val NodeIdViewOps = withTpe(NodeIdView)
     NodeIdViewOps {

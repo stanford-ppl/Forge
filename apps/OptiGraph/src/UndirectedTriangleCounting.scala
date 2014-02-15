@@ -27,12 +27,12 @@ trait UndirectedTriangleCounting extends OptiGraphApplication {
     val t = g.sumOverNodes{ n =>
       //could probably clean up syntax to move hash inside DSL
       val nbrHash = g.neighborHash(n)
-      g.sumOverNbrs(n){ smallNbr =>
-        g.sumOverNbrs(n){ bigNbr =>
-          if(nbrHash.hasEdgeWith(smallNbr)) 1
+      g.sumOverNbrs(n){ nbr =>
+        g.sumOverNbrs(nbr){ nbrOfNbr =>
+          if(nbrHash.hasEdgeWith(nbr)) 1
           else 0
-        }{bigNbr => bigNbr>smallNbr}
-      }{smallNbr => smallNbr > n.id}
+        }{nbrOfNbr => nbrOfNbr>nbr}
+      }{nbr => nbr > n.id}
     }
 
     toc("Triangle Counting",t)

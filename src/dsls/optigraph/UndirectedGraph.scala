@@ -51,6 +51,10 @@ trait UndirectedGraphOps{
       infix ("sumOverNbrs") ( CurriedMethodSignature(List(("n",Node),("data",MInt==>R),("cond",MInt==>MBoolean)),R), TNumeric(R), addTpePars=R) implements composite ${
         sum($self.neighbors(n))(data)(cond)
       }
+            //Perform a sum over the neighbors
+      infix ("sumOverNbrs") ( CurriedMethodSignature(List(("n",MInt),("data",MInt==>R),("cond",MInt==>MBoolean)),R), TNumeric(R), addTpePars=R) implements composite ${
+        sum($self.neighbors(n))(data)(cond)
+      }
       infix ("sumDownNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
         //only sum in neighbors a level up
         sum($self.neighbors(n))(data){e => (level(e)==(level(n.id)+1))}

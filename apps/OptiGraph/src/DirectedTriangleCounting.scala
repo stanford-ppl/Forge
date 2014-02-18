@@ -10,18 +10,19 @@ object DirectedTriangleCountingInterpreter extends OptiGraphApplicationInterpret
 
 trait DirectedTriangleCounting extends OptiGraphApplication {
   def main() = {
-    println("DirectedTriangleCounting")
+    println("DirectedTriangleCounting (counts through triangles)")
   
     if (args.length < 1) printUsage
-
+    tic("input",args(0))
     //Works for both directed and undirected, performance 
     val g = directedGraphFromEdgeList(args(0))
     
+    toc("input",g)
     println("Directed: " + g.isDirected)
     println("Number of Nodes: " + g.numNodes)
     
     println("performing Traingle Counting")
-    tic(g)
+    tic("Triangle Counting",g)
     
     val t = g.mapNodes{ n =>
       val inHash = g.inNeighborHash(n)
@@ -29,12 +30,12 @@ trait DirectedTriangleCounting extends OptiGraphApplication {
         g.outNbrs(nbr).mapreduce[Int]({ nbrOfNbr =>
           if(inHash.hasEdgeWith(nbrOfNbr)) 1
           else 0
-        },{(a,b) => a+b},{nbrOfNbr => nbrOfNbr>nbr})
+        },{(a,b) => a+b},{e => true})
       },{(a,b) => a+b},{e => true})
     }.reduce{(a,b) => a+b}
 
-    toc(t)
-    println("Number of trianges " + t)
+    toc("Triangle Counting", t)
+    println("Number through triangles (x3) : " + t)
   }
   def printUsage = {
     println("Usage: DirectedTriangleCounting <path to input edge list file>")

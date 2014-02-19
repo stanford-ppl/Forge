@@ -53,7 +53,10 @@ trait IOGraphOps {
           NodeData(cur)
       })
       //contains either duplicate edges or not
-      val edge_data = distinctTuples(NodeData[NodeData[Tup2[Int,Int]]](input_edges).flatMap(e => e))
+      val edge_data = NodeData[NodeData[Tup2[Int,Int]]](input_edges).flatMap(e => e).distinct
+      println("Edge data")
+      edge_data.print
+      
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       val src_ids = NodeData(fhashmap_keys(src_groups))
       val distinct_ids = src_ids

@@ -29,8 +29,8 @@ trait SkewTriangleCounting extends OptiGraphApplication {
       val nbrHash = g.neighborHash(n)
       g.sumOverNbrs(n){ nbr =>
         g.sumOverNbrs(nbr){ nbrOfNbr =>
-          if(nbrHash.hasEdgeWith(nbr)) 1
-          else 0
+          if(nbrHash.hasEdgeWith(nbr)) 1.toLong
+          else 0.toLong
         }{nbrOfNbr => nbrOfNbr>nbr}
       }{nbr => nbr > n.id}
     }

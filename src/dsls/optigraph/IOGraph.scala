@@ -40,6 +40,41 @@ trait IOGraphOps {
       xfs.close()
     })
     //assume every edge is listed twice for undirected graphs
+    direct (IO) ("undirectedGraphFromDirectedAdjList", Nil, MString :: UndirectedGraph) implements composite ${
+      val input_edges = ForgeFileReader.readLines($0)({line =>
+          val fields = line.fsplit("\t")
+          val cur = array_empty[Tup2[Int,Int]]((array_length(fields)-1)*2)
+          var i = 1
+          while(i < (array_length(fields))){
+            array_update(cur,(i-1)*2,pack(fields(0).toInt,fields(i).toInt))
+            array_update(cur,((i-1)*2)+1,pack(fields(i).toInt,fields(0).toInt))
+            i += 1  
+          }
+          NodeData(cur)
+      })
+      //contains either duplicate edges or not
+      val edge_data = distinctTuples(NodeData[NodeData[Tup2[Int,Int]]](input_edges).flatMap(e => e))
+      val src_groups = edge_data.groupBy(e => e._1, e => e._2)
+      val src_ids = NodeData(fhashmap_keys(src_groups))
+      val distinct_ids = src_ids
+
+      //set up the ID hash map
+      val numNodes = distinct_ids.length
+      val idView = NodeData(array_fromfunction(numNodes,{n => n}))
+      val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
+
+      //must filter down the ids we want to flat map to just the distinct src ids we want
+      //gets tricky because order of flatmap must match our internal id order other wise
+      //the edge array gets screwed up
+      val src_ids_ordered = NodeData(array_sort(array_map[Int,Int](src_ids.getRawArray,e => fhashmap_get(idHashMap,e))))
+      val src_edge_array = src_ids_ordered.flatMap{e => NodeData(src_groups(distinct_ids(e))).map(n => fhashmap_get(idHashMap,n))}
+
+      val serial_out = assignIndiciesSerialUndirected(numNodes,distinct_ids,src_groups,src_ids_ordered)
+
+      println("finished file I/O")
+      UndirectedGraph(numNodes,serial_out._2,distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
+    }
+    //assume every edge is listed twice for undirected graphs
     direct (IO) ("undirectedGraphFromEdgeList", Nil, (MString,MBoolean) :: UndirectedGraph) implements composite ${
       val input_edges = ForgeFileReader.readLines($0)({line =>
           val fields = line.fsplit(" ")

@@ -100,5 +100,11 @@ trait NodeDataOps {
 
       parallelize as ParallelCollectionBuffer(T,lookupOp("nd_raw_alloc"),lookupOp("length"),lookupOp("nd_apply"),lookupOp("nd_update"),lookupOp("nd_set_length"),lookupOp("nd_appendable"),lookupOp("nd_append"),lookupOp("nd_copy"))
     }
+    direct (NodeData) ("distinctTuples", Nil, NodeData(Tuple2(MInt,MInt)) :: NodeData(Tuple2(MInt,MInt))) implements composite ${
+      NodeData(fhashmap_keys($0.groupByReduce[String,Int](e => e._1.toString + " " + e._2.toString, e=>0,(a,b)=>a))).map{e =>
+        var fields = e.fsplit(" ")
+        pack(array_apply(fields,0).toInt,array_apply(fields,1).toInt)
+      }
+    }
   } 
 }

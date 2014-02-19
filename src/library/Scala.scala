@@ -424,7 +424,8 @@ trait ScalaOps {
     infix (Str) ("startsWith", Nil, (MString,MString) :: MBoolean) implements codegen($cala, ${ $0.startsWith($1) })
     infix (Str) ("endsWith", Nil, (MString,MString) :: MBoolean) implements codegen($cala, ${ $0.endsWith($1) })
     infix (Str) ("contains", Nil, (MString,MString) :: MBoolean) implements codegen($cala, ${ $0.contains($1) })
-
+    
+    
     // most of these variants collapse to a common back-end implementation:
 
     // maps to Rep[String], Rep[Any]
@@ -455,9 +456,8 @@ trait ScalaOps {
     // only the impl of the first declared canonical signature is actually used
     // should overloading be more explicit in the spec to avoid this problem? (an 'overloaded' parameter?)
     // at the very least, we should check for inconsistent codegen rules (or impls) between overloaded variants that collapse to the same thing
-    def scalaStrConcat = quotedArg(0)+".toString + " + quotedArg(1)+".toString"
     for (o <- List(concat,concat2,concat3,concat4,concat5,concat6,concat7,concat8,concat9,concat10,concat11,concat12,concat13,concat14,concat15,concat16)) {
-      impl (o) (codegen($cala, scalaStrConcat))
+      impl (o) (codegen($cala, ${ $0.toString + $1.toString }))
     }
   }
 
@@ -597,7 +597,8 @@ trait ScalaOps {
     infix (HashMapOps) ("update", (K,V), (SHashMap, K, V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $0.put($1,$2); () })
     infix (HashMapOps) ("contains", (K,V), (SHashMap, K) :: MBoolean) implements codegen($cala, ${ $0.contains($1) })
     // can we avoid the toArray?
-    infix (HashMapOps) ("keys", (K,V), SHashMap :: MArray(K)) implements codegen($cala, ${ $0.keySet.toArray })
+    infix (HashMapOps) ("keys", (K,V), SHashMap :: MArray(K)) implements codegen($cala, ${ $0.keys.toArray })
+    infix (HashMapOps) ("values", (K,V), SHashMap :: MArray(V)) implements codegen($cala, ${ $0.values.toArray })
     // infix ("keys") (Nil :: MArray(K)) implements codegen($cala, ${ scala.collection.JavaConverters.asScalaSetConverter($self.keySet).asScala.toArray })
   }
 }

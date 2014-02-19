@@ -203,7 +203,7 @@ trait VectorOps {
       infix ("*") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e*$1 })
       infix ("*") (DenseMatrix(T) :: DenseVector(T), A) implements composite ${
         // if (!$self.isRow) fatal("dimension mismatch: vector * matrix")
-        $1.t.mapRowsToVector { row => $self *:* row }
+        $1.mapColsToVector { col => $self *:* col }
       }
       infix ("/") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e/$1 })
 

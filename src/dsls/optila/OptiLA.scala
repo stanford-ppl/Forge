@@ -72,6 +72,7 @@ trait OptiLADSL extends ForgeApplication
     importStringableOps()
 
     // override default string formatting (numericPrecision is a global defined in extern)
+    // we use "" + $a instead of $a.toString to avoid an NPE when explicitly calling toString inside the REPL
     val strConcatWithNumerics = {
       val a = quotedArg(0)
       val b = quotedArg(1)
@@ -83,8 +84,8 @@ def numericStr[A](x: A) = {
   val padPrefix = (Global.numericPrecision+6) - s.length
   if (padPrefix > 0) " "*padPrefix + s else s
 }
-val a1 = if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else $a.toString
-val b1 = if ($b.isInstanceOf[Double] || $b.isInstanceOf[Float]) numericStr($b) else $b.toString
+val a1 = if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" + $a)
+val b1 = if ($b.isInstanceOf[Double] || $b.isInstanceOf[Float]) numericStr($b) else ("" + $b)
 a1+b1
 """
     }

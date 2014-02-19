@@ -772,11 +772,8 @@ trait DeliteGenOps extends BaseGenOps {
 
   def emitStructMethods(opsGrp: DSLOps, stream: PrintWriter) {
     def wrapManifest(t: Rep[DSLType]) = t match {
-      case Def(TpeInst(Def(Tpe("ForgeArray",args,stage)), List(p))) if (isTpePar(p)) => "darrayManifest(m.typeArguments(0))"
-      case Def(TpeInst(Def(Tpe("ForgeArray",args,stage)), List(p))) => "darrayManifest(manifest["+quote(p)+"])"
-      // do we need an equivalent of darrayManifest for each DSL type to preserve the type arguments? does it matter?
-      // case Def(TpeInst(Def(Tpe(name,args,stage)), ps)) if ps != Nil => "manifest[" + name + ps.zipWithIndex.map(a => if (!isTpePar(a._1)) quote(a._1) else "m.typeArguments(" + a._2 + ")").mkString("[",",","]") + "]"
-      case Def(TpeInst(Def(Tpe(name,args,stage)), ps)) if ps != Nil => "manifest[" + name + ps.map(a => "_").mkString("[",",","]") + "]"
+      case Def(TpeInst(Def(Tpe(name,args,stage)), ps)) if ps != Nil && ps.forall(isTpePar) => "makeManifest(classOf[" + name + ps.map(a => "_").mkString("[",",","]") + "], m.typeArguments)" 
+      case Def(TpeInst(Def(Tpe(name,args,stage)), ps)) if ps != Nil => "makeManifest(classOf[" + name + ps.map(a => "_").mkString("[",",","]") + "], " + ps.map(a => "manifest["+quote(a)+"]").mkString("List(",",","))")
       case _ => "manifest[" + quote(t) + "]"
     }
 

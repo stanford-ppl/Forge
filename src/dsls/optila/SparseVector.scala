@@ -264,7 +264,11 @@ trait SparseVectorOps {
         val indices = sparsevector_raw_indices($self)
         val data = sparsevector_raw_data($self)
         var s = ""
-        if ($self.nnz == 0) {
+
+        if ($self == null) {
+          s = "null"
+        }
+        else if ($self.nnz == 0) {
           s = "[ ]"
         }
         else if ($self.isRow) {
@@ -285,7 +289,11 @@ trait SparseVectorOps {
         val indices = sparsevector_raw_indices($self)
         val data = sparsevector_raw_data($self)
         var s = ""
-        if ($self.nnz == 0) {
+
+        if ($self == null) {
+          s = "null"
+        }
+        else if ($self.nnz == 0) {
           s = "[ ]"
         }
         else if ($self.isRow) {

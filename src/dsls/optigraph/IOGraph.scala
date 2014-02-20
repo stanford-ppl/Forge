@@ -89,7 +89,7 @@ trait IOGraphOps {
       })
       //contains either duplicate edges or not
       val edge_data = if($1) NodeData[Tup2[Int,Int]](input_edges).flatMap{e => 
-          NodeData[Tup2[Int,Int]](array_fromfunction(2,n => if(n==0) e else pack(e._2,e._1) ))}
+          NodeData[Tup2[Int,Int]](array_fromfunction(2,n => if(n==0) e else pack(e._2,e._1) ))}.distinct
           else NodeData[Tup2[Int,Int]](input_edges)
 
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)

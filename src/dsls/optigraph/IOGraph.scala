@@ -40,25 +40,18 @@ trait IOGraphOps {
       xfs.close()
     })
     //assume every edge is listed twice for undirected graphs
-    direct (IO) ("undirectedGraphFromDirectedAdjList", Nil, MString :: MUnit) implements composite ${
+    direct (IO) ("undirectedGraphFromDirectedAdjList", Nil, (MString,MBoolean,MInt) :: UndirectedGraph) implements composite ${
       val input_edges = ForgeFileReader.readLinesFlattened($0)({line =>
-          val fields = line.fsplit("\t")
-          array_fromfunction(array_length(fields),{n => 
-            array_apply(fields,n)
-          })
+        val fields = line.fsplit("\t")
+        array_fromfunction((array_length(fields)-1)*2,{n =>
+          if(n < (array_length(fields)-1))
+            pack(fields(0).toInt,fields(n+1).toInt)
+          else 
+            pack(fields((n+1)-(array_length(fields)-1)).toInt,fields(0).toInt)
+        })
       })
       //contains either duplicate edges or not
-
-      println("lines: " + array_length(input_edges))
-      var i = 0
-      while(i < array_length(input_edges)){
-        println(array_apply(input_edges,i))
-        i += 1
-      }
-      /*
       val edge_data = NodeData(input_edges).distinct
-      println("Edge data")
-      edge_data.print
       
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       val src_ids = NodeData(fhashmap_keys(src_groups))
@@ -75,11 +68,10 @@ trait IOGraphOps {
       val src_ids_ordered = NodeData(array_sort(array_map[Int,Int](src_ids.getRawArray,e => fhashmap_get(idHashMap,e))))
       val src_edge_array = src_ids_ordered.flatMap{e => NodeData(src_groups(distinct_ids(e))).map(n => fhashmap_get(idHashMap,n))}
 
-      val serial_out = assignIndiciesSerialUndirected(numNodes,distinct_ids,src_groups,src_ids_ordered)
+      val serial_out = assignIndiciesSerialUndirected($2,src_edge_array.length,numNodes,distinct_ids,src_groups,src_ids_ordered)
 
       println("finished file I/O")
       UndirectedGraph(numNodes,serial_out._2,distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
-      */
     }
     //assume every edge is listed twice for undirected graphs
     direct (IO) ("undirectedGraphFromEdgeList", Nil, (MString,MBoolean,MInt) :: UndirectedGraph) implements composite ${

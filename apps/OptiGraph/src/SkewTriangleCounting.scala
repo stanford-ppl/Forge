@@ -15,7 +15,7 @@ trait SkewTriangleCounting extends OptiGraphApplication {
     if (args.length < 2) printUsage
     tic("input",args(0))
     //Works for both directed and undirected, performance 
-    val g  = undirectedGraphFromEdgeList(args(0),true,args(1).toInt)
+    val g = undirectedGraphFromDirectedAdjList(args(0),true,args(1).toInt)
     
     toc("input",g)
     println("Directed: " + g.isDirected)
@@ -40,11 +40,11 @@ trait SkewTriangleCounting extends OptiGraphApplication {
             if(nbrHash.hasEdgeWith(nbrClone)) 1.toLong
             else 0.toLong
           }{nbrClone => nbrClone > nbr}
-        }{e => true}/3
+        }{e => true}
       }
     }
     toc("Triangle Counting",t)
-    println("Number of triangles " + t)
+    println("Number of triangles " + t/3)
   }
   def printUsage = {
     println("Usage: SkewTriangleCounting <path to input edge list file> <split # for heavy>")

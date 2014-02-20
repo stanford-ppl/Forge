@@ -44,9 +44,7 @@ trait IOGraphOps {
       val input_edges = ForgeFileReader.readLinesFlattened($0)({line =>
         val fields = line.fsplit("\t")
         if(array_length(fields) <= 1){
-          array_fromfunction(1,{n =>
-              pack("58771771".toInt,"58771769".toInt)
-          })
+          array_empty_imm[Tup2[Int,Int]](0)
         } 
         else{
           array_fromfunction((array_length(fields)-1)*2,{n =>
@@ -59,7 +57,7 @@ trait IOGraphOps {
       })
       //contains either duplicate edges or not
       val edge_data = NodeData(input_edges).distinct
-      
+
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       val src_ids = NodeData(fhashmap_keys(src_groups))
       val distinct_ids = src_ids
@@ -76,7 +74,7 @@ trait IOGraphOps {
       val src_edge_array = src_ids_ordered.flatMap{e => NodeData(src_groups(distinct_ids(e))).map(n => fhashmap_get(idHashMap,n))}
 
       val serial_out = assignIndiciesSerialUndirected($2,src_edge_array.length,numNodes,distinct_ids,src_groups,src_ids_ordered)
-
+      
       println("finished file I/O. Edges: " + src_edge_array.length)
       UndirectedGraph(numNodes,serial_out._2,distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
     }

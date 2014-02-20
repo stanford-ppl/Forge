@@ -43,7 +43,11 @@ trait IOGraphOps {
     direct (IO) ("undirectedGraphFromDirectedAdjList", Nil, (MString,MBoolean,MInt) :: UndirectedGraph) implements composite ${
       val input_edges = ForgeFileReader.readLinesFlattened($0)({line =>
         val fields = line.fsplit("\t")
-        if(array_length(fields)==1) array_empty[Tuple[Int,Int]](0)
+        if(array_length(fields) <= 1){
+          array_fromfunction(1,{n =>
+              pack("58771771".toInt,"58771769".toInt)
+          })
+        } 
         else{
           array_fromfunction((array_length(fields)-1)*2,{n =>
             if(n < (array_length(fields)-1))

@@ -43,12 +43,15 @@ trait IOGraphOps {
     direct (IO) ("undirectedGraphFromDirectedAdjList", Nil, (MString,MBoolean,MInt) :: UndirectedGraph) implements composite ${
       val input_edges = ForgeFileReader.readLinesFlattened($0)({line =>
         val fields = line.fsplit("\t")
-        array_fromfunction((array_length(fields)-1)*2,{n =>
-          if(n < (array_length(fields)-1))
-            pack(fields(0).toInt,fields(n+1).toInt)
-          else 
-            pack(fields((n+1)-(array_length(fields)-1)).toInt,fields(0).toInt)
-        })
+        if(array_length(fields)==1) array_empty[Tuple[Int,Int]](0)
+        else{
+          array_fromfunction((array_length(fields)-1)*2,{n =>
+            if(n < (array_length(fields)-1))
+              pack(fields(0).toInt,fields(n+1).toInt)
+            else 
+              pack(fields((n+1)-(array_length(fields)-1)).toInt,fields(0).toInt)
+          })
+        }
       })
       //contains either duplicate edges or not
       val edge_data = NodeData(input_edges).distinct

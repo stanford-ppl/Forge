@@ -40,20 +40,23 @@ trait IOGraphOps {
       xfs.close()
     })
     //assume every edge is listed twice for undirected graphs
-    direct (IO) ("undirectedGraphFromDirectedAdjList", Nil, MString :: UndirectedGraph) implements composite ${
-      val input_edges = ForgeFileReader.readLines($0)({line =>
+    direct (IO) ("undirectedGraphFromDirectedAdjList", Nil, MString :: MUnit) implements composite ${
+      val input_edges = ForgeFileReader.readLinesFlattened($0)({line =>
           val fields = line.fsplit("\t")
-          val cur = array_empty[Tup2[Int,Int]]((array_length(fields)-1)*2)
-          var i = 1
-          while(i < (array_length(fields))){
-            array_update(cur,(i-1)*2,pack(fields(0).toInt,fields(i).toInt))
-            array_update(cur,((i-1)*2)+1,pack(fields(i).toInt,fields(0).toInt))
-            i += 1  
-          }
-          NodeData(cur)
+          array_fromfunction(array_length(fields),{n => 
+            array_apply(fields,n)
+          })
       })
       //contains either duplicate edges or not
-      val edge_data = NodeData[NodeData[Tup2[Int,Int]]](input_edges).flatMap(e => e).distinct
+
+      println("lines: " + array_length(input_edges))
+      var i = 0
+      while(i < array_length(input_edges)){
+        println(array_apply(input_edges,i))
+        i += 1
+      }
+      /*
+      val edge_data = NodeData(input_edges).distinct
       println("Edge data")
       edge_data.print
       
@@ -76,9 +79,10 @@ trait IOGraphOps {
 
       println("finished file I/O")
       UndirectedGraph(numNodes,serial_out._2,distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
+      */
     }
     //assume every edge is listed twice for undirected graphs
-    direct (IO) ("undirectedGraphFromEdgeList", Nil, (MString,MBoolean) :: UndirectedGraph) implements composite ${
+    direct (IO) ("undirectedGraphFromEdgeList", Nil, (MString,MBoolean,MInt) :: UndirectedGraph) implements composite ${
       val input_edges = ForgeFileReader.readLines($0)({line =>
           val fields = line.fsplit(" ")
           pack(fields(0).toInt,fields(1).toInt) 
@@ -103,12 +107,12 @@ trait IOGraphOps {
       val src_ids_ordered = NodeData(array_sort(array_map[Int,Int](src_ids.getRawArray,e => fhashmap_get(idHashMap,e))))
       val src_edge_array = src_ids_ordered.flatMap{e => NodeData(src_groups(distinct_ids(e))).map(n => fhashmap_get(idHashMap,n))}
 
-      val serial_out = assignIndiciesSerialUndirected(numNodes,distinct_ids,src_groups,src_ids_ordered)
+      val serial_out = assignIndiciesSerialUndirected($2,src_edge_array.length,numNodes,distinct_ids,src_groups,src_ids_ordered)
 
       println("finished file I/O")
       UndirectedGraph(numNodes,serial_out._2,distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
     }
-     direct (IO) ("assignIndiciesSerialUndirected", Nil, MethodSignature(List(("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt))),("src_ids_ordered",NodeData(MInt))),Tuple2(MArray(MInt),SHashMap(MInt,MInt)))) implements single ${
+     direct (IO) ("assignIndiciesSerialUndirected", Nil, MethodSignature(List(("split",MInt),("numEdges",MInt),("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt))),("src_ids_ordered",NodeData(MInt))),Tuple2(MArray(MInt),SHashMap(MInt,MInt)))) implements single ${
       val src_node_array = NodeData[Int](numNodes)
       val dst_node_array = NodeData[Int](numNodes)
       val sHash = SHashMap[Int,Int]()
@@ -122,7 +126,7 @@ trait IOGraphOps {
           if((src_array_index+1) < src_ids_ordered.length) src_array_index += 1
         }
         else src_node_array(i+1) = src_node_array(i)
-        if(degree.toDouble > Math.sqrt(numNodes.toDouble)) sHash.update(i,distinct_ids(i))
+        if( (degree*degree) > numEdges) sHash.update(i,distinct_ids(i))
         i += 1
       }
       pack(src_node_array.getRawArray,sHash)

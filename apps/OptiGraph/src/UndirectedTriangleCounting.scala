@@ -15,7 +15,7 @@ trait UndirectedTriangleCounting extends OptiGraphApplication {
     if (args.length < 1) printUsage
     tic("input",args(0))
     //Works for both directed and undirected, performance 
-    val g = undirectedGraphFromEdgeList(args(0),true)
+    val g = undirectedGraphFromEdgeList(args(0),true,0)
 
     toc("input",g)
     println("Directed: " + g.isDirected)

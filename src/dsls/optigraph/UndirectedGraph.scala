@@ -40,12 +40,21 @@ trait UndirectedGraphOps{
     val UndirectedGraphOps = withTpe(UndirectedGraph)     
     UndirectedGraphOps{
       //UndirectedGraph directed or not?
+      infix ("numEdges")(Nil :: MInt) implements single ${array_length(edge_raw_data($self))}
+
       infix ("isDirected") (Nil :: MBoolean) implements single ${false}
       
       infix ("neighborHash") (Node :: NodeSHash(MInt,MInt), effect = simple) implements composite ${
         val hash = NodeSHash[Int,Int]
         $self.neighbors($1).serialForEach{n => hash.add(n,n)}
         hash
+      }
+      infix("sumOverEdges")( (Edge==>R) :: R, TNumeric(R), addTpePars=R) implements composite ${
+        NodeIdView($self.numNodes).mapreduce[R]( {n => 
+          $self.neighbors(n).mapreduce[R]({ nbr =>
+              $1(Edge(Node(n),Node(nbr)))
+            },(a,b) => a+b, e => true)
+        }, (a,b) => a+b, e => true)
       }
       //Perform a sum over the neighbors
       infix ("sumOverNbrs") ( CurriedMethodSignature(List(("n",Node),("data",MInt==>R),("cond",MInt==>MBoolean)),R), TNumeric(R), addTpePars=R) implements composite ${

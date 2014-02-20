@@ -34,6 +34,8 @@ trait GraphOps{
     val GraphCommonOps = withTpe(Graph)
     GraphCommonOps{
       infix ("getHeavyNodeHash") (Nil :: SHashMap(MInt,MInt)) implements getter(0, "_heavyNodes")
+      infix ("isHeavy") (Node :: MBoolean) implements single ${$self.getHeavyNodeHash.contains($1.id)}
+
       infix("mapLoadBalancedNodes")( (Node==>R) :: NodeData(R), TNumeric(R), addTpePars=R) implements composite ${
         //parallel on from function 
         val heavy = $self.getHeavyNodeHash

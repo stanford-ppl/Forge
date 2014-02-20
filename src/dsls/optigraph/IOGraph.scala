@@ -77,7 +77,7 @@ trait IOGraphOps {
 
       val serial_out = assignIndiciesSerialUndirected($2,src_edge_array.length,numNodes,distinct_ids,src_groups,src_ids_ordered)
 
-      println("finished file I/O")
+      println("finished file I/O. Edges: " + src_edge_array.length)
       UndirectedGraph(numNodes,serial_out._2,distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
     }
     //assume every edge is listed twice for undirected graphs
@@ -108,7 +108,7 @@ trait IOGraphOps {
 
       val serial_out = assignIndiciesSerialUndirected($2,src_edge_array.length,numNodes,distinct_ids,src_groups,src_ids_ordered)
 
-      println("finished file I/O")
+      println("finished file I/O. Edges: " + src_edge_array.length)
       UndirectedGraph(numNodes,serial_out._2,distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
     }
      direct (IO) ("assignIndiciesSerialUndirected", Nil, MethodSignature(List(("split",MInt),("numEdges",MInt),("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt))),("src_ids_ordered",NodeData(MInt))),Tuple2(MArray(MInt),SHashMap(MInt,MInt)))) implements single ${

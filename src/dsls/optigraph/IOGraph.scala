@@ -23,6 +23,7 @@ trait IOGraphOps {
     val Tuple2 = lookupTpe("Tup2")
     val Tuple3 = lookupTpe("Tup3")
 
+    //val MHashMap = lookupTpe("MHashMap")
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
 
     val T = tpePar("T")
@@ -39,6 +40,7 @@ trait IOGraphOps {
       }
       xfs.close()
     })
+    /*
     //assume every edge is listed twice for undirected graphs
     direct (IO) ("undirectedGraphFromDirectedAdjList", Nil, (MString,MBoolean,MInt) :: UndirectedGraph) implements composite ${
       val input_edges = ForgeFileReader.readLinesFlattened($0)({line =>
@@ -47,13 +49,16 @@ trait IOGraphOps {
           array_empty_imm[Tup2[Int,Int]](0)
         } 
         else{
-          array_fromfunction((array_length(fields)-1)*2,{n =>
+          array_fromfunction(((array_length(fields)-1)*2),{n =>
             if(n < (array_length(fields)-1))
               pack(fields(0).toInt,fields(n+1).toInt)
             else 
               pack(fields((n+1)-(array_length(fields)-1)).toInt,fields(0).toInt)
           })
         }
+      })
+      val input_edges = ForgeFileReader.readLinesFlattened($0)({line =>
+          val fields = line.fsplit("\t")
       })
       //contains either duplicate edges or not
       val edge_data = NodeData(input_edges).distinct
@@ -78,6 +83,7 @@ trait IOGraphOps {
       println("finished file I/O. Edges: " + src_edge_array.length)
       UndirectedGraph(numNodes,serial_out._2,distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
     }
+    */
     //assume every edge is listed twice for undirected graphs
     direct (IO) ("undirectedGraphFromEdgeList", Nil, (MString,MBoolean,MInt) :: UndirectedGraph) implements composite ${
       val input_edges = ForgeFileReader.readLines($0)({line =>
@@ -89,6 +95,7 @@ trait IOGraphOps {
           NodeData[Tup2[Int,Int]](array_fromfunction(2,n => if(n==0) e else pack(e._2,e._1) ))}.distinct
           else NodeData[Tup2[Int,Int]](input_edges)
 
+      //val edge_hash = edge_data.groupByReduce[Tup2[Int,Int],Int](e => e, e => 0, (a,b) => a )
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       val src_ids = NodeData(fhashmap_keys(src_groups))
       val distinct_ids = src_ids
@@ -107,9 +114,9 @@ trait IOGraphOps {
       val serial_out = assignIndiciesSerialUndirected($2,src_edge_array.length,numNodes,distinct_ids,src_groups,src_ids_ordered)
 
       println("finished file I/O. Edges: " + src_edge_array.length)
-      UndirectedGraph(numNodes,serial_out._2,distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
+      UndirectedGraph(numNodes,fhashmap_from_shashmap(serial_out._2),distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
     }
-     direct (IO) ("assignIndiciesSerialUndirected", Nil, MethodSignature(List(("split",MInt),("numEdges",MInt),("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt))),("src_ids_ordered",NodeData(MInt))),Tuple2(MArray(MInt),SHashMap(MInt,MInt)))) implements single ${
+    direct (IO) ("assignIndiciesSerialUndirected", Nil, MethodSignature(List(("split",MInt),("numEdges",MInt),("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt))),("src_ids_ordered",NodeData(MInt))),Tuple2(MArray(MInt),SHashMap(MInt,MInt)))) implements single ${
       val src_node_array = NodeData[Int](numNodes)
       val dst_node_array = NodeData[Int](numNodes)
       val sHash = SHashMap[Int,Int]()
@@ -168,7 +175,7 @@ trait IOGraphOps {
       val edge_arrays = serial_out._1
       
       println("finished file I/O")
-      DirectedGraph(numNodes,serial_out._2,distinct_ids.getRawArray,edge_arrays(0).getRawArray,src_edge_array.getRawArray,edge_arrays(1).getRawArray,dst_edge_array.getRawArray)
+      DirectedGraph(numNodes,fhashmap_from_shashmap(serial_out._2),distinct_ids.getRawArray,edge_arrays(0).getRawArray,src_edge_array.getRawArray,edge_arrays(1).getRawArray,dst_edge_array.getRawArray)
     }
     direct (IO) ("assignIndiciesSerialDirected", Nil, MethodSignature(List(("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt))),("src_ids_ordered",NodeData(MInt)),("dst_groups",MHashMap(MInt,MArrayBuffer(MInt))),("dst_ids_ordered",NodeData(MInt))), Tuple2(NodeData(NodeData(MInt)),SHashMap(MInt,MInt)) )) implements single ${
       val src_node_array = NodeData[Int](numNodes)

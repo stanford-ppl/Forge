@@ -33,9 +33,10 @@ trait UndirectedGraphOps{
     val K = tpePar("K")
     val V = tpePar("V")
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
+    //val MHashMap = lookupTpe("MHashMap")
 
-    data(UndirectedGraph,("_numNodes",MInt),("_heavyNodes",SHashMap(MInt,MInt)),("_externalIDs",MArray(MInt)),("_nodes",MArray(MInt)),("_edges",MArray(MInt))) 
-    static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("shash",SHashMap(MInt,MInt)),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt))), UndirectedGraph))) implements allocates(UndirectedGraph,${$count},${$shash},${$exID},${$outNodes},${outEdges})
+    data(UndirectedGraph,("_numNodes",MInt),("_heavyNodes",MHashMap(MInt,MInt)),("_externalIDs",MArray(MInt)),("_nodes",MArray(MInt)),("_edges",MArray(MInt))) 
+    static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("shash",MHashMap(MInt,MInt)),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt))), UndirectedGraph))) implements allocates(UndirectedGraph,${$count},${$shash},${$exID},${$outNodes},${outEdges})
 
     val UndirectedGraphOps = withTpe(UndirectedGraph)     
     UndirectedGraphOps{

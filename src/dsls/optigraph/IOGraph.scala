@@ -22,10 +22,7 @@ trait IOGraphOps {
     val V = tpePar("V")
     val Tuple2 = lookupTpe("Tup2")
     val Tuple3 = lookupTpe("Tup3")
-
-    //val MHashMap = lookupTpe("MHashMap")
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
-
     val T = tpePar("T")
 
     direct (IO) ("writeResults", T, (("path",MString),("ids",MArray(MInt)),("data",NodeData(T))) :: MUnit, TNumeric(T), effect = simple) implements single ${
@@ -95,7 +92,7 @@ trait IOGraphOps {
           NodeData[Tup2[Int,Int]](array_fromfunction(2,n => if(n==0) e else pack(e._2,e._1) ))}.distinct
           else NodeData[Tup2[Int,Int]](input_edges)
 
-      //val edge_hash = edge_data.groupByReduce[Tup2[Int,Int],Int](e => e, e => 0, (a,b) => a )
+      val edge_hash = edge_data.groupByReduce[Tup2[Int,Int],Int](e => e, e => 0, (a,b) => a )
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       val src_ids = NodeData(fhashmap_keys(src_groups))
       val distinct_ids = src_ids
@@ -114,7 +111,7 @@ trait IOGraphOps {
       val serial_out = assignIndiciesSerialUndirected($2,src_edge_array.length,numNodes,distinct_ids,src_groups,src_ids_ordered)
 
       println("finished file I/O. Edges: " + src_edge_array.length)
-      UndirectedGraph(numNodes,fhashmap_from_shashmap(serial_out._2),distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
+      UndirectedGraph(numNodes,serial_out._2,edge_hash,distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
     }
     direct (IO) ("assignIndiciesSerialUndirected", Nil, MethodSignature(List(("split",MInt),("numEdges",MInt),("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt))),("src_ids_ordered",NodeData(MInt))),Tuple2(MArray(MInt),SHashMap(MInt,MInt)))) implements single ${
       val src_node_array = NodeData[Int](numNodes)
@@ -130,7 +127,7 @@ trait IOGraphOps {
           if((src_array_index+1) < src_ids_ordered.length) src_array_index += 1
         }
         else src_node_array(i+1) = src_node_array(i)
-        if( (degree*degree) > numEdges) sHash.update(i,distinct_ids(i))
+        //if( (degree*degree) > numEdges) sHash.update(i,distinct_ids(i))
         i += 1
       }
       pack(src_node_array.getRawArray,sHash)
@@ -175,7 +172,7 @@ trait IOGraphOps {
       val edge_arrays = serial_out._1
       
       println("finished file I/O")
-      DirectedGraph(numNodes,fhashmap_from_shashmap(serial_out._2),distinct_ids.getRawArray,edge_arrays(0).getRawArray,src_edge_array.getRawArray,edge_arrays(1).getRawArray,dst_edge_array.getRawArray)
+      DirectedGraph(numNodes,serial_out._2,distinct_ids.getRawArray,edge_arrays(0).getRawArray,src_edge_array.getRawArray,edge_arrays(1).getRawArray,dst_edge_array.getRawArray)
     }
     direct (IO) ("assignIndiciesSerialDirected", Nil, MethodSignature(List(("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt))),("src_ids_ordered",NodeData(MInt)),("dst_groups",MHashMap(MInt,MArrayBuffer(MInt))),("dst_ids_ordered",NodeData(MInt))), Tuple2(NodeData(NodeData(MInt)),SHashMap(MInt,MInt)) )) implements single ${
       val src_node_array = NodeData[Int](numNodes)

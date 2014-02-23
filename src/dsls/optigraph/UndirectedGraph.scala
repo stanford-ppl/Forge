@@ -32,11 +32,11 @@ trait UndirectedGraphOps{
     val R = tpePar("R")
     val K = tpePar("K")
     val V = tpePar("V")
+    val Tuple2 = lookupTpe("Tup2")
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
-    //val MHashMap = lookupTpe("MHashMap")
 
-    data(UndirectedGraph,("_numNodes",MInt),("_heavyNodes",MHashMap(MInt,MInt)),("_externalIDs",MArray(MInt)),("_nodes",MArray(MInt)),("_edges",MArray(MInt))) 
-    static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("shash",MHashMap(MInt,MInt)),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt))), UndirectedGraph))) implements allocates(UndirectedGraph,${$count},${$shash},${$exID},${$outNodes},${outEdges})
+    data(UndirectedGraph,("_numNodes",MInt),("_heavyNodes",SHashMap(MInt,MInt)),("_edgeHash",MHashMap(Tuple2(MInt,MInt),MInt)),("_externalIDs",MArray(MInt)),("_nodes",MArray(MInt)),("_edges",MArray(MInt))) 
+    static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("shash",SHashMap(MInt,MInt)),("edgeHash",MHashMap(Tuple2(MInt,MInt),MInt)),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt))), UndirectedGraph))) implements allocates(UndirectedGraph,${$count},${$shash},${$edgeHash},${$exID},${$outNodes},${outEdges})
 
     val UndirectedGraphOps = withTpe(UndirectedGraph)     
     UndirectedGraphOps{
@@ -44,7 +44,15 @@ trait UndirectedGraphOps{
       infix ("numEdges")(Nil :: MInt) implements single ${array_length(edge_raw_data($self))}
 
       infix ("isDirected") (Nil :: MBoolean) implements single ${false}
-      
+      infix ("hasEdge") ((MInt,MInt) :: MBoolean) implements single ${
+        val eHash = get_edge_hash($self)
+        fhashmap_contains(eHash,pack($1,$2))
+      }
+      infix ("hasEdge") ((Node,Node) :: MBoolean) implements single ${
+        val eHash = get_edge_hash($self)
+        fhashmap_contains(eHash,pack($1.id,$2.id))
+      }
+
       infix ("neighborHash") (Node :: NodeSHash(MInt,MInt), effect = simple) implements composite ${
         val hash = NodeSHash[Int,Int]
         $self.neighbors($1).serialForEach{n => hash.add(n,n)}
@@ -90,6 +98,7 @@ trait UndirectedGraphOps{
         NodeDataView[Int](edge_raw_data($self),start,end-start)
       }
 
+      compiler ("get_edge_hash") (Nil :: MHashMap(Tuple2(MInt,MInt),MInt)) implements getter(0, "_edgeHash")
       compiler ("node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_nodes")
       compiler("node_apply")(MInt :: MInt) implements single ${array_apply(node_raw_data($self),$1)}
       compiler ("edge_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_edges")

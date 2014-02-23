@@ -28,34 +28,22 @@ trait SkewTriangleCounting extends OptiGraphApplication {
     val t = g.sumOverNodes{ n =>
       //could probably clean up syntax to move hash inside DSL
       if(g.isHeavy(n)){
-        val nbrHash = g.neighborHash(n)
         g.sumOverEdges{ e =>
-            if(nbrHash.hasEdgeWith(e.fromNode.id) && nbrHash.hasEdgeWith(e.toNode.id)) 1.toLong
-            else 0.toLong
+          if(g.hasEdge(n.id,e.fromNode.id) && g.hasEdge(n.id,e.toNode.id)) 1.toLong
+          else 0.toLong
         }/2
       }
       else{
-        /*
-        val nbrHash = g.neighborHash(n)
         g.sumOverNbrs(n){ nbr =>
-          g.sumOverNbrs(nbr){ nbrOfNbr =>
-            if(nbrHash.hasEdgeWith(nbr)) 1.toLong
-            else 0.toLong
-          }{nbrOfNbr => nbrOfNbr>nbr}
-        }{nbr => nbr > n.id}
-        */
-        g.sumOverNbrs(n){ nbr =>
-          val nbrHash = g.neighborHash(Node(nbr))
           g.sumOverNbrs(n){ nbrClone =>
-            if(nbrHash.hasEdgeWith(nbrClone)) 1.toLong
+            if(g.hasEdge(nbrClone,nbr)) 1.toLong
             else 0.toLong
           }{nbrClone => nbrClone > nbr}
-        }{e => true}
-
+        }{nbr => true}//nbr > n.id}
       }
     }
     toc("Triangle Counting",t)
-    println("Number of triangles " + t/3)
+    println("Number of triangles: " + t/3)
   }
   def printUsage = {
     println("Usage: SkewTriangleCounting <path to input edge list file> <split # for heavy>")

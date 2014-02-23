@@ -30,25 +30,25 @@ trait GraphOps{
     val K = tpePar("K")
     val V = tpePar("V")
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
-    //val MHashMap = lookupTpe("MHashMap")
 
     val Graph = g
     val GraphCommonOps = withTpe(Graph)
     GraphCommonOps{
-      infix ("getHeavyNodeHash") (Nil :: MHashMap(MInt,MInt)) implements getter(0, "_heavyNodes")
-      infix ("isHeavy") (Node :: MBoolean) implements single ${fhashmap_contains($self.getHeavyNodeHash,$1.id)}
+      infix ("getHeavyNodeHash") (Nil :: SHashMap(MInt,MInt)) implements getter(0, "_heavyNodes")
+      infix ("isHeavy") (Node :: MBoolean) implements single ${$self.getHeavyNodeHash.contains($1.id)}//fhashmap_contains($self.getHeavyNodeHash,$1.id)}
 
       infix("mapLoadBalancedNodes")( (Node==>R) :: NodeData(R), TNumeric(R), addTpePars=R) implements composite ${
         //parallel on from function 
         val heavy = $self.getHeavyNodeHash
         val data = array_buffer_strict_empty[R]($self.numNodes) 
         array_buffer_forIndices(data,{n => 
-          if(!fhashmap_contains(heavy,n)) array_buffer_update(data,n,$1(Node(n)))
+          if(!heavy.contains(n)) array_buffer_update(data,n,$1(Node(n)))
+          //if(!fhashmap_contains(heavy,n)) array_buffer_update(data,n,$1(Node(n)))
           else array_buffer_update(data,n,numeric_zero[R])
         })
 
         //parallel on function passed in
-        val keys = fhashmap_keys(heavy)
+        val keys = heavy.keys//fhashmap_keys(heavy)
         var i = 0
         while(i < array_length(keys)){
           array_buffer_update(data,array_apply(keys,i),$1(Node(array_apply(keys,i))))

@@ -36,6 +36,7 @@ trait GraphOps{
     GraphCommonOps{
       infix ("getHeavyNodeHash") (Nil :: SHashMap(MInt,MInt)) implements getter(0, "_heavyNodes")
       infix ("isHeavy") (Node :: MBoolean) implements single ${$self.getHeavyNodeHash.contains($1.id)}//fhashmap_contains($self.getHeavyNodeHash,$1.id)}
+      infix ("numHeavy") (Nil :: MInt) implements single ${array_length($self.getHeavyNodeHash.keys)}
 
       infix("mapLoadBalancedNodes")( (Node==>R) :: NodeData(R), TNumeric(R), addTpePars=R) implements composite ${
         //parallel on from function 

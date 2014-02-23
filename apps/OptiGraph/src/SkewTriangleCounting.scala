@@ -27,23 +27,24 @@ trait SkewTriangleCounting extends OptiGraphApplication {
     
     val t = g.sumOverNodes{ n =>
       //could probably clean up syntax to move hash inside DSL
-      if(g.isHeavy(n)){
+      if(true){
         g.sumOverEdges{ e =>
-          if(g.hasEdge(n.id,e.fromNode.id) && g.hasEdge(n.id,e.toNode.id)) 1.toLong
-          else 0.toLong
+          if(g.hasEdge(n.id,e.fromNode.id) && g.hasEdge(n.id,e.toNode.id)) 1
+          else 0
         }/2
       }
       else{
         g.sumOverNbrs(n){ nbr =>
           g.sumOverNbrs(n){ nbrClone =>
-            if(g.hasEdge(nbrClone,nbr)) 1.toLong
-            else 0.toLong
+            if(g.hasEdge(nbrClone,nbr)) 1
+            else 0
           }{nbrClone => nbrClone > nbr}
-        }{nbr => true}//nbr > n.id}
+        }{nbr => true}
       }
     }
     toc("Triangle Counting",t)
-    println("Number of triangles: " + t/3)
+    println("Number of triangles: " + t)
+    println("Number of heavy nodes: " + g.numHeavy)
   }
   def printUsage = {
     println("Usage: SkewTriangleCounting <path to input edge list file> <split # for heavy>")

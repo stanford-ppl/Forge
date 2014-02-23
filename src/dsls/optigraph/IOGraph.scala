@@ -89,10 +89,9 @@ trait IOGraphOps {
       })
       //contains either duplicate edges or not
       val edge_data = if($1) NodeData[Tup2[Int,Int]](input_edges).flatMap{e => 
-          NodeData[Tup2[Int,Int]](array_fromfunction(2,n => if(n==0) e else pack(e._2,e._1) ))}//.distinct
+          NodeData[Tup2[Int,Int]](array_fromfunction(2,n => if(n==0) e else pack(e._2,e._1) ))}.distinct
           else NodeData[Tup2[Int,Int]](input_edges)
 
-      val edge_hash = edge_data.groupByReduce[Tup2[Int,Int],Int](e => e, e => 0, (a,b) => a )
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       val src_ids = NodeData(fhashmap_keys(src_groups))
       val distinct_ids = src_ids
@@ -101,6 +100,7 @@ trait IOGraphOps {
       val numNodes = distinct_ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
+      val edge_hash = edge_data.groupByReduce[Tup2[Int,Int],Int](e => pack(fhashmap_get(idHashMap,e._1),fhashmap_get(idHashMap,e._2)), e => 0, (a,b) => a )
 
       //must filter down the ids we want to flat map to just the distinct src ids we want
       //gets tricky because order of flatmap must match our internal id order other wise

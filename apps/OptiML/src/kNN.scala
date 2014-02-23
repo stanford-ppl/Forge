@@ -38,7 +38,7 @@ trait kNN extends OptiMLApplication {
 
   def KNNClassify[L:Manifest](data: Rep[DenseMatrix[Double]], labels: Rep[DenseVector[L]], inX: Rep[DenseVector[Double]], k:Rep[Int]) : Rep[L] = {
     val kIndices = data.mapRowsToVector(row => dist(row, inX, EUC)).sortWithIndex._2.take(k)
-    val kLabels = labels(kIndices).groupBy(i => i)
+    val kLabels = labels(kIndices).groupBy(i => i, i => i).toVector
     val maxIndex = kLabels.map(_.length).maxIndex
     kLabels(maxIndex).apply(0) // return label associated with group
   }

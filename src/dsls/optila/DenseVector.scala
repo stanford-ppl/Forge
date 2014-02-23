@@ -112,9 +112,15 @@ trait DenseVectorOps {
       ($0 until $1: scala.Range).toArray.sortWith((a,b) => $2(a) < $2(b))
     })
 
-    compiler (DenseVector) ("densevector_groupby_helper", (T,R), (MArray(T), (T ==> R)) :: MArray(MArray(T))) implements codegen($cala, ${
-      $0.groupBy(e => $b[1](e)).values.toArray
-    })
+    val K = tpePar("K")
+    val V = tpePar("V")
+
+    compiler (DenseVector) ("densevector_groupby_helper", (T,K,V), (DenseVector(T), T ==> K, T ==> V) :: MHashMap(K, MArrayBuffer(V))) implements groupBy((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)})
+
+    infix (DenseVector) ("toVector", (T,R), MHashMap(T, DenseVector(R)) :: DenseVector(DenseVector(R))) implements composite ${
+      densevector_fromarray(fhashmap_values($0), true)
+    }
+
 
     val DenseVectorOps = withTpe (DenseVector)
     DenseVectorOps {
@@ -340,12 +346,12 @@ trait DenseVectorOps {
 
       direct ("__equal") (SparseVector(T) :: MBoolean) implements composite ${ $self == $1.toDense }
 
-      // TODO: switch to generic vector groupBy using Delite op
-      infix ("groupBy") (((T ==> R)) :: DenseVector(DenseVector(T)), addTpePars = R) implements composite ${
-        val a = densevector_groupby_helper(densevector_raw_data($self), $1)
-        (0 :: array_length(a)) { i =>
-          densevector_fromarray(array_apply(a,i), $self.isRow)
-        }
+      infix ("groupByReduce") ((T ==> K,T ==> V,(V,V) ==> V) :: MHashMap(K,V), TArith(V), addTpePars = (K,V)) implements groupByReduce((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)}, ${implicitly[Arith[V]].empty}, ${(a,b) => $3(a,b)})
+
+      infix ("groupBy") ((T ==> K,T ==> V) :: MHashMap(K, DenseVector(V)), addTpePars = (K,V)) implements composite ${
+        val hash = densevector_groupby_helper($self,$1,$2)
+        val vals = fhashmap_values(hash).map(ab => densevector_fromarray(array_buffer_result(ab), true))
+        fhashmap_from_arrays(fhashmap_keys(hash), vals)
       }
 
       /**

@@ -72,10 +72,13 @@ trait VectorOps {
         found
       }
       infix ("distinct") (Nil :: DenseVector(T)) implements single ${
+        val set = SHashMap[\$TT,Int]()
         val out = DenseVector[\$TT](0, $self.isRow)
         for (i <- 0 until $self.length) {
-          // slow -- should use a hashmap when it's available as a primitive
-          if (!out.contains($self(i))) out <<= $self(i)
+          if (!set.contains($self(i))) {
+            set($self(i)) = 1
+            out <<= $self(i)
+          }
         }
         out.unsafeImmutable
       }
@@ -138,16 +141,15 @@ trait VectorOps {
         }
         else if ($self.isRow) {
           for (i <- 0 until $self.length - 1) {
-            // make sure to force strConcatWithNumerics to kick in
-            s = s + optila_padspace("" + $self(i))
+            s = s + optila_padspace(optila_fmt_str($self(i)))
           }
-          s = s + optila_padspace("" + $self($self.length-1))
+          s = s + optila_padspace(optila_fmt_str($self($self.length-1)))
         }
         else {
           for (i <- 0 until $self.length - 1) {
-            s = s + optila_padspace("" + $self(i)) + "\\n"
+            s = s + optila_padspace(optila_fmt_str($self(i))) + "\\n"
           }
-          s = s + optila_padspace("" + $self($self.length-1))
+          s = s + optila_padspace(optila_fmt_str($self($self.length-1)))
         }
         s
       }

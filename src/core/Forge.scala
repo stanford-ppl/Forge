@@ -106,6 +106,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case `CInt` | `CLong` | `CFloat` | `CDouble` | `CBoolean` | `CChar` | `CString` | `CUnit` | `CAny` | `CNothing` => true
     // case Def(Tpe(_,_,`now`)) => true
     case Def(Tpe(name,_,_)) if name.startsWith("scala") => true
+    case Def(Tpe(name,_,_)) if name.startsWith("java") => true
     case Def(Tpe(name,_,_)) if name.startsWith("Tuple") => true
     case Def(Tpe("ForgeArray",_,_)) | Def(Tpe("ForgeArrayBuffer",_,_)) | Def(Tpe("ForgeHashMap",_,_)) => true
     case Def(Tpe("Var",_,_)) => true
@@ -119,7 +120,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   }
 
   def opsGrpOf(o: Rep[DSLOp]) = {
-    OpsGrp.getOrElse(o.grp, OpsGrp.find(g => g._2.ops.contains(o)).map(_._2).get)
+    OpsGrp.get(o.grp).orElse(OpsGrp.find(g => g._2.ops.contains(o)).map(_._2))
   }
 
   def grpIsTpe(grp: Rep[DSLGroup]) = grp match {

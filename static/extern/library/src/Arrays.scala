@@ -10,6 +10,8 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
   type ForgeArray[T] = scala.Array[T]
   implicit def forgeArrayManifest[T:Manifest] = manifest[Array[T]]
 
+  def farray_from_sarray[T:Manifest](__arg0: Rep[Array[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+    = __arg0
   def array_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = new ForgeArray[T](__arg0)
   def array_empty_imm[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
@@ -73,7 +75,7 @@ trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
   def array_buffer_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
     = new scala.collection.mutable.ArrayBuffer[T]()
   def array_buffer_immutable[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
-    = __arg0 
+    = __arg0
   def array_buffer_strict_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
     = (new scala.collection.mutable.ArrayBuffer[T]()) ++ (new Array[T](__arg0))
   def array_buffer_new_imm[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
@@ -127,7 +129,7 @@ trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
       __arg1(i)
       i += 1
     }
-  } 
+  }
 }
 
 

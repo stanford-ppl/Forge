@@ -16,8 +16,12 @@ trait ForgeHashMapOpsExp extends DeliteMapOpsExp {
   implicit def forgeMapManifest[K:Manifest,V:Manifest] = manifest[DeliteMap[K,V]]
 
   def fhashmap_from_shashmap[K:Manifest,V:Manifest](m: Rep[scala.collection.mutable.HashMap[K,V]])(implicit ctx: SourceContext): Rep[ForgeHashMap[K,V]] = {
-    val keys = reflectPure(ExtSHashMapKeys(m))
-    val values = reflectPure(ExtSHashMapValues(m))
+    val keys = farray_from_sarray(reflectPure(ExtSHashMapKeys(m)))
+    val values = farray_from_sarray(reflectPure(ExtSHashMapValues(m)))
+    val id: Exp[K] => Exp[K] = k => k
+    dmap_fromCollection[K,K,V](keys, id, values)
+  }
+  def fhashmap_from_arrays[K:Manifest,V:Manifest](keys: Rep[ForgeArray[K]], values: Rep[ForgeArray[V]])(implicit ctx: SourceContext): Rep[ForgeHashMap[K,V]] = {
     val id: Exp[K] => Exp[K] = k => k
     dmap_fromCollection[K,K,V](keys, id, values)
   }
@@ -34,11 +38,11 @@ trait ForgeHashMapOpsExp extends DeliteMapOpsExp {
   //def fhashmap_toArray[K:Manifest,V:Manifest](m: Rep[ForgeHashMap[K,V]])(implicit ctx: SourceContext): Rep[ForgeArray[(K,V)]]
 
   // avoid mixing in SHashMapOpsExp, which requires the mixed-in DSL to have called importHashMap() in Scala.scala (a dependency we don't want to force)
-  case class ExtSHashMapKeys[K:Manifest,V:Manifest](m: Exp[scala.collection.mutable.HashMap[K,V]]) extends Def[ForgeArray[K]] {
+  case class ExtSHashMapKeys[K:Manifest,V:Manifest](m: Exp[scala.collection.mutable.HashMap[K,V]]) extends Def[Array[K]] {
     val mK = manifest[K]
     val mV = manifest[V]
   }
-  case class ExtSHashMapValues[K:Manifest,V:Manifest](m: Exp[scala.collection.mutable.HashMap[K,V]]) extends Def[ForgeArray[V]] {
+  case class ExtSHashMapValues[K:Manifest,V:Manifest](m: Exp[scala.collection.mutable.HashMap[K,V]]) extends Def[Array[V]] {
     val mK = manifest[K]
     val mV = manifest[V]
   }

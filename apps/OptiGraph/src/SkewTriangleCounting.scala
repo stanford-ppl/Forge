@@ -30,16 +30,16 @@ trait SkewTriangleCounting extends OptiGraphApplication {
         g.sumOverEdges{ e =>
           if(g.hasEdge(n.id,e.fromNode.id) && g.hasEdge(n.id,e.toNode.id) 
             && e.fromNode.id < e.toNode.id){ 
-            1.toLong
+            1
           }
-          else 0.toLong
+          else 0
         }
       }
       else{
         g.sumOverNbrs(n){ nbr =>
           g.sumOverNbrs(n){ nbrClone =>
-            if(g.hasEdge(nbrClone,nbr)) 1.toLong
-            else 0.toLong
+            if(g.hasEdge(nbrClone,nbr)) 1
+            else 0
           }{nbrClone => nbrClone > nbr}
         }{nbr => true}
       }

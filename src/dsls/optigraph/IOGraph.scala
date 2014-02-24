@@ -127,7 +127,7 @@ trait IOGraphOps {
           if((src_array_index+1) < src_ids_ordered.length) src_array_index += 1
         }
         else src_node_array(i+1) = src_node_array(i)
-        //if( (degree*degree) > numEdges) sHash.update(i,distinct_ids(i))
+        if( (degree*degree) > numEdges) sHash.update(i,distinct_ids(i))
         i += 1
       }
       pack(src_node_array.getRawArray,sHash)

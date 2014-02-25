@@ -70,7 +70,7 @@ trait SpecUndirectedGraphOps{
           var t = 0
           while(i < nbrs.length){
             if(nbrs(i)==nbrsOfNbrs(j)) t += 1
-            while(nbrsOfNbrs(j) < nbrs(i)){
+            while(nbrsOfNbrs(j) < nbrs(i) && j < nbrsOfNbrs.length){
               j += 1
             }
             i += 1

@@ -52,6 +52,8 @@ trait NodeDataOps {
         array_copy($1.getRawArray,0,result,$0.length,$1.length)
         NodeData(result)
       }
+      infix("sort")(Nil :: NodeData(T),TNumeric(T)) implements composite ${NodeData(array_sort($self.getRawArray))}
+
       compiler ("nd_set_raw_data") (MArrayBuffer(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
 
       ///////////parallel operations////////////////////////////
@@ -60,7 +62,7 @@ trait NodeDataOps {
       infix ("sum") (Nil :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${ (a,b) => a+b })
       infix ("map") ((T ==> R) :: NodeData(R), addTpePars = R) implements map((T,R), 0, ${ e => $1(e) })
       infix ("flatMap") ((T ==> NodeData(R)) :: NodeData(R), addTpePars = R) implements flatMap((T,R), 0, ${ e => $1(e) })
-      infix ("filter") ( ((T ==> MBoolean),(T ==> MInt)) :: NodeData(MInt)) implements filter((T,MInt), 0, ${w => $1(w)}, ${e => $2(e)})
+      infix ("filter") ( ((T ==> MBoolean),(T ==> R)) :: NodeData(R), addTpePars = R) implements filter((T,R), 0, ${w => $1(w)}, ${e => $2(e)})
       infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements foreach(T, 0, ${ e => $1(e) })
       infix ("reduce") (((T,T) ==> T) :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${ (a,b) => $1(a,b) })
       infix ("reduceNested") ( (((T,T) ==> T),R):: T,addTpePars=R) implements reduce(T, 0, ${$2.asInstanceOf[Rep[T]]}, ${(a,b) => $1(a,b)})

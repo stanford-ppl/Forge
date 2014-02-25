@@ -13,6 +13,7 @@ trait Skew2TriangleCounting extends OptiGraphApplication {
     println("Skew2TriangleCounting")
   
     if (args.length < 2) printUsage
+    /*
     tic("input",args(0))
     //Works for both directed and undirected, performance 
     //val g = undirectedGraphFromDirectedAdjList(args(0),false,args(1).toInt)
@@ -48,6 +49,7 @@ trait Skew2TriangleCounting extends OptiGraphApplication {
     toc("Triangle Counting",t)
     println("Number of triangles: " + t)
     println("Number of heavy nodes: " + g.numHeavy)
+    */
   }
   def printUsage = {
     println("Usage: Skew2TriangleCounting <path to input edge list file> <split # for heavy>")

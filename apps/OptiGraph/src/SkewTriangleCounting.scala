@@ -12,11 +12,11 @@ trait SkewTriangleCounting extends OptiGraphApplication {
   def main() = {
     println("SkewTriangleCounting")
   
-    if (args.length < 2) printUsage
+    if (args.length < 1) printUsage
     tic("input",args(0))
     //Works for both directed and undirected, performance 
     //val g = undirectedGraphFromDirectedAdjList(args(0),false,args(1).toInt)
-    val g = undirectedGraphFromEdgeList(args(0),true,0)
+    val g = specundirectedGraphFromEdgeList(args(0),true,0)
 
     toc("input",g)
     println("Directed: " + g.isDirected)
@@ -24,14 +24,11 @@ trait SkewTriangleCounting extends OptiGraphApplication {
     
     println("performing Traingle Counting")
     tic("Triangle Counting",g)
-    
+
     val t = g.sumOverNodes{ n =>
       if(g.isHeavy(n)){
-        g.sumOverEdges{ e =>
-          if(g.hasEdge(n.id,e.fromNode.id) && g.hasEdge(n.id,e.toNode.id) 
-            && e.fromNode.id < e.toNode.id){ 
-            1
-          }
+        g.sumTrianglesOverEdges(n){ nbrOfNbr =>
+          if(g.hasEdge(n.id,nbrOfNbr)) 1
           else 0
         }
       }
@@ -40,16 +37,17 @@ trait SkewTriangleCounting extends OptiGraphApplication {
           g.sumOverNbrs(n){ nbrClone =>
             if(g.hasEdge(nbrClone,nbr)) 1
             else 0
-          }{nbrClone => nbrClone > nbr}
+          }{nbrClone => nbr>nbrClone}
         }{nbr => true}
       }
     }
+    
     toc("Triangle Counting",t)
     println("Number of triangles: " + t)
     println("Number of heavy nodes: " + g.numHeavy)
   }
   def printUsage = {
-    println("Usage: SkewTriangleCounting <path to input edge list file> <split # for heavy>")
+    println("Usage: SkewTriangleCounting <path to input edge list file>")
     exit(-1)
   }
 }

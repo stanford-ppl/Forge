@@ -16,6 +16,7 @@ trait IOGraphOps {
     val IO = grp("GraphIO")
     val DirectedGraph = lookupTpe("DirectedGraph")
     val UndirectedGraph = lookupTpe("UndirectedGraph")
+    val SpecUndirectedGraph = lookupTpe("SpecUndirectedGraph")
     val NodeData = lookupTpe("NodeData")
     val NodeIdView = lookupTpe("NodeIdView")
     val K = tpePar("K")
@@ -82,51 +83,52 @@ trait IOGraphOps {
     }
     */
     //assume every edge is listed twice for undirected graphs
-    direct (IO) ("undirectedGraphFromEdgeList", Nil, (MString,MBoolean,MInt) :: UndirectedGraph) implements composite ${
-      val input_edges = ForgeFileReader.readLines($0)({line =>
+    direct (IO) ("specundirectedGraphFromEdgeList", Nil, (MString,MBoolean,MInt) :: SpecUndirectedGraph) implements composite ${
+      val input_edges = if($1)
+        ForgeFileReader.readLinesFlattened($0)({line =>
+          val fields = line.fsplit(" ")
+          array_fromfunction(((array_length(fields)-1)*2),{n =>
+            if(n==0) pack(fields(0).toInt,fields(1).toInt)
+            else pack(fields(1).toInt,fields(0).toInt)
+          })
+        })
+      else
+        ForgeFileReader.readLines($0)({line =>
           val fields = line.fsplit(" ")
           pack(fields(0).toInt,fields(1).toInt) 
-      })
+        })
       //contains either duplicate edges or not
-      val edge_data = if($1) NodeData[Tup2[Int,Int]](input_edges).flatMap{e => 
-          NodeData[Tup2[Int,Int]](array_fromfunction(2,n => if(n==0) e else pack(e._2,e._1) ))}.distinct
-          else NodeData[Tup2[Int,Int]](input_edges)
-
+      val edge_data = NodeData[Tup2[Int,Int]](input_edges).distinct
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
-      val src_ids = NodeData(fhashmap_keys(src_groups))
-      val distinct_ids = src_ids
+
+      //sort by degree, helps with skew for buckets of nodes
+      val src_id_degrees = edge_data.groupBy(e => array_buffer_length(fhashmap_get(src_groups,e._1)), e => e._1)
+      val distinct_ids = (NodeData(fhashmap_keys(src_id_degrees)).sort).flatMap{e => NodeData(fhashmap_get(src_id_degrees,e)).distinct}
 
       //set up the ID hash map
       val numNodes = distinct_ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
-      val edge_hash = edge_data.groupByReduce[Tup2[Int,Int],Int](e => pack(fhashmap_get(idHashMap,e._1),fhashmap_get(idHashMap,e._2)), e => 0, (a,b) => a )
 
-      //must filter down the ids we want to flat map to just the distinct src ids we want
-      //gets tricky because order of flatmap must match our internal id order other wise
-      //the edge array gets screwed up
-      val src_ids_ordered = NodeData(array_sort(array_map[Int,Int](src_ids.getRawArray,e => fhashmap_get(idHashMap,e))))
-      val src_edge_array = src_ids_ordered.flatMap{e => NodeData(src_groups(distinct_ids(e))).map(n => fhashmap_get(idHashMap,n))}
+      val nbrHash = distinct_ids.map(e => NodeData(fhashmap_get(src_groups,e)).groupByReduce[Int,Int](e => fhashmap_get(idHashMap,e),e => 0,(a,b) => 0))
+      val filtered_nbrs = distinct_ids.map(e => NodeData(src_groups(e)).filter(a => 
+        fhashmap_get(idHashMap,a)>fhashmap_get(idHashMap,e),n =>fhashmap_get(idHashMap,n)).sort)
+      val src_edge_array = idView.flatMap{e => filtered_nbrs(e)}
 
-      val serial_out = assignIndiciesSerialUndirected($2,src_edge_array.length,numNodes,distinct_ids,src_groups,src_ids_ordered)
+      val serial_out = assignIndiciesSerialUndirected($2,src_groups,src_edge_array.length,numNodes,distinct_ids,filtered_nbrs,distinct_ids)
 
       println("finished file I/O. Edges: " + src_edge_array.length)
-      UndirectedGraph(numNodes,serial_out._2,edge_hash,distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
+      SpecUndirectedGraph(numNodes,serial_out._2,nbrHash.getRawArray,distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
     }
-    direct (IO) ("assignIndiciesSerialUndirected", Nil, MethodSignature(List(("split",MInt),("numEdges",MInt),("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt))),("src_ids_ordered",NodeData(MInt))),Tuple2(MArray(MInt),SHashMap(MInt,MInt)))) implements single ${
+    direct (IO) ("assignIndiciesSerialUndirected", Nil, MethodSignature(List(("split",MInt),("degrees",MHashMap(MInt,MArrayBuffer(MInt))),("numEdges",MInt),("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",NodeData(NodeData(MInt))),("src_ids_ordered",NodeData(MInt))),Tuple2(MArray(MInt),SHashMap(MInt,MInt)))) implements single ${
       val src_node_array = NodeData[Int](numNodes)
       val dst_node_array = NodeData[Int](numNodes)
       val sHash = SHashMap[Int,Int]()
       var i = 0
       var src_array_index = 0
       while(i < numNodes-1){
-        var degree = 0
-        if(src_ids_ordered(src_array_index)==i){
-          degree = array_buffer_length(fhashmap_get(src_groups,distinct_ids(i)))
-          src_node_array(i+1) = array_buffer_length(fhashmap_get(src_groups,distinct_ids(i))) + src_node_array(i)
-          if((src_array_index+1) < src_ids_ordered.length) src_array_index += 1
-        }
-        else src_node_array(i+1) = src_node_array(i)
+        val degree = array_buffer_length(fhashmap_get(degrees,distinct_ids(i)))
+        src_node_array(i+1) = src_groups(i).length + src_node_array(i)
         if( (degree*degree) > numEdges) sHash.update(i,distinct_ids(i))
         i += 1
       }

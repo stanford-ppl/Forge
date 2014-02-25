@@ -26,11 +26,8 @@ trait SkewTriangleCounting extends OptiGraphApplication {
     tic("Triangle Counting",g)
 
     val t = g.sumOverNodes{ n =>
-      if(g.isHeavy(n)){
-        g.sumTrianglesOverEdges(n){ nbrOfNbr =>
-          if(g.hasEdge(n.id,nbrOfNbr)) 1
-          else 0
-        }
+      if(true){//g.isHeavy(n)){
+        g.sumTrianglesOverEdges(n)
       }
       else{
         g.sumOverNbrs(n){ nbr =>

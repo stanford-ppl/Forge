@@ -61,10 +61,17 @@ trait SpecUndirectedGraphOps{
         $self.neighbors($1).serialForEach{n => hash.add(n,n)}
         hash
       }
-      infix("sumTrianglesOverEdges")( CurriedMethodSignature(List(("n",Node),("data",MInt==>R)),R), TNumeric(R), addTpePars=R) implements composite ${
-        $self.neighbors(n).mapreduce[R]({ nbr =>
-            $self.neighbors(nbr).mapreduce[R]({ nbrOfNbr =>
-              data(nbrOfNbr)
+      infix ("sumTrianglesOverEdges") (Node :: MInt) implements composite ${
+        $self.neighbors($1).mapreduce[Int]({ nbr =>
+          if($self.neighbors($1).length > $self.neighbors(nbr).length)
+            $self.neighbors(nbr).mapreduce[Int]({ nbrOfNbr =>
+              if($self.hasEdge($1.id,nbrOfNbr)) 1
+              else 0
+            },(a,b) => a+b, e => true)
+          else 
+            $self.neighbors($1).mapreduce[Int]({ nbr2 =>
+              if($self.hasEdge(nbr2,nbr)) 1
+              else 0
             },(a,b) => a+b, e => true)
         },(a,b) => a+b, e => true)
       }

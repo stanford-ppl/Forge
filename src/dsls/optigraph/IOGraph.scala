@@ -110,15 +110,16 @@ trait IOGraphOps {
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
 
-      val nbrHash = distinct_ids.map(e => NodeData(fhashmap_get(src_groups,e)).groupByReduce[Int,Int](e => fhashmap_get(idHashMap,e),e => 0,(a,b) => 0))
+      //val nbrHash = distinct_ids.map(e => NodeData(fhashmap_get(src_groups,e)).groupByReduce[Int,Int](e => fhashmap_get(idHashMap,e),e => 0,(a,b) => 0))
       val filtered_nbrs = distinct_ids.map(e => NodeData(src_groups(e)).filter(a => 
         fhashmap_get(idHashMap,a)>fhashmap_get(idHashMap,e),n =>fhashmap_get(idHashMap,n)).sort)
+      val nbr_hash = filtered_nbrs.map(e => e.groupByReduce[Int,Int](k => k, v => 0, (a,b) => 0))
       val src_edge_array = idView.flatMap{e => filtered_nbrs(e)}
 
       val serial_out = assignIndiciesSerialUndirected($2,src_groups,src_edge_array.length,numNodes,distinct_ids,filtered_nbrs,distinct_ids)
 
       println("finished file I/O. Edges: " + src_edge_array.length)
-      SpecUndirectedGraph(numNodes,serial_out._2,nbrHash.getRawArray,distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
+      SpecUndirectedGraph(numNodes,serial_out._2,nbr_hash.getRawArray,distinct_ids.getRawArray,serial_out._1,src_edge_array.getRawArray)
     }
     direct (IO) ("assignIndiciesSerialUndirected", Nil, MethodSignature(List(("split",MInt),("degrees",MHashMap(MInt,MArrayBuffer(MInt))),("numEdges",MInt),("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",NodeData(NodeData(MInt))),("src_ids_ordered",NodeData(MInt))),Tuple2(MArray(MInt),SHashMap(MInt,MInt)))) implements single ${
       val src_node_array = NodeData[Int](numNodes)

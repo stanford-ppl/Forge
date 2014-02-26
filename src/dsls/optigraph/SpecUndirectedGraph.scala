@@ -69,21 +69,43 @@ trait SpecUndirectedGraphOps{
           else{
             val nbrsOfNbrs = $self.neighbors(nbr)
             var i = 0
-            var j = 0
             var t = 0
-            
+            var j = 0
+            while(i < nbrs.length  && j < nbrsOfNbrs.length){
+              //println("node: " + $1.id + " " + nbrs.length + " " + nbrsOfNbrs.length)
+              //println("i: " + i + " " + nbrs(i) + " j: " + j + " " + nbrsOfNbrs(j))
+              while( (nbrs(i) < nbrsOfNbrs(j)) && (i < nbrs.length) ){
+                i += 1
+              }
+              if(i < nbrs.length){
+                while( (nbrsOfNbrs(j) < nbrs(i)) && (j < nbrsOfNbrs.length) ){
+                  j += 1
+                }
+                if(j < nbrsOfNbrs.length){
+                  if(nbrs(i) == nbrsOfNbrs(j)){
+                    t += 1
+                    j += 1
+                    i += 1
+                  }
+                }
+              }
+            }
+            t
+          }
+            /*
             while(i < nbrs.length  && j < nbrsOfNbrs.length){
               while(nbrsOfNbrs(j) < nbrs(i)){
                 j += 1
               }
               if(nbrs(i)==nbrsOfNbrs(j)){ 
-                //println("counting: " + $1.id + " nbr: " + nbr + " nbrsOfNbrs: " + nbrsOfNbrs(j))
+                println("counting: " + $1.id + " nbr: " + nbr + " nbrsOfNbrs: " + nbrsOfNbrs(j))
                 t += 1
               }
               i += 1
             }
             t
-          }
+            */
+          //}
         },(a,b) => a+b, e => true)
       }
       infix ("sumTrianglesOverEdges") (Node :: MInt) implements composite ${

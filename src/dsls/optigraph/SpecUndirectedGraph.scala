@@ -77,7 +77,7 @@ trait SpecUndirectedGraphOps{
                 j += 1
               }
               if(nbrs(i)==nbrsOfNbrs(j)){ 
-                println("counting: " + $1.id + " nbr: " + nbr + " nbrsOfNbrs: " + nbrsOfNbrs(j))
+                //println("counting: " + $1.id + " nbr: " + nbr + " nbrsOfNbrs: " + nbrsOfNbrs(j))
                 t += 1
               }
               i += 1

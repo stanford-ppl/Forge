@@ -63,19 +63,27 @@ trait SpecUndirectedGraphOps{
       }
       infix ("intersectSets") (Node :: MInt) implements composite ${
         val nbrs = $self.neighbors($1)
+
         nbrs.mapreduce[Int]({ nbr =>
-          val nbrsOfNbrs = $self.neighbors(nbr)
-          var i = 0
-          var j = 0
-          var t = 0
-          while(i < nbrs.length){
-            if(nbrs(i)==nbrsOfNbrs(j)) t += 1
-            while(nbrsOfNbrs(j) < nbrs(i) && ((j+1) < nbrsOfNbrs.length)){
-              j += 1
+          if($1.id > nbr) 0
+          else{
+            val nbrsOfNbrs = $self.neighbors(nbr)
+            var i = 0
+            var j = 0
+            var t = 0
+            
+            while(i < nbrs.length  && j < nbrsOfNbrs.length){
+              if(nbrs(i)==nbrsOfNbrs(j)){ 
+                //println("counting: " + $1.id + " nbr: " + nbrs(i) + " nbrsOfNbrs: " + nbrsOfNbrs(j))
+                t += 1
+              }
+              while(nbrsOfNbrs(j) < nbrs(i) && ((j+1) < nbrsOfNbrs.length)){
+                j += 1
+              }
+              i += 1
             }
-            i += 1
+            t
           }
-          t
         },(a,b) => a+b, e => true)
       }
       infix ("sumTrianglesOverEdges") (Node :: MInt) implements composite ${

@@ -1,0 +1,79 @@
+import optiml.compiler._
+import optiml.library._
+import optiml.shared._
+
+object NetflixCompiler extends OptiMLApplicationCompiler with Netflix
+object NetflixInterpreter extends OptiMLApplicationInterpreter with Netflix
+
+trait Netflix extends OptiMLApplication { 
+  def print_usage = {
+    println("Usage: Netflix <train set> <m> <n>")
+    exit(-1)
+  }
+
+  def main() = {
+    val cy = readMatrix[Int](args(0), line => line.toInt, " ")
+    //val c = readMatrix(args(0))
+    val m = args(1).toInt
+    val n = args(2).toInt
+    val r = args(3).toInt
+    
+    val mu = args(4).toDouble
+    val sigma = args(5).toDouble
+
+    val alpha = args(6).toDouble
+
+    println(m)
+    println(n)
+    println(r)
+
+    println(cy.numCols)
+    println(cy.numRows)
+
+    // initialize the matrix
+    val v0 = (0::(m+n), 0::r) { (i, j) => 
+      if(i == j) 1.0 else 0.0
+    }
+
+    println(v0.numRows)
+    println(v0.numCols)
+
+    //val result = untilconverged(v0, maxIter = 100) { v =>
+      val mdv = sum(0, cy.numRows) { k =>
+        val i = cy(k, 0) % m
+        val j = cy(k, 1) % n
+        val y = cy(k, 2).toDouble
+
+        //val ei = (0::(m+n)) { k => if(k == i + n) 1.0 else 0.0 }
+        //val ej = (0::(m+n)) { k => if(k == j) 1.0 else 0.0 }
+
+        val vi = v0.getRow(i + n)
+        val vj = v0.getRow(j)
+
+        val xmy = (vi *:* vj) - y
+
+        (0::(m+n), 0::r) { (mi, mj) =>
+          if(mi == i + n) {
+            vj(mj)
+          }
+          else if(mi == j) {
+            vi(mj)
+          }
+          else {
+            0.0
+          }
+        }
+        //xmy * (ei.t ** vj + ej.t ** vi)
+      }
+    //}
+
+    println(mdv.numRows)
+    println(mdv.numCols)
+
+
+  }
+
+  def normf(x: Rep[DenseMatrix[Double]]) = {
+    sqrt(sum(0,x.numRows)(i => x.getRow(i) *:* x.getRow(i)))
+  }
+}

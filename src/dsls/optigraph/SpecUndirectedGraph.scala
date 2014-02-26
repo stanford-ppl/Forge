@@ -65,8 +65,8 @@ trait SpecUndirectedGraphOps{
         val nbrs = $self.neighbors($1)
 
         nbrs.mapreduce[Int]({ nbr =>
-          //if($1.id > nbr) 0
-          //else{
+          if($1.id > nbr) 0
+          else{
             val nbrsOfNbrs = $self.neighbors(nbr)
             var i = 0
             var j = 0
@@ -83,7 +83,7 @@ trait SpecUndirectedGraphOps{
               i += 1
             }
             t
-         // }
+          }
         },(a,b) => a+b, e => true)
       }
       infix ("sumTrianglesOverEdges") (Node :: MInt) implements composite ${

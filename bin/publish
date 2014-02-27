@@ -105,7 +105,11 @@ ${header}
     unmanagedClasspath in Compile <+= (baseDirectory) map { bd => Attributed.blank(lms) },
     unmanagedClasspath in Compile <+= (baseDirectory) map { bd => Attributed.blank(deliteFramework) },
     unmanagedClasspath in Compile <+= (baseDirectory) map { bd => Attributed.blank(deliteRuntime) },
-    unmanagedClasspath in Compile <+= (baseDirectory) map { bd => Attributed.blank(deliteTest) }
+    unmanagedClasspath in Compile <+= (baseDirectory) map { bd => Attributed.blank(deliteTest) },
+    unmanagedClasspath in Test <+= (baseDirectory) map { bd => Attributed.blank(lms) },
+    unmanagedClasspath in Test <+= (baseDirectory) map { bd => Attributed.blank(deliteFramework) },
+    unmanagedClasspath in Test <+= (baseDirectory) map { bd => Attributed.blank(deliteRuntime) },
+    unmanagedClasspath in Test <+= (baseDirectory) map { bd => Attributed.blank(deliteTest) }    
   )
 
 ${footer}

@@ -75,6 +75,14 @@ trait GraphOps{
       infix("sumOverNodes")( (Node==>R) :: R, TNumeric(R), addTpePars=R) implements composite ${
         NodeIdView($self.numNodes).mapreduce[R]( e => $1(Node(e)), (a,b) => a+b, e => true)
       }
+      infix("sumSkewOverNodes")( (Node==>R) :: R, TNumeric(R), addTpePars=R) implements composite ${
+        val a = NodeIdView($self.numNodes).mapreduce[R]( e => $1(Node(e)), (a,b) => a+b, e => !$self.isHeavy(Node(e))) 
+        var b = numeric_zero[R]
+        NodeIdView($self.numNodes).forEachSerial{e => 
+          b += $1(Node(e))
+        }
+        a + b
+      }
       infix ("getExternalIDs") (Nil :: MArray(MInt)) implements getter(0, "_externalIDs")
       infix ("getExternalID") (MInt :: MInt) implements single ${array_apply($self.getExternalIDs,$1)}
       //perform BF traversal

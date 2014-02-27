@@ -72,40 +72,18 @@ trait SpecUndirectedGraphOps{
             var i = 0
             var t = 0
             var j = 0
-            /*
-            while(i < nbrs.length  && j < nbrsOfNbrs.length){
-              //println("node: " + $1.id + " " + nbrs.length + " " + nbrsOfNbrs.length)
-              //println("i: " + i + " " + nbrs(i) + " j: " + j + " " + nbrsOfNbrs(j))
-              while( (nbrs(i) < nbrsOfNbrs(j)) && (i < nbrs.length) ){
-                i += 1
+
+            val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
+            val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
+            while(i < small.length  && j < large.length){
+              while(large(j) < small(i) && j < large.length){
+                j += 1
               }
-              if(i < nbrs.length){
-                while( (nbrsOfNbrs(j) < nbrs(i)) && (j < nbrsOfNbrs.length) ){
-                  j += 1
-                }
-                if(j < nbrsOfNbrs.length){
-                  if(nbrs(i) == nbrsOfNbrs(j)){
-                    t += 1
-                    j += 1
-                    i += 1
-                  }
-                }
-              }
+              if(small(i)==large(j) && j < large.length)              
+                t += 1
+              i += 1
             }
             t
-          }
-          */
-          val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
-          val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
-          while(i < small.length  && j < large.length){
-            while(large(j) < small(i) && j < large.length){
-              j += 1
-            }
-            if(small(i)==large(j) && j < large.length)              
-              t += 1
-            i += 1
-          }
-          t
             
           }
         },(a,b) => a+b, e => true)

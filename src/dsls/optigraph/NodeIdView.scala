@@ -28,6 +28,13 @@ trait NodeIdViewOps {
     NodeIdViewOps {
       infix ("length") (Nil :: MInt) implements getter(0, "_length")
       infix ("apply") (MInt :: MInt) implements composite ${ $1 }
+      infix ("forEachSerial") ((MInt ==> MUnit) :: MUnit, effect = simple) implements single ${
+        var i = 0
+        while(i < $self.length){
+          $1($self(i))
+          i += 1
+        }
+      }
       infix ("foreach") ((MInt ==> MUnit) :: MUnit, effect=simple) implements foreach(MInt, 0, ${a => $1(a)})
       infix ("mapreduce") ( (MInt ==> T,(T,T) ==> T, MInt==>MBoolean) :: T, TNumeric(T), addTpePars=(T)) implements mapReduce((MInt,T), 0, ${e => $1(e)}, ${numeric_zero[T]}, ${(a,b) => $2(a,b)}, Some(${c => $3(c)}) )
       compiler ("NodeIdView_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("NodeIdViews cannot be allocated from a parallel op") }

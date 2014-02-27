@@ -38,31 +38,24 @@ trait IOGraphOps {
       }
       xfs.close()
     })
+    
     /*
     //assume every edge is listed twice for undirected graphs
-    direct (IO) ("undirectedGraphFromDirectedAdjList", Nil, (MString,MBoolean,MInt) :: UndirectedGraph) implements composite ${
-      val input_edges = ForgeFileReader.readLinesFlattened($0)({line =>
+    direct (IO) ("undirectedGraphFromDirectedAdjList", Nil, (MString,MString) :: NestedUndirectedGraph) implements composite ${
+      val input_edges1 = ForgeFileReader.readLinesFlattened($0)({line =>
         val fields = line.fsplit("\t")
-        if(array_length(fields) <= 1){
-          array_empty_imm[Tup2[Int,Int]](0)
-        } 
-        else{
-          array_fromfunction(((array_length(fields)-1)*2),{n =>
-            if(n < (array_length(fields)-1))
-              pack(fields(0).toInt,fields(n+1).toInt)
-            else 
-              pack(fields((n+1)-(array_length(fields)-1)).toInt,fields(0).toInt)
-          })
-        }
+        fields
       })
-      val input_edges = ForgeFileReader.readLinesFlattened($0)({line =>
-          val fields = line.fsplit("\t")
+      val input_edges2 = ForgeFileReader.readLinesFlattened($1)({line =>
+        val fields = line.fsplit("\t")
+        fields
       })
-      //contains either duplicate edges or not
-      val edge_data = NodeData(input_edges).distinct
 
-      val src_groups = edge_data.groupBy(e => e._1, e => e._2)
-      val src_ids = NodeData(fhashmap_keys(src_groups))
+      //contains either duplicate edges or not
+      val edge_data = NodeData(input_edges1).concat(NodeData(input_edges2))
+
+      val src_groups = edge_data.filter(a => a != e(0)))
+      val src_ids = NodeData(edge_data).filter(e => e(0))
       val distinct_ids = src_ids
 
       //set up the ID hash map
@@ -130,7 +123,7 @@ trait IOGraphOps {
       var i = 0
       var src_array_index = 0
       while(i < numNodes-1){
-        val degree = array_buffer_length(fhashmap_get(degrees,distinct_ids(i)))
+        val degree = src_groups(i).length//array_buffer_length(fhashmap_get(degrees,distinct_ids(i)))
         src_node_array(i+1) = src_groups(i).length + src_node_array(i)
         if( (degree*degree) > numEdges) sHash.update(i,distinct_ids(i))
         i += 1

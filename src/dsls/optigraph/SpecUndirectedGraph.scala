@@ -55,7 +55,6 @@ trait SpecUndirectedGraphOps{
       infix ("hasEdge") ((Node,Node) :: MBoolean) implements single ${
         $self.hasEdge($1.id,$2.id)
       }
-
       infix ("neighborHash") (Node :: NodeSHash(MInt,MInt), effect = simple) implements composite ${
         val hash = NodeSHash[Int,Int]
         $self.neighbors($1).serialForEach{n => hash.add(n,n)}
@@ -67,10 +66,13 @@ trait SpecUndirectedGraphOps{
         nbrs.mapreduce[Int]({ nbr =>
           if($1.id > nbr) 0
           else{
+            
             val nbrsOfNbrs = $self.neighbors(nbr)
+            
             var i = 0
             var t = 0
             var j = 0
+            /*
             while(i < nbrs.length  && j < nbrsOfNbrs.length){
               //println("node: " + $1.id + " " + nbrs.length + " " + nbrsOfNbrs.length)
               //println("i: " + i + " " + nbrs(i) + " j: " + j + " " + nbrsOfNbrs(j))
@@ -92,20 +94,20 @@ trait SpecUndirectedGraphOps{
             }
             t
           }
-            /*
-            while(i < nbrs.length  && j < nbrsOfNbrs.length){
-              while(nbrsOfNbrs(j) < nbrs(i)){
-                j += 1
-              }
-              if(nbrs(i)==nbrsOfNbrs(j)){ 
-                println("counting: " + $1.id + " nbr: " + nbr + " nbrsOfNbrs: " + nbrsOfNbrs(j))
-                t += 1
-              }
-              i += 1
+          */
+          val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
+          val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
+          while(i < small.length  && j < large.length){
+            while(large(j) < small(i) && j < large.length){
+              j += 1
             }
-            t
-            */
-          //}
+            if(small(i)==large(j) && j < large.length)              
+              t += 1
+            i += 1
+          }
+          t
+            
+          }
         },(a,b) => a+b, e => true)
       }
       infix ("sumTrianglesOverEdges") (Node :: MInt) implements composite ${
@@ -123,11 +125,21 @@ trait SpecUndirectedGraphOps{
         },(a,b) => a+b, e => true)
       }
       infix ("twoLevelHash") (Node :: MInt) implements composite ${
-        $self.neighbors($1).mapreduce[Int]({ nbr =>
-          $self.neighbors(nbr).mapreduce[Int]({ nbrOfNbr =>
-            if($self.hasEdge($1.id,nbrOfNbr)) 1
-            else 0
-          },(a,b) => a+b, e => true)
+        val nbrs = $self.neighbors($1)
+        nbrs.mapreduce[Int]({ nbr =>
+          val nbrsOfNbrs = $self.neighbors(nbr)
+          if(nbrsOfNbrs.length < nbrs.length)
+            nbrsOfNbrs.mapreduce[Int]({ nbrOfNbr =>
+              if($self.hasEdge($1.id,nbrOfNbr)) 1
+              else 0
+            },(a,b) => a+b, e => true)
+          else
+            nbrs.mapreduce[Int]({ nbr1 =>
+              if(nbr < nbr1){
+                if($self.hasEdge(nbr,nbr1)) 1
+                else 0
+              } else 0
+            },(a,b) => a+b, nbr1 => nbr < nbr1)
         },(a,b) => a+b, e => true)
       }
       //Perform a sum over the neighbors

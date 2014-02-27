@@ -23,8 +23,8 @@ trait SkewTriangleCounting extends OptiGraphApplication {
     println("Number of Nodes: " + g.numNodes)
     
     println("performing Traingle Counting")
-    tic("Triangle Counting",g)
 
+    /* Heavy / Light
     val t = g.sumOverNodes{ n =>
       if(true){//g.isHeavy(n)){
         g.intersectSets(n)
@@ -38,9 +38,24 @@ trait SkewTriangleCounting extends OptiGraphApplication {
         }{nbr => true}
       }
     }
+    */
+    tic("Set Triangle Counting",g)
+
+    //Set intersection
+    val t1 = g.sumOverNodes{ n =>
+      g.intersectSets(n)
+    }
     
-    toc("Triangle Counting",t)
-    println("Number of triangles: " + t)
+    toc("Set Triangle Counting",t1)
+    println("# Set of triangles: " + t1)
+
+    tic("Hash Triangle Counting",t1)
+        //Set intersection
+    val t2 = g.sumOverNodes{ n =>
+      g.twoLevelHash(n)
+    }
+    toc("Hash Triangle Counting",t2)
+    println("# Hash of triangles: " + t2)
     println("Number of heavy nodes: " + g.numHeavy)
   }
   def printUsage = {

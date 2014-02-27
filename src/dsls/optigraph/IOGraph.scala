@@ -112,10 +112,10 @@ trait IOGraphOps {
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
 
-      //val nbrHash = distinct_ids.map(e => NodeData(fhashmap_get(src_groups,e)).groupByReduce[Int,Int](e => fhashmap_get(idHashMap,e),e => 0,(a,b) => 0))
+      val nbr_hash = distinct_ids.map(e => NodeData(fhashmap_get(src_groups,e)).groupByReduce[Int,Int](e => fhashmap_get(idHashMap,e),e => 0,(a,b) => 0))
       val filtered_nbrs = distinct_ids.map(e => NodeData(src_groups(e)).filter(a => 
         fhashmap_get(idHashMap,a)>fhashmap_get(idHashMap,e),n =>fhashmap_get(idHashMap,n)).sort)
-      val nbr_hash = filtered_nbrs.map(e => e.groupByReduce[Int,Int](k => k, v => 0, (a,b) => 0))
+      //val nbr_hash = filtered_nbrs.map(e => e.groupByReduce[Int,Int](k => k, v => 0, (a,b) => 0))
       val src_edge_array = idView.flatMap{e => filtered_nbrs(e)}
 
       val serial_out = assignIndiciesSerialUndirected($2,src_groups,src_edge_array.length,numNodes,distinct_ids,filtered_nbrs,distinct_ids)

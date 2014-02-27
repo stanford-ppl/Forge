@@ -69,25 +69,36 @@ trait SpecUndirectedGraphOps{
             
             val nbrsOfNbrs = $self.neighbors(nbr)
             
-            var i = 0
-            var t = 0
-            var j = 0
-
-            val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
-            val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
-            while(i < small.length  && j < large.length){
-              while(large(j) < small(i) && j < large.length){
-                j += 1
-              }
-              if(small(i)==large(j) && j < large.length)              
-                t += 1
-              i += 1
+            if(nbrs.length == 0 || nbrsOfNbrs.length == 0) 0
+            else if(nbrs(0) > nbrsOfNbrs(nbrsOfNbrs.length-1) || 
+              nbrsOfNbrs(0) > nbrs(nbrs.length-1)){
+              0
             }
-            t
-            
+            else{
+              var i = 0
+              var t = 0
+              var j = 0
+              val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
+              val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
+              while(i < small.length  && j < large.length){
+                while(large(j) < small(i) && j < large.length){
+                  j += 1
+                }
+                if(small(i)==large(j) && j < large.length)              
+                  t += 1
+                i += 1
+              }
+              t
+            }
           }
         },(a,b) => a+b, e => true)
       }
+      /*
+      infix ("fastIntersectSets") (Node :: MInt) implements composite ${
+
+      }
+      */
+
       infix ("sumTrianglesOverEdges") (Node :: MInt) implements composite ${
         $self.neighbors($1).mapreduce[Int]({ nbr =>
           if($self.neighbors($1).length > $self.neighbors(nbr).length)

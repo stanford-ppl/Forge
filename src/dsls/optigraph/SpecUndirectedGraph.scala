@@ -63,12 +63,12 @@ trait SpecUndirectedGraphOps{
       infix ("intersectSets") (Node :: MInt) implements composite ${
         val nbrs = $self.neighbors($1)
 
-        nbrs.mapreduce[Int]({ nbr =>
+        nbrs.mapreduce[Int]({ nbr => 
           if($1.id > nbr) 0
-          else{
-            
+          else{ 
             val nbrsOfNbrs = $self.neighbors(nbr)
-            
+            var count = 0
+
             if(nbrs.length == 0 || nbrsOfNbrs.length == 0) 0
             else if(nbrs(0) > nbrsOfNbrs(nbrsOfNbrs.length-1) || 
               nbrsOfNbrs(0) > nbrs(nbrs.length-1)){
@@ -81,6 +81,7 @@ trait SpecUndirectedGraphOps{
               val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
               val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
               while(i < small.length  && j < large.length){
+                count += 1
                 while(large(j) < small(i) && j < large.length){
                   j += 1
                 }
@@ -88,7 +89,8 @@ trait SpecUndirectedGraphOps{
                   t += 1
                 i += 1
               }
-              t
+              count
+              //t
             }
           }
         },(a,b) => a+b, e => true)
@@ -109,10 +111,12 @@ trait SpecUndirectedGraphOps{
             }
             else{
               var t = 0
+              var count = 0
               var nbrStart = 0
               var nbrOfNbrStart = 0
               var nbrSearch = nbrs(nbrStart) < nbrsOfNbrs(nbrOfNbrStart)
               while(nbrStart < nbrs.length  && nbrOfNbrStart < nbrsOfNbrs.length){
+                count += 1
                 var done =  nbrStart == nbrs.length-1 || nbrOfNbrStart == nbrsOfNbrs.length-1
                 //println("nbrSearch " + nbrSearch)
                 if(nbrSearch){
@@ -135,7 +139,8 @@ trait SpecUndirectedGraphOps{
                 if(done) nbrStart = nbrs.length
                 nbrSearch = !nbrSearch
               }
-              t
+              count
+              //t
             }
           }
         },(a,b) => a+b, e => true)

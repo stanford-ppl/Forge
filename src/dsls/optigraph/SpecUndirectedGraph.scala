@@ -118,14 +118,11 @@ trait SpecUndirectedGraphOps{
               while(nbrStart < nbrs.length  && nbrOfNbrStart < nbrsOfNbrs.length){
                 count += 1
                 var done =  nbrStart == nbrs.length-1 || nbrOfNbrStart == nbrsOfNbrs.length-1
-                //println("nbrSearch " + nbrSearch)
                 if(nbrSearch){
                   nbrStart = $self.binarySearch(nbrs,nbrsOfNbrs(nbrOfNbrStart),nbrStart)
-                  //println("node: " + $1.id + " nbr: " + nbr + " nbrStart: " + nbrStart)
                 }
                 else{
                   nbrOfNbrStart = $self.binarySearch(nbrsOfNbrs,nbrs(nbrStart),nbrOfNbrStart)
-                  //println("node: " + $1.id + " nbr: " + nbr + " nbrOfNbrStart: " + nbrOfNbrStart)
                 }
                 //check to se if we match
                 if(nbrs(nbrStart)==nbrsOfNbrs(nbrOfNbrStart)){           
@@ -133,7 +130,7 @@ trait SpecUndirectedGraphOps{
                   nbrStart += 1
                   nbrOfNbrStart += 1
                   if(nbrStart < nbrs.length && nbrOfNbrStart < nbrsOfNbrs.length){
-                    nbrSearch = (nbrs(nbrStart)-nbrs(nbrStart-1)) > (nbrsOfNbrs(nbrOfNbrStart)-nbrsOfNbrs(nbrOfNbrStart-1))
+                    nbrSearch = !(nbrs(nbrStart) > nbrsOfNbrs(nbrOfNbrStart))
                   }
                 }
                 if(done) nbrStart = nbrs.length

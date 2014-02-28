@@ -28,7 +28,7 @@ trait SetTriangleCounting extends OptiGraphApplication {
 
     //Set intersection
     val t1 = g.sumOverNodes{ n =>
-      g.intersectSets(n)
+      g.leapFrogIntersectSets(n)
     }
     
     toc("Set Triangle Counting",t1)

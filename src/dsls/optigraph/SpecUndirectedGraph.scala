@@ -93,12 +93,84 @@ trait SpecUndirectedGraphOps{
           }
         },(a,b) => a+b, e => true)
       }
-      /*
-      infix ("fastIntersectSets") (Node :: MInt) implements composite ${
 
+      infix ("leapFrogIntersectSets") (Node :: MInt) implements composite ${
+        val nbrs = $self.neighbors($1)
+
+        nbrs.mapreduce[Int]({ nbr =>
+          if($1.id > nbr) 0
+          else{
+            val nbrsOfNbrs = $self.neighbors(nbr)
+            
+            if(nbrs.length == 0 || nbrsOfNbrs.length == 0) 0
+            else if(nbrs(0) > nbrsOfNbrs(nbrsOfNbrs.length-1) || 
+              nbrsOfNbrs(0) > nbrs(nbrs.length-1)){
+              0
+            }
+            else{
+              var t = 0
+              var nbrStart = 0
+              var nbrOfNbrStart = 0
+              var nbrSearch = nbrs(nbrStart) < nbrsOfNbrs(nbrOfNbrStart)
+              while(nbrStart < nbrs.length  && nbrOfNbrStart < nbrsOfNbrs.length){
+                var done =  nbrStart == nbrs.length-1 || nbrOfNbrStart == nbrsOfNbrs.length-1
+                //println("nbrSearch " + nbrSearch)
+                if(nbrSearch){
+                  nbrStart = $self.binarySearch(nbrs,nbrsOfNbrs(nbrOfNbrStart),nbrStart)
+                  //println("node: " + $1.id + " nbr: " + nbr + " nbrStart: " + nbrStart)
+                }
+                else{
+                  nbrOfNbrStart = $self.binarySearch(nbrsOfNbrs,nbrs(nbrStart),nbrOfNbrStart)
+                  //println("node: " + $1.id + " nbr: " + nbr + " nbrOfNbrStart: " + nbrOfNbrStart)
+                }
+                //check to se if we match
+                if(nbrs(nbrStart)==nbrsOfNbrs(nbrOfNbrStart)){           
+                  t += 1
+                  nbrStart += 1
+                  nbrOfNbrStart += 1
+                  if(nbrStart < nbrs.length && nbrOfNbrStart < nbrsOfNbrs.length){
+                    nbrSearch = (nbrs(nbrStart)-nbrs(nbrStart-1)) > (nbrsOfNbrs(nbrOfNbrStart)-nbrsOfNbrs(nbrOfNbrStart-1))
+                  }
+                }
+                if(done) nbrStart = nbrs.length
+                nbrSearch = !nbrSearch
+              }
+              t
+            }
+          }
+        },(a,b) => a+b, e => true)
       }
-      */
 
+      infix ("binarySearch") ((("a",NodeDataView(MInt)),("key",MInt),("inStart",MInt)) :: MInt) implements composite ${
+        // continue searching while [imin,imax] is not empty
+        var result = -1
+        var end = a.length-1
+        var start = inStart
+        while (end > start){
+          //println("start: " + start + " end: " + end)
+          // calculate the midpoint for roughly equal partition
+          val imid = ((end-start)/2) + start;
+          //println("middle: " + imid)
+          if(a(imid) >= key){
+            //will this ever happen?
+            if(imid-1 < 0){
+              end = start-1 // terminate condition 
+              result = imid 
+            }
+            else if(a(imid-1) < key){
+              end = start-1 // terminate condition 
+              result = imid      
+            }
+            else end = imid - 1
+          }
+          else{
+            // change min index to search upper subarray
+            start = imid + 1
+          }
+        }
+        if(start == end) start else result
+      }
+      
       infix ("sumTrianglesOverEdges") (Node :: MInt) implements composite ${
         $self.neighbors($1).mapreduce[Int]({ nbr =>
           if($self.neighbors($1).length > $self.neighbors(nbr).length)

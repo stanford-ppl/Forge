@@ -15,6 +15,7 @@ usage() {
   echo "  -c        perform a clean build"
   echo "  -C        clean only extern files"
   echo "  -s <n>    skip to step n in the update process"
+  echo "  -j        use jars instead of local class files"
   echo "  -f        (re-)generate forge specification"
   echo "  -g <gen>  generate only the specified version"
   echo "  -r <app>  run the specified application after compiling"
@@ -39,14 +40,16 @@ DELITE=false
 INTERACTIVE=false
 IDENT=false
 TARGET=""
+USE_JARS=""
 
-while getopts “hcCs:fg:r:di” option
+while getopts “hcCs:jfg:r:di” option
 do
   case $option in
     h) usage;;
     c) CLEAN=" -c";;
     C) CLEAN_EXTERN=" --clean-extern";;
     s) SKIP=$OPTARG;;
+    j) USE_JARS="--use-jars";;
     f) IDENT=true;;
     g) TARGET="$OPTARG";;
     r) APP_RUNNER="$OPTARG"
@@ -97,9 +100,9 @@ then
 fi
 
 if [ $SKIP -le 3 ];
-then
-  echo "publish $DSL_NAME $CLEAN $CLEAN_EXTERN (3/$NUM_STEPS)"
-  publish $DSL_NAME $CLEAN $CLEAN_EXTERN
+then  
+  echo "publish $DSL_NAME $CLEAN $CLEAN_EXTERN $USE_JARS (3/$NUM_STEPS)"
+  publish $DSL_NAME $CLEAN $CLEAN_EXTERN $USE_JARS
 fi
 
 pushd .

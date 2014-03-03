@@ -117,6 +117,28 @@ trait SpecUndirectedGraphOps{
           }
         },(a,b) => a+b, e => true)
       }
+      infix ("intersectHybrid") (Node :: MInt) implements composite ${
+        val nbrs = $self.neighbors($1)
+
+        nbrs.mapreduce[Int]({ nbr =>
+          if($1.id > nbr) 0
+          else{
+            val nbrsOfNbrs = $self.neighbors(nbr)
+            
+            if(nbrs.length == 0 || nbrsOfNbrs.length == 0) 0
+            else if(nbrs(0) > nbrsOfNbrs(nbrsOfNbrs.length-1) || 
+              nbrsOfNbrs(0) > nbrs(nbrs.length-1)){
+              0
+            }
+            else{
+              if( (nbrs.length - nbrsOfNbrs.length) > 10 ||  (nbrs.length - nbrsOfNbrs.length) < -10)
+                $self.leapFrogIntersect(nbrs,nbrsOfNbrs)
+              else 
+                $self.simpleIntersect(nbrs,nbrsOfNbrs)
+            }
+          }
+        },(a,b) => a+b, e => true)
+      }
       infix ("leapFrogIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements composite ${
         var t = 0
         var nbrStart = 0

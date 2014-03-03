@@ -75,27 +75,29 @@ trait SpecUndirectedGraphOps{
               0
             }
             else{
-              var i = 0
-              var t = 0
-              var j = 0
-              val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
-              val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
-              while(i < small.length  && j < large.length){
-                count += 1
-                while(large(j) < small(i) && j < large.length){
-                  j += 1
-                }
-                if(small(i)==large(j) && j < large.length)              
-                  t += 1
-                i += 1
-              }
-              count
-              //t
+              $self.simpleIntersect(nbrs,nbrsOfNbrs)
             }
           }
         },(a,b) => a+b, e => true)
       }
-
+      infix ("simpleIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements composite ${
+        var i = 0
+        var t = 0
+        var j = 0
+        val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
+        val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
+        while(i < small.length  && j < large.length){
+          while(large(j) < small(i) && j < large.length){
+            j += 1
+          }
+          if(small(i)==large(j) && j < large.length)              
+            t += 1
+          i += 1
+        }
+        //count
+        //println("intersect")
+        t
+      }
       infix ("leapFrogIntersectSets") (Node :: MInt) implements composite ${
         val nbrs = $self.neighbors($1)
 
@@ -110,39 +112,41 @@ trait SpecUndirectedGraphOps{
               0
             }
             else{
-              var t = 0
-              var count = 0
-              var nbrStart = 0
-              var nbrOfNbrStart = 0
-              var nbrSearch = nbrs(nbrStart) < nbrsOfNbrs(nbrOfNbrStart)
-              while(nbrStart < nbrs.length  && nbrOfNbrStart < nbrsOfNbrs.length){
-                count += 1
-                var done =  nbrStart == nbrs.length-1 || nbrOfNbrStart == nbrsOfNbrs.length-1
-                if(nbrSearch){
-                  nbrStart = $self.binarySearch(nbrs,nbrsOfNbrs(nbrOfNbrStart),nbrStart)
-                }
-                else{
-                  nbrOfNbrStart = $self.binarySearch(nbrsOfNbrs,nbrs(nbrStart),nbrOfNbrStart)
-                }
-                //check to se if we match
-                if(nbrs(nbrStart)==nbrsOfNbrs(nbrOfNbrStart)){           
-                  t += 1
-                  nbrStart += 1
-                  nbrOfNbrStart += 1
-                  if(nbrStart < nbrs.length && nbrOfNbrStart < nbrsOfNbrs.length){
-                    nbrSearch = !(nbrs(nbrStart) > nbrsOfNbrs(nbrOfNbrStart))
-                  }
-                }
-                if(done) nbrStart = nbrs.length
-                nbrSearch = !nbrSearch
-              }
-              count
-              //t
+              $self.leapFrogIntersect(nbrs,nbrsOfNbrs)
             }
           }
         },(a,b) => a+b, e => true)
       }
-
+      infix ("leapFrogIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements composite ${
+        var t = 0
+        var nbrStart = 0
+        var nbrOfNbrStart = 0
+        var nbrSearch = nbrs(nbrStart) < nbrsOfNbrs(nbrOfNbrStart)
+        var done = false
+        while(!done){
+          done =  nbrStart == nbrs.length-1 || nbrOfNbrStart == nbrsOfNbrs.length-1
+          if(nbrSearch){
+            nbrStart = $self.binarySearch(nbrs,nbrsOfNbrs(nbrOfNbrStart),nbrStart)
+          }
+          else{
+            nbrOfNbrStart = $self.binarySearch(nbrsOfNbrs,nbrs(nbrStart),nbrOfNbrStart)
+          }
+          //check to se if we match
+          if(nbrs(nbrStart)==nbrsOfNbrs(nbrOfNbrStart)){           
+            t += 1
+            nbrStart += 1
+            nbrOfNbrStart += 1
+            if(nbrStart < nbrs.length && nbrOfNbrStart < nbrsOfNbrs.length){
+              nbrSearch = nbrs(nbrStart) > nbrsOfNbrs(nbrOfNbrStart)
+            }
+            else
+              done = true
+          }
+          //if(done) nbrStart = nbrs.length
+          nbrSearch = !nbrSearch
+        }
+        t
+      } 
       infix ("binarySearch") ((("a",NodeDataView(MInt)),("key",MInt),("inStart",MInt)) :: MInt) implements composite ${
         // continue searching while [imin,imax] is not empty
         var result = -1

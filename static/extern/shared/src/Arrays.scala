@@ -43,9 +43,11 @@ trait ForgeArrayCompilerOps extends ForgeArrayOps {
   implicit class ForgeArrayOps[T:Manifest](x: Rep[ForgeArray[T]]) {
     def update(n: Rep[Int], y: Rep[T])(implicit ctx: SourceContext) = array_update(x,n,y)
     def apply(n: Rep[Int])(implicit ctx: SourceContext) = array_apply(x,n)
+    def map[R:Manifest](f: Rep[T] => Rep[R])(implicit ctx: SourceContext) = array_map[T,R](x,f)
     def Clone(implicit ctx: SourceContext) = array_clone(x)
   }
 
+  def farray_from_sarray[T:Manifest](__arg0: Rep[Array[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
   def array_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
   def array_empty_imm[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
   def array_raw_alloc[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[T]] = array_empty[T](__arg1)

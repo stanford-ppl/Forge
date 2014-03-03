@@ -117,9 +117,9 @@ trait SparseMatrixOps {
           // COO is not stored in order, so just output coordinates as a list
           for (i <- 0 until $self.nnz-1) {
             if (rowIndices(i) > -1)
-              s = s + "((" + rowIndices(i) + ", " + colIndices(i) + "), " + data(i) + ")\\n"
+              s = s + "((" + rowIndices(i) + ", " + colIndices(i) + "), " + optila_fmt_str(data(i)) + ")\\n"
           }
-          s = s + "((" + rowIndices($self.nnz-1) + ", " + colIndices($self.nnz-1) + "), " + data($self.nnz-1) + ")\\n"
+          s = s + "((" + rowIndices($self.nnz-1) + ", " + colIndices($self.nnz-1) + "), " + optila_fmt_str(data($self.nnz-1)) + ")\\n"
         }
         s
       }
@@ -728,10 +728,10 @@ trait SparseMatrixOps {
             if (nnz > 0) {
               s = s + "(" + i + "): "
               for (j <- rowPtr(i) until rowPtr(i+1)-1) {
-                s = s + "(" + colIndices(j) + ", " + data(j) + "), "
+                s = s + "(" + colIndices(j) + ", " + optila_fmt_str(data(j)) + "), "
               }
               val lineEnd = if (i == $self.numRows-1) "" else "\\n"
-              s = s + "(" + colIndices(rowPtr(i+1)-1) + ", " + data(rowPtr(i+1)-1) + ")" + lineEnd
+              s = s + "(" + colIndices(rowPtr(i+1)-1) + ", " + optila_fmt_str(data(rowPtr(i+1)-1)) + ")" + lineEnd
             }
           }
         }

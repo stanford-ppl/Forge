@@ -56,6 +56,7 @@ trait ScalaOps {
     lift (Prim) (MInt)
     lift (Prim) (MFloat)
     lift (Prim) (MDouble)
+    lift (Prim) (MLong)
 
     val toInt = infix (Prim) ("toInt", T withBound TNumeric, T :: MInt)
     val toFloat = infix (Prim) ("toFloat", T withBound TNumeric, T :: MFloat)
@@ -99,6 +100,10 @@ trait ScalaOps {
     val double_divide = direct (Prim) ("forge_double_divide", Nil, (MDouble,MDouble) :: MDouble)
 
     val long_plus = direct (Prim) ("forge_long_plus", Nil, (MLong, MLong) :: MLong)
+    val long_minus = direct (Prim) ("forge_long_minus", Nil, (MLong, MLong) :: MLong)
+    val long_times = direct (Prim) ("forge_long_times", Nil, (MLong,MLong) :: MLong)
+    val long_divide = direct (Prim) ("forge_long_divide", Nil, (MLong,MLong) :: MLong)
+    val long_divide_double = direct (Prim) ("forge_long_divide_double", Nil, (MLong,MDouble) :: MDouble)
     val long_binary_and = direct (Prim) ("forge_long_and", Nil, (MLong,MLong) :: MLong)
     val long_binary_or = direct (Prim) ("forge_long_or", Nil, (MLong,MLong) :: MLong)
     val long_shift_right_unsigned = direct (Prim) ("forge_long_shift_right_unsigned", Nil, (MLong,MInt) :: MLong)
@@ -126,6 +131,10 @@ trait ScalaOps {
       impl (double_divide) (codegen(g, ${$0 / $1}))
 
       impl (long_plus) (codegen(g, ${$0 + $1}))
+      impl (long_minus) (codegen(g, ${$0 - $1}))
+      impl (long_times) (codegen(g, ${$0 * $1}))
+      impl (long_divide) (codegen(g, ${$0 / $1}))
+      impl (long_divide_double) (codegen(g, ${$0 / $1}))
       impl (long_binary_and) (codegen(g, ${$0 & $1}))
       impl (long_binary_or) (codegen(g, ${$0 | $1}))
     }
@@ -249,6 +258,10 @@ trait ScalaOps {
     infix (Prim) ("<<",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_left($0,$1) }
 
     infix (Prim) ("+", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_plus($0,$1) }
+    infix (Prim) ("-", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_minus($0,$1) }
+    infix (Prim) ("*", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_times($0,$1) }
+    infix (Prim) ("/", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_divide($0,$1) }
+    infix (Prim) ("/", Nil, (MLong,MDouble) :: MDouble) implements redirect ${ forge_long_divide_double($0,$1) }
     infix (Prim) ("&", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_and($0,$1) }
     infix (Prim) ("|", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_or($0,$1) }
     infix (Prim) (">>>", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_shift_right_unsigned($0,$1) }
@@ -294,7 +307,10 @@ trait ScalaOps {
     }))
 
     val immutable = infix (Misc) ("unsafeImmutable", List(T), List(T) :: T, aliasHint = copies(0))
-    impl (immutable) (codegen($cala, quotedArg(0)))
+    impl (immutable) (codegen($cala, quotedArg(0) + " // unsafe immutable"))
+
+    val mutable = infix (Misc) ("unsafeMutable", List(T), List(T) :: T)
+    impl (mutable) (codegen($cala, quotedArg(0) + " // unsafe mutable"))
 
     for (g <- List(cuda, cpp)) {
       impl (exit) (codegen(g, ${exit($0)}))
@@ -399,6 +415,7 @@ trait ScalaOps {
     infix (Str) ("toInt", Nil, MString :: MInt) implements codegen($cala, ${ $0.toInt })
     infix (Str) ("toFloat", Nil, MString :: MFloat) implements codegen($cala, ${ $0.toFloat })
     infix (Str) ("toDouble", Nil, MString :: MDouble) implements codegen($cala, ${ $0.toDouble })
+    infix (Str) ("toBoolean", Nil, MString :: MBoolean) implements codegen($cala, ${ $0.toBoolean })
 
     // not much we can do here to use "split" as long as Delite brings in LMS' version, since we can't overload on the return type
     // we should refactor LMS/Delite to only use the StringOpsExp trait and not StringOps
@@ -570,19 +587,50 @@ trait ScalaOps {
   def importHashMap() = {
     val K = tpePar("K")
     val V = tpePar("V")
+    val T = tpePar("T")
 
     // in order to define lifted operations on an existing Scala type, we must place the lifted ops in a separate group
     // to avoid Forge attempting to use the fully qualified type name in traits
+    val SArray = tpe("scala.Array", T)
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
     val HashMapOps = grp("SHashMap")
 
     direct (HashMapOps) ("SHashMap", (K,V), Nil :: SHashMap(K,V), effect = mutable) implements codegen($cala, ${ new scala.collection.mutable.HashMap[$t[K],$t[V]]() })
+    compiler (HashMapOps) ("shashmap_from_arrays", (K,V), (MArray(K),MArray(V)) :: SHashMap(K,V), effect = mutable) implements codegen($cala, ${ scala.collection.mutable.HashMap($0.zip($1): _*) })
+    compiler (HashMapOps) ("shashmap_keys_array", (K,V), (SHashMap(K,V)) :: SArray(K)) implements codegen($cala, ${ $0.keys.toArray })
+    compiler (HashMapOps) ("shashmap_values_array", (K,V), (SHashMap(K,V)) :: SArray(V)) implements codegen($cala, ${ $0.values.toArray })
+
     infix (HashMapOps) ("apply", (K,V), (SHashMap, K) :: V) implements codegen($cala, ${ $0($1) })
     infix (HashMapOps) ("update", (K,V), (SHashMap, K, V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $0.put($1,$2); () })
     infix (HashMapOps) ("contains", (K,V), (SHashMap, K) :: MBoolean) implements codegen($cala, ${ $0.contains($1) })
-    // can we avoid the toArray?
-    infix (HashMapOps) ("keys", (K,V), SHashMap :: MArray(K)) implements codegen($cala, ${ $0.keys.toArray })
-    infix (HashMapOps) ("values", (K,V), SHashMap :: MArray(V)) implements codegen($cala, ${ $0.values.toArray })
-    // infix ("keys") (Nil :: MArray(K)) implements codegen($cala, ${ scala.collection.JavaConverters.asScalaSetConverter($self.keySet).asScala.toArray })
+    infix (HashMapOps) ("keys", (K,V), SHashMap(K,V) :: MArray(K)) implements composite ${ farray_from_sarray(shashmap_keys_array($0)) }
+    infix (HashMapOps) ("values", (K,V), SHashMap(K,V) :: MArray(V)) implements composite ${ farray_from_sarray(shashmap_values_array($0)) }
+  }
+
+  def importConcurrentHashMap() = {
+    val K = tpePar("K")
+    val V = tpePar("V")
+    val T = tpePar("T")
+
+    val SArray = tpe("scala.Array", T)
+    val CHashMap = tpe("java.util.concurrent.ConcurrentHashMap", (K,V))
+    val HashMapOps = grp("CHashMap")
+
+    direct (HashMapOps) ("CHashMap", (K,V), Nil :: CHashMap(K,V), effect = mutable) implements codegen($cala, ${ new java.util.concurrent.ConcurrentHashMap[$t[K],$t[V]]() })
+    compiler (HashMapOps) ("chashmap_from_arrays", (K,V), (MArray(K),MArray(V)) :: CHashMap(K,V), effect = mutable) implements codegen($cala, ${
+      val map = new java.util.concurrent.ConcurrentHashMap[$t[K],$t[V]]()
+      for (i <- 0 until $0.length) {
+        map.put($0(i),$1(i))
+      }
+      map
+    })
+    compiler (HashMapOps) ("chashmap_keys_array", (K,V), (CHashMap(K,V)) :: SArray(K)) implements codegen($cala, ${ scala.collection.JavaConverters.enumerationAsScalaIteratorConverter($0.keys).asScala.toArray })
+    compiler (HashMapOps) ("chashmap_values_array", (K,V), (CHashMap(K,V)) :: SArray(V)) implements codegen($cala, ${ scala.collection.JavaConverters.collectionAsScalaIterableConverter($0.values).asScala.toArray })
+
+    infix (HashMapOps) ("apply", (K,V), (CHashMap, K) :: V) implements codegen($cala, ${ $0.get($1) })
+    infix (HashMapOps) ("update", (K,V), (CHashMap, K, V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $0.put($1,$2); () })
+    infix (HashMapOps) ("contains", (K,V), (CHashMap, K) :: MBoolean) implements codegen($cala, ${ $0.contains($1) })
+    infix (HashMapOps) ("keys", (K,V), CHashMap(K,V) :: MArray(K)) implements composite ${ farray_from_sarray(chashmap_keys_array($0)) }
+    infix (HashMapOps) ("values", (K,V), CHashMap(K,V) :: MArray(V)) implements composite ${ farray_from_sarray(chashmap_values_array($0)) }
   }
 }

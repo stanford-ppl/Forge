@@ -28,6 +28,7 @@ trait OptiLADSL extends ForgeApplication
     importMath()
     importTuples()
     importHashMap()
+    importConcurrentHashMap()
 
     // OptiLA types
     // declare all tpes first, so that they are available to all ops (similar to Delite)
@@ -73,9 +74,8 @@ trait OptiLADSL extends ForgeApplication
 
     // override default string formatting (numericPrecision is a global defined in extern)
     // we use "" + $a instead of $a.toString to avoid an NPE when explicitly calling toString inside the REPL
-    val strConcatWithNumerics = {
+    val formatStr = {
       val a = quotedArg(0)
-      val b = quotedArg(1)
       val f = "(\"% .\"+Global.numericPrecision+\"g\")" // can't escape quotes inside string interpolation scope
 
 s"""
@@ -84,16 +84,11 @@ def numericStr[A](x: A) = {
   val padPrefix = (Global.numericPrecision+6) - s.length
   if (padPrefix > 0) " "*padPrefix + s else s
 }
-val a1 = if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" + $a)
-val b1 = if ($b.isInstanceOf[Double] || $b.isInstanceOf[Float]) numericStr($b) else ("" + $b)
-a1+b1
+if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" + $a)
 """
     }
 
-    // the ones that matter are the first that resolve to a unique tpe combination
-    impl (lookupOverloaded("FString","+",0)) (codegen($cala, strConcatWithNumerics))
-    impl (lookupOverloaded("FString","+",6)) (codegen($cala, strConcatWithNumerics))
-    impl (lookupOverloaded("FString","+",11)) (codegen($cala, strConcatWithNumerics))
+    direct (lookupGrp("FString")) ("optila_fmt_str", T, T :: MString) implements codegen($cala, formatStr)
 
     compiler (lookupGrp("FString")) ("optila_padspace", Nil, MString :: MString) implements composite ${
       "  " + $0

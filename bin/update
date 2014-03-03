@@ -68,9 +68,6 @@ then
   exit $E_BADARGS
 fi
 
-pushd .
-
-cd $FORGE_HOME
 DSL_RUNNER=$1
 DSL_NAME=$2
 
@@ -96,14 +93,16 @@ then
   fi
 
   echo "forge $DSL_RUNNER $FORGE_FLAGS (2/$NUM_STEPS)"
-  bin/forge $DSL_RUNNER $FORGE_FLAGS
+  forge $DSL_RUNNER $FORGE_FLAGS
 fi
 
 if [ $SKIP -le 3 ];
 then
   echo "publish $DSL_NAME $CLEAN $CLEAN_EXTERN (3/$NUM_STEPS)"
-  bin/publish $DSL_NAME $CLEAN $CLEAN_EXTERN
+  publish $DSL_NAME $CLEAN $CLEAN_EXTERN
 fi
+
+pushd .
 
 echo "cd published/$DSL_NAME/"
 cd "published/$DSL_NAME/"

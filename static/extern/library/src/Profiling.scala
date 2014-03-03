@@ -19,6 +19,9 @@ trait ProfilingWrapper extends HUMAN_DSL_NAMEBase {
       println("No tic found for component " + component)
     }
   }
+  def forge_profile_time(deps: Seq[Rep[Any]])(implicit ctx: SourceContext): Rep[Long] = {
+    System.currentTimeMillis()
+  }
 }
 
 

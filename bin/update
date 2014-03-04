@@ -96,13 +96,13 @@ then
   fi
 
   echo "forge $DSL_RUNNER $FORGE_FLAGS (2/$NUM_STEPS)"
-  forge $DSL_RUNNER $FORGE_FLAGS
+  $FORGE_HOME/bin/forge $DSL_RUNNER $FORGE_FLAGS
 fi
 
 if [ $SKIP -le 3 ];
 then  
   echo "publish $DSL_NAME $CLEAN $CLEAN_EXTERN $USE_JARS (3/$NUM_STEPS)"
-  publish $DSL_NAME $CLEAN $CLEAN_EXTERN $USE_JARS
+  $FORGE_HOME/bin/publish $DSL_NAME $CLEAN $CLEAN_EXTERN $USE_JARS
 fi
 
 pushd .

@@ -14,8 +14,19 @@ def main():
 
     dslRunner = argv[1]
     delitecommon.checkDeliteEnv()
-
+    
+    script_home = delitecommon.script_home
     DELITE_HOME = delitecommon.DELITE_HOME
+
+    # managed libs 
+    cp = ""
+    jars = [d + "/" + f for (d, n, fs) in os.walk(script_home + "/lib_managed/") for f in fs]
+    for j in jars:
+        cp = cp + j + os.pathsep
+
+    old_cp = os.getenv("CLASSPATH", "")
+    os.putenv("CLASSPATH", old_cp + os.pathsep + cp)
+    
     os.system(DELITE_HOME + "/bin/delite " + dslRunner + " " + " ".join(argv[2:len(argv)]))
 
 if __name__ == "__main__":

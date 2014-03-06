@@ -500,6 +500,19 @@ trait SparseMatrixOps {
         bsearch(colIndices, rowPtr(row), rowPtr(row+1)-1, col)
       }
 
+      infix ("getRowAsSparseVector") ((MInt) :: SparseVector(T)) implements composite ${
+        val rowPtr = sparsematrix_rowPtr($self)
+        val colIndices = sparsematrix_colIndices($self)
+        val data = sparsematrix_data($self)
+
+        val o_start = rowPtr($1)
+        val o_nnz = rowPtr($1 + 1) - rowPtr($1)
+        val o_idx = (0::o_nnz) { i => colIndices(i + o_start) }
+        val o_data = (0::o_nnz) { i => data(i + o_start) }
+        sparsevector_alloc_raw($self.numCols, true, 
+          densevector_raw_data(o_data), densevector_raw_data(o_idx), o_nnz)
+      }
+
       infix ("apply") ((MInt,MInt) :: T) implements composite ${
         val data = sparsematrix_csr_data($self)
         val offRaw = sparsematrix_csr_find_offset($self, $1, $2)

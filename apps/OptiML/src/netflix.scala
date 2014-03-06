@@ -55,8 +55,37 @@ trait Netflix extends OptiMLApplication {
 
     println("test 1")
 
+    val mdv = sum(0, cy.numRows) { k =>
+      val i = cy(k, 0) % m
+      val j = cy(k, 1) % n
+      val y = cy(k, 2).toDouble
+
+      //val ei = (0::(m+n)) { k => if(k == i + n) 1.0 else 0.0 }
+      //val ej = (0::(m+n)) { k => if(k == j) 1.0 else 0.0 }
+
+      val vi = v0.getRow(i + n)
+      val vj = v0.getRow(j)
+
+      val xmy = (vi *:* vj) - y
+
+      (0::(m+n), 0::r) { (mi, mj) =>
+        if(mi == i + n) {
+          xmy * vj(mj)
+        }
+        else if(mi == j) {
+          xmy * vi(mj)
+        }
+        else {
+          0.0
+        }
+      }
+      //xmy * (ei.t ** vj + ej.t ** vi)
+    }
+
+    println("test 2")
+
     val mdvi = (0::n) { i =>
-      val ci = cyr.getRow(i).toSparse
+      val ci = cyr.getRowAsSparseVector(i)
       val cii = ci.indices
       val ciy = ci.nz
 
@@ -75,10 +104,8 @@ trait Netflix extends OptiMLApplication {
       }
     }
 
-    println("test 2")
-
     val mdvj = (0::m) { i =>
-      val ci = cyc.getRow(i).toSparse
+      val ci = cyc.getRowAsSparseVector(i)
       val cii = ci.indices
       val ciy = ci.nz
 
@@ -109,8 +136,9 @@ trait Netflix extends OptiMLApplication {
     println(mdv2.numRows)
     println(mdv2.numCols)
 
-    println("mdv2")
     println(normf(mdv2))
+    println(normf(mdv))
+    println(normf(mdv - mdv2))
   }
 
   def normf(x: Rep[DenseMatrix[Double]]) = {

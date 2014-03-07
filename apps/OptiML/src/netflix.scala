@@ -55,32 +55,32 @@ trait Netflix extends OptiMLApplication {
 
     println("test 1")
 
-    val mdv = sum(0, cy.numRows) { k =>
-      val i = cy(k, 0) % m
-      val j = cy(k, 1) % n
-      val y = cy(k, 2).toDouble
+    // val mdv = sum(0, cy.numRows) { k =>
+    //   val i = cy(k, 0) % m
+    //   val j = cy(k, 1) % n
+    //   val y = cy(k, 2).toDouble
 
-      //val ei = (0::(m+n)) { k => if(k == i + n) 1.0 else 0.0 }
-      //val ej = (0::(m+n)) { k => if(k == j) 1.0 else 0.0 }
+    //   //val ei = (0::(m+n)) { k => if(k == i + n) 1.0 else 0.0 }
+    //   //val ej = (0::(m+n)) { k => if(k == j) 1.0 else 0.0 }
 
-      val vi = v0.getRow(i + n)
-      val vj = v0.getRow(j)
+    //   val vi = v0.getRow(i + n)
+    //   val vj = v0.getRow(j)
 
-      val xmy = (vi *:* vj) - y
+    //   val xmy = (vi *:* vj) - y
 
-      (0::(m+n), 0::r) { (mi, mj) =>
-        if(mi == i + n) {
-          xmy * vj(mj)
-        }
-        else if(mi == j) {
-          xmy * vi(mj)
-        }
-        else {
-          0.0
-        }
-      }
-      //xmy * (ei.t ** vj + ej.t ** vi)
-    }
+    //   (0::(m+n), 0::r) { (mi, mj) =>
+    //     if(mi == i + n) {
+    //       xmy * vj(mj)
+    //     }
+    //     else if(mi == j) {
+    //       xmy * vi(mj)
+    //     }
+    //     else {
+    //       0.0
+    //     }
+    //   }
+    //   //xmy * (ei.t ** vj + ej.t ** vi)
+    // }
 
     println("test 2")
 
@@ -137,8 +137,8 @@ trait Netflix extends OptiMLApplication {
     println(mdv2.numCols)
 
     println(normf(mdv2))
-    println(normf(mdv))
-    println(normf(mdv - mdv2))
+    // println(normf(mdv))
+    // println(normf(mdv - mdv2))
   }
 
   def normf(x: Rep[DenseMatrix[Double]]) = {

@@ -68,22 +68,24 @@ trait Netflix extends OptiMLApplication {
       //val ei = (0::(m+n)) { k => if(k == i + n) 1.0 else 0.0 }
       //val ej = (0::(m+n)) { k => if(k == j) 1.0 else 0.0 }
 
-      val vi = v0.getRow(i + n)
-      val vj = v0.getRow(j)
+      y
 
-      val xmy = (vi *:* vj) - y
+      // val vi = v0.getRow(i + n)
+      // val vj = v0.getRow(j)
 
-      (0::(m+n), 0::r) { (mi, mj) =>
-        if(mi == i + n) {
-          xmy * vj(mj)
-        }
-        else if(mi == j) {
-          xmy * vi(mj)
-        }
-        else {
-          0.0
-        }
-      }
+      // val xmy = (vi *:* vj) - y
+
+      // (0::(m+n), 0::r) { (mi, mj) =>
+      //   if(mi == i + n) {
+      //     xmy * vj(mj)
+      //   }
+      //   else if(mi == j) {
+      //     xmy * vi(mj)
+      //   }
+      //   else {
+      //     0.0
+      //   }
+      // }
       //xmy * (ei.t ** vj + ej.t ** vi)
     }
 
@@ -141,8 +143,10 @@ trait Netflix extends OptiMLApplication {
     // println(mdv2.numRows)
     // println(mdv2.numCols)
 
+    println(mdv)
+
     // println(normf(mdv2))
-    println(normf(mdv))
+    //println(normf(mdv))
     // println(normf(mdv - mdv2))
   }
 

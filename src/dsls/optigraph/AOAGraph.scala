@@ -84,6 +84,8 @@ trait AOAGraphOps{
         }
         t
         /*
+        slows me down by close to a second if I use this code, vice versus for CSR format.
+        interesting?
         val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
         val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
         while(i < small.length  && j < large.length){

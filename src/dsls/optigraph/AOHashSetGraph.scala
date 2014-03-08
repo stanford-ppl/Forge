@@ -52,11 +52,11 @@ trait AOHashSetGraphOps{
       }
       infix ("intersectSets") (Node :: MInt) implements composite ${
         val nbrs = $self.neighbors($1)
+        val nbrHash = node_applyAOHashSet($self,$1.id)
         nbrs.mapreduce[Int]({ nbr => 
           if($1.id > nbr) 0
           else{ 
             val nbrsOfNbrs = $self.neighbors(nbr)
-            val nbrHash = node_applyAOHashSet($self,nbr)
             nbrsOfNbrs.mapreduce[Int]({ nbrOfNbr => 
               if(fhashmap_contains(nbrHash,nbrOfNbr)) 1
               else 0

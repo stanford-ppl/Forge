@@ -68,12 +68,10 @@ trait Netflix extends OptiMLApplication {
       //val ei = (0::(m+n)) { k => if(k == i + n) 1.0 else 0.0 }
       //val ej = (0::(m+n)) { k => if(k == j) 1.0 else 0.0 }
 
-      y
+      val vi = v0.getRow(i + n)
+      val vj = v0.getRow(j)
 
-      // val vi = v0.getRow(i + n)
-      // val vj = v0.getRow(j)
-
-      // val xmy = (vi *:* vj) - y
+      val xmy = (vi *:* vj) - y
 
       // (0::(m+n), 0::r) { (mi, mj) =>
       //   if(mi == i + n) {
@@ -86,6 +84,7 @@ trait Netflix extends OptiMLApplication {
       //     0.0
       //   }
       // }
+      xmy * (vi + vj)
       //xmy * (ei.t ** vj + ej.t ** vi)
     }
 

@@ -30,23 +30,23 @@ trait Netflix extends OptiMLApplication {
     println(cy.numRows)
     println(cy.numCols)
 
-    val cyx_d = (0::cy.numRows) { k => cy(k, 2).toDouble }
-    val cyx_i = (0::cy.numRows) { k => cy(k, 0) % m }
-    val cyx_j = (0::cy.numRows) { k => cy(k, 1) % n }
+    // val cyx_d = (0::cy.numRows) { k => cy(k, 2).toDouble }
+    // val cyx_i = (0::cy.numRows) { k => cy(k, 0) % m }
+    // val cyx_j = (0::cy.numRows) { k => cy(k, 1) % n }
 
-    println(cyx_d.length)
-    println(cyx_i.length)
-    println(cyx_j.length)
+    // println(cyx_d.length)
+    // println(cyx_i.length)
+    // println(cyx_j.length)
 
-    val cyc = SparseMatrix[Double](m, n, cyx_d, cyx_j, cyx_i).finish
+    // val cyc = SparseMatrix[Double](m, n, cyx_d, cyx_j, cyx_i).finish
 
-    println(cyc.numCols)
-    println(cyc.numRows)
+    // println(cyc.numCols)
+    // println(cyc.numRows)
 
-    val cyr = SparseMatrix[Double](n, m, cyx_d, cyx_i, cyx_j).finish
+    // val cyr = SparseMatrix[Double](n, m, cyx_d, cyx_i, cyx_j).finish
 
-    println(cyr.numCols)
-    println(cyr.numRows)
+    // println(cyr.numCols)
+    // println(cyr.numRows)
 
     // initialize the matrix
     val v0 = (0::(m+n), 0::r) { (i, j) => 
@@ -60,89 +60,89 @@ trait Netflix extends OptiMLApplication {
 
     println("test 1")
 
-    // val mdv = sum(0, cy.numRows) { k =>
-    //   val i = cy(k, 0) % m
-    //   val j = cy(k, 1) % n
-    //   val y = cy(k, 2).toDouble
+    val mdv = sum(0, cy.numRows) { k =>
+      val i = cy(k, 0) % m
+      val j = cy(k, 1) % n
+      val y = cy(k, 2).toDouble
 
-    //   //val ei = (0::(m+n)) { k => if(k == i + n) 1.0 else 0.0 }
-    //   //val ej = (0::(m+n)) { k => if(k == j) 1.0 else 0.0 }
+      //val ei = (0::(m+n)) { k => if(k == i + n) 1.0 else 0.0 }
+      //val ej = (0::(m+n)) { k => if(k == j) 1.0 else 0.0 }
 
-    //   val vi = v0.getRow(i + n)
-    //   val vj = v0.getRow(j)
+      val vi = v0.getRow(i + n)
+      val vj = v0.getRow(j)
 
-    //   val xmy = (vi *:* vj) - y
+      val xmy = (vi *:* vj) - y
 
-    //   (0::(m+n), 0::r) { (mi, mj) =>
-    //     if(mi == i + n) {
-    //       xmy * vj(mj)
-    //     }
-    //     else if(mi == j) {
-    //       xmy * vi(mj)
-    //     }
-    //     else {
-    //       0.0
+      (0::(m+n), 0::r) { (mi, mj) =>
+        if(mi == i + n) {
+          xmy * vj(mj)
+        }
+        else if(mi == j) {
+          xmy * vi(mj)
+        }
+        else {
+          0.0
+        }
+      }
+      //xmy * (ei.t ** vj + ej.t ** vi)
+    }
+
+    // println("test 2")
+
+    // val mdvi = (0::n) { i =>
+    //   val ci = cyr.getRowAsSparseVector(i)
+    //   val cii = ci.indices
+    //   val ciy = ci.nz
+
+    //   val vi = v0.getRow(i).toDense
+
+    //   if(cii.length == 0) {
+    //     DenseVector.zeros(r)
+    //   }
+    //   else {
+    //     sum(0, cii.length) { k =>
+    //       val vj = v0.getRow(cii(k) + n).toDense
+    //       val y: Rep[Double] = ciy(k)
+    //       val xmy: Rep[Double] = (vi *:* vj) - y
+    //       xmy * vj
     //     }
     //   }
-    //   //xmy * (ei.t ** vj + ej.t ** vi)
     // }
 
-    println("test 2")
+    // val mdvj = (0::m) { i =>
+    //   val ci = cyc.getRowAsSparseVector(i)
+    //   val cii = ci.indices
+    //   val ciy = ci.nz
 
-    val mdvi = (0::n) { i =>
-      val ci = cyr.getRowAsSparseVector(i)
-      val cii = ci.indices
-      val ciy = ci.nz
+    //   val vi = v0.getRow(i + n).toDense
 
-      val vi = v0.getRow(i).toDense
+    //   if(cii.length == 0) {
+    //     DenseVector.zeros(r)
+    //   }
+    //   else {
+    //     sum(0, cii.length) { k =>
+    //       val vj = v0.getRow(cii(k)).toDense
+    //       val y: Rep[Double] = ciy(k)
+    //       val xmy: Rep[Double] = (vi *:* vj) - y
+    //       xmy * vj
+    //     }
+    //   }
+    // }
 
-      if(cii.length == 0) {
-        DenseVector.zeros(r)
-      }
-      else {
-        sum(0, cii.length) { k =>
-          val vj = v0.getRow(cii(k) + n).toDense
-          val y: Rep[Double] = ciy(k)
-          val xmy: Rep[Double] = (vi *:* vj) - y
-          xmy * vj
-        }
-      }
-    }
+    // val mdv2 = (0::(m+n), 0::r) { (i, j) =>
+    //   if (i < n) {
+    //     mdvi.apply(i).apply(j)
+    //   }
+    //   else {
+    //     mdvj.apply(i - n).apply(j)
+    //   }
+    // }
 
-    val mdvj = (0::m) { i =>
-      val ci = cyc.getRowAsSparseVector(i)
-      val cii = ci.indices
-      val ciy = ci.nz
+    // println(mdv2.numRows)
+    // println(mdv2.numCols)
 
-      val vi = v0.getRow(i + n).toDense
-
-      if(cii.length == 0) {
-        DenseVector.zeros(r)
-      }
-      else {
-        sum(0, cii.length) { k =>
-          val vj = v0.getRow(cii(k)).toDense
-          val y: Rep[Double] = ciy(k)
-          val xmy: Rep[Double] = (vi *:* vj) - y
-          xmy * vj
-        }
-      }
-    }
-
-    val mdv2 = (0::(m+n), 0::r) { (i, j) =>
-      if (i < n) {
-        mdvi.apply(i).apply(j)
-      }
-      else {
-        mdvj.apply(i - n).apply(j)
-      }
-    }
-
-    println(mdv2.numRows)
-    println(mdv2.numCols)
-
-    println(normf(mdv2))
-    // println(normf(mdv))
+    // println(normf(mdv2))
+    println(normf(mdv))
     // println(normf(mdv - mdv2))
   }
 

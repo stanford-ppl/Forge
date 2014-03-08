@@ -94,10 +94,20 @@ trait Netflix extends OptiMLApplication {
 
     val mdv = (0::(m+n), 0::r) { (i, j) =>
       if (i < n) {
-        mdvhi.apply(i).apply(j)
+        if(mdvhi.contains(i)) {
+          mdvhi.apply(i).apply(j)
+        }
+        else {
+          0.0
+        }
       }
       else {
-        mdvhj.apply(i - n).apply(j)
+        if(mdvhj.contains(i - n)) {
+          mdvhj.apply(i - n).apply(j)
+        }
+        else {
+          0.0
+        }
       }
     }
 

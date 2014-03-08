@@ -56,7 +56,7 @@ trait Netflix extends OptiMLApplication {
     val result = untilconverged(v0) { v =>
       val dv = v + mu * y_step(m, n, r, cy, v) + sigma * v * (v.t * v)
       println(normf(dv))
-      v - alpha * v
+      v - alpha * dv
     }
 
     println("result:")

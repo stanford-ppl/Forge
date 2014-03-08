@@ -80,31 +80,15 @@ trait CSRGraphOps{
           while(large(j) < small(i) && j < large.length){
             j += 1
           }
-          if(small(i)==large(j) && j < large.length)              
+          if(small(i)==large(j) && j < large.length){              
             t += 1
+            j += 1
+          }
           i += 1
         }
-        //count
-        //println("intersect")
         t
       }
-      /*
-      infix ("simpleIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements composite ${
-        var i = 0
-        var t = 0
-        var j = 0
 
-        while(i < nbrs.length && j < nbrsOfNbrs.length){
-          if(nbrs(i)==nbrsOfNbrs(j))              
-            t += 1
-          if(nbrs(i) < nbrsOfNbrs(j))
-            i += 1
-          else
-            j += 1
-        }
-        t
-      }
-      */
       infix ("leapFrogIntersectSets") (Node :: MInt) implements composite ${
         val nbrs = $self.neighbors($1)
 

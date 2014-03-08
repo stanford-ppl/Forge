@@ -75,37 +75,17 @@ trait AOAGraphOps{
         var j = 0
 
         while(i < nbrs.length && j < nbrsOfNbrs.length){
-          if(nbrs(i)==nbrsOfNbrs(j))              
+          if(nbrs(i)==nbrsOfNbrs(j)){             
             t += 1
-          if(nbrs(i) < nbrsOfNbrs(j))
+            i += 1
+            j += 1
+          }
+          else if(nbrs(i) < nbrsOfNbrs(j))
             i += 1
           else
             j += 1
         }
         t
-        /*
-        slows me down by close to a second if I use this code, vice versus for CSR format.
-        interesting?
-        val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
-        val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
-        while(i < small.length  && j < large.length){
-          var jInBounds = true
-          var incrJ = large(j) < small(i)
-          while(incrJ && jInBounds){
-            j += 1
-            jInBounds = j < large.length
-            incrJ = if(jInBounds) large(j) < small(i) else false
-          }
-          if(jInBounds){
-            if(small(i)==large(j))              
-              t += 1
-          }
-          i += 1
-        }
-        //count
-        //println("intersect")
-        t
-        */
       }
       infix ("leapFrogIntersectSets") (Node :: MInt) implements composite ${
         val nbrs = $self.neighbors($1)
@@ -146,30 +126,32 @@ trait AOAGraphOps{
         },(a,b) => a+b, e => true)
       }
       infix ("hybridIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements single ${
-        var i = 0
         var t = 0
+        var i = 0
         var j = 0
-        var simple = false
-        /*
-        if(nbrs.length-i > 2 && nbrsOfNbrs.length > 2){
-          if(nbrs(i+1)-nbrs(i) > 20){
-            simple = false
-            nbrSearch = false
-          }
-          else if(nbrsOfnbrs(j+))
-        }
-        */
         var nbrSearch = nbrs(i) < nbrsOfNbrs(j)
-        while(i < nbrs.length && j < nbrsOfNbrs.length){
+        var done = false
+        val simple = nbrs.length < 50 && nbrsOfNbrs.length < 50
+        while(!done){
           if(simple){
-            if(nbrs(i)==nbrsOfNbrs(j))              
+            if(nbrs(i)==nbrsOfNbrs(j)){             
               t += 1
-            if(nbrs(i) < nbrsOfNbrs(j))
+              i += 1
+              j += 1
+              //if(i < nbrs.length && j < nbrsOfNbrs.length){
+               // if(nbrs(i)-nbrs(i-1)>50 || nbrs(i)-nbrs(i-1)>50){
+                //  simple = false
+                //}
+              //}
+            }
+            else if(nbrs(i) < nbrsOfNbrs(j))
               i += 1
             else
               j += 1
+            if(i >= nbrs.length || j >= nbrsOfNbrs.length) done = true
           }
           else{
+            done =  i == nbrs.length-1 || j == nbrsOfNbrs.length-1
             if(nbrSearch){
               i = $self.binarySearch(nbrs,nbrsOfNbrs(j),i)
             }
@@ -183,8 +165,14 @@ trait AOAGraphOps{
               j += 1
               if(i < nbrs.length && j < nbrsOfNbrs.length){
                 nbrSearch = nbrs(i) > nbrsOfNbrs(j)
+                //if(nbrs(i)-nbrs(i-1) < 50 || nbrs(i)-nbrs(i-1) < 50){
+                //  simple = true
+                //}
               }
+              else
+                done = true
             }
+            //if(done) i = nbrs.length
             nbrSearch = !nbrSearch
           }
         }

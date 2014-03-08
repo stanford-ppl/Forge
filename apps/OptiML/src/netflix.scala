@@ -60,33 +60,74 @@ trait Netflix extends OptiMLApplication {
 
     println("test 1")
 
-    val mdv = sum(0, cy.numRows) { k =>
-      val i = cy(k, 0) % m
-      val j = cy(k, 1) % n
-      val y = cy(k, 2).toDouble
+    val mdvhi = (0::cy.numRows).groupByReduce(
+      { k => cy(k, 0) % m },
+      { k =>
+        val i = cy(k, 0) % m
+        val j = cy(k, 1) % n
+        val y = cy(k, 2).toDouble
 
-      //val ei = (0::(m+n)) { k => if(k == i + n) 1.0 else 0.0 }
-      //val ej = (0::(m+n)) { k => if(k == j) 1.0 else 0.0 }
+        val vi = v0.getRow(i + n).toDense
+        val vj = v0.getRow(j).toDense
 
-      val vi = v0.getRow(i + n)
-      val vj = v0.getRow(j)
+        val xmy = (vi *:* vj) - y
 
-      val xmy = (vi *:* vj) - y
+        xmy * vj
+      },
+      { (x: Rep[DenseVector[Double]], y: Rep[DenseVector[Double]]) => x + y })
+    
+    val mdvhj = (0::cy.numRows).groupByReduce(
+      { k => cy(k, 1) % n },
+      { k =>
+        val i = cy(k, 0) % m
+        val j = cy(k, 1) % n
+        val y = cy(k, 2).toDouble
 
-      // (0::(m+n), 0::r) { (mi, mj) =>
-      //   if(mi == i + n) {
-      //     xmy * vj(mj)
-      //   }
-      //   else if(mi == j) {
-      //     xmy * vi(mj)
-      //   }
-      //   else {
-      //     0.0
-      //   }
-      // }
-      xmy * (vi + vj)
-      //xmy * (ei.t ** vj + ej.t ** vi)
+        val vi = v0.getRow(i + n).toDense
+        val vj = v0.getRow(j).toDense
+
+        val xmy = (vi *:* vj) - y
+
+        xmy * vi
+      },
+      { (x: Rep[DenseVector[Double]], y: Rep[DenseVector[Double]]) => x + y })
+
+    val mdv = (0::(m+n), 0::r) { (i, j) =>
+      if (i < n) {
+        mdvhi.apply(i).apply(j)
+      }
+      else {
+        mdvhj.apply(i - n).apply(j)
+      }
     }
+
+    // val mdv = sum(0, cy.numRows) { k =>
+    //   val i = cy(k, 0) % m
+    //   val j = cy(k, 1) % n
+    //   val y = cy(k, 2).toDouble
+
+    //   //val ei = (0::(m+n)) { k => if(k == i + n) 1.0 else 0.0 }
+    //   //val ej = (0::(m+n)) { k => if(k == j) 1.0 else 0.0 }
+
+    //   val vi = v0.getRow(i + n)
+    //   val vj = v0.getRow(j)
+
+    //   val xmy = (vi *:* vj) - y
+
+    //   // (0::(m+n), 0::r) { (mi, mj) =>
+    //   //   if(mi == i + n) {
+    //   //     xmy * vj(mj)
+    //   //   }
+    //   //   else if(mi == j) {
+    //   //     xmy * vi(mj)
+    //   //   }
+    //   //   else {
+    //   //     0.0
+    //   //   }
+    //   // }
+    //   xmy * (vi + vj)
+    //   //xmy * (ei.t ** vj + ej.t ** vi)
+    // }
 
     // println("test 2")
 
@@ -142,10 +183,8 @@ trait Netflix extends OptiMLApplication {
     // println(mdv2.numRows)
     // println(mdv2.numCols)
 
-    println(mdv)
-
     // println(normf(mdv2))
-    //println(normf(mdv))
+    println(normf(mdv))
     // println(normf(mdv - mdv2))
   }
 

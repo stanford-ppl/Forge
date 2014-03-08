@@ -13,14 +13,14 @@ trait SetTriangleCounting extends OptiGraphApplication {
     println("SetTriangleCounting")
   
     if (args.length < 1) printUsage
-    tic("total",args(0))
+    tic("input",args(0))
     //Works for both directed and undirected, performance 
     //val g = undirectedGraphFromDirectedAdjList(args(0),false,args(1).toInt)
-    val t = countOverEdges(args(0))
-    println("Num triangles: " + t)
-    toc("total",t)
-    /*
-    val g = specundirectedGraphFromEdgeList(args(0),true,0)
+    //val t = countOverEdges(args(0))
+    //println("Num triangles: " + t)
+    //toc("total",t)
+    
+    val g = aoaGraphFromEdgeList(args(0))
 
     toc("input",g)
     println("Directed: " + g.isDirected)
@@ -32,14 +32,11 @@ trait SetTriangleCounting extends OptiGraphApplication {
 
     //Set intersection
     val t1 = g.sumOverNodes{ n =>
-      g.intersectHybrid(n)
+      g.intersectSets(n)
     }
     
     toc("Set Triangle Counting",t1)
     println("# Set of triangles: " + t1)
-
-    println("Number of heavy nodes: " + g.numHeavy)
-    */
   }
   def printUsage = {
     println("Usage: SetTriangleCounting <path to input edge list file>")

@@ -24,6 +24,7 @@ trait ScalaOps {
     importMath()
     importTuples()
     importHashMap()
+    importBitSet()
   }
 
   /**
@@ -568,6 +569,17 @@ trait ScalaOps {
   }
 
   // Forge's HashMap is not mutable, so a Scala HashMap can be used if updates are necessary.
+  def importBitSet() = {
+    // in order to define lifted operations on an existing Scala type, we must place the lifted ops in a separate group
+    // to avoid Forge attempting to use the fully qualified type name in traits
+    val SBitSet = tpe("scala.collection.BitSet")
+    val SBitSetOps = grp("SBitSet")
+
+    direct (SBitSetOps) ("SBitSet", Nil, Nil :: SBitSet) implements codegen($cala, ${ scala.collection.BitSet.empty })
+    infix (SBitSetOps) ("++", Nil, (SBitSet, MArray(MInt)) :: SBitSet) implements codegen($cala, ${$0 ++ $1})
+    infix (SBitSetOps) ("&", Nil, (SBitSet, SBitSet) :: SBitSet) implements codegen($cala, ${ $0.&($1) })
+    infix (SBitSetOps) ("size", Nil, SBitSet :: MInt) implements codegen($cala, ${ $0.size })
+  }
   def importHashMap() = {
     val K = tpePar("K")
     val V = tpePar("V")

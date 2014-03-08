@@ -27,18 +27,20 @@ trait Netflix extends OptiMLApplication {
     println(n)
     println(r)
 
-    val cyc = SparseMatrix[Double](m, n, 
-      (0::cy.numRows) { k => cy(k, 2).toDouble }, 
-      (0::cy.numRows) { k => cy(k, 1) % n }, 
-      (0::cy.numRows) { k => cy(k, 0) % m }).finish
+    val cyx_d = (0::cy.numRows) { k => cy(k, 2).toDouble }
+    val cyx_i = (0::cy.numRows) { k => cy(k, 0) % m }
+    val cyx_j = (0::cy.numRows) { k => cy(k, 1) % n }
+
+    println(cyx_d.length)
+    println(cyx_i.length)
+    println(cyx_j.length)
+
+    val cyc = SparseMatrix[Double](m, n, cyx_d, cyx_j, cyx_i).finish
 
     println(cyc.numCols)
     println(cyc.numRows)
 
-    val cyr = SparseMatrix[Double](n, m, 
-      (0::cy.numRows) { k => cy(k, 2).toDouble }, 
-      (0::cy.numRows) { k => cy(k, 0) % m }, 
-      (0::cy.numRows) { k => cy(k, 1) % n }).finish
+    val cyr = SparseMatrix[Double](n, m, cyx_d, cyx_i, cyx_j).finish
 
     println(cyr.numCols)
     println(cyr.numRows)

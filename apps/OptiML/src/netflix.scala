@@ -27,6 +27,9 @@ trait Netflix extends OptiMLApplication {
     println(n)
     println(r)
 
+    println(cy.numRows)
+    println(cy.numCols)
+
     val cyx_d = (0::cy.numRows) { k => cy(k, 2).toDouble }
     val cyx_i = (0::cy.numRows) { k => cy(k, 0) % m }
     val cyx_j = (0::cy.numRows) { k => cy(k, 1) % n }

@@ -20,7 +20,7 @@ trait SetTriangleCounting extends OptiGraphApplication {
     //println("Num triangles: " + t)
     //toc("total",t)
     
-    val g = aoHashSetGraphFromEdgeList(args(0))
+    val g = aoaGraphFromEdgeList(args(0))
 
     toc("input",g)
     println("Directed: " + g.isDirected)
@@ -32,7 +32,7 @@ trait SetTriangleCounting extends OptiGraphApplication {
 
     //Set intersection
     val t1 = g.sumOverNodes{ n =>
-      g.intersectSets(n)
+      g.leapFrogIntersectSets(n)
     }
     
     toc("Set Triangle Counting",t1)

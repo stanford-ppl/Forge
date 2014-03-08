@@ -69,7 +69,7 @@ trait AOAGraphOps{
           }
         },(a,b) => a+b, e => true)
       }
-      infix ("simpleIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements composite ${
+      infix ("simpleIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements single ${
         var i = 0
         var t = 0
         var j = 0
@@ -140,15 +140,58 @@ trait AOAGraphOps{
               0
             }
             else{
-              if( (nbrs.length - nbrsOfNbrs.length) > 10 ||  (nbrs.length - nbrsOfNbrs.length) < -10)
-                $self.leapFrogIntersect(nbrs,nbrsOfNbrs)
-              else 
-                $self.simpleIntersect(nbrs,nbrsOfNbrs)
+              $self.hybridIntersect(nbrs,nbrsOfNbrs)
             }
           }
         },(a,b) => a+b, e => true)
       }
-      infix ("leapFrogIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements composite ${
+      infix ("hybridIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements single ${
+        var i = 0
+        var t = 0
+        var j = 0
+        var simple = false
+        /*
+        if(nbrs.length-i > 2 && nbrsOfNbrs.length > 2){
+          if(nbrs(i+1)-nbrs(i) > 20){
+            simple = false
+            nbrSearch = false
+          }
+          else if(nbrsOfnbrs(j+))
+        }
+        */
+        var nbrSearch = nbrs(i) < nbrsOfNbrs(j)
+        while(i < nbrs.length && j < nbrsOfNbrs.length){
+          if(simple){
+            if(nbrs(i)==nbrsOfNbrs(j))              
+              t += 1
+            if(nbrs(i) < nbrsOfNbrs(j))
+              i += 1
+            else
+              j += 1
+          }
+          else{
+            if(nbrSearch){
+              i = $self.binarySearch(nbrs,nbrsOfNbrs(j),i)
+            }
+            else{
+              j = $self.binarySearch(nbrsOfNbrs,nbrs(i),j)
+            }
+            //check to se if we match
+            if(nbrs(i)==nbrsOfNbrs(j)){           
+              t += 1
+              i += 1
+              j += 1
+              if(i < nbrs.length && j < nbrsOfNbrs.length){
+                nbrSearch = nbrs(i) > nbrsOfNbrs(j)
+              }
+            }
+            nbrSearch = !nbrSearch
+          }
+        }
+        t
+      }
+
+      infix ("leapFrogIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements single ${
         var t = 0
         var nbrStart = 0
         var nbrOfNbrStart = 0
@@ -178,7 +221,7 @@ trait AOAGraphOps{
         }
         t
       } 
-      infix ("binarySearch") ((("a",NodeDataView(MInt)),("key",MInt),("inStart",MInt)) :: MInt) implements composite ${
+      infix ("binarySearch") ((("a",NodeDataView(MInt)),("key",MInt),("inStart",MInt)) :: MInt) implements single ${
         // continue searching while [imin,imax] is not empty
         var result = -1
         var end = a.length-1

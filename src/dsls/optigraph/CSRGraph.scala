@@ -70,7 +70,7 @@ trait CSRGraphOps{
           }
         },(a,b) => a+b, e => true)
       }
-      infix ("simpleIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements composite ${
+      infix ("simpleIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements single ${
         var i = 0
         var t = 0
         var j = 0
@@ -146,7 +146,7 @@ trait CSRGraphOps{
           }
         },(a,b) => a+b, e => true)
       }
-      infix ("leapFrogIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements composite ${
+      infix ("leapFrogIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements single ${
         var t = 0
         var nbrStart = 0
         var nbrOfNbrStart = 0
@@ -176,7 +176,7 @@ trait CSRGraphOps{
         }
         t
       } 
-      infix ("binarySearch") ((("a",NodeDataView(MInt)),("key",MInt),("inStart",MInt)) :: MInt) implements composite ${
+      infix ("binarySearch") ((("a",NodeDataView(MInt)),("key",MInt),("inStart",MInt)) :: MInt) implements single ${
         // continue searching while [imin,imax] is not empty
         var result = -1
         var end = a.length-1

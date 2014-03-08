@@ -70,7 +70,7 @@ trait CSRGraphOps{
           }
         },(a,b) => a+b, e => true)
       }
-      infix ("simpleIntersect2") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements composite ${
+      infix ("simpleIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements composite ${
         var i = 0
         var t = 0
         var j = 0
@@ -88,6 +88,7 @@ trait CSRGraphOps{
         //println("intersect")
         t
       }
+      /*
       infix ("simpleIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements composite ${
         var i = 0
         var t = 0
@@ -103,6 +104,7 @@ trait CSRGraphOps{
         }
         t
       }
+      */
       infix ("leapFrogIntersectSets") (Node :: MInt) implements composite ${
         val nbrs = $self.neighbors($1)
 

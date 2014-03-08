@@ -74,31 +74,25 @@ trait AOAGraphOps{
         var t = 0
         var j = 0
 
-        while(i < nbrs.length && j < nbrsOfNbrs.length){
-          if(nbrs(i)==nbrsOfNbrs(j))              
-            t += 1
-          if(nbrs(i) < nbrsOfNbrs(j))
-            i += 1
-          else
-            j += 1
-        }
-        t
-        /*
         val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
         val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
         while(i < small.length  && j < large.length){
-          println("1 i: " + i + " j: " + j + " len: " + large.length)
-          while(large(j) < small(i) && j < large.length){
+          var jInBounds = true
+          var incrJ = large(j) < small(i)
+          while(incrJ && jInBounds){
             j += 1
+            jInBounds = j < large.length
+            incrJ = if(jInBounds) large(j) < small(i) else false
           }
-          if(small(i)==large(j) && j < large.length)              
-            t += 1
+          if(jInBounds){
+            if(small(i)==large(j))              
+              t += 1
+          }
           i += 1
         }
         //count
         //println("intersect")
         t
-        */
       }
       infix ("leapFrogIntersectSets") (Node :: MInt) implements composite ${
         val nbrs = $self.neighbors($1)

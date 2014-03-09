@@ -28,6 +28,8 @@ trait IOGraphOps {
     val V = tpePar("V")
     val Tuple2 = lookupTpe("Tup2")
     val Tuple3 = lookupTpe("Tup3")
+    val SBitSet = tpe("scala.collection.BitSet")
+
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
     val T = tpePar("T")
 
@@ -189,52 +191,50 @@ trait IOGraphOps {
     //assume every edge is listed twice for undirected graphs
     
     direct (IO) ("countOverEdges", Nil, MString :: MInt) implements composite ${
-      val input_edges = ForgeFileReader.readLinesFlattened($0)({line =>
+      val input_edges =
+        ForgeFileReader.readLinesFlattened($0)({line =>
           val fields = line.fsplit(" ")
           array_fromfunction(((array_length(fields)-1)*2),{n =>
             if(n==0) pack(fields(0).toInt,fields(1).toInt)
             else pack(fields(1).toInt,fields(0).toInt)
           })
         })
+
+      //contains either duplicate edges or not
       val edge_data = NodeData[Tup2[Int,Int]](input_edges).distinct
-      val grps = edge_data.groupBy(e => e._1, e => e._2)
+      val src_groups = edge_data.groupBy(e => e._1, e => e._2)
 
-      val id_degrees = edge_data.groupBy(e => array_buffer_length(fhashmap_get(grps,e._1)), e => e._1)
-      val distinct_ids = (NodeData(fhashmap_keys(id_degrees)).sort).flatMap{e => NodeData(fhashmap_get(id_degrees,e)).distinct}
-
-      //val distinct_ids = NodeData(fhashmap_keys(grps))
+      //sort by degree, helps with skew for buckets of nodes
+      val src_id_degrees = edge_data.groupBy(e => array_buffer_length(fhashmap_get(src_groups,e._1)), e => e._1)
+      val distinct_ids = (NodeData(fhashmap_keys(src_id_degrees)).sort).flatMap{e => NodeData(fhashmap_get(src_id_degrees,e)).distinct}
       val numNodes = distinct_ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
+
+      val filtered_nbrs = distinct_ids.map(e => NodeData(src_groups(e)).filter(a => 
+        fhashmap_get(idHashMap,a)>fhashmap_get(idHashMap,e),n =>fhashmap_get(idHashMap,n)).sort.getRawArray)
+      val numEdges = idView.mapreduce[Int](e => array_length(filtered_nbrs(e)), (a,b) => a+b, e => true) 
       
       val edge_data_internal = edge_data.map(e => pack(idHashMap(e._1),idHashMap(e._2))).filter(e => e._1 > e._2, e => e)
-      val internal_grps = edge_data_internal.groupBy(e => e._1, e => e._2)
-      val adjList = distinct_ids.map(e => NodeData(grps(e)).filter(a =>  e < a,a=>a).sort)
+      val bitMap = edge_data_internal.map({ e =>
+          val a1 = NodeData(filtered_nbrs(e._1))
+          val a2 = NodeData(filtered_nbrs(e._2))
+          val min = if(a1.length > 0 && a2.length > 0) 
+              if(a1(0) < a2(0)) a1(0) else a2(0)
+          else if(a1.length > 0) a1(0)
+          else if(a2.length > 0) a2(0)
+          else 0
+          pack(SBitSetFromArray(a1.map(a => a-min).getRawArray),SBitSetFromArray(a2.map(a => a-min).getRawArray))
+          //pack(bs.++(orderedMap(revIdMap(e._1)).map{}),bs.++(orderedMap(revIdMap(e._2)).map{e => e-min}))
+      })
+      //val adjList = distinct_ids.map(e => NodeData(grps(e)).filter(a =>  e < a,a=>a).sort)
 
       println("edges: " + edge_data.length)
-      tic("tCounting",grps)
-      val count = edge_data_internal.mapreduce[Int]({e =>
-        intersectSets(adjList(e._1),adjList(e._2))
-      },(a,b) => a+b, e => true)
+      tic("tCounting",bitMap)
+
+      val count = bitMap.map(e => (e._1 & e._2).size).reduce((a,b) => a+b)
       toc("tCounting",count)
       count
-    }
-    direct (IO) ("intersectSets", Nil, (NodeData(MInt),NodeData(MInt)) :: MInt) implements single ${
-      val nbrs = $0
-      val nbrsOfNbrs = $1
-
-      var i = 0
-      var j = 0
-      var t = 0
-      while(i < nbrs.length && j < nbrsOfNbrs.length){
-        if(nbrs(i)==nbrsOfNbrs(j))              
-          t += 1
-        if(nbrs(i) < nbrsOfNbrs(j))
-          i += 1
-        else
-          j += 1
-      }
-      t
     }
 
     direct (IO) ("specundirectedGraphFromEdgeList", Nil, (MString,MBoolean,MInt) :: SpecUndirectedGraph) implements composite ${

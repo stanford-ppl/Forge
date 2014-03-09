@@ -576,6 +576,7 @@ trait ScalaOps {
     val SBitSetOps = grp("SBitSet")
 
     direct (SBitSetOps) ("SBitSet", Nil, Nil :: SBitSet) implements codegen($cala, ${ scala.collection.BitSet.empty })
+    direct (SBitSetOps) ("SBitSetFromArray", Nil, MArray(MInt) :: SBitSet) implements codegen($cala, ${ scala.collection.BitSet.empty ++ $0})
     infix (SBitSetOps) ("++", Nil, (SBitSet, MArray(MInt)) :: SBitSet) implements codegen($cala, ${$0 ++ $1})
     infix (SBitSetOps) ("&", Nil, (SBitSet, SBitSet) :: SBitSet) implements codegen($cala, ${ $0.&($1) })
     infix (SBitSetOps) ("size", Nil, SBitSet :: MInt) implements codegen($cala, ${ $0.size })

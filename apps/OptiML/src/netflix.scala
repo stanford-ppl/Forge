@@ -23,6 +23,8 @@ trait Netflix extends OptiMLApplication {
 
     val alpha = args(6).toDouble
 
+    val v0n0 = args(7).toDouble
+
     println(m)
     println(n)
     println(r)
@@ -49,9 +51,7 @@ trait Netflix extends OptiMLApplication {
     // println(cyr.numRows)
 
     // initialize the matrix
-    val v0 = (0::(m+n), 0::r) { (i, j) => 
-      if(i == j) 1.0 else 0.0
-    }
+    val v0 = (v0n0 / r) * DenseMatrix.randn(m+n, r)
 
     val result = untilconverged(v0) { v =>
       println("----")

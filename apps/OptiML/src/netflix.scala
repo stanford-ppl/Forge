@@ -51,7 +51,7 @@ trait Netflix extends OptiMLApplication {
     // println(cyr.numRows)
 
     // initialize the matrix
-    val v0 = (v0n0 / r) * DenseMatrix.randn(m+n, r)
+    val v0 = (v0n0 / (m+n)) * DenseMatrix.randn(m+n, r)
 
     println(v0.numRows)
     println(v0.numCols)
@@ -59,7 +59,7 @@ trait Netflix extends OptiMLApplication {
     val result = untilconverged(v0) { v =>
       println("----")
       println(y_obj(m, n, r, cy, v))
-      val dv = v + mu * y_step(m, n, r, cy, v) + sigma * v * (v.t * v)
+      val dv = mu * v + y_step(m, n, r, cy, v) + sigma * v * (v.t * v)
       println(normf(dv))
       v - alpha * dv
     }

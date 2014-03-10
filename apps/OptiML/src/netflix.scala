@@ -66,7 +66,7 @@ trait Netflix extends OptiMLApplication {
   }
 
   def y_obj(m: Rep[Int], n: Rep[Int], r: Rep[Int], cy: Rep[DenseMatrix[Int]], v: Rep[DenseMatrix[Double]]): Rep[Double] = {
-    sqrt(sum(0::cy.numRows) {
+    sqrt(sum(0, cy.numRows) {
       val i = cy(k, 0) % m
       val j = cy(k, 1) % n
       val y = cy(k, 2).toDouble

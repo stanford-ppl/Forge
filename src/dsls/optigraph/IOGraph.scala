@@ -203,6 +203,7 @@ trait IOGraphOps {
       //contains either duplicate edges or not
       val edge_data = NodeData[Tup2[Int,Int]](input_edges).distinct
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
+      println("edges: " + edge_data.length)
 
       //sort by degree, helps with skew for buckets of nodes
       val src_id_degrees = edge_data.groupBy(e => array_buffer_length(fhashmap_get(src_groups,e._1)), e => e._1)
@@ -217,6 +218,8 @@ trait IOGraphOps {
       
       val edge_data_internal = edge_data.map(e => pack(idHashMap(e._1),idHashMap(e._2))).filter(e => e._1 > e._2, e => e)
       val bitMap = edge_data_internal.map({ e =>
+          createBitMaps(e,filtered_nbrs)
+          /*
           val a1 = NodeData(filtered_nbrs(e._1))
           val a2 = NodeData(filtered_nbrs(e._2))
           val min = if(a1.length > 0 && a2.length > 0) 
@@ -225,18 +228,27 @@ trait IOGraphOps {
           else if(a2.length > 0) a2(0)
           else 0
           pack(SBitSetFromArray(a1.map(a => a-min).getRawArray),SBitSetFromArray(a2.map(a => a-min).getRawArray))
+          */
           //pack(bs.++(orderedMap(revIdMap(e._1)).map{}),bs.++(orderedMap(revIdMap(e._2)).map{e => e-min}))
       })
       //val adjList = distinct_ids.map(e => NodeData(grps(e)).filter(a =>  e < a,a=>a).sort)
-
-      println("edges: " + edge_data.length)
+      println("bitmap: " + bitMap.length)
       tic("tCounting",bitMap)
 
       val count = bitMap.map(e => (e._1 & e._2).size).reduce((a,b) => a+b)
       toc("tCounting",count)
       count
     }
-
+    direct (IO) ("createBitMaps", Nil, ( ("e",Tuple2(MInt,MInt)) , ("filtered_nbrs",NodeData(MArray(MInt))) ) :: Tuple2(SBitSet,SBitSet) ) implements single ${
+      val a1 = NodeData(filtered_nbrs(e._1))
+      val a2 = NodeData(filtered_nbrs(e._2))
+      val min = if(a1.length > 0 && a2.length > 0) 
+          if(a1(0) < a2(0)) a1(0) else a2(0)
+      else if(a1.length > 0) a1(0)
+      else if(a2.length > 0) a2(0)
+      else 0
+      pack(SBitSetFromArray(a1.map(a => a-min).getRawArray),SBitSetFromArray(a2.map(a => a-min).getRawArray))
+    }
     direct (IO) ("specundirectedGraphFromEdgeList", Nil, (MString,MBoolean,MInt) :: SpecUndirectedGraph) implements composite ${
       val input_edges = if($1)
         ForgeFileReader.readLinesFlattened($0)({line =>

@@ -70,7 +70,12 @@ trait Netflix extends OptiMLApplication {
       val i = cy(k, 0) % m
       val j = cy(k, 1) % n
       val y = cy(k, 2).toDouble
+
+      val vi = v.getRow(i + n).toDense
+      val vj = v.getRow(j).toDense
+
       val xmy = (vi *:* vj) - y
+      
       xmy * xmy
     })
   }

@@ -54,6 +54,8 @@ trait Netflix extends OptiMLApplication {
     }
 
     val result = untilconverged(v0) { v =>
+      println("----")
+      println(y_obj(m, n, r, cy, v))
       val dv = v + mu * y_step(m, n, r, cy, v) + sigma * v * (v.t * v)
       println(normf(dv))
       v - alpha * dv
@@ -61,6 +63,16 @@ trait Netflix extends OptiMLApplication {
 
     println("result:")
     println(normf(result))
+  }
+
+  def y_obj(m: Rep[Int], n: Rep[Int], r: Rep[Int], cy: Rep[DenseMatrix[Int]], v: Rep[DenseMatrix[Double]]): Rep[Double] = {
+    sqrt(sum(0::cy.numRows) {
+      val i = cy(k, 0) % m
+      val j = cy(k, 1) % n
+      val y = cy(k, 2).toDouble
+      val xmy = (vi *:* vj) - y
+      xmy * xmy
+    })
   }
 
   def y_step(m: Rep[Int], n: Rep[Int], r: Rep[Int], cy: Rep[DenseMatrix[Int]], v: Rep[DenseMatrix[Double]]): Rep[DenseMatrix[Double]] = {

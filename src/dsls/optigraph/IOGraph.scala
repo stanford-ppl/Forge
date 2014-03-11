@@ -28,7 +28,8 @@ trait IOGraphOps {
     val V = tpePar("V")
     val Tuple2 = lookupTpe("Tup2")
     val Tuple3 = lookupTpe("Tup3")
-    val SBitSet = tpe("scala.collection.BitSet")
+    //val SBitSet = tpe("scala.collection.BitSet")
+    val SBitSet = ephemeralTpe("java.util.BitSet")
 
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
     val T = tpePar("T")
@@ -234,7 +235,7 @@ trait IOGraphOps {
       //val adjList = distinct_ids.map(e => NodeData(grps(e)).filter(a =>  e < a,a=>a).sort)
       println("bitmap: " + bitMap.length)
       tic("tCounting",bitMap)
-
+      //val count = 0
       val count = bitMap.map(e => (e._1 & e._2).size).reduce((a,b) => a+b)
       toc("tCounting",count)
       count

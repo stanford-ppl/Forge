@@ -572,14 +572,18 @@ trait ScalaOps {
   def importBitSet() = {
     // in order to define lifted operations on an existing Scala type, we must place the lifted ops in a separate group
     // to avoid Forge attempting to use the fully qualified type name in traits
-    val SBitSet = tpe("scala.collection.BitSet")
+    val SBitSet = ephemeralTpe("java.util.BitSet")
     val SBitSetOps = grp("SBitSet")
 
-    direct (SBitSetOps) ("SBitSet", Nil, Nil :: SBitSet) implements codegen($cala, ${ scala.collection.BitSet.empty })
-    direct (SBitSetOps) ("SBitSetFromArray", Nil, MArray(MInt) :: SBitSet) implements codegen($cala, ${ scala.collection.BitSet.empty ++ $0})
-    infix (SBitSetOps) ("++", Nil, (SBitSet, MArray(MInt)) :: SBitSet) implements codegen($cala, ${$0 ++ $1})
-    infix (SBitSetOps) ("&", Nil, (SBitSet, SBitSet) :: SBitSet) implements codegen($cala, ${ $0.&($1) })
-    infix (SBitSetOps) ("size", Nil, SBitSet :: MInt) implements codegen($cala, ${ $0.size })
+    //direct (SBitSetOps) ("SBitSet", Nil, Nil :: SBitSet) implements codegen($cala, ${ scala.collection.BitSet.empty })
+    direct (SBitSetOps) ("SBitSetFromArray", Nil, MArray(MInt) :: SBitSet, effect=mutable) implements codegen($cala, ${ 
+        val bs = new java.util.BitSet()
+        $0.foreach(e => bs.set(e))
+        bs
+    })
+    //infix (SBitSetOps) ("++", Nil, (SBitSet, MArray(MInt)) :: SBitSet) implements codegen($cala, ${$0.and($1)})
+    infix (SBitSetOps) ("&", Nil, (SBitSet, SBitSet) :: SBitSet, effect=write(0)) implements codegen($cala, ${ $0.and($1); $0 })
+    infix (SBitSetOps) ("size", Nil, SBitSet :: MInt) implements codegen($cala, ${ $0.cardinality() })
   }
   def importHashMap() = {
     val K = tpePar("K")

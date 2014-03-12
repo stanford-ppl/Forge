@@ -31,6 +31,11 @@ def main():
     for j in jars:
         cp = cp + j + os.pathsep
 
+    # Delite
+    cp = cp + DELITE_HOME + "/framework/target/" + scala_major_id + "/classes" + os.pathsep
+    cp = cp + DELITE_HOME + "/framework/delite-test/target/" + scala_major_id + "/classes" + os.pathsep
+    cp = cp + DELITE_HOME + "/runtime/target/" + scala_major_id + "/classes" + os.pathsep
+
     old_cp = os.getenv("CLASSPATH", "")
     os.putenv("CLASSPATH", old_cp + os.pathsep + cp)
 

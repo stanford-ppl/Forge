@@ -70,7 +70,7 @@ def checkEnv():
     if SCALA_VIRT_HOME is None:
         scala_virt_home = USER_HOME + "/.sbt/boot/" + scala_virt_prefix + scala_virt_version + "/lib/"
         if not os.path.isdir(scala_virt_home):
-            err("couldn't find scala virtualized at: " + scala_virt_prefix + scala_virt_home + ". Please set the SCALA_VIRT_HOME environment variable.")
+            err("couldn't find scala virtualized at: " + scala_virt_home + ". Please set the SCALA_VIRT_HOME environment variable.")
         SCALA_VIRT_HOME = scala_virt_home
 
     if LMS_HOME is None:

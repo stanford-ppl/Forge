@@ -116,6 +116,8 @@ trait CGenForgeArrayOps extends CGenDeliteArrayOps with CGenObjectOps {
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case ArrayApply(x,n) => emitValDef(sym, quote(x) + "->apply(" + quote(n) + ")")
     case ArrayLength(x) => emitValDef(sym, quote(x) + "->length")
+    //TODO: enable ArrayStringSplit in cluster mode
+    case ArrayStringSplit(a,b,Const(0)) if (!Config.generateSerializable) => emitValDef(sym, "string_split(" + quote(a) + "," + quote(b) + ")")
     case _ => super.emitNode(sym, rhs)
   }
 }

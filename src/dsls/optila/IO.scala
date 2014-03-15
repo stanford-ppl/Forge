@@ -50,13 +50,18 @@ trait IOOps {
       densematrix_fromarray(a, array_length(a) / numCols, numCols).unsafeImmutable // unsafeImmutable needed due to struct unwrapping Reflect(Reflect(..)) bug (see LAInputReaderOps.scala line 46 in Delite)
     }
 
-    compiler (IO) ("readFirstLine", Nil, ("path",MString) :: MString) implements codegen($cala, ${
+    val readfirstline = compiler (IO) ("readFirstLine", Nil, ("path",MString) :: MString) 
+      
+    impl (readfirstline) (codegen($cala, ${
       val xfs = new java.io.BufferedReader(new java.io.FileReader($path))
       val line = xfs.readLine()
       xfs.close()
       line
-    })
+    }))
 
+    //NOTE: C++ target codegen for readfirstline uses the Delite C++ library (readFirstLineFile), 
+    //      but may want to have codegen directly here like scala target (after multi-line C++ codegen in Forge is fixed).
+    impl (readfirstline) (codegen(cpp, ${readFirstLineFile($path)}))
 
     // -- output
 

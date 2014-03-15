@@ -37,17 +37,23 @@ trait DeliteGenOps extends BaseGenOps {
       if (!isThunk(func.tpe)) {
         for (a <- args) {
           // have to be careful about automatic string lifting here
-          val add: String = (nl + "\"" + "val " + replaceWildcards(quotedArg(boundArgName(func,a))) + " = " + replaceWildcards(captured(i)) + "\\n\"")
+          val add: String = (nl + "emitValDef(" + replaceWildcards(boundArgName(func,a)) + ".asInstanceOf[Sym[Any]],\"" + replaceWildcards(captured(i)) + "\")")
           boundStr += add
           i += 1
         }
       }
+
+      //Print below warning only when this belongs to C++ target.
+      //if(!isForgeUnitType(ret)) 
+      //  warn("A block returns non-unit type result. C++ target may not work properly." + func.name)
+
       // the new-line formatting is admittedly weird; we are using a mixed combination of actual new-lines (for string splitting at Forge)
       // and escaped new-lines (for string splitting at Delite), based on how we received strings from string interpolation.
       // FIX: using inconsistent newline character, not platform independent
       "{ \"" + boundStr +
        nl + "emitBlock(" + func.name + ")" +
-       nl + "quote(getBlockResult(" + func.name + "))+\"\\n\"" + nl + " \" } "
+       (if(!isForgeUnitType(ret)) (nl + "quote(getBlockResult(" + func.name + "))+\"\\n\"") else "") + 
+       nl + " \" } "
 
     case Def(QuoteSeq(argName)) => "Seq("+unquotes(argName+".map(quote).mkString("+quotes(",")+")")+")"
 

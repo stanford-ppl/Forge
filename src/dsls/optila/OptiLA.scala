@@ -118,6 +118,9 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
     // native libs
     extern(grp("BLAS"))
     extern(grp("LAPACK"))
+
+    // rewrite rules
+    extern(grp("Rewrite"))
   }
 
   def importVecMatConstructor() {

@@ -170,26 +170,25 @@ trait DenseMatrixUpdates extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-// object GroupRowsByRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with GroupRowsBy
-// object GroupRowsByRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with GroupRowsBy
-// trait GroupRowsBy extends ForgeTestModule with OptiMLApplication {
-//   def main() = {
+object GroupRowsByRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with GroupRowsBy
+object GroupRowsByRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with GroupRowsBy
+trait GroupRowsBy extends ForgeTestModule with OptiMLApplication {
+  def main() = {
 
-//     val m = DenseMatrix((1,2,3,4),
-//                         (2,-2,-3,-4),
-//                         (1,5,6,7),
-//                         (2,-5,-6,-7))
+    val m = DenseMatrix((1,2,3,4),
+                        (2,-2,-3,-4),
+                        (1,5,6,7),
+                        (2,-5,-6,-7))
 
-//     val ms = m.groupRowsBy(row => row(0))
-//     collect(ms.length == 2)
-//     for (m <- ms) {
-//       m.pprint
-//       collect(m.numRows == 2)
-//       collect(m.numCols == 4)
-//     }
-//     mkReport
-//   }
-// }
+    val ms = m.groupRowsBy(row => row(0)).toVector
+    collect(ms.length == 2)
+    for (m <- ms) {
+      collect(m.numRows == 2)
+      collect(m.numCols == 4)
+    }
+    mkReport
+  }
+}
 
 object MapRowsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with MapRows
 object MapRowsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with MapRows
@@ -215,20 +214,66 @@ trait ReduceRows extends ForgeTestModule with OptiMLApplication {
   }
 }
 
+object ShapesRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Shapes
+object ShapesRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Shapes
+trait Shapes extends ForgeTestModule with OptiMLApplication {
+  def main() = {
+    val a = DenseMatrix((1,2,3), 
+                        (4,5,6), 
+                        (7,8,9))
+
+    collect(diag(a) == DenseVector(1,5,9).t)
+    collect(triu(a) == DenseMatrix((1,2,3), (0,5,6), (0,0,9)))
+    collect(tril(a) == DenseMatrix((1,0,0), (4,5,0), (7,8,9)))
+    
+    val b = DenseMatrix((1,2,3,4),
+                        (5,6,7,8))
+    
+    collect(diag(b) == DenseVector(1,6).t)
+    collect(triu(b) == DenseMatrix((1,2,3,4), (0,6,7,8)))
+    collect(tril(b) == DenseMatrix((1,0,0,0), (5,6,0,0)))
+
+    val c = DenseMatrix((1,2),
+                        (3,4),
+                        (5,6),
+                        (7,8))
+
+    collect(diag(c) == DenseVector(1,4).t)
+    collect(triu(c) == DenseMatrix((1,2), (0,4), (0,0), (0,0)))
+    collect(tril(c) == DenseMatrix((1,0), (3,4), (5,6), (7,8)))
+
+    // n x n utriangle shape
+    val tri = utriangle(a.numRows)
+    
+    collect(tri.size == 6)    
+    collect(tri(0)._1 == 0 && tri(0)._2 == 0)
+    collect(tri(1)._1 == 0 && tri(1)._2 == 1)
+    collect(tri(2)._1 == 0 && tri(2)._2 == 2)
+    collect(tri(3)._1 == 1 && tri(3)._2 == 1)
+    collect(tri(4)._1 == 1 && tri(4)._2 == 2)
+    collect(tri(5)._1 == 2 && tri(5)._2 == 2)    
+    collect(tri.contains(2,0) == false)
+    
+    mkReport
+  }
+}
+
 class DenseMatrixSuiteInterpreter extends ForgeSuiteInterpreter {
   def testAccessors() { runTest(DenseMatrixAccessorsRunnerI) }
   def testOperators() { runTest(DenseMatrixOperatorsRunnerI) }
   def testUpdates() { runTest(DenseMatrixUpdatesRunnerI) }
-  // def testGroupRowsBy() { runTest(GroupRowsByRunnerI) }
+  def testGroupRowsBy() { runTest(GroupRowsByRunnerI) }
   def testMapRows() { runTest(MapRowsRunnerI) }
   def testReduceRows() { runTest(ReduceRowsRunnerI) }
+  def testShapes() { runTest(ShapesRunnerI) }
 }
 
 class DenseMatrixSuiteCompiler extends ForgeSuiteCompiler {
   def testAccessors() { runTest(DenseMatrixAccessorsRunnerC) }
   def testOperators() { runTest(DenseMatrixOperatorsRunnerC) }
   def testUpdates() { runTest(DenseMatrixUpdatesRunnerC) }
-  // def testGroupRowsBy() { runTest(GroupRowsByRunnerC) }
+  def testGroupRowsBy() { runTest(GroupRowsByRunnerC) }
   def testMapRows() { runTest(MapRowsRunnerC) }
   def testReduceRows() { runTest(ReduceRowsRunnerC) }
+  def testShapes() { runTest(ShapesRunnerC) }
 }

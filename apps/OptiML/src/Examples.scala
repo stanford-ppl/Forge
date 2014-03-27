@@ -202,21 +202,17 @@ trait Example7 extends OptiMLApplication {
   }
 }
 
-// SparseDenseVector, SparseDenseMatrix
-// NOT YET IMPLEMENTED
-/*
+// SparseVector, SparseMatrix
 object Example8Compiler extends OptiMLApplicationCompiler with Example8
 object Example8Interpreter extends OptiMLApplicationInterpreter with Example8
 trait Example8 extends OptiMLApplication {
   def main() = {
-    val v = SparseDenseVector[Double](100,true)
+    val v = SparseVector[Double](100,true)
     v(5) = 10
     v(75) = 20
 
-    // mapping a sparse vector returns another sparse vector
-    // if the map function always maps zeros to zeros, the map will
-    // be optimized to only operate on non-zero values
-    val t1 = v map { e => e/(exp(e)+1) }
+    // mapping a sparse vector's non-zero elements returns another sparse vector
+    val t1 = v mapnz { e => e/(exp(e)+1) }
 
     // nnz (number of non-zeros is a field only available on sparse structures)
     println("t1 nnz: " + t1.nnz)
@@ -227,7 +223,7 @@ trait Example8 extends OptiMLApplication {
     // sparse matrices are split into separates phases for construction and use
     // they can only be mutated before 'finish' is called, and can only be
     // used in other operations (e.g. math) after 'finish' is called
-    val mBuilder = DenseMatrix.sparse[Double](1000,1000)
+    val mBuilder = SparseMatrix[Double](1000,1000)
     mBuilder(10,100) = 5
     mBuilder(9,100) = 1
     mBuilder(9,722) = 722
@@ -243,6 +239,7 @@ trait Example8 extends OptiMLApplication {
 
 // Graph
 // NOT YET IMPLEMENTED
+/*
 object Example9Compiler extends OptiMLApplicationCompiler with Example9
 object Example9Interpreter extends OptiMLApplicationInterpreter with Example9
 trait Example9 extends OptiMLApplication {

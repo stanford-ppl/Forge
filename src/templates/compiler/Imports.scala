@@ -24,7 +24,7 @@ trait DeliteGenImports extends BaseGenImports {
   }
 
   def emitDelitePackageImports(stream: PrintWriter) {
-    stream.println("import ppl.delite.framework.{Config, DeliteApplication}")
+    stream.println("import ppl.delite.framework.{Config, DeliteApplication, ExpressionsOpt}")
     stream.println("import ppl.delite.framework.codegen.Target")
     stream.println("import ppl.delite.framework.codegen.scala.TargetScala")
     stream.println("import ppl.delite.framework.codegen.cuda.TargetCuda")

@@ -52,7 +52,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     for (e <- Externs) {
       stream.print(" with " + e.opsGrp.name + "Exp")
     }
-    stream.println(" with DeliteOpsExp with DeliteAllOverridesExp with MultiloopSoATransformExp {")
+    stream.println(" with ExpressionsOpt with DeliteOpsExp with DeliteAllOverridesExp with MultiloopSoATransformExp {")
     stream.println(" this: DeliteApplication with " + dsl + "Application => ")
     stream.println()
     emitBlockComment("disambiguations for LMS classes pulled in by Delite", stream, indent=2)

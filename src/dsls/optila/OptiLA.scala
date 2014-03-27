@@ -7,7 +7,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 object OptiLADSLRunner extends ForgeApplicationRunner with OptiLADSL
 
 trait OptiLADSL extends ForgeApplication
-  with ArithOps with StringableOps
+  with ArithOps with StringableOps with ShapeOps
   with BasicMathOps with RandomOps with IOOps
   with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps with SparseVectorOps with SparseVectorViewOps
   with DenseMatrixOps with SparseMatrixOps
@@ -105,6 +105,7 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
     importVecMatConstructor()
     importIOOps()
     importLinAlgOps()
+    importShapeOps()
 
     // native libs
     extern(grp("BLAS"))

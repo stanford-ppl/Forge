@@ -7,7 +7,7 @@ object RBMInterpreter extends OptiMLApplicationInterpreter with RBM
 
 trait RBM extends OptiMLApplication {
 
-  def print_usage = {
+  def printUsage = {
     println("Usage: RBM <MNIST data file> <numHiddenUnits> <numcases>")
     exit(-1)
   }
@@ -15,7 +15,7 @@ trait RBM extends OptiMLApplication {
   def main() = {
     reseed
 
-    if (args.length < 3) print_usage
+    if (args.length < 3) printUsage
 
     val maxEpoch = 10 // maximum number of epochs
     val numHiddenUnits = args(1).toInt

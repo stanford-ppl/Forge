@@ -117,7 +117,7 @@ trait DenseVectorOps {
 
     compiler (DenseVector) ("densevector_groupby_helper", (T,K,V), (DenseVector(T), T ==> K, T ==> V) :: MHashMap(K, MArrayBuffer(V))) implements groupBy((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)})
 
-    infix (DenseVector) ("toVector", (T,R), MHashMap(T, DenseVector(R)) :: DenseVector(DenseVector(R))) implements composite ${
+    infix (DenseVector) ("toVector", (T,R), MHashMap(T, R) :: DenseVector(R)) implements composite ${
       densevector_fromarray(fhashmap_values($0), true)
     }
 
@@ -266,7 +266,6 @@ trait DenseVectorOps {
       /**
        * Math
        */
-
       infix ("+=") (DenseVector(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${
         $self.indices.foreach { i => $self(i) = $self(i) + $1(i) }
       }
@@ -346,6 +345,9 @@ trait DenseVectorOps {
 
       direct ("__equal") (SparseVector(T) :: MBoolean) implements composite ${ $self == $1.toDense }
 
+      /**
+       * Bulk
+       */
       infix ("groupByReduce") ((T ==> K,T ==> V,(V,V) ==> V) :: MHashMap(K,V), TArith(V), addTpePars = (K,V)) implements groupByReduce((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)}, ${implicitly[Arith[V]].empty}, ${(a,b) => $3(a,b)})
 
       infix ("groupBy") ((T ==> K,T ==> V) :: MHashMap(K, DenseVector(V)), addTpePars = (K,V)) implements composite ${
@@ -353,6 +355,9 @@ trait DenseVectorOps {
         val vals = fhashmap_values(hash).map(ab => densevector_fromarray(array_buffer_result(ab), true))
         fhashmap_from_arrays(fhashmap_keys(hash), vals)
       }
+
+      // filter is here, instead of Vector.scala, so that other Vector types can have a different return value
+      infix ("filter") ((T ==> MBoolean) :: DenseVector(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})      
 
       /**
        * Required for parallel collection

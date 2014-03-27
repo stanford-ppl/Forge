@@ -248,7 +248,6 @@ trait VectorOps {
        */
       infix ("map") ((T ==> R) :: DenseVector(R), addTpePars = R) implements map((T,R), 0, ${ e => $1(e) })
       infix ("reduce") (((T,T) ==> T) :: T, A) implements reduce(T, 0, Z, ${ (a,b) => $1(a,b) })
-      infix ("filter") ((T ==> MBoolean) :: DenseVector(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})
       infix ("foreach") ((T ==> MUnit) :: MUnit) implements foreach(T, 0, ${ e => $1(e) })
       infix ("find") ((T ==> MBoolean) :: IndexVector) implements composite ${ IndexVector($self.indices.filter(i => $1($self(i)))) }
 

@@ -32,6 +32,14 @@ trait IndexVectorOps {
       d.unsafeImmutable
     }
 
+    // this is unsafe because it uses the underlying input array directly instead of copying
+    // they should only be used if we know the intermediate reference is dead or immutable (to avoid unsafe aliasing)
+    // TODO: for some reason this does not work when we think it should, so we are reverting to the safer copy-always policy.
+        
+    // compiler (IndexVector) ("unsafe_dense_to_index", Nil, DenseVector(MInt) :: IndexVector) implements composite ${
+    //   indexvector_fromarray(densevector_raw_data($0), $0.isRow)
+    // }
+    
     // index helpers
     for (arity <- 2 to 6) {
       val Tup = tpeInst(lookupTpe("Tuple"+arity, stage = compile), (0 until arity).map(i => MInt).toList)
@@ -82,10 +90,10 @@ trait IndexVectorOps {
         if (indexvector_is_range($self)) {
           // if ($start < indexvector_start($self) || $end > indexvector_end($self))
           //   fatal("IndexVector slice (" + $start + "," + $end + ") out of bounds (" + indexvector_start($self) + "," + indexvector_end($self) + ")")
-          IndexVector($start,$end,$self.isRow)
+          IndexVector($start, $end, $self.isRow)
         }
         else {
-          IndexVector(densevector_fromarray(indexvector_raw_data($self), $self.isRow).slice($start,$end))
+          IndexVector($self.toDense.slice($start, $end))
         }
       }
 
@@ -95,19 +103,27 @@ trait IndexVectorOps {
         if (indexvector_is_range($self)) {
           IndexVector(indexvector_start($self),indexvector_end($self),$self.isRow)
         }
-        else {
+        else {          
           indexvector_fromarray(array_clone(indexvector_raw_data($self)), $self.isRow)
         }
       }
 
-      infix ("toDense") (Nil :: DenseVector(MInt)) implements composite ${ $self.map(e => e) }
+      infix ("toDense") (Nil :: DenseVector(MInt)) implements composite ${ 
+        if (indexvector_is_range($self)) { $self.map(e => e) }
+        else {
+          // this is safe because we are constructing an immutable DenseVector and IndexVectors are always immutable
+          densevector_fromarray(indexvector_raw_data($0), $0.isRow)
+        }        
+      }
 
       direct ("__equal") (IndexVector :: MBoolean) implements composite ${ $self.toDense == $1 }
       direct ("__equal") (DenseVector(MInt) :: MBoolean) implements composite ${ $1 == $self }
 
+      infix ("filter") ((MInt ==> MBoolean) :: IndexVector) implements composite ${ IndexVector($self.toDense.filter($1)) }
+
       // parallel, so the conversion can fuse with the consumer
       // is this fast and robust enough to capture parallel operators over index vectors?
-      fimplicit ("indexToDense") (Nil :: DenseVector(MInt)) implements composite ${
+      fimplicit ("indexToDense") (Nil :: DenseVector(MInt)) implements composite ${        
         if (Settings.verbose > 0) println("(performance warning): automatic conversion from IndexVector to DenseVector")
         $self.toDense
       }

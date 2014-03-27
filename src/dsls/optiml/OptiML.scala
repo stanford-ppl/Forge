@@ -8,7 +8,7 @@ import core.ForgeApplicationRunner
 object OptiMLDSLRunner extends ForgeApplicationRunner with OptiMLDSL
 
 trait OptiMLDSL extends OptiLADSL
-  with SetOps with BufferableOps {
+  with MLIOOps with SetOps with BufferableOps {
 
   override def dslName = "OptiML"
 
@@ -28,6 +28,7 @@ trait OptiMLDSL extends OptiLADSL
     importBufferableOps()
     importSetOps()
     importUntilConverged()
+    importMLIOOps()
   }
 
   def importUntilConverged() {
@@ -56,6 +57,11 @@ trait OptiMLDSL extends OptiLADSL
       }
 
       cur
+    }
+
+    // this is a convenience method that allows a user to override the 'diff' function without explicitly passing other implicits
+    direct (Control) ("untilconverged_withdiff", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, ".001"), ("minIter", MInt, "1"), ("maxIter", MInt, "1000")), ("block", T ==> T), ("diff", (T,T) ==> MDouble)), T)) implements redirect ${
+      untilconverged(x, tol, minIter, maxIter)(block)(manifest[T], implicitly[SourceContext], diff)
     }
 
     // double-buffered untilconverged. 'block' must not change the structure of the input across iterations.

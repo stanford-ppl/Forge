@@ -576,14 +576,22 @@ trait ScalaOps {
     val SBitSetOps = grp("SBitSet")
 
     //direct (SBitSetOps) ("SBitSet", Nil, Nil :: SBitSet) implements codegen($cala, ${ scala.collection.BitSet.empty })
-    direct (SBitSetOps) ("SBitSetFromArray", Nil, MArray(MInt) :: SBitSet, effect=mutable) implements codegen($cala, ${ 
+    direct (SBitSetOps) ("SBitSet", Nil, MInt :: SBitSet) implements codegen($cala, ${ new java.util.BitSet($0)})
+    direct (SBitSetOps) ("SBitSetFromArray", Nil, MArray(MInt) :: SBitSet) implements codegen($cala, ${ 
         val bs = new java.util.BitSet()
         $0.foreach(e => bs.set(e))
         bs
     })
     //infix (SBitSetOps) ("++", Nil, (SBitSet, MArray(MInt)) :: SBitSet) implements codegen($cala, ${$0.and($1)})
-    infix (SBitSetOps) ("&", Nil, (SBitSet, SBitSet) :: SBitSet, effect=write(0)) implements codegen($cala, ${ $0.and($1); $0 })
-    infix (SBitSetOps) ("size", Nil, SBitSet :: MInt) implements codegen($cala, ${ $0.cardinality() })
+    infix (SBitSetOps) ("&", Nil, (SBitSet, SBitSet) :: SBitSet) implements codegen($cala, ${ 
+        val result = $0.clone().asInstanceOf[java.util.BitSet];
+        result.and($1); 
+        result 
+    })
+    infix (SBitSetOps) ("cardinality", Nil, SBitSet :: MInt) implements codegen($cala, ${ $0.cardinality() })
+    infix (SBitSetOps) ("size", Nil, SBitSet :: MInt) implements codegen($cala, ${ $0.size() })
+    infix (SBitSetOps) ("get", Nil, (SBitSet,MInt) :: MBoolean) implements codegen($cala, ${ $0.get($1) })
+    infix (SBitSetOps) ("set", Nil, (SBitSet,MInt,MBoolean) :: MUnit, effect=write(0)) implements codegen($cala, ${ $0.set($1,$2) })
   }
   def importHashMap() = {
     val K = tpePar("K")

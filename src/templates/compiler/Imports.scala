@@ -36,6 +36,11 @@ trait DeliteGenImports extends BaseGenImports {
     stream.println("import ppl.delite.framework.transform._")
   }
 
+  def emitDeliteRestageImports(stream: PrintWriter) {
+    stream.println("import ppl.delite.framework.codegen.restage.{DeliteCodeGenRestage,TargetRestage}")
+    stream.println("import ppl.delite.framework.{DeliteInteractive, DeliteInteractiveRunner, DeliteRestageOps, DeliteRestageOpsExp, DeliteRestageRunner}")
+  }
+
   def emitDeliteTestImports(stream: PrintWriter) {
     stream.println("import ppl.tests.scalatest._")
   }
@@ -43,7 +48,8 @@ trait DeliteGenImports extends BaseGenImports {
   def emitDeliteImports(stream: PrintWriter) {
     emitDelitePackageImports(stream)
     emitDeliteOpsImports(stream)
-    emitDeliteTestImports(stream)
+    emitDeliteRestageImports(stream)
+    emitDeliteTestImports(stream)    
   }
 
   override def emitDSLImports(stream: PrintWriter) {

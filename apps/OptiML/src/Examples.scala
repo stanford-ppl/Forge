@@ -14,6 +14,9 @@ import optiml.compiler._
 import optiml.library._
 import optiml.shared._
 
+import ppl.delite.framework.{BeginScopes,EndScopes}
+import ppl.delite.framework.ScopeCommunication._
+
 // DenseVector, DenseMatrix
 object Example1Compiler extends OptiMLApplicationCompiler with Example1
 object Example1Interpreter extends OptiMLApplicationInterpreter with Example1
@@ -427,5 +430,63 @@ trait Example13 extends OptiMLApplication {
 
     val result = v1+v2
     println("result(10) with name " + result(10).name + " has data " + result(10).data)
+  }
+}
+
+// Scopes #1: In this example, we invoke an OptiML program from within an ordinary Scala program
+object Example14 {  
+  def main(args: Array[String]) {
+    // ordinary Scala
+    println("scala 1") 
+    
+    // storage for the answer
+    val ab = new scala.collection.mutable.ArrayBuffer[Double]
+
+    // executes immediately in OptiML
+    OptiML { 
+      println("inside OptiML!")
+      val v = DenseVector.rand(100)        
+      ab += v.sum
+      ()
+    }
+
+    // ordinary Scala again
+    println("computed sum: " + ab(0))  
+  }
+}
+
+// Scopes #2: In this example, we stage two OptiML snippets back-to-back to generate a combined program,
+// which can then be re-staged (run with delitec again). We could write multi-DSL programs this way.
+//
+// to run:
+//   1. delitec Example15
+//   2. mv restage-scopes.scala apps/src/
+//   3. sbt compile
+//   4. delitec RestageApplicationRunner
+//   5. delite RestageApplicationRunner
+object Example15 {  
+  def main(args: Array[String]) {
+    // ordinary Scala
+    println("scala 1") 
+    
+    BeginScopes() // marker to begin scope file
+
+    val a = 
+      OptiML_ { 
+        println("inside OptiML!")
+        val v = (0::10) { i => 1.0 } 
+        DRef(v.sum)        
+      }
+
+    OptiML_ {
+      val in = a.get
+      println("in scope b, got input: ")
+      println(in)
+      println("final answer is: ")  
+      println(in+100)
+      ()
+    }    
+
+    EndScopes() // marker to complete the scope file
   }
 }

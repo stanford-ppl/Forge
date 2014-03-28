@@ -72,7 +72,7 @@ trait ForgeOps extends Base {
       forge_op(grp,name,implicitMethod,tpePars,listToArgs(signature.args),Nil,listToImplicitArgs(implicitArgs),signature.retTpe,effect,aliasHint)
 
   def impl(op: Rep[DSLOp])(rule: OpType) = forge_impl(op,rule)
-  def extern(grp: Rep[DSLGroup], withLift: Boolean = false, targets: List[CodeGenerator] = generators) = forge_extern(grp, withLift, targets)
+  def extern(grp: Rep[DSLGroup], withLift: Boolean = false, targets: List[CodeGenerator] = generators.filterNot(_ == restage)) = forge_extern(grp, withLift, targets)
 
   case class ParallelizeKey(tpe: Rep[DSLType])
   object parallelize {

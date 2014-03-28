@@ -13,11 +13,29 @@ trait BitSetTriangleCounting extends OptiGraphApplication {
     println("BitSetTriangleCounting")
   
     if (args.length < 1) printUsage
-    tic("total",args(0))
+    //tic("input",args(0))
     //Works for both directed and undirected, performance 
-    val t = countOverEdges(args(0))
-    println("Num triangles: " + t)
-    toc("total",t)
+    //val g = undirectedGraphFromDirectedAdjList(args(0),false,args(1).toInt)
+    val g = bitSetGraphFromEdgeList(args(0))
+    println("Input finished.  NumNodes: " + g.numNodes)
+    val count = g.countTriangles
+    println("Count: " + count)
+    /*
+    toc("input",g)
+    println("Directed: " + g.isDirected)
+    println("Number of Nodes: " + g.numNodes)
+    
+    println("performing Traingle Counting")
+
+    tic("Hash Triangle Counting",g)
+        //Set intersection
+    val t2 = g.sumOverNodes{ n =>
+      g.twoLevelHash(n)
+    }
+    toc("Hash Triangle Counting",t2)
+    println("# Hash of triangles: " + t2)
+    println("Number of heavy nodes: " + g.numHeavy)
+    */
   }
   def printUsage = {
     println("Usage: BitSetTriangleCounting <path to input edge list file>")

@@ -23,6 +23,7 @@ trait BitSetGraphOps{
     val NodeDataView = lookupTpe("NodeDataView")
     val NodeIdView = lookupTpe("NodeIdView")
     val ParBitSet = lookupTpe("ParBitSet")
+    val NodeCollection = lookupTpe("NodeCollection")
     //Actual BitSetGraph declaration
     val BitSetGraph = tpe("BitSetGraph") 
     val T = tpePar("T")
@@ -41,43 +42,44 @@ trait BitSetGraphOps{
       infix ("numNodes")(Nil :: MInt) implements getter(0,"_numNodes")
       infix ("numHeavy")(Nil :: MInt) implements getter(0,"_numHeavy")
       infix ("numLight")(Nil :: MInt) implements getter(0,"_numLight")
+      infix ("isHeavy") (Node :: MBoolean) implements single ${$1.id >= $self.numLight}
+      infix ("isDirected") (Nil :: MBoolean) implements single ${false}
 
-      infix ("isDirected") (Nil :: MBoolean) implements single ${false}  
-    
-      /*
-      //Perform a sum over the neighbors
-      infix ("sumOverNbrs") ( CurriedMethodSignature(List(("n",Node),("data",MInt==>R),("cond",MInt==>MBoolean)),R), TNumeric(R), addTpePars=R) implements composite ${
-        sum($self.neighbors(n))(data)(cond)
+      infix("sumOverNodes")( (Node==>R) :: R, TNumeric(R), addTpePars=R) implements composite ${
+        NodeIdView($self.numNodes).mapreduce[R]( e => $1(Node(e)), (a,b) => a+b, e => true)
       }
-            //Perform a sum over the neighbors
-      infix ("sumOverNbrs") ( CurriedMethodSignature(List(("n",MInt),("data",MInt==>R),("cond",MInt==>MBoolean)),R), TNumeric(R), addTpePars=R) implements composite ${
-        sum($self.neighbors(n))(data)(cond)
+      
+      infix ("countTriangles") (Nil :: MInt) implements composite ${
+        println("here")
+        $self.sumOverNodes{n =>
+          println("Node: " + n.id)
+          val nbrs = $self.neighbors(n)
+          println("nbrr length: " + nbrs.length)
+          nbrs.mapreduce[Int]({ nbr => 
+            println("nbr: " + nbr)
+            0
+          },(a,b) => a+b, e => true)
+        }
       }
-      infix ("sumDownNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
-        //only sum in neighbors a level up
-        sum($self.neighbors(n))(data){e => (level(e)==(level(n.id)+1))}
+      
+      infix ("neighbors") (MInt :: NodeCollection) implements single ${$self.neighbors(Node($1))}
+      infix ("neighbors") (Node :: NodeCollection) implements single ${
+        if($self.isHeavy($1))       
+          NodeCollection(get_nbrsHEAVY($self,$1))
+        else
+          NodeCollection(get_nbrsLIGHT($self,$1))
       }
-      infix ("sumUpNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
-        sum($self.inNbrs(n))(data){e => (level(e)==(level(n.id)-1))}
+
+      compiler ("get_nbrsHEAVY") (Node :: ParBitSet) implements single ${
+        array_apply(getHeavyEdges($self),$1.id)
       }
-      infix ("outDegree") (Node :: MInt) implements single ${
-        val end  = if( ($1.id+1) < array_length(node_raw_data2($self)) ) node_apply2($self,($1.id+1)) 
-          else array_length(edge_raw_data2($self))
-        end - node_apply2($self,$1.id) 
-      }
-      infix ("inDegree") (Node :: MInt) implements single ${$self.outDegree($1)}
-      //get out neighbors
-      infix ("outNbrs") (Node :: NodeDataView(MInt)) implements single ${get_specNbrs($self,$1)} 
-      infix ("inNbrs") (Node :: NodeDataView(MInt)) implements single ${get_specNbrs($self,$1)}
-      infix ("neighbors") (MInt :: NodeDataView(MInt)) implements single ${get_specNbrs($self,Node($1))}
-      infix ("neighbors") (Node :: NodeDataView(MInt)) implements single ${get_specNbrs($self,$1)}
-      compiler ("get_specNbrs") (Node :: NodeDataView(MInt)) implements single ${
+      compiler ("get_nbrsLIGHT") (Node :: NodeDataView(MInt)) implements single ${
         val start = light_node_index_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(light_node_index_raw_data($self)) ) light_node_index_apply($self,($1.id+1))
           else array_length(light_edges_raw_data($self))
         NodeDataView[Int](light_edges_raw_data($self),start,end-start)
       }
-      */
+
       compiler ("getHeavyEdges") (Nil :: MArray(ParBitSet)) implements getter(0, "_heavyNodes")
       compiler ("getExternalIDs") (Nil :: MArray(MInt)) implements getter(0, "_externalIDs")
       compiler ("getExternalID") (MInt :: MInt) implements single ${array_apply(getExternalIDs($self),$1)}

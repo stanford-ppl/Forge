@@ -577,9 +577,9 @@ trait ScalaOps {
 
     //direct (SBitSetOps) ("SBitSet", Nil, Nil :: SBitSet) implements codegen($cala, ${ scala.collection.BitSet.empty })
     direct (SBitSetOps) ("SBitSet", Nil, MInt :: SBitSet) implements codegen($cala, ${ new java.util.BitSet($0)})
-    direct (SBitSetOps) ("SBitSetFromArray", Nil, MArray(MInt) :: SBitSet) implements codegen($cala, ${ 
-        val bs = new java.util.BitSet()
-        $0.foreach(e => bs.set(e))
+    direct (SBitSetOps) ("SBitSetFromArray", Nil, (MInt,MArray(MInt)) :: SBitSet) implements codegen($cala, ${ 
+        val bs = new java.util.BitSet($0)
+        $1.foreach(e => bs.set(e))
         bs
     })
     //infix (SBitSetOps) ("++", Nil, (SBitSet, MArray(MInt)) :: SBitSet) implements codegen($cala, ${$0.and($1)})

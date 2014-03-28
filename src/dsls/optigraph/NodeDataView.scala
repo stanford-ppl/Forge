@@ -21,6 +21,7 @@ trait NodeDataViewOps {
     val NodeDataView = tpe("NodeDataView",T)
 
     data(NodeDataView, ("_data", MArray(T)), ("_start", MInt), ("_length", MInt))
+
     static (NodeDataView) ("apply", T, (MArray(T), MInt, MInt) :: NodeDataView(T)) implements allocates(NodeDataView, ${$0}, ${$1}, ${$2})
     val NodeDataViewOps = withTpe(NodeDataView)
     NodeDataViewOps {
@@ -52,5 +53,7 @@ trait NodeDataViewOps {
       
       parallelize as ParallelCollection(T, lookupOp("NodeDataView_illegalalloc"), lookupOp("length"), lookupOverloaded("apply",1), lookupOp("NodeDataView_illegalupdate"))
     }
+    //A dummy alloc for my NodeCollection allocates
+    compiler (NodeDataView) ("ndv_fake_alloc", Nil, Nil :: NodeDataView(MInt)) implements single ${ NodeDataView(array_empty(0),0,0) }
   }
 }

@@ -148,7 +148,6 @@ trait IOGraphOps {
       var i = 0
       var src_array_index = 0
       while(i < numNodes-1){
-        println("here11: " + i)
         val degree = src_groups(i).length
         src_node_array(i+1) = src_groups(i).length + src_node_array(i)
         i += 1
@@ -215,7 +214,7 @@ trait IOGraphOps {
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
 
       val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
-      val nbr_array = distinct_ids.map(e => NodeData(src_groups(e)).map(a => fhashmap_get(idHashMap,a)).sort.getRawArray)
+      val nbr_array = distinct_ids.map(e => NodeData(src_groups(e)).map(a => fhashmap_get(idHashMap,a)).distinct.sort.getRawArray)
       val numEdges = idView.mapreduce[Int](e => array_length(nbr_array(e)), (a,b) => a+b, e => true) 
       val light_nodes = nbr_array.filter(e => array_length(e)*32 < numNodes, e => NodeData(e))
       val heavy_nodes = nbr_array.filter(e => array_length(e)*32 >= numNodes, e => e)
@@ -224,8 +223,9 @@ trait IOGraphOps {
       val serial_out = assignUndirectedIndicies(light_nodes.length,light_nodes)
       val bitMap = heavy_nodes.map(e => ParBitSet(numNodes,e))
 
+      println("light edges: " + src_edge_array.length)
       println("Heavy: " + heavy_nodes.length + " Light: " + light_nodes.length)
-      BitSetGraph(numNodes,numEdges,distinct_ids.getRawArray,heavy_nodes.length,bitMap.getRawArray,light_nodes.length,src_edge_array.getRawArray,serial_out)
+      BitSetGraph(numNodes,numEdges,distinct_ids.getRawArray,heavy_nodes.length,bitMap.getRawArray,light_nodes.length,serial_out,src_edge_array.getRawArray)
     }
     direct (IO) ("specundirectedGraphFromEdgeList", Nil, (MString,MBoolean,MInt) :: SpecUndirectedGraph) implements composite ${
       val input_edges = if($1)

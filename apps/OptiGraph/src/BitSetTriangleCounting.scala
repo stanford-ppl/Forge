@@ -19,7 +19,7 @@ trait BitSetTriangleCounting extends OptiGraphApplication {
     val g = bitSetGraphFromEdgeList(args(0))
     println("Input finished.  NumNodes: " + g.numNodes)
     val count = g.countTriangles
-    println("Count: " + count)
+    println("Count: " + count/6)
     /*
     toc("input",g)
     println("Directed: " + g.isDirected)

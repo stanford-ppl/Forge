@@ -33,6 +33,11 @@ trait NodeCollectionOps {
     val NodeCollectionOps = withTpe(NodeCollection)
     NodeCollectionOps{
       infix ("colType") (Nil :: MInt) implements getter(0, "_type")
+      infix ("print") (Nil :: MUnit, effect=simple) implements single ${
+        if($self.colType == 0) get_parbitset($self).print
+        else get_nodeview($self).print       
+      }
+
       infix ("length") (Nil :: MInt) implements single ${
         if($self.colType == 0) get_parbitset($self).cardinality
         else get_nodeview($self).length        
@@ -47,11 +52,13 @@ trait NodeCollectionOps {
         // 1. BS & BS
         if($self.colType == 0 && $1.colType == 0){
           //logical and
+          //println("intersect 1" + $self.colType)
           (get_parbitset($self) & get_parbitset($1)).cardinality
         }
         // 2. BS & NDV
         else if ($self.colType != $1.colType){
           //go through NDV probe BS
+          //println("intersect 2" + $self.colType)
           val pbs = if($self.colType==0) get_parbitset($self) else get_parbitset($1)
           val ndv = if($self.colType==1) get_nodeview($self) else get_nodeview($1)
           ndv.mapreduce[Int]({ n => 
@@ -68,12 +75,19 @@ trait NodeCollectionOps {
           val small = if($self.length < $1.length) get_nodeview($self) else get_nodeview($1)
           val large = if($self.length < $1.length) get_nodeview($1) else get_nodeview($self)
           while(i < small.length  && j < large.length){
-            while(large(j) < small(i) && j < large.length){
+            var go = large(j) < small(i) 
+            while(go){
               j += 1
+              if(j < large.length){
+                go = large(j) < small(i) 
+              }
+              else go = false
             }
-            if(small(i)==large(j) && j < large.length){              
-              t += 1
-              j += 1
+            if(j < large.length){
+              if(small(i)==large(j)){              
+                t += 1
+                j += 1
+              }
             }
             i += 1
           }

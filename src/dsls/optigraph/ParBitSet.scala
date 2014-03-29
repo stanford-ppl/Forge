@@ -32,9 +32,12 @@ trait ParBitSetOps {
 
       infix ("mapreduce") ( (MInt ==> R,(R,R) ==> R, MInt==>MBoolean) :: R, TNumeric(R), addTpePars=R) implements composite ${
         val ids = NodeIdView($self.length)
-        ids.mapreduce($1,$2,{t => 
-          $3(t) && $self(t)
-        })
+        ids.mapreduce({ t=>
+          if($self(t))
+            $1(t)
+          else
+            numeric_zero[R]
+        },$2,$3)
       }
       //mapReduce((T,R), 0, ${e => $1(e)}, ${numeric_zero[R]}, ${(a,b) => $2(a,b)}, Some(${c => $3(c)}) )
 
@@ -43,7 +46,8 @@ trait ParBitSetOps {
         var i = 0
         println("BitSet Contents")
         while(i < $self.length){
-          println("Index: " + i +  " Data: " + $self(i))
+          if($self(i))
+            println("Set: " + i)
           i += 1
         }
       }

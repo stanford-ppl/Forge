@@ -52,22 +52,29 @@ trait BitSetGraphOps{
       infix ("countTriangles") (Nil :: MInt) implements composite ${
         println("here")
         $self.sumOverNodes{n =>
-          println("Node: " + n.id)
           val nbrs = $self.neighbors(n)
-          println("nbrr length: " + nbrs.length)
+          //println("col type: " + nbrs.colType)
+          //nbrs.print
           nbrs.mapreduce[Int]({ nbr => 
-            println("nbr: " + nbr)
-            0
+            //println("nbr: " + nbr)
+            val nbrsOfNbrs = $self.neighbors(nbr)
+            //println("nbrOfNbr type: " + nbrsOfNbrs.colType)
+            //nbrsOfNbrs.print
+            val a = nbrsOfNbrs.intersect(nbrs)
+            //println("intersect finished: " + a)
+            a
           },(a,b) => a+b, e => true)
         }
       }
       
       infix ("neighbors") (MInt :: NodeCollection) implements single ${$self.neighbors(Node($1))}
       infix ("neighbors") (Node :: NodeCollection) implements single ${
-        if($self.isHeavy($1))       
-          NodeCollection(get_nbrsHEAVY($self,$1))
-        else
+        if($self.isHeavy($1)){
+          NodeCollection(get_nbrsHEAVY($self,Node($1.id-$self.numLight)))
+        }
+        else{
           NodeCollection(get_nbrsLIGHT($self,$1))
+        }
       }
 
       compiler ("get_nbrsHEAVY") (Node :: ParBitSet) implements single ${

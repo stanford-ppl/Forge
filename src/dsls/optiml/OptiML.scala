@@ -8,7 +8,7 @@ import core.ForgeApplicationRunner
 object OptiMLDSLRunner extends ForgeApplicationRunner with OptiMLDSL
 
 trait OptiMLDSL extends OptiLADSL
-  with MLIOOps with SetOps with BufferableOps with StreamOps {
+  with MLIOOps with SetOps with BufferableOps with StreamOps with ImageOps {
 
   override def dslName = "OptiML"
 
@@ -30,6 +30,7 @@ trait OptiMLDSL extends OptiLADSL
     importUntilConverged()
     importMLIOOps()
     importStreamOps()
+    importImageOps()
   }
 
   def importUntilConverged() {

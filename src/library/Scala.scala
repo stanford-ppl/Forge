@@ -88,7 +88,9 @@ trait ScalaOps {
     val int_shift_left = direct (Prim) ("forge_int_shift_left", Nil, (MInt,MInt) :: MInt)
     val int_mod = infix (Prim) ("%", Nil, (MInt,MInt) :: MInt)
     val int_bitwise_not = infix (Prim) ("unary_~", Nil, MInt :: MInt)
-
+    val int_binary_and = direct (Prim) ("forge_int_and", Nil, (MInt,MInt) :: MInt)
+    val int_binary_or = direct (Prim) ("forge_int_or", Nil, (MInt,MInt) :: MInt)
+    
     val float_plus = direct (Prim) ("forge_float_plus", Nil, (MFloat,MFloat) :: MFloat)
     val float_minus = direct (Prim) ("forge_float_minus", Nil, (MFloat,MFloat) :: MFloat)
     val float_times = direct (Prim) ("forge_float_times", Nil, (MFloat,MFloat) :: MFloat)
@@ -119,6 +121,8 @@ trait ScalaOps {
       impl (int_shift_left) (codegen(g, ${$0 << $1}))
       impl (int_mod) (codegen(g, ${$0 % $1}))
       impl (int_bitwise_not) (codegen(g, ${~$0}))
+      impl (int_binary_and) (codegen(g, ${$0 & $1}))
+      impl (int_binary_or) (codegen(g, ${$0 | $1}))
 
       impl (float_plus) (codegen(g, ${$0 + $1}))
       impl (float_minus) (codegen(g, ${$0 - $1}))
@@ -256,6 +260,8 @@ trait ScalaOps {
     infix (Prim) ("/", Nil, (MDouble,MDouble) :: MDouble) implements redirect ${ forge_double_divide($0,$1) }
 
     infix (Prim) ("<<",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_left($0,$1) }
+    infix (Prim) ("&", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_and($0,$1) }
+    infix (Prim) ("|", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_or($0,$1) }
 
     infix (Prim) ("+", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_plus($0,$1) }
     infix (Prim) ("-", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_minus($0,$1) }

@@ -11,7 +11,7 @@ trait OptiLADSL extends ForgeApplication
   with BasicMathOps with RandomOps with IOOps
   with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps with SparseVectorOps with SparseVectorViewOps
   with DenseMatrixOps with SparseMatrixOps
-  with LinAlgOps {
+  with ComplexOps with LinAlgOps {
 
   def dslName = "OptiLA"
 
@@ -71,6 +71,7 @@ trait OptiLADSL extends ForgeApplication
     importRandomOps()
     importArithOps()
     importStringableOps()
+    importComplexOps()    
 
     // override default string formatting (numericPrecision is a global defined in extern)
     // we use "" + $a instead of $a.toString to avoid an NPE when explicitly calling toString inside the REPL

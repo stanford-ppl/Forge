@@ -102,7 +102,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   // -- IR helpers
 
   def isForgePrimitiveType(t: Rep[DSLType]) = t match {
-    case `MInt` | `MLong` | `MFloat` | `MDouble` | `MBoolean` | `MChar` | `MString` | `MUnit` | `MAny` | `MNothing` | `MSourceContext` | `byName` => true
+    case `MInt` | `MLong` | `MFloat` | `MDouble` | `MBoolean` | `MChar` | `MString` | `MUnit` | `MAny` | `MNothing` | `MLambda` | `MSourceContext` | `byName` => true
     case `CInt` | `CLong` | `CFloat` | `CDouble` | `CBoolean` | `CChar` | `CString` | `CUnit` | `CAny` | `CNothing` => true
     // case Def(Tpe(_,_,`now`)) => true
     case Def(Tpe(name,_,_)) if name.startsWith("scala") => true

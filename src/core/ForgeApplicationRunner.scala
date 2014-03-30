@@ -24,6 +24,7 @@ trait ForgeApplicationRunner extends ForgeApplication with ForgeExp {
     extern(grp("ForgeArrayBuffer"))
     extern(grp("ForgeHashMap"))
     extern(grp("Var"), withLift = true)
+    extern(grp("Lambda"))
     extern(grp("Record"))
     extern(grp("InputOutput"))
     extern(grp("Profiling"))

@@ -38,7 +38,7 @@ trait ShapeOps {
 
     // Shape type class interface
 
-    // test whether a 2d index is conatined in this shape
+    // test whether a 2d index is contained in this shape
     infix (Shape) ("contains", S, (S, MInt, MInt) :: MBoolean)
 
     // return a particular 2d index in the shape

@@ -599,7 +599,7 @@ trait DeliteGenOps extends BaseGenOps {
       val xformArgs = "(" + o.args.zipWithIndex.flatMap(t => t._1 match {
         case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if Impls(o).isInstanceOf[CodeGen] && !isThunk(f) => "f("+opArgPrefix+t._2+")" :: args.map(a => boundArgAnonName(t._1,a,t._2) /*+ ".asInstanceOf[Sym[Any]]"*/)
         // -- workaround for apparent scalac bug (GADT skolem type error), with separate cases for regular tpes and function tpes. this may be too restrictive and miss cases we haven't seen yet that also trigger the bug.
-        case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if isTpePar(o.retTpe) && args.forall(_.tpe == o.retTpe) && ret == o.retTpe => List("f("+opArgPrefix+t._2+".asInstanceOf[" + repify(f).replaceAllLiterally(repify(o.retTpe), "Rep[A]") + "])")
+        case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if isTpePar(o.retTpe) && !isThunk(f) && args.forall(a => a.tpe == o.retTpe || !isTpePar(a.tpe)) && ret == o.retTpe => List("f("+opArgPrefix+t._2+".asInstanceOf[" + repify(f).replaceAllLiterally(repify(o.retTpe), "Rep[A]") + "])")
         case Def(Arg(name, tpe, d2)) if !isFuncArg(t._1) && isTpePar(o.retTpe) && tpe.tpePars.length == 1 && tpe.tpePars.apply(0) == o.retTpe => List("f("+opArgPrefix+t._2+".asInstanceOf[Rep[" + tpe.name + "[A]]])")
         // -- end workaround
         case Def(Arg(name, _, _)) => List("f("+opArgPrefix+t._2+")")

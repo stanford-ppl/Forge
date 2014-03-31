@@ -52,16 +52,18 @@ trait NodeCollectionOps {
         // 1. BS & BS
         if($self.colType == 0 && $1.colType == 0){
           //logical and
-          tic("intersect 1", $self.colType)
-          val a = (get_parbitset($self) & get_parbitset($1)).cardinality
+          val pbss = get_parbitset($self)
+          tic("intersect 1", pbss)
+          val a = (pbss & get_parbitset($1)).cardinality
           toc("intersect 1", a)
           a
         }
         // 2. BS & NDV
         else if ($self.colType != $1.colType){
           //go through NDV probe BS
-          tic("intersect 2", $self.colType)
           val pbs = if($self.colType==0) get_parbitset($self) else get_parbitset($1)
+          tic("intersect 2", pbs)
+
           val ndv = if($self.colType==1) get_nodeview($self) else get_nodeview($1)
           val a = ndv.mapreduce[Int]({ n => 
             if(pbs(n)) 1
@@ -73,11 +75,12 @@ trait NodeCollectionOps {
         // 3. NDV & NDV
         else{
           //simple set intersection
-          tic("intersect 3", $self.colType)
           var i = 0
           var t = 0
           var j = 0
+
           val small = if($self.length < $1.length) get_nodeview($self) else get_nodeview($1)
+          tic("intersect 3", i)
           val large = if($self.length < $1.length) get_nodeview($1) else get_nodeview($self)
           while(i < small.length  && j < large.length){
             var go = large(j) < small(i) 

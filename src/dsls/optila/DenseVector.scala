@@ -307,7 +307,6 @@ trait DenseVectorOps {
         $self.indices.foreach { i => $self(i) = $self(i) / $1(i) }
       }
 
-
       /**
        * Ordering
        */
@@ -390,6 +389,9 @@ trait DenseVectorOps {
 
     importDenseVectorPrimitiveOps()
     addVectorCommonOps(DenseVector,T)
+
+    // label DenseVector *:* DenseVectorView so that we can rewrite it in RewriteOpsExp
+    label(lookupOverloaded("DenseVector","*:*",1), "densevector_dot_densevectorview")
   }
 
 

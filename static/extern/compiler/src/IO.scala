@@ -4,7 +4,7 @@ import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common._
 import ppl.delite.framework.codegen.delite.overrides._
-import ppl.delite.framework.ops.{DeliteOpsExp, DeliteFileReaderOpsExp, ScalaGenDeliteFileReaderOps}
+import ppl.delite.framework.ops.{DeliteOpsExp, DeliteFileReaderOpsExp, ScalaGenDeliteFileReaderOps, CGenDeliteFileReaderOps}
 import ppl.delite.framework.datastructures._
 
 // For compiler (Delite) implementation
@@ -27,4 +27,4 @@ trait InputOutputOpsExp extends DeliteFileReaderOpsExp {
 trait ScalaGenInputOutputOps extends ScalaGenDeliteFileReaderOps
 trait CudaGenInputOutputOps
 trait OpenCLGenInputOutputOps
-trait CGenInputOutputOps
+trait CGenInputOutputOps extends CGenDeliteFileReaderOps

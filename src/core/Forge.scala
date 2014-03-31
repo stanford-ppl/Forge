@@ -114,6 +114,11 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case _ => false
   }
 
+  def isForgeUnitType(t: Rep[DSLType]) = t match {
+    case `MUnit` => true
+    case _ => false
+  }
+
   def opsGrpTpes(opsGrp: DSLOps) = {
     // assumption: all ops associated with a particular data structure belong to exactly 1 group
     opsGrp.ops.collect { case o if (grpIsTpe(o.grp)) => grpAsTpe(o.grp) }.distinct

@@ -59,13 +59,20 @@ trait OptiLADSL extends ForgeApplication
     // infix_foreach must be compiler only both so that it is not used improperly and to not interfere with other codegen nodes in the library
     // this is a little convoluted unfortunately (because of the restriction on passing structs to codegen nodes)
     compiler (Range) ("infix_foreach", Nil, (Range, MInt ==> MUnit) :: MUnit) implements composite ${ range_foreach(range_start($0), range_end($0), $1) }
-    compiler (Range) ("range_foreach", Nil, (("start",MInt),("end",MInt),("func",MInt ==> MUnit)) :: MUnit) implements codegen($cala, ${
+    val range_foreach = compiler (Range) ("range_foreach", Nil, (("start",MInt),("end",MInt),("func",MInt ==> MUnit)) :: MUnit) 
+    impl (range_foreach) (codegen($cala, ${
       var i = $start
       while (i < $end) {
         $b[func](i)
         i += 1
       }
-    })
+    }))
+
+    impl (range_foreach) (codegen(cpp, ${
+      for(int i=$start ; i<$end ; i++) {
+        $b[func](i)
+      }
+    }))
 
     importBasicMathOps()
     importRandomOps()
@@ -89,7 +96,9 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
 """
     }
 
-    direct (lookupGrp("FString")) ("optila_fmt_str", T, T :: MString) implements codegen($cala, formatStr)
+    val fmt_str = direct (lookupGrp("FString")) ("optila_fmt_str", T, T :: MString) 
+    impl (fmt_str) (codegen($cala, formatStr))
+    impl (fmt_str) (codegen(cpp, "convert_to_string<" +  unquotes("remapWithRef("+opArgPrefix+"0.tp)") + " >(" + quotedArg(0) + ")"))
 
     compiler (lookupGrp("FString")) ("optila_padspace", Nil, MString :: MString) implements composite ${
       "  " + $0

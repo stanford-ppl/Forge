@@ -583,10 +583,11 @@ trait ScalaOps {
         bs
     })
     direct (SBitSetOps) ("SstartTime", Nil, Nil :: MLong, effect=simple) implements codegen($cala, ${ System.nanoTime })
-    direct (SBitSetOps) ("SstopTime", Nil, MLong :: MUnit, effect=simple) implements codegen($cala, ${ 
+    direct (SBitSetOps) ("SstopTime", Nil, (MInt,MLong) :: MUnit, effect=simple) implements codegen($cala, ${ 
+        println("intersect " + $0)
         val end = System.nanoTime
-        val time = (end - $0)/1e6
-        println(time + " ms")
+        val time = (end - $1)/1e6
+        if(time > 0.02) println(time + " ms")
     })
 
 

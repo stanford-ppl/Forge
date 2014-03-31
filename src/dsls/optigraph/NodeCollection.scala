@@ -53,10 +53,9 @@ trait NodeCollectionOps {
         if($self.colType == 0 && $1.colType == 0){
           //logical and
           val pbss = get_parbitset($self)
-          println("intersect 1 " + pbss.length)
           val start = SstartTime
           val a = (pbss & get_parbitset($1)).cardinality
-          SstopTime(start)
+          SstopTime(1,start)
           a
         }
         // 2. BS & NDV
@@ -65,7 +64,6 @@ trait NodeCollectionOps {
 
           val pbs = if($self.colType==0) get_parbitset($self) else get_parbitset($1)
           
-          println("intersect 2 " + pbs.length)
           val start = SstartTime
 
           val ndv = if($self.colType==1) get_nodeview($self) else get_nodeview($1)
@@ -73,7 +71,7 @@ trait NodeCollectionOps {
             if(pbs(n)) 1
             else 0
           },(a,b) => a+b, e => true)
-          SstopTime(start)          
+          SstopTime(2,start)          
           a
         }
         // 3. NDV & NDV
@@ -85,7 +83,6 @@ trait NodeCollectionOps {
 
           val small = if($self.length < $1.length) get_nodeview($self) else get_nodeview($1)
           
-          println("intersect 3 " + small.length)
           val start = SstartTime
 
           val large = if($self.length < $1.length) get_nodeview($1) else get_nodeview($self)
@@ -107,7 +104,7 @@ trait NodeCollectionOps {
             i += 1
           }
           val a = t
-          SstopTime(start)          
+          SstopTime(3,start)          
           a
         }
       }

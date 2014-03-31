@@ -582,6 +582,14 @@ trait ScalaOps {
         $1.foreach(e => bs.set(e))
         bs
     })
+    direct (SBitSetOps) ("SstartTime", Nil, Nil :: MLong, effect=simple) implements codegen($cala, ${ System.nanoTime })
+    direct (SBitSetOps) ("SstopTime", Nil, MLong :: MUnit, effect=simple) implements codegen($cala, ${ 
+        val end = System.nanoTime
+        val time = (end - $0)/1e6
+        println(time + " ms")
+    })
+
+
     //infix (SBitSetOps) ("++", Nil, (SBitSet, MArray(MInt)) :: SBitSet) implements codegen($cala, ${$0.and($1)})
     infix (SBitSetOps) ("&", Nil, (SBitSet, SBitSet) :: SBitSet) implements codegen($cala, ${ 
         val result = $0.clone().asInstanceOf[java.util.BitSet];

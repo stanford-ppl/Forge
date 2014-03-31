@@ -76,7 +76,6 @@ trait BitSetGraphOps{
           NodeCollection(get_nbrsLIGHT($self,$1))
         }
       }
-
       compiler ("get_nbrsHEAVY") (Node :: ParBitSet) implements single ${
         array_apply(getHeavyEdges($self),$1.id)
       }

@@ -18,10 +18,13 @@ trait BitSetTriangleCounting extends OptiGraphApplication {
     //val g = undirectedGraphFromDirectedAdjList(args(0),false,args(1).toInt)
     val g = bitSetGraphFromEdgeList(args(0))
     println("Input finished.  NumNodes: " + g.numNodes)
+    
+    tic("Count Time",g)
     val count = g.countTriangles
+    toc("Count Time",g)
+
     println("Count: " + count/6)
     /*
-    toc("input",g)
     println("Directed: " + g.isDirected)
     println("Number of Nodes: " + g.numNodes)
     

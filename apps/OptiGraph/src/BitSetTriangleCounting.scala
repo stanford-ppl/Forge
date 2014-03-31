@@ -21,7 +21,7 @@ trait BitSetTriangleCounting extends OptiGraphApplication {
     
     tic("Count Time",g)
     val count = g.countTriangles
-    toc("Count Time",g)
+    toc("Count Time",count)
 
     println("Count: " + count/6)
     /*

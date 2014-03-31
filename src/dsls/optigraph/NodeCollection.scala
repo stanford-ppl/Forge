@@ -52,13 +52,13 @@ trait NodeCollectionOps {
         // 1. BS & BS
         if($self.colType == 0 && $1.colType == 0){
           //logical and
-          //println("intersect 1" + $self.colType)
+          println("intersect 1" + $self.colType)
           (get_parbitset($self) & get_parbitset($1)).cardinality
         }
         // 2. BS & NDV
         else if ($self.colType != $1.colType){
           //go through NDV probe BS
-          //println("intersect 2" + $self.colType)
+          println("intersect 2" + $self.colType)
           val pbs = if($self.colType==0) get_parbitset($self) else get_parbitset($1)
           val ndv = if($self.colType==1) get_nodeview($self) else get_nodeview($1)
           ndv.mapreduce[Int]({ n => 
@@ -69,6 +69,7 @@ trait NodeCollectionOps {
         // 3. NDV & NDV
         else{
           //simple set intersection
+          println("intersect 2" + $self.colType)
           var i = 0
           var t = 0
           var j = 0

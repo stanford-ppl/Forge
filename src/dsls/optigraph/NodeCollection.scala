@@ -52,24 +52,28 @@ trait NodeCollectionOps {
         // 1. BS & BS
         if($self.colType == 0 && $1.colType == 0){
           //logical and
-          println("intersect 1" + $self.colType)
-          (get_parbitset($self) & get_parbitset($1)).cardinality
+          tic("intersect 1", $self.colType)
+          val a = (get_parbitset($self) & get_parbitset($1)).cardinality
+          toc("intersect 1", a)
+          a
         }
         // 2. BS & NDV
         else if ($self.colType != $1.colType){
           //go through NDV probe BS
-          println("intersect 2" + $self.colType)
+          tic("intersect 2", $self.colType)
           val pbs = if($self.colType==0) get_parbitset($self) else get_parbitset($1)
           val ndv = if($self.colType==1) get_nodeview($self) else get_nodeview($1)
-          ndv.mapreduce[Int]({ n => 
+          val a = ndv.mapreduce[Int]({ n => 
             if(pbs(n)) 1
             else 0
           },(a,b) => a+b, e => true)
+          toc("intersect 2", a)
+          a
         }
         // 3. NDV & NDV
         else{
           //simple set intersection
-          println("intersect 2" + $self.colType)
+          tic("intersect 3", $self.colType)
           var i = 0
           var t = 0
           var j = 0
@@ -92,7 +96,9 @@ trait NodeCollectionOps {
             }
             i += 1
           }
-          t
+          val a = t
+          toc("intersect 3", a)
+          a
         }
       }
       compiler ("get_parbitset") (Nil :: ParBitSet) implements getter(0, "_dataBS")

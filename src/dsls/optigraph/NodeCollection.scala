@@ -52,39 +52,37 @@ trait NodeCollectionOps {
         // 1. BS & BS
         if($self.colType == 0 && $1.colType == 0){
           //logical and
-          val pbss = get_parbitset($self)
           val start = SstartTime
+          val pbss = get_parbitset($self)
           val a = (pbss & get_parbitset($1)).cardinality
           SstopTime(1,start)
+          println("1 - i1: " + pbss.cardinality + " i2: " + get_parbitset($1).cardinality + " o: " + a)          
           a
         }
         // 2. BS & NDV
         else if ($self.colType != $1.colType){
           //go through NDV probe BS
-
-          val pbs = if($self.colType==0) get_parbitset($self) else get_parbitset($1)
-          
           val start = SstartTime
-
+          val pbs = if($self.colType==0) get_parbitset($self) else get_parbitset($1)
           val ndv = if($self.colType==1) get_nodeview($self) else get_nodeview($1)
           val a = ndv.mapreduce[Int]({ n => 
             if(pbs(n)) 1
             else 0
           },(a,b) => a+b, e => true)
-          SstopTime(2,start)          
+          SstopTime(2,start)
+          println("2 - i1: " + ndv.length + " i2: " + pbs.cardinality + " o: " + a)          
           a
         }
         // 3. NDV & NDV
         else{
           //simple set intersection
+          val start = SstartTime
+
           var i = 0
           var t = 0
           var j = 0
 
-          val small = if($self.length < $1.length) get_nodeview($self) else get_nodeview($1)
-          
-          val start = SstartTime
-
+          val small = if($self.length < $1.length) get_nodeview($self) else get_nodeview($1)          
           val large = if($self.length < $1.length) get_nodeview($1) else get_nodeview($self)
           while(i < small.length  && j < large.length){
             var go = large(j) < small(i) 
@@ -104,7 +102,8 @@ trait NodeCollectionOps {
             i += 1
           }
           val a = t
-          SstopTime(3,start)          
+          SstopTime(3,start)
+          println("3 - i1: " + small.length + " i2: " + large.length + " o: " + a)          
           a
         }
       }

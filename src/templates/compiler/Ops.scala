@@ -17,6 +17,8 @@ trait DeliteGenOps extends BaseGenOps {
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
   import IR._
 
+  var activeGenerator: CodeGenerator = _
+
   def baseOpsCls(opsGrp: DSLOps) = {
     if (opsGrp.ops.exists(_.style == compilerMethod)) opsGrp.grp.name + "CompilerOps"
     else opsGrp.name
@@ -43,16 +45,15 @@ trait DeliteGenOps extends BaseGenOps {
         }
       }
 
-      //Print below warning only when this belongs to C++ target.
-      //if(!isForgeUnitType(ret)) 
-      //  warn("A block returns non-unit type result. C++ target may not work properly." + func.name)
+      if (activeGenerator == cpp && ret != MUnit)
+        warn("Block " + func.name + " returns non-unit type result. C++ target may not work properly.")
 
       // the new-line formatting is admittedly weird; we are using a mixed combination of actual new-lines (for string splitting at Forge)
       // and escaped new-lines (for string splitting at Delite), based on how we received strings from string interpolation.
       // FIX: using inconsistent newline character, not platform independent
       "{ \"" + boundStr +
        nl + "emitBlock(" + func.name + ")" +
-       (if(!isForgeUnitType(ret)) (nl + "quote(getBlockResult(" + func.name + "))+\"\\n\"") else "") + 
+       (if (ret != MUnit) (nl + "quote(getBlockResult(" + func.name + "))+\"\\n\"") else "") + 
        nl + " \" } "
 
     case Def(QuoteSeq(argName)) => "Seq("+unquotes(argName+".map(quote).mkString("+quotes(",")+")")+")"
@@ -849,7 +850,9 @@ trait DeliteGenOps extends BaseGenOps {
     if (rules.length > 0){
       emitBlockComment("Code generators", stream)
       stream.println()
-      for (g <- generators) {
+      val save = activeGenerator
+      for (g <- generators) {        
+        activeGenerator = g
         val generatorRules = rules.flatMap{case (o,i) => i.asInstanceOf[CodeGen].decls.collect{case (k,r) if (k == g) => (o,r)}}
         if (generatorRules.length > 0) {
           stream.println("trait " + g.name + "Gen" + opsGrp.name + " extends " + g.name + "GenFat {")
@@ -889,8 +892,9 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    case _ => super.emitNode(sym, rhs)")
           stream.println("  }")
           stream.println("}")
-        }
+        }        
       }
+      activeGenerator = save
     }
   }
 }

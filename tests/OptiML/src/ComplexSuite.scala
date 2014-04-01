@@ -41,7 +41,6 @@ trait ComplexMath extends ForgeTestModule with OptiMLApplication {
     collect(c8 == Complex(5,-2))
     
     val m = DenseMatrix(((Complex(3,1),Complex(5,0),Complex(0,-2))),((Complex(2,-2),Complex(0,1),Complex(-7,-13))))
-    m.t.map(_.conj).pprint
     val delta = (m.t.map(_.conj) - DenseMatrix(((Complex(3,-1),Complex(2,2))), ((Complex(5,-0), Complex(0,-1))), ((Complex(0,2), Complex(-7,13)))))
     collect(sum(abs(delta)).real < .01)
 

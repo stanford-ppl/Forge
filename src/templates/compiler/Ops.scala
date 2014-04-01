@@ -39,7 +39,9 @@ trait DeliteGenOps extends BaseGenOps {
       if (!isThunk(func.tpe)) {
         for (a <- args) {
           // have to be careful about automatic string lifting here
-          val add: String = (nl + "emitValDef(" + replaceWildcards(boundArgName(func,a)) + ".asInstanceOf[Sym[Any]],\"" + replaceWildcards(captured(i)) + "\")")
+          var add: String = (nl + "emitValDef(" + replaceWildcards(boundArgName(func,a)) + ".asInstanceOf[Sym[Any]],\"{\")")
+          add += (nl + "\"" + replaceWildcards(captured(i)) + "\"")
+          add += (nl + "\"}\\n\"")
           boundStr += add
           i += 1
         }

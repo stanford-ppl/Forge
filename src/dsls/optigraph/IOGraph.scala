@@ -61,6 +61,7 @@ trait IOGraphOps {
 
       //contains either duplicate edges or not
       val edge_data = NodeData[Tup2[Int,Int]](input_edges).distinct
+      println("Edges: " + edge_data.length)
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
 
       //sort by degree, helps with skew for buckets of nodes
@@ -203,21 +204,26 @@ trait IOGraphOps {
         })
 
       //contains either duplicate edges or not
-      val edge_data = NodeData[Tup2[Int,Int]](input_edges).distinct
+      val edge_data = NodeData[Tup2[Int,Int]](input_edges).distinct.filter(e => e._1 != e._2, e => e)
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       println("edges: " + edge_data.length)
 
       //sort by degree, helps with skew for buckets of nodes
-      val src_id_degrees = edge_data.groupBy(e => array_buffer_length(fhashmap_get(src_groups,e._1)), e => e._1)
-      val distinct_ids = (NodeData(fhashmap_keys(src_id_degrees)).sort).flatMap{e => NodeData(fhashmap_get(src_id_degrees,e)).distinct}
-      val numNodes = distinct_ids.length
+      val input_ids = NodeData(fhashmap_keys(src_groups))
+      val numNodes = input_ids.length
+      val numEdges = input_ids.mapreduce[Int](e => array_buffer_length(fhashmap_get(src_groups,e)), (a,b) => a+b, e => true) 
+      
+      val heavy_ids = input_ids.filter(e => array_buffer_length(fhashmap_get(src_groups,e))*32 < -2/*>= numNodes*/, e => e)
+      val light_ids = input_ids.filter(e => array_buffer_length(fhashmap_get(src_groups,e))*32 > -2/*numNodes*/, e => e)
+      
+      //ids from 0-N with light coming first then heavy
+      val distinct_ids = light_ids.concat(heavy_ids)
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
-
       val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
-      val nbr_array = distinct_ids.map(e => NodeData(src_groups(e)).map(a => fhashmap_get(idHashMap,a)).distinct.sort.getRawArray)
-      val numEdges = idView.mapreduce[Int](e => array_length(nbr_array(e)), (a,b) => a+b, e => true) 
-      val light_nodes = nbr_array.filter(e => array_length(e)*32 < numNodes, e => NodeData(e))
-      val heavy_nodes = nbr_array.filter(e => array_length(e)*32 >= numNodes, e => e)
+
+      //Get heavy and light edges grouped
+      val light_nodes = light_ids.map(e => NodeData(src_groups(e)).map(a => fhashmap_get(idHashMap,a)).sort)
+      val heavy_nodes = heavy_ids.map(e => NodeData(src_groups(e)).map(a => fhashmap_get(idHashMap,a)).sort.getRawArray)
 
       val src_edge_array = NodeData(array_fromfunction(light_nodes.length,{n => n})).flatMap{e => light_nodes(e)}
       val serial_out = assignUndirectedIndicies(light_nodes.length,light_nodes)

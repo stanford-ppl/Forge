@@ -22,23 +22,7 @@ trait BitSetTriangleCounting extends OptiGraphApplication {
     tic("Count Time",g)
     val count = g.countTriangles
     toc("Count Time",count)
-
-    println("Count: " + count/6)
-    /*
-    println("Directed: " + g.isDirected)
-    println("Number of Nodes: " + g.numNodes)
-    
-    println("performing Traingle Counting")
-
-    tic("Hash Triangle Counting",g)
-        //Set intersection
-    val t2 = g.sumOverNodes{ n =>
-      g.twoLevelHash(n)
-    }
-    toc("Hash Triangle Counting",t2)
-    println("# Hash of triangles: " + t2)
-    println("Number of heavy nodes: " + g.numHeavy)
-    */
+    println("Count: " + count)
   }
   def printUsage = {
     println("Usage: BitSetTriangleCounting <path to input edge list file>")

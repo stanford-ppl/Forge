@@ -50,19 +50,13 @@ trait BitSetGraphOps{
       }
       
       infix ("countTriangles") (Nil :: MInt) implements composite ${
-        println("here")
         $self.sumOverNodes{n =>
           val nbrs = $self.neighbors(n)
-          //println("col type: " + nbrs.colType)
-          //nbrs.print
-          nbrs.mapreduce[Int]({ nbr => 
-            //println("nbr: " + nbr)
-            val nbrsOfNbrs = $self.neighbors(nbr)
-            //println("nbrOfNbr type: " + nbrsOfNbrs.colType)
-            //nbrsOfNbrs.print
-            val a = nbrsOfNbrs.intersect(nbrs)
-            //println("intersect finished: " + a)
-            a
+          nbrs.mapreduce[Int]({ nbr =>
+            //if(nbr > n.id){ 
+              val nbrsOfNbrs = $self.neighbors(nbr)
+              nbrs.intersect(nbrsOfNbrs)
+            //} else 0
           },(a,b) => a+b, e => true)
         }
       }

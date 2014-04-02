@@ -14,7 +14,7 @@ trait SetTriangleCounting extends OptiGraphApplication {
   
     if (args.length < 1) printUsage
     tic("input",args(0))
-    val g = aoaGraphFromEdgeList(args(0))
+    val g = csrGraphFromEdgeList(args(0))
     toc("input",g)
 
     println("Number of Nodes: " + g.numNodes)    

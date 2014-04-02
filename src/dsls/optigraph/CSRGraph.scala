@@ -52,7 +52,6 @@ trait CSRGraphOps{
       }
       infix ("intersectSets") (Node :: MInt) implements composite ${
         val nbrs = $self.neighbors($1)
-
         nbrs.mapreduce[Int]({ nbr => 
           if($1.id > nbr) 0
           else{ 
@@ -71,6 +70,8 @@ trait CSRGraphOps{
         },(a,b) => a+b, e => true)
       }
       infix ("simpleIntersect") (( ("nbrs",NodeDataView(MInt)),("nbrsOfNbrs",NodeDataView(MInt)) ) :: MInt) implements single ${
+        val start = SstartTime
+
         var i = 0
         var t = 0
         var j = 0
@@ -86,7 +87,10 @@ trait CSRGraphOps{
           }
           i += 1
         }
-        t
+        val a = t
+        SstopTime(3,start)
+        println("3 - i1: " + small.length + " i2: " + large.length + " o: " + a)          
+        a      
       }
 
       infix ("leapFrogIntersectSets") (Node :: MInt) implements composite ${

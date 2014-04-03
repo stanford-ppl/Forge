@@ -10,7 +10,7 @@ import templates.Utilities.nl
  * Note that Delite pulls in some LMS common ops directly, requiring name disambiguation here.
  * However, so far it does not look like there are any major problems (e.g. ambiguous implicits) from including both versions in a DSL.
  */
-trait ScalaOps extends BitSetOps {
+trait ScalaOps {
   this: ForgeApplication =>
 
   def importScalaOps() = {
@@ -25,7 +25,6 @@ trait ScalaOps extends BitSetOps {
     importTuples()
     importTiming()
     importHashMap()
-    importBitSetOps()
   }
 
   /**

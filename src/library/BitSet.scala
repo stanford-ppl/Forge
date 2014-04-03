@@ -54,6 +54,7 @@ trait BitSetOps {
     //just looping around the integers and calling the set method.
     compiler (BitSet) ("bs_alloc_from_int_array", Nil, MArray(MInt) :: MArray(MLong)) implements single ${
       val sortedInput = bs_alloc_sort_array_in($0)
+      //instead of sorting find max, place ints into numWords buckets, allocate in parallel with a map
       val words = bs_alloc_words(array_length(sortedInput))
 
       //Loop over my array of ints, setting integer indexes in bitset.

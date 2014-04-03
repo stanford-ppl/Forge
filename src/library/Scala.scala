@@ -10,7 +10,7 @@ import templates.Utilities.nl
  * Note that Delite pulls in some LMS common ops directly, requiring name disambiguation here.
  * However, so far it does not look like there are any major problems (e.g. ambiguous implicits) from including both versions in a DSL.
  */
-trait ScalaOps {
+trait ScalaOps extends BitSetOps {
   this: ForgeApplication =>
 
   def importScalaOps() = {
@@ -23,7 +23,9 @@ trait ScalaOps {
     importStrings()
     importMath()
     importTuples()
+    importTiming()
     importHashMap()
+    importBitSetOps()
   }
 
   /**
@@ -86,6 +88,7 @@ trait ScalaOps {
     val int_times = direct (Prim) ("forge_int_times", Nil, (MInt,MInt) :: MInt)
     val int_divide = direct (Prim) ("forge_int_divide", Nil, (MInt,MInt) :: MInt)
     val int_shift_left = direct (Prim) ("forge_int_shift_left", Nil, (MInt,MInt) :: MInt)
+    val int_shift_right = direct (Prim) ("forge_int_shift_right", Nil, (MInt,MInt) :: MInt)
     val int_mod = infix (Prim) ("%", Nil, (MInt,MInt) :: MInt)
     val int_bitwise_not = infix (Prim) ("unary_~", Nil, MInt :: MInt)
     val int_binary_and = direct (Prim) ("forge_int_and", Nil, (MInt,MInt) :: MInt)
@@ -108,9 +111,12 @@ trait ScalaOps {
     val long_divide_double = direct (Prim) ("forge_long_divide_double", Nil, (MLong,MDouble) :: MDouble)
     val long_binary_and = direct (Prim) ("forge_long_and", Nil, (MLong,MLong) :: MLong)
     val long_binary_or = direct (Prim) ("forge_long_or", Nil, (MLong,MLong) :: MLong)
+    val long_binary_xor = direct (Prim) ("forge_long_xor", Nil, (MLong,MLong) :: MLong)
     val long_shift_right_unsigned = direct (Prim) ("forge_long_shift_right_unsigned", Nil, (MLong,MInt) :: MLong)
+    val long_shift_right = direct (Prim) ("forge_long_shift_right", Nil, (MLong,MInt) :: MLong)
     val long_shift_left = direct (Prim) ("forge_long_shift_left", Nil, (MLong,MInt) :: MLong)
     impl (long_shift_right_unsigned) (codegen($cala, ${ $0 >>> $1 }))
+    impl (long_shift_right) (codegen($cala, ${ $0 >> $1 }))
     impl (long_shift_left) (codegen($cala, ${ $0 << $1 }))
 
     for (g <- List($cala, cuda, cpp)) {
@@ -119,6 +125,7 @@ trait ScalaOps {
       impl (int_times) (codegen(g, ${$0 * $1}))
       impl (int_divide) (codegen(g, ${$0 / $1}))
       impl (int_shift_left) (codegen(g, ${$0 << $1}))
+      impl (int_shift_right) (codegen(g, ${$0 >> $1}))
       impl (int_mod) (codegen(g, ${$0 % $1}))
       impl (int_bitwise_not) (codegen(g, ${~$0}))
       impl (int_binary_and) (codegen(g, ${$0 & $1}))
@@ -141,6 +148,7 @@ trait ScalaOps {
       impl (long_divide_double) (codegen(g, ${$0 / $1}))
       impl (long_binary_and) (codegen(g, ${$0 & $1}))
       impl (long_binary_or) (codegen(g, ${$0 | $1}))
+      impl (long_binary_xor) (codegen(g, ${$0 ^ $1}))
     }
 
     // infix (Prim) ("+", Nil, enumerate(CInt,MInt,CFloat,MFloat,CDouble,MDouble)) implements codegen($cala, quotedArg(0) + " + " + quotedArg(1))
@@ -260,9 +268,9 @@ trait ScalaOps {
     infix (Prim) ("/", Nil, (MDouble,MDouble) :: MDouble) implements redirect ${ forge_double_divide($0,$1) }
 
     infix (Prim) ("<<",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_left($0,$1) }
+    infix (Prim) (">>",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_right($0,$1) }
     infix (Prim) ("&", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_and($0,$1) }
     infix (Prim) ("|", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_or($0,$1) }
-
     infix (Prim) ("+", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_plus($0,$1) }
     infix (Prim) ("-", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_minus($0,$1) }
     infix (Prim) ("*", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_times($0,$1) }
@@ -270,8 +278,10 @@ trait ScalaOps {
     infix (Prim) ("/", Nil, (MLong,MDouble) :: MDouble) implements redirect ${ forge_long_divide_double($0,$1) }
     infix (Prim) ("&", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_and($0,$1) }
     infix (Prim) ("|", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_or($0,$1) }
+    infix (Prim) ("^", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_xor($0,$1) }
     infix (Prim) (">>>", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_shift_right_unsigned($0,$1) }
     infix (Prim) ("<<", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_shift_left($0,$1) }
+    infix (Prim) (">>", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_shift_right($0,$1) }
   }
 
   def importMisc() = {
@@ -611,7 +621,17 @@ trait ScalaOps {
     direct (Tuple2) ("pack", (A,B), CTuple2(A,MVar(B)) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
     direct (Tuple2) ("pack", (A,B), CTuple2(MVar(A),MVar(B)) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
   }
-
+  
+  //Some scala timing operations to debug internal code times, ideally printed out then parsed with your own script to gather data
+  def importTiming() = {
+    val STimingOps = grp("ScalaTiming")
+    direct (STimingOps) ("startTimer", Nil, Nil :: MLong, effect=simple) implements codegen($cala, ${ System.nanoTime })
+    direct (STimingOps) ("stopTimer", Nil, (MString,MLong) :: MUnit, effect=simple) implements codegen($cala, ${ 
+        val end = System.nanoTime
+        println($0 + " - time: " + (end - $1)/1e6 + "ms")
+    })
+  }
+  
   // Forge's HashMap is not mutable, so a Scala HashMap can be used if updates are necessary.
   def importHashMap() = {
     val K = tpePar("K")

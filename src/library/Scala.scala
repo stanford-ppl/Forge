@@ -114,6 +114,7 @@ trait ScalaOps {
     val long_shift_right_unsigned = direct (Prim) ("forge_long_shift_right_unsigned", Nil, (MLong,MInt) :: MLong)
     val long_shift_right = direct (Prim) ("forge_long_shift_right", Nil, (MLong,MInt) :: MLong)
     val long_shift_left = direct (Prim) ("forge_long_shift_left", Nil, (MLong,MInt) :: MLong)
+    val long_bitwise_not = infix (Prim) ("unary_~", Nil, MLong :: MLong)
     impl (long_shift_right_unsigned) (codegen($cala, ${ $0 >>> $1 }))
     impl (long_shift_right) (codegen($cala, ${ $0 >> $1 }))
     impl (long_shift_left) (codegen($cala, ${ $0 << $1 }))
@@ -148,6 +149,7 @@ trait ScalaOps {
       impl (long_binary_and) (codegen(g, ${$0 & $1}))
       impl (long_binary_or) (codegen(g, ${$0 | $1}))
       impl (long_binary_xor) (codegen(g, ${$0 ^ $1}))
+      impl (long_bitwise_not) (codegen(g, ${~$0}))
     }
 
     // infix (Prim) ("+", Nil, enumerate(CInt,MInt,CFloat,MFloat,CDouble,MDouble)) implements codegen($cala, quotedArg(0) + " + " + quotedArg(1))
@@ -208,6 +210,7 @@ trait ScalaOps {
     infix (Prim) ("-", Nil, (MDouble,MDouble) :: MDouble) implements redirect ${ forge_double_minus($0,$1) }
 
     infix (Prim) ("unary_-", Nil, MInt :: MInt) implements redirect ${ unit(-1)*$0 }
+    infix (Prim) ("unary_-", Nil, MLong :: MLong) implements redirect ${ unit(-1L)*$0 }
     infix (Prim) ("unary_-", Nil, MFloat :: MFloat) implements redirect ${ unit(-1f)*$0 }
     infix (Prim) ("unary_-", Nil, MDouble :: MDouble) implements redirect ${ unit(-1)*$0 }
     infix (Prim) ("*", Nil, (CInt,MInt) :: MInt) implements redirect ${ forge_int_times(unit($0),$1) }
@@ -510,6 +513,7 @@ trait ScalaOps {
     impl (ninf) (codegen(cuda, "__longlong_as_double(0xfff0000000000000ULL)"))
 
     // methods
+    val bitCount = static (Math) ("bitcount", Nil, MLong :: MInt)
     val abs = static (Math) ("abs", Nil, MDouble :: MDouble)
     val exp = static (Math) ("exp", Nil, MDouble :: MDouble)
     val log = static (Math) ("log", Nil, MDouble :: MDouble)
@@ -532,6 +536,7 @@ trait ScalaOps {
     val max = static (Math) ("max", Nil, (MDouble,MDouble) :: MDouble)
     val min = static (Math) ("min", Nil, (MDouble,MDouble) :: MDouble)
 
+    impl (bitCount) (codegen($cala, "java.lang.Long.bitCount(" + quotedArg(0) + ")"))
     impl (abs) (codegen($cala, "java.lang.Math.abs(" + quotedArg(0) + ")"))
     impl (exp) (codegen($cala, "java.lang.Math.exp(" + quotedArg(0) + ")"))
     impl (log) (codegen($cala, "java.lang.Math.log(" + quotedArg(0) + ")"))

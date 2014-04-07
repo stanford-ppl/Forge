@@ -26,6 +26,7 @@ trait OptiGraphDSL extends ForgeApplication
      * Include Scala ops
      */
     importScalaOps()
+    importBitSetOps()
     /**
      * The main portion of our DSL
      */

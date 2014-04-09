@@ -73,8 +73,9 @@ trait NodeCollectionOps {
           a
         }
         // 3. NDV & NDV
-        else if ($self.colType == 0 && $1.colType == 0){
+        else if ($self.colType == 1 && $1.colType == 1){
           //simple set intersection
+
           var i = 0
           var t = 0
           var j = 0
@@ -109,7 +110,7 @@ trait NodeCollectionOps {
             else 0
           },(a,b) => a+b, e => true)
         }
-        // 4. NDV and Hash
+        // 4. Hash and Hash
         else if ($self.colType == 2 && $1.colType == 2){
           val hsSmall = if($self.length > $1.length) $1 else $self
           val hsLarge = if($self.length <= $1.length) nc_gethashmap_keydata($1) else nc_gethashmap_keydata($self)

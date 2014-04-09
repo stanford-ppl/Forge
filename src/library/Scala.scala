@@ -629,10 +629,13 @@ trait ScalaOps {
   //Some scala timing operations to debug internal code times, ideally printed out then parsed with your own script to gather data
   def importTiming() = {
     val STimingOps = grp("ScalaTiming")
-    direct (STimingOps) ("startTimer", Nil, Nil :: MLong, effect=simple) implements codegen($cala, ${ System.nanoTime })
-    direct (STimingOps) ("stopTimer", Nil, (MString,MLong) :: MUnit, effect=simple) implements codegen($cala, ${ 
-        val end = System.nanoTime
-        println($0 + " - time: " + (end - $1)/1e6 + "ms")
+    direct (STimingOps) ("startTimer", Nil, (MString,MInt,MInt) :: MLong, effect=simple) implements codegen($cala, ${ 
+      println($0 + " - i1: " + $1 + " i2: " + $2)
+      System.nanoTime 
+    })
+    direct (STimingOps) ("stopTimer", Nil, (MString,MLong,MInt) :: MUnit, effect=simple) implements codegen($cala, ${ 
+      val end = System.nanoTime
+      println($0 + " - time: " + (end - $1)/1e6 + "ms o: " + $2)
     })
   }
   

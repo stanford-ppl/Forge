@@ -32,12 +32,15 @@ trait NodeDataViewOps {
 
       infix ("intersect") (NodeDataView(T) :: MInt, TNumeric(T)) implements single ${
         //simple set intersection
+        //val start = startTimer("NDV Intersect",$self.length,$1.length)
+
         var i = 0
         var t = 0
         var j = 0
 
         val small = if($self.length < $1.length) $self else $1          
         val large = if($self.length < $1.length) $1 else $self
+
         while(i < small.length  && j < large.length){
           var go = large(j) < small(i) 
           while(go){
@@ -55,6 +58,8 @@ trait NodeDataViewOps {
           }
           i += 1
         }
+        val a = t
+        //stopTimer("NDV Intersect",start,a)
         t
       }
 

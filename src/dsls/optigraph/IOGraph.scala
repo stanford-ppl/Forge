@@ -20,10 +20,13 @@ trait IOGraphOps {
     val V = tpePar("V")
     val Tuple2 = lookupTpe("Tup2")
 
-    val NodeData = lookupTpe("NodeData")
     val NodeIdView = lookupTpe("NodeIdView")
+    val NodeCollection = lookupTpe("NodeCollection")
+    val NodeData = lookupTpe("NodeData")
+    val GraphBitSet = lookupTpe("GraphBitSet")
     val CSRDirectedGraph = lookupTpe("CSRDirectedGraph")
     val CSRUndirectedGraph = lookupTpe("CSRUndirectedGraph")
+    val HABUndirectedGraph = lookupTpe("HABUndirectedGraph")
 
     direct (IO) ("writeResults", T, (("path",MString),("ids",MArray(MInt)),("data",NodeData(T))) :: MUnit, TNumeric(T), effect = simple) implements single ${
       writeGraphData($path,ids,data.getRawArray,$data.length)
@@ -143,6 +146,56 @@ trait IOGraphOps {
         i += 1
       }
       pack(src_node_array,dst_node_array)
+    }
+    direct (IO) ("habPrunedUndirectedGraphFromEdgeList", Nil, MString :: HABUndirectedGraph) implements composite ${
+      val input_edges =
+        ForgeFileReader.readLinesFlattened($0)({line =>
+          val fields = line.fsplit(" ")
+          array_fromfunction(((array_length(fields)-1)*2),{n =>
+            if(n==0) pack(fields(0).toInt,fields(1).toInt)
+            else pack(fields(1).toInt,fields(0).toInt)
+          })
+        })
+
+      //contains either duplicate edges or not
+      val edge_data = NodeData[Tup2[Int,Int]](input_edges).distinct
+      println("Edges: " + edge_data.length)
+      val src_groups = edge_data.groupBy(e => e._1, e => e._2)
+
+      //sort by degree, helps with skew for buckets of nodes
+      val src_id_degrees = edge_data.groupBy(e => array_buffer_length(fhashmap_get(src_groups,e._1)), e => e._1)
+      val distinct_ids = (NodeData(fhashmap_keys(src_id_degrees)).sort).flatMap{e => NodeData(fhashmap_get(src_id_degrees,e)).distinct}
+
+      val numNodes = distinct_ids.length
+      val idView = NodeData(array_fromfunction(numNodes,{n => n}))
+      val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
+
+      val filtered_nbrs = distinct_ids.map(e => NodeData(src_groups(e)).filter(a => 
+        fhashmap_get(idHashMap,a)>fhashmap_get(idHashMap,e),n =>fhashmap_get(idHashMap,n)).sort)
+
+      val underForHash = 16
+      val nodes = idView.map{e => 
+        if( filtered_nbrs(e).length*32 >= numNodes ) NodeCollection(GraphBitSet(filtered_nbrs(e).getRawArray))
+        else if( filtered_nbrs(e).length < underForHash ) NodeCollection(filtered_nbrs(e).groupByReduce[Int,Int](e => e, e => e, (a,b) => 0))
+        else NodeCollection(filtered_nbrs(e))
+      }
+      val numEdges = filtered_nbrs.mapreduce[Int]( e => filtered_nbrs.length, (a,b) => a+b, e => true)
+      
+      val numHash = filtered_nbrs.mapreduce[Int]( {e => 
+        if(e.length*32 < numNodes && e.length < underForHash) 1
+        else 0
+      }, (a,b) => a+b, e => true)
+      val numArray = filtered_nbrs.mapreduce[Int]( {e => 
+        if(e.length*32 < numNodes && e.length >= underForHash) 1
+        else 0
+      }, (a,b) => a+b, e => true)   
+      val numBitSet = filtered_nbrs.mapreduce[Int]( {e => 
+        if(e.length*32 >= numNodes) 1
+        else 0
+      }, (a,b) => a+b, e => true)
+
+      println("numHash: " + numHash + " numArray: " + numArray + " numBitSet: " + numBitSet)
+      HABUndirectedGraph(numNodes,numEdges,distinct_ids.getRawArray,numHash,numArray,numBitSet,nodes.getRawArray)
     }    
   }
 }

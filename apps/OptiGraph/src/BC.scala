@@ -13,7 +13,7 @@ trait BC extends OptiGraphApplication {
     println("OptiGraph Test 1")
     if (args.length < 2) printUsage
 
-    val g = directedGraphFromEdgeList(args(0))
+    val g = csrDirectedGraphFromEdgeList(args(0))
     
     println("Directed: " + g.isDirected)
     println("Number of Nodes: " + g.numNodes)

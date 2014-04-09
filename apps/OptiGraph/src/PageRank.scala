@@ -15,7 +15,7 @@ trait PageRank extends OptiGraphApplication {
     if (args.length < 2) printUsage
 
     //Works for both directed and undirected, performance 
-    val g = directedGraphFromEdgeList(args(0))
+    val g = csrDirectedGraphFromEdgeList(args(0))
     
     println("Directed: " + g.isDirected)
     println("Number of Nodes: " + g.numNodes)
@@ -32,8 +32,8 @@ trait PageRank extends OptiGraphApplication {
     
     val pr =
      untilconverged(prInit, tol=threshold,maxIter=maxItr){ oldPr =>
-      g.mapLoadBalancedNodes{ n =>
-        ((1.0 - damp) / g.numNodes) + damp * sum(g.inNbrs(n)){ w =>
+      g.mapNodes{ n =>
+        ((1.0 - damp) / g.numNodes) + damp * sumOverCollection(g.inNbrs(n)){ w =>
           oldPr(w) / g.outDegree(Node(w))}{n => true}
       }
     }{(curPr,oldPr) => sum(abs(curPr-oldPr))}

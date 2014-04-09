@@ -52,12 +52,13 @@ trait NodeDataOps {
         array_copy($1.getRawArray,0,result,$0.length,$1.length)
         NodeData(result)
       }
-      compiler ("nd_set_raw_data") (MArrayBuffer(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
+      infix("sort")(Nil :: NodeData(T),TNumeric(T)) implements composite ${NodeData(array_sort($self.getRawArray))}
+
 
       ///////////parallel operations////////////////////////////
       infix ("-") (NodeData(T) :: NodeData(T), TNumeric(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a-b })
       infix ("+") (NodeData(T) :: NodeData(T), TNumeric(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a+b })
-      infix ("sum") (Nil :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${ (a,b) => a+b })
+      //infix ("sum") (Nil :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${ (a,b) => a+b })
       infix ("map") ((T ==> R) :: NodeData(R), addTpePars = R) implements map((T,R), 0, ${ e => $1(e) })
       infix ("flatMap") ((T ==> NodeData(R)) :: NodeData(R), addTpePars = R) implements flatMap((T,R), 0, ${ e => $1(e) })
       infix ("filter") ( ((T ==> MBoolean),(T ==> MInt)) :: NodeData(MInt)) implements filter((T,MInt), 0, ${w => $1(w)}, ${e => $2(e)})
@@ -67,6 +68,7 @@ trait NodeDataOps {
       infix ("groupBy") ((T ==> K,T ==> V) :: MHashMap(K, MArrayBuffer(V)), addTpePars = (K,V)) implements groupBy((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)})
       infix ("groupByReduce") ((T ==> K,T ==> V,(V,V) ==> V) :: MHashMap(K, V), TNumeric(V), addTpePars = (K,V)) implements groupByReduce((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)}, ${numeric_zero[V]}, ${(a,b) => $3(a,b)})
       infix ("mapreduce") ( (T ==> R,(R,R) ==> R, T==>MBoolean) :: R, TNumeric(R), addTpePars=(R)) implements mapReduce((T,R), 0, ${e => $1(e)}, ${numeric_zero[R]}, ${(a,b) => $2(a,b)}, Some(${c => $3(c)}) )
+      infix ("distinct") (Nil :: NodeData(T)) implements composite ${NodeData(fhashmap_keys($0.groupByReduce[T,Int](e => e, e=>0,(a,b)=>0)))}
 
       /////////////////////////debug operations (print serial & parallel)///////////////////////
       infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println("NodeData: " + a)})
@@ -94,11 +96,15 @@ trait NodeDataOps {
       compiler ("nd_apply") (MInt :: T) implements composite ${array_buffer_apply(nd_raw_data($self), $1)}
       compiler("nd_update")( (("id",MInt),("n",T)) :: MUnit, effect=write(0)) implements composite ${array_buffer_update(nd_raw_data($self),$id,$n)}
       compiler ("nd_set_length")(MInt :: MUnit, effect = write(0)) implements single ${array_buffer_set_length(nd_raw_data($self),$1)}
+      compiler ("nd_set_raw_data") (MArrayBuffer(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
       compiler ("nd_appendable") ((MInt,T) :: MBoolean) implements single("true") 
       compiler ("nd_append") ((MInt,T) :: MUnit, effect = write(0)) implements composite ${array_buffer_append(nd_raw_data($self),$2)}
       compiler("nd_copy") ((MInt,NodeData(T),MInt,MInt) :: MUnit, effect = write(2)) implements single ${array_buffer_copy(nd_raw_data($self),$1,nd_raw_data($2),$3,$4)}
 
       parallelize as ParallelCollectionBuffer(T,lookupOp("nd_raw_alloc"),lookupOp("length"),lookupOp("nd_apply"),lookupOp("nd_update"),lookupOp("nd_set_length"),lookupOp("nd_appendable"),lookupOp("nd_append"),lookupOp("nd_copy"))
     }
+    direct(NodeData) ("sum", R, NodeData(R) :: R, TNumeric(R)) implements composite ${$0.reduce((a,b) => a+b)}
+    direct(NodeData) ("sum", R, NodeData(NodeData(R)) :: NodeData(R), TFractional(R)) implements composite ${$0.reduceNested( ((a,b) => a+b),NodeData[R]($0.length))}
+    compiler (NodeData) ("nd_fake_alloc", Nil, Nil :: NodeData(MInt)) implements single ${ NodeData(0) }
   } 
 }

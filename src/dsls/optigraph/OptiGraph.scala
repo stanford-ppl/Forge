@@ -7,11 +7,11 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 // This object lets us build our DSL
 object OptiGraphDSLRunner extends ForgeApplicationRunner with OptiGraphDSL
 
-trait OptiGraphDSL extends ForgeApplication
-    with GraphOps with DirectedGraphOps  with UndirectedGraphOps
+trait OptiGraphDSL extends ForgeApplication with GraphOps 
+    with HABUndirectedGraphOps  with CSRDirectedGraphOps  with CSRUndirectedGraphOps
     with NodeOps with EdgeOps  with NodeDataOps with NodeDataViewOps
-    with NodeIdViewOps  with AtomicIntArrayOps with AtomicBooleanOps 
-    with NodeSHashOps with IOGraphOps {
+    with NodeIdViewOps  with AtomicIntArrayOps with AtomicBooleanOps
+    with GraphBitSetOps with NodeCollectionOps with IOGraphOps {
   /**
    * The name of our DSL. This is the name that will be used in generated files,
    * package declarations, etc.
@@ -33,14 +33,16 @@ trait OptiGraphDSL extends ForgeApplication
     importNodeOps()
     importEdgeOps()
     importNodeDataOps()
-    importNodeSHashOps()
     importAtomicBooleanOps()
     importAtomicIntArrayOps()
     importNodeDataViewOps()
     importNodeIdViewOps()
+    importGraphBitSetOps()
+    importNodeCollectionOps()
     importGraphAggregateOps()
-    importUndirectedGraphOps()
-    importDirectedGraphOps()
+    importCSRUndirectedGraphOps()
+    importCSRDirectedGraphOps()
+    importHABUndirectedGraphOps()
     importIOGraphOps()
   }
 } 

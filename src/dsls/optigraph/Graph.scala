@@ -29,32 +29,12 @@ trait GraphOps{
     val R = tpePar("R")
     val K = tpePar("K")
     val V = tpePar("V")
-    val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
     val Graph = g
     val GraphCommonOps = withTpe(Graph)
     GraphCommonOps{
-      infix ("getHeavyNodeHash") (Nil :: SHashMap(MInt,MInt)) implements getter(0, "_heavyNodes")
-      infix("mapLoadBalancedNodes")( (Node==>R) :: NodeData(R), TNumeric(R), addTpePars=R) implements composite ${
-        //parallel on from function 
-        val heavy = $self.getHeavyNodeHash
-        val data = array_buffer_strict_empty[R]($self.numNodes) 
-        array_buffer_forIndices(data,{n => 
-          if(!heavy.contains(n)) array_buffer_update(data,n,$1(Node(n)))
-          else array_buffer_update(data,n,numeric_zero[R])
-        })
-
-        //parallel on function passed in
-        val keys = heavy.keys
-        var i = 0
-        while(i < array_length(keys)){
-          array_buffer_update(data,array_apply(keys,i),$1(Node(array_apply(keys,i))))
-          i+=1
-        }
-        NodeData(data)
-      }
       //given an ID return a node
       infix("getNodeFromID")(MInt :: Node) implements composite ${
-        val result = NodeIdView($self.getExternalIDs,$self.numNodes).mapreduce[Int]( i => i, (a,b) => a+b, i => $self.getExternalID(i)==$1)
+        val result = NodeIdView($self.numNodes).mapreduce[Int]( i => i, (a,b) => a+b, i => $self.getExternalID(i)==$1)
         if(result >= $self.numNodes() || result < 0) fatal("ERROR. ID: " + $1 + " does not exist in this UndirectedGraph!")
         Node(result)
       }
@@ -67,14 +47,16 @@ trait GraphOps{
       infix("mapNodes")( (Node==>R) :: NodeData(R), addTpePars=R) implements composite ${
         NodeData[R](array_fromfunction($self.numNodes,{n => $1(Node(n))}))
       }
-
+      infix("sumOverNodes")  ( (Node ==> R) :: R, TNumeric(R), addTpePars=R) implements composite ${
+        NodeIdView($self.numNodes).mapreduce[R]({n => $1(Node(n))},{(a,b) => a+b},{n => true})
+      }
       infix ("getExternalIDs") (Nil :: MArray(MInt)) implements getter(0, "_externalIDs")
       infix ("getExternalID") (MInt :: MInt) implements single ${array_apply($self.getExternalIDs,$1)}
       //perform BF traversal
       infix ("inBFOrder") ( CurriedMethodSignature(List(Node,((Node,NodeData(R),NodeData(MInt)) ==> R),((Node,NodeData(R),NodeData(R),NodeData(MInt)) ==> R)),NodeData(R)), TFractional(R), addTpePars=R, effect=simple) implements composite ${
         val levelArray = NodeData[Int]($self.numNodes)
         val bitMap = AtomicIntArray($self.numNodes)
-        val nodes = NodeIdView($self.getExternalIDs,$self.numNodes) 
+        val nodes = NodeIdView($self.numNodes) 
         val forwardComp = NodeData[R]($self.numNodes)
         val reverseComp = NodeData[R]($self.numNodes)
 
@@ -135,12 +117,7 @@ trait GraphOps{
     direct(Graph) ("abs", Nil, NodeData(MDouble) :: NodeData(MDouble)) implements composite ${$0.map(e => math_object_abs(e))}
     direct(Graph) ("abs", Nil, MFloat :: MFloat) implements single ${if($0 > 0) $0 else $0 * -1}
     direct(Graph) ("abs", Nil, NodeData(MFloat) :: NodeData(MFloat)) implements composite ${$0.map(e => abs(e))}
-
-    //a couple of sum methods
-    direct(Graph) ("sum", R, NodeData(R) :: R, TNumeric(R)) implements composite ${$0.reduce((a,b) => a+b)}
-    direct(Graph) ("sum", R, CurriedMethodSignature(List(("nd_view",NodeDataView(MInt)), ("data",MInt==>R) ,("cond",MInt==>MBoolean)),R), TNumeric(R)) implements composite ${nd_view.mapreduce[R]( e => data(e), (a,b) => a+b, cond)}
-    direct(Graph) ("sum", R, NodeData(NodeData(R)) :: NodeData(R), TFractional(R)) implements composite ${$0.reduceNested( ((a,b) => a+b),NodeData[R]($0.length))}
-    
+        
     // "block" should not mutate the input, but always produce a new copy. in this version, block can change the structure of the input across iterations (e.g. increase its size)
     direct (Graph) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, ".0001"), ("minIter", MInt, "1"), ("maxIter", MInt, "100")), ("block", T ==> T), ("diff", (T,T) ==> MDouble)), T)) implements composite ${
       var delta = scala.Double.MaxValue

@@ -28,15 +28,50 @@ trait NodeDataViewOps {
       infix ("apply") (MInt :: T) implements composite ${ array_apply(NodeDataView_data($self), NodeDataView_start($self) + $1) }
       infix ("mapreduce") ( (T ==> R,(R,R) ==> R, T==>MBoolean) :: R, TNumeric(R), addTpePars=(T,R)) implements mapReduce((T,R), 0, ${e => $1(e)}, ${numeric_zero[R]}, ${(a,b) => $2(a,b)}, Some(${c => $3(c)}) )
       infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements foreach(T, 0, ${a => $1(a)})
-      infix ("serialForEach") ((T ==> MUnit) :: MUnit, effect = simple) implements single ${
+      infix ("start") (Nil :: MInt) implements single ${NodeDataView_start($self)}
+
+      infix ("intersect") (NodeDataView(T) :: MInt, TNumeric(T)) implements single ${
+        //simple set intersection
+        var i = 0
+        var t = 0
+        var j = 0
+
+        val small = if($self.length < $1.length) $self else $1          
+        val large = if($self.length < $1.length) $1 else $self
+        while(i < small.length  && j < large.length){
+          var go = large(j) < small(i) 
+          while(go){
+            j += 1
+            if(j < large.length){
+              go = large(j) < small(i) 
+            }
+            else go = false
+          }
+          if(j < large.length){
+            if(small(i)==large(j)){              
+              t += 1
+              j += 1
+            }
+          }
+          i += 1
+        }
+        t
+      }
+
+      infix ("serialForeach") ((T ==> MUnit) :: MUnit, effect = simple) implements single ${
         var i = 0
         while(i < $self.length){
           $1($self(i))
           i += 1
         }
+      }      
+      infix ("print") (Nil :: MUnit, effect = simple) implements single ${
+        var i = 0
+        while(i < $self.length){
+          println("NodeDataView -- Index: " + i + " Data: " + $self(i))
+          i += 1
+        }
       }
-      
-      infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println(a)})
       infix ("getRawArray") (Nil :: MArray(T)) implements composite ${
         val d = array_empty[T]($self.length)
         array_copy(NodeDataView_data($self),NodeDataView_start($self),d,0,$self.length)
@@ -50,5 +85,6 @@ trait NodeDataViewOps {
       
       parallelize as ParallelCollection(T, lookupOp("NodeDataView_illegalalloc"), lookupOp("length"), lookupOverloaded("apply",1), lookupOp("NodeDataView_illegalupdate"))
     }
+    direct(NodeDataView) ("sumOverCollection", (T,R), CurriedMethodSignature(List(("nd_view",NodeDataView(T)), ("data",T==>R) ,("cond",T==>MBoolean)),R), TNumeric(R)) implements composite ${nd_view.mapreduce[R]( e => data(e), (a,b) => a+b, cond)}
   }
 }

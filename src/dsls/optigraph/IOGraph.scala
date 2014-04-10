@@ -176,7 +176,7 @@ trait IOGraphOps {
       val underForHash = 16
       val nodes = idView.map{e => 
         if( filtered_nbrs(e).length*32 >= numNodes ) NodeCollection(GraphBitSet(filtered_nbrs(e).getRawArray))
-        else if( filtered_nbrs(e).length < underForHash ) NodeCollection(filtered_nbrs(e).groupByReduce[Int,Int](e => e, e => e, (a,b) => 0))
+        else if( filtered_nbrs(e).length < underForHash ) NodeCollection(HashSet(filtered_nbrs(e).getRawArray))
         else NodeCollection(filtered_nbrs(e))
       }
       val numEdges = filtered_nbrs.mapreduce[Int]( e => filtered_nbrs.length, (a,b) => a+b, e => true)

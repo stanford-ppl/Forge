@@ -174,23 +174,24 @@ trait IOGraphOps {
         fhashmap_get(idHashMap,a)>fhashmap_get(idHashMap,e),n =>fhashmap_get(idHashMap,n)).sort)
 
       val underForHash = 16
+      val multiplierForBitSet = 32
       val nodes = idView.map{e => 
-        if( filtered_nbrs(e).length*32 >= numNodes ) NodeCollection(GraphBitSet(filtered_nbrs(e).getRawArray))
+        if( filtered_nbrs(e).length*multiplierForBitSet >= numNodes ) NodeCollection(GraphBitSet(filtered_nbrs(e).getRawArray))
         else if( filtered_nbrs(e).length < underForHash ) NodeCollection(HashSet(filtered_nbrs(e).getRawArray))
         else NodeCollection(filtered_nbrs(e))
       }
       val numEdges = filtered_nbrs.mapreduce[Int]( e => filtered_nbrs.length, (a,b) => a+b, e => true)
       
       val numHash = filtered_nbrs.mapreduce[Int]( {e => 
-        if(e.length*32 < numNodes && e.length < underForHash) 1
+        if(e.length*multiplierForBitSet < numNodes && e.length < underForHash) 1
         else 0
       }, (a,b) => a+b, e => true)
       val numArray = filtered_nbrs.mapreduce[Int]( {e => 
-        if(e.length*32 < numNodes && e.length >= underForHash) 1
+        if(e.length*multiplierForBitSet < numNodes && e.length >= underForHash) 1
         else 0
       }, (a,b) => a+b, e => true)   
       val numBitSet = filtered_nbrs.mapreduce[Int]( {e => 
-        if(e.length*32 >= numNodes) 1
+        if(e.length*multiplierForBitSet >= numNodes) 1
         else 0
       }, (a,b) => a+b, e => true)
 

@@ -59,7 +59,7 @@ trait NodeCollectionOps {
         if($self.colType == 0 && $1.colType == 0){
           //logical and
           val bs = nc_getgraphbitset($self)
-          val a = (bs & nc_getgraphbitset($1)).cardinality        
+          val a = bs.andCardinality(nc_getgraphbitset($1))      
           a
         }
         // 2. BS & NDV

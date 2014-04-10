@@ -31,7 +31,6 @@ trait CSRUndirectedGraphOps{
     val R = tpePar("R")
     val K = tpePar("K")
     val V = tpePar("V")
-    val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
 
     data(CSRUndirectedGraph,("_numNodes",MInt),("_externalIDs",MArray(MInt)),("_nodes",MArray(MInt)),("_edges",MArray(MInt))) 
     static(CSRUndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt))), CSRUndirectedGraph))) implements allocates(CSRUndirectedGraph,${$count},${$exID},${$outNodes},${outEdges})

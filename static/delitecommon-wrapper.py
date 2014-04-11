@@ -6,7 +6,7 @@ import ConfigParser
 DELITE_HOME = os.getenv("DELITE_HOME")
 
 scala_virt_prefix = "org.scala-lang.virtualized."
-scala_virt_version = "scala-2.10.2-RC1"
+scala_virt_version = "scala-2.10.2"
 scala_major_id = '.'.join(scala_virt_version.split('.')[0:2])
 script_path = os.path.dirname(__file__)
 # base directory for the project (either DSL or Delite or ?) i.e. drops the '/bin' from script_path

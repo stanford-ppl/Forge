@@ -22,8 +22,6 @@ libraryDependencies += "org.scala-lang.virtualized" % "scala-library" % virtScal
 
 libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % virtScala
 
-libraryDependencies += "org.scala-lang" % "scala-actors" % virtScala // for ScalaTest
-
 libraryDependencies += scalaTest
 
 // tests are not thread safe

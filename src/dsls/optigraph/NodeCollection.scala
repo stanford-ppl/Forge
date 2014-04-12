@@ -77,7 +77,7 @@ trait NodeCollectionOps {
           //simple set intersection
           val nbrs = nc_getnodedata($self)
           val nbrsOfNbrs = nc_getnodedata($1)
-          nbrs.intersect(nbrsOfNbrs)
+          nd_intersect(nbrs.getRawArray,nbrsOfNbrs.getRawArray)
         }
         // 4. NDV and Hash
         else if ( ($self.colType == 2 && $1.colType == 1) || ($self.colType == 1 && $1.colType == 2) ){
@@ -100,7 +100,7 @@ trait NodeCollectionOps {
         // 6. BS and Hash
         else {
           val hs = if($self.colType==2) nc_gethashset_keydata($0) else nc_gethashset_keydata($1)
-          val bs = if($self.colType==1) nc_getgraphbitset($self) else nc_getgraphbitset($1)
+          val bs = if($self.colType==0) nc_getgraphbitset($self) else nc_getgraphbitset($1)
           hs.mapreduce[Int]({n => 
             if(bs(n)) 1
             else 0

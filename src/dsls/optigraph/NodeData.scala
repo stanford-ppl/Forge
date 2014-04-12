@@ -54,7 +54,6 @@ trait NodeDataOps {
       }
       infix("sort")(Nil :: NodeData(T),TNumeric(T)) implements composite ${NodeData(array_sort($self.getRawArray))}
 
-
       ///////////parallel operations////////////////////////////
       infix ("-") (NodeData(T) :: NodeData(T), TNumeric(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a-b })
       infix ("+") (NodeData(T) :: NodeData(T), TNumeric(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a+b })
@@ -71,25 +70,26 @@ trait NodeDataOps {
       infix ("distinct") (Nil :: NodeData(T)) implements composite ${NodeData(fhashmap_keys($0.groupByReduce[T,Int](e => e, e=>0,(a,b)=>0)))}
 
       infix ("intersect") (NodeData(T) :: MInt, TNumeric(T)) implements single ${
-        val nbrs = $self
+        val nbrs = $0
         val nbrsOfNbrs = $1
         var i = 0
         var t = 0
         var j = 0
-        val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
-        val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
-        while(i < small.length  && j < large.length){
-          while(j < large.length && large(j) < small(i)){
-            j += 1
-          }
-          if(j < large.length && small(i)==large(j)){              
+
+        while(i < nbrs.length && j < nbrsOfNbrs.length){
+          if(nbrs(i)==nbrsOfNbrs(j)){             
             t += 1
+            i += 1
             j += 1
           }
-          i += 1
+          else if(nbrs(i) < nbrsOfNbrs(j))
+            i += 1
+          else
+            j += 1
         }
         t
       }
+
       /////////////////////////debug operations (print serial & parallel)///////////////////////
       infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println("NodeData: " + a)})
       infix ("forindicies") ((MInt ==> MUnit) :: MUnit, effect = simple) implements composite ${
@@ -126,5 +126,25 @@ trait NodeDataOps {
     direct(NodeData) ("sum", R, NodeData(R) :: R, TNumeric(R)) implements composite ${$0.reduce((a,b) => a+b)}
     direct(NodeData) ("sum", R, NodeData(NodeData(R)) :: NodeData(R), TFractional(R)) implements composite ${$0.reduceNested( ((a,b) => a+b),NodeData[R]($0.length))}
     compiler (NodeData) ("nd_fake_alloc", Nil, Nil :: NodeData(MInt)) implements single ${ NodeData(0) }
+    compiler (NodeData) ("nd_intersect", Nil, (MArray(MInt),MArray(MInt)) :: MInt) implements codegen($cala, ${ 
+      val nbrs = $0
+      val nbrsOfNbrs = $1
+      var i = 0
+      var t = 0
+      var j = 0
+      val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
+      val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
+      while(i < small.length  && j < large.length){
+        while(j < large.length && large(j) < small(i)){
+          j += 1
+        }
+        if(j < large.length && small(i)==large(j)){              
+          t += 1
+          j += 1
+        }
+        i += 1
+      }
+      t
+    })
   } 
 }

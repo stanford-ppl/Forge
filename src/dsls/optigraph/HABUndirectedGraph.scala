@@ -42,7 +42,7 @@ trait HABUndirectedGraphOps{
       infix ("numArray")(Nil :: MInt) implements getter(0,"_numArray")
       infix ("numHash")(Nil :: MInt) implements getter(0,"_numHash")
       infix ("numBitSet")(Nil :: MInt) implements getter(0,"_numBitSet")
-
+     
       //needed for graph common ops
       infix ("outNbrs") (Node :: NodeCollection) implements single ${$self.neighbors($1.id)}
       infix ("inNbrs") (Node :: NodeCollection) implements single ${$self.neighbors($1.id)}

@@ -31,44 +31,25 @@ trait NodeDataViewOps {
       infix ("start") (Nil :: MInt) implements single ${NodeDataView_start($self)}
 
       infix ("intersect") (NodeDataView(T) :: MInt, TNumeric(T)) implements single ${
-        //simple set intersection
-        //val start = startTimer("NDV Intersect",$self.length,$1.length)
-        if($self.length == 0 || $1.length == 0) 0
-        else if($self(0) > $1($1.length-1) || 
-          $1(0) > $self($self.length-1)){
-          0
-        }
-        else{
-          var i = 0
-          var t = 0
-          var j = 0
-
-          val small = if($self.length < $1.length) $self else $1          
-          val large = if($self.length < $1.length) $1 else $self
-
-          while(i < small.length  && j < large.length){
-            var go = large(j) < small(i) 
-            while(go){
-              j += 1
-              if(j < large.length){
-                go = large(j) < small(i) 
-              }
-              else go = false
-            }
-            if(j < large.length){
-              if(small(i)==large(j)){              
-                t += 1
-                j += 1
-              }
-            }
-            i += 1
+        val nbrs = $self
+        val nbrsOfNbrs = $1
+        var i = 0
+        var t = 0
+        var j = 0
+        val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
+        val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
+        while(i < small.length  && j < large.length){
+          while(j < large.length && large(j) < small(i)){
+            j += 1
           }
-          val a = t
-          //stopTimer("NDV Intersect",start,a)
-          t
+          if(j < large.length && small(i)==large(j)){              
+            t += 1
+            j += 1
+          }
+          i += 1
         }
+        t
       }
-
       infix ("serialForeach") ((T ==> MUnit) :: MUnit, effect = simple) implements single ${
         var i = 0
         while(i < $self.length){

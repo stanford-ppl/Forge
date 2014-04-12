@@ -52,14 +52,13 @@ trait NodeCollectionOps {
         else if($self.colType == 1) nc_getnodedata($self).length
         else nc_gethashset($self).length       
       }
-
       infix ("intersect") (NodeCollection :: MInt) implements single ${
         //Needs to be 3 options 
         // 1. BS & BS
         if($self.colType == 0 && $1.colType == 0){
           //logical and
           val bs = nc_getgraphbitset($self)
-          val a = bs.andCardinality(nc_getgraphbitset($1))      
+          val a = (bs & nc_getgraphbitset($1)).cardinality        
           a
         }
         // 2. BS & NDV
@@ -76,31 +75,9 @@ trait NodeCollectionOps {
         // 3. NDV & NDV
         else if ($self.colType == 1 && $1.colType == 1){
           //simple set intersection
-
-          var i = 0
-          var t = 0
-          var j = 0
-
-          val small = if($self.length < $1.length) nc_getnodedata($self) else nc_getnodedata($1)          
-          val large = if($self.length < $1.length) nc_getnodedata($1) else nc_getnodedata($self)
-          while(i < small.length  && j < large.length){
-            var go = large(j) < small(i) 
-            while(go){
-              j += 1
-              if(j < large.length){
-                go = large(j) < small(i) 
-              }
-              else go = false
-            }
-            if(j < large.length){
-              if(small(i)==large(j)){              
-                t += 1
-                j += 1
-              }
-            }
-            i += 1
-          }
-          t
+          val nbrs = nc_getnodedata($self)
+          val nbrsOfNbrs = nc_getnodedata($1)
+          nbrs.intersect(nbrsOfNbrs)
         }
         // 4. NDV and Hash
         else if ( ($self.colType == 2 && $1.colType == 1) || ($self.colType == 1 && $1.colType == 2) ){
@@ -140,7 +117,6 @@ trait NodeCollectionOps {
         else if(nc.colType == 1) nc_getnodedata(nc).mapreduce[R](data,{(a,b) => a+b},cond)
         else nc_gethashset_keydata(nc).mapreduce[R](data,{(a,b) => a+b},cond)      
     }
-
     compiler (NodeCollection) ("nc_0", Nil, Nil :: MInt) implements single ${ 0 }
     compiler (NodeCollection) ("nc_1", Nil, Nil :: MInt) implements single ${ 1 }
     compiler (NodeCollection) ("nc_2", Nil, Nil :: MInt) implements single ${ 2 }

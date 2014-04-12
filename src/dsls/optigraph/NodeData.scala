@@ -70,6 +70,26 @@ trait NodeDataOps {
       infix ("mapreduce") ( (T ==> R,(R,R) ==> R, T==>MBoolean) :: R, TNumeric(R), addTpePars=(R)) implements mapReduce((T,R), 0, ${e => $1(e)}, ${numeric_zero[R]}, ${(a,b) => $2(a,b)}, Some(${c => $3(c)}) )
       infix ("distinct") (Nil :: NodeData(T)) implements composite ${NodeData(fhashmap_keys($0.groupByReduce[T,Int](e => e, e=>0,(a,b)=>0)))}
 
+      infix ("intersect") (NodeData(T) :: MInt, TNumeric(T)) implements single ${
+        val nbrs = $self
+        val nbrsOfNbrs = $1
+        var i = 0
+        var t = 0
+        var j = 0
+        val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
+        val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
+        while(i < small.length  && j < large.length){
+          while(j < large.length && large(j) < small(i)){
+            j += 1
+          }
+          if(j < large.length && small(i)==large(j)){              
+            t += 1
+            j += 1
+          }
+          i += 1
+        }
+        t
+      }
       /////////////////////////debug operations (print serial & parallel)///////////////////////
       infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println("NodeData: " + a)})
       infix ("forindicies") ((MInt ==> MUnit) :: MUnit, effect = simple) implements composite ${

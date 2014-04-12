@@ -40,7 +40,6 @@ trait IOGraphOps {
       }
       xfs.close()
     })
-
     direct (IO) ("csrPrunedUndirectedGraphFromEdgeList", Nil, MString :: CSRUndirectedGraph) implements composite ${
       val input_edges =
         ForgeFileReader.readLinesFlattened($0)({line =>
@@ -173,7 +172,7 @@ trait IOGraphOps {
       val filtered_nbrs = distinct_ids.map(e => NodeData(src_groups(e)).filter(a => 
         fhashmap_get(idHashMap,a)>fhashmap_get(idHashMap,e),n =>fhashmap_get(idHashMap,n)).sort)
 
-      val underForHash = 16
+      val underForHash = 0
       val multiplierForBitSet = 32
       val nodes = idView.map{e => 
         if( filtered_nbrs(e).length*multiplierForBitSet >= numNodes ) NodeCollection(GraphBitSet(filtered_nbrs(e).getRawArray))

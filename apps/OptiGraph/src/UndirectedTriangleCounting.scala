@@ -11,6 +11,7 @@ object UndirectedTriangleCountingInterpreter extends OptiGraphApplicationInterpr
 trait UndirectedTriangleCounting extends OptiGraphApplication {
   def main() = {
     println("UndirectedTriangleCounting")
+
     if (args.length < 1) printUsage
 
     //Works for both directed and undirected, performance 

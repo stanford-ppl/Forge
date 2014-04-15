@@ -51,8 +51,8 @@ trait ForgeHashMapOpsExp extends DeliteMapOpsExp {
     case e@ExtSHashMapKeys(x) => reflectPure(ExtSHashMapKeys(f(x))(e.mK,e.mV))
     case e@ExtSHashMapValues(x) => reflectPure(ExtSHashMapValues(f(x))(e.mK,e.mV))
 
-    case Reflect(e@ExtSHashMapKeys(x), u, es) => reflectMirrored(Reflect(ExtSHashMapKeys(f(x))(e.mK,e.mV), mapOver(f,u), f(es)))(mtype(manifest[A]))
-    case Reflect(e@ExtSHashMapValues(x), u, es) => reflectMirrored(Reflect(ExtSHashMapValues(f(x))(e.mK,e.mV), mapOver(f,u), f(es)))(mtype(manifest[A]))
+    case Reflect(e@ExtSHashMapKeys(x), u, es) => reflectMirrored(Reflect(ExtSHashMapKeys(f(x))(e.mK,e.mV), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case Reflect(e@ExtSHashMapValues(x), u, es) => reflectMirrored(Reflect(ExtSHashMapValues(f(x))(e.mK,e.mV), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e,f)
   }).asInstanceOf[Exp[A]] // why??
 }

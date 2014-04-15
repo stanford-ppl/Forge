@@ -630,7 +630,7 @@ trait DeliteGenOps extends BaseGenOps {
       def emitDeliteEffectfulMirror(suffix: String = "") {
         stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o, suffix) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o, suffix) + xformArgs + implicitsWithParens)
         stream.print(", mapOver(f,u), f(es)))")
-        stream.println("(mtype(manifest[A]))")
+        stream.println("(mtype(manifest[A]), pos)")
       }
 
       Impls(o) match {
@@ -660,7 +660,7 @@ trait DeliteGenOps extends BaseGenOps {
           // effectful version
           stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(" + makeOpNodeName(o) + xformArgs + implicitsWithParens)
           stream.print(", mapOver(f,u), f(es)))")
-          stream.println("(mtype(manifest[A]))")
+          stream.println("(mtype(manifest[A]), pos)")
         case _:GroupBy | _:GroupByReduce =>
           emitDelitePureMirror("Keys")
           emitDeliteEffectfulMirror("Keys")

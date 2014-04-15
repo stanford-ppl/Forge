@@ -73,9 +73,9 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
     case ArrayLength(a) => scala_array_length(f(a))(mtype(manifest[A]),pos)
     case ArrayStringSplit(a,b,l) => array_string_split(f(a),f(b),f(l))(pos)
 
-    case Reflect(ArrayApply(a,x), u, es) => reflectMirrored(Reflect(ArrayApply(f(a),f(x))(mtype(manifest[A])), mapOver(f,u), f(es)))(mtype(manifest[A]))
-    case Reflect(ArrayLength(a), u, es) => reflectMirrored(Reflect(ArrayLength(f(a))(mtype(manifest[A])), mapOver(f,u), f(es)))(mtype(manifest[A]))
-    case Reflect(ArrayStringSplit(a,b,l), u, es) => reflectMirrored(Reflect(ArrayStringSplit(f(a),f(b),f(l)), mapOver(f,u), f(es)))(mtype(manifest[A]))
+    case Reflect(ArrayApply(a,x), u, es) => reflectMirrored(Reflect(ArrayApply(f(a),f(x))(mtype(manifest[A])), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case Reflect(ArrayLength(a), u, es) => reflectMirrored(Reflect(ArrayLength(f(a))(mtype(manifest[A])), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case Reflect(ArrayStringSplit(a,b,l), u, es) => reflectMirrored(Reflect(ArrayStringSplit(f(a),f(b),f(l)), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e,f)
   }).asInstanceOf[Exp[A]] // why??
 

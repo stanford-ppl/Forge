@@ -115,8 +115,8 @@ trait IOGraphOps {
         })
        NodeData[Tup2[Int,Int]](input_edges).distinct
     }
-    direct (IO) ("createMeshEdgeList", Nil, Nil :: NodeData(Tuple2(MInt,MInt))) implements composite ${
-      val meshSize = 500
+    direct (IO) ("createMeshEdgeList", Nil, MInt :: NodeData(Tuple2(MInt,MInt))) implements composite ${
+      val meshSize = $0
       NodeData(array_fromfunction(meshSize,e => e)).flatMap{ e =>
         NodeData(array_fromfunction(meshSize,z => z)).map( z => pack(z,e))
       }.distinct
@@ -155,7 +155,7 @@ trait IOGraphOps {
       CSRUndirectedGraph(numNodes,distinct_ids.getRawArray,serial_out,src_edge_array.getRawArray)
     }
 
-    direct (IO) ("habPrunedUndirectedGraphFromEdgeList", Nil, ("edge_data",NodeData(Tuple2(MInt,MInt))) :: HABUndirectedGraph) implements composite ${
+    direct (IO) ("habPrunedUndirectedGraphFromEdgeList", Nil, (("edge_data",NodeData(Tuple2(MInt,MInt))),("underForHash",MInt),("bitSetMultiplier",MInt)) :: HABUndirectedGraph) implements composite ${
       val numEdges = edge_data.length
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
 
@@ -192,8 +192,6 @@ trait IOGraphOps {
         e.print
       }
 */
-      val bitSetMultiplier = 0
-      val underForHash =  -1
       val bitSetNeighborhoods = filtered_nbrs2.filter(e => e.length*bitSetMultiplier >= numNodes, e => GraphBitSet(e.getRawArray))
       val hashNeighborhoods = filtered_nbrs2.filter(e => ((e.length*bitSetMultiplier < numNodes) && (e.length <= underForHash)), e => HashSet(e.getRawArray))
       val csrNeighborhoods = filtered_nbrs2.filter(e => ((e.length*bitSetMultiplier < numNodes) && (e.length > underForHash)), e => e)

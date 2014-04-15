@@ -146,30 +146,33 @@ trait BitSetOps {
     //just looping around the integers and calling the set method.
     //This could happen in parallel.  Theoretically seemed more complex to code using parallel OPs though.
     compiler (BitSet) ("bs_alloc_from_int_array", Nil, MArray(MInt) :: MArray(MLong)) implements single ${
-      val sortedInput = bs_alloc_sort_array_in($0)
-      //instead of sorting find max, place ints into numWords buckets, allocate in parallel with a map
-      val words = array_empty[Long](bs_get_alloc_length(sortedInput(array_length(sortedInput)-1)))
-      //Loop over my array of ints, setting integer indexes in bitset.
-      var i = 0
-      while(i < array_length(sortedInput)){
-        var cur = sortedInput(i)
-        var wordIndex = bs_word_index(cur)
-        var setValue = 1L << cur
-        var sameWord = true
-        //Let's set all indicies same word at once.
-        i += 1
-        while(i < array_length(sortedInput) && sameWord){
-          //Are values in the same word?
-          if(bs_word_index(sortedInput(i))==wordIndex){
-            cur = sortedInput(i)
-            setValue = setValue | (1L << cur)
-            i += 1
-          } else sameWord = false
+      if(array_length($0) == 0) array_empty_imm[Long](0)
+      else{
+        val sortedInput = bs_alloc_sort_array_in($0)
+        //instead of sorting find max, place ints into numWords buckets, allocate in parallel with a map
+        val words = array_empty[Long](bs_get_alloc_length(sortedInput(array_length(sortedInput)-1)))
+        //Loop over my array of ints, setting integer indexes in bitset.
+        var i = 0
+        while(i < array_length(sortedInput)){
+          var cur = sortedInput(i)
+          var wordIndex = bs_word_index(cur)
+          var setValue = 1L << cur
+          var sameWord = true
+          //Let's set all indicies same word at once.
+          i += 1
+          while(i < array_length(sortedInput) && sameWord){
+            //Are values in the same word?
+            if(bs_word_index(sortedInput(i))==wordIndex){
+              cur = sortedInput(i)
+              setValue = setValue | (1L << cur)
+              i += 1
+            } else sameWord = false
+          }
+          //Set the current word and head off to the next.
+          array_update(words,wordIndex,setValue)
         }
-        //Set the current word and head off to the next.
-        array_update(words,wordIndex,setValue)
+        words
       }
-      words
     }
     //I sepearate this out in hopes that the compiler is smart enough not to do this work twice on allocations.
     compiler (BitSet) ("bs_alloc_sort_array_in", Nil, MArray(MInt) :: MArray(MInt)) implements single ${array_sort($0)}

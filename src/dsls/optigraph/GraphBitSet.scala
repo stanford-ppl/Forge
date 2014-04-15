@@ -65,6 +65,6 @@ trait GraphBitSetOps {
     }
 
     //fake out allocate for my NodeCollection routine
-    compiler (GraphBitSet) ("gbs_fake_alloc", Nil, Nil :: GraphBitSet) implements single ${GraphBitSet(BitSet(0))}
+    compiler (GraphBitSet) ("gbs_fake_alloc", Nil, Nil :: GraphBitSet) implements single ${GraphBitSet(BitSet(array_empty_imm[Long](0),0))}
   }
 }

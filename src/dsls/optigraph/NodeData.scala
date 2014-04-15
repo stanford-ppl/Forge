@@ -60,7 +60,7 @@ trait NodeDataOps {
       //infix ("sum") (Nil :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${ (a,b) => a+b })
       infix ("map") ((T ==> R) :: NodeData(R), addTpePars = R) implements map((T,R), 0, ${ e => $1(e) })
       infix ("flatMap") ((T ==> NodeData(R)) :: NodeData(R), addTpePars = R) implements flatMap((T,R), 0, ${ e => $1(e) })
-      infix ("filter") ( ((T ==> MBoolean),(T ==> MInt)) :: NodeData(MInt)) implements filter((T,MInt), 0, ${w => $1(w)}, ${e => $2(e)})
+      infix ("filter") ( ((T ==> MBoolean),(T ==> R)) :: NodeData(R), addTpePars = R) implements filter((T,R), 0, ${w => $1(w)}, ${e => $2(e)})
       infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements foreach(T, 0, ${ e => $1(e) })
       infix ("reduce") (((T,T) ==> T) :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${ (a,b) => $1(a,b) })
       infix ("reduceNested") ( (((T,T) ==> T),R):: T,addTpePars=R) implements reduce(T, 0, ${$2.asInstanceOf[Rep[T]]}, ${(a,b) => $1(a,b)})
@@ -68,27 +68,6 @@ trait NodeDataOps {
       infix ("groupByReduce") ((T ==> K,T ==> V,(V,V) ==> V) :: MHashMap(K, V), TNumeric(V), addTpePars = (K,V)) implements groupByReduce((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)}, ${numeric_zero[V]}, ${(a,b) => $3(a,b)})
       infix ("mapreduce") ( (T ==> R,(R,R) ==> R, T==>MBoolean) :: R, TNumeric(R), addTpePars=(R)) implements mapReduce((T,R), 0, ${e => $1(e)}, ${numeric_zero[R]}, ${(a,b) => $2(a,b)}, Some(${c => $3(c)}) )
       infix ("distinct") (Nil :: NodeData(T)) implements composite ${NodeData(fhashmap_keys($0.groupByReduce[T,Int](e => e, e=>0,(a,b)=>0)))}
-
-      infix ("intersect") (NodeData(T) :: MInt, TNumeric(T)) implements single ${
-        val nbrs = $0
-        val nbrsOfNbrs = $1
-        var i = 0
-        var t = 0
-        var j = 0
-
-        while(i < nbrs.length && j < nbrsOfNbrs.length){
-          if(nbrs(i)==nbrsOfNbrs(j)){             
-            t += 1
-            i += 1
-            j += 1
-          }
-          else if(nbrs(i) < nbrsOfNbrs(j))
-            i += 1
-          else
-            j += 1
-        }
-        t
-      }
 
       /////////////////////////debug operations (print serial & parallel)///////////////////////
       infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println("NodeData: " + a)})
@@ -126,25 +105,5 @@ trait NodeDataOps {
     direct(NodeData) ("sum", R, NodeData(R) :: R, TNumeric(R)) implements composite ${$0.reduce((a,b) => a+b)}
     direct(NodeData) ("sum", R, NodeData(NodeData(R)) :: NodeData(R), TFractional(R)) implements composite ${$0.reduceNested( ((a,b) => a+b),NodeData[R]($0.length))}
     compiler (NodeData) ("nd_fake_alloc", Nil, Nil :: NodeData(MInt)) implements single ${ NodeData(0) }
-    compiler (NodeData) ("nd_intersect", Nil, (MArray(MInt),MArray(MInt)) :: MInt) implements codegen($cala, ${ 
-      val nbrs = $0
-      val nbrsOfNbrs = $1
-      var i = 0
-      var t = 0
-      var j = 0
-      val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
-      val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
-      while(i < small.length  && j < large.length){
-        while(j < large.length && large(j) < small(i)){
-          j += 1
-        }
-        if(j < large.length && small(i)==large(j)){              
-          t += 1
-          j += 1
-        }
-        i += 1
-      }
-      t
-    })
   } 
 }

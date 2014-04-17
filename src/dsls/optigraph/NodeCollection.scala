@@ -52,23 +52,23 @@ trait NodeCollectionOps {
         else if($self.colType == 1) nc_getNodeDataView($self).length
         else nc_gethashset($self).length       
       }
-      infix ("intersect") (NodeCollection :: MInt) implements single ${
+      infix ("intersect") (NodeCollection :: MLong) implements single ${
         //Needs to be 3 options 
         // 1. BS & BS
         if($self.colType == 0 && $1.colType == 0){
           //logical and
           val bs = nc_getgraphbitset($self)
           val a = (bs & nc_getgraphbitset($1)).cardinality        
-          a
+          a.toLong
         }
         // 2. BS & NDV
         else if ( ($self.colType == 0 && $1.colType == 1) || ($self.colType == 1 && $1.colType == 0) ){
           //go through NDV probe BS
           val bs = if($self.colType==0) nc_getgraphbitset($self) else nc_getgraphbitset($1)
           val ndv = if($self.colType==1) nc_getNodeDataView($self) else nc_getNodeDataView($1)
-          val a = ndv.mapreduce[Int]({ n => 
-            if(bs(n)) 1
-            else 0
+          val a = ndv.mapreduce[Long]({ n => 
+            if(bs(n)) 1l
+            else 0l
           },(a,b) => a+b, e => true)         
           a
         }
@@ -83,35 +83,29 @@ trait NodeCollectionOps {
         else if ( ($self.colType == 2 && $1.colType == 1) || ($self.colType == 1 && $1.colType == 2) ){
           val hs = if($self.colType==2) nc_gethashset($self) else nc_gethashset($1)
           val ndv = if($self.colType==1) nc_getNodeDataView($self) else nc_getNodeDataView($1)
-          ndv.mapreduce[Int]({n => 
-            if(hs.contains(n)) 1
-            else 0
+          ndv.mapreduce[Long]({n => 
+            if(hs.contains(n)) 1l
+            else 0l
           },(a,b) => a+b, e => true)
         }
         // 4. Hash and Hash
         else if ($self.colType == 2 && $1.colType == 2){
           val hsSmall = if($self.length > $1.length) nc_gethashset($1) else nc_gethashset($self)
           val hsLarge = if($self.length <= $1.length) nc_gethashset_keydata($1) else nc_gethashset_keydata($self)
-          hsLarge.mapreduce[Int]({n => 
-            if(hsSmall.contains(n)) 1
-            else 0
+          hsLarge.mapreduce[Long]({n => 
+            if(hsSmall.contains(n)) 1l
+            else 0l
           },(a,b) => a+b, e => true)
         }
         // 6. BS and Hash
         else {
           val hs = if($self.colType==2) nc_gethashset_keydata($0) else nc_gethashset_keydata($1)
           val bs = if($self.colType==0) nc_getgraphbitset($self) else nc_getgraphbitset($1)
-          hs.mapreduce[Int]({n => 
-            if(bs(n)) 1
-            else 0
+          hs.mapreduce[Long]({n => 
+            if(bs(n)) 1l
+            else 0l
           },(a,b) => a+b, e => true)
         }
-      }
-      infix("countTriangles")((("data",MInt==>MInt),("cond",MInt==>MBoolean)) :: MInt) implements composite ${
-        val nc = $self
-        if(nc.colType == 0) nc_getgraphbitset(nc).mapreduce[Int](data,{(a,b) => a+b},cond)
-        else if(nc.colType == 1) nc_getNodeDataView(nc).mapreduce[Int](data,{(a,b) => a+b},cond)
-        else nc_gethashset_keydata(nc).mapreduce[Int](data,{(a,b) => a+b},cond)   
       }
       compiler ("nc_getgraphbitset") (Nil :: GraphBitSet) implements getter(0, "_dataBS")
       compiler ("nc_getNodeDataView") (Nil :: NodeDataView(MInt)) implements getter(0, "_dataNV")

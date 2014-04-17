@@ -30,23 +30,23 @@ trait NodeDataViewOps {
       infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements foreach(T, 0, ${a => $1(a)})
       infix ("start") (Nil :: MInt) implements single ${NodeDataView_start($self)}
 
-      infix ("intersect") (NodeDataView(T) :: MInt, TNumeric(T)) implements single ${
+      infix ("intersect") (NodeDataView(T) :: MLong, TNumeric(T)) implements single ${
         val nbrs = $self
         val nbrsOfNbrs = $1
-        if(nbrs.length == 0 || nbrsOfNbrs.length == 0) 0
+        if(nbrs.length == 0 || nbrsOfNbrs.length == 0) 0l
         else if(nbrs(0) > nbrsOfNbrs(nbrsOfNbrs.length-1) || 
           nbrsOfNbrs(0) > nbrs(nbrs.length-1)){
-          0
+          0l
         }
         else{
           ndv_intersect_sets(nbrs,nbrsOfNbrs)
         }
       }
-      compiler ("ndv_intersect_sets") (NodeDataView(T) :: MInt, TNumeric(T)) implements single ${
+      compiler ("ndv_intersect_sets") (NodeDataView(T) :: MLong, TNumeric(T)) implements single ${
         val nbrs = $self
         val nbrsOfNbrs = $1
         var i = 0
-        var t = 0
+        var t = 0l
         var j = 0
         val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
         val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs

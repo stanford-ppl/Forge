@@ -13,9 +13,9 @@ trait ProfilingOpsExp extends BaseFatExp with EffectExp {
   case class ForgeProfileTime(deps: List[Exp[Any]]) extends Def[Long]
 
   override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = (e match {
-    case Reflect(ForgeProfileStart(c,deps), u, es) => reflectMirrored(Reflect(ForgeProfileStart(f(c),f(deps)), mapOver(f,u), f(es)))(mtype(manifest[A]))
-    case Reflect(ForgeProfileStop(c,deps), u, es) => reflectMirrored(Reflect(ForgeProfileStop(f(c),f(deps)), mapOver(f,u), f(es)))(mtype(manifest[A]))
-    case Reflect(ForgeProfileTime(deps), u, es) => reflectMirrored(Reflect(ForgeProfileTime(f(deps)), mapOver(f,u), f(es)))(mtype(manifest[A]))
+    case Reflect(ForgeProfileStart(c,deps), u, es) => reflectMirrored(Reflect(ForgeProfileStart(f(c),f(deps)), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case Reflect(ForgeProfileStop(c,deps), u, es) => reflectMirrored(Reflect(ForgeProfileStop(f(c),f(deps)), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case Reflect(ForgeProfileTime(deps), u, es) => reflectMirrored(Reflect(ForgeProfileTime(f(deps)), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e,f)
   }).asInstanceOf[Exp[A]]
 

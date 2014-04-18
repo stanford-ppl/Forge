@@ -81,8 +81,8 @@ trait BLASOpsExp extends BLASOps with DenseMatrixOpsExp {
     case e@Native_matMult(xR,xC,x,yR,yC,y) => reflectPure(new { override val original = Some(f,e) } with Native_matMult(f(xR),f(xC),f(x),f(yR),f(yC),f(y))(e._mT,pos,e.__imp0))(mtype(manifest[A]),pos)
     case e@Native_matTimesVec(xR,xC,x,y) => reflectPure(new { override val original = Some(f,e) } with Native_matTimesVec(f(xR),f(xC),f(x),f(y))(e._mT,pos,e.__imp0))(mtype(manifest[A]),pos)
 
-    case Reflect(e@Native_matMult(xR,xC,x,yR,yC,y), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_matMult(f(xR),f(xC),f(x),f(yR),f(yC),f(y))(e._mT,pos,e.__imp0), mapOver(f,u), f(es)))(mtype(manifest[A]))
-    case Reflect(e@Native_matTimesVec(xR,xC,x,y), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_matTimesVec(f(xR),f(xC),f(x),f(y))(e._mT,pos,e.__imp0), mapOver(f,u), f(es)))(mtype(manifest[A]))
+    case Reflect(e@Native_matMult(xR,xC,x,yR,yC,y), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_matMult(f(xR),f(xC),f(x),f(yR),f(yC),f(y))(e._mT,pos,e.__imp0), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case Reflect(e@Native_matTimesVec(xR,xC,x,y), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_matTimesVec(f(xR),f(xC),f(x),f(y))(e._mT,pos,e.__imp0), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e,f)
   }).asInstanceOf[Exp[A]]
 }

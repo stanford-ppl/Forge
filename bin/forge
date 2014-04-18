@@ -12,6 +12,7 @@ USER_HOME = os.getenv("HOME")
 FORGE_HOME = os.getenv("FORGE_HOME")
 LMS_HOME = os.getenv("LMS_HOME")
 JAVA_HOME = os.getenv("JAVA_HOME")
+HYPER_HOME = os.getenv("HYPER_HOME")
 
 scala_major_id = "scala-2.10"
 lms_version = "lms_2.10"
@@ -52,7 +53,7 @@ def checkEnv():
     global FORGE_HOME
     global USER_HOME
     global JAVA_HOME
-    global SCALA_VIRT_HOME
+    global HYPER_HOME
     global LMS_HOME
 
     if FORGE_HOME is None:
@@ -62,11 +63,14 @@ def checkEnv():
         else:
             err("The FORGE_HOME environment variable must be defined")
 
+    if HYPER_HOME is None:
+        HYPER_HOME = FORGE_HOME
+
     if JAVA_HOME is None:
         err("The JAVA_HOME environment variable must be defined.")
 
     if LMS_HOME is None:
-          lms_home = FORGE_HOME + "/lib_managed/jars/EPFL/" + lms_version + "/"
+          lms_home = HYPER_HOME + "/lib_managed/jars/EPFL/" + lms_version + "/"
           if not os.path.isdir(lms_home):
               err("couldn't find the LMS library at: " + lms_home + ". Please set the LMS_HOME environment variable.")
 
@@ -97,7 +101,7 @@ def stage(runner, params, opts):
 
     # add all managed libs 
     # caveat: scalatest pulls in some non-virtualized scala dependencies which conflict with the scala-virtualized versions
-    jars = [os.path.join(d,f) for (d, n, fs) in os.walk(script_home + "/lib_managed/") if not (d.count("org.scala-lang") > 0 and d.count("virtualized") == 0) for f in fs]
+    jars = [os.path.join(d,f) for (d, n, fs) in os.walk(HYPER_HOME + "/lib_managed/") if not (d.count("org.scala-lang") > 0 and d.count("virtualized") == 0) for f in fs]
     for j in jars:
       cp = cp + j + os.pathsep
 

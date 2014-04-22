@@ -31,9 +31,8 @@ trait UndirectedTriangleCounting extends OptiGraphApplication {
     
     val t = g.sumOverNodes{ n =>
       val nbrs = g.neighbors(n)    
-     sumOverCollection(nbrs){ nbr =>
-        val nbrsOfNbrs = g.neighbors(nbr)
-        nbrs.intersect(nbrsOfNbrs)
+      sumOverCollection(nbrs){ nbr =>
+          nbrs.intersect(g.neighbors(nbr))
       }{e => true}
     }
 

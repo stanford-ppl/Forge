@@ -14,7 +14,7 @@ trait SVM extends FileUtil {
   /////////////
   // training
 
-  def train(X: Rep[TrainingSet[Int,Int]], C: Rep[Double], tol: Rep[Double], maxPasses: Rep[Int]) = {
+  def train(X: Rep[TrainingSet[Double,Double]], C: Rep[Double], tol: Rep[Double], maxPasses: Rep[Int]) = {
     println("Training SVM using the SMO algorithm")
 
     // init
@@ -126,7 +126,7 @@ trait SVM extends FileUtil {
     println("num iterations: " + iter)
 
     // compute the weights (assuming a linear kernel)
-    val weights = sum(0,numSamples) { i => X(i).toDouble * alphas(i) * Y(i) }    
+    val weights = sum(0,numSamples) { i => X(i) * alphas(i) * Y(i) }    
   
     print("\n")
 
@@ -136,12 +136,12 @@ trait SVM extends FileUtil {
   ////////////
   // testing
 
-  def classify(weights: Rep[DenseVector[Double]], b: Rep[Double], testPt: Rep[DenseVector[Double]]): Rep[Int] = {
+  def classify(weights: Rep[DenseVector[Double]], b: Rep[Double], testPt: Rep[DenseVector[Double]]): Rep[Double] = {
     // SVM prediction is W'*X + b
-    if ((weights*:*testPt + b) < 0){
-      -1
+    if ((weights*:*testPt + b) < 0) {
+      -1.0
     }
-    else 1
+    else 1.0
   }
 
   ////////////
@@ -163,10 +163,14 @@ trait SVM extends FileUtil {
   def main() = {
     if (args.length < 2) printUsage
 
-    val trainingSet = readTokenMatrix(args(0))
-    val testSet = readTokenMatrix(args(1))
+    val intTrainingSet = readTokenMatrix(args(0))
+    val intTestSet = readTokenMatrix(args(1))
     //val modelFile = args(2)
     //val numTests = args(3).toInt
+
+    // convert to double to use BLAS inside SMO
+    val trainingSet = TrainingSet(intTrainingSet.data.toDouble, intTrainingSet.labels.toDouble)
+    val testSet = TrainingSet(intTestSet.data.toDouble, intTestSet.labels.toDouble)
     
     reseed
 
@@ -184,7 +188,7 @@ trait SVM extends FileUtil {
     val YTest = testSet.labels map { e => if (e == 0) -1.0 else 1.0 }
     //load(modelFile)
 
-    val outputLabels = (0::testSet.numSamples){ i => classify(weights, b, testSet(i).toDouble) }    
+    val outputLabels = (0::testSet.numSamples){ i => classify(weights, b, testSet(i)) }    
     println("SVM testing finished. Calculating error..")
 
     val errors = sum[Int](0, testSet.numSamples) { i => if (YTest(i) != outputLabels(i)) 1 else 0 }    

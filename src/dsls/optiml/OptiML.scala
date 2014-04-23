@@ -109,6 +109,7 @@ trait OptiMLDSL extends OptiLADSL
 
   def importDistanceMetrics() {
     val DenseVector = lookupTpe("DenseVector")
+    val DenseVectorView = lookupTpe("DenseVectorView")
     val DenseMatrix = lookupTpe("DenseMatrix")
     val SparseVector = lookupTpe("SparseVector")
 
@@ -129,12 +130,12 @@ trait OptiMLDSL extends OptiLADSL
     identifier (DMetric) ("SQUARE")
     identifier (DMetric) ("EUC")
 
-    for (TP <- List(DenseVector,DenseMatrix,SparseVector)) {
-      fimplicit (TP) ("dist", Nil, (TP(MDouble),TP(MDouble)) :: MDouble) implements composite ${ sum(abs($0 - $1)) }
+    for (TP <- List(DenseVector,DenseVectorView,DenseMatrix,SparseVector)) {
+      fimplicit (TP) ("dist", Nil, (TP(MDouble),TP(MDouble)) :: MDouble) implements redirect ${ dist($0,$1,ABS) }
 
       direct (TP) ("dist", Nil, (TP(MDouble),TP(MDouble),DMetric) :: MDouble) implements composite ${
         $2 match {
-          case ABS => dist($0,$1)
+          case ABS => sum(abs($0 - $1))
           case SQUARE => sum(square($0 - $1))
           case EUC => sqrt(sum(square($0 - $1)))
         }

@@ -14,7 +14,7 @@ trait kMeans extends OptiMLApplication {
   private val tol = 0.001 // tolerance (for convergence)
   private val k = 16 // num clusters
 
-  private def findNearestCluster(x_i: Rep[DenseVector[Double]], mu: Rep[DenseMatrix[Double]]): Rep[Int] = {
+  private def findNearestCluster(x_i: Rep[DenseVectorView[Double]], mu: Rep[DenseMatrix[Double]]): Rep[Int] = {
     (mu mapRowsToVector { row => dist(x_i, row, SQUARE) }).minIndex
   }
 
@@ -31,10 +31,11 @@ trait kMeans extends OptiMLApplication {
     tic(mu)
 
     var iter = 0
+
     val newMu = untilconverged_withdiff(mu, tol){ mu =>
       iter += 1
 
-      val c = (0::m){e => findNearestCluster(x(e), mu)}   
+      val c = (0::m) { e => findNearestCluster(x(e), mu) }
 
       val allWP = (0::m).groupByReduce(i => c(i), i => x(i).Clone, (a: Rep[DenseVector[Double]], b: Rep[DenseVector[Double]]) => a + b)
       val allP = (0::m).groupByReduce(i => c(i), i => 1, (a: Rep[Int], b: Rep[Int]) => a+b)

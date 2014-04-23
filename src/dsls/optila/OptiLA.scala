@@ -153,7 +153,7 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
 
       // could fuse with nested matrix loops (loops over rowIndices), but not with loops directly over individual matrix elements -- like map!
       // it seems best for us to be consistent: matrix loops should either all be flat or all be nested. which one? should we use lowerings?
-      // however, mutable version also supresses fusion due to unsafeImmutable...
+      // however, mutable version also supresses fusion due to unsafeImmutable and code motion due to effects...
 
       // val out = DenseMatrix[T](rowIndices.length,colIndices.length)
       // rowIndices foreach { i =>
@@ -170,6 +170,9 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
     // one alternative is to use an IsVector type class for the function return type, instead of overloading.
     // currently, we just let DenseVectorViews implicitly convert to DenseVector, which will cause overhead
     // in the lib implementation, but should fuse away in the Delite implementation.
+    //
+    // furthermore, due to the effectful implementation, these cannot be fused or hoisted...
+    
     for (rhs <- List(DenseVector(T)/*, DenseVectorView(T))*/)) {
       infix (IndexVector) ("apply", T, (CTuple2(IndexVector,IndexWildcard), MInt ==> rhs) :: DenseMatrix(T)) implements composite ${
         val rowIndices = $0._1

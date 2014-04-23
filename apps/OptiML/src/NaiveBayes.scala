@@ -46,15 +46,19 @@ trait NaiveBayes extends FileUtil {
     // val spamTotalWords = wordsPerDoc(spamIndices).sum
     // val phi_y1 = spamWordCountAll.map(w => (w+1) / (spamTotalWords + ts.numFeatures).toDouble)
 
+    val spamWords = ts.data.apply(spamIndices)
+    val spamTotalWords = wordsPerDoc(spamIndices).sum
+
     val phi_y1 = (0::ts.numFeatures) { j =>
-      val spamWordCount = ts.data.apply(spamIndices).getCol(j).sum
-      val spamTotalWords = wordsPerDoc(spamIndices).sum
+      val spamWordCount = spamWords.getCol(j).sum
       (spamWordCount + 1) / (spamTotalWords + ts.numFeatures).toDouble
     }
 
+    val nonSpamWords = ts.data.apply(nonSpamIndices)
+    val nonSpamTotalWords = wordsPerDoc(nonSpamIndices).sum
+    
     val phi_y0 = (0::ts.numFeatures) { j =>
-      val nonSpamWordCount = ts.data.apply(nonSpamIndices).getCol(j).sum
-      val nonSpamTotalWords = wordsPerDoc(nonSpamIndices).sum
+      val nonSpamWordCount = nonSpamWords.getCol(j).sum
       (nonSpamWordCount + 1) / (nonSpamTotalWords + ts.numFeatures).toDouble
     }
 

@@ -218,28 +218,13 @@ trait VectorOps {
       infix ("min") (Nil :: T, O) implements reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a < b) a else b })
       infix ("max") (Nil :: T, O) implements reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a > b) a else b })
 
-      // TODO: switch to reduce when TupleReduce is generalized
-      infix ("minIndex") (Nil :: MInt, O) implements single ${
-        var min = $self(0)
-        var minIndex = 0
-        for (i <- 0 until $self.length) {
-          if ($self(i) < min) {
-            min = $self(i)
-            minIndex = i
-          }
-        }
-        minIndex
+      infix ("minIndex") (Nil :: MInt, O ::: A) implements composite ${
+        $self.indices.reduce { (a,b) => if ($self(a) < $self(b)) a else b }
+        // ($self.zip($self.indices) { (a,b) => pack((a,b)) } reduce { (t1,t2) => if (t1._1 < t2._1) t1 else t2 })._2
       }
-      infix ("maxIndex") (Nil :: MInt, O) implements single ${
-        var max = $self(0)
-        var maxIndex = 0
-        for (i <- 0 until $self.length) {
-          if ($self(i) > max) {
-            max = $self(i)
-            maxIndex = i
-          }
-        }
-        maxIndex
+      infix ("maxIndex") (Nil :: MInt, O ::: A) implements composite ${
+        $self.indices.reduce { (a,b) => if ($self(a) > $self(b)) a else b }
+        // ($self.zip($self.indices) { (a,b) => pack((a,b)) } reduce { (t1,t2) => if (t1._1 > t2._1) t1 else t2 })._2        
       }
 
 

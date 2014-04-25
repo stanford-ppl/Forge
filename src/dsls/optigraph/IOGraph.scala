@@ -158,7 +158,14 @@ trait IOGraphOps {
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
 
       //sort by degree, helps with skew for buckets of nodes
-      val distinct_ids = NodeData(fhashmap_keys(src_groups))
+      val ids = NodeData(fhashmap_keys(src_groups))
+      val distinct_ids = ids.sortBy({ (a,b) => 
+        val aV = array_buffer_length(fhashmap_get(src_groups,ids(a)))
+        val bV = array_buffer_length(fhashmap_get(src_groups,ids(b))) 
+        if(aV < bV) -1
+        else if(aV == bV) 0
+        else 1
+      })
 
       val numNodes = distinct_ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))

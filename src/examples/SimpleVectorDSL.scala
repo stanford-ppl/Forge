@@ -189,6 +189,34 @@ trait SimpleVectorDSL extends ForgeApplication {
       a(5)
     })
 
+    /* Test for C++ supporting a block with a return value to be input of other blocks.
+       Currently 'foo' above cannot be generated for C++ target because the outer-most block has return (e.g., $b[0]).
+       TODO: enable the outermost blocks with a return.
+    */
+    val foo2 = direct (Vector) ("foo2", T, List(MInt ==> MUnit, MInt, MThunk(MInt), (MInt,T) ==> MInt) :: MUnit)
+
+    impl (foo2) (codegen($cala, ${
+      var i = 0
+      val a = new Array[$t[T]](5)
+
+      while (i < 5) {
+        $b[0]($b[3]($1,a(i)))
+        i += 1
+      }
+      println("i = " + i)
+    }))
+
+    impl (foo2) (codegen(cpp, ${
+      int i = 0;
+      $t[T] *a = new $t[T]();
+      while (i < 5) {
+        $b[0]($b[3]($1,a[i]));
+        i += 1;
+      }
+      delete[] a;
+      std::cout << "i = " << i << std::endl;
+    }))
+
     ()
   }
 }

@@ -37,8 +37,8 @@ trait DeliteGenOps extends BaseGenOps {
     else false
   }
 
-  // bound symbol for the return of a block
-  private var blockRetSym: String = _
+  // bound symbol for the captured variable of a block
+  private var boundArg: String = _
 
   override def quote(x: Exp[Any]): String = x match {
     case Def(QuoteBlockResult(func,args,ret,captured)) =>
@@ -48,39 +48,39 @@ trait DeliteGenOps extends BaseGenOps {
       if (!isThunk(func.tpe)) {
         for (a <- args) {
           // have to be careful about automatic string lifting here
+          val boundArg_saved = boundArg
+          boundArg = replaceWildcards(boundArgName(func,a))
           if (containsBlock(replaceWildcards(captured(i)))) {
             // when the captured variable is another block,
             // declare the varible, emit block, and assign the result to the variable at the end of the block.
-            val blockRetSym_saved = blockRetSym
-            blockRetSym = replaceWildcards(boundArgName(func,a))
             val add = nl + "emitVarDecl(" + replaceWildcards(boundArgName(func,a))+ ".asInstanceOf[Sym[Any]])" + nl + replaceWildcards(captured(i))
-            blockRetSym = blockRetSym_saved
             boundStr += add
           }
           else {
             val add: String = (nl + "emitValDef(" + replaceWildcards(boundArgName(func,a)) + ".asInstanceOf[Sym[Any]],\"" + replaceWildcards(captured(i)) + "\")")
             boundStr += add
           }
+          boundArg = boundArg_saved
           i += 1
         }
       }
 
-      if (activeGenerator == cpp && ret != MUnit)
-        warn("Block " + func.name + " returns non-unit type result. C++ target may not work properly.")
+      if (activeGenerator == cpp && boundArg == null && ret != MUnit)
+        warn("Block " + func.name + " returns non-unit type result. C++ target may not work properly." + boundStr)
 
       // the new-line formatting is admittedly weird; we are using a mixed combination of actual new-lines (for string splitting at Forge)
       // and escaped new-lines (for string splitting at Delite), based on how we received strings from string interpolation.
       // FIX: using inconsistent newline character, not platform independent
       val out = "{ \"" + boundStr +
        nl + "emitBlock(" + func.name + ")" +
-       (if (ret != MUnit && blockRetSym == null)
+       (if (ret != MUnit && boundArg == null)
           (nl + "quote(getBlockResult(" + func.name + "))+\"\\n\"")
-        else if (ret != MUnit && blockRetSym != null)
-          (nl + "emitAssignment(" + blockRetSym + ".asInstanceOf[Sym[Any]], quote(getBlockResult(" + func.name + ")))")
+        else if (ret != MUnit && boundArg != null)
+          (nl + "emitAssignment(" + boundArg + ".asInstanceOf[Sym[Any]], quote(getBlockResult(" + func.name + ")))")
         else ""
        ) +
-       nl + " \" } "
-      if(ret != MUnit && blockRetSym != null) "\"" + out + "\"" else out
+       nl + " \" }\\n "
+      if(ret != MUnit && boundArg != null) "\"" + out + "\"" else out
 
     case Def(QuoteSeq(argName)) => "Seq("+unquotes(argName+".map(quote).mkString("+quotes(",")+")")+")"
 

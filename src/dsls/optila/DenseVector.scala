@@ -169,18 +169,18 @@ trait DenseVectorOps {
 
       infix ("update") ((("indices",IndexVector),("e",T)) :: MUnit, effect = write(0)) implements single ${
         (0::indices.length) foreach { i =>
-          // if (indices(i) < 0 || indices(i) >= $self.length) fatal("index out of bounds: bulk vector update")
+          fassert(indices(i) >= 0 && indices(i) < $self.length, "index out of bounds: bulk vector update")
           array_update(densevector_raw_data($self), indices(i), e)
         }
       }
 
       infix ("update") ((("indices",IndexVector),("v",DenseVector(T))) :: MUnit, effect = write(0)) implements single ${
-        if (indices.length != v.length) fatal("dimension mismatch: bulk vector update")
+        fassert(indices.length == v.length, "dimension mismatch: bulk vector update")
 
         // cannot be parallel unless indices contains only disjoint indices (why is why we use 'single' here)
         // however, maybe this should be a property that we guarantee of all IndexVectors
         (0::indices.length) foreach { i =>
-          // if (indices(i) < 0 || indices(i) >= $self.length) fatal("index out of bounds: bulk vector update")
+          fassert(indices(i) >= 0 && indices(i) < $self.length, "index out of bounds: bulk vector update")
           array_update(densevector_raw_data($self), indices(i), v(i))
         }
       }

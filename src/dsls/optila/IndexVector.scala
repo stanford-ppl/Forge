@@ -88,8 +88,7 @@ trait IndexVectorOps {
 
       infix ("slice") ((("start",MInt),("end",MInt)) :: IndexVector) implements composite ${
         if (indexvector_is_range($self)) {
-          // if ($start < indexvector_start($self) || $end > indexvector_end($self))
-          //   fatal("IndexVector slice (" + $start + "," + $end + ") out of bounds (" + indexvector_start($self) + "," + indexvector_end($self) + ")")
+          fassert($start >= indexvector_start($self) && $end <= indexvector_end($self), "IndexVector slice (" + $start + "," + $end + ") out of bounds (" + indexvector_start($self) + "," + indexvector_end($self) + ")")
           IndexVector($start, $end, $self.isRow)
         }
         else {

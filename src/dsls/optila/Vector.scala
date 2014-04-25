@@ -167,11 +167,11 @@ trait VectorOps {
         infix ("-") (rhs :: DenseVector(T), A) implements zip((T,T,T), (0,1), ${ (a,b) => a-b })
         infix ("*") (rhs :: DenseVector(T), A) implements zip((T,T,T), (0,1), ${ (a,b) => a*b })
         infix ("*:*") (rhs :: T, A) implements composite ${
-          // if ($self.length != $1.length) fatal("dimension mismatch: vector dot product")
+          fassert($self.length == $1.length, "dimension mismatch: vector dot product")
           sum($self*$1)
         }
         infix ("**") (rhs :: DenseMatrix(T), A) implements composite ${
-          if ($self.isRow || !$1.isRow) fatal ("dimension mismatch: vector outer product")
+          fassert(!$self.isRow && $1.isRow, "dimension mismatch: vector outer product")
           val out = DenseMatrix[\$TT]($self.length, $1.length)
           for (i <- 0 until $self.length ){
             for (j <- 0 until $1.length ){
@@ -204,7 +204,7 @@ trait VectorOps {
       infix ("-") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e-$1 })
       infix ("*") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e*$1 })
       infix ("*") (DenseMatrix(T) :: DenseVector(T), A) implements composite ${
-        // if (!$self.isRow) fatal("dimension mismatch: vector * matrix")
+        fassert($self.isRow, "dimension mismatch: vector * matrix")
         $1.mapColsToVector { col => $self *:* col }
       }
       infix ("/") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e/$1 })

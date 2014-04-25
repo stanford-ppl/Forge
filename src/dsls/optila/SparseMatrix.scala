@@ -501,7 +501,6 @@ trait SparseMatrixOps {
       infix ("apply") ((IndexVector, IndexWildcard) :: SparseMatrix(T)) implements redirect ${ $self.getRows($1) }
 
       infix ("apply") ((("rows", IndexVector), ("cols", IndexVector)) :: SparseMatrix(T)) implements composite ${
-        // if (rows.length != cols.length) fatal("dimension mismatch in bulk apply: rows.length " + rows.length + " != cols.length " + cols.length)
         // could avoid the logical access and COO <-> CSR conversion here by slicing the underlying CSR array directly
         val out = SparseMatrix[T](rows.length, cols.length)
         for (i <- 0 until rows.length) {
@@ -875,7 +874,7 @@ trait SparseMatrixOps {
 
       // TODO
       // infix ("*") (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements single ${
-      //   if ($self.numCols != $1.numRows) fatal("dimension mismatch: matrix multiply")
+      //   fassert($self.numCols == $1.numRows, "dimension mismatch: matrix multiply")
       //   // naive
       //   val yT = $1.t
       //   val out = SparseMatrix[T]($self.numRows, $1.numCols)
@@ -892,7 +891,7 @@ trait SparseMatrixOps {
       // }
 
       // infix ("*") (SparseVector(T) :: SparseVector(T), TArith(T)) implements single ${
-      //  if ($self.numCols != $1.length || $1.isRow) fatal("dimension mismatch: matrix * vector")
+      //  fassert($self.numCols == $1.length && !$1.isRow, "dimension mismatch: matrix * vector")
       //  val out = SparseVector[T]($self.numRows, false)
       //  for (rowIdx <- 0 until $self.numRows) {
       //    out(rowIdx) = $self(rowIdx) *:* $1

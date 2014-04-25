@@ -57,16 +57,15 @@ trait DenseMatrixOps {
         val numRows = subMatRow(0).numRows
         var numCols = subMatRow(0).numCols
         for (j <- 1 until subMatRow.length) {
-          if (subMatRow(j).numRows != numRows) fatal("dimension mismatch in block matrix constructor: " + subMatRow(j).numRows + " != " + numRows)
+          fassert(subMatRow(j).numRows == numRows, "dimension mismatch in block matrix constructor: " + subMatRow(j).numRows + " != " + numRows)
           numCols += subMatRow(j).numCols
         }
         totalNumRows += numRows
         if (i == 0) {
           totalNumCols = numCols
         }
-        else if (numCols != totalNumCols) {
-          fatal("dimension mismatch in block matrix constructor: row " + i + " has wrong number of cols " + numCols + " (expected " + totalNumCols + ")")
-          () // FIXME: these extra ()s are needed to convince the embedding that the branch returns a Rep[Unit]. why?
+        else {
+          fassert(numCols == totalNumCols, "dimension mismatch in block matrix constructor: row " + i + " has wrong number of cols " + numCols + " (expected " + totalNumCols + ")")          
         }
         ()
       }
@@ -165,7 +164,6 @@ trait DenseMatrixOps {
       infix ("apply") (IndexVector :: DenseMatrix(T)) implements redirect ${ $self.getRows($1) }
       infix ("apply") ((IndexVector, IndexWildcard) :: DenseMatrix(T)) implements redirect ${ $self.getRows($1) }
       infix ("apply") ((("rows", IndexVector), ("cols", IndexVector)) :: DenseMatrix(T)) implements composite ${
-        // if (rows.length != cols.length) fatal("dimension mismatch in bulk apply: rows.length " + rows.length + " != cols.length " + cols.length)
         (rows,cols) { (i,j) => $self(i,j) }
       }
       infix ("apply") ((IndexWildcard, IndexVector) :: DenseMatrix(T)) implements redirect ${ $self.getCols($2) }
@@ -422,7 +420,7 @@ trait DenseMatrixOps {
       }
 
       compiler ("densematrix_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
-        if ($pos < 0 || $pos > $self.size) fatal("DenseMatrix IndexOutOfBounds")
+        fassert($pos >= 0 && $pos <= $self.size, "densematrix_insertspace: index out of bounds")
         densematrix_ensureextra($self,$len)
         val d = densematrix_raw_data($self)
         array_copy(d, $pos, d, $pos + $len, $self.size - $pos)
@@ -478,7 +476,7 @@ trait DenseMatrixOps {
          $self.indices.foreach { i => densematrix_raw_update($self,i,densematrix_raw_apply($self,i)*$1) }
        }
        infix ("*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements single ${
-         if ($self.numCols != $1.numRows) fatal("dimension mismatch: matrix multiply")
+         fassert($self.numCols == $1.numRows, "dimension mismatch: matrix multiply")
          // naive
          val yT = $1.t
          val out = DenseMatrix[T]($self.numRows, $1.numCols)
@@ -494,7 +492,7 @@ trait DenseMatrixOps {
          out.unsafeImmutable
        }
        infix ("*") (DenseVector(T) :: DenseVector(T), TArith(T)) implements single ${
-        if ($self.numCols != $1.length || $1.isRow) fatal("dimension mismatch: matrix * vector")
+        fassert($self.numCols == $1.length && !$1.isRow, "dimension mismatch: matrix * vector")
         val out = DenseVector[T]($self.numRows, false)
         for (rowIdx <- 0 until $self.numRows) {
           out(rowIdx) = $self(rowIdx) *:* $1

@@ -36,6 +36,8 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
     = __arg0.zip(__arg1).map(t => __arg2(t._1,t._2))
   def array_reduce[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: (Rep[T],Rep[T]) => Rep[T],__arg2: Rep[T])(implicit __imp0: SourceContext): Rep[T]
     = if (array_length(__arg0) == 0) __arg2 else __arg0.reduce(__arg1)
+  def array_sortIndices(__arg0: Rep[Int], __arg1: (Rep[Int], Rep[Int]) => Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[Int]]
+    = array_empty[Int](__arg0).indices.toArray//.sortBy(__arg1)
   def array_groupByReduce[T:Manifest,K:Manifest,V:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[T] => Rep[K], __arg2: Rep[T] => Rep[V], __arg3: (Rep[V],Rep[V]) => Rep[V])(implicit __imp0: SourceContext): Rep[ForgeHashMap[K,V]] = {
     val grp = __arg0.groupBy[K](__arg1)
     val hm = scala.collection.mutable.HashMap[K,V]()

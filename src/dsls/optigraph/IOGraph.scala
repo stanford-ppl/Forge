@@ -153,111 +153,16 @@ trait IOGraphOps {
       }
       pack(src_node_array.getRawArray,src_edge_array.getRawArray)
     }
-    direct (IO) ("sortByDegree", Nil, (("a",NodeData(MInt)),("degrees",MHashMap(MInt,MArrayBuffer(MInt)))) :: NodeData(MInt)) implements single ${
-      var to = array_empty[Int](a.length)
-      var from = array_empty[Int](a.length)
-      var blockSize = 1
-      //I break this up to avoid the mutable copy that would have to occur
-      if(blockSize < a.length){
-        var start = 0
-        while(start < a.length){
-          //mergeWithoutCopy(a,to,start,start+blockSize,start+2*blockSize)
-          //////////////
-          val lo = start
-          val mid = if( (start+blockSize) > a.length) a.length else start+blockSize
-          val comp = start + (blockSize << 1) //forge can't figure this out if i type it in
-          val hi = if( comp > a.length) a.length else comp
-          var i = lo
-          var j = mid
-          var k = lo
-          while(k < hi){
-            //println("1i: " + i + " j: " + j + " k: " + k)
-            if(i == mid){
-              array_update(to,k,a(j))
-              j += 1
-            }
-            else if(j == hi){ 
-              array_update(to,k,a(i))
-              i += 1
-            }
-            else if(a(j) < a(i)){
-             array_update(to,k,a(j))
-             j += 1
-            }
-            else{ 
-              array_update(to,k,a(i))
-              i += 1
-            }
-            k += 1
-          }
-          //////////////
-          start += (blockSize << 1)
-        }
-        blockSize = (blockSize << 1)
-        val temp = from
-        from = to
-        to = temp
-      }
-      while(blockSize < a.length){
-        var start = 0
-        while(start < a.length){
-          //mergeWithoutCopy(from,to,start,start+blockSize,start+2*blockSize)
-          //////////////
-          val lo = start
-          val mid = if( (start+blockSize) > a.length) a.length else start+blockSize
-          val comp = start + (blockSize << 1) //forge can't figure this out if i type it in
-          val hi = if( comp > a.length) a.length else comp
-          var i = lo
-          var j = mid
-          var k = lo
-          while(k < hi){
-            //println("2i: " + i + " j: " + j + " k: " + k)
-            if(i == mid){
-              array_update(to,k,array_apply(from,j))
-              j += 1
-            }
-            else if(j == hi){ 
-              array_update(to,k,array_apply(from,i))
-              i += 1
-            }
-            else if(array_apply(from,j) < array_apply(from,j)){
-              array_update(to,k,array_apply(from,j))
-             j += 1
-            }
-            else{ 
-              array_update(to,k,array_apply(from,i))
-              i += 1
-            }
-            k += 1
-          }
-          //////////////
-          start += (blockSize << 1)
-        }
-        val temp = from
-        from = to
-        to = temp
-        blockSize = (blockSize << 1)
-      }
-      NodeData(from)
-    }
     direct (IO) ("csrPrunedUndirectedGraphFromEdgeList", Nil, ("edge_data",NodeData(Tuple2(MInt,MInt))) :: CSRUndirectedGraph) implements composite ${
       println("Edges: " + edge_data.length)
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
 
-      val ids = NodeData(fhashmap_keys(src_groups))
-      val numNodes = ids.length
+      //sort by degree, helps with skew for buckets of nodes
+      val distinct_ids = NodeData(fhashmap_keys(src_groups))
+
+      val numNodes = distinct_ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
-      val distinct_ids = sortByDegree(ids,src_groups)
-
       val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
-
-      /*
-      val filtered_nbrs = distinct_ids.map(e => NodeData(src_groups(e)).filter(a => 
-        fhashmap_get(idHashMap,a)>fhashmap_get(idHashMap,e),n =>fhashmap_get(idHashMap,n)).distinct.sort)
-
-      val src_edge_array = idView.flatMap{e => filtered_nbrs(e)}
-      val serial_out = assignUndirectedIndicies(numNodes,filtered_nbrs)
-      */
       val serial_out = assignSpecUndirectedIndicies(numNodes,edge_data.length/2,distinct_ids,idHashMap,src_groups)
 
       //println("finished file I/O. Edges: " + src_edge_array.length)

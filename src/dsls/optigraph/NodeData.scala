@@ -71,6 +71,9 @@ trait NodeDataOps {
       infix ("sortBy") (((MInt,MInt) ==> MInt) :: NodeData(T)) implements composite ${
           NodeData[Int](array_sortIndices($self.length,$1)).map[T](i => $self(i))
       }
+      infix ("sortIndicesBy") (((MInt,MInt) ==> MInt) :: NodeData(MInt)) implements single ${
+          NodeData[Int](array_sortIndices($self.length,$1))
+      }
 
       /////////////////////////debug operations (print serial & parallel)///////////////////////
       infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println("NodeData: " + a)})

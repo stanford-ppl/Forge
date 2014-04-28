@@ -19,11 +19,14 @@ trait IOGraphOps {
     val K = tpePar("K")
     val V = tpePar("V")
     val Tuple2 = lookupTpe("Tup2")
+    val Tuple4 = lookupTpe("Tup4")
+
 
     val NodeIdView = lookupTpe("NodeIdView")
     val NodeCollection = lookupTpe("NodeCollection")
     val NodeData = lookupTpe("NodeData")
     val GraphBitSet = lookupTpe("GraphBitSet")
+    val HashSet = lookupTpe("HashSet")
     val CSRDirectedGraph = lookupTpe("CSRDirectedGraph")
     val CSRUndirectedGraph = lookupTpe("CSRUndirectedGraph")
     val HABUndirectedGraph = lookupTpe("HABUndirectedGraph")
@@ -167,6 +170,9 @@ trait IOGraphOps {
         else 1
       })
 
+      //println("distinct ids")
+      //distinct_ids.print
+
       val numNodes = distinct_ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
@@ -177,51 +183,111 @@ trait IOGraphOps {
     }
 
     direct (IO) ("habPrunedUndirectedGraphFromEdgeList", Nil, (("edge_data",NodeData(Tuple2(MInt,MInt))),("underForHash",MInt),("bitSetMultiplier",MInt)) :: HABUndirectedGraph) implements composite ${
+      //I can write this in about ten lines of code but the performance is horrible.
       val numEdges = edge_data.length
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
 
       //sort by degree, helps with skew for buckets of nodes
-      val src_id_degrees = edge_data.groupBy(e => array_buffer_length(fhashmap_get(src_groups,e._1)), e => e._1)
-      val distinct_ids = (NodeData(fhashmap_keys(src_id_degrees)).sort).flatMap{e => NodeData(fhashmap_get(src_id_degrees,e)).distinct}
+      val ids = NodeData(fhashmap_keys(src_groups))
+      val distinct_ids = ids.sortBy({ (a,b) => 
+        val aV = array_buffer_length(fhashmap_get(src_groups,ids(a)))
+        val bV = array_buffer_length(fhashmap_get(src_groups,ids(b))) 
+        if(aV > bV) -1
+        else if(aV == bV) 0
+        else 1
+      })
+
+      //println("distinct_ids")
+      //distinct_ids.print
 
       val numNodes = distinct_ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
 
-      val filtered_nbrs = distinct_ids.map(e => NodeData(src_groups(e)).filter(a => 
-        fhashmap_get(idHashMap,a)>fhashmap_get(idHashMap,e),n =>fhashmap_get(idHashMap,n)).distinct.sort)
-/*
-      println("distinct ids")
-      distinct_ids.print
-      println("filtered nbrs")
-      filtered_nbrs.foreach{ e =>
-        println("node: " + e)
-        e.print
+      val filtered_nbrs = NodeData[NodeData[Int]](numNodes)
+      var numBitSet = 0
+      var numHash = 0
+      var numCSRNodes = 0
+      var numCSREdges = 0
+      idView.foreach{ i =>
+        filtered_nbrs(i) = NodeData(src_groups(distinct_ids(i))).filter(a => fhashmap_get(idHashMap,a) < i,n =>n)
+        if(filtered_nbrs(i).length*bitSetMultiplier >= numNodes) numBitSet += 1
+        else if((filtered_nbrs(i).length*bitSetMultiplier < numNodes) && (filtered_nbrs(i).length <= underForHash)) numHash += 1
+        else {
+          numCSRNodes += 1
+          numCSREdges += filtered_nbrs(i).length
+        }
+        //println("filtered nbrs: " + i)
+        //filtered_nbrs(i).print
       }
-*/
-      val filtered_degrees = idView.groupBy(e => filtered_nbrs(e).length, e => e)
-      val hash1_ids = (NodeData(fhashmap_keys(filtered_degrees)).sort).flatMap{e => NodeData(fhashmap_get(filtered_degrees,e)).distinct}
-      val idHashMap2 = idView.groupByReduce[Int,Int](n => distinct_ids(hash1_ids(n)), n => n, (a,b) => a)
-      val distinct_ids2 = idView.map(e => distinct_ids(hash1_ids(e)) )
-      val filtered_nbrs2 = idView.map(e => filtered_nbrs(fhashmap_get(idHashMap,distinct_ids2(e))).map(a => fhashmap_get(idHashMap2,distinct_ids(a))).sort)
-/*
-      println("distinct ids 2")
-      distinct_ids2.print
-      println("filtered nbrs 2")
-      filtered_nbrs2.foreach{ e =>
-        println("node 2: " + e)
-        e.print
-      }
-*/
-      val bitSetNeighborhoods = filtered_nbrs2.filter(e => e.length*bitSetMultiplier >= numNodes, e => GraphBitSet(e.getRawArray))
-      val hashNeighborhoods = filtered_nbrs2.filter(e => ((e.length*bitSetMultiplier < numNodes) && (e.length <= underForHash)), e => HashSet(e.getRawArray))
-      val csrNeighborhoods = filtered_nbrs2.filter(e => ((e.length*bitSetMultiplier < numNodes) && (e.length > underForHash)), e => e)
-            
-      val csrEdges = csrNeighborhoods.flatMap{e => e} 
-      val csrNodes = assignUndirectedIndicies(csrNeighborhoods.length,csrNeighborhoods)
+      
+      /////////////////////////
+      //These two ops are the overhead incurred for this special graph
+      val distinct_ids2 = distinct_ids.sortBy({ (a,b) => 
+        val aV = filtered_nbrs(fhashmap_get(idHashMap,distinct_ids(a))).length
+        val bV = filtered_nbrs(fhashmap_get(idHashMap,distinct_ids(b))).length
+        if(aV < bV) -1
+        else if(aV == bV) 0
+        else 1
+      })
+      val idHashMap2 = idView.groupByReduce[Int,Int](n => distinct_ids2(n), n => n, (a,b) => a)
+      //println("distinct_ids2")
+      //distinct_ids2.print
+      //////////////////////////
 
-      println("numHash: " + hashNeighborhoods.length + " numCSR: " + csrNeighborhoods.length + " numBitSet: " + bitSetNeighborhoods.length)
-      HABUndirectedGraph(numNodes,numEdges,distinct_ids2.getRawArray,hashNeighborhoods.length,csrNeighborhoods.length,bitSetNeighborhoods.length,hashNeighborhoods.getRawArray,csrNodes,csrEdges.getRawArray,bitSetNeighborhoods.getRawArray)
+      println("NumHash: " + numHash  + " NumCSR: " + numCSRNodes +  " numBitSet: " + numBitSet)
+ 
+      val serial_out = assignHABUndirectedIndicies(numNodes,distinct_ids,distinct_ids2,idHashMap,idHashMap2,numHash,numBitSet,numCSRNodes,numCSREdges,filtered_nbrs)
+      val bitSetNeighborhoods = serial_out._2
+      val hashNeighborhoods = serial_out._1
+      val csrEdges = serial_out._4
+      val csrNodes = serial_out._3
+
+      HABUndirectedGraph(numNodes,numEdges,distinct_ids2.getRawArray,numHash,numCSRNodes,numBitSet,hashNeighborhoods.getRawArray,csrNodes.getRawArray,csrEdges.getRawArray,bitSetNeighborhoods.getRawArray)
     }
+    direct (IO) ("assignHABUndirectedIndicies", Nil, MethodSignature(List(("numNodes",MInt),("distinct_ids",NodeData(MInt)),("distinct_ids2",NodeData(MInt)),("idHashMap",MHashMap(MInt,MInt)),("idHashMap2",MHashMap(MInt,MInt)),("numHash",MInt),("numBitSet",MInt),("numCSRNodes",MInt),("numCSREdges",MInt),("filtered_nbrs",NodeData(NodeData(MInt)))),Tuple4(NodeData(HashSet(MInt)),NodeData(GraphBitSet),NodeData(MInt),NodeData(MInt)))) implements single ${
+      var ii = 0
+      val bitSetNeighborhoods = NodeData[GraphBitSet](numBitSet)
+      val hashNeighborhoods = NodeData[HashSet[Int]](numHash)
+
+      var i = 0
+      var j = 0
+      val csrNodes = NodeData[Int](numCSRNodes)
+      val csrEdges = NodeData[Int](numCSREdges)
+      while(ii < numNodes){
+        //println("Ex Id: " + distinct_ids2(ii))
+        //println("Filtered Nbrs index: " + fhashmap_get(idHashMap,distinct_ids2(ii)))
+        val data = filtered_nbrs(fhashmap_get(idHashMap,distinct_ids2(ii))).map(n => fhashmap_get(idHashMap2,n)).sort
+        //println("data")
+        //filtered_nbrs(fhashmap_get(idHashMap,distinct_ids2(ii))).print
+        if(ii < numHash){
+          //println("Hash :" + ii)
+          hashNeighborhoods(ii) = HashSet(data.getRawArray)
+        }
+        else if(ii < (numCSRNodes + numHash)){
+          val neighborhood = data
+          //println("neighborhood")
+          //neighborhood.print
+          var k = 0
+          while(k < neighborhood.length){
+            csrEdges(j) = neighborhood(k)
+            j += 1
+            k += 1
+          }
+          if(ii < (numCSRNodes+numHash-1)){
+            //println("CSR: " + i +" j:" + j)
+            //I can do -1 here because I am pruning so the last node will never have any neighbors
+            csrNodes(i+1) = neighborhood.length + csrNodes(i)
+            i += 1
+          }
+        }
+        else{
+          bitSetNeighborhoods( (ii - numCSRNodes - numHash) ) = GraphBitSet(data.getRawArray)
+        }
+        ii += 1
+      }
+      pack(hashNeighborhoods,bitSetNeighborhoods,csrNodes,csrEdges)
+    }
+
   }
 }

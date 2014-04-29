@@ -560,7 +560,7 @@ trait ScalaOps {
     impl (min) (codegen($cala, "java.lang.Math.min(" + quotedArg(0) + ", " + quotedArg(1) + ")"))
 
     for (g <- List(cuda, cpp)) {
-      impl (abs) (codegen(g, "abs(" + quotedArg(0) + ")"))
+      impl (abs) (codegen(g, "fabs(" + quotedArg(0) + ")"))
       impl (exp) (codegen(g, "exp(" + quotedArg(0) + ")"))
       impl (log) (codegen(g, "log(" + quotedArg(0) + ")"))
       impl (log10) (codegen(g, "log10(" + quotedArg(0) + ")"))

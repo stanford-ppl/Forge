@@ -125,17 +125,7 @@ trait IOGraphOps {
       }.distinct
     }
 
-    direct (IO) ("assignUndirectedIndicies", Nil, MethodSignature(List(("numNodes",MInt),("src_groups",NodeData(NodeData(MInt)))),MArray(MInt))) implements single ${
-      val src_node_array = NodeData[Int](numNodes)
-      var i = 0
-      while(i < numNodes-1){
-        src_node_array(i+1) = src_groups(i).length + src_node_array(i)
-        i += 1
-      }
-      src_node_array.getRawArray
-    }
-
-    direct (IO) ("assignSpecUndirectedIndicies", Nil, MethodSignature(List(("numNodes",MInt),("numEdges",MInt),("distinct_ids",NodeData(MInt)),("idHashMap",MHashMap(MInt,MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt)))),Tuple2(MArray(MInt),MArray(MInt)))) implements single ${
+    direct (IO) ("assignUndirectedIndicies", Nil, MethodSignature(List(("numNodes",MInt),("numEdges",MInt),("distinct_ids",NodeData(MInt)),("idHashMap",MHashMap(MInt,MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt)))),Tuple2(MArray(MInt),MArray(MInt)))) implements single ${
       val src_edge_array = NodeData[Int](numEdges)
       val src_node_array = NodeData[Int](numNodes)
       var i = 0
@@ -143,8 +133,6 @@ trait IOGraphOps {
       //I can do -1 here because I am pruning so the last node will never have any neighbors
       while(i < numNodes-1){
         val neighborhood = NodeData(fhashmap_get(src_groups,distinct_ids(i))).filter(n => fhashmap_get(idHashMap,n) > i, n =>fhashmap_get(idHashMap,n)).sort
-        //println("neighborhood")
-        //neighborhood.print
         var k = 0
         while(k < neighborhood.length){
           src_edge_array(j) = neighborhood(k)
@@ -170,15 +158,11 @@ trait IOGraphOps {
         else 1
       })
 
-      //println("distinct ids")
-      //distinct_ids.print
-
       val numNodes = distinct_ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
-      val serial_out = assignSpecUndirectedIndicies(numNodes,edge_data.length/2,distinct_ids,idHashMap,src_groups)
+      val serial_out = assignUndirectedIndicies(numNodes,edge_data.length/2,distinct_ids,idHashMap,src_groups)
 
-      //println("finished file I/O. Edges: " + src_edge_array.length)
       CSRUndirectedGraph(numNodes,distinct_ids.getRawArray,serial_out._1,serial_out._2)
     }
 
@@ -197,9 +181,6 @@ trait IOGraphOps {
         else 1
       })
 
-      //println("distinct_ids")
-      //distinct_ids.print
-
       val numNodes = distinct_ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
@@ -217,8 +198,6 @@ trait IOGraphOps {
           numCSRNodes += 1
           numCSREdges += filtered_nbrs(i).length
         }
-        //println("filtered nbrs: " + i)
-        //filtered_nbrs(i).print
       }
       
       /////////////////////////
@@ -231,8 +210,6 @@ trait IOGraphOps {
         else 1
       })
       val idHashMap2 = idView.groupByReduce[Int,Int](n => distinct_ids2(n), n => n, (a,b) => a)
-      //println("distinct_ids2")
-      //distinct_ids2.print
       //////////////////////////
 
       println("NumHash: " + numHash  + " NumCSR: " + numCSRNodes +  " numBitSet: " + numBitSet)
@@ -255,19 +232,12 @@ trait IOGraphOps {
       val csrNodes = NodeData[Int](numCSRNodes)
       val csrEdges = NodeData[Int](numCSREdges)
       while(ii < numNodes){
-        //println("Ex Id: " + distinct_ids2(ii))
-        //println("Filtered Nbrs index: " + fhashmap_get(idHashMap,distinct_ids2(ii)))
         val data = filtered_nbrs(fhashmap_get(idHashMap,distinct_ids2(ii))).map(n => fhashmap_get(idHashMap2,n)).sort
-        //println("data")
-        //filtered_nbrs(fhashmap_get(idHashMap,distinct_ids2(ii))).print
         if(ii < numHash){
-          //println("Hash :" + ii)
           hashNeighborhoods(ii) = HashSet(data.getRawArray)
         }
         else if(ii < (numCSRNodes + numHash)){
           val neighborhood = data
-          //println("neighborhood")
-          //neighborhood.print
           var k = 0
           while(k < neighborhood.length){
             csrEdges(j) = neighborhood(k)
@@ -275,8 +245,6 @@ trait IOGraphOps {
             k += 1
           }
           if(ii < (numCSRNodes+numHash-1)){
-            //println("CSR: " + i +" j:" + j)
-            //I can do -1 here because I am pruning so the last node will never have any neighbors
             csrNodes(i+1) = neighborhood.length + csrNodes(i)
             i += 1
           }

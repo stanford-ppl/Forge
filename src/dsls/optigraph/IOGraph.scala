@@ -124,7 +124,59 @@ trait IOGraphOps {
         NodeData(array_fromfunction(meshSize,z => z)).map( z => pack(z,e))
       }.distinct
     }
+    /*
+    direct (IO) ("loadUndirectedAdjEdgeList", Nil, MString :: CSRUndirectedGraph) implements composite ${
+      val input = NodeData(ForgeFileReader.readLines($0)({line =>
+          val fields = line.fsplit(" ")
+          NodeData[Int](array_map[String,Int](fields,e => e.toInt))
+      }))
+      val idView = NodeData(array_fromfunction(input.length,{n => n}))
+      val src_groups = idView.groupBy({e => 
+          val cur = input(e)
+          cur(0)
+        }, { e =>
+          val cur = input(e)
+          NodeData(array_fromfunction(cur.length,{n => n})).map(n => cur(n+1))
+      })
+      val ids = NodeData(fhashmap_keys(src_groups))
+      val distinct_ids = ids.sortBy({ (a,b) => 
+        val aV = array_buffer_apply(src_groups(a),0).length
+        val bV = array_buffer_apply(src_groups(b),0).length
+        if(aV < bV) -1
+        else if(aV == bV) 0
+        else 1
+      })
+      println("distinct_ids")
+      distinct_ids.print
+      val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
+      val filtered_nbrs = distinct_ids.map(e => array_buffer_apply(src_groups(e),0).filter(a => e > a,a => fhashmap_get(idHashMap,a) ).sort )    
+      val serial_out = assignUndirectedIndicies(numNodes,filtered_nbrs,distinct_ids,idHashMap,src_groups)
 
+      CSRUndirectedGraph(numNodes,distinct_ids.getRawArray,serial_out._1,serial_out._2)
+    }
+
+    direct (IO) ("assignAdjUndirectedIndicies", Nil, MethodSignature(List(("numNodes",MInt),("filtered_nbrs",NodeData(NodeData(MInt))),("distinct_ids",NodeData(MInt)),("idHashMap",MHashMap(MInt,MInt)),("src_groups",NodeData(NodeData(MInt)))),Tuple2(MArray(MInt),MArray(MInt)))) implements single ${
+      val src_edge_array = NodeData[Int](numEdges)
+      val src_node_array = NodeData[Int](numNodes)
+      var i = 0
+      var j = 0
+      //I can do -1 here because I am pruning so the last node will never have any neighbors
+      while(i < numNodes-1){
+        println("i")
+        filtered_nbrs(i).print
+        val neighborhood = filtered_nbrs(i)
+        var k = 0
+        while(k < neighborhood.length){
+          src_edge_array(j) = neighborhood(k)
+          j += 1
+          k += 1
+        }
+        src_node_array(i+1) = neighborhood.length + src_node_array(i)
+        i += 1
+      }
+      pack(src_node_array.getRawArray,src_edge_array.getRawArray)
+    }
+    */
     direct (IO) ("assignUndirectedIndicies", Nil, MethodSignature(List(("numNodes",MInt),("numEdges",MInt),("distinct_ids",NodeData(MInt)),("idHashMap",MHashMap(MInt,MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt)))),Tuple2(MArray(MInt),MArray(MInt)))) implements single ${
       val src_edge_array = NodeData[Int](numEdges)
       val src_node_array = NodeData[Int](numNodes)
@@ -150,14 +202,15 @@ trait IOGraphOps {
 
       //sort by degree, helps with skew for buckets of nodes
       val ids = NodeData(fhashmap_keys(src_groups))
-      val distinct_ids = ids.sortBy({ (a,b) => 
+      
+      val distinct_ids = ids/*ids.sortBy({ (a,b) => 
         val aV = array_buffer_length(fhashmap_get(src_groups,ids(a)))
         val bV = array_buffer_length(fhashmap_get(src_groups,ids(b))) 
         if(aV < bV) -1
         else if(aV == bV) 0
         else 1
       })
-
+      */
       val numNodes = distinct_ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)

@@ -294,12 +294,13 @@ trait IOGraphOps {
         else 1
       })
 
-      val numEdges = sorted_input.mapreduce[Int](a => a.length, (a,b) => a+b, e=>true)
       val distinct_ids = sorted_input.map[Int]{nd => nd(0)}
+
       val nbrs = sorted_input.map{ nd =>
         NodeData.fromFunction(nd.length-1,a => a+1).map(a => nd(a)).sort
       }
 
+      val numEdges = nbrs.mapreduce[Int](a => a.length, (a,b) => a+b, e=>true)
       val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
       val serial_out = assignAdjUndirectedIndicies(numNodes,numEdges,nbrs,distinct_ids,idHashMap)
       
@@ -312,7 +313,7 @@ trait IOGraphOps {
       var j = 0
       //I can do -1 here because I am pruning so the last node will never have any neighbors
       while(i < numNodes-1){
-        val neighborhood = nbrs(i).filter(e => i < fhashmap_get(idHashMap,e), e => fhashmap_get(idHashMap,e))      
+        val neighborhood = nbrs(i).filter(e => i < fhashmap_get(idHashMap,e), e => fhashmap_get(idHashMap,e)).sort
         var k = 0
         while(k < neighborhood.length){
           src_edge_array(j) = neighborhood(k)

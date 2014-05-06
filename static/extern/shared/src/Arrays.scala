@@ -27,7 +27,7 @@ trait ForgeArrayOps extends Base {
   }
   // the implicit class method 'length' is not working for an unknown reason, possibly related to the problem mentioned in ForgeArrayCompilerOps below
   // omitting SourceContext is a hacky way to avoid conflicts with Forge DSLs without using an arbitrary Overloaded parameter
-  def infix_length[T:Manifest](x: Rep[Array[T]]) = scala_array_length(x)
+  def infix_length[T:Manifest](x: Rep[Array[T]])(implicit __imp0: SourceContext) = scala_array_length(x)
   def scala_array_apply[T:Manifest](x: Rep[Array[T]], n: Rep[Int])(implicit __imp0: SourceContext): Rep[T]
   def scala_array_length[T:Manifest](x: Rep[Array[T]])(implicit __imp0: SourceContext): Rep[Int]
 }

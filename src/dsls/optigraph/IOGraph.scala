@@ -41,13 +41,22 @@ trait IOGraphOps {
     })
     //assume every edge is listed twice for undirected graphs
     direct (IO) ("undirectedGraphFromEdgeList", Nil, MString :: UndirectedGraph) implements composite ${
-      val input_edges = ForgeFileReader.readLines($0)({line =>
-          val fields = line.fsplit(" ")
-          pack(fields(0).toInt,fields(1).toInt) 
+     val input_edges =
+      ForgeFileReader.readLinesFlattened($0)({line =>
+        val fields = line.fsplit(" ")
+        //no self edges allowed
+        if(fields(0).toInt != fields(1).toInt){
+          array_fromfunction(((array_length(fields)-1)*2),{n =>
+            if(n==0) pack(fields(0).toInt,fields(1).toInt)
+            else pack(fields(1).toInt,fields(0).toInt)
+          })
+        }
+        else{
+          array_empty[Tup2[Int,Int]](0)
+        }
       })
-
       //contains the input tuples
-      val edge_data = NodeData[Tup2[Int,Int]](input_edges)
+      val edge_data = NodeData[Tup2[Int,Int]](input_edges).distinct
 
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       val src_ids = NodeData(fhashmap_keys(src_groups))

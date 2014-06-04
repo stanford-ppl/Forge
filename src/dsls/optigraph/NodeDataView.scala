@@ -35,12 +35,105 @@ trait NodeDataViewOps {
           i += 1
         }
       }
-      
       infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println(a)})
       infix ("getRawArray") (Nil :: MArray(T)) implements composite ${
         val d = array_empty[T]($self.length)
         array_copy(NodeDataView_data($self),NodeDataView_start($self),d,0,$self.length)
         d
+      }
+      infix ("intersect") (NodeDataView(T) :: MLong, TNumeric(T)) implements single ${
+        val nbrs = $self
+        val nbrsOfNbrs = $1
+        if(nbrs.length == 0 || nbrsOfNbrs.length == 0) 0l
+        else if(nbrs(0) > nbrsOfNbrs(nbrsOfNbrs.length-1) || 
+          nbrsOfNbrs(0) > nbrs(nbrs.length-1)){
+          0l
+        }
+        else{
+          ndv_intersect_sets(nbrs,nbrsOfNbrs)
+        }
+      }
+      compiler ("ndv_intersect_sets") (NodeDataView(T) :: MLong, TNumeric(T)) implements single ${
+        val nbrs = $self
+        val nbrsOfNbrs = $1
+        var i = 0
+        var t = 0l
+        var j = 0
+        val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
+        val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
+        //I understand there are simplier ways to write this, I tried a lot of versions
+        //this is the fastest (that I tried).
+        while(i < (small.length-1)  && j < (large.length-1)){
+          while(j < (large.length-1) && large(j) < small(i)){
+            j += 1
+          }
+          if(small(i)==large(j)){
+           t += 1
+          }
+          i += 1
+        }
+        //if i reaches the end before j
+        while(j < (large.length-1) && large(j) < small(i)){
+          j += 1
+        }
+        //if j reaches the end before i
+        while(large(j) > small(i) && i < (small.length-1)){
+          i += 1
+        }
+        if(small(i) == large(j)) t += 1 
+        t
+      }
+      infix ("intersectInRange") ((("nbrsOfNbrs",NodeDataView(T)),("nbrsMax",T)) :: MLong, TNumeric(T)) implements single ${
+        val nbrs = $self
+
+        if(nbrs.length < 2 || nbrsOfNbrs.length < 2 ) 0l
+        else if(nbrsMax <= nbrsOfNbrs(0) ||
+          nbrsMax <= nbrs(0)){
+          0l
+        }
+        else if(nbrs(0) > nbrsOfNbrs(nbrsOfNbrs.length-1) || 
+          nbrsOfNbrs(0) > nbrs(nbrs.length-1)){
+          0l
+        }
+        else{
+          ndv_intersect_sets_in_range($self,nbrsOfNbrs,nbrsMax)
+        }
+      }
+      compiler ("ndv_intersect_sets_in_range") ((("nbrsOfNbrs",NodeDataView(T)),("nbrsMax",T)) :: MLong, TNumeric(T)) implements single ${
+        val nbrs = $self
+        var t = 0l
+        var i = 0
+        var j = 0
+        val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
+        val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
+        val smallMax = nbrsMax 
+        val largeMax = nbrsMax
+        //I understand there are simplier ways to write this, I tried a lot of versions
+        //this is the fastest (that I tried).
+        var notFinished = small(i) < smallMax && large(j) < largeMax
+        while(i < (small.length-1)  && j < (large.length-1) && notFinished){
+          while(j < (large.length-1) && large(j) < small(i) && notFinished){
+            j += 1
+            notFinished = large(j) < largeMax
+          }
+          if(small(i)==large(j) && notFinished){
+           t += 1
+          }
+          i += 1
+          notFinished = notFinished && small(i) < smallMax
+        }
+        //if i reaches the end before j
+        while(j < (large.length-1) && large(j) < small(i) && notFinished){
+          j += 1
+          notFinished = large(j) < largeMax
+        }
+        //if j reaches the end before i
+        while(large(j) > small(i) && i < (small.length-1) && notFinished){
+          i += 1
+          notFinished = small(i) < smallMax
+        }
+        if(small(i) == large(j) && notFinished) t += 1 
+        t
       }
 
       compiler ("NodeDataView_data") (Nil :: MArray(T)) implements getter(0, "_data")
@@ -50,5 +143,6 @@ trait NodeDataViewOps {
       
       parallelize as ParallelCollection(T, lookupOp("NodeDataView_illegalalloc"), lookupOp("length"), lookupOverloaded("apply",1), lookupOp("NodeDataView_illegalupdate"))
     }
+    direct(NodeDataView) ("sumOverCollection", (T,R), CurriedMethodSignature(List(("nd_view",NodeDataView(T)), ("data",T==>R) ,("cond",T==>MBoolean)),R), TNumeric(R)) implements composite ${nd_view.mapreduce[R]( e => data(e), (a,b) => a+b, cond)}
   }
 }

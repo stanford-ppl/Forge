@@ -8,7 +8,7 @@ object ExamplesInterpreter extends OptiWranglerApplicationInterpreter with Examp
 trait Examples extends OptiWranglerApplication {
   	
 	def main() = {
-		if (args.length < 1) printUsage
+		if (args.length < 2) printUsage
 
 		println("Reading input table...")
 		val inputTable = Table.fromFile(args(0), isValidLine)
@@ -20,31 +20,31 @@ trait Examples extends OptiWranglerApplication {
 	}
 
 	def printUsage = {
-	    println("Usage: Fill <input_file> <output_file>")
+	    println("Usage: bin/delite ExamplesCompiler <input_file> <output_file>")
 	    exit(-1)
   	}
 
 	def transformAndPrint(tbl:Rep[Table], outFile:Rep[String]) = {
 
-		tic(tbl)
-		
+		tic("Applying transforms")
 		println("Applying transforms...")
-		val colsToMerge = array_string_split("renCol,data1", ",")
-		val outTable = tbl Split(col = "data", delimiter = ";", numOfSplits = 4) 
-		                   Fill("up")
-		                   Translate("left")
-		                   Drop("data")
-		                   SetName("data0", "renCol")
-		                   Filter(Condition.apply)
-		                   Merge(colsToMerge, "::")
-		                   Transpose()
+
+		val colsToMerge = array_string_split("renCol,split1", ",")
+		val outTable = (tbl Split(col = "data", delimiter = ";", numOfSplits = 4)
+		                    Fill("up")
+		                    Translate("left")
+		                    Drop("data")
+		                    SetName("split0", "renCol")
+		                    Filter(Condition.apply)
+		                    Merge(colsToMerge, "::")
+		                    Transpose())
+
 		println("Applying transforms... DONE")
+		toc("Applying transforms")
 
 		println("Printing output table...")
-		writeTable(outTable, outFile)
+		writeToFile(outTable, outFile)
 		println("Printing output table...")
-
-		toc(outTable)
 	}
 
   def isValidLine(line: Rep[String]): Rep[Boolean] = {true}

@@ -8,6 +8,8 @@ object TPCHQ1Interpreter extends OptiQLApplicationInterpreter with TPCHQ1Trait
 object TPCHQ1Compiler extends OptiQLApplicationCompiler with TPCHQ1Trait
 object TPCHQ6Interpreter extends OptiQLApplicationInterpreter with TPCHQ6Trait
 object TPCHQ6Compiler extends OptiQLApplicationCompiler with TPCHQ6Trait
+object TPCHQ14Interpreter extends OptiQLApplicationInterpreter with TPCHQ14Trait
+object TPCHQ14Compiler extends OptiQLApplicationCompiler with TPCHQ14Trait
 
 trait TPCHBaseTrait extends OptiQLApplication with Types {
 

@@ -14,11 +14,9 @@ trait RewriteOpsExp extends RewriteOps with TableOpsExp with DeliteOptiQLExtraEx
   this: OptiQLExp =>
 
   def groupByHackImpl[K:Manifest,V:Manifest](self: Rep[Table[V]], keySelector: Rep[V] => Rep[K])(implicit pos: SourceContext): Rep[Table[Tup2[K,Table[V]]]] = {
-    /*val map = DeliteArrayBuffer(table_raw_data(self), table_size(self)).groupBy(keySelector)
-    val arr: Rep[DeliteArray[Tup2[K,Table[V]]]] = null //dmap_keys(map).zip(dmap_values(map)){ (k,v) => pack(k, null.asInstanceOf[Rep[Table[V]]]) }
-    //val arr = darray_zipwith(dmap_keys(map), dmap_values(map), (k:Rep[K],v:Rep[DeliteArrayBuffer[V]]) => pack(k,Table(darray_buffer_unsafe_result(v), v.length)))
-    Table(arr, arr.length)*/
-    cast_asinstanceof[Null,Table[Tup2[K,Table[V]]]](unit(null))
+    val map = DeliteArrayBuffer(table_raw_data(self), table_size(self)).groupBy(keySelector)
+    val arr = dmap_keys(map).zip(dmap_values(map)){ (k,v) => pack(k, table_object_apply(darray_buffer_unsafe_result(v), darray_buffer_length(v))) }
+    table_object_apply(arr, darray_length(arr))
   }
 
   def sortHackImpl[A:Manifest](self: Rep[Table[A]], comparator: (Rep[A],Rep[A]) => Rep[Int])(implicit pos: SourceContext): Rep[Table[A]] = {

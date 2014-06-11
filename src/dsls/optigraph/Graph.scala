@@ -52,9 +52,12 @@ trait GraphOps{
         }
         NodeData(data)
       }
+      infix("sumOverNodes")  ( (Node ==> R) :: R, TNumeric(R), addTpePars=R) implements composite ${
+        NodeIdView($self.numNodes).mapreduce[R]({n => $1(Node(n))},{(a,b) => a+b},{n => true})
+      }
       //given an ID return a node
       infix("getNodeFromID")(MInt :: Node) implements composite ${
-        val result = NodeIdView($self.getExternalIDs,$self.numNodes).mapreduce[Int]( i => i, (a,b) => a+b, i => $self.getExternalID(i)==$1)
+        val result = NodeIdView($self.numNodes).mapreduce[Int]( i => i, (a,b) => a+b, i => $self.getExternalID(i)==$1)
         if(result >= $self.numNodes() || result < 0) fatal("ERROR. ID: " + $1 + " does not exist in this UndirectedGraph!")
         Node(result)
       }
@@ -74,7 +77,7 @@ trait GraphOps{
       infix ("inBFOrder") ( CurriedMethodSignature(List(Node,((Node,NodeData(R),NodeData(MInt)) ==> R),((Node,NodeData(R),NodeData(R),NodeData(MInt)) ==> R)),NodeData(R)), TFractional(R), addTpePars=R, effect=simple) implements composite ${
         val levelArray = NodeData[Int]($self.numNodes)
         val bitMap = AtomicIntArray($self.numNodes)
-        val nodes = NodeIdView($self.getExternalIDs,$self.numNodes) 
+        val nodes = NodeIdView($self.numNodes) 
         val forwardComp = NodeData[R]($self.numNodes)
         val reverseComp = NodeData[R]($self.numNodes)
 
@@ -137,9 +140,7 @@ trait GraphOps{
     direct(Graph) ("abs", Nil, NodeData(MFloat) :: NodeData(MFloat)) implements composite ${$0.map(e => abs(e))}
 
     //a couple of sum methods
-    direct(Graph) ("sum", R, NodeData(R) :: R, TNumeric(R)) implements composite ${$0.reduce((a,b) => a+b)}
     direct(Graph) ("sum", R, CurriedMethodSignature(List(("nd_view",NodeDataView(MInt)), ("data",MInt==>R) ,("cond",MInt==>MBoolean)),R), TNumeric(R)) implements composite ${nd_view.mapreduce[R]( e => data(e), (a,b) => a+b, cond)}
-    direct(Graph) ("sum", R, NodeData(NodeData(R)) :: NodeData(R), TFractional(R)) implements composite ${$0.reduceNested( ((a,b) => a+b),NodeData[R]($0.length))}
     
     // "block" should not mutate the input, but always produce a new copy. in this version, block can change the structure of the input across iterations (e.g. increase its size)
     direct (Graph) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, ".0001"), ("minIter", MInt, "1"), ("maxIter", MInt, "100")), ("block", T ==> T), ("diff", (T,T) ==> MDouble)), T)) implements composite ${

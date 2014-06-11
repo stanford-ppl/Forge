@@ -85,6 +85,8 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("  override def infix_unsafeMutable[A:Manifest](lhs: Rep[A])(implicit pos: SourceContext) = object_unsafe_mutable(lhs)")
     stream.println("  override def infix_trim(lhs: Rep[String])(implicit pos: SourceContext) = string_trim(lhs)")
     stream.println("  override def infix_startsWith(lhs: Rep[String], rhs: Rep[String])(implicit pos: SourceContext) = fstring_startswith(lhs,rhs)")
+    stream.println("  override def infix_endsWith(lhs: Rep[String], rhs: Rep[String])(implicit pos: SourceContext) = fstring_endswith(lhs,rhs)")
+    stream.println("  override def infix_contains(lhs: Rep[String], rhs: Rep[String])(implicit pos: SourceContext) = fstring_contains(lhs,rhs)")
     stream.println("  override def __whileDo(cond: => Exp[Boolean], body: => Rep[Unit])(implicit pos: SourceContext) = delite_while(cond, body)")
     // delite and lms if-then-else don't use by-name-parameter for cond
     stream.println("  override def __ifThenElse[T:Manifest](cond: Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")

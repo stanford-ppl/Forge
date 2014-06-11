@@ -16,8 +16,12 @@ import optiql.library.classes._
 trait DateWrapper extends DateOps {
   this: OptiQLBase with OptiQLClasses =>
 
-  class DateImpl(__value: Int) extends Date {
+  case class DateImpl(__value: Int) extends Date {
     var value = __value
+
+    override def toString = {
+      "" + (value >>> 9) + "-" + ((value >>> 5) & 0xf) + "-" + (value & 0x1f)
+    }
   }
 
   def date_object_apply(__arg0: Rep[Int])(implicit __pos: SourceContext,__imp1: Overload4) = {

@@ -3,13 +3,23 @@ package LOWERCASE_DSL_NAME.library
 import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common._
-import scala.collection.mutable.HashMap
+import scala.collection.mutable.{ArrayBuffer, HashMap}
 
 trait RecordWrapper extends HUMAN_DSL_NAMEBase {
   this: StructOps =>
 
+  //case class extends Record appears to be broken (scalac bug)
   class RecordImpl extends Record {
     val fields: HashMap[String,Any] = new HashMap()
+    val fieldNames: ArrayBuffer[String] = new ArrayBuffer() //maintains declared field order
+
+    //records have structural equality
+    override def equals(other: Any): Boolean = other match {
+      case that: RecordImpl => this.fields == that.fields
+      case _ => false
+    }
+
+    override def hashCode: Int = fields.##
   }
 
   def field[T:Manifest](struct: Rep[Any],index: String)(implicit pos: SourceContext): Rep[T] = record_select(struct.asInstanceOf[Rep[Record]], index)
@@ -21,6 +31,7 @@ trait RecordWrapper extends HUMAN_DSL_NAMEBase {
       val value = rhs(recordRep)
       //println(value, value.getClass.getSimpleName)
       recordImpl.fields.asInstanceOf[HashMap[String,Any]] += Pair(name,value.asInstanceOf[Any])
+      recordImpl.fieldNames.asInstanceOf[ArrayBuffer[String]] += name
     }
     recordRep
   }

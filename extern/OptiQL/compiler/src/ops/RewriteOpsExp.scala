@@ -23,7 +23,7 @@ trait RewriteOpsExp extends RewriteOps with TableOpsExp {
     else queryable_sort_impl(self, (a:Rep[A],b:Rep[A]) => keySelector(b) compare keySelector(a))
   }
 
-
+  //TODO: this special-cases filter fusion (only for groupBy); LMS fusion should take care of it generically for us
   override def table_groupby[A:Manifest,K:Manifest](self: Rep[Table[A]],keySelector: (Rep[A]) => Rep[K])(implicit __pos: SourceContext): Rep[Table[Tup2[K,Table[A]]]] = self match {
     case Def(Table_Where(origS, predicate)) =>
       reflectPure(Table_GroupByWhere(origS, keySelector, predicate))
@@ -81,6 +81,9 @@ trait RewriteOpsExp extends RewriteOps with TableOpsExp {
   }
 
   override def table_select[A:Manifest,R:Manifest](self: Rep[Table[A]], resultSelector: (Rep[A]) => Rep[R])(implicit __pos: SourceContext): Exp[Table[R]] = self match {
+    //case Def(QueryableWhere(origS, predicate)) => //Where-Select fusion
+    //  QueryableSelectWhere(origS, resultSelector, predicate)
+
     case Def(g@Table_GroupBy(origS: Exp[Table[a]], keySelector)) => hashReduce(resultSelector, keySelector)(g._mA,g._mK,manifest[A],manifest[R]) match {
       case Some((valueFunc, reduceFunc, averageFunc)) =>
         val hr = groupByReduce(origS, keySelector, valueFunc, reduceFunc, (e:Exp[a]) => unit(true))(g._mA,g._mK,manifest[R],implicitly[SourceContext])

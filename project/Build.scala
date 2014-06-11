@@ -6,7 +6,7 @@ import java.io.File
 import scala.collection.mutable.{ArrayBuffer,HashSet,HashMap}
 
 object ForgeBuild extends Build with ForgePreprocessor {
-  val virtScala = Option(System.getenv("SCALA_VIRTUALIZED_VERSION")).getOrElse("2.10.2-RC1")
+  val virtScala = Option(System.getenv("SCALA_VIRTUALIZED_VERSION")).getOrElse("2.10.2-RC2")
   val virtualization_lms_core = "EPFL" % "lms_2.10" % "0.3-SNAPSHOT"
   val scalaTest = "org.scalatest" % "scalatest_2.10" % "2.0.M5b" % "test"
 

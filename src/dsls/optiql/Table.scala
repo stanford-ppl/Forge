@@ -8,10 +8,12 @@ trait TableOps {
   this: OptiQLDSL =>
 
   def importTableOps() {
-    val A = tpePar("A")
-    val K = tpePar("K")
-    val V = tpePar("V")
-    val R = tpePar("R")
+    val A = tpePar("A") //input types
+    val B = tpePar("B")
+    val C = tpePar("C")
+    val K = tpePar("K") //key tpe
+    val V = tpePar("V") //value tpe
+    val R = tpePar("R") //result tpe
 
     val Table = tpe("Table", A)
 
@@ -23,7 +25,6 @@ trait TableOps {
     static (Table) ("apply", A, MInt :: Table(A), effect = mutable) implements allocates(Table, ${$0}, ${array_empty[A]($0) })
     static (Table) ("apply", A, MArray(A) :: Table(A)) implements allocates(Table, ${array_length($0)}, ${$0})
     static (Table) ("apply", A, (MArray(A), MInt) :: Table(A)) implements allocates(Table, ${$1}, ${$0})
-    //static (Table) ("apply", A, (MArrayBuffer(A)) :: Table(A)) implements allocates(Table, ${$0.length}, ${$0.})
     static (Table) ("apply", A, varArgs(A) :: Table(A)) implements allocates(Table, ${unit($0.length)}, ${array_fromseq($0)})
     static (Table) ("range", Nil, (MInt, MInt) :: Table(MInt)) implements composite ${
       val a = array_fromfunction($1-$0, i => i + $0)
@@ -52,6 +53,16 @@ trait TableOps {
     infix (Tuple2) ("key", (K,V), Tuple2(K,Table(V)) :: K) implements composite ${ tup2__1($0) }
     infix (Tuple2) ("values", (K,V), Tuple2(K,Table(V)) :: Table(V)) implements composite ${ tup2__2($0) }
 
+    //sorting convenience method on Orderables
+    direct ("asc")("keySelector" -> (A ==> K) :: (A,A) => MInt, addTpePars = K withBound TOrdering) implements composite ${
+      (a,b) => keySelector(a) compare keySelector(b)
+    }
+
+    direct ("desc")("keySelector" -> (A ==> K) :: (A,A) => MInt, addTpePars = K withBound TOrdering) implements composite ${
+      (a,b) => keySelector(b) compare keySelector(a)
+    }
+
+
     val TableOps = withTpe (Table)
     TableOps {
 
@@ -62,6 +73,7 @@ trait TableOps {
 
       //bulk bucketReduce ops
       //TODO: composite op
+      //TODO: what are the semantics of GroupBy? does it return a Map or a Table(Pairs), or ...?
       infix ("GroupBy") ("keySelector" -> (A ==> K) :: Table(Tuple2(K,Table(A))), addTpePars = K) implements single ${
         groupByHackImpl($self, $keySelector)
       }
@@ -93,18 +105,27 @@ trait TableOps {
       infix ("Last") (Nil :: A) implements single ${ table_apply($self, table_size($self)-1) }
 
       //sorting ops
-      infix ("OrderBy") ("keySelector" -> (A ==> K) :: Table(A), addTpePars = K withBound TOrdering) implements composite ${
+      infix ("OrderBy") ("sorts" -> varArgs((A,A) ==> MInt) :: Table(A)) implements composite ${
         sortHackImpl($self, $keySelector, true)
       }
-      infix ("OrderByDescending")("keySelector" -> (A ==> K) :: Table(A), addTpePars = K withBound TOrdering) implements composite ${
-        sortHackImpl($self, $keySelector, false)
-      }
-
-      // infix ("ThenBy")
-      // infix ("ThenbyDescending")
 
       //multi-table ops
-      // infix ("Join")
+      //infix ("Join")
+
+      compiler ("join2")(("t1" -> Table(A), "k1" -> (A ==> K), "t2" -> Table(B), "k2" -> (B ==> K), "result" -> ((A,B) ==> R)) :: Table(R), addTpePars = (B,K,R)) implements composite ${
+        //TODO: we want to hash the smaller collection, but the size may be unknown (on disk); we could use file size as an approximation if we had some rewrites
+        val grouped = array_buffer_new_imm(table_raw_data(t1)).groupBy(keySelector1) //FIXME
+        val empty = array_buffer_imm(array_empty_imm(unit(0))) //note: control effects on IfThenElse require some manual hoisting
+        t2.flatMap(e2 => {
+          if (grouped.contains(keySelector2(e2))) grouped.get(keySelector2(e2)).map(e1 => resultSelector(e1,e2))
+          else empty
+        })
+      }
+
+      /*compiler ("join3")(("t1" -> Table(A), "k1" -> (A ==> K), "t2" -> Table(B), "k2" -> (B ==> K), "t3" -> Table(C), "k3" -> (C ==> K), "result" -> ((A,B,C) ==> R)) :: Table(R), addTpePars = (B,C,K,R)) implements composite ${
+        ???
+      }*/
+      
 
       //printing ops
       infix ("printAsTable") (("maxRows", MInt, "100") :: MUnit, effect = simple) implements codegen($cala, ${
@@ -115,6 +136,10 @@ trait TableOps {
         TablePrinter.writeAsJSON($self, $path)
       })
 
+      /*infix ("writeAsCSV") (("separator"->MString, "path"->MString) :: MUnit, effect = simple) implements codegen($cala ${
+        TablePrinter.writeAsCSV($self, $separator, $path)
+      })*/
+
       //internal transformed ops
       compiler("groupByReduce")(("keySelector" -> (A ==> K), "valueSelector" -> (A ==> V), "reducer" -> ((V,V) ==> V), "condition" -> (A ==> MBoolean)) :: Table(V), addTpePars = (K,V)) implements composite ${
         val map = groupByReduceOp($self, $keySelector, $valueSelector, $reducer, $condition)
@@ -123,6 +148,7 @@ trait TableOps {
       compiler("groupByReduceOp")(("keySelector" -> (A ==> K), "valueSelector" -> (A ==> V), "reducer" -> ((V,V) ==> V), "condition" -> (A ==> MBoolean)) :: MHashMap(K,V), addTpePars = (K,V)) implements groupByReduce((A,K,V), 0, ${$keySelector}, ${$valueSelector}, ${zeroType[V]}, ${$reducer}, Some(${condition}))
       compiler("bulkDivide") (("counts" -> Table(MInt), "avgFunc" -> ((A,MInt) ==> A)) :: Table(A)) implements zip((A,MInt,A), (0,1), ${$avgFunc})
 
+      
       //methods needed to implement Table as a Delite ParallelCollectionBufer
 
       //accessors

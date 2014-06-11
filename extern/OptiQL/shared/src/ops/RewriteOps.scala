@@ -11,7 +11,9 @@ trait RewriteCompilerOps extends RewriteOps {
 
   def groupByHackImpl[K:Manifest,V:Manifest](self: Rep[Table[V]], keySelector: Rep[V] => Rep[K])(implicit pos: SourceContext): Rep[Table[Tup2[K,Table[V]]]]
 
-  def sortHackImpl[A:Manifest,K:Manifest:Ordering](self: Rep[Table[A]], keySelector: Rep[A] => Rep[K], ascending: Boolean)(implicit pos: SourceContext): Rep[Table[A]]
+  def sortHackImpl[A:Manifest](self: Rep[Table[A]], comparator: (Rep[A],Rep[A]) => Rep[Int])(implicit pos: SourceContext): Rep[Table[A]]
+
+  def compareHackImpl[A:Manifest:Ordering](lhs: Rep[A], rhs: Rep[A]): Rep[Int]
 
   def zeroType[T:Manifest]: Rep[T] = (manifest[T] match { //need a more robust solution, e.g. type class
     //case StructType(tag,elems) => struct[T](tag, elems.map(e => (e._1, zeroType(e._2))))

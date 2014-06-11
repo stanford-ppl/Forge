@@ -93,8 +93,6 @@ trait ScalaOps {
     val int_shift_right = direct (Prim) ("forge_int_shift_right", Nil, (MInt,MInt) :: MInt)
     val int_mod = infix (Prim) ("%", Nil, (MInt,MInt) :: MInt)
     val int_bitwise_not = infix (Prim) ("unary_~", Nil, MInt :: MInt)
-    val int_binary_and = direct (Prim) ("forge_int_and", Nil, (MInt,MInt) :: MInt)
-    val int_binary_or = direct (Prim) ("forge_int_or", Nil, (MInt,MInt) :: MInt)
     
     val float_plus = direct (Prim) ("forge_float_plus", Nil, (MFloat,MFloat) :: MFloat)
     val float_minus = direct (Prim) ("forge_float_minus", Nil, (MFloat,MFloat) :: MFloat)
@@ -417,6 +415,7 @@ trait ScalaOps {
 
     infix (Ord) ("min", List(A withBound TOrdering), List(A,A) :: A) implements (codegen($cala, quotedArg(0) + " min " + quotedArg(1)))
     infix (Ord) ("max", List(A withBound TOrdering), List(A,A) :: A) implements (codegen($cala, quotedArg(0) + " max " + quotedArg(1)))
+    //infix (Ord) ("compare", List(A withBound TOrdering), List(A,A) :: MInt) implements (codegen($cala, quotedArg(0) + " compare " + quotedArg(1)))
     val lt = infix (Ord) ("<", List(A withBound TOrdering), List(A,A) :: MBoolean)
     val lte = infix (Ord) ("<=", List(A withBound TOrdering), List(A,A) :: MBoolean)
     val gt = infix (Ord) (">", List(A withBound TOrdering), List(A,A) :: MBoolean)

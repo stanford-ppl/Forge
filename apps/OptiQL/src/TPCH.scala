@@ -1,7 +1,7 @@
 import optiql.compiler._
 import optiql.library._
 import optiql.shared._
-
+import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common.Record
 
 object TPCHQ1Interpreter extends OptiQLApplicationInterpreter with TPCHQ1Trait
@@ -14,6 +14,13 @@ trait TPCHBaseTrait extends OptiQLApplication with Types {
   def printUsage = {
     println("Usage: TPCHQ## <input directory>")
     exit(-1)
+  }
+
+  //timing decided at staging time so we can fuse across I/O when possible
+  val timeIO: Boolean = System.getProperty("tpch.time.io", "true") != "false"
+  override def tic(in: Rep[Any]*)(implicit ctx: SourceContext) = {
+    if (timeIO) super.tic() //start timing immediately
+    else super.tic(in:_*) //start timing after input loaded
   }
 
   val queryName: String
@@ -61,7 +68,7 @@ trait TPCHQ1Trait extends TPCHBaseTrait {
       val avgPrice = g.values.Average(_.l_extendedprice)
       val avgDiscount = g.values.Average(_.l_discount)
       val countOrder = g.values.Count
-    }) OrderBy(_.returnFlag)
+    }) OrderBy(asc(_.returnFlag), asc(_.lineStatus))
     
     toc(q)
     q.printAsTable()
@@ -83,5 +90,28 @@ trait TPCHQ6Trait extends TPCHBaseTrait {
 
     toc(revenue)
     println(revenue)
+  }
+}
+
+trait TPCHQ14Trait extends TPCHBaseTrait {
+  val queryName = "Q14"
+
+  def query() = {
+    val parts = loadParts(); val lineItems = loadLineItems()
+    tic(parts.size, lineItems.size)
+
+    val shippedItems = lineItems.Where(li => li.l_shipdate >= Date("1995-09-01") && li.l_shipdate < Date("1995-10-01"))    
+    val q = parts.Join(shippedItems)(_.p_partkey, _.l_partkey)(
+      (p,l) => new Record { //this post-Join Select is very boilerplate but we need to get the type right
+        val l_extendedprice = l.l_extendedprice
+        val l_discount = l.l_discount
+        val p_type = p.p_type
+      })
+
+    val promoRevenue = q.Sum(l => if (l.p_type startsWith "PROMO") l.l_extendedprice * (1.0 - l.l_discount) else 0.0)
+    val totalRevenue = q.Sum(l => l.l_extendedprice * (1.0 - l.l_discount))
+    val promoPercentage = 100 * promoRevenue / totalRevenue
+    toc(promoPercentage)
+    println(promoPercentage)
   }
 }

@@ -29,6 +29,7 @@ trait ForgeSuiteInterpreter extends Suite {
     app.main()
 
     // ignore the report file and read the collector directly
+    if (verbose) println("==== " + app.getClass.getSimpleName + " ====")
     val results = app.collector
     for (i <- 0 until results.length) {
       val b = results(i)

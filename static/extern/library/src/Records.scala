@@ -8,8 +8,18 @@ import scala.collection.mutable.{ArrayBuffer, HashMap}
 trait RecordWrapper extends HUMAN_DSL_NAMEBase {
   this: StructOps =>
 
-  case class RecordImpl(fields: HashMap[String,Any] = new HashMap()) extends Record {
-    val fieldNames: ArrayBuffer[String] = new ArrayBuffer[String]() //maintains declared field order
+  //case class extends Record appears to be broken (scalac bug)
+  class RecordImpl extends Record {
+    val fields: HashMap[String,Any] = new HashMap()
+    val fieldNames: ArrayBuffer[String] = new ArrayBuffer() //maintains declared field order
+
+    //records have structural equality
+    override def equals(other: Any): Boolean = other match {
+      case that: RecordImpl => this.fields == that.fields
+      case _ => false
+    }
+
+    override def hashCode: Int = fields.##
   }
 
   def field[T:Manifest](struct: Rep[Any],index: String)(implicit pos: SourceContext): Rep[T] = record_select(struct.asInstanceOf[Rep[Record]], index)

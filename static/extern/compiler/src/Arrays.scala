@@ -153,6 +153,8 @@ trait ForgeArrayBufferOpsExp extends DeliteArrayBufferOpsExp {
     = throw new UnsupportedOperationException("DeliteArrayBuffer indexOf not implemented yet")
   def array_buffer_result[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = darray_buffer_result(__arg0)
+  def array_buffer_unsafe_result[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+    = darray_buffer_unsafe_result(__arg0)
   def array_buffer_map[T:Manifest,R:Manifest](__arg0: Rep[ForgeArrayBuffer[T]], __arg1: Rep[T] => Rep[R])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[R]]
     = darray_buffer_map(__arg0,__arg1)
   def array_buffer_flatmap[T:Manifest,R:Manifest](__arg0: Rep[ForgeArrayBuffer[T]], __arg1: Rep[T] => Rep[ForgeArrayBuffer[R]])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[R]]

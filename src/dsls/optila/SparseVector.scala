@@ -273,7 +273,7 @@ trait SparseVectorOps {
         }
         else if ($self.isRow) {
           for (i <- 0 until $self.nnz-1) {
-            s = s + "(" + array_apply(indices,i) + ", " +array_apply(data,i).makeStr + "), "
+            s = s + "(" + array_apply(indices,i) + ", " + array_apply(data,i).makeStr + "), "
           }
           s = s + "(" + array_apply(indices,$self.nnz-1) + ", " + array_apply(data,$self.nnz-1).makeStr + ") "
         }
@@ -298,16 +298,15 @@ trait SparseVectorOps {
         }
         else if ($self.isRow) {
           for (i <- 0 until $self.nnz-1) {
-            // make sure to force strConcatWithNumerics to kick in
-            s = s + "(" + array_apply(indices,i) + ", " + array_apply(data,i) + "), "
+            s = s + "(" + array_apply(indices,i) + ", " + optila_fmt_str(array_apply(data,i)) + "), "
           }
-          s = s + "(" + array_apply(indices,$self.nnz-1) + ", " + array_apply(data,$self.nnz-1) + ") "
+          s = s + "(" + array_apply(indices,$self.nnz-1) + ", " + optila_fmt_str(array_apply(data,$self.nnz-1)) + ") "
         }
         else {
           for (i <- 0 until $self.nnz-1) {
-            s = s + "(" + array_apply(indices,i) + ", " + array_apply(data,i) + ")\\n"
+            s = s + "(" + array_apply(indices,i) + ", " + optila_fmt_str(array_apply(data,i)) + ")\\n"
           }
-          s = s + "(" + array_apply(indices,$self.nnz-1) + ", " + array_apply(data,$self.nnz-1) + ")"
+          s = s + "(" + array_apply(indices,$self.nnz-1) + ", " + optila_fmt_str(array_apply(data,$self.nnz-1)) + ")"
         }
         s
       }
@@ -342,16 +341,16 @@ trait SparseVectorOps {
       // must be sequential (updates are not disjoint in the underlying arrays)
       infix ("update") ((("indices",IndexVector),("e",T)) :: MUnit, effect = write(0)) implements single ${
         for (i <- 0 until indices.length) {
-          // if (indices(i) < 0 || indices(i) >= $self.length) fatal("index out of bounds: bulk vector update")
+          fassert(indices(i) >= 0 && indices(i) < $self.length, "index out of bounds: bulk vector update")
           $self(indices(i)) = e
         }
       }
 
       infix ("update") ((("indices",IndexVector),("v",SparseVector(T))) :: MUnit, effect = write(0)) implements single ${
-        if (indices.length != v.length) fatal("dimension mismatch: bulk vector update")
+        fassert(indices.length == v.length, "dimension mismatch: bulk vector update")
 
         for (i <- 0 until indices.length) {
-          // if (indices(i) < 0 || indices(i) >= $self.length) fatal("index out of bounds: bulk vector update")
+          fassert(indices(i) >= 0 && indices(i) < $self.length, "index out of bounds: bulk vector update")
           $self(indices(i)) = v(i)
         }
       }
@@ -537,7 +536,7 @@ trait SparseVectorOps {
       // infix ("*") (SparseMatrix(T) :: SparseVector(T), TArith(T) implements composite ${
       // }
       infix ("*") (DenseMatrix(T) :: DenseVector(T), TArith(T)) implements composite ${
-        // if (!$self.isRow) fatal("dimension mismatch: vector * matrix")
+        fassert($self.isRow, "dimension mismatch: vector * matrix")
         $1.t.mapRowsToVector { row => row *:* $self }
       }
 
@@ -545,7 +544,7 @@ trait SparseVectorOps {
       infix ("*:*") (DenseVector(T) :: T, TArith(T)) implements composite ${ $self.toDense *:* $1 }
 
       // infix ("**") (SparseVector(T) :: SparseMatrix(T), TArith(T)) implements composite ${
-      //   // if ($self.isRow || !$1.isRow) fatal ("dimension mismatch: vector outer product")
+      //   fassert(!$self.isRow && $1.isRow, "dimension mismatch: vector outer product")
       //   val out = DenseMatrix[\$TT]($self.length, $1.length)
       //   for (i <- 0 until $self.length ){
       //     for (j <- 0 until $1.length ){

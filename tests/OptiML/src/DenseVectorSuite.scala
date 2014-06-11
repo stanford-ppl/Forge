@@ -333,7 +333,7 @@ trait GroupBy extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
     val v = DenseVector("one", "two", "two", "three", "four", "three", "four", "three", "four", "four")
-    val vs = v.groupBy(e=>e)
+    val vs = v.groupBy(k => k,v => v).toVector
     collect(vs.length == 4)
     for (v <- vs) {
       if (v(0) == "one") collect(v.length == 1)

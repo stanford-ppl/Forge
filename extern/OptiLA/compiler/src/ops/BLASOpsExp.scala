@@ -14,8 +14,8 @@ import ppl.delite.framework.Util._
 import ppl.delite.framework.Config
 import ppl.delite.framework.extern.codegen.scala.ScalaGenExternalBase
 import ppl.delite.framework.extern.codegen.cuda.CudaGenExternalBase
-import ppl.delite.framework.extern.lib.LAPACK
-import ppl.delite.framework.extern.lib.cuBLAS
+import ppl.delite.framework.extern.codegen.cpp.CGenExternalBase
+import ppl.delite.framework.extern.lib.{BLAS, cuBLAS}
 
 import optila.shared._
 import optila.shared.ops._
@@ -81,10 +81,93 @@ trait BLASOpsExp extends BLASOps with DenseMatrixOpsExp {
     case e@Native_matMult(xR,xC,x,yR,yC,y) => reflectPure(new { override val original = Some(f,e) } with Native_matMult(f(xR),f(xC),f(x),f(yR),f(yC),f(y))(e._mT,pos,e.__imp0))(mtype(manifest[A]),pos)
     case e@Native_matTimesVec(xR,xC,x,y) => reflectPure(new { override val original = Some(f,e) } with Native_matTimesVec(f(xR),f(xC),f(x),f(y))(e._mT,pos,e.__imp0))(mtype(manifest[A]),pos)
 
-    case Reflect(e@Native_matMult(xR,xC,x,yR,yC,y), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_matMult(f(xR),f(xC),f(x),f(yR),f(yC),f(y))(e._mT,pos,e.__imp0), mapOver(f,u), f(es)))(mtype(manifest[A]))
-    case Reflect(e@Native_matTimesVec(xR,xC,x,y), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_matTimesVec(f(xR),f(xC),f(x),f(y))(e._mT,pos,e.__imp0), mapOver(f,u), f(es)))(mtype(manifest[A]))
+    case Reflect(e@Native_matMult(xR,xC,x,yR,yC,y), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_matMult(f(xR),f(xC),f(x),f(yR),f(yC),f(y))(e._mT,pos,e.__imp0), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case Reflect(e@Native_matTimesVec(xR,xC,x,y), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_matTimesVec(f(xR),f(xC),f(x),f(y))(e._mT,pos,e.__imp0), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e,f)
   }).asInstanceOf[Exp[A]]
+}
+
+trait ScalaGenBLASOps extends ScalaGenExternalBase {
+  val IR: BLASOpsExp with OptiLAExp
+  import IR._
+
+  // TODO: 'BLAS' is a Delite object right now, but to use it in the library impl, this needs to be refactored.
+  // much of this is boilerplate that we can generate. what do we really need?
+  //   -- type signature of lib call (Array*,Array*,Array*,int,int,int)
+  //   -- actual invocation method
+  //   -- mapping between op inputs and c call arguments?
+
+
+  /**
+   * JNI implementation
+   */
+  override def emitExternalNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case e@Native_matMult(xR,xC,x,yR,yC,y) =>
+      val args = scala.List("%1$s", "%2$s", "%3$s", "%4$s", "%5$s", "%6$s")
+                 .map { _.format(quote(x), quote(y), quote(sym), quote(xR), quote(xC), quote(yC)) }
+      emitMethodCall(sym, e, BLAS, args)
+
+    case e@Native_matTimesVec(xR,xC,x,y) =>
+      val args = scala.List("%1$s", "%2$s", "%3$s", "%4$s", "%5$s", "0", "1")
+                 .map { _.format(quote(x), quote(y), quote(sym), quote(xR), quote(xC)) }
+      emitMethodCall(sym, e, BLAS, args)
+    case _ => super.emitExternalNode(sym,rhs)
+  }
+
+  override def emitExternalLib(rhs: Def[Any]): Unit = rhs match {
+
+    case e@Native_matMult(xR,xC,x,yR,yC,y) =>
+      val tp = e._mT.toString
+      val func = tp match {
+        case "Double" => "cblas_dgemm"
+        case "Float" => "cblas_sgemm"
+      }
+      emitInterfaceAndMethod(BLAS, e.funcName,
+        scala.List("mat1:Array[%1$s]", "mat2:Array[%1$s]", "mat3:Array[%1$s]", "mat1_r:Int", "mat1_c:Int", "mat2_c:Int") map { _.format(tp) },
+        scala.List("j%1$sArray mat1", "j%1$sArray mat2", "j%1$sArray mat3", "jint mat1_r", "jint mat1_c", "jint mat2_c") map { _.format(tp.toLowerCase) },
+        """
+        {
+          jboolean copy;
+          j%1$s *mat1_ptr = (j%1$s*)(env->GetPrimitiveArrayCritical((jarray)mat1, &copy));
+          j%1$s *mat2_ptr = (j%1$s*)(env->GetPrimitiveArrayCritical((jarray)mat2, &copy));
+          j%1$s *mat3_ptr = (j%1$s*)(env->GetPrimitiveArrayCritical((jarray)mat3, &copy));
+
+          %2$s(CblasRowMajor, CblasNoTrans, CblasNoTrans, mat1_r, mat2_c, mat1_c, 1.0, mat1_ptr, mat1_c, mat2_ptr, mat2_c, 0.0, mat3_ptr, mat2_c);
+
+          env->ReleasePrimitiveArrayCritical(mat1, mat1_ptr, 0);
+          env->ReleasePrimitiveArrayCritical(mat2, mat2_ptr, 0);
+          env->ReleasePrimitiveArrayCritical(mat3, mat3_ptr, 0);
+        }""".format(tp.toLowerCase, func))
+
+
+    case e@Native_matTimesVec(xR,xC,x,y) =>
+      val tp = e._mT.toString
+      val func = tp match {
+        case "Double" => "cblas_dgemv"
+        case "Float" => "cblas_sgemv"
+      }
+      emitInterfaceAndMethod(BLAS, e.funcName,
+        scala.List("mat1:Array[%1$s]", "vec2:Array[%1$s]", "vec3:Array[%1$s]", "mat_row:Int", "mat_col:Int", "vec_offset:Int", "vec_stride:Int") map { _.format(tp) },
+        scala.List("j%1$sArray mat1", "j%1$sArray vec2", "j%1$sArray vec3", "jint mat_row", "jint mat_col", "jint vec_offset", "jint vec_stride") map { _.format(tp.toLowerCase) },
+        """
+        {
+          jboolean copy;
+
+          j%1$s *mat1_ptr = (j%1$s*)(env->GetPrimitiveArrayCritical((jarray)mat1, &copy));
+          j%1$s *vec2_ptr = (j%1$s*)(env->GetPrimitiveArrayCritical((jarray)vec2, &copy));
+          j%1$s *vec3_ptr = (j%1$s*)(env->GetPrimitiveArrayCritical((jarray)vec3, &copy));
+
+          vec2_ptr += vec_offset;
+
+          %2$s(CblasRowMajor, CblasNoTrans, mat_row, mat_col, 1.0, mat1_ptr, mat_col, vec2_ptr, vec_stride, 0.0, vec3_ptr, 1);
+
+          env->ReleasePrimitiveArrayCritical(mat1, mat1_ptr, 0);
+          env->ReleasePrimitiveArrayCritical(vec2, vec2_ptr, 0);
+          env->ReleasePrimitiveArrayCritical(vec3, vec3_ptr, 0);
+        }""".format(tp.toLowerCase, func))
+
+    case _ => super.emitExternalLib(rhs)
+  }
 }
 
 trait CudaGenBLASOps extends CudaGenExternalBase {
@@ -143,89 +226,59 @@ trait CudaGenBLASOps extends CudaGenExternalBase {
 
 }
 
-trait OpenCLGenBLASOps
-trait CGenBLASOps
+trait OpenCLGenBLASOps // todo: implement
 
-trait ScalaGenBLASOps extends ScalaGenExternalBase {
+trait CGenBLASOps extends CGenExternalBase {
   val IR: BLASOpsExp with OptiLAExp
   import IR._
 
-  // TODO: 'BLAS' is a Delite object right now, but to use it in the library impl, this needs to be refactored.
-  // much of this is boilerplate that we can generate. what do we really need?
-  //   -- type signature of lib call (Array*,Array*,Array*,int,int,int)
-  //   -- actual invocation method
-  //   -- mapping between op inputs and c call arguments?
-
-
-  /**
-   * JNI implementation
-   */
   override def emitExternalNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case e@Native_matMult(xR,xC,x,yR,yC,y) =>
-      val args = scala.List("%1$s", "%2$s", "%3$s", "%4$s", "%5$s", "%6$s")
+      val args = scala.List("%1$s->data", "%2$s->data", "%3$s->data", "%4$s", "%5$s", "%6$s")
                  .map { _.format(quote(x), quote(y), quote(sym), quote(xR), quote(xC), quote(yC)) }
-      emitMethodCall(sym, e, LAPACK, args)
+      emitMethodCall(sym, e, BLAS, args)
 
     case e@Native_matTimesVec(xR,xC,x,y) =>
-      val args = scala.List("%1$s", "%2$s", "%3$s", "%4$s", "%5$s", "0", "1")
+      val args = scala.List("%1$s->data", "%2$s->data", "%3$s->data", "%4$s", "%5$s", "0", "1")
                  .map { _.format(quote(x), quote(y), quote(sym), quote(xR), quote(xC)) }
-      emitMethodCall(sym, e, LAPACK, args)
-    case _ => super.emitExternalNode(sym,rhs)
+      emitMethodCall(sym, e, BLAS, args)
+
+    case _ => super.emitExternalNode(sym, rhs)
   }
 
   override def emitExternalLib(rhs: Def[Any]): Unit = rhs match {
-
     case e@Native_matMult(xR,xC,x,yR,yC,y) =>
-      val tp = e._mT.toString
+      val tp = remap(e._mT)
       val func = tp match {
-        case "Double" => "cblas_dgemm"
-        case "Float" => "cblas_sgemm"
+        case "double" => "cblas_dgemm"
+        case "float" => "cblas_sgemm"
       }
-      emitInterfaceAndMethod(LAPACK, e.funcName,
-        scala.List("mat1:Array[%1$s]", "mat2:Array[%1$s]", "mat3:Array[%1$s]", "mat1_r:Int", "mat1_c:Int", "mat2_c:Int") map { _.format(tp) },
-        scala.List("j%1$sArray mat1", "j%1$sArray mat2", "j%1$sArray mat3", "jint mat1_r", "jint mat1_c", "jint mat2_c") map { _.format(tp.toLowerCase) },
+      emitInterfaceAndMethod(BLAS, e.funcName,
+        scala.List("%1$s *mat1_ptr", "%1$s *mat2_ptr", "%1$s *mat3_ptr", "int mat1_r", "int mat1_c", "int mat2_c") map { _.format(tp) },
+        "",
         """
         {
-          jboolean copy;
-          j%1$s *mat1_ptr = (*env)->GetPrimitiveArrayCritical(env, (jarray)mat1, &copy);
-          j%1$s *mat2_ptr = (*env)->GetPrimitiveArrayCritical(env, (jarray)mat2, &copy);
-          j%1$s *mat3_ptr = (*env)->GetPrimitiveArrayCritical(env, (jarray)mat3, &copy);
-
           %2$s(CblasRowMajor, CblasNoTrans, CblasNoTrans, mat1_r, mat2_c, mat1_c, 1.0, mat1_ptr, mat1_c, mat2_ptr, mat2_c, 0.0, mat3_ptr, mat2_c);
-
-          (*env)->ReleasePrimitiveArrayCritical(env, mat1, mat1_ptr, 0);
-          (*env)->ReleasePrimitiveArrayCritical(env, mat2, mat2_ptr, 0);
-          (*env)->ReleasePrimitiveArrayCritical(env, mat3, mat3_ptr, 0);
         }""".format(tp.toLowerCase, func))
 
-
     case e@Native_matTimesVec(xR,xC,x,y) =>
-      val tp = e._mT.toString
+      val tp = remap(e._mT)
       val func = tp match {
-        case "Double" => "cblas_dgemv"
-        case "Float" => "cblas_sgemv"
+        case "double" => "cblas_dgemv"
+        case "float" => "cblas_sgemv"
       }
-      emitInterfaceAndMethod(LAPACK, e.funcName,
-        scala.List("mat1:Array[%1$s]", "vec2:Array[%1$s]", "vec3:Array[%1$s]", "mat_row:Int", "mat_col:Int", "vec_offset:Int", "vec_stride:Int") map { _.format(tp) },
-        scala.List("j%1$sArray mat1", "j%1$sArray vec2", "j%1$sArray vec3", "jint mat_row", "jint mat_col", "jint vec_offset", "jint vec_stride") map { _.format(tp.toLowerCase) },
+      emitInterfaceAndMethod(BLAS, e.funcName,
+        scala.List("%1$s *mat1_ptr", "%1$s *vec2_ptr", "%1$s *vec3_ptr", "int mat_row", "int mat_col", "int vec_offset", "int vec_stride") map { _.format(tp) },
+        "",
         """
         {
-          jboolean copy;
-
-          j%1$s *mat1_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)mat1, &copy));
-          j%1$s *vec2_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)vec2, &copy));
-          j%1$s *vec3_ptr = (j%1$s*)((*env)->GetPrimitiveArrayCritical(env, (jarray)vec3, &copy));
-
           vec2_ptr += vec_offset;
 
           %2$s(CblasRowMajor, CblasNoTrans, mat_row, mat_col, 1.0, mat1_ptr, mat_col, vec2_ptr, vec_stride, 0.0, vec3_ptr, 1);
-
-          (*env)->ReleasePrimitiveArrayCritical(env, mat1, mat1_ptr, 0);
-          (*env)->ReleasePrimitiveArrayCritical(env, vec2, vec2_ptr, 0);
-          (*env)->ReleasePrimitiveArrayCritical(env, vec3, vec3_ptr, 0);
         }""".format(tp.toLowerCase, func))
 
     case _ => super.emitExternalLib(rhs)
   }
+
 }
 

@@ -24,11 +24,13 @@ trait ForgeApplicationRunner extends ForgeApplication with ForgeExp {
     extern(grp("ForgeArrayBuffer"))
     extern(grp("ForgeHashMap"))
     extern(grp("Var"), withLift = true)
+    extern(grp("Lambda"))
     extern(grp("Record"))
     extern(grp("InputOutput"))
     extern(grp("Profiling"))
     extern(grp("Reppable"))
     extern(grp("Tests"))
+    extern(grp("Asserts"), targets = List($cala))
 
     // in order to use arrays and arraybuffers as parallel collections, we must be able to access their parallel collection methods.
     // here we construct a transient group (not saved in the Ops IR) to hold this mapping. unfortunately, we now have a dependence between the

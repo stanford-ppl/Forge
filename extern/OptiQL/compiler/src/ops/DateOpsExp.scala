@@ -77,7 +77,7 @@ trait DateOpsExp extends DateCompilerOps with BaseFatExp with DeliteStructsExp {
    */
   override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = (e match {
     case mn@Date5Object_Apply(__arg0) => reflectPure(new { override val original = Some(f,mn) } with Date5Object_Apply(f(__arg0))(mn.__pos))(mtype(manifest[A]), pos)
-    case Reflect(mn@Date5Object_Apply(__arg0), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,mn) } with Date5Object_Apply(f(__arg0))(mn.__pos), mapOver(f,u), f(es)))(mtype(manifest[A]))
+    case Reflect(mn@Date5Object_Apply(__arg0), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,mn) } with Date5Object_Apply(f(__arg0))(mn.__pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e, f)
   }).asInstanceOf[Exp[A]]
 

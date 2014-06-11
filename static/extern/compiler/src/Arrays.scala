@@ -15,6 +15,8 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
   type ForgeArray[T] = DeliteArray[T]
   implicit def forgeArrayManifest[T:Manifest] = manifest[DeliteArray[T]]
 
+  def farray_from_sarray[T:Manifest](__arg0: Rep[Array[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+    = darray_fromfunction(scala_array_length(__arg0), i => scala_array_apply(__arg0,i))
   def array_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = darray_new[T](__arg0)
   def array_empty_imm[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
@@ -71,9 +73,9 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
     case ArrayLength(a) => scala_array_length(f(a))(mtype(manifest[A]),pos)
     case ArrayStringSplit(a,b,l) => array_string_split(f(a),f(b),f(l))(pos)
 
-    case Reflect(ArrayApply(a,x), u, es) => reflectMirrored(Reflect(ArrayApply(f(a),f(x))(mtype(manifest[A])), mapOver(f,u), f(es)))(mtype(manifest[A]))
-    case Reflect(ArrayLength(a), u, es) => reflectMirrored(Reflect(ArrayLength(f(a))(mtype(manifest[A])), mapOver(f,u), f(es)))(mtype(manifest[A]))
-    case Reflect(ArrayStringSplit(a,b,l), u, es) => reflectMirrored(Reflect(ArrayStringSplit(f(a),f(b),f(l)), mapOver(f,u), f(es)))(mtype(manifest[A]))
+    case Reflect(ArrayApply(a,x), u, es) => reflectMirrored(Reflect(ArrayApply(f(a),f(x))(mtype(manifest[A])), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case Reflect(ArrayLength(a), u, es) => reflectMirrored(Reflect(ArrayLength(f(a))(mtype(manifest[A])), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case Reflect(ArrayStringSplit(a,b,l), u, es) => reflectMirrored(Reflect(ArrayStringSplit(f(a),f(b),f(l)), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e,f)
   }).asInstanceOf[Exp[A]] // why??
 
@@ -114,6 +116,8 @@ trait CGenForgeArrayOps extends CGenDeliteArrayOps with CGenObjectOps {
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case ArrayApply(x,n) => emitValDef(sym, quote(x) + "->apply(" + quote(n) + ")")
     case ArrayLength(x) => emitValDef(sym, quote(x) + "->length")
+    //TODO: enable ArrayStringSplit in cluster mode
+    case ArrayStringSplit(a,b,Const(0)) if (!Config.generateSerializable) => emitValDef(sym, "string_split(" + quote(a) + "," + quote(b) + ")")
     case _ => super.emitNode(sym, rhs)
   }
 }

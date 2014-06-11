@@ -67,5 +67,37 @@ trait ArithOps {
     infix (IntArith) ("abs", Nil, MInt :: MInt) implements composite ${ math_object_abs($0).toInt }
     infix (IntArith) ("exp", Nil, MInt :: MInt) implements composite ${ math_object_exp($0).toInt }
     infix (IntArith) ("log", Nil, MInt :: MInt) implements composite ${ math_object_log($0).toInt }
+
+    val LongArith = tpeClassInst("ArithLong", Nil, Arith(MLong))
+    infix (LongArith) ("zero", Nil, MLong :: MLong) implements composite ${ unit(0L) }
+    infix (LongArith) ("empty", Nil, Nil :: MLong) implements composite ${ unit(0L) }
+    infix (LongArith) ("+", Nil, (MLong,MLong) :: MLong) implements composite ${ forge_long_plus($0,$1) }
+    infix (LongArith) ("-", Nil, (MLong,MLong) :: MLong) implements composite ${ forge_long_minus($0,$1) }
+    infix (LongArith) ("*", Nil, (MLong,MLong) :: MLong) implements composite ${ forge_long_times($0,$1) }
+    infix (LongArith) ("/", Nil, (MLong,MLong) :: MLong) implements composite ${ forge_long_divide($0,$1) }
+    infix (LongArith) ("abs", Nil, MLong :: MLong) implements composite ${ math_object_abs($0.toDouble).toLong }
+    infix (LongArith) ("exp", Nil, MLong :: MLong) implements composite ${ math_object_exp($0.toDouble).toLong }
+    infix (LongArith) ("log", Nil, MLong :: MLong) implements composite ${ math_object_log($0.toDouble).toLong }
+
+    // tuples of ariths
+    for (arity <- 2 until maxTuples) {
+      val Tup = lookupTpe("Tup"+arity)
+      val pars = (0 until arity).map(i => tpePar(('A'.toInt+i).toChar.toString) withBound TArith).toList
+      val TupArith = tpeClassInst("ArithTup"+arity, pars, Arith(Tup))
+
+      def tupArithStr(op: String) = "pack((" + pars.map(p => "implicitly[Arith["+p.name+"]]."+op).mkString(",") + "))"
+      def tupArithFromSrcStr(op: String) = "pack((" + (1 to arity).map(i => "t._"+i+"."+op).mkString(",") + "))"
+      def tupArithBinStr(op: String) = "pack((" + (1 to arity).map(i => "t1._"+i+op+"t2._"+i).mkString(",") + "))"
+
+      infix (TupArith) ("zero", pars, ("t",Tup) :: Tup) implements composite { tupArithFromSrcStr("zero") }
+      infix (TupArith) ("empty", pars, Nil :: Tup) implements composite { tupArithStr("empty") }
+      infix (TupArith) ("+", pars, (("t1",Tup), ("t2",Tup)) :: Tup) implements composite { tupArithBinStr("+") }
+      infix (TupArith) ("-", pars, (("t1",Tup), ("t2",Tup)) :: Tup) implements composite { tupArithBinStr("-") }
+      infix (TupArith) ("*", pars, (("t1",Tup), ("t2",Tup)) :: Tup) implements composite { tupArithBinStr("*") }
+      infix (TupArith) ("/", pars, (("t1",Tup), ("t2",Tup)) :: Tup) implements composite { tupArithBinStr("/") }
+      infix (TupArith) ("abs", pars, ("t",Tup) :: Tup) implements composite { tupArithFromSrcStr("abs") }
+      infix (TupArith) ("exp", pars, ("t",Tup) :: Tup) implements composite { tupArithFromSrcStr("exp") }
+      infix (TupArith) ("log", pars, ("t",Tup) :: Tup) implements composite { tupArithFromSrcStr("log") }
+    }
   }
 }

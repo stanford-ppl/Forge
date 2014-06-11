@@ -100,6 +100,9 @@ trait HelloSimple extends SimpleVectorApplication {
     // // z == 0.7
     // // y = 15
     println("fooResult: " + fooResult)
+
+    println("calling foo2")
+    foo2[Int](i => println(i), 2, 13, (a,b) => a + 5)
   }
 
 }

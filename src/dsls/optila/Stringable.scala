@@ -27,16 +27,16 @@ trait StringableOps {
 
     // primitive implementations
     val DoubleStringable = tpeClassInst("StringableDouble", Nil, Stringable(MDouble))
-    infix (DoubleStringable) ("makeStr", Nil, MDouble :: MString) implements composite ${ "" + $0 }
+    infix (DoubleStringable) ("makeStr", Nil, MDouble :: MString) implements composite ${ optila_fmt_str($0) }
 
     val FloatStringable = tpeClassInst("StringableFloat", Nil, Stringable(MFloat))
-    infix (FloatStringable) ("makeStr", Nil, MFloat :: MString) implements composite ${ "" + $0 }
+    infix (FloatStringable) ("makeStr", Nil, MFloat :: MString) implements composite ${ optila_fmt_str($0) }
 
     val IntStringable = tpeClassInst("StringableInt", Nil, Stringable(MInt))
-    infix (IntStringable) ("makeStr", Nil, MInt :: MString) implements composite ${ "" + $0 }
+    infix (IntStringable) ("makeStr", Nil, MInt :: MString) implements composite ${ optila_fmt_str($0) }
 
     val BoolStringable = tpeClassInst("StringableBool", Nil, Stringable(MBoolean))
-    infix (BoolStringable) ("makeStr", Nil, MBoolean :: MString) implements composite ${ "" + $0 }
+    infix (BoolStringable) ("makeStr", Nil, MBoolean :: MString) implements composite ${ optila_fmt_str($0) }
 
     val StrStringable = tpeClassInst("StringableStr", Nil, Stringable(MString))
     infix (StrStringable) ("makeStr", Nil, MString :: MString) implements composite ${ $0 }

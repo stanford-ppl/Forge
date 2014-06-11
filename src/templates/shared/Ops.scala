@@ -115,7 +115,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
   // def nameClash(o1: Rep[DSLOp], o2: Rep[DSLOp]) = o1.name == o2.name && o1.args.length == o2.args.length && (o1.args.zip(o2.args).forall(t => getHkTpe(t._1.tpe).name == getHkTpe(t._2.tpe).name || (t._1.tpe.stage == future && t._2.tpe.stage == future)))
   def nameClash(o1: Rep[DSLOp], o2: Rep[DSLOp]) = o1.style == o2.style && o1.name == o2.name // forces a global numbering
 
-  def nameClashesGrp(o: Rep[DSLOp]) = opsGrpOf(o).ops.filter(o2 => o.grp.name == o2.grp.name && nameClash(o,o2))
+  def nameClashesGrp(o: Rep[DSLOp]) = opsGrpOf(o).map(_.ops.filter(o2 => o.grp.name == o2.grp.name && nameClash(o,o2))).getOrElse(Nil)
 
   def nameClashesUniversal(o: Rep[DSLOp]) = allOps.filter(o2 => nameClash(o,o2))
 
@@ -496,23 +496,24 @@ trait BaseGenOps extends ForgeCodeGenBase {
         }
 
         val opsClsName = opsGrp.grp.name + tpe.name.replaceAll("\\.","") + tpeArgs.map(_.name).mkString("") + "OpsCls"
+        val implicitParams = if (tpePars.length > 0) makeImplicitCtxBounds(tpePars) + ",__pos" else "__pos"
 
         if (tpe.stage == compile) {
-          stream.println("  implicit def liftTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ") = new " + opsClsName + "(x)")
+          stream.println("  implicit def liftTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ")(implicit __pos: SourceContext) = new " + opsClsName + "(x)(" + implicitParams + ")")
         }
         else {
-          stream.println("  implicit def repTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ") = new " + opsClsName + "(x)")
+          stream.println("  implicit def repTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ")(implicit __pos: SourceContext) = new " + opsClsName + "(x)(" + implicitParams + ")")
           if (pimpOps.exists(o => quote(o.args.apply(0).tpe) == quote(tpe) && o.args.apply(0).tpe.stage == now)) {
-            stream.println("  implicit def liftTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + quote(tpe) + ") = new " + opsClsName + "(unit(x))")
+            stream.println("  implicit def liftTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + quote(tpe) + ")(implicit __pos: SourceContext) = new " + opsClsName + "(unit(x))(" + implicitParams + ")")
           }
           // we provide the Var conversion even if no lhs var is declared, since it is essentially a chained implicit with readVar
           if (Tpes.exists(t => getHkTpe(t).name == "Var")) {
-            stream.println("  implicit def varTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + varify(tpe) + ") = new " + opsClsName + "(readVar(x))")
+            stream.println("  implicit def varTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + varify(tpe) + ")(implicit __pos: SourceContext) = new " + opsClsName + "(readVar(x))(" + implicitParams + ")")
           }
         }
 
         stream.println()
-        stream.println("  class " + opsClsName + makeTpeParsWithBounds(tpePars) + "(val self: " + repify(tpe) + ") {")
+        stream.println("  class " + opsClsName + makeTpeParsWithBounds(tpePars) + "(val self: " + repify(tpe) + ")(implicit __pos: SourceContext) {")
 
         for (o <- ops if quote(o.args.apply(0).tpe) == quote(tpe)) {
           val otherArgs = makeArgsWithNowType(o.firstArgs.drop(1))

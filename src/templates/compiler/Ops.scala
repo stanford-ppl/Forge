@@ -17,6 +17,8 @@ trait DeliteGenOps extends BaseGenOps {
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
   import IR._
 
+  var activeGenerator: CodeGenerator = _
+
   def baseOpsCls(opsGrp: DSLOps) = {
     if (opsGrp.ops.exists(_.style == compilerMethod)) opsGrp.grp.name + "CompilerOps"
     else opsGrp.name
@@ -29,6 +31,15 @@ trait DeliteGenOps extends BaseGenOps {
     else "BaseFatExp with EffectExp" // we use codegen *GenFat, which requires EffectExp
   }
 
+  //TODO: better way to check if the string contains block
+  private def containsBlock(b: String): Boolean = {
+    if(b.contains("emitBlock")) true
+    else false
+  }
+
+  // bound symbol for the captured variable of a block
+  private var boundArg: String = _
+
   override def quote(x: Exp[Any]): String = x match {
     case Def(QuoteBlockResult(func,args,ret,captured)) =>
       // bind function args to captured args
@@ -37,17 +48,39 @@ trait DeliteGenOps extends BaseGenOps {
       if (!isThunk(func.tpe)) {
         for (a <- args) {
           // have to be careful about automatic string lifting here
-          val add: String = (nl + "\"" + "val " + replaceWildcards(quotedArg(boundArgName(func,a))) + " = " + replaceWildcards(captured(i)) + "\\n\"")
-          boundStr += add
+          val boundArg_saved = boundArg
+          boundArg = replaceWildcards(boundArgName(func,a))
+          if (containsBlock(replaceWildcards(captured(i)))) {
+            // when the captured variable is another block,
+            // declare the varible, emit block, and assign the result to the variable at the end of the block.
+            val add = nl + "emitVarDecl(" + replaceWildcards(boundArgName(func,a))+ ".asInstanceOf[Sym[Any]])" + nl + replaceWildcards(captured(i))
+            boundStr += add
+          }
+          else {
+            val add: String = (nl + "emitValDef(" + replaceWildcards(boundArgName(func,a)) + ".asInstanceOf[Sym[Any]],\"" + replaceWildcards(captured(i)) + "\")")
+            boundStr += add
+          }
+          boundArg = boundArg_saved
           i += 1
         }
       }
+
+      if (activeGenerator == cpp && boundArg == null && ret != MUnit)
+        warn("Block " + func.name + " returns non-unit type result. C++ target may not work properly." + boundStr)
+
       // the new-line formatting is admittedly weird; we are using a mixed combination of actual new-lines (for string splitting at Forge)
       // and escaped new-lines (for string splitting at Delite), based on how we received strings from string interpolation.
       // FIX: using inconsistent newline character, not platform independent
-      "{ \"" + boundStr +
+      val out = "{ \"" + boundStr +
        nl + "emitBlock(" + func.name + ")" +
-       nl + "quote(getBlockResult(" + func.name + "))+\"\\n\"" + nl + " \" } "
+       (if (ret != MUnit && boundArg == null)
+          (nl + "quote(getBlockResult(" + func.name + "))+\"\\n\"")
+        else if (ret != MUnit && boundArg != null)
+          (nl + "emitAssignment(" + boundArg + ".asInstanceOf[Sym[Any]], quote(getBlockResult(" + func.name + ")))")
+        else ""
+       ) +
+       nl + " \" }\\n "
+      if(ret != MUnit && boundArg != null) "\"" + out + "\"" else out
 
     case Def(QuoteSeq(argName)) => "Seq("+unquotes(argName+".map(quote).mkString("+quotes(",")+")")+")"
 
@@ -237,7 +270,7 @@ trait DeliteGenOps extends BaseGenOps {
     else {
       stream.println("    def cond: Exp["+quote(tpePars._1)+"] => Exp[Boolean] = null")
     }
-    stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(inDc.size) + ")")
+    stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(inDc.size) + "(in))")
     stream.println("    def keyFunc = " + makeOpImplMethodNameWithArgs(o, "_key"))
   }
 
@@ -257,7 +290,7 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println("    def zero = unit(null).asInstanceOf["+repify(tpePars._2)+"]")
 
     // see comment about innerDcArg in library/Ops.scala
-    val keysDcArg = if (getHkTpe(in.tpe) == getHkTpe(outerColTpe)) "in" else "null.asInstanceOf["+repify(tpeInst(outerColTpe, tpePars._2))+"]"
+    val keysDcArg = if (quote(in.tpe) == quote(outerColTpe)) "in" else "null.asInstanceOf["+repify(tpeInst(outerColTpe, tpePars._2))+"]"
     stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,tpePars._2)) + "("+keysDcArg+", len)")
 
     emitOpNodeFooter(o, stream)
@@ -307,7 +340,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val in = " + in.name)
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_map"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,map.tpePars._2)) + "(in, len)")
-          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(inDc.size) + ")")
+          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(inDc.size) + "(in))")
         case zip:Zip =>
           val colTpe = getHkTpe(o.retTpe)
           val outDc = ForgeCollections(colTpe)
@@ -319,7 +352,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val inB = " + o.args.apply(zip.argIndices._2).name)
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_zip"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,inA.tpe,zip.tpePars._3)) + "(inA, len)")
-          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(inDc.size) + ")")
+          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(inDc.size) + "(inA))")
         case reduce:Reduce =>
           val col = o.args.apply(reduce.argIndex)
           val dc = ForgeCollections(getHkTpe(col.tpe))
@@ -362,7 +395,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    def cond = " + makeOpImplMethodNameWithArgs(o, "_cond"))
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_map"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,filter.tpePars._2)) + "(in, len)")
-          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(inDc.size) + ")")
+          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(inDc.size) + "(in))")
         case flatmap:FlatMap =>
           val colTpe = getHkTpe(o.retTpe)
           val outDc = ForgeCollections(colTpe)
@@ -373,7 +406,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val in = " + in.name)
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_func"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,flatmap.tpePars._2)) + "(in, len)")
-          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(inDc.size) + ")")
+          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(inDc.size) + "(in))")
         case foreach:Foreach =>
           val col = o.args.apply(foreach.argIndex)
           val dc = ForgeCollections(getHkTpe(col.tpe))
@@ -409,10 +442,10 @@ trait DeliteGenOps extends BaseGenOps {
           emitGroupByCommonVals(o, in, gb.cond, (gb.tpePars._1,gb.tpePars._2,gb.tpePars._3), stream)
           stream.println("    def valFunc = " + makeOpImplMethodNameWithArgs(o, "_map"))
 
-          val innerDcArg = if (getHkTpe(in.tpe) == getHkTpe(innerColTpe)) "in" else "null.asInstanceOf["+repify(tpeInst(innerColTpe, gb.tpePars._3))+"]"
+          val innerDcArg = if (quote(in.tpe) == quote(innerColTpe)) "in" else "null.asInstanceOf["+repify(tpeInst(innerColTpe, gb.tpePars._3))+"]"
           stream.println("    override def allocI(len: Exp[Int]) = " + makeOpMethodName(innerDc.alloc) + makeTpePars(instAllocReturnTpe(innerDc.alloc, in.tpe, gb.tpePars._3)) + "("+innerDcArg+", len)")
 
-          val outDcArg = if (getHkTpe(in.tpe) == getHkTpe(outerColTpe)) "in" else "null.asInstanceOf["+repify(tpeInst(outerColTpe, tpeInst(innerColTpe, gb.tpePars._3)))+"]"
+          val outDcArg = if (quote(in.tpe) == quote(outerColTpe)) "in" else "null.asInstanceOf["+repify(tpeInst(outerColTpe, tpeInst(innerColTpe, gb.tpePars._3)))+"]"
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc, in.tpe, tpeInst(innerColTpe, gb.tpePars._3))) + "("+outDcArg+", len)")
 
           emitOpNodeFooter(o, stream)
@@ -599,7 +632,7 @@ trait DeliteGenOps extends BaseGenOps {
       val xformArgs = "(" + o.args.zipWithIndex.flatMap(t => t._1 match {
         case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if Impls(o).isInstanceOf[CodeGen] && !isThunk(f) => "f("+opArgPrefix+t._2+")" :: args.map(a => boundArgAnonName(t._1,a,t._2) /*+ ".asInstanceOf[Sym[Any]]"*/)
         // -- workaround for apparent scalac bug (GADT skolem type error), with separate cases for regular tpes and function tpes. this may be too restrictive and miss cases we haven't seen yet that also trigger the bug.
-        case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if isTpePar(o.retTpe) && args.forall(_.tpe == o.retTpe) && ret == o.retTpe => List("f("+opArgPrefix+t._2+".asInstanceOf[" + repify(f).replaceAllLiterally(repify(o.retTpe), "Rep[A]") + "])")
+        case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if isTpePar(o.retTpe) && !isThunk(f) && args.forall(a => a.tpe == o.retTpe || !isTpePar(a.tpe)) && ret == o.retTpe => List("f("+opArgPrefix+t._2+".asInstanceOf[" + repify(f).replaceAllLiterally(repify(o.retTpe), "Rep[A]") + "])")
         case Def(Arg(name, tpe, d2)) if !isFuncArg(t._1) && isTpePar(o.retTpe) && tpe.tpePars.length == 1 && tpe.tpePars.apply(0) == o.retTpe => List("f("+opArgPrefix+t._2+".asInstanceOf[Rep[" + tpe.name + "[A]]])")
         // -- end workaround
         case Def(Arg(name, _, _)) => List("f("+opArgPrefix+t._2+")")
@@ -621,7 +654,7 @@ trait DeliteGenOps extends BaseGenOps {
       def emitDeliteEffectfulMirror(suffix: String = "") {
         stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o, suffix) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o, suffix) + xformArgs + implicitsWithParens)
         stream.print(", mapOver(f,u), f(es)))")
-        stream.println("(mtype(manifest[A]))")
+        stream.println("(mtype(manifest[A]), pos)")
       }
 
       Impls(o) match {
@@ -651,7 +684,7 @@ trait DeliteGenOps extends BaseGenOps {
           // effectful version
           stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(" + makeOpNodeName(o) + xformArgs + implicitsWithParens)
           stream.print(", mapOver(f,u), f(es)))")
-          stream.println("(mtype(manifest[A]))")
+          stream.println("(mtype(manifest[A]), pos)")
         case _:GroupBy | _:GroupByReduce =>
           emitDelitePureMirror("Keys")
           emitDeliteEffectfulMirror("Keys")
@@ -772,9 +805,11 @@ trait DeliteGenOps extends BaseGenOps {
 
   def emitStructMethods(opsGrp: DSLOps, stream: PrintWriter) {
     def wrapManifest(t: Rep[DSLType]) = t match {
-      case Def(TpeInst(Def(Tpe(name,args,stage)), ps)) if ps != Nil && ps.forall(isTpePar) => "makeManifest(classOf[" + name + ps.map(a => "_").mkString("[",",","]") + "], m.typeArguments)" 
-      case Def(TpeInst(Def(Tpe(name,args,stage)), ps)) if ps != Nil => "makeManifest(classOf[" + name + ps.map(a => "_").mkString("[",",","]") + "], " + ps.map(a => "manifest["+quote(a)+"]").mkString("List(",",","))")
-      case _ => "manifest[" + quote(t) + "]"
+      case Def(TpeInst(Def(Tpe(name,args,stage)), ps)) if ps != Nil =>
+        val tpeArgIndices = ps.map(p => if (isTpePar(p)) 1 else 0).scan(0)(_+_).drop(1).map(_ - 1)
+        "makeManifest(classOf[" + name + ps.map(a => "_").mkString("[",",","]") + "], " + (ps.zipWithIndex.map(t => if (isTpePar(t._1)) "m.typeArguments("+tpeArgIndices(t._2)+")" else "manifest["+quote(t._1)+"]")).mkString("List(",",","))")
+      case _ =>
+        "manifest[" + quote(t) + "]"
     }
 
     val classes = opsGrpTpes(opsGrp)
@@ -841,7 +876,9 @@ trait DeliteGenOps extends BaseGenOps {
     if (rules.length > 0){
       emitBlockComment("Code generators", stream)
       stream.println()
-      for (g <- generators) {
+      val save = activeGenerator
+      for (g <- generators) {        
+        activeGenerator = g
         val generatorRules = rules.flatMap{case (o,i) => i.asInstanceOf[CodeGen].decls.collect{case (k,r) if (k == g) => (o,r)}}
         if (generatorRules.length > 0) {
           stream.println("trait " + g.name + "Gen" + opsGrp.name + " extends " + g.name + "GenFat {")
@@ -881,8 +918,9 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    case _ => super.emitNode(sym, rhs)")
           stream.println("  }")
           stream.println("}")
-        }
+        }        
       }
+      activeGenerator = save
     }
   }
 }

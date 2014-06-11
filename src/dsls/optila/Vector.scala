@@ -72,10 +72,13 @@ trait VectorOps {
         found
       }
       infix ("distinct") (Nil :: DenseVector(T)) implements single ${
+        val set = SHashMap[\$TT,Int]()
         val out = DenseVector[\$TT](0, $self.isRow)
         for (i <- 0 until $self.length) {
-          // slow -- should use a hashmap when it's available as a primitive
-          if (!out.contains($self(i))) out <<= $self(i)
+          if (!set.contains($self(i))) {
+            set($self(i)) = 1
+            out <<= $self(i)
+          }
         }
         out.unsafeImmutable
       }
@@ -138,16 +141,15 @@ trait VectorOps {
         }
         else if ($self.isRow) {
           for (i <- 0 until $self.length - 1) {
-            // make sure to force strConcatWithNumerics to kick in
-            s = s + optila_padspace("" + $self(i))
+            s = s + optila_padspace(optila_fmt_str($self(i)))
           }
-          s = s + optila_padspace("" + $self($self.length-1))
+          s = s + optila_padspace(optila_fmt_str($self($self.length-1)))
         }
         else {
           for (i <- 0 until $self.length - 1) {
-            s = s + optila_padspace("" + $self(i)) + "\\n"
+            s = s + optila_padspace(optila_fmt_str($self(i))) + "\\n"
           }
-          s = s + optila_padspace("" + $self($self.length-1))
+          s = s + optila_padspace(optila_fmt_str($self($self.length-1)))
         }
         s
       }
@@ -165,11 +167,11 @@ trait VectorOps {
         infix ("-") (rhs :: DenseVector(T), A) implements zip((T,T,T), (0,1), ${ (a,b) => a-b })
         infix ("*") (rhs :: DenseVector(T), A) implements zip((T,T,T), (0,1), ${ (a,b) => a*b })
         infix ("*:*") (rhs :: T, A) implements composite ${
-          // if ($self.length != $1.length) fatal("dimension mismatch: vector dot product")
+          fassert($self.length == $1.length, "dimension mismatch: vector dot product")
           sum($self*$1)
         }
         infix ("**") (rhs :: DenseMatrix(T), A) implements composite ${
-          if ($self.isRow || !$1.isRow) fatal ("dimension mismatch: vector outer product")
+          fassert(!$self.isRow && $1.isRow, "dimension mismatch: vector outer product")
           val out = DenseMatrix[\$TT]($self.length, $1.length)
           for (i <- 0 until $self.length ){
             for (j <- 0 until $1.length ){
@@ -202,7 +204,7 @@ trait VectorOps {
       infix ("-") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e-$1 })
       infix ("*") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e*$1 })
       infix ("*") (DenseMatrix(T) :: DenseVector(T), A) implements composite ${
-        // if (!$self.isRow) fatal("dimension mismatch: vector * matrix")
+        fassert($self.isRow, "dimension mismatch: vector * matrix")
         $1.mapColsToVector { col => $self *:* col }
       }
       infix ("/") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e/$1 })
@@ -216,28 +218,13 @@ trait VectorOps {
       infix ("min") (Nil :: T, O) implements reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a < b) a else b })
       infix ("max") (Nil :: T, O) implements reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a > b) a else b })
 
-      // TODO: switch to reduce when TupleReduce is generalized
-      infix ("minIndex") (Nil :: MInt, O) implements single ${
-        var min = $self(0)
-        var minIndex = 0
-        for (i <- 0 until $self.length) {
-          if ($self(i) < min) {
-            min = $self(i)
-            minIndex = i
-          }
-        }
-        minIndex
+      infix ("minIndex") (Nil :: MInt, O ::: A) implements composite ${
+        $self.indices.reduce { (a,b) => if ($self(a) < $self(b)) a else b }
+        // ($self.zip($self.indices) { (a,b) => pack((a,b)) } reduce { (t1,t2) => if (t1._1 < t2._1) t1 else t2 })._2
       }
-      infix ("maxIndex") (Nil :: MInt, O) implements single ${
-        var max = $self(0)
-        var maxIndex = 0
-        for (i <- 0 until $self.length) {
-          if ($self(i) > max) {
-            max = $self(i)
-            maxIndex = i
-          }
-        }
-        maxIndex
+      infix ("maxIndex") (Nil :: MInt, O ::: A) implements composite ${
+        $self.indices.reduce { (a,b) => if ($self(a) > $self(b)) a else b }
+        // ($self.zip($self.indices) { (a,b) => pack((a,b)) } reduce { (t1,t2) => if (t1._1 > t2._1) t1 else t2 })._2        
       }
 
 
@@ -246,7 +233,6 @@ trait VectorOps {
        */
       infix ("map") ((T ==> R) :: DenseVector(R), addTpePars = R) implements map((T,R), 0, ${ e => $1(e) })
       infix ("reduce") (((T,T) ==> T) :: T, A) implements reduce(T, 0, Z, ${ (a,b) => $1(a,b) })
-      infix ("filter") ((T ==> MBoolean) :: DenseVector(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})
       infix ("foreach") ((T ==> MUnit) :: MUnit) implements foreach(T, 0, ${ e => $1(e) })
       infix ("find") ((T ==> MBoolean) :: IndexVector) implements composite ${ IndexVector($self.indices.filter(i => $1($self(i)))) }
 

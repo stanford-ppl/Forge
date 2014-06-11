@@ -88,9 +88,9 @@ trait LAPACKOpsExp extends LAPACKOps with LinAlgOpsExp {
     case e@Native_lu(a,p) => reflectPure(new { override val original = Some(f,e) } with Native_lu(f(a),f(p))(pos))(mtype(manifest[A]),pos)
     case e@Native_chol(a,t) => reflectPure(new { override val original = Some(f,e) } with Native_chol(f(a),f(t))(pos))(mtype(manifest[A]),pos)
 
-    case Reflect(e@Native_linsolve(a,b), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_linsolve(f(a),f(b))(pos), mapOver(f,u), f(es)))(mtype(manifest[A]))
-    case Reflect(e@Native_lu(a,p), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_lu(f(a),f(p))(pos), mapOver(f,u), f(es)))(mtype(manifest[A]))
-    case Reflect(e@Native_chol(a,t), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_chol(f(a),f(t))(pos), mapOver(f,u), f(es)))(mtype(manifest[A]))
+    case Reflect(e@Native_linsolve(a,b), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_linsolve(f(a),f(b))(pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case Reflect(e@Native_lu(a,p), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_lu(f(a),f(p))(pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case Reflect(e@Native_chol(a,t), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_chol(f(a),f(t))(pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e,f)
   }).asInstanceOf[Exp[A]]
 }

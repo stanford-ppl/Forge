@@ -21,6 +21,7 @@ trait BasicMathOps {
     direct (Math) ("exp", Nil, MDouble :: MDouble) implements redirect ${ Math.exp($0) }
     direct (Math) ("log", Nil, MDouble :: MDouble) implements redirect ${ Math.log($0) }
     direct (Math) ("log10", Nil, MDouble :: MDouble) implements redirect ${ Math.log10($0) }
+    direct (Math) ("square", Nil, MDouble :: MDouble) implements redirect ${ $0*$0 }
     direct (Math) ("sqrt", Nil, MDouble :: MDouble) implements redirect ${ Math.sqrt($0) }
     direct (Math) ("ceil", Nil, MDouble :: MInt) implements redirect ${ Math.ceil($0).toInt }
     direct (Math) ("floor", Nil, MDouble :: MInt) implements redirect ${ Math.floor($0).toInt }

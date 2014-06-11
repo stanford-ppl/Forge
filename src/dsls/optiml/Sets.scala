@@ -25,11 +25,14 @@ trait SetOps {
       infix ("labels") (Nil :: DenseVector(L)) implements getter(0, "_labels")
     }
 
-    val TestSet = tpe("TestSet", D)
-    data(TestSet, ("_data", DenseMatrix(D)))
-    static (TestSet) ("apply", D, DenseMatrix(D) :: TestSet(D)) implements allocates(TestSet, ${$0})
+    // is there any use for a separate TestSet type (readability)? to actually measure error, 
+    // TestSets will typically have labels, and therefore be structurally identical to TrainingSet
 
-    for (t <- List(TrainingSet, TestSet)) {
+    // val TestSet = tpe("TestSet", D)
+    // data(TestSet, ("_data", DenseMatrix(D)))
+    // static (TestSet) ("apply", D, DenseMatrix(D) :: TestSet(D)) implements allocates(TestSet, ${$0})
+
+    for (t <- List(TrainingSet/*, TestSet*/)) {
       val ops = withTpe(t)
       ops {
         infix ("data") (Nil :: DenseMatrix(D)) implements getter(0, "_data")

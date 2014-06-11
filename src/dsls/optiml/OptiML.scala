@@ -8,7 +8,7 @@ import core.ForgeApplicationRunner
 object OptiMLDSLRunner extends ForgeApplicationRunner with OptiMLDSL
 
 trait OptiMLDSL extends OptiLADSL
-  with SetOps with BufferableOps {
+  with MLIOOps with SetOps with BufferableOps with StreamOps with ImageOps {
 
   override def dslName = "OptiML"
 
@@ -28,6 +28,9 @@ trait OptiMLDSL extends OptiLADSL
     importBufferableOps()
     importSetOps()
     importUntilConverged()
+    importMLIOOps()
+    importStreamOps()
+    importImageOps()
   }
 
   def importUntilConverged() {
@@ -56,6 +59,11 @@ trait OptiMLDSL extends OptiLADSL
       }
 
       cur
+    }
+
+    // this is a convenience method that allows a user to override the 'diff' function without explicitly passing other implicits
+    direct (Control) ("untilconverged_withdiff", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, ".001"), ("minIter", MInt, "1"), ("maxIter", MInt, "1000")), ("block", T ==> T), ("diff", (T,T) ==> MDouble)), T)) implements redirect ${
+      untilconverged(x, tol, minIter, maxIter)(block)(manifest[T], implicitly[SourceContext], diff)
     }
 
     // double-buffered untilconverged. 'block' must not change the structure of the input across iterations.
@@ -101,6 +109,7 @@ trait OptiMLDSL extends OptiLADSL
 
   def importDistanceMetrics() {
     val DenseVector = lookupTpe("DenseVector")
+    val DenseVectorView = lookupTpe("DenseVectorView")
     val DenseMatrix = lookupTpe("DenseMatrix")
     val SparseVector = lookupTpe("SparseVector")
 
@@ -121,12 +130,12 @@ trait OptiMLDSL extends OptiLADSL
     identifier (DMetric) ("SQUARE")
     identifier (DMetric) ("EUC")
 
-    for (TP <- List(DenseVector,DenseMatrix,SparseVector)) {
-      fimplicit (TP) ("dist", Nil, (TP(MDouble),TP(MDouble)) :: MDouble) implements composite ${ sum(abs($0 - $1)) }
+    for (TP <- List(DenseVector,DenseVectorView,DenseMatrix,SparseVector)) {
+      fimplicit (TP) ("dist", Nil, (TP(MDouble),TP(MDouble)) :: MDouble) implements redirect ${ dist($0,$1,ABS) }
 
       direct (TP) ("dist", Nil, (TP(MDouble),TP(MDouble),DMetric) :: MDouble) implements composite ${
         $2 match {
-          case ABS => dist($0,$1)
+          case ABS => sum(abs($0 - $1))
           case SQUARE => sum(square($0 - $1))
           case EUC => sqrt(sum(square($0 - $1)))
         }

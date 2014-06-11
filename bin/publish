@@ -24,6 +24,7 @@ def main():
     parser.add_option("-d", "--dest", action="store", dest="build_dir", default=os.getenv("PWD")+"/published/", help="directory to publish generated DSL")
     parser.add_option("-c", "--clean", action="store_true", dest="build_clean", default=False, help="nuke the build directory if it already exists")
     parser.add_option("--clean-extern", action="store_true", dest="extern_clean", default=False, help="always republish extern files")
+    parser.add_option("--use-jars", action="store_true", dest="use_jars", default=False, help="generate an SBT build file for the DSL that uses managed dependencies for LMS/Delite")
 
     (opts, args) = parser.parse_args()
     if len(args) < 1:
@@ -52,34 +53,26 @@ def printEnv():
     print("======== REQUIRED FORGE PUBLISH ENVIRONMENT VARIABLES =========")
     print("FORGE_HOME = " + FORGE_HOME)
 
-def sbtBuildFile(dsl):
+def sbtBuildFileHeader(dsl):
     s = Template("""
 import sbt._
 import Keys._
 
 object ${dslName}Build extends Build {
-  val virtualization_lms_core = "EPFL" % "lms_2.10" % "0.3-SNAPSHOT"
-  val delite_framework = "stanford-ppl" % "framework_2.10" % "0.1-SNAPSHOT"
-  val delite_runtime = "stanford-ppl" % "runtime_2.10" % "0.1-SNAPSHOT"
-  val delite_tests = "stanford-ppl" % "delite-test_2.10" % "0.1-SNAPSHOT"
-
-  val virtScala = "2.10.2-RC1"
+  val virtScala = "2.10.2"
   val virtBuildSettingsBase = Project.defaultSettings ++ Seq(
     organization := "stanford-ppl",
     scalaOrganization := "org.scala-lang.virtualized",
     scalaVersion := virtScala,
     publishArtifact in (Compile, packageDoc) := false,
-    libraryDependencies += virtualization_lms_core,
-    libraryDependencies += delite_framework,
-    libraryDependencies += delite_runtime,
-    libraryDependencies += delite_tests,
     // needed for scala.tools, which is apparently not included in sbt's built in version
     libraryDependencies += "org.scala-lang.virtualized" % "scala-library" % virtScala,
     libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % virtScala,
+    libraryDependencies += "org.scalatest" % "scalatest_2.10" % "2.1.2",
     libraryDependencies += "org.apache.commons" % "commons-math" % "2.2",
     // cluster deps
     libraryDependencies += "com.google.protobuf" % "protobuf-java" % "2.4.1",
-    libraryDependencies += "org.apache.mesos" % "mesos" % "0.9.0-incubating",    
+    libraryDependencies += "org.apache.mesos" % "mesos" % "0.9.0-incubating",
     libraryDependencies += "org.apache.hadoop" % "hadoop-core" % "1.2.0",
     // used in delitec to access jars
     retrieveManaged := true,
@@ -91,24 +84,77 @@ object ${dslName}Build extends Build {
   val virtBuildSettings = virtBuildSettingsBase ++ Seq(
     scalaSource in Compile <<= baseDirectory(_ / "src")
   )
+""")
+    return s.substitute(dslName=dsl, dslNameLowerCase=dsl.lower())
 
+# this version uses local classes rather than jars. is it any better from an incremental compilation standpoint?
+def sbtBuildFileLocal(dsl):
+    s = Template("""
+${header}
+
+  lazy val LMS_HOME = sys.env.get("LMS_HOME").getOrElse(error("Please set the LMS_HOME environment variable."))
+  lazy val DELITE_HOME = sys.env.get("DELITE_HOME").getOrElse(error("Please set the DELITE_HOME environment variable."))
+
+  val scalacp = "/target/scala-2.10/classes/"
+  lazy val lms = file(LMS_HOME + scalacp)
+  lazy val deliteFramework = file(DELITE_HOME + "/framework" + scalacp)
+  lazy val deliteRuntime = file(DELITE_HOME + "/runtime" + scalacp)
+  lazy val deliteTest = file(DELITE_HOME + "/framework/delite-test" + scalacp)
+
+  val deps = Seq(
+    unmanagedClasspath in Compile <+= (baseDirectory) map { bd => Attributed.blank(lms) },
+    unmanagedClasspath in Compile <+= (baseDirectory) map { bd => Attributed.blank(deliteFramework) },
+    unmanagedClasspath in Compile <+= (baseDirectory) map { bd => Attributed.blank(deliteRuntime) },
+    unmanagedClasspath in Compile <+= (baseDirectory) map { bd => Attributed.blank(deliteTest) },
+    unmanagedClasspath in Test <+= (baseDirectory) map { bd => Attributed.blank(lms) },
+    unmanagedClasspath in Test <+= (baseDirectory) map { bd => Attributed.blank(deliteFramework) },
+    unmanagedClasspath in Test <+= (baseDirectory) map { bd => Attributed.blank(deliteRuntime) },
+    unmanagedClasspath in Test <+= (baseDirectory) map { bd => Attributed.blank(deliteTest) }    
+  )
+
+${footer}
+""")
+    return s.substitute(header=sbtBuildFileHeader(dsl), footer=sbtBuildFileFooter(dsl))
+
+def sbtBuildFile(dsl):
+    s = Template("""
+${header}
+
+  val virtualization_lms_core = "EPFL" % "lms_2.10" % "0.3-SNAPSHOT"
+  val delite_framework = "stanford-ppl" % "framework_2.10" % "0.1-SNAPSHOT"
+  val delite_runtime = "stanford-ppl" % "runtime_2.10" % "0.1-SNAPSHOT"
+  val delite_tests = "stanford-ppl" % "delite-test_2.10" % "0.1-SNAPSHOT"
+
+  val deps = Seq(
+    libraryDependencies += virtualization_lms_core,
+    libraryDependencies += delite_framework,
+    libraryDependencies += delite_runtime,
+    libraryDependencies += delite_tests
+  )
+
+${footer}
+""")
+    return s.substitute(header=sbtBuildFileHeader(dsl), footer=sbtBuildFileFooter(dsl))
+
+def sbtBuildFileFooter(dsl):
+    s = Template("""
   // build targets
-  lazy val ${dslName}Shared = Project("${dslName}-shared", file("shared"), settings = virtBuildSettings)
-  lazy val ${dslName}Comp = Project("${dslName}-comp", file("compiler"), settings = virtBuildSettings) dependsOn(${dslName}Shared)
-  lazy val ${dslName}Lib = Project("${dslName}-lib", file("library"), settings = virtBuildSettings) dependsOn(${dslName}Shared)
-  lazy val ${dslName}Ident = Project("${dslName}-ident", file("ident"), settings = virtBuildSettings) dependsOn(${dslName}Shared)
-  lazy val ${dslName}Apps = Project("${dslName}-apps", file("apps"), settings = virtBuildSettings) dependsOn(${dslName}Comp, ${dslName}Lib, ${dslName}Ident)
-  lazy val ${dslName}Tests = Project("${dslName}-tests", file("tests"), settings = virtBuildSettingsBase ++ Seq(
+  lazy val ${dslName}Shared = Project("${dslName}-shared", file("shared"), settings = virtBuildSettings ++ deps)
+  lazy val ${dslName}Comp = Project("${dslName}-comp", file("compiler"), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Shared)
+  lazy val ${dslName}Lib = Project("${dslName}-lib", file("library"), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Shared)
+  lazy val ${dslName}Ident = Project("${dslName}-ident", file("ident"), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Shared)
+  lazy val ${dslName}Apps = Project("${dslName}-apps", file("apps"), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Comp, ${dslName}Lib, ${dslName}Ident)
+  lazy val ${dslName}Tests = Project("${dslName}-tests", file("tests"), settings = virtBuildSettingsBase ++ deps ++ Seq(
     scalaSource in Test <<= baseDirectory(_ / "src"),
     parallelExecution in Test := false,
     concurrentRestrictions in Test += Tags.limitAll(1) // don't run anything in parallel
   )) dependsOn(${dslName}Comp, ${dslName}Lib)
 }
 """)
-    return s.substitute(dslName=dsl, dslNameLowerCase=dsl.lower())
+    return s.substitute(dslName=dsl)
 
 def get_files(path):
-    return [d + "/" + f for (d, n, fs) in os.walk(path) for f in fs] 
+    return [d + "/" + f for (d, n, fs) in os.walk(path) for f in fs]
 
 def check_conflict(base_dir, generated_dir):
     base = set(get_files(base_dir))
@@ -123,17 +169,17 @@ def rename_all(src, mappings):
     infiles = fileinput.FileInput(replfiles, inplace = 1)
     for line in infiles:
         for orig,repl in mappings.iteritems():
-          line = line.replace(orig,repl)          
+          line = line.replace(orig,repl)
         sys.stdout.write(line)
 
 def publish_static_extern(dsl, build_dir, scratch_dir):
     static_dir = FORGE_HOME + "/static/extern/"
     check_conflict(static_dir, build_dir)
 
-    # copy and perform name replacement of static extern files on the fly        
+    # copy and perform name replacement of static extern files on the fly
     os.system("rsync -r " + static_dir + " " + scratch_dir)
     rename_all(scratch_dir, {'HUMAN_DSL_NAME': dsl, 'LOWERCASE_DSL_NAME': dsl.lower()})
-    
+
     # we need to mirror the package layout convention defined in Forge
     all_targets = ['shared','compiler','library']
     targets = [t for t in all_targets if os.path.exists(build_dir + t + "/src/")]
@@ -141,12 +187,12 @@ def publish_static_extern(dsl, build_dir, scratch_dir):
         dest_root = t + "/"
         dest = dest_root + "src/" + dsl.lower() + "/" + t + "/"
         src_root = scratch_dir + "/" + t  + "/"
-        src = src_root + "src/" 
-        os.system("rsync -r " + src + " " + build_dir + "/" + dest)    
-        os.system("rsync -q " + src_root + "*" + " " + build_dir + "/" + dest_root) 
+        src = src_root + "src/"
+        os.system("rsync -r " + src + " " + build_dir + "/" + dest)
+        os.system("rsync -q " + src_root + "*" + " " + build_dir + "/" + dest_root)
 
 def publish_dsl_extern(dsl, build_dir, scratch_dir, final_name):
-    extern_dir = FORGE_HOME + "/extern/" + dsl + "/"  
+    extern_dir = FORGE_HOME + "/extern/" + dsl + "/"
     if not os.path.exists(extern_dir):
         return
     check_conflict(extern_dir, build_dir)
@@ -159,32 +205,32 @@ def publish_dsl_extern(dsl, build_dir, scratch_dir, final_name):
     # we need to mirror the package layout convention defined in Forge
     all_targets = ['shared','compiler','library']
     targets = [t for t in all_targets if os.path.exists(build_dir + t + "/src/")]
-    tmp_dest = scratch_dir + dsl + "_extern/"            
+    tmp_dest = scratch_dir + dsl + "_extern/"
     for t in targets:
         dest_root = t + "/"
         dest = dest_root + "src/" + final_name.lower() + "/" + t + "/"
         src_root = extern_dir + "/" + t  + "/"
         src = src_root + "src/"
-               
+
         if dsl != final_name:
             if not os.path.exists(tmp_dest + dest):
                   os.makedirs(tmp_dest + dest)
-            os.system("rsync -r " + src + " " + tmp_dest + dest)    
-            os.system("rsync -q " + src_root + "*" + " " + tmp_dest + dest_root) 
+            os.system("rsync -r " + src + " " + tmp_dest + dest)
+            os.system("rsync -q " + src_root + "*" + " " + tmp_dest + dest_root)
         else:
-            os.system("rsync -r " + src + " " + build_dir + "/" + dest)    
-            os.system("rsync -q " + src_root + "*" + " " + build_dir + "/" + dest_root) 
+            os.system("rsync -r " + src + " " + build_dir + "/" + dest)
+            os.system("rsync -q " + src_root + "*" + " " + build_dir + "/" + dest_root)
 
     if dsl != final_name:
         # dependencies need to have dsl names remapped
         rename_all(tmp_dest, {dsl: final_name, dsl.lower(): final_name.lower()})
-        os.system("rsync -r " + tmp_dest + " " + build_dir) 
- 
+        os.system("rsync -r " + tmp_dest + " " + build_dir)
+
 def publish(dsl, opts):
     global FORGE_HOME
     global FORGE_GENERATED
 
-    generated_root = FORGE_HOME + "/" + FORGE_GENERATED + "/" + dsl + "/"
+    generated_root = FORGE_GENERATED + "/" + dsl + "/"
     if not os.path.isdir(generated_root):
         err("could not find generated DSL " + dsl + ". (did you forget to run forge?)")
 
@@ -202,13 +248,13 @@ def publish(dsl, opts):
     # extern
     scratch_dir = FORGE_GENERATED + "/.scratch/"
     # in the common case, extern dependencies don't change - so we
-    # only republish it if the scratch directory does not exist                
+    # only republish it if the scratch directory does not exist
     if not os.path.exists(scratch_dir) or opts.extern_clean:
         if not os.path.exists(scratch_dir):
             os.makedirs(scratch_dir)
         publish_static_extern(dsl, build_dir, scratch_dir)
         publish_dsl_extern(dsl, build_dir, scratch_dir, dsl)
-    
+
     # apps
     apps_dir = FORGE_HOME + "/apps/" + dsl + "/"
     if os.path.exists(apps_dir):
@@ -223,7 +269,10 @@ def publish(dsl, opts):
     if not os.path.exists(build_dir + "/project/"):
         os.mkdir(build_dir + "/project/")
         buildFile = open(build_dir + "/project/Build.scala", 'w')
-        buildFile.write(sbtBuildFile(dsl))
+        if opts.use_jars:
+            buildFile.write(sbtBuildFile(dsl))
+        else:
+            buildFile.write(sbtBuildFileLocal(dsl))
         buildFile.close()
 
     # executable scripts
@@ -239,7 +288,7 @@ def publish(dsl, opts):
 
         shutil.copyfile(FORGE_HOME + "/static/delitecommon-wrapper.py", build_dir+"/bin/delitecommon.py")
 
-    print "[forge]: Publishing complete. Don't forget to run 'sbt publish-local' from your DELITE_HOME for the framework and runtime modules before compiling your new DSL."
+    print "[forge]: Publishing complete."
 
 if __name__ == "__main__":
     main()

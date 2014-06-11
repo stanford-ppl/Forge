@@ -112,9 +112,15 @@ trait DenseVectorOps {
       ($0 until $1: scala.Range).toArray.sortWith((a,b) => $2(a) < $2(b))
     })
 
-    compiler (DenseVector) ("densevector_groupby_helper", (T,R), (MArray(T), (T ==> R)) :: MArray(MArray(T))) implements codegen($cala, ${
-      $0.groupBy(e => $b[1](e)).values.toArray
-    })
+    val K = tpePar("K")
+    val V = tpePar("V")
+
+    compiler (DenseVector) ("densevector_groupby_helper", (T,K,V), (DenseVector(T), T ==> K, T ==> V) :: MHashMap(K, MArrayBuffer(V))) implements groupBy((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)})
+
+    infix (DenseVector) ("toVector", (T,R), MHashMap(T, R) :: DenseVector(R)) implements composite ${
+      densevector_fromarray(fhashmap_values($0), true)
+    }
+
 
     val DenseVectorOps = withTpe (DenseVector)
     DenseVectorOps {
@@ -163,18 +169,18 @@ trait DenseVectorOps {
 
       infix ("update") ((("indices",IndexVector),("e",T)) :: MUnit, effect = write(0)) implements single ${
         (0::indices.length) foreach { i =>
-          // if (indices(i) < 0 || indices(i) >= $self.length) fatal("index out of bounds: bulk vector update")
+          fassert(indices(i) >= 0 && indices(i) < $self.length, "index out of bounds: bulk vector update")
           array_update(densevector_raw_data($self), indices(i), e)
         }
       }
 
       infix ("update") ((("indices",IndexVector),("v",DenseVector(T))) :: MUnit, effect = write(0)) implements single ${
-        if (indices.length != v.length) fatal("dimension mismatch: bulk vector update")
+        fassert(indices.length == v.length, "dimension mismatch: bulk vector update")
 
         // cannot be parallel unless indices contains only disjoint indices (why is why we use 'single' here)
         // however, maybe this should be a property that we guarantee of all IndexVectors
         (0::indices.length) foreach { i =>
-          // if (indices(i) < 0 || indices(i) >= $self.length) fatal("index out of bounds: bulk vector update")
+          fassert(indices(i) >= 0 && indices(i) < $self.length, "index out of bounds: bulk vector update")
           array_update(densevector_raw_data($self), indices(i), v(i))
         }
       }
@@ -260,7 +266,6 @@ trait DenseVectorOps {
       /**
        * Math
        */
-
       infix ("+=") (DenseVector(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${
         $self.indices.foreach { i => $self(i) = $self(i) + $1(i) }
       }
@@ -302,7 +307,6 @@ trait DenseVectorOps {
         $self.indices.foreach { i => $self(i) = $self(i) / $1(i) }
       }
 
-
       /**
        * Ordering
        */
@@ -340,13 +344,19 @@ trait DenseVectorOps {
 
       direct ("__equal") (SparseVector(T) :: MBoolean) implements composite ${ $self == $1.toDense }
 
-      // TODO: switch to generic vector groupBy using Delite op
-      infix ("groupBy") (((T ==> R)) :: DenseVector(DenseVector(T)), addTpePars = R) implements composite ${
-        val a = densevector_groupby_helper(densevector_raw_data($self), $1)
-        (0 :: array_length(a)) { i =>
-          densevector_fromarray(array_apply(a,i), $self.isRow)
-        }
+      /**
+       * Bulk
+       */
+      infix ("groupByReduce") ((T ==> K,T ==> V,(V,V) ==> V) :: MHashMap(K,V), TArith(V), addTpePars = (K,V)) implements groupByReduce((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)}, ${implicitly[Arith[V]].empty}, ${(a,b) => $3(a,b)})
+
+      infix ("groupBy") ((T ==> K,T ==> V) :: MHashMap(K, DenseVector(V)), addTpePars = (K,V)) implements composite ${
+        val hash = densevector_groupby_helper($self,$1,$2)
+        val vals = fhashmap_values(hash).map(ab => densevector_fromarray(array_buffer_result(ab), true))
+        fhashmap_from_arrays(fhashmap_keys(hash), vals)
       }
+
+      // filter is here, instead of Vector.scala, so that other Vector types can have a different return value
+      infix ("filter") ((T ==> MBoolean) :: DenseVector(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})      
 
       /**
        * Required for parallel collection
@@ -379,6 +389,9 @@ trait DenseVectorOps {
 
     importDenseVectorPrimitiveOps()
     addVectorCommonOps(DenseVector,T)
+
+    // label DenseVector *:* DenseVectorView so that we can rewrite it in RewriteOpsExp
+    label(lookupOverloaded("DenseVector","*:*",1), "densevector_dot_densevectorview")
   }
 
 

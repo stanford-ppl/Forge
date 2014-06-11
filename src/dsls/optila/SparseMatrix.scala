@@ -108,9 +108,9 @@ trait SparseMatrixOps {
           // COO is not stored in order, so just output coordinates as a list
           for (i <- 0 until $self.nnz-1) {
             if (rowIndices(i) > -1)
-              s = s + "((" + rowIndices(i) + ", " + colIndices(i) + "), " + data(i) + ")\\n"
+              s = s + "((" + rowIndices(i) + ", " + colIndices(i) + "), " + optila_fmt_str(data(i)) + ")\\n"
           }
-          s = s + "((" + rowIndices($self.nnz-1) + ", " + colIndices($self.nnz-1) + "), " + data($self.nnz-1) + ")\\n"
+          s = s + "((" + rowIndices($self.nnz-1) + ", " + colIndices($self.nnz-1) + "), " + optila_fmt_str(data($self.nnz-1)) + ")\\n"
         }
         s
       }
@@ -501,7 +501,6 @@ trait SparseMatrixOps {
       infix ("apply") ((IndexVector, IndexWildcard) :: SparseMatrix(T)) implements redirect ${ $self.getRows($1) }
 
       infix ("apply") ((("rows", IndexVector), ("cols", IndexVector)) :: SparseMatrix(T)) implements composite ${
-        // if (rows.length != cols.length) fatal("dimension mismatch in bulk apply: rows.length " + rows.length + " != cols.length " + cols.length)
         // could avoid the logical access and COO <-> CSR conversion here by slicing the underlying CSR array directly
         val out = SparseMatrix[T](rows.length, cols.length)
         for (i <- 0 until rows.length) {
@@ -715,10 +714,10 @@ trait SparseMatrixOps {
             if (nnz > 0) {
               s = s + "(" + i + "): "
               for (j <- rowPtr(i) until rowPtr(i+1)-1) {
-                s = s + "(" + colIndices(j) + ", " + data(j) + "), "
+                s = s + "(" + colIndices(j) + ", " + optila_fmt_str(data(j)) + "), "
               }
               val lineEnd = if (i == $self.numRows-1) "" else "\\n"
-              s = s + "(" + colIndices(rowPtr(i+1)-1) + ", " + data(rowPtr(i+1)-1) + ")" + lineEnd
+              s = s + "(" + colIndices(rowPtr(i+1)-1) + ", " + optila_fmt_str(data(rowPtr(i+1)-1)) + ")" + lineEnd
             }
           }
         }
@@ -875,7 +874,7 @@ trait SparseMatrixOps {
 
       // TODO
       // infix ("*") (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements single ${
-      //   if ($self.numCols != $1.numRows) fatal("dimension mismatch: matrix multiply")
+      //   fassert($self.numCols == $1.numRows, "dimension mismatch: matrix multiply")
       //   // naive
       //   val yT = $1.t
       //   val out = SparseMatrix[T]($self.numRows, $1.numCols)
@@ -892,7 +891,7 @@ trait SparseMatrixOps {
       // }
 
       // infix ("*") (SparseVector(T) :: SparseVector(T), TArith(T)) implements single ${
-      //  if ($self.numCols != $1.length || $1.isRow) fatal("dimension mismatch: matrix * vector")
+      //  fassert($self.numCols == $1.length && !$1.isRow, "dimension mismatch: matrix * vector")
       //  val out = SparseVector[T]($self.numRows, false)
       //  for (rowIdx <- 0 until $self.numRows) {
       //    out(rowIdx) = $self(rowIdx) *:* $1

@@ -93,8 +93,8 @@ trait SumOpsExp extends SumOps with BaseFatExp with EffectExp {
     e match {
       case e@Sum(st,en,b,init) => reflectPure(new { override val original = Some(f,e) } with Sum(f(st),f(en),f(b),f(init))(mtype(e.m),atype(e.a),cstype(e.cs),e.sc))(mtype(manifest[A]), implicitly[SourceContext])
       case e@SumIf(st,en,c,b) => reflectPure(new { override val original = Some(f,e) } with SumIf(f(st),f(en),f(c),f(b))(mtype(e.mR),atype(e.a),mtype(e.mA),cstype(e.cs),e.sc))(mtype(manifest[A]), implicitly[SourceContext])
-      case Reflect(e@Sum(st,en,b,init), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Sum(f(st),f(en),f(b),f(init))(mtype(e.m), atype(e.a), cstype(e.cs), e.sc), mapOver(f,u), f(es)))(mtype(manifest[A]))
-      case Reflect(e@SumIf(st,en,c,b), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with SumIf(f(st),f(en),f(c),f(b))(mtype(e.mR),atype(e.a),mtype(e.mA),cstype(e.cs),e.sc), mapOver(f,u), f(es)))(mtype(manifest[A]))
+      case Reflect(e@Sum(st,en,b,init), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Sum(f(st),f(en),f(b),f(init))(mtype(e.m), atype(e.a), cstype(e.cs), e.sc), mapOver(f,u), f(es)))(mtype(manifest[A]), ctx)
+      case Reflect(e@SumIf(st,en,c,b), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with SumIf(f(st),f(en),f(c),f(b))(mtype(e.mR),atype(e.a),mtype(e.mA),cstype(e.cs),e.sc), mapOver(f,u), f(es)))(mtype(manifest[A]), ctx)
       case _ => super.mirror(e, f)
   }}.asInstanceOf[Exp[A]] // why??
 }

@@ -24,7 +24,7 @@ trait DeliteGenImports extends BaseGenImports {
   }
 
   def emitDelitePackageImports(stream: PrintWriter) {
-    stream.println("import ppl.delite.framework.{Config, DeliteApplication}")
+    stream.println("import ppl.delite.framework.{Config, DeliteApplication, ExpressionsOpt}")
     stream.println("import ppl.delite.framework.codegen.Target")
     stream.println("import ppl.delite.framework.codegen.scala.TargetScala")
     stream.println("import ppl.delite.framework.codegen.cuda.TargetCuda")
@@ -36,6 +36,11 @@ trait DeliteGenImports extends BaseGenImports {
     stream.println("import ppl.delite.framework.transform._")
   }
 
+  def emitDeliteRestageImports(stream: PrintWriter) {
+    stream.println("import ppl.delite.framework.codegen.restage.{DeliteCodeGenRestage,TargetRestage}")
+    stream.println("import ppl.delite.framework.{DeliteInteractive, DeliteInteractiveRunner, DeliteRestageOps, DeliteRestageOpsExp, DeliteRestageRunner}")
+  }
+
   def emitDeliteTestImports(stream: PrintWriter) {
     stream.println("import ppl.tests.scalatest._")
   }
@@ -43,7 +48,12 @@ trait DeliteGenImports extends BaseGenImports {
   def emitDeliteImports(stream: PrintWriter) {
     emitDelitePackageImports(stream)
     emitDeliteOpsImports(stream)
-    emitDeliteTestImports(stream)
+    emitDeliteRestageImports(stream)
+    emitDeliteTestImports(stream)    
+  }
+
+  def emitScalaToolsImports(stream: PrintWriter) {
+    stream.println("import scala.tools.nsc.io._")
   }
 
   override def emitDSLImports(stream: PrintWriter) {
@@ -55,7 +65,8 @@ trait DeliteGenImports extends BaseGenImports {
 
   override def emitAllImports(stream: PrintWriter) {
     super.emitAllImports(stream)
+    emitScalaToolsImports(stream)
     emitLMSImports(stream)
-    emitDeliteImports(stream)
+    emitDeliteImports(stream)    
   }
 }

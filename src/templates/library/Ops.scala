@@ -196,7 +196,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
           // FIXME: passing 'in' to dc_alloc is a bit of a hack - what do we do when 'in' is not the same type as 'out'? currently (and only for groupby) we pass null.
           // this is only safe when the output collection type is known to not use the input argument, such as the current case, ArrayBuffer.
           // to really fix this, either the dc_alloc design needs to be revisited, or we need to use a different allocation mechanism than dc_alloc.
-          val innerDcArg = if (getHkTpe(in.tpe) == getHkTpe(innerColTpe)) "in" else "null.asInstanceOf["+repify(tpeInst(innerColTpe, gb.tpePars._3))+"]"
+          val innerDcArg = if (quote(in.tpe) == quote(innerColTpe)) "in" else "null.asInstanceOf["+repify(tpeInst(innerColTpe, gb.tpePars._3))+"]"
 
           emitWithIndent("val bucket = " + makeOpMethodName(innerDc.alloc) + makeTpePars(instAllocReturnTpe(innerDc.alloc, in.tpe, gb.tpePars._3)) + "("+innerDcArg+",0)", stream, indent+8)
           emitWithIndent(makeOpMethodName(innerDc.append) + "(bucket, 0, map(e))", stream, indent+8)

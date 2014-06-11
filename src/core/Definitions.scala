@@ -49,7 +49,10 @@ trait Definitions extends DerivativeTypes {
   lazy val CNothing = tpe("Nothing", stage = now)
   lazy val byName = tpe("Thunk")
   def MThunk(ret: Rep[DSLType], freq: Frequency = normal) = ftpe(List(forge_arg("", byName, None)),ret,freq) // TODO
+  // unstaged (inlined) functions
   def MFunction(args: List[Rep[Any]], ret: Rep[DSLType], freq: Frequency = normal) = ftpe(args.zipWithIndex.map(anyToArg),ret,freq)
+  // staged (reified) function of A => B (note that A can be a tuple for multiple arguments)
+  lazy val MLambda = tpe("Function1", (tpePar("A"), tpePar("B")))  
   lazy val MSourceContext = tpe("SourceContext", stage = now)
 
   // generic types
@@ -87,8 +90,9 @@ trait Definitions extends DerivativeTypes {
   case object cuda extends CodeGenerator { def name = "Cuda" }
   case object opencl extends CodeGenerator { def name = "OpenCL" }
   case object cpp extends CodeGenerator { def name = "C" }
+  case object restage extends CodeGenerator { def name = "Restage" }
 
-  val generators = List($cala, cuda, opencl, cpp)
+  val generators = List($cala, cuda, opencl, cpp, restage)
 
   /**
    * Type classes

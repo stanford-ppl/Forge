@@ -14,6 +14,9 @@ import optiml.compiler._
 import optiml.library._
 import optiml.shared._
 
+import ppl.delite.framework.{BeginScopes,EndScopes}
+import ppl.delite.framework.ScopeCommunication._
+
 // DenseVector, DenseMatrix
 object Example1Compiler extends OptiMLApplicationCompiler with Example1
 object Example1Interpreter extends OptiMLApplicationInterpreter with Example1
@@ -202,21 +205,17 @@ trait Example7 extends OptiMLApplication {
   }
 }
 
-// SparseDenseVector, SparseDenseMatrix
-// NOT YET IMPLEMENTED
-/*
+// SparseVector, SparseMatrix
 object Example8Compiler extends OptiMLApplicationCompiler with Example8
 object Example8Interpreter extends OptiMLApplicationInterpreter with Example8
 trait Example8 extends OptiMLApplication {
   def main() = {
-    val v = SparseDenseVector[Double](100,true)
+    val v = SparseVector[Double](100,true)
     v(5) = 10
     v(75) = 20
 
-    // mapping a sparse vector returns another sparse vector
-    // if the map function always maps zeros to zeros, the map will
-    // be optimized to only operate on non-zero values
-    val t1 = v map { e => e/(exp(e)+1) }
+    // mapping a sparse vector's non-zero elements returns another sparse vector
+    val t1 = v mapnz { e => e/(exp(e)+1) }
 
     // nnz (number of non-zeros is a field only available on sparse structures)
     println("t1 nnz: " + t1.nnz)
@@ -227,7 +226,7 @@ trait Example8 extends OptiMLApplication {
     // sparse matrices are split into separates phases for construction and use
     // they can only be mutated before 'finish' is called, and can only be
     // used in other operations (e.g. math) after 'finish' is called
-    val mBuilder = DenseMatrix.sparse[Double](1000,1000)
+    val mBuilder = SparseMatrix[Double](1000,1000)
     mBuilder(10,100) = 5
     mBuilder(9,100) = 1
     mBuilder(9,722) = 722
@@ -243,6 +242,7 @@ trait Example8 extends OptiMLApplication {
 
 // Graph
 // NOT YET IMPLEMENTED
+/*
 object Example9Compiler extends OptiMLApplicationCompiler with Example9
 object Example9Interpreter extends OptiMLApplicationInterpreter with Example9
 trait Example9 extends OptiMLApplication {
@@ -430,5 +430,63 @@ trait Example13 extends OptiMLApplication {
 
     val result = v1+v2
     println("result(10) with name " + result(10).name + " has data " + result(10).data)
+  }
+}
+
+// Scopes #1: In this example, we invoke an OptiML program from within an ordinary Scala program
+object Example14 {  
+  def main(args: Array[String]) {
+    // ordinary Scala
+    println("scala 1") 
+    
+    // storage for the answer
+    val ab = new scala.collection.mutable.ArrayBuffer[Double]
+
+    // executes immediately in OptiML
+    OptiML { 
+      println("inside OptiML!")
+      val v = DenseVector.rand(100)        
+      ab += v.sum
+      ()
+    }
+
+    // ordinary Scala again
+    println("computed sum: " + ab(0))  
+  }
+}
+
+// Scopes #2: In this example, we stage two OptiML snippets back-to-back to generate a combined program,
+// which can then be re-staged (run with delitec again). We could write multi-DSL programs this way.
+//
+// to run:
+//   1. delitec Example15
+//   2. mv restage-scopes.scala apps/src/
+//   3. sbt compile
+//   4. delitec RestageApplicationRunner
+//   5. delite RestageApplicationRunner
+object Example15 {  
+  def main(args: Array[String]) {
+    // ordinary Scala
+    println("scala 1") 
+    
+    BeginScopes() // marker to begin scope file
+
+    val a = 
+      OptiML_ { 
+        println("inside OptiML!")
+        val v = (0::10) { i => 1.0 } 
+        DRef(v.sum)        
+      }
+
+    OptiML_ {
+      val in = a.get
+      println("in scope b, got input: ")
+      println(in)
+      println("final answer is: ")  
+      println(in+100)
+      ()
+    }    
+
+    EndScopes() // marker to complete the scope file
   }
 }

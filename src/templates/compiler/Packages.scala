@@ -44,6 +44,26 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("}")
     stream.println()
 
+    // scopes
+    // NOTE: this currently only works in Delite mode. Is there a way to use scopes and still 
+    // delegate to a different implementation for interpreter mode?
+    stream.println("trait " + dsl + "Interactive extends " + dsl + "Application with DeliteInteractive")
+    stream.println("trait " + dsl + "InteractiveRunner[R] extends " + dsl + "ApplicationCompiler with DeliteInteractiveRunner[R]")
+    stream.println()
+    stream.println("// executes scope immediately")
+    stream.println("object " + dsl + " {")
+    stream.println("  def apply[R](b: => R) = new Scope["+dsl+"Interactive, "+dsl+"InteractiveRunner[R], R](b)")
+    stream.println("}")
+    stream.println()
+    stream.println("trait " + dsl + "Lower extends " + dsl + "Application with DeliteRestageOps")
+    stream.println("trait " + dsl + "LowerRunner[R] extends " + dsl + "ApplicationCompiler with DeliteRestageRunner[R]")
+    stream.println()
+    stream.println("// stages scope and generates re-stageable code")
+    stream.println("object " + dsl + "_ {")
+    stream.println("  def apply[R](b: => R) = new Scope["+dsl+"Lower, "+dsl+"LowerRunner[R], R](b)")
+    stream.println("}")
+    stream.println()
+
     // exp
     stream.println("trait " + dsl + "Exp extends " + dsl + "Compiler")
     for (opsGrp <- opsGrps) {
@@ -52,7 +72,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     for (e <- Externs) {
       stream.print(" with " + e.opsGrp.name + "Exp")
     }
-    stream.println(" with DeliteOpsExp with DeliteAllOverridesExp with MultiloopSoATransformExp {")
+    stream.println(" with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteAllOverridesExp with MultiloopSoATransformExp {")
     stream.println(" this: DeliteApplication with " + dsl + "Application => ")
     stream.println()
     emitBlockComment("disambiguations for LMS classes pulled in by Delite", stream, indent=2)
@@ -62,6 +82,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("  override def infix_&&(lhs: Rep[Boolean], rhs: Rep[Boolean])(implicit pos: SourceContext) = boolean_and(lhs,rhs)")
     stream.println("  override def infix_||(lhs: Rep[Boolean], rhs: Rep[Boolean])(implicit pos: SourceContext) = boolean_or(lhs,rhs)")
     stream.println("  override def infix_unsafeImmutable[A:Manifest](lhs: Rep[A])(implicit pos: SourceContext) = object_unsafe_immutable(lhs)")
+    stream.println("  override def infix_unsafeMutable[A:Manifest](lhs: Rep[A])(implicit pos: SourceContext) = object_unsafe_mutable(lhs)")
     stream.println("  override def infix_trim(lhs: Rep[String])(implicit pos: SourceContext) = string_trim(lhs)")
     stream.println("  override def infix_startsWith(lhs: Rep[String], rhs: Rep[String])(implicit pos: SourceContext) = fstring_startswith(lhs,rhs)")
     stream.println("  override def infix_endsWith(lhs: Rep[String], rhs: Rep[String])(implicit pos: SourceContext) = fstring_endswith(lhs,rhs)")
@@ -149,7 +170,8 @@ trait DeliteGenPackages extends BaseGenPackages {
       }
       if (g == cuda) stream.println(" with DeliteCppHostTransfer with DeliteCudaDeviceTransfer ")
       if (g == cpp) stream.println(" with DeliteCppHostTransfer ")
-      stream.println(" with " + g.name + "GenDeliteOps with Delite" + g.name + "GenAllOverrides {" )
+      if (g == restage && generators.contains($cala)) stream.println(" with " + dsl + "Codegen"+$cala.name + " with DeliteCodeGenRestage { ")      
+      else stream.println(" with " + g.name + "GenDeliteOps with Delite" + g.name + "GenAllOverrides {" )
       stream.println("  val IR: DeliteApplication with " + dsl + "Exp")
       // TODO: generalize, other targets can have remaps too, need to be encoded somehow
       // store dsmap and remap inside the generator itself?
@@ -171,7 +193,7 @@ trait DeliteGenPackages extends BaseGenPackages {
         stream.println()
       }
       stream.println("}")
-    }
+    } 
   }
 
 }

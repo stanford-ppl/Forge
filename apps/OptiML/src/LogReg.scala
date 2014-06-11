@@ -6,13 +6,13 @@ object LogRegCompiler extends OptiMLApplicationCompiler with LogReg
 object LogRegInterpreter extends OptiMLApplicationInterpreter with LogReg
 
 trait LogReg extends OptiMLApplication {
-  def print_usage = {
+  def printUsage = {
     println("Usage: LogReg <input training data file> <input training label file>")
     exit(-1)
   }
 
   def main() = {
-    if (args.length < 2) print_usage
+    if (args.length < 2) printUsage
 
     val x = readMatrix(args(0))
     val y = readVector(args(1)).t

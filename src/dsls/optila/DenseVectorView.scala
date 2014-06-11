@@ -39,6 +39,8 @@ trait DenseVectorViewOps {
 
       direct ("__equal") (DenseVector(T) :: MBoolean) implements composite ${ $1 == $self }
 
+      infix ("filter") ((T ==> MBoolean) :: DenseVector(T)) implements redirect ${ $self.toDense.filter($1) }
+
       fimplicit ("viewToDense") (Nil :: DenseVector(T)) implements composite ${
         if (Settings.verbose > 0) println("(performance warning): automatic conversion from DenseVectorView to DenseVector")
         // Console.println("  at " + quotePos(fresh[Nothing].withPos(List(implicitly[SourceContext]))))

@@ -1,11 +1,22 @@
 package optiql.shared.ops
 
-import scala.virtualization.lms.common.StructOps
+import scala.virtualization.lms.common.{Base,StructOps}
 import optiql.shared._
 import optiql.shared.ops._
 import scala.reflect.{RefinedManifest,SourceContext}
 
-trait RewriteOps
+//TODO: this trait is basically a misc. grab bag of features, but most of it should be pushed directly into Forge
+trait RewriteOps extends Base {
+  this: OptiQL => 
+
+  def infix_printAsTable[A:Manifest](self: Rep[Table[A]],maxRows: Rep[Int] = unit(100))(implicit __pos: SourceContext) = table_printastable[A](self,maxRows)(implicitly[Manifest[A]],__pos)
+  def infix_writeAsJSON[A:Manifest](self: Rep[Table[A]],path: Rep[String])(implicit __pos: SourceContext) = table_writeasjson[A](self,path)(implicitly[Manifest[A]],__pos)
+  //def infix_writeAsCSV
+
+  def table_printastable[A:Manifest](self: Rep[Table[A]],maxRows: Rep[Int] = unit(100))(implicit __pos: SourceContext): Rep[Unit]
+  def table_writeasjson[A:Manifest](self: Rep[Table[A]],path: Rep[String])(implicit __pos: SourceContext): Rep[Unit]
+}
+
 trait RewriteCompilerOps extends RewriteOps {
   this: OptiQL =>
 

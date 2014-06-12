@@ -457,7 +457,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   // vet codegen rules and update the ops list if necessary
   def reconcileCodegenRule(op: Rep[DSLOp], rule: CodeGen) {
     if (op.args.exists(a => DataStructs.contains(getHkTpe(a.tpe))))
-      warn("(op " + op.name + ") code generated ops should not have struct types as inputs, since structs may be eliminated at compile time. consider passing in one or more fields of the struct as input(s) to the op instead.")
+      err("(op " + op.name + ") code generated ops should not have struct types as inputs, since structs may be eliminated at compile time. consider passing in one or more fields of the struct as input(s) to the op instead.")
 
     // also may need to update opsGrp targets
     val opsGrp = OpsGrp.getOrElse(op.grp, err("couldn't find group " + op.grp.name + " for code generator declared on op " + op.name))

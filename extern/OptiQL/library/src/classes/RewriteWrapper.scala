@@ -6,7 +6,7 @@ import optiql.library.classes._
 import scala.reflect.{Manifest,SourceContext}
 import scala.collection.mutable.HashMap
 
-trait RewriteWrapper extends RewriteOps {
+trait RewriteWrapper {
   this: OptiQLBase with OptiQLClasses =>
 
   def groupByHackImpl[K:Manifest,V:Manifest](self: Rep[Table[V]], keySelector: Rep[V] => Rep[K])(implicit pos: SourceContext): Rep[Table[Tup2[K,Table[V]]]] = {
@@ -33,6 +33,16 @@ trait RewriteWrapper extends RewriteOps {
 
   def compareHackImpl[A:Manifest:Ordering](lhs: Rep[A], rhs: Rep[A]): Rep[Int] = {
     implicitly[Ordering[A]].compare(lhs, rhs)
+  }
+
+  ///////
+
+  def table_printastable[A:Manifest](self: Rep[Table[A]],maxRows: Rep[Int] = unit(100))(implicit __pos: SourceContext) = {
+    TablePrinter.printAsTable(self, maxRows)
+  }
+  
+  def table_writeasjson[A:Manifest](self: Rep[Table[A]],path: Rep[String])(implicit __pos: SourceContext) = {
+    TablePrinter.writeAsJSON(self, path)
   }
 
 }

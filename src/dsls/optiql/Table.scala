@@ -149,17 +149,7 @@ trait TableOps {
       infix ("toArray") (Nil :: MArray(A)) implements composite ${ array_fromfunction($self.size, i => $self.apply(i)) }
 
       //printing ops
-      infix ("printAsTable") (("maxRows", MInt, "100") :: MUnit, effect = simple) implements codegen($cala, ${
-        TablePrinter.printAsTable($self, $maxRows)
-      })
-
-      infix ("writeAsJSON") (("path"->MString) :: MUnit, effect = simple) implements codegen($cala, ${
-        TablePrinter.writeAsJSON($self, $path)
-      })
-
-      /*infix ("writeAsCSV") (("separator"->MString, "path"->MString) :: MUnit, effect = simple) implements codegen($cala ${
-        TablePrinter.writeAsCSV($self, $separator, $path)
-      })*/
+      //see extern files, currently manual Scala implementations
 
       //internal transformed ops
       compiler("groupByReduce")(("keySelector" -> (A ==> K), "valueSelector" -> (A ==> V), "reducer" -> ((V,V) ==> V), "condition" -> (A ==> MBoolean)) :: Table(V), addTpePars = (K,V)) implements composite ${

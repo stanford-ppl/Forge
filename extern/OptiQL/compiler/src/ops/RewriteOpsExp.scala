@@ -1,6 +1,6 @@
 package optiql.compiler.ops
 
-import scala.virtualization.lms.common.StructOps
+import scala.virtualization.lms.common.{StructOps,ScalaGenFat}
 import scala.reflect.{RefinedManifest,SourceContext}
 import ppl.delite.framework.datastructures._
 import ppl.delite.framework.transform.MultiloopSoATransformWithReduceExp
@@ -8,7 +8,7 @@ import optiql.compiler._
 import optiql.shared.ops._
 
 //extra traits from Delite that we want to include that aren't pulled in by default with Forge
-trait DeliteOptiQLExtraExp //extends MultiloopSoATransformWithReduceExp
+trait DeliteOptiQLExtraExp //extends MultiloopSoATransformWithReduceExp //TODO: Forge's KeysDistinct doesn't transform
 
 trait RewriteOpsExp extends RewriteOps with TableOpsExp with DeliteOptiQLExtraExp {
   this: OptiQLExp =>
@@ -113,10 +113,53 @@ trait RewriteOpsExp extends RewriteOps with TableOpsExp with DeliteOptiQLExtraEx
     case _ => super.table_select(self, resultSelector)
   }
 
+  ///////
+
+  def table_printastable[A:Manifest](self: Rep[Table[A]],maxRows: Rep[Int] = unit(100))(implicit __pos: SourceContext) = {
+    reflectEffect(Table_PrintAsTable[A](self,maxRows)(implicitly[Manifest[A]],__pos))
+  }
+  def table_writeasjson[A:Manifest](self: Rep[Table[A]],path: Rep[String])(implicit __pos: SourceContext) = {
+    reflectEffect(Table_WriteAsJSON[A](self,path)(implicitly[Manifest[A]],__pos))
+  }
+
+  case class Table_PrintAsTable[A:Manifest](self: Rep[Table[A]],maxRows: Rep[Int] = unit(100))(implicit val __pos: SourceContext) extends Def[Unit] {
+    val _mA = implicitly[Manifest[A]]
+  }
+
+  case class Table_WriteAsJSON[A:Manifest](self: Rep[Table[A]],path: Rep[String])(implicit val __pos: SourceContext) extends Def[Unit] {
+    val _mA = implicitly[Manifest[A]]
+  }
+
+  override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = (e match {
+    case mn@Table_PrintAsTable(__arg0,__arg1) => table_printastable(f(__arg0),f(__arg1))(mtype(mn._mA),mn.__pos)
+    case Reflect(mn@Table_PrintAsTable(__arg0,__arg1), u, es) => reflectMirrored(Reflect(Table_PrintAsTable(f(__arg0),f(__arg1))(mtype(mn._mA),mn.__pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case mn@Table_WriteAsJSON(__arg0,__arg1) => table_writeasjson(f(__arg0),f(__arg1))(mtype(mn._mA),mn.__pos)
+    case Reflect(mn@Table_WriteAsJSON(__arg0,__arg1), u, es) => reflectMirrored(Reflect(Table_WriteAsJSON(f(__arg0),f(__arg1))(mtype(mn._mA),mn.__pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case _ => super.mirror(e, f)
+  }).asInstanceOf[Exp[A]]
+
 }
 
-// these need to exist for externs, even though we don't need them
-trait ScalaGenRewriteOps
+// these need to exist for externs, even if we don't need them
+trait ScalaGenRewriteOps extends ScalaGenFat {
+  val IR: RewriteOpsExp
+  import IR._
+
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case mn@Table_PrintAsTable(self,maxRows) => 
+      stream.println("val "+quote(sym)+" = {")
+      stream.print("TablePrinter.printAsTable("+quote(self)+", "+quote(maxRows)+")")
+      stream.println("}")
+
+    case mn@Table_WriteAsJSON(self,path) => 
+      stream.println("val "+quote(sym)+" = {")
+      stream.print("TablePrinter.writeAsJSON("+quote(self)+", "+quote(path)+")")
+      stream.println("}")
+
+    case _ => super.emitNode(sym, rhs)
+  }
+}
+
 trait CudaGenRewriteOps
 trait OpenCLGenRewriteOps
 trait CGenRewriteOps

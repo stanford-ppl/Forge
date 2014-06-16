@@ -31,15 +31,6 @@ trait DeliteGenOps extends BaseGenOps {
     else "BaseFatExp with EffectExp" // we use codegen *GenFat, which requires EffectExp
   }
 
-  //TODO: better way to check if the string contains block
-  private def containsBlock(b: String): Boolean = {
-    if(b.contains("emitBlock")) true
-    else false
-  }
-
-  // bound symbol for the captured variable of a block
-  private var boundArg: String = _
-
   override def quote(x: Exp[Any]): String = x match {
     case Def(QuoteBlockResult(func,args,ret,captured)) =>
       // bind function args to captured args
@@ -48,39 +39,24 @@ trait DeliteGenOps extends BaseGenOps {
       if (!isThunk(func.tpe)) {
         for (a <- args) {
           // have to be careful about automatic string lifting here
-          val boundArg_saved = boundArg
-          boundArg = replaceWildcards(boundArgName(func,a))
-          if (containsBlock(replaceWildcards(captured(i)))) {
-            // when the captured variable is another block,
-            // declare the varible, emit block, and assign the result to the variable at the end of the block.
-            val add = nl + "emitVarDecl(" + replaceWildcards(boundArgName(func,a))+ ".asInstanceOf[Sym[Any]])" + nl + replaceWildcards(captured(i))
-            boundStr += add
-          }
-          else {
-            val add: String = (nl + "emitValDef(" + replaceWildcards(boundArgName(func,a)) + ".asInstanceOf[Sym[Any]],\"" + replaceWildcards(captured(i)) + "\")")
-            boundStr += add
-          }
-          boundArg = boundArg_saved
+          var add: String = (nl + "emitValDef(" + replaceWildcards(boundArgName(func,a)) + ".asInstanceOf[Sym[Any]],\"{\")")
+          add += (nl + "\"" + replaceWildcards(captured(i)) + "\"")
+          add += (nl + "\"}\\n\"")
+          boundStr += add
           i += 1
         }
       }
 
-      if (activeGenerator == cpp && boundArg == null && ret != MUnit)
-        warn("Block " + func.name + " returns non-unit type result. C++ target may not work properly." + boundStr)
+      if (activeGenerator == cpp && ret != MUnit)
+        warn("Block " + func.name + " returns non-unit type result. C++ target may not work properly.")
 
       // the new-line formatting is admittedly weird; we are using a mixed combination of actual new-lines (for string splitting at Forge)
       // and escaped new-lines (for string splitting at Delite), based on how we received strings from string interpolation.
       // FIX: using inconsistent newline character, not platform independent
-      val out = "{ \"" + boundStr +
+      "{ \"" + boundStr +
        nl + "emitBlock(" + func.name + ")" +
-       (if (ret != MUnit && boundArg == null)
-          (nl + "quote(getBlockResult(" + func.name + "))+\"\\n\"")
-        else if (ret != MUnit && boundArg != null)
-          (nl + "emitAssignment(" + boundArg + ".asInstanceOf[Sym[Any]], quote(getBlockResult(" + func.name + ")))")
-        else ""
-       ) +
-       nl + " \" }\\n "
-      if(ret != MUnit && boundArg != null) "\"" + out + "\"" else out
+       (if (ret != MUnit) (nl + "quote(getBlockResult(" + func.name + "))+\"\\n\"") else "") + 
+       nl + " \" } "
 
     case Def(QuoteSeq(argName)) => "Seq("+unquotes(argName+".map(quote).mkString("+quotes(",")+")")+")"
 
@@ -341,6 +317,17 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_map"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,map.tpePars._2)) + "(in, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(inDc.size) + "(in))")
+          if(map.numDynamicChunks == "dynamic"){
+            stream.println("    override val numDynamicChunks = -1")
+          }
+          else{
+            val num:Int = try{
+              map.numDynamicChunks.toInt
+            } catch{
+              case e:Exception => 0
+            }
+            stream.println("    override val numDynamicChunks = " + num)
+          }        
         case zip:Zip =>
           val colTpe = getHkTpe(o.retTpe)
           val outDc = ForgeCollections(colTpe)
@@ -353,6 +340,17 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_zip"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,inA.tpe,zip.tpePars._3)) + "(inA, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(inDc.size) + "(inA))")
+          if(zip.numDynamicChunks == "dynamic"){
+            stream.println("    override val numDynamicChunks = -1")
+          }
+          else{
+            val num:Int = try{
+              zip.numDynamicChunks.toInt
+            } catch{
+              case e:Exception => 0
+            }
+            stream.println("    override val numDynamicChunks = " + num)
+          }
         case reduce:Reduce =>
           val col = o.args.apply(reduce.argIndex)
           val dc = ForgeCollections(getHkTpe(col.tpe))
@@ -362,6 +360,17 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_reduce"))
           stream.println("    def zero = " + makeOpImplMethodNameWithArgs(o, "_zero"))
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
+          if(reduce.numDynamicChunks == "dynamic"){
+            stream.println("    override val numDynamicChunks = -1")
+          }
+          else{
+            val num:Int = try{
+              reduce.numDynamicChunks.toInt
+            } catch{
+              case e:Exception => 0
+            }
+            stream.println("    override val numDynamicChunks = " + num)
+          }
         case mapreduce:MapReduce =>
           val col = o.args.apply(mapreduce.argIndex)
           val dc = ForgeCollections(getHkTpe(col.tpe))
@@ -384,6 +393,17 @@ trait DeliteGenOps extends BaseGenOps {
             stream.println("    def map = " + makeOpImplMethodNameWithArgs(o, "_map"))
           }
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
+          if(mapreduce.numDynamicChunks == "dynamic"){
+            stream.println("    override val numDynamicChunks = -1")
+          }
+          else{
+            val num:Int = try{
+              mapreduce.numDynamicChunks.toInt
+            } catch{
+              case e:Exception => 0
+            }
+            stream.println("    override val numDynamicChunks = " + num)
+          }
         case filter:Filter =>
           val colTpe = getHkTpe(o.retTpe)
           val outDc = ForgeCollections(colTpe)
@@ -396,6 +416,17 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_map"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,filter.tpePars._2)) + "(in, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(inDc.size) + "(in))")
+          if(filter.numDynamicChunks == "dynamic"){
+            stream.println("    override val numDynamicChunks = -1")
+          }
+          else{
+            val num:Int = try{
+              filter.numDynamicChunks.toInt
+            } catch{
+              case e:Exception => 0
+            }
+            stream.println("    override val numDynamicChunks = " + num)
+          }
         case flatmap:FlatMap =>
           val colTpe = getHkTpe(o.retTpe)
           val outDc = ForgeCollections(colTpe)
@@ -407,6 +438,17 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_func"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,flatmap.tpePars._2)) + "(in, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(inDc.size) + "(in))")
+          if(flatmap.numDynamicChunks == "dynamic"){
+            stream.println("    override val numDynamicChunks = -1")
+          }
+          else{
+            val num:Int = try{
+              flatmap.numDynamicChunks.toInt
+            } catch{
+              case e:Exception => 0
+            }
+            stream.println("    override val numDynamicChunks = " + num)
+          }        
         case foreach:Foreach =>
           val col = o.args.apply(foreach.argIndex)
           val dc = ForgeCollections(getHkTpe(col.tpe))
@@ -416,6 +458,17 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_func"))
           stream.println("    def sync = n => unit(List())")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
+          if(foreach.numDynamicChunks == "dynamic"){
+            stream.println("    override val numDynamicChunks = -1")
+          }
+          else{
+            val num:Int = try{
+              foreach.numDynamicChunks.toInt
+            } catch{
+              case e:Exception => 0
+            }
+            stream.println("    override val numDynamicChunks = " + num)
+          }
       }
       emitOpNodeFooter(o, stream)
       stream.println()
@@ -529,7 +582,7 @@ trait DeliteGenOps extends BaseGenOps {
           emitWithIndent("val keys = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o, "Keys") + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
           emitWithIndent("val index = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o, "Index") + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
           emitWithIndent("val values = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o) + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
-          emitWithIndent(makeEffectAnnotation(pure,o) + "(DeliteMapNewImm(keys, values, index, darray_length(values)))", stream, 4)
+          emitWithIndent(makeEffectAnnotation(pure,o) + "(DeliteMapNewImm(keys, values, index, values.length))", stream, 4)
         case _ if hasEffects =>
           // if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
           val prologue = if (o.effect == simple) " andAlso Simple()" else ""

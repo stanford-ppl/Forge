@@ -60,18 +60,24 @@ trait IOGraphOps {
         })
        NodeData[Tup2[Int,Int]](input_edges).distinct
     }
+    direct (IO) ("loadDirectedEdgeList", Nil, MString :: NodeData(Tuple2(MInt,MInt))) implements composite ${
+      val input_edges = ForgeFileReader.readLines($0)({line =>
+          val fields = line.fsplit(" ")
+          pack(fields(0).toInt,fields(1).toInt) 
+      })
+      NodeData[Tup2[Int,Int]](input_edges).distinct
+    }
     direct (IO) ("createMeshEdgeList", Nil, MInt :: NodeData(Tuple2(MInt,MInt))) implements composite ${
       val meshSize = $0
       NodeData(array_fromfunction(meshSize,e => e)).flatMap{ e =>
         NodeData(array_fromfunction(meshSize,z => z)).map( z => pack(z,e))
-      }.distinct
+      }.filter(e => e._1 != e._2, e => e).distinct
     }
 /////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////
 ////////Undirected CSR Loader
 /////////////////////////////////////////////////////////////////////////////////////////////
     direct (IO) ("undirectedGraphFromEdgeList", Nil, ("edge_data",NodeData(Tuple2(MInt,MInt))) :: UndirectedGraph) implements composite ${
-      println("Edges: " + edge_data.length)
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
 
       //sort by degree, helps with skew for buckets of nodes
@@ -109,16 +115,10 @@ trait IOGraphOps {
       }
       pack(src_node_array.getRawArray,src_edge_array.getRawArray)
     }
-
-    direct (IO) ("directedGraphFromEdgeList", Nil, MString :: DirectedGraph) implements composite ${
-      val input_edges = ForgeFileReader.readLines($0)({line =>
-          val fields = line.fsplit(" ")
-          pack(fields(0).toInt,fields(1).toInt) 
-      })
-
-      //contains the input tuples
-      val edge_data = NodeData[Tup2[Int,Int]](input_edges)
-
+/////////////////////////////////////////////////////////////////////////////////////////////
+////////Directed CSR Loader
+/////////////////////////////////////////////////////////////////////////////////////////////
+    direct (IO) ("directedGraphFromEdgeList", Nil, ("edge_data",NodeData(Tuple2(MInt,MInt))) :: DirectedGraph) implements composite ${
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
       val dst_groups = edge_data.groupBy(e => e._2, e => e._1)
 
@@ -145,15 +145,13 @@ trait IOGraphOps {
       val dst_edge_array = dst_ids_ordered.flatMap(e => NodeData(dst_groups(distinct_ids(e))).map{n => fhashmap_get(idHashMap,n)})
 
       val serial_out = assignIndiciesSerialDirected(numNodes,distinct_ids,src_groups,src_ids_ordered,dst_groups,dst_ids_ordered)
-      val edge_arrays = serial_out._1
       
       println("finished file I/O")
-      DirectedGraph(numNodes,serial_out._2,distinct_ids.getRawArray,edge_arrays(0).getRawArray,src_edge_array.getRawArray,edge_arrays(1).getRawArray,dst_edge_array.getRawArray)
+      DirectedGraph(numNodes,distinct_ids.getRawArray,serial_out(0).getRawArray,src_edge_array.getRawArray,serial_out(1).getRawArray,dst_edge_array.getRawArray)
     }
-    direct (IO) ("assignIndiciesSerialDirected", Nil, MethodSignature(List(("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt))),("src_ids_ordered",NodeData(MInt)),("dst_groups",MHashMap(MInt,MArrayBuffer(MInt))),("dst_ids_ordered",NodeData(MInt))), Tuple2(NodeData(NodeData(MInt)),SHashMap(MInt,MInt)) )) implements single ${
+    direct (IO) ("assignIndiciesSerialDirected", Nil, MethodSignature(List(("numNodes",MInt),("distinct_ids",NodeData(MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt))),("src_ids_ordered",NodeData(MInt)),("dst_groups",MHashMap(MInt,MArrayBuffer(MInt))),("dst_ids_ordered",NodeData(MInt))), NodeData(NodeData(MInt)) )) implements single ${
       val src_node_array = NodeData[Int](numNodes)
       val dst_node_array = NodeData[Int](numNodes)
-      val sHash = SHashMap[Int,Int]()
 
       var i = 0
       var src_array_index = 0
@@ -174,7 +172,6 @@ trait IOGraphOps {
         }
         else dst_node_array(i+1) = dst_node_array(i)
         
-        if(degree.toDouble > Math.sqrt(numNodes.toDouble)) sHash.update(i,distinct_ids(i))
         i += 1
       }
 
@@ -183,7 +180,7 @@ trait IOGraphOps {
       result(1) = dst_node_array
       NodeData(result.getRawArray)
 
-      pack(result,sHash)
+      result
     }    
   }
 }

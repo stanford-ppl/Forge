@@ -14,9 +14,14 @@ trait UndirectedTriangleCounting extends OptiGraphApplication {
   
     if (args.length < 1) printUsage
 
-    //Works for both directed and undirected, performance 
-    val g = undirectedGraphFromEdgeList(args(0))
-    
+    tic("input loading")
+    val edgeList = loadUndirectedEdgeList(args(0))
+    toc("input loading",edgeList)
+
+    tic("creating graph",edgeList)
+    val g = undirectedGraphFromEdgeList(edgeList)
+    toc("creating graph",g)
+
     println("Directed: " + g.isDirected)
     println("Number of Nodes: " + g.numNodes)
     

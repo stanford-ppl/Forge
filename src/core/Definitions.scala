@@ -285,9 +285,9 @@ trait Definitions extends DerivativeTypes {
    * @param argIndex  index of op argument that corresponds to input collection
    * @param func      string representation of a map function A => R
    */
-   def forge_map(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String], numDynamicChunks: String = "0"): DeliteOpType
+   def forge_map(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String], numDynamicChunks: Any = None): DeliteOpType
    object map {
-     def apply(tpePars: (Rep[DSLType],Rep[DSLType]), mapArgIndex: Int, func: Rep[String], numDynamicChunks: String = "0") = forge_map(tpePars, mapArgIndex, func, numDynamicChunks)
+     def apply(tpePars: (Rep[DSLType],Rep[DSLType]), mapArgIndex: Int, func: Rep[String], numDynamicChunks: Any = None) = forge_map(tpePars, mapArgIndex, func, numDynamicChunks)
    }
 
   /**
@@ -297,10 +297,10 @@ trait Definitions extends DerivativeTypes {
    * @param argIndices    index of op arguments that correspond to zip arguments inA, inB (first and second collection respectively)
    * @param func          string representation of a zip function (A, B) => R
    */
-  def forge_zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String], numDynamicChunks: String = "0"): DeliteOpType
+  def forge_zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String], numDynamicChunks: Any = None): DeliteOpType
   object zip {
     // def apply[T](x: (T,T) => T)
-    def apply(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), zipArgIndices: (Int,Int), func: Rep[String], numDynamicChunks: String = "0") = forge_zip(tpePars, zipArgIndices, func, numDynamicChunks)
+    def apply(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), zipArgIndices: (Int,Int), func: Rep[String], numDynamicChunks: Any = None) = forge_zip(tpePars, zipArgIndices, func, numDynamicChunks)
   }
 
   /**
@@ -311,9 +311,9 @@ trait Definitions extends DerivativeTypes {
    * @param zero      string representation of a function => A
    * @param func      string representation of a reduce function (A, A) => A
    */
-   def forge_reduce(tpePar: Rep[DSLType], argIndex: Int, zero: Rep[String], func: Rep[String], numDynamicChunks: String = "0"): DeliteOpType
+   def forge_reduce(tpePar: Rep[DSLType], argIndex: Int, zero: Rep[String], func: Rep[String], numDynamicChunks: Any = None): DeliteOpType
    object reduce {
-     def apply(tpePar: Rep[DSLType], redArgIndex: Int, zero: Rep[String], func: Rep[String], numDynamicChunks: String = "0") = forge_reduce(tpePar, redArgIndex, zero, func, numDynamicChunks)
+     def apply(tpePar: Rep[DSLType], redArgIndex: Int, zero: Rep[String], func: Rep[String], numDynamicChunks: Any = None) = forge_reduce(tpePar, redArgIndex, zero, func, numDynamicChunks)
    }
 
   /**
@@ -328,9 +328,9 @@ trait Definitions extends DerivativeTypes {
    * @param reduce      string representation of a reduce function (R, R) => R
    * @param cond        optional string representation of a condition function A => Boolean
    */
-   def forge_mapreduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]], numDynamicChunks: String = "0"): DeliteOpType
+   def forge_mapreduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]], numDynamicChunks: Any = None): DeliteOpType
    object mapReduce {
-     def apply(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]] = None, numDynamicChunks: String = "0") = forge_mapreduce(tpePars, argIndex, map, zero, reduce, cond, numDynamicChunks)
+     def apply(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]] = None, numDynamicChunks: Any = None) = forge_mapreduce(tpePars, argIndex, map, zero, reduce, cond, numDynamicChunks)
    }
 
   /**
@@ -341,9 +341,9 @@ trait Definitions extends DerivativeTypes {
    * @param cond      string representation of predicate function A => Boolean
    * @param func      string representation of a map function A => R
    */
-   def forge_filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String], numDynamicChunks: String = "0"): DeliteOpType
+   def forge_filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String], numDynamicChunks: Any = None): DeliteOpType
    object filter {
-     def apply(tpePars: (Rep[DSLType],Rep[DSLType]), filterArgIndex: Int, cond: Rep[String], func: Rep[String], numDynamicChunks: String = "0") = forge_filter(tpePars, filterArgIndex, cond, func, numDynamicChunks)
+     def apply(tpePars: (Rep[DSLType],Rep[DSLType]), filterArgIndex: Int, cond: Rep[String], func: Rep[String], numDynamicChunks: Any = None) = forge_filter(tpePars, filterArgIndex, cond, func, numDynamicChunks)
    }
 
   /**
@@ -353,9 +353,9 @@ trait Definitions extends DerivativeTypes {
    * @param argIndex  index of op argument that correspond to input collection
    * @param func      string representation of a function A => Col[R]
    */
-   def forge_flatmap(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String], numDynamicChunks: String = "0"): DeliteOpType
+   def forge_flatmap(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String], numDynamicChunks: Any = None): DeliteOpType
    object flatMap {
-     def apply(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String], numDynamicChunks: String = "0") = forge_flatmap(tpePars, argIndex, func, numDynamicChunks)
+     def apply(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String], numDynamicChunks: Any = None) = forge_flatmap(tpePars, argIndex, func, numDynamicChunks)
    }
 
   /**
@@ -370,9 +370,9 @@ trait Definitions extends DerivativeTypes {
    * @param map       string representation of a function A => V
    * @param cond      optional string representation of predicate function A => Boolean
    */
-   def forge_groupby(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], cond: Option[Rep[String]] = None, numDynamicChunks: String = "0"): DeliteOpType
+   def forge_groupby(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], cond: Option[Rep[String]] = None, numDynamicChunks: Any = None): DeliteOpType
    object groupBy {
-     def apply(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]/*,Rep[DSLType]*/), hashArgIndex: Int, key: Rep[String], map: Rep[String], cond: Option[Rep[String]] = None, numDynamicChunks: String = "0") = forge_groupby(/*tpePars*/(tpePars._1,tpePars._2,tpePars._3,MArrayBuffer(tpePars._3)), hashArgIndex, key, map, cond, numDynamicChunks)
+     def apply(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]/*,Rep[DSLType]*/), hashArgIndex: Int, key: Rep[String], map: Rep[String], cond: Option[Rep[String]] = None, numDynamicChunks: Any = None) = forge_groupby(/*tpePars*/(tpePars._1,tpePars._2,tpePars._3,MArrayBuffer(tpePars._3)), hashArgIndex, key, map, cond, numDynamicChunks)
    }
 
   /**
@@ -388,9 +388,9 @@ trait Definitions extends DerivativeTypes {
    * @param reduce    string representation of a reduce function (V, V) => V
    * @param cond      optional string representation of predicate function A => Boolean
    */
-   def forge_groupby_reduce(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]] = None, numDynamicChunks: String = "0"): DeliteOpType
+   def forge_groupby_reduce(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]] = None, numDynamicChunks: Any = None): DeliteOpType
    object groupByReduce {
-     def apply(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), hashArgIndex: Int, key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]] = None, numDynamicChunks: String = "0") = forge_groupby_reduce(tpePars, hashArgIndex, key, map, zero, reduce, cond, numDynamicChunks)
+     def apply(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), hashArgIndex: Int, key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]] = None, numDynamicChunks: Any = None) = forge_groupby_reduce(tpePars, hashArgIndex, key, map, zero, reduce, cond, numDynamicChunks)
    }
 
   /**
@@ -400,9 +400,9 @@ trait Definitions extends DerivativeTypes {
    * @param argIndex  index of op argument that correspond to foreach argument in
    * @param func      string representation of a foreach function A => Unit
    */
-   def forge_foreach(tpePar: Rep[DSLType], argIndex: Int, func: Rep[String], numDynamicChunks: String = "0"): DeliteOpType
+   def forge_foreach(tpePar: Rep[DSLType], argIndex: Int, func: Rep[String], numDynamicChunks: Any = None): DeliteOpType
    object foreach {
-     def apply(tpePar: Rep[DSLType], foreachArgIndex: Int, func: Rep[String], numDynamicChunks: String = "0") = forge_foreach(tpePar, foreachArgIndex, func, numDynamicChunks)
+     def apply(tpePar: Rep[DSLType], foreachArgIndex: Int, func: Rep[String], numDynamicChunks: Any = None) = forge_foreach(tpePar, foreachArgIndex, func, numDynamicChunks)
    }
 }
 
@@ -454,30 +454,30 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
   case class SingleTask(func: Rep[String]) extends DeliteOpType
   def forge_single(func: Rep[String]) = SingleTask(func)
 
-  case class Map(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String], numDynamicChunks: String) extends DeliteOpType
-  def forge_map(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String], numDynamicChunks: String) = Map(tpePars, argIndex, func, numDynamicChunks)
+  case class Map(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String], numDynamicChunks: Any) extends DeliteOpType
+  def forge_map(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String], numDynamicChunks: Any) = Map(tpePars, argIndex, func, numDynamicChunks)
 
-  case class Zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String], numDynamicChunks: String) extends DeliteOpType
-  def forge_zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String], numDynamicChunks: String) = Zip(tpePars, argIndices, func, numDynamicChunks)
+  case class Zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String], numDynamicChunks: Any) extends DeliteOpType
+  def forge_zip(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndices: (Int,Int), func: Rep[String], numDynamicChunks: Any) = Zip(tpePars, argIndices, func, numDynamicChunks)
 
-  case class Reduce(tpePar: Rep[DSLType], argIndex: Int, zero: Rep[String], func: Rep[String], numDynamicChunks: String) extends DeliteOpType
-  def forge_reduce(tpePar: Rep[DSLType], argIndex: Int, zero: Rep[String], func: Rep[String], numDynamicChunks: String) = Reduce(tpePar, argIndex, zero, func, numDynamicChunks)
+  case class Reduce(tpePar: Rep[DSLType], argIndex: Int, zero: Rep[String], func: Rep[String], numDynamicChunks: Any) extends DeliteOpType
+  def forge_reduce(tpePar: Rep[DSLType], argIndex: Int, zero: Rep[String], func: Rep[String], numDynamicChunks: Any) = Reduce(tpePar, argIndex, zero, func, numDynamicChunks)
 
-  case class MapReduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]], numDynamicChunks: String) extends DeliteOpType
-  def forge_mapreduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]], numDynamicChunks: String) = MapReduce(tpePars, argIndex, map, zero, reduce, cond, numDynamicChunks)
+  case class MapReduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]], numDynamicChunks: Any) extends DeliteOpType
+  def forge_mapreduce(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]], numDynamicChunks: Any) = MapReduce(tpePars, argIndex, map, zero, reduce, cond, numDynamicChunks)
 
-  case class Filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String], numDynamicChunks: String) extends DeliteOpType
-  def forge_filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String], numDynamicChunks: String) = Filter(tpePars, argIndex, cond, func, numDynamicChunks)
+  case class Filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String], numDynamicChunks: Any) extends DeliteOpType
+  def forge_filter(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, cond: Rep[String], func: Rep[String], numDynamicChunks: Any) = Filter(tpePars, argIndex, cond, func, numDynamicChunks)
 
-  case class FlatMap(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String], numDynamicChunks: String) extends DeliteOpType
-  def forge_flatmap(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String], numDynamicChunks: String) = FlatMap(tpePars, argIndex, func, numDynamicChunks)
+  case class FlatMap(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String], numDynamicChunks: Any) extends DeliteOpType
+  def forge_flatmap(tpePars: (Rep[DSLType],Rep[DSLType]), argIndex: Int, func: Rep[String], numDynamicChunks: Any) = FlatMap(tpePars, argIndex, func, numDynamicChunks)
 
-  case class GroupBy(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], cond: Option[Rep[String]], numDynamicChunks: String) extends DeliteOpType
-  def forge_groupby(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], cond: Option[Rep[String]], numDynamicChunks: String) = GroupBy(tpePars, argIndex, key, map, cond, numDynamicChunks)
+  case class GroupBy(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], cond: Option[Rep[String]], numDynamicChunks: Any) extends DeliteOpType
+  def forge_groupby(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], cond: Option[Rep[String]], numDynamicChunks: Any) = GroupBy(tpePars, argIndex, key, map, cond, numDynamicChunks)
 
-  case class GroupByReduce(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]], numDynamicChunks: String) extends DeliteOpType
-  def forge_groupby_reduce(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]], numDynamicChunks: String) = GroupByReduce(tpePars, argIndex, key, map, zero, reduce, cond, numDynamicChunks)
+  case class GroupByReduce(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]], numDynamicChunks: Any) extends DeliteOpType
+  def forge_groupby_reduce(tpePars: (Rep[DSLType],Rep[DSLType],Rep[DSLType]), argIndex: Int, key: Rep[String], map: Rep[String], zero: Rep[String], reduce: Rep[String], cond: Option[Rep[String]], numDynamicChunks: Any) = GroupByReduce(tpePars, argIndex, key, map, zero, reduce, cond, numDynamicChunks)
 
-  case class Foreach(tpePar: Rep[DSLType], argIndex: Int, func: Rep[String], numDynamicChunks:String) extends DeliteOpType
-  def forge_foreach(tpePar: Rep[DSLType], argIndex: Int, func: Rep[String], numDynamicChunks:String) = Foreach(tpePar, argIndex, func, numDynamicChunks)
+  case class Foreach(tpePar: Rep[DSLType], argIndex: Int, func: Rep[String], numDynamicChunks: Any) extends DeliteOpType
+  def forge_foreach(tpePar: Rep[DSLType], argIndex: Int, func: Rep[String], numDynamicChunks: Any) = Foreach(tpePar, argIndex, func, numDynamicChunks)
 }

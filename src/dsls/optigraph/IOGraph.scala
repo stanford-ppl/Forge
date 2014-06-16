@@ -75,24 +75,18 @@ trait IOGraphOps {
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
 
       //sort by degree, helps with skew for buckets of nodes
-      val ids = NodeData(fhashmap_keys(src_groups))
-         
-      /*  
-      val ids = ids1.sortBy({ (a,b) => 
-        val aV = array_buffer_length(fhashmap_get(src_groups,ids1(a)))
-        val bV = array_buffer_length(fhashmap_get(src_groups,ids1(b))) 
-        if(aV < bV) -1
-        else if(aV == bV) 0
-        else 1
-      })
-      */
+      val ids1 = NodeData(fhashmap_keys(src_groups))
+
+      //FIXME: GET SORT BY WORKING
+      val ids = ids1//.sortBy(a => array_buffer_length(fhashmap_get(src_groups,ids1(a))))
+
       val numNodes = ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       val idHashMap = idView.groupByReduce[Int,Int](n => ids(n), n => n, (a,b) => a)
       val serial_out = assignUndirectedIndicies(numNodes,edge_data.length,ids,idHashMap,src_groups)
 
       UndirectedGraph(numNodes,ids.getRawArray,serial_out._1,serial_out._2)    
-  }
+    }
 
     direct (IO) ("assignUndirectedIndicies", Nil, MethodSignature(List(("numNodes",MInt),("numEdges",MInt),("distinct_ids",NodeData(MInt)),("idHashMap",MHashMap(MInt,MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt)))),Tuple2(MArray(MInt),MArray(MInt)))) implements single ${
       val src_edge_array = NodeData[Int](numEdges)

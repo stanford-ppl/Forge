@@ -57,7 +57,6 @@ trait NodeDataOps {
       ///////////parallel operations////////////////////////////
       infix ("-") (NodeData(T) :: NodeData(T), TNumeric(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a-b })
       infix ("+") (NodeData(T) :: NodeData(T), TNumeric(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a+b })
-      //infix ("sum") (Nil :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${ (a,b) => a+b })
       infix ("map") ((T ==> R) :: NodeData(R), addTpePars = R) implements map((T,R), 0, ${ e => $1(e) })
       infix ("flatMap") ((T ==> NodeData(R)) :: NodeData(R), addTpePars = R) implements flatMap((T,R), 0, ${ e => $1(e) })
       infix ("filter") ( ((T ==> MBoolean),(T ==> R)) :: NodeData(R), addTpePars = R) implements filter((T,R), 0, ${w => $1(w)}, ${e => $2(e)})
@@ -69,12 +68,12 @@ trait NodeDataOps {
       infix ("mapreduce") ( (T ==> R,(R,R) ==> R, T==>MBoolean) :: R, TNumeric(R), addTpePars=(R)) implements mapReduce((T,R), 0, ${e => $1(e)}, ${numeric_zero[R]}, ${(a,b) => $2(a,b)}, Some(${c => $3(c)}))
       infix ("distinct") (Nil :: NodeData(T)) implements composite ${NodeData(fhashmap_keys($0.groupByReduce[T,Int](e => e, e=>0,(a,b)=>0)))}
       infix("sort")(Nil :: NodeData(T),TNumeric(T)) implements composite ${NodeData(array_sort($self.getRawArray))}      
-      //infix ("sortBy") (((MInt,MInt) ==> MInt) :: NodeData(T)) implements composite ${
-      //    NodeData[Int](array_sortIndices($self.length,$1)).map[T](i => $self(i))
-      //}
-      //infix ("sortIndicesBy") (((MInt,MInt) ==> MInt) :: NodeData(MInt)) implements single ${
-      //    NodeData[Int](array_sortIndices($self.length,$1))
-      //}
+      infix ("sortBy") ((MInt ==> MInt) :: NodeData(T)) implements composite ${
+          NodeData[Int](array_sortIndices($self.length,$1)).map[T](i => $self(i))
+      }
+      infix ("sortIndicesBy") ((MInt ==> MInt) :: NodeData(MInt)) implements single ${
+          NodeData[Int](array_sortIndices($self.length,$1))
+      }
 
       /////////////////////////debug operations (print serial & parallel)///////////////////////
       infix ("pprint") (Nil :: MUnit, effect = simple) implements foreach(T, 0, ${a => println("NodeData: " + a)})

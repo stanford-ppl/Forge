@@ -61,6 +61,16 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
   }
   def array_string_split(__arg0: Rep[String],__arg1: Rep[String],__arg2: Rep[Int] = unit(0))(implicit __imp0: SourceContext): Rep[ForgeArray[String]]
     = reflectPure(ArrayStringSplit(__arg0, __arg1, __arg2))
+  def array_sortIndices(__arg0: Rep[Int], __arg1: (Rep[Int] => Rep[Int]))(implicit __imp0: SourceContext): Rep[ForgeArray[Int]]
+    = darray_sortIndices(__arg0,{(a,b) => 
+        val aV = __arg1(a)
+        val bV = __arg1(b)
+        
+        //FIXME: HOW DO I GET A REP[T] from INT's?
+        if(aV < bV) Const[Int](-1)
+        else if(aV == bV) Const[Int](0)
+        else Const[Int](1)
+      })
 
   // avoid mixing in LMS Array ops due to conflicts. alternatively, we could refactor LMS array ops to
   // put ArrayApply and ArrayLength in an isolated trait that we can use.

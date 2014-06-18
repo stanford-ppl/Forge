@@ -39,6 +39,7 @@ trait DeliteGenOps extends BaseGenOps {
  
    // bound symbol for the captured variable of a block
   private var boundArg: String = _
+  
   override def quote(x: Exp[Any]): String = x match {
     case Def(QuoteBlockResult(func,args,ret,captured)) =>
       // bind function args to captured args
@@ -71,7 +72,6 @@ trait DeliteGenOps extends BaseGenOps {
       // and escaped new-lines (for string splitting at Delite), based on how we received strings from string interpolation.
       // FIX: using inconsistent newline character, not platform independent
       val out = "{ \"" + boundStr +       
-        nl + "emitBlock(" + func.name + ")" +
         nl + "emitBlock(" + func.name + ")" +
         (if (ret != MUnit && boundArg == null)
            (nl + "quote(getBlockResult(" + func.name + "))+\"\\n\"")

@@ -37,24 +37,6 @@ trait CommunityOps {
             0d
         })
       }
-      infix("neighComm")( ("node",MInt) :: MUnit, effect=simple) implements single ${
-        $self.setNeighWeight(array_fromfunction($self.size,e => -1.0))
-        var neigh_last = 0
-        
-        $self.graph.neighbors(node).foreach{nbr =>
-          val neigh_comm = $self.n2c(nbr)
-          val neigh_w = 1 //FIXME add in when we have weights
-          if(nbr != node){
-            if($self.neighWeight(neigh_comm) == -1){
-              $self.updateNeighWeight(neigh_comm,0d)
-              $self.updateNeighPos(neigh_last,neigh_comm)
-              neigh_last += 1
-            }
-            $self.updateNeighWeight(neigh_comm,$self.neighWeight(neigh_comm)+neigh_w)
-          }
-        }
-        $self.setNeighLast(neigh_last)
-      }
       infix("remove")( (("node",MInt),("comm",MInt),("dnodecomm",MDouble)) :: MUnit, effect = simple) implements single ${
         fassert(node >= 0 && node < $self.size, "node must be in range 0 - size")
 
@@ -135,7 +117,6 @@ trait CommunityOps {
             var i = 0
             while(i < $self.neighLast){
               val increase = $self.modularityGain(node,$self.neighPos(i),$self.neighWeight($self.neighPos(i)),w_degree)
-              println("increase: " + increase)
               if(increase > best_increase){
                 best_comm = $self.neighPos(i)
                 best_nblinks = $self.neighWeight($self.neighPos(i))
@@ -158,6 +139,27 @@ trait CommunityOps {
         return improvement
 
       }
+      infix("neighComm")( ("node",MInt) :: MUnit, effect=simple) implements single ${
+        $self.setNeighWeight(array_fromfunction($self.size,e => -1.0))
+        var neigh_last = 1
+        $self.updateNeighPos(0,$self.n2c(node))
+        $self.updateNeighWeight($self.neighPos(0),0d)
+
+        $self.graph.neighbors(node).foreach{nbr =>
+          val neigh_comm = $self.n2c(nbr)
+          val neigh_w = 1 //FIXME add in when we have weights
+          if(nbr != node){
+            if($self.neighWeight(neigh_comm) == -1d){
+              $self.updateNeighWeight(neigh_comm,0d)
+              $self.updateNeighPos(neigh_last,neigh_comm)
+              neigh_last += 1
+            }
+            $self.updateNeighWeight(neigh_comm,$self.neighWeight(neigh_comm)+neigh_w)
+          }
+        }
+        $self.setNeighLast(neigh_last)
+      }
+
       infix ("size") (Nil :: MInt) implements getter(0, "_size")
       infix ("neighLast") (Nil :: MInt) implements getter(0, "_neighLast")
       infix ("graph") (Nil :: UndirectedGraph) implements getter(0, "_graph")

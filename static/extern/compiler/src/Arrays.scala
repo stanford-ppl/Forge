@@ -65,11 +65,10 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
     = darray_sortIndices(__arg0,{(a,b) => 
         val aV = __arg1(a)
         val bV = __arg1(b)
-        
-        //FIXME: HOW DO I GET A REP[T] from INT's?
-        if(aV < bV) Const[Int](-1)
-        else if(aV == bV) Const[Int](0)
-        else Const[Int](1)
+
+        if (aV < bV) unit(-1)
+        else if (aV == bV) unit(0)
+        else unit(1)
       })
 
   // avoid mixing in LMS Array ops due to conflicts. alternatively, we could refactor LMS array ops to

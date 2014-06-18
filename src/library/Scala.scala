@@ -353,8 +353,11 @@ trait ScalaOps {
 
     val asinstance = infix (Cast) ("AsInstanceOf", (A,B), A :: B)
     impl (asinstance) (codegen($cala, ${ $0.asInstanceOf[$t[B]] }))
-    impl (asinstance) (codegen(cuda, ${ ($t[B])$0 }))
-    impl (asinstance) (codegen(cpp, ${ ($t[B])$0 }))
+    //impl (asinstance) (codegen(cuda, ${ ($t[B])$0 }))
+    //impl (asinstance) (codegen(cpp, ${ ($t[B])$0 }))
+    //TODO: what is the proper way to get the result type (sym.tp) to call with remapWithRef?
+    impl (asinstance) (codegen(cuda, "(" + unquotes("remapWithRef(sym.tp)") + ")" + quotedArg(0)))
+    impl (asinstance) (codegen(cpp, "(" + unquotes("remapWithRef(sym.tp)") + ")" + quotedArg(0)))
 
     val isinstance = infix (Cast) ("IsInstanceOf", (A,B), A :: MBoolean)
     impl (isinstance) (codegen($cala, ${ $0.isInstanceOf[$t[B]] }))

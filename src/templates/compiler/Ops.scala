@@ -36,10 +36,10 @@ trait DeliteGenOps extends BaseGenOps {
     if(b.contains("emitBlock")) true
     else false
   }
-
+ 
   // bound symbol for the captured variable of a block
   private var boundArg: String = _
-
+  
   override def quote(x: Exp[Any]): String = x match {
     case Def(QuoteBlockResult(func,args,ret,captured)) =>
       // bind function args to captured args
@@ -71,16 +71,16 @@ trait DeliteGenOps extends BaseGenOps {
       // the new-line formatting is admittedly weird; we are using a mixed combination of actual new-lines (for string splitting at Forge)
       // and escaped new-lines (for string splitting at Delite), based on how we received strings from string interpolation.
       // FIX: using inconsistent newline character, not platform independent
-      val out = "{ \"" + boundStr +
-       nl + "emitBlock(" + func.name + ")" +
-       (if (ret != MUnit && boundArg == null)
-          (nl + "quote(getBlockResult(" + func.name + "))+\"\\n\"")
-        else if (ret != MUnit && boundArg != null)
-          (nl + "emitAssignment(" + boundArg + ".asInstanceOf[Sym[Any]], quote(getBlockResult(" + func.name + ")))")
-        else ""
-       ) +
-       nl + " \" }\\n "
-      if(ret != MUnit && boundArg != null) "\"" + out + "\"" else out
+      val out = "{ \"" + boundStr +       
+        nl + "emitBlock(" + func.name + ")" +
+        (if (ret != MUnit && boundArg == null)
+           (nl + "quote(getBlockResult(" + func.name + "))+\"\\n\"")
+         else if (ret != MUnit && boundArg != null)
+           (nl + "emitAssignment(" + boundArg + ".asInstanceOf[Sym[Any]], quote(getBlockResult(" + func.name + ")))")
+         else ""
+        ) +
+        nl + " \" }\\n "
+       if(ret != MUnit && boundArg != null) "\"" + out + "\"" else out
 
     case Def(QuoteSeq(argName)) => "Seq("+unquotes(argName+".map(quote).mkString("+quotes(",")+")")+")"
 
@@ -311,7 +311,11 @@ trait DeliteGenOps extends BaseGenOps {
    * IR node implementation for each op type
    */
   def emitIRNodes(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
-
+    def matchChunkInput(x: Any): Int = x match {
+      case i:Int => i.asInstanceOf[Int]
+      case s:String => -1
+      case _ => 0
+    }
     // IR nodes
     for (o <- uniqueOps if hasIRNode(o) && !hasMultipleIRNodes(o)) {
       stream.print("  case class " + makeOpNodeName(o) + makeTpeParsWithBounds(o.tpePars))
@@ -341,6 +345,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_map"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,map.tpePars._2)) + "(in, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(inDc.size) + "(in))")
+          stream.println("    override val numDynamicChunks = " + matchChunkInput(map.numDynamicChunks))
         case zip:Zip =>
           val colTpe = getHkTpe(o.retTpe)
           val outDc = ForgeCollections(colTpe)
@@ -353,6 +358,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_zip"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,inA.tpe,zip.tpePars._3)) + "(inA, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(inDc.size) + "(inA))")
+          stream.println("    override val numDynamicChunks = " + matchChunkInput(zip.numDynamicChunks))
         case reduce:Reduce =>
           val col = o.args.apply(reduce.argIndex)
           val dc = ForgeCollections(getHkTpe(col.tpe))
@@ -362,6 +368,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_reduce"))
           stream.println("    def zero = " + makeOpImplMethodNameWithArgs(o, "_zero"))
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
+          stream.println("    override val numDynamicChunks = " + matchChunkInput(reduce.numDynamicChunks))
         case mapreduce:MapReduce =>
           val col = o.args.apply(mapreduce.argIndex)
           val dc = ForgeCollections(getHkTpe(col.tpe))
@@ -384,6 +391,7 @@ trait DeliteGenOps extends BaseGenOps {
             stream.println("    def map = " + makeOpImplMethodNameWithArgs(o, "_map"))
           }
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
+          stream.println("    override val numDynamicChunks = " + matchChunkInput(mapreduce.numDynamicChunks))
         case filter:Filter =>
           val colTpe = getHkTpe(o.retTpe)
           val outDc = ForgeCollections(colTpe)
@@ -396,6 +404,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_map"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,filter.tpePars._2)) + "(in, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(inDc.size) + "(in))")
+          stream.println("    override val numDynamicChunks = " + matchChunkInput(filter.numDynamicChunks))
         case flatmap:FlatMap =>
           val colTpe = getHkTpe(o.retTpe)
           val outDc = ForgeCollections(colTpe)
@@ -407,6 +416,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_func"))
           stream.println("    override def alloc(len: Exp[Int]) = " + makeOpMethodName(outDc.alloc) + makeTpePars(instAllocReturnTpe(outDc.alloc,in.tpe,flatmap.tpePars._2)) + "(in, len)")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(inDc.size) + "(in))")
+          stream.println("    override val numDynamicChunks = " + matchChunkInput(flatmap.numDynamicChunks))
         case foreach:Foreach =>
           val col = o.args.apply(foreach.argIndex)
           val dc = ForgeCollections(getHkTpe(col.tpe))
@@ -416,6 +426,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_func"))
           stream.println("    def sync = n => unit(List())")
           stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
+          stream.println("    override val numDynamicChunks = " + matchChunkInput(foreach.numDynamicChunks))
       }
       emitOpNodeFooter(o, stream)
       stream.println()
@@ -529,7 +540,7 @@ trait DeliteGenOps extends BaseGenOps {
           emitWithIndent("val keys = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o, "Keys") + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
           emitWithIndent("val index = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o, "Index") + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
           emitWithIndent("val values = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o) + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
-          emitWithIndent(makeEffectAnnotation(pure,o) + "(DeliteMapNewImm(keys, values, index, values.length))", stream, 4)
+          emitWithIndent(makeEffectAnnotation(pure,o) + "(DeliteMapNewImm(keys, values, index, darray_length(values)))", stream, 4)
         case _ if hasEffects =>
           // if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
           val prologue = if (o.effect == simple) " andAlso Simple()" else ""

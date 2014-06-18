@@ -15,11 +15,14 @@ trait PageRank extends OptiGraphApplication {
     if (args.length < 2) printUsage
 
     //Works for both directed and undirected, performance 
-    val g = directedGraphFromEdgeList(args(0))
-    
-    println("Directed: " + g.isDirected)
-    println("Number of Nodes: " + g.numNodes)
-    
+    tic("input loading")
+    val edgeList = loadDirectedEdgeList(args(0))
+    toc("input loading",edgeList)
+
+    tic("creating graph",edgeList)
+    val g = directedGraphFromEdgeList(edgeList)
+    toc("creating graph",g)
+
     println("performing Page Rank")
     tic(g)
 
@@ -32,7 +35,7 @@ trait PageRank extends OptiGraphApplication {
     
     val pr =
      untilconverged(prInit, tol=threshold,maxIter=maxItr){ oldPr =>
-      g.mapLoadBalancedNodes{ n =>
+      g.mapNodes{ n =>
         ((1.0 - damp) / g.numNodes) + damp * sum(g.inNbrs(n)){ w =>
           oldPr(w) / g.outDegree(Node(w))}{n => true}
       }
@@ -43,7 +46,7 @@ trait PageRank extends OptiGraphApplication {
     println("wrote output to: " + args(1))
   }
   def printUsage = {
-    println("Usage: BC <path to input edge list file> <path to output file (to be created)>")
+    println("Usage: PageRank <path to input edge list file> <path to output file (to be created)>")
     exit(-1)
   }
 }

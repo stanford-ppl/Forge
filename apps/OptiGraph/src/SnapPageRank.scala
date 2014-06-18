@@ -14,10 +14,13 @@ trait SnapPageRank extends OptiGraphApplication {
 	
 		if (args.length < 2) printUsage
 
-    	val g = directedGraphFromEdgeList(args(0))
-		
-		println("Directed: " + g.isDirected)
-		println("Number of Nodes: " + g.numNodes)
+    tic("input loading")
+    val edgeList = loadDirectedEdgeList(args(0))
+    toc("input loading",edgeList)
+
+    tic("creating graph",edgeList)
+    val g = directedGraphFromEdgeList(edgeList)
+    toc("creating graph",g)
 		
 		println("performing Page Rank")
 		tic(g)

@@ -21,9 +21,6 @@ trait UndirectedTriangleCounting extends OptiGraphApplication {
     tic("creating graph",edgeList)
     val g = undirectedGraphFromEdgeList(edgeList)
     toc("creating graph",g)
-
-    println("Directed: " + g.isDirected)
-    println("Number of Nodes: " + g.numNodes)
     
     println("performing Traingle Counting")
     tic(g)

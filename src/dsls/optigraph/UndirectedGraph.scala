@@ -62,7 +62,9 @@ trait UndirectedGraphOps{
       infix ("sumUpNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
         sumOverCollection($self.inNbrs(n))(data){e => (level(e)==(level(n.id)-1))}
       }
-      
+      infix ("totalWeight") (Nil :: MDouble) implements single ${
+        $self.sumOverNodes(n => $self.weightedDegree(n.id))
+      }
       infix ("weightedDegree") (MInt :: MDouble) implements single ${
         val end  = if( ($1+1) < array_length(node_raw_data($self)) ) node_apply($self,($1+1)) 
           else array_length(edge_raw_data($self))
@@ -71,7 +73,11 @@ trait UndirectedGraphOps{
       infix ("numSelfLoops") (MInt :: MDouble) implements single ${
         0d
       }
-
+      infix ("degree") (Node :: MInt) implements single ${
+        val end  = if( ($1.id+1) < array_length(node_raw_data($self)) ) node_apply($self,($1.id+1)) 
+          else array_length(edge_raw_data($self))
+        end - node_apply($self,$1.id) 
+      }
       infix ("outDegree") (Node :: MInt) implements single ${
         val end  = if( ($1.id+1) < array_length(node_raw_data($self)) ) node_apply($self,($1.id+1)) 
           else array_length(edge_raw_data($self))

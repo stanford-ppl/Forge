@@ -52,6 +52,8 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
     scala.util.Sorting.quickSort(d)
     d
   }
+  def array_sortIndices(__arg0: Rep[Int], __arg1: (Rep[Int] => Rep[Int]))(implicit __imp0: SourceContext): Rep[ForgeArray[Int]]
+    = array_empty[Int](__arg0).indices.toArray.sortBy(__arg1)
   def array_fromfunction[T:Manifest](__arg0: Rep[Int],__arg1: Rep[Int] => Rep[T])(implicit __imp0: SourceContext): Rep[ForgeArray[T]] = {
     Array.tabulate[T](__arg0)(__arg1)
   }
@@ -97,7 +99,9 @@ trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
     = { __arg0 += __arg1 }
   def array_buffer_indexof[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[T])(implicit __imp0: SourceContext): Rep[Int]
     = __arg0.indexOf(__arg1)
-   def array_buffer_result[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+  def array_buffer_result[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+    = __arg0.toArray
+  def array_buffer_unsafe_result[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = __arg0.toArray
   def array_buffer_map[T:Manifest,R:Manifest](__arg0: Rep[ForgeArrayBuffer[T]], __arg1: Rep[T] => Rep[R])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[R]]
     = __arg0.map(__arg1)

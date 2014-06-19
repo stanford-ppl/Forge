@@ -68,9 +68,9 @@ object DenseVectorConversionsRunnerC extends ForgeTestRunnerCompiler with OptiML
 trait DenseVectorConversions extends ForgeTestModule with OptiMLApplication {
   def main() {
 
-    val vint = DenseVector[Int](100,true)
-    val vdbl = DenseVector[Double](100,true)
-    val vflt = DenseVector[Float](100,true)
+    val vint = DenseVector[Int](100,true).map(_ => 1)
+    val vdbl = DenseVector[Double](100,true).map(_ => 1.0)
+    val vflt = DenseVector[Float](100,true).map(_ => 1.0f)
 
     val int = unit(1)
     val dbl = unit(1.0)
@@ -124,7 +124,14 @@ trait DenseVectorConversions extends ForgeTestModule with OptiMLApplication {
     val lit17 = vflt + 1.0
     val lit18 = vdbl + 1.0
 
-    collect(true)
+    collect(l2 == l4 && l5 == l6 && l6 == l9 && l3 == l7 && l7 == l8 && l1(0) == 2 &&
+            lift1 == lit1 && lift2 == lit2 && lift3 == lit3 &&
+            lift4 == lit4 && lift5 == lit5 && lift6 == lit6 &&
+            lift7 == lit7 && lift8 == lit8 && lift9 == lit9 &&
+            lift10 == lit10 && lift11 == lit11 && lift12 == lit12 &&
+            lift13 == lit13 && lift14 == lit14 && lift15 == lit15 &&
+            lift16 == lit16 && lift17 == lit17 && lift18 == lit18)
+
     mkReport
   }
 }
@@ -133,9 +140,9 @@ object DenseMatrixConversionsRunnerI extends ForgeTestRunnerInterpreter with Opt
 object DenseMatrixConversionsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with DenseMatrixConversions
 trait DenseMatrixConversions extends ForgeTestModule with OptiMLApplication {
   def main() {
-    val mint = DenseMatrix[Int](100,100)
-    val mdbl = DenseMatrix[Double](100,100)
-    val mflt = DenseMatrix[Float](100,100)
+    val mint = DenseMatrix[Int](100,100).map(_ => 1)
+    val mdbl = DenseMatrix[Double](100,100).map(_ => 1.0)
+    val mflt = DenseMatrix[Float](100,100).map(_ => 1.0f)
 
     val int = unit(1)
     val dbl = unit(1.0)
@@ -189,7 +196,13 @@ trait DenseMatrixConversions extends ForgeTestModule with OptiMLApplication {
     val lit17 = mflt + 1.0
     val lit18 = mdbl + 1.0
 
-    collect(true)
+    collect(l2 == l4 && l5 == l6 && l6 == l9 && l3 == l7 && l7 == l8 && l1(0,0) == 2 &&
+            lift1 == lit1 && lift2 == lit2 && lift3 == lit3 &&
+            lift4 == lit4 && lift5 == lit5 && lift6 == lit6 &&
+            lift7 == lit7 && lift8 == lit8 && lift9 == lit9 &&
+            lift10 == lit10 && lift11 == lit11 && lift12 == lit12 &&
+            lift13 == lit13 && lift14 == lit14 && lift15 == lit15 &&
+            lift16 == lit16 && lift17 == lit17 && lift18 == lit18)
     mkReport
   }
 }

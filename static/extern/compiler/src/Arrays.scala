@@ -61,6 +61,15 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
   }
   def array_string_split(__arg0: Rep[String],__arg1: Rep[String],__arg2: Rep[Int] = unit(0))(implicit __imp0: SourceContext): Rep[ForgeArray[String]]
     = reflectPure(ArrayStringSplit(__arg0, __arg1, __arg2))
+  def array_sortIndices(__arg0: Rep[Int], __arg1: (Rep[Int] => Rep[Int]))(implicit __imp0: SourceContext): Rep[ForgeArray[Int]]
+    = darray_sortIndices(__arg0,{(a,b) => 
+        val aV = __arg1(a)
+        val bV = __arg1(b)
+
+        if (aV < bV) unit(-1)
+        else if (aV == bV) unit(0)
+        else unit(1)
+      })
 
   // avoid mixing in LMS Array ops due to conflicts. alternatively, we could refactor LMS array ops to
   // put ArrayApply and ArrayLength in an isolated trait that we can use.
@@ -153,6 +162,8 @@ trait ForgeArrayBufferOpsExp extends DeliteArrayBufferOpsExp {
     = throw new UnsupportedOperationException("DeliteArrayBuffer indexOf not implemented yet")
   def array_buffer_result[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = darray_buffer_result(__arg0)
+  def array_buffer_unsafe_result[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+    = darray_buffer_unsafe_result(__arg0)
   def array_buffer_map[T:Manifest,R:Manifest](__arg0: Rep[ForgeArrayBuffer[T]], __arg1: Rep[T] => Rep[R])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[R]]
     = darray_buffer_map(__arg0,__arg1)
   def array_buffer_flatmap[T:Manifest,R:Manifest](__arg0: Rep[ForgeArrayBuffer[T]], __arg1: Rep[T] => Rep[ForgeArrayBuffer[R]])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[R]]

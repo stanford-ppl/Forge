@@ -70,7 +70,7 @@ trait WranglerTableOps {
           else {
             val i = c - numCurrCols
             val tmp = numOfPastSplits + i
-            val colName = if (tmp == 0) "split" else ("split" + tmp)
+            val colName = "split" + tmp
             tuple($self, colName, array_map(splitElems, ((r:Rep[ForgeArray[String]]) => r(i))))
           }
         })

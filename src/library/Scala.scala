@@ -86,11 +86,13 @@ trait ScalaOps {
     val int_times = direct (Prim) ("forge_int_times", Nil, (MInt,MInt) :: MInt)
     val int_divide = direct (Prim) ("forge_int_divide", Nil, (MInt,MInt) :: MInt)
     val int_shift_left = direct (Prim) ("forge_int_shift_left", Nil, (MInt,MInt) :: MInt)
+    val int_shift_right_unsigned = direct (Prim) ("forge_int_shift_right_unsigned", Nil, (MInt,MInt) :: MInt)
+    impl (int_shift_right_unsigned) (codegen($cala, ${ $0 >>> $1 }))
+    val int_binary_and = direct (Prim) ("forge_int_and", Nil, (MInt,MInt) :: MInt)
+    val int_binary_or = direct (Prim) ("forge_int_or", Nil, (MInt,MInt) :: MInt)
     val int_shift_right = direct (Prim) ("forge_int_shift_right", Nil, (MInt,MInt) :: MInt)
     val int_mod = infix (Prim) ("%", Nil, (MInt,MInt) :: MInt)
     val int_bitwise_not = infix (Prim) ("unary_~", Nil, MInt :: MInt)
-    val int_binary_and = direct (Prim) ("forge_int_and", Nil, (MInt,MInt) :: MInt)
-    val int_binary_or = direct (Prim) ("forge_int_or", Nil, (MInt,MInt) :: MInt)
     
     val float_plus = direct (Prim) ("forge_float_plus", Nil, (MFloat,MFloat) :: MFloat)
     val float_minus = direct (Prim) ("forge_float_minus", Nil, (MFloat,MFloat) :: MFloat)
@@ -276,6 +278,7 @@ trait ScalaOps {
     
     infix (Prim) ("<<",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_left($0,$1) }
     infix (Prim) (">>",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_right($0,$1) }
+    infix (Prim) (">>>",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_right_unsigned($0,$1) }
     infix (Prim) ("&", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_and($0,$1) }
     infix (Prim) ("|", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_or($0,$1) }
     infix (Prim) ("&", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_and($0,$1) }
@@ -350,8 +353,11 @@ trait ScalaOps {
 
     val asinstance = infix (Cast) ("AsInstanceOf", (A,B), A :: B)
     impl (asinstance) (codegen($cala, ${ $0.asInstanceOf[$t[B]] }))
-    impl (asinstance) (codegen(cuda, ${ ($t[B])$0 }))
-    impl (asinstance) (codegen(cpp, ${ ($t[B])$0 }))
+    //impl (asinstance) (codegen(cuda, ${ ($t[B])$0 }))
+    //impl (asinstance) (codegen(cpp, ${ ($t[B])$0 }))
+    //TODO: what is the proper way to get the result type (sym.tp) to call with remapWithRef?
+    impl (asinstance) (codegen(cuda, "(" + unquotes("remapWithRef(sym.tp)") + ")" + quotedArg(0)))
+    impl (asinstance) (codegen(cpp, "(" + unquotes("remapWithRef(sym.tp)") + ")" + quotedArg(0)))
 
     val isinstance = infix (Cast) ("IsInstanceOf", (A,B), A :: MBoolean)
     impl (isinstance) (codegen($cala, ${ $0.isInstanceOf[$t[B]] }))
@@ -410,6 +416,9 @@ trait ScalaOps {
     infix (Ord) ("!=", (AC,B), (AC,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
     infix (Ord) ("!=", (AC,B), (AC,MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
 
+    infix (Ord) ("min", List(A withBound TOrdering), List(A,A) :: A) implements (codegen($cala, quotedArg(0) + " min " + quotedArg(1)))
+    infix (Ord) ("max", List(A withBound TOrdering), List(A,A) :: A) implements (codegen($cala, quotedArg(0) + " max " + quotedArg(1)))
+    //infix (Ord) ("compare", List(A withBound TOrdering), List(A,A) :: MInt) implements (codegen($cala, quotedArg(0) + " compare " + quotedArg(1)))
     val lt = infix (Ord) ("<", List(A withBound TOrdering), List(A,A) :: MBoolean)
     val lte = infix (Ord) ("<=", List(A withBound TOrdering), List(A,A) :: MBoolean)
     val gt = infix (Ord) (">", List(A withBound TOrdering), List(A,A) :: MBoolean)
@@ -431,6 +440,7 @@ trait ScalaOps {
     val T = tpePar("T")
 
     val toInt = infix (Str) ("toInt", Nil, MString :: MInt) 
+    val toLong = infix (Str) ("toLong", Nil, MString :: MLong)
     val toFloat = infix (Str) ("toFloat", Nil, MString :: MFloat)
     val toDouble = infix (Str) ("toDouble", Nil, MString :: MDouble)
     val toBoolean = infix (Str) ("toBoolean", Nil, MString :: MBoolean)
@@ -439,8 +449,11 @@ trait ScalaOps {
     val startsWith = infix (Str) ("startsWith", Nil, (MString,MString) :: MBoolean)
     val slice = infix (Str) ("slice", Nil, (MString,MInt,MInt) :: MString)
     val length = infix (Str) ("length", Nil, MString :: MInt)
+    val endsWith = infix (Str) ("endsWith", Nil, (MString,MString) :: MBoolean)
+    val contains = infix (Str) ("contains", Nil, (MString,MString) :: MBoolean)
 
     impl (toInt) (codegen($cala, ${ $0.toInt })) 
+    impl (toLong) (codegen($cala, ${ $0.toLong })) 
     impl (toFloat) (codegen($cala, ${ $0.toFloat })) 
     impl (toDouble) (codegen($cala, ${ $0.toDouble })) 
     impl (toBoolean) (codegen($cala, ${ $0.toBoolean })) 
@@ -449,14 +462,19 @@ trait ScalaOps {
     impl (startsWith) (codegen($cala, ${ $0.startsWith($1) })) 
     impl (slice) (codegen($cala, ${ $0.slice($1,$2) }))
     impl (length) (codegen($cala, ${ $0.length }))
+    impl (endsWith) (codegen($cala, ${ $0.endsWith($1) })) 
+    impl (contains) (codegen($cala, ${ $0.contains($1) })) 
     
     impl (toInt) (codegen(cpp, ${ string_toInt($0) })) 
+    impl (toLong) (codegen(cpp, ${ string_toLong($0) })) 
     impl (toFloat) (codegen(cpp, ${ string_toFloat($0) })) 
     impl (toDouble) (codegen(cpp, ${ string_toDouble($0) })) 
     impl (toBoolean) (codegen(cpp, ${ string_toBoolean($0) })) 
     impl (trim) (codegen(cpp, ${ string_trim($0) })) 
     impl (fcharAt) (codegen(cpp, ${ string_charAt($0,$1) })) 
     impl (startsWith) (codegen(cpp, ${ string_startsWith($0,$1) })) 
+    impl (endsWith) (codegen(cpp, ${ string_endsWith($0,$1) })) 
+    impl (contains) (codegen(cpp, ${ string_contains($0,$1) })) 
 
     // not much we can do here to use "split" as long as Delite brings in LMS' version, since we can't overload on the return type
     // we should refactor LMS/Delite to only use the StringOpsExp trait and not StringOps

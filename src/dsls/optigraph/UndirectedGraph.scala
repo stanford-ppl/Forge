@@ -25,20 +25,21 @@ trait UndirectedGraphOps{
     val NodeDataView = lookupTpe("NodeDataView")
     val NodeIdView = lookupTpe("NodeIdView")
     val NodeSHash = lookupTpe("NodeSHash")
-
+    
     //Actual UndirectedGraph declaration
     val UndirectedGraph = tpe("UndirectedGraph") 
     val T = tpePar("T")
     val R = tpePar("R")
     val K = tpePar("K")
     val V = tpePar("V")
-    val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
 
-    data(UndirectedGraph,("_numNodes",MInt),("_heavyNodes",SHashMap(MInt,MInt)),("_externalIDs",MArray(MInt)),("_nodes",MArray(MInt)),("_edges",MArray(MInt))) 
-    static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("shash",SHashMap(MInt,MInt)),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt))), UndirectedGraph))) implements allocates(UndirectedGraph,${$count},${$shash},${$exID},${$outNodes},${outEdges})
+    data(UndirectedGraph,("_numNodes",MInt),("_externalIDs",MArray(MInt)),("_nodes",MArray(MInt)),("_edges",MArray(MInt))) 
+    static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt))), UndirectedGraph))) implements allocates(UndirectedGraph,${$count},${$exID},${$outNodes},${outEdges})
 
     val UndirectedGraphOps = withTpe(UndirectedGraph)     
     UndirectedGraphOps{
+      infix ("numEdges")(Nil :: MInt) implements single ${array_length(edge_raw_data($self))}
+
       //UndirectedGraph directed or not?
       infix ("isDirected") (Nil :: MBoolean) implements single ${false}
       
@@ -47,12 +48,19 @@ trait UndirectedGraphOps{
         $self.outNbrs($1).serialForEach{n => hash.add(n,n)}
         hash
       }
+      infix ("sumOverNbrs") ( CurriedMethodSignature(List(("n",Node),("data",MInt==>R),("cond",MInt==>MBoolean)),R), TNumeric(R), addTpePars=R) implements composite ${
+        sumOverCollection($self.neighbors(n))(data)(cond)
+      }
+      //Perform a sum over the neighbors
+      infix ("sumOverNbrs") ( CurriedMethodSignature(List(("n",MInt),("data",MInt==>R),("cond",MInt==>MBoolean)),R), TNumeric(R), addTpePars=R) implements composite ${
+        sumOverCollection($self.neighbors(n))(data)(cond)
+      }
       infix ("sumDownNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
         //only sum in neighbors a level up
-        sum($self.outNbrs(n))(data){e => (level(e)==(level(n.id)+1))}
+        sumOverCollection($self.outNbrs(n))(data){e => (level(e)==(level(n.id)+1))}
       }
       infix ("sumUpNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
-        sum($self.inNbrs(n))(data){e => (level(e)==(level(n.id)-1))}
+        sumOverCollection($self.inNbrs(n))(data){e => (level(e)==(level(n.id)-1))}
       }
       infix ("outDegree") (Node :: MInt) implements single ${
         val end  = if( ($1.id+1) < array_length(node_raw_data($self)) ) node_apply($self,($1.id+1)) 

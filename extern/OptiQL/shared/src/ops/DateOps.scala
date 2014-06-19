@@ -45,4 +45,3 @@ trait DateCompilerOps extends DateOps {
 
   def date_value(self: Rep[Date])(implicit __pos: SourceContext): Rep[Int]
 }
-

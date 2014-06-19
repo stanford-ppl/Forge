@@ -32,7 +32,7 @@ trait IOOps {
     val Elem = tpePar("Elem")
 
     // whitespace delimited by default
-    direct (IO) ("readVector", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> Elem),("delim",MString,"\"\\s+\"")), DenseVector(Elem)), effect = simple) implements single ${
+    direct (IO) ("readVector", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseVector(Elem)), effect = simple) implements single ${
       val a = ForgeFileReader.readLines($path){ line =>
         val tokens = line.trim.fsplit(delim)
         val tokenVector = (0::array_length(tokens)) { i => tokens(i) }
@@ -41,7 +41,7 @@ trait IOOps {
       densevector_fromarray(a, true)
     }
 
-    direct (IO) ("readMatrix", Elem, MethodSignature(List(("path",MString),("schemaBldr",MString ==> Elem),("delim",MString,"\"\\s+\"")), DenseMatrix(Elem)), effect = simple) implements single ${
+    direct (IO) ("readMatrix", Elem, MethodSignature(List(("path",MString),("schemaBldr",MString ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseMatrix(Elem)), effect = simple) implements single ${
       val a = ForgeFileReader.readLinesFlattened($path){ line:Rep[String] =>
         val tokens = line.trim.fsplit(delim)
         array_fromfunction(array_length(tokens), i => schemaBldr(tokens(i)))
@@ -77,7 +77,7 @@ trait IOOps {
       xfs.close()
     })
 
-    direct (IO) ("writeMatrix", Elem withBound TStringable, MethodSignature(List(("m",DenseMatrix(Elem)),("path",MString),("delim",MString,"\"    \"")), MUnit), effect = simple) implements composite ${
+    direct (IO) ("writeMatrix", Elem withBound TStringable, MethodSignature(List(("m",DenseMatrix(Elem)),("path",MString),("delim",MString,"unit(\"    \")")), MUnit), effect = simple) implements composite ${
       write_matrix_helper($path, densematrix_raw_data($m.map(_.makeStr)), $m.numRows, $m.numCols, $delim)
     }
 

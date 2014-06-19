@@ -191,7 +191,7 @@ trait DenseMatrixOps {
       infix ("sliceCols") ((("start",MInt),("end",MInt)) :: DenseMatrix(T)) implements redirect ${ $self.getCols(start::end) }
 
       // TODO: generalize the following (and the static diag above) to kth diagonal
-      // infix ("diag") (MethodSignature(List(("x",DenseMatrix(T)),("k",MInt,"0")), DenseVector(T)) implements composite ${
+      // infix ("diag") (MethodSignature(List(("x",DenseMatrix(T)),("k",MInt,"unit(0)")), DenseVector(T)) implements composite ${
       infix ("diag") (Nil :: DenseVector(T)) implements composite ${
         val dim = min($self.numRows, $self.numCols)
         val indices = (0::dim) { i => i + i*$self.numCols }

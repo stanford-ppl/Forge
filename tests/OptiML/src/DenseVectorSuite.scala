@@ -341,6 +341,12 @@ trait GroupBy extends ForgeTestModule with OptiMLApplication {
       else if (v(0) == "three") collect(v.length == 3)
       else if (v(0) == "four") collect(v.length == 4)
     }
+
+    val v2 = DenseVector(DenseVector(1,2),DenseVector(3,4),DenseVector(5,6))
+    val g2 = v2.groupBy(e => sum(e), e => e)
+    collect(g2(7).apply(0) == DenseVector(3,4))
+    collect(!g2.contains(5))
+
     mkReport
   }
 }

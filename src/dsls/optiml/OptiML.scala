@@ -8,7 +8,7 @@ import core.ForgeApplicationRunner
 object OptiMLDSLRunner extends ForgeApplicationRunner with OptiMLDSL
 
 trait OptiMLDSL extends OptiLADSL
-  with MLIOOps with SetOps with BufferableOps with StreamOps with ImageOps {
+  with MLIOOps /*with FeatureOps*/ with SetOps with BufferableOps with StreamOps with ImageOps {
 
   override def dslName = "OptiML"
 
@@ -26,11 +26,12 @@ trait OptiMLDSL extends OptiLADSL
 
     extern(grp("Sum"))
     importBufferableOps()
+    // importFeatureOps()
     importSetOps()
     importUntilConverged()
     importMLIOOps()
     importStreamOps()
-    importImageOps()
+    importImageOps()    
   }
 
   def importUntilConverged() {
@@ -41,7 +42,7 @@ trait OptiMLDSL extends OptiLADSL
     val T = tpePar("T")
 
     // "block" should not mutate the input, but always produce a new copy. in this version, block can change the structure of the input across iterations (e.g. increase its size)
-    direct (Control) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, ".001"), ("minIter", MInt, "1"), ("maxIter", MInt, "1000")), ("block", T ==> T)), T), ("diff", (T,T) ==> MDouble)) implements composite ${
+    direct (Control) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, "unit(.001)"), ("minIter", MInt, "unit(1)"), ("maxIter", MInt, "unit(1000)")), ("block", T ==> T)), T), ("diff", (T,T) ==> MDouble)) implements composite ${
       var delta = scala.Double.MaxValue
       var cur = x
       var iter = 0
@@ -62,12 +63,12 @@ trait OptiMLDSL extends OptiLADSL
     }
 
     // this is a convenience method that allows a user to override the 'diff' function without explicitly passing other implicits
-    direct (Control) ("untilconverged_withdiff", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, ".001"), ("minIter", MInt, "1"), ("maxIter", MInt, "1000")), ("block", T ==> T), ("diff", (T,T) ==> MDouble)), T)) implements redirect ${
+    direct (Control) ("untilconverged_withdiff", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, "unit(.001)"), ("minIter", MInt, "unit(1)"), ("maxIter", MInt, "unit(1000)")), ("block", T ==> T), ("diff", (T,T) ==> MDouble)), T)) implements redirect ${
       untilconverged(x, tol, minIter, maxIter)(block)(manifest[T], implicitly[SourceContext], diff)
     }
 
     // double-buffered untilconverged. 'block' must not change the structure of the input across iterations.
-    direct (Control) ("untilconverged_buffered", T withBound TBufferable, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, ".001"), ("minIter", MInt, "1"), ("maxIter", MInt, "1000")), ("block", T ==> T)), T), ("diff", (T,T) ==> MDouble)) implements composite ${
+    direct (Control) ("untilconverged_buffered", T withBound TBufferable, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, "unit(.001)"), ("minIter", MInt, "unit(1)"), ("maxIter", MInt, "unit(1000)")), ("block", T ==> T)), T), ("diff", (T,T) ==> MDouble)) implements composite ${
       val bufA = x.mutable
       val bufB = x.mutable
       // val bufSize = bufferable_size(bufA)

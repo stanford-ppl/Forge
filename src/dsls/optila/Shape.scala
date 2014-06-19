@@ -54,7 +54,7 @@ trait ShapeOps {
     data(UTri, ("N", MInt), ("_includeDiagonal", MBoolean))
 
     // create a new upper triangular shape for an N x N square matrix
-    direct (UTri) ("utriangle", Nil, MethodSignature(List(("N", MInt), ("includeDiagonal", MBoolean, "true")), UTri)) implements allocates(UTri, ${$0}, ${$1})
+    direct (UTri) ("utriangle", Nil, MethodSignature(List(("N", MInt), ("includeDiagonal", MBoolean, "unit(true)")), UTri)) implements allocates(UTri, ${$0}, ${$1})
 
     compiler (UTri) ("tri_size", Nil, ("n", MInt) :: MInt) implements composite ${ n*(n+1)/2 } // arithmetic sequence sum
 

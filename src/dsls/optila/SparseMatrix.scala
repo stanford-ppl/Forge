@@ -142,7 +142,7 @@ trait SparseMatrixOps {
         $self.append($1,$2,$3,true)
       }
 
-      infix ("append") (MethodSignature(List(("i",MInt),("j",MInt),("y",T),("alwaysWrite",MBoolean,"true")), MUnit), effect = write(0)) implements single ${
+      infix ("append") (MethodSignature(List(("i",MInt),("j",MInt),("y",T),("alwaysWrite",MBoolean,"unit(true)")), MUnit), effect = write(0)) implements single ${
         val shouldAppend = alwaysWrite || (y != defaultValue[T])  // conditional evaluated at staging time
         if (shouldAppend) {
           sparsematrix_coo_ensureextra($self, 1)
@@ -478,7 +478,7 @@ trait SparseMatrixOps {
       infix ("size") (Nil :: MInt) implements composite ${ $self.numRows*$self.numCols }
       infix ("nnz") (Nil :: MInt) implements getter(0, "_nnz")
 
-      infix ("nz") (MethodSignature(List(("asRow",MBoolean,"true")), DenseVector(T))) implements composite ${ densevector_alloc_raw($self.nnz, $1, sparsematrix_csr_data($self)) }
+      infix ("nz") (MethodSignature(List(("asRow",MBoolean,"unit(true)")), DenseVector(T))) implements composite ${ densevector_alloc_raw($self.nnz, $1, sparsematrix_csr_data($self)) }
 
       compiler ("sparsematrix_csr_find_offset") ((("row",MInt),("col",MInt)) :: MInt) implements single ${
         val rowPtr = sparsematrix_csr_rowptr($self)
@@ -595,7 +595,7 @@ trait SparseMatrixOps {
 
       // TODO
       // TODO: generalize the following (and the static diag above) to kth diagonal
-      // infix ("diag") (MethodSignature(List(("x",SparseMatrix(T)),("k",MInt,"0")), SparseVector(T)) implements composite ${
+      // infix ("diag") (MethodSignature(List(("x",SparseMatrix(T)),("k",MInt,"unit(0)")), SparseVector(T)) implements composite ${
       // infix ("diag") (Nil :: SparseVector(T)) implements composite ${
       //   val indices = (0::$self.numRows) { i => i + i*$self.numCols }
       //   indices.t map { i => sparsematrix_raw_apply($self,i) }

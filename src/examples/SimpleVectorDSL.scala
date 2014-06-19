@@ -61,7 +61,7 @@ trait SimpleVectorDSL extends ForgeApplication {
       }
 
       // example named, default arg. 'MethodSignature' is currently explicitly needed when mixing arg types.
-      infix ("slice") (MethodSignature(List(("start",MInt,"0"),("end",MInt)), Vector(T))) implements single ${
+      infix ("slice") (MethodSignature(List(("start",MInt,"unit(0)"),("end",MInt)), Vector(T))) implements single ${
         val out = Vector[T]($end - $start)
         var i = $start
         while (i < $end) {

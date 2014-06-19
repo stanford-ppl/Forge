@@ -34,7 +34,7 @@ trait SimpleIntVectorDSL extends ForgeApplication {
         array_update(vector_raw_data($self), $i, $e)
       }
 
-      infix ("slice") (MethodSignature(List(("start",MInt,"0"),("end",MInt)), Vector)) implements single ${
+      infix ("slice") (MethodSignature(List(("start",MInt,"unit(0)"),("end",MInt)), Vector)) implements single ${
         val out = Vector($end - $start)
         var i = $start
         while (i < $end) {

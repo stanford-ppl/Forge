@@ -437,6 +437,8 @@ trait ScalaOps {
     val trim = infix (Str) ("trim", Nil, MString :: MString) 
     val fcharAt = infix (Str) ("fcharAt", Nil, (MString,MInt) :: MChar) 
     val startsWith = infix (Str) ("startsWith", Nil, (MString,MString) :: MBoolean)
+    val slice = infix (Str) ("slice", Nil, (MString,MInt,MInt) :: MString)
+    val length = infix (Str) ("length", Nil, MString :: MInt)
 
     impl (toInt) (codegen($cala, ${ $0.toInt })) 
     impl (toFloat) (codegen($cala, ${ $0.toFloat })) 
@@ -445,6 +447,8 @@ trait ScalaOps {
     impl (trim) (codegen($cala, ${ $0.trim })) 
     impl (fcharAt) (codegen($cala, ${ $0.charAt($1) })) 
     impl (startsWith) (codegen($cala, ${ $0.startsWith($1) })) 
+    impl (slice) (codegen($cala, ${ $0.slice($1,$2) }))
+    impl (length) (codegen($cala, ${ $0.length }))
     
     impl (toInt) (codegen(cpp, ${ string_toInt($0) })) 
     impl (toFloat) (codegen(cpp, ${ string_toFloat($0) })) 

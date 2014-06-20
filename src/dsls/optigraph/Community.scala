@@ -22,6 +22,8 @@ trait CommunityOps {
     data(Community,("_size",MInt),("_neighLast",MInt),("_graph",UndirectedGraph),("_neighWeight",MArray(MDouble)),("_neighPos",MArray(MInt)),("_n2c",MArray(MInt)),("_tot",MArray(MDouble)),("_in",MArray(MDouble)))
     static(Community)("apply", Nil, ("g",UndirectedGraph) :: Community, effect=mutable) implements allocates(Community,${alloc_size(g)},${unit(0)},${$0},${alloc_doubles(alloc_size(g),{e => unit(-1.0)})},${alloc_ints(alloc_size(g),{e => unit(0)})},${alloc_ints(alloc_size(g),{e => e})},${alloc_weights(g)},${alloc_selfs(g)})
 
+
+
     val CommunityOps = withTpe(Community)
     CommunityOps{  
       infix("modularity")(Nil :: MDouble) implements composite ${
@@ -44,11 +46,16 @@ trait CommunityOps {
         $self.updateIn(comm,$self.in(comm)-(2*dnodecomm+$self.graph.numSelfLoops(node)))
         $self.updateN2c(node,-1)
       }
-      infix("insert")( (("node",MInt),("comm",MInt),("dnodecomm",MDouble)) :: MUnit, effect = simple) implements single ${
+      infix("insert")( (("node",MInt),("old_comm",MInt),("olddnodecomm",MDouble),("comm",MInt),("dnodecomm",MDouble)) :: MUnit, effect = simple) implements single ${
         fassert(node >= 0 && node < $self.size, "node must be in range 0 - size")
 
+        //Would really like this to be atomic but lets roll the dice
+        $self.updateTot(old_comm,$self.tot(old_comm)-$self.graph.weightedDegree(node))
         $self.updateTot(comm,$self.tot(comm)+$self.graph.weightedDegree(node))
+
+        $self.updateIn(old_comm,$self.in(old_comm)-(2*olddnodecomm+$self.graph.numSelfLoops(node)))
         $self.updateIn(comm,$self.in(comm)+(2*dnodecomm+$self.graph.numSelfLoops(node)))
+
         $self.updateN2c(node,comm)
       }
       infix("modularityGain")( (("node",MInt),("comm",MInt),("dnodecomm",MDouble),("w_degree",MDouble)) :: MDouble) implements composite ${
@@ -56,7 +63,17 @@ trait CommunityOps {
 
         val totc = $self.tot(comm).toDouble
         val degc = w_degree
-        val m2 = $self.graph.totalWeight
+        val m2 = $self.graph.totalWeight  //FIXME -> we shouldn't mapreduce each time
+        val dnc = dnodecomm 
+
+        (dnc - totc*degc/m2)
+      }
+      infix("modularityGainNoMove")( (("node",MInt),("comm",MInt),("dnodecomm",MDouble),("w_degree",MDouble)) :: MDouble) implements composite ${
+        fassert(node >= 0 && node < $self.size, "node must be in range 0 - size")
+
+        val totc = $self.tot(comm).toDouble-$self.graph.weightedDegree(node)
+        val degc = w_degree
+        val m2 = $self.graph.totalWeight  //FIXME -> we shouldn't mapreduce each time
         val dnc = dnodecomm 
 
         (dnc - totc*degc/m2)
@@ -83,17 +100,6 @@ trait CommunityOps {
         var cur_mod = new_mod
 
         val random_order = array_fromfunction[Int]({size},{e => e})
-        /*
-        I wonder if this realy helps
-        var i = 0
-        while(i < size-1){
-          var rand_pos = randomInt(size-i) + i
-          var tmp = random_order(i)
-          random_order(i) = random_order(rand_pos)
-          random_order(rand_pos) = tmp
-          i += 1
-        }
-        */
 
         var continue = true
         while(continue){
@@ -101,44 +107,83 @@ trait CommunityOps {
           nb_moves = 0
           nb_pass_done += 1
 
-          //FIXME: change me to foreachRandomNode or something
+          //Makes this effectively for each community
           g.foreachNode{ n =>
             var node = n.id
             var node_comm = $self.n2c(node)
             var w_degree = g.weightedDegree(node)
 
-            $self.neighComm(node)
-            $self.remove(node,node_comm,$self.neighWeight(node_comm))
+            //////////////////////////////////////////
+            //Formerly neigh communities method
+            //This section pulls all the communities out of the neighborhoods
+            //and sums inter-weights for the neighborhood per community.
+            val nbrs = g.neighbors(node)
+            var number_of_neighbor_comm = 1
+
+            val comm_weights = SHashMap[Int,Double]()
+            comm_weights.update($self.n2c(node),0d)
+
+            //Do computations for node's community to start
+            nbrs.foreach({ nbr =>
+              val neigh_comm = $self.n2c(nbr)
+              if(comm_weights.contains(neigh_comm)){
+                comm_weights.update(neigh_comm,comm_weights(neigh_comm)+1d) //FIXME CHANGE TO WEIGHTS
+              }
+              else{
+                comm_weights.update(neigh_comm,1d) //FIXME CHANGE TO WEIGHTS
+                number_of_neighbor_comm += 1
+              }
+            })
+            /////////////////////////////////////////
+            //$self.remove(node,node_comm,comm_weights(node_comm))
 
             var best_comm = node_comm
-            var best_nblinks = 0d
-            var best_increase = 0d
+            var best_nblinks = comm_weights(node_comm)
+            var best_increase = $self.modularityGainNoMove(node,node_comm,comm_weights(node_comm),w_degree)
 
+            val keys  = comm_weights.keys
             var i = 0
-            while(i < $self.neighLast){
-              val increase = $self.modularityGain(node,$self.neighPos(i),$self.neighWeight($self.neighPos(i)),w_degree)
-              if(increase > best_increase){
-                best_comm = $self.neighPos(i)
-                best_nblinks = $self.neighWeight($self.neighPos(i))
-                best_increase = increase
+            while(i < number_of_neighbor_comm){
+              val neigh_comm = keys(i)
+              if(neigh_comm != node_comm){
+                val weight = comm_weights(neigh_comm)
+                
+                val increase = $self.modularityGain(node,neigh_comm,weight,w_degree)
+                if(increase > best_increase){
+                  best_comm = neigh_comm
+                  best_nblinks = weight
+                  best_increase = increase
+                }
               }
-              i += 1
+              i += 1            
+            } 
+
+            if(best_comm != node_comm){
+              nb_moves += 1
+              $self.insert(node,node_comm,comm_weights(node_comm),best_comm,best_nblinks)
             }
-
-            $self.insert(node,best_comm,best_nblinks)
-
-            if(best_comm != node_comm) nb_moves += 1
-          }
+          } //end parallel section
 
           new_mod = $self.modularity
           if(nb_moves > 0) improvement = true
 
           continue = nb_moves > 0 && new_mod-cur_mod > min_modularity
         }
-
         return improvement
-
       }
+    /*
+      n2c -> size == numNodes, indexed by nodeID gives the community a node belongs to
+      in,tot -> size == # of communities, used for modularity calculation
+        tot == total weighted degree of the community
+        in == # links strictly within the community (divided by 2)
+
+
+      //these two seem thread and node local, let's just compute them on the fly 
+      then use them right after computing, no need for this storage  
+      neighWeight -> size == # of communities, gives the # of links from node to a indexed comm
+      neighPos -> lists the comm for a given nodes neighbors, the 0th entry is the nodes current neighbor
+          
+    */
       infix("neighComm")( ("node",MInt) :: MUnit, effect=simple) implements single ${
         $self.setNeighWeight(array_fromfunction($self.size,e => -1.0))
         var neigh_last = 1

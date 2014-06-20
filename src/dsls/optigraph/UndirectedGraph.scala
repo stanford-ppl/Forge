@@ -33,8 +33,9 @@ trait UndirectedGraphOps{
     val K = tpePar("K")
     val V = tpePar("V")
 
-    data(UndirectedGraph,("_numNodes",MInt),("_externalIDs",MArray(MInt)),("_nodes",MArray(MInt)),("_edges",MArray(MInt))) 
-    static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt))), UndirectedGraph))) implements allocates(UndirectedGraph,${$count},${$exID},${$outNodes},${outEdges})
+    data(UndirectedGraph,("_numNodes",MInt),("_externalIDs",MArray(MInt)),("_nodes",MArray(MInt)),("_edges",MArray(MInt)),("_weights",MArray(MDouble)))
+    static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt))), UndirectedGraph))) implements allocates(UndirectedGraph,${$count},${$exID},${$outNodes},${outEdges},${array_empty[Double](unit(0))})
+    static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("weights",MArray(MDouble))), UndirectedGraph))) implements allocates(UndirectedGraph,${$count},${$exID},${$outNodes},${outEdges},${weights})
 
     val UndirectedGraphOps = withTpe(UndirectedGraph)     
     UndirectedGraphOps{
@@ -63,7 +64,7 @@ trait UndirectedGraphOps{
         sumOverCollection($self.inNbrs(n))(data){e => (level(e)==(level(n.id)-1))}
       }
       infix ("totalWeight") (Nil :: MDouble) implements single ${
-        $self.sumOverNodes(n => $self.weightedDegree(n.id))
+        array_length(edge_raw_data($self))//array_reduce[Double](edge_weights($self),{(a,b) => a+b},0d)
       }
       infix ("weightedDegree") (MInt :: MDouble) implements single ${
         val end  = if( ($1+1) < array_length(node_raw_data($self)) ) node_apply($self,($1+1)) 
@@ -94,7 +95,7 @@ trait UndirectedGraphOps{
           else array_length(edge_raw_data($self))
         NodeDataView[Int](edge_raw_data($self),start,end-start)
       }
-
+      compiler ("edge_weights") (Nil :: MArray(MDouble)) implements getter(0, "_weights")
       compiler ("node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_nodes")
       compiler("node_apply")(MInt :: MInt) implements single ${array_apply(node_raw_data($self),$1)}
       compiler ("edge_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_edges")

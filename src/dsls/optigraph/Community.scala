@@ -123,7 +123,6 @@ trait CommunityOps {
             val comm_weights = SHashMap[Int,Double]()
             comm_weights.update($self.n2c(node),0d)
 
-            //Do computations for node's community to start
             nbrs.foreach({ nbr =>
               val neigh_comm = $self.n2c(nbr)
               if(comm_weights.contains(neigh_comm)){

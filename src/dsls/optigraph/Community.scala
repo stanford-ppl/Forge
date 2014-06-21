@@ -16,13 +16,19 @@ trait CommunityOps {
   def importCommunityOps() {
     val T = tpePar("T")
     val UndirectedGraph = lookupTpe("UndirectedGraph")
+    val NodeData = lookupTpe("NodeData")
 
     val Community = tpe("Community") 
 
     data(Community,("_size",MInt),("_totalWeight",MDouble),("_graph",UndirectedGraph),("_neighWeight",MArray(MDouble)),("_n2c",MArray(MInt)),("_tot",MArray(MDouble)),("_in",MArray(MDouble)))
     static(Community)("apply", Nil, ("g",UndirectedGraph) :: Community, effect=mutable) implements allocates(Community,${alloc_size(g)},${alloc_total_weight($0)},${$0},${alloc_doubles(alloc_size(g),{e => unit(-1.0)})},${alloc_ints(alloc_size(g),{e => e})},${alloc_weights(g)},${alloc_selfs(g)})
-
-
+    
+    /*
+      n2c -> size == numNodes, indexed by nodeID gives the community a node belongs to
+      in,tot -> size == # of communities, used for modularity calculation
+        tot == total weighted degree of the community
+        in == sum of degree of links strictly within the community (divided by 2)
+    */
 
     val CommunityOps = withTpe(Community)
     CommunityOps{  
@@ -86,7 +92,29 @@ trait CommunityOps {
           i += 1
         }
       }
+      /*
+      infix("generateNewGraph")(Nil :: UndirectedGraph) implements composite ${
+        val g = $self.graph
+        val tot = $self.tot
+        val in = $self.in
+        val n2c = $self.n2c
+        val size = $self.size
 
+        val originalNodeIds = NodeData.fromFunction(size,i=>i)
+        val groupedComms = originalNodeIds.groupBy(k => n2c(k),v => v)
+
+        val newSize = fhashmap_size(groupedComms)
+        val newNodeIds = NodeData.fromFunction(newSize,i => i)
+        val oldComms = NodeData(fhashmap_keys(groupedComms))
+
+        //need to go through and find all edges between communities
+
+        //Need to make this a hash map between communities and weights.
+        //go over every edge in the old graph and simply add in...not much 
+        //to it.
+        array_empty[MArrayBuffer[Tup2[Int,Double]]](newSize)
+      }
+      */
       infix("oneLevel")(Nil :: MDouble, effect = simple) implements composite ${
         val g = $self.graph
         val tot = $self.tot
@@ -115,52 +143,46 @@ trait CommunityOps {
             //Formerly neigh communities method
             //This section pulls all the communities out of the neighborhoods
             //and sums inter-weights for the neighborhood per community.
-            val comm_weights = SHashMap[Int,Double]()
-            comm_weights.update(node_comm,0d) //no matter what we need to look at nodes current comm
             val (nbrs,nbrWeights) = unpack(g.getNeighborsAndWeights(n))
+
+            val neighPos = array_empty[Int](nbrs.length+1) //holds indexes in for comm weights (neighbors plus current node)
+            val commWeights = array_fromfunction[Double](size,i => 0d).mutable //holds comm weights for neighborhoods
+            neighPos(0) = node_comm
+
             var i = 0
             while(i < nbrs.length){
               val neigh_comm = $self.n2c(nbrs(i))
-              //println("i: " + i + " comm: " + neigh_comm + " nodecomm: " + node_comm)
-              if(comm_weights.contains(neigh_comm)){
-                comm_weights.update(neigh_comm,comm_weights(neigh_comm)+nbrWeights(i))
-              }
-              else{
-                comm_weights.update(neigh_comm,nbrWeights(i))
-              }
+              neighPos(i+1) = neigh_comm
+              commWeights(neigh_comm) = commWeights(neigh_comm)+nbrWeights(i)
               i += 1
             }
             /////////////////////////////////////////
-            //$self.remove(node,node_comm,comm_weights(node_comm))
-
+            //By default set everything to our current community
             var best_comm = node_comm
-            var best_nblinks = comm_weights(node_comm)
-            var best_increase = $self.modularityGainNoMove(node,node_comm,comm_weights(node_comm),w_degree)
+            var best_nblinks = commWeights(node_comm)
+            var best_increase = $self.modularityGainNoMove(node,node_comm,commWeights(node_comm),w_degree)
 
-            val keys  = comm_weights.keys
-            i = 0
             //println("number of comms: " + array_length(keys))
-            while(i < array_length(keys)){
+            i = 1 //we already did our own node above
+            while(i < array_length(neighPos)){
               //println("comm: " + keys(i) + " weight: " + comm_weights(keys(i)))
-              val neigh_comm = keys(i)
-              if(neigh_comm != node_comm){
-                val weight = comm_weights(neigh_comm)
-                
-                val increase = $self.modularityGain(node,neigh_comm,weight,w_degree)
-                if(increase > best_increase){
-                  best_comm = neigh_comm
-                  best_nblinks = weight
-                  best_increase = increase
-                }
+              val neigh_comm = neighPos(i)
+              val weight = commWeights(neigh_comm)
+              
+              val increase = $self.modularityGain(node,neigh_comm,weight,w_degree)
+              if(increase > best_increase){
+                best_comm = neigh_comm
+                best_nblinks = weight
+                best_increase = increase
               }
               i += 1            
             } 
 
             if(best_comm != node_comm){
               nb_moves += 1
-              $self.insert(node,node_comm,comm_weights(node_comm),best_comm,best_nblinks)
+              $self.insert(node,node_comm,commWeights(node_comm),best_comm,best_nblinks)
             }
-          } //end parallel section
+          }//end parallel section
 
           new_mod = $self.modularity
           continue = nb_moves > 0 && new_mod-cur_mod > min_modularity
@@ -168,19 +190,6 @@ trait CommunityOps {
         println("Number of passes: " + nb_pass_done)
         return new_mod
       }
-    /*
-      n2c -> size == numNodes, indexed by nodeID gives the community a node belongs to
-      in,tot -> size == # of communities, used for modularity calculation
-        tot == total weighted degree of the community
-        in == # links strictly within the community (divided by 2)
-
-
-      //these two seem thread and node local, let's just compute them on the fly 
-      then use them right after computing, no need for this storage  
-      neighWeight -> size == # of communities, gives the # of links from node to a indexed comm
-      neighPos -> lists the comm for a given nodes neighbors, the 0th entry is the nodes current neighbor
-          
-    */
 
       infix ("size") (Nil :: MInt) implements getter(0, "_size")
       infix ("totalWeight") (Nil :: MDouble) implements getter(0, "_totalWeight")

@@ -39,10 +39,10 @@ trait UndirectedGraphOps{
 
     val UndirectedGraphOps = withTpe(UndirectedGraph)     
     UndirectedGraphOps{
-      infix ("numEdges")(Nil :: MInt) implements single ${array_length(edge_raw_data($self))}
+      infix ("numEdges")(Nil :: MInt) implements composite ${array_length(edge_raw_data($self))}
 
       //UndirectedGraph directed or not?
-      infix ("isDirected") (Nil :: MBoolean) implements single ${false}
+      infix ("isDirected") (Nil :: MBoolean) implements composite ${false}
       
       infix ("neighborHash") (Node :: NodeSHash(MInt,MInt), effect = simple) implements composite ${
         val hash = NodeSHash[Int,Int]
@@ -63,43 +63,59 @@ trait UndirectedGraphOps{
       infix ("sumUpNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
         sumOverCollection($self.inNbrs(n))(data){e => (level(e)==(level(n.id)-1))}
       }
-      infix ("totalWeight") (Nil :: MDouble) implements single ${
-        array_length(edge_raw_data($self))//array_reduce[Double](edge_weights($self),{(a,b) => a+b},0d)
+      infix ("totalWeight") (Nil :: MDouble) implements composite ${
+        array_reduce[Double](edge_weights($self),{(a,b) => a+b},0d)
       }
-      infix ("weightedDegree") (MInt :: MDouble) implements single ${
-        val end  = if( ($1+1) < array_length(node_raw_data($self)) ) node_apply($self,($1+1)) 
-          else array_length(edge_raw_data($self))
-        (end - node_apply($self,$1)).toDouble
+      infix ("weightedDegree") (MInt :: MDouble) implements composite ${
+        get_edge_weights($self,Node($1)).reduce({(a,b)=>a+b})
       }
-      infix ("numSelfLoops") (MInt :: MDouble) implements single ${
-        0d
+      infix ("numSelfLoops") (MInt :: MDouble) implements composite ${
+        ///it seems like a perf hit to do it this way.
+        var degree = 0d
+        var i = 0
+        val start = node_apply($self,$1)
+        val nbrs = $self.neighbors($1)
+        while(i < nbrs.length){
+          if(nbrs(i) == $1){
+            degree = array_apply(edge_weights($self),start+i)
+            i = nbrs.length
+          }
+          i += 1
+        }
+        degree
       }
-      infix ("degree") (Node :: MInt) implements single ${
+      infix ("degree") (Node :: MInt) implements composite ${
         val end  = if( ($1.id+1) < array_length(node_raw_data($self)) ) node_apply($self,($1.id+1)) 
           else array_length(edge_raw_data($self))
         end - node_apply($self,$1.id) 
       }
-      infix ("outDegree") (Node :: MInt) implements single ${
+      infix ("outDegree") (Node :: MInt) implements composite ${
         val end  = if( ($1.id+1) < array_length(node_raw_data($self)) ) node_apply($self,($1.id+1)) 
           else array_length(edge_raw_data($self))
         end - node_apply($self,$1.id) 
       }
-      infix ("inDegree") (Node :: MInt) implements single ${$self.outDegree($1)}
-      infix ("outNbrs") (Node :: NodeDataView(MInt)) implements single ${get_nbrs($self,$1)} 
-      infix ("inNbrs") (Node :: NodeDataView(MInt)) implements single ${get_nbrs($self,$1)}
-      infix ("neighbors") (MInt :: NodeDataView(MInt)) implements single ${get_nbrs($self,Node($1))}
-      infix ("neighbors") (Node :: NodeDataView(MInt)) implements single ${get_nbrs($self,$1)}
-      compiler ("get_nbrs") (Node :: NodeDataView(MInt)) implements single ${
+      infix ("inDegree") (Node :: MInt) implements composite ${$self.outDegree($1)}
+      infix ("outNbrs") (Node :: NodeDataView(MInt)) implements composite ${get_nbrs($self,$1)} 
+      infix ("inNbrs") (Node :: NodeDataView(MInt)) implements composite ${get_nbrs($self,$1)}
+      infix ("neighbors") (MInt :: NodeDataView(MInt)) implements composite ${get_nbrs($self,Node($1))}
+      infix ("neighbors") (Node :: NodeDataView(MInt)) implements composite ${get_nbrs($self,$1)}
+      compiler ("get_nbrs") (Node :: NodeDataView(MInt)) implements composite ${
         val start = node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(node_raw_data($self)) ) node_apply($self,($1.id+1))
           else array_length(edge_raw_data($self))
         NodeDataView[Int](edge_raw_data($self),start,end-start)
       }
+      compiler ("get_edge_weights") (Node :: NodeDataView(MDouble)) implements composite ${
+        val start = node_apply($self,$1.id)
+        val end = if( ($1.id+1) < array_length(node_raw_data($self)) ) node_apply($self,($1.id+1))
+          else array_length(edge_weights($self))
+        NodeDataView[Double](edge_weights($self),start,end-start)
+      }
       compiler ("edge_weights") (Nil :: MArray(MDouble)) implements getter(0, "_weights")
       compiler ("node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_nodes")
-      compiler("node_apply")(MInt :: MInt) implements single ${array_apply(node_raw_data($self),$1)}
+      compiler("node_apply")(MInt :: MInt) implements composite ${array_apply(node_raw_data($self),$1)}
       compiler ("edge_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_edges")
-      compiler("edge_apply")(MInt :: MInt) implements single ${array_apply(edge_raw_data($self),$1)}
+      compiler("edge_apply")(MInt :: MInt) implements composite ${array_apply(edge_raw_data($self),$1)}
     }
     addGraphCommonOps(UndirectedGraph) 
   } 

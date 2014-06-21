@@ -72,7 +72,6 @@ trait IOGraphOps {
 ////////Undirected CSR Loader
 /////////////////////////////////////////////////////////////////////////////////////////////
     direct (IO) ("undirectedGraphFromEdgeList", Nil, ("edge_data",NodeData(Tuple2(MInt,MInt))) :: UndirectedGraph) implements composite ${
-      val ed = edge_data.filter(e => e._1 == e._2, e=> e._1)
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
 
       //sort by degree, helps with skew for buckets of nodes

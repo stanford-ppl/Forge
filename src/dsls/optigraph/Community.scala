@@ -168,6 +168,7 @@ trait CommunityOps {
 
           continue = nb_moves > 0 && new_mod-cur_mod > min_modularity
         }
+        println(nb_pass_done)
         return improvement
       }
     /*

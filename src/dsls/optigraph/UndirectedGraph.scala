@@ -32,6 +32,7 @@ trait UndirectedGraphOps{
     val R = tpePar("R")
     val K = tpePar("K")
     val V = tpePar("V")
+    val Tuple2 = lookupTpe("Tup2")
 
     data(UndirectedGraph,("_numNodes",MInt),("_externalIDs",MArray(MInt)),("_nodes",MArray(MInt)),("_edges",MArray(MInt)),("_weights",MArray(MDouble)))
     static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt))), UndirectedGraph))) implements allocates(UndirectedGraph,${$count},${$exID},${$outNodes},${outEdges},${array_empty[Double](unit(0))})
@@ -93,6 +94,12 @@ trait UndirectedGraphOps{
         val end  = if( ($1.id+1) < array_length(node_raw_data($self)) ) node_apply($self,($1.id+1)) 
           else array_length(edge_raw_data($self))
         end - node_apply($self,$1.id) 
+      }
+      infix ("getNeighborsAndWeights") (Node :: Tuple2(NodeDataView(MInt),NodeDataView(MDouble))) implements composite ${
+        val start = node_apply($self,$1.id)
+        val end = if( ($1.id+1) < array_length(node_raw_data($self)) ) node_apply($self,($1.id+1))
+          else array_length(edge_raw_data($self))
+        pack(NodeDataView[Int](edge_raw_data($self),start,end-start),NodeDataView[Double](edge_weights($self),start,end-start))
       }
       infix ("inDegree") (Node :: MInt) implements composite ${$self.outDegree($1)}
       infix ("outNbrs") (Node :: NodeDataView(MInt)) implements composite ${get_nbrs($self,$1)} 

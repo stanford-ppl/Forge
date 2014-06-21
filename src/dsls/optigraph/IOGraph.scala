@@ -78,7 +78,7 @@ trait IOGraphOps {
       val ids1 = NodeData(fhashmap_keys(src_groups))
 
       //FIXME: GET SORT BY WORKING
-      val ids = ids1//.sortBy(a => array_buffer_length(fhashmap_get(src_groups,ids1(a))))
+      val ids = ids1.sortBy(a => array_buffer_length(fhashmap_get(src_groups,ids1(a))))
 
       val numNodes = ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))

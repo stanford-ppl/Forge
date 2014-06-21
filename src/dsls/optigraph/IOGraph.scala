@@ -76,8 +76,6 @@ trait IOGraphOps {
 
       //sort by degree, helps with skew for buckets of nodes
       val ids1 = NodeData(fhashmap_keys(src_groups))
-
-      //FIXME: GET SORT BY WORKING
       val ids = ids1.sortBy(a => array_buffer_length(fhashmap_get(src_groups,ids1(a))))
 
       val numNodes = ids.length

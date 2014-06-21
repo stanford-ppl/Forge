@@ -66,10 +66,12 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
         val aV = __arg1(a)
         val bV = __arg1(b)
         
-        //FIXME: HOW DO I GET A REP[T] from INT's?
-        if(aV < bV) Const[Int](-1)
-        else if(aV == bV) Const[Int](0)
-        else Const[Int](1)
+        //You have to have 3 conditions and then a default. 
+        //Otherwise you will violate the JAVA runtime comparator contract.
+        if(aV < bV) unit(-1)
+        else if(aV == bV) unit(0)
+        else if(aV > bV) unit(1)
+        else unit(0)
       })
 
   // avoid mixing in LMS Array ops due to conflicts. alternatively, we could refactor LMS array ops to

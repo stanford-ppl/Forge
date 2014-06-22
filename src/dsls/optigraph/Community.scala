@@ -18,6 +18,7 @@ trait CommunityOps {
     val UndirectedGraph = lookupTpe("UndirectedGraph")
     val NodeData = lookupTpe("NodeData")
 
+    val Tuple5 = lookupTpe("Tup5")
     val Community = tpe("Community") 
 
     data(Community,("_size",MInt),("_totalWeight",MDouble),("_graph",UndirectedGraph),("_neighWeight",MArray(MDouble)),("_n2c",MArray(MInt)),("_tot",MArray(MDouble)),("_in",MArray(MDouble)))
@@ -52,18 +53,6 @@ trait CommunityOps {
         $self.updateTot(comm,$self.tot(comm)-$self.graph.weightedDegree(node))
         $self.updateIn(comm,$self.in(comm)-(2*dnodecomm+$self.graph.numSelfLoops(node)))
         $self.updateN2c(node,-1)
-      }
-      infix("insert")( (("node",MInt),("old_comm",MInt),("olddnodecomm",MDouble),("comm",MInt),("dnodecomm",MDouble)) :: MUnit, effect = simple) implements composite ${
-        fassert(node >= 0 && node < $self.size, "node must be in range 0 - size")
-
-        //Would really like this to be atomic but lets roll the dice
-        $self.updateTot(old_comm,$self.tot(old_comm)-$self.graph.weightedDegree(node))
-        $self.updateTot(comm,$self.tot(comm)+$self.graph.weightedDegree(node))
-
-        $self.updateIn(old_comm,$self.in(old_comm)-(2*olddnodecomm+$self.graph.numSelfLoops(node)))
-        $self.updateIn(comm,$self.in(comm)+(2*dnodecomm+$self.graph.numSelfLoops(node)))
-
-        $self.updateN2c(node,comm)
       }
       infix("modularityGain")( (("node",MInt),("comm",MInt),("dnodecomm",MDouble),("w_degree",MDouble)) :: MDouble) implements composite ${
         fassert(node >= 0 && node < $self.size, "node must be in range 0 - size")
@@ -115,7 +104,7 @@ trait CommunityOps {
         array_empty[MArrayBuffer[Tup2[Int,Double]]](newSize)
       }
       */
-      infix("oneLevel")(Nil :: MDouble, effect = simple) implements composite ${
+      infix("oneLevelNotFunctional")(Nil :: MDouble, effect = simple) implements composite ${
         val g = $self.graph
         val tot = $self.tot
         val in = $self.in
@@ -146,8 +135,8 @@ trait CommunityOps {
             val (nbrs,nbrWeights) = unpack(g.getNeighborsAndWeights(n))
 
             val neighPos = array_empty[Int](nbrs.length+1) //holds indexes in for comm weights (neighbors plus current node)
-            val commWeights = array_fromfunction[Double](size,i => 0d).mutable //holds comm weights for neighborhoods
-            neighPos(0) = node_comm
+            //FIXME relies on fact that array_empty gives and array of 0's
+            val commWeights = array_empty[Double](size) //holds comm weights for neighborhoods            neighPos(0) = node_comm
 
             var i = 0
             while(i < nbrs.length){
@@ -190,7 +179,129 @@ trait CommunityOps {
         println("Number of passes: " + nb_pass_done)
         return new_mod
       }
+      infix("oneLevel")(Nil :: MDouble, effect = simple) implements composite ${
+        val g = $self.graph
+        val tot = $self.tot
+        val in = $self.in
+        val size = $self.size 
+        val min_modularity = 0.000001
 
+        var nb_moves = 0
+        var nb_pass_done = 0
+        var new_mod = $self.modularity
+        var cur_mod = new_mod
+
+        var continue = true
+        while(continue){
+          cur_mod = new_mod
+          nb_moves = 0
+          nb_pass_done += 1
+
+          //Makes this effectively for each community
+
+          val newData = g.mapNodes[Tup5[Int,Double,Int,Double,Double]]{ n =>
+            var node = n.id
+            val node_comm = $self.n2c(node)
+            var w_degree = g.weightedDegree(node)
+
+            //////////////////////////////////////////
+            //Formerly neigh communities method
+            //This section pulls all the communities out of the neighborhoods
+            //and sums inter-weights for the neighborhood per community.
+            val (nbrs,nbrWeights) = unpack(g.getNeighborsAndWeights(n))
+
+            val neighPos = array_empty[Int](nbrs.length+1) //holds indexes in for comm weights (neighbors plus current node)
+            //FIXME relies on fact that array_empty gives and array of 0's
+            val commWeights = array_empty[Double](size) //holds comm weights for neighborhoods
+            neighPos(0) = node_comm
+
+            var i = 0
+            while(i < nbrs.length){
+              val neigh_comm = $self.n2c(nbrs(i))
+              neighPos(i+1) = neigh_comm
+              commWeights(neigh_comm) = commWeights(neigh_comm)+nbrWeights(i)
+              i += 1
+            }
+            
+            /////////////////////////////////////////
+            //By default set everything to our current community
+            var best_comm = node_comm
+            var best_nblinks = commWeights(node_comm)
+            var best_increase = $self.modularityGainNoMove(node,node_comm,commWeights(node_comm),w_degree)
+
+            //println("number of comms: " + array_length(keys))
+            i = 1 //we already did our own node above
+            while(i < array_length(neighPos)){
+              //println("comm: " + keys(i) + " weight: " + comm_weights(keys(i)))
+              val neigh_comm = neighPos(i)
+              val weight = commWeights(neigh_comm)
+              
+              val increase = $self.modularityGain(node,neigh_comm,weight,w_degree)
+              if(increase > best_increase){
+                best_comm = neigh_comm
+                best_nblinks = weight
+                best_increase = increase
+              }
+              i += 1            
+            } 
+            nb_moves += 1
+            val dnodecomm = unit(2)*best_nblinks+$self.graph.numSelfLoops(n.id)
+            val olddnodecomm =unit(2)*commWeights(node_comm)+$self.graph.numSelfLoops(n.id)
+            pack(best_comm,dnodecomm,node_comm,olddnodecomm,$self.graph.weightedDegree(n.id))
+          }//end map nodes
+          $self.setN2c(newData.map({i => i._1}).getRawArray)
+
+          //Filter out data where nodes didn't move communities
+          val changedData = newData.filter({i => i._1 != i._3},{i=>i})
+          val newcommupdatehash = changedData.groupBy(i => i._1,{i => i})
+          val oldcommupdatehash = changedData.groupBy(i => i._3,{i => i})
+
+          val newcomms = NodeData(fhashmap_keys(newcommupdatehash))
+          val oldcomms = NodeData(fhashmap_keys(oldcommupdatehash))
+
+          val newdnodecomm = newcomms.map{e => 
+            NodeData(fhashmap_get(newcommupdatehash,e)).mapreduce[Double](i => i._2,(a,b) => a+b,i=>true)
+          }
+          val olddnodecomm = oldcomms.map{e => 
+            NodeData(fhashmap_get(oldcommupdatehash,e)).mapreduce[Double](i => i._4,(a,b) => a+b,i=>true)
+          }
+          val newweights = newcomms.map{e => 
+            NodeData(fhashmap_get(newcommupdatehash,e)).mapreduce[Double](i => i._5,(a,b) => a+b,i=>true)
+          }
+          val oldweights = oldcomms.map{e =>
+            NodeData(fhashmap_get(oldcommupdatehash,e)).mapreduce[Double](i => i._5,(a,b) => a+b,i=>true) 
+          }
+
+          NodeIdView(newcomms.length).foreach{ i =>
+            $self.updateIn(newcomms(i),$self.in(newcomms(i))+newdnodecomm(i))
+            $self.updateTot(newcomms(i),$self.in(newcomms(i))+newweights(i))
+
+          }
+          NodeIdView(oldcomms.length).foreach{ i =>
+            $self.updateIn(oldcomms(i),$self.in(oldcomms(i))-olddnodecomm(i))
+            $self.updateTot(oldcomms(i),$self.in(oldcomms(i))+oldweights(i))
+          }
+
+          //$self.display
+
+          new_mod = $self.modularity
+          continue = nb_moves > 0 && new_mod-cur_mod > min_modularity
+        }
+        println("Number of passes: " + nb_pass_done)
+        return new_mod
+      }
+      infix("insert")( (("node",MInt),("old_comm",MInt),("olddnodecomm",MDouble),("comm",MInt),("dnodecomm",MDouble)) :: MUnit, effect = simple) implements composite ${
+        fassert(node >= 0 && node < $self.size, "node must be in range 0 - size")
+
+        //Would really like this to be atomic but lets roll the dice
+        $self.updateTot(old_comm,$self.tot(old_comm)-$self.graph.weightedDegree(node))
+        $self.updateTot(comm,$self.tot(comm)+$self.graph.weightedDegree(node))
+
+        $self.updateIn(old_comm,$self.in(old_comm)-(2*olddnodecomm+$self.graph.numSelfLoops(node)))
+        $self.updateIn(comm,$self.in(comm)+(2*dnodecomm+$self.graph.numSelfLoops(node)))
+
+        $self.updateN2c(node,comm)
+      }
       infix ("size") (Nil :: MInt) implements getter(0, "_size")
       infix ("totalWeight") (Nil :: MDouble) implements getter(0, "_totalWeight")
       infix ("graph") (Nil :: UndirectedGraph) implements getter(0, "_graph")

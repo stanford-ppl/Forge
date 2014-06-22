@@ -33,7 +33,8 @@ trait CommunityDetection extends OptiGraphApplication {
 
     var improvement = true
     while(improvement){
-      new_mod = c.oneLevel
+      new_mod = c.oneLevelNotFunctional
+      //new_mod = c.oneLevel
       //c.display
       println("Level: " + level + " Modularity: " + new_mod)
       improvement = false

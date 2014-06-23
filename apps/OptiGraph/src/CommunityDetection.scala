@@ -34,16 +34,18 @@ trait CommunityDetection extends OptiGraphApplication {
 
     var improvement = true
     while(improvement){
-      new_mod = c.oneLevelNotFunctional
+      c = c.oneLevelNotFunctional
+      new_mod = c.modularity
       g = c.generateNewGraph
       c = Community(g)
-      //new_mod = c.oneLevel
-      //c.display
+
       println("Level: " + level + " Modularity: " + new_mod)
-      println("\tnumNodes: " + g.numNodes + " numEdges: " + g.numEdges)
+      println("\tnumNodes: " + g.numNodes + " numEdges: " + g.numEdges + " weight: " + g.totalWeight)
+
       improvement = (new_mod != mod)
       level += 1
       mod = new_mod
+
     }
     //println("new mod: " + c.modularity)
     toc(mod)

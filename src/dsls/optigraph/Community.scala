@@ -25,7 +25,7 @@ trait CommunityOps {
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
 
     data(Community,("_size",MInt),("_totalWeight",MDouble),("_graph",UndirectedGraph),("_neighWeight",MArray(MDouble)),("_n2c",MArray(MInt)),("_tot",MArray(MDouble)),("_in",MArray(MDouble)))
-    static(Community)("apply", Nil, ("g",UndirectedGraph) :: Community, effect = mutable) implements allocates(Community,${alloc_size(g)},${alloc_total_weight($0)},${$0},${alloc_doubles(alloc_size(g),{e => unit(-1.0)})},${alloc_ints(alloc_size(g),{e => e})},${alloc_weights(g)},${alloc_selfs(g)})
+    static(Community)("apply", Nil, ("g",UndirectedGraph) :: Community) implements allocates(Community,${alloc_size(g)},${alloc_total_weight($0)},${$0},${alloc_doubles(alloc_size(g),{e => unit(-1.0)})},${alloc_ints(alloc_size(g),{e => e})},${alloc_weights(g)},${alloc_selfs(g)})
     //FIXME
     //lots of errors removed but wrong answer when effect = mutable is taken out
     
@@ -168,7 +168,7 @@ trait CommunityOps {
         }
         pack(src_node_array.getRawArray,src_edge_array.getRawArray,src_edge_weight_array.getRawArray)
       }
-      infix("oneLevelNotFunctional")(Nil :: MDouble, effect = write(0)) implements composite ${
+      infix("oneLevelNotFunctional")(Nil :: Community, effect = write(0)) implements composite ${
         val g = $self.graph
         val tot = $self.tot
         val in = $self.in
@@ -243,7 +243,7 @@ trait CommunityOps {
           continue = nb_moves > 0 && new_mod-cur_mod > min_modularity
         }
         println("Number of passes: " + nb_pass_done)
-        return new_mod
+        return $self
       }
       infix("oneLevel")(Nil :: MDouble, effect = simple) implements composite ${
         val g = $self.graph

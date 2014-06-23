@@ -141,6 +141,7 @@ ${footer}
 def sbtBuildFileFooter(dsl):
     s = Template("""
   // build targets
+  lazy val ${dslName} = Project("${dslName}", file("."), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Apps) // default
   lazy val ${dslName}Shared = Project("${dslName}-shared", file("shared"), settings = virtBuildSettings ++ deps)
   lazy val ${dslName}Comp = Project("${dslName}-comp", file("compiler"), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Shared)
   lazy val ${dslName}Lib = Project("${dslName}-lib", file("library"), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Shared)

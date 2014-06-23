@@ -76,7 +76,7 @@ trait IOGraphOps {
 
       //sort by degree, helps with skew for buckets of nodes
       val ids1 = NodeData(fhashmap_keys(src_groups))
-      val ids = ids1.sortBy(a => array_buffer_length(fhashmap_get(src_groups,ids1(a))))
+      val ids = ids1.sortBy(a => ids1.length - array_buffer_length(fhashmap_get(src_groups,ids1(a)))) //reverse sort by degree
 
       val numNodes = ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))

@@ -17,13 +17,19 @@ trait CommunityOps {
     val T = tpePar("T")
     val UndirectedGraph = lookupTpe("UndirectedGraph")
     val NodeData = lookupTpe("NodeData")
-
+    val Tuple3 = lookupTpe("Tup3")
     val Tuple5 = lookupTpe("Tup5")
-    val Community = tpe("Community") 
+    val Community = tpe("Community")
+    val K = tpePar("K")
+    val V = tpePar("V")
+    val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
 
     data(Community,("_size",MInt),("_totalWeight",MDouble),("_graph",UndirectedGraph),("_neighWeight",MArray(MDouble)),("_n2c",MArray(MInt)),("_tot",MArray(MDouble)),("_in",MArray(MDouble)))
-    static(Community)("apply", Nil, ("g",UndirectedGraph) :: Community, effect=mutable) implements allocates(Community,${alloc_size(g)},${alloc_total_weight($0)},${$0},${alloc_doubles(alloc_size(g),{e => unit(-1.0)})},${alloc_ints(alloc_size(g),{e => e})},${alloc_weights(g)},${alloc_selfs(g)})
+    static(Community)("apply", Nil, ("g",UndirectedGraph) :: Community, effect = mutable) implements allocates(Community,${alloc_size(g)},${alloc_total_weight($0)},${$0},${alloc_doubles(alloc_size(g),{e => unit(-1.0)})},${alloc_ints(alloc_size(g),{e => e})},${alloc_weights(g)},${alloc_selfs(g)})
+    //FIXME
+    //lots of errors removed but wrong answer when effect = mutable is taken out
     
+
     /*
       n2c -> size == numNodes, indexed by nodeID gives the community a node belongs to
       in,tot -> size == # of communities, used for modularity calculation
@@ -81,7 +87,6 @@ trait CommunityOps {
           i += 1
         }
       }
-      /*
       infix("generateNewGraph")(Nil :: UndirectedGraph) implements composite ${
         val g = $self.graph
         val tot = $self.tot
@@ -93,18 +98,77 @@ trait CommunityOps {
         val groupedComms = originalNodeIds.groupBy(k => n2c(k),v => v)
 
         val newSize = fhashmap_size(groupedComms)
-        val newNodeIds = NodeData.fromFunction(newSize,i => i)
+        val newComms = NodeData.fromFunction(newSize,i => i)
         val oldComms = NodeData(fhashmap_keys(groupedComms))
+        
+        val old2newHash = fhashmap_from_arrays[Int,Int](oldComms.getRawArray,newComms.getRawArray)
 
-        //need to go through and find all edges between communities
+        //For each edge
+          //find src and dst comm (use n2c)
+          //if edge between comm exists
+            //add edge with weight
+          //else
+            //add to edge with weight
 
-        //Need to make this a hash map between communities and weights.
-        //go over every edge in the old graph and simply add in...not much 
-        //to it.
-        array_empty[MArrayBuffer[Tup2[Int,Double]]](newSize)
+        //Should be safe parallelism here.
+        //println(fhashmap_size(old2newHash))
+        val newGraph = newComms.map({ src =>
+          //println("src: " + src)
+          val oldComm = oldComms(src)
+          val nodeHash = SHashMap[Int,Double]()
+
+          val nodesInComm = NodeData(fhashmap_get(groupedComms,oldComm))
+          nodesInComm.foreach({ n => 
+            val (nbrs,nbrWeights) = unpack(g.getNeighborsAndWeights(Node(n)))
+            var i = 0
+
+            //println("len: " + nbrs.length)
+            while(i < nbrs.length){
+              val dst = old2newHash(n2c(nbrs(i)))
+              //println("dst: " + dst)
+              if(nodeHash.contains(dst)){
+                nodeHash.update(dst,nodeHash(dst)+nbrWeights(i))
+              }
+              else{
+                nodeHash.update(dst,nbrWeights(i))
+              }
+              i += 1
+            }
+          })
+          nodeHash
+        })
+        val numEdges = newGraph.mapreduce[Int](a => array_length(a.keys), (a,b) => a+b, a => true)
+        val serial_out = $self.assignUndirectedIndicies(newSize,numEdges,newGraph.getRawArray)
+
+        UndirectedGraph(newSize,oldComms.getRawArray,serial_out._1,serial_out._2,serial_out._3)    
       }
-      */
-      infix("oneLevelNotFunctional")(Nil :: MDouble, effect = simple) implements composite ${
+
+      infix("assignUndirectedIndicies")((("numNodes",MInt),("numEdges",MInt),("src_groups",MArray(SHashMap(MInt,MDouble)))) :: Tuple3(MArray(MInt),MArray(MInt),MArray(MDouble))) implements single ${
+        val src_edge_array = NodeData[Int](numEdges)
+        val src_edge_weight_array = NodeData[Double](numEdges)
+        val src_node_array = NodeData[Int](numNodes)
+        var i = 0
+        var j = 0
+        //I can do -1 here because I am pruning so the last node will never have any neighbors
+        while(i < numNodes){
+          val neighborhash = src_groups(i)
+          val neighborhood = NodeData(neighborhash.keys).sort
+          val neighWeights = neighborhood.map(e => neighborhash(e))
+          var k = 0
+          while(k < neighborhood.length){
+            src_edge_array(j) = neighborhood(k)
+            src_edge_weight_array(j) = neighWeights(k)
+            j += 1
+            k += 1
+          }
+          if(i < numNodes-1){
+            src_node_array(i+1) = neighborhood.length + src_node_array(i)
+          }
+          i += 1
+        }
+        pack(src_node_array.getRawArray,src_edge_array.getRawArray,src_edge_weight_array.getRawArray)
+      }
+      infix("oneLevelNotFunctional")(Nil :: MDouble, effect = write(0)) implements composite ${
         val g = $self.graph
         val tot = $self.tot
         val in = $self.in
@@ -132,13 +196,14 @@ trait CommunityOps {
             //Formerly neigh communities method
             //This section pulls all the communities out of the neighborhoods
             //and sums inter-weights for the neighborhood per community.
+            
             val (nbrs,nbrWeights) = unpack(g.getNeighborsAndWeights(n))
-
             val neighPos = array_empty[Int](nbrs.length+1) //holds indexes in for comm weights (neighbors plus current node)
             //FIXME relies on fact that array_empty gives and array of 0's
             val commWeights = array_empty[Double](size) //holds comm weights for neighborhoods            neighPos(0) = node_comm
 
             var i = 0
+            //println("nbr len: " + nbrs.length)
             while(i < nbrs.length){
               val neigh_comm = $self.n2c(nbrs(i))
               neighPos(i+1) = neigh_comm
@@ -151,10 +216,10 @@ trait CommunityOps {
             var best_nblinks = commWeights(node_comm)
             var best_increase = $self.modularityGainNoMove(node,node_comm,commWeights(node_comm),w_degree)
 
-            //println("number of comms: " + array_length(keys))
+            //println("number of comms: " + array_length(neighPos))
             i = 1 //we already did our own node above
             while(i < array_length(neighPos)){
-              //println("comm: " + keys(i) + " weight: " + comm_weights(keys(i)))
+              //println("comm: " + neighPos(i) + " weight: " + commWeights(neighPos(i)))
               val neigh_comm = neighPos(i)
               val weight = commWeights(neigh_comm)
               
@@ -174,6 +239,7 @@ trait CommunityOps {
           }//end parallel section
 
           new_mod = $self.modularity
+          //println("new mod: " + new_mod)
           continue = nb_moves > 0 && new_mod-cur_mod > min_modularity
         }
         println("Number of passes: " + nb_pass_done)

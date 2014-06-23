@@ -19,14 +19,15 @@ trait CommunityDetection extends OptiGraphApplication {
     toc("input loading",edgeList)
 
     tic("creating graph",edgeList)
-    val g = undirectedGraphFromEdgeList(edgeList)
+    var g = undirectedGraphFromEdgeList(edgeList)
     toc("creating graph",g)
     
     println("performing Community Detection")
     tic(g)
     
-    val c = Community(g)
+    var c = Community(g)
     var mod = c.modularity
+
     println("Modularity: " + mod)
     var new_mod = mod
     var level = 0
@@ -34,12 +35,17 @@ trait CommunityDetection extends OptiGraphApplication {
     var improvement = true
     while(improvement){
       new_mod = c.oneLevelNotFunctional
+      g = c.generateNewGraph
+      c = Community(g)
       //new_mod = c.oneLevel
       //c.display
       println("Level: " + level + " Modularity: " + new_mod)
-      improvement = false
+      println("\tnumNodes: " + g.numNodes + " numEdges: " + g.numEdges)
+      improvement = (new_mod != mod)
       level += 1
+      mod = new_mod
     }
+    //println("new mod: " + c.modularity)
     toc(mod)
   }
   def printUsage = {

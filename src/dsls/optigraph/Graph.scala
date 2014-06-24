@@ -33,6 +33,7 @@ trait GraphOps{
     val Graph = g
     val GraphCommonOps = withTpe(Graph)
     GraphCommonOps{
+      infix ("numNodes")(Nil :: MInt) implements getter(0,"_numNodes")
       infix("sumOverNodes")  ( (Node ==> R) :: R, TNumeric(R), addTpePars=R) implements composite ${
         NodeIdView($self.numNodes).mapreduce[R]({n => $1(Node(n))},{(a,b) => a+b},{n => true})
       }
@@ -42,7 +43,6 @@ trait GraphOps{
         if(result >= $self.numNodes() || result < 0) fatal("ERROR. ID: " + $1 + " does not exist in this UndirectedGraph!")
         Node(result)
       }
-      infix ("numNodes")(Nil :: MInt) implements getter(0,"_numNodes")
       infix ("foreachNode") ((Node ==> MUnit) :: MUnit, effect = simple) implements composite ${
         NodeData(array_fromfunction($self.numNodes,{n => n})).foreach{ i =>
           $1(Node(i))

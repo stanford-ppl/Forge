@@ -47,16 +47,10 @@ trait IOGraphOps {
       val input_edges =
         ForgeFileReader.readLinesFlattened($0)({line =>
           val fields = line.fsplit(" ")
-          //no self edges allowed
-          if(fields(0).toInt != fields(1).toInt){
-            array_fromfunction(((array_length(fields)-1)*2),{n =>
-              if(n==0) pack(fields(0).toInt,fields(1).toInt)
-              else pack(fields(1).toInt,fields(0).toInt)
-            })
-          }
-          else{
-            array_empty[Tup2[Int,Int]](0)
-          }
+          array_fromfunction(((array_length(fields)-1)*2),{n =>
+            if(n==0) pack(fields(0).toInt,fields(1).toInt)
+            else pack(fields(1).toInt,fields(0).toInt)
+          })
         })
        NodeData[Tup2[Int,Int]](input_edges).distinct
     }
@@ -82,16 +76,15 @@ trait IOGraphOps {
 
       //sort by degree, helps with skew for buckets of nodes
       val ids1 = NodeData(fhashmap_keys(src_groups))
-
-      //FIXME: GET SORT BY WORKING
-      val ids = ids1//.sortBy(a => array_buffer_length(fhashmap_get(src_groups,ids1(a))))
+      val ids = ids1.sortBy(a => ids1.length - array_buffer_length(fhashmap_get(src_groups,ids1(a)))) //reverse sort by degree
 
       val numNodes = ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       val idHashMap = idView.groupByReduce[Int,Int](n => ids(n), n => n, (a,b) => a)
+      
       val serial_out = assignUndirectedIndicies(numNodes,edge_data.length,ids,idHashMap,src_groups)
 
-      UndirectedGraph(numNodes,ids.getRawArray,serial_out._1,serial_out._2)    
+      UndirectedGraph(numNodes,ids.getRawArray,serial_out._1,serial_out._2,array_fromfunction[Double](edge_data.length,e=>1d))    
     }
 
     direct (IO) ("assignUndirectedIndicies", Nil, MethodSignature(List(("numNodes",MInt),("numEdges",MInt),("distinct_ids",NodeData(MInt)),("idHashMap",MHashMap(MInt,MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt)))),Tuple2(MArray(MInt),MArray(MInt)))) implements single ${

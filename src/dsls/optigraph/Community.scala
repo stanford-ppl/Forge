@@ -259,6 +259,7 @@ trait CommunityOps {
           cur_mod = new_mod
           nb_moves = 0
           nb_pass_done += 1
+          if(nb_pass_done % 10 == 0) println("Number of passes: " + nb_pass_done)
 
           //Makes this effectively for each community
           g.foreachNode{ n =>

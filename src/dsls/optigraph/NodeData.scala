@@ -94,7 +94,7 @@ trait NodeDataOps {
           i = i+1
         }
       }
-
+      
       ///////////////methods for parallel collection buffer declaration/////////////////////////
       compiler ("nd_raw_data") (Nil :: MArrayBuffer(T)) implements getter(0, "_data")
       compiler("nd_raw_alloc")(MInt :: NodeData(R), addTpePars = R, effect=mutable) implements composite ${NodeData[R]($1)}

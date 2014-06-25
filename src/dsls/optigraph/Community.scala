@@ -68,7 +68,6 @@ trait CommunityOps {
         })
       }
       infix("modularityGain")( (("totc",MDouble),("dnodecomm",MDouble),("w_degree",MDouble)) :: MDouble) implements composite ${
-  
         val degc = w_degree
         val m2 = $self.totalWeight  //total weight is really a function of the graph not the comm.
         val dnc = dnodecomm 

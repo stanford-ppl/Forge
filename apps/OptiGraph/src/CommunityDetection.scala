@@ -36,7 +36,7 @@ trait CommunityDetection extends OptiGraphApplication {
       //Move nodes to different communities until we converge
       c = c.louvain //heart of the algorithm
       val newMod = c.storedModularity
-      improvement = false
+      improvement = c.canImprove
       //Generate a new graph from community structure
       //Generate a new comm structure from graph so we can go again
       g = c.generateNewGraph

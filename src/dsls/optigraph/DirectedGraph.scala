@@ -24,9 +24,8 @@ trait DirectedGraphOps{
     val Node = lookupTpe("Node")
     val Edge = lookupTpe("Edge")
     val NodeData = lookupTpe("NodeData")
-    val NodeDataView = lookupTpe("NodeDataView")
+    val NeighborView = lookupTpe("NeighborView")
     val NodeIdView = lookupTpe("NodeIdView")
-    val NodeSHash = lookupTpe("NodeSHash")
     //Actual DirectedGraph declaration
     val DirectedGraph = tpe("DirectedGraph") 
     val T = tpePar("T")
@@ -41,32 +40,22 @@ trait DirectedGraphOps{
     val DirectedGraphOps = withTpe(DirectedGraph)     
     DirectedGraphOps{
       infix ("numEdges")(Nil :: MInt) implements single ${array_length(in_edge_raw_data($self)) + array_length(out_edge_raw_data($self))}
-
       infix ("isDirected") (Nil :: MBoolean) implements single ${true}
-      infix ("inNeighborHash") (Node :: NodeSHash(MInt,MInt)) implements single ${
-        val hash = NodeSHash[Int,Int]
-        $self.inNbrs($1).serialForEach{n => hash.add(n,n)}
-        hash
-      }
-      infix ("outNeighborHash") (Node :: NodeSHash(MInt,MInt)) implements single ${
-        val hash = NodeSHash[Int,Int]
-        $self.outNbrs($1).serialForEach{n => hash.add(n,n)}
-        hash
-      }
+
       //get out neighbors
-      infix ("outNbrs") (MInt :: NodeDataView(MInt)) implements single ${$self.outNbrs(Node($1))}
-      infix ("outNbrs") (Node :: NodeDataView(MInt)) implements single ${
+      infix ("outNbrs") (MInt :: NeighborView(MInt)) implements single ${$self.outNbrs(Node($1))}
+      infix ("outNbrs") (Node :: NeighborView(MInt)) implements single ${
         val start = out_node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1))
           else array_length(out_edge_raw_data($self))
-        NodeDataView[Int](out_edge_raw_data($self),start,end-start)
+        NeighborView[Int](out_edge_raw_data($self),start,end-start)
       }
       //get in neighbors   
-      infix ("inNbrs") (Node :: NodeDataView(MInt)) implements single ${
+      infix ("inNbrs") (Node :: NeighborView(MInt)) implements single ${
         val start = in_node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) 
             else array_length(in_edge_raw_data($self)) 
-        NodeDataView[Int](in_edge_raw_data($self),start,end-start)
+        NeighborView[Int](in_edge_raw_data($self),start,end-start)
       }
       infix ("outDegree") (Node :: MInt) implements single ${
         val end  = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1)) 

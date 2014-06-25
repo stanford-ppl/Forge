@@ -22,9 +22,8 @@ trait UndirectedGraphOps{
     val Node = lookupTpe("Node")
     val Edge = lookupTpe("Edge")
     val NodeData = lookupTpe("NodeData")
-    val NodeDataView = lookupTpe("NodeDataView")
+    val NeighborView = lookupTpe("NeighborView")
     val NodeIdView = lookupTpe("NodeIdView")
-    val NodeSHash = lookupTpe("NodeSHash")
     
     //Actual UndirectedGraph declaration
     val UndirectedGraph = tpe("UndirectedGraph") 
@@ -45,11 +44,6 @@ trait UndirectedGraphOps{
       //UndirectedGraph directed or not?
       infix ("isDirected") (Nil :: MBoolean) implements composite ${false}
       
-      infix ("neighborHash") (Node :: NodeSHash(MInt,MInt), effect = simple) implements composite ${
-        val hash = NodeSHash[Int,Int]
-        $self.outNbrs($1).serialForEach{n => hash.add(n,n)}
-        hash
-      }
       infix ("sumOverNbrs") ( CurriedMethodSignature(List(("n",Node),("data",MInt==>R),("cond",MInt==>MBoolean)),R), TNumeric(R), addTpePars=R) implements composite ${
         sumOverCollection($self.neighbors(n))(data)(cond)
       }
@@ -95,28 +89,28 @@ trait UndirectedGraphOps{
           else array_length(edge_raw_data($self))
         end - node_apply($self,$1.id) 
       }
-      infix ("getNeighborsAndWeights") (Node :: Tuple2(NodeDataView(MInt),NodeDataView(MDouble))) implements composite ${
+      infix ("getNeighborsAndWeights") (Node :: Tuple2(NeighborView(MInt),NeighborView(MDouble))) implements composite ${
         val start = node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(node_raw_data($self)) ) node_apply($self,($1.id+1))
           else array_length(edge_raw_data($self))
-        pack(NodeDataView[Int](edge_raw_data($self),start,end-start),NodeDataView[Double](edge_weights($self),start,end-start))
+        pack(NeighborView[Int](edge_raw_data($self),start,end-start),NeighborView[Double](edge_weights($self),start,end-start))
       }
       infix ("inDegree") (Node :: MInt) implements composite ${$self.outDegree($1)}
-      infix ("outNbrs") (Node :: NodeDataView(MInt)) implements composite ${get_nbrs($self,$1)} 
-      infix ("inNbrs") (Node :: NodeDataView(MInt)) implements composite ${get_nbrs($self,$1)}
-      infix ("neighbors") (MInt :: NodeDataView(MInt)) implements composite ${get_nbrs($self,Node($1))}
-      infix ("neighbors") (Node :: NodeDataView(MInt)) implements composite ${get_nbrs($self,$1)}
-      compiler ("get_nbrs") (Node :: NodeDataView(MInt)) implements composite ${
+      infix ("outNbrs") (Node :: NeighborView(MInt)) implements composite ${get_nbrs($self,$1)} 
+      infix ("inNbrs") (Node :: NeighborView(MInt)) implements composite ${get_nbrs($self,$1)}
+      infix ("neighbors") (MInt :: NeighborView(MInt)) implements composite ${get_nbrs($self,Node($1))}
+      infix ("neighbors") (Node :: NeighborView(MInt)) implements composite ${get_nbrs($self,$1)}
+      compiler ("get_nbrs") (Node :: NeighborView(MInt)) implements composite ${
         val start = node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(node_raw_data($self)) ) node_apply($self,($1.id+1))
           else array_length(edge_raw_data($self))
-        NodeDataView[Int](edge_raw_data($self),start,end-start)
+        NeighborView[Int](edge_raw_data($self),start,end-start)
       }
-      compiler ("get_edge_weights") (Node :: NodeDataView(MDouble)) implements composite ${
+      compiler ("get_edge_weights") (Node :: NeighborView(MDouble)) implements composite ${
         val start = node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(node_raw_data($self)) ) node_apply($self,($1.id+1))
           else array_length(edge_weights($self))
-        NodeDataView[Double](edge_weights($self),start,end-start)
+        NeighborView[Double](edge_weights($self),start,end-start)
       }
       compiler ("edge_weights") (Nil :: MArray(MDouble)) implements getter(0, "_weights")
       compiler ("node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_nodes")

@@ -21,7 +21,7 @@ trait GraphOps{
     val Node = lookupTpe("Node")
     val Edge = lookupTpe("Edge")
     val NodeData = lookupTpe("NodeData")
-    val NodeDataView = lookupTpe("NodeDataView")
+    val NeighborView = lookupTpe("NeighborView")
     val NodeIdView = lookupTpe("NodeIdView")
 
     //Actual Graph declaration
@@ -107,7 +107,7 @@ trait GraphOps{
     val Node = lookupTpe("Node")
     val Edge = lookupTpe("Edge")
     val NodeData = lookupTpe("NodeData")
-    val NodeDataView = lookupTpe("NodeDataView")
+    val NeighborView = lookupTpe("NeighborView")
     val NodeIdView = lookupTpe("NodeIdView")
 
     //Actual Graph declaration
@@ -121,7 +121,7 @@ trait GraphOps{
     direct(Graph) ("abs", Nil, NodeData(MFloat) :: NodeData(MFloat)) implements composite ${$0.map(e => abs(e))}
 
     //a couple of sum methods
-    direct(Graph) ("sum", R, CurriedMethodSignature(List(("nd_view",NodeDataView(MInt)), ("data",MInt==>R) ,("cond",MInt==>MBoolean)),R), TNumeric(R)) implements composite ${nd_view.mapreduce[R]( e => data(e), (a,b) => a+b, cond)}
+    direct(Graph) ("sum", R, CurriedMethodSignature(List(("nd_view",NeighborView(MInt)), ("data",MInt==>R) ,("cond",MInt==>MBoolean)),R), TNumeric(R)) implements composite ${nd_view.mapreduce[R]( e => data(e), (a,b) => a+b, cond)}
     
     // "block" should not mutate the input, but always produce a new copy. in this version, block can change the structure of the input across iterations (e.g. increase its size)
     direct (Graph) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, ".0001"), ("minIter", MInt, "1"), ("maxIter", MInt, "100")), ("block", T ==> T), ("diff", (T,T) ==> MDouble)), T)) implements composite ${

@@ -9,9 +9,9 @@ object OptiGraphDSLRunner extends ForgeApplicationRunner with OptiGraphDSL
 
 trait OptiGraphDSL extends ForgeApplication
     with GraphOps with DirectedGraphOps  with UndirectedGraphOps
-    with NodeOps with EdgeOps  with NodeDataOps with NodeDataViewOps
+    with NodeOps with EdgeOps  with NodeDataOps with NeighborViewOps
     with NodeIdViewOps  with AtomicIntArrayOps with AtomicBooleanOps 
-    with NodeSHashOps with IOGraphOps with CommunityOps {
+    with IOGraphOps with CommunityOps with AtomicDoubleArrayOps {
   /**
    * The name of our DSL. This is the name that will be used in generated files,
    * package declarations, etc.
@@ -30,18 +30,18 @@ trait OptiGraphDSL extends ForgeApplication
     /**
      * The main portion of our DSL
      */
-    importNodeOps()
-    importEdgeOps()
-    importNodeDataOps()
-    importNodeSHashOps()
-    importAtomicBooleanOps()
-    importAtomicIntArrayOps()
-    importNodeDataViewOps()
-    importNodeIdViewOps()
-    importGraphAggregateOps()
-    importUndirectedGraphOps()
-    importDirectedGraphOps()
-    importIOGraphOps()
-    importCommunityOps()
+    importNodeOps() //Primitives.scala
+    importEdgeOps() //Primitives.scala
+    importNodeDataOps() //NodeData.scala
+    importAtomicBooleanOps() //Atomics.scala
+    importAtomicIntArrayOps() //Atomics.scala
+    importAtomicDoubleArrayOps() //Atomics.scala
+    importNeighborViewOps() //NeighborView.scala
+    importNodeIdViewOps()  //NodeIdView.scala
+    importGraphAggregateOps() //Graph.scala
+    importUndirectedGraphOps() //UndirectedGraph.scala
+    importDirectedGraphOps() //DirectedGraph.scala
+    importIOGraphOps() //IOGraph.scala
+    importCommunityOps() //Community.scala
   }
 } 

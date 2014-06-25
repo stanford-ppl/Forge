@@ -28,8 +28,8 @@ trait CommunityOps {
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
 
     data(Community,("_size",MInt),("_modularity",MDouble),("_canImprove",MBoolean),("_totalWeight",MDouble),("_graph",UndirectedGraph),("_n2c",MArray(MInt)),("_tot",MArray(MDouble)),("_in",MArray(MDouble)))
-    static(Community)("apply", Nil, ("g",UndirectedGraph) :: Community, effect = mutable) implements allocates(Community,${alloc_size(g)},${unit(0d)},${unit(true)},${alloc_total_weight($0)},${$0},${alloc_ints(alloc_size(g),{e => e})},${alloc_weights(g)},${alloc_selfs(g)})
-    static(Community)("apply", Nil, MethodSignature(List(("size",MInt),("modularity",MDouble),("canImprove",MBoolean),("totalWeight",MDouble),("g",UndirectedGraph),("n2c",MArray(MInt)),("tot",MArray(MDouble)),("in",MArray(MDouble))),Community),effect= mutable) implements allocates(Community,${size},${modularity},${canImprove},${totalWeight},${g},${n2c},${tot},${in})
+    static(Community)("apply", Nil, ("g",UndirectedGraph) :: Community) implements allocates(Community,${alloc_size(g)},${unit(0d)},${unit(true)},${alloc_total_weight($0)},${$0},${alloc_ints(alloc_size(g),{e => e})},${alloc_weights(g)},${alloc_selfs(g)})
+    static(Community)("apply", Nil, MethodSignature(List(("size",MInt),("modularity",MDouble),("canImprove",MBoolean),("totalWeight",MDouble),("g",UndirectedGraph),("n2c",MArray(MInt)),("tot",MArray(MDouble)),("in",MArray(MDouble))),Community)) implements allocates(Community,${size},${modularity},${canImprove},${totalWeight},${g},${n2c},${tot},${in})
 
     //FIXME
     //lots of errors removed but wrong answer when effect = mutable is taken out

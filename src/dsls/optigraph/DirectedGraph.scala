@@ -57,12 +57,12 @@ trait DirectedGraphOps{
             else array_length(in_edge_raw_data($self)) 
         NeighborView[Int](in_edge_raw_data($self),start,end-start)
       }
-      infix ("outDegree") (Node :: MInt) implements single ${
+      infix ("outDegree") (Node :: MInt) implements composite ${
         val end  = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1)) 
           else array_length(out_edge_raw_data($self))
         end - out_node_apply($self,$1.id) 
       }
-      infix ("inDegree") (Node :: MInt) implements single ${
+      infix ("inDegree") (Node :: MInt) implements composite ${
         val end = if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) 
             else array_length(in_edge_raw_data($self))
         end - in_node_apply($self,$1.id)

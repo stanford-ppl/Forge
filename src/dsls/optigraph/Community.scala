@@ -31,9 +31,6 @@ trait CommunityOps {
     static(Community)("apply", Nil, (("g",UndirectedGraph),("precision",MDouble)) :: Community) implements allocates(Community,${alloc_size(g)},${precision},${unit(0d)},${unit(true)},${alloc_total_weight($0)},${$0},${alloc_ints(alloc_size(g),{e => e})},${alloc_weights(g)},${alloc_selfs(g)})
     static(Community)("apply", Nil, MethodSignature(List(("size",MInt),("precision",MDouble),("modularity",MDouble),("canImprove",MBoolean),("totalWeight",MDouble),("g",UndirectedGraph),("n2c",MArray(MInt)),("tot",MArray(MDouble)),("in",MArray(MDouble))),Community)) implements allocates(Community,${size},${precision},${modularity},${canImprove},${totalWeight},${g},${n2c},${tot},${in})
 
-    //FIXME
-    //lots of errors removed but wrong answer when effect = mutable is taken out
-
     /*
       n2c -> size == numNodes, indexed by nodeID gives the community a node belongs to
       in,tot -> size == # of communities, used for modularity calculation
@@ -72,8 +69,6 @@ trait CommunityOps {
         val m2 = $self.totalWeight  //total weight is really a function of the graph not the comm.
         val dnc = dnodecomm //neighbor weight
 
-        //println("dnc: " + dnc + " totc: " + totc + " degc: " + degc + " m2: " +m2)
-
         (dnc - totc*degc/m2)
       }
       infix("display")(Nil :: MUnit, effect=simple) implements single ${
@@ -92,8 +87,6 @@ trait CommunityOps {
       }
       infix("generateNewGraph")(Nil :: UndirectedGraph) implements composite ${
         val g = $self.graph
-        val tot = $self.tot
-        val in = $self.in
         val n2c = $self.n2c
         val size = $self.size
 
@@ -124,10 +117,8 @@ trait CommunityOps {
             val (nbrs,nbrWeights) = unpack(g.getNeighborsAndWeights(Node(n)))
             var i = 0
 
-            //println("len: " + nbrs.length)
             while(i < nbrs.length){
               val dst = old2newHash(n2c(nbrs(i)))
-              //println("dst: " + dst)
               if(nodeHash.contains(dst)){
                 nodeHash.update(dst,nodeHash(dst)+nbrWeights(i))
               }
@@ -180,12 +171,11 @@ trait CommunityOps {
         //If you don't use a mutable hash map you will get killed on performance.
         val g = $self.graph
         val commWeights = SHashMap[Int,Double]()
-        commWeights.update(n2c(n.id),0d) //no matter what we need to look at nodes current comm
+        commWeights.update(n2c(n.id),0d) //Add current nodes community with a weight of 0
         val (nbrs,nbrWeights) = unpack(g.getNeighborsAndWeights(n))
         var i = 0
         while(i < nbrs.length){
           val neigh_comm = n2c(nbrs(i))
-          //println("i: " + i + " comm: " + neigh_comm + " nodecomm: " + node_comm)
           if(nbrs(i) != n.id){
             if(commWeights.contains(neigh_comm)){
               commWeights.update(neigh_comm,commWeights(neigh_comm)+nbrWeights(i))
@@ -202,24 +192,19 @@ trait CommunityOps {
         val g = $self.graph
         val node_comm = n2c(n.id) //READ
         val w_degree = g.weightedDegree(n.id)
-        //println("wdubs: " + w_degree)
+
         //By default set everything to our current community
         var best_comm = node_comm
         var best_nblinks = commWeights(node_comm)
         var best_increase = $self.modularityGain(tot(node_comm)-g.weightedDegree(n.id),best_nblinks,w_degree) //READ
 
-        //println("number of comms: " + array_length(neighPos))
-        //println()
-        //println("Node: " + n.id)
         val comms = commWeights.keys
         var i = 0
         while(i < array_length(comms)){
-          //println("comm: " + neighPos(i) + " weight: " + commWeights(neighPos(i)))
           val neigh_comm = comms(i)
           if(neigh_comm != node_comm){
             val weight = commWeights(neigh_comm)
             val increase = $self.modularityGain(tot(neigh_comm),weight,w_degree) //READ
-            //println("increase: " + increase)
             if(increase > best_increase){
               best_comm = neigh_comm
               best_nblinks = weight
@@ -228,7 +213,6 @@ trait CommunityOps {
           }
           i += 1            
         }
-        //println("best increase: " + best_increase)
         pack(best_comm,best_nblinks) 
       }
       infix("parallelArrayCopy")((("dst",MArray(T)),("src",MArray(T))) :: MUnit, effect=write(1),aliasHint = copies(2), addTpePars = T ) implements composite ${
@@ -240,8 +224,6 @@ trait CommunityOps {
         val g = $self.graph
         val totalWeight = $self.totalWeight
         val size = $self.size 
-
-        //$self.display()
 
         val tot = array_empty[Double](array_length($self.tot)) 
         val in = array_empty[Double](array_length($self.in)) 
@@ -273,17 +255,13 @@ trait CommunityOps {
           nb_pass_done += 1
           //Makes this effectively for each community
           g.foreachNode{ n =>
-           // println(g.weightedDegree(n.id) + " " + g.numSelfLoops(n.id))
             val node_comm = n2c(n.id) //READ
             val commWeights = $self.buildNeighboringCommunities(n,n2c)
             val (best_comm,best_nblinks) = unpack($self.findBestCommunityMove(n,n2c,tot,commWeights))
 
             if(best_comm != node_comm){
-              numberOfMoves += 1
-              //println("moving to: " + best_comm)
               /////////////////////////////////////////////
-              ////REALLY Needs to be atomic
-              ////MUTATION
+              ////Should this be atomic.  Challenge for parallelism is here.
               $self.insert(n2c,in,tot,n.id,node_comm,commWeights(node_comm),best_comm,best_nblinks) //WRITE
               /////////////////////////////////////////////
             }
@@ -299,7 +277,7 @@ trait CommunityOps {
           //////////////////////////////////////////
 
           new_mod = $self.modularity(in,tot)
-          println("new mod: " + new_mod + " cur_mod: " + cur_mod + " diff: " + (new_mod-cur_mod))
+          //println("new mod: " + new_mod + " cur_mod: " + cur_mod + " diff: " + (new_mod-cur_mod))
           continue = (new_mod-cur_mod) > min_modularity
         }
         val improvement = (nb_pass_done > 1) || (new_mod != cur_mod)
@@ -331,6 +309,8 @@ trait CommunityOps {
       infix ("in") (MInt :: MDouble) implements composite ${array_apply($self.in, $1)}
       infix ("n2c") (MInt :: MInt) implements composite ${array_apply($self.n2c, $1)}
 
+      /*
+      We might need these when parallelism is added in.
       infix ("updateTot") ( (MInt,MDouble) :: MUnit, effect = write(0)) implements composite ${ array_update($self.tot,$1,$2)}
       infix ("updateIn") ( (MInt,MDouble) :: MUnit, effect = write(0)) implements composite ${ array_update($self.in,$1,$2)}
       infix ("updateN2c") ( (MInt,MInt) :: MUnit, effect = write(0)) implements composite ${ array_update($self.n2c,$1,$2)}
@@ -338,6 +318,7 @@ trait CommunityOps {
       infix ("setTot") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_tot", quotedArg(1))
       infix ("setIn") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_in", quotedArg(1))
       infix ("setN2c") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_n2c", quotedArg(1))
+      */
     }
     compiler (Community) ("alloc_total_weight", Nil, UndirectedGraph :: MDouble) implements single ${$0.totalWeight}
     compiler (Community) ("alloc_size", Nil, UndirectedGraph :: MInt) implements single ${$0.numNodes}

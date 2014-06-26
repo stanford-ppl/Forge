@@ -25,6 +25,7 @@ trait CommunityDetection extends OptiGraphApplication {
     val k = 0.01
     val result = CommunityDetection(g.getNodes,g.getEdges,k)
 
+    println(array_length(result._1))
   }
   def CommunityDetection(nodes:Rep[ForgeArray[Int]], edges:Rep[ForgeArray[Int]], k:Rep[Double]) : Tuple2[Rep[ForgeArray[Int]],Rep[ForgeArray[Int]]] = {
     var g = undirectedGraphFromCSR(nodes,edges)

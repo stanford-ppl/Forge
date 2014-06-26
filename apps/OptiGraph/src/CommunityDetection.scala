@@ -25,7 +25,8 @@ trait CommunityDetection extends OptiGraphApplication {
     println("performing Community Detection")
     tic(g)
     
-    var c = Community(g)
+    val precision = 0.01
+    var c = Community(g,precision)
     var mod = c.modularity
 
     println("Modularity: " + mod)
@@ -40,7 +41,7 @@ trait CommunityDetection extends OptiGraphApplication {
       //Generate a new graph from community structure
       //Generate a new comm structure from graph so we can go again
       g = c.generateNewGraph
-      c = Community(g)
+      c = Community(g,precision)
 
       //purely for debug
       println("Level: " + level + " Modularity improved from: " + mod + " to: " + newMod)

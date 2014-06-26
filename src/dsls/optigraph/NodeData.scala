@@ -68,10 +68,10 @@ trait NodeDataOps {
       infix ("mapreduce") ( (T ==> R,(R,R) ==> R, T==>MBoolean) :: R, TNumeric(R), addTpePars=(R)) implements mapReduce((T,R), 0, ${e => $1(e)}, ${numeric_zero[R]}, ${(a,b) => $2(a,b)}, Some(${c => $3(c)}))
       infix ("distinct") (Nil :: NodeData(T)) implements composite ${NodeData(fhashmap_keys($0.groupByReduce[T,Int](e => e, e=>0,(a,b)=>0)))}
       infix("sort")(Nil :: NodeData(T),TNumeric(T)) implements composite ${NodeData(array_sort($self.getRawArray))}      
-      infix ("sortBy") ((MInt ==> MInt) :: NodeData(T)) implements composite ${
+      infix ("sortBy") ((MInt ==> R) :: NodeData(T), TOrdering(R), addTpePars=R) implements composite ${
           NodeData[Int](array_sortIndices($self.length,$1)).map[T](i => $self(i))
       }
-      infix ("sortIndicesBy") ((MInt ==> MInt) :: NodeData(MInt)) implements single ${
+      infix ("sortIndicesBy") ((MInt ==> R) :: NodeData(MInt), TOrdering(R), addTpePars=R) implements single ${
           NodeData[Int](array_sortIndices($self.length,$1))
       }
 

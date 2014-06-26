@@ -61,7 +61,7 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
   }
   def array_string_split(__arg0: Rep[String],__arg1: Rep[String],__arg2: Rep[Int] = unit(0))(implicit __imp0: SourceContext): Rep[ForgeArray[String]]
     = reflectPure(ArrayStringSplit(__arg0, __arg1, __arg2))
-  def array_sortIndices(__arg0: Rep[Int], __arg1: (Rep[Int] => Rep[Int]))(implicit __imp0: SourceContext): Rep[ForgeArray[Int]]
+  def array_sortIndices[R:Manifest:Ordering](__arg0: Rep[Int], __arg1: (Rep[Int] => Rep[R]))(implicit __imp0: SourceContext): Rep[ForgeArray[Int]]
     = darray_sortIndices(__arg0,{(a,b) => 
         val aV = __arg1(a)
         val bV = __arg1(b)

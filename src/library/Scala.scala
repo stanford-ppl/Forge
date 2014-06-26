@@ -353,8 +353,11 @@ trait ScalaOps {
 
     val asinstance = infix (Cast) ("AsInstanceOf", (A,B), A :: B)
     impl (asinstance) (codegen($cala, ${ $0.asInstanceOf[$t[B]] }))
-    impl (asinstance) (codegen(cuda, ${ ($t[B])$0 }))
-    impl (asinstance) (codegen(cpp, ${ ($t[B])$0 }))
+    //impl (asinstance) (codegen(cuda, ${ ($t[B])$0 }))
+    //impl (asinstance) (codegen(cpp, ${ ($t[B])$0 }))
+    //TODO: what is the proper way to get the result type (sym.tp) to call with remapWithRef?
+    impl (asinstance) (codegen(cuda, "(" + unquotes("remapWithRef(sym.tp)") + ")" + quotedArg(0)))
+    impl (asinstance) (codegen(cpp, "(" + unquotes("remapWithRef(sym.tp)") + ")" + quotedArg(0)))
 
     val isinstance = infix (Cast) ("IsInstanceOf", (A,B), A :: MBoolean)
     impl (isinstance) (codegen($cala, ${ $0.isInstanceOf[$t[B]] }))
@@ -444,6 +447,8 @@ trait ScalaOps {
     val trim = infix (Str) ("trim", Nil, MString :: MString) 
     val fcharAt = infix (Str) ("fcharAt", Nil, (MString,MInt) :: MChar) 
     val startsWith = infix (Str) ("startsWith", Nil, (MString,MString) :: MBoolean)
+    val slice = infix (Str) ("slice", Nil, (MString,MInt,MInt) :: MString)
+    val length = infix (Str) ("length", Nil, MString :: MInt)
     val endsWith = infix (Str) ("endsWith", Nil, (MString,MString) :: MBoolean)
     val contains = infix (Str) ("contains", Nil, (MString,MString) :: MBoolean)
 
@@ -455,6 +460,8 @@ trait ScalaOps {
     impl (trim) (codegen($cala, ${ $0.trim })) 
     impl (fcharAt) (codegen($cala, ${ $0.charAt($1) })) 
     impl (startsWith) (codegen($cala, ${ $0.startsWith($1) })) 
+    impl (slice) (codegen($cala, ${ $0.slice($1,$2) }))
+    impl (length) (codegen($cala, ${ $0.length }))
     impl (endsWith) (codegen($cala, ${ $0.endsWith($1) })) 
     impl (contains) (codegen($cala, ${ $0.contains($1) })) 
     

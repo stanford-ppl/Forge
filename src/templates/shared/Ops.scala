@@ -289,7 +289,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     val addRet = withReturnTpe.getOrElse(Config.fastCompile)
     val ret = if (addRet || isRedirect(o)) ": " + repifySome(o.retTpe) else ""
     val curriedArgs = o.curriedArgs.map(a => makeArgsWithNowType(a)).mkString("")
-    prefix + o.name + makeTpeParsWithBounds(o.tpePars) + makeArgsWithNowType(o.firstArgs, o.effect != pure) + curriedArgs + makeOpImplicitArgsWithOverloadWithType(o) + ret + " = " + makeOpMethodNameWithFutureArgs(o)
+    prefix + o.name + makeTpeParsWithBounds(o.tpePars) + makeArgsWithNowType(o.firstArgs, o.effect != pure || o.name == "apply") + curriedArgs + makeOpImplicitArgsWithOverloadWithType(o) + ret + " = " + makeOpMethodNameWithFutureArgs(o)
   }
 
   def makeOpImplMethodName(o: Rep[DSLOp]) = makeOpMethodName(o) + "_impl" + nameClashId(o)

@@ -260,7 +260,7 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
 
   def argify(a: Exp[DSLArg], typify: Exp[DSLType] => String = repify): String = a match {
     case Def(Arg(name, tpe@Def(FTpe(args,ret,freq)), Some(d))) => name + ": " + typify(tpe) + " = " + escape(d)
-    case Def(Arg(name, tpe, Some(d))) => name + ": " + typify(tpe) + " = " + "unit("+escape(d)+")"
+    case Def(Arg(name, tpe, Some(d))) => name + ": " + typify(tpe) + " = " + escape(d)
     case Def(Arg(name, tpe, None)) => name + ": " + typify(tpe)
   }
 

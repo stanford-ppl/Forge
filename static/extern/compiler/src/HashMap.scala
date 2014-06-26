@@ -22,8 +22,11 @@ trait ForgeHashMapOpsExp extends DeliteMapOpsExp {
     dmap_fromCollection[K,K,V](keys, id, values)
   }
   def fhashmap_from_arrays[K:Manifest,V:Manifest](keys: Rep[ForgeArray[K]], values: Rep[ForgeArray[V]])(implicit ctx: SourceContext): Rep[ForgeHashMap[K,V]] = {
+    // if we already have an index, we could skip rebuilding it as well 
     val id: Exp[K] => Exp[K] = k => k
-    dmap_fromCollection[K,K,V](keys, id, values)
+    val index = reflectPure(DeliteMapBuildIndex(keys,id)) 
+    reflectPure(DeliteMapNewImm(keys, values, index, values.length))    
+    // dmap_fromCollection[K,K,V](keys, id, values)
   }
   def fhashmap_size[K:Manifest,V:Manifest](m: Rep[ForgeHashMap[K,V]])(implicit ctx: SourceContext): Rep[Int]
     = dmap_size(m)

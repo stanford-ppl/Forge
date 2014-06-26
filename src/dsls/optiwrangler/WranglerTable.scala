@@ -57,7 +57,7 @@ trait WranglerTableOps {
     
   	val WranglerTableOps = withTpe (Table)
   	WranglerTableOps {
-      infix ("Split") (MethodSignature(List(("col", MString),("delimiter", MString, "\",\""),("numOfSplits", MInt, "1")), Table)) implements composite ${
+      infix ("Split") (MethodSignature(List(("col", MString),("delimiter", MString, "unit(\",\")"),("numOfSplits", MInt, "unit(1)")), Table)) implements composite ${
         val origCol = get_column_by_name($self, $col)
         val splitElems = array_map(origCol, ((s:Rep[String]) => splitString(s, $delimiter, $numOfSplits)))
 
@@ -78,7 +78,7 @@ trait WranglerTableOps {
         Table(numColsInNewTable, table_num_rows($self), newData)
       }
 
-      infix ("Translate") (MethodSignature(List(("direction", MString, "\"left\"")), Table)) implements composite ${
+      infix ("Translate") (MethodSignature(List(("direction", MString, "unit(\"left\")")), Table)) implements composite ${
         val numCurrCols = table_num_cols($self)
         val numCurrRows = table_num_rows($self)
         val newData = array_fromfunction(numCurrCols, {c => 
@@ -89,7 +89,7 @@ trait WranglerTableOps {
         Table(numCurrCols, numCurrRows, newData)
       }
 
-      infix ("Fill") (MethodSignature(List(("direction", MString, "\"down\"")), Table)) implements composite ${
+      infix ("Fill") (MethodSignature(List(("direction", MString, "unit(\"down\")")), Table)) implements composite ${
         val numCurrCols = table_num_cols($self)
         val numCurrRows = table_num_rows($self)
         val newData = array_fromfunction(numCurrCols, {c => 
@@ -148,7 +148,7 @@ trait WranglerTableOps {
         Table(table_num_cols($self), numRowsInNewTable, newData)
       }
 
-      infix ("Transpose") (MethodSignature(List(("incCurrHeadersAsCol", MBoolean, "true")), Table)) implements composite ${
+      infix ("Transpose") (MethodSignature(List(("incCurrHeadersAsCol", MBoolean, "unit(true)")), Table)) implements composite ${
         val numOfColsInNewTable = table_num_rows($self)
         val newData = array_fromfunction(numOfColsInNewTable, {r => 
           val colName = if (r == 0) "transpose" else "transpose" + r
@@ -158,7 +158,7 @@ trait WranglerTableOps {
         Table(numOfColsInNewTable, table_num_rows($self), newData)
       }
 
-      infix ("Merge") (MethodSignature(List(("colNames", MArray(MString)), ("delimiter", MString, "\" \"")), Table)) implements composite ${
+      infix ("Merge") (MethodSignature(List(("colNames", MArray(MString)), ("delimiter", MString, "unit(\" \")")), Table)) implements composite ${
         val numCurrCols = table_num_cols($self)
         val colIndices = array_map($colNames, ((n:Rep[String]) => get_col_index($self, n)))
         val data = table_data($self)
@@ -177,7 +177,7 @@ trait WranglerTableOps {
       // ASSUMPTIONS:
       //  i. Key-rows are adjacent and are the first rows in the table. This should be changed. Any set of rows could be the key rows
       //  ii. If ($numOfKeyRows == 0) the set of column headers is used as the key row. Else, the headers are ignored.
-      infix ("Fold") (MethodSignature(List(("selectedColNames", MArray(MString)), ("numOfKeyRows", MInt, "0")), Table)) implements composite ${
+      infix ("Fold") (MethodSignature(List(("selectedColNames", MArray(MString)), ("numOfKeyRows", MInt, "unit(0)")), Table)) implements composite ${
         val numSelCols = array_length($selectedColNames)
         val numSelRows = if ($numOfKeyRows > 0) $numOfKeyRows else 1
         val numCurrCols = table_num_cols($self)

@@ -37,7 +37,7 @@ trait DeliteGenOps extends BaseGenOps {
     else false
   }
  
-   // bound symbol for the captured variable of a block
+  // bound symbol for the captured variable of a block
   private var boundArg: String = _
   
   override def quote(x: Exp[Any]): String = x match {
@@ -66,7 +66,7 @@ trait DeliteGenOps extends BaseGenOps {
       }
 
       if (activeGenerator == cpp && boundArg == null && ret != MUnit)
-         warn("Block " + func.name + " returns non-unit type result. C++ target may not work properly." + boundStr)
+        warn("Block " + func.name + " returns non-unit type result. C++ target may not work properly." + boundStr)
 
       // the new-line formatting is admittedly weird; we are using a mixed combination of actual new-lines (for string splitting at Forge)
       // and escaped new-lines (for string splitting at Delite), based on how we received strings from string interpolation.
@@ -540,7 +540,7 @@ trait DeliteGenOps extends BaseGenOps {
           emitWithIndent("val keys = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o, "Keys") + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
           emitWithIndent("val index = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o, "Index") + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
           emitWithIndent("val values = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o) + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
-          emitWithIndent(makeEffectAnnotation(pure,o) + "(DeliteMapNewImm(keys, values, index, values.length))", stream, 4)
+          emitWithIndent(makeEffectAnnotation(pure,o) + "(DeliteMapNewImm(keys, values, index, darray_length(values)))", stream, 4)
         case _ if hasEffects =>
           // if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
           val prologue = if (o.effect == simple) " andAlso Simple()" else ""

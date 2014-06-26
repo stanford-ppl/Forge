@@ -21,7 +21,7 @@ trait LinAlgOps {
     direct (LinAlg) ("lu", Nil, DenseMatrix(MDouble) :: CTuple3(DenseMatrix(MDouble),DenseMatrix(MDouble),DenseMatrix(MInt))) implements composite ${ (fatal("no non-native lu method exists"), fatal(""), fatal("")) }
 
     /* Cholesky factorization */
-    direct (LinAlg) ("chol", Nil, MethodSignature(List(("A",DenseMatrix(MDouble)), ("tri",MString,"\"upper\"")),DenseMatrix(MDouble))) implements composite ${ fatal("no non-native chol method exists") }
+    direct (LinAlg) ("chol", Nil, MethodSignature(List(("A",DenseMatrix(MDouble)), ("tri",MString,"unit(\"upper\")")),DenseMatrix(MDouble))) implements composite ${ fatal("no non-native chol method exists") }
 
     /* determinant */
     compiler (LinAlg) ("densematrix_determinant_22", T withBound TNumeric withBound TArith, ("x",DenseMatrix(T)) :: T) implements single ${

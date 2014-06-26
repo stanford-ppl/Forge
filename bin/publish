@@ -11,6 +11,8 @@ import fileinput
 
 FORGE_HOME = os.getenv("FORGE_HOME")
 FORGE_GENERATED = "build" # TODO
+SCALA_MAJOR_VERS = "2.10"
+SCALA_MINOR_VERS = "2"
 
 def err(s):
     exit("error: " + s)
@@ -59,7 +61,7 @@ import sbt._
 import Keys._
 
 object ${dslName}Build extends Build {
-  val virtScala = "2.10.2"
+  val virtScala = "${scala_major_vers}.${scala_minor_vers}"
   val virtBuildSettingsBase = Project.defaultSettings ++ Seq(
     organization := "stanford-ppl",
     scalaOrganization := "org.scala-lang.virtualized",
@@ -68,7 +70,7 @@ object ${dslName}Build extends Build {
     // needed for scala.tools, which is apparently not included in sbt's built in version
     libraryDependencies += "org.scala-lang.virtualized" % "scala-library" % virtScala,
     libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % virtScala,
-    libraryDependencies += "org.scalatest" % "scalatest_2.10" % "2.1.2",
+    libraryDependencies += "org.scalatest" % "scalatest_${scala_major_vers}" % "2.1.2",
     libraryDependencies += "com.google.guava" % "guava" % "17.0",
     libraryDependencies += "org.apache.commons" % "commons-math" % "2.2",
     // cluster deps
@@ -86,7 +88,7 @@ object ${dslName}Build extends Build {
     scalaSource in Compile <<= baseDirectory(_ / "src")
   )
 """)
-    return s.substitute(dslName=dsl, dslNameLowerCase=dsl.lower())
+    return s.substitute(dslName=dsl, dslNameLowerCase=dsl.lower(), scala_major_vers=SCALA_MAJOR_VERS, scala_minor_vers=SCALA_MINOR_VERS)
 
 # this version uses local classes rather than jars. is it any better from an incremental compilation standpoint?
 def sbtBuildFileLocal(dsl):
@@ -96,7 +98,7 @@ ${header}
   lazy val LMS_HOME = sys.env.get("LMS_HOME").getOrElse(error("Please set the LMS_HOME environment variable."))
   lazy val DELITE_HOME = sys.env.get("DELITE_HOME").getOrElse(error("Please set the DELITE_HOME environment variable."))
 
-  val scalacp = "/target/scala-2.10/classes/"
+  val scalacp = "/target/scala-${scala_major_vers}/classes/"
   lazy val lms = file(LMS_HOME + scalacp)
   lazy val deliteFramework = file(DELITE_HOME + "/framework" + scalacp)
   lazy val deliteRuntime = file(DELITE_HOME + "/runtime" + scalacp)
@@ -115,16 +117,16 @@ ${header}
 
 ${footer}
 """)
-    return s.substitute(header=sbtBuildFileHeader(dsl), footer=sbtBuildFileFooter(dsl))
+    return s.substitute(header=sbtBuildFileHeader(dsl), footer=sbtBuildFileFooter(dsl), scala_major_vers=SCALA_MAJOR_VERS, scala_minor_vers=SCALA_MINOR_VERS)
 
 def sbtBuildFile(dsl):
     s = Template("""
 ${header}
 
-  val virtualization_lms_core = "EPFL" % "lms_2.10" % "0.3-SNAPSHOT"
-  val delite_framework = "stanford-ppl" % "framework_2.10" % "0.1-SNAPSHOT"
-  val delite_runtime = "stanford-ppl" % "runtime_2.10" % "0.1-SNAPSHOT"
-  val delite_tests = "stanford-ppl" % "delite-test_2.10" % "0.1-SNAPSHOT"
+  val virtualization_lms_core = "EPFL" % "lms_${scala_major_vers}" % "0.3-SNAPSHOT"
+  val delite_framework = "stanford-ppl" % "framework_${scala_major_vers}" % "0.1-SNAPSHOT"
+  val delite_runtime = "stanford-ppl" % "runtime_${scala_major_vers}" % "0.1-SNAPSHOT"
+  val delite_tests = "stanford-ppl" % "delite-test_${scala_major_vers}" % "0.1-SNAPSHOT"
 
   val deps = Seq(
     libraryDependencies += virtualization_lms_core,
@@ -135,11 +137,12 @@ ${header}
 
 ${footer}
 """)
-    return s.substitute(header=sbtBuildFileHeader(dsl), footer=sbtBuildFileFooter(dsl))
+    return s.substitute(header=sbtBuildFileHeader(dsl), footer=sbtBuildFileFooter(dsl), scala_major_vers=SCALA_MAJOR_VERS)
 
 def sbtBuildFileFooter(dsl):
     s = Template("""
   // build targets
+  lazy val ${dslName} = Project("${dslName}", file("."), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Apps) // default
   lazy val ${dslName}Shared = Project("${dslName}-shared", file("shared"), settings = virtBuildSettings ++ deps)
   lazy val ${dslName}Comp = Project("${dslName}-comp", file("compiler"), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Shared)
   lazy val ${dslName}Lib = Project("${dslName}-lib", file("library"), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Shared)
@@ -275,6 +278,7 @@ def publish(dsl, opts):
         else:
             buildFile.write(sbtBuildFileLocal(dsl))
         buildFile.close()
+        shutil.copyfile(FORGE_HOME + "/static/build.properties", build_dir + "/project/build.properties")
 
     # executable scripts
     if not os.path.exists(build_dir + "/bin/"):

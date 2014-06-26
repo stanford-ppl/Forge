@@ -3,7 +3,10 @@ import optigraph.library._
 import optigraph.shared._
 
 // This object lets us run the Delite version of the code
-object CommunityDetectionCompiler extends OptiGraphApplicationCompiler with CommunityDetection
+object CommunityDetectionCompiler extends OptiGraphApplicationCompiler with CommunityDetection {
+  registerFunction(CommunityDetection _)  
+  override def functionName = "CommunityDetection"
+}
 
 // This object lets us run the Scala library version of the code
 object CommunityDetectionInterpreter extends OptiGraphApplicationInterpreter with CommunityDetection
@@ -27,7 +30,7 @@ trait CommunityDetection extends OptiGraphApplication {
 
     println(array_length(result._1))
   }
-  def CommunityDetection(nodes:Rep[ForgeArray[Int]], edges:Rep[ForgeArray[Int]], k:Rep[Double]) : Tuple2[Rep[ForgeArray[Int]],Rep[ForgeArray[Int]]] = {
+  def CommunityDetection(nodes:Rep[ForgeArray[Int]], edges:Rep[ForgeArray[Int]], k:Rep[Double]) : Rep[Tup2[ForgeArray[Int],ForgeArray[Int]]] = {
     var g = undirectedGraphFromCSR(nodes,edges)
 
     println("performing Community Detection")
@@ -65,7 +68,7 @@ trait CommunityDetection extends OptiGraphApplication {
     }
     toc(mod)
 
-    (g.getNodes,g.getEdges)
+    pack(g.getNodes,g.getEdges)
   }
   def printUsage = {
     println("Usage: CommunityDetection <path to input edge list file>")

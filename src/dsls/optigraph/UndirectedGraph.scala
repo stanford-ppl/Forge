@@ -59,7 +59,7 @@ trait UndirectedGraphOps{
         sumOverCollection($self.inNbrs(n))(data){e => (level(e)==(level(n.id)-1))}
       }
       infix ("totalWeight") (Nil :: MDouble) implements composite ${
-        array_reduce[Double](edge_weights($self),{(a,b) => a+b},0d)
+        array_reduce[Double](edge_weights($self),{(a,b) => a+b},unit(0d))
       }
       infix ("weightedDegree") (MInt :: MDouble) implements composite ${
         get_edge_weights($self,Node($1)).reduce({(a,b)=>a+b})

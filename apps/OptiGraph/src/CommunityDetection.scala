@@ -27,29 +27,33 @@ trait CommunityDetection extends OptiGraphApplication {
     
     val precision = 0.01
     var c = Community(g,precision)
-    var mod = c.modularity
+    var mod,newMod = c.modularity
 
     println("Modularity: " + mod)
     
     var level = 0
     var improvement = true
-    while(improvement){ //can be an until converged.
+    while(improvement){
+      ///////////////////PHASE 1/////////////////////////////////////
       //Move nodes to different communities until we converge
       c = c.louvain //heart of the algorithm
-      val newMod = c.storedModularity
-      improvement = c.canImprove
+      newMod = c.storedModularity //to avoid recomputation, store it
+      improvement = c.canImprove //are we done yet?
+      ///////////////////////////////////////////////////////////////
+      
+      ///////////////////PHASE 2/////////////////////////////////////
       //Generate a new graph from community structure
       //Generate a new comm structure from graph so we can go again
       g = c.generateNewGraph
-      c = Community(g,precision)
+      c = Community(g,precision)  //to be used in the next round
+      ///////////////////////////////////////////////////////////////
 
-      //purely for debug
+      //////////////////////DEBUG/////////////////////////////////////
       println("Level: " + level + " Modularity improved from: " + mod + " to: " + newMod)
       println("\tnumNodes: " + g.numNodes + " numEdges: " + g.numEdges + " weight: " + g.totalWeight)
-
-      //Keep track of some stats between iterations
       level += 1
       mod = newMod
+      ////////////////////////////////////////////////////////////////
     }
     toc(mod)
   }

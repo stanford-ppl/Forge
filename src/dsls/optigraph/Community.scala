@@ -251,9 +251,6 @@ trait CommunityOps {
         $self.parallelArrayCopy(in,$self.in) //in = $self.in
         $self.parallelArrayCopy(n2c,$self.n2c) //n2c = $self.n2c
 
-        var numberOfMoves = 0
-        val order = NodeData.fromFunction(size, e=>e).sortBy(e => size - g.weightedDegree(e))
-
         /*
         val oldtot = array_empty[Double](array_length($self.tot)) 
         val oldin = array_empty[Double](array_length($self.in)) 
@@ -275,8 +272,7 @@ trait CommunityOps {
           nb_moves = 0
           nb_pass_done += 1
           //Makes this effectively for each community
-          g.foreachNode{ i =>
-            val n = Node(order(i.id))
+          g.foreachNode{ n =>
            // println(g.weightedDegree(n.id) + " " + g.numSelfLoops(n.id))
             val node_comm = n2c(n.id) //READ
             val commWeights = $self.buildNeighboringCommunities(n,n2c)
@@ -306,7 +302,7 @@ trait CommunityOps {
           println("new mod: " + new_mod + " cur_mod: " + cur_mod + " diff: " + (new_mod-cur_mod))
           continue = (new_mod-cur_mod) > min_modularity
         }
-        val improvement = numberOfMoves != 0//(nb_pass_done > 1) || (new_mod != cur_mod)
+        val improvement = (nb_pass_done > 1) || (new_mod != cur_mod)
         println("Number of passes: " + nb_pass_done + " improvement: " + improvement)
         Community(size,$self.precision,new_mod,improvement,totalWeight,g,n2c,tot,in)
       }

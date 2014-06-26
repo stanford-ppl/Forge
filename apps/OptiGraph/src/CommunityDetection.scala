@@ -19,13 +19,20 @@ trait CommunityDetection extends OptiGraphApplication {
     toc("input loading",edgeList)
 
     tic("creating graph",edgeList)
-    var g = undirectedGraphFromEdgeList(edgeList)
+    val g = undirectedGraphFromEdgeList(edgeList)
     toc("creating graph",g)
     
+    val k = 0.01
+    val result = CommunityDetection(g.getNodes,g.getEdges,k)
+
+  }
+  def CommunityDetection(nodes:Rep[ForgeArray[Int]], edges:Rep[ForgeArray[Int]], k:Rep[Double]) : Tuple2[Rep[ForgeArray[Int]],Rep[ForgeArray[Int]]] = {
+    var g = undirectedGraphFromCSR(nodes,edges)
+
     println("performing Community Detection")
     tic(g)
     
-    val precision = 0.01
+    val precision = k
     var c = Community(g,precision)
     var mod,newMod = c.modularity
 
@@ -56,6 +63,8 @@ trait CommunityDetection extends OptiGraphApplication {
       ////////////////////////////////////////////////////////////////
     }
     toc(mod)
+
+    (g.getNodes,g.getEdges)
   }
   def printUsage = {
     println("Usage: CommunityDetection <path to input edge list file>")

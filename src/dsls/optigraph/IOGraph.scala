@@ -71,6 +71,9 @@ trait IOGraphOps {
 /////////////////////////////////////////////////////////////////////////////////////////////
 ////////Undirected CSR Loader
 /////////////////////////////////////////////////////////////////////////////////////////////
+    direct (IO) ("undirectedGraphFromCSR", Nil, ( (("nodes",MArray(MInt)),("edges",MArray(MInt))) :: UndirectedGraph)) implements composite ${
+      UndirectedGraph(array_length(nodes),array_fromfunction[Int](array_length(edges),e=>e),nodes,edges,array_fromfunction[Double](array_length(edges),e=>1d))    
+    }
     direct (IO) ("undirectedGraphFromEdgeList", Nil, ("edge_data",NodeData(Tuple2(MInt,MInt))) :: UndirectedGraph) implements composite ${
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
 
@@ -86,7 +89,6 @@ trait IOGraphOps {
 
       UndirectedGraph(numNodes,ids.getRawArray,serial_out._1,serial_out._2,array_fromfunction[Double](edge_data.length,e=>1d))    
     }
-
     direct (IO) ("assignUndirectedIndicies", Nil, MethodSignature(List(("numNodes",MInt),("numEdges",MInt),("distinct_ids",NodeData(MInt)),("idHashMap",MHashMap(MInt,MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt)))),Tuple2(MArray(MInt),MArray(MInt)))) implements single ${
       val src_edge_array = NodeData[Int](numEdges)
       val src_node_array = NodeData[Int](numNodes)

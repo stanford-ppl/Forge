@@ -375,14 +375,20 @@ trait ScalaOps {
     val minus = infix (Num) ("-", List(T withBound TNumeric), List(T,T) :: T)
     val times = infix (Num) ("*", List(T withBound TNumeric), List(T,T) :: T)
     impl (zero) (codegen($cala, "implicitly[Numeric["+quotedTpe(0,zero)+"]].zero"))
-    impl (plus) (codegen($cala, quotedArg(0) + " + " + quotedArg(1)))
-    impl (minus) (codegen($cala, quotedArg(0) + " - " + quotedArg(1)))
-    impl (times) (codegen($cala, quotedArg(0) + " * " + quotedArg(1)))
+    impl (zero) (codegen(cuda, "0"))
+    impl (zero) (codegen(cpp, "0"))
+    for (g <- List($cala, cuda, cpp)) {
+      impl (plus) (codegen(g, quotedArg(0) + " + " + quotedArg(1)))
+      impl (minus) (codegen(g, quotedArg(0) + " - " + quotedArg(1)))
+      impl (times) (codegen(g, quotedArg(0) + " * " + quotedArg(1)))
+    }
 
     val Frac = grp("Fractional")
     val R = tpePar("R")
     val div = infix (Frac) ("/", List(T,R withBound TFractional), (T,R) :: R, T ==> R)
     impl (div) (codegen($cala, ${ implicitly[Fractional[$t[R]]].div($0,$1) }))
+    impl (div) (codegen(cuda, ${ $0 / $1 }))
+    impl (div) (codegen(cpp, ${ $0 / $1 }))
   }
 
   def importOrdering() = {

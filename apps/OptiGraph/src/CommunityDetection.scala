@@ -3,15 +3,15 @@ import optigraph.library._
 import optigraph.shared._
 
 // This object lets us run the Delite version of the code
-object CommunityDetectionCompiler extends OptiGraphApplicationCompiler with CommunityDetection {
+object CommunityDetectionCompiler extends OptiGraphApplicationCompiler with CommDetection {
   registerFunction(CommunityDetection _)  
   override def functionName = "CommunityDetection"
 }
 
 // This object lets us run the Scala library version of the code
-object CommunityDetectionInterpreter extends OptiGraphApplicationInterpreter with CommunityDetection
+object CommunityDetectionInterpreter extends OptiGraphApplicationInterpreter with CommDetection
 
-trait CommunityDetection extends OptiGraphApplication {
+trait CommDetection extends OptiGraphApplication {
   def main() = {
     println("CommunityDetection")
   

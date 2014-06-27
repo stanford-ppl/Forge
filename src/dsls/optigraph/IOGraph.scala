@@ -86,6 +86,7 @@ trait IOGraphOps {
       val idHashMap = idView.groupByReduce[Int,Int](n => ids(n), n => n, (a,b) => a)
       
       val serial_out = assignUndirectedIndicies(numNodes,edge_data.length,ids,idHashMap,src_groups)
+      println("Number of Nodes: " + numNodes + " Number of Edges: " + edge_data.length)
 
       UndirectedGraph(numNodes,ids.getRawArray,serial_out._1,serial_out._2,array_fromfunction[Double](edge_data.length,e=>1d))    
     }

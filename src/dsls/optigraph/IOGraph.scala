@@ -177,6 +177,59 @@ trait IOGraphOps {
       NodeData(result.getRawArray)
 
       result
-    }    
+    }
+    /////////////////////////////////////////////////////////////////////////////////////////////
+////////Undirected Adjacency Loader
+/////////////////////////////////////////////////////////////////////////////////////////////
+    direct (IO) ("loadUndirectedAdjList", Nil, MString :: NodeData(NodeData(MInt))) implements composite ${
+      val input = NodeData(ForgeFileReader.readLines($0)({line =>
+          val fields = line.fsplit("\t")
+          NodeData[Int](array_map[String,Int](fields,e => e.toInt))
+      }))
+      input
+    }
+
+    direct (IO) ("createICBUndirectedGraphFromAdjList", Nil, (NodeData(NodeData(MInt))) :: UndirectedGraph) implements composite ${
+      val input = $0
+      val numNodes = input.length
+      val idView = NodeData(array_fromfunction(numNodes,{n => n}))
+      var numEdges = 0l
+
+      val csr = input.sortBy({ a => 
+        numNodes - input(a).length
+      })
+
+      val distinct_ids = csr.map[Int]{nd => nd(0)}
+      val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
+
+      val csrNbrs = csr.map[NodeData[Int]]{ nd =>
+        NodeData.fromFunction(nd.length-1,a => a+1).map(a => fhashmap_get(idHashMap,nd(a))).sort
+      }
+
+      val serial_out = assignADJUndirectedIndicies(numNodes,numEdges.toInt,distinct_ids,idHashMap,csrNbrs)
+      UndirectedGraph(numNodes,distinct_ids.getRawArray,serial_out._1,serial_out._2,array_fromfunction[Double](numEdges.toInt,e=>1d))    
+    }
+    direct (IO) ("assignADJUndirectedIndicies", Nil, MethodSignature(List(("numNodes",MInt),("numEdges",MInt),("distinct_ids",NodeData(MInt)),("idHashMap",MHashMap(MInt,MInt)),("src_groups",NodeData(NodeData(MInt)))),Tuple2(MArray(MInt),MArray(MInt)))) implements single ${
+      val src_edge_array = NodeData[Int](numEdges)
+      val src_node_array = NodeData[Int](numNodes)
+      var i = 0
+      var j = 0
+      //I can do -1 here because I am pruning so the last node will never have any neighbors
+      while(i < numNodes){
+        val neighborhood = src_groups(i)
+        var k = 0
+        while(k < neighborhood.length){
+          src_edge_array(j) = neighborhood(k)
+          j += 1
+          k += 1
+        }
+        if(i < numNodes-1){
+          src_node_array(i+1) = neighborhood.length + src_node_array(i)
+        }
+        i += 1
+      }
+      pack(src_node_array.getRawArray,src_edge_array.getRawArray)
+    }
+/////////////////////////////////////////////////////////////////////////////////////////////    
   }
 }

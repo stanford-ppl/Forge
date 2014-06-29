@@ -39,19 +39,19 @@ trait DirectedGraphOps{
 
     val DirectedGraphOps = withTpe(DirectedGraph)     
     DirectedGraphOps{
-      infix ("numEdges")(Nil :: MInt) implements single ${array_length(in_edge_raw_data($self)) + array_length(out_edge_raw_data($self))}
-      infix ("isDirected") (Nil :: MBoolean) implements single ${true}
+      infix ("numEdges")(Nil :: MInt) implements composite ${array_length(in_edge_raw_data($self)) + array_length(out_edge_raw_data($self))}
+      infix ("isDirected") (Nil :: MBoolean) implements composite ${true}
 
       //get out neighbors
-      infix ("outNbrs") (MInt :: NeighborView(MInt)) implements single ${$self.outNbrs(Node($1))}
-      infix ("outNbrs") (Node :: NeighborView(MInt)) implements single ${
+      infix ("outNbrs") (MInt :: NeighborView(MInt)) implements composite ${$self.outNbrs(Node($1))}
+      infix ("outNbrs") (Node :: NeighborView(MInt)) implements composite ${
         val start = out_node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1))
           else array_length(out_edge_raw_data($self))
         NeighborView[Int](out_edge_raw_data($self),start,end-start)
       }
       //get in neighbors   
-      infix ("inNbrs") (Node :: NeighborView(MInt)) implements single ${
+      infix ("inNbrs") (Node :: NeighborView(MInt)) implements composite ${
         val start = in_node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) 
             else array_length(in_edge_raw_data($self)) 
@@ -85,15 +85,15 @@ trait DirectedGraphOps{
       }
       //Out Node Accessors
       compiler ("out_node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_outNodes")
-      compiler("out_node_apply")(MInt :: MInt) implements single ${array_apply(out_node_raw_data($self),$1)}
+      compiler("out_node_apply")(MInt :: MInt) implements composite ${array_apply(out_node_raw_data($self),$1)}
       compiler ("out_edge_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_outEdges")
-      compiler("out_edge_apply")(MInt :: MInt) implements single ${array_apply(out_edge_raw_data($self),$1)}
+      compiler("out_edge_apply")(MInt :: MInt) implements composite ${array_apply(out_edge_raw_data($self),$1)}
 
       //In Node Accessors
       compiler ("in_node_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_inNodes")
-      compiler("in_node_apply")(MInt :: MInt) implements single ${array_apply(in_node_raw_data($self),$1)}
+      compiler("in_node_apply")(MInt :: MInt) implements composite ${array_apply(in_node_raw_data($self),$1)}
       compiler ("in_edge_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_inEdges")
-      compiler("in_edge_apply")(MInt :: MInt) implements single ${array_apply(in_edge_raw_data($self),$1)}
+      compiler("in_edge_apply")(MInt :: MInt) implements composite ${array_apply(in_edge_raw_data($self),$1)}
     }
     addGraphCommonOps(DirectedGraph)
   } 

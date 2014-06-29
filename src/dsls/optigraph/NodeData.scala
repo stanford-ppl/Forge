@@ -19,6 +19,8 @@ trait NodeDataOps {
     val K = tpePar("K")
     val V = tpePar("V")
     val R = tpePar("R")
+    val Node
+     = lookupTpe("Node") 
     val NodeData = tpe("NodeData", T) 
 
     data(NodeData,("_data",MArrayBuffer(T)))
@@ -31,6 +33,7 @@ trait NodeDataOps {
     NodeDataOps{  
       //////////////basic accessors//////////////////////////////
       infix("apply")(MInt :: T) implements composite ${array_buffer_apply(nd_raw_data($self),$1)}
+      infix("apply")(Node :: T) implements composite ${array_buffer_apply(nd_raw_data($self),$1.id)}
       infix("update")( (("id",MInt),("n",T)) :: MUnit, effect=write(0)) implements composite ${array_buffer_update(nd_raw_data($self),$id,$n)}
       infix ("length")(Nil :: MInt) implements single ${array_buffer_length(nd_raw_data($self))}
       infix ("append") (T :: MUnit, effect = write(0)) implements composite ${nd_append($self,$self.length, $1)}
@@ -108,8 +111,6 @@ trait NodeDataOps {
 
       parallelize as ParallelCollectionBuffer(T,lookupOp("nd_raw_alloc"),lookupOp("length"),lookupOp("nd_apply"),lookupOp("nd_update"),lookupOp("nd_set_length"),lookupOp("nd_appendable"),lookupOp("nd_append"),lookupOp("nd_copy"))
     }
-    direct(NodeData) ("sum", R, NodeData(R) :: R, TNumeric(R)) implements composite ${$0.reduce((a,b) => a+b)}
-    direct(NodeData) ("sum", R, NodeData(NodeData(R)) :: NodeData(R), TFractional(R)) implements composite ${$0.reduceNested( ((a,b) => a+b),NodeData[R]($0.length))}
     compiler (NodeData) ("nd_fake_alloc", R, Nil :: NodeData(R)) implements single ${ NodeData[R](0) }
   } 
 }

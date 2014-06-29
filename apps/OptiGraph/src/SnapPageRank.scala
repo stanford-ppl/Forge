@@ -14,13 +14,13 @@ trait SnapPageRank extends OptiGraphApplication {
 	
 		if (args.length < 2) printUsage
 
-    tic("input loading")
-    val edgeList = loadDirectedEdgeList(args(0))
-    toc("input loading",edgeList)
+	tic("input loading")
+	val edgeList = loadDirectedEdgeList(args(0))
+	toc("input loading",edgeList)
 
-    tic("creating graph",edgeList)
-    val g = directedGraphFromEdgeList(edgeList)
-    toc("creating graph",g)
+	tic("creating graph",edgeList)
+	val g = directedGraphFromEdgeList(edgeList)
+	toc("creating graph",g)
 		
 		println("performing Page Rank")
 		tic(g)
@@ -35,7 +35,7 @@ trait SnapPageRank extends OptiGraphApplication {
 		val pr =
 		 untilconverged(prInit, tol=threshold,maxIter=maxItr){ oldPr =>
 			val tmp = g.mapNodes({ n =>
-				  damp * sum(g.inNbrs(n)){w => oldPr(w) / g.outDegree(Node(w))}{n =>true}
+				  damp * sumOverNbrs(g.inNeighbors(n)){w => oldPr(w) / g.outDegree(w)}
 				})
 			val leaked = (1.0 - sum(tmp)) / g.numNodes
 			tmp.map(e => e + leaked)

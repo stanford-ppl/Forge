@@ -31,7 +31,7 @@ trait NodeIdViewOps {
       
       //Really the only two parallel ops you can have for this structure
       infix ("foreach") ((MInt ==> MUnit) :: MUnit, effect=simple) implements foreach(MInt, 0, ${a => $1(a)})
-      infix ("mapreduce") ( (MInt ==> T,(T,T) ==> T, MInt==>MBoolean) :: T, TNumeric(T), addTpePars=(T)) implements mapReduce((MInt,T), 0, ${e => $1(e)}, ${numeric_zero[T]}, ${(a,b) => $2(a,b)}, Some(${c => $3(c)}))
+      infix ("mapreduce") ( (MInt ==> T,(T,T) ==> T, MInt==>MBoolean) :: T, TNumeric(T), addTpePars=(T)) implements mapReduce((MInt,T), 0, ${e => $1(e)}, ${numeric_zero[T]}, ${(a,b) => $2(a,b)}, Some(${c => $3(c)}), 5000)
       
       //Debug
       infix ("serialForeach") ((MInt ==> MUnit) :: MUnit, effect = simple) implements single ${

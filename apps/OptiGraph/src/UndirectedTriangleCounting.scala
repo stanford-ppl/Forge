@@ -26,7 +26,7 @@ trait UndirectedTriangleCounting extends OptiGraphApplication {
     tic(g)
     
     val t = sumOverNodes(g.nodes){ n =>
-      sumOverNbrs(g.neighbors(n)){ nbr =>
+      sumOverNeighbors(g.neighbors(n)){ nbr =>
         if(nbr > n) g.commonNeighbors(n,nbr)
         else 0l
       }

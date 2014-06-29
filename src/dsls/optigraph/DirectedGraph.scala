@@ -68,11 +68,11 @@ trait DirectedGraphOps{
       }
       infix ("sumDownNeighbors") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",Node==>R)),R), TFractional(R), addTpePars=R) implements composite ${
         //only sum in neighbors a level up
-        sumOverNbrsC($self.outNeighbors(n))(data){e => (level(e.id)==(level(n.id)+1))}
+        sumOverNeighborsC($self.outNeighbors(n))(data){e => (level(e.id)==(level(n.id)+1))}
       }
       infix ("sumUpNeighbors") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",Node==>R)),R), TFractional(R), addTpePars=R) implements composite ${
         //only sum in neighbors a level up
-        sumOverNbrsC($self.inNeighbors(n))(data){e => level(e.id)==(level(n.id)-1)}
+        sumOverNeighborsC($self.inNeighbors(n))(data){e => level(e.id)==(level(n.id)-1)}
       }
       //Input node ids
       infix ("hasEdge") ((MInt,MInt) :: MBoolean) implements composite ${$self.hasEdge(Node($1),Node($2))}

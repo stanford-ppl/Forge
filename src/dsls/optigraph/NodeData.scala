@@ -55,7 +55,6 @@ trait NodeDataOps {
         array_copy($1.getRawArray,0,result,$0.length,$1.length)
         NodeData(result)
       }
-      //infix("sort")(Nil :: NodeData(T),TNumeric(T)) implements composite ${NodeData(array_sort($self.getRawArray))}
 
       ///////////parallel operations////////////////////////////
       infix ("-") (NodeData(T) :: NodeData(T), TNumeric(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a-b })

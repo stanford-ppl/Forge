@@ -53,16 +53,16 @@ trait UndirectedGraphOps{
       }
 
       infix ("sumOverNeighbors") ( CurriedMethodSignature(List(("n",Node),("data",Node==>R),("cond",Node==>MBoolean)),R), TNumeric(R), addTpePars=R) implements composite ${
-        sumOverNbrsC($self.neighbors(n))(data)(cond)
+        sumOverNeighborsC($self.neighbors(n))(data)(cond)
       }
 
       infix ("sumDownNeighbors") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",Node==>R)),R), TNumeric(R), addTpePars=R) implements composite ${
         //only sum in neighbors a level up
-        sumOverNbrsC($self.outNeighbors(n))(data){e => (level(e.id)==(level(n.id)+1))}
+        sumOverNeighborsC($self.outNeighbors(n))(data){e => (level(e.id)==(level(n.id)+1))}
       }
 
       infix ("sumUpNeighbors") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",Node==>R)),R), TNumeric(R), addTpePars=R) implements composite ${
-        sumOverNbrsC($self.inNeighbors(n))(data){e => (level(e.id)==(level(n.id)-1))}
+        sumOverNeighborsC($self.inNeighbors(n))(data){e => (level(e.id)==(level(n.id)-1))}
       }
 
       infix ("totalWeight") (Nil :: MDouble) implements composite ${

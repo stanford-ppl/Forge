@@ -121,13 +121,13 @@ trait GraphOps{
     direct(Graph) ("abs", Nil, NodeData(MFloat) :: NodeData(MFloat)) implements composite ${$0.map(e => abs(e))}
 
     //a couple of sum methods, with condition provided
-    direct(Graph) ("sumOverNbrsC", R, CurriedMethodSignature(List(("nd_view",NeighborView(MInt)), ("data",Node==>R) ,("cond",Node==>MBoolean)),R), TNumeric(R)) implements composite ${
+    direct(Graph) ("sumOverNeighborsC", R, CurriedMethodSignature(List(("nd_view",NeighborView(MInt)), ("data",Node==>R) ,("cond",Node==>MBoolean)),R), TNumeric(R)) implements composite ${
       nd_view.mapreduce[R]({n => data(Node(n))},{(a,b) => a+b},n=>cond(Node(n)))
     }
     direct(Graph) ("sumOverNodesC", R, CurriedMethodSignature(List(("nodes",NodeIdView), ("data",Node==>R) ,("cond",Node==>MBoolean)),R), TNumeric(R)) implements composite ${
       nodes.mapreduce[R]({n => data(Node(n))},{(a,b) => a+b},n=>cond(Node(n)))
     }
-    direct(Graph) ("sumOverNbrs", R, CurriedMethodSignature(List(("nd_view",NeighborView(MInt)), ("data",Node==>R)),R), TNumeric(R)) implements composite ${
+    direct(Graph) ("sumOverNeighbors", R, CurriedMethodSignature(List(("nd_view",NeighborView(MInt)), ("data",Node==>R)),R), TNumeric(R)) implements composite ${
       nd_view.mapreduce[R]({n => data(Node(n))},{(a,b) => a+b}, {n => true})
     }
     direct(Graph) ("sumOverNodes", R, CurriedMethodSignature(List(("nodes",NodeIdView), ("data",Node==>R)),R), TNumeric(R)) implements composite ${

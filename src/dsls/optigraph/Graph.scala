@@ -53,7 +53,7 @@ trait GraphOps{
       }
 
       infix ("getExternalIDs") (Nil :: MArray(MInt)) implements getter(0, "_externalIDs")
-      infix ("getExternalID") (MInt :: MInt) implements single ${array_apply($self.getExternalIDs,$1)}
+      infix ("getExternalID") (Node :: MInt) implements single ${array_apply($self.getExternalIDs,$1.id)}
       //perform BF traversal
       infix ("inBFOrder") ( CurriedMethodSignature(List(Node,((Node,NodeData(R),NodeData(MInt)) ==> R),((Node,NodeData(R),NodeData(R),NodeData(MInt)) ==> R)),NodeData(R)), TFractional(R), addTpePars=R, effect=simple) implements composite ${
         val levelArray = NodeData[Int]($self.numNodes)

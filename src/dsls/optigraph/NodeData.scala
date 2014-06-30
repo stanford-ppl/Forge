@@ -59,7 +59,8 @@ trait NodeDataOps {
       ///////////parallel operations////////////////////////////
       infix ("-") (NodeData(T) :: NodeData(T), TNumeric(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a-b })
       infix ("+") (NodeData(T) :: NodeData(T), TNumeric(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a+b })
-      infix ("map") ((T ==> R) :: NodeData(R), addTpePars = R) implements map((T,R), 0, ${ e => $1(e) })
+      infix ("pack") (NodeData(T) :: NodeData(Tuple2(T,T))) implements zip( (T,T,Tuple2(T,T)), (0,1), ${ (a,b) => pack(a,b) })
+      infix ("map") ((T ==> R) :: NodeData(R), addTpePars=R) implements map((T,R), 0, ${ e => $1(e) })
       infix ("flatMap") ((T ==> NodeData(R)) :: NodeData(R), addTpePars = R) implements flatMap((T,R), 0, ${ e => $1(e) })
       infix ("filter") ( ((T ==> MBoolean),(T ==> R)) :: NodeData(R), addTpePars = R) implements filter((T,R), 0, ${w => $1(w)}, ${e => $2(e)})
       infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements foreach(T, 0, ${ e => $1(e) })

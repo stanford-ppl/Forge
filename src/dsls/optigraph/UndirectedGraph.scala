@@ -52,10 +52,6 @@ trait UndirectedGraphOps{
         neigh1.intersectInRange(neigh2,max)
       }
 
-      infix ("sumOverNeighbors") ( CurriedMethodSignature(List(("n",Node),("data",Node==>R),("cond",Node==>MBoolean)),R), TNumeric(R), addTpePars=R) implements composite ${
-        sumOverNeighborsC($self.neighbors(n))(data)(cond)
-      }
-
       infix ("sumDownNeighbors") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",Node==>R)),R), TNumeric(R), addTpePars=R) implements composite ${
         //only sum in neighbors a level up
         sumOverNeighborsC($self.outNeighbors(n))(data){e => (level(e.id)==(level(n.id)+1))}

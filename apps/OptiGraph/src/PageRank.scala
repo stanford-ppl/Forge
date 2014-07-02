@@ -29,14 +29,14 @@ trait PageRank extends OptiGraphApplication {
     //matches parameters from snap
     //initalize array to 1/numNodes
     val prInit = NodeData.fromFunction[Double](g.numNodes,{e => 1.0/g.numNodes})
-    val threshold = 0.0001 
-    val damp = 0.85
+    val threshold = 0.01 
+    val damp = 0.15
     val maxItr = 100
     
     val pr =
      untilconverged(prInit, tol=threshold,maxIter=maxItr){ oldPr =>
       g.mapNodes{ n =>
-        ((1.0 - damp) / g.numNodes) + damp * sumOverNeighbors(g.inNeighbors(n)){ w =>
+        damp + (1.0-damp)*sumOverNeighbors(g.inNeighbors(n)){ w =>
           oldPr(w) / g.outDegree(w)}
       }
     }{(curPr,oldPr) => sum(abs(curPr-oldPr))}

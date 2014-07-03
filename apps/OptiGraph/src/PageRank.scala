@@ -31,7 +31,7 @@ trait PageRank extends OptiGraphApplication {
     val prInit = NodeData.fromFunction[Double](g.numNodes,{e => 1.0/g.numNodes})
     val threshold = 0.01 
     val damp = 0.15
-    val maxItr = 50
+    val maxItr = if(args.length == 3) args(2) else 100
     
     val pr =
      untilconverged(prInit, tol=threshold,maxIter=maxItr){ oldPr =>
@@ -46,7 +46,7 @@ trait PageRank extends OptiGraphApplication {
     println("wrote output to: " + args(1))
   }
   def printUsage = {
-    println("Usage: PageRank <path to input edge list file> <path to output file (to be created)>")
+    println("Usage: PageRank <path to input edge list file> <path to output file (to be created)> <OPTIONAL: max # of iterations>")
     exit(-1)
   }
 }

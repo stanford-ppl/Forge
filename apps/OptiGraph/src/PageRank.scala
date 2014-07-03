@@ -31,7 +31,7 @@ trait PageRank extends OptiGraphApplication {
     val prInit = NodeData.fromFunction[Double](g.numNodes,{e => 1.0/g.numNodes})
     val threshold = 0.01 
     val damp = 0.15
-    val maxItr = 100
+    val maxItr = 50
     
     val pr =
      untilconverged(prInit, tol=threshold,maxIter=maxItr){ oldPr =>

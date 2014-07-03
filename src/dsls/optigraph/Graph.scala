@@ -133,6 +133,7 @@ trait GraphOps{
     direct(Graph) ("sumOverNodes", R, CurriedMethodSignature(List(("nodes",NodeIdView), ("data",Node==>R)),R), TNumeric(R)) implements composite ${
       nodes.mapreduce[R]({n => data(Node(n))},{(a,b) => a+b},{n => true})
     }
+
     direct(Graph) ("sum", R, NodeData(R) :: R, TNumeric(R)) implements composite ${$0.reduce((a,b) => a+b)}
     direct(Graph) ("sum", R, NodeData(NodeData(R)) :: NodeData(R), TFractional(R)) implements composite ${$0.reduceNested( ((a,b) => a+b),NodeData[R]($0.length))}
 

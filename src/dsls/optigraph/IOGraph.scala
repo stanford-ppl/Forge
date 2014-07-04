@@ -39,7 +39,26 @@ trait IOGraphOps {
       }
       xfs.close()
     })
+    direct (IO) ("printGraph", Nil, MethodSignature(List(("pathin",MString),("level",MInt),("mod",MDouble),("newMod",MDouble),("numNodes",MInt),("numEdges",MInt),("nodes",MArray(MInt)),("edges",MArray(MInt)),("edgeWeights",MArray(MDouble))),MUnit), effect = simple) implements codegen($cala, ${
+      val pin = $pathin
+      val path = pin + "_" + $level.toString + ".txt"
+      val xfs = new java.io.BufferedWriter(new java.io.FileWriter(path))
+      xfs.write("number of nodes: " + $numNodes + " number of edges: " + $numEdges)
+      xfs.write("old mod: " + $mod + " new mod: " + $newMod)
 
+      for (i <- 0 until $nodes.length) {
+        val src = i
+        var start = $nodes(i)
+        var end = if(i+1 < $nodes.length) $nodes(i+1) else $edges.length
+
+        for(j <- start until end){
+          xfs.write(i.toString + "\\t")
+          xfs.write($edges(j).toString + "\\t")
+          xfs.write($edgeWeights(j).toString + "\\n")
+        }
+      }
+      xfs.close()
+    })
 /////////////////////////////////////////////////////////////////////////////////////////////
 ////////General Loaders
 /////////////////////////////////////////////////////////////////////////////////////////////

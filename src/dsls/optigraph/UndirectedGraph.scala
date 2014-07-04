@@ -114,6 +114,7 @@ trait UndirectedGraphOps{
           else array_length(edge_weights($self))
         NeighborView[Double](edge_weights($self),start,end-start)
       }
+      infix ("getCSREdgeWeights") (Nil :: MArray(MDouble)) implements getter(0, "_weights")
       compiler ("edge_weights") (Nil :: MArray(MDouble)) implements getter(0, "_weights")
       infix ("getCSRNodes") (Nil :: MArray(MInt)) implements getter(0, "_nodes")
       compiler("node_apply")(MInt :: MInt) implements composite ${array_apply($self.getCSRNodes,$1)}

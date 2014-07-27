@@ -14,7 +14,7 @@ trait LinAlgOps {
     val T = tpePar("T")
 
     /* linear system solve */
-    infix (LinAlg) ("\\", Nil, (DenseMatrix(MDouble),DenseVector(MDouble)) :: DenseVector(MDouble)) implements single ${ fatal("no non-native \\\\ method exists") }
+    infix (LinAlg) ("\\", Nil, (DenseMatrix(MDouble),DenseVector(MDouble)) :: DenseVector(MDouble)) implements composite ${ fatal("no non-native \\\\ method exists") }
     label(lookupOp("LinAlg","\\"), "linsolve")
 
     /* LU factorization */
@@ -24,16 +24,16 @@ trait LinAlgOps {
     direct (LinAlg) ("chol", Nil, MethodSignature(List(("A",DenseMatrix(MDouble)), ("tri",MString,"unit(\"upper\")")),DenseMatrix(MDouble))) implements composite ${ fatal("no non-native chol method exists") }
 
     /* determinant */
-    compiler (LinAlg) ("densematrix_determinant_22", T withBound TNumeric withBound TArith, ("x",DenseMatrix(T)) :: T) implements single ${
+    compiler (LinAlg) ("densematrix_determinant_22", T withBound TNumeric withBound TArith, ("x",DenseMatrix(T)) :: T) implements composite ${
       x(0,0)*x(1,1)-x(0,1)*x(1,0)
     }
 
-    compiler (LinAlg) ("densematrix_determinant_33", T withBound TNumeric withBound TArith, ("x",DenseMatrix(T)) :: T) implements single ${
+    compiler (LinAlg) ("densematrix_determinant_33", T withBound TNumeric withBound TArith, ("x",DenseMatrix(T)) :: T) implements composite ${
       x(0,0)*x(1,1)*x(2,2) + x(0,1)*x(1,2)*x(2,0) + x(0,2)*x(1,0)*x(2,1) -
       x(0,2)*x(1,1)*x(2,0) - x(0,1)*x(1,0)*x(2,2) - x(0,0)*x(1,2)*x(2,1)
     }
 
-    compiler (LinAlg) ("densematrix_determinant_44", T withBound TNumeric withBound TArith, ("x",DenseMatrix(T)) :: T) implements single ${
+    compiler (LinAlg) ("densematrix_determinant_44", T withBound TNumeric withBound TArith, ("x",DenseMatrix(T)) :: T) implements composite ${
       val two = unit(2).AsInstanceOf[T]
 
       x(0,1)*x(0,1)*x(2,3)*x(2,3)     - x(2,2)*x(3,3)*x(0,1)*x(0,1)     + two*x(3,3)*x(0,1)*x(0,2)*x(1,2) -
@@ -44,7 +44,7 @@ trait LinAlgOps {
       x(0,0)*x(1,1)*x(2,3)*x(2,3)     + x(0,0)*x(1,1)*x(2,2)*x(3,3)
     }
 
-    direct (LinAlg) ("det", T withBound TNumeric withBound TArith, ("x",DenseMatrix(T)) :: T) implements single ${
+    direct (LinAlg) ("det", T withBound TNumeric withBound TArith, ("x",DenseMatrix(T)) :: T) implements composite ${
       if (x.numRows == 2 && x.numCols == 2) densematrix_determinant_22(x)
       else if (x.numRows == 3 && x.numCols == 3) densematrix_determinant_33(x)
       else if (x.numRows == 4 && x.numCols == 4) densematrix_determinant_44(x)

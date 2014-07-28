@@ -25,7 +25,7 @@ trait RandomOps {
       }
     }
 
-    direct (Rand) ("randomElem", A, DenseVector(A) :: A, effect = simple) implements single ${
+    direct (Rand) ("randomElem", A, DenseVector(A) :: A, effect = simple) implements composite ${
       $0(randomInt($0.length))
     }
 

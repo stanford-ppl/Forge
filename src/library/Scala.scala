@@ -53,10 +53,11 @@ trait ScalaOps {
       impl (and) (codegen(g, quotedArg(0) + " && " + quotedArg(1)))
     }
 
+    lift (Prim) (MShort)
     lift (Prim) (MInt)
-    lift (Prim) (MFloat)
-    lift (Prim) (MDouble)
     lift (Prim) (MLong)
+    lift (Prim) (MFloat)
+    lift (Prim) (MDouble)    
 
     val toInt = infix (Prim) ("toInt", T withBound TNumeric, T :: MInt)
     val toFloat = infix (Prim) ("toFloat", T withBound TNumeric, T :: MFloat)
@@ -644,6 +645,11 @@ trait ScalaOps {
       infix (TT) ("toString", pars, ("t",TT(pars: _*)) :: MString) implements composite ${ \$makeTupleStrStr }
     }
 
+    // using an implicit conversion requires us to name all of the type parameters, whereas infix does not
+    for (arity <- 1 until maxTuples) { 
+      mustInfixList ::= "_" + arity
+    }
+
     // add pack for Var combinations inside Tuple2s. We don't do this for all of them,
     // since the number of T,Var[T],Rep[T] combinations is exponential in the size of the tuple
     val Tuple2 = lookupTpe("Tup2")
@@ -671,9 +677,9 @@ trait ScalaOps {
     compiler (HashMapOps) ("shashmap_keys_array", (K,V), (SHashMap(K,V)) :: SArray(K)) implements codegen($cala, ${ $0.keys.toArray })
     compiler (HashMapOps) ("shashmap_values_array", (K,V), (SHashMap(K,V)) :: SArray(V)) implements codegen($cala, ${ $0.values.toArray })
 
-    infix (HashMapOps) ("apply", (K,V), (SHashMap, K) :: V) implements codegen($cala, ${ $0($1) })
-    infix (HashMapOps) ("update", (K,V), (SHashMap, K, V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $0.put($1,$2); () })
-    infix (HashMapOps) ("contains", (K,V), (SHashMap, K) :: MBoolean) implements codegen($cala, ${ $0.contains($1) })
+    infix (HashMapOps) ("apply", (K,V), (SHashMap(K,V), K) :: V) implements codegen($cala, ${ $0($1) })
+    infix (HashMapOps) ("update", (K,V), (SHashMap(K,V), K, V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $0.put($1,$2); () })
+    infix (HashMapOps) ("contains", (K,V), (SHashMap(K,V), K) :: MBoolean) implements codegen($cala, ${ $0.contains($1) })
     infix (HashMapOps) ("keys", (K,V), SHashMap(K,V) :: MArray(K)) implements composite ${ farray_from_sarray(shashmap_keys_array($0)) }
     infix (HashMapOps) ("values", (K,V), SHashMap(K,V) :: MArray(V)) implements composite ${ farray_from_sarray(shashmap_values_array($0)) }
   }
@@ -698,9 +704,9 @@ trait ScalaOps {
     compiler (HashMapOps) ("chashmap_keys_array", (K,V), (CHashMap(K,V)) :: SArray(K)) implements codegen($cala, ${ scala.collection.JavaConverters.enumerationAsScalaIteratorConverter($0.keys).asScala.toArray })
     compiler (HashMapOps) ("chashmap_values_array", (K,V), (CHashMap(K,V)) :: SArray(V)) implements codegen($cala, ${ scala.collection.JavaConverters.collectionAsScalaIterableConverter($0.values).asScala.toArray })
 
-    infix (HashMapOps) ("apply", (K,V), (CHashMap, K) :: V) implements codegen($cala, ${ $0.get($1) })
-    infix (HashMapOps) ("update", (K,V), (CHashMap, K, V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $0.put($1,$2); () })
-    infix (HashMapOps) ("contains", (K,V), (CHashMap, K) :: MBoolean) implements codegen($cala, ${ $0.contains($1) })
+    infix (HashMapOps) ("apply", (K,V), (CHashMap(K,V), K) :: V) implements codegen($cala, ${ $0.get($1) })
+    infix (HashMapOps) ("update", (K,V), (CHashMap(K,V), K, V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $0.put($1,$2); () })
+    infix (HashMapOps) ("contains", (K,V), (CHashMap(K,V), K) :: MBoolean) implements codegen($cala, ${ $0.contains($1) })
     infix (HashMapOps) ("keys", (K,V), CHashMap(K,V) :: MArray(K)) implements composite ${ farray_from_sarray(chashmap_keys_array($0)) }
     infix (HashMapOps) ("values", (K,V), CHashMap(K,V) :: MArray(V)) implements composite ${ farray_from_sarray(chashmap_values_array($0)) }
   }

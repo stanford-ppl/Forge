@@ -8,6 +8,8 @@ trait FeatureOps {
   this: OptiMLDSL =>
 
   def importFeatureOps() {
+    val DenseVector = lookupTpe("DenseVector")
+    
     val ContinuousFeature = tpe("ContinuousFeature")
     data(ContinuousFeature, ("_min", MDouble), ("_max", MDouble))
     static (ContinuousFeature) ("apply", Nil, (("min", MDouble, "math_ninf()"), ("max", MDouble, "math_inf()")) :: ContinuousFeature) implements allocates(ContinuousFeature, ${$0}, ${$1})
@@ -42,6 +44,15 @@ trait FeatureOps {
         val featureMap = getFeatures($self)
         if (featureMap.contains($1)) featureMap($1) else 0
       }
+
+      // convert this feature value into an indicator or dummy variable encoding
+      infix ("indicator") (MString :: DenseVector(MInt)) implements composite ${
+        val featureMap = getFeatures($self)
+        val numKeys = fhashmap_size(featureMap)
+        val e = if (featureMap.contains($1)) featureMap($1) else 0
+        (0::numKeys) { i => if (i == e) 1 else 0 }
+      }
+
     }
 
     val BinaryFeature = tpe("BinaryFeature")

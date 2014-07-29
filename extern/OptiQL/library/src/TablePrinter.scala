@@ -6,7 +6,7 @@ import scala.collection.mutable.{ArrayBuffer,HashMap}
 object TablePrinter {
 
   def writeAsJSON(table: AnyRef, path: String) {
-    val numRows = table.getClass.getMethod("size").invoke(table).asInstanceOf[Integer].intValue
+    val numRows = tableSize(table)
     val data = table.getClass.getMethod("data").invoke(table).asInstanceOf[Array[_]]
     val columnStrings = getFields(data(0))
 
@@ -29,10 +29,10 @@ object TablePrinter {
     xfs.close()
   }
 
-  def printAsTable(table: AnyRef, maxRows: Int = 0) {
+  def printAsTable(table: AnyRef, maxRows: Int) {
 
     implicit val tableStr = new StringBuilder
-    val numRows = math.min(table.getClass.getMethod("size").invoke(table).asInstanceOf[Integer].intValue, maxRows)
+    val numRows = math.min(tableSize(table), maxRows)
     val data = table.getClass.getMethod("data").invoke(table).asInstanceOf[Array[_]]
     val columnStrings = getFields(data(0))
     val columnSizes = getTableColSizes(data, columnStrings, numRows)
@@ -83,6 +83,12 @@ object TablePrinter {
 
     horizontalRule
     println(tableStr.toString)
+  }
+
+  private def tableSize(table: AnyRef) = table.getClass.getMethod("size").invoke(table) match {
+    case i:Integer => i.intValue
+    case i:java.lang.Long => i.intValue
+    case i => throw new RuntimeException("Unexpected type: " + i + " for table size")
   }
 
   private def getFields(record: Any) = {

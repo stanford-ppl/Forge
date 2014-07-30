@@ -57,7 +57,8 @@ trait DenseVectorOps {
     static (DenseVector) ("onesf", Nil, MInt :: DenseVector(MFloat)) implements composite ${ densevector_fromfunc($0, i => 1f) }
     static (DenseVector) ("rand", Nil, MInt :: DenseVector(MDouble)) implements composite ${ densevector_fromfunc($0, i => random[Double]) }
     static (DenseVector) ("randf", Nil, MInt :: DenseVector(MFloat)) implements composite ${ densevector_fromfunc($0, i => random[Float]) }
-    static (DenseVector) ("uniform", Nil, MethodSignature(List(("start", MInt), ("step_size", MDouble), ("end", MInt), ("isRow", MBoolean, "unit(true)")), DenseVector(MDouble))) implements composite ${
+    static (DenseVector) ("uniform", Nil, MethodSignature(List(("start", MDouble), ("step_size", MDouble), ("end", MDouble), ("isRow", MBoolean, "unit(true)")), DenseVector(MDouble))) implements composite ${
+      fassert(end > start+step_size, "end <= start+step_size in DenseVector.uniform")      
       val length = ceil(($end-$start)/$step_size)
       densevector_fromfunc(length, i => $step_size*i + $start)
     }

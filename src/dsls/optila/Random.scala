@@ -89,5 +89,55 @@ trait RandomOps {
 
       out.unsafeImmutable
     }
+
+    direct (Rand) ("sample", Nil, (("v",IndexVector), ("pct", MDouble)) :: IndexVector, effect = simple) implements composite ${
+      indexvector_fromarray(densevector_raw_data(sample($0.toDense,pct)), $0.isRow)
+    }
+
+    direct (Rand) ("sample", A, (("v",DenseVector(A)), ("pct", MDouble)) :: DenseVector(A), effect = simple) implements composite ${
+      val candidates = (0::v.length).mutable
+
+      val sampled = DenseVector[A](0, v.isRow)
+      val numSamples = ceil(v.length * pct)
+      for (i <- 0 until numSamples){
+        val r = i + randomInt(v.length-i)
+        val idx = candidates(r)
+        sampled <<= v(idx)
+
+        // remove index r from consideration
+        val t = candidates(r)
+        candidates(r) = candidates(i)
+        candidates(i) = t
+      }
+
+      sampled.unsafeImmutable
+    }      
+
+    direct (Rand) ("sample", A, MethodSignature(List(("m",DenseMatrix(A)), ("pct", MDouble), ("sampleRows", MBoolean, "unit(true)")), DenseMatrix(A)), effect = simple) implements composite ${      
+      val numSamples = if (sampleRows) ceil(m.numRows*pct) else ceil(m.numCols*pct)
+      val length = if (sampleRows) m.numRows else m.numCols
+      val newRows = if (sampleRows) numSamples else m.numRows
+      val newCols = if (sampleRows) m.numCols else numSamples
+
+      val sampled = if (sampleRows) DenseMatrix[A](0, newCols) else DenseMatrix[A](0, newRows) // transposed for efficiency
+      
+      val candidates = (0::length).mutable
+
+      // transpose to make constructing sampling more efficient
+      val mt = if (sampleRows) m else m.t
+
+      for (i <- 0 until numSamples){
+        val r = i + randomInt(length-i)
+        val idx = candidates(r)
+        sampled <<= mt(idx).Clone
+
+        // remove index r from consideration
+        val t = candidates(r)
+        candidates(r) = candidates(i)
+        candidates(i) = t
+      }
+
+      if (sampleRows) sampled else sampled.t
+    }
   }
 }

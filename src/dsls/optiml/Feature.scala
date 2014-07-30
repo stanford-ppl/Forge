@@ -11,18 +11,26 @@ trait FeatureOps {
     val DenseVector = lookupTpe("DenseVector")
     
     val ContinuousFeature = tpe("ContinuousFeature")
-    data(ContinuousFeature, ("_min", MDouble), ("_max", MDouble))
-    static (ContinuousFeature) ("apply", Nil, (("min", MDouble, "math_ninf()"), ("max", MDouble, "math_inf()")) :: ContinuousFeature) implements allocates(ContinuousFeature, ${$0}, ${$1})
+    data(ContinuousFeature, ("_default", MDouble), ("_min", MDouble), ("_max", MDouble))
+
+    // we use a magic number for the default because we don't support optional values in generated DSL code (yet)
+    static (ContinuousFeature) ("apply", Nil, (("default", MDouble, "unit(0.0209)"), ("min", MDouble, "math_ninf()"), ("max", MDouble, "math_inf()")) :: ContinuousFeature) implements allocates(ContinuousFeature, ${$0}, ${$1}, ${$2})
 
     val ContinuousFeatureOps = withTpe(ContinuousFeature)
     ContinuousFeatureOps {
+      infix ("default") (Nil :: MDouble) implements getter(0, "_default")
       infix ("min") (Nil :: MDouble) implements getter(0, "_min")
       infix ("max") (Nil :: MDouble) implements getter(0, "_max")
       infix ("apply") (MString :: MDouble) implements composite ${ 
-        val num = $1.toDouble
-        if (num < $self.min) { $self.min }
-        else if (num > $self.max) { $self.max }
-        else num
+        if ($1 == "" && $self.default != 0.0209) {
+          $self.default
+        }
+        else {
+          val num = $1.toDouble
+          if (num < $self.min) { $self.min }
+          else if (num > $self.max) { $self.max }
+          else num
+        }
       }
     }
 
@@ -56,14 +64,18 @@ trait FeatureOps {
     }
 
     val BinaryFeature = tpe("BinaryFeature")
-    data(BinaryFeature)
-    static (BinaryFeature) ("apply", Nil, (Nil :: BinaryFeature)) implements allocates(BinaryFeature)
+    data(BinaryFeature, ("_default", MBoolean))
+    static (BinaryFeature) ("apply", Nil, ("default", MBoolean, "unit(false)") :: BinaryFeature) implements allocates(BinaryFeature, ${$0})
 
     val BinaryFeatureOps = withTpe(BinaryFeature)
     BinaryFeatureOps {
+      infix ("default") (Nil :: MBoolean) implements getter(0, "_default")
+
       infix ("apply") (MString :: MInt) implements composite ${ 
-        fassert($1.toInt == 0 || $1.toInt == 1, "illegal input to binary feature")
-        $1.toInt
+        fassert($1 == "" || $1.toInt == 0 || $1.toInt == 1, "illegal input to binary feature")
+        if ($1 == "" && $self.default) 1
+        else if ($1 == "" && !$self.default) 0
+        else $1.toInt
       }
     }
   }

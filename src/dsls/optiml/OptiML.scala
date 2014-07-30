@@ -10,7 +10,8 @@ object OptiMLDSLRunner extends ForgeApplicationRunner with OptiMLDSL
 
 trait OptiMLDSL extends OptiLADSL
   with MLIOOps with FeatureOps with SetOps with BufferableOps with StreamOps with ImageOps
-  with FactorOps with FactorGraphOps {
+  with FactorOps with FactorGraphOps
+  with ClassifierOps with ValidateOps {
 
   override def dslName = "OptiML"
 
@@ -35,6 +36,8 @@ trait OptiMLDSL extends OptiLADSL
     importMLIOOps()
     importStreamOps()
     importImageOps()    
+    importClassifierOps()
+    importValidateOps()
   }
 
   def importUntilConverged() {
@@ -59,9 +62,12 @@ trait OptiMLDSL extends OptiLADSL
       }
 
       if (iter == maxIter){
-        println("Maximum iterations exceeded")
+        println("[optiml]: maximum iterations (" + iter + ") exceeded")
       }
-
+      else {
+        println("[optiml]: converged in " + iter + " iterations")
+      }
+      
       cur
     }
 

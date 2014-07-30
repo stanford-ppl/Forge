@@ -620,18 +620,14 @@ trait DenseMatrixOps {
        }
 
        infix ("mapRows") ((DenseVectorView(T) ==> DenseVector(R)) :: DenseMatrix(R), addTpePars = R) implements composite ${
-         val out = DenseMatrix[R]($self.numRows, $self.numCols)
-         (0::$self.numRows) foreach { i =>
-           out(i) = $1($self(i))
+         (0::$self.numRows, *) { i =>
+           $1($self(i))
          }
-         out.unsafeImmutable
        }
        infix ("mapCols") ((DenseVectorView(T) ==> DenseVector(R)) :: DenseMatrix(R), addTpePars = R) implements composite ${
-         val out = DenseMatrix[R]($self.numRows, $self.numCols)
-         (0::$self.numCols) foreach { j =>
-           out.updateCol(j, $1($self.getCol(j)))
+         (*, 0::$self.numCols) { j =>
+           $1($self.getCol(j))
          }
-         out.unsafeImmutable
        }
 
        // in order to express this with the current Delite ops, we have to convert the matrix to a vector of vectors,

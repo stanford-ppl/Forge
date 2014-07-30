@@ -27,6 +27,7 @@ def main():
     parser.add_option("-c", "--clean", action="store_true", dest="build_clean", default=False, help="nuke the build directory if it already exists")
     parser.add_option("--clean-extern", action="store_true", dest="extern_clean", default=False, help="always republish extern files")
     parser.add_option("--use-jars", action="store_true", dest="use_jars", default=False, help="generate an SBT build file for the DSL that uses managed dependencies for LMS/Delite")
+    parser.add_option("--no-apps", action="store_false", dest="copy_apps", default=True, help="do not copy included DSL apps to published folder")
 
     (opts, args) = parser.parse_args()
     if len(args) < 1:
@@ -260,9 +261,10 @@ def publish(dsl, opts):
         publish_dsl_extern(dsl, build_dir, scratch_dir, dsl)
 
     # apps
-    apps_dir = FORGE_HOME + "/apps/" + dsl + "/"
-    if os.path.exists(apps_dir):
-        os.system("rsync -r " + apps_dir + " " + build_dir + "/apps/")
+    if opts.copy_apps:
+        apps_dir = FORGE_HOME + "/apps/" + dsl + "/"
+        if os.path.exists(apps_dir):
+            os.system("rsync -r " + apps_dir + " " + build_dir + "/apps/")
 
     # tests
     tests_dir = FORGE_HOME + "/tests/" + dsl + "/"

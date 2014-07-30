@@ -90,6 +90,14 @@ trait ScalaGenDateOps extends ScalaGenDeliteStruct {
     case _ => super.remap(m)
   }
 }
-trait CudaGenDateOps
-trait OpenCLGenDateOps
-trait CGenDateOps
+
+trait CLikeGenDateOps extends CLikeGenDeliteStruct {
+  override def remap[A](m: Manifest[A]): String = m match {
+    case m if m.erasure.getSimpleName == "Date" => remap(Manifest.Int)
+    case _ => super.remap(m)
+  }
+}
+
+trait CudaGenDateOps extends CLikeGenDateOps
+trait OpenCLGenDateOps extends CLikeGenDateOps
+trait CGenDateOps extends CLikeGenDateOps

@@ -46,9 +46,10 @@ trait GeneApp extends OptiQLApplication {
       val fields = array_string_split(line, "\t")
       fields(1)
     }
+
     tic(data.size)
     val q = data.Select(g => g.substring(13)).Where(g => fuzzyStartsWith(g))
-    toc(q)
+    toc(q.size)
   }
 
 }

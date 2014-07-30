@@ -2,10 +2,8 @@ import optigraph.compiler._
 import optigraph.library._
 import optigraph.shared._
 
-// This object lets us run the Delite version of the code
-object UndirectedTriangleCountingCSRCompiler extends OptiGraphApplicationCompiler with UndirectedTriangleCountingCSR
 
-// This object lets us run the Scala library version of the code
+object UndirectedTriangleCountingCSRCompiler extends OptiGraphApplicationCompiler with UndirectedTriangleCountingCSR
 object UndirectedTriangleCountingCSRInterpreter extends OptiGraphApplicationInterpreter with UndirectedTriangleCountingCSR
 
 trait UndirectedTriangleCountingCSR extends OptiGraphApplication {
@@ -13,9 +11,15 @@ trait UndirectedTriangleCountingCSR extends OptiGraphApplication {
     if (args.length < 2) printUsage
 
     val nodesArray = ForgeFileReader.readLines(args(0)){ _.toInt }
-    val edgesArray = ForgeFileReader.readLines(args(1)){ _.toInt }
+    val nl = array_length(nodesArray)
+    println("nodes: " + nl)
+
+    val edgesArray = ForgeFileReader.readLinesFlattened(args(1)){ s => array_string_split(s,"\\s+").map(_.toInt) }
+    val el = array_length(edgesArray)
+    println("edges: " + el)
+
     val g = undirectedGraphFromCSR(nodesArray, edgesArray)
-    tic(g)
+    tic(nl,el)
     
     val t = sumOverNodes(g.nodes){ n =>
       sumOverNeighbors(g.neighbors(n)){ nbr =>
@@ -25,7 +29,7 @@ trait UndirectedTriangleCountingCSR extends OptiGraphApplication {
     }
 
     toc(t)
-    println("Number of triangles " + t)
+    println("Number of triangles: " + t)
   }
   def printUsage = {
     println("Usage: UndirectedTriangleCounting <path to nodes> <path to edges>")

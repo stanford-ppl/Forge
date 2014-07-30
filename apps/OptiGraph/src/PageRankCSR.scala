@@ -2,10 +2,8 @@ import optigraph.compiler._
 import optigraph.library._
 import optigraph.shared._
 
-// This object lets us run the Delite version of the code
-object PageRankCSRCompiler extends OptiGraphApplicationCompiler with PageRankCSR
 
-// This object lets us run the Scala library version of the code
+object PageRankCSRCompiler extends OptiGraphApplicationCompiler with PageRankCSR
 object PageRankCSRInterpreter extends OptiGraphApplicationInterpreter with PageRankCSR
 
 trait PageRankCSR extends OptiGraphApplication {
@@ -14,15 +12,19 @@ trait PageRankCSR extends OptiGraphApplication {
     array_reduce(array_fromfunction(a.length, i => abs(a(i)-b(i))), (x:Rep[Double],y:Rep[Double]) => x+y, 0.0)
   }
 
-  def main() = {
-    println("PageRank")
-  
+  def main() = {  
     if (args.length < 2) printUsage
 
     val nodesArray = ForgeFileReader.readLines(args(0)){ _.toInt }
-    val edgesArray = ForgeFileReader.readLines(args(1)){ _.toInt }
+    val nl = array_length(nodesArray)
+    println("nodes: " + nl)
+
+    val edgesArray = ForgeFileReader.readLinesFlattened(args(1)){ s => array_string_split(s,"\\s+").map(_.toInt) }
+    val el = array_length(edgesArray)
+    println("edges: " + el)
+
     val g = undirectedGraphFromCSR(nodesArray, edgesArray)
-    tic(g)
+    tic(nl,el)
 
     //matches parameters from snap
     //initalize array to 1/numNodes
@@ -39,7 +41,7 @@ trait PageRankCSR extends OptiGraphApplication {
       }
     }{(curPr,oldPr) => hackyReduce(curPr,oldPr)}
     
-    toc(pr)
+    toc(pr.length)
     println(pr(0))
   }
   def printUsage = {

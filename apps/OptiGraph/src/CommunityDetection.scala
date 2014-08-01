@@ -14,7 +14,7 @@ trait CommDetection extends OptiGraphApplication {
   def main() = {
     println("CommunityDetection")
   
-    if (args.length < 2) printUsage
+    if (args.length < 3) printUsage
 
     tic("input loading")
     val edgeList = loadUndirectedEdgeList(args(0))
@@ -24,7 +24,7 @@ trait CommDetection extends OptiGraphApplication {
     val g = undirectedGraphFromEdgeList(edgeList)
     toc("creating graph",g)
     
-    val k = 0.01
+    val k = args(2).toDouble
     val result = CommunityDetection(args(1),g.getCSRNodes,g.getCSREdges,k)
 
     println(array_length(result._1))
@@ -71,7 +71,7 @@ trait CommDetection extends OptiGraphApplication {
     pack(g.getCSRNodes,g.getCSREdges)
   }
   def printUsage = {
-    println("Usage: CommunityDetection <path to input edge list file> <path prefix for output>")
+    println("Usage: CommunityDetection <path to input edge list file> <path prefix for output> <convergance factor>")
     exit(-1)
   }
 }

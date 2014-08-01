@@ -481,7 +481,6 @@ trait ScalaOps {
     impl (toBoolean) (codegen(cpp, ${ string_toBoolean($0) })) 
     impl (trim) (codegen(cpp, ${ string_trim($0) })) 
     impl (fcharAt) (codegen(cpp, ${ string_charAt($0,$1) })) 
-    impl (length) (codegen(cpp, ${ $0->length }))
     impl (startsWith) (codegen(cpp, ${ string_startsWith($0,$1) })) 
     impl (length) (codegen(cpp, ${ string_length($0) }))
     impl (endsWith) (codegen(cpp, ${ string_endsWith($0,$1) })) 

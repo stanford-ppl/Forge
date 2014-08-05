@@ -61,13 +61,15 @@ trait CommDetection extends OptiGraphApplication {
       ///////////////////PHASE 2/////////////////////////////////////
       //Generate a new graph from community structure
       //Generate a new comm structure from graph so we can go again
-      val (g,n2o) = unpack(c.generateNewGraph)
+      val result = c.generateNewGraph
+      g = result._1
+      val n2o = result._2
       c = Community(g,precision,n2o)  //to be used in the next round
       ///////////////////////////////////////////////////////////////
 
       //////////////////////DEBUG/////////////////////////////////////
       println("Level: " + level + " Modularity improved from: " + mod + " to: " + newMod)
-      //println("\tnumNodes: " + g.numNodes + " numEdges: " + g.numEdges + " weight: " + g.totalWeight)
+      println("\tnumNodes: " + g.numNodes + " numEdges: " + g.numEdges + " weight: " + g.totalWeight)
       //printGraph(path,level,mod,newMod,g.numNodes,g.numEdges,g.getCSRNodes,g.getCSREdges,g.getCSREdgeWeights)
       level += 1
       mod = newMod

@@ -71,7 +71,7 @@ trait StreamOps {
         close_reader(f)        
       }
 
-      infix ("map") (CurriedMethodSignature(List(List(("outFile", MString)), List(("func", MString ==> MString))), MUnit)) implements single ${      
+      infix ("map") (CurriedMethodSignature(List(List(("outFile", MString)), List(("func", MString ==> MString))), MUnit)) implements composite ${      
         val out = open_writer(outFile)
         // the below incorrectly infers the type of 'line' for mysterious reasons
         // for (line <- $self) { 
@@ -81,7 +81,7 @@ trait StreamOps {
         close_writer(out)
       } 
 
-      infix ("reduce") (CurriedMethodSignature(List(List(("init", T)), List(("func", (T,MString) ==> T))), T), addTpePars = T) implements single ${
+      infix ("reduce") (CurriedMethodSignature(List(List(("init", T)), List(("func", (T,MString) ==> T))), T), addTpePars = T) implements composite ${
         var acc = init
         // for (line <- $self) { 
         $self.foreach { line: Rep[String] => 

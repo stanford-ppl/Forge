@@ -53,7 +53,7 @@ trait SparseMatrixOps {
         foundAtIndex
       }
 
-      infix ("apply") ((("i",MInt),("j",MInt)) :: T) implements single ${
+      infix ("apply") ((("i",MInt),("j",MInt)) :: T) implements composite ${
         println("[optila warning]: possible performance problem - reading from a sparse matrix COO representation")
 
         val data = sparsematrix_coo_data($self)
@@ -131,7 +131,7 @@ trait SparseMatrixOps {
       compiler ("sparsematrix_coo_set_colindices") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_colIndices", ${$1})
       compiler ("sparsematrix_coo_set_nnz") (MInt :: MUnit, effect = write(0)) implements setter(0, "_nnz", ${$1})
 
-      infix ("update") ((MInt,MInt,T) :: MUnit, effect = write(0)) implements single ${
+      infix ("update") ((MInt,MInt,T) :: MUnit, effect = write(0)) implements composite ${
         // duplicates are allowed, so don't bother checking if the value already exists
         // the last value in the array (furthest to the right is the true value)
 
@@ -493,7 +493,7 @@ trait SparseMatrixOps {
         if (offRaw > -1) data(offRaw) else defaultValue[T]
       }
 
-      infix ("apply") (MInt :: SparseVector(T)) implements redirect ${ $self.getRow($1) }
+      infix ("apply") (MInt :: SparseVectorView(T)) implements redirect ${ $self.getRow($1) }
 
       // orientation of IndexVector in apply does not matter - use getCols or 2d apply to slice cols. This is so we can use n::m syntax
       // to slice rows, while still retaining our convention of row vectors being the default (e.g. for matrix construction)

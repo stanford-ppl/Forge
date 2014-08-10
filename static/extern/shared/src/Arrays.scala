@@ -7,17 +7,23 @@ import scala.virtualization.lms.util.OverloadHack
 
 // Front-end
 trait ForgeArrayOps extends Base with OverloadHack {
+  this: ForgeHashMapOps =>
+
   /**
    * We use ForgeArray[T] instead of T so we don't get any subtle errors related to shadowing Array[T]
    */
   type ForgeArray[T]
-  type ForgeHashMap[K,V]
   implicit def forgeArrayManifest[T:Manifest]: Manifest[ForgeArray[T]]
 
   /**
    * Applications may need direct access to ForgeArrays, if, for example, they use string fsplit
    * How do we allow DSLs to only optionally include the Array API for end users?
    */
+  implicit class ForgeArrayOps[T:Manifest](x: Rep[ForgeArray[T]]) {
+    def apply(n: Rep[Int])(implicit ctx: SourceContext) = array_apply(x,n)
+    def length = array_length(x)
+  }
+
   def array_apply[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[T]
   def array_length[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[Int]
 
@@ -33,6 +39,8 @@ trait ForgeArrayOps extends Base with OverloadHack {
   def scala_array_length[T:Manifest](x: Rep[Array[T]])(implicit __imp0: SourceContext): Rep[Int]
 }
 trait ForgeArrayCompilerOps extends ForgeArrayOps {
+  this: ForgeHashMapCompilerOps =>
+
   /**
    * There are some unfortunate scalac typer crashes when we try to use the nicer front-end from DSLs :(
    */
@@ -41,9 +49,8 @@ trait ForgeArrayCompilerOps extends ForgeArrayOps {
     def copy[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int],__arg2: Rep[ForgeArray[T]],__arg3: Rep[Int],__arg4: Rep[Int])(implicit __imp0: SourceContext) = array_copy(__arg0,__arg1,__arg2,__arg3,__arg4)
   }
 
-  implicit class ForgeArrayOps[T:Manifest](x: Rep[ForgeArray[T]]) {
-    def update(n: Rep[Int], y: Rep[T])(implicit ctx: SourceContext) = array_update(x,n,y)
-    def apply(n: Rep[Int])(implicit ctx: SourceContext) = array_apply(x,n)
+  implicit class ForgeArrayCompilerOps[T:Manifest](x: Rep[ForgeArray[T]]) {
+    def update(n: Rep[Int], y: Rep[T])(implicit ctx: SourceContext) = array_update(x,n,y)    
     def map[R:Manifest](f: Rep[T] => Rep[R])(implicit ctx: SourceContext) = array_map[T,R](x,f)
     def Clone(implicit ctx: SourceContext) = array_clone(x)
   }
@@ -76,8 +83,9 @@ trait ForgeArrayBufferOps extends Base {
   type ForgeArrayBuffer[T]
   implicit def forgeArrayBufferManifest[T:Manifest]: Manifest[ForgeArrayBuffer[T]]
 }
+
 trait ForgeArrayBufferCompilerOps extends ForgeArrayBufferOps {
-  this: ForgeArrayCompilerOps =>
+  this: ForgeArrayCompilerOps with ForgeHashMapCompilerOps =>
 
   def array_buffer_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
   def array_buffer_immutable[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]

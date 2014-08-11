@@ -41,7 +41,7 @@ trait GeneApp extends OptiQLApplication {
     if (args.length < 1) printUsage()
     val path = args(0)
     val data = Table.fromFile(path){ line =>
-      val fields = array_string_split(line, "\t")
+      val fields = line.fsplit("\t")
       fields(1)
     }
 

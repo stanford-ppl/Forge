@@ -91,11 +91,11 @@ trait DenseMatrixOps {
       out.unsafeImmutable
     }
 
-    static (DenseMatrix) ("diag", T withBound TArith, (MInt, DenseVector(T)) :: DenseMatrix(T)) implements single ${ densematrix_fromfunc($0, $0, (i,j) =>
+    static (DenseMatrix) ("diag", T withBound TArith, (MInt, DenseVector(T)) :: DenseMatrix(T)) implements composite ${ densematrix_fromfunc($0, $0, (i,j) =>
       if (i == j) $1(i)
       else implicitly[Arith[T]].empty
     )}
-    static (DenseMatrix) ("identity", Nil, (MInt,MInt) :: DenseMatrix(MDouble)) implements single ${ densematrix_fromfunc($0, $1, (i,j) =>
+    static (DenseMatrix) ("identity", Nil, (MInt,MInt) :: DenseMatrix(MDouble)) implements composite ${ densematrix_fromfunc($0, $1, (i,j) =>
       if (i == j) 1.0
       else 0.0
     )}
@@ -259,7 +259,7 @@ trait DenseMatrixOps {
          }
          out
        }
-       infix ("replicate") ((MInt,MInt) :: DenseMatrix(T)) implements single ${
+       infix ("replicate") ((MInt,MInt) :: DenseMatrix(T)) implements composite ${
          val out = DenseMatrix[T]($1*$self.numRows, $2*$self.numCols)
          for (ii <- 0 until $1) {
            for (i <- 0 until $self.numRows) {
@@ -296,25 +296,25 @@ trait DenseMatrixOps {
         }
       }
 
-      infix ("<<") (DenseVector(T) :: DenseMatrix(T)) implements single ${
+      infix ("<<") (DenseVector(T) :: DenseMatrix(T)) implements composite ${
         val out = DenseMatrix[T](0, 0)
         out <<= $self
         out <<= $1
         out.unsafeImmutable
       }
-      infix ("<<") (DenseMatrix(T) :: DenseMatrix(T)) implements single ${
+      infix ("<<") (DenseMatrix(T) :: DenseMatrix(T)) implements composite ${
         val out = DenseMatrix[T](0, 0)
         out <<= $self
         out <<= $1
         out.unsafeImmutable
       }
-      infix ("<<|") (DenseVector(T) :: DenseMatrix(T)) implements single ${
+      infix ("<<|") (DenseVector(T) :: DenseMatrix(T)) implements composite ${
         val out = DenseMatrix[T](0, 0)
         out.insertAllCols(0, $self)
         out.insertCol($self.numCols, $1)
         out.unsafeImmutable
       }
-      infix ("<<|") (DenseMatrix(T) :: DenseMatrix(T)) implements single ${
+      infix ("<<|") (DenseMatrix(T) :: DenseMatrix(T)) implements composite ${
         val out = DenseMatrix[T](0, 0)
         out.insertAllCols(0, $self)
         out.insertAllCols($self.numCols, $1)

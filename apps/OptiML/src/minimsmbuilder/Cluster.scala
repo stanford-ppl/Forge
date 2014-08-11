@@ -33,7 +33,7 @@ object MiniMSMInterpreter extends OptiMLApplicationInterpreter with Clarans {
 }
   
 trait Clarans extends OptiMLApplication with TheoData with DirectSolver {
-  lazy val verbose = true
+  val verbose = true
   
   def vprint(s: Rep[String]) = if (verbose) print(s)
   

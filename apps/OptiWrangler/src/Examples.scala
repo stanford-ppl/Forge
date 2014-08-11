@@ -29,7 +29,7 @@ trait Examples extends OptiWranglerApplication {
 		tic("Applying transforms")
 		println("Applying transforms...")
 
-		val colsToMerge = array_string_split("renCol,split1", ",")
+		val colsToMerge = "renCol,split1".fsplit(",")
 		val outTable = (tbl Split(col = "data", delimiter = ";", numOfSplits = 4)
 		                    Fill("up")
 		                    Translate("left")

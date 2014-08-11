@@ -46,16 +46,16 @@ trait VectorOps {
       /**
        * Conversions
        */
-      infix ("toBoolean") (Nil :: DenseVector(MBoolean), ("conv",T ==> MBoolean)) implements map((T,MBoolean), 0, ${$conv})
-      infix ("toDouble") (Nil :: DenseVector(MDouble), ("conv",T ==> MDouble)) implements map((T,MDouble), 0, ${$conv})
-      infix ("toFloat") (Nil :: DenseVector(MFloat), ("conv",T ==> MFloat)) implements map((T,MFloat), 0, ${$conv})
-      infix ("toInt") (Nil :: DenseVector(MInt), ("conv",T ==> MInt)) implements map((T,MInt), 0, ${$conv})
+      infix ("toBoolean") (Nil :: DenseVector(MBoolean), ("conv",T ==> MBoolean)) implements composite ${ self.map(conv) }
+      infix ("toDouble") (Nil :: DenseVector(MDouble), ("conv",T ==> MDouble)) implements composite ${ self.map(conv) }
+      infix ("toFloat") (Nil :: DenseVector(MFloat), ("conv",T ==> MFloat)) implements composite ${ self.map(conv) }
+      infix ("toInt") (Nil :: DenseVector(MInt), ("conv",T ==> MInt)) implements composite ${ self.map(conv) }
 
       /**
        * Accessors
        */
       infix ("indices") (Nil :: IndexVector) implements composite ${ IndexVector(unit(0), $self.length, $self.isRow) }
-      infix ("isEmpty") (Nil :: MBoolean) implements single ${ $self.length == 0 }
+      infix ("isEmpty") (Nil :: MBoolean) implements composite ${ $self.length == 0 }
       infix ("first") (Nil :: T) implements composite ${ $self(0) }
       infix ("last") (Nil :: T) implements composite ${ $self($self.length - 1) }
       infix ("drop") (MInt :: V) implements composite ${ $self.slice($1, $self.length) }
@@ -91,7 +91,7 @@ trait VectorOps {
         out
       }
 
-      infix ("replicate") ((MInt,MInt) :: DenseMatrix(T)) implements single ${
+      infix ("replicate") ((MInt,MInt) :: DenseMatrix(T)) implements composite ${
         if ($self.isRow) {
           val out = DenseMatrix[\$TT]($1, $2*$self.length)
           for (col <- 0 until $2*$self.length){
@@ -115,7 +115,7 @@ trait VectorOps {
       }
 
       // we need two versions so that we can override toString in the lib, and use makeStr in Delite. sad.
-      infix ("makeString") (Nil :: MString, S) implements single ${
+      infix ("makeString") (Nil :: MString, S) implements composite ${
         var s = ""
         if ($self.length == 0) {
           s = "[ ]"
@@ -134,7 +134,7 @@ trait VectorOps {
         }
         s
       }
-      infix ("toString") (Nil :: MString) implements single ${
+      infix ("toString") (Nil :: MString) implements composite ${
         var s = ""
         if ($self.length == 0) {
           s = "[ ]"
@@ -163,9 +163,9 @@ trait VectorOps {
 
       // allow arbitrary rhs arguments as well.. are we getting carried away?
       for (rhs <- List(DenseVector(T),DenseVectorView(T))) {
-        infix ("+") (rhs :: DenseVector(T), A) implements zip((T,T,T), (0,1), ${ (a,b) => a+b })
-        infix ("-") (rhs :: DenseVector(T), A) implements zip((T,T,T), (0,1), ${ (a,b) => a-b })
-        infix ("*") (rhs :: DenseVector(T), A) implements zip((T,T,T), (0,1), ${ (a,b) => a*b })
+        infix ("+") (rhs :: DenseVector(T), A) implements composite ${ $self.zip($1) { (a,b) => a+b } }
+        infix ("-") (rhs :: DenseVector(T), A) implements composite ${ $self.zip($1) { (a,b) => a-b } }
+        infix ("*") (rhs :: DenseVector(T), A) implements composite ${ $self.zip($1) { (a,b) => a*b } }
         infix ("*:*") (rhs :: T, A) implements composite ${
           fassert($self.length == $1.length, "dimension mismatch: vector dot product")
           sum($self*$1)
@@ -180,7 +180,7 @@ trait VectorOps {
           }
           out.unsafeImmutable
         }
-        infix ("/") (rhs :: DenseVector(T), A) implements zip((T,T,T), (0,1), ${ (a,b) => a/b })
+        infix ("/") (rhs :: DenseVector(T), A) implements composite ${ $self.zip($1) { (a,b) => a/b } }
       }
 
       for (rhs <- List(SparseVector(T),SparseVectorView(T))) {
@@ -200,19 +200,19 @@ trait VectorOps {
         infix ("zip") (CurriedMethodSignature(List(List(rhs), List((T,B) ==> R)), DenseVector(R)), addTpePars = (B,R)) implements zip((T,B,R), (0,1), ${ (a,b) => $2(a,b) })
       }
 
-      infix ("+") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e+$1 })
-      infix ("-") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e-$1 })
-      infix ("*") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e*$1 })
+      infix ("+") (T :: DenseVector(T), A) implements composite ${ self.map(e => e+$1) }
+      infix ("-") (T :: DenseVector(T), A) implements composite ${ self.map(e => e-$1) }
+      infix ("*") (T :: DenseVector(T), A) implements composite ${ self.map(e => e*$1) }
       infix ("*") (DenseMatrix(T) :: DenseVector(T), A) implements composite ${
         fassert($self.isRow, "dimension mismatch: vector * matrix")
         $1.mapColsToVector { col => $self *:* col }
       }
-      infix ("/") (T :: DenseVector(T), A) implements map((T,T), 0, ${ e => e/$1 })
+      infix ("/") (T :: DenseVector(T), A) implements composite ${ self.map(e => e/$1) }
 
-      infix ("abs") (Nil :: DenseVector(T), A) implements map((T,T), 0, ${ e => e.abs })
-      infix ("exp") (Nil :: DenseVector(T), A) implements map((T,T), 0, ${ e => e.exp })
-      infix ("log") (Nil :: DenseVector(T), A) implements map((T,T), 0, ${ e => e.log })
-      infix ("sum") (Nil :: T, A) implements reduce(T, 0, Z, ${ (a,b) => a+b })
+      infix ("abs") (Nil :: DenseVector(T), A) implements composite ${ self.map(e => e.abs) }
+      infix ("exp") (Nil :: DenseVector(T), A) implements composite ${ self.map(e => e.exp) }
+      infix ("log") (Nil :: DenseVector(T), A) implements composite ${ self.map(e => e.log) }
+      infix ("sum") (Nil :: T, A) implements composite ${ self.reduce((a,b) => a+b ) }
       infix ("prod") (Nil :: T, A) implements reduce(T, 0, ${unit(1.asInstanceOf[\$TT])}, ${ (a,b) => a*b })
       infix ("mean") (Nil :: MDouble, ("conv",T ==> MDouble)) implements composite ${ $self.map(conv).sum / $self.length }
       infix ("min") (Nil :: T, O) implements reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a < b) a else b })
@@ -244,7 +244,7 @@ trait VectorOps {
         else 0
       }
 
-      infix ("partition") (("pred",(T ==> MBoolean)) :: Tuple2(DenseVector(T),DenseVector(T))) implements single ${
+      infix ("partition") (("pred",(T ==> MBoolean)) :: Tuple2(DenseVector(T),DenseVector(T))) implements composite ${
         val outT = DenseVector[\$TT](0, $self.isRow)
         val outF = DenseVector[\$TT](0, $self.isRow)
         for (i <- 0 until $self.length) {

@@ -117,7 +117,7 @@ trait DenseVectorOps {
 
     compiler (DenseVector) ("densevector_groupby_helper", (T,K,V), (DenseVector(T), T ==> K, T ==> V) :: MHashMap(K, MArrayBuffer(V))) implements groupBy((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)})
 
-    infix (DenseVector) ("toVector", (T,R), MHashMap(T, R) :: DenseVector(R)) implements composite ${
+    infix (DenseVector) ("toVector", (T,R), MHashMap(T,R) :: DenseVector(R)) implements composite ${
       densevector_fromarray(fhashmap_values($0), true)
     }
 
@@ -167,7 +167,7 @@ trait DenseVectorOps {
         array_update(densevector_raw_data($self), $i, $e)
       }
 
-      infix ("update") ((("indices",IndexVector),("e",T)) :: MUnit, effect = write(0)) implements single ${
+      infix ("update") ((("indices",IndexVector),("e",T)) :: MUnit, effect = write(0)) implements composite ${
         (0::indices.length) foreach { i =>
           fassert(indices(i) >= 0 && indices(i) < $self.length, "index out of bounds: bulk vector update")
           array_update(densevector_raw_data($self), indices(i), e)
@@ -185,12 +185,12 @@ trait DenseVectorOps {
         }
       }
 
-      infix ("<<") (T :: DenseVector(T)) implements single ${
+      infix ("<<") (T :: DenseVector(T)) implements composite ${
         val out = $self.mutable
         out <<= $1
         out.unsafeImmutable
       }
-      infix("<<") (DenseVector(T) :: DenseVector(T)) implements single ${
+      infix("<<") (DenseVector(T) :: DenseVector(T)) implements composite ${
         val out = DenseVector[T]($self.length+$1.length, $self.isRow)
         for (i <- 0 until $self.length){
           out(i) = $self(i)
@@ -316,12 +316,20 @@ trait DenseVectorOps {
         val a = array_sort(densevector_raw_data(v2))
         densevector_fromarray(a, $self.isRow)
       }
+
+      infix ("sortBy") ((T ==> B) :: DenseVector(T), TOrdering(B), addTpePars = B) implements composite ${
+        val sortedIndicesRaw = densevector_sortindex_helper(0, $self.length, densevector_raw_data($self.map($1)))
+        val sortedIndices = IndexVector(densevector_fromarray(sortedIndicesRaw,$self.isRow))
+        $self(sortedIndices)        
+      }
+
       infix ("sortWithIndex") (Nil :: CTuple2(DenseVector(T),IndexVector), TOrdering(T)) implements composite ${
         val sortedIndicesRaw = densevector_sortindex_helper(0, $self.length, densevector_raw_data($self))
         val sortedIndices = IndexVector(densevector_fromarray(sortedIndicesRaw,$self.isRow))
         ($self(sortedIndices),sortedIndices)
       }
-      infix ("median") (Nil :: T, (TNumeric(T),TOrdering(T))) implements single ${
+
+      infix ("median") (Nil :: T, (TNumeric(T),TOrdering(T))) implements composite ${
         val x = $self.sort
         val mid = x.length / 2
         if (x.length % 2 == 0) {
@@ -361,11 +369,11 @@ trait DenseVectorOps {
       /**
        * Required for parallel collection
        */
-      compiler ("densevector_appendable") ((MInt,T) :: MBoolean) implements single("true")
-      compiler ("densevector_append") ((MInt,T) :: MUnit, effect = write(0)) implements single ${
+      compiler ("densevector_appendable") ((MInt,T) :: MBoolean) implements composite("true")
+      compiler ("densevector_append") ((MInt,T) :: MUnit, effect = write(0)) implements composite ${
         $self.insert($self.length, $2)
       }
-      compiler ("densevector_copy") ((MInt,DenseVector(T),MInt,MInt) :: MUnit, effect = write(2)) implements single ${
+      compiler ("densevector_copy") ((MInt,DenseVector(T),MInt,MInt) :: MUnit, effect = write(2)) implements composite ${
         val src = densevector_raw_data($self)
         val dest = densevector_raw_data($2)
         array_copy(src, $1, dest, $3, $4)

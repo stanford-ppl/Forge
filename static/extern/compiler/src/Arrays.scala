@@ -129,7 +129,7 @@ trait CGenForgeArrayOps extends CGenDeliteArrayOps with CGenObjectOps {
     case ArrayApply(x,n) => emitValDef(sym, quote(x) + "->apply(" + quote(n) + ")")
     case ArrayLength(x) => emitValDef(sym, quote(x) + "->length")
     //TODO: enable ArrayStringSplit in cluster mode
-    case ArrayStringSplit(a,b,Const(0)) if (!Config.generateSerializable) => emitValDef(sym, "string_split(" + quote(a) + "," + quote(b) + ")")
+    case ArrayStringSplit(a,b,l) if (!Config.generateSerializable) => emitValDef(sym, "string_split(resourceInfo," + quote(a) + "," + quote(b) + "," + quote(l) + ")")
     case _ => super.emitNode(sym, rhs)
   }
 }

@@ -72,4 +72,4 @@ trait ScalaGenForgeHashMapOps extends ScalaGenDeliteMapOps {
 }
 trait CudaGenForgeHashMapOps
 trait OpenCLGenForgeHashMapOps
-trait CGenForgeHashMapOps
+trait CGenForgeHashMapOps extends CGenDeliteMapOps

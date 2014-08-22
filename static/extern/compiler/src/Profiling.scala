@@ -51,7 +51,7 @@ trait CGenProfilingOps extends CGenEffect {
     case ForgeProfileTime(deps) =>
       stream.println("struct timeval _" + quote(sym) + ";")
       stream.println("gettimeofday(&_" + quote(sym) + ", NULL);")
-      emitValDef(sym, "_" + quote(sym) + ".tv_sec * 1000000L + _" + quote(sym) + ".tv_usec")
+      emitValDef(sym, "(_" + quote(sym) + ".tv_sec * 1000000L + _" + quote(sym) + ".tv_usec)/1000")
     case _ => super.emitNode(sym,rhs)
   }
 }

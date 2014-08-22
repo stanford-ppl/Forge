@@ -680,16 +680,26 @@ trait ScalaOps {
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
     val HashMapOps = grp("SHashMap")
 
-    direct (HashMapOps) ("SHashMap", (K,V), Nil :: SHashMap(K,V), effect = mutable) implements codegen($cala, ${ new scala.collection.mutable.HashMap[$t[K],$t[V]]() })
+    val hashmap = direct (HashMapOps) ("SHashMap", (K,V), Nil :: SHashMap(K,V), effect = mutable)
+    impl (hashmap) (codegen($cala, ${ new scala.collection.mutable.HashMap[$t[K],$t[V]]() }))
+    impl (hashmap) (codegen(cpp, ${ new std::map<$t[K],$t[V]>() }))
+
     compiler (HashMapOps) ("shashmap_from_arrays", (K,V), (MArray(K),MArray(V)) :: SHashMap(K,V), effect = mutable) implements codegen($cala, ${ scala.collection.mutable.HashMap($0.zip($1): _*) })
     compiler (HashMapOps) ("shashmap_keys_array", (K,V), (SHashMap(K,V)) :: SArray(K)) implements codegen($cala, ${ $0.keys.toArray })
     compiler (HashMapOps) ("shashmap_values_array", (K,V), (SHashMap(K,V)) :: SArray(V)) implements codegen($cala, ${ $0.values.toArray })
 
-    infix (HashMapOps) ("apply", (K,V), (SHashMap(K,V), K) :: V) implements codegen($cala, ${ $0($1) })
-    infix (HashMapOps) ("update", (K,V), (SHashMap(K,V), K, V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $0.put($1,$2); () })
-    infix (HashMapOps) ("contains", (K,V), (SHashMap(K,V), K) :: MBoolean) implements codegen($cala, ${ $0.contains($1) })
+    val apply = infix (HashMapOps) ("apply", (K,V), (SHashMap(K,V), K) :: V)
+    val update = infix (HashMapOps) ("update", (K,V), (SHashMap(K,V), K, V) :: MUnit, effect = write(0))
+    val contains = infix (HashMapOps) ("contains", (K,V), (SHashMap(K,V), K) :: MBoolean)
     infix (HashMapOps) ("keys", (K,V), SHashMap(K,V) :: MArray(K)) implements composite ${ farray_from_sarray(shashmap_keys_array($0)) }
     infix (HashMapOps) ("values", (K,V), SHashMap(K,V) :: MArray(V)) implements composite ${ farray_from_sarray(shashmap_values_array($0)) }
+
+    impl (apply) (codegen($cala, ${ $0($1) }))
+    impl (apply) (codegen(cpp, ${ $0->find($1)->second }))
+    impl (update) (codegen($cala, ${ $0.put($1,$2); () }))
+    impl (update) (codegen(cpp, ${ $0->insert(std::pair<$t[K],$t[V]>($1,$2)) }))
+    impl (contains) (codegen($cala, ${ $0.contains($1) }))
+    impl (contains) (codegen(cpp, ${ $0->find($1) != $0->end() }))
   }
 
   def importConcurrentHashMap() = {

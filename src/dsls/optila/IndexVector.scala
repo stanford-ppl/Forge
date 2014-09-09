@@ -27,9 +27,7 @@ trait IndexVectorOps {
       allocates(IndexVector, quotedArg(0), ${ unit(0) }, ${ unit(0) }, quotedArg(1), ${ unit(false) })
 
     compiler (IndexVector) ("indexvector_copyarray", Nil, DenseVector(MInt) :: MArray(MInt)) implements composite ${
-      val d = array_empty[Int]($0.length)
-      $0.indices foreach { i => d(i) = $0(i) }
-      d.unsafeImmutable
+      array_fromfunction($0.length, { i => $0(i) })
     }
 
     // this is unsafe because it uses the underlying input array directly instead of copying
@@ -84,6 +82,9 @@ trait IndexVectorOps {
         else {
           indexvector_raw_data($self).apply($1)
         }
+      }
+      infix ("apply") (IndexVector :: IndexVector) implements composite ${
+        IndexVector($1 { i => $self(i) }, $self.isRow)        
       }
 
       infix ("slice") ((("start",MInt),("end",MInt)) :: IndexVector) implements composite ${

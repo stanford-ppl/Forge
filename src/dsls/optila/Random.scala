@@ -91,7 +91,7 @@ trait RandomOps {
     }
 
     direct (Rand) ("sample", Nil, (("v",IndexVector), ("pct", MDouble)) :: IndexVector, effect = simple) implements composite ${
-      indexvector_fromarray(densevector_raw_data(sample($0.toDense,pct)), $0.isRow)
+      IndexVector(sample($0.toDense,pct), $0.isRow)
     }
 
     direct (Rand) ("sample", A, (("v",DenseVector(A)), ("pct", MDouble)) :: DenseVector(A), effect = simple) implements composite ${

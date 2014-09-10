@@ -366,7 +366,7 @@ trait DenseVectorOps {
       
       // filter is here, instead of Vector.scala, so that other Vector types can have a different return value
       infix ("filter") ((T ==> MBoolean) :: DenseVector(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})      
-
+      
       /**
        * Required for parallel collection
        */
@@ -382,6 +382,10 @@ trait DenseVectorOps {
 
       parallelize as ParallelCollectionBuffer(T, lookupOp("densevector_dc_alloc"), lookupOp("length"), lookupOverloaded("apply",2), lookupOp("update"), lookupOp("densevector_set_length"), lookupOp("densevector_appendable"), lookupOp("densevector_append"), lookupOp("densevector_copy"))
     }
+
+    // the generic Vector.scala reduce requires an Arithmetic type class, so we handle some convenient other cases here
+    compiler (DenseVector) ("reduce_and", Nil, DenseVector(MBoolean) :: MBoolean) implements reduce(MBoolean, 0, ${unit(true)}, ${ (a,b) => a && b })
+    compiler (DenseVector) ("reduce_or", Nil, DenseVector(MBoolean) :: MBoolean) implements reduce(MBoolean, 0, ${unit(false)}, ${ (a,b) => a || b })
 
     // Add DenseVector to Arith
     val Arith = lookupGrp("Arith").asInstanceOf[Rep[DSLTypeClass]]

@@ -181,21 +181,21 @@ trait TreeOps {
     /* Construct the decision tree in a depth-first fashion */
     direct (Tree) ("dtree", Nil, MethodSignature(List(
                                    ("trainingSet",TrainingSet(MDouble,MDouble)), 
-                                   ("_maxDepth", MInt, "unit(-1)"),
-                                   ("_maxNumFeatures", MInt, "unit(-1)"),                                   
+                                   ("maxDepth", MInt, "unit(-1)"),
+                                   ("maxNumFeatures", MInt, "unit(-1)"),                                   
                                    ("minSamplesSplit", MInt, "unit(2)"),
                                    ("minSamplesLeaf", MInt, "unit(1)"),
                                    ("criterion", TCriterion, "MSE")
                                  ), Tree)) implements composite ${
 
       // optional value fakery
-      val maxDepth = if (_maxDepth < 0) INF.toInt else _maxDepth
-      val maxNumFeatures = if (_maxNumFeatures < 0) sqrt(trainingSet.numFeatures).toInt else _maxNumFeatures
+      val _maxDepth = if (maxDepth < 0) INF.toInt else maxDepth
+      val _maxNumFeatures = if (maxNumFeatures < 0) sqrt(trainingSet.numFeatures).toInt else maxNumFeatures
 
       // constants
       val MIN_IMPURITY_SPLIT = 1e-7
 
-      val tree = init_tree(maxDepth)
+      val tree = init_tree(_maxDepth)
 
       // create a lifted function we can call recursively
       val process = doLambda({(t: Rep[Tup7[IndexVector,Int,Int,Boolean,Double,DenseVector[Boolean],Any]]) =>
@@ -225,7 +225,8 @@ trait TreeOps {
 
         // stopping conditions
         val isLeaf = 
-          (depth >= maxDepth) || 
+          (depth >= _maxDepth) || 
+          (constantFeatures.forall(f => f == true)) ||
           (numNodeSamples < minSamplesSplit) || 
           (numNodeSamples < 2*minSamplesLeaf) || 
           (impurity <= MIN_IMPURITY_SPLIT)
@@ -237,16 +238,23 @@ trait TreeOps {
         } 
         else {
           // try to split this node
-          val (sortedSamples, pos, threshold, feature, impurityLeft, impurityRight, nextConstantFeatures) = unpack(tree_split(tree, trainingSet, samples, maxNumFeatures, impurity, constantFeatures, criterion))
+          val (sortedSamples, pos, threshold, feature, impurityLeft, impurityRight, nextConstantFeatures) = unpack(tree_split(tree, trainingSet, samples, _maxNumFeatures, impurity, constantFeatures, criterion))
           
-          // add node to tree
-          val nodeId = tree.addNode(parent, isLeft, isLeaf, feature, threshold, impurity, numNodeSamples)
+          if (pos == -1) { // failed to split, add node as leaf
+            val nodeId = tree.addNode(parent, isLeft, true, 0, 0.0, impurity, numNodeSamples)
+            tree.value(nodeId) = tree_score(trainingSet, samples, criterion) 
+            ()
+          }
+          else {
+            // add internal node to tree
+            val nodeId = tree.addNode(parent, isLeft, isLeaf, feature, threshold, impurity, numNodeSamples)
 
-          // right child
-          doApply(next, pack((sortedSamples(pos::sortedSamples.length), depth+1, nodeId, unit(false), impurityRight, nextConstantFeatures, continuation)))
+            // right child
+            doApply(next, pack((sortedSamples(pos::sortedSamples.length), depth+1, nodeId, unit(false), impurityRight, nextConstantFeatures, continuation)))
 
-          // left child
-          doApply(next, pack((sortedSamples(0::pos), depth+1, nodeId, unit(true), impurityLeft, nextConstantFeatures, continuation)))
+            // left child
+            doApply(next, pack((sortedSamples(0::pos), depth+1, nodeId, unit(true), impurityLeft, nextConstantFeatures, continuation)))
+          }
         }    
 
         ()
@@ -268,6 +276,7 @@ trait TreeOps {
 
       // sample up to maxNumFeatures and evaluate impurity to find the best feature to split on
       val candidateFeatures = trainingSet.data.colIndices filter { i => !constantFeatures(i) }
+      fassert(candidateFeatures.length > 0, "a non-constant feature is required to split")      
       val pct = maxNumFeatures.toDouble / candidateFeatures.length.toDouble 
       val testFeatures = if (pct < 1.0) sample(candidateFeatures, pct) else candidateFeatures
 
@@ -326,7 +335,14 @@ trait TreeOps {
       for (j <- newConstantFeatures) {
         nextConstantFeatures(j) = true      
       }      
-      pack((bestSort, bestPos, threshold, bestFeature, impurityLeft, impurityRight, nextConstantFeatures))
+
+      if (improvements(bestFeatureIndex)._1 == -INF) {
+        // no split could be found
+        pack((bestSort, unit(-1), unit(0.0), unit(0), unit(0.0), unit(0.0), nextConstantFeatures))
+      }
+      else {
+        pack((bestSort, bestPos, threshold, bestFeature, impurityLeft, impurityRight, nextConstantFeatures))
+      }
     }  
 
 

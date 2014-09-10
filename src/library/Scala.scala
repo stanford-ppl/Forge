@@ -493,8 +493,8 @@ trait ScalaOps {
 
     // not much we can do here to use "split" as long as Delite brings in LMS' version, since we can't overload on the return type
     // we should refactor LMS/Delite to only use the StringOpsExp trait and not StringOps
-    infix (Str) ("fsplit", Nil, ((MString,MString) :: MArray(MString))) implements composite ${
-      array_string_split($0,$1)
+    infix (Str) ("fsplit", Nil, MethodSignature(List(MString,MString,("numSplits",MInt,"unit(0)")), MArray(MString))) implements composite ${
+      array_string_split($0,$1,$2)
     }
 
     // most of these variants collapse to a common back-end implementation:

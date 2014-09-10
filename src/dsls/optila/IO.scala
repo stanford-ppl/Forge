@@ -34,7 +34,7 @@ trait IOOps {
     // whitespace delimited by default
     direct (IO) ("readVector", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseVector(Elem)), effect = simple) implements composite ${
       val a = ForgeFileReader.readLines($path){ line =>
-        val tokens = line.trim.fsplit(delim)
+        val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
         val tokenVector = (0::array_length(tokens)) { i => tokens(i) }
         schemaBldr(tokenVector)
       }
@@ -43,10 +43,10 @@ trait IOOps {
 
     direct (IO) ("readMatrix", Elem, MethodSignature(List(("path",MString),("schemaBldr",MString ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseMatrix(Elem)), effect = simple) implements single ${
       val a = ForgeFileReader.readLinesFlattened($path){ line:Rep[String] =>
-        val tokens = line.trim.fsplit(delim)
+        val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values 
         array_fromfunction(array_length(tokens), i => schemaBldr(tokens(i)))
       }
-      val numCols = array_length(readFirstLine(path).trim.fsplit(delim))
+      val numCols = array_length(readFirstLine(path).trim.fsplit(delim, -1))
       densematrix_fromarray(a, array_length(a) / numCols, numCols).unsafeImmutable // unsafeImmutable needed due to struct unwrapping Reflect(Reflect(..)) bug (see LAInputReaderOps.scala line 46 in Delite)
     }
 

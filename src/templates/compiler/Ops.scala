@@ -367,7 +367,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val in = " + col.name)
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_reduce"))
           stream.println("    def zero = " + makeOpImplMethodNameWithArgs(o, "_zero"))
-          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
+          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(dc.size) + "(in))")
           stream.println("    override val numDynamicChunks = " + matchChunkInput(reduce.numDynamicChunks))
         case mapreduce:MapReduce =>
           val col = o.args.apply(mapreduce.argIndex)
@@ -390,7 +390,7 @@ trait DeliteGenOps extends BaseGenOps {
           else {
             stream.println("    def map = " + makeOpImplMethodNameWithArgs(o, "_map"))
           }
-          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
+          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(dc.size) + "(in))")
           stream.println("    override val numDynamicChunks = " + matchChunkInput(mapreduce.numDynamicChunks))
         case filter:Filter =>
           val colTpe = getHkTpe(o.retTpe)
@@ -425,7 +425,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val in = " + col.name)
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_func"))
           stream.println("    def sync = n => unit(List())")
-          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
+          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(dc.size) + "(in))")
           stream.println("    override val numDynamicChunks = " + matchChunkInput(foreach.numDynamicChunks))
       }
       emitOpNodeFooter(o, stream)

@@ -72,10 +72,11 @@ trait FeatureOps {
       infix ("default") (Nil :: MBoolean) implements getter(0, "_default")
 
       infix ("apply") (MString :: MInt) implements composite ${ 
-        fassert($1 == "" || $1.toInt == 0 || $1.toInt == 1, "illegal input to binary feature")
-        if ($1 == "" && $self.default) 1
-        else if ($1 == "" && !$self.default) 0
-        else $1.toInt
+        fassert($1 == "" || $1 == "0" || $1 == "1" || $1 == "false" || $1 == "true", "illegal input to binary feature")
+        if ($1 == "0" || $1 == "false") 0
+        else if ($1 == "1" || $1 == "true") 1
+        else if ($self.default) 1
+        else 0        
       }
     }
   }

@@ -102,8 +102,8 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   // -- IR helpers
 
   def isForgePrimitiveType(t: Rep[DSLType]) = t match {
-    case `MInt` | `MLong` | `MFloat` | `MDouble` | `MBoolean` | `MChar` | `MString` | `MUnit` | `MAny` | `MNothing` | `MLambda` | `MSourceContext` | `byName` => true
-    case `CInt` | `CLong` | `CFloat` | `CDouble` | `CBoolean` | `CChar` | `CString` | `CUnit` | `CAny` | `CNothing` => true
+    case `MShort` | `MInt` | `MLong` | `MFloat` | `MDouble` | `MBoolean` | `MChar` | `MString` | `MUnit` | `MAny` | `MNothing` | `MLambda` | `MSourceContext` | `byName` => true
+    case `CShort` | `CInt` | `CLong` | `CFloat` | `CDouble` | `CBoolean` | `CChar` | `CString` | `CUnit` | `CAny` | `CNothing` => true
     // case Def(Tpe(_,_,`now`)) => true
     case Def(Tpe(name,_,_)) if name.startsWith("scala") => true
     case Def(Tpe(name,_,_)) if name.startsWith("java") => true
@@ -181,6 +181,11 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
 
   def hasFuncArgs(o: Rep[DSLOp]) = {
     o.args.exists(isFuncArg) || o.implicitArgs.exists(isFuncArg)
+  }
+
+  def hasDefaultValue(a: Rep[DSLArg]) = a match {
+    case Def(Arg(_, _, Some(x))) => true
+    case _ => false
   }
 
   def isThunk(f: Rep[DSLType]) = f match {

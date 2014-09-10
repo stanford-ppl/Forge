@@ -15,7 +15,7 @@ trait IOOps {
 
     // -- input
 
-    compiler (IO) ("optila_todouble", Nil, MString :: MDouble) implements single ${
+    compiler (IO) ("optila_todouble", Nil, MString :: MDouble) implements composite ${
       if ($0 == "Inf") INF
       else if ($0 == "-Inf") nINF
       else $0.toDouble
@@ -32,7 +32,7 @@ trait IOOps {
     val Elem = tpePar("Elem")
 
     // whitespace delimited by default
-    direct (IO) ("readVector", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseVector(Elem)), effect = simple) implements single ${
+    direct (IO) ("readVector", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseVector(Elem)), effect = simple) implements composite ${
       val a = ForgeFileReader.readLines($path){ line =>
         val tokens = line.trim.fsplit(delim)
         val tokenVector = (0::array_length(tokens)) { i => tokens(i) }

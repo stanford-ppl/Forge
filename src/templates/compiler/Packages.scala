@@ -126,7 +126,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("  def dsmap(line: String) = line")
     stream.println("  override def emitDataStructures(path: String) {")
     stream.println("    val s = File.separator")
-    stream.println("    val dsRoot = System.getProperty(\"user.dir\")+s+\"compiler\"+s+\"src\"+s+"+packageDir+"+s+\"datastruct\"+s+this.toString")
+    stream.println("    val dsRoot = sys.env.get(\""+dsl.toUpperCase+"_HOME\").getOrElse(System.getProperty(\"user.dir\"))+s+\"compiler\"+s+\"src\"+s+"+packageDir+"+s+\"datastruct\"+s+this.toString")
     stream.println()
     stream.println("    val dsDir = Directory(Path(dsRoot))")
     stream.println("    val outDir = Directory(Path(path))")

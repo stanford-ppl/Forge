@@ -27,7 +27,12 @@ trait IndexVectorOps {
       allocates(IndexVector, quotedArg(0), ${ unit(0) }, ${ unit(0) }, quotedArg(1), ${ unit(false) })
 
     compiler (IndexVector) ("indexvector_copyarray", Nil, DenseVector(MInt) :: MArray(MInt)) implements composite ${
-      array_fromfunction($0.length, { i => $0(i) })
+      val d = array_empty[Int]($0.length)
+      $0.indices foreach { i => d(i) = $0(i) }
+      d.unsafeImmutable
+      
+      // FIXME: using the pure version causes SparseVectorSuite testAccessors to fail with a fusion exception (applyAddCondition not implemented)
+      // array_fromfunction($0.length, { i => $0(i) })
     }
 
     // this is unsafe because it uses the underlying input array directly instead of copying

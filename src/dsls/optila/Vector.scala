@@ -224,7 +224,7 @@ trait VectorOps {
       }
       infix ("maxIndex") (Nil :: MInt, O ::: A) implements composite ${
         $self.indices.reduce { (a,b) => if ($self(a) > $self(b)) a else b }
-        // ($self.zip($self.indices) { (a,b) => pack((a,b)) } reduce { (t1,t2) => if (t1._1 > t2._1) t1 else t2 })._2        
+        // ($self.zip($self.indices) { (a,b) => pack((a,b)) } reduce { (t1,t2) => if (t1._1 > t2._1) t1 else t2 })._2
       }
 
 
@@ -276,6 +276,13 @@ trait VectorOps {
 
       // TODO
       // infix ("groupBy") (((T ==> R)) :: DenseVector(DenseVector(T)))
+
+
+      /**
+       * Data exchange
+       */
+
+      infix ("toArray") (Nil :: MArray(T)) implements composite ${ densevector_raw_data($self.map(e => e)) }
     }
   }
 }

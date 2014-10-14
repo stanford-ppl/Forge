@@ -53,10 +53,10 @@ trait SparseVectorOps {
       // binary search index for pos
       var start = _start
       var end = _end
-      var mid = (start+end)/2
+      var mid = (readVar(start)+readVar(end))/2
       var found = false
       while (!found && (start <= end)) {
-        mid = (start+end)/2
+        mid = (readVar(start)+readVar(end))/2
         if (pos > a(mid)) {
           start = mid + 1
         }
@@ -73,7 +73,7 @@ trait SparseVectorOps {
         // maps to a reversible negative number representing the index to insert at if not found
         if (_end < _start) ~(_start)
         else if (pos > a(mid)) ~(mid+1)
-        else ~mid
+        else ~readVar(mid)
       }
     }
 

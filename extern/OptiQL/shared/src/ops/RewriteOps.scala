@@ -61,12 +61,11 @@ trait RewriteCompilerOps extends RewriteOps {
     case _ => throw new RuntimeException("ERROR: don't know how to average type " + manifest[T].toString)
   }).asInstanceOf[Rep[T]]
 
-  def createRecord[T:Manifest](record: Rep[ForgeArray[String]]) = {
-    val rm = manifest[T] match {
-      case rm: RefinedManifest[T] => rm
-      case m => throw new RuntimeException("Don't know hot to automatically parse type " + m.toString + ". Try passing in your own parsing function instead.")
+  def createRecord[T:Manifest](record: Rep[ForgeArray[String]]): Rep[T] = {
+    val (elems, isRecord) = manifest[T] match {
+      case rm: RefinedManifest[T] => (rm.fields, true)
+      case m => (List(("",m)), false)
     }
-    val elems = rm.fields
 
     val fields = Range(0,elems.length) map { i =>
       val (field, tp) = elems(i)
@@ -79,10 +78,11 @@ trait RewriteCompilerOps extends RewriteOps {
         case "Long" => (field, false, (r:Rep[T]) => record(unit(i)).toLong)
         case "Char" => (field, false, (r:Rep[T]) => infix_fcharAt(record(unit(i)), unit(0)))
         case d if d.contains("Date") => (field, false, (r:Rep[T]) => Date(record(unit(i))))
-        case _ => throw new RuntimeException("Unsupported record field type: " + tp.toString)
+        case _ => throw new RuntimeException("Don't know hot to automatically parse type " + tp.toString + ". Try passing in your own parsing function instead.")
       }
     }
     
-    record_new[T](fields)
+    if (isRecord) record_new[T](fields)
+    else fields(0)._3(null.asInstanceOf[Rep[T]]).asInstanceOf[Rep[T]]
   }
 }

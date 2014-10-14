@@ -70,10 +70,10 @@ trait ScalaOps {
     impl (toLong) (codegen($cala, ${ $0.toLong }))
 
     for (g <- List(cuda, cpp)) {
-      impl (toInt) (codegen(g, ${ (int) $0 }))
+      impl (toInt) (codegen(g, ${ (int32_t) $0 }))
       impl (toFloat) (codegen(g, ${ (float) $0 }))
       impl (toDouble) (codegen(g, ${ (double) $0 }))
-      impl (toLong) (codegen(g, ${ (long) $0 }))
+      impl (toLong) (codegen(g, ${ (int64_t) $0 }))
     }
 
     fimplicit (Prim) ("repInt2ToRepDouble", Nil, MInt :: MDouble) implements composite ${ $0.toDouble }
@@ -118,8 +118,6 @@ trait ScalaOps {
     val long_shift_left = direct (Prim) ("forge_long_shift_left", Nil, (MLong,MInt) :: MLong)
     val long_bitwise_not = infix (Prim) ("unary_~", Nil, MLong :: MLong)
     impl (long_shift_right_unsigned) (codegen($cala, ${ $0 >>> $1 }))
-    impl (long_shift_right) (codegen($cala, ${ $0 >> $1 }))
-    impl (long_shift_left) (codegen($cala, ${ $0 << $1 }))
 
     for (g <- List($cala, cuda, cpp)) {
       impl (int_plus) (codegen(g, ${$0 + $1}))
@@ -151,6 +149,8 @@ trait ScalaOps {
       impl (long_binary_and) (codegen(g, ${$0 & $1}))
       impl (long_binary_or) (codegen(g, ${$0 | $1}))
       impl (long_binary_xor) (codegen(g, ${$0 ^ $1}))
+      impl (long_shift_right) (codegen(g, ${ $0 >> $1 }))
+      impl (long_shift_left) (codegen(g, ${ $0 << $1 }))
       impl (long_bitwise_not) (codegen(g, ${~$0}))
     }
 
@@ -453,9 +453,9 @@ trait ScalaOps {
     val toBoolean = infix (Str) ("toBoolean", Nil, MString :: MBoolean)
     val trim = infix (Str) ("trim", Nil, MString :: MString) 
     val fcharAt = infix (Str) ("fcharAt", Nil, (MString,MInt) :: MChar) 
-    val startsWith = infix (Str) ("startsWith", Nil, (MString,MString) :: MBoolean)
-    val slice = infix (Str) ("slice", Nil, (MString,MInt,MInt) :: MString)
     val length = infix (Str) ("length", Nil, MString :: MInt)
+    val startsWith = infix (Str) ("startsWith", Nil, (MString,MString) :: MBoolean)
+    infix (Str) ("slice", Nil, (MString,MInt,MInt) :: MString) implements redirect ${ fstring_substring($0,$1,$2) }
     val endsWith = infix (Str) ("endsWith", Nil, (MString,MString) :: MBoolean)
     val contains = infix (Str) ("contains", Nil, (MString,MString) :: MBoolean)
     val substring1 = infix (Str) ("substring", Nil, (MString,MInt) :: MString)
@@ -468,9 +468,8 @@ trait ScalaOps {
     impl (toBoolean) (codegen($cala, ${ $0.toBoolean })) 
     impl (trim) (codegen($cala, ${ $0.trim })) 
     impl (fcharAt) (codegen($cala, ${ $0.charAt($1) })) 
-    impl (startsWith) (codegen($cala, ${ $0.startsWith($1) })) 
-    impl (slice) (codegen($cala, ${ $0.slice($1,$2) }))
     impl (length) (codegen($cala, ${ $0.length }))
+    impl (startsWith) (codegen($cala, ${ $0.startsWith($1) })) 
     impl (endsWith) (codegen($cala, ${ $0.endsWith($1) })) 
     impl (contains) (codegen($cala, ${ $0.contains($1) })) 
     impl (substring1) (codegen($cala, ${ $0.substring($1) }))
@@ -484,7 +483,6 @@ trait ScalaOps {
     impl (trim) (codegen(cpp, ${ string_trim($0) })) 
     impl (fcharAt) (codegen(cpp, ${ string_charAt($0,$1) })) 
     impl (startsWith) (codegen(cpp, ${ string_startsWith($0,$1) })) 
-    impl (slice) (codegen(cpp, ${ string_substr($0,$1,$2) }))
     impl (length) (codegen(cpp, ${ string_length($0) }))
     impl (endsWith) (codegen(cpp, ${ string_endsWith($0,$1) })) 
     impl (contains) (codegen(cpp, ${ string_contains($0,$1) })) 
@@ -544,8 +542,8 @@ trait ScalaOps {
 
     impl (inf) (codegen($cala, "Double.PositiveInfinity"))
     impl (ninf) (codegen($cala, "Double.NegativeInfinity"))
-    impl (inf) (codegen(cpp, "std::numeric_limits<double>::max()"))
-    impl (ninf) (codegen(cpp, "std::numeric_limits<double>::min()"))
+    impl (inf) (codegen(cpp, "std::numeric_limits<double>::infinity()"))
+    impl (ninf) (codegen(cpp, "-std::numeric_limits<double>::infinity()"))
     impl (inf) (codegen(cuda, "__longlong_as_double(0x7ff0000000000000ULL)"))
     impl (ninf) (codegen(cuda, "__longlong_as_double(0xfff0000000000000ULL)"))
 
@@ -604,7 +602,7 @@ trait ScalaOps {
       impl (sqrt) (codegen(g, "sqrt(" + quotedArg(0) + ")"))
       impl (ceil) (codegen(g, "ceil(" + quotedArg(0) + ")"))
       impl (floor) (codegen(g, "floor(" + quotedArg(0) + ")"))
-      impl (round) (codegen(g, "(long) round(" + quotedArg(0) + ")"))
+      impl (round) (codegen(g, "(int64_t) round(" + quotedArg(0) + ")"))
       impl (sin) (codegen(g, "sin(" + quotedArg(0) + ")"))
       impl (sinh) (codegen(g, "sinh(" + quotedArg(0) + ")"))
       impl (asin) (codegen(g, "asin(" + quotedArg(0) + ")"))

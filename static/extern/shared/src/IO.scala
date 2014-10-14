@@ -11,12 +11,10 @@ trait InputOutputOps extends Base {
   object ForgeFileReader {
     def readLines[A:Manifest](path: Rep[String])(f: Rep[String] => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = forge_filereader_readlines(path, f)
     def readLinesFlattened[A:Manifest](path: Rep[String])(f: Rep[String] => Rep[ForgeArray[A]])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = forge_filereader_readlines_flattened(path, f)
-    def readLinesUnstructured[A:Manifest](path: Rep[String])(f: (Rep[String], Rep[ForgeArrayBuffer[A]]) => Rep[Unit])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = forge_filereader_readlines_unstructured(path, f)
   }
 
   def forge_filereader_readlines[A:Manifest](path: Rep[String], f: Rep[String] => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]]
   def forge_filereader_readlines_flattened[A:Manifest](path: Rep[String], f: Rep[String] => Rep[ForgeArray[A]])(implicit ctx: SourceContext): Rep[ForgeArray[A]]
-  def forge_filereader_readlines_unstructured[A:Manifest](path: Rep[String], f: (Rep[String], Rep[ForgeArrayBuffer[A]]) => Rep[Unit])(implicit ctx: SourceContext): Rep[ForgeArray[A]]
 }
 
 trait InputOutputCompilerOps extends InputOutputOps {

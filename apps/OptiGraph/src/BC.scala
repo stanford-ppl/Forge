@@ -27,10 +27,10 @@ trait BC extends OptiGraphApplication {
     val bc = sum( g.mapNodes( { n =>
       g.inBFOrder(n){ (bfsNode:Rep[Node],sigma:Rep[NodeData[Double]],levelArray:Rep[NodeData[Int]]) =>
         if(bfsNode.id==n.id){1.0}
-        else{g.sumUpNbrs(bfsNode,levelArray){w => sigma(w)}}
+        else{g.sumUpNeighbors(bfsNode,levelArray){w => sigma(w)}}
       }
       {(rbfsNode:Rep[Node],sigma:Rep[NodeData[Double]],delta:Rep[NodeData[Double]],levelArray:Rep[NodeData[Int]]) => 
-        if(levelArray(rbfsNode.id)!=1){ g.sumDownNbrs(rbfsNode,levelArray){w => 
+        if(levelArray(rbfsNode.id)!=1){ g.sumDownNeighbors(rbfsNode,levelArray){w => 
           (sigma(rbfsNode.id)/ sigma(w))*(1.0+delta(w))}
         }
         else{0.0}

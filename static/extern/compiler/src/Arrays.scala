@@ -32,7 +32,7 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
   def array_clone[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]] = {
     val out = darray_new[T](darray_length(__arg0))
     darray_copy(__arg0, unit(0), out, unit(0), darray_length(__arg0))
-    out.unsafeImmutable
+    delite_unsafe_immutable(out)
   }
   def array_take[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int]): Rep[ForgeArray[T]]
     = darray_take(__arg0,__arg1)
@@ -57,7 +57,7 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
     for (i <- 0 until __arg0.length) {
       out(unit(i)) = __arg0(i)
     }
-    out.unsafeImmutable
+    delite_unsafe_immutable(out)
   }
   def array_string_split(__arg0: Rep[String],__arg1: Rep[String],__arg2: Rep[Int] = unit(0))(implicit __imp0: SourceContext): Rep[ForgeArray[String]]
     = reflectPure(ArrayStringSplit(__arg0, __arg1, __arg2))
@@ -66,11 +66,11 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
         val aV = __arg1(a)
         val bV = __arg1(b)
         
-        //You have to have 3 conditions and then a default. 
-        //Otherwise you will violate the JAVA runtime comparator contract.
-        if(aV < bV) unit(-1)
-        else if(aV == bV) unit(0)
-        else if(aV > bV) unit(1)
+        // You have to have 3 conditions and then a default.
+        // Otherwise you will violate the Java runtime comparator contract.
+        if (delite_less_than(aV, bV)) unit(-1)
+        else if (delite_equals(aV, bV)) unit(0)
+        else if (delite_greater_than(aV, bV)) unit(1)
         else unit(0)
       })
 
@@ -96,7 +96,7 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
   def scala_array_length[T:Manifest](__arg0: Rep[Array[T]])(implicit __imp0: SourceContext): Rep[Int]
     = ArrayLength(__arg0)
 }
-trait ScalaGenForgeArrayOps extends ScalaGenDeliteArrayOps with ScalaGenPrimitiveOps with ScalaGenObjectOps {
+trait ScalaGenForgeArrayOps extends ScalaGenDeliteArrayOps {
   val IR: ForgeArrayOpsExp with DeliteOpsExp
   import IR._
 
@@ -119,9 +119,9 @@ trait CLikeGenForgeArrayOps extends CLikeGenBase {
     case _ => super.emitNode(sym, rhs)
   }
 }
-trait CudaGenForgeArrayOps extends CudaGenDeliteArrayOps with CLikeGenForgeArrayOps with CudaGenObjectOps { val IR: ForgeArrayOpsExp with DeliteOpsExp }
-trait OpenCLGenForgeArrayOps extends OpenCLGenDeliteArrayOps with CLikeGenForgeArrayOps with OpenCLGenObjectOps { val IR: ForgeArrayOpsExp with DeliteOpsExp }
-trait CGenForgeArrayOps extends CGenDeliteArrayOps with CGenObjectOps {
+trait CudaGenForgeArrayOps extends CudaGenDeliteArrayOps with CLikeGenForgeArrayOps { val IR: ForgeArrayOpsExp with DeliteOpsExp }
+trait OpenCLGenForgeArrayOps extends OpenCLGenDeliteArrayOps with CLikeGenForgeArrayOps { val IR: ForgeArrayOpsExp with DeliteOpsExp }
+trait CGenForgeArrayOps extends CGenDeliteArrayOps {
   val IR: ForgeArrayOpsExp with DeliteOpsExp
   import IR._
 
@@ -186,8 +186,8 @@ trait ForgeArrayBufferOpsExp extends DeliteArrayBufferOpsExp {
   def array_buffer_forIndices[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[Int] => Rep[Unit])(implicit __imp0: SourceContext): Rep[Unit]
     = darray_buffer_forIndices(__arg0,__arg1)
 }
-trait ScalaGenForgeArrayBufferOps extends ScalaGenDeliteArrayBufferOps with ScalaGenOrderingOps with ScalaGenPrimitiveOps with ScalaGenObjectOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp }
-trait CudaGenForgeArrayBufferOps extends CudaGenDeliteArrayBufferOps with CudaGenOrderingOps with CudaGenPrimitiveOps with CudaGenObjectOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp }
+trait ScalaGenForgeArrayBufferOps extends ScalaGenDeliteArrayBufferOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp }
+trait CudaGenForgeArrayBufferOps extends CudaGenDeliteArrayBufferOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp }
 trait OpenCLGenForgeArrayBufferOps // TODO
-trait CGenForgeArrayBufferOps extends /*CGenDeliteArrayBufferOps with */CGenOrderingOps with CGenPrimitiveOps with CGenObjectOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp }
+trait CGenForgeArrayBufferOps /*extends CGenDeliteArrayBufferOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp } */
 

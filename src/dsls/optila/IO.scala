@@ -32,7 +32,7 @@ trait IOOps {
     val Elem = tpePar("Elem")
 
     // whitespace delimited by default
-    direct (IO) ("readVector", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseVector(Elem)), effect = simple) implements composite ${
+    direct (IO) ("readVector", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseVector(Elem))) implements composite ${
       val a = ForgeFileReader.readLines($path){ line =>
         val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
         val tokenVector = (0::array_length(tokens)) { i => tokens(i) }
@@ -41,17 +41,17 @@ trait IOOps {
       densevector_fromarray(a, true)
     }
 
-    direct (IO) ("readMatrix", Elem, MethodSignature(List(("path",MString),("schemaBldr",MString ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseMatrix(Elem)), effect = simple) implements single ${
+    direct (IO) ("readMatrix", Elem, MethodSignature(List(("path",MString),("schemaBldr",MString ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseMatrix(Elem))) implements composite ${
       val a = ForgeFileReader.readLinesFlattened($path){ line:Rep[String] =>
-        val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values 
+        val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
         array_fromfunction(array_length(tokens), i => schemaBldr(tokens(i)))
       }
       val numCols = array_length(readFirstLine(path).trim.fsplit(delim, -1))
       densematrix_fromarray(a, array_length(a) / numCols, numCols).unsafeImmutable // unsafeImmutable needed due to struct unwrapping Reflect(Reflect(..)) bug (see LAInputReaderOps.scala line 46 in Delite)
     }
 
-    val readfirstline = compiler (IO) ("readFirstLine", Nil, ("path",MString) :: MString) 
-      
+    val readfirstline = compiler (IO) ("readFirstLine", Nil, ("path",MString) :: MString)
+
     impl (readfirstline) (codegen($cala, ${
       val xfs = new java.io.BufferedReader(new java.io.FileReader($path))
       val line = xfs.readLine()
@@ -59,7 +59,7 @@ trait IOOps {
       line
     }))
 
-    //NOTE: C++ target codegen for readfirstline uses the Delite C++ library (readFirstLineFile), 
+    //NOTE: C++ target codegen for readfirstline uses the Delite C++ library (readFirstLineFile),
     //      but may want to have codegen directly here like scala target (after multi-line C++ codegen in Forge is fixed).
     impl (readfirstline) (codegen(cpp, ${readFirstLineFile($path)}))
 

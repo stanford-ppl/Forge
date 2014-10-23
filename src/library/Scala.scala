@@ -6,11 +6,8 @@ import templates.Utilities.nl
 
 /**
  * This file re-implements LMS common ops in Forge.
- *
- * Note that Delite pulls in some LMS common ops directly, requiring name disambiguation here.
- * However, so far it does not look like there are any major problems (e.g. ambiguous implicits) from including both versions in a DSL.
  */
-trait ScalaOps {
+trait ScalaOps extends PrimitiveMathGen {
   this: ForgeApplication =>
 
   def importScalaOps() = {
@@ -22,7 +19,7 @@ trait ScalaOps {
     importOrdering()
     importStrings()
     importMath()
-    importTuples()    
+    importTuples()
     importHashMap()
   }
 
@@ -36,13 +33,11 @@ trait ScalaOps {
   }
 
   def importPrimitives() = {
-    val Prim = grp("Primitive2") // conflicts with PrimitiveOps from LMS brought in by Delite
+    val Prim = grp("Primitive")
     val T = tpePar("T")
 
     lift (Prim) (MBoolean)
 
-    // why do these conflict with Delite Boolean ops and not the others in Prim?
-    // the reason seems to be because of the combination of overloaded parameters that already exist in the LMS versions of the other ops. (i.e., we got lucky)
     val not = infix (Prim) ("unary_!", Nil, MBoolean :: MBoolean)
     val or = infix (Prim) ("||", Nil, (MBoolean, MBoolean) :: MBoolean)
     val and = infix (Prim) ("&&", Nil, (MBoolean, MBoolean) :: MBoolean)
@@ -53,11 +48,16 @@ trait ScalaOps {
       impl (and) (codegen(g, quotedArg(0) + " && " + quotedArg(1)))
     }
 
+    infix (Prim) ("unary_-", Nil, MInt :: MInt) implements redirect ${ unit(-1)*$0 }
+    infix (Prim) ("unary_-", Nil, MLong :: MLong) implements redirect ${ unit(-1L)*$0 }
+    infix (Prim) ("unary_-", Nil, MFloat :: MFloat) implements redirect ${ unit(-1f)*$0 }
+    infix (Prim) ("unary_-", Nil, MDouble :: MDouble) implements redirect ${ unit(-1)*$0 }
+
     lift (Prim) (MShort)
     lift (Prim) (MInt)
     lift (Prim) (MLong)
     lift (Prim) (MFloat)
-    lift (Prim) (MDouble)    
+    lift (Prim) (MDouble)
 
     val toInt = infix (Prim) ("toInt", T withBound TNumeric, T :: MInt)
     val toFloat = infix (Prim) ("toFloat", T withBound TNumeric, T :: MFloat)
@@ -94,7 +94,7 @@ trait ScalaOps {
     val int_shift_right = direct (Prim) ("forge_int_shift_right", Nil, (MInt,MInt) :: MInt)
     val int_mod = infix (Prim) ("%", Nil, (MInt,MInt) :: MInt)
     val int_bitwise_not = infix (Prim) ("unary_~", Nil, MInt :: MInt)
-    
+
     val float_plus = direct (Prim) ("forge_float_plus", Nil, (MFloat,MFloat) :: MFloat)
     val float_minus = direct (Prim) ("forge_float_minus", Nil, (MFloat,MFloat) :: MFloat)
     val float_times = direct (Prim) ("forge_float_times", Nil, (MFloat,MFloat) :: MFloat)
@@ -154,129 +154,6 @@ trait ScalaOps {
       impl (long_bitwise_not) (codegen(g, ${~$0}))
     }
 
-    // infix (Prim) ("+", Nil, enumerate(CInt,MInt,CFloat,MFloat,CDouble,MDouble)) implements codegen($cala, quotedArg(0) + " + " + quotedArg(1))
-    infix (Prim) ("+", Nil, (CInt,MInt) :: MInt) implements redirect ${ forge_int_plus(unit($0),$1) }
-    infix (Prim) ("+", Nil, (CInt,MFloat) :: MFloat) implements redirect ${ forge_float_plus(unit($0.toFloat),$1) }
-    infix (Prim) ("+", Nil, (CInt,MDouble) :: MDouble) implements redirect ${ forge_double_plus(unit($0.toDouble),$1) }
-    infix (Prim) ("+", Nil, (CFloat,MInt) :: MFloat) implements redirect ${ forge_float_plus(unit($0),$1.toFloat) }
-    infix (Prim) ("+", Nil, (CFloat,MFloat) :: MFloat) implements redirect ${ forge_float_plus(unit($0),$1) }
-    infix (Prim) ("+", Nil, (CFloat,MDouble) :: MDouble) implements redirect ${ forge_double_plus(unit($0.toDouble),$1) }
-    infix (Prim) ("+", Nil, (CDouble,MInt) :: MDouble) implements redirect ${ forge_double_plus(unit($0),$1.toDouble) }
-    infix (Prim) ("+", Nil, (CDouble,MFloat) :: MDouble) implements redirect ${ forge_double_plus(unit($0),$1.toDouble) }
-    infix (Prim) ("+", Nil, (CDouble,MDouble) :: MDouble) implements redirect ${ forge_double_plus(unit($0),$1) }
-    infix (Prim) ("+", Nil, (MInt,CInt) :: MInt) implements redirect ${ forge_int_plus($0,unit($1)) }
-    infix (Prim) ("+", Nil, (MInt,CFloat) :: MFloat) implements redirect ${ forge_float_plus($0.toFloat,unit($1)) }
-    infix (Prim) ("+", Nil, (MInt,CDouble) :: MDouble) implements redirect ${ forge_double_plus($0.toDouble,unit($1)) }
-    infix (Prim) ("+", Nil, (MFloat,CInt) :: MFloat) implements redirect ${ forge_float_plus($0,unit($1.toFloat)) }
-    infix (Prim) ("+", Nil, (MFloat,CFloat) :: MFloat) implements redirect ${ forge_float_plus($0,unit($1)) }
-    infix (Prim) ("+", Nil, (MFloat,CDouble) :: MDouble) implements redirect ${ forge_double_plus($0.toDouble,unit($1)) }
-    infix (Prim) ("+", Nil, (MDouble,CInt) :: MDouble) implements redirect ${ forge_double_plus($0,unit($1.toDouble)) }
-    infix (Prim) ("+", Nil, (MDouble,CFloat) :: MDouble) implements redirect ${ forge_double_plus($0.toDouble,unit($1)) }
-    infix (Prim) ("+", Nil, (MDouble,CDouble) :: MDouble) implements redirect ${ forge_double_plus($0,unit($1)) }
-    infix (Prim) ("+", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_plus($0,$1) }
-    infix (Prim) ("+", Nil, (MInt,MFloat) :: MFloat) implements redirect ${ forge_float_plus($0.toFloat,$1) }
-    infix (Prim) ("+", Nil, (MInt,MDouble) :: MDouble) implements redirect ${ forge_double_plus($0.toDouble,$1) }
-    infix (Prim) ("+", Nil, (MFloat,MInt) :: MFloat) implements redirect ${ forge_float_plus($0,$1.toFloat) }
-    infix (Prim) ("+", Nil, (MFloat,MFloat) :: MFloat) implements redirect ${ forge_float_plus($0,$1) }
-    infix (Prim) ("+", Nil, (MFloat,MDouble) :: MDouble) implements redirect ${ forge_double_plus($0.toDouble,$1) }
-    infix (Prim) ("+", Nil, (MDouble,MInt) :: MDouble) implements redirect ${ forge_double_plus($0,$1.toDouble) }
-    infix (Prim) ("+", Nil, (MDouble,MFloat) :: MDouble) implements redirect ${ forge_double_plus($0,$1.toDouble) }
-    infix (Prim) ("+", Nil, (MDouble,MDouble) :: MDouble) implements redirect ${ forge_double_plus($0,$1) }
-
-    infix (Prim) ("-", Nil, (CInt,MInt) :: MInt) implements redirect ${ forge_int_minus(unit($0),$1) }
-    infix (Prim) ("-", Nil, (CInt,MFloat) :: MFloat) implements redirect ${ forge_float_minus(unit($0.toFloat),$1) }
-    infix (Prim) ("-", Nil, (CInt,MDouble) :: MDouble) implements redirect ${ forge_double_minus(unit($0.toDouble),$1) }
-    infix (Prim) ("-", Nil, (CFloat,MInt) :: MFloat) implements redirect ${ forge_float_minus(unit($0),$1.toFloat) }
-    infix (Prim) ("-", Nil, (CFloat,MFloat) :: MFloat) implements redirect ${ forge_float_minus(unit($0),$1) }
-    infix (Prim) ("-", Nil, (CFloat,MDouble) :: MDouble) implements redirect ${ forge_double_minus(unit($0.toDouble),$1) }
-    infix (Prim) ("-", Nil, (CDouble,MInt) :: MDouble) implements redirect ${ forge_double_minus(unit($0),$1.toDouble) }
-    infix (Prim) ("-", Nil, (CDouble,MFloat) :: MDouble) implements redirect ${ forge_double_minus(unit($0),$1.toDouble) }
-    infix (Prim) ("-", Nil, (CDouble,MDouble) :: MDouble) implements redirect ${ forge_double_minus(unit($0),$1) }
-    infix (Prim) ("-", Nil, (MInt,CInt) :: MInt) implements redirect ${ forge_int_minus($0,unit($1)) }
-    infix (Prim) ("-", Nil, (MInt,CFloat) :: MFloat) implements redirect ${ forge_float_minus($0.toFloat,unit($1)) }
-    infix (Prim) ("-", Nil, (MInt,CDouble) :: MDouble) implements redirect ${ forge_double_minus($0.toDouble,unit($1)) }
-    infix (Prim) ("-", Nil, (MFloat,CInt) :: MFloat) implements redirect ${ forge_float_minus($0,unit($1.toFloat)) }
-    infix (Prim) ("-", Nil, (MFloat,CFloat) :: MFloat) implements redirect ${ forge_float_minus($0,unit($1)) }
-    infix (Prim) ("-", Nil, (MFloat,CDouble) :: MDouble) implements redirect ${ forge_double_minus($0.toDouble,unit($1)) }
-    infix (Prim) ("-", Nil, (MDouble,CInt) :: MDouble) implements redirect ${ forge_double_minus($0,unit($1.toDouble)) }
-    infix (Prim) ("-", Nil, (MDouble,CFloat) :: MDouble) implements redirect ${ forge_double_minus($0.toDouble,unit($1)) }
-    infix (Prim) ("-", Nil, (MDouble,CDouble) :: MDouble) implements redirect ${ forge_double_minus($0,unit($1)) }
-    infix (Prim) ("-", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_minus($0,$1) }
-    infix (Prim) ("-", Nil, (MInt,MFloat) :: MFloat) implements redirect ${ forge_float_minus($0.toFloat,$1) }
-    infix (Prim) ("-", Nil, (MInt,MDouble) :: MDouble) implements redirect ${ forge_double_minus($0.toDouble,$1) }
-    infix (Prim) ("-", Nil, (MFloat,MInt) :: MFloat) implements redirect ${ forge_float_minus($0,$1.toFloat) }
-    infix (Prim) ("-", Nil, (MFloat,MFloat) :: MFloat) implements redirect ${ forge_float_minus($0,$1) }
-    infix (Prim) ("-", Nil, (MFloat,MDouble) :: MDouble) implements redirect ${ forge_double_minus($0.toDouble,$1) }
-    infix (Prim) ("-", Nil, (MDouble,MInt) :: MDouble) implements redirect ${ forge_double_minus($0,$1.toDouble) }
-    infix (Prim) ("-", Nil, (MDouble,MFloat) :: MDouble) implements redirect ${ forge_double_minus($0,$1.toDouble) }
-    infix (Prim) ("-", Nil, (MDouble,MDouble) :: MDouble) implements redirect ${ forge_double_minus($0,$1) }
-
-    infix (Prim) ("unary_-", Nil, MInt :: MInt) implements redirect ${ unit(-1)*$0 }
-    infix (Prim) ("unary_-", Nil, MLong :: MLong) implements redirect ${ unit(-1L)*$0 }
-    infix (Prim) ("unary_-", Nil, MFloat :: MFloat) implements redirect ${ unit(-1f)*$0 }
-    infix (Prim) ("unary_-", Nil, MDouble :: MDouble) implements redirect ${ unit(-1)*$0 }
-    infix (Prim) ("*", Nil, (CInt,MInt) :: MInt) implements redirect ${ forge_int_times(unit($0),$1) }
-    infix (Prim) ("*", Nil, (CInt,MFloat) :: MFloat) implements redirect ${ forge_float_times(unit($0.toFloat),$1) }
-    infix (Prim) ("*", Nil, (CInt,MDouble) :: MDouble) implements redirect ${ forge_double_times(unit($0.toDouble),$1) }
-    infix (Prim) ("*", Nil, (CFloat,MInt) :: MFloat) implements redirect ${ forge_float_times(unit($0),$1.toFloat) }
-    infix (Prim) ("*", Nil, (CFloat,MFloat) :: MFloat) implements redirect ${ forge_float_times(unit($0),$1) }
-    infix (Prim) ("*", Nil, (CFloat,MDouble) :: MDouble) implements redirect ${ forge_double_times(unit($0.toDouble),$1) }
-    infix (Prim) ("*", Nil, (CDouble,MInt) :: MDouble) implements redirect ${ forge_double_times(unit($0),$1.toDouble) }
-    infix (Prim) ("*", Nil, (CDouble,MFloat) :: MDouble) implements redirect ${ forge_double_times(unit($0),$1.toDouble) }
-    infix (Prim) ("*", Nil, (CDouble,MDouble) :: MDouble) implements redirect ${ forge_double_times(unit($0),$1) }
-    infix (Prim) ("*", Nil, (MInt,CInt) :: MInt) implements redirect ${ forge_int_times($0,unit($1)) }
-    infix (Prim) ("*", Nil, (MInt,CFloat) :: MFloat) implements redirect ${ forge_float_times($0.toFloat,unit($1)) }
-    infix (Prim) ("*", Nil, (MInt,CDouble) :: MDouble) implements redirect ${ forge_double_times($0.toDouble,unit($1)) }
-    infix (Prim) ("*", Nil, (MFloat,CInt) :: MFloat) implements redirect ${ forge_float_times($0,unit($1.toFloat)) }
-    infix (Prim) ("*", Nil, (MFloat,CFloat) :: MFloat) implements redirect ${ forge_float_times($0,unit($1)) }
-    infix (Prim) ("*", Nil, (MFloat,CDouble) :: MDouble) implements redirect ${ forge_double_times($0.toDouble,unit($1)) }
-    infix (Prim) ("*", Nil, (MDouble,CInt) :: MDouble) implements redirect ${ forge_double_times($0,unit($1.toDouble)) }
-    infix (Prim) ("*", Nil, (MDouble,CFloat) :: MDouble) implements redirect ${ forge_double_times($0.toDouble,unit($1)) }
-    infix (Prim) ("*", Nil, (MDouble,CDouble) :: MDouble) implements redirect ${ forge_double_times($0,unit($1)) }
-    infix (Prim) ("*", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_times($0,$1) }
-    infix (Prim) ("*", Nil, (MInt,MFloat) :: MFloat) implements redirect ${ forge_float_times($0.toFloat,$1) }
-    infix (Prim) ("*", Nil, (MInt,MDouble) :: MDouble) implements redirect ${ forge_double_times($0.toDouble,$1) }
-    infix (Prim) ("*", Nil, (MFloat,MInt) :: MFloat) implements redirect ${ forge_float_times($0,$1.toFloat) }
-    infix (Prim) ("*", Nil, (MFloat,MFloat) :: MFloat) implements redirect ${ forge_float_times($0,$1) }
-    infix (Prim) ("*", Nil, (MFloat,MDouble) :: MDouble) implements redirect ${ forge_double_times($0.toDouble,$1) }
-    infix (Prim) ("*", Nil, (MDouble,MInt) :: MDouble) implements redirect ${ forge_double_times($0,$1.toDouble) }
-    infix (Prim) ("*", Nil, (MDouble,MFloat) :: MDouble) implements redirect ${ forge_double_times($0,$1.toDouble) }
-    infix (Prim) ("*", Nil, (MDouble,MDouble) :: MDouble) implements redirect ${ forge_double_times($0,$1) }
-
-    infix (Prim) ("/", Nil, (CInt,MInt) :: MInt) implements redirect ${ forge_int_divide(unit($0),$1) }
-    infix (Prim) ("/", Nil, (CInt,MFloat) :: MFloat) implements redirect ${ forge_float_divide(unit($0.toFloat),$1) }
-    infix (Prim) ("/", Nil, (CInt,MDouble) :: MDouble) implements redirect ${ forge_double_divide(unit($0.toDouble),$1) }
-    infix (Prim) ("/", Nil, (CFloat,MInt) :: MFloat) implements redirect ${ forge_float_divide(unit($0),$1.toFloat) }
-    infix (Prim) ("/", Nil, (CFloat,MFloat) :: MFloat) implements redirect ${ forge_float_divide(unit($0),$1) }
-    infix (Prim) ("/", Nil, (CFloat,MDouble) :: MDouble) implements redirect ${ forge_double_divide(unit($0.toDouble),$1) }
-    infix (Prim) ("/", Nil, (CDouble,MInt) :: MDouble) implements redirect ${ forge_double_divide(unit($0),$1.toDouble) }
-    infix (Prim) ("/", Nil, (CDouble,MFloat) :: MDouble) implements redirect ${ forge_double_divide(unit($0),$1.toDouble) }
-    infix (Prim) ("/", Nil, (CDouble,MDouble) :: MDouble) implements redirect ${ forge_double_divide(unit($0),$1) }
-    infix (Prim) ("/", Nil, (MInt,CInt) :: MInt) implements redirect ${ forge_int_divide($0,unit($1)) }
-    infix (Prim) ("/", Nil, (MInt,CFloat) :: MFloat) implements redirect ${ forge_float_divide($0.toFloat,unit($1)) }
-    infix (Prim) ("/", Nil, (MInt,CDouble) :: MDouble) implements redirect ${ forge_double_divide($0.toDouble,unit($1)) }
-    infix (Prim) ("/", Nil, (MFloat,CInt) :: MFloat) implements redirect ${ forge_float_divide($0,unit($1.toFloat)) }
-    infix (Prim) ("/", Nil, (MFloat,CFloat) :: MFloat) implements redirect ${ forge_float_divide($0,unit($1)) }
-    infix (Prim) ("/", Nil, (MFloat,CDouble) :: MDouble) implements redirect ${ forge_double_divide($0.toDouble,unit($1)) }
-    infix (Prim) ("/", Nil, (MDouble,CInt) :: MDouble) implements redirect ${ forge_double_divide($0,unit($1.toDouble)) }
-    infix (Prim) ("/", Nil, (MDouble,CFloat) :: MDouble) implements redirect ${ forge_double_divide($0.toDouble,unit($1)) }
-    infix (Prim) ("/", Nil, (MDouble,CDouble) :: MDouble) implements redirect ${ forge_double_divide($0,unit($1)) }
-    infix (Prim) ("/", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_divide($0,$1) }
-    infix (Prim) ("/", Nil, (MInt,MFloat) :: MFloat) implements redirect ${ forge_float_divide($0.toFloat,$1) }
-    infix (Prim) ("/", Nil, (MInt,MDouble) :: MDouble) implements redirect ${ forge_double_divide($0.toDouble,$1) }
-    infix (Prim) ("/", Nil, (MFloat,MInt) :: MFloat) implements redirect ${ forge_float_divide($0,$1.toFloat) }
-    infix (Prim) ("/", Nil, (MFloat,MFloat) :: MFloat) implements redirect ${ forge_float_divide($0,$1) }
-    infix (Prim) ("/", Nil, (MFloat,MDouble) :: MDouble) implements redirect ${ forge_double_divide($0.toDouble,$1) }
-    infix (Prim) ("/", Nil, (MDouble,MInt) :: MDouble) implements redirect ${ forge_double_divide($0,$1.toDouble) }
-    infix (Prim) ("/", Nil, (MDouble,MFloat) :: MDouble) implements redirect ${ forge_double_divide($0,$1.toDouble) }
-    infix (Prim) ("/", Nil, (MDouble,MDouble) :: MDouble) implements redirect ${ forge_double_divide($0,$1) }
-
-    infix (Prim) ("+", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_plus($0,$1) }
-    infix (Prim) ("-", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_minus($0,$1) }
-    infix (Prim) ("*", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_times($0,$1) }
-    infix (Prim) ("/", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_divide($0,$1) }
-    infix (Prim) ("/", Nil, (MLong,MDouble) :: MDouble) implements redirect ${ forge_long_divide_double($0,$1) }
-    
     infix (Prim) ("<<",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_left($0,$1) }
     infix (Prim) (">>",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_right($0,$1) }
     infix (Prim) (">>>",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_right_unsigned($0,$1) }
@@ -288,6 +165,12 @@ trait ScalaOps {
     infix (Prim) (">>>", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_shift_right_unsigned($0,$1) }
     infix (Prim) ("<<", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_shift_left($0,$1) }
     infix (Prim) (">>", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_shift_right($0,$1) }
+
+    // Uncomment this to generate type classes for primitive math combinations.
+    // importPrimitiveMathTypeClasses()
+
+    // Uncomment this to generate infix methods for primitive math combinations.
+    importPrimitiveMathInfix(Prim)
   }
 
   def importMisc() = {
@@ -393,35 +276,39 @@ trait ScalaOps {
   }
 
   def importOrdering() = {
-    val Ord = grp("Ordering2") // Ordering gets pulled in by DeliteArrayOps, need to disambiguate
+    val Ord = grp("Ordering")
     val A = tpePar("A")
     val B = tpePar("B")
     val AC = tpePar("A", stage = now)
     val BC = tpePar("B", stage = now)
 
     val eq = direct (Ord) ("__equal", (A,B), (A,B) :: MBoolean)
+    label (eq, "forge_equals")
     impl (eq) (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
     impl (eq) (codegen(cuda, quotedArg(0) + " == " + quotedArg(1)))
     impl (eq) (codegen(cpp, quotedArg(0) + " == " + quotedArg(1)))
-    direct (Ord) ("__equal", (A,B), (MVar(A),B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
-    direct (Ord) ("__equal", (A,B), (A,MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
-    direct (Ord) ("__equal", (A,B), (MVar(A),MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
-    direct (Ord) ("__equal", (A,BC), (A,BC) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
-    direct (Ord) ("__equal", (A,BC), (MVar(A),BC) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
-    direct (Ord) ("__equal", (AC,B), (AC,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
-    direct (Ord) ("__equal", (AC,B), (AC,MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
+
+    direct (Ord) ("__equal", (A,B), (MVar(A),B) :: MBoolean) implements redirect ${ forge_equals(readVar($0), $1) }
+    direct (Ord) ("__equal", (A,B), (A,MVar(B)) :: MBoolean) implements redirect ${ forge_equals($0, readVar($1)) }
+    direct (Ord) ("__equal", (A,B), (MVar(A),MVar(B)) :: MBoolean) implements redirect ${ forge_equals(readVar($0), readVar($1)) }
+    direct (Ord) ("__equal", (A,BC), (A,BC) :: MBoolean) implements redirect ${ forge_equals($0, unit($1)) }
+    direct (Ord) ("__equal", (A,BC), (MVar(A),BC) :: MBoolean) implements redirect ${ forge_equals(readVar($0), unit($1)) }
+    direct (Ord) ("__equal", (AC,B), (AC,B) :: MBoolean) implements redirect ${ forge_equals(unit($0), $1) }
+    direct (Ord) ("__equal", (AC,B), (AC,MVar(B)) :: MBoolean) implements redirect ${ forge_equals(unit($0), readVar($1)) }
 
     val neq = infix (Ord) ("!=", (A,B), (A,B) :: MBoolean)
+    label (neq, "forge_notequals")
     impl (neq) (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
     impl (neq) (codegen(cuda, quotedArg(0) + " != " + quotedArg(1)))
     impl (neq) (codegen(cpp, quotedArg(0) + " != " + quotedArg(1)))
-    infix (Ord) ("!=", (A,B), (MVar(A),B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
-    infix (Ord) ("!=", (A,B), (A,MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
-    infix (Ord) ("!=", (A,B), (MVar(A),MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
-    infix (Ord) ("!=", (A,BC), (A,BC) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
-    infix (Ord) ("!=", (A,BC), (MVar(A),BC) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
-    infix (Ord) ("!=", (AC,B), (AC,B) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
-    infix (Ord) ("!=", (AC,B), (AC,MVar(B)) :: MBoolean) implements (codegen($cala, quotedArg(0) + " != " + quotedArg(1)))
+
+    infix (Ord) ("!=", (A,B), (MVar(A),B) :: MBoolean) implements redirect ${ forge_notequals(readVar($0), $1) }
+    infix (Ord) ("!=", (A,B), (A,MVar(B)) :: MBoolean) implements redirect ${ forge_notequals($0, readVar($1)) }
+    infix (Ord) ("!=", (A,B), (MVar(A),MVar(B)) :: MBoolean) implements redirect ${ forge_notequals(readVar($0), readVar($1)) }
+    infix (Ord) ("!=", (A,BC), (A,BC) :: MBoolean) implements redirect ${ forge_notequals($0, unit($1)) }
+    infix (Ord) ("!=", (A,BC), (MVar(A),BC) :: MBoolean) implements redirect ${ forge_notequals(readVar($0), unit($1)) }
+    infix (Ord) ("!=", (AC,B), (AC,B) :: MBoolean) implements redirect ${ forge_notequals(unit($0), $1) }
+    infix (Ord) ("!=", (AC,B), (AC,MVar(B)) :: MBoolean) implements redirect ${ forge_notequals(unit($0), readVar($1)) }
 
     infix (Ord) ("min", List(A withBound TOrdering), List(A,A) :: A) implements (codegen($cala, quotedArg(0) + " min " + quotedArg(1)))
     infix (Ord) ("max", List(A withBound TOrdering), List(A,A) :: A) implements (codegen($cala, quotedArg(0) + " max " + quotedArg(1)))
@@ -440,19 +327,19 @@ trait ScalaOps {
   }
 
   def importStrings() = {
-    val Str = grp("FString")
+    val Str = grp("FString") // have to use either grp("xx") or MString, NOT grp("String") which is ambiguous with MString
     lift (Str) (MString)
 
     // overloaded variants of string concat
     val T = tpePar("T")
 
-    val toInt = infix (Str) ("toInt", Nil, MString :: MInt) 
+    val toInt = infix (Str) ("toInt", Nil, MString :: MInt)
     val toLong = infix (Str) ("toLong", Nil, MString :: MLong)
     val toFloat = infix (Str) ("toFloat", Nil, MString :: MFloat)
     val toDouble = infix (Str) ("toDouble", Nil, MString :: MDouble)
     val toBoolean = infix (Str) ("toBoolean", Nil, MString :: MBoolean)
-    val trim = infix (Str) ("trim", Nil, MString :: MString) 
-    val fcharAt = infix (Str) ("fcharAt", Nil, (MString,MInt) :: MChar) 
+    val trim = infix (Str) ("trim", Nil, MString :: MString)
+    val fcharAt = infix (Str) ("fcharAt", Nil, (MString,MInt) :: MChar)
     val length = infix (Str) ("length", Nil, MString :: MInt)
     val startsWith = infix (Str) ("startsWith", Nil, (MString,MString) :: MBoolean)
     infix (Str) ("slice", Nil, (MString,MInt,MInt) :: MString) implements redirect ${ fstring_substring($0,$1,$2) }
@@ -461,82 +348,75 @@ trait ScalaOps {
     val substring1 = infix (Str) ("substring", Nil, (MString,MInt) :: MString)
     val substring2 = infix (Str) ("substring", Nil, (MString,MInt,MInt) :: MString)
 
-    impl (toInt) (codegen($cala, ${ $0.toInt })) 
-    impl (toLong) (codegen($cala, ${ $0.toLong })) 
-    impl (toFloat) (codegen($cala, ${ $0.toFloat })) 
-    impl (toDouble) (codegen($cala, ${ $0.toDouble })) 
-    impl (toBoolean) (codegen($cala, ${ $0.toBoolean })) 
-    impl (trim) (codegen($cala, ${ $0.trim })) 
-    impl (fcharAt) (codegen($cala, ${ $0.charAt($1) })) 
+    impl (toInt) (codegen($cala, ${ $0.toInt }))
+    impl (toLong) (codegen($cala, ${ $0.toLong }))
+    impl (toFloat) (codegen($cala, ${ $0.toFloat }))
+    impl (toDouble) (codegen($cala, ${ $0.toDouble }))
+    impl (toBoolean) (codegen($cala, ${ $0.toBoolean }))
+    impl (trim) (codegen($cala, ${ $0.trim }))
+    impl (fcharAt) (codegen($cala, ${ $0.charAt($1) }))
     impl (length) (codegen($cala, ${ $0.length }))
-    impl (startsWith) (codegen($cala, ${ $0.startsWith($1) })) 
-    impl (endsWith) (codegen($cala, ${ $0.endsWith($1) })) 
-    impl (contains) (codegen($cala, ${ $0.contains($1) })) 
+    impl (startsWith) (codegen($cala, ${ $0.startsWith($1) }))
+    impl (endsWith) (codegen($cala, ${ $0.endsWith($1) }))
+    impl (contains) (codegen($cala, ${ $0.contains($1) }))
     impl (substring1) (codegen($cala, ${ $0.substring($1) }))
     impl (substring2) (codegen($cala, ${ $0.substring($1,$2) }))
-    
-    impl (toInt) (codegen(cpp, ${ string_toInt($0) })) 
-    impl (toLong) (codegen(cpp, ${ string_toLong($0) })) 
-    impl (toFloat) (codegen(cpp, ${ string_toFloat($0) })) 
-    impl (toDouble) (codegen(cpp, ${ string_toDouble($0) })) 
-    impl (toBoolean) (codegen(cpp, ${ string_toBoolean($0) })) 
-    impl (trim) (codegen(cpp, ${ string_trim($0) })) 
-    impl (fcharAt) (codegen(cpp, ${ string_charAt($0,$1) })) 
-    impl (startsWith) (codegen(cpp, ${ string_startsWith($0,$1) })) 
+
+    impl (toInt) (codegen(cpp, ${ string_toInt($0) }))
+    impl (toLong) (codegen(cpp, ${ string_toLong($0) }))
+    impl (toFloat) (codegen(cpp, ${ string_toFloat($0) }))
+    impl (toDouble) (codegen(cpp, ${ string_toDouble($0) }))
+    impl (toBoolean) (codegen(cpp, ${ string_toBoolean($0) }))
+    impl (trim) (codegen(cpp, ${ string_trim($0) }))
+    impl (fcharAt) (codegen(cpp, ${ string_charAt($0,$1) }))
+    impl (startsWith) (codegen(cpp, ${ string_startsWith($0,$1) }))
     impl (length) (codegen(cpp, ${ string_length($0) }))
-    impl (endsWith) (codegen(cpp, ${ string_endsWith($0,$1) })) 
-    impl (contains) (codegen(cpp, ${ string_contains($0,$1) })) 
+    impl (endsWith) (codegen(cpp, ${ string_endsWith($0,$1) }))
+    impl (contains) (codegen(cpp, ${ string_contains($0,$1) }))
     impl (substring1) (codegen(cpp, ${ string_substr($0,$1) }))
     impl (substring2) (codegen(cpp, ${ string_substr($0,$1,$2) }))
 
-    // not much we can do here to use "split" as long as Delite brings in LMS' version, since we can't overload on the return type
-    // we should refactor LMS/Delite to only use the StringOpsExp trait and not StringOps
-    infix (Str) ("fsplit", Nil, MethodSignature(List(MString,MString,("numSplits",MInt,"unit(0)")), MArray(MString))) implements composite ${
+    // We leave fsplit, though deprecated, here for compatibility
+    infix (Str) ("fsplit", Nil, MethodSignature(List(MString,MString,("numSplits",MInt,"unit(0)")), MArray(MString))) implements redirect ${ $0.split($1, $2) }
+
+    infix (Str) ("split", Nil, MethodSignature(List(MString,MString,("numSplits",MInt,"unit(0)")), MArray(MString))) implements composite ${
       array_string_split($0,$1,$2)
     }
 
-    // most of these variants collapse to a common back-end implementation:
+    val B = tpePar("B")
+    val concat = direct (Str) ("forge_string_plus", (T,B), (T,B) :: MString)
+    impl (concat) (codegen($cala, ${ $0.toString + $1.toString }))
+    impl (concat) (codegen(cpp, "string_plus( convert_to_string< " + unquotes("remapWithRef("+opArgPrefix+"0.tp)") + ">(" + quotedArg(0) + "), convert_to_string< " + unquotes("remapWithRef("+opArgPrefix+"1.tp)") + ">(" + quotedArg(1) + "))"))
 
-    // maps to Rep[String], Rep[Any]
-    val concat = infix (Str) ("+", List(T), List(CString, T) :: MString)
-    val concat2 = infix (Str) ("+", List(T), List(MString, T) :: MString)
-    val concat3 = infix (Str) ("+", List(T), List(CString, MVar(T)) :: MString)
-    val concat4 = infix (Str) ("+", List(T), List(MString, MVar(T)) :: MString)
-    val concat5 = infix (Str) ("+", List(T), List(MVar(MString), T) :: MString)
-    val concat6 = infix (Str) ("+", List(T), List(MVar(MString), MVar(T)) :: MString)
+    // TODO: check these combinations to see if they could be condensed or if there is anything missing
 
-    // Rep[Any], Rep[String]
-    val concat7 = infix (Str) ("+", List(T), List(T, CString) :: MString)
-    val concat8 = infix (Str) ("+", List(T), List(T, MString) :: MString)
-    val concat9 = infix (Str) ("+", List(T), List(MVar(T), CString) :: MString)
-    val concat10 = infix (Str) ("+", List(T), List(MVar(T), MString) :: MString)
-    val concat11 = infix (Str) ("+", List(T), List(MVar(T), MVar(MString)) :: MString)
+    infix (Str) ("+", T, (CString, T) :: MString) implements redirect ${ forge_string_plus(unit($0), $1) }
+    infix (Str) ("+", T, (MString, T) :: MString) implements redirect ${ forge_string_plus($0, $1) }
+    infix (Str) ("+", T, (CString, MVar(T)) :: MString) implements redirect ${ forge_string_plus(unit($0), readVar($1)) }
+    infix (Str) ("+", T, (MString, MVar(T)) :: MString) implements redirect ${ forge_string_plus($0, readVar($1)) }
+    infix (Str) ("+", T, (MVar(MString), T) :: MString) implements redirect ${ forge_string_plus(readVar($0), $1) }
+    infix (Str) ("+", T, (MVar(MString), MVar(T)) :: MString) implements redirect ${ forge_string_plus(readVar($0), readVar($1)) }
 
-    // Rep[String], Rep[String]
-    // val concat9 = infix (Str) ("+", List(), List(MString, CString) :: MString)
-    val concat12 = infix (Str) ("+", List(), List(CString, MString) :: MString)
-    val concat13 = infix (Str) ("+", List(), List(MString, MString) :: MString)
-    val concat14 = infix (Str) ("+", List(), List(MString, MVar(MString)) :: MString)
-    val concat15 = infix (Str) ("+", List(), List(MVar(MString), MString) :: MString)
-    val concat16 = infix (Str) ("+", List(), List(MVar(MString), MVar(MString)) :: MString)
+    infix (Str) ("+", T, (T, CString) :: MString) implements redirect ${ forge_string_plus($0, unit($1)) }
+    infix (Str) ("+", T, (T, MString) :: MString) implements redirect ${ forge_string_plus($0, $1) }
+    infix (Str) ("+", T, (MVar(T), CString) :: MString) implements redirect ${ forge_string_plus(readVar($0), unit($1)) }
+    infix (Str) ("+", T, (MVar(T), MString) :: MString) implements redirect ${ forge_string_plus(readVar($0), $1) }
+    infix (Str) ("+", T, (MVar(T), MVar(MString)) :: MString) implements redirect ${ forge_string_plus(readVar($0), readVar($1)) }
 
-
-    // TODO: we would like overloaded variants to possibly use the same codegen impl instead of being redundant here
-    // only the impl of the first declared canonical signature is actually used
-    // should overloading be more explicit in the spec to avoid this problem? (an 'overloaded' parameter?)
-    // at the very least, we should check for inconsistent codegen rules (or impls) between overloaded variants that collapse to the same thing
-    for (o <- List(concat,concat2,concat3,concat4,concat5,concat6,concat7,concat8,concat9,concat10,concat11,concat12,concat13,concat14,concat15,concat16)) {
-      impl (o) (codegen($cala, ${ $0.toString + $1.toString }))
-      impl (o) (codegen(cpp, "string_plus( convert_to_string< " + unquotes("remapWithRef("+opArgPrefix+"0.tp)") + ">(" + quotedArg(0) + "), convert_to_string< " + unquotes("remapWithRef("+opArgPrefix+"1.tp)") + ">(" + quotedArg(1) + "))"))
-    }
+    // infix (Str) ("+", Nil, (MString, CString) :: MString) implements redirect ${ forge_string_plus($0, unit($1)) }
+    infix (Str) ("+", Nil, (CString, MString) :: MString) implements redirect ${ forge_string_plus(unit($0), $1) }
+    infix (Str) ("+", Nil, (MString, MString) :: MString) implements redirect ${ forge_string_plus($0, $1) }
+    infix (Str) ("+", Nil, (MString, MVar(MString)) :: MString) implements redirect ${ forge_string_plus($0, readVar($1)) }
+    infix (Str) ("+", Nil, (MVar(MString), MString) :: MString) implements redirect ${ forge_string_plus(readVar($0), $1) }
+    infix (Str) ("+", Nil, (MVar(MString), MVar(MString)) :: MString) implements redirect ${ forge_string_plus(readVar($0), readVar($1)) }
   }
 
   def importMath() = {
     val Math = grp("Math")
 
     // constants
-    val inf = direct (Math) ("INF", Nil, Nil :: MDouble) 
-    val ninf = direct (Math) ("nINF", Nil, Nil :: MDouble) 
+    val inf = direct (Math) ("INF", Nil, Nil :: MDouble)
+    val ninf = direct (Math) ("nINF", Nil, Nil :: MDouble)
     direct (Math) ("Pi", Nil, Nil :: MDouble) implements redirect ${ unit(java.lang.Math.PI) }
     direct (Math) ("E", Nil, Nil :: MDouble) implements redirect ${ unit(java.lang.Math.E) }
 
@@ -652,7 +532,7 @@ trait ScalaOps {
     }
 
     // using an implicit conversion requires us to name all of the type parameters, whereas infix does not
-    for (arity <- 1 until maxTuples) { 
+    for (arity <- 1 until maxTuples) {
       mustInfixList ::= "_" + arity
     }
 
@@ -665,7 +545,7 @@ trait ScalaOps {
     direct (Tuple2) ("pack", (A,B), CTuple2(A,MVar(B)) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
     direct (Tuple2) ("pack", (A,B), CTuple2(MVar(A),MVar(B)) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
   }
-    
+
   // Forge's HashMap is not mutable, so a Scala HashMap can be used if updates are necessary.
   def importHashMap() = {
     val K = tpePar("K")

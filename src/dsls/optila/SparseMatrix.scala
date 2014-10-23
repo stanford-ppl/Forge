@@ -545,7 +545,7 @@ trait SparseMatrixOps {
         indexvector_fromarray(rows.unsafeImmutable, false)
       }
 
-      infix ("colIndices") (Nil :: IndexVector) implements single ${
+      infix ("colIndices") (Nil :: IndexVector) implements composite ${
         IndexVector(indexvector_fromarray(sparsematrix_csr_colindices($self), true).distinct)
       }
 
@@ -558,7 +558,7 @@ trait SparseMatrixOps {
       compiler ("sparsematrix_vview") ((MInt, MInt, MInt, MBoolean) :: SparseVectorView(T), aliasHint = contains(0)) implements single ${ SparseVectorView[T]($self, $1, $2, $3, $4) } // read-only right now
       infix ("getRow") (MInt :: SparseVectorView(T)) implements composite ${ sparsematrix_vview($self, $1*$self.numCols, 1, $self.numCols, true) }
 
-      infix ("getRows") (IndexVector :: SparseMatrix(T)) implements single ${
+      infix ("getRows") (IndexVector :: SparseMatrix(T)) implements composite ${
         // could avoid the COO <-> CSR conversion here by slicing the underlying CSR array directly
         val out = SparseMatrix[T]($1.length, $self.numCols)
         for (i <- 0 until $1.length) {
@@ -616,7 +616,7 @@ trait SparseMatrixOps {
        * Miscellaneous
        */
 
-      infix ("t") (Nil :: SparseMatrix(T)) implements single ${
+      infix ("t") (Nil :: SparseMatrix(T)) implements composite ${
         val out = SparseMatrix[T]($self.numCols, $self.numRows)
         val rowPtr = sparsematrix_csr_rowptr($self)
         val colIndices = sparsematrix_csr_colindices($self)

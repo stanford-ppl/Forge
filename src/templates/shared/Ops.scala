@@ -80,8 +80,10 @@ trait BaseGenOps extends ForgeCodeGenBase {
     else Nil
   }
 
+
   /**
-   * Overloading resolution
+   * Overloading resolution, using implicit hack.
+   * We need overloads for both front-end signatures (e.g., "+", universal) as well as abstract methods (e.g. vector_plus, grp).
    */
 
   // if after converting Ts and Vars to Reps there are duplicates, remove them.
@@ -109,15 +111,48 @@ trait BaseGenOps extends ForgeCodeGenBase {
   lazy val allOpsCanonicalMap = uniqueMap(allOps)._2
   def canonical(o: Rep[DSLOp]): Rep[DSLOp] = allOpsCanonicalMap.getOrElse(canonicalize(o), err("no canonical version of " + o.name + " found"))
 
-  // overload name clash resolution using implicit hack
-  // we need overloads for both front-end signatures (e.g., "+", universal) as well as abstract methods (e.g. vector_plus, grp), but the actual overload implicit used may differ in each case.
-  // problem: the local numbering of a signature can overlap with the same Overloaded# as one of the unique targets, causing an ambiguity
-  // def nameClash(o1: Rep[DSLOp], o2: Rep[DSLOp]) = o1.name == o2.name && o1.args.length == o2.args.length && (o1.args.zip(o2.args).forall(t => getHkTpe(t._1.tpe).name == getHkTpe(t._2.tpe).name || (t._1.tpe.stage == future && t._2.tpe.stage == future)))
-  def nameClash(o1: Rep[DSLOp], o2: Rep[DSLOp]) = o1.style == o2.style && o1.name == o2.name // forces a global numbering
+  // The actual op comparison is a performance hotspot; checks should be decomposed to allow early exits.
+
+  // Here we try to remove unnecessary overloaded implicits; unfortunately, it doesn't appear to have much of an impact (on compile times).
+  // def nameClash(o1: Rep[DSLOp], o2: Rep[DSLOp]) = {
+  //   val simpleChecks = o1.style == o2.style && o1.name == o2.name && o1.args.length == o2.args.length
+  //   simpleChecks && {
+  //     val o1infix = !noInfix(o1)
+  //     val o2infix = !noInfix(o2)
+  //     (o1infix == o2infix) && {
+  //       // with implicit classes we don't need to consider the first argument for method overloading resolution,
+  //       // unless it is the same type (after promotion) in both ops
+  //       val usingImplicits = o1.style == infixMethod && !o1infix && !o2infix
+  //       val (co1, co2) = (canonical(o1), canonical(o2)) // required to have a consistent view
+  //       co1 == co2 || {
+  //         val (o1args, o2args) = if (usingImplicits) (co1.args.drop(1), co2.args.drop(1)) else (co1.args, co2.args)
+  //         val lhsMatch = {
+  //           !usingImplicits || o1.args.length == 0 || {
+  //             val t1 = o1.args.apply(0).tpe
+  //             val t2 = o2.args.apply(0).tpe
+  //             getHkTpe(t1).name == getHkTpe(t2).name || repify(t1) == repify(t2)
+  //           }
+  //         }
+  //         lhsMatch && o1args.zip(o2args).forall { a =>
+  //           getHkTpe(a._1.tpe).name == getHkTpe(a._2.tpe).name ||
+  //           isTpePar(a._1.tpe) || isTpePar(a._2.tpe) ||
+  //           (isFuncArg(a._1) && isFuncArg(a._2)) ||
+  //           (repify(a._1).startsWith("Rep") && repify(a._2).startsWith("Rep")) // check for promotions
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
+
+  def nameClash(o1: Rep[DSLOp], o2: Rep[DSLOp]) = simpleNameClash(o1,o2)
+
+  def simpleNameClash(o1: Rep[DSLOp], o2: Rep[DSLOp]) = o1.style == o2.style && o1.name == o2.name // forces a global numbering
 
   def nameClashesGrp(o: Rep[DSLOp]) = opsGrpOf(o).map(_.ops.filter(o2 => o.grp.name == o2.grp.name && nameClash(o,o2))).getOrElse(Nil)
 
   def nameClashesUniversal(o: Rep[DSLOp]) = allOps.filter(o2 => nameClash(o,o2))
+
+  def nameClashesSimple(o: Rep[DSLOp]) = allOps.filter(o2 => simpleNameClash(o,o2))
 
   def nameClashId(o: Rep[DSLOp], clasher: Rep[DSLOp] => List[Rep[DSLOp]] = nameClashesUniversal) = {
     val clashes = clasher(o)
@@ -417,7 +452,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
   def noInfix(o: Rep[DSLOp]) = {
     // FIXME: we get scalac internal crashes when using the default-implicit mode now
     // if (Config.fastCompile) {
-    //   // default implicit mode (appears empirically slightly faster than infix)      
+    //   // default implicit mode (appears empirically slightly faster than infix)
     //   (!mustInfixList.contains(o.name)) && o.args.length > 0 && !o.args.exists(hasDefaultValue)
     // }
     // else {

@@ -27,6 +27,17 @@ trait OptiGraphDSL extends ForgeApplication
      */
     importScalaOps()
     importBitSetOps()
+
+    /**
+     * Expose some arrays ops (used in PageRankCSR right now)
+     */
+    val T = tpePar("T")
+    val R = tpePar("R")
+    val GArray = grp("GArrays")
+    direct (GArray) ("garray_fromfunction", T, (MInt, MInt ==> T) :: MArray(T)) implements composite ${ array_fromfunction($0, $1) }
+    direct (GArray) ("garray_reduce", T, (MArray(T), (T,T) ==> T, T) :: T) implements composite ${ array_reduce($0, $1, $2) }    
+    infix (GArray) ("map", (T,R), (MArray(T), T ==> R) :: MArray(R)) implements composite ${ array_map($0, $1) }
+
     /**
      * The main portion of our DSL
      */

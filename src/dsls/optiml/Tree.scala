@@ -25,18 +25,18 @@ trait TreeOps {
     /* Identifiers for tree building parameters */
     val TCriterion = tpe("TCriterion", stage = compile)
     identifier (TCriterion) ("MSE")   // for continuous-valued labels
-    identifier (TCriterion) ("Gini")  // for discrete-valued labels  
+    identifier (TCriterion) ("Gini")  // for discrete-valued labels
 
     val Tree = tpe("DecisionTree")
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Tree definition
 
-    /* 
+    /*
      * Array-based binary decision tree. Each array is of length N, where N is the
      * number of nodes in the tree, and index i represents information about node i.
      */
-    data(Tree, 
+    data(Tree,
         ("_numNodes", MInt),               // number of nodes in the tree
         ("_capacity", MInt),               // the size of the internal arrays, >= numNodes
         ("_isLeaf", MArray(MBoolean)),     // isLeaf(i) is true if node i is a leaf, false otherwise
@@ -96,7 +96,7 @@ trait TreeOps {
 
       // Adds a node to the tree. The new node registers itself as the child of its parent.
       infix ("addNode") (MethodSignature(List(
-                          ("parent", MInt), ("isLeft", MBoolean), ("isLeaf", MBoolean), 
+                          ("parent", MInt), ("isLeft", MBoolean), ("isLeaf", MBoolean),
                           ("feature", MInt), ("threshold", MDouble), ("impurity", MDouble),
                           ("numNodeSamples", MInt)), MInt), effect = write(0)) implements composite ${
 
@@ -107,8 +107,8 @@ trait TreeOps {
 
         if (parent != -1) { // -1 means that we are the root node
           if (isLeft)
-            $self.leftChildren(parent) = nodeId        
-          else 
+            $self.leftChildren(parent) = nodeId
+          else
             $self.rightChildren(parent) = nodeId
         }
 
@@ -121,16 +121,16 @@ trait TreeOps {
         $self.impurity(nodeId) = impurity
         $self.numNodeSamples(nodeId) = numNodeSamples
 
-        $self.set_num_nodes($self.numNodes + 1)      
+        $self.set_num_nodes($self.numNodes + 1)
 
-        nodeId  
-      } 
+        nodeId
+      }
     }
 
-    compiler (Tree) ("tree_realloc", Nil, (("tree", Tree), ("minCapacity", MInt)) :: MUnit, effect = write(0)) implements composite ${          
+    compiler (Tree) ("tree_realloc", Nil, (("tree", Tree), ("minCapacity", MInt)) :: MUnit, effect = write(0)) implements composite ${
       var n = max(4, tree.capacity * 2)
       while (n < minCapacity) n = n*2
-      
+
       val newIsLeaf = array_empty[Boolean](n)
       array_copy(tree.isLeaf, 0, newIsLeaf, 0, $tree.numNodes)
       tree.set_is_leaf(newIsLeaf)
@@ -158,20 +158,20 @@ trait TreeOps {
       val newImpurity = array_empty[Double](n)
       array_copy(tree.impurity, 0, newImpurity, 0, $tree.numNodes)
       tree.set_impurity(newImpurity)
-      
+
       val newNumNodeSamples = array_empty[Int](n)
       array_copy(tree.numNodeSamples, 0, newNumNodeSamples, 0, $tree.numNodes)
       tree.set_num_node_samples(newNumNodeSamples)
 
       tree.set_capacity(n)
     }
-    
+
     compiler (Tree) ("init_tree", Nil, ("maxDepth", MInt) :: Tree) implements composite ${
       val initCapacity =
-        if (maxDepth <= 10) (pow(2, maxDepth+1) - 1).toInt
+        if (maxDepth <= 10) (pow(2.0, maxDepth+1.0) - 1).toInt
         else 2047
 
-      alloc_tree(initCapacity) 
+      alloc_tree(initCapacity)
     }
 
 
@@ -180,9 +180,9 @@ trait TreeOps {
 
     /* Construct the decision tree in a depth-first fashion */
     direct (Tree) ("dtree", Nil, MethodSignature(List(
-                                   ("trainingSet",TrainingSet(MDouble,MDouble)), 
+                                   ("trainingSet",TrainingSet(MDouble,MDouble)),
                                    ("maxDepth", MInt, "unit(-1)"),
-                                   ("maxNumFeatures", MInt, "unit(-1)"),                                   
+                                   ("maxNumFeatures", MInt, "unit(-1)"),
                                    ("minSamplesSplit", MInt, "unit(2)"),
                                    ("minSamplesLeaf", MInt, "unit(1)"),
                                    ("criterion", TCriterion, "MSE")
@@ -200,7 +200,7 @@ trait TreeOps {
       // create a lifted function we can call recursively
       val process = doLambda({(t: Rep[Tup7[IndexVector,Int,Int,Boolean,Double,DenseVector[Boolean],Any]]) =>
         // an IndexVector in [0,numSamples] containing the partition of the TrainingSet we are currently working on
-        val samples = t._1 
+        val samples = t._1
 
         // the current depth of the tree
         val depth = t._2
@@ -224,25 +224,25 @@ trait TreeOps {
         val numNodeSamples = samples.length
 
         // stopping conditions
-        val isLeaf = 
-          (depth >= _maxDepth) || 
+        val isLeaf =
+          (depth >= _maxDepth) ||
           (constantFeatures.forall(f => f == true)) ||
-          (numNodeSamples < minSamplesSplit) || 
-          (numNodeSamples < 2*minSamplesLeaf) || 
+          (numNodeSamples < minSamplesSplit) ||
+          (numNodeSamples < 2*minSamplesLeaf) ||
           (impurity <= MIN_IMPURITY_SPLIT)
 
         if (isLeaf) {
           val nodeId = tree.addNode(parent, isLeft, isLeaf, 0, 0.0, impurity, numNodeSamples)
-          tree.value(nodeId) = tree_score(trainingSet, samples, criterion) 
+          tree.value(nodeId) = tree_score(trainingSet, samples, criterion)
           ()
-        } 
+        }
         else {
           // try to split this node
           val (sortedSamples, pos, threshold, feature, impurityLeft, impurityRight, nextConstantFeatures) = unpack(tree_split(tree, trainingSet, samples, _maxNumFeatures, impurity, constantFeatures, criterion))
-          
+
           if (pos == -1) { // failed to split, add node as leaf
             val nodeId = tree.addNode(parent, isLeft, true, 0, 0.0, impurity, numNodeSamples)
-            tree.value(nodeId) = tree_score(trainingSet, samples, criterion) 
+            tree.value(nodeId) = tree_score(trainingSet, samples, criterion)
             ()
           }
           else {
@@ -255,7 +255,7 @@ trait TreeOps {
             // left child
             doApply(next, pack((sortedSamples(0::pos), depth+1, nodeId, unit(true), impurityLeft, nextConstantFeatures, continuation)))
           }
-        }    
+        }
 
         ()
       })
@@ -276,14 +276,14 @@ trait TreeOps {
 
       // sample up to maxNumFeatures and evaluate impurity to find the best feature to split on
       val candidateFeatures = trainingSet.data.colIndices filter { i => !constantFeatures(i) }
-      fassert(candidateFeatures.length > 0, "a non-constant feature is required to split")      
-      val pct = maxNumFeatures.toDouble / candidateFeatures.length.toDouble 
+      fassert(candidateFeatures.length > 0, "a non-constant feature is required to split")
+      val pct = maxNumFeatures.toDouble / candidateFeatures.length.toDouble
       val testFeatures = if (pct < 1.0) sample(candidateFeatures, pct) else candidateFeatures
 
       // for each feature, evaluate all possible splits for improvement
       val improvements = testFeatures { j =>
         // sort samples along this feature
-        val featureValues = trainingSet.data.apply(samples).getCol(j)        
+        val featureValues = trainingSet.data.apply(samples).getCol(j)
         val (sortedValues, sortedIndices) = featureValues.sortWithIndex
         val sortedSamples = samples(sortedIndices)
 
@@ -291,25 +291,25 @@ trait TreeOps {
         if (sortedValues(0) == sortedValues(sortedValues.length-1)) {
           pack((-INF, sortedSamples, j, unit(0.0), unit(0.0), unit(0.0)))
         }
-        else {        
+        else {
           // compute scores for each candidate split
           var p = 1
           var bestPos = 1
           var bestScore = -INF
           var bestImpurityLeft = -INF
           var bestImpurityRight = -INF
-          
+
           while (p < sortedValues.length - 1) {
             // skip to the next p at least FEATURE_THRESHOLD greater than the current value
             while ((p+1 < sortedValues.length - 1) && (abs(sortedValues.apply(p+1) - sortedValues.apply(p)) > FEATURE_THRESHOLD))
               p += 1
-            
+
             val (improvement, impurityLeft, impurityRight) = unpack(compute_impurity_improvement(trainingSet, impurity, sortedSamples, p, criterion))
 
             if (improvement > bestScore) {
               bestScore = improvement
               bestPos = p
-              bestImpurityLeft = impurityLeft              
+              bestImpurityLeft = impurityLeft
               bestImpurityRight = impurityRight
             }
 
@@ -317,24 +317,24 @@ trait TreeOps {
           }
 
           val threshold = (sortedValues(bestPos-1) + sortedValues(bestPos)) / 2.0
-            
+
           pack((readVar(bestScore), sortedSamples, readVar(bestPos), threshold, readVar(bestImpurityLeft), readVar(bestImpurityRight)))
-        }                        
+        }
       }
 
-      val bestFeatureIndex = improvements.map(_._1).maxIndex      
+      val bestFeatureIndex = improvements.map(_._1).maxIndex
       val bestFeature = testFeatures(bestFeatureIndex)
       val bestSort = improvements(bestFeatureIndex)._2
       val bestPos = improvements(bestFeatureIndex)._3
       val threshold = improvements(bestFeatureIndex)._4
       val impurityLeft = improvements(bestFeatureIndex)._5
       val impurityRight = improvements(bestFeatureIndex)._6
-    
+
       val newConstantFeatures = improvements filter { t => t._1 == -INF } map { _._3 }
       val nextConstantFeatures = constantFeatures.mutable
       for (j <- newConstantFeatures) {
-        nextConstantFeatures(j) = true      
-      }      
+        nextConstantFeatures(j) = true
+      }
 
       if (improvements(bestFeatureIndex)._1 == -INF) {
         // no split could be found
@@ -343,11 +343,11 @@ trait TreeOps {
       else {
         pack((bestSort, bestPos, threshold, bestFeature, impurityLeft, impurityRight, nextConstantFeatures))
       }
-    }  
+    }
 
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // Impurity Criterion 
+    // Impurity Criterion
 
     compiler (Tree) ("compute_impurity_improvement", Nil, (("trainingSet", TrainingSet(MDouble,MDouble)), ("impurity", MDouble), ("samples", IndexVector), ("splitPos", MInt), ("criterion", TCriterion)) :: Tup3(MDouble,MDouble,MDouble)) implements composite ${
       val leftSamples = samples(0::splitPos)
@@ -369,20 +369,20 @@ trait TreeOps {
       }
     }
 
-    /* 
+    /*
      * Mean Squared Error (MSE) regression criterion
      */
     compiler (Tree) ("impurity_mse", Nil, (("trainingSet", TrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
       variance(trainingSet.labels.apply(samples))
     }
-   
+
     /**
      * Gini index classification criterion
      */
     compiler (Tree) ("impurity_gini", Nil, (("trainingSet", TrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
       val labels = trainingSet.labels.apply(samples)
       val numSamplesByLabel = labels.groupByReduce(l => l, l => 1, (a: Rep[Int],b: Rep[Int]) => a+b)
-      
+
       1.0 - sum(0, numSamplesByLabel.keys.length) { ki =>
         val k = numSamplesByLabel.keys.apply(ki)
         // proportion of class k observations in the current set of samples
@@ -402,9 +402,9 @@ trait TreeOps {
     }
 
     compiler (Tree) ("tree_score_mse", Nil, (("trainingSet", TrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
-      // regression prediction value is the mean of values assigned to this node 
+      // regression prediction value is the mean of values assigned to this node
       mean(trainingSet.labels.apply(samples))
-    }  
+    }
 
     compiler (Tree) ("tree_score_gini", Nil, (("trainingSet", TrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
       // select the label with the highest frequency in the sample
@@ -434,7 +434,7 @@ trait TreeOps {
       }
 
       // prediction value for this leaf
-      tree.value.apply(node)      
+      tree.value.apply(node)
     }
 
 
@@ -442,7 +442,7 @@ trait TreeOps {
     // Visualization
 
     infix (Tree) ("pprint", Nil, (("tree", Tree)) :: MUnit, effect = simple) implements composite ${
-      val process = doLambda({(t: Rep[Tup2[Int,Any]]) => 
+      val process = doLambda({(t: Rep[Tup2[Int,Any]]) =>
         val node = t._1
         val continuation = t._2
         val next = continuation.AsInstanceOf[Tup2[Int,Any] => Unit]
@@ -456,16 +456,16 @@ trait TreeOps {
         println("Node: " + node)
         if (!isLeaf) {
           println("If feature " + feature + " <= " + threshold + " then node " + leftChild + " else node " + rightChild)
-          println()      
+          println()
           doApply(next, pack((leftChild, continuation)))
           doApply(next, pack((rightChild, continuation)))
         }
         else {
           println("Leaf covering " + tree.numNodeSamples.apply(node) + " samples. Prediction value is: " + tree.value.apply(node))
-          println()      
-        }        
+          println()
+        }
       })
-      
+
       doApply(process, pack((unit(0), process.AsInstanceOf[Any])))
     }
   }

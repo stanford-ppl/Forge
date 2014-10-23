@@ -21,12 +21,17 @@ trait RewriteOpsExp extends RewriteOps with TableOpsExp with DeliteOptiQLExtraEx
 
   def sortHackImpl[A:Manifest](self: Rep[Table[A]], comparator: (Rep[A],Rep[A]) => Rep[Int])(implicit pos: SourceContext): Rep[Table[A]] = {
     val indices = DeliteArray.sortIndices(self.size)((i:Rep[Int],j:Rep[Int]) => comparator(self(i), self(j)))
-    val sorted = DeliteArray.fromFunction(self.size)(i => table_apply(self, darray_apply(indices, i)))  
+    val sorted = DeliteArray.fromFunction(self.size)(i => table_apply(self, darray_apply(indices, i)))
     Table(sorted, self.size)
   }
 
+  case class CompareHack[T:Ordering:Manifest](lhs: Exp[T], rhs: Exp[T]) extends Def[Int] {
+    def mev = manifest[T]
+    def aev = implicitly[Ordering[T]]
+  }
+
   def compareHackImpl[A:Manifest:Ordering](lhs: Rep[A], rhs: Rep[A]): Rep[Int] = {
-    lhs compare rhs
+    CompareHack(lhs, rhs)
   }
 
 
@@ -94,7 +99,7 @@ trait RewriteOpsExp extends RewriteOps with TableOpsExp with DeliteOptiQLExtraEx
       case Some((valueFunc, reduceFunc, averageFunc)) =>
         //Console.err.println("fused GroupBy-Select")
         val hr = groupByReduce(origS, keySelector, valueFunc, reduceFunc, (e:Exp[a]) => unit(true))(g._mA,g._mK,manifest[R],implicitly[SourceContext])
-        val count = groupByReduce(origS, keySelector, (e:Exp[a]) => unit(1), (a:Exp[Int],b:Exp[Int])=>primitive2_forge_int_plus(a,b), (e:Exp[a])=>unit(true))(g._mA,g._mK,manifest[Int],implicitly[SourceContext])
+        val count = groupByReduce(origS, keySelector, (e:Exp[a]) => unit(1), (a:Exp[Int],b:Exp[Int])=>forge_int_plus(a,b), (e:Exp[a])=>unit(true))(g._mA,g._mK,manifest[Int],implicitly[SourceContext])
         bulkDivide(hr, count, averageFunc)(manifest[R],implicitly[SourceContext])
       case None =>
         Console.err.println("WARNING: unable to fuse GroupBy-Select")
@@ -104,7 +109,7 @@ trait RewriteOpsExp extends RewriteOps with TableOpsExp with DeliteOptiQLExtraEx
       case Some((valueFunc, reduceFunc, averageFunc)) =>
         //Console.err.println("fused GroupBy-Select")
         val hr = groupByReduce(origS, keySelector, valueFunc, reduceFunc, cond)(g._mA,g._mK,manifest[R],implicitly[SourceContext])
-        val count = groupByReduce(origS, keySelector, (e:Exp[a]) => unit(1), (a:Exp[Int],b:Exp[Int])=>primitive2_forge_int_plus(a,b), cond)(g._mA,g._mK,manifest[Int],implicitly[SourceContext])
+        val count = groupByReduce(origS, keySelector, (e:Exp[a]) => unit(1), (a:Exp[Int],b:Exp[Int])=>forge_int_plus(a,b), cond)(g._mA,g._mK,manifest[Int],implicitly[SourceContext])
         bulkDivide(hr, count, averageFunc)(manifest[R],implicitly[SourceContext])
       case None =>
         Console.err.println("WARNING: unable to fuse GroupBy-Select")
@@ -135,6 +140,8 @@ trait RewriteOpsExp extends RewriteOps with TableOpsExp with DeliteOptiQLExtraEx
     case Reflect(mn@Table_PrintAsTable(__arg0,__arg1), u, es) => reflectMirrored(Reflect(Table_PrintAsTable(f(__arg0),f(__arg1))(mtype(mn._mA),mn.__pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case mn@Table_WriteAsJSON(__arg0,__arg1) => table_writeasjson(f(__arg0),f(__arg1))(mtype(mn._mA),mn.__pos)
     case Reflect(mn@Table_WriteAsJSON(__arg0,__arg1), u, es) => reflectMirrored(Reflect(Table_WriteAsJSON(f(__arg0),f(__arg1))(mtype(mn._mA),mn.__pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case e@CompareHack(a,b) => reflectPure(CompareHack(f(a),f(b))(e.aev,e.mev))(mtype(manifest[A]), pos)
+    case Reflect(e@CompareHack(a,b), u, es) => reflectMirrored(Reflect(CompareHack(f(a),f(b))(e.aev,e.mev), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e, f)
   }).asInstanceOf[Exp[A]]
 
@@ -146,15 +153,30 @@ trait ScalaGenRewriteOps extends ScalaGenFat {
   import IR._
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case mn@Table_PrintAsTable(self,maxRows) => 
+    case mn@Table_PrintAsTable(self,maxRows) =>
       stream.println("val "+quote(sym)+" = {")
       stream.print("TablePrinter.printAsTable("+quote(self)+", "+quote(maxRows)+")")
       stream.println("}")
 
-    case mn@Table_WriteAsJSON(self,path) => 
+    case mn@Table_WriteAsJSON(self,path) =>
       stream.println("val "+quote(sym)+" = {")
       stream.print("TablePrinter.writeAsJSON("+quote(self)+", "+quote(path)+")")
       stream.println("}")
+
+    // Unfortunately duplicated from LMS OrderingOps now, since we no longer include OrderingOps in Forge DSLs.
+    // Need to come up with a good way of code-generating this type of implementation from a Forge spec
+    // (it should be implemented in Forge's Scala.scala).
+    case c@CompareHack(a,b) => c.mev match {
+      case m if m == Manifest.Int => emitValDef(sym, "java.lang.Integer.compare("+quote(a)+","+quote(b)+")")
+      case m if m == Manifest.Long => emitValDef(sym, "java.lang.Long.compare("+quote(a)+","+quote(b)+")")
+      case m if m == Manifest.Double => emitValDef(sym, "java.lang.Double.compare("+quote(a)+","+quote(b)+")")
+      case m if m == Manifest.Float => emitValDef(sym, "java.lang.Float.compare("+quote(a)+","+quote(b)+")")
+      case m if m == Manifest.Boolean => emitValDef(sym, "java.lang.Boolean.compare("+quote(a)+","+quote(b)+")")
+      case m if m == Manifest.Byte => emitValDef(sym, "java.lang.Byte.compare("+quote(a)+","+quote(b)+")")
+      case m if m == Manifest.Char => emitValDef(sym, "java.lang.Character.compare("+quote(a)+","+quote(b)+")")
+      case m if m == Manifest.Short => emitValDef(sym, "java.lang.Short.compare("+quote(a)+","+quote(b)+")")
+      case _ => emitValDef(sym, quote(a) + " compare " + quote(b))
+    }
 
     case _ => super.emitNode(sym, rhs)
   }

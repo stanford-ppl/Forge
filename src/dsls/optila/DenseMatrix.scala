@@ -65,7 +65,7 @@ trait DenseMatrixOps {
           totalNumCols = numCols
         }
         else {
-          fassert(numCols == totalNumCols, "dimension mismatch in block matrix constructor: row " + i + " has wrong number of cols " + numCols + " (expected " + totalNumCols + ")")          
+          fassert(numCols == totalNumCols, "dimension mismatch in block matrix constructor: row " + i + " has wrong number of cols " + numCols + " (expected " + totalNumCols + ")")
         }
         ()
       }
@@ -199,7 +199,7 @@ trait DenseMatrixOps {
        }
       infix ("triu") (Nil :: DenseMatrix(T), TArith(T)) implements composite ${
         (0::$self.numRows, 0::$self.numCols) { (i,j) =>
-          if (i <= j) $self(i,j) else implicitly[Arith[T]].empty          
+          if (i <= j) $self(i,j) else implicitly[Arith[T]].empty
         }
       }
       infix ("tril") (Nil :: DenseMatrix(T), TArith(T)) implements composite ${
@@ -446,36 +446,36 @@ trait DenseMatrixOps {
        */
 
        // TODO: inverse
-       infix ("+") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a+b })
-       infix ("+") (T :: DenseMatrix(T), TArith(T)) implements map((T,T), 0, ${ e => e+$1 })
+       infix ("+") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ $self.zip($1) { (a,b) => a+b } }
+       infix ("+") (T :: DenseMatrix(T), TArith(T)) implements composite ${ $self.map(e => e+$1) }
          // infix ("+") (DenseMatrix(B) :: DenseMatrix(T), (TArith(T), B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a+b })
        infix ("+=") (DenseMatrix(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${
          $self.indices.foreach { i => densematrix_raw_update($self,i,densematrix_raw_apply($self,i)+densematrix_raw_apply($1,i)) }
        }
-       infix ("+=") (T :: MUnit, TArith(T), effect = write(0)) implements composite ${         
+       infix ("+=") (T :: MUnit, TArith(T), effect = write(0)) implements composite ${
          $self.indices.foreach { i => densematrix_raw_update($self,i,densematrix_raw_apply($self,i)+$1) }
        }
 
-       infix ("-") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a-b })
-       infix ("-") (T :: DenseMatrix(T), TArith(T)) implements map((T,T), 0, ${ e => e-$1 })
+       infix ("-") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ $self.zip($1) { (a,b) => a-b } }
+       infix ("-") (T :: DenseMatrix(T), TArith(T)) implements composite ${ $self.map(e => e-$1) }
          // infix ("-") (DenseMatrix(B) :: DenseMatrix(T), (TArith(T), B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a-b })
-       infix ("-=") (DenseMatrix(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${         
+       infix ("-=") (DenseMatrix(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${
          $self.indices.foreach { i => densematrix_raw_update($self,i,densematrix_raw_apply($self,i)-densematrix_raw_apply($1,i)) }
        }
        infix ("-=") (T :: MUnit, TArith(T), effect = write(0)) implements composite ${
          $self.indices.foreach { i => densematrix_raw_update($self,i,densematrix_raw_apply($self,i)-$1) }
        }
 
-       infix ("*:*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a*b })
-       infix ("*") (T :: DenseMatrix(T), TArith(T)) implements map((T,T), 0, ${ e => e*$1 })
+       infix ("*:*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ $self.zip($1) { (a,b) => a*b } }
+       infix ("*") (T :: DenseMatrix(T), TArith(T)) implements composite ${ $self.map(e => e*$1) }
          // infix ("*") (DenseMatrix(B) :: DenseMatrix(T), (TArith(T), B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a*b })
-       infix ("*=") (DenseMatrix(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${         
+       infix ("*=") (DenseMatrix(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${
          $self.indices.foreach { i => densematrix_raw_update($self,i,densematrix_raw_apply($self,i)*densematrix_raw_apply($1,i)) }
        }
-       infix ("*=") (T :: MUnit, TArith(T), effect = write(0)) implements composite ${         
+       infix ("*=") (T :: MUnit, TArith(T), effect = write(0)) implements composite ${
          $self.indices.foreach { i => densematrix_raw_update($self,i,densematrix_raw_apply($self,i)*$1) }
        }
-       infix ("*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements single ${
+       infix ("*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${
          fassert($self.numCols == $1.numRows, "dimension mismatch: matrix multiply")
          // naive
          val yT = $1.t
@@ -491,7 +491,7 @@ trait DenseMatrixOps {
          }
          out.unsafeImmutable
        }
-       infix ("*") (DenseVector(T) :: DenseVector(T), TArith(T)) implements single ${
+       infix ("*") (DenseVector(T) :: DenseVector(T), TArith(T)) implements composite ${
         fassert($self.numCols == $1.length && !$1.isRow, "dimension mismatch: matrix * vector")
         val out = DenseVector[T]($self.numRows, false)
         for (rowIdx <- 0 until $self.numRows) {
@@ -500,13 +500,13 @@ trait DenseMatrixOps {
         out.unsafeImmutable
        }
 
-       infix ("/") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a/b })
-       infix ("/") (T :: DenseMatrix(T), TArith(T)) implements map((T,T), 0, ${ e => e/$1 })
+       infix ("/") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ $self.zip($1) { (a,b) => a/b } }
+       infix ("/") (T :: DenseMatrix(T), TArith(T)) implements composite ${ $self.map(e => e/$1) }
          // infix ("/") (DenseMatrix(B) :: DenseMatrix(T), (TArith(T), B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a/b })
-       infix ("/=") (DenseMatrix(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${         
+       infix ("/=") (DenseMatrix(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${
          $self.indices.foreach { i => densematrix_raw_update($self,i,densematrix_raw_apply($self,i)/densematrix_raw_apply($1,i)) }
        }
-       infix ("/=") (T :: MUnit, TArith(T), effect = write(0)) implements composite ${         
+       infix ("/=") (T :: MUnit, TArith(T), effect = write(0)) implements composite ${
          $self.indices.foreach { i => densematrix_raw_update($self,i,densematrix_raw_apply($self,i)/$1) }
        }
 
@@ -520,9 +520,9 @@ trait DenseMatrixOps {
        infix ("sum") (Nil :: T, TArith(T)) implements reduce(T, 0, ${ implicitly[Arith[T]].empty }, ${ (a,b) => a+b })
        infix ("prod") (Nil :: T, TArith(T)) implements reduce(T, 0, ${ unit(1.asInstanceOf[T]) }, ${ (a,b) => a*b })
        infix ("mean") (Nil :: MDouble, ("conv",T ==> MDouble)) implements composite ${ $self.map(conv).sum / $self.size }
-       infix ("abs") (Nil :: DenseMatrix(T), TArith(T)) implements map((T,T), 0, ${ e => e.abs })
-       infix ("exp") (Nil :: DenseMatrix(T), TArith(T)) implements map((T,T), 0, ${ e => e.exp })
-       infix ("log") (Nil :: DenseMatrix(T), TArith(T)) implements map((T,T), 0, ${ e => e.log })
+       infix ("abs") (Nil :: DenseMatrix(T), TArith(T)) implements composite ${ $self.map(e => e.abs) }
+       infix ("exp") (Nil :: DenseMatrix(T), TArith(T)) implements composite ${ $self.map(e => e.exp) }
+       infix ("log") (Nil :: DenseMatrix(T), TArith(T)) implements composite ${ $self.map(e => e.log) }
 
        infix ("sumRows") (Nil :: DenseVector(T), TArith(T)) implements composite ${ $self.mapRowsToVector { row => sum(row) }}
        infix ("sumCols") (Nil :: DenseVector(T), TArith(T)) implements composite ${ $self.mapColsToVector { col => sum(col) }}
@@ -646,14 +646,14 @@ trait DenseMatrixOps {
 
        infix ("groupRowsBy") ((DenseVectorView(T) ==> K) :: MHashMap(K, DenseMatrix(T)), addTpePars = K) implements composite ${
          val grps = densematrix_grouprowsby_helper($self.rowIndices, $self, $1, (row: Rep[DenseVectorView[T]]) => row)
-         val vals = fhashmap_values(grps)         
+         val vals = fhashmap_values(grps)
          val submats = vals.map(buf => (0::array_buffer_length(buf), *) { i => array_buffer_apply(buf,i) })
          fhashmap_from_arrays(fhashmap_keys(grps), submats)
        }
 
        infix ("groupColsBy") ((DenseVectorView(T) ==> K) :: MHashMap(K, DenseMatrix(T)), addTpePars = K) implements composite ${
          val grps = densematrix_groupcolsby_helper($self.colIndices, $self, $1, (col: Rep[DenseVectorView[T]]) => col)
-         val vals = fhashmap_values(grps)         
+         val vals = fhashmap_values(grps)
          val submats = vals.map(buf => (*, 0::array_buffer_length(buf)) { j => array_buffer_apply(buf,j) })
          fhashmap_from_arrays(fhashmap_keys(grps), submats)
        }

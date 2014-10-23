@@ -36,10 +36,10 @@ trait DeliteGenOps extends BaseGenOps {
     if(b.contains("emitBlock")) true
     else false
   }
- 
+
   // bound symbol for the captured variable of a block
   private var boundArg: String = _
-  
+
   override def quote(x: Exp[Any]): String = x match {
     case Def(QuoteBlockResult(func,args,ret,captured)) =>
       // bind function args to captured args
@@ -71,7 +71,7 @@ trait DeliteGenOps extends BaseGenOps {
       // the new-line formatting is admittedly weird; we are using a mixed combination of actual new-lines (for string splitting at Forge)
       // and escaped new-lines (for string splitting at Delite), based on how we received strings from string interpolation.
       // FIX: using inconsistent newline character, not platform independent
-      val out = "{ \"" + boundStr +       
+      val out = "{ \"" + boundStr +
         nl + "emitBlock(" + func.name + ")" +
         (if (ret != MUnit && boundArg == null)
            (nl + "quote(getBlockResult(" + func.name + "))+\"\\n\"")
@@ -93,7 +93,7 @@ trait DeliteGenOps extends BaseGenOps {
   // IR node names
   def makeOpNodeName(o: Rep[DSLOp], suffix: String = "") = {
     Labels.get(o).map(_.capitalize).getOrElse {
-      val i = nameClashId(o)
+      val i = nameClashId(o, clasher = nameClashesSimple)
       o.style match {
         case `staticMethod` => o.grp.name + i + "Object_" + sanitize(o.name).capitalize + suffix
         case `compilerMethod` => o.name.capitalize + suffix
@@ -888,7 +888,7 @@ trait DeliteGenOps extends BaseGenOps {
       emitBlockComment("Code generators", stream)
       stream.println()
       val save = activeGenerator
-      for (g <- generators) {        
+      for (g <- generators) {
         activeGenerator = g
         val generatorRules = rules.flatMap{case (o,i) => i.asInstanceOf[CodeGen].decls.collect{case (k,r) if (k == g) => (o,r)}}
         if (generatorRules.length > 0) {
@@ -929,7 +929,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    case _ => super.emitNode(sym, rhs)")
           stream.println("  }")
           stream.println("}")
-        }        
+        }
       }
       activeGenerator = save
     }

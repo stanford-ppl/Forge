@@ -9,7 +9,7 @@ object PageRankCSRInterpreter extends OptiGraphApplicationInterpreter with PageR
 trait PageRankCSR extends OptiGraphApplication {
   
   def hackyReduce(a: Rep[NodeData[Double]], b: Rep[NodeData[Double]]): Rep[Double] = {
-    array_reduce(array_fromfunction(a.length, i => abs(a(i)-b(i))), (x:Rep[Double],y:Rep[Double]) => x+y, 0.0)
+    garray_reduce(garray_fromfunction(a.length, i => abs(a(i)-b(i))), (x:Rep[Double],y:Rep[Double]) => x+y, 0.0)
   }
 
   def main() = {  
@@ -19,7 +19,7 @@ trait PageRankCSR extends OptiGraphApplication {
     val nl = array_length(nodesArray)
     println("nodes: " + nl)
 
-    val edgesArray = ForgeFileReader.readLinesFlattened(args(1)){ s => array_string_split(s,"\\s+").map(_.toInt) }
+    val edgesArray = ForgeFileReader.readLinesFlattened(args(1)){ s => s.split("\\s+").map(_.toInt) }
     val el = array_length(edgesArray)
     println("edges: " + el)
 

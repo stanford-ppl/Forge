@@ -125,7 +125,7 @@ trait OptiMLDSL extends OptiLADSL
     val SparseVector = lookupTpe("SparseVector")
 
     // val Arith = lookupGrp("Arith")
-    val Prim = lookupGrp("Primitive2")
+    val Prim = lookupGrp("Primitive")
     val T = tpePar("T")
 
     // default metric is ABS

@@ -14,7 +14,7 @@ trait UndirectedTriangleCountingCSR extends OptiGraphApplication {
     val nl = array_length(nodesArray)
     println("nodes: " + nl)
 
-    val edgesArray = ForgeFileReader.readLinesFlattened(args(1)){ s => array_string_split(s,"\\s+").map(_.toInt) }
+    val edgesArray = ForgeFileReader.readLinesFlattened(args(1)){ s => s.split("\\s+").map(_.toInt) }
     val el = array_length(edgesArray)
     println("edges: " + el)
 

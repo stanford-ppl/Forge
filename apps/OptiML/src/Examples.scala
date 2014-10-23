@@ -440,18 +440,18 @@ object Example14 {
     println("scala 1") 
     
     // storage for the answer
-    val ab = new scala.collection.mutable.ArrayBuffer[Double]
+    var ans: Double = 0.0
 
     // executes immediately in OptiML
     OptiML { 
       println("inside OptiML!")
       val v = DenseVector.rand(100)        
-      ab += v.sum
+      ans = v.sum
       ()
     }
 
     // ordinary Scala again
-    println("computed sum: " + ab(0))  
+    println("computed sum: " + ans)
   }
 }
 

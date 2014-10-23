@@ -22,6 +22,10 @@ trait Definitions extends DerivativeTypes {
    * Built-in types
    */
   // concrete types (M stands for "Meta", C stands for "Current").. these aren't exactly consistent
+
+  // FIXME: Need to resolve discrepancy between 'compile' and 'now'. Ideally everything should have 'compile' behavior, but it breaks
+  //        string lifting in Scala.scala, for example.
+
   lazy val MAny = tpe("Any")
   lazy val CAny = tpe("Any", stage = now)
   lazy val MInt = tpe("Int")
@@ -56,12 +60,13 @@ trait Definitions extends DerivativeTypes {
   // unstaged (inlined) functions
   def MFunction(args: List[Rep[Any]], ret: Rep[DSLType], freq: Frequency = normal) = ftpe(args.zipWithIndex.map(anyToArg),ret,freq)
   // staged (reified) function of A => B (note that A can be a tuple for multiple arguments)
-  lazy val MLambda = tpe("Function1", (tpePar("A"), tpePar("B")))  
-  lazy val MSourceContext = tpe("SourceContext", stage = now)
+  lazy val MLambda = tpe("Function1", (tpePar("A"), tpePar("B")))
+  lazy val MSourceContext = tpe("SourceContext", stage = compile)
 
   // generic types
   // should these return a different Forge type (e.g. Rep[TypeConstructor] or Rep[GenericType]) than concrete types?
   lazy val MVar = tpe("Var", tpePar("A"))
+  lazy val CVar = tpe("Var", tpePar("A"), stage = compile)
   lazy val MArray = tpe("ForgeArray", tpePar("A"))
   lazy val MArrayBuffer = tpe("ForgeArrayBuffer", tpePar("A"))
   lazy val MHashMap = tpe("ForgeHashMap",(tpePar("K"),tpePar("V"))) // Forge HashMap (immutable)

@@ -56,9 +56,8 @@ object FileStreamRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationC
 object FileStreamRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with FileStreamTest
 trait FileStreamTest extends ForgeTestModule with OptiMLApplication {
   def main() = {
-    val testMatFile = "test.mat"    
     val testMat = DenseMatrix.ones(10000,100)
-    writeMatrix(testMat, testMatFile)
+    writeMatrix(testMat, "test.mat")
 
     val f = FileStream("test.mat")
     for (line <- f) {
@@ -83,7 +82,10 @@ trait FileStreamTest extends ForgeTestModule with OptiMLApplication {
     }
 
     collect(total == testMat.sum)
-    
+
+    deleteFile("test.mat")
+    deleteFile("test2.mat")
+
     mkReport
   }
 }

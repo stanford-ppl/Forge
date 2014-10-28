@@ -65,14 +65,14 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println()
 
     // exp
-    stream.println("trait " + dsl + "Exp extends " + dsl + "Compiler")
+    stream.println("trait " + dsl + "Exp extends " + dsl + "Compiler with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
     for (opsGrp <- opsGrps) {
       stream.print(" with " + opsGrp.name + "Exp")
     }
     for (e <- Externs) {
       stream.print(" with " + e.opsGrp.name + "Exp")
     }
-    stream.println(" with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp with DeliteAllOverridesExp with MultiloopSoATransformExp {")
+    stream.println(" with DeliteAllOverridesExp with MultiloopSoATransformExp {")
     stream.println(" this: DeliteApplication with " + dsl + "Application => ")
     stream.println()
     emitBlockComment("disambiguations for Delite internal operations", stream, indent=2)

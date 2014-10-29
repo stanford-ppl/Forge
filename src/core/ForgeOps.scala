@@ -160,7 +160,7 @@ trait ForgeSugar extends ForgeSugarLowPriority {
   /**
    * Uses Scala-Virtualized scopes to enable sugar for ops scoped on a particular DSLType
    */
-  var _tpeScopeBox: Rep[DSLType] = null
+  var _tpeScopeBox: Rep[DSLType] = _
   def withTpe(tpe: Rep[DSLType]) = {
     _tpeScopeBox = tpe
     new ChainTpe(tpe)

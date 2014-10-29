@@ -11,7 +11,7 @@ import fileinput
 
 FORGE_HOME = os.getenv("FORGE_HOME")
 FORGE_GENERATED = "build" # TODO
-SCALA_MAJOR_VERS = "2.10"
+SCALA_MAJOR_VERS = "2.11"
 SCALA_MINOR_VERS = "2"
 
 def err(s):
@@ -65,13 +65,15 @@ object ${dslName}Build extends Build {
   val virtScala = "${scala_major_vers}.${scala_minor_vers}"
   val virtBuildSettingsBase = Project.defaultSettings ++ Seq(
     organization := "stanford-ppl",
-    scalaOrganization := "org.scala-lang.virtualized",
+    scalaOrganization := "org.scala-lang",
     scalaVersion := virtScala,
+    scalaHome := Some(file("/Users/asujeeth/opensource/scala-virtualized-2.11/build/pack/")),
+
     publishArtifact in (Compile, packageDoc) := false,
     // needed for scala.tools, which is apparently not included in sbt's built in version
-    libraryDependencies += "org.scala-lang.virtualized" % "scala-library" % virtScala,
-    libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % virtScala,
-    libraryDependencies += "org.scalatest" % "scalatest_${scala_major_vers}" % "2.1.2",
+    libraryDependencies += "org.scala-lang" % "scala-library" % virtScala,
+    libraryDependencies += "org.scala-lang" % "scala-compiler" % virtScala,
+    libraryDependencies += "org.scalatest" % "scalatest_${scala_major_vers}" % "2.2.2",
     libraryDependencies += "com.google.guava" % "guava" % "17.0",
     libraryDependencies += "org.apache.commons" % "commons-math" % "2.2",
     libraryDependencies += "commons-io" % "commons-io" % "2.4",
@@ -81,6 +83,7 @@ object ${dslName}Build extends Build {
     libraryDependencies += "org.apache.hadoop" % "hadoop-common" % "2.5.1",
     libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "2.3.0",
     libraryDependencies += "org.apache.hadoop" % "hadoop-hdfs" % "2.3.0",
+
     // used in delitec to access jars
     retrieveManaged := true,
     scalacOptions += "-Yno-generic-signatures",

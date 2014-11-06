@@ -29,30 +29,33 @@ trait RandomOps {
       $0(randomInt($0.length))
     }
 
-    direct (Rand) ("randomInt", Nil, MInt :: MInt, effect = simple) implements codegen($cala, ${
-      Global.randRef.nextInt($0)
-    })
+    val randomint = direct (Rand) ("randomInt", Nil, MInt :: MInt, effect = simple)
+    impl (randomint) (codegen($cala, ${ Global.randRef.nextInt($0) }))
+    impl (randomint) (codegen(cpp, ${ resourceInfo.rand->nextInt($0) }))
 
-    direct (Rand) ("randomGaussian", Nil, Nil :: MDouble, effect = simple) implements codegen($cala, ${
-      Global.randRef.nextGaussian()
-    })
+    val randomgaussian = direct (Rand) ("randomGaussian", Nil, Nil :: MDouble, effect = simple)
+    impl (randomgaussian) (codegen($cala, ${ Global.randRef.nextGaussian() }))
+    impl (randomgaussian) (codegen(cpp, ${ resourceInfo.rand->nextGaussian() }))
 
-    direct (Rand) ("reseed", Nil, Nil :: MUnit, effect = simple) implements codegen($cala, ${
-      Global.randRef.setSeed(Global.INITIAL_SEED)
-    })
+    val reseed = direct (Rand) ("reseed", Nil, Nil :: MUnit, effect = simple)
+    impl (reseed) (codegen($cala, ${ Global.randRef.setSeed(Global.INITIAL_SEED) }))
+    impl (reseed) (codegen(cpp, ${ resourceInfo.rand->setSeed(DeliteCppRandom.INITIAL_SEED) }))
 
-    compiler (Rand) ("optila_rand_double", Nil, Nil :: MDouble, effect = simple) implements codegen($cala, ${
-      Global.randRef.nextDouble()
-    })
-    compiler (Rand) ("optila_rand_float", Nil, Nil :: MFloat, effect = simple) implements codegen($cala, ${
-      Global.randRef.nextFloat()
-    })
-    compiler (Rand) ("optila_rand_int", Nil, Nil :: MInt, effect = simple) implements codegen($cala, ${
-      Global.randRef.nextInt()
-    })
-    compiler (Rand) ("optila_rand_boolean", Nil, Nil :: MBoolean, effect = simple) implements codegen($cala, ${
-      Global.randRef.nextBoolean()
-    })
+    val randdouble = compiler (Rand) ("optila_rand_double", Nil, Nil :: MDouble, effect = simple)
+    impl (randdouble) (codegen($cala, ${ Global.randRef.nextDouble() }))
+    impl (randdouble) (codegen(cpp, ${ resourceInfo.rand->nextDouble() }))
+
+    val randfloat = compiler (Rand) ("optila_rand_float", Nil, Nil :: MFloat, effect = simple)
+    impl (randfloat) (codegen($cala, ${ Global.randRef.nextFloat() }))
+    impl (randfloat) (codegen(cpp, ${ resourceInfo.rand->nextFloat() }))
+
+    val randint = compiler (Rand) ("optila_rand_int", Nil, Nil :: MInt, effect = simple)
+    impl (randint) (codegen($cala, ${ Global.randRef.nextInt() }))
+    impl (randint) (codegen(cpp, ${ resourceInfo.rand->nextInt() }))
+
+    val randboolean = compiler (Rand) ("optila_rand_boolean", Nil, Nil :: MBoolean, effect = simple)
+    impl (randboolean) (codegen($cala, ${ Global.randRef.nextBoolean() }))
+    impl (randboolean) (codegen(cpp, ${ resourceInfo.rand->nextBoolean() }))
 
     direct (Rand) ("shuffle", Nil, IndexVector :: IndexVector, effect = simple) implements composite ${
       indexvector_fromarray(densevector_raw_data(shuffle($0.toDense)), $0.isRow)

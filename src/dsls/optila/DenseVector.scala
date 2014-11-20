@@ -58,7 +58,7 @@ trait DenseVectorOps {
     static (DenseVector) ("rand", Nil, MInt :: DenseVector(MDouble)) implements composite ${ densevector_fromfunc($0, i => random[Double]) }
     static (DenseVector) ("randf", Nil, MInt :: DenseVector(MFloat)) implements composite ${ densevector_fromfunc($0, i => random[Float]) }
     static (DenseVector) ("uniform", Nil, MethodSignature(List(("start", MDouble), ("step_size", MDouble), ("end", MDouble), ("isRow", MBoolean, "unit(true)")), DenseVector(MDouble))) implements composite ${
-      fassert(end > start+step_size, "end <= start+step_size in DenseVector.uniform")      
+      fassert(end > start+step_size, "end <= start+step_size in DenseVector.uniform")
       val length = ceil(($end-$start)/$step_size)
       densevector_fromfunc(length, i => $step_size*i + $start)
     }
@@ -321,7 +321,7 @@ trait DenseVectorOps {
       infix ("sortBy") ((T ==> B) :: DenseVector(T), TOrdering(B), addTpePars = B) implements composite ${
         val sortedIndicesRaw = densevector_sortindex_helper(0, $self.length, densevector_raw_data($self.map($1)))
         val sortedIndices = IndexVector(densevector_fromarray(sortedIndicesRaw,$self.isRow))
-        $self(sortedIndices)        
+        $self(sortedIndices)
       }
 
       infix ("sortWithIndex") (Nil :: CTuple2(DenseVector(T),IndexVector), TOrdering(T)) implements composite ${
@@ -363,10 +363,10 @@ trait DenseVectorOps {
         val vals = fhashmap_values(hash).map(ab => densevector_fromarray(array_buffer_result(ab), true))
         fhashmap_from_arrays(fhashmap_keys(hash), vals)
       }
-      
+
       // filter is here, instead of Vector.scala, so that other Vector types can have a different return value
-      infix ("filter") ((T ==> MBoolean) :: DenseVector(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})      
-      
+      infix ("filter") ((T ==> MBoolean) :: DenseVector(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})
+
       /**
        * Required for parallel collection
        */

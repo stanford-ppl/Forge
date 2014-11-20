@@ -25,12 +25,9 @@ usage() {
   exit $E_BADARGS
 }
 
-if [ $# -lt $EXPECTED_ARGS ]; then usage; fi
-
 # check FORGE_HOME exists
 if [ -z "${FORGE_HOME+xxx}" ]; then echo error: FORGE_HOME is not defined; exit $E_NOHOME; fi
 if [ -z "$FORGE_HOME" -a "${FORGE_HOME+xxx}" = "xxx" ]; then echo error: FORGE_HOME is set but empty; exit $E_NOHOME; fi
-
 
 APP_RUNNER=""
 COPY_APPS=""
@@ -68,6 +65,8 @@ do
 done
 shift $(($OPTIND - 1))
 
+if [ $# -lt $EXPECTED_ARGS ]; then usage; fi
+
 if [ $INTERACTIVE == true ] && [ "$APP_RUNNER" != "" ];
 then
   echo error: interactive mode and application mode cannot be run at the same time
@@ -103,7 +102,7 @@ then
 fi
 
 if [ $SKIP -le 3 ];
-then  
+then
   echo "publish $DSL_NAME $CLEAN $CLEAN_EXTERN $USE_JARS $COPY_APPS (3/$NUM_STEPS)"
   $FORGE_HOME/bin/publish $DSL_NAME $CLEAN $CLEAN_EXTERN $USE_JARS $COPY_APPS
 fi

@@ -30,7 +30,10 @@ trait IOGraphOps {
     direct (IO) ("writeResults", T, (("path",MString),("ids",MArray(MInt)),("data",NodeData(T))) :: MUnit, TNumeric(T), effect = simple) implements single ${
       writeGraphData($path,ids,data.getRawArray,$data.length)
     }
-    compiler (IO) ("writeGraphData", T, (("path",MString),("ids",MArray(MInt)),("data",MArray(T)),("length",MInt)) :: MUnit, TNumeric(T), effect = simple) implements codegen($cala, ${
+
+    val writeGraphData = compiler (IO) ("writeGraphData", T, (("path",MString),("ids",MArray(MInt)),("data",MArray(T)),("length",MInt)) :: MUnit, TNumeric(T), effect = simple) 
+        
+    impl (writeGraphData) (codegen($cala, ${
       val xfs = new java.io.BufferedWriter(new java.io.FileWriter($path))
       xfs.write("#node id\\tdata\\n")
       for (i <- 0 until $length) {
@@ -38,7 +41,17 @@ trait IOGraphOps {
         xfs.write($data(i).toString + "\\n")
       }
       xfs.close()
-    })
+    }))
+
+    impl (writeGraphData) (codegen(cpp, ${
+      std::ofstream xfs($path.c_str());
+      xfs << "#node id \\tdata\\n";
+      for (int64_t i=0; i < $length ; i++) {
+        xfs << $ids->data[i] << "\\t";
+        xfs << $data->data[i] << "\\n";
+      }
+      xfs.close();
+    }))
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 ////////General Loaders

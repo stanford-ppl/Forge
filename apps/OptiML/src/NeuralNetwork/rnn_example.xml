@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+
+<net    name="RNNExample"
+        dataset_path="apps/src/NeuralNetwork/examples/stock_market" 
+        samples_per_window="25"
+        bidirectional="False"
+>
+
+        <layer  name="h1" 
+                type="FULLY_CONNECTED"
+                num_hidden="200"
+        >
+        </layer>
+
+        <layer  name="h1" 
+                type="FULLY_CONNECTED"
+                num_hidden="100"
+        >
+        </layer>
+
+        <layer  name="h1" 
+                type="FULLY_CONNECTED"
+                num_hidden="25"
+        >
+        </layer>
+
+        <layer  name="output"
+                type="SOFTMAX"
+                num_hidden="5"
+        >
+        </layer>
+
+</net>

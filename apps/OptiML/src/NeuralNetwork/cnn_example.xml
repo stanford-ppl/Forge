@@ -1,0 +1,93 @@
+<?xml version="1.0"?>
+
+<net    name="CNNExample"
+        colormap="RGB" 
+        dataset_path="apps/src/NeuralNetwork/examples/cifar10" 
+        lr_cmd_line_arg="1" 
+        img_size="32x32"
+> 
+
+<!-- Additional options:
+
+        blas="1"
+                Uses cuBLAS GEMM instead of OptiML parallel dot products.
+                This turns out to be slower, which needs investigation.
+
+        num_input_channels="3"
+                This is an alternative to colormap
+                Use num_input_channels to specify the number of input channels
+                in each row of your input data. E.g. a grayscale image has 1
+                and an RGB image has 3. "colormap" is a shorthand for 
+                num_input_channels, i.e. colormap="Grayscale" is analogous 
+                to num_input_channels="1" and colormap="RGB" is analogous to
+                num_input_channels="3". If num_input_channels is specified,
+                colormap is not needed. If both are specified, colormap is
+                ignored. If neither is specified, the default is Grayscale (1 channel).
+
+        lr_cmd_line_arg="0"
+                This specifies whether the learning rate should be an input
+                through the command line ("1") or a separate parameter file ("0").
+-->
+
+
+        <layer  name="c1"
+                type="CONVOLUTION"
+                kernel_size="7"
+                num_hidden="32"
+        >
+        </layer>
+
+        <layer  name="m2"
+                type="MAX_POOL"
+                pool_size="2"
+        >
+        </layer>
+
+        <layer  name="c3"
+                type="CONVOLUTION"
+                kernel_size="5"
+                num_hidden="32"
+        >
+        </layer>
+
+        <layer  name="m4"
+                type="MAX_POOL"
+                pool_size="2"
+        >
+        </layer>
+
+        <layer  name="c5"
+                type="CONVOLUTION"
+                kernel_size="5"
+                num_hidden="64"
+        >
+        </layer>
+
+        <layer  name="m4"
+                type="MAX_POOL"
+                pool_size="2"
+        >
+        </layer>
+
+        <layer  name="h5" 
+                type="FULLY_CONNECTED"
+                num_hidden="64"
+                dropout="0.5"
+        >
+        </layer>
+
+        <layer  name="h5" 
+                type="FULLY_CONNECTED"
+                num_hidden="10"
+                dropout="0.5"
+                activation="LINEAR"
+        >
+        </layer>
+
+        <layer  name="output"
+                type="SOFTMAX"
+                num_hidden="10"
+        >
+        </layer>
+
+</net>

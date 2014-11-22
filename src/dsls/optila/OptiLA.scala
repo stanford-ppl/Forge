@@ -123,6 +123,7 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
 
     // rewrites
     extern(grp("Rewrite"), targets = Nil)
+    extern(grp("Distributed"), targets = List($cala))
   }
 
   def importVecMatConstructor() {

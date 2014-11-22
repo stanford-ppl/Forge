@@ -736,7 +736,8 @@ trait DeliteGenOps extends BaseGenOps {
         val colTpe = makeTpeInst(tpe, tpePar("A"))
         val a = if (dc.tpeArg.tp.runtimeClass == classOf[TypePar]) "A" else quote(dc.tpeArg) // hack!
 
-        stream.println("  def " + isTpe + "[A](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = isSubtype(x.tp.erasure,classOf["+makeTpeInst(tpe, tpePar("A"))+"])")
+        stream.println("  def " + isTpe + "Tpe(x: Manifest[_])(implicit ctx: SourceContext) = isSubtype(x.erasure,classOf["+makeTpeInst(tpe, tpePar("_"))+"])")
+        stream.println("  def " + isTpe + "[A](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = " + isTpe + "Tpe(x.tp)")
         stream.println("  def " + asTpe + "[A](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = x.asInstanceOf[Exp["+colTpe+"]]")
         stream.println()
 
@@ -860,7 +861,7 @@ trait DeliteGenOps extends BaseGenOps {
           warn("could not infer size field for struct " + tpe.name)
         }
         if (arrayFields.length == 1 && sizeField.isDefined) {
-          val isTpe = "is"+tpe.name
+          val isTpe = "is"+tpe.name+"Tpe"
           val prefix = if (first) "    if " else "    else if "
           dcDataFieldStream += prefix + "("+isTpe+"(x)) \"" + arrayFields(0)._1 + "\"" + nl
           dcSizeFieldStream += prefix + "("+isTpe+"(x)) \"" + sizeField.get + "\"" + nl
@@ -869,12 +870,12 @@ trait DeliteGenOps extends BaseGenOps {
       }
 
       if (!first) {
-        stream.println("  override def dc_data_field[A:Manifest](x: Exp[DeliteCollection[A]]) = {")
+        stream.println("  override def dc_data_field(x: Manifest[_]) = {")
         stream.print(dcDataFieldStream)
         stream.println("    else super.dc_data_field(x)")
         stream.println("  }")
         stream.println()
-        stream.println("  override def dc_size_field[A:Manifest](x: Exp[DeliteCollection[A]]) = {")
+        stream.println("  override def dc_size_field(x: Manifest[_]) = {")
         stream.print(dcSizeFieldStream)
         stream.println("    else super.dc_size_field(x)")
         stream.println("  }")

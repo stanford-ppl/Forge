@@ -59,7 +59,7 @@ trait OptiLADSL extends ForgeApplication
     // infix_foreach must be compiler only both so that it is not used improperly and to not interfere with other codegen nodes in the library
     // this is a little convoluted unfortunately (because of the restriction on passing structs to codegen nodes)
     compiler (Range) ("infix_foreach", Nil, (Range, MInt ==> MUnit) :: MUnit) implements composite ${ range_foreach(range_start($0), range_end($0), $1) }
-    val range_foreach = compiler (Range) ("range_foreach", Nil, (("start",MInt),("end",MInt),("func",MInt ==> MUnit)) :: MUnit) 
+    val range_foreach = compiler (Range) ("range_foreach", Nil, (("start",MInt),("end",MInt),("func",MInt ==> MUnit)) :: MUnit)
     impl (range_foreach) (codegen($cala, ${
       var i = $start
       while (i < $end) {
@@ -78,7 +78,7 @@ trait OptiLADSL extends ForgeApplication
     importRandomOps()
     importArithOps()
     importStringableOps()
-    importComplexOps()    
+    importComplexOps()
 
     // override default string formatting (numericPrecision is a global defined in extern)
     // we use "" + $a instead of $a.toString to avoid an NPE when explicitly calling toString inside the REPL
@@ -96,7 +96,7 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
 """
     }
 
-    val fmt_str = direct (lookupGrp("FString")) ("optila_fmt_str", T, T :: MString) 
+    val fmt_str = direct (lookupGrp("FString")) ("optila_fmt_str", T, T :: MString)
     impl (fmt_str) (codegen($cala, formatStr))
     impl (fmt_str) (codegen(cpp, "convert_to_string<" +  unquotes("remapWithRef("+opArgPrefix+"0.tp)") + " >(" + quotedArg(0) + ")"))
 
@@ -123,6 +123,7 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
 
     // rewrites
     extern(grp("Rewrite"), targets = Nil)
+    extern(grp("Distributed"), targets = List($cala))
   }
 
   def importVecMatConstructor() {
@@ -151,6 +152,16 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
         $1(rowIndices(rowIndex),colIndices(colIndex))
       }
 
+      // FIXME: using this version exposes some new fun bugs related to nested arrays. Not clear why it only shows up below,
+      //        but not with the version above. Using this version also completely changes the stencil situation...
+
+      // val size = rowIndices.length*colIndices.length
+      // val out_data = array_fromfunction(size, i => {
+      //   val (rowIndex, colIndex) = unpack(matrix_shapeindex(i, colIndices.length))
+      //   $1(rowIndices(rowIndex),colIndices(colIndex))
+      // })
+      // densematrix_fromarray(out_data,rowIndices.length,colIndices.length)
+
       // could fuse with nested matrix loops (loops over rowIndices), but not with loops directly over individual matrix elements -- like map!
       // it seems best for us to be consistent: matrix loops should either all be flat or all be nested. which one? should we use lowerings?
       // however, mutable version also supresses fusion due to unsafeImmutable and code motion due to effects...
@@ -170,9 +181,11 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
     // one alternative is to use an IsVector type class for the function return type, instead of overloading.
     // currently, we just let DenseVectorViews implicitly convert to DenseVector, which will cause overhead
     // in the lib implementation, but should fuse away in the Delite implementation.
-    //
-    // furthermore, due to the effectful implementation, these cannot be fused or hoisted...
-    
+
+    // FIXME: the effectful implementation here prevents these operations from being fused, hoisted, or distributed
+    //        distribution is prevented by the output matrix allocation happening on the master
+    //        (even though the foreach afterwards could be distributed)
+
     for (rhs <- List(DenseVector(T)/*, DenseVectorView(T))*/)) {
       infix (IndexVector) ("apply", T, (CTuple2(IndexVector,IndexWildcard), MInt ==> rhs) :: DenseMatrix(T)) implements composite ${
         val rowIndices = $0._1

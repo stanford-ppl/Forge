@@ -29,11 +29,8 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
     = darray_apply(__arg0,__arg1)
   def array_length[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[Int]
     = darray_length(__arg0)
-  def array_clone[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]] = {
-    val out = darray_new[T](darray_length(__arg0))
-    darray_copy(__arg0, unit(0), out, unit(0), darray_length(__arg0))
-    delite_unsafe_immutable(out)
-  }
+  def array_clone[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+    = darray_fromfunction(darray_length(__arg0), i => darray_apply(__arg0,i))
   def array_take[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int]): Rep[ForgeArray[T]]
     = darray_take(__arg0,__arg1)
   def array_mkstring[A:Manifest](__arg0: Rep[ForgeArray[A]],__arg1: Rep[String])(implicit __imp0: SourceContext): Rep[String]

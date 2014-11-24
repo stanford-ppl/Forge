@@ -56,7 +56,7 @@ trait ValidateOps {
         
       }
 
-      DenseMatrix((stats(0), stats(1)), (stats(2), stats(3)))
+      DenseMatrix(DenseVector(stats(0), stats(1)), DenseVector(stats(2), stats(3)))
     }
   }
 }

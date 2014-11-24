@@ -36,7 +36,7 @@ trait GDA extends OptiMLApplication {
     val mu0_num = sumRowsIf(0,m) { !y(_) } { x(_) }
     val mu1_num = sumRowsIf(0,m) { y(_) } { x(_) }
 
-    val phi = 1./m * y_ones
+    val phi = 1.0/m * y_ones
     val mu0 = mu0_num / y_zeros
     val mu1 = mu1_num / y_ones
 

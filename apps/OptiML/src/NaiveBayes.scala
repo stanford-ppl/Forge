@@ -72,10 +72,10 @@ trait NaiveBayes extends FileUtil {
 
     val output = (0::ts.numSamples) { j =>
       // compute log(p(x|y=1)p(y=1)) and log(p(x|y=0)p(y=0))
-      val pNorm = sumIf(0,ts.numFeatures) { i => ts(j,i) > 0 } { i => (log(phi_y0(i)) + log(1.-phi_y)) * ts(j,i) }
+      val pNorm = sumIf(0,ts.numFeatures) { i => ts(j,i) > 0 } { i => (log(phi_y0(i)) + log(1.0-phi_y)) * ts(j,i) }
       val pSpam = sumIf(0,ts.numFeatures) { i => ts(j,i) > 0 } { i => (log(phi_y1(i)) + log(phi_y)) * ts(j,i) }
 
-      if (pSpam > pNorm) 1. else 0.
+      if (pSpam > pNorm) 1.0 else 0.0
     }
 
     // compute error on test set

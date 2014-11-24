@@ -458,7 +458,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     // else {
       // default infix mode (slightly easier to understand what's happening, also fails to apply less than implicits)
       // blacklist or curried args or function args (in the latter two cases, infix doesn't always resolve correctly)
-      noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o)
+      !mustInfixList.contains(o.name) && (noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o))
     // }
   }
 

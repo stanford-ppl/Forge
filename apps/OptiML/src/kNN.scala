@@ -12,7 +12,7 @@ trait kNN extends OptiMLApplication {
   }
 
   def createDataSet = {
-    val group = DenseMatrix((1.0, 1.1),(1.0, 1.0),(0.0, 0.0),(0.0, 0.1))
+    val group = DenseMatrix(DenseVector(1.0, 1.1),DenseVector(1.0, 1.0),DenseVector(0.0, 0.0),DenseVector(0.0, 0.1))
     val labels = DenseVector("A", "A", "B", "B")
     TrainingSet(group,labels)
   }

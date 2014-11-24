@@ -22,6 +22,8 @@ trait DenseVectorOps {
     data(DenseVector, ("_length", MInt), ("_isRow", MBoolean), ("_data", MArray(T)))
 
     // operations on literal sequences are made available via tuple conversions to DenseVector
+    // These are temporarily commented due to a bug in Scala 2.11: https://issues.scala-lang.org/browse/SI-8992
+    /*
     for (arity <- (2 until 23)) {
       // we use "Reppable" to allow heterogeneous tuples (that vary in A, Rep[A], and Var[A]) to still be converted
       val pars = tpePar("A") :: (1 until arity).map(i => tpePar(('A'.toInt+i).toChar.toString, Nil)).toList
@@ -40,6 +42,7 @@ trait DenseVectorOps {
       val TV = tpe("Tuple" + arity, tpePar("Var[A]") :: pars.drop(1), stage = compile)
       fimplicit (DenseVector) ("varTupleToDense" + arity, pars, (("t",TV) :: DenseVector(pars(0))), impls) implements redirect ${ DenseVector[A](readVar(t._1),\$elems) }
     }
+    */
 
     // static methods
     static (DenseVector) ("apply", T, (MInt, MBoolean) :: DenseVector(T), effect = mutable) implements allocates(DenseVector, ${$0}, ${$1}, ${array_empty[T]($0)})

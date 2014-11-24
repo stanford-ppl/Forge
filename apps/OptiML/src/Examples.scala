@@ -52,14 +52,14 @@ trait Example2 extends OptiMLApplication {
     val v3 = DenseVector.rand(100) // 100x1 random doubles
     val v4 = DenseVector.zeros(100) // 100x1 all zeros, doubles
     val v5 = DenseVector(1,2,3,4,5) // [1,2,3,4,5]
-    val v6 = DenseVector(1.,2.,3.,4.,5.) // [1.0,2.0,3.0,4.0,5.0]
+    val v6 = DenseVector(1.0,2.0,3.0,4.0,5.0) // [1.0,2.0,3.0,4.0,5.0]
     val v7 = (0::100) { e => random[Int] } // 100x1, random ints
 
     /* various ways of constructing a DenseMatrix */
     val m0 = DenseMatrix[Int](100,50) // 100x50 zeros, ints
     val m1 = DenseMatrix.rand(100,50) // 100x50 random doubles
     val m2 = DenseMatrix.zeros(100,50) // 100x50 zeros, doubles
-    val m3 = DenseMatrix((1,2,3),(4,5,6)) // [1,2,3]
+    val m3 = DenseMatrix(DenseVector(1,2,3),DenseVector(4,5,6)) // [1,2,3]
                                           // [4,5,6]
     val m4 = (0::2, *) { i => DenseVector(2,3,4) }  // [2,3,4]
                                                     // [2,3,4]

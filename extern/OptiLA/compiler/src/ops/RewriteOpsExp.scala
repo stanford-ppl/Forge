@@ -105,7 +105,7 @@ trait RewriteOpsExp extends RewriteOps with PrimitiveOpsExp with DenseVectorOpsE
     case _ => super.primitive_todouble(__arg0)
   }
   override def primitive_tolong[T:Numeric:Manifest](__arg0: Rep[T])(implicit __pos: SourceContext) = __arg0 match {
-    case Const(x) => Const(implicitly[Numeric[T]].toLong(x))
+    // case Const(x) => Const(implicitly[Numeric[T]].toLong(x))
     case _ => super.primitive_tolong(__arg0)
   }
   override def primitive_repint2torepdouble(__arg0: Rep[Int])(implicit __pos: SourceContext) = __arg0 match {

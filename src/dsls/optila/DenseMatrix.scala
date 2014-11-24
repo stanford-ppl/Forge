@@ -142,6 +142,10 @@ trait DenseMatrixOps {
       infix ("toFloat") (Nil :: DenseMatrix(MFloat), ("conv",T ==> MFloat)) implements map((T,MFloat), 0, ${$conv})
       infix ("toInt") (Nil :: DenseMatrix(MInt), ("conv",T ==> MInt)) implements map((T,MInt), 0, ${$conv})
 
+      // This workaround is required for 2.11 for some reason (the matrix conversion implicit fails to
+      // resolve for vector * matrix).
+      mustInfixList :::= List("toFloat", "toDouble")
+
       infix ("flattenToVector") (Nil :: DenseVector(T)) implements composite ${
         (0::$self.size) { i => densematrix_raw_apply($self, i) }
       }

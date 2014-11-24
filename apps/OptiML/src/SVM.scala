@@ -43,7 +43,7 @@ trait SVM extends FileUtil {
         val f_i = (alphasOld*Y*(X.data*X(i).t)).sum + b //TR M*V alph0
         val E_i = f_i - Y(i)
 
-        if (((Y(i)*E_i < -1.*tol) && (alphasOld(i) < C)) || ((Y(i)*E_i > tol) && (alphasOld(i) > 0.0))) {        
+        if (((Y(i)*E_i < -1.0*tol) && (alphasOld(i) < C)) || ((Y(i)*E_i > tol) && (alphasOld(i) > 0.0))) {
           // select a candidate j from the remaining numSamples-i samples at random
           var j = floor(random[Double]*(numSamples-1)).AsInstanceOf[Int]+1
           while (j == i) {
@@ -61,11 +61,11 @@ trait SVM extends FileUtil {
           var L = 0.0
           var H = 0.0
           if (Y(i) != Y(j)) {
-            L = max(0., alphasOld(j) - alphasOld(i))
+            L = max(0.0, alphasOld(j) - alphasOld(i))
             H = min(C, C + alphasOld(j) - alphasOld(i))
           }
           else {
-            L = max(0., alphasOld(i) + alphasOld(j) - C)
+            L = max(0.0, alphasOld(i) + alphasOld(j) - C)
             H = min(C, alphasOld(i) + alphasOld(j))
           }
 

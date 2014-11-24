@@ -67,7 +67,7 @@ object ${dslName}Build extends Build {
     organization := "stanford-ppl",
     scalaOrganization := "org.scala-lang",
     scalaVersion := virtScala,
-    scalaHome := Some(file("/Users/asujeeth/opensource/scala-virtualized-2.11/build/pack/")),
+    scalaHome := Some(file(sys.env("SCALA_VIRTUALIZED_HOME"))),
 
     publishArtifact in (Compile, packageDoc) := false,
     // needed for scala.tools, which is apparently not included in sbt's built in version

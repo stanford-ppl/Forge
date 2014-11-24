@@ -321,7 +321,7 @@ trait PDIPSolver extends OptiMLApplication {
 
     val det = a*d - b*c
 
-    DenseMatrix((d/det, -b/det), (-c/det, a/det))
+    DenseMatrix(DenseVector(d/det, -b/det), DenseVector(-c/det, a/det))
   }
 
   def lsqr(A: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]]): Rep[DenseVector[Double]] = {

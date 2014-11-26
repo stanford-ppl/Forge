@@ -35,7 +35,12 @@ trait VectorOps {
     // we can also perform bulk operations generically, returning a DenseVector result for each operation
     // Arith is only required if T is actually a tpePar here, so we need to be careful.
     if (!isTpePar(T)) compiler (v) ("zeroT", Nil, Nil :: T) implements composite ${ 0.asInstanceOf[\$TT] }
-    val AZ = if (isTpePar(T)) (List(TArith(asTpePar(T))), "implicitly[Arith[T]].zero(self(unit(0)))") else (Nil, "zeroT")
+
+    // We need to be a little careful using empty for zero here. With nested vectors, the zero vector
+    // will not be the correct dimension. This implementation relies on the fact that DeliteOps will not
+    // attempt to reduce with the zero element unless the collection is empty, in which case the behavior
+    // is still not correct (but should probably throw an exception instead of silently returning []).
+    val AZ = if (isTpePar(T)) (List(TArith(asTpePar(T))), "implicitly[Arith[T]].empty") else (Nil, "zeroT")
     val A = AZ._1; val Z = AZ._2; // can't use capital letters with tuple return pattern matching
     val O = if (isTpePar(T)) List(TOrdering(asTpePar(T))) else Nil
     val S = if (isTpePar(T)) List(TStringable(asTpePar(T))) else Nil
@@ -134,6 +139,7 @@ trait VectorOps {
         }
         s
       }
+
       infix ("toString") (Nil :: MString) implements composite ${
         var s = ""
         if ($self.length == 0) {

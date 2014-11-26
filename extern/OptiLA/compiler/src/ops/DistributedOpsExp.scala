@@ -18,13 +18,13 @@ trait DistributedOpsExp extends DistributedOps with DenseMatrixOpsExp {
 
   // This is used when we to distribute a parallel op over a matrix; the size passed in is the total matrix size
   // Each matrix chunk should allocate a smaller number of rows, depending on the total chunk size, while numCols is constant.      
-  // Is there any reason this shouldn't be the default implementation for densematrix_raw_alloc?
-  override def densematrix_raw_alloc[T:Manifest,R:Manifest](self: Rep[DenseMatrix[T]],__arg1: Rep[Int])(implicit __pos: SourceContext) = {
+  // Is there any reason this shouldn't be the default implementation for densematrix_dc_alloc?
+  override def densematrix_dc_alloc[T:Manifest,R:Manifest](self: Rep[DenseMatrix[T]],__arg1: Rep[Int])(implicit __pos: SourceContext) = {
     if (ppl.delite.framework.Config.generateSerializable) {
       val numRows = __arg1 / self.numCols
       DenseMatrix[R](numRows, self.numCols)
     }
-    else super.densematrix_raw_alloc[T,R](self,__arg1)
+    else super.densematrix_dc_alloc[T,R](self,__arg1)
   }
 }
 

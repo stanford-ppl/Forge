@@ -47,38 +47,20 @@ trait IOOps {
     }
 
     direct (IO) ("readMatrix", Elem, MethodSignature(List(("path",MString),("schemaBldr",MString ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseMatrix(Elem))) implements composite ${
-      val a = ForgeFileReader.readLines(path){ line:Rep[String] =>
+      val a = ForgeFileReader.readLinesFlattened($path){ line:Rep[String] =>
         val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
-        (0::array_length(tokens)) { i => schemaBldr(tokens(i)) }
+        array_fromfunction(array_length(tokens), i => schemaBldr(tokens(i)))
       }
-      DenseMatrix(densevector_fromarray(a, true))
-
-      /*
-       * No longer using this version because it forces us to assume the underlying FS to re-open
-       * the file (or use Hadoop APIs here), which is not great. However, the version above should be
-       * less efficient. We should measure the overhead of constructing the Vector[Vector[]] representation.
-       */
-      // val a = ForgeFileReader.readLinesFlattened($path){ line:Rep[String] =>
-      //   val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
-      //   array_fromfunction(array_length(tokens), i => schemaBldr(tokens(i)))
-      // }
-      // val numCols = array_length(readFirstLine(path).trim.fsplit(delim, -1))
-      // densematrix_fromarray(a, array_length(a) / numCols, numCols).unsafeImmutable // unsafeImmutable needed due to struct unwrapping Reflect(Reflect(..)) bug (see LAInputReaderOps.scala line 46 in Delite)
+      val numCols = array_length(readFirstLine(path).trim.fsplit(delim, -1))
+      densematrix_fromarray(a, array_length(a) / numCols, numCols)
     }
 
-    // val readfirstline = compiler (IO) ("readFirstLine", Nil, ("path",MString) :: MString)
-
-    // impl (readfirstline) (codegen($cala, ${
-    //   val xfs = new java.io.BufferedReader(new java.io.FileReader($path))
-    //   val line = xfs.readLine()
-    //   xfs.close()
-    //   line
-    // }))
-
-    //NOTE: C++ target codegen for readfirstline uses the Delite C++ library (readFirstLineFile),
-    //      but may want to have codegen directly here like scala target (after multi-line C++ codegen in Forge is fixed).
-    // impl (readfirstline) (codegen(cpp, ${readFirstLineFile($path)}))
-
+    val readfirstline = compiler (IO) ("readFirstLine", Nil, ("path",MString) :: MString) implements composite ${
+      val in = ForgeFileInputStream(path)
+      val line = in.readLine()
+      in.close()
+      line
+    }
 
     // -- output
 

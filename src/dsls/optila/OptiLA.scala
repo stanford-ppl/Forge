@@ -145,22 +145,12 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
       val (rowIndices,colIndices) = $0
 
       // can fuse with flat matrix loops
-      val v = (0::(rowIndices.length*colIndices.length)).toDense
-      val indices = densematrix_fromarray(densevector_raw_data(v),rowIndices.length,colIndices.length)
-      indices map { i =>
+      val size = rowIndices.length*colIndices.length
+      val out_data = array_fromfunction(size, i => {
         val (rowIndex, colIndex) = unpack(matrix_shapeindex(i, colIndices.length))
         $1(rowIndices(rowIndex),colIndices(colIndex))
-      }
-
-      // FIXME: using this version exposes some new fun bugs related to nested arrays. Not clear why it only shows up below,
-      //        but not with the version above. Using this version also completely changes the stencil situation...
-
-      // val size = rowIndices.length*colIndices.length
-      // val out_data = array_fromfunction(size, i => {
-      //   val (rowIndex, colIndex) = unpack(matrix_shapeindex(i, colIndices.length))
-      //   $1(rowIndices(rowIndex),colIndices(colIndex))
-      // })
-      // densematrix_fromarray(out_data,rowIndices.length,colIndices.length)
+      })
+      densematrix_fromarray(out_data,rowIndices.length,colIndices.length)
 
       // could fuse with nested matrix loops (loops over rowIndices), but not with loops directly over individual matrix elements -- like map!
       // it seems best for us to be consistent: matrix loops should either all be flat or all be nested. which one? should we use lowerings?

@@ -30,7 +30,7 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
   def array_length[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[Int]
     = darray_length(__arg0)
   def array_clone[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
-    = darray_fromfunction(darray_length(__arg0), i => darray_apply(__arg0,i))
+    = darray_clone(__arg0)
   def array_take[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int]): Rep[ForgeArray[T]]
     = darray_take(__arg0,__arg1)
   def array_mkstring[A:Manifest](__arg0: Rep[ForgeArray[A]],__arg1: Rep[String])(implicit __imp0: SourceContext): Rep[String]

@@ -62,6 +62,7 @@ import sbt._
 import Keys._
 
 object ${dslName}Build extends Build {
+  if (System.getProperty("showSuppressedErrors") == null) System.setProperty("showSuppressedErrors", "false")
   val virtScala = "${scala_major_vers}.${scala_minor_vers}"
   val virtBuildSettingsBase = Project.defaultSettings ++ Seq(
     organization := "stanford-ppl",

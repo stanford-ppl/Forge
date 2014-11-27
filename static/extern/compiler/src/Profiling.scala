@@ -35,6 +35,23 @@ trait ScalaGenProfilingOps extends ScalaGenEffect {
     case _ => super.emitNode(sym,rhs)
   }
 }
+
 trait CudaGenProfilingOps
 trait OpenCLGenProfilingOps
-trait CGenProfilingOps
+
+trait CGenProfilingOps extends CGenEffect {
+  val IR: ProfilingOpsExp
+  import IR._
+
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case ForgeProfileStart(c,deps) =>
+      stream.println("DeliteCppTimerStart(resourceInfo->thread_id," + quote(c) + ", false);")
+    case ForgeProfileStop(c,deps) =>
+      stream.println("DeliteCppTimerStop(resourceInfo->thread_id," + quote(c) + ");")
+    case ForgeProfileTime(deps) =>
+      stream.println("struct timeval _" + quote(sym) + ";")
+      stream.println("gettimeofday(&_" + quote(sym) + ", NULL);")
+      emitValDef(sym, "(_" + quote(sym) + ".tv_sec * 1000000L + _" + quote(sym) + ".tv_usec)/1000")
+    case _ => super.emitNode(sym,rhs)
+  }
+}

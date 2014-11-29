@@ -1,17 +1,32 @@
+<!-- An example convolutional network showing all possible XML tags -->
+
 <?xml version="1.0"?>
 
 <net    name="CNNExample"
         colormap="RGB" 
         dataset_path="apps/src/NeuralNetwork/examples/cifar10" 
-        lr_cmd_line_arg="1" 
         img_size="32x32"
 > 
 
 <!-- Additional options:
 
+        lr_cmd_line_arg="1"
+                This specifies whether the learning rate should be an input
+                through the command line ("1") or a separate parameter file ("0").
+                If specified, the network can be trained by running, for example:
+                        delite CNNExampleCompiler 0.01
+                or with CUDA,
+                        delite CNNExampleCompiler --cude 1 0.01
+                This is useful along with train.py, which is an outer loop that
+                lowers the learning rate over time.
+
+
         blas="1"
-                Uses cuBLAS GEMM instead of OptiML parallel dot products.
-                This turns out to be slower, which needs investigation.
+                Uses BLAS (or cuBLAS on the GPU) GEMM instead of OptiML parallel
+                dot products to do matrix multiplication. BLAS is often faster,
+                but on the CPU it requires tuning the number of threads and on
+                the GPU currently cuBLAS can cause slow-downs if the matrix sizes
+                are small.
 
         num_input_channels="3"
                 This is an alternative to colormap
@@ -24,58 +39,68 @@
                 colormap is not needed. If both are specified, colormap is
                 ignored. If neither is specified, the default is Grayscale (1 channel).
 
-        lr_cmd_line_arg="0"
-                This specifies whether the learning rate should be an input
-                through the command line ("1") or a separate parameter file ("0").
 -->
 
+        <!-- Convolution Layer 
 
+                Also takes an optional "activation" parameter, which 
+                specifies the output activation. Here it is omitted, 
+                so the default is activation="ReLU"
+
+                By default, zero-padding is added so that convolutions
+                do not change feature map sizes. This will be added
+                as a "pad" option in the future.
+        !-->
         <layer  name="c1"
                 type="CONVOLUTION"
-                kernel_size="7"
+                kernel_size="5"
                 num_hidden="32"
         >
         </layer>
 
+        <!-- Max Pooling Layer !-->
         <layer  name="m2"
                 type="MAX_POOL"
                 pool_size="2"
         >
         </layer>
 
+        <!-- Convolution Layer 
+
+                Here the rectified linear activation has been
+                written explicitly (although it is the default)
+        !-->
         <layer  name="c3"
                 type="CONVOLUTION"
                 kernel_size="5"
                 num_hidden="32"
+                activation="ReLU"
         >
         </layer>
 
+        <!-- Max Pooling Layer !-->
         <layer  name="m4"
                 type="MAX_POOL"
                 pool_size="2"
         >
         </layer>
 
-        <layer  name="c5"
-                type="CONVOLUTION"
-                kernel_size="5"
-                num_hidden="64"
-        >
-        </layer>
-
-        <layer  name="m4"
-                type="MAX_POOL"
-                pool_size="2"
-        >
-        </layer>
-
+        <!-- Fully-Connected Layer 
+                - Dropout of 0.5 is used
+                - Logistic activation is used
+        !-->
         <layer  name="h5" 
                 type="FULLY_CONNECTED"
                 num_hidden="64"
+                activation="LOGISTIC"
                 dropout="0.5"
         >
         </layer>
 
+        <!-- Fully-Connected Layer 
+                - Dropout of 0.5 is used
+                - Linear activation is used
+        !-->
         <layer  name="h5" 
                 type="FULLY_CONNECTED"
                 num_hidden="10"
@@ -84,6 +109,7 @@
         >
         </layer>
 
+        <!-- Output softmax with 10 classes -->
         <layer  name="output"
                 type="SOFTMAX"
                 num_hidden="10"

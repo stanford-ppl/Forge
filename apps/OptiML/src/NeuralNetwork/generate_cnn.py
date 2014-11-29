@@ -2,7 +2,7 @@
 
 # ------------------------------------------------------------------------------
 #
-# This script reads in an xml file describing a multi-layer neural network
+# This script reads in an xml file describing a convolutional neural network
 # and generates OptiML
 #  
 #  Stanford Pervasive Parallelism Laboratory
@@ -125,7 +125,9 @@ def generate_parameter_files(name, net):
 100 ; Mini-Batch size
 0 ; Read model from file
 1 ; Write model back to file
-0 ; Read momentum from file''')
+0 ; Read momentum from file
+1000 ; Test mini-batch size, training set (for final error report)
+1000 ; Test mini-batch size, validation set (for final error report)''')
 		param_file.close()
 
 def generate_weight_files(name, net):
@@ -134,7 +136,6 @@ def generate_weight_files(name, net):
 
 
 def verify_net_architecture(net):
-	found_fullyconnected = False
 
 	# Only valid layers
 	allowed_list = ['SOFTMAX', 'MAX_POOL', 'CONVOLUTION', 'FULLY_CONNECTED']
@@ -149,6 +150,7 @@ def verify_net_architecture(net):
 					', '.join(activation_list) + '. (Currently, case-sensetive)')
 
 
+	found_fullyconnected = False
 	for i,l in enumerate(net):
 		if l.attrib['type'] == 'SOFTMAX':
 			if i != len(net)-1:
@@ -452,7 +454,7 @@ def write_training_header(f, net, name, use_feature_maps, first_layer_num_featur
 
 		// Initialize parameters for each layer
 		val m = X.numRows	// m = # examples
-		val n = X.numCols 	// n = # features
+		val n = ''' + str(input_image_size) + ''' 	// n = # features
 		val k = ''' + net[-1].attrib['num_hidden'] + ''' // k = # classes (# outputs of final layer)
 
 		// Global settings
@@ -614,7 +616,7 @@ def write_training_loop(f, net, use_dropout, first_layer_num_feature_maps,input_
 				// Some are also SIMD
 
 	'''
-	blas = net.get('blas')
+	blas = (net.get('blas')=='1')
 	f.write('''
 		var epoch = 0
 		// Serial Iteration
@@ -630,7 +632,7 @@ def write_training_loop(f, net, use_dropout, first_layer_num_feature_maps,input_
 
 				val start_index = minib_epoch * minib_m
 				val stop_index  = (minib_epoch+1) * minib_m
-				val minib_X = X.sliceRows(start_index, stop_index)
+				val minib_X = (start_index::stop_index, 0::X.numCols) { (r,c) => X(r,c) }
 				val minib_y = y.slice(start_index, stop_index)''')
 
 	for i,l in enumerate(net):
@@ -1176,8 +1178,9 @@ E.g.: dataset_path="apps/src/NeuralNetwork/examples/mnist/"''')
 		val (''' + weight_vars + ''') = train(X, y)
 
 		// Check classification error
+		val glob_params = readVector[Double]("apps/src/NeuralNetwork/''' + name + '''/global_params.txt", line => line(0).toDouble, ";" )
 		print("Running on training set...")
-		validate(X, y, ''' + weight_vars + ''', 500) // TODO: Don't hard-code 500!
+		validate(X, y, ''' + weight_vars + ''', glob_params(5).toInt)
 
 		// Check validation error (may want to skip this too)
 		val val_X = readMatrix[Double]("''' + dataset_path + '''/val_data.txt", s => s.toDouble)
@@ -1190,7 +1193,8 @@ E.g.: dataset_path="apps/src/NeuralNetwork/examples/mnist/"''')
 		}
 		val val_y = readVector("''' + dataset_path + '''/val_labels.txt")
 		print("Running on validation set...")
-		validate(val_X, val_y, ''' + weight_vars + ''', 500) // TODO: Don't hard-code 500!
+		val mini_batch_size = glob_params(1).toInt
+		validate(val_X, val_y, ''' + weight_vars + ''', glob_params(6).toInt)
 	}
 ''')
 
@@ -1294,6 +1298,8 @@ tree = ET.parse(filename)
 # Get the name of the app
 net = tree.getroot()
 name = net.get('name')
+if not name:
+	err('net tag needs a \"name\" attribute')
 
 # ------------------------------------------------------------------------------
 # Verify that the network is correct
@@ -1318,10 +1324,10 @@ for l in net:
 		use_dropout = True
 		break
 
-# NOTE: Now I assme grasyscale is from 0-1, and so is RGB
-# (Can easily specify this in xml)
-# Learning net w/ 0-255 seems harder and http://deeplearning.net/tutorial/lenet.html
-# divides by 256
+# Note: Now I assme grasyscale rages from 0-1, and so is RGB
+# (i.e. the python to make the data does the scaling. I could also
+# also specify the scaling factor in XML like other tools, e.g. 
+# http://deeplearning.net/tutorial/lenet.html divides by 256)
 first_layer_num_feature_maps = '1'
 num_input_channels = net.get('num_input_channels')
 if num_input_channels:
@@ -1364,28 +1370,18 @@ write_optiml_header(optiml_file, name, net)
 num_layers = len(net)
 if use_dropout:
 	write_ff_header_dropout(optiml_file, net)
-	write_ff_layers_dropout(optiml_file, net, net.get('blas'),first_layer_num_feature_maps,input_image_size)
+	write_ff_layers_dropout(optiml_file, net, net.get('blas')=='1',first_layer_num_feature_maps,input_image_size)
 	write_ff_ending(optiml_file, num_layers, net)
 
 write_ff_header(optiml_file, net)
-write_ff_layers(optiml_file, net, net.get('blas'),first_layer_num_feature_maps,input_image_size)
+write_ff_layers(optiml_file, net, net.get('blas')=='1',first_layer_num_feature_maps,input_image_size)
 write_ff_ending(optiml_file, num_layers, net)
-
-
 
 # Write train def (SGD/back-prop)
 write_train_def(optiml_file,net,name,use_feature_maps,first_layer_num_feature_maps, use_dropout, input_image_size)
 
 # Write validation def
 write_validate_def(optiml_file,net)
-
-# Write each feed-forward implementation
-# Note: This isn't necessary if we pass parameters as matrices/vectors, because
-# then we can implement these functions in a separate scala file and include it
-#write_layer_ff_defs(optiml_file, net)
-
-# Write the back-prop def
-#write_training(optiml_file, name, net)
 
 # Write the main
 write_main(optiml_file, net, first_layer_num_feature_maps, input_image_size)

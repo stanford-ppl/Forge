@@ -1,14 +1,16 @@
 import cPickle, gzip
 import numpy as np
 from subprocess import call
+import os
+
 
 # Load the dataset
 # http://www.cs.utoronto.ca/~kriz/cifar.html
 print "\nDownloading CIFAR-10 dataset from utoronto.ca...\n"
-#call(['wget', 'http://www.cs.utoronto.ca/~kriz/cifar-10-python.tar.gz'])
-#call(['tar', 'xvfz', 'cifar-10-python.tar.gz'])
-#call(['mv', 'cifar-10-batches-py/*', '.'])
-#call(['rmdir', 'cifar-10-batches-py'])
+call(['wget', 'http://www.cs.utoronto.ca/~kriz/cifar-10-python.tar.gz'])
+call(['tar', 'xvfz', 'cifar-10-python.tar.gz'])
+os.system('mv cifar-10-batches-py/* .')
+call(['rmdir', 'cifar-10-batches-py'])
 
 print "Creating train_data.txt and train_labels.txt..."
 for i in range(4):

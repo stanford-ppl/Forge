@@ -9,14 +9,22 @@
 #
 # This dataset can be used either with a classifier output layer (e.g. softmax) or a 
 # regression output layer (e.g. to predict the future price of the stock)
+#
+# Usage:
+# >>> python make_dataset.py
+#
+# To also display the data,
+# >>> python make_dataset.py show_data plot_data
+#
+
 
 import numpy as np
 import random
 from subprocess import call
-import matplotlib.pyplot as plt
+import sys
 
-num_intervals = 10
-interval_size = 200
+num_intervals = 5
+interval_size = 400
 window_size = 25
 
 # Generate "num_intervals" noisy sine waves, each with "interval_size" points, and concatenate them
@@ -35,7 +43,7 @@ def get_random_stock():
 		bias_slope = (random.random()-0.5)*5
 		biases = np.linspace(0.0, 5.0, num=interval_size)*bias_slope
 		# Also add some noise
-		data = data + biases + np.random.randn(interval_size)*2
+		data = data + biases + np.random.randn(interval_size)
 		last_endpoint = data[-1] # for continuity
 		stock_price = np.append(stock_price, data)
 
@@ -120,18 +128,21 @@ for s in range(num_stocks):
 data_f.close()
 labels_f.close()
 
-
 # Validation
 val_data = get_random_stock()
 val_labels = get_labels(val_data)
 
-print("\n\nValidation:")
-for i in range(len(val_labels)/2):
-	print str((i+1)*window_size) + ': ' + str(val_labels[i]) + '\t\t\t' + \
-		str(((i+1) + len(val_labels)/2) * window_size) + ': ' + str(val_labels[i + len(val_labels)/2])
-print val_labels
-plt.plot(val_data)
-plt.show()
+if len(sys.argv) > 1 and sys.argv[1] == 'show_data':
+	print("\n\nValidation data:")
+	for i in range(len(val_labels)/2):
+		print str((i+1)*window_size) + ': ' + str(val_labels[i]) + '\t\t\t' + \
+			str(((i+1) + len(val_labels)/2) * window_size) + ': ' + str(val_labels[i + len(val_labels)/2])
+	print val_labels
+
+if len(sys.argv) > 2 and sys.argv[2] == 'plot_data':
+	import matplotlib.pyplot as plt
+	plt.plot(val_data)
+	plt.show()
 
 data_f = open("val_data.txt", "w")
 labels_f = open("val_labels.txt", "w")

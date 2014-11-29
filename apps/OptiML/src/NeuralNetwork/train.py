@@ -6,8 +6,7 @@
 import subprocess
 import sys
 import time
-from subprocess import call
-import os.path
+import os
 
 if len(sys.argv) != 3:
 	print 'Usage: python train.py APP_DIR_NAME PATH_TO_APP'
@@ -54,17 +53,17 @@ while True:
 	train_file.write(str(train_err) + "\n")
 
 	if checkpoint_counter == 0:
-		#checkpoint_counter = checkpoint_frequency
-		#now = (time.strftime("%c")).replace (" ", "_")
-		#checkpoint_path = path + 'CHECKPOINT_' + now
-		#if not os.path.exists(checkpoint_path):
-		#    os.makedirs(checkpoint_path)
-		#call(["cp", path + "b*txt", checkpoint_path + '/'])
-		#call(["cp", path + "db*txt", checkpoint_path + '/'])
-		#call(["cp", path + "w*txt", checkpoint_path + '/'])
-		#call(["cp", path + "dw*txt", checkpoint_path + '/'])
-		#print 'Created checkpoint in: ' + checkpoint_path
-		#log_file.write('Created checkpoint in: ' + checkpoint_path)
+		checkpoint_counter = checkpoint_frequency
+		now = (time.strftime("%c")).replace (" ", "_")
+		checkpoint_path = path + 'CHECKPOINT_' + now
+		if not os.path.exists(checkpoint_path):
+		    os.makedirs(checkpoint_path)
+		os.system('cp ' + path + ' b*txt '  + checkpoint_path + '/')
+		os.system('cp ' + path + ' db*txt ' + checkpoint_path + '/')
+		os.system('cp ' + path + ' w*txt '  + checkpoint_path + '/')
+		os.system('cp ' + path + ' dw*txt ' + checkpoint_path + '/')
+		print 'Created checkpoint in: ' + checkpoint_path
+		log_file.write('Created checkpoint in: ' + checkpoint_path)
 	else:
 		checkpoint_counter -= 1
 

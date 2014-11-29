@@ -21,7 +21,7 @@ for i,l in enumerate(train_data_file):
 
 # Write the image to a file
 img_1D = numpy.fromstring(img_str, dtype=float, sep="\t") * 256
-img = numpy.reshape(img_1D, (3,32,32))
+img = numpy.reshape(img_1D, (28,28))
 name = 'img_' + str(img_num) + '.png'
 scipy.misc.imsave(name, img)
 print 'Saved ' + name 

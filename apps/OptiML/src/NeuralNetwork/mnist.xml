@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+
+<net    name="mnist_tutorial"
+        colormap="Grayscale"
+        dataset_path="apps/src/NeuralNetwork/examples/mnist"
+        img_size="28x28"
+>
+
+        <layer  name="c1"
+                type="CONVOLUTION"
+                kernel_size="5"
+                num_hidden="6"
+        >
+        </layer>
+
+        <layer  name="m1"
+                type="MAX_POOL"
+                pool_size="2"
+        >
+        </layer>
+
+        <layer  name="c2"
+                type="CONVOLUTION"
+                kernel_size="5"
+                num_hidden="6"
+        >
+        </layer>
+
+        <layer  name="m2"
+                type="MAX_POOL"
+                pool_size="2"
+        >
+        </layer>
+
+        <layer  name="h5" 
+                type="FULLY_CONNECTED"
+                num_hidden="50"
+        >
+        </layer>
+
+        <layer  name="output"
+                type="SOFTMAX"
+                num_hidden="10"
+        >
+        </layer>
+
+</net>

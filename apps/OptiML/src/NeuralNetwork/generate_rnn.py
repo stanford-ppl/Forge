@@ -116,9 +116,9 @@ def generate_parameter_files(name, net):
 		filename = name + '/layer_' + str(idx) + '_params.txt'
 		if not os.path.exists(filename):
 			param_file = open(filename, 'w')
-			param_file.write('''0.0001 ; Learning Rate
+			param_file.write('''0.0001 ; Learning Rate -- Careful! Setting too high can cause gradients to explode
 0.0001 ; L2 Regularization
-0.9 ; momentum
+0.0 ; momentum -- Careful! Backprop through time with momentum can cause gradients to explode
 0.1 ; initial weights
 0.0 ; initial biases''')
 			param_file.close()
@@ -126,9 +126,9 @@ def generate_parameter_files(name, net):
 			filename = name + '/layer_R' + str(idx) + '_params.txt'
 			if not os.path.exists(filename):
 				param_file = open(filename, 'w')
-				param_file.write('''0.0001 ; Learning Rate
+				param_file.write('''0.0001 ; Learning Rate -- Careful! Setting too high can cause gradients to explode
 0.0001 ; L2 Regularization
-0.9 ; momentum
+0.0 ; momentum -- Careful! Backprop through time with momentum can cause gradients to explode
 0.1 ; initial weights
 0.0 ; initial biases''')
 				param_file.close()
@@ -137,13 +137,15 @@ def generate_parameter_files(name, net):
 	filename = name + '/global_params.txt'
 	if not os.path.exists(filename):
 		param_file = open(filename, 'w')
-		param_file.write('''0 ; Num Epochs
-1 ; Mini-Batch size
+		param_file.write('''1 ; Num Epochs
+10 ; Mini-Batch size
 0 ; Read model from file
 1 ; Write model back to file
 0 ; Read momentum from file
 0 ; Print outputs
-0.00001 ; Finite difference epsilon''')
+0.00001 ; Finite difference epsilon
+100 ; Test mini-batch size, training set (for final error report)
+1 ; Test mini-batch size, validation set (for final error report)''')
 		param_file.close()
 
 def generate_weight_files(name, net):
@@ -152,6 +154,25 @@ def generate_weight_files(name, net):
 
 
 def verify_net_architecture(net):
+
+	if not net.get('samples_per_window'):
+		err('net tag needs a \"samples_per_window\" attribute')
+	if not net.get('name'):
+		err('net tag needs a \"name\" attribute')
+
+	# Only valid layers
+	allowed_list = ['SOFTMAX', 'FULLY_CONNECTED']
+	activation_list = ['LOGISTIC', 'ReLU', 'LINEAR']
+	for l in net:
+		if l.attrib['type'] not in allowed_list:
+			err('Layer type ' + l.attrib['type'] + ' is not supported')
+		if l.attrib.get('activation'):
+			activation = l.attrib['activation']
+			if activation not in activation_list:
+				err(activation + ' is not a valid activation. Choose from: ' + \
+					', '.join(activation_list) + '. (Currently, case-sensetive)')
+
+
 	found_fullyconnected = False
 	for i,l in enumerate(net):
 		if l.attrib['type'] == 'SOFTMAX':
@@ -208,7 +229,7 @@ From /published/OptiML,
  
 sbt compile
 bin/delitec ''' + fname + '''Compiler
-bin/delite ''' + fname + '''Compiler -t 8
+bin/delite ''' + fname + '''Compiler
 
 */
 
@@ -248,6 +269,10 @@ def write_ff_header (f, net):
 
 def write_ff_layers (f,net,blas):
 
+	blas_suffix = ''
+	if blas:
+		blas_suffix = '_blas'
+
 	f.write('''
 		var t = 0
 		val T = X.numCols / samples_per_window''')
@@ -280,12 +305,12 @@ def write_ff_layers (f,net,blas):
 			// Layer ''' + str(i) + ': ' + l.attrib['name'])
 		if type == 'SOFTMAX':
 			f.write('''
-			o''' + str(i) + '''(t) = softmax_ff (''' + input + ', ' + print_nonrecurrent_weight_vars_for_layer(i,l) + ')')
+			o''' + str(i) + '''(t) = softmax_ff''' + blas_suffix + ''' (''' + input + ', ' + print_nonrecurrent_weight_vars_for_layer(i,l) + ')')
 		elif type == 'FULLY_CONNECTED':
 			f.write('''
 			// Note: Can also do: o(t) = { if () else () }
 			if (t == 0) {
-				o''' + str(i) + '''(t) = fullycon_ff(''' + input + ', ' + 
+				o''' + str(i) + '''(t) = fullycon_ff''' + blas_suffix + ''' (''' + input + ', ' + 
 					print_nonrecurrent_weight_vars_for_layer(i,l) + ''').map(''' + activation)
 			if l.attrib.get('dropout'):
 					f.write(').*(' + l.attrib['dropout'])
@@ -335,6 +360,10 @@ def write_ff_header_dropout (f, net):
 
 def write_ff_layers_dropout (f,net,blas):
 
+	blas_suffix = ''
+	if blas:
+		blas_suffix = '_blas'
+
 	f.write('''
 		var t = 0
 		val T = X.numCols / samples_per_window''')
@@ -367,7 +396,7 @@ def write_ff_layers_dropout (f,net,blas):
 			// Layer ''' + str(i) + ': ' + l.attrib['name'])
 		if type == 'SOFTMAX':
 			f.write('''
-			o''' + str(i) + '''(t) = softmax_ff (''' + input + ', ' + print_nonrecurrent_weight_vars_for_layer(i,l) + ')')
+			o''' + str(i) + '''(t) = softmax_ff''' + blas_suffix + ''' (''' + input + ', ' + print_nonrecurrent_weight_vars_for_layer(i,l) + ')')
 		elif type == 'FULLY_CONNECTED':
 			dropout_suffix = '(t)'
 			dropout_prefix = ''
@@ -377,7 +406,7 @@ def write_ff_layers_dropout (f,net,blas):
 			f.write('''
 			// Note: Can also do: o(t) = { if () else () }
 			if (t == 0) {
-				''' + dropout_prefix + '''o''' + str(i) + dropout_suffix + ''' = fullycon_ff(''' + input + ', ' + 
+				''' + dropout_prefix + '''o''' + str(i) + dropout_suffix + ''' = fullycon_ff''' + blas_suffix + ''' (''' + input + ', ' + 
 					print_nonrecurrent_weight_vars_for_layer(i,l) + ''').map(''' + activation + ''')''')
 			if l.attrib.get('dropout'):
 				f.write('''
@@ -561,7 +590,7 @@ def write_training_loop(f, net, use_dropout):
 					// Some are also SIMD
 					val minib_X_t = minib_X.slice(0, minib_X.numRows, t*samples_per_window, (t+1)*samples_per_window)
 	'''
-	blas = net.get('blas')
+	blas = (net.get('blas') == '1')
 	f.write('''
 		var epoch = 0
 		// Serial Iteration
@@ -577,8 +606,8 @@ def write_training_loop(f, net, use_dropout):
 
 				val start_index = minib_epoch * minib_m
 				val stop_index  = (minib_epoch+1) * minib_m
-				val minib_X = X.sliceRows(start_index, stop_index)
-				val minib_y = y.sliceRows(start_index, stop_index)''')
+				val minib_X = (start_index::stop_index, 0::X.numCols) { (r,c) => X(r,c) }
+				val minib_y = (start_index::stop_index, 0::y.numCols) { (r,c) => y(r,c) }''')
 
 	for i,l in enumerate(net):
 		if l.attrib.get('dropout'):
@@ -967,7 +996,7 @@ def write_train_def(f, net, name, use_dropout):
 # Writing main def
 # ------------------------------------------------------------------------------
 
-def write_main(f, net):
+def write_main(f, net, name):
 	dataset_path = net.get('dataset_path')
 	if not dataset_path:
 		err('''Please add a dataset_path attribute to the <net> tag,
@@ -987,8 +1016,9 @@ E.g.: dataset_path="apps/src/NeuralNetwork/examples/stock_market/"''')
 		val (''' + weight_vars + ''') = train(X, y)
 
 		// Check classification error
+		val glob_params = readVector[Double]("apps/src/NeuralNetwork/''' + name + '''/global_params.txt", line => line(0).toDouble, ";" )
 		print("Running on training set...")
-		validate(X, y, ''' + weight_vars + ''', 1)
+		validate(X, y, ''' + weight_vars + ''', glob_params(7).toInt)
 		''')
 	f.write('''
 		// Check validation error (may want to skip this too)
@@ -997,7 +1027,7 @@ E.g.: dataset_path="apps/src/NeuralNetwork/examples/stock_market/"''')
 	f.write('''
 		val val_y = readMatrix[Double]("''' + dataset_path + '''/val_labels.txt", s => s.toDouble)
 		print("Running on validation set...")
-		validate(val_X, val_y, ''' + weight_vars + ''', 1)
+		validate(val_X, val_y, ''' + weight_vars + ''', glob_params(8).toInt)
 	}
 ''')
 
@@ -1066,7 +1096,7 @@ def write_validate_def(f, net):
 		minib_size: Rep[Int] // Can pass in 1 for online testing
 	) = {
 
-		val glob_params = readVector[Double]("apps/src/NeuralNetwork/StockMarket/global_params.txt", line => line(0).toDouble, ";" )
+		val glob_params = readVector[Double]("apps/src/NeuralNetwork/''' + name + '''/global_params.txt", line => line(0).toDouble, ";" )
 		val print_rnn_output = glob_params(5).toInt
 		val (c_entropy, classification_error) = get_cross_entropy_and_classification_error(X, y, ''' + print_weight_vars(net) + ''', minib_size, print_rnn_output)
 		print("Classification Error (")
@@ -1160,11 +1190,11 @@ write_optiml_header(optiml_file, name)
 num_layers = len(net)
 if use_dropout:
 	write_ff_header_dropout(optiml_file, net)
-	write_ff_layers_dropout(optiml_file, net, net.get('blas'))
+	write_ff_layers_dropout(optiml_file, net, net.get('blas')=='1')
 	write_ff_ending(optiml_file, num_layers, net)
 
 write_ff_header(optiml_file, net)
-write_ff_layers(optiml_file, net, net.get('blas'))
+write_ff_layers(optiml_file, net, net.get('blas')=='1')
 write_ff_ending(optiml_file, num_layers, net)
 
 # Write train def (SGD/back-prop)
@@ -1174,7 +1204,7 @@ write_train_def(optiml_file,net,name, use_dropout)
 write_validate_def(optiml_file,net)
 
 # Write the main
-write_main(optiml_file, net)
+write_main(optiml_file, net, name)
 
 # Close the file
 write_optiml_ending(optiml_file, name)
@@ -1187,7 +1217,7 @@ print 'Generated ' + name + '/' + name + '''.scala. To train and run the network
 From /published/OptiML,
 	sbt compile
 	bin/delitec ''' + name + '''Compiler
-	bin/delite ''' + name + '''Compiler -t 8
+	bin/delite ''' + name + '''Compiler
 To modify parameters (e.g. learning rate, # epochs) modify the files:
 	''' + name + '''/layer_*_params.txt
 	''' + name + '''/global_params.txt

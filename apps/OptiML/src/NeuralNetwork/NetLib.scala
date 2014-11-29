@@ -39,7 +39,7 @@ trait NetLib extends OptiMLApplication {
 
 	// Forward through fully connected layer
 	def fullycon_ff(X: Rep[DenseMatrix[Double]], W: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]]) = {
-	    (0::X.numRows, 0::W.numCols) { (r,c) =>
+		(0::X.numRows, 0::W.numCols) { (r,c) =>
 			val s = sum(0, X.numCols) { i =>
 				X(r,i)*W(i,c)
 			}
@@ -51,11 +51,11 @@ trait NetLib extends OptiMLApplication {
 	def fullycon_ff_RNN(X: Rep[DenseMatrix[Double]], H: Rep[DenseMatrix[Double]], Wx: Rep[DenseMatrix[Double]], 
 		b: Rep[DenseVector[Double]], Wh: Rep[DenseMatrix[Double]]) = {
 
-		// BLAS: H*Wh + X*Wc
+		// TODO: Make a BLAS version of this function: H*Wh + X*Wc
 		// Note: 
 		// X.numRows = H.numRows
 
-	    (0::X.numRows, 0::H.numCols) { (r,c) =>
+		(0::X.numRows, 0::H.numCols) { (r,c) =>
 			val s1 = sum(0, X.numCols) { i =>
 				X(r,i)*Wx(i,c)
 			}
@@ -70,24 +70,24 @@ trait NetLib extends OptiMLApplication {
 	// BLAS version
 	def fullycon_ff_blas(X: Rep[DenseMatrix[Double]], W: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]]) = {
 
-/* Implementation 1: (Replicate may produce unnecessary copy?) */		
+/* Implementation 1: (Replicate may produce unnecessary copy?) 
 		val num_samples = X.numRows
-	    X*W + b.replicate(num_samples, 1)
-
+		X*W + b.replicate(num_samples, 1)
+*/		
 /* Alternate Implementation:
 		val prod = X*W
-	    (0::prod.numRows, *) { r => prod(r) + b }
+		(0::prod.numRows, *) { r => prod(r) + b }
 */
 
 /* Alternate Implementation:
-		val prod = X*W
-	    (0::prod.numRows, 0::prod.numCols) { (r,c) => prod(r,c) + b(c) }
 */
+		val prod = X*W
+		(0::prod.numRows, 0::prod.numCols) { (r,c) => prod(r,c) + b(c) }
 	}
 
 	// Forward through softmax
 	def softmax_ff(X: Rep[DenseMatrix[Double]], W: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]]) = {
-	    val prod = (0::X.numRows, 0::W.numCols) { (r,c) =>
+		val prod = (0::X.numRows, 0::W.numCols) { (r,c) =>
 			val s = sum(0, X.numCols) { i =>
 				X(r,i)*W(i,c)
 			}
@@ -106,21 +106,21 @@ trait NetLib extends OptiMLApplication {
 	// BLAS version
 	def softmax_ff_blas(X: Rep[DenseMatrix[Double]], W: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]]) = {
 
-/* Implementation 1: (Replicate may produce unnecessary copy?) */		
+/* Implementation 1: (Replicate may produce unnecessary copy?) 		
 		val num_samples = X.numRows
-	    val prod = X*W + b.replicate(num_samples, 1)
-
+		val prod = X*W + b.replicate(num_samples, 1)
+*/
 /* Alternate Implementation:
-	    val prod_no_bias = X*W
-	    val prod = (0::prod_no_bias.numRows, *) { r => prod_no_bias(r) + b }
+		val prod_no_bias = X*W
+		val prod = (0::prod_no_bias.numRows, *) { r => prod_no_bias(r) + b }
 */
 
 /* Alternate Implementation:
-	    val prod_no_bias = X*W
-	    val prod = (0::prod_no_bias.numRows, 0::prod_no_bias.numCols) { (r,c) =>
+*/
+		val prod_no_bias = X*W
+		val prod = (0::prod_no_bias.numRows, 0::prod_no_bias.numCols) { (r,c) =>
 			prod_no_bias(r,c) + b(c)
 		}
-*/
 		val Py_given_X = ( prod ).map(e => exp(e)) // exp(_)
 		val sum_of_rows = (0::X.numRows) {
 			r => Py_given_X.getRow(r).sum
@@ -138,15 +138,15 @@ trait NetLib extends OptiMLApplication {
 		val predictions = (0::num_test) { r => all_predictions.getRow(r).maxIndex }
 
 		// Compare to the actual classes and print result
-       	val results = (0::predictions.length) { i =>
-    		if (predictions(i) == y(i)) 0 else 1
-       	}
-       	results.sum.toDouble / num_test.toDouble * 100
+		val results = (0::predictions.length) { i =>
+			if (predictions(i) == y(i)) 0 else 1
+		}
+		results.sum.toDouble / num_test.toDouble * 100
 	}
 
 	def print_classification_error(all_predictions: Rep[DenseMatrix[Double]], y: Rep[DenseVector[Double]]) = {
 
-       	val classification_error = get_classification_error(all_predictions, y)
+		val classification_error = get_classification_error(all_predictions, y)
 		print("Classification Error (")
 		print(y.length)
 		print(" examples):  ")
@@ -241,7 +241,7 @@ trait NetLib extends OptiMLApplication {
 					}
 					kernel_value * value_from_src_matrix
 				}
-			    partial_convolution_result.sum
+				partial_convolution_result.sum
 			}
 			conv_result_from_each_L1_feature_map.sum + b(L2_feature_map_num)
 		}
@@ -567,7 +567,11 @@ trait NetLib extends OptiMLApplication {
 		}
 	}
 
-	// Max pool for concatenated input
+	// Max pool for concatenated input feature maps
+	// The input matrix X has 1 row per example. Each row contains "num_feature_maps"
+	// concatenated feature maps, each of size "old_fmap_size" x "old_fmap_size"
+	// (concatenated in row-major order). This function does mxm pooling to return
+	// the same number of feature maps but smaller by a factor of mxm
 	def max_pool_indices(X: Rep[DenseMatrix[Double]], m: Rep[Int], num_feature_maps: Rep[Int],
 		// The remaining inputs can be determined from the above inputs, but the
 		// code is faster if as many inputs as possible are constants
@@ -581,8 +585,8 @@ trait NetLib extends OptiMLApplication {
 			val fmap_num = c / new_fmap_total_size // Old and new fmax number
 			val mxm_box_row = (c%new_fmap_total_size) / new_fmap_size
 			val mxm_box_col = (c%new_fmap_total_size) % new_fmap_size
-		    // This puts us at the top left corner of our mxm box in the source image
-		    // We are looking at each row of this mxm box in parallel below (iterator i)
+			// This puts us at the top left corner of our mxm box in the source image
+			// We are looking at each row of this mxm box in parallel below (iterator i)
 			val index_of_mxm_feature_map = old_fmap_total_size*fmap_num + // Get to right example and feature map
 							old_fmap_size*m*mxm_box_row + // Get to right row of source feature map for this mxm box
 							m*mxm_box_col // Get to the col that is the top-left corner of this mxm box
@@ -603,8 +607,8 @@ trait NetLib extends OptiMLApplication {
 			val fmap_num = c / new_fmap_total_size // Old and new fmax number
 			val mxm_box_row = (c%new_fmap_total_size) / new_fmap_size
 			val mxm_box_col = (c%new_fmap_total_size) % new_fmap_size
-		    // This puts us at the top left corner of our mxm box in the source image
-		    // We are looking at each row of this mxm box in parallel below (iterator i)
+			// This puts us at the top left corner of our mxm box in the source image
+			// We are looking at each row of this mxm box in parallel below (iterator i)
 			val index_of_mxm_feature_map = old_fmap_total_size*fmap_num + // Get to right example and feature map
 							old_fmap_size*m*mxm_box_row + // Get to right row of source feature map for this mxm box
 							m*mxm_box_col // Get to the col that is the top-left corner of this mxm box

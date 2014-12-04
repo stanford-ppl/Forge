@@ -18,8 +18,8 @@ object StreamForeachRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplic
 trait StreamForeach extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
-    val s = ComputeStream[Int](10000, 1000){ (i,j) => random[Int] }
-    s.foreachRow { v => collect(v.length == 1000 && v.sum.abs > 0) }
+    val s = ComputeStream[Int](1000, 100){ (i,j) => random[Int] }
+    s.foreachRow { v => collect(v.length == 100 && v.sum.abs > 0) }
 
     mkReport
   }
@@ -33,7 +33,7 @@ trait StreamCorrectSmall extends ForgeTestModule with OptiMLApplication {
     //should be row vectors starting at 0, 10, ... 90
     val s = ComputeStream[Int](10,10){ (i,j) => i*10+j }
     s.foreachRow { v => collect(v(2) % 10 == 2) }
-    
+
     mkReport
   }
 }
@@ -52,28 +52,52 @@ trait StreamCorrectLarge extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object FileStreamRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with FileStreamTest
-object FileStreamRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with FileStreamTest
-trait FileStreamTest extends ForgeTestModule with OptiMLApplication {
+
+/* Reading and writing the same filename in the same app is not supported, as the order of operations is not guaranteed */
+
+trait StreamSuitePaths {
+  val testMat = "test.mat"
+  val testMat2 = "test2.mat"
+}
+
+object FileStreamWriteARunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with FileStreamWriteA
+object FileStreamWriteARunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with FileStreamWriteA
+trait FileStreamWriteA extends ForgeTestModule with OptiMLApplication with StreamSuitePaths {
   def main() = {
-    val testMat = DenseMatrix.ones(10000,100)
-    writeMatrix(testMat, "test.mat")
+    val x = DenseMatrix.ones(1000,100)
+    writeMatrix(x, testMat)
 
-    val f = FileStream("test.mat")
-    for (line <- f) {
-      val tokens = line.trim.fsplit("\\s+")
-      val v = (0::array_length(tokens)) { i => array_apply(tokens, i).toDouble }
-      collect(v == DenseVector.ones(100))
-    }
+    collect(true)
+    mkReport
+  }
+}
 
-    f.map("test2.mat") { line => 
+object FileStreamWriteBRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with FileStreamWriteB
+object FileStreamWriteBRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with FileStreamWriteB
+trait FileStreamWriteB extends ForgeTestModule with OptiMLApplication with StreamSuitePaths {
+  def main() = {
+    val f = FileStream(testMat)
+    f.map(testMat2) { line =>
       val tokens = line.trim.fsplit("\\s+")
       val v = (0::array_length(tokens)) { i => array_apply(tokens, i).toDouble }
       (v+1).makeStr
     }
 
-    val test2Mat = readMatrix("test2.mat")
-    collect(test2Mat == (testMat + 1))
+    collect(true)
+    mkReport
+  }
+}
+
+object FileStreamReadRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with FileStreamRead
+object FileStreamReadRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with FileStreamRead
+trait FileStreamRead extends ForgeTestModule with OptiMLApplication with StreamSuitePaths {
+  def main() = {
+    val f = FileStream(testMat)
+    for (line <- f) {
+      val tokens = line.trim.fsplit("\\s+")
+      val v = (0::array_length(tokens)) { i => array_apply(tokens, i).toDouble }
+      collect(v == DenseVector.ones(100))
+    }
 
     val total = f.reduce(0.0) { (acc, line) =>
       val tokens = line.trim.fsplit("\\s+")
@@ -81,11 +105,24 @@ trait FileStreamTest extends ForgeTestModule with OptiMLApplication {
       acc + sum(v)
     }
 
-    collect(total == testMat.sum)
+    val a = readMatrix(testMat)
+    collect(total == a.sum)
 
-    deleteFile("test.mat")
-    deleteFile("test2.mat")
+    val b = readMatrix(testMat2)
+    collect(b == (a + 1))
 
+    mkReport
+  }
+}
+
+object FileStreamDeleteRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with FileStreamDelete
+object FileStreamDeleteRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with FileStreamDelete
+trait FileStreamDelete extends ForgeTestModule with OptiMLApplication with StreamSuitePaths {
+  def main() = {
+    deleteFile(testMat)
+    deleteFile(testMat2)
+
+    collect(true)
     mkReport
   }
 }
@@ -94,11 +131,21 @@ class StreamSuiteInterpreter extends ForgeSuiteInterpreter {
   def testStreamForeach() { runTest(StreamForeachRunnerI) }
   def testStreamCorrectSmall() { runTest(StreamCorrectSmallRunnerI) }
   def testStreamCorrectLarge() { runTest(StreamCorrectLargeRunnerI) }
-  def testFileStream() { runTest(FileStreamRunnerI) }
+  def testFileStream() {
+    runTest(FileStreamWriteARunnerI)
+    runTest(FileStreamWriteBRunnerI)
+    runTest(FileStreamReadRunnerI)
+    runTest(FileStreamDeleteRunnerI)
+  }
 }
 class StreamSuiteCompiler extends ForgeSuiteCompiler {
   def testStreamForeach() { runTest(StreamForeachRunnerC) }
   def testStreamCorrectSmall() { runTest(StreamCorrectSmallRunnerC) }
   def testStreamCorrectLarge() { runTest(StreamCorrectLargeRunnerC) }
-  def testFileStream() { runTest(FileStreamRunnerC) }
+  def testFileStream() {
+    runTest(FileStreamWriteARunnerC)
+    runTest(FileStreamWriteBRunnerC)
+    runTest(FileStreamReadRunnerC)
+    runTest(FileStreamDeleteRunnerC)
+  }
 }

@@ -25,8 +25,8 @@ trait IOOps {
      * For fusion and cluster execution, reads should be pure. however, in that case we need a different way to order them with respect to writes / deletes.
      * one solution would be to implicitly convert strings to mutable file objects, and (manually) CSE future conversions to return the original mutable object.
      *
-     * Our current solution is to require the user to explicitly pass dependencies (using "after"), so they can manually force a read to happen after a write,
-     * or vice versa.
+     * Currently, reading and writing the same file in the same program is not supported, unless there is an alternate dependency chain from the output
+     * being written to the input (e.g. the output vector or matrix explicitly depends on the one being read).
      */
 
     direct (IO) ("readVector", Nil, ("path",MString) :: DenseVector(MDouble)) implements composite ${ readVector[Double]($path, v => optila_todouble(v(0))) }

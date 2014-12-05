@@ -27,7 +27,7 @@ trait DenseVectorViewOps {
       infix ("length") (Nil :: MInt) implements getter(0, "_length")
       infix ("isRow") (Nil :: MBoolean) implements getter(0, "_isRow")
       infix ("apply") (MInt :: T) implements composite ${ array_apply(densevectorview_data($self), densevectorview_start($self) + $1*densevectorview_stride($self)) }
-
+      
       infix ("slice") ((("start",MInt),("end",MInt)) :: DenseVectorView(T)) implements composite ${
         DenseVectorView(densevectorview_data($self), densevectorview_start($self)+$start*densevectorview_stride($self), densevectorview_stride($self), $end-$start, $self.isRow)
       }

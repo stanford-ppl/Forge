@@ -224,7 +224,7 @@ trait VectorOps {
       }
       infix ("maxIndex") (Nil :: MInt, O ::: A) implements composite ${
         $self.indices.reduce { (a,b) => if ($self(a) > $self(b)) a else b }
-        // ($self.zip($self.indices) { (a,b) => pack((a,b)) } reduce { (t1,t2) => if (t1._1 > t2._1) t1 else t2 })._2        
+        // ($self.zip($self.indices) { (a,b) => pack((a,b)) } reduce { (t1,t2) => if (t1._1 > t2._1) t1 else t2 })._2
       }
 
 
@@ -234,6 +234,7 @@ trait VectorOps {
       infix ("map") ((T ==> R) :: DenseVector(R), addTpePars = R) implements map((T,R), 0, ${ e => $1(e) })
       infix ("reduce") (((T,T) ==> T) :: T, A) implements reduce(T, 0, Z, ${ (a,b) => $1(a,b) })
       infix ("foreach") ((T ==> MUnit) :: MUnit) implements foreach(T, 0, ${ e => $1(e) })
+      infix ("forall") ((T ==> MBoolean) :: MBoolean) implements composite ${ reduce_and($self.map($1)) }
       infix ("find") ((T ==> MBoolean) :: IndexVector) implements composite ${ IndexVector($self.indices.filter(i => $1($self(i)))) }
 
       val filterMap = v.name.toLowerCase + "_densevector_filter_map"
@@ -275,6 +276,13 @@ trait VectorOps {
 
       // TODO
       // infix ("groupBy") (((T ==> R)) :: DenseVector(DenseVector(T)))
+
+
+      /**
+       * Data exchange
+       */
+
+      infix ("toArray") (Nil :: MArray(T)) implements composite ${ densevector_raw_data($self.map(e => e)) }
     }
   }
 }

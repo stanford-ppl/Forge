@@ -39,84 +39,87 @@ trait UndirectedGraphOps{
 
     val UndirectedGraphOps = withTpe(UndirectedGraph)     
     UndirectedGraphOps{
-      infix ("numEdges")(Nil :: MInt) implements composite ${array_length($self.getEdges)}
+      infix ("numEdges")(Nil :: MInt) implements composite ${array_length($self.getCSREdges)}
 
       //UndirectedGraph directed or not?
       infix ("isDirected") (Nil :: MBoolean) implements composite ${false}
-      
-      infix ("sumOverNbrs") ( CurriedMethodSignature(List(("n",Node),("data",MInt==>R),("cond",MInt==>MBoolean)),R), TNumeric(R), addTpePars=R) implements composite ${
-        sumOverCollection($self.neighbors(n))(data)(cond)
+
+      infix ("commonNeighbors") ((Node,Node) :: MLong) implements composite ${
+        val neigh1 = $self.neighbors($1)
+        val neigh2 = $self.neighbors($2)
+        val max = if($1 > $2) $2.id else $1.id
+
+        neigh1.intersectInRange(neigh2,max)
       }
-      //Perform a sum over the neighbors
-      infix ("sumOverNbrs") ( CurriedMethodSignature(List(("n",MInt),("data",MInt==>R),("cond",MInt==>MBoolean)),R), TNumeric(R), addTpePars=R) implements composite ${
-        sumOverCollection($self.neighbors(n))(data)(cond)
-      }
-      infix ("sumDownNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
+
+      infix ("sumDownNeighbors") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",Node==>R)),R), TNumeric(R), addTpePars=R) implements composite ${
         //only sum in neighbors a level up
-        sumOverCollection($self.outNbrs(n))(data){e => (level(e)==(level(n.id)+1))}
+        sumOverNeighborsC($self.outNeighbors(n))(data){e => (level(e.id)==(level(n.id)+1))}
       }
-      infix ("sumUpNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
-        sumOverCollection($self.inNbrs(n))(data){e => (level(e)==(level(n.id)-1))}
+
+      infix ("sumUpNeighbors") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",Node==>R)),R), TNumeric(R), addTpePars=R) implements composite ${
+        sumOverNeighborsC($self.inNeighbors(n))(data){e => (level(e.id)==(level(n.id)-1))}
       }
+
       infix ("totalWeight") (Nil :: MDouble) implements composite ${
         array_reduce[Double](edge_weights($self),{(a,b) => a+b},unit(0d))
       }
-      infix ("weightedDegree") (MInt :: MDouble) implements composite ${
-        get_edge_weights($self,Node($1)).reduce({(a,b)=>a+b})
+      infix ("weightedDegree") (Node :: MDouble) implements composite ${
+        get_edge_weights($self,$1).reduce({(a,b)=>a+b})
       }
-      infix ("numSelfLoops") (MInt :: MDouble) implements composite ${
+      infix ("numSelfLoops") (Node :: MDouble) implements composite ${
         ///it seems like a perf hit to do it this way.
         var degree = 0d
         var i = 0
-        val start = node_apply($self,$1)
-        val nbrs = $self.neighbors($1)
-        while(i < nbrs.length){
-          if(nbrs(i) == $1){
+        val start = node_apply($self,$1.id)
+        val neighbors = $self.neighbors($1)
+        while(i < neighbors.length){
+          if(neighbors(i) == $1.id){
             degree = array_apply(edge_weights($self),start+i)
-            i = nbrs.length
+            i = neighbors.length
           }
           i += 1
         }
         degree
       }
       infix ("degree") (Node :: MInt) implements composite ${
-        val end  = if( ($1.id+1) < array_length($self.getNodes) ) node_apply($self,($1.id+1)) 
-          else array_length($self.getEdges)
+        val end  = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1)) 
+          else array_length($self.getCSREdges)
         end - node_apply($self,$1.id) 
       }
       infix ("outDegree") (Node :: MInt) implements composite ${
-        val end  = if( ($1.id+1) < array_length($self.getNodes) ) node_apply($self,($1.id+1)) 
-          else array_length($self.getEdges)
+        val end  = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1)) 
+          else array_length($self.getCSREdges)
         end - node_apply($self,$1.id) 
       }
       infix ("getNeighborsAndWeights") (Node :: Tuple2(NeighborView(MInt),NeighborView(MDouble))) implements composite ${
         val start = node_apply($self,$1.id)
-        val end = if( ($1.id+1) < array_length($self.getNodes) ) node_apply($self,($1.id+1))
-          else array_length($self.getEdges)
-        pack(NeighborView[Int]($self.getEdges,start,end-start),NeighborView[Double](edge_weights($self),start,end-start))
+        val end = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1))
+          else array_length($self.getCSREdges)
+        pack(NeighborView[Int]($self.getCSREdges,start,end-start),NeighborView[Double](edge_weights($self),start,end-start))
       }
       infix ("inDegree") (Node :: MInt) implements composite ${$self.outDegree($1)}
-      infix ("outNbrs") (Node :: NeighborView(MInt)) implements composite ${get_nbrs($self,$1)} 
-      infix ("inNbrs") (Node :: NeighborView(MInt)) implements composite ${get_nbrs($self,$1)}
-      infix ("neighbors") (MInt :: NeighborView(MInt)) implements composite ${get_nbrs($self,Node($1))}
-      infix ("neighbors") (Node :: NeighborView(MInt)) implements composite ${get_nbrs($self,$1)}
-      compiler ("get_nbrs") (Node :: NeighborView(MInt)) implements composite ${
+      infix ("outNeighbors") (Node :: NeighborView(MInt)) implements composite ${get_neighbors($self,$1)} 
+      infix ("inNeighbors") (Node :: NeighborView(MInt)) implements composite ${get_neighbors($self,$1)}
+      infix ("neighbors") (Node :: NeighborView(MInt)) implements composite ${get_neighbors($self,$1)}
+      compiler ("get_neighbors") (Node :: NeighborView(MInt)) implements composite ${
         val start = node_apply($self,$1.id)
-        val end = if( ($1.id+1) < array_length($self.getNodes) ) node_apply($self,($1.id+1))
-          else array_length($self.getEdges)
-        NeighborView[Int]($self.getEdges,start,end-start)
+        val end = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1))
+          else array_length($self.getCSREdges)
+        NeighborView[Int]($self.getCSREdges,start,end-start)
       }
       compiler ("get_edge_weights") (Node :: NeighborView(MDouble)) implements composite ${
         val start = node_apply($self,$1.id)
-        val end = if( ($1.id+1) < array_length($self.getNodes) ) node_apply($self,($1.id+1))
+        val end = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1))
           else array_length(edge_weights($self))
         NeighborView[Double](edge_weights($self),start,end-start)
       }
+      infix ("getCSREdgeWeights") (Nil :: MArray(MDouble)) implements getter(0, "_weights")
       compiler ("edge_weights") (Nil :: MArray(MDouble)) implements getter(0, "_weights")
-      infix ("getNodes") (Nil :: MArray(MInt)) implements getter(0, "_nodes")
-      compiler("node_apply")(MInt :: MInt) implements composite ${array_apply($self.getNodes,$1)}
-      infix ("getEdges") (Nil :: MArray(MInt)) implements getter(0, "_edges")
-      compiler("edge_apply")(MInt :: MInt) implements composite ${array_apply($self.getEdges,$1)}
+      infix ("getCSRNodes") (Nil :: MArray(MInt)) implements getter(0, "_nodes")
+      compiler("node_apply")(MInt :: MInt) implements composite ${array_apply($self.getCSRNodes,$1)}
+      infix ("getCSREdges") (Nil :: MArray(MInt)) implements getter(0, "_edges")
+      compiler("edge_apply")(MInt :: MInt) implements composite ${array_apply($self.getCSREdges,$1)}
     }
     addGraphCommonOps(UndirectedGraph) 
   } 

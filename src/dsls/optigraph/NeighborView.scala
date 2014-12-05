@@ -43,25 +43,25 @@ trait NeighborViewOps {
         d
       }
       infix ("intersect") (NeighborView(T) :: MLong, TNumeric(T)) implements single ${
-        val nbrs = $self
-        val nbrsOfNbrs = $1
-        if(nbrs.length == 0 || nbrsOfNbrs.length == 0) 0l
-        else if(nbrs(0) > nbrsOfNbrs(nbrsOfNbrs.length-1) || 
-          nbrsOfNbrs(0) > nbrs(nbrs.length-1)){
+        val neighbors = $self
+        val neighborsOfNeighbors = $1
+        if(neighbors.length == 0 || neighborsOfNeighbors.length == 0) 0l
+        else if(neighbors(0) > neighborsOfNeighbors(neighborsOfNeighbors.length-1) || 
+          neighborsOfNeighbors(0) > neighbors(neighbors.length-1)){
           0l
         }
         else{
-          ndv_intersect_sets(nbrs,nbrsOfNbrs)
+          ndv_intersect_sets(neighbors,neighborsOfNeighbors)
         }
       }
       compiler ("ndv_intersect_sets") (NeighborView(T) :: MLong, TNumeric(T)) implements single ${
-        val nbrs = $self
-        val nbrsOfNbrs = $1
+        val neighbors = $self
+        val neighborsOfNeighbors = $1
         var i = 0
         var t = 0l
         var j = 0
-        val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
-        val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
+        val small = if(neighbors.length < neighborsOfNeighbors.length) neighbors else neighborsOfNeighbors
+        val large = if(neighbors.length < neighborsOfNeighbors.length) neighborsOfNeighbors else neighbors
         //I understand there are simplier ways to write this, I tried a lot of versions
         //this is the fastest (that I tried).
         while(i < (small.length-1)  && j < (large.length-1)){
@@ -84,31 +84,31 @@ trait NeighborViewOps {
         if(small(i) == large(j)) t += 1 
         t
       }
-      infix ("intersectInRange") ((("nbrsOfNbrs",NeighborView(T)),("nbrsMax",T)) :: MLong, TNumeric(T)) implements single ${
-        val nbrs = $self
+      infix ("intersectInRange") ((("neighborsOfNeighbors",NeighborView(T)),("neighborsMax",T)) :: MLong, TNumeric(T)) implements single ${
+        val neighbors = $self
 
-        if(nbrs.length < 2 || nbrsOfNbrs.length < 2 ) 0l
-        else if(nbrsMax <= nbrsOfNbrs(0) ||
-          nbrsMax <= nbrs(0)){
+        if(neighbors.length < 2 || neighborsOfNeighbors.length < 2 ) 0l
+        else if(neighborsMax <= neighborsOfNeighbors(0) ||
+          neighborsMax <= neighbors(0)){
           0l
         }
-        else if(nbrs(0) > nbrsOfNbrs(nbrsOfNbrs.length-1) || 
-          nbrsOfNbrs(0) > nbrs(nbrs.length-1)){
+        else if(neighbors(0) > neighborsOfNeighbors(neighborsOfNeighbors.length-1) || 
+          neighborsOfNeighbors(0) > neighbors(neighbors.length-1)){
           0l
         }
         else{
-          ndv_intersect_sets_in_range($self,nbrsOfNbrs,nbrsMax)
+          ndv_intersect_sets_in_range($self,neighborsOfNeighbors,neighborsMax)
         }
       }
-      compiler ("ndv_intersect_sets_in_range") ((("nbrsOfNbrs",NeighborView(T)),("nbrsMax",T)) :: MLong, TNumeric(T)) implements single ${
-        val nbrs = $self
+      compiler ("ndv_intersect_sets_in_range") ((("neighborsOfNeighbors",NeighborView(T)),("neighborsMax",T)) :: MLong, TNumeric(T)) implements single ${
+        val neighbors = $self
         var t = 0l
         var i = 0
         var j = 0
-        val small = if(nbrs.length < nbrsOfNbrs.length) nbrs else nbrsOfNbrs
-        val large = if(nbrs.length < nbrsOfNbrs.length) nbrsOfNbrs else nbrs
-        val smallMax = nbrsMax 
-        val largeMax = nbrsMax
+        val small = if(neighbors.length < neighborsOfNeighbors.length) neighbors else neighborsOfNeighbors
+        val large = if(neighbors.length < neighborsOfNeighbors.length) neighborsOfNeighbors else neighbors
+        val smallMax = neighborsMax 
+        val largeMax = neighborsMax
         //I understand there are simplier ways to write this, I tried a lot of versions
         //this is the fastest (that I tried).
         var notFinished = small(i) < smallMax && large(j) < largeMax
@@ -144,6 +144,5 @@ trait NeighborViewOps {
       
       parallelize as ParallelCollection(T, lookupOp("NeighborView_illegalalloc"), lookupOp("length"), lookupOverloaded("apply",1), lookupOp("NeighborView_illegalupdate"))
     }
-    direct(NeighborView) ("sumOverCollection", (T,R), CurriedMethodSignature(List(("nd_view",NeighborView(T)), ("data",T==>R) ,("cond",T==>MBoolean)),R), TNumeric(R)) implements composite ${nd_view.mapreduce[R]( e => data(e), (a,b) => a+b, cond)}
   }
 }

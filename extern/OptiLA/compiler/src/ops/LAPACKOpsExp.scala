@@ -75,7 +75,7 @@ trait LAPACKOpsExp extends LAPACKOps with LinAlgOpsExp {
     if (useLAPACK) {
       check_chol(a,tri)
 
-      val t = if (ordering2___equal(tri, unit("upper"))) unit('U') else unit('L')
+      val t = if (forge_equals(tri, unit("upper"))) unit('U') else unit('L')
       val alloc = a.mutable
       reflectWrite(alloc)(Native_chol(alloc, t))
       postprocess_chol(alloc, tri)

@@ -20,16 +20,16 @@ trait SimpleWriteRead extends ForgeTestModule with OptiMLApplication {
     val testVec = "test.vec"
 
     val x = DenseMatrix.rand(10,10)
-    writeMatrix(x, testMat)
-    val y = readMatrix(testMat)
+    val t1 = writeMatrix(x, testMat)
+    val y = readMatrix(testMat) after t1
     collect(sum(abs(x-y)) < .01)
-    deleteFile(testMat)
+    deleteFile(testMat) after y
 
     val a = DenseVector.rand(10)
-    writeVector(a, testVec)
-    val b = readVector(testVec)
+    val t2 = writeVector(a, testVec)
+    val b = readVector(testVec) after t2
     collect(sum(abs(a-b)) < .01)
-    deleteFile(testVec)
+    deleteFile(testVec) after b
 
     mkReport
   }

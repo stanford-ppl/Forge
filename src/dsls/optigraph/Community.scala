@@ -46,7 +46,7 @@ trait CommunityOps {
         val in = $self.in
         var m2 = $self.totalWeight
         
-        g.sumOverNodes({ n => 
+        sumOverNodes(g.nodes)({ n => 
           if(tot(n.id) > 0)
             (in(n.id)/m2) - (tot(n.id)/m2)*(tot(n.id)/m2)
           else 
@@ -57,7 +57,7 @@ trait CommunityOps {
         val g = $self.graph
         var m2 = $self.totalWeight
         
-        g.sumOverNodes({ n => 
+        sumOverNodes(g.nodes)({ n => 
           if(tot(n.id) > 0)
             (in(n.id)/m2) - (tot(n.id)/m2)*(tot(n.id)/m2)
           else 
@@ -114,11 +114,11 @@ trait CommunityOps {
 
           val nodesInComm = NodeData(fhashmap_get(groupedComms,oldComm))
           nodesInComm.foreach({ n => 
-            val (nbrs,nbrWeights) = unpack(g.getNeighborsAndWeights(Node(n)))
+            val (neighbors,nbrWeights) = unpack(g.getNeighborsAndWeights(Node(n)))
             var i = 0
 
-            while(i < nbrs.length){
-              val dst = old2newHash(n2c(nbrs(i)))
+            while(i < neighbors.length){
+              val dst = old2newHash(n2c(neighbors(i)))
               if(nodeHash.contains(dst)){
                 nodeHash.update(dst,nodeHash(dst)+nbrWeights(i))
               }
@@ -172,11 +172,11 @@ trait CommunityOps {
         val g = $self.graph
         val commWeights = SHashMap[Int,Double]()
         commWeights.update(n2c(n.id),0d) //Add current nodes community with a weight of 0
-        val (nbrs,nbrWeights) = unpack(g.getNeighborsAndWeights(n))
+        val (neighbors,nbrWeights) = unpack(g.getNeighborsAndWeights(n))
         var i = 0
-        while(i < nbrs.length){
-          val neigh_comm = n2c(nbrs(i))
-          if(nbrs(i) != n.id){
+        while(i < neighbors.length){
+          val neigh_comm = n2c(neighbors(i))
+          if(neighbors(i) != n.id){
             if(commWeights.contains(neigh_comm)){
               commWeights.update(neigh_comm,commWeights(neigh_comm)+nbrWeights(i))
             }
@@ -191,12 +191,12 @@ trait CommunityOps {
       infix("findBestCommunityMove")((("n",Node),("n2c",MArray(MInt)),("tot",MArray(MDouble)),("commWeights",SHashMap(MInt,MDouble))) :: Tuple2(MInt,MDouble)) implements single ${
         val g = $self.graph
         val node_comm = n2c(n.id) //READ
-        val w_degree = g.weightedDegree(n.id)
+        val w_degree = g.weightedDegree(n)
 
         //By default set everything to our current community
         var best_comm = node_comm
         var best_nblinks = commWeights(node_comm)
-        var best_increase = $self.modularityGain(tot(node_comm)-g.weightedDegree(n.id),best_nblinks,w_degree) //READ
+        var best_increase = $self.modularityGain(tot(node_comm)-g.weightedDegree(n),best_nblinks,w_degree) //READ
 
         val comms = commWeights.keys
         var i = 0
@@ -286,11 +286,11 @@ trait CommunityOps {
       }
 
       infix("insert")( MethodSignature(List(("n2c",MArray(MInt)),("in",MArray(MDouble)),("tot",MArray(MDouble)),("node",MInt),("old_comm",MInt),("olddnodecomm",MDouble),("comm",MInt),("dnodecomm",MDouble)),MUnit), effect = write(1,2,3)) implements single ${
-        array_update(tot,old_comm,tot(old_comm)-$self.graph.weightedDegree(node))
-        array_update(tot,comm,tot(comm)+$self.graph.weightedDegree(node))
+        array_update(tot,old_comm,tot(old_comm)-$self.graph.weightedDegree(Node(node)))
+        array_update(tot,comm,tot(comm)+$self.graph.weightedDegree(Node(node)))
 
-        array_update(in,old_comm,in(old_comm)-(2*olddnodecomm+$self.graph.numSelfLoops(node)))
-        array_update(in,comm,in(comm)+(2*dnodecomm+$self.graph.numSelfLoops(node)))
+        array_update(in,old_comm,in(old_comm)-(2*olddnodecomm+$self.graph.numSelfLoops(Node(node))))
+        array_update(in,comm,in(comm)+(2*dnodecomm+$self.graph.numSelfLoops(Node(node))))
 
         array_update(n2c,node,comm)
       }
@@ -324,7 +324,7 @@ trait CommunityOps {
     compiler (Community) ("alloc_size", Nil, UndirectedGraph :: MInt) implements single ${$0.numNodes}
     compiler (Community) ("alloc_doubles", Nil, (MInt,(MInt ==> MDouble)) :: MArray(MDouble)) implements single ${array_fromfunction[Double]($0,$1)}
     compiler (Community) ("alloc_ints", Nil, (MInt,(MInt ==> MInt)) :: MArray(MInt)) implements single ${array_fromfunction[Int]($0,$1)}
-    compiler (Community) ("alloc_weights", Nil, UndirectedGraph :: MArray(MDouble)) implements single ${array_fromfunction[Double](alloc_size($0),{n => $0.weightedDegree(n)})}
-    compiler (Community) ("alloc_selfs", Nil, UndirectedGraph :: MArray(MDouble)) implements single ${array_fromfunction[Double](alloc_size($0),{n => $0.numSelfLoops(n)})}
+    compiler (Community) ("alloc_weights", Nil, UndirectedGraph :: MArray(MDouble)) implements single ${array_fromfunction[Double](alloc_size($0),{n => $0.weightedDegree(Node(n))})}
+    compiler (Community) ("alloc_selfs", Nil, UndirectedGraph :: MArray(MDouble)) implements single ${array_fromfunction[Double](alloc_size($0),{n => $0.numSelfLoops(Node(n))})}
   } 
 }

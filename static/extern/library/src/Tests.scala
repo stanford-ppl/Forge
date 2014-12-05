@@ -17,7 +17,7 @@ trait ForgeTestRunnerInterpreter extends ForgeTestModule {
 
   val collector: Rep[ArrayBuffer[Boolean]] = new ArrayBuffer[Boolean](0)
 
-  def collect(s: Rep[Boolean]) { collector += s }
+  def collect(s: Rep[Boolean]) = { collector += s }
 
   def mkReport(): Rep[Unit] = { () }
 }

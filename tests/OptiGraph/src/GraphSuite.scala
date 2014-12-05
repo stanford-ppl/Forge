@@ -23,7 +23,7 @@ object UndirectedGraphC extends ForgeTestRunnerCompiler with OptiGraphApplicatio
 trait UndirectedGraphTest extends ForgeTestModule with OptiGraphApplication {
   def main() {
     val g = undirectedGraphFromEdgeList(createMeshEdgeList(7))
-    val sum = g.sumOverNodes({n => n.id})
+    val sum = sumOverNodes(g.nodes){n => n.id}
     val nd = g.mapNodes{n => n.id*2}
 
     collect(g.numNodes == 7 && g.numEdges == 42 
@@ -31,8 +31,8 @@ trait UndirectedGraphTest extends ForgeTestModule with OptiGraphApplication {
       && nd(1) == 2 && nd(2) == 4 && nd(3) == 6 && nd(4) == 8
       && nd(5) == 10 && nd(6) == 12 && nd.length == 7)
 
-    val nbr = g.neighbors(1)
-    val sumNbr = g.sumOverNbrs(Node(1)){w => w}{n => true}
+    val nbr = g.neighbors(Node(1))
+    val sumNbr = sumOverNeighbors(nbr){w => w.id}
 
     collect(nbr.length == 6 && sumNbr == 20)
 
@@ -45,7 +45,7 @@ object DirectedGraphC extends ForgeTestRunnerCompiler with OptiGraphApplicationC
 trait DirectedGraphTest extends ForgeTestModule with OptiGraphApplication {
   def main() {
     val g = directedGraphFromEdgeList(createMeshEdgeList(7))
-    val sum = g.sumOverNodes({n => n.id})
+    val sum = sumOverNodes(g.nodes){n => n.id}
 
     val nd = g.mapNodes{n => n.id*2}
 
@@ -54,14 +54,12 @@ trait DirectedGraphTest extends ForgeTestModule with OptiGraphApplication {
       && nd(1) == 2 && nd(2) == 4 && nd(3) == 6 && nd(4) == 8
       && nd(5) == 10 && nd(6) == 12 && nd.length == 7) 
 
-    val inNbr = g.inNbrs(Node(6))
+    val inNbr = g.inNeighbors(Node(6))
 
-    //FIXME:  Why can't I write this like I did with my pagerank application.
-    //ERROR: DirectedGraphTest.this.Rep[Int] does not take parameters
-    //val sumDownNbr = sum(inNbr){w => w}{n => true}
-    //val sumUpNbrs = sum(g.outNbrs(Node(5))){w => w}{n => true}
+    val sumDownNbr = sumOverNeighbors(inNbr){w => w.id}
+    val sumUpNbrs = sumOverNeighbors(g.outNeighbors(Node(5))){w => w.id}
 
-    collect(inNbr.length == 6)
+    collect(inNbr.length == 6 && sumUpNbrs == 16 && sumDownNbr == 15)
 
     mkReport
   }

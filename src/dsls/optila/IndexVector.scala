@@ -30,6 +30,9 @@ trait IndexVectorOps {
       val d = array_empty[Int]($0.length)
       $0.indices foreach { i => d(i) = $0(i) }
       d.unsafeImmutable
+      
+      // FIXME: using the pure version causes SparseVectorSuite testAccessors to fail with a fusion exception (applyAddCondition not implemented)
+      // array_fromfunction($0.length, { i => $0(i) })
     }
 
     // this is unsafe because it uses the underlying input array directly instead of copying
@@ -78,12 +81,16 @@ trait IndexVectorOps {
       }
       infix ("isRow") (Nil :: MBoolean) implements getter(0, "_isRow")
       infix ("apply") (MInt :: MInt) implements composite ${
+        fassert($1 >= 0 && $1 < $self.length, "IndexVector apply out of bounds at index " + $1)
         if (indexvector_is_range($self)) {
           indexvector_start($self) + $1
         }
         else {
           indexvector_raw_data($self).apply($1)
         }
+      }
+      infix ("apply") (IndexVector :: IndexVector) implements composite ${
+        IndexVector($1 { i => $self(i) }, $self.isRow)        
       }
 
       infix ("slice") ((("start",MInt),("end",MInt)) :: IndexVector) implements composite ${

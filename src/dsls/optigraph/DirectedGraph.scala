@@ -43,15 +43,14 @@ trait DirectedGraphOps{
       infix ("isDirected") (Nil :: MBoolean) implements composite ${true}
 
       //get out neighbors
-      infix ("outNbrs") (MInt :: NeighborView(MInt)) implements composite ${$self.outNbrs(Node($1))}
-      infix ("outNbrs") (Node :: NeighborView(MInt)) implements composite ${
+      infix ("outNeighbors") (Node :: NeighborView(MInt)) implements composite ${
         val start = out_node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1))
           else array_length(out_edge_raw_data($self))
         NeighborView[Int](out_edge_raw_data($self),start,end-start)
       }
       //get in neighbors   
-      infix ("inNbrs") (Node :: NeighborView(MInt)) implements composite ${
+      infix ("inNeighbors") (Node :: NeighborView(MInt)) implements composite ${
         val start = in_node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) 
             else array_length(in_edge_raw_data($self)) 
@@ -67,20 +66,20 @@ trait DirectedGraphOps{
             else array_length(in_edge_raw_data($self))
         end - in_node_apply($self,$1.id)
       }
-      infix ("sumDownNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
+      infix ("sumDownNeighbors") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",Node==>R)),R), TFractional(R), addTpePars=R) implements composite ${
         //only sum in neighbors a level up
-        sum($self.outNbrs(n))(data){e => (level(e)==(level(n.id)+1))}
+        sumOverNeighborsC($self.outNeighbors(n))(data){e => (level(e.id)==(level(n.id)+1))}
       }
-      infix ("sumUpNbrs") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",MInt==>R)),R), TFractional(R), addTpePars=R) implements composite ${
+      infix ("sumUpNeighbors") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",Node==>R)),R), TFractional(R), addTpePars=R) implements composite ${
         //only sum in neighbors a level up
-        sum($self.inNbrs(n))(data){e => level(e)==(level(n.id)-1)}
+        sumOverNeighborsC($self.inNeighbors(n))(data){e => level(e.id)==(level(n.id)-1)}
       }
       //Input node ids
       infix ("hasEdge") ((MInt,MInt) :: MBoolean) implements composite ${$self.hasEdge(Node($1),Node($2))}
       infix ("hasEdge") ((Node,Node) :: MBoolean) implements composite ${
-        val inNbrs = NodeData($self.inNbrs($1).getRawArray).groupByReduce[Int,Int](e => e, e => e, (a,b) => a)
-        val outNbrs = NodeData($self.outNbrs($1).getRawArray).groupByReduce[Int,Int](e => e, e => e, (a,b) => a)
-        if(fhashmap_contains[Int,Int](inNbrs,$2.id) || fhashmap_contains[Int,Int](outNbrs,$2.id)) true 
+        val inNeighbors = NodeData($self.inNeighbors($1).getRawArray).groupByReduce[Int,Int](e => e, e => e, (a,b) => a)
+        val outNeighbors = NodeData($self.outNeighbors($1).getRawArray).groupByReduce[Int,Int](e => e, e => e, (a,b) => a)
+        if(fhashmap_contains[Int,Int](inNeighbors,$2.id) || fhashmap_contains[Int,Int](outNeighbors,$2.id)) true 
         else false
       }
       //Out Node Accessors

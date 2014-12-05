@@ -27,6 +27,7 @@ def main():
     parser.add_option("-c", "--clean", action="store_true", dest="build_clean", default=False, help="nuke the build directory if it already exists")
     parser.add_option("--clean-extern", action="store_true", dest="extern_clean", default=False, help="always republish extern files")
     parser.add_option("--use-jars", action="store_true", dest="use_jars", default=False, help="generate an SBT build file for the DSL that uses managed dependencies for LMS/Delite")
+    parser.add_option("--no-apps", action="store_false", dest="copy_apps", default=True, help="do not copy included DSL apps to published folder")
 
     (opts, args) = parser.parse_args()
     if len(args) < 1:
@@ -61,6 +62,7 @@ import sbt._
 import Keys._
 
 object ${dslName}Build extends Build {
+  if (System.getProperty("showSuppressedErrors") == null) System.setProperty("showSuppressedErrors", "false")
   val virtScala = "${scala_major_vers}.${scala_minor_vers}"
   val virtBuildSettingsBase = Project.defaultSettings ++ Seq(
     organization := "stanford-ppl",
@@ -73,10 +75,13 @@ object ${dslName}Build extends Build {
     libraryDependencies += "org.scalatest" % "scalatest_${scala_major_vers}" % "2.1.2",
     libraryDependencies += "com.google.guava" % "guava" % "17.0",
     libraryDependencies += "org.apache.commons" % "commons-math" % "2.2",
+    libraryDependencies += "commons-io" % "commons-io" % "2.4",
     // cluster deps
-    libraryDependencies += "com.google.protobuf" % "protobuf-java" % "2.4.1",
-    libraryDependencies += "org.apache.mesos" % "mesos" % "0.9.0-incubating",
-    libraryDependencies += "org.apache.hadoop" % "hadoop-core" % "1.2.0",
+    libraryDependencies += "com.google.protobuf" % "protobuf-java" % "2.5.0",
+    libraryDependencies += "org.apache.mesos" % "mesos" % "0.20.1",
+    libraryDependencies += "org.apache.hadoop" % "hadoop-common" % "2.5.1",
+    libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "2.5.1",
+    libraryDependencies += "org.apache.hadoop" % "hadoop-hdfs" % "2.5.1",
     // used in delitec to access jars
     retrieveManaged := true,
     scalacOptions += "-Yno-generic-signatures",
@@ -112,7 +117,7 @@ ${header}
     unmanagedClasspath in Test <+= (baseDirectory) map { bd => Attributed.blank(lms) },
     unmanagedClasspath in Test <+= (baseDirectory) map { bd => Attributed.blank(deliteFramework) },
     unmanagedClasspath in Test <+= (baseDirectory) map { bd => Attributed.blank(deliteRuntime) },
-    unmanagedClasspath in Test <+= (baseDirectory) map { bd => Attributed.blank(deliteTest) }    
+    unmanagedClasspath in Test <+= (baseDirectory) map { bd => Attributed.blank(deliteTest) }
   )
 
 ${footer}
@@ -260,9 +265,10 @@ def publish(dsl, opts):
         publish_dsl_extern(dsl, build_dir, scratch_dir, dsl)
 
     # apps
-    apps_dir = FORGE_HOME + "/apps/" + dsl + "/"
-    if os.path.exists(apps_dir):
-        os.system("rsync -r " + apps_dir + " " + build_dir + "/apps/")
+    if opts.copy_apps:
+        apps_dir = FORGE_HOME + "/apps/" + dsl + "/"
+        if os.path.exists(apps_dir):
+            os.system("rsync -r " + apps_dir + " " + build_dir + "/apps/")
 
     # tests
     tests_dir = FORGE_HOME + "/tests/" + dsl + "/"

@@ -10,7 +10,8 @@ object OptiMLDSLRunner extends ForgeApplicationRunner with OptiMLDSL
 
 trait OptiMLDSL extends OptiLADSL
   with MLIOOps with FeatureOps with SetOps with BufferableOps with StreamOps with ImageOps
-  with FactorOps with FactorGraphOps {
+  with FactorOps with FactorGraphOps
+  with ClassifierOps with ValidateOps with TreeOps {
 
   override def dslName = "OptiML"
 
@@ -35,6 +36,9 @@ trait OptiMLDSL extends OptiLADSL
     importMLIOOps()
     importStreamOps()
     importImageOps()    
+    importClassifierOps()
+    importValidateOps()
+    importTreeOps()
   }
 
   def importUntilConverged() {
@@ -59,9 +63,12 @@ trait OptiMLDSL extends OptiLADSL
       }
 
       if (iter == maxIter){
-        println("Maximum iterations exceeded")
+        println("[optiml]: maximum iterations (" + iter + ") exceeded")
       }
-
+      else {
+        println("[optiml]: converged in " + iter + " iterations")
+      }
+      
       cur
     }
 
@@ -118,7 +125,7 @@ trait OptiMLDSL extends OptiLADSL
     val SparseVector = lookupTpe("SparseVector")
 
     // val Arith = lookupGrp("Arith")
-    val Prim = lookupGrp("Primitive2")
+    val Prim = lookupGrp("Primitive")
     val T = tpePar("T")
 
     // default metric is ABS

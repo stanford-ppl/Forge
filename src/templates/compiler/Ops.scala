@@ -36,10 +36,10 @@ trait DeliteGenOps extends BaseGenOps {
     if(b.contains("emitBlock")) true
     else false
   }
- 
+
   // bound symbol for the captured variable of a block
   private var boundArg: String = _
-  
+
   override def quote(x: Exp[Any]): String = x match {
     case Def(QuoteBlockResult(func,args,ret,captured)) =>
       // bind function args to captured args
@@ -71,7 +71,7 @@ trait DeliteGenOps extends BaseGenOps {
       // the new-line formatting is admittedly weird; we are using a mixed combination of actual new-lines (for string splitting at Forge)
       // and escaped new-lines (for string splitting at Delite), based on how we received strings from string interpolation.
       // FIX: using inconsistent newline character, not platform independent
-      val out = "{ \"" + boundStr +       
+      val out = "{ \"" + boundStr +
         nl + "emitBlock(" + func.name + ")" +
         (if (ret != MUnit && boundArg == null)
            (nl + "quote(getBlockResult(" + func.name + "))+\"\\n\"")
@@ -93,7 +93,7 @@ trait DeliteGenOps extends BaseGenOps {
   // IR node names
   def makeOpNodeName(o: Rep[DSLOp], suffix: String = "") = {
     Labels.get(o).map(_.capitalize).getOrElse {
-      val i = nameClashId(o)
+      val i = nameClashId(o, clasher = nameClashesSimple)
       o.style match {
         case `staticMethod` => o.grp.name + i + "Object_" + sanitize(o.name).capitalize + suffix
         case `compilerMethod` => o.name.capitalize + suffix
@@ -367,7 +367,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val in = " + col.name)
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_reduce"))
           stream.println("    def zero = " + makeOpImplMethodNameWithArgs(o, "_zero"))
-          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
+          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(dc.size) + "(in))")
           stream.println("    override val numDynamicChunks = " + matchChunkInput(reduce.numDynamicChunks))
         case mapreduce:MapReduce =>
           val col = o.args.apply(mapreduce.argIndex)
@@ -390,7 +390,7 @@ trait DeliteGenOps extends BaseGenOps {
           else {
             stream.println("    def map = " + makeOpImplMethodNameWithArgs(o, "_map"))
           }
-          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
+          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(dc.size) + "(in))")
           stream.println("    override val numDynamicChunks = " + matchChunkInput(mapreduce.numDynamicChunks))
         case filter:Filter =>
           val colTpe = getHkTpe(o.retTpe)
@@ -425,7 +425,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    val in = " + col.name)
           stream.println("    def func = " + makeOpImplMethodNameWithArgs(o, "_func"))
           stream.println("    def sync = n => unit(List())")
-          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodNameWithArgs(dc.size) + ")")
+          stream.println("    val size = copyTransformedOrElse(_.size)(" + makeOpMethodName(dc.size) + "(in))")
           stream.println("    override val numDynamicChunks = " + matchChunkInput(foreach.numDynamicChunks))
       }
       emitOpNodeFooter(o, stream)
@@ -736,7 +736,8 @@ trait DeliteGenOps extends BaseGenOps {
         val colTpe = makeTpeInst(tpe, tpePar("A"))
         val a = if (dc.tpeArg.tp.runtimeClass == classOf[TypePar]) "A" else quote(dc.tpeArg) // hack!
 
-        stream.println("  def " + isTpe + "[A](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = isSubtype(x.tp.erasure,classOf["+makeTpeInst(tpe, tpePar("A"))+"])")
+        stream.println("  def " + isTpe + "Tpe(x: Manifest[_])(implicit ctx: SourceContext) = isSubtype(x.erasure,classOf["+makeTpeInst(tpe, tpePar("_"))+"])")
+        stream.println("  def " + isTpe + "[A](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = " + isTpe + "Tpe(x.tp)")
         stream.println("  def " + asTpe + "[A](x: Exp[DeliteCollection[A]])(implicit ctx: SourceContext) = x.asInstanceOf[Exp["+colTpe+"]]")
         stream.println()
 
@@ -860,7 +861,7 @@ trait DeliteGenOps extends BaseGenOps {
           warn("could not infer size field for struct " + tpe.name)
         }
         if (arrayFields.length == 1 && sizeField.isDefined) {
-          val isTpe = "is"+tpe.name
+          val isTpe = "is"+tpe.name+"Tpe"
           val prefix = if (first) "    if " else "    else if "
           dcDataFieldStream += prefix + "("+isTpe+"(x)) \"" + arrayFields(0)._1 + "\"" + nl
           dcSizeFieldStream += prefix + "("+isTpe+"(x)) \"" + sizeField.get + "\"" + nl
@@ -869,12 +870,12 @@ trait DeliteGenOps extends BaseGenOps {
       }
 
       if (!first) {
-        stream.println("  override def dc_data_field[A:Manifest](x: Exp[DeliteCollection[A]]) = {")
+        stream.println("  override def dc_data_field(x: Manifest[_]) = {")
         stream.print(dcDataFieldStream)
         stream.println("    else super.dc_data_field(x)")
         stream.println("  }")
         stream.println()
-        stream.println("  override def dc_size_field[A:Manifest](x: Exp[DeliteCollection[A]]) = {")
+        stream.println("  override def dc_size_field(x: Manifest[_]) = {")
         stream.print(dcSizeFieldStream)
         stream.println("    else super.dc_size_field(x)")
         stream.println("  }")
@@ -888,7 +889,7 @@ trait DeliteGenOps extends BaseGenOps {
       emitBlockComment("Code generators", stream)
       stream.println()
       val save = activeGenerator
-      for (g <- generators) {        
+      for (g <- generators) {
         activeGenerator = g
         val generatorRules = rules.flatMap{case (o,i) => i.asInstanceOf[CodeGen].decls.collect{case (k,r) if (k == g) => (o,r)}}
         if (generatorRules.length > 0) {
@@ -929,7 +930,7 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("    case _ => super.emitNode(sym, rhs)")
           stream.println("  }")
           stream.println("}")
-        }        
+        }
       }
       activeGenerator = save
     }

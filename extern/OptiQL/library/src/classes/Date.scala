@@ -48,27 +48,27 @@ trait DateWrapper extends DateOps {
   }
 
   def date_object_apply_impl5(__arg0: Rep[String])(implicit __pos: SourceContext): Rep[Date] = {
-    val tokens = fstring_fsplit(__arg0,unit("-"))
+    val tokens = __arg0.split(unit("-"))
     val year = fstring_toint(array_apply(tokens,unit(0)))
     val month = fstring_toint(array_apply(tokens,unit(1)))
     val day = fstring_toint(array_apply(tokens,unit(2)))
-    Date(primitive2_forge_int_plus(primitive2_forge_int_shift_left(year, unit(9)), primitive2_forge_int_plus(primitive2_forge_int_shift_left(month, unit(5)), day)))
+    Date(primitive_forge_int_plus(primitive_forge_int_shift_left(year, unit(9)), primitive_forge_int_plus(primitive_forge_int_shift_left(month, unit(5)), day)))
   }
 
   def date_lt_impl1(self: Rep[Date],__arg0: Rep[Date])(implicit __pos: SourceContext): Rep[Boolean] = {
-    ordering2_lt(date_value(self), date_value(__arg0))
+    ordering_lt(date_value(self), date_value(__arg0))
   }
 
   def date_lteq_impl1(self: Rep[Date],__arg0: Rep[Date])(implicit __pos: SourceContext): Rep[Boolean] = {
-    ordering2_lteq(date_value(self), date_value(__arg0))
+    ordering_lteq(date_value(self), date_value(__arg0))
   }
 
   def date_gt_impl1(self: Rep[Date],__arg0: Rep[Date])(implicit __pos: SourceContext): Rep[Boolean] = {
-    ordering2_gt(date_value(self), date_value(__arg0))
+    ordering_gt(date_value(self), date_value(__arg0))
   }
 
   def date_gteq_impl1(self: Rep[Date],__arg0: Rep[Date])(implicit __pos: SourceContext): Rep[Boolean] = {
-    ordering2_gteq(date_value(self), date_value(__arg0))
+    ordering_gteq(date_value(self), date_value(__arg0))
   }
 
 }

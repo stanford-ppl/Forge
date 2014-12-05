@@ -56,6 +56,7 @@ trait Forge extends ForgeScalaOpsPkg with Definitions with ForgeSugar with Field
   def forge_warn(s: String)(implicit ctx: SourceContext): Unit
 
   // exposed since DSL developers may also need to introspect
+  def canonicalName(tpe: Rep[DSLType]): String
   def isTpePar(tpe: Rep[DSLType]): Boolean
   def asTpePar(tpe: Rep[DSLType]): Rep[TypePar]
   def isTpeInst(tpe: Rep[DSLType]): Boolean
@@ -109,6 +110,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case Def(Tpe(name,_,_)) if name.startsWith("java") => true
     case Def(Tpe(name,_,_)) if name.startsWith("Tuple") => true
     case Def(Tpe("ForgeArray",_,_)) | Def(Tpe("ForgeArrayBuffer",_,_)) | Def(Tpe("ForgeHashMap",_,_)) => true
+    case Def(Tpe("ForgeFileInputStream",_,_)) | Def(Tpe("ForgeFileOutputStream",_,_)) => true
     case Def(Tpe("Var",_,_)) => true
     case Def(Tpe("Overloaded",_,_)) => true
     case _ => false
@@ -138,6 +140,11 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case t@Def(TpeClass(n,sig,targs)) => t.asInstanceOf[Rep[DSLType]]
     case t@Def(TpeClassInst(n,targs,t2)) => t.asInstanceOf[Rep[DSLType]]
     // case _ => err(grp.name + " is not a DSLType")
+  }
+
+  def canonicalName(x: Rep[DSLType]): String = {
+    val prefix = if (x.stage == future) "Rep" else ""
+    prefix + x.name + x.tpeArgs.map(canonicalName).mkString("")
   }
 
   def isTpePar(tpe: Rep[DSLType]) = tpe match {
@@ -241,9 +248,10 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     }
     case Def(Tpe(name, arg, `compile`)) => quote(a)
     case Def(Tpe("Var", arg, stage)) => repify(arg(0))
+    case Def(TpePar(name, ctx, `compile`)) => quote(a)
     case Def(TpeClass(_,_,_)) | Def(TpeClassInst(_,_,_)) => quote(a)
-    case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2)) => repify(a2(0))
     case Def(TpeInst(Def(Tpe(name, args, `compile`)), args2)) => name + (if (!args2.isEmpty) "[" + args2.map(repifySome).mkString(",") + "]" else "") // implicits don't auto-convert things wrapped in an outer tpe, so we still use repifySome
+    case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2)) => repify(a2(0))
     case Def(VarArgs(t)) => "Seq[" + repify(t) + "]"
     case _ => "Rep[" + quote(a) + "]"
   }
@@ -257,8 +265,8 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     case Def(Tpe(name, arg, `now`)) => quote(a)
     case Def(Tpe("Var", arg, stage)) => varify(arg(0))
     case Def(TpePar(name, ctx, `now`)) => quote(a)
-    case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2)) => varify(a2(0))
     case Def(TpeInst(Def(Tpe(name, args, `now` | `compile`)), args2)) => name + (if (!args2.isEmpty) "[" + args2.map(repifySome).mkString(",") + "]" else "") // is this the right thing to do?
+    case Def(TpeInst(Def(Tpe("Var",a1,s1)), a2)) => varify(a2(0))
     case Def(VarArgs(t)) => repifySome(t) + "*"
     case _ => repify(a)
   }

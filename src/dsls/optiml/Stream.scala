@@ -23,38 +23,8 @@ trait StreamOps {
 
     static (Stream) ("apply", Nil, MString :: Stream) implements allocates(Stream, ${$0})
     
-    // unfortunately can't use Delite FileReader, since we need to read sequentially
-    // so we fall-back to basic Scala i/o
-
-    val FileReader = tpe("java.io.BufferedReader")    
-
-    compiler (Stream) ("open_reader", Nil, MString :: FileReader, effect = simple) implements codegen($cala, ${
-      new java.io.BufferedReader(new java.io.FileReader($0))
-    })
-
-    compiler (Stream) ("close_reader", Nil, FileReader :: MUnit, effect = simple) implements codegen($cala, ${
-      $0.close()
-    })
+    // we need to read sequentially, but from potentially different data stores, so we use ForgeFileInputStream and ForgeFileOutputStream
     
-    compiler (Stream) ("read_line", Nil, FileReader :: MString, effect = simple) implements codegen($cala, ${
-      $0.readLine()
-    })
-
-    val FileWriter = tpe("java.io.BufferedWriter")
-
-    compiler (Stream) ("open_writer", Nil, MString :: FileWriter, effect = simple) implements codegen($cala, ${
-      new java.io.BufferedWriter(new java.io.FileWriter($0))
-    })
-
-    compiler (Stream) ("close_writer", Nil, FileWriter :: MUnit, effect = simple) implements codegen($cala, ${
-      $0.close()
-    })
-
-    compiler (Stream) ("write_line", Nil, (FileWriter, MString) :: MUnit, effect = simple) implements codegen($cala, ${
-      $0.write($1, 0, $1.length)
-      $0.newLine()
-    })
-
     val T = tpePar("T")
     val StreamOps = withTpe(Stream)
     StreamOps {
@@ -62,23 +32,23 @@ trait StreamOps {
 
       // currently loaded and executed sequentially, chunk-by-chunk
       infix ("foreach") ((MString ==> MUnit) :: MUnit) implements single ${        
-        val f = open_reader($self.path)
-        var line = read_line(f)
+        val f = ForgeFileInputStream($self.path)
+        var line = f.readLine()
         while (line != null) {
           $1(line)
-          line = read_line(f)
+          line = f.readLine()
         }
-        close_reader(f)        
+        f.close()
       }
 
       infix ("map") (CurriedMethodSignature(List(List(("outFile", MString)), List(("func", MString ==> MString))), MUnit)) implements composite ${      
-        val out = open_writer(outFile)
+        val out = ForgeFileOutputStream(outFile)
         // the below incorrectly infers the type of 'line' for mysterious reasons
         // for (line <- $self) { 
         $self.foreach { line: Rep[String] => 
-          write_line(out, func(line)) 
+          out.writeLine(func(line))
         }        
-        close_writer(out)
+        out.close()
       } 
 
       infix ("reduce") (CurriedMethodSignature(List(List(("init", T)), List(("func", (T,MString) ==> T))), T), addTpePars = T) implements composite ${

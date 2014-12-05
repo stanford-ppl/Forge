@@ -45,7 +45,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println()
 
     // scopes
-    // NOTE: this currently only works in Delite mode. Is there a way to use scopes and still 
+    // NOTE: this currently only works in Delite mode. Is there a way to use scopes and still
     // delegate to a different implementation for interpreter mode?
     stream.println("trait " + dsl + "Interactive extends " + dsl + "Application with DeliteInteractive")
     stream.println("trait " + dsl + "InteractiveRunner[R] extends " + dsl + "ApplicationCompiler with DeliteInteractiveRunner[R]")
@@ -65,38 +65,41 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println()
 
     // exp
-    stream.println("trait " + dsl + "Exp extends " + dsl + "Compiler")
+    stream.println("trait " + dsl + "Exp extends " + dsl + "Compiler with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
     for (opsGrp <- opsGrps) {
       stream.print(" with " + opsGrp.name + "Exp")
     }
     for (e <- Externs) {
       stream.print(" with " + e.opsGrp.name + "Exp")
     }
-    stream.println(" with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteAllOverridesExp with MultiloopSoATransformExp {")
+    stream.println(" with DeliteAllOverridesExp with MultiloopSoATransformExp {")
     stream.println(" this: DeliteApplication with " + dsl + "Application => ")
     stream.println()
-    emitBlockComment("disambiguations for LMS classes pulled in by Delite", stream, indent=2)
+    emitBlockComment("disambiguations for Delite internal operations", stream, indent=2)
 
-    // TODO: generalize -- these depend on certain Scala.scala operations being imported, which may not be the case
-    stream.println("  override def infix_unary_!(x: Rep[Boolean])(implicit pos: SourceContext) = boolean_negate(x)")
-    stream.println("  override def infix_&&(lhs: Rep[Boolean], rhs: Rep[Boolean])(implicit pos: SourceContext) = boolean_and(lhs,rhs)")
-    stream.println("  override def infix_||(lhs: Rep[Boolean], rhs: Rep[Boolean])(implicit pos: SourceContext) = boolean_or(lhs,rhs)")
-    stream.println("  override def infix_unsafeImmutable[A:Manifest](lhs: Rep[A])(implicit pos: SourceContext) = object_unsafe_immutable(lhs)")
-    stream.println("  override def infix_unsafeMutable[A:Manifest](lhs: Rep[A])(implicit pos: SourceContext) = object_unsafe_mutable(lhs)")
-    stream.println("  override def infix_trim(lhs: Rep[String])(implicit pos: SourceContext) = string_trim(lhs)")
-    stream.println("  override def infix_startsWith(lhs: Rep[String], rhs: Rep[String])(implicit pos: SourceContext) = fstring_startswith(lhs,rhs)")
-    stream.println("  override def infix_endsWith(lhs: Rep[String], rhs: Rep[String])(implicit pos: SourceContext) = fstring_endswith(lhs,rhs)")
-    stream.println("  override def infix_contains(lhs: Rep[String], rhs: Rep[String])(implicit pos: SourceContext) = fstring_contains(lhs,rhs)")
-    stream.println("  override def __whileDo(cond: => Exp[Boolean], body: => Rep[Unit])(implicit pos: SourceContext) = delite_while(cond, body)")
-    // delite and lms if-then-else don't use by-name-parameter for cond
-    stream.println("  override def __ifThenElse[T:Manifest](cond: Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")
-    stream.println("  override def __ifThenElse[T:Manifest](cond: => Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")
-    stream.println("  implicit def repToOrderingOps[A:Manifest:Ordering](x: Rep[A]) = repOrderingToOrderingOps(x)")
-    stream.println("  implicit def varToOrderingOps[A:Manifest:Ordering](x: Var[A]) = varOrderingToOrderingOps(x)")
-    stream.println("  // forward to LMS primitive ops to make stencil analysis detect intervals (and get constant folding rewrites)")
-    stream.println("  override def primitive2_forge_int_plus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = int_plus(__arg0, __arg1)")
-    stream.println("  override def primitive2_forge_int_minus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = int_minus(__arg0, __arg1)")
-    stream.println("  override def primitive2_forge_int_times(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = int_times(__arg0, __arg1)")
+    // These are the primitive Delite methods that Delite requires be forwarded, since they may be used in analyses or optimizations.
+    // Note that this means the Forge-generated IR nodes for these methods will never get constructed, and rewrite rules should not
+    // be written for them, as they will have no effect. Any way to check this?
+
+    if (OpsGrp.keySet.exists(_.name == "Primitive")) {
+      stream.println("  override def primitive_forge_int_plus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_plus(__arg0, __arg1)")  
+      stream.println("  override def primitive_forge_int_minus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_minus(__arg0, __arg1)")
+      stream.println("  override def primitive_forge_int_times(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_times(__arg0, __arg1)")
+      stream.println("  override def primitive_unary_bang(__arg0: Rep[Boolean])(implicit __pos: SourceContext): Rep[Boolean] = delite_boolean_negate(__arg0)")
+    }
+
+    if (OpsGrp.keySet.exists(_.name == "Misc")) {
+      stream.println("  override def misc_unsafeimmutable[A:Manifest](lhs: Rep[A])(implicit pos: SourceContext): Rep[A] = delite_unsafe_immutable(lhs)")
+      stream.println("  override def __whileDo(cond: => Exp[Boolean], body: => Rep[Unit])(implicit pos: SourceContext) = delite_while(cond, body)")
+      // delite and lms if-then-else don't use by-name-parameter for cond
+      stream.println("  override def __ifThenElse[T:Manifest](cond: Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")
+      stream.println("  override def __ifThenElse[T:Manifest](cond: => Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")
+    }
+
+    if (OpsGrp.keySet.exists(_.name == "Ordering")) {
+      stream.println("  override def forge_equals[A:Manifest,B:Manifest](__arg0: Rep[A],__arg1: Rep[B])(implicit __pos: SourceContext) = delite_equals(__arg0,__arg1)")
+      stream.println("  override def forge_notequals[A:Manifest,B:Manifest](__arg0: Rep[A],__arg1: Rep[B])(implicit __pos: SourceContext) = delite_notequals(__arg0,__arg1)")
+    }
 
     stream.println()
     emitBlockComment("dsl types", stream, indent=2)
@@ -126,7 +129,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("  def dsmap(line: String) = line")
     stream.println("  override def emitDataStructures(path: String) {")
     stream.println("    val s = File.separator")
-    stream.println("    val dsRoot = System.getProperty(\"user.dir\")+s+\"compiler\"+s+\"src\"+s+"+packageDir+"+s+\"datastruct\"+s+this.toString")
+    stream.println("    val dsRoot = sys.env.get(\""+dsl.toUpperCase+"_HOME\").getOrElse(System.getProperty(\"user.dir\"))+s+\"compiler\"+s+\"src\"+s+"+packageDir+"+s+\"datastruct\"+s+this.toString")
     stream.println()
     stream.println("    val dsDir = Directory(Path(dsRoot))")
     stream.println("    val outDir = Directory(Path(path))")
@@ -168,9 +171,10 @@ trait DeliteGenPackages extends BaseGenPackages {
         if (e.opsGrp.targets.contains(g))
           stream.print(" with " + g.name + "Gen" + e.opsGrp.name)
       }
+      if (g == $cala) stream.println(" with ScalaGenDeliteTest ")
       if (g == cuda) stream.println(" with DeliteCppHostTransfer with DeliteCudaDeviceTransfer ")
       if (g == cpp) stream.println(" with DeliteCppHostTransfer ")
-      if (g == restage && generators.contains($cala)) stream.println(" with " + dsl + "Codegen"+$cala.name + " with DeliteCodeGenRestage { ")      
+      if (g == restage && generators.contains($cala)) stream.println(" with " + dsl + "Codegen"+$cala.name + " with DeliteCodeGenRestage { ")
       else stream.println(" with " + g.name + "GenDeliteOps with Delite" + g.name + "GenAllOverrides {" )
       stream.println("  val IR: DeliteApplication with " + dsl + "Exp")
       // TODO: generalize, other targets can have remaps too, need to be encoded somehow
@@ -179,9 +183,7 @@ trait DeliteGenPackages extends BaseGenPackages {
         stream.println()
         emitComment("these methods translate types in the compiler to typed in the generated code", stream, indent=1)
         stream.println("  override def dsmap(line: String): String = {")
-        stream.println("    var res = line.replaceAll(\"" + packageName + ".datastruct\", \"generated\")")
-        stream.println("    res = res.replaceAll(\"ppl.delite.framework.datastruct\", \"generated\")")
-        stream.println("    res = res.replaceAll(\"" + packageName + "\", \"generated.scala\")")
+        stream.println("    var res = line.replaceAll(\"" + packageName + ".datastruct.scala\", this.packageName)")
         stream.println("    res")
         stream.println("  }")
         stream.println()
@@ -193,7 +195,7 @@ trait DeliteGenPackages extends BaseGenPackages {
         stream.println()
       }
       stream.println("}")
-    } 
+    }
   }
 
 }

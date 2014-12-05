@@ -30,6 +30,9 @@ trait FieldOps extends Base with OverloadHack {
   def infix_name(x: Rep[DSLType])(implicit o: Overloaded2): String
   // needed for is
   def infix_tpePars(x: Rep[DSLType]): List[Rep[TypePar]]
+  // needed to generate primitive math combinations as type classes
+  def infix_stage(x: Rep[DSLType]): StageTag
+  def infix_tpeArgs(x: Rep[DSLType]): List[Rep[DSLType]]
 }
 
 trait FieldOpsExp extends FieldOps {
@@ -84,6 +87,10 @@ trait FieldOpsExp extends FieldOps {
     case Def(TpeClassInst(name,tpePars,t)) => future
     case Def(FTpe(args,ret,freq)) => future
     case Def(VarArgs(t)) => future
+  }
+  def infix_tpeArgs(x: Exp[DSLType]) = x match {
+    case Def(TpeInst(t,args)) => args
+    case _ => Nil
   }
 
   /**

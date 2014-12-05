@@ -4,6 +4,7 @@ import optiql.shared._
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common.Record
 
+
 object GeneInterpreter extends OptiQLApplicationInterpreter with GeneApp
 object GeneCompiler extends OptiQLApplicationCompiler with GeneApp
 
@@ -40,6 +41,7 @@ trait GeneApp extends OptiQLApplication {
   def main() = {
     if (args.length < 1) printUsage()
     val path = args(0)
+
     val data = Table.fromFile(path){ line =>
       val fields = line.fsplit("\t")
       fields(1)
@@ -49,4 +51,5 @@ trait GeneApp extends OptiQLApplication {
     val q = data.Select(g => g.substring(13)).Where(g => fuzzyStartsWith(g))
     toc(q.size)
   }
+
 }

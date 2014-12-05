@@ -190,14 +190,27 @@ trait GroupRowsBy extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object MapRowsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with MapRows
-object MapRowsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with MapRows
-trait MapRows extends ForgeTestModule with OptiMLApplication {
+object MapAllRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with MapAll
+object MapAllRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with MapAll
+trait MapAll extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
     val x = DenseMatrix.zeros(10,10)
-    val y = x mapRows { i => DenseVector.ones(10) }
-    collect (y == DenseMatrix.ones(10,10))
+
+    val a = x.map(e => e + 2.0)
+    collect (a == (DenseMatrix.ones(10,10)*2.0))
+
+    val b = x mapRows { i => DenseVector.ones(10) }
+    collect (b == DenseMatrix.ones(10,10))
+
+    val c = x mapRows { i => DenseVector.ones(5) }
+    collect (c == DenseMatrix.ones(10,5))
+
+    val d = x mapCols { i => DenseVector.ones(10).t }
+    collect (d == DenseMatrix.ones(10,10))
+
+    val e = x mapCols { i => DenseVector.ones(5).t }
+    collect (e == DenseMatrix.ones(5,10))
     mkReport
   }
 }
@@ -263,7 +276,7 @@ class DenseMatrixSuiteInterpreter extends ForgeSuiteInterpreter {
   def testOperators() { runTest(DenseMatrixOperatorsRunnerI) }
   def testUpdates() { runTest(DenseMatrixUpdatesRunnerI) }
   def testGroupRowsBy() { runTest(GroupRowsByRunnerI) }
-  def testMapRows() { runTest(MapRowsRunnerI) }
+  def testMapAll() { runTest(MapAllRunnerI) }
   def testReduceRows() { runTest(ReduceRowsRunnerI) }
   def testShapes() { runTest(ShapesRunnerI) }
 }
@@ -273,7 +286,7 @@ class DenseMatrixSuiteCompiler extends ForgeSuiteCompiler {
   def testOperators() { runTest(DenseMatrixOperatorsRunnerC) }
   def testUpdates() { runTest(DenseMatrixUpdatesRunnerC) }
   def testGroupRowsBy() { runTest(GroupRowsByRunnerC) }
-  def testMapRows() { runTest(MapRowsRunnerC) }
+  def testMapAll() { runTest(MapAllRunnerC) }
   def testReduceRows() { runTest(ReduceRowsRunnerC) }
   def testShapes() { runTest(ShapesRunnerC) }
 }

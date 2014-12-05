@@ -2,20 +2,19 @@ import optigraph.compiler._
 import optigraph.library._
 import optigraph.shared._
 
-// This object lets us run the Delite version of the code
-object CommunityDetectionCompiler extends OptiGraphApplicationCompiler with CommDetection {
+object CommunityDetectionJar extends OptiGraphApplicationCompiler with CommDetection {
   registerFunction(CommunityDetection _)  
   override def functionName = "CommunityDetection"
 }
 
-// This object lets us run the Scala library version of the code
+object CommunityDetectionCompiler extends OptiGraphApplicationCompiler with CommDetection
 object CommunityDetectionInterpreter extends OptiGraphApplicationInterpreter with CommDetection
 
 trait CommDetection extends OptiGraphApplication {
   def main() = {
     println("CommunityDetection")
   
-    if (args.length < 1) printUsage
+    if (args.length < 2) printUsage
 
     tic("input loading")
     val edgeList = loadUndirectedEdgeList(args(0))
@@ -26,11 +25,11 @@ trait CommDetection extends OptiGraphApplication {
     toc("creating graph",g)
     
     val k = 0.01
-    val result = CommunityDetection(g.getNodes,g.getEdges,k)
+    val result = CommunityDetection(args(1),g.getCSRNodes,g.getCSREdges,k)
 
     println(array_length(result._1))
   }
-  def CommunityDetection(nodes:Rep[ForgeArray[Int]], edges:Rep[ForgeArray[Int]], k:Rep[Double]) : Rep[Tup2[ForgeArray[Int],ForgeArray[Int]]] = {
+  def CommunityDetection(path: Rep[String], nodes:Rep[ForgeArray[Int]], edges:Rep[ForgeArray[Int]], k:Rep[Double]) : Rep[Tup2[ForgeArray[Int],ForgeArray[Int]]] = {
     var g = undirectedGraphFromCSR(nodes,edges)
 
     println("performing Community Detection")
@@ -62,16 +61,17 @@ trait CommDetection extends OptiGraphApplication {
       //////////////////////DEBUG/////////////////////////////////////
       println("Level: " + level + " Modularity improved from: " + mod + " to: " + newMod)
       println("\tnumNodes: " + g.numNodes + " numEdges: " + g.numEdges + " weight: " + g.totalWeight)
+      printGraph(path,level,mod,newMod,g.numNodes,g.numEdges,g.getCSRNodes,g.getCSREdges,g.getCSREdgeWeights)
       level += 1
       mod = newMod
       ////////////////////////////////////////////////////////////////
     }
     toc(mod)
 
-    pack(g.getNodes,g.getEdges)
+    pack(g.getCSRNodes,g.getCSREdges)
   }
   def printUsage = {
-    println("Usage: CommunityDetection <path to input edge list file>")
+    println("Usage: CommunityDetection <path to input edge list file> <path prefix for output>")
     exit(-1)
   }
 }

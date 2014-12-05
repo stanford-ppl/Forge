@@ -53,6 +53,27 @@ trait IOGraphOps {
       xfs.close();
     }))
 
+    direct (IO) ("printGraph", Nil, MethodSignature(List(("pathin",MString),("level",MInt),("mod",MDouble),("newMod",MDouble),("numNodes",MInt),("numEdges",MInt),("nodes",MArray(MInt)),("edges",MArray(MInt)),("edgeWeights",MArray(MDouble))),MUnit), effect = simple) implements codegen($cala, ${
+      val pin = $pathin
+      val path = pin + "_" + $level.toString + ".txt"
+      val xfs = new java.io.BufferedWriter(new java.io.FileWriter(path))
+      xfs.write("number of nodes: " + $numNodes + " number of edges: " + $numEdges)
+      xfs.write("old mod: " + $mod + " new mod: " + $newMod)
+
+      for (i <- 0 until $nodes.length) {
+        val src = i
+        var start = $nodes(i)
+        var end = if(i+1 < $nodes.length) $nodes(i+1) else $edges.length
+
+        for(j <- start until end){
+          xfs.write(i.toString + "\\t")
+          xfs.write($edges(j).toString + "\\t")
+          xfs.write($edgeWeights(j).toString + "\\n")
+        }
+      }
+      xfs.close()
+    })
+
 /////////////////////////////////////////////////////////////////////////////////////////////
 ////////General Loaders
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -189,6 +210,59 @@ trait IOGraphOps {
       NodeData(result.getRawArray)
 
       result
-    }    
+    }
+    /////////////////////////////////////////////////////////////////////////////////////////////
+////////Undirected Adjacency Loader
+/////////////////////////////////////////////////////////////////////////////////////////////
+    direct (IO) ("loadUndirectedAdjList", Nil, MString :: NodeData(NodeData(MInt))) implements composite ${
+      val input = NodeData(ForgeFileReader.readLines($0)({line =>
+          val fields = line.fsplit("\t")
+          NodeData[Int](array_map[String,Int](fields,e => e.toInt))
+      }))
+      input
+    }
+
+    direct (IO) ("createICBUndirectedGraphFromAdjList", Nil, (NodeData(NodeData(MInt))) :: UndirectedGraph) implements composite ${
+      val input = $0
+      val numNodes = input.length
+      val idView = NodeData(array_fromfunction(numNodes,{n => n}))
+      var numEdges = 0l
+
+      val csr = input.sortBy({ a => 
+        numNodes - input(a).length
+      })
+
+      val distinct_ids = csr.map[Int]{nd => nd(0)}
+      val idHashMap = idView.groupByReduce[Int,Int](n => distinct_ids(n), n => n, (a,b) => a)
+
+      val csrNeighbors = csr.map[NodeData[Int]]{ nd =>
+        NodeData.fromFunction(nd.length-1,a => a+1).map(a => fhashmap_get(idHashMap,nd(a))).sort
+      }
+
+      val serial_out = assignADJUndirectedIndicies(numNodes,numEdges.toInt,distinct_ids,idHashMap,csrNeighbors)
+      UndirectedGraph(numNodes,distinct_ids.getRawArray,serial_out._1,serial_out._2,array_fromfunction[Double](numEdges.toInt,e=>1d))    
+    }
+    direct (IO) ("assignADJUndirectedIndicies", Nil, MethodSignature(List(("numNodes",MInt),("numEdges",MInt),("distinct_ids",NodeData(MInt)),("idHashMap",MHashMap(MInt,MInt)),("src_groups",NodeData(NodeData(MInt)))),Tuple2(MArray(MInt),MArray(MInt)))) implements single ${
+      val src_edge_array = NodeData[Int](numEdges)
+      val src_node_array = NodeData[Int](numNodes)
+      var i = 0
+      var j = 0
+      //I can do -1 here because I am pruning so the last node will never have any neighbors
+      while(i < numNodes){
+        val neighborhood = src_groups(i)
+        var k = 0
+        while(k < neighborhood.length){
+          src_edge_array(j) = neighborhood(k)
+          j += 1
+          k += 1
+        }
+        if(i < numNodes-1){
+          src_node_array(i+1) = neighborhood.length + src_node_array(i)
+        }
+        i += 1
+      }
+      pack(src_node_array.getRawArray,src_edge_array.getRawArray)
+    }
+/////////////////////////////////////////////////////////////////////////////////////////////    
   }
 }

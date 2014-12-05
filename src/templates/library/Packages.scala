@@ -46,13 +46,13 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
     stream.println("  override def __newVar[T](x: T) = super.__newVar(x)")
     // TODO: this is ambiguous and unresolvable for some reason, even when supplying explicit arguments. possibly due to the thunks?
     // stream.println("  override def __whileDo(c: => Boolean, b: => Unit): Unit = super.__whileDo(c,b)")
-    if (OpsGrp.keySet.exists(_.name == "Ordering2")) {
+    if (OpsGrp.keySet.exists(_.name == "Ordering")) {
       for (t1 <- List("Int","Float","Double")) {
         for (t2 <- List("Int","Float","Double")) {
-          stream.println("  def infix_!=(x: "+t1+", y: "+t2+") = ordering2_bangeq(x,y)")
+          stream.println("  def infix_!=(x: "+t1+", y: "+t2+") = forge_notequals(x,y)")
         }
       }
-      stream.println("  def infix_!=(x: Boolean, y: Boolean) = ordering2_bangeq(x,y)")
+      stream.println("  def infix_!=(x: Boolean, y: Boolean) = forge_notequals(x,y)")
     }
 
     stream.println("}")

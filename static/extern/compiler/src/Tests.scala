@@ -12,9 +12,9 @@ import LOWERCASE_DSL_NAME.shared.ForgeTestModule
 trait TestsOpsExp extends DeliteTestOpsExp
 
 trait ScalaGenTestsOps extends ScalaGenDeliteTest { val IR: TestsOpsExp }
-trait CudaGenTestsOps extends CudaGenSynchronizedArrayBufferOps with CudaGenStringOps with CudaGenIOOps { val IR: TestsOpsExp }
-trait OpenCLGenTestsOps extends OpenCLGenSynchronizedArrayBufferOps with OpenCLGenStringOps with OpenCLGenIOOps { val IR: TestsOpsExp }
-trait CGenTestsOps extends CGenSynchronizedArrayBufferOps with CGenStringOps with CGenIOOps { val IR: TestsOpsExp }
+trait CudaGenTestsOps
+trait OpenCLGenTestsOps
+trait CGenTestsOps
 
 trait ForgeTestRunnerCompiler extends ForgeTestModule with TestsOpsExp with DeliteTestRunner {
   // everything inherited from DeliteTestRunner

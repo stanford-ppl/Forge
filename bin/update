@@ -9,9 +9,10 @@ E_BADARGS=65
 E_NOHOME=66
 
 usage() {
-  echo "Usage: `basename $0` [-h] [-c] [-s step] [-f] [-g delite | lib] [-i | -r fully.qualified.ApplicationRunner] fully.qualified.DSLRunner DSLName"
+  echo "Usage: `basename $0` [-h] [-a] [-c] [-s step] [-f] [-g delite | lib] [-i | -r fully.qualified.ApplicationRunner] fully.qualified.DSLRunner DSLName"
   echo "Note that `basename $0` requires options to be specified before required arguments."
   echo "  -h        show this message"
+  echo "  -a        do not copy included DSL apps to generated folder"
   echo "  -c        perform a clean build"
   echo "  -C        clean only extern files"
   echo "  -s <n>    skip to step n in the update process"
@@ -24,14 +25,12 @@ usage() {
   exit $E_BADARGS
 }
 
-if [ $# -lt $EXPECTED_ARGS ]; then usage; fi
-
 # check FORGE_HOME exists
 if [ -z "${FORGE_HOME+xxx}" ]; then echo error: FORGE_HOME is not defined; exit $E_NOHOME; fi
 if [ -z "$FORGE_HOME" -a "${FORGE_HOME+xxx}" = "xxx" ]; then echo error: FORGE_HOME is set but empty; exit $E_NOHOME; fi
 
-
 APP_RUNNER=""
+COPY_APPS=""
 CLEAN=""
 CLEAN_EXTERN=""
 NUM_STEPS=4
@@ -42,10 +41,11 @@ IDENT=false
 TARGET=""
 USE_JARS=""
 
-while getopts “hcCs:jfg:r:di” option
+while getopts “hacCs:jfg:r:di” option
 do
   case $option in
     h) usage;;
+    a) COPY_APPS=" --no-apps";;
     c) CLEAN=" -c";;
     C) CLEAN_EXTERN=" --clean-extern";;
     s) SKIP=$OPTARG;;
@@ -64,6 +64,8 @@ do
   esac
 done
 shift $(($OPTIND - 1))
+
+if [ $# -lt $EXPECTED_ARGS ]; then usage; fi
 
 if [ $INTERACTIVE == true ] && [ "$APP_RUNNER" != "" ];
 then
@@ -100,9 +102,9 @@ then
 fi
 
 if [ $SKIP -le 3 ];
-then  
-  echo "publish $DSL_NAME $CLEAN $CLEAN_EXTERN $USE_JARS (3/$NUM_STEPS)"
-  $FORGE_HOME/bin/publish $DSL_NAME $CLEAN $CLEAN_EXTERN $USE_JARS
+then
+  echo "publish $DSL_NAME $CLEAN $CLEAN_EXTERN $USE_JARS $COPY_APPS (3/$NUM_STEPS)"
+  $FORGE_HOME/bin/publish $DSL_NAME $CLEAN $CLEAN_EXTERN $USE_JARS $COPY_APPS
 fi
 
 pushd .

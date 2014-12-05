@@ -92,6 +92,12 @@ trait BasicMathOps {
       direct (Math) ("sum", P, V :: R2, A) implements redirect ${ $0.sum }
       direct (Math) ("prod", P, V :: R2, A) implements redirect ${ $0.prod }
       direct (Math) ("mean", P, V :: MDouble, C) implements redirect ${ $0.mean }
+      direct (Math) ("variance", P, V :: MDouble, C) implements composite ${ 
+        val dbls = $0.toDouble
+        val avg = mean(dbls)
+        mean(dbls map { e => square(e-avg) }) 
+      }
+      direct (Math) ("stddev", P, V :: MDouble, C) implements composite ${ sqrt(variance($0)) }
       direct (Math) ("min", P, V :: R2, O) implements redirect ${ $0.min }
       direct (Math) ("max", P, V :: R2, O) implements redirect ${ $0.max }
 

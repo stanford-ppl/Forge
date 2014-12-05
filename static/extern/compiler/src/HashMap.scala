@@ -10,7 +10,7 @@ import ppl.delite.framework.Config
 
 // For compiler (Delite) implementation
 trait ForgeHashMapOpsExp extends DeliteMapOpsExp {
-  this: ForgeArrayOpsExp with DeliteOpsExp with PrimitiveOpsExp with OrderingOpsExp with EqualExp =>
+  this: ForgeArrayOpsExp with DeliteOpsExp =>
 
   type ForgeHashMap[K,V] = DeliteMap[K,V]
   implicit def forgeMapManifest[K:Manifest,V:Manifest] = manifest[DeliteMap[K,V]]

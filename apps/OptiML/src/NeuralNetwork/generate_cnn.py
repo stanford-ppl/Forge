@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------
 #
 # This script reads in an xml file describing a convolutional neural network
-# and generates OptiML
+# and generates OptiML. See cnn_example.xml for a sample input file.
 #  
 #  Stanford Pervasive Parallelism Laboratory
 #  http://ppl.stanford.edu/
@@ -62,16 +62,16 @@ def print_weight_vars_function_input(net):
 			s += ', '
 	return s
 
-def print_read_weights_from_file_for_layer(i,l,name):
+def print_write_weights_to_file_for_layer(i,l,write_dir):
 	s = ''
 	type = l.attrib['type']
 	if type != 'MAX_POOL':
 		# Weight and bias
 		s += ('''
-			writeMatrix(w''' + str(i) + ''', "apps/src/NeuralNetwork/''' + name + '''/w''' + str(i) + '''.txt")
-			writeVector(b''' + str(i) + ''', "apps/src/NeuralNetwork/''' + name + '''/b''' + str(i) + '''.txt")
-			writeMatrix(dw''' + str(i) + ''', "apps/src/NeuralNetwork/''' + name + '''/dw''' + str(i) + '''.txt")
-			writeVector(db''' + str(i) + ''', "apps/src/NeuralNetwork/''' + name + '''/db''' + str(i) + '''.txt")''')
+				writeMatrix(w'''  + str(i) + ''', "''' + write_dir + '''w''' + str(i) + '''.txt")
+				writeVector(b'''  + str(i) + ''', "''' + write_dir + '''b''' + str(i) + '''.txt")
+				writeMatrix(dw''' + str(i) + ''', "''' + write_dir + '''dw''' + str(i) + '''.txt")
+				writeVector(db''' + str(i) + ''', "''' + write_dir + '''db''' + str(i) + '''.txt")''')
 	return s
 
 def create_weights_file_for_layer(i,l,name):
@@ -124,10 +124,14 @@ def generate_parameter_files(name, net):
 		param_file.write('''1 ; Num Epochs
 100 ; Mini-Batch size
 0 ; Read model from file
-1 ; Write model back to file
 0 ; Read momentum from file
+10 ; Num epochs between saving model (0 to disable)
+10 ; Num epochs between testing on training set (0 to disable)
 1000 ; Test mini-batch size, training set (for final error report)
-1000 ; Test mini-batch size, validation set (for final error report)''')
+10 ; Num epochs between testing on validation set (0 to disable)
+1000 ; Test mini-batch size, validation set (for final error report)
+0 ; Test mode (0 disables testing, 1 disables training)
+1000 ; Test set mini-batch size''')
 		param_file.close()
 
 def generate_weight_files(name, net):
@@ -202,6 +206,8 @@ bin/delite ''' + fname + '''Compiler --cuda 1 ''' + extra_arg + '''
 import optiml.compiler._
 import optiml.library._
 import optiml.shared._
+
+import java.util.Date // For writing weights back to file
 
 object ''' + fname + '''Interpreter extends OptiMLApplicationInterpreter with ''' + fname + '''
 object ''' + fname + '''Compiler extends OptiMLApplicationCompiler with ''' + fname + ''' 
@@ -449,7 +455,8 @@ def write_training_header(f, net, name, use_feature_maps, first_layer_num_featur
 
 	# Declare the def and some variables
 	f.write('''
-	def train(X: Rep[DenseMatrix[Double]], y: Rep[DenseVector[Double]]) = {''')
+	def train(X: Rep[DenseMatrix[Double]], y: Rep[DenseVector[Double]],
+		val_X: Rep[DenseMatrix[Double]], val_y: Rep[DenseVector[Double]]) = {''')
 	f.write('''
 
 		// Initialize parameters for each layer
@@ -462,8 +469,12 @@ def write_training_header(f, net, name, use_feature_maps, first_layer_num_featur
 		val num_epochs = glob_params(0).toInt
 		val minib_m = glob_params(1).toInt
 		val read_model = glob_params(2).toInt
-		val write_model = glob_params(3).toInt
-		val read_mtm = glob_params(4).toInt
+		val read_mtm = glob_params(3).toInt
+		val save_freq = glob_params(4).toInt
+		val test_freq_train_set = glob_params(5).toInt
+		val testing_minib_size_train = glob_params(6).toInt
+		val test_freq_val_set = glob_params(7).toInt
+		val testing_minib_size_val = glob_params(8).toInt
 	''')
 
 	# Create parameters for each layer
@@ -478,10 +489,10 @@ def write_training_header(f, net, name, use_feature_maps, first_layer_num_featur
 		val ''' + layer_id + '''_params = readVector[Double]("apps/src/NeuralNetwork/''' + name +'''/layer_''' + str(i) + '''_params.txt", line => line(0).toDouble, ";" )
 		''')
 		if net.get('lr_cmd_line_arg') == '1':
-			f.write('''val ''' + layer_id + '''_lr = args(0).toDouble
+			f.write('''var ''' + layer_id + '''_lr = args(0).toDouble
 		''')
 		else:
-			f.write('''val ''' + layer_id + '''_lr = ''' + layer_id + '''_params(0)
+			f.write('''var ''' + layer_id + '''_lr = ''' + layer_id + '''_params(0)
 		''')
 		f.write('''val ''' + layer_id + '''_L2reg = ''' + layer_id + '''_params(1) // L2 regularization
 		val ''' + layer_id + '''_mtm = ''' + layer_id + '''_params(2) // momentum
@@ -493,6 +504,16 @@ def write_training_header(f, net, name, use_feature_maps, first_layer_num_featur
 	current_feature_map_size = int(input_image_size)
 
 	f.write('''
+
+		// Parameters for decreasing the learning rate over time
+		val recent_history_size = 2 // Can increase beyond 2 to allow small fluctuations in error rate
+		var history_counter = 0
+		val train_logfile = "apps/src/NeuralNetwork/''' + name + '''/train.log"
+		val train_err_history = DenseVector.zeros(num_epochs / max(1,test_freq_train_set)).mutable
+		val val_logfile = "apps/src/NeuralNetwork/''' + name + '''/val.log"
+		val val_err_history = DenseVector.zeros(num_epochs / max(1,test_freq_val_set)).mutable
+		val val_err_recent_history = (DenseVector.ones(recent_history_size)*(100)).mutable
+
 		if (read_model == 1) {
 			print("Reading models from file...")
 		}
@@ -623,8 +644,8 @@ def write_training_loop(f, net, use_dropout, first_layer_num_feature_maps,input_
 		while(epoch < num_epochs) {
 
 			epoch+=1
-			print("\\nEpoch ")
-			print(epoch)
+			print("Epoch ")
+			println(epoch)
 
 			var minib_epoch = 0
 			// Serial iteration
@@ -998,8 +1019,8 @@ def write_training_loop(f, net, use_dropout, first_layer_num_feature_maps,input_
 		else:
 			weight_updates += '''
 				// Derivative with L2 regularization term, and also momentum
-				dw''' + str(i) + ''' = (''' + dJ_dWi + '''_no_reg + w''' + str(i) + '''.*(''' + layer_id + '''_L2reg))*(-1*''' + layer_id + '''_lr) + dw''' + str(i) + '''.*(''' + layer_id + '''_mtm)
-				db''' + str(i) + ''' = (''' + dJ_dbi + '''_no_reg                     )*(-1*''' + layer_id + '''_lr) + db''' + str(i) + '''.*(''' + layer_id + '''_mtm)
+				dw''' + str(i) + ''' = (''' + dJ_dWi + '''_no_reg + w''' + str(i) + '''.*(''' + layer_id + '''_L2reg))*(-1*''' + layer_id + '''_lr.toDouble) + dw''' + str(i) + '''.*(''' + layer_id + '''_mtm)
+				db''' + str(i) + ''' = (''' + dJ_dbi + '''_no_reg                     )*(-1*''' + layer_id + '''_lr.toDouble) + db''' + str(i) + '''.*(''' + layer_id + '''_mtm)
 
 		'''
 
@@ -1115,25 +1136,84 @@ def write_training_ending(f, net, name):
 
 	f.write('''
 			} // Mini-Batch
-		} // Epoch
 
-		println("\\nFinished Training")
+			// End of epoch
+			// Check if we should run on the training/validation sets
+			if (test_freq_train_set > 0 && epoch % max(1,test_freq_train_set) == 0) {
 
-		// Save these for later
-		if (write_model == 1) {
-			print("Writing models to file...")''')
+				val (train_c_entropy, train_classification_error) = 
+					get_cross_entropy_and_classification_error(X, y, ''' + print_weight_vars(net) + ''', 
+						testing_minib_size_train)
+				train_err_history(epoch/test_freq_train_set - 1) = train_classification_error
+				writeVector(train_err_history, train_logfile)
+				print("  Training set error (")
+				print(X.numRows)
+				print(" examples): ")
+				print(train_classification_error)
+				print("%, Cross Entropy ")
+				println(train_c_entropy)
+			}
+
+			// For validation error, additionally use the returned error to adjust the learning rate
+			if (test_freq_val_set > 0 && epoch % max(1,test_freq_val_set) == 0) {
+				val (val_c_entropy, val_classification_error) = 
+					get_cross_entropy_and_classification_error(val_X, val_y, ''' + print_weight_vars(net) + ''', 
+						testing_minib_size_val)
+				val_err_history(epoch/test_freq_val_set - 1) = val_classification_error
+				writeVector(val_err_history, val_logfile)
+				print("  Validation set error (")
+				print(val_X.numRows)
+				print(" examples): ")
+				print(val_classification_error)
+				print("%, Cross Entropy ")
+				println(val_c_entropy)
+
+				// Check whether the learning rates should be decreased:
+
+				// First add the newest error to the history, removing the oldest one
+				val_err_recent_history(history_counter % recent_history_size) = val_classification_error
+				history_counter += 1
+				val val_err_recent_history_IMM = val_err_recent_history.Clone
+
+				// Now check if there has been no improvement in the history period
+				if ( (history_counter >= recent_history_size) &&
+						(max(val_err_recent_history_IMM) - val_classification_error) <= 0.0 ) {
+					println("  Decreasing all learning rates by a factor of 10")
+					''')
 
 	for i,l in enumerate(net):
-		f.write(print_read_weights_from_file_for_layer(i,l,name))
+		if l.attrib['type'] == 'MAX_POOL':
+			continue
+		f.write('''layer''' + str(i) + '''_lr += (layer''' + str(i) + '''_lr * -0.9) // TODO: Diving by 10 causes cuda errors, only += works...
+					''')
 
 	f.write('''
-			println("done")
-		}
+					// Clear the history for the new LR
+					history_counter += (history_counter * -1) // Setting to zero causes errors..
+				}
+			}
+			// Check if weights should be saved or validation should be done.
+			if (save_freq > 0 && epoch % max(1,save_freq) == 0) {
+				val current_datetime = new java.util.Date().toString.replaceAll(" ", "_").replaceAll(":", "_")
+				val prefix = "checkpoints/" + current_datetime + "_e" + readVar(epoch).makeStr + "_"
 
-		(''' + print_weight_vars(net) + ''')
+				print("  Created checkpoint with prefix \\"")
+				print(prefix)
+				println("\\"")
+				''')
+
+	for i,l in enumerate(net):
+		f.write(print_write_weights_to_file_for_layer(i,l,'apps/src/NeuralNetwork/' + name + '/" + prefix + "'))
+	f.write("\n")
+	for i,l in enumerate(net):
+		f.write(print_write_weights_to_file_for_layer(i,l,'apps/src/NeuralNetwork/' + name + '/'))
+
+	f.write('''
+			}
+		} // Epoch
 	}
-	''')
 
+	''')
 
 def write_train_def(f, net, name, use_feature_maps, first_layer_num_feature_maps, use_dropout, input_image_size):
 	write_training_header(f, net, name, use_feature_maps, first_layer_num_feature_maps, input_image_size)
@@ -1144,13 +1224,8 @@ def write_train_def(f, net, name, use_feature_maps, first_layer_num_feature_maps
 # Writing main def
 # ------------------------------------------------------------------------------
 
-def write_main(f, net, first_layer_num_feature_maps, input_image_size):
+def write_main(f, net, first_layer_num_feature_maps, input_image_size, dataset_path):
 	expected_num_cols = int(first_layer_num_feature_maps) * int(input_image_size)
-	dataset_path = net.get('dataset_path')
-	if not dataset_path:
-		err('''Please add a dataset_path attribute to the <net> tag,
-either as a relative path to /published/OptiML/, or an absolute path.
-E.g.: dataset_path="apps/src/NeuralNetwork/examples/mnist/"''')
 	weight_vars = print_weight_vars(net)
 	f.write('''
 
@@ -1164,41 +1239,45 @@ E.g.: dataset_path="apps/src/NeuralNetwork/examples/mnist/"''')
 		}
 		''')
 	f.write('''
-		val X = readMatrix[Double]("'''+ dataset_path + '''/train_data.txt", s => s.toDouble)
-		if ( X.numCols != ''' + str(expected_num_cols) + ''' ) {
-			print("\\nError: According to the XML file, train_data.txt should have ")
-			print(''' + str(expected_num_cols) + ''')
-			println(" columns per row.")
-			println("Please update the XML or data to match.")
-			exit(1)
-		}
-		val y = readVector("'''+ dataset_path +'''/train_labels.txt")
-
-		// Train and return parameters
-		val (''' + weight_vars + ''') = train(X, y)
-
-		// Check classification error
 		val glob_params = readVector[Double]("apps/src/NeuralNetwork/''' + name + '''/global_params.txt", line => line(0).toDouble, ";" )
-		print("Running on training set...")
-		validate(X, y, ''' + weight_vars + ''', glob_params(5).toInt)
+		val test = glob_params(9).toInt
 
-		// Check validation error (may want to skip this too)
-		val val_X = readMatrix[Double]("''' + dataset_path + '''/val_data.txt", s => s.toDouble)
-		if ( val_X.numCols != ''' + str(expected_num_cols) + ''' ) {
-			print("\\nError: According to the XML file, val_data.txt should have ")
-			print(''' + str(expected_num_cols) + ''')
-			println(" columns per row.")
-			println("Please update the XML or data to match.")
-			exit(1)
+		if (test == 1) {
+			run_test_set(glob_params(10).toInt)
+		} 
+		else {
+
+			// Read training data	
+			val X = readMatrix[Double]("'''+ dataset_path + '''/train_data.txt", s => s.toDouble)
+			if ( X.numCols != ''' + str(expected_num_cols) + ''' ) {
+				print("\\nError: According to the XML file, train_data.txt should have ")
+				print(''' + str(expected_num_cols) + ''')
+				println(" columns per row.")
+				println("Please update the XML or data to match.")
+				exit(1)
+			}
+			val y = readVector("'''+ dataset_path +'''/train_labels.txt")
+
+			// Also read validation data, used for early-stopping
+			val val_X = readMatrix[Double]("''' + dataset_path + '''/val_data.txt", s => s.toDouble)
+			if ( val_X.numCols != ''' + str(expected_num_cols) + ''' ) {
+				print("\\nError: According to the XML file, val_data.txt should have ")
+				print(''' + str(expected_num_cols) + ''')
+				println(" columns per row.")
+				println("Please update the XML or data to match.")
+				exit(1)
+			}
+			val val_y = readVector("''' + dataset_path + '''/val_labels.txt")
+
+			// Train the network
+			train(X, y, val_X, val_y)
 		}
-		val val_y = readVector("''' + dataset_path + '''/val_labels.txt")
-		print("Running on validation set...")
-		val mini_batch_size = glob_params(1).toInt
-		validate(val_X, val_y, ''' + weight_vars + ''', glob_params(6).toInt)
 	}
 ''')
 
-def write_validate_def(f, net):
+def write_test_def(f, net, dataset_path, name, first_layer_num_feature_maps, input_image_size):
+
+	expected_num_cols = int(first_layer_num_feature_maps) * int(input_image_size)
 
 	f.write('''
 	def get_cross_entropy_and_classification_error
@@ -1226,20 +1305,35 @@ def write_validate_def(f, net):
 		(c_entropy, classification_error/num_minibatches)
 	}
 
-	// Validation
-	def validate
-	(
-		// Data''')
-	f.write('''
-		X: Rep[DenseMatrix[Double]], y: Rep[DenseVector[Double]],''')
-	f.write('''
-		// Weights''' + print_weight_vars_function_input(net) + ''',
+	// Testing
+	def run_test_set(batch_size: Rep[Int]) = {
 
-		minib_size: Rep[Int] // Can pass in 1 for online testing
-	) = {
-		val (c_entropy, classification_error) = get_cross_entropy_and_classification_error(X, y, ''' + print_weight_vars(net) + ''', minib_size)
+		val X = readMatrix[Double]("''' + dataset_path + '''/test_data.txt", s => s.toDouble)
+		if ( X.numCols != ''' + str(expected_num_cols) + ''' ) {
+			print("\\nError: According to the XML file, test_data.txt should have ")
+			print(''' + str(expected_num_cols) + ''')
+			println(" columns per row.")
+			println("Please update the XML or data to match.")
+			exit(1)
+		}
+		val y = readVector("''' + dataset_path + '''/test_labels.txt")
+
+		// Load weights''')
+
+	for i,l in enumerate(net):
+		if l.attrib['type'] == 'MAX_POOL':
+			continue
+		f.write('''
+		val w''' + str(i) + ''' = readMatrix[Double]("apps/src/NeuralNetwork/''' + name + '''/w''' + str(i) + '''.txt", s => s.toDouble)
+		val b''' + str(i) + ''' = readVector("apps/src/NeuralNetwork/''' + name + '''/b''' + str(i) + '''.txt")''')
+
+	f.write('''
+
+		// Test
+		val (c_entropy, classification_error) = 
+			get_cross_entropy_and_classification_error(X, y, ''' + print_weight_vars(net) + ''', batch_size)
 		val num_test = y.length
-		print("Classification Error (")
+		print("Test Set Classification Error (")
 		print(num_test)
 		print(" examples):  ")
 		print(classification_error)
@@ -1336,16 +1430,58 @@ elif net.get('colormap') == 'RGB':
 	first_layer_num_feature_maps = '3'
 
 
-# Check the input image size, if this is a convnet
-input_img_size_str = net.get('img_size')
-if not input_img_size_str:
-	err("Please specify img_size as an attribute of the XML's <net> tag, e.g. img_size=\"32x32\"")
-input_image_dims = input_img_size_str.split('x')
-if not len(input_image_dims) == 2:
-	err("Please specify img_size in the XML using the format img_size=\"32x32\"")
-if int(input_image_dims[0]) != int(input_image_dims[1]):
-	err("Only square image sizes are supported, please update img_size in the XML")
-input_image_size = int(input_image_dims[0]) * int(input_image_dims[1])
+# Get the input size
+input_image_size = 0
+# If this is a convnet, then ensure the input image is square
+if use_feature_maps:
+	input_img_size_str = net.get('img_size')
+	if not input_img_size_str:
+		err("Please specify img_size as an attribute of the XML's <net> tag, e.g. img_size=\"32x32\"")
+	input_image_dims = input_img_size_str.split('x')
+	if not len(input_image_dims) == 2:
+		err("Please specify img_size in the XML using the format (e.g.) img_size=\"32x32\"")
+	if int(input_image_dims[0]) != int(input_image_dims[1]):
+		err('Only square image sizes are currently supported. Please resize the images to make them square.')
+	input_image_size = int(input_image_dims[0]) * int(input_image_dims[1])
+
+# This isn't a convnet, so see if the user specified the size a different way
+else:
+	# First see if they still use img_size. For example this may not be a convnet (e.g. just a
+	# softmax), but the inputs are still images. Now however they don't need to be square.
+	input_img_size_str = net.get('img_size')
+	if input_img_size_str:
+		input_image_dims = input_img_size_str.split('x')
+		if not len(input_image_dims) == 2:
+			err("Please specify img_size in the XML using the format (e.g.) img_size=\"32x32\"")
+		input_image_size = int(input_image_dims[0]) * int(input_image_dims[1])
+
+	# No img_size specified, but that's ok since this is not a convolutional network and so
+	# the inputs may not be images. But we still need the user to specify the input data size:
+	else:
+		input_size_str = net.get('input_size')
+		if not input_size_str:
+			err('''Please specify the input size as an attribute of the XML's <net> tag.
+
+Since this network is not doing colvolution/pooling, input size can be specified in 1 of 2 ways:
+
+1. Using the img_size attribute, e.g.: img_size=\"32x32\"
+   (E.g., you can use this if the inputs are images)
+
+2. Using the input_size attribute, e.g.: input_size=\"400\"
+   Here 400 is the number of elements of an input vector. 
+   (E.g., you can use this if the inputs are not images)
+
+''')
+		if 'x' in input_size_str:
+			err('input_size should be specified as a single integer')
+		input_image_size = int(input_size_str)
+
+# Get the path to the dataset
+dataset_path = net.get('dataset_path')
+if not dataset_path:
+	err('''Please add a dataset_path attribute to the <net> tag,
+either as a relative path to /published/OptiML/, or an absolute path.
+E.g.: dataset_path="apps/src/NeuralNetwork/examples/mnist/"''')
 
 # ------------------------------------------------------------------------------
 # Generate parameter files
@@ -1354,6 +1490,8 @@ input_image_size = int(input_image_dims[0]) * int(input_image_dims[1])
 # Create an output directory
 if not os.path.exists(name):
     os.makedirs(name)
+if not os.path.exists(name + '/checkpoints'):
+    os.makedirs(name + '/checkpoints')
 
 generate_parameter_files(name, net)
 generate_weight_files(name, net)
@@ -1381,10 +1519,10 @@ write_ff_ending(optiml_file, num_layers, net)
 write_train_def(optiml_file,net,name,use_feature_maps,first_layer_num_feature_maps, use_dropout, input_image_size)
 
 # Write validation def
-write_validate_def(optiml_file,net)
+write_test_def(optiml_file,net,dataset_path, name, first_layer_num_feature_maps, input_image_size)
 
 # Write the main
-write_main(optiml_file, net, first_layer_num_feature_maps, input_image_size)
+write_main(optiml_file, net, first_layer_num_feature_maps, input_image_size, dataset_path)
 
 # Close the file
 write_optiml_ending(optiml_file, name)
@@ -1408,4 +1546,6 @@ print '''
 To modify parameters (e.g. ''' + example + ''', # epochs) modify the files:
 	''' + name + '''/layer_*_params.txt
 	''' + name + '''/global_params.txt
+
+For example you can modify the parameters to do testing instead of training.
 	'''

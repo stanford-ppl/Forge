@@ -1,4 +1,5 @@
-<!-- An example recurrent network -->
+<!-- An example recurrent network showing all possible XML tags
+     for the script generate_rnn.py. -->
 
 <?xml version="1.0"?>
 

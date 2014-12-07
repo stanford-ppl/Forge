@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------
 #
 # This script reads in an xml file describing a recurrent neural network
-# and generates OptiML
+# and generates OptiML. See rnn_example.xml for a sample input file.
 #  
 #  Stanford Pervasive Parallelism Laboratory
 #  http://ppl.stanford.edu/

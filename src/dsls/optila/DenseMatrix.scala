@@ -177,12 +177,10 @@ trait DenseMatrixOps {
       infix ("vview") ((MInt, MInt, MInt, MBoolean) :: DenseVectorView(T), aliasHint = contains(0)) implements single ${ DenseVectorView[T](densematrix_raw_data($self), $1, $2, $3, $4) } // read-only right now
       infix ("getRow") (MInt :: DenseVectorView(T)) implements composite ${ $self.vview($1*$self.numCols, 1, $self.numCols, true) }
       infix ("getRows") (IndexVector :: DenseMatrix(T)) implements composite ${
-        // DenseMatrix($1.map(i => $self(i)))
         ($1, *) { i => $self(i) }
       }
       infix ("getCol") (MInt :: DenseVectorView(T)) implements composite ${ $self.vview($1, $self.numCols, $self.numRows, false) }
       infix ("getCols") (IndexVector :: DenseMatrix(T)) implements composite ${
-        // DenseMatrix($1.map(i => $self.getCol(i))).t
         (*, $1) { j => $self.getCol(j) }
       }
 
@@ -626,12 +624,12 @@ trait DenseMatrixOps {
        }
 
        infix ("mapRows") ((DenseVectorView(T) ==> DenseVector(R)) :: DenseMatrix(R), addTpePars = R) implements composite ${
-         (0::$self.numRows, *) { i =>
+         ($self.rowIndices, *) { i =>
            $1($self(i))
          }
        }
        infix ("mapCols") ((DenseVectorView(T) ==> DenseVector(R)) :: DenseMatrix(R), addTpePars = R) implements composite ${
-         (*, 0::$self.numCols) { j =>
+         (*, $self.colIndices) { j =>
            $1($self.getCol(j))
          }
        }

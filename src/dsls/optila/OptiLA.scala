@@ -172,29 +172,33 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
     // currently, we just let DenseVectorViews implicitly convert to DenseVector, which will cause overhead
     // in the lib implementation, but should fuse away in the Delite implementation.
 
-    // FIXME: the effectful implementation here prevents these operations from being fused, hoisted, or distributed
-    //        distribution is prevented by the output matrix allocation happening on the master
-    //        (even though the foreach afterwards could be distributed)
-
     for (rhs <- List(DenseVector(T)/*, DenseVectorView(T))*/)) {
       infix (IndexVector) ("apply", T, (CTuple2(IndexVector,IndexWildcard), MInt ==> rhs) :: DenseMatrix(T)) implements composite ${
         val rowIndices = $0._1
-        val first = $1(rowIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
-        val out = DenseMatrix[T](rowIndices.length,first.length)
-        (0::rowIndices.length) foreach { i =>
-          out(i) = $1(rowIndices(i))
-        }
-        out.unsafeImmutable
+
+        // prefer immutable version
+        DenseMatrix(rowIndices.map(i => $1(i)))
+
+        // effectful version is more efficient, but prevents optimizations and distribution
+        //
+        // val first = $1(rowIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
+        // val out = DenseMatrix[T](rowIndices.length,first.length)
+        // (0::rowIndices.length) foreach { i =>
+        //   out(i) = $1(rowIndices(i))
+        // }
+        // out.unsafeImmutable
       }
 
       infix (IndexVector) ("apply", T, (CTuple2(IndexWildcard,IndexVector), MInt ==> rhs) :: DenseMatrix(T)) implements composite ${
         val colIndices = $0._2
-        val first = $1(colIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
-        val out = DenseMatrix[T](first.length, colIndices.length)
-        (0::colIndices.length) foreach { j =>
-          out.updateCol(j, $1(colIndices(j)))
-        }
-        out.unsafeImmutable
+        DenseMatrix(colIndices.map(i => $1(i))).t
+
+        // val first = $1(colIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
+        // val out = DenseMatrix[T](first.length, colIndices.length)
+        // (0::colIndices.length) foreach { j =>
+        //   out.updateCol(j, $1(colIndices(j)))
+        // }
+        // out.unsafeImmutable
       }
     }
   }

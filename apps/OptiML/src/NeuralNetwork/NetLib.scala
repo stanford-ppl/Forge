@@ -38,7 +38,7 @@ trait NetLib extends OptiMLApplication {
 	}
 
 	// Forward through fully connected layer
-	def fullycon_ff(X: Rep[DenseMatrix[Double]], W: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]]) = {
+	def fullycon_fw(X: Rep[DenseMatrix[Double]], W: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]]) = {
 		(0::X.numRows, 0::W.numCols) { (r,c) =>
 			val s = sum(0, X.numCols) { i =>
 				X(r,i)*W(i,c)
@@ -48,12 +48,12 @@ trait NetLib extends OptiMLApplication {
 	}
 
 	// Forward through fully connected layer
-	def fullycon_ff_RNN(X: Rep[DenseMatrix[Double]], H: Rep[DenseMatrix[Double]], Wx: Rep[DenseMatrix[Double]], 
+	// For recurrent neural networks
+	def fullycon_fw_RNN(X: Rep[DenseMatrix[Double]], H: Rep[DenseMatrix[Double]], Wx: Rep[DenseMatrix[Double]], 
 		b: Rep[DenseVector[Double]], Wh: Rep[DenseMatrix[Double]]) = {
 
-		// TODO: Make a BLAS version of this function: H*Wh + X*Wc
-		// Note: 
-		// X.numRows = H.numRows
+		// TODO: Make a non-BLAS version of this function
+		// Note: X.numRows = H.numRows
 
 		(0::X.numRows, 0::H.numCols) { (r,c) =>
 			val s1 = sum(0, X.numCols) { i =>
@@ -68,7 +68,7 @@ trait NetLib extends OptiMLApplication {
 
 	// Forward through fully connected layer
 	// BLAS version
-	def fullycon_ff_blas(X: Rep[DenseMatrix[Double]], W: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]]) = {
+	def fullycon_fw_blas(X: Rep[DenseMatrix[Double]], W: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]]) = {
 
 /* Implementation 1: (Replicate may produce unnecessary copy?) 
 		val num_samples = X.numRows
@@ -86,7 +86,7 @@ trait NetLib extends OptiMLApplication {
 	}
 
 	// Forward through softmax
-	def softmax_ff(X: Rep[DenseMatrix[Double]], W: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]]) = {
+	def softmax_fw(X: Rep[DenseMatrix[Double]], W: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]]) = {
 		val prod = (0::X.numRows, 0::W.numCols) { (r,c) =>
 			val s = sum(0, X.numCols) { i =>
 				X(r,i)*W(i,c)
@@ -104,7 +104,7 @@ trait NetLib extends OptiMLApplication {
 
 	// Forward through softmax
 	// BLAS version
-	def softmax_ff_blas(X: Rep[DenseMatrix[Double]], W: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]]) = {
+	def softmax_fw_blas(X: Rep[DenseMatrix[Double]], W: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]]) = {
 
 /* Implementation 1: (Replicate may produce unnecessary copy?) 		
 		val num_samples = X.numRows
@@ -118,6 +118,9 @@ trait NetLib extends OptiMLApplication {
 /* Alternate Implementation:
 */
 		val prod_no_bias = X*W
+		// TODO: The loop below cannot be fused if we used a blas call, but
+		// we can get rid of this loop by adding an extra column of 1's to the
+		// data matrix and the biases as the final row of the weights.
 		val prod = (0::prod_no_bias.numRows, 0::prod_no_bias.numCols) { (r,c) =>
 			prod_no_bias(r,c) + b(c)
 		}
@@ -154,8 +157,12 @@ trait NetLib extends OptiMLApplication {
 		println(" %")
 	}
 
-	// Convert matrix with really long rows to a matrix of matrices
-	// Used only for visualization, etc., not actual performance code
+	// Input:  A matrix where each row contains num_feature_maps feature maps concatenated
+	//         in row-major order
+	// Output: A matrix of matrices (feature maps)
+	//
+	// This function is currently unused, but would be used for nested data-structures with
+	// nested parallelism.
 	def reshape_2D_Tensor_to_4D_Tensor(T_2D: Rep[DenseMatrix[Double]], num_feature_maps: Rep[Int],
 		// The remaining inputs can be determined from the above inputs, but the
 		// code is faster if as many inputs as possible are constants
@@ -170,8 +177,12 @@ trait NetLib extends OptiMLApplication {
 		}
 	}
 
-	// Convert matrix with really long rows to a matrix of matrices
-	// Used only for visualization, etc., not actual performance code
+	// Input:  A matrix of matrices (feature maps)
+	// Output: A matrix where each row contains num_feature_maps feature maps concatenated
+	//         in row-major order
+	//
+	// This function is currently unused, but would be used for nested data-structures with
+	// nested parallelism.
 	def reshape_4D_Tensor_to_2D_Tensor(T_4D: Rep[DenseMatrix[DenseMatrix[Double]]],
 		// The remaining inputs can be determined from the above inputs, but the
 		// code is faster if as many inputs as possible are constants
@@ -188,16 +199,18 @@ trait NetLib extends OptiMLApplication {
 		}
 	}
 
-	// NOTE: This uses zero-padding, as in AlexNet, so no information is thrown away
+	// Forward propagation through convolutional layer
+	//
+	// NOTE: This uses zero-padding, so no information is thrown away
 	// and the feature map size is unchanged by convolution.
 	// This can instead be specified as an option (how much to zero-pad), which may
 	// provide some speedups because:
-	// - Doesn't get much worse in terms of accuracy
 	// - Less computation
-	// - Convolutions further reduce fmap size
+	// - Convolutions further reduce feature map sizes
 	// - Easier BackProp (ignore borders)
 	// - Prevents divergence on GPU (esp. for small fmaps where borders dominate)
-	def conv_ff(X: Rep[DenseMatrix[Double]], num_feature_maps_L1: Rep[Int],
+	// - Doesn't get much worse in terms of accuracy
+	def conv_fw(X: Rep[DenseMatrix[Double]], num_feature_maps_L1: Rep[Int],
  		W: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]], 
 		// The remaining inputs can be determined from the above inputs, but the
 		// code is faster if as many inputs as possible are constants
@@ -247,9 +260,45 @@ trait NetLib extends OptiMLApplication {
 		}
 	}
 
-	// Backprop through conv layer
-	// Returns gradient of cost function wrt the convolutional WEIGHTS
-	def conv_bp
+	// Forward propagation through convolutional layer
+	//
+	// An alternate implementation of the fw prop convolution which uses a large
+	// blas call, as in cuDNN. 
+	// TODO: Finish implementing this
+	// TODO: Do the same thing for the backwards convolutions, which have special
+	// cases due to merging upsampling and convolution (which gives speedups)
+	def conv_fw_gemm(X: Rep[DenseMatrix[Double]], num_feature_maps_L1: Rep[Int],
+ 		W: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]], 
+		// The remaining inputs can be determined from the above inputs, but the
+		// code is faster if as many inputs as possible are constants
+ 		num_feature_maps_L2: Rep[Int], // = W.numCols
+ 		num_2D_kernel_elements: Rep[Int], // = W.numRows / num_feature_maps_L1 // Square
+ 		kernel_size: Rep[Int], // = sqrt(num_2D_kernel_elements.toDouble).toInt
+ 		half_convolution_length: Rep[Int], // = (kernel_size)/2
+
+		feature_map_total_size: Rep[Int], // = X.numCols / num_feature_maps_L1
+		feature_map_size: Rep[Int] // = sqrt(feature_map_total_size.toDouble).toInt
+	) = {
+
+		println("Error, conv_fw_gemm is currently not implemented")
+		exit(0)
+	}
+
+	// Back propagation through convolutional layer (with respect to weights)
+	//
+	// Returns gradient of cost function wrt the convolutional weights of this
+	// convolutional layer
+	//
+	// Note: This assumes the convolutional layer was followed by a max pool
+	// layer and combines the backwards pooling (upsampling) with the convolution.
+	// A more modular approach would have been to have a function which does the
+	// backward pass over the pool layer, then pass the upsampled layer to this
+	// function to go backwards through the convolutional layer, but it is ~2x faster
+	// to skip the upsampling step and directly upsample/convolve (even for the smallest
+	// pooling of 2x2) because in the 2x2 case there are 4x fewer computations needed,
+	// since following backprop through max-pool layers (upsampling) 1/(m^2) elements
+	// are 0, where m is the pooling factor.
+	def conv_bw_weights
 	(
 		k_total_size: Rep[Int], L1_num_fmaps: Rep[Int], L2_num_fmaps: Rep[Int],
 		L1: Rep[DenseMatrix[Double]], downsampled_dJ_dL2: Rep[DenseMatrix[Double]],
@@ -331,8 +380,15 @@ trait NetLib extends OptiMLApplication {
 		}
 	}
 
-	// Same as above but without pooling
-	def conv_bp_NO_POOL
+	// Back propagation through convolutional layer (with respect to weights)
+	//
+	// Same as conv_bw_weights but without pooling, i.e. conv_bw_weights takes
+	// pooling indices (for upsampling) as well as a pool factor, assuming 
+	// that the convolution layer was followed by a max pool layer. If that's
+	// not the case, then we could have just passed a pool factor of 1 and an
+	// upsample matrix of 0 for all indices. That is what that function does,
+	// but without the extra arguments and matrix reads.
+	def conv_bw_weights_no_pool
 	(
 		k_total_size: Rep[Int], L1_num_fmaps: Rep[Int], L2_num_fmaps: Rep[Int],
 		L1: Rep[DenseMatrix[Double]], downsampled_dJ_dL2: Rep[DenseMatrix[Double]],
@@ -348,7 +404,6 @@ trait NetLib extends OptiMLApplication {
 		fmap_size_downsampled: Rep[Int] // = fmap_size / m
  	) = {
  
-
  		val m = 1
 		val num_examples = L1.numRows
 		(0::(k_total_size * L1_num_fmaps), 0::L2_num_fmaps) { (r,c) =>
@@ -414,9 +469,22 @@ trait NetLib extends OptiMLApplication {
 	// TODO: All these fw prop and bp methods just do convolution,
 	// should combine the functionality to just call a "conv" method
 
-	// Backprop through conv layer
-	// Returns gradient of cost function wrt the INPUT FEATURE MAPS
-	def bp_through_conv_layer
+
+	// Back propagation through convolutional layer (with respect to data)
+	//
+	// Returns gradient of cost function wrt the input feature maps of this
+	// convolutional layer
+	//
+	// Note: This assumes the convolutional layer was followed by a max pool
+	// layer and combines the backwards pooling (upsampling) with the convolution.
+	// A more modular approach would have been to have a function which does the
+	// backward pass over the pool layer, then pass the upsampled layer to this
+	// function to go backwards through the convolutional layer, but it is ~2x faster
+	// to skip the upsampling step and directly upsample/convolve (even for the smallest
+	// pooling of 2x2) because in the 2x2 case there are 4x fewer computations needed,
+	// since following backprop through max-pool layers (upsampling) 1/(m^2) elements
+	// are 0, where m is the pooling factor.
+	def conv_bw_data
 	(
 		w: Rep[DenseMatrix[Double]], L1_num_fmaps: Rep[Int],
 		downsampled_dJ_dL2: Rep[DenseMatrix[Double]],
@@ -493,8 +561,15 @@ trait NetLib extends OptiMLApplication {
 		}
 	}
 
-	// Same as above but without pooling
-	def bp_through_conv_layer_NO_POOL
+	// Back propagation through convolutional layer (with respect to data)
+	//
+	// Same as conv_bw_data but without pooling, i.e. conv_bw_data takes
+	// pooling indices (for upsampling) as well as a pool factor, assuming 
+	// that the convolution layer was followed by a max pool layer. If that's
+	// not the case, then we could have just passed a pool factor of 1 and an
+	// upsample matrix of 0 for all indices. That is what that function does,
+	// but without the extra arguments and matrix reads.
+	def conv_bw_data_no_pool
 	(
 		w: Rep[DenseMatrix[Double]], L1_num_fmaps: Rep[Int],
 		downsampled_dJ_dL2: Rep[DenseMatrix[Double]],
@@ -601,7 +676,7 @@ trait NetLib extends OptiMLApplication {
 		}
 
 		// TODO: This code is exactly the same as above but I return maxIndex instead of max
-		// There should be some way to merge these?
+		// There should be some way to fuse these?
 
 		val indices = ( 0::X.numRows, 0::X.numCols/(m*m) ) { (r,c) =>
 			val fmap_num = c / new_fmap_total_size // Old and new fmax number

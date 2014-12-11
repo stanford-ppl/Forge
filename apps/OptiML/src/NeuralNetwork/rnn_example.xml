@@ -1,7 +1,7 @@
+<?xml version="1.0"?>
+
 <!-- An example recurrent network showing all possible XML tags
      for the script generate_rnn.py. -->
-
-<?xml version="1.0"?>
 
 <net    name="RNNExample"
         dataset_path="apps/src/NeuralNetwork/examples/stock_market" 

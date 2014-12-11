@@ -253,7 +253,7 @@ def write_optiml_ending (f, fname):
 # Writing feed-forward
 # ------------------------------------------------------------------------------
 
-def write_ff_header (f, net):
+def write_fw_header (f, net):
 	f.write('''
 	// Feed-forward pass through the network
 	def feed_forward
@@ -267,7 +267,7 @@ def write_ff_header (f, net):
 	) = {
 ''')
 
-def write_ff_layers (f,net,blas):
+def write_fw_layers (f,net,blas):
 
 	blas_suffix = ''
 	if blas:
@@ -284,6 +284,11 @@ def write_ff_layers (f,net,blas):
 
 	f.write('''
 
+		// TODO: The way this is written does not take advantage of task parallelism.
+		// All the first matrix multiplies (from the input layer) can be done in
+		// parallel. Additionally, once hidden layer L (e.g. L=2 for 2nd hidden layer)
+		// at time t is computed, both layer L+1 at time t and layer L at time t+1 can
+		// be computed in parallel.
 		while (t < T) {
 
 			val X_t = X.slice(0, X.numRows, t*samples_per_window, (t+1)*samples_per_window)
@@ -305,18 +310,18 @@ def write_ff_layers (f,net,blas):
 			// Layer ''' + str(i) + ': ' + l.attrib['name'])
 		if type == 'SOFTMAX':
 			f.write('''
-			o''' + str(i) + '''(t) = softmax_ff''' + blas_suffix + ''' (''' + input + ', ' + print_nonrecurrent_weight_vars_for_layer(i,l) + ')')
+			o''' + str(i) + '''(t) = softmax_fw''' + blas_suffix + ''' (''' + input + ', ' + print_nonrecurrent_weight_vars_for_layer(i,l) + ')')
 		elif type == 'FULLY_CONNECTED':
 			f.write('''
 			// Note: Can also do: o(t) = { if () else () }
 			if (t == 0) {
-				o''' + str(i) + '''(t) = fullycon_ff''' + blas_suffix + ''' (''' + input + ', ' + 
+				o''' + str(i) + '''(t) = fullycon_fw''' + blas_suffix + ''' (''' + input + ', ' + 
 					print_nonrecurrent_weight_vars_for_layer(i,l) + ''').map(''' + activation)
 			if l.attrib.get('dropout'):
 					f.write(').*(' + l.attrib['dropout'])
 			f.write(''')
 			} else {
-				o''' + str(i) + '''(t) = fullycon_ff_RNN(''' + input + ', o' + str(i) + '(t-1), ' + 
+				o''' + str(i) + '''(t) = fullycon_fw_RNN(''' + input + ', o' + str(i) + '(t-1), ' + 
 					print_nonrecurrent_weight_vars_for_layer(i,l) + recurrent_weight + ''').map(''' + activation)
 			if l.attrib.get('dropout'):
 					f.write(').*(' + l.attrib['dropout'])
@@ -327,7 +332,7 @@ def write_ff_layers (f,net,blas):
 		}
 		''')
 
-def write_ff_ending (f, num_layers, net):
+def write_fw_ending (f, num_layers, net):
 	f.write('''
 		// Return result of each layer, including output layer
 		(''' + print_output_vars(net) + ''')
@@ -339,7 +344,7 @@ def write_ff_ending (f, num_layers, net):
 # Writing feed-forward for dropout
 # ------------------------------------------------------------------------------
 
-def write_ff_header_dropout (f, net):
+def write_fw_header_dropout (f, net):
 	f.write('''
 	// Feed-forward pass through the network, with dropout
 	def feed_forward_dropout
@@ -358,7 +363,7 @@ def write_ff_header_dropout (f, net):
 	) = {
 ''')
 
-def write_ff_layers_dropout (f,net,blas):
+def write_fw_layers_dropout (f,net,blas):
 
 	blas_suffix = ''
 	if blas:
@@ -396,7 +401,7 @@ def write_ff_layers_dropout (f,net,blas):
 			// Layer ''' + str(i) + ': ' + l.attrib['name'])
 		if type == 'SOFTMAX':
 			f.write('''
-			o''' + str(i) + '''(t) = softmax_ff''' + blas_suffix + ''' (''' + input + ', ' + print_nonrecurrent_weight_vars_for_layer(i,l) + ')')
+			o''' + str(i) + '''(t) = softmax_fw''' + blas_suffix + ''' (''' + input + ', ' + print_nonrecurrent_weight_vars_for_layer(i,l) + ')')
 		elif type == 'FULLY_CONNECTED':
 			dropout_suffix = '(t)'
 			dropout_prefix = ''
@@ -406,7 +411,7 @@ def write_ff_layers_dropout (f,net,blas):
 			f.write('''
 			// Note: Can also do: o(t) = { if () else () }
 			if (t == 0) {
-				''' + dropout_prefix + '''o''' + str(i) + dropout_suffix + ''' = fullycon_ff''' + blas_suffix + ''' (''' + input + ', ' + 
+				''' + dropout_prefix + '''o''' + str(i) + dropout_suffix + ''' = fullycon_fw''' + blas_suffix + ''' (''' + input + ', ' + 
 					print_nonrecurrent_weight_vars_for_layer(i,l) + ''').map(''' + activation + ''')''')
 			if l.attrib.get('dropout'):
 				f.write('''
@@ -415,7 +420,7 @@ def write_ff_layers_dropout (f,net,blas):
 				}''')
 			f.write('''
 			} else {
-				''' + dropout_prefix + '''o''' + str(i) + dropout_suffix + '''  = fullycon_ff_RNN(''' + input + ', o' + str(i) + '(t-1), ' + 
+				''' + dropout_prefix + '''o''' + str(i) + dropout_suffix + '''  = fullycon_fw_RNN(''' + input + ', o' + str(i) + '(t-1), ' + 
 					print_nonrecurrent_weight_vars_for_layer(i,l) + recurrent_weight + ''').map(''' + activation + ''')''')
 			if l.attrib.get('dropout'):
 				f.write('''
@@ -587,7 +592,6 @@ def write_training_loop(f, net, use_dropout):
 	num_layers = len(net)
 	weight_updates = '''
 					// TODO: The operations below can be computed in parallel (task-level)
-					// Some are also SIMD
 					val minib_X_t = minib_X.slice(0, minib_X.numRows, t*samples_per_window, (t+1)*samples_per_window)
 	'''
 	blas = (net.get('blas') == '1')
@@ -1189,13 +1193,13 @@ write_optiml_header(optiml_file, name)
 # Write the feed-forward def
 num_layers = len(net)
 if use_dropout:
-	write_ff_header_dropout(optiml_file, net)
-	write_ff_layers_dropout(optiml_file, net, net.get('blas')=='1')
-	write_ff_ending(optiml_file, num_layers, net)
+	write_fw_header_dropout(optiml_file, net)
+	write_fw_layers_dropout(optiml_file, net, net.get('blas')=='1')
+	write_fw_ending(optiml_file, num_layers, net)
 
-write_ff_header(optiml_file, net)
-write_ff_layers(optiml_file, net, net.get('blas')=='1')
-write_ff_ending(optiml_file, num_layers, net)
+write_fw_header(optiml_file, net)
+write_fw_layers(optiml_file, net, net.get('blas')=='1')
+write_fw_ending(optiml_file, num_layers, net)
 
 # Write train def (SGD/back-prop)
 write_train_def(optiml_file,net,name, use_dropout)

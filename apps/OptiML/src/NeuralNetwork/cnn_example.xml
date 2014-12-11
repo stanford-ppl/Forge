@@ -1,7 +1,7 @@
-<!-- An example convolutional network showing all possible XML tags
-     for the script generate_cnn.py. -->
-
 <?xml version="1.0"?>
+
+<!-- An example convolutional network showing all possible XML tags
+     for the script generate_cnn.py. !-->
 
 <net    name="CNNExample"
         colormap="RGB" 
@@ -16,8 +16,6 @@
                 through the command line ("1") or a separate parameter file ("0").
                 If specified, the network can be trained by running, for example:
                         delite CNNExampleCompiler 0.01
-                or with CUDA,
-                        delite CNNExampleCompiler --cude 1 0.01
                 This is useful if you want to quickly set all layers to have the
                 same learning rate (rather than modifying the parameter file for
                 each layer)
@@ -28,6 +26,12 @@
                 but on the CPU it requires tuning the number of threads and on
                 the GPU currently cuBLAS can cause slow-downs if the matrix sizes
                 are small.
+
+        gemm_conv="1"
+                Uses a large matrix multiply call for the convolutions, as in cuDNN.
+                For now, this is always implemented as a blas call, regardless of the 
+                setting of the blas attribute above. Also, it is currently implemented
+                as an attribute for the entire net, not per-layer.
 
         num_input_channels="3"
                 This is an alternative to colormap
@@ -69,7 +73,7 @@
                 the network contains any convolution or pooling layers, then only the 
                 first attribute is valid. 
 
--->
+!-->
 
         <!-- Convolution Layer 
 

@@ -225,7 +225,7 @@ def write_optiml_ending (f, fname):
 # Writing feed-forward
 # ------------------------------------------------------------------------------
 
-def write_ff_header (f, net):
+def write_fw_header (f, net):
 	f.write('''
 	// Feed-forward pass through the network
 	def feed_forward
@@ -238,7 +238,7 @@ def write_ff_header (f, net):
 	) = {
 ''')
 
-def write_ff_layers (f,net,blas,first_layer_num_feature_maps,input_image_size):
+def write_fw_layers (f,net,blas,first_layer_num_feature_maps,input_image_size):
 
 	# Keep track of # feature maps @ each layer
 	prev_layer_num_fmaps = str(first_layer_num_feature_maps)
@@ -256,20 +256,23 @@ def write_ff_layers (f,net,blas,first_layer_num_feature_maps,input_image_size):
 		val o''' + str(i) + ''' = (''')
 		if type == 'SOFTMAX':
 			if blas:
-				f.write('softmax_ff_blas (')
+				f.write('softmax_fw_blas (')
 			else:
-				f.write('softmax_ff (')
+				f.write('softmax_fw (')
 		elif type == 'FULLY_CONNECTED':
 			if blas:
-				f.write('fullycon_ff_blas (')
+				f.write('fullycon_fw_blas (')
 			else:
-				f.write('fullycon_ff (')
+				f.write('fullycon_fw (')
 		elif type == 'CONVOLUTION':
-			f.write('conv_ff (')
+			if net.get('gemm_conv') == '1':
+				f.write('conv_fw_gemm (')
+			else:
+				f.write('conv_fw (')
 		elif type == 'MAX_POOL':
 			f.write('max_pool_indices (')
 		else:
-			err("Unsupported type in write_ff_layer")
+			err("Unsupported type in write_fw_layer")
 
 		if i==0:
 			f.write('X, ')
@@ -325,7 +328,7 @@ def write_ff_layers (f,net,blas,first_layer_num_feature_maps,input_image_size):
 		f.write('''
 			''')
 
-def write_ff_ending (f, num_layers, net):
+def write_fw_ending (f, num_layers, net):
 	f.write('''
 		// Return result of each layer, including output layer
 		(''' + print_output_vars(net) + ''')
@@ -337,7 +340,7 @@ def write_ff_ending (f, num_layers, net):
 # Writing feed-forward for dropout
 # ------------------------------------------------------------------------------
 
-def write_ff_header_dropout (f, net):
+def write_fw_header_dropout (f, net):
 	f.write('''
 	// Feed-forward pass through the network, with dropout
 	def feed_forward_dropout
@@ -355,9 +358,9 @@ def write_ff_header_dropout (f, net):
 	) = {
 ''')
 
-# TODO: Should merge this with write_ff_layers, no need to duplicate all the code
+# TODO: Should merge this with write_fw_layers, no need to duplicate all the code
 # for 2 small changes.
-def write_ff_layers_dropout (f,net,blas,first_layer_num_feature_maps,input_image_size):
+def write_fw_layers_dropout (f,net,blas,first_layer_num_feature_maps,input_image_size):
 
 	# Keep track of # feature maps @ each layer
 	prev_layer_num_fmaps = str(first_layer_num_feature_maps)
@@ -380,20 +383,23 @@ def write_ff_layers_dropout (f,net,blas,first_layer_num_feature_maps,input_image
 		val o''' + str(i) + ''' = (''')
 		if type == 'SOFTMAX':
 			if blas:
-				f.write('softmax_ff_blas (')
+				f.write('softmax_fw_blas (')
 			else:
-				f.write('softmax_ff (')
+				f.write('softmax_fw (')
 		elif type == 'FULLY_CONNECTED':
 			if blas:
-				f.write('fullycon_ff_blas (')
+				f.write('fullycon_fw_blas (')
 			else:
-				f.write('fullycon_ff (')
+				f.write('fullycon_fw (')
 		elif type == 'CONVOLUTION':
-			f.write('conv_ff (')
+			if net.get('gemm_conv') == '1':
+				f.write('conv_fw_gemm (')
+			else:
+				f.write('conv_fw (')
 		elif type == 'MAX_POOL':
 			f.write('max_pool_indices (')
 		else:
-			err("Unsupported type in write_ff_layer")
+			err("Unsupported type in write_fw_layer")
 
 		if i==0:
 			f.write('X, ')
@@ -531,7 +537,6 @@ def write_training_header(f, net, name, use_feature_maps, first_layer_num_featur
 		# Create the weight matrices
 		type = l.attrib['type']
 		if type == 'SOFTMAX':
-			# TODO: Initialize the weights
 
 			if first_nonconv_layer and use_feature_maps:
 				first_nonconv_layer = False
@@ -559,7 +564,6 @@ def write_training_header(f, net, name, use_feature_maps, first_layer_num_featur
 				first_nonconv_layer = False
 				cols_of_prev_layer = '(' + cols_of_prev_layer + '*' + str(current_feature_map_size) + ')'
 
-			# TODO: Initialize the weights
 			f.write("\t\t// Weights for Fully-Connected Layer\n")
 			f.write("\t\t" + 'var w' + str(i) + '  = DenseMatrix.randn(' + cols_of_prev_layer + ', ' + cols_of_this_layer + ')*(layer' + str(i) + '_init_w)' + "\n")
 			f.write("\t\t" + 'var b' + str(i) + '  = DenseVector.ones (' + cols_of_this_layer + ')*(layer' + str(i) + '_init_b)' + "\n")
@@ -588,6 +592,18 @@ def write_training_header(f, net, name, use_feature_maps, first_layer_num_featur
 
 			# The number of feature maps of the previous layer is the number of columns of the prev layer output unit matrix
 			# So actually we do still need this # cols of the prev layer, but not that by itself, also multiplied by k*k
+
+			# Weight format: The convolutional weights are stored in a single matrix, where each column
+			# corresponds to the weights of an output feature map.
+			#
+			# For example, consider the case where a convolutional layer has 32 input feature maps, 64 output 
+			# feature maps, and 5x5 convolutional kernels. The number of columns will be 64, and the number of 
+			# rows will be 5x5x32. So column 1 contains all the convolutional weights going from the 32 input feature 
+			# maps to output feature map #1. Column 2 contains the weights from the 32 inputs to output map #2, etc.
+			# The 5x5x32 weights in each column are grouped by input feature map, i.e. the first 25 rows of a column
+			# correspond to the convolution weights for input feature map 1, the next 25 rows of a column correspond
+			# to the convolution weights for input feature map 2, etc. Finally, within this group of 25 weights, the
+			# convolution weights of each 5x5 kernel are stored in row-major order, i.e. first row 1, then row 2, etc.
 			num_3D_kernel_elements = '(' + str(num_2D_kernel_elements) + '*' + cols_of_prev_layer + ')'
 			f.write("\t\t// Weights for Convolutional Layer\n")
 			f.write("\t\t" + 'var w' + str(i) + '  = DenseMatrix.randn(' + str(num_3D_kernel_elements) + ', ' + cols_of_this_layer + ')*(layer' + str(i) + '_init_w)' + "\n")
@@ -634,7 +650,6 @@ def write_training_loop(f, net, use_dropout, first_layer_num_feature_maps,input_
 	num_layers = len(net)
 	weight_updates = '''
 				// TODO: The operations below can be computed in parallel (task-level)
-				// Some are also SIMD
 
 	'''
 	blas = (net.get('blas')=='1')
@@ -783,7 +798,7 @@ def write_training_loop(f, net, use_dropout, first_layer_num_feature_maps,input_
 				f.write('''
 			    // ''' + str(i) + '''a) Derivative of J wrt output and input of layer ''' + str(i) + '''
 			    val ''' + dJ_doi_OUT +''' =
-			    	bp_through_conv_layer(w''' + str(prev_layer) + ''', layer''' + str(i) + 
+			    	conv_bw_data(w''' + str(prev_layer) + ''', layer''' + str(i) + 
 			    		'''_num_hidden, dJ_do''' + str(prev_layer) + '''IN, ''' + pool_size + 
 			    		''', pool_indices_o''' + str(prev_layer+1) + ''', layer''' + str(prev_layer) + '_num_hidden, ' +
 				    	str(conv_size*conv_size) + ', ' + 
@@ -810,7 +825,7 @@ def write_training_loop(f, net, use_dropout, first_layer_num_feature_maps,input_
 				f.write('''
 			    // ''' + str(i) + '''a) Derivative of J wrt output and input of layer ''' + str(i) + '''
 			    val ''' + dJ_doi_OUT +''' =
-			    	bp_through_conv_layer_NO_POOL(w''' + str(prev_layer) + ''', layer''' + str(i) + 
+			    	conv_bw_data_no_pool(w''' + str(prev_layer) + ''', layer''' + str(i) + 
 			    		'''_num_hidden, dJ_do''' + str(prev_layer) + '''IN, layer''' + str(i) + '_num_hidden, ' +
 			    	str(conv_size*conv_size) + ', ' + 
 			    	str(conv_size) + ', ' + 
@@ -977,12 +992,12 @@ def write_training_loop(f, net, use_dropout, first_layer_num_feature_maps,input_
 				pool_size = net[i+1].attrib['pool_size']
 				if net[i+2].attrib['type'] == 'MAX_POOL':
 					# We could support back-prop for consecutive pooling layers but 
-					# need to modify conv_bp
+					# need to modify conv_bw_weights
 					err("Backprop not currently supported for consecutive pooling layers")
 
 				weight_updates += '''
 				val ''' + dJ_dWi + '''_no_reg =
-					conv_bp(''' + kernel_total_size + ', ' + L1_num_fmaps + ', layer' + str(i) + \
+					conv_bw_weights(''' + kernel_total_size + ', ' + L1_num_fmaps + ', layer' + str(i) + \
 						'''_num_hidden, ''' + prev_layer_output + ''', ''' + dJ_doi_IN + ', ' + \
 						pool_size + ''', pool_indices_o''' + str(i+1) + \
 						', ' + str(kernel_size) + ', ' + str(int(kernel_size/2)) + ', ' + \
@@ -996,7 +1011,7 @@ def write_training_loop(f, net, use_dropout, first_layer_num_feature_maps,input_
 			else:
 				weight_updates += '''
 				val ''' + dJ_dWi + '''_no_reg =
-					conv_bp_NO_POOL(''' + kernel_total_size + ''', ''' + L1_num_fmaps + ''', layer''' + str(i) + \
+					conv_bw_weights_no_pool(''' + kernel_total_size + ''', ''' + L1_num_fmaps + ''', layer''' + str(i) + \
 						 '''_num_hidden, ''' + prev_layer_output + ''', ''' + dJ_doi_IN + ', ' + \
 						str(downsampled_size) + ', ' + \
 						str(int(math.sqrt(downsampled_size))) + ', ' + \
@@ -1507,13 +1522,13 @@ write_optiml_header(optiml_file, name, net)
 # Write the feed-forward def
 num_layers = len(net)
 if use_dropout:
-	write_ff_header_dropout(optiml_file, net)
-	write_ff_layers_dropout(optiml_file, net, net.get('blas')=='1',first_layer_num_feature_maps,input_image_size)
-	write_ff_ending(optiml_file, num_layers, net)
+	write_fw_header_dropout(optiml_file, net)
+	write_fw_layers_dropout(optiml_file, net, net.get('blas')=='1',first_layer_num_feature_maps,input_image_size)
+	write_fw_ending(optiml_file, num_layers, net)
 
-write_ff_header(optiml_file, net)
-write_ff_layers(optiml_file, net, net.get('blas')=='1',first_layer_num_feature_maps,input_image_size)
-write_ff_ending(optiml_file, num_layers, net)
+write_fw_header(optiml_file, net)
+write_fw_layers(optiml_file, net, net.get('blas')=='1',first_layer_num_feature_maps,input_image_size)
+write_fw_ending(optiml_file, num_layers, net)
 
 # Write train def (SGD/back-prop)
 write_train_def(optiml_file,net,name,use_feature_maps,first_layer_num_feature_maps, use_dropout, input_image_size)

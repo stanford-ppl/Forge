@@ -39,7 +39,7 @@ trait RandomOps {
 
     val reseed = direct (Rand) ("reseed", Nil, Nil :: MUnit, effect = simple)
     impl (reseed) (codegen($cala, ${ Global.randRef.setSeed(Global.INITIAL_SEED) }))
-    impl (reseed) (codegen(cpp, ${ resourceInfo->rand->setSeed(DeliteCppRandom.INITIAL_SEED) }))
+    impl (reseed) (codegen(cpp, ${ fprintf(stderr, "WARNING: reseed is not currently implemented\\n") }))
 
     val randdouble = compiler (Rand) ("optila_rand_double", Nil, Nil :: MDouble, effect = simple)
     impl (randdouble) (codegen($cala, ${ Global.randRef.nextDouble() }))

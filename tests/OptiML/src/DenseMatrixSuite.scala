@@ -200,14 +200,16 @@ trait MapAll extends ForgeTestModule with OptiMLApplication {
     val a = x.map(e => e + 2.0)
     collect (a == (DenseMatrix.ones(10,10)*2.0))
 
-    val b = x mapRows { i => DenseVector.ones(10) }
-    collect (b == DenseMatrix.ones(10,10))
+    // Triggers fusion bug -- see https://github.com/stanford-ppl/Delite/issues/45
+    // val b = x mapRows { i => DenseVector.ones(10) }
+    val b = x mapRows { i => DenseVector.ones(11) }
+    collect (b == DenseMatrix.ones(10,11))
 
     val c = x mapRows { i => DenseVector.ones(5) }
     collect (c == DenseMatrix.ones(10,5))
 
-    val d = x mapCols { i => DenseVector.ones(10).t }
-    collect (d == DenseMatrix.ones(10,10))
+    val d = x mapCols { i => DenseVector.ones(11).t }
+    collect (d == DenseMatrix.ones(11,10))
 
     val e = x mapCols { i => DenseVector.ones(5).t }
     collect (e == DenseMatrix.ones(5,10))
@@ -231,17 +233,17 @@ object ShapesRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationIn
 object ShapesRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Shapes
 trait Shapes extends ForgeTestModule with OptiMLApplication {
   def main() = {
-    val a = DenseMatrix((1,2,3), 
-                        (4,5,6), 
+    val a = DenseMatrix((1,2,3),
+                        (4,5,6),
                         (7,8,9))
 
     collect(diag(a) == DenseVector(1,5,9).t)
     collect(triu(a) == DenseMatrix((1,2,3), (0,5,6), (0,0,9)))
     collect(tril(a) == DenseMatrix((1,0,0), (4,5,0), (7,8,9)))
-    
+
     val b = DenseMatrix((1,2,3,4),
                         (5,6,7,8))
-    
+
     collect(diag(b) == DenseVector(1,6).t)
     collect(triu(b) == DenseMatrix((1,2,3,4), (0,6,7,8)))
     collect(tril(b) == DenseMatrix((1,0,0,0), (5,6,0,0)))
@@ -257,16 +259,16 @@ trait Shapes extends ForgeTestModule with OptiMLApplication {
 
     // n x n utriangle shape
     val tri = utriangle(a.numRows)
-    
-    collect(tri.size == 6)    
+
+    collect(tri.size == 6)
     collect(tri(0)._1 == 0 && tri(0)._2 == 0)
     collect(tri(1)._1 == 0 && tri(1)._2 == 1)
     collect(tri(2)._1 == 0 && tri(2)._2 == 2)
     collect(tri(3)._1 == 1 && tri(3)._2 == 1)
     collect(tri(4)._1 == 1 && tri(4)._2 == 2)
-    collect(tri(5)._1 == 2 && tri(5)._2 == 2)    
+    collect(tri(5)._1 == 2 && tri(5)._2 == 2)
     collect(tri.contains(2,0) == false)
-    
+
     mkReport
   }
 }

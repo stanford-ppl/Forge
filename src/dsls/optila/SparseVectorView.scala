@@ -171,7 +171,7 @@ trait SparseVectorViewOps {
         }
       }
 
-      infix ("toString") (Nil :: MString) implements single ${ $self.toSparse.toString }
+      infix ("toString") (Nil :: MString) implements composite ${ $self.toSparse.toString }
 
       fimplicit ("viewToSparse") (Nil :: SparseVector(T)) implements composite ${
         if (Settings.verbose > 0) println("(performance warning): automatic conversion from SparseVectorView to SparseVector")

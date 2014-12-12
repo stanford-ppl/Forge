@@ -956,11 +956,11 @@ trait SparseMatrixOps {
 
       infix ("countnz") ((T ==> MBoolean) :: MInt) implements composite ${ $self.nz.count($1) }
 
-      infix ("mapRowsToVector") ((SparseVectorView(T) ==> R) :: SparseVector(R), addTpePars = R) implements single ${
+      infix ("mapRowsToVector") ((SparseVectorView(T) ==> R) :: SparseVector(R), addTpePars = R) implements composite ${
         sparsevector_fromfunc($self.numRows, false, $self.nzRows, i => $1($self(i)))
       }
 
-      infix ("mapColsToVector") ((SparseVectorView(T) ==> R) :: SparseVector(R), addTpePars = R) implements single ${
+      infix ("mapColsToVector") ((SparseVectorView(T) ==> R) :: SparseVector(R), addTpePars = R) implements composite ${
         sparsevector_fromfunc($self.numCols, true, $self.nzCols, i => $1($self.getCol(i)))
       }
 

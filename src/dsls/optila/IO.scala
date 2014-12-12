@@ -29,29 +29,56 @@ trait IOOps {
      * being written to the input (e.g. the output vector or matrix explicitly depends on the one being read).
      */
 
-    direct (IO) ("readVector", Nil, ("path",MString) :: DenseVector(MDouble)) implements composite ${ readVector[Double]($path, v => optila_todouble(v(0))) }
+    direct (IO) ("readVector", Nil, ("path",MString) :: DenseVector(MDouble)) implements composite ${ readVector[Double]($path, (s: Rep[String]) => optila_todouble(s)) }
 
-    direct (IO) ("readMatrix", Nil, ("path", MString) :: DenseMatrix(MDouble)) implements composite ${ readMatrix[Double]($path, s => optila_todouble(s)) }
-    direct (IO) ("readMatrix", Nil, (("path", MString), ("delim", MString)) :: DenseMatrix(MDouble)) implements composite ${ readMatrix[Double]($path, s => optila_todouble(s), $delim) }
+    direct (IO) ("readMatrix", Nil, ("path", MString) :: DenseMatrix(MDouble)) implements composite ${ readMatrix[Double]($path, (s: Rep[String]) => optila_todouble(s)) }
+    direct (IO) ("readMatrix", Nil, (("path", MString), ("delim", MString)) :: DenseMatrix(MDouble)) implements composite ${ readMatrix[Double]($path, (s: Rep[String]) => optila_todouble(s), $delim) }
 
     val Elem = tpePar("Elem")
 
-    // whitespace delimited by default
-    direct (IO) ("readVector", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseVector(Elem))) implements composite ${
+    // Simplest version simply passes the string to the schemaBldr function
+    direct (IO) ("readVector", Elem, MethodSignature(List(("path",MString),("schemaBldr", MString ==> Elem)), DenseVector(Elem))) implements composite ${
+      val a = ForgeFileReader.readLines($path){ line => schemaBldr(line) }
+      densevector_fromarray(a, true)
+    }
+
+    // Lines can also be parsed with a custom delimiter (default whitespace)
+    direct (IO) ("readVectorAndParse", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseVector(Elem))) implements composite ${
       val a = ForgeFileReader.readLines($path){ line =>
         val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
-        val tokenVector = (0::array_length(tokens)) { i => tokens(i) }
+        val tokenVector = densevector_fromarray(tokens, true)
         schemaBldr(tokenVector)
       }
       densevector_fromarray(a, true)
     }
 
+    // Simple version allows converting each element consistently
     direct (IO) ("readMatrix", Elem, MethodSignature(List(("path",MString),("schemaBldr",MString ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseMatrix(Elem))) implements composite ${
       val a = ForgeFileReader.readLinesFlattened($path){ line:Rep[String] =>
         val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
         array_fromfunction(array_length(tokens), i => schemaBldr(tokens(i)))
       }
       val numCols = array_length(readFirstLine(path).trim.fsplit(delim, -1))
+      densematrix_fromarray(a, array_length(a) / numCols, numCols)
+
+      // FIXME: i/o loops get split with this version, but not fused, so we end up with multiple i/o loops.
+      // val a = ForgeFileReader.readLines($path) { line: Rep[String] =>
+      //   val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
+      //   (0::array_length(tokens)) { i => schemaBldr(tokens(i)) }
+      // }
+      // DenseMatrix(densevector_fromarray(a, true))
+    }
+
+    // This version allows parsing columns differently
+    // Bad rows can be ignored by returning an empty vector (unless we get an exception during splitting -- we should handle that here)
+    direct (IO) ("readMatrixAndParse", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> DenseVector(Elem)),("delim",MString,"unit(\"\\s+\")")), DenseMatrix(Elem))) implements composite ${
+      val a = ForgeFileReader.readLinesFlattened($path){ line:Rep[String] =>
+        val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
+        val tokenVector = densevector_fromarray(tokens, true)
+        val outRow = schemaBldr(tokenVector)
+        array_fromfunction(outRow.length, i => outRow(i))
+      }
+      val numCols = schemaBldr(densevector_fromarray(readFirstLine(path).trim.fsplit(delim, -1), true)).length
       densematrix_fromarray(a, array_length(a) / numCols, numCols)
     }
 

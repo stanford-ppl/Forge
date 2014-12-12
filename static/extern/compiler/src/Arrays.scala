@@ -51,13 +51,8 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
     = darray_sort(__arg0)
   def array_fromfunction[T:Manifest](__arg0: Rep[Int],__arg1: Rep[Int] => Rep[T])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = darray_fromfunction(__arg0,__arg1)
-  def array_fromseq[T:Manifest](__arg0: Seq[Rep[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]] = {
-    val out = darray_new[T](unit(__arg0.length))
-    for (i <- 0 until __arg0.length) {
-      out(unit(i)) = __arg0(i)
-    }
-    delite_unsafe_immutable(out)
-  }
+  def array_fromseq[T:Manifest](__arg0: Seq[Rep[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+    = darray_fromseq(__arg0)
   def array_string_split(__arg0: Rep[String],__arg1: Rep[String],__arg2: Rep[Int] = unit(0))(implicit __imp0: SourceContext): Rep[ForgeArray[String]]
     = reflectPure(ArrayStringSplit(__arg0, __arg1, __arg2))
   def array_sortIndices[R:Manifest:Ordering](__arg0: Rep[Int], __arg1: (Rep[Int] => Rep[R]))(implicit __imp0: SourceContext): Rep[ForgeArray[Int]]

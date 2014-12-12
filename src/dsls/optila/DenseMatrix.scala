@@ -36,7 +36,7 @@ trait DenseMatrixOps {
     }
 
     // matrix from variable number of vectors (rows)
-    static (DenseMatrix) ("apply", T, varArgs(DenseVector(T)) :: DenseMatrix(T)) implements single ${
+    static (DenseMatrix) ("apply", T, varArgs(DenseVector(T)) :: DenseMatrix(T)) implements composite ${
       val out = DenseMatrix[T](0, 0)
       // don't lift the range over the current stage Seq[DenseVector[T]]
       for (i: Int <- scala.collection.immutable.Range(0,$0.length)) {
@@ -253,7 +253,7 @@ trait DenseMatrixOps {
          densematrix_fromarray(array_clone(densematrix_raw_data($self)), $self.numRows, $self.numCols)
        }
 
-       infix ("mutable") (Nil :: DenseMatrix(T), effect = mutable, aliasHint = copies(0)) implements single ${
+       infix ("mutable") (Nil :: DenseMatrix(T), effect = mutable, aliasHint = copies(0)) implements composite ${
          val out = DenseMatrix[T]($self.numRows, $self.numCols)
          for (i <- 0 until $self.numRows) {
            for (j <- 0 until $self.numCols) {
@@ -400,14 +400,14 @@ trait DenseMatrixOps {
 
       infix ("removeRow") (("pos",MInt) :: MUnit, effect = write(0)) implements composite ${ $self.removeRows($pos, 1) }
       infix ("removeCol") (("pos",MInt) :: MUnit, effect = write(0)) implements composite ${ $self.removeCols($pos, 1) }
-      infix ("removeRows") ((("pos",MInt),("num",MInt)) :: MUnit, effect=write(0)) implements single ${
+      infix ("removeRows") ((("pos",MInt),("num",MInt)) :: MUnit, effect=write(0)) implements composite ${
         val idx = $pos*$self.numCols
         val len = $num*$self.numCols
         val data = densematrix_raw_data($self)
         array_copy(data, idx + len, data, idx, $self.size - (idx + len))
         densematrix_set_numrows($self, $self.numRows - $num)
       }
-      infix ("removeCols") ((("pos",MInt),("num",MInt)) :: MUnit, effect=write(0)) implements single ${
+      infix ("removeCols") ((("pos",MInt),("num",MInt)) :: MUnit, effect=write(0)) implements composite ${
         val newCols = $self.numCols-$num
         val outData = array_empty[T]($self.numRows*newCols)
         for (i <- 0 until $self.numRows){

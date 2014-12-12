@@ -204,7 +204,7 @@ trait SparseVectorOps {
         sparsevector_alloc_raw($1.length, $self.isRow, densevector_raw_data(physicalIndices.map(i => array_apply(data,i))), densevector_raw_data(logicalIndices), logicalIndices.length)
       }
 
-      infix ("isEmpty") (Nil :: MBoolean) implements single ${ $self.nnz == 0 }
+      infix ("isEmpty") (Nil :: MBoolean) implements composite ${ $self.nnz == 0 }
       infix ("first") (Nil :: T) implements composite ${ $self(0) }
       infix ("firstnz") (Nil :: T) implements composite ${ $self.nz.apply(0) }
       infix ("last") (Nil :: T) implements composite ${ $self($self.length-1) }

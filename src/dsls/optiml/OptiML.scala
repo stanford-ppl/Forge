@@ -30,12 +30,13 @@ trait OptiMLDSL extends OptiLADSL
     extern(grp("Sum"))
     importBufferableOps()
     importFeatureOps()
+    importFeatureHelperOps()
     importSetOps()
     importUntilConverged()
-    importAllFactorGraphOps() 
+    importAllFactorGraphOps()
     importMLIOOps()
     importStreamOps()
-    importImageOps()    
+    importImageOps()
     importClassifierOps()
     importValidateOps()
     importTreeOps()
@@ -68,7 +69,7 @@ trait OptiMLDSL extends OptiLADSL
       else {
         println("[optiml]: converged in " + iter + " iterations")
       }
-      
+
       cur
     }
 

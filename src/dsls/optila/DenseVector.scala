@@ -48,7 +48,7 @@ trait DenseVectorOps {
     // helper
     direct (DenseVector) ("densevector_fromarray", T, (MArray(T), MBoolean) :: DenseVector(T)) implements allocates(DenseVector, ${array_length($0)}, ${$1}, ${$0})
     direct (DenseVector) ("densevector_fromfunc", T, (MInt, MBoolean, MInt ==> T) :: DenseVector(T)) implements composite ${
-      IndexVector(0,$0,$1) map { i => $2(i) }      
+      IndexVector(0,$0,$1) map { i => $2(i) }
     }
     compiler (DenseVector) ("densevector_alloc_raw", T, (MInt, MBoolean, MArray(T)) :: DenseVector(T)) implements allocates(DenseVector, ${$0}, ${$1}, ${$2})
     static (DenseVector) ("zeros", Nil, MInt :: DenseVector(MDouble)) implements composite ${ (0::$0) { i => 0.0 } }
@@ -63,7 +63,7 @@ trait DenseVectorOps {
       (0::length) { i => $step_size*i + $start }
     }
 
-    static (DenseVector) ("flatten", T, ("pieces",DenseVector(DenseVector(T))) :: DenseVector(T)) implements single ${
+    static (DenseVector) ("flatten", T, ("pieces",DenseVector(DenseVector(T))) :: DenseVector(T)) implements composite ${
       if ($pieces.length == 0){
         DenseVector[T](0, $pieces.isRow).unsafeImmutable
       }

@@ -65,7 +65,7 @@ trait VectorOps {
       infix ("last") (Nil :: T) implements composite ${ $self($self.length - 1) }
       infix ("drop") (MInt :: V) implements composite ${ $self.slice($1, $self.length) }
       infix ("take") (MInt :: V) implements composite ${ $self.slice(0, $1) }
-      infix ("contains") (T :: MBoolean) implements single ${
+      infix ("contains") (T :: MBoolean) implements composite ${
         var found = false
         var i = 0
         while (i < $self.length && !found) {
@@ -76,20 +76,20 @@ trait VectorOps {
         }
         found
       }
-      infix ("distinct") (Nil :: DenseVector(T)) implements single ${
-        val set = SHashMap[\$TT,Int]()
-        val out = DenseVector[\$TT](0, $self.isRow)
-        for (i <- 0 until $self.length) {
-          if (!set.contains($self(i))) {
-            set($self(i)) = 1
-            out <<= $self(i)
-          }
-        }
-        out.unsafeImmutable
+
+      infix ("histogram") (Nil :: MHashMap(T,MInt)) implements composite ${
+        $self.groupByReduce(e => e, v => 1, (a: Rep[Int],b: Rep[Int]) => a+b)
       }
 
-      infix ("mutable") (Nil :: DenseVector(T), effect = mutable, aliasHint = copies(0)) implements single ${
+      infix ("distinct") (Nil :: DenseVector(T)) implements composite ${
+        val elements = $self.histogram
+        densevector_fromarray(elements.keys(), true)
+      }
+
+      infix ("mutable") (Nil :: DenseVector(T), effect = mutable, aliasHint = copies(0)) implements composite ${
         val out = DenseVector[\$TT]($self.length, $self.isRow)
+        // TODO - investigate: Using composite and 'foreach' below breaks testBulkUpdate() in DenseVectorSuite when SoA is on. Why?
+        // out.indices foreach { i => out(i) = $self(i) }
         for (i <- 0 until out.length) {
           out(i) = $self(i)
         }
@@ -267,7 +267,7 @@ trait VectorOps {
       }
 
       // TODO: need to implement with a DeliteOp
-      infix ("scan") (CurriedMethodSignature(List(List(("zero", R)), List((R,T) ==> R)), DenseVector(R)), addTpePars = R) implements single ${
+      infix ("scan") (CurriedMethodSignature(List(List(("zero", R)), List((R,T) ==> R)), DenseVector(R)), addTpePars = R) implements composite ${
         val out = DenseVector[R]($self.length, $self.isRow)
         out(0) = $2($zero,$self(0))
         var i = 1

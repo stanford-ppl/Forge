@@ -347,6 +347,8 @@ trait ScalaOps extends PrimitiveMathGen {
     val contains = infix (Str) ("contains", Nil, (MString,MString) :: MBoolean)
     val substring1 = infix (Str) ("substring", Nil, (MString,MInt) :: MString)
     val substring2 = infix (Str) ("substring", Nil, (MString,MInt,MInt) :: MString)
+    val toLowerCase = infix (Str) ("toLowerCase", Nil, MString :: MString)
+    val toUpperCase = infix (Str) ("toUpperCase", Nil, MString :: MString)
 
     impl (toInt) (codegen($cala, ${ $0.toInt }))
     impl (toLong) (codegen($cala, ${ $0.toLong }))
@@ -361,6 +363,8 @@ trait ScalaOps extends PrimitiveMathGen {
     impl (contains) (codegen($cala, ${ $0.contains($1) }))
     impl (substring1) (codegen($cala, ${ $0.substring($1) }))
     impl (substring2) (codegen($cala, ${ $0.substring($1,$2) }))
+    impl (toLowerCase) (codegen($cala, ${ $0.toLowerCase }))
+    impl (toUpperCase) (codegen($cala, ${ $0.toUpperCase }))
 
     impl (toInt) (codegen(cpp, ${ string_toInt($0) }))
     impl (toLong) (codegen(cpp, ${ string_toLong($0) }))

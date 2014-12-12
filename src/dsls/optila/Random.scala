@@ -76,7 +76,7 @@ trait RandomOps {
     }
 
     // any good parallel implementation?
-    compiler (Rand) ("optila_shuffle_array", A, MArray(A) :: MArray(A), effect = simple) implements single ${
+    compiler (Rand) ("optila_shuffle_array", A, MArray(A) :: MArray(A), effect = simple) implements composite ${
       val len = array_length($0)
       val out = array_empty[A](len)
       array_copy($0, 0, out, 0, len)
@@ -114,16 +114,16 @@ trait RandomOps {
       }
 
       sampled.unsafeImmutable
-    }      
+    }
 
-    direct (Rand) ("sample", A, MethodSignature(List(("m",DenseMatrix(A)), ("pct", MDouble), ("sampleRows", MBoolean, "unit(true)")), DenseMatrix(A)), effect = simple) implements composite ${      
+    direct (Rand) ("sample", A, MethodSignature(List(("m",DenseMatrix(A)), ("pct", MDouble), ("sampleRows", MBoolean, "unit(true)")), DenseMatrix(A)), effect = simple) implements composite ${
       val numSamples = if (sampleRows) ceil(m.numRows*pct) else ceil(m.numCols*pct)
       val length = if (sampleRows) m.numRows else m.numCols
       val newRows = if (sampleRows) numSamples else m.numRows
       val newCols = if (sampleRows) m.numCols else numSamples
 
       val sampled = if (sampleRows) DenseMatrix[A](0, newCols) else DenseMatrix[A](0, newRows) // transposed for efficiency
-      
+
       val candidates = (0::length).mutable
 
       // transpose to make constructing sampling more efficient

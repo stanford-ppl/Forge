@@ -281,10 +281,15 @@ trait Distinct extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
     val v1 = DenseVector(10.,10.,5.,5.,0.)
-
-    collect(v1.contains(5.))
+    collect(v1.contains(5.0))
     collect(!v1.contains(7.5))
-    collect(v1.distinct == DenseVector(10.,5.,0.))
+
+    val v2 = v1.distinct
+    collect(v2.length == 3)
+    collect(v2.contains(10.0))
+    collect(v2.contains(5.0))
+    collect(v2.contains(0.0))
+
     mkReport
   }
 }
@@ -314,18 +319,17 @@ trait Median extends ForgeTestModule with OptiMLApplication {
 //   }
 // }
 
-// object SampleRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Sample
-// object SampleRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Sample
-// trait Sample extends ForgeTestModule with OptiMLApplication {
-//   def main() = {
+object SampleRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Sample
+object SampleRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Sample
+trait Sample extends ForgeTestModule with OptiMLApplication {
+  def main() = {
 
-//     val v = (0::100)
-//     val vs = sample[Int,DenseVector[Int]](v, 10)
-//     //val vs = sample(v, 10)
-//     vs foreach { e => collect(v contains e) }
-//     mkReport
-//   }
-// }
+    val v = (0::100)
+    val vs = sample(v, 0.1)
+    vs foreach { e => collect(v contains e) }
+    mkReport
+  }
+}
 
 object GroupByRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with GroupBy
 object GroupByRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with GroupBy
@@ -390,7 +394,7 @@ class DenseVectorSuiteInterpreter extends ForgeSuiteInterpreter {
   def testDistinct() { runTest(DistinctRunnerI) }
   def testMedian() { runTest(MedianRunnerI) }
   // def testNearestNeighbor() { runTest(NearestNeighborRunnerI) }
-  // def testSample() { runTest(SampleRunnerI) }
+  def testSample() { runTest(SampleRunnerI) }
   def testGroupBy() { runTest(GroupByRunnerI) }
   def testFlatMap() { runTest(SimpleFlatMapRunnerI) }
   def testFlatten() { runTest(SimpleFlattenRunnerI) }
@@ -411,7 +415,7 @@ class DenseVectorSuiteCompiler extends ForgeSuiteCompiler {
   def testDistinct() { runTest(DistinctRunnerC) }
   def testMedian() { runTest(MedianRunnerC) }
   // def testNearestNeighbor() { runTest(NearestNeighborRunnerC) }
-  // def testSample() { runTest(SampleRunnerC) }
+  def testSample() { runTest(SampleRunnerC) }
   def testGroupBy() { runTest(GroupByRunnerC) }
   def testFlatMap() { runTest(SimpleFlatMapRunnerC) }
   def testFlatten() { runTest(SimpleFlattenRunnerC) }

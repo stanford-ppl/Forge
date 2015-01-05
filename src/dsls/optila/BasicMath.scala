@@ -84,6 +84,7 @@ trait BasicMathOps {
       val P = if (V != IndexVector) List(T) else Nil
       val R1 = if (V == DenseMatrix(T)) DenseMatrix(T) else if (V == IndexVector) DenseVector(MInt) else DenseVector(T)
       val R2 = if (V != IndexVector) T else MInt
+      val size = if (V == DenseMatrix(T)) "size" else "length"
 
       direct (Math) ("abs", P, V :: R1, A) implements redirect ${ $0.abs }
       direct (Math) ("exp", P, V :: R1, A) implements redirect ${ $0.exp }
@@ -92,10 +93,12 @@ trait BasicMathOps {
       direct (Math) ("sum", P, V :: R2, A) implements redirect ${ $0.sum }
       direct (Math) ("prod", P, V :: R2, A) implements redirect ${ $0.prod }
       direct (Math) ("mean", P, V :: MDouble, C) implements redirect ${ $0.mean }
-      direct (Math) ("variance", P, V :: MDouble, C) implements composite ${ 
+      direct (Math) ("variance", P, V :: MDouble, C) implements composite ${
         val dbls = $0.toDouble
         val avg = mean(dbls)
-        mean(dbls map { e => square(e-avg) }) 
+        val diffs = dbls map { e => square(e-avg) }
+        sum(diffs) / (diffs.\$size-1.0)
+        // mean(diffs) // 2nd moment around mean
       }
       direct (Math) ("stddev", P, V :: MDouble, C) implements composite ${ sqrt(variance($0)) }
       direct (Math) ("min", P, V :: R2, O) implements redirect ${ $0.min }

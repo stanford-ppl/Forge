@@ -30,6 +30,7 @@ trait DenseMatrixOps {
     for (v <- List(DenseVector(T),DenseVectorView(T))) {
       static (DenseMatrix) ("apply", T, (DenseVector(v)) :: DenseMatrix(T)) implements composite ${
         val numRows = $0.length
+        fassert(numRows > 0, "error: matrix constructor with empty vectors")
         val numCols = $0(0).length
         (0::numRows, 0::numCols) { (i,j) => $0(i).apply(j) }
       }
@@ -177,11 +178,19 @@ trait DenseMatrixOps {
       infix ("vview") ((MInt, MInt, MInt, MBoolean) :: DenseVectorView(T), aliasHint = contains(0)) implements single ${ DenseVectorView[T](densematrix_raw_data($self), $1, $2, $3, $4) } // read-only right now
       infix ("getRow") (MInt :: DenseVectorView(T)) implements composite ${ $self.vview($1*$self.numCols, 1, $self.numCols, true) }
       infix ("getRows") (IndexVector :: DenseMatrix(T)) implements composite ${
-        ($1, *) { i => $self(i) }
+        if ($1.length == 0) densematrix_fromarray[T](array_empty_imm[T](0), 0, $self.numCols)
+        else {
+          var z = $self // manual guard against code motion
+          ($1, *) { i => z(i) }
+        }
       }
       infix ("getCol") (MInt :: DenseVectorView(T)) implements composite ${ $self.vview($1, $self.numCols, $self.numRows, false) }
       infix ("getCols") (IndexVector :: DenseMatrix(T)) implements composite ${
-        (*, $1) { j => $self.getCol(j) }
+        if ($1.length == 0) densematrix_fromarray[T](array_empty_imm[T](0), $self.numRows, 0)
+        else {
+          var z = $self // manual guard against code motion
+          (*, $1) { j => z.getCol(j) }
+        }
       }
 
       infix ("slice") ((("startRow",MInt),("endRow",MInt),("startCol",MInt),("endCol",MInt)) :: DenseMatrix(T)) implements redirect ${ $self(startRow::endRow, startCol::endCol) }

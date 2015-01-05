@@ -38,7 +38,8 @@ trait FeatureOps {
     data(DiscreteFeature, ("_features", MHashMap(MString, MInt)))
     compiler (DiscreteFeature) ("discrete_feature_alloc", Nil, (MHashMap(MString, MInt) :: DiscreteFeature)) implements allocates(DiscreteFeature, ${$0})
 
-    // FIXME: this produces an illegal ordering of effect error when array_fromseq is mutable. What happens with MHashMap in this case?
+    // FIXME: this produces an illegal ordering of effect error when array_fromseq is mutable or when using 'single'.
+    // What happens with MHashMap in this case?
     static (DiscreteFeature) ("apply", Nil, (varArgs(MString) :: DiscreteFeature)) implements composite ${
       val keys = array_fromseq($0)
       val values = array_fromfunction(array_length(keys), i => i)
@@ -86,18 +87,19 @@ trait FeatureOps {
     }
 
     val DateFeature = tpe("DateFeature")
-    val SDateFormat = tpe("java.text.DateFormat")
+    val SDateFormat = tpe("org.joda.time.format.DateTimeFormatter")
+    primitiveTpePrefix ::= "org.joda"
 
     static (DateFeature) ("apply", Nil, MString :: SDateFormat) implements codegen($cala, ${
-      new java.text.SimpleDateFormat($0)
+      org.joda.time.format.DateTimeFormat.forPattern($0)
     })
 
     infix (DateFeature) ("apply", Nil, (SDateFormat,MString) :: MDouble) implements codegen($cala, ${
-      if ($1 == "") 0.0 // defaults to 1970, for better or worse... what else can we do?
-      else {
-        val date = $0.parse($1, new java.text.ParsePosition(0))
-        if (date == null) 0.0
-        else date.getTime.toDouble
+      try {
+        $0.parseMillis($1).toDouble
+      }
+      catch {
+        case e => 0.0 // defaults to 1970, for better or worse... what else can we do?
       }
     })
 

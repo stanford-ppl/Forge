@@ -98,6 +98,7 @@ trait ScalaGenForgeArrayOps extends ScalaGenDeliteArrayOps {
     case ArrayApply(x,n) => emitValDef(sym, "" + quote(x) + "(" + quote(n) + ")")
     case ArrayLength(x) => emitValDef(sym, "" + quote(x) + ".length")
     // TODO
+    case ArrayStringSplit(a,b,l) if Config.intSize == "long" => emitValDef(sym, "ppl.delite.runtime.data.RaggedNativeArray(" + quote(a) + ".split(" + quote(b) + "))")
     case ArrayStringSplit(a,b,l) if Config.generateSerializable => emitValDef(sym, "new ppl.delite.runtime.data.LocalDeliteArrayObject[String](" + quote(a) + ".split(" + quote(b) + "))")
     case ArrayStringSplit(a,b,l) => emitValDef(sym, quote(a) + ".split(" + quote(b) + ", " + quote(l) + ")")
     case _ => super.emitNode(sym,rhs)

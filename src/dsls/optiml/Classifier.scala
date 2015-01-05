@@ -21,7 +21,7 @@ trait ClassifierOps {
 
       // val minVal = min($0)
       // val maxVal = max($)
-      // $0 map { e => (e - minVal) / (maxVal - minVal) }
+      // (($0 map { e => (e - minVal) / (maxVal - minVal) }) * 2.0) - 1.0 // scale to [-1 1]
     }
 
     direct (Classifier) ("normalize", Nil, DenseMatrix(MDouble) :: DenseMatrix(MDouble)) implements composite ${

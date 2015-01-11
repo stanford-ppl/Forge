@@ -87,7 +87,7 @@ trait SparseVectorViewOps {
         }
       }
 
-      infix ("indices") (Nil :: IndexVector) implements single ${
+      infix ("indices") (Nil :: IndexVector) implements composite ${
         if (sparsevectorview_stride($self) == 1) {
           // could use a view, except we need to return an IndexVector
           val (startOffset, endOffset) = unpack(sparsevectorview_calc_offsets($self))
@@ -144,7 +144,7 @@ trait SparseVectorViewOps {
         sparsevectorview_source($self) == sparsevectorview_source($1)
       }
 
-      direct ("__equal") (SparseVector(T) :: MBoolean) implements single ${
+      direct ("__equal") (SparseVector(T) :: MBoolean) implements composite ${
         if ($self.length != $1.length || $self.nnz != $1.nnz || $self.isRow != $1.isRow) false
         else {
           val (startOffset, endOffset) = unpack(sparsevectorview_calc_offsets($self))
@@ -171,7 +171,7 @@ trait SparseVectorViewOps {
         }
       }
 
-      infix ("toString") (Nil :: MString) implements single ${ $self.toSparse.toString }
+      infix ("toString") (Nil :: MString) implements composite ${ $self.toSparse.toString }
 
       fimplicit ("viewToSparse") (Nil :: SparseVector(T)) implements composite ${
         if (Settings.verbose > 0) println("(performance warning): automatic conversion from SparseVectorView to SparseVector")

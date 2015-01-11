@@ -11,7 +11,7 @@ trait ClassifierOps {
     val DenseVector = lookupTpe("DenseVector")
     val DenseMatrix = lookupTpe("DenseMatrix")
     val TrainingSet = lookupTpe("TrainingSet")
-    
+
     val Classifier = grp("Classifier")
 
     direct (Classifier) ("normalize", Nil, DenseVector(MDouble) :: DenseVector(MDouble)) implements composite ${
@@ -21,15 +21,15 @@ trait ClassifierOps {
 
       // val minVal = min($0)
       // val maxVal = max($)
-      // $0 map { e => (e - minVal) / (maxVal - minVal) }
+      // (($0 map { e => (e - minVal) / (maxVal - minVal) }) * 2.0) - 1.0 // scale to [-1 1]
     }
 
     direct (Classifier) ("normalize", Nil, DenseMatrix(MDouble) :: DenseMatrix(MDouble)) implements composite ${
-      $0 mapCols { c => normalize(c) }        
+      $0 mapCols { c => normalize(c) }
     }
 
     direct (Classifier) ("logreg", Nil, MethodSignature(List(
-                                            ("data",TrainingSet(MDouble,MBoolean)), 
+                                            ("data",TrainingSet(MDouble,MBoolean)),
                                             ("learningRate", MDouble, "unit(1.0)"),
                                             ("maxIter", MInt, "unit(30)")
                                           ), DenseVector(MDouble))) implements composite ${
@@ -42,14 +42,15 @@ trait ClassifierOps {
       // batch gradient descent with logistic function
       val _maxIter = maxIter
       val w = untilconverged(theta, maxIter = _maxIter) { cur =>
-        val gradient = sum((0::data.numSamples) { i =>
-          data(i)*(y(i) - sigmoid(cur *:* data(i)))
-        })
+        val gradient =
+          ((0::data.numSamples) { i =>
+            data(i)*(y(i) - sigmoid(cur *:* data(i)))
+          }).sum
 
-        cur + gradient*alpha        
+        cur + gradient*alpha
       }
 
       w
     }
-  }   
+  }
 }

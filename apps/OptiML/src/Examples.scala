@@ -152,7 +152,7 @@ trait Example5 extends OptiMLApplication {
     // i/o with custom parser
     // second argument is a function from a DenseVector[String] to a Double
     // third argument is the delimeter used to split the line
-    val v2 = readVector[Double]("myvector2.dat", line => line(0).toDouble, ";")
+    val v2 = readVectorAndParse[Double]("myvector2.dat", line => line(0).toDouble, ";")
     v2.pprint
   }
 }
@@ -434,18 +434,18 @@ trait Example13 extends OptiMLApplication {
 }
 
 // Scopes #1: In this example, we invoke an OptiML program from within an ordinary Scala program
-object Example14 {  
+object Example14 {
   def main(args: Array[String]) {
     // ordinary Scala
-    println("scala 1") 
-    
+    println("scala 1")
+
     // storage for the answer
     var ans: Double = 0.0
 
     // executes immediately in OptiML
-    OptiML { 
+    OptiML {
       println("inside OptiML!")
-      val v = DenseVector.rand(100)        
+      val v = DenseVector.rand(100)
       ans = v.sum
       ()
     }
@@ -464,28 +464,28 @@ object Example14 {
 //   3. sbt compile
 //   4. delitec RestageApplicationRunner
 //   5. delite RestageApplicationRunner
-object Example15 {  
+object Example15 {
   def main(args: Array[String]) {
     // ordinary Scala
-    println("scala 1") 
-    
+    println("scala 1")
+
     BeginScopes() // marker to begin scope file
 
-    val a = 
-      OptiML_ { 
+    val a =
+      OptiML_ {
         println("inside OptiML!")
-        val v = (0::10) { i => 1.0 } 
-        DRef(v.sum)        
+        val v = (0::10) { i => 1.0 }
+        DRef(v.sum)
       }
 
     OptiML_ {
       val in = a.get
       println("in scope b, got input: ")
       println(in)
-      println("final answer is: ")  
+      println("final answer is: ")
       println(in+100)
       ()
-    }    
+    }
 
     EndScopes() // marker to complete the scope file
   }

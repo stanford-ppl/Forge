@@ -11,12 +11,7 @@ trait TestsOps
 trait TestsCompilerOps extends TestsOps
 
 trait ForgeTestModule extends Base {
-  //var args: Rep[Array[String]]
   def main(): Unit
-
-  def collector: Rep[ArrayBuffer[Boolean]]
-
-  def collect(s: Rep[Boolean]): Unit
-
+  def collect(s: Rep[Boolean]): Rep[Unit]
   def mkReport(): Rep[Unit]
 }

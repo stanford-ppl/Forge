@@ -49,24 +49,24 @@ trait DenseVectorOps {
     static (DenseVector) ("apply", T, varArgs(T) :: DenseVector(T)) implements allocates(DenseVector, ${unit($0.length)}, ${unit(true)}, ${array_fromseq($0)})
 
     // helper
-    compiler (DenseVector) ("densevector_alloc_raw", T, (MInt, MBoolean, MArray(T)) :: DenseVector(T)) implements allocates(DenseVector, ${$0}, ${$1}, ${$2})
-    compiler (DenseVector) ("densevector_fromarray", T, (MArray(T), MBoolean) :: DenseVector(T)) implements allocates(DenseVector, ${array_length($0)}, ${$1}, ${$0})
-    compiler (DenseVector) ("densevector_fromfunc", T, (MInt, MInt ==> T) :: DenseVector(T)) implements composite ${
-      (0::$0) { i => $1(i) }
+    direct (DenseVector) ("densevector_fromarray", T, (MArray(T), MBoolean) :: DenseVector(T)) implements allocates(DenseVector, ${array_length($0)}, ${$1}, ${$0})
+    direct (DenseVector) ("densevector_fromfunc", T, (MInt, MBoolean, MInt ==> T) :: DenseVector(T)) implements composite ${
+      IndexVector(0,$0,$1) map { i => $2(i) }
     }
-    static (DenseVector) ("zeros", Nil, MInt :: DenseVector(MDouble)) implements composite ${ densevector_fromfunc($0, i => 0.0 )}
-    static (DenseVector) ("zerosf", Nil, MInt :: DenseVector(MFloat)) implements composite ${ densevector_fromfunc($0, i => 0f )}
-    static (DenseVector) ("ones", Nil, MInt :: DenseVector(MDouble)) implements composite ${ densevector_fromfunc($0, i => 1.0) }
-    static (DenseVector) ("onesf", Nil, MInt :: DenseVector(MFloat)) implements composite ${ densevector_fromfunc($0, i => 1f) }
-    static (DenseVector) ("rand", Nil, MInt :: DenseVector(MDouble)) implements composite ${ densevector_fromfunc($0, i => random[Double]) }
-    static (DenseVector) ("randf", Nil, MInt :: DenseVector(MFloat)) implements composite ${ densevector_fromfunc($0, i => random[Float]) }
+    compiler (DenseVector) ("densevector_alloc_raw", T, (MInt, MBoolean, MArray(T)) :: DenseVector(T)) implements allocates(DenseVector, ${$0}, ${$1}, ${$2})
+    static (DenseVector) ("zeros", Nil, MInt :: DenseVector(MDouble)) implements composite ${ (0::$0) { i => 0.0 } }
+    static (DenseVector) ("zerosf", Nil, MInt :: DenseVector(MFloat)) implements composite ${ (0::$0) { i => 0f } }
+    static (DenseVector) ("ones", Nil, MInt :: DenseVector(MDouble)) implements composite ${ (0::$0) { i => 1.0 } }
+    static (DenseVector) ("onesf", Nil, MInt :: DenseVector(MFloat)) implements composite ${ (0::$0) { i => 1f } }
+    static (DenseVector) ("rand", Nil, MInt :: DenseVector(MDouble)) implements composite ${ (0::$0) { i => random[Double] } }
+    static (DenseVector) ("randf", Nil, MInt :: DenseVector(MFloat)) implements composite ${ (0::$0) { i => random[Float] } }
     static (DenseVector) ("uniform", Nil, MethodSignature(List(("start", MDouble), ("step_size", MDouble), ("end", MDouble), ("isRow", MBoolean, "unit(true)")), DenseVector(MDouble))) implements composite ${
-      fassert(end > start+step_size, "end <= start+step_size in DenseVector.uniform")      
+      fassert(end > start+step_size, "end <= start+step_size in DenseVector.uniform")
       val length = ceil(($end-$start)/$step_size)
-      densevector_fromfunc(length, i => $step_size*i + $start)
+      (0::length) { i => $step_size*i + $start }
     }
 
-    static (DenseVector) ("flatten", T, ("pieces",DenseVector(DenseVector(T))) :: DenseVector(T)) implements single ${
+    static (DenseVector) ("flatten", T, ("pieces",DenseVector(DenseVector(T))) :: DenseVector(T)) implements composite ${
       if ($pieces.length == 0){
         DenseVector[T](0, $pieces.isRow).unsafeImmutable
       }
@@ -157,7 +157,9 @@ trait DenseVectorOps {
         }
       }
 
-      infix ("Clone") (Nil :: DenseVector(T), aliasHint = copies(0)) implements map((T,T), 0, "e => e")
+      infix ("Clone") (Nil :: DenseVector(T), aliasHint = copies(0)) implements composite ${
+        densevector_alloc_raw($self.length, $self.isRow, array_clone(densevector_raw_data($self)))
+      }
 
       /**
        * Data operations
@@ -324,7 +326,7 @@ trait DenseVectorOps {
       infix ("sortBy") ((T ==> B) :: DenseVector(T), TOrdering(B), addTpePars = B) implements composite ${
         val sortedIndicesRaw = densevector_sortindex_helper(0, $self.length, densevector_raw_data($self.map($1)))
         val sortedIndices = IndexVector(densevector_fromarray(sortedIndicesRaw,$self.isRow))
-        $self(sortedIndices)        
+        $self(sortedIndices)
       }
 
       infix ("sortWithIndex") (Nil :: CTuple2(DenseVector(T),IndexVector), TOrdering(T)) implements composite ${
@@ -366,10 +368,10 @@ trait DenseVectorOps {
         val vals = fhashmap_values(hash).map(ab => densevector_fromarray(array_buffer_result(ab), true))
         fhashmap_from_arrays(fhashmap_keys(hash), vals)
       }
-      
+
       // filter is here, instead of Vector.scala, so that other Vector types can have a different return value
-      infix ("filter") ((T ==> MBoolean) :: DenseVector(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})      
-      
+      infix ("filter") ((T ==> MBoolean) :: DenseVector(T)) implements filter((T,T), 0, ${e => $1(e)}, ${e => e})
+
       /**
        * Required for parallel collection
        */
@@ -390,11 +392,17 @@ trait DenseVectorOps {
     compiler (DenseVector) ("reduce_and", Nil, DenseVector(MBoolean) :: MBoolean) implements reduce(MBoolean, 0, ${unit(true)}, ${ (a,b) => a && b })
     compiler (DenseVector) ("reduce_or", Nil, DenseVector(MBoolean) :: MBoolean) implements reduce(MBoolean, 0, ${unit(false)}, ${ (a,b) => a || b })
 
+    // Bulk of vector operations is imported
+    addVectorCommonOps(DenseVector,T)
+
+    // label DenseVector *:* DenseVectorView so that we can rewrite it in RewriteOpsExp
+    label(lookupOverloaded("DenseVector","*:*",1), "densevector_dot_densevectorview")
+
     // Add DenseVector to Arith
     val Arith = lookupGrp("Arith").asInstanceOf[Rep[DSLTypeClass]]
     val DenseVectorArith = tpeClassInst("ArithDenseVector", T withBound TArith, Arith(DenseVector(T)))
-    infix (DenseVectorArith) ("zero", T withBound TArith, DenseVector(T) :: DenseVector(T)) implements composite ${ DenseVector[T]($0.length,$0.isRow).unsafeImmutable }
-    infix (DenseVectorArith) ("empty", T withBound TArith, Nil :: DenseVector(T)) implements composite ${ DenseVector[T](unit(0),unit(true)).unsafeImmutable }
+    infix (DenseVectorArith) ("zero", T withBound TArith, DenseVector(T) :: DenseVector(T)) implements composite ${ densevector_fromfunc[T]($0.length, $0.isRow, i => implicitly[Arith[T]].empty) }
+    infix (DenseVectorArith) ("empty", T withBound TArith, Nil :: DenseVector(T)) implements composite ${ densevector_fromarray[T](array_empty_imm[T](unit(0)),unit(true)) }
     infix (DenseVectorArith) ("+", T withBound TArith, (DenseVector(T),DenseVector(T)) :: DenseVector(T)) implements composite ${ densevector_pl($0,$1) }
     infix (DenseVectorArith) ("-", T withBound TArith, (DenseVector(T),DenseVector(T)) :: DenseVector(T)) implements composite ${ densevector_sub($0,$1) }
     infix (DenseVectorArith) ("*", T withBound TArith, (DenseVector(T),DenseVector(T)) :: DenseVector(T)) implements composite ${ densevector_mul($0,$1) }
@@ -404,10 +412,6 @@ trait DenseVectorOps {
     infix (DenseVectorArith) ("log", T withBound TArith, DenseVector(T) :: DenseVector(T)) implements composite ${ densevector_log($0) }
 
     importDenseVectorPrimitiveOps()
-    addVectorCommonOps(DenseVector,T)
-
-    // label DenseVector *:* DenseVectorView so that we can rewrite it in RewriteOpsExp
-    label(lookupOverloaded("DenseVector","*:*",1), "densevector_dot_densevectorview")
   }
 
 

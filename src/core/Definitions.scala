@@ -73,6 +73,9 @@ trait Definitions extends DerivativeTypes {
   lazy val MInputStream = tpe("ForgeFileInputStream")
   lazy val MOutputStream = tpe("ForgeFileOutputStream")
 
+  /* whitelist for primitive types (i.e. we should not generate a Forge shadow) */
+  var primitiveTpePrefix = scala.List("scala","java")
+
   /**
    * DSLType placeholders
    */

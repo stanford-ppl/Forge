@@ -10,7 +10,7 @@ trait OptiLADSL extends ForgeApplication
   with ArithOps with StringableOps with ShapeOps
   with BasicMathOps with RandomOps with IOOps
   with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps with SparseVectorOps with SparseVectorViewOps
-  with DenseMatrixOps with SparseMatrixOps
+  with MatrixOps with DenseMatrixOps with DenseMatrixViewOps with SparseMatrixOps
   with ComplexOps with LinAlgOps {
 
   def dslName = "OptiLA"
@@ -36,6 +36,7 @@ trait OptiLADSL extends ForgeApplication
     val DenseVector = tpe("DenseVector", T)
     val DenseVectorView = tpe("DenseVectorView", T)
     val DenseMatrix = tpe("DenseMatrix", T)
+    val DenseMatrixView = tpe("DenseMatrixView", T)
     val IndexVector = tpe("IndexVector")
     val IndexWildcard = tpe("IndexWildcard", stage = compile)
     identifier (IndexWildcard) ("*")
@@ -59,7 +60,7 @@ trait OptiLADSL extends ForgeApplication
     // infix_foreach must be compiler only both so that it is not used improperly and to not interfere with other codegen nodes in the library
     // this is a little convoluted unfortunately (because of the restriction on passing structs to codegen nodes)
     compiler (Range) ("infix_foreach", Nil, (Range, MInt ==> MUnit) :: MUnit) implements composite ${ range_foreach(range_start($0), range_end($0), $1) }
-    val range_foreach = compiler (Range) ("range_foreach", Nil, (("start",MInt),("end",MInt),("func",MInt ==> MUnit)) :: MUnit) 
+    val range_foreach = compiler (Range) ("range_foreach", Nil, (("start",MInt),("end",MInt),("func",MInt ==> MUnit)) :: MUnit)
     impl (range_foreach) (codegen($cala, ${
       var i = $start
       while (i < $end) {
@@ -78,7 +79,7 @@ trait OptiLADSL extends ForgeApplication
     importRandomOps()
     importArithOps()
     importStringableOps()
-    importComplexOps()    
+    importComplexOps()
 
     // override default string formatting (numericPrecision is a global defined in extern)
     // we use "" + $a instead of $a.toString to avoid an NPE when explicitly calling toString inside the REPL
@@ -96,7 +97,7 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
 """
     }
 
-    val fmt_str = direct (lookupGrp("FString")) ("optila_fmt_str", T, T :: MString) 
+    val fmt_str = direct (lookupGrp("FString")) ("optila_fmt_str", T, T :: MString)
     impl (fmt_str) (codegen($cala, formatStr))
     impl (fmt_str) (codegen(cpp, "convert_to_string<" +  unquotes("remapWithRef("+opArgPrefix+"0.tp)") + " >(" + quotedArg(0) + ")"))
 
@@ -109,6 +110,7 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
     importDenseVectorViewOps()
     importDenseVectorOps()
     importDenseMatrixOps()
+    importDenseMatrixViewOps()
     importSparseVectorOps()
     importSparseVectorViewOps()
     importSparseMatrixOps()
@@ -123,6 +125,7 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
 
     // rewrites
     extern(grp("Rewrite"), targets = Nil)
+    extern(grp("Distributed"), targets = List($cala))
   }
 
   def importVecMatConstructor() {
@@ -141,15 +144,15 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
 
     // matrix constructor (0::numRows,0::numCols) { ... }
     infix (IndexVector) ("apply", T, (CTuple2(IndexVector,IndexVector), (MInt,MInt) ==> T) :: DenseMatrix(T)) implements composite ${
-      val (rowIndices,colIndices) = $0
+      val (rowIndices, colIndices) = $0
 
       // can fuse with flat matrix loops
-      val v = (0::(rowIndices.length*colIndices.length)).toDense
-      val indices = densematrix_fromarray(densevector_raw_data(v),rowIndices.length,colIndices.length)
-      indices map { i =>
+      val size = rowIndices.length*colIndices.length
+      val outData = array_fromfunction(size, i => {
         val (rowIndex, colIndex) = unpack(matrix_shapeindex(i, colIndices.length))
         $1(rowIndices(rowIndex),colIndices(colIndex))
-      }
+      })
+      densematrix_fromarray(outData,rowIndices.length,colIndices.length)
 
       // could fuse with nested matrix loops (loops over rowIndices), but not with loops directly over individual matrix elements -- like map!
       // it seems best for us to be consistent: matrix loops should either all be flat or all be nested. which one? should we use lowerings?
@@ -170,28 +173,90 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
     // one alternative is to use an IsVector type class for the function return type, instead of overloading.
     // currently, we just let DenseVectorViews implicitly convert to DenseVector, which will cause overhead
     // in the lib implementation, but should fuse away in the Delite implementation.
-    //
-    // furthermore, due to the effectful implementation, these cannot be fused or hoisted...
-    
+
     for (rhs <- List(DenseVector(T)/*, DenseVectorView(T))*/)) {
       infix (IndexVector) ("apply", T, (CTuple2(IndexVector,IndexWildcard), MInt ==> rhs) :: DenseMatrix(T)) implements composite ${
+        // Prefer immutable version and materialize vectors incrementally to enable garbage collection.
         val rowIndices = $0._1
-        val first = $1(rowIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
-        val out = DenseMatrix[T](rowIndices.length,first.length)
-        (0::rowIndices.length) foreach { i =>
-          out(i) = $1(rowIndices(i))
-        }
-        out.unsafeImmutable
+        // val arrayIndices = array_buffer_fromfunction(rowIndices.length, i => rowIndices(i))
+        // val arrayIndices = array_buffer_new_imm(array_fromfunction(rowIndices.length, i => rowIndices(i)), rowIndices.length)
+        // val outData = array_buffer_flatmap[Int,T](arrayIndices, i => {
+        //   val v = $1(i)
+        //   array_buffer_new_imm(densevector_raw_data(v), v.length)
+        // })
+
+        val arrayIndices = array_fromfunction(rowIndices.length, i => rowIndices(i))
+        val outData = array_flatmap[Int,T](arrayIndices, i => {
+          val v = $1(i)
+          array_fromfunction(v.length, i => v(i))
+        })
+
+        // val numCols = $1(rowIndices(0)).length
+        val numCols =
+          if (rowIndices.length == 0) 0
+          else {
+            var z = rowIndices // manual guard against code motion
+            $1(z(0)).length // better be pure
+          }
+
+        // densematrix_fromarray(array_buffer_result(outData),rowIndices.length,numCols)
+        densematrix_fromarray(outData,rowIndices.length,numCols)
+
+        // val rowVectors = rowIndices.map(i => $1(i))
+        // // We don't put a check with manual guard here, because it interferes with fusing rowVectors and the subsequent
+        // // constructor. Instead, callers are responsible for ensuring the IndexVector is not empty.
+        // fassert(rowIndices.length > 0, "error: matrix constructor with empty indices")
+        // val numCols = rowVectors(0).length
+        // (0::rowVectors.length, 0::numCols) { (i,j) => rowVectors(i).apply(j) }
+
+        // effectful version is more efficient, but prevents optimizations and distribution
+        //
+        // val first = $1(rowIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
+        // val out = DenseMatrix[T](rowIndices.length,first.length)
+        // (0::rowIndices.length) foreach { i =>
+        //   out(i) = $1(rowIndices(i))
+        // }
+        // out.unsafeImmutable
       }
 
       infix (IndexVector) ("apply", T, (CTuple2(IndexWildcard,IndexVector), MInt ==> rhs) :: DenseMatrix(T)) implements composite ${
         val colIndices = $0._2
-        val first = $1(colIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
-        val out = DenseMatrix[T](first.length, colIndices.length)
-        (0::colIndices.length) foreach { j =>
-          out.updateCol(j, $1(colIndices(j)))
-        }
-        out.unsafeImmutable
+        // val arrayIndices = array_buffer_fromfunction(colIndices.length, i => colIndices(i))
+        // val arrayIndices = array_buffer_new_imm(array_fromfunction(colIndices.length, i => colIndices(i)), colIndices.length)
+        // val outData = array_buffer_flatmap[Int,T](arrayIndices, i => {
+        //   val v = $1(i)
+        //   array_buffer_new_imm(densevector_raw_data(v), v.length)
+        // })
+
+        val arrayIndices = array_fromfunction(colIndices.length, i => colIndices(i))
+        val outData = array_flatmap[Int,T](arrayIndices, i => {
+          val v = $1(i)
+          array_fromfunction(v.length, i => v(i))
+        })
+
+        // val numRows = $1(colIndices(0)).length
+        val numRows =
+          if (colIndices.length == 0) 0
+          else {
+            var z = colIndices // manual guard against code motion
+            $1(z(0)).length // better be pure
+          }
+
+        // We have to transpose here since we filled the output array in the (incorrect) column-major order.
+        // (densematrix_fromarray(array_buffer_result(outData),colIndices.length,numRows)).t
+        (densematrix_fromarray(outData,colIndices.length,numRows)).t
+
+        // fassert(colIndices.length > 0, "error: matrix constructor with empty indices")
+        // val colVectors = colIndices.map(i => $1(i))
+        // val numRows = colVectors(0).length
+        // (0::numRows, 0::colVectors.length) { (i,j) => colVectors(j).apply(i) }
+
+        // val first = $1(colIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
+        // val out = DenseMatrix[T](first.length, colIndices.length)
+        // (0::colIndices.length) foreach { j =>
+        //   out.updateCol(j, $1(colIndices(j)))
+        // }
+        // out.unsafeImmutable
       }
     }
   }

@@ -20,7 +20,7 @@ trait TableOps {
     //internal data format
     //TODO: this is equivalent to a DeliteArrayBuffer, we should be able to just use that
     data(Table, "size" -> MInt, "data" -> MArray(A))
-    
+
     //static constructors
     static (Table) ("apply", A, MInt :: Table(A), effect = mutable) implements allocates(Table, ${$0}, ${array_empty[A]($0) })
     static (Table) ("apply", A, MArray(A) :: Table(A)) implements allocates(Table, ${array_length($0)}, ${$0})
@@ -68,7 +68,7 @@ trait TableOps {
 
       // bulk collect ops
       infix ("Select") ("selector" -> (A ==> R) :: Table(R), addTpePars = R) implements map((A,R), 0, ${$selector})
-      infix ("SelectMany") ("selector" -> (A ==> Table(R)) :: Table(R), addTpePars = R) implements flatMap((A,R), 0, ${$selector}) 
+      infix ("SelectMany") ("selector" -> (A ==> Table(R)) :: Table(R), addTpePars = R) implements flatMap((A,R), 0, ${$selector})
       infix ("Where") ("predicate" -> (A ==> MBoolean) :: Table(A)) implements filter((A,A), 0, ${$predicate}, ${e => e})
 
       //bulk bucketReduce ops
@@ -96,7 +96,7 @@ trait TableOps {
       infix ("Min") ("selector" -> (A ==> R) :: R, addTpePars = R withBound TOrdering) implements mapReduce((A,R), 0, ${$selector}, ${maxValue[R]}, ${(a,b) => a min b})
 
       infix ("Count") ("predicate" -> (A ==> MBoolean) :: MInt) implements mapReduce((A,MInt), 0, ${e => unit(1)}, ${unit(0)}, ${(a,b) => a + b}, Some(${$predicate}))
-      //TODO: these create a scalac typer bug in mirroring definition (see Ops.scala:634) 
+      //TODO: these create a scalac typer bug in mirroring definition (see Ops.scala:634)
       //infix ("First") ("predicate" -> (A ==> MBoolean) :: A) implements mapReduce((A,A), 0, ${e => e}, ${zeroType[A]}, ${(a,b) => a}, Some(${$predicate}))
       //infix ("Last") ("predicate" -> (A ==> MBoolean) :: A) implements mapReduce((A,A), 0, ${e => e}, ${zeroType[A]}, ${(a,b) => b}, Some(${$predicate}))
 
@@ -107,7 +107,7 @@ trait TableOps {
 
       //sorting ops
       infix ("OrderBy") ("sorts" -> varArgs((A,A) ==> MInt) :: Table(A)) implements composite ${
-        fassert($sorts.length > 0, "ERROR: OrderBy requires at least one argument")
+        Predef.assert($sorts.length > 0, "OrderBy requires at least one argument")
         val buf = new scala.collection.mutable.ArrayBuffer[(Rep[A],Rep[A])=>Rep[Int]]
         buf += $sorts(0)
         for (i <- 1 until $sorts.length) {
@@ -125,13 +125,13 @@ trait TableOps {
 
 
       //multi-table ops
-      infix ("Join") (CurriedMethodSignature(List(List("t2"->Table(B)), List("k1"->(A ==> K), "k2"->(B ==> K)), List("result"->((A,B) ==> R))), Table(R)), addTpePars = (B,K,R)) implements composite ${ 
+      infix ("Join") (CurriedMethodSignature(List(List("t2"->Table(B)), List("k1"->(A ==> K), "k2"->(B ==> K)), List("result"->((A,B) ==> R))), Table(R)), addTpePars = (B,K,R)) implements composite ${
         join2($self, $k1, $t2, $k2, $result)
       }
 
       compiler ("join2")(("k1" -> (A ==> K), "t2" -> Table(B), "k2" -> (B ==> K), "result" -> ((A,B) ==> R)) :: Table(R), addTpePars = (B,K,R)) implements composite ${
         //TODO: we want to hash the smaller collection, but the size may be unknown (on disk); we could use file size as an approximation if we had some rewrites
-        val grouped = array_buffer_groupBy(array_buffer_new_imm(table_raw_data($self)), $k1) //FIXME: array_buffer vs. table
+        val grouped = array_buffer_groupBy(array_buffer_new_imm(table_raw_data($self), array_length(table_raw_data($self))), $k1) //FIXME: array_buffer vs. table
         val empty = Table(array_empty_imm[R](unit(0))) //note: control effects on IfThenElse require some manual hoisting
         $t2.SelectMany(e2 => {
           if (fhashmap_contains(grouped, $k2(e2))) {
@@ -145,7 +145,7 @@ trait TableOps {
       /*compiler ("join3")(("t1" -> Table(A), "k1" -> (A ==> K), "t2" -> Table(B), "k2" -> (B ==> K), "t3" -> Table(C), "k3" -> (C ==> K), "result" -> ((A,B,C) ==> R)) :: Table(R), addTpePars = (B,C,K,R)) implements composite ${
         ???
       }*/
-      
+
       infix ("toArray") (Nil :: MArray(A)) implements composite ${ array_fromfunction($self.size, i => $self.apply(i)) }
 
       //printing ops
@@ -159,7 +159,7 @@ trait TableOps {
       compiler("groupByReduceOp")(("keySelector" -> (A ==> K), "valueSelector" -> (A ==> V), "reducer" -> ((V,V) ==> V), "condition" -> (A ==> MBoolean)) :: MHashMap(K,V), addTpePars = (K,V)) implements groupByReduce((A,K,V), 0, ${$keySelector}, ${$valueSelector}, ${zeroType[V]}, ${$reducer}, Some(${condition}))
       compiler("bulkDivide") (("counts" -> Table(MInt), "avgFunc" -> ((A,MInt) ==> A)) :: Table(A)) implements zip((A,MInt,A), (0,1), ${$avgFunc})
 
-      
+
       //methods needed to implement Table as a Delite ParallelCollectionBufer
 
       //accessors

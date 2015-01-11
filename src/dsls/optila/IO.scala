@@ -25,60 +25,69 @@ trait IOOps {
      * For fusion and cluster execution, reads should be pure. however, in that case we need a different way to order them with respect to writes / deletes.
      * one solution would be to implicitly convert strings to mutable file objects, and (manually) CSE future conversions to return the original mutable object.
      *
-     * Our current solution is to require the user to explicitly pass dependencies (using "after"), so they can manually force a read to happen after a write,
-     * or vice versa.
+     * Currently, reading and writing the same file in the same program is not supported, unless there is an alternate dependency chain from the output
+     * being written to the input (e.g. the output vector or matrix explicitly depends on the one being read).
      */
 
-    direct (IO) ("readVector", Nil, ("path",MString) :: DenseVector(MDouble)) implements composite ${ readVector[Double]($path, v => optila_todouble(v(0))) }
+    direct (IO) ("readVector", Nil, ("path",MString) :: DenseVector(MDouble)) implements composite ${ readVector[Double]($path, (s: Rep[String]) => optila_todouble(s)) }
 
-    direct (IO) ("readMatrix", Nil, ("path", MString) :: DenseMatrix(MDouble)) implements composite ${ readMatrix[Double]($path, s => optila_todouble(s)) }
-    direct (IO) ("readMatrix", Nil, (("path", MString), ("delim", MString)) :: DenseMatrix(MDouble)) implements composite ${ readMatrix[Double]($path, s => optila_todouble(s), $delim) }
+    direct (IO) ("readMatrix", Nil, ("path", MString) :: DenseMatrix(MDouble)) implements composite ${ readMatrix[Double]($path, (s: Rep[String]) => optila_todouble(s)) }
+    direct (IO) ("readMatrix", Nil, (("path", MString), ("delim", MString)) :: DenseMatrix(MDouble)) implements composite ${ readMatrix[Double]($path, (s: Rep[String]) => optila_todouble(s), $delim) }
 
     val Elem = tpePar("Elem")
 
-    // whitespace delimited by default
-    direct (IO) ("readVector", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseVector(Elem))) implements composite ${
+    // Simplest version simply passes the string to the schemaBldr function
+    direct (IO) ("readVector", Elem, MethodSignature(List(("path",MString),("schemaBldr", MString ==> Elem)), DenseVector(Elem))) implements composite ${
+      val a = ForgeFileReader.readLines($path){ line => schemaBldr(line) }
+      densevector_fromarray(a, true)
+    }
+
+    // Lines can also be parsed with a custom delimiter (default whitespace)
+    direct (IO) ("readVectorAndParse", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseVector(Elem))) implements composite ${
       val a = ForgeFileReader.readLines($path){ line =>
         val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
-        val tokenVector = (0::array_length(tokens)) { i => tokens(i) }
+        val tokenVector = densevector_fromarray(tokens, true)
         schemaBldr(tokenVector)
       }
       densevector_fromarray(a, true)
     }
 
+    // Simple version allows converting each element consistently
     direct (IO) ("readMatrix", Elem, MethodSignature(List(("path",MString),("schemaBldr",MString ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseMatrix(Elem))) implements composite ${
-      val a = ForgeFileReader.readLines(path){ line:Rep[String] =>
+      val a = ForgeFileReader.readLinesFlattened($path){ line:Rep[String] =>
         val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
-        (0::array_length(tokens)) { i => schemaBldr(tokens(i)) }
+        array_fromfunction(array_length(tokens), i => schemaBldr(tokens(i)))
       }
-      DenseMatrix(densevector_fromarray(a, true))
+      val numCols = array_length(readFirstLine(path).trim.fsplit(delim, -1))
+      densematrix_fromarray(a, array_length(a) / numCols, numCols)
 
-      /*
-       * No longer using this version because it forces us to assume the underlying FS to re-open
-       * the file (or use Hadoop APIs here), which is not great. However, the version above should be
-       * less efficient. We should measure the overhead of constructing the Vector[Vector[]] representation.
-       */
-      // val a = ForgeFileReader.readLinesFlattened($path){ line:Rep[String] =>
+      // FIXME: i/o loops get split with this version, but not fused, so we end up with multiple i/o loops.
+      // val a = ForgeFileReader.readLines($path) { line: Rep[String] =>
       //   val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
-      //   array_fromfunction(array_length(tokens), i => schemaBldr(tokens(i)))
+      //   (0::array_length(tokens)) { i => schemaBldr(tokens(i)) }
       // }
-      // val numCols = array_length(readFirstLine(path).trim.fsplit(delim, -1))
-      // densematrix_fromarray(a, array_length(a) / numCols, numCols).unsafeImmutable // unsafeImmutable needed due to struct unwrapping Reflect(Reflect(..)) bug (see LAInputReaderOps.scala line 46 in Delite)
+      // DenseMatrix(densevector_fromarray(a, true))
     }
 
-    // val readfirstline = compiler (IO) ("readFirstLine", Nil, ("path",MString) :: MString)
+    // This version allows parsing columns differently
+    // Bad rows can be ignored by returning an empty vector (unless we get an exception during splitting -- we should handle that here)
+    direct (IO) ("readMatrixAndParse", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> DenseVector(Elem)),("delim",MString,"unit(\"\\s+\")")), DenseMatrix(Elem))) implements composite ${
+      val a = ForgeFileReader.readLinesFlattened($path){ line:Rep[String] =>
+        val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
+        val tokenVector = densevector_fromarray(tokens, true)
+        val outRow = schemaBldr(tokenVector)
+        array_fromfunction(outRow.length, i => outRow(i))
+      }
+      val numCols = schemaBldr(densevector_fromarray(readFirstLine(path).trim.fsplit(delim, -1), true)).length
+      densematrix_fromarray(a, array_length(a) / numCols, numCols)
+    }
 
-    // impl (readfirstline) (codegen($cala, ${
-    //   val xfs = new java.io.BufferedReader(new java.io.FileReader($path))
-    //   val line = xfs.readLine()
-    //   xfs.close()
-    //   line
-    // }))
-
-    //NOTE: C++ target codegen for readfirstline uses the Delite C++ library (readFirstLineFile),
-    //      but may want to have codegen directly here like scala target (after multi-line C++ codegen in Forge is fixed).
-    // impl (readfirstline) (codegen(cpp, ${readFirstLineFile($path)}))
-
+    val readfirstline = compiler (IO) ("readFirstLine", Nil, ("path",MString) :: MString) implements composite ${
+      val in = ForgeFileInputStream(path)
+      val line = in.readLine()
+      in.close()
+      line
+    }
 
     // -- output
 

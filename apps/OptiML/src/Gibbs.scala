@@ -46,10 +46,10 @@ trait Gibbs extends OptiMLApplication {
   def sampleVariables(graph: Rep[FactorGraph[FunctionFactor]], variableIds: Rep[DenseVector[Int]], times: Rep[DenseVector[Tup2[Int,Long]]]) = {
 
     val start = time()
-    val z = for (v <- variableIds) {
+    for (v <- variableIds) {
       sampleVariable(graph, v)
     }
-    val end = time(z)
+    val end = time()
 
     times <<= pack(variableIds.length, end - start)
   }

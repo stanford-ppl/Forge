@@ -25,6 +25,7 @@ def main():
     cp = ""
     for comp in comps:
       cp = cp + script_home + "/" + comp + "/target/" + scala_major_id + "/classes" + os.pathsep
+    cp = cp + script_home + "/tests/target/" + scala_major_id + "/test-classes" + os.pathsep
 
     # add all managed libs 
     # caveat: scalatest pulls in some non-virtualized scala dependencies which conflict with the scala-virtualized versions

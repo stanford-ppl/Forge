@@ -50,17 +50,17 @@ trait FeatureOps {
     DiscreteFeatureOps {
       compiler ("getFeatures") (Nil :: MHashMap(MString, MInt)) implements getter(0, "_features")
 
-      infix ("apply") (MString :: MInt) implements composite ${
+      infix ("apply") (MString :: MDouble) implements composite ${
         val featureMap = getFeatures($self)
-        if (featureMap.contains($1)) featureMap($1) else 0
+        if (featureMap.contains($1)) featureMap($1).toDouble else 0.0
       }
 
       // convert this feature value into an indicator or dummy variable encoding
-      infix ("indicator") (MString :: DenseVector(MInt)) implements composite ${
+      infix ("indicator") (MString :: DenseVector(MDouble)) implements composite ${
         val featureMap = getFeatures($self)
         val numKeys = fhashmap_size(featureMap)
-        val e = if (featureMap.contains($1)) featureMap($1) else 0
-        (0::numKeys) { i => if (i == e) 1 else 0 }
+        val e = if (featureMap.contains($1)) featureMap($1).toDouble else 0.0
+        (0::numKeys) { i => if (i == e) 1.0 else 0.0 }
       }
 
       infix ("size") (Nil :: MInt) implements composite ${
@@ -77,12 +77,12 @@ trait FeatureOps {
     BinaryFeatureOps {
       infix ("default") (Nil :: MBoolean) implements getter(0, "_default")
 
-      infix ("apply") (MString :: MInt) implements composite ${
+      infix ("apply") (MString :: MDouble) implements composite ${
         fassert($1 == "" || $1 == "0" || $1 == "1" || $1 == "false" || $1 == "true", "illegal input to binary feature")
-        if ($1 == "0" || $1 == "false") 0
-        else if ($1 == "1" || $1 == "true") 1
-        else if ($self.default) 1
-        else 0
+        if ($1 == "0" || $1 == "false") 0.0
+        else if ($1 == "1" || $1 == "true") 1.0
+        else if ($self.default) 1.0
+        else 0.0
       }
     }
 

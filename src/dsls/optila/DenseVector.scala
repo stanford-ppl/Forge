@@ -389,6 +389,12 @@ trait DenseVectorOps {
     compiler (DenseVector) ("reduce_and", Nil, DenseVector(MBoolean) :: MBoolean) implements reduce(MBoolean, 0, ${unit(true)}, ${ (a,b) => a && b })
     compiler (DenseVector) ("reduce_or", Nil, DenseVector(MBoolean) :: MBoolean) implements reduce(MBoolean, 0, ${unit(false)}, ${ (a,b) => a || b })
 
+    // Bulk of vector operations is imported
+    addVectorCommonOps(DenseVector,T)
+
+    // label DenseVector *:* DenseVectorView so that we can rewrite it in RewriteOpsExp
+    label(lookupOverloaded("DenseVector","*:*",1), "densevector_dot_densevectorview")
+
     // Add DenseVector to Arith
     val Arith = lookupGrp("Arith").asInstanceOf[Rep[DSLTypeClass]]
     val DenseVectorArith = tpeClassInst("ArithDenseVector", T withBound TArith, Arith(DenseVector(T)))
@@ -403,10 +409,6 @@ trait DenseVectorOps {
     infix (DenseVectorArith) ("log", T withBound TArith, DenseVector(T) :: DenseVector(T)) implements composite ${ densevector_log($0) }
 
     importDenseVectorPrimitiveOps()
-    addVectorCommonOps(DenseVector,T)
-
-    // label DenseVector *:* DenseVectorView so that we can rewrite it in RewriteOpsExp
-    label(lookupOverloaded("DenseVector","*:*",1), "densevector_dot_densevectorview")
   }
 
 

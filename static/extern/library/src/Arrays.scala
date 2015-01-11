@@ -32,19 +32,19 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
     = __arg0.mkString(__arg1)
   def array_map[T:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]], __arg1: Rep[T] => Rep[R])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]
     = __arg0.map(__arg1)
-  //def array_flatmap[T:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]], __arg1: Rep[T] => Rep[ForgeArray[R]])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]
-  //  = __arg0.flatMap(__arg1.toSeq)
+  def array_flatmap[T:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]], __arg1: Rep[T] => Rep[ForgeArray[R]])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]
+    = __arg0.flatMap(e => __arg1(e))
   def array_zip[T:Manifest,B:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[ForgeArray[B]], __arg2: (Rep[T],Rep[B]) => Rep[R])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]
     = __arg0.zip(__arg1).map(t => __arg2(t._1,t._2))
   def array_reduce[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: (Rep[T],Rep[T]) => Rep[T],__arg2: Rep[T])(implicit __imp0: SourceContext): Rep[T]
     = if (array_length(__arg0) == 0) __arg2 else __arg0.reduce(__arg1)
   def array_groupByReduce[T:Manifest,K:Manifest,V:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[T] => Rep[K], __arg2: Rep[T] => Rep[V], __arg3: (Rep[V],Rep[V]) => Rep[V])(implicit __imp0: SourceContext): Rep[ForgeHashMap[K,V]] = {
     val grp = __arg0.groupBy[K](__arg1)
-    val hm = scala.collection.mutable.HashMap[K,V]()
+    val m = scala.collection.mutable.HashMap[K,V]()
     grp.foreach{ a =>
-      hm.put(a._1,array_map(a._2,__arg2).reduce(__arg3))
+      m.put(a._1,array_map(a._2,__arg2).reduce(__arg3))
     }
-    hm
+    m
   }
   def array_filter[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[T] => Rep[Boolean])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = __arg0.filter(__arg1)
@@ -82,8 +82,14 @@ trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
     = __arg0
   def array_buffer_strict_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
     = (new scala.collection.mutable.ArrayBuffer[T]()) ++ (new Array[T](__arg0))
-  def array_buffer_new_imm[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
-    = (new scala.collection.mutable.ArrayBuffer[T]()) ++ (__arg0.toArray)
+  def array_buffer_new_imm[T:Manifest](__arg0: Rep[ForgeArray[T]], __arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]] = {
+    assert(__arg0.length > __arg1, "array_buffer_new_imm requires the initial array to be at least as large as the array buffer size")
+    val out = new scala.collection.mutable.ArrayBuffer[T](__arg1)
+    for (i <- 0 until __arg0.length) {
+      out(i) = __arg0(i)
+    }
+    out
+  }
   def array_buffer_copy[T:Manifest](src: Rep[ForgeArrayBuffer[T]], srcPos: Rep[Int], dest: Rep[ForgeArrayBuffer[T]], destPos: Rep[Int], length: Rep[Int])(implicit __imp0: SourceContext): Rep[Unit] = {
     for (i <- 0 until length) {
       dest(destPos+i) = src(srcPos+i)
@@ -135,6 +141,9 @@ trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
       __arg1(i)
       i += 1
     }
+  }
+  def array_buffer_fromfunction[T:Manifest](__arg0: Rep[Int], __arg1: Rep[Int] => Rep[T])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]] = {
+    scala.collection.mutable.ArrayBuffer.tabulate[T](__arg0)(__arg1)
   }
 }
 

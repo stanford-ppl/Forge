@@ -1,12 +1,12 @@
 /*//////////////////////////////////////////////////////////////
 Author: Christopher R. Aberger
 
-Description: Stores data asscoicated with nodes in an array 
+Description: Stores data asscoicated with nodes in an array
 buffer indexed by internal node IDs
 *///////////////////////////////////////////////////////////////
 
 package ppl.dsl.forge
-package dsls 
+package dsls
 package optigraph
 
 import core.{ForgeApplication,ForgeApplicationRunner}
@@ -20,17 +20,17 @@ trait NodeDataOps {
     val V = tpePar("V")
     val R = tpePar("R")
     val Node
-     = lookupTpe("Node") 
-    val NodeData = tpe("NodeData", T) 
+     = lookupTpe("Node")
+    val NodeData = tpe("NodeData", T)
 
     data(NodeData,("_data",MArrayBuffer(T)))
     static(NodeData)("apply", T, MInt :: NodeData(T)) implements allocates(NodeData,${array_buffer_strict_empty[T]($0)})
-    static(NodeData)("apply", T, MArray(T) :: NodeData(T)) implements allocates(NodeData,${array_buffer_new_imm($0)})
+    static(NodeData)("apply", T, MArray(T) :: NodeData(T)) implements allocates(NodeData,${array_buffer_new_imm($0, $0.length)})
     static(NodeData)("apply", T, MArrayBuffer(T) :: NodeData(T)) implements allocates(NodeData,${array_buffer_immutable($0)})
-    static(NodeData)("fromFunction", T, (MInt,(MInt ==> T)) :: NodeData(T)) implements allocates(NodeData,${array_buffer_new_imm(array_fromfunction($0,$1))})
+    static(NodeData)("fromFunction", T, (MInt,(MInt ==> T)) :: NodeData(T)) implements allocates(NodeData,${array_buffer_new_imm(array_fromfunction($0,$1), $0)})
 
     val NodeDataOps = withTpe(NodeData)
-    NodeDataOps{  
+    NodeDataOps{
       //////////////basic accessors//////////////////////////////
       infix("apply")(MInt :: T) implements composite ${array_buffer_apply(nd_raw_data($self),$1)}
       infix("apply")(Node :: T) implements composite ${array_buffer_apply(nd_raw_data($self),$1.id)}
@@ -70,7 +70,7 @@ trait NodeDataOps {
       infix ("groupByReduce") ((T ==> K,T ==> V,(V,V) ==> V) :: MHashMap(K, V), TNumeric(V), addTpePars = (K,V)) implements groupByReduce((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)}, ${numeric_zero[V]}, ${(a,b) => $3(a,b)})
       infix ("mapreduce") ( (T ==> R,(R,R) ==> R, T==>MBoolean) :: R, TNumeric(R), addTpePars=(R)) implements mapReduce((T,R), 0, ${e => $1(e)}, ${numeric_zero[R]}, ${(a,b) => $2(a,b)}, Some(${c => $3(c)}))
       infix ("distinct") (Nil :: NodeData(T)) implements composite ${NodeData(fhashmap_keys($0.groupByReduce[T,Int](e => e, e=>0,(a,b)=>0)))}
-      infix("sort")(Nil :: NodeData(T),TNumeric(T)) implements composite ${NodeData(array_sort($self.getRawArray))}      
+      infix("sort")(Nil :: NodeData(T),TNumeric(T)) implements composite ${NodeData(array_sort($self.getRawArray))}
       infix ("sortBy") ((MInt ==> R) :: NodeData(T), TOrdering(R), addTpePars=R) implements composite ${
           NodeData[Int](array_sortIndices($self.length,$1)).map[T](i => $self(i))
       }
@@ -97,7 +97,7 @@ trait NodeDataOps {
           i = i+1
         }
       }
-      
+
       ///////////////methods for parallel collection buffer declaration/////////////////////////
       compiler ("nd_raw_data") (Nil :: MArrayBuffer(T)) implements getter(0, "_data")
       compiler("nd_raw_alloc")(MInt :: NodeData(R), addTpePars = R, effect=mutable) implements composite ${NodeData[R]($1)}
@@ -105,12 +105,12 @@ trait NodeDataOps {
       compiler("nd_update")( (("id",MInt),("n",T)) :: MUnit, effect=write(0)) implements composite ${array_buffer_update(nd_raw_data($self),$id,$n)}
       compiler ("nd_set_length")(MInt :: MUnit, effect = write(0)) implements single ${array_buffer_set_length(nd_raw_data($self),$1)}
       compiler ("nd_set_raw_data") (MArrayBuffer(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
-      compiler ("nd_appendable") ((MInt,T) :: MBoolean) implements single("true") 
+      compiler ("nd_appendable") ((MInt,T) :: MBoolean) implements single("true")
       compiler ("nd_append") ((MInt,T) :: MUnit, effect = write(0)) implements composite ${array_buffer_append(nd_raw_data($self),$2)}
       compiler("nd_copy") ((MInt,NodeData(T),MInt,MInt) :: MUnit, effect = write(2)) implements single ${array_buffer_copy(nd_raw_data($self),$1,nd_raw_data($2),$3,$4)}
 
       parallelize as ParallelCollectionBuffer(T,lookupOp("nd_raw_alloc"),lookupOp("length"),lookupOp("nd_apply"),lookupOp("nd_update"),lookupOp("nd_set_length"),lookupOp("nd_appendable"),lookupOp("nd_append"),lookupOp("nd_copy"))
     }
     compiler (NodeData) ("nd_fake_alloc", R, Nil :: NodeData(R)) implements single ${ NodeData[R](0) }
-  } 
+  }
 }

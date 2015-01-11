@@ -273,6 +273,29 @@ trait Shapes extends ForgeTestModule with OptiMLApplication {
   }
 }
 
+object ViewsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Views
+object ViewsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Views
+trait Views extends ForgeTestModule with OptiMLApplication {
+  def main() = {
+    val m = DenseMatrix((0,1,2,3,4),(5,6,7,8,9),(10,11,12,13,14),(15,16,17,18,19))
+    val middleTwoRows = m.sliceRows(1,3)
+    collect(middleTwoRows == DenseMatrix((5,6,7,8,9),(10,11,12,13,14)))
+
+    val middleThreeCols = m.sliceCols(1,4)
+    collect(middleThreeCols == DenseMatrix((1,2,3),(6,7,8),(11,12,13),(16,17,18)))
+
+    // last 3 rows, last 3 cols
+    val rect = m.slice(1,4,2,5)
+    collect(rect == DenseMatrix((7,8,9),(12,13,14),(17,18,19)))
+
+    val rectSecondRow = rect(1)
+    collect(rectSecondRow == DenseVector(12,13,14))
+
+    val rectSecondCol = rect.getCol(1)
+    collect(rectSecondCol == DenseVector(8,13,18))
+  }
+}
+
 class DenseMatrixSuiteInterpreter extends ForgeSuiteInterpreter {
   def testAccessors() { runTest(DenseMatrixAccessorsRunnerI) }
   def testOperators() { runTest(DenseMatrixOperatorsRunnerI) }
@@ -281,6 +304,7 @@ class DenseMatrixSuiteInterpreter extends ForgeSuiteInterpreter {
   def testMapAll() { runTest(MapAllRunnerI) }
   def testReduceRows() { runTest(ReduceRowsRunnerI) }
   def testShapes() { runTest(ShapesRunnerI) }
+  def testViews() { runTest(ViewsRunnerI) }
 }
 
 class DenseMatrixSuiteCompiler extends ForgeSuiteCompiler {
@@ -291,4 +315,5 @@ class DenseMatrixSuiteCompiler extends ForgeSuiteCompiler {
   def testMapAll() { runTest(MapAllRunnerC) }
   def testReduceRows() { runTest(ReduceRowsRunnerC) }
   def testShapes() { runTest(ShapesRunnerC) }
+  def testViews() { runTest(ViewsRunnerC) }
 }

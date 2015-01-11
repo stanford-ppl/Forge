@@ -221,8 +221,19 @@ trait VectorOps {
       infix ("sum") (Nil :: T, A) implements composite ${ self.reduce((a,b) => a+b ) }
       infix ("prod") (Nil :: T, A) implements reduce(T, 0, ${unit(1.asInstanceOf[\$TT])}, ${ (a,b) => a*b })
       infix ("mean") (Nil :: MDouble, ("conv",T ==> MDouble)) implements composite ${ $self.map(conv).sum / $self.length }
-      infix ("min") (Nil :: T, O) implements reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a < b) a else b })
-      infix ("max") (Nil :: T, O) implements reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a > b) a else b })
+
+
+      /**
+       * Ordering
+       */
+      infix ("min") (Nil :: T, O ::: A) implements composite ${
+        $self.reduce { (a,b) => if (a < b) a else b }
+        //reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a < b) a else b })
+      }
+      infix ("max") (Nil :: T, O ::: A) implements composite ${
+        $self.reduce { (a,b) => if (a > b) a else b }
+        //reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a > b) a else b })
+      }
 
       infix ("minIndex") (Nil :: MInt, O ::: A) implements composite ${
         $self.indices.reduce { (a,b) => if ($self(a) < $self(b)) a else b }
@@ -241,7 +252,7 @@ trait VectorOps {
       infix ("reduce") (((T,T) ==> T) :: T, A) implements reduce(T, 0, Z, ${ (a,b) => $1(a,b) })
       infix ("foreach") ((T ==> MUnit) :: MUnit) implements foreach(T, 0, ${ e => $1(e) })
       infix ("forall") ((T ==> MBoolean) :: MBoolean) implements composite ${ reduce_and($self.map($1)) }
-      infix ("find") ((T ==> MBoolean) :: IndexVector) implements composite ${ IndexVector($self.indices.filter(i => $1($self(i)))) }
+      infix ("find") ((T ==> MBoolean) :: IndexVector) implements composite ${ $self.indices.filter(i => $1($self(i))) }
 
       val filterMap = v.name.toLowerCase + "_densevector_filter_map"
       compiler (filterMap) (((T ==> MBoolean), (T ==> R)) :: DenseVector(R), addTpePars = R) implements filter((T,R), 0, ${ e => $1(e) }, ${ e => $2(e) })
@@ -262,9 +273,7 @@ trait VectorOps {
         pack((outT.unsafeImmutable, outF.unsafeImmutable))
       }
 
-      infix ("flatMap") ((T ==> DenseVector(R)) :: DenseVector(R), addTpePars = R) implements composite ${
-        DenseVector.flatten($self.map($1))
-      }
+      infix ("flatMap") ((T ==> DenseVector(R)) :: DenseVector(R), addTpePars = R) implements flatMap((T,R), 0, ${ e => $1(e) })
 
       // TODO: need to implement with a DeliteOp
       infix ("scan") (CurriedMethodSignature(List(List(("zero", R)), List((R,T) ==> R)), DenseVector(R)), addTpePars = R) implements composite ${

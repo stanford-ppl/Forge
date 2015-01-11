@@ -153,20 +153,20 @@ trait RewriteOpsExp extends RewriteOps with PrimitiveOpsExp with DenseVectorOpsE
   // VectorView
   // TEST: do we still need these even with struct field rewrites?
   override def densevectorview_length[A:Manifest](x: Exp[DenseVectorView[A]])(implicit ctx: SourceContext) = x match {
-    case Def(DenseMatrix_Vview(m, start, stride, l, r)) => l
-    case Def(s@Reflect(DenseMatrix_Vview(m, start, stride, l, r), u, es)) if context.contains(s) => l
+    case Def(Densematrix_vectorview(m, start, stride, l, r)) => l
+    case Def(s@Reflect(Densematrix_vectorview(m, start, stride, l, r), u, es)) if context.contains(s) => l
     case _ => super.densevectorview_length(x)
   }
 
   override def densevectorview_isrow[A:Manifest](x: Exp[DenseVectorView[A]])(implicit ctx: SourceContext) = x match {
-    case Def(DenseMatrix_Vview(m, start, stride, l, r)) => r
-    case Def(s@Reflect(DenseMatrix_Vview(m, start, stride, l, r), u, es)) if context.contains(s) => r
+    case Def(Densematrix_vectorview(m, start, stride, l, r)) => r
+    case Def(s@Reflect(Densematrix_vectorview(m, start, stride, l, r), u, es)) if context.contains(s) => r
     case _ => super.densevectorview_isrow(x)
   }
 
   def dense_vectorview_optimize_apply[A:Manifest](x: Exp[DeliteCollection[A]], n: Exp[Int])(implicit ctx: SourceContext): Option[Exp[A]] = x match {
-    case Def(DenseMatrix_Vview(m, start, stride, l, r)) => Some(densematrix_raw_apply(m,start + n*stride))
-    case Def(s@Reflect(DenseMatrix_Vview(m, start, stride, l, r), u, es)) if context.contains(s) => Some(densematrix_raw_apply(m,start + n*stride))
+    case Def(Densematrix_vectorview(m, start, stride, l, r)) => Some(densematrix_raw_apply(m,start + n*stride))
+    case Def(s@Reflect(Densematrix_vectorview(m, start, stride, l, r), u, es)) if context.contains(s) => Some(densematrix_raw_apply(m,start + n*stride))
     case _ => None
   }
 

@@ -15,7 +15,7 @@ trait MLIOOps {
     importARFFOps()
   }
 
-  def importFactorIOOps() {  
+  def importFactorIOOps() {
     val T = tpePar("T")
     val DenseVector = lookupTpe("DenseVector")
     val FactorGraph = lookupTpe("FactorGraph")
@@ -64,13 +64,13 @@ trait MLIOOps {
 
     // -- input
 
-    compiler (IO) ("fg_read_weights", Nil, ("path",MString) :: DenseVector(Weight)) implements single ${
+    compiler (IO) ("fg_read_weights", Nil, ("path",MString) :: DenseVector(Weight)) implements composite ${
       val dis = datainputstream_new($path)
       val out = DenseVector[Weight](0, true)
       while (dis.available() > 0) {
         val weightId = dis.readLong().toInt
         val isFixed = dis.readBoolean()
-        val initialValue = dis.readDouble()   
+        val initialValue = dis.readDouble()
 
         out <<= Weight(weightId, initialValue, isFixed)
       }
@@ -78,7 +78,7 @@ trait MLIOOps {
       out.unsafeImmutable
     }
 
-    compiler (IO) ("fg_read_variables", Nil, ("path",MString) :: DenseVector(Variable)) implements single ${
+    compiler (IO) ("fg_read_variables", Nil, ("path",MString) :: DenseVector(Variable)) implements composite ${
       val dis = datainputstream_new($path)
       val out = DenseVector[RandomVariable](0, true)
       while (dis.available() > 0) {
@@ -89,14 +89,14 @@ trait MLIOOps {
         val edgeCount = dis.readLong().toInt
         val cardinality = dis.readLong().toInt
         val isQuery = !isEvidence
-        
+
         out <<= RandomVariable(variableId, DenseVector(0.0, 1.0), initialValue, isEvidence, isQuery)
       }
       dis.fclose()
       out.unsafeImmutable
     }
 
-    compiler (IO) ("fg_read_edges", Nil, ("path",MString) :: DenseVector(Tup4(MInt,MInt,MBoolean,MInt))) implements single ${
+    compiler (IO) ("fg_read_edges", Nil, ("path",MString) :: DenseVector(Tup4(MInt,MInt,MBoolean,MInt))) implements composite ${
       val dis = datainputstream_new($path)
       val out = DenseVector[Tup4[Int,Int,Boolean,Int]](0, true)
       while (dis.available() > 0) {
@@ -105,14 +105,14 @@ trait MLIOOps {
         val position = dis.readLong().toInt
         val isPositive = dis.readBoolean()
         val equalPredicate = dis.readLong().toInt
-        
+
         out <<= pack((variableId, factorId, isPositive, position))
       }
       dis.fclose()
       out.unsafeImmutable
     }
 
-    compiler (IO) ("fg_read_factors", Nil, ("path",MString) :: DenseVector(Tup3(MInt,MInt,MInt))) implements single ${
+    compiler (IO) ("fg_read_factors", Nil, ("path",MString) :: DenseVector(Tup3(MInt,MInt,MInt))) implements composite ${
       val dis = datainputstream_new($path)
       val out = DenseVector[Tup3[Int,Int,Int]](0, true)
       while (dis.available() > 0) {
@@ -127,12 +127,12 @@ trait MLIOOps {
     }
 
     direct (IO) ("readFactorGraph", Nil, MethodSignature(List(("factorsPath", MString), ("variablesPath", MString), ("weightsPath", MString), ("edgesPath", MString), ("delim",MString,"unit(\"\\t\")")), FactorGraph(FunctionFactor))) implements composite ${
-      val weights = fg_read_weights($weightsPath).sortBy(w => w.id)      
-      val variables = fg_read_variables($variablesPath).distinct.sortBy(r => r.id)      
+      val weights = fg_read_weights($weightsPath).sortBy(w => w.id)
+      val variables = fg_read_variables($variablesPath).distinct.sortBy(r => r.id)
       val edges = fg_read_edges($edgesPath)
-      
-      val factorVariablesMap = edges.groupBy(r => r._2, r => FactorVariable(r._1, r._3, DenseVector(0.0, 1.0), r._4))      
-      val factorRows = fg_read_factors($factorsPath)      
+
+      val factorVariablesMap = edges.groupBy(r => r._2, r => FactorVariable(r._1, r._3, DenseVector(0.0, 1.0), r._4))
+      val factorRows = fg_read_factors($factorsPath)
       val allFactors = factorRows.map { t =>
         val vars = if (factorVariablesMap.contains(t._1)) factorVariablesMap(t._1).sortBy(r => r.position) else DenseVector[FactorVariable]()
         FunctionFactor(t._1, vars, t._2, t._3)
@@ -143,7 +143,7 @@ trait MLIOOps {
       val variableValues = variables.map(v => v.value).mutable
       val weightValues = weights.map(w => w.value).mutable
 
-      FactorGraph(factors, variables, weights, variablesToFactors, variableValues, weightValues)      
+      FactorGraph(factors, variables, weights, variablesToFactors, variableValues, weightValues)
     }
 
     /*
@@ -154,7 +154,7 @@ trait MLIOOps {
         val (id, initialValue, isFixed) = (tokens(0).toInt, tokens(1).toDouble, tokens(2).toBoolean)
         Weight(id, initialValue, isFixed)
       }, true).sortBy(w => w.id)
-      
+
       val variableRows = ForgeFileReader.readLines($variablesPath) { line =>
         val tokens = line.trim.fsplit(delim)
         val (variableId, factorId, position, isPositive, dataType, initialValue, isEvidence, isQuery) = (tokens(0).toInt, tokens(1).toInt, tokens(2).toInt, tokens(3).toBoolean, tokens(4), tokens(5).toDouble, tokens(6).toBoolean, tokens(7).toBoolean)
@@ -163,7 +163,7 @@ trait MLIOOps {
 
       // currently only supporting boolean vars
       val variables = densevector_fromarray(variableRows, true).map(r => RandomVariable(r._1, DenseVector(0.0, 1.0), r._6, r._7, r._8)).distinct.sortBy(r => r.id)
-      
+
       val factorVariablesMap = densevector_fromarray(variableRows, true).groupBy(r => r._2, r => FactorVariable(r._1, r._4, DenseVector(0.0, 1.0), r._3))
 
       // reading factors breaks in parallel if we try to look up the hashmap inside the file reading loop, for some reason
@@ -179,12 +179,12 @@ trait MLIOOps {
         FunctionFactor(t._1, vars, t._2, t._3)
       }
       val factors = densevector_fromarray(allFactors, true).filter(f => f.vars.length > 0).sortBy(f => f.id)
-      
+
       val variablesToFactors = build_variable_factors(variables, factors)
       val variableValues = variables.map(v => v.value).mutable
       val weightValues = weights.map(w => w.value).mutable
 
-      FactorGraph(factors, variables, weights, variablesToFactors, variableValues, weightValues)      
+      FactorGraph(factors, variables, weights, variablesToFactors, variableValues, weightValues)
     }
     */
 
@@ -196,7 +196,7 @@ trait MLIOOps {
 
     /* builds reverse mapping from variables -> factors */
     compiler (IO) ("build_variable_factors", Nil, (("variables", DenseVector(Variable)), ("factors", DenseVector(FunctionFactor))) :: DenseVector(DenseVector(MInt))) implements composite ${
-      val variablesToFactors = DenseVector[DenseVector[Int]](variables.length, true) 
+      val variablesToFactors = DenseVector[DenseVector[Int]](variables.length, true)
 
       for (i <- 0 until variablesToFactors.length) {
         variablesToFactors(i) = DenseVector[Int]()
@@ -211,12 +211,12 @@ trait MLIOOps {
           variablesToFactors.update(vId, curVec << factorIds(i))
         }
       }
-   
-      variablesToFactors.map(v => v.distinct)      
+
+      variablesToFactors.map(v => v.distinct)
     }
 
     ()
-  
+
   }
 
   def importARFFOps() {
@@ -227,7 +227,7 @@ trait MLIOOps {
   	  // INVESTIGATE: lines and start computations, and body and map computations, fuse unsafely without .mutable
   	  // the latter appears to be the bug of not having the filter condition properly guard the subsequent computation
   	  val lines = densevector_fromarray(ForgeFileReader.readLines($path){ line => line.trim }, true).mutable
-  	  
+
   	  // skip past the header to the data section
       // since we are using schemaBldr, we don't care about the attribute types
   	  val start = lines find { _ == "@DATA" }

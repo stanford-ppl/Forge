@@ -56,13 +56,13 @@ trait DenseMatrixAccessors extends ForgeTestModule with OptiMLApplication {
     val mSlice = m2(0::2,4::5)
     collect(mSlice == DenseMatrix(DenseVector(4,5)).t)
     val mSlice2 = m2(3::4)
-    collect(mSlice2 == DenseMatrix((3,4,5,6,7,8,9,10,11,12)))
+    collect(mSlice2 == DenseMatrix(DenseVector(3,4,5,6,7,8,9,10,11,12)))
     val mSlice3 = m2(*,0::2)
-    collect(mSlice3 == DenseMatrix((0,1,2,3,4,5,6,7,8,9),(1,2,3,4,5,6,7,8,9,10)).t)
+    collect(mSlice3 == DenseMatrix(DenseVector(0,1,2,3,4,5,6,7,8,9),DenseVector(1,2,3,4,5,6,7,8,9,10)).t)
     val mSlice4 = m2(1::4,*)
-    collect(mSlice4 == DenseMatrix((1,2,3,4,5,6,7,8,9,10),(2,3,4,5,6,7,8,9,10,11),(3,4,5,6,7,8,9,10,11,12)))
-    val mSlice5 = m2(IndexVector((3,1,2)),IndexVector((4,0,6)))
-    collect(mSlice5 == DenseMatrix((7,3,9),(5,1,7),(6,2,8)))
+    collect(mSlice4 == DenseMatrix(DenseVector(1,2,3,4,5,6,7,8,9,10),DenseVector(2,3,4,5,6,7,8,9,10,11),DenseVector(3,4,5,6,7,8,9,10,11,12)))
+    val mSlice5 = m2(IndexVector(DenseVector(3,1,2)),IndexVector(DenseVector(4,0,6)))
+    collect(mSlice5 == DenseMatrix(DenseVector(7,3,9),DenseVector(5,1,7),DenseVector(6,2,8)))
 
     mkReport
   }
@@ -77,7 +77,7 @@ trait DenseMatrixOperators extends ForgeTestModule with OptiMLApplication {
     collect(m_rand(0,0) != m_rand(1,0))
     collect(m_rand(0,0) != m_rand(1,1))
 
-    val m = DenseMatrix((1,2,3,4,5),(1,2,3,4,5))
+    val m = DenseMatrix(DenseVector(1,2,3,4,5),DenseVector(1,2,3,4,5))
     collect(mean(m) == 3)
     collect(max(m) == 5)
     collect(min(m) == 1)
@@ -175,10 +175,10 @@ object GroupRowsByRunnerC extends ForgeTestRunnerCompiler with OptiMLApplication
 trait GroupRowsBy extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
-    val m = DenseMatrix((1,2,3,4),
-                        (2,-2,-3,-4),
-                        (1,5,6,7),
-                        (2,-5,-6,-7))
+    val m = DenseMatrix(DenseVector(1,2,3,4),
+                        DenseVector(2,-2,-3,-4),
+                        DenseVector(1,5,6,7),
+                        DenseVector(2,-5,-6,-7))
 
     val ms = m.groupRowsBy(row => row(0)).toVector
     collect(ms.length == 2)
@@ -224,7 +224,7 @@ trait ReduceRows extends ForgeTestModule with OptiMLApplication {
 
     val x = DenseMatrix.ones(10,10)
     val y = x reduceRows { (r1,r2) => r1 + r2 }
-    collect(y == DenseVector(10.,10.,10.,10.,10.,10.,10.,10.,10.,10.))
+    collect(y == DenseVector(10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0))
     mkReport
   }
 }
@@ -233,29 +233,29 @@ object ShapesRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationIn
 object ShapesRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Shapes
 trait Shapes extends ForgeTestModule with OptiMLApplication {
   def main() = {
-    val a = DenseMatrix((1,2,3),
-                        (4,5,6),
-                        (7,8,9))
+    val a = DenseMatrix(DenseVector(1,2,3),
+                        DenseVector(4,5,6),
+                        DenseVector(7,8,9))
 
     collect(diag(a) == DenseVector(1,5,9).t)
-    collect(triu(a) == DenseMatrix((1,2,3), (0,5,6), (0,0,9)))
-    collect(tril(a) == DenseMatrix((1,0,0), (4,5,0), (7,8,9)))
+    collect(triu(a) == DenseMatrix(DenseVector(1,2,3), DenseVector(0,5,6), DenseVector(0,0,9)))
+    collect(tril(a) == DenseMatrix(DenseVector(1,0,0), DenseVector(4,5,0), DenseVector(7,8,9)))
 
-    val b = DenseMatrix((1,2,3,4),
-                        (5,6,7,8))
+    val b = DenseMatrix(DenseVector(1,2,3,4),
+                        DenseVector(5,6,7,8))
 
     collect(diag(b) == DenseVector(1,6).t)
-    collect(triu(b) == DenseMatrix((1,2,3,4), (0,6,7,8)))
-    collect(tril(b) == DenseMatrix((1,0,0,0), (5,6,0,0)))
+    collect(triu(b) == DenseMatrix(DenseVector(1,2,3,4), DenseVector(0,6,7,8)))
+    collect(tril(b) == DenseMatrix(DenseVector(1,0,0,0), DenseVector(5,6,0,0)))
 
-    val c = DenseMatrix((1,2),
-                        (3,4),
-                        (5,6),
-                        (7,8))
+    val c = DenseMatrix(DenseVector(1,2),
+                        DenseVector(3,4),
+                        DenseVector(5,6),
+                        DenseVector(7,8))
 
     collect(diag(c) == DenseVector(1,4).t)
-    collect(triu(c) == DenseMatrix((1,2), (0,4), (0,0), (0,0)))
-    collect(tril(c) == DenseMatrix((1,0), (3,4), (5,6), (7,8)))
+    collect(triu(c) == DenseMatrix(DenseVector(1,2), DenseVector(0,4), DenseVector(0,0), DenseVector(0,0)))
+    collect(tril(c) == DenseMatrix(DenseVector(1,0), DenseVector(3,4), DenseVector(5,6), DenseVector(7,8)))
 
     // n x n utriangle shape
     val tri = utriangle(a.numRows)
@@ -277,22 +277,24 @@ object ViewsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInt
 object ViewsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Views
 trait Views extends ForgeTestModule with OptiMLApplication {
   def main() = {
-    val m = DenseMatrix((0,1,2,3,4),(5,6,7,8,9),(10,11,12,13,14),(15,16,17,18,19))
+    val m = DenseMatrix(DenseVector(0,1,2,3,4),DenseVector(5,6,7,8,9),DenseVector(10,11,12,13,14),DenseVector(15,16,17,18,19))
     val middleTwoRows = m.sliceRows(1,3)
-    collect(middleTwoRows == DenseMatrix((5,6,7,8,9),(10,11,12,13,14)))
+    collect(middleTwoRows == DenseMatrix(DenseVector(5,6,7,8,9),DenseVector(10,11,12,13,14)))
 
     val middleThreeCols = m.sliceCols(1,4)
-    collect(middleThreeCols == DenseMatrix((1,2,3),(6,7,8),(11,12,13),(16,17,18)))
+    collect(middleThreeCols == DenseMatrix(DenseVector(1,2,3),DenseVector(6,7,8),DenseVector(11,12,13),DenseVector(16,17,18)))
 
     // last 3 rows, last 3 cols
     val rect = m.slice(1,4,2,5)
-    collect(rect == DenseMatrix((7,8,9),(12,13,14),(17,18,19)))
+    collect(rect == DenseMatrix(DenseVector(7,8,9),DenseVector(12,13,14),DenseVector(17,18,19)))
 
     val rectSecondRow = rect(1)
     collect(rectSecondRow == DenseVector(12,13,14))
 
     val rectSecondCol = rect.getCol(1)
-    collect(rectSecondCol == DenseVector(8,13,18))
+    collect(rectSecondCol == DenseVector(8,13,18).t)
+
+    mkReport
   }
 }
 

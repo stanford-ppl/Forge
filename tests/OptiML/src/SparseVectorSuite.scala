@@ -168,7 +168,7 @@ trait SparseVectorAccessors extends ForgeTestModule with OptiMLApplication {
     collect(vSlice == DenseVector(1,2))
     val vSlice2 = v2(3::5)
     collect(vSlice2 == DenseVector(4,5))
-    val vSlice3 = v2(IndexVector((4,2,0)))
+    val vSlice3 = v2(IndexVector(DenseVector(4,2,0)))
     collect(vSlice3 == DenseVector(5,3,1))
 
     mkReport
@@ -258,7 +258,7 @@ trait SparseVectorDistinct extends ForgeTestModule with OptiMLApplication {
     val v1 = SparseVector[Double](100,true)
     v1(0) = 10; v1(1) = 10; v1(2) = 5; v1(3) = 5; v1(4) = 0
 
-    collect(v1.contains(5.))
+    collect(v1.contains(5.0))
     collect(!v1.contains(7.5))
     collect(v1.distinct.length == 3)
     mkReport

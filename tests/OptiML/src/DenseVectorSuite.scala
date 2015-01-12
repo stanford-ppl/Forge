@@ -59,7 +59,7 @@ trait DenseVectorAccessors extends ForgeTestModule with OptiMLApplication {
     collect(vSlice == DenseVector(1,2))
     val vSlice2 = v2(3::5)
     collect(vSlice2 == DenseVector(4,5))
-    val vSlice3 = v2(IndexVector((4,2,0)))
+    val vSlice3 = v2(IndexVector(DenseVector(4,2,0)))
     collect(vSlice3 == DenseVector(5,3,1))
 
     mkReport
@@ -198,7 +198,7 @@ trait Init extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
     val v1 = DenseVector(1,2,3,4,5)
-    val v2 = DenseVector(1.,2.,3.,4.,5.)
+    val v2 = DenseVector(1.0,2.0,3.0,4.0,5.0)
 
     // just make sure we can reach here without an error
     collect(true)
@@ -267,8 +267,8 @@ object DistRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompile
 trait Dist extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
-    val v1 = DenseVector(10.,10.,5.,5.,0.)
-    val v2 = DenseVector(5.,5.,10.,10.,-5.)
+    val v1 = DenseVector(10.0,10.0,5.0,5.0,0.0)
+    val v2 = DenseVector(5.0,5.0,10.0,10.0,-5.0)
 
     collect(dist(v1,v2) == 25)
     mkReport
@@ -280,7 +280,7 @@ object DistinctRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCom
 trait Distinct extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
-    val v1 = DenseVector(10.,10.,5.,5.,0.)
+    val v1 = DenseVector(10.0,10.0,5.0,5.0,0.0)
     collect(v1.contains(5.0))
     collect(!v1.contains(7.5))
 
@@ -310,7 +310,7 @@ trait Median extends ForgeTestModule with OptiMLApplication {
 // trait NearestNeighbor extends ForgeTestModule with OptiMLApplication {
 //   def main() = {
 
-//     val m = DenseMatrix((1,1,1,1), (9,9,9,9), (-2,-2,-2,-2), (0,0,0,0), (1,1,1,1))
+//     val m = DenseMatrix(DenseVector(1,1,1,1), DenseVector(9,9,9,9), DenseVector(-2,-2,-2,-2), DenseVector(0,0,0,0), DenseVector(1,1,1,1))
 //     val nearestUnique = nearestNeighborIndex(0, m, false)
 //     collect(nearestUnique == 3)
 //     val nearestAny = nearestNeighborIndex(0, m)
@@ -372,7 +372,7 @@ object SimpleFlattenRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicati
 trait SimpleFlatten extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
-    val x = DenseVector((1,2,3,4,5), (6,7,8,9))
+    val x = DenseVector(DenseVector(1,2,3,4,5), DenseVector(6,7,8,9))
     val y = DenseVector.flatten(x)
     collect(y == DenseVector(1,2,3,4,5,6,7,8,9))
     mkReport

@@ -25,7 +25,7 @@ trait NodeDataOps {
 
     data(NodeData,("_data",MArrayBuffer(T)))
     static(NodeData)("apply", T, MInt :: NodeData(T)) implements allocates(NodeData,${array_buffer_strict_empty[T]($0)})
-    static(NodeData)("apply", T, MArray(T) :: NodeData(T)) implements allocates(NodeData,${array_buffer_new_imm($0, $0.length)})
+    static(NodeData)("apply", T, MArray(T) :: NodeData(T)) implements allocates(NodeData,${array_buffer_new_imm($0, array_length($0))})
     static(NodeData)("apply", T, MArrayBuffer(T) :: NodeData(T)) implements allocates(NodeData,${array_buffer_immutable($0)})
     static(NodeData)("fromFunction", T, (MInt,(MInt ==> T)) :: NodeData(T)) implements allocates(NodeData,${array_buffer_new_imm(array_fromfunction($0,$1), $0)})
 

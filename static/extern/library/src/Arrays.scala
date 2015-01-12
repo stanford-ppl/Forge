@@ -83,10 +83,10 @@ trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
   def array_buffer_strict_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
     = (new scala.collection.mutable.ArrayBuffer[T]()) ++ (new Array[T](__arg0))
   def array_buffer_new_imm[T:Manifest](__arg0: Rep[ForgeArray[T]], __arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]] = {
-    assert(__arg0.length > __arg1, "array_buffer_new_imm requires the initial array to be at least as large as the array buffer size")
+    assert(__arg0.length >= __arg1, "array_buffer_new_imm requires the initial array to be at least as large as the array buffer size")
     val out = new scala.collection.mutable.ArrayBuffer[T](__arg1)
-    for (i <- 0 until __arg0.length) {
-      out(i) = __arg0(i)
+    for (i <- 0 until __arg1) {
+      out += __arg0(i)
     }
     out
   }

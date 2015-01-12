@@ -132,8 +132,9 @@ trait IndexVectorOps {
       // }
 
       infix ("filter") ((MInt ==> MBoolean) :: IndexVector) implements composite ${
-        // use $self.map instead of toDense for fusion
-        indexvector_fromarray(densevector_raw_data($self.map(e => e).filter($1)), $self.isRow)
+        // map over array instead of using toDense for fusion
+        val data = array_filter(array_fromfunction($self.length, i => $self(i)), $1)
+        indexvector_fromarray(data, $self.isRow)
       }
 
       // parallel, so the conversion can fuse with the consumer

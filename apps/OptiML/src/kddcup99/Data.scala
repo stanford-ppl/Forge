@@ -9,7 +9,7 @@ trait KDDCup99Data extends OptiMLApplication {
 
 	// discrete features
   lazy val protocol_type 		= DiscreteFeature("tcp", "udp", "icmp")
-  lazy val service 					= DiscreteFeature(    
+  lazy val service 					= DiscreteFeature(
     "IRC",
     "X11",
     "Z39_50",
@@ -78,11 +78,11 @@ trait KDDCup99Data extends OptiMLApplication {
   )
 
   lazy val flag 						= DiscreteFeature("SF")  // normal or error status of the connection
-  lazy val land 						= BinaryFeature()  // 1 if connection is from/to the same host/port; 0 otherwise 
-  lazy val logged_in 				= BinaryFeature()  // 1 if successfully logged in; 0 otherwise 
+  lazy val land 						= BinaryFeature()  // 1 if connection is from/to the same host/port; 0 otherwise
+  lazy val logged_in 				= BinaryFeature()  // 1 if successfully logged in; 0 otherwise
   lazy val root_shell 			= BinaryFeature()  // 1 if root shell is obtained; 0 otherwise
   lazy val su_attempted 		= BinaryFeature()  // 1 if ``su root'' command attempted; 0 otherwise
-  lazy val is_hot_login 		= BinaryFeature()	 // 1 if the login belongs to the ``hot'' list; 0 otherwise 
+  lazy val is_hot_login 		= BinaryFeature()	 // 1 if the login belongs to the ``hot'' list; 0 otherwise
   lazy val is_guest_login 	= BinaryFeature()  // 1 if the login is a ``guest''login; 0 otherwise
 
   // continuous features
@@ -175,7 +175,7 @@ trait KDDCup99Data extends OptiMLApplication {
   	"normal",
 
   	// DOS
-		"back", 
+		"back",
 		"land",
 		"neptune",
 		"pod",
@@ -187,11 +187,11 @@ trait KDDCup99Data extends OptiMLApplication {
 		"udpstorm",
 
 		// R2L
-		"ftp_write", 
-		"guess_passwd", 
-		"imap", 
-		"multihop", 
-		"phf", 
+		"ftp_write",
+		"guess_passwd",
+		"imap",
+		"multihop",
+		"phf",
 		"spy",
 		"warezclient",
 		"warezmaster",
@@ -204,28 +204,28 @@ trait KDDCup99Data extends OptiMLApplication {
 		"xsnoop",
 
 		// U2R
-		"buffer_overflow", 
-		"loadmodule", 
-		"perl", 
+		"buffer_overflow",
+		"loadmodule",
+		"perl",
 		"rootkit",
 		"xterm",
 		"ps",
 		"httptunnel",
 		"worm",
-		
+
 		// probe
-		"ipsweep", 
-		"nmap", 
+		"ipsweep",
+		"nmap",
 		"portsweep",
 		"satan",
 		"mscan",
-		"saint"		
+		"saint"
 	)
 
   lazy val attack_category = DiscreteFeature("normal", "DOS", "R2L", "U2R", "probing")
 
-  // maps specific attacks to 5 main categories (normal, DOS, R2L, U2R, probing)  
-  def coarseLabel(label: Rep[Int]): Rep[Int] = {
+  // maps specific attacks to 5 main categories (normal, DOS, R2L, U2R, probing)
+  def coarseLabel(label: Rep[Double]): Rep[Double] = {
   	if (label == 0) attack_category("normal")
   	else if (label < NUM_DOS+1) attack_category("DOS")
   	else if (label < NUM_R2L+1) attack_category("R2L")
@@ -233,11 +233,11 @@ trait KDDCup99Data extends OptiMLApplication {
   	else attack_category("probing")
   }
 
-  def test(testSet: Rep[TrainingSet[Double,Int]], classify: Rep[DenseVectorView[Double]] => Rep[Int], numSamples: Rep[Int]) = {
+  def test(testSet: Rep[TrainingSet[Double,Double]], classify: Rep[DenseVectorView[Double]] => Rep[Double], numSamples: Rep[Int]) = {
     // returns [TN, TP, FP, FN]
-    sum(0, numSamples) { i =>      
+    sum(0, numSamples) { i =>
       if (i > 0 && i % 10000 == 0) println("sample: " + i)
-     
+
       val trueLabel = coarseLabel(testSet.labels.apply(i))
       val classifyLabel = classify(testSet(i))
       val predictedLabel = coarseLabel(classifyLabel)
@@ -254,13 +254,13 @@ trait KDDCup99Data extends OptiMLApplication {
       else {
         DenseVector(0, 0, 0, 1)
       }
-    }    
+    }
   }
 
-  def readKDDCupData(path: Rep[String], selectedFeatures: Rep[IndexVector] = 0::NUM_FEATURES): Rep[TrainingSet[Double,Int]] = {
+  def readKDDCupData(path: Rep[String], selectedFeatures: Rep[IndexVector] = 0::NUM_FEATURES): Rep[TrainingSet[Double,Double]] = {
   	val lines = readMatrix[String](path, s => s, ",")
   	val data = lines mapRows { row => parseNetworkRow(row) } getCols(selectedFeatures)
 	 	val labels = lines.getCol(lines.numCols-1).map(s => attack_type(s.slice(0,s.length-1)))
-	 	TrainingSet(data, labels) 
+	 	TrainingSet(data, labels)
 	}
 }

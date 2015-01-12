@@ -5,7 +5,7 @@ import ConfigParser
 
 DELITE_HOME = os.getenv("DELITE_HOME")
 
-scala_major_id = "scala-2.10"
+scala_major_id = "scala-2.11"
 script_path = os.path.dirname(__file__)
 # base directory for the project (either DSL or Delite or ?) i.e. drops the '/bin' from script_path
 script_home = os.path.split(script_path)[0]

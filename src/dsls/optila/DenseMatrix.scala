@@ -130,6 +130,20 @@ trait DenseMatrixOps {
     direct (DenseMatrix) ("triu", T withBound TArith, DenseMatrix(T) :: DenseMatrix(T)) implements redirect ${ $0.triu }
     direct (DenseMatrix) ("tril", T withBound TArith, DenseMatrix(T) :: DenseMatrix(T)) implements redirect ${ $0.tril }
 
+    // a non-type-safe way of passing the metadata required to allocate a DenseMatrix in a parallel op
+    // ideally we would encode this is as a type class, but it's not clear we would get an instance of this type class in dc_alloc
+    val CR = tpePar("CR")
+    compiler (DenseMatrix) ("densematrix_dc_alloc", (R,CR), (CR,MInt) :: DenseMatrix(R)) implements composite ${
+      val simpleName = manifest[CR].erasure.getSimpleName
+      val (numRows, numCols) = simpleName match {
+        case s if s.startsWith("DenseMatrixView") =>
+          (densematrixview_numrows($0.asInstanceOf[Rep[DenseMatrixView[Any]]]), densematrixview_numcols($0.asInstanceOf[Rep[DenseMatrixView[Any]]]))
+        case s if s.startsWith("DenseMatrix") =>
+          (densematrix_numrows($0.asInstanceOf[Rep[DenseMatrix[Any]]]), densematrix_numcols($0.asInstanceOf[Rep[DenseMatrix[Any]]]))
+      }
+      DenseMatrix[R](numRows, numCols)
+    }
+
     val DenseMatrixOps = withTpe (DenseMatrix)
     DenseMatrixOps {
       /**
@@ -138,6 +152,9 @@ trait DenseMatrixOps {
       // This workaround is required for 2.11 for some reason (the matrix conversion implicit fails to
       // resolve for vector * matrix).
       mustInfixList :::= List("toFloat", "toDouble")
+
+      // But on the other hand, infix is not working for these in 2.11.
+      noInfixList :::= List("slice", "vview", "getRow", "getCol")
 
       infix ("flattenToVector") (Nil :: DenseVector(T)) implements composite ${
         (0::$self.size) { i => densematrix_raw_apply($self, i) }
@@ -441,10 +458,10 @@ trait DenseMatrixOps {
       /**
        * Required for parallel collection
        */
-      compiler ("densematrix_dc_alloc") (MInt :: DenseMatrix(R), addTpePars = R) implements composite ${
-        // assert($1 == $self.size) // any reason this would not be true? <-- assert fails because it is staging time reference equality
-        DenseMatrix[R]($self.numRows, $self.numCols)
-      }
+      // compiler ("densematrix_dc_alloc") (MInt :: DenseMatrix(R), addTpePars = R) implements composite ${
+      //   // assert($1 == $self.size) // any reason this would not be true? <-- assert fails because it is staging time reference equality
+      //   DenseMatrix[R]($self.numRows, $self.numCols)
+      // }
       direct ("densematrix_raw_apply") (MInt :: T) implements composite ${ array_apply(densematrix_raw_data($self), $1) }
       direct ("densematrix_raw_update") ((MInt,T) :: MUnit, effect = write(0)) implements composite ${ array_update(densematrix_raw_data($self), $1, $2) }
 

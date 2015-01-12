@@ -17,14 +17,28 @@ trait DistributedOpsExp extends DistributedOps with DenseMatrixOpsExp {
   this: OptiLAExp =>
 
   // This is used when we to distribute a parallel op over a matrix; the size passed in is the total matrix size
-  // Each matrix chunk should allocate a smaller number of rows, depending on the total chunk size, while numCols is constant.      
+  // Each matrix chunk should allocate a smaller number of rows, depending on the total chunk size, while numCols is constant.
   // Is there any reason this shouldn't be the default implementation for densematrix_dc_alloc?
-  override def densematrix_dc_alloc[T:Manifest,R:Manifest](self: Rep[DenseMatrix[T]],__arg1: Rep[Int])(implicit __pos: SourceContext) = {
+  // override def densematrix_dc_alloc[T:Manifest,R:Manifest](self: Rep[DenseMatrix[T]],__arg1: Rep[Int])(implicit __pos: SourceContext) = {
+  //   if (ppl.delite.framework.Config.generateSerializable) {
+  //     val numRows = __arg1 / self.numCols
+  //     DenseMatrix[R](numRows, self.numCols)
+  //   }
+  //   else super.densematrix_dc_alloc[T,R](self,__arg1)
+  // }
+  override def densematrix_dc_alloc[R:Manifest,CR:Manifest](self: Rep[CR],__arg1: Rep[Int])(implicit __pos: SourceContext): Rep[DenseMatrix[R]] = {
     if (ppl.delite.framework.Config.generateSerializable) {
-      val numRows = __arg1 / self.numCols
-      DenseMatrix[R](numRows, self.numCols)
+      val simpleName = manifest[CR].erasure.getSimpleName
+      val numCols = simpleName match {
+        case s if s.startsWith("DenseMatrixView") =>
+          densematrixview_numcols(self.asInstanceOf[Rep[DenseMatrixView[Any]]])
+        case s if s.startsWith("DenseMatrix") =>
+          densematrix_numcols(self.asInstanceOf[Rep[DenseMatrix[Any]]])
+      }
+      val numRows = __arg1 / numCols
+      DenseMatrix[R](numRows, numCols)
     }
-    else super.densematrix_dc_alloc[T,R](self,__arg1)
+    else super.densematrix_dc_alloc[R,CR](self,__arg1)
   }
 }
 
@@ -37,13 +51,13 @@ trait ScalaGenDistributedOps extends ScalaGenDeliteStruct {
     if (isDenseMatrixTpe(structType)) {
       elems map { case (field,tp) =>
         val lhs = prefixL + "." + field
-        val rhs = prefixR + "." + field 
+        val rhs = prefixR + "." + field
         val newVal = field match {
           case "_numRows" => lhs + " + " + rhs
           case "_numCols" => lhs
           case "_data" => delite_array_combine(tp, lhs, rhs)
         }
-        (field,tp,newVal)      
+        (field,tp,newVal)
       }
     }
     else super.dc_combine(structType, elems, prefixL, prefixR)

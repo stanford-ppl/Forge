@@ -51,11 +51,11 @@ trait DenseMatrixViewOps {
 
       infix ("getRow") (MInt :: DenseVectorView(T)) implements composite ${
         val srcRow = densematrixview_startrow($self)+$1
-        $self.vview($1*densematrixview_srcnumcols($self), 1, $self.numCols, true)
+        $self.vview(srcRow*densematrixview_srcnumcols($self)+densematrixview_startcol($self), 1, $self.numCols, true)
       }
       infix ("getCol") (MInt :: DenseVectorView(T)) implements composite ${
         val srcCol = densematrixview_startcol($self)+$1
-        $self.vview(srcCol, densematrixview_srcnumcols($self), $self.numRows, false)
+        $self.vview(densematrixview_startrow($self)*densematrixview_srcnumcols($self)+srcCol, densematrixview_srcnumcols($self), $self.numRows, false)
       }
 
       infix ("slice") ((("startRow",MInt),("endRow",MInt),("startCol",MInt),("endCol",MInt)) :: DenseMatrixView(T)) implements composite ${
@@ -82,8 +82,8 @@ trait DenseMatrixViewOps {
       }
 
       direct ("densematrixview_raw_apply") (MInt :: T) implements composite ${
-        val offset = densematrixview_startrow($self)*densematrixview_srcnumcols($self)+densematrixview_startcol($self)
-        array_apply(densematrixview_data($self), offset+$1)
+        val (r,c) = unpack(matrix_shapeindex($1, $self.numCols))
+        $self(r,c)
       }
       compiler ("densematrixview_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("DenseMatrixViews cannot be allocated from a parallel op") }
       compiler ("densematrixview_illegalupdate") ((MInt, T) :: MNothing, effect = simple) implements composite ${ fatal("DenseMatrixViews cannot be updated") }

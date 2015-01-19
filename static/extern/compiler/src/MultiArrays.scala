@@ -1,74 +1,45 @@
-package LOWERCASE_DSL_NAME.shared
+package LOWERCASE_DSL_NAME.compiler
 
 import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common._
-import scala.virtualization.lms.util.OverloadHack
+import ppl.delite.framework.codegen.delite.overrides._
+import ppl.delite.framework.ops.DeliteOpsExp
+import ppl.delite.framework.datastructures._
+import ppl.delite.framework.Config
 
-// Front-end
-trait ForgeMultiArrayOps extends Base with OverloadHack {
-  this: ForgeHashMapOps =>
+// For compiler (Delite) implementation
+trait ForgeMultiArrayOpsExp extends DeliteMultiArrayOpsExp {
+  this: DeliteOpsExp with ForgeMultiMapOpsExp =>
 
-  type ForgeMultiArray[T]
-  type ForgeArray1D[T]
-  type ForgeArray2D[T]
-  type ForgeArray3D[T]
-  type ForgeArray4D[T]
-  type ForgeArray5D[T]
+  type ForgeMultiArray[T] = DeliteMultiArray[T]
+  type ForgeArray1D[T] = DeliteArray1D[T]
+  type ForgeArray2D[T] = DeliteArray2D[T]
+  type ForgeArray3D[T] = DeliteArray3D[T]
+  type ForgeArray4D[T] = DeliteArray4D[T]
+  type ForgeArray5D[T] = DeliteArray5D[T]
 
   // --- implicit manifests
-  implicit def forgeMultiArrayManifest[T:Manifest]: Manifest[ForgeMultiArray[T]]
-  implicit def forgeArray1DManifest[T:Manifest]: Manifest[ForgeArray1D[T]]
-  implicit def forgeArray2DManifest[T:Manifest]: Manifest[ForgeArray2D[T]]
-  implicit def forgeArray3DManifest[T:Manifest]: Manifest[ForgeArray3D[T]]
-  implicit def forgeArray4DManifest[T:Manifest]: Manifest[ForgeArray4D[T]]
-  implicit def forgeArray5DManifest[T:Manifest]: Manifest[ForgeArray5D[T]]
+  implicit def forgeMultiArrayManifest[T:Manifest] = manifest[DeliteMultiArray[T]]
+  implicit def forgeArray1DManifest[T:Manifest] = manifest[DeliteArray1D[T]]
+  implicit def forgeArray2DManifest[T:Manifest] = manifest[DeliteArray2D[T]]
+  implicit def forgeArray3DManifest[T:Manifest] = manifest[DeliteArray3D[T]]
+  implicit def forgeArray4DManifest[T:Manifest] = manifest[DeliteArray4D[T]]
+  implicit def forgeArray5DManifest[T:Manifest] = manifest[DeliteArray5D[T]]
 
   // --- inheritance casts
-  implicit def forgeArray1DToMultiArray[T:Manifest](ma: Rep[ForgeArray1D[T]]): Rep[ForgeMultiArray[T]]
-  implicit def forgeArray2DToMultiArray[T:Manifest](ma: Rep[ForgeArray2D[T]]): Rep[ForgeMultiArray[T]]
-  implicit def forgeArray3DToMultiArray[T:Manifest](ma: Rep[ForgeArray3D[T]]): Rep[ForgeMultiArray[T]]
-  implicit def forgeArray4DToMultiArray[T:Manifest](ma: Rep[ForgeArray4D[T]]): Rep[ForgeMultiArray[T]]
-  implicit def forgeArray5DToMultiArray[T:Manifest](ma: Rep[ForgeArray5D[T]]): Rep[ForgeMultiArray[T]]
-
-  /**
-   * Applications may need direct access to MultiArrays, if, for example, they use string fsplit
-   * How do we allow DSLs to only optionally include the Array API for end users?
-   */
-  implicit class ForgeMultiArrayOps[T:Manifest](ma: Rep[ForgeMultiArray[T]]) {
-    def apply(i: Rep[Int]*)(implicit ctx: SourceContext) = multia_apply(x,i)
-    def size = multia_size(x)
-  }
-  def multia_apply[T:Manifest](ma: Rep[ForgeMultiArray[T]],i: Seq[Rep[Int]])(implicit ctx: SourceContext): Rep[T]
-  def multia_size[T:Manifest](ma: Rep[ForgeMultiArray[T]])(implicit ctx: SourceContext): Rep[Int]
-}
-
-trait ForgeMultiArrayCompilerOps extends ForgeMultiArrayOps {
-  this: ForgeHashMapCompilerOps =>
-
-  object MultiArray {
-    def empty[T:Manifest](dims: Rep[Int]*)(implicit ctx: SourceContext) = multia_empty[T](dims)
-  }
-
-  implicit class ForgeMultiArrayCompilerOps[T:Manifest](ma: Rep[ForgeMultiArray[T]]) {
-    // --- rank casts
-    def as1D: Rep[ForgeArray1D[T]] = multia_as_1D(ma)
-    def as2D: Rep[ForgeArray2D[T]] = multia_as_2D(ma)
-    def as3D: Rep[ForgeArray3D[T]] = multia_as_3D(ma)
-    def as4D: Rep[ForgeArray4D[T]] = multia_as_4D(ma)
-    def as5D: Rep[ForgeArray5D[T]] = multia_as_5D(ma)
-
-    def update(i: Seq[Rep[Int]], x: Rep[T])(implicit ctx: SourceContext) = multia_update(ma,i,x)    
-    def map[R:Manifest](f: Rep[T] => Rep[R])(implicit ctx: SourceContext) = multia_map[T,R](ma,f)
-    def Clone(implicit ctx: SourceContext) = multia_clone(ma)
-  }
+  implicit def forgeArray1DToMultiArray[T:Manifest](ma: Rep[ForgeArray1D[T]]) = ma.asInstanceOf[Rep[ForgeMultiArray[T]]]
+  implicit def forgeArray2DToMultiArray[T:Manifest](ma: Rep[ForgeArray2D[T]]) = ma.asInstanceOf[Rep[ForgeMultiArray[T]]]
+  implicit def forgeArray3DToMultiArray[T:Manifest](ma: Rep[ForgeArray3D[T]]) = ma.asInstanceOf[Rep[ForgeMultiArray[T]]]
+  implicit def forgeArray4DToMultiArray[T:Manifest](ma: Rep[ForgeArray4D[T]]) = ma.asInstanceOf[Rep[ForgeMultiArray[T]]]
+  implicit def forgeArray5DToMultiArray[T:Manifest](ma: Rep[ForgeArray5D[T]]) = ma.asInstanceOf[Rep[ForgeMultiArray[T]]]
 
   // --- Rank type casts
-  def multia_as_1D[T:Manifest](ma: Rep[ForgeMultiArray[T]]): Rep[ForgeArray1D[T]]
-  def multia_as_2D[T:Manifest](ma: Rep[ForgeMultiArray[T]]): Rep[ForgeArray2D[T]]
-  def multia_as_3D[T:Manifest](ma: Rep[ForgeMultiArray[T]]): Rep[ForgeArray3D[T]]
-  def multia_as_4D[T:Manifest](ma: Rep[ForgeMultiArray[T]]): Rep[ForgeArray4D[T]]
-  def multia_as_5D[T:Manifest](ma: Rep[ForgeMultiArray[T]]): Rep[ForgeArray5D[T]]
+  def multia_as_1D[T:Manifest](ma: Rep[ForgeMultiArray[T]]) = dmultia_as_1D(ma)
+  def multia_as_2D[T:Manifest](ma: Rep[ForgeMultiArray[T]]) = dmultia_as_2D(ma)
+  def multia_as_3D[T:Manifest](ma: Rep[ForgeMultiArray[T]]) = dmultia_as_3D(ma)
+  def multia_as_4D[T:Manifest](ma: Rep[ForgeMultiArray[T]]) = dmultia_as_4D(ma)
+  def multia_as_5D[T:Manifest](ma: Rep[ForgeMultiArray[T]]) = dmultia_as_5D(ma)
 
   // --- Constructors
   def multia_empty[T:Manifest](dims: Seq[Rep[Int]])(implicit ctx: SourceContext): Rep[ForgeMultiArray[T]]
@@ -81,8 +52,10 @@ trait ForgeMultiArrayCompilerOps extends ForgeMultiArrayOps {
   // --- Properties
   def multia_rank[T:Manifest](ma: Rep[ForgeMultiArray[T]])(implicit ctx: SourceContext): Rep[Int]
   def multia_shape[T:Manifest](ma: Rep[ForgeMultiArray[T]])(implicit ctx: SourceContext): Rep[Seq[Rep[Int]]]
+  def multia_size[T:Manifest](ma: Rep[ForgeMultiArray[T]])(implicit ctx: SourceContext): Rep[Int]
 
   // --- Single element operators
+  def multia_apply[T:Manifest](ma: Rep[ForgeMultiArray[T]],i: Seq[Rep[Int]])(implicit ctx: SourceContext): Rep[T]
   def multia_update[T:Manifest](ma: Rep[ForgeMultiArray[T]],i: Seq[Rep[Int]],x: Rep[T])(implicit ctx: SourceContext): Rep[Unit]
   
   // --- Copies / Mutating / Permuting

@@ -42,55 +42,86 @@ trait ForgeMultiArrayOpsExp extends DeliteMultiArrayOpsExp {
   def multia_as_5D[T:Manifest](ma: Rep[ForgeMultiArray[T]]) = dmultia_as_5D(ma)
 
   // --- Constructors
-  def multia_empty[T:Manifest](dims: Seq[Rep[Int]])(implicit ctx: SourceContext): Rep[ForgeMultiArray[T]]
-  def multia_empty_imm[T:Manifest](dims: Seq[Rep[Int]])(implicit ctx: SourceContext): Rep[ForgeMultiArray[T]]
-  def multia_fromfunction[T:Manifest](dims: Seq[Rep[Int]], func: Rep[Seq[Rep[Int]]] => Rep[T])(implicit ctx: SourceContext): Rep[ForgeMultiArray[T]]
-  //def multia_from_sarray[T:Manifest](x: Rep[Array[T]])(implicit ctx: SourceContext): Rep[ForgeMultiArray[T]]
+  def multia_empty[T:Manifest](dims: Seq[Rep[Int]])(implicit ctx: SourceContext) = dmultia_new(dims)
+  def multia_empty_imm[T:Manifest](dims: Seq[Rep[Int]])(implicit ctx: SourceContext) = dmultia_new_immutable(dims)
+  def multia_fromfunction[T:Manifest](dims: Seq[Rep[Int]], func: Rep[Seq[Rep[Int]]] => Rep[T])(implicit ctx: SourceContext) = dmultia_fromfunction(dims,func)
   
-  def multia_view[T:Manifest](ma: Rep[ForgeMultiArray[T]], start: Seq[Rep[Int]], stride: Seq[Rep[Int]], dims: Seq[Rep[Int]]): Rep[ForgeMultiArray[T]]
+  def multia_view[T:Manifest](ma: Rep[ForgeMultiArray[T]], start: Seq[Rep[Int]], stride: Seq[Rep[Int]], dims: Seq[Rep[Int]]) = dmultia_view(ma,start,stride,dims)
 
   // --- Properties
-  def multia_rank[T:Manifest](ma: Rep[ForgeMultiArray[T]])(implicit ctx: SourceContext): Rep[Int]
-  def multia_shape[T:Manifest](ma: Rep[ForgeMultiArray[T]])(implicit ctx: SourceContext): Rep[Seq[Rep[Int]]]
-  def multia_size[T:Manifest](ma: Rep[ForgeMultiArray[T]])(implicit ctx: SourceContext): Rep[Int]
+  def multia_rank[T:Manifest](ma: Rep[ForgeMultiArray[T]])(implicit ctx: SourceContext) = dmultia_rank(ma)
+  def multia_shape[T:Manifest](ma: Rep[ForgeMultiArray[T]])(implicit ctx: SourceContext) = dmultia_shape(ma)
+  def multia_size[T:Manifest](ma: Rep[ForgeMultiArray[T]])(implicit ctx: SourceContext) = dmultia_size(ma)
 
   // --- Single element operators
-  def multia_apply[T:Manifest](ma: Rep[ForgeMultiArray[T]],i: Seq[Rep[Int]])(implicit ctx: SourceContext): Rep[T]
-  def multia_update[T:Manifest](ma: Rep[ForgeMultiArray[T]],i: Seq[Rep[Int]],x: Rep[T])(implicit ctx: SourceContext): Rep[Unit]
+  def multia_apply[T:Manifest](ma: Rep[ForgeMultiArray[T]],i: Seq[Rep[Int]])(implicit ctx: SourceContext) = dmultia_apply(ma,i)
+  def multia_update[T:Manifest](ma: Rep[ForgeMultiArray[T]],i: Seq[Rep[Int]],x: Rep[T])(implicit ctx: SourceContext) = dmultia_update(ma,i,x)
   
   // --- Copies / Mutating / Permuting
-  def multia_clone[T:Manifest](ma: Rep[ForgeMultiArray[T]])(implicit ctx: SourceContext): Rep[ForgeMultiArray[T]]
-  def multia_permute[T:Manifest](ma: Rep[ForgeMultiArray[T]], config: Seq[Int])(implicit ctx: SourceContext): Rep[ForgeMultiArray[T]]
-  def multia_reshape[T:Manifest](ma: Rep[ForgeMultiArray[T]], shape: Seq[Rep[Int]])(implicit ctx: SourceContext): Rep[ForgeMultiArray[T]]
+  def multia_clone[T:Manifest](ma: Rep[ForgeMultiArray[T]])(implicit ctx: SourceContext) = dmultia_clone(ma)
+  def multia_permute[T:Manifest](ma: Rep[ForgeMultiArray[T]], config: Seq[Int])(implicit ctx: SourceContext) = dmultia_permute(ma,config)
+  def multia_reshape[T:Manifest](ma: Rep[ForgeMultiArray[T]], shape: Seq[Rep[Int]])(implicit ctx: SourceContext) = dmultia_reshape(ma,shape)
 
   // --- Parallel ops
-  def multia_map[T:Manifest,R:Manifest](in: Rep[ForgeMultiArray[T]], func: Rep[T] => Rep[R])(implicit ctx: SourceContext): Rep[ForgeMultiArray[R]]
-  def multia_zipwith[T:Manifest,B:Manifest,R:Manifest](inA: Rep[ForgeMultiArray[T]],inB: Rep[ForgeMultiArray[B]], func: (Rep[T],Rep[B]) => Rep[R])(implicit ctx: SourceContext): Rep[ForgeMultiArray[R]]
-  def multia_reduce[T:Manifest](in: Rep[ForgeMultiArray[T]], func: (Rep[T],Rep[T]) => Rep[T], zero: Rep[T])(implicit ctx: SourceContext): Rep[T]
+  def multia_map[T:Manifest,R:Manifest](ma: Rep[ForgeMultiArray[T]], func: Rep[T] => Rep[R])(implicit ctx: SourceContext) = dmultia_map(ma,func)
+  def multia_zipwith[T:Manifest,B:Manifest,R:Manifest](ma: Rep[ForgeMultiArray[T]], mb: Rep[ForgeMultiArray[B]], func: (Rep[T],Rep[B]) => Rep[R])(implicit ctx: SourceContext) = dmultia_zipwith(ma,mb,func)
+  def multia_reduce[T:Manifest](ma: Rep[ForgeMultiArray[T]], func: (Rep[T],Rep[T]) => Rep[T], zero: Rep[T])(implicit ctx: SourceContext) = dmultia_reduce(ma,func,zero)
 
-  def multia_mmap[T:Manifest](in: Rep[ForgeMultiArray[T]], func: Rep[T] => Rep[T])(implicit ctx: SourceContext): Rep[Unit]
-  def multia_mzipwith[T:Manifest](inA: Rep[ForgeMultiArray[T]], inB: Rep[ForgeMultiArray[T]], func: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext): Rep[Unit]
+  def multia_mmap[T:Manifest](ma: Rep[ForgeMultiArray[T]], func: Rep[T] => Rep[T])(implicit ctx: SourceContext) = dmultia_mmap(ma,func)
+  def multia_mzipwith[T:Manifest,B:Manifest](ma: Rep[ForgeMultiArray[T]], mb: Rep[ForgeMultiArray[B]], func: (Rep[T],Rep[B]) => Rep[T])(implicit ctx: SourceContext) = dmultia_mzipwith(ma,mb,func)
 
-  // --- Bulk
-  def multia_mkstring[T:Manifest](ma: Rep[ForgeMultiArray[T]], del: Rep[String])(implicit ctx: SourceContext): Rep[String]
-  
+  def multia_NDmap[A:Manifest,B:Manifest](ma: Rep[ForgeMultiArray[A]], mdims: Seq[Int], func: Rep[ForgeMultiArray[A]] => Rep[ForgeMultiArray[B]])(implicit ctx: SourceContext) = dmultia_NDmap(ma,mdims,func)
+
+  // --- Buffer ops
+  def multia_NDinsert[A:Manifest](ma: Rep[ForgeMultiArray[A]], rhs: Rep[ForgeMultiArray[A]], axis: Int, index: Rep[Int])(implicit ctx: SourceContext) = dmultia_NDinsert(ma,rhs,axis,index)
+  def multia_NDappend[A:Manifest](ma: Rep[ForgeMultiArray[A]], rhs: Rep[ForgeMultiArray[A]], axis: Int)(implicit ctx: SourceContext) = dmultia_NDappend(ma,rhs,axis)
+
+  def multia_insertAll[A:Manifest](ma: Rep[ForgeMultiArray[A]], rhs: Rep[ForgeMultiArray[A]], axis: Int, index: Rep[Int])(implicit ctx: SourceContext) = dmultia_insertAll(ma,rhs,axis,index)
+  def multia_appendAll[A:Manifest](ma: Rep[ForgeMultiArray[A]], rhs: Rep[ForgeMultiArray[A]], axis: Int)(implicit ctx: SourceContext) = dmultia_appendAll(ma,rhs,axis,index)
+
+  // --- Misc.
+  def multia_mkstring[T:Manifest](ma: Rep[ForgeMultiArray[T]], dels: Seq[Rep[String]])(implicit ctx: SourceContext) = dmultia_mkstring(ma,dels)  
+  def multia_string_split(str: Rep[String], pat: Rep[String], ofs: Rep[Int] = unit(0))(implicit ctx: SourceContext) = dmultia_string_split(str,pat,ofs)
+
   // --- 1D Operations
-  def multia_sort[T:Manifest:Ordering](ma: Rep[ForgeArray1D[T]])(implicit ctx: SourceContext): Rep[ForgeArray1D[T]] = {
-    val indices = multia_sortIndices(ma.size, (i: Rep[Int]) => ma(i))
-    indices.map{i => ma(i)}
+  def multia_sortwith[T:Manifest](ma: Rep[ForgeArray1D[T]], comp: (Rep[T],Rep[T]) => Rep[Int])(implicit ctx: SourceContext)
+    = dmultia_sortIndices(ma.length, {(a,b) => 
+        val aV = ma(a)
+        val bV = ma(b)
+        comp(aV,bV)
+      })
+
+  def multia_sortIndices[R:Manifest:Ordering](len: Rep[Int], func: (Rep[Int] => Rep[R]))(implicit ctx: SourceContext)
+    = dmultia_sortIndices(len, {(a,b) =>
+        val aV = func(a)
+        val bV = func(b)
+
+        // Java comparator requires three conditions + default
+        if (delite_less_than(aV, bV)) unit(-1)
+        else if (delite_equals(aV, bV)) unit(0)
+        else if (delite_greater_than(aV, bV)) unit(1)
+        else unit(0)
+      })
+
+  def multia_flatmap[T:Manifest,R:Manifest](ma: Rep[ForgeArray1D[T]], func: Rep[T] => Rep[ForgeArray1D[R]])(implicit ctx: SourceContext) = dmultia_flatmap(ma,func)
+  def multia_filter[T:Manifest](ma: Rep[ForgeArray1D[T]], cond: Rep[T] => Rep[Boolean])(implicit ctx: SourceContext) = dmultia_filter(ma,cond)
+  def multia_groupBy[T:Manifest,K:Manifest](ma: Rep[ForgeArray1D[T]], key: Rep[T] => Rep[K])(implicit ctx: SourceContext) = dmultia_groupBy(ma,key)
+  def multia_groupByReduce[T:Manifest,K:Manifest,V:Manifest](ma: Rep[ForgeArray1D[T]],key: Rep[T] => Rep[K], value: Rep[T] => Rep[V], reduce: (Rep[V],Rep[V]) => Rep[V])(implicit ctx: SourceContext)
+    = dmultia_groupByReduce(ma,key,value,reduce)
+
+  // May need to change this implementation later..
+  def multia_fromseq[T:Manifest](sq: Seq[Rep[T]])(implicit ctx: SourceContext) = {
+    val out = dmultia_new[T](unit(sq.length))
+    for (i <- 0 until sq.length) {
+      out(unit(i)) = sq(i)
+    }
+    delite_unsafe_immutable(out)
   }
-  def multia_sortwith[T:Manifest](ma: Rep[ForgeArray1D[T]], comp: (Rep[T],Rep[T]) => Rep[Int])(implicit ctx: SourceContext): Rep[ForgeArray1D[T]] 
-  def multia_sortIndices[R:Manifest:Ordering](len: Rep[Int], comp: (Rep[Int] => Rep[R]))(implicit ctx: SourceContext): Rep[ForgeArray1D[Int]]
 
-  def multia_flatmap[T:Manifest,R:Manifest](in: Rep[ForgeArray1D[T]], func: Rep[T] => Rep[ForgeArray1D[R]])(implicit ctx: SourceContext): Rep[ForgeArray1D[R]]
-  def multia_filter[T:Manifest](in: Rep[ForgeArray1D[T]], cond: Rep[T] => Rep[Boolean])(implicit ctx: SourceContext): Rep[ForgeArray1D[T]]
-  def multia_groupBy[T:Manifest,K:Manifest](in: Rep[ForgeArray1D[T]], key: Rep[T] => Rep[K])(implicit ctx: SourceContext): Rep[ForgeMultiMap[K,ForgeArray1D[T]]]
-  def multia_groupByReduce[T:Manifest,K:Manifest,V:Manifest](in: Rep[ForgeArray1D[T]],key: Rep[T] => Rep[K], value: Rep[T] => Rep[V], reduce: (Rep[V],Rep[V]) => Rep[V])(implicit ctx: SourceContext): Rep[ForgeMultiMap[K,V]]
-
-  def multia_fromseq[T:Manifest](sq: Seq[Rep[T]])(implicit ctx: SourceContext): Rep[ForgeArray1D[T]]
-  def multia_string_split(str: Rep[String], pat: Rep[String], ofs: Rep[Int] = unit(0))(implicit ctx: SourceContext): Rep[ForgeArray1D[String]]
+  def multia_insert[A:Manifest](ma: Rep[ForgeArray1D[A]], x: Rep[A], index: Rep[Int])(implicit ctx: SourceContext) = dmultia_insert(ma,x,index)
+  def multia_append[A:Manifest](ma: Rep[ForgeArray1D[A]], x: Rep[A])(implicit ctx: SourceContext) = dmultia_append(ma,x)
 
   // --- 2D Operations
-  def multia_matmult[T:Manifest:Numeric](lhs: Rep[ForgeArray2D[T]], rhs: Rep[ForgeArray2D[T]])(implicit ctx: SourceContext): Rep[ForgeArray2D[T]]
-  def multia_matvecmult[T:Manifest:Numeric](lhs: Rep[ForgeArray2D[T]], rhs: Rep[ForgeArray1D[T]])(implicit ctx: SourceContext): Rep[ForgeArray1D[T]]
+  def multia_matmult[T:Manifest:Numeric](lhs: Rep[ForgeArray2D[T]], rhs: Rep[ForgeArray2D[T]])(implicit ctx: SourceContext) = dmultia_matmult(lhs,rhs)
+  def multia_matvecmult[T:Manifest:Numeric](mat: Rep[ForgeArray2D[T]], vec: Rep[ForgeArray1D[T]])(implicit ctx: SourceContext) = dmultia_matvecmult(lhs,rhs)
 }

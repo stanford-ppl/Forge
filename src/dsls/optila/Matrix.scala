@@ -70,10 +70,21 @@ trait MatrixOps {
       infix ("colIndices") (Nil :: IndexVector) implements composite ${ IndexVector(0, $self.numCols) }
 
       infix ("getRows") (IndexVector :: DenseMatrix(T)) implements composite ${
-        ($1, *) { i => $self(i) }
+        // ($1, *) { i => $self(i) }
+        if ($1.length == 0) densematrix_fromarray[T](array_empty_imm[T](0), 0, $self.numCols)
+        else {
+          var z = $self // manual guard against code motion
+          ($1, *) { i => z(i) }
+        }
       }
       infix ("getCols") (IndexVector :: DenseMatrix(T)) implements composite ${
-        (*, $1) { j => $self.getCol(j) }
+        // (*, $1) { j => $self.getCol(j) }
+        if ($1.length == 0) densematrix_fromarray[T](array_empty_imm[T](0), $self.numRows, 0)
+        else {
+          var z = $self // manual guard against code motion
+          (*, $1) { j => z.getCol(j) }
+        }
+
       }
 
       infix ("sliceRows") ((("start",MInt),("end",MInt)) :: DenseMatrixView(T)) implements composite ${ $self.slice(start, end, 0, $self.numCols) }

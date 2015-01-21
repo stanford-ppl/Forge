@@ -29,7 +29,12 @@ trait DenseMatrixOps {
     // matrix from vector of vectors
     for (v <- List(DenseVector(T),DenseVectorView(T))) {
       static (DenseMatrix) ("apply", T, (DenseVector(v)) :: DenseMatrix(T)) implements composite ${
-        (0::$0.length, *) { i => $0(i) }
+        // (0::$0.length, *) { i => $0(i) }
+        if ($0.length == 0) densematrix_fromarray[T](array_empty_imm[T](0), 0, 0)
+        else {
+          var z = $0 // manual guard against code motion
+          (0::z.length, *) { i => z(i) }
+        }
       }
     }
 
@@ -458,10 +463,6 @@ trait DenseMatrixOps {
       /**
        * Required for parallel collection
        */
-      // compiler ("densematrix_dc_alloc") (MInt :: DenseMatrix(R), addTpePars = R) implements composite ${
-      //   // assert($1 == $self.size) // any reason this would not be true? <-- assert fails because it is staging time reference equality
-      //   DenseMatrix[R]($self.numRows, $self.numCols)
-      // }
       direct ("densematrix_raw_apply") (MInt :: T) implements composite ${ array_apply(densematrix_raw_data($self), $1) }
       direct ("densematrix_raw_update") ((MInt,T) :: MUnit, effect = write(0)) implements composite ${ array_update(densematrix_raw_data($self), $1, $2) }
 

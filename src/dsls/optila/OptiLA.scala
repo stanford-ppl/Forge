@@ -176,22 +176,29 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
 
     for (rhs <- List(DenseVector(T)/*, DenseVectorView(T))*/)) {
       infix (IndexVector) ("apply", T, (CTuple2(IndexVector,IndexWildcard), MInt ==> rhs) :: DenseMatrix(T)) implements composite ${
-        // Prefer immutable version and materialize vectors incrementally to enable garbage collection.
         val rowIndices = $0._1
-        // val arrayIndices = array_buffer_fromfunction(rowIndices.length, i => rowIndices(i))
-        // val arrayIndices = array_buffer_new_imm(array_fromfunction(rowIndices.length, i => rowIndices(i)), rowIndices.length)
-        // val outData = array_buffer_flatmap[Int,T](arrayIndices, i => {
-        //   val v = $1(i)
-        //   array_buffer_new_imm(densevector_raw_data(v), v.length)
-        // })
 
+        /**
+         * Option 1: Immutable and allocate vectors up front
+         *           + speed, - memory
+         */
+        // We don't put a check with manual guard here, because it interferes with fusing rowVectors and the subsequent
+        // constructor. Instead, callers are responsible for ensuring the IndexVector is not empty.
+        fassert(rowIndices.length > 0, "error: matrix constructor with empty indices")
+        val rowVectors = rowIndices.map(i => $1(i))
+        val numCols = rowVectors(0).length
+        (0::rowVectors.length, 0::numCols) { (i,j) => rowVectors(i).apply(j) }
+
+        /**
+         * Option 2: Immutable and materialize vectors incrementally to enable garbage collection
+         *           - speed, + memory
+         *
         val arrayIndices = array_fromfunction(rowIndices.length, i => rowIndices(i))
         val outData = array_flatmap[Int,T](arrayIndices, i => {
           val v = $1(i)
           array_fromfunction(v.length, i => v(i))
         })
 
-        // val numCols = $1(rowIndices(0)).length
         val numCols =
           if (rowIndices.length == 0) 0
           else {
@@ -199,42 +206,44 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
             $1(z(0)).length // better be pure
           }
 
-        // densematrix_fromarray(array_buffer_result(outData),rowIndices.length,numCols)
         densematrix_fromarray(outData,rowIndices.length,numCols)
+        */
 
-        // val rowVectors = rowIndices.map(i => $1(i))
-        // // We don't put a check with manual guard here, because it interferes with fusing rowVectors and the subsequent
-        // // constructor. Instead, callers are responsible for ensuring the IndexVector is not empty.
-        // fassert(rowIndices.length > 0, "error: matrix constructor with empty indices")
-        // val numCols = rowVectors(0).length
-        // (0::rowVectors.length, 0::numCols) { (i,j) => rowVectors(i).apply(j) }
-
-        // effectful version is more efficient, but prevents optimizations and distribution
-        //
-        // val first = $1(rowIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
-        // val out = DenseMatrix[T](rowIndices.length,first.length)
-        // (0::rowIndices.length) foreach { i =>
-        //   out(i) = $1(rowIndices(i))
-        // }
-        // out.unsafeImmutable
+        /**
+         * Option 3: Mutable
+         *           + speed, + memory, - optimizations / distribution
+         *
+        val first = $1(rowIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
+        val out = DenseMatrix[T](rowIndices.length,first.length)
+        (0::rowIndices.length) foreach { i =>
+          out(i) = $1(rowIndices(i))
+        }
+        out.unsafeImmutable
+        */
       }
 
       infix (IndexVector) ("apply", T, (CTuple2(IndexWildcard,IndexVector), MInt ==> rhs) :: DenseMatrix(T)) implements composite ${
         val colIndices = $0._2
-        // val arrayIndices = array_buffer_fromfunction(colIndices.length, i => colIndices(i))
-        // val arrayIndices = array_buffer_new_imm(array_fromfunction(colIndices.length, i => colIndices(i)), colIndices.length)
-        // val outData = array_buffer_flatmap[Int,T](arrayIndices, i => {
-        //   val v = $1(i)
-        //   array_buffer_new_imm(densevector_raw_data(v), v.length)
-        // })
 
+        /**
+         * Option 1: Immutable and allocate vectors up front
+         *           + speed, - memory
+         */
+        fassert(colIndices.length > 0, "error: matrix constructor with empty indices")
+        val colVectors = colIndices.map(i => $1(i))
+        val numRows = colVectors(0).length
+        (0::numRows, 0::colVectors.length) { (i,j) => colVectors(j).apply(i) }
+
+        /**
+         * Option 2: Immutable and materialize vectors incrementally to enable garbage collection
+         *           - speed, + memory
+         *
         val arrayIndices = array_fromfunction(colIndices.length, i => colIndices(i))
         val outData = array_flatmap[Int,T](arrayIndices, i => {
           val v = $1(i)
           array_fromfunction(v.length, i => v(i))
         })
 
-        // val numRows = $1(colIndices(0)).length
         val numRows =
           if (colIndices.length == 0) 0
           else {
@@ -243,20 +252,20 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
           }
 
         // We have to transpose here since we filled the output array in the (incorrect) column-major order.
-        // (densematrix_fromarray(array_buffer_result(outData),colIndices.length,numRows)).t
         (densematrix_fromarray(outData,colIndices.length,numRows)).t
+        */
 
-        // fassert(colIndices.length > 0, "error: matrix constructor with empty indices")
-        // val colVectors = colIndices.map(i => $1(i))
-        // val numRows = colVectors(0).length
-        // (0::numRows, 0::colVectors.length) { (i,j) => colVectors(j).apply(i) }
-
-        // val first = $1(colIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
-        // val out = DenseMatrix[T](first.length, colIndices.length)
-        // (0::colIndices.length) foreach { j =>
-        //   out.updateCol(j, $1(colIndices(j)))
-        // }
-        // out.unsafeImmutable
+        /**
+         * Option 3: Mutable
+         *           + speed, + memory, - optimizations / distribution
+         *
+        val first = $1(colIndices(0)) // better be pure, because we ignore it to maintain normal loop size below
+        val out = DenseMatrix[T](first.length, colIndices.length)
+        (0::colIndices.length) foreach { j =>
+          out.updateCol(j, $1(colIndices(j)))
+        }
+        out.unsafeImmutable
+        */
       }
     }
   }

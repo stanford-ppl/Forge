@@ -50,7 +50,7 @@ trait OptiMLDSL extends OptiLADSL
     val T = tpePar("T")
 
     // "block" should not mutate the input, but always produce a new copy. in this version, block can change the structure of the input across iterations (e.g. increase its size)
-    direct (Control) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, "unit(.001)"), ("minIter", MInt, "unit(1)"), ("maxIter", MInt, "unit(1000)")), ("block", T ==> T)), T), ("diff", (T,T) ==> MDouble)) implements composite ${
+    direct (Control) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, "unit(.001)"), ("minIter", MInt, "unit(1)"), ("maxIter", MInt, "unit(1000)"), ("verbose", MBoolean, "unit(true)")), ("block", T ==> T)), T), ("diff", (T,T) ==> MDouble)) implements composite ${
       var delta = scala.Double.MaxValue
       var cur = x
       var iter = 0
@@ -63,11 +63,13 @@ trait OptiMLDSL extends OptiLADSL
         cur = next
       }
 
-      if (iter == maxIter){
-        println("[optiml]: maximum iterations (" + iter + ") exceeded")
-      }
-      else {
-        println("[optiml]: converged in " + iter + " iterations")
+      if (verbose) {
+        if (iter == maxIter) {
+          println("[optiml]: maximum iterations (" + iter + ") exceeded")
+        }
+        else {
+          println("[optiml]: converged in " + iter + " iterations")
+        }
       }
 
       cur

@@ -31,7 +31,8 @@ trait ClassifierOps {
     direct (Classifier) ("logreg", Nil, MethodSignature(List(
                                             ("data",TrainingSet(MDouble,MBoolean)),
                                             ("learningRate", MDouble, "unit(1.0)"),
-                                            ("maxIter", MInt, "unit(30)")
+                                            ("maxIter", MInt, "unit(30)"),
+                                            ("verbose", MBoolean, "unit(true)")
                                           ), DenseVector(MDouble))) implements composite ${
 
       val theta = DenseVector.zeros(data.numFeatures)
@@ -41,7 +42,8 @@ trait ClassifierOps {
 
       // batch gradient descent with logistic function
       val _maxIter = maxIter
-      val w = untilconverged(theta, maxIter = _maxIter) { cur =>
+      val _verbose = verbose
+      val w = untilconverged(theta, maxIter = _maxIter, verbose = _verbose) { cur =>
         val gradient =
           ((0::data.numSamples) { i =>
             data(i)*(y(i) - sigmoid(cur *:* data(i)))

@@ -77,13 +77,15 @@ object FileStreamWriteBRunnerI extends ForgeTestRunnerInterpreter with OptiMLApp
 trait FileStreamWriteB extends ForgeTestModule with OptiMLApplication with StreamSuitePaths {
   def main() = {
     val f = FileStream(testMat)
-    f.map(testMat2) { line =>
+    val g = f.map(testMat2) { line =>
       val tokens = line.trim.fsplit("\\s+")
       val v = (0::array_length(tokens)) { i => array_apply(tokens, i).toDouble }
       (v+1).makeStr
     }
 
+    // contents of testMat and testMat2 tested in next phase
     collect(true)
+
     mkReport
   }
 }

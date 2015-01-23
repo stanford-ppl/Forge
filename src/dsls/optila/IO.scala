@@ -76,7 +76,7 @@ trait IOOps {
         val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
         val tokenVector = densevector_fromarray(tokens, true)
         val outRow = schemaBldr(tokenVector)
-        array_fromfunction(outRow.length, i => outRow(i))
+        outRow.toArray
       }
       val numCols = schemaBldr(densevector_fromarray(readFirstLine(path).trim.fsplit(delim, -1), true)).length
       densematrix_fromarray(a, array_length(a) / numCols, numCols)

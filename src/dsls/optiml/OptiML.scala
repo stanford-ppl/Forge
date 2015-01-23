@@ -27,6 +27,15 @@ trait OptiMLDSL extends OptiLADSL
     // compiler (whileDo) lookupImpl("Misc","__whileDo").apply(0)
     // impl (whileDo) (composite ${ fatal("illegal operation: 'while'. try using 'untilconverged' instead") })
 
+    // OptiML types
+    val V = tpePar("V")
+    val T = tpePar("T")
+    val HashStream = tpe("HashStream", V)
+    val FileStream = tpe("FileStream")
+    val ComputeStream = tpe("ComputeStream", T)
+
+    // OptiML ops
+    importByteBuffer()
     extern(grp("Sum"))
     importBufferableOps()
     importFeatureOps()

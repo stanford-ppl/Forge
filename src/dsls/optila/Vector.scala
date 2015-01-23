@@ -297,7 +297,9 @@ trait VectorOps {
        * Data exchange
        */
 
-      infix ("toArray") (Nil :: MArray(T)) implements composite ${ densevector_raw_data($self.map(e => e)) }
+      infix ("toArray") (Nil :: MArray(T)) implements composite ${
+        array_fromfunction($self.length, i => $self(i))
+      }
     }
   }
 }

@@ -193,10 +193,10 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
          * Option 2: Immutable and materialize vectors incrementally to enable garbage collection
          *           - speed, + memory
          *
-        val arrayIndices = array_fromfunction(rowIndices.length, i => rowIndices(i))
+        val arrayIndices = rowIndices.toArray
         val outData = array_flatmap[Int,T](arrayIndices, i => {
           val v = $1(i)
-          array_fromfunction(v.length, i => v(i))
+          v.toArray
         })
 
         val numCols =
@@ -238,10 +238,10 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
          * Option 2: Immutable and materialize vectors incrementally to enable garbage collection
          *           - speed, + memory
          *
-        val arrayIndices = array_fromfunction(colIndices.length, i => colIndices(i))
+        val arrayIndices = colIndices.toArray
         val outData = array_flatmap[Int,T](arrayIndices, i => {
           val v = $1(i)
-          array_fromfunction(v.length, i => v(i))
+          v.toArray
         })
 
         val numRows =

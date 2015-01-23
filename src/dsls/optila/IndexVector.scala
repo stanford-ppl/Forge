@@ -133,7 +133,7 @@ trait IndexVectorOps {
 
       infix ("filter") ((MInt ==> MBoolean) :: IndexVector) implements composite ${
         // map over array instead of using toDense for fusion
-        val data = array_filter(array_fromfunction($self.length, i => $self(i)), $1)
+        val data = array_filter($self.toArray, $1)
         indexvector_fromarray(data, $self.isRow)
       }
 

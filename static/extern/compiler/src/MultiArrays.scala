@@ -1,6 +1,5 @@
 package LOWERCASE_DSL_NAME.compiler
 
-import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common._
 import ppl.delite.framework.codegen.delite.overrides._
@@ -9,7 +8,14 @@ import ppl.delite.framework.datastructures._
 import ppl.delite.framework.Config
 
 // For compiler (Delite) implementation
-trait ForgeMultiArrayOpsExp extends DeliteMultiArrayOpsExp {
+
+trait ForgeLayoutsExp {
+  this: ForgeMultiArrayOpsExp =>
+
+  type FLayout[T,R] = Layout[T,R]
+}
+
+trait ForgeMultiArrayOpsExp extends DeliteMultiArrayOpsExp with ForgeLayoutsExp {
   this: DeliteOpsExp with ForgeMultiMapOpsExp =>
 
   type ForgeMultiArray[T] = DeliteMultiArray[T]

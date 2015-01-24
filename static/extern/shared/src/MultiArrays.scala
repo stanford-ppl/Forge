@@ -1,14 +1,15 @@
 package LOWERCASE_DSL_NAME.shared
 
-import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common._
-import scala.virtualization.lms.util.OverloadHack
 
 // Front-end
-trait ForgeMultiArrayOps extends Base with OverloadHack {
-  this: ForgeHashMapOps =>
 
+trait ForgeLayouts {
+  type FLayout[T,R]
+}
+
+trait ForgeMultiArrayOps extends Base with ForgeLayouts {
   type ForgeMultiArray[T]
   type ForgeArray1D[T]
   type ForgeArray2D[T]
@@ -44,7 +45,7 @@ trait ForgeMultiArrayOps extends Base with OverloadHack {
 }
 
 trait ForgeMultiArrayCompilerOps extends ForgeMultiArrayOps {
-  this: ForgeHashMapCompilerOps =>
+  this: ForgeMultiMapCompilerOps with ForgeArrayCompilerOps =>
 
   object MultiArray {
     def empty[T:Manifest](dims: Rep[Int]*)(implicit ctx: SourceContext) = multia_empty[T](dims)
@@ -74,8 +75,7 @@ trait ForgeMultiArrayCompilerOps extends ForgeMultiArrayOps {
   def multia_empty[T:Manifest](dims: Seq[Rep[Int]])(implicit ctx: SourceContext): Rep[ForgeMultiArray[T]]
   def multia_empty_imm[T:Manifest](dims: Seq[Rep[Int]])(implicit ctx: SourceContext): Rep[ForgeMultiArray[T]]
   def multia_fromfunction[T:Manifest](dims: Seq[Rep[Int]], func: Rep[Seq[Rep[Int]]] => Rep[T])(implicit ctx: SourceContext): Rep[ForgeMultiArray[T]]
-  //def multia_from_sarray[T:Manifest](x: Rep[Array[T]])(implicit ctx: SourceContext): Rep[ForgeMultiArray[T]]
-  
+
   def multia_view[T:Manifest](ma: Rep[ForgeMultiArray[T]], start: Seq[Rep[Int]], stride: Seq[Rep[Int]], dims: Seq[Rep[Int]]): Rep[ForgeMultiArray[T]]
 
   // --- Properties
@@ -113,6 +113,14 @@ trait ForgeMultiArrayCompilerOps extends ForgeMultiArrayOps {
   def multia_mkstring[T:Manifest](ma: Rep[ForgeMultiArray[T]], dels: Seq[Rep[String]])(implicit ctx: SourceContext): Rep[String]
   def multia_string_split(str: Rep[String], pat: Rep[String], ofs: Rep[Int] = unit(0))(implicit ctx: SourceContext): Rep[ForgeArray1D[String]]
 
+  /* Possible alternative? 
+
+  def multia_string_split(str: Exp[String], pat: Exp[String], ofs: Exp[Int] = unit(0))(implicit ctx: SourceContext) = {
+    val result = array_string_split(str,pat,ofs)
+    multia_unpin(result, FlatLayout[String](1), Seq(array_length(result))).as1D
+  }
+  */
+
   // --- 1D Operations
   def multia_sort[T:Manifest:Ordering](ma: Rep[ForgeArray1D[T]])(implicit ctx: SourceContext): Rep[ForgeArray1D[T]] = {
     val indices = multia_sortIndices(ma.size, {i => ma(i)})
@@ -134,4 +142,8 @@ trait ForgeMultiArrayCompilerOps extends ForgeMultiArrayOps {
   // --- 2D Operations
   def multia_matmult[T:Manifest:Numeric](lhs: Rep[ForgeArray2D[T]], rhs: Rep[ForgeArray2D[T]])(implicit ctx: SourceContext): Rep[ForgeArray2D[T]]
   def multia_matvecmult[T:Manifest:Numeric](mat: Rep[ForgeArray2D[T]], vec: Rep[ForgeArray1D[T]])(implicit ctx: SourceContext): Rep[ForgeArray1D[T]]
+
+  // --- Pinning
+  def multia_pin[T:Manifest,R:Manifest](ma: Rep[ForgeMultiArray[T]], layout: FLayout[T,R])(implicit ctx: SourceContext): Rep[ForgeArray[R]]
+  def multia_unpin[T:Manifest,R:Manifest](in: Rep[ForgeArray[R]], layout: FLayout[T,R], shape: Seq[Rep[Int]])(implicit ctx: SourceContext): Rep[ForgeMultiArray[T]]
 }

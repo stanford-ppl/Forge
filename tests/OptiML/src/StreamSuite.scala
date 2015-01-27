@@ -101,10 +101,12 @@ trait FileStreamRead extends ForgeTestModule with OptiMLApplication with StreamS
       collect(v == DenseVector.ones(100))
     }
 
-    val total = f.reduce(0.0) { (acc, line) =>
+    val total = f.reduce(0.0) { line =>
       val tokens = line.trim.fsplit("\\s+")
       val v = (0::array_length(tokens)) { i => array_apply(tokens, i).toDouble }
-      acc + sum(v)
+      sum(v)
+    } {
+      (a,b) => a+b
     }
 
     val a = readMatrix(testMat)

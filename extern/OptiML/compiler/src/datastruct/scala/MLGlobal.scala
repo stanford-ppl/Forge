@@ -21,8 +21,11 @@ object MLGlobal {
       identifierMap.get(s)
     }
     else {
-      identifierMap.put(s, nextId.get())
-      nextId.getAndIncrement()
+      val id = nextId.getAndIncrement()
+      // If someone else assigns an id to this string first, the next string will skip an id value.
+      // While this is not ideal, it is still correct, as a contiguous id range is not guaranteed.
+      val z = identifierMap.putIfAbsent(s, id)
+      if (z == 0) id else z
     }
   }
 

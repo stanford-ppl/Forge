@@ -8,13 +8,17 @@ import core.{ForgeApplication,ForgeApplicationRunner}
  * Stream provides basic iterator functionality over a file or computation too
  * large to fit in memory.
  *
+ * Note: HashStream's mapValues and FileStream's map/mapRows will both skip writing empty
+ *       lines / rows to file, which allows for in-line filtering of bad records.
+ *
  * Current limitations:
  *   1) HashStream is single-box, Scala-only (uses an embedded DB via codegen methods, lambda for deserialization)
- *   2) FileStream & HashStream are sequential (groupRowsBy would require a lock on the underlying HashStream)
- *   3) FileStream groupRowsBy uses a logical key naming scheme that depends on LevelDB's sorted key storage for efficiency.
+ *   2) FileStream groupRowsBy uses a logical key naming scheme that depends on LevelDB's sorted key storage for efficiency.
  */
 trait StreamOps {
   this: OptiMLDSL =>
+
+  val HASH_LOGICAL_KEY_PREFIX = "_LK_"
 
   def importStreamOps() {
     importHashStreamOps()
@@ -23,37 +27,83 @@ trait StreamOps {
   }
 
   def importHashStreamOps() {
-    val V = tpePar("V")
     val HashStream = lookupTpe("HashStream")
     val FileStream = lookupTpe("FileStream")
+    val DenseVector = lookupTpe("DenseVector")
     val Tup2 = lookupTpe("Tup2")
+    val V = tpePar("V")
+    val R = tpePar("R")
 
     val LevelDB = tpe("org.iq80.leveldb.DB")
     primitiveTpePrefix ::= "org.iq80"
 
     data(HashStream, ("_table", MString), ("_db", LevelDB), ("_deserialize", MLambda(Tup2(HashStream(V),MString), V)))
 
-    static (HashStream) ("apply", V, (("table", MString), ("deserialize", (HashStream(V),MString) ==> V)) :: HashStream(V), effect = mutable) implements
+    static (HashStream) ("apply", V, (("table", MString), ("deserialize", (HashStream(V),MString) ==> V)) :: HashStream(V), effect = mutable) implements composite ${
+      val hash = hash_alloc_raw[V](table, deserialize)
+      hash.open()
+      hash
+    }
+
+    compiler (HashStream) ("hash_alloc_raw", V, (("table", MString), ("deserialize", (HashStream(V),MString) ==> V)) :: HashStream(V), effect = mutable) implements
       allocates(HashStream, ${$0}, "unit(null.asInstanceOf[org.iq80.leveldb.DB])", ${doLambda((t: Rep[Tup2[HashStream[V],String]]) => deserialize(t._1, t._2))})
 
 
     // -- code generated internal methods interface with the embedded db
 
-    compiler (HashStream) ("hash_open_internal", Nil, MString :: LevelDB) implements codegen($cala, ${
+    // We use simple effects in lieu of read / write effects because these are codegen nodes,
+    // so we cannot pass the struct to them (a limitation of Forge at the moment).
+
+    compiler (HashStream) ("hash_open_internal", Nil, MString :: LevelDB, effect = simple) implements codegen($cala, ${
       import org.iq80.leveldb._
       import org.fusesource.leveldbjni.JniDBFactory._
       val options = new Options()
       options.createIfMissing(true)
+      // options.cacheSize(100000000L)
       val db = factory.open(new java.io.File($0), options)
       db
     })
 
-    compiler (HashStream) ("hash_get_internal", Nil, (LevelDB, MString) :: MArray(MByte)) implements codegen($cala, ${
+    compiler (HashStream) ("hash_get_internal", Nil, (LevelDB, MString) :: MArray(MByte), effect = simple) implements codegen($cala, ${
       $0.get(org.fusesource.leveldbjni.JniDBFactory.bytes($1))
+    })
+
+    compiler (HashStream) ("hash_get_range_internal", Nil, (LevelDB, MString, MInt) :: MArray(MArray(MByte)), effect = simple) implements codegen($cala, ${
+      // workaround for named arguments in codegen methods not working
+      val db = $0
+      val startKey = $1
+      val numKeys = $2
+
+      val buf = scala.collection.mutable.ArrayBuffer[Array[Byte]]()
+      val iterator = db.iterator()
+      iterator.seek(org.fusesource.leveldbjni.JniDBFactory.bytes(startKey))
+
+      var pos = 0
+      while (iterator.hasNext && pos < numKeys) {
+        val key = org.fusesource.leveldbjni.JniDBFactory.asString(iterator.peekNext().getKey())
+        buf += iterator.peekNext().getValue()
+        iterator.next()
+        pos += 1
+      }
+
+      iterator.close()
+      buf.toArray
     })
 
     compiler (HashStream) ("hash_put_internal", Nil, (LevelDB, MString, MArray(MByte)) :: MUnit, effect = simple) implements codegen($cala, ${
       $0.put(org.fusesource.leveldbjni.JniDBFactory.bytes($1), $2)
+    })
+
+    compiler (HashStream) ("hash_put_all_internal", Nil, (LevelDB, MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
+      assert($1.length >= $3 && $2.length >= $3, "HashStream putAll called with too small arrays")
+      val batch = $0.createWriteBatch()
+      var i = 0
+      while (i < $3) {
+        batch.put(org.fusesource.leveldbjni.JniDBFactory.bytes($1(i)), $2(i))
+        i += 1
+      }
+      $0.write(batch)
+      batch.close()
     })
 
     compiler (HashStream) ("hash_close_internal", Nil, LevelDB :: MUnit, effect = simple) implements codegen($cala, ${
@@ -67,11 +117,12 @@ trait StreamOps {
 
       while (iterator.hasNext) {
         val key = org.fusesource.leveldbjni.JniDBFactory.asString(iterator.peekNext().getKey())
-        if (!key.endsWith("_logical")) // skip logical keys
+        if (!key.startsWith("\$HASH_LOGICAL_KEY_PREFIX")) // skip logical keys
           buf += key
         iterator.next()
       }
 
+      iterator.close()
       buf.toArray
     })
 
@@ -95,16 +146,28 @@ trait StreamOps {
         doApply(lambda, pack(($self,$1)))
       }
 
-      infix ("get") (MString :: MArray(MByte)) implements composite ${
+      infix ("get") (MString :: MArray(MByte)) implements single ${
         val db = hash_get_db($self)
         fassert(db != null, "No DB opened in HashStream")
         hash_get_internal(db, $1)
+      }
+
+      infix ("getRange") ((MString, MInt) :: MArray(MArray(MByte))) implements single ${
+        val db = hash_get_db($self)
+        fassert(db != null, "No DB opened in HashStream")
+        hash_get_range_internal(db, $1, $2)
       }
 
       infix ("put") ((MString, MArray(MByte)) :: MUnit, effect = write(0)) implements single ${
         val db = hash_get_db($self)
         fassert(db != null, "No DB opened in HashStream")
         hash_put_internal(db, $1, $2)
+      }
+
+      infix ("putAll") ((MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = write(0)) implements single ${
+        val db = hash_get_db($self)
+        fassert(db != null, "No DB opened in HashStream")
+        hash_put_all_internal(db, $1, $2, $3)
       }
 
       infix ("close") (Nil :: MUnit, effect = write(0)) implements single ${
@@ -119,29 +182,44 @@ trait StreamOps {
 
       infix ("mapValues") (CurriedMethodSignature(List(
         List(
-          ("outFile", MString)
+          ("outFile", MString),
+          ("outDelim", MString, "unit(\"    \")") // output delimiter is an ordinary string
         ),
         List(
-          ("func", V ==> MString)
-        )), FileStream)) implements composite ${
+          ("func", V ==> DenseVector(R))
+        )), FileStream), TStringable(R), addTpePars = R) implements composite ${
 
-        val out = ForgeFileOutputStream(outFile)
+        // Delete destination if it exists
+        deleteFile(outFile)
 
         // This requires 2 passes (one to get the keys, the next to process the values),
         // because we cannot call our deserialize function from within a codegen method.
         val db = hash_get_db($self)
         fassert(db != null, "No DB opened in HashStream")
-
         val lambda = hash_deserialize($self)
-
         val keys = hash_keys_internal(db)
+
+        // Performance is particularly sensitive to chunkSize because currently this function is very susceptible to load
+        // balance issues (i.e. some keys are associated with much more data and therefore execution time). We should address
+        // this by computing key sizes ahead-of-time and then splitting the work in a more balanced way.
+        val chunkSize = 10000000 // getting better results with a constant, for now. this is highly dependent on the application.
+        // val chunkSize = (getChunkByteSize / 1000).toInt // number of keys to process in parallel. assume each key holds ~1KB.
+
+        val numChunks = ceil(keys.length.toDouble / chunkSize)
         var i = 0
-        while (i < keys.length) {
-          val v = doApply(lambda, pack(($self,keys(i))))
-          out.writeLine(func(v))
+        var keysProcessed = 0
+        while (i < numChunks) {
+          // process remainder if we're the last chunk
+          val processSize: Rep[Int] = if (i == numChunks - 1) keys.length - keysProcessed else chunkSize
+          val vecs = array_fromfunction(processSize, i => func(doApply(lambda, pack(($self,keys(keysProcessed+i))))))
+          val writeArray = array_filter(vecs, (e: Rep[DenseVector[R]]) => e.length > 0)
+          ForgeFileWriter.writeLines(outFile, writeArray.length, append = true) { i =>
+            val v = writeArray(i)
+            array_mkstring(v.toArray, outDelim)
+          }
+          keysProcessed += chunkSize
           i += 1
         }
-        out.close()
 
         FileStream(outFile)
       }
@@ -161,14 +239,61 @@ trait StreamOps {
     val T = tpePar("T")
     val R = tpePar("R")
 
-    // we need to read sequentially, but from potentially different data stores, so we use ForgeFileInputStream and ForgeFileOutputStream
-    // TODO: We should load a chunk in at a time in parallel, and write the chunk out in parallel, and then read the next chunk (like ComputeStream).
-    //       To do this we need to extend DeliteFileReader and DeliteFileWriter to handle fixed size loops.
+    // These "hashMatrix" operations are factored out of groupRowsBy() so that end users can create a
+    // HashStream directly from a persistent hash that was constructed from a FileStream.groupRowsBy() call.
+    //     e.g. val hash = HashStream("test.hash", hashMatrixDeserializer)
+    direct (FileStream) ("hashMatrixDeserializer", Nil, (("hash", HashStream(DenseMatrix(MDouble))), ("k", MString)) :: DenseMatrix(MDouble)) implements composite ${
+      val a: Rep[ForgeArray[Byte]] = hash.get(k)
+      fassert(a != null, "HashStream: could not find key " + k)
+      fassert(a.length == 4, "HashStream: lookup of key " + k + " did not return an integer value (length) as expected") // should be the number of rows in this group
+
+      val firstKey = hashMatrixLogicalKey(k, 0)
+      val numRows = ByteBufferWrap(a).getInt()
+      fassert(numRows > 0, "HashStream: attempted to deserialize a matrix key with 0 rows which is unexpected")
+      val rows = hash.getRange(firstKey, numRows)
+      val numCols = ByteBufferWrap(rows(0)).getInt()
+
+      val out = DenseMatrix[Double](numRows, numCols)
+
+      var i = 0
+      while (i < numRows) {
+        val rowArray = rows(i)
+        val rowBuffer = ByteBufferWrap(rowArray)
+        val numCols = rowBuffer.getInt()
+        val dst = densematrix_raw_data(out).unsafeMutable // array_update gets rewritten, but not the write below
+        rowBuffer.unsafeImmutable.get(dst, i*numCols, numCols) // write directly to underlying matrix
+        i += 1
+      }
+
+      out.unsafeImmutable
+    }
+
+    // Create a lexicographically ordered logical key that respects integer order. We do this instead of
+    // supplying a custom comparator to LevelDB, which would require jumping across the JNI boundary to invoke.
+    compiler (FileStream) ("hashMatrixLogicalKey", Nil, (("k", MString), ("index", MInt)) :: MString) implements composite ${
+      val prefix = "\$HASH_LOGICAL_KEY_PREFIX" + k + "_"
+      val strIndex = ""+index
+      val suffix = strIndex.length + strIndex
+      prefix + suffix
+    }
+
+    // --
+
+    direct (FileStream) ("getChunkByteSize", Nil, Nil :: MLong) implements composite ${
+      // While this seems very conservative, with a 100 GB heap on a 128 GB machine, larger sizes blow out the heap.
+      // (0.10*getMaxHeapSize).toLong
+
+      // A reasonable and static (e.g. 1 GB) chunk size seems to give us the most consistent good performance. This should be configurable.
+      // Using a constant also seems to increase fusion opportunities, though what is happening is a bit of a mystery.
+      (1e9).toLong
+    }
+
+    // We need to read sequentially, but from potentially different data stores, so we use ForgeFileInputStream and ForgeFileOutputStream
     val FileStreamOps = withTpe(FileStream)
     FileStreamOps {
       infix ("path") (Nil :: MString) implements getter(0, "_path")
 
-      // currently loaded and executed sequentially, chunk-by-chunk
+      // rows are loaded and executed sequentially
       infix ("foreach") ((MString ==> MUnit) :: MUnit, effect = simple) implements single ${
         val f = ForgeFileInputStream($self.path)
         var line = f.readLine()
@@ -179,21 +304,60 @@ trait StreamOps {
         f.close()
       }
 
+      compiler ("processFileChunks") ((("readFunc", MString ==> R), ("processFunc", MArray(R) ==> MUnit)) :: MUnit, addTpePars = R) implements composite ${
+        val f = ForgeFileInputStream($self.path)
+        val totalSize = f.size
+        f.close()
+
+        val chunkSize = getChunkByteSize
+        val numChunks = ceil(totalSize.toDouble / chunkSize)
+        var totalBytesRead = 0L
+        var totalLinesRead = 0
+        var i = 0
+
+        while (i < numChunks) {
+          // process remainder if we're the last chunk
+          val processSize: Rep[Long] = if (i == numChunks - 1) totalSize - totalBytesRead else chunkSize
+          val a = ForgeFileReader.readLinesChunk($self.path)(totalBytesRead, processSize)(readFunc)
+          processFunc(a)
+
+          totalBytesRead += chunkSize
+          totalLinesRead += a.length
+          i += 1
+        }
+      }
+
+      // chunks are loaded in parallel, one chunk at a time
       infix ("map") (CurriedMethodSignature(List(
         List(
-          ("outFile", MString)
+          ("outFile", MString),
+          ("preserveOrder", MBoolean, "unit(false)")
         ),
         List(
           ("func", MString ==> MString)
         )), FileStream)) implements composite ${
 
-        val out = ForgeFileOutputStream(outFile)
-        // the below incorrectly infers the type of 'line' for mysterious reasons
-        // for (line <- $self) {
-        $self.foreach { line: Rep[String] =>
-          out.writeLine(func(line))
-        }
-        out.close()
+        // Delete destination if it exists
+        deleteFile(outFile)
+
+        processFileChunks($self, func, { (a: Rep[ForgeArray[String]]) =>
+          if (!preserveOrder) {
+            // This only makes sense if the order of the writes doesn't matter, since we are striping each chunk across the
+            // different output files. Therefore when they are reconstructed, output file 0 will have elements from all chunks,
+            // instead of just the first n elements.
+            val writeArray = array_filter(a, (e: Rep[String]) => e.length > 0)
+            ForgeFileWriter.writeLines(outFile, writeArray.length, append = true)(i => writeArray(i))
+          }
+          else {
+            // write sequentially
+            val out = ForgeFileOutputStream(outFile, append = true)
+            for (j <- 0 until a.length) {
+              if (a(j).length > 0)
+                out.writeLine(a(j))
+            }
+            out.close()
+          }
+        })
 
         FileStream(outFile)
       }
@@ -201,24 +365,22 @@ trait StreamOps {
       infix ("mapRows") (CurriedMethodSignature(List(
         List(
           ("outFile", MString),
-          ("inDelim", MString, "unit(\"\\s+\")"),   // input delimiter is a regular expression
+          ("inDelim", MString, "unit(\"\\s+\")"), // input delimiter is a regular expression
           ("outDelim", MString, "unit(\"    \")") // output delimiter is an ordinary string
         ),
         List(
           ("func", DenseVector(MString) ==> DenseVector(R))
         )), FileStream), TStringable(R), addTpePars = R) implements composite ${
 
-        val out = ForgeFileOutputStream(outFile)
-        $self.foreach { line: Rep[String] =>
-          // explicit types are needed because of some scalac bug (not found tokenVector, outRow)
+        $self.map(outFile) { line =>
           val tokens: Rep[ForgeArray[String]] = line.trim.fsplit(inDelim, -1) // we preserve trailing empty values
           val tokenVector: Rep[DenseVector[String]] = densevector_fromarray(tokens, true)
-          val outRow: Rep[DenseVector[String]] = func(tokenVector) map { e => e.makeStr }
-          val outLine: Rep[String] = array_mkstring(densevector_raw_data(outRow), outDelim)
-          if (outLine != "")
-            out.writeLine(outLine)
+          // val outRow: Rep[DenseVector[String]] = func(tokenVector) map { e => e.makeStr }
+          // val outLine: Rep[String] = array_mkstring(densevector_raw_data(outRow), outDelim)
+          val outRow: Rep[DenseVector[R]] = func(tokenVector)
+          // skip OptiLA formatting (slow) when writing to file... this is a little sketchy.
+          if (outRow.length > 0) array_mkstring(outRow.toArray, outDelim) else ""
         }
-        out.close()
 
         FileStream(outFile)
       }
@@ -241,74 +403,82 @@ trait StreamOps {
           val x = ByteBuffer(4+8*v.length)
           x.putInt(v.length)
           x.put(v.toArray, 0, v.length)
-          x.array
+          x.unsafeImmutable.array
         }
 
-        def deserialize(hash: Rep[HashStream[DenseMatrix[Double]]], k: Rep[String]): Rep[DenseMatrix[Double]] = {
-          val a: Rep[ForgeArray[Byte]] = hash.get(k)
-          fassert(a != null, "HashStream: could not find key " + k)
-          fassert(a.length == 4, "HashStream: lookup of key " + k + " did not return an integer value (length) as expected") // should be the number of rows in this group
+        /* see hashMatrixDeserializer for deserialization */
 
-          val x = ByteBufferWrap(a)
-          val numRows = x.getInt()
 
-          // process first row so we can preallocate
-          val firstRow = hash.get(k + "_" + 0 + "_logical")
-          val firstBuffer = ByteBufferWrap(firstRow)
-          val numCols = firstBuffer.getInt()
-          val out = DenseMatrix[Double](numRows,numCols)
+        deleteFile(outTable) // Delete destination if it exists
+        val hash = HashStream[DenseMatrix[Double]](outTable, hashMatrixDeserializer)
 
-          var i = 0
-          while (i < numRows) {
-            val rowArray = hash.get(k + "_" + i + "_logical")
-            val rowBuffer = ByteBufferWrap(rowArray)
-            val numCols = rowBuffer.getInt()
-            val dst = densematrix_raw_data(out).unsafeMutable // array_update gets rewritten, but not the copy below
-            rowBuffer.unsafeImmutable.get(dst, i*numCols, numCols) // write directly to underlying matrix
-            i += 1
-          }
-          out.unsafeImmutable
-        }
-
-        deleteFile(outTable)
-        val hash = HashStream[DenseMatrix[Double]](outTable, deserialize)
-        hash.open()
-
-        $self.foreach { line: Rep[String] =>
-          // explicit types are needed because of some scalac bug (not found tokenVector, outRow)
+        processFileChunks($self, { line =>
           val tokens: Rep[ForgeArray[String]] = line.trim.fsplit(delim, -1) // we preserve trailing empty values
           val tokenVector: Rep[DenseVector[String]] = densevector_fromarray(tokens, true)
           val key: Rep[String] = keyFunc(tokenVector)
           val value: Rep[DenseVector[Double]] = valFunc(tokenVector)
-
+          pack((key, value))
+        },
+        { (a: Rep[ForgeArray[Tup2[String,DenseVector[Double]]]]) =>
           // The scheme belows appends new rows as new logical keys (instead of storing and growing a byte array
           // value in the "master" key). This relies on LevelDBs sorted key functionality for efficiency (the logical
           // keys are stored close together, enabling compression and sequential scanning).
           //
-          // However, we want to process multiple rows in parallel and do a batch append, but this is not
-          // thread-safe. There is no atomic get-modify-put operation, so multiple parallel readers can end
-          // up generating duplicate logical keys, unless we use our own concurrency control.
-          if (value.length > 0) {
-            val existing: Rep[ForgeArray[Byte]] = hash.get(key)
-            val numRows: Rep[Int] = if (existing == null) 0 else ByteBufferWrap(existing).getInt()
-            val newRows: Rep[Int] = numRows+1
-            val lenBuf: Rep[java.nio.ByteBuffer] = ByteBuffer(4)
-            lenBuf.putInt(newRows)
-            hash.put(key, lenBuf.array)
-            val logicalKey = key + "_" + numRows + "_logical" // logical keys are 0-indexed
-            hash.put(logicalKey, serialize(value))
+          // We write to the map sequentially to avoid needing to use external concurrency control (and because benchmarks
+          // do not show LevelDB scaling well with concurrent writers). We also batch all of the writes in one chunk for
+          // improved performance.
+
+          val masterKeys = SHashMap[String, ForgeArray[Byte]]()
+          val logicalKeys = array_empty[String](a.length)
+          val logicalValues = array_empty[ForgeArray[Byte]](a.length)
+          var numLogicalEntries = 0
+
+          // Using 'while' causes Delite to over-parallelize this loop
+          for (j <- 0 until a.length) {
+            // FIXME: without these var hacks, the combination of 'for' and 'if' causes the hash / DB to apparently lock-up.
+            //        due to excessive inlining (e.g. redundant computation inside branches). Why's this happening?
+            var key: Var[String] = a(j)._1
+            var value: Var[DenseVector[Double]] = a(j)._2
+
+            // Zero-length rows are skipped (note that the only two valid lengths for "value" are 0 and numCols)
+            // If there is a key present in the resulting map, there was at least 1 non-empty row mapping to it.
+            if (value.length > 0) {
+              // "master" key stores the current number of rows of the matrix, and is written directly to the map,
+              // since we need to look it up on subsequent iterations. this would require a lock if run in parallel.
+              var numRows: Var[Int] = if (!masterKeys.contains(key)) 0 else ByteBufferWrap(masterKeys.unsafeImmutable.apply(key)).getInt()
+              var newRows: Var[Int] = if (value.length == 0) numRows else numRows+1
+              val lenBuf: Rep[java.nio.ByteBuffer] = ByteBuffer(4)
+              lenBuf.putInt(newRows)
+              masterKeys(key) = lenBuf.unsafeImmutable.array
+
+              // "logical" keys store the actual matrix row contents, and are written to the map in a batch.
+              // zero-length rows are skipped
+              val logicalKey = hashMatrixLogicalKey(key, numRows) // logical keys are 0-indexed
+              logicalKeys(numLogicalEntries) = logicalKey
+              logicalValues(numLogicalEntries) = serialize(value)
+              numLogicalEntries += 1
+            }
           }
-        }
+
+          // We seem to be getting write bandwidth on the logicalKeys of ~15MB/sec, while the Google benchmarks at
+          // https://github.com/google/leveldb claim writes should be ~45MB/sec. This could be due to hardware, JNI,
+          // or the Java driver. Write bandwidth on the masterKeys, which are random and tiny, is abysmal.
+          val ks = masterKeys.keys
+          hash.putAll(ks, masterKeys.values, ks.length)
+          hash.putAll(logicalKeys, logicalValues, numLogicalEntries)
+        })
 
         hash
       }
 
-      infix ("reduce") (CurriedMethodSignature(List(List(("init", T)), List(("func", (T,MString) ==> T))), T), addTpePars = T) implements composite ${
-        var acc = init
-        // for (line <- $self) {
-        $self.foreach { line: Rep[String] =>
-          acc = func(acc, line)
-        }
+      infix ("reduce") (CurriedMethodSignature(List(List(("zero", T)), List(("func", MString ==> T)), List(("rfunc", (T,T) ==> T))), T), addTpePars = T) implements composite ${
+        var acc = zero
+
+        processFileChunks($self, line => func(line), { (a: Rep[ForgeArray[T]]) =>
+          val reduced = array_reduce(a, rfunc, zero)
+          acc = rfunc(acc, reduced)
+        })
+
         acc
       }
     }

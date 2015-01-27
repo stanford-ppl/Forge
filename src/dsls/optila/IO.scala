@@ -99,7 +99,11 @@ trait IOOps {
 
     direct (IO) ("writeMatrix", Elem withBound TStringable, MethodSignature(List(("m",DenseMatrix(Elem)),("path",MString),("delim",MString,"unit(\"    \")")), MUnit), effect = simple) implements composite ${
       ForgeFileWriter.writeLines(path, m.numRows) { i =>
-        array_mkstring(densevector_raw_data(m(i).map(_.makeStr)), delim)
+        // array_mkstring(densevector_raw_data(m(i).map(_.makeStr)), delim)
+
+        // skip OptiLA formatting (slow) when writing to file... this is a little sketchy (for objects,
+        // mkString will print a reference rather than a value). Let's just call that not supported.
+        array_mkstring(m(i).toArray, delim)
       }
     }
 

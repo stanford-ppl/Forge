@@ -170,7 +170,7 @@ trait Example6 extends OptiMLApplication {
     val c2 = 9.7
     val linit = 5.5
     val lambda =
-      untilconverged(linit, .001) { lambda =>
+      untilconverged(linit, .001) { (lambda, iter) =>
         val l2 = lambda*lambda
         val b = (l2 + c2)*lambda
         val a = b + c1

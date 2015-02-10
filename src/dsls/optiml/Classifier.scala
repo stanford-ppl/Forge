@@ -30,29 +30,43 @@ trait ClassifierOps {
 
     direct (Classifier) ("logreg", Nil, MethodSignature(List(
                                             ("data",TrainingSet(MDouble,MBoolean)),
-                                            ("learningRate", MDouble, "unit(1.0)"),
+                                            ("initLearningRate", MDouble, "unit(1.0)"),
                                             ("maxIter", MInt, "unit(30)"),
+                                            ("stochastic", MBoolean, "unit(true)"),
                                             ("verbose", MBoolean, "unit(true)")
                                           ), DenseVector(MDouble))) implements composite ${
 
       val theta = DenseVector.zeros(data.numFeatures)
-      val alpha = learningRate
-
       val y = data.labels map { label => if (label) 1.0 else 0.0 }
 
-      // batch gradient descent with logistic function
       val _maxIter = maxIter
       val _verbose = verbose
-      val w = untilconverged(theta, maxIter = _maxIter, verbose = _verbose) { cur =>
-        val gradient =
-          ((0::data.numSamples) { i =>
-            data(i)*(y(i) - sigmoid(cur *:* data(i)))
-          }).sum
 
-        cur + gradient*alpha
+      // gradient descent with logistic function
+      if (stochastic) {
+        untilconverged(theta, maxIter = _maxIter, verbose = _verbose) { (cur, iter) =>
+          val alpha = initLearningRate / (1.0 + initLearningRate*iter)
+          val next = cur.mutable
+          for (i <- 0 until data.numSamples) {
+            val gradient = data(i)*(y(i) - sigmoid(next *:* data(i)))
+            for (j <- 0 until data.numFeatures) {
+              next(j) = next(j) + gradient(j)*alpha
+            }
+          }
+          next.unsafeImmutable
+        }
       }
+      else {
+        untilconverged(theta, maxIter = _maxIter, verbose = _verbose) { (cur, iter) =>
+          val alpha = initLearningRate / (1.0 + initLearningRate*iter)
+          val gradient =
+            ((0::data.numSamples) { i =>
+              data(i)*(y(i) - sigmoid(cur *:* data(i)))
+            }).sum
 
-      w
+          cur + gradient*alpha
+        }
+      }
     }
   }
 }

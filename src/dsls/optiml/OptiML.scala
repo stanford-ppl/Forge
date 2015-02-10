@@ -59,16 +59,17 @@ trait OptiMLDSL extends OptiLADSL
     val T = tpePar("T")
 
     // "block" should not mutate the input, but always produce a new copy. in this version, block can change the structure of the input across iterations (e.g. increase its size)
-    direct (Control) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, "unit(.001)"), ("minIter", MInt, "unit(1)"), ("maxIter", MInt, "unit(1000)"), ("verbose", MBoolean, "unit(true)")), ("block", T ==> T)), T), ("diff", (T,T) ==> MDouble)) implements composite ${
+    direct (Control) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, "unit(.01)"), ("minIter", MInt, "unit(1)"), ("maxIter", MInt, "unit(1000)"), ("verbose", MBoolean, "unit(true)")), ("block", (T,MInt) ==> T)), T), ("diff", (T,T) ==> MDouble)) implements composite ${
       var delta = scala.Double.MaxValue
       var cur = x
       var iter = 0
 
       while ((abs(delta) > tol && iter < maxIter) || iter < minIter) {
         val prev = cur
-        val next = block(cur)
+        val next = block(cur, iter)
+        delta = diff(prev, next)
+        if (verbose) println("[optiml]: iter " + iter + ", delta: " + delta)
         iter += 1
-        delta = diff(prev,next)
         cur = next
       }
 
@@ -85,7 +86,7 @@ trait OptiMLDSL extends OptiLADSL
     }
 
     // this is a convenience method that allows a user to override the 'diff' function without explicitly passing other implicits
-    direct (Control) ("untilconverged_withdiff", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, "unit(.001)"), ("minIter", MInt, "unit(1)"), ("maxIter", MInt, "unit(1000)")), ("block", T ==> T), ("diff", (T,T) ==> MDouble)), T)) implements redirect ${
+    direct (Control) ("untilconverged_withdiff", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, "unit(.001)"), ("minIter", MInt, "unit(1)"), ("maxIter", MInt, "unit(1000)")), ("block", (T,MInt) ==> T), ("diff", (T,T) ==> MDouble)), T)) implements redirect ${
       untilconverged(x, tol, minIter, maxIter)(block)(manifest[T], implicitly[SourceContext], diff)
     }
 

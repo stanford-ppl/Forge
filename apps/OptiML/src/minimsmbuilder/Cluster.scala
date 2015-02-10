@@ -81,7 +81,7 @@ trait Clarans extends OptiMLApplication with TheoData with DirectSolver {
     val linit = (gx + gy) / 2.0
     /*
     val lambda =
-      untilconverged(linit, (cur: Rep[Double]) => abs(.000001*cur), 50, false) { lambda =>
+      untilconverged(linit, (cur: Rep[Double]) => abs(.000001*cur), 50, false) { (lambda, iter) =>
         val l2 = lambda*lambda
         val b = (l2 + c2)*lambda
         val a = b + c1

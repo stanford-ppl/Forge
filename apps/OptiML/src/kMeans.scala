@@ -21,20 +21,16 @@ trait kMeans extends OptiMLApplication {
   def main() = {
     if (args.length < 1) printUsage
 
-    val x = TrainingSet(readMatrix(args(0)), DenseVector[Double]()) // no labels    
+    val x = TrainingSet(readMatrix(args(0)), DenseVector[Double]()) // no labels
     val m = x.numSamples
     val n = x.numFeatures
     val mu = if (args.length > 1) readMatrix(args(1)) else ((0::k, *) { i => x(randomInt(m)) })
-    
+
     println("m:"+m+",n:"+n+",numClusters:"+k+",mu.numRows:"+mu.numRows)
 
     tic(mu)
 
-    var iter = 0
-
-    val newMu = untilconverged_withdiff(mu, tol){ mu =>
-      iter += 1
-
+    val newMu = untilconverged_withdiff(mu, tol){ (mu, iter) =>
       val c = (0::m) { e => findNearestCluster(x(e), mu) }
 
       val allWP = (0::m).groupByReduce(i => c(i), i => x(i).Clone, (a: Rep[DenseVector[Double]], b: Rep[DenseVector[Double]]) => a + b)
@@ -43,13 +39,12 @@ trait kMeans extends OptiMLApplication {
       (0::k, *) { j =>
         val weightedpoints = allWP(j)
         val points = allP(j)
-        val d = if (points == 0) 1 else points 
+        val d = if (points == 0) 1 else points
         weightedpoints / d
       }
     }((x, y) => dist(x, y, SQUARE)) // use SQUARE instead of the default EUC distance
 
     toc(newMu)
-    println("finished in " + iter + " iterations")
     newMu.pprint
   }
 }

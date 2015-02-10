@@ -104,7 +104,7 @@ trait Gibbs extends OptiMLApplication {
       println("no query weights, nothing to learn!")
     }
     else {
-      untilconverged(0, minIter = numIterations, maxIter = numIterations) { i =>
+      untilconverged(0, minIter = numIterations, maxIter = numIterations) { (i, iter) =>
         val iterLearningRate = pow(diminishRate, i) * learningRate
 
         println("iteration="+i+" learning_rate="+iterLearningRate)

@@ -146,6 +146,18 @@ trait StreamOps {
         doApply(lambda, pack(($self,$1)))
       }
 
+      // This may be too inefficient, since a subsequent get has to hit the hash again.
+      // However, if it's cached, it should be fine.
+      infix ("contains") (MString :: MBoolean) implements single ${
+        $self.get($1) != null
+      }
+
+      infix ("keys") (Nil :: MArray(MString)) implements single ${
+        val db = hash_get_db($self)
+        fassert(db != null, "No DB opened in HashStream")
+        hash_keys_internal(db)
+      }
+
       infix ("get") (MString :: MArray(MByte)) implements single ${
         val db = hash_get_db($self)
         fassert(db != null, "No DB opened in HashStream")
@@ -186,7 +198,7 @@ trait StreamOps {
           ("outDelim", MString, "unit(\"    \")") // output delimiter is an ordinary string
         ),
         List(
-          ("func", V ==> DenseVector(R))
+          ("func", (MString,V) ==> DenseVector(R))
         )), FileStream), TStringable(R), addTpePars = R) implements composite ${
 
         // Delete destination if it exists
@@ -194,10 +206,8 @@ trait StreamOps {
 
         // This requires 2 passes (one to get the keys, the next to process the values),
         // because we cannot call our deserialize function from within a codegen method.
-        val db = hash_get_db($self)
-        fassert(db != null, "No DB opened in HashStream")
         val lambda = hash_deserialize($self)
-        val keys = hash_keys_internal(db)
+        val keys = $self.keys
 
         // Performance is particularly sensitive to chunkSize because currently this function is very susceptible to load
         // balance issues (i.e. some keys are associated with much more data and therefore execution time). We should address
@@ -211,7 +221,7 @@ trait StreamOps {
         while (i < numChunks) {
           // process remainder if we're the last chunk
           val processSize: Rep[Int] = if (i == numChunks - 1) keys.length - keysProcessed else chunkSize
-          val vecs = array_fromfunction(processSize, i => func(doApply(lambda, pack(($self,keys(keysProcessed+i))))))
+          val vecs = array_fromfunction(processSize, i => func(keys(keysProcessed+i), doApply(lambda, pack(($self,keys(keysProcessed+i))))))
           val writeArray = array_filter(vecs, (e: Rep[DenseVector[R]]) => e.length > 0)
           ForgeFileWriter.writeLines(outFile, writeArray.length, append = true) { i =>
             val v = writeArray(i)
@@ -304,12 +314,11 @@ trait StreamOps {
         f.close()
       }
 
-      compiler ("processFileChunks") ((("readFunc", MString ==> R), ("processFunc", MArray(R) ==> MUnit)) :: MUnit, addTpePars = R) implements composite ${
+      compiler ("processFileChunks") (MethodSignature(List(("readFunc", MString ==> R), ("processFunc", MArray(R) ==> MUnit), ("chunkSize", MLong, "filestream_getchunkbytesize()")), MUnit), addTpePars = R) implements composite ${
         val f = ForgeFileInputStream($self.path)
         val totalSize = f.size
         f.close()
 
-        val chunkSize = getChunkByteSize
         val numChunks = ceil(totalSize.toDouble / chunkSize)
         var totalBytesRead = 0L
         var totalLinesRead = 0
@@ -321,7 +330,7 @@ trait StreamOps {
           val a = ForgeFileReader.readLinesChunk($self.path)(totalBytesRead, processSize)(readFunc)
           processFunc(a)
 
-          totalBytesRead += chunkSize
+          totalBytesRead += processSize
           totalLinesRead += a.length
           i += 1
         }
@@ -331,7 +340,8 @@ trait StreamOps {
       infix ("map") (CurriedMethodSignature(List(
         List(
           ("outFile", MString),
-          ("preserveOrder", MBoolean, "unit(false)")
+          ("preserveOrder", MBoolean, "unit(false)"),
+          ("chunkSize", MLong, "filestream_getchunkbytesize()")
         ),
         List(
           ("func", MString ==> MString)
@@ -357,7 +367,7 @@ trait StreamOps {
             }
             out.close()
           }
-        })
+        }, chunkSize)
 
         FileStream(outFile)
       }

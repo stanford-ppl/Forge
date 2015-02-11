@@ -4,10 +4,12 @@ import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common._
 
-import java.io.{InputStreamReader, BufferedReader, OutputStreamWriter, BufferedWriter, PrintWriter}
+import java.io.{OutputStreamWriter, BufferedWriter, PrintWriter}
 
 import org.apache.hadoop.conf._
 import org.apache.hadoop.fs._
+import org.apache.hadoop.util.LineReader
+import org.apache.hadoop.io.Text
 
 trait InputOutputWrapper extends HUMAN_DSL_NAMEBase {
   this: ForgeArrayWrapper with ForgeArrayBufferWrapper =>
@@ -38,16 +40,19 @@ trait InputOutputWrapper extends HUMAN_DSL_NAMEBase {
   }
 
   def forge_filereader_readlines_chunk[A:Manifest](path: Rep[String], offset: Rep[Long], numBytes: Rep[Long], f: Rep[String] => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
-    val input = forge_fileinputstream_new_withoffset(path, offset)
-    val startPos = input.stream.getPos()
-
     val out = new ForgeArrayBuffer[A](0)
+    val input = forge_fileinputstream_new_withoffset(path, offset)
+
+    // skip ahead to next line - any previous reader should have read past this offset to a full line.
     var line = forge_fileinputstream_readline(input)
-    var curPos = input.stream.getPos()
-    while (line != null && (curPos - startPos) < numBytes) {
-      array_buffer_append(out, f(line))
+    var curPos = input.pos
+    if (offset == 0) array_buffer_append(out, f(line))
+
+    // <= because the next chunk will skip the first (partial or full) line above
+    while (line != null && (curPos - offset) <= numBytes) {
       line = forge_fileinputstream_readline(input)
-      curPos = input.stream.getPos()
+      if (line != null) array_buffer_append(out, f(line))
+      curPos = input.pos
     }
     forge_fileinputstream_close(input)
     out.toArray
@@ -64,20 +69,27 @@ trait InputOutputWrapper extends HUMAN_DSL_NAMEBase {
 
   // Note: ForgeFileInputStream interpreter does not exactly replicate the semantics of DeliteFileInputStream,
   // since we do not concatenate multiple physical files together. Therefore, we cannot read a directory in
-  // interpreter mode. This ought to be fixed, but would cause significant code duplication unless we come up with
-  // a better refactoring.
+  // interpreter mode. This ought to be fixed, but would cause even more code duplication than is already
+  // here unless we come up with a better refactoring.
 
-  class ForgeFileInputStream(val stream: Rep[FSDataInputStream], val reader: Rep[BufferedReader], val size: Rep[Long])
+  class ForgeFileInputStream(val stream: Rep[FSDataInputStream], val reader: Rep[LineReader], var pos: Rep[Long], val size: Rep[Long])
   implicit def forgeInputStreamManifest = manifest[ForgeFileInputStream]
+
+  private var lineText = new Text()
 
   private def forge_fileinputstream_new_withoffset(path: Rep[String], offset: Rep[Long] = 0L)(implicit ctx: SourceContext): Rep[ForgeFileInputStream] = {
     val hPath = new Path(path)
     val conf = new Configuration()
     val fs = hPath.getFileSystem(conf)
     val stream = fs.open(hPath)
-    stream.skip(offset)
+    val reader = new LineReader(stream)
+    var pos = 0L
+    if (offset > 0) {
+      stream.skip(offset)
+      pos += offset
+    }
     val size = fs.getFileStatus(hPath).getLen()
-    new ForgeFileInputStream(stream, new BufferedReader(new InputStreamReader(stream)), size)
+    new ForgeFileInputStream(stream, new LineReader(stream), pos, size)
   }
 
   def forge_fileinputstream_new(path: Rep[String])(implicit ctx: SourceContext): Rep[ForgeFileInputStream] = {
@@ -85,7 +97,9 @@ trait InputOutputWrapper extends HUMAN_DSL_NAMEBase {
   }
 
   def forge_fileinputstream_readline(stream: Rep[ForgeFileInputStream])(implicit ctx: SourceContext): Rep[String] = {
-    stream.reader.readLine()
+    val length = stream.reader.readLine(lineText)
+    stream.pos += length
+    if (length > 0) lineText.toString else null
   }
 
   def forge_fileinputstream_size(stream: Rep[ForgeFileInputStream])(implicit ctx: SourceContext): Rep[Long] = {

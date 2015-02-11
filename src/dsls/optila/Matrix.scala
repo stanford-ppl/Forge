@@ -96,7 +96,7 @@ trait MatrixOps {
       // $self.toString doesn't work in Delite, since there is no 'self' instance
       infix ("pprint") (Nil :: MUnit, S, effect = simple) implements composite ${ println($self.makeStr + "\\n") }
 
-      infix ("makeString") (Nil :: MString, S) implements composite ${
+      infix ("makeString") (Nil :: MString, S) implements single ${
         var s = ""
         if ($self == null) {
           s = "null"
@@ -113,7 +113,7 @@ trait MatrixOps {
         s
       }
 
-      infix ("toString") (Nil :: MString) implements composite ${
+      infix ("toString") (Nil :: MString) implements single ${
         var s = ""
         if ($self == null) {
           s = "null"

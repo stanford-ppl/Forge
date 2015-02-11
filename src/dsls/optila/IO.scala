@@ -56,7 +56,7 @@ trait IOOps {
     direct (IO) ("readMatrix", Elem, MethodSignature(List(("path",MString),("schemaBldr",MString ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseMatrix(Elem))) implements composite ${
       val a = ForgeFileReader.readLinesFlattened($path){ line:Rep[String] =>
         val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
-        array_fromfunction(array_length(tokens), i => schemaBldr(tokens(i)))
+        array_fromfunction(tokens.length, i => schemaBldr(tokens(i)))
       }
       val numCols = array_length(readFirstLine(path).trim.fsplit(delim, -1))
       densematrix_fromarray(a, array_length(a) / numCols, numCols)

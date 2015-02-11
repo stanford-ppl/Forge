@@ -58,6 +58,7 @@ trait StreamCorrectLarge extends ForgeTestModule with OptiMLApplication {
 trait StreamSuitePaths {
   val testMat = "test.mat"
   val testMat2 = "test2.mat"
+  val testMat3 = "test3.mat"
 }
 
 object FileStreamWriteARunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with FileStreamWriteA
@@ -79,13 +80,17 @@ trait FileStreamWriteB extends ForgeTestModule with OptiMLApplication with Strea
     val f = FileStream(testMat)
     val g = f.map(testMat2) { line =>
       val tokens = line.trim.fsplit("\\s+")
-      val v = (0::array_length(tokens)) { i => array_apply(tokens, i).toDouble }
+      val v = (0::tokens.length) { i => tokens(i).toDouble }
+      (v+1).makeStr
+    }
+    val h = f.map(testMat3, chunkSize = 100000) { line =>
+      val tokens = line.trim.fsplit("\\s+")
+      val v = (0::tokens.length) { i => tokens(i).toDouble }
       (v+1).makeStr
     }
 
-    // contents of testMat and testMat2 tested in next phase
+    // contents of testMats tested in next phase
     collect(true)
-
     mkReport
   }
 }
@@ -97,13 +102,13 @@ trait FileStreamRead extends ForgeTestModule with OptiMLApplication with StreamS
     val f = FileStream(testMat)
     for (line <- f) {
       val tokens = line.trim.fsplit("\\s+")
-      val v = (0::array_length(tokens)) { i => array_apply(tokens, i).toDouble }
+      val v = (0::tokens.length) { i => tokens(i).toDouble }
       collect(v == DenseVector.ones(100))
     }
 
     val total = f.reduce(0.0) { line =>
       val tokens = line.trim.fsplit("\\s+")
-      val v = (0::array_length(tokens)) { i => array_apply(tokens, i).toDouble }
+      val v = (0::tokens.length) { i => tokens(i).toDouble }
       sum(v)
     } {
       (a,b) => a+b
@@ -115,6 +120,9 @@ trait FileStreamRead extends ForgeTestModule with OptiMLApplication with StreamS
     val b = readMatrix(testMat2)
     collect(b == (a + 1))
 
+    val c = readMatrix(testMat3)
+    collect(b == c)
+
     mkReport
   }
 }
@@ -125,6 +133,7 @@ trait FileStreamDelete extends ForgeTestModule with OptiMLApplication with Strea
   def main() = {
     deleteFile(testMat)
     deleteFile(testMat2)
+    deleteFile(testMat3)
 
     collect(true)
     mkReport

@@ -120,7 +120,7 @@ trait VectorOps {
       }
 
       // we need two versions so that we can override toString in the lib, and use makeStr in Delite. sad.
-      infix ("makeString") (Nil :: MString, S) implements composite ${
+      infix ("makeString") (Nil :: MString, S) implements single ${
         var s = ""
         if ($self.length == 0) {
           s = "[ ]"
@@ -140,7 +140,7 @@ trait VectorOps {
         s
       }
 
-      infix ("toString") (Nil :: MString) implements composite ${
+      infix ("toString") (Nil :: MString) implements single ${
         var s = ""
         if ($self.length == 0) {
           s = "[ ]"
@@ -162,6 +162,9 @@ trait VectorOps {
 
       infix ("pprint") (Nil :: MUnit, S, effect = simple) implements composite ${ println($self.makeStr + "\\n") } // $self.toString doesn't work in Delite
 
+      infix ("makeStrWithDelim") (("delim",MString) :: MString, S) implements composite ${
+        array_mkstring($self.toArray, delim)
+      }
 
       /**
        * Math
@@ -262,15 +265,11 @@ trait VectorOps {
         else 0
       }
 
-      infix ("partition") (("pred",(T ==> MBoolean)) :: Tuple2(DenseVector(T),DenseVector(T))) implements composite ${
-        val outT = DenseVector[\$TT](0, $self.isRow)
-        val outF = DenseVector[\$TT](0, $self.isRow)
-        for (i <- 0 until $self.length) {
-          val x = $self(i)
-          if (pred(x)) outT <<= x
-          else outF <<= x
-        }
-        pack((outT.unsafeImmutable, outF.unsafeImmutable))
+      val partitionReturn = if (v.name == "IndexVector") IndexVector else DenseVector(T)
+      infix ("partition") (("pred",(T ==> MBoolean)) :: Tuple2(partitionReturn,partitionReturn)) implements composite ${
+        val partT = $self.filter(pred)
+        val partF = $self.filter(e => !pred(e))
+        pack((partT, partF))
       }
 
       infix ("flatMap") ((T ==> DenseVector(R)) :: DenseVector(R), addTpePars = R) implements flatMap((T,R), 0, ${ e => $1(e) })

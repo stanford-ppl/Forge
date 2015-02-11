@@ -88,13 +88,14 @@ trait FeatureOps {
 
     val DateFeature = tpe("DateFeature")
     val SDateFormat = tpe("org.joda.time.format.DateTimeFormatter")
+    val SDateTime = tpe("org.joda.time.DateTime")
     primitiveTpePrefix ::= "org.joda"
 
     static (DateFeature) ("apply", Nil, MString :: SDateFormat) implements codegen($cala, ${
       org.joda.time.format.DateTimeFormat.forPattern($0)
     })
 
-    infix (DateFeature) ("apply", Nil, (SDateFormat,MString) :: MDouble) implements codegen($cala, ${
+    infix (DateFeature) ("apply", Nil, (SDateFormat, MString) :: MDouble) implements codegen($cala, ${
       try {
         $0.parseMillis($1).toDouble
       }
@@ -103,6 +104,62 @@ trait FeatureOps {
       }
     })
 
+    // Internal DateTime operations. These are factored into separate methods so we don't
+    // need to create multiple DateTime instances at run-time and can still define our own API.
+
+    compiler (DateFeature) ("dt_internal", Nil, MDouble :: SDateTime) implements codegen($cala, ${
+      new org.joda.time.DateTime($0.toLong)
+    })
+
+    compiler (DateFeature) ("dt_internal_year", Nil, SDateTime :: MInt) implements codegen($cala, ${
+      $0.getYear()
+    })
+
+    compiler (DateFeature) ("dt_internal_month", Nil, SDateTime :: MInt) implements codegen($cala, ${
+      $0.getMonthOfYear()
+    })
+
+    compiler (DateFeature) ("dt_internal_hour", Nil, SDateTime :: MInt) implements codegen($cala, ${
+      $0.getHourOfDay()
+    })
+
+    compiler (DateFeature) ("dt_internal_day", Nil, SDateTime :: MInt) implements codegen($cala, ${
+      $0.getDayOfMonth()
+    })
+
+    compiler (DateFeature) ("dt_internal_weekday", Nil, SDateTime :: MInt) implements codegen($cala, ${
+      $0.getDayOfWeek()
+    })
+
+
+    // User-facing DateTime operations.
+
+    static (DateFeature) ("year", Nil, MDouble :: MInt) implements composite ${
+      val dt = dt_internal($0)
+      dt_internal_year(dt)
+    }
+
+    static (DateFeature) ("month", Nil, MDouble :: MInt) implements composite ${
+      val dt = dt_internal($0)
+      dt_internal_month(dt)
+    }
+
+    static (DateFeature) ("hour", Nil, MDouble :: MInt) implements composite ${
+      val dt = dt_internal($0)
+      dt_internal_hour(dt)
+    }
+
+    static (DateFeature) ("day", Nil, MDouble :: MInt) implements composite ${
+      val dt = dt_internal($0)
+      dt_internal_day(dt)
+    }
+
+    // Monday is 1, Sunday is 7
+    // http://joda-time.sourceforge.net/apidocs/org/joda/time/DateTimeConstants.html
+    static (DateFeature) ("weekday", Nil, MDouble :: MInt) implements composite ${
+      val dt = dt_internal($0)
+      dt_internal_weekday(dt)
+    }
   }
 
   def importFeatureHelperOps() {

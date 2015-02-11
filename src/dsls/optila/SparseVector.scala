@@ -260,7 +260,7 @@ trait SparseVectorOps {
         out.unsafeImmutable
       }
 
-      infix ("makeString") (Nil :: MString, TStringable(T)) implements composite ${
+      infix ("makeString") (Nil :: MString, TStringable(T)) implements single ${
         val indices = sparsevector_raw_indices($self)
         val data = sparsevector_raw_data($self)
         var s = ""
@@ -285,7 +285,7 @@ trait SparseVectorOps {
         }
         s
       }
-      infix ("toString") (Nil :: MString) implements composite ${
+      infix ("toString") (Nil :: MString) implements single ${
         val indices = sparsevector_raw_indices($self)
         val data = sparsevector_raw_data($self)
         var s = ""

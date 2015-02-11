@@ -69,7 +69,7 @@ trait SparseMatrixOps {
       // $self.toString doesn't work in Delite, since there is no 'self' instance
       infix ("pprint") (Nil :: MUnit, TStringable(T), effect = simple) implements composite ${ println($self.makeStr + "\\n") }
 
-      infix ("makeString") (Nil :: MString, TStringable(T)) implements composite ${
+      infix ("makeString") (Nil :: MString, TStringable(T)) implements single ${
         val rowIndices = sparsematrix_coo_rowindices($self)
         val colIndices = sparsematrix_coo_colindices($self)
         val data = sparsematrix_coo_data($self)
@@ -92,7 +92,7 @@ trait SparseMatrixOps {
         s
       }
 
-      infix ("toString") (Nil :: MString) implements composite ${
+      infix ("toString") (Nil :: MString) implements single ${
         val rowIndices = sparsematrix_coo_rowindices($self)
         val colIndices = sparsematrix_coo_colindices($self)
         val data = sparsematrix_coo_data($self)

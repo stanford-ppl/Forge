@@ -379,6 +379,18 @@ trait SimpleFlatten extends ForgeTestModule with OptiMLApplication {
   }
 }
 
+object PartitionRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Partition
+object PartitionRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Partition
+trait Partition extends ForgeTestModule with OptiMLApplication {
+  def main() = {
+    val x = DenseVector.rand(100)
+    val (a,b) = unpack(x.partition(_ > 0.5))
+    collect(sum(abs((a << b).sort - x.sort)) < 0.01)
+
+    mkReport
+  }
+}
+
 class DenseVectorSuiteInterpreter extends ForgeSuiteInterpreter {
   def testAccessors() { runTest(DenseVectorAccessorsRunnerI) }
   def testOperators() { runTest(DenseVectorOperatorsRunnerI) }
@@ -398,6 +410,7 @@ class DenseVectorSuiteInterpreter extends ForgeSuiteInterpreter {
   def testGroupBy() { runTest(GroupByRunnerI) }
   def testFlatMap() { runTest(SimpleFlatMapRunnerI) }
   def testFlatten() { runTest(SimpleFlattenRunnerI) }
+  def testPartition() { runTest(PartitionRunnerI) }
 }
 
 class DenseVectorSuiteCompiler extends ForgeSuiteCompiler {
@@ -419,5 +432,6 @@ class DenseVectorSuiteCompiler extends ForgeSuiteCompiler {
   def testGroupBy() { runTest(GroupByRunnerC) }
   def testFlatMap() { runTest(SimpleFlatMapRunnerC) }
   def testFlatten() { runTest(SimpleFlattenRunnerC) }
+  def testPartition() { runTest(PartitionRunnerC) }
 }
 

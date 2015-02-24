@@ -402,7 +402,8 @@ trait StreamOps {
       infix ("groupRowsBy") (CurriedMethodSignature(List(
         List(
           ("outTable", MString),
-          ("delim", MString, "unit(\"\\s+\")")   // input delimiter is a regular expression
+          ("delim", MString, "unit(\"\\s+\")"),   // input delimiter is a regular expression
+          ("appendToHash", MBoolean, "unit(false)")
         ),
         List(
           ("keyFunc", DenseVector(MString) ==> MString),
@@ -418,8 +419,9 @@ trait StreamOps {
 
         /* see hashMatrixDeserializer for deserialization */
 
-
-        deleteFile(outTable) // Delete destination if it exists
+        if (!appendToHash) {
+          deleteFile(outTable) // Delete destination if it exists
+        }
         val hash = HashStream[DenseMatrix[Double]](outTable, hashMatrixDeserializer)
 
         processFileChunks($self, { line =>

@@ -61,6 +61,56 @@ trait ValidateOps {
       DenseMatrix(DenseVector(stats(0), stats(1)), DenseVector(stats(2), stats(3)))
     }
 
+    /*
+     * Splits the input training set into training, validation, and test sets, trains a
+     * classifier, and reports both training and validation error every iteration until
+     * convergence. It also reports a final test error on an independently held out set.
+     */
+    direct (Validate) ("learningCurve", Nil, MethodSignature(List(
+                                               ("dataSet", TrainingSet(MDouble,MBoolean)),
+                                               ("classifier", MString),
+                                               ("metric", DenseMatrix(MInt) ==> MDouble),
+                                               ("_verbose", MBoolean, "unit(false)"),
+                                               ("pctTrainingSamples", MDouble, "unit(0.80)"),
+                                               ("pctValidationSamples", MDouble, "unit(0.10)"),
+                                               ("pctTestSamples", MDouble, "unit(0.10)")
+                                           ), MUnit)) implements composite ${
+
+      val trainingNumSamples = floor(dataSet.numSamples*pctTrainingSamples)
+      val validationNumSamples = floor(dataSet.numSamples*pctValidationSamples)
+      val testNumSamples = floor(dataSet.numSamples*pctTestSamples)
+
+      val shuffledIndices = shuffle(0::dataSet.numSamples)
+      val trainingSampleIndices = shuffledIndices(0::trainingNumSamples)
+      val validationSampleIndices = shuffledIndices(trainingNumSamples::trainingNumSamples+validationNumSamples)
+      val testSampleIndices = shuffledIndices(trainingNumSamples+validationNumSamples::dataSet.numSamples)
+
+      val trainingSet = TrainingSet(dataSet.data.apply(trainingSampleIndices), dataSet.labels.apply(trainingSampleIndices))
+      val validationSet = TrainingSet(dataSet.data.apply(validationSampleIndices), dataSet.labels.apply(validationSampleIndices))
+      val testSet = TrainingSet(dataSet.data.apply(testSampleIndices), dataSet.labels.apply(testSampleIndices))
+
+      val validClassifiers = "logreg"
+
+      if (classifier == "logreg") {
+        def classify(model: Rep[DenseVector[Double]], x: Rep[DenseVectorView[Double]]) = sigmoid(x *:* model) > 0.5
+
+        val model = logreg(trainingSet, maxIter = 1000, verbose = _verbose, callback = { (curModel: Rep[DenseVector[Double]], iter: Rep[Int]) =>
+          val trainingSetResults = confusionMatrix(trainingSet, (x: Rep[DenseVectorView[Double]]) => classify(curModel, x))
+          println(" iter " + iter + ", training metric = " + metric(trainingSetResults))
+          val validationSetResults = confusionMatrix(validationSet, (x: Rep[DenseVectorView[Double]]) => classify(curModel, x))
+          println(" iter " + iter + ", validation metric = " + metric(validationSetResults))
+        })
+
+        val testSetResults = confusionMatrix(testSet, (x: Rep[DenseVectorView[Double]]) => classify(model, x))
+        println("test set confusion matrix: ")
+        testSetResults.pprint
+        println("test metric = " + metric(testSetResults))
+      }
+      else {
+        fatal("learningCurve is not yet supported for classifier " + classifier + ". valid classifiers are: " + validClassifiers)
+      }
+    }
+
     direct (Validate) ("crossValidateRaw", (T,M,R), CurriedMethodSignature(List(List(
                                                  ("dataSet", TrainingSet(T,MBoolean)),
                                                  ("train", TrainingSet(T,MBoolean) ==> M),

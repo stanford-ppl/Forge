@@ -113,7 +113,7 @@ trait DenseVectorOps {
     }
 
     compiler (DenseVector) ("densevector_sortindex_helper", T, (MInt,MInt,MArray(T)) :: MArray(MInt), TOrdering(T)) implements codegen($cala, ${
-      ($0 until $1: scala.Range).toArray.sortWith((a,b) => $2(a) < $2(b))
+      ($0.toInt until $1.toInt: scala.Range).toArray.sortWith((a,b) => $2(a) < $2(b))
     })
 
     val K = tpePar("K")

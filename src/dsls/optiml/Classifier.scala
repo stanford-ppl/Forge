@@ -33,7 +33,8 @@ trait ClassifierOps {
                                             ("initLearningRate", MDouble, "unit(1.0)"),
                                             ("maxIter", MInt, "unit(30)"),
                                             ("stochastic", MBoolean, "unit(true)"),
-                                            ("verbose", MBoolean, "unit(true)")
+                                            ("verbose", MBoolean, "unit(false)"),
+                                            ("callback", (DenseVector(MDouble), MInt) ==> MUnit, "(m,i) => unit(())")
                                           ), DenseVector(MDouble))) implements composite ${
 
       val theta = DenseVector.zeros(data.numFeatures)
@@ -53,7 +54,9 @@ trait ClassifierOps {
               next(j) = next(j) + gradient(j)*alpha
             }
           }
-          next.unsafeImmutable
+          val ret = next.unsafeImmutable
+          callback(ret, iter)
+          ret
         }
       }
       else {
@@ -64,7 +67,9 @@ trait ClassifierOps {
               data(i)*(y(i) - sigmoid(cur *:* data(i)))
             }).sum
 
-          cur + gradient*alpha
+          val next = cur + gradient*alpha
+          callback(next, iter)
+          next
         }
       }
     }

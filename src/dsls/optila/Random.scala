@@ -30,31 +30,31 @@ trait RandomOps {
     }
 
     val randomint = direct (Rand) ("randomInt", Nil, MInt :: MInt, effect = simple)
-    impl (randomint) (codegen($cala, ${ Global.randRef.nextInt($0) }))
+    impl (randomint) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextInt($0) }))
     impl (randomint) (codegen(cpp, ${ resourceInfo->rand->nextInt($0) }))
 
     val randomgaussian = direct (Rand) ("randomGaussian", Nil, Nil :: MDouble, effect = simple)
-    impl (randomgaussian) (codegen($cala, ${ Global.randRef.nextGaussian() }))
+    impl (randomgaussian) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextGaussian() }))
     impl (randomgaussian) (codegen(cpp, ${ resourceInfo->rand->nextGaussian() }))
 
     val reseed = direct (Rand) ("reseed", Nil, Nil :: MUnit, effect = simple)
-    impl (reseed) (codegen($cala, ${ Global.randRef.setSeed(Global.INITIAL_SEED) }))
+    impl (reseed) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().setSeed(Global.INITIAL_SEED) }))
     impl (reseed) (codegen(cpp, ${ fprintf(stderr, "WARNING: reseed is not currently implemented\\n") }))
 
     val randdouble = compiler (Rand) ("optila_rand_double", Nil, Nil :: MDouble, effect = simple)
-    impl (randdouble) (codegen($cala, ${ Global.randRef.nextDouble() }))
+    impl (randdouble) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextDouble() }))
     impl (randdouble) (codegen(cpp, ${ resourceInfo->rand->nextDouble() }))
 
     val randfloat = compiler (Rand) ("optila_rand_float", Nil, Nil :: MFloat, effect = simple)
-    impl (randfloat) (codegen($cala, ${ Global.randRef.nextFloat() }))
+    impl (randfloat) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextFloat() }))
     impl (randfloat) (codegen(cpp, ${ resourceInfo->rand->nextFloat() }))
 
     val randint = compiler (Rand) ("optila_rand_int", Nil, Nil :: MInt, effect = simple)
-    impl (randint) (codegen($cala, ${ Global.randRef.nextInt() }))
+    impl (randint) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextInt() }))
     impl (randint) (codegen(cpp, ${ resourceInfo->rand->nextInt() }))
 
     val randboolean = compiler (Rand) ("optila_rand_boolean", Nil, Nil :: MBoolean, effect = simple)
-    impl (randboolean) (codegen($cala, ${ Global.randRef.nextBoolean() }))
+    impl (randboolean) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextBoolean() }))
     impl (randboolean) (codegen(cpp, ${ resourceInfo->rand->nextBoolean() }))
 
     direct (Rand) ("shuffle", Nil, IndexVector :: IndexVector, effect = simple) implements composite ${

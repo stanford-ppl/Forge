@@ -453,6 +453,15 @@ trait DenseVectorOps {
     infix (DenseVector) ("+", Nil, (DenseVector(MDouble),DenseVector(MFloat)) :: DenseVector(MDouble)) implements redirect ${ densevector_pl[Double]($0,$1.toDouble) }
     infix (DenseVector) ("+", Nil, (DenseVector(MDouble),DenseVector(MDouble)) :: DenseVector(MDouble)) implements redirect ${ densevector_pl[Double]($0,$1) }
 
+    infix (DenseVector) ("-", Nil, (MInt,DenseVector(MInt)) :: DenseVector(MInt)) implements redirect ${ densevector_map[Int,Int]($1, e => forge_int_minus($0,e)) }
+    infix (DenseVector) ("-", Nil, (MInt,DenseVector(MFloat)) :: DenseVector(MFloat)) implements redirect ${ densevector_map[Float,Float]($1, e => forge_float_minus($0.toFloat,e)) }
+    infix (DenseVector) ("-", Nil, (MInt,DenseVector(MDouble)) :: DenseVector(MDouble)) implements redirect ${ densevector_map[Double,Double]($1, e => forge_double_minus($0.toDouble,e)) }
+    infix (DenseVector) ("-", Nil, (MFloat,DenseVector(MInt)) :: DenseVector(MFloat)) implements redirect ${ densevector_map[Int,Float]($1, e => forge_float_minus($0,e)) }
+    infix (DenseVector) ("-", Nil, (MFloat,DenseVector(MFloat)) :: DenseVector(MFloat)) implements redirect ${ densevector_map[Float,Float]($1, e => forge_float_minus($0,e)) }
+    infix (DenseVector) ("-", Nil, (MFloat,DenseVector(MDouble)) :: DenseVector(MDouble)) implements redirect ${ densevector_map[Double,Double]($1, e => forge_double_minus($0.toDouble,e)) }
+    infix (DenseVector) ("-", Nil, (MDouble,DenseVector(MInt)) :: DenseVector(MDouble)) implements redirect ${ densevector_map[Int,Double]($1, e => forge_double_minus($0,e.toDouble)) }
+    infix (DenseVector) ("-", Nil, (MDouble,DenseVector(MFloat)) :: DenseVector(MDouble)) implements redirect ${ densevector_map[Float,Double]($1, e => forge_double_minus($0,e.toDouble)) }
+    infix (DenseVector) ("-", Nil, (MDouble,DenseVector(MDouble)) :: DenseVector(MDouble)) implements redirect ${ densevector_map[Double,Double]($1, e => forge_double_minus($0,e)) }
     infix (DenseVector) ("-", Nil, (DenseVector(MInt),MInt) :: DenseVector(MInt)) implements redirect ${ densevector_sub[Int]($0,$1) }
     infix (DenseVector) ("-", Nil, (DenseVector(MInt),MFloat) :: DenseVector(MFloat)) implements redirect ${ densevector_sub[Float]($0.toFloat,$1) }
     infix (DenseVector) ("-", Nil, (DenseVector(MInt),MDouble) :: DenseVector(MDouble)) implements redirect ${ densevector_sub[Double]($0.toDouble,$1) }

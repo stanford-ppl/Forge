@@ -96,6 +96,10 @@ trait MatrixOps {
       // $self.toString doesn't work in Delite, since there is no 'self' instance
       infix ("pprint") (Nil :: MUnit, S, effect = simple) implements composite ${ println($self.makeStr + "\\n") }
 
+      infix ("makeDimsStr") (Nil :: MString) implements single ${
+        $self.numRows + " x " + $self.numCols
+      }
+
       infix ("makeString") (Nil :: MString, S) implements single ${
         var s = ""
         if ($self == null) {
@@ -174,7 +178,7 @@ trait MatrixOps {
      // infix ("*") (DenseMatrix(B) :: DenseMatrix(T), (A, B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a*b })
 
      infix ("*") (DenseMatrix(T) :: DenseMatrix(T), A) implements composite ${
-       fassert($self.numCols == $1.numRows, "dimension mismatch: matrix multiply")
+       fassert($self.numCols == $1.numRows, "dimension mismatch: matrix multiply (lhs: " + $self.makeDimsStr + ", rhs: " + $1.makeDimsStr + ")")
        // naive
        val yT = $1.t
        val out = DenseMatrix[\$TT]($self.numRows, $1.numCols)

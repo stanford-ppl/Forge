@@ -274,19 +274,31 @@ trait VectorOps {
 
       infix ("flatMap") ((T ==> DenseVector(R)) :: DenseVector(R), addTpePars = R) implements flatMap((T,R), 0, ${ e => $1(e) })
 
-      // TODO: need to implement with a DeliteOp
-      infix ("scan") (CurriedMethodSignature(List(List(("zero", R)), List((R,T) ==> R)), DenseVector(R)), addTpePars = R) implements composite ${
-        val out = DenseVector[R]($self.length, $self.isRow)
-        out(0) = $2($zero,$self(0))
+      // TODO: implement with a DeliteOp
+      infix ("scanLeft") (CurriedMethodSignature(List(List(("zero", R)), List((R,T) ==> R)), DenseVector(R)), addTpePars = R) implements composite ${
+        val out = DenseVector[R]($self.length+1, $self.isRow)
+        out(0) = $zero
         var i = 1
-        while (i < $self.length) {
-          out(i) = $2(out(i-1), $self(i))
+        while (i < out.length) {
+          out(i) = $2(out(i-1), $self(i-1))
           i += 1
         }
         out.unsafeImmutable
       }
 
-      infix ("prefixSum") (Nil :: DenseVector(T), A) implements composite ${ $self.scan(\$Z)((a,b) => a+b) }
+      // TODO: implement with a DeliteOp
+      infix ("scanRight") (CurriedMethodSignature(List(List(("zero", R)), List((T,R) ==> R)), DenseVector(R)), addTpePars = R) implements composite ${
+        val out = DenseVector[R]($self.length+1, $self.isRow)
+        out(out.length-1) = $zero
+        var i = $self.length-1
+        while (i >= 0) {
+          out(i) = $2($self(i), out(i+1))
+          i -= 1
+        }
+        out.unsafeImmutable
+      }
+
+      infix ("prefixSum") (Nil :: DenseVector(T), A) implements composite ${ ($self.scanLeft(\$Z)((a,b) => a+b)).drop(1) }
 
       // TODO
       // infix ("groupBy") (((T ==> R)) :: DenseVector(DenseVector(T)))

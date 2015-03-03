@@ -530,6 +530,15 @@ trait DenseMatrixOps {
     infix (DenseMatrix) ("+", Nil, (DenseMatrix(MDouble),DenseMatrix(MFloat)) :: DenseMatrix(MDouble)) implements redirect ${ densematrix_pl[Double]($0,$1.toDouble) }
     infix (DenseMatrix) ("+", Nil, (DenseMatrix(MDouble),DenseMatrix(MDouble)) :: DenseMatrix(MDouble)) implements redirect ${ densematrix_pl[Double]($0,$1) }
 
+    infix (DenseMatrix) ("-", Nil, (MInt,DenseMatrix(MInt)) :: DenseMatrix(MInt)) implements redirect ${ densematrix_map[Int,Int]($1, e => forge_int_minus($0,e)) }
+    infix (DenseMatrix) ("-", Nil, (MInt,DenseMatrix(MFloat)) :: DenseMatrix(MFloat)) implements redirect ${ densematrix_map[Float,Float]($1, e => forge_float_minus($0.toFloat,e)) }
+    infix (DenseMatrix) ("-", Nil, (MInt,DenseMatrix(MDouble)) :: DenseMatrix(MDouble)) implements redirect ${ densematrix_map[Double,Double]($1, e => forge_double_minus($0.toDouble,e)) }
+    infix (DenseMatrix) ("-", Nil, (MFloat,DenseMatrix(MInt)) :: DenseMatrix(MFloat)) implements redirect ${ densematrix_map[Int,Float]($1, e => forge_float_minus($0,e.toFloat)) }
+    infix (DenseMatrix) ("-", Nil, (MFloat,DenseMatrix(MFloat)) :: DenseMatrix(MFloat)) implements redirect ${ densematrix_map[Float,Float]($1, e => forge_float_minus($0,e)) }
+    infix (DenseMatrix) ("-", Nil, (MFloat,DenseMatrix(MDouble)) :: DenseMatrix(MDouble)) implements redirect ${ densematrix_map[Double,Double]($1, e => forge_double_minus($0.toDouble,e)) }
+    infix (DenseMatrix) ("-", Nil, (MDouble,DenseMatrix(MInt)) :: DenseMatrix(MDouble)) implements redirect ${ densematrix_map[Int,Double]($1, e => forge_double_minus($0,e.toDouble)) }
+    infix (DenseMatrix) ("-", Nil, (MDouble,DenseMatrix(MFloat)) :: DenseMatrix(MDouble)) implements redirect ${ densematrix_map[Float,Double]($1, e => forge_double_minus($0,e.toDouble)) }
+    infix (DenseMatrix) ("-", Nil, (MDouble,DenseMatrix(MDouble)) :: DenseMatrix(MDouble)) implements redirect ${ densematrix_map[Double,Double]($1, e => forge_double_minus($0,e)) }
     infix (DenseMatrix) ("-", Nil, (DenseMatrix(MInt),MInt) :: DenseMatrix(MInt)) implements redirect ${ densematrix_sub[Int]($0,$1) }
     infix (DenseMatrix) ("-", Nil, (DenseMatrix(MInt),MFloat) :: DenseMatrix(MFloat)) implements redirect ${ densematrix_sub[Float]($0.toFloat,$1) }
     infix (DenseMatrix) ("-", Nil, (DenseMatrix(MInt),MDouble) :: DenseMatrix(MDouble)) implements redirect ${ densematrix_sub[Double]($0.toDouble,$1) }

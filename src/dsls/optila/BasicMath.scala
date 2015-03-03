@@ -9,12 +9,17 @@ trait BasicMathOps {
 
   def importBasicMathOps() {
     val Math = grp("BasicMath")
+    val Prim = lookupGrp("Primitive")
+
 	  val T = tpePar("T")
 
     val IndexVector = lookupTpe("IndexVector")
     val DenseVector = lookupTpe("DenseVector")
     val DenseVectorView = lookupTpe("DenseVectorView")
     val DenseMatrix = lookupTpe("DenseMatrix")
+    val DenseMatrixView = lookupTpe("DenseMatrixView")
+    val SparseVector = lookupTpe("SparseVector")
+    val SparseMatrix = lookupTpe("SparseMatrix")
 
     // -- aliases for Math._
     direct (Math) ("abs", Nil, MDouble :: MDouble) implements redirect ${ Math.abs($0) }
@@ -46,8 +51,70 @@ trait BasicMathOps {
     	impl (min) (codegen(g, "(" + quotedArg(0) + "<" + quotedArg(1) + ")?" + quotedArg(0) + ":" + quotedArg(1)))
   	}
 
+
+    // -- distance
+
+    // don't kick in when polymorphic, for unknown reasons
+    // fimplicit (DenseVector) ("dist", T, (DenseVector(T),DenseVector(T)) :: MDouble, ("conv", T ==> MDouble)) implements composite ${ sum(abs($0.toDouble - $1.toDouble)) }
+    // fimplicit (DenseMatrix) ("dist", T, (DenseMatrix(T),DenseMatrix(T)) :: MDouble, ("conv", T ==> MDouble)) implements composite ${ sum(abs($0.toDouble - $1.toDouble)) }
+    fimplicit (Prim) ("dist", Nil, (MInt,MInt) :: MDouble) implements composite ${ abs($0-$1) }
+    fimplicit (Prim) ("dist", Nil, (MDouble,MDouble) :: MDouble) implements composite ${ abs($0-$1) }
+
+    // metrics: default is ABS
+    val DMetric = tpe("DistanceMetric", stage = compile)
+    identifier (DMetric) ("ABS")
+    identifier (DMetric) ("SQUARE")
+    identifier (DMetric) ("EUC")
+
+    for (TP <- List(DenseVector,DenseVectorView,DenseMatrix,SparseVector)) {
+      fimplicit (TP) ("dist", Nil, (TP(MDouble),TP(MDouble)) :: MDouble) implements redirect ${ dist($0,$1,ABS) }
+
+      direct (TP) ("dist", Nil, (TP(MDouble),TP(MDouble),DMetric) :: MDouble) implements composite ${
+        $2 match {
+          case ABS => sum(abs($0 - $1))
+          case SQUARE => sum(square($0 - $1))
+          case EUC => sqrt(sum(square($0 - $1)))
+        }
+      }
+    }
+
+
+    // -- norms
+
+    // norm ids: default is L2
+    val NormId = tpe("NormId", stage = compile)
+    identifier (NormId) ("L1")
+    identifier (NormId) ("L2")
+    identifier (NormId) ("FRO")
+
+    for (TP <- List(DenseVector,DenseVectorView)) {
+      direct (TP) ("norm", Nil, TP(MDouble) :: MDouble) implements redirect ${ norm($0,L2) }
+
+      direct (TP) ("norm", Nil, (TP(MDouble),NormId) :: MDouble) implements composite ${
+        $1 match {
+          case L1 => sum(abs($0))
+          case L2 => sqrt(sum(square($0)))
+          case FRO => norm($0, L2)
+        }
+      }
+    }
+
+    for (TP <- List(DenseMatrix,DenseMatrixView)) {
+      direct (TP) ("norm", Nil, TP(MDouble) :: MDouble) implements redirect ${ norm($0,L2) }
+
+      direct (TP) ("norm", Nil, (TP(MDouble),NormId) :: MDouble) implements composite ${
+        $1 match {
+          case L1 => max($0.mapColsToVector(c => norm(c, L1)))
+          case L2 => fatal("not implemented")
+          case FRO => sqrt(sum($0.mapColsToVector(c => sum(square(c)))))
+        }
+      }
+    }
+
+
     // -- other math ops
     direct (Math) ("sigmoid", Nil, MDouble :: MDouble) implements composite ${ 1.0 / (1.0 + exp(-$0)) }
+
 
     // -- pdfs
     direct (Math) ("normpdf", Nil, (("x",MDouble),("mu",MDouble),("sigma",MDouble)) :: MDouble) implements composite ${
@@ -109,9 +176,6 @@ trait BasicMathOps {
      	  direct (Math) ("median", T, V :: T, (TNumeric(T),TOrdering(T))) implements redirect ${ $0.median }
       }
     }
-
-    val SparseVector = lookupTpe("SparseVector")
-    val SparseMatrix = lookupTpe("SparseMatrix")
 
     for (V <- List(SparseVector(T), SparseMatrix(T))) {
       val R = if (V == SparseMatrix(T)) SparseMatrix(T) else SparseVector(T)

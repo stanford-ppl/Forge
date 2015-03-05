@@ -147,7 +147,7 @@ trait DDGibbs extends OptiMLApplication {
 
     tic()
 
-    val marginals = (0::numModels).map({ imodel =>
+    val marginals = sum(0,numModels) { imodel =>
       val graph = GR.local.mutableVariables()
       val marginalsAcc = DenseVector.zeros(graph.nonEvidenceVariables.length).mutable()
       var sampleCt = 0
@@ -160,7 +160,7 @@ trait DDGibbs extends OptiMLApplication {
         //println("sampling " + sampleCt + "/" + numSamples)
       }
       marginalsAcc
-    }).sum / numSamples
+    } / numSamples
 
     toc(marginals)
 

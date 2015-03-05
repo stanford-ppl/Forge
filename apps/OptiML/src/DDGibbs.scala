@@ -121,6 +121,8 @@ trait DDGibbs extends OptiMLApplication {
 
     tic("io")
     val numSamples = args(4).toInt
+    val numModels = args(5).toInt
+    val numSamplesPerModel = numSamples / numModels
     val G = readDDFactorGraph(args(0), args(1), args(2), args(3))
     toc("io", G)
 
@@ -136,21 +138,29 @@ trait DDGibbs extends OptiMLApplication {
     println("done!")
 
     println("")
+    println("replicating the graph...")
+    val GR = replicate(G)
+    println("done!")
+
+    println("")
     println("estimating marginals (numsamples = " + numSamples + ")")
 
     tic()
 
-    val marginalsAcc = DenseVector.zeros(G.nonEvidenceVariables.length).mutable
-    var sampleCt = 0
-    while (sampleCt < numSamples) {
-      for (iv <- 0::G.nonEvidenceVariables.length) {
-        val v = G.nonEvidenceVariables.apply(iv)
-        marginalsAcc(iv) = marginalsAcc(iv) + (if (sampleVariable(G, v)) 1.0 else 0.0)
+    val marginals = (0::numModels).map({ imodel =>
+      val graph = GR.local.mutableVariables()
+      val marginalsAcc = DenseVector.zeros(graph.nonEvidenceVariables.length).mutable()
+      var sampleCt = 0
+      while (sampleCt < numSamplesPerModel) {
+        for (iv <- 0::graph.nonEvidenceVariables.length) {
+          val v = graph.nonEvidenceVariables.apply(iv)
+          marginalsAcc(iv) = marginalsAcc(iv) + (if (sampleVariable(graph, v)) 1.0 else 0.0)
+        }
+        sampleCt += 1
+        //println("sampling " + sampleCt + "/" + numSamples)
       }
-      sampleCt += 1
-      //println("sampling " + sampleCt + "/" + numSamples)
-    }
-    val marginals = marginalsAcc / numSamples
+      marginalsAcc
+    }).sum / numSamples
 
     toc(marginals)
 

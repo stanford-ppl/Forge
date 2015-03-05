@@ -84,6 +84,15 @@ trait MLGraphOps {
         val fidx = array_apply(csrgraph_get_nodes($self), $1 + unit(1))
         densevector_fromfunc(fidx - eidx, i => CSRNgbr(eidx + i, array_apply(csrgraph_get_edges($self), eidx + i)) )
       }
+
+      infix ("deepcopy") (Nil :: CSRGraph) implements composite ${
+        CSRGraph(
+          csrgraph_get_numnodes($self),
+          csrgraph_get_numedges($self),
+          array_clone(csrgraph_get_nodes($self)),
+          array_clone(csrgraph_get_edges($self))
+        )
+      }
     }
   }
 }

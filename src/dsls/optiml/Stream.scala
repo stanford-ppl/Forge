@@ -64,11 +64,11 @@ trait StreamOps {
       db
     })
 
-    compiler (HashStream) ("hash_get_internal", Nil, (LevelDB, MString) :: MArray(MByte), effect = simple) implements codegen($cala, ${
-      $0.get(org.fusesource.leveldbjni.JniDBFactory.bytes($1))
+    compiler (HashStream) ("hash_get_internal", Nil, (LevelDB, MArray(MByte)) :: MArray(MByte), effect = simple) implements codegen($cala, ${
+      $0.get($1)
     })
 
-    compiler (HashStream) ("hash_get_range_internal", Nil, (LevelDB, MString, MInt) :: MArray(MArray(MByte)), effect = simple) implements codegen($cala, ${
+    compiler (HashStream) ("hash_get_range_internal", Nil, (LevelDB, MArray(MByte), MInt) :: MArray(MArray(MByte)), effect = simple) implements codegen($cala, ${
       // workaround for named arguments in codegen methods not working
       val db = $0
       val startKey = $1
@@ -76,11 +76,11 @@ trait StreamOps {
 
       val buf = scala.collection.mutable.ArrayBuffer[Array[Byte]]()
       val iterator = db.iterator()
-      iterator.seek(org.fusesource.leveldbjni.JniDBFactory.bytes(startKey))
+      iterator.seek(startKey)
 
       var pos = 0
       while (iterator.hasNext && pos < numKeys) {
-        val key = org.fusesource.leveldbjni.JniDBFactory.asString(iterator.peekNext().getKey())
+        // val key = org.fusesource.leveldbjni.JniDBFactory.asString(iterator.peekNext().getKey())
         buf += iterator.peekNext().getValue()
         iterator.next()
         pos += 1
@@ -90,16 +90,16 @@ trait StreamOps {
       buf.toArray
     })
 
-    compiler (HashStream) ("hash_put_internal", Nil, (LevelDB, MString, MArray(MByte)) :: MUnit, effect = simple) implements codegen($cala, ${
-      $0.put(org.fusesource.leveldbjni.JniDBFactory.bytes($1), $2)
+    compiler (HashStream) ("hash_put_internal", Nil, (LevelDB, MArray(MByte), MArray(MByte)) :: MUnit, effect = simple) implements codegen($cala, ${
+      $0.put($1, $2)
     })
 
-    compiler (HashStream) ("hash_put_all_internal", Nil, (LevelDB, MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
+    compiler (HashStream) ("hash_put_all_internal", Nil, (LevelDB, MArray(MArray(MByte)), MArray(MArray(MByte)), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
       assert($1.length >= $3 && $2.length >= $3, "HashStream putAll called with too small arrays")
       val batch = $0.createWriteBatch()
       var i = 0
       while (i < $3) {
-        batch.put(org.fusesource.leveldbjni.JniDBFactory.bytes($1(i)), $2(i))
+        batch.put($1(i), $2(i))
         i += 1
       }
       $0.write(batch)
@@ -161,25 +161,25 @@ trait StreamOps {
       infix ("get") (MString :: MArray(MByte)) implements single ${
         val db = hash_get_db($self)
         fassert(db != null, "No DB opened in HashStream")
-        hash_get_internal(db, $1)
+        hash_get_internal(db, $1.getBytes)
       }
 
       infix ("getRange") ((MString, MInt) :: MArray(MArray(MByte))) implements single ${
         val db = hash_get_db($self)
         fassert(db != null, "No DB opened in HashStream")
-        hash_get_range_internal(db, $1, $2)
+        hash_get_range_internal(db, $1.getBytes, $2)
       }
 
       infix ("put") ((MString, MArray(MByte)) :: MUnit, effect = write(0)) implements single ${
         val db = hash_get_db($self)
         fassert(db != null, "No DB opened in HashStream")
-        hash_put_internal(db, $1, $2)
+        hash_put_internal(db, $1.getBytes, $2)
       }
 
-      infix ("putAll") ((MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = write(0)) implements single ${
+      infix ("putAll") ((MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = write(0)) implements composite ${
         val db = hash_get_db($self)
         fassert(db != null, "No DB opened in HashStream")
-        hash_put_all_internal(db, $1, $2, $3)
+        hash_put_all_internal(db, $1.map(_.getBytes), $2, $3)
       }
 
       infix ("close") (Nil :: MUnit, effect = write(0)) implements single ${
@@ -440,44 +440,40 @@ trait StreamOps {
           // do not show LevelDB scaling well with concurrent writers). We also batch all of the writes in one chunk for
           // improved performance.
 
-          val masterKeys = SHashMap[String, ForgeArray[Byte]]()
-          val logicalKeys = array_empty[String](a.length)
-          val logicalValues = array_empty[ForgeArray[Byte]](a.length)
-          var numLogicalEntries = 0
+          // Zero-length rows are skipped (note that the only two valid lengths for "value" are 0 and numCols)
+          // If there is a key present in the resulting map, there was at least 1 non-empty row mapping to it.
+          val chunk = densevector_fromarray(a, true).filter(v => v._2.length > 0)
+          val chunkRows: Rep[ForgeHashMap[String, DenseVector[DenseVector[Double]]]] = chunk.groupBy(v => v._1, v => v._2)
 
-          // Using 'while' causes Delite to over-parallelize this loop
-          for (j <- 0 until a.length) {
-            // FIXME: without these var hacks, the combination of 'for' and 'if' causes the hash / DB to apparently lock-up.
-            //        due to excessive inlining (e.g. redundant computation inside branches). Why's this happening?
-            var key: Var[String] = a(j)._1
-            var value: Var[DenseVector[Double]] = a(j)._2
+          val allKeys: Rep[DenseVector[String]] = densevector_fromarray(chunkRows.keys, true)
+          val allValues: Rep[DenseVector[DenseVector[DenseVector[Double]]]] = densevector_fromarray(fhashmap_values(chunkRows), true)
+          val allKV = allKeys.zip(allValues) { (k,v) => pack((k,v)) }
 
-            // Zero-length rows are skipped (note that the only two valid lengths for "value" are 0 and numCols)
-            // If there is a key present in the resulting map, there was at least 1 non-empty row mapping to it.
-            if (value.length > 0) {
-              // "master" key stores the current number of rows of the matrix, and is written directly to the map,
-              // since we need to look it up on subsequent iterations. this would require a lock if run in parallel.
-              var numRows: Var[Int] = if (!masterKeys.contains(key)) 0 else ByteBufferWrap(masterKeys.unsafeImmutable.apply(key)).getInt()
-              var newRows: Var[Int] = if (value.length == 0) numRows else numRows+1
+          val masterValues: Rep[ForgeArray[ForgeArray[Byte]]] =
+            allValues.map { group =>
               val lenBuf: Rep[java.nio.ByteBuffer] = ByteBuffer(4)
-              lenBuf.putInt(newRows)
-              masterKeys(key) = lenBuf.unsafeImmutable.array
+              lenBuf.putInt(group.length)
+              lenBuf.unsafeImmutable.array
+            }.toArray
 
-              // "logical" keys store the actual matrix row contents, and are written to the map in a batch.
-              // zero-length rows are skipped
-              val logicalKey = hashMatrixLogicalKey(key, numRows) // logical keys are 0-indexed
-              logicalKeys(numLogicalEntries) = logicalKey
-              logicalValues(numLogicalEntries) = serialize(value)
-              numLogicalEntries += 1
-            }
-          }
+          // We can't fuse flatMaps automatically yet, so manually fuse.
+          val logicalEntries: Rep[ForgeArray[Tup2[String, ForgeArray[Byte]]]] =
+            allKV.flatMap { t =>
+              val (k, group) = unpack(t)
+              val logicalKeys = group.indices.map { i => hashMatrixLogicalKey(k, i) }
+              val logicalValues = group.map { row => serialize(row) }
+              logicalKeys.zip(logicalValues) { (a,b) => pack((a,b)) }
+            }.toArray
+
+          val logicalKeys: Rep[ForgeArray[String]] = logicalEntries.map(_._1)
+          val logicalValues: Rep[ForgeArray[ForgeArray[Byte]]] = logicalEntries.map(_._2)
 
           // We seem to be getting write bandwidth on the logicalKeys of ~15MB/sec, while the Google benchmarks at
           // https://github.com/google/leveldb claim writes should be ~45MB/sec. This could be due to hardware, JNI,
           // or the Java driver. Write bandwidth on the masterKeys, which are random and tiny, is abysmal.
-          val ks = masterKeys.keys
-          hash.putAll(ks, masterKeys.values, ks.length)
-          hash.putAll(logicalKeys, logicalValues, numLogicalEntries)
+          val ks = chunkRows.keys
+          hash.putAll(ks, masterValues, ks.length)
+          hash.putAll(logicalKeys, logicalValues, logicalKeys.length)
         })
 
         hash

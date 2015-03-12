@@ -354,6 +354,7 @@ trait ScalaOps extends PrimitiveMathGen {
     val substring2 = infix (Str) ("substring", Nil, (MString,MInt,MInt) :: MString)
     val toLowerCase = infix (Str) ("toLowerCase", Nil, MString :: MString)
     val toUpperCase = infix (Str) ("toUpperCase", Nil, MString :: MString)
+    val getBytes = infix (Str) ("getBytes", Nil, MString :: MArray(MByte))
 
     impl (toInt) (codegen($cala, ${ $0.toInt }))
     impl (toLong) (codegen($cala, ${ $0.toLong }))
@@ -370,6 +371,7 @@ trait ScalaOps extends PrimitiveMathGen {
     impl (substring2) (codegen($cala, ${ $0.substring($1,$2) }))
     impl (toLowerCase) (codegen($cala, ${ $0.toLowerCase }))
     impl (toUpperCase) (codegen($cala, ${ $0.toUpperCase }))
+    impl (getBytes) (codegen($cala, ${ $0.getBytes() }))
 
     impl (toInt) (codegen(cpp, ${ string_toInt($0) }))
     impl (toLong) (codegen(cpp, ${ string_toLong($0) }))

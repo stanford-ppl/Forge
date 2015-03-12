@@ -25,6 +25,7 @@ trait DenseMatrixOps {
 
     // static methods
     static (DenseMatrix) ("apply", T, (MInt, MInt) :: DenseMatrix(T), effect = mutable) implements allocates(DenseMatrix, ${$0}, ${$1}, ${array_empty[T]($0*$1)})
+    static (DenseMatrix) ("apply", T, (MArray(T), MInt, MInt) :: DenseMatrix(T)) implements composite ${ densematrix_fromarray($0, $1, $2) }
 
     // matrix from vector of vectors
     for (v <- List(DenseVector(T),DenseVectorView(T))) {
@@ -282,6 +283,8 @@ trait DenseMatrixOps {
       compiler ("densematrix_set_numrows") (MInt :: MUnit, effect = write(0)) implements setter(0, "_numRows", ${$1})
       compiler ("densematrix_set_numcols") (MInt :: MUnit, effect = write(0)) implements setter(0, "_numCols", ${$1})
 
+      infix ("toArray") (Nil :: MArray(T)) implements composite ${ densematrix_raw_data($self.map(e => e)) }
+
       infix ("update") ((MInt,MInt,T) :: MUnit, effect = write(0)) implements composite ${ array_update(densematrix_raw_data($self), densematrix_index($self,$1,$2), $3) }
 
       for (rhs <- List(DenseVector(T),DenseVectorView(T))) {
@@ -493,11 +496,7 @@ trait DenseMatrixOps {
        }
        infix ("*") (DenseVector(T) :: DenseVector(T), TArith(T)) implements composite ${
         fassert($self.numCols == $1.length && !$1.isRow, "dimension mismatch: matrix * vector")
-        val out = DenseVector[T]($self.numRows, false)
-        for (rowIdx <- 0 until $self.numRows) {
-          out(rowIdx) = $self(rowIdx) *:* $1
-        }
-        out.unsafeImmutable
+        $self.mapRowsToVector(v => (v*$1).sum)
        }
 
        infix ("/") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ $self.zip($1) { (a,b) => a/b } }

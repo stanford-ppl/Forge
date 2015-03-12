@@ -44,6 +44,7 @@ trait DenseVectorOps {
     // static methods
     static (DenseVector) ("apply", T, (MInt, MBoolean) :: DenseVector(T), effect = mutable) implements allocates(DenseVector, ${$0}, ${$1}, ${array_empty[T]($0)})
     static (DenseVector) ("apply", T, varArgs(T) :: DenseVector(T)) implements allocates(DenseVector, ${unit($0.length)}, ${unit(true)}, ${array_fromseq($0)})
+    static (DenseVector) ("apply", T, MArray(T) :: DenseVector(T)) implements composite ${ densevector_fromarray($0, unit(true)) }
 
     // helper
     compiler (DenseVector) ("densevector_alloc_raw", T, (MInt, MBoolean, MArray(T)) :: DenseVector(T)) implements allocates(DenseVector, ${$0}, ${$1}, ${$2})
@@ -380,7 +381,7 @@ trait DenseVectorOps {
         array_copy(src, $1, dest, $3, $4)
       }
 
-      parallelize as ParallelCollectionBuffer(T, lookupOp("densevector_dc_alloc"), lookupOp("length"), lookupOverloaded("apply",2), lookupOp("update"), lookupOp("densevector_set_length"), lookupOp("densevector_appendable"), lookupOp("densevector_append"), lookupOp("densevector_copy"))
+      parallelize as ParallelCollectionBuffer(T, lookupOp("densevector_dc_alloc"), lookupOp("length"), lookupOverloaded("apply",3), lookupOp("update"), lookupOp("densevector_set_length"), lookupOp("densevector_appendable"), lookupOp("densevector_append"), lookupOp("densevector_copy"))
     }
 
     // the generic Vector.scala reduce requires an Arithmetic type class, so we handle some convenient other cases here

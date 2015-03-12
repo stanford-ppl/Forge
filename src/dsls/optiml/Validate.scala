@@ -252,13 +252,7 @@ trait ValidateOps {
       def classifyWithModel(m: Rep[M], t: Rep[Double])(x: Rep[DenseVectorView[T]]): Rep[Boolean] = classify(m, x) > t
 
       val AUCs = crossValidateRaw[T,M,Double](dataSet, train, numFolds) { (model, testSet) =>
-        val ROC_curve = (0::numThresholds) { t =>
-          val threshold = t.toDouble / numThresholds
-          val conf = confusionMatrix(testSet, classifyWithModel(model, threshold))
-          ROC(conf)
-        }
-
-        AUC(ROC_curve)
+        AUC(ROCCurve(testSet, t => classifyWithModel(model, t), numThresholds))
       }
 
       mean(AUCs)
@@ -278,16 +272,41 @@ trait ValidateOps {
       def classifyWithModel(m: Rep[M], t: Rep[Double])(x: Rep[DenseMatrix[T]]): Rep[DenseVector[Boolean]] = classify(m, x).map(_ > t)
 
       val AUCs = crossValidateRaw[T,M,Double](dataSet, train, numFolds) { (model, testSet) =>
-        val ROC_curve = (0::numThresholds) { t =>
-          val threshold = t.toDouble / numThresholds
-          val conf = confusionMatrixBatch(testSet, classifyWithModel(model, threshold))
-          ROC(conf)
-        }
-
-        AUC(ROC_curve)
+        AUC(ROCCurveBatch(testSet, t => classifyWithModel(model, t), numThresholds))
       }
 
       mean(AUCs)
+    }
+
+    // The (x,y) point on the ROC curve for the given classifier, representing (fpr, tpr)
+    direct (Validate) ("ROC", Nil, DenseMatrix(MInt) :: Tup2(MDouble,MDouble)) implements composite ${
+      pack((fallout($0), sensitivity($0)))
+    }
+
+    direct (Validate) ("ROCCurve", T, MethodSignature(List(
+                                        ("testSet", TrainingSet(T,MBoolean)),
+                                        ("classify", (MDouble ==> (DenseVectorView(T) ==> MBoolean))),
+                                        ("numThresholds", MInt, "unit(10)")
+                                      ), DenseVector(Tup2(MDouble,MDouble)))) implements composite ${
+
+      (0::numThresholds) { t =>
+        val threshold = t.toDouble / numThresholds
+        val conf = confusionMatrix(testSet, classify(threshold))
+        ROC(conf)
+      }
+    }
+
+    direct (Validate) ("ROCCurveBatch", T, MethodSignature(List(
+                                             ("testSet", TrainingSet(T,MBoolean)),
+                                             ("classify", (MDouble ==> (DenseMatrix(T) ==> DenseVector(MBoolean)))),
+                                             ("numThresholds", MInt, "unit(10)")
+                                           ), DenseVector(Tup2(MDouble,MDouble)))) implements composite ${
+
+      (0::numThresholds) { t =>
+        val threshold = t.toDouble / numThresholds
+        val conf = confusionMatrixBatch(testSet, classify(threshold))
+        ROC(conf)
+      }
     }
 
     direct (Validate) ("AUC", Nil, ("unsortedROCs", DenseVector(Tup2(MDouble,MDouble))) :: MDouble) implements composite ${
@@ -345,11 +364,6 @@ trait ValidateOps {
 
     direct (Validate) ("fscore", Nil, DenseMatrix(MInt) :: MDouble) implements composite ${
       2.0 / ((1.0 / precision($0)) + (1.0 / recall($0)))
-    }
-
-    // The (x,y) point on the ROC curve for the given classifier, representing (fpr, tpr)
-    direct (Validate) ("ROC", Nil, DenseMatrix(MInt) :: Tup2(MDouble,MDouble)) implements composite ${
-      pack((fallout($0), sensitivity($0)))
     }
   }
 }

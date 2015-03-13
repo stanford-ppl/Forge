@@ -95,7 +95,7 @@ trait ScalaGenForgeArrayOps extends ScalaGenDeliteArrayOps {
   import IR._
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case ArrayApply(x,n) => emitValDef(sym, "" + quote(x) + "(" + quote(n) + ")")
+    case ArrayApply(x,n) => emitValDef(sym, "" + quote(x) + "(" + quote(n) + ".toInt)")
     case ArrayLength(x) => emitValDef(sym, "" + quote(x) + ".length")
     // TODO
     case ArrayStringSplit(a,b,l) if Config.intSize == "long" => emitValDef(sym, "ppl.delite.runtime.data.RaggedNativeArray(" + quote(a) + ".split(" + quote(b) + "))")

@@ -30,7 +30,7 @@ trait RandomOps {
     }
 
     val randomint = direct (Rand) ("randomInt", Nil, MInt :: MInt, effect = simple)
-    impl (randomint) (codegen($cala, ${ Global.randRef.nextInt($0) }))
+    impl (randomint) (codegen($cala, ${ Global.randRef.nextInt($0.toInt) }))
     impl (randomint) (codegen(cpp, ${ resourceInfo->rand->nextInt($0) }))
 
     val randomgaussian = direct (Rand) ("randomGaussian", Nil, Nil :: MDouble, effect = simple)

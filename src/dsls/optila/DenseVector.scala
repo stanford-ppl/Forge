@@ -12,6 +12,7 @@ trait DenseVectorOps {
     val R = tpePar("R")
     val B = tpePar("B")
 
+    val SArray = lookupTpe("scala.Array")
     val DenseVector = lookupTpe("DenseVector") // tpe("DenseVector", T)
     val IndexVector = lookupTpe("IndexVector")
     val DenseVectorView = lookupTpe("DenseVectorView")
@@ -112,8 +113,10 @@ trait DenseVectorOps {
       DenseVector[R]($1, isRow)
     }
 
-    compiler (DenseVector) ("densevector_sortindex_helper", T, (MInt,MInt,MArray(T)) :: MArray(MInt), TOrdering(T)) implements codegen($cala, ${
-      ($0.toInt until $1.toInt: scala.Range).toArray.sortWith((a,b) => $2(a) < $2(b))
+    compiler (DenseVector) ("densevector_sortindex_helper", T, (MInt,MInt,MArray(T)) :: SArray(MInt), TOrdering(T)) implements codegen($cala, ${
+      // this is a hack for int64 mode, where ints get remapped to longs.
+      def promoteInt64(x: Int) = $0 + x - $0
+      ($0.toInt until $1.toInt: scala.Range).toArray.map(i => promoteInt64(i)).sortWith((a,b) => $2(a) < $2(b))
     })
 
     val K = tpePar("K")
@@ -324,13 +327,13 @@ trait DenseVectorOps {
       }
 
       infix ("sortBy") ((T ==> B) :: DenseVector(T), TOrdering(B), addTpePars = B) implements composite ${
-        val sortedIndicesRaw = densevector_sortindex_helper(0, $self.length, densevector_raw_data($self.map($1)))
+        val sortedIndicesRaw = farray_from_sarray(densevector_sortindex_helper(0, $self.length, densevector_raw_data($self.map($1))))
         val sortedIndices = IndexVector(densevector_fromarray(sortedIndicesRaw,$self.isRow))
         $self(sortedIndices)
       }
 
       infix ("sortWithIndex") (Nil :: CTuple2(DenseVector(T),IndexVector), TOrdering(T)) implements composite ${
-        val sortedIndicesRaw = densevector_sortindex_helper(0, $self.length, densevector_raw_data($self))
+        val sortedIndicesRaw = farray_from_sarray(densevector_sortindex_helper(0, $self.length, densevector_raw_data($self)))
         val sortedIndices = IndexVector(densevector_fromarray(sortedIndicesRaw,$self.isRow))
         ($self(sortedIndices),sortedIndices)
       }

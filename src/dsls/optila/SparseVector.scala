@@ -192,16 +192,22 @@ trait SparseVectorOps {
       infix ("apply") (MInt :: T) implements composite ${
         val data = sparsevector_raw_data($self)
         val offRaw = sparsevector_find_offset($self, $1)
-        if (offRaw > -1) array_apply(data,offRaw) else defaultValue[T]
+        if (offRaw > -1) {
+          var d = data // manual guard against code motion
+          array_apply(readVar(d),offRaw)
+        }
+        else defaultValue[T]
       }
 
       infix ("apply") (IndexVector :: SparseVector(T)) implements composite ${
         // could optimize this by sorting the argument IndexVector first, and then bounding the search space
         val data = sparsevector_raw_data($self)
         val offsets = $1.map(i => sparsevector_find_offset($self,i))
-        val logicalIndices = offsets.find(_ > -1) // relies on fusion to not materialize zeros (we could use a map-filter op here instead)
-        val physicalIndices = logicalIndices.map(i => offsets(i))
-        sparsevector_alloc_raw($1.length, $self.isRow, densevector_raw_data(physicalIndices.map(i => array_apply(data,i))), densevector_raw_data(logicalIndices), logicalIndices.length)
+        val logicalIndices = offsets.find(_ > -1)
+        val physicalIndices = offsets(logicalIndices)
+        // WORKAROUND: we use physicalIndices.mutable due to an apparent fusion bug: without it physicalIndices.map(..) fuses with logicalIndices.map(..)
+        //             and the array access array_apply(data,i) gets emitted outside of the find condition, which is not safe.
+        sparsevector_alloc_raw($1.length, $self.isRow, densevector_raw_data(physicalIndices.mutable.map(i => array_apply(data,i))), densevector_raw_data(logicalIndices), logicalIndices.length)
       }
 
       infix ("isEmpty") (Nil :: MBoolean) implements composite ${ $self.nnz == 0 }
@@ -567,12 +573,12 @@ trait SparseVectorOps {
        * Ordering
        */
 
-      infix ("min") (Nil :: T, (TOrdering(T), TArith(T))) implements composite ${
+      infix ("min") (Nil :: T, (TOrdering(T), THasMinMax(T))) implements composite ${
         val min = $self.nz.min
         if (min > defaultValue[T]) defaultValue[T] else min
       }
 
-      infix ("max") (Nil :: T, (TOrdering(T), TArith(T))) implements composite ${
+      infix ("max") (Nil :: T, (TOrdering(T), THasMinMax(T))) implements composite ${
         val max = $self.nz.max
         if (max < defaultValue[T]) defaultValue[T] else max
       }

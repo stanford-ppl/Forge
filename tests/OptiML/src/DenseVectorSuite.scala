@@ -82,7 +82,9 @@ trait DenseVectorOperators extends ForgeTestModule with OptiMLApplication {
     collect(median(v2) == 3)
     collect(mean(v2) == 3)
     collect(max(v2) == 5)
+    collect(v2(v2.maxIndex) == 5)
     collect(min(v2) == 1)
+    collect(v2(v2.minIndex) == 1)
     collect(mean(3,6,2,5) == 4.0)
 
     mkReport

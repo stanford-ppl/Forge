@@ -229,23 +229,15 @@ trait VectorOps {
       /**
        * Ordering
        */
-      infix ("min") (Nil :: T, O ::: A) implements composite ${
-        $self.reduce { (a,b) => if (a < b) a else b }
-        //reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a < b) a else b })
-      }
-      infix ("max") (Nil :: T, O ::: A) implements composite ${
-        $self.reduce { (a,b) => if (a > b) a else b }
-        //reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a > b) a else b })
-      }
+      val H = if (isTpePar(T)) List(THasMinMax(asTpePar(T))) else Nil
+      val MinT = if (isTpePar(T)) "implicitly[HasMinMax[T]].min" else "implicitly[HasMinMax["+TT+"]].min"
+      val MaxT = if (isTpePar(T)) "implicitly[HasMinMax[T]].max" else "implicitly[HasMinMax["+TT+"]].max"
 
-      infix ("minIndex") (Nil :: MInt, O ::: A) implements composite ${
-        $self.indices.reduce { (a,b) => if ($self(a) < $self(b)) a else b }
-        // ($self.zip($self.indices) { (a,b) => pack((a,b)) } reduce { (t1,t2) => if (t1._1 < t2._1) t1 else t2 })._2
-      }
-      infix ("maxIndex") (Nil :: MInt, O ::: A) implements composite ${
-        $self.indices.reduce { (a,b) => if ($self(a) > $self(b)) a else b }
-        // ($self.zip($self.indices) { (a,b) => pack((a,b)) } reduce { (t1,t2) => if (t1._1 > t2._1) t1 else t2 })._2
-      }
+      infix ("min") (Nil :: T, O ::: H) implements reduce(T, 0, MinT, ${ (a,b) => if (a < b) a else b })
+      infix ("max") (Nil :: T, O ::: H) implements reduce(T, 0, MaxT, ${ (a,b) => if (a > b) a else b })
+
+      infix ("minIndex") (Nil :: MInt, O) implements composite ${ min_index_of($self.indices, $self) }
+      infix ("maxIndex") (Nil :: MInt, O) implements composite ${ max_index_of($self.indices, $self) }
 
 
       /**

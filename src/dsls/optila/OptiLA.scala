@@ -7,7 +7,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 object OptiLADSLRunner extends ForgeApplicationRunner with OptiLADSL
 
 trait OptiLADSL extends ForgeApplication
-  with ArithOps with StringableOps with ShapeOps
+  with ArithOps with HasMinMaxOps with StringableOps with ShapeOps
   with BasicMathOps with RandomOps with IOOps
   with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps with SparseVectorOps with SparseVectorViewOps
   with MatrixOps with DenseMatrixOps with DenseMatrixViewOps with SparseMatrixOps
@@ -78,6 +78,7 @@ trait OptiLADSL extends ForgeApplication
     importBasicMathOps()
     importRandomOps()
     importArithOps()
+    importHasMinMaxOps()
     importStringableOps()
     importComplexOps()
 

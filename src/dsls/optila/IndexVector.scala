@@ -91,7 +91,7 @@ trait IndexVectorOps {
       }
       infix ("apply") (IndexVector :: IndexVector) implements composite ${
         val out = $1 { i => $self(i) }
-        indexvector_fromarray(densevector_raw_data(out), $self.isRow)
+        IndexVector(out, $self.isRow)
       }
 
       infix ("slice") ((("start",MInt),("end",MInt)) :: IndexVector) implements composite ${
@@ -136,6 +136,12 @@ trait IndexVectorOps {
         val data = array_filter($self.toArray, $1)
         indexvector_fromarray(data, $self.isRow)
       }
+
+      // These are required because reduce currently requires a collection of type A to be matched with a signature (A,A) => A.
+      // Therefore, we need a method that takes as input a collection of type Int in order to reduce it with the proper zero values.
+      val T = tpePar("T")
+      compiler ("min_index_of") (DenseVector(T) :: MInt, TOrdering(T), addTpePars = T) implements reduce(MInt, 0, "unit(Int.MaxValue)", ${ (a,b) => if ($1(a) < $1(b)) a else b})
+      compiler ("max_index_of") (DenseVector(T) :: MInt, TOrdering(T), addTpePars = T) implements reduce(MInt, 0, "unit(Int.MinValue)", ${ (a,b) => if ($1(a) > $1(b)) a else b})
 
       // parallel, so the conversion can fuse with the consumer
       // is this fast and robust enough to capture parallel operators over index vectors?

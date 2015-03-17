@@ -147,6 +147,7 @@ trait BasicMathOps {
     for (V <- List(DenseVector(T),DenseVectorView(T),IndexVector,DenseMatrix(T))) {
       val A = if (V != IndexVector) List(TArith(T)) else Nil
       val O = if (V != IndexVector) List(TOrdering(T)) else Nil
+      val H = if (V != IndexVector) List(THasMinMax(T)) else Nil
       val C = if (V != IndexVector) List(arg("conv",T ==> MDouble)) else Nil
       val P = if (V != IndexVector) List(T) else Nil
       val R1 = if (V == DenseMatrix(T)) DenseMatrix(T) else if (V == IndexVector) DenseVector(MInt) else DenseVector(T)
@@ -168,8 +169,8 @@ trait BasicMathOps {
         // mean(diffs) // 2nd moment around mean
       }
       direct (Math) ("stddev", P, V :: MDouble, C) implements composite ${ sqrt(variance($0)) }
-      direct (Math) ("min", P, V :: R2, O ::: A) implements redirect ${ $0.min }
-      direct (Math) ("max", P, V :: R2, O ::: A) implements redirect ${ $0.max }
+      direct (Math) ("min", P, V :: R2, O ::: H) implements redirect ${ $0.min }
+      direct (Math) ("max", P, V :: R2, O ::: H) implements redirect ${ $0.max }
 
       // only DenseVector has sort, and therefore median, defined right now
       if (V == DenseVector(T)) {
@@ -183,8 +184,8 @@ trait BasicMathOps {
       direct (Math) ("square", T, V :: R, TArith(T)) implements composite ${ $0.mapnz(e => e*e) }
       direct (Math) ("sum", T, V :: T, TArith(T)) implements redirect ${ $0.sum }
       direct (Math) ("mean", T, V :: MDouble, ("conv",T ==> MDouble)) implements redirect ${ $0.mean }
-      direct (Math) ("min", T, V :: T, (TOrdering(T), TArith(T))) implements redirect ${ $0.min }
-      direct (Math) ("max", T, V :: T, (TOrdering(T), TArith(T))) implements redirect ${ $0.max }
+      direct (Math) ("min", T, V :: T, (TOrdering(T), THasMinMax(T))) implements redirect ${ $0.min }
+      direct (Math) ("max", T, V :: T, (TOrdering(T), THasMinMax(T))) implements redirect ${ $0.max }
     }
 
 
@@ -192,8 +193,8 @@ trait BasicMathOps {
     // can't have a sequence-based sum, because it makes sum(0,n) { i => ... } ambiguous for int arguments
     // direct (Math) ("sum", T, varArgs(T) :: T, TArith(T)) implements composite ${ densevector_fromarray(array_fromseq($0),true).sum }
     direct (Math) ("mean", T, varArgs(T) :: MDouble, ("conv",T ==> MDouble)) implements composite ${ densevector_fromarray(array_fromseq($0),true).mean }
-    direct (Math) ("min", T, varArgs(T) :: T, (TOrdering(T), TArith(T))) implements composite ${ densevector_fromarray(array_fromseq($0),true).min }
-    direct (Math) ("max", T, varArgs(T) :: T, (TOrdering(T), TArith(T))) implements composite ${ densevector_fromarray(array_fromseq($0),true).max }
+    direct (Math) ("min", T, varArgs(T) :: T, (TOrdering(T), THasMinMax(T))) implements composite ${ densevector_fromarray(array_fromseq($0),true).min }
+    direct (Math) ("max", T, varArgs(T) :: T, (TOrdering(T), THasMinMax(T))) implements composite ${ densevector_fromarray(array_fromseq($0),true).max }
     direct (Math) ("median", T, varArgs(T) :: T, (TNumeric(T),TOrdering(T))) implements composite ${ densevector_fromarray(array_fromseq($0),true).median }
   }
 }

@@ -915,21 +915,21 @@ trait SparseMatrixOps {
       /**
        * Ordering
        */
-      infix ("min") (Nil :: T, (TOrdering(T), TArith(T))) implements composite ${
+      infix ("min") (Nil :: T, (TOrdering(T), THasMinMax(T))) implements composite ${
         val min = $self.nz.min
         if (min > defaultValue[T]) defaultValue[T] else min
       }
 
-      infix ("max") (Nil :: T, (TOrdering(T), TArith(T))) implements composite ${
+      infix ("max") (Nil :: T, (TOrdering(T), THasMinMax(T))) implements composite ${
         val max = $self.nz.max
         if (max < defaultValue[T]) defaultValue[T] else max
       }
 
       // FIXME: why is explicit toSparse needed?
-      infix ("minRows") (Nil :: SparseVector(T), (TOrdering(T), TArith(T))) implements composite ${ $self.mapRowsToVector { row => min(row.toSparse) }}
-      infix ("minCols") (Nil :: SparseVector(T), (TOrdering(T), TArith(T))) implements composite ${ $self.mapColsToVector { col => min(col.toSparse) }}
-      infix ("maxRows") (Nil :: SparseVector(T), (TOrdering(T), TArith(T))) implements composite ${ $self.mapRowsToVector { row => max(row.toSparse) }}
-      infix ("maxCols") (Nil :: SparseVector(T), (TOrdering(T), TArith(T))) implements composite ${ $self.mapColsToVector { col => max(col.toSparse) }}
+      infix ("minRows") (Nil :: SparseVector(T), (TOrdering(T), THasMinMax(T))) implements composite ${ $self.mapRowsToVector { row => min(row.toSparse) }}
+      infix ("minCols") (Nil :: SparseVector(T), (TOrdering(T), THasMinMax(T))) implements composite ${ $self.mapColsToVector { col => min(col.toSparse) }}
+      infix ("maxRows") (Nil :: SparseVector(T), (TOrdering(T), THasMinMax(T))) implements composite ${ $self.mapRowsToVector { row => max(row.toSparse) }}
+      infix ("maxCols") (Nil :: SparseVector(T), (TOrdering(T), THasMinMax(T))) implements composite ${ $self.mapColsToVector { col => max(col.toSparse) }}
 
       direct ("__equal") (SparseMatrix(T) :: MBoolean) implements composite ${
         if ($self.numRows != $1.numRows || $self.numCols != $1.numCols) false

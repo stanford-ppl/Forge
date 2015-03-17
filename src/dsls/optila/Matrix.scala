@@ -228,19 +228,17 @@ trait MatrixOps {
      /**
       * Ordering
       */
-     infix ("minRows") (Nil :: DenseVector(T), O ::: A) implements composite ${ $self.mapRowsToVector { row => min(row) }}
-     infix ("minCols") (Nil :: DenseVector(T), O ::: A) implements composite ${ $self.mapColsToVector { col => min(col) }}
-     infix ("maxRows") (Nil :: DenseVector(T), O ::: A) implements composite ${ $self.mapRowsToVector { row => max(row) }}
-     infix ("maxCols") (Nil :: DenseVector(T), O ::: A) implements composite ${ $self.mapColsToVector { col => max(col) }}
+     val H = if (isTpePar(T)) List(THasMinMax(asTpePar(T))) else Nil
+     val MinT = if (isTpePar(T)) "implicitly[HasMinMax[T]].min" else "implicitly[HasMinMax["+TT+"]].min"
+     val MaxT = if (isTpePar(T)) "implicitly[HasMinMax[T]].max" else "implicitly[HasMinMax["+TT+"]].max"
 
-     infix ("min") (Nil :: T, O ::: A) implements composite ${
-       $self.reduce { (a,b) => if (a < b) a else b }
-       // reduce(T, 0, ${$self(0,0)}, ${ (a,b) => if (a < b) a else b })
-     }
-     infix ("max") (Nil :: T, O ::: A) implements composite ${
-       $self.reduce { (a,b) => if (a > b) a else b }
-       //reduce(T, 0, ${$self(0,0)}, ${ (a,b) => if (a > b) a else b })
-     }
+     infix ("minRows") (Nil :: DenseVector(T), O ::: H) implements composite ${ $self.mapRowsToVector { row => min(row) }}
+     infix ("minCols") (Nil :: DenseVector(T), O ::: H) implements composite ${ $self.mapColsToVector { col => min(col) }}
+     infix ("maxRows") (Nil :: DenseVector(T), O ::: H) implements composite ${ $self.mapRowsToVector { row => max(row) }}
+     infix ("maxCols") (Nil :: DenseVector(T), O ::: H) implements composite ${ $self.mapColsToVector { col => max(col) }}
+
+     infix ("min") (Nil :: T, O ::: H) implements reduce(T, 0, MinT, ${ (a,b) => if (a < b) a else b })
+     infix ("max") (Nil :: T, O ::: H) implements reduce(T, 0, MaxT, ${ (a,b) => if (a > b) a else b })
 
      // TODO: switch to reduce when TupleReduce is generalized
      infix ("minIndex") (Nil :: Tuple2(MInt,MInt), O) implements composite ${

@@ -36,11 +36,51 @@ trait CrossValidation extends ForgeTestModule with OptiMLApplication {
   }
 }
 
+object HoldOutRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with HoldOut
+object HoldOutRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with HoldOut
+trait HoldOut extends ForgeTestModule with OptiMLApplication {
+  def main() = {
+    val x = DenseMatrix.rand(100,10)
+    val y = DenseVector.rand(100).map(e => e > 0.5)
+    val trainingSet = TrainingSet(x, y)
+
+    val (t1,t2) = unpack(holdOut(trainingSet, 0.2))
+    collect(t1.numSamples + t2.numSamples == trainingSet.numSamples)
+    collect(t1.numFeatures == t2.numFeatures && t2.numFeatures == trainingSet.numFeatures)
+    collect(t1.labels.length + t2.labels.length == trainingSet.labels.length)
+
+    val dataRecombined = t1.data << t2.data
+    val labelsRecombined = t1.labels << t2.labels
+    val sortedRecombinedIndices = IndexVector(dataRecombined.rowIndices.sortBy(i => dataRecombined(i).sum))
+    val sortedOriginalIndices = IndexVector(trainingSet.data.rowIndices.sortBy(i => trainingSet.data.apply(i).sum))
+
+    collect(sum(abs(dataRecombined(sortedRecombinedIndices) - x(sortedOriginalIndices))) < 0.01)
+    collect(labelsRecombined(sortedRecombinedIndices) == trainingSet.labels.apply(sortedOriginalIndices))
+
+    val (v1,v2,v3) = unpack(holdOut2(trainingSet, 0.1, 0.1))
+    collect(v1.numSamples + v2.numSamples + v3.numSamples == trainingSet.numSamples)
+    collect(v1.numFeatures == v2.numFeatures && v2.numFeatures == v3.numFeatures && v3.numFeatures == trainingSet.numFeatures)
+    collect(v1.labels.length + v2.labels.length + v3.labels.length == trainingSet.labels.length)
+
+    val dataRecombined2 = v1.data << v2.data << v3.data
+    val labelsRecombined2 = v1.labels << v2.labels << v3.labels
+    val sortedRecombinedIndices2 = IndexVector(dataRecombined2.rowIndices.sortBy(i => dataRecombined2(i).sum))
+
+    collect(sum(abs(dataRecombined2(sortedRecombinedIndices2) - x(sortedOriginalIndices))) < 0.01)
+    collect(labelsRecombined2(sortedRecombinedIndices2) == trainingSet.labels.apply(sortedOriginalIndices))
+
+    mkReport
+  }
+}
+
+
 class ValidationSuiteInterpreter extends ForgeSuiteInterpreter {
   def testConfusionMatrixOps() { runTest(ConfusionMatrixRunnerI) }
   def testCrossValidationOps() { runTest(CrossValidationRunnerI) }
+  def testHoldOutOps() { runTest(HoldOutRunnerI) }
 }
 class ValidationSuiteCompiler extends ForgeSuiteCompiler {
   def testConfusionMatrixOps() { runTest(ConfusionMatrixRunnerC) }
   def testCrossValidationOps() { runTest(CrossValidationRunnerC) }
+  def testHoldOutOps() { runTest(HoldOutRunnerC) }
 }

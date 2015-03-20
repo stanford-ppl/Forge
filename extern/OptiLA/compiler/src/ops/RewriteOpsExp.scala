@@ -170,8 +170,8 @@ trait RewriteOpsExp extends RewriteOps with PrimitiveOpsExp with DenseVectorOpsE
     case _ => None
   }
 
-  override def densevectorview_apply[A:Manifest](x: Exp[DenseVectorView[A]], n: Exp[Int])(implicit ctx: SourceContext) = {
-    dense_vectorview_optimize_apply(x.asInstanceOf[Exp[DeliteCollection[A]]],n) getOrElse super.densevectorview_apply(x,n)
+  override def densevectorview_apply_int[A:Manifest](x: Exp[DenseVectorView[A]], n: Exp[Int])(implicit ctx: SourceContext) = {
+    dense_vectorview_optimize_apply(x.asInstanceOf[Exp[DeliteCollection[A]]],n) getOrElse super.densevectorview_apply_int(x,n)
   }
 
   override def dc_apply[A:Manifest](x: Exp[DeliteCollection[A]], n: Exp[Int])(implicit ctx: SourceContext) = {

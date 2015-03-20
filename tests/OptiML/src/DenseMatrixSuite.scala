@@ -298,6 +298,22 @@ trait Views extends ForgeTestModule with OptiMLApplication {
   }
 }
 
+
+object SortByRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SortBy
+object SortByRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SortBy
+trait SortBy extends ForgeTestModule with OptiMLApplication {
+  def main() = {
+    val m = DenseMatrix(DenseVector(5,6,7,8,9),DenseVector(0,1,2,3,4),DenseVector(15,16,17,18,19),DenseVector(10,11,12,13,14))
+    val sortedRows = m.sortRowsBy(v => v.sum)
+    collect(sortedRows == DenseMatrix(DenseVector(0,1,2,3,4),DenseVector(5,6,7,8,9),DenseVector(10,11,12,13,14),DenseVector(15,16,17,18,19)))
+
+    val sortedCols = m.t.sortColsBy(v => v.sum)
+    collect(sortedCols == sortedRows.t)
+
+    mkReport
+  }
+}
+
 class DenseMatrixSuiteInterpreter extends ForgeSuiteInterpreter {
   def testAccessors() { runTest(DenseMatrixAccessorsRunnerI) }
   def testOperators() { runTest(DenseMatrixOperatorsRunnerI) }
@@ -307,6 +323,7 @@ class DenseMatrixSuiteInterpreter extends ForgeSuiteInterpreter {
   def testReduceRows() { runTest(ReduceRowsRunnerI) }
   def testShapes() { runTest(ShapesRunnerI) }
   def testViews() { runTest(ViewsRunnerI) }
+  def testSortBy() { runTest(SortByRunnerI) }
 }
 
 class DenseMatrixSuiteCompiler extends ForgeSuiteCompiler {
@@ -318,4 +335,5 @@ class DenseMatrixSuiteCompiler extends ForgeSuiteCompiler {
   def testReduceRows() { runTest(ReduceRowsRunnerC) }
   def testShapes() { runTest(ShapesRunnerC) }
   def testViews() { runTest(ViewsRunnerC) }
+  def testSortBy() { runTest(SortByRunnerC) }
 }

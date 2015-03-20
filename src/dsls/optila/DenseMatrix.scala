@@ -427,6 +427,18 @@ trait DenseMatrixOps {
         * Ordering
         */
 
+       infix ("sortRowsBy") ((DenseVectorView(T) ==> B) :: DenseMatrix(T), TOrdering(B), addTpePars = B) implements composite ${
+         val sortedIndicesRaw = farray_from_sarray(densevector_sortindex_helper(0, $self.numRows, densevector_raw_data($self.mapRowsToVector($1))))
+         val sortedIndices = IndexVector(densevector_fromarray(sortedIndicesRaw,true))
+         $self(sortedIndices)
+       }
+
+       infix ("sortColsBy") ((DenseVectorView(T) ==> B) :: DenseMatrix(T), TOrdering(B), addTpePars = B) implements composite ${
+         val sortedIndicesRaw = farray_from_sarray(densevector_sortindex_helper(0, $self.numCols, densevector_raw_data($self.mapColsToVector($1))))
+         val sortedIndices = IndexVector(densevector_fromarray(sortedIndicesRaw,true))
+         $self.getCols(sortedIndices)
+       }
+
        infix (":>") (DenseMatrix(T) :: DenseMatrix(MBoolean), TOrdering(T)) implements zip((T,T,MBoolean), (0,1), ${ (a,b) => a > b })
        infix (":<") (DenseMatrix(T) :: DenseMatrix(MBoolean), TOrdering(T)) implements zip((T,T,MBoolean), (0,1), ${ (a,b) => a < b })
 

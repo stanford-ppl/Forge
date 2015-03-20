@@ -259,8 +259,9 @@ trait VectorOps {
 
       val partitionReturn = if (v.name == "IndexVector") IndexVector else DenseVector(T)
       infix ("partition") (("pred",(T ==> MBoolean)) :: Tuple2(partitionReturn,partitionReturn)) implements composite ${
-        val partT = $self.filter(pred)
-        val partF = $self.filter(e => !pred(e))
+        val assignments = $self.map(pred)
+        val partT = $self(assignments.find(e => e))
+        val partF = $self(assignments.find(e => !e))
         pack((partT, partF))
       }
 

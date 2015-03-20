@@ -11,6 +11,7 @@ trait DenseVectorViewOps {
     val T = tpePar("T")
     val DenseVectorView = lookupTpe("DenseVectorView") // tpe("DenseVectorView", T)
     val DenseVector = lookupTpe("DenseVector")
+    val IndexVector = lookupTpe("IndexVector")
 
     // data fields
     data(DenseVectorView, ("_data", MArray(T)), ("_start", MInt), ("_stride", MInt), ("_length", MInt), ("_isRow", MBoolean))
@@ -27,6 +28,10 @@ trait DenseVectorViewOps {
       infix ("length") (Nil :: MInt) implements getter(0, "_length")
       infix ("isRow") (Nil :: MBoolean) implements getter(0, "_isRow")
       infix ("apply") (MInt :: T) implements composite ${ array_apply(densevectorview_data($self), densevectorview_start($self) + $1*densevectorview_stride($self)) }
+      infix ("apply") (IndexVector :: DenseVector(T)) implements composite ${ $self.toDense.apply($1) }
+
+      // label DenseVector *:* DenseVectorView so that we can rewrite it in RewriteOpsExp
+      label(lookupOverloaded("DenseVectorView","apply",1), "densevectorview_apply_int")
 
       infix ("slice") ((("start",MInt),("end",MInt)) :: DenseVectorView(T)) implements composite ${
         DenseVectorView(densevectorview_data($self), densevectorview_start($self)+$start*densevectorview_stride($self), densevectorview_stride($self), $end-$start, $self.isRow)

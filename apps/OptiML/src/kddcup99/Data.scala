@@ -233,7 +233,7 @@ trait KDDCup99Data extends OptiMLApplication {
   	else attack_category("probing")
   }
 
-  def test(testSet: Rep[TrainingSet[Double,Double]], classify: Rep[DenseVectorView[Double]] => Rep[Double], numSamples: Rep[Int]) = {
+  def test(testSet: Rep[DenseTrainingSet[Double,Double]], classify: Rep[DenseVectorView[Double]] => Rep[Double], numSamples: Rep[Int]) = {
     // returns [TN, TP, FP, FN]
     sum(0, numSamples) { i =>
       if (i > 0 && i % 10000 == 0) println("sample: " + i)
@@ -257,10 +257,10 @@ trait KDDCup99Data extends OptiMLApplication {
     }
   }
 
-  def readKDDCupData(path: Rep[String], selectedFeatures: Rep[IndexVector] = 0::NUM_FEATURES): Rep[TrainingSet[Double,Double]] = {
-  	val lines = readMatrix[String](path, s => s, ",")
-  	val data = lines mapRows { row => parseNetworkRow(row) } getCols(selectedFeatures)
-	 	val labels = lines.getCol(lines.numCols-1).map(s => attack_type(s.slice(0,s.length-1)))
-	 	TrainingSet(data, labels)
-	}
+  def readKDDCupData(path: Rep[String], selectedFeatures: Rep[IndexVector] = 0::NUM_FEATURES): Rep[DenseTrainingSet[Double,Double]] = {
+    val lines = readMatrix[String](path, s => s, ",")
+    val data = lines mapRows { row => parseNetworkRow(row) } getCols(selectedFeatures)
+    val labels = lines.getCol(lines.numCols-1).map(s => attack_type(s.slice(0,s.length-1)))
+    DenseTrainingSet(data, labels)
+  }
 }

@@ -7,6 +7,40 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 trait SparseVectorOps {
   this: OptiLADSL =>
 
+  // Duplicates an important subset of the sparse interface between SparseVector and SparseVectorView,
+  // avoiding an unnecessary conversion when used with views.
+  def addSparseVectorCommonOps(v: Rep[DSLType], T: Rep[TypePar]) {
+    val DenseVector = lookupTpe("DenseVector")
+    val DenseVectorView = lookupTpe("DenseVectorView")
+    val DenseMatrix = lookupTpe("DenseMatrix")
+    val SparseVector = lookupTpe("SparseVector")
+
+    val SparseVectorCommonOps = withTpe(v)
+    SparseVectorCommonOps {
+      for (rhs <- List(DenseVector(T), DenseVectorView(T))) {
+        infix ("*") (rhs :: SparseVector(T), TArith(T)) implements composite ${
+          val out = ($self.indices.zip($self.nz) { (i,e) => e*$1(i) })
+          // We will retain zeros from the rhs explicitly in the resulting SparseVector.
+          sparsevector_alloc_raw($self.length, $self.isRow, out.toArray, $self.indices.toArray, $self.nnz)
+        }
+
+        infix ("*:*") (rhs :: T, TArith(T)) implements composite ${
+          ($self.indices.zip($self.nz) { (i,e) => e*$1(i) }).sum
+        }
+      }
+
+      infix ("*") (T :: SparseVector(T), TArith(T)) implements composite ${
+        val out = $self.nz.map(e => e*$1)
+        sparsevector_alloc_raw($self.length, $self.isRow, out.toArray, $self.indices.toArray, $self.nnz)
+      }
+
+      infix ("*") (DenseMatrix(T) :: DenseVector(T), TArith(T)) implements composite ${
+        fassert($self.isRow, "dimension mismatch: vector * matrix")
+        $1.mapColsToVector { col => $self *:* col }
+      }
+    }
+  }
+
   def importSparseVectorOps() {
     val T = tpePar("T")
     val R = tpePar("R")
@@ -26,27 +60,39 @@ trait SparseVectorOps {
     // static methods
     static (SparseVector) ("apply", T, (MInt, MBoolean) :: SparseVector(T), effect = mutable) implements allocates(SparseVector, ${$0}, ${$1}, ${array_empty[T](unit(32))}, ${array_empty[Int](unit(32))}, ${unit(0)})
 
+    static (SparseVector) ("fromElements", T, MethodSignature(List(
+        ("length", MInt),
+        ("isRow", MBoolean),
+        ("nzIndices", IndexVector),
+        ("nzElements", DenseVector(T))), SparseVector(T))) implements composite ${
+
+      val (sortedIndices, sortedOriginalPositions) = nzIndices.toDense.sortWithIndex
+      val sortedElements = nzElements(sortedOriginalPositions)
+      sparsevector_alloc_raw(length, isRow, densevector_raw_data(sortedElements), densevector_raw_data(sortedIndices), sortedIndices.length)
+    }
+
+    static (SparseVector) ("fromFunc", T, (MInt, MBoolean, IndexVector, MInt ==> T) :: SparseVector(T)) implements composite ${
+      val sorted = $2.sort
+      sparsevector_alloc_raw($0, $1, densevector_raw_data(sorted.map($3)), densevector_raw_data(sorted), sorted.length)
+    }
+
     // helper
     compiler (SparseVector) ("sparsevector_alloc_raw", T, (MInt, MBoolean, MArray(T), MArray(MInt), MInt) :: SparseVector(T)) implements
       allocates(SparseVector, ${$0}, ${$1}, ${$2}, ${$3}, ${$4})
 
-    compiler (SparseVector) ("sparsevector_fromfunc", T, (MInt, MBoolean, IndexVector, MInt ==> T) :: SparseVector(T)) implements composite ${
-      val sorted = $2.sort
-      sparsevector_alloc_raw($0, $1, densevector_raw_data(sorted.map($3)), densevector_raw_data(sorted), sorted.length)
-    }
     static (SparseVector) ("zeros", Nil, MInt :: SparseVector(MDouble)) implements redirect ${ SparseVector[Double]($0, unit(true)) }
     static (SparseVector) ("zerosf", Nil, MInt :: SparseVector(MFloat)) implements redirect ${ SparseVector[Float]($0, unit(true)) }
     static (SparseVector) ("rand", Nil, (("length", MInt), ("sparsity", MDouble)) :: SparseVector(MDouble)) implements composite ${
       val density = 1.0 - sparsity
       val nnz = floor(density*length)
       val indices = shuffle(0::length).take(nnz)
-      sparsevector_fromfunc($0, true, indices, i => random[Double])
+      SparseVector.fromFunc($0, true, indices, i => random[Double])
     }
     static (SparseVector) ("randf", Nil, (("length", MInt), ("sparsity", MDouble)) :: SparseVector(MFloat)) implements composite ${
       val density = 1.0 - sparsity
       val nnz = floor(density*length)
       val indices = shuffle(0::length).take(nnz)
-      sparsevector_fromfunc($0, true, indices, i => random[Float])
+      SparseVector.fromFunc($0, true, indices, i => random[Float])
     }
 
     compiler (SparseVector) ("bsearch", Nil, (("a",MArray(MInt)),("_start",MInt),("_end",MInt),("pos",MInt)) :: MInt) implements single ${
@@ -536,18 +582,11 @@ trait SparseVectorOps {
       infix ("-") (T :: DenseVector(T), TArith(T)) implements composite ${ $self.toDense - $1 }
 
       infix ("*") (SparseVector(T) :: SparseVector(T), TArith(T)) implements composite ${ zipVectorIntersect[T,T,T]($self, $1, (a,b) => a*b) }
-      infix ("*") (DenseVector(T) :: DenseVector(T), TArith(T)) implements composite ${ $self.toDense * $1 }
-      infix ("*") (T :: SparseVector(T), TArith(T)) implements composite ${ $self.mapnz(e => e*$1) }
 
       // infix ("*") (SparseMatrix(T) :: SparseVector(T), TArith(T) implements composite ${
       // }
-      infix ("*") (DenseMatrix(T) :: DenseVector(T), TArith(T)) implements composite ${
-        fassert($self.isRow, "dimension mismatch: vector * matrix")
-        $1.t.mapRowsToVector { row => row *:* $self }
-      }
 
       infix ("*:*") (SparseVector(T) :: T, TArith(T)) implements composite ${ sum($self*$1) }
-      infix ("*:*") (DenseVector(T) :: T, TArith(T)) implements composite ${ $self.toDense *:* $1 }
 
       // infix ("**") (SparseVector(T) :: SparseMatrix(T), TArith(T)) implements composite ${
       //   fassert(!$self.isRow && $1.isRow, "dimension mismatch: vector outer product")
@@ -559,6 +598,7 @@ trait SparseVectorOps {
       //   }
       //   out.unsafeImmutable
       // }
+
       infix ("**") (DenseVector(T) :: DenseMatrix(T), TArith(T)) implements composite ${ $self.toDense ** $1 }
 
       infix ("/") (SparseVector(T) :: SparseVector(T), TArith(T)) implements composite ${ zipVectorIntersect[T,T,T]($self, $1, (a,b) => a/b) } // ignores x / 0 errors...
@@ -626,8 +666,9 @@ trait SparseVectorOps {
       }
 
       infix ("countnz") ((T ==> MBoolean) :: MInt) implements composite ${ $self.nz.count{$1} }
-
     }
+
+    addSparseVectorCommonOps(SparseVector, T)
 
     // should we add primitive sparse op combinations? the extra combinations kill our compile times, but the trade-off is the loss of flexible syntax with sparse math.
   }

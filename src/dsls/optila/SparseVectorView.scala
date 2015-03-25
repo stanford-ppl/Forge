@@ -51,6 +51,7 @@ trait SparseVectorViewOps {
 
       infix ("length") (Nil :: MInt) implements getter(0, "_length")
       infix ("isRow") (Nil :: MBoolean) implements getter(0, "_isRow")
+
       infix ("apply") (MInt :: T) implements composite ${
         val flatIdx = sparsevectorview_start($self) + sparsevectorview_stride($self)*$1
         val src = sparsevectorview_source($self)
@@ -183,5 +184,7 @@ trait SparseVectorViewOps {
         repTo\${grpName}SparseVectorOpsCls(viewToSparse($self))
       }
     }
+
+    addSparseVectorCommonOps(SparseVectorView, T)
   }
 }

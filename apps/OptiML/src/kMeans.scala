@@ -21,7 +21,7 @@ trait kMeans extends OptiMLApplication {
   def main() = {
     if (args.length < 1) printUsage
 
-    val x = TrainingSet(readMatrix(args(0)), DenseVector[Double]()) // no labels
+    val x = DenseTrainingSet(readMatrix(args(0)), DenseVector[Double]()) // no labels
     val m = x.numSamples
     val n = x.numFeatures
     val mu = if (args.length > 1) readMatrix(args(1)) else ((0::k, *) { i => x(randomInt(m)) })

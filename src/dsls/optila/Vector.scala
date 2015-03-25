@@ -195,8 +195,8 @@ trait VectorOps {
       for (rhs <- List(SparseVector(T),SparseVectorView(T))) {
         infix ("+") (rhs :: DenseVector(T), A) implements composite ${ $self + $1.toDense }
         infix ("-") (rhs :: DenseVector(T), A) implements composite ${ $self - $1.toDense }
-        infix ("*") (rhs :: DenseVector(T), A) implements composite ${ $self * $1.toDense }
-        infix ("*:*") (rhs :: T, A) implements composite ${ $self *:* $1.toDense }
+        infix ("*") (rhs :: SparseVector(T), A) implements composite ${ $1 * $self.toDense }
+        infix ("*:*") (rhs :: T, A) implements composite ${ $1 *:* $self.toDense }
         infix ("**") (rhs :: DenseMatrix(T), A) implements composite ${ $self ** $1.toDense }
         infix ("/") (rhs :: DenseVector(T), A) implements composite ${ $self / $1.toDense }
       }
@@ -259,7 +259,9 @@ trait VectorOps {
 
       val partitionReturn = if (v.name == "IndexVector") IndexVector else DenseVector(T)
       infix ("partition") (("pred",(T ==> MBoolean)) :: Tuple2(partitionReturn,partitionReturn)) implements composite ${
-        val assignments = $self.map(pred)
+        // FIXME: If $self is the result of a filter, the partT find fuses into that filter (somehow incorrectly),
+        // and we get an ArrayOutOfBoundsException during init. As a workaround, we use mutable here to prevent the fusion.
+        val assignments = $self.map(pred).mutable
         val partT = $self(assignments.find(e => e))
         val partF = $self(assignments.find(e => !e))
         pack((partT, partF))

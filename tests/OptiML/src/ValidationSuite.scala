@@ -7,9 +7,9 @@ object ConfusionMatrixRunnerC extends ForgeTestRunnerCompiler with OptiMLApplica
 object ConfusionMatrixRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with ConfusionMatrix
 trait ConfusionMatrix extends ForgeTestModule with OptiMLApplication {
   def main() = {
-    val testSet = TrainingSet(DenseMatrix(DenseVector(0,1), DenseVector(2,3), DenseVector(4,5), DenseVector(6,7)), DenseVector(true,false,true,true))
+    val testSet = DenseTrainingSet(DenseMatrix(DenseVector(0,1), DenseVector(2,3), DenseVector(4,5), DenseVector(6,7)), DenseVector(true,false,true,true))
     def classify(x: Rep[DenseVectorView[Int]]) = (x(0) == 0) || (x(0) == 2)
-    val results = confusionMatrix(testSet, classify)
+    val results = confusionMatrix(testSet, i => classify(testSet(i)))
 
     collect(results == DenseMatrix(DenseVector(1, 1), DenseVector(2, 0)))
     collect(accuracy(results) == 0.25)
@@ -26,9 +26,9 @@ object CrossValidationRunnerC extends ForgeTestRunnerCompiler with OptiMLApplica
 object CrossValidationRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with CrossValidation
 trait CrossValidation extends ForgeTestModule with OptiMLApplication {
   def main() = {
-    val testSet = TrainingSet(DenseMatrix(DenseVector(0,1), DenseVector(2,3), DenseVector(4,5), DenseVector(6,7)), DenseVector(true,false,true,true))
-    def train(x: Rep[TrainingSet[Int,Boolean]]) = DenseVector(3.5,3.5)
-    def classify(x: Rep[DenseVector[Double]], y: Rep[DenseVectorView[Int]]) = (y(0).toDouble > x(0)) && (y(1).toDouble > x(1))
+    val testSet = DenseTrainingSet(DenseMatrix(DenseVector(0,1), DenseVector(2,3), DenseVector(4,5), DenseVector(6,7)), DenseVector(true,false,true,true))
+    def train(x: Rep[DenseTrainingSet[Int,Boolean]]) = DenseVector(3.5,3.5)
+    def classify(x: Rep[DenseVector[Double]], set: Rep[DenseTrainingSet[Int,Boolean]], i: Rep[Int]) = (set(i,0).toDouble > x(0)) && (set(i,1).toDouble > x(1))
     val res = crossValidate(testSet, train, classify, accuracy)
     collect(res == 0.75)
 
@@ -42,7 +42,7 @@ trait HoldOut extends ForgeTestModule with OptiMLApplication {
   def main() = {
     val x = DenseMatrix.rand(100,10)
     val y = DenseVector.rand(100).map(e => e > 0.5)
-    val trainingSet = TrainingSet(x, y)
+    val trainingSet = DenseTrainingSet(x, y)
 
     val (t1,t2) = unpack(holdOut(trainingSet, 0.2))
     collect(t1.numSamples + t2.numSamples == trainingSet.numSamples)

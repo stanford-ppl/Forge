@@ -160,6 +160,9 @@ trait DenseVectorOps {
         }
       }
 
+      // No-op; just available so that we can call it generically on vectors.
+      infix ("toDense") (Nil :: DenseVector(T)) implements redirect ${ $self }
+
       infix ("Clone") (Nil :: DenseVector(T), aliasHint = copies(0)) implements composite ${
         densevector_alloc_raw($self.length, $self.isRow, array_clone(densevector_raw_data($self)))
       }

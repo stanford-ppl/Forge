@@ -11,25 +11,26 @@ trait ValidateOps {
     val DenseVector = lookupTpe("DenseVector")
     val DenseVectorView = lookupTpe("DenseVectorView")
     val DenseMatrix = lookupTpe("DenseMatrix")
-    val TrainingSet = lookupTpe("TrainingSet")
+    val DenseTrainingSet = lookupTpe("DenseTrainingSet")
+    val IndexVector = lookupTpe("IndexVector")
     val Tup2 = lookupTpe("Tup2")
     val Tup3 = lookupTpe("Tup3")
     val T = tpePar("T")
     val L = tpePar("L")
     val M = tpePar("M")
     val R = tpePar("R")
+    val TS = hkTpePar("TS", (T,L))
 
     val Validate = grp("Validate")
 
-    direct (Validate) ("holdOut", (T,L), (("dataSet", TrainingSet(T,L)), ("pct", MDouble)) :: Tup2(TrainingSet(T,L),TrainingSet(T,L))) implements composite ${
+    direct (Validate) ("holdOut", (T,L,TS), (("dataSet", TS(T,L)), ("pct", MDouble)) :: Tup2(TS(T,L),TS(T,L)), TTrainingSetLike(T,L,TS(T,L))) implements composite ${
       val (trainSet, testSet) = unpack((0::dataSet.numSamples) partition { e => random[Double] > pct })
       val (trainIndices, testIndices) = (IndexVector(trainSet), IndexVector(testSet))
 
-      pack((TrainingSet(dataSet.data.apply(trainIndices), dataSet.labels.apply(trainIndices)),
-            TrainingSet(dataSet.data.apply(testIndices), dataSet.labels.apply(testIndices))))
+      pack((dataSet.getRows(trainIndices)), dataSet.getRows(testIndices))
     }
 
-    direct (Validate) ("holdOut2", (T,L), (("dataSet", TrainingSet(T,L)), ("pctValidationSamples", MDouble), ("pctTestSamples", MDouble)) :: Tup3(TrainingSet(T,L),TrainingSet(T,L),TrainingSet(T,L))) implements composite ${
+    direct (Validate) ("holdOut2", (T,L,TS), (("dataSet", TS(T,L)), ("pctValidationSamples", MDouble), ("pctTestSamples", MDouble)) :: Tup3(TS(T,L),TS(T,L),TS(T,L)), TTrainingSetLike(T,L,TS(T,L))) implements composite ${
       val pctTrainingSamples = 1.0 - (pctValidationSamples + pctTestSamples)
       val trainingNumSamples = floor(dataSet.numSamples*pctTrainingSamples)
       val validationNumSamples = floor(dataSet.numSamples*pctValidationSamples)
@@ -40,9 +41,9 @@ trait ValidateOps {
       val validationSampleIndices = shuffledIndices(trainingNumSamples::trainingNumSamples+validationNumSamples)
       val testSampleIndices = shuffledIndices(trainingNumSamples+validationNumSamples::dataSet.numSamples)
 
-      val trainingSet = TrainingSet(dataSet.data.apply(trainingSampleIndices), dataSet.labels.apply(trainingSampleIndices))
-      val validationSet = TrainingSet(dataSet.data.apply(validationSampleIndices), dataSet.labels.apply(validationSampleIndices))
-      val testSet = TrainingSet(dataSet.data.apply(testSampleIndices), dataSet.labels.apply(testSampleIndices))
+      val trainingSet = dataSet.getRows(trainingSampleIndices)
+      val validationSet = dataSet.getRows(validationSampleIndices)
+      val testSet = dataSet.getRows(testSampleIndices)
       pack((trainingSet, validationSet, testSet))
     }
 
@@ -64,11 +65,11 @@ trait ValidateOps {
     /**
      * Generate a confusion matrix for the given classifier and testSet.
      */
-    direct (Validate) ("confusionMatrix", T, MethodSignature(List(
-                                            ("testSet",TrainingSet(T,MBoolean)),
-                                            ("classify", DenseVectorView(T) ==> MBoolean),
+    direct (Validate) ("confusionMatrix", (T,TS), MethodSignature(List(
+                                            ("testSet", TS(T,MBoolean)),
+                                            ("classify", MInt ==> MBoolean),
                                             ("numSamples", MInt, "unit(-1)")
-                                          ), DenseMatrix(MInt))) implements composite ${
+                                          ), DenseMatrix(MInt)), TTrainingSetLike(T,MBoolean,TS(T,MBoolean))) implements composite ${
 
       val numSamplesToProcess = if (numSamples == -1) testSet.numSamples else numSamples
 
@@ -76,7 +77,7 @@ trait ValidateOps {
       val stats = sum(0, numSamplesToProcess) { i =>
         // if (i > 0 && i % 10000 == 0) println("sample: " + i)
         val trueLabel = testSet.labels.apply(i)
-        val predictedLabel = classify(testSet(i))
+        val predictedLabel = classify(i)
         confusionMatrixIndicator(trueLabel, predictedLabel)
       }
 
@@ -86,15 +87,15 @@ trait ValidateOps {
     /**
      * The same as confusionMatrix, except process testSamples as a batch.
      */
-    direct (Validate) ("confusionMatrixBatch", T, MethodSignature(List(
-                                            ("testSet",TrainingSet(T,MBoolean)),
-                                            ("classify", DenseMatrix(T) ==> DenseVector(MBoolean)),
+    direct (Validate) ("confusionMatrixBatch", (T,TS), MethodSignature(List(
+                                            ("testSet", TS(T,MBoolean)),
+                                            ("classify", IndexVector ==> DenseVector(MBoolean)),
                                             ("numSamples", MInt, "unit(-1)")
-                                          ), DenseMatrix(MInt))) implements composite ${
+                                          ), DenseMatrix(MInt)), TTrainingSetLike(T,MBoolean,TS(T,MBoolean))) implements composite ${
 
       val numSamplesToProcess = if (numSamples == -1) testSet.numSamples else numSamples
 
-      val results = classify(testSet.data.apply(0::numSamplesToProcess))
+      val results = classify(0::numSamplesToProcess)
 
       // returns [TP, FP; FN, TN]
       val stats = sum(0, numSamplesToProcess) { i =>
@@ -112,31 +113,30 @@ trait ValidateOps {
      * classifier, and reports both training and validation error every iteration until
      * convergence. It also reports a final test error on an independently held out set.
      */
-    direct (Validate) ("learningCurve", Nil, MethodSignature(List(
-                                               ("dataSet", TrainingSet(MDouble,MBoolean)),
+    direct (Validate) ("learningCurve", TS, MethodSignature(List(
+                                               ("dataSet", TS(MDouble,MBoolean)),
                                                ("classifier", MString),
                                                ("metric", DenseMatrix(MInt) ==> MDouble),
                                                ("_verbose", MBoolean, "unit(false)"),
                                                ("pctValidationSamples", MDouble, "unit(0.10)"),
                                                ("pctTestSamples", MDouble, "unit(0.10)")
-                                           ), MUnit)) implements composite ${
-
+                                           ), MUnit), TTrainingSetLike(MDouble,MBoolean,TS(MDouble,MBoolean))) implements composite ${
 
       val (trainingSet, validationSet, testSet) = unpack(holdOut2(dataSet, pctValidationSamples, pctTestSamples))
 
       val validClassifiers = "logreg"
 
       if (classifier == "logreg") {
-        def classify(model: Rep[DenseVector[Double]], x: Rep[DenseVectorView[Double]]) = sigmoid(x *:* model) > 0.5
+        def classify(set: Rep[TS[Double,Boolean]], i: Rep[Int], model: Rep[DenseVector[Double]]) = sigmoid(set.dot(i, model)) > 0.5
 
         val model = logreg(trainingSet, maxIter = 1000, verbose = _verbose, callback = { (curModel: Rep[DenseVector[Double]], iter: Rep[Int]) =>
-          val trainingSetResults = confusionMatrix(trainingSet, (x: Rep[DenseVectorView[Double]]) => classify(curModel, x))
+          val trainingSetResults = confusionMatrix(trainingSet, (i: Rep[Int]) => classify(trainingSet, i, curModel))
           println(" iter " + iter + ", training metric = " + metric(trainingSetResults))
-          val validationSetResults = confusionMatrix(validationSet, (x: Rep[DenseVectorView[Double]]) => classify(curModel, x))
+          val validationSetResults = confusionMatrix(validationSet, (i: Rep[Int]) => classify(validationSet, i, curModel))
           println(" iter " + iter + ", validation metric = " + metric(validationSetResults))
         })
 
-        val testSetResults = confusionMatrix(testSet, (x: Rep[DenseVectorView[Double]]) => classify(model, x))
+        val testSetResults = confusionMatrix(testSet, (i: Rep[Int]) => classify(testSet, i, model))
         println("test set confusion matrix: ")
         testSetResults.pprint
         println("test metric = " + metric(testSetResults))
@@ -146,14 +146,14 @@ trait ValidateOps {
       }
     }
 
-    direct (Validate) ("crossValidateRaw", (T,M,R), CurriedMethodSignature(List(List(
-                                                 ("dataSet", TrainingSet(T,MBoolean)),
-                                                 ("train", TrainingSet(T,MBoolean) ==> M),
+    direct (Validate) ("crossValidateRaw", (T,M,R,TS), CurriedMethodSignature(List(List(
+                                                 ("dataSet", TS(T,MBoolean)),
+                                                 ("train", TS(T,MBoolean) ==> M),
                                                  ("_numFolds", MInt, "unit(10)")),
                                                List(
-                                                 ("evalTestSet", (M,TrainingSet(T,MBoolean)) ==> R)
+                                                 ("evalTestSet", (M,TS(T,MBoolean)) ==> R)
                                                )
-                                            ), DenseVector(R))) implements composite ${
+                                            ), DenseVector(R)), TTrainingSetLike(T,MBoolean,TS(T,MBoolean))) implements composite ${
 
 
       fassert(dataSet.numSamples > 2, "Cannot cross validate dataset with less than 2 samples")
@@ -172,10 +172,10 @@ trait ValidateOps {
         val sourceTrainingSampleIndices = shuffledIndices(trainingSampleIndices)
         val sourceTestSampleIndices = shuffledIndices(testSampleIndices)
 
-        val trainingSet = TrainingSet(dataSet.data.apply(sourceTrainingSampleIndices), dataSet.labels.apply(sourceTrainingSampleIndices))
+        val trainingSet = dataSet.getRows(sourceTrainingSampleIndices)
         val model = train(trainingSet)
 
-        val testSet = TrainingSet(dataSet.data.apply(sourceTestSampleIndices), dataSet.labels.apply(sourceTestSampleIndices))
+        val testSet = dataSet.getRows(sourceTestSampleIndices)
         evalTestSet(model, testSet)
       }
     }
@@ -184,19 +184,19 @@ trait ValidateOps {
      * Compute a cross-validated score for the classifier using a user-specified metric from a confusion matrix
      * to a score (e.g. accuracy, precision).
      */
-    direct (Validate) ("crossValidate", (T,M), MethodSignature(List(
-                                               ("dataSet", TrainingSet(T,MBoolean)),
-                                               ("train", TrainingSet(T,MBoolean) ==> M),
-                                               ("classify", (M,DenseVectorView(T)) ==> MBoolean),
+    direct (Validate) ("crossValidate", (T,M,TS), MethodSignature(List(
+                                               ("dataSet", TS(T,MBoolean)),
+                                               ("train", TS(T,MBoolean) ==> M),
+                                               ("classify", (M,TS(T,MBoolean),MInt) ==> MBoolean),
                                                ("metric", DenseMatrix(MInt) ==> MDouble),
                                                ("numFolds", MInt, "unit(10)"),
                                                ("verbose", MBoolean, "unit(false)")
-                                            ), MDouble)) implements composite ${
+                                            ), MDouble), TTrainingSetLike(T,MBoolean,TS(T,MBoolean))) implements composite ${
 
-      def classifyWithModel(m: Rep[M])(x: Rep[DenseVectorView[T]]): Rep[Boolean] = classify(m, x)
+      def classifyWithModel(m: Rep[M], set: Rep[TS[T,Boolean]])(i: Rep[Int]): Rep[Boolean] = classify(m, set, i)
 
-      val foldResults = crossValidateRaw[T,M,Double](dataSet, train, numFolds) { (model, testSet) =>
-        val conf = confusionMatrix(testSet, classifyWithModel(model))
+      val foldResults = crossValidateRaw[T,M,Double,TS](dataSet, train, numFolds) { (model, testSet) =>
+        val conf = confusionMatrix(testSet, classifyWithModel(model, testSet))
 
         if (verbose) {
           println("confusionMatrix: [TP FP; FN TN]")
@@ -212,19 +212,19 @@ trait ValidateOps {
    /**
     * The same as crossValidate, except with a batch of test samples at a time.
     */
-    direct (Validate) ("crossValidateBatch", (T,M), MethodSignature(List(
-                                               ("dataSet", TrainingSet(T,MBoolean)),
-                                               ("train", TrainingSet(T,MBoolean) ==> M),
-                                               ("classify", (M,DenseMatrix(T)) ==> DenseVector(MBoolean)),
+    direct (Validate) ("crossValidateBatch", (T,M,TS), MethodSignature(List(
+                                               ("dataSet", TS(T,MBoolean)),
+                                               ("train", TS(T,MBoolean) ==> M),
+                                               ("classify", (M,TS(T,MBoolean),IndexVector) ==> DenseVector(MBoolean)),
                                                ("metric", DenseMatrix(MInt) ==> MDouble),
                                                ("numFolds", MInt, "unit(10)"),
                                                ("verbose", MBoolean, "unit(false)")
-                                            ), MDouble)) implements composite ${
+                                            ), MDouble), TTrainingSetLike(T,MBoolean,TS(T,MBoolean))) implements composite ${
 
-      def classifyWithModel(m: Rep[M])(x: Rep[DenseMatrix[T]]): Rep[DenseVector[Boolean]] = classify(m, x)
+      def classifyWithModel(m: Rep[M], set: Rep[TS[T,Boolean]])(i: Rep[IndexVector]): Rep[DenseVector[Boolean]] = classify(m, set, i)
 
-      val foldResults = crossValidateRaw[T,M,Double](dataSet, train, numFolds) { (model, testSet) =>
-        val conf = confusionMatrixBatch(testSet, classifyWithModel(model))
+      val foldResults = crossValidateRaw[T,M,Double,TS](dataSet, train, numFolds) { (model, testSet) =>
+        val conf = confusionMatrixBatch(testSet, classifyWithModel(model, testSet))
 
         if (verbose) {
           println("confusionMatrix: [TP FP; FN TN]")
@@ -241,18 +241,18 @@ trait ValidateOps {
      * Compute the cross-validated area under the ROC curve for a probabilistic classifier returning a value between 0.0 and 1.0,
      * evaluated with different classification thresholds. For each fold, we evaluate the AUC, and take the average across folds.
      */
-    direct (Validate) ("crossValidateAUC", (T,M), MethodSignature(List(
-                                               ("dataSet", TrainingSet(T,MBoolean)),
-                                               ("train", TrainingSet(T,MBoolean) ==> M),
-                                               ("classify", (M,DenseVectorView(T)) ==> MDouble),
+    direct (Validate) ("crossValidateAUC", (T,M,TS), MethodSignature(List(
+                                               ("dataSet", TS(T,MBoolean)),
+                                               ("train", TS(T,MBoolean) ==> M),
+                                               ("classify", (M,TS(T,MBoolean),MInt) ==> MDouble),
                                                ("numFolds", MInt, "unit(10)"),
                                                ("numThresholds", MInt, "unit(10)")
-                                            ), MDouble)) implements composite ${
+                                            ), MDouble), TTrainingSetLike(T,MBoolean,TS(T,MBoolean))) implements composite ${
 
-      def classifyWithModel(m: Rep[M], t: Rep[Double])(x: Rep[DenseVectorView[T]]): Rep[Boolean] = classify(m, x) > t
+      def classifyWithModel(m: Rep[M], set: Rep[TS[T,Boolean]], t: Rep[Double])(i: Rep[Int]): Rep[Boolean] = classify(m, set, i) > t
 
-      val AUCs = crossValidateRaw[T,M,Double](dataSet, train, numFolds) { (model, testSet) =>
-        AUC(ROCCurve(testSet, t => classifyWithModel(model, t), numThresholds))
+      val AUCs = crossValidateRaw[T,M,Double,TS](dataSet, train, numFolds) { (model, testSet) =>
+        AUC(ROCCurve(testSet, t => classifyWithModel(model, testSet, t), numThresholds))
       }
 
       mean(AUCs)
@@ -261,18 +261,18 @@ trait ValidateOps {
     /**
      * Same as crossValidateAUC, except with a batch of test samples at a time.
      */
-    direct (Validate) ("crossValidateAUCBatch", (T,M), MethodSignature(List(
-                                               ("dataSet", TrainingSet(T,MBoolean)),
-                                               ("train", TrainingSet(T,MBoolean) ==> M),
-                                               ("classify", (M,DenseMatrix(T)) ==> DenseVector(MDouble)),
+    direct (Validate) ("crossValidateAUCBatch", (T,M,TS), MethodSignature(List(
+                                               ("dataSet", TS(T,MBoolean)),
+                                               ("train", TS(T,MBoolean) ==> M),
+                                               ("classify", (M,TS(T,MBoolean),IndexVector) ==> DenseVector(MDouble)),
                                                ("numFolds", MInt, "unit(10)"),
                                                ("numThresholds", MInt, "unit(10)")
-                                            ), MDouble)) implements composite ${
+                                            ), MDouble), TTrainingSetLike(T,MBoolean,TS(T,MBoolean))) implements composite ${
 
-      def classifyWithModel(m: Rep[M], t: Rep[Double])(x: Rep[DenseMatrix[T]]): Rep[DenseVector[Boolean]] = classify(m, x).map(_ > t)
+      def classifyWithModel(m: Rep[M], set: Rep[TS[T,Boolean]], t: Rep[Double])(x: Rep[IndexVector]): Rep[DenseVector[Boolean]] = classify(m, set, x).map(_ > t)
 
-      val AUCs = crossValidateRaw[T,M,Double](dataSet, train, numFolds) { (model, testSet) =>
-        AUC(ROCCurveBatch(testSet, t => classifyWithModel(model, t), numThresholds))
+      val AUCs = crossValidateRaw[T,M,Double,TS](dataSet, train, numFolds) { (model, testSet) =>
+        AUC(ROCCurveBatch(testSet, t => classifyWithModel(model, testSet, t), numThresholds))
       }
 
       mean(AUCs)
@@ -283,11 +283,11 @@ trait ValidateOps {
       pack((fallout($0), sensitivity($0)))
     }
 
-    direct (Validate) ("ROCCurve", T, MethodSignature(List(
-                                        ("testSet", TrainingSet(T,MBoolean)),
-                                        ("classify", (MDouble ==> (DenseVectorView(T) ==> MBoolean))),
+    direct (Validate) ("ROCCurve", (T,TS), MethodSignature(List(
+                                        ("testSet", TS(T,MBoolean)),
+                                        ("classify", (MDouble ==> (MInt ==> MBoolean))),
                                         ("numThresholds", MInt, "unit(10)")
-                                      ), DenseVector(Tup2(MDouble,MDouble)))) implements composite ${
+                                      ), DenseVector(Tup2(MDouble,MDouble))), TTrainingSetLike(T,MBoolean,TS(T,MBoolean))) implements composite ${
 
       (0::numThresholds) { t =>
         val threshold = t.toDouble / numThresholds
@@ -296,11 +296,11 @@ trait ValidateOps {
       }
     }
 
-    direct (Validate) ("ROCCurveBatch", T, MethodSignature(List(
-                                             ("testSet", TrainingSet(T,MBoolean)),
-                                             ("classify", (MDouble ==> (DenseMatrix(T) ==> DenseVector(MBoolean)))),
+    direct (Validate) ("ROCCurveBatch", (T,TS), MethodSignature(List(
+                                             ("testSet", TS(T,MBoolean)),
+                                             ("classify", (MDouble ==> (IndexVector ==> DenseVector(MBoolean)))),
                                              ("numThresholds", MInt, "unit(10)")
-                                           ), DenseVector(Tup2(MDouble,MDouble)))) implements composite ${
+                                           ), DenseVector(Tup2(MDouble,MDouble))), TTrainingSetLike(T,MBoolean,TS(T,MBoolean))) implements composite ${
 
       (0::numThresholds) { t =>
         val threshold = t.toDouble / numThresholds

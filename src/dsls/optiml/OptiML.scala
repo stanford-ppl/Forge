@@ -9,9 +9,10 @@ import factor._
 object OptiMLDSLRunner extends ForgeApplicationRunner with OptiMLDSL
 
 trait OptiMLDSL extends OptiLADSL
-  with MLIOOps with FeatureOps with SetOps with BufferableOps with StreamOps with ImageOps
+  with MLIOOps with FeatureOps with SetOps with StreamOps with ImageOps with TreeOps
   with FactorOps with FactorGraphOps
-  with ClassifierOps with ValidateOps with TreeOps {
+  with ClassifierOps with ValidateOps
+  with BufferableOps with TrainingSetLikeOps {
 
   override def dslName = "OptiML"
 
@@ -35,12 +36,13 @@ trait OptiMLDSL extends OptiLADSL
     val ComputeStream = tpe("ComputeStream", T)
 
     // OptiML ops
+    importSetOps()
+    importTrainingSetLikeOps()
     importByteBuffer()
     extern(grp("Sum"))
     importBufferableOps()
     importFeatureOps()
     importFeatureHelperOps()
-    importSetOps()
     importUntilConverged()
     importAllFactorGraphOps()
     importMLIOOps()

@@ -389,6 +389,10 @@ trait Partition extends ForgeTestModule with OptiMLApplication {
     val (a,b) = unpack(x.partition(_ > 0.5))
     collect(sum(abs((a << b).sort - x.sort)) < 0.01)
 
+    // We had issues with broken fusion of filters and partitions, so test that it's working here.
+    val xf = x.filter(_ > 0.2)
+    val (a2,b2) = unpack(xf.partition(_ > 0.7))
+    collect(sum(abs((a2 << b2).sort - xf.sort)) < 0.01)
     mkReport
   }
 }

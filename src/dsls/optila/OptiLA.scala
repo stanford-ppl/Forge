@@ -75,9 +75,9 @@ trait OptiLADSL extends ForgeApplication
       }
     }))
 
+    importArithOps()
     importBasicMathOps()
     importRandomOps()
-    importArithOps()
     importHasMinMaxOps()
     importStringableOps()
     importComplexOps()

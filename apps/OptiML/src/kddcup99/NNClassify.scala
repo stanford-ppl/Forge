@@ -11,7 +11,7 @@ trait KDDNN extends OptiMLApplication with KDDCup99Data {
     exit(-1)
   }
 
-  def NNClassify(trainingSet: Rep[TrainingSet[Double,Double]])(inX: Rep[DenseVectorView[Double]]): Rep[Double] = {
+  def NNClassify(trainingSet: Rep[DenseTrainingSet[Double,Double]])(inX: Rep[DenseVectorView[Double]]): Rep[Double] = {
     // mapRowsToVector appears to be allocated a new vector here for some reason instead of fusing with minIndex,
     // though it doesn't appear to make a big difference
     val nearestIndex = trainingSet.data.mapRowsToVector(row => dist(row, inX, EUC)).minIndex

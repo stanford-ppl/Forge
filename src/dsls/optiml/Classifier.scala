@@ -10,7 +10,11 @@ trait ClassifierOps {
   def importClassifierOps() {
     val DenseVector = lookupTpe("DenseVector")
     val DenseMatrix = lookupTpe("DenseMatrix")
-    val TrainingSet = lookupTpe("TrainingSet")
+    val DenseTrainingSet = lookupTpe("DenseTrainingSet")
+
+    val D = tpePar("D")
+    val L = tpePar("L")
+    val TS = hkTpePar("TS", (D,L))
 
     val Classifier = grp("Classifier")
 
@@ -28,14 +32,14 @@ trait ClassifierOps {
       $0 mapCols { c => normalize(c) }
     }
 
-    direct (Classifier) ("logreg", Nil, MethodSignature(List(
-                                            ("data",TrainingSet(MDouble,MBoolean)),
+    direct (Classifier) ("logreg", TS, MethodSignature(List(
+                                            ("data",TS(MDouble,MBoolean)),
                                             ("initLearningRate", MDouble, "unit(1.0)"),
                                             ("maxIter", MInt, "unit(30)"),
                                             ("stochastic", MBoolean, "unit(true)"),
                                             ("verbose", MBoolean, "unit(false)"),
                                             ("callback", (DenseVector(MDouble), MInt) ==> MUnit, "(m,i) => unit(())")
-                                          ), DenseVector(MDouble))) implements composite ${
+                                          ), DenseVector(MDouble)), ("_ts", TTrainingSetLike(MDouble,MBoolean,TS(MDouble,MBoolean)))) implements composite ${
 
       val theta = DenseVector.zeros(data.numFeatures)
       val y = data.labels map { label => if (label) 1.0 else 0.0 }
@@ -49,10 +53,8 @@ trait ClassifierOps {
           val alpha = initLearningRate / (1.0 + initLearningRate*iter)
           val next = cur.mutable
           for (i <- 0 until data.numSamples) {
-            val gradient = data(i)*(y(i) - sigmoid(next *:* data(i)))
-            for (j <- 0 until data.numFeatures) {
-              next(j) = next(j) + gradient(j)*alpha
-            }
+            val gradient = data.timesScalar(i, y(i) - sigmoid(data.dot(i, next)))
+            next += gradient*alpha
           }
           val ret = next.unsafeImmutable
           callback(ret, iter)
@@ -64,7 +66,7 @@ trait ClassifierOps {
           val alpha = initLearningRate / (1.0 + initLearningRate*iter)
           val gradient =
             ((0::data.numSamples) { i =>
-              data(i)*(y(i) - sigmoid(cur *:* data(i)))
+              data.timesScalar(i, y(i) - sigmoid(data.dot(i, cur)))
             }).sum
 
           val next = cur + gradient*alpha

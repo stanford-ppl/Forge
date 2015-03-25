@@ -31,13 +31,13 @@ trait IrisClassify extends OptiMLApplication {
 
     val dataNormalized = normalize(data)
     val dataWithIntercept = DenseVector.ones(dataNormalized.numRows).t.toMat <<| dataNormalized
-    val trainingSet = TrainingSet(dataWithIntercept, labels)
+    val trainingSet = DenseTrainingSet(dataWithIntercept, labels)
 
     println("Running cross validation..")
-    val acc = crossValidate[Double,DenseVector[Double]](trainingSet, s => logreg(s, maxIter = 100, verbose = false), (m,x) => sigmoid(m *:* x) > 0.5, accuracy, verbose = true)
+    val acc = crossValidate[Double,DenseVector[Double],DenseTrainingSet](trainingSet, s => logreg(s, maxIter = 100, verbose = false), (m,set,i) => sigmoid(m *:* set(i)) > 0.5, accuracy, verbose = true)
     println("accuracy: " + acc)
 
-    val auc = crossValidateAUC[Double,DenseVector[Double]](trainingSet, s => logreg(s, maxIter = 100, verbose = false), (m,x) => sigmoid(m *:* x))
+    val auc = crossValidateAUC[Double,DenseVector[Double],DenseTrainingSet](trainingSet, s => logreg(s, maxIter = 100, verbose = false), (m,set,i) => sigmoid(m *:* set(i)))
     println("auc: " + auc)
   }
 }

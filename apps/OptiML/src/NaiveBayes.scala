@@ -34,7 +34,7 @@ trait NaiveBayes extends FileUtil {
     println("Test error: " + incorrectClassifications.toDouble / testSet.numSamples.toDouble)
   }
 
-  def train(ts: Rep[TrainingSet[Int,Int]]): (Rep[DenseVector[Double]], Rep[DenseVector[Double]], Rep[Double]) = {
+  def train(ts: Rep[DenseTrainingSet[Int,Int]]): (Rep[DenseVector[Double]], Rep[DenseVector[Double]], Rep[Double]) = {
     val wordsPerDoc = ts.data.sumRows
     val spamIndices = ts.labels.find(_ == 1)
     val nonSpamIndices = ts.labels.find(_ == 0)
@@ -56,7 +56,7 @@ trait NaiveBayes extends FileUtil {
 
     val nonSpamWords = ts.data.apply(nonSpamIndices)
     val nonSpamTotalWords = wordsPerDoc(nonSpamIndices).sum
-    
+
     val phi_y0 = (0::ts.numFeatures) { j =>
       val nonSpamWordCount = nonSpamWords.getCol(j).sum
       (nonSpamWordCount + 1) / (nonSpamTotalWords + ts.numFeatures).toDouble
@@ -67,7 +67,7 @@ trait NaiveBayes extends FileUtil {
     (phi_y1, phi_y0, phi_y)
   }
 
-  def test(ts: Rep[TrainingSet[Int,Int]], phi_y1: Rep[DenseVector[Double]], phi_y0: Rep[DenseVector[Double]], phi_y: Rep[Double]) = {
+  def test(ts: Rep[DenseTrainingSet[Int,Int]], phi_y1: Rep[DenseVector[Double]], phi_y0: Rep[DenseVector[Double]], phi_y: Rep[Double]) = {
     println("Testing model on " + ts.numSamples + " documents.")
 
     val output = (0::ts.numSamples) { j =>

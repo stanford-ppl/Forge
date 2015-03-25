@@ -23,9 +23,17 @@ trait SparseMatrixOps {
     val SparseMatrixBuildable = lookupTpe("SparseMatrixBuildable")
 
     // COO format
-    data(SparseMatrixBuildable, ("_numRows", MInt), ("_numCols", MInt), ("_data", MArray(T)), ("_colIndices", MArray(MInt)), ("_rowIndices", MArray(MInt)), ("_nnz", MInt))
+    data(SparseMatrixBuildable, ("_numRows", MInt), ("_numCols", MInt), ("_data", MArray(T)), ("_rowIndices", MArray(MInt)), ("_colIndices", MArray(MInt)), ("_nnz", MInt))
 
     static (SparseMatrix) ("apply", T, (MInt, MInt) :: SparseMatrixBuildable(T), effect = mutable) implements allocates(SparseMatrixBuildable, ${$0}, ${$1}, ${array_empty[T](unit(32))}, ${array_empty[Int](unit(32))}, ${array_empty[Int](unit(32))}, ${unit(0)})
+
+    compiler (SparseMatrix) ("sparsematrix_coo_alloc_raw", T, MethodSignature(List(
+      ("numRows", MInt),
+      ("numCols", MInt),
+      ("nzElements", MArray(T)),
+      ("rowIndices", MArray(MInt)),
+      ("colIndices", MArray(MInt)),
+      ("nnz", MInt)), SparseMatrixBuildable(T))) implements allocates(SparseMatrixBuildable, ${$0}, ${$1}, ${$2}, ${$3}, ${$4}, ${$5})
 
     val SparseMatrixBuildableOps = withTpe(SparseMatrixBuildable)
     SparseMatrixBuildableOps {
@@ -413,6 +421,18 @@ trait SparseMatrixOps {
     data(SparseMatrix, ("_numRows", MInt), ("_numCols", MInt), ("_data", MArray(T)), ("_colIndices",MArray(MInt)), ("_rowPtr",MArray(MInt)), ("_nnz",MInt))
 
     // static methods
+    static (SparseMatrix) ("fromElements", T, MethodSignature(List(
+      ("numRows", MInt),
+      ("numCols", MInt),
+      ("nzElements", DenseVector(T)),
+      ("nzRowIndices", DenseVector(MInt)),
+      ("nzColIndices", DenseVector(MInt))), SparseMatrix(T)), effect = mutable) implements composite ${
+
+      val coo = sparsematrix_coo_alloc_raw($0, $1, densevector_raw_data($2), densevector_raw_data($3), densevector_raw_data($4), densevector_length($2))
+      val csr = coo.finish
+      csr
+    }
+
     static (SparseMatrix) ("diag", T withBound TArith, (MInt, SparseVector(T)) :: SparseMatrix(T)) implements composite ${
       val out = SparseMatrix[T]($0,$0)
       // updates append, and must be sequential
@@ -957,11 +977,11 @@ trait SparseMatrixOps {
       infix ("countnz") ((T ==> MBoolean) :: MInt) implements composite ${ $self.nz.count($1) }
 
       infix ("mapRowsToVector") ((SparseVectorView(T) ==> R) :: SparseVector(R), addTpePars = R) implements composite ${
-        sparsevector_fromfunc($self.numRows, false, $self.nzRows, i => $1($self(i)))
+        SparseVector.fromFunc($self.numRows, false, $self.nzRows, i => $1($self(i)))
       }
 
       infix ("mapColsToVector") ((SparseVectorView(T) ==> R) :: SparseVector(R), addTpePars = R) implements composite ${
-        sparsevector_fromfunc($self.numCols, true, $self.nzCols, i => $1($self.getCol(i)))
+        SparseVector.fromFunc($self.numCols, true, $self.nzCols, i => $1($self.getCol(i)))
       }
 
       infix ("findRows") ((SparseVectorView(T) ==> MBoolean) :: IndexVector) implements composite ${

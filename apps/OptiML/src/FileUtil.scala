@@ -33,6 +33,6 @@ trait FileUtil extends OptiMLApplication {
       }
       denseRow.unsafeImmutable
     }
-    TrainingSet(data, labels)
+    DenseTrainingSet(data, labels)
   }
 }

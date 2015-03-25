@@ -10,6 +10,7 @@ trait Definitions extends DerivativeTypes {
   val opIdentifierPrefix = "mn"
   val opArgPrefix = "__arg"
   val implicitOpArgPrefix = "__imp"
+  val implicitCtxBoundArgPrefix = "__cb"
   val qu = "__quote"
   val symMarker = "__sym"
 

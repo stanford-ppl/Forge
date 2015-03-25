@@ -12,12 +12,13 @@ trait ForgeOps extends Base {
 
   def infix_withBound(a: Rep[TypePar], b: TypeClassSignature) = forge_withbound(a,b)
   implicit class TpeClassOps(a: TypeClassSignature) {
-    def apply(b: Rep[TypePar]*) = forge_typeclasson(a,b.toList)
+    def apply(b: Rep[DSLType]*) = forge_typeclasson(a,b.toList)
   }
 
   def grp(name: String) = forge_grp(name)
   def tpeAlias(name: String, tpe: Rep[DSLType]) = forge_tpealias(name, tpe)
   def tpePar(name: String, ctxBounds: List[TypeClassSignature] = List(TManifest), stage: StageTag = future) = forge_tpepar(name, ctxBounds, stage) // TODO: type bounds
+  def hkTpePar(name: String, tpePars: List[Rep[TypePar]], ctxBounds: List[TypeClassSignature] = List(TManifest), stage: StageTag = future) = forge_hktpepar(name, tpePars, ctxBounds, stage)
   def ephemeralTpe(name: String, tpePars: List[Rep[TypePar]] = List(), stage: StageTag = future) = forge_ephemeral_tpe(name, tpePars, stage)
   def tpe(name: String, tpePars: List[Rep[TypePar]] = List(), stage: StageTag = future) = forge_tpe(name, tpePars, stage)
   def tpeInst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]] = List()) = forge_tpeinst(hkTpe, tpeArgs)
@@ -82,6 +83,7 @@ trait ForgeOps extends Base {
   def infix_as(p: ParallelizeKey, dc: ParallelCollectionBuffer) = forge_isparallelcollection_buffer(p.tpe, dc)
 
   def lookupTpe(tpeName: String, stage: StageTag = future) = forge_lookup_tpe(tpeName,stage)
+  def lookupTpeClass(tpeClassName: String) = forge_lookup_tpe_class(tpeClassName)
   def lookupGrp(grpName: String) = forge_lookup_grp(grpName)
   def lookupOp(grp: Rep[DSLGroup], opName: String) = forge_lookup_op(grp,opName,0)
   def lookupOp(grpName: String, opName: String) = forge_lookup_op(lookupGrp(grpName),opName,0)
@@ -92,8 +94,9 @@ trait ForgeOps extends Base {
   def forge_grp(name: String): Rep[DSLGroup]
   def forge_tpealias(name: String, tpe: Rep[DSLType]): Rep[TypeAlias]
   def forge_tpepar(name: String, ctxBounds: List[TypeClassSignature], stage: StageTag): Rep[TypePar]
+  def forge_hktpepar(name: String, tpePars: List[Rep[TypePar]], ctxBounds: List[TypeClassSignature], stage: StageTag): Rep[TypePar]
   def forge_withbound(a: Rep[TypePar], b: TypeClassSignature): Rep[TypePar]
-  def forge_typeclasson(a: TypeClassSignature, b: List[Rep[TypePar]]): Rep[DSLType]
+  def forge_typeclasson(a: TypeClassSignature, b: List[Rep[DSLType]]): Rep[DSLType]
   def forge_tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag): Rep[DSLType]
   def forge_ephemeral_tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag): Rep[DSLType]
   def forge_tpeinst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]]): Rep[DSLType]
@@ -112,6 +115,7 @@ trait ForgeOps extends Base {
   def forge_isparallelcollection(tpe: Rep[DSLType], dc: ParallelCollection): Rep[Unit]
   def forge_isparallelcollection_buffer(tpe: Rep[DSLType], dc: ParallelCollectionBuffer): Rep[Unit]
   def forge_lookup_tpe(tpeName: String, stage: StageTag): Rep[DSLType]
+  def forge_lookup_tpe_class(tpeClassName: String): Option[Rep[DSLTypeClass]]
   def forge_lookup_grp(grpName: String): Rep[DSLGroup]
   def forge_lookup_op(grp: Rep[DSLGroup], opName: String, overloadedIndex: Int): Rep[DSLOp]
   def forge_label(op: Rep[DSLOp], name: String): Rep[Unit]
@@ -232,6 +236,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   val Lifts = HashMap[Exp[DSLGroup],ArrayBuffer[Exp[DSLType]]]()
   val TpeAliases = ArrayBuffer[Exp[TypeAlias]]()
   val Tpes = ArrayBuffer[Exp[DSLType]]()
+  val TpeClasses = ArrayBuffer[Exp[DSLTypeClass]]()
   val Identifiers = ArrayBuffer[Exp[DSLIdentifier]]()
   val DataStructs = HashMap[Exp[DSLType],Exp[DSLData]]()
   val OpsGrp = HashMap[Exp[DSLGroup],DSLOps]()
@@ -250,6 +255,10 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
       err("lookup failed: no tpe exists with name " + tpeName + " and stage " + stage)
     }
     t.get
+  }
+
+  def forge_lookup_tpe_class(tpeClassName: String): Option[Rep[DSLTypeClass]] = {
+    TpeClasses.find(t => t.signature.name == tpeClassName)
   }
 
   def forge_lookup_grp(grpName: String): Rep[DSLGroup] = {
@@ -299,15 +308,14 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   }
 
   /* TpePar represents a named type parameter for another DSLType */
-  // no higher-kinded fun yet
   case class TpePar(name: String, ctxBounds: List[TypeClassSignature], stage: StageTag) extends Def[TypePar]
 
   def forge_tpepar(name: String, ctxBounds: List[TypeClassSignature], stage: StageTag) = TpePar(name, ctxBounds, stage)
 
-  /* Adds a bound to a type parameter by constructing a new type parameter */
-  def forge_withbound(a: Rep[TypePar], b: TypeClassSignature) = tpePar(a.name, b :: a.ctxBounds)
+  /* HkTpePar represents a named higher-kinded type parameter for another DSLType */
+  case class HkTpePar(name: String, tpePars: List[Rep[TypePar]], ctxBounds: List[TypeClassSignature], stage: StageTag) extends Def[TypePar]
 
-  def forge_typeclasson(a: TypeClassSignature, b: List[Rep[TypePar]]) = tpeClass(a.name, a, b)
+  def forge_hktpepar(name: String, tpePars: List[Rep[TypePar]], ctxBounds: List[TypeClassSignature], stage: StageTag) = HkTpePar(name, tpePars, ctxBounds, stage)
 
   /* A DSLType */
   case class Tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag) extends Def[DSLType]
@@ -327,7 +335,9 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   case class TpeInst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]]) extends Def[DSLType]
 
   def forge_tpeinst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]]) = {
-    if (tpeArgs.length != hkTpe.tpePars.length) err("cannot instantiate tpe " + hkTpe.name + " with args " + tpeArgs + " - not enough arguments")
+    if (tpeArgs.length != hkTpe.tpePars.length) {
+      err("cannot instantiate tpe " + hkTpe.name + " with args " + tpeArgs + " - not enough arguments")
+    }
     val t: Exp[DSLType] = TpeInst(hkTpe, tpeArgs)
     // if (!Tpes.contains(t)) Tpes += t
     t
@@ -337,18 +347,42 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   case class TpeClass(name: String, signature: TypeClassSignature, tpePars: List[Rep[TypePar]]) extends Def[DSLTypeClass]
 
   def forge_tpeclass(name: String, signature: TypeClassSignature, tpePars: List[Rep[TypePar]]) = {
-    TpeClass(name, signature, tpePars)
+    val t: Exp[DSLTypeClass] = TpeClass(name, signature, tpePars)
+    if (!TpeClasses.contains(t)) TpeClasses += t
+    t
   }
 
   /* A DSL-defined type class instance */
   case class TpeClassInst(name: String, tpePars: List[Rep[TypePar]], tpe: Rep[DSLType]) extends Def[DSLTypeClassInst]
 
   def forge_tpeclassinst(name: String, tpePars: List[Rep[TypePar]], tpe: Rep[DSLType]) = {
-    getHkTpe(tpe) match {
-      case Def(TpeClass(_,_,_)) => TpeClassInst(name, tpePars, tpe)
-      case _ => err("cannot instantiate tpe class instance from tpe " + name + " - not a tpe class")
+    if (!isTpeClass(getHkTpe(tpe))) {
+      err("cannot instantiate tpe class instance from tpe " + name + " - not a tpe class")
     }
+    TpeClassInst(name, tpePars, tpe)
   }
+
+  case class TpeClassEvidence(name: String, signature: TypeClassSignature, tpePars: List[Rep[DSLType]]) extends Def[DSLTypeClass]
+
+  /* Create an implicit parameter to serve as evidence for a type class */
+  def forge_typeclasson(a: TypeClassSignature, b: List[Rep[DSLType]]) = {
+    // For user-defined type classes, we verify the number of arguments. Note that for built-ins, we don't currently record
+    // the expected number of type pars, so this is less safe. We just take the number of arguments as gospel and move on.
+    val tpeCls = lookupTpeClass(a.name)
+    tpeCls foreach { t =>
+      if (t.tpePars.length != b.length) {
+        err("cannot instance tpe class evidence for " + a.name + " with parameters " + b.mkString(",") + "; wrong number of parameters")
+      }
+    }
+
+    // We need to return a tpeClass here, because it is treated specially when generating mirrors.
+    // It also quotes everything to be a 'compile' type (present stage), which is what we want.
+    // 'b' can be a mixture of concrete types and type parameters, rather than only type parameters as with TpeClass.
+    TpeClassEvidence(a.name, a, b)
+  }
+
+  /* Adds a bound to a type parameter by constructing a new type parameter */
+  def forge_withbound(a: Rep[TypePar], b: TypeClassSignature) = tpePar(a.name, b :: a.ctxBounds)
 
   /* A function of Rep arguments */
   case class FTpe(args: List[Rep[DSLArg]], ret: Rep[DSLType], freq: Frequency) extends Def[DSLType]

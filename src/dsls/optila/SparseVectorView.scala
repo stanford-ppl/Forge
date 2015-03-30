@@ -19,15 +19,15 @@ trait SparseVectorViewOps {
     val Tuple6 = lookupTpe("Tup6")
 
     // data fields
-    data(SparseVectorView, ("_source", SparseMatrix(T)), ("_start", MInt), ("_stride", MInt), ("_length", MInt), ("_isRow", MBoolean))
+    data(SparseVectorView, ("_source", SparseMatrix(T)), ("_start", MLong), ("_stride", MInt), ("_length", MInt), ("_isRow", MBoolean))
 
     // static methods
-    static (SparseVectorView) ("apply", T, ((SparseMatrix(T), MInt, MInt, MInt, MBoolean) :: SparseVectorView)) implements allocates(SparseVectorView, ${$0}, ${$1}, ${$2}, ${$3}, ${$4})
+    static (SparseVectorView) ("apply", T, ((SparseMatrix(T), MLong, MInt, MInt, MBoolean) :: SparseVectorView)) implements allocates(SparseVectorView, ${$0}, ${$1}, ${$2}, ${$3}, ${$4})
 
     val SparseVectorViewOps = withTpe(SparseVectorView)
     SparseVectorViewOps {
       compiler ("sparsevectorview_source") (Nil :: SparseMatrix(T)) implements getter(0, "_source")
-      compiler ("sparsevectorview_start") (Nil :: MInt) implements getter(0, "_start")
+      compiler ("sparsevectorview_start") (Nil :: MLong) implements getter(0, "_start")
       compiler ("sparsevectorview_stride") (Nil :: MInt) implements getter(0, "_stride")
 
       compiler ("sparsevectorview_calc_offsets_all") (Nil :: Tuple6(MInt,MInt,MInt,MInt,MInt,MInt)) implements composite ${

@@ -566,7 +566,7 @@ trait SparseMatrixOps {
       }
 
       infix ("colIndices") (Nil :: IndexVector) implements composite ${
-        IndexVector(indexvector_fromarray(sparsematrix_csr_colindices($self), true).distinct)
+        IndexVector(indexvector_fromarray(sparsematrix_csr_colindices($self), true))
       }
 
       // FIXME: more efficient way to get nzRows/nzCols?
@@ -575,8 +575,8 @@ trait SparseMatrixOps {
 
       // vview is a "contains" because the view points-to the matrix; dereferencing the view returns the matrix.
       // it is not "extracts", because it is not returning any matrix elements.
-      compiler ("sparsematrix_vview") ((MInt, MInt, MInt, MBoolean) :: SparseVectorView(T), aliasHint = contains(0)) implements single ${ SparseVectorView[T]($self, $1, $2, $3, $4) } // read-only right now
-      infix ("getRow") (MInt :: SparseVectorView(T)) implements composite ${ sparsematrix_vview($self, $1*$self.numCols, 1, $self.numCols, true) }
+      compiler ("sparsematrix_vview") ((MLong, MInt, MInt, MBoolean) :: SparseVectorView(T), aliasHint = contains(0)) implements single ${ SparseVectorView[T]($self, $1, $2, $3, $4) } // read-only right now
+      infix ("getRow") (MInt :: SparseVectorView(T)) implements composite ${ sparsematrix_vview($self, $1.toLong*$self.numCols, 1, $self.numCols, true) }
 
       infix ("getRows") (IndexVector :: SparseMatrix(T)) implements composite ${
         // could avoid the COO <-> CSR conversion here by slicing the underlying CSR array directly
@@ -1022,12 +1022,12 @@ trait SparseMatrixOps {
       // }
 
       // infix ("reduceRows") (((SparseVector(T),SparseVector(T)) ==> SparseVector(T)) :: SparseVector(T), TArith(T)) implements composite ${
-      //   val vv = $self.rowIndices.map(i => $self(i).toSparse)
+      //   val vv = $self.rowIndices.distinct.map(i => $self(i).toSparse)
       //   vv.reduce((a,b) => $1(a,b))
       // }
 
       // infix ("reduceCols") (((SparseVector(T),SparseVector(T)) ==> SparseVector(T)) :: SparseVector(T), TArith(T)) implements composite ${
-      //   val vv = $self.colIndices.map(i => $self.getCol(i).toSparse)
+      //   val vv = $self.colIndices.distinct.map(i => $self.getCol(i).toSparse)
       //   vv.reduce((a,b) => $1(a,b))
       // }
 

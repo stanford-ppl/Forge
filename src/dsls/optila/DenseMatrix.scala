@@ -109,10 +109,10 @@ trait DenseMatrixOps {
     direct (DenseMatrix) ("densematrix_fromfunc", T, (MInt, MInt, (MInt,MInt) ==> T) :: DenseMatrix(T)) implements composite ${
       (0::$0, 0::$1) { (i,j) => $2(i,j) }
     }
-    compiler (DenseMatrix) ("matrix_shapeindex", Nil, (("idx",MInt),("numCols",MInt)) :: Tuple2(MInt,MInt)) implements composite ${
+    compiler (DenseMatrix) ("matrix_shapeindex", Nil, (("idx",MLong),("numCols",MLong)) :: Tuple2(MInt,MInt)) implements composite ${
       val rowIndex = idx / numCols
       val colIndex = idx % numCols
-      pack(rowIndex,colIndex)
+      pack(rowIndex.toInt,colIndex.toInt)
     }
 
     val K = tpePar("K")

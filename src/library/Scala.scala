@@ -79,6 +79,7 @@ trait ScalaOps extends PrimitiveMathGen {
 
     fimplicit (Prim) ("repInt2ToRepDouble", Nil, MInt :: MDouble) implements composite ${ $0.toDouble }
     fimplicit (Prim) ("repInt2ToRepFloat", Nil, MInt :: MFloat) implements composite ${ $0.toFloat }
+    fimplicit (Prim) ("repInt2ToRepLong", Nil, MInt :: MLong) implements composite ${ $0.toLong }
     fimplicit (Prim) ("repFloat2ToRepDouble", Nil, MFloat :: MDouble) implements composite ${ $0.toDouble }
 
     // specialized versions for primitives
@@ -117,6 +118,7 @@ trait ScalaOps extends PrimitiveMathGen {
     val long_shift_right_unsigned = direct (Prim) ("forge_long_shift_right_unsigned", Nil, (MLong,MInt) :: MLong)
     val long_shift_right = direct (Prim) ("forge_long_shift_right", Nil, (MLong,MInt) :: MLong)
     val long_shift_left = direct (Prim) ("forge_long_shift_left", Nil, (MLong,MInt) :: MLong)
+    val long_mod = infix (Prim) ("%", Nil, (MLong,MLong) :: MLong)
     val long_bitwise_not = infix (Prim) ("unary_~", Nil, MLong :: MLong)
     impl (long_shift_right_unsigned) (codegen($cala, ${ $0 >>> $1 }))
 
@@ -152,6 +154,7 @@ trait ScalaOps extends PrimitiveMathGen {
       impl (long_binary_xor) (codegen(g, ${$0 ^ $1}))
       impl (long_shift_right) (codegen(g, ${ $0 >> $1 }))
       impl (long_shift_left) (codegen(g, ${ $0 << $1 }))
+      impl (long_mod) (codegen(g, ${$0 % $1}))
       impl (long_bitwise_not) (codegen(g, ${~$0}))
     }
 

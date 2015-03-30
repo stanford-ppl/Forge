@@ -23,7 +23,10 @@ trait IndexVectorOps {
     static (IndexVector) ("apply", Nil, (DenseVector(MInt), MBoolean) :: IndexVector) implements
       allocates(IndexVector, ${ indexvector_copyarray($0) }, ${ unit(0) }, ${ unit(0) }, quotedArg(1), ${ unit(false) })
 
-    compiler (IndexVector) ("indexvector_fromarray", Nil, (MArray(MInt),MBoolean) :: IndexVector) implements
+    static (IndexVector) ("apply", Nil, MethodSignature(List(MArray(MInt), ("isRow", MBoolean, "unit(true)")), IndexVector)) implements
+      redirect ${ indexvector_fromarray($0,isRow) }
+
+    direct (IndexVector) ("indexvector_fromarray", Nil, (MArray(MInt),MBoolean) :: IndexVector) implements
       allocates(IndexVector, quotedArg(0), ${ unit(0) }, ${ unit(0) }, quotedArg(1), ${ unit(false) })
 
     compiler (IndexVector) ("indexvector_copyarray", Nil, DenseVector(MInt) :: MArray(MInt)) implements composite ${
@@ -163,7 +166,7 @@ trait IndexVectorOps {
       compiler ("indexvector_illegalupdate") ((MInt, MInt) :: MNothing) implements composite ${ fatal("IndexVectors cannot be updated") }
 
       // IndexVectors can't be mapped over, but they can be zipped with or reduced
-      parallelize as ParallelCollection(MInt, lookupOp("indexvector_illegalalloc"), lookupOp("length"), lookupOverloaded("apply",4), lookupOp("indexvector_illegalupdate"))
+      parallelize as ParallelCollection(MInt, lookupOp("indexvector_illegalalloc"), lookupOp("length"), lookupOverloaded("apply",5), lookupOp("indexvector_illegalupdate"))
     }
 
     // allows us to perform operations without converting to a DenseVector first

@@ -26,25 +26,28 @@ trait SparseVectorDataOps extends ForgeTestModule with OptiMLApplication {
     collect(v(17) == 0)
     collect(v(5) == 10)
 
+    v(5) = 35
+    collect(v(5) == 35)
+
     // insert, apply
     v.insert(50,1000)
     collect(v.length == 101)
     collect(v(50) == 1000)
-    collect(v(5) == 10)
+    collect(v(5) == 35)
     collect(v(75) == 0)
     collect(v(76) == 20)
 
     // removeAll
     v.removeAll(6,95)
     collect(v.length == 6)
-    collect(v == DenseVector(0,0,0,0,0,10))
+    collect(v == DenseVector(0,0,0,0,0,35))
 
     // insertAll
     val v2 = SparseVector[Int](10,true)
     v2(1) = 2; v2(2) = 2; v2(7) = 2; v2(8) = 2
     v.insertAll(3, v2)
     collect(v.length == 16)
-    collect(v == DenseVector(0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,10))
+    collect(v == DenseVector(0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,35))
 
     val v3 = SparseVector[Int](10,true)
     v3(0) = 72
@@ -54,7 +57,7 @@ trait SparseVectorDataOps extends ForgeTestModule with OptiMLApplication {
     // trim
     v.trim()
     collect(v.length == 16)
-    collect(v == DenseVector(0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,10))
+    collect(v == DenseVector(0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,35))
 
     // clear
     v.clear()

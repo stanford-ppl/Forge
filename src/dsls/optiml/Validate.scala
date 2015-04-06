@@ -108,44 +108,9 @@ trait ValidateOps {
       DenseMatrix(DenseVector(stats(0), stats(1)), DenseVector(stats(2), stats(3)))
     }
 
-    /*
-     * Splits the input training set into training, validation, and test sets, trains a
-     * classifier, and reports both training and validation error every iteration until
-     * convergence. It also reports a final test error on an independently held out set.
+    /**
+     * A generic cross validate routine that is shared by crossValidate and crossValidateBatch.
      */
-    direct (Validate) ("learningCurve", TS, MethodSignature(List(
-                                               ("dataSet", TS(MDouble,MBoolean)),
-                                               ("classifier", MString),
-                                               ("metric", DenseMatrix(MInt) ==> MDouble),
-                                               ("_verbose", MBoolean, "unit(false)"),
-                                               ("pctValidationSamples", MDouble, "unit(0.10)"),
-                                               ("pctTestSamples", MDouble, "unit(0.10)")
-                                           ), MUnit), TTrainingSetLike(MDouble,MBoolean,TS(MDouble,MBoolean))) implements composite ${
-
-      val (trainingSet, validationSet, testSet) = unpack(holdOut2(dataSet, pctValidationSamples, pctTestSamples))
-
-      val validClassifiers = "logreg"
-
-      if (classifier == "logreg") {
-        def classify(set: Rep[TS[Double,Boolean]], i: Rep[Int], model: Rep[DenseVector[Double]]) = sigmoid(set.dot(i, model)) > 0.5
-
-        val model = logreg(trainingSet, maxIter = 1000, verbose = _verbose, callback = { (curModel: Rep[DenseVector[Double]], iter: Rep[Int]) =>
-          val trainingSetResults = confusionMatrix(trainingSet, (i: Rep[Int]) => classify(trainingSet, i, curModel))
-          println(" iter " + iter + ", training metric = " + metric(trainingSetResults))
-          val validationSetResults = confusionMatrix(validationSet, (i: Rep[Int]) => classify(validationSet, i, curModel))
-          println(" iter " + iter + ", validation metric = " + metric(validationSetResults))
-        })
-
-        val testSetResults = confusionMatrix(testSet, (i: Rep[Int]) => classify(testSet, i, model))
-        println("test set confusion matrix: ")
-        testSetResults.pprint
-        println("test metric = " + metric(testSetResults))
-      }
-      else {
-        fatal("learningCurve is not yet supported for classifier " + classifier + ". valid classifiers are: " + validClassifiers)
-      }
-    }
-
     direct (Validate) ("crossValidateRaw", (T,M,R,TS), CurriedMethodSignature(List(List(
                                                  ("dataSet", TS(T,MBoolean)),
                                                  ("train", TS(T,MBoolean) ==> M),
@@ -180,7 +145,7 @@ trait ValidateOps {
       }
     }
 
-    /*
+    /**
      * Compute a cross-validated score for the classifier using a user-specified metric from a confusion matrix
      * to a score (e.g. accuracy, precision).
      */
@@ -310,7 +275,8 @@ trait ValidateOps {
     }
 
     direct (Validate) ("AUC", Nil, ("unsortedROCs", DenseVector(Tup2(MDouble,MDouble))) :: MDouble) implements composite ${
-      val sorted = unsortedROCs.sortBy(t => t._1) // increasing by FPR (i.e. to the right)
+      // increasing by TPR then FPR (i.e. up and to the right)
+      val sorted = unsortedROCs.sortBy(t => (t._2.toLong << 32) + t._1.toLong)
 
       // add end points
       val curve = DenseVector(pack((unit(0.0),unit(0.0)))) << sorted << DenseVector(pack((unit(1.0),unit(1.0))))

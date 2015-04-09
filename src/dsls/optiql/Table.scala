@@ -107,7 +107,7 @@ trait TableOps {
 
       //sorting ops
       infix ("OrderBy") ("sorts" -> varArgs((A,A) ==> MInt) :: Table(A)) implements composite ${
-        Predef.assert($sorts.length > 0, "OrderBy requires at least one argument")
+        Predef.assert($sorts.length > 0, "[OPTIQL ERROR]: OrderBy requires at least one argument")
         val buf = new scala.collection.mutable.ArrayBuffer[(Rep[A],Rep[A])=>Rep[Int]]
         buf += $sorts(0)
         for (i <- 1 until $sorts.length) {

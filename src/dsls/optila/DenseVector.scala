@@ -147,17 +147,17 @@ trait DenseVectorOps {
       /**
        * Miscellaneous
        */
-      infix ("t") (Nil :: DenseVector(T)) implements allocates(DenseVector, ${densevector_length($0)}, ${!(densevector_isrow($0))}, ${array_clone(densevector_raw_data($0))})
+      infix ("t") (Nil :: DenseVector(T)) implements allocates(DenseVector, ${densevector_length($0)}, ${!(densevector_isrow($0))}, ${array_soft_clone(densevector_raw_data($0))})
       infix ("mt") (Nil :: MUnit, effect = write(0)) implements composite ${
         densevector_set_isrow($0, !$0.isRow)
       }
 
       infix ("toMat") (Nil :: DenseMatrix(T)) implements composite ${
         if ($self.isRow) {
-          DenseMatrix($self)
+          densematrix_fromarray(array_soft_clone(densevector_raw_data($self)), 1, $self.length)
         }
         else {
-          DenseMatrix[T](0,0) <<| $self
+          densematrix_fromarray(array_soft_clone(densevector_raw_data($self)), $self.length, 1)
         }
       }
 

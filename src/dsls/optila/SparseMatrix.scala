@@ -462,20 +462,42 @@ trait SparseMatrixOps {
 
     compiler (SparseMatrix) ("sparsematrix_rand", T, (("numRows",MInt),("numCols",MInt),("sparsity",MDouble),("gen",MInt ==> T)) :: SparseMatrix(T)) implements composite ${
       val density = 1.0 - sparsity
-      val size = numRows*numCols
+      val size = numRows.toLong*numCols.toLong
       val nnz = floor(density*size)
-      val indices = shuffle(0::size).take(nnz)
+      val nz = (0::nnz) { i => gen(i) }
 
-      val out = SparseMatrix[T]($0,$1)
-      for (i <- indices) {
-        // FIXME: weird scalac errors (not found: value rowIndex) or (erroneous or inaccessible type) if we don't explicitly specify types here
-        // val (rowIndex, colIndex) = unpack(matrix_shapeindex(i,numCols))
-        val t: Rep[Tup2[Int,Int]] = matrix_shapeindex(i,numCols)
-        val rowIndex: Rep[Int] = t._1
-        val colIndex: Rep[Int] = t._2
-        out(rowIndex,colIndex) = gen(i)
-      }
-      out.finish
+      // Select row and column indices at random, but remove duplicates and keep selecting until we reach nnz
+      // This could be pretty slow if the matrix is small or sparsity is low.
+      // val indices = ((0::nnz) { i => pack((randomInt(numRows), randomInt(numCols))) }).distinct
+      // while (indices.length != nnz) {
+      //   val append = (0::nnz-indices.length) { i => pack((randomInt(numRows), randomInt(numCols))) }
+      //   indices = (indices << append).distinct
+      // }
+      // val rowIndices = indices.map(_._1)
+      // val colIndices = indices.map(_._2)
+
+      // Duplicates will be removed during construction; faster than above, but we may not achieve the desired
+      // sparsity if the matrix is small or sparsity is low.
+      val rowIndices = (0::nnz) { i => randomInt(numRows) }
+      val colIndices = (0::nnz) { i => randomInt(numCols) }
+      SparseMatrix.fromElements(numRows, numCols, nz, rowIndices, colIndices)
+
+      // This is O(numRows*numCols) (instead of nnz), but constructs the SparseMatrixBuildable in sorted order,
+      // which enables it to be turned into a CSR much faster.
+      // val out = SparseMatrix[T](numRows, numCols)
+      // var i = 0
+      // var j = 0
+      // while (i < numRows) {
+      //   while (j < numCols) {
+      //     if (random[Double] > sparsity) {
+      //       out(i,j) = gen(i*numRows+j)
+      //     }
+      //     j += 1
+      //   }
+      //   j = 0
+      //   i += 1
+      // }
+      // out.finish
     }
 
     static (SparseMatrix) ("rand", Nil, (MInt,MInt,MDouble) :: SparseMatrix(MDouble)) implements composite ${ sparsematrix_rand[Double]($0, $1, $2, i => random[Double]) }
@@ -637,33 +659,29 @@ trait SparseMatrixOps {
        */
 
       infix ("t") (Nil :: SparseMatrix(T)) implements composite ${
-        val out = SparseMatrix[T]($self.numCols, $self.numRows)
-        val rowPtr = sparsematrix_csr_rowptr($self)
-        val colIndices = sparsematrix_csr_colindices($self)
-        val data = sparsematrix_csr_data($self)
+        val rowIndices = $self.rowIndices
+        val colIndices = $self.colIndices
 
-        // must be sequential because writing to COO
-        for (i <- $self.rowIndices) {
-          for (j <- rowPtr(i) until rowPtr(i+1)) {
-            out(colIndices(j),i) = data(j)
-          }
-        }
-        out.finish
+        SparseMatrix.fromElements[T](
+          $self.numCols,
+          $self.numRows,
+          $self.nz,
+          colIndices,
+          rowIndices
+        )
       }
 
       infix ("Clone") (Nil :: SparseMatrix(T), aliasHint = copies(0)) implements composite ${ $self.mapnz(e =>e) }
 
       infix ("mutable") (Nil :: SparseMatrixBuildable(T), effect = mutable, aliasHint = copies(0)) implements single ${
         val out = SparseMatrix[T]($self.numRows, $self.numCols)
-        val rowPtr = sparsematrix_csr_rowptr($self)
-        val colIndices = sparsematrix_csr_colindices($self)
         val data = sparsematrix_csr_data($self)
+        val colIndices = sparsematrix_csr_colindices($self)
+        val rowIndices = $self.rowIndices
 
         // must be sequential because writing to COO
-        for (i <- $self.rowIndices) {
-          for (j <- rowPtr(i) until rowPtr(i+1)) {
-            out(i,colIndices(j)) = data(j)
-          }
+        for (i <- 0 until data.length) {
+          out(rowIndices(i), colIndices(i)) = data(i)
         }
         out
       }
@@ -675,7 +693,7 @@ trait SparseMatrixOps {
         val data = sparsematrix_csr_data($self)
 
         // parallel (but irregular), disjoint writes to rows
-        out.rowIndices.foreach { i =>
+        (0::$self.numRows).foreach { i =>
           for (j <- rowPtr(i) until rowPtr(i+1)) {
             out(i,colIndices(j)) = data(j)
           }
@@ -686,6 +704,10 @@ trait SparseMatrixOps {
 
       // $self.toString doesn't work in Delite, since there is no 'self' instance
       infix ("pprint") (Nil :: MUnit, TStringable(T), effect = simple) implements composite ${ println($self.makeStr + "\\n") }
+
+      infix ("makeDimsStr") (Nil :: MString) implements single ${
+        $self.numRows + " x " + $self.numCols + ", " + $self.nnz + " nnz"
+      }
 
       infix ("makeString") (Nil :: MString, TStringable(T)) implements composite ${
         val rowPtr = sparsematrix_csr_rowptr($self)
@@ -892,31 +914,25 @@ trait SparseMatrixOps {
       infix ("*:*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ $self.toDense * $1 }
       infix ("*") (T :: SparseMatrix(T), TArith(T)) implements composite ${ $self.mapnz(e => e*$1) }
 
+      infix ("*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${
+        fassert($self.numCols == $1.numRows, "dimension mismatch: matrix multiply (lhs: " + $self.makeDimsStr + ", rhs: " + $1.makeDimsStr + ")")
+        // naive
+        if ($self.numRows == 0) DenseMatrix[T]()
+        else {
+          var z = $self // manual guard against code motion
+          (0::z.numRows, *) { i =>
+            $1.mapColsToVector { c => z(i) *:* c }
+          }
+        }
+      }
+
       // TODO
       // infix ("*") (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements single ${
       //   fassert($self.numCols == $1.numRows, "dimension mismatch: matrix multiply")
-      //   // naive
-      //   val yT = $1.t
-      //   val out = SparseMatrix[T]($self.numRows, $1.numCols)
-      //   for (rowIdx <- 0 until $self.numRows) {
-      //     for (i <- 0 until $1.numCols) {
-      //       var acc = $self(rowIdx, 0) * yT(i, 0)
-      //       for (j <- 1 until yT.numCols) {
-      //         acc += $self(rowIdx, j) * yT(i, j)
-      //       }
-      //       out(rowIdx, i) = acc
-      //     }
-      //   }
-      //   out.unsafeImmutable
       // }
 
       // infix ("*") (SparseVector(T) :: SparseVector(T), TArith(T)) implements single ${
       //  fassert($self.numCols == $1.length && !$1.isRow, "dimension mismatch: matrix * vector")
-      //  val out = SparseVector[T]($self.numRows, false)
-      //  for (rowIdx <- 0 until $self.numRows) {
-      //    out(rowIdx) = $self(rowIdx) *:* $1
-      //  }
-      //  out.unsafeImmutable
       // }
 
       infix ("/") (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements composite ${ zipMatrixIntersect[T,T,T]($self, $1, (a,b) => a/b) } // ignores x / 0 errors...
@@ -937,12 +953,12 @@ trait SparseMatrixOps {
        */
       infix ("min") (Nil :: T, (TOrdering(T), THasMinMax(T))) implements composite ${
         val min = $self.nz.min
-        if (min > defaultValue[T]) defaultValue[T] else min
+        if (min > defaultValue[T] && $self.nnz < $self.size) defaultValue[T] else min
       }
 
       infix ("max") (Nil :: T, (TOrdering(T), THasMinMax(T))) implements composite ${
         val max = $self.nz.max
-        if (max < defaultValue[T]) defaultValue[T] else max
+        if (max < defaultValue[T] && $self.nnz < $self.size) defaultValue[T] else max
       }
 
       // FIXME: why is explicit toSparse needed?

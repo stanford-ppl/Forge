@@ -112,6 +112,36 @@ trait BasicMathOps {
     }
 
 
+    // -- normalization
+
+    val NormalizeMethod = tpe("NormalizeMethod", stage = compile)
+    identifier (NormalizeMethod) ("Std")
+    identifier (NormalizeMethod) ("Unity")
+
+    direct (Math) ("normalize", Nil, DenseVector(MDouble) :: DenseVector(MDouble)) implements redirect ${ normalize($0, Std) }
+
+    direct (Math) ("normalize", Nil, (DenseVector(MDouble), NormalizeMethod) :: DenseVector(MDouble)) implements composite ${
+      $1 match {
+        case Std =>
+          val avg = mean($0)
+          val dev = stddev($0)
+          $0 map { e => (e - avg) / dev }
+
+        case Unity =>
+          // scale to [-1 1]
+          val minVal = min($0)
+          val maxVal = max($0)
+          (($0 map { e => (e - minVal) / (maxVal - minVal) }) * 2.0) - 1.0
+      }
+    }
+
+    direct (Math) ("normalize", Nil, DenseMatrix(MDouble) :: DenseMatrix(MDouble)) implements redirect ${ normalize($0, Std) }
+
+    direct (Math) ("normalize", Nil, (DenseMatrix(MDouble), NormalizeMethod) :: DenseMatrix(MDouble)) implements composite ${
+      $0 mapCols { c => normalize(c, $1) }
+    }
+
+
     // -- other math ops
     direct (Math) ("sigmoid", Nil, MDouble :: MDouble) implements composite ${ 1.0 / (1.0 + exp(-$0)) }
 

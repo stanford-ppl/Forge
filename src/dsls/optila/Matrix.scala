@@ -174,43 +174,42 @@ trait MatrixOps {
      // infix ("-") (DenseMatrix(B) :: DenseMatrix(T), (A, B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a-b })
 
      infix ("*:*") (DenseMatrix(T) :: DenseMatrix(T), A) implements composite ${ $self.zip($1) { (a,b) => a*b } }
+     // infix ("*:*") (DenseMatrix(B) :: DenseMatrix(T), (A, B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a*b })
      infix ("*") (T :: DenseMatrix(T), A) implements composite ${ $self.map(e => e*$1) }
-     // infix ("*") (DenseMatrix(B) :: DenseMatrix(T), (A, B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a*b })
 
      infix ("*") (DenseMatrix(T) :: DenseMatrix(T), A) implements composite ${
        fassert($self.numCols == $1.numRows, "dimension mismatch: matrix multiply (lhs: " + $self.makeDimsStr + ", rhs: " + $1.makeDimsStr + ")")
        // naive
-       val yT = $1.t
-       val out = DenseMatrix[\$TT]($self.numRows, $1.numCols)
-       for (rowIdx <- 0 until $self.numRows) {
-         for (i <- 0 until $1.numCols) {
-           var acc = $self(rowIdx, 0) * yT(i, 0)
-           for (j <- 1 until yT.numCols) {
-             acc += $self(rowIdx, j) * yT(i, j)
-           }
-           out(rowIdx, i) = acc
+       if ($self.numRows == 0) DenseMatrix[T]()
+       else {
+         var z = $self
+         (0::z.numRows, *) { i =>
+           $1.mapColsToVector { c => z(i) *:* c }
          }
        }
-       out.unsafeImmutable
      }
 
-     infix ("*") (DenseVector(T) :: DenseVector(T), A) implements composite ${
-       fassert($self.numCols == $1.length && !$1.isRow, "dimension mismatch: matrix * vector")
-       val out = DenseVector[\$TT]($self.numRows, false)
-       for (rowIdx <- 0 until $self.numRows) {
-         out(rowIdx) = $self(rowIdx) *:* $1
+     infix ("*") (SparseMatrix(T) :: DenseMatrix(T), A) implements composite ${
+       fassert($self.numCols == $1.numRows, "dimension mismatch: matrix multiply (lhs: " + $self.makeDimsStr + ", rhs: " + $1.makeDimsStr + ")")
+       // Compute (rhs.t*lhs.t).t == lhs*rhs to reformulate as sparse*dense, which is supported by sparse BLAS
+       ($1.t*$self.t).t
+     }
+
+     for (rhs <- List(DenseVector(T), SparseVector(T))) {
+       infix ("*") (rhs :: DenseVector(T), A) implements composite ${
+         fassert($self.numCols == $1.length && !$1.isRow, "dimension mismatch: matrix * vector")
+         val out = (0::$self.numRows) { i => $self(i) *:* $1 }
+         out.t
        }
-       out.unsafeImmutable
      }
 
      infix ("/") (DenseMatrix(T) :: DenseMatrix(T), A) implements composite ${ $self.zip($1) { (a,b) => a/b } }
      infix ("/") (T :: DenseMatrix(T), A) implements composite ${ $self.map(e => e/$1) }
      // infix ("/") (DenseMatrix(B) :: DenseMatrix(T), (A, B ==> T), addTpePars = B) implements zip((T,B,T), (0,1), ${ (a,b) => a/b })
 
-     // dense-sparse math
+     // Dense-sparse point-wise math
      infix ("+") (SparseMatrix(T) :: DenseMatrix(T), A) implements composite ${ $self + $1.toDense }
      infix ("-") (SparseMatrix(T) :: DenseMatrix(T), A) implements composite ${ $self - $1.toDense }
-     // infix ("*") (SparseMatrix(T) :: DenseMatrix(T), A) implements composite ${ $self * $1.toDense }
      infix ("*:*") (SparseMatrix(T) :: DenseMatrix(T), A) implements composite ${ $self *:* $1.toDense }
      infix ("/") (SparseMatrix(T) :: DenseMatrix(T), A) implements composite ${ $self / $1.toDense }
 

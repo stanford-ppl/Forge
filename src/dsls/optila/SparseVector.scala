@@ -306,7 +306,7 @@ trait SparseVectorOps {
       /**
        * Miscellaneous
        */
-      infix ("t") (Nil :: SparseVector(T)) implements allocates(SparseVector, ${sparsevector_length($0)}, ${!(sparsevector_isrow($0))}, ${array_clone(sparsevector_raw_data($0))}, ${array_clone(sparsevector_raw_indices($0))}, ${sparsevector_nnz($0)})
+      infix ("t") (Nil :: SparseVector(T)) implements allocates(SparseVector, ${sparsevector_length($0)}, ${!(sparsevector_isrow($0))}, ${array_soft_clone(sparsevector_raw_data($0))}, ${array_soft_clone(sparsevector_raw_indices($0))}, ${sparsevector_nnz($0)})
       infix ("mt") (Nil :: MUnit, effect = write(0)) implements composite ${
         sparsevector_set_isrow($0, !$0.isRow)
       }

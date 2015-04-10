@@ -20,20 +20,6 @@ trait ClassifierOps {
 
     val Classifier = grp("Classifier")
 
-    direct (Classifier) ("normalize", Nil, DenseVector(MDouble) :: DenseVector(MDouble)) implements composite ${
-      val avg = mean($0)
-      val dev = stddev($0)
-      $0 map { e => (e - avg) / dev }
-
-      // val minVal = min($0)
-      // val maxVal = max($)
-      // (($0 map { e => (e - minVal) / (maxVal - minVal) }) * 2.0) - 1.0 // scale to [-1 1]
-    }
-
-    direct (Classifier) ("normalize", Nil, DenseMatrix(MDouble) :: DenseMatrix(MDouble)) implements composite ${
-      $0 mapCols { c => normalize(c) }
-    }
-
     /**
      * Logistic regression with dense parameters. The training set can be dense or sparse.
      */

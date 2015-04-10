@@ -60,6 +60,10 @@ trait SimpleDenseMatrixArithmetic extends ForgeTestModule with DenseLinearAlgebr
     val ansMat5 = m23*m33*m32
     collect(check(ansMat5, DenseMatrix(DenseVector(73592.6225, 271.0046), DenseVector(98312.252799, 2079.73147))))
 
+    // empty matrix multiplication (should not throw exception)
+    val ansMat6 = DenseMatrix.zeros(0,0)*DenseMatrix.zeros(0,0)
+    collect(ansMat6.numRows == 0 && ansMat6.numCols == 0)
+
     // summation
     val ans = m23.sum
     collect(check(ans, 39.9))

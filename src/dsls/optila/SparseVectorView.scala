@@ -33,7 +33,7 @@ trait SparseVectorViewOps {
       compiler ("sparsevectorview_calc_offsets_all") (Nil :: Tuple6(MInt,MInt,MInt,MInt,MInt,MInt)) implements composite ${
         val numCols = sparsevectorview_source($self).numCols
         val (startRow,startCol) = unpack(matrix_shapeindex(sparsevectorview_start($self), numCols))
-        val (endRow,endCol) = unpack(matrix_shapeindex(sparsevectorview_start($self)+sparsevectorview_stride($self)*$self.length, numCols))
+        val (endRow,endCol) = unpack(matrix_shapeindex(sparsevectorview_start($self)+sparsevectorview_stride($self).toLong*$self.length, numCols))
         val rowPtr = sparsematrix_csr_rowptr(sparsevectorview_source($self))
         pack(startRow,endRow,startCol,endCol,rowPtr(startRow),rowPtr(endRow))
       }

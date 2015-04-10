@@ -221,6 +221,20 @@ trait DenseMatrixOps {
          densematrix_fromarray(array_clone(densematrix_raw_data($self)), $self.numRows, $self.numCols)
        }
 
+       infix ("toSparse") (Nil :: SparseMatrix(T)) implements composite ${
+          val sparseElements = $self.indices.map { i =>
+            pack((densematrix_raw_apply($self, i), i / $self.numCols, i % $self.numCols))
+          }
+
+          SparseMatrix.fromElements(
+            $self.numRows,
+            $self.numCols,
+            sparseElements.map(_._1),
+            sparseElements.map(_._2),
+            sparseElements.map(_._3)
+          )
+       }
+
 
       /**
        * Data operations
@@ -241,6 +255,26 @@ trait DenseMatrixOps {
         }
         infix ("updateCol") ((MInt,rhs) :: MUnit, effect=write(0)) implements composite ${
           (0::$2.length) foreach { i => $self(i,$1) = $2(i) }
+        }
+      }
+
+      infix ("update") ((IndexVector,DenseMatrix(T)) :: MUnit, effect=write(0)) implements composite ${
+        $self.updateRows($1, $2)
+      }
+
+      infix ("updateRows") ((IndexVector,DenseMatrix(T)) :: MUnit, effect=write(0)) implements composite ${
+        fassert($1.length == $2.numRows && $self.numCols == $2.numCols, "dimension mismatch in updateRows")
+        (0::$1.length) foreach { (i: Rep[Int]) =>
+          val row: Rep[Int] = $1(i)
+          $self.updateRow(row, $2(i))
+        }
+      }
+
+      infix ("updateCols") ((IndexVector,DenseMatrix(T)) :: MUnit, effect=write(0)) implements composite ${
+        fassert($1.length == $2.numCols && $self.numRows == $2.numRows, "dimension mismatch in updateCols")
+        (0::$1.length) foreach { (i: Rep[Int]) =>
+          val col: Rep[Int] = $1(i)
+          $self.updateCol(col, $2.getCol(i))
         }
       }
 
@@ -393,7 +427,6 @@ trait DenseMatrixOps {
        * Math
        */
 
-
        infix ("+=") (DenseMatrix(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${
          $self.indices.foreach { i => densematrix_raw_update($self,i,densematrix_raw_apply($self,i)+densematrix_raw_apply($1,i)) }
        }
@@ -487,7 +520,9 @@ trait DenseMatrixOps {
     // label lets you give a precise name to a particular variant of an overloaded op (typically so that you can refer to it in external code)
     // we use the following labels to optionally override the ops by calling BLAS
     label(lookupOverloaded("DenseMatrix","*",1), "densematrix_matmult")
-    label(lookupOverloaded("DenseMatrix","*",2), "densematrix_matvecmult")
+    label(lookupOverloaded("DenseMatrix","*",2), "densematrix_sparse_matmult")
+    label(lookupOverloaded("DenseMatrix","*",3), "densematrix_matvecmult")
+    label(lookupOverloaded("DenseMatrix","*",4), "densematrix_sparse_matvecmult")
 
     // Add DenseMatrix to Arith
     val Arith = lookupGrp("Arith").asInstanceOf[Rep[DSLTypeClass]]

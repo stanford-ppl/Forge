@@ -85,6 +85,21 @@ trait DDFactorGraphOps {
 
       infix ("nonEvidenceVariables") (Nil :: DenseVector(MInt)) implements getter(0, "_nonEvidenceVariables")
 
+      infix ("mutable") (Nil :: DDFactorGraph) implements composite ${
+        DDFactorGraph(
+          $self.v2f,
+          $self.f2v,
+          $self.weightValue.mutable(),
+          $self.weightIsFixed,
+          $self.variableValue.mutable(),
+          $self.variableIsEvidence,
+          $self.factorWeightIdx,
+          $self.factorFunction,
+          $self.edgeIsPositiveF2V,
+          $self.nonEvidenceVariables
+        )
+      }
+
       infix ("mutableWeights") (Nil :: DDFactorGraph) implements composite ${
         DDFactorGraph(
           $self.v2f,

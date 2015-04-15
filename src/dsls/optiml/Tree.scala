@@ -249,11 +249,11 @@ trait TreeOps {
             // add internal node to tree
             val nodeId = tree.addNode(parent, isLeft, isLeaf, feature, threshold, impurity, numNodeSamples)
 
-            // right child
-            doApply(next, pack((sortedSamples(pos::sortedSamples.length), depth+1, nodeId, unit(false), impurityRight, nextConstantFeatures, continuation)))
-
             // left child
             doApply(next, pack((sortedSamples(0::pos), depth+1, nodeId, unit(true), impurityLeft, nextConstantFeatures, continuation)))
+
+            // right child
+            doApply(next, pack((sortedSamples(pos::sortedSamples.length), depth+1, nodeId, unit(false), impurityRight, nextConstantFeatures, continuation)))
           }
         }
 
@@ -288,8 +288,8 @@ trait TreeOps {
         val sortedSamples = samples(sortedIndices)
 
         // constant feature value gets a -INF score
-        if (sortedValues(0) == sortedValues(sortedValues.length-1)) {
-          pack((-INF, sortedSamples, j, unit(0.0), unit(0.0), unit(0.0)))
+        if ((sortedValues(sortedValues.length-1) - sortedValues(0)) < FEATURE_THRESHOLD) {
+          pack((-INF, sortedSamples, unit(0), unit(0.0), unit(0.0), unit(0.0)))
         }
         else {
           // compute scores for each candidate split
@@ -299,10 +299,11 @@ trait TreeOps {
           var bestImpurityLeft = -INF
           var bestImpurityRight = -INF
 
-          while (p < sortedValues.length - 1) {
+          while (p < sortedValues.length) {
             // skip to the next p at least FEATURE_THRESHOLD greater than the current value
-            while ((p+1 < sortedValues.length - 1) && (abs(sortedValues.apply(p+1) - sortedValues.apply(p)) > FEATURE_THRESHOLD))
+            while ((p < sortedValues.length - 1) && ((sortedValues(p) - sortedValues(p-1)) < FEATURE_THRESHOLD)) {
               p += 1
+            }
 
             val (improvement, impurityLeft, impurityRight) = unpack(compute_impurity_improvement(trainingSet, impurity, sortedSamples, p, criterion))
 
@@ -330,7 +331,7 @@ trait TreeOps {
       val impurityLeft = improvements(bestFeatureIndex)._5
       val impurityRight = improvements(bestFeatureIndex)._6
 
-      val newConstantFeatures = improvements filter { t => t._1 == -INF } map { _._3 }
+      val newConstantFeatures = testFeatures(improvements find { t => t._1 == -INF })
       val nextConstantFeatures = constantFeatures.mutable
       for (j <- newConstantFeatures) {
         nextConstantFeatures(j) = true

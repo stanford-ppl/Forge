@@ -13,7 +13,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
  *
  * Current limitations:
  *   1) HashStream is single-box, Scala-only (uses an embedded DB via codegen methods, lambda for deserialization)
- *   2) FileStream groupRowsBy uses a logical key naming scheme that depends on LevelDB's sorted key storage for efficiency.
+ *   2) FileStream groupRowsBy uses a logical key naming scheme that depends on RocksDB's sorted key storage for efficiency.
  */
 trait StreamOps {
   this: OptiMLDSL =>
@@ -34,10 +34,10 @@ trait StreamOps {
     val V = tpePar("V")
     val R = tpePar("R")
 
-    val LevelDB = tpe("org.iq80.leveldb.DB")
-    primitiveTpePrefix ::= "org.iq80"
+    val DBObject = tpe("org.rocksdb.RocksDB")
+    primitiveTpePrefix ::= "org.rocksdb"
 
-    data(HashStream, ("_table", MString), ("_db", LevelDB), ("_deserialize", MLambda(Tup2(HashStream(V),MString), V)))
+    data(HashStream, ("_table", MString), ("_db", DBObject), ("_deserialize", MLambda(Tup2(HashStream(V),MString), V)))
 
     static (HashStream) ("apply", V, (("table", MString), ("deserialize", (HashStream(V),MString) ==> V)) :: HashStream(V), effect = mutable) implements composite ${
       val hash = hash_alloc_raw[V](table, deserialize)
@@ -46,7 +46,7 @@ trait StreamOps {
     }
 
     compiler (HashStream) ("hash_alloc_raw", V, (("table", MString), ("deserialize", (HashStream(V),MString) ==> V)) :: HashStream(V), effect = mutable) implements
-      allocates(HashStream, ${$0}, "unit(null.asInstanceOf[org.iq80.leveldb.DB])", ${doLambda((t: Rep[Tup2[HashStream[V],String]]) => deserialize(t._1, t._2))})
+      allocates(HashStream, ${$0}, "unit(null.asInstanceOf[org.rocksdb.RocksDB])", ${doLambda((t: Rep[Tup2[HashStream[V],String]]) => deserialize(t._1, t._2))})
 
 
     // -- code generated internal methods interface with the embedded db
@@ -54,75 +54,74 @@ trait StreamOps {
     // We use simple effects in lieu of read / write effects because these are codegen nodes,
     // so we cannot pass the struct to them (a limitation of Forge at the moment).
 
-    compiler (HashStream) ("hash_open_internal", Nil, MString :: LevelDB, effect = simple) implements codegen($cala, ${
-      import org.iq80.leveldb._
-      import org.fusesource.leveldbjni.JniDBFactory._
-      val options = new Options()
-      options.createIfMissing(true)
-      // options.cacheSize(100000000L)
-      val db = factory.open(new java.io.File($0), options)
+    compiler (HashStream) ("hash_open_internal", Nil, MString :: DBObject, effect = simple) implements codegen($cala, ${
+      val options = new org.rocksdb.Options()
+      options.setCreateIfMissing(true).setMaxBackgroundCompactions(16)
+      val db = org.rocksdb.RocksDB.open(options, $0)
       db
     })
 
-    compiler (HashStream) ("hash_get_internal", Nil, (LevelDB, MArray(MByte)) :: MArray(MByte), effect = simple) implements codegen($cala, ${
+    compiler (HashStream) ("hash_get_internal", Nil, (DBObject, MArray(MByte)) :: MArray(MByte), effect = simple) implements codegen($cala, ${
       $0.get($1)
     })
 
-    compiler (HashStream) ("hash_get_range_internal", Nil, (LevelDB, MArray(MByte), MInt) :: MArray(MArray(MByte)), effect = simple) implements codegen($cala, ${
+    compiler (HashStream) ("hash_get_range_internal", Nil, (DBObject, MArray(MByte), MInt) :: MArray(MArray(MByte)), effect = simple) implements codegen($cala, ${
       // workaround for named arguments in codegen methods not working
       val db = $0
       val startKey = $1
       val numKeys = $2
 
       val buf = scala.collection.mutable.ArrayBuffer[Array[Byte]]()
-      val iterator = db.iterator()
+      val iterator = db.newIterator()
       iterator.seek(startKey)
 
       var pos = 0
-      while (iterator.hasNext && pos < numKeys) {
-        // val key = org.fusesource.leveldbjni.JniDBFactory.asString(iterator.peekNext().getKey())
-        buf += iterator.peekNext().getValue()
+      while (iterator.isValid && pos < numKeys) {
+        buf += iterator.value
         iterator.next()
         pos += 1
       }
 
-      iterator.close()
+      iterator.dispose()
       buf.toArray
     })
 
-    compiler (HashStream) ("hash_put_internal", Nil, (LevelDB, MArray(MByte), MArray(MByte)) :: MUnit, effect = simple) implements codegen($cala, ${
+    compiler (HashStream) ("hash_put_internal", Nil, (DBObject, MArray(MByte), MArray(MByte)) :: MUnit, effect = simple) implements codegen($cala, ${
       $0.put($1, $2)
     })
 
-    compiler (HashStream) ("hash_put_all_internal", Nil, (LevelDB, MArray(MArray(MByte)), MArray(MArray(MByte)), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
+    compiler (HashStream) ("hash_put_all_internal", Nil, (DBObject, MArray(MArray(MByte)), MArray(MArray(MByte)), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
       assert($1.length >= $3 && $2.length >= $3, "HashStream putAll called with too small arrays")
-      val batch = $0.createWriteBatch()
+      val batch = new org.rocksdb.WriteBatch()
       var i = 0
       while (i < $3) {
         batch.put($1(i), $2(i))
         i += 1
       }
-      $0.write(batch)
-      batch.close()
+      val options = new org.rocksdb.WriteOptions()
+      options.setSync(false).setDisableWAL(true)
+      $0.write(options, batch)
+      batch.dispose()
+      options.dispose()
     })
 
-    compiler (HashStream) ("hash_close_internal", Nil, LevelDB :: MUnit, effect = simple) implements codegen($cala, ${
-      $0.close()
+    compiler (HashStream) ("hash_close_internal", Nil, DBObject :: MUnit, effect = simple) implements codegen($cala, ${
+      $0.dispose()
     })
 
-    compiler (HashStream) ("hash_keys_internal", Nil, LevelDB :: MArray(MString)) implements codegen($cala, ${
+    compiler (HashStream) ("hash_keys_internal", Nil, DBObject :: MArray(MString)) implements codegen($cala, ${
       val buf = scala.collection.mutable.ArrayBuffer[String]()
-      val iterator = $0.iterator()
+      val iterator = $0.newIterator
       iterator.seekToFirst()
 
-      while (iterator.hasNext) {
-        val key = org.fusesource.leveldbjni.JniDBFactory.asString(iterator.peekNext().getKey())
+      while (iterator.isValid) {
+        val key = new String(iterator.key)
         if (!key.startsWith("\$HASH_LOGICAL_KEY_PREFIX")) // skip logical keys
           buf += key
         iterator.next()
       }
 
-      iterator.close()
+      iterator.dispose()
       buf.toArray
     })
 
@@ -132,8 +131,8 @@ trait StreamOps {
     HashStreamOps {
       compiler ("hash_deserialize") (Nil :: MLambda(Tup2(HashStream(V),MString), V)) implements getter(0, "_deserialize")
       compiler ("hash_table_name") (Nil :: MString) implements getter(0, "_table")
-      compiler ("hash_get_db") (Nil :: LevelDB) implements getter(0, "_db")
-      compiler ("hash_set_db") (LevelDB :: MUnit, effect = write(0)) implements setter(0, "_db", ${$1})
+      compiler ("hash_get_db") (Nil :: DBObject) implements getter(0, "_db")
+      compiler ("hash_set_db") (DBObject :: MUnit, effect = write(0)) implements setter(0, "_db", ${$1})
 
       infix ("open") (Nil :: MUnit, effect = write(0)) implements single ${
         val table = hash_table_name($self)
@@ -186,7 +185,7 @@ trait StreamOps {
         val db = hash_get_db($self)
         fassert(db != null, "No DB opened in HashStream")
         hash_close_internal(db)
-        hash_set_db($self, unit(null.asInstanceOf[org.iq80.leveldb.DB]))
+        hash_set_db($self, unit(null.asInstanceOf[org.rocksdb.RocksDB]))
       }
 
 
@@ -279,7 +278,7 @@ trait StreamOps {
     }
 
     // Create a lexicographically ordered logical key that respects integer order. We do this instead of
-    // supplying a custom comparator to LevelDB, which would require jumping across the JNI boundary to invoke.
+    // supplying a custom comparator to RocksDB, which would require jumping across the JNI boundary to invoke.
     compiler (FileStream) ("hashMatrixLogicalKey", Nil, (("k", MString), ("index", MInt)) :: MString) implements composite ${
       val prefix = "\$HASH_LOGICAL_KEY_PREFIX" + k + "_"
       val strIndex = ""+index
@@ -433,12 +432,11 @@ trait StreamOps {
         },
         { (a: Rep[ForgeArray[Tup2[String,DenseVector[Double]]]]) =>
           // The scheme belows appends new rows as new logical keys (instead of storing and growing a byte array
-          // value in the "master" key). This relies on LevelDBs sorted key functionality for efficiency (the logical
+          // value in the "master" key). This relies on RocksDB's sorted key functionality for efficiency (the logical
           // keys are stored close together, enabling compression and sequential scanning).
           //
-          // We write to the map sequentially to avoid needing to use external concurrency control (and because benchmarks
-          // do not show LevelDB scaling well with concurrent writers). We also batch all of the writes in one chunk for
-          // improved performance.
+          // We write to the map sequentially to avoid needing to use external concurrency control. 
+          // We also batch all of the writes in one chunk for improved performance.
 
           // Zero-length rows are skipped (note that the only two valid lengths for "value" are 0 and numCols)
           // If there is a key present in the resulting map, there was at least 1 non-empty row mapping to it.

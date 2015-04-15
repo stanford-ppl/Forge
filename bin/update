@@ -92,7 +92,7 @@ then
   if [ "$TARGET" == "lib" ];
   then
     FORGE_FLAGS="$FORGE_FLAGS --no-delite"
-  elif [ "$TARGET" = "delite" ];
+  elif [ "$TARGET" == "delite" ];
   then
     FORGE_FLAGS="$FORGE_FLAGS --no-lib"
   fi

@@ -185,12 +185,14 @@ trait TreeOps {
                                    ("maxNumFeatures", MInt, "unit(-1)"),
                                    ("minSamplesSplit", MInt, "unit(2)"),
                                    ("minSamplesLeaf", MInt, "unit(1)"),
+                                   ("useSamples", IndexVector, "unit(null.asInstanceOf[IndexVector])"),
                                    ("criterion", TCriterion, "MSE")
                                  ), Tree)) implements composite ${
 
       // optional value fakery
       val _maxDepth = if (maxDepth < 0) INF.toInt else maxDepth
       val _maxNumFeatures = if (maxNumFeatures < 0) sqrt(trainingSet.numFeatures).toInt else maxNumFeatures
+      val _useSamples = if (useSamples == null) trainingSet.data.rowIndices else useSamples
 
       // constants
       val MIN_IMPURITY_SPLIT = 1e-7
@@ -262,8 +264,7 @@ trait TreeOps {
 
       // kick off the tree construction
       // this has the side-effect of updating "tree", so that we don't have to continuously copy the internal arrays)
-      val allSamples = trainingSet.data.rowIndices
-      doApply(process, pack((allSamples, unit(0), unit(-1), unit(false), compute_impurity(trainingSet, allSamples, criterion), (0::trainingSet.numFeatures) { i => false }, process.AsInstanceOf[Any])))
+      doApply(process, pack((_useSamples, unit(0), unit(-1), unit(false), compute_impurity(trainingSet, _useSamples, criterion), (0::trainingSet.numFeatures) { i => false }, process.AsInstanceOf[Any])))
 
       tree.unsafeImmutable
     }

@@ -48,9 +48,9 @@ trait OptiMLDSL extends OptiLADSL
     importMLIOOps()
     importStreamOps()
     importImageOps()
+    importTreeOps()
     importClassifierOps()
     importValidateOps()
-    importTreeOps()
   }
 
   def importUntilConverged() {

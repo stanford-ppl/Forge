@@ -21,6 +21,62 @@ trait ClassifierOps {
     val Classifier = grp("Classifier")
 
     /**
+     * Random forest. The training set must be dense.
+     */
+    val Tree = lookupTpe("DecisionTree")
+    val Forest = tpe("RandomForest")
+    data(Forest, ("_trees", DenseVector(Tree)))
+
+    compiler (Forest) ("alloc_forest", Nil, ("trees", DenseVector(Tree)) :: Forest) implements allocates(Forest, ${$0})
+
+    // For each tree, we default to using approximately 2/3rds of the total available samples
+    // http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#remarks
+    direct (Classifier) ("rforest", Nil, MethodSignature(List(
+        ("trainingSet",DenseTrainingSet(MDouble,MBoolean)),
+        ("numTrees", MInt, "unit(10)"),
+        ("samplingRate", MDouble, "unit(0.66)"),
+        ("maxDepth", MInt, "unit(-1)"),
+        ("maxNumFeatures", MInt, "unit(-1)"),
+        ("minSamplesSplit", MInt, "unit(2)"),
+        ("minSamplesLeaf", MInt, "unit(1)"),
+        ("verbose", MBoolean, "unit(false)")
+      ), Forest)) implements composite ${
+
+      val y = trainingSet.labels map { label => if (label) 1.0 else 0.0 }
+      val data = DenseTrainingSet(trainingSet.data, y)
+
+      if (verbose) {
+        println("Building random forest with " + numTrees + " trees")
+      }
+      val start = time()
+      val trees = (0::numTrees) { i =>
+        val sampleIndices = sample(0::data.numSamples, samplingRate)
+        dtree(data, maxDepth, maxNumFeatures, minSamplesSplit, minSamplesLeaf, sampleIndices, Gini)
+      }
+      val end = time(trees)
+      if (verbose) {
+        println("Random forest complete! training took " + (end-start) / 1000.0 + "s")
+      }
+
+      alloc_forest(trees)
+    }
+
+    val ForestOps = withTpe(Forest)
+    ForestOps {
+      infix ("trees") (Nil :: DenseVector(Tree)) implements getter(0, "_trees")
+
+      infix ("predict") (("testPt", DenseVector(MDouble)) :: MDouble) implements composite ${
+        fassert($self.trees.length > 0, "random forest is empty")
+
+        // Take majority vote
+        val predictions = $self.trees.map(t => t.predict(testPt))
+        val counts = predictions.histogram
+        val majorityIndex = counts.toVector.maxIndex
+        counts.keys.apply(majorityIndex)
+      }
+    }
+
+    /**
      * Logistic regression with dense parameters. The training set can be dense or sparse.
      */
     direct (Classifier) ("logreg", TS, MethodSignature(List(

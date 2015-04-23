@@ -163,7 +163,12 @@ def sbtBuildFileFooter(dsl):
     // See http://stackoverflow.com/questions/19425613/unsatisfiedlinkerror-with-native-library-under-sbt
     // and http://www.scala-sbt.org/release/docs/Forking.html
     fork := true,
-    javaOptions in Test := sys.env.getOrElse("SBT_OPTS", "").split(" ")
+    // HACK alert: with fork = true, sbt appears to ignore the -D properties passed on the command line,
+    // which breaks test_all. Here we manually look for the currently relevant options. Needs a proper fix!
+    javaOptions in Test ++= sys.env.getOrElse("SBT_OPTS", "").split(" ").toSeq,
+    javaOptions in Test += "-Dtests.verbose="+System.getProperty("tests.verbose", "false"),
+    javaOptions in Test += "-Dtests.threads="+System.getProperty("tests.threads", "1"),
+    javaOptions in Test += "-Dtests.targets="+System.getProperty("tests.targets", "scala")
   )) dependsOn(${dslName}Comp, ${dslName}Lib)
 }
 """)

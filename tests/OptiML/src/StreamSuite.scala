@@ -181,6 +181,11 @@ trait HashStreamWriteB extends ForgeTestModule with OptiMLApplication with Strea
     val raw = FileStream(testMat)
     val data = raw.mapRows(testMat2, "\\|", "|") { v => DenseVector(v(0).toDouble, v(1).toDouble, v(5).toDouble, v(7).toDouble, v(9).toDouble) }
 
+    // Set stream chunk byteSize to be small, so that we test HashStreams with multiple chunks
+    val p = System.getProperties()
+    p.setProperty("optiml.stream.chunk.bytesize", "1e5") // 10KB
+    System.setProperties(p)
+
     // There is some weirdness going in converting a double value to a string key here.
     // We need to use a canonical representation of the double, so we use Scala's (rather than
     // the formatted version we read from the file).

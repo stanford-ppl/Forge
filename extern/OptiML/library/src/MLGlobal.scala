@@ -12,6 +12,7 @@ import java.util.HashMap
 object MLGlobal {
   /* A single-threaded HashMap for mapping string identifiers to unique integer ids */
   private val identifierMap = new java.util.HashMap[String,Int]()
+  private val reverseIdentifierMap = new java.util.HashMap[Int,String]()
   private var nextId = 0
 
   def getId(s: String) = {
@@ -20,9 +21,14 @@ object MLGlobal {
     }
     else {
       identifierMap.put(s, nextId)
+      reverseIdentifierMap.put(nextId, s)
       nextId += 1
       nextId - 1
     }
+  }
+
+  def lookupId(i: Int) = {
+    reverseIdentifierMap.get(i)
   }
 
   // REFACTOR: Most of the below is duplicated from compiler/src/datastruct/scala/MLGlobal.scala,
@@ -48,6 +54,7 @@ object MLGlobal {
         val tokens = line.split(MAPPING_DELIMITER)
         val id = tokens(1).toInt
         identifierMap.put(tokens(0), id)
+        reverseIdentifierMap.put(id, tokens(0))
         if (id > nextId) nextId = id+1
         line = f.readLine()
       }

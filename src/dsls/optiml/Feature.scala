@@ -172,6 +172,11 @@ trait FeatureOps {
       MLGlobal.getId($0)
     })
 
+    /* Lookup the string corresponding to a given unique integer identifier */
+    direct (FeatureHelper) ("reverseUnique", Nil, MInt :: MString) implements codegen($cala, ${
+      MLGlobal.lookupId($0)
+    })
+
     // direct (FeatureHelper) ("getUniqueMappings", Nil, Nil :: DenseVector(Tup2(MInt,MString))) implements composite ${
     //   val names = get_unique_names_helper
     //   val ids = get_unique_ids_helper

@@ -14,6 +14,7 @@ object MLGlobal {
   /* A thread-safe HashMap for mapping string identifiers to unique integer ids */
   // TODO: For distributed execution, slaves should send a message back to the master to handle this.
   private val identifierMap = new ConcurrentHashMap[String,Int](16, 0.75f, Config.numThreads)
+  private val reverseIdentifierMap = new ConcurrentHashMap[Int,String](16, 0.75f, Config.numThreads)
   private val nextId = new AtomicInteger(0)
 
   def getId(s: String) = {
@@ -25,8 +26,16 @@ object MLGlobal {
       // If someone else assigns an id to this string first, the next string will skip an id value.
       // While this is not ideal, it is still correct, as a contiguous id range is not guaranteed.
       val z = identifierMap.putIfAbsent(s, id)
-      if (z == 0) id else z
+      if (z == 0) {
+        reverseIdentifierMap.put(id, s)
+        id
+      }
+      else z
     }
+  }
+
+  def lookupId(i: Int) = {
+    reverseIdentifierMap.get(i)
   }
 
   def getUniqueNames: Array[String] = {
@@ -48,6 +57,7 @@ object MLGlobal {
         val tokens = line.split(MAPPING_DELIMITER)
         val id = tokens(1).toInt
         identifierMap.put(tokens(0), id)
+        reverseIdentifierMap.put(id, tokens(0))
         if (id > nextId.get) nextId.set(id+1)
         line = f.readLine()
       }

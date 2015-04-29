@@ -276,7 +276,7 @@ trait ValidateOps {
 
     direct (Validate) ("AUC", Nil, ("unsortedROCs", DenseVector(Tup2(MDouble,MDouble))) :: MDouble) implements composite ${
       // increasing by TPR then FPR (i.e. up and to the right)
-      val sorted = unsortedROCs.sortBy(t => (t._2.toLong << 32) + t._1.toLong)
+      val sorted = unsortedROCs.sortBy(t => t._1).sortBy(t => t._2)
 
       // add end points
       val curve = DenseVector(pack((unit(0.0),unit(0.0)))) << sorted << DenseVector(pack((unit(1.0),unit(1.0))))

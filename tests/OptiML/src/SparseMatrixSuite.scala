@@ -17,7 +17,9 @@ object SparseMatrixDataOpsRunnerI extends ForgeTestRunnerInterpreter with OptiML
 trait SparseMatrixDataOps extends ForgeTestModule with OptiMLApplication {
   def main() {
     val mb = SparseMatrix[Double](1000,1000)
+    mb(10,100) = 39
     mb(10,100) = 5
+    mb(11,101) = 17
     mb(9,100) = 1
     mb(9,722) = 722
     mb(9,331) = 331

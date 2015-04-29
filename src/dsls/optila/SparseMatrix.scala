@@ -297,7 +297,7 @@ trait SparseMatrixOps {
           coo_to_csr_unordered($self)
       }
 
-      compiler ("coo_ordered") ((("nnz",MInt),("rowIndices",MArray(MInt)),("colIndices",MArray(MInt))) :: MBoolean) implements composite ${
+      compiler ("coo_ordered") ((("nnz",MInt),("rowIndices",MArray(MInt)),("colIndices",MArray(MInt))) :: MBoolean) implements single ${
         var i = 0
         var lastRow = 0
         var lastCol = 0
@@ -314,7 +314,7 @@ trait SparseMatrixOps {
         !outOfOrder
       }
 
-      compiler ("coo_to_csr_ordered") (Nil :: SparseMatrix(T)) implements composite ${
+      compiler ("coo_to_csr_ordered") (Nil :: SparseMatrix(T)) implements single ${
         val data = sparsematrix_coo_data($self)
         val rowIndices = sparsematrix_coo_rowindices($self)
         val colIndices = sparsematrix_coo_colindices($self)
@@ -334,25 +334,20 @@ trait SparseMatrixOps {
         coo_to_csr_finalize($self,outData,outColIndices,outRowPtr)
       }
 
-      compiler ("coo_to_csr_unordered") (Nil :: SparseMatrix(T)) implements composite ${
+      compiler ("coo_to_csr_unordered") (Nil :: SparseMatrix(T)) implements single ${
         val data = sparsematrix_coo_data($self)
         val rowIndices = sparsematrix_coo_rowindices($self)
         val colIndices = sparsematrix_coo_colindices($self)
 
-        // build a hashmap containing the elements of the COO matrix,
+        // build a HashMap containing the elements of the COO matrix,
         // with tuples mapped to longs and rowIndices in the high bits so we can sort by them.
-        // TODO: switch to using a specialized HashMap impl to avoid boxing
-        val elems = SHashMap[Long,T]()
+        // remove duplicates by preferring elements further to the right in the array, and
+        // ignore already removed elements, which are represented by a negative index
+        val elems = (0::$self.nnz).find(i => rowIndices(i) >= 0)
+                                  .groupByReduce(i => (rowIndices(i).toLong << 32) + colIndices(i).toLong,
+                                                 i => i,
+                                                 (a: Rep[Int],b: Rep[Int]) => b)
 
-        // remove duplicates by preferring elements further to the right in the array
-        var i = 0
-        while (i < $self.nnz) {
-          if (rowIndices(i) >= 0) {  // removed elements are represented by a negative index
-            val key = (rowIndices(i).toLong << 32) + colIndices(i).toLong
-            elems(key) = data(i)
-          }
-          i += 1
-        }
         val indices = array_sort(elems.keys)
         val outData = array_empty[T](array_length(indices))
         val outColIndices = array_empty[Int](array_length(indices))
@@ -360,12 +355,11 @@ trait SparseMatrixOps {
 
         // write to output in sorted order without duplicates
         // left-to-right, top-to-bottom
-        i = 0
+        var i = 0
         while (i < array_length(indices)) {
           val colIdx = (indices(i) & unit(0x00000000ffffffffL)).toInt
           array_update(outColIndices, i, colIdx)
-          array_update(outData, i, elems(indices(i)))
-
+          array_update(outData, i, data(elems(indices(i))))
           val rowIdx = (indices(i) >>> 32).toInt
           array_update(outRowPtr, rowIdx+1, outRowPtr(rowIdx+1)+1)
           i += 1
@@ -374,7 +368,7 @@ trait SparseMatrixOps {
         coo_to_csr_finalize($self,outData,outColIndices,outRowPtr)
       }
 
-      compiler ("coo_to_csr_finalize") ((("outData",MArray(T)),("outColIndices",MArray(MInt)),("outRowPtr",MArray(MInt))) :: SparseMatrix(T)) implements composite ${
+      compiler ("coo_to_csr_finalize") ((("outData",MArray(T)),("outColIndices",MArray(MInt)),("outRowPtr",MArray(MInt))) :: SparseMatrix(T)) implements single ${
         // finalize rowPtr
         var i = 0
         var acc = 0

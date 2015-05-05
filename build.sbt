@@ -4,11 +4,11 @@ organization := "Stanford_PPL"
 
 retrieveManaged := true
 
-scalaOrganization := "org.scala-lang"
+scalaOrganization := "org.scala-lang.virtualized"
 
 scalaVersion := virtScala
 
-scalaHome := Some(file(sys.env("SCALA_VIRTUALIZED_HOME")))
+scalaHome := sys.env.get("SCALA_VIRTUALIZED_HOME").map(file)
 
 scalaSource in Compile <<= baseDirectory(_ / "src")
 
@@ -20,9 +20,9 @@ scalacOptions += "-Yvirtualize"
 
 scalacOptions in Compile ++= Seq("-unchecked", "-deprecation")
 
-libraryDependencies += "org.scala-lang" % "scala-library" % virtScala
+libraryDependencies += "org.scala-lang.virtualized" % "scala-library" % virtScala
 
-libraryDependencies += "org.scala-lang" % "scala-compiler" % virtScala
+libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % virtScala
 
 libraryDependencies += scalaTest
 
@@ -30,4 +30,4 @@ libraryDependencies += scalaTest
 parallelExecution in Test := false
 
 // disable publishing of main docs
-publishArtifact in (Compile, packageDoc) := false 
+publishArtifact in (Compile, packageDoc) := false

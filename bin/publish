@@ -66,14 +66,14 @@ object ${dslName}Build extends Build {
   val virtScala = "${scala_major_vers}.${scala_minor_vers}"
   val virtBuildSettingsBase = Project.defaultSettings ++ Seq(
     organization := "stanford-ppl",
-    scalaOrganization := "org.scala-lang",
+    scalaOrganization := "org.scala-lang.virtualized",
     scalaVersion := virtScala,
-    scalaHome := Some(file(sys.env("SCALA_VIRTUALIZED_HOME"))),
+    scalaHome := sys.env.get("SCALA_VIRTUALIZED_HOME").map(file),
 
     publishArtifact in (Compile, packageDoc) := false,
     // needed for scala.tools, which is apparently not included in sbt's built in version
-    libraryDependencies += "org.scala-lang" % "scala-library" % virtScala,
-    libraryDependencies += "org.scala-lang" % "scala-compiler" % virtScala,
+    libraryDependencies += "org.scala-lang.virtualized" % "scala-library" % virtScala,
+    libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % virtScala,
     libraryDependencies += "org.scalatest" % "scalatest_${scala_major_vers}" % "2.2.2",
     libraryDependencies += "com.google.guava" % "guava" % "17.0",
     libraryDependencies += "org.apache.commons" % "commons-math" % "2.2",

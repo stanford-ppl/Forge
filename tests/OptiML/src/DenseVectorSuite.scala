@@ -296,6 +296,22 @@ trait Distinct extends ForgeTestModule with OptiMLApplication {
   }
 }
 
+object IntersectRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Intersect
+object IntersectRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Intersect
+trait Intersect extends ForgeTestModule with OptiMLApplication {
+  def main() = {
+
+    val v1 = DenseVector(10.0,10.0,11.0,5.0,5.0,-3.0)
+    val v2 = DenseVector(5.0, -3.0)
+    val i = v1 intersect v2
+
+    // duplicates are removed
+    collect(i.sort == DenseVector(-3.0, 5.0))
+
+    mkReport
+  }
+}
+
 object MedianRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Median
 object MedianRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Median
 trait Median extends ForgeTestModule with OptiMLApplication {
@@ -410,6 +426,7 @@ class DenseVectorSuiteInterpreter extends ForgeSuiteInterpreter {
   def testFind() { runTest(FindRunnerI) }
   def testDist() { runTest(DistRunnerI) }
   def testDistinct() { runTest(DistinctRunnerI) }
+  def testIntersect() { runTest(IntersectRunnerI) }
   def testMedian() { runTest(MedianRunnerI) }
   // def testNearestNeighbor() { runTest(NearestNeighborRunnerI) }
   def testSample() { runTest(SampleRunnerI) }
@@ -432,6 +449,7 @@ class DenseVectorSuiteCompiler extends ForgeSuiteCompiler {
   def testFind() { runTest(FindRunnerC) }
   def testDist() { runTest(DistRunnerC) }
   def testDistinct() { runTest(DistinctRunnerC) }
+  def testIntersect() { runTest(IntersectRunnerC) }
   def testMedian() { runTest(MedianRunnerC) }
   // def testNearestNeighbor() { runTest(NearestNeighborRunnerC) }
   def testSample() { runTest(SampleRunnerC) }

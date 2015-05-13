@@ -298,6 +298,11 @@ trait VectorOps {
       // TODO
       // infix ("groupBy") (((T ==> R)) :: DenseVector(DenseVector(T)))
 
+      infix ("intersect") (DenseVector(T) :: DenseVector(T)) implements composite ${
+        val hash = if ($self.length > $1.length) $1.histogram else $self.histogram
+        val other = if ($self.length > $1.length) $self.distinct else $1.distinct
+        other.filter(e => hash.contains(e))
+      }
 
       /**
        * Data exchange

@@ -297,6 +297,10 @@ def publish(dsl, opts):
         shutil.copyfile(FORGE_HOME + "/static/delite-wrapper", out_delite)
         os.chmod(out_delite, stat.S_IXUSR | os.stat(out_delite)[stat.ST_MODE])
 
+        out_parse_perf_report = build_dir + "/bin/parse_perf_report"
+        shutil.copyfile(FORGE_HOME + "/static/parse_perf_report", out_parse_perf_report)
+        os.chmod(out_parse_perf_report, stat.S_IXUSR | os.stat(out_parse_perf_report)[stat.ST_MODE])
+
         shutil.copyfile(FORGE_HOME + "/static/delitecommon-wrapper.py", build_dir+"/bin/delitecommon.py")
 
     print "[forge]: Publishing complete."

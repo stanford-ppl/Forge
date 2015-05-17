@@ -33,6 +33,7 @@ def main():
     os.putenv("CLASSPATH", old_cp + os.pathsep + cp)
     
     os.system(DELITE_HOME + "/bin/delite " + dslRunner + " " + " ".join(argv[2:len(argv)]))
+	os.system("parse_perf_report")
 
 if __name__ == "__main__":
     main()

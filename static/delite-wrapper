@@ -7,6 +7,7 @@ import delitecommon
 
 ## a forwarder to the delite script in DELITE_HOME
 def main():
+
     usage = "usage: %prog <dsl runner> [delite args]"
 
     if len(argv) < 2:
@@ -33,7 +34,8 @@ def main():
     os.putenv("CLASSPATH", old_cp + os.pathsep + cp)
     
     os.system(DELITE_HOME + "/bin/delite " + dslRunner + " " + " ".join(argv[2:len(argv)]))
-	os.system("parse_perf_report")
+    parse_perf_report_script = os.path.abspath( os.path.dirname( sys.argv[0] ) ) +  "/parse_perf_report"
+    os.system( parse_perf_report_script )
 
 if __name__ == "__main__":
     main()

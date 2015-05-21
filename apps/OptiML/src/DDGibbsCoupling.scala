@@ -8,7 +8,7 @@ object DDGibbsCouplingInterpreter extends OptiMLApplicationInterpreter with DDGi
 trait DDGibbsCoupling extends OptiMLApplication {
 
   def print_usage = {
-    println("Usage: DDGibbsCoupling <factors file> <variables file> <weights file> <edges file> <max samples>")
+    println("Usage: DDGibbsCoupling <factors file> <variables file> <weights file> <edges file> <max samples> <number of runs>")
     exit(-1)
   }
 
@@ -129,10 +129,11 @@ trait DDGibbsCoupling extends OptiMLApplication {
   }
 
   def main() = {
-    if (args.length < 5) print_usage
+    if (args.length < 6) print_usage
 
     tic("io")
     var maxSamples = args(4).toInt
+    var nruns = args(5).toInt
     val G = readDDFactorGraph(args(0), args(1), args(2), args(3))
     toc("io", G)
 
@@ -144,44 +145,51 @@ trait DDGibbsCoupling extends OptiMLApplication {
     println("  " + G.numEdges + " edges")
     println("  " + G.nonEvidenceVariables.length + " non-evidence variables")
     println("max samples: " + maxSamples)
+    println("number of runs: " + nruns)
 
     println("")
     println("done!")
 
-    println("")
-    println("creating two mutable copies of the graph...")
-    val G1 = randomizeVariables(G)
-    val G2 = randomizeVariables(G)
-    println("done!")
+    var irun = 1
+    while(irun <= nruns) {
+      println("")
+      println("run " + irun)
+      println("creating two mutable copies of the graph...")
+      val G1 = randomizeVariables(G)
+      val G2 = randomizeVariables(G)
+      println("done!")
 
-    println("")
-    println("estimating coupling time")
+      println("")
+      println("estimating coupling time")
 
-    tic()
+      tic("run" + irun)
 
-    var sampleCt = 0
-    while (sampleCt < maxSamples) {
-      for (iv <- 0::G.nonEvidenceVariables.length) {
-        val v = G.nonEvidenceVariables.apply(iv)
-        val rd: Rep[Double] = random[Double]
-        sampleVariable(G1, v, rd)
-        sampleVariable(G2, v, rd)
+      var sampleCt = 0
+      while (sampleCt < maxSamples) {
+        for (iv <- 0::G.nonEvidenceVariables.length) {
+          val v = G.nonEvidenceVariables.apply(iv)
+          val rd: Rep[Double] = random[Double]
+          sampleVariable(G1, v, rd)
+          sampleVariable(G2, v, rd)
+        }
+
+        sampleCt += 1
+
+        if(G1.variableValue == G2.variableValue) {
+          println("chains coupled after " + sampleCt + " samples")
+          maxSamples = 0
+        }
       }
 
-      sampleCt += 1
-
-      if(G1.variableValue == G2.variableValue) {
-        println("chains coupled after " + sampleCt + " samples")
-        maxSamples = 0
+      if (maxSamples != 0) {
+        println("maximum iterations " + maxSamples + " exceeded")
       }
+
+      toc("run" + irun, sampleCt)
+
+      println("done!")
+
+      irun += 1
     }
-
-    if (maxSamples != 0) {
-      println("maximum iterations " + maxSamples + " exceeded")
-    }
-
-    toc(sampleCt)
-
-    println("done!")
   }
 }

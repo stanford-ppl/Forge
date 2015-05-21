@@ -8,7 +8,7 @@ object DDGibbsCouplingInterpreter extends OptiMLApplicationInterpreter with DDGi
 trait DDGibbsCoupling extends OptiMLApplication {
 
   def print_usage = {
-    println("Usage: DDGibbsCoupling <factors file> <variables file> <weights file> <edges file> <num samples> <num models> <num weight iterations> <num weight samples> <learning rate> <regularization constant> <diminish rate>")
+    println("Usage: DDGibbsCoupling <factors file> <variables file> <weights file> <edges file> <max samples>")
     exit(-1)
   }
 
@@ -167,6 +167,8 @@ trait DDGibbsCoupling extends OptiMLApplication {
         sampleVariable(G1, v, rd)
         sampleVariable(G2, v, rd)
       }
+
+      sampleCt += 1
 
       if(G1.variableValue == G2.variableValue) {
         println("chains coupled after " + sampleCt + " samples")

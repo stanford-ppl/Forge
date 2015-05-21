@@ -132,8 +132,8 @@ trait DDGibbsCoupling extends OptiMLApplication {
     if (args.length < 6) print_usage
 
     tic("io")
-    var maxSamples = args(4).toInt
-    var nruns = args(5).toInt
+    val maxSamples = args(4).toInt
+    val nruns = args(5).toInt
     val G = readDDFactorGraph(args(0), args(1), args(2), args(3))
     toc("io", G)
 
@@ -165,7 +165,8 @@ trait DDGibbsCoupling extends OptiMLApplication {
       tic("run" + irun)
 
       var sampleCt = 0
-      while (sampleCt < maxSamples) {
+      var sampleMax = maxSamples
+      while (sampleCt < sampleMax) {
         for (iv <- 0::G.nonEvidenceVariables.length) {
           val v = G.nonEvidenceVariables.apply(iv)
           val rd: Rep[Double] = random[Double]
@@ -177,11 +178,11 @@ trait DDGibbsCoupling extends OptiMLApplication {
 
         if(G1.variableValue == G2.variableValue) {
           println("chains coupled after " + sampleCt + " samples")
-          maxSamples = 0
+          sampleMax = 0
         }
       }
 
-      if (maxSamples != 0) {
+      if (sampleMax != 0) {
         println("maximum iterations " + maxSamples + " exceeded")
       }
 

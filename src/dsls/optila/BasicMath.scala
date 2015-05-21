@@ -123,9 +123,7 @@ trait BasicMathOps {
     direct (Math) ("normalize", Nil, (DenseVector(MDouble), NormalizeMethod) :: DenseVector(MDouble)) implements composite ${
       $1 match {
         case Std =>
-          val avg = mean($0)
-          val dev = stddev($0)
-          $0 map { e => (e - avg) / dev }
+          normalizeUsing($0, mean($0), stddev($0))
 
         case Unity =>
           // scale to [-1 1]
@@ -133,6 +131,10 @@ trait BasicMathOps {
           val maxVal = max($0)
           (($0 map { e => (e - minVal) / (maxVal - minVal) }) * 2.0) - 1.0
       }
+    }
+
+    direct (Math) ("normalizeUsing", Nil, (("v",DenseVector(MDouble)), ("avg", MDouble), ("stddev", MDouble)) :: DenseVector(MDouble)) implements composite ${
+      v map { e => (e - avg) / stddev }
     }
 
     direct (Math) ("normalize", Nil, DenseMatrix(MDouble) :: DenseMatrix(MDouble)) implements redirect ${ normalize($0, Std) }

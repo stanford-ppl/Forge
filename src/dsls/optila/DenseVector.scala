@@ -48,7 +48,7 @@ trait DenseVectorOps {
     // static methods
     static (DenseVector) ("apply", T, (MInt, MBoolean) :: DenseVector(T), effect = mutable) implements allocates(DenseVector, ${$0}, ${$1}, ${array_empty[T]($0)})
     static (DenseVector) ("apply", T, varArgs(T) :: DenseVector(T)) implements allocates(DenseVector, ${unit($0.length)}, ${unit(true)}, ${array_fromseq[T]($0)})
-    static (DenseVector) ("apply", T, MethodSignature(List(MArray(T), ("isRow", MBoolean, "unit(true)")), DenseVector(T))) implements redirect ${ densevector_fromarray($0, isRow) }
+    static (DenseVector) ("apply", T, MethodSignature(List(MArray(T), ("isRow", MBoolean)), DenseVector(T))) implements redirect ${ densevector_fromarray($0, isRow) }
 
     // helper
     direct (DenseVector) ("densevector_fromarray", T, (MArray(T), MBoolean) :: DenseVector(T)) implements allocates(DenseVector, ${array_length($0)}, ${$1}, ${$0})

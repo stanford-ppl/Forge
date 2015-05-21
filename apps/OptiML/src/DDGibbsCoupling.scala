@@ -2,13 +2,13 @@ import optiml.compiler._
 import optiml.library._
 import optiml.shared._
 
-object DDGibbsCompiler extends OptiMLApplicationCompiler with DDGibbs
-object DDGibbsInterpreter extends OptiMLApplicationInterpreter with DDGibbs
+object DDGibbsCouplingCompiler extends OptiMLApplicationCompiler with DDGibbsCoupling
+object DDGibbsCouplingInterpreter extends OptiMLApplicationInterpreter with DDGibbsCoupling
 
-trait DDGibbs extends OptiMLApplication {
+trait DDGibbsCoupling extends OptiMLApplication {
 
   def print_usage = {
-    println("Usage: DDGibbs <factors file> <variables file> <weights file> <edges file> <num samples> <num models> <num weight iterations> <num weight samples> <learning rate> <regularization constant> <diminish rate>")
+    println("Usage: DDGibbsCoupling <factors file> <variables file> <weights file> <edges file> <num samples> <num models> <num weight iterations> <num weight samples> <learning rate> <regularization constant> <diminish rate>")
     exit(-1)
   }
 
@@ -104,7 +104,7 @@ trait DDGibbs extends OptiMLApplication {
     }
   }
 
-  def sampleVariable(G: Rep[DDFactorGraph], v: Rep[Int], rd: Rep[Double]): Rep[Boolean] = {
+  def sampleVariable(G: Rep[DDFactorGraph], v: Rep[Int], rd: Rep[Double]) {
     val dw: Rep[Double] = G.v2f.ngbrNodes(v).map({ f =>
       val w0 = evalFactorUnder(G, f, v, false)
       val w1 = evalFactorUnder(G, f, v, true)
@@ -113,15 +113,14 @@ trait DDGibbs extends OptiMLApplication {
 
     val newValue: Rep[Boolean] = ((rd * (1.0 + exp(-dw))) <= 1.0)
     G.variableValue(v) = newValue
-    newValue
   }
 
   // randomly reassign the non-evidence variables to 0 or 1
-  def randomizeVariables(G :: Rep[DDFactorGraph]) = {
+  def randomizeVariables(G: Rep[DDFactorGraph]) = {
     val GR = G.mutableVariables()
 
-    for (iv <- 0::graph.nonEvidenceVariables.length) {
-      val v = graph.nonEvidenceVariables.apply(iv)
+    for (iv <- 0::G.nonEvidenceVariables.length) {
+      val v = G.nonEvidenceVariables.apply(iv)
       val newValue: Rep[Boolean] = (random[Double] >= 0.5)
       GR.variableValue(v) = newValue
     }

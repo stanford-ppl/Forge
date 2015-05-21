@@ -90,7 +90,7 @@ trait DDGibbsCoupling extends OptiMLApplication {
     else if (ffx == 6) { //RATIO
       var acc = 1.0
       var idx = 0
-      while ((idx < nargs - 1)&&(acc == false)) {
+      while (idx < nargs - 1) {
         if (args(idx) == true) {
           acc += 1.0
         }

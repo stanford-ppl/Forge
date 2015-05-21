@@ -88,19 +88,25 @@ trait DDGibbsCoupling extends OptiMLApplication {
       }
     }
     else if (ffx == 6) { //RATIO
+      val bhead = args(nargs - 1)
       var acc = 1.0
       var idx = 0
       while (idx < nargs - 1) {
-        if (args(idx) == true) {
+        if (bhead || (args(idx) == false)) {
           acc += 1.0
         }
         idx += 1
       }
-      if (args(nargs - 1)) {
-        log(acc)
+      if (nargs == 1) {
+        if (bhead) {
+          1.0
+        }
+        else {
+          0.0
+        }
       }
       else {
-        -log(acc)
+        log(acc) / log(2.0)
       }
     }
     else {

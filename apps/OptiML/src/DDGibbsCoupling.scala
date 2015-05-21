@@ -69,7 +69,7 @@ trait DDGibbsCoupling extends OptiMLApplication {
       else {
         println("error: isequal factor function cannot contain " + nargs + " arguments")
         exit(-1)
-        false
+        0.0
       }
     }
     else if (ffx == 4) { // ISTRUE
@@ -84,7 +84,7 @@ trait DDGibbsCoupling extends OptiMLApplication {
       else {
         println("error: istrue factor function cannot contain " + nargs + " arguments")
         exit(-1)
-        false
+        0.0
       }
     }
     else if (ffx == 6) { //RATIO

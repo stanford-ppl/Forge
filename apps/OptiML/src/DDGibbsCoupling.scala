@@ -106,7 +106,7 @@ trait DDGibbsCoupling extends OptiMLApplication {
     else {
       println("error: invalid factor function " + ffx)
       exit(-1)
-      false
+      0.0
     }
   }
 

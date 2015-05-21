@@ -12,7 +12,7 @@ trait DDGibbsCoupling extends OptiMLApplication {
     exit(-1)
   }
 
-  def evalFFX(ffx: Rep[Int], nargs: Rep[Int], args: Rep[Int] => Rep[Boolean]): Rep[Boolean] = {
+  def evalFFX(ffx: Rep[Int], nargs: Rep[Int], args: Rep[Int] => Rep[Boolean]): Rep[Double] = {
     if(ffx == 0) { // IMPLY
       var acc = args(nargs - 1)
       var idx = 0
@@ -22,7 +22,12 @@ trait DDGibbsCoupling extends OptiMLApplication {
         }
         idx += 1
       }
-      acc
+      if (acc) {
+        1.0
+      }
+      else {
+        0.0
+      }
     }
     else if (ffx == 1) { // OR
       var acc = false
@@ -31,7 +36,12 @@ trait DDGibbsCoupling extends OptiMLApplication {
         acc = args(idx)
         idx += 1
       }
-      acc
+      if (acc) {
+        1.0
+      }
+      else {
+        0.0
+      }
     }
     else if (ffx == 2) { // AND
       var acc = true
@@ -40,11 +50,21 @@ trait DDGibbsCoupling extends OptiMLApplication {
         acc = args(idx)
         idx += 1
       }
-      acc
+      if (acc) {
+        1.0
+      }
+      else {
+        0.0
+      }
     }
     else if (ffx == 3) { // EQUAL
       if(nargs == 2) {
-        (args(0) == args(1))
+        if (args(0) == args(1)) {
+          1.0
+        }
+        else {
+          0.0
+        }
       } 
       else {
         println("error: isequal factor function cannot contain " + nargs + " arguments")
@@ -54,12 +74,33 @@ trait DDGibbsCoupling extends OptiMLApplication {
     }
     else if (ffx == 4) { // ISTRUE
       if(nargs == 1) {
-        args(0)
+        if (args(0)) {
+          1.0
+        }
+        else {
+          0.0
+        }
       }
       else {
         println("error: istrue factor function cannot contain " + nargs + " arguments")
         exit(-1)
         false
+      }
+    }
+    else if (ffx == 6) { //RATIO
+      var acc = 1.0
+      var idx = 0
+      while ((idx < nargs - 1)&&(acc == false)) {
+        if (args(idx) == true) {
+          acc += 1.0
+        }
+        idx += 1
+      }
+      if (args(nargs - 1)) {
+        log(acc)
+      }
+      else {
+        -log(acc)
       }
     }
     else {
@@ -96,12 +137,7 @@ trait DDGibbsCoupling extends OptiMLApplication {
     // get the weight
     val w = G.weightValue.apply(G.factorWeightIdx.apply(f))
     // finally, return the weight times the result
-    if (z) {
-      w
-    }
-    else {
-      0.0
-    }
+    z * w
   }
 
   def sampleVariable(G: Rep[DDFactorGraph], v: Rep[Int], rd: Rep[Double]) {

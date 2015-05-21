@@ -80,6 +80,6 @@ trait ImageOps {
       //   val b = $self.convolve(scharrYkernel)
       //   if (polar) cartToPolar(a,b) else pack((a,b))
       // }          
-    }
+    // }
   }   
 }

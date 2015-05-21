@@ -73,19 +73,19 @@ trait DDGibbsCoupling extends OptiMLApplication {
       }
     }
     else if (ffx == 4) { // ISTRUE
-      if(nargs == 1) {
+      // if(nargs == 1) {
         if (args(0)) {
           1.0
         }
         else {
           0.0
         }
-      }
-      else {
-        println("error: istrue factor function cannot contain " + nargs + " arguments")
-        exit(-1)
-        0.0
-      }
+      // }
+      // else {
+      //   println("error: istrue factor function cannot contain " + nargs + " arguments")
+      //   exit(-1)
+      //   0.0
+      // }
     }
     else if (ffx == 6) { //RATIO
       val bhead = args(nargs - 1)

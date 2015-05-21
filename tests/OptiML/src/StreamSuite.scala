@@ -200,7 +200,7 @@ trait HashStreamWriteB extends ForgeTestModule with OptiMLApplication with Strea
       DenseVector[Double](
         customer.getCol(2).min,
         customer.getCol(3).max,
-        customer.getCol(4).sum
+        customer.getCol(4).sort.sum
       )
     }
 
@@ -222,7 +222,7 @@ trait HashStreamWriteB extends ForgeTestModule with OptiMLApplication with Strea
       DenseVector[Double](
         customer.getCol(2).min,
         customer.getCol(3).max,
-        customer.getCol(4).sum
+        customer.getCol(4).sort.sum
       )
     }
 

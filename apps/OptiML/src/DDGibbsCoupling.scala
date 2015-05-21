@@ -192,6 +192,8 @@ trait DDGibbsCoupling extends OptiMLApplication {
     println("")
     println("done!")
 
+    val coupling_times = Vector[Int](nruns)
+
     var irun = 1
     while(irun <= nruns) {
       println("")
@@ -230,9 +232,13 @@ trait DDGibbsCoupling extends OptiMLApplication {
 
       toc("run" + irun, sampleCt)
 
+      coupling_times[irun - 1] = sampleCt
+
       println("done!")
 
       irun += 1
     }
+
+    println(coupling_times)
   }
 }

@@ -232,7 +232,7 @@ trait DDGibbsCoupling extends OptiMLApplication {
 
       toc("run" + irun, sampleCt)
 
-      coupling_times[irun - 1] = sampleCt
+      coupling_times(irun - 1) = sampleCt
 
       println("done!")
 

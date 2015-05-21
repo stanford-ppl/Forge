@@ -239,6 +239,10 @@ trait DDGibbsCoupling extends OptiMLApplication {
       irun += 1
     }
 
-    println(coupling_times)
+    irun = 0
+    while(irun < nruns) {
+      println(coupling_times(irun))
+      irun += 1
+    }
   }
 }

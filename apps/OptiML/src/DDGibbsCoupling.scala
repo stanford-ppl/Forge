@@ -192,7 +192,7 @@ trait DDGibbsCoupling extends OptiMLApplication {
     println("")
     println("done!")
 
-    val coupling_times = DenseVector[Int](nruns)
+    val coupling_times = DenseVector[Int](nruns, false)
 
     var irun = 1
     while(irun <= nruns) {

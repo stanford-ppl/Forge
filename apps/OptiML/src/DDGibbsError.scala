@@ -237,9 +237,10 @@ trait DDGibbsErr extends OptiMLApplication {
     var sampleCt = 0
     while (sampleCt < numSamples) {
       for (iv <- 0::graph.nonEvidenceVariables.length) {
-        for (im <- 0::numModels)
+        for (im <- 0::numModels) {
           val v = graphs(im).nonEvidenceVariables.apply(iv)
           marginalsAcc(im, iv) = marginalsAcc(im, iv) + (if (sampleVariable(graphs(im), v)) 1.0 else 0.0)
+        }
       }
 
       errs(sampleCt) = sum(0, numModels) { im =>

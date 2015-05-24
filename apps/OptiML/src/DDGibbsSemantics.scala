@@ -39,6 +39,7 @@ trait DDGibbsSemantics extends OptiMLApplication {
   def semantic_function(n: Rep[Double]): Rep[Double] = {
     println("error: invalid semantic function")
     exit(-1)
+    0.0
   }
 
   def print_usage = {

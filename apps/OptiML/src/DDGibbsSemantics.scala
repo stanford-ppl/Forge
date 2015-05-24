@@ -12,19 +12,19 @@ object DDGibbsLogicalCompiler extends OptiMLApplicationCompiler with DDGibbsLogi
 object DDGibbsLogicalInterpreter extends OptiMLApplicationInterpreter with DDGibbsLogical
 
 trait DDGibbsLinear extends DDGibbs {
-  def semantic_function(n :: Rep[Double]): Rep[Double] = {
+  def semantic_function(n: Rep[Double]): Rep[Double] = {
     n
   }
 }
 
 trait DDGibbsRatio extends DDGibbs {
-  def semantic_function(n :: Rep[Double]): Rep[Double] = {
+  def semantic_function(n: Rep[Double]): Rep[Double] = {
     log(n + 1.0) / log(2.0)
   }
 }
 
 trait DDGibbsLogical extends DDGibbs {
-  def semantic_function(n :: Rep[Double]): Rep[Double] = {
+  def semantic_function(n: Rep[Double]): Rep[Double] = {
     if (n > 0.5) {
       1.0
     }

@@ -217,7 +217,7 @@ trait DDGibbsErr extends OptiMLApplication {
     println("  " + G.numEdges + " edges")
     println("  " + G.nonEvidenceVariables.length + " non-evidence variables")
 
-    val goldMarginals = readVector(marginalsPath)
+    val goldMarginals = readVector[Double](marginalsPath)
 
     println("finished reading marginals")
     println("read " + goldMarginals.length + " marginals")
@@ -231,7 +231,7 @@ trait DDGibbsErr extends OptiMLApplication {
     tic()
 
     val graphs = (0::numModels) map { i => randomizeVariables(G) }
-    val marginalsAcc = DenseMatrix.zeros(numModels, graph.nonEvidenceVariables.length).mutable()
+    val marginalsAcc = DenseMatrix.zeros(numModels, goldMarginals.length).mutable()
     val errs = DenseVector[Double](numSamples, false)
 
     var sampleCt = 0
@@ -245,7 +245,7 @@ trait DDGibbsErr extends OptiMLApplication {
 
       errs(sampleCt) = sum(0, numModels) { im =>
         sum(0, goldMarginals.length) { iv =>
-          val dd = (marginalsAcc(im, iv) / (sampleCt + 1)) - goldMarginals(iv) 
+          val dd: Rep[Double] = (marginalsAcc(im, iv) / (sampleCt + 1)) - goldMarginals(iv) 
           dd * dd
         }
       } / numModels

@@ -47,7 +47,7 @@ trait DDGibbsSemantics extends OptiMLApplication {
     exit(-1)
   }
 
-  def evalFFX(ffx: Rep[Int], nargs: Rep[Int], args: Rep[Int] => Rep[Boolean]): Rep[Boolean] = {
+  def evalFFX(ffx: Rep[Int], nargs: Rep[Int], args: Rep[Int] => Rep[Boolean]): Rep[Double] = {
     if(ffx == 0) { // IMPLY
       var acc = args(nargs - 1)
       var idx = 0
@@ -57,7 +57,12 @@ trait DDGibbsSemantics extends OptiMLApplication {
         }
         idx += 1
       }
-      acc
+      if (acc) {
+        1.0
+      }
+      else {
+        0.0
+      }
     }
     else if (ffx == 1) { // OR
       var acc = false
@@ -66,7 +71,12 @@ trait DDGibbsSemantics extends OptiMLApplication {
         acc = args(idx)
         idx += 1
       }
-      acc
+      if (acc) {
+        1.0
+      }
+      else {
+        0.0
+      }
     }
     else if (ffx == 2) { // AND
       var acc = true
@@ -75,26 +85,34 @@ trait DDGibbsSemantics extends OptiMLApplication {
         acc = args(idx)
         idx += 1
       }
-      acc
+      if (acc) {
+        1.0
+      }
+      else {
+        0.0
+      }
     }
     else if (ffx == 3) { // EQUAL
       if(nargs == 2) {
-        (args(0) == args(1))
+        if (args(0) == args(1)) {
+          1.0
+        }
+        else {
+          0.0
+        }
       } 
       else {
         println("error: isequal factor function cannot contain " + nargs + " arguments")
         exit(-1)
-        false
+        0.0
       }
     }
     else if (ffx == 4) { // ISTRUE
-      if(nargs == 1) {
-        args(0)
+      if (args(0)) {
+        1.0
       }
       else {
-        println("error: istrue factor function cannot contain " + nargs + " arguments")
-        exit(-1)
-        false
+        0.0
       }
     }
     else if (ffx == 6) { //RATIO
@@ -122,7 +140,7 @@ trait DDGibbsSemantics extends OptiMLApplication {
     else {
       println("error: invalid factor function " + ffx)
       exit(-1)
-      false
+      0.0
     }
   }
 
@@ -153,12 +171,7 @@ trait DDGibbsSemantics extends OptiMLApplication {
     // get the weight
     val w = G.weightValue.apply(G.factorWeightIdx.apply(f))
     // finally, return the weight times the result
-    if (z) {
-      w
-    }
-    else {
-      0.0
-    }
+    w * z
   }
 
   def sampleVariable(G: Rep[DDFactorGraph], v: Rep[Int]): Rep[Boolean] = {

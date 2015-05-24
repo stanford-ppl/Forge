@@ -11,19 +11,19 @@ object DDGibbsRatioInterpreter extends OptiMLApplicationInterpreter with DDGibbs
 object DDGibbsLogicalCompiler extends OptiMLApplicationCompiler with DDGibbsLogical
 object DDGibbsLogicalInterpreter extends OptiMLApplicationInterpreter with DDGibbsLogical
 
-trait DDGibbsLinear extends DDGibbs {
+trait DDGibbsLinear extends DDGibbsSemantics {
   def semantic_function(n: Rep[Double]): Rep[Double] = {
     n
   }
 }
 
-trait DDGibbsRatio extends DDGibbs {
+trait DDGibbsRatio extends DDGibbsSemantics {
   def semantic_function(n: Rep[Double]): Rep[Double] = {
     log(n + 1.0) / log(2.0)
   }
 }
 
-trait DDGibbsLogical extends DDGibbs {
+trait DDGibbsLogical extends DDGibbsSemantics {
   def semantic_function(n: Rep[Double]): Rep[Double] = {
     if (n > 0.5) {
       1.0
@@ -34,10 +34,15 @@ trait DDGibbsLogical extends DDGibbs {
   }
 }
 
-trait DDGibbs extends OptiMLApplication {
+trait DDGibbsSemantics extends OptiMLApplication {
+
+  def semantic_function(n: Rep[Double]): Rep[Double] = {
+    println("error: invalid semantic function")
+    exit(-1)
+  }
 
   def print_usage = {
-    println("Usage: DDGibbs <factors file> <variables file> <weights file> <edges file> <num samples> <num models> <num weight iterations> <num weight samples> <learning rate> <regularization constant> <diminish rate>")
+    println("Usage: DDGibbsSemantics <factors file> <variables file> <weights file> <edges file> <output marginals> <num samples>")
     exit(-1)
   }
 

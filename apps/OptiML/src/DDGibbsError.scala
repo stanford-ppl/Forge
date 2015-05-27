@@ -127,7 +127,7 @@ trait DDGibbsErr extends OptiMLApplication {
       var acc = 0.0
       var idx = 0
       while (idx < nargs - 1) {
-        if (bhead || (args(idx) == false)) {
+        if (args(idx)) {
           acc += 1.0
         }
         idx += 1
@@ -137,11 +137,16 @@ trait DDGibbsErr extends OptiMLApplication {
           1.0
         }
         else {
-          0.0
+          -1.0
         }
       }
       else {
-        semantic_function(acc)
+        if (bhead) {
+          semantic_function(acc)
+        }
+        else {
+          -semantic_function(acc)
+        }
       }
     }
     else {

@@ -82,10 +82,10 @@ trait StreamOps {
       $0.get($1)
     })
 
-    compiler (HashStream) ("hash_get_all_internal", Nil, (LevelDB, MArray(MByte)) :: MArray(MArray(MByte)), effect = simple) implements codegen($cala, ${
+    compiler (HashStream) ("hash_get_all_internal", Nil, (LevelDB, MString) :: MArray(MArray(MByte)), effect = simple) implements codegen($cala, ${
       // workaround for named arguments in codegen methods not working
       val db = $0
-      val prefix = $1
+      val prefix = ($1 + "\$HASH_LOGICAL_KEY_SEPARATOR").getBytes
 
       val buf = scala.collection.mutable.ArrayBuffer[Array[Byte]]()
       val iterator = db.iterator()
@@ -193,7 +193,7 @@ trait StreamOps {
 
       //get all values associated with the supplied logical key (prefix)
       infix ("getAll") (MString :: MArray(MArray(MByte))) implements single ${
-        hash_get_all_internal(hash_get_db_safe($self), $1.getBytes)
+        hash_get_all_internal(hash_get_db_safe($self), $1)
       }
 
       infix ("putAll") ((MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = write(0)) implements composite ${
@@ -290,9 +290,10 @@ trait StreamOps {
     }
 
     // Create a lexicographically ordered key with the given prefix; the key suffix will be unique for every call
-    compiler (FileStream) ("hashMatrixNewKey", Nil, MString :: MString) implements codegen($cala, ${
+    compiler (FileStream) ("hashMatrixNewKey", Nil, (MString, MInt) :: MString) implements codegen($cala, ${
       val uniqueId = new java.rmi.server.UID() //globally unique value on every call: machine + timestamp + counter
       //TODO: we could make smaller keys by serializing uniqueId as multiple ints rather than a string, but not sure if leveldb can handle null bytes in the middle of keys
+      //we currently don't use the row index as part of the key generation, but still require it as a formal input to prevent unsafe code motion
       ($0 + "\$HASH_LOGICAL_KEY_SEPARATOR" + uniqueId.toString)
     })
 
@@ -304,7 +305,10 @@ trait StreamOps {
 
       // A reasonable and static (e.g. 1 GB) chunk size seems to give us the most consistent good performance. This should be configurable.
       // Using a constant also seems to increase fusion opportunities, though what is happening is a bit of a mystery.
-      System.getProperty("optiml.stream.chunk.bytesize","1e9").toDouble.toLong
+      // without the explicit types the results gets lifted and 'toX' is staged :(
+      val chunkSize: String = System.getProperty("optiml.stream.chunk.bytesize","1e9")
+      val chunkDouble: Double = chunkSize.toDouble
+      unit(chunkDouble.toLong)
     }
 
     // We need to read sequentially, but from potentially different data stores, so we use ForgeFileInputStream and ForgeFileOutputStream
@@ -462,7 +466,7 @@ trait StreamOps {
             ((0::allKeys.length) flatMap { (i: Rep[Int]) =>
               val k = allKeys(i)
               val group = allValues(i)
-              val dbKeys = group.map { _ => hashMatrixNewKey(k) }
+              val dbKeys = group.indices.map { j => hashMatrixNewKey(k, j) }
               val dbValues = group.map { row => serialize(row) }
               dbKeys.zip(dbValues) { (a,b) => pack((a,b)) }
             }).toArray

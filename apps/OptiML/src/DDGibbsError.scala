@@ -134,7 +134,6 @@ trait DDGibbsErr extends OptiMLApplication {
         }
       }
       else {
-        println(acc)
         semantic_function(acc)
       }
     }
@@ -224,17 +223,6 @@ trait DDGibbsErr extends OptiMLApplication {
     println("read " + goldMarginals.length + " marginals")
 
     println("")
-    println("done!")
-
-    println("counting ratio edges...")
-    for (f <- 0::G.numFactors) {
-      val nvars = G.f2v.ngbrEdges(f).length
-      val ffx = G.factorFunction.apply(f)
-
-      if ((ffx == 8) && (nvars > 1)) {
-        println(nvars)
-      }
-    }
     println("done!")
 
     println("")

@@ -108,10 +108,17 @@ trait DDGibbsErr extends OptiMLApplication {
       }
     }
     else if (ffx == 4) { // ISTRUE
-      if (args(0)) {
-        1.0
+      if (nargs == 1) {
+        if (args(0)) {
+          1.0
+        }
+        else {
+          0.0
+        }
       }
       else {
+        println("error: istrue factor function cannot contain " + nargs + " arguments")
+        exit(-1)
         0.0
       }
     }

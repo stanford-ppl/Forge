@@ -108,10 +108,17 @@ trait DDGibbsSemantics extends OptiMLApplication {
       }
     }
     else if (ffx == 4) { // ISTRUE
-      if (args(0)) {
-        1.0
+      if (nargs == 1) {
+        if (args(0)) {
+          1.0
+        }
+        else {
+          0.0
+        }
       }
       else {
+        println("error: istrue factor function cannot contain " + nargs + " arguments")
+        exit(-1)
         0.0
       }
     }
@@ -120,7 +127,7 @@ trait DDGibbsSemantics extends OptiMLApplication {
       var acc = 0.0
       var idx = 0
       while (idx < nargs - 1) {
-        if (bhead || (args(idx) == false)) {
+        if (args(idx)) {
           acc += 1.0
         }
         idx += 1
@@ -130,11 +137,16 @@ trait DDGibbsSemantics extends OptiMLApplication {
           1.0
         }
         else {
-          0.0
+          -1.0
         }
       }
       else {
-        semantic_function(acc)
+        if (bhead) {
+          semantic_function(acc)
+        }
+        else {
+          -semantic_function(acc)
+        }
       }
     }
     else {

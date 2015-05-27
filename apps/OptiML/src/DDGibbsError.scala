@@ -134,6 +134,7 @@ trait DDGibbsErr extends OptiMLApplication {
         }
       }
       else {
+	println(acc)
         semantic_function(acc)
       }
     }

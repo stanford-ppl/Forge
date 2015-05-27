@@ -338,14 +338,16 @@ trait DDFactorGraphOps {
       val edgesRaw = ddfg_read_edges($edgesPath)
 
       val v2fEdgeCounts = (variablesRaw map (v => unit(0))).mutable
+      val f2vEdgeCounts = (factorsRaw map (v => unit(0))).mutable
       var ecidx = unit(0)
       while (ecidx < edgesRaw.length) {
         val e = edgesRaw(ecidx)
         v2fEdgeCounts(e.variableId) = v2fEdgeCounts(e.variableId) + unit(1)
+        f2vEdgeCounts(e.factorId) = f2vEdgeCounts(e.factorId) + unit(1)
         ecidx += unit(1)
       }
 
-      val f2vEdgeCounts = factorsRaw map (f => f.edgeCount)
+      // val f2vEdgeCounts = factorsRaw map (f => f.edgeCount)
 
       val v2fnodes = ddfg_util_cumsum(v2fEdgeCounts)
       val f2vnodes = ddfg_util_cumsum(f2vEdgeCounts)
@@ -385,6 +387,12 @@ trait DDFactorGraphOps {
         val f = factorsRaw(fidx)
         factorWeightIdx(f.factorId) = f.weightId
         factorFunction(f.factorId) = f.factorFunction
+
+        if(f2vEdgeCounts(f.factorId) != f.edgeCount) {
+          println("edge mismatch error: " + f2vEdgeCounts(f.factorId) + " != " + f.edgeCount)
+          exit(-1)
+        }
+
         fidx += unit(1)
       }
 

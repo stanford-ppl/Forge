@@ -231,7 +231,7 @@ trait DDGibbsErr extends OptiMLApplication {
       val nvars = G.f2v.ngbrEdges(f).length
       val ffx = G.factorFunction.apply(f)
 
-      if (ffx == 8) {
+      if ((ffx == 8) && (ffx > 1)) {
         println(nvars)
       }
     }

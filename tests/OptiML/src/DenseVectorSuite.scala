@@ -413,6 +413,28 @@ trait Partition extends ForgeTestModule with OptiMLApplication {
   }
 }
 
+object SortRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Sort
+object SortRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Sort
+trait Sort extends ForgeTestModule with OptiMLApplication {
+  def main() = {
+    val v = DenseVector(DenseVector(3,5,-31),DenseVector(-5,6,17),DenseVector(0,-12,2))
+    val sorted = v.sortBy(r => r(0))
+    val sortedKey = DenseVector(DenseVector(-5,6,17),DenseVector(0,-12,2),DenseVector(3,5,-31))
+
+    // Nested DenseVector equality doesn't work at the moment, because the inner type is T
+    // and implemented by reference equality.
+    // collect(sorted == sortedKey)
+    collect((0::sorted.length).forall(i => sorted(i) == sortedKey(i)))
+
+    val v2 = DenseVector(3.2,-6.9,0.0,0.1,-71.5,3.14,2.96)
+    val (sortedV2, sortedIndices) = v2.sortWithIndex
+    collect(sortedIndices == IndexVector(DenseVector(4,1,2,3,6,5,0)))
+    collect(v2(sortedIndices) == sortedV2)
+
+    mkReport
+  }
+}
+
 class DenseVectorSuiteInterpreter extends ForgeSuiteInterpreter {
   def testAccessors() { runTest(DenseVectorAccessorsRunnerI) }
   def testOperators() { runTest(DenseVectorOperatorsRunnerI) }
@@ -434,6 +456,7 @@ class DenseVectorSuiteInterpreter extends ForgeSuiteInterpreter {
   def testFlatMap() { runTest(SimpleFlatMapRunnerI) }
   def testFlatten() { runTest(SimpleFlattenRunnerI) }
   def testPartition() { runTest(PartitionRunnerI) }
+  def testSort() { runTest(SortRunnerI) }
 }
 
 class DenseVectorSuiteCompiler extends ForgeSuiteCompiler {
@@ -457,5 +480,6 @@ class DenseVectorSuiteCompiler extends ForgeSuiteCompiler {
   def testFlatMap() { runTest(SimpleFlatMapRunnerC) }
   def testFlatten() { runTest(SimpleFlattenRunnerC) }
   def testPartition() { runTest(PartitionRunnerC) }
+  def testSort() { runTest(SortRunnerC) }
 }
 

@@ -115,7 +115,7 @@ trait DDGibbsSemantics extends OptiMLApplication {
         0.0
       }
     }
-    else if (ffx == 6) { //RATIO
+    else if (ffx == 8) { //RATIO
       val bhead = args(nargs - 1)
       var acc = 0.0
       var idx = 0

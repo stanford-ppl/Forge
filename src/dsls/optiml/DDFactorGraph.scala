@@ -263,7 +263,7 @@ trait DDFactorGraphOps {
       val out = DenseVector[DDFGFVariable](0, true)
       while (dis.available() > 0) {
         val variableId = dis.readLong().toInt
-        val isEvidence = dis.readBoolean()
+        val isEvidence = false //dis.readBoolean()
         val initialValue = dis.readDouble()
         val dataType = dis.readShort().toInt
         val edgeCount = dis.readLong().toInt

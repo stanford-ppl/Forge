@@ -259,7 +259,7 @@ trait DDGibbsErr extends OptiMLApplication {
         (sum(0, goldMarginals.length) { iv =>
           val dd: Rep[Double] = (marginalsAcc(im, iv) / (sampleCt + 1.0)) - goldMarginals(iv) 
           dd * dd
-        })
+        }) / goldMarginals.length
       } / numModels
 
       sampleCt += 1

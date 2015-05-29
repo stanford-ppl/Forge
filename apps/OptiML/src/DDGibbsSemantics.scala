@@ -142,10 +142,10 @@ trait DDGibbsSemantics extends OptiMLApplication {
       }
       else {
         if (bhead) {
-          2 * semantic_function(acc)
+          5 * semantic_function(acc)
         }
         else {
-          -2 * semantic_function(acc)
+          -5 * semantic_function(acc)
         }
       }
     }

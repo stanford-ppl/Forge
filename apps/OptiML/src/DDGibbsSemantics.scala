@@ -49,48 +49,51 @@ trait DDGibbsSemantics extends OptiMLApplication {
 
   def evalFFX(ffx: Rep[Int], nargs: Rep[Int], args: Rep[Int] => Rep[Boolean]): Rep[Double] = {
     if(ffx == 0) { // IMPLY
-      var acc = args(nargs - 1)
-      var idx = 0
-      while ((idx < nargs - 1)&&(acc == false)) {
-        if (args(idx) == false) {
-          acc = true
-        }
-        idx += 1
-      }
-      if (acc) {
-        1.0
-      }
-      else {
-        0.0
-      }
+      // var acc = args(nargs - 1)
+      // var idx = 0
+      // while ((idx < nargs - 1)&&(acc == false)) {
+      //   if (args(idx) == false) {
+      //     acc = true
+      //   }
+      //   idx += 1
+      // }
+      // if (acc) {
+      //   1.0
+      // }
+      // else {
+      //   0.0
+      // }
+      0.0
     }
     else if (ffx == 1) { // OR
-      var acc = false
-      var idx = 0
-      while ((idx < nargs)&&(acc == false)) {
-        acc = args(idx)
-        idx += 1
-      }
-      if (acc) {
-        1.0
-      }
-      else {
-        0.0
-      }
+      // var acc = false
+      // var idx = 0
+      // while ((idx < nargs)&&(acc == false)) {
+      //   acc = args(idx)
+      //   idx += 1
+      // }
+      // if (acc) {
+      //   1.0
+      // }
+      // else {
+      //   0.0
+      // }
+      0.0
     }
     else if (ffx == 2) { // AND
-      var acc = true
-      var idx = 0
-      while ((idx < nargs)&&(acc == true)) {
-        acc = args(idx)
-        idx += 1
-      }
-      if (acc) {
-        1.0
-      }
-      else {
-        0.0
-      }
+      // var acc = true
+      // var idx = 0
+      // while ((idx < nargs)&&(acc == true)) {
+      //   acc = args(idx)
+      //   idx += 1
+      // }
+      // if (acc) {
+      //   1.0
+      // }
+      // else {
+      //   0.0
+      // }
+      0.0
     }
     else if (ffx == 3) { // EQUAL
       if(nargs == 2) {
@@ -108,46 +111,48 @@ trait DDGibbsSemantics extends OptiMLApplication {
       }
     }
     else if (ffx == 4) { // ISTRUE
-      if (nargs == 1) {
-        if (args(0)) {
-          1.0
-        }
-        else {
-          0.0
-        }
-      }
-      else {
-        println("error: istrue factor function cannot contain " + nargs + " arguments")
-        exit(-1)
-        0.0
-      }
+      // if (nargs == 1) {
+      //   if (args(0)) {
+      //     1.0
+      //   }
+      //   else {
+      //     0.0
+      //   }
+      // }
+      // else {
+      //   println("error: istrue factor function cannot contain " + nargs + " arguments")
+      //   exit(-1)
+      //   0.0
+      // }
+      0.0
     }
     else if (ffx == 8) { //RATIO
       val bhead = args(nargs - 1)
       var acc = 0.0
       var idx = 0
       while (idx < nargs - 1) {
-        if (args(idx)) {
+        if (args(idx) == bhead) {
           acc += 1.0
         }
         idx += 1
       }
-      if (nargs == 1) {
-        if (bhead) {
-          1.0
-        }
-        else {
-          -1.0
-        }
-      }
-      else {
-        if (bhead) {
-          5 * semantic_function(acc)
-        }
-        else {
-          -5 * semantic_function(acc)
-        }
-      }
+      semantic_function(acc)
+      // if (nargs == 1) {
+      //   if (bhead) {
+      //     1.0
+      //   }
+      //   else {
+      //     -1.0
+      //   }
+      // }
+      // else {
+      //   if (bhead) {
+      //     5 * semantic_function(acc)
+      //   }
+      //   else {
+      //     -5 * semantic_function(acc)
+      //   }
+      // }
     }
     else {
       println("error: invalid factor function " + ffx)

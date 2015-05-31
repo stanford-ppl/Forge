@@ -191,7 +191,7 @@ trait DDGibbsErr extends OptiMLApplication {
     w * z
   }
 
-  def sampleVariable(G: Rep[DDFactorGraph], v: Rep[Int]): Rep[Boolean] = {
+  def sampleVariable(G: Rep[DDFactorGraph], v: Rep[Int]): Rep[Double] = {
     val dw: Rep[Double] = G.v2f.ngbrNodes(v).map({ f =>
       val w0 = evalFactorUnder(G, f, v, false)
       val w1 = evalFactorUnder(G, f, v, true)
@@ -199,10 +199,9 @@ trait DDGibbsErr extends OptiMLApplication {
     }).sum
 
     val pp = 1.0 / (1.0 + exp(-dw))
-    println(pp)
     val newValue: Rep[Boolean] = (random[Double] <= pp)
     G.variableValue(v) = newValue
-    newValue
+    pp
   }
 
   def randomizeVariables(G: Rep[DDFactorGraph]) = {
@@ -258,7 +257,7 @@ trait DDGibbsErr extends OptiMLApplication {
       for (iv <- 0::G.nonEvidenceVariables.length) {
         for (im <- 0::numModels) {
           val v = graphs(im).nonEvidenceVariables.apply(iv)
-          marginalsAcc(im, iv) = marginalsAcc(im, iv) + (if (sampleVariable(graphs(im), v)) 1.0 else 0.0)
+          marginalsAcc(im, iv) = marginalsAcc(im, iv) + sampleVariable(graphs(im), v) //(if (sampleVariable(graphs(im), v)) 1.0 else 0.0)
         }
       }
 

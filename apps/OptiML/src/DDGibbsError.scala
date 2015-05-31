@@ -201,7 +201,7 @@ trait DDGibbsErr extends OptiMLApplication {
     val pp = 1.0 / (1.0 + exp(-dw))
     val newValue: Rep[Boolean] = (random[Double] <= pp)
     G.variableValue(v) = newValue
-    pp
+    if (newValue) { 1.0 } else { 0.0 }
   }
 
   def randomizeVariables(G: Rep[DDFactorGraph]) = {
@@ -263,7 +263,6 @@ trait DDGibbsErr extends OptiMLApplication {
 
       errs(sampleCt) =  ((0::G.nonEvidenceVariables.length) map { iv =>
         ((sum(0, numModels) { im =>
-          println(marginalsAcc(im, iv))
           val dd: Rep[Double] = (marginalsAcc(im, iv) / (sampleCt + 1.0)) - 0.5 //goldMarginals(iv) 
           dd * dd
         }) / numModels)

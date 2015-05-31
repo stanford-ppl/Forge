@@ -198,7 +198,9 @@ trait DDGibbsErr extends OptiMLApplication {
       w1 - w0
     }).sum
 
-    val newValue: Rep[Boolean] = ((random[Double] * (1.0 + exp(-dw))) <= 1.0)
+    val pp = 1.0 / (1.0 + exp(-dw))
+    println(pp)
+    val newValue: Rep[Boolean] = (random[Double] <= pp)
     G.variableValue(v) = newValue
     newValue
   }

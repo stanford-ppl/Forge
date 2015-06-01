@@ -45,9 +45,9 @@ trait CGenProfilingOps extends CGenEffect {
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case ForgeProfileStart(c,deps) =>
-      stream.println("DeliteCppTimerStart(resourceInfo->threadId," + quote(c) + ", false);")
+      stream.println("DeliteCppTimerTic(" + quote(c.c_str()) + ")")
     case ForgeProfileStop(c,deps) =>
-      stream.println("DeliteCppTimerStop(resourceInfo->threadId," + quote(c) + ");")
+      stream.println("DeliteCppTimerToc(" + quote(c.c_str()) + ");")
     case ForgeProfileTime(deps) =>
       stream.println("struct timeval _" + quote(sym) + ";")
       stream.println("gettimeofday(&_" + quote(sym) + ", NULL);")

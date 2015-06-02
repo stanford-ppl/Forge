@@ -17,9 +17,9 @@ object ComplexMathRunnerC extends ForgeTestRunnerCompiler with OptiMLApplication
 object ComplexMathRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with ComplexMath
 trait ComplexMath extends ForgeTestModule with OptiMLApplication {
   def main() = {
-    val a = Complex(5,2) 
-    val b = Complex(3,-11) 
-     
+    val a = Complex(5,2)
+    val b = Complex(3,-11)
+
     val c1 = a+b
     collect(c1 == Complex(8,-9))
     val c2 = a-b
@@ -34,14 +34,14 @@ trait ComplexMath extends ForgeTestModule with OptiMLApplication {
     collect(abs(c5.imag)-134.951704 < .01)
     val c6 = a.log
     collect(abs(c6.real)-1.68365 < .01)
-    collect(abs(c6.imag)-0.38051 < .01)    
+    collect(abs(c6.imag)-0.38051 < .01)
     val c7 = a.abs
     collect(abs(c7.real)-5.385165 < .01)
     val c8 = a.conj
     collect(c8 == Complex(5,-2))
-    
-    val m = DenseMatrix(((Complex(3,1),Complex(5,0),Complex(0,-2))),((Complex(2,-2),Complex(0,1),Complex(-7,-13))))
-    val delta = (m.t.map(_.conj) - DenseMatrix(((Complex(3,-1),Complex(2,2))), ((Complex(5,-0), Complex(0,-1))), ((Complex(0,2), Complex(-7,13)))))
+
+    val m = DenseMatrix(DenseVector(Complex(3,1),Complex(5,0),Complex(0,-2)),DenseVector(Complex(2,-2),Complex(0,1),Complex(-7,-13)))
+    val delta = (m.t.map(_.conj) - DenseMatrix(DenseVector(Complex(3,-1),Complex(2,2)), DenseVector(Complex(5,-0), Complex(0,-1)), DenseVector(Complex(0,2), Complex(-7,13))))
     collect(sum(abs(delta)).real < .01)
 
     mkReport

@@ -85,10 +85,10 @@ trait IndexVectorConstruct2 extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
 		val x = (0::10, *) { i => DenseVector.ones(2) * i	}
-		collect(x == DenseMatrix((0.,0.), (1.,1.), (2.,2.), (3.,3.), (4.,4.), (5.,5.), (6., 6.), (7.,7.), (8.,8.), (9.,9.)))
+		collect(x == DenseMatrix(DenseVector(0.0,0.0), DenseVector(1.0,1.0), DenseVector(2.0,2.0), DenseVector(3.0,3.0), DenseVector(4.0,4.0), DenseVector(5.0,5.0), DenseVector(6.0, 6.0), DenseVector(7.0,7.0), DenseVector(8.0,8.0), DenseVector(9.0,9.0)))
 
 		val y = (0::2, 0::3) { (i,j) =>	i*j	}
-		collect(y == DenseMatrix((0,0,0),(0,1,2)))
+		collect(y == DenseMatrix(DenseVector(0,0,0),DenseVector(0,1,2)))
 
     mkReport
   }

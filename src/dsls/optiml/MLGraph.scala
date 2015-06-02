@@ -82,7 +82,7 @@ trait MLGraphOps {
       infix ("ngbrs") (MInt :: DenseVector(CSRNgbr)) implements composite ${
         val eidx = array_apply(csrgraph_get_nodes($self), $1)
         val fidx = array_apply(csrgraph_get_nodes($self), $1 + unit(1))
-        densevector_fromfunc(fidx - eidx, i => CSRNgbr(eidx + i, array_apply(csrgraph_get_edges($self), eidx + i)) )
+        densevector_fromfunc(fidx - eidx, unit(true), i => CSRNgbr(eidx + i, array_apply(csrgraph_get_edges($self), eidx + i)) )
       }
 
       infix ("deepcopy") (Nil :: CSRGraph) implements composite ${

@@ -4,24 +4,23 @@ package optiml
 
 import core.{ForgeApplication,ForgeApplicationRunner}
 
-// DeepDive/DimmWitted factor graph
-trait DDFactorGraphOps {
+trait FactorGraphOps {
   this: OptiMLDSL =>
 
-  def importAllDDFactorGraphOps() {
-    importDDFactorGraphOps()
-    importDDFactorGraphFileOps()
-    importDDFactorGraphLoaderOps()
-    importDDFactorGraphReplicateHackOps()
+  def importAllFactorGraphOps() {
+    importFactorGraphOps()
+    importFactorGraphFileOps()
+    importFactorGraphLoaderOps()
+    importFactorGraphReplicateHackOps()
   }
 
-  def importDDFactorGraphOps() {
+  def importFactorGraphOps() {
     val DenseVector = lookupTpe("DenseVector")
     val DenseVectorView = lookupTpe("DenseVectorView")
     val CSRGraph = lookupTpe("CSRGraph")
-    val DDFactorGraph = tpe("DDFactorGraph")
+    val FactorGraph = tpe("FactorGraph")
 
-    data(DDFactorGraph,
+    data(FactorGraph,
       ("_v2f", CSRGraph), 
       ("_f2v", CSRGraph), 
       ("_weightValue", DenseVector(MDouble)), 
@@ -34,7 +33,7 @@ trait DDFactorGraphOps {
       ("_nonEvidenceVariables", DenseVector(MInt))
     )
 
-    static (DDFactorGraph) ("apply", Nil, MethodSignature(List(
+    static (FactorGraph) ("apply", Nil, MethodSignature(List(
       ("v2f", CSRGraph), 
       ("f2v", CSRGraph), 
       ("weightValue", DenseVector(MDouble)), 
@@ -45,11 +44,11 @@ trait DDFactorGraphOps {
       ("factorFunction", DenseVector(MInt)),
       ("edgeIsPositiveF2V", DenseVector(MBoolean)),
       ("nonEvidenceVariables", DenseVector(MInt))
-    ), DDFactorGraph)) implements
-      allocates(DDFactorGraph, ${$0}, ${$1}, ${$2}, ${$3}, ${$4}, ${$5}, ${$6}, ${$7}, ${$8}, ${$9})
+    ), FactorGraph)) implements
+      allocates(FactorGraph, ${$0}, ${$1}, ${$2}, ${$3}, ${$4}, ${$5}, ${$6}, ${$7}, ${$8}, ${$9})
 
-    val DDFactorGraphOps = withTpe(DDFactorGraph)
-    DDFactorGraphOps {
+    val FactorGraphOps = withTpe(FactorGraph)
+    FactorGraphOps {
       infix ("v2f") (Nil :: CSRGraph) implements getter(0, "_v2f")
       infix ("f2v") (Nil :: CSRGraph) implements getter(0, "_f2v")
 
@@ -85,8 +84,8 @@ trait DDFactorGraphOps {
 
       infix ("nonEvidenceVariables") (Nil :: DenseVector(MInt)) implements getter(0, "_nonEvidenceVariables")
 
-      infix ("mutable") (Nil :: DDFactorGraph) implements composite ${
-        DDFactorGraph(
+      infix ("mutable") (Nil :: FactorGraph) implements composite ${
+        FactorGraph(
           $self.v2f,
           $self.f2v,
           $self.weightValue.mutable(),
@@ -100,8 +99,8 @@ trait DDFactorGraphOps {
         )
       }
 
-      infix ("mutableWeights") (Nil :: DDFactorGraph) implements composite ${
-        DDFactorGraph(
+      infix ("mutableWeights") (Nil :: FactorGraph) implements composite ${
+        FactorGraph(
           $self.v2f,
           $self.f2v,
           $self.weightValue.mutable(),
@@ -115,8 +114,8 @@ trait DDFactorGraphOps {
         )
       }
 
-      infix ("mutableVariables") (Nil :: DDFactorGraph) implements composite ${
-        DDFactorGraph(
+      infix ("mutableVariables") (Nil :: FactorGraph) implements composite ${
+        FactorGraph(
           $self.v2f,
           $self.f2v,
           $self.weightValue,
@@ -130,8 +129,8 @@ trait DDFactorGraphOps {
         )
       }
 
-      infix ("deepcopy") (Nil :: DDFactorGraph) implements composite ${
-        DDFactorGraph(
+      infix ("deepcopy") (Nil :: FactorGraph) implements composite ${
+        FactorGraph(
           $self.v2f.deepcopy,
           $self.f2v.deepcopy,
           $self.weightValue.Clone,
@@ -147,7 +146,7 @@ trait DDFactorGraphOps {
     }
   }
 
-  def importDDFactorGraphFileOps() {
+  def importFactorGraphFileOps() {
     val DDFGFWeight = tpe("DDFGFWeight")
     val DDFGFVariable = tpe("DDFGFVariable")
     val DDFGFFactor = tpe("DDFGFFactor")
@@ -233,10 +232,10 @@ trait DDFactorGraphOps {
     }
   }
 
-  def importDDFactorGraphLoaderOps() {
+  def importFactorGraphLoaderOps() {
     val DenseVector = lookupTpe("DenseVector")
     val CSRGraph = lookupTpe("CSRGraph")
-    val DDFactorGraph = lookupTpe("DDFactorGraph")
+    val FactorGraph = lookupTpe("FactorGraph")
     val DDFGFWeight = lookupTpe("DDFGFWeight")
     val DDFGFVariable = lookupTpe("DDFGFVariable")
     val DDFGFFactor = lookupTpe("DDFGFFactor")
@@ -331,7 +330,7 @@ trait DDFactorGraphOps {
     // ("edgeIsPositiveF2V", DenseVector(MBoolean)),
     // ("nonEvidenceVariables", DenseVector(MInt))
 
-    direct (IO) ("readDDFactorGraph", Nil, MethodSignature(List(("factorsPath", MString), ("variablesPath", MString), ("weightsPath", MString), ("edgesPath", MString)), DDFactorGraph)) implements composite ${
+    direct (IO) ("readFactorGraph", Nil, MethodSignature(List(("factorsPath", MString), ("variablesPath", MString), ("weightsPath", MString), ("edgesPath", MString)), FactorGraph)) implements composite ${
       val factorsRaw = ddfg_read_factors($factorsPath)
       val variablesRaw = ddfg_read_variables($variablesPath)
       val weightsRaw = ddfg_read_weights($weightsPath)
@@ -398,7 +397,7 @@ trait DDFactorGraphOps {
         eidx += unit(1)
       }
 
-      DDFactorGraph(
+      FactorGraph(
         CSRGraph(v2fnodes.unsafeImmutable, v2fedges.unsafeImmutable),
         CSRGraph(f2vnodes.unsafeImmutable, f2vedges.unsafeImmutable),
         weightValue.unsafeImmutable,
@@ -413,37 +412,40 @@ trait DDFactorGraphOps {
     }
   }
 
-  def importDDFactorGraphReplicateHackOps() {
-    val DenseVector = lookupTpe("DenseVector")
-    val DenseVectorView = lookupTpe("DenseVectorView")
-    val CSRGraph = lookupTpe("CSRGraph")
-    val DDFactorGraph = lookupTpe("DDFactorGraph")
-    val DDFactorGraphReplicated = tpe("DDFactorGraphReplicated")
+  def importFactorGraphReplicateHackOps() {
+    val FactorGraph = lookupTpe("FactorGraph")
+    val T = tpePar("T")
+    val Replicated = tpe("Replicated", T)
 
     val Control = grp("Control")
 
-    data(DDFactorGraphReplicated,
-      ("_copies", DenseVector(DDFactorGraph))
-    )
+    data(Replicated, ("_copies", MArray(T)))
 
-    static (DDFactorGraphReplicated) ("apply", Nil, DenseVector(DDFactorGraph) :: DDFactorGraphReplicated) implements
-      allocates(DDFactorGraphReplicated, ${$0})
+    static (Replicated) ("apply", T, MArray(T) :: Replicated(T)) implements allocates(Replicated, ${$0})
 
-    val DDFactorGraphReplicatedOps = withTpe(DDFactorGraphReplicated)
-    DDFactorGraphReplicatedOps {
-      compiler ("ddfgr_get_copies") (Nil :: DenseVector(DDFactorGraph)) implements getter(0, "_copies")
+    fimplicit (Replicated) ("readLocal", T, (("r", Replicated(T)) :: T)) implements redirect ${ r.local }
 
-      infix ("local") (Nil :: DDFactorGraph) implements composite ${
-        val socketId = 0
-        ddfgr_get_copies($self).apply(socketId)
+    val ReplicatedOps = withTpe(Replicated)
+    ReplicatedOps {
+      compiler ("get_copies") (Nil :: MArray(T)) implements getter(0, "_copies")
+
+      infix ("local") (Nil :: T) implements composite ${
+        val socketId = getSocket
+        array_apply(get_copies($self), socketId)
       }
     }
 
-    direct (Control) ("replicate", Nil, DDFactorGraph :: DDFactorGraphReplicated) implements composite ${
-      val numSockets = 1
-      DDFactorGraphReplicated((0::numSockets).map({ isocket =>
-        $0.deepcopy
-      }))
+    val getSocket = direct (Control) ("getSocket", Nil, Nil :: MInt)
+    getSocket implements codegen($cala, { "0" })
+    getSocket implements codegen(cpp, { "resourceInfo->socketId" })
+
+    val getNumSockets = direct (Control) ("getNumSockets", Nil, Nil :: MInt)
+    getNumSockets implements codegen($cala, { "1" })
+    getNumSockets implements codegen(cpp, { "resourceInfo->numSockets" })
+
+    direct (Control) ("replicate", Nil, FactorGraph :: Replicated(FactorGraph)) implements composite ${
+      val numSockets = getNumSockets
+      Replicated(array_fromfunction(numSockets, isocket => $0.deepcopy))
     }
   }
 }

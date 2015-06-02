@@ -299,7 +299,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
           stream.print("  "+makeDefWithOverride(o)+" " + o.name + makeTpeParsWithBounds(otherTpePars))
           //stream.print("(" + o.args/*.drop(1)*/.map(t => t.name + ": " + repify(t.tpe) + " = " + unit(t.default)).mkString(",") + ")") TODO
           stream.print("(" + o.args.drop(1).map(t => argify(t, repify)).mkString(",") + ")")
-          stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars diff otherTpePars, without = data.tpe.tpePars))
+          stream.print(makeImplicitArgsWithCtxBoundsWithType(o.tpePars diff otherTpePars, o.args, o.implicitArgs, without = data.tpe.tpePars))
           stream.println(" = {")
           emitWithIndent("val " + o.args.apply(0).name + " = this", stream, 4)
           emitOp(o, stream, indent=4)

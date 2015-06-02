@@ -2,13 +2,13 @@ import optiml.compiler._
 import optiml.library._
 import optiml.shared._
 
-object DDGibbsCompiler extends OptiMLApplicationCompiler with DDGibbs
-object DDGibbsInterpreter extends OptiMLApplicationInterpreter with DDGibbs
+object GibbsCompiler extends OptiMLApplicationCompiler with Gibbs
+object GibbsInterpreter extends OptiMLApplicationInterpreter with Gibbs
 
-trait DDGibbs extends OptiMLApplication {
+trait Gibbs extends OptiMLApplication {
 
   def print_usage = {
-    println("Usage: DDGibbs <factors file> <variables file> <weights file> <edges file> <num samples> <num models> <num weight iterations> <num weight samples> <learning rate> <regularization constant> <diminish rate>")
+    println("Usage: Gibbs <factors file> <variables file> <weights file> <edges file> <num samples> <num models> <num weight iterations> <num weight samples> <learning rate> <regularization constant> <diminish rate>")
     exit(-1)
   }
 
@@ -69,7 +69,7 @@ trait DDGibbs extends OptiMLApplication {
     }
   }
 
-  def readFVUnder(G: Rep[DDFactorGraph], f: Rep[Int], v: Rep[Int], x: Rep[Boolean], idx: Rep[Int]): Rep[Boolean] = {
+  def readFVUnder(G: Rep[FactorGraph], f: Rep[Int], v: Rep[Int], x: Rep[Boolean], idx: Rep[Int]): Rep[Boolean] = {
     val ie = G.f2v.ngbrEdges(f).apply(idx)
     val iv = G.f2v.edges.apply(ie)
 
@@ -88,7 +88,7 @@ trait DDGibbs extends OptiMLApplication {
     }
   }
 
-  def readFV(G: Rep[DDFactorGraph], f: Rep[Int], idx: Rep[Int]): Rep[Boolean] = {
+  def readFV(G: Rep[FactorGraph], f: Rep[Int], idx: Rep[Int]): Rep[Boolean] = {
     val ie = G.f2v.ngbrEdges(f).apply(idx)
     val iv = G.f2v.edges.apply(ie)
 
@@ -102,7 +102,7 @@ trait DDGibbs extends OptiMLApplication {
     }
   }
 
-  def evalFactorUnder(G: Rep[DDFactorGraph], f: Rep[Int], v: Rep[Int], x: Rep[Boolean]): Rep[Double] = {
+  def evalFactorUnder(G: Rep[FactorGraph], f: Rep[Int], v: Rep[Int], x: Rep[Boolean]): Rep[Double] = {
     val nvars = G.f2v.ngbrEdges(f).length
     val ffx = G.factorFunction.apply(f)
 
@@ -118,7 +118,7 @@ trait DDGibbs extends OptiMLApplication {
     }
   }
 
-  def evalFactorDiff(G: Rep[DDFactorGraph], f: Rep[Int]): Rep[Double] = {
+  def evalFactorDiff(G: Rep[FactorGraph], f: Rep[Int]): Rep[Double] = {
     val nvars = G.f2v.ngbrEdges(f).length
     val ffx = G.factorFunction.apply(f)
 
@@ -132,7 +132,7 @@ trait DDGibbs extends OptiMLApplication {
     }
   }
 
-  def sampleVariable(G: Rep[DDFactorGraph], v: Rep[Int]): Rep[Boolean] = {
+  def sampleVariable(G: Rep[FactorGraph], v: Rep[Int]): Rep[Boolean] = {
     val dw: Rep[Double] = G.v2f.ngbrNodes(v).map({ f =>
       val w0 = evalFactorUnder(G, f, v, false)
       val w1 = evalFactorUnder(G, f, v, true)
@@ -144,7 +144,7 @@ trait DDGibbs extends OptiMLApplication {
     newValue
   }
 
-  def sampleFactors(G: Rep[DDFactorGraph], vars: Rep[DenseVector[Int]], factors: Rep[DenseVector[Int]], numSamples: Rep[Int]): Rep[DenseVector[Double]] = {
+  def sampleFactors(G: Rep[FactorGraph], vars: Rep[DenseVector[Int]], factors: Rep[DenseVector[Int]], numSamples: Rep[Int]): Rep[DenseVector[Double]] = {
     var sampleCt = 0
     var acc = DenseVector.zeros(factors.length)
     while (sampleCt < numSamples) {
@@ -158,7 +158,7 @@ trait DDGibbs extends OptiMLApplication {
     acc / numSamples
   }
 
-  def learnWeights(G: Rep[DDFactorGraph], numIterations: Rep[Int], numSamples: Rep[Int], learningRate: Rep[Double], regularizationConstant: Rep[Double], diminishRate: Rep[Double]): Rep[DDFactorGraph] = {
+  def learnWeights(G: Rep[FactorGraph], numIterations: Rep[Int], numSamples: Rep[Int], learningRate: Rep[Double], regularizationConstant: Rep[Double], diminishRate: Rep[Double]): Rep[FactorGraph] = {
 
     println("")
     println("learning weights...")
@@ -231,7 +231,7 @@ trait DDGibbs extends OptiMLApplication {
     val learningRate = args(8).toDouble
     val regularizationConstant = args(9).toDouble
     val diminishRate = args(10).toDouble
-    val G = readDDFactorGraph(args(0), args(1), args(2), args(3))
+    val G = readFactorGraph(args(0), args(1), args(2), args(3))
     toc("io", G)
 
     println("finished reading factor graph")

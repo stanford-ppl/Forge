@@ -14,14 +14,9 @@ trait MLIOOps {
     importARFFOps()
   }
 
-  def importFactorIOOps() {  
+  def importFactorIOOps() {
     val T = tpePar("T")
     val DenseVector = lookupTpe("DenseVector")
-    // val FactorGraph = lookupTpe("FactorGraph")
-    // val Weight = lookupTpe("Weight")
-    // val FactorVariable = lookupTpe("FactorVariable")
-    // val Variable = lookupTpe("RandomVariable")
-    // val FunctionFactor = lookupTpe("FunctionFactor")
     val Tup3 = lookupTpe("Tup3")
     val Tup4 = lookupTpe("Tup4")
 
@@ -61,10 +56,8 @@ trait MLIOOps {
       $0.readBoolean()
     })
 
-    // -- input
-
     ()
-  
+
   }
 
   def importARFFOps() {
@@ -75,7 +68,7 @@ trait MLIOOps {
   	  // INVESTIGATE: lines and start computations, and body and map computations, fuse unsafely without .mutable
   	  // the latter appears to be the bug of not having the filter condition properly guard the subsequent computation
   	  val lines = densevector_fromarray(ForgeFileReader.readLines($path){ line => line.trim }, true).mutable
-  	  
+
   	  // skip past the header to the data section
       // since we are using schemaBldr, we don't care about the attribute types
   	  val start = lines find { _ == "@DATA" }

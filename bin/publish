@@ -11,7 +11,7 @@ import fileinput
 
 FORGE_HOME = os.getenv("FORGE_HOME")
 FORGE_GENERATED = "build" # TODO
-SCALA_MAJOR_VERS = "2.10"
+SCALA_MAJOR_VERS = "2.11"
 SCALA_MINOR_VERS = "2"
 
 def err(s):
@@ -68,11 +68,12 @@ object ${dslName}Build extends Build {
     organization := "stanford-ppl",
     scalaOrganization := "org.scala-lang.virtualized",
     scalaVersion := virtScala,
+
     publishArtifact in (Compile, packageDoc) := false,
     // needed for scala.tools, which is apparently not included in sbt's built in version
     libraryDependencies += "org.scala-lang.virtualized" % "scala-library" % virtScala,
     libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % virtScala,
-    libraryDependencies += "org.scalatest" % "scalatest_${scala_major_vers}" % "2.1.2",
+    libraryDependencies += "org.scalatest" % "scalatest_${scala_major_vers}" % "2.2.2",
     libraryDependencies += "com.google.guava" % "guava" % "17.0",
     libraryDependencies += "org.apache.commons" % "commons-math" % "2.2",
     libraryDependencies += "commons-io" % "commons-io" % "2.4",
@@ -156,7 +157,12 @@ def sbtBuildFileFooter(dsl):
   lazy val ${dslName}Tests = Project("${dslName}-tests", file("tests"), settings = virtBuildSettingsBase ++ deps ++ Seq(
     scalaSource in Test <<= baseDirectory(_ / "src"),
     parallelExecution in Test := false,
-    concurrentRestrictions in Test += Tags.limitAll(1) // don't run anything in parallel
+    concurrentRestrictions in Test += Tags.limitAll(1), // don't run anything in parallel
+    // Required to use native libraries within tests
+    // See http://stackoverflow.com/questions/19425613/unsatisfiedlinkerror-with-native-library-under-sbt
+    // and http://www.scala-sbt.org/release/docs/Forking.html
+    fork := true,
+    javaOptions in Test := sys.env.getOrElse("SBT_OPTS", "").split(" ")
   )) dependsOn(${dslName}Comp, ${dslName}Lib)
 }
 """)

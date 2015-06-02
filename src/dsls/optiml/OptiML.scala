@@ -8,9 +8,10 @@ import optila.OptiLADSL
 object OptiMLDSLRunner extends ForgeApplicationRunner with OptiMLDSL
 
 trait OptiMLDSL extends OptiLADSL
-  with MLIOOps with FeatureOps with SetOps with BufferableOps with StreamOps with ImageOps
-  with MLGraphOps with DDFactorGraphOps
-  with ClassifierOps with ValidateOps with TreeOps {
+  with MLIOOps with FeatureOps with SetOps with StreamOps with ImageOps with TreeOps
+  with MLGraphOps with FactorGraphOps
+  with ClassifierOps with ValidateOps
+  with BufferableOps with TrainingSetLikeOps {
 
   override def dslName = "OptiML"
 
@@ -26,54 +27,65 @@ trait OptiMLDSL extends OptiLADSL
     // compiler (whileDo) lookupImpl("Misc","__whileDo").apply(0)
     // impl (whileDo) (composite ${ fatal("illegal operation: 'while'. try using 'untilconverged' instead") })
 
+    // OptiML types
+    val V = tpePar("V")
+    val T = tpePar("T")
+    val HashStream = tpe("HashStream", V)
+    val FileStream = tpe("FileStream")
+    val ComputeStream = tpe("ComputeStream", T)
+
+    // OptiML ops
+    importSetOps()
+    importTrainingSetLikeOps()
+    importByteBuffer()
     extern(grp("Sum"))
     importBufferableOps()
     importFeatureOps()
-    importSetOps()
+    importFeatureHelperOps()
     importUntilConverged()
     importAllGraphOps()
-    importAllDDFactorGraphOps()
+    importAllFactorGraphOps()
     importMLIOOps()
     importStreamOps()
-    importImageOps()    
+    importImageOps()
+    importTreeOps()
     importClassifierOps()
     importValidateOps()
-    importTreeOps()
   }
 
   def importUntilConverged() {
-    // pull in distance metrics
-    importDistanceMetrics()
-
     val Control = grp("Control")
     val T = tpePar("T")
 
     // "block" should not mutate the input, but always produce a new copy. in this version, block can change the structure of the input across iterations (e.g. increase its size)
-    direct (Control) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, "unit(.001)"), ("minIter", MInt, "unit(1)"), ("maxIter", MInt, "unit(1000)")), ("block", T ==> T)), T), ("diff", (T,T) ==> MDouble)) implements composite ${
+    direct (Control) ("untilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, "unit(.001)"), ("minIter", MInt, "unit(1)"), ("maxIter", MInt, "unit(1000)"), ("verbose", MBoolean, "unit(false)")), ("block", (T,MInt) ==> T)), T), ("diff", (T,T) ==> MDouble)) implements composite ${
       var delta = scala.Double.MaxValue
       var cur = x
       var iter = 0
 
       while ((abs(delta) > tol && iter < maxIter) || iter < minIter) {
         val prev = cur
-        val next = block(cur)
+        val next = block(cur, iter)
+        delta = diff(prev, next)
+        if (verbose) println("[optiml]: iter " + iter + ", delta: " + delta)
         iter += 1
-        delta = diff(prev,next)
         cur = next
       }
 
-      if (iter == maxIter){
-        println("[optiml]: maximum iterations (" + iter + ") exceeded")
+      if (verbose) {
+        if (iter == maxIter) {
+          println("[optiml]: maximum iterations (" + iter + ") exceeded")
+        }
+        else {
+          println("[optiml]: converged in " + iter + " iterations")
+        }
       }
-      else {
-        println("[optiml]: converged in " + iter + " iterations")
-      }
-      
+
       cur
     }
 
     // this is a convenience method that allows a user to override the 'diff' function without explicitly passing other implicits
-    direct (Control) ("untilconverged_withdiff", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, "unit(.001)"), ("minIter", MInt, "unit(1)"), ("maxIter", MInt, "unit(1000)")), ("block", T ==> T), ("diff", (T,T) ==> MDouble)), T)) implements redirect ${
+    direct (Control) ("untilconverged_withdiff", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, "unit(.001)"), ("minIter", MInt, "unit(1)"), ("maxIter", MInt, "unit(1000)")), ("block", (T,MInt) ==> T), ("diff", (T,T) ==> MDouble)), T)) implements redirect ${
       untilconverged(x, tol, minIter, maxIter)(block)(manifest[T], implicitly[SourceContext], diff)
     }
 
@@ -116,41 +128,5 @@ trait OptiMLDSL extends OptiLADSL
       bufA
     }
 
-  }
-
-  def importDistanceMetrics() {
-    val DenseVector = lookupTpe("DenseVector")
-    val DenseVectorView = lookupTpe("DenseVectorView")
-    val DenseMatrix = lookupTpe("DenseMatrix")
-    val SparseVector = lookupTpe("SparseVector")
-
-    // val Arith = lookupGrp("Arith")
-    val Prim = lookupGrp("Primitive")
-    val T = tpePar("T")
-
-    // default metric is ABS
-
-    // don't kick in when polymorphic, for unknown reasons
-    // fimplicit (DenseVector) ("dist", T, (DenseVector(T),DenseVector(T)) :: MDouble, ("conv", T ==> MDouble)) implements composite ${ sum(abs($0.toDouble - $1.toDouble)) }
-    // fimplicit (DenseMatrix) ("dist", T, (DenseMatrix(T),DenseMatrix(T)) :: MDouble, ("conv", T ==> MDouble)) implements composite ${ sum(abs($0.toDouble - $1.toDouble)) }
-    fimplicit (Prim) ("dist", Nil, (MInt,MInt) :: MDouble) implements composite ${ abs($0-$1) }
-    fimplicit (Prim) ("dist", Nil, (MDouble,MDouble) :: MDouble) implements composite ${ abs($0-$1) }
-
-    val DMetric = tpe("DistanceMetric", stage = compile)
-    identifier (DMetric) ("ABS")
-    identifier (DMetric) ("SQUARE")
-    identifier (DMetric) ("EUC")
-
-    for (TP <- List(DenseVector,DenseVectorView,DenseMatrix,SparseVector)) {
-      fimplicit (TP) ("dist", Nil, (TP(MDouble),TP(MDouble)) :: MDouble) implements redirect ${ dist($0,$1,ABS) }
-
-      direct (TP) ("dist", Nil, (TP(MDouble),TP(MDouble),DMetric) :: MDouble) implements composite ${
-        $2 match {
-          case ABS => sum(abs($0 - $1))
-          case SQUARE => sum(square($0 - $1))
-          case EUC => sqrt(sum(square($0 - $1)))
-        }
-      }
-    }
   }
 }

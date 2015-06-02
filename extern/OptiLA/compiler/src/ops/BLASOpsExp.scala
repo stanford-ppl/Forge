@@ -73,7 +73,14 @@ trait BLASOpsExp extends BLASOps with DenseMatrixOpsExp {
   }
 
   override def densematrix_matvecmult[T:Manifest](self: Rep[DenseMatrix[T]],__arg0: Rep[DenseVector[T]])(implicit __pos: SourceContext,__imp0: Arith[T]): Rep[DenseVector[T]] = {
-    if (useBLAS && Config.useBlas && (manifest[T] == manifest[Double] || manifest[T] == manifest[Float])) densevector_fromarray(Native_matTimesVec(self.numRows,self.numCols,densematrix_raw_data(self),densevector_raw_data(__arg0)),unit(false))
+    if (useBLAS && Config.useBlas && (manifest[T] == manifest[Double] || manifest[T] == manifest[Float])) {
+      if (densematrix_size(self) > MIN_SIZE && densevector_length(__arg0) > MIN_SIZE) {
+        densevector_fromarray(Native_matTimesVec(self.numRows,self.numCols,densematrix_raw_data(self),densevector_raw_data(__arg0)),unit(false))
+      }
+      else {
+        super.densematrix_matvecmult(self,__arg0)
+      }
+    }
     else super.densematrix_matvecmult(self,__arg0)
   }
 

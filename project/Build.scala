@@ -4,9 +4,9 @@ import Keys._
 import forge.preprocessor._
 
 object ForgeBuild extends Build with ForgePreprocessor {
-  val virtScala = Option(System.getenv("SCALA_VIRTUALIZED_VERSION")).getOrElse("2.10.2")
-  val virtualization_lms_core = "EPFL" % "lms_2.10" % "0.3-SNAPSHOT"
-  val scalaTest = "org.scalatest" % "scalatest_2.10" % "2.1.2"
+  val virtScala = Option(System.getenv("SCALA_VIRTUALIZED_VERSION")).getOrElse("2.11.2")
+  val virtualization_lms_core = "EPFL" % "lms_2.11" % "0.3-SNAPSHOT"
+  val scalaTest = "org.scalatest" % "scalatest_2.11" % "2.2.2"
 
   System.setProperty("showSuppressedErrors", "false")
 

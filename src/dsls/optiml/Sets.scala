@@ -9,40 +9,48 @@ trait SetOps {
 
   def importSetOps() {
     val DenseMatrix = lookupTpe("DenseMatrix")
+    val SparseMatrix = lookupTpe("SparseMatrix")
     val DenseVector = lookupTpe("DenseVector")
     val DenseVectorView = lookupTpe("DenseVectorView")
+    val SparseVectorView = lookupTpe("SparseVectorView")
     val IndexVector = lookupTpe("IndexVector")
 
     val D = tpePar("D")
     val L = tpePar("L")
 
-    val TrainingSet = tpe("TrainingSet", (D,L))
-    data(TrainingSet, ("_data", DenseMatrix(D)), ("_labels", DenseVector(L)))
-    static (TrainingSet) ("apply", (D,L), (DenseMatrix(D), DenseVector(L)) :: TrainingSet(D,L)) implements allocates(TrainingSet, ${$0}, ${$1})
+    // Dense and Sparse TrainingSets have identical interfaces, except for different backing data matrix types.
+    for (s <- List("DenseTrainingSet", "SparseTrainingSet")) {
+      val TrainingSet = tpe(s, (D,L))
+      val Matrix = if (s == "DenseTrainingSet") DenseMatrix else SparseMatrix
+      val VectorView = if (s == "DenseTrainingSet") DenseVectorView else SparseVectorView
 
-    val TrainingSetOps = withTpe(TrainingSet)
-    TrainingSetOps {
-      infix ("labels") (Nil :: DenseVector(L)) implements getter(0, "_labels")
-    }
+      data(TrainingSet, ("_data", Matrix(D)), ("_labels", DenseVector(L)))
+      static (TrainingSet) ("apply", (D,L), (Matrix(D), DenseVector(L)) :: TrainingSet(D,L)) implements allocates(TrainingSet, ${$0}, ${$1})
 
-    // is there any use for a separate TestSet type (readability)? to actually measure error, 
-    // TestSets will typically have labels, and therefore be structurally identical to TrainingSet
+      val TrainingSetOps = withTpe(TrainingSet)
+      TrainingSetOps {
+        infix ("labels") (Nil :: DenseVector(L)) implements getter(0, "_labels")
+      }
 
-    // val TestSet = tpe("TestSet", D)
-    // data(TestSet, ("_data", DenseMatrix(D)))
-    // static (TestSet) ("apply", D, DenseMatrix(D) :: TestSet(D)) implements allocates(TestSet, ${$0})
+      // is there any use for a separate TestSet type (readability)? to actually measure error,
+      // TestSets will typically have labels, and therefore be structurally identical to TrainingSet
 
-    for (t <- List(TrainingSet/*, TestSet*/)) {
-      val ops = withTpe(t)
-      ops {
-        infix ("data") (Nil :: DenseMatrix(D)) implements getter(0, "_data")
+      // val DenseTestSet = tpe("DenseTestSet", D)
+      // data(DenseTestSet, ("_data", DenseMatrix(D)))
+      // static (DenseTestSet) ("apply", D, DenseMatrix(D) :: DenseTestSet(D)) implements allocates(DenseTestSet, ${$0})
 
-        infix ("apply") ((MInt,MInt) :: D) implements composite ${ $self.data.apply($1,$2) }
-        infix ("apply") (MInt :: DenseVectorView(D)) implements composite ${ $self.data.apply($1) }
-        // infix ("apply") (IndexVector :: t) implements composite ${ TrainingSet($self.data.apply($1),$self.labels.apply($1)) }   // scalac typer crash...
+      for (t <- List(TrainingSet/*, DenseTestSet*/)) {
+        val ops = withTpe(t)
+        ops {
+          infix ("data") (Nil :: Matrix(D)) implements getter(0, "_data")
 
-        infix ("numSamples") (Nil :: MInt) implements composite ${ $self.data.numRows }
-        infix ("numFeatures") (Nil :: MInt) implements composite ${ $self.data.numCols }
+          infix ("apply") ((MInt,MInt) :: D) implements composite ${ $self.data.apply($1,$2) }
+          infix ("apply") (MInt :: VectorView(D)) implements composite ${ $self.data.apply($1) }
+          // infix ("apply") (IndexVector :: t) implements composite ${ DenseTrainingSet($self.data.apply($1),$self.labels.apply($1)) }   // scalac typer crash...
+
+          infix ("numSamples") (Nil :: MInt) implements composite ${ $self.data.numRows }
+          infix ("numFeatures") (Nil :: MInt) implements composite ${ $self.data.numCols }
+        }
       }
     }
   }

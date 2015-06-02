@@ -14,7 +14,7 @@ trait CG extends OptiMLApplication {
   def conjugateGradient(A0: Rep[ForgeArray[Double]], numRows: Rep[Int], numCols: Rep[Int], b0: Rep[ForgeArray[Double]], maxIters: Rep[Int]): Rep[ForgeArray[Double]] = {
     
     val A = DenseMatrix(A0, numRows, numCols)
-    val b = DenseVector(b0)
+    val b = DenseVector(b0, false)
 
     implicit def diffCG(t1: Rep[Tup3[DenseVector[Double],DenseVector[Double],DenseVector[Double]]],
                         t2: Rep[Tup3[DenseVector[Double],DenseVector[Double],DenseVector[Double]]]) = {
@@ -24,7 +24,7 @@ trait CG extends OptiMLApplication {
 
     val x0 = DenseVector.zeros(A.numCols).t
 
-    val result = untilconverged(pack(x0, b, b), maxIter = maxIters) { cur =>
+    val result = untilconverged(pack(x0, b, b), maxIter = maxIters) { (cur, iter) =>
       val (x, r, p) = unpack(cur)
 
       val Ap = A * p
@@ -48,7 +48,7 @@ trait CG extends OptiMLApplication {
     val expected_result = readVector(args(2)).t
     val maxIters = args(3).toInt
 
-    val x_soln = DenseVector(conjugateGradient(A.toArray, A.numRows, A.numCols, b.toArray, maxIters))
+    val x_soln = DenseVector(conjugateGradient(A.toArray, A.numRows, A.numCols, b.toArray, maxIters), false)
  
     val err = x_soln - expected_result
     println(sqrt(err *:* err))

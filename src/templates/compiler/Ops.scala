@@ -816,10 +816,10 @@ trait DeliteGenOps extends BaseGenOps {
   }
 
   def emitStructMethods(opsGrp: DSLOps, stream: PrintWriter) {
-    def wrapManifest(t: Rep[DSLType]) = t match {
+    def wrapManifest(t: Rep[DSLType]): String = t match {
       case Def(TpeInst(Def(Tpe(name,args,stage)), ps)) if ps != Nil =>
         val tpeArgIndices = ps.map(p => if (isTpePar(p)) 1 else 0).scan(0)(_+_).drop(1).map(_ - 1)
-        "makeManifest(classOf[" + name + ps.map(a => "_").mkString("[",",","]") + "], " + (ps.zipWithIndex.map(t => if (isTpePar(t._1)) "m.typeArguments("+tpeArgIndices(t._2)+")" else "manifest["+quote(t._1)+"]")).mkString("List(",",","))")
+        "makeManifest(classOf[" + name + ps.map(a => "_").mkString("[",",","]") + "], " + (ps.zipWithIndex.map(t => if (isTpePar(t._1)) "m.typeArguments("+tpeArgIndices(t._2)+")" else wrapManifest(t._1))).mkString("List(",",","))")
       case _ =>
         "manifest[" + quote(t) + "]"
     }

@@ -111,7 +111,7 @@ trait TopN extends OptiMLApplication {
     // pairwiseRatings.pprint
         
     /* similarity matrix */
-    val uniqueRatings = (pairwiseRatings.groupBy(r => (r.profileA, r.profileB), r => r)).toVector // DenseVector[DenseVector[PairwiseRating]]        
+    val uniqueRatings = (pairwiseRatings.groupBy(r => DenseVector(r.profileA, r.profileB), r => r)).toVector // DenseVector[DenseVector[PairwiseRating]]
     val similarities = uniqueRatings map { similarity } // DenseVector[Similarity]  
     // var n = 0
     // while (n < similarities.length) {

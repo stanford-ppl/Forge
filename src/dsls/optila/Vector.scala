@@ -35,7 +35,12 @@ trait VectorOps {
     // we can also perform bulk operations generically, returning a DenseVector result for each operation
     // Arith is only required if T is actually a tpePar here, so we need to be careful.
     if (!isTpePar(T)) compiler (v) ("zeroT", Nil, Nil :: T) implements composite ${ 0.asInstanceOf[\$TT] }
-    val AZ = if (isTpePar(T)) (List(TArith(asTpePar(T))), "implicitly[Arith[T]].zero(self(unit(0)))") else (Nil, "zeroT")
+
+    // We need to be a little careful using empty for zero here. With nested vectors, the zero vector
+    // will not be the correct dimension. This implementation relies on the fact that DeliteOps will not
+    // attempt to reduce with the zero element unless the collection is empty, in which case the behavior
+    // is still not correct (but should probably throw an exception instead of silently returning []).
+    val AZ = if (isTpePar(T)) (List(TArith(asTpePar(T))), "implicitly[Arith[T]].empty") else (Nil, "zeroT")
     val A = AZ._1; val Z = AZ._2; // can't use capital letters with tuple return pattern matching
     val O = if (isTpePar(T)) List(TOrdering(asTpePar(T))) else Nil
     val S = if (isTpePar(T)) List(TStringable(asTpePar(T))) else Nil
@@ -60,7 +65,7 @@ trait VectorOps {
       infix ("last") (Nil :: T) implements composite ${ $self($self.length - 1) }
       infix ("drop") (MInt :: V) implements composite ${ $self.slice($1, $self.length) }
       infix ("take") (MInt :: V) implements composite ${ $self.slice(0, $1) }
-      infix ("contains") (T :: MBoolean) implements single ${
+      infix ("contains") (T :: MBoolean) implements composite ${
         var found = false
         var i = 0
         while (i < $self.length && !found) {
@@ -71,20 +76,20 @@ trait VectorOps {
         }
         found
       }
-      infix ("distinct") (Nil :: DenseVector(T)) implements single ${
-        val set = SHashMap[\$TT,Int]()
-        val out = DenseVector[\$TT](0, $self.isRow)
-        for (i <- 0 until $self.length) {
-          if (!set.contains($self(i))) {
-            set($self(i)) = 1
-            out <<= $self(i)
-          }
-        }
-        out.unsafeImmutable
+
+      infix ("histogram") (Nil :: MHashMap(T,MInt)) implements composite ${
+        $self.groupByReduce(e => e, v => 1, (a: Rep[Int],b: Rep[Int]) => a+b)
       }
 
-      infix ("mutable") (Nil :: DenseVector(T), effect = mutable, aliasHint = copies(0)) implements single ${
+      infix ("distinct") (Nil :: DenseVector(T)) implements composite ${
+        val elements = $self.histogram
+        densevector_fromarray(elements.keys(), true)
+      }
+
+      infix ("mutable") (Nil :: DenseVector(T), effect = mutable, aliasHint = copies(0)) implements composite ${
         val out = DenseVector[\$TT]($self.length, $self.isRow)
+        // TODO - investigate: Using composite and 'foreach' below breaks testBulkUpdate() in DenseVectorSuite when SoA is on. Why?
+        // out.indices foreach { i => out(i) = $self(i) }
         for (i <- 0 until out.length) {
           out(i) = $self(i)
         }
@@ -115,7 +120,7 @@ trait VectorOps {
       }
 
       // we need two versions so that we can override toString in the lib, and use makeStr in Delite. sad.
-      infix ("makeString") (Nil :: MString, S) implements composite ${
+      infix ("makeString") (Nil :: MString, S) implements single ${
         var s = ""
         if ($self.length == 0) {
           s = "[ ]"
@@ -134,7 +139,8 @@ trait VectorOps {
         }
         s
       }
-      infix ("toString") (Nil :: MString) implements composite ${
+
+      infix ("toString") (Nil :: MString) implements single ${
         var s = ""
         if ($self.length == 0) {
           s = "[ ]"
@@ -156,6 +162,9 @@ trait VectorOps {
 
       infix ("pprint") (Nil :: MUnit, S, effect = simple) implements composite ${ println($self.makeStr + "\\n") } // $self.toString doesn't work in Delite
 
+      infix ("makeStrWithDelim") (("delim",MString) :: MString, S) implements composite ${
+        array_mkstring($self.toArray, delim)
+      }
 
       /**
        * Math
@@ -186,8 +195,8 @@ trait VectorOps {
       for (rhs <- List(SparseVector(T),SparseVectorView(T))) {
         infix ("+") (rhs :: DenseVector(T), A) implements composite ${ $self + $1.toDense }
         infix ("-") (rhs :: DenseVector(T), A) implements composite ${ $self - $1.toDense }
-        infix ("*") (rhs :: DenseVector(T), A) implements composite ${ $self * $1.toDense }
-        infix ("*:*") (rhs :: T, A) implements composite ${ $self *:* $1.toDense }
+        infix ("*") (rhs :: SparseVector(T), A) implements composite ${ $1 * $self.toDense }
+        infix ("*:*") (rhs :: T, A) implements composite ${ $1 *:* $self.toDense }
         infix ("**") (rhs :: DenseMatrix(T), A) implements composite ${ $self ** $1.toDense }
         infix ("/") (rhs :: DenseVector(T), A) implements composite ${ $self / $1.toDense }
       }
@@ -215,17 +224,20 @@ trait VectorOps {
       infix ("sum") (Nil :: T, A) implements composite ${ self.reduce((a,b) => a+b ) }
       infix ("prod") (Nil :: T, A) implements reduce(T, 0, ${unit(1.asInstanceOf[\$TT])}, ${ (a,b) => a*b })
       infix ("mean") (Nil :: MDouble, ("conv",T ==> MDouble)) implements composite ${ $self.map(conv).sum / $self.length }
-      infix ("min") (Nil :: T, O) implements reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a < b) a else b })
-      infix ("max") (Nil :: T, O) implements reduce(T, 0, ${$self(0)}, ${ (a,b) => if (a > b) a else b })
 
-      infix ("minIndex") (Nil :: MInt, O ::: A) implements composite ${
-        $self.indices.reduce { (a,b) => if ($self(a) < $self(b)) a else b }
-        // ($self.zip($self.indices) { (a,b) => pack((a,b)) } reduce { (t1,t2) => if (t1._1 < t2._1) t1 else t2 })._2
-      }
-      infix ("maxIndex") (Nil :: MInt, O ::: A) implements composite ${
-        $self.indices.reduce { (a,b) => if ($self(a) > $self(b)) a else b }
-        // ($self.zip($self.indices) { (a,b) => pack((a,b)) } reduce { (t1,t2) => if (t1._1 > t2._1) t1 else t2 })._2
-      }
+
+      /**
+       * Ordering
+       */
+      val H = if (isTpePar(T)) List(THasMinMax(asTpePar(T))) else Nil
+      val MinT = if (isTpePar(T)) "implicitly[HasMinMax[T]].min" else "implicitly[HasMinMax["+TT+"]].min"
+      val MaxT = if (isTpePar(T)) "implicitly[HasMinMax[T]].max" else "implicitly[HasMinMax["+TT+"]].max"
+
+      infix ("min") (Nil :: T, O ::: H) implements reduce(T, 0, MinT, ${ (a,b) => if (a < b) a else b })
+      infix ("max") (Nil :: T, O ::: H) implements reduce(T, 0, MaxT, ${ (a,b) => if (a > b) a else b })
+
+      infix ("minIndex") (Nil :: MInt, O) implements composite ${ min_index_of($self.indices, $self) }
+      infix ("maxIndex") (Nil :: MInt, O) implements composite ${ max_index_of($self.indices, $self) }
 
 
       /**
@@ -235,7 +247,7 @@ trait VectorOps {
       infix ("reduce") (((T,T) ==> T) :: T, A) implements reduce(T, 0, Z, ${ (a,b) => $1(a,b) })
       infix ("foreach") ((T ==> MUnit) :: MUnit) implements foreach(T, 0, ${ e => $1(e) })
       infix ("forall") ((T ==> MBoolean) :: MBoolean) implements composite ${ reduce_and($self.map($1)) }
-      infix ("find") ((T ==> MBoolean) :: IndexVector) implements composite ${ IndexVector($self.indices.filter(i => $1($self(i)))) }
+      infix ("find") ((T ==> MBoolean) :: IndexVector) implements composite ${ $self.indices.filter(i => $1($self(i))) }
 
       val filterMap = v.name.toLowerCase + "_densevector_filter_map"
       compiler (filterMap) (((T ==> MBoolean), (T ==> R)) :: DenseVector(R), addTpePars = R) implements filter((T,R), 0, ${ e => $1(e) }, ${ e => $2(e) })
@@ -245,34 +257,43 @@ trait VectorOps {
         else 0
       }
 
-      infix ("partition") (("pred",(T ==> MBoolean)) :: Tuple2(DenseVector(T),DenseVector(T))) implements composite ${
-        val outT = DenseVector[\$TT](0, $self.isRow)
-        val outF = DenseVector[\$TT](0, $self.isRow)
-        for (i <- 0 until $self.length) {
-          val x = $self(i)
-          if (pred(x)) outT <<= x
-          else outF <<= x
-        }
-        pack((outT.unsafeImmutable, outF.unsafeImmutable))
+      val partitionReturn = if (v.name == "IndexVector") IndexVector else DenseVector(T)
+      infix ("partition") (("pred",(T ==> MBoolean)) :: Tuple2(partitionReturn,partitionReturn)) implements composite ${
+        // FIXME: If $self is the result of a filter, the partT find fuses into that filter (somehow incorrectly),
+        // and we get an ArrayOutOfBoundsException during init. As a workaround, we use mutable here to prevent the fusion.
+        val assignments = $self.map(pred).mutable
+        val partT = $self(assignments.find(e => e))
+        val partF = $self(assignments.find(e => !e))
+        pack((partT, partF))
       }
 
-      infix ("flatMap") ((T ==> DenseVector(R)) :: DenseVector(R), addTpePars = R) implements composite ${
-        DenseVector.flatten($self.map($1))
-      }
+      infix ("flatMap") ((T ==> DenseVector(R)) :: DenseVector(R), addTpePars = R) implements flatMap((T,R), 0, ${ e => $1(e) })
 
-      // TODO: need to implement with a DeliteOp
-      infix ("scan") (CurriedMethodSignature(List(List(("zero", R)), List((R,T) ==> R)), DenseVector(R)), addTpePars = R) implements single ${
-        val out = DenseVector[R]($self.length, $self.isRow)
-        out(0) = $2($zero,$self(0))
+      // TODO: implement with a DeliteOp
+      infix ("scanLeft") (CurriedMethodSignature(List(List(("zero", R)), List((R,T) ==> R)), DenseVector(R)), addTpePars = R) implements composite ${
+        val out = DenseVector[R]($self.length+1, $self.isRow)
+        out(0) = $zero
         var i = 1
-        while (i < $self.length) {
-          out(i) = $2(out(i-1), $self(i))
+        while (i < out.length) {
+          out(i) = $2(out(i-1), $self(i-1))
           i += 1
         }
         out.unsafeImmutable
       }
 
-      infix ("prefixSum") (Nil :: DenseVector(T), A) implements composite ${ $self.scan(\$Z)((a,b) => a+b) }
+      // TODO: implement with a DeliteOp
+      infix ("scanRight") (CurriedMethodSignature(List(List(("zero", R)), List((T,R) ==> R)), DenseVector(R)), addTpePars = R) implements composite ${
+        val out = DenseVector[R]($self.length+1, $self.isRow)
+        out(out.length-1) = $zero
+        var i = $self.length-1
+        while (i >= 0) {
+          out(i) = $2($self(i), out(i+1))
+          i -= 1
+        }
+        out.unsafeImmutable
+      }
+
+      infix ("prefixSum") (Nil :: DenseVector(T), A) implements composite ${ ($self.scanLeft(\$Z)((a,b) => a+b)).drop(1) }
 
       // TODO
       // infix ("groupBy") (((T ==> R)) :: DenseVector(DenseVector(T)))
@@ -282,7 +303,9 @@ trait VectorOps {
        * Data exchange
        */
 
-      infix ("toArray") (Nil :: MArray(T)) implements composite ${ densevector_raw_data($self.map(e => e)) }
+      infix ("toArray") (Nil :: MArray(T)) implements composite ${
+        array_fromfunction($self.length, i => $self(i))
+      }
     }
   }
 }

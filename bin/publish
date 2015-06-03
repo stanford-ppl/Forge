@@ -71,8 +71,8 @@ object ${dslName}Build extends Build {
 
     publishArtifact in (Compile, packageDoc) := false,
     // needed for scala.tools, which is apparently not included in sbt's built in version
-    libraryDependencies += "org.scala-lang.virtualized" % "scala-library" % virtScala,
-    libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % virtScala,
+    libraryDependencies += "org.scala-lang" % "scala-library" % virtScala,
+    libraryDependencies += "org.scala-lang" % "scala-compiler" % virtScala,
     libraryDependencies += "org.scalatest" % "scalatest_${scala_major_vers}" % "2.2.2",
     libraryDependencies += "com.google.guava" % "guava" % "17.0",
     libraryDependencies += "org.apache.commons" % "commons-math" % "2.2",
@@ -161,8 +161,9 @@ def sbtBuildFileFooter(dsl):
     // Required to use native libraries within tests
     // See http://stackoverflow.com/questions/19425613/unsatisfiedlinkerror-with-native-library-under-sbt
     // and http://www.scala-sbt.org/release/docs/Forking.html
-    fork := true,
-    javaOptions in Test := sys.env.getOrElse("SBT_OPTS", "").split(" ")
+    //fork := true,
+    //javaOptions in Test := sys.env.getOrElse("SBT_OPTS", "").split(" ")
+    fork := false
   )) dependsOn(${dslName}Comp, ${dslName}Lib)
 }
 """)

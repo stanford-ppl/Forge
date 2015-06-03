@@ -303,7 +303,6 @@ def publish(dsl, opts):
 
         cp_executable_script(DELITE_HOME + "/bin/delited", build_dir + "/bin/delited")
         cp_executable_script(DELITE_HOME + "/bin/server.py", build_dir + "/bin/server.py")
-        cp_executable_script(DELITE_HOME + "/bin/parse_perf_report", build_dir + "/bin/parse_perf_report")
 
     print "[forge]: Publishing complete."
 

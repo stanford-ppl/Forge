@@ -9,7 +9,7 @@ trait FeatureOps {
 
   def importFeatureOps() {
     val DenseVector = lookupTpe("DenseVector")
-    
+
     val ContinuousFeature = tpe("ContinuousFeature")
     data(ContinuousFeature, ("_default", MDouble), ("_min", MDouble), ("_max", MDouble))
 
@@ -21,8 +21,8 @@ trait FeatureOps {
       infix ("default") (Nil :: MDouble) implements getter(0, "_default")
       infix ("min") (Nil :: MDouble) implements getter(0, "_min")
       infix ("max") (Nil :: MDouble) implements getter(0, "_max")
-      infix ("apply") (MString :: MDouble) implements composite ${ 
-        if ($1 == "" && $self.default != 0.0209) {
+      infix ("apply") (MString :: MDouble) implements composite ${
+        if (self.default != 0.0209 && ($1 == "" || $1.toLowerCase == "null")) {
           $self.default
         }
         else {
@@ -38,8 +38,9 @@ trait FeatureOps {
     data(DiscreteFeature, ("_features", MHashMap(MString, MInt)))
     compiler (DiscreteFeature) ("discrete_feature_alloc", Nil, (MHashMap(MString, MInt) :: DiscreteFeature)) implements allocates(DiscreteFeature, ${$0})
 
-    // FIXME: this produces an illegal ordering of effect error when 'composite' instead of 'single'. related to combo of array_fromseq (mutable) and FHashMap?    
-    static (DiscreteFeature) ("apply", Nil, (varArgs(MString) :: DiscreteFeature)) implements single ${
+    // FIXME: this produces an illegal ordering of effect error when array_fromseq is mutable or when using 'single'.
+    // What happens with MHashMap in this case?
+    static (DiscreteFeature) ("apply", Nil, (varArgs(MString) :: DiscreteFeature)) implements composite ${
       val keys = array_fromseq($0)
       val values = array_fromfunction(array_length(keys), i => i)
       discrete_feature_alloc(fhashmap_from_arrays(keys, values))
@@ -48,19 +49,24 @@ trait FeatureOps {
     val DiscreteFeatureOps = withTpe(DiscreteFeature)
     DiscreteFeatureOps {
       compiler ("getFeatures") (Nil :: MHashMap(MString, MInt)) implements getter(0, "_features")
-      infix ("apply") (MString :: MInt) implements composite ${ 
+
+      infix ("apply") (MString :: MDouble) implements composite ${
         val featureMap = getFeatures($self)
-        if (featureMap.contains($1)) featureMap($1) else 0
+        if (featureMap.contains($1)) featureMap($1).toDouble else 0.0
       }
 
       // convert this feature value into an indicator or dummy variable encoding
-      infix ("indicator") (MString :: DenseVector(MInt)) implements composite ${
+      infix ("indicator") (MString :: DenseVector(MDouble)) implements composite ${
         val featureMap = getFeatures($self)
         val numKeys = fhashmap_size(featureMap)
-        val e = if (featureMap.contains($1)) featureMap($1) else 0
-        (0::numKeys) { i => if (i == e) 1 else 0 }
+        val e = if (featureMap.contains($1)) featureMap($1).toDouble else 0.0
+        (0::numKeys) { i => if (i == e) 1.0 else 0.0 }
       }
 
+      infix ("size") (Nil :: MInt) implements composite ${
+        val featureMap = getFeatures($self)
+        fhashmap_size(featureMap)
+      }
     }
 
     val BinaryFeature = tpe("BinaryFeature")
@@ -71,13 +77,123 @@ trait FeatureOps {
     BinaryFeatureOps {
       infix ("default") (Nil :: MBoolean) implements getter(0, "_default")
 
-      infix ("apply") (MString :: MInt) implements composite ${ 
+      infix ("apply") (MString :: MDouble) implements composite ${
         fassert($1 == "" || $1 == "0" || $1 == "1" || $1 == "false" || $1 == "true", "illegal input to binary feature")
-        if ($1 == "0" || $1 == "false") 0
-        else if ($1 == "1" || $1 == "true") 1
-        else if ($self.default) 1
-        else 0        
+        if ($1 == "0" || $1 == "false") 0.0
+        else if ($1 == "1" || $1 == "true") 1.0
+        else if ($self.default) 1.0
+        else 0.0
       }
     }
+
+    val DateFeature = tpe("DateFeature")
+    val SDateFormat = tpe("org.joda.time.format.DateTimeFormatter")
+    val SDateTime = tpe("org.joda.time.DateTime")
+    primitiveTpePrefix ::= "org.joda"
+
+    static (DateFeature) ("apply", Nil, MString :: SDateFormat) implements codegen($cala, ${
+      org.joda.time.format.DateTimeFormat.forPattern($0)
+    })
+
+    infix (DateFeature) ("apply", Nil, (SDateFormat, MString) :: MDouble) implements codegen($cala, ${
+      try {
+        $0.parseMillis($1).toDouble
+      }
+      catch {
+        case e => 0.0 // defaults to 1970, for better or worse... what else can we do?
+      }
+    })
+
+    // Internal DateTime operations. These are factored into separate methods so we don't
+    // need to create multiple DateTime instances at run-time and can still define our own API.
+
+    compiler (DateFeature) ("dt_internal", Nil, MDouble :: SDateTime) implements codegen($cala, ${
+      new org.joda.time.DateTime($0.toLong)
+    })
+
+    compiler (DateFeature) ("dt_internal_year", Nil, SDateTime :: MInt) implements codegen($cala, ${
+      $0.getYear()
+    })
+
+    compiler (DateFeature) ("dt_internal_month", Nil, SDateTime :: MInt) implements codegen($cala, ${
+      $0.getMonthOfYear()
+    })
+
+    compiler (DateFeature) ("dt_internal_hour", Nil, SDateTime :: MInt) implements codegen($cala, ${
+      $0.getHourOfDay()
+    })
+
+    compiler (DateFeature) ("dt_internal_day", Nil, SDateTime :: MInt) implements codegen($cala, ${
+      $0.getDayOfMonth()
+    })
+
+    compiler (DateFeature) ("dt_internal_weekday", Nil, SDateTime :: MInt) implements codegen($cala, ${
+      $0.getDayOfWeek()
+    })
+
+
+    // User-facing DateTime operations.
+
+    static (DateFeature) ("year", Nil, MDouble :: MInt) implements composite ${
+      val dt = dt_internal($0)
+      dt_internal_year(dt)
+    }
+
+    static (DateFeature) ("month", Nil, MDouble :: MInt) implements composite ${
+      val dt = dt_internal($0)
+      dt_internal_month(dt)
+    }
+
+    static (DateFeature) ("hour", Nil, MDouble :: MInt) implements composite ${
+      val dt = dt_internal($0)
+      dt_internal_hour(dt)
+    }
+
+    static (DateFeature) ("day", Nil, MDouble :: MInt) implements composite ${
+      val dt = dt_internal($0)
+      dt_internal_day(dt)
+    }
+
+    // Monday is 1, Sunday is 7
+    // http://joda-time.sourceforge.net/apidocs/org/joda/time/DateTimeConstants.html
+    static (DateFeature) ("weekday", Nil, MDouble :: MInt) implements composite ${
+      val dt = dt_internal($0)
+      dt_internal_weekday(dt)
+    }
+  }
+
+  def importFeatureHelperOps() {
+    val FeatureHelper = grp("FeatureHelper")
+    val DenseVector = lookupTpe("DenseVector")
+    val Tup2 = lookupTpe("Tup2")
+
+    /* Return a unique integer identifier for a given string */
+    direct (FeatureHelper) ("unique", Nil, MString :: MInt) implements codegen($cala, ${
+      MLGlobal.getId($0)
+    })
+
+    // direct (FeatureHelper) ("getUniqueMappings", Nil, Nil :: DenseVector(Tup2(MInt,MString))) implements composite ${
+    //   val names = get_unique_names_helper
+    //   val ids = get_unique_ids_helper
+    //   fassert(names.length == ids.length, "names and ids in unique map are different lengths")
+    //   val data = array_fromfunction(names.length,  i => pack((ids(i), names(i))))
+    //   densevector_fromarray(data, true)
+    // }
+
+    // compiler (FeatureHelper) ("get_unique_names_helper", Nil, Nil :: MArray(MString)) implements codegen($cala, ${
+    //   MLGlobal.getUniqueNames
+    // })
+
+    // compiler (FeatureHelper) ("get_unique_ids_helper", Nil, Nil :: MArray(MInt)) implements codegen($cala, ${
+    //   MLGlobal.getUniqueIds
+    // })
+
+    direct (FeatureHelper) ("loadUniqueMappings", Nil, MString :: MInt, effect = simple) implements codegen($cala, ${
+      MLGlobal.loadUniqueMappings($0)
+    })
+
+    direct (FeatureHelper) ("dumpUniqueMappings", Nil, MString :: MUnit, effect = simple) implements codegen($cala, ${
+      MLGlobal.dumpUniqueMappings($0)
+    })
   }
 }

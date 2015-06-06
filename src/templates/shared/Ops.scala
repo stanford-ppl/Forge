@@ -180,7 +180,6 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
   }
 
-
   /**
    * Op argument formatting
    */
@@ -211,7 +210,34 @@ trait BaseGenOps extends ForgeCodeGenBase {
   def makeFullArgs(o: Rep[DSLOp], makeArgs: Rep[DSLOp] => String) = {
     // we always pass implicit arguments explicitly (in practice, less issues arise this way)
     val implicitArgs = if (needOverload(o)) makeOpImplicitArgsWithOverload(o, useCanonical = true) else makeOpImplicitArgs(o)
-    makeTpePars(o.tpePars) + makeArgs(o) + implicitArgs
+    makeTpeParsAsArgs(o.tpePars, o.tpePars) + makeArgs(o) + implicitArgs
+  }
+
+
+  /**
+   * Higher-kinded type parameter manipulation
+   */
+
+  def withoutHkTpePars(tpePars: List[Rep[TypePar]]): List[Rep[TypePar]] = {
+    tpePars.filter {
+      case Def(HkTpePar(n,args,c,s)) => false
+      case _ => true
+    }
+  }
+
+  def getHkTpeParInstantiations(tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLArg]]): List[Rep[DSLArg]] = {
+    // hkTpePars context bounds must be included, since we cannot use context bounds with them
+    // We have to be careful -- we only want to include manifests for any concrete instantiations of the hkTpePar in the op.
+    val hkTpePars = (tpePars collect { case d@Def(HkTpePar(n,t,sigs,s)) => (n,sigs) }).toMap
+    val hkTpeParInsts =
+      ((args ++ implicitArgs).map(_.tpe) flatMap {
+        case d@Def(TpeInst(hkTpe, hkArgs)) if hkTpePars.contains(hkTpe.name) =>
+          val sigs = hkTpePars(hkTpe.name)
+          sigs.map(b => ephemeralTpe(b.name+"["+quote(d)+"]", stage = now))
+        case _ => Nil
+      }).distinct
+
+    hkTpeParInsts.zipWithIndex.map(t => arg(implicitCtxBoundArgPrefix+"_hk_"+t._2, t._1))
   }
 
 
@@ -221,45 +247,58 @@ trait BaseGenOps extends ForgeCodeGenBase {
 
   // untyped implicit args
   def makeImplicitCtxBounds(tpePars: List[Rep[TypePar]]) = {
-    tpePars.flatMap(a => a.ctxBounds.map(b => "implicitly["+b.name+"["+quote(a)+"]]")).mkString(",")
+    tpePars.flatMap { a =>
+      a.ctxBounds.map(b => "implicitly["+b.name+"["+quote(a)+"]]")
+    }.mkString(",")
   }
 
-  def makeOpImplicitCtxBounds(o: Rep[DSLOp]) = makeImplicitCtxBounds(o.tpePars)
+  def makeImplicitArgs(tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLArg]]) = {
+    val hkInstantiations = getHkTpeParInstantiations(tpePars, args, implicitArgs)
 
-  def makeImplicitArgs(implicitArgs: List[Rep[DSLArg]], ctxBoundsStr: String = "") = {
-    // ctxBounds must come before regular implicits
+    // passing order is: regular ctxBounds, then regular implicits, and finally hkInstantiations context bounds
+    val ctxBoundsStr = makeImplicitCtxBounds(withoutHkTpePars(tpePars))
     val ctxBounds2 = if (ctxBoundsStr == "") "" else ctxBoundsStr+","
-    if (implicitArgs.length > 0) "(" + ctxBounds2 + implicitArgs.map(quote).mkString(",") + ")"
+    val allImplicitArgs = implicitArgs ++ hkInstantiations
+    if (allImplicitArgs.length > 0) "(" + ctxBounds2 + allImplicitArgs.map(quote).mkString(",") + ")"
     else ""
   }
 
-  def makeOpImplicitArgs(o: Rep[DSLOp]) = makeImplicitArgs(o.implicitArgs, makeOpImplicitCtxBounds(o)) // explicitly passing implicits requires passing ctxBounds, too
+  def makeOpImplicitArgs(o: Rep[DSLOp]) = {
+    makeImplicitArgs(o.tpePars, o.args, o.implicitArgs)
+  }
 
-  def makeOpImplicitArgsWithOverload(o: Rep[DSLOp], asVals: Boolean = false, useCanonical: Boolean = false) = makeImplicitArgs(implicitArgsWithOverload(o, useCanonical), makeOpImplicitCtxBounds(o))
+  def makeOpImplicitArgsWithOverload(o: Rep[DSLOp], asVals: Boolean = false, useCanonical: Boolean = false) = {
+    makeImplicitArgs(o.tpePars, o.args, implicitArgsWithOverload(o, useCanonical))
+  }
 
   // typed implicit args with context bounds (only needed for instance methods)
   // 'without' is used to subtract bounds that are already in scope
   def implicitCtxBoundsWithType(tpePars: List[Rep[TypePar]], without: List[Rep[TypePar]] = Nil) = {
     val withoutBounds = without.flatMap(a => a.ctxBounds)
-    tpePars.flatMap(a => a.ctxBounds.diff(withoutBounds).map(b => ephemeralTpe(b.name+"["+quote(a)+"]", stage = now))).distinct
+    withoutHkTpePars(tpePars).flatMap(a => a.ctxBounds.diff(withoutBounds).map(b => ephemeralTpe(b.name+"["+quote(a)+"]", stage = now))).distinct
   }
 
-  def makeImplicitArgsWithCtxBoundsWithType(implicitArgs: List[Rep[DSLArg]], tpePars: List[Rep[TypePar]], without: List[Rep[TypePar]] = Nil, asVals: Boolean = false) = {
-    val addArgs = implicitCtxBoundsWithType(tpePars, without)
-    val l = implicitArgs.length
-    makeImplicitArgsWithType(implicitArgs ++ addArgs.zip(l until l+addArgs.length).map(anyToImplicitArg), asVals)
+  def makeImplicitArgsWithCtxBoundsWithType(tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLArg]], without: List[Rep[TypePar]] = Nil, asVals: Boolean = false) = {
+    val addArgs = implicitCtxBoundsWithType(tpePars, without).zipWithIndex.map(t => arg(implicitCtxBoundArgPrefix+t._2, t._1))
+    makeImplicitArgsWithType(tpePars, args, addArgs ++ implicitArgs, asVals)
   }
 
-  // typed implicit args without context bounds
-  def makeImplicitArgsWithType(implicitArgs: List[Rep[DSLArg]], asVals: Boolean = false) = {
+  // typed implicit args without context bounds (but hkTpePar context bounds are passed explicitly)
+  def makeImplicitArgsWithType(tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLArg]], asVals: Boolean = false) = {
     val prefix = if (asVals == true) "val " else ""
-    if (implicitArgs.length > 0) "(implicit " + implicitArgs.map(t => prefix + argify(t,repifySome)).mkString(",") + ")"
+    val hkInstantiations = getHkTpeParInstantiations(tpePars, args, implicitArgs)
+    val allImplicitArgs = implicitArgs ++ hkInstantiations
+    if (allImplicitArgs.length > 0) "(implicit " + allImplicitArgs.map(t => prefix + argify(t,repifySome)).mkString(",") + ")"
     else ""
   }
 
-  def makeOpImplicitArgsWithType(o: Rep[DSLOp], asVals: Boolean = false) = makeImplicitArgsWithType(o.implicitArgs, asVals)
+  def makeOpImplicitArgsWithType(o: Rep[DSLOp], asVals: Boolean = false) = {
+    makeImplicitArgsWithType(o.tpePars, o.args, o.implicitArgs, asVals)
+  }
 
-  def makeOpImplicitArgsWithOverloadWithType(o: Rep[DSLOp], asVals: Boolean = false, useCanonical: Boolean = false) = makeImplicitArgsWithType(implicitArgsWithOverload(o, useCanonical), asVals)
+  def makeOpImplicitArgsWithOverloadWithType(o: Rep[DSLOp], asVals: Boolean = false, useCanonical: Boolean = false) = {
+    makeImplicitArgsWithType(o.tpePars, o.args, implicitArgsWithOverload(o, useCanonical), asVals)
+  }
 
 
   /**
@@ -329,7 +368,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
 
   def makeOpImplMethodName(o: Rep[DSLOp]) = makeOpMethodName(o) + "_impl" + nameClashId(o)
 
-  def makeOpImplMethodNameWithArgs(o: Rep[DSLOp], postfix: String = "") = makeOpImplMethodName(o) + postfix + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o)
+  def makeOpImplMethodNameWithArgs(o: Rep[DSLOp], postfix: String = "") = makeOpImplMethodName(o) + postfix + makeTpeParsAsArgs(o.tpePars, o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o)
 
   def makeOpImplMethodSignature(o: Rep[DSLOp], postfix: String = "", returnTpe: Option[String] = None) = {
     "def " + makeOpImplMethodName(o) + postfix + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithType(o) + ": " + (returnTpe getOrElse repifySome(o.retTpe))
@@ -458,7 +497,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     // else {
       // default infix mode (slightly easier to understand what's happening, also fails to apply less than implicits)
       // blacklist or curried args or function args (in the latter two cases, infix doesn't always resolve correctly)
-      noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o)
+      !mustInfixList.contains(o.name) && (noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o))
     // }
   }
 
@@ -557,7 +596,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
           val otherTpePars = o.tpePars.filterNot(p => tpePars.map(_.name).contains(p.name))
           val ret = if (Config.fastCompile) ": " + repifySome(o.retTpe) else ""
           stream.println("    def " + o.name + makeTpeParsWithBounds(otherTpePars) + otherArgs + curriedArgs
-            + (makeImplicitArgsWithCtxBoundsWithType(implicitArgsWithOverload(o), o.tpePars diff otherTpePars, without = tpePars)) + ret + " = " + makeOpMethodNameWithFutureArgs(o, a => if (a.name ==  o.args.apply(0).name) "self" else simpleArgName(a)))
+            + (makeImplicitArgsWithCtxBoundsWithType(o.tpePars diff otherTpePars, o.args, implicitArgsWithOverload(o), without = tpePars)) + ret + " = " + makeOpMethodNameWithFutureArgs(o, a => if (a.name ==  o.args.apply(0).name) "self" else simpleArgName(a)))
         }
         stream.println("  }")
         stream.println()

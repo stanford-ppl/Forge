@@ -30,15 +30,17 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
   def array_length[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[Int]
     = darray_length(__arg0)
   def array_clone[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
-    = darray_fromfunction(darray_length(__arg0), i => darray_apply(__arg0,i))
+    = darray_clone(__arg0)
+  def array_soft_clone[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+    = darray_soft_clone(__arg0)
   def array_take[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int]): Rep[ForgeArray[T]]
     = darray_take(__arg0,__arg1)
   def array_mkstring[A:Manifest](__arg0: Rep[ForgeArray[A]],__arg1: Rep[String])(implicit __imp0: SourceContext): Rep[String]
     = darray_mkstring(__arg0,__arg1)
   def array_map[T:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]], __arg1: Rep[T] => Rep[R])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]
     = darray_map(__arg0,__arg1)
-  //def array_flatmap[T:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]], __arg1: Rep[T] => Rep[ForgeArray[R]])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]
-  //  = darray_flatmap(__arg0,__arg1)
+  def array_flatmap[T:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]], __arg1: Rep[T] => Rep[ForgeArray[R]])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]
+    = darray_flatmap(__arg0,__arg1)
   def array_zip[T:Manifest,B:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[ForgeArray[B]], __arg2: (Rep[T],Rep[B]) => Rep[R])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]
     = darray_zipwith(__arg0,__arg1,__arg2)
   def array_reduce[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: (Rep[T],Rep[T]) => Rep[T],__arg2: Rep[T])(implicit __imp0: SourceContext): Rep[T]
@@ -51,13 +53,8 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
     = darray_sort(__arg0)
   def array_fromfunction[T:Manifest](__arg0: Rep[Int],__arg1: Rep[Int] => Rep[T])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
     = darray_fromfunction(__arg0,__arg1)
-  def array_fromseq[T:Manifest](__arg0: Seq[Rep[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]] = {
-    val out = darray_new[T](unit(__arg0.length))
-    for (i <- 0 until __arg0.length) {
-      out(unit(i)) = __arg0(i)
-    }
-    delite_unsafe_immutable(out)
-  }
+  def array_fromseq[T:Manifest](__arg0: Seq[Rep[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
+    = darray_fromseq(__arg0)
   def array_string_split(__arg0: Rep[String],__arg1: Rep[String],__arg2: Rep[Int] = unit(0))(implicit __imp0: SourceContext): Rep[ForgeArray[String]]
     = reflectPure(ArrayStringSplit(__arg0, __arg1, __arg2))
   def array_sortIndices[R:Manifest:Ordering](__arg0: Rep[Int], __arg1: (Rep[Int] => Rep[R]))(implicit __imp0: SourceContext): Rep[ForgeArray[Int]]
@@ -100,9 +97,10 @@ trait ScalaGenForgeArrayOps extends ScalaGenDeliteArrayOps {
   import IR._
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case ArrayApply(x,n) => emitValDef(sym, "" + quote(x) + "(" + quote(n) + ")")
+    case ArrayApply(x,n) => emitValDef(sym, "" + quote(x) + "(" + quote(n) + ".toInt)")
     case ArrayLength(x) => emitValDef(sym, "" + quote(x) + ".length")
     // TODO
+    case ArrayStringSplit(a,b,l) if Config.intSize == "long" => emitValDef(sym, "ppl.delite.runtime.data.RaggedNativeArray(" + quote(a) + ".split(" + quote(b) + "))")
     case ArrayStringSplit(a,b,l) if Config.generateSerializable => emitValDef(sym, "new ppl.delite.runtime.data.LocalDeliteArrayObject[String](" + quote(a) + ".split(" + quote(b) + "))")
     case ArrayStringSplit(a,b,l) => emitValDef(sym, quote(a) + ".split(" + quote(b) + ", " + quote(l) + ")")
     case _ => super.emitNode(sym,rhs)
@@ -146,8 +144,8 @@ trait ForgeArrayBufferOpsExp extends DeliteArrayBufferOpsExp {
     = darray_buffer_immutable[T](__arg0)
   def array_buffer_strict_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
     = darray_buffer_new[T](__arg0,__arg0)
-  def array_buffer_new_imm[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
-    = darray_buffer_new_imm[T](__arg0,array_length(__arg0))
+  def array_buffer_new_imm[T:Manifest](__arg0: Rep[ForgeArray[T]], __arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
+    = darray_buffer_new_imm[T](__arg0,__arg1)
   def array_buffer_copy[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[Int],__arg2: Rep[ForgeArrayBuffer[T]],__arg3: Rep[Int],__arg4: Rep[Int])(implicit __imp0: SourceContext): Rep[Unit]
     = darray_copy(darray_buffer_raw_data(asDeliteArrayBuffer(__arg0)), __arg1, darray_buffer_raw_data(asDeliteArrayBuffer(__arg2)), __arg3, __arg4)
   def array_buffer_update[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[Int],__arg2: Rep[T])(implicit __imp0: SourceContext): Rep[Unit]
@@ -184,6 +182,8 @@ trait ForgeArrayBufferOpsExp extends DeliteArrayBufferOpsExp {
     = darray_buffer_foreach(__arg0,__arg1)
   def array_buffer_forIndices[T:Manifest](__arg0: Rep[ForgeArrayBuffer[T]],__arg1: Rep[Int] => Rep[Unit])(implicit __imp0: SourceContext): Rep[Unit]
     = darray_buffer_forIndices(__arg0,__arg1)
+  def array_buffer_fromfunction[T:Manifest](__arg0: Rep[Int], __arg1: Rep[Int] => Rep[T])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]]
+    = darray_buffer_from_function(__arg0, __arg1)
 }
 trait ScalaGenForgeArrayBufferOps extends ScalaGenDeliteArrayBufferOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp }
 trait CudaGenForgeArrayBufferOps extends CudaGenDeliteArrayBufferOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp }

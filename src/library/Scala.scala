@@ -21,6 +21,7 @@ trait ScalaOps extends PrimitiveMathGen {
     importMath()
     importTuples()
     importHashMap()
+    importByteBuffer()
   }
 
   /**
@@ -78,6 +79,7 @@ trait ScalaOps extends PrimitiveMathGen {
 
     fimplicit (Prim) ("repInt2ToRepDouble", Nil, MInt :: MDouble) implements composite ${ $0.toDouble }
     fimplicit (Prim) ("repInt2ToRepFloat", Nil, MInt :: MFloat) implements composite ${ $0.toFloat }
+    fimplicit (Prim) ("repInt2ToRepLong", Nil, MInt :: MLong) implements composite ${ $0.toLong }
     fimplicit (Prim) ("repFloat2ToRepDouble", Nil, MFloat :: MDouble) implements composite ${ $0.toDouble }
 
     // specialized versions for primitives
@@ -116,6 +118,7 @@ trait ScalaOps extends PrimitiveMathGen {
     val long_shift_right_unsigned = direct (Prim) ("forge_long_shift_right_unsigned", Nil, (MLong,MInt) :: MLong)
     val long_shift_right = direct (Prim) ("forge_long_shift_right", Nil, (MLong,MInt) :: MLong)
     val long_shift_left = direct (Prim) ("forge_long_shift_left", Nil, (MLong,MInt) :: MLong)
+    val long_mod = infix (Prim) ("%", Nil, (MLong,MLong) :: MLong)
     val long_bitwise_not = infix (Prim) ("unary_~", Nil, MLong :: MLong)
     impl (long_shift_right_unsigned) (codegen($cala, ${ $0 >>> $1 }))
 
@@ -151,6 +154,7 @@ trait ScalaOps extends PrimitiveMathGen {
       impl (long_binary_xor) (codegen(g, ${$0 ^ $1}))
       impl (long_shift_right) (codegen(g, ${ $0 >> $1 }))
       impl (long_shift_left) (codegen(g, ${ $0 << $1 }))
+      impl (long_mod) (codegen(g, ${$0 % $1}))
       impl (long_bitwise_not) (codegen(g, ${~$0}))
     }
 
@@ -212,10 +216,10 @@ trait ScalaOps extends PrimitiveMathGen {
     }))
 
     val immutable = infix (Misc) ("unsafeImmutable", List(T), List(T) :: T, aliasHint = copies(0))
-    impl (immutable) (codegen($cala, quotedArg(0) + " // unsafe immutable"))
+    impl (immutable) (codegen($cala, quotedArg(0) + " /* unsafe immutable */"))
 
-    val mutable = infix (Misc) ("unsafeMutable", List(T), List(T) :: T)
-    impl (mutable) (codegen($cala, quotedArg(0) + " // unsafe mutable"))
+    val mut = infix (Misc) ("unsafeMutable", List(T), List(T) :: T, effect = mutable, aliasHint = copies(0))
+    impl (mut) (codegen($cala, quotedArg(0) + " /* unsafe mutable */"))
 
     for (g <- List(cuda, cpp)) {
       impl (exit) (codegen(g, ${exit($0)}))
@@ -225,6 +229,10 @@ trait ScalaOps extends PrimitiveMathGen {
       impl (println2) (codegen(g, ${std::cout << std::endl}))
       impl (immutable) (codegen(g, ${$0}))
     }
+
+    direct (Misc) ("getMaxHeapSize", Nil, Nil :: MLong) implements codegen($cala, ${
+      Runtime.getRuntime.maxMemory()
+    })
   }
 
   def importCasts() = {
@@ -347,6 +355,9 @@ trait ScalaOps extends PrimitiveMathGen {
     val contains = infix (Str) ("contains", Nil, (MString,MString) :: MBoolean)
     val substring1 = infix (Str) ("substring", Nil, (MString,MInt) :: MString)
     val substring2 = infix (Str) ("substring", Nil, (MString,MInt,MInt) :: MString)
+    val toLowerCase = infix (Str) ("toLowerCase", Nil, MString :: MString)
+    val toUpperCase = infix (Str) ("toUpperCase", Nil, MString :: MString)
+    val getBytes = infix (Str) ("getBytes", Nil, MString :: MArray(MByte))
 
     impl (toInt) (codegen($cala, ${ $0.toInt }))
     impl (toLong) (codegen($cala, ${ $0.toLong }))
@@ -361,6 +372,9 @@ trait ScalaOps extends PrimitiveMathGen {
     impl (contains) (codegen($cala, ${ $0.contains($1) }))
     impl (substring1) (codegen($cala, ${ $0.substring($1) }))
     impl (substring2) (codegen($cala, ${ $0.substring($1,$2) }))
+    impl (toLowerCase) (codegen($cala, ${ $0.toLowerCase }))
+    impl (toUpperCase) (codegen($cala, ${ $0.toUpperCase }))
+    impl (getBytes) (codegen($cala, ${ $0.getBytes() }))
 
     impl (toInt) (codegen(cpp, ${ string_toInt($0) }))
     impl (toLong) (codegen(cpp, ${ string_toLong($0) }))
@@ -602,8 +616,32 @@ trait ScalaOps extends PrimitiveMathGen {
 
     infix (HashMapOps) ("apply", (K,V), (CHashMap(K,V), K) :: V) implements codegen($cala, ${ $0.get($1) })
     infix (HashMapOps) ("update", (K,V), (CHashMap(K,V), K, V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $0.put($1,$2); () })
-    infix (HashMapOps) ("contains", (K,V), (CHashMap(K,V), K) :: MBoolean) implements codegen($cala, ${ $0.contains($1) })
+    infix (HashMapOps) ("contains", (K,V), (CHashMap(K,V), K) :: MBoolean) implements codegen($cala, ${ $0.containsKey($1) })
     infix (HashMapOps) ("keys", (K,V), CHashMap(K,V) :: MArray(K)) implements composite ${ farray_from_sarray(chashmap_keys_array($0)) }
     infix (HashMapOps) ("values", (K,V), CHashMap(K,V) :: MArray(V)) implements composite ${ farray_from_sarray(chashmap_values_array($0)) }
+  }
+
+  def importByteBuffer() = {
+    val ByteBuffer = tpe("java.nio.ByteBuffer")
+    val IntBuffer = tpe("java.nio.IntBuffer")
+    val DoubleBuffer = tpe("java.nio.DoubleBuffer")
+
+    val ByteBufferOps = grp("SByteBuffer")
+    direct (ByteBufferOps) ("ByteBuffer", Nil, MInt :: ByteBuffer, effect = mutable) implements codegen($cala, ${ java.nio.ByteBuffer.allocate($0) })
+    direct (ByteBufferOps) ("ByteBufferWrap", Nil, MArray(MByte) :: ByteBuffer, effect = mutable) implements codegen($cala, ${ java.nio.ByteBuffer.wrap($0) })
+
+    infix (ByteBufferOps) ("rewind", Nil, ByteBuffer :: MUnit, effect = write(0)) implements codegen($cala, ${ $0.rewind(); () })
+    infix (ByteBufferOps) ("array", Nil, ByteBuffer :: MArray(MByte)) implements codegen($cala, ${ $0.array })
+
+    infix (ByteBufferOps) ("getInt", Nil, ByteBuffer :: MInt) implements codegen($cala, ${ $0.getInt() })
+    infix (ByteBufferOps) ("getDouble", Nil, ByteBuffer :: MDouble) implements codegen($cala, ${ $0.getDouble() })
+    infix (ByteBufferOps) ("putInt", Nil, (ByteBuffer, MInt) :: ByteBuffer, effect = write(0)) implements codegen($cala, ${ $0.putInt($1) })
+    infix (ByteBufferOps) ("putDouble", Nil, (ByteBuffer, MDouble) :: ByteBuffer, effect = write(0)) implements codegen($cala, ${ $0.putDouble($1) })
+
+    // We deviate slightly from the actual ByteBuffer API here to observe our nested mutability rules by chaining the operations together implicitly.
+    infix (ByteBufferOps) ("get", Nil, (ByteBuffer, MArray(MInt), MInt, MInt) :: IntBuffer, effect = write(1)) implements codegen($cala, ${ $0.asIntBuffer.get($1, $2, $3) })
+    infix (ByteBufferOps) ("get", Nil, (ByteBuffer, MArray(MDouble), MInt, MInt) :: DoubleBuffer, effect = write(1)) implements codegen($cala, ${ $0.asDoubleBuffer.get($1, $2, $3) })
+    infix (ByteBufferOps) ("put", Nil, (ByteBuffer, MArray(MInt), MInt, MInt) :: IntBuffer, effect = write(0)) implements codegen($cala, ${ $0.asIntBuffer.put($1, $2, $3) })
+    infix (ByteBufferOps) ("put", Nil, (ByteBuffer, MArray(MDouble), MInt, MInt) :: DoubleBuffer, effect = write(0)) implements codegen($cala, ${ $0.asDoubleBuffer.put($1, $2, $3) })
   }
 }

@@ -59,7 +59,7 @@ trait DenseVectorAccessors extends ForgeTestModule with OptiMLApplication {
     collect(vSlice == DenseVector(1,2))
     val vSlice2 = v2(3::5)
     collect(vSlice2 == DenseVector(4,5))
-    val vSlice3 = v2(IndexVector((4,2,0)))
+    val vSlice3 = v2(IndexVector(DenseVector(4,2,0)))
     collect(vSlice3 == DenseVector(5,3,1))
 
     mkReport
@@ -82,7 +82,9 @@ trait DenseVectorOperators extends ForgeTestModule with OptiMLApplication {
     collect(median(v2) == 3)
     collect(mean(v2) == 3)
     collect(max(v2) == 5)
+    collect(v2(v2.maxIndex) == 5)
     collect(min(v2) == 1)
+    collect(v2(v2.minIndex) == 1)
     collect(mean(3,6,2,5) == 4.0)
 
     mkReport
@@ -198,7 +200,7 @@ trait Init extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
     val v1 = DenseVector(1,2,3,4,5)
-    val v2 = DenseVector(1.,2.,3.,4.,5.)
+    val v2 = DenseVector(1.0,2.0,3.0,4.0,5.0)
 
     // just make sure we can reach here without an error
     collect(true)
@@ -267,8 +269,8 @@ object DistRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompile
 trait Dist extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
-    val v1 = DenseVector(10.,10.,5.,5.,0.)
-    val v2 = DenseVector(5.,5.,10.,10.,-5.)
+    val v1 = DenseVector(10.0,10.0,5.0,5.0,0.0)
+    val v2 = DenseVector(5.0,5.0,10.0,10.0,-5.0)
 
     collect(dist(v1,v2) == 25)
     mkReport
@@ -280,11 +282,16 @@ object DistinctRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCom
 trait Distinct extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
-    val v1 = DenseVector(10.,10.,5.,5.,0.)
-
-    collect(v1.contains(5.))
+    val v1 = DenseVector(10.0,10.0,5.0,5.0,0.0)
+    collect(v1.contains(5.0))
     collect(!v1.contains(7.5))
-    collect(v1.distinct == DenseVector(10.,5.,0.))
+
+    val v2 = v1.distinct
+    collect(v2.length == 3)
+    collect(v2.contains(10.0))
+    collect(v2.contains(5.0))
+    collect(v2.contains(0.0))
+
     mkReport
   }
 }
@@ -305,7 +312,7 @@ trait Median extends ForgeTestModule with OptiMLApplication {
 // trait NearestNeighbor extends ForgeTestModule with OptiMLApplication {
 //   def main() = {
 
-//     val m = DenseMatrix((1,1,1,1), (9,9,9,9), (-2,-2,-2,-2), (0,0,0,0), (1,1,1,1))
+//     val m = DenseMatrix(DenseVector(1,1,1,1), DenseVector(9,9,9,9), DenseVector(-2,-2,-2,-2), DenseVector(0,0,0,0), DenseVector(1,1,1,1))
 //     val nearestUnique = nearestNeighborIndex(0, m, false)
 //     collect(nearestUnique == 3)
 //     val nearestAny = nearestNeighborIndex(0, m)
@@ -314,18 +321,17 @@ trait Median extends ForgeTestModule with OptiMLApplication {
 //   }
 // }
 
-// object SampleRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Sample
-// object SampleRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Sample
-// trait Sample extends ForgeTestModule with OptiMLApplication {
-//   def main() = {
+object SampleRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Sample
+object SampleRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Sample
+trait Sample extends ForgeTestModule with OptiMLApplication {
+  def main() = {
 
-//     val v = (0::100)
-//     val vs = sample[Int,DenseVector[Int]](v, 10)
-//     //val vs = sample(v, 10)
-//     vs foreach { e => collect(v contains e) }
-//     mkReport
-//   }
-// }
+    val v = (0::100)
+    val vs = sample(v, 0.1)
+    vs foreach { e => collect(v contains e) }
+    mkReport
+  }
+}
 
 object GroupByRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with GroupBy
 object GroupByRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with GroupBy
@@ -368,9 +374,25 @@ object SimpleFlattenRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicati
 trait SimpleFlatten extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
-    val x = DenseVector((1,2,3,4,5), (6,7,8,9))
+    val x = DenseVector(DenseVector(1,2,3,4,5), DenseVector(6,7,8,9))
     val y = DenseVector.flatten(x)
     collect(y == DenseVector(1,2,3,4,5,6,7,8,9))
+    mkReport
+  }
+}
+
+object PartitionRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Partition
+object PartitionRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Partition
+trait Partition extends ForgeTestModule with OptiMLApplication {
+  def main() = {
+    val x = DenseVector.rand(100)
+    val (a,b) = unpack(x.partition(_ > 0.5))
+    collect(sum(abs((a << b).sort - x.sort)) < 0.01)
+
+    // We had issues with broken fusion of filters and partitions, so test that it's working here.
+    val xf = x.filter(_ > 0.2)
+    val (a2,b2) = unpack(xf.partition(_ > 0.7))
+    collect(sum(abs((a2 << b2).sort - xf.sort)) < 0.01)
     mkReport
   }
 }
@@ -390,10 +412,11 @@ class DenseVectorSuiteInterpreter extends ForgeSuiteInterpreter {
   def testDistinct() { runTest(DistinctRunnerI) }
   def testMedian() { runTest(MedianRunnerI) }
   // def testNearestNeighbor() { runTest(NearestNeighborRunnerI) }
-  // def testSample() { runTest(SampleRunnerI) }
+  def testSample() { runTest(SampleRunnerI) }
   def testGroupBy() { runTest(GroupByRunnerI) }
   def testFlatMap() { runTest(SimpleFlatMapRunnerI) }
   def testFlatten() { runTest(SimpleFlattenRunnerI) }
+  def testPartition() { runTest(PartitionRunnerI) }
 }
 
 class DenseVectorSuiteCompiler extends ForgeSuiteCompiler {
@@ -411,9 +434,10 @@ class DenseVectorSuiteCompiler extends ForgeSuiteCompiler {
   def testDistinct() { runTest(DistinctRunnerC) }
   def testMedian() { runTest(MedianRunnerC) }
   // def testNearestNeighbor() { runTest(NearestNeighborRunnerC) }
-  // def testSample() { runTest(SampleRunnerC) }
+  def testSample() { runTest(SampleRunnerC) }
   def testGroupBy() { runTest(GroupByRunnerC) }
   def testFlatMap() { runTest(SimpleFlatMapRunnerC) }
   def testFlatten() { runTest(SimpleFlattenRunnerC) }
+  def testPartition() { runTest(PartitionRunnerC) }
 }
 

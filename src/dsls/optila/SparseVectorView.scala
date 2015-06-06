@@ -19,21 +19,21 @@ trait SparseVectorViewOps {
     val Tuple6 = lookupTpe("Tup6")
 
     // data fields
-    data(SparseVectorView, ("_source", SparseMatrix(T)), ("_start", MInt), ("_stride", MInt), ("_length", MInt), ("_isRow", MBoolean))
+    data(SparseVectorView, ("_source", SparseMatrix(T)), ("_start", MLong), ("_stride", MInt), ("_length", MInt), ("_isRow", MBoolean))
 
     // static methods
-    static (SparseVectorView) ("apply", T, ((SparseMatrix(T), MInt, MInt, MInt, MBoolean) :: SparseVectorView)) implements allocates(SparseVectorView, ${$0}, ${$1}, ${$2}, ${$3}, ${$4})
+    static (SparseVectorView) ("apply", T, ((SparseMatrix(T), MLong, MInt, MInt, MBoolean) :: SparseVectorView)) implements allocates(SparseVectorView, ${$0}, ${$1}, ${$2}, ${$3}, ${$4})
 
     val SparseVectorViewOps = withTpe(SparseVectorView)
     SparseVectorViewOps {
       compiler ("sparsevectorview_source") (Nil :: SparseMatrix(T)) implements getter(0, "_source")
-      compiler ("sparsevectorview_start") (Nil :: MInt) implements getter(0, "_start")
+      compiler ("sparsevectorview_start") (Nil :: MLong) implements getter(0, "_start")
       compiler ("sparsevectorview_stride") (Nil :: MInt) implements getter(0, "_stride")
 
       compiler ("sparsevectorview_calc_offsets_all") (Nil :: Tuple6(MInt,MInt,MInt,MInt,MInt,MInt)) implements composite ${
         val numCols = sparsevectorview_source($self).numCols
         val (startRow,startCol) = unpack(matrix_shapeindex(sparsevectorview_start($self), numCols))
-        val (endRow,endCol) = unpack(matrix_shapeindex(sparsevectorview_start($self)+sparsevectorview_stride($self)*$self.length, numCols))
+        val (endRow,endCol) = unpack(matrix_shapeindex(sparsevectorview_start($self)+sparsevectorview_stride($self).toLong*$self.length, numCols))
         val rowPtr = sparsematrix_csr_rowptr(sparsevectorview_source($self))
         pack(startRow,endRow,startCol,endCol,rowPtr(startRow),rowPtr(endRow))
       }
@@ -51,6 +51,7 @@ trait SparseVectorViewOps {
 
       infix ("length") (Nil :: MInt) implements getter(0, "_length")
       infix ("isRow") (Nil :: MBoolean) implements getter(0, "_isRow")
+
       infix ("apply") (MInt :: T) implements composite ${
         val flatIdx = sparsevectorview_start($self) + sparsevectorview_stride($self)*$1
         val src = sparsevectorview_source($self)
@@ -87,7 +88,7 @@ trait SparseVectorViewOps {
         }
       }
 
-      infix ("indices") (Nil :: IndexVector) implements single ${
+      infix ("indices") (Nil :: IndexVector) implements composite ${
         if (sparsevectorview_stride($self) == 1) {
           // could use a view, except we need to return an IndexVector
           val (startOffset, endOffset) = unpack(sparsevectorview_calc_offsets($self))
@@ -144,7 +145,7 @@ trait SparseVectorViewOps {
         sparsevectorview_source($self) == sparsevectorview_source($1)
       }
 
-      direct ("__equal") (SparseVector(T) :: MBoolean) implements single ${
+      direct ("__equal") (SparseVector(T) :: MBoolean) implements composite ${
         if ($self.length != $1.length || $self.nnz != $1.nnz || $self.isRow != $1.isRow) false
         else {
           val (startOffset, endOffset) = unpack(sparsevectorview_calc_offsets($self))
@@ -171,7 +172,7 @@ trait SparseVectorViewOps {
         }
       }
 
-      infix ("toString") (Nil :: MString) implements single ${ $self.toSparse.toString }
+      infix ("toString") (Nil :: MString) implements composite ${ $self.toSparse.toString }
 
       fimplicit ("viewToSparse") (Nil :: SparseVector(T)) implements composite ${
         if (Settings.verbose > 0) println("(performance warning): automatic conversion from SparseVectorView to SparseVector")
@@ -183,5 +184,7 @@ trait SparseVectorViewOps {
         repTo\${grpName}SparseVectorOpsCls(viewToSparse($self))
       }
     }
+
+    addSparseVectorCommonOps(SparseVectorView, T)
   }
 }

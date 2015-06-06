@@ -30,31 +30,52 @@ trait RandomOps {
     }
 
     val randomint = direct (Rand) ("randomInt", Nil, MInt :: MInt, effect = simple)
-    impl (randomint) (codegen($cala, ${ Global.randRef.nextInt($0) }))
+    impl (randomint) (codegen($cala, ${
+      if (Global.useThreadLocalRandom) java.util.concurrent.ThreadLocalRandom.current().nextInt($0.toInt)
+      else Global.randRef.nextInt($0.toInt)
+    }))
     impl (randomint) (codegen(cpp, ${ resourceInfo->rand->nextInt($0) }))
 
     val randomgaussian = direct (Rand) ("randomGaussian", Nil, Nil :: MDouble, effect = simple)
-    impl (randomgaussian) (codegen($cala, ${ Global.randRef.nextGaussian() }))
+    impl (randomgaussian) (codegen($cala, ${
+      if (Global.useThreadLocalRandom) java.util.concurrent.ThreadLocalRandom.current().nextGaussian()
+      else Global.randRef.nextGaussian()
+    }))
     impl (randomgaussian) (codegen(cpp, ${ resourceInfo->rand->nextGaussian() }))
 
     val reseed = direct (Rand) ("reseed", Nil, Nil :: MUnit, effect = simple)
-    impl (reseed) (codegen($cala, ${ Global.randRef.setSeed(Global.INITIAL_SEED) }))
+    impl (reseed) (codegen($cala, ${
+      if (Global.useThreadLocalRandom) java.util.concurrent.ThreadLocalRandom.current().setSeed(Global.INITIAL_SEED)
+      else Global.randRef.setSeed(Global.INITIAL_SEED)
+    }))
     impl (reseed) (codegen(cpp, ${ fprintf(stderr, "WARNING: reseed is not currently implemented\\n") }))
 
     val randdouble = compiler (Rand) ("optila_rand_double", Nil, Nil :: MDouble, effect = simple)
-    impl (randdouble) (codegen($cala, ${ Global.randRef.nextDouble() }))
+    impl (randdouble) (codegen($cala, ${
+      if (Global.useThreadLocalRandom) java.util.concurrent.ThreadLocalRandom.current().nextDouble()
+      else Global.randRef.nextDouble()
+    }))
     impl (randdouble) (codegen(cpp, ${ resourceInfo->rand->nextDouble() }))
 
     val randfloat = compiler (Rand) ("optila_rand_float", Nil, Nil :: MFloat, effect = simple)
-    impl (randfloat) (codegen($cala, ${ Global.randRef.nextFloat() }))
+    impl (randfloat) (codegen($cala, ${
+      if (Global.useThreadLocalRandom) java.util.concurrent.ThreadLocalRandom.current().nextFloat()
+      else Global.randRef.nextFloat()
+    }))
     impl (randfloat) (codegen(cpp, ${ resourceInfo->rand->nextFloat() }))
 
     val randint = compiler (Rand) ("optila_rand_int", Nil, Nil :: MInt, effect = simple)
-    impl (randint) (codegen($cala, ${ Global.randRef.nextInt() }))
+    impl (randint) (codegen($cala, ${
+      if (Global.useThreadLocalRandom) java.util.concurrent.ThreadLocalRandom.current().nextInt()
+      else Global.randRef.nextInt()
+    }))
     impl (randint) (codegen(cpp, ${ resourceInfo->rand->nextInt() }))
 
     val randboolean = compiler (Rand) ("optila_rand_boolean", Nil, Nil :: MBoolean, effect = simple)
-    impl (randboolean) (codegen($cala, ${ Global.randRef.nextBoolean() }))
+    impl (randboolean) (codegen($cala, ${
+      if (Global.useThreadLocalRandom) java.util.concurrent.ThreadLocalRandom.current().nextBoolean()
+      else Global.randRef.nextBoolean()
+    }))
     impl (randboolean) (codegen(cpp, ${ resourceInfo->rand->nextBoolean() }))
 
     direct (Rand) ("shuffle", Nil, IndexVector :: IndexVector, effect = simple) implements composite ${
@@ -76,7 +97,7 @@ trait RandomOps {
     }
 
     // any good parallel implementation?
-    compiler (Rand) ("optila_shuffle_array", A, MArray(A) :: MArray(A), effect = simple) implements single ${
+    compiler (Rand) ("optila_shuffle_array", A, MArray(A) :: MArray(A), effect = simple) implements composite ${
       val len = array_length($0)
       val out = array_empty[A](len)
       array_copy($0, 0, out, 0, len)
@@ -114,16 +135,16 @@ trait RandomOps {
       }
 
       sampled.unsafeImmutable
-    }      
+    }
 
-    direct (Rand) ("sample", A, MethodSignature(List(("m",DenseMatrix(A)), ("pct", MDouble), ("sampleRows", MBoolean, "unit(true)")), DenseMatrix(A)), effect = simple) implements composite ${      
+    direct (Rand) ("sample", A, MethodSignature(List(("m",DenseMatrix(A)), ("pct", MDouble), ("sampleRows", MBoolean, "unit(true)")), DenseMatrix(A)), effect = simple) implements composite ${
       val numSamples = if (sampleRows) ceil(m.numRows*pct) else ceil(m.numCols*pct)
       val length = if (sampleRows) m.numRows else m.numCols
       val newRows = if (sampleRows) numSamples else m.numRows
       val newCols = if (sampleRows) m.numCols else numSamples
 
       val sampled = if (sampleRows) DenseMatrix[A](0, newCols) else DenseMatrix[A](0, newRows) // transposed for efficiency
-      
+
       val candidates = (0::length).mutable
 
       // transpose to make constructing sampling more efficient

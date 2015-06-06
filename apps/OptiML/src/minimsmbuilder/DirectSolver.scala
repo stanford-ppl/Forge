@@ -84,7 +84,7 @@ trait DirectSolver extends OptiMLApplication {
     val a1 = d1/d4
     val a0 = d0/d4
 
-    val au2 = -1.*a2
+    val au2 = -1.0*a2
     val au1 = (a1*a3 - 4.0*a0) 
     val au0 = 4.0*a0*a2 - a1*a1 - a0*a3*a3
 
@@ -147,10 +147,10 @@ trait DirectSolver extends OptiMLApplication {
 
     if (delta > 0.0) {
       var s1 = r + sqrt(delta)
-      s1 = if (s1 >= 0.0) pow(s1,1./3.) else -1.*pow(s1*(-1.),1./3.)  // FIXME AKS: unary_- with vars
+      s1 = if (s1 >= 0.0) pow(s1,1.0/3.0) else -1.0*pow(s1*(-1.0),1.0/3.0)  // FIXME AKS: unary_- with vars
 
       var s2 = r - sqrt(delta)
-      s2 = if (s2 >= 0.0) pow(s2,1./3.) else -1.*pow(s2*(-1.),1./3.)
+      s2 = if (s2 >= 0.0) pow(s2,1.0/3.0) else -1.0*pow(s2*(-1.0),1.0/3.0)
 
       val t = -0.5 * (s1+s2) - a2/3.0
       NewCubicResult((s1+s2) - a2/3.0, t, t, 1)
@@ -161,11 +161,11 @@ trait DirectSolver extends OptiMLApplication {
       val sinth = sin(theta)
       val sq = sqrt(-1.0*q)
 
-      NewCubicResult(2.0*sq*costh - a2/3.0, -1.0*sq*costh - a2/3.0 - sqrt(3.) * sq * sinth, -1.0*sq*costh - a2/3.0 + sqrt(3.) * sq * sinth, 3)
+      NewCubicResult(2.0*sq*costh - a2/3.0, -1.0*sq*costh - a2/3.0 - sqrt(3.0) * sq * sinth, -1.0*sq*costh - a2/3.0 + sqrt(3.0) * sq * sinth, 3)
     }
     else {
-      val s = if (r >= 0.0) pow(r,1./3.) else -1.0*pow(-1.*r,1./3.)      
-      val t = -1.*s - a2/3.0      
+      val s = if (r >= 0.0) pow(r,1.0/3.0) else -1.0*pow(-1.0*r,1.0/3.0)
+      val t = -1.0*s - a2/3.0
       NewCubicResult(2.0*s - a2/3.0, t, t, 3)
     }
   }

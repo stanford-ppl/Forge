@@ -60,6 +60,7 @@ def sbtBuildFileHeader(dsl):
     s = Template("""
 import sbt._
 import Keys._
+import Tests._
 
 object ${dslName}Build extends Build {
   if (System.getProperty("showSuppressedErrors") == null) System.setProperty("showSuppressedErrors", "false")

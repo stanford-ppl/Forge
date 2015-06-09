@@ -151,8 +151,11 @@ def sbtBuildFileFooter(dsl):
     s = Template("""
   // HACK alert: with fork = true, sbt appears to ignore the -D properties passed on the command line,
   // which breaks test_all. Here we manually look for the currently relevant options. Needs a proper fix!
-  def separateTests(tests: Seq[TestDefinition]) = tests map { test => new Group(test.name, Seq(test), SubProcess(Seq("-Dtests.verbose="+System.getProperty("tests.verbose", "false"), "-Dtests.threads="+System.getProperty("tests.threads", "1"), "-Dtests.targets="+System.getProperty("tests.targets", "scala")))) }
-
+  def separateTests(tests: Seq[TestDefinition]) = {
+    if (tests.isEmpty) Seq(new Group("", Seq(), SubProcess(Seq()))) //workaround for sbt crash on empty tests
+    else tests map { test => new Group(test.name, Seq(test), SubProcess(Seq("-Dtests.verbose="+System.getProperty("tests.verbose", "false"), "-Dtests.threads="+System.getProperty("tests.threads", "1"), "-Dtests.targets="+System.getProperty("tests.targets", "scala")))) }
+  }
+  
   // build targets
   lazy val ${dslName} = Project("${dslName}", file("."), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Apps) // default
   lazy val ${dslName}Shared = Project("${dslName}-shared", file("shared"), settings = virtBuildSettings ++ deps)
@@ -291,13 +294,13 @@ def publish(dsl, opts):
     # sbt project
     if not os.path.exists(build_dir + "/project/"):
         os.mkdir(build_dir + "/project/")
-        buildFile = open(build_dir + "/project/Build.scala", 'w')
-        if opts.use_jars:
-            buildFile.write(sbtBuildFile(dsl))
-        else:
-            buildFile.write(sbtBuildFileLocal(dsl))
-        buildFile.close()
-        shutil.copyfile(FORGE_HOME + "/static/build.properties", build_dir + "/project/build.properties")
+    buildFile = open(build_dir + "/project/Build.scala", 'w')
+    if opts.use_jars:
+        buildFile.write(sbtBuildFile(dsl))
+    else:
+        buildFile.write(sbtBuildFileLocal(dsl))
+    buildFile.close()
+    shutil.copyfile(FORGE_HOME + "/static/build.properties", build_dir + "/project/build.properties")
 
     # executable scripts
     if not os.path.exists(build_dir + "/bin/"):

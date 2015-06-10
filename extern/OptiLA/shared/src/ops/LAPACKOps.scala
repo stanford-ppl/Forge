@@ -18,8 +18,7 @@ trait LAPACKCompilerOps extends LAPACKOps with LAPACKHelperOps {
   this: OptiLAApplication =>
 }
 
-trait LAPACKHelperOps {
-  this: OptiLAApplication =>
+trait LAPACKHelperOps { this: OptiLAApplication =>
 
   def ipiv_to_P(numRows: Rep[Int], ipiv: Rep[DenseVector[Int]]): Rep[DenseMatrix[Int]] = {
     val P_indices = (0::numRows).mutable

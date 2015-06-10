@@ -19,9 +19,10 @@ trait StringableOps {
 
   def importStringableOps() {
     val T = tpePar("T")
-
     val Stringable = tpeClass("Stringable", TStringable, T)
 
+    val IndexVector = lookupTpe("IndexVector")
+    
     // Stringable type class interface
     infix (Stringable) ("makeStr", T, T :: MString)
 
@@ -42,35 +43,9 @@ trait StringableOps {
     infix (StrStringable) ("makeStr", Nil, MString :: MString) implements composite ${ $0 }
 
     // OptiLA types
-    val DenseVector = lookupTpe("DenseVector")
-    val DenseVectorView = lookupTpe("DenseVectorView")
-    val IndexVector = lookupTpe("IndexVector")
-    val DenseMatrix = lookupTpe("DenseMatrix")
-    val SparseVector = lookupTpe("SparseVector")
-    val SparseMatrix = lookupTpe("SparseMatrix")
-    val SparseMatrixBuildable = lookupTpe("SparseMatrixBuildable")
-
-    val DenseVectorStringable = tpeClassInst("StringableDenseVector", T withBound TStringable, Stringable(DenseVector(T)))
-    infix (DenseVectorStringable) ("makeStr", Nil, DenseVector(T) :: MString) implements composite ${ $0.makeString }
-
-    val DenseVectorViewStringable = tpeClassInst("StringableDenseVectorView", T withBound TStringable, Stringable(DenseVectorView(T)))
-    infix (DenseVectorViewStringable) ("makeStr", Nil, DenseVectorView(T) :: MString) implements composite ${ $0.makeString }
-
+    //val Fixed = lookupTpe("Fixed")
     val IndexVectorStringable = tpeClassInst("StringableIndexVector", Nil, Stringable(IndexVector))
     infix (IndexVectorStringable) ("makeStr", Nil, IndexVector :: MString) implements composite ${ $0.makeString }
-
-    val DenseMatrixStringable = tpeClassInst("StringableDenseMatrix", T withBound TStringable, Stringable(DenseMatrix(T)))
-    infix (DenseMatrixStringable) ("makeStr", Nil, DenseMatrix(T) :: MString) implements composite ${ $0.makeString }
-
-    val SparseVectorStringable = tpeClassInst("StringableSparseVector", T withBound TStringable, Stringable(SparseVector(T)))
-    infix (SparseVectorStringable) ("makeStr", Nil, SparseVector(T) :: MString) implements composite ${ $0.makeString }
-
-    val SparseMatrixBuildableStringable = tpeClassInst("StringableSparseMatrixBuildable", T withBound TStringable, Stringable(SparseMatrixBuildable(T)))
-    infix (SparseMatrixBuildableStringable) ("makeStr", Nil, SparseMatrixBuildable(T) :: MString) implements composite ${ $0.makeString }
-
-    val SparseMatrixStringable = tpeClassInst("StringableSparseMatrix", T withBound TStringable, Stringable(SparseMatrix(T)))
-    infix (SparseMatrixStringable) ("makeStr", Nil, SparseMatrix(T) :: MString) implements composite ${ $0.makeString }
-
 
     // tuples of stringables
     for (arity <- 2 until maxTuples) {

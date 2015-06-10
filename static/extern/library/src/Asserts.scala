@@ -10,6 +10,11 @@ trait AssertsWrapper extends HUMAN_DSL_NAMEBase {
     // println("assertion failed at " + quotepos(fresh[Nothing].withPos(List(ctx))) + ": ") // quotepos not in scope
     assert(cond, err)
   }
+
+  // TODO: Way to turn off some warnings?
+  def forge_warn(cond: Rep[Boolean], msg: Rep[String], lvl: Int)(implicit ctx: SourceContext): Rep[Unit] = {
+    if (!cond) System.err.println("[\u001B[33mwarn\u001B[0m] " + msg)
+  }
 }
 
 

@@ -157,6 +157,9 @@ trait Definitions extends DerivativeTypes {
   // blacklist for op names that need the SourceContext implicit parameter to be surpressed (usually because they construct an object with an apply method)
   var noSourceContextList = List[String]()
 
+  // Add Delite primitive types without adding case statements directly
+  var primitiveTypes = List[Rep[DSLType]]()
+
   /**
    * Effect types
    */

@@ -21,14 +21,14 @@ import optila.shared.typeclass._
 import optila.compiler._
 import optila.compiler.ops._
 
-
+// TODO: Need data pinning for external LAPACK calls
 trait LAPACKOpsExp extends LAPACKOps with LinAlgOpsExp {
   this: OptiLAExp with LAPACKHelperOps =>
 
   /**
    * Intercept LAPACK-able operations
    */
-
+/*
   case class Native_linsolve(a: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]])(implicit val __pos: SourceContext) extends DeliteOpExternal[Unit] {
     override def inputs = scala.List(a,b)
     def alloc = Const(())
@@ -71,11 +71,11 @@ trait LAPACKOpsExp extends LAPACKOps with LinAlgOpsExp {
     else super.linalg_lu(a)
   }
 
-  override def linalg_chol(a: Rep[DenseMatrix[Double]], tri: Rep[String])(implicit __pos: SourceContext): Rep[DenseMatrix[Double]] = {
+ override def linalg_chol(a: Rep[DenseMatrix[Double]], tri: Rep[String])(implicit __pos: SourceContext): Rep[DenseMatrix[Double]] = {
     if (useLAPACK) {
       check_chol(a,tri)
 
-      val t = if (forge_equals(tri, unit("upper"))) unit('U') else unit('L')
+      val t = if (ordering2___equal(tri, unit("upper"))) unit('U') else unit('L')
       val alloc = a.mutable
       reflectWrite(alloc)(Native_chol(alloc, t))
       postprocess_chol(alloc, tri)
@@ -93,6 +93,7 @@ trait LAPACKOpsExp extends LAPACKOps with LinAlgOpsExp {
     case Reflect(e@Native_chol(a,t), u, es) => reflectMirrored(Reflect(new { override val original = Some(f,e) } with Native_chol(f(a),f(t))(pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e,f)
   }).asInstanceOf[Exp[A]]
+*/
 }
 
 trait CudaGenLAPACKOps
@@ -106,7 +107,7 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
   /**
    * JNI implementation
    */
-  override def emitExternalNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+  /*override def emitExternalNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case e@Native_linsolve(a,b) =>
       val args = scala.List("%1$s._data", "%2$s._data", "%1$s._numRows", "%1$s._numCols")
                  .map { _.format(quote(a), quote(b)) }
@@ -183,6 +184,6 @@ trait ScalaGenLAPACKOps extends ScalaGenExternalBase {
         }""".format(tp.toLowerCase))
 
     case _ => super.emitExternalLib(rhs)
-  }
+  }*/
 }
 

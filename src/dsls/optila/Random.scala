@@ -12,6 +12,8 @@ trait RandomOps {
     val IndexVector = lookupTpe("IndexVector")
     val DenseVector = lookupTpe("DenseVector")
     val DenseMatrix = lookupTpe("DenseMatrix")
+    val MultiArray  = lookupTpe("MultiArray")
+   	//val Fixed       = lookupTpe("Fixed")
     val A = tpePar("A")
 
     direct (Rand) ("random", A, Nil :: A) implements composite ${
@@ -29,50 +31,66 @@ trait RandomOps {
       $0(randomInt($0.length))
     }
 
-    val randomint = direct (Rand) ("randomInt", Nil, MInt :: MInt, effect = simple)
-    impl (randomint) (codegen($cala, ${ Global.randRef.nextInt($0) }))
-    impl (randomint) (codegen(cpp, ${ resourceInfo->rand->nextInt($0) }))
+    direct (Rand) ("randomInt", Nil, MInt :: MInt, effect = simple) implements codegen($cala, ${
+      Global.randRef.nextInt($0)
+    }) /*exhibits behavior ${
+      if ($0.max <= 0) {
+        warn("Argument to randomInt is always less than or equal to zero, which will result in a runtime error")(__pos)
+        SymRange[Int]
+      }
+      else SymRange[Int](0, $0.max - 1)
+    }*/
 
-    val randomgaussian = direct (Rand) ("randomGaussian", Nil, Nil :: MDouble, effect = simple)
-    impl (randomgaussian) (codegen($cala, ${ Global.randRef.nextGaussian() }))
-    impl (randomgaussian) (codegen(cpp, ${ resourceInfo->rand->nextGaussian() }))
+    direct (Rand) ("randomGaussian", Nil, Nil :: MDouble, effect = simple) implements codegen($cala, ${
+      Global.randRef.nextGaussian()
+    })
 
-    val reseed = direct (Rand) ("reseed", Nil, Nil :: MUnit, effect = simple)
-    impl (reseed) (codegen($cala, ${ Global.randRef.setSeed(Global.INITIAL_SEED) }))
-    impl (reseed) (codegen(cpp, ${ fprintf(stderr, "WARNING: reseed is not currently implemented\\n") }))
+    direct (Rand) ("reseed", Nil, Nil :: MUnit, effect = simple) implements codegen($cala, ${
+      Global.randRef.setSeed(Global.INITIAL_SEED)
+    })
+    direct (Rand) ("seed", Nil, MLong :: MUnit, effect = simple) implements codegen($cala, ${
+      Global.randRef.setSeed($0)
+    })
 
-    val randdouble = compiler (Rand) ("optila_rand_double", Nil, Nil :: MDouble, effect = simple)
-    impl (randdouble) (codegen($cala, ${ Global.randRef.nextDouble() }))
-    impl (randdouble) (codegen(cpp, ${ resourceInfo->rand->nextDouble() }))
+    compiler (Rand) ("optila_rand_double", Nil, Nil :: MDouble, effect = simple) implements codegen($cala, ${
+      Global.randRef.nextDouble()
+    }) /*exhibits behavior ${ RealRange[Double](0, 1, false, false, false) }*/
 
-    val randfloat = compiler (Rand) ("optila_rand_float", Nil, Nil :: MFloat, effect = simple)
-    impl (randfloat) (codegen($cala, ${ Global.randRef.nextFloat() }))
-    impl (randfloat) (codegen(cpp, ${ resourceInfo->rand->nextFloat() }))
+    compiler (Rand) ("optila_rand_float", Nil, Nil :: MFloat, effect = simple) implements codegen($cala, ${
+      Global.randRef.nextFloat()
+    }) /*exhibits behavior ${ RealRange[Float](0, 1, false, false, false) }*/
 
-    val randint = compiler (Rand) ("optila_rand_int", Nil, Nil :: MInt, effect = simple)
-    impl (randint) (codegen($cala, ${ Global.randRef.nextInt() }))
-    impl (randint) (codegen(cpp, ${ resourceInfo->rand->nextInt() }))
+    compiler (Rand) ("optila_rand_int", Nil, Nil :: MInt, effect = simple) implements codegen($cala, ${
+      Global.randRef.nextInt()
+    })
+    compiler (Rand) ("optila_rand_boolean", Nil, Nil :: MBoolean, effect = simple) implements codegen($cala, ${
+      Global.randRef.nextBoolean()
+    })
+    //compiler (Rand) ("optila_rand_fixed", Nil, Nil :: Fixed, effect = simple) implements single ${
+    //  Fixed(optila_rand_int)
+    //}
 
-    val randboolean = compiler (Rand) ("optila_rand_boolean", Nil, Nil :: MBoolean, effect = simple)
-    impl (randboolean) (codegen($cala, ${ Global.randRef.nextBoolean() }))
-    impl (randboolean) (codegen(cpp, ${ resourceInfo->rand->nextBoolean() }))
 
     direct (Rand) ("shuffle", Nil, IndexVector :: IndexVector, effect = simple) implements composite ${
-      indexvector_fromarray(densevector_raw_data(shuffle($0.toDense)), $0.isRow)
+    	indexvector_fromarray(fmultia_to_array(shuffle($0.toDense)), vector_dims($0))
     }
 
     direct (Rand) ("shuffle", A, DenseVector(A) :: DenseVector(A), effect = simple) implements composite ${
       val v2 = $0.mutable
-      v2.trim()
-      val a = optila_shuffle_array(densevector_raw_data(v2))
-      densevector_fromarray(a, $0.isRow)
+      val a = optila_shuffle_array(fmultia_trimmed_array(v2))
+      fmultia_fromarray(a, fmultia_dims($0), mutable = false)
     }
 
     direct (Rand) ("shuffle", A, DenseMatrix(A) :: DenseMatrix(A), effect = simple) implements composite ${
       val m2 = $0.mutable
-      m2.trim()
-      val a = optila_shuffle_array(densematrix_raw_data(m2))
-      densematrix_fromarray(a, $0.numRows, $0.numCols)
+      val a = optila_shuffle_array(fmultia_trimmed_array(m2))
+      fmultia_fromarray(a, fmultia_dims($0), mutable = false)
+    }
+
+    direct (Rand) ("shuffle", A, MultiArray(A) :: MultiArray(A), effect = simple) implements composite ${
+    	val md2 = $0.mutable
+    	val a = optila_shuffle_array(fmultia_trimmed_array(md2))
+    	fmultia_fromarray(a, fmultia_dims($0), mutable = false)
     }
 
     // any good parallel implementation?
@@ -91,56 +109,6 @@ trait RandomOps {
       }
 
       out.unsafeImmutable
-    }
-
-    direct (Rand) ("sample", Nil, (("v",IndexVector), ("pct", MDouble)) :: IndexVector, effect = simple) implements composite ${
-      IndexVector(sample($0.toDense,pct), $0.isRow)
-    }
-
-    direct (Rand) ("sample", A, (("v",DenseVector(A)), ("pct", MDouble)) :: DenseVector(A), effect = simple) implements composite ${
-      val candidates = (0::v.length).mutable
-
-      val sampled = DenseVector[A](0, v.isRow)
-      val numSamples = ceil(v.length * pct)
-      for (i <- 0 until numSamples){
-        val r = i + randomInt(v.length-i)
-        val idx = candidates(r)
-        sampled <<= v(idx)
-
-        // remove index r from consideration
-        val t = candidates(r)
-        candidates(r) = candidates(i)
-        candidates(i) = t
-      }
-
-      sampled.unsafeImmutable
-    }      
-
-    direct (Rand) ("sample", A, MethodSignature(List(("m",DenseMatrix(A)), ("pct", MDouble), ("sampleRows", MBoolean, "unit(true)")), DenseMatrix(A)), effect = simple) implements composite ${      
-      val numSamples = if (sampleRows) ceil(m.numRows*pct) else ceil(m.numCols*pct)
-      val length = if (sampleRows) m.numRows else m.numCols
-      val newRows = if (sampleRows) numSamples else m.numRows
-      val newCols = if (sampleRows) m.numCols else numSamples
-
-      val sampled = if (sampleRows) DenseMatrix[A](0, newCols) else DenseMatrix[A](0, newRows) // transposed for efficiency
-      
-      val candidates = (0::length).mutable
-
-      // transpose to make constructing sampling more efficient
-      val mt = if (sampleRows) m else m.t
-
-      for (i <- 0 until numSamples){
-        val r = i + randomInt(length-i)
-        val idx = candidates(r)
-        sampled <<= mt(idx).Clone
-
-        // remove index r from consideration
-        val t = candidates(r)
-        candidates(r) = candidates(i)
-        candidates(i) = t
-      }
-
-      if (sampleRows) sampled else sampled.t
     }
   }
 }

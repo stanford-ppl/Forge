@@ -1,15 +1,5 @@
 package optila.library
 
-/* Global values used in generated OptiLA code.
- *
- * author:  Arvind Sujeeth (asujeeth@stanford.edu)
- * created: 12/30/10
- *
- * Pervasive Parallelism Laboratory (PPL)
- * Stanford University
- *
- */
-
 object Global {
 
   //////////////////////////////////////

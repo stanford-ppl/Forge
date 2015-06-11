@@ -13,10 +13,9 @@ trait SparseVectorOps {
     val A = tpePar("A")
     val B = tpePar("B")
 
-    val DenseVector = lookupTpe("DenseVector")
-    val DenseVectorView = lookupTpe("DenseVectorView")
-    val DenseMatrix = lookupTpe("DenseMatrix")
     val IndexVector = lookupTpe("IndexVector")
+    val DenseVector = lookupTpe("DenseVector")
+    val DenseMatrix = lookupTpe("DenseMatrix")
     val SparseVector = lookupTpe("SparseVector")
     val SparseVectorView = lookupTpe("SparseVectorView")
 
@@ -32,7 +31,7 @@ trait SparseVectorOps {
 
     compiler (SparseVector) ("sparsevector_fromfunc", T, (MInt, MBoolean, IndexVector, MInt ==> T) :: SparseVector(T)) implements composite ${
       val sorted = $2.sort
-      sparsevector_alloc_raw($0, $1, densevector_raw_data(sorted.map($3)), densevector_raw_data(sorted), sorted.length)
+      sparsevector_alloc_raw($0, $1, densevector_raw_data(sorted.map($3)).flatPinHACK, densevector_raw_data(sorted).flatPinHACK, sorted.length)
     }
     static (SparseVector) ("zeros", Nil, MInt :: SparseVector(MDouble)) implements redirect ${ SparseVector[Double]($0, unit(true)) }
     static (SparseVector) ("zerosf", Nil, MInt :: SparseVector(MFloat)) implements redirect ${ SparseVector[Float]($0, unit(true)) }
@@ -177,12 +176,14 @@ trait SparseVectorOps {
       infix ("isRow") (Nil :: MBoolean) implements getter(0, "_isRow")
       infix ("nnz") (Nil :: MInt) implements getter(0, "_nnz")
 
-      infix ("nz") (Nil :: DenseVectorView(T), aliasHint = contains(0)) implements single ${
+      infix ("nz") (Nil :: DenseVector(T), aliasHint = contains(0)) implements composite ${
         // densevector_alloc_raw($self.nnz, $self.isRow, sparsevector_raw_data($self))
-        DenseVectorView[T](sparsevector_raw_data($self), 0, 1, $self.nnz, $self.isRow)
+        densevector_fromarray1d(Array1D.flatPinHACK(sparsevector_raw_data($self)).slice(0, $self.nnz), $self.isRow)
       }
 
-      infix ("indices") (Nil :: IndexVector) implements composite ${ indexvector_fromarray(array_take(sparsevector_raw_indices($self), $self.nnz), $self.isRow) }
+      infix ("indices") (Nil :: IndexVector) implements composite ${ 
+        indexvector_fromarray1d(Array1D.flatPinHACK(array_take(sparsevector_raw_indices($self), $self.nnz)), $self.isRow) 
+      }
 
       compiler ("sparsevector_find_offset") (("pos",MInt) :: MInt) implements composite ${
         val indices = sparsevector_raw_indices($self)
@@ -196,12 +197,13 @@ trait SparseVectorOps {
       }
 
       infix ("apply") (IndexVector :: SparseVector(T)) implements composite ${
+        val inds = if (isWild($1)) $self.indices else $1
         // could optimize this by sorting the argument IndexVector first, and then bounding the search space
         val data = sparsevector_raw_data($self)
-        val offsets = $1.map(i => sparsevector_find_offset($self,i))
+        val offsets = inds.map(i => sparsevector_find_offset($self,i))
         val logicalIndices = offsets.find(_ > -1) // relies on fusion to not materialize zeros (we could use a map-filter op here instead)
         val physicalIndices = logicalIndices.map(i => offsets(i))
-        sparsevector_alloc_raw($1.length, $self.isRow, densevector_raw_data(physicalIndices.map(i => array_apply(data,i))), densevector_raw_data(logicalIndices), logicalIndices.length)
+        sparsevector_alloc_raw(inds.length, $self.isRow, densevector_raw_data(physicalIndices.map(i => array_apply(data,i))), densevector_raw_data(logicalIndices), logicalIndices.length)
       }
 
       infix ("isEmpty") (Nil :: MBoolean) implements single ${ $self.nnz == 0 }
@@ -219,15 +221,23 @@ trait SparseVectorOps {
         else densevector_alloc_raw($self.nnz, true, sparsevector_raw_data($self)).contains($1)
       }
 
+      // FIXME: Pinning hack
+      // Changed to use HashMap - needs to be tested
       infix ("distinct") (Nil :: DenseVector(T)) implements composite ${
-        val data = densevector_alloc_raw($self.nnz, true, sparsevector_raw_data($self))
+        val data = densevector_fromarray1d(Array1D.flatPinHACK(sparsevector_raw_data($self)).slice(0, $self.nnz), true)
+        val set = SHashMap[T, Boolean]()
         val out = DenseVector[T](0, $self.isRow)
 
-        if ($self.nnz < $self.length) out <<= defaultValue[T]
+        if ($self.nnz < $self.length) {
+          out <<= defaultValue[T]
+          set(defaultValue[T]) = true
+        }
 
         for (i <- 0 until $self.nnz) {
-          // slow -- should use a hashmap when it's available as a primitive
-          if (!out.contains(data(i))) out <<= data(i)
+          if (!set.contains(data(i))) {
+            out <<= data(i)
+            set(data(i)) = true
+          }
         }
         out.unsafeImmutable
       }
@@ -254,7 +264,7 @@ trait SparseVectorOps {
 
       infix ("toDense") (Nil :: DenseVector(T)) implements composite ${
         val out = DenseVector[T]($self.length, $self.isRow)
-        val indices = densevector_alloc_raw($self.nnz, true, sparsevector_raw_indices($self))
+        val indices = densevector_fromarray1d(Array1D.flatPinHACK(sparsevector_raw_indices($self)).slice(0, $self.nnz), true)
         val data = sparsevector_raw_data($self)
         (0::indices.length) foreach { i => out(indices(i)) = data(i) } // indirection, but guaranteed disjoint since there are no duplicate indices
         out.unsafeImmutable
@@ -265,12 +275,8 @@ trait SparseVectorOps {
         val data = sparsevector_raw_data($self)
         var s = ""
 
-        if ($self == null) {
-          s = "null"
-        }
-        else if ($self.nnz == 0) {
-          s = "[ ]"
-        }
+        if ($self == null) { s = "null" }
+        else if ($self.nnz == 0) { s = "[ ]" }
         else if ($self.isRow) {
           for (i <- 0 until $self.nnz-1) {
             s = s + "(" + array_apply(indices,i) + ", " + array_apply(data,i).makeStr + "), "
@@ -290,12 +296,8 @@ trait SparseVectorOps {
         val data = sparsevector_raw_data($self)
         var s = ""
 
-        if ($self == null) {
-          s = "null"
-        }
-        else if ($self.nnz == 0) {
-          s = "[ ]"
-        }
+        if ($self == null) { s = "null" }
+        else if ($self.nnz == 0) { s = "[ ]" }
         else if ($self.isRow) {
           for (i <- 0 until $self.nnz-1) {
             s = s + "(" + array_apply(indices,i) + ", " + optila_fmt_str(array_apply(data,i)) + "), "
@@ -340,18 +342,20 @@ trait SparseVectorOps {
 
       // must be sequential (updates are not disjoint in the underlying arrays)
       infix ("update") ((("indices",IndexVector),("e",T)) :: MUnit, effect = write(0)) implements single ${
-        for (i <- 0 until indices.length) {
-          fassert(indices(i) >= 0 && indices(i) < $self.length, "index out of bounds: bulk vector update")
-          $self(indices(i)) = e
+        val inds = if (isWild(indices)) $self.indices else indices
+        for (i <- 0 until inds.length) {
+          fassert(inds(i) >= 0 && inds(i) < $self.length, "index out of bounds: bulk vector update")
+          $self(inds(i)) = e
         }
       }
 
       infix ("update") ((("indices",IndexVector),("v",SparseVector(T))) :: MUnit, effect = write(0)) implements single ${
-        fassert(indices.length == v.length, "dimension mismatch: bulk vector update")
+        val inds = if (isWild(indices)) $self.indices else indices
+        fassert(inds.length == v.length, "dimension mismatch: bulk vector update")
 
-        for (i <- 0 until indices.length) {
-          fassert(indices(i) >= 0 && indices(i) < $self.length, "index out of bounds: bulk vector update")
-          $self(indices(i)) = v(i)
+        for (i <- 0 until inds.length) {
+          fassert(inds(i) >= 0 && inds(i) < $self.length, "index out of bounds: bulk vector update")
+          $self(inds(i)) = v(i)
         }
       }
 

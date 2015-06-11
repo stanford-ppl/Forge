@@ -14,7 +14,6 @@ trait MultiArrayOps {
    */
   def addMultiArrayCommonOps(MA: Rep[DSLType], ndims: Int, mult: String, wrapper: Rep[String] => OpType) {
     val T = tpePar("T")
-    val A = tpePar("A")
     val R = tpePar("R")
     val S = tpePar("S")
     val name = MA.name.toLowerCase
@@ -22,7 +21,7 @@ trait MultiArrayOps {
     // Default vector is in 2nd dimension (row vector)
     val argListN = List.tabulate(ndims){i => quotedArg(i)}.mkString(",")
     
-    compiler (MA) ("fmultia_shape_mismatch", A, (MA(A), MA(A)) :: MBoolean) implements composite ${
+    compiler (MA) ("fmultia_shape_mismatch", T, (MA(T), MA(T)) :: MBoolean) implements composite ${
       Seq.tabulate(\$ndims){d => $0.dim(d) != $1.dim(d)}.reduce{_||_}
     }
 
@@ -74,31 +73,31 @@ trait MultiArrayOps {
         infix ("indices") (Nil :: IndexVector) implements composite ${ IndexVector(0, $self.size, $self.isRow) }
 
       // --- Conversions
-      infix ("toBoolean") (Nil :: MA(MBoolean), ("conv",A ==> MBoolean)) implements composite ${ $self.map($conv(_))}
-      infix ("toDouble") (Nil :: MA(MDouble), ("conv",A ==> MDouble)) implements composite ${ $self.map($conv(_))}
-      infix ("toFloat") (Nil :: MA(MFloat), ("conv",A ==> MFloat)) implements composite ${ $self.map($conv(_))}
-      infix ("toLong") (Nil :: MA(MLong), ("conv",A ==> MLong)) implements composite ${ $self.map($conv(_))}
-      infix ("toInt") (Nil :: MA(MInt), ("conv",A ==> MInt)) implements composite ${ $self.map($conv(_))}
+      infix ("toBoolean") (Nil :: MA(MBoolean), ("conv",T ==> MBoolean)) implements composite ${ $self.map($conv(_))}
+      infix ("toDouble") (Nil :: MA(MDouble), ("conv",T ==> MDouble)) implements composite ${ $self.map($conv(_))}
+      infix ("toFloat") (Nil :: MA(MFloat), ("conv",T ==> MFloat)) implements composite ${ $self.map($conv(_))}
+      infix ("toLong") (Nil :: MA(MLong), ("conv",T ==> MLong)) implements composite ${ $self.map($conv(_))}
+      infix ("toInt") (Nil :: MA(MInt), ("conv",T ==> MInt)) implements composite ${ $self.map($conv(_))}
 
       // --- Ordering
-      infix ("<")( MA(A) :: MA(MBoolean), TOrder(A)) implements composite ${ $self.zip($1){(a,b) => implicitly[Order[A]].lt(a,b)} }
-      infix ("<=") (MA(A) :: MA(MBoolean), TOrder(A)) implements composite ${ $self.zip($1){(a,b) => implicitly[Order[A]].lteq(a,b)} }
-      infix (">") (MA(A) :: MA(MBoolean), TOrder(A)) implements composite ${ $self.zip($1){(a,b) => implicitly[Order[A]].gt(a,b)} }
-      infix (">=") (MA(A) :: MA(MBoolean), TOrder(A)) implements composite ${ $self.zip($1){(a,b) => implicitly[Order[A]].gteq(a,b)} }
+      infix ("<")( MA(T) :: MA(MBoolean), TOrder(T)) implements composite ${ $self.zip($1){(a,b) => implicitly[Order[T]].lt(a,b)} }
+      infix ("<=") (MA(T) :: MA(MBoolean), TOrder(T)) implements composite ${ $self.zip($1){(a,b) => implicitly[Order[T]].lteq(a,b)} }
+      infix (">") (MA(T) :: MA(MBoolean), TOrder(T)) implements composite ${ $self.zip($1){(a,b) => implicitly[Order[T]].gt(a,b)} }
+      infix (">=") (MA(T) :: MA(MBoolean), TOrder(T)) implements composite ${ $self.zip($1){(a,b) => implicitly[Order[T]].gteq(a,b)} }
       // element-wise equality comparison
-      infix ("=:=") (MA(A):: MA(MBoolean)) implements composite ${ $self.zip($1){(a,b) => a == b} }
-      infix ("=/=") (MA(A) :: MA(MBoolean)) implements composite ${ $self.zip($1){(a,b) => a != b} }
+      infix ("=:=") (MA(T):: MA(MBoolean)) implements composite ${ $self.zip($1){(a,b) => a == b} }
+      infix ("=/=") (MA(T) :: MA(MBoolean)) implements composite ${ $self.zip($1){(a,b) => a != b} }
       
-      infix ("<")( A :: MA(MBoolean), TOrder(A)) implements composite ${ $self.map{e => implicitly[Order[A]].lt(e,$1)} }
-      infix ("<=") (A :: MA(MBoolean), TOrder(A)) implements composite ${ $self.map{e => implicitly[Order[A]].lteq(e,$1)} }
-      infix (">") (A :: MA(MBoolean), TOrder(A)) implements composite ${ $self.map{e => implicitly[Order[A]].gt(e,$1)} }
-      infix (">=") (A :: MA(MBoolean), TOrder(A)) implements composite ${ $self.map{e => implicitly[Order[A]].gteq(e,$1)} }
+      infix ("<")( T :: MA(MBoolean), TOrder(T)) implements composite ${ $self.map{e => implicitly[Order[T]].lt(e,$1)} }
+      infix ("<=") (T :: MA(MBoolean), TOrder(T)) implements composite ${ $self.map{e => implicitly[Order[T]].lteq(e,$1)} }
+      infix (">") (T :: MA(MBoolean), TOrder(T)) implements composite ${ $self.map{e => implicitly[Order[T]].gt(e,$1)} }
+      infix (">=") (T :: MA(MBoolean), TOrder(T)) implements composite ${ $self.map{e => implicitly[Order[T]].gteq(e,$1)} }
       // element-wise equality comparison
-      infix ("=:=") (A :: MA(MBoolean)) implements composite ${ $self.map{e => e == $1} }
-      infix ("=/=") (A :: MA(MBoolean)) implements composite ${ $self.map{e => e != $1} }
+      infix ("=:=") (T :: MA(MBoolean)) implements composite ${ $self.map{e => e == $1} }
+      infix ("=/=") (T :: MA(MBoolean)) implements composite ${ $self.map{e => e != $1} }
 
       // full collection equality (shapes equal, all elements equal)
-      direct ("__equal") (MA(A) :: MBoolean) implements composite ${
+      direct ("__equal") (MA(T) :: MBoolean) implements composite ${
         if (fmultia_shape_mismatch($self,$1)) false
         else {
           $self.zip($1){(a,b) => a == b}.fold(unit(true)){(a,b) => a && b}
@@ -106,91 +105,91 @@ trait MultiArrayOps {
       }
 
       // --- Copiers/mutability
-      infix ("Clone") (Nil :: MA(A), aliasHint = copies(0)) implements wrapper ${ raw_data($self).Clone }
-      infix ("mutable") (Nil :: MA(A), effect = mutable, aliasHint = copies(0)) implements wrapper ${raw_data($self).mutable }
-      //infix ("unsafeImmutable") (Nil :: MA(A)) implements composite s"""fmultia_copy(self, mutable = false, unsafe = true).$tcast"""
-      //infix ("unsafeMutable") (Nil :: MA(A)) implements composite s"""fmultia_copy(self, mutable = true, unsafe = true).$tcast"""
+      infix ("Clone") (Nil :: MA(T), aliasHint = copies(0)) implements wrapper ${ raw_data($self).Clone }
+      infix ("mutable") (Nil :: MA(T), effect = mutable, aliasHint = copies(0)) implements wrapper ${raw_data($self).mutable }
+      //infix ("unsafeImmutable") (Nil :: MA(T)) implements composite s"""fmultia_copy(self, mutable = false, unsafe = true).$tcast"""
+      //infix ("unsafeMutable") (Nil :: MA(T)) implements composite s"""fmultia_copy(self, mutable = true, unsafe = true).$tcast"""
 
       // --- Reshaping
-      infix ("reshape") ((MInt, MBoolean) :: DenseVector(A)) implements composite ${
+      infix ("reshape") ((MInt, MBoolean) :: DenseVector(T)) implements composite ${
         fassert($1 == $self.size, "Dimension mismatch - Number of elements must not change in reshape")
         densevector_from_array1d(raw_data($self).reshape($1), $2)
       }
-      infix ("reshape") (MInt :: DenseVector(A)) implements redirect ${ $self.reshape($1,unit(true)) }
+      infix ("reshape") (MInt :: DenseVector(T)) implements redirect ${ $self.reshape($1,unit(true)) }
 
       // --- Basic Arith
-      infix ("abs") (Nil :: MA(A), TArith(A)) implements composite ${ $0 map {e => abs(e) }}
-      infix ("square") (Nil :: MA(A), TArith(A)) implements composite ${ $0.map {e => square(e) }}
-      infix ("negate") (Nil :: MA(A), TArith(A)) implements composite ${ $0.map {e => implicitly[Arith[A]].negate(e) }}
-      infix ("ceil") (Nil :: MA(A), TArith(A)) implements composite ${ $0.map {e => ceil(e) }}
-      infix ("floor") (Nil :: MA(A), TArith(A)) implements composite ${ $0.map {e => floor(e) }}
+      infix ("abs") (Nil :: MA(T), TArith(T)) implements composite ${ $0 map {e => abs(e) }}
+      infix ("square") (Nil :: MA(T), TArith(T)) implements composite ${ $0.map {e => square(e) }}
+      infix ("negate") (Nil :: MA(T), TArith(T)) implements composite ${ $0.map {e => implicitly[Arith[T]].negate(e) }}
+      infix ("ceil") (Nil :: MA(T), TArith(T)) implements composite ${ $0.map {e => ceil(e) }}
+      infix ("floor") (Nil :: MA(T), TArith(T)) implements composite ${ $0.map {e => floor(e) }}
 
       // Legacy Arith
-      infix ("exp") (Nil :: MA(A), TArith(A)) implements composite ${ $0.map{e => e.log} }
-      infix ("log") (Nil :: MA(A), TArith(A)) implements composite ${ $0.map{e => e.log} }
+      infix ("exp") (Nil :: MA(T), TArith(T)) implements composite ${ $0.map{e => e.log} }
+      infix ("log") (Nil :: MA(T), TArith(T)) implements composite ${ $0.map{e => e.log} }
 
       // --- Math operations
-      infix ("unary_-") (Nil :: MA(A), TArith(A)) implements redirect ${ $self.negate }
-      infix ("+") (A :: MA(A), TArith(A)) implements composite ${ $self.map{e => implicitly[Arith[A]] + (e,$1) }}
-      infix ("-") (A :: MA(A), TArith(A)) implements composite ${ $self.map{e => implicitly[Arith[A]] - (e,$1) }}
-      infix ("*") (A :: MA(A), TArith(A)) implements composite ${ $self.map{e => implicitly[Arith[A]] * (e,$1) }}
-      infix ("/") (A :: MA(A), TArith(A)) implements composite ${ $self.map{e => implicitly[Arith[A]] / (e,$1) }}
-      infix ("+") (MA(A) :: MA(A), TArith(A)) implements composite ${ $self.zip($1){(a,b) => implicitly[Arith[A]] + (a,b) }}
-      infix ("-") (MA(A) :: MA(A), TArith(A)) implements composite ${ $self.zip($1){(a,b) => implicitly[Arith[A]] - (a,b) }}
-      infix ("/") (MA(A) :: MA(A), TArith(A)) implements composite ${ $self.zip($1){(a,b) => implicitly[Arith[A]] / (a,b) }}
+      infix ("unary_-") (Nil :: MA(T), TArith(T)) implements redirect ${ $self.negate }
+      infix ("+") (T :: MA(T), TArith(T)) implements composite ${ $self.map{e => implicitly[Arith[T]] + (e,$1) }}
+      infix ("-") (T :: MA(T), TArith(T)) implements composite ${ $self.map{e => implicitly[Arith[T]] - (e,$1) }}
+      infix ("*") (T :: MA(T), TArith(T)) implements composite ${ $self.map{e => implicitly[Arith[T]] * (e,$1) }}
+      infix ("/") (T :: MA(T), TArith(T)) implements composite ${ $self.map{e => implicitly[Arith[T]] / (e,$1) }}
+      infix ("+") (MA(T) :: MA(T), TArith(T)) implements composite ${ $self.zip($1){(a,b) => implicitly[Arith[T]] + (a,b) }}
+      infix ("-") (MA(T) :: MA(T), TArith(T)) implements composite ${ $self.zip($1){(a,b) => implicitly[Arith[T]] - (a,b) }}
+      infix ("/") (MA(T) :: MA(T), TArith(T)) implements composite ${ $self.zip($1){(a,b) => implicitly[Arith[T]] / (a,b) }}
 
       // --- Element updates (in place)
-      infix ("+=") (A :: MUnit, TArith(A), effect = write(0)) implements composite ${ $self.mmap{e => e + $1 }}
-      infix ("-=") (A :: MUnit, TArith(A), effect = write(0)) implements composite ${ $self.mmap{e => implicitly[Arith[A]] - (e,$1) }}
-      infix ("*=") (A :: MUnit, TArith(A), effect = write(0)) implements composite ${ $self.mmap{e => implicitly[Arith[A]] * (e,$1) }}
-      infix ("/=") (A :: MUnit, TArith(A), effect = write(0)) implements composite ${ $self.mmap{e => implicitly[Arith[A]] / (e,$1) }}
-      infix ("+=") (MA(A) :: MUnit, TArith(A), effect = write(0)) implements composite ${ $self.mzip($1){(a,b) => a + b }}
-      infix ("-=") (MA(A) :: MUnit, TArith(A), effect = write(0)) implements composite ${ $self.mzip($1){(a,b) => implicitly[Arith[A]] - (a,b) }}
-      infix ("*=") (MA(A) :: MUnit, TArith(A), effect = write(0)) implements composite ${ $self.mzip($1){(a,b) => implicitly[Arith[A]] * (a,b) }}
-      infix ("/=") (MA(A) :: MUnit, TArith(A), effect = write(0)) implements composite ${ $self.mzip($1){(a,b) => implicitly[Arith[A]] / (a,b) }}
+      infix ("+=") (T :: MUnit, TArith(T), effect = write(0)) implements composite ${ $self.mmap{e => e + $1 }}
+      infix ("-=") (T :: MUnit, TArith(T), effect = write(0)) implements composite ${ $self.mmap{e => implicitly[Arith[T]] - (e,$1) }}
+      infix ("*=") (T :: MUnit, TArith(T), effect = write(0)) implements composite ${ $self.mmap{e => implicitly[Arith[T]] * (e,$1) }}
+      infix ("/=") (T :: MUnit, TArith(T), effect = write(0)) implements composite ${ $self.mmap{e => implicitly[Arith[T]] / (e,$1) }}
+      infix ("+=") (MA(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${ $self.mzip($1){(a,b) => a + b }}
+      infix ("-=") (MA(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${ $self.mzip($1){(a,b) => implicitly[Arith[T]] - (a,b) }}
+      infix ("*=") (MA(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${ $self.mzip($1){(a,b) => implicitly[Arith[T]] * (a,b) }}
+      infix ("/=") (MA(T) :: MUnit, TArith(T), effect = write(0)) implements composite ${ $self.mzip($1){(a,b) => implicitly[Arith[T]] / (a,b) }}
 
       // --- Ordering
-      infix ("min") (Nil :: A, TOrder(A)) implements composite ${ $0.reduce{(a,b) => implicitly[Order[A]].min(a,b)} }
-      infix ("max") (Nil :: A, TOrder(A)) implements composite ${ $0.reduce{(a,b) => implicitly[Order[A]].max(a,b)} }
+      infix ("min") (Nil :: T, TOrder(T)) implements composite ${ $0.reduce{(a,b) => implicitly[Order[T]].min(a,b)} }
+      infix ("max") (Nil :: T, TOrder(T)) implements composite ${ $0.reduce{(a,b) => implicitly[Order[T]].max(a,b)} }
 
       // --- Math operations
-      infix ("sum") (Nil :: A, TArith(A)) implements composite ${ $self.reduce{(a,b) => implicitly[Arith[A]] + (a,b)} }
-      infix ("prod") (Nil :: A, TArith(A)) implements composite ${ $self.reduceOne{(a,b) => implicitly[Arith[A]] * (a,b)} }
-      infix ("mean") (Nil :: MDouble, (TArith(A), TNumeric(A))) implements composite ${ $self.sum.toDouble / $self.size }
+      infix ("sum") (Nil :: T, TArith(T)) implements composite ${ $self.reduce{(a,b) => implicitly[Arith[T]] + (a,b)} }
+      infix ("prod") (Nil :: T, TArith(T)) implements composite ${ $self.reduceOne{(a,b) => implicitly[Arith[T]] * (a,b)} }
+      infix ("mean") (Nil :: MDouble, (TArith(T), TNumeric(T))) implements composite ${ $self.sum.toDouble / $self.size }
 
       // --- Parallel operations
-      infix ("groupBy") ((A ==> K, A ==> V) :: MMap(K, DenseVector(V)), addTpePars = (K,V)) implements composite ${
+      infix ("groupBy") ((T ==> K, T ==> V) :: MMap(K, DenseVector(V)), addTpePars = (K,V)) implements composite ${
         val hash = raw_data($self).groupBy($1, $2)
         val vals = fmulmap_values(hash).map{ab => densevector_fromarray1d(ab, true)}
         fmulmap_from_1d_arrays(fmulmap_keys(hash), vals)
       }
-      infix ("groupByReduce") ((A ==> K,A ==> V,(V,V) ==> V) :: MMap(K,V), TArith(V), addTpePars = (K,V)) implements composite ${
+      infix ("groupByReduce") ((T ==> K,T ==> V,(V,V) ==> V) :: MMap(K,V), TArith(V), addTpePars = (K,V)) implements composite ${
         raw_data($self).groupByReduce($1,$2,$3)
       }
 
-      infix ("count") ((A ==> MBoolean) :: MInt) implements composite ${ $self.map{a => if ($1(a)) 1 else 0}.sum }
-      infix ("foreach") ((A ==> MUnit) :: MUnit, effect = simple) implements composite ${ fmultia_foreach(raw_data($self), $1) }
+      infix ("count") ((T ==> MBoolean) :: MInt) implements composite ${ $self.map{a => if ($1(a)) 1 else 0}.sum }
+      infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements composite ${ fmultia_foreach(raw_data($self), $1) }
       
       val loopIndices = Seq.tabulate(ndims){i => "li(" + i + ")"}.mkString(",")
       infix ("forIndices") (MIntArgs ==> MUnit :: MUnit, effect = simple) implements composite ${ 
         raw_data($self).forIndices{li => $1(\$loopIndices) }
       }
       // Reduce not yet available - only fold is currently supported
-      //infix ("reduce") (((A, A) ==> A) :: A) implements composite "fmultia_reduce(" + rawData("self") + "," + quotedArg(1) + ")"
+      //infix ("reduce") (((T, T) ==> T) :: T) implements composite "fmultia_reduce(" + rawData("self") + "," + quotedArg(1) + ")"
       // Reduction hacks to allow user to not give zero, even though we don't yet have fold/reduce distinction
-      compiler ("fmultia_first_hack") (Nil :: A) implements composite ${
+      compiler ("fmultia_first_hack") (Nil :: T) implements composite ${
         fmultia_apply($0, findices_new(Seq.fill(\$ndims)(unit(0))) )
       }
-      infix ("reduce") (((A, A) ==> A) :: A, TArith(A)) implements composite ${ fmultia_fold(raw_data($self), $1, implicitly[Arith[A]].zero(fmultia_first_hack(self))) }
-      infix ("reduceOne") (((A, A) ==> A) :: A, TArith(A)) implements composite ${ fmultia_fold(raw_data($self), $1, implicitly[Arith[A]].one(fmultia_first_hack(self))) }
+      infix ("reduce") (((T, T) ==> T) :: T, TArith(T)) implements composite ${ fmultia_fold(raw_data($self), $1, implicitly[Arith[T]].zero(fmultia_first_hack(self))) }
+      infix ("reduceOne") (((T, T) ==> T) :: T, TArith(T)) implements composite ${ fmultia_fold(raw_data($self), $1, implicitly[Arith[T]].one(fmultia_first_hack(self))) }
       
-      infix ("fold") (CurriedMethodSignature(List(List(("zero", A)), List((A, A) ==> A)), A)) implements composite ${  fmultia_fold(raw_data($self), $2, $1) }
-      infix ("map") ((A ==> R) :: MA(R), addTpePars = R) implements wrapper ${ fmultia_map(raw_data($self), $1) }
-      infix ("zip") (CurriedMethodSignature(List(List(MA(S)), List((A,S) ==> R)), MA(R)), addTpePars = (S,R)) implements wrapper ${ fmultia_zip(raw_data($self), raw_data($1), $2) }
+      infix ("fold") (CurriedMethodSignature(List(List(("zero", T)), List((T, T) ==> T)), T)) implements composite ${  fmultia_fold(raw_data($self), $2, $1) }
+      infix ("map") ((T ==> R) :: MA(R), addTpePars = R) implements wrapper ${ fmultia_map(raw_data($self), $1) }
+      infix ("zip") (CurriedMethodSignature(List(List(MA(S)), List((T,S) ==> R)), MA(R)), addTpePars = (S,R)) implements wrapper ${ fmultia_zip(raw_data($self), raw_data($1), $2) }
 
       // mutable map and zip (in place)
-      infix ("mmap") ((A ==> A) :: MUnit, effect = write(0)) implements composite ${ raw_data($self).mmap($1) }
-      infix ("mzip") (CurriedMethodSignature(List(List(MA(A)), List((A,A) ==> A)), MUnit), effect = write(0)) implements composite ${ raw_data($self).mzip($1)($2) }
+      infix ("mmap") ((T ==> T) :: MUnit, effect = write(0)) implements composite ${ raw_data($self).mmap($1) }
+      infix ("mzip") (CurriedMethodSignature(List(List(MA(T)), List((T,T) ==> T)), MUnit), effect = write(0)) implements composite ${ raw_data($self).mzip($1)($2) }
 
       // --- Miscellaneous
       // $self.toString doesn't work in Delite, since there is no 'self' instance
@@ -200,7 +199,7 @@ trait MultiArrayOps {
       // These hide the actual implementation, but after transformation these methods are pretty
       // much the same as they were in the previous version of optila. 
       // Still need null checks (don't really want a DeliteNullCheck node just for this)
-      infix ("makeString") (Nil :: MString, TStringable(A)) implements composite ${
+      infix ("makeString") (Nil :: MString, TStringable(T)) implements composite ${
         if (self == null) unit("null")
         else raw_data($self).mkStringFunc(\$delims){x => optila_padspace(x.makeStr) }
       }
@@ -209,84 +208,84 @@ trait MultiArrayOps {
         else raw_data($self).mkStringFunc(\$delims){x => optila_padspace(optila_fmt_str(x)) }
       }
 
-      infix ("pprint") (Nil :: MUnit, TStringable(A), effect = simple) implements composite ${ println($self.makeStr + "\\n") }
+      infix ("pprint") (Nil :: MUnit, TStringable(T), effect = simple) implements composite ${ println($self.makeStr + "\\n") }
     } /* End of MultiArrayCommonOps */
     
     // --- Math
     val Math = lookupGrp("BasicMath")
-    UnaryMath.forall{(op, A, R) => direct (Math) (op, Nil, MA(A) :: MA(R)) implements composite { quotedArg(0) + ".map{" + op + "(_)}" } }
-    direct (Math) ("sum", A, MA(A) :: A, TArith(A)) implements composite ${ $0.sum }
-    direct (Math) ("prod", A, MA(A) :: A, TArith(A)) implements composite ${ $0.prod }
+    UnaryMath.forall{(op, T, R) => direct (Math) (op, Nil, MA(T) :: MA(R)) implements composite { quotedArg(0) + ".map{" + op + "(_)}" } }
+    direct (Math) ("sum", T, MA(T) :: T, TArith(T)) implements composite ${ $0.sum }
+    direct (Math) ("prod", T, MA(T) :: T, TArith(T)) implements composite ${ $0.prod }
     // Arith for summation, Numeric for converting to Double
-    // TBD: old version used implicit conv(A => Double) - are there any apps that need this?
-    direct (Math) ("mean", A, MA(A) :: MDouble, (TArith(A), TNumeric(A))) implements composite ${ $0.mean }
+    // TBD: old version used implicit conv(T => Double) - are there any apps that need this?
+    direct (Math) ("mean", T, MA(T) :: MDouble, (TArith(T), TNumeric(T))) implements composite ${ $0.mean }
 
     // --- Ordering
     val Order = lookupGrp("BasicOrder")
-    direct (Order) ("min", A, MA(A) :: A, TOrder(A)) implements composite ${ $0.min }
-    direct (Order) ("max", A, MA(A) :: A, TOrder(A)) implements composite ${ $0.max }
+    direct (Order) ("min", T, MA(T) :: T, TOrder(T)) implements composite ${ $0.min }
+    direct (Order) ("max", T, MA(T) :: T, TOrder(T)) implements composite ${ $0.max }
 
     // --- Implicit type casting in math and comparison ops
-    CastHelp.pairs{ (A, B, R) => 
-      infix (MA) ("+", Nil, (A, MA(B)) :: MA(R)) implements redirect {name + "_pl[" + R.name + "]" + CastHelp.reorderCasting((1, B), (0, A)) }
-      infix (MA) ("-", Nil, (A, MA(B)) :: MA(R)) implements redirect {name + "_sub[" + R.name + "]" + CastHelp.reorderCasting((1, B), (0, A)) } 
-      infix (MA) ("*", Nil, (A, MA(B)) :: MA(R)) implements redirect {name + "_mul[" + R.name + "]" + CastHelp.reorderCasting((1, B), (0, A)) }
-      infix (MA) ("/", Nil, (A, MA(B)) :: MA(R)) implements redirect {name + "_div[" + R.name + "]" + CastHelp.reorderCasting((1, B), (0, A)) }
+    CastHelp.pairs{ (T, B, R) => 
+      infix (MA) ("+", Nil, (T, MA(B)) :: MA(R)) implements redirect {name + "_pl[" + R.name + "]" + CastHelp.reorderCasting((1, B), (0, T)) }
+      infix (MA) ("-", Nil, (T, MA(B)) :: MA(R)) implements redirect {name + "_sub[" + R.name + "]" + CastHelp.reorderCasting((1, B), (0, T)) } 
+      infix (MA) ("*", Nil, (T, MA(B)) :: MA(R)) implements redirect {name + "_mul[" + R.name + "]" + CastHelp.reorderCasting((1, B), (0, T)) }
+      infix (MA) ("/", Nil, (T, MA(B)) :: MA(R)) implements redirect {name + "_div[" + R.name + "]" + CastHelp.reorderCasting((1, B), (0, T)) }
       
-      infix (MA) ("+", Nil, (MA(A), B) :: MA(R)) implements redirect {name + "_pl[" + R.name + "]" + CastHelp.casting(A, B) }
-      infix (MA) ("-", Nil, (MA(A), B) :: MA(R)) implements redirect {name + "_sub[" + R.name + "]" + CastHelp.casting(A, B) } 
-      infix (MA) ("*", Nil, (MA(A), B) :: MA(R)) implements redirect {name + "_mul[" + R.name + "]" + CastHelp.casting(A, B) }
-      infix (MA) ("/", Nil, (MA(A), B) :: MA(R)) implements redirect {name + "_div[" + R.name + "]" + CastHelp.casting(A, B) }
+      infix (MA) ("+", Nil, (MA(T), B) :: MA(R)) implements redirect {name + "_pl[" + R.name + "]" + CastHelp.casting(T, B) }
+      infix (MA) ("-", Nil, (MA(T), B) :: MA(R)) implements redirect {name + "_sub[" + R.name + "]" + CastHelp.casting(T, B) } 
+      infix (MA) ("*", Nil, (MA(T), B) :: MA(R)) implements redirect {name + "_mul[" + R.name + "]" + CastHelp.casting(T, B) }
+      infix (MA) ("/", Nil, (MA(T), B) :: MA(R)) implements redirect {name + "_div[" + R.name + "]" + CastHelp.casting(T, B) }
       
       // MA * MA Not included since Matrix * Matrix has a different meaning than others
-      infix (MA) ("+", Nil, (MA(A), MA(B)) :: MA(R)) implements redirect {name + "_pl[" + R.name + "]" + CastHelp.casting(A, B) }
-      infix (MA) ("-", Nil, (MA(A), MA(B)) :: MA(R)) implements redirect {name + "_sub[" + R.name + "]" + CastHelp.casting(A, B) }
-      infix (MA) ("/", Nil, (MA(A), MA(B)) :: MA(R)) implements redirect {name + "_div[" + R.name + "]" + CastHelp.casting(A, B) }
+      infix (MA) ("+", Nil, (MA(T), MA(B)) :: MA(R)) implements redirect {name + "_pl[" + R.name + "]" + CastHelp.casting(T, B) }
+      infix (MA) ("-", Nil, (MA(T), MA(B)) :: MA(R)) implements redirect {name + "_sub[" + R.name + "]" + CastHelp.casting(T, B) }
+      infix (MA) ("/", Nil, (MA(T), MA(B)) :: MA(R)) implements redirect {name + "_div[" + R.name + "]" + CastHelp.casting(T, B) }
     }
     
-    CastHelp.leftDomPairs{ (A,B) => 
-      infix (MA) ("+=", Nil, (MA(A), B) :: MUnit, effect = write(0)) implements redirect {name + "_pleq[" + A.name + "]" + CastHelp.casting(A, B) }
-      infix (MA) ("-=", Nil, (MA(A), B) :: MUnit, effect = write(0)) implements redirect {name + "_subeq[" + A.name + "]" + CastHelp.casting(A, B) }
-      infix (MA) ("*=", Nil, (MA(A), B) :: MUnit, effect = write(0)) implements redirect {name + "_muleq[" + A.name + "]" + CastHelp.casting(A, B) }
-      infix (MA) ("/=", Nil, (MA(A), B) :: MUnit, effect = write(0)) implements redirect {name + "_diveq[" + A.name + "]" + CastHelp.casting(A, B) }
+    CastHelp.leftDomPairs{ (T,B) => 
+      infix (MA) ("+=", Nil, (MA(T), B) :: MUnit, effect = write(0)) implements redirect {name + "_pleq[" + T.name + "]" + CastHelp.casting(T, B) }
+      infix (MA) ("-=", Nil, (MA(T), B) :: MUnit, effect = write(0)) implements redirect {name + "_subeq[" + T.name + "]" + CastHelp.casting(T, B) }
+      infix (MA) ("*=", Nil, (MA(T), B) :: MUnit, effect = write(0)) implements redirect {name + "_muleq[" + T.name + "]" + CastHelp.casting(T, B) }
+      infix (MA) ("/=", Nil, (MA(T), B) :: MUnit, effect = write(0)) implements redirect {name + "_diveq[" + T.name + "]" + CastHelp.casting(T, B) }
 
-      infix (MA) ("+=", Nil, (MA(A), MA(B)) :: MUnit, effect = write(0)) implements redirect {name + "_pleq[" + A.name + "]" + CastHelp.casting(A, B) }
-      infix (MA) ("-=", Nil, (MA(A), MA(B)) :: MUnit, effect = write(0)) implements redirect {name + "_subeq[" + A.name + "]" + CastHelp.casting(A, B) }
-      infix (MA) ("*=", Nil, (MA(A), MA(B)) :: MUnit, effect = write(0)) implements redirect {name + "_muleq[" + A.name + "]" + CastHelp.casting(A, B) }
-      infix (MA) ("/=", Nil, (MA(A), MA(B)) :: MUnit, effect = write(0)) implements redirect {name + "_diveq[" + A.name + "]" + CastHelp.casting(A, B) }
+      infix (MA) ("+=", Nil, (MA(T), MA(B)) :: MUnit, effect = write(0)) implements redirect {name + "_pleq[" + T.name + "]" + CastHelp.casting(T, B) }
+      infix (MA) ("-=", Nil, (MA(T), MA(B)) :: MUnit, effect = write(0)) implements redirect {name + "_subeq[" + T.name + "]" + CastHelp.casting(T, B) }
+      infix (MA) ("*=", Nil, (MA(T), MA(B)) :: MUnit, effect = write(0)) implements redirect {name + "_muleq[" + T.name + "]" + CastHelp.casting(T, B) }
+      infix (MA) ("/=", Nil, (MA(T), MA(B)) :: MUnit, effect = write(0)) implements redirect {name + "_diveq[" + T.name + "]" + CastHelp.casting(T, B) }
     }
 
-    CastHelp.pairs{ (A,B,_) => 
-      infix (MA) ("<", Nil, (MA(A), B) :: MA(MBoolean)) implements redirect {name + "_lt" + CastHelp.casting(A, B) }
-      infix (MA) ("<=", Nil, (MA(A), B) :: MA(MBoolean)) implements redirect {name + "_lteq" + CastHelp.casting(A, B) } 
-      infix (MA) (">", Nil, (MA(A), B) :: MA(MBoolean)) implements redirect {name + "_gt" + CastHelp.casting(A, B) }
-      infix (MA) (">=", Nil, (MA(A), B) :: MA(MBoolean)) implements redirect {name + "_gteq" + CastHelp.casting(A, B) }
-      infix (MA) ("=:=", Nil, (MA(A), B) :: MA(MBoolean)) implements redirect {name + "_eqclneq" + CastHelp.casting(A, B) }
-      infix (MA) ("=/=", Nil, (MA(A), B) :: MA(MBoolean)) implements redirect {name + "_eqdiveq" + CastHelp.casting(A, B) }
+    CastHelp.pairs{ (T,B,_) => 
+      infix (MA) ("<", Nil, (MA(T), B) :: MA(MBoolean)) implements redirect {name + "_lt" + CastHelp.casting(T, B) }
+      infix (MA) ("<=", Nil, (MA(T), B) :: MA(MBoolean)) implements redirect {name + "_lteq" + CastHelp.casting(T, B) } 
+      infix (MA) (">", Nil, (MA(T), B) :: MA(MBoolean)) implements redirect {name + "_gt" + CastHelp.casting(T, B) }
+      infix (MA) (">=", Nil, (MA(T), B) :: MA(MBoolean)) implements redirect {name + "_gteq" + CastHelp.casting(T, B) }
+      infix (MA) ("=:=", Nil, (MA(T), B) :: MA(MBoolean)) implements redirect {name + "_eqclneq" + CastHelp.casting(T, B) }
+      infix (MA) ("=/=", Nil, (MA(T), B) :: MA(MBoolean)) implements redirect {name + "_eqdiveq" + CastHelp.casting(T, B) }
     
-      infix (MA) ("<", Nil, (MA(A), MA(B)) :: MA(MBoolean)) implements redirect {name + "_lt" + CastHelp.casting(A, B) }
-      infix (MA) ("<=", Nil, (MA(A), MA(B)) :: MA(MBoolean)) implements redirect {name + "_lteq" + CastHelp.casting(A, B) } 
-      infix (MA) (">", Nil, (MA(A), MA(B)) :: MA(MBoolean)) implements redirect {name + "_gt" + CastHelp.casting(A, B) }
-      infix (MA) (">=", Nil, (MA(A), MA(B)) :: MA(MBoolean)) implements redirect {name + "_gteq" + CastHelp.casting(A, B) }
-      infix (MA) ("=:=", Nil, (MA(A), MA(B)) :: MA(MBoolean)) implements redirect {name + "_eqclneq" + CastHelp.casting(A, B) }
-      infix (MA) ("=/=", Nil, (MA(A), MA(B)) :: MA(MBoolean)) implements redirect {name + "_eqdiveq" + CastHelp.casting(A, B) }
+      infix (MA) ("<", Nil, (MA(T), MA(B)) :: MA(MBoolean)) implements redirect {name + "_lt" + CastHelp.casting(T, B) }
+      infix (MA) ("<=", Nil, (MA(T), MA(B)) :: MA(MBoolean)) implements redirect {name + "_lteq" + CastHelp.casting(T, B) } 
+      infix (MA) (">", Nil, (MA(T), MA(B)) :: MA(MBoolean)) implements redirect {name + "_gt" + CastHelp.casting(T, B) }
+      infix (MA) (">=", Nil, (MA(T), MA(B)) :: MA(MBoolean)) implements redirect {name + "_gteq" + CastHelp.casting(T, B) }
+      infix (MA) ("=:=", Nil, (MA(T), MA(B)) :: MA(MBoolean)) implements redirect {name + "_eqclneq" + CastHelp.casting(T, B) }
+      infix (MA) ("=/=", Nil, (MA(T), MA(B)) :: MA(MBoolean)) implements redirect {name + "_eqdiveq" + CastHelp.casting(T, B) }
     }
 
     // temporary fix for constants not being lifted for some infix functions
     // TODO: This adds a large number of extra functions that should be unnecessary - remove as soon as possible
-    CastHelp.leftConsts{ (A,B,R) =>
-      infix (MA) ("+", Nil, (A, MA(B)) :: MA(R)) implements redirect {name + "_pl[" + R.name + "]" + CastHelp.reorderCasting((1,B),(0,A)) }
+    CastHelp.leftConsts{ (T,B,R) =>
+      infix (MA) ("+", Nil, (T, MA(B)) :: MA(R)) implements redirect {name + "_pl[" + R.name + "]" + CastHelp.reorderCasting((1,B),(0,T)) }
     }
-    CastHelp.rightConsts{ (A,B,R) =>
-      infix (MA) ("+", Nil, (MA(A), B) :: MA(R)) implements redirect {name + "_pl[" + R.name + "]" + CastHelp.casting(A, B) }
-      infix (MA) ("=:=", Nil, (MA(A), B) :: MA(MBoolean)) implements redirect {name + "_eqclneq" + CastHelp.casting(A, B) }
-      infix (MA) ("=/=", Nil, (MA(A), B) :: MA(MBoolean)) implements redirect {name + "_eqdiveq" + CastHelp.casting(A, B) }
+    CastHelp.rightConsts{ (T,B,R) =>
+      infix (MA) ("+", Nil, (MA(T), B) :: MA(R)) implements redirect {name + "_pl[" + R.name + "]" + CastHelp.casting(T, B) }
+      infix (MA) ("=:=", Nil, (MA(T), B) :: MA(MBoolean)) implements redirect {name + "_eqclneq" + CastHelp.casting(T, B) }
+      infix (MA) ("=/=", Nil, (MA(T), B) :: MA(MBoolean)) implements redirect {name + "_eqdiveq" + CastHelp.casting(T, B) }
     }
-    CastHelp.leftDomRightConsts { (A,B) =>
-      infix (MA) ("+=", Nil, (MA(A), B) :: MUnit, effect = write(0)) implements redirect {name + "_pleq[" + A.name + "]" + CastHelp.casting(A, B) }
-      infix (MA) ("-=", Nil, (MA(A), B) :: MUnit, effect = write(0)) implements redirect {name + "_subeq[" + A.name + "]" + CastHelp.casting(A, B) }
-      infix (MA) ("*=", Nil, (MA(A), B) :: MUnit, effect = write(0)) implements redirect {name + "_muleq[" + A.name + "]" + CastHelp.casting(A, B) }
-      infix (MA) ("/=", Nil, (MA(A), B) :: MUnit, effect = write(0)) implements redirect {name + "_diveq[" + A.name + "]" + CastHelp.casting(A, B) }
+    CastHelp.leftDomRightConsts { (T,B) =>
+      infix (MA) ("+=", Nil, (MA(T), B) :: MUnit, effect = write(0)) implements redirect {name + "_pleq[" + T.name + "]" + CastHelp.casting(T, B) }
+      infix (MA) ("-=", Nil, (MA(T), B) :: MUnit, effect = write(0)) implements redirect {name + "_subeq[" + T.name + "]" + CastHelp.casting(T, B) }
+      infix (MA) ("*=", Nil, (MA(T), B) :: MUnit, effect = write(0)) implements redirect {name + "_muleq[" + T.name + "]" + CastHelp.casting(T, B) }
+      infix (MA) ("/=", Nil, (MA(T), B) :: MUnit, effect = write(0)) implements redirect {name + "_diveq[" + T.name + "]" + CastHelp.casting(T, B) }
     }
     
     // --- Add to Arith
@@ -294,26 +293,26 @@ trait MultiArrayOps {
     val emptyShape = "Seq" + Seq.fill(ndims)("0").mkString("(",",",")")
 
     val Arith = lookupGrp("Arith").asInstanceOf[Rep[DSLTypeClass]]
-    val MDArith = tpeClassInst("Arith" + MA.name, A withBound TArith, Arith(MA(A)))
-    infix (MDArith) ("one", A withBound TArith, MA(A) :: MA(A)) implements wrapper ${ fmultia_fromfunction(\$shape,{i => implicitly[Arith[A]].one(fmultia_apply(raw_data(self), i))})}
-    infix (MDArith) ("zero", A withBound TArith, MA(A) :: MA(A)) implements wrapper ${ fmultia_fromfunction(\$shape,{i => implicitly[Arith[A]].zero(fmultia_apply(raw_data(self), i))}) } 
-    infix (MDArith) ("empty", A withBound TArith, Nil :: MA(A)) implements wrapper ${ fmultia_new_immutable(\$emptyShape) }
+    val MDArith = tpeClassInst("Arith" + MA.name, T withBound TArith, Arith(MA(T)))
+    infix (MDArith) ("one", T withBound TArith, MA(T) :: MA(T)) implements wrapper ${ fmultia_fromfunction(\$shape,{i => implicitly[Arith[T]].one(fmultia_apply(raw_data(self), i))})}
+    infix (MDArith) ("zero", T withBound TArith, MA(T) :: MA(T)) implements wrapper ${ fmultia_fromfunction(\$shape,{i => implicitly[Arith[T]].zero(fmultia_apply(raw_data(self), i))}) } 
+    infix (MDArith) ("empty", T withBound TArith, Nil :: MA(T)) implements wrapper ${ fmultia_new_immutable(\$emptyShape) }
 
-    infix (MDArith) ("+", A withBound TArith, (MA(A), MA(A)) :: MA(A)) implements composite {name + "_pl(" + quotedArg(0) + "," + quotedArg(1) + ")"}
-    infix (MDArith) ("-", A withBound TArith, (MA(A), MA(A)) :: MA(A)) implements composite {name + "_sub(" + quotedArg(0) + "," + quotedArg(1) + ")"}
-    infix (MDArith) ("*", A withBound TArith, (MA(A), MA(A)) :: MA(A)) implements composite {name + "_" + mult + "(" + quotedArg(0) + "," + quotedArg(1) + ")"}
-    infix (MDArith) ("/", A withBound TArith, (MA(A), MA(A)) :: MA(A)) implements composite {name + "_div(" + quotedArg(0) + "," + quotedArg(1) + ")"}
-    infix (MDArith) ("negate", A withBound TArith, MA(A) :: MA(A)) implements composite {name + "_negate(" + quotedArg(0) + ")"}
-    infix (MDArith) ("square", A withBound TArith, MA(A) :: MA(A)) implements composite {name + "_square(" + quotedArg(0) + ")"}
-    infix (MDArith) ("abs", A withBound TArith, MA(A) :: MA(A)) implements composite {name + "_abs(" + quotedArg(0) + ")"}
-    infix (MDArith) ("ceil", A withBound TArith, MA(A) :: MA(A)) implements composite {name + "_ceil(" + quotedArg(0) + ")"}
-    infix (MDArith) ("floor", A withBound TArith, MA(A) :: MA(A)) implements composite {name + "_floor(" + quotedArg(0) + ")"}
-    infix (MDArith) ("exp", A withBound TArith, MA(A) :: MA(A)) implements composite {name + "_exp(" + quotedArg(0) + ")"}
-    infix (MDArith) ("log", A withBound TArith, MA(A) :: MA(A)) implements composite {name + "_log(" + quotedArg(0) + ")"}
+    infix (MDArith) ("+", T withBound TArith, (MA(T), MA(T)) :: MA(T)) implements composite {name + "_pl(" + quotedArg(0) + "," + quotedArg(1) + ")"}
+    infix (MDArith) ("-", T withBound TArith, (MA(T), MA(T)) :: MA(T)) implements composite {name + "_sub(" + quotedArg(0) + "," + quotedArg(1) + ")"}
+    infix (MDArith) ("*", T withBound TArith, (MA(T), MA(T)) :: MA(T)) implements composite {name + "_" + mult + "(" + quotedArg(0) + "," + quotedArg(1) + ")"}
+    infix (MDArith) ("/", T withBound TArith, (MA(T), MA(T)) :: MA(T)) implements composite {name + "_div(" + quotedArg(0) + "," + quotedArg(1) + ")"}
+    infix (MDArith) ("negate", T withBound TArith, MA(T) :: MA(T)) implements composite {name + "_negate(" + quotedArg(0) + ")"}
+    infix (MDArith) ("square", T withBound TArith, MA(T) :: MA(T)) implements composite {name + "_square(" + quotedArg(0) + ")"}
+    infix (MDArith) ("abs", T withBound TArith, MA(T) :: MA(T)) implements composite {name + "_abs(" + quotedArg(0) + ")"}
+    infix (MDArith) ("ceil", T withBound TArith, MA(T) :: MA(T)) implements composite {name + "_ceil(" + quotedArg(0) + ")"}
+    infix (MDArith) ("floor", T withBound TArith, MA(T) :: MA(T)) implements composite {name + "_floor(" + quotedArg(0) + ")"}
+    infix (MDArith) ("exp", T withBound TArith, MA(T) :: MA(T)) implements composite {name + "_exp(" + quotedArg(0) + ")"}
+    infix (MDArith) ("log", T withBound TArith, MA(T) :: MA(T)) implements composite {name + "_log(" + quotedArg(0) + ")"}
 
     // --- Add to Stringable
     val Stringable = lookupGrp("Stringable").asInstanceOf[Rep[DSLTypeClass]]
-    val MDString = tpeClassInst("Stringable" + MA.name, A withBound TStringable, Stringable(MA(A)))
-    infix (MDString) ("makeStr", A withBound TStringable, MA(A) :: MString) implements composite ${ $0.makeString }
+    val MDString = tpeClassInst("Stringable" + MA.name, T withBound TStringable, Stringable(MA(T)))
+    infix (MDString) ("makeStr", T withBound TStringable, MA(T) :: MString) implements composite ${ $0.makeString }
   } /* end of CommonMultiArrayOps */
 }

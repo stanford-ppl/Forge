@@ -1,10 +1,12 @@
 package optila.compiler
 
-import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common._
+import scala.virtualization.lms.internal._
+import scala.virtualization.lms.internal.Meetable._
 
 import ppl.delite.framework.datastructures._
+import ppl.delite.framework.transform._
 import ppl.delite.framework.ops._
 
 trait ForgeIndicesOpsExp extends IndicesOpsExp { 
@@ -22,8 +24,9 @@ trait ForgeIndicesOpsExp extends IndicesOpsExp {
   implicit def inds_to_abstInds(inds: Rep[ForgeIndices]) = inds.asInstanceOf[Rep[ForgeAbstractIndices]]
 }
 
-// For compiler (Delite) implementation
-trait MultiArraySupportOpsExp extends DeliteMultiArrayOpsExp with ForgeIndicesOpsExp { 
+// For compiler (Delite) implementation 
+// TODO: Currently mixes in transformer here - may want to relocate this later!
+trait MultiArraySupportOpsExp extends DeliteMultiArrayOpsExp with ForgeIndicesOpsExp with MultiArrayTransform { 
 	this: DeliteOpsExp  =>
 
   type ArrayMD[T] = DeliteMultiArray[T]
@@ -176,14 +179,24 @@ trait MultiArraySupportOpsExp extends DeliteMultiArrayOpsExp with ForgeIndicesOp
     = dmultia_string_split(str,pat,ofs)
 
   // --- 2D Ops
-  def fmultia_matmult[A:Manifest:Numeric](lhs: Rep[Array2D[A]], rhs: Rep[Array2D[A]])(implicit ctx: SourceContext): Rep[Array2D[A]]
-    = dmultia_matmult(lhs,rhs)
-  def fmultia_matvecmult[A:Manifest:Numeric](mat: Rep[Array2D[A]], vec: Rep[Array1D[A]])(implicit ctx: SourceContext): Rep[Array1D[A]]
-    = dmultia_matvecmult(mat,vec)
+  def fmultia_matmult[A:Manifest:Numeric](lhs: Rep[Array2D[A]], rhs: Rep[Array2D[A]], mult: (Rep[A],Rep[A]) => Rep[A], add: (Rep[A],Rep[A]) => Rep[A], zero: Rep[A], one: Rep[A])(implicit ctx: SourceContext): Rep[Array2D[A]]
+    = dmultia_matmult(lhs,rhs,mult,add,zero,one)
+  def fmultia_matvecmult[A:Manifest:Numeric](mat: Rep[Array2D[A]], vec: Rep[Array1D[A]], mult: (Rep[A],Rep[A]) => Rep[A], add: (Rep[A],Rep[A]) => Rep[A], zero: Rep[A], one: Rep[A])(implicit ctx: SourceContext): Rep[Array1D[A]]
+    = dmultia_matvecmult(mat,vec,mult,add,zero,one)
+
+  // --- Pinning
+  def fmultia_pin_1D_hack[A:Manifest](arr: Rep[ForgeArray[A]])(implicit ctx: SourceContext): Rep[Array1D[A]] = {
+    arr.asInstanceOf[Rep[DeliteArray1D[A]]].withData(FlatLayout(1,Plain))
+  }
+  def fmultia_flatpin_1d_hack[A:Manifest](ma: Rep[Array1D[A]])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
+    ma.asInstanceOf[Rep[ForgeArray[A]]].withData(FlatLayout(1,Plain))
+  }
+
 }
 
 // Need these to make MultiArrays match other extern, but should not generate code for MultiArrays
-trait ScalaGenMultiArraySupportOps
-trait CudaGenMultiArraySupportOps
-trait OpenCLGenMultiArraySupportOps
-trait CGenMultiArraySupportOps
+// TODO: Mixes in MultiArray implementation codegen here, may want to move this later
+trait ScalaGenMultiArraySupportOps extends ScalaGenMultiArray
+trait CudaGenMultiArraySupportOps extends CudaGenMultiArray
+trait OpenCLGenMultiArraySupportOps extends OpenCLGenMultiArray
+trait CGenMultiArraySupportOps extends CGenMultiArray

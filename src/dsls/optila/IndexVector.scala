@@ -7,9 +7,8 @@ import core.{ForgeApplication,ForgeApplicationRunner,Config}
 trait IndexVectorOps {
   this: OptiLADSL =>
 
-  // TODO: add arithmetic operations?
-
   def importIndexVectorOps() {
+    val MArray1D = lookupTpe("Array1D")
   	val DenseMatrix = lookupTpe("DenseMatrix")
   	val DenseVector = lookupTpe("DenseVector")
     val IndexVector = lookupTpe("IndexVector")

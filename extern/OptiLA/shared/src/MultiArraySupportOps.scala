@@ -125,8 +125,12 @@ trait MultiArraySupportOps extends ForgeIndicesOps with Base {
   def fmultia_string_split(str: Rep[String],pat: Rep[String],lim: Rep[Int] = unit(0))(implicit ctx: SourceContext): Rep[Array1D[String]]
 
   // --- 2D Ops
-  def fmultia_matmult[A:Manifest:Numeric](lhs: Rep[Array2D[A]], rhs: Rep[Array2D[A]])(implicit ctx: SourceContext): Rep[Array2D[A]]
-  def fmultia_matvecmult[A:Manifest:Numeric](mat: Rep[Array2D[A]], vec: Rep[Array1D[A]])(implicit ctx: SourceContext): Rep[Array1D[A]]
+  def fmultia_matmult[A:Manifest](lhs: Rep[Array2D[A]], rhs: Rep[Array2D[A]], mult: (Rep[A],Rep[A]) => Rep[A], add: (Rep[A],Rep[A]) => Rep[A], zero: Rep[A], one: Rep[A])(implicit ctx: SourceContext): Rep[Array2D[A]]
+  def fmultia_matvecmult[A:Manifest](mat: Rep[Array2D[A]], vec: Rep[Array1D[A]], mult: (Rep[A],Rep[A]) => Rep[A], add: (Rep[A],Rep[A]) => Rep[A], zero: Rep[A], one: Rep[A])(implicit ctx: SourceContext): Rep[Array1D[A]]
+
+  // --- Pinning
+  def fmultia_pin_1D_hack[A:Manifest](arr: Rep[ForgeArray[A]])(implicit ctx: SourceContext): Rep[Array1D[A]]
+  def fmultia_flatpin_1d_hack[A:Manifest](ma: Rep[Array1D[A]])(implicit ctx: SourceContext): Rep[ForgeArray[A]]
 }
 
 trait MultiArraySupportCompilerOps extends MultiSupportOps {
@@ -227,6 +231,8 @@ trait MultiArraySupportCompilerOps extends MultiSupportOps {
     def splitString(str: Rep[String],pat: Rep[String],ofs: Rep[Int] = unit(0))(implicit ctx: SourceContext) = fmultia_string_split(str,pat,ofs)
 
     def fromFile[T:Manifest](path: Rep[String])(func: Rep[String] => Rep[T])(implicit ctx: SourceContext) = fmultia_readfile(path, Seq(unit("\n")), func)
+  
+    def flatPinHACK[T:Manifest](arr: Rep[ForgeArray[T]])(implicit ctx: SourceContext) = fmultia_pin_1D_hack(arr)
   }
 
   implicit def repArray1DtoArray1DOps[T:Manifest](ma: Rep[Array1D[T]])(implicit ctx: SourceContext) = new Array1DOpsCls(ma)
@@ -269,6 +275,9 @@ trait MultiArraySupportCompilerOps extends MultiSupportOps {
   
     def mkString(del: Rep[String] = unit(",")) = fmultia_mkstring(ma,Seq(del),None)
     def writeFile(path: Rep[String])(func: Rep[T] => Rep[String])(implicit ctx: SourceContext) = fmultia_writefile(ma, Seq(unit("\n")), path, func)
+  
+    // --- Pinning
+    def flatPinHACK = fmultia_flatpin_1d_hack(ma)
   }
 
   implicit def repArray1DToOrderedArray1DOpsCls[T:Manifest:Ordering](ma: Rep[Array1D[T]])(implicit ctx: SourceContext) = new Array1DOrderedOpsCls(ma)

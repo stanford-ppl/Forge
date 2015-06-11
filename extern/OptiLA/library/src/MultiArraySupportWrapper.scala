@@ -590,7 +590,7 @@ trait MultiArraySupportWrapper extends MultiArrayLib with ForgeIndicesWrapper wi
   }
 
   // --- 2D Ops
-  def fmultia_matmult[A:Manifest:Numeric](lhs: Rep[Array2D[A]], rhs: Rep[Array2D[A]])(implicit ctx: SourceContext): Rep[Array2D[A]] = {
+  def fmultia_matmult[A:Manifest](lhs: Rep[Array2D[A]], rhs: Rep[Array2D[A]], mult: (Rep[A],Rep[A]) => Rep[A], add: (Rep[A],Rep[A]) => Rep[A], zero: Rep[A], one: Rep[A])(implicit ctx: SourceContext): Rep[Array2D[A]] = {
     fassert(lhs.__dims(1) == rhs.__dims(0), "Dimension mismatch in matrix multiply: " + lhs.__dims(1) + " != " + rhs.__dims(0))
     val numRows = lhs.__dims.apply(0)
     val numCols = rhs.__dims.apply(1)
@@ -608,8 +608,16 @@ trait MultiArraySupportWrapper extends MultiArrayLib with ForgeIndicesWrapper wi
     }
     LibArrayMD(data, Seq(numRows, numCols), false)
   }
-  def fmultia_matvecmult[A:Manifest:Numeric](mat: Rep[Array2D[A]], vec: Rep[Array1D[A]])(implicit ctx: SourceContext): Rep[Array1D[A]] = {
+  def fmultia_matvecmult[A:Manifest](mat: Rep[Array2D[A]], vec: Rep[Array1D[A]], mult: (Rep[A],Rep[A]) => Rep[A], add: (Rep[A],Rep[A]) => Rep[A], zero: Rep[A], one: Rep[A])(implicit ctx: SourceContext): Rep[Array1D[A]] = {
     val rhs = fmultia_view(vec, Seq(0), Seq(1,1), vec.__dims :+ 1, Nil).as2D
-    fmultia_matmult(mat, rhs)
+    fmultia_matmult(mat, rhs, mult, add, zero, one)
+  }
+
+  // --- Pinning
+  def fmultia_pin_1D_hack[A:Manifest](arr: Rep[ForgeArray[A]])(implicit ctx: SourceContext): Rep[Array1D[A]] = {
+    LibArray1D(arr)
+  }
+  def fmultia_flatpin_1d_hack[A:Manifest](ma: Rep[Array1D[A]])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
+    ma.__data
   }
 }

@@ -8,15 +8,18 @@ trait VectorOps {
   this: OptiLADSL =>
 
   def addVectorCommonOps(v: Rep[DSLType], T: Rep[DSLType]) {
-    val V = if (isTpePar(T)) v(T) else v
-    val A = if (isTpePar(T)) List(TArith(asTpePar(T))) else Nil
-    val S = if (isTpePar(T)) List(TStringable(asTpePar(T))) else Nil
-
-    val R = tpePar("R")
+    val MArray1D = lookupTpe("Array1D")
     val IndexVector = lookupTpe("IndexVector")
     val DenseVector = lookupTpe("DenseVector")
     val DenseMatrix = lookupTpe("DenseMatrix")
+    val SparseVector = lookupTpe("SparseVector")
+    val SparseVectorView = lookupTpe("SparseVectorView")
     val Tuple2 = lookupTpe("Tup2")  
+
+    val V = if (isTpePar(T)) v(T) else v
+    val A = if (isTpePar(T)) List(TArith(asTpePar(T))) else Nil
+    val S = if (isTpePar(T)) List(TStringable(asTpePar(T))) else Nil
+    val R = tpePar("R")
 
     /** 
      * Common vector ops (between IndexVector and DenseVector)
@@ -63,8 +66,17 @@ trait VectorOps {
       	else $self.dice($1) 
       }
 
-      // --- Reshaping
+      // --- Math
+      for (rhs <- List(SparseVector(T),SparseVectorView(T))) {
+        infix ("+") (rhs :: DenseVector(T), A) implements composite ${ $self + $1.toDense }
+        infix ("-") (rhs :: DenseVector(T), A) implements composite ${ $self - $1.toDense }
+        infix ("*") (rhs :: DenseVector(T), A) implements composite ${ $self * $1.toDense }
+        infix ("*:*") (rhs :: T, A) implements composite ${ $self *:* $1.toDense }
+        infix ("**") (rhs :: DenseMatrix(T), A) implements composite ${ $self ** $1.toDense }
+        infix ("/") (rhs :: DenseVector(T), A) implements composite ${ $self / $1.toDense }
+      }
 
+      // --- Reshaping
       // TODO: Generalize this to n-dimensions
       infix ("replicate") ( (MInt, MInt) :: DenseMatrix(T)) implements composite ${
         fassert(!isWild($self), "Method replicate is not defined for Wildcard")

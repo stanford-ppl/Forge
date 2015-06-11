@@ -13,14 +13,14 @@ trait SparseMatrixOps {
   }
 
   def importSparseMatrixBuildableOps() {
+    val DenseMatrix = lookupTpe("DenseMatrix")
+    val SparseVector = lookupTpe("SparseVector")
+    val SparseMatrix = lookupTpe("SparseMatrix")
+    val SparseMatrixBuildable = lookupTpe("SparseMatrixBuildable")
+
     val T = tpePar("T")
     val R = tpePar("R")
     val B = tpePar("B")
-
-    val SparseVector = lookupTpe("SparseVector")
-    val DenseMatrix = lookupTpe("DenseMatrix")
-    val SparseMatrix = lookupTpe("SparseMatrix")
-    val SparseMatrixBuildable = lookupTpe("SparseMatrixBuildable")
 
     // COO format
     data(SparseMatrixBuildable, ("_numRows", MInt), ("_numCols", MInt), ("_data", MArray(T)), ("_colIndices", MArray(MInt)), ("_rowIndices", MArray(MInt)), ("_nnz", MInt))
@@ -75,12 +75,8 @@ trait SparseMatrixOps {
         val data = sparsematrix_coo_data($self)
         var s = ""
 
-        if ($self == null) {
-          s = "null"
-        }
-        else if ($self.nnz == 0) {
-          s = "[ ]"
-        }
+        if ($self == null) { s = "null" }
+        else if ($self.nnz == 0) { s = "[ ]" }
         else {
           // COO is not stored in order, so just output coordinates as a list
           for (i <- 0 until $self.nnz-1) {
@@ -98,12 +94,8 @@ trait SparseMatrixOps {
         val data = sparsematrix_coo_data($self)
         var s = ""
 
-        if ($self == null) {
-          s = "null"
-        }
-        else if ($self.nnz == 0) {
-          s = "[ ]"
-        }
+        if ($self == null) { s = "null" }
+        else if ($self.nnz == 0) { s = "[ ]" }
         else {
           // COO is not stored in order, so just output coordinates as a list
           for (i <- 0 until $self.nnz-1) {
@@ -399,13 +391,11 @@ trait SparseMatrixOps {
     val R = tpePar("R")
     val B = tpePar("B")
 
-    val DenseVector = lookupTpe("DenseVector")
     val IndexVector = lookupTpe("IndexVector")
-    val IndexWildcard = lookupTpe("IndexWildcard", stage = compile)
-    val DenseVectorView = lookupTpe("DenseVectorView")
+    val DenseVector = lookupTpe("DenseVector")
+    val DenseMatrix = lookupTpe("DenseMatrix")
     val SparseVector = lookupTpe("SparseVector")
     val SparseVectorView = lookupTpe("SparseVectorView")
-    val DenseMatrix = lookupTpe("DenseMatrix")
     val SparseMatrix = lookupTpe("SparseMatrix")
     val SparseMatrixBuildable = lookupTpe("SparseMatrixBuildable")
 
@@ -478,7 +468,10 @@ trait SparseMatrixOps {
       infix ("size") (Nil :: MInt) implements composite ${ $self.numRows*$self.numCols }
       infix ("nnz") (Nil :: MInt) implements getter(0, "_nnz")
 
-      infix ("nz") (MethodSignature(List(("asRow",MBoolean,"unit(true)")), DenseVector(T))) implements composite ${ densevector_alloc_raw($self.nnz, $1, sparsematrix_csr_data($self)) }
+      // TODO: Either convert sparse to using Array1D, or fix pinning implementation
+      infix ("nz") (MethodSignature(List(("asRow",MBoolean,"unit(true)")), DenseVector(T))) implements composite ${ 
+        densevector_fromarray1d(Array1D.flatPinHACK(sparsematrix_csr_data($self)), $asRow) 
+      }
 
       compiler ("sparsematrix_csr_find_offset") ((("row",MInt),("col",MInt)) :: MInt) implements single ${
         val rowPtr = sparsematrix_csr_rowptr($self)
@@ -498,24 +491,32 @@ trait SparseMatrixOps {
       // orientation of IndexVector in apply does not matter - use getCols or 2d apply to slice cols. This is so we can use n::m syntax
       // to slice rows, while still retaining our convention of row vectors being the default (e.g. for matrix construction)
       infix ("apply") (IndexVector :: SparseMatrix(T)) implements redirect ${ $self.getRows($1) }
-      infix ("apply") ((IndexVector, IndexWildcard) :: SparseMatrix(T)) implements redirect ${ $self.getRows($1) }
 
-      infix ("apply") ((("rows", IndexVector), ("cols", IndexVector)) :: SparseMatrix(T)) implements composite ${
-        // could avoid the logical access and COO <-> CSR conversion here by slicing the underlying CSR array directly
-        val out = SparseMatrix[T](rows.length, cols.length)
-        for (i <- 0 until rows.length) {
-          // FIXME: weird scalac errors (not found: value row) if we don't explicitly specify type here
-          val row: Rep[SparseVectorView[T]] = $self(rows(i))
-          for (j <- 0 until cols.length) {
-            val col = cols(j)
-            if (row(col) != defaultValue[T]) {
-              out(i,j) = row(col)
+      infix ("apply") ((("rInds", IndexVector), ("cInds", IndexVector)) :: SparseMatrix(T)) implements composite ${
+        if (isWild(rInds) && !isWild(cInds)) $self.getCols(cInds)
+        else if (!isWild(rInds) && isWild(cInds)) $self.getRows(rInds)
+        else {
+          val rows = if (isWild(rInds)) $self.rowIndices else rInds
+          val cols = if (isWild(cInds)) $self.colIndices else cInds
+
+          // could avoid the logical access and COO <-> CSR conversion here by slicing the underlying CSR array directly
+          val out = SparseMatrix[T](rows.length, cols.length)
+          for (i <- 0 until rows.length) {
+            // FIXME: weird scalac errors (not found: value row) if we don't explicitly specify type here
+            val row: Rep[SparseVectorView[T]] = $self(rows(i))
+            for (j <- 0 until cols.length) {
+              val col = cols(j)
+              if (row(col) != defaultValue[T]) {
+                out(i,j) = row(col)
+              }
             }
           }
+          out.finish
         }
-        out.finish
       }
-      infix ("apply") ((IndexWildcard, IndexVector) :: SparseMatrix(T)) implements redirect ${ $self.getCols($2) }
+      //infix ("apply") ((IndexWildcard, IndexVector) :: SparseMatrix(T)) implements redirect ${ $self.getCols($2) }
+      //infix ("apply") ((IndexVector, IndexWildcard) :: SparseMatrix(T)) implements redirect ${ $self.getRows($1) }
+
 
       infix ("rowIndices") (Nil :: IndexVector) implements single ${
         // for each data index, compute the row associated with it
@@ -542,11 +543,11 @@ trait SparseMatrixOps {
           oldRow = nextRow
           i += 1
         }
-        indexvector_fromarray(rows.unsafeImmutable, false)
+        indexvector_fromarray1d(Array1D.flatPinHACK(rows.unsafeImmutable), false)
       }
 
       infix ("colIndices") (Nil :: IndexVector) implements composite ${
-        IndexVector(indexvector_fromarray(sparsematrix_csr_colindices($self), true).distinct)
+        IndexVector(indexvector_fromarray1d(Array1D.flatPinHACK(sparsematrix_csr_colindices($self)), true).distinct)
       }
 
       // FIXME: more efficient way to get nzRows/nzCols?
@@ -559,11 +560,12 @@ trait SparseMatrixOps {
       infix ("getRow") (MInt :: SparseVectorView(T)) implements composite ${ sparsematrix_vview($self, $1*$self.numCols, 1, $self.numCols, true) }
 
       infix ("getRows") (IndexVector :: SparseMatrix(T)) implements composite ${
+        val inds = if (isWild($1)) $self.rowIndices else $1
         // could avoid the COO <-> CSR conversion here by slicing the underlying CSR array directly
-        val out = SparseMatrix[T]($1.length, $self.numCols)
-        for (i <- 0 until $1.length) {
+        val out = SparseMatrix[T](inds.length, $self.numCols)
+        for (i <- 0 until inds.length) {
           // FIXME: weird scalac errors (not found: value row) if we don't explicitly specify type here
-          val row: Rep[SparseVectorView[T]] = $self($1(i))
+          val row: Rep[SparseVectorView[T]] = $self(inds(i))
           val rowData = row.nz
           val rowIndices = row.indices
           for (j <- 0 until rowData.length) {
@@ -576,10 +578,11 @@ trait SparseMatrixOps {
       infix ("getCol") (MInt :: SparseVectorView(T)) implements composite ${ sparsematrix_vview($self, $1, $self.numCols, $self.numRows, false) }
 
       infix ("getCols") (IndexVector :: SparseMatrix(T)) implements composite ${
+        val inds = if (isWild($1)) $self.colIndices else $1
         // could avoid the OO <-> CSR conversion here by slicing the underlying CSR array directly
-        val out = SparseMatrix[T]($self.numRows, $1.length)
-        for (j <- 0 until $1.length) {
-          val col = $self.getCol($1(j))
+        val out = SparseMatrix[T]($self.numRows, inds.length)
+        for (j <- 0 until inds.length) {
+          val col = $self.getCol(inds(j))
           val colData = col.nz
           val colIndices = col.indices
           for (i <- 0 until colData.length) {
@@ -648,6 +651,7 @@ trait SparseMatrixOps {
         out
       }
 
+      // TODO: May be able to improve this
       infix ("toDense") (Nil :: DenseMatrix(T)) implements composite ${
         val out = DenseMatrix[T]($self.numRows, $self.numCols)
         val rowPtr = sparsematrix_csr_rowptr($self)
@@ -673,12 +677,8 @@ trait SparseMatrixOps {
         val data = sparsematrix_csr_data($self)
         var s = ""
 
-        if ($self == null) {
-          s = "null"
-        }
-        else if ($self.nnz < 1) {
-          s = "[ ]"
-        }
+        if ($self == null) { s = "null" }
+        else if ($self.nnz < 1) { s = "[ ]" }
         else {
           for (i <- 0 until $self.numRows) {
             val nnz = rowPtr(i+1) - rowPtr(i)
@@ -702,12 +702,8 @@ trait SparseMatrixOps {
         val data = sparsematrix_csr_data($self)
         var s = ""
 
-        if ($self == null) {
-          s = "null"
-        }
-        else if ($self.nnz < 1) {
-          s = "[ ]"
-        }
+        if ($self == null) { s = "null" }
+        else if ($self.nnz < 1) { s = "[ ]" }
         else {
           for (i <- 0 until $self.numRows) {
             val nnz = rowPtr(i+1) - rowPtr(i)
@@ -949,7 +945,7 @@ trait SparseMatrixOps {
        */
       infix ("mapnz") ((T ==> R) :: SparseMatrix(R), addTpePars = R) implements composite ${
         val out = $self.nz.map($1)
-        sparsematrix_csr_alloc_raw($self.numRows, $self.numCols, densevector_raw_data(out), sparsematrix_csr_colindices($self), sparsematrix_csr_rowptr($self), $self.nnz)
+        sparsematrix_csr_alloc_raw($self.numRows, $self.numCols, densevector_raw_data(out).flatPinHACK, sparsematrix_csr_colindices($self), sparsematrix_csr_rowptr($self), $self.nnz)
       }
 
       infix ("foreachnz") ((T ==> MUnit) :: MUnit) implements composite ${ $self.nz.foreach($1) }
@@ -965,10 +961,10 @@ trait SparseMatrixOps {
       }
 
       infix ("findRows") ((SparseVectorView(T) ==> MBoolean) :: IndexVector) implements composite ${
-        IndexVector($self.nzRows.filter(i => $1($self(i))))
+        IndexVector(Array1D.flatPinHACK($self.nzRows.filter(i => $1($self(i)))))
       }
       infix ("findCols") ((SparseVectorView(T) ==> MBoolean) :: IndexVector) implements composite ${
-        IndexVector($self.nzCols.filter(i => $1($self.getCol(i))))
+        IndexVector(Array1D.flatPinHACK($self.nzCols.filter(i => $1($self.getCol(i)))))
       }
 
       infix ("filterRows") ((SparseVectorView(T) ==> MBoolean) :: SparseMatrix(T)) implements composite ${

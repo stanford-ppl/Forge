@@ -75,11 +75,11 @@ trait SparseVectorViewOps {
       // create a SparseVector wrapper over the new array, and then perform the operation. in order to avoid this copy,
       // we will need a variable-strided view. (or to replicate the interface and repeat the variable stride on each op)
 
-      infix ("nz") (Nil :: DenseVectorView(T), aliasHint = contains(0)) implements single ${
+      infix ("nz") (Nil :: DenseVector(T), aliasHint = contains(0)) implements composite ${
         if (sparsevectorview_stride($self) == 1) {
           val src = sparsevectorview_source($self)
           val (startOffset, endOffset) = unpack(sparsevectorview_calc_offsets($self))
-          DenseVectorView[T](sparsematrix_csr_data(src), startOffset, 1, endOffset - startOffset, $self.isRow)
+          DenseVector[T](Array1D.flatPinHACK(sparsematrix_csr_data(src)).slice(startOffset, endOffset - startOffset), $self.isRow)
         }
         else {
           // if the stride is uneven in the underlying array, we cannot currently represent this is as a direct view
@@ -97,7 +97,7 @@ trait SparseVectorViewOps {
           for (i <- 0 until nnz) {
             outIndices(i) = srcIndices(i + startOffset)
           }
-          indexvector_fromarray(outIndices, $self.isRow)
+          indexvector_fromarray1d(Array1D.flatPinHACK(outIndices), $self.isRow)
         }
         else {
           $self.toSparse.indices

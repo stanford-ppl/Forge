@@ -63,6 +63,11 @@ trait Definitions extends DerivativeTypes {
   lazy val MLambda = tpe("Function1", (tpePar("A"), tpePar("B")))
   lazy val MSourceContext = tpe("SourceContext", stage = compile)
 
+  // Using I prefix for "Immediate" (values used in compiler) - distinguishing from those needing Const wrapper
+  lazy val IBoolean = tpe("Boolean", stage = compile)
+  lazy val IInt = tpe("Int", stage = compile)
+  lazy val IString = tpe("String", stage = compile)
+
   // generic types
   // should these return a different Forge type (e.g. Rep[TypeConstructor] or Rep[GenericType]) than concrete types?
   lazy val MVar = tpe("Var", tpePar("A"))

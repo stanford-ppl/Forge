@@ -32,30 +32,34 @@ trait OptiLADSL extends ForgeApplication
     importConcurrentHashMap()
 
     // Declare types first so that they are available to all ops
-    val A = tpePar("A")
+    val T = tpePar("T")
     val K = tpePar("K")
     val V = tpePar("V")
 
     // Delite/Forge internals
     // TODO: These should eventually be added to Forge as a whole.
     extern(grp("MultiArraySupport"))	
-    val MArray1D = tpe("Array1D", A)
-    val MArray2D = tpe("Array2D", A)
-    val MArray3D = tpe("Array3D", A)
-    val MArray4D = tpe("Array4D", A)
-    val MArray5D = tpe("Array5D", A)
-    val MArrayMD = tpe("ArrayMD", A)
+    val MArray1D = tpe("Array1D", T)
+    val MArray2D = tpe("Array2D", T)
+    val MArray3D = tpe("Array3D", T)
+    val MArray4D = tpe("Array4D", T)
+    val MArray5D = tpe("Array5D", T)
+    val MArrayMD = tpe("ArrayMD", T)
     val MMap = tpe("ForgeMap", List(K, V))
     primitiveTypes :::= List(MArray1D, MArray2D, MArray3D, MArray4D, MArray5D, MArrayMD, MMap)
 
     // OptiLA Structs
     val IndexVector = tpe("IndexVector")
-    val DenseVector = tpe("DenseVector", A)
-    val DenseMatrix = tpe("DenseMatrix", A)
-    val DenseTensor3 = tpe("DenseTensor3", A) // These need better names..
-    val DenseTensor4 = tpe("DenseTensor4", A)
-    val DenseTensor5 = tpe("DenseTensor5", A)
-    val DenseTensorN = tpe("DenseTensorN", A)
+    val DenseVector = tpe("DenseVector", T)
+    val DenseMatrix = tpe("DenseMatrix", T)
+    val DenseTensor3 = tpe("DenseTensor3", T) // These need better names..
+    val DenseTensor4 = tpe("DenseTensor4", T)
+    val DenseTensor5 = tpe("DenseTensor5", T)
+    val DenseTensorN = tpe("DenseTensorN", T)
+    val SparseVector = tpe("SparseVector", T)
+    val SparseVectorView = tpe("SparseVectorView", T)
+    val SparseMatrix = tpe("SparseMatrix", T)
+    val SparseMatrixBuildable = tpe("SparseMatrixBuildable", T)
     val Ctr = grp("Constructors")
     val IO = grp("LAio")    // avoid conflict with IOOps in LMS
 
@@ -74,8 +78,10 @@ trait OptiLADSL extends ForgeApplication
     importDenseVectorOps()
     importDenseMatrixOps()
     importTensorOps()
+    importSparseVectorOps()
+    importSparseVectorViewOps()
+    importSparseMatrixOps()
     importConstructors()
-    importIOOps()
     importLinAlgOps()
     importShapeOps()
     importLegacySupport()
@@ -127,7 +133,7 @@ trait OptiLADSL extends ForgeApplication
       val f = "(\"% .\"+Global.numericPrecision+\"g\")" // can't escape quotes inside string interpolation scope
 
       s"""
-      def numericStr[A](x: A) = {
+      def numericStr[T](x: T) = {
         val s = $f.format(x)
         val padPrefix = (Global.numericPrecision+6) - s.length
         if (padPrefix > 0) " "*padPrefix + s else s

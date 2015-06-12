@@ -57,8 +57,8 @@ trait IOGraphOps {
       val pin = $pathin
       val path = pin + "_" + $level.toString + ".txt"
       val xfs = new java.io.BufferedWriter(new java.io.FileWriter(path))
-      xfs.write("number of nodes: " + $numNodes + " number of edges: " + $numEdges)
-      xfs.write("old mod: " + $mod + " new mod: " + $newMod)
+      xfs.write("number of nodes: " + $numNodes + " number of edges: " + $numEdges + "\\n")
+      xfs.write("old mod: " + $mod + " new mod: " + $newMod + "\\n")
 
       for (i <- 0 until $nodes.length) {
         val src = i

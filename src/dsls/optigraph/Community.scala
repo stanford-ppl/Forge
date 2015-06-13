@@ -29,6 +29,7 @@ trait CommunityOps {
 
     data(Community,("_size",MInt),("_precision",MDouble),("_modularity",MDouble),("_canImprove",MBoolean),("_totalWeight",MDouble),("_graph",UndirectedGraph),("_n2c",MArray(MInt)),("_tot",MArray(MDouble)),("_in",MArray(MDouble)),("_n2o",MArray(MInt)))
     static(Community)("apply", Nil, (("g",UndirectedGraph),("precision",MDouble),("n2o",MArray(MInt))) :: Community) implements allocates(Community,${alloc_size(g)},${precision},${unit(0d)},${unit(true)},${alloc_total_weight($0)},${$0},${alloc_ints(alloc_size(g),{e => e})},${alloc_weights(g)},${alloc_selfs(g)},${n2o})
+    static(Community)("apply", Nil, (("g",UndirectedGraph),("precision",MDouble)) :: Community) implements composite ${ Community($g, $precision, array_fromfunction[Int]($g.numNodes,e=>e)) }
     static(Community)("apply", Nil, MethodSignature(List(("size",MInt),("precision",MDouble),("modularity",MDouble),("canImprove",MBoolean),("totalWeight",MDouble),("g",UndirectedGraph),("n2c",MArray(MInt)),("tot",MArray(MDouble)),("in",MArray(MDouble)),("n2o",MArray(MInt))),Community)) implements allocates(Community,${size},${precision},${modularity},${canImprove},${totalWeight},${g},${n2c},${tot},${in},${n2o})
 
     /*

@@ -308,7 +308,7 @@ def publish(dsl, opts):
 
         shutil.copyfile(FORGE_HOME + "/static/delitecommon-wrapper.py", build_dir+"/bin/delitecommon.py")
 
-        cp_executable_script(DELITE_HOME + "/bin/delited", build_dir + "/bin/delited")
+        cp_executable_script(DELITE_HOME + "/bin/delitep", build_dir + "/bin/delitep")
         cp_executable_script(DELITE_HOME + "/bin/server.py", build_dir + "/bin/server.py")
 
     print "[forge]: Publishing complete."

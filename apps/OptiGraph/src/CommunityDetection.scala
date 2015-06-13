@@ -43,7 +43,7 @@ trait CommDetection extends OptiGraphApplication {
     tic(g)
     
     val precision = k
-    var c = Community(g,precision,array_fromfunction[Int](g.numNodes,e=>e))
+    var c = Community(g,precision)
     var mod,newMod = c.modularity
 
     println("Modularity: " + mod)

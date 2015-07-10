@@ -9,6 +9,7 @@ trait IndexVectorOps {
 
   def importIndexVectorOps() {
     val MArray1D = lookupTpe("Array1D")
+    val MMap = lookupTpe("ForgeMap")
   	val DenseMatrix = lookupTpe("DenseMatrix")
   	val DenseVector = lookupTpe("DenseVector")
     val IndexVector = lookupTpe("IndexVector")
@@ -18,17 +19,17 @@ trait IndexVectorOps {
     val K = tpePar("K")
     val V = tpePar("V")
 
-    data(IndexVector, ("_data", MArray1D(MInt)), ("_start", MInt), ("_end", MInt), ("_isRow", MBoolean) ("_isRange", MBoolean), ("_isWild", MBoolean))
+    data(IndexVector, ("_data", MArray1D(MInt)), ("_start", MInt), ("_end", MInt), ("_isRow", MBoolean), ("_isRange", MBoolean), ("_isWild", MBoolean))
 
     // --- Compiler field accessors
-    compiler (IndexVector) ("indexvector_get_start", Nil :: MInt) implements getter(0, "_start")
-    compiler (IndexVector) ("indexvector_get_end", Nil :: MInt) implements getter(0, "_end")
-    compiler (IndexVector) ("indexvector_raw_data", Nil :: MArray(MInt)) implements getter (0, "_data")
-    compiler (IndexVector) ("isRange", Nil :: MBoolean) implements getter(0, "_isRange")
-    compiler (IndexVector) ("isWild", Nil :: MBoolean) implements getter(0, "_isWild")
+    compiler (IndexVector) ("indexvector_get_start", Nil, IndexVector :: MInt) implements getter(0, "_start")
+    compiler (IndexVector) ("indexvector_get_end", Nil, IndexVector :: MInt) implements getter(0, "_end")
+    compiler (IndexVector) ("indexvector_raw_data", Nil, IndexVector :: MArray(MInt)) implements getter (0, "_data")
+    compiler (IndexVector) ("isRange", Nil, IndexVector :: MBoolean) implements getter(0, "_isRange")
+    compiler (IndexVector) ("isWild", Nil, IndexVector :: MBoolean) implements getter(0, "_isWild")
 
     // --- Compiler helper methods
-    compiler (IndexVector) ("indexvector_allocate", Nil, (MArray(MInt), MInt, MInt, MBoolean, MBoolean, MBoolean) :: IndexVector) implements
+    compiler (IndexVector) ("indexvector_allocate", Nil, (MArray1D(MInt), MInt, MInt, MBoolean, MBoolean, MBoolean) :: IndexVector) implements
       allocates(IndexVector, quotedArg(0), quotedArg(1), quotedArg(2), quotedArg(3), quotedArg(4), quotedArg(5))
 
     compiler (IndexVector) ("indexvector_copydata", Nil, (DenseVector(MInt)) :: MArray1D(MInt)) implements composite ${

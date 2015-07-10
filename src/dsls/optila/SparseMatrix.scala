@@ -936,9 +936,7 @@ trait SparseMatrixOps {
           dataEqual && colIndexEqual && rowPtrEqual
         }
       }
-
       direct ("__equal") (DenseMatrix(T) :: MBoolean) implements composite ${ $self.toDense == $1 }
-
 
       /**
        *  Bulk

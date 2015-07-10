@@ -96,12 +96,13 @@ trait MultiArraySupportOps extends ForgeIndicesOps with Base {
   def fmultia_zipwith[A:Manifest,B:Manifest,R:Manifest](ma: Rep[ArrayMD[A]], mb: Rep[ArrayMD[B]], f: (Rep[A],Rep[B]) => Rep[R])(implicit ctx: SourceContext): Rep[ArrayMD[R]]
   def fmultia_reduce[A:Manifest](ma: Rep[ArrayMD[A]], f: (Rep[A],Rep[A]) => Rep[A])(implicit ctx: SourceContext): Rep[A]
   def fmultia_fold[A:Manifest](ma: Rep[ArrayMD[A]], f: (Rep[A],Rep[A]) => Rep[A], zero: Rep[A])(implicit ctx: SourceContext): Rep[A]
-  def fmultia_forindices[A:Manifest](ma: Rep[ArrayMD[A]], f: Rep[ForgeLoopIndices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Unit]
   def fmultia_foreach[A:Manifest](ma: Rep[ArrayMD[A]], f: Rep[A] => Rep[Unit])(implicit ctx: SourceContext): Rep[Unit]
+  def fmultia_forindices[A:Manifest](ma: Rep[ArrayMD[A]], f: Rep[ForgeLoopIndices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Unit]
+  def fmultia_forshapeindices(shape: Seq[Rep[Int]], f: Rep[LoopIndices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Unit]
   def fmultia_NDmap[A:Manifest,B:Manifest](ma: Rep[ArrayMD[A]], mdims: Seq[Int], func: Rep[ArrayMD[A]] => Rep[ArrayMD[B]])(implicit ctx: SourceContext): Rep[ArrayMD[B]]
 
-  def fmultia_groupBy[A:Manifest,K:Manifest,V:Manifest](ma: Rep[ArrayMD[A]], key: Rep[A] => Rep[K], value: Rep[A] => Rep[V])(implicit ctx: SourceContext): Rep[DeliteHashMap[K,Array1D[V]]]
-  def fmultia_groupByReduce[A:Manifest,K:Manifest,V:Manifest](ma: Rep[ArrayMD[A]], key: Rep[A] => Rep[K], value: Rep[A] => Rep[V], reduce: (Rep[V],Rep[V]) => Rep[V])(implicit ctx: SourceContext): Rep[DeliteHashMap[K,V]]
+  def fmultia_groupBy[A:Manifest,K:Manifest,V:Manifest](ma: Rep[ArrayMD[A]], key: Rep[A] => Rep[K], value: Rep[A] => Rep[V])(implicit ctx: SourceContext): Rep[ForgeMap[K,Array1D[V]]]
+  def fmultia_groupByReduce[A:Manifest,K:Manifest,V:Manifest](ma: Rep[ArrayMD[A]], key: Rep[A] => Rep[K], value: Rep[A] => Rep[V], reduce: (Rep[V],Rep[V]) => Rep[V])(implicit ctx: SourceContext): Rep[ForgeMap[K,V]]
 
   // --- 1D Parallel Ops
   def fmultia_fromseq[A:Manifest](seq: Seq[Rep[A]])(implicit ctx: SourceContext): Rep[Array1D[A]]
@@ -125,9 +126,9 @@ trait MultiArraySupportOps extends ForgeIndicesOps with Base {
   def fmultia_string_split(str: Rep[String],pat: Rep[String],lim: Rep[Int] = unit(0))(implicit ctx: SourceContext): Rep[Array1D[String]]
 
   // --- 2D Ops
-  def fmultia_matmult[A:Manifest](lhs: Rep[Array2D[A]], rhs: Rep[Array2D[A]], mult: (Rep[A],Rep[A]) => Rep[A], add: (Rep[A],Rep[A]) => Rep[A], zero: Rep[A], one: Rep[A])(implicit ctx: SourceContext): Rep[Array2D[A]]
-  def fmultia_matvecmult[A:Manifest](mat: Rep[Array2D[A]], vec: Rep[Array1D[A]], mult: (Rep[A],Rep[A]) => Rep[A], add: (Rep[A],Rep[A]) => Rep[A], zero: Rep[A], one: Rep[A])(implicit ctx: SourceContext): Rep[Array1D[A]]
-
+  def fmultia_matmult[A:Manifest](lhs: Rep[Array2D[A]], rhs: Rep[Array2D[A]], default: (Rep[Array2D[A]], Rep[Array2D[A]]) => Rep[Array2D[A]])(implicit ctx: SourceContext): Rep[Array2D[A]]
+  def fmultia_matvecmult[A:Manifest](mat: Rep[Array2D[A]], vec: Rep[Array2D[A]], default: (Rep[Array2D[A]], Rep[Array1D[A]]) => Rep[Array1D[A]])(implicit ctx: SourceContext): Rep[Array1D[A]]
+  
   // --- Pinning
   def fmultia_pin_1D_hack[A:Manifest](arr: Rep[ForgeArray[A]])(implicit ctx: SourceContext): Rep[Array1D[A]]
   def fmultia_flatpin_1d_hack[A:Manifest](ma: Rep[Array1D[A]])(implicit ctx: SourceContext): Rep[ForgeArray[A]]
@@ -209,10 +210,11 @@ trait MultiArraySupportCompilerOps extends MultiSupportOps {
     // --- parallel ops
     def map[B:Manifest](f: Rep[T] => Rep[B]): Rep[ArrayMD[B]] = fmultia_map(ma,f)
     def zip[B:Manifest,R:Manifest](y: Rep[ArrayMD[B]])(f: (Rep[T],Rep[B]) => Rep[R]): Rep[ArrayMD[R]] = fmultia_zipwith(ma,y,f)
-    def reduce(zero: Rep[T])(f: (Rep[T],Rep[T]) => Rep[T]): Rep[T] = fmultia_reduce(ma,f,zero)
+    def reduce(f: (Rep[T],Rep[T]) => Rep[T]): Rep[T] = fmultia_reduce(ma,f)
+    def fold(zero: Rep[T])(f: (Rep[T],Rep[T]) => Rep[T]): Rep[T] = fmultia_fold(ma, f, zero)
     def foreach(f: Rep[T] => Rep[Unit]): Rep[Unit] = fmultia_foreach(ma,{x: Rep[T] => f(x) })
     def forIndices(f: Rep[ForgeLoopIndices] => Rep[Unit]): Rep[Unit] = fmultia_forindices(ma,{i: Rep[ForgeLoopIndices] => f(i) })
-    def groupBy[K:Manifest](key: Rep[T] => Rep[K]) = fmultia_groupBy(ma,key)
+    def groupBy[K:Manifest, V: Manifest](key: Rep[T] => Rep[K], value: Rep[T] => Rep[V]) = fmultia_groupBy(ma,key,value)
     def groupByReduce[K:Manifest, V:Manifest](key: Rep[T] => Rep[K], value: Rep[T] => Rep[V], reduce: (Rep[V],Rep[V]) => Rep[V]) = fmultia_groupByReduce(ma,key,value,reduce)
 
     def mmap(f: Rep[T] => Rep[T]): Rep[Unit] = this.forIndices{i => ma(i) = f(ma(i))}

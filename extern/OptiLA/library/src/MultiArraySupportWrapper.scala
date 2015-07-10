@@ -334,13 +334,6 @@ trait MultiArraySupportWrapper extends MultiArrayLib with ForgeIndicesWrapper wi
     copy.__data.fold(zero){(a,b) => f(a,b)}
   }
 
-  def fmultia_forindices[A:Manifest](ma: Rep[ArrayMD[A]], f: Rep[ForgeLoopIndices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Unit] = {
-    val size = fmultia_size(ma)
-    for (v <- 0 until size) {
-      val i = LoopIndices.unflatten(v, ma.__dims)
-      f(i)
-    }
-  }
   def fmultia_foreach[A:Manifest](ma: Rep[ArrayMD[A]], f: Rep[A] => Rep[Unit])(implicit ctx: SourceContext): Rep[Unit] = {
     val size = fmultia_size(ma)
     for (v <- 0 until size) {
@@ -349,6 +342,21 @@ trait MultiArraySupportWrapper extends MultiArrayLib with ForgeIndicesWrapper wi
       f(x)
     }
   }
+  def fmultia_forindices[A:Manifest](ma: Rep[ArrayMD[A]], f: Rep[ForgeLoopIndices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Unit] = {
+    val size = fmultia_size(ma)
+    for (v <- 0 until size) {
+      val i = LoopIndices.unflatten(v, ma.__dims)
+      f(i)
+    }
+  }
+  def fmultia_forshapeindices(shape: Seq[Rep[Int]], f: Rep[LoopIndices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Unit] = {
+    val size = shape.reduce{_*_}
+    for (v <- 0 until size) {
+      val i = LoopIndices.unflatten(v, shape)
+      f(i)
+    }
+  }
+  
   // Super slow version of ND map with debug checks!
   def fmultia_NDmap[A:Manifest,B:Manifest](ma: Rep[ArrayMD[A]], mdims: Seq[Int], func: Rep[ArrayMD[A]] => Rep[ArrayMD[B]])(implicit ctx: SourceContext): Rep[ArrayMD[B]] = {
     val dims = ma.__dims
@@ -590,27 +598,11 @@ trait MultiArraySupportWrapper extends MultiArrayLib with ForgeIndicesWrapper wi
   }
 
   // --- 2D Ops
-  def fmultia_matmult[A:Manifest](lhs: Rep[Array2D[A]], rhs: Rep[Array2D[A]], mult: (Rep[A],Rep[A]) => Rep[A], add: (Rep[A],Rep[A]) => Rep[A], zero: Rep[A], one: Rep[A])(implicit ctx: SourceContext): Rep[Array2D[A]] = {
-    fassert(lhs.__dims(1) == rhs.__dims(0), "Dimension mismatch in matrix multiply: " + lhs.__dims(1) + " != " + rhs.__dims(0))
-    val numRows = lhs.__dims.apply(0)
-    val numCols = rhs.__dims.apply(1)
-    val common = lhs.__dims.apply(1)
-    val data = new Array[T](numRows*numCols)
-    val i = 0
-    val j = 0
-    for (i <- 0 until numRows) {
-      for (j <- 0 until numCols) {
-        data(i*numCols + j) = Array.tabulate(common){k => 
-          // Have to use implicitly[Numeric] since Arith has precedence on Rep * Rep
-          implicitly[Numeric[T]].times(fmultia_apply(lhs, Indices(Seq(i, k))), fmultia_apply(rhs, Indices(Seq(k, j))))
-        }.sum
-      }
-    }
-    LibArrayMD(data, Seq(numRows, numCols), false)
+  def fmultia_matmult[A:Manifest](lhs: Rep[Array2D[A]], rhs: Rep[Array2D[A]], default: (Rep[Array2D[A]], Rep[Array2D[A]]) => Rep[Array2D[A]])(implicit ctx: SourceContext): Rep[Array2D[A]] = {
+    default(lhs, rhs)
   }
-  def fmultia_matvecmult[A:Manifest](mat: Rep[Array2D[A]], vec: Rep[Array1D[A]], mult: (Rep[A],Rep[A]) => Rep[A], add: (Rep[A],Rep[A]) => Rep[A], zero: Rep[A], one: Rep[A])(implicit ctx: SourceContext): Rep[Array1D[A]] = {
-    val rhs = fmultia_view(vec, Seq(0), Seq(1,1), vec.__dims :+ 1, Nil).as2D
-    fmultia_matmult(mat, rhs, mult, add, zero, one)
+  def fmultia_matvecmult[A:Manifest](mat: Rep[Array2D[A]], vec: Rep[Array2D[A]], default: (Rep[Array2D[A]], Rep[Array1D[A]]) => Rep[Array1D[A]])(implicit ctx: SourceContext): Rep[Array1D[A]] = {
+    default(mat, vec)
   }
 
   // --- Pinning

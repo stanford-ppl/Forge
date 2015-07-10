@@ -18,7 +18,6 @@ trait VectorOps {
 
     val V = if (isTpePar(T)) v(T) else v
     val A = if (isTpePar(T)) List(TArith(asTpePar(T))) else Nil
-    val S = if (isTpePar(T)) List(TStringable(asTpePar(T))) else Nil
     val R = tpePar("R")
 
     /** 
@@ -115,9 +114,9 @@ trait VectorOps {
       
       // --- Data exchange
       // TODO: Need to implement layout pinning for extracting Arrays (not Array1Ds)
-      //infix ("toArray") (Nil :: MArray(T)) implements composite ${ densevector_raw_data($self.map(e => e)) }
       infix ("toArray1D") (Nil :: MArray1D(T)) implements composite ${ densevector_raw_data($self).Clone }
 
+      infix ("toArray") (Nil :: MArray(T)) implements composite ${ $self.toArray1D.flatPinHACK }
     }
   }
 

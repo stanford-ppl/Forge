@@ -9,6 +9,7 @@ trait DenseMatrixOps {
 
   def importDenseMatrixOps() {
     val MArray2D = lookupTpe("Array2D")
+    val MMap = lookupTpe("ForgeMap")
     val IndexVector = lookupTpe("IndexVector")
     val DenseVector = lookupTpe("DenseVector")
     val DenseMatrix = lookupTpe("DenseMatrix")
@@ -377,20 +378,32 @@ trait DenseMatrixOps {
       }
 
       // Matrix multiply
+      // TODO: Change fold to reduce when reduce transformation works
       infix ("*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${
         fassert($0.numCols == $1.numRows, "Dimension mismatch in matrix multiply (" + $0.numCols + " != " + $1.numRows + ")")
         val lhs = densematrix_raw_data($0)
-        val rhs = densematrix_raw_data($1)    
-        densematrix_fromarray2d(fmultia_matmult(lhs, rhs))
+        val rhs = densematrix_raw_data($1)
+        densematrix_fromarray2d(fmultia_matmult(lhs, rhs, {(l, r) => 
+          Array2D.fromFunction(l.rows, r.cols){(i,j) => 
+            val dp = l.getRow(i).zip(r.getCol(j)){(a,b) => implicitly[Arith[T]]*(a,b)}
+            dp.fold(implicitly[Arith[T]].zero(dp(0))){(a,b) => implicitly[Arith[T]]+(a,b) }
+          }
+        }))
       }
 
       // Matrix-Vector multiply
+      // TODO: Change fold to reduce when reduce transformation works
       infix ("*") (DenseVector(T) :: DenseVector(T), TArith(T)) implements composite ${
         fassert($1.isCol, "Dimension mismatch in matrix-vector product (Expected column vector)")
         fassert($0.numCols == $1.length, "Dimension mismatch in matrix-vector product (" + $self.numCols + " != " + $1.length + ")")
         val lhs = densematrix_raw_data($0)
         val rhs = densevector_raw_data($1)
-        densevector_fromarray1d(fmultia_matvecmult(lhs, rhs), unit(false))
+        densevector_fromarray1d(fmultia_matvecmult(lhs, rhs, {(m,v) =>
+          Array1D.fromFunction(m.rows){i => 
+            val dp = m.getRow(i).zip(v){(a,b) => implicitly[Arith[T]]*(a,b) }
+            dp.fold(implicitly[Arith[T]].zero(dp(0))){(a,b) => implicitly[Arith[T]]+(a,b)}
+          }
+        }), unit(false))
       }
 
       // Dense-Sparse math

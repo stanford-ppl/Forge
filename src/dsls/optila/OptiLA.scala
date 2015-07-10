@@ -10,6 +10,7 @@ trait OptiLADSL extends ForgeApplication
 		with MultiArrayOps 			with VectorOps 				with DenseVectorOps
 		with IndexVectorOps 		with DenseMatrixOps   with TensorOps
     with MultiArrayConstructors
+    with SparseMatrixOps    with SparseVectorOps  with SparseVectorViewOps
 
 	  with ArithOps  					with BasicMathOps  		with OrderOps 
 	  with StringableOps      with RandomOps        with ShapeOps

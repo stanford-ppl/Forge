@@ -15,13 +15,13 @@ trait TensorOps {
     for (r <- 3 until 6) {
       val DenseTensor = lookupTpe("DenseTensor" + r)
       val MArrayR = lookupTpe("Array" + r + "D")
-      val name = DenseTensor.name.toLower
+      val name = DenseTensor.name.toLowerCase
 
       data(DenseTensor, ("_data", MArrayR(A)))
-      compiler (DenseTensor) (f"$name%s_raw_data", A, DenseTensor(A) :: MArrayR(A)) implements getter(0, "_data")
-      compiler (DenseTensor) (f"$name%s_set_raw_data", A, (DenseTensor(A), MArrayR(A)) :: MUnit) implements setter(0, "_data". ${$1})
+      compiler (DenseTensor) ( (f"$name%s_raw_data"), A, DenseTensor(A) :: MArrayR(A)) implements getter(0, "_data")
+      compiler (DenseTensor) ( (f"$name%s_set_raw_data"), A, (DenseTensor(A), MArrayR(A)) :: MUnit) implements setter(0, "_data", ${$1})
     
-      compiler (DenseTensor) (f"$name%s_fromarray$r%dd", A, MArrayR(A) :: DenseTensor(A)) implements allocates(DenseTensor, ${$0})
+      compiler (DenseTensor) ( (f"$name%s_fromarray$r%dd"), A, MArrayR(A) :: DenseTensor(A)) implements allocates(DenseTensor, ${$0})
     
       val TensorOps = withTpe(DenseTensor)
       TensorOps {
@@ -31,8 +31,8 @@ trait TensorOps {
         }
       }
 
-      val wrapper: String => OpType = data => composite f"$name%s_fromarray$r%dd{$$data.as$r%dD}"
-      compiler (DenseTensor) ("raw_data", A, DenseTensor(A) :: MArrayR(A)) implements composite f"densetensor$r%d_raw_data($$0)"
+      val wrapper: String => OpType = data => composite { f"$name%s_fromarray$r%dd{$$data.as$r%dD}" }
+      compiler (DenseTensor) ("raw_data", A, DenseTensor(A) :: MArrayR(A)) implements composite { f"densetensor$r%d_raw_data($$0)" }
       addMultiArrayCommonOps(DenseTensor, r, "mul", wrapper)
       addTensorCommonOps(DenseTensor, r, wrapper)
 
@@ -77,7 +77,7 @@ trait TensorOps {
     addTensorCommonOps(DenseTensor4, 4, wrapper4D)
   }*/
 
-  def addTensorCommonOps(MA: Rep[DSLType], ndims: Int, wrapper: Rep[String] => OpType) {
+  def addTensorCommonOps(MA: Rep[DSLType], ndims: Int, wrapper: String => OpType) {
     val defaultReadDelims = List("\\s+/\\s+", "\\s+:\\s+", "\\s+;\\s+", "\\s+")
     val defaultWriteDelims = List("  /  ", "  :  ", "  ;  ", "    ")
 
@@ -89,7 +89,7 @@ trait TensorOps {
     val MIntArgs = List.fill(ndims)(MInt)
     val IIntArgs = List.fill(ndims)(IInt)
 
-    var argListN = Seq.tabulate(ndims){i => quotedArg(i)}.mkString(",")
+    var argListN = List.tabulate(ndims){i => quotedArg(i)}.mkString(",")
 
     // --- Constructors
     static (MA) ("apply", A, MIntArgs :: MA(A), effect = mutable) implements wrapper ${ ArrayMD[A](\$argListN) } 
@@ -99,37 +99,38 @@ trait TensorOps {
     // one solution would be to implicitly convert strings to mutable file objects, and (manually) CSE future conversions to return the original mutable object.
     val rdelims = defaultReadDelims.drop(defaultReadDelims.length - ndims + 1).mkString(", ") 
     val wdelims = defaultWriteDelims.drop(defaultWriteDelims.length - ndims + 1).mkString(", ")
-    val delimsArgs = Seq.tabulate(ndims-1){i => ("delim"+(i+1), MString) }
-    val delims = Seq.tabulate(ndims-1){i => "$delim"+(i+1) }.mkString(",") 
+    val delimsArgs = List.tabulate(ndims-1){i => forge_arg("delim"+i, MString, None) }
+    val delims = List.tabulate(ndims-1){i => "$delim"+i }.mkString(",") 
 
     static (MA) ("fromFile", Nil, ("path", MString) :: MA(MDouble)) implements composite ${
       \$name.fromFile($path, \$rdelims, s => parse_string_todouble(s) )
     }
-    static (MA) ("fromFile", Nil, ("path", MString) +: delimsArgs :: MA(MDouble)) implements composite ${ 
+    static (MA) ("fromFile", Nil, (forge_arg("path", MString, None) +: delimsArgs) :: MA(MDouble)) implements composite ${ 
       \$name.fromFile($path, \$delims, s => parse_string_todouble(s) )
     }
     static (MA) ("fromFile", A, (("path", MString), ("bldr", MString ==> A)) :: MA(A)) implements composite ${
       \$name.fromFile($path, \$rdelims, $bldr)
     }
-    static (MA) ("fromFile", A ("path", MString) +: delimsArgs :+ ("bldr", MString ==> A) :: MA(A)) implements wrapper ${
+    static (MA) ("fromFile", A, ((forge_arg("path", MString, None) +: delimsArgs) :+ forge_arg("bldr", MString ==> A, None)) :: MA(A)) implements wrapper ${
       fmultia_readfile($path, Seq("\\n", \$delims), $bldr)
     } 
 
+    // TODO: Lower dimensional slicing/dicing (e.g. 3D -> 2D view)
     val TensorCommonOps = withTpe(MA)
     TensorCommonOps {
-      argListN = Seq.tabulate(ndims){i => quotedArg(i+1)}.mkString(",")
+      argListN = List.tabulate(ndims){i => quotedArg(i+1)}.mkString(",")
 
       // --- File Output
       infix ("writeFile") (("path", MString) :: MUnit, TStringable(A), effect = simple) implements composite ${
         $self.writeFile($path, \$wdelims, e => e.makStr)
       }
-      infix ("writefile") ( ("path", MString) +: delimsArgs :: MUnit, TStringable(A), effect = simple) implements composite ${
+      infix ("writefile") ( ( forge_arg("path", MString, None) +: delimsArgs) :: MUnit, TStringable(A), effect = simple) implements composite ${
         $self.writeFile($path, \$delims, e => e.makeStr)
       }
-      infix ("writeFile") ( (("path", MString), ("bldr", A ==> MString)), effect = simple) implements composite ${
+      infix ("writeFile") ( (("path", MString), ("bldr", A ==> MString)) :: MUnit, effect = simple) implements composite ${
         $self.writeFile($path, \$delims, $bldr) 
       }
-      infix ("writeFile") ( ("path", MString) +: delimsArgs :+ ("bldr", A ==> MString), effect = simple) implements composite ${
+      infix ("writeFile") ( (( forge_arg("path", MString, None) +: delimsArgs) :+ forge_arg("bldr", A ==> MString, None)) :: MUnit, effect = simple) implements composite ${
         fmultia_writefile(raw_data($self), Seq(\$delims), $path, $bldr)
       }
 
@@ -161,29 +162,34 @@ trait TensorOps {
         else {
           val inds = indvs.zipWithIndex.map{i => if (isWild(i._1)) $self.dimIndices(i._2) else i._1 }
           val dims = inds.map{_.length}
+          // Gather
           fmultia_fromfunction(dims){li => $self(\$loopIndices) }
         }
       }
 
       // --- Updates
       val argRHS = quotedArg(ndims+1)
-      infix ("update") (MIntArgs :+ A :: MUnit, effect = write(0)) implements composite ${
+      infix ("update") ((MIntArgs :+ A) :: MUnit, effect = write(0)) implements composite ${
         raw_data($self).update(\$argListN, \$argRHS)
       }
 
-      infix ("update") (IndexVectorArgs :+ A :: MUnit, effect = write(0)) implements composite ${
+      infix ("update") ((IndexVectorArgs :+ A) :: MUnit, effect = write(0)) implements composite ${
         val indvs = Seq(\$argListN)
         if (indvs.map{isWild(_)}.reduce{_&&_}) {
           $self.mmap{e => \$argRHS}  // Updates all elements
         }
         else {  // Can't use slice.mmap even if all are Ranges - slices are immutable
-
+          val lens = indvs.map{_.length}
+          fmultia_forshapeindices(lens, {li =>
+            val inds = findices_new(Seq(\$loopIndices))
+            fmultia_update($self, inds, \$argRHS)
+          })
         }
       }
 
       val inds = Seq.tabulate(ndims){d => ('i' + d).toChar.toString}.mkString(",")
       val scatterInds = Seq.tabulate(ndims){ d => quotedArg(d) + "(" + ('i' + d).toChar.toString + ")"}.mkString(",")
-      infix ("update") (IndexVectorArgs :+ MA(A) :: MUnit, effect = write(0)) implements composite ${
+      infix ("update") ((IndexVectorArgs :+ MA(A)) :: MUnit, effect = write(0)) implements composite ${
         val indvs = Seq(\$argListN)
         if (indvs.map{isWild(_)}.reduce{_&&_}) {  // Full copy
           fassert(!fmultia_shape_mismatch($self, \$argRHS), "Dimension mismatch in \$name copy")
@@ -196,6 +202,7 @@ trait TensorOps {
       }
 
       // --- Permuting
+      // Don't generate for Matrix - permute is just transpose
       if (ndims > 2) {
         infix ("permute") (IIntArgs :: MA(A)) implements wrapper ${
           fmultia_permute(raw_data($self), Seq(\$argListN))

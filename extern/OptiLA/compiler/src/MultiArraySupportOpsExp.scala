@@ -27,8 +27,7 @@ trait ForgeIndicesOpsExp extends IndicesOpsExp {
 // For compiler (Delite) implementation 
 // TODO: Currently mixes in transformer here - may want to relocate this later!
 trait MultiArraySupportOpsExp extends DeliteMultiArrayOpsExp with ForgeIndicesOpsExp with MultiArrayTransform { 
-	this: DeliteOpsExp  =>
-
+  
   type ArrayMD[T] = DeliteMultiArray[T]
   type Array1D[T] = DeliteArray1D[T]
   type Array2D[T] = DeliteArray2D[T]
@@ -127,10 +126,12 @@ trait MultiArraySupportOpsExp extends DeliteMultiArrayOpsExp with ForgeIndicesOp
     = dmultia_reduce(ma,f)
   def fmultia_fold[A:Manifest](ma: Rep[ArrayMD[A]], f: (Rep[A],Rep[A]) => Rep[A], zero: Rep[A])(implicit ctx: SourceContext): Rep[A]
     = dmultia_fold(ma,f,zero)
-  def fmultia_forindices[A:Manifest](ma: Rep[ArrayMD[A]], f: Rep[ForgeLoopIndices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Unit]
-    = dmultia_forindices[ma,f]
   def fmultia_foreach[A:Manifest](ma: Rep[ArrayMD[A]], f: Rep[A] => Rep[Unit])(implicit ctx: SourceContext): Rep[Unit]
     = dmultia_foreach(ma,f)
+  def fmultia_forindices[A:Manifest](ma: Rep[ArrayMD[A]], f: Rep[ForgeLoopIndices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Unit]
+    = dmultia_forindices(ma,f)
+  def fmultia_forshapeindices(shape: Seq[Rep[Int]], f: Rep[LoopIndices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Unit]
+    = dmultia_forshapeindices(shape, f)
   def fmultia_NDmap[A:Manifest,B:Manifest](ma: Rep[ArrayMD[A]], mdims: Seq[Int], func: Rep[ArrayMD[A]] => Rep[ArrayMD[B]])(implicit ctx: SourceContext): Rep[ArrayMD[B]]
     = dmultia_NDmap(ma,mdims,func)
 
@@ -179,10 +180,10 @@ trait MultiArraySupportOpsExp extends DeliteMultiArrayOpsExp with ForgeIndicesOp
     = dmultia_string_split(str,pat,ofs)
 
   // --- 2D Ops
-  def fmultia_matmult[A:Manifest:Numeric](lhs: Rep[Array2D[A]], rhs: Rep[Array2D[A]], mult: (Rep[A],Rep[A]) => Rep[A], add: (Rep[A],Rep[A]) => Rep[A], zero: Rep[A], one: Rep[A])(implicit ctx: SourceContext): Rep[Array2D[A]]
-    = dmultia_matmult(lhs,rhs,mult,add,zero,one)
-  def fmultia_matvecmult[A:Manifest:Numeric](mat: Rep[Array2D[A]], vec: Rep[Array1D[A]], mult: (Rep[A],Rep[A]) => Rep[A], add: (Rep[A],Rep[A]) => Rep[A], zero: Rep[A], one: Rep[A])(implicit ctx: SourceContext): Rep[Array1D[A]]
-    = dmultia_matvecmult(mat,vec,mult,add,zero,one)
+  def fmultia_matmult[A:Manifest](lhs: Rep[Array2D[A]], rhs: Rep[Array2D[A]], default: (Rep[Array2D[A]], Rep[Array2D[A]]) => Rep[Array2D[A]])(implicit ctx: SourceContext): Rep[Array2D[A]]
+    = dmultia_matmult(lhs,rhs,default)
+  def fmultia_matvecmult[A:Manifest](mat: Rep[Array2D[A]], vec: Rep[Array2D[A]], default: (Rep[Array2D[A]], Rep[Array1D[A]]) => Rep[Array1D[A]])(implicit ctx: SourceContext): Rep[Array1D[A]]
+    = dmultia_matvecmult(lhs,rhs,default)
 
   // --- Pinning
   def fmultia_pin_1D_hack[A:Manifest](arr: Rep[ForgeArray[A]])(implicit ctx: SourceContext): Rep[Array1D[A]] = {

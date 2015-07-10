@@ -12,10 +12,20 @@ trait MultiArrayOps {
    * Requires the following methods:
    * - direct 'raw_data' method - extracts MultiArray subclass from struct
    */
-  def addMultiArrayCommonOps(MA: Rep[DSLType], ndims: Int, mult: String, wrapper: Rep[String] => OpType) {
+  def addMultiArrayCommonOps(MA: Rep[DSLType], ndims: Int, mult: String, wrapper: String => OpType) {
+    val MMap = lookupTpe("ForgeMap")
+    val IndexVector = lookupTpe("IndexVector")
+    val DenseVector = lookupTpe("DenseVector")
+    val DenseMatrix = lookupTpe("DenseMatrix")
+    val DenseTensor3 = lookupTpe("DenseTensor3")
+    val DenseTensor4 = lookupTpe("DenseTensor4")
+    val DenseTensor5 = lookupTpe("DenseTensor5")
     val T = tpePar("T")
     val R = tpePar("R")
     val S = tpePar("S")
+    val K = tpePar("K")
+    val V = tpePar("V")
+
     val name = MA.name.toLowerCase
     val MIntArgs = List.fill(ndims){MInt}
     // Default vector is in 2nd dimension (row vector)
@@ -171,7 +181,7 @@ trait MultiArrayOps {
       infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements composite ${ fmultia_foreach(raw_data($self), $1) }
       
       val loopIndices = Seq.tabulate(ndims){i => "li(" + i + ")"}.mkString(",")
-      infix ("forIndices") (MIntArgs ==> MUnit :: MUnit, effect = simple) implements composite ${ 
+      infix ("forIndices") ((MIntArgs ==> MUnit) :: MUnit, effect = simple) implements composite ${ 
         raw_data($self).forIndices{li => $1(\$loopIndices) }
       }
       // Reduce not yet available - only fold is currently supported
@@ -289,7 +299,7 @@ trait MultiArrayOps {
     }
     
     // --- Add to Arith
-    val shape = "Seq" + Seq.tabulate(ndims){d => rawData(0) + ".dim(" + d + ")"}.mkString("(",",",")")
+    val shape = "Seq" + Seq.tabulate(ndims){d => "raw_data($self).dim(" + d + ")"}.mkString("(",",",")")
     val emptyShape = "Seq" + Seq.fill(ndims)("0").mkString("(",",",")")
 
     val Arith = lookupGrp("Arith").asInstanceOf[Rep[DSLTypeClass]]

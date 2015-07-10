@@ -9,6 +9,7 @@ trait DenseVectorOps {
 
 	def importDenseVectorOps() {
     val MArray1D = lookupTpe("Array1D")
+    val MMap = lookupTpe("ForgeMap")
     val IndexVector = lookupTpe("IndexVector")
     val DenseVector = lookupTpe("DenseVector")
     val DenseMatrix = lookupTpe("DenseMatrix")
@@ -77,10 +78,10 @@ trait DenseVectorOps {
     static (DenseVector) ("fromFile", T, (("path", MString), ("schemaBldr", DenseVector(MString) ==> T)) :: DenseVector(T)) implements composite ${
       DenseVector.fromFile($path, "\"\\s+\"", $schemaBldr)
     }
-    static (DenseVector) ("fromFile", T (("path", MString), ("delim", MString), ("schemaBldr", DenseVector(MString) ==> T)) :: DenseVector(T)) implements wrapper ${
+    static (DenseVector) ("fromFile", T, (("path", MString), ("delim", MString), ("schemaBldr", DenseVector(MString) ==> T)) :: DenseVector(T)) implements composite ${
       val data = Array1D.fromFile($path){elem =>
         val tokens = Array1D.splitString(elem.trim, $delim)
-        schemaBldr(densevector_fromarray1d(tokens))
+        $schemaBldr(densevector_fromarray1d(tokens))
       }
       densevector_fromarray1d(data, true)
     }
@@ -370,7 +371,7 @@ trait DenseVectorOps {
       infix ("writeFile") (("path", MString) :: MUnit, TStringable(T), effect = simple) implements composite ${
         $self.writeFile($path, e => e.makStr)
       }
-      infix ("writeFile") ( (("path", MString), ("bldr", T ==> MString)), effect = simple) implements composite ${
+      infix ("writeFile") ( (("path", MString), ("bldr", T ==> MString)) :: MUnit, effect = simple) implements composite ${
         densevector_raw_data($self).writeFile($path)($bldr) 
       }
 

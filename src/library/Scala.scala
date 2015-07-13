@@ -318,8 +318,14 @@ trait ScalaOps extends PrimitiveMathGen {
     infix (Ord) ("!=", (AC,B), (AC,B) :: MBoolean) implements redirect ${ forge_notequals(unit($0), $1) }
     infix (Ord) ("!=", (AC,B), (AC,MVar(B)) :: MBoolean) implements redirect ${ forge_notequals(unit($0), readVar($1)) }
 
-    infix (Ord) ("min", List(A withBound TOrdering), List(A,A) :: A) implements (codegen($cala, quotedArg(0) + " min " + quotedArg(1)))
-    infix (Ord) ("max", List(A withBound TOrdering), List(A,A) :: A) implements (codegen($cala, quotedArg(0) + " max " + quotedArg(1)))
+    val min = infix (Ord) ("min", List(A withBound TOrdering), List(A,A) :: A)
+    val max = infix (Ord) ("max", List(A withBound TOrdering), List(A,A) :: A)
+    impl (min) (codegen($cala, quotedArg(0) + " min " + quotedArg(1)))
+    impl (max) (codegen($cala, quotedArg(0) + " max " + quotedArg(1)))
+    for (g <- List(cuda,cpp)) {
+      impl (min) (codegen(g, quotedArg(0) + " < " + quotedArg(1) + "?" + quotedArg(0) + ":" + quotedArg(1)))
+      impl (max) (codegen(g, quotedArg(0) + " > " + quotedArg(1) + "?" + quotedArg(0) + ":" + quotedArg(1)))
+    }
     //infix (Ord) ("compare", List(A withBound TOrdering), List(A,A) :: MInt) implements (codegen($cala, quotedArg(0) + " compare " + quotedArg(1)))
     val lt = infix (Ord) ("<", List(A withBound TOrdering), List(A,A) :: MBoolean)
     val lte = infix (Ord) ("<=", List(A withBound TOrdering), List(A,A) :: MBoolean)

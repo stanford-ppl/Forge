@@ -233,8 +233,8 @@ trait VectorOps {
       val MinT = if (isTpePar(T)) "implicitly[HasMinMax[T]].min" else "implicitly[HasMinMax["+TT+"]].min"
       val MaxT = if (isTpePar(T)) "implicitly[HasMinMax[T]].max" else "implicitly[HasMinMax["+TT+"]].max"
 
-      infix ("min") (Nil :: T, O ::: H) implements reduce(T, 0, MinT, ${ (a,b) => if (a < b) a else b })
-      infix ("max") (Nil :: T, O ::: H) implements reduce(T, 0, MaxT, ${ (a,b) => if (a > b) a else b })
+      infix ("min") (Nil :: T, O ::: H) implements reduce(T, 0, MaxT, ${ (a,b) => if (a < b) a else b })
+      infix ("max") (Nil :: T, O ::: H) implements reduce(T, 0, MinT, ${ (a,b) => if (a > b) a else b })
 
       infix ("minIndex") (Nil :: MInt, O) implements composite ${ min_index_of($self.indices, $self) }
       infix ("maxIndex") (Nil :: MInt, O) implements composite ${ max_index_of($self.indices, $self) }

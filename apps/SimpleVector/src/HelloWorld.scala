@@ -9,8 +9,9 @@ trait HelloSimple extends SimpleVectorApplication {
   def main() = {
     println("hello world")
 
-    val v1 = Vector[Int](10)
-    val v2 = Vector[Int](10)
+    val size = args(0).toInt
+    val v1 = Vector[Int](size)
+    val v2 = Vector[Int](size)
 
     // defs
     var i = 0
@@ -76,16 +77,6 @@ trait HelloSimple extends SimpleVectorApplication {
     // should be 2 elements (one for even group, one for odd group)
     println(v7(true))
     println(v7(false))
-
-    // groupby
-    println("v8 = v2.groupBy(e => e % 2 == 0, e => e*10)")
-    val v8 = v2.groupBy(e => e % 2 == 0, e => e*10)
-    i = 0
-    while (i < v8.length) {
-      println("group " + i + ": ")
-      v8(i).pprint
-      i += 1
-    }
 
     // flatmap
     println("v9 = v2.flatMap(e => Vector[Int](5)")

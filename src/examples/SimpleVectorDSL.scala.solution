@@ -68,7 +68,7 @@ trait SimpleVectorDSL extends ForgeApplication {
         matrix_raw_update($self, $1*$self.numCols + $2, $3)
       }
 
-      infix ("toString") (Nil :: MString, effect = simple) implements composite ${
+      infix ("toString") (Nil :: MString) implements composite ${
         var s = ""
         var i = 0
         while (i < $self.numRows) {

@@ -26,6 +26,83 @@ trait SimpleVectorDSL extends ForgeApplication {
      * The main portion of our DSL
      */
     importVectorOps()
+    importMatrixOps()
+  }
+
+  def importMatrixOps() {
+    val T = tpePar("T")
+    val R = tpePar("R")
+    val Vector = lookupTpe("Vector")
+
+    val Matrix = tpe("Matrix", T)
+
+    data(Matrix, ("_numRows", MInt), ("_numCols", MInt), ("_data", MArray(T)))
+
+    static (Matrix) ("apply", T, (MInt, MInt) :: Matrix(T), effect = mutable) implements allocates(Matrix, ${$0}, ${$1}, ${ array_empty[T]($0*$1) })
+
+    val MatrixOps = withTpe (Matrix)
+    MatrixOps {
+      infix ("+") (Matrix(T) :: Matrix(T), TNumeric(T)) implements zip((T,T,T), (0,1), ${ (a,b) => a+b })
+      
+      // this is an alternative longer form that does not require 'ParallelCollection' api
+      // infix ("+") (Matrix(T) :: Matrix(T), TNumeric(T)) implements composite ${
+      //   val data1 = matrix_raw_data($self)
+      //   val data2 = matrix_raw_data($1)
+      //   val outData = data1.zip(data2){ (a,b) => a + b }
+      //   Matrix.fromArray($self.numRows, $self.numCols, outData)
+      // }
+
+      infix ("*") (Vector(T) :: Vector(T), TNumeric(T)) implements composite ${
+        Vector(array_fromfunction($self.numRows, i => 
+          array_reduce(array_fromfunction($self.numCols, j => 
+            $self(i,j) * $1(j)
+          ), (a:Rep[T],b:Rep[T]) => a + b, implicitly[Numeric[T]].zero)
+        ))
+      }
+
+      infix ("apply") ((MInt,MInt) :: T) implements composite ${ 
+        matrix_raw_apply($self, $1*$self.numCols + $2) 
+      }
+      
+      infix ("update") ((MInt,MInt,T) :: MUnit, effect=write(0)) implements composite ${
+        matrix_raw_update($self, $1*$self.numCols + $2, $3)
+      }
+
+      infix ("toString") (Nil :: MString, effect = simple) implements composite ${
+        var s = ""
+        var i = 0
+        while (i < $self.numRows) {
+          var j = 0
+          while (j < $self.numCols) {
+            s = s + $self(i,j) + " "
+            j += 1
+          }
+          s = s + "\\n"
+          i += 1
+        }
+        s
+      }
+
+      compiler ("matrix_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
+      infix ("numRows") (Nil :: MInt) implements getter(0, "_numRows")
+      infix ("numCols") (Nil :: MInt) implements getter(0, "_numCols")
+      infix ("size") (Nil :: MInt) implements composite ${ $self.numRows * $self.numCols }
+
+      compiler ("matrix_raw_alloc") (MInt :: Matrix(R), addTpePars = R, effect = mutable) implements composite ${
+        Matrix[R]($self.numRows, $self.numCols)
+      }
+
+      compiler ("matrix_raw_apply") (MInt :: T) implements composite ${
+        array_apply(matrix_raw_data($self), $1)
+      }
+
+      compiler ("matrix_raw_update") ((MInt, T) :: MUnit, effect=write(0)) implements composite ${
+        array_update(matrix_raw_data($self), $1, $2)
+      }
+
+      parallelize as ParallelCollection(T, lookupOp("matrix_raw_alloc"), lookupOp("size"), lookupOp("matrix_raw_apply"), lookupOp("matrix_raw_update"))
+    }
+
   }
 
   def importVectorOps() {

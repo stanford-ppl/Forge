@@ -120,6 +120,10 @@ trait SimpleVectorDSL extends ForgeApplication {
     static (Vector) ("apply", T, MArray(T) :: Vector(T)) implements allocates(Vector, ${array_length($0)}, ${$0})
     static (Vector) ("apply", T, varArgs(T) :: Vector(T)) implements allocates(Vector, ${unit($0.length)}, ${array_fromseq($0)})
 
+    static (Vector) ("fromFunction", T, CurriedMethodSignature(List(List(MInt), List(MInt ==> T)), Vector(T))) implements composite ${
+      Vector(array_fromfunction($0, $1))
+    }
+
     // doesn't rewrite correctly if we use "withTpe (Vector) {", but works if we use:
     val VectorOps = withTpe (Vector)
 
@@ -206,8 +210,7 @@ trait SimpleVectorDSL extends ForgeApplication {
       infix ("groupByReduce") ((T ==> K,T ==> V,(V,V) ==> V) :: MHashMap(K,V), TNumeric(V), addTpePars = (K,V)) implements groupByReduce((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)}, ${numeric_zero[V]}, ${(a,b) => $3(a,b)})
 
       // misc
-      //enables pretty output in the REPL
-      infix ("toString") (Nil :: MString) implements composite ${
+      infix ("makeString") (Nil :: MString) implements composite ${
         var s = ""
         var i = 0
         while (i < $self.length) {
@@ -217,7 +220,10 @@ trait SimpleVectorDSL extends ForgeApplication {
         s
       }
 
-      infix ("pprint") (Nil :: MUnit, effect = simple) implements composite ${ println($self.toString) }
+      infix ("pprint") (Nil :: MUnit, effect = simple) implements composite ${ println($self.makeString) }
+
+      //enables pretty output in the REPL
+      infix ("toString") (Nil :: MString) implements composite ${ $self.makeString }
 
 
       // parallel collectionification

@@ -66,24 +66,12 @@ trait HelloSimple extends SimpleVectorApplication {
     val vc2 = vc.mapreduce(e => e-1, (a,b) => a+b)
     println("vc2: " + vc2)
 
-    // filter
-    // println("v6 = v1.filter(_ < 5)")
-    // val v6 = v1.filter(_ < 5)
-    // v6.pprint
-
     // groupbyreduce
     println("v7 = v2.groupByReduce(e => e % 2 == 0, e => e*10, (a,b) => a+b)")
     val v7 = v2.groupByReduce[Boolean,Int](e => e % 2 == 0, e => e*10, (a,b) => a+b)
     // should be 2 elements (one for even group, one for odd group)
     println(v7(true))
     println(v7(false))
-
-    // flatmap
-    println("v9 = v2.flatMap(e => Vector[Int](5)")
-    val v9 = v2.flatMap(e => Vector[Int](5))
-    println("v9.length: " + v9.length)
-    println("v9: ")
-    v9.pprint
 
     // foo
     val fooResult = foo[Int](i => i+100, 2, 13, (a,b) => a + 5, 0.7, d => d)

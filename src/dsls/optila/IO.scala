@@ -110,14 +110,16 @@ trait IOOps {
 
     // -- utility
 
-    direct (IO) ("deleteFile", Nil, MString :: MUnit, effect = simple) implements codegen($cala, ${
+    val deleteFile = direct (IO) ("deleteFile", Nil, MString :: MUnit, effect = simple)
+    impl (deleteFile) (codegen($cala, ${
       val f = new java.io.File($0)
       if (f.exists) {
         if (f.isDirectory) org.apache.commons.io.FileUtils.deleteDirectory(f) // deletes even if non-empty
         else f.delete()
       }
       ()
-    })
+    }))
+    impl (deleteFile) (codegen(cpp, ${DeliteFileSystem::deleteRecursive($0)}))
 
   }
 }

@@ -40,11 +40,12 @@ trait SimpleRead extends ForgeTestModule with OptiMLApplication with IOSuitePath
   def main() = {
     val x = (0::10, 0::10) { (i,j) => i+j*0.1 }
     val y = readMatrix(testMat)
-    collect(sum(abs(x-y)) < .01)
+    // NOTE: when reading testMat from multiple files, the order of files is not known
+    collect(abs(sum(x)-sum(y)) < .01)
 
     val a = (0::10) { i => i*3.6 }
     val b = readVector(testVec)
-    collect(sum(abs(a-b)) < .01)
+    collect(abs(sum(a)-sum(b)) < .01)
 
     mkReport
   }

@@ -23,6 +23,8 @@ object UniqueRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompi
 object UniqueRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Unique
 trait Unique extends ForgeTestModule with OptiMLApplication {
   def main() = {
+    loadUniqueMappings("test_unique_db")
+
     val names = (0::1000) { i => "hello_" + i }
     val ids = names.map(n => unique(n))
     val reverseIds = ids.map(i => reverseUnique(i))

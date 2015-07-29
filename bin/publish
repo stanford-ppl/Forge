@@ -151,11 +151,16 @@ def sbtBuildFileFooter(dsl):
     s = Template("""
   // HACK alert: with fork = true, sbt appears to ignore the -D properties passed on the command line,
   // which breaks test_all. Here we manually look for the currently relevant options. Needs a proper fix!
+  val testOptions = Seq("-Dtests.verbose="+System.getProperty("tests.verbose", "false"),
+                        "-Dtests.threads="+System.getProperty("tests.threads", "1"),
+                        "-Dtests.targets="+System.getProperty("tests.targets", "scala"))
+  val sbtTestOptions = sys.env.getOrElse("SBT_OPTS", "").split(" ").toSeq
+
   def separateTests(tests: Seq[TestDefinition]) = {
     if (tests.isEmpty) Seq(new Group("", Seq(), SubProcess(Seq()))) //workaround for sbt crash on empty tests
-    else tests map { test => new Group(test.name, Seq(test), SubProcess(Seq("-Dtests.verbose="+System.getProperty("tests.verbose", "false"), "-Dtests.threads="+System.getProperty("tests.threads", "1"), "-Dtests.targets="+System.getProperty("tests.targets", "scala")))) }
+    else tests map { test => new Group(test.name, Seq(test), SubProcess(testOptions ++ sbtTestOptions)) }
   }
-  
+
   // build targets
   lazy val ${dslName} = Project("${dslName}", file("."), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Apps) // default
   lazy val ${dslName}Shared = Project("${dslName}-shared", file("shared"), settings = virtBuildSettings ++ deps)
@@ -171,8 +176,7 @@ def sbtBuildFileFooter(dsl):
     // See http://stackoverflow.com/questions/19425613/unsatisfiedlinkerror-with-native-library-under-sbt
     // and http://www.scala-sbt.org/release/docs/Forking.html
     testGrouping in Test <<= definedTests in Test map separateTests,
-    fork := true,
-    javaOptions in Test ++= sys.env.getOrElse("SBT_OPTS", "").split(" ").toSeq
+    fork := true
   )) dependsOn(${dslName}Comp, ${dslName}Lib)
 }
 """)

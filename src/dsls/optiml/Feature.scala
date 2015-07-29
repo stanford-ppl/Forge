@@ -185,15 +185,15 @@ trait FeatureOps {
     //   densevector_fromarray(data, true)
     // }
 
-    // compiler (FeatureHelper) ("get_unique_names_helper", Nil, Nil :: MArray(MString)) implements codegen($cala, ${
-    //   MLGlobal.getUniqueNames
-    // })
+    direct (FeatureHelper) ("getUniqueIds", Nil, Nil :: MArray(MInt)) implements codegen($cala, ${
+      MLGlobal.getUniqueIds
+    })
 
-    // compiler (FeatureHelper) ("get_unique_ids_helper", Nil, Nil :: MArray(MInt)) implements codegen($cala, ${
-    //   MLGlobal.getUniqueIds
-    // })
+    direct (FeatureHelper) ("getUniqueNames", Nil, Nil :: MArray(MString)) implements codegen($cala, ${
+      MLGlobal.getUniqueNames
+    })
 
-    direct (FeatureHelper) ("loadUniqueMappings", Nil, MString :: MInt, effect = simple) implements codegen($cala, ${
+    direct (FeatureHelper) ("loadUniqueMappings", Nil, MString :: MUnit, effect = simple) implements codegen($cala, ${
       MLGlobal.loadUniqueMappings($0)
     })
 

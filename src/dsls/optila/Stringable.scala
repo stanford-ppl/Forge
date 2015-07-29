@@ -35,6 +35,9 @@ trait StringableOps {
     val IntStringable = tpeClassInst("StringableInt", Nil, Stringable(MInt))
     infix (IntStringable) ("makeStr", Nil, MInt :: MString) implements composite ${ optila_fmt_str($0) }
 
+    val LongStringable = tpeClassInst("StringableLong", Nil, Stringable(MLong))
+    infix (LongStringable) ("makeStr", Nil, MLong :: MString) implements composite ${ optila_fmt_str($0) }
+
     val BoolStringable = tpeClassInst("StringableBool", Nil, Stringable(MBoolean))
     infix (BoolStringable) ("makeStr", Nil, MBoolean :: MString) implements composite ${ optila_fmt_str($0) }
 

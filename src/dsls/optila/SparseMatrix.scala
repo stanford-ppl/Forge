@@ -973,6 +973,11 @@ trait SparseMatrixOps {
         sparsematrix_csr_alloc_raw($self.numRows, $self.numCols, densevector_raw_data(out), sparsematrix_csr_colindices($self), sparsematrix_csr_rowptr($self), $self.nnz)
       }
 
+      infix ("zipnz") (CurriedMethodSignature(List(List(DenseVector(B)), List((T,B) ==> R)), SparseMatrix(R)), addTpePars = (B,R)) implements composite ${
+        val out = $self.nz.zip($1) { (a,b) => $2(a,b) }
+        sparsematrix_csr_alloc_raw($self.numRows, $self.numCols, densevector_raw_data(out), sparsematrix_csr_colindices($self), sparsematrix_csr_rowptr($self), $self.nnz)
+      }
+
       infix ("foreachnz") ((T ==> MUnit) :: MUnit) implements composite ${ $self.nz.foreach($1) }
 
       infix ("countnz") ((T ==> MBoolean) :: MInt) implements composite ${ $self.nz.count($1) }

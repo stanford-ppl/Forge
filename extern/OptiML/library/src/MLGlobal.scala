@@ -46,7 +46,7 @@ object MLGlobal {
   // Something we don't expect to see in client data, but that is also human readable.
   val MAPPING_DELIMITER = " ::---> "
 
-  def loadUniqueMappings(path: String): Int = {
+  def loadUniqueMappings(path: String) = {
     if (new File(path).isFile) {
       val f = new BufferedReader(new FileReader(path))
       var line = f.readLine()
@@ -60,7 +60,6 @@ object MLGlobal {
       }
       f.close()
     }
-    nextId-1
   }
 
   def dumpUniqueMappings(path: String) = {

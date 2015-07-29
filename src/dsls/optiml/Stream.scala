@@ -19,7 +19,7 @@ trait StreamOps {
   this: OptiMLDSL =>
 
   /* we internally have a Key -> Coll[Value] store, implemented as a key := LogicalKey_Sep_UniqueId -> Value
-   * This is done so that a logical append corresponds to only a physical put rather than a get-concat-put 
+   * This is done so that a logical append corresponds to only a physical put rather than a get-concat-put
    * LevelDB sorts data by key, so using the logical key as a prefix makes LevelDB keep all Coll[Value] adjacent on disk
    */
   val HASH_LOGICAL_KEY_SEPARATOR = "_LK_"
@@ -72,12 +72,14 @@ trait StreamOps {
       val key = $1
       val iterator = $0.iterator()
       iterator.seek(key)
-      iterator.hasNext && {
+      val res = iterator.hasNext && {
         val foundKey = iterator.next.getKey
         java.util.Arrays.equals(key, foundKey) || foundKey.startsWith(key ++ "\$HASH_LOGICAL_KEY_SEPARATOR".getBytes)
       }
+      iterator.close()
+      res
     })
- 
+
     compiler (HashStream) ("hash_get_internal", Nil, (LevelDB, MArray(MByte)) :: MArray(MByte), effect = simple) implements codegen($cala, ${
       $0.get($1)
     })
@@ -446,7 +448,7 @@ trait StreamOps {
         },
         { (a: Rep[ForgeArray[Tup2[String,DenseVector[Double]]]]) =>
           // The scheme belows appends new rows as new keys (instead of reading and growing the existing byte array)
-          // This relies on LevelDBs sorted key functionality for efficiency 
+          // This relies on LevelDBs sorted key functionality for efficiency
           // (the logical keys are stored close together, enabling compression and sequential scanning).
           //
           // We write to the map sequentially to avoid needing to use external concurrency control (and because benchmarks
@@ -455,24 +457,11 @@ trait StreamOps {
 
           // Zero-length rows are skipped (note that the only two valid lengths for "value" are 0 and numCols)
           // If there is a key present in the resulting map, there was at least 1 non-empty row mapping to it.
-          val chunk = densevector_fromarray(a, true).filter(v => v._2.length > 0)
-          val chunkRows: Rep[ForgeHashMap[String, DenseVector[DenseVector[Double]]]] = chunk.groupBy(v => v._1, v => v._2)
+          val chunk = densevector_fromarray(a, true).filter(t => t._2.length > 0)
 
-          val allKeys: Rep[DenseVector[String]] = densevector_fromarray(chunkRows.keys, true)
-          val allValues: Rep[DenseVector[DenseVector[DenseVector[Double]]]] = densevector_fromarray(fhashmap_values(chunkRows), true)
-
-          // We can't fuse flatMaps automatically yet, so manually fuse.
-          val logicalEntries: Rep[ForgeArray[Tup2[String, ForgeArray[Byte]]]] =
-            ((0::allKeys.length) flatMap { (i: Rep[Int]) =>
-              val k = allKeys(i)
-              val group = allValues(i)
-              val dbKeys = group.indices.map { j => hashMatrixNewKey(k, j) }
-              val dbValues = group.map { row => serialize(row) }
-              dbKeys.zip(dbValues) { (a,b) => pack((a,b)) }
-            }).toArray
-
-          val dbKeys: Rep[ForgeArray[String]] = logicalEntries.map(_._1)
-          val dbValues: Rep[ForgeArray[ForgeArray[Byte]]] = logicalEntries.map(_._2)
+          // int argument to hashMatrixNewKey is currently not being used (see comment @ hashMatrixNewKey definition)
+          val dbKeys: Rep[ForgeArray[String]] = chunk.indices.map(i => hashMatrixNewKey(chunk(i)._1, i)).toArray
+          val dbValues: Rep[ForgeArray[ForgeArray[Byte]]] = chunk.map(t => serialize(t._2)).toArray
 
           // We seem to be getting write bandwidth on the logicalKeys of ~15MB/sec, while the Google benchmarks at
           // https://github.com/google/leveldb claim writes should be ~45MB/sec. This could be due to hardware, JNI,

@@ -1,10 +1,14 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-object GDACompiler extends OptiMLApplicationCompiler with GDA
-object GDAInterpreter extends OptiMLApplicationInterpreter with GDA
+// object GDACompiler extends OptiMLApplicationCompiler with GDA
+// object GDAInterpreter extends OptiMLApplicationInterpreter with GDA
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait GDA extends OptiMLApplication {
   def printUsage = {
     println("Usage: GDA <input data file> <output label data file>")
@@ -52,7 +56,7 @@ trait GDA extends OptiMLApplication {
     }
 
     toc(sigma)
-    println("  phi = " + phi)
+    println("  phi = " ++ phi)
     println("  mu0 = " ); mu0.pprint
     println("  mu1 = " ); mu1.pprint
     println("  sigma = "); sigma.sliceRows(0,10).pprint

@@ -1,7 +1,10 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
 
+@virtualize
 trait FileUtil extends OptiMLApplication {
 
   /* The input file is expected to follow the format:
@@ -23,7 +26,7 @@ trait FileUtil extends OptiMLApplication {
     val labels = matrix.map(v => v.first.toInt).t
     val data = (0::numDocs, *) { i =>
       val row = matrix(i).slice(1,matrix(i).length-1)
-      val tupleIndices = DenseVector.uniform(0,2,row.length).map(_.toInt)
+      val tupleIndices = DenseVector.uniform(0.0,2.0,row.length).map(_.toInt)
       val cumulIndices = tupleIndices.map(row(_).toInt).prefixSum
 
       // TODO: need to use a sparse matrix to avoid this mutation efficiently

@@ -1,12 +1,16 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-import scala.virtualization.lms.common.Record
+// import scala.virtualization.lms.common.Record
 
-object NeuronIdCompiler extends OptiMLApplicationCompiler with NeuronId
-object NeuronIdInterpreter extends OptiMLApplicationInterpreter with NeuronId
+// object NeuronIdCompiler extends OptiMLApplicationCompiler with NeuronId
+// object NeuronIdInterpreter extends OptiMLApplicationInterpreter with NeuronId
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait NeuronId extends OptiMLApplication {
 
   def gaussImage(mux: Rep[Double], muy: Rep[Double], sigx: Rep[Double], sigy: Rep[Double], theta: Rep[Double], imgHeight: Rep[Int], imgWidth: Rep[Int]): Rep[DenseMatrix[Double]] = {
@@ -181,7 +185,7 @@ trait NeuronId extends OptiMLApplication {
     // compute likelihood parameters
     // activeCells can overlap, so the outer loop must be sequential
     untilconverged(0, minIter = activeTimes.length, maxIter = activeTimes.length) { (i, _) =>
-      println("iteration " + i + " of " + activeTimes.length)
+      println("iteration " ++ i + " of " ++ activeTimes.length)
 
       val t = activeTimes(i)
       val F = imgs(t)
@@ -285,16 +289,16 @@ trait NeuronId extends OptiMLApplication {
 
     val (muX, muY, sigX, sigY, theta) = unpack(a)
 
-    println("muX(0,0): " + muX(0,0))
-    println("muY(0,0): " + muY(0,0))
-    println("sigX(0,0): " + sigX(0,0))
-    println("sigY(0,0): " + sigY(0,0))
-    println("theta(0,0): " + theta(0,0))
+    println("muX(0,0): " ++ muX(0,0))
+    println("muY(0,0): " ++ muY(0,0))
+    println("sigX(0,0): " ++ sigX(0,0))
+    println("sigY(0,0): " ++ sigY(0,0))
+    println("theta(0,0): " ++ theta(0,0))
 
-    writeMatrix(muX, srcDir + "_mux.out")
-    writeMatrix(muY, srcDir + "_muy.out")
-    writeMatrix(sigX, srcDir + "_sigx.out")
-    writeMatrix(sigY, srcDir + "_sigy.out")
-    writeMatrix(theta, srcDir + "_sigtheta.out")
+    writeMatrix(muX, srcDir ++ "_mux.out")
+    writeMatrix(muY, srcDir ++ "_muy.out")
+    writeMatrix(sigX, srcDir ++ "_sigx.out")
+    writeMatrix(sigY, srcDir ++ "_sigy.out")
+    writeMatrix(theta, srcDir ++ "_sigtheta.out")
   }
 }

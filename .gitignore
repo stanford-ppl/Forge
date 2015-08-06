@@ -15,7 +15,7 @@ project/plugins/project/
 
 # forge specific
 build
-published
+#published
 
 # PDIPSolver specific
 data/PDIPSolver/*.dat

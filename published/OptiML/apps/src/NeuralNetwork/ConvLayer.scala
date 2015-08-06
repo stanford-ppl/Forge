@@ -1,8 +1,12 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-object ConvLayerCompiler extends OptiMLApplicationCompiler with ConvLayer
+// object ConvLayerCompiler extends OptiMLApplicationCompiler with ConvLayer
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait ConvLayer extends OptiMLApplication with NetLib {
   def main() = {
 
@@ -22,7 +26,7 @@ trait ConvLayer extends OptiMLApplication with NetLib {
     val b = DenseVector.randf(outSize*outSize)
 
     val iter = if (args.length == 0) 10 else args(0).toInt
-    println(iter + " iterations")
+    println("" ++ iter ++ " iterations")
 
     // convolution layer
     var totalNumRows = 0

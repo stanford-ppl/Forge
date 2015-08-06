@@ -1,7 +1,11 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait RNTNOps extends OptiMLApplication with Utilities {
 	
 	private val TREECOLS = 6
@@ -70,7 +74,7 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 	) = {
 		val levels   = tree.length
 		val maxLevel = levels - 1
-		verbosePrint("			Activating tree with " + levels + " level(s)", VERBOSE)	
+		verbosePrint("			Activating tree with " ^ levels ^ " level(s)", VERBOSE)	
 
 		val acts = DenseVector[DenseVector[DenseVector[Double]]](levels, true)
 		val outs = DenseVector[DenseVector[DenseVector[Double]]](levels, true)
@@ -78,13 +82,13 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 
 		var curLevel = maxLevel
 		while (curLevel >= 0) {
-			verbosePrint("				Activating level " + curLevel, VERBOSE)	
+			verbosePrint("				Activating level " ^ curLevel, VERBOSE)	
 			val kidsActs = if (curLevel == maxLevel) acts(curLevel) else acts(curLevel + 1)
 			val level 	 = tree(curLevel)
 			val numNodes = level.numRows
 			
 			val levelIO = (0::numNodes) { n =>
-				verbosePrint("					Activating node " + n, VERBOSE)	
+				verbosePrint("					Activating node " ^ n, VERBOSE)	
 				val node = level(n)
 				val (act, out) = computeNode(node, kidsActs, Wc, W, Wt, Wv)
 				val nodeLabel = node(LABEL)
@@ -125,7 +129,7 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 		var curLevel = 0
 		var deltas = DenseVector[DenseVector[Double]](DenseVector.zeros(WORDSIZE).t)
 		while (curLevel < levels) {
-			verbosePrint("				Backpropagating at level " + curLevel, VERBOSE)	
+			verbosePrint("				Backpropagating at level " ^ curLevel, VERBOSE)	
 			val level  = tree(curLevel)
 			val levelActs = acts(curLevel)
 			val levelOuts = outs(curLevel)
@@ -146,9 +150,9 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 			val dWt_level = DenseVector[DenseMatrix[Double]](numParents, true)
 			val dWv_level = DenseVector[DenseMatrix[Double]](numLeaves, true)
 
-			verbosePrint("				Back-propagating the " + numNodes + " nodes at level " + curLevel, VERBOSE)
+			verbosePrint("				Back-propagating the " ^ numNodes ^ " nodes at level " ^ curLevel, VERBOSE)
 			val dWc_level = (0::numNodes) {n =>
-				verbosePrint("					Backpropagating at node " + n, VERBOSE)	
+				verbosePrint("					Backpropagating at node " ^ n, VERBOSE)
 				val node  	   = level(n)
 				val nodeAct    = levelActs(n)		// WORDSIZE X 1
 				val nodeOut    = levelOuts(n)	    // NUMCLASSES X 1
@@ -235,7 +239,7 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 
 		tic("Batch Run")
 		val costs_batch = (0::curBatchSize) { t => 
-			verbosePrint("		Training on tree " + t, VERBOSE)
+			verbosePrint("		Training on tree " ^ t, VERBOSE)
 			tic("Current tree")
 			val tree = trees(t)
 			tic("Forward Propagation")
@@ -282,14 +286,14 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 		val dfWv = dWv_batch.sum * (1/numSent) + Wv * regC_Wv
 		val cost = costs_batch.sum * (1/numSent)
 
-		verbosePrint("		Total cost without regularization: " + cost, VERBOSE)
+		verbosePrint("		Total cost without regularization: " ^ cost, VERBOSE)
 	
 		val regularCost = cost + ( Wc.map(e => e*e).sum * regC_Wc/2 ) + 
 								 ( Wshort.map(e => e*e).sum * regC_W/2 ) +
 							     ( Wt.map(e => e*e).sum * 0.001/2 ) + 
 							     ( Wv.map(e => e*e).sum * regC_Wv/2 ) 
 		
-		verbosePrint("		Total cost with regularization: " + regularCost, VERBOSE)
+		verbosePrint("		Total cost with regularization: " ^ regularCost, VERBOSE)
 		//(dfWcat, W, Wt, Wv, numSent)
 		verbosePrint("		Computation complete. Batch run is done.", VERBOSE)
 		toc("Final computation")
@@ -351,7 +355,7 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 	) {
 		val numTrees   = trees.length
 		val numBatches = ceil(numTrees.toDouble/batchSize.toDouble)
-		println("Running " + numTrees + " trees in " + numBatches + " batches")
+		println("Running " ^ numTrees ^ " trees in " ^ numBatches ^ " batches")
 
 		// Randomize train set order - necessary for good performance w/ SGD
 		verbosePrint("	Creating random training sequence...", VERBOSE)
@@ -373,7 +377,7 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 			val dfBatchWvSq = dfBatchWv.map(e => e*e)
 
 			verbosePrint("		[TRAINING] Updating sums of squares...", VERBOSE)
-			if (ADAZERO && batchIter == 0) {
+			if (unit(ADAZERO) && batchIter == 0) { //TR
 				setMatrix(ssWc, dfWcSq)
 				setMatrix(ssW, dfWSq)
 				setMatrix(ssWt, dfWtSq)
@@ -464,7 +468,7 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 
 		val curBatchSize = trees.length
 		val treesCorrect = (0::curBatchSize) { t =>
-			verbosePrint("		Activating tree " + t, VERBOSE)
+			verbosePrint("		Activating tree " ^ t, VERBOSE)
 			tic("Tree Activation")
 			val outs = DenseVector.flatten( activateTree(trees(t), Wc, W, Wt, Wv) )
 			toc("Tree Activation")
@@ -483,8 +487,8 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 
 		toc("Current Batch")
 		verbosePrint("--- Batch Results ---", VERBOSE)
-		verbosePrint("Root binary accuracy over all trees in batch: " + percentRoots + "  ( " + correctRoots + "/" + rootBinaryTotal + " )", VERBOSE)
-		verbosePrint("Node binary accuracy over all trees in batch: " + percentAll + "  (" + correctNodes + "/" + allBinaryTotal + " )", VERBOSE)
+		verbosePrint("Root binary accuracy over all trees in batch: " ^ percentRoots ^ "  ( " ^ correctRoots ^ "/" ^ rootBinaryTotal ^ " )", VERBOSE)
+		verbosePrint("Node binary accuracy over all trees in batch: " ^ percentAll ^ "  (" ^ correctNodes ^ "/" ^ allBinaryTotal ^ " )", VERBOSE)
 		pack( (correctNodes, correctRoots, allBinaryTotal, rootBinaryTotal) )
 	}
 
@@ -498,7 +502,7 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 	) {
 		val numTrees   = trees.length
 		val numBatches = ceil(numTrees.toDouble/batchSize.toDouble)
-		println(numTrees + " trees to be run in " + numBatches + " batches")
+		println("" ^ numTrees ^ " trees to be run in " ^ numBatches ^ " batches")
 
 		// Randomize train set order - necessary for good performance w/ SGD
 		val randomTrain = randperm(numTrees, numTrees)
@@ -522,8 +526,8 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 
 		toc("All Batches")
 		println("-----------------Evaluation complete-----------------")
-		println("Root binary accuracy over all trees: " + percentRoots + "  ( " + correctRoots + "/" + numRoots + " )")
-		println("Node binary accuracy over all trees: " + percentAll + "  ( " + correctNodes + "/" + numNodes + " )")
+		println("Root binary accuracy over all trees: " ^ percentRoots ^ "  ( " ^ correctRoots ^ "/" ^ numRoots ^ " )")
+		println("Node binary accuracy over all trees: " ^ percentAll ^ "  ( " ^ correctNodes ^ "/" ^ numNodes ^ " )")
 		println("-----------------------------------------------------")
 	}
 

@@ -7,9 +7,9 @@
 */
 
 
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
 /*
 * This neural network classifier implements a classic feedforward neural network using a logistic
@@ -24,6 +24,10 @@ import optiml.shared._
 * the batch size increases). 
 */
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait NeuralNetworkTrainerStochastic extends OptiMLApplication with NeuralNetUtilities {
 
 	private val MIN_WEIGHTS_INIT = -0.01
@@ -60,11 +64,11 @@ trait NeuralNetworkTrainerStochastic extends OptiMLApplication with NeuralNetUti
 		println("#################################################################################")
 		println("STARTING NETWORK TRAINING")
 		println("Training neural network with the following parameters: ")
-		println("Learning rate: " + learningRate)
-		println("Number of iterations: " + numIterations)
-		println("Number of inputs: " + (numInputNeurons - 1))
-		println("Number of hidden neurons: " + (numHiddenNeurons - 1))
-		println("Number of outputs: " + numOutputNeurons)
+		println("Learning rate: " ++ learningRate)
+		println("Number of iterations: " ++ numIterations)
+		println("Number of inputs: " ++ (numInputNeurons - 1))
+		println("Number of hidden neurons: " ++ (numHiddenNeurons - 1))
+		println("Number of outputs: " ++ numOutputNeurons)
 
 		var inputNeurons = (0::numInputNeurons) { index =>
 			if(index == numInputNeurons - 1) {
@@ -170,7 +174,7 @@ trait NeuralNetworkTrainerStochastic extends OptiMLApplication with NeuralNetUti
 		def trainNetwork(numIterations: Rep[Int]) = {
 			var trainingEpoch = 0
 			while(trainingEpoch < numIterations) {
-				println("***** Epoch " + (trainingEpoch + 1) + " *****")
+				println("***** Epoch " ++ (trainingEpoch + 1) ++ " *****")
 				var sampleIndex = 0
 				while(sampleIndex < trainingSet.numRows) {
 					val inputValues = trainingSet(sampleIndex)
@@ -206,7 +210,7 @@ trait NeuralNetworkTrainerStochastic extends OptiMLApplication with NeuralNetUti
 
 				sampleIndex+=1
 			}
-			println("Network accuracy: " + (countCorrect/(dataSet.numRows.toDouble) * 100.0) + "%"); 
+			println("Network accuracy: " ++ (countCorrect/(dataSet.numRows.toDouble) * 100.0) ++ "%"); 
 		}
 
 		initializeWeights()

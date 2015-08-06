@@ -1,10 +1,14 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-object PDIPSolverCompiler extends OptiMLApplicationCompiler with PDIPSolver
-object PDIPSolverInterpreter extends OptiMLApplicationInterpreter with PDIPSolver
+// object PDIPSolverCompiler extends OptiMLApplicationCompiler with PDIPSolver
+// object PDIPSolverInterpreter extends OptiMLApplicationInterpreter with PDIPSolver
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait PDIPSolver extends OptiMLApplication {
   def print_usage = {
     println("Usage: PDIPSolver <c> <G> <h> <A> <b> <x0> <s0> <y0> <z0>")
@@ -270,7 +274,7 @@ trait PDIPSolver extends OptiMLApplication {
       // primal infeasible
       println("primal infeasible")
       val t = abs(h*:*z+b*:*y)
-      println("\nt = " + t.toString + "\n")
+      println("\nt = " ++ t.toString ++ "\n")
       println("\nz")
       (z / t).pprint
       println("\ny")
@@ -280,7 +284,7 @@ trait PDIPSolver extends OptiMLApplication {
       // dual infeasible
       println("dual infeasible")
       val t = abs(c*:*x)
-      println("\nt = " + t.toString + "\n")
+      println("\nt = " ++ t.toString ++ "\n")
       println("\nx")
       (x / t).pprint
       println("\ns")

@@ -29,6 +29,9 @@ trait OptiMLApplication extends optiml.direct.OptiMLApplication {
   implicit class IntVarOps(s:Var[Int]) {
     def +=(x:Rep[Int]): Rep[Unit] = ???
   }
+  implicit class DoubleVarOps(s:Var[Double]) {
+    def +=(x:Rep[Double]): Rep[Unit] = ???
+  }
   def infix_==(x:Rep[Any], y: Rep[Any]): Rep[Boolean] = ???
   def infix_!=(x:Rep[Any], y: Rep[Any]): Rep[Boolean] = ???
   def __assign[T](x:Var[T], y: T): Rep[Unit] = ???

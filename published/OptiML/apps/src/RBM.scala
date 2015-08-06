@@ -1,10 +1,14 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-object RBMCompiler extends OptiMLApplicationCompiler with RBM
-object RBMInterpreter extends OptiMLApplicationInterpreter with RBM
+// object RBMCompiler extends OptiMLApplicationCompiler with RBM
+// object RBMInterpreter extends OptiMLApplicationInterpreter with RBM
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait RBM extends OptiMLApplication {
 
   def printUsage = {
@@ -27,7 +31,7 @@ trait RBM extends OptiMLApplication {
     val initialMomentum = 0.5
     val finalMomentum = 0.9
 
-    println("Using " + numHiddenUnits + " hidden units.")
+    println("Using " ++ numHiddenUnits ++ " hidden units.")
 
     println("Reading MNIST dataset")
     val numCases = args(2).toInt // batchSize
@@ -98,8 +102,8 @@ trait RBM extends OptiMLApplication {
       if (batch == numBatches) {
         batch = 0
         epoch += 1
-        println("--> Epoch " + epoch)
-        println(" error = " + epochErrSum)
+        println("--> Epoch " ^ epoch) //TR cannot use ++ ?
+        println(" error = " ^ epochErrSum)
         epochErrSum = 0.0
       }
 

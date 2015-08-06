@@ -114,7 +114,7 @@ trait Definitions extends DerivativeTypes {
    * DSLs can extend these by adding their own
    */
   case object TManifest extends TypeClassSignature {
-    def name = "Manifest"
+    def name = "Typ"
     def prefix = "_m"
     def wrapper = Some("mtype")
   }

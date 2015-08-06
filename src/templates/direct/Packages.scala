@@ -12,17 +12,38 @@ trait BaseGenPackages extends ForgeCodeGenBase {
   import IR._
 
   def emitApplicationRunnerBase(stream: PrintWriter) {
+stream.println("/*")
     emitComment("the trait that all " + dsl + " applications must extend", stream)
     stream.println("trait " + dsl + "Application extends " + dsl + " with " + dsl + "Lift {")
     stream.println("  var args: Rep[Array[String]]")
     stream.println("  var stagingArgs: Array[String]")
     stream.println("  def main()")
     stream.println("}")
+stream.println("*/")
+    stream.println("trait " + dsl + "Application extends " + dsl)
   }
 
   def emitDSLPackageDefinitionsBase(opsGrps: List[DSLOps], stream: PrintWriter) {
     emitBlockComment("dsl definition", stream)
 
+    stream.println("trait VarOps")
+    stream.println("trait Base {")
+    stream.println("  type Rep[T]")
+    stream.println("  type Typ[T]")
+    stream.println("  type Var[T]")
+    stream.println("  implicit def readVar[T](x: Var[T]): Rep[T]")
+    stream.println("  implicit def typBool: Typ[Boolean]")
+    stream.println("  implicit def typInt: Typ[Int]")
+    stream.println("  implicit def typLong: Typ[Long]")
+    stream.println("  implicit def typFloat: Typ[Float]")
+    stream.println("  implicit def typDouble: Typ[Double]")
+    stream.println("  implicit def typString: Typ[String]")
+    stream.println("  def unit[T](x:T): Rep[T]")
+    stream.println("}")
+
+
+
+stream.println("/*")
     // Lift
     stream.println("trait " + dsl + "Lift")
     val liftOps = Lifts.keys.toList
@@ -40,6 +61,7 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     stream.println("}")
     stream.println()
     stream.println()
+stream.println("*/")
 
     // dsl interface
     stream.println("trait " + dsl + "Identifiers extends Base with GenOverloadHack {")
@@ -51,7 +73,7 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     emitBlockComment("types with no associated data structure", stream, indent=2)
     for (tpe <- Tpes if !isForgePrimitiveType(tpe) && !DataStructs.contains(tpe)) {
       stream.println("  abstract class " + quote(tpe))
-      stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]") // needed?
+      stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + ": Typ[" + quote(tpe) + "]") // needed?
     }
     stream.println("}")
 
@@ -71,7 +93,7 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     emitBlockComment("abstract types", stream, indent=2)
     for (tpe <- Tpes if !isForgePrimitiveType(tpe) && DataStructs.contains(tpe)) {
       stream.println("  type " + quote(tpe))
-      stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + ": Manifest[" + quote(tpe) + "]")
+      stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + ": Typ[" + quote(tpe) + "]")
     }
 
     if (TpeAliases.length > 0) {

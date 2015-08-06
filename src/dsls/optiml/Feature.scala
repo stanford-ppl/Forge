@@ -86,6 +86,7 @@ trait FeatureOps {
       }
     }
 
+/* TR: trouble with joda import
     val DateFeature = tpe("DateFeature")
     val SDateFormat = tpe("org.joda.time.format.DateTimeFormatter")
     val SDateTime = tpe("org.joda.time.DateTime")
@@ -160,6 +161,7 @@ trait FeatureOps {
       val dt = dt_internal($0)
       dt_internal_weekday(dt)
     }
+*/
   }
 
   def importFeatureHelperOps() {

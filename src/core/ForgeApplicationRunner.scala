@@ -104,6 +104,9 @@ trait ForgeApplicationRunner extends ForgeApplication with ForgeExp {
     if (Config.genIdent) codeGenerators :+= identCodegen
     if (Config.genDirect) codeGenerators :+= directCodegen
 
+    //TR HACK
+    codeGenerators = List(directCodegen)
+
     for (c <- codeGenerators) {
       c.emitDSLImplementation()
     }

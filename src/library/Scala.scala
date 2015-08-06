@@ -520,7 +520,7 @@ trait ScalaOps extends PrimitiveMathGen {
   }
 
   def importTuples() = {
-    val e = tpePar("_")
+    //TR val e = tpePar("_")
 
     // only go to 10 for the sake of compile-time overhead (for now)
     for (arity <- (2 until maxTuples)) {
@@ -532,7 +532,8 @@ trait ScalaOps extends PrimitiveMathGen {
       data(TT, elems.zip(pars): _*)
 
       for (i <- 0 until arity) {
-        val concrete = pars.zipWithIndex.map(t => if (t._2 == i) t._1 else e)
+        //TR val concrete = pars.zipWithIndex.map(t => if (t._2 == i) t._1 else e)
+        val concrete = pars.zipWithIndex.map(t => t._1)
         infix (TT) ("_"+(i+1), pars(i), TT(concrete: _*) :: pars(i)) implements getter(0, elems(i))
       }
 

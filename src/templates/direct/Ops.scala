@@ -488,18 +488,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
   }
 
   // certain ops (e.g. "apply" cannot be expressed with infix notation right now), so we use implicits as a workaround
-  def noInfix(o: Rep[DSLOp]) = {
-    // FIXME: we get scalac internal crashes when using the default-implicit mode now
-    // if (Config.fastCompile) {
-    //   // default implicit mode (appears empirically slightly faster than infix)
-    //   (!mustInfixList.contains(o.name)) && o.args.length > 0 && !o.args.exists(hasDefaultValue)
-    // }
-    // else {
-      // default infix mode (slightly easier to understand what's happening, also fails to apply less than implicits)
-      // blacklist or curried args or function args (in the latter two cases, infix doesn't always resolve correctly)
-      !mustInfixList.contains(o.name) && (noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o))
-    // }
-  }
+  def noInfix(o: Rep[DSLOp]) = true
 
   def emitOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("Operations", stream)

@@ -274,7 +274,7 @@ trait PDIPSolver extends OptiMLApplication {
       // primal infeasible
       println("primal infeasible")
       val t = abs(h*:*z+b*:*y)
-      println("\nt = " ++ t.toString ++ "\n")
+      println("\nt = " ^ t.toString ^ "\n") //TR somehow can't use ++ ??
       println("\nz")
       (z / t).pprint
       println("\ny")
@@ -284,7 +284,7 @@ trait PDIPSolver extends OptiMLApplication {
       // dual infeasible
       println("dual infeasible")
       val t = abs(c*:*x)
-      println("\nt = " ++ t.toString ++ "\n")
+      println("\nt = " ^ t.toString ^ "\n") //TR somehow can't use ++ ??
       println("\nx")
       (x / t).pprint
       println("\ns")

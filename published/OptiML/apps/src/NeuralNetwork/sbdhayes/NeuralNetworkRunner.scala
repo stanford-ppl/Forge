@@ -36,7 +36,7 @@ trait NeuralNetworkRunner extends OptiMLApplication with NeuralNetworkTrainerSto
 	private val HIDDEN_NEURON_INIT = "-1"
 	private val LEARNING_RATE_INIT = "0.001"
 	private val NUM_ITERATIONS_INIT = "5000"
-	private val BATCH_SIZE = "100"
+	private val BATCH_SIZE = 100
 	
 	//Saves the weights to files. The encapsulating folders must already exist for this function to work. It will not create the folders for you. 
 	def save(inputToHiddenWeights: Rep[DenseMatrix[Double]], hiddenToOutputWeights: Rep[DenseMatrix[Double]], inputToHiddenWeightsFilename: Rep[String], hiddenToOutputWeightsFilename: Rep[String]) = {

@@ -23,6 +23,7 @@ trait OptiMLApplication extends optiml.direct.OptiMLApplication {
     def ++[T](x:Var[T]): Rep[String] = ???
     def ^(x:Rep[Any]): Rep[String] = ???
     def ^[T](x:Var[T]): Rep[String] = ???
+    def toInt: Rep[Int] = ???
   }
   implicit def string2ops(s:String) = StringOps2(unit(s))
   implicit class IntVarOps(s:Var[Int]) {

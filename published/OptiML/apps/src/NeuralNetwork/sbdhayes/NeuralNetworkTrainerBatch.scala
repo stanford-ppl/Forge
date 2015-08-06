@@ -7,9 +7,9 @@
 */
 
 
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
 /*
 * This neural network classifier implements a classic feedforward neural network using a logistic
@@ -23,6 +23,10 @@ import optiml.shared._
 */
 
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait NeuralNetworkTrainerBatch extends OptiMLApplication with NeuralNetUtilities {
 
 	private val MIN_WEIGHTS_INIT = -0.01
@@ -63,12 +67,12 @@ trait NeuralNetworkTrainerBatch extends OptiMLApplication with NeuralNetUtilitie
 		println("#################################################################################")
 		println("STARTING NETWORK TRAINING")
 		println("Training neural network with the following parameters: ")
-		println("Learning rate: " + learningRate)
-		println("Number of iterations: " + numIterations)
-		println("Number of inputs: " + (numInputNeurons - 1))
-		println("Number of hidden neurons: " + (numHiddenNeurons - 1))
-		println("Number of outputs: " + numOutputNeurons)
-		println("Batch size: " + batchSize)
+		println("Learning rate: " ++ learningRate)
+		println("Number of iterations: " ++ numIterations)
+		println("Number of inputs: " ++ (numInputNeurons - 1))
+		println("Number of hidden neurons: " ++ (numHiddenNeurons - 1))
+		println("Number of outputs: " ++ numOutputNeurons)
+		println("Batch size: " ++ batchSize)
 		
 		var inputToHiddenWeights = DenseMatrix.zeros(numInputNeurons, numHiddenNeurons - 1) 
 		var hiddenToOutputWeights = DenseMatrix.zeros(numHiddenNeurons, numOutputNeurons)
@@ -86,7 +90,7 @@ trait NeuralNetworkTrainerBatch extends OptiMLApplication with NeuralNetUtilitie
 			var trainingEpoch = 0
 			while(trainingEpoch < numIterations) {
 				
-				println("***** Epoch " + (trainingEpoch + 1) + " *****")
+				println("***** Epoch " ++ (trainingEpoch + 1) ++ " *****")
 				var trainingIndex = 0
 				while(trainingIndex + batchSize - 1 < trainingSet.numRows) {
 					val ffResults = (0::batchSize) { batchIndex =>
@@ -267,7 +271,7 @@ trait NeuralNetworkTrainerBatch extends OptiMLApplication with NeuralNetUtilitie
 				}
 				pack(readVar(hiddenNeurons), readVar(outputNeurons), readVar(inputNeurons))
 			}
-			println("Network accuracy: " + (countCorrect/(dataSet.numRows.toDouble) * 100.0) + "%"); 
+			println("Network accuracy: " ++ (countCorrect/(dataSet.numRows.toDouble) * 100.0) ++ "%"); 
 		}
 
 		initializeWeights()

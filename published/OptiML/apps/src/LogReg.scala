@@ -1,10 +1,14 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-object LogRegCompiler extends OptiMLApplicationCompiler with LogReg
-object LogRegInterpreter extends OptiMLApplicationInterpreter with LogReg
+// object LogRegCompiler extends OptiMLApplicationCompiler with LogReg
+// object LogRegInterpreter extends OptiMLApplicationInterpreter with LogReg
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait LogReg extends OptiMLApplication {
   def printUsage = {
     println("Usage: LogReg <input training data file> <input training label file>")
@@ -17,9 +21,9 @@ trait LogReg extends OptiMLApplication {
     val x = readMatrix(args(0))
     val y = readVector(args(1)).t
 
-    println("x.numRows: " + x.numRows)
-    println("x.numCols: " + x.numCols)
-    println("y.length:  " + y.length)
+    println("x.numRows: " ++ x.numRows)
+    println("x.numCols: " ++ x.numCols)
+    println("y.length:  " ++ y.length)
 
     tic()
     val theta = DenseVector.zeros(x.numCols)

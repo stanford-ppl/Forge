@@ -1,10 +1,14 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-object SVMCompiler extends OptiMLApplicationCompiler with SVM
-object SVMInterpreter extends OptiMLApplicationInterpreter with SVM
+// object SVMCompiler extends OptiMLApplicationCompiler with SVM
+// object SVMInterpreter extends OptiMLApplicationInterpreter with SVM
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait SVM extends FileUtil {
   def printUsage = {
     println("Usage: SVM <train data file> <test data file>")//" <model filename> <num tests>")
@@ -73,7 +77,7 @@ trait SVM extends FileUtil {
             // calculate eta
             val eta = (X(i)*:*X(j)*2) - (X(i)*:*X(i)) - (X(j)*:*X(j))
             // check eta
-            if (eta < 0){
+            if (eta < 0.0){
               // compute new alphas(j)
 
               //alphas = alphas.Clone //TR
@@ -123,7 +127,7 @@ trait SVM extends FileUtil {
     } // while
 
     // SMO finished
-    println("num iterations: " + iter)
+    println("num iterations: " ^ iter)
 
     // compute the weights (assuming a linear kernel)
     val weights = sum(0,numSamples) { i => X(i) * alphas(i) * Y(i) }
@@ -138,7 +142,7 @@ trait SVM extends FileUtil {
 
   def classify(weights: Rep[DenseVector[Double]], b: Rep[Double], testPt: Rep[DenseVector[Double]]): Rep[Double] = {
     // SVM prediction is W'*X + b
-    if ((weights*:*testPt + b) < 0) {
+    if ((weights*:*testPt + b) < 0.0) {
       -1.0
     }
     else 1.0
@@ -176,7 +180,7 @@ trait SVM extends FileUtil {
 
     // -- run the SMO training algorithm
     tic()
-    val (weights, b) = train(trainingSet, 1, .001, 10)
+    val (weights, b) = train(trainingSet, 1.0, .001, 10)
     toc()
     //saveModel(weights, b, modelFile)
 
@@ -192,6 +196,6 @@ trait SVM extends FileUtil {
     println("SVM testing finished. Calculating error..")
 
     val errors = sum[Int](0, testSet.numSamples) { i => if (YTest(i) != outputLabels(i)) 1 else 0 }
-    println("Classification error: " + (errors.toDouble/testSet.numSamples.toDouble))
+    println("Classification error: " ^ (errors.toDouble/testSet.numSamples.toDouble))
   }
 }

@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+
+<!-- An example convolutional network showing all possible XML tags
+     for the script generate_cnn.py. !-->
+
+<net    name="CNNExample"
+        colormap="RGB" 
+        dataset_path="apps/src/NeuralNetwork/examples/cifar10" 
+        img_size="32x32"
+> 
+
+<!-- Additional options:
+
+        lr_cmd_line_arg="1"
+                This specifies whether the learning rate should be an input
+                through the command line ("1") or a separate parameter file ("0").
+                If specified, the network can be trained by running, for example:
+                        delite CNNExampleCompiler 0.01
+                This is useful if you want to quickly set all layers to have the
+                same learning rate (rather than modifying the parameter file for
+                each layer)
+        
+        blas="1"
+                Uses BLAS (or cuBLAS on the GPU) GEMM instead of OptiML parallel
+                dot products to do matrix multiplication. BLAS is often faster,
+                but on the CPU it requires tuning the number of threads and on
+                the GPU currently cuBLAS can cause slow-downs if the matrix sizes
+                are small.
+
+        gemm_conv="1"
+                Uses a large matrix multiply call for the convolutions, as in cuDNN.
+                For now, this is always implemented as a blas call, regardless of the 
+                setting of the blas attribute above. Also, it is currently implemented
+                as an attribute for the entire net, not per-layer.
+
+        num_input_channels="3"
+                This is an alternative to colormap
+                Use num_input_channels to specify the number of input channels
+                in each row of your input data. E.g. a grayscale image has 1
+                and an RGB image has 3. "colormap" is a shorthand for 
+                num_input_channels, i.e. colormap="Grayscale" is analogous 
+                to num_input_channels="1" and colormap="RGB" is analogous to
+                num_input_channels="3". If num_input_channels is specified,
+                colormap is not needed. If both are specified, colormap is
+                ignored. If neither is specified, the default is Grayscale (1 channel).
+
+        input_size="400"
+                This is an alternative to the img_size attribute. Use this attribute
+                when the inputs to the network are not images, but arbitrary data vectors.
+
+                Specifically, while generate_cnn.py is meant to generate convolutional 
+                networks that take 2D images as input (i.e. networks that do 2D 
+                convolution and pooling), it can also generate networks which contain
+                only fully-connected / softmax layers. These have no 2D spatial 
+                interpretation and just treat the input as a 1D vector. That means that
+                generate_cnn.py can generate networks for any type of input data.
+
+                If the generated network contains convolution or pooling layers, 
+                i.e. layers with 2D computations, then img_size must be specified 
+                and the size must be square. But if the network only contains fully-
+                connected and softmax layers (1D computations), then either img_size 
+                or input_size can be used to specify the size of the input vector.
+                E.g. for networks with no convolution/pooling, all these are equivalent:
+
+                        img_size="20x20"
+                        img_size="40x10"
+                        img_size="400x1"
+                        img_size="1x400"
+                        input_size="400"
+
+                Here each input example is a vector with 400 elements, and e.g. could be
+                a 20x20 image or any length 400 vector of arbitrary data. Note that if
+                the network contains any convolution or pooling layers, then only the 
+                first attribute is valid. 
+
+!-->
+
+        <!-- Convolution Layer 
+
+                Also takes an optional "activation" parameter, which 
+                specifies the output activation. Here it is omitted, 
+                so the default is activation="ReLU"
+
+                By default, zero-padding is added so that convolutions
+                do not change feature map sizes. This will be added
+                as a "pad" option in the future.
+        !-->
+        <layer  name="c1"
+                type="CONVOLUTION"
+                kernel_size="5"
+                num_hidden="32"
+        >
+        </layer>
+
+        <!-- Max Pooling Layer !-->
+        <layer  name="m2"
+                type="MAX_POOL"
+                pool_size="2"
+        >
+        </layer>
+
+        <!-- Output softmax with 10 classes -->
+        <layer  name="output"
+                type="SOFTMAX"
+                num_hidden="10"
+        >
+        </layer>
+
+</net>

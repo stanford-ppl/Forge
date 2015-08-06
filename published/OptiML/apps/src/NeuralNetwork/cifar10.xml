@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+
+<net    name="cifar10"
+        colormap="RGB" 
+        dataset_path="apps/src/NeuralNetwork/examples/cifar10" 
+        img_size="32x32"
+> 
+
+        <layer  name="c1"
+                type="CONVOLUTION"
+                kernel_size="5"
+                num_hidden="16"
+        >
+        </layer>
+
+        <layer  name="m2"
+                type="MAX_POOL"
+                pool_size="2"
+        >
+        </layer>
+
+        <layer  name="c3"
+                type="CONVOLUTION"
+                kernel_size="5"
+                num_hidden="20"
+        >
+        </layer>
+
+        <layer  name="m4"
+                type="MAX_POOL"
+                pool_size="2"
+        >
+        </layer>
+
+        <layer  name="c5"
+                type="CONVOLUTION"
+                kernel_size="5"
+                num_hidden="20"
+        >
+        </layer>
+
+        <layer  name="m6"
+                type="MAX_POOL"
+                pool_size="2"
+        >
+        </layer>
+
+        <layer  name="h7" 
+                type="FULLY_CONNECTED"
+                num_hidden="100"
+                dropout="0.5"
+        >
+        </layer>
+
+        <layer  name="output"
+                type="SOFTMAX"
+                num_hidden="10"
+        >
+        </layer>
+
+</net>

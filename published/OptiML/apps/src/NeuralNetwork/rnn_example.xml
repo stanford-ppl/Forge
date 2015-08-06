@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+
+<!-- An example recurrent network showing all possible XML tags
+     for the script generate_rnn.py. -->
+
+<net    name="RNNExample"
+        dataset_path="apps/src/NeuralNetwork/examples/stock_market" 
+        samples_per_window="25"
+>
+
+<!-- Additional options:
+
+        blas="1"
+                Uses BLAS (or cuBLAS on the GPU) GEMM instead of OptiML parallel
+                dot products to do matrix multiplication. BLAS is often faster,
+                but on the CPU it requires tuning the number of threads and on
+                the GPU currently cuBLAS can cause slow-downs if the matrix sizes
+                are small.
+
+        bidirectional="1"
+                This is not implemented yet, but would specify a bidirectional RNN
+-->
+
+        <layer  name="h1" 
+                type="FULLY_CONNECTED"
+                num_hidden="100"
+        >
+        </layer>
+
+        <layer  name="h1" 
+                type="FULLY_CONNECTED"
+                num_hidden="25"
+        >
+        </layer>
+
+        <layer  name="output"
+                type="SOFTMAX"
+                num_hidden="5"
+        >
+        </layer>
+
+</net>

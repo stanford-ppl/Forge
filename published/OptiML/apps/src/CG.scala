@@ -29,6 +29,8 @@ trait OptiMLApplication extends optiml.direct.OptiMLApplication {
     def +=(x:Rep[Int]): Rep[Unit] = ???
   }
   def infix_==(x:Rep[Any], y: Rep[Any]): Rep[Boolean] = ???
+  def __assign[T](x:Var[T], y: T): Rep[Unit] = ???
+  def __assign[T](x:Var[T], y: Rep[T]): Rep[Unit] = ???
 }
 
 import org.scala_lang.virtualized.virtualize  

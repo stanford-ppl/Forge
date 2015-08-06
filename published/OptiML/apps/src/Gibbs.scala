@@ -1,10 +1,14 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-object GibbsCompiler extends OptiMLApplicationCompiler with Gibbs
-object GibbsInterpreter extends OptiMLApplicationInterpreter with Gibbs
+// object GibbsCompiler extends OptiMLApplicationCompiler with Gibbs
+// object GibbsInterpreter extends OptiMLApplicationInterpreter with Gibbs
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait Gibbs extends OptiMLApplication {
 
   def print_usage = {
@@ -47,7 +51,7 @@ trait Gibbs extends OptiMLApplication {
         (args(0) == args(1))
       } 
       else {
-        println("error: isequal factor function cannot contain " + nargs + " arguments")
+        println("error: isequal factor function cannot contain " ++ nargs ++ " arguments")
         exit(-1)
         false
       }
@@ -57,13 +61,13 @@ trait Gibbs extends OptiMLApplication {
         args(0)
       }
       else {
-        println("error: istrue factor function cannot contain " + nargs + " arguments")
+        println("error: istrue factor function cannot contain " ++ nargs ++ " arguments")
         exit(-1)
         false
       }
     }
     else {
-      println("error: invalid factor function " + ffx)
+      println("error: invalid factor function " ++ ffx)
       exit(-1)
       false
     }
@@ -176,14 +180,14 @@ trait Gibbs extends OptiMLApplication {
       G
     }
     else {
-      println("learning " + queryWeightIds.length + " weights from " + queryFactorIds.length + " factors")
-      println("using " + numIterations + " iterations of " + numSamples + " each")
+      println("learning " ++ queryWeightIds.length ++ " weights from " ++ queryFactorIds.length ++ " factors")
+      println("using " ++ numIterations ++ " iterations of " ++ numSamples ++ " each")
 
-      val gmc = G.mutable()
-      val gmu = G.mutable()
+      val gmc = G.mutable
+      val gmu = G.mutable
 
       var iterct = 0
-      var iterLearningRate: Rep[Double] = learningRate
+      var iterLearningRate = learningRate
       while(iterct < numIterations) {
         // compute the expectation for all factors sampling only query variables
         val conditionedEx = sampleFactors(gmc, G.nonEvidenceVariables, queryFactorIds, numSamples)
@@ -236,11 +240,11 @@ trait Gibbs extends OptiMLApplication {
 
     println("finished reading factor graph")
     println("read:")
-    println("  " + G.numFactors + " factors")
-    println("  " + G.numVariables + " variables")
-    println("  " + G.numWeights + " weights")
-    println("  " + G.numEdges + " edges")
-    println("  " + G.nonEvidenceVariables.length + " non-evidence variables")
+    println("  " ++ G.numFactors ++ " factors")
+    println("  " ++ G.numVariables ++ " variables")
+    println("  " ++ G.numWeights ++ " weights")
+    println("  " ++ G.numEdges ++ " edges")
+    println("  " ++ G.nonEvidenceVariables.length ++ " non-evidence variables")
 
     println("")
     println("done!")
@@ -248,7 +252,7 @@ trait Gibbs extends OptiMLApplication {
     val Gwl = learnWeights(G, numIterationsWL, numSamplesWL, learningRate, regularizationConstant, diminishRate) 
 
     val outWeights: Rep[DenseVector[String]] = (0::Gwl.numWeights).map({iw => 
-      "" + iw + "\t" + Gwl.weightValue.apply(iw) + "\t" + Gwl.weightIsFixed.apply(iw)
+      "" ++ iw ++ "\t" ++ Gwl.weightValue.apply(iw) ++ "\t" ++ Gwl.weightIsFixed.apply(iw)
     })
     writeVector(outWeights, "weights.out")
 
@@ -258,12 +262,12 @@ trait Gibbs extends OptiMLApplication {
     println("done!")
 
     println("")
-    println("estimating marginals (numsamples = " + numSamples + ")")
+    println("estimating marginals (numsamples = " ++ numSamples ++ ")")
 
     tic()
 
     val marginals = sum(0,numModels) { imodel =>
-      val graph = GR.local.mutableVariables()
+      val graph = GR.local.mutableVariables
       val marginalsAcc = DenseVector.zeros(graph.nonEvidenceVariables.length).mutable()
       var sampleCt = 0
       while (sampleCt < numSamplesPerModel) {
@@ -282,7 +286,7 @@ trait Gibbs extends OptiMLApplication {
     println("done!")
 
     val outMarginals: Rep[DenseVector[String]] = (0::G.nonEvidenceVariables.length).map({iv => 
-      "" + G.nonEvidenceVariables.apply(iv) + "\t" + marginals(iv)
+      "" ++ G.nonEvidenceVariables.apply(iv) ++ "\t" + marginals(iv)
     })
     writeVector(outMarginals, "marginals.out")
   }

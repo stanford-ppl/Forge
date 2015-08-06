@@ -154,6 +154,7 @@ def sbtBuildFileFooter(dsl):
   lazy val ${dslName}Comp = Project("${dslName}-comp", file("compiler"), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Shared)
   lazy val ${dslName}Lib = Project("${dslName}-lib", file("library"), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Shared)
   lazy val ${dslName}Ident = Project("${dslName}-ident", file("ident"), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Shared)
+  lazy val ${dslName}Direct = Project("${dslName}-direct", file("direct"), settings = virtBuildSettings ++ deps)
   lazy val ${dslName}Apps = Project("${dslName}-apps", file("apps"), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Comp, ${dslName}Lib, ${dslName}Ident)
   lazy val ${dslName}Tests = Project("${dslName}-tests", file("tests"), settings = virtBuildSettingsBase ++ deps ++ Seq(
     scalaSource in Test <<= baseDirectory(_ / "src"),
@@ -165,7 +166,7 @@ def sbtBuildFileFooter(dsl):
     //fork := true,
     //javaOptions in Test := sys.env.getOrElse("SBT_OPTS", "").split(" ")
     fork := false
-  )) dependsOn(${dslName}Comp, ${dslName}Lib)
+  )) dependsOn(${dslName}Comp, ${dslName}Lib, ${dslName}Direct)
 }
 """)
     return s.substitute(dslName=dsl)
@@ -198,7 +199,7 @@ def publish_static_extern(dsl, build_dir, scratch_dir):
     rename_all(scratch_dir, {'HUMAN_DSL_NAME': dsl, 'LOWERCASE_DSL_NAME': dsl.lower()})
 
     # we need to mirror the package layout convention defined in Forge
-    all_targets = ['shared','compiler','library']
+    all_targets = ['shared','compiler','library','direct']
     targets = [t for t in all_targets if os.path.exists(build_dir + t + "/src/")]
     for t in targets:
         dest_root = t + "/"

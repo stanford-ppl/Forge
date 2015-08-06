@@ -1,10 +1,13 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-object NBCompiler extends OptiMLApplicationCompiler with NaiveBayes
-object NBInterpreter extends OptiMLApplicationInterpreter with NaiveBayes
+// object NBCompiler extends OptiMLApplicationCompiler with NaiveBayes
+// object NBInterpreter extends OptiMLApplicationInterpreter with NaiveBayes
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
 
+@virtualize
 trait NaiveBayes extends FileUtil {
   def printUsage = {
     println("NaiveBayes <training file> <test file>")
@@ -18,7 +21,7 @@ trait NaiveBayes extends FileUtil {
     val testFile = args(1)
 
     val trainingSet = readTokenMatrix(trainingFile)
-    println("Training model on " + trainingSet.numSamples + " documents.")
+    println("Training model on " ++ trainingSet.numSamples ++ " documents.")
     tic()
     val (phi_y1, phi_y0, phi_y) = train(trainingSet)
     toc(phi_y1)
@@ -28,10 +31,10 @@ trait NaiveBayes extends FileUtil {
     phi_y1.pprint
     println("phi_y0: ")
     phi_y0.pprint
-    println("phi_y: "+ phi_y)
+    println("phi_y: " ++ phi_y)
 
     val incorrectClassifications = test(testSet, phi_y1, phi_y0, phi_y)
-    println("Test error: " + incorrectClassifications.toDouble / testSet.numSamples.toDouble)
+    println("Test error: " ++ incorrectClassifications.toDouble / testSet.numSamples.toDouble)
   }
 
   def train(ts: Rep[DenseTrainingSet[Int,Int]]): (Rep[DenseVector[Double]], Rep[DenseVector[Double]], Rep[Double]) = {
@@ -68,7 +71,7 @@ trait NaiveBayes extends FileUtil {
   }
 
   def test(ts: Rep[DenseTrainingSet[Int,Int]], phi_y1: Rep[DenseVector[Double]], phi_y0: Rep[DenseVector[Double]], phi_y: Rep[Double]) = {
-    println("Testing model on " + ts.numSamples + " documents.")
+    println("Testing model on " ++ ts.numSamples ++ " documents.")
 
     val output = (0::ts.numSamples) { j =>
       // compute log(p(x|y=1)p(y=1)) and log(p(x|y=0)p(y=0))

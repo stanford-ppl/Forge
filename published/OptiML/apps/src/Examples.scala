@@ -7,19 +7,23 @@
  *   delite Example1Interpreter
  */
 
-import scala.virtualization.lms.common.Record
-import scala.reflect.SourceContext
+//import scala.virtualization.lms.common.Record
+//import scala.reflect.SourceContext
 
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
+import optiml.direct.{ OptiMLApplication => _, _}
+
+import org.scala_lang.virtualized.virtualize  
 
 import ppl.delite.framework.{BeginScopes,EndScopes}
 import ppl.delite.framework.ScopeCommunication._
 
 // DenseVector, DenseMatrix
-object Example1Compiler extends OptiMLApplicationCompiler with Example1
-object Example1Interpreter extends OptiMLApplicationInterpreter with Example1
+// object Example1Compiler extends OptiMLApplicationCompiler with Example1
+// object Example1Interpreter extends OptiMLApplicationInterpreter with Example1
+@virtualize 
 trait Example1 extends OptiMLApplication {
   def main() = {
     // 10000x1 DenseVector
@@ -42,8 +46,9 @@ trait Example1 extends OptiMLApplication {
 }
 
 // DenseVector, DenseMatrix construction
-object Example2Compiler extends OptiMLApplicationCompiler with Example2
-object Example2Interpreter extends OptiMLApplicationInterpreter with Example2
+// object Example2Compiler extends OptiMLApplicationCompiler with Example2
+// object Example2Interpreter extends OptiMLApplicationInterpreter with Example2
+@virtualize 
 trait Example2 extends OptiMLApplication {
   def main() = {
     /* various ways of constructing a DenseVector */
@@ -72,15 +77,16 @@ trait Example2 extends OptiMLApplication {
 }
 
 // using functional operators (map, zip, filter)
-object Example3Compiler extends OptiMLApplicationCompiler with Example3
-object Example3Interpreter extends OptiMLApplicationInterpreter with Example3
+// object Example3Compiler extends OptiMLApplicationCompiler with Example3
+// object Example3Interpreter extends OptiMLApplicationInterpreter with Example3
+@virtualize 
 trait Example3 extends OptiMLApplication {
   def main() = {
     val v = DenseVector.rand(1000)
 
     // filter selects all the elements matching a predicate
     // map constructs a new vector by applying a function to each element
-    val v2 = (v*1000).filter(e => e < 500).map(e=>e*e*random[Double])
+    val v2 = (v*1000).filter(e => e < 500.0).map(e=>e*e*random[Double])
     println(v2.length)
 
     // reduce produces a scalar by successively applying a function to pairs
@@ -88,16 +94,25 @@ trait Example3 extends OptiMLApplication {
     println(logmin)
 
     // partition splits the vector into two based on a predicate
-    val (v2small, v2large) = unpack(v2.partition(e => e < 1000))
-    println("v2small size: " + v2small.length)
-    println("v2large size: " + v2large.length)
+    val (v2small, v2large) = unpack(v2.partition(e => e < 1000.0))
+    println("v2small size: " ++ v2small.length)
+    println("v2large size: " ++ v2large.length)
   }
 }
 
 // iterating
-object Example4Compiler extends OptiMLApplicationCompiler with Example4
-object Example4Interpreter extends OptiMLApplicationInterpreter with Example4
+// object Example4Compiler extends OptiMLApplicationCompiler with Example4
+// object Example4Interpreter extends OptiMLApplicationInterpreter with Example4
+@virtualize 
 trait Example4 extends OptiMLApplication {
+  implicit class StringOps2(s:Rep[String]) {
+    def ++(x:Rep[Any]): Rep[String] = ???
+    def ++[T](x:Var[T]): Rep[String] = ???
+  }
+  implicit def string2ops2(s:String) = StringOps2(unit(s))
+  //TR why need to repeat???
+
+
   def main() = {
     // a DenseVector[DenseVector[Double]]
     // 100 vectors, each containing 1000 random doubles
@@ -110,11 +125,11 @@ trait Example4 extends OptiMLApplication {
     }
 
     // iterate using while (sequential)
-    var i = 0
+    var i = 0: Rep[Int]
     while (i < v.length) {
       val vi = v(i)
       // always prints in order
-      println("first element of vector " + i + ": " + vi(0))
+      println("first element of vector " ++ i ++ ": " ++ vi(0))
       i += 1
     }
   }
@@ -138,8 +153,9 @@ trait Example4 extends OptiMLApplication {
 // 3 12 5
 // 17 32 1
 // -6 1 0
-object Example5Compiler extends OptiMLApplicationCompiler with Example5
-object Example5Interpreter extends OptiMLApplicationInterpreter with Example5
+// object Example5Compiler extends OptiMLApplicationCompiler with Example5
+// object Example5Interpreter extends OptiMLApplicationInterpreter with Example5
+@virtualize 
 trait Example5 extends OptiMLApplication {
   def main() = {
     // simple i/o
@@ -158,8 +174,9 @@ trait Example5 extends OptiMLApplication {
 }
 
 // untilconverged
-object Example6Compiler extends OptiMLApplicationCompiler with Example6
-object Example6Interpreter extends OptiMLApplicationInterpreter with Example6
+// object Example6Compiler extends OptiMLApplicationCompiler with Example6
+// object Example6Interpreter extends OptiMLApplicationInterpreter with Example6
+@virtualize 
 trait Example6 extends OptiMLApplication {
   def main() = {
     // newton descent
@@ -176,17 +193,18 @@ trait Example6 extends OptiMLApplication {
         val a = b + c1
         lambda - (a * lambda + c0) / (2.0*lambda*l2 + b + a)
       }
-    println("lambda: " + lambda)
+    println("lambda: " ++ lambda)
   }
 }
 
 // sum
-object Example7Compiler extends OptiMLApplicationCompiler with Example7
-object Example7Interpreter extends OptiMLApplicationInterpreter with Example7
+// object Example7Compiler extends OptiMLApplicationCompiler with Example7
+// object Example7Interpreter extends OptiMLApplicationInterpreter with Example7
+@virtualize 
 trait Example7 extends OptiMLApplication {
   def main() = {
     val simpleSeries = sum(0, 100) { i => i } // sum(0,1,2,3,...99)
-    println("simpleSeries: " + simpleSeries)
+    println("simpleSeries: " ++ simpleSeries)
 
     val m = DenseMatrix.rand(10,100)
     // sum first 10 rows of m
@@ -196,7 +214,7 @@ trait Example7 extends OptiMLApplication {
 
     // sum(0,2,4,8...98)
     val conditionalSeries = sumIf(0,100)(i => i % 2 == 0) { i => i }
-    println("conditionalSeries: " + conditionalSeries)
+    println("conditionalSeries: " ++ conditionalSeries)
 
     // conditional sum over rows of a matrix
     val conditionalRowSum = sumRowsIf(0,10)(i => m(i).min > .01) { i => m(i) }
@@ -206,20 +224,22 @@ trait Example7 extends OptiMLApplication {
 }
 
 // SparseVector, SparseMatrix
-object Example8Compiler extends OptiMLApplicationCompiler with Example8
-object Example8Interpreter extends OptiMLApplicationInterpreter with Example8
+// object Example8Compiler extends OptiMLApplicationCompiler with Example8
+// object Example8Interpreter extends OptiMLApplicationInterpreter with Example8
+@virtualize 
 trait Example8 extends OptiMLApplication {
   def main() = {
     val v = SparseVector[Double](100,true)
-    v(5) = 10
-    v(75) = 20
+    //TR no autolifting
+    v(5:Rep[Int]) = 10.0
+    v(75:Rep[Int]) = 20.0
 
     // mapping a sparse vector's non-zero elements returns another sparse vector
     val t1 = v mapnz { e => e/(exp(e)+1) }
 
     // nnz (number of non-zeros is a field only available on sparse structures)
-    println("t1 nnz: " + t1.nnz)
-    println("t1.length: " + t1.length)
+    println("t1 nnz: " ++ t1.nnz)
+    println("t1.length: " ++ t1.length)
     t1.pprint
 
     // constructing a new sparse matrix
@@ -227,16 +247,16 @@ trait Example8 extends OptiMLApplication {
     // they can only be mutated before 'finish' is called, and can only be
     // used in other operations (e.g. math) after 'finish' is called
     val mBuilder = SparseMatrix[Double](1000,1000)
-    mBuilder(10,100) = 5
-    mBuilder(9,100) = 1
-    mBuilder(9,722) = 722
+    mBuilder(10,100) = 5.0
+    mBuilder(9,100) = 1.0
+    mBuilder(9,722) = 722.0
     val m = mBuilder.finish
-    println("m numRows: " + m.numRows)
-    println("m numCols: " + m.numCols)
-    println("m nnz: " + m.nnz)
+    println("m numRows: " ++ m.numRows)
+    println("m numCols: " ++ m.numCols)
+    println("m nnz: " ++ m.nnz)
 
     val m2 = m+m
-    println("m2 nnz: " + m2.nnz)
+    println("m2 nnz: " ++ m2.nnz)
   }
 }
 
@@ -245,6 +265,7 @@ trait Example8 extends OptiMLApplication {
 /*
 object Example9Compiler extends OptiMLApplicationCompiler with Example9
 object Example9Interpreter extends OptiMLApplicationInterpreter with Example9
+@virtualize 
 trait Example9 extends OptiMLApplication {
   def main() = {
     // simple diamond-shaped graph
@@ -293,8 +314,9 @@ trait Example9 extends OptiMLApplication {
 */
 
 // mutation
-object Example10Compiler extends OptiMLApplicationCompiler with Example10
-object Example10Interpreter extends OptiMLApplicationInterpreter with Example10
+// object Example10Compiler extends OptiMLApplicationCompiler with Example10
+// object Example10Interpreter extends OptiMLApplicationInterpreter with Example10
+@virtualize 
 trait Example10 extends OptiMLApplication {
   def main() = {
     val vMut = DenseVector[Double](1000, true) // mutable vector initialized to all zeros
@@ -306,13 +328,13 @@ trait Example10 extends OptiMLApplication {
     var i = 0
     while (i < vMut.length) {
       if (i % 10 == 0) {
-        vMut(i) = 1 // ok
+        vMut(i) = 1.0 // ok
         // vImm(i) = 1 // would cause a stage-time error!
       }
       i += 1
     }
 
-    println("vMut(10): " + vMut(10))
+    println("vMut(10): " ++ vMut(10))
 
     // nested mutable objects are not allowed!
     val vNestedMut = DenseVector[DenseVector[Double]](10, true)
@@ -322,8 +344,9 @@ trait Example10 extends OptiMLApplication {
 }
 
 // using types
-object Example11Compiler extends OptiMLApplicationCompiler with Example11
-object Example11Interpreter extends OptiMLApplicationInterpreter with Example11
+// object Example11Compiler extends OptiMLApplicationCompiler with Example11
+// object Example11Interpreter extends OptiMLApplicationInterpreter with Example11
+@virtualize 
 trait Example11 extends OptiMLApplication {
   def main() = {
     // an explicitly-typed result
@@ -345,8 +368,9 @@ trait Example11 extends OptiMLApplication {
 }
 
 // code organization
-object Example12Compiler extends OptiMLApplicationCompiler with Example12
-object Example12Interpreter extends OptiMLApplicationInterpreter with Example12
+// object Example12Compiler extends OptiMLApplicationCompiler with Example12
+// object Example12Interpreter extends OptiMLApplicationInterpreter with Example12
+@virtualize 
 trait Example12 extends OptiMLApplication with Example12work {
   def main() = {
     // code can be organized into different methods and traits
@@ -358,17 +382,18 @@ trait Example12 extends OptiMLApplication with Example12work {
     println(a)
   }
 }
+@virtualize 
 trait Example12work extends OptiMLApplication {
   // methods signatures require types; return types are optional
   def doWork(v: Rep[DenseVector[Double]]) = {
-    println("v length is: " + v.length)
+    println("v length is: " ++ v.length)
   }
 
   // methods can use generic types, too
   // but you have to include this ":Manifest" boilerplate
   // Manifest is a Scala object that stores type information for T
-  def doWork2[T:Manifest](v: Rep[DenseVector[T]]) = {
-    println("v(0) is: " + v(0))
+  def doWork2[T:Typ](v: Rep[DenseVector[T]]) = {
+    println("v(0) is: " ++ v(0))
   }
 
   // an example method returning a value with an explicit return type
@@ -383,9 +408,13 @@ trait Example12work extends OptiMLApplication {
 }
 
 
+/*
+FIXME: structs and scopes!
+
 // user-defined type
-object Example13Compiler extends OptiMLApplicationCompiler with Example13
-object Example13Interpreter extends OptiMLApplicationInterpreter with Example13
+// object Example13Compiler extends OptiMLApplicationCompiler with Example13
+// object Example13Interpreter extends OptiMLApplicationInterpreter with Example13
+@virtualize 
 trait Example13 extends OptiMLApplication {
   def main() = {
     // type alias is for convenience
@@ -490,3 +519,4 @@ object Example15 {
     EndScopes() // marker to complete the scope file
   }
 }
+*/

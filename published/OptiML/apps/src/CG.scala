@@ -1,14 +1,39 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-object CGCompiler extends OptiMLApplicationCompiler with CG
-object CGInterpreter extends OptiMLApplicationInterpreter with CG
-object CGFunction extends OptiMLApplicationCompiler with CG {
-  registerFunction(conjugateGradient _)
-  override def functionName = "CG"
+// object CGCompiler extends OptiMLApplicationCompiler with CG
+// object CGInterpreter extends OptiMLApplicationInterpreter with CG
+// object CGFunction extends OptiMLApplicationCompiler with CG {
+//   registerFunction(conjugateGradient _)
+//   override def functionName = "CG"
+// }
+
+import optiml.direct._
+
+trait OptiMLApplication extends optiml.direct.OptiMLApplication {
+  def args: Rep[Array[String]]
+  implicit class IntOps2(x:Int) {
+    def ::(y:Int): Rep[IndexVector] = unit(y)::unit(x)
+  }
+  //implicit def int2intRep(x:Int): Rep[Int] = unit(x)
+  //implicit def int2doubleRep(x:Int): Rep[Double] = unit(x)
+  implicit class StringOps2(s:Rep[String]) {
+    def ++(x:Rep[Any]): Rep[String] = ???
+    def ++[T](x:Var[T]): Rep[String] = ???
+    def ^(x:Rep[Any]): Rep[String] = ???
+    def ^[T](x:Var[T]): Rep[String] = ???
+  }
+  implicit def string2ops(s:String) = StringOps2(unit(s))
+  implicit class IntVarOps(s:Var[Int]) {
+    def +=(x:Rep[Int]): Rep[Unit] = ???
+  }
+  def infix_==(x:Rep[Any], y: Rep[Any]): Rep[Boolean] = ???
 }
 
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait CG extends OptiMLApplication { 
 
   def conjugateGradient(A0: Rep[ForgeArray[Double]], numRows: Rep[Int], numCols: Rep[Int], b0: Rep[ForgeArray[Double]], maxIters: Rep[Int]): Rep[ForgeArray[Double]] = {

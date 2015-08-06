@@ -25,6 +25,9 @@ object OptiMLBuild extends Build {
     libraryDependencies += "org.apache.hadoop" % "hadoop-common" % "2.5.1",
     libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "2.5.1",
     libraryDependencies += "org.apache.hadoop" % "hadoop-hdfs" % "2.5.1",
+    // MACRO VIRTUALIZATION
+    libraryDependencies += "org.scala-lang.virtualized" %% "scala-virtualized" % "0.0.1-SNAPSHOT",
+    addCompilerPlugin("org.scalamacros" % "paradise" % "2.0.1" cross CrossVersion.full),
     // used in delitec to access jars
     retrieveManaged := true,
     scalacOptions += "-Yno-generic-signatures",

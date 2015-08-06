@@ -3,10 +3,14 @@
 //  http://ppl.stanford.edu/
 //
 
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait NetLib extends OptiMLApplication {
 
   // Calculate and return cross entropy
@@ -30,11 +34,11 @@ trait NetLib extends OptiMLApplication {
     1.0f / (1.0f + exp(z * -1.0f).toFloat)
   }
   def ReLU(z: Rep[Float]) : Rep[Float] = {
-    if (z <= 0) 0.0f
+    if (z <= 0.0f) 0.0f
     else z
   }
   def ReLU_Deriv(z: Rep[Float]) : Rep[Float] = {
-    if (z <= 0) 0.0f else 1.0f
+    if (z <= 0.0f) 0.0f else 1.0f
   }
 
   // Forward through fully connected layer

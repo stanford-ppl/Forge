@@ -65,7 +65,7 @@ object OptiMLBuild extends Build {
   lazy val OptiMLLib = Project("OptiML-lib", file("library"), settings = virtBuildSettings ++ deps) dependsOn(OptiMLShared)
   lazy val OptiMLIdent = Project("OptiML-ident", file("ident"), settings = virtBuildSettings ++ deps) dependsOn(OptiMLShared)
   lazy val OptiMLDirect = Project("OptiML-direct", file("direct"), settings = virtBuildSettings ++ deps)
-  lazy val OptiMLApps = Project("OptiML-apps", file("apps"), settings = virtBuildSettings ++ deps) dependsOn(OptiMLComp, OptiMLLib, OptiMLIdent)
+  lazy val OptiMLApps = Project("OptiML-apps", file("apps"), settings = virtBuildSettings ++ deps) dependsOn(OptiMLComp, OptiMLLib, OptiMLIdent, OptiMLDirect)
   lazy val OptiMLTests = Project("OptiML-tests", file("tests"), settings = virtBuildSettingsBase ++ deps ++ Seq(
     scalaSource in Test <<= baseDirectory(_ / "src"),
     parallelExecution in Test := false,

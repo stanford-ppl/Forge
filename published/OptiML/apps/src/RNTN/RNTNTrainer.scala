@@ -1,9 +1,13 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-object RNTNInterpreter extends OptiMLApplicationInterpreter with RNTNTrainer
-object RNTNCompiler extends OptiMLApplicationCompiler with RNTNTrainer
+// object RNTNInterpreter extends OptiMLApplicationInterpreter with RNTNTrainer
+// object RNTNCompiler extends OptiMLApplicationCompiler with RNTNTrainer
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait RNTNTrainer extends OptiMLApplication with RNTNOps with Utilities {
 	private val TREECOLS = 6
 	private val PARENT = 0  		// Gives the index of the parent node of the node
@@ -30,7 +34,7 @@ trait RNTNTrainer extends OptiMLApplication with RNTNOps with Utilities {
 	}
 
 	private def readIndices(filename: Rep[String]): Rep[IndexVector] = {
-		readMatrix(filename, (e => e.toDouble), " ").getRow(0).find(e => e > 0)
+		readMatrix(filename, (e => e.toDouble), " ").getRow(0).find(e => e > 0.0)
 	}
 
 	// Read condensed matrix of trees and pick out individual trees using the fact that a node has
@@ -44,7 +48,7 @@ trait RNTNTrainer extends OptiMLApplication with RNTNOps with Utilities {
 			// Assumes that data is saved such that parents are always below their children
 			val roots    = rawTrees.getCol(PARENT).t.find(d => d == 0)
 			val numTrees = roots.length
-			println("Trees are unmodified. Pre-processing " + numTrees + " trees...")
+			println("Trees are unmodified. Pre-processing " ^ numTrees ^ " trees...")
 			val treeFirstLeaves = (0::1).toDense << (roots + 1)
 
 			(0::numTrees) { treeNum =>
@@ -63,7 +67,7 @@ trait RNTNTrainer extends OptiMLApplication with RNTNOps with Utilities {
 					val parent = family(curNode, PARENT)
 					val parentLevel = if (parent <= curNode || parent >= numNodes || parent < 0) {
 	 					family.pprint
-	 					errorOut("Error: There was a problem with the tree data: invalid parent given at node #" + curNode + " (requested node# " + parent + ")")
+	 					errorOut("Error: There was a problem with the tree data: invalid parent given at node #" ^ curNode ^ " (requested node# " ^ parent ^ ")")
 					}
 					else { levels(parent) }
 					levels(curNode) = parentLevel + 1
@@ -112,7 +116,7 @@ trait RNTNTrainer extends OptiMLApplication with RNTNOps with Utilities {
 								  	else		   			    { POSNEGNEUT } // neutral
 								}
 								else {
-									if (score > 1) { errorOut("Error: An invalid phrase score of " + score + " exists in the tree at node" + node +".") }
+									if (score > 1.0) { errorOut("Error: An invalid phrase score of " ^ score ^ " exists in the tree at node" ^ node ^".") }
 									else {floor(abs(score - 0.001)*NUMCLASSES) }
 								}
 							}
@@ -172,7 +176,7 @@ trait RNTNTrainer extends OptiMLApplication with RNTNOps with Utilities {
 		//val testPhrases  = phrases(testIndices)
 		val testTrees  = allTrees(testIndices)
 
-		println("Data loaded. " + numTrees + " phrase trees with " + numWords + " total words")
+		println("Data loaded. " ^ numTrees ^ " phrase trees with " ^ numWords ^ " total words")
  
 		// -------------------------------------------------------------------------------------//
 		//								Init Weights (intParams.m)						  		//
@@ -227,13 +231,13 @@ trait RNTNTrainer extends OptiMLApplication with RNTNOps with Utilities {
 
 	   	var runIter = 1
 	   	while (runIter <= runsThroughData) {
-			println("Training run " + runIter + "/" + runsThroughData)
+			println("Training run " ^ runIter ^ "/" ^ runsThroughData)
 			trainOnTrees(trainTrees, Wc, W, Wt, Wv, ssWc, ssW, ssWt, ssWv, batchSize)
-			println("Completed run " + runIter + "/" + runsThroughData)
+			println("Completed run " ^ runIter ^ "/" ^ runsThroughData)
 
-			println("Checking accuracy for run " + runIter + "/" + runsThroughData + "...")
+			println("Checking accuracy for run " ^ runIter ^ "/" ^ runsThroughData ^ "...")
 			evalOnTrees(trainTrees, Wc, W, Wt, Wv, 100)
-			println("Completed Accuracy check for run " + runIter + "/" + runsThroughData + "...")
+			println("Completed Accuracy check for run " ^ runIter ^ "/" ^ runsThroughData ^ "...")
 
 			runIter += 1
 		}		
@@ -242,10 +246,10 @@ trait RNTNTrainer extends OptiMLApplication with RNTNOps with Utilities {
 		evalOnTrees(testTrees, Wc, W, Wt, Wv, 100)
 
 		println("Writing out results...")
-		writeMatrix(Wc, OUTPUT + "Wc_final.txt", delim)
-		writeMatrix(W,  OUTPUT + "W_final.txt", delim)
-		writeMatrix(Wt, OUTPUT + "Wt_final.txt", delim)
-		writeMatrix(Wv, OUTPUT + "Wv_final.txt", delim)
+		writeMatrix(Wc, OUTPUT ^ "Wc_final.txt", delim)
+		writeMatrix(W,  OUTPUT ^ "W_final.txt", delim)
+		writeMatrix(Wt, OUTPUT ^ "Wt_final.txt", delim)
+		writeMatrix(Wv, OUTPUT ^ "Wv_final.txt", delim)
 
 		println("All done!")
 		toc("Entire Program")

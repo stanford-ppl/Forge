@@ -6,16 +6,19 @@
 * Stanford University
 */
 
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
 
 /*
 * File used to store helper functions for my applications. Needed these functions across multiple applications. 
 */
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
 
+@virtualize
 trait NeuralNetUtilities extends OptiMLApplication {
 
 	//Rounds up from 0.5 and down otherwise. Only for values 0-1. 

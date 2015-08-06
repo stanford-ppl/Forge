@@ -18,14 +18,17 @@
 */
 
 
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-object NNCompiler extends OptiMLApplicationCompiler with NeuralNetworkRunner
-object NNInterpreter extends OptiMLApplicationInterpreter with NeuralNetworkRunner
+// object NNCompiler extends OptiMLApplicationCompiler with NeuralNetworkRunner
+// object NNInterpreter extends OptiMLApplicationInterpreter with NeuralNetworkRunner
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
 
+@virtualize
 trait NeuralNetworkRunner extends OptiMLApplication with NeuralNetworkTrainerStochastic with NeuralNetworkTrainerBatch with NeuralNetUtilities {
 
 	//Initial parameters for the network. Usually never makes sense to use the default ones here, so it is recommended to also supply 
@@ -99,7 +102,7 @@ trait NeuralNetworkRunner extends OptiMLApplication with NeuralNetworkTrainerSto
 
 		def runNetwork(dataSetName: Rep[String], dataSet: Rep[DenseMatrix[Double]], outputFilename: Rep[String]) = {
 			println("#################################################################################")
-			println("STARTING CLASSIFICATION RUN: " + dataSetName)
+			println("STARTING CLASSIFICATION RUN: " ++ dataSetName)
 
 			val outputMatrix = DenseMatrix.zeros(0, 0).mutable
 			var sampleIndex = 0
@@ -141,11 +144,11 @@ trait NeuralNetworkRunner extends OptiMLApplication with NeuralNetworkTrainerSto
 		val outputFilename = args(5)
 
 		def checkForFileFormatErrors() = {
-			if(labels.numRows != trainingSet.numRows) {printError("Training set and labels files do not have matching number of rows. Training set rows: " + 
-											trainingSet.numRows + ". Number of label rows: " + labels.numRows + ". Each training example needs a matching label and vice versa!")}
-			if(genSet.numRows != genSetLabels.numRows) {printError("Generalization set and generalization set labels do not have the same number of rows. Set rows:" + 
-											genSet.numRows + ". Label rows: " + genSetLabels.numRows + ". Each generalization example needs a matching label and vice versa!")}
-			if(labels.numCols != genSetLabels.numCols) {printError("Error: The number of label columns in " + args(1) + " and the number of label columns in " + 
+			if(labels.numRows != trainingSet.numRows) {printError("Training set and labels files do not have matching number of rows. Training set rows: " ++ 
+											trainingSet.numRows ++ ". Number of label rows: " ++ labels.numRows ++ ". Each training example needs a matching label and vice versa!")}
+			if(genSet.numRows != genSetLabels.numRows) {printError("Generalization set and generalization set labels do not have the same number of rows. Set rows:" ++ 
+											genSet.numRows ++ ". Label rows: " ++ genSetLabels.numRows ++ ". Each generalization example needs a matching label and vice versa!")}
+			if(labels.numCols != genSetLabels.numCols) {printError("Error: The number of label columns in " ++ args(1) ++ " and the number of label columns in " ++ 
 											args(3) + " do not match." )}
 		}
 

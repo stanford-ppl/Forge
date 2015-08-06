@@ -154,11 +154,13 @@ def sbtBuildFileFooter(dsl):
   val testOptions = Seq("-Dtests.verbose="+System.getProperty("tests.verbose", "false"),
                         "-Dtests.threads="+System.getProperty("tests.threads", "1"),
                         "-Dtests.targets="+System.getProperty("tests.targets", "scala"))
-  val sbtTestOptions = sys.env.getOrElse("SBT_OPTS", "").split(" ").toSeq
+
+  // Test suites are run individually in different JVMs. Set TEST_JAVA_OPTS to configure JAVA_OPTS for each suite.
+  val testJavaOptions = sys.env.getOrElse("TEST_JAVA_OPTS", "").split(" ").toSeq
 
   def separateTests(tests: Seq[TestDefinition]) = {
     if (tests.isEmpty) Seq(new Group("", Seq(), SubProcess(Seq()))) //workaround for sbt crash on empty tests
-    else tests map { test => new Group(test.name, Seq(test), SubProcess(testOptions ++ sbtTestOptions)) }
+    else tests map { test => new Group(test.name, Seq(test), SubProcess(testOptions ++ testJavaOptions)) }
   }
 
   // build targets

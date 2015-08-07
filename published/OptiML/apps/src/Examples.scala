@@ -105,14 +105,6 @@ trait Example3 extends OptiMLApplication {
 // object Example4Interpreter extends OptiMLApplicationInterpreter with Example4
 @virtualize 
 trait Example4 extends OptiMLApplication {
-  implicit class StringOps2(s:Rep[String]) {
-    def ++(x:Rep[Any]): Rep[String] = ???
-    def ++[T](x:Var[T]): Rep[String] = ???
-  }
-  implicit def string2ops2(s:String) = StringOps2(unit(s))
-  //TR why need to repeat???
-
-
   def main() = {
     // a DenseVector[DenseVector[Double]]
     // 100 vectors, each containing 1000 random doubles
@@ -129,7 +121,7 @@ trait Example4 extends OptiMLApplication {
     while (i < v.length) {
       val vi = v(i)
       // always prints in order
-      println("first element of vector " ++ i ++ ": " ++ vi(0))
+      println("first element of vector " ^ i ^ ": " ^ vi(0))
       i += 1
     }
   }

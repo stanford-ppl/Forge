@@ -11,6 +11,7 @@
 
 import optiml.direct._
 
+// some missing framework bits
 trait OptiMLApplication extends optiml.direct.OptiMLApplication {
   def args: Rep[Array[String]]
   implicit class IntOps2(x:Int) {
@@ -19,23 +20,25 @@ trait OptiMLApplication extends optiml.direct.OptiMLApplication {
   //implicit def int2intRep(x:Int): Rep[Int] = unit(x)
   //implicit def int2doubleRep(x:Int): Rep[Double] = unit(x)
   implicit class StringOps2(s:Rep[String]) {
-    def ++(x:Rep[Any]): Rep[String] = ???
-    def ++[T](x:Var[T]): Rep[String] = ???
-    def ^(x:Rep[Any]): Rep[String] = ???
-    def ^[T](x:Var[T]): Rep[String] = ???
+    def ++(x:Rep[Any])(implicit o:Overload1): Rep[String] = ???
+    def ++[T](x:Var[T])(implicit o:Overload2): Rep[String] = ???
+    def ^(x:Rep[Any])(implicit o:Overload1): Rep[String] = ???
+    def ^[T](x:Var[T])(implicit o:Overload2): Rep[String] = ???
     def toInt: Rep[Int] = ???
   }
   implicit def string2ops(s:String) = StringOps2(unit(s))
   implicit class IntVarOps(s:Var[Int]) {
     def +=(x:Rep[Int]): Rep[Unit] = ???
+    def -=(x:Rep[Int]): Rep[Unit] = ???
   }
   implicit class DoubleVarOps(s:Var[Double]) {
     def +=(x:Rep[Double]): Rep[Unit] = ???
+    def -=(x:Rep[Double]): Rep[Unit] = ???
   }
   def infix_==(x:Rep[Any], y: Rep[Any]): Rep[Boolean] = ???
   def infix_!=(x:Rep[Any], y: Rep[Any]): Rep[Boolean] = ???
-  def __assign[T](x:Var[T], y: T): Rep[Unit] = ???
-  def __assign[T](x:Var[T], y: Rep[T]): Rep[Unit] = ???
+  def __assign[T](x:Var[T], y: T)(implicit o:Overload1): Rep[Unit] = ???
+  def __assign[T](x:Var[T], y: Rep[T])(implicit o:Overload2): Rep[Unit] = ???
 }
 
 import org.scala_lang.virtualized.virtualize  

@@ -1,10 +1,14 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-import scala.virtualization.lms.common.Record
+// import scala.virtualization.lms.common.Record
 
-object ScratchpadRunner extends OptiMLApplicationCompiler with Scratchpad
+// object ScratchpadRunner extends OptiMLApplicationCompiler with Scratchpad
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait Scratchpad extends OptiMLApplication {
 
   def parseRow(r_in: Rep[DenseVector[String]]): Rep[DenseVector[Double]] = {
@@ -25,12 +29,12 @@ trait Scratchpad extends OptiMLApplication {
     val t1 = time()
     val data = readMatrixAndParse[Double]("raw.dat", v => parseRow(v), "\\|")
     val t2 = time(data)
-    println("initial pass took " + (t2-t1)/1000.0 + "s")
+    println("initial pass took " ^ (t2-t1)/1000.0 ^ "s")
 
     val customers = data.groupRowsBy(row => row(0))
     val accounts = data.groupRowsBy(row => row(1))
     val t3 = time(customers, accounts)
-    println("computed hashes (" + (t3-t2)/1000.0 + "s)")
+    println("computed hashes (" ^ (t3-t2)/1000.0 ^ "s)")
 
     val features = accounts.toVector.map { account =>
       // account is looked up from the HashStream as a Rep[DenseMatrix[Double]] (the value in the bucket)
@@ -45,7 +49,7 @@ trait Scratchpad extends OptiMLApplication {
     }
 
     val t4 = time(features)
-    println("computed " + features.length + " feature vectors (" + (t4-t3)/1000.0 + "s)")
+    println("computed " ^ features.length ^ " feature vectors (" ^ (t4-t3)/1000.0 ^ "s)")
     writeMatrix(DenseMatrix(features), "features_inmem.dat", "|")
   }
 
@@ -55,20 +59,20 @@ trait Scratchpad extends OptiMLApplication {
     val raw = FileStream("raw.dat")
     val data = raw.mapRows("etl.dat", "\\|", "|") { v => parseRow(v) }
     val t2 = time(data)
-    println("initial pass took " + (t2-t1)/1000.0 + "s")
+    println("initial pass took " ^ (t2-t1)/1000.0 ^ "s")
 
     // There is some weirdness going in converting a double value to a string key here.
     // We need to use a canonical representation of the double, so we use Scala's (rather than
     // the formatted version we read from the file).
-    val customers = data.groupRowsBy("cust.hash", "\\|")(row => ""+row(0).toDouble, _.map(_.toDouble))
-    val accounts = data.groupRowsBy("accounts.hash", "\\|")(row => ""+row(1).toDouble, _.map(_.toDouble))
+    val customers = data.groupRowsBy("cust.hash", "\\|")(row => ""^row(0).toDouble, _.map(_.toDouble))
+    val accounts = data.groupRowsBy("accounts.hash", "\\|")(row => ""^row(1).toDouble, _.map(_.toDouble))
     val t3 = time(customers, accounts)
-    println("computed hashes (" + (t3-t2)/1000.0 + "s)")
+    println("computed hashes (" ^ (t3-t2)/1000.0 ^ "s)")
 
     val features = accounts.mapValues("features.dat", "|") { (acctId, account) =>
       // account is looked up from the HashStream as a Rep[DenseMatrix[Double]] (the value in the bucket)
       val custId = account(0, 0)
-      val customer = customers(""+custId)
+      val customer = customers(""^custId)
 
       DenseVector[Double](
         customer.getCol(2).min,
@@ -81,7 +85,7 @@ trait Scratchpad extends OptiMLApplication {
     accounts.close()
 
     val t4 = time(features)
-    println("computed feature vectors (" + (t4-t3)/1000.0 + "s)")
+    println("computed feature vectors (" ^ (t4-t3)/1000.0 ^ "s)")
   }
 
   def main() = {

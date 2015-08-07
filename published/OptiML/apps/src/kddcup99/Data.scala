@@ -1,9 +1,13 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-import scala.virtualization.lms.common.Record
+// import scala.virtualization.lms.common.Record
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait KDDCup99Data extends OptiMLApplication {
 	val NUM_FEATURES = 41
 
@@ -100,24 +104,24 @@ trait KDDCup99Data extends OptiMLApplication {
   lazy val num_access_files 					 = ContinuousFeature()
   lazy val num_outbound_cmds 					 = ContinuousFeature()
   lazy val count 											 = ContinuousFeature()
-  lazy val serror_rate 								 = ContinuousFeature(max = 100)
-  lazy val rerror_rate 								 = ContinuousFeature(max = 100)
-  lazy val same_srv_rate 							 = ContinuousFeature(max = 100)
-  lazy val diff_srv_rate 							 = ContinuousFeature(max = 100)
+  lazy val serror_rate 								 = ContinuousFeature(max = 100.0)
+  lazy val rerror_rate 								 = ContinuousFeature(max = 100.0)
+  lazy val same_srv_rate 							 = ContinuousFeature(max = 100.0)
+  lazy val diff_srv_rate 							 = ContinuousFeature(max = 100.0)
   lazy val srv_count 									 = ContinuousFeature()
-  lazy val srv_serror_rate 						 = ContinuousFeature(max = 100)
-  lazy val srv_rerror_rate 					   = ContinuousFeature(max = 100)
-  lazy val srv_diff_host_rate  				 = ContinuousFeature(max = 100)
+  lazy val srv_serror_rate 						 = ContinuousFeature(max = 100.0)
+  lazy val srv_rerror_rate 					   = ContinuousFeature(max = 100.0)
+  lazy val srv_diff_host_rate  				 = ContinuousFeature(max = 100.0)
   lazy val dst_host_count							 = ContinuousFeature()
   lazy val dst_host_srv_count					 = ContinuousFeature()
-  lazy val dst_host_same_srv_rate  		 = ContinuousFeature(max = 100)
-  lazy val dst_host_diff_srv_rate  		 = ContinuousFeature(max = 100)
-  lazy val dst_host_same_src_port_rate = ContinuousFeature(max = 100)
-  lazy val dst_host_srv_diff_host_rate = ContinuousFeature(max = 100)
-  lazy val dst_host_serror_rate  	 		 = ContinuousFeature(max = 100)
-  lazy val dst_host_srv_serror_rate  	 = ContinuousFeature(max = 100)
-  lazy val dst_host_rerror_rate  			 = ContinuousFeature(max = 100)
-  lazy val dst_host_srv_rerror_rate  	 = ContinuousFeature(max = 100)
+  lazy val dst_host_same_srv_rate  		 = ContinuousFeature(max = 100.0)
+  lazy val dst_host_diff_srv_rate  		 = ContinuousFeature(max = 100.0)
+  lazy val dst_host_same_src_port_rate = ContinuousFeature(max = 100.0)
+  lazy val dst_host_srv_diff_host_rate = ContinuousFeature(max = 100.0)
+  lazy val dst_host_serror_rate  	 		 = ContinuousFeature(max = 100.0)
+  lazy val dst_host_srv_serror_rate  	 = ContinuousFeature(max = 100.0)
+  lazy val dst_host_rerror_rate  			 = ContinuousFeature(max = 100.0)
+  lazy val dst_host_srv_rerror_rate  	 = ContinuousFeature(max = 100.0)
 
   def parseNetworkRow(row: Rep[DenseVectorView[String]]): Rep[DenseVector[Double]] = {
   	DenseVector[Double](
@@ -236,7 +240,7 @@ trait KDDCup99Data extends OptiMLApplication {
   def test(testSet: Rep[DenseTrainingSet[Double,Double]], classify: Rep[DenseVectorView[Double]] => Rep[Double], numSamples: Rep[Int]) = {
     // returns [TN, TP, FP, FN]
     sum(0, numSamples) { i =>
-      if (i > 0 && i % 10000 == 0) println("sample: " + i)
+      if (i > 0 && i % 10000 == 0) println("sample: " ^ i)
 
       val trueLabel = coarseLabel(testSet.labels.apply(i))
       val classifyLabel = classify(testSet(i))

@@ -1,10 +1,15 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-object kNNCompiler extends OptiMLApplicationCompiler with kNN
-object kNNInterpreter extends OptiMLApplicationInterpreter with kNN
+// object kNNCompiler extends OptiMLApplicationCompiler with kNN
+// object kNNInterpreter extends OptiMLApplicationInterpreter with kNN
 
+import optiml.direct._
+
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait kNN extends OptiMLApplication {
   def printUsage = {
     println("Usage: KNN <input data file> <held back ratio 0.0 -- 1.0>")
@@ -36,7 +41,7 @@ trait kNN extends OptiMLApplication {
     DenseTrainingSet(data1,labels)
   }
 
-  def KNNClassify[L:Manifest](data: Rep[DenseMatrix[Double]], labels: Rep[DenseVector[L]], inX: Rep[DenseVector[Double]], k:Rep[Int]) : Rep[L] = {
+  def KNNClassify[L:Typ](data: Rep[DenseMatrix[Double]], labels: Rep[DenseVector[L]], inX: Rep[DenseVector[Double]], k:Rep[Int]) : Rep[L] = {
     val kIndices = data.mapRowsToVector(row => dist(row, inX, EUC)).sortWithIndex._2.take(k)
     val kLabels = labels(kIndices).groupBy(i => i, i => i).toVector
     val maxIndex = kLabels.map(_.length).maxIndex
@@ -62,11 +67,11 @@ trait kNN extends OptiMLApplication {
         0
       }
       else {
-        println( "the classifier came back with:"+ classifyLabel + " the real answer is:" + testLabels(i))
+        println( "the classifier came back with:"^ classifyLabel ^ " the real answer is:" ^ testLabels(i))
         1
       }
     }
-    println("Total error rate:" + errCount/numTestVecs.toDouble)
-    println("Total error count:" + errCount)
+    println("Total error rate:" ^ errCount/numTestVecs.toDouble)
+    println("Total error count:" ^ errCount)
   }
 }

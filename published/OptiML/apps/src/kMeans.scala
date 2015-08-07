@@ -1,10 +1,15 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-object kMeansCompiler extends OptiMLApplicationCompiler with kMeans
-object kMeansInterpreter extends OptiMLApplicationInterpreter with kMeans
+// object kMeansCompiler extends OptiMLApplicationCompiler with kMeans
+// object kMeansInterpreter extends OptiMLApplicationInterpreter with kMeans
 
+import optiml.direct._
+
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait kMeans extends OptiMLApplication {
   def printUsage = {
     println("Usage: kmeans <input data file> [initmu data file]")
@@ -26,7 +31,7 @@ trait kMeans extends OptiMLApplication {
     val n = x.numFeatures
     val mu = if (args.length > 1) readMatrix(args(1)) else ((0::k, *) { i => x(randomInt(m)) })
 
-    println("m:"+m+",n:"+n+",numClusters:"+k+",mu.numRows:"+mu.numRows)
+    println("m:"^m^",n:"^n^",numClusters:"^k^",mu.numRows:"^mu.numRows)
 
     tic(mu)
 

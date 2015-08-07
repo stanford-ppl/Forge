@@ -19,11 +19,13 @@
  * 
  */
 
-import reflect.{Manifest, SourceContext}
-import scala.virtualization.lms.common.Record
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import reflect.{Manifest, SourceContext}
+// import scala.virtualization.lms.common.Record
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
 
 //
 //=============================================================================================
@@ -52,7 +54,7 @@ import optiml.shared._
  * Original code from http://code.google.com/p/python-mhd/
  *------------------------------------------------------------------------------
  */
-
+@virtualized
 trait DirectSolver extends OptiMLApplication { 
 
   type QuarticResult = Record{val r1: Double; val r2: Double; val r3: Double; val r4: Double; val nr12: Int; val nr34: Int}

@@ -19,19 +19,23 @@
  *
  */
 
-import reflect.{Manifest, SourceContext}
-import scala.virtualization.lms.common.Record
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import reflect.{Manifest, SourceContext}
+// import scala.virtualization.lms.common.Record
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-object MiniMSMCompiler extends OptiMLApplicationCompiler with Clarans {
-  val mTheo: Manifest[Theo] = manifest[Theo]
-}
-object MiniMSMInterpreter extends OptiMLApplicationInterpreter with Clarans {
-  val mTheo: Manifest[Theo] = manifest[Theo]
-}
+// object MiniMSMCompiler extends OptiMLApplicationCompiler with Clarans {
+//   val mTheo: Manifest[Theo] = manifest[Theo]
+// }
+// object MiniMSMInterpreter extends OptiMLApplicationInterpreter with Clarans {
+//   val mTheo: Manifest[Theo] = manifest[Theo]
+// }
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait Clarans extends OptiMLApplication with TheoData with DirectSolver {
   val verbose = true
 

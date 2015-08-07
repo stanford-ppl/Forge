@@ -1,10 +1,14 @@
-import optiml.compiler._
-import optiml.library._
-import optiml.shared._
+// import optiml.compiler._
+// import optiml.library._
+// import optiml.shared._
 
-object S3TestCompiler extends OptiMLApplicationCompiler with S3Test
-object S3TestInterpreter extends OptiMLApplicationInterpreter with S3Test
+// object S3TestCompiler extends OptiMLApplicationCompiler with S3Test
+// object S3TestInterpreter extends OptiMLApplicationInterpreter with S3Test
 
+import optiml.direct._
+import org.scala_lang.virtualized.virtualize  
+
+@virtualize
 trait S3Test extends OptiMLApplication {
 
   def main() = {

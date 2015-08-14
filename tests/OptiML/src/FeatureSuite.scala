@@ -31,6 +31,8 @@ trait Unique extends ForgeTestModule with OptiMLApplication {
 
     collect(ids.distinct.length == 1000)
     collect(names == reverseIds)
+
+    dumpUniqueMappings("test_unique_db_out")
     mkReport
   }
 }

@@ -319,9 +319,9 @@ trait StreamOps {
       $0.save(new KeyValue($1, $2, $3))
     })
 
-    compiler (DHashStream) ("dhash_put_all_internal", Nil, (DB, MArray(MString), MArray(MString), MArray(ByteBuffer), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
+    compiler (DHashStream) ("dhash_put_all_internal", Nil, (DB, MArray(MString), MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
       assert($1.length >= $4 && $2.length >= $4 && $3.length >= $4, "DHashStream putAll called with too small arrays")
-      val numThreads = 128
+      val numThreads: Int = System.getProperty("optiml.stream.dynamodb.threads","128").toInt
 
       val temp = new Array[java.util.ArrayList[KeyValue]](numThreads)
       for (t <- 0 until numThreads) {
@@ -329,7 +329,7 @@ trait StreamOps {
         var i = t * $4 / numThreads
         val end = (t+1) * $4 / numThreads
         while (i < end) {
-          temp(t).add(new KeyValue($1(i), $2(i), $3(i)))
+          temp(t).add(new KeyValue($1(i), $2(i), java.nio.ByteBuffer.wrap($3(i))))
           i += 1
         }
       }
@@ -414,7 +414,7 @@ trait StreamOps {
         dhash_get_all_internal(dhash_get_db_safe($self), $1)
       }
 
-      infix ("putAll") ((MArray(MString), MArray(MString), MArray(ByteBuffer), MInt) :: MUnit, effect = write(0)) implements composite ${
+      infix ("putAll") ((MArray(MString), MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = write(0)) implements composite ${
         dhash_put_all_internal(dhash_get_db_safe($self), $1, $2, $3, $4)
       }
 
@@ -696,10 +696,9 @@ trait StreamOps {
           // If there is a key present in the resulting map, there was at least 1 non-empty row mapping to it.
           val chunk = densevector_fromarray(a, true).filter(t => t._2.length > 0)
 
-          val serialized: Rep[DenseVector[ForgeArray[Byte]]] = chunk.map(t => serialize(t._2))
           val dbKeyPrefix: Rep[ForgeArray[String]] = chunk.map(t => t._1).toArray
-          val dbKeySuffix: Rep[ForgeArray[String]] = serialized.map(t => hashMatrixKeySuffix(t)).toArray
-          val dbValues: Rep[ForgeArray[ForgeArray[Byte]]] = serialized.toArray
+          val dbKeySuffix: Rep[ForgeArray[String]] = chunk.map(t => hashMatrixKeySuffix(serialize(t._2))).toArray
+          val dbValues: Rep[ForgeArray[ForgeArray[Byte]]] = chunk.map(t => serialize(t._2)).toArray
 
           // We seem to be getting write bandwidth on the logicalKeys of ~15MB/sec, while the Google benchmarks at
           // https://github.com/google/leveldb claim writes should be ~45MB/sec. This could be due to hardware, JNI,
@@ -722,11 +721,11 @@ trait StreamOps {
           ("valFunc", DenseVector(MString) ==> DenseVector(MDouble))
         )), DHashStream(DenseMatrix(MDouble)))) implements composite ${
 
-        def serialize(v: Rep[DenseVector[Double]]): Rep[java.nio.ByteBuffer] = {
+        def serialize(v: Rep[DenseVector[Double]]): Rep[ForgeArray[Byte]] = {
           val x = ByteBuffer(4+8*v.length)
           x.putInt(v.length)
           x.put(v.toArray, 0, v.length)
-          x.unsafeImmutable
+          x.unsafeImmutable.array
         }
 
         val hash = DHashStream[DenseMatrix[Double]](outTable, hashMatrixDeserializerD)
@@ -741,10 +740,9 @@ trait StreamOps {
         { (a: Rep[ForgeArray[Tup2[String,DenseVector[Double]]]]) =>
           
           val chunk = densevector_fromarray(a, true).filter(t => t._2.length > 0)
-          val serialized: Rep[DenseVector[java.nio.ByteBuffer]] = chunk.map(t => serialize(t._2))
           val dbKeyPrefix: Rep[ForgeArray[String]] = chunk.map(t => t._1).toArray
-          val dbKeySuffix: Rep[ForgeArray[String]] = serialized.map(t => hashMatrixKeySuffix(t.array)).toArray
-          val dbValues: Rep[ForgeArray[java.nio.ByteBuffer]] = serialized.toArray
+          val dbKeySuffix: Rep[ForgeArray[String]] = chunk.map(t => hashMatrixKeySuffix(serialize(t._2))).toArray
+          val dbValues: Rep[ForgeArray[ForgeArray[Byte]]] = chunk.map(t => serialize(t._2)).toArray
 
           hash.putAll(dbKeyPrefix, dbKeySuffix, dbValues, dbKeyPrefix.length)
         })

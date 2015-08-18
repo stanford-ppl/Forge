@@ -218,6 +218,7 @@ trait HashStreamWriteB extends ForgeTestModule with OptiMLApplication with Strea
     // Set stream chunk byteSize to be small, so that we test HashStreams with multiple chunks
     val p = System.getProperties()
     p.setProperty("optiml.stream.chunk.bytesize", "1e5") // 10KB
+    p.setProperty("optiml.stream.dynamodb.threads","4") // reduce concurrent threads to prevent exception on low throughput tables
     System.setProperties(p)
 
     // There is some weirdness going in converting a double value to a string key here.

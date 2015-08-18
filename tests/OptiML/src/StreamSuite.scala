@@ -70,7 +70,10 @@ trait StreamSuitePaths {
   val testMat3 = "test3.mat"
   val testHash1 = "test1.hash"
   val testHash2 = "test2.hash"
+  val testDHash1 = "test1"
+  val testDHash2 = "test2"
   val testHashStreamMat = "test_hash_stream.mat"
+  val testDHashStreamMat = "test_dhash_stream"
   val testHashInMemMat = "test_hash_inmem.mat"
 }
 
@@ -208,6 +211,34 @@ trait HashStreamWriteB extends ForgeTestModule with OptiMLApplication with Strea
     accounts.close()
   }
 
+  def writeDStream() = {
+    val raw = FileStream(testMat)
+    val data = raw.mapRows(testMat2, "\\|", "|") { v => DenseVector(v(0).toDouble, v(1).toDouble, v(5).toDouble, v(7).toDouble, v(9).toDouble) }
+
+    // Set stream chunk byteSize to be small, so that we test HashStreams with multiple chunks
+    val p = System.getProperties()
+    p.setProperty("optiml.stream.chunk.bytesize", "1e5") // 10KB
+    System.setProperties(p)
+
+    // There is some weirdness going in converting a double value to a string key here.
+    // We need to use a canonical representation of the double, so we use Scala's (rather than
+    // the formatted version we read from the file).
+    val customers = data.groupRowsByD(testDHash1, "\\|")(row => ""+row(0).toDouble, _.map(_.toDouble))
+    val accounts = data.groupRowsByD(testDHash2, "\\|")(row => ""+row(1).toDouble, _.map(_.toDouble))
+
+    val result = accounts.mapValues(testDHashStreamMat) { (acctId, account) =>
+      // account is looked up from the HashStream as a Rep[DenseMatrix[Double]] (the value in the bucket)
+      val custId = account(0, 0)
+      val customer = customers(""+custId)
+
+      DenseVector[Double](
+        customer.getCol(2).min,
+        customer.getCol(3).max,
+        customer.getCol(4).sort.sum
+      )
+    }
+  }
+
   def writeInMem() = {
     val data = readMatrixAndParse[Double](testMat, v => DenseVector(v(0).toDouble, v(1).toDouble, v(5).toDouble, v(7).toDouble, v(9).toDouble), "\\|")
 
@@ -231,6 +262,7 @@ trait HashStreamWriteB extends ForgeTestModule with OptiMLApplication with Strea
 
   def main() = {
     writeStream()
+    writeDStream()
     writeInMem()
 
     // setup - testing occurs in subsequent phases
@@ -245,14 +277,18 @@ trait HashStreamRead extends ForgeTestModule with OptiMLApplication with StreamS
   def main() = {
     val a = readMatrix(testHashStreamMat)
     val b = readMatrix(testHashInMemMat)
+    val c = readMatrix(testDHashStreamMat)
 
     // groupRowsBy is not guaranteed to maintain ordering of rows
     val sortedAIndices = IndexVector((0::a.numRows).sortBy(i => a(i).sum))
     val sortedBIndices = IndexVector((0::b.numRows).sortBy(i => b(i).sum))
+    val sortedCIndices = IndexVector((0::c.numRows).sortBy(i => c(i).sum))
     val sortedA = a(sortedAIndices)
     val sortedB = b(sortedBIndices)
+    val sortedC = c(sortedCIndices)
 
     collect(sortedA == sortedB)
+    collect(sortedB == sortedC)
     mkReport
   }
 }

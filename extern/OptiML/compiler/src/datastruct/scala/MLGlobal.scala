@@ -3,9 +3,12 @@ package optiml.compiler.datastruct.scala
 import java.io.{File,BufferedReader,FileReader,PrintWriter,BufferedWriter,FileWriter}
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.JavaConverters._
-
 import org.iq80.leveldb._
 import org.fusesource.leveldbjni.JniDBFactory._
+import annotation.meta.beanGetter
+import beans.BeanProperty
+import com.amazonaws.services.dynamodbv2.datamodeling._
+import java.nio.ByteBuffer
 import ppl.delite.runtime.Config
 
 /*
@@ -103,4 +106,16 @@ object MLGlobal {
     reverseIdentifierDB.close()
     reverseIdentifierDB = null
   }
+}
+
+
+@DynamoDBTable(tableName="default")
+case class KeyValue (
+  // meta annotations create java-style getter/setter and place the dynamodb annotation on the getter
+  @(DynamoDBHashKey @beanGetter) @BeanProperty var hashKey: String, // must be var for dynamo
+  @(DynamoDBRangeKey @beanGetter) @BeanProperty var rangeKey: String,
+  @(DynamoDBAttribute @beanGetter) @BeanProperty var value: ByteBuffer
+) {
+  def this() = this(null, null, null) // needed by dynamo to instantiate instances
+  def this(hashKey: String) = this(hashKey, null, null) //convenient to perform queries by hash-key
 }

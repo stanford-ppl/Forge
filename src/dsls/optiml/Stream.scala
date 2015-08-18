@@ -26,6 +26,7 @@ trait StreamOps {
 
   def importStreamOps() {
     importHashStreamOps()
+    importDHashStreamOps()
     importFileStreamOps()
     importComputeStreamOps()
   }
@@ -51,7 +52,6 @@ trait StreamOps {
 
     compiler (HashStream) ("hash_alloc_raw", V, (("table", MString), ("deserialize", (HashStream(V),MString) ==> V)) :: HashStream(V), effect = mutable) implements
       allocates(HashStream, ${$0}, "unit(null.asInstanceOf[org.iq80.leveldb.DB])", ${doLambda((t: Rep[Tup2[HashStream[V],String]]) => deserialize(t._1, t._2))})
-
 
     // -- code generated internal methods interface with the embedded db
 
@@ -112,12 +112,13 @@ trait StreamOps {
       $0.put($1, $2)
     })
 
-    compiler (HashStream) ("hash_put_all_internal", Nil, (LevelDB, MArray(MArray(MByte)), MArray(MArray(MByte)), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
-      assert($1.length >= $3 && $2.length >= $3, "HashStream putAll called with too small arrays")
+    compiler (HashStream) ("hash_put_all_internal", Nil, (LevelDB, MArray(MString), MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
+      assert($1.length >= $4 && $2.length >= $4 && $3.length >= $4, "HashStream putAll called with too small arrays")
       val batch = $0.createWriteBatch()
       var i = 0
-      while (i < $3) {
-        batch.put($1(i), $2(i))
+      while (i < $4) {
+        val key = ($1(i) + "\$HASH_LOGICAL_KEY_SEPARATOR" + $2(i)).getBytes
+        batch.put(key, $3(i))
         i += 1
       }
       $0.write(batch)
@@ -198,15 +199,14 @@ trait StreamOps {
         hash_get_all_internal(hash_get_db_safe($self), $1)
       }
 
-      infix ("putAll") ((MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = write(0)) implements composite ${
-        hash_put_all_internal(hash_get_db_safe($self), $1.map(_.getBytes), $2, $3)
+      infix ("putAll") ((MArray(MString), MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = write(0)) implements composite ${
+        hash_put_all_internal(hash_get_db_safe($self), $1, $2, $3, $4)
       }
 
       infix ("close") (Nil :: MUnit, effect = write(0)) implements single ${
         hash_close_internal(hash_get_db_safe($self))
         hash_set_db($self, unit(null.asInstanceOf[org.iq80.leveldb.DB]))
       }
-
 
       // -- bulk
 
@@ -254,9 +254,225 @@ trait StreamOps {
     }
   }
 
+  def importDHashStreamOps() {
+    val DHashStream = lookupTpe("DHashStream")
+    val FileStream = lookupTpe("FileStream")
+    val DenseVector = lookupTpe("DenseVector")
+    val ByteBuffer = tpe("java.nio.ByteBuffer")
+    val Tup2 = lookupTpe("Tup2")
+    val V = tpePar("V")
+    val R = tpePar("R")
+
+    val DB = tpe("com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper")
+    primitiveTpePrefix ::= "com.amazonaws"
+
+    data(DHashStream, ("_table", MString), ("_db", DB), ("_deserialize", MLambda(Tup2(DHashStream(V),MString), V)))
+
+    static (DHashStream) ("apply", V, (("table", MString), ("deserialize", (DHashStream(V),MString) ==> V)) :: DHashStream(V), effect = mutable) implements composite ${
+      val hash = dhash_alloc_raw[V](table, deserialize)
+      hash.open()
+      hash
+    }
+
+    compiler (DHashStream) ("dhash_alloc_raw", V, (("table", MString), ("deserialize", (DHashStream(V),MString) ==> V)) :: DHashStream(V), effect = mutable) implements
+      allocates(DHashStream, ${$0}, "unit(null.asInstanceOf[com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper])", ${doLambda((t: Rep[Tup2[DHashStream[V],String]]) => deserialize(t._1, t._2))})
+
+    // -- code generated internal methods interface with the embedded db
+
+    // We use simple effects in lieu of read / write effects because these are codegen nodes,
+    // so we cannot pass the struct to them (a limitation of Forge at the moment).
+
+    compiler (DHashStream) ("dhash_open_internal", Nil, MString :: DB, effect = simple) implements codegen($cala, ${
+      import com.amazonaws.services.dynamodbv2._
+      import com.amazonaws.services.dynamodbv2.datamodeling._
+
+      val client = new AmazonDynamoDBClient()
+      client.configureRegion(com.amazonaws.regions.Regions.US_WEST_2) //TODO: should be user configurable somehow
+      //TODO: need to create table if it doesn't exist, configure throughput, etc.
+      val config = new DynamoDBMapperConfig(DynamoDBMapperConfig.DEFAULT, new DynamoDBMapperConfig(DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement($0)))
+      val db = new DynamoDBMapper(client, config)
+      db
+    })
+
+    compiler (DHashStream) ("dhash_contains_internal", Nil, (DB, MString) :: MBoolean, effect = simple) implements codegen($cala, ${    
+      val query = (new com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression).withHashKeyValues(new KeyValue($1)).withSelect("COUNT").withLimit(1)
+      $0.queryPage(classOf[KeyValue], query).getCount > 0
+    })
+ 
+    compiler (DHashStream) ("dhash_get_internal", Nil, (DB, MString, MString) :: ByteBuffer, effect = simple) implements codegen($cala, ${
+      $0.load(classOf[KeyValue], $1, $2).value
+    })
+
+    compiler (DHashStream) ("dhash_get_all_internal", Nil, (DB, MString) :: MArray(ByteBuffer), effect = simple) implements codegen($cala, ${
+      val list = $0.query(classOf[KeyValue], (new com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression).withHashKeyValues(new KeyValue($1)))
+      val res = new Array[java.nio.ByteBuffer](list.size)
+      var i = 0
+      var iter = list.iterator
+      while (i < list.size) {
+        res(i) = iter.next.value
+        i += 1
+      }
+      res
+    })
+
+    compiler (DHashStream) ("dhash_put_internal", Nil, (DB, MString, MString, ByteBuffer) :: MUnit, effect = simple) implements codegen($cala, ${
+      $0.save(new KeyValue($1, $2, $3))
+    })
+
+    compiler (DHashStream) ("dhash_put_all_internal", Nil, (DB, MArray(MString), MArray(MString), MArray(ByteBuffer), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
+      assert($1.length >= $4 && $2.length >= $4 && $3.length >= $4, "DHashStream putAll called with too small arrays")
+      val numThreads = 128
+
+      val temp = new Array[java.util.ArrayList[KeyValue]](numThreads)
+      for (t <- 0 until numThreads) {
+        temp(t) = new java.util.ArrayList[KeyValue]()
+        var i = t * $4 / numThreads
+        val end = (t+1) * $4 / numThreads
+        while (i < end) {
+          temp(t).add(new KeyValue($1(i), $2(i), $3(i)))
+          i += 1
+        }
+      }
+
+      val threads = new Array[Thread](numThreads)
+      for (t <- 0 until numThreads) {
+        val thread = new Thread( new Runnable {
+          def run() = {
+            val failures = $0.batchSave(temp(t))
+            if (!failures.isEmpty) throw failures.get(0).getException
+          }
+        })
+        thread.start()
+        threads(t) = thread
+      }
+      for (t <- 0 until numThreads) { threads(t).join() }
+
+      ()
+    })
+
+    compiler (DHashStream) ("dhash_keys_internal", Nil, DB :: MArray(MString)) implements codegen($cala, ${
+      val buf = new scala.collection.mutable.HashSet[String]
+      
+      val scan = (new com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression).withProjectionExpression("hashKey")
+      val result = $0.parallelScan(classOf[KeyValue], scan, 16)
+      val iter = result.iterator
+      while (iter.hasNext) {
+        buf += iter.next.hashKey
+      }
+      buf.toArray
+    })
+
+    // --
+
+    val DHashStreamOps = withTpe(DHashStream)
+    DHashStreamOps {
+      compiler ("dhash_deserialize") (Nil :: MLambda(Tup2(DHashStream(V),MString), V)) implements getter(0, "_deserialize")
+      compiler ("dhash_table_name") (Nil :: MString) implements getter(0, "_table")
+      compiler ("dhash_get_db") (Nil :: DB) implements getter(0, "_db")
+      compiler ("dhash_set_db") (DB :: MUnit, effect = write(0)) implements setter(0, "_db", ${$1})
+
+      compiler ("dhash_get_db_safe") (Nil :: DB) implements composite ${
+        val db = dhash_get_db($self)
+        fassert(db != null, "No DB opened in DHashStream")
+        db
+      }
+
+      infix ("open") (Nil :: MUnit, effect = write(0)) implements single ${
+        val table = dhash_table_name($self)
+        val db = dhash_open_internal(table)
+        dhash_set_db($self, db)
+      }
+
+      infix ("apply") (MString :: V) implements composite ${
+        val lambda = dhash_deserialize($self)
+        doApply(lambda, pack(($self,$1)))
+      }
+
+      //TODO: can we reconcile the type signatures for the different DHashStream apis 
+      //e.g., need to pick either Array[Byte] or ByteBuffer, etc.
+
+      // This may be too inefficient, since a subsequent get has to hit the hash again.
+      // However, if it's cached, it should be fine.
+      infix ("contains") (MString :: MBoolean) implements single ${
+        dhash_contains_internal(dhash_get_db_safe($self), $1)
+      }
+
+      infix ("keys") (Nil :: MArray(MString)) implements single ${
+        dhash_keys_internal(dhash_get_db_safe($self))
+      }
+
+      infix ("get") ((MString, MString) :: ByteBuffer) implements single ${
+        dhash_get_internal(dhash_get_db_safe($self), $1, $2)
+      }
+
+      infix ("put") ((MString, MString, ByteBuffer) :: MUnit, effect = write(0)) implements single ${
+        dhash_put_internal(dhash_get_db_safe($self), $1, $2, $3)
+      }
+
+      //get all values associated with the supplied logical key (prefix)
+      infix ("getAll") (MString :: MArray(ByteBuffer)) implements single ${
+        dhash_get_all_internal(dhash_get_db_safe($self), $1)
+      }
+
+      infix ("putAll") ((MArray(MString), MArray(MString), MArray(ByteBuffer), MInt) :: MUnit, effect = write(0)) implements composite ${
+        dhash_put_all_internal(dhash_get_db_safe($self), $1, $2, $3, $4)
+      }
+
+      infix ("close") (Nil :: MUnit, effect = write(0)) implements single ${
+        dhash_set_db($self, unit(null.asInstanceOf[com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper]))
+      }
+
+
+      // -- bulk
+
+      infix ("mapValues") (CurriedMethodSignature(List(
+        List(
+          ("outFile", MString),
+          ("outDelim", MString, "unit(\"    \")") // output delimiter is an ordinary string
+        ),
+        List(
+          ("func", (MString,V) ==> DenseVector(R))
+        )), FileStream), TStringable(R), addTpePars = R) implements composite ${
+
+        // Delete destination if it exists
+        deleteFile(outFile)
+
+        // This requires 2 passes (one to get the keys, the next to process the values),
+        // because we cannot call our deserialize function from within a codegen method.
+        val lambda = dhash_deserialize($self)
+        val keys = $self.keys
+
+        // Performance is particularly sensitive to chunkSize because currently this function is very susceptible to load
+        // balance issues (i.e. some keys are associated with much more data and therefore execution time). We should address
+        // this by computing key sizes ahead-of-time and then splitting the work in a more balanced way.
+        val chunkSize = 10000000 // getting better results with a constant, for now. this is highly dependent on the application.
+        // val chunkSize = (getChunkByteSize / 1000).toInt // number of keys to process in parallel. assume each key holds ~1KB.
+
+        val numChunks = ceil(keys.length.toDouble / chunkSize)
+        var i = 0
+        var keysProcessed = 0
+        while (i < numChunks) {
+          // process remainder if we're the last chunk
+          val processSize: Rep[Int] = if (i == numChunks - 1) keys.length - keysProcessed else chunkSize
+          val vecs = array_fromfunction(processSize, i => func(keys(keysProcessed+i), doApply(lambda, pack(($self,keys(keysProcessed+i))))))
+          val writeArray = array_filter(vecs, (e: Rep[DenseVector[R]]) => e.length > 0)
+          ForgeFileWriter.writeLines(outFile, writeArray.length, append = true) { i =>
+            val v = writeArray(i)
+            array_mkstring(v.toArray, outDelim)
+          }
+          keysProcessed += chunkSize
+          i += 1
+        }
+
+        FileStream(outFile)
+      }
+    }
+  }
+
   def importFileStreamOps() {
     val FileStream = lookupTpe("FileStream")
     val HashStream = lookupTpe("HashStream")
+    val DHashStream = lookupTpe("DHashStream")
     val DenseVector = lookupTpe("DenseVector")
     val DenseMatrix = lookupTpe("DenseMatrix")
 
@@ -282,7 +498,8 @@ trait StreamOps {
         val rowArray = rows(i)
         val rowBuffer = ByteBufferWrap(rowArray)
         val numCols = rowBuffer.getInt()
-        fassert(numCols0 == numCols, "hashMatrixDeserializer: expected " + numCols0 + " cols, but found " + numCols)
+
+        fassert(numCols0 == numCols, "hashMatrixDeserializer: expected " + numCols0 + " cols for row " + i + ", but found " + numCols)
         val dst = densematrix_raw_data(out).unsafeMutable // array_update gets rewritten, but not the write below
         rowBuffer.unsafeImmutable.get(dst, i*numCols, numCols) // write directly to underlying matrix
         i += 1
@@ -291,12 +508,32 @@ trait StreamOps {
       out.unsafeImmutable
     }
 
-    // Create a lexicographically ordered key with the given prefix; the key suffix will be unique for every call
-    compiler (FileStream) ("hashMatrixNewKey", Nil, (MString, MInt) :: MString) implements codegen($cala, ${
-      val uniqueId = new java.rmi.server.UID() //globally unique value on every call: machine + timestamp + counter
-      //TODO: we could make smaller keys by serializing uniqueId as multiple ints rather than a string, but not sure if leveldb can handle null bytes in the middle of keys
-      //we currently don't use the row index as part of the key generation, but still require it as a formal input to prevent unsafe code motion
-      ($0 + "\$HASH_LOGICAL_KEY_SEPARATOR" + uniqueId.toString)
+    direct (FileStream) ("hashMatrixDeserializerD", Nil, (("hash", DHashStream(DenseMatrix(MDouble))), ("k", MString)) :: DenseMatrix(MDouble)) implements composite ${
+      val rows = hash.getAll(k)
+      val numRows = rows.length
+      val rowBuffer = rows(0)
+      val numCols0 = rowBuffer.getInt()
+
+      val out = DenseMatrix[Double](numRows, numCols0)
+      val dst = densematrix_raw_data(out).unsafeMutable // array_update gets rewritten, but not the write below
+      rowBuffer.unsafeImmutable.get(dst, 0, numCols0) // write directly to underlying matrix
+
+      var i = 1
+      while (i < numRows) {
+        val rowBuffer = rows(i)
+        val numCols = rowBuffer.getInt()
+        fassert(numCols0 == numCols, "hashMatrixDeserializer: expected " + numCols0 + " cols, but found " + numCols)
+        rowBuffer.unsafeImmutable.get(dst, i*numCols, numCols) 
+        i += 1
+      }
+
+      out.unsafeImmutable
+    }
+
+    // Create a unique key suffix for the given record
+    compiler (FileStream) ("hashMatrixKeySuffix", Nil, MArray(MByte) :: MString) implements codegen($cala, ${
+      val uniqueId = com.google.common.hash.Hashing.murmur3_128.hashBytes($0)
+      uniqueId.toString
     })
 
     // --
@@ -459,14 +696,57 @@ trait StreamOps {
           // If there is a key present in the resulting map, there was at least 1 non-empty row mapping to it.
           val chunk = densevector_fromarray(a, true).filter(t => t._2.length > 0)
 
-          // int argument to hashMatrixNewKey is currently not being used (see comment @ hashMatrixNewKey definition)
-          val dbKeys: Rep[ForgeArray[String]] = chunk.indices.map(i => hashMatrixNewKey(chunk(i)._1, i)).toArray
-          val dbValues: Rep[ForgeArray[ForgeArray[Byte]]] = chunk.map(t => serialize(t._2)).toArray
+          val serialized: Rep[DenseVector[ForgeArray[Byte]]] = chunk.map(t => serialize(t._2))
+          val dbKeyPrefix: Rep[ForgeArray[String]] = chunk.map(t => t._1).toArray
+          val dbKeySuffix: Rep[ForgeArray[String]] = serialized.map(t => hashMatrixKeySuffix(t)).toArray
+          val dbValues: Rep[ForgeArray[ForgeArray[Byte]]] = serialized.toArray
 
           // We seem to be getting write bandwidth on the logicalKeys of ~15MB/sec, while the Google benchmarks at
           // https://github.com/google/leveldb claim writes should be ~45MB/sec. This could be due to hardware, JNI,
           // or the Java driver.
-          hash.putAll(dbKeys, dbValues, dbKeys.length)
+          hash.putAll(dbKeyPrefix, dbKeySuffix, dbValues, dbKeyPrefix.length)
+        })
+
+        hash
+      }
+
+      //TODO: unfortunate duplication for HashStream variants
+      infix ("groupRowsByD") (CurriedMethodSignature(List(
+        List(
+          ("outTable", MString),
+          ("delim", MString, "unit(\"\\s+\")")   // input delimiter is a regular expression
+          //("appendToHash", MBoolean, "unit(false)")
+        ),
+        List(
+          ("keyFunc", DenseVector(MString) ==> MString),
+          ("valFunc", DenseVector(MString) ==> DenseVector(MDouble))
+        )), DHashStream(DenseMatrix(MDouble)))) implements composite ${
+
+        def serialize(v: Rep[DenseVector[Double]]): Rep[java.nio.ByteBuffer] = {
+          val x = ByteBuffer(4+8*v.length)
+          x.putInt(v.length)
+          x.put(v.toArray, 0, v.length)
+          x.unsafeImmutable
+        }
+
+        val hash = DHashStream[DenseMatrix[Double]](outTable, hashMatrixDeserializerD)
+
+        processFileChunks($self, { line =>
+          val tokens: Rep[ForgeArray[String]] = line.trim.fsplit(delim, -1) // we preserve trailing empty values
+          val tokenVector: Rep[DenseVector[String]] = densevector_fromarray(tokens, true)
+          val key: Rep[String] = keyFunc(tokenVector)
+          val value: Rep[DenseVector[Double]] = valFunc(tokenVector)
+          pack((key, value))
+        },
+        { (a: Rep[ForgeArray[Tup2[String,DenseVector[Double]]]]) =>
+          
+          val chunk = densevector_fromarray(a, true).filter(t => t._2.length > 0)
+          val serialized: Rep[DenseVector[java.nio.ByteBuffer]] = chunk.map(t => serialize(t._2))
+          val dbKeyPrefix: Rep[ForgeArray[String]] = chunk.map(t => t._1).toArray
+          val dbKeySuffix: Rep[ForgeArray[String]] = serialized.map(t => hashMatrixKeySuffix(t.array)).toArray
+          val dbValues: Rep[ForgeArray[java.nio.ByteBuffer]] = serialized.toArray
+
+          hash.putAll(dbKeyPrefix, dbKeySuffix, dbValues, dbKeyPrefix.length)
         })
 
         hash

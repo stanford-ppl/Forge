@@ -32,6 +32,7 @@ trait OptiMLDSL extends OptiLADSL
     val V = tpePar("V")
     val T = tpePar("T")
     val HashStream = tpe("HashStream", V)
+    val DHashStream = tpe("DHashStream", V)
     val FileStream = tpe("FileStream")
     val ComputeStream = tpe("ComputeStream", T)
 

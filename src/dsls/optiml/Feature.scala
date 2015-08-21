@@ -131,6 +131,17 @@ trait FeatureOps {
       $0.getDayOfWeek()
     })
 
+    compiler (DateFeature) ("dt_internal_days_between", Nil, (SDateTime, SDateTime) :: MInt) implements codegen($cala, ${
+      org.joda.time.Days.daysBetween($0.toLocalDate(), $1.toLocalDate()).getDays()
+    })
+
+    compiler (DateFeature) ("dt_internal_months_between", Nil, (SDateTime, SDateTime) :: MInt) implements codegen($cala, ${
+      org.joda.time.Months.monthsBetween($0.toLocalDate(), $1.toLocalDate()).getMonths()
+    })
+
+    compiler (DateFeature) ("dt_internal_years_between", Nil, (SDateTime, SDateTime) :: MInt) implements codegen($cala, ${
+      org.joda.time.Years.yearsBetween($0.toLocalDate(), $1.toLocalDate()).getYears()
+    })
 
     // User-facing DateTime operations.
 
@@ -159,6 +170,18 @@ trait FeatureOps {
     static (DateFeature) ("weekday", Nil, MDouble :: MInt) implements composite ${
       val dt = dt_internal($0)
       dt_internal_weekday(dt)
+    }
+
+    static (DateFeature) ("daysBetween", Nil, (MDouble, MDouble) :: MInt) implements composite ${
+      dt_internal_days_between(dt_internal($0), dt_internal($1))
+    }
+
+    static (DateFeature) ("monthsBetween", Nil, (MDouble, MDouble) :: MInt) implements composite ${
+      dt_internal_months_between(dt_internal($0), dt_internal($1))
+    }
+
+    static (DateFeature) ("yearsBetween", Nil, (MDouble, MDouble) :: MInt) implements composite ${
+      dt_internal_years_between(dt_internal($0), dt_internal($1))
     }
   }
 

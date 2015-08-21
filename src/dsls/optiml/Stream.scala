@@ -137,11 +137,10 @@ trait StreamOps {
 
       while (iterator.hasNext) {
         val dbKey = new String(iterator.next.getKey)
-        val sepIndex = dbKey.indexOf("\$HASH_LOGICAL_KEY_SEPARATOR")
-        val key = if (sepIndex != -1) dbKey.substring(0, sepIndex) else dbKey
-
-        if ((lastKey eq null) || (key != lastKey)) {
-          lastKey = key
+        if ((lastKey eq null) || !dbKey.startsWith(lastKey)) {
+          val sepIndex = dbKey.indexOf("\$HASH_LOGICAL_KEY_SEPARATOR")
+          val key = if (sepIndex != -1) dbKey.substring(0, sepIndex) else dbKey
+          lastKey = key + "\$HASH_LOGICAL_KEY_SEPARATOR" // only skip logical keys
           buf += key
         }
       }
@@ -566,7 +565,7 @@ trait StreamOps {
         f.close()
       }
 
-      compiler ("processFileChunks") (MethodSignature(List(("readFunc", MString ==> R), ("processFunc", MArray(R) ==> MUnit), ("chunkSize", MLong, "filestream_getchunkbytesize()")), MUnit), addTpePars = R) implements composite ${
+      infix ("processFileChunks") (MethodSignature(List(("readFunc", MString ==> R), ("processFunc", MArray(R) ==> MUnit), ("chunkSize", MLong, "filestream_getchunkbytesize()")), MUnit), addTpePars = R) implements composite ${
         val f = ForgeFileInputStream($self.path)
         val totalSize = f.size
         f.close()
@@ -602,7 +601,7 @@ trait StreamOps {
         // Delete destination if it exists
         deleteFile(outFile)
 
-        processFileChunks($self, func, { (a: Rep[ForgeArray[String]]) =>
+        $self.processFileChunks(func, { (a: Rep[ForgeArray[String]]) =>
           if (!preserveOrder) {
             // This only makes sense if the order of the writes doesn't matter, since we are striping each chunk across the
             // different output files. Therefore when they are reconstructed, output file 0 will have elements from all chunks,
@@ -634,7 +633,7 @@ trait StreamOps {
           ("func", DenseVector(MString) ==> DenseVector(R))
         )), FileStream), TStringable(R), addTpePars = R) implements composite ${
 
-        $self.map(outFile) { line =>
+        $self.map(outFile, preserveOrder = true) { line =>
           val tokens: Rep[ForgeArray[String]] = line.trim.fsplit(inDelim, -1) // we preserve trailing empty values
           val tokenVector: Rep[DenseVector[String]] = densevector_fromarray(tokens, true)
           // val outRow: Rep[DenseVector[String]] = func(tokenVector) map { e => e.makeStr }
@@ -676,7 +675,7 @@ trait StreamOps {
         }
         val hash = HashStream[DenseMatrix[Double]](outTable, hashMatrixDeserializer)
 
-        processFileChunks($self, { line =>
+        $self.processFileChunks({ line =>
           val tokens: Rep[ForgeArray[String]] = line.trim.fsplit(delim, -1) // we preserve trailing empty values
           val tokenVector: Rep[DenseVector[String]] = densevector_fromarray(tokens, true)
           val key: Rep[String] = keyFunc(tokenVector)
@@ -753,7 +752,7 @@ trait StreamOps {
       infix ("reduce") (CurriedMethodSignature(List(List(("zero", T)), List(("func", MString ==> T)), List(("rfunc", (T,T) ==> T))), T), addTpePars = T) implements composite ${
         var acc = zero
 
-        processFileChunks($self, line => func(line), { (a: Rep[ForgeArray[T]]) =>
+        $self.processFileChunks(line => func(line), { (a: Rep[ForgeArray[T]]) =>
           val reduced = array_reduce(a, rfunc, zero)
           acc = rfunc(acc, reduced)
         })

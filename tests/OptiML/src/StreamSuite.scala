@@ -99,7 +99,7 @@ trait FileStreamWriteB extends ForgeTestModule with OptiMLApplication with Strea
       val v = (0::tokens.length) { i => tokens(i).toDouble }
       (v+1).makeStr
     }
-    val h = f.map(testMat3, chunkSize = 100000) { line =>
+    val h = f.map(testMat3, preserveOrder = true, chunkSize = 1000) { line =>
       val tokens = line.trim.fsplit("\\s+")
       val v = (0::tokens.length) { i => tokens(i).toDouble }
       (v+1).makeStr
@@ -194,6 +194,14 @@ trait HashStreamWriteB extends ForgeTestModule with OptiMLApplication with Strea
     // the formatted version we read from the file).
     val customers = data.groupRowsBy(testHash1, "\\|")(row => ""+row(0).toDouble, _.map(_.toDouble))
     val accounts = data.groupRowsBy(testHash2, "\\|")(row => ""+row(1).toDouble, _.map(_.toDouble))
+
+    val custKeys = DenseVector(customers.keys, false).map(s => s.toDouble)
+    val refCustKeys = readMatrix(testMat, "\\|").mapRowsToVector(r => r(0)).distinct
+    collect(sum(abs(custKeys.sort - refCustKeys.sort)) < 0.1)
+
+    val acctKeys = DenseVector(accounts.keys, false).map(s => s.toDouble)
+    val refAcctKeys = readMatrix(testMat, "\\|").mapRowsToVector(r => r(1)).distinct
+    collect(sum(abs(acctKeys.sort - refAcctKeys.sort)) < 0.1)
 
     val result = accounts.mapValues(testHashStreamMat) { (acctId, account) =>
       // account is looked up from the HashStream as a Rep[DenseMatrix[Double]] (the value in the bucket)

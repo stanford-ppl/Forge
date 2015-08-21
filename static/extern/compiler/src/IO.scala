@@ -51,8 +51,8 @@ trait InputOutputOpsExp extends DeliteFileReaderOpsExp with DeliteFileWriterOpsE
   type ForgeFileOutputStream = DeliteFileOutputStream
   implicit def forgeOutputStreamManifest = manifest[ForgeFileOutputStream]
 
-  def forge_fileoutputstream_new(path: Rep[String], append: Rep[Boolean])(implicit ctx: SourceContext): Rep[ForgeFileOutputStream] = {
-    dfos_new(path, append) // single-threaded / single-file
+  def forge_fileoutputstream_new(path: Rep[String], _append: Rep[Boolean])(implicit ctx: SourceContext): Rep[ForgeFileOutputStream] = {
+    dfos_new(path, append = _append) // single-threaded / single-file
   }
 
   def forge_fileoutputstream_writeline(stream: Rep[ForgeFileOutputStream], line: Rep[String])(implicit ctx: SourceContext): Rep[Unit] = {

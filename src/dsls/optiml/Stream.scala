@@ -293,11 +293,11 @@ trait StreamOps {
       db
     })
 
-    compiler (DHashStream) ("dhash_contains_internal", Nil, (DB, MString) :: MBoolean, effect = simple) implements codegen($cala, ${    
+    compiler (DHashStream) ("dhash_contains_internal", Nil, (DB, MString) :: MBoolean, effect = simple) implements codegen($cala, ${
       val query = (new com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression).withHashKeyValues(new KeyValue($1)).withSelect("COUNT").withLimit(1)
       $0.queryPage(classOf[KeyValue], query).getCount > 0
     })
- 
+
     compiler (DHashStream) ("dhash_get_internal", Nil, (DB, MString, MString) :: ByteBuffer, effect = simple) implements codegen($cala, ${
       $0.load(classOf[KeyValue], $1, $2).value
     })
@@ -351,7 +351,7 @@ trait StreamOps {
 
     compiler (DHashStream) ("dhash_keys_internal", Nil, DB :: MArray(MString)) implements codegen($cala, ${
       val buf = new scala.collection.mutable.HashSet[String]
-      
+
       val scan = (new com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression).withProjectionExpression("hashKey")
       val result = $0.parallelScan(classOf[KeyValue], scan, 16)
       val iter = result.iterator
@@ -387,7 +387,7 @@ trait StreamOps {
         doApply(lambda, pack(($self,$1)))
       }
 
-      //TODO: can we reconcile the type signatures for the different DHashStream apis 
+      //TODO: can we reconcile the type signatures for the different DHashStream apis
       //e.g., need to pick either Array[Byte] or ByteBuffer, etc.
 
       // This may be too inefficient, since a subsequent get has to hit the hash again.
@@ -522,7 +522,7 @@ trait StreamOps {
         val rowBuffer = rows(i)
         val numCols = rowBuffer.getInt()
         fassert(numCols0 == numCols, "hashMatrixDeserializer: expected " + numCols0 + " cols, but found " + numCols)
-        rowBuffer.unsafeImmutable.get(dst, i*numCols, numCols) 
+        rowBuffer.unsafeImmutable.get(dst, i*numCols, numCols)
         i += 1
       }
 
@@ -729,7 +729,7 @@ trait StreamOps {
 
         val hash = DHashStream[DenseMatrix[Double]](outTable, hashMatrixDeserializerD)
 
-        processFileChunks($self, { line =>
+        $self.processFileChunks({ line =>
           val tokens: Rep[ForgeArray[String]] = line.trim.fsplit(delim, -1) // we preserve trailing empty values
           val tokenVector: Rep[DenseVector[String]] = densevector_fromarray(tokens, true)
           val key: Rep[String] = keyFunc(tokenVector)
@@ -737,7 +737,7 @@ trait StreamOps {
           pack((key, value))
         },
         { (a: Rep[ForgeArray[Tup2[String,DenseVector[Double]]]]) =>
-          
+
           val chunk = densevector_fromarray(a, true).filter(t => t._2.length > 0)
           val dbKeyPrefix: Rep[ForgeArray[String]] = chunk.map(t => t._1).toArray
           val dbKeySuffix: Rep[ForgeArray[String]] = chunk.map(t => hashMatrixKeySuffix(serialize(t._2))).toArray

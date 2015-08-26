@@ -3,8 +3,8 @@ import optiml.shared._
 import optiml.library._
 import ppl.tests.scalatest._
 
-object NormalizationRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Normalization
-object NormalizationRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Normalization
+object NormalizationRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Normalization
+object NormalizationRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Normalization
 
 trait Normalization extends ForgeTestModule with OptiMLApplication {
   def main() = {

@@ -15,7 +15,8 @@ trait DeliteGenPackages extends BaseGenPackages {
   import IR._
 
   def emitApplicationRunner(stream: PrintWriter) {
-    stream.println("trait " + dsl + "ApplicationCompiler extends " + dsl + "Application with DeliteApplication with " + dsl+"Exp")
+    stream.println("trait " + dsl + "ApplicationCompilerTrait extends " + dsl + "Application with DeliteApplication with " + dsl+"Exp")
+    stream.println("abstract class " + dsl + "ApplicationCompiler extends " + dsl + "Application with DeliteApplication with " + dsl+"Exp")
   }
 
   def targetName(g: CodeGenerator) = g match {
@@ -48,7 +49,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     // NOTE: this currently only works in Delite mode. Is there a way to use scopes and still
     // delegate to a different implementation for interpreter mode?
     stream.println("trait " + dsl + "Interactive extends " + dsl + "Application with DeliteInteractive")
-    stream.println("trait " + dsl + "InteractiveRunner[R] extends " + dsl + "ApplicationCompiler with DeliteInteractiveRunner[R]")
+    stream.println("trait " + dsl + "InteractiveRunner[R] extends " + dsl + "ApplicationCompilerTrait with DeliteInteractiveRunner[R]")
     stream.println()
     stream.println("// executes scope immediately")
     stream.println("object " + dsl + " {")
@@ -56,7 +57,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("}")
     stream.println()
     stream.println("trait " + dsl + "Lower extends " + dsl + "Application with DeliteRestageOps")
-    stream.println("trait " + dsl + "LowerRunner[R] extends " + dsl + "ApplicationCompiler with DeliteRestageRunner[R]")
+    stream.println("trait " + dsl + "LowerRunner[R] extends " + dsl + "ApplicationCompilerTrait with DeliteRestageRunner[R]")
     stream.println()
     stream.println("// stages scope and generates re-stageable code")
     stream.println("object " + dsl + "_ {")
@@ -82,7 +83,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     // be written for them, as they will have no effect. Any way to check this?
 
     if (OpsGrp.keySet.exists(_.name == "Primitive")) {
-      stream.println("  override def primitive_forge_int_plus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_plus(__arg0, __arg1)")  
+      stream.println("  override def primitive_forge_int_plus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_plus(__arg0, __arg1)")
       stream.println("  override def primitive_forge_int_minus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_minus(__arg0, __arg1)")
       stream.println("  override def primitive_forge_int_times(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_times(__arg0, __arg1)")
       stream.println("  override def primitive_unary_bang(__arg0: Rep[Boolean])(implicit __pos: SourceContext): Rep[Boolean] = delite_boolean_negate(__arg0)")

@@ -12,8 +12,8 @@ import optiml.library._
 import optiml.compiler._
 import ppl.tests.scalatest._
 
-object PrimitiveConversionsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with PrimitiveConversions
-object PrimitiveConversionsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with PrimitiveConversions
+object PrimitiveConversionsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with PrimitiveConversions
+object PrimitiveConversionsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with PrimitiveConversions
 trait PrimitiveConversions extends ForgeTestModule with OptiMLApplication {
   def main() {
     val int = unit(1)
@@ -63,8 +63,8 @@ trait PrimitiveConversions extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object DenseVectorConversionsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with DenseVectorConversions
-object DenseVectorConversionsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with DenseVectorConversions
+object DenseVectorConversionsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with DenseVectorConversions
+object DenseVectorConversionsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with DenseVectorConversions
 trait DenseVectorConversions extends ForgeTestModule with OptiMLApplication {
   def main() {
 
@@ -136,8 +136,8 @@ trait DenseVectorConversions extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object DenseMatrixConversionsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with DenseMatrixConversions
-object DenseMatrixConversionsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with DenseMatrixConversions
+object DenseMatrixConversionsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with DenseMatrixConversions
+object DenseMatrixConversionsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with DenseMatrixConversions
 trait DenseMatrixConversions extends ForgeTestModule with OptiMLApplication {
   def main() {
     val mint = DenseMatrix[Int](100,100).map(_ => 1)

@@ -19,8 +19,8 @@ trait IOSuitePaths {
 
 /* Reading and writing the same filename in the same app is not supported, as the order of operations is not guaranteed */
 
-object SimpleWriteRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SimpleWrite
-object SimpleWriteRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SimpleWrite
+object SimpleWriteRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SimpleWrite
+object SimpleWriteRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SimpleWrite
 trait SimpleWrite extends ForgeTestModule with OptiMLApplication with IOSuitePaths {
   def main() = {
     val x = (0::10, 0::10) { (i,j) => i+j*0.1 }
@@ -34,8 +34,8 @@ trait SimpleWrite extends ForgeTestModule with OptiMLApplication with IOSuitePat
   }
 }
 
-object SimpleReadRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SimpleRead
-object SimpleReadRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SimpleRead
+object SimpleReadRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SimpleRead
+object SimpleReadRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SimpleRead
 trait SimpleRead extends ForgeTestModule with OptiMLApplication with IOSuitePaths {
   def main() = {
     val x = (0::10, 0::10) { (i,j) => i+j*0.1 }
@@ -50,8 +50,8 @@ trait SimpleRead extends ForgeTestModule with OptiMLApplication with IOSuitePath
   }
 }
 
-object SimpleDeleteRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SimpleDelete
-object SimpleDeleteRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SimpleDelete
+object SimpleDeleteRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SimpleDelete
+object SimpleDeleteRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SimpleDelete
 trait SimpleDelete extends ForgeTestModule with OptiMLApplication with IOSuitePaths {
   def main() = {
     deleteFile(testMat)

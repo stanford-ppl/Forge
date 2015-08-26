@@ -156,7 +156,9 @@ def sbtBuildFileFooter(dsl):
                         "-Dtests.targets="+System.getProperty("tests.targets", "scala"))
 
   // Test suites are run individually in different JVMs. Set TEST_JAVA_OPTS to configure JAVA_OPTS for each suite.
-  val testJavaOptions = sys.env.getOrElse("TEST_JAVA_OPTS", "").split(" ").toSeq
+  val testJavaOptionsStr = sys.env.getOrElse("TEST_JAVA_OPTS", "")
+  // TEST_JAVA_OPTS cannot be empty or SBT crashes when it gets a non-empty Seq containing an empty string.
+  val testJavaOptions = if (testJavaOptionsStr == "") Seq() else testJavaOptionsStr.split(" ").toSeq
 
   def separateTests(tests: Seq[TestDefinition]) = {
     if (tests.isEmpty) Seq(new Group("", Seq(), SubProcess(Seq()))) //workaround for sbt crash on empty tests

@@ -36,12 +36,12 @@ trait TestRecord extends OptiQLApplication {
 
 }
 
-object QueryableSelectRunnerC extends ForgeTestRunnerCompiler with OptiQLApplicationCompiler with QueryableSelectTest
-object QueryableSelectRunnerI extends ForgeTestRunnerInterpreter with OptiQLApplicationInterpreter with QueryableSelectTest
+object QueryableSelectRunnerC extends OptiQLApplicationCompiler with ForgeTestRunnerCompiler with QueryableSelectTest
+object QueryableSelectRunnerI extends OptiQLApplicationInterpreter with ForgeTestRunnerInterpreter with QueryableSelectTest
 trait QueryableSelectTest extends ForgeTestModule with OptiQLApplication with TestRecord {
   def main() = {
     val scalarResult = items Select (item => item.id)
-    
+
     collect(scalarResult.size == itemsSize)
     for (i <- 0 until itemsSize) {
       collect(scalarResult(i) == i)
@@ -65,8 +65,8 @@ trait QueryableSelectTest extends ForgeTestModule with OptiQLApplication with Te
   }
 }
 
-object QueryableWhereRunnerC extends ForgeTestRunnerCompiler with OptiQLApplicationCompiler with QueryableWhereTest
-object QueryableWhereRunnerI extends ForgeTestRunnerInterpreter with OptiQLApplicationInterpreter with QueryableWhereTest
+object QueryableWhereRunnerC extends OptiQLApplicationCompiler with ForgeTestRunnerCompiler with QueryableWhereTest
+object QueryableWhereRunnerI extends OptiQLApplicationInterpreter with ForgeTestRunnerInterpreter with QueryableWhereTest
 trait QueryableWhereTest extends ForgeTestModule with OptiQLApplication with TestRecord {
   def main() = {
     val result = items Where(_.status == 'N') Select(item => new Record {
@@ -88,8 +88,8 @@ trait QueryableWhereTest extends ForgeTestModule with OptiQLApplication with Tes
   }
 }
 
-object QueryableReduceRunnerC extends ForgeTestRunnerCompiler with OptiQLApplicationCompiler with QueryableReduceTest
-object QueryableReduceRunnerI extends ForgeTestRunnerInterpreter with OptiQLApplicationInterpreter with QueryableReduceTest
+object QueryableReduceRunnerC extends OptiQLApplicationCompiler with ForgeTestRunnerCompiler with QueryableReduceTest
+object QueryableReduceRunnerI extends OptiQLApplicationInterpreter with ForgeTestRunnerInterpreter with QueryableReduceTest
 trait QueryableReduceTest extends ForgeTestModule with OptiQLApplication with TestRecord {
   def main() = {
     val sumQuantity = items Sum(_.quantity)
@@ -107,8 +107,8 @@ trait QueryableReduceTest extends ForgeTestModule with OptiQLApplication with Te
   }
 }
 
-object QueryableGroupByReduceRunnerC extends ForgeTestRunnerCompiler with OptiQLApplicationCompiler with QueryableGroupByReduceTest
-object QueryableGroupByReduceRunnerI extends ForgeTestRunnerInterpreter with OptiQLApplicationInterpreter with QueryableGroupByReduceTest
+object QueryableGroupByReduceRunnerC extends OptiQLApplicationCompiler with ForgeTestRunnerCompiler with QueryableGroupByReduceTest
+object QueryableGroupByReduceRunnerI extends OptiQLApplicationInterpreter with ForgeTestRunnerInterpreter with QueryableGroupByReduceTest
 trait QueryableGroupByReduceTest extends ForgeTestModule with OptiQLApplication with TestRecord {
   def main() = {
     val res1 = items GroupBy(_.status) Select(g => new Record {
@@ -142,8 +142,8 @@ trait QueryableGroupByReduceTest extends ForgeTestModule with OptiQLApplication 
   }
 }
 
-object QueryableGroupByRunnerC extends ForgeTestRunnerCompiler with OptiQLApplicationCompiler with QueryableGroupByTest
-object QueryableGroupByRunnerI extends ForgeTestRunnerInterpreter with OptiQLApplicationInterpreter with QueryableGroupByTest
+object QueryableGroupByRunnerC extends OptiQLApplicationCompiler with ForgeTestRunnerCompiler with QueryableGroupByTest
+object QueryableGroupByRunnerI extends OptiQLApplicationInterpreter with ForgeTestRunnerInterpreter with QueryableGroupByTest
 trait QueryableGroupByTest extends ForgeTestModule with OptiQLApplication with TestRecord {
   def main() = {
     val res = items GroupBy(_.status) SelectMany(g => g.values.Select(_.quantity))
@@ -156,8 +156,8 @@ trait QueryableGroupByTest extends ForgeTestModule with OptiQLApplication with T
   }
 }
 
-object QueryableSortRunnerC extends ForgeTestRunnerCompiler with OptiQLApplicationCompiler with QueryableSortTest
-object QueryableSortRunnerI extends ForgeTestRunnerInterpreter with OptiQLApplicationInterpreter with QueryableSortTest
+object QueryableSortRunnerC extends OptiQLApplicationCompiler with ForgeTestRunnerCompiler with QueryableSortTest
+object QueryableSortRunnerI extends OptiQLApplicationInterpreter with ForgeTestRunnerInterpreter with QueryableSortTest
 trait QueryableSortTest extends ForgeTestModule with OptiQLApplication with TestRecord {
   def main() = {
     val sort1 = items OrderBy(asc(_.id))
@@ -180,8 +180,8 @@ trait QueryableSortTest extends ForgeTestModule with OptiQLApplication with Test
   }
 }
 
-object QueryableJoinRunnerC extends ForgeTestRunnerCompiler with OptiQLApplicationCompiler with QueryableJoinTest
-object QueryableJoinRunnerI extends ForgeTestRunnerInterpreter with OptiQLApplicationInterpreter with QueryableJoinTest
+object QueryableJoinRunnerC extends OptiQLApplicationCompiler with ForgeTestRunnerCompiler with QueryableJoinTest
+object QueryableJoinRunnerI extends OptiQLApplicationInterpreter with ForgeTestRunnerInterpreter with QueryableJoinTest
 trait QueryableJoinTest extends ForgeTestModule with OptiQLApplication with TestRecord {
   def main() = {
     val res = items.Join(items2)(_.id, _.id)((a,b) => new Record {

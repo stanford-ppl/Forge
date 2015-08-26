@@ -3,8 +3,8 @@ import optiml.shared._
 import optiml.library._
 import ppl.tests.scalatest._
 
-object DateTimeRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with DateTime
-object DateTimeRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with DateTime
+object DateTimeRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with DateTime
+object DateTimeRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with DateTime
 trait DateTime extends ForgeTestModule with OptiMLApplication {
   def main() = {
     val t = DateFeature("yyyyMMddHHmmss")
@@ -19,8 +19,8 @@ trait DateTime extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object UniqueRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Unique
-object UniqueRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Unique
+object UniqueRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Unique
+object UniqueRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Unique
 trait Unique extends ForgeTestModule with OptiMLApplication {
   def main() = {
     loadUniqueMappings("test_unique_db")

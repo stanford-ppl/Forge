@@ -12,8 +12,8 @@ import optiml.library._
 import optiml.shared._
 import ppl.tests.scalatest._
 
-object DenseMatrixAccessorsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with DenseMatrixAccessors
-object DenseMatrixAccessorsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with DenseMatrixAccessors
+object DenseMatrixAccessorsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with DenseMatrixAccessors
+object DenseMatrixAccessorsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with DenseMatrixAccessors
 trait DenseMatrixAccessors extends ForgeTestModule with OptiMLApplication {
   def main() {
     val m = DenseMatrix.rand(100,100)
@@ -68,8 +68,8 @@ trait DenseMatrixAccessors extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object DenseMatrixOperatorsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with DenseMatrixOperators
-object DenseMatrixOperatorsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with DenseMatrixOperators
+object DenseMatrixOperatorsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with DenseMatrixOperators
+object DenseMatrixOperatorsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with DenseMatrixOperators
 trait DenseMatrixOperators extends ForgeTestModule with OptiMLApplication {
   def main() {
     val m_rand = DenseMatrix.rand(2,2)
@@ -86,8 +86,8 @@ trait DenseMatrixOperators extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object DenseMatrixUpdatesRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with DenseMatrixUpdates
-object DenseMatrixUpdatesRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with DenseMatrixUpdates
+object DenseMatrixUpdatesRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with DenseMatrixUpdates
+object DenseMatrixUpdatesRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with DenseMatrixUpdates
 trait DenseMatrixUpdates extends ForgeTestModule with OptiMLApplication {
   def main() {
     val v = DenseVector.rand(100)
@@ -170,8 +170,8 @@ trait DenseMatrixUpdates extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object GroupRowsByRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with GroupRowsBy
-object GroupRowsByRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with GroupRowsBy
+object GroupRowsByRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with GroupRowsBy
+object GroupRowsByRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with GroupRowsBy
 trait GroupRowsBy extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -190,8 +190,8 @@ trait GroupRowsBy extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object MapAllRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with MapAll
-object MapAllRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with MapAll
+object MapAllRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with MapAll
+object MapAllRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with MapAll
 trait MapAll extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -217,8 +217,8 @@ trait MapAll extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object ReduceRowsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with ReduceRows
-object ReduceRowsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with ReduceRows
+object ReduceRowsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with ReduceRows
+object ReduceRowsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with ReduceRows
 trait ReduceRows extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -229,8 +229,8 @@ trait ReduceRows extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object ShapesRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Shapes
-object ShapesRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Shapes
+object ShapesRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Shapes
+object ShapesRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Shapes
 trait Shapes extends ForgeTestModule with OptiMLApplication {
   def main() = {
     val a = DenseMatrix(DenseVector(1,2,3),
@@ -273,8 +273,8 @@ trait Shapes extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object ViewsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Views
-object ViewsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Views
+object ViewsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Views
+object ViewsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Views
 trait Views extends ForgeTestModule with OptiMLApplication {
   def main() = {
     val m = DenseMatrix(DenseVector(0,1,2,3,4),DenseVector(5,6,7,8,9),DenseVector(10,11,12,13,14),DenseVector(15,16,17,18,19))
@@ -299,8 +299,8 @@ trait Views extends ForgeTestModule with OptiMLApplication {
 }
 
 
-object SortByRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SortBy
-object SortByRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SortBy
+object SortByRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SortBy
+object SortByRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SortBy
 trait SortBy extends ForgeTestModule with OptiMLApplication {
   def main() = {
     val m = DenseMatrix(DenseVector(5,6,7,8,9),DenseVector(0,1,2,3,4),DenseVector(15,16,17,18,19),DenseVector(10,11,12,13,14))

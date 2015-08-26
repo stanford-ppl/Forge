@@ -18,8 +18,8 @@ import ppl.tests.scalatest._
 // ComputeStream
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-object StreamForeachRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with StreamForeach
-object StreamForeachRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with StreamForeach
+object StreamForeachRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with StreamForeach
+object StreamForeachRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with StreamForeach
 trait StreamForeach extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -30,8 +30,8 @@ trait StreamForeach extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object StreamCorrectSmallRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with StreamCorrectSmall
-object StreamCorrectSmallRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with StreamCorrectSmall
+object StreamCorrectSmallRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with StreamCorrectSmall
+object StreamCorrectSmallRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with StreamCorrectSmall
 trait StreamCorrectSmall extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -43,8 +43,8 @@ trait StreamCorrectSmall extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object StreamCorrectLargeRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with StreamCorrectLarge
-object StreamCorrectLargeRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with StreamCorrectLarge
+object StreamCorrectLargeRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with StreamCorrectLarge
+object StreamCorrectLargeRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with StreamCorrectLarge
 trait StreamCorrectLarge extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -77,8 +77,8 @@ trait StreamSuitePaths {
   val testHashInMemMat = "test_hash_inmem.mat"
 }
 
-object FileStreamWriteARunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with FileStreamWriteA
-object FileStreamWriteARunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with FileStreamWriteA
+object FileStreamWriteARunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with FileStreamWriteA
+object FileStreamWriteARunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with FileStreamWriteA
 trait FileStreamWriteA extends ForgeTestModule with OptiMLApplication with StreamSuitePaths {
   def main() = {
     val x = DenseMatrix.ones(1000,100)
@@ -89,8 +89,8 @@ trait FileStreamWriteA extends ForgeTestModule with OptiMLApplication with Strea
   }
 }
 
-object FileStreamWriteBRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with FileStreamWriteB
-object FileStreamWriteBRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with FileStreamWriteB
+object FileStreamWriteBRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with FileStreamWriteB
+object FileStreamWriteBRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with FileStreamWriteB
 trait FileStreamWriteB extends ForgeTestModule with OptiMLApplication with StreamSuitePaths {
   def main() = {
     val f = FileStream(testMat)
@@ -111,8 +111,8 @@ trait FileStreamWriteB extends ForgeTestModule with OptiMLApplication with Strea
   }
 }
 
-object FileStreamReadRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with FileStreamRead
-object FileStreamReadRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with FileStreamRead
+object FileStreamReadRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with FileStreamRead
+object FileStreamReadRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with FileStreamRead
 trait FileStreamRead extends ForgeTestModule with OptiMLApplication with StreamSuitePaths {
   def main() = {
     val f = FileStream(testMat)
@@ -143,8 +143,8 @@ trait FileStreamRead extends ForgeTestModule with OptiMLApplication with StreamS
   }
 }
 
-object FileStreamDeleteRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with FileStreamDelete
-object FileStreamDeleteRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with FileStreamDelete
+object FileStreamDeleteRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with FileStreamDelete
+object FileStreamDeleteRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with FileStreamDelete
 trait FileStreamDelete extends ForgeTestModule with OptiMLApplication with StreamSuitePaths {
   def main() = {
     deleteFile(testMat)
@@ -161,8 +161,8 @@ trait FileStreamDelete extends ForgeTestModule with OptiMLApplication with Strea
 // HashStream
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-object HashStreamWriteARunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with HashStreamWriteA
-object HashStreamWriteARunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with HashStreamWriteA
+object HashStreamWriteARunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with HashStreamWriteA
+object HashStreamWriteARunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with HashStreamWriteA
 trait HashStreamWriteA extends ForgeTestModule with OptiMLApplication with StreamSuitePaths {
   def main() = {
     val raw = DenseMatrix.rand(10000,8)
@@ -177,8 +177,8 @@ trait HashStreamWriteA extends ForgeTestModule with OptiMLApplication with Strea
   }
 }
 
-object HashStreamWriteBRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with HashStreamWriteB
-object HashStreamWriteBRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with HashStreamWriteB
+object HashStreamWriteBRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with HashStreamWriteB
+object HashStreamWriteBRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with HashStreamWriteB
 trait HashStreamWriteB extends ForgeTestModule with OptiMLApplication with StreamSuitePaths {
   def writeStream() = {
     val raw = FileStream(testMat)
@@ -280,8 +280,8 @@ trait HashStreamWriteB extends ForgeTestModule with OptiMLApplication with Strea
   }
 }
 
-object HashStreamReadRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with HashStreamRead
-object HashStreamReadRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with HashStreamRead
+object HashStreamReadRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with HashStreamRead
+object HashStreamReadRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with HashStreamRead
 trait HashStreamRead extends ForgeTestModule with OptiMLApplication with StreamSuitePaths {
   def main() = {
     val a = readMatrix(testHashStreamMat)
@@ -302,8 +302,8 @@ trait HashStreamRead extends ForgeTestModule with OptiMLApplication with StreamS
   }
 }
 
-object HashStreamDeleteRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with HashStreamDelete
-object HashStreamDeleteRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with HashStreamDelete
+object HashStreamDeleteRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with HashStreamDelete
+object HashStreamDeleteRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with HashStreamDelete
 trait HashStreamDelete extends ForgeTestModule with OptiMLApplication with StreamSuitePaths {
   def main() = {
     deleteFile(testMat)

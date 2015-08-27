@@ -623,6 +623,32 @@ trait ScalaOps extends PrimitiveMathGen {
     infix (HashMapOps) ("values", (K,V), CHashMap(K,V) :: MArray(V)) implements composite ${ farray_from_sarray(chashmap_values_array($0)) }
   }
 
+  def importConcurrentQueue() = {
+    val T = tpePar("T")
+    val CQueue = tpe("java.util.concurrent.ArrayBlockingQueue", T)
+    val CQueueOps = grp("CQueue")
+
+    direct (CQueueOps) ("CQueue", T, MInt :: CQueue(T), effect = mutable) implements codegen($cala, ${ new java.util.concurrent.ArrayBlockingQueue[$t[T]]($0) })
+
+    infix (CQueueOps) ("add", T, (CQueue(T), T) :: MBoolean) implements codegen($cala, ${ $0.add($1) })
+    infix (CQueueOps) ("contains", T, (CQueue(T), T) :: MBoolean) implements codegen($cala, ${ $0.contains($1) })
+    infix (CQueueOps) ("peek", T, (CQueue(T) :: T)) implements codegen($cala, ${ $0.peek() })
+    infix (CQueueOps) ("poll", T, (CQueue(T) :: T)) implements codegen($cala, ${ $0.poll() })
+  }
+
+  def importThreads() = {
+    val SThread = tpe("java.lang.Thread")
+    val SThreadOps = grp("SThread")
+
+    infix (SThreadOps) ("interrupt", Nil, SThread :: MUnit, effect = simple) implements codegen($cala, ${
+      $0.interrupt()
+    })
+
+    infix (SThreadOps) ("join", Nil, SThread :: MUnit, effect = simple) implements codegen($cala, ${
+      $0.join()
+    })
+  }
+
   def importByteBuffer() = {
     val ByteBuffer = tpe("java.nio.ByteBuffer")
     val IntBuffer = tpe("java.nio.IntBuffer")

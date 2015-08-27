@@ -262,6 +262,14 @@ trait StreamOps {
     val V = tpePar("V")
     val R = tpePar("R")
 
+    // Unfortunately, we need to do a bit of our own application-level parallelism to
+    // enable reading a file and writing to DynamoDB asynchronously, which is required to
+    // maximize throughput.
+    importConcurrentQueue()
+    importThreads()
+    val CQueue = lookupTpe("java.util.concurrent.ArrayBlockingQueue")
+    val SThread = lookupTpe("java.lang.Thread")
+
     val DB = tpe("com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper")
     primitiveTpePrefix ::= "com.amazonaws"
 
@@ -318,34 +326,92 @@ trait StreamOps {
       $0.save(new KeyValue($1, $2, $3))
     })
 
-    compiler (DHashStream) ("dhash_put_all_internal", Nil, (DB, MArray(MString), MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
-      assert($1.length >= $4 && $2.length >= $4 && $3.length >= $4, "DHashStream putAll called with too small arrays")
+    // We use a background thread to constantly push writes to DynamoDB from a queue that is filled by readers,
+    // as they process each file chunk. The input queue has a bounded size, so if readers race too far ahead
+    // of writers, the readers will block, preventing unbounded memory growth.
+    compiler (DHashStream) ("dhash_launch_background_writer_internal", Nil, (DB, CQueue(MAny)) :: SThread, effect = simple) implements codegen($cala, ${
       val numThreads: Int = System.getProperty("optiml.stream.dynamodb.threads","128").toInt
+      val batchSize: Int = System.getProperty("optiml.stream.dynamodb.batchsize", "1000").toInt
+      val inputQueue = $1.asInstanceOf[java.util.concurrent.ArrayBlockingQueue[KeyValue]]
+      val workQueueSize = 100
+      val workQueue = new java.util.concurrent.ArrayBlockingQueue[Runnable](workQueueSize)
+      val pool = new java.util.concurrent.ThreadPoolExecutor(numThreads, numThreads, workQueueSize, java.util.concurrent.TimeUnit.SECONDS, workQueue)
 
-      val temp = new Array[java.util.ArrayList[KeyValue]](numThreads)
-      for (t <- 0 until numThreads) {
-        temp(t) = new java.util.ArrayList[KeyValue]()
-        var i = t * $4 / numThreads
-        val end = (t+1) * $4 / numThreads
-        while (i < end) {
-          temp(t).add(new KeyValue($1(i), $2(i), java.nio.ByteBuffer.wrap($3(i))))
-          i += 1
-        }
-      }
+      // This thread will run forever until the process dies or it is interrupted!
+      val t = new Thread(new Runnable {
+        // Keep track of the current batch, so we can drain if interrupted.
+        var batchInProgress: java.util.ArrayList[KeyValue] = null
 
-      val threads = new Array[Thread](numThreads)
-      for (t <- 0 until numThreads) {
-        val thread = new Thread( new Runnable {
+        def submitOne(batch: java.util.ArrayList[KeyValue]) = new Runnable {
           def run() = {
-            val failures = $0.batchSave(temp(t))
-            if (!failures.isEmpty) throw failures.get(0).getException
+            val failures = $0.batchSave(batch)
+            if (!failures.isEmpty) {
+              failures.get(0).getException.printStackTrace()
+            }
           }
-        })
-        thread.start()
-        threads(t) = thread
-      }
-      for (t <- 0 until numThreads) { threads(t).join() }
+        }
 
+        def block() { Thread.sleep(100) }
+
+        def drain() {
+          val batch = new java.util.ArrayList[KeyValue]()
+          if (batchInProgress != null) batch.addAll(batchInProgress)
+          inputQueue.drainTo(batch)
+          if (batch.size > 0) {
+            while (workQueue.size > workQueueSize-1) block()
+            pool.execute(submitOne(batch))
+          }
+          pool.shutdown()
+          while (!pool.isTerminated()) block()
+        }
+
+        def run(): Unit = {
+          while (true) {
+            try {
+              // Block if our pool is busy. This is necessary because the thread pool
+              // will reject tasks if the queue is full and no threads are available,
+              // rather than block.
+              while (workQueue.size > workQueueSize-1) block()
+
+              // Fill the next DynamoDB batch request (block if no data is ready)
+              val batch = new java.util.ArrayList[KeyValue]()
+              batchInProgress = batch
+              while (batch.size < batchSize) {
+                // Will block until the queue is ready
+                val e = inputQueue.take()
+                batch.add(e)
+              }
+
+              // Launch the request in an independent thread
+              try {
+                pool.execute(submitOne(batch))
+                batchInProgress = null
+              }
+              catch {
+                case e: java.util.concurrent.RejectedExecutionException => e.printStackTrace()
+              }
+            }
+            catch {
+              case e:InterruptedException => drain; return
+            }
+          }
+        }
+      })
+
+      t.start()
+      t
+    })
+
+    compiler (DHashStream) ("dhash_put_all_internal", Nil, MethodSignature(List(DB, CQueue(MAny), MArray(MString), MArray(MString), MArray(MArray(MByte)), MInt), MUnit), effect = simple) implements codegen($cala, ${
+      assert($2.length >= $5, "DHashStream putAll called with too small arrays")
+      val queue = $1.asInstanceOf[java.util.concurrent.ArrayBlockingQueue[KeyValue]]
+      var i = 0
+      while (i < $5) {
+        val kv = new KeyValue($2(i), $3(i), java.nio.ByteBuffer.wrap($4(i)))
+        // Will block if the queue is already full
+        queue.put(kv)
+        i += 1
+      }
       ()
     })
 
@@ -360,6 +426,7 @@ trait StreamOps {
       }
       buf.toArray
     })
+
 
     // --
 
@@ -413,8 +480,8 @@ trait StreamOps {
         dhash_get_all_internal(dhash_get_db_safe($self), $1)
       }
 
-      infix ("putAll") ((MArray(MString), MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = write(0)) implements composite ${
-        dhash_put_all_internal(dhash_get_db_safe($self), $1, $2, $3, $4)
+      infix ("putAll") ((CQueue(MAny), MArray(MString), MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = write(0)) implements composite ${
+        dhash_put_all_internal(dhash_get_db_safe($self), $1, $2, $3, $4, $5)
       }
 
       infix ("close") (Nil :: MUnit, effect = write(0)) implements single ${
@@ -729,6 +796,11 @@ trait StreamOps {
 
         val hash = DHashStream[DenseMatrix[Double]](outTable, hashMatrixDeserializerD)
 
+        // Launch background writer thread with 10M capacity queue
+        val queueSize: Int = System.getProperty("optiml.stream.dynamodb.queuesize", "10000000").toInt
+        val queue = CQueue[Any](queueSize)
+        val t = dhash_launch_background_writer_internal(dhash_get_db_safe(hash), queue)
+
         $self.processFileChunks({ line =>
           val tokens: Rep[ForgeArray[String]] = line.trim.fsplit(delim, -1) // we preserve trailing empty values
           val tokenVector: Rep[DenseVector[String]] = densevector_fromarray(tokens, true)
@@ -743,9 +815,11 @@ trait StreamOps {
           val dbKeySuffix: Rep[ForgeArray[String]] = chunk.map(t => hashMatrixKeySuffix(serialize(t._2))).toArray
           val dbValues: Rep[ForgeArray[ForgeArray[Byte]]] = chunk.map(t => serialize(t._2)).toArray
 
-          hash.putAll(dbKeyPrefix, dbKeySuffix, dbValues, dbKeyPrefix.length)
+          hash.putAll(queue, dbKeyPrefix, dbKeySuffix, dbValues, dbKeyPrefix.length)
         })
 
+        t.interrupt()
+        t.join()
         hash
       }
 

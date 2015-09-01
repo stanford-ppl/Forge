@@ -107,15 +107,3 @@ object MLGlobal {
     reverseIdentifierDB = null
   }
 }
-
-
-@DynamoDBTable(tableName="default")
-case class KeyValue (
-  // meta annotations create java-style getter/setter and place the dynamodb annotation on the getter
-  @(DynamoDBHashKey @beanGetter) @BeanProperty var hashKey: String, // must be var for dynamo
-  @(DynamoDBRangeKey @beanGetter) @BeanProperty var rangeKey: String,
-  @(DynamoDBAttribute @beanGetter) @BeanProperty var value: ByteBuffer
-) {
-  def this() = this(null, null, null) // needed by dynamo to instantiate instances
-  def this(hashKey: String) = this(hashKey, null, null) //convenient to perform queries by hash-key
-}

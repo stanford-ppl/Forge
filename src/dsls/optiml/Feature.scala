@@ -190,6 +190,8 @@ trait FeatureOps {
     val DenseVector = lookupTpe("DenseVector")
     val Tup2 = lookupTpe("Tup2")
 
+    // -- Single-machine unique map. The map is currently stored in an embedded LevelDB.
+
     /* Return a unique integer identifier for a given string */
     direct (FeatureHelper) ("unique", Nil, MString :: MInt) implements codegen($cala, ${
       MLGlobal.getId($0)
@@ -223,5 +225,37 @@ trait FeatureOps {
     direct (FeatureHelper) ("dumpUniqueMappings", Nil, MString :: MUnit, effect = simple) implements codegen($cala, ${
       MLGlobal.dumpUniqueMappings($0)
     })
+
+
+    // -- DynamoDB-based unique map
+    // Caution: experimental feature. See comments in MLGlobalDynamo.scala.
+
+    /* Return a unique integer identifier for a given string, saving the id in DynamoDB */
+    direct (FeatureHelper) ("dUnique", Nil, MString :: MInt) implements codegen($cala, ${
+      MLGlobalDynamo.getId($0)
+    })
+
+    /* Lookup the string corresponding to a given unique integer identifier from DynamoDB */
+    direct (FeatureHelper) ("dReverseUnique", Nil, MInt :: MString) implements codegen($cala, ${
+      MLGlobalDynamo.lookupId($0)
+    })
+
+    direct (FeatureHelper) ("dGetUniqueIds", Nil, Nil :: MArray(MInt)) implements codegen($cala, ${
+      MLGlobalDynamo.getUniqueIds
+    })
+
+    direct (FeatureHelper) ("dGetUniqueNames", Nil, Nil :: MArray(MString)) implements codegen($cala, ${
+      MLGlobalDynamo.getUniqueNames
+    })
+
+    direct (FeatureHelper) ("dLoadUniqueMappings", Nil, MString :: MUnit, effect = simple) implements codegen($cala, ${
+      MLGlobalDynamo.loadUniqueMappings($0)
+    })
+
+    direct (FeatureHelper) ("dDumpUniqueMappings", Nil, MString :: MUnit, effect = simple) implements codegen($cala, ${
+      MLGlobalDynamo.dumpUniqueMappings($0)
+    })
+
+    // -- end DynamoDB support
   }
 }

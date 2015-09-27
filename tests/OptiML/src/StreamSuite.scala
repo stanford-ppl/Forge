@@ -184,12 +184,14 @@ trait HashStreamWriteB extends ForgeTestModule with OptiMLApplication with Strea
     // There is some weirdness going in converting a double value to a string key here.
     // We need to use a canonical representation of the double, so we use Scala's (rather than
     // the formatted version we read from the file).
-    val customers = data.groupRowsBy(testHash1, "\\|")(row => ""+row(0).toDouble, _.map(_.toDouble))
-    val accounts = data.groupRowsBy(testHash2, "\\|")(row => ""+row(1).toDouble, _.map(_.toDouble))
+    // When running with C++ target, the string representation of a double value is different between scala and C++,
+    // so casting to integer for the fields used as keys.
+    val customers = data.groupRowsBy(testHash1, "\\|")(row => ""+row(0).toDouble.toInt, _.map(_.toDouble))
+    val accounts = data.groupRowsBy(testHash2, "\\|")(row => ""+row(1).toDouble.toInt, _.map(_.toDouble))
 
     val result = accounts.mapValues(testHashStreamMat) { (acctId, account) =>
       // account is looked up from the HashStream as a Rep[DenseMatrix[Double]] (the value in the bucket)
-      val custId = account(0, 0)
+      val custId = account(0, 0).toInt
       val customer = customers(""+custId)
 
       DenseVector[Double](

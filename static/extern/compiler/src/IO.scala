@@ -19,7 +19,7 @@ trait InputOutputOpsExp extends DeliteFileReaderOpsExp with DeliteFileWriterOpsE
     DeliteFileReader.readLinesFlattened[A](path)(f)
   }
 
-  def forge_filereader_readlines_chunk[A:Manifest](path: Rep[String], offset: Rep[Long], numBytes: Rep[Long], f: Rep[String] => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
+  def forge_filereader_readlines_chunk[A:Manifest](path: Rep[String], offset: Rep[Long], numBytes: Rep[Long], f: (Rep[String], Rep[String]) => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
     DeliteFileReader.readLinesChunk[A](path)(offset, numBytes)(f)
   }
 

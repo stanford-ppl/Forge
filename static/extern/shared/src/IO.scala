@@ -15,12 +15,12 @@ trait InputOutputOps extends Base {
     def readLinesFlattened[A:Manifest](path: Rep[String])(f: Rep[String] => Rep[ForgeArray[A]])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = forge_filereader_readlines_flattened(path, f)
 
     // This version allows reading from a stream in parallel starting at a particular offset and proceeding for a fixed number of bytes (used with streaming).
-    def readLinesChunk[A:Manifest](path: Rep[String])(offset: Rep[Long], numBytes: Rep[Long])(f: Rep[String] => Rep[A])(implicit pos: SourceContext): Rep[ForgeArray[A]] = forge_filereader_readlines_chunk(path, offset, numBytes, f)
+    def readLinesChunk[A:Manifest](path: Rep[String])(offset: Rep[Long], numBytes: Rep[Long])(f: (Rep[String], Rep[String]) => Rep[A])(implicit pos: SourceContext): Rep[ForgeArray[A]] = forge_filereader_readlines_chunk(path, offset, numBytes, f)
   }
 
   def forge_filereader_readlines[A:Manifest](path: Rep[String], f: Rep[String] => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]]
   def forge_filereader_readlines_flattened[A:Manifest](path: Rep[String], f: Rep[String] => Rep[ForgeArray[A]])(implicit ctx: SourceContext): Rep[ForgeArray[A]]
-  def forge_filereader_readlines_chunk[A:Manifest](path: Rep[String], offset: Rep[Long], numBytes: Rep[Long], f: Rep[String] => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]]
+  def forge_filereader_readlines_chunk[A:Manifest](path: Rep[String], offset: Rep[Long], numBytes: Rep[Long], f: (Rep[String], Rep[String]) => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]]
 
   object ForgeFileWriter {
     def writeLines(path: Rep[String], numLines: Rep[Int], append: Rep[Boolean] = unit(false))(f: Rep[Int] => Rep[String])(implicit ctx: SourceContext) = forge_filewriter_writelines(path, numLines, append, f)

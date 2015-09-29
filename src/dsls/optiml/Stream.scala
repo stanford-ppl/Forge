@@ -272,8 +272,10 @@ trait StreamOps {
 
     val DB = tpe("com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper")
     primitiveTpePrefix ::= "com.amazonaws"
+    val SecretKey = tpe("javax.crypto.spec.SecretKeySpec")
+    primitiveTpePrefix ::= "javax.crypto"
 
-    data(DHashStream, ("_table", MString), ("_db", DB), ("_deserialize", MLambda(Tup2(DHashStream(V),MString), V)))
+    data(DHashStream, ("_table", MString), ("_key", SecretKey), ("_db", DB), ("_deserialize", MLambda(Tup2(DHashStream(V),MString), V)))
 
     static (DHashStream) ("apply", V, (("table", MString), ("deserialize", (DHashStream(V),MString) ==> V)) :: DHashStream(V), effect = mutable) implements composite ${
       val hash = dhash_alloc_raw[V](table, deserialize)
@@ -282,7 +284,7 @@ trait StreamOps {
     }
 
     compiler (DHashStream) ("dhash_alloc_raw", V, (("table", MString), ("deserialize", (DHashStream(V),MString) ==> V)) :: DHashStream(V), effect = mutable) implements
-      allocates(DHashStream, ${$0}, "unit(null.asInstanceOf[com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper])", ${doLambda((t: Rep[Tup2[DHashStream[V],String]]) => deserialize(t._1, t._2))})
+      allocates(DHashStream, ${$0}, "unit(null.asInstanceOf[javax.crypto.spec.SecretKeySpec])", "unit(null.asInstanceOf[com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper])", ${doLambda((t: Rep[Tup2[DHashStream[V],String]]) => deserialize(t._1, t._2))})
 
     // -- code generated internal methods interface with the embedded db
 
@@ -337,12 +339,30 @@ trait StreamOps {
 
       // TODO: Configure client for tuning options.
       // see: http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/ClientConfiguration.html
-      val client = new AmazonDynamoDBClient()
+      val dynamoClient = new AmazonDynamoDBClient()
       val regionName = sys.env.getOrElse("AWS_DEFAULT_REGION", "us-west-2")
-      client.configureRegion(com.amazonaws.regions.Regions.fromName(regionName))
+      dynamoClient.configureRegion(com.amazonaws.regions.Regions.fromName(regionName))
+      val config = new DynamoDBMapperConfig.Builder().withTableNameOverride(DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement($0)).withConsistentReads(DynamoDBMapperConfig.ConsistentReads.EVENTUAL).build()
+      new DynamoDBMapper(dynamoClient, config)
+    })
 
-      val config = new DynamoDBMapperConfig.Builder().withTableNameOverride(DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement($0)).build()
-      new DynamoDBMapper(client, config)
+    compiler (DHashStream) ("dhash_lookup_key_internal", Nil, Nil :: SecretKey, effect = simple) implements codegen($cala, ${
+      import com.amazonaws.services.kms._
+      
+      val kmsClient = new AWSKMSClient()
+      val s3Client = new com.amazonaws.services.s3.AmazonS3Client()
+      val regionName = sys.env.getOrElse("AWS_DEFAULT_REGION", "us-west-2")
+      kmsClient.configureRegion(com.amazonaws.regions.Regions.fromName(regionName))
+      s3Client.configureRegion(com.amazonaws.regions.Regions.fromName(regionName))
+
+      val inputStream = s3Client.getObject("mine-dynamo", "dynamo").getObjectContent
+      val encryptedKey = new Array[Byte](256)
+      val encryptedSize = inputStream.read(encryptedKey)
+      assert(inputStream.read() == -1, "ERROR: S3 key contents larger than expected")
+      inputStream.close()
+
+      val decryptedKey = kmsClient.decrypt(new model.DecryptRequest().withCiphertextBlob(java.nio.ByteBuffer.wrap(encryptedKey, 0, encryptedSize))).getPlaintext.array
+      new javax.crypto.spec.SecretKeySpec(decryptedKey, "AES")
     })
 
     compiler (DHashStream) ("dhash_contains_internal", Nil, (DB, MString, MString) :: MBoolean, effect = simple) implements codegen($cala, ${
@@ -370,9 +390,13 @@ trait StreamOps {
       $0.load(classOf[KeyValue], $1, $2).value
     })
 
-    compiler (DHashStream) ("dhash_get_all_internal", Nil, (DB, MString, MString) :: MArray(ByteBuffer), effect = simple) implements codegen($cala, ${
+    compiler (DHashStream) ("dhash_get_all_internal", Nil, (DB, SecretKey, MString, MString) :: MArray(ByteBuffer), effect = simple) implements codegen($cala, ${
+      import javax.crypto._
+      val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+      val ivLength = 16
+
       try {
-        val list = $0.query(classOf[KeyValue], (new com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression).withHashKeyValues(new KeyValue($1)))
+        val list = $0.query(classOf[KeyValue], (new com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression).withHashKeyValues(new KeyValue($2)))
         if ((list == null) || list.isEmpty) {
           null
         }
@@ -381,7 +405,25 @@ trait StreamOps {
           var i = 0
           var iter = list.iterator
           while (i < list.size) {
-            res(i) = iter.next.value
+            val encrypted = iter.next.value
+
+            val iv = new Array[Byte](ivLength)
+            encrypted.get(iv)
+            val cipherText = new Array[Byte](encrypted.remaining)
+            encrypted.get(cipherText)
+            cipher.init(Cipher.DECRYPT_MODE, $1, new spec.IvParameterSpec(iv))
+            val decrypted = cipher.doFinal(cipherText)
+
+            val gzip = new java.util.zip.GZIPInputStream(new java.io.ByteArrayInputStream(decrypted))
+            val decompressed = new java.io.ByteArrayOutputStream
+            val chunkSize = 1024
+            val buffer = new Array[Byte](chunkSize)
+            var length = 0
+            while (length != -1) {
+              decompressed.write(buffer, 0, length)
+              length = gzip.read(buffer, 0, chunkSize)
+            }
+            res(i) = java.nio.ByteBuffer.wrap(decompressed.toByteArray)
             i += 1
           }
           res
@@ -391,10 +433,10 @@ trait StreamOps {
         case p: com.amazonaws.services.dynamodbv2.model.ProvisionedThroughputExceededException =>
           // Should application-level retry?
           p.printStackTrace
-          println("[optiml stream]: failed to read key " + $1 + " from DynamoDB from " + $2 + " (returning null).")
+          println("[optiml stream]: failed to read key " + $2 + " from DynamoDB from " + $3 + " (returning null).")
           null
         case e: Throwable =>
-          println("[optiml stream]: caught unknown exception: " + e + " with " + $2 + " (returning null).")
+          println("[optiml stream]: caught unknown exception: " + e + " with " + $3 + " (returning null).")
           null
       }
     })
@@ -479,12 +521,26 @@ trait StreamOps {
       t
     })
 
-    compiler (DHashStream) ("dhash_put_all_internal", Nil, MethodSignature(List(DB, CQueue(MAny), MArray(MString), MArray(MString), MArray(MArray(MByte)), MInt), MUnit), effect = simple) implements codegen($cala, ${
+    compiler (DHashStream) ("dhash_put_all_internal", Nil, MethodSignature(List(SecretKey, CQueue(MAny), MArray(MString), MArray(MString), MArray(MArray(MByte)), MInt), MUnit), effect = simple) implements codegen($cala, ${
+      import javax.crypto._
+
+      val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+
       assert($2.length >= $5, "DHashStream putAll called with too small arrays")
       val queue = $1.asInstanceOf[java.util.concurrent.ArrayBlockingQueue[KeyValue]]
       var i = 0
       while (i < $5) {
-        val kv = new KeyValue($2(i), $3(i), java.nio.ByteBuffer.wrap($4(i)))
+        //compress values before sending
+        val compressed = new java.io.ByteArrayOutputStream
+        val gzip = new java.util.zip.GZIPOutputStream(compressed)
+        gzip.write($4(i))
+        gzip.finish()
+
+        cipher.init(Cipher.ENCRYPT_MODE, $0)
+        val iv = cipher.getParameters.getParameterSpec(classOf[spec.IvParameterSpec]).getIV
+        val encrypted = cipher.doFinal(compressed.toByteArray)
+
+        val kv = new KeyValue($2(i), $3(i), java.nio.ByteBuffer.wrap(iv ++ encrypted))
         // Will block if the queue is already full
         queue.put(kv)
         i += 1
@@ -513,6 +569,8 @@ trait StreamOps {
       compiler ("dhash_table_name") (Nil :: MString) implements getter(0, "_table")
       compiler ("dhash_get_db") (Nil :: DB) implements getter(0, "_db")
       compiler ("dhash_set_db") (DB :: MUnit, effect = write(0)) implements setter(0, "_db", ${$1})
+      compiler ("dhash_get_key") (Nil :: SecretKey) implements getter(0, "_key")
+      compiler ("dhash_set_key") (SecretKey :: MUnit, effect = write(0)) implements setter(0, "_key", ${$1})
 
       compiler ("dhash_get_db_safe") (Nil :: DB) implements composite ${
         val db = dhash_get_db($self)
@@ -524,6 +582,8 @@ trait StreamOps {
         val table = dhash_table_name($self)
         val db = dhash_open_internal(table)
         dhash_set_db($self, db)
+        val key = dhash_lookup_key_internal()
+        dhash_set_key($self, key)
       }
 
       infix ("apply") (MString :: V) implements composite ${
@@ -554,11 +614,11 @@ trait StreamOps {
 
       //get all values associated with the supplied logical key (prefix)
       infix ("getAll") (MString :: MArray(ByteBuffer)) implements single ${
-        dhash_get_all_internal(dhash_get_db_safe($self), $1, dhash_table_name($self))
+        dhash_get_all_internal(dhash_get_db_safe($self), dhash_get_key($self), $1, dhash_table_name($self))
       }
 
       infix ("putAll") ((CQueue(MAny), MArray(MString), MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = write(0)) implements composite ${
-        dhash_put_all_internal(dhash_get_db_safe($self), $1, $2, $3, $4, $5)
+        dhash_put_all_internal(dhash_get_key($self), $1, $2, $3, $4, $5)
       }
 
       infix ("close") (Nil :: MUnit, effect = write(0)) implements single ${
@@ -718,7 +778,7 @@ trait StreamOps {
         f.close()
       }
 
-      infix ("processFileChunks") (MethodSignature(List(("readFunc", MString ==> R), ("processFunc", MArray(R) ==> MUnit), ("chunkSize", MLong, "filestream_getchunkbytesize()")), MUnit), addTpePars = R) implements composite ${
+      infix ("processFileChunks") (MethodSignature(List(("readFunc", (MString,MString) ==> R), ("processFunc", MArray(R) ==> MUnit), ("chunkSize", MLong, "filestream_getchunkbytesize()")), MUnit), addTpePars = R) implements composite ${
         val f = ForgeFileInputStream($self.path)
         val totalSize = f.size
         f.close()
@@ -767,7 +827,7 @@ trait StreamOps {
         // Delete destination if it exists
         deleteFile(outFile)
 
-        $self.processFileChunks(func, { (a: Rep[ForgeArray[String]]) =>
+        $self.processFileChunks((a,b) => func(a), { (a: Rep[ForgeArray[String]]) =>
           if (!preserveOrder) {
             // This only makes sense if the order of the writes doesn't matter, since we are striping each chunk across the
             // different output files. Therefore when they are reconstructed, output file 0 will have elements from all chunks,
@@ -841,14 +901,14 @@ trait StreamOps {
         }
         val hash = HashStream[DenseMatrix[Double]](outTable, hashMatrixDeserializer)
 
-        $self.processFileChunks({ line =>
+        $self.processFileChunks({ (line, location) =>
           val tokens: Rep[ForgeArray[String]] = line.trim.fsplit(delim, -1) // we preserve trailing empty values
           val tokenVector: Rep[DenseVector[String]] = densevector_fromarray(tokens, true)
           val key: Rep[String] = keyFunc(tokenVector)
           val value: Rep[DenseVector[Double]] = valFunc(tokenVector)
-          pack((key, value))
+          pack((key, value, location))
         },
-        { (a: Rep[ForgeArray[Tup2[String,DenseVector[Double]]]]) =>
+        { (a: Rep[ForgeArray[Tup3[String,DenseVector[Double],String]]]) =>
           // The scheme belows appends new rows as new keys (instead of reading and growing the existing byte array)
           // This relies on LevelDBs sorted key functionality for efficiency
           // (the logical keys are stored close together, enabling compression and sequential scanning).
@@ -862,7 +922,7 @@ trait StreamOps {
           val chunk = densevector_fromarray(a, true).filter(t => t._2.length > 0)
 
           val dbKeyPrefix: Rep[ForgeArray[String]] = chunk.map(t => t._1).toArray
-          val dbKeySuffix: Rep[ForgeArray[String]] = chunk.map(t => hashMatrixKeySuffix(serialize(t._2))).toArray
+          val dbKeySuffix: Rep[ForgeArray[String]] = chunk.map(t => t._3).toArray
           val dbValues: Rep[ForgeArray[ForgeArray[Byte]]] = chunk.map(t => serialize(t._2)).toArray
 
           // We seem to be getting write bandwidth on the logicalKeys of ~15MB/sec, while the Google benchmarks at
@@ -909,18 +969,18 @@ trait StreamOps {
         val queue = CQueue[Any](queueSize)
         val t = dhash_launch_background_writer_internal(dhash_get_db_safe(hash), queue)
 
-        $self.processFileChunks({ line =>
+        $self.processFileChunks({ (line, location) =>
           val tokens: Rep[ForgeArray[String]] = line.trim.fsplit(delim, -1) // we preserve trailing empty values
           val tokenVector: Rep[DenseVector[String]] = densevector_fromarray(tokens, true)
           val key: Rep[String] = keyFunc(tokenVector)
           val value: Rep[DenseVector[Double]] = valFunc(tokenVector)
-          pack((key, value))
+          pack((key, value, location))
         },
-        { (a: Rep[ForgeArray[Tup2[String,DenseVector[Double]]]]) =>
+        { (a: Rep[ForgeArray[Tup3[String,DenseVector[Double],String]]]) =>
 
           val chunk = densevector_fromarray(a, true).filter(t => t._2.length > 0)
           val dbKeyPrefix: Rep[ForgeArray[String]] = chunk.map(t => t._1).toArray
-          val dbKeySuffix: Rep[ForgeArray[String]] = chunk.map(t => hashMatrixKeySuffix(serialize(t._2))).toArray
+          val dbKeySuffix: Rep[ForgeArray[String]] = chunk.map(t => t._3).toArray
           val dbValues: Rep[ForgeArray[ForgeArray[Byte]]] = chunk.map(t => serialize(t._2)).toArray
 
           hash.putAll(queue, dbKeyPrefix, dbKeySuffix, dbValues, dbKeyPrefix.length)
@@ -934,7 +994,7 @@ trait StreamOps {
       infix ("reduce") (CurriedMethodSignature(List(List(("zero", T)), List(("func", MString ==> T)), List(("rfunc", (T,T) ==> T))), T), addTpePars = T) implements composite ${
         var acc = zero
 
-        $self.processFileChunks(line => func(line), { (a: Rep[ForgeArray[T]]) =>
+        $self.processFileChunks((line, location) => func(line), { (a: Rep[ForgeArray[T]]) =>
           val reduced = array_reduce(a, rfunc, zero)
           acc = rfunc(acc, reduced)
         })

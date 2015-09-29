@@ -73,7 +73,7 @@ trait StreamSuitePaths {
   val testDHash1 = "test1"
   val testDHash2 = "test2"
   val testHashStreamMat = "test_hash_stream.mat"
-  val testDHashStreamMat = "test_dhash_stream"
+  val testDHashStreamMat = "test_dhash_stream.mat"
   val testHashInMemMat = "test_hash_inmem.mat"
 }
 

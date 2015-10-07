@@ -71,8 +71,8 @@ trait ScalaOps extends PrimitiveMathGen {
     impl (toFloat) (codegen($cala, ${ $0.toFloat }))
     impl (toDouble) (codegen($cala, ${ $0.toDouble }))
     impl (toLong) (codegen($cala, ${ $0.toLong }))
-    impl (toShort) (codegen($cala, ${ $0.toShort }))
-    impl (toByte) (codegen($cala, ${ $0.toByte }))
+    impl (toShort) (codegen($cala, ${ $0.toLong.toShort }))
+    impl (toByte) (codegen($cala, ${ $0.toLong.toByte }))
 
     for (g <- List(cuda, cpp)) {
       impl (toInt) (codegen(g, ${ (int32_t) $0 }))

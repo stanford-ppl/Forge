@@ -64,17 +64,23 @@ trait ScalaOps extends PrimitiveMathGen {
     val toFloat = infix (Prim) ("toFloat", T withBound TNumeric, T :: MFloat)
     val toDouble = infix (Prim) ("toDouble", T withBound TNumeric, T :: MDouble)
     val toLong = infix (Prim) ("toLong", T withBound TNumeric, T :: MLong)
+    val toShort = infix (Prim) ("toShort", T withBound TNumeric, T :: MShort)
+    val toByte = infix (Prim) ("toByte", T withBound TNumeric, T :: MByte)
 
     impl (toInt) (codegen($cala, ${ $0.toInt }))
     impl (toFloat) (codegen($cala, ${ $0.toFloat }))
     impl (toDouble) (codegen($cala, ${ $0.toDouble }))
     impl (toLong) (codegen($cala, ${ $0.toLong }))
+    impl (toShort) (codegen($cala, ${ $0.toShort }))
+    impl (toByte) (codegen($cala, ${ $0.toByte }))
 
     for (g <- List(cuda, cpp)) {
       impl (toInt) (codegen(g, ${ (int32_t) $0 }))
       impl (toFloat) (codegen(g, ${ (float) $0 }))
       impl (toDouble) (codegen(g, ${ (double) $0 }))
       impl (toLong) (codegen(g, ${ (int64_t) $0 }))
+      impl (toShort) (codegen(g, ${ (int16_t) $0 }))
+      impl (toByte) (codegen(g, ${ (int8_t) $0 }))
     }
 
     fimplicit (Prim) ("repInt2ToRepDouble", Nil, MInt :: MDouble) implements composite ${ $0.toDouble }

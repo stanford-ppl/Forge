@@ -122,6 +122,16 @@ trait ScalaOps extends PrimitiveMathGen {
     val long_bitwise_not = infix (Prim) ("unary_~", Nil, MLong :: MLong)
     impl (long_shift_right_unsigned) (codegen($cala, ${ $0 >>> $1 }))
 
+    val short_plus = direct (Prim) ("forge_short_plus", Nil, (MShort, MShort) :: MShort)
+    val short_minus = direct (Prim) ("forge_short_minus", Nil, (MShort, MShort) :: MShort)
+    val short_times = direct (Prim) ("forge_short_times", Nil, (MShort,MShort) :: MShort)
+    val short_divide = direct (Prim) ("forge_short_divide", Nil, (MShort,MShort) :: MShort)
+    
+    val byte_plus = direct (Prim) ("forge_byte_plus", Nil, (MByte, MByte) :: MByte)
+    val byte_minus = direct (Prim) ("forge_byte_minus", Nil, (MByte, MByte) :: MByte)
+    val byte_times = direct (Prim) ("forge_byte_times", Nil, (MByte,MByte) :: MByte)
+    val byte_divide = direct (Prim) ("forge_byte_divide", Nil, (MByte,MByte) :: MByte)
+
     for (g <- List($cala, cuda, cpp)) {
       impl (int_plus) (codegen(g, ${$0 + $1}))
       impl (int_minus) (codegen(g, ${$0 - $1}))
@@ -156,6 +166,16 @@ trait ScalaOps extends PrimitiveMathGen {
       impl (long_shift_left) (codegen(g, ${ $0 << $1 }))
       impl (long_mod) (codegen(g, ${$0 % $1}))
       impl (long_bitwise_not) (codegen(g, ${~$0}))
+
+      impl (short_plus) (codegen(g, ${$0 + $1}))
+      impl (short_minus) (codegen(g, ${$0 - $1}))
+      impl (short_times) (codegen(g, ${$0 * $1}))
+      impl (short_divide) (codegen(g, ${$0 / $1}))
+
+      impl (byte_plus) (codegen(g, ${$0 + $1}))
+      impl (byte_minus) (codegen(g, ${$0 - $1}))
+      impl (byte_times) (codegen(g, ${$0 * $1}))
+      impl (byte_divide) (codegen(g, ${$0 / $1}))
     }
 
     infix (Prim) ("<<",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_left($0,$1) }
@@ -349,6 +369,8 @@ trait ScalaOps extends PrimitiveMathGen {
 
     val toInt = infix (Str) ("toInt", Nil, MString :: MInt)
     val toLong = infix (Str) ("toLong", Nil, MString :: MLong)
+    val toShort = infix (Str) ("toShort", Nil, MString :: MShort)
+    val toByte = infix (Str) ("toByte", Nil, MString :: MByte)
     val toFloat = infix (Str) ("toFloat", Nil, MString :: MFloat)
     val toDouble = infix (Str) ("toDouble", Nil, MString :: MDouble)
     val toBoolean = infix (Str) ("toBoolean", Nil, MString :: MBoolean)
@@ -367,6 +389,8 @@ trait ScalaOps extends PrimitiveMathGen {
 
     impl (toInt) (codegen($cala, ${ $0.toInt }))
     impl (toLong) (codegen($cala, ${ $0.toLong }))
+    impl (toShort) (codegen($cala, ${ $0.toShort }))
+    impl (toByte) (codegen($cala, ${ $0.toByte }))
     impl (toFloat) (codegen($cala, ${ $0.toFloat }))
     impl (toDouble) (codegen($cala, ${ $0.toDouble }))
     impl (toBoolean) (codegen($cala, ${ $0.toBoolean }))
@@ -384,6 +408,8 @@ trait ScalaOps extends PrimitiveMathGen {
 
     impl (toInt) (codegen(cpp, ${ string_toInt($0) }))
     impl (toLong) (codegen(cpp, ${ string_toLong($0) }))
+    impl (toShort) (codegen(cpp, ${ string_toShort($0) }))
+    impl (toByte) (codegen(cpp, ${ string_toByte($0) }))
     impl (toFloat) (codegen(cpp, ${ string_toFloat($0) }))
     impl (toDouble) (codegen(cpp, ${ string_toDouble($0) }))
     impl (toBoolean) (codegen(cpp, ${ string_toBoolean($0) }))

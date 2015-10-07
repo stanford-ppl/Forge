@@ -79,6 +79,22 @@ trait ArithOps {
     infix (LongArith) ("exp", Nil, MLong :: MLong) implements composite ${ math_object_exp($0.toDouble).toLong }
     infix (LongArith) ("log", Nil, MLong :: MLong) implements composite ${ math_object_log($0.toDouble).toLong }
 
+    val ShortArith = tpeClassInst("ArithShort", Nil, Arith(MShort))
+    infix (ShortArith) ("zero", Nil, MShort :: MShort) implements composite ${ unit(0) }
+    infix (ShortArith) ("empty", Nil, Nil :: MShort) implements composite ${ unit(0) }
+    infix (ShortArith) ("+", Nil, (MShort,MShort) :: MShort) implements composite ${ forge_short_plus($0,$1) }
+    infix (ShortArith) ("-", Nil, (MShort,MShort) :: MShort) implements composite ${ forge_short_minus($0,$1) }
+    infix (ShortArith) ("*", Nil, (MShort,MShort) :: MShort) implements composite ${ forge_short_times($0,$1) }
+    infix (ShortArith) ("/", Nil, (MShort,MShort) :: MShort) implements composite ${ forge_short_divide($0,$1) }
+
+    val ByteArith = tpeClassInst("ArithByte", Nil, Arith(MByte))
+    infix (ByteArith) ("zero", Nil, MByte :: MByte) implements composite ${ unit(0) }
+    infix (ByteArith) ("empty", Nil, Nil :: MByte) implements composite ${ unit(0) }
+    infix (ByteArith) ("+", Nil, (MByte,MByte) :: MByte) implements composite ${ forge_byte_plus($0,$1) }
+    infix (ByteArith) ("-", Nil, (MByte,MByte) :: MByte) implements composite ${ forge_byte_minus($0,$1) }
+    infix (ByteArith) ("*", Nil, (MByte,MByte) :: MByte) implements composite ${ forge_byte_times($0,$1) }
+    infix (ByteArith) ("/", Nil, (MByte,MByte) :: MByte) implements composite ${ forge_byte_divide($0,$1) }
+
     // tuples of ariths
     for (arity <- 2 until maxTuples) {
       val Tup = lookupTpe("Tup"+arity)

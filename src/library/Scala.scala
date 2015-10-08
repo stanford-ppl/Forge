@@ -172,7 +172,19 @@ trait ScalaOps extends PrimitiveMathGen {
       impl (long_shift_left) (codegen(g, ${ $0 << $1 }))
       impl (long_mod) (codegen(g, ${$0 % $1}))
       impl (long_bitwise_not) (codegen(g, ${~$0}))
+    }
 
+    impl (short_plus) (codegen($cala, ${ ($0.toInt + $1.toInt).toShort }))
+    impl (short_minus) (codegen($cala, ${ ($0.toInt - $1.toInt).toShort }))
+    impl (short_times) (codegen($cala, ${ ($0.toInt * $1.toInt).toShort }))
+    impl (short_divide) (codegen($cala, ${ ($0.toInt / $1.toInt).toShort }))
+
+    impl (byte_plus) (codegen($cala, ${ ($0.toInt + $1.toInt).toByte }))
+    impl (byte_minus) (codegen($cala, ${ ($0.toInt - $1.toInt).toByte }))
+    impl (byte_times) (codegen($cala, ${ ($0.toInt * $1.toInt).toByte }))
+    impl (byte_divide) (codegen($cala, ${ ($0.toInt / $1.toInt).toByte }))
+
+    for (g <- List(cuda, cpp)) {
       impl (short_plus) (codegen(g, ${$0 + $1}))
       impl (short_minus) (codegen(g, ${$0 - $1}))
       impl (short_times) (codegen(g, ${$0 * $1}))

@@ -14,7 +14,7 @@ trait LPTest extends OptiMLApplication {
   def main() = {
     if (args.length < 1) printUsage
 
-    val test_size = args(0).toLong
+    val test_size = args(0).toInt
 
     val x8 = (0::test_size) { i =>
         ((i + 234) * (i + 344534345)).toByte
@@ -37,7 +37,7 @@ trait LPTest extends OptiMLApplication {
     tic("lpdot")
     val xylpdot = DenseVector.lpdot(x8, y8)
     toc("lpdot", xylpdot)
-    println("dot(x8, y8): " + xylpdot)
+    println("lpdot(x8, y8): " + xylpdot)
 
     // val x8 = args(0).toByte
     // val y8 = args(1).toByte

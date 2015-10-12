@@ -560,7 +560,7 @@ trait DenseVectorOps {
     }))
 
     impl (lpdot8_helper) (codegen(cpp, ${
-      lpblas::dot($0->data, $1->data, $2)
+      lpblas_dot8($0->data, $1->data, $2)
     }))
 
     static (DenseVector) ("lpdot", Nil, (DenseVector(MByte), DenseVector(MByte)) :: MFloat) implements composite ${

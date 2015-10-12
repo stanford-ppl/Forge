@@ -25,7 +25,8 @@ trait LPTest extends OptiMLApplication {
     }
 
     tic("dot", x8.size, y8.size)
-    val xydot = (x8 *:* y8)
+    //val xydot = (x8 *:* y8)
+    val xydot = sum(0, test_size) { i => x8(i) * y8(i)}
     toc("dot", xydot)
     println("dot(x8, y8): " + xydot)
 

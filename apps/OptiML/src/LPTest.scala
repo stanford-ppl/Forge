@@ -14,7 +14,7 @@ trait LPTest extends OptiMLApplication {
   def main() = {
     if (args.length < 1) printUsage
 
-    val test_size = args(0).toInt
+    val test_size = args(0).toLong
 
     val x8 = (0::test_size) { i =>
         ((i + 234) * (i + 344534345)).toByte
@@ -25,16 +25,19 @@ trait LPTest extends OptiMLApplication {
     }
 
     tic("dot")
-    println("dot(x8, y8): " + (x8 *:* y8))
-    toc("dot")
+    val xydot = (x8 *:* y8)
+    toc("dot", xydot)
+    println("dot(x8, y8): " + xydot)
 
     tic("fpdot")
-    println("fpdot(x8, y8): " + sum(0, test_size) { i => (x8(i).toFloat) * (y8(i).toFloat)})
-    toc("fpdot")
+    val xyfpdot = sum(0, test_size) { i => (x8(i).toFloat) * (y8(i).toFloat)}
+    toc("fpdot", xyfpdot)
+    println("fpdot(x8, y8): " + xyfpdot)
 
     tic("lpdot")
-    println("dot(x8, y8): " + DenseVector.lpdot(x8, y8))
-    toc("lpdot")
+    val xylpdot = DenseVector.lpdot(x8, y8)
+    toc("lpdot", xylpdot)
+    println("dot(x8, y8): " + xylpdot)
 
     // val x8 = args(0).toByte
     // val y8 = args(1).toByte

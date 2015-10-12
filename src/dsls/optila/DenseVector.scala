@@ -555,6 +555,10 @@ trait DenseVectorOps {
 
     val lpdot8_helper = compiler (DenseVector) ("lpdot8_helper", Nil, (MArray(MByte), MArray(MByte)) :: MFloat)
 
+    impl (lpdot8_helper) (codegen($scala, ${
+      0.0f
+    }))
+
     impl (lpdot8_helper) (codegen(cpp, ${
       3.0f
     }))

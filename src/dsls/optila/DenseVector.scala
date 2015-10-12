@@ -553,18 +553,18 @@ trait DenseVectorOps {
   def importDenseVectorLowPrecisionOps() {
     val DenseVector = lookupTpe("DenseVector")
 
-    val lpdot8_helper = compiler (DenseVector) ("lpdot8_helper", Nil, (MArray(MByte), MArray(MByte)) :: MFloat)
+    val lpdot8_helper = compiler (DenseVector) ("lpdot8_helper", Nil, (MArray(MByte), MArray(MByte), MLong) :: MFloat)
 
     impl (lpdot8_helper) (codegen($cala, ${
       0.0f
     }))
 
     impl (lpdot8_helper) (codegen(cpp, ${
-      3.0f
+      lpblas::dot($0->data, $1->data, $2)
     }))
 
     static (DenseVector) ("lpdot", Nil, (DenseVector(MByte), DenseVector(MByte)) :: MFloat) implements composite ${
-      lpdot8_helper(densevector_raw_data($0), densevector_raw_data($1))
+      lpdot8_helper(densevector_raw_data($0), densevector_raw_data($1), $0.length)
     }
   }
 }

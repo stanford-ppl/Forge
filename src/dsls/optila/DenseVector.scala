@@ -566,5 +566,19 @@ trait DenseVectorOps {
     static (DenseVector) ("lpdot", Nil, (DenseVector(MByte), DenseVector(MByte)) :: MFloat) implements composite ${
       lpdot8_helper(densevector_raw_data($0), densevector_raw_data($1), $0.length)
     }
+
+    val lpdot16_helper = compiler (DenseVector) ("lpdot16_helper", Nil, (MArray(MShort), MArray(MShort), MLong) :: MFloat)
+
+    impl (lpdot16_helper) (codegen($cala, ${
+      0.0f
+    }))
+
+    impl (lpdot16_helper) (codegen(cpp, ${
+      lpblas_dot16($0->data, $1->data, $2)
+    }))
+
+    static (DenseVector) ("lpdot", Nil, (DenseVector(MShort), DenseVector(MShort)) :: MFloat) implements composite ${
+      lpdot16_helper(densevector_raw_data($0), densevector_raw_data($1), $0.length)
+    }
   }
 }

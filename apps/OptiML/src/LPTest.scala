@@ -17,11 +17,11 @@ trait LPTest extends OptiMLApplication {
     val test_size = args(0).toInt
 
     val x8 = (0::test_size) { i =>
-        ((i + 234) * (i + 344534345)).toByte
+        ((i + 234) * (i + 344534345)).toShort
     }
 
     val y8 = (0::test_size) { i =>
-        ((i + 232) * (i + 345654465)).toByte
+        ((i + 232) * (i + 345654465)).toShort
     }
 
     tic("dot", x8.size, y8.size)

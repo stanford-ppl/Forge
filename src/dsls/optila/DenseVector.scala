@@ -419,6 +419,8 @@ trait DenseVectorOps {
     infix (DenseVectorArith) ("log", T withBound TArith, DenseVector(T) :: DenseVector(T)) implements composite ${ densevector_log($0) }
 
     importDenseVectorPrimitiveOps()
+
+    importDenseVectorLowPrecisionOps()
   }
 
 
@@ -546,5 +548,20 @@ trait DenseVectorOps {
     infix (DenseVector) ("/", Nil, (DenseVector(MDouble),DenseVector(MInt)) :: DenseVector(MDouble)) implements redirect ${ densevector_div[Double]($0,$1.toDouble) }
     infix (DenseVector) ("/", Nil, (DenseVector(MDouble),DenseVector(MFloat)) :: DenseVector(MDouble)) implements redirect ${ densevector_div[Double]($0,$1.toDouble) }
     infix (DenseVector) ("/", Nil, (DenseVector(MDouble),DenseVector(MDouble)) :: DenseVector(MDouble)) implements redirect ${ densevector_div[Double]($0,$1) }
+  }
+
+
+  def importDenseVectorPrimitiveOps() {
+    val DenseVector = lookupTpe("DenseVector")
+
+    val lpdot8_helper = compiler (DenseVector) ("lpdot8_helper", Nil, (MArray(MByte), MArray(MByte)) :: MFloat)
+
+    impl (lpdot8_helper) (codegen(cpp, ${
+      3.0f
+    }))
+
+    static (DenseVector) ("lpdot", Nil, (DenseVector(MByte), DenseVector(MByte)) :: MFloat) implements composite ${
+      lpdot8_helper(densevector_raw_data($0), densevector_raw_data($1))
+    }
   }
 }

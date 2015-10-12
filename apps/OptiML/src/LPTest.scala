@@ -31,8 +31,9 @@ trait LPTest extends OptiMLApplication {
     println("x16 * y16: " + (x16 * y16))
 
     val v8 = DenseVector(x8, y8)
+    val n2: Rep[Byte] = (v8 *:* v8)
     
-    println("dot(v8, v8): " + (v8 *:* v8))
+    println("dot(v8, v8): " + n2)
     println("lpdot(v8, v8): " + DenseVector.lpdot(v8, v8))
   }
 }

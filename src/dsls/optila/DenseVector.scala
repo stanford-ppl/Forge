@@ -550,8 +550,7 @@ trait DenseVectorOps {
     infix (DenseVector) ("/", Nil, (DenseVector(MDouble),DenseVector(MDouble)) :: DenseVector(MDouble)) implements redirect ${ densevector_div[Double]($0,$1) }
   }
 
-
-  def importDenseVectorPrimitiveOps() {
+  def importDenseVectorLowPrecisionOps() {
     val DenseVector = lookupTpe("DenseVector")
 
     val lpdot8_helper = compiler (DenseVector) ("lpdot8_helper", Nil, (MArray(MByte), MArray(MByte)) :: MFloat)

@@ -34,6 +34,6 @@ trait LPTest extends OptiMLApplication {
 
     println("v8: " + v8)
     println("dot(v8, v8): " + (v8 *:* v8))
-    println("lpdot(v8, v8): " + lpdot(v8, v8))
+    println("lpdot(v8, v8): " + DenseVector.lpdot(v8, v8))
   }
 }

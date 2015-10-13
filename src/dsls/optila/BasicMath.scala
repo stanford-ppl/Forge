@@ -123,15 +123,12 @@ trait BasicMathOps {
     direct (Math) ("normalize", Nil, (DenseVector(MDouble), NormalizeMethod) :: DenseVector(MDouble)) implements composite ${
       $1 match {
         case Std =>
-          val avg = mean($0)
-          val dev = stddev($0)
-          $0 map { e => (e - avg) / dev }
+          // scale to mean 0, stddev 1
+          normalizeStdUsing($0, mean($0), stddev($0))
 
         case Unity =>
-          // scale to [-1 1]
-          val minVal = min($0)
-          val maxVal = max($0)
-          (($0 map { e => (e - minVal) / (maxVal - minVal) }) * 2.0) - 1.0
+          // scale to [-1, 1]
+          normalizeUnityUsing($0, min($0), max($0))
       }
     }
 
@@ -141,6 +138,23 @@ trait BasicMathOps {
       $0 mapCols { c => normalize(c, $1) }
     }
 
+    // -- These are factored out so that users can call them independently (i.e. with saved values)
+
+    direct (Math) ("normalizeUnityScalarUsing", Nil, (("e",MDouble), ("minVal", MDouble), ("maxVal", MDouble)) :: MDouble) implements composite ${
+      (((e - minVal) / (maxVal - minVal)) * 2.0) - 1.0
+    }
+
+    direct (Math) ("normalizeUnityUsing", Nil, (("v",DenseVector(MDouble)), ("minVal", MDouble), ("maxVal", MDouble)) :: DenseVector(MDouble)) implements composite ${
+      v map { e => normalizeUnityScalarUsing(e, minVal, maxVal) }
+    }
+
+    direct (Math) ("normalizeStdScalarUsing", Nil, (("e",MDouble), ("avg", MDouble), ("stddev", MDouble)) :: MDouble) implements composite ${
+      (e - avg) / stddev
+    }
+
+    direct (Math) ("normalizeStdUsing", Nil, (("v",DenseVector(MDouble)), ("avg", MDouble), ("stddev", MDouble)) :: DenseVector(MDouble)) implements composite ${
+      v map { e => normalizeStdScalarUsing(e, avg, stddev) }
+    }
 
     // -- other math ops
     direct (Math) ("sigmoid", Nil, MDouble :: MDouble) implements composite ${ 1.0 / (1.0 + exp(-$0)) }

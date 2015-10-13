@@ -12,11 +12,13 @@ import optiml.shared._
 import optiml.library._
 import ppl.tests.scalatest._
 
-object SparseMatrixDataOpsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SparseMatrixDataOps
-object SparseMatrixDataOpsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SparseMatrixDataOps
+object SparseMatrixDataOpsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseMatrixDataOps
+object SparseMatrixDataOpsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseMatrixDataOps
 trait SparseMatrixDataOps extends ForgeTestModule with OptiMLApplication {
   def main() {
     val mb = SparseMatrix[Double](1000,1000)
+    mb(11,101) = 17
+    mb(10,100) = 39
     mb(10,100) = 5
     mb(9,100) = 1
     mb(9,722) = 722
@@ -76,8 +78,8 @@ trait SparseMatrixDataOps extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object SparseMatrixOperatorsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SparseMatrixOperators
-object SparseMatrixOperatorsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SparseMatrixOperators
+object SparseMatrixOperatorsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseMatrixOperators
+object SparseMatrixOperatorsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseMatrixOperators
 trait SparseMatrixOperators extends ForgeTestModule with OptiMLApplication {
   def main() {
     val mRand = SparseMatrix.rand(100,100,0.9)
@@ -106,8 +108,8 @@ trait SparseMatrixOperators extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object SparseMatrixBulkOpsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SparseMatrixBulkOps
-object SparseMatrixBulkOpsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SparseMatrixBulkOps
+object SparseMatrixBulkOpsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseMatrixBulkOps
+object SparseMatrixBulkOpsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseMatrixBulkOps
 trait SparseMatrixBulkOps extends ForgeTestModule with OptiMLApplication {
   def main() {
     val ab = SparseMatrix[Int](10000,10000)

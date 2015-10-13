@@ -3,8 +3,8 @@ import optiml.shared._
 import optiml.library._
 import ppl.tests.scalatest._
 
-object DenseSparseMatrixArithmeticRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with DenseSparseMatrixArithmetic
-object DenseSparseMatrixArithmeticRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with DenseSparseMatrixArithmetic
+object DenseSparseMatrixArithmeticRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with DenseSparseMatrixArithmetic
+object DenseSparseMatrixArithmeticRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with DenseSparseMatrixArithmetic
 trait DenseSparseMatrixArithmetic extends ForgeTestModule with OptiMLApplication {
   def main() = {
     val nz = DenseVector(0.18608, 0.65816, 0.22775, 0.36317, 0.48526, 0.77628, 0.77896)

@@ -115,8 +115,10 @@ trait DenseVectorOps {
     }
 
     compiler (DenseVector) ("densevector_sortindex_helper", T, (MInt,MInt,MArray(T)) :: SArray(MInt), TOrdering(T)) implements codegen($cala, ${
-      // this is a hack for int64 mode, where ints get remapped to longs.
-      def promoteInt64(x: Int) = $0 + x - $0
+      // this is a hack for int64 mode, where ints get remapped to longs. By adding / subtracting $1,
+      // the return type of promoteInt64 should be Long when int64 is on, and Int otherwise.
+      // (Note if $1 is a constant, this trick doesn't work. More often though, $0 is a constant.)
+      def promoteInt64(x: Int) = $1 + x - $1
       ($0.toInt until $1.toInt: scala.Range).toArray.map(i => promoteInt64(i)).sortWith((a,b) => $2(a) < $2(b))
     })
 

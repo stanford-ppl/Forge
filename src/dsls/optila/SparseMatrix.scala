@@ -305,7 +305,7 @@ trait SparseMatrixOps {
         while (i < nnz && !outOfOrder) {
           if (rowIndices(i) < lastRow)
             outOfOrder = true
-          if (rowIndices(i) == lastRow && colIndices(i) < lastCol)
+          if (rowIndices(i) == lastRow && colIndices(i) <= lastCol)
             outOfOrder = true
           lastRow = rowIndices(i)
           lastCol = colIndices(i)
@@ -331,7 +331,7 @@ trait SparseMatrixOps {
           i += 1
         }
 
-        coo_to_csr_finalize($self,outData,outColIndices,outRowPtr)
+        coo_to_csr_finalize($self,outData,outColIndices,outRowPtr,$self.nnz)
       }
 
       compiler ("coo_to_csr_unordered") (Nil :: SparseMatrix(T)) implements composite ${
@@ -339,42 +339,42 @@ trait SparseMatrixOps {
         val rowIndices = sparsematrix_coo_rowindices($self)
         val colIndices = sparsematrix_coo_colindices($self)
 
-        // build a hashmap containing the elements of the COO matrix,
-        // with tuples mapped to longs and rowIndices in the high bits so we can sort by them.
-        // TODO: switch to using a specialized HashMap impl to avoid boxing
-        val elems = SHashMap[Long,T]()
+        // First, remove deleted elements, which are represented by a negative index
+        val remainingElems = (0::$self.nnz).filter(i => rowIndices(i) >= 0)
 
-        // remove duplicates by preferring elements further to the right in the array
+        // Sort by column and then row, so that cols are sorted, but row takes precedence
+        val sortedElems = remainingElems.sortBy(i => colIndices(i)).sortBy(i => rowIndices(i))
+        // val sortedElems = remainingElems.sortBy(i => (rowIndices(i).toLong << 32) + colIndices(i).toLong)
+
+        // Write to output in sorted order without duplicates (left to right, top to bottom)
+        val outData = array_empty[T](sortedElems.length)
+        val outColIndices = array_empty[Int](sortedElems.length)
+        val outRowPtr = array_empty[Int]($self.numRows+1)
+
         var i = 0
-        while (i < $self.nnz) {
-          if (rowIndices(i) >= 0) {  // removed elements are represented by a negative index
-            val key = (rowIndices(i).toLong << 32) + colIndices(i).toLong
-            elems(key) = data(i)
+        var nnz = 0
+        while (i < sortedElems.length) {
+          // Check for duplicates, relying on sorted order
+          var newElem = false
+          val next = sortedElems(i)
+          val prev = if (i > 0) { var z = i; sortedElems(z-1) } else 0
+          if (nnz == 0 || rowIndices(next) != rowIndices(prev) || colIndices(next) != colIndices(prev)) {
+            nnz += 1
+            newElem = true
+          }
+
+          array_update(outData, nnz-1, data(next))
+          if (newElem) {
+            array_update(outColIndices, nnz-1, colIndices(next))
+            array_update(outRowPtr, rowIndices(next)+1, outRowPtr(rowIndices(next)+1)+1)
           }
           i += 1
         }
-        val indices = array_sort(elems.keys)
-        val outData = array_empty[T](array_length(indices))
-        val outColIndices = array_empty[Int](array_length(indices))
-        val outRowPtr = array_empty[Int]($self.numRows+1)
 
-        // write to output in sorted order without duplicates
-        // left-to-right, top-to-bottom
-        i = 0
-        while (i < array_length(indices)) {
-          val colIdx = (indices(i) & unit(0x00000000ffffffffL)).toInt
-          array_update(outColIndices, i, colIdx)
-          array_update(outData, i, elems(indices(i)))
-
-          val rowIdx = (indices(i) >>> 32).toInt
-          array_update(outRowPtr, rowIdx+1, outRowPtr(rowIdx+1)+1)
-          i += 1
-        }
-
-        coo_to_csr_finalize($self,outData,outColIndices,outRowPtr)
+        coo_to_csr_finalize($self,outData,outColIndices,outRowPtr,nnz)
       }
 
-      compiler ("coo_to_csr_finalize") ((("outData",MArray(T)),("outColIndices",MArray(MInt)),("outRowPtr",MArray(MInt))) :: SparseMatrix(T)) implements composite ${
+      compiler ("coo_to_csr_finalize") ((("outData",MArray(T)),("outColIndices",MArray(MInt)),("outRowPtr",MArray(MInt)),("outNnz",MInt)) :: SparseMatrix(T)) implements single ${
         // finalize rowPtr
         var i = 0
         var acc = 0
@@ -383,7 +383,7 @@ trait SparseMatrixOps {
           array_update(outRowPtr, i, acc)
           i += 1
         }
-        array_update(outRowPtr, $self.numRows, array_length(outData))
+        array_update(outRowPtr, $self.numRows, outNnz)
 
         // -- debug
         // println("indices.length: " + array_length(indices))
@@ -397,7 +397,7 @@ trait SparseMatrixOps {
         // println("colIndices: " + outColIndices)
         // println("rowPtr: " + outRowPtr)
 
-        sparsematrix_csr_alloc_raw[T]($self.numRows,$self.numCols,outData.unsafeImmutable,outColIndices.unsafeImmutable,outRowPtr.unsafeImmutable,array_length(outData))
+        sparsematrix_csr_alloc_raw[T]($self.numRows,$self.numCols,outData.unsafeImmutable,outColIndices.unsafeImmutable,outRowPtr.unsafeImmutable,outNnz)
       }
     }
   }
@@ -481,23 +481,6 @@ trait SparseMatrixOps {
       val rowIndices = (0::nnz) { i => randomInt(numRows) }
       val colIndices = (0::nnz) { i => randomInt(numCols) }
       SparseMatrix.fromElements(numRows, numCols, nz, rowIndices, colIndices)
-
-      // This is O(numRows*numCols) (instead of nnz), but constructs the SparseMatrixBuildable in sorted order,
-      // which enables it to be turned into a CSR much faster.
-      // val out = SparseMatrix[T](numRows, numCols)
-      // var i = 0
-      // var j = 0
-      // while (i < numRows) {
-      //   while (j < numCols) {
-      //     if (random[Double] > sparsity) {
-      //       out(i,j) = gen(i*numRows+j)
-      //     }
-      //     j += 1
-      //   }
-      //   j = 0
-      //   i += 1
-      // }
-      // out.finish
     }
 
     static (SparseMatrix) ("rand", Nil, (MInt,MInt,MDouble) :: SparseMatrix(MDouble)) implements composite ${ sparsematrix_rand[Double]($0, $1, $2, i => random[Double]) }
@@ -588,7 +571,9 @@ trait SparseMatrixOps {
       }
 
       infix ("colIndices") (Nil :: IndexVector) implements composite ${
-        IndexVector(indexvector_fromarray(sparsematrix_csr_colindices($self), true))
+        // Make sure to trim the raw array down to nnz size before creating the IndexVector
+        val rawColIndices = sparsematrix_csr_colindices($self)
+        IndexVector((0::$self.nnz) { i => rawColIndices(i) })
       }
 
       // FIXME: more efficient way to get nzRows/nzCols?
@@ -680,7 +665,7 @@ trait SparseMatrixOps {
         val rowIndices = $self.rowIndices
 
         // must be sequential because writing to COO
-        for (i <- 0 until data.length) {
+        for (i <- 0 until $self.nnz) {
           out(rowIndices(i), colIndices(i)) = data(i)
         }
         out
@@ -930,6 +915,18 @@ trait SparseMatrixOps {
         }
       }
 
+      infix ("*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${
+        fassert($self.numCols == $1.numRows, "dimension mismatch: matrix multiply (lhs: " + $self.makeDimsStr + ", rhs: " + $1.makeDimsStr + ")")
+        // naive
+        if ($self.numRows == 0) DenseMatrix[T]()
+        else {
+          var z = $self // manual guard against code motion
+          (0::z.numRows, *) { i =>
+            $1.mapColsToVector { c => z(i) *:* c }
+          }
+        }
+      }
+
       // TODO
       // infix ("*") (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements single ${
       //   fassert($self.numCols == $1.numRows, "dimension mismatch: matrix multiply")
@@ -989,6 +986,11 @@ trait SparseMatrixOps {
        */
       infix ("mapnz") ((T ==> R) :: SparseMatrix(R), addTpePars = R) implements composite ${
         val out = $self.nz.map($1)
+        sparsematrix_csr_alloc_raw($self.numRows, $self.numCols, densevector_raw_data(out), sparsematrix_csr_colindices($self), sparsematrix_csr_rowptr($self), $self.nnz)
+      }
+
+      infix ("zipnz") (CurriedMethodSignature(List(List(DenseVector(B)), List((T,B) ==> R)), SparseMatrix(R)), addTpePars = (B,R)) implements composite ${
+        val out = $self.nz.zip($1) { (a,b) => $2(a,b) }
         sparsematrix_csr_alloc_raw($self.numRows, $self.numCols, densevector_raw_data(out), sparsematrix_csr_colindices($self), sparsematrix_csr_rowptr($self), $self.nnz)
       }
 

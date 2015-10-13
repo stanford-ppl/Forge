@@ -13,8 +13,8 @@ import optiml.shared._
 import optiml.library._
 import ppl.tests.scalatest._
 
-object ComplexMathRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with ComplexMath
-object ComplexMathRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with ComplexMath
+object ComplexMathRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with ComplexMath
+object ComplexMathRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with ComplexMath
 trait ComplexMath extends ForgeTestModule with OptiMLApplication {
   def main() = {
     val a = Complex(5,2)

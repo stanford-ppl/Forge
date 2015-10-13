@@ -131,6 +131,17 @@ trait FeatureOps {
       $0.getDayOfWeek()
     })
 
+    compiler (DateFeature) ("dt_internal_days_between", Nil, (SDateTime, SDateTime) :: MInt) implements codegen($cala, ${
+      org.joda.time.Days.daysBetween($0.toLocalDate(), $1.toLocalDate()).getDays()
+    })
+
+    compiler (DateFeature) ("dt_internal_months_between", Nil, (SDateTime, SDateTime) :: MInt) implements codegen($cala, ${
+      org.joda.time.Months.monthsBetween($0.toLocalDate(), $1.toLocalDate()).getMonths()
+    })
+
+    compiler (DateFeature) ("dt_internal_years_between", Nil, (SDateTime, SDateTime) :: MInt) implements codegen($cala, ${
+      org.joda.time.Years.yearsBetween($0.toLocalDate(), $1.toLocalDate()).getYears()
+    })
 
     // User-facing DateTime operations.
 
@@ -160,6 +171,18 @@ trait FeatureOps {
       val dt = dt_internal($0)
       dt_internal_weekday(dt)
     }
+
+    static (DateFeature) ("daysBetween", Nil, (MDouble, MDouble) :: MInt) implements composite ${
+      dt_internal_days_between(dt_internal($0), dt_internal($1))
+    }
+
+    static (DateFeature) ("monthsBetween", Nil, (MDouble, MDouble) :: MInt) implements composite ${
+      dt_internal_months_between(dt_internal($0), dt_internal($1))
+    }
+
+    static (DateFeature) ("yearsBetween", Nil, (MDouble, MDouble) :: MInt) implements composite ${
+      dt_internal_years_between(dt_internal($0), dt_internal($1))
+    }
   }
 
   def importFeatureHelperOps() {
@@ -172,6 +195,11 @@ trait FeatureOps {
       MLGlobal.getId($0)
     })
 
+    /* Lookup the string corresponding to a given unique integer identifier */
+    direct (FeatureHelper) ("reverseUnique", Nil, MInt :: MString) implements codegen($cala, ${
+      MLGlobal.lookupId($0)
+    })
+
     // direct (FeatureHelper) ("getUniqueMappings", Nil, Nil :: DenseVector(Tup2(MInt,MString))) implements composite ${
     //   val names = get_unique_names_helper
     //   val ids = get_unique_ids_helper
@@ -180,15 +208,15 @@ trait FeatureOps {
     //   densevector_fromarray(data, true)
     // }
 
-    // compiler (FeatureHelper) ("get_unique_names_helper", Nil, Nil :: MArray(MString)) implements codegen($cala, ${
-    //   MLGlobal.getUniqueNames
-    // })
+    direct (FeatureHelper) ("getUniqueIds", Nil, Nil :: MArray(MInt)) implements codegen($cala, ${
+      MLGlobal.getUniqueIds
+    })
 
-    // compiler (FeatureHelper) ("get_unique_ids_helper", Nil, Nil :: MArray(MInt)) implements codegen($cala, ${
-    //   MLGlobal.getUniqueIds
-    // })
+    direct (FeatureHelper) ("getUniqueNames", Nil, Nil :: MArray(MString)) implements codegen($cala, ${
+      MLGlobal.getUniqueNames
+    })
 
-    direct (FeatureHelper) ("loadUniqueMappings", Nil, MString :: MInt, effect = simple) implements codegen($cala, ${
+    direct (FeatureHelper) ("loadUniqueMappings", Nil, MString :: MUnit, effect = simple) implements codegen($cala, ${
       MLGlobal.loadUniqueMappings($0)
     })
 

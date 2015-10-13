@@ -61,6 +61,7 @@ def sbtBuildFileHeader(dsl):
     s = Template("""
 import sbt._
 import Keys._
+import Tests._
 
 object ${dslName}Build extends Build {
   if (System.getProperty("showSuppressedErrors") == null) System.setProperty("showSuppressedErrors", "false")
@@ -148,6 +149,22 @@ ${footer}
 
 def sbtBuildFileFooter(dsl):
     s = Template("""
+  // HACK alert: with fork = true, sbt appears to ignore the -D properties passed on the command line,
+  // which breaks test_all. Here we manually look for the currently relevant options. Needs a proper fix!
+  val testOptions = Seq("-Dtests.verbose="+System.getProperty("tests.verbose", "false"),
+                        "-Dtests.threads="+System.getProperty("tests.threads", "1"),
+                        "-Dtests.targets="+System.getProperty("tests.targets", "scala"))
+
+  // Test suites are run individually in different JVMs. Set TEST_JAVA_OPTS to configure JAVA_OPTS for each suite.
+  val testJavaOptionsStr = sys.env.getOrElse("TEST_JAVA_OPTS", "")
+  // TEST_JAVA_OPTS cannot be empty or SBT crashes when it gets a non-empty Seq containing an empty string.
+  val testJavaOptions = if (testJavaOptionsStr == "") Seq() else testJavaOptionsStr.split(" ").toSeq
+
+  def separateTests(tests: Seq[TestDefinition]) = {
+    if (tests.isEmpty) Seq(new Group("", Seq(), SubProcess(Seq()))) //workaround for sbt crash on empty tests
+    else tests map { test => new Group(test.name, Seq(test), SubProcess(testOptions ++ testJavaOptions)) }
+  }
+
   // build targets
   lazy val ${dslName} = Project("${dslName}", file("."), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Apps) // default
   lazy val ${dslName}Shared = Project("${dslName}-shared", file("shared"), settings = virtBuildSettings ++ deps)
@@ -162,9 +179,8 @@ def sbtBuildFileFooter(dsl):
     // Required to use native libraries within tests
     // See http://stackoverflow.com/questions/19425613/unsatisfiedlinkerror-with-native-library-under-sbt
     // and http://www.scala-sbt.org/release/docs/Forking.html
-    //fork := true,
-    //javaOptions in Test := sys.env.getOrElse("SBT_OPTS", "").split(" ")
-    fork := false
+    testGrouping in Test <<= definedTests in Test map separateTests,
+    fork := true
   )) dependsOn(${dslName}Comp, ${dslName}Lib)
 }
 """)
@@ -287,13 +303,13 @@ def publish(dsl, opts):
     # sbt project
     if not os.path.exists(build_dir + "/project/"):
         os.mkdir(build_dir + "/project/")
-        buildFile = open(build_dir + "/project/Build.scala", 'w')
-        if opts.use_jars:
-            buildFile.write(sbtBuildFile(dsl))
-        else:
-            buildFile.write(sbtBuildFileLocal(dsl))
-        buildFile.close()
-        shutil.copyfile(FORGE_HOME + "/static/build.properties", build_dir + "/project/build.properties")
+    buildFile = open(build_dir + "/project/Build.scala", 'w')
+    if opts.use_jars:
+        buildFile.write(sbtBuildFile(dsl))
+    else:
+        buildFile.write(sbtBuildFileLocal(dsl))
+    buildFile.close()
+    shutil.copyfile(FORGE_HOME + "/static/build.properties", build_dir + "/project/build.properties")
 
     # executable scripts
     if not os.path.exists(build_dir + "/bin/"):

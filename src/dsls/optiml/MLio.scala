@@ -57,7 +57,6 @@ trait MLIOOps {
     })
 
     ()
-
   }
 
   def importARFFOps() {

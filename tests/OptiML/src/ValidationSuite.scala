@@ -3,8 +3,8 @@ import optiml.shared._
 import optiml.library._
 import ppl.tests.scalatest._
 
-object ConfusionMatrixRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with ConfusionMatrix
-object ConfusionMatrixRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with ConfusionMatrix
+object ConfusionMatrixRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with ConfusionMatrix
+object ConfusionMatrixRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with ConfusionMatrix
 trait ConfusionMatrix extends ForgeTestModule with OptiMLApplication {
   def main() = {
     val testSet = DenseTrainingSet(DenseMatrix(DenseVector(0,1), DenseVector(2,3), DenseVector(4,5), DenseVector(6,7)), DenseVector(true,false,true,true))
@@ -22,8 +22,8 @@ trait ConfusionMatrix extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object CrossValidationRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with CrossValidation
-object CrossValidationRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with CrossValidation
+object CrossValidationRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with CrossValidation
+object CrossValidationRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with CrossValidation
 trait CrossValidation extends ForgeTestModule with OptiMLApplication {
   def main() = {
     val testSet = DenseTrainingSet(DenseMatrix(DenseVector(0,1), DenseVector(2,3), DenseVector(4,5), DenseVector(6,7)), DenseVector(true,false,true,true))

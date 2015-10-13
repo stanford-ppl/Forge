@@ -13,8 +13,8 @@ import optiml.library._
 import optiml.shared._
 import ppl.tests.scalatest._
 
-object DenseVectorAccessorsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with DenseVectorAccessors
-object DenseVectorAccessorsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with DenseVectorAccessors
+object DenseVectorAccessorsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with DenseVectorAccessors
+object DenseVectorAccessorsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with DenseVectorAccessors
 trait DenseVectorAccessors extends ForgeTestModule with OptiMLApplication {
   def main() {
     val v = DenseVector.rand(1000)
@@ -66,8 +66,8 @@ trait DenseVectorAccessors extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object DenseVectorOperatorsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with DenseVectorOperators
-object DenseVectorOperatorsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with DenseVectorOperators
+object DenseVectorOperatorsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with DenseVectorOperators
+object DenseVectorOperatorsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with DenseVectorOperators
 trait DenseVectorOperators extends ForgeTestModule with OptiMLApplication {
   def main() {
     val v = DenseVector.rand(1000)
@@ -91,8 +91,8 @@ trait DenseVectorOperators extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object DenseVectorUpdatesRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with DenseVectorUpdates
-object DenseVectorUpdatesRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with DenseVectorUpdates
+object DenseVectorUpdatesRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with DenseVectorUpdates
+object DenseVectorUpdatesRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with DenseVectorUpdates
 trait DenseVectorUpdates extends ForgeTestModule with OptiMLApplication {
   def main() {
     val v = DenseVector.rand(1000).mutable
@@ -172,8 +172,8 @@ trait DenseVectorUpdates extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object DenseVectorRangeRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with DenseVectorRange
-object DenseVectorRangeRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with DenseVectorRange
+object DenseVectorRangeRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with DenseVectorRange
+object DenseVectorRangeRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with DenseVectorRange
 trait DenseVectorRange extends ForgeTestModule with OptiMLApplication {
   def main() {
     val rangeEasy = (0::1000)
@@ -194,8 +194,8 @@ trait DenseVectorRange extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object InitRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Init
-object InitRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Init
+object InitRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Init
+object InitRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Init
 trait Init extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -208,8 +208,8 @@ trait Init extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object LoopRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Loop
-object LoopRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Loop
+object LoopRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Loop
+object LoopRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Loop
 trait Loop extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -227,8 +227,8 @@ trait Loop extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object CountRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Count
-object CountRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Count
+object CountRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Count
+object CountRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Count
 trait Count extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -239,8 +239,8 @@ trait Count extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object BulkUpdateRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with BulkUpdate
-object BulkUpdateRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with BulkUpdate
+object BulkUpdateRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with BulkUpdate
+object BulkUpdateRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with BulkUpdate
 trait BulkUpdate extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -252,8 +252,8 @@ trait BulkUpdate extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object FindRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Find
-object FindRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Find
+object FindRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Find
+object FindRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Find
 trait Find extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -264,8 +264,8 @@ trait Find extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object DistRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Dist
-object DistRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Dist
+object DistRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Dist
+object DistRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Dist
 trait Dist extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -277,8 +277,8 @@ trait Dist extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object DistinctRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Distinct
-object DistinctRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Distinct
+object DistinctRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Distinct
+object DistinctRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Distinct
 trait Distinct extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -296,8 +296,24 @@ trait Distinct extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object MedianRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Median
-object MedianRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Median
+object IntersectRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Intersect
+object IntersectRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Intersect
+trait Intersect extends ForgeTestModule with OptiMLApplication {
+  def main() = {
+
+    val v1 = DenseVector(10.0,10.0,11.0,5.0,5.0,-3.0)
+    val v2 = DenseVector(5.0, -3.0)
+    val i = v1 intersect v2
+
+    // duplicates are removed
+    collect(i.sort == DenseVector(-3.0, 5.0))
+
+    mkReport
+  }
+}
+
+object MedianRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Median
+object MedianRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Median
 trait Median extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -307,8 +323,8 @@ trait Median extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-// object NearestNeighborRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with NearestNeighbor
-// object NearestNeighborRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with NearestNeighbor
+// object NearestNeighborRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with NearestNeighbor
+// object NearestNeighborRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with NearestNeighbor
 // trait NearestNeighbor extends ForgeTestModule with OptiMLApplication {
 //   def main() = {
 
@@ -321,8 +337,8 @@ trait Median extends ForgeTestModule with OptiMLApplication {
 //   }
 // }
 
-object SampleRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Sample
-object SampleRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Sample
+object SampleRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Sample
+object SampleRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Sample
 trait Sample extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -333,8 +349,8 @@ trait Sample extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object GroupByRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with GroupBy
-object GroupByRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with GroupBy
+object GroupByRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with GroupBy
+object GroupByRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with GroupBy
 trait GroupBy extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -357,8 +373,8 @@ trait GroupBy extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object SimpleFlatMapRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SimpleFlatMap
-object SimpleFlatMapRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SimpleFlatMap
+object SimpleFlatMapRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SimpleFlatMap
+object SimpleFlatMapRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SimpleFlatMap
 trait SimpleFlatMap extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -369,8 +385,8 @@ trait SimpleFlatMap extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object SimpleFlattenRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SimpleFlatten
-object SimpleFlattenRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SimpleFlatten
+object SimpleFlattenRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SimpleFlatten
+object SimpleFlattenRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SimpleFlatten
 trait SimpleFlatten extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -381,8 +397,8 @@ trait SimpleFlatten extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object PartitionRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Partition
-object PartitionRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Partition
+object PartitionRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Partition
+object PartitionRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Partition
 trait Partition extends ForgeTestModule with OptiMLApplication {
   def main() = {
     val x = DenseVector.rand(100)
@@ -393,6 +409,28 @@ trait Partition extends ForgeTestModule with OptiMLApplication {
     val xf = x.filter(_ > 0.2)
     val (a2,b2) = unpack(xf.partition(_ > 0.7))
     collect(sum(abs((a2 << b2).sort - xf.sort)) < 0.01)
+    mkReport
+  }
+}
+
+object SortRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Sort
+object SortRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Sort
+trait Sort extends ForgeTestModule with OptiMLApplication {
+  def main() = {
+    val v = DenseVector(DenseVector(3,5,-31),DenseVector(-5,6,17),DenseVector(0,-12,2))
+    val sorted = v.sortBy(r => r(0))
+    val sortedKey = DenseVector(DenseVector(-5,6,17),DenseVector(0,-12,2),DenseVector(3,5,-31))
+
+    // Nested DenseVector equality doesn't work at the moment, because the inner type is T
+    // and implemented by reference equality.
+    // collect(sorted == sortedKey)
+    collect((0::sorted.length).forall(i => sorted(i) == sortedKey(i)))
+
+    val v2 = DenseVector(3.2,-6.9,0.0,0.1,-71.5,3.14,2.96)
+    val (sortedV2, sortedIndices) = v2.sortWithIndex
+    collect(sortedIndices == IndexVector(DenseVector(4,1,2,3,6,5,0)))
+    collect(v2(sortedIndices) == sortedV2)
+
     mkReport
   }
 }
@@ -410,6 +448,7 @@ class DenseVectorSuiteInterpreter extends ForgeSuiteInterpreter {
   def testFind() { runTest(FindRunnerI) }
   def testDist() { runTest(DistRunnerI) }
   def testDistinct() { runTest(DistinctRunnerI) }
+  def testIntersect() { runTest(IntersectRunnerI) }
   def testMedian() { runTest(MedianRunnerI) }
   // def testNearestNeighbor() { runTest(NearestNeighborRunnerI) }
   def testSample() { runTest(SampleRunnerI) }
@@ -417,12 +456,12 @@ class DenseVectorSuiteInterpreter extends ForgeSuiteInterpreter {
   def testFlatMap() { runTest(SimpleFlatMapRunnerI) }
   def testFlatten() { runTest(SimpleFlattenRunnerI) }
   def testPartition() { runTest(PartitionRunnerI) }
+  def testSort() { runTest(SortRunnerI) }
 }
 
 class DenseVectorSuiteCompiler extends ForgeSuiteCompiler {
   def testAccessors() { runTest(DenseVectorAccessorsRunnerC) }
-  // HJ: Temporarily disabling this test to avoid all test suite crashing after a CUDA error. Currently fixing this bug.
-  // def testOperators() { runTest(DenseVectorOperatorsRunnerC) }
+  def testOperators() { runTest(DenseVectorOperatorsRunnerC) }
   def testUpdates() { runTest(DenseVectorUpdatesRunnerC) }
   def testRange() { runTest(DenseVectorRangeRunnerC) }
 
@@ -433,6 +472,7 @@ class DenseVectorSuiteCompiler extends ForgeSuiteCompiler {
   def testFind() { runTest(FindRunnerC) }
   def testDist() { runTest(DistRunnerC) }
   def testDistinct() { runTest(DistinctRunnerC) }
+  def testIntersect() { runTest(IntersectRunnerC) }
   def testMedian() { runTest(MedianRunnerC) }
   // def testNearestNeighbor() { runTest(NearestNeighborRunnerC) }
   def testSample() { runTest(SampleRunnerC) }
@@ -440,5 +480,5 @@ class DenseVectorSuiteCompiler extends ForgeSuiteCompiler {
   def testFlatMap() { runTest(SimpleFlatMapRunnerC) }
   def testFlatten() { runTest(SimpleFlattenRunnerC) }
   def testPartition() { runTest(PartitionRunnerC) }
+  def testSort() { runTest(SortRunnerC) }
 }
-

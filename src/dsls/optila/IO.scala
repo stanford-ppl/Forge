@@ -121,5 +121,10 @@ trait IOOps {
     }))
     impl (deleteFile) (codegen(cpp, ${DeliteFileSystem::deleteRecursive($0)}))
 
+    direct (IO) ("fileExists", Nil, MString :: MBoolean, effect = simple) implements codegen($cala, ${
+      val f = new java.io.File($0)
+      f.exists
+    })
+
   }
 }

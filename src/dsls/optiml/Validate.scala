@@ -276,7 +276,7 @@ trait ValidateOps {
 
     direct (Validate) ("AUC", Nil, ("unsortedROCs", DenseVector(Tup2(MDouble,MDouble))) :: MDouble) implements composite ${
       // increasing by TPR then FPR (i.e. up and to the right)
-      val sorted = unsortedROCs.sortBy(t => (t._2.toLong << 32) + t._1.toLong)
+      val sorted = unsortedROCs.sortBy(t => t._1).sortBy(t => t._2)
 
       // add end points
       val curve = DenseVector(pack((unit(0.0),unit(0.0)))) << sorted << DenseVector(pack((unit(1.0),unit(1.0))))
@@ -307,25 +307,40 @@ trait ValidateOps {
       TP.toDouble / (TP + FP).toDouble
     }
 
-    // a.k.a. True negative rate (TNR). Proportion of actual negative examples that were correctly classified.
-    direct (Validate) ("specificity", Nil, DenseMatrix(MInt) :: MDouble) implements composite ${
+    // True negative rate (TNR). Proportion of actual negative examples that were correctly classified. a.k.a. specificity.
+    direct (Validate) ("tnr", Nil, DenseMatrix(MInt) :: MDouble) implements composite ${
       val TN = $0(1,1)
       val FP = $0(0,1)
       TN.toDouble / (FP + TN).toDouble
     }
 
-    // a.k.a. True positive rate (TPR). Proportion of actual positive examples that were correctly classified. a.k.a. Recall.
-    direct (Validate) ("sensitivity", Nil, DenseMatrix(MInt) :: MDouble) implements composite ${
+    direct (Validate) ("specificity", Nil, DenseMatrix(MInt) :: MDouble) implements redirect ${ tnr($0) }
+
+    // True positive rate (TPR). Proportion of actual positive examples that were correctly classified. a.k.a. sensitivity, recall.
+    direct (Validate) ("tpr", Nil, DenseMatrix(MInt) :: MDouble) implements composite ${
       val TP = $0(0,0)
       val FN = $0(1,0)
       TP.toDouble / (TP + FN).toDouble
     }
 
-    direct (Validate) ("recall", Nil, DenseMatrix(MInt) :: MDouble) implements redirect ${ sensitivity($0) }
+    direct (Validate) ("sensitivity", Nil, DenseMatrix(MInt) :: MDouble) implements redirect ${ tpr($0) }
 
-    // a.k.a. False positive rate (FPR). Proportion of negative examples that were incorrectly classified.
-    direct (Validate) ("fallout", Nil, DenseMatrix(MInt) :: MDouble) implements composite ${
-      1.0 - specificity($0)
+    direct (Validate) ("recall", Nil, DenseMatrix(MInt) :: MDouble) implements redirect ${ tpr($0) }
+
+    // False positive rate (FPR). Proportion of negative examples that were incorrectly classified. a.k.a. fallout.
+    direct (Validate) ("fpr", Nil, DenseMatrix(MInt) :: MDouble) implements composite ${
+      val FP = $0(0,1)
+      val TN = $0(1,1)
+      FP.toDouble / (FP + TN).toDouble
+    }
+
+    direct (Validate) ("fallout", Nil, DenseMatrix(MInt) :: MDouble) implements redirect ${ fpr($0) }
+
+    // False negative rate (FNR). Proportion of positive examples that were incorrectly classified.
+    direct (Validate) ("fnr", Nil, DenseMatrix(MInt) :: MDouble) implements composite ${
+      val FN = $0(1,0)
+      val TP = $0(0,0)
+      FN.toDouble / (FN + TP).toDouble
     }
 
     direct (Validate) ("fscore", Nil, DenseMatrix(MInt) :: MDouble) implements composite ${

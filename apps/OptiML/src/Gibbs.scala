@@ -47,8 +47,7 @@ trait Gibbs extends OptiMLApplication {
         (args(0) == args(1))
       } 
       else {
-        println("error: isequal factor function cannot contain " + nargs + " arguments")
-        exit(-1)
+        fatal("isequal factor function cannot contain " + nargs + " arguments")
         false
       }
     }
@@ -57,35 +56,22 @@ trait Gibbs extends OptiMLApplication {
         args(0)
       }
       else {
-        println("error: istrue factor function cannot contain " + nargs + " arguments")
-        exit(-1)
+        fatal("istrue factor function cannot contain " + nargs + " arguments")
         false
       }
     }
     else {
-      println("error: invalid factor function " + ffx)
-      exit(-1)
+      fatal("invalid factor function " + ffx)
       false
     }
   }
 
-  def readFVUnder(G: Rep[FactorGraph], f: Rep[Int], v: Rep[Int], x: Rep[Boolean], idx: Rep[Int]): Rep[Boolean] = {
+  def readFVUnder(G: Rep[FactorGraph], f: Rep[Int], v: Rep[Int], x: Boolean, idx: Rep[Int]): Rep[Boolean] = {
     val ie = G.f2v.ngbrEdges(f).apply(idx)
     val iv = G.f2v.edges.apply(ie)
 
-    val vv = if(v == iv) {
-      x
-    }
-    else {
-      G.variableValue.apply(iv)
-    }
-
-    if (G.edgeIsPositiveF2V.apply(ie)) {
-      vv
-    }
-    else {
-      !vv
-    }
+    val vv = if(v == iv) x else G.variableValue.apply(iv)
+    if (G.edgeIsPositiveF2V.apply(ie)) vv else !vv
   }
 
   def readFV(G: Rep[FactorGraph], f: Rep[Int], idx: Rep[Int]): Rep[Boolean] = {
@@ -93,16 +79,10 @@ trait Gibbs extends OptiMLApplication {
     val iv = G.f2v.edges.apply(ie)
 
     val vv = G.variableValue.apply(iv)
-
-    if (G.edgeIsPositiveF2V.apply(ie)) {
-      vv
-    }
-    else {
-      !vv
-    }
+    if (G.edgeIsPositiveF2V.apply(ie)) vv else !vv
   }
 
-  def evalFactorUnder(G: Rep[FactorGraph], f: Rep[Int], v: Rep[Int], x: Rep[Boolean]): Rep[Double] = {
+  def evalFactorUnder(G: Rep[FactorGraph], f: Rep[Int], v: Rep[Int], x: Boolean): Rep[Double] = {
     val nvars = G.f2v.ngbrEdges(f).length
     val ffx = G.factorFunction.apply(f)
 
@@ -110,12 +90,7 @@ trait Gibbs extends OptiMLApplication {
     // get the weight
     val w = G.weightValue.apply(G.factorWeightIdx.apply(f))
     // finally, return the weight times the result
-    if (z) {
-      w
-    }
-    else {
-      0.0
-    }
+    if (z) w else 0.0
   }
 
   def evalFactorDiff(G: Rep[FactorGraph], f: Rep[Int]): Rep[Double] = {
@@ -124,12 +99,7 @@ trait Gibbs extends OptiMLApplication {
 
     val z = evalFFX(ffx, nvars, { idx => readFV(G, f, idx) })
     // finally, return the weight times the result
-    if (z) {
-      1.0
-    }
-    else {
-      0.0
-    }
+    if (z) 1.0 else 0.0
   }
 
   def sampleVariable(G: Rep[FactorGraph], v: Rep[Int]): Rep[Boolean] = {

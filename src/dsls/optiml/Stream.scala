@@ -13,12 +13,16 @@ import core.{ForgeApplication,ForgeApplicationRunner}
  *
  * Current limitations:
  *   1) HashStream is single-box, Scala-only (uses an embedded DB via codegen methods, lambda for deserialization)
- *   2) FileStream groupRowsBy uses a logical key naming scheme that depends on RocksDB's sorted key storage for efficiency.
+ *   2) FileStream groupRowsBy uses a logical key naming scheme that depends on LevelDB's sorted key storage for efficiency.
  */
 trait StreamOps {
   this: OptiMLDSL =>
 
-  val HASH_LOGICAL_KEY_PREFIX = "_LK_"
+  /* we internally have a Key -> Coll[Value] store, implemented as a key := LogicalKey_Sep_UniqueId -> Value
+   * This is done so that a logical append corresponds to only a physical put rather than a get-concat-put
+   * LevelDB sorts data by key, so using the logical key as a prefix makes LevelDB keep all Coll[Value] adjacent on disk
+   */
+  val HASH_LOGICAL_KEY_SEPARATOR = "_LK_"
 
   def importStreamOps() {
     importHashStreamOps()
@@ -34,10 +38,10 @@ trait StreamOps {
     val V = tpePar("V")
     val R = tpePar("R")
 
-    val DBObject = tpe("org.rocksdb.RocksDB")
-    primitiveTpePrefix ::= "org.rocksdb"
+    val LevelDB = tpe("org.iq80.leveldb.DB")
+    primitiveTpePrefix ::= "org.iq80"
 
-    data(HashStream, ("_table", MString), ("_db", DBObject), ("_deserialize", MLambda(Tup2(HashStream(V),MString), V)))
+    data(HashStream, ("_table", MString), ("_db", LevelDB), ("_deserialize", MLambda(Tup2(HashStream(V),MString), V)))
 
     static (HashStream) ("apply", V, (("table", MString), ("deserialize", (HashStream(V),MString) ==> V)) :: HashStream(V), effect = mutable) implements composite ${
       val hash = hash_alloc_raw[V](table, deserialize)
@@ -46,7 +50,7 @@ trait StreamOps {
     }
 
     compiler (HashStream) ("hash_alloc_raw", V, (("table", MString), ("deserialize", (HashStream(V),MString) ==> V)) :: HashStream(V), effect = mutable) implements
-      allocates(HashStream, ${$0}, "unit(null.asInstanceOf[org.rocksdb.RocksDB])", ${doLambda((t: Rep[Tup2[HashStream[V],String]]) => deserialize(t._1, t._2))})
+      allocates(HashStream, ${$0}, "unit(null.asInstanceOf[org.iq80.leveldb.DB])", ${doLambda((t: Rep[Tup2[HashStream[V],String]]) => deserialize(t._1, t._2))})
 
 
     // -- code generated internal methods interface with the embedded db
@@ -54,74 +58,93 @@ trait StreamOps {
     // We use simple effects in lieu of read / write effects because these are codegen nodes,
     // so we cannot pass the struct to them (a limitation of Forge at the moment).
 
-    compiler (HashStream) ("hash_open_internal", Nil, MString :: DBObject, effect = simple) implements codegen($cala, ${
-      val options = new org.rocksdb.Options()
-      options.setCreateIfMissing(true).setMaxBackgroundCompactions(16)
-      val db = org.rocksdb.RocksDB.open(options, $0)
+    compiler (HashStream) ("hash_open_internal", Nil, MString :: LevelDB, effect = simple) implements codegen($cala, ${
+      import org.iq80.leveldb._
+      import org.fusesource.leveldbjni.JniDBFactory._
+      val options = new Options()
+      options.createIfMissing(true)
+      // options.cacheSize(100000000L)
+      val db = factory.open(new java.io.File($0), options)
       db
     })
 
-    compiler (HashStream) ("hash_get_internal", Nil, (DBObject, MArray(MByte)) :: MArray(MByte), effect = simple) implements codegen($cala, ${
+    compiler (HashStream) ("hash_contains_internal", Nil, (LevelDB, MArray(MByte)) :: MBoolean, effect = simple) implements codegen($cala, ${
+      val key = $1
+      val iterator = $0.iterator()
+      iterator.seek(key)
+      val res = iterator.hasNext && {
+        val foundKey = iterator.next.getKey
+        java.util.Arrays.equals(key, foundKey) || foundKey.startsWith(key ++ "\$HASH_LOGICAL_KEY_SEPARATOR".getBytes)
+      }
+      iterator.close()
+      res
+    })
+
+    compiler (HashStream) ("hash_get_internal", Nil, (LevelDB, MArray(MByte)) :: MArray(MByte), effect = simple) implements codegen($cala, ${
       $0.get($1)
     })
 
-    compiler (HashStream) ("hash_get_range_internal", Nil, (DBObject, MArray(MByte), MInt) :: MArray(MArray(MByte)), effect = simple) implements codegen($cala, ${
+    compiler (HashStream) ("hash_get_all_internal", Nil, (LevelDB, MString) :: MArray(MArray(MByte)), effect = simple) implements codegen($cala, ${
       // workaround for named arguments in codegen methods not working
       val db = $0
-      val startKey = $1
-      val numKeys = $2
+      val prefix = ($1 + "\$HASH_LOGICAL_KEY_SEPARATOR").getBytes
 
       val buf = scala.collection.mutable.ArrayBuffer[Array[Byte]]()
-      val iterator = db.newIterator()
-      iterator.seek(startKey)
+      val iterator = db.iterator()
+      iterator.seek(prefix) //first key that comes after prefix lexicographically
 
-      var pos = 0
-      while (iterator.isValid && pos < numKeys) {
-        buf += iterator.value
-        iterator.next()
-        pos += 1
+      var continue = true
+      while (iterator.hasNext && continue) {
+        val pair = iterator.next()
+        val key = pair.getKey
+        if (key.startsWith(prefix)) {
+          buf += pair.getValue
+        } else {
+          continue = false
+        }
       }
 
-      iterator.dispose()
+      iterator.close()
       buf.toArray
     })
 
-    compiler (HashStream) ("hash_put_internal", Nil, (DBObject, MArray(MByte), MArray(MByte)) :: MUnit, effect = simple) implements codegen($cala, ${
+    compiler (HashStream) ("hash_put_internal", Nil, (LevelDB, MArray(MByte), MArray(MByte)) :: MUnit, effect = simple) implements codegen($cala, ${
       $0.put($1, $2)
     })
 
-    compiler (HashStream) ("hash_put_all_internal", Nil, (DBObject, MArray(MArray(MByte)), MArray(MArray(MByte)), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
+    compiler (HashStream) ("hash_put_all_internal", Nil, (LevelDB, MArray(MArray(MByte)), MArray(MArray(MByte)), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
       assert($1.length >= $3 && $2.length >= $3, "HashStream putAll called with too small arrays")
-      val batch = new org.rocksdb.WriteBatch()
+      val batch = $0.createWriteBatch()
       var i = 0
       while (i < $3) {
         batch.put($1(i), $2(i))
         i += 1
       }
-      val options = new org.rocksdb.WriteOptions()
-      options.setSync(false).setDisableWAL(true)
-      $0.write(options, batch)
-      batch.dispose()
-      options.dispose()
+      $0.write(batch)
+      batch.close()
     })
 
-    compiler (HashStream) ("hash_close_internal", Nil, DBObject :: MUnit, effect = simple) implements codegen($cala, ${
-      $0.dispose()
+    compiler (HashStream) ("hash_close_internal", Nil, LevelDB :: MUnit, effect = simple) implements codegen($cala, ${
+      $0.close()
     })
 
-    compiler (HashStream) ("hash_keys_internal", Nil, DBObject :: MArray(MString)) implements codegen($cala, ${
+    compiler (HashStream) ("hash_keys_internal", Nil, LevelDB :: MArray(MString)) implements codegen($cala, ${
       val buf = scala.collection.mutable.ArrayBuffer[String]()
-      val iterator = $0.newIterator
+      val iterator = $0.iterator()
       iterator.seekToFirst()
+      var lastKey: String = null
 
-      while (iterator.isValid) {
-        val key = new String(iterator.key)
-        if (!key.startsWith("\$HASH_LOGICAL_KEY_PREFIX")) // skip logical keys
+      while (iterator.hasNext) {
+        val dbKey = new String(iterator.next.getKey)
+        if ((lastKey eq null) || !dbKey.startsWith(lastKey)) {
+          val sepIndex = dbKey.indexOf("\$HASH_LOGICAL_KEY_SEPARATOR")
+          val key = if (sepIndex != -1) dbKey.substring(0, sepIndex) else dbKey
+          lastKey = key + "\$HASH_LOGICAL_KEY_SEPARATOR" // only skip logical keys
           buf += key
-        iterator.next()
+        }
       }
 
-      iterator.dispose()
+      iterator.close()
       buf.toArray
     })
 
@@ -131,8 +154,14 @@ trait StreamOps {
     HashStreamOps {
       compiler ("hash_deserialize") (Nil :: MLambda(Tup2(HashStream(V),MString), V)) implements getter(0, "_deserialize")
       compiler ("hash_table_name") (Nil :: MString) implements getter(0, "_table")
-      compiler ("hash_get_db") (Nil :: DBObject) implements getter(0, "_db")
-      compiler ("hash_set_db") (DBObject :: MUnit, effect = write(0)) implements setter(0, "_db", ${$1})
+      compiler ("hash_get_db") (Nil :: LevelDB) implements getter(0, "_db")
+      compiler ("hash_set_db") (LevelDB :: MUnit, effect = write(0)) implements setter(0, "_db", ${$1})
+
+      compiler ("hash_get_db_safe") (Nil :: LevelDB) implements composite ${
+        val db = hash_get_db($self)
+        fassert(db != null, "No DB opened in HashStream")
+        db
+      }
 
       infix ("open") (Nil :: MUnit, effect = write(0)) implements single ${
         val table = hash_table_name($self)
@@ -148,44 +177,33 @@ trait StreamOps {
       // This may be too inefficient, since a subsequent get has to hit the hash again.
       // However, if it's cached, it should be fine.
       infix ("contains") (MString :: MBoolean) implements single ${
-        $self.get($1) != null
+        hash_contains_internal(hash_get_db_safe($self), $1.getBytes)
       }
 
       infix ("keys") (Nil :: MArray(MString)) implements single ${
-        val db = hash_get_db($self)
-        fassert(db != null, "No DB opened in HashStream")
-        hash_keys_internal(db)
+        hash_keys_internal(hash_get_db_safe($self))
       }
 
       infix ("get") (MString :: MArray(MByte)) implements single ${
-        val db = hash_get_db($self)
-        fassert(db != null, "No DB opened in HashStream")
-        hash_get_internal(db, $1.getBytes)
-      }
-
-      infix ("getRange") ((MString, MInt) :: MArray(MArray(MByte))) implements single ${
-        val db = hash_get_db($self)
-        fassert(db != null, "No DB opened in HashStream")
-        hash_get_range_internal(db, $1.getBytes, $2)
+        hash_get_internal(hash_get_db_safe($self), $1.getBytes)
       }
 
       infix ("put") ((MString, MArray(MByte)) :: MUnit, effect = write(0)) implements single ${
-        val db = hash_get_db($self)
-        fassert(db != null, "No DB opened in HashStream")
-        hash_put_internal(db, $1.getBytes, $2)
+        hash_put_internal(hash_get_db_safe($self), $1.getBytes, $2)
+      }
+
+      //get all values associated with the supplied logical key (prefix)
+      infix ("getAll") (MString :: MArray(MArray(MByte))) implements single ${
+        hash_get_all_internal(hash_get_db_safe($self), $1)
       }
 
       infix ("putAll") ((MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = write(0)) implements composite ${
-        val db = hash_get_db($self)
-        fassert(db != null, "No DB opened in HashStream")
-        hash_put_all_internal(db, $1.map(_.getBytes), $2, $3)
+        hash_put_all_internal(hash_get_db_safe($self), $1.map(_.getBytes), $2, $3)
       }
 
       infix ("close") (Nil :: MUnit, effect = write(0)) implements single ${
-        val db = hash_get_db($self)
-        fassert(db != null, "No DB opened in HashStream")
-        hash_close_internal(db)
-        hash_set_db($self, unit(null.asInstanceOf[org.rocksdb.RocksDB]))
+        hash_close_internal(hash_get_db_safe($self))
+        hash_set_db($self, unit(null.asInstanceOf[org.iq80.leveldb.DB]))
       }
 
 
@@ -252,23 +270,18 @@ trait StreamOps {
     // HashStream directly from a persistent hash that was constructed from a FileStream.groupRowsBy() call.
     //     e.g. val hash = HashStream("test.hash", hashMatrixDeserializer)
     direct (FileStream) ("hashMatrixDeserializer", Nil, (("hash", HashStream(DenseMatrix(MDouble))), ("k", MString)) :: DenseMatrix(MDouble)) implements composite ${
-      val a: Rep[ForgeArray[Byte]] = hash.get(k)
-      fassert(a != null, "HashStream: could not find key " + k)
-      fassert(a.length == 4, "HashStream: lookup of key " + k + " did not return an integer value (length) as expected") // should be the number of rows in this group
+      val rows = hash.getAll(k)
+      val numRows = rows.length
+      val numCols0 = ByteBufferWrap(rows(0)).getInt()
 
-      val firstKey = hashMatrixLogicalKey(k, 0)
-      val numRows = ByteBufferWrap(a).getInt()
-      fassert(numRows > 0, "HashStream: attempted to deserialize a matrix key with 0 rows which is unexpected")
-      val rows = hash.getRange(firstKey, numRows)
-      val numCols = ByteBufferWrap(rows(0)).getInt()
-
-      val out = DenseMatrix[Double](numRows, numCols)
+      val out = DenseMatrix[Double](numRows, numCols0)
 
       var i = 0
       while (i < numRows) {
         val rowArray = rows(i)
         val rowBuffer = ByteBufferWrap(rowArray)
         val numCols = rowBuffer.getInt()
+        fassert(numCols0 == numCols, "hashMatrixDeserializer: expected " + numCols0 + " cols, but found " + numCols)
         val dst = densematrix_raw_data(out).unsafeMutable // array_update gets rewritten, but not the write below
         rowBuffer.unsafeImmutable.get(dst, i*numCols, numCols) // write directly to underlying matrix
         i += 1
@@ -277,14 +290,13 @@ trait StreamOps {
       out.unsafeImmutable
     }
 
-    // Create a lexicographically ordered logical key that respects integer order. We do this instead of
-    // supplying a custom comparator to RocksDB, which would require jumping across the JNI boundary to invoke.
-    compiler (FileStream) ("hashMatrixLogicalKey", Nil, (("k", MString), ("index", MInt)) :: MString) implements composite ${
-      val prefix = "\$HASH_LOGICAL_KEY_PREFIX" + k + "_"
-      val strIndex = ""+index
-      val suffix = strIndex.length + strIndex
-      prefix + suffix
-    }
+    // Create a lexicographically ordered key with the given prefix; the key suffix will be unique for every call
+    compiler (FileStream) ("hashMatrixNewKey", Nil, (MString, MInt) :: MString) implements codegen($cala, ${
+      val uniqueId = new java.rmi.server.UID() //globally unique value on every call: machine + timestamp + counter
+      //TODO: we could make smaller keys by serializing uniqueId as multiple ints rather than a string, but not sure if leveldb can handle null bytes in the middle of keys
+      //we currently don't use the row index as part of the key generation, but still require it as a formal input to prevent unsafe code motion
+      ($0 + "\$HASH_LOGICAL_KEY_SEPARATOR" + uniqueId.toString)
+    })
 
     // --
 
@@ -294,7 +306,10 @@ trait StreamOps {
 
       // A reasonable and static (e.g. 1 GB) chunk size seems to give us the most consistent good performance. This should be configurable.
       // Using a constant also seems to increase fusion opportunities, though what is happening is a bit of a mystery.
-      (1e9).toLong
+      // without the explicit types the results gets lifted and 'toX' is staged :(
+      val chunkSize: String = System.getProperty("optiml.stream.chunk.bytesize","1e9")
+      val chunkDouble: Double = chunkSize.toDouble
+      unit(chunkDouble.toLong)
     }
 
     // We need to read sequentially, but from potentially different data stores, so we use ForgeFileInputStream and ForgeFileOutputStream
@@ -313,7 +328,7 @@ trait StreamOps {
         f.close()
       }
 
-      compiler ("processFileChunks") (MethodSignature(List(("readFunc", MString ==> R), ("processFunc", MArray(R) ==> MUnit), ("chunkSize", MLong, "filestream_getchunkbytesize()")), MUnit), addTpePars = R) implements composite ${
+      infix ("processFileChunks") (MethodSignature(List(("readFunc", MString ==> R), ("processFunc", MArray(R) ==> MUnit), ("chunkSize", MLong, "filestream_getchunkbytesize()")), MUnit), addTpePars = R) implements composite ${
         val f = ForgeFileInputStream($self.path)
         val totalSize = f.size
         f.close()
@@ -349,7 +364,7 @@ trait StreamOps {
         // Delete destination if it exists
         deleteFile(outFile)
 
-        processFileChunks($self, func, { (a: Rep[ForgeArray[String]]) =>
+        $self.processFileChunks(func, { (a: Rep[ForgeArray[String]]) =>
           if (!preserveOrder) {
             // This only makes sense if the order of the writes doesn't matter, since we are striping each chunk across the
             // different output files. Therefore when they are reconstructed, output file 0 will have elements from all chunks,
@@ -381,7 +396,7 @@ trait StreamOps {
           ("func", DenseVector(MString) ==> DenseVector(R))
         )), FileStream), TStringable(R), addTpePars = R) implements composite ${
 
-        $self.map(outFile) { line =>
+        $self.map(outFile, preserveOrder = true) { line =>
           val tokens: Rep[ForgeArray[String]] = line.trim.fsplit(inDelim, -1) // we preserve trailing empty values
           val tokenVector: Rep[DenseVector[String]] = densevector_fromarray(tokens, true)
           // val outRow: Rep[DenseVector[String]] = func(tokenVector) map { e => e.makeStr }
@@ -423,7 +438,7 @@ trait StreamOps {
         }
         val hash = HashStream[DenseMatrix[Double]](outTable, hashMatrixDeserializer)
 
-        processFileChunks($self, { line =>
+        $self.processFileChunks({ line =>
           val tokens: Rep[ForgeArray[String]] = line.trim.fsplit(delim, -1) // we preserve trailing empty values
           val tokenVector: Rep[DenseVector[String]] = densevector_fromarray(tokens, true)
           val key: Rep[String] = keyFunc(tokenVector)
@@ -431,47 +446,26 @@ trait StreamOps {
           pack((key, value))
         },
         { (a: Rep[ForgeArray[Tup2[String,DenseVector[Double]]]]) =>
-          // The scheme belows appends new rows as new logical keys (instead of storing and growing a byte array
-          // value in the "master" key). This relies on RocksDB's sorted key functionality for efficiency (the logical
-          // keys are stored close together, enabling compression and sequential scanning).
+          // The scheme belows appends new rows as new keys (instead of reading and growing the existing byte array)
+          // This relies on LevelDBs sorted key functionality for efficiency
+          // (the logical keys are stored close together, enabling compression and sequential scanning).
           //
-          // We write to the map sequentially to avoid needing to use external concurrency control. 
-          // We also batch all of the writes in one chunk for improved performance.
+          // We write to the map sequentially to avoid needing to use external concurrency control (and because benchmarks
+          // do not show LevelDB scaling well with concurrent writers). We also batch all of the writes in one chunk for
+          // improved performance.
 
           // Zero-length rows are skipped (note that the only two valid lengths for "value" are 0 and numCols)
           // If there is a key present in the resulting map, there was at least 1 non-empty row mapping to it.
-          val chunk = densevector_fromarray(a, true).filter(v => v._2.length > 0)
-          val chunkRows: Rep[ForgeHashMap[String, DenseVector[DenseVector[Double]]]] = chunk.groupBy(v => v._1, v => v._2)
+          val chunk = densevector_fromarray(a, true).filter(t => t._2.length > 0)
 
-          val allKeys: Rep[DenseVector[String]] = densevector_fromarray(chunkRows.keys, true)
-          val allValues: Rep[DenseVector[DenseVector[DenseVector[Double]]]] = densevector_fromarray(fhashmap_values(chunkRows), true)
-          val allKV = allKeys.zip(allValues) { (k,v) => pack((k,v)) }
-
-          val masterValues: Rep[ForgeArray[ForgeArray[Byte]]] =
-            allValues.map { group =>
-              val lenBuf: Rep[java.nio.ByteBuffer] = ByteBuffer(4)
-              lenBuf.putInt(group.length)
-              lenBuf.unsafeImmutable.array
-            }.toArray
-
-          // We can't fuse flatMaps automatically yet, so manually fuse.
-          val logicalEntries: Rep[ForgeArray[Tup2[String, ForgeArray[Byte]]]] =
-            allKV.flatMap { t =>
-              val (k, group) = unpack(t)
-              val logicalKeys = group.indices.map { i => hashMatrixLogicalKey(k, i) }
-              val logicalValues = group.map { row => serialize(row) }
-              logicalKeys.zip(logicalValues) { (a,b) => pack((a,b)) }
-            }.toArray
-
-          val logicalKeys: Rep[ForgeArray[String]] = logicalEntries.map(_._1)
-          val logicalValues: Rep[ForgeArray[ForgeArray[Byte]]] = logicalEntries.map(_._2)
+          // int argument to hashMatrixNewKey is currently not being used (see comment @ hashMatrixNewKey definition)
+          val dbKeys: Rep[ForgeArray[String]] = chunk.indices.map(i => hashMatrixNewKey(chunk(i)._1, i)).toArray
+          val dbValues: Rep[ForgeArray[ForgeArray[Byte]]] = chunk.map(t => serialize(t._2)).toArray
 
           // We seem to be getting write bandwidth on the logicalKeys of ~15MB/sec, while the Google benchmarks at
           // https://github.com/google/leveldb claim writes should be ~45MB/sec. This could be due to hardware, JNI,
-          // or the Java driver. Write bandwidth on the masterKeys, which are random and tiny, is abysmal.
-          val ks = chunkRows.keys
-          hash.putAll(ks, masterValues, ks.length)
-          hash.putAll(logicalKeys, logicalValues, logicalKeys.length)
+          // or the Java driver.
+          hash.putAll(dbKeys, dbValues, dbKeys.length)
         })
 
         hash
@@ -479,8 +473,7 @@ trait StreamOps {
 
       infix ("reduce") (CurriedMethodSignature(List(List(("zero", T)), List(("func", MString ==> T)), List(("rfunc", (T,T) ==> T))), T), addTpePars = T) implements composite ${
         var acc = zero
-
-        processFileChunks($self, line => func(line), { (a: Rep[ForgeArray[T]]) =>
+        $self.processFileChunks(line => func(line), { (a: Rep[ForgeArray[T]]) =>
           val reduced = array_reduce(a, rfunc, zero)
           acc = rfunc(acc, reduced)
         })

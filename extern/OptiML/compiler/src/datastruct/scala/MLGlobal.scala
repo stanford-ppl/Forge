@@ -1,9 +1,11 @@
 package optiml.compiler.datastruct.scala
 
 import java.io.{File,BufferedReader,FileReader,PrintWriter,BufferedWriter,FileWriter}
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.JavaConverters._
+
+import org.iq80.leveldb._
+import org.fusesource.leveldbjni.JniDBFactory._
 import ppl.delite.runtime.Config
 
 /*
@@ -11,56 +13,94 @@ import ppl.delite.runtime.Config
  */
 
 object MLGlobal {
-  /* A thread-safe HashMap for mapping string identifiers to unique integer ids */
-  // TODO: For distributed execution, slaves should send a message back to the master to handle this.
-  private val identifierMap = new ConcurrentHashMap[String,Int](16, 0.75f, Config.numThreads)
+  /*
+   * In Delite mode, we use a thread-safe LevelDB instance to store the mapping of
+   * string identifiers to unique integer ids.
+   *
+   * TODO: For distributed execution, slaves should send a message back to the master to handle this.
+   */
+  private object lock
+  private var identifierDB: DB = null // intentionally null until loaded
+  private var reverseIdentifierDB: DB = null // intentionally null until loaded
   private val nextId = new AtomicInteger(0)
 
+  def intToBytes(i: Int) = java.nio.ByteBuffer.allocate(4).putInt(i).array
+  def bytesToInt(a: Array[Byte]) = java.nio.ByteBuffer.wrap(a).getInt()
+
   def getId(s: String) = {
-    if (identifierMap.containsKey(s)) {
-      identifierMap.get(s)
+    assert(identifierDB != null, "error: unique DB is not loaded")
+    assert(reverseIdentifierDB != null, "error: unique DB is not loaded")
+
+    val e = identifierDB.get(s.getBytes)
+    if (e != null) {
+      bytesToInt(e)
     }
     else {
-      val id = nextId.getAndIncrement()
-      // If someone else assigns an id to this string first, the next string will skip an id value.
-      // While this is not ideal, it is still correct, as a contiguous id range is not guaranteed.
-      val z = identifierMap.putIfAbsent(s, id)
-      if (z == 0) id else z
+      lock.synchronized {
+        val id = nextId.getAndIncrement()
+        val e = identifierDB.get(s.getBytes)
+        if (e != null) {
+          bytesToInt(e)
+        }
+        else {
+          val (k, v) = (s.getBytes, intToBytes(id))
+          identifierDB.put(k, v)
+          reverseIdentifierDB.put(v, k)
+          id
+        }
+      }
     }
   }
 
-  def getUniqueNames: Array[String] = {
-    identifierMap.entrySet().asScala.map(e => e.getKey).toArray
+  def lookupId(i: Int) = {
+    assert(reverseIdentifierDB != null, "error: unique DB is not loaded")
+    new String(reverseIdentifierDB.get(intToBytes(i)))
   }
 
   def getUniqueIds: Array[Int] = {
-    identifierMap.entrySet().asScala.map(e => e.getValue).toArray
+    assert(reverseIdentifierDB != null, "error: unique DB is not loaded")
+
+    val buf = scala.collection.mutable.ArrayBuffer[Int]()
+    val iterator = reverseIdentifierDB.iterator()
+    iterator.seekToFirst()
+
+    while (iterator.hasNext) {
+      buf += bytesToInt(iterator.next.getKey)
+    }
+
+    iterator.close()
+    buf.toArray
   }
 
-  // Something we don't expect to see in client data, but that is also human readable.
-  val MAPPING_DELIMITER = " ::---> "
+  def getUniqueNames: Array[String] = {
+    assert(identifierDB != null, "error: unique DB is not loaded")
 
-  def loadUniqueMappings(path: String): Int = {
-    if (new File(path).isFile) {
-      val f = new BufferedReader(new FileReader(path))
-      var line = f.readLine()
-      while (line != null) {
-        val tokens = line.split(MAPPING_DELIMITER)
-        val id = tokens(1).toInt
-        identifierMap.put(tokens(0), id)
-        if (id > nextId.get) nextId.set(id+1)
-        line = f.readLine()
-      }
-      f.close()
+    val buf = scala.collection.mutable.ArrayBuffer[String]()
+    val iterator = identifierDB.iterator()
+    iterator.seekToFirst()
+
+    while (iterator.hasNext) {
+      buf += new String(iterator.next.getKey)
     }
-    nextId.get-1
+
+    iterator.close()
+    buf.toArray
+  }
+
+  private def reverseIdentifierPath(path: String) = { path + "_reverse" }
+
+  def loadUniqueMappings(path: String) = {
+    val options = new Options()
+    options.createIfMissing(true)
+    // options.cacheSize(100000000L)
+    identifierDB = factory.open(new java.io.File(path), options)
+    reverseIdentifierDB = factory.open(new java.io.File(reverseIdentifierPath(path)), options)
   }
 
   def dumpUniqueMappings(path: String) = {
-    val f = new PrintWriter(new BufferedWriter(new FileWriter(path)))
-    for (e <- identifierMap.entrySet().asScala) {
-      f.println(e.getKey+MAPPING_DELIMITER+e.getValue)
-    }
-    f.close()
+    identifierDB.close()
+    identifierDB = null
+    reverseIdentifierDB.close()
+    reverseIdentifierDB = null
   }
 }

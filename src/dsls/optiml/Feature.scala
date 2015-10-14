@@ -193,12 +193,12 @@ trait FeatureOps {
     // -- Single-machine unique map. The map is currently stored in an embedded LevelDB.
 
     /* Return a unique integer identifier for a given string */
-    direct (FeatureHelper) ("unique", Nil, MString :: MInt) implements codegen($cala, ${
+    direct (FeatureHelper) ("unique", Nil, MString :: MInt, effect = simple) implements codegen($cala, ${
       MLGlobal.getId($0)
     })
 
     /* Lookup the string corresponding to a given unique integer identifier */
-    direct (FeatureHelper) ("reverseUnique", Nil, MInt :: MString) implements codegen($cala, ${
+    direct (FeatureHelper) ("reverseUnique", Nil, MInt :: MString, effect = simple) implements codegen($cala, ${
       MLGlobal.lookupId($0)
     })
 
@@ -210,11 +210,11 @@ trait FeatureOps {
     //   densevector_fromarray(data, true)
     // }
 
-    direct (FeatureHelper) ("getUniqueIds", Nil, Nil :: MArray(MInt)) implements codegen($cala, ${
+    direct (FeatureHelper) ("getUniqueIds", Nil, Nil :: MArray(MInt), effect = simple) implements codegen($cala, ${
       MLGlobal.getUniqueIds
     })
 
-    direct (FeatureHelper) ("getUniqueNames", Nil, Nil :: MArray(MString)) implements codegen($cala, ${
+    direct (FeatureHelper) ("getUniqueNames", Nil, Nil :: MArray(MString), effect = simple) implements codegen($cala, ${
       MLGlobal.getUniqueNames
     })
 

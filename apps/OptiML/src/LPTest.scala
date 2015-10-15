@@ -118,7 +118,7 @@ trait LPLogReg extends OptiMLApplication {
         val yi: Rep[Float] = y(i).toFloat
         val si: Rep[Float] = sigmoid(DenseVector.lpdot(cur, xi).toDouble).toFloat
         val ui: Rep[Float] = yi - si
-        x map {z => z.toFloat * ui}
+        xi map {z => z.toFloat * ui}
       }
 
       // println("gradient: ")

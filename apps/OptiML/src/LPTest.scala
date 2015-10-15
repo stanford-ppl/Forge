@@ -113,13 +113,13 @@ trait LPLogReg extends OptiMLApplication {
     val alpha = 1.0f
 
     val w = untilconverged_withdiff(theta, maxIter = 30) { (cur: Rep[DenseVector[Byte]], iter) =>
-      val gradient: Rep[DenseVector[Float]] = ((0::x.numRows) { i =>
+      val gradient: Rep[DenseVector[Float]] = sum(0, x.numRows) { i =>
         val xi: Rep[DenseVector[Byte]] = x(i)
         val yi: Rep[Float] = y(i).toFloat
         val si: Rep[Float] = sigmoid(DenseVector.lpdot(cur, xi).toDouble).toFloat
         val ui: Rep[Float] = yi - si
         x map {z => z.toFloat * ui}
-      }).sum
+      }
 
       // println("gradient: ")
       // gradient.pprint

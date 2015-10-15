@@ -112,7 +112,7 @@ trait LPLogReg extends OptiMLApplication {
     // gradient descent with logistic function
     val alpha = 1.0
 
-    val w = untilconverged(theta, maxIter = 30) { (cur, iter) =>
+    val w = untilconverged_withdiff(theta, maxIter = 30) { (cur, iter) =>
       val gradient = ((0::x.numRows) { i =>
         val ui = y(i) - sigmoid(DenseVector.lpdot(cur, x(i))) 
         x map {z => z.toFloat * ui}
@@ -126,11 +126,11 @@ trait LPLogReg extends OptiMLApplication {
       // println("next value (c): ")
       // z.pprint
       v
-    }
+    }((x,y) => 1.0)
 
     toc(w)
     println("w:")
-    w.pprint
+    (w map {z => z.toFloat}).pprint
   }
 }
 

@@ -42,8 +42,8 @@ trait InputOutputWrapper extends HUMAN_DSL_NAMEBase {
 
   def forge_filereader_readlines_chunk[A:Manifest](path: Rep[String], offset: Rep[Long], numBytes: Rep[Long], f: (Rep[String], Rep[String]) => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
     val out = new ForgeArrayBuffer[A](0)
-    val input = DeliteFileInputStream(Seq(path), offset = offset)
-    while (input.position < offset + numBytes) {
+    val input = DeliteFileInputStream(Seq(path), offset = offset).openAtNewLine(0, numBytes)
+    while (!input.isEmpty) {
       val location = input.getFileLocation
       val line = input.readLine()
       array_buffer_append(out, f(line, location))

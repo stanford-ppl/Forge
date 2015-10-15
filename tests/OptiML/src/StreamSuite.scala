@@ -319,6 +319,7 @@ trait HashStreamDelete extends ForgeTestModule with OptiMLApplication with Strea
     deleteFile(testHash1)
     deleteFile(testHash2)
     deleteFile(testHashStreamMat)
+    deleteFile(testDHashStreamMat)
     deleteFile(testHashInMemMat)
 
     collect(true)

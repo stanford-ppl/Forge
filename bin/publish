@@ -82,9 +82,10 @@ object ${dslName}Build extends Build {
     // cluster deps
     libraryDependencies += "com.google.protobuf" % "protobuf-java" % "2.5.0",
     libraryDependencies += "org.apache.mesos" % "mesos" % "0.20.1",
-    libraryDependencies += "org.apache.hadoop" % "hadoop-common" % "2.5.1",
-    libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "2.5.1",
-    libraryDependencies += "org.apache.hadoop" % "hadoop-hdfs" % "2.5.1",
+    libraryDependencies += "org.apache.hadoop" % "hadoop-common" % "2.7.1",
+    libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "2.7.1",
+    libraryDependencies += "org.apache.hadoop" % "hadoop-hdfs" % "2.7.1",
+    libraryDependencies += "com.amazonaws" % "aws-java-sdk" % "1.10.6",
     // used in delitec to access jars
     retrieveManaged := true,
     scalacOptions += "-Yno-generic-signatures",

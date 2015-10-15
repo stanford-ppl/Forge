@@ -299,7 +299,7 @@ trait StreamOps {
 
       try {
         val client = new AmazonDynamoDBClient()
-        val regionName = sys.env.getOrElse("AWS_DEFAULT_REGION", "us-west-2")
+        val regionName = sys.env.getOrElse("AWS_DYNAMO_REGION", sys.env.getOrElse("AWS_DEFAULT_REGION", "us-east-1"))
         client.configureRegion(com.amazonaws.regions.Regions.fromName(regionName))
 
         if (Tables.doesTableExist(client, $0)) {
@@ -340,7 +340,7 @@ trait StreamOps {
       // TODO: Configure client for tuning options.
       // see: http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/ClientConfiguration.html
       val dynamoClient = new AmazonDynamoDBClient()
-      val regionName = sys.env.getOrElse("AWS_DEFAULT_REGION", "us-west-2")
+      val regionName = sys.env.getOrElse("AWS_DYNAMO_REGION", sys.env.getOrElse("AWS_DEFAULT_REGION", "us-east-1"))
       dynamoClient.configureRegion(com.amazonaws.regions.Regions.fromName(regionName))
       val config = new DynamoDBMapperConfig.Builder().withTableNameOverride(DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement($0)).withConsistentReads(DynamoDBMapperConfig.ConsistentReads.EVENTUAL).build()
       new DynamoDBMapper(dynamoClient, config)
@@ -350,12 +350,18 @@ trait StreamOps {
       import com.amazonaws.services.kms._
       
       val kmsClient = new AWSKMSClient()
+      val kmsRegion = sys.env.getOrElse("AWS_KMS_REGION", sys.env.getOrElse("AWS_DEFAULT_REGION", "us-east-1"))
+      kmsClient.configureRegion(com.amazonaws.regions.Regions.fromName(kmsRegion))
+      
       val s3Client = new com.amazonaws.services.s3.AmazonS3Client()
-      val regionName = sys.env.getOrElse("AWS_DEFAULT_REGION", "us-west-2")
-      kmsClient.configureRegion(com.amazonaws.regions.Regions.fromName(regionName))
-      s3Client.configureRegion(com.amazonaws.regions.Regions.fromName(regionName))
+      val s3Region = sys.env.getOrElse("AWS_S3_REGION", sys.env.getOrElse("AWS_DEFAULT_REGION", "us-east-1"))
+      s3Client.configureRegion(com.amazonaws.regions.Regions.fromName(s3Region))
 
-      val inputStream = s3Client.getObject("mine-dynamo", "dynamo").getObjectContent
+      val keyPath = sys.env.getOrElse("AWS_KMS_KEY_PATH", throw new RuntimeException("DHashStream: AWS_KMS_KEY_PATH is undefined"))
+      val bucketName = keyPath.takeWhile(_ != '/')
+      val keyName = keyPath.drop(bucketName.length + 1)
+
+      val inputStream = s3Client.getObject(bucketName, keyName).getObjectContent
       val encryptedKey = new Array[Byte](256)
       val encryptedSize = inputStream.read(encryptedKey)
       assert(inputStream.read() == -1, "ERROR: S3 key contents larger than expected")

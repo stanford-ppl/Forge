@@ -42,8 +42,6 @@ trait LPTest extends OptiMLApplication {
 
 
 
-    val test_size = args(0).toInt
-
     val x16 = (0::test_size) { i =>
         ((i + 234) * (i + 344534345)).toShort
     }

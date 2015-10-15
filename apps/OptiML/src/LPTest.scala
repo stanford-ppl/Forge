@@ -107,12 +107,12 @@ trait LPLogReg extends OptiMLApplication {
     val y: Rep[DenseVector[Byte]] = yfp map {z => z.toByte}
 
     tic()
-    val theta = (0::x.numCols) { (0.0).toByte }
+    val theta: Rep[DenseVector[Byte]] = (0::x.numCols) { (0.0).toByte }
 
     // gradient descent with logistic function
     val alpha = 1.0
 
-    val w = untilconverged_withdiff(theta, maxIter = 30) { (cur, iter) =>
+    val w = untilconverged_withdiff(theta, maxIter = 30) { (cur: Rep[DenseVector[Byte]], iter) =>
       val gradient = ((0::x.numRows) { i =>
         val xi: Rep[DenseVector[Byte]] = x(i)
         val yi: Rep[Float] = y(i).toFloat
@@ -128,7 +128,7 @@ trait LPLogReg extends OptiMLApplication {
       val v = cur + gradient*alpha
       // println("next value (c): ")
       // z.pprint
-      v
+      v map {z => z.toByte}
     }((x,y) => 1.0)
 
     toc(w)

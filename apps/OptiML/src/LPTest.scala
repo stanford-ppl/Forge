@@ -99,9 +99,9 @@ trait LPLogReg extends OptiMLApplication {
     val xfp = readMatrix(args(0))
     val yfp = readVector(args(1)).t
 
-    println("x.numRows: " + x.numRows)
-    println("x.numCols: " + x.numCols)
-    println("y.length:  " + y.length)
+    println("x.numRows: " + xfp.numRows)
+    println("x.numCols: " + xfp.numCols)
+    println("y.length:  " + yfp.length)
 
     val x = xfp map {z => z.toByte}
     val y = yfp map {z => z.toByte}

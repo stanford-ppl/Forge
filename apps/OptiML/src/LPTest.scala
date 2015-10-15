@@ -107,7 +107,7 @@ trait LPLogReg extends OptiMLApplication {
     val y: Rep[DenseVector[Byte]] = yfp map {z => z.toByte}
 
     tic()
-    val theta: Rep[DenseVector[Byte]] = (0::x.numCols) { i => unit((0.0).toByte) }
+    val theta: Rep[DenseVector[Byte]] = (0::x.numCols) { i => unit(0.0).toByte }
 
     // gradient descent with logistic function
     val alpha = 1.0f

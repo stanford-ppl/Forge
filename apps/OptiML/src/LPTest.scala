@@ -114,7 +114,7 @@ trait LPLogReg extends OptiMLApplication {
 
     val w = untilconverged_withdiff(theta, maxIter = 30) { (cur, iter) =>
       val gradient = ((0::x.numRows) { i =>
-        val ui: Rep[Float] = (y(i).toByte.toFloat) - (sigmoid(DenseVector.lpdot(cur, x(i)).toDouble).toFloat) 
+        val ui: Rep[Float] = (1.0f * y(i)) - (sigmoid(DenseVector.lpdot(cur, x(i)).toDouble).toFloat) 
         x map {z => z.toFloat * ui}
       }).sum
 

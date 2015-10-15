@@ -107,10 +107,10 @@ trait LPLogReg extends OptiMLApplication {
     val y: Rep[DenseVector[Byte]] = yfp map {z => z.toByte}
 
     tic()
-    val theta: Rep[DenseVector[Byte]] = (0::x.numCols) { i => (0.0).toByte }
+    val theta: Rep[DenseVector[Byte]] = (0::x.numCols) { i => unit((0.0).toByte) }
 
     // gradient descent with logistic function
-    val alpha = 1.0
+    val alpha = 1.0f
 
     val w = untilconverged_withdiff(theta, maxIter = 30) { (cur: Rep[DenseVector[Byte]], iter) =>
       val gradient = ((0::x.numRows) { i =>
@@ -125,7 +125,7 @@ trait LPLogReg extends OptiMLApplication {
       // gradient.pprint
 
       // alpha*gradient returns an inaccessible type when using implicits (instead of infix)
-      val v = (0::x.numCols) { i => (cur(i).toFloat + alpha * gradient(i)).toByte }
+      val v = (0::x.numCols) { i => (cur(i).toFloat + gradient(i) * alpha).toByte }
       // println("next value (c): ")
       // z.pprint
       v

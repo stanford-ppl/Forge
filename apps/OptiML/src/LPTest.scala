@@ -82,3 +82,55 @@ trait LPTest16 extends OptiMLApplication {
     println("lpdot8(x, y): " + xylpdot)
   }
 }
+
+
+object LPLogRegCompiler extends OptiMLApplicationCompiler with LPLogReg
+object LPLogRegInterpreter extends OptiMLApplicationInterpreter with LPLogReg
+
+trait LPLogReg extends OptiMLApplication {
+  def printUsage = {
+    println("Usage: LPLogReg <input training data file> <input training label file>")
+    exit(-1)
+  }
+
+  def main() = {
+    if (args.length < 2) printUsage
+
+    val xfp = readMatrix(args(0))
+    val yfp = readVector(args(1)).t
+
+    println("x.numRows: " + x.numRows)
+    println("x.numCols: " + x.numCols)
+    println("y.length:  " + y.length)
+
+    val x = xfp map {z => z.toByte}
+    val y = yfp map {z => z.toByte}
+
+    tic()
+    val theta = (0::x.numCols) { (0.0).toByte }
+
+    // gradient descent with logistic function
+    val alpha = 1.0
+
+    val w = untilconverged(theta, maxIter = 30) { (cur, iter) =>
+      val gradient = ((0::x.numRows) { i =>
+        val ui = y(i) - sigmoid(DenseVector.lpdot(cur, x(i))) 
+        x map {z => z.toFloat * ui}
+      }).sum
+
+      // println("gradient: ")
+      // gradient.pprint
+
+      // alpha*gradient returns an inaccessible type when using implicits (instead of infix)
+      val v = cur + gradient*alpha
+      // println("next value (c): ")
+      // z.pprint
+      v
+    }
+
+    toc(w)
+    println("w:")
+    w.pprint
+  }
+}
+

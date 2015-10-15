@@ -103,8 +103,8 @@ trait LPLogReg extends OptiMLApplication {
     println("x.numCols: " + xfp.numCols)
     println("y.length:  " + yfp.length)
 
-    val x = xfp map {z => z.toByte}
-    val y = yfp map {z => z.toByte}
+    val x: Rep[DenseMatrix[Byte]] = xfp map {z => z.toByte}
+    val y: Rep[DenseVector[Byte]] = yfp map {z => z.toByte}
 
     tic()
     val theta = (0::x.numCols) { (0.0).toByte }

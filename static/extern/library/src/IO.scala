@@ -15,6 +15,9 @@ import org.apache.hadoop.io.Text
 trait InputOutputWrapper extends HUMAN_DSL_NAMEBase {
   this: ForgeArrayWrapper with ForgeArrayBufferWrapper =>
 
+  type ForgeFileInputStream = DeliteFileInputStream
+  implicit def forgeInputStreamManifest = manifest[ForgeFileInputStream]
+
   def forge_filereader_readlines[A:Manifest](path: Rep[String], f: Rep[String] => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
     forge_filereader_readlines_unstructured(path, (line, buf) => array_buffer_append(buf, f(line)))
   }
@@ -29,7 +32,7 @@ trait InputOutputWrapper extends HUMAN_DSL_NAMEBase {
   }
 
   def forge_filereader_readlines_unstructured[A:Manifest](path: Rep[String], append: (Rep[String], Rep[ForgeArrayBuffer[A]]) => Rep[Unit])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
-    val input = DeliteFileInputStream(Seq(path))
+    val input = forge_fileinputstream_new(path)
     val out = new ForgeArrayBuffer[A](0)
     var line = input.readLine()
     while (line != null) {
@@ -40,9 +43,10 @@ trait InputOutputWrapper extends HUMAN_DSL_NAMEBase {
     out.toArray
   }
 
-  def forge_filereader_readlines_chunk[A:Manifest](path: Rep[String], offset: Rep[Long], numBytes: Rep[Long], f: (Rep[String], Rep[String]) => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
+  def forge_filereader_readlines_chunk[A:Manifest](stream: Rep[ForgeFileInputStream], offset: Rep[Long], numBytes: Rep[Long], f: (Rep[String], Rep[String]) => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
     val out = new ForgeArrayBuffer[A](0)
-    val input = DeliteFileInputStream(Seq(path), offset = offset).openAtNewLine(0, numBytes)
+    val input = stream.withOffset(offset)
+    input.openAtNewLine(0, numBytes)
     while (!input.isEmpty) {
       val location = input.getFileLocation
       val line = input.readLine()
@@ -60,11 +64,10 @@ trait InputOutputWrapper extends HUMAN_DSL_NAMEBase {
     forge_fileoutputstream_close(output)
   }
 
-  type ForgeFileInputStream = DeliteFileInputStream
-  implicit def forgeInputStreamManifest = manifest[ForgeFileInputStream]
-
   def forge_fileinputstream_new(path: Rep[String])(implicit ctx: SourceContext): Rep[ForgeFileInputStream] = {
-    DeliteFileInputStream(Seq(path))
+    val out = DeliteFileInputStream(Seq(path))
+    out.open()
+    out
   }
 
   def forge_fileinputstream_readline(stream: Rep[ForgeFileInputStream])(implicit ctx: SourceContext): Rep[String] = {

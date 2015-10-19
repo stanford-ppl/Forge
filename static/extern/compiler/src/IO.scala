@@ -11,6 +11,9 @@ import ppl.delite.framework.datastructures._
 trait InputOutputOpsExp extends DeliteFileReaderOpsExp with DeliteFileWriterOpsExp {
   this: ForgeArrayOpsExp with ForgeArrayBufferOpsExp =>
 
+  type ForgeFileInputStream = DeliteFileInputStream
+  implicit def forgeInputStreamManifest = manifest[ForgeFileInputStream]
+
   def forge_filereader_readlines[A:Manifest](path: Rep[String], f: Rep[String] => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
     DeliteFileReader.readLines[A](path)(f)
   }
@@ -19,17 +22,14 @@ trait InputOutputOpsExp extends DeliteFileReaderOpsExp with DeliteFileWriterOpsE
     DeliteFileReader.readLinesFlattened[A](path)(f)
   }
 
-  def forge_filereader_readlines_chunk[A:Manifest](path: Rep[String], offset: Rep[Long], numBytes: Rep[Long], f: (Rep[String], Rep[String]) => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
-    DeliteFileReader.readLinesChunk[A](path)(offset, numBytes)(f)
+  def forge_filereader_readlines_chunk[A:Manifest](stream: Rep[ForgeFileInputStream], offset: Rep[Long], numBytes: Rep[Long], f: (Rep[String], Rep[String]) => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
+    DeliteFileReader.readLinesChunk[A](stream)(offset, numBytes)(f)
   }
 
   def forge_filewriter_writelines(path: Rep[String], numLines: Rep[Int], append: Rep[Boolean], f: Rep[Int] => Rep[String])(implicit ctx: SourceContext): Rep[Unit] = {
     DeliteFileWriter.writeLines(path, numLines, append)(f)
   }
 
-
-  type ForgeFileInputStream = DeliteFileInputStream
-  implicit def forgeInputStreamManifest = manifest[ForgeFileInputStream]
 
   def forge_fileinputstream_new(path: Rep[String])(implicit ctx: SourceContext): Rep[ForgeFileInputStream] = {
     dfis_new_effectful(Seq(path))

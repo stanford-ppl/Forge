@@ -348,11 +348,11 @@ trait StreamOps {
 
     compiler (DHashStream) ("dhash_lookup_key_internal", Nil, Nil :: SecretKey, effect = simple) implements codegen($cala, ${
       import com.amazonaws.services.kms._
-      
+
       val kmsClient = new AWSKMSClient()
       val kmsRegion = sys.env.getOrElse("AWS_KMS_REGION", sys.env.getOrElse("AWS_DEFAULT_REGION", "us-east-1"))
       kmsClient.configureRegion(com.amazonaws.regions.Regions.fromName(kmsRegion))
-      
+
       val s3Client = new com.amazonaws.services.s3.AmazonS3Client()
       val s3Region = sys.env.getOrElse("AWS_S3_REGION", sys.env.getOrElse("AWS_DEFAULT_REGION", "us-east-1"))
       s3Client.configureRegion(com.amazonaws.regions.Regions.fromName(s3Region))
@@ -787,7 +787,6 @@ trait StreamOps {
       infix ("processFileChunks") (MethodSignature(List(("readFunc", (MString,MString) ==> R), ("processFunc", MArray(R) ==> MUnit), ("chunkSize", MLong, "filestream_getchunkbytesize()")), MUnit), addTpePars = R) implements composite ${
         val f = ForgeFileInputStream($self.path)
         val totalSize = f.size
-        f.close()
 
         val numChunks = ceil(totalSize.toDouble / chunkSize)
         var totalBytesRead = 0L
@@ -810,13 +809,15 @@ trait StreamOps {
           }
           // process remainder if we're the last chunk
           val processSize: Rep[Long] = if (i == numChunks - 1) totalSize - totalBytesRead else chunkSize
-          val a = ForgeFileReader.readLinesChunk($self.path)(totalBytesRead, processSize)(readFunc)
+          val a = ForgeFileReader.readLinesChunk(f)(totalBytesRead, processSize)(readFunc)
           processFunc(a)
 
           totalBytesRead += processSize
           totalLinesRead += a.length
           i += 1
         }
+
+        f.close()
       }
 
       // chunks are loaded in parallel, one chunk at a time

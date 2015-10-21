@@ -65,6 +65,10 @@ trait StreamCorrectLarge extends ForgeTestModule with OptiMLApplication {
 /* Reading and writing the same filename in the same app is not supported, as the order of operations is not guaranteed */
 
 trait StreamSuitePaths {
+  // In order to run AWS tests, the following environment variables should be set:
+  // AWS_DEFAULT_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_KMS_KEY_PATH
+  val runAWSTests = System.getProperty("optiml.tests.run.aws", "false").toBoolean
+
   val testMat = "test.mat"
   val testMat2 = "test2.mat"
   val testMat3 = "test3.mat"
@@ -279,8 +283,10 @@ trait HashStreamWriteB extends ForgeTestModule with OptiMLApplication with Strea
 
   def main() = {
     writeStream()
-    writeDStream()
     writeInMem()
+    if (runAWSTests) {
+      writeDStream()
+    }
 
     // setup - testing occurs in subsequent phases
     collect(true)
@@ -294,18 +300,21 @@ trait HashStreamRead extends ForgeTestModule with OptiMLApplication with StreamS
   def main() = {
     val a = readMatrix(testHashStreamMat)
     val b = readMatrix(testHashInMemMat)
-    val c = readMatrix(testDHashStreamMat)
 
     // groupRowsBy is not guaranteed to maintain ordering of rows
     val sortedAIndices = IndexVector((0::a.numRows).sortBy(i => a(i).sum))
     val sortedBIndices = IndexVector((0::b.numRows).sortBy(i => b(i).sum))
-    val sortedCIndices = IndexVector((0::c.numRows).sortBy(i => c(i).sum))
     val sortedA = a(sortedAIndices)
     val sortedB = b(sortedBIndices)
-    val sortedC = c(sortedCIndices)
-
     collect(sortedA == sortedB)
-    collect(sortedB == sortedC)
+
+    if (runAWSTests) {
+      val c = readMatrix(testDHashStreamMat)
+      val sortedCIndices = IndexVector((0::c.numRows).sortBy(i => c(i).sum))
+      val sortedC = c(sortedCIndices)
+      collect(sortedB == sortedC)
+    }
+
     mkReport
   }
 }
@@ -319,8 +328,10 @@ trait HashStreamDelete extends ForgeTestModule with OptiMLApplication with Strea
     deleteFile(testHash1)
     deleteFile(testHash2)
     deleteFile(testHashStreamMat)
-    deleteFile(testDHashStreamMat)
     deleteFile(testHashInMemMat)
+    if (runAWSTests) {
+      deleteFile(testDHashStreamMat)
+    }
 
     collect(true)
     mkReport

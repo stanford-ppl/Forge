@@ -19,7 +19,8 @@
  *
  */
 
-import reflect.{Manifest, SourceContext}
+import reflect.Manifest;
+import org.scala_lang.virtualized.SourceContext
 import scala.virtualization.lms.common.Record
 import optiml.compiler._
 import optiml.library._

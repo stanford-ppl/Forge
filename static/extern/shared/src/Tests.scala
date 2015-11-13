@@ -1,7 +1,8 @@
 package LOWERCASE_DSL_NAME.shared
 
 import scala.annotation.unchecked.uncheckedVariance
-import scala.reflect.{Manifest,SourceContext}
+import reflect.Manifest;
+import org.scala_lang.virtualized.SourceContext
 import scala.virtualization.lms.common._
 
 import java.io._

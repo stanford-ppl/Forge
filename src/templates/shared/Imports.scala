@@ -14,7 +14,7 @@ trait BaseGenImports extends ForgeCodeGenBase {
   }
 
   def emitScalaReflectImports(stream: PrintWriter) {    
-    stream.println("import scala.reflect.{Manifest,SourceContext}")    
+    stream.println("import reflect.Manifest; import org.scala_lang.virtualized.SourceContext")    
   }
 
   def emitScalaImports(stream: PrintWriter) {

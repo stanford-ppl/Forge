@@ -8,7 +8,7 @@
  */
 
 import scala.virtualization.lms.common.Record
-import scala.reflect.SourceContext
+import org.scala_lang.virtualized.SourceContext
 
 import optiml.compiler._
 import optiml.library._

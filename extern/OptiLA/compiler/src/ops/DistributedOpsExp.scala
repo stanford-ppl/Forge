@@ -1,6 +1,7 @@
 package optila.compiler.ops
 
-import scala.reflect.{Manifest,RefinedManifest,SourceContext}
+import scala.reflect.Manifest
+import org.scala_lang.virtualized.{SourceContext,RefinedManifest}
 import scala.virtualization.lms.internal._
 import scala.virtualization.lms.common.{Base,BaseExp,EffectExp,BaseFatExp,StructOps}
 import ppl.delite.framework.ops.{DeliteCollection, DeliteOpsExp, DeliteCollectionOpsExp}

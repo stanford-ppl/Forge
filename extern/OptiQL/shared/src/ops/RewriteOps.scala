@@ -3,7 +3,7 @@ package optiql.shared.ops
 import scala.virtualization.lms.common.{Base,StructOps}
 import optiql.shared._
 import optiql.shared.ops._
-import scala.reflect.{RefinedManifest,SourceContext}
+import org.scala_lang.virtualized.{RefinedManifest,SourceContext}
 
 //TODO: this trait is basically a misc. grab bag of features, but most of it should be pushed directly into Forge
 trait RewriteOps extends Base {

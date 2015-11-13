@@ -1,7 +1,8 @@
 package optiml.compiler.ops
 
 import scala.tools.nsc.io._
-import scala.reflect.{Manifest,SourceContext}
+import reflect.Manifest;
+import org.scala_lang.virtualized.SourceContext
 import scala.virtualization.lms.common.{Base,BaseExp,EffectExp,BaseFatExp}
 import scala.virtualization.lms.common.{ScalaGenBase,ScalaGenEffect,ScalaGenFat}
 import scala.virtualization.lms.util._

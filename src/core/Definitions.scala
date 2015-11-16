@@ -1,6 +1,8 @@
 package ppl.dsl.forge
 package core
 
+import org.scala_lang.virtualized.SourceContext
+
 trait Definitions extends DerivativeTypes {
   this: Forge =>
 

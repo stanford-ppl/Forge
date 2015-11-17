@@ -9,9 +9,11 @@ import org.scala_lang.virtualized.{RefinedManifest,SourceContext}
 trait RewriteOps extends Base {
   this: OptiQL => 
 
-  def infix_printAsTable[A:Manifest](self: Rep[Table[A]],maxRows: Rep[Int] = unit(100))(implicit __pos: SourceContext) = table_printastable[A](self,maxRows)(implicitly[Manifest[A]],__pos)
-  def infix_writeAsJSON[A:Manifest](self: Rep[Table[A]],path: Rep[String])(implicit __pos: SourceContext) = table_writeasjson[A](self,path)(implicitly[Manifest[A]],__pos)
-  //def infix_writeAsCSV
+  implicit class TableOpsCls[A:Manifest](val self: Rep[Table[A]])(implicit pos: SourceContext) {
+    def printAsTable(maxRows: Rep[Int] = unit(100))(implicit __pos: SourceContext) = table_printastable[A](self,maxRows)(implicitly[Manifest[A]],__pos)
+    def writeAsJSON(path: Rep[String])(implicit __pos: SourceContext) = table_writeasjson[A](self,path)(implicitly[Manifest[A]],__pos)
+    //def writeAsCSV
+  }
 
   def table_printastable[A:Manifest](self: Rep[Table[A]],maxRows: Rep[Int] = unit(100))(implicit __pos: SourceContext): Rep[Unit]
   def table_writeasjson[A:Manifest](self: Rep[Table[A]],path: Rep[String])(implicit __pos: SourceContext): Rep[Unit]

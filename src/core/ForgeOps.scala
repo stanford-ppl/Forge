@@ -2,6 +2,7 @@ package ppl.dsl.forge
 package core
 
 import java.io.{PrintWriter}
+import org.scala_lang.virtualized.virtualize
 import org.scala_lang.virtualized.SourceContext
 import scala.virtualization.lms.common._
 import scala.virtualization.lms.internal._
@@ -10,9 +11,12 @@ import scala.collection.mutable.{ArrayBuffer,HashMap}
 trait ForgeOps extends Base {
   this: Forge =>
 
-  def infix_withBound(a: Rep[TypePar], b: TypeClassSignature) = forge_withbound(a,b)
-  implicit class TpeClassOps(a: TypeClassSignature) {
-    def apply(b: Rep[DSLType]*) = forge_typeclasson(a,b.toList)
+  implicit class TypeParOpsCls(val a: Rep[TypePar])(implicit pos: SourceContext) {
+    def withBound(b: TypeClassSignature)(implicit pos: SourceContext) = forge_withbound(a, b)
+  }
+
+  implicit class TpeClassOps(a: TypeClassSignature)(implicit pos: SourceContext) {
+    def apply(b: Rep[DSLType]*)(implicit pos: SourceContext) = forge_typeclasson(a,b.toList)
   }
 
   def grp(name: String) = forge_grp(name)
@@ -46,19 +50,19 @@ trait ForgeOps extends Base {
   case class MethodSignature(args: List[Rep[Any]], retTpe: Rep[DSLType]) extends MethodSignatureType
   case class CurriedMethodSignature(args: List[List[Rep[Any]]], retTpe: Rep[DSLType]) extends MethodSignatureType
 
-  def infix_args(signature: MethodSignatureType) = signature match {
-    case MethodSignature(args, _) => args
-    case CurriedMethodSignature(args, _) => args(0)
-  }
-
-  def infix_allArgs(signature: MethodSignatureType) = signature match {
-    case MethodSignature(_, _) => Nil.asInstanceOf[List[List[Rep[DSLArg]]]]
-    case CurriedMethodSignature(args, _) => args // includes actual args because we need to know the length to get the arg number right in listToCurriedArgs
-  }
-
-  def infix_retTpe(signature: MethodSignatureType) = signature match {
-    case MethodSignature(_, r) => r
-    case CurriedMethodSignature(_, r) => r
+  implicit class MethodSignatureTypeOpsCls(val signature: MethodSignatureType)(implicit pos: SourceContext) {
+    def args(implicit pos: SourceContext) = signature match {
+      case MethodSignature(args, _) => args
+      case CurriedMethodSignature(args, _) => args(0)
+    }
+    def allArgs(implicit pos: SourceContext) = signature match {
+      case MethodSignature(_, _) => Nil.asInstanceOf[List[List[Rep[DSLArg]]]]
+      case CurriedMethodSignature(args, _) => args // includes actual args because we need to know the length to get the arg number right in listToCurriedArgs
+    }
+    def retTpe(implicit pos: SourceContext) = signature match {
+      case MethodSignature(_, r) => r
+      case CurriedMethodSignature(_, r) => r
+    }
   }
 
   def static(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) =
@@ -79,8 +83,10 @@ trait ForgeOps extends Base {
   object parallelize {
     def apply(tpe: Rep[DSLType]) = ParallelizeKey(tpe)
   }
-  def infix_as(p: ParallelizeKey, dc: ParallelCollection) = forge_isparallelcollection(p.tpe, dc)
-  def infix_as(p: ParallelizeKey, dc: ParallelCollectionBuffer) = forge_isparallelcollection_buffer(p.tpe, dc)
+  implicit class ParallelizeKeyOpsCls(val p: ParallelizeKey)(implicit pos: SourceContext) {
+    def as(dc: ParallelCollection)(implicit pos: SourceContext) = forge_isparallelcollection(p.tpe, dc)
+    def as(dc: ParallelCollectionBuffer)(implicit pos: SourceContext) = forge_isparallelcollection_buffer(p.tpe, dc)
+  }
 
   def lookupTpe(tpeName: String, stage: StageTag = future) = forge_lookup_tpe(tpeName,stage)
   def lookupTpeClass(tpeClassName: String) = forge_lookup_tpe_class(tpeClassName)
@@ -153,9 +159,16 @@ trait ForgeSugar extends ForgeSugarLowPriority {
    * Sugar available everywhere inside Forge
    */
 
-  def infix_::(retTpe: Rep[DSLType], args: List[Rep[Any]]) = MethodSignature(args, retTpe)
-  def infix_implements(o: Rep[DSLOp], rule: OpType) = forge_impl(o,rule)
-  def infix_==>(args: List[Rep[Any]], ret: Rep[DSLType]) = MFunction(args,ret)
+  implicit class DSLTypeOpsCls(val retTpe: Rep[DSLType])(implicit pos: SourceContext) {
+    def ::(args: List[Rep[Any]])(implicit pos: SourceContext) = MethodSignature(args, retTpe)
+  }
+
+  implicit class DSLOpOpsCls(val o: Rep[DSLOp])(implicit pos: SourceContext) {
+    def implements(rule: OpType) = forge_impl(o, rule)
+  }
+  implicit class ListRepAnyOpsCls(val args: List[Rep[Any]])(implicit pos: SourceContext) {
+    def ==>(ret: Rep[DSLType]) = MFunction(args, ret)
+  }
 
   implicit class TpeOps(hkTpe: Rep[DSLType]) {
     def apply(tpeArgs: Rep[DSLType]*) = tpeInst(hkTpe, tpeArgs.toList)
@@ -169,6 +182,7 @@ trait ForgeSugar extends ForgeSugarLowPriority {
     _tpeScopeBox = tpe
     new ChainTpe(tpe)
   }
+
   class ChainTpe(tpe: Rep[DSLType]) {
     def apply[R](block: => R) = new Scope[TpeScope, TpeScopeRunner[R], R](block)
   }

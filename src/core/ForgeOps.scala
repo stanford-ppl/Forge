@@ -11,12 +11,12 @@ import scala.collection.mutable.{ArrayBuffer,HashMap}
 trait ForgeOps extends Base {
   this: Forge =>
 
-  implicit class TypeParOpsCls(val a: Rep[TypePar])(implicit pos: SourceContext) {
-    def withBound(b: TypeClassSignature)(implicit pos: SourceContext) = forge_withbound(a, b)
+  implicit class TypeParOpsCls(val a: Rep[TypePar]) {
+    def withBound(b: TypeClassSignature) = forge_withbound(a, b)
   }
 
-  implicit class TpeClassOps(a: TypeClassSignature)(implicit pos: SourceContext) {
-    def apply(b: Rep[DSLType]*)(implicit pos: SourceContext) = forge_typeclasson(a,b.toList)
+  implicit class TpeClassOps(a: TypeClassSignature) {
+    def apply(b: Rep[DSLType]*) = forge_typeclasson(a,b.toList)
   }
 
   def grp(name: String) = forge_grp(name)
@@ -50,16 +50,16 @@ trait ForgeOps extends Base {
   case class MethodSignature(args: List[Rep[Any]], retTpe: Rep[DSLType]) extends MethodSignatureType
   case class CurriedMethodSignature(args: List[List[Rep[Any]]], retTpe: Rep[DSLType]) extends MethodSignatureType
 
-  implicit class MethodSignatureTypeOpsCls(val signature: MethodSignatureType)(implicit pos: SourceContext) {
-    def args(implicit pos: SourceContext) = signature match {
+  implicit class MethodSignatureTypeOpsCls(val signature: MethodSignatureType) {
+    def args = signature match {
       case MethodSignature(args, _) => args
       case CurriedMethodSignature(args, _) => args(0)
     }
-    def allArgs(implicit pos: SourceContext) = signature match {
+    def allArgs = signature match {
       case MethodSignature(_, _) => Nil.asInstanceOf[List[List[Rep[DSLArg]]]]
       case CurriedMethodSignature(args, _) => args // includes actual args because we need to know the length to get the arg number right in listToCurriedArgs
     }
-    def retTpe(implicit pos: SourceContext) = signature match {
+    def retTpe = signature match {
       case MethodSignature(_, r) => r
       case CurriedMethodSignature(_, r) => r
     }
@@ -83,9 +83,9 @@ trait ForgeOps extends Base {
   object parallelize {
     def apply(tpe: Rep[DSLType]) = ParallelizeKey(tpe)
   }
-  implicit class ParallelizeKeyOpsCls(val p: ParallelizeKey)(implicit pos: SourceContext) {
-    def as(dc: ParallelCollection)(implicit pos: SourceContext) = forge_isparallelcollection(p.tpe, dc)
-    def as(dc: ParallelCollectionBuffer)(implicit pos: SourceContext) = forge_isparallelcollection_buffer(p.tpe, dc)
+  implicit class ParallelizeKeyOpsCls(val p: ParallelizeKey) {
+    def as(dc: ParallelCollection) = forge_isparallelcollection(p.tpe, dc)
+    def as(dc: ParallelCollectionBuffer) = forge_isparallelcollection_buffer(p.tpe, dc)
   }
 
   def lookupTpe(tpeName: String, stage: StageTag = future) = forge_lookup_tpe(tpeName,stage)
@@ -159,14 +159,14 @@ trait ForgeSugar extends ForgeSugarLowPriority {
    * Sugar available everywhere inside Forge
    */
 
-  implicit class DSLTypeOpsCls(val retTpe: Rep[DSLType])(implicit pos: SourceContext) {
-    def ::(args: List[Rep[Any]])(implicit pos: SourceContext) = MethodSignature(args, retTpe)
+  implicit class DSLTypeOpsCls(val retTpe: Rep[DSLType]) {
+    def ::(args: List[Rep[Any]]) = MethodSignature(args, retTpe)
   }
 
-  implicit class DSLOpOpsCls(val o: Rep[DSLOp])(implicit pos: SourceContext) {
+  implicit class DSLOpOpsCls(val o: Rep[DSLOp]) {
     def implements(rule: OpType) = forge_impl(o, rule)
   }
-  implicit class ListRepAnyOpsCls(val args: List[Rep[Any]])(implicit pos: SourceContext) {
+  implicit class ListRepAnyOpsCls(val args: List[Rep[Any]]) {
     def ==>(ret: Rep[DSLType]) = MFunction(args, ret)
   }
 
@@ -183,6 +183,7 @@ trait ForgeSugar extends ForgeSugarLowPriority {
     new ChainTpe(tpe)
   }
 
+  @virtualize
   class ChainTpe(tpe: Rep[DSLType]) {
     def apply[R](block: => R) = new Scope[TpeScope, TpeScopeRunner[R], R](block)
   }
@@ -237,7 +238,7 @@ trait ForgeSugar extends ForgeSugarLowPriority {
   trait TpeScopeRunner[R] extends TpeScope {
     def apply: R
     val result = apply
-    _tpeScopeBox = null // reset
+    _tpeScopeBox = _: Rep[DSLType] // reset
   }
 }
 

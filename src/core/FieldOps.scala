@@ -27,18 +27,15 @@ trait FieldOps extends Base with OverloadHack {
   // TODO: hide these behind a forge cmd in ForgeOps
 
   // needed for lookup
-//  implicit class DSLTypeOpsCls(val x: Rep[DSLType]) {
-//    def name(implicit o: Overloaded1): String = dsltype_name()
-//    // needed for is
-//    def tpePars(implicit pos: SourceContext): List[Rep[TypePar]]
-//    // needed to generate primitive math combinations as type classes
-//    def stage(implicit pos: SourceContext): StageTag
-//    def tpeArgs(implicit pos: SourceContext): List[Rep[DSLType]]
-//  }
-//  def dsltype_name(x: Rep[DSLType])(implicit o: Overloaded1): String
-//  def dsltype_tpePars(x: Rep[DSLType])//:
-//  def dsltype_stage(x: Rep[DSLType])//:
-//  def dsltype_tpeArgs(x: Rep[DSLType])//:
+  implicit def DSLTypeOpsClsFO(x: Rep[DSLType]): AbsDSLTypeOpsCls
+  abstract class AbsDSLTypeOpsCls {
+    def name(implicit o: Overloaded1): String
+    // needed for is
+    def tpePars: List[Rep[TypePar]]
+    // needed to generate primitive math combinations as type classes
+    def stage: StageTag
+    def tpeArgs: List[Rep[DSLType]]
+  }
 }
 
 
@@ -71,7 +68,8 @@ trait FieldOpsExp extends FieldOps {
   /**
    * DSLType
    */
-  implicit class DSLTypeOpsCls(val x: Exp[DSLType]) {
+  implicit def DSLTypeOpsClsFO(x: Rep[DSLType]) = new DSLTypeOpsCls(x)
+  class DSLTypeOpsCls(val x: Exp[DSLType]) extends AbsDSLTypeOpsCls {
     def name(implicit o: Overloaded1): String = x match {
       case Def(Tpe(name,tpePars,stage)) => name
       case Def(TpeInst(t,args)) => t.name(o)

@@ -16,8 +16,11 @@ trait ImageOps {
     data(GrayscaleImage, ("_data", DenseMatrix(MDouble)))
     static (GrayscaleImage) ("apply", Nil, DenseMatrix(MDouble) :: GrayscaleImage) implements allocates(GrayscaleImage, ${$0})
 
-    val ImageOps = withTpe(GrayscaleImage)
-    ImageOps {
+    //val ImageOps = withTpe(GrayscaleImage)
+    //ImageOps {
+    import org.scala_lang.virtualized.virtualize
+    @virtualize
+    def magic[R] = withTpee(GrayscaleImage){
       infix ("data") (Nil :: DenseMatrix(MDouble)) implements getter(0, "_data")
       infix ("numRows") (Nil :: MInt) implements redirect ${ $self.data.numRows }
       infix ("numCols") (Nil :: MInt) implements redirect ${ $self.data.numCols }

@@ -40,8 +40,11 @@ trait MatrixOps {
     val S = if (isTpePar(T)) List(TStringable(asTpePar(T))) else Nil
     val M = if (isTpePar(T)) m(T) else m
 
-    val MatrixCommonOps = withTpe(m)
-    MatrixCommonOps {
+    //val MatrixCommonOps = withTpe(m)
+    //MatrixCommonOps {
+    import org.scala_lang.virtualized.virtualize
+    @virtualize
+    def magic[R] = withTpee(m){
       /**
        * Conversions
        */

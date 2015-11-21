@@ -530,11 +530,11 @@ trait DeliteGenOps extends BaseGenOps {
         case c:Composite => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
         case g@Getter(structArgIndex,field) =>
           val struct = o.args.apply(structArgIndex)
-          val fieldTpe = DataStructs(getHkTpe(struct.tpe)).fields.find(t => t._1 == field).get.tpe
+          val fieldTpe = DataStructs(getHkTpe(struct.tpe)).fields.find(t => t._1 == field).get._2//.tpe
           emitWithIndent("field["+quote(fieldTpe)+"]("+inline(o,quotedArg(struct.name),quoteLiteral)+",\""+field+"\")", stream, 4)
         case s@Setter(structArgIndex,field,value) =>
           val struct = o.args.apply(structArgIndex)
-          val fieldTpe = DataStructs(getHkTpe(struct.tpe)).fields.find(t => t._1 == field).get.tpe
+          val fieldTpe = DataStructs(getHkTpe(struct.tpe)).fields.find(t => t._1 == field).get._2//.tpe
           emitWithIndent("field_update["+quote(fieldTpe)+"]("+inline(o,quotedArg(struct.name),quoteLiteral)+",\""+field+"\","+inline(o,value,quoteLiteral)+")", stream, 4)
         case _:GroupBy | _:GroupByReduce =>
           emitWithIndent("val keys = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o, "Keys") + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)

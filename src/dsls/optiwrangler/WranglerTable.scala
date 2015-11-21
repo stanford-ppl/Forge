@@ -55,8 +55,11 @@ trait WranglerTableOps {
       xfs.close()
     })
     
-  	val WranglerTableOps = withTpe (Table)
-  	WranglerTableOps {
+  	//val WranglerTableOps = withTpe (Table)
+  	//WranglerTableOps {
+  	import org.scala_lang.virtualized.virtualize
+  	@virtualize
+  	def magic[R] = withTpee(Table){
       infix ("Split") (MethodSignature(List(("col", MString),("delimiter", MString, "unit(\",\")"),("numOfSplits", MInt, "unit(1)")), Table)) implements composite ${
         val origCol = get_column_by_name($self, $col)
         val splitElems = array_map(origCol, ((s:Rep[String]) => splitString(s, $delimiter, $numOfSplits)))

@@ -11,7 +11,7 @@ import scala.collection.mutable.{ArrayBuffer,HashMap}
 trait ForgeOps extends Base {
   this: Forge =>
 
-  implicit class TypeParOpsCls(val a: Rep[TypePar]) {
+  implicit class TypeParOpsClsForge(val a: Rep[TypePar]) {
     def withBound(b: TypeClassSignature) = forge_withbound(a, b)
   }
 
@@ -163,10 +163,10 @@ trait ForgeSugar extends ForgeSugarLowPriority {
     def ::(args: List[Rep[Any]]) = MethodSignature(args, retTpe)
   }
 
-  implicit class DSLOpOpsCls(val o: Rep[DSLOp]) {
+  implicit class DSLOpOpsClsForge(val o: Rep[DSLOp]) {
     def implements(rule: OpType) = forge_impl(o, rule)
   }
-  implicit class ListRepAnyOpsCls(val args: List[Rep[Any]]) {
+  implicit class ListRepAnyOpsCls[T <% List[Rep[Any]]](val args: T) {
     def ==>(ret: Rep[DSLType]) = MFunction(args, ret)
   }
 
@@ -236,8 +236,8 @@ trait ForgeSugar extends ForgeSugarLowPriority {
   }
 
   trait TpeScopeRunner[R] extends TpeScope {
-    def apply: R
-    val result = apply
+    //def apply: R
+    //val result = apply
     _tpeScopeBox = _: Rep[DSLType] // reset
   }
 }
@@ -309,7 +309,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
    */
 
   /* A group represents a collection of ops which become an op trait in the generated DSL */
-  case class Grp(name: String) extends Def[DSLGroup]
+  case class Grp(name: String) extends Def[DSLType]
 
   def forge_grp(name: String) = Grp(name)
 

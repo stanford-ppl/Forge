@@ -132,8 +132,11 @@ trait DenseVectorOps {
     }
 
 
-    val DenseVectorOps = withTpe (DenseVector)
-    DenseVectorOps {
+    //val DenseVectorOps = withTpe (DenseVector)
+    //DenseVectorOps {
+    import org.scala_lang.virtualized.virtualize
+    @virtualize
+    def magic[R] = withTpee(DenseVector){
       /**
        * Accessors
        */

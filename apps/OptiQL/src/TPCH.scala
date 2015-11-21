@@ -2,7 +2,6 @@ import optiql.compiler._
 import optiql.library._
 import optiql.shared._
 import reflect.Manifest;
-import org.scala_lang.virtualized.SourceContext
 import scala.virtualization.lms.common.Record
 
 object TPCHQ1Interpreter extends OptiQLApplicationInterpreter with TPCHQ1Trait

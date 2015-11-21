@@ -58,8 +58,11 @@ trait ShapeOps {
 
     compiler (UTri) ("tri_size", Nil, ("n", MInt) :: MInt) implements composite ${ n*(n+1)/2 } // arithmetic sequence sum
 
-    val UTriOps = withTpe(UTri)
-    UTriOps {
+    //val UTriOps = withTpe(UTri)
+    //UTriOps {
+    import org.scala_lang.virtualized.virtualize
+    @virtualize
+    def magic[R] = withTpee(UTri){
       infix ("N") (Nil :: MInt) implements getter(0, "N")
       infix ("includeDiagonal") (Nil :: MBoolean) implements getter(0, "_includeDiagonal")      
 

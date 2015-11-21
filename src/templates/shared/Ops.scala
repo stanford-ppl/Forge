@@ -415,13 +415,13 @@ trait BaseGenOps extends ForgeCodeGenBase {
         val struct = getHkTpe(o.args.apply(structArgIndex).tpe)
         val data = DataStructs.get(struct)
         if (data.isEmpty) err("no struct definitions found for arg index " + structArgIndex + " in op " + o.name)
-        if (!data.get.fields.map(_.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)
+        if (!data.get.fields.map(_._2.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)
       case Setter(structArgIndex,field,value) =>
         if (structArgIndex > o.args.length) err("arg index " + structArgIndex + " does not exist for op " + o.name)
         val struct = getHkTpe(o.args.apply(structArgIndex).tpe)
         val data = DataStructs.get(struct)
         if (data.isEmpty) err("no struct definitions found for arg index " + structArgIndex + " in op " + o.name)
-        if (!data.get.fields.map(_.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)
+        if (!data.get.fields.map(_._2.name).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)
       case map:Map =>
         val col = getHkTpe(o.args.apply(map.argIndex).tpe)
         if (!isParallelCollection(col)) err("map argument " + col.name + " is not a ParallelCollection")

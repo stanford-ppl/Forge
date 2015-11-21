@@ -61,8 +61,11 @@ trait TreeOps {
       ${array_empty[Int](initCapacity)}
     )
 
-    val TreeOps = withTpe(Tree)
-    TreeOps {
+    //val TreeOps = withTpe(Tree)
+    //TreeOps {
+    import org.scala_lang.virtualized.virtualize
+    @virtualize
+    def magic[R] = withTpee(Tree){
       // getters and setters
       infix ("numNodes") (Nil :: MInt) implements getter(0, "_numNodes")
       compiler ("infix_set_num_nodes") (MInt :: MUnit, effect = write(0)) implements setter(0, "_numNodes", ${$1})

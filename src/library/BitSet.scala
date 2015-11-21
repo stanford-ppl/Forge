@@ -44,8 +44,11 @@ trait BitSetOps {
     // Allocate a bitset where your internal words are already ready.
     static (BitSet) ("apply", Nil, (MArray(MLong),MInt) :: BitSet) implements allocates(BitSet, ${$0},${$1})
 
-    val BitSetOps = withTpe(BitSet)
-    BitSetOps{
+    //val BitSetOps = withTpe(BitSet)
+    //BitSetOps{
+    import org.scala_lang.virtualized.virtualize
+    @virtualize
+    def magic[R] = withTpee(BitSet){
 
       //////////////////////////////Basic Accessors////////////////////////////////////////
 

@@ -61,8 +61,11 @@ trait ClassifierOps {
       alloc_forest(trees)
     }
 
-    val ForestOps = withTpe(Forest)
-    ForestOps {
+    //val ForestOps = withTpe(Forest)
+    //ForestOps {
+    import org.scala_lang.virtualized.virtualize
+    @virtualize
+    def magic[R] = withTpee(Forest){
       infix ("trees") (Nil :: DenseVector(Tree)) implements getter(0, "_trees")
 
       infix ("predict") (("testPt", DenseVector(MDouble)) :: MDouble) implements composite ${

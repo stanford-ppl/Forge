@@ -14,8 +14,11 @@ trait ComplexOps {
 
     static (Complex) ("apply", Nil, (MDouble,MDouble) :: Complex) implements allocates(Complex, ${$0}, ${$1})
 
-    val ComplexOps = withTpe(Complex)
-    ComplexOps {
+    //val ComplexOps = withTpe(Complex)
+    //ComplexOps {
+    import org.scala_lang.virtualized.virtualize
+    @virtualize
+    def magic[R] = withTpee(Complex){
    	  infix ("real") (Nil :: MDouble) implements getter(0, "_real")
    	  infix ("imag") (Nil :: MDouble) implements getter(0, "_imag")
 

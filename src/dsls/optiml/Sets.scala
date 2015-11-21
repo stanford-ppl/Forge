@@ -27,8 +27,11 @@ trait SetOps {
       data(TrainingSet, ("_data", Matrix(D)), ("_labels", DenseVector(L)))
       static (TrainingSet) ("apply", (D,L), (Matrix(D), DenseVector(L)) :: TrainingSet(D,L)) implements allocates(TrainingSet, ${$0}, ${$1})
 
-      val TrainingSetOps = withTpe(TrainingSet)
-      TrainingSetOps {
+      //val TrainingSetOps = withTpe(TrainingSet)
+      //TrainingSetOps {
+      import org.scala_lang.virtualized.virtualize
+      @virtualize
+      def magic[R] = withTpee(TrainingSet){
         infix ("labels") (Nil :: DenseVector(L)) implements getter(0, "_labels")
       }
 
@@ -40,8 +43,11 @@ trait SetOps {
       // static (DenseTestSet) ("apply", D, DenseMatrix(D) :: DenseTestSet(D)) implements allocates(DenseTestSet, ${$0})
 
       for (t <- List(TrainingSet/*, DenseTestSet*/)) {
-        val ops = withTpe(t)
-        ops {
+        //val ops = withTpe(t)
+        //ops {
+        import org.scala_lang.virtualized.virtualize
+        @virtualize
+        def magic2[R] = withTpee(t){
           infix ("data") (Nil :: Matrix(D)) implements getter(0, "_data")
 
           infix ("apply") ((MInt,MInt) :: D) implements composite ${ $self.data.apply($1,$2) }

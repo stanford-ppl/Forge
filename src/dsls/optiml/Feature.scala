@@ -3,6 +3,7 @@ package dsls
 package optiml
 
 import core.{ForgeApplication,ForgeApplicationRunner}
+import org.scala_lang.virtualized.virtualize
 
 trait FeatureOps {
   this: OptiMLDSL =>
@@ -16,8 +17,10 @@ trait FeatureOps {
     // we use a magic number for the default because we don't support optional values in generated DSL code (yet)
     static (ContinuousFeature) ("apply", Nil, (("default", MDouble, "unit(0.0209)"), ("min", MDouble, "math_ninf()"), ("max", MDouble, "math_inf()")) :: ContinuousFeature) implements allocates(ContinuousFeature, ${$0}, ${$1}, ${$2})
 
-    val ContinuousFeatureOps = withTpe(ContinuousFeature)
-    ContinuousFeatureOps {
+    //val ContinuousFeatureOps = withTpe(ContinuousFeature)
+    //ContinuousFeatureOps {
+    @virtualize
+    def magic[R] = withTpee(ContinuousFeature){
       infix ("default") (Nil :: MDouble) implements getter(0, "_default")
       infix ("min") (Nil :: MDouble) implements getter(0, "_min")
       infix ("max") (Nil :: MDouble) implements getter(0, "_max")
@@ -46,8 +49,10 @@ trait FeatureOps {
       discrete_feature_alloc(fhashmap_from_arrays(keys, values))
     }
 
-    val DiscreteFeatureOps = withTpe(DiscreteFeature)
-    DiscreteFeatureOps {
+    //val DiscreteFeatureOps = withTpe(DiscreteFeature)
+    //DiscreteFeatureOps {
+    @virtualize
+    def magic2[R] = withTpee(DiscreteFeature){
       compiler ("getFeatures") (Nil :: MHashMap(MString, MInt)) implements getter(0, "_features")
 
       infix ("apply") (MString :: MDouble) implements composite ${
@@ -73,8 +78,10 @@ trait FeatureOps {
     data(BinaryFeature, ("_default", MBoolean))
     static (BinaryFeature) ("apply", Nil, ("default", MBoolean, "unit(false)") :: BinaryFeature) implements allocates(BinaryFeature, ${$0})
 
-    val BinaryFeatureOps = withTpe(BinaryFeature)
-    BinaryFeatureOps {
+    //val BinaryFeatureOps = withTpe(BinaryFeature)
+    //BinaryFeatureOps {
+    @virtualize
+    def magic3[R] = withTpee(BinaryFeature){
       infix ("default") (Nil :: MBoolean) implements getter(0, "_default")
 
       infix ("apply") (MString :: MDouble) implements composite ${

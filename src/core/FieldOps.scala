@@ -58,7 +58,7 @@ trait FieldOpsExp extends FieldOps {
   /**
    * TypePar
    */
-  implicit class TypeParOpsCls(val x: Exp[TypePar]) {
+  implicit class TypeParOpsClsField(val x: Exp[TypePar]) {
     def ctxBounds: List[TypeClassSignature] = x match {
       case Def(TpePar(name,ctx,s)) => ctx
       case Def(HkTpePar(name,tpePars,ctx,s)) => ctx
@@ -157,7 +157,7 @@ trait FieldOpsExp extends FieldOps {
   /**
    * DSLOp
    */
-  implicit class DSLOpOpsCls(val x: Exp[DSLOp]) {
+  implicit class DSLOpOpsClsField(val x: Exp[DSLOp]) {
     def args = x match {
       case Def(Op(grp, name, style, tpePars, args, Nil, implArgs, retTpe, eff, alias)) => args
       case Def(Op(grp, name, style, tpePars, args, curArgs, implArgs, retTpe, eff, alias)) => args ++ curArgs.flatten

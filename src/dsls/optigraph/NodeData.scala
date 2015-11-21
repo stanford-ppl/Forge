@@ -29,8 +29,11 @@ trait NodeDataOps {
     static(NodeData)("apply", T, MArrayBuffer(T) :: NodeData(T)) implements allocates(NodeData,${array_buffer_immutable($0)})
     static(NodeData)("fromFunction", T, (MInt,(MInt ==> T)) :: NodeData(T)) implements allocates(NodeData,${array_buffer_new_imm(array_fromfunction($0,$1), $0)})
 
-    val NodeDataOps = withTpe(NodeData)
-    NodeDataOps{
+    //val NodeDataOps = withTpe(NodeData)
+    //NodeDataOps{
+    import org.scala_lang.virtualized.virtualize
+    @virtualize
+    def magic[R] = withTpee(NodeData){
       //////////////basic accessors//////////////////////////////
       infix("apply")(MInt :: T) implements composite ${array_buffer_apply(nd_raw_data($self),$1)}
       infix("apply")(Node :: T) implements composite ${array_buffer_apply(nd_raw_data($self),$1.id)}

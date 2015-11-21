@@ -63,9 +63,12 @@ trait HUMAN_DSL_NAMEDSL extends ForgeApplication {
     allocates (ParType, ${$1}, ${ array_empty[T]($1) })
 
     // A refence to our operations, necessary for scala compiler reasons
-    val ParTypeOps = withTpe (ParType)
+    //val ParTypeOps = withTpe (ParType)
 
-    ParTypeOps {
+    //ParTypeOps {
+    import org.scala_lang.virtualized.virtualize
+    @virtualize
+    def magic[R] = withTpee(ParType){
       /**
        * Ops :
        * (1) Scope

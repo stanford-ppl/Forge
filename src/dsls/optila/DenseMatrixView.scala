@@ -19,8 +19,11 @@ trait DenseMatrixViewOps {
     // static methods
     static (DenseMatrixView) ("apply", T, (MethodSignature(List(MArray(T), MInt, MInt, MInt, MInt, MInt, MInt), DenseMatrixView))) implements allocates(DenseMatrixView, ${$0}, ${$1}, ${$2}, ${$3}, ${$4}, ${$5}, ${$6})
 
-    val DenseMatrixViewOps = withTpe(DenseMatrixView)
-    DenseMatrixViewOps {
+    //val DenseMatrixViewOps = withTpe(DenseMatrixView)
+    //DenseMatrixViewOps {
+    import org.scala_lang.virtualized.virtualize
+    @virtualize
+    def magic[R] = withTpee(DenseMatrixView){
       compiler ("densematrixview_data") (Nil :: MArray(T)) implements getter(0, "_data")
       compiler ("densematrixview_startrow") (Nil :: MInt) implements getter(0, "_startRow")
       compiler ("densematrixview_endrow") (Nil :: MInt) implements getter(0, "_endRow")

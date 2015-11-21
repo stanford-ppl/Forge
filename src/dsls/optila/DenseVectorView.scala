@@ -19,8 +19,11 @@ trait DenseVectorViewOps {
     // static methods
     static (DenseVectorView) ("apply", T, ((MArray(T), MInt ,MInt, MInt, MBoolean) :: DenseVectorView)) implements allocates(DenseVectorView, ${$0}, ${$1}, ${$2}, ${$3}, ${$4})
 
-    val DenseVectorViewOps = withTpe(DenseVectorView)
-    DenseVectorViewOps {
+    //val DenseVectorViewOps = withTpe(DenseVectorView)
+    //DenseVectorViewOps {
+    import org.scala_lang.virtualized.virtualize
+    @virtualize
+    def magic[R] = withTpee(DenseVectorView){
       compiler ("densevectorview_data") (Nil :: MArray(T)) implements getter(0, "_data")
       compiler ("densevectorview_start") (Nil :: MInt) implements getter(0, "_start")
       compiler ("densevectorview_stride") (Nil :: MInt) implements getter(0, "_stride")

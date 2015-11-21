@@ -3,6 +3,7 @@ package dsls
 package optiml
 
 import core.{ForgeApplication,ForgeApplicationRunner}
+import org.scala_lang.virtualized.virtualize
 
 trait FactorGraphOps {
   this: OptiMLDSL =>
@@ -47,8 +48,10 @@ trait FactorGraphOps {
     ), FactorGraph)) implements
       allocates(FactorGraph, ${$0}, ${$1}, ${$2}, ${$3}, ${$4}, ${$5}, ${$6}, ${$7}, ${$8}, ${$9})
 
-    val FactorGraphOps = withTpe(FactorGraph)
-    FactorGraphOps {
+    //val FactorGraphOps = withTpe(FactorGraph)
+    //FactorGraphOps {
+    @virtualize
+    def magic[R] = withTpee(FactorGraph){
       infix ("v2f") (Nil :: CSRGraph) implements getter(0, "_v2f")
       infix ("f2v") (Nil :: CSRGraph) implements getter(0, "_f2v")
 
@@ -161,8 +164,10 @@ trait FactorGraphOps {
     static (DDFGFWeight) ("apply", Nil, (MInt, MBoolean, MDouble) :: DDFGFWeight) implements
       allocates(DDFGFWeight, ${$0}, ${$1}, ${$2})
 
-    val DDFGFWeightOps = withTpe(DDFGFWeight)
-    DDFGFWeightOps {
+    //val DDFGFWeightOps = withTpe(DDFGFWeight)
+    //DDFGFWeightOps {
+    @virtualize
+    def magic2[R] = withTpee(DDFGFWeight){
       infix ("weightId") (Nil :: MInt) implements getter(0, "_weightId")
       infix ("isFixed") (Nil :: MBoolean) implements getter(0, "_isFixed")
       infix ("initialValue") (Nil :: MDouble) implements getter(0, "_initialValue")
@@ -181,8 +186,10 @@ trait FactorGraphOps {
     static (DDFGFVariable) ("apply", Nil, MethodSignature(List(MInt, MBoolean, MDouble, MInt, MInt, MInt), DDFGFVariable)) implements
       allocates(DDFGFVariable, ${$0}, ${$1}, ${$2}, ${$3}, ${$4}, ${$5})
 
-    val DDFDFVariableOps = withTpe(DDFGFVariable)
-    DDFDFVariableOps {
+    //val DDFDFVariableOps = withTpe(DDFGFVariable)
+    //DDFDFVariableOps {
+    @virtualize
+    def magic3[R] = withTpee(DDFGFVariable){
       infix ("variableId") (Nil :: MInt) implements getter(0, "_variableId")
       infix ("isEvidence") (Nil :: MBoolean) implements getter(0, "_isEvidence")
       infix ("initialValue") (Nil :: MDouble) implements getter(0, "_initialValue")
@@ -202,8 +209,10 @@ trait FactorGraphOps {
     static (DDFGFFactor) ("apply", Nil, (MInt, MInt, MInt, MInt) :: DDFGFFactor) implements
       allocates(DDFGFFactor, ${$0}, ${$1}, ${$2}, ${$3})
 
-    val DDFGFFactorOps = withTpe(DDFGFFactor)
-    DDFGFFactorOps {
+    //val DDFGFFactorOps = withTpe(DDFGFFactor)
+    //DDFGFFactorOps {
+    @virtualize
+    def magic4[R] = withTpee(DDFGFFactor){
       infix ("factorId") (Nil :: MInt) implements getter(0, "_factorId")
       infix ("weightId") (Nil :: MInt) implements getter(0, "_weightId")
       infix ("factorFunction") (Nil :: MInt) implements getter(0, "_factorFunction")
@@ -222,8 +231,10 @@ trait FactorGraphOps {
     static (DDFGFEdge) ("apply", Nil, (MInt, MInt, MInt, MBoolean, MInt) :: DDFGFEdge) implements
       allocates(DDFGFEdge, ${$0}, ${$1}, ${$2}, ${$3}, ${$4})
 
-    val DDFGFEdgeOps = withTpe(DDFGFEdge)
-    DDFGFEdgeOps {
+    //val DDFGFEdgeOps = withTpe(DDFGFEdge)
+    //DDFGFEdgeOps {
+    @virtualize
+    def magic5[R] = withTpee(DDFGFEdge){
       infix ("variableId") (Nil :: MInt) implements getter(0, "_variableId")
       infix ("factorId") (Nil :: MInt) implements getter(0, "_factorId")
       infix ("position") (Nil :: MInt) implements getter(0, "_position")
@@ -425,8 +436,10 @@ trait FactorGraphOps {
 
     fimplicit (Replicated) ("readLocal", T, (("r", Replicated(T)) :: T)) implements redirect ${ r.local }
 
-    val ReplicatedOps = withTpe(Replicated)
-    ReplicatedOps {
+    //val ReplicatedOps = withTpe(Replicated)
+    //ReplicatedOps {
+    @virtualize
+    def magic6[R] = withTpee(Replicated){
       compiler ("get_copies") (Nil :: MArray(T)) implements getter(0, "_copies")
 
       infix ("local") (Nil :: T) implements composite ${

@@ -35,8 +35,11 @@ trait SparseMatrixOps {
       ("colIndices", MArray(MInt)),
       ("nnz", MInt)), SparseMatrixBuildable(T))) implements allocates(SparseMatrixBuildable, ${$0}, ${$1}, ${$2}, ${$3}, ${$4}, ${$5})
 
-    val SparseMatrixBuildableOps = withTpe(SparseMatrixBuildable)
-    SparseMatrixBuildableOps {
+    //val SparseMatrixBuildableOps = withTpe(SparseMatrixBuildable)
+    //SparseMatrixBuildableOps {
+    import org.scala_lang.virtualized.virtualize
+    @virtualize
+    def magic[R] = withTpee(SparseMatrixBuildable){
       /**
        * Accessors
        */
@@ -493,8 +496,11 @@ trait SparseMatrixOps {
     // direct (SparseMatrix) ("triu", T withBound TArith, SparseMatrix(T) :: SparseMatrix(T)) implements redirect ${ $0.triu }
     // direct (SparseMatrix) ("tril", T withBound TArith, SparseMatrix(T) :: SparseMatrix(T)) implements redirect ${ $0.tril }
 
-    val SparseMatrixOps = withTpe (SparseMatrix)
-    SparseMatrixOps {
+    //val SparseMatrixOps = withTpe (SparseMatrix)
+    //SparseMatrixOps {
+    import org.scala_lang.virtualized.virtualize
+    @virtualize
+    def magic2[R] = withTpee(SparseMatrix){
       /**
        * Accessors
        */

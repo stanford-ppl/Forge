@@ -211,7 +211,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
 trait ForgeUtilities {
   this: ForgeExp =>
 
-  def err(s: String) = { //(implicit ctx: SourceContext) = {
+  def err(s: String)(implicit ctx: SourceContext) = {
     println("[forge error]: " + s)
     // println("  at " + (ctx.fileName.split("/").last + ":" + ctx.line))
     println("Source Position not available!!")

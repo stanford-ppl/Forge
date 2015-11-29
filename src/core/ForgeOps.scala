@@ -177,6 +177,8 @@ trait ForgeSugar extends ForgeSugarLowPriority {
   /**
    * Uses Scala-Virtualized scopes to enable sugar for ops scoped on a particular DSLType
    */
+
+  //FIXME: we rather use withTpee as nee nee direct code block injection
   var _tpeScopeBox: Rep[DSLType] = _
   def withTpe(tpe: Rep[DSLType]) = {
     _tpeScopeBox = tpe
@@ -185,7 +187,7 @@ trait ForgeSugar extends ForgeSugarLowPriority {
 
   @virtualize
   class ChainTpe(tpe: Rep[DSLType]) {
-    def apply[R](block: => R) = new Scope[TpeScope, TpeScopeRunner[R], R](block)
+    //def apply[R](block: => R) = new Scope[TpeScope, TpeScopeRunner[R], R](block)
   }
 
   trait TpeScope {
@@ -235,9 +237,11 @@ trait ForgeSugar extends ForgeSugarLowPriority {
     def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup_op(lookupGrp(grpName),opName,index)
   }
 
-  trait TpeScopeRunner[R] extends TpeScope {
-    //def apply: R
-    //val result = apply
+//  trait TpeScopeRunner[R] extends TpeScope {
+//    def apply: R
+  trait TpeScopeRunner extends TpeScope {
+    def apply: Nothing
+    val result = apply //should this execute what's inside?
     _tpeScopeBox = _: Rep[DSLType] // reset
   }
 }

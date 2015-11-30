@@ -240,7 +240,7 @@ trait ForgeSugar extends ForgeSugarLowPriority {
 //  trait TpeScopeRunner[R] extends TpeScope {
 //    def apply: R
   trait TpeScopeRunner extends TpeScope {
-    def apply: Nothing
+    def apply: List[Any]
     val result = apply //should this execute what's inside?
     _tpeScopeBox = _: Rep[DSLType] // reset
   }

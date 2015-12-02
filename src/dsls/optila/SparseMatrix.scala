@@ -915,18 +915,6 @@ trait SparseMatrixOps {
         }
       }
 
-      infix ("*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${
-        fassert($self.numCols == $1.numRows, "dimension mismatch: matrix multiply (lhs: " + $self.makeDimsStr + ", rhs: " + $1.makeDimsStr + ")")
-        // naive
-        if ($self.numRows == 0) DenseMatrix[T]()
-        else {
-          var z = $self // manual guard against code motion
-          (0::z.numRows, *) { i =>
-            $1.mapColsToVector { c => z(i) *:* c }
-          }
-        }
-      }
-
       // TODO
       // infix ("*") (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements single ${
       //   fassert($self.numCols == $1.numRows, "dimension mismatch: matrix multiply")

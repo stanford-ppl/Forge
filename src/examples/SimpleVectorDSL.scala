@@ -47,12 +47,9 @@ trait SimpleVectorDSL extends ForgeApplication {
 
     //VectorOps {
     import org.scala_lang.virtualized.virtualize
-    import language.experimental.macros
-    import scala.reflect.macros.blackbox.Context
 
-    //@virtualize
-    def VectorOps[R](block: => R) = macro core.MacroImpl.mimpl[R]
-    VectorOps {
+    @virtualize
+    def magic[R] = withTpee(Vector){
       // getters and setters
       compiler ("vector_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
       compiler ("vector_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
@@ -177,6 +174,7 @@ trait SimpleVectorDSL extends ForgeApplication {
 
       parallelize as ParallelCollectionBuffer(T, lookupOp("vector_raw_alloc"), lookupOp("length"), lookupOverloaded("apply",1), lookupOp("update"), lookupOp("vector_set_length"), lookupOp("vector_appendable"), lookupOp("append"), lookupOp("vector_copy"))
     }
+    val magy = magic.result
 
     /* Testing: some codegen op that takes a block with arguments */
     val z = direct (Vector) ("foo", T, List(MInt ==> T, MInt, MThunk(MInt), (MInt,MInt) ==> MInt, MDouble, MDouble ==> MDouble) :: T) implements codegen($cala, ${

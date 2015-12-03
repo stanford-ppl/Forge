@@ -7,6 +7,8 @@ import org.scala_lang.virtualized.SourceContext
 import scala.virtualization.lms.common._
 import scala.virtualization.lms.internal._
 import scala.collection.mutable.{ArrayBuffer,HashMap}
+import language.experimental.macros
+import scala.reflect.macros.blackbox.Context
 
 trait ForgeOps extends Base {
   this: Forge =>
@@ -587,5 +589,31 @@ trait ScalaGenForgeOps extends ScalaGenBase {
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case _ => super.emitNode(sym, rhs)
+  }
+}
+
+
+class ChainTpeeee(tpe: DSLType) {
+  import MacroImpl._
+  def apply[R](block: => R) = macro mimpl[R]
+//  def x = macro impl
+  def infix_notify(x: AnyRef): Unit = macro anyRef_notify
+}
+
+object MacroImpl {
+  def mimpl[R](c:Context)(block: c.Expr[R]):c.Expr[R] = {
+    import c.universe._
+    c.Expr(q"""
+    abstract class DSLprog extends TpeScope {
+      def apply:R = $block
+    }
+    class DSLrun extends DSLprog with TpeScopeRunner
+    ((new DSLrun): OptiML with OptiMLExp).result
+      """)
+  }
+  def anyRef_notify(c: Context)(x: c.Expr[AnyRef]): c.Expr[Unit] = {
+
+    import c.universe._
+    c.Expr(q"")
   }
 }

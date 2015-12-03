@@ -17,8 +17,9 @@ trait ConditionOps {
   	//val ConditionOps = withTpe (Condition)
   	//ConditionOps {
   	import org.scala_lang.virtualized.virtualize
+  	magic()
   	@virtualize
-  	def magic[R] = withTpee(Condition){
+  	def magic[R]() = withTpee(Condition){
       compiler ("get_is_empty") (Nil :: MBoolean) implements getter(0, "isEmpty")
   		compiler ("get_col_startswith") (Nil :: MString) implements getter(0, "colForStartsWith")
   		compiler ("get_col_contains") (Nil :: MString) implements getter(0, "colForContains")

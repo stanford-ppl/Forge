@@ -68,8 +68,9 @@ trait IndexVectorOps {
     //val IndexVectorOps = withTpe(IndexVector)
     //IndexVectorOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(IndexVector){
+    def magic[R]() = withTpee(IndexVector){
       compiler ("indexvector_start") (Nil :: MInt) implements getter(0, "_start")
       compiler ("indexvector_end") (Nil :: MInt) implements getter(0, "_end")
       compiler ("indexvector_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_data")

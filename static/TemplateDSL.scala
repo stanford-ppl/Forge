@@ -67,8 +67,9 @@ trait HUMAN_DSL_NAMEDSL extends ForgeApplication {
 
     //ParTypeOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(ParType){
+    def magic[R]() = withTpee(ParType){
       /**
        * Ops :
        * (1) Scope

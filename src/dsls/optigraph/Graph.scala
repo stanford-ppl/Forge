@@ -34,8 +34,9 @@ trait GraphOps{
     //val GraphCommonOps = withTpe(Graph)
     //GraphCommonOps{
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(Graph){
+    def magic[R]() = withTpee(Graph){
       infix ("numNodes")(Nil :: MInt) implements getter(0,"_numNodes")
 
       infix ("nodes")(Nil :: NodeIdView) implements composite ${NodeIdView($self.numNodes)}

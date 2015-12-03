@@ -25,8 +25,9 @@ trait SimpleIntVectorDSL extends ForgeApplication {
     //val VectorOps = withTpe (Vector)
     //VectorOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(Vector){
+    def magic[R]() = withTpee(Vector){
       compiler ("vector_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_data")
       compiler ("vector_set_raw_data") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
       infix ("length") (Nil :: MInt) implements getter(0, "_length")

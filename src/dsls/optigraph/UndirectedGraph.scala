@@ -40,8 +40,9 @@ trait UndirectedGraphOps{
     //val UndirectedGraphOps = withTpe(UndirectedGraph)     
     //UndirectedGraphOps{
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(UndirectedGraph){
+    def magic[R]() = withTpee(UndirectedGraph){
       infix ("numEdges")(Nil :: MInt) implements composite ${array_length($self.getCSREdges)}
 
       //UndirectedGraph directed or not?

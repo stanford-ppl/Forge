@@ -35,8 +35,9 @@ trait MLGraphOps {
     //val CSRNgbrOps = withTpe(CSRNgbr)
     //CSRNgbrOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(CSRNgbr){
+    def magic[R]() = withTpee(CSRNgbr){
       infix ("edge") (Nil :: MInt) implements getter(0, "_edgeId")
       infix ("node") (Nil :: MInt) implements getter(0, "_nodeId")
     }
@@ -44,8 +45,9 @@ trait MLGraphOps {
     //val CSRGraphOps = withTpe(CSRGraph)
     //CSRGraphOps {
     //import org.scala_lang.virtualized.virtualize
+    magic2()
     @virtualize
-    def magic2[R] = withTpee(CSRGraph) {
+    def magic2[R]() = withTpee(CSRGraph) {
       compiler ("csrgraph_get_numnodes") (Nil :: MInt) implements getter(0, "_numNodes")
       compiler ("csrgraph_get_numedges") (Nil :: MInt) implements getter(0, "_numEdges")
       compiler ("csrgraph_get_nodes") (Nil :: MArray(MInt)) implements getter(0, "_nodes")

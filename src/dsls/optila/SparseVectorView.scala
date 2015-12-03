@@ -27,8 +27,9 @@ trait SparseVectorViewOps {
     //val SparseVectorViewOps = withTpe(SparseVectorView)
     //SparseVectorViewOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(SparseVectorView){
+    def magic[R]() = withTpee(SparseVectorView){
       compiler ("sparsevectorview_source") (Nil :: SparseMatrix(T)) implements getter(0, "_source")
       compiler ("sparsevectorview_start") (Nil :: MLong) implements getter(0, "_start")
       compiler ("sparsevectorview_stride") (Nil :: MInt) implements getter(0, "_stride")

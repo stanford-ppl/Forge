@@ -32,8 +32,9 @@ trait NodeDataOps {
     //val NodeDataOps = withTpe(NodeData)
     //NodeDataOps{
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(NodeData){
+    def magic[R]() = withTpee(NodeData){
       //////////////basic accessors//////////////////////////////
       infix("apply")(MInt :: T) implements composite ${array_buffer_apply(nd_raw_data($self),$1)}
       infix("apply")(Node :: T) implements composite ${array_buffer_apply(nd_raw_data($self),$1.id)}

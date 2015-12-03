@@ -50,8 +50,9 @@ trait FactorGraphOps {
 
     //val FactorGraphOps = withTpe(FactorGraph)
     //FactorGraphOps {
+    magic()
     @virtualize
-    def magic[R] = withTpee(FactorGraph){
+    def magic[R]() = withTpee(FactorGraph){
       infix ("v2f") (Nil :: CSRGraph) implements getter(0, "_v2f")
       infix ("f2v") (Nil :: CSRGraph) implements getter(0, "_f2v")
 
@@ -166,8 +167,9 @@ trait FactorGraphOps {
 
     //val DDFGFWeightOps = withTpe(DDFGFWeight)
     //DDFGFWeightOps {
+    magic2()
     @virtualize
-    def magic2[R] = withTpee(DDFGFWeight){
+    def magic2[R]() = withTpee(DDFGFWeight){
       infix ("weightId") (Nil :: MInt) implements getter(0, "_weightId")
       infix ("isFixed") (Nil :: MBoolean) implements getter(0, "_isFixed")
       infix ("initialValue") (Nil :: MDouble) implements getter(0, "_initialValue")
@@ -188,8 +190,9 @@ trait FactorGraphOps {
 
     //val DDFDFVariableOps = withTpe(DDFGFVariable)
     //DDFDFVariableOps {
+    magic3()
     @virtualize
-    def magic3[R] = withTpee(DDFGFVariable){
+    def magic3[R]() = withTpee(DDFGFVariable){
       infix ("variableId") (Nil :: MInt) implements getter(0, "_variableId")
       infix ("isEvidence") (Nil :: MBoolean) implements getter(0, "_isEvidence")
       infix ("initialValue") (Nil :: MDouble) implements getter(0, "_initialValue")
@@ -211,8 +214,9 @@ trait FactorGraphOps {
 
     //val DDFGFFactorOps = withTpe(DDFGFFactor)
     //DDFGFFactorOps {
+    magic4()
     @virtualize
-    def magic4[R] = withTpee(DDFGFFactor){
+    def magic4[R]() = withTpee(DDFGFFactor){
       infix ("factorId") (Nil :: MInt) implements getter(0, "_factorId")
       infix ("weightId") (Nil :: MInt) implements getter(0, "_weightId")
       infix ("factorFunction") (Nil :: MInt) implements getter(0, "_factorFunction")
@@ -233,8 +237,9 @@ trait FactorGraphOps {
 
     //val DDFGFEdgeOps = withTpe(DDFGFEdge)
     //DDFGFEdgeOps {
+    magic5()
     @virtualize
-    def magic5[R] = withTpee(DDFGFEdge){
+    def magic5[R]() = withTpee(DDFGFEdge){
       infix ("variableId") (Nil :: MInt) implements getter(0, "_variableId")
       infix ("factorId") (Nil :: MInt) implements getter(0, "_factorId")
       infix ("position") (Nil :: MInt) implements getter(0, "_position")
@@ -438,8 +443,9 @@ trait FactorGraphOps {
 
     //val ReplicatedOps = withTpe(Replicated)
     //ReplicatedOps {
+    magic6()
     @virtualize
-    def magic6[R] = withTpee(Replicated){
+    def magic6[R]() = withTpee(Replicated){
       compiler ("get_copies") (Nil :: MArray(T)) implements getter(0, "_copies")
 
       infix ("local") (Nil :: T) implements composite ${

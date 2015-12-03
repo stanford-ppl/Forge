@@ -153,8 +153,9 @@ trait DenseMatrixOps {
     //val DenseMatrixOps = withTpe (DenseMatrix)
     //DenseMatrixOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(DenseMatrix){
+    def magic[R]() = withTpee(DenseMatrix){
       /**
        * Conversions
        */

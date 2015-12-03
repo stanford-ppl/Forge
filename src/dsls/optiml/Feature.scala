@@ -19,8 +19,9 @@ trait FeatureOps {
 
     //val ContinuousFeatureOps = withTpe(ContinuousFeature)
     //ContinuousFeatureOps {
+    magic()
     @virtualize
-    def magic[R] = withTpee(ContinuousFeature){
+    def magic[R]() = withTpee(ContinuousFeature){
       infix ("default") (Nil :: MDouble) implements getter(0, "_default")
       infix ("min") (Nil :: MDouble) implements getter(0, "_min")
       infix ("max") (Nil :: MDouble) implements getter(0, "_max")
@@ -51,8 +52,9 @@ trait FeatureOps {
 
     //val DiscreteFeatureOps = withTpe(DiscreteFeature)
     //DiscreteFeatureOps {
+    magic2()
     @virtualize
-    def magic2[R] = withTpee(DiscreteFeature){
+    def magic2[R]() = withTpee(DiscreteFeature){
       compiler ("getFeatures") (Nil :: MHashMap(MString, MInt)) implements getter(0, "_features")
 
       infix ("apply") (MString :: MDouble) implements composite ${
@@ -80,8 +82,9 @@ trait FeatureOps {
 
     //val BinaryFeatureOps = withTpe(BinaryFeature)
     //BinaryFeatureOps {
+    magic3()
     @virtualize
-    def magic3[R] = withTpee(BinaryFeature){
+    def magic3[R]() = withTpee(BinaryFeature){
       infix ("default") (Nil :: MBoolean) implements getter(0, "_default")
 
       infix ("apply") (MString :: MDouble) implements composite ${

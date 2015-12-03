@@ -16,8 +16,9 @@ trait RangeOps {
 	//val RangeOps = withTpe (Range)
 	//RangeOps {
 	import org.scala_lang.virtualized.virtualize
+	magic()
 	@virtualize
-	def magic[R] = withTpee(Range){
+	def magic[R]() = withTpee(Range){
 	  compiler ("startIndex") (Nil :: MInt) implements getter (0, "start")
 	  compiler ("endIndex") (Nil :: MInt) implements getter (0, "end")
 	  compiler ("length") (Nil :: MInt) implements single ${endIndex($self) - startIndex($self)}

@@ -47,8 +47,9 @@ trait BitSetOps {
     //val BitSetOps = withTpe(BitSet)
     //BitSetOps{
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(BitSet){
+    def magic[R]() = withTpee(BitSet){
 
       //////////////////////////////Basic Accessors////////////////////////////////////////
 

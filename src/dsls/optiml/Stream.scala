@@ -153,8 +153,9 @@ trait StreamOps {
     //val HashStreamOps = withTpe(HashStream)
     //HashStreamOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(HashStream){
+    def magic[R]() = withTpee(HashStream){
       compiler ("hash_deserialize") (Nil :: MLambda(Tup2(HashStream(V),MString), V)) implements getter(0, "_deserialize")
       compiler ("hash_table_name") (Nil :: MString) implements getter(0, "_table")
       compiler ("hash_get_db") (Nil :: LevelDB) implements getter(0, "_db")
@@ -319,8 +320,9 @@ trait StreamOps {
     //val FileStreamOps = withTpe(FileStream)
     //FileStreamOps {
     import org.scala_lang.virtualized.virtualize
+    magic2()
     @virtualize
-    def magic2[R] = withTpee(FileStream){
+    def magic2[R]() = withTpee(FileStream){
       infix ("path") (Nil :: MString) implements getter(0, "_path")
 
       // rows are loaded and executed sequentially
@@ -509,8 +511,9 @@ trait StreamOps {
     //val ComputeStreamOps = withTpe(ComputeStream)
     //ComputeStreamOps {
     import org.scala_lang.virtualized.virtualize
+    magic3()
     @virtualize
-    def magic3[R] = withTpee(ComputeStream){
+    def magic3[R]() = withTpee(ComputeStream){
       infix ("numRows") (Nil :: MInt) implements getter(0, "_numRows")
       infix ("numCols") (Nil :: MInt) implements getter(0, "_numCols")
       compiler ("stream_func") (Nil :: MLambda(Tup2(MInt,MInt), T)) implements getter(0, "_func")

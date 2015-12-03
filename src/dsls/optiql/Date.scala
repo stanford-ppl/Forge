@@ -25,8 +25,9 @@ trait DateOps {
     //val DateOps = withTpe (Date)
     //DateOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(Date){
+    def magic[R]() = withTpee(Date){
 
       compiler ("date_value") (Nil :: MInt) implements getter(0, "value")
       compiler ("date_year") (Nil :: MInt) implements single ${ date_value($self) >>> 9 }

@@ -17,8 +17,9 @@ trait ComplexOps {
     //val ComplexOps = withTpe(Complex)
     //ComplexOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(Complex){
+    def magic[R]() = withTpee(Complex){
    	  infix ("real") (Nil :: MDouble) implements getter(0, "_real")
    	  infix ("imag") (Nil :: MDouble) implements getter(0, "_imag")
 

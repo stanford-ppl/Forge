@@ -42,8 +42,9 @@ trait CommunityOps {
     //val CommunityOps = withTpe(Community)
     //CommunityOps{
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(Community){  
+    def magic[R]() = withTpee(Community){  
       infix("modularity")(Nil :: MDouble) implements composite ${
         val g = $self.graph
         val tot = $self.tot

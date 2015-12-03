@@ -18,8 +18,9 @@ trait SparseVectorOps {
     //val SparseVectorCommonOps = withTpe(v)
     //SparseVectorCommonOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(v){
+    def magic[R]() = withTpee(v){
       for (rhs <- List(DenseVector(T), DenseVectorView(T))) {
         infix ("*") (rhs :: SparseVector(T), TArith(T)) implements composite ${
           val out = ($self.indices.zip($self.nz) { (i,e) => e*$1(i) })
@@ -235,8 +236,9 @@ trait SparseVectorOps {
     //val SparseVectorOps = withTpe (SparseVector)
     //SparseVectorOps {
     import org.scala_lang.virtualized.virtualize
+    magic2()
     @virtualize
-    def magic2[R] = withTpee(SparseVector){
+    def magic2[R]() = withTpee(SparseVector){
       /**
        * Accessors
        */

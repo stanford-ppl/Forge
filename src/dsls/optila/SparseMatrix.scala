@@ -38,8 +38,9 @@ trait SparseMatrixOps {
     //val SparseMatrixBuildableOps = withTpe(SparseMatrixBuildable)
     //SparseMatrixBuildableOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(SparseMatrixBuildable){
+    def magic[R]() = withTpee(SparseMatrixBuildable){
       /**
        * Accessors
        */
@@ -499,8 +500,9 @@ trait SparseMatrixOps {
     //val SparseMatrixOps = withTpe (SparseMatrix)
     //SparseMatrixOps {
     import org.scala_lang.virtualized.virtualize
+    magic2()
     @virtualize
-    def magic2[R] = withTpee(SparseMatrix){
+    def magic2[R]() = withTpee(SparseMatrix){
       /**
        * Accessors
        */

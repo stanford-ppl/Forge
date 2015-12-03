@@ -27,8 +27,9 @@ trait NodeIdViewOps {
     //val NodeIdViewOps = withTpe(NodeIdView)
     //NodeIdViewOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(NodeIdView){
+    def magic[R]() = withTpee(NodeIdView){
       infix ("length") (Nil :: MInt) implements getter(0, "_length")
       infix ("apply") (MInt :: MInt) implements composite ${ $1 }
       

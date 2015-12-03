@@ -49,8 +49,9 @@ trait VectorOps {
     //val VectorCommonOps = withTpe(v)
     //VectorCommonOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(v){
+    def magic[R]() = withTpee(v){
       /**
        * Conversions
        */

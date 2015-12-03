@@ -19,8 +19,9 @@ trait ImageOps {
     //val ImageOps = withTpe(GrayscaleImage)
     //ImageOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(GrayscaleImage){
+    def magic[R]() = withTpee(GrayscaleImage){
       infix ("data") (Nil :: DenseMatrix(MDouble)) implements getter(0, "_data")
       infix ("numRows") (Nil :: MInt) implements redirect ${ $self.data.numRows }
       infix ("numCols") (Nil :: MInt) implements redirect ${ $self.data.numCols }

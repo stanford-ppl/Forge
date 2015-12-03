@@ -40,8 +40,9 @@ trait DirectedGraphOps{
     //val DirectedGraphOps = withTpe(DirectedGraph)     
     //DirectedGraphOps{
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(DirectedGraph){
+    def magic[R]() = withTpee(DirectedGraph){
       infix ("numEdges")(Nil :: MInt) implements composite ${array_length(in_edge_raw_data($self)) + array_length(out_edge_raw_data($self))}
       infix ("isDirected") (Nil :: MBoolean) implements composite ${true}
 

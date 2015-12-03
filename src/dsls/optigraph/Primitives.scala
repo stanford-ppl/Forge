@@ -18,8 +18,9 @@ trait NodeOps {
     //val NodeOps = withTpe(Node)
     //NodeOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(Node){
+    def magic[R]() = withTpee(Node){
       infix("id") (Nil :: MInt) implements getter(0,"_id")
       infix(">") (Node :: MBoolean) implements single ${$0.id>$1.id}
       infix("<") (Node :: MBoolean) implements single ${$0.id<$1.id}
@@ -40,8 +41,9 @@ trait EdgeOps {
     //val EdgeOps = withTpe(Edge)
     //EdgeOps{
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(Edge){
+    def magic[R]() = withTpee(Edge){
       infix("fromNode") (Nil :: Node) implements getter(0,"_nodeFrom")
       infix("toNode") (Nil :: Node) implements getter(0,"_nodeTo")
     }

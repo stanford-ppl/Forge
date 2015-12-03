@@ -30,8 +30,9 @@ trait SetOps {
       //val TrainingSetOps = withTpe(TrainingSet)
       //TrainingSetOps {
       import org.scala_lang.virtualized.virtualize
+      magic()
       @virtualize
-      def magic[R] = withTpee(TrainingSet){
+      def magic[R]() = withTpee(TrainingSet){
         infix ("labels") (Nil :: DenseVector(L)) implements getter(0, "_labels")
       }
 
@@ -46,8 +47,9 @@ trait SetOps {
         //val ops = withTpe(t)
         //ops {
         import org.scala_lang.virtualized.virtualize
+        magic2()
         @virtualize
-        def magic2[R] = withTpee(t){
+        def magic2[R]() = withTpee(t){
           infix ("data") (Nil :: Matrix(D)) implements getter(0, "_data")
 
           infix ("apply") ((MInt,MInt) :: D) implements composite ${ $self.data.apply($1,$2) }

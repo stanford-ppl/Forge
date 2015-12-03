@@ -25,8 +25,9 @@ trait NeighborViewOps {
     //val NeighborViewOps = withTpe(NeighborView)
     //NeighborViewOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(NeighborView){
+    def magic[R]() = withTpee(NeighborView){
       infix ("length") (Nil :: MInt) implements getter(0, "_length")
       infix ("apply") (MInt :: T) implements composite ${ array_apply(NeighborView_data($self), NeighborView_start($self) + $1) }
       infix ("reduce") (((T,T) ==> T) :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${ (a,b) => $1(a,b) })

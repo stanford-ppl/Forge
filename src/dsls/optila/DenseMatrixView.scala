@@ -22,8 +22,9 @@ trait DenseMatrixViewOps {
     //val DenseMatrixViewOps = withTpe(DenseMatrixView)
     //DenseMatrixViewOps {
     import org.scala_lang.virtualized.virtualize
+    magic()
     @virtualize
-    def magic[R] = withTpee(DenseMatrixView){
+    def magic[R]() = withTpee(DenseMatrixView){
       compiler ("densematrixview_data") (Nil :: MArray(T)) implements getter(0, "_data")
       compiler ("densematrixview_startrow") (Nil :: MInt) implements getter(0, "_startRow")
       compiler ("densematrixview_endrow") (Nil :: MInt) implements getter(0, "_endRow")

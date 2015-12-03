@@ -47,8 +47,12 @@ trait SimpleVectorDSL extends ForgeApplication {
 
     //VectorOps {
     import org.scala_lang.virtualized.virtualize
-    @virtualize
-    def magic[R] = withTpee(Vector){
+    import language.experimental.macros
+    import scala.reflect.macros.blackbox.Context
+
+    //@virtualize
+    def VectorOps[R](block: => R) = macro core.MacroImpl.mimpl[R]
+    VectorOps {
       // getters and setters
       compiler ("vector_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
       compiler ("vector_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))

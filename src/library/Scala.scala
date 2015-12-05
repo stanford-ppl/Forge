@@ -532,9 +532,11 @@ trait ScalaOps extends PrimitiveMathGen {
       // the abstract name needs to be different than the Scala name, since we don't want to shadow it.
       val TT = tpe("Tup" + arity, pars)
       data(TT, elems.zip(pars): _*)
+      println("defined " + TT)
 
       for (i <- 0 until arity) {
         val concrete = pars.zipWithIndex.map(t => if (t._2 == i) t._1 else e)
+        println(s"defining getter $i for $TT")
         infix (TT) ("_"+(i+1), pars(i), TT(concrete: _*) :: pars(i)) implements getter(0, elems(i))
       }
 

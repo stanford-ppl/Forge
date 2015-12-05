@@ -30,6 +30,7 @@ trait SimpleVectorDSL extends ForgeApplication {
 
 
   def importVectorOps() {
+    println("BEGINXX")
     // generic type parameters we will use
     val T = tpePar("T")
     val R = tpePar("R")
@@ -51,6 +52,9 @@ trait SimpleVectorDSL extends ForgeApplication {
     magic()
     @virtualize
     def magic[R]() = withTpee(Vector){
+      println("MAGIICC"+math.random)
+      for (str <- Thread.currentThread().getStackTrace())
+        println(str)
       // getters and setters
       compiler ("vector_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
       compiler ("vector_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
@@ -223,6 +227,8 @@ trait SimpleVectorDSL extends ForgeApplication {
     }))
 
     ()
+
+    println("ENDXX")
   }
 }
 

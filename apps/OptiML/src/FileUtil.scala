@@ -14,7 +14,7 @@ trait FileUtil extends OptiMLApplication {
    *    the matrix is sparse, so each row has a tuple of (tokenIndex, number of appearances)
   */
   def readTokenMatrix(f: Rep[String]) = {
-    val lines = readVector[DenseVector[String]](f, words => words)
+    val lines = readVectorAndParse[DenseVector[String]](f, words => words)
     val numDocs = lines(1).apply(0).toInt
     val numTokens = lines(1).apply(1).toInt
     val tokens = lines(2)
@@ -33,6 +33,6 @@ trait FileUtil extends OptiMLApplication {
       }
       denseRow.unsafeImmutable
     }
-    TrainingSet(data, labels)
+    DenseTrainingSet(data, labels)
   }
 }

@@ -19,10 +19,12 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
     if (addREPLOverride) stream.println("  with " + dsl + "REPLOverrides")
 
     stream.println()
-    stream.println("trait " + dsl + "ApplicationInterpreter extends " + dsl + "Application with " + dsl+"Lib {")
+    stream.println("abstract class " + dsl + "ApplicationInterpreter extends " + dsl + "Application with " + dsl+"Lib {")
     stream.println("  var args: Rep[Array[String]] = _")
+    stream.println("  var stagingArgs: Array[String] = _")
     stream.println("  final def main(argsIn: Array[String]) {")
     stream.println("    this.args = argsIn")
+    stream.println("    this.stagingArgs = argsIn")
     stream.println("    main()")
     stream.println("  }")
     stream.println()

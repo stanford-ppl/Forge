@@ -12,33 +12,68 @@ import optiml.library._
 import optiml.shared._
 import ppl.tests.scalatest._
 
-object SimpleWriteReadRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SimpleWriteRead
-object SimpleWriteReadRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SimpleWriteRead
-trait SimpleWriteRead extends ForgeTestModule with OptiMLApplication {
+trait IOSuitePaths {
+  val testMat = "test.mat"
+  val testVec = "test.vec"
+}
+
+/* Reading and writing the same filename in the same app is not supported, as the order of operations is not guaranteed */
+
+object SimpleWriteRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SimpleWrite
+object SimpleWriteRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SimpleWrite
+trait SimpleWrite extends ForgeTestModule with OptiMLApplication with IOSuitePaths {
   def main() = {
-    val testMat = "test.mat"
-    val testVec = "test.vec"
+    val x = (0::10, 0::10) { (i,j) => i+j*0.1 }
+    writeMatrix(x, testMat)
 
-    val x = DenseMatrix.rand(10,10)
-    val t1 = writeMatrix(x, testMat)
-    val y = readMatrix(testMat) after t1
+    val a = (0::10) { i => i*3.6 }
+    writeVector(a, testVec)
+
+    collect(true)
+    mkReport
+  }
+}
+
+object SimpleReadRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SimpleRead
+object SimpleReadRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SimpleRead
+trait SimpleRead extends ForgeTestModule with OptiMLApplication with IOSuitePaths {
+  def main() = {
+    val x = (0::10, 0::10) { (i,j) => i+j*0.1 }
+    val y = readMatrix(testMat)
     collect(sum(abs(x-y)) < .01)
-    deleteFile(testMat) after y
 
-    val a = DenseVector.rand(10)
-    val t2 = writeVector(a, testVec)
-    val b = readVector(testVec) after t2
+    val a = (0::10) { i => i*3.6 }
+    val b = readVector(testVec)
     collect(sum(abs(a-b)) < .01)
-    deleteFile(testVec) after b
 
     mkReport
   }
 }
 
+object SimpleDeleteRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SimpleDelete
+object SimpleDeleteRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SimpleDelete
+trait SimpleDelete extends ForgeTestModule with OptiMLApplication with IOSuitePaths {
+  def main() = {
+    deleteFile(testMat)
+    deleteFile(testVec)
+
+    collect(true)
+    mkReport
+  }
+}
+
 class IOSuiteInterpreter extends ForgeSuiteInterpreter {
-  def testSimpleWriteRead() { runTest(SimpleWriteReadRunnerI) }
+  def testSimpleWriteRead() {
+    runTest(SimpleWriteRunnerI)
+    runTest(SimpleReadRunnerI)
+    runTest(SimpleDeleteRunnerI)
+  }
 }
 class IOSuiteCompiler extends ForgeSuiteCompiler {
-  def testSimpleWriteRead() { runTest(SimpleWriteReadRunnerC) }
+  def testSimpleWriteRead() {
+    runTest(SimpleWriteRunnerC)
+    runTest(SimpleReadRunnerC)
+    runTest(SimpleDeleteRunnerC)
+  }
 }
 

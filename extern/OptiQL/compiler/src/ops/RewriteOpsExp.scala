@@ -1,6 +1,6 @@
 package optiql.compiler.ops
 
-import scala.virtualization.lms.common.{StructOps,ScalaGenFat}
+import scala.virtualization.lms.common.{StructOps,ScalaGenFat,CGenFat}
 import scala.reflect.{RefinedManifest,SourceContext}
 import ppl.delite.framework.datastructures._
 import ppl.delite.framework.transform.MultiloopSoATransformWithReduceExp
@@ -182,6 +182,26 @@ trait ScalaGenRewriteOps extends ScalaGenFat {
   }
 }
 
+trait CGenRewriteOps extends CGenFat {
+  val IR: RewriteOpsExp
+  import IR._
+
+  // TODO: Add robust comparators for float and double
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case c@CompareHack(a,b) => c.mev match {
+      case m if m == Manifest.Int => emitValDef(sym, quote(a)+"-"+quote(b))
+      case m if m == Manifest.Long => emitValDef(sym, quote(a)+"-"+quote(b))
+      case m if m == Manifest.Double => emitValDef(sym, quote(a)+"-"+quote(b))
+      case m if m == Manifest.Float => emitValDef(sym, quote(a)+"-"+quote(b))
+      case m if m == Manifest.Boolean => emitValDef(sym, quote(a)+"-"+quote(b))
+      case m if m == Manifest.Byte => emitValDef(sym, quote(a)+"-"+quote(b))
+      case m if m == Manifest.Char => emitValDef(sym, quote(a)+"-"+quote(b))
+      case m if m == Manifest.Short => emitValDef(sym, quote(a)+"-"+quote(b))
+      case _ => super.emitNode(sym, rhs)
+    }
+    case _ => super.emitNode(sym, rhs)
+  }
+}
+
 trait CudaGenRewriteOps
 trait OpenCLGenRewriteOps
-trait CGenRewriteOps

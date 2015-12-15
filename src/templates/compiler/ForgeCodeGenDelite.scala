@@ -20,9 +20,9 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
 
   def makeEffectAnnotation(effect: EffectType, o: Rep[DSLOp]) = effect match {
     case `pure` => "reflectPure"
-    case `mutable` => "reflectMutable"
-    case `simple` => "reflectEffect"
-    case write(args @ _*) => "reflectWrite(" + args.map(i => o.args.apply(i).name).mkString(",") + ")"
+    case `mutable` => "reflectMutable" + makeTpePars(o.retTpe)
+    case `simple` => "reflectEffect" + makeTpePars(o.retTpe)
+    case write(args @ _*) => "reflectWrite" + makeTpePars(o.retTpe) + "(" + args.map(i => o.args.apply(i).name).mkString(",") + ")"
     case `global` => err("TODO")
   }
 

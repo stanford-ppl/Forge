@@ -12,16 +12,16 @@ trait kNN extends OptiMLApplication {
   }
 
   def createDataSet = {
-    val group = DenseMatrix((1.0, 1.1),(1.0, 1.0),(0.0, 0.0),(0.0, 0.1))
+    val group = DenseMatrix(DenseVector(1.0, 1.1),DenseVector(1.0, 1.0),DenseVector(0.0, 0.0),DenseVector(0.0, 0.1))
     val labels = DenseVector("A", "A", "B", "B")
-    TrainingSet(group,labels)
+    DenseTrainingSet(group,labels)
   }
 
   def file2TraniningSet(inputFile:Rep[String]) = {
     val matrixIn = readMatrix(inputFile, s => s)
     val data = matrixIn.slice(0, matrixIn.numRows, 0, matrixIn.numCols-1).map(x => x.toDouble)
     val labels = matrixIn.getCol(matrixIn.numCols-1)
-    TrainingSet(data,labels)
+    DenseTrainingSet(data,labels)
   }
 
   def file2TraniningSetAutoNorm(inputFile:Rep[String]) = {
@@ -33,7 +33,7 @@ trait kNN extends OptiMLApplication {
     val data1 = (0::data.numRows-1,*)(i => (data(i)- minVals)/ranges)
     // val data1 = data.mapRows(row => (row - minVals)/ranges)
     val labels = matrixIn.getCol(matrixIn.numCols-1)
-    TrainingSet(data1,labels)
+    DenseTrainingSet(data1,labels)
   }
 
   def KNNClassify[L:Manifest](data: Rep[DenseMatrix[Double]], labels: Rep[DenseVector[L]], inX: Rep[DenseVector[Double]], k:Rep[Int]) : Rep[L] = {

@@ -12,8 +12,8 @@ import optiml.shared._
 import optiml.library._
 import ppl.tests.scalatest._
 
-object SparseVectorDataOpsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SparseVectorDataOps
-object SparseVectorDataOpsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SparseVectorDataOps
+object SparseVectorDataOpsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseVectorDataOps
+object SparseVectorDataOpsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseVectorDataOps
 trait SparseVectorDataOps extends ForgeTestModule with OptiMLApplication {
   def main() {
     val v = SparseVector[Int](100,true)
@@ -26,25 +26,28 @@ trait SparseVectorDataOps extends ForgeTestModule with OptiMLApplication {
     collect(v(17) == 0)
     collect(v(5) == 10)
 
+    v(5) = 35
+    collect(v(5) == 35)
+
     // insert, apply
     v.insert(50,1000)
     collect(v.length == 101)
     collect(v(50) == 1000)
-    collect(v(5) == 10)
+    collect(v(5) == 35)
     collect(v(75) == 0)
     collect(v(76) == 20)
 
     // removeAll
     v.removeAll(6,95)
     collect(v.length == 6)
-    collect(v == DenseVector(0,0,0,0,0,10))
+    collect(v == DenseVector(0,0,0,0,0,35))
 
     // insertAll
     val v2 = SparseVector[Int](10,true)
     v2(1) = 2; v2(2) = 2; v2(7) = 2; v2(8) = 2
     v.insertAll(3, v2)
     collect(v.length == 16)
-    collect(v == DenseVector(0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,10))
+    collect(v == DenseVector(0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,35))
 
     val v3 = SparseVector[Int](10,true)
     v3(0) = 72
@@ -54,7 +57,7 @@ trait SparseVectorDataOps extends ForgeTestModule with OptiMLApplication {
     // trim
     v.trim()
     collect(v.length == 16)
-    collect(v == DenseVector(0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,10))
+    collect(v == DenseVector(0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,35))
 
     // clear
     v.clear()
@@ -71,8 +74,8 @@ trait SparseVectorDataOps extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object SparseVectorBulkOpsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SparseVectorBulkOps
-object SparseVectorBulkOpsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SparseVectorBulkOps
+object SparseVectorBulkOpsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseVectorBulkOps
+object SparseVectorBulkOpsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseVectorBulkOps
 trait SparseVectorBulkOps extends ForgeTestModule with OptiMLApplication {
   def main() {
     val a = SparseVector[Int](100000,false)
@@ -121,8 +124,8 @@ trait SparseVectorBulkOps extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object SparseVectorAccessorsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SparseVectorAccessors
-object SparseVectorAccessorsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SparseVectorAccessors
+object SparseVectorAccessorsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseVectorAccessors
+object SparseVectorAccessorsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseVectorAccessors
 trait SparseVectorAccessors extends ForgeTestModule with OptiMLApplication {
   def main() {
     val v = SparseVector.rand(1000, .90)
@@ -168,15 +171,15 @@ trait SparseVectorAccessors extends ForgeTestModule with OptiMLApplication {
     collect(vSlice == DenseVector(1,2))
     val vSlice2 = v2(3::5)
     collect(vSlice2 == DenseVector(4,5))
-    val vSlice3 = v2(IndexVector((4,2,0)))
+    val vSlice3 = v2(IndexVector(DenseVector(4,2,0)))
     collect(vSlice3 == DenseVector(5,3,1))
 
     mkReport
   }
 }
 
-object SparseVectorOperatorsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SparseVectorOperators
-object SparseVectorOperatorsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SparseVectorOperators
+object SparseVectorOperatorsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseVectorOperators
+object SparseVectorOperatorsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseVectorOperators
 trait SparseVectorOperators extends ForgeTestModule with OptiMLApplication {
   def main() {
     val v = SparseVector[Double](1000,true)
@@ -198,8 +201,8 @@ trait SparseVectorOperators extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object SparseVectorCountRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SparseVectorCount
-object SparseVectorCountRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SparseVectorCount
+object SparseVectorCountRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseVectorCount
+object SparseVectorCountRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseVectorCount
 trait SparseVectorCount extends ForgeTestModule with OptiMLApplication {
   def main() = {
     val v2 = SparseVector[Double](100,true)
@@ -210,8 +213,8 @@ trait SparseVectorCount extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object SparseVectorBulkUpdateRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SparseVectorBulkUpdate
-object SparseVectorBulkUpdateRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SparseVectorBulkUpdate
+object SparseVectorBulkUpdateRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseVectorBulkUpdate
+object SparseVectorBulkUpdateRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseVectorBulkUpdate
 trait SparseVectorBulkUpdate extends ForgeTestModule with OptiMLApplication {
   def main() = {
     val v = SparseVector[Double](10,true)
@@ -222,8 +225,8 @@ trait SparseVectorBulkUpdate extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object SparseVectorFindRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SparseVectorFind
-object SparseVectorFindRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SparseVectorFind
+object SparseVectorFindRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseVectorFind
+object SparseVectorFindRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseVectorFind
 trait SparseVectorFind extends ForgeTestModule with OptiMLApplication {
   def main() = {
     val v2 = SparseVector[Double](100,true)
@@ -234,8 +237,8 @@ trait SparseVectorFind extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object SparseVectorDistRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SparseVectorDist
-object SparseVectorDistRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SparseVectorDist
+object SparseVectorDistRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseVectorDist
+object SparseVectorDistRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseVectorDist
 trait SparseVectorDist extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -250,23 +253,23 @@ trait SparseVectorDist extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object SparseVectorDistinctRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SparseVectorDistinct
-object SparseVectorDistinctRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SparseVectorDistinct
+object SparseVectorDistinctRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseVectorDistinct
+object SparseVectorDistinctRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseVectorDistinct
 trait SparseVectorDistinct extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
     val v1 = SparseVector[Double](100,true)
     v1(0) = 10; v1(1) = 10; v1(2) = 5; v1(3) = 5; v1(4) = 0
 
-    collect(v1.contains(5.))
+    collect(v1.contains(5.0))
     collect(!v1.contains(7.5))
     collect(v1.distinct.length == 3)
     mkReport
   }
 }
 
-// object SparseVectorMedianC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SparseVectorMedian
-// object SparseVectorMedianI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SparseVectorMedian
+// object SparseVectorMedianC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseVectorMedian
+// object SparseVectorMedianI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseVectorMedian
 // trait SparseVectorMedian extends ForgeTestModule with OptiMLApplication {
 //   def main() = {
 

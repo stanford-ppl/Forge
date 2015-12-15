@@ -14,11 +14,11 @@ trait SVM extends FileUtil {
   /////////////
   // training
 
-  def train(X: Rep[TrainingSet[Double,Double]], C: Rep[Double], tol: Rep[Double], maxPasses: Rep[Int]) = {
+  def train(X: Rep[DenseTrainingSet[Double,Double]], C: Rep[Double], tol: Rep[Double], maxPasses: Rep[Int]) = {
     println("Training SVM using the SMO algorithm")
 
     // init
-    val numSamples = X.numSamples  
+    val numSamples = X.numSamples
     var passes = 0
     var iter = 0
 
@@ -30,7 +30,7 @@ trait SVM extends FileUtil {
 
     // intermediate training info
     val alphas = DenseVector.zeros(numSamples).t.mutable // col vector
-    
+
     while (passes < maxPasses) {
       print(".")
       iter += 1
@@ -39,11 +39,11 @@ trait SVM extends FileUtil {
       while (i < numSamples) { //TR
         // TODO: x761 -- code is recalculating alphas from original definition here
         val alphasOld = alphas.Clone
-        
+
         val f_i = (alphasOld*Y*(X.data*X(i).t)).sum + b //TR M*V alph0
         val E_i = f_i - Y(i)
 
-        if (((Y(i)*E_i < -1.*tol) && (alphasOld(i) < C)) || ((Y(i)*E_i > tol) && (alphasOld(i) > 0.0))) {        
+        if (((Y(i)*E_i < -1.0*tol) && (alphasOld(i) < C)) || ((Y(i)*E_i > tol) && (alphasOld(i) > 0.0))) {
           // select a candidate j from the remaining numSamples-i samples at random
           var j = floor(random[Double]*(numSamples-1)).AsInstanceOf[Int]+1
           while (j == i) {
@@ -52,7 +52,7 @@ trait SVM extends FileUtil {
 
           val f_j = (alphasOld*Y*(X.data*X(j).t)).sum + b //TR M*V alph0 -- inside if, cannot be fused with the one in f_i (calc actually happens further down)
           val E_j = f_j - Y(j)
-                        
+
           val old_aj = alphasOld(j) //TR: making it a val should not move it down!
           //var old_ai = alphas(i)
 
@@ -61,11 +61,11 @@ trait SVM extends FileUtil {
           var L = 0.0
           var H = 0.0
           if (Y(i) != Y(j)) {
-            L = max(0., alphasOld(j) - alphasOld(i))
+            L = max(0.0, alphasOld(j) - alphasOld(i))
             H = min(C, C + alphasOld(j) - alphasOld(i))
           }
           else {
-            L = max(0., alphasOld(i) + alphasOld(j) - C)
+            L = max(0.0, alphasOld(i) + alphasOld(j) - C)
             H = min(C, alphasOld(i) + alphasOld(j))
           }
 
@@ -120,14 +120,14 @@ trait SVM extends FileUtil {
       else {
         passes = 0;
       }
-    } // while 
+    } // while
 
     // SMO finished
     println("num iterations: " + iter)
 
     // compute the weights (assuming a linear kernel)
-    val weights = sum(0,numSamples) { i => X(i) * alphas(i) * Y(i) }    
-  
+    val weights = sum(0,numSamples) { i => X(i) * alphas(i) * Y(i) }
+
     print("\n")
 
     (weights, b)
@@ -169,9 +169,9 @@ trait SVM extends FileUtil {
     //val numTests = args(3).toInt
 
     // convert to double to use BLAS inside SMO
-    val trainingSet = TrainingSet(intTrainingSet.data.toDouble, intTrainingSet.labels.toDouble)
-    val testSet = TrainingSet(intTestSet.data.toDouble, intTestSet.labels.toDouble)
-    
+    val trainingSet = DenseTrainingSet(intTrainingSet.data.toDouble, intTrainingSet.labels.toDouble)
+    val testSet = DenseTrainingSet(intTestSet.data.toDouble, intTestSet.labels.toDouble)
+
     reseed
 
     // -- run the SMO training algorithm
@@ -188,10 +188,10 @@ trait SVM extends FileUtil {
     val YTest = testSet.labels map { e => if (e == 0) -1.0 else 1.0 }
     //load(modelFile)
 
-    val outputLabels = (0::testSet.numSamples){ i => classify(weights, b, testSet(i)) }    
+    val outputLabels = (0::testSet.numSamples){ i => classify(weights, b, testSet(i)) }
     println("SVM testing finished. Calculating error..")
 
-    val errors = sum[Int](0, testSet.numSamples) { i => if (YTest(i) != outputLabels(i)) 1 else 0 }    
+    val errors = sum[Int](0, testSet.numSamples) { i => if (YTest(i) != outputLabels(i)) 1 else 0 }
     println("Classification error: " + (errors.toDouble/testSet.numSamples.toDouble))
   }
 }

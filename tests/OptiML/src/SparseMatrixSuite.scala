@@ -12,11 +12,13 @@ import optiml.shared._
 import optiml.library._
 import ppl.tests.scalatest._
 
-object SparseMatrixDataOpsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SparseMatrixDataOps
-object SparseMatrixDataOpsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SparseMatrixDataOps
+object SparseMatrixDataOpsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseMatrixDataOps
+object SparseMatrixDataOpsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseMatrixDataOps
 trait SparseMatrixDataOps extends ForgeTestModule with OptiMLApplication {
   def main() {
     val mb = SparseMatrix[Double](1000,1000)
+    mb(11,101) = 17
+    mb(10,100) = 39
     mb(10,100) = 5
     mb(9,100) = 1
     mb(9,722) = 722
@@ -76,8 +78,38 @@ trait SparseMatrixDataOps extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object SparseMatrixBulkOpsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SparseMatrixBulkOps
-object SparseMatrixBulkOpsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SparseMatrixBulkOps
+object SparseMatrixOperatorsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseMatrixOperators
+object SparseMatrixOperatorsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseMatrixOperators
+trait SparseMatrixOperators extends ForgeTestModule with OptiMLApplication {
+  def main() {
+    val mRand = SparseMatrix.rand(100,100,0.9)
+    collect(abs(mRand.nnz-1000) < 100)
+
+    val mT = mRand.t
+    collect(mT.numCols == mRand.numRows)
+    collect(mT.numRows == mRand.numCols)
+    collect(mT.nnz == mRand.nnz)
+    (0::100) foreach { i =>
+      collect(mRand(i).t == mT.getCol(i).toSparse)
+    }
+
+    val mClone = mRand.Clone
+    collect(mRand == mClone)
+
+    val mMut = mRand.mutable.finish
+    collect(mRand == mMut)
+
+    val m = DenseMatrix(DenseVector(1,2,3,4,5),DenseVector(1,2,3,4,5)).toSparse
+    collect(mean(m) == 3)
+    collect(max(m) == 5)
+    collect(min(m) == 1)
+
+    mkReport
+  }
+}
+
+object SparseMatrixBulkOpsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SparseMatrixBulkOps
+object SparseMatrixBulkOpsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SparseMatrixBulkOps
 trait SparseMatrixBulkOps extends ForgeTestModule with OptiMLApplication {
   def main() {
     val ab = SparseMatrix[Int](10000,10000)
@@ -141,10 +173,12 @@ trait SparseMatrixBulkOps extends ForgeTestModule with OptiMLApplication {
 
 class SparseMatrixSuiteInterpreter extends ForgeSuiteInterpreter {
   def testDataOps() { runTest(SparseMatrixDataOpsRunnerI) }
+  def testOperators() { runTest(SparseMatrixOperatorsRunnerI) }
   def testBulkOps() { runTest(SparseMatrixBulkOpsRunnerI) }
 }
 
 class SparseMatrixSuiteCompiler extends ForgeSuiteCompiler {
   def testDataOps() { runTest(SparseMatrixDataOpsRunnerC) }
+  def testOperators() { runTest(SparseMatrixOperatorsRunnerC) }
   def testBulkOps() { runTest(SparseMatrixBulkOpsRunnerC) }
 }

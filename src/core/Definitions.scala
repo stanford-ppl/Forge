@@ -10,6 +10,7 @@ trait Definitions extends DerivativeTypes {
   val opIdentifierPrefix = "mn"
   val opArgPrefix = "__arg"
   val implicitOpArgPrefix = "__imp"
+  val implicitCtxBoundArgPrefix = "__cb"
   val qu = "__quote"
   val symMarker = "__sym"
 
@@ -72,6 +73,9 @@ trait Definitions extends DerivativeTypes {
   lazy val MHashMap = tpe("ForgeHashMap",(tpePar("K"),tpePar("V"))) // Forge HashMap (immutable)
   lazy val MInputStream = tpe("ForgeFileInputStream")
   lazy val MOutputStream = tpe("ForgeFileOutputStream")
+
+  /* whitelist for primitive types (i.e. we should not generate a Forge shadow) */
+  var primitiveTpePrefix = scala.List("scala","java")
 
   /**
    * DSLType placeholders

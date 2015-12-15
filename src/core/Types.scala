@@ -37,3 +37,5 @@ abstract class CodeGenerator {
   def name: String
 }
 abstract class DeliteParallelStrategy extends DSLType
+
+case class AbstractFamily(name: String)

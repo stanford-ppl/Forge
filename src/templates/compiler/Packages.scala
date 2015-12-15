@@ -82,7 +82,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     // be written for them, as they will have no effect. Any way to check this?
 
     if (OpsGrp.keySet.exists(_.name == "Primitive")) {
-      stream.println("  override def primitive_forge_int_plus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_plus(__arg0, __arg1)")  
+      stream.println("  override def primitive_forge_int_plus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_plus(__arg0, __arg1)")
       stream.println("  override def primitive_forge_int_minus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_minus(__arg0, __arg1)")
       stream.println("  override def primitive_forge_int_times(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_times(__arg0, __arg1)")
       stream.println("  override def primitive_unary_bang(__arg0: Rep[Boolean])(implicit __pos: SourceContext): Rep[Boolean] = delite_boolean_negate(__arg0)")
@@ -106,8 +106,27 @@ trait DeliteGenPackages extends BaseGenPackages {
     for (tpe <- Tpes if (!isForgePrimitiveType(tpe) && DataStructs.contains(tpe))) {
       stream.print("  abstract class " + quote(tpe))
       if (ForgeCollections.contains(tpe)) stream.println(" extends DeliteCollection[" + quote(ForgeCollections(tpe).tpeArg) + "]") else stream.println()
+    }
+    for (tpe <- Tpes if (!isForgePrimitiveType(tpe)) && AbstractTpes.contains(tpe)) {
+      stream.println("  trait " + quote(tpe) + TpeParents.get(tpe).map(p => " extends " + quote(p)).getOrElse(""))
+    }
+    stream.println()
+    emitBlockComment("implicit manifests", stream, indent=2)
+    for (tpe <- Tpes if (!isForgePrimitiveType(tpe)) && DataStructs.contains(tpe)) {
       stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")
     }
+    for (tpe <- Tpes if (!isForgePrimitiveType(tpe)) && AbstractTpes.contains(tpe)) {
+      stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")
+    }
+
+    if (TpeParents.size > 0) {
+      stream.println()
+      emitBlockComment("abstract type inheritance", stream, indent=2)
+      for ((tpe,parent) <- TpeParents) {
+        stream.println("  def m_" + tpe.name + "_to_" + parent.name + makeTpeParsWithBounds(tpe.tpePars) + "(__arg0: Rep[" + tpe.name + makeTpePars(tpe.tpePars) + "]): Rep[" + parent.name + makeTpePars(parent.tpePars) + "] = __arg0.asInstanceOf[Rep[" + parent.name + makeTpePars(parent.tpePars) + "]]")
+      }
+    }
+
     stream.println()
     stream.println("  def getCodeGenPkg(t: Target{val IR: " + dsl + "Exp.this.type}): GenericFatCodegen{val IR: " + dsl + "Exp.this.type} = {")
     stream.println("    t match {")

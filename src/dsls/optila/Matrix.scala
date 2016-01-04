@@ -219,6 +219,8 @@ trait MatrixOps {
      infix ("abs") (Nil :: DenseMatrix(T), A) implements composite ${ $self.map(e => e.abs) }
      infix ("exp") (Nil :: DenseMatrix(T), A) implements composite ${ $self.map(e => e.exp) }
      infix ("log") (Nil :: DenseMatrix(T), A) implements composite ${ $self.map(e => e.log) }
+     infix ("variance") (Nil :: MDouble, ("conv",T ==> MDouble)) implements composite ${ $self.flattenToVector.variance }
+     infix ("stddev") (Nil :: MDouble, ("conv",T ==> MDouble)) implements composite ${ sqrt($0.variance) }
 
      infix ("sumRows") (Nil :: DenseVector(T), A) implements composite ${ $self.mapRowsToVector { row => sum(row) }}
      infix ("sumCols") (Nil :: DenseVector(T), A) implements composite ${ $self.mapColsToVector { col => sum(col) }}

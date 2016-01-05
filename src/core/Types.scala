@@ -38,4 +38,4 @@ abstract class CodeGenerator {
 }
 abstract class DeliteParallelStrategy extends DSLType
 
-case class AbstractFamily(name: String)
+case class FigmentFamily(name: String)

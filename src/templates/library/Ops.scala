@@ -36,9 +36,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
 
   def requiresImpl(o: Rep[DSLOp]) = Impls(o) match {
     case _:CodeGen | _:Redirect => false
-    case Getter(structArgIndex,field) => false
-    case Setter(structArgIndex,field,value) => false
-    case Allocates(tpe,init) => false
+    case _:Getter | _:Setter => false
+    case _:Allocates | _:AbstractAllocates => false
     case _ => true
   }
 
@@ -56,6 +55,9 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
           inline(o, single.func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent+2 )}
         case composite:Composite =>
           inline(o, composite.func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent+2 )}
+        case figment:Figment =>
+          inline(o, figment.func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent+2 )}
+
         case map:Map =>
           val outDc = ForgeCollections(getHkTpe(o.retTpe))
           val in = o.args.apply(map.argIndex)
@@ -279,6 +281,11 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         emitOverloadShadows(o, stream, indent)
         val initialVals = init.map(i => inline(o,i)).mkString(",")
         emitWithIndent("new " + quote(tpe) + "(" + initialVals + ")", stream, indent)
+      case AbstractAllocates(tpe,init) =>
+        emitOverloadShadows(o, stream, indent)
+        val initialVals = init.map(i => inline(o,i)).mkString(",")
+        emitWithIndent("new " + quote(tpe) + "(" + initialVals + ")", stream, indent)
+
       case _ => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
     }
   }

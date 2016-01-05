@@ -334,6 +334,12 @@ trait DeliteGenOps extends BaseGenOps {
           val elemsPure = data.fields.zip(init) map { case ((name,t),i) => ("\""+name+"\"", inline(o,i,quoteLiteral)) }
           val elems = if (o.effect == mutable) elemsPure map { case (k,v) => (k, "var_new("+v+").e") } else elemsPure
           stream.println("    val elems = copyTransformedElems(collection.Seq(" + elems.mkString(",") + "))")
+
+        case AbstractAllocates(tpe,init) =>
+          emitOpNodeHeader(o, "AbstractDef[" + quote(o.retTpe) + "]", stream)
+        case figment:Figment =>
+          emitOpNodeHeader(o, "AbstractDef[" + quote(o.retTpe) + "]", stream)
+
         case map:Map =>
           val colTpe = getHkTpe(o.retTpe)
           val outDc = ForgeCollections(colTpe)
@@ -656,56 +662,67 @@ trait DeliteGenOps extends BaseGenOps {
                       }
       val implicitsWithParens = if (implicits.length == 0) "" else implicits.mkString("(",",",")")
 
-      def emitDelitePureMirror(suffix: String = "") {
+      def emitDeliteOpPureMirror(suffix: String = "") {
         stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o, suffix) + " => ")
         stream.print("reflectPure(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o, suffix) + xformArgs + implicitsWithParens + ")")
         stream.println("(mtype(manifest[A]), pos)")
       }
 
-      def emitDeliteEffectfulMirror(suffix: String = "") {
+      def emitDeliteOpEffectfulMirror(suffix: String = "") {
         stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o, suffix) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o, suffix) + xformArgs + implicitsWithParens)
+        stream.print(", mapOver(f,u), f(es)))")
+        stream.println("(mtype(manifest[A]), pos)")
+      }
+
+      def emitNodePureMirror() {
+        stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
+        // Pure version with no function arguments uses smart constructor
+        if (!hasFuncArgs(o)) {
+          stream.print(makeOpMethodName(o) + xformArgs)
+          if (needOverload(o) || implicits.length > 0) {
+            stream.print("(")
+            if (implicits.length > 0) stream.print(implicits.mkString(","))
+            if (needOverload(o)) {
+              // NOTE: We may need to supply an explicit Overload parameter for the smart constructor
+              // Also relies on convention established in implicitArgsWithOverload (overload guaranteed to always be last implicit)
+              val overload = implicitArgsWithOverload(o).last
+              if (implicits.length > 0) stream.print(",")
+              stream.print(quote(overload))
+            }
+            stream.println(")")
+          }
+        }
+        else {
+          // Pure version with function arguments
+          stream.print("reflectPure(" + makeOpNodeName(o) + xformArgs + implicitsWithParens + ")")
+          stream.println("(mtype(manifest[A]), pos)")
+        }
+      }
+      def emitNodeEffectfulMirror() {
+        stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(" + makeOpNodeName(o) + xformArgs + implicitsWithParens)
         stream.print(", mapOver(f,u), f(es)))")
         stream.println("(mtype(manifest[A]), pos)")
       }
 
       Impls(o) match {
         case codegen:CodeGen =>
-          stream.print("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + " => ")
-          // pure version with no func args uses smart constructor
-          if (!hasFuncArgs(o)) {
-            stream.print(makeOpMethodName(o) + xformArgs)
-            if (needOverload(o) || implicits.length > 0) {
-              stream.print("(")
-              if (implicits.length > 0) stream.print(implicits.mkString(","))
-              // we may need to supply an explicit Overload parameter for the smart constructor
-              // relies on conventions established in implicitArgsWithOverload (e.g., guaranteed to always be the last implicit)
-              if (needOverload(o)) {
-                val overload = implicitArgsWithOverload(o).last
-                if (implicits.length > 0) stream.print(",")
-                stream.print(quote(overload))
-              }
-              stream.println(")")
-            }
-          }
-          else {
-            stream.print("reflectPure(" + makeOpNodeName(o) + xformArgs + implicitsWithParens + ")")
-            stream.println("(mtype(manifest[A]), pos)")
-          }
+          emitNodePureMirror()
+          emitNodeEffectfulMirror()
 
-          // effectful version
-          stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(" + makeOpNodeName(o) + xformArgs + implicitsWithParens)
-          stream.print(", mapOver(f,u), f(es)))")
-          stream.println("(mtype(manifest[A]), pos)")
+        case figment:Figment =>
+          emitNodePureMirror()
+          emitNodeEffectfulMirror()
+
         case _:GroupBy | _:GroupByReduce =>
-          emitDelitePureMirror("Keys")
-          emitDeliteEffectfulMirror("Keys")
-          emitDelitePureMirror("Index")
-          emitDeliteEffectfulMirror("Index")
-          emitDelitePureMirror()
-          emitDeliteEffectfulMirror()
+          emitDeliteOpPureMirror("Keys")
+          emitDeliteOpEffectfulMirror("Keys")
+          emitDeliteOpPureMirror("Index")
+          emitDeliteOpEffectfulMirror("Index")
+          emitDeliteOpPureMirror()
+          emitDeliteOpEffectfulMirror()
         case _:DeliteOpType =>
-          emitDelitePureMirror()
-          emitDeliteEffectfulMirror()
+          emitDeliteOpPureMirror()
+          emitDeliteOpEffectfulMirror()
         case _ => // no mirror
       }
     }

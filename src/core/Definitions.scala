@@ -31,6 +31,7 @@ trait Definitions extends DerivativeTypes {
   lazy val CAny = tpe("Any", stage = now)
   lazy val MInt = tpe("Int")
   lazy val CInt = tpe("Int", stage = now)
+  lazy val IInt = tpe("Int", stage = compile)   // immediate integer (used as constant during compilation)
   lazy val MLong = tpe("Long")
   lazy val CLong = tpe("Long", stage = now)
   lazy val MFloat = tpe("Float")
@@ -73,6 +74,7 @@ trait Definitions extends DerivativeTypes {
   lazy val MHashMap = tpe("ForgeHashMap",(tpePar("K"),tpePar("V"))) // Forge HashMap (immutable)
   lazy val MInputStream = tpe("ForgeFileInputStream")
   lazy val MOutputStream = tpe("ForgeFileOutputStream")
+  lazy val CSeq = tpe("scala.collection.immutable.Seq", tpePar("A"), stage = compile)
 
   /* whitelist for primitive types (i.e. we should not generate a Forge shadow) */
   var primitiveTpePrefix = scala.List("scala","java")
@@ -246,6 +248,16 @@ trait Definitions extends DerivativeTypes {
   }
 
   /**
+   *
+   * "Figment" abstract node type
+   *
+   */
+  def forge_figment(func: Rep[String]): OpType
+  object figment {
+    def apply(func: Rep[String]) = forge_figment(func)
+  }
+
+  /**
    * Getters / setters for DSL structs
    */
   def forge_getter(structArgIndex: Int, field: String): OpType
@@ -264,7 +276,7 @@ trait Definitions extends DerivativeTypes {
    * @param data     The data struct that this op allocates
    * @param init     A sequence of tuples (fieldName, initialValue)
    */
-  def forge_allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]): DeliteOpType
+  def forge_allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]): OpType
   object allocates {
     def apply(tpe: Rep[DSLType], init: Rep[String]*) = forge_allocates(tpe, init)
   }
@@ -456,11 +468,18 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
   case class Redirect(func: Rep[String]) extends OpType
   def forge_redirect(func: Rep[String]) = Redirect(func)
 
+  case class Figment(func: Rep[String]) extends OpType
+  def forge_figment(func: Rep[String]) = Figment(func)
+
   /**
    * Delite ops
    */
   case class Allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]) extends DeliteOpType
-  def forge_allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]) = Allocates(tpe,init)
+  case class AbstractAllocates(tpe: Rep[DSLType], init: Seq[Rep[String]]) extends OpType
+
+  def forge_allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]) = {
+    if (FigmentTpes.contains(tpe)) { AbstractAllocates(tpe,init) } else { Allocates(tpe,init) }
+  }
 
   case class SingleTask(func: Rep[String]) extends DeliteOpType
   def forge_single(func: Rep[String]) = SingleTask(func)

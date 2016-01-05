@@ -13,24 +13,28 @@ trait OptiMADSL extends ForgeApplication with MultiArrayOps {
   def specification() = {
     // our selection of Scala ops
     // we don't use Numeric or Fractional, since they are replaced by Arith
-    /*importPrimitives()
-    importMisc()
-    importCasts()
-    importOrdering()
-    importStrings()
-    importMath()
-    importTuples()
+    //importMisc()
+    importPrimitives()
+    //importCasts()
+    //importOrdering()
+    //importStrings()
+    //importMath()
+    //importTuples()
+    noInfixList :::= List("toInt", "toFloat", "toDouble", "toLong")
+
+    /*
     importHashMap()
     importConcurrentHashMap()*/
 
-    // OptiLA types
-    // declare all tpes first, so that they are available to all ops (similar to Delite)
+    // MultiArray figment types (with subtyping)
     val T = tpePar("T")
-    val ma = abstractFamily("MultiArrayFamily")
-    val ArrayND = abstractTpe("ArrayND", T, ma)
-    val Array1D = abstractTpe("Array1D", T, ma) isA ArrayND
-    val Array2D = abstractTpe("Array2D", T, ma) isA ArrayND
-    val Array3D = abstractTpe("Array3D", T, ma) isA ArrayND
+    implicit val ma = figmentFamily("MultiArrayFamily")
+    val ArrayND = figmentTpe("ArrayND", T)
+    val Array1D = figmentTpe("Array1D", T) isA ArrayND
+    val Array2D = figmentTpe("Array2D", T) isA ArrayND
+    val Array3D = figmentTpe("Array3D", T) isA ArrayND
+
+    importMultiArrayOps()
 
     // rewrites
     //extern(grp("Rewrite"), targets = Nil)

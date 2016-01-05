@@ -30,8 +30,8 @@ trait ForgeOps extends Base {
   def lift(grp: Rep[DSLGroup])(tpe: Rep[DSLType]) = forge_lift(grp, tpe)
   def data(tpe: Rep[DSLType], fields: (String, Rep[DSLType])*) = forge_data(tpe, fields)
 
-  def abstractTpe(name: String, tpePars: List[Rep[TypePar]], family: AbstractFamily) = forge_abstract_tpe(name, tpePars, family)
-  def abstractFamily(name: String) = forge_abstract_family(name)
+  def figmentTpe(name: String, tpePars: List[Rep[TypePar]])(implicit family: FigmentFamily) = forge_figment_tpe(name, tpePars, family)
+  def figmentFamily(name: String) = forge_figment_family(name)
 
   implicit def namedTpeToArg(arg: (String, Rep[DSLType])): Rep[DSLArg] = forge_arg(arg._1, arg._2, None)
   implicit def namedTpeWithDefaultToArg(arg: (String, Rep[DSLType], String)): Rep[DSLArg] = forge_arg(arg._1, arg._2, Some(arg._3))
@@ -123,8 +123,8 @@ trait ForgeOps extends Base {
   def forge_lookup_op(grp: Rep[DSLGroup], opName: String, overloadedIndex: Int): Rep[DSLOp]
   def forge_label(op: Rep[DSLOp], name: String): Rep[Unit]
 
-  def forge_abstract_tpe(name: String, tpePars: List[Rep[TypePar]], group: AbstractFamily): Rep[DSLType]
-  def forge_abstract_family(name: String): AbstractFamily
+  def forge_figment_tpe(name: String, tpePars: List[Rep[TypePar]], group: FigmentFamily): Rep[DSLType]
+  def forge_figment_family(name: String): FigmentFamily
   def forge_add_parent_tpe(tpe: Rep[DSLType], parent: Rep[DSLType]): Rep[Unit]
 }
 
@@ -256,7 +256,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   val Labels = HashMap[Exp[DSLOp],String]()
 
   // Experimental for MultiArray
-  val AbstractTpes = HashMap[Exp[DSLType], AbstractFamily]()
+  val FigmentTpes = HashMap[Exp[DSLType], FigmentFamily]()
   val TpeParents = HashMap[Exp[DSLType], Exp[DSLType]]()
 
   /**
@@ -345,13 +345,13 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     Tpe(name, tpePars, stage)
   }
 
-  def forge_abstract_family(name: String) = AbstractFamily(name)
+  def forge_figment_family(name: String) = FigmentFamily(name)
 
   // creates an abstract type that requires lowering (note stage tag must be future)
-  def forge_abstract_tpe(name: String, tpePars: List[Rep[TypePar]], family: AbstractFamily): Exp[DSLType] = {
+  def forge_figment_tpe(name: String, tpePars: List[Rep[TypePar]], family: FigmentFamily): Exp[DSLType] = {
     val t: Exp[DSLType] = Tpe(name, tpePars, future)
     if (!Tpes.contains(t)) Tpes += t
-    if (!AbstractTpes.contains(t)) AbstractTpes += t -> family
+    if (!FigmentTpes.contains(t)) FigmentTpes += t -> family
     t
   }
 
@@ -363,7 +363,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
 
   def forge_add_parent_tpe(tpe: Exp[DSLType], parent: Exp[DSLType]) = {
     if (!TpeParents.contains(tpe)) {
-      if (AbstractTpes.contains(parent) && AbstractTpes.contains(tpe)) {
+      if (FigmentTpes.contains(parent) && FigmentTpes.contains(tpe)) {
         TpeParents += (tpe -> parent)
         ()
       }

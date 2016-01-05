@@ -52,12 +52,14 @@ trait BaseGenPackages extends ForgeCodeGenBase {
       }
     }
 
-    val NonStructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && !DataStructs.contains(t) && !AbstractTpes.contains(t))
+    val NonStructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && !DataStructs.contains(t))
     if (NonStructTpes.length > 0) {
       stream.println()
       emitBlockComment("types with no associated data structure", stream, indent=2)
       for (tpe <- NonStructTpes) {
-        stream.println("  abstract class " + quote(tpe))
+        stream.println("  abstract class " + quote(tpe) + TpeParents.get(tpe).map(p => " extends " + quote(p)).getOrElse(""))
+      }
+      for (tpe <- NonStructTpes) {
         stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]") // needed?
       }
     }
@@ -77,19 +79,19 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     // abstract types are not included in the identifiers trait above because they can clash with either the class definitions or Scala
     // types in the lib implementation, causing a nasty scalac typer crash. (occurs, for example, if we declare an abstract Vector type)
     emitBlockComment("abstract types", stream, indent=2)
-    for (tpe <- Tpes if !isForgePrimitiveType(tpe) && DataStructs.contains(tpe)) {
+    for (tpe <- Tpes if !isForgePrimitiveType(tpe) && DataStructs.contains(tpe) && !FigmentTpes.contains(tpe)) {
       stream.println("  type " + quote(tpe))
     }
-    for (tpe <- Tpes if !isForgePrimitiveType(tpe) && AbstractTpes.contains(tpe)) {
+    for (tpe <- Tpes if !isForgePrimitiveType(tpe) && DataStructs.contains(tpe) && FigmentTpes.contains(tpe)) {
       stream.println("  type " + quote(tpe))
     }
 
     stream.println()
     emitBlockComment("implicit manifests", stream, indent=2)
-    for (tpe <- Tpes if !isForgePrimitiveType(tpe) && DataStructs.contains(tpe)) {
+    for (tpe <- Tpes if !isForgePrimitiveType(tpe) && DataStructs.contains(tpe) && !FigmentTpes.contains(tpe)) {
       stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + ": Manifest[" + quote(tpe) + "]")
     }
-    for (tpe <- Tpes if !isForgePrimitiveType(tpe) && AbstractTpes.contains(tpe)) {
+    for (tpe <- Tpes if !isForgePrimitiveType(tpe) && DataStructs.contains(tpe) && FigmentTpes.contains(tpe)) {
       stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + ": Manifest[" + quote(tpe) + "]")
     }
 

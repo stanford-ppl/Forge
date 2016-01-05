@@ -104,19 +104,19 @@ trait DeliteGenPackages extends BaseGenPackages {
 
     stream.println()
     emitBlockComment("dsl types", stream, indent=2)
-    for (tpe <- Tpes if (!isForgePrimitiveType(tpe) && DataStructs.contains(tpe))) {
+    for (tpe <- Tpes if (!isForgePrimitiveType(tpe) && DataStructs.contains(tpe) && !FigmentTpes.contains(tpe))) {
       stream.print("  abstract class " + quote(tpe))
       if (ForgeCollections.contains(tpe)) stream.println(" extends DeliteCollection[" + quote(ForgeCollections(tpe).tpeArg) + "]") else stream.println()
     }
-    for (tpe <- Tpes if (!isForgePrimitiveType(tpe)) && AbstractTpes.contains(tpe)) {
+    for (tpe <- Tpes if (!isForgePrimitiveType(tpe)) && DataStructs.contains(tpe) && FigmentTpes.contains(tpe)) {
       stream.println("  trait " + quote(tpe) + TpeParents.get(tpe).map(p => " extends " + quote(p)).getOrElse(""))
     }
     stream.println()
     emitBlockComment("implicit manifests", stream, indent=2)
-    for (tpe <- Tpes if (!isForgePrimitiveType(tpe)) && DataStructs.contains(tpe)) {
+    for (tpe <- Tpes if (!isForgePrimitiveType(tpe)) && DataStructs.contains(tpe) && !FigmentTpes.contains(tpe)) {
       stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")
     }
-    for (tpe <- Tpes if (!isForgePrimitiveType(tpe)) && AbstractTpes.contains(tpe)) {
+    for (tpe <- Tpes if (!isForgePrimitiveType(tpe)) && DataStructs.contains(tpe) && FigmentTpes.contains(tpe)) {
       stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")
     }
 

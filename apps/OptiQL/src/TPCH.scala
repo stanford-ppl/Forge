@@ -29,14 +29,14 @@ trait TPCHBaseTrait extends OptiQLApplication with Types {
   
   var tpchDataPath: Rep[String] = _
   val sep = "\\|"
-  def loadLineItems() = Table.fromFile[LineItem](tpchDataPath+"/lineitem.tbl", sep)
-  def loadCustomers() = Table.fromFile[Customer](tpchDataPath+"/customer.tbl", sep)
-  def loadNations() = Table.fromFile[Nation](tpchDataPath+"/nation.tbl", sep)
-  def loadOrders() = Table.fromFile[Order](tpchDataPath+"/orders.tbl", sep)
-  def loadParts() = Table.fromFile[Part](tpchDataPath+"/part.tbl", sep)
-  def loadPartSuppliers() = Table.fromFile[PartSupplier](tpchDataPath+"/partsupp.tbl", sep)
-  def loadRegions() = Table.fromFile[Region](tpchDataPath+"/region.tbl", sep)
-  def loadSuppliers() = Table.fromFile[Supplier](tpchDataPath+"/supplier.tbl", sep)
+  def loadLineItems() = Table.fromFile[LineItem](tpchDataPath+"/lineitem.csv", sep)
+  def loadCustomers() = Table.fromFile[Customer](tpchDataPath+"/customer.csv", sep)
+  def loadNations() = Table.fromFile[Nation](tpchDataPath+"/nation.csv", sep)
+  def loadOrders() = Table.fromFile[Order](tpchDataPath+"/orders.csv", sep)
+  def loadParts() = Table.fromFile[Part](tpchDataPath+"/part.csv", sep)
+  def loadPartSuppliers() = Table.fromFile[PartSupplier](tpchDataPath+"/partsupp.csv", sep)
+  def loadRegions() = Table.fromFile[Region](tpchDataPath+"/region.csv", sep)
+  def loadSuppliers() = Table.fromFile[Supplier](tpchDataPath+"/supplier.csv", sep)
   
   def query(): Rep[_]
   

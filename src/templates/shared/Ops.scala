@@ -415,8 +415,6 @@ trait BaseGenOps extends ForgeCodeGenBase {
         val struct = getHkTpe(o.args.apply(structArgIndex).tpe)
         val data = DataStructs.get(struct)
         if (data.isEmpty) err("no struct definitions found for arg index " + structArgIndex + " in op " + o.name)
-        println(data.get.fields)
-        println(data.get.fields.map(_._1))
         if (!data.get.fields.map(_._1).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)
       case Setter(structArgIndex,field,value) =>
         if (structArgIndex > o.args.length) err("arg index " + structArgIndex + " does not exist for op " + o.name)
@@ -486,7 +484,6 @@ trait BaseGenOps extends ForgeCodeGenBase {
    */
 
   def checkOps(opsGrp: DSLOps) {
-    DataStructs.foreach(println(_))
     for (o <- unique(opsGrp.ops)) check(o)
   }
 

@@ -19,16 +19,24 @@ trait DeliteGenOps extends BaseGenOps {
 
   var activeGenerator: CodeGenerator = _
 
+  def isFigmentOp(op: Rep[DSLOp]) = Impls(op) match {
+    case _:Figment | _:AllocatesFigment => true
+    case _ => false
+  }
+
   def baseOpsCls(opsGrp: DSLOps) = {
     if (opsGrp.ops.exists(_.style == compilerMethod)) opsGrp.grp.name + "CompilerOps"
     else opsGrp.name
   }
   def baseExpCls(opsGrp: DSLOps) = {
     // in order of decreasing inclusiveness
-    if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && ForgeCollections.contains(grpAsTpe(o.grp)) && DataStructs.contains(grpAsTpe(o.grp)))) "DeliteCollectionOpsExp with DeliteStructsExp"
-    else if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && ForgeCollections.contains(grpAsTpe(o.grp)))) "DeliteCollectionOpsExp"
-    else if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && DataStructs.contains(grpAsTpe(o.grp)))) "BaseFatExp with DeliteStructsExp"
-    else "BaseFatExp with EffectExp" // we use codegen *GenFat, which requires EffectExp
+    val base = if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && ForgeCollections.contains(grpAsTpe(o.grp)) && DataStructs.contains(grpAsTpe(o.grp)))) "DeliteCollectionOpsExp with DeliteStructsExp"
+               else if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && ForgeCollections.contains(grpAsTpe(o.grp)))) "DeliteCollectionOpsExp"
+               else if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && DataStructs.contains(grpAsTpe(o.grp)))) "BaseFatExp with DeliteStructsExp"
+               else "BaseFatExp with EffectExp" // we use codegen *GenFat, which requires EffectExp
+
+    // Check if we need to mix in figment ops
+    if (opsGrp.ops.exists(o => isFigmentOp(o))) base + " with DeliteFigmentOpsExp" else base
   }
 
   //TODO: better way to check if the string contains block
@@ -149,7 +157,12 @@ trait DeliteGenOps extends BaseGenOps {
 
   def emitImplMethod(o: Rep[DSLOp], func: Rep[String], postfix: String, returnTpe: Option[String], stream: PrintWriter, indent: Int = 2) {
     emitWithIndent(makeOpImplMethodSignature(o, postfix, returnTpe) + " = {", stream, indent)
-    inline(o, func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent+2 )}
+    if (hasCompilerVersion(o)) {
+      inline(o, func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent+2 )}
+    }
+    else {
+      emitNoCompilerErr(o, stream, indent)
+    }
     emitWithIndent("}", stream, indent)
     stream.println()
   }
@@ -205,6 +218,7 @@ trait DeliteGenOps extends BaseGenOps {
         case _ =>
       }
     }
+
     stream.println("}")
   }
 
@@ -234,9 +248,17 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println("}")
   }
 
+  def hasCompilerVersion(o: Rep[DSLOp]) = o.style match {
+    case `libraryMethod` => false
+    case _ => true
+  }
+  def emitNoCompilerErr(o: Rep[DSLOp], stream: PrintWriter, indent: Int) {
+    emitWithIndent("throw new Exception(\"DSL design error: attempted to call library-only method " + o.name + " during staging\")", stream, indent+2)
+  }
+
   def hasIRNode(o: Rep[DSLOp]) = Impls(o) match {
     case _:Composite | _:Redirect | _:Getter | _:Setter => false
-    case _ => true
+    case _ => hasCompilerVersion(o)
   }
 
   def hasMultipleIRNodes(o: Rep[DSLOp]) = Impls(o) match {
@@ -335,10 +357,10 @@ trait DeliteGenOps extends BaseGenOps {
           val elems = if (o.effect == mutable) elemsPure map { case (k,v) => (k, "var_new("+v+").e") } else elemsPure
           stream.println("    val elems = copyTransformedElems(collection.Seq(" + elems.mkString(",") + "))")
 
-        case AbstractAllocates(tpe,init) =>
-          emitOpNodeHeader(o, "AbstractDef[" + quote(o.retTpe) + "]", stream)
+        case AllocatesFigment(tpe,init) =>
+          emitOpNodeHeader(o, "Fig[" + quote(o.retTpe) + "]", stream)
         case figment:Figment =>
-          emitOpNodeHeader(o, "AbstractDef[" + quote(o.retTpe) + "]", stream)
+          emitOpNodeHeader(o, "Fig[" + quote(o.retTpe) + "]", stream)
 
         case map:Map =>
           val colTpe = getHkTpe(o.retTpe)
@@ -530,35 +552,40 @@ trait DeliteGenOps extends BaseGenOps {
 
       val hasEffects = summary.length > 0
 
-      // composites, getters and setters are currently inlined
-      // in the future, to support pattern matching and optimization, we should implement these as abstract IR nodes and use lowering transformers
-      Impls(o) match {
-        case c:Composite => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
-        case g@Getter(structArgIndex,field) =>
-          val struct = o.args.apply(structArgIndex)
-          val fieldTpe = DataStructs(getHkTpe(struct.tpe)).fields.find(t => t._1 == field).get.tpe
-          emitWithIndent("field["+quote(fieldTpe)+"]("+inline(o,quotedArg(struct.name),quoteLiteral)+",\""+field+"\")", stream, 4)
-        case s@Setter(structArgIndex,field,value) =>
-          val struct = o.args.apply(structArgIndex)
-          val fieldTpe = DataStructs(getHkTpe(struct.tpe)).fields.find(t => t._1 == field).get.tpe
-          emitWithIndent("field_update["+quote(fieldTpe)+"]("+inline(o,quotedArg(struct.name),quoteLiteral)+",\""+field+"\","+inline(o,value,quoteLiteral)+")", stream, 4)
-        case _:GroupBy | _:GroupByReduce =>
-          emitWithIndent("val keys = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o, "Keys") + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
-          emitWithIndent("val index = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o, "Index") + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
-          emitWithIndent("val values = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o) + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
-          emitWithIndent(makeEffectAnnotation(pure,o) + "(DeliteMapNewImm(keys, values, index, darray_length(values)))", stream, 4)
-        case _ if hasEffects =>
-          // if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
-          val prologue = if (o.effect == simple) " andAlso Simple()" else ""
-          val args = "(" + o.args.flatMap(a => a match {
-            case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) =>
-              val freshSyms = if (isThunk(f)) Nil else args.map(b => boundArgName(a,b))
-              ("b_" + name) :: freshSyms
-            case Def(Arg(name, _, _)) => List(name)
-          }).mkString(",") + ")"
-          emitWithIndent(makeEffectAnnotation(simple,o) + "(" + makeOpNodeName(o) + makeTpePars(o.tpePars) + args + makeOpImplicitArgs(o) + ", " + summarizeEffects(summary) + prologue + ")", stream, 4)
-        case _ =>
-          emitWithIndent(makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o) + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
+      if (hasCompilerVersion(o)) {
+        // composites, getters and setters are currently inlined
+        // in the future, to support pattern matching and optimization, we should implement these as abstract IR nodes and use lowering transformers
+        Impls(o) match {
+          case c:Composite => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
+          case g@Getter(structArgIndex,field) =>
+            val struct = o.args.apply(structArgIndex)
+            val fieldTpe = DataStructs(getHkTpe(struct.tpe)).fields.find(t => t._1 == field).get.tpe
+            emitWithIndent("field["+quote(fieldTpe)+"]("+inline(o,quotedArg(struct.name),quoteLiteral)+",\""+field+"\")", stream, 4)
+          case s@Setter(structArgIndex,field,value) =>
+            val struct = o.args.apply(structArgIndex)
+            val fieldTpe = DataStructs(getHkTpe(struct.tpe)).fields.find(t => t._1 == field).get.tpe
+            emitWithIndent("field_update["+quote(fieldTpe)+"]("+inline(o,quotedArg(struct.name),quoteLiteral)+",\""+field+"\","+inline(o,value,quoteLiteral)+")", stream, 4)
+          case _:GroupBy | _:GroupByReduce =>
+            emitWithIndent("val keys = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o, "Keys") + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
+            emitWithIndent("val index = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o, "Index") + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
+            emitWithIndent("val values = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o) + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
+            emitWithIndent(makeEffectAnnotation(pure,o) + "(DeliteMapNewImm(keys, values, index, darray_length(values)))", stream, 4)
+          case _ if hasEffects =>
+            // if (o.effect != simple) { err("don't know how to generate non-simple effects with functions") }
+            val prologue = if (o.effect == simple) " andAlso Simple()" else ""
+            val args = "(" + o.args.flatMap(a => a match {
+              case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) =>
+                val freshSyms = if (isThunk(f)) Nil else args.map(b => boundArgName(a,b))
+                ("b_" + name) :: freshSyms
+              case Def(Arg(name, _, _)) => List(name)
+            }).mkString(",") + ")"
+            emitWithIndent(makeEffectAnnotation(simple,o) + "(" + makeOpNodeName(o) + makeTpePars(o.tpePars) + args + makeOpImplicitArgs(o) + ", " + summarizeEffects(summary) + prologue + ")", stream, 4)
+          case _ =>
+            emitWithIndent(makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o) + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)
+        }
+      }
+      else {
+        emitNoCompilerErr(o, stream, 4)
       }
 
       emitWithIndent("}", stream, 2)
@@ -644,16 +671,28 @@ trait DeliteGenOps extends BaseGenOps {
     emitBlockComment("Mirroring", stream, indent=2)
     stream.println("  override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = (e match {")
 
-    for (o <- uniqueOps) {
+    for (o <- uniqueOps if hasIRNode(o)) {
       // helpful identifiers
-      val xformArgs = "(" + o.args.zipWithIndex.flatMap(t => t._1 match {
-        case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if Impls(o).isInstanceOf[CodeGen] && !isThunk(f) => "f("+opArgPrefix+t._2+")" :: args.map(a => boundArgAnonName(t._1,a,t._2) /*+ ".asInstanceOf[Sym[Any]]"*/)
+
+      val xformArgs = "(" + o.args.zipWithIndex.flatMap{case (arg,idx) => arg match {
+        case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if Impls(o).isInstanceOf[CodeGen] && !isThunk(f) => "f("+opArgPrefix+idx+")" :: args.map(a => boundArgAnonName(arg,a,idx))
         // -- workaround for apparent scalac bug (GADT skolem type error), with separate cases for regular tpes and function tpes. this may be too restrictive and miss cases we haven't seen yet that also trigger the bug.
-        case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if isTpePar(o.retTpe) && !isThunk(f) && args.forall(a => a.tpe == o.retTpe || !isTpePar(a.tpe)) && ret == o.retTpe => List("f("+opArgPrefix+t._2+".asInstanceOf[" + repify(f).replaceAllLiterally(repify(o.retTpe), "Rep[A]") + "])")
-        case Def(Arg(name, tpe, d2)) if !isFuncArg(t._1) && isTpePar(o.retTpe) && tpe.tpePars.length == 1 && tpe.tpePars.apply(0) == o.retTpe => List("f("+opArgPrefix+t._2+".asInstanceOf[Rep[" + tpe.name + "[A]]])")
+        case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if isTpePar(o.retTpe) && !isThunk(f) && args.forall(a => a.tpe == o.retTpe || !isTpePar(a.tpe)) && ret == o.retTpe => List("f("+opArgPrefix+idx+".asInstanceOf[" + repify(f).replaceAllLiterally(repify(o.retTpe), "Rep[A]") + "])")
+        case Def(Arg(name, tpe, d2)) if !isFuncArg(arg) && isTpePar(o.retTpe) && tpe.tpePars.length == 1 && tpe.tpePars.apply(0) == o.retTpe => List("f("+opArgPrefix+idx+".asInstanceOf[Rep[" + tpe.name + "[A]]])")
         // -- end workaround
-        case Def(Arg(name, _, _)) => List("f("+opArgPrefix+t._2+")")
-      }).mkString(",") + ")"
+
+        // Hack for dealing with "immediate" DSL types (e.g. Lists of Reps)
+        // TODO: Doesn't cover arbitrarily nested cases, e.g. List[List[Rep[Int]]], but those aren't that useful anyway
+        case Def(Arg(name, tpe, _)) => tpe.stage match {
+          case `compile` if tpe.name.startsWith("List") =>
+            val tP = tpe.tpeArgs.head
+            println("Found List[" + tP.name + "]" )
+            if (tP.name.startsWith("Rep") || tP.name.startsWith("Exp") || tP.stage != compile) List(opArgPrefix+idx+".map{x => f(x)}")
+            else List(opArgPrefix+idx)
+          case `compile` if !tpe.name.startsWith("Rep") && !tpe.name.startsWith("Exp") => List(opArgPrefix+idx)
+          case _ => List("f(" + opArgPrefix+idx + ")")
+        }
+      }}.mkString(",") + ")"
 
       val implicits = o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++
                       o.implicitArgs.map { a =>

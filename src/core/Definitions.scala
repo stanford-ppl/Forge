@@ -74,7 +74,7 @@ trait Definitions extends DerivativeTypes {
   lazy val MHashMap = tpe("ForgeHashMap",(tpePar("K"),tpePar("V"))) // Forge HashMap (immutable)
   lazy val MInputStream = tpe("ForgeFileInputStream")
   lazy val MOutputStream = tpe("ForgeFileOutputStream")
-  lazy val CSeq = tpe("scala.collection.immutable.Seq", tpePar("A"), stage = compile)
+  lazy val IList = tpe("List", tpePar("A"), stage = compile)
 
   /* whitelist for primitive types (i.e. we should not generate a Forge shadow) */
   var primitiveTpePrefix = scala.List("scala","java")
@@ -149,6 +149,7 @@ trait Definitions extends DerivativeTypes {
   case object directMethod extends MethodType
   case object compilerMethod extends MethodType
   case object implicitMethod extends MethodType
+  case object libraryMethod extends MethodType
 
   // blacklist for op names that cannot be expressed with infix methods
   // we also blacklist some operators for improved compilation performance or to avoid ambiguities in the REPL version
@@ -468,17 +469,22 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
   case class Redirect(func: Rep[String]) extends OpType
   def forge_redirect(func: Rep[String]) = Redirect(func)
 
+
+  /**
+   * Figment op types
+   * TODO: Do we need a figment op type?
+   */
   case class Figment(func: Rep[String]) extends OpType
   def forge_figment(func: Rep[String]) = Figment(func)
+
+  case class AllocatesFigment(tpe: Rep[DSLType], init: Seq[Rep[String]]) extends OpType
 
   /**
    * Delite ops
    */
   case class Allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]) extends DeliteOpType
-  case class AbstractAllocates(tpe: Rep[DSLType], init: Seq[Rep[String]]) extends OpType
-
   def forge_allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]) = {
-    if (FigmentTpes.contains(tpe)) { AbstractAllocates(tpe,init) } else { Allocates(tpe,init) }
+    if (FigmentTpes.contains(tpe)) { AllocatesFigment(tpe,init) } else { Allocates(tpe,init) }
   }
 
   case class SingleTask(func: Rep[String]) extends DeliteOpType

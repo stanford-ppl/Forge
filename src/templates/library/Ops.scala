@@ -37,7 +37,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   def requiresImpl(o: Rep[DSLOp]) = Impls(o) match {
     case _:CodeGen | _:Redirect => false
     case _:Getter | _:Setter => false
-    case _:Allocates | _:AbstractAllocates => false
+    case _:Allocates | _:AllocatesFigment => false
     case _ => true
   }
 
@@ -281,7 +281,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         emitOverloadShadows(o, stream, indent)
         val initialVals = init.map(i => inline(o,i)).mkString(",")
         emitWithIndent("new " + quote(tpe) + "(" + initialVals + ")", stream, indent)
-      case AbstractAllocates(tpe,init) =>
+      case AllocatesFigment(tpe,init) =>
         emitOverloadShadows(o, stream, indent)
         val initialVals = init.map(i => inline(o,i)).mkString(",")
         emitWithIndent("new " + quote(tpe) + "(" + initialVals + ")", stream, indent)

@@ -323,7 +323,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
       val i = /*if (Config.fastCompile) nameClashId(canonical(o), nameClashesGrp) else*/ ""
       o.style match {
         case `staticMethod` => o.grp.name.toLowerCase + "_object_" + sanitize(o.name).toLowerCase + i
-        case `compilerMethod` =>
+        case `compilerMethod` | `libraryMethod` =>
           if (o.name != sanitize(o.name)) err("compiler op name has special characters that require reformatting: " + o.name)
           o.name // should be callable directly from impl code
         case _ => o.grp.name.toLowerCase + "_" + sanitize(o.name).toLowerCase + i

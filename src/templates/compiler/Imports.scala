@@ -19,7 +19,7 @@ trait DeliteGenImports extends BaseGenImports {
 
   def emitDeliteOpsImports(stream: PrintWriter) {
     emitDeliteCollectionImports(stream)
-    stream.println("import ppl.delite.framework.ops.{DeliteOpsExp, DeliteCollectionOpsExp}")
+    stream.println("import ppl.delite.framework.ops.{DeliteOpsExp, DeliteCollectionOpsExp, DeliteFigmentOpsExp}")
     stream.println("import ppl.delite.framework.Util._")
   }
 
@@ -49,7 +49,7 @@ trait DeliteGenImports extends BaseGenImports {
     emitDelitePackageImports(stream)
     emitDeliteOpsImports(stream)
     emitDeliteRestageImports(stream)
-    emitDeliteTestImports(stream)    
+    emitDeliteTestImports(stream)
   }
 
   def emitScalaToolsImports(stream: PrintWriter) {
@@ -67,6 +67,6 @@ trait DeliteGenImports extends BaseGenImports {
     super.emitAllImports(stream)
     emitScalaToolsImports(stream)
     emitLMSImports(stream)
-    emitDeliteImports(stream)    
+    emitDeliteImports(stream)
   }
 }

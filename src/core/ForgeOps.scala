@@ -30,8 +30,7 @@ trait ForgeOps extends Base {
   def lift(grp: Rep[DSLGroup])(tpe: Rep[DSLType]) = forge_lift(grp, tpe)
   def data(tpe: Rep[DSLType], fields: (String, Rep[DSLType])*) = forge_data(tpe, fields)
 
-  def figmentTpe(name: String, tpePars: List[Rep[TypePar]])(implicit family: FigmentFamily) = forge_figment_tpe(name, tpePars, family)
-  def figmentFamily(name: String) = forge_figment_family(name)
+  def figmentTpe(name: String, tpePars: List[Rep[TypePar]]) = forge_figment_tpe(name, tpePars)
 
   implicit def namedTpeToArg(arg: (String, Rep[DSLType])): Rep[DSLArg] = forge_arg(arg._1, arg._2, None)
   implicit def namedTpeWithDefaultToArg(arg: (String, Rep[DSLType], String)): Rep[DSLArg] = forge_arg(arg._1, arg._2, Some(arg._3))
@@ -74,6 +73,9 @@ trait ForgeOps extends Base {
       forge_op(grp,name,compilerMethod,tpePars,listToArgs(signature.args),Nil,listToImplicitArgs(implicitArgs),signature.retTpe,effect,aliasHint)
   def fimplicit(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) =
       forge_op(grp,name,implicitMethod,tpePars,listToArgs(signature.args),Nil,listToImplicitArgs(implicitArgs),signature.retTpe,effect,aliasHint)
+
+  def library(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) =
+      forge_op(grp,name,libraryMethod,tpePars,listToArgs(signature.args),Nil,listToImplicitArgs(implicitArgs),signature.retTpe,effect,aliasHint)
 
   def impl(op: Rep[DSLOp])(rule: OpType) = forge_impl(op,rule)
   def extern(grp: Rep[DSLGroup], withLift: Boolean = false, targets: List[CodeGenerator] = generators.filterNot(_ == restage)) = forge_extern(grp, withLift, targets)
@@ -123,8 +125,7 @@ trait ForgeOps extends Base {
   def forge_lookup_op(grp: Rep[DSLGroup], opName: String, overloadedIndex: Int): Rep[DSLOp]
   def forge_label(op: Rep[DSLOp], name: String): Rep[Unit]
 
-  def forge_figment_tpe(name: String, tpePars: List[Rep[TypePar]], group: FigmentFamily): Rep[DSLType]
-  def forge_figment_family(name: String): FigmentFamily
+  def forge_figment_tpe(name: String, tpePars: List[Rep[TypePar]]): Rep[DSLType]
   def forge_add_parent_tpe(tpe: Rep[DSLType], parent: Rep[DSLType]): Rep[Unit]
 }
 
@@ -256,7 +257,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   val Labels = HashMap[Exp[DSLOp],String]()
 
   // Experimental for MultiArray
-  val FigmentTpes = HashMap[Exp[DSLType], FigmentFamily]()
+  val FigmentTpes = ArrayBuffer[Exp[DSLType]]()
   val TpeParents = HashMap[Exp[DSLType], Exp[DSLType]]()
 
   /**
@@ -345,20 +346,18 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     Tpe(name, tpePars, stage)
   }
 
-  def forge_figment_family(name: String) = FigmentFamily(name)
-
   // creates an abstract type that requires lowering (note stage tag must be future)
-  def forge_figment_tpe(name: String, tpePars: List[Rep[TypePar]], family: FigmentFamily): Exp[DSLType] = {
+  def forge_figment_tpe(name: String, tpePars: List[Rep[TypePar]]): Exp[DSLType] = {
     val t: Exp[DSLType] = Tpe(name, tpePars, future)
     if (!Tpes.contains(t)) Tpes += t
-    if (!FigmentTpes.contains(t)) FigmentTpes += t -> family
+    if (!FigmentTpes.contains(t)) FigmentTpes += t
     t
   }
 
   /**
    * Add a parent type to a specified DSL type
    * WARNING: Code generation currently does not support subclassing. Subclassing in DSLs will
-   * currently only work for abstract types with lowering transformers.
+   * currently only work for figment types with lowering transformers.
    */
 
   def forge_add_parent_tpe(tpe: Exp[DSLType], parent: Exp[DSLType]) = {
@@ -372,6 +371,11 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     }
     else
       err("type " + tpe.name + " already has parent type " + TpeParents(tpe).name + " - DSL types can only have single inheritance")
+  }
+
+  // Array and Array[T] should be the same type
+  def is_figment_tpe(tpe: Exp[DSLType]) = {
+    FigmentTpes.contains(tpe) || FigmentTpes.exists(t => t.name == tpe.name && t.stage == tpe.stage)
   }
 
   /* A DSLType instance of a higher-kinded type */
@@ -508,6 +512,15 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
    * Add an op implementation rule
    */
   def forge_impl(op: Rep[DSLOp], rule: OpType) = {
+    // Prior to adding an op rule, check to see if the op is implemented as a field getter/setter on a figment data structure
+    def checkFieldFigments(op: Rep[DSLOp], rule: OpType) = rule match {
+      case Getter(argIndex, field) if is_figment_tpe(op.args.apply(argIndex).tpe) && op.style != `libraryMethod` =>
+        err("getter method " + op.name + " for figment type " + op.args.apply(argIndex).tpe.name + " must be a library-only method")
+      case Setter(argIndex, field, value) if is_figment_tpe(op.args.apply(argIndex).tpe) && op.style != `libraryMethod` =>
+        err("setter method " + op.name + " for figment type " + op.args.apply(argIndex).tpe.name + " must be a library-only method")
+      case _ => rule
+    }
+
     (Impls.get(op),rule) match {
       // only codegen rules may have multiple declarations
       case (Some(current@CodeGen(d1)),add@CodeGen(d2)) =>
@@ -518,9 +531,9 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
         }
       case (Some(x),y) =>
         if (Config.verbosity > 0) warn("op " + op.name + " already has implementation rule " + x + ". It is being overwritten with " + rule)
-        Impls(op) = rule
+        Impls(op) = checkFieldFigments(op,rule)
       case _ =>
-        Impls(op) = rule
+        Impls(op) = checkFieldFigments(op,rule)
     }
 
     // no matter what branch we took, we may need to reconcile codegen rules

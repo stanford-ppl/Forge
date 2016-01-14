@@ -10,8 +10,6 @@ trait DHDLDSL extends ForgeApplication
 	with PrimOps with MiscOps{
 
 	val MAX_FIXPT_PRECISION = 64
-	val SIGN_MASK:Long = 1L << (MAX_FIXPT_PRECISION-1)
-	
   def dslName = "DHDL"
 	
   override def addREPLOverride = false 
@@ -21,11 +19,12 @@ trait DHDLDSL extends ForgeApplication
 		val FixPt = tpe("Long", stage=future)
 
 		val TpeOps = grp("TpeOps")
+
+		lift(TpeOps) (FixPt)
 		lift(TpeOps) (MInt)
 		lift(TpeOps) (MFloat)
 		lift(TpeOps) (MBoolean)
 
-		val FixPtOps = withTpe (FixPt)
 		def checkFixPtPrec (intPrec:Int, fracPrec:Int) = {
 			if (intPrec>=MAX_FIXPT_PRECISION)
 				throw new Exception("Integer precision cannot exceed " + (MAX_FIXPT_PRECISION-1) + ": " +
@@ -38,24 +37,31 @@ trait DHDLDSL extends ForgeApplication
 			}
 		}
 
+		val FixPtOps = withTpe (FixPt)
 		FixPtOps {
-			infix ("getSign") (Nil :: MInt) implements signle ${
+			infix ("getSign") (Nil :: MInt) implements single ${
+				val MAX_FIXPT_PRECISION = 64
+				val SIGN_MASK:Long = 1L << (MAX_FIXPT_PRECISION-1)
 				(SIGN_MASK & $0) >> (MAX_FIXPT_PRECISION-1)
 			}
 			/* getInt(intPrec, fracPrec): returns integer part of the fix point number */
-			infix ("getInt") ((MInt, MInt) :: MInt) implements single ${
+			infix ("getInt") ((MInt, MInt) :: MInt) implements composite ${
 				val intPrec = $1
 				val fracPrec = $2
-				val intMask = (1L << intPrec + fracPrec) - 1 
-				(scala.math.abs($self) & intMask) >> fracPrec
+				val intMask = 1L << (intPrec + fracPrec) - 1L 
+				(abs($self) & intMask) >> fracPrec
 			}
 			/* getFrac(fracPrec): returns fraction part of the fix point number */
-			infix ("getFrac") (MInt :: MInt) implements single ${
+			infix ("getFrac") (MInt :: MInt) implements composite ${
 				val fracPrec = $1
-				val fracMask = (1L << fracPrec) - 1
-				(scala.math.abs($self) & fracMask)
+				val fracMask = (1L << fracPrec.toFixPt) - 1L
+				(abs($self) & fracMask)
 			}
-			direct ("FixPt") (((MInt,MInt,MInt,MInt,MInt) :: MInt)) implements codegen ${
+			infix ("toString") ((MInt, MInt) :: MString) implements composite ${
+				if ($self.getSign==0) "" else "-" 
+				+ $self.getFrac($1, $2) + "." + frac
+			}
+			direct ("FixPt") (((MInt,MInt,MInt,MInt,MInt) :: MInt)) implements codegen ($cala, ${
 				val intPrec = $4
 				val fracPrec = $5
 				val sign = $1
@@ -63,21 +69,40 @@ trait DHDLDSL extends ForgeApplication
 				val frac = $3
 				val posval = (int << fracPrec.toLong) | frac.toLong 
 				if (sign==0) posval else -posval
-			}
-			infix ("toString") ((MInt :: MInt) :: MString) implements single ${
-				if ($self.getSign==0) "" else "-" 
-				+ $self.getFrac($1, $2) + "." + frac
-			}
+			})
 			val fix2Float = infix ("toFloat") (Nil :: MFloat)
-			impl (fix2Float) (codegen($cala, ${ $0.toString.toFloat }))
+			impl (fix2Float) (codegen($cala, ${
+				val intprec = 31
+				val fracprec = 0
+				//TODO
+				$0.toFloat
+			}))
+			val fix2Int = infix ("toInt") (Nil :: MInt)
+			impl (fix2Int) (composite ${
+				val intprec = 31
+				val fracprec = 0
+				$0 >> fracprec.toLong
+			})
+		
+			fimplicit ("fixpt_to_float") (Nil::MFloat) implements composite ${ $self.toFloat }
+			fimplicit ("fixpt_to_int") (Nil::MInt) implements composite ${ $self.toInt }
 		}
 
-		val FloatOps = withTpe (MFloat)
-		FloatOps {
-			val float2fix = infix ("toFixPt") (Nil::FixPt)
-			//TODO: Don't know how to convert float to fixpt without knowing precision in FixPt
-			impl (float2fix) (codegen($cala, ${ FixPt($0.toInt, 0)} ))
+		val IntOps = withTpe (MInt)
+		IntOps {
+			val int2fxp = infix ("toFixPt") (Nil::FixPt)
+			impl (int2fxp) (codegen($cala, ${ $self.toLong } ))
+			fimplicit ("int_to_fixpt") (Nil::FixPt) implements composite ${ $self.toFixPt }
+
+			infix ("+") (MInt :: MInt) implements single ${$self + $1}
 		}
+
+		//val FloatOps = withTpe (MFloat)
+		//FloatOps {
+		//	val float2fix = infix ("toFixPt") (Nil::FixPt)
+		//	//TODO: Don't know how to convert float to fixpt without knowing precision in FixPt
+		//	impl (float2fix) (codegen($cala, ${ FixPt($0.toInt, 0)} ))
+		//}
 
 		importDHDLPrimitives()
 		importMiscs()

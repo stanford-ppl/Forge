@@ -2,10 +2,10 @@ import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
 
-object DotProductCompiler extends DHDLApplicationCompiler with DotProduct 
-object DotProductInterpreter extends DHDLApplicationInterpreter with DotProduct 
+object TestCompiler extends DHDLApplicationCompiler with Test 
+object TestInterpreter extends DHDLApplicationInterpreter with Test 
 
-trait DotProduct extends DHDLApplication {
+trait Test extends DHDLApplication {
 	def printUsage = {
     println("Usage: dotprod")
     exit(-1)
@@ -21,7 +21,7 @@ trait DotProduct extends DHDLApplication {
 		r.reset
 		assert(r.value==a)
 
-		val m = BRAM[Long]("m", 16)
+		val m = BRAM[FixPt]("m", 16)
 		m.st(3,b)
 		assert(m.ld(3)==b)
 	}

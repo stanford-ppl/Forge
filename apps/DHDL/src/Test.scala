@@ -24,5 +24,7 @@ trait Test extends DHDLApplication {
 		val m = BRAM[FixPt]("m", 16)
 		m.st(3,b)
 		assert(m.ld(3)==b)
+
+		//val om = OffChipMem[FixPt]("om", Array[FixPt](1l,2l,3l))
 	}
 }

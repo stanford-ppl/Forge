@@ -18,7 +18,6 @@ trait DHDLDSL extends ForgeApplication
 		importDHDLPrimitives()
 		importMems()
 		importMiscs()
-		importStrings()
 		()
 	}
 }

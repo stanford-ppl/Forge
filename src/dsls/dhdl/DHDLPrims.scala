@@ -36,6 +36,8 @@ trait PrimOps {
 		impl (fixEq) (codegen ($cala, ${$0 == $1}))
 		val fltEq = infix (Prim) ("==", Nil, (MFloat, MFloat):: MBoolean)
 		impl (fltEq) (codegen ($cala, ${$0 == $1}))
+		val boolEq = infix (Prim) ("==", Nil, (MBoolean, MBoolean):: MBoolean)
+		impl (boolEq) (codegen ($cala, ${$0 == $1}))
 
 		val fixGt = infix (Prim) ("<", Nil, (FixPt, FixPt):: MBoolean)
 		impl (fixGt) (codegen ($cala, ${$0 < $1}))
@@ -49,9 +51,13 @@ trait PrimOps {
 
 		val fxpAnd = infix (Prim) ("&", Nil, (FixPt, FixPt) :: FixPt)
 		impl (fxpAnd) (codegen($cala, ${$0 & $1}))
+		val boolAnd = infix (Prim) ("&&", Nil, (MBoolean, MBoolean):: MBoolean)
+		impl (boolAnd) (codegen ($cala, ${$0 && $1}))
 
 		val fxpOr = infix (Prim) ("|", Nil, (FixPt, FixPt) :: FixPt)
 		impl (fxpOr) (codegen($cala, ${$0 | $1}))
+		val boolOr = infix (Prim) ("||", Nil, (MBoolean, MBoolean):: MBoolean)
+		impl (boolOr) (codegen ($cala, ${$0 || $1}))
 
 		val fxpLls = infix (Prim) ("<<", Nil, (FixPt, FixPt) :: FixPt)
 		impl (fxpLls) (codegen($cala, ${$0 << $1}))

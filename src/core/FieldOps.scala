@@ -193,6 +193,25 @@ trait FieldOpsExp extends FieldOps {
   }
 
 
+  /**
+   * DSLTraversal
+   */
+  def infix_name(x: Exp[DSLTraversal])(implicit o: Overloaded7): String = x match {
+    case Def(Transform(name,isExtern)) => name
+    case Def(Analyze(name,isExtern)) => name
+  }
+  def infix_isExtern(x: Exp[DSLTraversal]): Boolean = x match {
+    case Def(Transform(name,isExtern)) => isExtern
+    case Def(Analyze(name,isExtern)) => isExtern
+  }
+
+  /**
+   * DSLMetadata
+   */
+  def infix_name(x: Exp[DSLMetadata])(implicit o: Overloaded8): String = x match {
+    case Def(MetaDef(name)) => name
+  }
+
 }
 
 

@@ -36,6 +36,15 @@ trait DeliteGenImports extends BaseGenImports {
     stream.println("import ppl.delite.framework.transform._")
   }
 
+  def emitDeliteTraversalImports(stream: PrintWriter) {
+    stream.println("import ppl.delite.framework.{Config, DeliteApplication, ExpressionsOpt}")
+    stream.println("import ppl.delite.framework.analysis._")
+    stream.println("import ppl.delite.framework.transform._")
+    stream.println("import ppl.delite.framework.ops._")
+    stream.println("import ppl.delite.framework.datastructures._")
+    stream.println("import ppl.delite.framework.codegen.delite.overrides._")
+  }
+
   def emitDeliteRestageImports(stream: PrintWriter) {
     stream.println("import ppl.delite.framework.codegen.restage.{DeliteCodeGenRestage,TargetRestage}")
     stream.println("import ppl.delite.framework.{DeliteInteractive, DeliteInteractiveRunner, DeliteRestageOps, DeliteRestageOpsExp, DeliteRestageRunner}")
@@ -60,6 +69,7 @@ trait DeliteGenImports extends BaseGenImports {
     super.emitDSLImports(stream)
     stream.println("import " + packageName + "._")
     stream.println("import " + packageName + ".ops._")
+    stream.println("import " + packageName + ".transform._")
     // stream.println("import " + dsl.toLowerCase() + ".compiler.extern._")
   }
 

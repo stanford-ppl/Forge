@@ -23,6 +23,16 @@ abstract class LiftStm
 abstract class RewriteRule
 abstract class CodeGenRule
 
+abstract class DSLTraversal
+abstract class DSLAnalyzer extends DSLTraversal
+abstract class DSLTransformer extends DSLTraversal
+abstract class DSLMetadata
+abstract class DSLMetaFields
+
+abstract class TraversalRule
+abstract class DSLPattern
+abstract class DSLRule
+
 /**
  * Types representing built-in constructs
  */

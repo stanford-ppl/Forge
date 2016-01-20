@@ -19,6 +19,12 @@ trait Definitions extends DerivativeTypes {
    */
   val maxTuples = 10
 
+
+  /**
+   * Delite transformers
+   */
+  lazy val MultiloopSoA = transformer("MultiloopSoA", isExtern = true)
+
   /**
    * Built-in types
    */
@@ -29,6 +35,7 @@ trait Definitions extends DerivativeTypes {
 
   lazy val MAny = tpe("Any")
   lazy val CAny = tpe("Any", stage = now)
+  lazy val IAny = tpe("Any", stage = compile)   // immediate Any (used during compilation)
   lazy val MInt = tpe("Int")
   lazy val CInt = tpe("Int", stage = now)
   lazy val IInt = tpe("Int", stage = compile)   // immediate integer (used as constant during compilation)
@@ -472,7 +479,7 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
 
   /**
    * Figment op types
-   * TODO: Do we need a figment op type?
+   * TODO: Do we need a figment op type to pattern match on?
    */
   case class Figment(func: Rep[String]) extends OpType
   def forge_figment(func: Rep[String]) = Figment(func)

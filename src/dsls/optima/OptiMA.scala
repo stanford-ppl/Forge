@@ -5,11 +5,10 @@ package optima
 import core.{ForgeApplication,ForgeApplicationRunner}
 
 object OptiMADSLRunner extends ForgeApplicationRunner with OptiMADSL
-
-trait OptiMADSL extends ForgeApplication with MultiArrayOps {
+trait OptiMADSL extends ForgeApplication with MultiArrayOps with IndexingOps {
 
   def dslName = "OptiMA"
-  override val clearVisitors = true
+  override def clearTraversals = true
 
   def specification() = {
     // our selection of Scala ops
@@ -21,6 +20,7 @@ trait OptiMADSL extends ForgeApplication with MultiArrayOps {
     //importStrings()
     //importMath()
     //importTuples()
+    importIndexingOps()
     noInfixList :::= List("toInt", "toFloat", "toDouble", "toLong")
 
     /*
@@ -34,11 +34,23 @@ trait OptiMADSL extends ForgeApplication with MultiArrayOps {
     val Array2D = figmentTpe("Array2D", T) isA ArrayND
     val Array3D = figmentTpe("Array3D", T) isA ArrayND
 
-
-
-
-
     importMultiArrayOps()
+
+    val RankAnalyzer = analyzer("Rank")
+    val RankChecker  = analyzer("RankCheck")
+    //val ArrayWrapper = transformer("ArrayWrapper", isExtern=true)
+    //val LayoutAnalyzer = analyzer("LayoutAnalyzer")
+    val ArrayLowering = transformer("ArrayLowering")
+
+    schedule(RankAnalyzer)
+    schedule(RankChecker)
+    //schedule(ArrayWrapper)
+    //schedule(LayoutAnalyzer)
+    schedule(ArrayLowering)
+    schedule(MultiloopSoA)
+
+    // Experimental metadata (move later)
+    val RankMetadata = meta("Rank")
 
     // rewrites
     //extern(grp("Rewrite"), targets = Nil)

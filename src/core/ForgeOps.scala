@@ -7,7 +7,7 @@ import scala.virtualization.lms.common._
 import scala.virtualization.lms.internal._
 import scala.collection.mutable.{ArrayBuffer,HashMap}
 
-trait ForgeOps extends Base {
+trait ForgeOps extends Base with ForgeTraversalOps {
   this: Forge =>
 
   def infix_withBound(a: Rep[TypePar], b: TypeClassSignature) = forge_withbound(a,b)
@@ -154,7 +154,7 @@ trait ForgeSugarLowPriority extends ForgeOps {
   implicit def defaultArg5ToList(t: ((String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String),(String,Rep[DSLType],String))): List[Rep[DSLArg]] = List(namedTpeWithDefaultToArg(t._1),namedTpeWithDefaultToArg(t._2),namedTpeWithDefaultToArg(t._3),namedTpeWithDefaultToArg(t._4),namedTpeWithDefaultToArg(t._5))
 }
 
-trait ForgeSugar extends ForgeSugarLowPriority {
+trait ForgeSugar extends ForgeSugarLowPriority with ForgeTraversalSugar {
   this: Forge =>
 
   /**
@@ -238,7 +238,7 @@ trait ForgeSugar extends ForgeSugarLowPriority {
   }
 }
 
-trait ForgeOpsExp extends ForgeSugar with BaseExp {
+trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
   this: ForgeExp  =>
 
   /*
@@ -256,7 +256,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   val Externs = ArrayBuffer[Extern]()
   val Labels = HashMap[Exp[DSLOp],String]()
 
-  // Experimental for MultiArray
+  // Experimental additions for lowering and metadata
   val FigmentTpes = ArrayBuffer[Exp[DSLType]]()
   val TpeParents = HashMap[Exp[DSLType], Exp[DSLType]]()
 

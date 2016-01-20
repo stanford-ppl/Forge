@@ -15,31 +15,8 @@ trait MultiArrayOps { this: OptiMADSL =>
     val Array2D = lookupTpe("Array2D")
     val Array3D = lookupTpe("Array3D")
 
-    // --- Index math
-    // TODO: Delete and import all primitives later
-    val Prim = grp("Primitive")
-    val not = infix (Prim) ("unary_!", Nil, MBoolean :: MBoolean)
-    val int_plus = direct (Prim) ("forge_int_plus", Nil, (MInt,MInt) :: MInt)
-    val int_minus = direct (Prim) ("forge_int_minus", Nil, (MInt,MInt) :: MInt)
-    val int_times = direct (Prim) ("forge_int_times", Nil, (MInt,MInt) :: MInt)
-    val int_divide = direct (Prim) ("forge_int_divide", Nil, (MInt,MInt) :: MInt)
-    for (g <- List($cala, cuda, cpp)) {
-      impl (not) (codegen(g, "!" + quotedArg(0) ))
-      impl (int_plus) (codegen(g, ${$0 + $1}))
-      impl (int_minus) (codegen(g, ${$0 - $1}))
-      impl (int_times) (codegen(g, ${$0 * $1}))
-      impl (int_divide) (codegen(g, ${$0 / $1}))
-    }
-    infix (Prim) ("+", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_plus($0, $1) }
-    infix (Prim) ("-", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_minus($0, $1) }
-    infix (Prim) ("*", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_times($0, $1) }
-    infix (Prim) ("/", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_divide($0, $1) }
-
-    lift (Prim) (MBoolean)
-    lift (Prim) (MInt)
-
     // --- Utils
-    // TODO: Should probably be in a different file
+    // TODO: Move to a different file
     val Utils = grp("Utils")
     //compiler (Utils) ("list_zeros", T, IInt :: IList(MInt)) implements composite ${ List.fill($0)(unit(0)) }
     compiler (Utils) ("reductionTree", T, (IList(T), ((T,T) ==> T)) :: IList(T)) implements composite ${

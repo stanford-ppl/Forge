@@ -8,7 +8,8 @@ import core._
 import shared.BaseGenPackages
 import Utilities._
 
-trait DeliteGenPackages extends BaseGenPackages {
+// Included traversal gen here for emitting static traversal schedule
+trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
   this: ForgeCodeGenDelite =>
 
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
@@ -40,7 +41,7 @@ trait DeliteGenPackages extends BaseGenPackages {
       stream.print(" with " + e.opsGrp.grp.name + "CompilerOps")
     }
     stream.println(" {")
-    stream.println("  this: " + dsl + "Application with " + dsl + "Exp => ")
+    stream.println("  this: " + dsl + "Application with " + dsl + "OpsExp => ")
     stream.println()
     stream.println("}")
     stream.println()
@@ -65,16 +66,23 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("}")
     stream.println()
 
-    // exp
-    stream.println("trait " + dsl + "Exp extends " + dsl + "Compiler with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
+    // OpsExp
+    stream.println("trait " + dsl + "OpsExp extends " + dsl + "Compiler with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
     for (opsGrp <- opsGrps) {
       stream.print(" with " + opsGrp.name + "Exp")
     }
     for (e <- Externs) {
       stream.print(" with " + e.opsGrp.name + "Exp")
     }
-    stream.println(" with DeliteAllOverridesExp with MultiloopSoATransformExp {")
-    stream.println(" this: DeliteApplication with " + dsl + "Application => ")
+    stream.println()
+    stream.println(" with DeliteAllOverridesExp with " + dsl + "MetadataOps {")
+    stream.println("  this: DeliteApplication with " + dsl + "Application => ")
+    stream.println("}")
+    stream.println()
+
+    // exp
+    stream.println("trait " + dsl + "Exp extends " + dsl + "OpsExp with " + dsl + "Transform {") //with MultiloopSoATransformExp
+    stream.println(" self: DeliteApplication with " + dsl + "Application => ")
     stream.println()
     emitBlockComment("disambiguations for Delite internal operations", stream, indent=2)
 
@@ -126,6 +134,20 @@ trait DeliteGenPackages extends BaseGenPackages {
       for ((tpe,parent) <- TpeParents) {
         stream.println("  def m_" + tpe.name + "_to_" + parent.name + makeTpeParsWithBounds(tpe.tpePars) + "(__arg0: Rep[" + tpe.name + makeTpePars(tpe.tpePars) + "]): Rep[" + parent.name + makeTpePars(parent.tpePars) + "] = __arg0.asInstanceOf[Rep[" + parent.name + makeTpePars(parent.tpePars) + "]]")
       }
+    }
+
+    stream.println()
+    emitBlockComment("traversals", stream, indent=2)
+    Traversals.zipWithIndex.foreach{ case (t,idx) =>
+      stream.println("  private val __trv" + idx + " = new " + makeTraversalName(t) + " { override val IR: self.type = self }")
+    }
+    stream.println()
+    emitBlockComment("traversal schedule", stream, indent=2)
+    if (IR.clearTraversals) stream.println("  clearTraversals()")
+    TraversalSchedule.foreach{t =>
+      val idx = Traversals.indexOf(t)
+      if (idx == -1) err("traversal " + t.name + " was scheduled but not declared (how did you do that?)")
+      stream.println("  appendTraversal(__trv" + idx + ")")
     }
 
     stream.println()

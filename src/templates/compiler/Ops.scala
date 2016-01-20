@@ -227,7 +227,7 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println()
 
     stream.println("trait " + opsGrp.name + "Exp extends " + baseOpsCls(opsGrp) + " with " + baseExpCls(opsGrp) + " {")
-    stream.println("  this: " + dsl + "Exp => ")
+    stream.println("  this: " + dsl + "OpsExp => ")
     stream.println()
 
     val uniqueOps = unique(opsGrp.ops)
@@ -686,7 +686,6 @@ trait DeliteGenOps extends BaseGenOps {
         case Def(Arg(name, tpe, _)) => tpe.stage match {
           case `compile` if tpe.name.startsWith("List") =>
             val tP = tpe.tpeArgs.head
-            println("Found List[" + tP.name + "]" )
             if (tP.name.startsWith("Rep") || tP.name.startsWith("Exp") || tP.stage != compile) List(opArgPrefix+idx+".map{x => f(x)}")
             else List(opArgPrefix+idx)
           case `compile` if !tpe.name.startsWith("Rep") && !tpe.name.startsWith("Exp") => List(opArgPrefix+idx)
@@ -885,7 +884,7 @@ trait DeliteGenOps extends BaseGenOps {
       emitBlockComment("Delite struct", stream, indent=2)
       var structStream = ""
       var first = true
-      for (tpe <- classes if DataStructs.contains(tpe)) {
+      for (tpe <- classes if DataStructs.contains(tpe) && !FigmentTpes.contains(tpe)) {
         val d = DataStructs(tpe)
         val fields = d.fields.zipWithIndex.map { case ((fieldName,fieldType),i) => ("\""+fieldName+"\"", if (isTpePar(fieldType)) "m.typeArguments("+i+")" else wrapManifest(fieldType)) }
         val erasureCls = tpe.name + (if (!tpe.tpePars.isEmpty) "[" + tpe.tpePars.map(t => "_").mkString(",") + "]" else "")
@@ -939,11 +938,59 @@ trait DeliteGenOps extends BaseGenOps {
     }
   }
 
+  // TODO: This may not work on more complicated ops with bound or function arguments
+  def emitOpRewrites(opsGrp: DSLOps, stream: PrintWriter) {
+    emitBlockComment("Op rewrites", stream)
+    stream.println("trait " + opsGrp.name + "RewriteExp extends " + opsGrp.name + "Exp {")
+    stream.println("  this: " + dsl + "OpsExp => ")
+    stream.println()
+    val rewrites = unique(opsGrp.ops).flatMap(o => Rewrites.get(o).map(rule => o -> rule))
+    rewrites foreach { case (o, rules) =>
+      stream.println("  override " + makeOpMethodSignature(o) + " = {")
+      stream.println("    " + makeArgs(o.args) + " match {")
+
+      def emitCase(pattern: List[String], rule: Rep[String]) {
+        stream.print("      case " + pattern.mkString("(",",",")") + " => ")
+        val lines = inline(o, rule, quoteLiteral).split(nl)
+        if (lines.length > 1) {
+          stream.println()
+          lines.foreach { line => emitWithIndent(line, stream, 8)}
+        }
+        else
+          stream.println(lines.head)
+      }
+      // Emit all pattern cases (in order) first
+      for (r <- rules.flatMap{case r: PatternRule => Some(r) case _ => None}) {
+        emitCase(r.pattern, r.rule)
+        if (r.commutative) {
+          if (r.pattern.length == 2) emitCase(r.pattern.reverse, r.rule)
+          else warn("TODO: Ignoring commutative rewrite rule with more than two arguments")
+        }
+      }
+
+      stream.print("      case _ => ")
+      rules.find(r => r.isInstanceOf[SimpleRule]) match {
+        case Some(SimpleRule(rule)) =>
+          val lines = inline(o, rule, quoteLiteral).split(nl)
+          if (lines.length > 1) {
+            stream.println()
+            lines.foreach { line => emitWithIndent(line, stream, 8)}
+          }
+          else
+            stream.println(lines.head)
+        case _ =>
+          stream.println("super." + makeOpMethodName(o) + makeArgs(o.args))
+      }
+      stream.println("    }")
+      stream.println("  }")
+    }
+    stream.println("}")
+  }
+
   def emitOpCodegen(opsGrp: DSLOps, stream: PrintWriter) {
     val rules = unique(opsGrp.ops).map(o => (o,Impls(o))).filter(_._2.isInstanceOf[CodeGen])
     if (rules.length > 0){
       emitBlockComment("Code generators", stream)
-      stream.println()
       val save = activeGenerator
       for (g <- generators) {
         activeGenerator = g

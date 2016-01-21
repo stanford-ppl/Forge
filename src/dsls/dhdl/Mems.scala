@@ -66,11 +66,35 @@ trait MemsElements {
 			infix ("toString") (Nil :: MString) implements composite ${ offchip_to_string[T]( $self.name,
 				$self.data )
 			}
+			/* load from offchip mem to bram. (BRAM, startIdx, endIdx)*/
+			infix ("ld") ((BRAM, MInt, MInt) :: MUnit, effect = write(0)) implements composite ${
+				offchip_load( $self.data, $1.data, $2, $3 )
+			}
+			/* store from bram to offchip. (BRAM, startIdx, endIdx)*/
+		 	infix ("st") ((BRAM, MInt, MInt) :: MUnit, effect = write(0)) implements composite ${
+				offchip_store( $self.data, $1.data, $2, $3 )
+			}
 		}
 
-		direct (Mems) ("offchip_to_string", T, (MString, MArray(T))::MString) implements
-		codegen ($cala, ${"name: " + $0 + "\\n data:\\n" + array_mkstring($1, ",")})
+		compiler (Mems) ("offchip_load", T, (MArray(T), MArray(T), MInt, MInt) :: MUnit, 
+			effect = write(0)) implements codegen ($cala, ${
+			val offData = $0
+			val bramData = $1
+			val startIdx = $2
+			val endIdx = $3
+			(startIdx until endIdx).foreach {i => bramData(i-startIdx) = offData(i)}
+		})
+		compiler (Mems) ("offchip_store", T, (MArray(T), MArray(T), MInt, MInt) :: MUnit,
+			effect = write(0)) implements codegen ($cala, ${
+			val offData = $0
+			val bramData = $1
+			val startIdx = $2
+			val endIdx = $3
+			(startIdx until endIdx).foreach {i => offData(i) = bramData(i-startIdx)}
+		})
 
+		compiler (Mems) ("offchip_to_string", T, (MString, MArray(T))::MString) implements
+		codegen ($cala, ${"name: " + $0 + "\\n data:\\n" + array_mkstring($1, ",")})
 	}
 }
 

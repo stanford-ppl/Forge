@@ -56,10 +56,14 @@ trait FeatureOps {
       }
 
       // convert this feature value into an indicator or dummy variable encoding
+      // note that if the desired string is not one of the allowed values of the discrete feature,
+      // we indicate element 0 (thus possibly overcounting element 0). therefore, element 0 in the
+      // discrete feature should be used as "unknown" if unexpected values are possible, and is
+      // unreliable otherwise if an unexpected value is encountered.
       infix ("indicator") (MString :: DenseVector(MDouble)) implements composite ${
         val featureMap = getFeatures($self)
         val numKeys = fhashmap_size(featureMap)
-        val e = if (featureMap.contains($1)) featureMap($1).toDouble else 0.0
+        val e = if (featureMap.contains($1)) featureMap($1) else 0
         (0::numKeys) { i => if (i == e) 1.0 else 0.0 }
       }
 

@@ -56,12 +56,35 @@ trait Unique2 extends ForgeTestModule with OptiMLApplication {
   }
 }
 
+object IndicatorRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Indicator
+object IndicatorRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Indicator
+trait Indicator extends ForgeTestModule with OptiMLApplication {
+  def main() = {
+    def my_feature = DiscreteFeature("0","1","2","3","4","5","6","7","8","9")
+
+    val totals1 = sum(0,1000) { i =>
+      if (i % 2 == 0) {
+        my_feature.indicator("3")
+      }
+      else {
+        my_feature.indicator("9")
+      }
+    }
+
+    collect(totals1(3) == 500)
+    collect(totals1(9) == 500)
+    collect(totals1.sum == 1000)
+    mkReport
+  }
+}
+
 class FeatureSuiteInterpreter extends ForgeSuiteInterpreter {
   def testDateTimeOps() { runTest(DateTimeRunnerI) }
   def testUniqueOps() {
     runTest(UniqueRunnerI)
     runTest(Unique2RunnerI)
   }
+  def testIndicatorOps() { runTest(IndicatorRunnerI) }
 }
 class FeatureSuiteCompiler extends ForgeSuiteCompiler {
   def testDateTimeOps() { runTest(DateTimeRunnerC) }
@@ -69,4 +92,5 @@ class FeatureSuiteCompiler extends ForgeSuiteCompiler {
     runTest(UniqueRunnerC)
     runTest(Unique2RunnerC)
   }
+  def testIndicatorOps() { runTest(IndicatorRunnerC) }
 }

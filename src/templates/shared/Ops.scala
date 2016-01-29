@@ -497,8 +497,11 @@ trait BaseGenOps extends ForgeCodeGenBase {
     // else {
       // default infix mode (slightly easier to understand what's happening, also fails to apply less than implicits)
       // blacklist or curried args or function args (in the latter two cases, infix doesn't always resolve correctly)
-      !mustInfixList.contains(o.name) && (noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o))
     // }
+
+    //TODO macrovirt: !mustInfixList.contains(o.name) && (noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o)) //old version wich has more infix_stuff
+    !macroInfix.contains(o.name) && (o.curriedArgs.length > 0 || hasFuncArgs(o)) //old version wich has more infix_stuff
+    //!macroInfix.contains(o.name) || !(o.args.size > 0)
   }
 
   def emitOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
@@ -553,11 +556,24 @@ trait BaseGenOps extends ForgeCodeGenBase {
     // infix ops
     val allInfixOps = opsGrp.ops.filter(e=>e.style==infixMethod)
 
-    val (pimpOps, infixOps) = allInfixOps.partition(noInfix)
+    //macro virtualized fix => output all methods as part of the implicit class and not as a "infix_" methods
+    val (pimpOps, infixOps) = allInfixOps.partition(noInfix) //macrovirt: virtualize a lot more!
+
     if (pimpOps.nonEmpty) {
       // set up a pimp-my-library style promotion
-      val ops = pimpOps.filterNot(o => getHkTpe(o.args.apply(0).tpe).name == "Var" ||
-                                       (o.args.apply(0).tpe.stage == now && pimpOps.exists(o2 => o.args.apply(0).tpe.name == o2.args.apply(0).tpe.name && o2.args.apply(0).tpe.stage == future)))
+      //Get all the infix methods as pimp methods as well!
+      val ops = pimpOps.filterNot(o =>
+        getHkTpe(o.args.apply(0).tpe).name == "Var" ||
+        (o.args.apply(0).tpe.stage == now && pimpOps.exists(o2 => o.args.apply(0).tpe.name == o2.args.apply(0).tpe.name && o2.args.apply(0).tpe.stage == future)))
+      println("ops:")
+      for (x <- ops)
+        x match { case Def(o:Op) => println(o)}
+      if (pimpOps.forall(!ops.contains(_))) {
+        println("ops and pimpOps are different:")
+        println("pimpOps:")
+        for (x <- pimpOps)
+          println(x.name)
+      }
       val tpes = ops.map(_.args.apply(0).tpe).distinct
       for (tpe <- tpes) {
         val tpePars = tpe match {
@@ -578,7 +594,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
         }
         else {
           stream.println("  implicit def repTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ")(implicit __pos: SourceContext) = new " + opsClsName + "(x)(" + implicitParams + ")")
-          if (pimpOps.exists(o => quote(o.args.apply(0).tpe) == quote(tpe) && o.args.apply(0).tpe.stage == now)) {
+          ists(o => quote(o.args.apply(0).tpe) == quote(tpe) && o.args.apply(0).tpe.stage == now)) {
             stream.println("  implicit def liftTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + quote(tpe) + ")(implicit __pos: SourceContext) = new " + opsClsName + "(unit(x))(" + implicitParams + ")")
           }
           // we provide the Var conversion even if no lhs var is declared, since it is essentially a chained implicit with readVar

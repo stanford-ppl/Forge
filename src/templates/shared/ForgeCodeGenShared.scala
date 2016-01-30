@@ -61,7 +61,7 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
         emitLifts(grp, Lifts(grp), stream)
         stream.println()
       }
-      emitOpSyntax(ops, stream)
+      emitSharedOpSyntax(ops, stream)
       stream.close()
     }
 

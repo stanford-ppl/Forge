@@ -39,11 +39,11 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
   }
 
   def emitDSLImplementation() = {
+    println("[Forge] Emitting compiler backend")
     Directory(Path(dslDir)).createDirectory()
     emitDSLDefinition()
     // emitDataStructures()
     emitOps()
-    emitMetadata()
     emitTraversals()
   }
 
@@ -100,24 +100,6 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     }
   }
 
-  // TODO: Need a separate file for each metadata class? Better way to do this?
-  def emitMetadata() {
-    val traversalDir = dslDir + File.separator + "transform"
-    Directory(Path(traversalDir)).createDirectory()
-
-    for (meta <- Metadatas) {
-      val stream = new PrintWriter(new FileWriter(traversalDir+File.separator+meta.name+"MetadataOps.scala"))
-      stream.println("package " + packageName + ".transform")
-      stream.println()
-      emitScalaReflectImports(stream)
-      emitLMSImports(stream)
-      emitDSLImports(stream)
-      stream.println()
-      emitMetadataDefs(meta, stream)
-      stream.close()
-    }
-  }
-
   def emitTraversals() {
     val traversalDir = dslDir + File.separator + "transform"
     Directory(Path(traversalDir)).createDirectory()
@@ -142,17 +124,14 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     emitLMSImports(stream)
     emitDelitePackageImports(stream)
     stream.println()
-    stream.print("trait " + dsl + "MetadataOps extends MetadataOps")
-    Metadatas.foreach{m => stream.print(" with " + m.name + "MetadataOps")}
-    stream.println("{")
-    stream.println("  this: " + dsl + "OpsExp =>")
-    stream.println("}")
-    stream.println()
-    stream.print("trait " + dsl + "Transform extends DeliteTransform")
+
+    emitMetadataClasses(stream)
+
+    stream.print("trait " + dsl + "Transform extends DeliteTransform with " + dsl + "MetadataOps")
     Traversals.foreach{t => stream.print(" with " + makeTraversalIRName(t))}
     // TODO: Mix in all other analyzer/transformer traits here
-    stream.println("{")
-    stream.println("  this: DeliteApplication with " + dsl + "Application =>")
+    stream.println(" {")
+    stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication =>")
     stream.println("}")
     stream.close()
   }

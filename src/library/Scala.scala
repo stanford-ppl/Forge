@@ -48,6 +48,8 @@ trait ScalaOps extends PrimitiveMathGen {
       impl (or) (codegen(g, quotedArg(0) + " || " + quotedArg(1)))
       impl (and) (codegen(g, quotedArg(0) + " && " + quotedArg(1)))
     }
+    // Forward boolean negation to Delite internal implementation
+    rewrite (not) using forwarding ${ delite_boolean_negate($0) }
 
     infix (Prim) ("unary_-", Nil, MInt :: MInt) implements redirect ${ unit(-1)*$0 }
     infix (Prim) ("unary_-", Nil, MLong :: MLong) implements redirect ${ unit(-1L)*$0 }
@@ -88,6 +90,11 @@ trait ScalaOps extends PrimitiveMathGen {
     val int_minus = direct (Prim) ("forge_int_minus", Nil, (MInt,MInt) :: MInt)
     val int_times = direct (Prim) ("forge_int_times", Nil, (MInt,MInt) :: MInt)
     val int_divide = direct (Prim) ("forge_int_divide", Nil, (MInt,MInt) :: MInt)
+    // Forward integer operations used for index calc to Delite internal implementations
+    rewrite (int_plus) using forwarding ${ delite_int_plus($0, $1) }
+    rewrite (int_minus) using forwarding ${ delite_int_minus($0, $1) }
+    rewrite (int_times) using forwarding ${ delite_int_times($0, $1) }
+
     val int_shift_left = direct (Prim) ("forge_int_shift_left", Nil, (MInt,MInt) :: MInt)
     val int_shift_right_unsigned = direct (Prim) ("forge_int_shift_right_unsigned", Nil, (MInt,MInt) :: MInt)
     impl (int_shift_right_unsigned) (codegen($cala, ${ $0 >>> $1 }))
@@ -157,6 +164,22 @@ trait ScalaOps extends PrimitiveMathGen {
       impl (long_mod) (codegen(g, ${$0 % $1}))
       impl (long_bitwise_not) (codegen(g, ${~$0}))
     }
+
+    // Rewrite Ops (mostly constant propagation)
+    val zero = "Const(0 | 0.0 | 0.0f | -0.0 | -0.0f)"
+    rewrite (float_plus,double_plus,long_plus) using pattern((${Const(x)}, ${Const(y)}) -> ${unit(x + y)} )
+    rewrite (float_plus,double_plus,long_plus) using commutative((zero, ${x}) -> ${x} )
+    rewrite (float_minus,double_minus,long_minus) using pattern((${Const(x)}, ${Const(y)}) -> ${unit(x - y)} )
+    rewrite (float_minus,double_minus,long_minus) using pattern((${x}, zero) -> ${x})
+    rewrite (float_times,double_times,long_times) using pattern((${Const(x)}, ${Const(y)}) -> ${unit(x * y)} )
+    //rewrite (float_times) using commutative((zero, ${x}) -> ${unit(0f)} ) -- Not completely correct (Inf * 0 = NaN)
+    rewrite (float_divide,double_divide,long_divide) using pattern((${Const(x)}, ${Const(y)}) -> ${unit(x / y)} )
+    //rewrite (float_divide) using pattern((zero, ${x}) -> ${unit(0f)} ) -- Also not always correct (e.g. 0 / 0 != NaN)
+
+    rewrite (toInt) using pattern(${Const(x)} -> ${unit(x.toInt)} )
+    rewrite (toFloat) using pattern(${Const(x)} -> ${unit(x.toFloat)} )
+    rewrite (toDouble) using pattern(${Const(x)} -> ${unit(x.toDouble)} )
+    rewrite (toLong) using pattern(${Const(x)} -> ${unit(implicitly[Numeric[T]].toLong(x))} )
 
     infix (Prim) ("<<",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_left($0,$1) }
     infix (Prim) (">>",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_right($0,$1) }
@@ -233,6 +256,11 @@ trait ScalaOps extends PrimitiveMathGen {
     direct (Misc) ("getMaxHeapSize", Nil, Nil :: MLong) implements codegen($cala, ${
       Runtime.getRuntime.maxMemory()
     })
+
+    // Forward Misc methods to Delite internal implementations
+    rewrite (whileDo) using forwarding ${ delite_while($0, $1) }
+    rewrite (immutable) using forwarding ${ delite_unsafe_immutable($0) }
+    rewrite (ifThenElse) using forwarding ${ delite_ifThenElse($0, $1, $2, false, true) }
   }
 
   def importCasts() = {
@@ -338,6 +366,9 @@ trait ScalaOps extends PrimitiveMathGen {
       impl (gt) (codegen(g, quotedArg(0) + " > " + quotedArg(1)))
       impl (gte) (codegen(g, quotedArg(0) + " >= " + quotedArg(1)))
     }
+
+    rewrite (eq) using forwarding ${ delite_equals($0, $1) }
+    rewrite (neq) using forwarding ${ delite_notequals($0, $1) }
   }
 
   def importStrings() = {

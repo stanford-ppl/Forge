@@ -10,39 +10,59 @@ import scala.collection.mutable.{ArrayBuffer,HashMap}
 trait ForgeTraversalOps extends Base {
   this: Forge =>
 
+  // --- API
+
   def transformer(name: String, isExtern: Boolean = false) = forge_transformer(name,isExtern)
   def analyzer(name: String, isExtern: Boolean = false) = forge_analyzer(name,isExtern)
   def schedule(traversal: Rep[DSLTraversal]) = forge_schedule(traversal)
 
-  def meta(name: String) = forge_metadata(name)
-  def lookupMeta(name: String) = forge_lookup_metadata(name)
-
-  def forge_transformer(name: String, isExtern: Boolean): Rep[DSLTransformer]
-  def forge_analyzer(name: String, isExtern: Boolean): Rep[DSLAnalyzer]
-  def forge_schedule(traversal: Rep[DSLTraversal]): Rep[Unit]
-  def forge_metadata(name: String): Rep[DSLMetadata]
-  def forge_lookup_metadata(name: String): Rep[DSLMetadata]
-  def forge_metadata_fields(meta: Rep[DSLMetadata], fields: Seq[(String, Rep[DSLType])]): Rep[Unit]
-
-  def rewrite(op: Rep[DSLOp]) = forge_rewrite(op)
+  def rewrite(op: Rep[DSLOp]*) = forge_rewrite(op)
   def lower(xf: Rep[DSLTransformer])(op: Rep[DSLOp]) = forge_lower(xf, op)
 
-  object rule {
-    def apply(rule: Rep[String]) = forge_rule(rule)
-  }
   object pattern {
     def apply(rule: (List[String], String)) = forge_pattern(rule._1, unit(rule._2), false)
   }
   object commutative {
     def apply(rule: (List[String], String)) = forge_pattern(rule._1, unit(rule._2), true)
   }
+  object rule {
+    def apply(rule: Rep[String]) = forge_rule(rule)
+  }
+  object forwarding {
+    def apply(rule: Rep[String]) = forge_forwarding(rule)
+  }
 
-  def forge_rewrite(op: Rep[DSLOp]): Rep[DSLPattern]
+  // TODO: Should users be allowed to specify type parameters for metadata?
+  // TODO: Should metadata even have type parameters?
+  def metadata(name: String): Rep[DSLMetadata] = forge_metadata(name, Nil)
+  // Alternate shorter form with fields inlined
+  def metadata(name: String, field1: (String, Rep[DSLType]), fields: (String, Rep[DSLType])*): Rep[DSLMetadata] = {
+    val m = metadata(name)
+    data(m, (field1 +: fields):_*)
+    m
+  }
+  def lookupMeta(name: String) = forge_lookup_metadata(name)
+
+  def meet(meta: Rep[DSLMetadata], alias: MetaMeet = any)(rule: Rep[String]) = forge_meet(meta,alias,rule)
+
+
+
+  // --- Forge stubs
+  def forge_transformer(name: String, isExtern: Boolean): Rep[DSLTransformer]
+  def forge_analyzer(name: String, isExtern: Boolean): Rep[DSLAnalyzer]
+  def forge_schedule(traversal: Rep[DSLTraversal]): Rep[Unit]
+  def forge_metadata(name: String, tpePars: List[Rep[TypePar]]): Rep[DSLMetadata]
+  def forge_lookup_metadata(name: String): Rep[DSLMetadata]
+
+  def forge_rewrite(op: Seq[Rep[DSLOp]]): Rep[DSLPattern]
   def forge_lower(t: Rep[DSLTransformer], op: Rep[DSLOp]): Rep[DSLPattern]
   def forge_rule(rule: Rep[String]): DSLRule
+  def forge_forwarding(rule: Rep[String]): DSLRule
   def forge_pattern(pattern: List[String], rule: Rep[String], commutative: Boolean): DSLRule
 
   def forge_using(pattern: Rep[DSLPattern], rule: DSLRule)(implicit ctx: SourceContext): Rep[Unit]
+
+  def forge_meet(grp: Rep[DSLGroup], func: MetaMeet, rule: Rep[String]): Rep[Unit]
 }
 
 trait ForgeTraversalSugarLowPriority extends ForgeTraversalOps {
@@ -74,6 +94,7 @@ trait ForgeTraversalSugar extends ForgeTraversalSugarLowPriority with ForgeTrave
    */
   var _xFormScope: Option[Rep[DSLTransformer]] = None
   var _analysisScope: Option[Rep[DSLAnalyzer]] = None
+  var _metadataScope: Option[Rep[DSLMetadata]] = None
 
   implicit class TransformOpsCls(xf: Rep[DSLTransformer]) {
     def apply[R](block: => R) {
@@ -92,7 +113,6 @@ trait ForgeTraversalSugar extends ForgeTraversalSugarLowPriority with ForgeTrave
     }
   }
 
-
   // --- Transformer scope sugar
   // TODO: Add other transformer methods here
   trait TransformScope {
@@ -105,7 +125,8 @@ trait ForgeTraversalSugar extends ForgeTraversalSugarLowPriority with ForgeTrave
 
   // --- Analysis scope sugar
   trait AnalysisScope {
-
+    //def infix_propagates(op: Rep[DSLOp], rule: Rep[String]) = forge_propagates(_analysisScope.get, op, rule)
+    //def infix_updates(op: Rep[DSLOp], idx: Int, rule: Rep[String]) = forge_updates(_analysisScope.get, op, idx, rule)
   }
   trait AnalysisScopeRunner[R] extends AnalysisScope {
     def apply: R
@@ -123,8 +144,7 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
   val Transformers = HashMap[Exp[DSLTransformer], TraversalRules]()
   val Analyzers = HashMap[Exp[DSLAnalyzer], AnalysisRules]()
   val TraversalSchedule = ArrayBuffer[Exp[DSLTraversal]]()
-  val Metadatas = ArrayBuffer[Exp[DSLMetadata]]()
-  val MetaStructs = HashMap[Exp[DSLMetadata], Exp[DSLMetaFields]]()
+  val MetaImpls = HashMap[Exp[DSLMetadata], MetaOps]()
 
   val Rewrites = HashMap[Exp[DSLOp], List[DSLRule]]()
 
@@ -132,9 +152,15 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
    * Traversal op patterns
    */
   case class RewritePattern(op: Rep[DSLOp]) extends Def[DSLPattern]
+  case class RewriteSetPattern(op: List[Rep[DSLOp]]) extends Def[DSLPattern]
   case class LowerPattern(xf: Rep[DSLTransformer], op: Rep[DSLOp]) extends Def[DSLPattern]
 
-  def forge_rewrite(op: Rep[DSLOp]): Rep[DSLPattern] = RewritePattern(op)
+  def forge_rewrite(ops: Seq[Rep[DSLOp]]): Rep[DSLPattern] = {
+    if (ops.length == 1)
+      RewritePattern(ops.head)
+    else
+      RewriteSetPattern(ops.toList)
+  }
   def forge_lower(xf: Rep[DSLTransformer], op: Rep[DSLOp]): Rep[DSLPattern] = LowerPattern(xf, op)
 
 
@@ -145,8 +171,12 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
   case class PropagationRule(rule: Rep[String]) extends AnalysisRule
   case class UpdateRule(index: Int, rule: Rep[String]) extends AnalysisRule
 
-  def forge_propagates(rule: Rep[String]) = PropagationRule(rule)
-  def forge_updates(index: Int, rule: Rep[String]) = UpdateRule(index, rule)
+  /*def forge_analysis_propagates(az: Rep[DSLAnalyzer], op: Rep[DSLOp], rule: Rep[String]) = {
+    Analyzers
+  }
+  def forge_analysis_updates(az: Rep[DSLAnalyzer], op: Rep[Int], index: Int, rule: Rep[String]) = {
+
+  }*/
 
   case class AnalysisRules(patterns: HashMap[Rep[DSLOp],List[AnalysisRule]])
   object AnalysisRules {
@@ -158,8 +188,11 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
    */
   case class SimpleRule(rule: Rep[String]) extends DSLRule
   case class PatternRule(pattern: List[String], rule: Rep[String], commutative: Boolean) extends DSLRule
+  case class ForwardingRule(rule: Rep[String]) extends DSLRule
+
 
   def forge_rule(rule: Rep[String]) = SimpleRule(rule)
+  def forge_forwarding(rule: Rep[String]) = ForwardingRule(rule)
   def forge_pattern(pattern: List[String], rule: Rep[String], commutative: Boolean)
     = PatternRule(pattern, rule, commutative)
 
@@ -175,15 +208,25 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
   def forge_using(pattern: Rep[DSLPattern], rule: DSLRule)(implicit ctx: SourceContext): Rep[Unit] = {
 
     // Check that the user doesn't give two simple rules for one op pattern
-    def append_rule(oldRules: List[DSLRule]) = rule match {
-      case rule: PatternRule => oldRules :+ rule
-      case rule: SimpleRule =>
-        // TODO: Better stringify method for patterns
-        if (oldRules.exists(_.isInstanceOf[SimpleRule])) err("Pattern " + pattern + " already has a simple rule")
-        else oldRules :+ rule
+    // TODO: Better stringify method for patterns for warnings/errors
+    def append_rule(oldRules: List[DSLRule]) = {
+      if (oldRules.exists(_.isInstanceOf[ForwardingRule])) {
+        warn("Cannot define rewrite rule on pattern " + pattern + " - pattern already has a forwarding rule")
+        oldRules
+      }
+      else rule match {
+        case rule: ForwardingRule =>
+          warn("Pattern " + pattern + " has a forwarding rule and other rewrite rules defined on it")
+          List(rule)
+        case rule: PatternRule => oldRules :+ rule
+        case rule: SimpleRule =>
+          if (oldRules.exists(_.isInstanceOf[SimpleRule])) err("Pattern " + pattern + " already has a simple rule")
+          else oldRules :+ rule
+      }
     }
 
     pattern match {
+      case Def(RewriteSetPattern(ops)) => ops.foreach(op => forge_using(forge_rewrite(op), rule))
       case Def(RewritePattern(op)) if !Rewrites.contains(op) => Rewrites(op) = List(rule) // Create
       case Def(RewritePattern(op)) => Rewrites(op) = append_rule(Rewrites(op))
       case Def(LowerPattern(xf, op)) =>
@@ -222,25 +265,52 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
     ()
   }
 
-  case class MetaDef(name: String) extends Def[DSLMetadata]
-  def forge_metadata(name: String) = {
-    val md: Exp[DSLMetadata] = MetaDef(name)
-    if (!Metadatas.exists(_.name == md.name)) Metadatas += md
+  case class Meta(name: String, tpePars: List[Rep[TypePar]]) extends Def[DSLMetadata]
+  def forge_metadata(name: String, tpePars: List[Rep[TypePar]]) = {
+    val md: Exp[DSLMetadata] = Meta(name,tpePars)
+    if (!Tpes.exists(_.name == md.name)) Tpes += md
     md
   }
+  // TODO: Needed?
   def forge_lookup_metadata(name: String): Rep[DSLMetadata] = {
-    val md = Metadatas.find(t => t.name == name)
+    val md = Tpes.find(t => t.name == name && isMetaType(t))
     if (md.isEmpty)
-      err("No metadata found with name " + name)
-    md.get
+      err("No metadata type found with name " + name)
+    md.get.asInstanceOf[Rep[DSLMetadata]]
   }
 
-  case class MetaFields(fields: Seq[(String, Rep[DSLType])]) extends Def[DSLMetaFields]
+  case class MetaOps(
+    val meet: HashMap[MetaMeet,Rep[String]],
+    val canMeet: HashMap[MetaMeet,Rep[String]],
+    var matches: Option[Rep[String]],
+    var complete: Option[Rep[String]]
+  )
+  object MetaOps {
+    def empty = MetaOps(HashMap[MetaMeet,Rep[String]](), HashMap[MetaMeet,Rep[String]](), None, None)
+  }
+
+  def forge_meet(grp: Rep[DSLGroup], func: MetaMeet, rule: Rep[String]): Rep[Unit] = {
+    if (!isMetaType(grp))
+      err("Meet operations can only be defined on metadata types")
+
+    val m = grp.asInstanceOf[Rep[DSLMetadata]]
+
+    if (!MetaImpls.contains(m))
+      MetaImpls(m) = MetaOps.empty
+
+    if (MetaImpls(m).meet.contains(func))
+      warn("Overwriting meet rule on metadata type " + m.name + " for meet function " + func)
+
+    MetaImpls(m).meet += func -> rule
+    ()
+  }
+
+  /*case class MetaFields(fields: Seq[(String, Rep[DSLType])]) extends Def[DSLMetaFields]
   def forge_metadata_fields(meta: Rep[DSLMetadata], fields: Seq[(String, Rep[DSLType])]) = {
     val data = MetaFields(fields)
     if (MetaStructs.contains(meta)) err("Data fields already defined for metadata " + meta.name)
     else MetaStructs(meta) = data
     ()
-  }
+  }*/
 
 }

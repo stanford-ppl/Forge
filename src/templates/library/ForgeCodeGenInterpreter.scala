@@ -17,12 +17,19 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
 
   lazy val targetName = "library"
 
+  /**
+   * Emit the entire library backend
+   */
   def emitDSLImplementation() {
+    println("[Forge] Emitting library backend")
     Directory(Path(dslDir)).createDirectory()
     emitDSLDefinition()
     emitClasses()
   }
 
+  /**
+   * Emit header files which mix in all library ops and which the user can extend
+   */
   def emitDSLDefinition() {
     val dslStream = new PrintWriter(new FileWriter(dslDir+dsl+".scala"))
     dslStream.println("package " + packageName)
@@ -36,6 +43,10 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     dslStream.close()
   }
 
+  /**
+   * Emit the library version of all data structures in the DSL.
+   * DSLClasses extends [Grp]Wrapper with [Grp]WrapperImpl with [TpeClassGrp]Ops
+   */
   def emitClasses() {
     val clsDir = dslDir + File.separator + "classes"
     Directory(Path(clsDir)).createDirectory()
@@ -70,6 +81,8 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
         stream.println()
         stream.println("trait " + wrapper + " {")
         // stream.println("trait " + wrapper + " extends " + grp.name + "Ops with " + dsl + "Base {")
+        // Note that Wrapper must not have a view of lifts, as this causes ambiguous implicit calls
+        // for the library class implementations (specifically the var fields)
         stream.println( "  this: " + dsl + "Base with " + dsl + "Classes => ")
         stream.println()
         emitClass(opsGrp, stream)
@@ -94,14 +107,14 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
         }
       }
     }
-    for (d <- DataStructs.keys.toSeq diff OpsGrp.values.flatMap(_.ops).map(_.grp).filter(grpIsTpe).map(grpAsTpe).toSeq) {
+    for (d <- DataStructs.keys.toSeq diff OpsGrp.values.flatMap(_.ops).map(_.grp).filter(grpIsTpe).map(grpAsTpe).toSeq if !isMetaType(d)) {
       warn("(library) ignoring data definition for " + d.name + " since it cannot be instantiated in app code (it has no accompanying ops)")
     }
     for (e <- Externs) {
       grpStream.print(" with " + e.opsGrp.grp.name + "Wrapper")
     }
     grpStream.println("{")
-    grpStream.println("  this: " + dsl + "Lib with " + dsl + "Application => ")
+    grpStream.println("  this: " + dsl + "Library => ")
     grpStream.println("}")
     grpStream.println()
     grpStream.close()

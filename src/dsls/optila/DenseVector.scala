@@ -55,7 +55,7 @@ trait DenseVectorOps {
     direct (DenseVector) ("densevector_fromfunc", T, (MInt, MBoolean, MInt ==> T) :: DenseVector(T)) implements composite ${
       IndexVector(0,$0,$1) map { i => $2(i) }
     }
-    compiler (DenseVector) ("densevector_alloc_raw", T, (MInt, MBoolean, MArray(T)) :: DenseVector(T)) implements allocates(DenseVector, ${$0}, ${$1}, ${$2})
+    internal (DenseVector) ("densevector_alloc_raw", T, (MInt, MBoolean, MArray(T)) :: DenseVector(T)) implements allocates(DenseVector, ${$0}, ${$1}, ${$2})
     static (DenseVector) ("zeros", Nil, MInt :: DenseVector(MDouble)) implements composite ${ (0::$0) { i => 0.0 } }
     static (DenseVector) ("zerosf", Nil, MInt :: DenseVector(MFloat)) implements composite ${ (0::$0) { i => 0f } }
     static (DenseVector) ("ones", Nil, MInt :: DenseVector(MDouble)) implements composite ${ (0::$0) { i => 1.0 } }
@@ -86,7 +86,7 @@ trait DenseVectorOps {
     // only composite ops can return non-lifted tuples (or anything else). using CTuple2 should work, but there is a problem with iFThenElse that I don't fully understand yet.
     // val Tuple2 = CTuple2
     val Tuple2 = lookupTpe("Tup2")
-    compiler (DenseVector) ("densevector_precumulate", T, ((("v",DenseVector(T)), ("identity",T), ("func",(T,T) ==> T)) :: Tuple2(T,DenseVector(T)))) implements composite ${
+    internal (DenseVector) ("densevector_precumulate", T, ((("v",DenseVector(T)), ("identity",T), ("func",(T,T) ==> T)) :: Tuple2(T,DenseVector(T)))) implements composite ${
       if ($v.length == 0) {
         pack(($identity,DenseVector[T](0,$v.isRow).unsafeImmutable))
       }
@@ -104,7 +104,7 @@ trait DenseVectorOps {
     // a non-type-safe way of passing the metadata required to allocate a DenseVector in a parallel op
     // ideally we would encode this is as a type class, but it's not clear we would get an instance of this type class in dc_alloc
     val CR = tpePar("CR")
-    compiler (DenseVector) ("densevector_dc_alloc", (R,CR), (CR,MInt) :: DenseVector(R)) implements composite ${
+    internal (DenseVector) ("densevector_dc_alloc", (R,CR), (CR,MInt) :: DenseVector(R)) implements composite ${
       val simpleName = manifest[CR].erasure.getSimpleName
       val isRow = simpleName match {
         case s if s.startsWith("IndexVector") => indexvector_isrow($0.asInstanceOf[Rep[IndexVector]])
@@ -114,7 +114,7 @@ trait DenseVectorOps {
       DenseVector[R]($1, isRow)
     }
 
-    compiler (DenseVector) ("densevector_sortindex_helper", T, (MInt,MInt,MArray(T)) :: SArray(MInt), TOrdering(T)) implements codegen($cala, ${
+    internal (DenseVector) ("densevector_sortindex_helper", T, (MInt,MInt,MArray(T)) :: SArray(MInt), TOrdering(T)) implements codegen($cala, ${
       // this is a hack for int64 mode, where ints get remapped to longs. By adding / subtracting $1,
       // the return type of promoteInt64 should be Long when int64 is on, and Int otherwise.
       // (Note if $1 is a constant, this trick doesn't work. More often though, $0 is a constant.)
@@ -125,7 +125,7 @@ trait DenseVectorOps {
     val K = tpePar("K")
     val V = tpePar("V")
 
-    compiler (DenseVector) ("densevector_groupby_helper", (T,K,V), (DenseVector(T), T ==> K, T ==> V) :: MHashMap(K, MArrayBuffer(V))) implements groupBy((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)})
+    internal (DenseVector) ("densevector_groupby_helper", (T,K,V), (DenseVector(T), T ==> K, T ==> V) :: MHashMap(K, MArrayBuffer(V))) implements groupBy((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)})
 
     infix (DenseVector) ("toVector", (T,R), MHashMap(T,R) :: DenseVector(R)) implements composite ${
       densevector_fromarray(fhashmap_values($0), true)
@@ -173,10 +173,10 @@ trait DenseVectorOps {
       /**
        * Data operations
        */
-      compiler ("densevector_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
-      compiler ("densevector_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements setter(0, "_data", ${$1})
-      compiler ("densevector_set_length") (MInt :: MUnit, effect = write(0)) implements setter(0, "_length", ${$1})
-      compiler ("densevector_set_isrow") (MBoolean :: MUnit, effect = write(0)) implements setter(0, "_isRow", ${$1})
+      internal ("densevector_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
+      internal ("densevector_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements setter(0, "_data", ${$1})
+      internal ("densevector_set_length") (MInt :: MUnit, effect = write(0)) implements setter(0, "_length", ${$1})
+      internal ("densevector_set_isrow") (MBoolean :: MUnit, effect = write(0)) implements setter(0, "_isRow", ${$1})
 
       infix ("update") ((("i",MInt),("e",T)) :: MUnit, effect = write(0)) implements composite ${
         array_update(densevector_raw_data($self), $i, $e)
@@ -256,19 +256,19 @@ trait DenseVectorOps {
         densevector_set_raw_data($self, (array_empty[T](0)).unsafeImmutable)
       }
 
-      compiler ("densevector_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
+      internal ("densevector_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
         densevector_ensureextra($self,$len)
         val data = densevector_raw_data($self)
         array_copy(data,$pos,data,$pos+$len,$self.length-$pos)
         densevector_set_length($self,$self.length+$len)
       }
-      compiler ("densevector_ensureextra") (("extra",MInt) :: MUnit, effect = write(0)) implements single ${
+      internal ("densevector_ensureextra") (("extra",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = densevector_raw_data($self)
         if (array_length(data) - $self.length < $extra) {
           densevector_realloc($self, $self.length+$extra)
         }
       }
-      compiler ("densevector_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
+      internal ("densevector_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = densevector_raw_data($self)
         var n = max(4, array_length(data)*2)
         while (n < $minLen) n = n*2
@@ -384,11 +384,11 @@ trait DenseVectorOps {
       /**
        * Required for parallel collection
        */
-      compiler ("densevector_appendable") ((MInt,T) :: MBoolean) implements composite("true")
-      compiler ("densevector_append") ((MInt,T) :: MUnit, effect = write(0)) implements composite ${
+      internal ("densevector_appendable") ((MInt,T) :: MBoolean) implements composite("true")
+      internal ("densevector_append") ((MInt,T) :: MUnit, effect = write(0)) implements composite ${
         $self.insert($self.length, $2)
       }
-      compiler ("densevector_copy") ((MInt,DenseVector(T),MInt,MInt) :: MUnit, effect = write(2)) implements composite ${
+      internal ("densevector_copy") ((MInt,DenseVector(T),MInt,MInt) :: MUnit, effect = write(2)) implements composite ${
         val src = densevector_raw_data($self)
         val dest = densevector_raw_data($2)
         array_copy(src, $1, dest, $3, $4)
@@ -398,8 +398,8 @@ trait DenseVectorOps {
     }
 
     // the generic Vector.scala reduce requires an Arithmetic type class, so we handle some convenient other cases here
-    compiler (DenseVector) ("reduce_and", Nil, DenseVector(MBoolean) :: MBoolean) implements reduce(MBoolean, 0, ${unit(true)}, ${ (a,b) => a && b })
-    compiler (DenseVector) ("reduce_or", Nil, DenseVector(MBoolean) :: MBoolean) implements reduce(MBoolean, 0, ${unit(false)}, ${ (a,b) => a || b })
+    internal (DenseVector) ("reduce_and", Nil, DenseVector(MBoolean) :: MBoolean) implements reduce(MBoolean, 0, ${unit(true)}, ${ (a,b) => a && b })
+    internal (DenseVector) ("reduce_or", Nil, DenseVector(MBoolean) :: MBoolean) implements reduce(MBoolean, 0, ${unit(false)}, ${ (a,b) => a || b })
 
     // Bulk of vector operations is imported
     addVectorCommonOps(DenseVector,T)

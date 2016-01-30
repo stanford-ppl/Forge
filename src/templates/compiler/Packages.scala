@@ -16,8 +16,8 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
   import IR._
 
   def emitApplicationRunner(stream: PrintWriter) {
-    stream.println("trait " + dsl + "ApplicationCompilerTrait extends " + dsl + "Application with DeliteApplication with " + dsl+"Exp")
-    stream.println("abstract class " + dsl + "ApplicationCompiler extends " + dsl + "Application with DeliteApplication with " + dsl+"Exp")
+    stream.println("trait " + dsl + "ApplicationCompilerTrait extends " + dsl + "Application with DeliteApplication with " + dsl+"Compiler")
+    stream.println("abstract class " + dsl + "ApplicationCompiler extends " + dsl + "ApplicationCompilerTrait") //with DeliteApplication with " + dsl+"Compiler")
   }
 
   def targetName(g: CodeGenerator) = g match {
@@ -26,22 +26,22 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
   }
 
   def emitDSLPackageDefinitions(opsGrps: List[DSLOps], stream: PrintWriter) {
-    emitBlockComment("dsl compiler definition", stream)
+    emitBlockComment("DSL compiler definition", stream)
 
     // compiler
-    stream.println("trait " + dsl + "Compiler extends " + dsl)
+    stream.println("trait " + dsl + "CompilerOps extends " + dsl)
     for (opsGrp <- opsGrps) {
       // stream.print(" with " + opsGrp.name)
       if (opsGrp.ops.exists(o => Impls(o).isInstanceOf[SingleTask] || Impls(o).isInstanceOf[Composite]))
         stream.print(" with " + opsGrp.name + "Impl")
-      if (opsGrp.ops.exists(_.style == compilerMethod))
-        stream.print(" with " + opsGrp.grp.name + "CompilerOps")
+      if (opsGrp.ops.exists(_.backend == internalBackend))
+        stream.print(" with " + opsGrp.grp.name + "InternalOps")
     }
     for (e <- Externs) {
-      stream.print(" with " + e.opsGrp.grp.name + "CompilerOps")
+      stream.print(" with " + e.opsGrp.grp.name + "CompilerOps") // Legacy naming for InternalOps
     }
     stream.println(" {")
-    stream.println("  this: " + dsl + "Application with " + dsl + "OpsExp => ")
+    stream.println("  this: " + dsl + "Compiler with " + dsl + "Application => ")
     stream.println()
     stream.println("}")
     stream.println()
@@ -50,7 +50,7 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     // NOTE: this currently only works in Delite mode. Is there a way to use scopes and still
     // delegate to a different implementation for interpreter mode?
     stream.println("trait " + dsl + "Interactive extends " + dsl + "Application with DeliteInteractive")
-    stream.println("trait " + dsl + "InteractiveRunner[R] extends " + dsl + "ApplicationCompilerTrait with DeliteInteractiveRunner[R]")
+    stream.println("trait " + dsl + "InteractiveRunner[R] extends DeliteApplication with " + dsl + "ApplicationCompilerTrait with DeliteInteractiveRunner[R]")
     stream.println()
     stream.println("// executes scope immediately")
     stream.println("object " + dsl + " {")
@@ -67,70 +67,89 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     stream.println()
 
     // OpsExp
-    stream.println("trait " + dsl + "OpsExp extends " + dsl + "Compiler with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
+    stream.println("trait " + dsl + "OpsExp extends " + dsl + "CompilerOps with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
     for (opsGrp <- opsGrps) {
-      stream.print(" with " + opsGrp.name + "Exp")
+      // Group has an op with a set of rewrite rules that doesn't contain a Forwarding rule
+      val hasRewrites = unique(opsGrp.ops).exists(o => Rewrites.get(o).map(rules => rules.nonEmpty && !rules.exists(_.isInstanceOf[ForwardingRule])).getOrElse(false))
+      val opExpName = if (hasRewrites) opsGrp.grp.name + "RewriteOpsExp" else opsGrp.name + "Exp"
+      stream.print(" with " + opExpName)
     }
     for (e <- Externs) {
       stream.print(" with " + e.opsGrp.name + "Exp")
     }
     stream.println()
-    stream.println(" with DeliteAllOverridesExp with " + dsl + "MetadataOps {")
-    stream.println("  this: DeliteApplication with " + dsl + "Application => ")
+    stream.println(" with DeliteAllOverridesExp {")
+    stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication => ")
+    stream.println()
+
+    // These are the primitive Delite methods that Delite requires be forwarded, since they may be used in analyses or optimizations.
+    // Note that this means the Forge-generated IR nodes for these methods will never get constructed, and rewrite rules should not
+    // be written for them, as they will have no effect.
+    emitBlockComment("Disambiguations for Delite internal operations", stream, indent=2)
+    for ((o,rules) <- Rewrites if rules.exists(_.isInstanceOf[ForwardingRule])) {
+      val forwarder = rules.find(_.isInstanceOf[ForwardingRule]).get.asInstanceOf[ForwardingRule]
+      val lines = inline(o, forwarder.rule, quoteLiteral).split(nl)
+      // TODO: Should have better way of determining which version to override
+      val signature = o.name match {
+        case "__ifThenElse" | "__whileDo" => makeSyntaxSignature(o)
+        case _ => makeOpMethodSignature(o)
+      }
+      stream.print("  override " + signature + " = ")
+      if (lines.length > 1) {
+        stream.println("{")
+        lines.foreach{line => emitWithIndent(line, stream, 4) }
+        stream.println("  }")
+      }
+      else stream.println(lines.head)
+    }
     stream.println("}")
     stream.println()
 
     // exp
-    stream.println("trait " + dsl + "Exp extends " + dsl + "OpsExp with " + dsl + "Transform {") //with MultiloopSoATransformExp
-    stream.println(" self: DeliteApplication with " + dsl + "Application => ")
+    stream.println("trait " + dsl + "Compiler extends " + dsl + "OpsExp with " + dsl + "Transform {") //with MultiloopSoATransformExp
+    stream.println(" self: " + dsl + "Application with DeliteApplication => ")
     stream.println()
-    emitBlockComment("disambiguations for Delite internal operations", stream, indent=2)
 
-    // These are the primitive Delite methods that Delite requires be forwarded, since they may be used in analyses or optimizations.
-    // Note that this means the Forge-generated IR nodes for these methods will never get constructed, and rewrite rules should not
-    // be written for them, as they will have no effect. Any way to check this?
-
-    if (OpsGrp.keySet.exists(_.name == "Primitive")) {
+    /*if (OpsGrp.keySet.exists(_.name == "Primitive")) {
       stream.println("  override def primitive_forge_int_plus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_plus(__arg0, __arg1)")
       stream.println("  override def primitive_forge_int_minus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_minus(__arg0, __arg1)")
       stream.println("  override def primitive_forge_int_times(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_times(__arg0, __arg1)")
       stream.println("  override def primitive_unary_bang(__arg0: Rep[Boolean])(implicit __pos: SourceContext): Rep[Boolean] = delite_boolean_negate(__arg0)")
-    }
+    }*/
 
-    if (OpsGrp.keySet.exists(_.name == "Misc")) {
+    /*if (OpsGrp.keySet.exists(_.name == "Misc")) {
       stream.println("  override def misc_unsafeimmutable[A:Manifest](lhs: Rep[A])(implicit pos: SourceContext): Rep[A] = delite_unsafe_immutable(lhs)")
       stream.println("  override def __whileDo(cond: => Exp[Boolean], body: => Rep[Unit])(implicit pos: SourceContext) = delite_while(cond, body)")
       // delite and lms if-then-else don't use by-name-parameter for cond
       stream.println("  override def __ifThenElse[T:Manifest](cond: Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")
       stream.println("  override def __ifThenElse[T:Manifest](cond: => Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")
-    }
+    }*/
 
-    if (OpsGrp.keySet.exists(_.name == "Ordering")) {
+    /*if (OpsGrp.keySet.exists(_.name == "Ordering")) {
       stream.println("  override def forge_equals[A:Manifest,B:Manifest](__arg0: Rep[A],__arg1: Rep[B])(implicit __pos: SourceContext) = delite_equals(__arg0,__arg1)")
       stream.println("  override def forge_notequals[A:Manifest,B:Manifest](__arg0: Rep[A],__arg1: Rep[B])(implicit __pos: SourceContext) = delite_notequals(__arg0,__arg1)")
-    }
+    }*/
+    val StructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && !FigmentTpes.contains(t) && !isMetaType(t))
+    val FigmentStructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && FigmentTpes.contains(t) && isMetaType(t))
 
     stream.println()
-    emitBlockComment("dsl types", stream, indent=2)
-    for (tpe <- Tpes if (!isForgePrimitiveType(tpe) && DataStructs.contains(tpe) && !FigmentTpes.contains(tpe))) {
+    emitBlockComment("DSL types", stream, indent=2)
+    for (tpe <- StructTpes) {
       stream.print("  abstract class " + quote(tpe))
-      if (ForgeCollections.contains(tpe)) stream.println(" extends DeliteCollection[" + quote(ForgeCollections(tpe).tpeArg) + "]") else stream.println()
+      stream.println(ForgeCollections.get(tpe).map(c => " extends DeliteCollection[" + quote(c.tpeArg) + "]").getOrElse(""))
     }
-    for (tpe <- Tpes if (!isForgePrimitiveType(tpe)) && DataStructs.contains(tpe) && FigmentTpes.contains(tpe)) {
-      stream.println("  trait " + quote(tpe) + TpeParents.get(tpe).map(p => " extends " + quote(p)).getOrElse(""))
+    for (tpe <- FigmentStructTpes) {
+      stream.println("  abstract class " + quote(tpe) + TpeParents.get(tpe).map(p => " extends " + quote(p)).getOrElse(""))
     }
     stream.println()
     emitBlockComment("implicit manifests", stream, indent=2)
-    for (tpe <- Tpes if (!isForgePrimitiveType(tpe)) && DataStructs.contains(tpe) && !FigmentTpes.contains(tpe)) {
-      stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")
-    }
-    for (tpe <- Tpes if (!isForgePrimitiveType(tpe)) && DataStructs.contains(tpe) && FigmentTpes.contains(tpe)) {
+    for (tpe <- StructTpes ++ FigmentStructTpes) {
       stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")
     }
 
     if (TpeParents.size > 0) {
       stream.println()
-      emitBlockComment("abstract type inheritance", stream, indent=2)
+      emitBlockComment("Figment type inheritance", stream, indent=2)
       for ((tpe,parent) <- TpeParents) {
         stream.println("  def m_" + tpe.name + "_to_" + parent.name + makeTpeParsWithBounds(tpe.tpePars) + "(__arg0: Rep[" + tpe.name + makeTpePars(tpe.tpePars) + "]): Rep[" + parent.name + makeTpePars(parent.tpePars) + "] = __arg0.asInstanceOf[Rep[" + parent.name + makeTpePars(parent.tpePars) + "]]")
       }
@@ -151,10 +170,10 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     }
 
     stream.println()
-    stream.println("  def getCodeGenPkg(t: Target{val IR: " + dsl + "Exp.this.type}): GenericFatCodegen{val IR: " + dsl + "Exp.this.type} = {")
+    stream.println("  def getCodeGenPkg(t: Target{val IR: " + dsl + "Compiler.this.type}): GenericFatCodegen{val IR: " + dsl + "Compiler.this.type} = {")
     stream.println("    t match {")
     for (g <- generators) {
-      stream.println("      case _:Target" + targetName(g) + " => new " + dsl + "Codegen" + g.name + "{val IR: " + dsl + "Exp.this.type = " + dsl + "Exp.this}")
+      stream.println("      case _:Target" + targetName(g) + " => new " + dsl + "Codegen" + g.name + "{val IR: " + dsl + "Compiler.this.type = " + dsl + "Compiler.this}")
     }
     stream.println("      case _ => throw new RuntimeException(\"" + dsl + " does not support this target\")")
     stream.println("    }")
@@ -165,7 +184,7 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
   private def emitBaseCodegen(stream: PrintWriter) {
     val packageDir = packageName.split("\\.").map(s => "\""+s+"\"").mkString("+s+")
     stream.println("trait " + dsl + "CodegenBase extends GenericFatCodegen {")
-    stream.println("  val IR: DeliteApplication with " + dsl + "Exp")
+    stream.println("  val IR: " + dsl + "Compiler with DeliteApplication")
     stream.println("  override def initialDefs = IR.deliteGenerator.availableDefs")
     stream.println()
     stream.println("  def dsmap(line: String) = line")
@@ -218,12 +237,12 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
       if (g == cpp) stream.println(" with DeliteCppHostTransfer ")
       if (g == restage && generators.contains($cala)) stream.println(" with " + dsl + "Codegen"+$cala.name + " with DeliteCodeGenRestage { ")
       else stream.println(" with " + g.name + "GenDeliteOps with Delite" + g.name + "GenAllOverrides {" )
-      stream.println("  val IR: DeliteApplication with " + dsl + "Exp")
+      stream.println("  val IR: " + dsl + "Compiler with DeliteApplication")
       // TODO: generalize, other targets can have remaps too, need to be encoded somehow
       // store dsmap and remap inside the generator itself?
       if (g == $cala) {
         stream.println()
-        emitComment("these methods translate types in the compiler to typed in the generated code", stream, indent=1)
+        emitComment("These methods translate types in the compiler to typed in the generated code", stream, indent=1)
         stream.println("  override def dsmap(line: String): String = {")
         stream.println("    var res = line.replaceAll(\"" + packageName + ".datastruct.scala\", this.packageName)")
         stream.println("    res")

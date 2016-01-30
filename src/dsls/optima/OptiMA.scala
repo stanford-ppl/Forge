@@ -5,7 +5,7 @@ package optima
 import core.{ForgeApplication,ForgeApplicationRunner}
 
 object OptiMADSLRunner extends ForgeApplicationRunner with OptiMADSL
-trait OptiMADSL extends ForgeApplication with MultiArrayOps with IndexingOps {
+trait OptiMADSL extends ForgeApplication with MultiArrayOps with VisibilityTestOps {
 
   def dslName = "OptiMA"
   override def clearTraversals = true
@@ -20,37 +20,40 @@ trait OptiMADSL extends ForgeApplication with MultiArrayOps with IndexingOps {
     //importStrings()
     //importMath()
     //importTuples()
-    importIndexingOps()
-    noInfixList :::= List("toInt", "toFloat", "toDouble", "toLong")
+    //importIndexingOps()
+    //noInfixList :::= List("toInt", "toFloat", "toDouble", "toLong")
+
+    importVisibilityTest()
+    importVisibilityTest2()
 
     /*
     importHashMap()
     importConcurrentHashMap()*/
 
     // MultiArray figment types (with subtyping)
-    val T = tpePar("T")
+    /*val T = tpePar("T")
     val ArrayND = figmentTpe("ArrayND", T)
     val Array1D = figmentTpe("Array1D", T) isA ArrayND
     val Array2D = figmentTpe("Array2D", T) isA ArrayND
-    val Array3D = figmentTpe("Array3D", T) isA ArrayND
+    val Array3D = figmentTpe("Array3D", T) isA ArrayND*/
 
-    importMultiArrayOps()
+    //importMultiArrayOps()
 
-    val RankAnalyzer = analyzer("Rank")
-    val RankChecker  = analyzer("RankCheck")
+    //val RankAnalyzer = analyzer("Rank")
+    //val RankChecker  = analyzer("RankCheck")
     //val ArrayWrapper = transformer("ArrayWrapper", isExtern=true)
     //val LayoutAnalyzer = analyzer("LayoutAnalyzer")
-    val ArrayLowering = transformer("ArrayLowering")
+    //val ArrayLowering = transformer("ArrayLowering")
 
-    schedule(RankAnalyzer)
-    schedule(RankChecker)
+    //schedule(RankAnalyzer)
+    //schedule(RankChecker)
     //schedule(ArrayWrapper)
     //schedule(LayoutAnalyzer)
-    schedule(ArrayLowering)
-    schedule(MultiloopSoA)
+    //schedule(ArrayLowering)
+    //schedule(MultiloopSoA)
 
     // Experimental metadata (move later)
-    val RankMetadata = meta("Rank")
+    //val RankMetadata = metadata("Rank")
 
     // rewrites
     //extern(grp("Rewrite"), targets = Nil)

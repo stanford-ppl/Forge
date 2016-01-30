@@ -34,18 +34,25 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     case _ => super.quote(x)
   }
 
+  /**
+   * Checks if given op requires library implementation method
+   */
   def requiresImpl(o: Rep[DSLOp]) = Impls(o) match {
     case _:CodeGen | _:Redirect => false
     case _:Getter | _:Setter => false
     case _:Allocates | _:AllocatesFigment => false
-    case _ => true
+    case _ => hasLibraryVersion(o)
   }
 
+  /**
+   * Emit implementation bodies for all ops except codegen, setter, getter, and allocates
+   * These implementations are called from Wrapper (ops not generated here are inlined)
+   */
   def emitImpls(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("SingleTask and Composite Impls", stream)
     stream.println()
     stream.println("trait " + opsGrp.grp.name + "WrapperImpl {")
-    stream.println("  this: " + dsl + "Application with " + dsl + "CompilerOps => ")
+    stream.println("  this: " + dsl + "Library => ")
     stream.println()
     val indent = 2
     for (o <- unique(opsGrp.ops) if requiresImpl(o)) {
@@ -266,8 +273,19 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     if (i != "") emitWithIndent("def " + implicitOpArgPrefix + o.implicitArgs.length + " = ()", stream, indent)
   }
 
+
+  def emitNoLibraryErr(o: Rep[DSLOp], stream: PrintWriter, indent: Int) {
+    emitWithIndent("throw new Exception(\"DSL design error: attempted to call compiler-only method " + o.name + "\")", stream, indent)
+  }
+  /**
+   * Generate calls to an op's implementation
+   * Directly inlines the method for codegen, getter, setter, and allocates
+   */
   def emitOp(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) {
-    Impls(o) match {
+    if (!hasLibraryVersion(o)) {
+      emitNoLibraryErr(o,stream,indent)
+    }
+    else Impls(o) match {
       case codegen:CodeGen =>
         val rule = codegen.decls.getOrElse($cala, err("could not find Scala codegen rule for op: " + o.name))
         inline(o, rule.decl, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent) }
@@ -285,14 +303,17 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         emitOverloadShadows(o, stream, indent)
         val initialVals = init.map(i => inline(o,i)).mkString(",")
         emitWithIndent("new " + quote(tpe) + "(" + initialVals + ")", stream, indent)
-
       case _ => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
     }
   }
 
+  /**
+   * Emit classes as the library backend implementation of structs
+   * HACK: case classes are only used for the special Forge Tups
+   */
   def emitClass(opsGrp: DSLOps, stream: PrintWriter) {
     val classes = opsGrpTpes(opsGrp)
-    for (tpe <- classes) {
+    for (tpe <- classes if !isMetaType(tpe)) {
       val d = DataStructs.get(tpe)
       d.foreach { data =>
         val classType = if (data.tpe.name.startsWith("Tup")) "case class " else "class " //sketchy, but we want our special tuples to retain value equality (like Scala tuples)
@@ -301,7 +322,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
 
         // Actually emitting the infix methods as instance methods, while a little more readable, makes the interpreter methods
         // ambiguous with the op conversions unless they already exist on every instance and must be overridden (e.g. toString)
-        for (o <- unique(opsGrp.ops) if overrideList.contains(o.name) && !Impls(o).isInstanceOf[Redirect] && o.style == infixMethod && o.args.length > 0 && quote(o.args.apply(0).tpe) == quote(tpe)) {
+        for (o <- unique(opsGrp.ops) if overrideList.contains(o.name) && !isRedirect(o) && o.style == infixMethod && o.args.length > 0 && quote(o.args.apply(0).tpe) == quote(tpe)) {
           val otherTpePars = o.tpePars.filterNot(p => data.tpe.tpePars.map(_.name).contains(p.name))
           stream.print("  "+makeDefWithOverride(o)+" " + o.name + makeTpeParsWithBounds(otherTpePars))
           //stream.print("(" + o.args/*.drop(1)*/.map(t => t.name + ": " + repify(t.tpe) + " = " + unit(t.default)).mkString(",") + ")") TODO

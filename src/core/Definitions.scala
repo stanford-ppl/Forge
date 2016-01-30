@@ -21,40 +21,53 @@ trait Definitions extends DerivativeTypes {
 
 
   /**
-   * Delite transformers
+   * Delite/LMS transformers
+   * TODO: Add Fusion here when it is schedulable
    */
   lazy val MultiloopSoA = transformer("MultiloopSoA", isExtern = true)
 
   /**
    * Built-in types
    */
-  // concrete types (M stands for "Meta", C stands for "Current").. these aren't exactly consistent
+  // concrete types
+  // M-- stands for "Meta"    (a staged symbolic expression)
+  // C-- stands for "Current" (a staged constant)
+  // S-- stands for "Scala"   (always a constant, never staged)
 
+  // TODO: These aren't exactly consistent
   // FIXME: Need to resolve discrepancy between 'compile' and 'now'. Ideally everything should have 'compile' behavior, but it breaks
   //        string lifting in Scala.scala, for example.
 
   lazy val MAny = tpe("Any")
   lazy val CAny = tpe("Any", stage = now)
-  lazy val IAny = tpe("Any", stage = compile)   // immediate Any (used during compilation)
+  lazy val SAny = tpe("Any", stage = compile)   // Scala Any (used during compilation)
   lazy val MInt = tpe("Int")
   lazy val CInt = tpe("Int", stage = now)
-  lazy val IInt = tpe("Int", stage = compile)   // immediate integer (used as constant during compilation)
+  lazy val SInt = tpe("Int", stage = compile)   // Scala integer (used as constant during compilation)
   lazy val MLong = tpe("Long")
   lazy val CLong = tpe("Long", stage = now)
+  lazy val SLong = tpe("Long", stage = compile)
   lazy val MFloat = tpe("Float")
   lazy val CFloat = tpe("Float", stage = now)
+  lazy val SFloat = tpe("Float", stage = compile)
   lazy val MDouble = tpe("Double")
   lazy val CDouble = tpe("Double", stage = now)
+  lazy val SDouble = tpe("Double", stage = compile)
   lazy val MBoolean = tpe("Boolean")
   lazy val CBoolean = tpe("Boolean", stage = now)
+  lazy val SBoolean = tpe("Boolean", stage = compile)
   lazy val MString = tpe("String")
   lazy val CString = tpe("String", stage = now)
+  lazy val SString = tpe("String", stage = compile)
   lazy val MShort = tpe("Short")
   lazy val CShort = tpe("Short", stage = now)
+  lazy val SShort = tpe("Short", stage = compile)
   lazy val MByte = tpe("Byte")
   lazy val CByte = tpe("Byte", stage = now)
+  lazy val SByte = tpe("Byte", stage = compile)
   lazy val MChar = tpe("Char")
   lazy val CChar = tpe("Char", stage = now)
+  lazy val SChar = tpe("Char", stage = compile)
   lazy val CTuple2 = tpe("Tuple2", (tpePar("A"),tpePar("B")), stage = compile)
   lazy val CTuple3 = tpe("Tuple3", (tpePar("A"),tpePar("B"),tpePar("C")), stage = compile)
   lazy val CTuple4 = tpe("Tuple4", (tpePar("A"),tpePar("B"),tpePar("C"),tpePar("D")), stage = compile)
@@ -62,6 +75,7 @@ trait Definitions extends DerivativeTypes {
   lazy val CTuple6 = tpe("Tuple6", List(tpePar("A"),tpePar("B"),tpePar("C"),tpePar("D"),tpePar("E"),tpePar("F")), stage = compile)
   lazy val MUnit = tpe("Unit")
   lazy val CUnit = tpe("Unit", stage = now)
+  lazy val SUnit = tpe("Unit", stage = compile) // Useful?
   lazy val MNothing = tpe("Nothing")
   lazy val CNothing = tpe("Nothing", stage = now)
   lazy val byName = tpe("Thunk")
@@ -81,7 +95,7 @@ trait Definitions extends DerivativeTypes {
   lazy val MHashMap = tpe("ForgeHashMap",(tpePar("K"),tpePar("V"))) // Forge HashMap (immutable)
   lazy val MInputStream = tpe("ForgeFileInputStream")
   lazy val MOutputStream = tpe("ForgeFileOutputStream")
-  lazy val IList = tpe("List", tpePar("A"), stage = compile)
+  lazy val SList = tpe("List", tpePar("A"), stage = compile)
 
   /* whitelist for primitive types (i.e. we should not generate a Forge shadow) */
   var primitiveTpePrefix = scala.List("scala","java")
@@ -154,9 +168,24 @@ trait Definitions extends DerivativeTypes {
   case object staticMethod extends MethodType
   case object infixMethod extends MethodType
   case object directMethod extends MethodType
-  case object compilerMethod extends MethodType
   case object implicitMethod extends MethodType
-  case object libraryMethod extends MethodType
+
+  /**
+   * Method backend types
+   */
+  case object sharedBackend extends BackendType
+  case object internalBackend extends BackendType
+  case object libraryBackend extends BackendType
+  case object compilerBackend extends BackendType
+
+  /**
+   * Metadata meet functions
+   * TODO: Add these as needed (not clear how complete this needs to be yet)
+   */
+  case object branch extends MetaMeet       // Aliasing from if-then-else
+  case object mutate extends MetaMeet       // Aliasing from data mutation
+  case object metaUpdate extends MetaMeet   // Metadata updates (TODO: Is this needed?)
+  case object any extends MetaMeet          // All remaining aliasing forms
 
   // blacklist for op names that cannot be expressed with infix methods
   // we also blacklist some operators for improved compilation performance or to avoid ambiguities in the REPL version

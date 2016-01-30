@@ -90,8 +90,18 @@ trait ForgePreprocessor {
       override def toString = "lookupOp("+grp+",\""+name+"\")"
     }
 
+    val opStarters = {
+      /*var list = List[String]()
+      for (back <- List("", "internal", "compiler", "library")) {
+        for (mtyp <- List("infix", "static", "direct")) {
+          list :+= back + (if (back == "") "" else ".") + mtyp
+      }}*/
+      List("internal", "compiler", "library", "infix", "static", "direct") // ++ list
+    }
+
     def scanBackToOp(start: Int, input: Array[Byte]): OpEncoding = {
-      val words = Array("static","infix","direct","compiler","impl") // enclosing op definers
+      val words = opStarters :+ "impl" // enclosing op definers
+      //println("words: " + words.mkString(", "))
       var i = start
       var foundWord = ""
       val maxWordLength = words.map(_.length).max
@@ -104,7 +114,7 @@ trait ForgePreprocessor {
       }
 
       foundWord match {
-        case "static" | "infix" | "direct" | "compiler"  =>
+        case word if opStarters.contains(word) =>
           var inTpeScope = true
           var startGrpIndex = -1
           var endGrpIndex = -1
@@ -269,8 +279,8 @@ trait ForgePreprocessor {
       val enclosingOp =
         if (args.exists(isBlockArg) || !tpeArgs.isEmpty) {
           // scan backwards until the lexically enclosing op identifier, which can be one of:
-          //   static | direct | infix | compiler (grp) (name, ....)
-          //   static | direct | infix | compiler (name) (....)
+          //   static | direct | infix | internal (grp) (name, ....)
+          //   static | direct | infix | internal (name) (....)
           //   impl (binding) (...)
           Some(scanBackToOp(i, input))
         }

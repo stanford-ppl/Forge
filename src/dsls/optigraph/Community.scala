@@ -1,12 +1,12 @@
 /*//////////////////////////////////////////////////////////////
 Author: Christopher R. Aberger
 
-Description: Stores data asscoicated with nodes in an array 
+Description: Stores data asscoicated with nodes in an array
 buffer indexed by internal node IDs
 *///////////////////////////////////////////////////////////////
 
 package ppl.dsl.forge
-package dsls 
+package dsls
 package optigraph
 
 import core.{ForgeApplication,ForgeApplicationRunner}
@@ -40,28 +40,28 @@ trait CommunityOps {
     */
 
     val CommunityOps = withTpe(Community)
-    CommunityOps{  
+    CommunityOps{
       infix("modularity")(Nil :: MDouble) implements composite ${
         val g = $self.graph
         val tot = $self.tot
         val in = $self.in
         var m2 = $self.totalWeight
-        
-        sumOverNodes(g.nodes)({ n => 
+
+        sumOverNodes(g.nodes)({ n =>
           if(tot(n.id) > 0)
             (in(n.id)/m2) - (tot(n.id)/m2)*(tot(n.id)/m2)
-          else 
+          else
             0d
         })
       }
       infix("modularity")( (("in",MArray(MDouble)),("tot",MArray(MDouble))) :: MDouble) implements composite ${
         val g = $self.graph
         var m2 = $self.totalWeight
-        
-        sumOverNodes(g.nodes)({ n => 
+
+        sumOverNodes(g.nodes)({ n =>
           if(tot(n.id) > 0)
             (in(n.id)/m2) - (tot(n.id)/m2)*(tot(n.id)/m2)
-          else 
+          else
             0d
         })
       }
@@ -97,11 +97,11 @@ trait CommunityOps {
         val newSize = fhashmap_size(groupedComms)
         val newComms = NodeData.fromFunction(newSize,i => i)
         val oldComms = NodeData(fhashmap_keys(groupedComms))
-        
+
         val old2newHash = fhashmap_from_arrays[Int,Int](oldComms.getRawArray,newComms.getRawArray)
 
         //go from n20 into n2c
-        //from n2c into old2newHash 
+        //from n2c into old2newHash
         val n2new = array_map[Int,Int]($self.n2o, {o =>
           val oldcomm = n2c(o)
           fhashmap_get(old2newHash,oldcomm)
@@ -120,7 +120,7 @@ trait CommunityOps {
           val nodeHash = SHashMap[Int,Double]()
 
           val nodesInComm = NodeData(fhashmap_get(groupedComms,oldComm))
-          nodesInComm.foreach({ n => 
+          nodesInComm.foreach({ n =>
             val (neighbors,nbrWeights) = unpack(g.getNeighborsAndWeights(Node(n)))
             var i = 0
 
@@ -140,7 +140,7 @@ trait CommunityOps {
         val numEdges = newGraph.mapreduce[Int](a => array_length(a.keys), (a,b) => a+b, a => true)
         val serial_out = $self.assignUndirectedIndicies(newSize,numEdges,newGraph.getRawArray)
 
-        pack(UndirectedGraph(newSize,oldComms.getRawArray,serial_out._1,serial_out._2,serial_out._3),n2new)    
+        pack(UndirectedGraph(newSize,oldComms.getRawArray,serial_out._1,serial_out._2,serial_out._3),n2new)
       }
 
       infix("assignUndirectedIndicies")((("numNodes",MInt),("numEdges",MInt),("src_groups",MArray(SHashMap(MInt,MDouble)))) :: Tuple3(MArray(MInt),MArray(MInt),MArray(MDouble))) implements single ${
@@ -218,9 +218,9 @@ trait CommunityOps {
               best_increase = increase
             }
           }
-          i += 1            
+          i += 1
         }
-        pack(best_comm,best_nblinks) 
+        pack(best_comm,best_nblinks)
       }
       infix("parallelArrayCopy")((("dst",MArray(T)),("src",MArray(T))) :: MUnit, effect=write(1),aliasHint = copies(2), addTpePars = T ) implements composite ${
         NodeIdView(array_length(src)).foreach({i =>
@@ -230,20 +230,20 @@ trait CommunityOps {
       infix("louvain")(Nil :: Community) implements single ${
         val g = $self.graph
         val totalWeight = $self.totalWeight
-        val size = $self.size 
+        val size = $self.size
 
-        val tot = array_empty[Double](array_length($self.tot)) 
-        val in = array_empty[Double](array_length($self.in)) 
-        val n2c = array_empty[Int](array_length($self.n2c)) 
+        val tot = array_empty[Double](array_length($self.tot))
+        val in = array_empty[Double](array_length($self.in))
+        val n2c = array_empty[Int](array_length($self.n2c))
 
         $self.parallelArrayCopy(tot,$self.tot)  //tot = $self.tot
         $self.parallelArrayCopy(in,$self.in) //in = $self.in
         $self.parallelArrayCopy(n2c,$self.n2c) //n2c = $self.n2c
 
         /*
-        val oldtot = array_empty[Double](array_length($self.tot)) 
-        val oldin = array_empty[Double](array_length($self.in)) 
-        val oldn2c = array_empty[Int](array_length($self.n2c)) 
+        val oldtot = array_empty[Double](array_length($self.tot))
+        val oldin = array_empty[Double](array_length($self.in))
+        val oldn2c = array_empty[Int](array_length($self.n2c))
         $self.parallelArrayCopy(oldn2c,$self.n2c) //oldn2c = $self.n2c
         $self.parallelArrayCopy(oldin,$self.in) //oldin = $self.in
         $self.parallelArrayCopy(oldtot,$self.tot) //oldtot = $self.tot
@@ -273,7 +273,7 @@ trait CommunityOps {
               /////////////////////////////////////////////
             }
           }//end parallel section
-          
+
           /////////////////////////////////////////
           //Copy new values over for next iteration
           /*
@@ -310,7 +310,7 @@ trait CommunityOps {
       infix ("graph") (Nil :: UndirectedGraph) implements getter(0, "_graph")
       infix ("n2c") (Nil :: MArray(MInt)) implements getter(0, "_n2c")
       infix ("in") (Nil :: MArray(MDouble)) implements getter(0, "_in")
-      infix ("tot") (Nil :: MArray(MDouble)) implements getter(0, "_tot")   
+      infix ("tot") (Nil :: MArray(MDouble)) implements getter(0, "_tot")
       infix ("n2o") (Nil :: MArray(MInt)) implements getter(0, "_n2o")
 
       infix ("tot") (MInt :: MDouble) implements composite ${array_apply($self.tot, $1)}
@@ -329,11 +329,11 @@ trait CommunityOps {
       infix ("setN2c") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_n2c", quotedArg(1))
       */
     }
-    compiler (Community) ("alloc_total_weight", Nil, UndirectedGraph :: MDouble) implements single ${$0.totalWeight}
-    compiler (Community) ("alloc_size", Nil, UndirectedGraph :: MInt) implements single ${$0.numNodes}
-    compiler (Community) ("alloc_doubles", Nil, (MInt,(MInt ==> MDouble)) :: MArray(MDouble)) implements single ${array_fromfunction[Double]($0,$1)}
-    compiler (Community) ("alloc_ints", Nil, (MInt,(MInt ==> MInt)) :: MArray(MInt)) implements single ${array_fromfunction[Int]($0,$1)}
-    compiler (Community) ("alloc_weights", Nil, UndirectedGraph :: MArray(MDouble)) implements single ${array_fromfunction[Double](alloc_size($0),{n => $0.weightedDegree(Node(n))})}
-    compiler (Community) ("alloc_selfs", Nil, UndirectedGraph :: MArray(MDouble)) implements single ${array_fromfunction[Double](alloc_size($0),{n => $0.numSelfLoops(Node(n))})}
-  } 
+    internal (Community) ("alloc_total_weight", Nil, UndirectedGraph :: MDouble) implements single ${$0.totalWeight}
+    internal (Community) ("alloc_size", Nil, UndirectedGraph :: MInt) implements single ${$0.numNodes}
+    internal (Community) ("alloc_doubles", Nil, (MInt,(MInt ==> MDouble)) :: MArray(MDouble)) implements single ${array_fromfunction[Double]($0,$1)}
+    internal (Community) ("alloc_ints", Nil, (MInt,(MInt ==> MInt)) :: MArray(MInt)) implements single ${array_fromfunction[Int]($0,$1)}
+    internal (Community) ("alloc_weights", Nil, UndirectedGraph :: MArray(MDouble)) implements single ${array_fromfunction[Double](alloc_size($0),{n => $0.weightedDegree(Node(n))})}
+    internal (Community) ("alloc_selfs", Nil, UndirectedGraph :: MArray(MDouble)) implements single ${array_fromfunction[Double](alloc_size($0),{n => $0.numSelfLoops(Node(n))})}
+  }
 }

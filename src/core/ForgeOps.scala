@@ -167,7 +167,7 @@ trait ForgeSugar extends ForgeSugarLowPriority {
   var _tpeScopeBox: Rep[DSLType] = _
 
   def withTpe(tpe: Rep[DSLType]) = {
-    _tpeScopeBox = Some(tpe)
+    _tpeScopeBox = tpe
     new ChainTpe(tpe)
   }
   class ChainTpe(tpe: Rep[DSLType]) {
@@ -224,7 +224,7 @@ trait ForgeSugar extends ForgeSugarLowPriority {
   trait TpeScopeRunner[R] extends TpeScope {
     def apply: R
     val result = apply
-    _tpeScopeBox = None // reset
+    _tpeScopeBox = null // reset
   }
 }
 

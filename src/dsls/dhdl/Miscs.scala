@@ -1,6 +1,6 @@
 package ppl.dsl.forge
 package dsls
-package dhdl 
+package dhdl
 
 trait MiscOps {
   this: DHDLDSL =>
@@ -16,5 +16,7 @@ trait MiscOps {
 
 		val assert = direct (Misc) ("assert", Nil, MBoolean :: MUnit, effect = simple)
 		impl (assert) (codegen($cala, ${assert($0)}))
+
+    direct (Misc) ("exit", Nil, MInt :: MNothing, effect = simple) implements codegen($cala, ${ sys.exit($0) })
 	}
 }

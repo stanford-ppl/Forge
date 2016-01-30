@@ -499,14 +499,17 @@ trait BaseGenOps extends ForgeCodeGenBase {
       // blacklist or curried args or function args (in the latter two cases, infix doesn't always resolve correctly)
     // }
 
-    //TODO macrovirt: !mustInfixList.contains(o.name) && (noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o)) //old version wich has more infix_stuff
-    !macroInfix.contains(o.name) && (o.curriedArgs.length > 0 || hasFuncArgs(o)) //old version wich has more infix_stuff
-    //!macroInfix.contains(o.name) || !(o.args.size > 0)
+    //TODO macrovirt:
+    //!mustInfixList.contains(o.name) && (noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o)) //old version wich has more infix_stuff
+    //ORIGINAL: !macroInfix.contains(o.name) && (o.curriedArgs.length > 0 || hasFuncArgs(o)) //old version which has more infix_stuff
+    (o.tpePars.size <= 1) && !o.grp.name.startsWith("Tup") // o.curriedArgs.length > 0 || hasFuncArgs(o) ||   //has
   }
 
   def emitOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("Operations", stream)
     stream.println()
+
+    println("")
 
     // implicits go in a base class for lower priority
     val implicitOps = opsGrp.ops.filter(e=>e.style==implicitMethod)
@@ -554,28 +557,44 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
 
     // infix ops
-    val allInfixOps = opsGrp.ops.filter(e=>e.style==infixMethod)
+    val (noArgsOps, allInfixOps) = opsGrp.ops.filter(e => e.style == infixMethod).partition(_.args.size == 0)
 
     //macro virtualized fix => output all methods as part of the implicit class and not as a "infix_" methods
     val (pimpOps, infixOps) = allInfixOps.partition(noInfix) //macrovirt: virtualize a lot more!
+    if (allInfixOps.size > 0) { //should not be that many
+      println("ClassName " + allInfixOps(0).grp.name)
+      noArgsOps.foreach(x => println("no args: " + x.name))
+    }
+    print("pimpOps:")
+    for (o <- pimpOps)
+      print(o.name+", ")
+    println("")
+    print("infixOps: ")
+    for (o <- infixOps)
+      print(o.name+", ")
+    println("")
+    println("Type Args?")
+    for (o <- infixOps)
+      o match {
+        case Def(o:Op) => println(o)
+      }
 
     if (pimpOps.nonEmpty) {
       // set up a pimp-my-library style promotion
       //Get all the infix methods as pimp methods as well!
       val ops = pimpOps.filterNot(o =>
-        getHkTpe(o.args.apply(0).tpe).name == "Var" ||
+        (getHkTpe(o.args.apply(0).tpe).name == "Var") ||
         (o.args.apply(0).tpe.stage == now && pimpOps.exists(o2 => o.args.apply(0).tpe.name == o2.args.apply(0).tpe.name && o2.args.apply(0).tpe.stage == future)))
-      println("ops:")
-      for (x <- ops)
-        x match { case Def(o:Op) => println(o)}
-      if (pimpOps.forall(!ops.contains(_))) {
-        println("ops and pimpOps are different:")
-        println("pimpOps:")
-        for (x <- pimpOps)
-          println(x.name)
-      }
+
+      if (!noArgsOps.isEmpty) {
+        println(noArgsOps.size+"operations with no arguments" )
+
+      } else
+        println("no operations with no arguments")
       val tpes = ops.map(_.args.apply(0).tpe).distinct
-      for (tpe <- tpes) {
+      tpes.foreach(x => print(x.name))
+      println("")
+      for (tpe <- tpes) { //OpsCls has to be defined for each different Type Instantiation
         val tpePars = tpe match {
           case Def(TpeInst(_,args)) => args.filter(isTpePar).asInstanceOf[List[Rep[TypePar]]]
           case Def(TpePar(_,_,_)) => List(tpe.asInstanceOf[Rep[TypePar]])
@@ -594,7 +613,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
         }
         else {
           stream.println("  implicit def repTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ")(implicit __pos: SourceContext) = new " + opsClsName + "(x)(" + implicitParams + ")")
-          ists(o => quote(o.args.apply(0).tpe) == quote(tpe) && o.args.apply(0).tpe.stage == now)) {
+          if (pimpOps.exists(o => quote(o.args.apply(0).tpe) == quote(tpe) && o.args.apply(0).tpe.stage == now)) {
             stream.println("  implicit def liftTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + quote(tpe) + ")(implicit __pos: SourceContext) = new " + opsClsName + "(unit(x))(" + implicitParams + ")")
           }
           // we provide the Var conversion even if no lhs var is declared, since it is essentially a chained implicit with readVar

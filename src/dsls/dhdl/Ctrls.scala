@@ -28,14 +28,16 @@ trait CtrlOps {
 
 		val CtrChain = tpe("CtrChain")
 		data (CtrChain, ("_chain", MArray(Ctr)))
-		static (CtrChain) ("apply", Nil, Ctr :: CtrChain, effect=mutable) implements
-		allocates(CtrChain, ${
-			{val array = array_empty[Ctr]( unit(1) );
-			array_update[Ctr](array, unit(0), $0);
-			array}
-		})
 
-		//TODO: problem here
+    compiler (CtrChain) ("ctrchain_from_array", Nil, MArray(Ctr) :: CtrChain,effect=mutable) implements allocates(CtrChain, ${$0})
+
+		static (CtrChain) ("apply", Nil, varArgs(Ctr) :: CtrChain) implements composite ${
+      val array = array_empty[Ctr](unit($0.length))
+      val ctrchain = ctrchain_from_array(array)
+      for (i <- 0 until $0.length) { ctrchain(i) = $0.apply(i) }
+      ctrchain
+    }
+
 		val CtrChainOps = withTpe(CtrChain)
 		CtrChainOps {
 			infix ("mkString") (Nil :: MString) implements composite ${
@@ -46,6 +48,7 @@ trait CtrlOps {
         ) + unit("]")
 			}
 			infix ("chain") (Nil :: MArray(Ctr)) implements getter(0, "_chain")
+      infix ("update") ((MInt,Ctr) :: MUnit, effect = write(0)) implements composite ${ array_update($0.chain, $1, $2) }
 		}
 	}
 }

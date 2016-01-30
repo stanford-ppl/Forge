@@ -160,9 +160,9 @@ trait ForgeSugar extends ForgeSugarLowPriority {
   /**
    * Uses Scala-Virtualized scopes to enable sugar for ops scoped on a particular DSLType
    */
-  var _tpeScopeBox: Rep[DSLType] = null
+  var _tpeScopeBox: Option[Rep[DSLType]] = None   // Strange error sometimes popped up with Rep[DSLType] = null
   def withTpe(tpe: Rep[DSLType]) = {
-    _tpeScopeBox = tpe
+    _tpeScopeBox = Some(tpe)
     new ChainTpe(tpe)
   }
   class ChainTpe(tpe: Rep[DSLType]) {
@@ -173,10 +173,10 @@ trait ForgeSugar extends ForgeSugarLowPriority {
     // it appears that shadowing the Forge op with the simpler version makes the general version inaccessible unless we explicitly define it
 
     def data(fields: (String, Rep[DSLType])*)
-      = forge_data(_tpeScopeBox, fields)
+      = forge_data(_tpeScopeBox.get, fields)
 
     private def tpeOpArgs(addTpePars: List[Rep[TypePar]], args: List[Rep[Any]], allArgs: List[List[Rep[Any]]]) = {
-      val t = _tpeScopeBox
+      val t = _tpeScopeBox.get
       val amendedTpePars = (t.tpePars ::: addTpePars).distinct
       val amendedArgs = namedTpeToArg("self",t) :: args.zipWithIndex.map(t => anyToArg(t._1,t._2+1)).asInstanceOf[List[Rep[DSLArg]]] // arg numbering starts at 1
       val amendedCurriedArgs = listToCurriedArgs(amendedArgs :: allArgs.drop(1))
@@ -186,40 +186,40 @@ trait ForgeSugar extends ForgeSugarLowPriority {
     // sugared version of op declarations
     // automatically imports the enclosing type as a type parameter and an instance of that type as the first argument, exported under 'self'
     def static(name: String)(signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
-      forge_warn("declaring static method inside tpe scope - argument of type " + _tpeScopeBox.name + " is added as first parameter. is this what you meant?")
+      forge_warn("declaring static method inside tpe scope - argument of type " + _tpeScopeBox.get.name + " is added as first parameter. is this what you meant?")
       val (amendedTpePars, amendedArgs, amendedCurriedArgs) = tpeOpArgs(addTpePars, signature.args, signature.allArgs)
-      forge_op(_tpeScopeBox,name,staticMethod,amendedTpePars,amendedArgs,amendedCurriedArgs,listToImplicitArgs(implicitArgs),signature.retTpe,effect,aliasHint)
+      forge_op(_tpeScopeBox.get,name,staticMethod,amendedTpePars,amendedArgs,amendedCurriedArgs,listToImplicitArgs(implicitArgs),signature.retTpe,effect,aliasHint)
     }
     def infix(name: String)(signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
       val (amendedTpePars, amendedArgs, amendedCurriedArgs) = tpeOpArgs(addTpePars, signature.args, signature.allArgs)
-      forge_op(_tpeScopeBox,name,infixMethod,amendedTpePars,amendedArgs,amendedCurriedArgs,listToImplicitArgs(implicitArgs),signature.retTpe,effect,aliasHint)
+      forge_op(_tpeScopeBox.get,name,infixMethod,amendedTpePars,amendedArgs,amendedCurriedArgs,listToImplicitArgs(implicitArgs),signature.retTpe,effect,aliasHint)
     }
     def direct(name: String)(signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
       val (amendedTpePars, amendedArgs, amendedCurriedArgs) = tpeOpArgs(addTpePars, signature.args, signature.allArgs)
-      forge_op(_tpeScopeBox,name,directMethod,amendedTpePars,amendedArgs,amendedCurriedArgs,listToImplicitArgs(implicitArgs),signature.retTpe,effect,aliasHint)
+      forge_op(_tpeScopeBox.get,name,directMethod,amendedTpePars,amendedArgs,amendedCurriedArgs,listToImplicitArgs(implicitArgs),signature.retTpe,effect,aliasHint)
     }
     def compiler(name: String)(signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
       val (amendedTpePars, amendedArgs, amendedCurriedArgs) = tpeOpArgs(addTpePars, signature.args, signature.allArgs)
-      forge_op(_tpeScopeBox,name,compilerMethod,amendedTpePars,amendedArgs,Nil,listToImplicitArgs(implicitArgs),signature.retTpe,effect,aliasHint)
+      forge_op(_tpeScopeBox.get,name,compilerMethod,amendedTpePars,amendedArgs,Nil,listToImplicitArgs(implicitArgs),signature.retTpe,effect,aliasHint)
     }
     def fimplicit(name: String)(signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) = {
       val (amendedTpePars, amendedArgs, amendedCurriedArgs) = tpeOpArgs(addTpePars, signature.args, signature.allArgs)
-      forge_op(_tpeScopeBox,name,implicitMethod,amendedTpePars,amendedArgs,Nil,listToImplicitArgs(implicitArgs),signature.retTpe,effect,aliasHint)
+      forge_op(_tpeScopeBox.get,name,implicitMethod,amendedTpePars,amendedArgs,Nil,listToImplicitArgs(implicitArgs),signature.retTpe,effect,aliasHint)
     }
 
-    val parallelize = ParallelizeKey(_tpeScopeBox)
+    val parallelize = ParallelizeKey(_tpeScopeBox.get)
 
-    def lookupOp(opName: String) = forge_lookup_op(_tpeScopeBox,opName,0)
+    def lookupOp(opName: String) = forge_lookup_op(_tpeScopeBox.get,opName,0)
     def lookupOp(grp: Rep[DSLGroup], opName: String) = forge_lookup_op(grp,opName,0)
     def lookupOp(grpName: String, opName: String) = forge_lookup_op(lookupGrp(grpName),opName,0)
-    def lookupOverloaded(opName: String, index: Int) = forge_lookup_op(_tpeScopeBox,opName,index)
+    def lookupOverloaded(opName: String, index: Int) = forge_lookup_op(_tpeScopeBox.get,opName,index)
     def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup_op(lookupGrp(grpName),opName,index)
   }
 
   trait TpeScopeRunner[R] extends TpeScope {
     def apply: R
     val result = apply
-    _tpeScopeBox = null // reset
+    _tpeScopeBox = None // reset
   }
 }
 

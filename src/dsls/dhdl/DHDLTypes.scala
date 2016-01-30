@@ -19,7 +19,7 @@ trait DHDLTypes {
 		importStrings()
 
 		//TODO: op checkFixPtPrec has return type Unit but no effects, so it is a no-op
-		compiler (TpeOps) ("checkFixPtPrec", Nil, (MInt,MInt)::MUnit) implements codegen ($cala, ${
+		compiler (TpeOps) ("checkFixPtPrec", Nil, (MInt,MInt)::MUnit, effect = simple) implements codegen ($cala, ${
 			val intPrec = $0
 			val fracPrec = $1
 			val MAX_FIXPT_PRECISION = 64

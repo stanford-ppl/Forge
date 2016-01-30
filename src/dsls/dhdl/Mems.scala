@@ -7,7 +7,7 @@ trait MemsElements {
 
 	def importMems() = {
 
-		val Mems = grp("Mems")
+		val MemOps = grp("Mems")
 
 		val T = tpePar("T")
 
@@ -67,7 +67,7 @@ trait MemsElements {
 				$self.data )
 			}
 			/* load from offchip mem to bram. (BRAM, startIdx, endIdx)*/
-			infix ("ld") ((BRAM, MInt, MInt) :: MUnit, effect = write(0)) implements composite ${
+			infix ("ld") ((BRAM, MInt, MInt) :: MUnit, effect = write(1)) implements composite ${
 				offchip_load( $self.data, $1.data, $2, $3 )
 			}
 			/* store from bram to offchip. (BRAM, startIdx, endIdx)*/
@@ -76,15 +76,15 @@ trait MemsElements {
 			}
 		}
 
-		compiler (Mems) ("offchip_load", T, (MArray(T), MArray(T), MInt, MInt) :: MUnit, 
-			effect = write(0)) implements codegen ($cala, ${
+		compiler (MemOps) ("offchip_load", T, (MArray(T), MArray(T), MInt, MInt) :: MUnit, 
+			effect = write(1)) implements codegen ($cala, ${
 			val offData = $0
 			val bramData = $1
 			val startIdx = $2
 			val endIdx = $3
 			(startIdx until endIdx).foreach {i => bramData(i-startIdx) = offData(i)}
 		})
-		compiler (Mems) ("offchip_store", T, (MArray(T), MArray(T), MInt, MInt) :: MUnit,
+		compiler (MemOps) ("offchip_store", T, (MArray(T), MArray(T), MInt, MInt) :: MUnit,
 			effect = write(0)) implements codegen ($cala, ${
 			val offData = $0
 			val bramData = $1
@@ -93,7 +93,7 @@ trait MemsElements {
 			(startIdx until endIdx).foreach {i => offData(i) = bramData(i-startIdx)}
 		})
 
-		compiler (Mems) ("offchip_to_string", T, (MString, MArray(T))::MString) implements
+		compiler (MemOps) ("offchip_to_string", T, (MString, MArray(T))::MString) implements
 		codegen ($cala, ${"name: " + $0 + "\\n data:\\n" + array_mkstring($1, ",")})
 	}
 }

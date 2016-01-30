@@ -7,7 +7,8 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 object DHDLDSLRunner extends ForgeApplicationRunner with DHDLDSL 
 
 trait DHDLDSL extends ForgeApplication 
-	with PrimOps with MiscOps with DHDLTypes with MemsElements{
+	with PrimOps with MiscOps with DHDLTypes with MemsElements
+	with CtrlOps{
 
   def dslName = "DHDL"
 	
@@ -17,6 +18,7 @@ trait DHDLDSL extends ForgeApplication
 		importDHDLTypes()
 		importDHDLPrimitives()
 		importMems()
+		importCtrls()
 		importMiscs()
 		()
 	}

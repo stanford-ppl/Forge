@@ -14,19 +14,19 @@ import ppl.tests.scalatest._
 
 /*
   Some starter tests for directed and undirected graphs.
-  Indirectly the small chunks of code  below touch a large amount of 
+  Indirectly the small chunks of code  below touch a large amount of
   the OptiGraph code base through IO and helper traits.
 */
 
-object UndirectedGraphI extends ForgeTestRunnerInterpreter with OptiGraphApplicationInterpreter with UndirectedGraphTest
-object UndirectedGraphC extends ForgeTestRunnerCompiler with OptiGraphApplicationCompiler with UndirectedGraphTest
+object UndirectedGraphI extends OptiGraphApplicationInterpreter with ForgeTestRunnerInterpreter with UndirectedGraphTest
+object UndirectedGraphC extends OptiGraphApplicationCompiler with ForgeTestRunnerCompiler with UndirectedGraphTest
 trait UndirectedGraphTest extends ForgeTestModule with OptiGraphApplication {
   def main() {
     val g = undirectedGraphFromEdgeList(createMeshEdgeList(7))
     val sum = sumOverNodes(g.nodes){n => n.id}
     val nd = g.mapNodes{n => n.id*2}
 
-    collect(g.numNodes == 7 && g.numEdges == 42 
+    collect(g.numNodes == 7 && g.numEdges == 42
       && sum == 21 && g.isDirected == false && nd(0) == 0
       && nd(1) == 2 && nd(2) == 4 && nd(3) == 6 && nd(4) == 8
       && nd(5) == 10 && nd(6) == 12 && nd.length == 7)
@@ -40,8 +40,8 @@ trait UndirectedGraphTest extends ForgeTestModule with OptiGraphApplication {
   }
 }
 
-object DirectedGraphI extends ForgeTestRunnerInterpreter with OptiGraphApplicationInterpreter with DirectedGraphTest
-object DirectedGraphC extends ForgeTestRunnerCompiler with OptiGraphApplicationCompiler with DirectedGraphTest
+object DirectedGraphI extends OptiGraphApplicationInterpreter with ForgeTestRunnerInterpreter with DirectedGraphTest
+object DirectedGraphC extends OptiGraphApplicationCompiler with ForgeTestRunnerCompiler with DirectedGraphTest
 trait DirectedGraphTest extends ForgeTestModule with OptiGraphApplication {
   def main() {
     val g = directedGraphFromEdgeList(createMeshEdgeList(7))
@@ -52,7 +52,7 @@ trait DirectedGraphTest extends ForgeTestModule with OptiGraphApplication {
     collect(g.numNodes == 7 && g.isDirected == true
       && sum == 21 && g.numEdges == 84 && nd(0) == 0
       && nd(1) == 2 && nd(2) == 4 && nd(3) == 6 && nd(4) == 8
-      && nd(5) == 10 && nd(6) == 12 && nd.length == 7) 
+      && nd(5) == 10 && nd(6) == 12 && nd.length == 7)
 
     val inNbr = g.inNeighbors(Node(6))
 

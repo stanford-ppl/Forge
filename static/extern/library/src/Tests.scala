@@ -23,7 +23,7 @@ trait ForgeTestRunnerInterpreter extends ForgeTestModule {
 }
 
 trait ForgeSuiteInterpreter extends Suite {
-  val verbose = System.getProperty("interpreter.tests.verbose", "false").toBoolean
+  val verbose = System.getProperty("tests.verbose", "false").toBoolean
 
   def runTest(app: ForgeTestRunnerInterpreter) {
     app.main()

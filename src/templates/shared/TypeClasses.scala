@@ -36,9 +36,8 @@ trait BaseGenTypeClasses extends BaseGenOps {
     emitBlockComment("Type class", stream, indent=2)
     stream.println("  trait " + quote(tpeCls) + " {")
     for (o <- opsGrp.ops) {
-      // very similar to method declaration in pimp ops in shared/Ops.scala, maybe we can consolidate
       stream.println("    def " + o.name + makeTpeParsWithBounds(o.tpePars.filterNot(p => tpeCls.tpePars.map(_.name).contains(p.name)))
-        + makeOpArgsWithType(o, addParen = o.effect != pure) + makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = tpeCls.tpePars) + ": " + repify(o.retTpe))
+        + makeOpArgsWithType(o, addParen = o.effect != pure) + makeImplicitArgsWithCtxBoundsWithType(withoutHkTpePars(o.tpePars), o.args, o.implicitArgs, without = tpeCls.tpePars) + ": " + repify(o.retTpe))
     }
     stream.println("  }")
     stream.println()
@@ -61,9 +60,9 @@ trait BaseGenTypeClasses extends BaseGenOps {
     val instances = OpsGrp filter { case (grp,ops) => isTpeClassInst(grp) && getHkTpe(asTpeClassInst(grp).tpe).name == tpeCls.name }
     for ((i, instOpsGrp) <- instances) {
       val inst = asTpeClassInst(i)
-      val instantiatedTpes = inst.tpe match { case Def(TpeInst(_, args)) => args }
       checkTpeClassInst(tpeCls, inst)
       stream.println("  implicit def can" + inst.name + makeTpeParsWithBounds(inst.tpePars) + ": " + quote(inst) + " = new " + quote(inst) + " {")
+      // val instantiatedTpes = inst.tpe match { case Def(TpeInst(_, args)) => args }
       for (o <- instOpsGrp.ops) {
         // add context bounds we might have lost in the instantiation
         // val missingTpePars = opsGrp.ops.find(_.name == o.name).get.tpePars diff o.tpePars
@@ -72,7 +71,7 @@ trait BaseGenTypeClasses extends BaseGenOps {
         val implicits = o.implicitArgs
 
         stream.println("    def " + o.name + makeTpeParsWithBounds(o.tpePars.filterNot(p => inst.tpePars.map(_.name).contains(p.name))) + makeOpArgsWithType(o, addParen = o.effect != pure)
-          + (makeImplicitArgsWithCtxBoundsWithType(implicits, o.tpePars, without = inst.tpePars)) + " = {")
+          + (makeImplicitArgsWithCtxBoundsWithType(o.tpePars, o.args, implicits, without = inst.tpePars)) + " = {")
         inline(o, Impls(o).asInstanceOf[Composite].func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, 6) }
         stream.println("    }")
       }
@@ -81,32 +80,37 @@ trait BaseGenTypeClasses extends BaseGenOps {
     }
     stream.println()
 
-    // only try to auto-generate forwarders for type classes with 1 type parameter, since in this case we know what the argument is
-    if (tpeCls.tpePars.length == 1) {
-      emitBlockComment("Forwarders - these allow infix notation to be used when the type class is available", stream, indent=2)
-      val boundedTpePars = tpeCls.tpePars.map(t => tpePar(t.name, t.ctxBounds :+ tpeCls.signature))
-      stream.println("  implicit class " + tpeCls.name + "2" + tpeCls.name + "Ops" + makeTpeParsWithBounds(boundedTpePars) + "(self: " + repify(tpeCls.tpePars.apply(0)) + ") {")
-      for (o <- opsGrp.ops) {
-        // again, quite redundant with shared/Ops.scala
-        val otherArgs = makeArgsWithNowType(o.firstArgs.drop(1))
-        stream.println("    def " + o.name + makeTpeParsWithBounds(o.tpePars.filterNot(p => tpeCls.tpePars.map(_.name).contains(p.name))) + otherArgs
-          + (makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = tpeCls.tpePars))
-          + " = " + makeOpMethodName(o) + makeTpePars(o.tpePars) + makeArgs(o.args, a => if (a.name == o.args.apply(0).name) "self" else simpleArgName(a)))
-
-        // stream.println("  def infix_" + o.name + makeTpeParsWithBounds(boundedTpePars)
-        //   + makeOpArgsWithType(o, addParen = o.effect != pure) + makeImplicitArgsWithType(o.implicitArgs)
-        //   + " = " + makeOpMethodName(o) + makeTpePars(o.tpePars) + makeOpArgs(o))
-      }
-      stream.println("  }")
-      stream.println()
-      for (o <- opsGrp.ops) {
-        val boundedTpePars = o.tpePars.map(t => if (tpeCls.tpePars.exists(_.name == t.name)) tpePar(t.name, t.ctxBounds :+ tpeCls.signature) else t)
-        "def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithOverloadWithType(o)
-        stream.println("  def " + makeOpMethodName(o) + makeTpeParsWithBounds(boundedTpePars)
-          + makeOpArgsWithType(o) + makeImplicitArgsWithType(o.implicitArgs)
-          + ": " + repify(o.retTpe) + " = implicitly["+quote(tpeCls)+"]." + o.name + makeOpArgs(o, addParen = o.effect != pure))
-      }
+    // We may want to add an option to disable this (or make not generating anything in this case the non-default behavior.)
+    if (tpeCls.tpePars.length > 1) {
+      warn("type class " + tpeCls.name + " has more than 1 type parameter; generating forwarders assuming, " +
+           "by convention, that the last parameter is the promotion type")
     }
+
+    emitBlockComment("Forwarders - these allow infix notation to be used when the type class is available", stream, indent=2)
+    // Manually construct implicit parameters to forwarder
+    val tpeClsArgs = arg("__tc", tpeCls.signature.apply(tpeCls.tpePars: _*))
+    // This is normally handled by hkInstantiations, but here we are faking the self instance using 'repify' below
+    val tpeClsPars = tpeCls.tpePars.flatMap(a => a.ctxBounds.map(b => ephemeralTpe(b.name+"["+quote(a)+"]", stage = now))).distinct
+    val tpeClsBounds = tpeClsPars.zipWithIndex.map(t => arg(implicitCtxBoundArgPrefix+t._2, t._1))
+
+    stream.println("  implicit class " + tpeCls.name + "2" + tpeCls.name + "Ops" + makeTpePars(tpeCls.tpePars)
+      + "(self: " + repify(tpeCls.tpePars.last) + ")" + makeImplicitArgsWithType(tpeCls.tpePars, arg("self",tpeCls.tpePars.last), tpeClsBounds ++ tpeClsArgs) + "{")
+    for (o <- opsGrp.ops) {
+      // again, quite redundant with shared/Ops.scala.
+      // We currently don't support tpeCls methods requiring additional type parameters than are available in the type class. (Not clear this is necessary)
+      val otherArgs = makeArgsWithNowType(o.firstArgs.drop(1))
+      stream.println("    def " + o.name + otherArgs
+        + (makeImplicitArgsWithType(withoutHkTpePars(o.tpePars), o.args, o.implicitArgs))
+        + " = " + makeOpMethodName(o) + makeTpeParsAsArgs(tpeCls.tpePars, tpeCls.tpePars) + makeArgs(o.args, a => if (a.name == o.args.apply(0).name) "self" else simpleArgName(a)))
+    }
+    stream.println("  }")
+    stream.println()
+    for (o <- opsGrp.ops) {
+      stream.println("  def " + makeOpMethodName(o) + makeTpePars(tpeCls.tpePars)
+        + makeOpArgsWithType(o) + makeImplicitArgsWithCtxBoundsWithType(tpeCls.tpePars, o.args, o.implicitArgs :+ tpeClsArgs)
+        + ": " + repify(o.retTpe) + " = __tc." + o.name + makeOpArgs(o, addParen = o.effect != pure))
+    }
+
     stream.println("}")
   }
 }

@@ -27,9 +27,10 @@ trait CommunityOps {
     val V = tpePar("V")
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
 
-    data(Community,("_size",MInt),("_precision",MDouble),("_modularity",MDouble),("_canImprove",MBoolean),("_totalWeight",MDouble),("_graph",UndirectedGraph),("_n2c",MArray(MInt)),("_tot",MArray(MDouble)),("_in",MArray(MDouble)))
-    static(Community)("apply", Nil, (("g",UndirectedGraph),("precision",MDouble)) :: Community) implements allocates(Community,${alloc_size(g)},${precision},${unit(0d)},${unit(true)},${alloc_total_weight($0)},${$0},${alloc_ints(alloc_size(g),{e => e})},${alloc_weights(g)},${alloc_selfs(g)})
-    static(Community)("apply", Nil, MethodSignature(List(("size",MInt),("precision",MDouble),("modularity",MDouble),("canImprove",MBoolean),("totalWeight",MDouble),("g",UndirectedGraph),("n2c",MArray(MInt)),("tot",MArray(MDouble)),("in",MArray(MDouble))),Community)) implements allocates(Community,${size},${precision},${modularity},${canImprove},${totalWeight},${g},${n2c},${tot},${in})
+    data(Community,("_size",MInt),("_precision",MDouble),("_modularity",MDouble),("_canImprove",MBoolean),("_totalWeight",MDouble),("_graph",UndirectedGraph),("_n2c",MArray(MInt)),("_tot",MArray(MDouble)),("_in",MArray(MDouble)),("_n2o",MArray(MInt)))
+    static(Community)("apply", Nil, (("g",UndirectedGraph),("precision",MDouble),("n2o",MArray(MInt))) :: Community) implements allocates(Community,${alloc_size(g)},${precision},${unit(0d)},${unit(true)},${alloc_total_weight($0)},${$0},${alloc_ints(alloc_size(g),{e => e})},${alloc_weights(g)},${alloc_selfs(g)},${n2o})
+    static(Community)("apply", Nil, (("g",UndirectedGraph),("precision",MDouble)) :: Community) implements composite ${ Community($g, $precision, array_fromfunction[Int]($g.numNodes,e=>e)) }
+    static(Community)("apply", Nil, MethodSignature(List(("size",MInt),("precision",MDouble),("modularity",MDouble),("canImprove",MBoolean),("totalWeight",MDouble),("g",UndirectedGraph),("n2c",MArray(MInt)),("tot",MArray(MDouble)),("in",MArray(MDouble)),("n2o",MArray(MInt))),Community)) implements allocates(Community,${size},${precision},${modularity},${canImprove},${totalWeight},${g},${n2c},${tot},${in},${n2o})
 
     /*
       n2c -> size == numNodes, indexed by nodeID gives the community a node belongs to
@@ -85,7 +86,7 @@ trait CommunityOps {
           i += 1
         }
       }
-      infix("generateNewGraph")(Nil :: UndirectedGraph) implements composite ${
+      infix("generateNewGraph")(Nil :: Tuple2(UndirectedGraph,MArray(MInt))) implements composite ${
         val g = $self.graph
         val n2c = $self.n2c
         val size = $self.size
@@ -99,6 +100,12 @@ trait CommunityOps {
         
         val old2newHash = fhashmap_from_arrays[Int,Int](oldComms.getRawArray,newComms.getRawArray)
 
+        //go from n20 into n2c
+        //from n2c into old2newHash 
+        val n2new = array_map[Int,Int]($self.n2o, {o =>
+          val oldcomm = n2c(o)
+          fhashmap_get(old2newHash,oldcomm)
+        })
         //For each edge
           //find src and dst comm (use n2c)
           //if edge between comm exists
@@ -133,7 +140,7 @@ trait CommunityOps {
         val numEdges = newGraph.mapreduce[Int](a => array_length(a.keys), (a,b) => a+b, a => true)
         val serial_out = $self.assignUndirectedIndicies(newSize,numEdges,newGraph.getRawArray)
 
-        UndirectedGraph(newSize,oldComms.getRawArray,serial_out._1,serial_out._2,serial_out._3)    
+        pack(UndirectedGraph(newSize,oldComms.getRawArray,serial_out._1,serial_out._2,serial_out._3),n2new)    
       }
 
       infix("assignUndirectedIndicies")((("numNodes",MInt),("numEdges",MInt),("src_groups",MArray(SHashMap(MInt,MDouble)))) :: Tuple3(MArray(MInt),MArray(MInt),MArray(MDouble))) implements single ${
@@ -282,7 +289,7 @@ trait CommunityOps {
         }
         val improvement = (nb_pass_done > 1) || (new_mod != cur_mod)
         println("Number of passes: " + nb_pass_done + " improvement: " + improvement)
-        Community(size,$self.precision,new_mod,improvement,totalWeight,g,n2c,tot,in)
+        Community(size,$self.precision,new_mod,improvement,totalWeight,g,n2c,tot,in,$self.n2o)
       }
 
       infix("insert")( MethodSignature(List(("n2c",MArray(MInt)),("in",MArray(MDouble)),("tot",MArray(MDouble)),("node",MInt),("old_comm",MInt),("olddnodecomm",MDouble),("comm",MInt),("dnodecomm",MDouble)),MUnit), effect = write(1,2,3)) implements single ${
@@ -304,10 +311,12 @@ trait CommunityOps {
       infix ("n2c") (Nil :: MArray(MInt)) implements getter(0, "_n2c")
       infix ("in") (Nil :: MArray(MDouble)) implements getter(0, "_in")
       infix ("tot") (Nil :: MArray(MDouble)) implements getter(0, "_tot")   
-      
+      infix ("n2o") (Nil :: MArray(MInt)) implements getter(0, "_n2o")
+
       infix ("tot") (MInt :: MDouble) implements composite ${array_apply($self.tot, $1)}
       infix ("in") (MInt :: MDouble) implements composite ${array_apply($self.in, $1)}
       infix ("n2c") (MInt :: MInt) implements composite ${array_apply($self.n2c, $1)}
+      infix ("n2o") (MInt :: MInt) implements composite ${array_apply($self.n2o, $1)}
 
       /*
       We might need these when parallelism is added in.

@@ -5,7 +5,7 @@ import optiml.shared._
 object PDIPSolverCompiler extends OptiMLApplicationCompiler with PDIPSolver
 object PDIPSolverInterpreter extends OptiMLApplicationInterpreter with PDIPSolver
 
-trait PDIPSolver extends OptiMLApplication { 
+trait PDIPSolver extends OptiMLApplication {
   def print_usage = {
     println("Usage: PDIPSolver <c> <G> <h> <A> <b> <x0> <s0> <y0> <z0>")
     exit(-1)
@@ -79,7 +79,7 @@ trait PDIPSolver extends OptiMLApplication {
 
     val dimu = m+1
     val dimv = p+n+1
-    val dimw = m+1    
+    val dimw = m+1
 
     //println("\n%16s%14s".format("duality gap", "residuals"))
     //println("%9s%8s%10s%6s".format("abs.", "rel.", "primal", "dual"))
@@ -97,12 +97,12 @@ trait PDIPSolver extends OptiMLApplication {
       val lambda = w(0)
       val s = w.slice(1, m+1)
 
-      val pcost = (c*:*x) / tau  
-      val dcost = -(h*:*z + b*:*y)/ tau  
+      val pcost = (c*:*x) / tau
+      val dcost = -(h*:*z + b*:*y)/ tau
       val absgap = (u*:*w) / (tau*tau)
       val relgap = if (dcost > 0.0) {
         absgap / dcost
-      } 
+      }
       else if (pcost < 0.0) {
         absgap / (-pcost)
       }
@@ -119,7 +119,7 @@ trait PDIPSolver extends OptiMLApplication {
       val dres = norm(resd)/nrmc
       val hpres = max(norm(hresi), norm(hrese))
       val hdres = norm(hresd)
-      
+
       //println("%02.0f:% 7.0e% 8.0e% 8.0e% 8.0e ".format(iters - 1.0, absgap, relgap, pres, dres))
 
       if ((pres <= FEASTOL)&&(dres <= FEASTOL)&&((absgap <= ABSTOL)||(relgap <= RELTOL))) {
@@ -140,10 +140,10 @@ trait PDIPSolver extends OptiMLApplication {
       }
     }
 
-    val result = untilconverged(pack(u0,v0,w0,DenseVector(0.0)), maxIter = MAXITERS) { cur =>
+    val result = untilconverged(pack(u0,v0,w0,DenseVector(0.0)), maxIter = MAXITERS) { (cur, iter) =>
       val (u, v, w, viters) = unpack(cur)
       val iters = viters(0)
-      
+
       val tau = u(0)
       val z = u.slice(1, m+1)
       val y = v.slice(0, p)
@@ -152,7 +152,7 @@ trait PDIPSolver extends OptiMLApplication {
       val lambda = w(0)
       val s = w.slice(1, m+1)
 
-      val (solx1, soly1, solz1) =  kkt_sol(s / z, G, A, c, -b, -h) 
+      val (solx1, soly1, solz1) =  kkt_sol(s / z, G, A, c, -b, -h)
       val (solx2, soly2, solz2) =  kkt_sol(s / z, G, A, -rd, re, ri)
       val Gx = solx1.toMat <<| solx2.toMat
       val Gy = soly1.toMat <<| soly2.toMat
@@ -231,12 +231,12 @@ trait PDIPSolver extends OptiMLApplication {
     val lambda = w(0)
     val s = w.slice(1, m+1)
 
-    val pcost = (c*:*x) / tau  
-    val dcost = -(h*:*z + b*:*y)/ tau  
+    val pcost = (c*:*x) / tau
+    val dcost = -(h*:*z + b*:*y)/ tau
     val absgap = (u*:*w) / (tau*tau)
     val relgap = if (dcost > 0.0) {
       absgap / dcost
-    } 
+    }
     else if (pcost < 0.0) {
       absgap / (-pcost)
     }
@@ -321,7 +321,7 @@ trait PDIPSolver extends OptiMLApplication {
 
     val det = a*d - b*c
 
-    DenseMatrix((d/det, -b/det), (-c/det, a/det))
+    DenseMatrix(DenseVector(d/det, -b/det), DenseVector(-c/det, a/det))
   }
 
   def lsqr(A: Rep[DenseMatrix[Double]], b: Rep[DenseVector[Double]]): Rep[DenseVector[Double]] = {
@@ -339,7 +339,7 @@ trait PDIPSolver extends OptiMLApplication {
       norm(A*x-b)
     }
 
-    val result = untilconverged(pack(u0,alpha0,v0,w0,x0,phihat0,rhohat0), maxIter = 100) { cur =>
+    val result = untilconverged(pack(u0,alpha0,v0,w0,x0,phihat0,rhohat0), maxIter = 100) { (cur, iter) =>
       val (u,alpha,v,w,x,phihat,rhohat) = unpack(cur)
 
       val (beta_, u_) = normalize(A * v - alpha * u)

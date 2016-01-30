@@ -15,7 +15,7 @@ trait TreeOps {
   this: OptiMLDSL =>
 
   def importTreeOps() {
-    val TrainingSet = lookupTpe("TrainingSet")
+    val DenseTrainingSet = lookupTpe("DenseTrainingSet")
     val DenseVector = lookupTpe("DenseVector")
     val IndexVector = lookupTpe("IndexVector")
     val Tup2 = lookupTpe("Tup2")
@@ -180,17 +180,19 @@ trait TreeOps {
 
     /* Construct the decision tree in a depth-first fashion */
     direct (Tree) ("dtree", Nil, MethodSignature(List(
-                                   ("trainingSet",TrainingSet(MDouble,MDouble)),
+                                   ("trainingSet",DenseTrainingSet(MDouble,MDouble)),
                                    ("maxDepth", MInt, "unit(-1)"),
                                    ("maxNumFeatures", MInt, "unit(-1)"),
                                    ("minSamplesSplit", MInt, "unit(2)"),
                                    ("minSamplesLeaf", MInt, "unit(1)"),
+                                   ("useSamples", IndexVector, "unit(null.asInstanceOf[IndexVector])"),
                                    ("criterion", TCriterion, "MSE")
                                  ), Tree)) implements composite ${
 
       // optional value fakery
       val _maxDepth = if (maxDepth < 0) INF.toInt else maxDepth
       val _maxNumFeatures = if (maxNumFeatures < 0) sqrt(trainingSet.numFeatures).toInt else maxNumFeatures
+      val _useSamples = if (useSamples == null) trainingSet.data.rowIndices else useSamples
 
       // constants
       val MIN_IMPURITY_SPLIT = 1e-7
@@ -249,11 +251,11 @@ trait TreeOps {
             // add internal node to tree
             val nodeId = tree.addNode(parent, isLeft, isLeaf, feature, threshold, impurity, numNodeSamples)
 
-            // right child
-            doApply(next, pack((sortedSamples(pos::sortedSamples.length), depth+1, nodeId, unit(false), impurityRight, nextConstantFeatures, continuation)))
-
             // left child
             doApply(next, pack((sortedSamples(0::pos), depth+1, nodeId, unit(true), impurityLeft, nextConstantFeatures, continuation)))
+
+            // right child
+            doApply(next, pack((sortedSamples(pos::sortedSamples.length), depth+1, nodeId, unit(false), impurityRight, nextConstantFeatures, continuation)))
           }
         }
 
@@ -262,13 +264,12 @@ trait TreeOps {
 
       // kick off the tree construction
       // this has the side-effect of updating "tree", so that we don't have to continuously copy the internal arrays)
-      val allSamples = trainingSet.data.rowIndices
-      doApply(process, pack((allSamples, unit(0), unit(-1), unit(false), compute_impurity(trainingSet, allSamples, criterion), (0::trainingSet.numFeatures) { i => false }, process.AsInstanceOf[Any])))
+      doApply(process, pack((_useSamples, unit(0), unit(-1), unit(false), compute_impurity(trainingSet, _useSamples, criterion), (0::trainingSet.numFeatures) { i => false }, process.AsInstanceOf[Any])))
 
       tree.unsafeImmutable
     }
 
-    compiler (Tree) ("tree_split", Nil, MethodSignature(List(("tree", Tree), ("trainingSet", TrainingSet(MDouble,MDouble)), ("samples", IndexVector), ("maxNumFeatures", MInt), ("impurity", MDouble), ("constantFeatures", DenseVector(MBoolean)), ("criterion", TCriterion)), Tup7(IndexVector,MInt,MDouble,MInt,MDouble,MDouble,DenseVector(MBoolean)))) implements composite ${
+    compiler (Tree) ("tree_split", Nil, MethodSignature(List(("tree", Tree), ("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector), ("maxNumFeatures", MInt), ("impurity", MDouble), ("constantFeatures", DenseVector(MBoolean)), ("criterion", TCriterion)), Tup7(IndexVector,MInt,MDouble,MInt,MDouble,MDouble,DenseVector(MBoolean)))) implements composite ${
       fassert(samples.length > 1, "samples to split must be at least 2")
 
       // constants
@@ -288,8 +289,8 @@ trait TreeOps {
         val sortedSamples = samples(sortedIndices)
 
         // constant feature value gets a -INF score
-        if (sortedValues(0) == sortedValues(sortedValues.length-1)) {
-          pack((-INF, sortedSamples, j, unit(0.0), unit(0.0), unit(0.0)))
+        if ((sortedValues(sortedValues.length-1) - sortedValues(0)) < FEATURE_THRESHOLD) {
+          pack((-INF, sortedSamples, unit(0), unit(0.0), unit(0.0), unit(0.0)))
         }
         else {
           // compute scores for each candidate split
@@ -299,10 +300,11 @@ trait TreeOps {
           var bestImpurityLeft = -INF
           var bestImpurityRight = -INF
 
-          while (p < sortedValues.length - 1) {
+          while (p < sortedValues.length) {
             // skip to the next p at least FEATURE_THRESHOLD greater than the current value
-            while ((p+1 < sortedValues.length - 1) && (abs(sortedValues.apply(p+1) - sortedValues.apply(p)) > FEATURE_THRESHOLD))
+            while ((p < sortedValues.length - 1) && ((sortedValues(p) - sortedValues(p-1)) < FEATURE_THRESHOLD)) {
               p += 1
+            }
 
             val (improvement, impurityLeft, impurityRight) = unpack(compute_impurity_improvement(trainingSet, impurity, sortedSamples, p, criterion))
 
@@ -330,7 +332,7 @@ trait TreeOps {
       val impurityLeft = improvements(bestFeatureIndex)._5
       val impurityRight = improvements(bestFeatureIndex)._6
 
-      val newConstantFeatures = improvements filter { t => t._1 == -INF } map { _._3 }
+      val newConstantFeatures = testFeatures(improvements find { t => t._1 == -INF })
       val nextConstantFeatures = constantFeatures.mutable
       for (j <- newConstantFeatures) {
         nextConstantFeatures(j) = true
@@ -349,7 +351,7 @@ trait TreeOps {
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Impurity Criterion
 
-    compiler (Tree) ("compute_impurity_improvement", Nil, (("trainingSet", TrainingSet(MDouble,MDouble)), ("impurity", MDouble), ("samples", IndexVector), ("splitPos", MInt), ("criterion", TCriterion)) :: Tup3(MDouble,MDouble,MDouble)) implements composite ${
+    compiler (Tree) ("compute_impurity_improvement", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("impurity", MDouble), ("samples", IndexVector), ("splitPos", MInt), ("criterion", TCriterion)) :: Tup3(MDouble,MDouble,MDouble)) implements composite ${
       val leftSamples = samples(0::splitPos)
       val rightSamples = samples(splitPos::samples.length)
 
@@ -362,7 +364,7 @@ trait TreeOps {
       pack((improvement, impurityLeft, impurityRight))
     }
 
-    compiler (Tree) ("compute_impurity", Nil, (("trainingSet", TrainingSet(MDouble,MDouble)), ("samples", IndexVector), ("criterion", TCriterion)) :: MDouble) implements composite ${
+    compiler (Tree) ("compute_impurity", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector), ("criterion", TCriterion)) :: MDouble) implements composite ${
       criterion match {
         case MSE => impurity_mse(trainingSet, samples)
         case Gini => impurity_gini(trainingSet, samples)
@@ -372,14 +374,14 @@ trait TreeOps {
     /*
      * Mean Squared Error (MSE) regression criterion
      */
-    compiler (Tree) ("impurity_mse", Nil, (("trainingSet", TrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
+    compiler (Tree) ("impurity_mse", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
       variance(trainingSet.labels.apply(samples))
     }
 
     /**
      * Gini index classification criterion
      */
-    compiler (Tree) ("impurity_gini", Nil, (("trainingSet", TrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
+    compiler (Tree) ("impurity_gini", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
       val labels = trainingSet.labels.apply(samples)
       val numSamplesByLabel = labels.groupByReduce(l => l, l => 1, (a: Rep[Int],b: Rep[Int]) => a+b)
 
@@ -394,19 +396,19 @@ trait TreeOps {
     /**
      * The value to store as the prediction for this leaf.
      */
-    compiler (Tree) ("tree_score", Nil, (("trainingSet", TrainingSet(MDouble,MDouble)), ("samples", IndexVector), ("criterion", TCriterion)) :: MDouble) implements composite ${
+    compiler (Tree) ("tree_score", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector), ("criterion", TCriterion)) :: MDouble) implements composite ${
       criterion match {
         case MSE => tree_score_mse(trainingSet, samples)
         case Gini => tree_score_gini(trainingSet, samples)
       }
     }
 
-    compiler (Tree) ("tree_score_mse", Nil, (("trainingSet", TrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
+    compiler (Tree) ("tree_score_mse", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
       // regression prediction value is the mean of values assigned to this node
       mean(trainingSet.labels.apply(samples))
     }
 
-    compiler (Tree) ("tree_score_gini", Nil, (("trainingSet", TrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
+    compiler (Tree) ("tree_score_gini", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
       // select the label with the highest frequency in the sample
       val allLabels = trainingSet.labels.apply(samples)
       val samplesByLabel = allLabels.groupByReduce(l => l, l => 1, (a: Rep[Int],b: Rep[Int]) => a+b)

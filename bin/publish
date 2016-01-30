@@ -9,9 +9,10 @@ import stat
 import math
 import fileinput
 
+DELITE_HOME = os.getenv("DELITE_HOME")
 FORGE_HOME = os.getenv("FORGE_HOME")
 FORGE_GENERATED = "build" # TODO
-SCALA_MAJOR_VERS = "2.10"
+SCALA_MAJOR_VERS = "2.11"
 SCALA_MINOR_VERS = "2"
 
 def err(s):
@@ -60,6 +61,7 @@ def sbtBuildFileHeader(dsl):
     s = Template("""
 import sbt._
 import Keys._
+import Tests._
 
 object ${dslName}Build extends Build {
   if (System.getProperty("showSuppressedErrors") == null) System.setProperty("showSuppressedErrors", "false")
@@ -68,11 +70,12 @@ object ${dslName}Build extends Build {
     organization := "stanford-ppl",
     scalaOrganization := "org.scala-lang.virtualized",
     scalaVersion := virtScala,
+
     publishArtifact in (Compile, packageDoc) := false,
     // needed for scala.tools, which is apparently not included in sbt's built in version
-    libraryDependencies += "org.scala-lang.virtualized" % "scala-library" % virtScala,
-    libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % virtScala,
-    libraryDependencies += "org.scalatest" % "scalatest_${scala_major_vers}" % "2.1.2",
+    libraryDependencies += "org.scala-lang" % "scala-library" % virtScala,
+    libraryDependencies += "org.scala-lang" % "scala-compiler" % virtScala,
+    libraryDependencies += "org.scalatest" % "scalatest_${scala_major_vers}" % "2.2.2",
     libraryDependencies += "com.google.guava" % "guava" % "17.0",
     libraryDependencies += "org.apache.commons" % "commons-math" % "2.2",
     libraryDependencies += "commons-io" % "commons-io" % "2.4",
@@ -146,6 +149,22 @@ ${footer}
 
 def sbtBuildFileFooter(dsl):
     s = Template("""
+  // HACK alert: with fork = true, sbt appears to ignore the -D properties passed on the command line,
+  // which breaks test_all. Here we manually look for the currently relevant options. Needs a proper fix!
+  val testOptions = Seq("-Dtests.verbose="+System.getProperty("tests.verbose", "false"),
+                        "-Dtests.threads="+System.getProperty("tests.threads", "1"),
+                        "-Dtests.targets="+System.getProperty("tests.targets", "scala"))
+
+  // Test suites are run individually in different JVMs. Set TEST_JAVA_OPTS to configure JAVA_OPTS for each suite.
+  val testJavaOptionsStr = sys.env.getOrElse("TEST_JAVA_OPTS", "")
+  // TEST_JAVA_OPTS cannot be empty or SBT crashes when it gets a non-empty Seq containing an empty string.
+  val testJavaOptions = if (testJavaOptionsStr == "") Seq() else testJavaOptionsStr.split(" ").toSeq
+
+  def separateTests(tests: Seq[TestDefinition]) = {
+    if (tests.isEmpty) Seq(new Group("", Seq(), SubProcess(Seq()))) //workaround for sbt crash on empty tests
+    else tests map { test => new Group(test.name, Seq(test), SubProcess(testOptions ++ testJavaOptions)) }
+  }
+
   // build targets
   lazy val ${dslName} = Project("${dslName}", file("."), settings = virtBuildSettings ++ deps) dependsOn(${dslName}Apps) // default
   lazy val ${dslName}Shared = Project("${dslName}-shared", file("shared"), settings = virtBuildSettings ++ deps)
@@ -156,7 +175,12 @@ def sbtBuildFileFooter(dsl):
   lazy val ${dslName}Tests = Project("${dslName}-tests", file("tests"), settings = virtBuildSettingsBase ++ deps ++ Seq(
     scalaSource in Test <<= baseDirectory(_ / "src"),
     parallelExecution in Test := false,
-    concurrentRestrictions in Test += Tags.limitAll(1) // don't run anything in parallel
+    concurrentRestrictions in Test += Tags.limitAll(1), // don't run anything in parallel
+    // Required to use native libraries within tests
+    // See http://stackoverflow.com/questions/19425613/unsatisfiedlinkerror-with-native-library-under-sbt
+    // and http://www.scala-sbt.org/release/docs/Forking.html
+    testGrouping in Test <<= definedTests in Test map separateTests,
+    fork := true
   )) dependsOn(${dslName}Comp, ${dslName}Lib)
 }
 """)
@@ -236,6 +260,7 @@ def publish_dsl_extern(dsl, build_dir, scratch_dir, final_name):
         os.system("rsync -r " + tmp_dest + " " + build_dir)
 
 def publish(dsl, opts):
+    global DELITE_HOME
     global FORGE_HOME
     global FORGE_GENERATED
 
@@ -278,13 +303,13 @@ def publish(dsl, opts):
     # sbt project
     if not os.path.exists(build_dir + "/project/"):
         os.mkdir(build_dir + "/project/")
-        buildFile = open(build_dir + "/project/Build.scala", 'w')
-        if opts.use_jars:
-            buildFile.write(sbtBuildFile(dsl))
-        else:
-            buildFile.write(sbtBuildFileLocal(dsl))
-        buildFile.close()
-        shutil.copyfile(FORGE_HOME + "/static/build.properties", build_dir + "/project/build.properties")
+    buildFile = open(build_dir + "/project/Build.scala", 'w')
+    if opts.use_jars:
+        buildFile.write(sbtBuildFile(dsl))
+    else:
+        buildFile.write(sbtBuildFileLocal(dsl))
+    buildFile.close()
+    shutil.copyfile(FORGE_HOME + "/static/build.properties", build_dir + "/project/build.properties")
 
     # executable scripts
     if not os.path.exists(build_dir + "/bin/"):
@@ -299,7 +324,14 @@ def publish(dsl, opts):
 
         shutil.copyfile(FORGE_HOME + "/static/delitecommon-wrapper.py", build_dir+"/bin/delitecommon.py")
 
+        cp_executable_script(DELITE_HOME + "/bin/delitep", build_dir + "/bin/delitep")
+        cp_executable_script(DELITE_HOME + "/bin/server.py", build_dir + "/bin/server.py")
+
     print "[forge]: Publishing complete."
+
+def cp_executable_script(src, dst):
+    shutil.copyfile(src, dst)
+    os.chmod(dst, stat.S_IXUSR | os.stat(dst)[stat.ST_MODE])
 
 if __name__ == "__main__":
     main()

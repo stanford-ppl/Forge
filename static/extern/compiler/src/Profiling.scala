@@ -29,8 +29,8 @@ trait ScalaGenProfilingOps extends ScalaGenEffect {
   import IR._
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case ForgeProfileStart(c,deps) => emitValDef(sym, "ppl.delite.runtime.profiler.PerformanceTimer.start(" + quote(c) + ", false)")
-    case ForgeProfileStop(c,deps) => emitValDef(sym, "ppl.delite.runtime.profiler.PerformanceTimer.stop(" + quote(c) + ", false)")
+    case ForgeProfileStart(c,deps) => emitValDef(sym, "ppl.delite.runtime.profiler.PerformanceTimer.start(" + quote(c) + ")")
+    case ForgeProfileStop(c,deps) => emitValDef(sym, "ppl.delite.runtime.profiler.PerformanceTimer.stop(" + quote(c) + ")")
     case ForgeProfileTime(deps) => emitValDef(sym, "System.currentTimeMillis()")
     case _ => super.emitNode(sym,rhs)
   }
@@ -45,9 +45,9 @@ trait CGenProfilingOps extends CGenEffect {
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case ForgeProfileStart(c,deps) =>
-      stream.println("DeliteCppTimerStart(resourceInfo->threadId," + quote(c) + ", false);")
+      stream.println("DeliteCppTimerTic(" + quote(c) + ");")
     case ForgeProfileStop(c,deps) =>
-      stream.println("DeliteCppTimerStop(resourceInfo->threadId," + quote(c) + ");")
+      stream.println("DeliteCppTimerToc(" + quote(c) + ");")
     case ForgeProfileTime(deps) =>
       stream.println("struct timeval _" + quote(sym) + ";")
       stream.println("gettimeofday(&_" + quote(sym) + ", NULL);")

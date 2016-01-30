@@ -12,8 +12,8 @@ import optiml.library._
 import optiml.shared._
 import ppl.tests.scalatest._
 
-object DenseMatrixAccessorsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with DenseMatrixAccessors
-object DenseMatrixAccessorsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with DenseMatrixAccessors
+object DenseMatrixAccessorsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with DenseMatrixAccessors
+object DenseMatrixAccessorsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with DenseMatrixAccessors
 trait DenseMatrixAccessors extends ForgeTestModule with OptiMLApplication {
   def main() {
     val m = DenseMatrix.rand(100,100)
@@ -56,20 +56,20 @@ trait DenseMatrixAccessors extends ForgeTestModule with OptiMLApplication {
     val mSlice = m2(0::2,4::5)
     collect(mSlice == DenseMatrix(DenseVector(4,5)).t)
     val mSlice2 = m2(3::4)
-    collect(mSlice2 == DenseMatrix((3,4,5,6,7,8,9,10,11,12)))
+    collect(mSlice2 == DenseMatrix(DenseVector(3,4,5,6,7,8,9,10,11,12)))
     val mSlice3 = m2(*,0::2)
-    collect(mSlice3 == DenseMatrix((0,1,2,3,4,5,6,7,8,9),(1,2,3,4,5,6,7,8,9,10)).t)
+    collect(mSlice3 == DenseMatrix(DenseVector(0,1,2,3,4,5,6,7,8,9),DenseVector(1,2,3,4,5,6,7,8,9,10)).t)
     val mSlice4 = m2(1::4,*)
-    collect(mSlice4 == DenseMatrix((1,2,3,4,5,6,7,8,9,10),(2,3,4,5,6,7,8,9,10,11),(3,4,5,6,7,8,9,10,11,12)))
-    val mSlice5 = m2(IndexVector((3,1,2)),IndexVector((4,0,6)))
-    collect(mSlice5 == DenseMatrix((7,3,9),(5,1,7),(6,2,8)))
+    collect(mSlice4 == DenseMatrix(DenseVector(1,2,3,4,5,6,7,8,9,10),DenseVector(2,3,4,5,6,7,8,9,10,11),DenseVector(3,4,5,6,7,8,9,10,11,12)))
+    val mSlice5 = m2(IndexVector(DenseVector(3,1,2)),IndexVector(DenseVector(4,0,6)))
+    collect(mSlice5 == DenseMatrix(DenseVector(7,3,9),DenseVector(5,1,7),DenseVector(6,2,8)))
 
     mkReport
   }
 }
 
-object DenseMatrixOperatorsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with DenseMatrixOperators
-object DenseMatrixOperatorsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with DenseMatrixOperators
+object DenseMatrixOperatorsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with DenseMatrixOperators
+object DenseMatrixOperatorsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with DenseMatrixOperators
 trait DenseMatrixOperators extends ForgeTestModule with OptiMLApplication {
   def main() {
     val m_rand = DenseMatrix.rand(2,2)
@@ -77,7 +77,7 @@ trait DenseMatrixOperators extends ForgeTestModule with OptiMLApplication {
     collect(m_rand(0,0) != m_rand(1,0))
     collect(m_rand(0,0) != m_rand(1,1))
 
-    val m = DenseMatrix((1,2,3,4,5),(1,2,3,4,5))
+    val m = DenseMatrix(DenseVector(1,2,3,4,5),DenseVector(1,2,3,4,5))
     collect(mean(m) == 3)
     collect(max(m) == 5)
     collect(min(m) == 1)
@@ -86,8 +86,8 @@ trait DenseMatrixOperators extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object DenseMatrixUpdatesRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with DenseMatrixUpdates
-object DenseMatrixUpdatesRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with DenseMatrixUpdates
+object DenseMatrixUpdatesRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with DenseMatrixUpdates
+object DenseMatrixUpdatesRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with DenseMatrixUpdates
 trait DenseMatrixUpdates extends ForgeTestModule with OptiMLApplication {
   def main() {
     val v = DenseVector.rand(100)
@@ -170,15 +170,15 @@ trait DenseMatrixUpdates extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object GroupRowsByRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with GroupRowsBy
-object GroupRowsByRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with GroupRowsBy
+object GroupRowsByRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with GroupRowsBy
+object GroupRowsByRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with GroupRowsBy
 trait GroupRowsBy extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
-    val m = DenseMatrix((1,2,3,4),
-                        (2,-2,-3,-4),
-                        (1,5,6,7),
-                        (2,-5,-6,-7))
+    val m = DenseMatrix(DenseVector(1,2,3,4),
+                        DenseVector(2,-2,-3,-4),
+                        DenseVector(1,5,6,7),
+                        DenseVector(2,-5,-6,-7))
 
     val ms = m.groupRowsBy(row => row(0)).toVector
     collect(ms.length == 2)
@@ -190,8 +190,8 @@ trait GroupRowsBy extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object MapAllRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with MapAll
-object MapAllRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with MapAll
+object MapAllRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with MapAll
+object MapAllRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with MapAll
 trait MapAll extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -200,14 +200,16 @@ trait MapAll extends ForgeTestModule with OptiMLApplication {
     val a = x.map(e => e + 2.0)
     collect (a == (DenseMatrix.ones(10,10)*2.0))
 
-    val b = x mapRows { i => DenseVector.ones(10) }
-    collect (b == DenseMatrix.ones(10,10))
+    // Triggers fusion bug -- see https://github.com/stanford-ppl/Delite/issues/45
+    // val b = x mapRows { i => DenseVector.ones(10) }
+    val b = x mapRows { i => DenseVector.ones(11) }
+    collect (b == DenseMatrix.ones(10,11))
 
     val c = x mapRows { i => DenseVector.ones(5) }
     collect (c == DenseMatrix.ones(10,5))
 
-    val d = x mapCols { i => DenseVector.ones(10).t }
-    collect (d == DenseMatrix.ones(10,10))
+    val d = x mapCols { i => DenseVector.ones(11).t }
+    collect (d == DenseMatrix.ones(11,10))
 
     val e = x mapCols { i => DenseVector.ones(5).t }
     collect (e == DenseMatrix.ones(5,10))
@@ -215,58 +217,99 @@ trait MapAll extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object ReduceRowsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with ReduceRows
-object ReduceRowsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with ReduceRows
+object ReduceRowsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with ReduceRows
+object ReduceRowsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with ReduceRows
 trait ReduceRows extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
     val x = DenseMatrix.ones(10,10)
     val y = x reduceRows { (r1,r2) => r1 + r2 }
-    collect(y == DenseVector(10.,10.,10.,10.,10.,10.,10.,10.,10.,10.))
+    collect(y == DenseVector(10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0))
     mkReport
   }
 }
 
-object ShapesRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Shapes
-object ShapesRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Shapes
+object ShapesRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Shapes
+object ShapesRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Shapes
 trait Shapes extends ForgeTestModule with OptiMLApplication {
   def main() = {
-    val a = DenseMatrix((1,2,3), 
-                        (4,5,6), 
-                        (7,8,9))
+    val a = DenseMatrix(DenseVector(1,2,3),
+                        DenseVector(4,5,6),
+                        DenseVector(7,8,9))
 
     collect(diag(a) == DenseVector(1,5,9).t)
-    collect(triu(a) == DenseMatrix((1,2,3), (0,5,6), (0,0,9)))
-    collect(tril(a) == DenseMatrix((1,0,0), (4,5,0), (7,8,9)))
-    
-    val b = DenseMatrix((1,2,3,4),
-                        (5,6,7,8))
-    
-    collect(diag(b) == DenseVector(1,6).t)
-    collect(triu(b) == DenseMatrix((1,2,3,4), (0,6,7,8)))
-    collect(tril(b) == DenseMatrix((1,0,0,0), (5,6,0,0)))
+    collect(triu(a) == DenseMatrix(DenseVector(1,2,3), DenseVector(0,5,6), DenseVector(0,0,9)))
+    collect(tril(a) == DenseMatrix(DenseVector(1,0,0), DenseVector(4,5,0), DenseVector(7,8,9)))
 
-    val c = DenseMatrix((1,2),
-                        (3,4),
-                        (5,6),
-                        (7,8))
+    val b = DenseMatrix(DenseVector(1,2,3,4),
+                        DenseVector(5,6,7,8))
+
+    collect(diag(b) == DenseVector(1,6).t)
+    collect(triu(b) == DenseMatrix(DenseVector(1,2,3,4), DenseVector(0,6,7,8)))
+    collect(tril(b) == DenseMatrix(DenseVector(1,0,0,0), DenseVector(5,6,0,0)))
+
+    val c = DenseMatrix(DenseVector(1,2),
+                        DenseVector(3,4),
+                        DenseVector(5,6),
+                        DenseVector(7,8))
 
     collect(diag(c) == DenseVector(1,4).t)
-    collect(triu(c) == DenseMatrix((1,2), (0,4), (0,0), (0,0)))
-    collect(tril(c) == DenseMatrix((1,0), (3,4), (5,6), (7,8)))
+    collect(triu(c) == DenseMatrix(DenseVector(1,2), DenseVector(0,4), DenseVector(0,0), DenseVector(0,0)))
+    collect(tril(c) == DenseMatrix(DenseVector(1,0), DenseVector(3,4), DenseVector(5,6), DenseVector(7,8)))
 
     // n x n utriangle shape
     val tri = utriangle(a.numRows)
-    
-    collect(tri.size == 6)    
+
+    collect(tri.size == 6)
     collect(tri(0)._1 == 0 && tri(0)._2 == 0)
     collect(tri(1)._1 == 0 && tri(1)._2 == 1)
     collect(tri(2)._1 == 0 && tri(2)._2 == 2)
     collect(tri(3)._1 == 1 && tri(3)._2 == 1)
     collect(tri(4)._1 == 1 && tri(4)._2 == 2)
-    collect(tri(5)._1 == 2 && tri(5)._2 == 2)    
+    collect(tri(5)._1 == 2 && tri(5)._2 == 2)
     collect(tri.contains(2,0) == false)
-    
+
+    mkReport
+  }
+}
+
+object ViewsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Views
+object ViewsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Views
+trait Views extends ForgeTestModule with OptiMLApplication {
+  def main() = {
+    val m = DenseMatrix(DenseVector(0,1,2,3,4),DenseVector(5,6,7,8,9),DenseVector(10,11,12,13,14),DenseVector(15,16,17,18,19))
+    val middleTwoRows = m.sliceRows(1,3)
+    collect(middleTwoRows == DenseMatrix(DenseVector(5,6,7,8,9),DenseVector(10,11,12,13,14)))
+
+    val middleThreeCols = m.sliceCols(1,4)
+    collect(middleThreeCols == DenseMatrix(DenseVector(1,2,3),DenseVector(6,7,8),DenseVector(11,12,13),DenseVector(16,17,18)))
+
+    // last 3 rows, last 3 cols
+    val rect = m.slice(1,4,2,5)
+    collect(rect == DenseMatrix(DenseVector(7,8,9),DenseVector(12,13,14),DenseVector(17,18,19)))
+
+    val rectSecondRow = rect(1)
+    collect(rectSecondRow == DenseVector(12,13,14))
+
+    val rectSecondCol = rect.getCol(1)
+    collect(rectSecondCol == DenseVector(8,13,18).t)
+
+    mkReport
+  }
+}
+
+
+object SortByRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SortBy
+object SortByRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SortBy
+trait SortBy extends ForgeTestModule with OptiMLApplication {
+  def main() = {
+    val m = DenseMatrix(DenseVector(5,6,7,8,9),DenseVector(0,1,2,3,4),DenseVector(15,16,17,18,19),DenseVector(10,11,12,13,14))
+    val sortedRows = m.sortRowsBy(v => v.sum)
+    collect(sortedRows == DenseMatrix(DenseVector(0,1,2,3,4),DenseVector(5,6,7,8,9),DenseVector(10,11,12,13,14),DenseVector(15,16,17,18,19)))
+
+    val sortedCols = m.t.sortColsBy(v => v.sum)
+    collect(sortedCols == sortedRows.t)
+
     mkReport
   }
 }
@@ -279,6 +322,8 @@ class DenseMatrixSuiteInterpreter extends ForgeSuiteInterpreter {
   def testMapAll() { runTest(MapAllRunnerI) }
   def testReduceRows() { runTest(ReduceRowsRunnerI) }
   def testShapes() { runTest(ShapesRunnerI) }
+  def testViews() { runTest(ViewsRunnerI) }
+  def testSortBy() { runTest(SortByRunnerI) }
 }
 
 class DenseMatrixSuiteCompiler extends ForgeSuiteCompiler {
@@ -289,4 +334,6 @@ class DenseMatrixSuiteCompiler extends ForgeSuiteCompiler {
   def testMapAll() { runTest(MapAllRunnerC) }
   def testReduceRows() { runTest(ReduceRowsRunnerC) }
   def testShapes() { runTest(ShapesRunnerC) }
+  def testViews() { runTest(ViewsRunnerC) }
+  def testSortBy() { runTest(SortByRunnerC) }
 }

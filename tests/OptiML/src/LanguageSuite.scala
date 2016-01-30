@@ -3,8 +3,8 @@ import optiml.library._
 import optiml.shared._
 import ppl.tests.scalatest._
 
-object SumRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Sum
-object SumRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Sum
+object SumRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Sum
+object SumRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Sum
 trait Sum extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -16,8 +16,8 @@ trait Sum extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object SumIfRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with SumIf
-object SumIfRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with SumIf
+object SumIfRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with SumIf
+object SumIfRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with SumIf
 trait SumIf extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -29,8 +29,8 @@ trait SumIf extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-// object AggregateIfRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with AggregateIf
-// object AggregateIfRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with AggregateIf
+// object AggregateIfRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with AggregateIf
+// object AggregateIfRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with AggregateIf
 // trait AggregateIf extends ForgeTestModule with OptiMLApplication {
 //   def main() = {
 
@@ -42,8 +42,8 @@ trait SumIf extends ForgeTestModule with OptiMLApplication {
 //   }
 // }
 
-// object Aggregate2dRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Aggregate2d
-// object Aggregate2dRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Aggregate2d
+// object Aggregate2dRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Aggregate2d
+// object Aggregate2dRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Aggregate2d
 // trait Aggregate2d extends ForgeTestModule with OptiMLApplication {
 //   def main() = {
 
@@ -55,8 +55,8 @@ trait SumIf extends ForgeTestModule with OptiMLApplication {
 //   }
 // }
 
-// object Aggregate2dIfRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with Aggregate2dIf
-// object Aggregate2dIfRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with Aggregate2dIf
+// object Aggregate2dIfRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with Aggregate2dIf
+// object Aggregate2dIfRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with Aggregate2dIf
 // trait Aggregate2dIf extends ForgeTestModule with OptiMLApplication {
 //   def main() = {
 
@@ -68,8 +68,8 @@ trait SumIf extends ForgeTestModule with OptiMLApplication {
 //   }
 // }
 
-object IndexVectorConstructRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with IndexVectorConstruct
-object IndexVectorConstructRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with IndexVectorConstruct
+object IndexVectorConstructRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with IndexVectorConstruct
+object IndexVectorConstructRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with IndexVectorConstruct
 trait IndexVectorConstruct extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
@@ -79,16 +79,16 @@ trait IndexVectorConstruct extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object IndexVectorConstruct2RunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with IndexVectorConstruct2
-object IndexVectorConstruct2RunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with IndexVectorConstruct2
+object IndexVectorConstruct2RunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with IndexVectorConstruct2
+object IndexVectorConstruct2RunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with IndexVectorConstruct2
 trait IndexVectorConstruct2 extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
 		val x = (0::10, *) { i => DenseVector.ones(2) * i	}
-		collect(x == DenseMatrix((0.,0.), (1.,1.), (2.,2.), (3.,3.), (4.,4.), (5.,5.), (6., 6.), (7.,7.), (8.,8.), (9.,9.)))
+		collect(x == DenseMatrix(DenseVector(0.0,0.0), DenseVector(1.0,1.0), DenseVector(2.0,2.0), DenseVector(3.0,3.0), DenseVector(4.0,4.0), DenseVector(5.0,5.0), DenseVector(6.0, 6.0), DenseVector(7.0,7.0), DenseVector(8.0,8.0), DenseVector(9.0,9.0)))
 
 		val y = (0::2, 0::3) { (i,j) =>	i*j	}
-		collect(y == DenseMatrix((0,0,0),(0,1,2)))
+		collect(y == DenseMatrix(DenseVector(0,0,0),DenseVector(0,1,2)))
 
     mkReport
   }

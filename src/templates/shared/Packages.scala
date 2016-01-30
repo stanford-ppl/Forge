@@ -15,6 +15,7 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     emitComment("the trait that all " + dsl + " applications must extend", stream)
     stream.println("trait " + dsl + "Application extends " + dsl + " with " + dsl + "Lift {")
     stream.println("  var args: Rep[Array[String]]")
+    stream.println("  var stagingArgs: Array[String]")
     stream.println("  def main()")
     stream.println("}")
   }

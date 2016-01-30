@@ -14,7 +14,7 @@ object TPCHQ14Compiler extends OptiQLApplicationCompiler with TPCHQ14Trait
 trait TPCHBaseTrait extends OptiQLApplication with Types {
 
   def printUsage = {
-    println("Usage: TPCHQ## <input directory>")
+    println("Usage: TPCH"+queryName+" <input directory>")
     exit(-1)
   }
 

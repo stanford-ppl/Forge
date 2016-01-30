@@ -27,10 +27,10 @@ trait LogReg extends OptiMLApplication {
     // gradient descent with logistic function
     val alpha = 1.0
 
-    val w = untilconverged(theta, maxIter = 30) { cur =>
-      val gradient = sum((0::x.numRows) { i =>
+    val w = untilconverged(theta, maxIter = 30) { (cur, iter) =>
+      val gradient = ((0::x.numRows) { i =>
         x(i)*(y(i) - sigmoid(cur *:* x(i)))
-      })
+      }).sum
 
       // println("gradient: ")
       // gradient.pprint

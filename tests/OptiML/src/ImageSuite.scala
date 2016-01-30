@@ -3,12 +3,12 @@ import optiml.shared._
 import optiml.library._
 import ppl.tests.scalatest._
 
-object GrayscaleImageOpsRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with GrayscaleImageOps
-object GrayscaleImageOpsRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with GrayscaleImageOps
+object GrayscaleImageOpsRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with GrayscaleImageOps
+object GrayscaleImageOpsRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with GrayscaleImageOps
 trait GrayscaleImageOps extends ForgeTestModule with OptiMLApplication {
   def main() = {
-    val img = GrayscaleImage(DenseMatrix((12,55,92,13), (0,255,255,255), (17,33,33,10), (0,0,0,0)).toDouble)
-    
+    val img = GrayscaleImage(DenseMatrix(DenseVector(12,55,92,13), DenseVector(0,255,255,255), DenseVector(17,33,33,10), DenseVector(0,0,0,0)).toDouble)
+
     val hist = img.histogram
     collect(hist.length == 256)
     collect(hist(12) == 1)
@@ -34,8 +34,8 @@ trait GrayscaleImageOps extends ForgeTestModule with OptiMLApplication {
 }
 
 class ImageSuiteInterpreter extends ForgeSuiteInterpreter {
-  def testGrayscaleImageOps() { runTest(GrayscaleImageOpsRunnerI) }  
+  def testGrayscaleImageOps() { runTest(GrayscaleImageOpsRunnerI) }
 }
 class ImageSuiteCompiler extends ForgeSuiteCompiler {
-  def testGrayscaleImageOps() { runTest(GrayscaleImageOpsRunnerC) }  
+  def testGrayscaleImageOps() { runTest(GrayscaleImageOpsRunnerC) }
 }

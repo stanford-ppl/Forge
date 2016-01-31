@@ -82,7 +82,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
         stream.println("    }")
 
         // Compatibility tests
-        stream.println("    def _canMeet(that: self.type)(implicit t: MeetFunc): Boolean = t match {")
+        stream.println("    override def _canMeet(that: self.type)(implicit t: MeetFunc): Boolean = t match {")
         for (func <- meetFuncs if canMeetRules.contains(func)) {
           stream.println("      case " + quoteFunc(func) + " => ")
           quoteLiteral(canMeetRules(func)).split(nl).foreach{ line => emitWithIndent(line, stream, 8) }
@@ -102,7 +102,6 @@ trait DeliteGenTraversals extends BaseGenTraversals {
           quoteLiteral(completeRule.get).split(nl).foreach{ line => emitWithIndent(line, stream, 6) }
           stream.println("    }")
         }
-        stream.println("    }")
 
         stream.println("  }")
       }

@@ -73,13 +73,18 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
 
     // Library mixes in application ops with internal ops
     stream.println("trait " + dsl + "LibraryOps extends " + dsl + "Application")
-    for (opsGrp <- opsGrps if opsGrp.ops.exists(_.backend == internalBackend)) {
-      stream.print(" with " + opsGrp.grp.name + "InternalOps")
+    for (opsGrp <- opsGrps) {
+      if (opsGrp.ops.exists(_.backend == internalBackend))
+        stream.print(" with " + opsGrp.grp.name + "InternalOps")
+      if (opsGrp.ops.exists(_.backend == libraryBackend))
+        stream.print(" with " + opsGrp.grp.name + "LibraryOps")
     }
     for (e <- Externs) {
       stream.print(" with " + e.opsGrp.grp.name + "CompilerOps") // Legacy naming for internal ops
     }
-    stream.println()
+    stream.println("{")
+    stream.println("  this: " + dsl + "Library =>")
+    stream.println("}")
     stream.println()
 
     // library impl brings all of the library types in scope

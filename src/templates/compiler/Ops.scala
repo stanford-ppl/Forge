@@ -151,13 +151,28 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println()
   }
 
+  def emitCompilerOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
+    emitBlockComment("Compiler-only operations", stream)
+    emitOpSugar(opsGrp.grp.name + "Compiler", opsGrp.name, dsl + "Compiler", opsGrp, stream, compilerBackend)
+  }
+
+  def requiresImpl(op: Rep[DSLOp]) = Impls(op) match {
+    case _:CodeGen | _:Redirect => false
+    case _:Getter | _:Setter => false
+    case _:Allocates | _:AllocatesFigment => false
+    case _ => hasCompilerVersion(op)
+  }
+
+  /**
+   * Emit op implementations for composite and single task n
+   */
   def emitImpls(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("Op Impls", stream)
     stream.println()
     stream.println("trait " + opsGrp.name + "Impl {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Lift => ")
     stream.println()
-    for (o <- unique(opsGrp.ops) if o.backend != libraryBackend) {
+    for (o <- unique(opsGrp.ops) if requiresImpl(o)) {
       Impls(o) match {
         case single:SingleTask =>
           emitImplMethod(o, single.func, "", None, stream)
@@ -213,7 +228,7 @@ trait DeliteGenOps extends BaseGenOps {
    * Checks to see if we need DeliteCollections, DeliteStructs, and/or FigmentOps to be mixed in
    */
   def baseOpsCls(opsGrp: DSLOps) = {
-    var base = if (!opsGrp.ops.forall(isUserFacing)) opsGrp.grp.name + "InternalOps" else opsGrp.name
+    var base = if (opsGrp.ops.exists(_.backend == internalBackend)) opsGrp.grp.name + "InternalOps" else opsGrp.name
     base += " with BaseFatExp with EffectExp"
     base += ( if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && ForgeCollections.contains(grpAsTpe(o.grp)))) " with DeliteCollectionOpsExp" else "" )
     base += ( if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && DataStructs.contains(grpAsTpe(o.grp)))) " with DeliteStructsExp" else "" )
@@ -230,7 +245,7 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println("  this: " + dsl + "Compiler => ")
     stream.println()
 
-    val uniqueOps = unique(opsGrp.ops).filter(_.backend != libraryBackend)
+    val uniqueOps = unique(opsGrp.ops).filter(hasCompilerVersion)
 
     emitIRNodes(uniqueOps, stream)
     stream.println()
@@ -888,7 +903,7 @@ trait DeliteGenOps extends BaseGenOps {
       emitBlockComment("Delite struct", stream, indent=2)
       var structStream = ""
       var first = true
-      for (tpe <- classes if DataStructs.contains(tpe) && !FigmentTpes.contains(tpe)) {
+      for (tpe <- classes if DataStructs.contains(tpe) && !FigmentTpes.contains(tpe) && !isMetaType(tpe)) {
         val d = DataStructs(tpe)
         val fields = d.fields.zipWithIndex.map { case ((fieldName,fieldType),i) => ("\""+fieldName+"\"", if (isTpePar(fieldType)) "m.typeArguments("+i+")" else wrapManifest(fieldType)) }
         val erasureCls = tpe.name + (if (!tpe.tpePars.isEmpty) "[" + tpe.tpePars.map(t => "_").mkString(",") + "]" else "")
@@ -942,6 +957,46 @@ trait DeliteGenOps extends BaseGenOps {
     }
   }
 
+  // TODO: This probably won't work for curried method signatures
+  def emitTraversalRules(op: Rep[DSLOp], rules: List[DSLRule], isRewrite: Boolean, stream: PrintWriter, indent: Int) {
+    val patternPrefix = if (isRewrite) "" else makeOpNodeName(op)
+
+    def emitCase(pattern: List[String], rule: Rep[String]) {
+      emitWithIndentInline("case " + patternPrefix + pattern.mkString("(",",",")") + " => ", stream, indent)
+      val lines = inline(op, rule, quoteLiteral).split(nl)
+      if (lines.length > 1) {
+        stream.println()
+        lines.foreach{line => emitWithIndent(line, stream, indent+2)}
+      }
+      else
+        stream.println(lines.head)
+    }
+    // Emit all pattern cases (in order) first
+    for (r <- rules.flatMap{case r: PatternRule => Some(r) case _ => None}) {
+      emitCase(r.pattern, r.rule)
+      if (r.commutative) {
+        if (r.pattern.length == 2) emitCase(r.pattern.reverse, r.rule)
+        else warn("Ignoring commutativity of rewrite rule with more than two arguments")
+      }
+    }
+    if (isRewrite)
+      emitWithIndentInline("case _ => ", stream, indent)
+    else
+      emitWithIndentInline("case " + patternPrefix + op.args.map(_ => "_").mkString("(",",",")") + " =>", stream, indent)
+    rules.find(r => r.isInstanceOf[SimpleRule]) match {
+      case Some(SimpleRule(rule)) =>
+        val lines = inline(op, rule, quoteLiteral).split(nl)
+        if (lines.length > 1) {
+          stream.println()
+          lines.foreach{line => emitWithIndent(line, stream, indent+2)}
+        }
+        else
+          stream.println(lines.head)
+      case _ if isRewrite => stream.println("super." + makeOpMethodName(op) + makeArgs(op.args))
+      case _ =>
+    }
+  }
+
   /**
    * Emit all rewrite rules (except forwarders) for ops in the given op group
    */
@@ -957,38 +1012,7 @@ trait DeliteGenOps extends BaseGenOps {
       rewrites foreach { case (o, rules) =>
         stream.println("  override " + makeOpMethodSignature(o) + " = {")
         stream.println("    " + makeArgs(o.args) + " match {")
-
-        def emitCase(pattern: List[String], rule: Rep[String]) {
-          stream.print("      case " + pattern.mkString("(",",",")") + " => ")
-          val lines = inline(o, rule, quoteLiteral).split(nl)
-          if (lines.length > 1) {
-            stream.println()
-            lines.foreach { line => emitWithIndent(line, stream, 8)}
-          }
-          else
-            stream.println(lines.head)
-        }
-        // Emit all pattern cases (in order) first
-        for (r <- rules.flatMap{case r: PatternRule => Some(r) case _ => None}) {
-          emitCase(r.pattern, r.rule)
-          if (r.commutative) {
-            if (r.pattern.length == 2) emitCase(r.pattern.reverse, r.rule)
-            else warn("Ignoring commutativity of rewrite rule with more than two arguments")
-          }
-        }
-        stream.print("      case _ => ")
-        rules.find(r => r.isInstanceOf[SimpleRule]) match {
-          case Some(SimpleRule(rule)) =>
-            val lines = inline(o, rule, quoteLiteral).split(nl)
-            if (lines.length > 1) {
-              stream.println()
-              lines.foreach { line => emitWithIndent(line, stream, 8)}
-            }
-            else
-              stream.println(lines.head)
-          case _ =>
-            stream.println("super." + makeOpMethodName(o) + makeArgs(o.args))
-        }
+        emitTraversalRules(o, rules, true, stream, 6)
         stream.println("    }")
         stream.println("  }")
       }

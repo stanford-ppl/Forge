@@ -44,6 +44,11 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     case _ => hasLibraryVersion(o)
   }
 
+  def emitLibraryOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
+    emitBlockComment("Library-only operations", stream)
+    emitOpSugar(opsGrp.grp.name + "Library", opsGrp.name, dsl + "Library", opsGrp, stream, libraryBackend)
+  }
+
   /**
    * Emit implementation bodies for all ops except codegen, setter, getter, and allocates
    * These implementations are called from Wrapper (ops not generated here are inlined)
@@ -273,45 +278,37 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     if (i != "") emitWithIndent("def " + implicitOpArgPrefix + o.implicitArgs.length + " = ()", stream, indent)
   }
 
-
-  def emitNoLibraryErr(o: Rep[DSLOp], stream: PrintWriter, indent: Int) {
-    emitWithIndent("throw new Exception(\"DSL design error: attempted to call compiler-only method " + o.name + "\")", stream, indent)
-  }
   /**
    * Generate calls to an op's implementation
    * Directly inlines the method for codegen, getter, setter, and allocates
    */
-  def emitOp(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) {
-    if (!hasLibraryVersion(o)) {
-      emitNoLibraryErr(o,stream,indent)
-    }
-    else Impls(o) match {
-      case codegen:CodeGen =>
-        val rule = codegen.decls.getOrElse($cala, err("could not find Scala codegen rule for op: " + o.name))
-        inline(o, rule.decl, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent) }
-      case Getter(structArgIndex,field) =>
-        emitOverloadShadows(o, stream, indent)
-        emitWithIndent(inline(o, quotedArg(o.args.apply(structArgIndex).name)) + "." + field, stream, indent)
-      case Setter(structArgIndex,field,value) =>
-        emitOverloadShadows(o, stream, indent)
-        emitWithIndent(inline(o, quotedArg(o.args.apply(structArgIndex).name)) + "." + field + " = " + inline(o,value), stream, indent)
-      case Allocates(tpe,init) =>
-        emitOverloadShadows(o, stream, indent)
-        val initialVals = init.map(i => inline(o,i)).mkString(",")
-        emitWithIndent("new " + quote(tpe) + "(" + initialVals + ")", stream, indent)
-      case AllocatesFigment(tpe,init) =>
-        emitOverloadShadows(o, stream, indent)
-        val initialVals = init.map(i => inline(o,i)).mkString(",")
-        emitWithIndent("new " + quote(tpe) + "(" + initialVals + ")", stream, indent)
-      case _ => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
-    }
+  def emitOp(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) = Impls(o) match {
+    case codegen:CodeGen =>
+      val rule = codegen.decls.getOrElse($cala, err("could not find Scala codegen rule for op: " + o.name))
+      inline(o, rule.decl, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent) }
+    case Getter(structArgIndex,field) =>
+      emitOverloadShadows(o, stream, indent)
+      emitWithIndent(inline(o, quotedArg(o.args.apply(structArgIndex).name)) + "." + field, stream, indent)
+    case Setter(structArgIndex,field,value) =>
+      emitOverloadShadows(o, stream, indent)
+      emitWithIndent(inline(o, quotedArg(o.args.apply(structArgIndex).name)) + "." + field + " = " + inline(o,value), stream, indent)
+    case Allocates(tpe,init) =>
+      emitOverloadShadows(o, stream, indent)
+      val initialVals = init.map(i => inline(o,i)).mkString(",")
+      emitWithIndent("new " + quote(tpe) + "(" + initialVals + ")", stream, indent)
+    case AllocatesFigment(tpe,init) =>
+      emitOverloadShadows(o, stream, indent)
+      val initialVals = init.map(i => inline(o,i)).mkString(",")
+      emitWithIndent("new " + quote(tpe) + "(" + initialVals + ")", stream, indent)
+    case _ =>
+      emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
   }
 
   /**
    * Emit classes as the library backend implementation of structs
    * HACK: case classes are only used for the special Forge Tups
    */
-  def emitClass(opsGrp: DSLOps, stream: PrintWriter) {
+  def emitGrpClasses(opsGrp: DSLOps, stream: PrintWriter) {
     val classes = opsGrpTpes(opsGrp)
     for (tpe <- classes if !isMetaType(tpe)) {
       val d = DataStructs.get(tpe)
@@ -346,7 +343,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       }
     }
 
-    for (o <- unique(opsGrp.ops) if !Impls(o).isInstanceOf[Redirect]) {
+    for (o <- unique(opsGrp.ops) if !Impls(o).isInstanceOf[Redirect] && hasLibraryVersion(o)) {
       // no return tpe because not all of the tpes are in scope in the lib wrapper
       stream.println("  " + makeOpMethodSignature(o, withReturnTpe = Some(false)) + " = {")
       o.style match {

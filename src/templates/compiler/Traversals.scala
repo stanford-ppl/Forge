@@ -11,7 +11,13 @@ trait BaseGenTraversals extends ForgeCodeGenBase {
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
   import IR._
 
+  def hasIR(t: Rep[DSLTraversal]) = t match {
+    case Def(Traverse(_,_)) => false
+    case _ => true
+  }
+
   def makeTraversalName(t: Rep[DSLTraversal]) = t match {
+    case Def(Traverse(name,isExtern)) => name
     case Def(Transform(name,isExtern)) => name + "Transformer"
     case Def(Analyze(name,isExtern)) => name + "Analyzer"
   }
@@ -125,12 +131,23 @@ trait DeliteGenTraversals extends BaseGenTraversals {
 
   // --- Transformers
   def emitTransformer(t: Rep[DSLTransformer], stream: PrintWriter) {
-    // TODO: May not want to always extend TunnelingTransformer?
+    // TODO: May not want to always extend TunnelingTransformer or have this behavior?
     stream.println("trait " + makeTraversalName(t) + " extends TunnelingTransformer {")
     stream.println("  val IR: " + makeTraversalIRName(t))
     stream.println("  import IR._")
+    stream.println("  override val name = " + makeTraversalName(t))
+    stream.println("  override val debugMode = false")        // TODO: Should be able to change this
     stream.println()
-    stream.println("  override def transformTP[A](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext) = rhs match {")
+    stream.println("  override def transformTP[A](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext): Option[Exp[Any]] = rhs match {")
+
+    val patterns = Transformers(t).rules
+    for ((op,rules) <- patterns) {
+      if (!hasIRNode(op) || hasMultipleIRNodes(op)) {
+        err("Cannot create transformation rule for op " + op.name + ": Op must be represented by exactly one IR node")
+      }
+      emitTraversalRules(op, rules, false, stream, 4)
+    }
+
     stream.println("    case _ => super.transformTP(lhs, rhs)") // TODO: Should be able to change this
     stream.println("  }")
     stream.println("}")
@@ -147,8 +164,20 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("trait " + makeTraversalName(az) + " extends AnalyzerBase {")
     stream.println("  val IR: " + makeTraversalIRName(az))
     stream.println("  import IR._")
+    stream.println("  override val name = " + makeTraversalName(az))
+    stream.println("  override val debugMode = false")        // TODO: Should be able to change this
     stream.println("  override val autopropagate = true")     // TODO: Should be able to change this
+    stream.println()
     stream.println("  override def processTP(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext) = rhs match {")
+
+    val patterns = Analyzers(az).rules
+    for ((op,rules) <- patterns) {
+      if (!hasIRNode(op) || hasMultipleIRNodes(op)) {
+        err("Cannot create analysis rule for op " + op.name + ": Op must be represented by exactly one IR node")
+      }
+      emitTraversalRules(op, rules, false, stream, 4)
+    }
+
     stream.println("    case _ => super.processTP(lhs, rhs)") // TODO: Should be able to change this
     stream.println("  }")
     stream.println("}")

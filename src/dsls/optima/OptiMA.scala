@@ -4,6 +4,13 @@ package optima
 
 import core.{ForgeApplication,ForgeApplicationRunner}
 
+// TODO:
+// - Default type metadata
+// - What should DSL-writer facing syntax be for metadata setters/getters?
+// - Codegen analysis and lowering rules (should be easy)
+// - Misc. operations for analysis (e.g. convergence messages, postprocessing)
+//   - Don't want this to just be writing Delite code in Forge box, but what else can we do here?
+
 object OptiMADSLRunner extends ForgeApplicationRunner with OptiMADSL
 trait OptiMADSL extends ForgeApplication with MultiArrayOps with VisibilityTestOps {
 
@@ -14,7 +21,7 @@ trait OptiMADSL extends ForgeApplication with MultiArrayOps with VisibilityTestO
     // our selection of Scala ops
     // we don't use Numeric or Fractional, since they are replaced by Arith
     //importMisc()
-    //importPrimitives()
+    importPrimitives()
     //importCasts()
     //importOrdering()
     //importStrings()
@@ -24,22 +31,21 @@ trait OptiMADSL extends ForgeApplication with MultiArrayOps with VisibilityTestO
     //noInfixList :::= List("toInt", "toFloat", "toDouble", "toLong")
 
     importVisibilityTest()
-    importVisibilityTest2()
 
     /*
     importHashMap()
     importConcurrentHashMap()*/
 
     // MultiArray figment types (with subtyping)
-    /*val T = tpePar("T")
+    val T = tpePar("T")
     val ArrayND = figmentTpe("ArrayND", T)
     val Array1D = figmentTpe("Array1D", T) isA ArrayND
     val Array2D = figmentTpe("Array2D", T) isA ArrayND
-    val Array3D = figmentTpe("Array3D", T) isA ArrayND*/
+    val Array3D = figmentTpe("Array3D", T) isA ArrayND
 
-    //importMultiArrayOps()
+    importMultiArrayOps()
 
-    //val RankAnalyzer = analyzer("Rank")
+    val RankAnalyzer = analyzer("Rank")
     //val RankChecker  = analyzer("RankCheck")
     //val ArrayWrapper = transformer("ArrayWrapper", isExtern=true)
     //val LayoutAnalyzer = analyzer("LayoutAnalyzer")
@@ -51,9 +57,6 @@ trait OptiMADSL extends ForgeApplication with MultiArrayOps with VisibilityTestO
     //schedule(LayoutAnalyzer)
     //schedule(ArrayLowering)
     //schedule(MultiloopSoA)
-
-    // Experimental metadata (move later)
-    //val RankMetadata = metadata("Rank")
 
     // rewrites
     //extern(grp("Rewrite"), targets = Nil)

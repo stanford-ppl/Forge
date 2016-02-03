@@ -106,6 +106,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case `MShort` | `MInt` | `MLong` | `MFloat` | `MDouble` | `MBoolean` | `MChar` | `MByte` | `MString` | `MUnit` | `MAny` | `MNothing` | `MLambda` | `MSourceContext` | `byName` => true
     case `CShort` | `CInt` | `CLong` | `CFloat` | `CDouble` | `CBoolean` | `CChar` | `CByte` | `CString` | `CUnit` | `CAny` | `CNothing` => true
     case `SShort` | `SInt` | `SLong` | `SFloat` | `SDouble` | `SBoolean` | `SChar` | `SByte` | `SString` | `SUnit` | `SAny` | `SList`  => true
+    case `SymProps` | `ArrayProps` | `StructProps` | `ScalarProps` | `SOption` => true
     // case Def(Tpe(_,_,`now`)) => true
     case Def(Tpe(name,_,_)) if name.startsWith("Tuple") => true
     case Def(Tpe(name,_,_)) if primitiveTpePrefix exists { t => name.startsWith(t) } => true
@@ -268,6 +269,7 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
       case List(Def(Arg(_,`byName`,_))) => " => " + repify(ret)
       case _ => "(" + args.map(repify).mkString(",") + ") => " + repify(ret)
     }
+    case Def(Meta(name,args)) => quote(a)
     case Def(Tpe(name, arg, `compile`)) => quote(a)
     case Def(Tpe("Var", arg, stage)) => repify(arg(0))
     case Def(TpePar(name, ctx, `compile`)) => quote(a)
@@ -285,6 +287,7 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
       case List(Def(Arg(_,`byName`,_))) => " => " + repifySome(ret)
       case _ => "(" + args.map(repifySome).mkString(",") + ") => " + repifySome(ret)
     }
+    case Def(Meta(name,args)) => quote(a)
     case Def(Tpe(name, arg, `now`)) => quote(a)
     case Def(Tpe("Var", arg, stage)) => varify(arg(0))
     case Def(TpePar(name, ctx, `now`)) => quote(a)

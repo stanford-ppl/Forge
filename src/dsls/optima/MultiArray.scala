@@ -4,7 +4,7 @@ package optima
 
 import core.{ForgeApplication,ForgeApplicationRunner}
 
-trait MultiArrayOps { this: OptiMADSL =>
+trait MultiArrayOps extends MultiUtils { this: OptiMADSL =>
 
   def importMultiArrayOps() {
     val T = tpePar("T")
@@ -16,27 +16,9 @@ trait MultiArrayOps { this: OptiMADSL =>
     val Array3D = lookupTpe("Array3D")
 
     // --- Utils
-    // TODO: Move to a different file
-    val Utils = grp("Utils")
-    //internal (Utils) ("list_zeros", T, SInt :: SList(MInt)) implements composite ${ List.fill($0)(unit(0)) }
-    internal (Utils) ("reductionTree", T, (SList(T), ((T,T) ==> T)) :: SList(T)) implements composite ${
-      if ($0.length == 1) $0
-      else if ($0.length % 2 == 0) reductionTree( List.tabulate($0.length/2){i => $1( $0(2*i), $0(2*i+1)) }, $1)
-      else reductionTree( List.tabulate($0.length/2){i => $1( $0(2*i), $0(2*i+1)) } :+ $0.last, $1)
-    }
-    internal (Utils) ("productTree", Nil, SList(MInt) :: MInt) implements composite ${
-      reductionTree($0, {(a: Rep[Int],b: Rep[Int]) => a * b}).head
-    }
-    internal (Utils) ("dimsToStrides", Nil, SList(MInt) :: SList(MInt)) implements composite ${
-      List.tabulate($0.length){d =>
-        if (d == $0.length - 1) unit(1)
-        else productTree($0.drop(d + 1))
-      }
-    }
-    internal (Utils) ("flattenIndices", Nil, (("indices", SList(MInt)), ("ofs", MInt), ("stride", SList(MInt))) :: MInt) implements composite ${
-      List.tabulate($indices.length){i => $indices(i)*$stride(i) }.reduce{_+_} + $ofs
-    }
-    library (Utils) ("flattenIndicesInto", T, (("indices", SList(MInt)), ("ma", ArrayND(T))) :: MInt) implements composite ${
+    importMultiUtils()
+
+    library (ArrayND) ("flattenIndicesInto", T, (("indices", SList(MInt)), ("ma", ArrayND(T))) :: MInt) implements composite ${
       flattenIndices($indices, multia_ofs($ma), multia_stride($ma))
     }
 
@@ -73,7 +55,6 @@ trait MultiArrayOps { this: OptiMADSL =>
     }*/
 
     // --- Properties
-    // UNUSED: internal (ArrayND) ("multia_rank", T, ArrayND(T) :: MInt) implements figment ${ multia_dims($0).length }
     internal (ArrayND) ("multia_size", T, ArrayND(T) :: MInt) implements figment ${ multia_dims($0).reduce{_*_} }
     internal (ArrayND) ("multia_dim", T, (ArrayND(T), SInt) :: MInt) implements figment ${ multia_dims($0).apply($1) }
 

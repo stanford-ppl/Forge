@@ -25,14 +25,15 @@ trait Definitions extends DerivativeTypes {
    * TODO: Add Fusion here when it is schedulable
    */
   lazy val MultiloopSoA = transformer("MultiloopSoA", isExtern = true)
+  lazy val IRPrinter = traversal("IRPrinter", isExtern = true)  // For debugging
 
   /**
    * Built-in types
    */
   // concrete types
-  // M-- stands for "Meta"    (a staged symbolic expression)
-  // C-- stands for "Current" (a staged constant)
-  // S-- stands for "Scala"   (always a constant, never staged)
+  // M- stands for "Meta"    (a staged symbolic expression)
+  // C- stands for "Current" (a staged constant)
+  // S- stands for "Scala"   (always a constant, never staged)
 
   // TODO: These aren't exactly consistent
   // FIXME: Need to resolve discrepancy between 'compile' and 'now'. Ideally everything should have 'compile' behavior, but it breaks
@@ -96,6 +97,14 @@ trait Definitions extends DerivativeTypes {
   lazy val MInputStream = tpe("ForgeFileInputStream")
   lazy val MOutputStream = tpe("ForgeFileOutputStream")
   lazy val SList = tpe("List", tpePar("A"), stage = compile)
+
+  // Metadata types
+  // TODO: Is there a better way to expose these to the DSL author? Way to not expose them at all?
+  lazy val SymProps = tpe("SymbolProperties", stage = compile)
+  lazy val ArrayProps = tpe("ArrayProperties", stage = compile)
+  lazy val StructProps = tpe("StructProperties", stage = compile)
+  lazy val ScalarProps = tpe("ScalarProperties", stage = compile)
+  lazy val SOption = tpe("Option", tpePar("A"), stage = compile)
 
   /* whitelist for primitive types (i.e. we should not generate a Forge shadow) */
   var primitiveTpePrefix = scala.List("scala","java")

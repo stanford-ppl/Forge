@@ -10,30 +10,67 @@ import scala.collection.mutable.{ArrayBuffer,HashMap}
 trait ForgeTraversalOps extends Base {
   this: Forge =>
 
-  // --- API
+  //--------
+  //--- API
+  //--------
 
-  def transformer(name: String, isExtern: Boolean = false) = forge_transformer(name,isExtern)
-  def analyzer(name: String, isExtern: Boolean = false) = forge_analyzer(name,isExtern)
-  def schedule(traversal: Rep[DSLTraversal]) = forge_schedule(traversal)
+  /**
+   * Methods for defining IR traversals and traversal rules
+   * Note that Analyzers and Transformers are subclasses of Traversals.
+   *
+   * Ex:
+   *   val MaxAnalysis = analyzer("Max")
+   *   analyze (MaxAnalysis)(int_plus) using rule ${ [annotate max of lhs as function of maxes of inputs] }
+   *
+   * TODO: Support additional settings/methods for traversals
+   * TODO: Modify preprocessor to support named arguments in rewrite rules
+   **/
 
-  def rewrite(op: Rep[DSLOp]*) = forge_rewrite(op)
-  def lower(xf: Rep[DSLTransformer])(op: Rep[DSLOp]) = forge_lower(xf, op)
+  def traversal(name: String, isExtern: Boolean = false): Rep[DSLTraversal] = forge_traversal(name, isExtern)
+  def transformer(name: String, isExtern: Boolean = false): Rep[DSLTransformer] = forge_transformer(name,isExtern)
+  def analyzer(name: String, isExtern: Boolean = false): Rep[DSLAnalyzer] = forge_analyzer(name,isExtern)
 
+  // Add given traversal to compiler's IR traversal schedule
+  def schedule(traversal: Rep[DSLTraversal]): Rep[Unit] = forge_schedule(traversal)
+
+  def rewrite(op: Rep[DSLOp]*): Rep[DSLPattern] = forge_rewrite(op)
+  def lower(xf: Rep[DSLTransformer])(op: Rep[DSLOp]): Rep[DSLPattern] = forge_lower(xf, op)
+  def analyze(az: Rep[DSLAnalyzer])(op: Rep[DSLOp]): Rep[DSLPattern] = forge_analyze(az, op)
+
+  // --- Traversal rules
+  // In analysis and traversal rules, the symbol representing the IR node can be referred to
+  // using the variable name "lhs". Note that in rewrite rules there is no symbol yet.
+  // Input arguments to the node are referred to using $0...$N
+  //
+  // Note: Forwarding typically should only be used as a rewrite rule
   object pattern {
-    def apply(rule: (List[String], String)) = forge_pattern(rule._1, unit(rule._2), false)
+    def apply(rule: (List[String], String)): DSLRule = forge_pattern(rule._1, unit(rule._2), false)
   }
   object commutative {
-    def apply(rule: (List[String], String)) = forge_pattern(rule._1, unit(rule._2), true)
+    def apply(rule: (List[String], String)): DSLRule = forge_pattern(rule._1, unit(rule._2), true)
   }
   object rule {
-    def apply(rule: Rep[String]) = forge_rule(rule)
+    def apply(rule: Rep[String]): DSLRule = forge_rule(rule)
   }
   object forwarding {
-    def apply(rule: Rep[String]) = forge_forwarding(rule)
+    def apply(rule: Rep[String]): DSLRule = forge_forwarding(rule)
   }
 
-  // TODO: Should users be allowed to specify type parameters for metadata?
-  // TODO: Should metadata even have type parameters?
+  /**
+   * Methods for defining metadata types and methods
+   * All metadata types must have the meet function defined on aliasing type 'any'
+   * All other methods are optional
+   *
+   * Ex:
+   *    val MaxVal = metadata("MaxVal", (max, SInt))  // Short form
+   *    meet (MaxVal) ${ MaxVal(Math.max(this.max, that.max)) }
+   *
+   * TODO: Add sugar for other metadata methods
+   * FIXME: Should users be allowed to specify type parameters for metadata?
+   * FIXME: Should metadata even have type parameters?
+   **/
+
+  // Create a metadata type. Use data() to define fields
   def metadata(name: String): Rep[DSLMetadata] = forge_metadata(name, Nil)
   // Alternate shorter form with fields inlined
   def metadata(name: String, field1: (String, Rep[DSLType]), fields: (String, Rep[DSLType])*): Rep[DSLMetadata] = {
@@ -41,13 +78,17 @@ trait ForgeTraversalOps extends Base {
     data(m, (field1 +: fields):_*)
     m
   }
-  def lookupMeta(name: String) = forge_lookup_metadata(name)
+  def lookupMeta(name: String): Rep[DSLMetadata] = forge_lookup_metadata(name)
 
+  // Creates a meet rule for given metadata type for given aliasing type
+  // Rule is always on exactly two arguments of given metadata type: this and that
+  // Meet rule should return the same type of metadata
   def meet(meta: Rep[DSLMetadata], alias: MetaMeet = any)(rule: Rep[String]) = forge_meet(meta,alias,rule)
 
-
-
-  // --- Forge stubs
+  //----------
+  //--- Stubs
+  //----------
+  def forge_traversal(name: String, isExtern: Boolean): Rep[DSLTraversal]
   def forge_transformer(name: String, isExtern: Boolean): Rep[DSLTransformer]
   def forge_analyzer(name: String, isExtern: Boolean): Rep[DSLAnalyzer]
   def forge_schedule(traversal: Rep[DSLTraversal]): Rep[Unit]
@@ -56,6 +97,7 @@ trait ForgeTraversalOps extends Base {
 
   def forge_rewrite(op: Seq[Rep[DSLOp]]): Rep[DSLPattern]
   def forge_lower(t: Rep[DSLTransformer], op: Rep[DSLOp]): Rep[DSLPattern]
+  def forge_analyze(az: Rep[DSLAnalyzer], op: Rep[DSLOp]): Rep[DSLPattern]
   def forge_rule(rule: Rep[String]): DSLRule
   def forge_forwarding(rule: Rep[String]): DSLRule
   def forge_pattern(pattern: List[String], rule: Rep[String], commutative: Boolean): DSLRule
@@ -96,7 +138,10 @@ trait ForgeTraversalSugar extends ForgeTraversalSugarLowPriority with ForgeTrave
   var _analysisScope: Option[Rep[DSLAnalyzer]] = None
   var _metadataScope: Option[Rep[DSLMetadata]] = None
 
-  implicit class TransformOpsCls(xf: Rep[DSLTransformer]) {
+  def withTransformer(t: Rep[DSLTransformer]) = new TransformOps(t)
+  def withAnalyzer(t: Rep[DSLAnalyzer]) = new AnalysisOps(t)
+
+  class TransformOps(xf: Rep[DSLTransformer]) {
     def apply[R](block: => R) {
       if (_xFormScope.isDefined) forge_err("Cannot create nested transformer scopes!")
       _xFormScope = Some(xf)   // set transformer scope
@@ -104,7 +149,7 @@ trait ForgeTraversalSugar extends ForgeTraversalSugarLowPriority with ForgeTrave
       _xFormScope = None // reset transformer scope
     }
   }
-  implicit class AnalysisOpsCls(az: Rep[DSLAnalyzer]) {
+  class AnalysisOps(az: Rep[DSLAnalyzer]) {
     def apply[R](block: => R) {
       if (_analysisScope.isDefined) forge_err("Cannot create nested analysis scopes!")
       _analysisScope = Some(az)
@@ -127,6 +172,7 @@ trait ForgeTraversalSugar extends ForgeTraversalSugarLowPriority with ForgeTrave
   trait AnalysisScope {
     //def infix_propagates(op: Rep[DSLOp], rule: Rep[String]) = forge_propagates(_analysisScope.get, op, rule)
     //def infix_updates(op: Rep[DSLOp], idx: Int, rule: Rep[String]) = forge_updates(_analysisScope.get, op, idx, rule)
+    def analyze(op: Rep[DSLOp]) = forge_analyze(_analysisScope.get, op)
   }
   trait AnalysisScopeRunner[R] extends AnalysisScope {
     def apply: R
@@ -141,8 +187,8 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
    * Compiler state
    */
   val Traversals = ArrayBuffer[Exp[DSLTraversal]]()
+  val Analyzers = HashMap[Exp[DSLAnalyzer], TraversalRules]()
   val Transformers = HashMap[Exp[DSLTransformer], TraversalRules]()
-  val Analyzers = HashMap[Exp[DSLAnalyzer], AnalysisRules]()
   val TraversalSchedule = ArrayBuffer[Exp[DSLTraversal]]()
   val MetaImpls = HashMap[Exp[DSLMetadata], MetaOps]()
 
@@ -154,6 +200,7 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
   case class RewritePattern(op: Rep[DSLOp]) extends Def[DSLPattern]
   case class RewriteSetPattern(op: List[Rep[DSLOp]]) extends Def[DSLPattern]
   case class LowerPattern(xf: Rep[DSLTransformer], op: Rep[DSLOp]) extends Def[DSLPattern]
+  case class AnalysisPattern(az: Rep[DSLAnalyzer], op: Rep[DSLOp]) extends Def[DSLPattern]
 
   def forge_rewrite(ops: Seq[Rep[DSLOp]]): Rep[DSLPattern] = {
     if (ops.length == 1)
@@ -162,7 +209,7 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
       RewriteSetPattern(ops.toList)
   }
   def forge_lower(xf: Rep[DSLTransformer], op: Rep[DSLOp]): Rep[DSLPattern] = LowerPattern(xf, op)
-
+  def forge_analyze(az: Rep[DSLAnalyzer], op: Rep[DSLOp]): Rep[DSLPattern] = AnalysisPattern(az, op)
 
   /**
    * Analysis (metadata propagation) rules
@@ -209,7 +256,7 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
 
     // Check that the user doesn't give two simple rules for one op pattern
     // TODO: Better stringify method for patterns for warnings/errors
-    def append_rule(oldRules: List[DSLRule]) = {
+    def append_rule_to(oldRules: List[DSLRule]) = {
       if (oldRules.exists(_.isInstanceOf[ForwardingRule])) {
         warn("Cannot define rewrite rule on pattern " + pattern + " - pattern already has a forwarding rule")
         oldRules
@@ -228,11 +275,16 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
     pattern match {
       case Def(RewriteSetPattern(ops)) => ops.foreach(op => forge_using(forge_rewrite(op), rule))
       case Def(RewritePattern(op)) if !Rewrites.contains(op) => Rewrites(op) = List(rule) // Create
-      case Def(RewritePattern(op)) => Rewrites(op) = append_rule(Rewrites(op))
+      case Def(RewritePattern(op)) => Rewrites(op) = append_rule_to(Rewrites(op))
       case Def(LowerPattern(xf, op)) =>
         val rules = Transformers(xf).rules
         if (!rules.contains(op)) rules(op) = List(rule)
-        else rules(op) = append_rule(rules(op))
+        else rules(op) = append_rule_to(rules(op))
+
+      case Def(AnalysisPattern(az,op)) =>
+        val rules = Analyzers(az).rules
+        if (!rules.contains(op)) rules(op) = List(rule)
+        else rules(op) = append_rule_to(rules(op))
     }
     ()
   }
@@ -240,6 +292,14 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
   /**
    * IR Definitions
    **/
+  case class Traverse(name: String, isExtern: Boolean) extends Def[DSLTraversal]
+  def forge_traversal(name: String, isExtern: Boolean) = {
+    val t: Exp[DSLTraversal] = Traverse(name,isExtern)
+    if (!Traversals.contains(t))
+      Traversals += t
+    t
+  }
+
   case class Transform(name: String, isExtern: Boolean) extends Def[DSLTransformer]
   def forge_transformer(name: String, isExtern: Boolean) = {
     val xf: Exp[DSLTransformer] = Transform(name,isExtern)
@@ -254,7 +314,7 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
   def forge_analyzer(name: String, isExtern: Boolean) = {
     val az: Exp[DSLAnalyzer] = Analyze(name,isExtern)
     if (!Analyzers.contains(az)) {
-      Analyzers += az -> AnalysisRules.empty
+      Analyzers += az -> TraversalRules.empty
       Traversals += az
     }
     az

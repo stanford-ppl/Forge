@@ -51,59 +51,71 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     val clsDir = dslDir + File.separator + "classes"
     Directory(Path(clsDir)).createDirectory()
 
-    // trait to group all of the ops together
-    val grpStream = new PrintWriter(new FileWriter(clsDir+File.separator+dsl+"Classes.scala"))
-    grpStream.println("package " + packageName + ".classes")
-    grpStream.println()
-    emitScalaReflectImports(grpStream)
-    emitLMSImports(grpStream)
-    emitDSLImports(grpStream)
-    grpStream.println()
-    grpStream.print("trait " + dsl + "Classes extends ")
-    var first = true
+    // Note that Wrapper must not have a view of lifts, as this causes ambiguous implicit calls
+    // for the library class implementations (specifically their var fields)
+    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp)) {
+      val stream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+".scala"))
+      stream.println("package " + packageName + ".classes")
+      stream.println()
+      emitScalaReflectImports(stream)
+      emitScalaMathImports(stream)
+      emitLMSImports(stream)
+      emitDSLImports(stream)
+      stream.println()
+      stream.println("trait " + grp.name + "Wrapper {")
+      stream.println( "  this: " + dsl + "Base with " + dsl + "Classes => ")
+      stream.println()
+      emitGrpClasses(opsGrp, stream)
+      stream.println("}")
+      stream.println()
+      stream.close()
+
+      // because front-end types are not in scope (to prevent unintentional recursive calls and ambiguities),
+      // we need to factor almost all tasks out to a separate trait in the library version also
+      if (opsGrp.ops.exists(requiresImpl)) {
+        val implStream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+"WrapperImpl"+".scala"))
+        implStream.println("package " + packageName + ".classes")
+        implStream.println()
+        emitScalaReflectImports(implStream)
+        emitScalaMathImports(implStream)
+        emitDSLImports(implStream)
+        implStream.println()
+        emitImpls(opsGrp, implStream)
+        implStream.close()
+      }
+      if (opsGrp.ops.exists(_.backend == libraryBackend)) {
+        val libStream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+"CompilerOps.scala"))
+        libStream.println("package " + packageName + ".ops")
+        libStream.println()
+        emitScalaReflectImports(libStream)
+        emitDSLImports(libStream)
+        libStream.println()
+        emitLibraryOpSyntax(opsGrp, libStream)
+        libStream.close()
+      }
+    }
+
+    // DSLClasses - One trait to group all of the ops together
+    val stream = new PrintWriter(new FileWriter(clsDir+File.separator+dsl+"Classes.scala"))
+    stream.println("package " + packageName + ".classes")
+    stream.println()
+    emitScalaReflectImports(stream)
+    emitLMSImports(stream)
+    emitDSLImports(stream)
+    stream.println()
+    stream.print("trait " + dsl + "Classes")
+
+    var conj = " extends "
     for ((grp,opsGrp) <- OpsGrp) {
       if (isTpeClass(grp)) {
-        if (first) grpStream.print(opsGrp.name) else grpStream.print(" with " + opsGrp.name)
-        first = false
+        stream.print(conj + opsGrp.name)
+        conj = " with "
       }
-      else if (!isTpeClass(grp) && !isTpeClassInst(grp)) {
-        val wrapper = grp.name + "Wrapper"
-        if (first) grpStream.print(wrapper) else grpStream.print(" with " + wrapper)
-        first = false
-
-        val stream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+".scala"))
-        stream.println("package " + packageName + ".classes")
-        stream.println()
-        emitScalaReflectImports(stream)
-        emitScalaMathImports(stream)
-        emitLMSImports(stream)
-        emitDSLImports(stream)
-        stream.println()
-        stream.println("trait " + wrapper + " {")
-        // stream.println("trait " + wrapper + " extends " + grp.name + "Ops with " + dsl + "Base {")
-        // Note that Wrapper must not have a view of lifts, as this causes ambiguous implicit calls
-        // for the library class implementations (specifically the var fields)
-        stream.println( "  this: " + dsl + "Base with " + dsl + "Classes => ")
-        stream.println()
-        emitClass(opsGrp, stream)
-        stream.println("}")
-        stream.println()
-        stream.close()
-
-        // because front-end types are not in scope (to prevent unintentional recursive calls and ambiguities),
-        // we need to factor almost all tasks out to a separate trait in the library version also
+      else if (!isTpeClassInst(grp)) {
+        stream.print(conj + grp.name + "Wrapper")
+        conj = " with "
         if (opsGrp.ops.exists(requiresImpl)) {
-          val implStream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+"WrapperImpl"+".scala"))
-          implStream.println("package " + packageName + ".classes")
-          implStream.println()
-          emitScalaReflectImports(implStream)
-          emitScalaMathImports(implStream)
-          emitDSLImports(implStream)
-          implStream.println()
-          emitImpls(opsGrp, implStream)
-          implStream.close()
-
-          grpStream.print(" with " + grp.name + "WrapperImpl")
+          stream.print(conj + grp.name + "WrapperImpl")
         }
       }
     }
@@ -111,13 +123,14 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
       warn("(library) ignoring data definition for " + d.name + " since it cannot be instantiated in app code (it has no accompanying ops)")
     }
     for (e <- Externs) {
-      grpStream.print(" with " + e.opsGrp.grp.name + "Wrapper")
+      stream.print(conj + e.opsGrp.grp.name + "Wrapper")
+      conj = " with "
     }
-    grpStream.println("{")
-    grpStream.println("  this: " + dsl + "Library => ")
-    grpStream.println("}")
-    grpStream.println()
-    grpStream.close()
+    stream.println(" {")
+    stream.println("  this: " + dsl + "Library => ")
+    stream.println("}")
+    stream.println()
+    stream.close()
   }
 }
 

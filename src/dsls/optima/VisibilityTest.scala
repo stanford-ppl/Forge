@@ -6,59 +6,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 
 trait VisibilityTestOps { this: OptiMADSL =>
 
-  def importVisibilityTest2() {
-    val ImplForm = metadata("ImplForm", ("v", SInt))
-    val Buffer = metadata("MBuffer", ("impl", ImplForm))
-    val View = metadata("MView", ("impl", ImplForm))
-
-    val Rank = metadata("MRank", ("rank", SInt))
-    val MayUpdate = metadata("MayUpdate", ("mayUpdate", SBoolean))
-    //val Precision = metadata("Precision", ("signed", SBoolean), ("intBits", SInt), ("decBits", SInt))
-
-    //compiler (ImplForm) ("NoImpl", Nil, Nil :: ImplForm) implements composite ${ ImplForm(0) }
-    //compiler (ImplForm) ("PhysOnly", Nil, Nil :: ImplForm) implements composite ${ ImplForm(1) }
-    //compiler (ImplForm) ("TrueImpl", Nil, Nil :: ImplForm) implements composite ${ ImplForm(2) }
-
-    // Meet: proposed syntax version 1
-    // Default for matching is case class equality (which is generated as field equality)
-    // Default for MetaOverwrite meet case is keep the rhs
-
-    meet (ImplForm) ${ if (this != that) ImplForm(1) else that }
-    meet (Buffer) ${ MBuffer(meet(this.impl, that.impl)) }
-    meet (View) ${ MView(meet(this.impl, that.impl)) }
-
-    meet (Rank) ${ MRank(this.rank) }
-    meet (MayUpdate) ${ MayUpdate(this.mayUpdate || that.mayUpdate) }
-
-    //meet (Precision, alias = branch) ${ ... }
-
-  }
-
   def importVisibilityTest() {
-    // --- Primitives
-    val Prim = grp("Primitive")
-
-    lift (Prim) (MInt)
-    lift (Prim) (MBoolean)
-    lift (Prim) (MString)
-
-    val not = infix (Prim) ("unary_!", Nil, MBoolean :: MBoolean) implements codegen($cala, "!" + quotedArg(0))
-    rewrite (not) using forwarding ${ delite_boolean_negate($0) }
-
-    val int_plus = direct (Prim) ("forge_int_plus", Nil, (MInt,MInt) :: MInt) implements codegen($cala, ${$0 + $1})
-    val int_minus = direct (Prim) ("forge_int_minus", Nil, (MInt,MInt) :: MInt) implements codegen($cala, ${$0 - $1})
-    val int_times = direct (Prim) ("forge_int_times", Nil, (MInt,MInt) :: MInt) implements codegen($cala, ${$0 * $1})
-    val int_divide = direct (Prim) ("forge_int_divide", Nil, (MInt,MInt) :: MInt) implements codegen($cala, ${$0 / $1})
-    // Forward integer operations used for index calc to Delite internal implementations
-    rewrite (int_plus) using forwarding ${ delite_int_plus($0, $1) }
-    rewrite (int_minus) using forwarding ${ delite_int_minus($0, $1) }
-    rewrite (int_times) using forwarding ${ delite_int_times($0, $1) }
-
-    infix (Prim) ("+", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_plus($0, $1) }
-    infix (Prim) ("-", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_minus($0, $1) }
-    infix (Prim) ("*", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_times($0, $1) }
-    infix (Prim) ("/", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_divide($0, $1) }
-
     // --- Ranges
     val Range = tpe("Range")
     data(Range, ("_start", MInt), ("_end", MInt), ("_stride", MInt))
@@ -85,11 +33,9 @@ trait VisibilityTestOps { this: OptiMADSL =>
     //internal.infix (Range) ("::", Nil, (MInt, MInt) :: Range) implements composite ${ Range($0, $1, 1) }
     //noSourceContextList ::= "::"
     noInfixList ::= "foreach"
-    noInfixList ::= "t"
-    noInfixList ::= "isRow"
 
     // --- Vectors
-    val Vector = tpe("Vector")
+    /*val Vector = tpe("Vector")
     data(Vector, ("_length",MInt), ("_data",MArray(MInt)), ("_isRow", MBoolean))
 
     infix (Vector) ("length", Nil, Vector :: MInt) implements getter(0, "_length")
@@ -121,5 +67,6 @@ trait VisibilityTestOps { this: OptiMADSL =>
     // NOTE: Not a great way of writing this, just need to test internal implicit
     internal.fimplicit (Vector) ("vec_to_array", Nil, Vector :: MArray(MInt)) implements composite ${ $0.data }
     infix (Vector) ("t", Nil, Vector :: Vector) implements composite ${ vector_allocate($0.length, $0, !$0.isRow) }
+  */
   }
 }

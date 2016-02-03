@@ -502,15 +502,15 @@ trait BaseGenOps extends ForgeCodeGenBase {
 
   /**
    * Implicits go in a base class for lower priority
-   * Conditionally generate this class depending on if there are
-   * Returns name of trait to extend for implicits (either traitName or baseTrait)
+   * Conditionally generate this class depending on if there are any implicits
+   * Returns name of trait to extend for implicits (either traitName or baseTrait if there are no implicits)
    */
-  def emitOpImplicits(traitName: String, baseTrait: String, opsGrp: DSLOps, stream: PrintWriter, backend: BackendType): String = {
+  def emitOpImplicits(traitName: String, baseTrait: String, parentTrait: String, opsGrp: DSLOps, stream: PrintWriter, backend: BackendType): String = {
     val implicitOps = opsGrp.ops.filter(e => e.style == implicitMethod && e.backend == backend)
 
     if (implicitOps.nonEmpty) {
       stream.println("trait " +  traitName + " extends " + baseTrait + " {")
-      stream.println("  this: " + dsl + " => ")
+      stream.println("  this: " + parentTrait + " => ")
       stream.println()
       if (unique(implicitOps).length != implicitOps.length) err("non-unique implicit op variants (e.g. Var, T args) are not yet supported")
 
@@ -531,16 +531,23 @@ trait BaseGenOps extends ForgeCodeGenBase {
   }
 
   // TODO: Need to check that static methods are only generated at one visibility level
-  def emitOpSugar(traitName: String, baseTrait: String, opsGrp: DSLOps, stream: PrintWriter, backend: BackendType) {
+  /**
+   * Emits all sugar for a group of ops at a specified visibility level
+   * Also emits stub methods which need to be filled in by the backend(s)
+   * Op sugar is emitted in two traits:
+   *   [traitName]Ops  - most of the sugar
+   *   [traitName]Base - sugar for implicits (separated into a base class for lower priority)
+   */
+  def emitOpSugar(traitName: String, baseTrait: String, parentTrait: String, opsGrp: DSLOps, stream: PrintWriter, backend: BackendType) {
     // Partition ops by style and visibility
     val staticOps   = opsGrp.ops.filter(e => e.style == staticMethod && e.backend == backend)
     val directOps   = opsGrp.ops.filter(e => e.style == directMethod && e.backend == backend)
     val allInfixOps = opsGrp.ops.filter(e => e.style == infixMethod && e.backend == backend)
 
     // --- Implicit ops
-    val base = emitOpImplicits(traitName + "Base", baseTrait, opsGrp, stream, backend)
+    val base = emitOpImplicits(traitName + "Base", baseTrait, parentTrait, opsGrp, stream, backend)
     stream.println("trait " + traitName + "Ops extends " + base + " {")
-    stream.println("  this: " + dsl + " => ")
+    stream.println("  this: " + parentTrait + " => ")
     stream.println()
 
     // --- Static ops
@@ -562,6 +569,15 @@ trait BaseGenOps extends ForgeCodeGenBase {
     // TODO: Potential future problem with infix operations at multiple visibility levels:
     // Ying-Yang uses simple string insertion rules to insert OpsCls instantiations. If we use this
     // version of the frontend but have multiple visibility levels of infixes, how do we ensure that we insert the right OpsCls?
+
+    // TODO: Should compiler and library backends even be allowed here?
+    val opsClsSuffix = backend match {
+      case `sharedBackend` => ""
+      case `internalBackend` => "Internal"
+      case `compilerBackend` => "Compiler"
+      case `libraryBackend` => "Library"
+    }
+
     val (pimpOps, infixOps) = allInfixOps.partition(noInfix)
     if (pimpOps.nonEmpty) {
       // set up a pimp-my-library style promotion
@@ -577,13 +593,6 @@ trait BaseGenOps extends ForgeCodeGenBase {
         val tpeArgs = tpe match {
           case Def(TpeInst(hk,args)) => args.filterNot(isTpePar)
           case _ => Nil
-        }
-
-        val opsClsSuffix = backend match {
-          case `sharedBackend` => ""
-          case `internalBackend` => "Internal"
-          case `compilerBackend` => "Compiler"  // TODO: Should compiler and library backends be allowed?
-          case `libraryBackend` => "Library"
         }
 
         val opsClsName = opsGrp.grp.name + tpe.name.replaceAll("\\.","") + tpeArgs.map(_.name).mkString("") + opsClsSuffix + "OpsCls"
@@ -634,16 +643,13 @@ trait BaseGenOps extends ForgeCodeGenBase {
 
   def emitSharedOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
     // Shared Ops (visible to user, shared across library and compiler)
-    // Generates: [OpGrp]Implicits extends [BaseTraits] and [OpGrp]Ops extends [OpGrp]Implicits
     emitBlockComment("Shared operations", stream)
-    emitOpSugar(opsGrp.grp.name, baseOpsCls(opsGrp.grp), opsGrp, stream, sharedBackend)
+    emitOpSugar(opsGrp.grp.name, baseOpsCls(opsGrp.grp), dsl, opsGrp, stream, sharedBackend)
 
-    // "Compiler" Ops (not visible to user, shared across library and compiler)
-    // (Name is confusing because it's meant to match up with legacy naming conventions in Delite/LMS)
-    // Generates: [OpGrp]InternalImplicits extends [OpGrp]Ops and [OpGrp]InternalOps extends [OpGrp]InternalImplicits
+    // Internal Ops (not visible to user, shared across library and compiler)
     if (opsGrp.ops.exists(e=> e.backend == internalBackend)) {
       emitBlockComment("Internal operations", stream)
-      emitOpSugar(opsGrp.grp.name + "Internal", opsGrp.name, opsGrp, stream, internalBackend)
+      emitOpSugar(opsGrp.grp.name + "Internal", opsGrp.name, dsl, opsGrp, stream, internalBackend)
     }
     /*val internalOps = opsGrp.ops.filter(e=>e.backend == internalBackend)
     if (!internalOps.isEmpty) {

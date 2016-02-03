@@ -32,17 +32,18 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     stream.println("trait " + dsl + "CompilerOps extends " + dsl)
     for (opsGrp <- opsGrps) {
       // stream.print(" with " + opsGrp.name)
-      if (opsGrp.ops.exists(o => Impls(o).isInstanceOf[SingleTask] || Impls(o).isInstanceOf[Composite]))
+      if (opsGrp.ops.exists(requiresImpl))
         stream.print(" with " + opsGrp.name + "Impl")
       if (opsGrp.ops.exists(_.backend == internalBackend))
         stream.print(" with " + opsGrp.grp.name + "InternalOps")
+      if (opsGrp.ops.exists(_.backend == compilerBackend))
+        stream.print(" with " + opsGrp.grp.name + "CompilerOps")
     }
     for (e <- Externs) {
       stream.print(" with " + e.opsGrp.grp.name + "CompilerOps") // Legacy naming for InternalOps
     }
     stream.println(" {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Application => ")
-    stream.println()
     stream.println("}")
     stream.println()
 

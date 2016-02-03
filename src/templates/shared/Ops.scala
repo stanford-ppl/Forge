@@ -492,7 +492,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     // FIXME: we get scalac internal crashes when using the default-implicit mode now
     // if (Config.fastCompile) {
     //   // default implicit mode (appears empirically slightly faster than infix)
-    //   (!mustInfixList.contains(o.name)) && o.args.length > 0 && !o.args.exists(hasDefaultValue)
+       (!mustInfixList.contains(o.name)) && o.args.length > 0 && !o.args.exists(hasDefaultValue)
     // }
     // else {
       // default infix mode (slightly easier to understand what's happening, also fails to apply less than implicits)
@@ -500,9 +500,9 @@ trait BaseGenOps extends ForgeCodeGenBase {
     // }
 
     //TODO macrovirt:
-    //!mustInfixList.contains(o.name) && (noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o)) //old version wich has more infix_stuff
+//    !mustInfixList.contains(o.name) && (noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o)) //old version wich has more infix_stuff
     //ORIGINAL: !macroInfix.contains(o.name) && (o.curriedArgs.length > 0 || hasFuncArgs(o)) //old version which has more infix_stuff
-    (o.tpePars.size <= 1) && !o.grp.name.startsWith("Tup") // o.curriedArgs.length > 0 || hasFuncArgs(o) ||   //has
+//    (o.tpePars.size <= 1) && !o.grp.name.startsWith("Tup") // o.curriedArgs.length > 0 || hasFuncArgs(o) ||   //has
   }
 
   def emitOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {

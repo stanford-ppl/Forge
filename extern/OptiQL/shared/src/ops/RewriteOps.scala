@@ -78,13 +78,12 @@ trait RewriteCompilerOps extends RewriteOps {
         case "Boolean" => (field, false, (r:Rep[T]) => record(unit(i)) == "true")
         case "Int" => (field, false, (r:Rep[T]) => record(unit(i)).toInt)
         case "Long" => (field, false, (r:Rep[T]) => record(unit(i)).toLong)
-        case "Char" => (field, false, (r:Rep[T]) => infix_fcharAt(record(unit(i)), unit(0)))
+        case "Char" => (field, false, (r:Rep[T]) => fstring_fcharat(record(unit(i)), unit(0)))
         case d if d.contains("Date") => (field, false, (r:Rep[T]) => Date(record(unit(i))))
         case _ => throw new RuntimeException("Don't know hot to automatically parse type " + tp.toString + ". Try passing in your own parsing function instead.")
       }
     }
-    
-    if (isRecord) record_new[T](fields)
+    if (isRecord) record_new[T](fields.asInstanceOf[Seq[(String, Boolean, RewriteCompilerOps.this.Rep[T] => RewriteCompilerOps.this.Rep[_])]])
     else fields(0)._3(null.asInstanceOf[Rep[T]]).asInstanceOf[Rep[T]]
   }
 }

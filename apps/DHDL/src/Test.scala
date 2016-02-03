@@ -13,24 +13,30 @@ trait Test extends DHDLApplication {
   def main() = {
 		//val om = OffChipMem[FixPt]("om", Array[FixPt](1l,2l,3l))
 
-		//val a = FixPt(5, 31, 0)
-		//val b = FixPt(7, 31, 0)
-		//val r = Reg("a", a)
-		//assert(r.value==a)
-		//r.write(b)
-		//assert(r.value==b)
-		//assert(r.init==a)
-		//r.reset
-		//assert(r.value==a)
+		val a = FixPt(5, 31, 0)
+		val b = FixPt(7, 31, 0)
+		val r = Reg("a", a)
+		println(a.mkString)
+		assert(r.value==a)
+		r.write(b)
+		assert(r.value==b)
+		assert(r.init==a)
+		r.reset
+		assert(r.value==a)
 
-		//val m = BRAM[FixPt]("m", 16)
-		//m.st(3,b)
-		//assert(m.ld(3)==b)
+		val m = BRAM[FixPt]("m", 16)
+		m.st(3,b)
+		assert(m.ld(3)==b)
 
-		val ctr = Ctr("ctr1", 10, 1)
-		val ct = CtrChain(ctr)
-		val str = ct.mkString
-		println(str)
+		val ctr1 = Ctr("ctr1", 0, 10, 1)
+		val ctrs = CtrChain(ctr1)
+		println(ctrs.mkString)
+
+		Map(ctrs, { c =>
+			m.st(c, FixPt(c))
+			println(c)
+		})
+		println(m.mkString)
 
 	}
 }

@@ -77,10 +77,8 @@ trait DHDLTypes {
 				val fracMask = (1L << fracPrec.toFixPt) - 1L
 				(abs($self) & fracMask)
 			}
-			//importString()
-			infix ("toString") (Nil:: MString) implements composite ${
-				(if ($self.getSign==0L) "" else "-") 
-				//+ $self.getInt.toString + "." + $self.getFrac.toString
+			infix ("mkString") (Nil:: MString) implements composite ${
+				(if ($self.getSign==0L) "" else "-") + $self.getInt.toString + "." + $self.getFrac.toString
 			}
 			val fix2Float = infix ("toFloat") (Nil :: MFloat)
 			impl (fix2Float) (codegen($cala, ${
@@ -109,9 +107,6 @@ trait DHDLTypes {
 
 			infix ("==") (MInt :: MBoolean) implements codegen ($cala, ${ $self == $1 })
 
-			infix ("toString") (Nil:: MString) implements codegen ($cala, ${
-				$self.toString
-			})
 		}
 
 		val FloatOps = withTpe (MFloat)

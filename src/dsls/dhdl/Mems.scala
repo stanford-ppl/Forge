@@ -3,8 +3,7 @@ package dsls
 package dhdl 
 
 trait MemsElements {
-  this: DHDLDSL =>
-
+  this: DHDLDS
 	def importMems() = {
 
 		val MemOps = grp("Mems")
@@ -49,6 +48,8 @@ trait MemsElements {
 			infix ("ld") (MInt :: T) implements composite ${ array_apply( $self.data, $1) }
 			//TODO this should be $1*width + $2
 			infix ("ld") ((MInt, MInt) :: T) implements composite ${ $self.ld($1*$2)}
+			infix ("mkString") (Nil :: MString) implements composite ${ unit("bram[") + array_mkstring[T]( $self.data,
+				unit(", ")) + unit("]")}
 		}
 
 		val OffChipMem = tpe("OffChipMem", tpePar("T")) 
@@ -63,7 +64,7 @@ trait MemsElements {
 		OffChipMemOps {
 			infix ("name") (Nil :: MString) implements getter(0, "_name")
 			infix ("data") (Nil :: MArray(T)) implements getter(0, "_data")
-			infix ("toString") (Nil :: MString) implements composite ${ offchip_to_string[T]( $self.name,
+			infix ("mkString") (Nil :: MString) implements composite ${ offchip_to_string[T]( $self.name,
 				$self.data )
 			}
 			/* load from offchip mem to bram. (BRAM, startIdx, endIdx)*/

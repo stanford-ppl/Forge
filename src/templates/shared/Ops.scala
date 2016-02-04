@@ -492,8 +492,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     // FIXME: we get scalac internal crashes when using the default-implicit mode now
      if (true || Config.fastCompile) {
        // default implicit mode (appears empirically slightly faster than infix)
-       (!mustInfixList.contains(o.name)) && (o.args.length > 0) && //(!o.args.exists(hasDefaultValue)) &&
-         !o.grp.name.startsWith("Tup") //cedric
+       (!mustInfixList.contains(o.name)) && (o.args.length > 0) //(!o.args.exists(hasDefaultValue)) &&
      }
      else {
        //default infix mode (slightly easier to understand what's happening, also fails to apply less than implicits)
@@ -509,6 +508,35 @@ trait BaseGenOps extends ForgeCodeGenBase {
     stream.println()
 
     println("")
+
+
+    //to many different implicit classes for primitives to not work!
+    // implicit def repToPrimitiveTOpsCls[T:Manifest](x: Rep[T])(implicit __pos: SourceContext) = new PrimitiveTOpsCls(x)(implicitly[Manifest[T]],__pos)
+    // implicit def varToPrimitiveTOpsCls[T:Manifest](x: Var[T])(implicit __pos: SourceContext) = new PrimitiveTOpsCls(readVar(x))(implicitly[Manifest[T]],__pos)
+    //
+    // class PrimitiveTOpsCls[T:Manifest](val self: Rep[T])(implicit __pos: SourceContext) {
+    //   def toInt(implicit __cb0: Numeric[T],__pos: SourceContext,__imp1: Overload2) = primitive_toint[T](self)(implicitly[Numeric[T]],implicitly[Manifest[T]],__pos)
+    //   def toFloat(implicit __cb0: Numeric[T],__pos: SourceContext,__imp1: Overload2) = primitive_tofloat[T](self)(implicitly[Numeric[T]],implicitly[Manifest[T]],__pos)
+    //   def toDouble(implicit __cb0: Numeric[T],__pos: SourceContext,__imp1: Overload2) = primitive_todouble[T](self)(implicitly[Numeric[T]],implicitly[Manifest[T]],__pos)
+    //   def toLong(implicit __cb0: Numeric[T],__pos: SourceContext,__imp1: Overload2) = primitive_tolong[T](self)(implicitly[Numeric[T]],implicitly[Manifest[T]],__pos)
+    // }
+
+    // def toInt(implicit __pos: SourceContext,__imp1: Overload2) = {
+    //   type T = Double
+    //   primitive_toint[T](self)(implicitly[Numeric[T]],implicitly[Manifest[T]],__pos)
+    // }
+    // def toFloat(implicit __pos: SourceContext,__imp1: Overload2) = {
+    //   type T = Double
+    //   primitive_tofloat[T](self)(implicitly[Numeric[T]],implicitly[Manifest[T]],__pos)
+    // }
+    // def toDouble(implicit __pos: SourceContext,__imp1: Overload2) = {
+    //   type T = Double
+    //   primitive_todouble[T](self)(implicitly[Numeric[T]],implicitly[Manifest[T]],__pos)
+    // }
+    // def toLong(implicit __pos: SourceContext,__imp1: Overload2) = {
+    //   type T = Double
+    //   primitive_tolong[T](self)(implicitly[Numeric[T]],implicitly[Manifest[T]],__pos)
+    // }
 
     // implicits go in a base class for lower priority
     val implicitOps = opsGrp.ops.filter(e=>e.style==implicitMethod)

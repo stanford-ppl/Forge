@@ -178,6 +178,7 @@ class SparseMatrixSuiteInterpreter extends ForgeSuiteInterpreter {
 }
 
 class SparseMatrixSuiteCompiler extends ForgeSuiteCompiler {
+  cppWhiteList ++= Seq("sortindex_helper")
   def testDataOps() { runTest(SparseMatrixDataOpsRunnerC) }
   def testOperators() { runTest(SparseMatrixOperatorsRunnerC) }
   def testBulkOps() { runTest(SparseMatrixBulkOpsRunnerC) }

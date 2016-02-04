@@ -69,7 +69,7 @@ trait SimpleIntVectorDSL extends ForgeApplication {
 
       compiler ("vector_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = vector_raw_data($self)
-        var n = Math.max(4, array_length(data)*2).toInt
+        var n = Math.max(unit(4), array_length(data)*2).toInt
         while (n < $minLen) n = n*2
         val d = array_empty[Int](n)
         array_copy(data, 0, d, 0, $self.length)

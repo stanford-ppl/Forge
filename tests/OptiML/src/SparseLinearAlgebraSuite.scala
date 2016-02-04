@@ -49,5 +49,6 @@ class SparseLinearAlgebraSuiteInterpreter extends ForgeSuiteInterpreter {
 }
 
 class SparseLinearAlgebraSuiteCompiler extends ForgeSuiteCompiler {
+  cppWhiteList ++= Seq("sortindex_helper")
   def testDenseSparseMatrixArithmetic() { runTest(DenseSparseMatrixArithmeticRunnerC) }
 }

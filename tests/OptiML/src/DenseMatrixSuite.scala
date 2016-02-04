@@ -327,6 +327,7 @@ class DenseMatrixSuiteInterpreter extends ForgeSuiteInterpreter {
 }
 
 class DenseMatrixSuiteCompiler extends ForgeSuiteCompiler {
+  cppWhiteList ++= Seq("sortindex_helper")
   def testAccessors() { runTest(DenseMatrixAccessorsRunnerC) }
   def testOperators() { runTest(DenseMatrixOperatorsRunnerC) }
   def testUpdates() { runTest(DenseMatrixUpdatesRunnerC) }

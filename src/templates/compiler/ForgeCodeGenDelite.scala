@@ -75,7 +75,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     // Up to 3 files per group: First includes OpsExp, Rewrites, and codegen
     // Second is an additional Impl file if the group contains SingleTask and Composite ops
     // Third is compiler-only ops if the group contains any
-    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp)) {
+    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp) && opsGrp.ops.exists(hasCompilerVersion)) {
       val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsExp"+".scala"))
       stream.println("package " + packageName + ".ops")
       stream.println()
@@ -140,11 +140,12 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
 
     emitMetadataClasses(stream)
 
-    stream.print("trait " + dsl + "Transform extends DeliteTransform with " + dsl + "MetadataOps")
+    stream.print("trait " + dsl + "Transform extends DeliteTransform")
     Traversals.filter(hasIR).foreach{t => stream.print(" with " + makeTraversalIRName(t))}
-    // TODO: Mix in all other analyzer/transformer traits here
     stream.println(" {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication =>")
+    stream.println()
+    emitTypeMetadata(stream)
     stream.println("}")
     stream.close()
   }

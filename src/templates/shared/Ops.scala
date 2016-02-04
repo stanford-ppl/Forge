@@ -299,7 +299,19 @@ trait BaseGenOps extends ForgeCodeGenBase {
    * Op method names
    */
 
-  val specialCharacters = scala.collection.immutable.Map("+" -> "pl", "-" -> "sub", "/" -> "div", "*" -> "mul", "=" -> "eq", "<" -> "lt", ">" -> "gt", "&" -> "and", "|" -> "or", "!" -> "bang", ":" -> "cln")
+  val specialCharacters = scala.collection.immutable.Map("+" -> "pl",
+                                                         "-" -> "sub",
+                                                         "/" -> "div",
+                                                         "*" -> "mul",
+                                                         "=" -> "eq",
+                                                         "<" -> "lt",
+                                                         ">" -> "gt",
+                                                         "&" -> "and",
+                                                         "|" -> "or",
+                                                         "!" -> "bang",
+                                                         ":" -> "cln",
+                                                         "%" -> "pct",
+                                                         "~" -> "tld")
   def sanitize(x: String) = {
     var out = x
     specialCharacters.keys.foreach { k => if (x.contains(k)) out = out.replace(k, specialCharacters(k)) }
@@ -411,6 +423,11 @@ trait BaseGenOps extends ForgeCodeGenBase {
         val data = DataStructs(tpe)
         if (init.length != data.fields.length)
           err("allocator " + o.name + " has a different number of fields than the data definition for " + tpe.name)
+
+      case Figment(func) if o.backend != libraryBackend =>
+        if (!Transformers.exists{case (t,pattern) => pattern.rules.contains(o)})
+          warn("No lowering rule defined for op " + o.name + ". Instantiated figment ops must be lowered prior to code generation.")
+
       case Getter(structArgIndex,field) =>
         if (structArgIndex > o.args.length) err("arg index " + structArgIndex + " does not exist for op " + o.name)
         val struct = getHkTpe(o.args.apply(structArgIndex).tpe)

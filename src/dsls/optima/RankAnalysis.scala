@@ -16,9 +16,9 @@ trait RankAnalysis { this: OptiMADSL =>
 
     // --- Metadata definitions
     val ImplForm = metadata("ImplForm", ("v", SInt))
-    meet (ImplForm) ${ if (this != that) PhysOnly else that }
+    meet (ImplForm) ${ if (this != that) PhysImpl else that }
     compiler (ImplForm) ("NoImpl", Nil, Nil :: ImplForm) implements composite ${ ImplForm(0) }
-    compiler (ImplForm) ("PhysOnly", Nil, Nil :: ImplForm) implements composite ${ ImplForm(1) }
+    compiler (ImplForm) ("PhysImpl", Nil, Nil :: ImplForm) implements composite ${ ImplForm(1) }
     compiler (ImplForm) ("TrueImpl", Nil, Nil :: ImplForm) implements composite ${ ImplForm(2) }
 
     val MBuffer = metadata("MBuffer", ("impl", ImplForm))
@@ -53,17 +53,21 @@ trait RankAnalysis { this: OptiMADSL =>
 
       compiler (Rank) ("getRank", Nil, T :: SOption(Rank)) implements composite ${ meta[MRank]($0) }
       // Note rank() will throw an exception if used before all ranks have been assigned!
-      compiler.static (rank) ("apply", Nil, T :: Rank) implements composite ${ getRank($0).get.rank }
+      compiler.static (rank) ("apply", Nil, T :: SInt) implements composite ${ getRank($0).get.rank }
 
       compiler (MayUpdate) ("getMayUpdate", Nil, T :: SOption(MayUpdate)) implements composite ${ meta[MayUpdate]($0) }
       compiler (MayUpdate) ("mayUpdate", Nil, T :: SBoolean) implements composite ${ getMayUpdate($0).map{_.mayUpdate}.getOrElse(false) }
     }
 
-    compiler.static (rank) ("update", Nil, (MAny, SInt) :: MUnit) implements composite ${ setMetadata($0, MRank($1)) }
+    compiler.static (rank) ("update", Nil, (MAny, SInt) :: MUnit, effect = simple) implements composite ${ setMetadata($0, MRank($1)) }
 
+    defaultMetadata(MArray) ${ MRank(1) }
+    defaultMetadata(Array1D) ${ MRank(1) }
+    defaultMetadata(Array2D) ${ MRank(2) }
+    defaultMetadata(Array3D) ${ MRank(3) }
 
     // TODO: Better way to have pointers to these ops?
-    val multia_new = lookupOp(ArrayND, "multia_new")
+    // val multia_new = lookupOp(ArrayND, "multia_new")
 
     // Testing analysis scope - not working yet
     /*val RankAnalysisRules = withAnalyzer(RankAnalyzer)

@@ -46,7 +46,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
 
   def emitLibraryOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("Library-only operations", stream)
-    emitOpSugar(opsGrp.grp.name + "Library", opsGrp.name, dsl + "Library", opsGrp, stream, libraryBackend)
+    emitOpSugar(opsGrp.grp.name + "Library", opsGrp.name, dsl, opsGrp, stream, libraryBackend)
   }
 
   /**
@@ -57,7 +57,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     emitBlockComment("SingleTask and Composite Impls", stream)
     stream.println()
     stream.println("trait " + opsGrp.grp.name + "WrapperImpl {")
-    stream.println("  this: " + dsl + "Library => ")
+    stream.println("  this: " + dsl + "Application with " + dsl + "LibraryOps => ")
     stream.println()
     val indent = 2
     for (o <- unique(opsGrp.ops) if requiresImpl(o)) {

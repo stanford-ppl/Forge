@@ -53,7 +53,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
 
     // Note that Wrapper must not have a view of lifts, as this causes ambiguous implicit calls
     // for the library class implementations (specifically their var fields)
-    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp)) {
+    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp) && opsGrp.ops.exists(hasLibraryVersion)) {
       val stream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+".scala"))
       stream.println("package " + packageName + ".classes")
       stream.println()
@@ -84,8 +84,8 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
         implStream.close()
       }
       if (opsGrp.ops.exists(_.backend == libraryBackend)) {
-        val libStream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+"CompilerOps.scala"))
-        libStream.println("package " + packageName + ".ops")
+        val libStream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+"LibraryOps.scala"))
+        libStream.println("package " + packageName + ".classes")
         libStream.println()
         emitScalaReflectImports(libStream)
         emitDSLImports(libStream)
@@ -106,7 +106,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     stream.print("trait " + dsl + "Classes")
 
     var conj = " extends "
-    for ((grp,opsGrp) <- OpsGrp) {
+    for ((grp,opsGrp) <- OpsGrp if opsGrp.ops.exists(hasLibraryVersion)) {
       if (isTpeClass(grp)) {
         stream.print(conj + opsGrp.name)
         conj = " with "

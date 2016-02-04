@@ -40,7 +40,6 @@ trait DeliteGenTraversals extends BaseGenTraversals {
 
   // --- Metadata
   def emitMetadataClasses(stream: PrintWriter) {
-
     val meetFuncs = List(metaUpdate,branch,mutate,any)
 
     val MetaTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
@@ -111,8 +110,8 @@ trait DeliteGenTraversals extends BaseGenTraversals {
 
         stream.println("  }")
       }
+      stream.println("}")
     }
-    stream.println("}")
   }
 
   // --- Traversals
@@ -135,7 +134,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("trait " + makeTraversalName(t) + " extends TunnelingTransformer {")
     stream.println("  val IR: " + makeTraversalIRName(t))
     stream.println("  import IR._")
-    stream.println("  override val name = " + makeTraversalName(t))
+    stream.println("  override val name = \"" + makeTraversalName(t) + "\"")
     stream.println("  override val debugMode = false")        // TODO: Should be able to change this
     stream.println()
     stream.println("  override def transformTP[A](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext): Option[Exp[Any]] = rhs match {")
@@ -154,7 +153,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
   }
   def emitTransformerExp(t: Rep[DSLTransformer], stream: PrintWriter) {
     stream.println("trait " + makeTraversalIRName(t) + " extends " + dsl + "OpsExp {")
-    stream.println("  this: " + dsl + "Compiler =>")
+    stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication =>")
     stream.println("}")
   }
 
@@ -164,7 +163,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("trait " + makeTraversalName(az) + " extends AnalyzerBase {")
     stream.println("  val IR: " + makeTraversalIRName(az))
     stream.println("  import IR._")
-    stream.println("  override val name = " + makeTraversalName(az))
+    stream.println("  override val name = \"" + makeTraversalName(az) + "\"")
     stream.println("  override val debugMode = false")        // TODO: Should be able to change this
     stream.println("  override val autopropagate = true")     // TODO: Should be able to change this
     stream.println()
@@ -185,7 +184,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
 
   def emitAnalyzerExp(az: Rep[DSLAnalyzer], stream: PrintWriter) {
     stream.println("trait " + makeTraversalIRName(az) + " extends " + dsl + "OpsExp {")
-    stream.println("  this: " + dsl + "Compiler =>")
+    stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication =>")
     stream.println("}")
   }
 }

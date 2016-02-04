@@ -165,21 +165,25 @@ trait ScalaOps extends PrimitiveMathGen {
       impl (long_bitwise_not) (codegen(g, ${~$0}))
     }
 
-    // Rewrite Ops (mostly constant propagation)
-    val zero = "Const(0 | 0.0 | 0.0f | -0.0 | -0.0f)"
-    rewrite (float_plus,double_plus,long_plus) using pattern((${Const(x)}, ${Const(y)}) -> ${unit(x + y)} )
+    // --- Rewrite Ops (mostly constant propagation)
+    val zero = "Const(0 | 0L | 0.0 | 0.0f | -0.0 | -0.0f)"
+    // TODO: The scala typer blows up on these
+    rewrite (float_plus,double_plus,long_plus) using pattern((${Const(x)}, ${Const(y)}) -> ${ unit(x + y)} )
     rewrite (float_plus,double_plus,long_plus) using commutative((zero, ${x}) -> ${x} )
-    rewrite (float_minus,double_minus,long_minus) using pattern((${Const(x)}, ${Const(y)}) -> ${unit(x - y)} )
+    rewrite (float_minus,double_minus,long_minus) using pattern((${Const(x)}, ${Const(y)}) -> ${ unit(x - y)} )
     rewrite (float_minus,double_minus,long_minus) using pattern((${x}, zero) -> ${x})
-    rewrite (float_times,double_times,long_times) using pattern((${Const(x)}, ${Const(y)}) -> ${unit(x * y)} )
-    //rewrite (float_times) using commutative((zero, ${x}) -> ${unit(0f)} ) -- Not completely correct (Inf * 0 = NaN)
-    rewrite (float_divide,double_divide,long_divide) using pattern((${Const(x)}, ${Const(y)}) -> ${unit(x / y)} )
-    //rewrite (float_divide) using pattern((zero, ${x}) -> ${unit(0f)} ) -- Also not always correct (e.g. 0 / 0 != NaN)
+    rewrite (float_times,double_times,long_times) using pattern((${Const(x)}, ${Const(y)}) -> ${ unit(x * y)} )
+    rewrite (float_divide,double_divide,long_divide) using pattern((${Const(x)}, ${Const(y)}) -> ${ unit(x / y)} )
 
-    rewrite (toInt) using pattern(${Const(x)} -> ${unit(x.toInt)} )
-    rewrite (toFloat) using pattern(${Const(x)} -> ${unit(x.toFloat)} )
-    rewrite (toDouble) using pattern(${Const(x)} -> ${unit(x.toDouble)} )
-    rewrite (toLong) using pattern(${Const(x)} -> ${unit(implicitly[Numeric[T]].toLong(x))} )
+    // TODO: Should these be DSL specific? App specific? How often are these even important?
+    //rewrite (float_times) using commutative((zero, ${x}) -> ${unit(0f)} ) // Not completely correct (Inf * 0 = NaN)
+    //rewrite (float_divide) using pattern((zero, ${x}) -> ${unit(0f)} )    // Also not always correct (e.g. 0 / 0 = NaN)
+
+    // For some reason using the infix version of these casts was giving crazy scalac typer crashes
+    rewrite (toInt) using pattern(${Const(x)} -> ${ unit(implicitly[Numeric[T]].toInt(x)) })
+    rewrite (toFloat) using pattern(${Const(x)} -> ${ unit(implicitly[Numeric[T]].toFloat(x)) })
+    rewrite (toDouble) using pattern(${Const(x)} -> ${ unit(implicitly[Numeric[T]].toDouble(x)) })
+    rewrite (toLong) using pattern(${Const(x)} -> ${ unit(implicitly[Numeric[T]].toLong(x)) })
 
     infix (Prim) ("<<",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_left($0,$1) }
     infix (Prim) (">>",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_right($0,$1) }

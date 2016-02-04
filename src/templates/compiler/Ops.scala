@@ -35,7 +35,7 @@ trait DeliteGenOps extends BaseGenOps {
       val i = nameClashId(o, clasher = nameClashesSimple)
       o.style match {
         case `staticMethod` => o.grp.name + i + "Object_" + sanitize(o.name).capitalize + suffix
-        case `directMethod` if o.backend != `sharedBackend` => o.name.capitalize + suffix
+        case `directMethod` if o.backend != sharedBackend => sanitize(o.name).capitalize + suffix
         case _ => o.grp.name + i + "_" + sanitize(o.name).capitalize + suffix
       }
     }
@@ -242,7 +242,7 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println()
 
     stream.println("trait " + opsGrp.name + "Exp extends " + baseOpsCls(opsGrp) + " {")
-    stream.println("  this: " + dsl + "Compiler => ")
+    stream.println("  this: " + dsl + "OpsExp => ")
     stream.println()
 
     val uniqueOps = unique(opsGrp.ops).filter(hasCompilerVersion)
@@ -260,6 +260,7 @@ trait DeliteGenOps extends BaseGenOps {
     emitDeliteCollection(opsGrp, stream)
     stream.println()
     emitStructMethods(opsGrp, stream)
+    stream.println()
     stream.println("}")
   }
 
@@ -886,6 +887,10 @@ trait DeliteGenOps extends BaseGenOps {
     }
   }
 
+  def erasureType(tpe: Rep[DSLType]) = {
+    tpe.name + (if (!tpe.tpePars.isEmpty) "[" + tpe.tpePars.map(t => "_").mkString(",") + "]" else "")
+  }
+
   /**
    * Emit data structure definitions for types in the given op group
    */
@@ -906,9 +911,8 @@ trait DeliteGenOps extends BaseGenOps {
       for (tpe <- classes if DataStructs.contains(tpe) && !FigmentTpes.contains(tpe) && !isMetaType(tpe)) {
         val d = DataStructs(tpe)
         val fields = d.fields.zipWithIndex.map { case ((fieldName,fieldType),i) => ("\""+fieldName+"\"", if (isTpePar(fieldType)) "m.typeArguments("+i+")" else wrapManifest(fieldType)) }
-        val erasureCls = tpe.name + (if (!tpe.tpePars.isEmpty) "[" + tpe.tpePars.map(t => "_").mkString(",") + "]" else "")
         val prefix = if (first) "    if " else "    else if "
-        structStream += prefix + "(m.erasure == classOf["+erasureCls+"]) Some((classTag(m), collection.immutable.List("+fields.mkString(",")+")))" + nl
+        structStream += prefix + "(m.erasure == classOf["+erasureType(tpe)+"]) Some((classTag(m), collection.immutable.List("+fields.mkString(",")+")))" + nl
         first = false
       }
 
@@ -957,6 +961,23 @@ trait DeliteGenOps extends BaseGenOps {
     }
   }
 
+  // TODO: Assumption here is that expressions are simple metadata instantiations
+  def emitTypeMetadata(stream: PrintWriter) {
+    if (TypeMetadata.nonEmpty) {
+      emitBlockComment("Default type metadata", stream, indent=2)
+      stream.println("  override def defaultMetadata[A](m: Manifest[A]): List[Metadata] = {")
+      var prefix = "    if"
+      for ((tpe,data) <- TypeMetadata) {
+        stream.print(prefix + "(m.erasure == classOf["+erasureType(tpe)+"]) List(")
+        stream.print(data.map(quoteLiteral).mkString(", "))
+        stream.println(")")
+        prefix = "    else if "
+      }
+      stream.println("    else Nil")
+      stream.println("  } ++ super.defaultMetadata(m)")
+    }
+  }
+
   // TODO: This probably won't work for curried method signatures
   def emitTraversalRules(op: Rep[DSLOp], rules: List[DSLRule], isRewrite: Boolean, stream: PrintWriter, indent: Int) {
     val patternPrefix = if (isRewrite) "" else makeOpNodeName(op)
@@ -1001,13 +1022,13 @@ trait DeliteGenOps extends BaseGenOps {
    * Emit all rewrite rules (except forwarders) for ops in the given op group
    */
   def emitOpRewrites(opsGrp: DSLOps, stream: PrintWriter) {
-    emitBlockComment("Op rewrites", stream)
     // Get all rewrite rules for ops in this group EXCEPT for forwarding rules (those are generated in Packages)
     val allRewrites = unique(opsGrp.ops).flatMap(o => Rewrites.get(o).map(rules => o -> rules))
     val rewrites = allRewrites.filterNot(rewrite => rewrite._2.exists(_.isInstanceOf[ForwardingRule]))
     if (rewrites.nonEmpty) {
+      emitBlockComment("Op rewrites", stream)
       stream.println("trait " + opsGrp.grp.name + "RewriteOpsExp extends " + opsGrp.name + "Exp {")
-      stream.println("  this: " + dsl + "Compiler => ")
+      stream.println("  this: " + dsl + "OpsExp => ")
       stream.println()
       rewrites foreach { case (o, rules) =>
         stream.println("  override " + makeOpMethodSignature(o) + " = {")

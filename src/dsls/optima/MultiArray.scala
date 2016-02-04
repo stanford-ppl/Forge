@@ -43,10 +43,10 @@ trait MultiArrayOps extends MultiUtils { this: OptiMADSL =>
     library (Array2D) ("array2dview_from_array", T, (MArray(T), SList(MInt), MInt, SList(MInt)) :: Array2D(T)) implements allocates(Array2D, ${$0}, ${$1}, ${$2}, ${$3})
     library (Array1D) ("array1dview_from_array", T, (MArray(T), SList(MInt), MInt, SList(MInt)) :: Array1D(T)) implements allocates(Array1D, ${$0}, ${$1}, ${$2}, ${$3})
 
-    library (ArrayND) ("multia_from_array", T, (MArray(T), SList(MInt)) :: ArrayND(T)) implements figment ${
+    library (ArrayND) ("multia_from_array", T, (MArray(T), SList(MInt)) :: ArrayND(T)) implements composite ${
       multiaview_from_array($0, $1, unit(0), dimsToStrides($1))
     }
-    // node constructors
+
     internal (ArrayND) ("multia_new", T, SList(MInt) :: ArrayND(T)) implements figment ${
       multia_from_array(array_empty_imm[T]($0.reduce{_*_}), $0)
     }
@@ -61,6 +61,13 @@ trait MultiArrayOps extends MultiUtils { this: OptiMADSL =>
     // --- Rank casts
     // FIXME: In the library this is a shallow copy, while in the internal this is just a cast
     // These should be made consistent somehow
+    // For instance, if we have:
+    //   val x = ArrayND(10)
+    //   val y = x.as1D
+    //   y.append(3)
+    // Only y will see the append in the library, whereas both will see it in the compiler
+    // For now, blocking use of these except by the DSL author since they are generally unsafe
+
     internal (ArrayND) ("multia_as_1d", T, ArrayND(T) :: Array1D(T), aliasHint = aliases(0)) implements figment ${
       array1dview_from_array(multia_data($0), multia_dims($0), multia_ofs($0), multia_stride($0))
     }
@@ -115,9 +122,9 @@ trait MultiArrayOps extends MultiUtils { this: OptiMADSL =>
     //static (Array1D) ("apply", T, MInt :: Array1D(T)) implements composite ${  }
 
     */
-    // -----------------
-    // Syntax sugar
-    // -----------------
+    //--------
+    //--- API
+    //--------
     static (ArrayND) ("apply", T, varArgs(MInt) :: ArrayND(T)) implements composite ${ multia_new[T]($0.toList) }
     static (Array3D) ("apply", T, (MInt, MInt, MInt) :: Array3D(T)) implements composite ${ multia_new[T](List($0, $1, $2)).as3D }
     static (Array2D) ("apply", T, (MInt, MInt) :: Array2D(T)) implements composite ${ multia_new[T](List($0, $1)).as2D }
@@ -127,9 +134,9 @@ trait MultiArrayOps extends MultiUtils { this: OptiMADSL =>
     ArrayNDOps {
       // --- Compiler shortcuts
       // Users shouldn't have access to these (how to restrict subset of infixes?)
-      infix ("as3D") (Nil :: Array3D(T)) implements composite ${ multia_as_3d($self) }
-      infix ("as2D") (Nil :: Array2D(T)) implements composite ${ multia_as_2d($self) }
-      infix ("as1D") (Nil :: Array1D(T)) implements composite ${ multia_as_1d($self) }
+      internal.infix ("as3D") (Nil :: Array3D(T)) implements composite ${ multia_as_3d($self) }
+      internal.infix ("as2D") (Nil :: Array2D(T)) implements composite ${ multia_as_2d($self) }
+      internal.infix ("as1D") (Nil :: Array1D(T)) implements composite ${ multia_as_1d($self) }
 
       // --- Properties
       infix ("size") (Nil :: MInt) implements composite ${ multia_size($self) }

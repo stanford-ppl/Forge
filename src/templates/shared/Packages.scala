@@ -37,7 +37,7 @@ trait BaseGenPackages extends ForgeCodeGenBase {
       stream.print("  extends Lift" + liftExterns.head.opsGrp.grp.name)
       for (e <- liftExterns.drop(1)) stream.print(" with Lift" + e.opsGrp.grp.name)
     }
-    stream.println(" { \nthis: " + dsl + " => \n}")
+    stream.println(" { \n    this: " + dsl + " => \n}")
     stream.println()
 
     // --- DSLInterface

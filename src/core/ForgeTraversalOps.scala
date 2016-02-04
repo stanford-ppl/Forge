@@ -83,7 +83,9 @@ trait ForgeTraversalOps extends Base {
   // Creates a meet rule for given metadata type for given aliasing type
   // Rule is always on exactly two arguments of given metadata type: this and that
   // Meet rule should return the same type of metadata
-  def meet(meta: Rep[DSLMetadata], alias: MetaMeet = any)(rule: Rep[String]) = forge_meet(meta,alias,rule)
+  def meet(meta: Rep[DSLMetadata], alias: MetaMeet = any)(rule: Rep[String]): Rep[Unit] = forge_meet(meta,alias,rule)
+
+  def defaultMetadata(tpe: Rep[DSLType])(rule: Rep[String]): Rep[Unit] = forge_default_metadata(tpe, rule)
 
   //----------
   //--- Stubs
@@ -105,6 +107,7 @@ trait ForgeTraversalOps extends Base {
   def forge_using(pattern: Rep[DSLPattern], rule: DSLRule)(implicit ctx: SourceContext): Rep[Unit]
 
   def forge_meet(grp: Rep[DSLGroup], func: MetaMeet, rule: Rep[String]): Rep[Unit]
+  def forge_default_metadata(tpe: Rep[DSLType], rule: Rep[String]): Rep[Unit]
 }
 
 trait ForgeTraversalSugarLowPriority extends ForgeTraversalOps {
@@ -193,6 +196,7 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
   val MetaImpls = HashMap[Exp[DSLMetadata], MetaOps]()
 
   val Rewrites = HashMap[Exp[DSLOp], List[DSLRule]]()
+  val TypeMetadata = HashMap[Exp[DSLType], List[Rep[String]]]()
 
   /**
    * Traversal op patterns
@@ -365,12 +369,12 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
     ()
   }
 
-  /*case class MetaFields(fields: Seq[(String, Rep[DSLType])]) extends Def[DSLMetaFields]
-  def forge_metadata_fields(meta: Rep[DSLMetadata], fields: Seq[(String, Rep[DSLType])]) = {
-    val data = MetaFields(fields)
-    if (MetaStructs.contains(meta)) err("Data fields already defined for metadata " + meta.name)
-    else MetaStructs(meta) = data
+  def forge_default_metadata(tpe: Rep[DSLType], rule: Rep[String]): Rep[Unit] = {
+    if (TypeMetadata.contains(tpe))
+      TypeMetadata(tpe) = TypeMetadata(tpe) :+ rule
+    else
+      TypeMetadata(tpe) = List(rule)
     ()
-  }*/
+  }
 
 }

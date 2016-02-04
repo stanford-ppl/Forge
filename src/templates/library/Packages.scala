@@ -31,7 +31,7 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
 
     emitBlockComment("Dismabiguations for interpreter mode", stream, indent=2)
     for (opsGrp <- opsGrps if !isTpeClass(opsGrp.grp) && !isTpeClassInst(opsGrp.grp)) {
-      for (o <- unique(opsGrp.ops) if (nameClashesUniversal(o).length > 1) && !o.args.exists(a => getHkTpe(a.tpe).name == "Var")) {
+      for (o <- unique(opsGrp.ops) if (nameClashesUniversal(o).length > 1) && !o.args.exists(a => getHkTpe(a.tpe).name == "Var") && hasLibraryVersion(o)) {
         var prefix = ""
         if (o.style == infixMethod && !noInfix(o))
           prefix = "  override def infix_"
@@ -99,6 +99,30 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
       stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")
     }
     stream.println()
+
+    // TODO: We should instead generate the actual class inheritances rather than making these shallow copies
+    if (TpeParents.size > 0) {
+      emitBlockComment("Figment type inheritance", stream, indent=2)
+      for ((tpe,parent) <- TpeParents) {
+        stream.println("  def m_" + tpe.name + "_to_" + parent.name + makeTpeParsWithBounds(tpe.tpePars) + "(__arg0: Rep[" + tpe.name + makeTpePars(tpe.tpePars) + "]): Rep[" + parent.name + makeTpePars(parent.tpePars) + "] = {")
+        if (DataStructs.contains(parent)) {
+          // Sanity check - child must have at least the fields that its parent does
+          // TODO: Should also check types?
+          val parentFields = DataStructs(parent).fields
+          val childFields = DataStructs(tpe).fields
+          if (!parentFields.forall(t => childFields.exists(f => f._1 == t._1)))
+            err(tpe.name + " must contain all fields in its parent to inherit from " + parent.name)
+
+          stream.println("    new " + quote(parent) + "(" + DataStructs(parent).fields.map(f => "__arg0." + f._1).mkString(",") + ")")
+        }
+        else {
+          // TODO: What to do here? No data backing means no class, so what's the library version?
+          stream.println("    __arg0.asInstanceOf[Rep[" + parent.name + makeTpePars(parent.tpePars) + "]]")
+        }
+        stream.println("  }")
+      }
+    }
+
     stream.println("}")
   }
 }

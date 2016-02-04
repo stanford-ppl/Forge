@@ -42,6 +42,9 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     for (e <- Externs) {
       stream.print(" with " + e.opsGrp.grp.name + "CompilerOps") // Legacy naming for InternalOps
     }
+    val hasMetadata = Tpes.exists(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
+    if (hasMetadata) stream.print(" with " + dsl + "MetadataOps")
+
     stream.println(" {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Application => ")
     stream.println("}")
@@ -86,6 +89,7 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     // These are the primitive Delite methods that Delite requires be forwarded, since they may be used in analyses or optimizations.
     // Note that this means the Forge-generated IR nodes for these methods will never get constructed, and rewrite rules should not
     // be written for them, as they will have no effect.
+    stream.println()
     emitBlockComment("Disambiguations for Delite internal operations", stream, indent=2)
     for ((o,rules) <- Rewrites if rules.exists(_.isInstanceOf[ForwardingRule])) {
       val forwarder = rules.find(_.isInstanceOf[ForwardingRule]).get.asInstanceOf[ForwardingRule]
@@ -103,6 +107,40 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
       }
       else stream.println(lines.head)
     }
+
+    val StructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && !FigmentTpes.contains(t) && !isMetaType(t))
+    val FigmentStructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && FigmentTpes.contains(t) && !isMetaType(t))
+
+    emitBlockComment("DSL types", stream, indent=2)
+    for (tpe <- StructTpes) {
+      stream.print("  abstract class " + quote(tpe))
+      stream.println(ForgeCollections.get(tpe).map(c => " extends DeliteCollection[" + quote(c.tpeArg) + "]").getOrElse(""))
+    }
+    for (tpe <- FigmentStructTpes) {
+      stream.println("  abstract class " + quote(tpe) + TpeParents.get(tpe).map(p => " extends " + quote(p)).getOrElse(""))
+    }
+    stream.println()
+    emitBlockComment("implicit manifests", stream, indent=2)
+    for (tpe <- StructTpes ++ FigmentStructTpes) {
+      stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")
+    }
+
+    if (TpeParents.nonEmpty) {
+      stream.println()
+      emitBlockComment("Figment type inheritance", stream, indent=2)
+      for ((tpe,parent) <- TpeParents) {
+        stream.println("  def m_" + tpe.name + "_to_" + parent.name + makeTpeParsWithBounds(tpe.tpePars) + "(__arg0: Rep[" + tpe.name + makeTpePars(tpe.tpePars) + "]): Rep[" + parent.name + makeTpePars(parent.tpePars) + "] = __arg0.asInstanceOf[Rep[" + parent.name + makeTpePars(parent.tpePars) + "]]")
+      }
+    }
+
+    /*if (MetaTpes.nonEmpty) {
+      stream.println()
+      emitBlockComment("Metadata types", stream, indent=2)
+      for (tpe <- MetaTpes) {
+        stream.println("type " + tpe.name)
+      }
+    }*/
+
     stream.println("}")
     stream.println()
 
@@ -130,33 +168,6 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
       stream.println("  override def forge_equals[A:Manifest,B:Manifest](__arg0: Rep[A],__arg1: Rep[B])(implicit __pos: SourceContext) = delite_equals(__arg0,__arg1)")
       stream.println("  override def forge_notequals[A:Manifest,B:Manifest](__arg0: Rep[A],__arg1: Rep[B])(implicit __pos: SourceContext) = delite_notequals(__arg0,__arg1)")
     }*/
-    val StructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && !FigmentTpes.contains(t) && !isMetaType(t))
-    val FigmentStructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && FigmentTpes.contains(t) && isMetaType(t))
-
-    stream.println()
-    emitBlockComment("DSL types", stream, indent=2)
-    for (tpe <- StructTpes) {
-      stream.print("  abstract class " + quote(tpe))
-      stream.println(ForgeCollections.get(tpe).map(c => " extends DeliteCollection[" + quote(c.tpeArg) + "]").getOrElse(""))
-    }
-    for (tpe <- FigmentStructTpes) {
-      stream.println("  abstract class " + quote(tpe) + TpeParents.get(tpe).map(p => " extends " + quote(p)).getOrElse(""))
-    }
-    stream.println()
-    emitBlockComment("implicit manifests", stream, indent=2)
-    for (tpe <- StructTpes ++ FigmentStructTpes) {
-      stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")
-    }
-
-    if (TpeParents.size > 0) {
-      stream.println()
-      emitBlockComment("Figment type inheritance", stream, indent=2)
-      for ((tpe,parent) <- TpeParents) {
-        stream.println("  def m_" + tpe.name + "_to_" + parent.name + makeTpeParsWithBounds(tpe.tpePars) + "(__arg0: Rep[" + tpe.name + makeTpePars(tpe.tpePars) + "]): Rep[" + parent.name + makeTpePars(parent.tpePars) + "] = __arg0.asInstanceOf[Rep[" + parent.name + makeTpePars(parent.tpePars) + "]]")
-      }
-    }
-
-    stream.println()
     emitBlockComment("traversals", stream, indent=2)
     Traversals.zipWithIndex.foreach{ case (t,idx) =>
       stream.println("  private val __trv" + idx + " = new " + makeTraversalName(t) + " { override val IR: self.type = self }")

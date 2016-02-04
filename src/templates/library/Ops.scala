@@ -45,6 +45,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   def emitImpls(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("SingleTask and Composite Impls", stream)
     stream.println()
+    stream.println("@virtualize")
     stream.println("trait " + opsGrp.grp.name + "WrapperImpl {")
     stream.println("  this: " + dsl + "Application with " + dsl + "CompilerOps => ")
     stream.println()

@@ -13,8 +13,10 @@ trait BaseGenImports extends ForgeCodeGenBase {
     stream.println("import java.io.{BufferedWriter, FileWriter, PrintWriter}")
   }
 
-  def emitScalaReflectImports(stream: PrintWriter) {    
-    stream.println("import reflect.Manifest; import org.scala_lang.virtualized.SourceContext")    
+  def emitScalaReflectImports(stream: PrintWriter) {
+    stream.println("import reflect.Manifest")
+    stream.println("import org.scala_lang.virtualized.SourceContext")
+    stream.println("import org.scala_lang.virtualized.virtualize")
   }
 
   def emitScalaImports(stream: PrintWriter) {

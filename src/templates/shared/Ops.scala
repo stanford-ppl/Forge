@@ -490,19 +490,18 @@ trait BaseGenOps extends ForgeCodeGenBase {
   // certain ops (e.g. "apply" cannot be expressed with infix notation right now), so we use implicits as a workaround
   def noInfix(o: Rep[DSLOp]) = {
     // FIXME: we get scalac internal crashes when using the default-implicit mode now
-    // if (Config.fastCompile) {
-    //   // default implicit mode (appears empirically slightly faster than infix)
-       (!mustInfixList.contains(o.name)) && o.args.length > 0 && !o.args.exists(hasDefaultValue)
-    // }
-    // else {
-      // default infix mode (slightly easier to understand what's happening, also fails to apply less than implicits)
-      // blacklist or curried args or function args (in the latter two cases, infix doesn't always resolve correctly)
-    // }
-
-    //TODO macrovirt:
-//    !mustInfixList.contains(o.name) && (noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o)) //old version wich has more infix_stuff
-    //ORIGINAL: !macroInfix.contains(o.name) && (o.curriedArgs.length > 0 || hasFuncArgs(o)) //old version which has more infix_stuff
-//    (o.tpePars.size <= 1) && !o.grp.name.startsWith("Tup") // o.curriedArgs.length > 0 || hasFuncArgs(o) ||   //has
+     if (true || Config.fastCompile) {
+       // default implicit mode (appears empirically slightly faster than infix)
+       (!mustInfixList.contains(o.name)) && (o.args.length > 0) && //(!o.args.exists(hasDefaultValue)) &&
+         !o.grp.name.startsWith("Tup") //cedric
+     }
+     else {
+       //default infix mode (slightly easier to understand what's happening, also fails to apply less than implicits)
+       //blacklist or curried args or function args (in the latter two cases, infix doesn't always resolve correctly)
+       !mustInfixList.contains(o.name) && (noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o)) //original
+       //!macroInfix.contains(o.name) && (o.curriedArgs.length > 0 || hasFuncArgs(o)) //cedric
+       //(o.tpePars.size <= 1) && !o.grp.name.startsWith("Tup") // o.curriedArgs.length > 0 || hasFuncArgs(o) ||   //cedric tryout
+     }
   }
 
   def emitOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
@@ -515,6 +514,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     val implicitOps = opsGrp.ops.filter(e=>e.style==implicitMethod)
     if (!implicitOps.isEmpty) {
       if (unique(implicitOps).length != implicitOps.length) err("non-unique implicit op variants (e.g. Var, T args) are not yet supported")
+      stream.println("@virtualize")
       stream.println("trait " + opsGrp.name + "Base extends " + baseOpsCls(opsGrp.grp) + " {")
       stream.println("  this: " + dsl + " => ")
       stream.println()
@@ -557,12 +557,15 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
 
     // infix ops
-    val (noArgsOps, allInfixOps) = opsGrp.ops.filter(e => e.style == infixMethod).partition(_.args.size == 0)
-
+    val (_, noArgsOps) = opsGrp.ops.filter(e => e.style == infixMethod).partition( _.args.size > 0)
+    val allOps = opsGrp.ops.filter(e => e.style == infixMethod)
+    for (op <- allOps)
+      if (op.name == "split")
+        println(op)
     //macro virtualized fix => output all methods as part of the implicit class and not as a "infix_" methods
-    val (pimpOps, infixOps) = allInfixOps.partition(noInfix) //macrovirt: virtualize a lot more!
-    if (allInfixOps.size > 0) { //should not be that many
-      println("ClassName " + allInfixOps(0).grp.name)
+    val (pimpOps, infixOps) = allOps.partition(noInfix) //macrovirt: virtualize a lot more!
+    if (allOps.size > 0) { //should not be that many
+      println("ClassName " + allOps(0).grp.name)
       noArgsOps.foreach(x => println("no args: " + x.name))
     }
     print("pimpOps:")

@@ -32,18 +32,22 @@ trait Test extends DHDLApplication {
 		m.st(3,b)
 		assert(m.ld(3)==b)
 
-		val ctr1 = Ctr("ctr1", 0, 10, 1)
-		val ctrs = CtrChain(ctr1)
+		val ctr1 = Ctr("ctr1", 0, 3, 1)
+		val ctr2 = Ctr("ctr2", 0, 4, 1)
+		val ctrs = CtrChain(ctr1, ctr2)
 		println(ctrs.mkString)
 
-		Map(ctrs, { c =>
-			m.st(c, FixPt(c))
+		Map(ctrs, { case i::j::_ =>
+			//m.st(c, FixPt(c))
+			println(i)
+			println(j)
+			println("---")
 		})
-		assert(m.ld(9)!=9)
+		//assert(m.ld(9)!=9)
 
-		Reduce(ctrs, r, { (c:Test.this.Rep[Int],reg:Test.this.Rep[Test.this.Reg[FixPt]]) => 
-			reg.write(reg.value + c)
-		})
-		assert(r.value!=50)
+		//Reduce(ctrs, r, { (c:Test.this.Rep[Int],reg:Test.this.Rep[Test.this.Reg[FixPt]]) => 
+		//	reg.write(reg.value + c)
+		//})
+		//assert(r.value!=50)
 	}
 }

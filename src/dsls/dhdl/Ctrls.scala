@@ -56,30 +56,48 @@ trait CtrlOps {
 		data (Pipe, ("_ctrs", CtrChain)) //TODO: Modify pipe to keep track of nodes inside
 		static (Pipe) ("apply", Nil, CtrChain :: Pipe) implements allocates(Pipe, ${$0})
 
-		val pipe_map = direct (Pipe) ("Map", Nil, (("ctrs", CtrChain), ("func", MInt ==> MUnit)) :: Pipe) 
+		val pipe_map = direct (Pipe) ("Map", Nil, (("ctrs", CtrChain), ("func", varArgs(MInt) ==> MUnit)) :: Pipe) 
 		impl (pipe_map) (composite ${
-			val pipe = Pipe( $ctrs )
-			val ctr1 = ctrs.chain.apply(unit(0))
-			var i = ctr1.min
-			while (i < ctr1.max) {
-				$func(i)
-				i = i + ctr1.step
+
+			def loop (ctr:Rep[Ctr], lambda: Rep[Int] => Rep[Unit]) = {
+				var i = ctr.min
+				while (i < ctr.max) {
+					lambda (i)
+					i = i + ctr.step
+				}
 			}
+			//def recPipe (idx:Rep[Int], idxs:Seq[Rep[Int]]): Rep[Unit] = {
+			//	val ctr = $ctrs.chain.apply(idx)
+			//	if (idx == unit(1)) {
+			//		loop(ctr, ( (i:Rep[Int]) => $func( i+:idxs )))
+			//	} else {
+			//		loop(ctr, ( (i:Rep[Int]) => recPipe(idx - unit(1), i+:idxs) ))
+			//	}
+			//}
+			val pipe = Pipe( $ctrs )
+
+			//recPipe( $ctrs.length, Seq.empty[Rep[Int]] )
+
+			val level = $ctrs.length
+			val ctr0 = $ctrs.chain.apply(unit(0))
+			val ctr1 = $ctrs.chain.apply(unit(1))
+
+			loop(ctr0, (j:Rep[Int]) => loop(ctr1, (i:Rep[Int]) => $func(Seq(i, j)) ) )
 			pipe
 		})
 
-		val T = tpePar("T")
-		val Reg = lookupTpe("Reg")
-		val pipe_reduce = direct (Pipe) ("Reduce", T, (("ctrs", CtrChain), ("accum", Reg(T)), ("func", (MInt, Reg(T)) ==> MUnit)) :: Pipe) 
-		impl (pipe_reduce) (composite ${
-			val pipe = Pipe( $ctrs )
-			val ctr1 = ctrs.chain.apply( unit(0) )
-			var i = ctr1.min
-			while (i < ctr1.max) {
-				$func(i, $accum)
-				i = i + ctr1.step
-			}
-			pipe
-		})
+		//val T = tpePar("T")
+		//val Reg = lookupTpe("Reg")
+		//val pipe_reduce = direct (Pipe) ("Reduce", T, (("ctrs", CtrChain), ("accum", Reg(T)), ("func", (MInt, Reg(T)) ==> MUnit)) :: Pipe) 
+		//impl (pipe_reduce) (composite ${
+		//	val pipe = Pipe( $ctrs )
+		//	val ctr1 = ctrs.chain.apply( unit(0) )
+		//	var i = ctr1.min
+		//	while (i < ctr1.max) {
+		//		$func(i, $accum)
+		//		i = i + ctr1.step
+		//	}
+		//	pipe
+		//})
 	}
 }

@@ -16,8 +16,8 @@ trait DotProduct extends DHDLApplication {
 		val dataSize = 64
 		val svec1 = Seq.fill(dataSize)(Random.nextInt(100))
 		val svec2 = Seq.fill(dataSize)(Random.nextInt(100))
-		val vec1 = OffChipMem[FixPt]("vec1", svec1: _*)
-		val vec2 = OffChipMem[FixPt]("vec2", svec2: _*)
+		val vec1 = OffChipMem[FixPt]("vec1", svec1.map(i => i.toFixPt): _*)
+		val vec2 = OffChipMem[FixPt]("vec2", svec2.map(i => i.toFixPt): _*)
 		val bm1 = BRAM[FixPt]("bm1", 16)
 		val bm2 = BRAM[FixPt]("bm2", 16)
 

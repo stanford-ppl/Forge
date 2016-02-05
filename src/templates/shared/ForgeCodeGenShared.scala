@@ -52,7 +52,7 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     Directory(Path(opsDir)).createDirectory()
 
     // 1 file per grp, includes only abstract Ops
-    for ((grp,ops) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp)) {
+    for ((grp,ops) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp) && ops.ops.exists(o => o.backend == internalBackend || o.backend == sharedBackend)) {
       checkOps(ops)
 
       val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"Ops"+".scala"))

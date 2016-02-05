@@ -153,7 +153,7 @@ trait DeliteGenOps extends BaseGenOps {
 
   def emitCompilerOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("Compiler-only operations", stream)
-    emitOpSugar(opsGrp.grp.name + "Compiler", opsGrp.name, dsl + "Compiler", opsGrp, stream, compilerBackend)
+    emitOpSugar(opsGrp.grp.name + "Compiler", opsGrp.name, dsl + "CompilerOps", opsGrp, stream, compilerBackend)
   }
 
   def requiresImpl(op: Rep[DSLOp]) = Impls(op) match {
@@ -170,7 +170,7 @@ trait DeliteGenOps extends BaseGenOps {
     emitBlockComment("Op Impls", stream)
     stream.println()
     stream.println("trait " + opsGrp.name + "Impl {")
-    stream.println("  this: " + dsl + "Compiler with " + dsl + "Lift => ")
+    stream.println("  this: " + dsl + "CompilerOps with " + dsl + "Lift => ")
     stream.println()
     for (o <- unique(opsGrp.ops) if requiresImpl(o)) {
       Impls(o) match {

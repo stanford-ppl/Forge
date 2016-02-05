@@ -7,9 +7,6 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 // TODO:
 // - Misc. operations for analysis (e.g. convergence messages, postprocessing)
 //   - Don't want this to just be writing Delite code in Forge box, but what else can we do here?
-// - Should be able to access internal direct methods (and others?) from allocates, etc.
-//   - Option 1: Redirection in the library implementation for allocates
-//   - Option 2: Add another trait so Wrapper can view LibraryOps without viewing lifts
 
 object OptiMADSLRunner extends ForgeApplicationRunner with OptiMADSL
 trait OptiMADSL extends ForgeApplication with MultiArrayOps with RankAnalysis with VisibilityTestOps {

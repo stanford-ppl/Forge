@@ -44,8 +44,8 @@ trait DeliteGenTraversals extends BaseGenTraversals {
 
     val MetaTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
     if (MetaTpes.nonEmpty) {
-      stream.println("trait " + dsl + "MetadataOps {")
-      stream.println("  this: " + dsl + "Compiler =>")
+      stream.println("trait " + dsl + "MetadataOps extends MetadataOps {")
+      stream.println("  this: " + dsl + "CompilerOps with MetadataExp =>")
       stream.println()
       emitBlockComment("DSL metadata types", stream, 2)
       for (tpe <- MetaTpes) {

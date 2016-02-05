@@ -167,7 +167,6 @@ trait ScalaOps extends PrimitiveMathGen {
 
     // --- Rewrite Ops (mostly constant propagation)
     val zero = "Const(0 | 0L | 0.0 | 0.0f | -0.0 | -0.0f)"
-    // TODO: The scala typer blows up on these
     rewrite (float_plus,double_plus,long_plus) using pattern((${Const(x)}, ${Const(y)}) -> ${ unit(x + y)} )
     rewrite (float_plus,double_plus,long_plus) using commutative((zero, ${x}) -> ${x} )
     rewrite (float_minus,double_minus,long_minus) using pattern((${Const(x)}, ${Const(y)}) -> ${ unit(x - y)} )
@@ -232,9 +231,9 @@ trait ScalaOps extends PrimitiveMathGen {
 
     // TODO: something is broken with IfThenElse here; bound symbols (effects) are getting hoisted if the frequencies are not set to cold.
     val T = tpePar("T")
-    val ifThenElse = direct (Misc) ("__ifThenElse", List(T), List(MThunk(MBoolean),MThunk(T,cold),MThunk(T,cold)) :: T)
+    val ifThenElse = direct (Misc) ("__ifThenElse", List(T), List(MBoolean,MThunk(T,cold),MThunk(T,cold)) :: T)
     impl (ifThenElse) (codegen($cala, ${
-      if ($b[0]) {
+      if ($0) {
         $b[1]
       }
       else {

@@ -46,7 +46,7 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     if (hasMetadata) stream.print(" with " + dsl + "MetadataOps")
 
     stream.println(" {")
-    stream.println("  this: " + dsl + "Compiler with " + dsl + "Application => ")
+    stream.println("  this: " + dsl + "Exp with " + dsl + "Application => ")
     stream.println("}")
     stream.println()
 
@@ -91,7 +91,6 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     // be written for them, as they will have no effect.
     stream.println()
     emitBlockComment("Disambiguations for Delite internal operations", stream, indent=2)
-    stream.println("  override def __ifThenElse[T:Manifest](cond: Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")
     for ((o,rules) <- Rewrites if rules.exists(_.isInstanceOf[ForwardingRule])) {
       val forwarder = rules.find(_.isInstanceOf[ForwardingRule]).get.asInstanceOf[ForwardingRule]
       val lines = inline(o, forwarder.rule, quoteLiteral).split(nl)
@@ -118,7 +117,14 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
       stream.println(ForgeCollections.get(tpe).map(c => " extends DeliteCollection[" + quote(c.tpeArg) + "]").getOrElse(""))
     }
     for (tpe <- FigmentStructTpes) {
-      stream.println("  abstract class " + quote(tpe) + TpeParents.get(tpe).map(p => " extends " + quote(p)).getOrElse(""))
+      stream.print("  abstract class " + quote(tpe))
+      stream.print(ForgeCollections.get(tpe).map(c => " extends DeliteCollection[" + quote(c.tpeArg) + "]").getOrElse(""))
+
+      if (ForgeCollections.contains(tpe) && TpeParents.contains(tpe)) stream.print(" with ")
+      else if (TpeParents.contains(tpe)) stream.print(" extends ")
+
+      stream.print(TpeParents.get(tpe).map(p => quote(p)).getOrElse(""))
+      stream.println()
     }
     stream.println()
     emitBlockComment("implicit manifests", stream, indent=2)

@@ -24,7 +24,7 @@ trait OptiMLDSL extends OptiLADSL
     // we could get around this by only overriding while inside a new trait that is only mixed in at the Application level (sort of a de-lift)
 
     // val whileDo = lookupOp("Misc","__whileDo")
-    // compiler (whileDo) lookupImpl("Misc","__whileDo").apply(0)
+    // internal (whileDo) lookupImpl("Misc","__whileDo").apply(0)
     // impl (whileDo) (composite ${ fatal("illegal operation: 'while'. try using 'untilconverged' instead") })
 
     // OptiML types

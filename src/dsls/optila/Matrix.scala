@@ -32,7 +32,7 @@ trait MatrixOps {
 
     // we can also perform bulk operations generically, returning a DenseVector result for each operation
     // Arith is only required if T is actually a tpePar here, so we need to be careful.
-    if (!isTpePar(T)) compiler (m) ("zeroT", Nil, Nil :: T) implements composite ${ 0.asInstanceOf[\$TT] }
+    if (!isTpePar(T)) internal (m) ("zeroT", Nil, Nil :: T) implements composite ${ 0.asInstanceOf[\$TT] }
 
     val AZ = if (isTpePar(T)) (List(TArith(asTpePar(T))), "implicitly[Arith[T]].empty") else (Nil, "zeroT")
     val A = AZ._1; val Z = AZ._2; // can't use capital letters with tuple return pattern matching

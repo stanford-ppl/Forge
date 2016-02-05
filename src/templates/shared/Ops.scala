@@ -329,9 +329,9 @@ trait BaseGenOps extends ForgeCodeGenBase {
       val i = /*if (Config.fastCompile) nameClashId(canonical(o), nameClashesGrp) else*/ ""
       o.style match {
         case `staticMethod` => o.grp.name.toLowerCase + "_object_" + sanitize(o.name).toLowerCase + i
-        //case _ if o.backend != `sharedBackend` =>
-        //  if (o.name != sanitize(o.name)) err("Non-user level op name has special characters that require reformatting: " + o.name)
-        //  o.name // should be callable directly from impl code
+        case `directMethod` if o.backend != `sharedBackend` =>
+          if (o.name != sanitize(o.name)) err("Non-user level op name has special characters that require reformatting: " + o.name)
+          o.name // should be callable directly from impl code
         case _ => o.grp.name.toLowerCase + "_" + sanitize(o.name).toLowerCase + i
       }
     })
@@ -579,8 +579,12 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
 
     // --- Direct ops
-    for (o <- directOps) stream.println("  " + makeSyntaxMethod(o))
-    if (directOps.length > 0) stream.println()
+    // Direct ops below the user-facing level are generated without indirection to make them
+    // visible to allocators, setters, getters, and redirects
+    if (backend == sharedBackend) {
+      for (o <- directOps) stream.println("  " + makeSyntaxMethod(o))
+      if (directOps.length > 0) stream.println()
+    }
 
     // --- Infix ops
     // TODO: Potential future problem with infix operations at multiple visibility levels:

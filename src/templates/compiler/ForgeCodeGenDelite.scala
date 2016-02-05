@@ -75,6 +75,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     // Up to 3 files per group: First includes OpsExp, Rewrites, and codegen
     // Second is an additional Impl file if the group contains SingleTask and Composite ops
     // Third is compiler-only ops if the group contains any
+    // TODO: Would it make sense to just put all three of these in one file?
     for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp) && opsGrp.ops.exists(hasCompilerVersion)) {
       val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsExp"+".scala"))
       stream.println("package " + packageName + ".ops")

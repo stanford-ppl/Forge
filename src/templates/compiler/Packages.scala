@@ -70,8 +70,8 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     stream.println("}")
     stream.println()
 
-    // OpsExp
-    stream.println("trait " + dsl + "OpsExp extends " + dsl + "CompilerOps with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
+    // Exp
+    stream.println("trait " + dsl + "Exp extends " + dsl + "CompilerOps with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
     for (opsGrp <- opsGrps) {
       // Group has an op with a set of rewrite rules that doesn't contain a Forwarding rule
       val hasRewrites = unique(opsGrp.ops).exists(o => Rewrites.get(o).map(rules => rules.nonEmpty && !rules.exists(_.isInstanceOf[ForwardingRule])).getOrElse(false))
@@ -91,6 +91,7 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     // be written for them, as they will have no effect.
     stream.println()
     emitBlockComment("Disambiguations for Delite internal operations", stream, indent=2)
+    stream.println("  override def __ifThenElse[T:Manifest](cond: Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")
     for ((o,rules) <- Rewrites if rules.exists(_.isInstanceOf[ForwardingRule])) {
       val forwarder = rules.find(_.isInstanceOf[ForwardingRule]).get.asInstanceOf[ForwardingRule]
       val lines = inline(o, forwarder.rule, quoteLiteral).split(nl)
@@ -145,7 +146,7 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     stream.println()
 
     // exp
-    stream.println("trait " + dsl + "Compiler extends " + dsl + "OpsExp with " + dsl + "Transform {") //with MultiloopSoATransformExp
+    stream.println("trait " + dsl + "Compiler extends " + dsl + "Exp with " + dsl + "Transform {") //with MultiloopSoATransformExp
     stream.println(" self: " + dsl + "Application with DeliteApplication => ")
     stream.println()
 

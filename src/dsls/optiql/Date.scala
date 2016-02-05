@@ -25,10 +25,10 @@ trait DateOps {
     val DateOps = withTpe (Date)
     DateOps {
 
-      compiler ("date_value") (Nil :: MInt) implements getter(0, "value")
-      compiler ("date_year") (Nil :: MInt) implements single ${ date_value($self) >>> 9 }
-      compiler ("date_month") (Nil :: MInt) implements single ${ (date_value($self) >>> 5) & 0xf }
-      compiler ("date_day") (Nil :: MInt) implements single ${ date_value($self) & 0x1f }
+      internal ("date_value") (Nil :: MInt) implements getter(0, "value")
+      internal ("date_year") (Nil :: MInt) implements single ${ date_value($self) >>> 9 }
+      internal ("date_month") (Nil :: MInt) implements single ${ (date_value($self) >>> 5) & 0xf }
+      internal ("date_day") (Nil :: MInt) implements single ${ date_value($self) & 0x1f }
 
       infix ("<") (Date :: MBoolean) implements single ${ date_value($self) < date_value($1) }
       infix ("<=") (Date :: MBoolean) implements single ${ date_value($self) <= date_value($1) }

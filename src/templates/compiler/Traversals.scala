@@ -152,7 +152,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("}")
   }
   def emitTransformerExp(t: Rep[DSLTransformer], stream: PrintWriter) {
-    stream.println("trait " + makeTraversalIRName(t) + " extends " + dsl + "OpsExp {")
+    stream.println("trait " + makeTraversalIRName(t) + " extends " + dsl + "Exp {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication =>")
     stream.println("}")
   }
@@ -183,7 +183,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
   }
 
   def emitAnalyzerExp(az: Rep[DSLAnalyzer], stream: PrintWriter) {
-    stream.println("trait " + makeTraversalIRName(az) + " extends " + dsl + "OpsExp {")
+    stream.println("trait " + makeTraversalIRName(az) + " extends " + dsl + "Exp {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication =>")
     stream.println("}")
   }

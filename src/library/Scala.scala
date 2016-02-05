@@ -582,7 +582,7 @@ trait ScalaOps extends PrimitiveMathGen {
 
       // internal_pack is necessary so that we don't store a stage = now type (CT) in a Delite IR node, which expects Reps.
       val argStr = (0 until pars.length).map(i => unit(quotedArg(i)))
-      compiler (TT) ("internal_pack" + arity, pars, (pars :: TT(pars: _*))) implements allocates(TT, argStr: _*)
+      internal (TT) ("internal_pack" + arity, pars, (pars :: TT(pars: _*))) implements allocates(TT, argStr: _*)
 
       val makeTupleStrStr = "\"(\"+" + (1 to arity).map(i => "t._"+i).mkString("+\",\"+") + "+\")\""
       infix (TT) ("toString", pars, ("t",TT(pars: _*)) :: MString) implements composite ${ \$makeTupleStrStr }
@@ -619,9 +619,9 @@ trait ScalaOps extends PrimitiveMathGen {
     impl (hashmap) (codegen($cala, ${ new scala.collection.mutable.HashMap[$t[K],$t[V]]() }))
     impl (hashmap) (codegen(cpp, ${ new std::map<$t[K],$t[V]>() }))
 
-    compiler (HashMapOps) ("shashmap_from_arrays", (K,V), (MArray(K),MArray(V)) :: SHashMap(K,V), effect = mutable) implements codegen($cala, ${ scala.collection.mutable.HashMap($0.zip($1): _*) })
-    val keys_array = compiler (HashMapOps) ("shashmap_keys_array", (K,V), (SHashMap(K,V)) :: SArray(K))
-    val values_array = compiler (HashMapOps) ("shashmap_values_array", (K,V), (SHashMap(K,V)) :: SArray(V))
+    internal (HashMapOps) ("shashmap_from_arrays", (K,V), (MArray(K),MArray(V)) :: SHashMap(K,V), effect = mutable) implements codegen($cala, ${ scala.collection.mutable.HashMap($0.zip($1): _*) })
+    val keys_array = internal (HashMapOps) ("shashmap_keys_array", (K,V), (SHashMap(K,V)) :: SArray(K))
+    val values_array = internal (HashMapOps) ("shashmap_values_array", (K,V), (SHashMap(K,V)) :: SArray(V))
     impl (keys_array) (codegen($cala, ${ $0.keys.toArray }))
     impl (values_array) (codegen($cala, ${ $0.values.toArray }))
     impl (keys_array) (codegen(cpp, "new " + unquotes("remap(sym.tp)") + ${ ($0->size()); int keys_idx_$0 = 0; for(std::map<$t[K],$t[V]>::iterator it = $0->begin(); it != $0->end(); ++it) } + unquotes("quote(sym)") + ${->update(keys_idx_$0++, it->first); }))
@@ -651,15 +651,15 @@ trait ScalaOps extends PrimitiveMathGen {
     val HashMapOps = grp("CHashMap")
 
     direct (HashMapOps) ("CHashMap", (K,V), Nil :: CHashMap(K,V), effect = mutable) implements codegen($cala, ${ new java.util.concurrent.ConcurrentHashMap[$t[K],$t[V]]() })
-    compiler (HashMapOps) ("chashmap_from_arrays", (K,V), (MArray(K),MArray(V)) :: CHashMap(K,V), effect = mutable) implements codegen($cala, ${
+    internal (HashMapOps) ("chashmap_from_arrays", (K,V), (MArray(K),MArray(V)) :: CHashMap(K,V), effect = mutable) implements codegen($cala, ${
       val map = new java.util.concurrent.ConcurrentHashMap[$t[K],$t[V]]()
       for (i <- 0 until $0.length) {
         map.put($0(i),$1(i))
       }
       map
     })
-    compiler (HashMapOps) ("chashmap_keys_array", (K,V), (CHashMap(K,V)) :: SArray(K)) implements codegen($cala, ${ scala.collection.JavaConverters.enumerationAsScalaIteratorConverter($0.keys).asScala.toArray })
-    compiler (HashMapOps) ("chashmap_values_array", (K,V), (CHashMap(K,V)) :: SArray(V)) implements codegen($cala, ${ scala.collection.JavaConverters.collectionAsScalaIterableConverter($0.values).asScala.toArray })
+    internal (HashMapOps) ("chashmap_keys_array", (K,V), (CHashMap(K,V)) :: SArray(K)) implements codegen($cala, ${ scala.collection.JavaConverters.enumerationAsScalaIteratorConverter($0.keys).asScala.toArray })
+    internal (HashMapOps) ("chashmap_values_array", (K,V), (CHashMap(K,V)) :: SArray(V)) implements codegen($cala, ${ scala.collection.JavaConverters.collectionAsScalaIterableConverter($0.values).asScala.toArray })
 
     infix (HashMapOps) ("apply", (K,V), (CHashMap(K,V), K) :: V) implements codegen($cala, ${ $0.get($1) })
     infix (HashMapOps) ("update", (K,V), (CHashMap(K,V), K, V) :: MUnit, effect = write(0)) implements codegen($cala, ${ $0.put($1,$2); () })

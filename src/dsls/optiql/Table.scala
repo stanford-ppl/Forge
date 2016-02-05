@@ -129,7 +129,7 @@ trait TableOps {
         join2($self, $k1, $t2, $k2, $result)
       }
 
-      compiler ("join2")(("k1" -> (A ==> K), "t2" -> Table(B), "k2" -> (B ==> K), "result" -> ((A,B) ==> R)) :: Table(R), addTpePars = (B,K,R)) implements composite ${
+      internal ("join2")(("k1" -> (A ==> K), "t2" -> Table(B), "k2" -> (B ==> K), "result" -> ((A,B) ==> R)) :: Table(R), addTpePars = (B,K,R)) implements composite ${
         //TODO: we want to hash the smaller collection, but the size may be unknown (on disk); we could use file size as an approximation if we had some rewrites
         val grouped = array_buffer_groupBy(array_buffer_new_imm(table_raw_data($self), array_length(table_raw_data($self))), $k1) //FIXME: array_buffer vs. table
         val empty = Table(array_empty_imm[R](unit(0))) //note: control effects on IfThenElse require some manual hoisting
@@ -142,7 +142,7 @@ trait TableOps {
         })
       }
 
-      /*compiler ("join3")(("t1" -> Table(A), "k1" -> (A ==> K), "t2" -> Table(B), "k2" -> (B ==> K), "t3" -> Table(C), "k3" -> (C ==> K), "result" -> ((A,B,C) ==> R)) :: Table(R), addTpePars = (B,C,K,R)) implements composite ${
+      /*internal ("join3")(("t1" -> Table(A), "k1" -> (A ==> K), "t2" -> Table(B), "k2" -> (B ==> K), "t3" -> Table(C), "k3" -> (C ==> K), "result" -> ((A,B,C) ==> R)) :: Table(R), addTpePars = (B,C,K,R)) implements composite ${
         ???
       }*/
 
@@ -152,12 +152,12 @@ trait TableOps {
       //see extern files, currently manual Scala implementations
 
       //internal transformed ops
-      compiler("groupByReduce")(("keySelector" -> (A ==> K), "valueSelector" -> (A ==> V), "reducer" -> ((V,V) ==> V), "condition" -> (A ==> MBoolean)) :: Table(V), addTpePars = (K,V)) implements composite ${
+      internal("groupByReduce")(("keySelector" -> (A ==> K), "valueSelector" -> (A ==> V), "reducer" -> ((V,V) ==> V), "condition" -> (A ==> MBoolean)) :: Table(V), addTpePars = (K,V)) implements composite ${
         val map = groupByReduceOp($self, $keySelector, $valueSelector, $reducer, $condition)
         Table[V](fhashmap_values(map))
       }
-      compiler("groupByReduceOp")(("keySelector" -> (A ==> K), "valueSelector" -> (A ==> V), "reducer" -> ((V,V) ==> V), "condition" -> (A ==> MBoolean)) :: MHashMap(K,V), addTpePars = (K,V)) implements groupByReduce((A,K,V), 0, ${$keySelector}, ${$valueSelector}, ${zeroType[V]}, ${$reducer}, Some(${condition}))
-      compiler("bulkDivide") (("counts" -> Table(MInt), "avgFunc" -> ((A,MInt) ==> A)) :: Table(A)) implements zip((A,MInt,A), (0,1), ${$avgFunc})
+      internal("groupByReduceOp")(("keySelector" -> (A ==> K), "valueSelector" -> (A ==> V), "reducer" -> ((V,V) ==> V), "condition" -> (A ==> MBoolean)) :: MHashMap(K,V), addTpePars = (K,V)) implements groupByReduce((A,K,V), 0, ${$keySelector}, ${$valueSelector}, ${zeroType[V]}, ${$reducer}, Some(${condition}))
+      internal("bulkDivide") (("counts" -> Table(MInt), "avgFunc" -> ((A,MInt) ==> A)) :: Table(A)) implements zip((A,MInt,A), (0,1), ${$avgFunc})
 
 
       //methods needed to implement Table as a Delite ParallelCollectionBufer
@@ -166,20 +166,20 @@ trait TableOps {
       infix ("apply") (MInt :: A) implements composite ${ table_apply_internal($self, $1) }
       infix ("size") (Nil :: MInt) implements composite ${ table_size_internal($self) }
 
-      compiler ("table_raw_data") (Nil :: MArray(A)) implements getter(0, "data")
-      compiler ("table_size_internal") (Nil :: MInt) implements getter(0, "size")
-      compiler ("table_apply_internal") (MInt :: A) implements composite ${
+      internal ("table_raw_data") (Nil :: MArray(A)) implements getter(0, "data")
+      internal ("table_size_internal") (Nil :: MInt) implements getter(0, "size")
+      internal ("table_apply_internal") (MInt :: A) implements composite ${
         array_apply(table_raw_data($self), $1)
       }
 
       //mutators
-      compiler ("table_set_raw_data") (MArray(A) :: MUnit, effect = write(0)) implements setter(0, "data", quotedArg(1))
-      compiler ("table_set_size") (MInt :: MUnit, effect = write(0)) implements setter(0, "size", quotedArg(1))
-      compiler ("table_update") (("i"->MInt,"e"->A) :: MUnit, effect = write(0)) implements composite ${
+      internal ("table_set_raw_data") (MArray(A) :: MUnit, effect = write(0)) implements setter(0, "data", quotedArg(1))
+      internal ("table_set_size") (MInt :: MUnit, effect = write(0)) implements setter(0, "size", quotedArg(1))
+      internal ("table_update") (("i"->MInt,"e"->A) :: MUnit, effect = write(0)) implements composite ${
         array_update(table_raw_data($self), $i, $e)
       }
 
-      compiler ("table_alloc") (MInt :: Table(R), addTpePars = R, effect = mutable) implements composite ${
+      internal ("table_alloc") (MInt :: Table(R), addTpePars = R, effect = mutable) implements composite ${
         Table[R]($1)
       }
 
@@ -192,21 +192,21 @@ trait TableOps {
         table_insert($self, table_size($self), $1)
       }
 
-      compiler ("table_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
+      internal ("table_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
         table_ensureextra($self,$len)
         val data = table_raw_data($self)
         array_copy(data,$pos,data,$pos+$len,table_size($self)-$pos)
         table_set_size($self,table_size($self)+$len)
       }
 
-      compiler ("table_ensureextra") (("extra",MInt) :: MUnit, effect = write(0)) implements single ${
+      internal ("table_ensureextra") (("extra",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = table_raw_data($self)
         if (array_length(data) - table_size($self) < $extra) {
           table_realloc($self, table_size($self)+$extra)
         }
       }
 
-      compiler ("table_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
+      internal ("table_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = table_raw_data($self)
         var n = unit(4) max (array_length(data)*2)
         while (n < $minLen) n = n*2
@@ -215,11 +215,11 @@ trait TableOps {
         table_set_raw_data($self, d.unsafeImmutable)
       }
 
-      compiler ("table_appendable") ((MInt,A) :: MBoolean) implements single("true")
-      compiler ("table_dc_append") ((MInt,A) :: MUnit, effect = write(0)) implements single ${
+      internal ("table_appendable") ((MInt,A) :: MBoolean) implements single("true")
+      internal ("table_dc_append") ((MInt,A) :: MUnit, effect = write(0)) implements single ${
         table_append($self, $2)
       }
-      compiler ("table_copy") ((MInt,Table(A),MInt,MInt) :: MUnit, effect = write(2)) implements single ${
+      internal ("table_copy") ((MInt,Table(A),MInt,MInt) :: MUnit, effect = write(2)) implements single ${
         val src = table_raw_data($self)
         val dest = table_raw_data($2)
         array_copy(src, $1, dest, $3, $4)

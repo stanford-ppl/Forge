@@ -27,7 +27,7 @@ trait ClassifierOps {
     val Forest = tpe("RandomForest")
     data(Forest, ("_trees", DenseVector(Tree)))
 
-    compiler (Forest) ("alloc_forest", Nil, ("trees", DenseVector(Tree)) :: Forest) implements allocates(Forest, ${$0})
+    internal (Forest) ("alloc_forest", Nil, ("trees", DenseVector(Tree)) :: Forest) implements allocates(Forest, ${$0})
 
     // For each tree, we default to using approximately 2/3rds of the total available samples
     // http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#remarks

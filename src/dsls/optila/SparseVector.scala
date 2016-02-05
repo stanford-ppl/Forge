@@ -92,7 +92,7 @@ trait SparseVectorOps {
     }
 
     // helper
-    compiler (SparseVector) ("sparsevector_alloc_raw", T, (MInt, MBoolean, MArray(T), MArray(MInt), MInt) :: SparseVector(T)) implements
+    internal (SparseVector) ("sparsevector_alloc_raw", T, (MInt, MBoolean, MArray(T), MArray(MInt), MInt) :: SparseVector(T)) implements
       allocates(SparseVector, ${$0}, ${$1}, ${$2}, ${$3}, ${$4})
 
     static (SparseVector) ("zeros", Nil, MInt :: SparseVector(MDouble)) implements redirect ${ SparseVector[Double]($0, unit(true)).unsafeImmutable }
@@ -110,7 +110,7 @@ trait SparseVectorOps {
       SparseVector.fromFunc($0, true, indices, i => random[Float])
     }
 
-    compiler (SparseVector) ("bsearch", Nil, (("a",MArray(MInt)),("_start",MInt),("_end",MInt),("pos",MInt)) :: MInt) implements single ${
+    internal (SparseVector) ("bsearch", Nil, (("a",MArray(MInt)),("_start",MInt),("_end",MInt),("pos",MInt)) :: MInt) implements single ${
       // binary search index for pos
       var start = _start
       var end = _end
@@ -141,7 +141,7 @@ trait SparseVectorOps {
     // defaultValue must obey "zero" semantics:
     //    x+defaultValue = x,              x-defaultValue = -x
     //    x*defaultValue = defaultValue,   defaultValue/x = defaultValue
-    compiler (SparseVector) ("defaultValue", T, Nil :: T) implements composite ${
+    internal (SparseVector) ("defaultValue", T, Nil :: T) implements composite ${
       manifest[T] match {
         case Manifest.Boolean => unit(false).asInstanceOf[Rep[T]]
         case Manifest.Int => unit(0).asInstanceOf[Rep[T]]
@@ -159,7 +159,7 @@ trait SparseVectorOps {
      * sparse-sparse math ops should be at most O(nnz1+nnz2). how should they be parallelized?
      * would it be easier if we represented the sparse vectors as hashmaps? (e.g., and chunk one of the key sets)
      */
-    compiler (SparseVector) ("zipUnion", (A,B,R), MethodSignature(List(("nnzInit",MInt),("aIdxInit",MInt),("annz",MInt),("aIndices",MArray(MInt)),("aData",MArray(A)),("bIdxInit",MInt),("bnnz",MInt),("bIndices",MArray(MInt)),("bData",MArray(B)),("outIndices",MArray(MInt)),("outData",MArray(R)),("f",(A,B) ==> R)), MInt), effect = write(9,10)) implements single ${
+    internal (SparseVector) ("zipUnion", (A,B,R), MethodSignature(List(("nnzInit",MInt),("aIdxInit",MInt),("annz",MInt),("aIndices",MArray(MInt)),("aData",MArray(A)),("bIdxInit",MInt),("bnnz",MInt),("bIndices",MArray(MInt)),("bData",MArray(B)),("outIndices",MArray(MInt)),("outData",MArray(R)),("f",(A,B) ==> R)), MInt), effect = write(9,10)) implements single ${
       // need to zip only places where either va and vb are non-zero
       var nnz = nnzInit
       var aIdx = aIdxInit
@@ -205,7 +205,7 @@ trait SparseVectorOps {
       nnz
     }
 
-    compiler (SparseVector) ("zipIntersect", (A,B,R), MethodSignature(List(("nnzInit",MInt),("aIdxInit",MInt),("annz",MInt),("aIndices",MArray(MInt)),("aData",MArray(A)),("bIdxInit",MInt),("bnnz",MInt),("bIndices",MArray(MInt)),("bData",MArray(B)),("outIndices",MArray(MInt)),("outData",MArray(R)),("f",(A,B) ==> R)), MInt), effect = write(9,10)) implements single ${
+    internal (SparseVector) ("zipIntersect", (A,B,R), MethodSignature(List(("nnzInit",MInt),("aIdxInit",MInt),("annz",MInt),("aIndices",MArray(MInt)),("aData",MArray(A)),("bIdxInit",MInt),("bnnz",MInt),("bIndices",MArray(MInt)),("bData",MArray(B)),("outIndices",MArray(MInt)),("outData",MArray(R)),("f",(A,B) ==> R)), MInt), effect = write(9,10)) implements single ${
       // need to zip only places where both va and vb are non-zero
       var nnz = nnzInit
       var aIdx = aIdxInit
@@ -249,7 +249,7 @@ trait SparseVectorOps {
         indexvector_fromarray(data, $self.isRow)
       }
 
-      compiler ("sparsevector_find_offset") (("pos",MInt) :: MInt) implements composite ${
+      internal ("sparsevector_find_offset") (("pos",MInt) :: MInt) implements composite ${
         val indices = sparsevector_raw_indices($self)
         bsearch(indices, 0, $self.nnz-1, pos)
       }
@@ -388,13 +388,13 @@ trait SparseVectorOps {
       /**
        * Data operations
        */
-      compiler ("sparsevector_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
-      compiler ("sparsevector_raw_indices") (Nil :: MArray(MInt)) implements getter(0, "_indices")
-      compiler ("sparsevector_set_length") (MInt :: MUnit, effect = write(0)) implements setter(0, "_length", ${$1})
-      compiler ("sparsevector_set_isrow") (MBoolean :: MUnit, effect = write(0)) implements setter(0, "_isRow", ${$1})
-      compiler ("sparsevector_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements setter(0, "_data", ${$1})
-      compiler ("sparsevector_set_raw_indices") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_indices", ${$1})
-      compiler ("sparsevector_set_nnz") (MInt :: MUnit, effect = write(0)) implements setter(0, "_nnz", ${$1})
+      internal ("sparsevector_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
+      internal ("sparsevector_raw_indices") (Nil :: MArray(MInt)) implements getter(0, "_indices")
+      internal ("sparsevector_set_length") (MInt :: MUnit, effect = write(0)) implements setter(0, "_length", ${$1})
+      internal ("sparsevector_set_isrow") (MBoolean :: MUnit, effect = write(0)) implements setter(0, "_isRow", ${$1})
+      internal ("sparsevector_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements setter(0, "_data", ${$1})
+      internal ("sparsevector_set_raw_indices") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_indices", ${$1})
+      internal ("sparsevector_set_nnz") (MInt :: MUnit, effect = write(0)) implements setter(0, "_nnz", ${$1})
 
       infix ("update") ((("pos",MInt),("e",T)) :: MUnit, effect = write(0)) implements composite ${
         val offRaw = sparsevector_find_offset($self, pos)
@@ -451,7 +451,7 @@ trait SparseVectorOps {
       infix ("<<=") (T :: MUnit, effect = write(0)) implements composite ${ sparsevector_insert_at_off($self, $self.nnz, $self.length, $1) }
       infix ("<<=") (SparseVector(T) :: MUnit, effect = write(0)) implements composite ${ $self.insertAll($self.length,$1) }
 
-      compiler ("sparsevector_insert_at_off") ((("off",MInt),("pos",MInt),("e",T)) :: MUnit, effect = write(0)) implements composite ${
+      internal ("sparsevector_insert_at_off") ((("off",MInt),("pos",MInt),("e",T)) :: MUnit, effect = write(0)) implements composite ${
         sparsevector_insertspace($self, off, 1)
         val data = sparsevector_raw_data($self)
         val indices = sparsevector_raw_indices($self)
@@ -540,7 +540,7 @@ trait SparseVectorOps {
         sparsevector_set_raw_indices($self, (array_empty[Int](0)).unsafeImmutable)
       }
 
-      compiler ("sparsevector_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
+      internal ("sparsevector_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
         sparsevector_ensureextra($self,len)
         val data = sparsevector_raw_data($self)
         val indices = sparsevector_raw_indices($self)
@@ -549,14 +549,14 @@ trait SparseVectorOps {
         sparsevector_set_nnz($self, $self.nnz + len)
       }
 
-      compiler ("sparsevector_ensureextra") (("extra",MInt) :: MUnit, effect = write(0)) implements single ${
+      internal ("sparsevector_ensureextra") (("extra",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = sparsevector_raw_data($self)
         if (array_length(data) - $self.nnz < extra) {
           sparsevector_realloc($self, $self.nnz + extra)
         }
       }
 
-      compiler ("sparsevector_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
+      internal ("sparsevector_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = sparsevector_raw_data($self)
         val indices = sparsevector_raw_indices($self)
         var n = max(4, array_length(data) * 2)
@@ -576,7 +576,7 @@ trait SparseVectorOps {
 
       // toDense will materialize in parallel, and then the dense operations will also be in parallel
 
-      compiler ("zipVectorUnion") ((SparseVector(B), (T,B) ==> R) :: SparseVector(R), addTpePars = (B,R)) implements composite ${
+      internal ("zipVectorUnion") ((SparseVector(B), (T,B) ==> R) :: SparseVector(R), addTpePars = (B,R)) implements composite ${
         val outIndices = array_empty[Int]($self.nnz+$1.nnz) // upper bound
         val outData = array_empty[R]($self.nnz+$1.nnz)
 
@@ -584,7 +584,7 @@ trait SparseVectorOps {
         sparsevector_alloc_raw($self.length, $self.isRow, outData.unsafeImmutable, outIndices.unsafeImmutable, nnz)
       }
 
-      compiler ("zipVectorIntersect") ((SparseVector(B), (T,B) ==> R) :: SparseVector(R), addTpePars = (B,R)) implements composite ${
+      internal ("zipVectorIntersect") ((SparseVector(B), (T,B) ==> R) :: SparseVector(R), addTpePars = (B,R)) implements composite ${
         val outIndices = array_empty[Int]($self.nnz) // upper bound
         val outData = array_empty[R]($self.nnz)
 

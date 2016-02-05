@@ -242,7 +242,7 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println()
 
     stream.println("trait " + opsGrp.name + "Exp extends " + baseOpsCls(opsGrp) + " {")
-    stream.println("  this: " + dsl + "OpsExp => ")
+    stream.println("  this: " + dsl + "Exp => ")
     stream.println()
 
     val uniqueOps = unique(opsGrp.ops).filter(hasCompilerVersion)
@@ -1028,7 +1028,7 @@ trait DeliteGenOps extends BaseGenOps {
     if (rewrites.nonEmpty) {
       emitBlockComment("Op rewrites", stream)
       stream.println("trait " + opsGrp.grp.name + "RewriteOpsExp extends " + opsGrp.name + "Exp {")
-      stream.println("  this: " + dsl + "OpsExp => ")
+      stream.println("  this: " + dsl + "Exp => ")
       stream.println()
       rewrites foreach { case (o, rules) =>
         stream.println("  override " + makeOpMethodSignature(o) + " = {")

@@ -6,6 +6,7 @@ import java.io.{BufferedWriter, FileWriter, PrintWriter}
 import scala.tools.nsc.io._
 import scala.collection.mutable.ArrayBuffer
 import scala.virtualization.lms.common._
+import org.scala_lang.virtualized.SourceContext
 
 import core._
 import shared.BaseGenOps
@@ -157,6 +158,7 @@ trait DeliteGenOps extends BaseGenOps {
   def emitImpls(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("Op Impls", stream)
     stream.println()
+    stream.println("@virtualize")
     stream.println("trait " + opsGrp.name + "Impl {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Lift => ")
     stream.println()
@@ -530,11 +532,11 @@ trait DeliteGenOps extends BaseGenOps {
         case c:Composite => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
         case g@Getter(structArgIndex,field) =>
           val struct = o.args.apply(structArgIndex)
-          val fieldTpe = DataStructs(getHkTpe(struct.tpe)).fields.find(t => t._1 == field).get._2//.tpe
+          val fieldTpe = DataStructs(getHkTpe(struct.tpe)).fields.find(t => t._1 == field).get._2//.tpe TODO(macrovirt) check this
           emitWithIndent("field["+quote(fieldTpe)+"]("+inline(o,quotedArg(struct.name),quoteLiteral)+",\""+field+"\")", stream, 4)
         case s@Setter(structArgIndex,field,value) =>
           val struct = o.args.apply(structArgIndex)
-          val fieldTpe = DataStructs(getHkTpe(struct.tpe)).fields.find(t => t._1 == field).get._2//.tpe
+          val fieldTpe = DataStructs(getHkTpe(struct.tpe)).fields.find(t => t._1 == field).get._2//.tpe TODO(macrovirt) check this
           emitWithIndent("field_update["+quote(fieldTpe)+"]("+inline(o,quotedArg(struct.name),quoteLiteral)+",\""+field+"\","+inline(o,value,quoteLiteral)+")", stream, 4)
         case _:GroupBy | _:GroupByReduce =>
           emitWithIndent("val keys = " + makeEffectAnnotation(o.effect,o) + "(" + makeOpNodeName(o, "Keys") + makeTpePars(o.tpePars) + makeOpArgs(o) + makeOpImplicitArgs(o) + ")", stream, 4)

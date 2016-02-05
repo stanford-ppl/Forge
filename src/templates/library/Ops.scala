@@ -7,6 +7,7 @@ import scala.util.matching._
 import scala.tools.nsc.io._
 import scala.collection.mutable.ArrayBuffer
 import scala.virtualization.lms.common._
+import org.scala_lang.virtualized.SourceContext
 
 import core._
 import shared.{BaseGenOps,BaseGenDataStructures}

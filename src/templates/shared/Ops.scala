@@ -6,6 +6,8 @@ import java.io.{BufferedWriter, FileWriter, PrintWriter}
 import scala.tools.nsc.io._
 import scala.collection.mutable.ArrayBuffer
 import scala.virtualization.lms.common._
+import org.scala_lang.virtualized.SourceContext
+
 import core._
 import Utilities._
 
@@ -415,12 +417,14 @@ trait BaseGenOps extends ForgeCodeGenBase {
         val struct = getHkTpe(o.args.apply(structArgIndex).tpe)
         val data = DataStructs.get(struct)
         if (data.isEmpty) err("no struct definitions found for arg index " + structArgIndex + " in op " + o.name)
+        //TODO(macrovirt) check this:
         if (!data.get.fields.map(_._1).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)
       case Setter(structArgIndex,field,value) =>
         if (structArgIndex > o.args.length) err("arg index " + structArgIndex + " does not exist for op " + o.name)
         val struct = getHkTpe(o.args.apply(structArgIndex).tpe)
         val data = DataStructs.get(struct)
         if (data.isEmpty) err("no struct definitions found for arg index " + structArgIndex + " in op " + o.name)
+        //TODO(macrovirt) check this:
         if (!data.get.fields.map(_._1).contains(field)) err("struct arg " + structArgIndex + " does not contain field " + field + " in op " + o.name)
       case map:Map =>
         val col = getHkTpe(o.args.apply(map.argIndex).tpe)
@@ -492,7 +496,8 @@ trait BaseGenOps extends ForgeCodeGenBase {
     // FIXME: we get scalac internal crashes when using the default-implicit mode now
      if (true || Config.fastCompile) {
        // default implicit mode (appears empirically slightly faster than infix)
-       (!mustInfixList.contains(o.name)) && (o.args.length > 0) //(!o.args.exists(hasDefaultValue)) &&
+       //(!mustInfixList.contains(o.name)) && (o.args.length > 0) && (!o.args.exists(hasDefaultValue))
+       (!macroInfix.contains(o.name)) && (o.args.length > 0) && (!o.args.exists(hasDefaultValue)) && !o.grp.name.startsWith("Tup")
      }
      else {
        //default infix mode (slightly easier to understand what's happening, also fails to apply less than implicits)

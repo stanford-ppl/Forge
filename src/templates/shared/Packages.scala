@@ -83,12 +83,13 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     }
 
     stream.println()
-    // emitBlockComment("hacks for Scala-Virtualized", stream, indent=2)
-    //   // HACK -- bug in scala-virtualized (copied from LMS IfThenElse.scala)
-    // stream.println("  override def __ifThenElse[T](cond: => Boolean, thenp: => T, elsep: => T) = cond match {")
-    // stream.println("    case true => thenp")
-    // stream.println("    case false => elsep")
-    // stream.println("  }")
+    //TODO(macrovirt) this is weird
+     emitBlockComment("hacks for Scala-Virtualized", stream, indent=2)
+       // HACK -- bug in scala-virtualized (copied from LMS IfThenElse.scala)
+     stream.println("  override def __ifThenElse[T](cond: => Boolean, thenp: => T, elsep: => T) = cond match {")
+     stream.println("    case true => thenp")
+     stream.println("    case false => elsep")
+     stream.println("  }")
 
     stream.println()
     stream.println("}")

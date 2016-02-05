@@ -275,6 +275,23 @@ trait ScalaOps extends PrimitiveMathGen {
       impl (times) (codegen(g, quotedArg(0) + " * " + quotedArg(1)))
     }
 
+    //    val toInt = infix (Num) ("toInt", T withBound TNumeric, T :: MInt)
+    //    val toFloat = infix (Num) ("toFloat", T withBound TNumeric, T :: MFloat)
+    //    val toDouble = infix (Num) ("toDouble", T withBound TNumeric, T :: MDouble)
+    //    val toLong = infix (Num) ("toLong", T withBound TNumeric, T :: MLong)
+    //
+    //    impl (toInt) (codegen($cala, ${ $0.toInt }))
+    //    impl (toFloat) (codegen($cala, ${ $0.toFloat }))
+    //    impl (toDouble) (codegen($cala, ${ $0.toDouble }))
+    //    impl (toLong) (codegen($cala, ${ $0.toLong }))
+    //
+    //    for (g <- List(cuda, cpp)) {
+    //      impl (toInt) (codegen(g, ${ (int32_t) $0 }))
+    //      impl (toFloat) (codegen(g, ${ (float) $0 }))
+    //      impl (toDouble) (codegen(g, ${ (double) $0 }))
+    //      impl (toLong) (codegen(g, ${ (int64_t) $0 }))
+    //    }
+
     val Frac = grp("Fractional")
     val R = tpePar("R")
     val div = infix (Frac) ("/", List(T,R withBound TFractional), (T,R) :: R, T ==> R)

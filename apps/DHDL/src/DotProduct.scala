@@ -1,6 +1,7 @@
 import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
+import scala.util.Random
 
 object DotProductCompiler extends DHDLApplicationCompiler with DotProduct 
 object DotProductInterpreter extends DHDLApplicationInterpreter with DotProduct 
@@ -11,18 +12,15 @@ trait DotProduct extends DHDLApplication {
     exit(-1)
 	}
   def main() = {
-		val a = FixPt(5, 31, 0)
-		val b = FixPt(7, 31, 0)
-		val r = Reg("a", a)
-		assert(r.value==a)
-		r.write(b)
-		assert(r.value==b)
-		assert(r.init==a)
-		r.reset
-		assert(r.value==a)
+		val tileSize = 4
+		val dataSize = 64
+		val svec1 = Seq.fill(dataSize)(Random.nextInt(100))
+		val svec2 = Seq.fill(dataSize)(Random.nextInt(100))
+		val vec1 = OffChipMem[FixPt]("vec1", svec1: _*)
+		val vec2 = OffChipMem[FixPt]("vec2", svec2: _*)
+		val bm1 = BRAM[FixPt]("bm1", 16)
+		val bm2 = BRAM[FixPt]("bm2", 16)
 
-		val m = BRAM[Long]("m", 16)
-		m.st(3,b)
-		assert(m.ld(3)==b)
+		val ctrs = CtrChain(Ctr("ctr", 0, dataSize/tileSize, 1), Ctr("ctr1", 0, tileSize, 1))
 	}
 }

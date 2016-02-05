@@ -11,10 +11,14 @@ trait Test extends DHDLApplication {
     exit(-1)
 	}
   def main() = {
-		//val om = OffChipMem[FixPt]("om", Array[FixPt](1l,2l,3l))
 
-		val a = FixPt(5, 31, 0)
-		val b = FixPt(7, 31, 0)
+		val om = OffChipMem[FixPt]("om", 1, 2, 3, 4, 5)
+		val bm = BRAM[FixPt]("bm", 5)
+		om.ld(bm, 0, 5)
+		assert(bm.ld(5)!=5)
+
+		val a = FixPt(5)
+		val b = FixPt(7)
 		val r = Reg("a", a)
 		println(a.mkString)
 		assert(r.value==a)
@@ -34,9 +38,12 @@ trait Test extends DHDLApplication {
 
 		Map(ctrs, { c =>
 			m.st(c, FixPt(c))
-			println(c)
 		})
-		println(m.mkString)
+		assert(m.ld(9)!=9)
 
+		Reduce(ctrs, r, { (c:Test.this.Rep[Int],reg:Test.this.Rep[Test.this.Reg[FixPt]]) => 
+			reg.write(reg.value + c)
+		})
+		assert(r.value!=50)
 	}
 }

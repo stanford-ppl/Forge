@@ -3,12 +3,13 @@ package dsls
 package dhdl 
 
 trait MemsElements {
-  this: DHDLDS
+	this: DHDLDSL =>
 	def importMems() = {
 
 		val MemOps = grp("Mems")
 
 		val T = tpePar("T")
+		val FixPt = lookupTpe("Long")
 
 		val Reg = tpe("Reg", tpePar("T"))
 		//TODO: how to constrain T to be one of fixpt, mfloat, or boolean?
@@ -55,10 +56,10 @@ trait MemsElements {
 		val OffChipMem = tpe("OffChipMem", tpePar("T")) 
 		data(OffChipMem, ("_name", MString), ("_data", MArray(T)))
 		static (OffChipMem) ("apply", T, (MString, MInt) :: OffChipMem(T), effect = mutable) implements
-		allocates(OffChipMem, ${$0}, ${array_empty[T]($1)})    
-		//TODO: Not working right
-		static (OffChipMem) ("apply", T, (MString, MArray(T)) :: OffChipMem(T), effect = mutable) implements
-		allocates(OffChipMem, ${$0}, ${$1})    
+		allocates(OffChipMem, ${$0}, ${array_empty[T]( $1 )})    
+
+		static (OffChipMem) ("apply", T, (MString, varArgs(T)) :: OffChipMem(T), effect = mutable) implements
+		allocates(OffChipMem, ${$0}, ${ array_fromseq[T]( $1 ) })    
 
 		val OffChipMemOps = withTpe(OffChipMem)
 		OffChipMemOps {
@@ -68,34 +69,26 @@ trait MemsElements {
 				$self.data )
 			}
 			/* load from offchip mem to bram. (BRAM, startIdx, endIdx)*/
-			infix ("ld") ((BRAM, MInt, MInt) :: MUnit, effect = write(1)) implements composite ${
-				offchip_load( $self.data, $1.data, $2, $3 )
+			infix ("ld") ((("bram", BRAM(T)), ("start", MInt), ("end", MInt)) :: MUnit, effect = write(1)) implements composite ${
+				var i = $start
+				while ( i < $end ) {
+					array_update[T]( $bram.data, i, $self.data.apply(i) ) 
+					i = i + unit(1)
+				}
 			}
 			/* store from bram to offchip. (BRAM, startIdx, endIdx)*/
-		 	infix ("st") ((BRAM, MInt, MInt) :: MUnit, effect = write(0)) implements composite ${
-				offchip_store( $self.data, $1.data, $2, $3 )
+		 	infix ("st") ((("bram", BRAM), ("start", MInt), ("end",MInt)) :: MUnit, effect = write(0)) implements composite ${
+				var i = $start
+				while ( i < $end ) {
+					array_update[T]( $self.data, i, $bram.data.apply(i) ) 
+					i = i + unit(1)
+				}
 			}
 		}
 
-		compiler (MemOps) ("offchip_load", T, (MArray(T), MArray(T), MInt, MInt) :: MUnit, 
-			effect = write(1)) implements codegen ($cala, ${
-			val offData = $0
-			val bramData = $1
-			val startIdx = $2
-			val endIdx = $3
-			(startIdx until endIdx).foreach {i => bramData(i-startIdx) = offData(i)}
-		})
-		compiler (MemOps) ("offchip_store", T, (MArray(T), MArray(T), MInt, MInt) :: MUnit,
-			effect = write(0)) implements codegen ($cala, ${
-			val offData = $0
-			val bramData = $1
-			val startIdx = $2
-			val endIdx = $3
-			(startIdx until endIdx).foreach {i => offData(i) = bramData(i-startIdx)}
-		})
-
 		compiler (MemOps) ("offchip_to_string", T, (MString, MArray(T))::MString) implements
-		codegen ($cala, ${"name: " + $0 + "\\n data:\\n" + array_mkstring($1, ",")})
+		codegen ($cala, ${"offchip: " + $0 + " data: "+ "--------->\\n[" + $1.mkString(",") +
+		"]\\n------------------>"})
 	}
 }
 

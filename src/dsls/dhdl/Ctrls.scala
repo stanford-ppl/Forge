@@ -55,40 +55,31 @@ trait CtrlOps {
 		val Pipe = tpe("Pipe")
 		data (Pipe, ("_ctrs", CtrChain)) //TODO: Modify pipe to keep track of nodes inside
 		static (Pipe) ("apply", Nil, CtrChain :: Pipe) implements allocates(Pipe, ${$0})
-		direct (Pipe) ("Map", Nil, (("ctrs", CtrChain), ("func", MInt==> MUnit)) :: Pipe) implements composite ${
-			val pipe = Pipe(ctrs)
+
+		val pipe_map = direct (Pipe) ("Map", Nil, (("ctrs", CtrChain), ("func", MInt ==> MUnit)) :: Pipe) 
+		impl (pipe_map) (composite ${
+			val pipe = Pipe( $ctrs )
 			val ctr1 = ctrs.chain.apply(unit(0))
-			pipe_map(ctr1.min, ctr1.max, ctr1.step, $func)
-			pipe
-		}
-		val pipe_map = compiler (Pipe) ("pipe_map", Nil, (("start", MInt), ("end", MInt), ("step", MInt), 
-			("func", MInt==> MUnit)) :: MUnit)
-		impl (pipe_map) (codegen($cala, ${
-			var i = $start
-			while (i < $end) {
-				$b[func](i)
-				i += $step
+			var i = ctr1.min
+			while (i < ctr1.max) {
+				$func(i)
+				i = i + ctr1.step
 			}
-		}))
+			pipe
+		})
 
-		//val T = tpePar("T")
-		//val Reg = lookupTpe("Reg")
-		//direct (Pipe) ("Reduce", T, 
-		//	(("ctrs", CtrChain), ("accum", Reg(T)), ("func", Tuple2(MInt, T)) ==> MUnit) :: Pipe) implements composite ${
-		//	val pipe = Pipe(ctrs)
-		//	val ctr1 = ctrs.chain.apply(unit(0))
-		//	pipe_reduce(ctr1.min, ctr1.max, ctr1.step, $accum, $func)
-		//	pipe
-		//}
-		//val pipe_reduce = compiler (Pipe) ("pipe_reduce", Nil, (("start", MInt), ("end", MInt),
-		//	("step", MInt), ("accum", Reg(T)), ("func", Tuple2(MInt, T)==> MUnit)) :: MUnit)
-		//impl (pipe_reduce) (codegen($cala, ${
-		//	var i = $start
-		//	while (i < $end) {
-		//		$b[func](i, $accum)
-		//		i += $step
-		//	}
-		//}))
-
+		val T = tpePar("T")
+		val Reg = lookupTpe("Reg")
+		val pipe_reduce = direct (Pipe) ("Reduce", T, (("ctrs", CtrChain), ("accum", Reg(T)), ("func", (MInt, Reg(T)) ==> MUnit)) :: Pipe) 
+		impl (pipe_reduce) (composite ${
+			val pipe = Pipe( $ctrs )
+			val ctr1 = ctrs.chain.apply( unit(0) )
+			var i = ctr1.min
+			while (i < ctr1.max) {
+				$func(i, $accum)
+				i = i + ctr1.step
+			}
+			pipe
+		})
 	}
 }

@@ -22,14 +22,18 @@ trait DotProduct extends DHDLApplication {
 		val bm1 = BRAM[FixPt]("bm1", tileSize)
 		val bm2 = BRAM[FixPt]("bm2", tileSize)
 
-		val ctrs = CtrChain(Ctr("ctr", 0, dataSize/tileSize, 1), Ctr("ctr1", 0, tileSize, 1))
+		val ctrs_out = CtrChain(Ctr(max=dataSize/tileSize))
+		val ctrs_in = CtrChain(Ctr(max=tileSize))
 
 		val accum = Reg[FixPt]("accum", 0)
 
-		reduce2(ctrs, accum, ((_+_):(Rep[FixPt],Rep[FixPt]) => Rep[FixPt]), { case i::j::_ =>
+		MetaPipe1(ctrs_out, {case i::_ => 
 			vec1.ld(bm1, i*tileSize, tileSize)
 			vec2.ld(bm2, i*tileSize, tileSize)
-			bm1.ld(j)*bm2.ld(j)
+			Pipe1(ctrs_in, accum, ((_+_):(Rep[FixPt],Rep[FixPt]) => Rep[FixPt]), { case j::_ =>
+				bm1.ld(j)*bm2.ld(j)
+			})
+			()
 		})
 
 		val gold = svec1.zip(svec2).map{case (x,y) => x*y}.reduce(_+_)

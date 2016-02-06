@@ -37,7 +37,7 @@ trait Test extends DHDLApplication {
 		val ctrs = CtrChain(ctr1, ctr2)
 		println(ctrs.mkString)
 
-		map2(ctrs, { case i::j::_ =>
+		Pipe2(ctrs, { case i::j::_ =>
 			//m.st(c, FixPt(c))
 			println(i)
 			println(j)

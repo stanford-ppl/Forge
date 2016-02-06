@@ -37,7 +37,7 @@ trait Test extends DHDLApplication {
 		val ctrs = CtrChain(ctr1, ctr2)
 		println(ctrs.mkString)
 
-		Map(ctrs, { case i::j::_ =>
+		map2(ctrs, { case i::j::_ =>
 			//m.st(c, FixPt(c))
 			println(i)
 			println(j)
@@ -45,7 +45,7 @@ trait Test extends DHDLApplication {
 		})
 		//assert(m.ld(9)!=9)
 
-		//Reduce(ctrs, r, { (c:Test.this.Rep[Int],reg:Test.this.Rep[Test.this.Reg[FixPt]]) => 
+		//Reduce(ctrs, r, { (c:Rep[Int],reg:Rep[Reg[FixPt]]) => 
 		//	reg.write(reg.value + c)
 		//})
 		//assert(r.value!=50)

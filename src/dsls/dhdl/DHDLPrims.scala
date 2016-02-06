@@ -23,14 +23,14 @@ trait PrimOps {
 		impl (fltSub) (codegen($cala, ${$0 - $1}))
 
 		val fxpMul = infix (Prim) ("*", Nil, (FixPt, FixPt) :: FixPt)
-		impl (fxpMul) (codegen($cala, ${$0 - $1}))
+		impl (fxpMul) (codegen($cala, ${$0 * $1}))
 		val fltMul = infix (Prim) ("*", Nil, (MFloat, MFloat) :: MFloat)
-		impl (fltMul) (codegen($cala, ${$0 - $1}))
+		impl (fltMul) (codegen($cala, ${$0 * $1}))
 
 		val fxpDiv = infix (Prim) ("/", Nil, (FixPt, FixPt) :: FixPt)
-		impl (fxpDiv) (codegen($cala, ${$0 - $1}))
+		impl (fxpDiv) (codegen($cala, ${$0 / $1}))
 		val fltDiv = infix (Prim) ("/", Nil, (MFloat, MFloat) :: MFloat)
-		impl (fltDiv) (codegen($cala, ${$0 - $1}))
+		impl (fltDiv) (codegen($cala, ${$0 / $1}))
 
 		val fixEq = infix (Prim) ("==", Nil, (FixPt, FixPt):: MBoolean)
 		impl (fixEq) (codegen ($cala, ${$0 == $1}))

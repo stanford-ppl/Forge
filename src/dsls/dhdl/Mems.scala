@@ -68,19 +68,19 @@ trait MemsElements {
 			infix ("mkString") (Nil :: MString) implements composite ${ offchip_to_string[T]( $self.name,
 				$self.data )
 			}
-			/* load from offchip mem to bram. (BRAM, startIdx, endIdx)*/
-			infix ("ld") ((("bram", BRAM(T)), ("start", MInt), ("end", MInt)) :: MUnit, effect = write(1)) implements composite ${
-				var i = $start
-				while ( i < $end ) {
-					array_update[T]( $bram.data, i, $self.data.apply(i) ) 
+			/* load from offchip mem to bram. (BRAM, startIdx, offSet)*/
+			infix ("ld") ((("bram", BRAM(T)), ("start", MInt), ("offset", MInt)) :: MUnit, effect = write(1)) implements composite ${
+				var i = unit(0)
+				while ( i <  $offset ) {
+					array_update[T]( $bram.data, i, $self.data.apply(i + $start) ) 
 					i = i + unit(1)
 				}
 			}
-			/* store from bram to offchip. (BRAM, startIdx, endIdx)*/
-		 	infix ("st") ((("bram", BRAM), ("start", MInt), ("end",MInt)) :: MUnit, effect = write(0)) implements composite ${
-				var i = $start
-				while ( i < $end ) {
-					array_update[T]( $self.data, i, $bram.data.apply(i) ) 
+			/* store from bram to offchip. (BRAM, startIdx, offSet)*/
+		 	infix ("st") ((("bram", BRAM), ("start", MInt), ("offset",MInt)) :: MUnit, effect = write(0)) implements composite ${
+				var i = unit(0)
+				while ( i < $offset ) {
+					array_update[T]( $self.data, i, $bram.data.apply(i + $start) ) 
 					i = i + unit(1)
 				}
 			}

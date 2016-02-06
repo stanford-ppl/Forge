@@ -56,48 +56,104 @@ trait CtrlOps {
 		data (Pipe, ("_ctrs", CtrChain)) //TODO: Modify pipe to keep track of nodes inside
 		static (Pipe) ("apply", Nil, CtrChain :: Pipe) implements allocates(Pipe, ${$0})
 
-		val pipe_map = direct (Pipe) ("Map", Nil, (("ctrs", CtrChain), ("func", varArgs(MInt) ==> MUnit)) :: Pipe) 
-		impl (pipe_map) (composite ${
-
-			def loop (ctr:Rep[Ctr], lambda: Rep[Int] => Rep[Unit]) = {
-				var i = ctr.min
-				while (i < ctr.max) {
-					lambda (i)
-					i = i + ctr.step
-				}
+		val loop = compiler (Pipe) ("loop", Nil, (("ctr", Ctr), ("lambda", MInt ==> MUnit)) :: MUnit)
+		impl (loop) (composite ${
+			var i = $ctr.min
+			while (i < $ctr.max) {
+				$lambda (i)
+				i = i + $ctr.step
 			}
-			//def recPipe (idx:Rep[Int], idxs:Seq[Rep[Int]]): Rep[Unit] = {
-			//	val ctr = $ctrs.chain.apply(idx)
-			//	if (idx == unit(1)) {
-			//		loop(ctr, ( (i:Rep[Int]) => $func( i+:idxs )))
-			//	} else {
-			//		loop(ctr, ( (i:Rep[Int]) => recPipe(idx - unit(1), i+:idxs) ))
-			//	}
-			//}
+		})
+
+		val pipe_map1 = direct (Pipe) ("map1", Nil, (("ctrs", CtrChain), ("func", varArgs(MInt) ==> MUnit)) :: Pipe) 
+		impl (pipe_map1) (composite ${
 			val pipe = Pipe( $ctrs )
-
-			//recPipe( $ctrs.length, Seq.empty[Rep[Int]] )
-
-			val level = $ctrs.length
-			val ctr0 = $ctrs.chain.apply(unit(0))
-			val ctr1 = $ctrs.chain.apply(unit(1))
-
-			loop(ctr0, (j:Rep[Int]) => loop(ctr1, (i:Rep[Int]) => $func(Seq(i, j)) ) )
+			def ctr(i:Int):Rep[Ctr] = $ctrs.chain.apply(unit(i))
+			loop(ctr(0), (i:Rep[Int]) => $func(Seq(i))) 
 			pipe
 		})
 
-		//val T = tpePar("T")
-		//val Reg = lookupTpe("Reg")
-		//val pipe_reduce = direct (Pipe) ("Reduce", T, (("ctrs", CtrChain), ("accum", Reg(T)), ("func", (MInt, Reg(T)) ==> MUnit)) :: Pipe) 
-		//impl (pipe_reduce) (composite ${
+		val pipe_map2 = direct (Pipe) ("map2", Nil, (("ctrs", CtrChain), ("func", varArgs(MInt) ==> MUnit)) :: Pipe) 
+		impl (pipe_map2) (composite ${
+			val pipe = Pipe( $ctrs )
+			def ctr(i:Int):Rep[Ctr] = $ctrs.chain.apply(unit(i))
+			loop(ctr(0), (i:Rep[Int]) => 
+					loop(ctr(1), (j:Rep[Int]) => $func(Seq(i, j))) 
+			)
+			pipe
+		})
+
+		val pipe_map3 = direct (Pipe) ("map3", Nil, (("ctrs", CtrChain), ("func", varArgs(MInt) ==> MUnit)) :: Pipe) 
+		impl (pipe_map3) (composite ${
+			val pipe = Pipe( $ctrs )
+			def ctr(i:Int):Rep[Ctr] = $ctrs.chain.apply(unit(i))
+			loop(ctr(0), (i:Rep[Int]) => 
+				loop(ctr(1), (j:Rep[Int]) => 
+					loop(ctr(2), (k:Rep[Int]) => $func(Seq(i, j, k))) 
+				)
+			)
+			pipe
+		})
+
+		//TODO: Won't work here until have metadata
+		val pipe_map = direct (Pipe) ("map", Nil, (("ctrs", CtrChain), ("func", varArgs(MInt) ==> MUnit)) :: Pipe) 
+		impl (pipe_map) (composite ${
+
+			def prepend(x:Rep[Int], seq: Seq[Rep[Int]]) = {
+				Seq.tabulate[Rep[Int]](seq.length+1) ((i:Int) => 
+			 		if (i==0) x else seq(i-1) 
+				)
+			}
+			def recPipe (idx:Rep[Int], idxs:Seq[Rep[Int]]): Rep[Unit] = {
+				val ctr = $ctrs.chain.apply(idx)
+				if (idx == unit(1)) {
+					loop(ctr, ( (i:Rep[Int]) => $func( prepend(i, idxs) )) )
+				} else {
+					loop(ctr, ( (i:Rep[Int]) => recPipe(idx - unit(1), prepend(i, idxs) ) ))
+				}
+			}
+			val pipe = Pipe( $ctrs )
+
+			recPipe( $ctrs.length, Seq.empty[Rep[Int]] )
+
+			pipe
+		})
+
+		val T = tpePar("T")
+		val Reg = lookupTpe("Reg")
+		val pipe_reduce1 = direct (Pipe) ("reduce1", T, (("ctrs", CtrChain), ("accum", Reg(T)),
+			("reduceFuc", (T, T) ==> T) , ("mapFunc", varArgs(MInt) ==> T)) :: Pipe) 
+		impl (pipe_reduce1) (composite ${
+			val pipe = Pipe( $ctrs )
+			def ctr(i:Int):Rep[Ctr] = $ctrs.chain.apply(unit(i))
+			def func(idxs:Seq[Rep[Int]]) = $accum.write($reduceFuc($accum.value, $mapFunc(idxs)))
+			loop(ctr(0), (i:Rep[Int]) => func(Seq(i))) 
+			pipe
+		})
+		val pipe_reduce2 = direct (Pipe) ("reduce2", T, (("ctrs", CtrChain), ("accum", Reg(T)),
+			("reduceFuc", (T, T) ==> T) , ("mapFunc", varArgs(MInt) ==> T)) :: Pipe) 
+		impl (pipe_reduce2) (composite ${
+			val pipe = Pipe( $ctrs )
+			def ctr(i:Int):Rep[Ctr] = $ctrs.chain.apply(unit(i))
+			def func(idxs:Seq[Rep[Int]]) = $accum.write($reduceFuc($accum.value, $mapFunc(idxs)))
+			loop(ctr(0), (i:Rep[Int]) => 
+					loop(ctr(1), (j:Rep[Int]) => func(Seq(i, j))) 
+			)
+			pipe
+		})
+		//val pipe_reduce3 = direct (Pipe) ("reduce3", T, (("ctrs", CtrChain), ("accum", Reg(T)), ("func",
+		//	(Reg(T), varArgs(MInt)) ==> MUnit)) :: Pipe) 
+		//impl (pipe_reduce3) (composite ${
 		//	val pipe = Pipe( $ctrs )
-		//	val ctr1 = ctrs.chain.apply( unit(0) )
-		//	var i = ctr1.min
-		//	while (i < ctr1.max) {
-		//		$func(i, $accum)
-		//		i = i + ctr1.step
-		//	}
+		//	def ctr(i:Int):Rep[Ctr] = $ctrs.chain.apply(unit(i))
+		//	val funca = $func($accum, _:Seq[Rep[Int]])
+		//	loop(ctr(0), (i:Rep[Int]) => 
+		//		loop(ctr(1), (j:Rep[Int]) => 
+		//			loop(ctr(2), (k:Rep[Int]) => funca(Seq(i, j, k))) 
+		//		)
+		//	)
 		//	pipe
 		//})
+
 	}
 }

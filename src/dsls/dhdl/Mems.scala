@@ -11,16 +11,22 @@ trait MemsElements {
 		val T = tpePar("T")
 		val FixPt = lookupTpe("Long")
 
+		//TODO: Add argIn/argOut as metadata of Reg
 		val Reg = tpe("Reg", tpePar("T"))
 		//TODO: how to constrain T to be one of fixpt, mfloat, or boolean?
 		data(Reg, ("_name", MString), ("_value", T), ("_init", T)) 
 		static (Reg) ("apply", T, 
 			MethodSignature(List(("name", MString, "unit(\"\")"),
 													 ("value", T, "unit(0)"), 
-												 	 ("init", T, "unit(0)")), Reg(T)),
+												 	 ("init", T, "unit(0)"),
+													 ("tpe", MString, "unit(\"normal\")")), Reg(T)),
 			effect=mutable) implements allocates(Reg,
 			${$name}, ${$value}, ${$init})  
-		static (Reg) ("apply", T, T :: Reg(T)) implements redirect ${ Reg.apply(unit(""), $0, $0) }  
+		static (Reg) ("apply", T, T :: Reg(T)) implements redirect ${ Reg.apply(value=$0, init=$0) }  
+		direct (Reg) ("ArgIn", T, T :: Reg(T)) implements redirect ${ Reg.apply(value=$0, init=$0,
+		tpe=unit("argin")) }  
+		direct (Reg) ("ArgOut", T, T :: Reg(T)) implements redirect ${ Reg.apply(value=$0, init=$0,
+		tpe=unit("argout")) }  
 
 		val RegOps = withTpe(Reg)
 		RegOps {
@@ -39,10 +45,12 @@ trait MemsElements {
 			effect = mutable) implements
 		allocates(BRAM, ${$name}, ${array_empty[T]($size)})    
 		/* apply(name:String, width:Int, length:Int) */
-		static (BRAM) ("apply", T, 
-			MethodSignature(List(("name", MString), MInt, MInt), BRAM(T)), 
-			effect = mutable) implements
-		composite ${BRAM.apply[T]($name,$1 * $2)}    
+		static (BRAM) ("apply", T, MInt :: BRAM(T), effect = mutable) implements
+		composite ${BRAM.apply[T](size=$0)}
+		static (BRAM) ("apply", T, (MString, MInt, MInt) :: BRAM(T), effect = mutable) implements
+		composite ${BRAM.apply[T]($0, $1 * $2)}    
+		static (BRAM) ("apply", T, (MInt, MInt) :: BRAM(T), effect = mutable) implements
+		composite ${BRAM.apply[T](size=($0*$1))}    
 
 		val BRAMOps = withTpe(BRAM)
 		BRAMOps {
@@ -68,6 +76,9 @@ trait MemsElements {
 			effect = mutable) implements
 		allocates(OffChipMem, ${$name}, ${array_empty[T]( $size )})    
 
+		static (OffChipMem) ("apply", T, MInt:: OffChipMem(T), effect = mutable) implements
+		composite ${ OffChipMem[T](size=$0)}
+
 		static (OffChipMem) ("apply", T, (MString, varArgs(T)) :: OffChipMem(T), effect = mutable) implements
 		allocates(OffChipMem, ${$0}, ${ array_fromseq[T]( $1 ) })    
 
@@ -78,22 +89,61 @@ trait MemsElements {
 			infix ("mkString") (Nil :: MString) implements composite ${ offchip_to_string[T]( $self.name,
 				$self.data )
 			}
+			infix ("ld") (MInt :: T) implements composite ${ array_apply( $self.data, $1) }
 			/* load from offchip mem to bram. (BRAM, startIdx, offSet)*/
-			infix ("ld") ((("bram", BRAM(T)), ("start", MInt), ("offset", MInt)) :: MUnit, effect = write(1)) implements composite ${
+			val offld1 = infix ("ld") ((("bram", BRAM(T)), ("start", MInt), ("offset", MInt)) :: MUnit, effect = write(1)) 
+			impl (offld1) (composite ${
 				var i = unit(0)
 				while ( i <  $offset ) {
 					array_update[T]( $bram.data, i, $self.data.apply(i + $start) ) 
 					i = i + unit(1)
 				}
-			}
-			/* store from bram to offchip. (BRAM, startIdx, offSet)*/
-		 	infix ("st") ((("bram", BRAM), ("start", MInt), ("offset",MInt)) :: MUnit, effect = write(0)) implements composite ${
+			})
+			val offld2 = infix ("ld") (MethodSignature(
+				List(("bram", BRAM(T)), ("startx", MInt), ("starty", MInt), ("offsetx", MInt), ("offsety", MInt), ("width", MInt)), MUnit),
+				effect = write(1))
+			impl (offld2) (composite ${
+				var j = unit(0)
+				while ( j <  $offsety ) {
+					var i = unit(0)
+					while ( i <  $offsetx ) {
+						val row = i + $startx
+						val col = j + $starty
+						val offaddr = col*$width + row
+						val bramaddr = j*$offsetx + i
+						array_update[T]( $bram.data, bramaddr, $self.data.apply(offaddr) ) 
+						i = i + unit(1)
+					}
+					j = j + unit(1)
+				}
+			})
+			/* store from bram to offchip. (BRAM, stMUnitdx, offSet)*/
+		 	val offst1 = infix ("st") ((("bram", BRAM), ("start", MInt), ("offset",MInt)) :: MUnit, effect = write(0))
+			impl (offst1) (composite ${
 				var i = unit(0)
 				while ( i < $offset ) {
 					array_update[T]( $self.data, i, $bram.data.apply(i + $start) ) 
 					i = i + unit(1)
 				}
-			}
+			})
+		 	val offst2 = infix ("st") (MethodSignature(
+				List(("bram", BRAM), ("startx", MInt), ("starty", MInt), ("offsetx",MInt), ("offsety", MInt), ("width", MInt)), MUnit),
+				effect = write(0)) 
+			impl (offst2) (composite ${
+				var j = unit(0)
+				while ( j <  $offsety ) {
+					var i = unit(0)
+					while ( i <  $offsetx ) {
+						val row = i + $startx
+						val col = j + $starty
+						val offaddr = col*$width + row
+						val bramaddr = j*$offsetx + i
+						array_update[T]( $self.data, offaddr, $bram.data.apply(bramaddr) ) 
+						i = i + unit(1)
+					}
+					j = j + unit(1)
+				}
+			})
 		}
 
 		compiler (MemOps) ("offchip_to_string", T, (MString, MArray(T))::MString) implements

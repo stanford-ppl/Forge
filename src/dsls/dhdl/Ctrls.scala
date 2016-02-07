@@ -82,7 +82,7 @@ trait CtrlOps {
 			val pipe = Pipe( $ctrs )
 			def ctr(i:Int):Rep[Ctr] = $ctrs.chain.apply(unit(i))
 			loop(ctr(0), (i:Rep[Int]) => 
-					loop(ctr(1), (j:Rep[Int]) => $mapFunc(Seq(i, j))) 
+				loop(ctr(1), (j:Rep[Int]) => $mapFunc(Seq(i, j))) 
 			)
 			pipe
 		})
@@ -129,6 +129,7 @@ trait CtrlOps {
 			val pipe = Pipe( $ctrs )
 			def ctr(i:Int):Rep[Ctr] = $ctrs.chain.apply(unit(i))
 			def func(idxs:Seq[Rep[Int]]) = $accum.write($reduceFuc($accum.value, $mapFunc(idxs)))
+			$accum.reset
 			loop(ctr(0), (i:Rep[Int]) => func(Seq(i))) 
 			pipe
 		})
@@ -138,6 +139,7 @@ trait CtrlOps {
 			val pipe = Pipe( $ctrs )
 			def ctr(i:Int):Rep[Ctr] = $ctrs.chain.apply(unit(i))
 			def func(idxs:Seq[Rep[Int]]) = $accum.write($reduceFuc($accum.value, $mapFunc(idxs)))
+			$accum.reset
 			loop(ctr(0), (i:Rep[Int]) => 
 					loop(ctr(1), (j:Rep[Int]) => func(Seq(i, j))) 
 			)
@@ -149,6 +151,7 @@ trait CtrlOps {
 			val pipe = Pipe( $ctrs )
 			def ctr(i:Int):Rep[Ctr] = $ctrs.chain.apply(unit(i))
 			def func(idxs:Seq[Rep[Int]]) = $accum.write($reduceFuc($accum.value, $mapFunc(idxs)))
+			$accum.reset
 			loop(ctr(0), (i:Rep[Int]) => 
 				loop(ctr(1), (j:Rep[Int]) => 
 					loop(ctr(2), (k:Rep[Int]) => func(Seq(i, j, k))) 
@@ -170,18 +173,30 @@ trait CtrlOps {
 			metaPipe
 		})
 
+		val meta_map2 = direct (MetaPipe) ("MetaPipe2", Nil, (("ctrs", CtrChain), ("mapFunc", varArgs(MInt) ==>
+				MUnit)) :: MetaPipe) 
+		impl (meta_map2) (composite ${
+			val metaPipe = MetaPipe( $ctrs )
+			def ctr(i:Int):Rep[Ctr] = $ctrs.chain.apply(unit(i))
+			loop(ctr(0), (i:Rep[Int]) => 
+				loop(ctr(1), (j:Rep[Int]) => $mapFunc(Seq(i, j))) 
+			)
+			metaPipe
+		})
+
 		val meta_reduce1 = direct (MetaPipe) ("MetaPipe1", T, (("ctrs", CtrChain), ("accum", Reg(T)),
 			("reduceFuc", (T, T) ==> T) , ("mapFunc", varArgs(MInt) ==> T)) :: MetaPipe) 
 		impl (meta_reduce1) (composite ${
 			val metaPipe = MetaPipe( $ctrs )
 			def ctr(i:Int):Rep[Ctr] = $ctrs.chain.apply(unit(i))
 			def func(idxs:Seq[Rep[Int]]) = $accum.write($reduceFuc($accum.value, $mapFunc(idxs)))
+			$accum.reset
 			loop(ctr(0), (i:Rep[Int]) => func(Seq(i))) 
 			metaPipe
 		})
 
 		val meta_grp = direct (MetaPipe) ("MetaGrp", Nil, (("tpe", MString), ("func", MAny ==>
-				MUnit)) :: MetaPipe) 
+			MUnit)) :: MetaPipe) 
 		impl (meta_grp) (composite ${
 			val metaPipe = MetaPipe( CtrChain(Ctr(max=unit(1))) )
 			$func()

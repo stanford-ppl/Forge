@@ -224,6 +224,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   def isUserFacing(op: Rep[DSLOp]) = op.backend == sharedBackend
   def hasCompilerVersion(o: Rep[DSLOp]) = o.backend != libraryBackend
   def hasLibraryVersion(o: Rep[DSLOp]) = o.backend != compilerBackend
+  def hasSharedVersion(o: Rep[DSLOp]) = o.backend == sharedBackend || o.backend == internalBackend
 }
 
 trait ForgeUtilities {

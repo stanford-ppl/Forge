@@ -152,8 +152,9 @@ trait DeliteGenOps extends BaseGenOps {
   }
 
   def emitCompilerOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
+    val base = if (opsGrp.ops.exists(hasSharedVersion)) opsGrp.name else "Base"
     emitBlockComment("Compiler-only operations", stream)
-    emitOpSugar(opsGrp.grp.name + "Compiler", opsGrp.name, dsl + "CompilerOps", opsGrp, stream, compilerBackend)
+    emitOpSugar(opsGrp.grp.name + "Compiler", base, dsl + "CompilerOps", opsGrp, stream, compilerBackend)
   }
 
   def requiresImpl(op: Rep[DSLOp]) = Impls(op) match {
@@ -228,8 +229,10 @@ trait DeliteGenOps extends BaseGenOps {
    * Checks to see if we need DeliteCollections, DeliteStructs, and/or FigmentOps to be mixed in
    */
   def baseOpsCls(opsGrp: DSLOps) = {
-    var base = if (opsGrp.ops.exists(_.backend == internalBackend)) opsGrp.grp.name + "InternalOps" else opsGrp.name
-    base += " with BaseFatExp with EffectExp"
+    var base = "BaseFatExp with EffectExp"
+    base += { if (opsGrp.ops.exists(_.backend == internalBackend)) " with " + opsGrp.grp.name + "InternalOps"
+              else if (opsGrp.ops.exists(hasSharedVersion)) " with " + opsGrp.name
+              else "" }
     base += ( if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && ForgeCollections.contains(grpAsTpe(o.grp)))) " with DeliteCollectionOpsExp" else "" )
     base += ( if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && DataStructs.contains(grpAsTpe(o.grp)))) " with DeliteStructsExp" else "" )
     base += ( if (opsGrp.ops.exists(isFigmentOp)) " with DeliteFigmentOpsExp" else "" )
@@ -681,37 +684,42 @@ trait DeliteGenOps extends BaseGenOps {
     }
   }
 
+  def makeTransformedArgs(o: Rep[DSLOp], xf: String = "f") = {
+    o.args.zipWithIndex.flatMap{case (arg,idx) => arg match {
+      case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if Impls(o).isInstanceOf[CodeGen] && !isThunk(f) => xf + "("+opArgPrefix+idx+")" :: args.map(a => boundArgAnonName(arg,a,idx))
+      // -- workaround for apparent scalac bug (GADT skolem type error), with separate cases for regular tpes and function tpes. this may be too restrictive and miss cases we haven't seen yet that also trigger the bug.
+      case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if isTpePar(o.retTpe) && !isThunk(f) && args.forall(a => a.tpe == o.retTpe || !isTpePar(a.tpe)) && ret == o.retTpe => List(xf + "("+opArgPrefix+idx+".asInstanceOf[" + repify(f).replaceAllLiterally(repify(o.retTpe), "Rep[A]") + "])")
+      case Def(Arg(name, tpe, d2)) if !isFuncArg(arg) && isTpePar(o.retTpe) && tpe.tpePars.length == 1 && tpe.tpePars.apply(0) == o.retTpe => List(xf + "("+opArgPrefix+idx+".asInstanceOf[Rep[" + tpe.name + "[A]]])")
+      // -- end workaround
+
+      // Hack for dealing with "immediate" DSL types (e.g. Lists of Reps)
+      // TODO: Doesn't cover arbitrarily nested cases, e.g. List[List[Rep[Int]]]
+      case Def(Arg(name, tpe, _)) => tpe.stage match {
+        case `compile` if tpe.name.startsWith("List") || tpe.name.startsWith("Seq") =>
+          val tP = tpe.tpeArgs.head
+          if (tP.name.startsWith("Rep") || tP.name.startsWith("Exp") || tP.stage != compile) List(opArgPrefix+idx+".map{x => " + xf + "(x)}")
+          else List(opArgPrefix+idx)
+        case `compile` if !tpe.name.startsWith("Rep") && !tpe.name.startsWith("Exp") => List(opArgPrefix+idx)
+        case _ => List(xf + "(" + opArgPrefix+idx + ")")
+      }
+    }}.mkString("(",",",")")
+  }
+  def makeTransformedImplicits(o: Rep[DSLOp], xf: String = "f") = {
+    o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++
+    o.implicitArgs.map { a =>
+      val argName = opIdentifierPrefix + "." + a.name
+      if (isTpeClass(a.tpe)) asTpeClass(a.tpe).signature.wrapper.getOrElse("") + "(" + argName + ")" else argName
+    }
+  }
+
   def emitMirrors(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
     emitBlockComment("Mirroring", stream, indent=2)
     stream.println("  override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = (e match {")
 
     for (o <- uniqueOps if hasIRNode(o)) {
       // helpful identifiers
-
-      val xformArgs = "(" + o.args.zipWithIndex.flatMap{case (arg,idx) => arg match {
-        case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if Impls(o).isInstanceOf[CodeGen] && !isThunk(f) => "f("+opArgPrefix+idx+")" :: args.map(a => boundArgAnonName(arg,a,idx))
-        // -- workaround for apparent scalac bug (GADT skolem type error), with separate cases for regular tpes and function tpes. this may be too restrictive and miss cases we haven't seen yet that also trigger the bug.
-        case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if isTpePar(o.retTpe) && !isThunk(f) && args.forall(a => a.tpe == o.retTpe || !isTpePar(a.tpe)) && ret == o.retTpe => List("f("+opArgPrefix+idx+".asInstanceOf[" + repify(f).replaceAllLiterally(repify(o.retTpe), "Rep[A]") + "])")
-        case Def(Arg(name, tpe, d2)) if !isFuncArg(arg) && isTpePar(o.retTpe) && tpe.tpePars.length == 1 && tpe.tpePars.apply(0) == o.retTpe => List("f("+opArgPrefix+idx+".asInstanceOf[Rep[" + tpe.name + "[A]]])")
-        // -- end workaround
-
-        // Hack for dealing with "immediate" DSL types (e.g. Lists of Reps)
-        // TODO: Doesn't cover arbitrarily nested cases, e.g. List[List[Rep[Int]]]
-        case Def(Arg(name, tpe, _)) => tpe.stage match {
-          case `compile` if tpe.name.startsWith("List") =>
-            val tP = tpe.tpeArgs.head
-            if (tP.name.startsWith("Rep") || tP.name.startsWith("Exp") || tP.stage != compile) List(opArgPrefix+idx+".map{x => f(x)}")
-            else List(opArgPrefix+idx)
-          case `compile` if !tpe.name.startsWith("Rep") && !tpe.name.startsWith("Exp") => List(opArgPrefix+idx)
-          case _ => List("f(" + opArgPrefix+idx + ")")
-        }
-      }}.mkString(",") + ")"
-
-      val implicits = o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++
-                      o.implicitArgs.map { a =>
-                         val argName = opIdentifierPrefix + "." + a.name
-                         if (isTpeClass(a.tpe)) asTpeClass(a.tpe).signature.wrapper.getOrElse("") + "(" + argName + ")" else argName
-                      }
+      val xformArgs = makeTransformedArgs(o)
+      val implicits = makeTransformedImplicits(o)
       val implicitsWithParens = if (implicits.length == 0) "" else implicits.mkString("(",",",")")
 
       def emitDeliteOpPureMirror(suffix: String = "") {
@@ -721,7 +729,8 @@ trait DeliteGenOps extends BaseGenOps {
       }
 
       def emitDeliteOpEffectfulMirror(suffix: String = "") {
-        stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o, suffix) + ", u, es) => reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o, suffix) + xformArgs + implicitsWithParens)
+        stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o, suffix) + ", u, es) => ")
+        stream.print("reflectMirrored(Reflect(new { override val original = Some(f," + opIdentifierPrefix + ") } with " + makeOpNodeName(o, suffix) + xformArgs + implicitsWithParens)
         stream.print(", mapOver(f,u), f(es)))")
         stream.println("(mtype(manifest[A]), pos)")
       }
@@ -751,8 +760,8 @@ trait DeliteGenOps extends BaseGenOps {
         }
       }
       def emitNodeEffectfulMirror() {
-        stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => reflectMirrored(Reflect(" + makeOpNodeName(o) + xformArgs + implicitsWithParens)
-        stream.print(", mapOver(f,u), f(es)))")
+        stream.print("    case Reflect(" + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(o) + ", u, es) => ")
+        stream.print("reflectMirrored(Reflect(" + makeOpNodeName(o) + xformArgs + implicitsWithParens + ", mapOver(f,u), f(es)))")
         stream.println("(mtype(manifest[A]), pos)")
       }
 
@@ -979,15 +988,21 @@ trait DeliteGenOps extends BaseGenOps {
   }
 
   // TODO: This probably won't work for curried method signatures
-  def emitTraversalRules(op: Rep[DSLOp], rules: List[DSLRule], isRewrite: Boolean, stream: PrintWriter, indent: Int) {
-    val patternPrefix = if (isRewrite) "" else makeOpNodeName(op)
+  def emitTraversalRules(op: Rep[DSLOp], rules: List[DSLRule], matchArgs: Boolean, stream: PrintWriter, indent: Int, funcName: Rep[DSLOp] => String, prefix: String = "") {
+    val patternPrefix = if (matchArgs) "" else makeOpNodeName(op)
+
+    val innerIndent = if (matchArgs) {
+      emitWithIndent(prefix + "def " + funcName(op) + makeOpArgsSignature(op, Some(false)) + " = " + makeArgs(op.args) + " match {", stream, indent)
+      indent + 2
+    }
+    else indent
 
     def emitCase(pattern: List[String], rule: Rep[String]) {
-      emitWithIndentInline("case " + patternPrefix + pattern.mkString("(",",",")") + " => ", stream, indent)
+      emitWithIndentInline("case " + patternPrefix + pattern.mkString("(",",",")") + " => ", stream, innerIndent)
       val lines = inline(op, rule, quoteLiteral).split(nl)
       if (lines.length > 1) {
         stream.println()
-        lines.foreach{line => emitWithIndent(line, stream, indent+2)}
+        lines.foreach{line => emitWithIndent(line, stream, innerIndent+2)}
       }
       else
         stream.println(lines.head)
@@ -1000,22 +1015,26 @@ trait DeliteGenOps extends BaseGenOps {
         else warn("Ignoring commutativity of rewrite rule with more than two arguments")
       }
     }
-    if (isRewrite)
-      emitWithIndentInline("case _ => ", stream, indent)
+    if (matchArgs)
+      emitWithIndentInline("case _ => ", stream, innerIndent)
     else
-      emitWithIndentInline("case " + patternPrefix + op.args.map(_ => "_").mkString("(",",",")") + " =>", stream, indent)
+      emitWithIndentInline("case rhs@" + makeOpSimpleNodeNameWithAnonArgs(op) + " => ", stream, innerIndent)
     rules.find(r => r.isInstanceOf[SimpleRule]) match {
       case Some(SimpleRule(rule)) =>
         val lines = inline(op, rule, quoteLiteral).split(nl)
         if (lines.length > 1) {
           stream.println()
-          lines.foreach{line => emitWithIndent(line, stream, indent+2)}
+          lines.foreach{line => emitWithIndent(line, stream, innerIndent+2)}
         }
         else
           stream.println(lines.head)
-      case _ if isRewrite => stream.println("super." + makeOpMethodName(op) + makeArgs(op.args))
+      case _ if matchArgs => stream.println("super." + funcName(op) + makeArgs(op.args))
       case _ =>
     }
+    if (matchArgs) {
+      emitWithIndent("}", stream, indent)
+    }
+
   }
 
   /**
@@ -1031,11 +1050,7 @@ trait DeliteGenOps extends BaseGenOps {
       stream.println("  this: " + dsl + "Exp => ")
       stream.println()
       rewrites foreach { case (o, rules) =>
-        stream.println("  override " + makeOpMethodSignature(o) + " = {")
-        stream.println("    " + makeArgs(o.args) + " match {")
-        emitTraversalRules(o, rules, true, stream, 6)
-        stream.println("    }")
-        stream.println("  }")
+        emitTraversalRules(o, rules, true, stream, 2, makeOpMethodName, "override ")
       }
       stream.println("}")
     }

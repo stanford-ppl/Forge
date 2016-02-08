@@ -60,6 +60,8 @@ trait ForgeTraversalOps extends Base {
    * Methods for defining metadata types and methods
    * All metadata types must have the meet function defined on aliasing type 'any'
    * All other methods are optional
+   * Creating metadata also creates a constructor of the same name and functions for
+   * getting all fields of metadata instances by name
    *
    * Ex:
    *    val MaxVal = metadata("MaxVal", (max, SInt))  // Short form
@@ -84,8 +86,16 @@ trait ForgeTraversalOps extends Base {
   // Rule is always on exactly two arguments of given metadata type: this and that
   // Meet rule should return the same type of metadata
   def meet(meta: Rep[DSLMetadata], alias: MetaMeet = any)(rule: Rep[String]): Rep[Unit] = forge_meet(meta,alias,rule)
+  def canMeet(meta: Rep[DSLMetadata], alias: MetaMeet = any)(rule: Rep[String]): Rep[Unit] = forge_canMeet(meta,alias,rule)
+  def matches(meta: Rep[DSLMetadata])(rule: Rep[String]): Rep[Unit] = forge_matches(meta, rule)
+  def isComplete(meta: Rep[DSLMetadata])(rule: Rep[String]): Rep[Unit] = forge_complete(meta, rule)
 
   def defaultMetadata(tpe: Rep[DSLType])(rule: Rep[String]): Rep[Unit] = forge_default_metadata(tpe, rule)
+
+  // --- Others
+  def disableFusion(): Unit
+  def disableSoA(): Unit
+
 
   //----------
   //--- Stubs
@@ -106,7 +116,10 @@ trait ForgeTraversalOps extends Base {
 
   def forge_using(pattern: Rep[DSLPattern], rule: DSLRule)(implicit ctx: SourceContext): Rep[Unit]
 
-  def forge_meet(grp: Rep[DSLGroup], func: MetaMeet, rule: Rep[String]): Rep[Unit]
+  def forge_meet(m: Rep[DSLMetadata], func: MetaMeet, rule: Rep[String]): Rep[Unit]
+  def forge_canMeet(m: Rep[DSLMetadata], func: MetaMeet, rule: Rep[String]): Rep[Unit]
+  def forge_matches(m: Rep[DSLMetadata], rule: Rep[String]): Rep[Unit]
+  def forge_complete(m: Rep[DSLMetadata], rule: Rep[String]): Rep[Unit]
   def forge_default_metadata(tpe: Rep[DSLType], rule: Rep[String]): Rep[Unit]
 }
 
@@ -139,36 +152,38 @@ trait ForgeTraversalSugar extends ForgeTraversalSugarLowPriority with ForgeTrave
    */
   var _xFormScope: Option[Rep[DSLTransformer]] = None
   var _analysisScope: Option[Rep[DSLAnalyzer]] = None
-  var _metadataScope: Option[Rep[DSLMetadata]] = None
 
-  def withTransformer(t: Rep[DSLTransformer]) = new TransformOps(t)
-  def withAnalyzer(t: Rep[DSLAnalyzer]) = new AnalysisOps(t)
+  def withTransformer(xf: Rep[DSLTransformer]) = {
+    if (_xFormScope.isDefined) forge_err("Cannot create nested transformer scopes!")
+    _xFormScope = Some(xf)   // set transformer scope
+    new TransformOps(xf)
+  }
+  def withAnalyzer(az: Rep[DSLAnalyzer]) = {
+    if (_analysisScope.isDefined) forge_err("Cannot create nested analysis scopes!")
+    _analysisScope = Some(az)
+    new AnalysisOps(az)
+  }
 
   class TransformOps(xf: Rep[DSLTransformer]) {
-    def apply[R](block: => R) {
-      if (_xFormScope.isDefined) forge_err("Cannot create nested transformer scopes!")
-      _xFormScope = Some(xf)   // set transformer scope
-      new Scope[TransformScope, TransformScopeRunner[R], R](block)
-      _xFormScope = None // reset transformer scope
-    }
+    def apply[R](block: => R) = new Scope[TransformScope, TransformScopeRunner[R], R](block)
   }
   class AnalysisOps(az: Rep[DSLAnalyzer]) {
-    def apply[R](block: => R) {
-      if (_analysisScope.isDefined) forge_err("Cannot create nested analysis scopes!")
-      _analysisScope = Some(az)
-      new Scope[AnalysisScope, AnalysisScopeRunner[R], R](block)
-      _analysisScope = None
-    }
+    def apply[R](block: => R) = new Scope[AnalysisScope, AnalysisScopeRunner[R], R](block)
   }
 
   // --- Transformer scope sugar
   // TODO: Add other transformer methods here
   trait TransformScope {
     def lower(op: Rep[DSLOp]) = forge_lower(_xFormScope.get, op)
+    def lower(grp: Rep[DSLGroup], name: String) = {
+      val op = lookupOp(grp, name)
+      forge_lower(_xFormScope.get, op)
+    }
   }
   trait TransformScopeRunner[R] extends TransformScope {
     def apply: R
     val result = apply
+    _xFormScope = None
   }
 
   // --- Analysis scope sugar
@@ -176,15 +191,26 @@ trait ForgeTraversalSugar extends ForgeTraversalSugarLowPriority with ForgeTrave
     //def infix_propagates(op: Rep[DSLOp], rule: Rep[String]) = forge_propagates(_analysisScope.get, op, rule)
     //def infix_updates(op: Rep[DSLOp], idx: Int, rule: Rep[String]) = forge_updates(_analysisScope.get, op, idx, rule)
     def analyze(op: Rep[DSLOp]) = forge_analyze(_analysisScope.get, op)
+    def analyze(grp: Rep[DSLGroup], name: String) = {
+      val op = lookupOp(grp, name)
+      forge_analyze(_analysisScope.get, op)
+    }
   }
   trait AnalysisScopeRunner[R] extends AnalysisScope {
     def apply: R
     val result = apply
+    _analysisScope = None
   }
 }
 
 trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
   this: ForgeExp =>
+
+  // Override these to change Config settings across all DSL applications
+  var enableFusion = true
+  var enableSoA = true
+  def disableFusion() { enableFusion = false }
+  def disableSoA() { enableSoA = false }
 
   /**
    * Compiler state
@@ -353,11 +379,9 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
     def empty = MetaOps(HashMap[MetaMeet,Rep[String]](), HashMap[MetaMeet,Rep[String]](), None, None)
   }
 
-  def forge_meet(grp: Rep[DSLGroup], func: MetaMeet, rule: Rep[String]): Rep[Unit] = {
-    if (!isMetaType(grp))
+  def forge_meet(m: Rep[DSLMetadata], func: MetaMeet, rule: Rep[String]): Rep[Unit] = {
+    if (!isMetaType(m))
       err("Meet operations can only be defined on metadata types")
-
-    val m = grp.asInstanceOf[Rep[DSLMetadata]]
 
     if (!MetaImpls.contains(m))
       MetaImpls(m) = MetaOps.empty
@@ -368,6 +392,46 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
     MetaImpls(m).meet += func -> rule
     ()
   }
+  def forge_canMeet(m: Rep[DSLMetadata], func: MetaMeet, rule: Rep[String]): Rep[Unit] = {
+    if (!isMetaType(m))
+      err("canMeet rules can only be defined on metadata types")
+
+    if (!MetaImpls.contains(m))
+      MetaImpls(m) = MetaOps.empty
+
+    if (MetaImpls(m).canMeet.contains(func))
+      warn("Overwriting canMeet rule on metadata type " + m.name + " for meet function " + func)
+
+    MetaImpls(m).canMeet += func -> rule
+    ()
+  }
+  def forge_matches(m: Rep[DSLMetadata], rule: Rep[String]): Rep[Unit] = {
+    if (!isMetaType(m))
+      err("matches rules can only be defined on metadata types")
+
+    if (!MetaImpls.contains(m))
+      MetaImpls(m) = MetaOps.empty
+
+    if (MetaImpls(m).matches.isDefined)
+      warn("Overwriting matches rule on metadata type " + m.name)
+
+    MetaImpls(m).matches = Some(rule)
+    ()
+  }
+  def forge_complete(m: Rep[DSLMetadata], rule: Rep[String]): Rep[Unit] = {
+    if (!isMetaType(m))
+      err("isComplete rules can only be defined on metadata types")
+
+    if (!MetaImpls.contains(m))
+      MetaImpls(m) = MetaOps.empty
+
+    if (MetaImpls(m).complete.isDefined)
+      warn("Overwriting isComplete rule on metadata type " + m.name)
+
+    MetaImpls(m).complete = Some(rule)
+    ()
+  }
+
 
   def forge_default_metadata(tpe: Rep[DSLType], rule: Rep[String]): Rep[Unit] = {
     if (TypeMetadata.contains(tpe))

@@ -632,7 +632,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
 
   // vet codegen rules and update the ops list if necessary
   def reconcileCodegenRule(op: Rep[DSLOp], rule: CodeGen) {
-    if (op.args.exists(a => DataStructs.contains(getHkTpe(a.tpe))))
+    if (enableSoA && op.args.exists(a => DataStructs.contains(getHkTpe(a.tpe))))
       err("(op " + op.name + ") code generated ops should not have struct types as inputs, since structs may be eliminated at compile time. consider passing in one or more fields of the struct as input(s) to the op instead.")
 
     // also may need to update opsGrp targets

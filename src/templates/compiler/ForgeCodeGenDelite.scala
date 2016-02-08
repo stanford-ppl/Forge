@@ -39,7 +39,6 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
   }
 
   def emitDSLImplementation() = {
-    println("[Forge] Emitting compiler backend")
     Directory(Path(dslDir)).createDirectory()
     emitDSLDefinition()
     // emitDataStructures()
@@ -67,6 +66,9 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
   //   Directory(Path(dataDir)).createDirectory()
   //   emitStructs(dataDir)
   // }
+  def requiresCompilerBackend(opsGrp: DSLOps) = {
+    opsGrp.ops.exists(hasCompilerVersion) || opsGrpTpes(opsGrp).nonEmpty
+  }
 
   def emitOps() {
     val opsDir = dslDir + File.separator + "ops"
@@ -76,7 +78,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     // Second is an additional Impl file if the group contains SingleTask and Composite ops
     // Third is compiler-only ops if the group contains any
     // TODO: Would it make sense to just put all three of these in one file?
-    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp) && opsGrp.ops.exists(hasCompilerVersion)) {
+    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp) && requiresCompilerBackend(opsGrp)) {
       val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsExp"+".scala"))
       stream.println("package " + packageName + ".ops")
       stream.println()
@@ -106,6 +108,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
         compStream.println("package " + packageName + ".ops")
         compStream.println()
         emitScalaReflectImports(compStream)
+        emitLMSImports(compStream)
         emitDSLImports(compStream)
         compStream.println()
         emitCompilerOpSyntax(opsGrp, compStream)
@@ -140,6 +143,24 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     stream.println()
 
     emitMetadataClasses(stream)
+
+    stream.println("trait " + dsl + "Transforming extends " + dsl + "Exp with DeliteStructsExp with DeliteTransforming {")
+    stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication =>")
+    /*for ((grp,opsGrp) <- OpsGrp) {
+      for (op <- unique(opsGrp)) {
+        Impls(op) match {
+          case _:Figment | _:AllocatesFigment if op.backend != libraryBackend =>
+            if (!Transformers.exists{case (t,pattern) => pattern.rules.contains(op)})
+              warn("No lowering rule defined for op " + op.name + ". Instantiated figment ops must be lowered prior to code generation.")
+
+            stream.println(makeLowerMethodSignature(op, stream) + " = {")
+            stream.println("  throw new Exception(\"No lowering rule for op " + op.name + "\")")
+            stream.println("}")
+          case _ =>
+        }
+    }}*/
+    stream.println("}")
+
 
     stream.print("trait " + dsl + "Transform extends DeliteTransform")
     Traversals.filter(hasIR).foreach{t => stream.print(" with " + makeTraversalIRName(t))}

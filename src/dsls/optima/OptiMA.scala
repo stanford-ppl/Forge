@@ -5,11 +5,14 @@ package optima
 import core.{ForgeApplication,ForgeApplicationRunner}
 
 // TODO:
-// - Misc. operations for analysis (e.g. convergence messages, postprocessing)
-//   - Don't want this to just be writing Delite code in Forge box, but what else can we do here?
+// - Completeness checks for analyses
+// - Convergence conditions for analyses
+// - Pre- and Post-processing rules for analyses
+// - Module syntax sugar
 
 object OptiMADSLRunner extends ForgeApplicationRunner with OptiMADSL
-trait OptiMADSL extends ForgeApplication with MultiArrayOps with RankAnalysis with VisibilityTestOps {
+trait OptiMADSL extends ForgeApplication with MultiArrayOps with MultiArrayAnalysis with ArrayLowering
+  with VisibilityTestOps {
 
   def dslName = "OptiMA"
   override def clearTraversals = true
@@ -37,20 +40,21 @@ trait OptiMADSL extends ForgeApplication with MultiArrayOps with RankAnalysis wi
     val Array3D = figmentTpe("Array3D", T) isA ArrayND
 
     importMultiArrayOps()
-    importRankAnalysis()
+    importMultiArrayAnalysis()
+    importArrayLowering()
 
     val RankAnalyzer = analyzer("Rank")
 
     //val RankChecker  = analyzer("RankCheck")
     //val ArrayWrapper = transformer("ArrayWrapper", isExtern=true)
     //val LayoutAnalyzer = analyzer("LayoutAnalyzer")
-    //val ArrayLowering = transformer("ArrayLowering")
+    val ArrayLowering = transformer("ArrayLowering")
 
-    //schedule(RankAnalyzer)
+    schedule(RankAnalyzer)
     //schedule(RankChecker)
     //schedule(ArrayWrapper)
     //schedule(LayoutAnalyzer)
-    //schedule(ArrayLowering)
+    schedule(ArrayLowering)
     //schedule(MultiloopSoA)
 
     // rewrites

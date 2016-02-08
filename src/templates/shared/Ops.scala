@@ -352,15 +352,19 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
   }
 
-  def makeOpMethodSignature(o: Rep[DSLOp], withReturnTpe: Option[Boolean] = None) = {
+  def makeOpArgsSignature(o: Rep[DSLOp], withReturnTpe: Option[Boolean] = None) = {
     val addRet = withReturnTpe.getOrElse(Config.fastCompile)
     val ret = if (addRet || isRedirect(o)) ": " + repifySome(o.retTpe) else ""
     val implicitArgs = if (needOverload(o)) makeOpImplicitArgsWithOverloadWithType(o, useCanonical = true) else makeOpImplicitArgsWithType(o)
+    makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + implicitArgs + ret
+  }
+
+  def makeOpMethodSignature(o: Rep[DSLOp], withReturnTpe: Option[Boolean] = None) = {
     // if (Config.fastCompile) {
     //   "def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithType(o) + ret
     // }
     // else {
-      "def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + implicitArgs + ret
+      "def " + makeOpMethodName(o) + makeOpArgsSignature(o, withReturnTpe)
     // }
   }
 
@@ -423,11 +427,6 @@ trait BaseGenOps extends ForgeCodeGenBase {
         val data = DataStructs(tpe)
         if (init.length != data.fields.length)
           err("allocator " + o.name + " has a different number of fields than the data definition for " + tpe.name)
-
-      case Figment(func) if o.backend != libraryBackend =>
-        if (!Transformers.exists{case (t,pattern) => pattern.rules.contains(o)})
-          warn("No lowering rule defined for op " + o.name + ". Instantiated figment ops must be lowered prior to code generation.")
-
       case Getter(structArgIndex,field) =>
         if (structArgIndex > o.args.length) err("arg index " + structArgIndex + " does not exist for op " + o.name)
         val struct = getHkTpe(o.args.apply(structArgIndex).tpe)

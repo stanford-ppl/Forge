@@ -122,6 +122,7 @@ trait MultiArrayOps extends MultiUtils { this: OptiMADSL =>
     //static (Array1D) ("apply", T, MInt :: Array1D(T)) implements composite ${  }
 
     */
+
     //--------
     //--- API
     //--------

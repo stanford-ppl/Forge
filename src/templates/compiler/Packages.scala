@@ -139,42 +139,24 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
         stream.println("  def m_" + tpe.name + "_to_" + parent.name + makeTpeParsWithBounds(tpe.tpePars) + "(__arg0: Rep[" + tpe.name + makeTpePars(tpe.tpePars) + "]): Rep[" + parent.name + makeTpePars(parent.tpePars) + "] = __arg0.asInstanceOf[Rep[" + parent.name + makeTpePars(parent.tpePars) + "]]")
       }
     }
-
-    /*if (MetaTpes.nonEmpty) {
-      stream.println()
-      emitBlockComment("Metadata types", stream, indent=2)
-      for (tpe <- MetaTpes) {
-        stream.println("type " + tpe.name)
-      }
-    }*/
-
     stream.println("}")
     stream.println()
 
-    // exp
+    // DSLCompiler
     stream.println("trait " + dsl + "Compiler extends " + dsl + "Exp with " + dsl + "Transform {") //with MultiloopSoATransformExp
     stream.println(" self: " + dsl + "Application with DeliteApplication => ")
     stream.println()
 
-    /*if (OpsGrp.keySet.exists(_.name == "Primitive")) {
-      stream.println("  override def primitive_forge_int_plus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_plus(__arg0, __arg1)")
-      stream.println("  override def primitive_forge_int_minus(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_minus(__arg0, __arg1)")
-      stream.println("  override def primitive_forge_int_times(__arg0: Rep[Int],__arg1: Rep[Int])(implicit __pos: SourceContext) = delite_int_times(__arg0, __arg1)")
-      stream.println("  override def primitive_unary_bang(__arg0: Rep[Boolean])(implicit __pos: SourceContext): Rep[Boolean] = delite_boolean_negate(__arg0)")
-    }*/
+    if (!IR.enableSoA || !IR.enableFusion) {
+      emitBlockComment("Static config settings for DSL", stream, indent=2)
+      if (!IR.enableSoA) stream.println("  Config.soaEnabled = false")
+      if (!IR.enableFusion) stream.println("  Config.opfusionEnabled = false")
+      stream.println()
+    }
+    if (!IR.enableSoA && TraversalSchedule.contains(MultiloopSoA)) {
+      warn("You've disabled SoA in the compiler but scheduled SoA as a transformer!")
+    }
 
-    /*if (OpsGrp.keySet.exists(_.name == "Misc")) {
-      stream.println("  override def misc_unsafeimmutable[A:Manifest](lhs: Rep[A])(implicit pos: SourceContext): Rep[A] = delite_unsafe_immutable(lhs)")
-      stream.println("  override def __whileDo(cond: => Exp[Boolean], body: => Rep[Unit])(implicit pos: SourceContext) = delite_while(cond, body)")
-      // delite and lms if-then-else don't use by-name-parameter for cond
-      stream.println("  override def __ifThenElse[T:Manifest](cond: Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")
-      stream.println("  override def __ifThenElse[T:Manifest](cond: => Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")
-    }*/
-
-    /*if (OpsGrp.keySet.exists(_.name == "Ordering")) {
-      stream.println("  override def forge_equals[A:Manifest,B:Manifest](__arg0: Rep[A],__arg1: Rep[B])(implicit __pos: SourceContext) = delite_equals(__arg0,__arg1)")
-      stream.println("  override def forge_notequals[A:Manifest,B:Manifest](__arg0: Rep[A],__arg1: Rep[B])(implicit __pos: SourceContext) = delite_notequals(__arg0,__arg1)")
-    }*/
     emitBlockComment("traversals", stream, indent=2)
     Traversals.zipWithIndex.foreach{ case (t,idx) =>
       stream.println("  private val __trv" + idx + " = new " + makeTraversalName(t) + " { override val IR: self.type = self }")

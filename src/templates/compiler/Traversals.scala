@@ -50,6 +50,10 @@ trait DeliteGenTraversals extends BaseGenTraversals {
       emitBlockComment("DSL metadata types", stream, 2)
       for (tpe <- MetaTpes) {
         val m = tpe.asInstanceOf[Rep[DSLMetadata]]
+
+        if (!MetaImpls.contains(m))
+          err("No generic meet function defined on metadata type " + m.name + ". Define one using 'alias = any'")
+
         val struct = DataStructs(tpe)
         val meetRules = MetaImpls(m).meet
         val matchesRule = MetaImpls(m).matches
@@ -129,6 +133,21 @@ trait DeliteGenTraversals extends BaseGenTraversals {
   }
 
   // --- Transformers
+  def makeLowerMethodName(o: Rep[DSLOp]) = "lower_" + makeOpMethodName(o)
+  def makeLowerMethodCall(o: Rep[DSLOp]) = {
+    val xformArgs = makeTransformedArgs(o)
+    val implicits = makeTransformedImplicits(o)  // TODO: Need to transform these further to allow type changes
+    val implicitsWithParens = if (implicits.isEmpty) "" else implicits.mkString("(",",",")")
+
+    makeLowerMethodName(o) + xformArgs + implicitsWithParens
+  }
+
+  // TODO: Doesn't handle methods which require implicit overload arguments
+  def makeLowerMethodSignature(o: Rep[DSLOp]) = {
+    val implicitArgs = makeOpImplicitArgsWithType(o)
+    "def " + makeLowerMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + implicitArgs
+  }
+
   def emitTransformer(t: Rep[DSLTransformer], stream: PrintWriter) {
     // TODO: May not want to always extend TunnelingTransformer or have this behavior?
     stream.println("trait " + makeTraversalName(t) + " extends TunnelingTransformer {")
@@ -144,15 +163,21 @@ trait DeliteGenTraversals extends BaseGenTraversals {
       if (!hasIRNode(op) || hasMultipleIRNodes(op)) {
         err("Cannot create transformation rule for op " + op.name + ": Op must be represented by exactly one IR node")
       }
-      emitTraversalRules(op, rules, false, stream, 4)
+      emitWithIndent("case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(op) + " => " + makeLowerMethodCall(op), stream, 4)
     }
-
     stream.println("    case _ => super.transformTP(lhs, rhs)") // TODO: Should be able to change this
     stream.println("  }")
+
+    for ((op,rules) <- patterns) {
+      emitTraversalRules(op, rules, true, stream, 2, makeLowerMethodName)
+    }
+
     stream.println("}")
   }
+
+  // TODO: Is an IR trait for every transformer really needed?
   def emitTransformerExp(t: Rep[DSLTransformer], stream: PrintWriter) {
-    stream.println("trait " + makeTraversalIRName(t) + " extends " + dsl + "Exp {")
+    stream.println("trait " + makeTraversalIRName(t) + " extends " + dsl + "Transforming {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication =>")
     stream.println("}")
   }
@@ -174,7 +199,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
       if (!hasIRNode(op) || hasMultipleIRNodes(op)) {
         err("Cannot create analysis rule for op " + op.name + ": Op must be represented by exactly one IR node")
       }
-      emitTraversalRules(op, rules, false, stream, 4)
+      emitTraversalRules(op, rules, false, stream, 4, makeOpMethodName)
     }
 
     stream.println("    case _ => super.processTP(lhs, rhs)") // TODO: Should be able to change this
@@ -182,6 +207,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("}")
   }
 
+  // TODO: Is an IR trait for every analyzer needed?
   def emitAnalyzerExp(az: Rep[DSLAnalyzer], stream: PrintWriter) {
     stream.println("trait " + makeTraversalIRName(az) + " extends " + dsl + "Exp {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication =>")

@@ -69,7 +69,7 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     val StructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && !isMetaType(t))
 
     stream.println("trait " + dsl + " extends " + dsl + "Identifiers")
-    for (opsGrp <- opsGrps) {
+    for (opsGrp <- opsGrps if opsGrp.ops.exists(hasSharedVersion)) {
       stream.print(" with " + opsGrp.name)
     }
     for (e <- Externs) {

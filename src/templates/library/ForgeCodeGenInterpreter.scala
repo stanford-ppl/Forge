@@ -21,7 +21,6 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
    * Emit the entire library backend
    */
   def emitDSLImplementation() {
-    println("[Forge] Emitting library backend")
     Directory(Path(dslDir)).createDirectory()
     emitDSLDefinition()
     emitClasses()
@@ -43,6 +42,10 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     dslStream.close()
   }
 
+  def requiresLibraryBackend(opsGrp: DSLOps) = {
+    opsGrp.ops.exists(hasLibraryVersion) || opsGrpTpes(opsGrp).exists(t => !isMetaType(t))
+  }
+
   /**
    * Emit the library version of all data structures in the DSL.
    * DSLClasses extends [Grp]Wrapper with [Grp]WrapperImpl with [TpeClassGrp]Ops
@@ -53,7 +56,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
 
     // Note that Wrapper must not have a view of lifts, as this causes ambiguous implicit calls
     // for the library class implementations (specifically their var fields)
-    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp) && opsGrp.ops.exists(hasLibraryVersion)) {
+    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp) && requiresLibraryBackend(opsGrp)) {
       val stream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+".scala"))
       stream.println("package " + packageName + ".classes")
       stream.println()
@@ -88,6 +91,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
         libStream.println("package " + packageName + ".classes")
         libStream.println()
         emitScalaReflectImports(libStream)
+        emitLMSImports(libStream)
         emitDSLImports(libStream)
         libStream.println()
         emitLibraryOpSyntax(opsGrp, libStream)
@@ -106,7 +110,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     stream.print("trait " + dsl + "Classes")
 
     var conj = " extends "
-    for ((grp,opsGrp) <- OpsGrp if opsGrp.ops.exists(hasLibraryVersion)) {
+    for ((grp,opsGrp) <- OpsGrp if requiresLibraryBackend(opsGrp)) {
       if (isTpeClass(grp)) {
         stream.print(conj + opsGrp.name)
         conj = " with "

@@ -17,12 +17,18 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
 
   lazy val targetName = "library"
 
+  /**
+   * Emit the entire library backend
+   */
   def emitDSLImplementation() {
     Directory(Path(dslDir)).createDirectory()
     emitDSLDefinition()
     emitClasses()
   }
 
+  /**
+   * Emit header files which mix in all library ops and which the user can extend
+   */
   def emitDSLDefinition() {
     val dslStream = new PrintWriter(new FileWriter(dslDir+dsl+".scala"))
     dslStream.println("package " + packageName)
@@ -36,75 +42,99 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     dslStream.close()
   }
 
+  def requiresLibraryBackend(opsGrp: DSLOps) = {
+    opsGrp.ops.exists(hasLibraryVersion) || opsGrpTpes(opsGrp).exists(t => !isMetaType(t))
+  }
+
+  /**
+   * Emit the library version of all data structures in the DSL.
+   * DSLClasses extends [Grp]Wrapper with [Grp]WrapperImpl with [TpeClassGrp]Ops
+   */
   def emitClasses() {
     val clsDir = dslDir + File.separator + "classes"
     Directory(Path(clsDir)).createDirectory()
 
-    // trait to group all of the ops together
-    val grpStream = new PrintWriter(new FileWriter(clsDir+File.separator+dsl+"Classes.scala"))
-    grpStream.println("package " + packageName + ".classes")
-    grpStream.println()
-    emitScalaReflectImports(grpStream)
-    emitLMSImports(grpStream)
-    emitDSLImports(grpStream)
-    grpStream.println()
-    grpStream.print("trait " + dsl + "Classes extends ")
-    var first = true
-    for ((grp,opsGrp) <- OpsGrp) {
-      if (isTpeClass(grp)) {
-        if (first) grpStream.print(opsGrp.name) else grpStream.print(" with " + opsGrp.name)
-        first = false
+    // Note that Wrapper must not have a view of lifts, as this causes ambiguous implicit calls
+    // for the library class implementations (specifically their var fields)
+    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp) && requiresLibraryBackend(opsGrp)) {
+      val stream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+".scala"))
+      stream.println("package " + packageName + ".classes")
+      stream.println()
+      emitScalaReflectImports(stream)
+      emitScalaMathImports(stream)
+      emitLMSImports(stream)
+      emitDSLImports(stream)
+      stream.println()
+      stream.println("trait " + grp.name + "Wrapper {")
+      stream.println( "  this: " + dsl + "Base with " + dsl + "Classes => ")
+      stream.println()
+      emitGrpClasses(opsGrp, stream)
+      stream.println("}")
+      stream.println()
+      stream.close()
+
+      // because front-end types are not in scope (to prevent unintentional recursive calls and ambiguities),
+      // we need to factor almost all tasks out to a separate trait in the library version also
+      if (opsGrp.ops.exists(requiresImpl)) {
+        val implStream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+"WrapperImpl"+".scala"))
+        implStream.println("package " + packageName + ".classes")
+        implStream.println()
+        emitScalaReflectImports(implStream)
+        emitScalaMathImports(implStream)
+        emitDSLImports(implStream)
+        implStream.println()
+        emitImpls(opsGrp, implStream)
+        implStream.close()
       }
-      else if (!isTpeClass(grp) && !isTpeClassInst(grp)) {
-        val wrapper = grp.name + "Wrapper"
-        if (first) grpStream.print(wrapper) else grpStream.print(" with " + wrapper)
-        first = false
+      if (opsGrp.ops.exists(_.backend == libraryBackend)) {
+        val libStream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+"LibraryOps.scala"))
+        libStream.println("package " + packageName + ".classes")
+        libStream.println()
+        emitScalaReflectImports(libStream)
+        emitLMSImports(libStream)
+        emitDSLImports(libStream)
+        libStream.println()
+        emitLibraryOpSyntax(opsGrp, libStream)
+        libStream.close()
+      }
+    }
 
-        val stream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+".scala"))
-        stream.println("package " + packageName + ".classes")
-        stream.println()
-        emitScalaReflectImports(stream)
-        emitScalaMathImports(stream)
-        emitLMSImports(stream)
-        emitDSLImports(stream)
-        stream.println()
-        stream.println("trait " + wrapper + " {")
-        // stream.println("trait " + wrapper + " extends " + grp.name + "Ops with " + dsl + "Base {")
-        stream.println( "  this: " + dsl + "Base with " + dsl + "Classes => ")
-        stream.println()
-        emitClass(opsGrp, stream)
-        stream.println("}")
-        stream.println()
-        stream.close()
+    // DSLClasses - One trait to group all of the ops together
+    val stream = new PrintWriter(new FileWriter(clsDir+File.separator+dsl+"Classes.scala"))
+    stream.println("package " + packageName + ".classes")
+    stream.println()
+    emitScalaReflectImports(stream)
+    emitLMSImports(stream)
+    emitDSLImports(stream)
+    stream.println()
+    stream.print("trait " + dsl + "Classes")
 
-        // because front-end types are not in scope (to prevent unintentional recursive calls and ambiguities),
-        // we need to factor almost all tasks out to a separate trait in the library version also
+    var conj = " extends "
+    for ((grp,opsGrp) <- OpsGrp if requiresLibraryBackend(opsGrp)) {
+      if (isTpeClass(grp)) {
+        stream.print(conj + opsGrp.name)
+        conj = " with "
+      }
+      else if (!isTpeClassInst(grp)) {
+        stream.print(conj + grp.name + "Wrapper")
+        conj = " with "
         if (opsGrp.ops.exists(requiresImpl)) {
-          val implStream = new PrintWriter(new FileWriter(clsDir+File.separator+grp.name+"WrapperImpl"+".scala"))
-          implStream.println("package " + packageName + ".classes")
-          implStream.println()
-          emitScalaReflectImports(implStream)
-          emitScalaMathImports(implStream)
-          emitDSLImports(implStream)
-          implStream.println()
-          emitImpls(opsGrp, implStream)
-          implStream.close()
-
-          grpStream.print(" with " + grp.name + "WrapperImpl")
+          stream.print(conj + grp.name + "WrapperImpl")
         }
       }
     }
-    for (d <- DataStructs.keys.toSeq diff OpsGrp.values.flatMap(_.ops).map(_.grp).filter(grpIsTpe).map(grpAsTpe).toSeq) {
+    for (d <- DataStructs.keys.toSeq diff OpsGrp.values.flatMap(_.ops).map(_.grp).filter(grpIsTpe).map(grpAsTpe).toSeq if !isMetaType(d)) {
       warn("(library) ignoring data definition for " + d.name + " since it cannot be instantiated in app code (it has no accompanying ops)")
     }
     for (e <- Externs) {
-      grpStream.print(" with " + e.opsGrp.grp.name + "Wrapper")
+      stream.print(conj + e.opsGrp.grp.name + "Wrapper")
+      conj = " with "
     }
-    grpStream.println("{")
-    grpStream.println("  this: " + dsl + "Lib with " + dsl + "Application => ")
-    grpStream.println("}")
-    grpStream.println()
-    grpStream.close()
+    stream.println(" {")
+    stream.println("  this: " + dsl + "Library => ")
+    stream.println("}")
+    stream.println()
+    stream.close()
   }
 }
 

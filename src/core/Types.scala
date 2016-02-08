@@ -23,11 +23,23 @@ abstract class LiftStm
 abstract class RewriteRule
 abstract class CodeGenRule
 
+abstract class DSLTraversal
+abstract class DSLAnalyzer extends DSLTraversal
+abstract class DSLTransformer extends DSLTraversal
+abstract class DSLMetadata extends DSLType
+abstract class DSLMetaFields
+
+abstract class TraversalRule
+abstract class DSLPattern
+abstract class DSLRule
+
+abstract class MetaMeet
 /**
  * Types representing built-in constructs
  */
 abstract class StageTag
 abstract class MethodType
+abstract class BackendType
 abstract class MethodSignatureType
 abstract class EffectType
 abstract class AliasHint

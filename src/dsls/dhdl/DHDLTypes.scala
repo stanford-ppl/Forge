@@ -1,6 +1,6 @@
 package ppl.dsl.forge
 package dsls
-package dhdl 
+package dhdl
 
 trait DHDLTypes {
   this: DHDLDSL =>
@@ -19,7 +19,7 @@ trait DHDLTypes {
 		importStrings()
 
 		//TODO: op checkFixPtPrec has return type Unit but no effects, so it is a no-op
-		compiler (TpeOps) ("checkFixPtPrec", Nil, (MInt,MInt)::MUnit, effect = simple) implements codegen ($cala, ${
+		internal (TpeOps) ("checkFixPtPrec", Nil, (MInt,MInt)::MUnit, effect = simple) implements codegen ($cala, ${
 			val intPrec = $0
 			val fracPrec = $1
 			val MAX_FIXPT_PRECISION = 64
@@ -36,22 +36,22 @@ trait DHDLTypes {
 
 		direct (TpeOps) ("FixPt", Nil, MInt :: FixPt) implements codegen ($cala, ${
 			val int = $0
-			val intPrec = 31 
+			val intPrec = 31
 			val fracPrec = 0
 			if (int > scala.math.pow(2,intPrec))
 				throw new Exception("Integer precision not enough to hold integer value of the fix point: "
 					+ int)
-			int.toLong 
+			int.toLong
 		})
 
 		direct (TpeOps) ("FixPt", Nil, (MFloat,MInt,MInt) :: FixPt) implements codegen ($cala, ${
 			val flt = $0
-			val intPrec = $1 
+			val intPrec = $1
 			val fracPrec = $2
 			if (scala.math.round(flt) > scala.math.pow(2,intPrec))
 				throw new Exception("Integer precision not enough to hold integer value of the fix point: "
 					+ scala.math.round(flt))
-			scala.math.round(flt * scala.math.pow(2,fracPrec)).toLong 
+			scala.math.round(flt * scala.math.pow(2,fracPrec)).toLong
 		})
 
 		val FixPtOps = withTpe (FixPt)
@@ -67,7 +67,7 @@ trait DHDLTypes {
 				val fracPrec = 0L
 				//val intPrec = $1
 				//val fracPrec = $2
-				val intMask = 1L << (intPrec + fracPrec) - 1L 
+				val intMask = 1L << (intPrec + fracPrec) - 1L
 				(abs($self) & intMask) << (fracPrec)
 			}
 			/* getFrac(fracPrec): returns fraction part of the fix point number */
@@ -93,10 +93,10 @@ trait DHDLTypes {
 				val fracprec = 0
 				($self >> fracprec.toLong).toInt
 			}))
-			
+
 		}
 
-		val fix_to_string = compiler (FixPt) ("fix_to_string", Nil, (("sign", FixPt), ("int", FixPt), ("frac", FixPt)) :: MString)
+		val fix_to_string = internal (FixPt) ("fix_to_string", Nil, (("sign", FixPt), ("int", FixPt), ("frac", FixPt)) :: MString)
 		impl (fix_to_string) (codegen ($cala, ${
 			(if ($sign == 0L) "" else "-") + $int + "." + $frac
 		}))

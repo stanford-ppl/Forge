@@ -48,19 +48,19 @@ trait OptiLADSL extends ForgeApplication
     // OptiLA ops
     // note that the order matters with respect to 'lookup' calls
 
-    // sneak in a compiler-only range method
+    // sneak in an internal range method
     val Range = tpe("Range")
     data(Range, ("start", MInt), ("end", MInt))
-    compiler (Range) ("range_start", Nil, Range :: MInt) implements getter(0, "start")
-    compiler (Range) ("range_end", Nil, Range :: MInt) implements getter(0, "end")
+    internal (Range) ("range_start", Nil, Range :: MInt) implements getter(0, "start")
+    internal (Range) ("range_end", Nil, Range :: MInt) implements getter(0, "end")
 
     noInfixList :::= List("infix_foreach")
-    compiler (Range) ("infix_until", Nil, (MInt,MInt) :: Range) implements allocates(Range, quotedArg(0), quotedArg(1))
+    internal (Range) ("infix_until", Nil, (MInt,MInt) :: Range) implements allocates(Range, quotedArg(0), quotedArg(1))
 
-    // infix_foreach must be compiler only both so that it is not used improperly and to not interfere with other codegen nodes in the library
+    // infix_foreach must be internal only both so that it is not used improperly and to not interfere with other codegen nodes in the library
     // this is a little convoluted unfortunately (because of the restriction on passing structs to codegen nodes)
-    compiler (Range) ("infix_foreach", Nil, (Range, MInt ==> MUnit) :: MUnit) implements composite ${ range_foreach(range_start($0), range_end($0), $1) }
-    val range_foreach = compiler (Range) ("range_foreach", Nil, (("start",MInt),("end",MInt),("func",MInt ==> MUnit)) :: MUnit)
+    internal (Range) ("infix_foreach", Nil, (Range, MInt ==> MUnit) :: MUnit) implements composite ${ range_foreach(range_start($0), range_end($0), $1) }
+    val range_foreach = internal (Range) ("range_foreach", Nil, (("start",MInt),("end",MInt),("func",MInt ==> MUnit)) :: MUnit)
     impl (range_foreach) (codegen($cala, ${
       var i = $start
       while (i < $end) {
@@ -102,7 +102,7 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
     impl (fmt_str) (codegen($cala, formatStr))
     impl (fmt_str) (codegen(cpp, "convert_to_string<" +  unquotes("remapWithRef("+opArgPrefix+"0.tp)") + " >(" + quotedArg(0) + ")"))
 
-    compiler (lookupGrp("FString")) ("optila_padspace", Nil, MString :: MString) implements composite ${
+    internal (lookupGrp("FString")) ("optila_padspace", Nil, MString :: MString) implements composite ${
       "  " + $0
       // if ($0.startsWith("-")) "  " + $0 else "   " + $0
     }

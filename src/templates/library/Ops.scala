@@ -34,19 +34,31 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     case _ => super.quote(x)
   }
 
+  /**
+   * Checks if given op requires library implementation method
+   */
   def requiresImpl(o: Rep[DSLOp]) = Impls(o) match {
     case _:CodeGen | _:Redirect => false
-    case Getter(structArgIndex,field) => false
-    case Setter(structArgIndex,field,value) => false
-    case Allocates(tpe,init) => false
-    case _ => true
+    case _:Getter | _:Setter => false
+    case _:Allocates | _:AllocatesFigment => false
+    case _ => hasLibraryVersion(o)
   }
 
+  def emitLibraryOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
+    val base = if (opsGrp.ops.exists(hasSharedVersion)) opsGrp.name else "Base"
+    emitBlockComment("Library-only operations", stream)
+    emitOpSugar(opsGrp.grp.name + "Library", base, dsl, opsGrp, stream, libraryBackend)
+  }
+
+  /**
+   * Emit implementation bodies for all ops except codegen, setter, getter, and allocates
+   * These implementations are called from Wrapper (ops not generated here are inlined)
+   */
   def emitImpls(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("SingleTask and Composite Impls", stream)
     stream.println()
     stream.println("trait " + opsGrp.grp.name + "WrapperImpl {")
-    stream.println("  this: " + dsl + "Application with " + dsl + "CompilerOps => ")
+    stream.println("  this: " + dsl + "Application with " + dsl + "LibraryOps => ")
     stream.println()
     val indent = 2
     for (o <- unique(opsGrp.ops) if requiresImpl(o)) {
@@ -56,6 +68,9 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
           inline(o, single.func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent+2 )}
         case composite:Composite =>
           inline(o, composite.func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent+2 )}
+        case figment:Figment =>
+          inline(o, figment.func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent+2 )}
+
         case map:Map =>
           val outDc = ForgeCollections(getHkTpe(o.retTpe))
           val in = o.args.apply(map.argIndex)
@@ -264,28 +279,39 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     if (i != "") emitWithIndent("def " + implicitOpArgPrefix + o.implicitArgs.length + " = ()", stream, indent)
   }
 
-  def emitOp(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) {
-    Impls(o) match {
-      case codegen:CodeGen =>
-        val rule = codegen.decls.getOrElse($cala, err("could not find Scala codegen rule for op: " + o.name))
-        inline(o, rule.decl, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent) }
-      case Getter(structArgIndex,field) =>
-        emitOverloadShadows(o, stream, indent)
-        emitWithIndent(inline(o, quotedArg(o.args.apply(structArgIndex).name)) + "." + field, stream, indent)
-      case Setter(structArgIndex,field,value) =>
-        emitOverloadShadows(o, stream, indent)
-        emitWithIndent(inline(o, quotedArg(o.args.apply(structArgIndex).name)) + "." + field + " = " + inline(o,value), stream, indent)
-      case Allocates(tpe,init) =>
-        emitOverloadShadows(o, stream, indent)
-        val initialVals = init.map(i => inline(o,i)).mkString(",")
-        emitWithIndent("new " + quote(tpe) + "(" + initialVals + ")", stream, indent)
-      case _ => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
-    }
+  /**
+   * Generate calls to an op's implementation
+   * Directly inlines the method for codegen, getter, setter, and allocates
+   */
+  def emitOp(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) = Impls(o) match {
+    case codegen:CodeGen =>
+      val rule = codegen.decls.getOrElse($cala, err("could not find Scala codegen rule for op: " + o.name))
+      inline(o, rule.decl, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent) }
+    case Getter(structArgIndex,field) =>
+      emitOverloadShadows(o, stream, indent)
+      emitWithIndent(inline(o, quotedArg(o.args.apply(structArgIndex).name)) + "." + field, stream, indent)
+    case Setter(structArgIndex,field,value) =>
+      emitOverloadShadows(o, stream, indent)
+      emitWithIndent(inline(o, quotedArg(o.args.apply(structArgIndex).name)) + "." + field + " = " + inline(o,value), stream, indent)
+    case Allocates(tpe,init) =>
+      emitOverloadShadows(o, stream, indent)
+      val initialVals = init.map(i => inline(o,i)).mkString(",")
+      emitWithIndent("new " + quote(tpe) + "(" + initialVals + ")", stream, indent)
+    case AllocatesFigment(tpe,init) =>
+      emitOverloadShadows(o, stream, indent)
+      val initialVals = init.map(i => inline(o,i)).mkString(",")
+      emitWithIndent("new " + quote(tpe) + "(" + initialVals + ")", stream, indent)
+    case _ =>
+      emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
   }
 
-  def emitClass(opsGrp: DSLOps, stream: PrintWriter) {
+  /**
+   * Emit classes as the library backend implementation of structs
+   * HACK: case classes are only used for the special Forge Tups
+   */
+  def emitGrpClasses(opsGrp: DSLOps, stream: PrintWriter) {
     val classes = opsGrpTpes(opsGrp)
-    for (tpe <- classes) {
+    for (tpe <- classes if !isMetaType(tpe)) {
       val d = DataStructs.get(tpe)
       d.foreach { data =>
         val classType = if (data.tpe.name.startsWith("Tup")) "case class " else "class " //sketchy, but we want our special tuples to retain value equality (like Scala tuples)
@@ -294,7 +320,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
 
         // Actually emitting the infix methods as instance methods, while a little more readable, makes the interpreter methods
         // ambiguous with the op conversions unless they already exist on every instance and must be overridden (e.g. toString)
-        for (o <- unique(opsGrp.ops) if overrideList.contains(o.name) && !Impls(o).isInstanceOf[Redirect] && o.style == infixMethod && o.args.length > 0 && quote(o.args.apply(0).tpe) == quote(tpe)) {
+        for (o <- unique(opsGrp.ops) if overrideList.contains(o.name) && !isRedirect(o) && o.style == infixMethod && o.args.length > 0 && quote(o.args.apply(0).tpe) == quote(tpe)) {
           val otherTpePars = o.tpePars.filterNot(p => data.tpe.tpePars.map(_.name).contains(p.name))
           stream.print("  "+makeDefWithOverride(o)+" " + o.name + makeTpeParsWithBounds(otherTpePars))
           //stream.print("(" + o.args/*.drop(1)*/.map(t => t.name + ": " + repify(t.tpe) + " = " + unit(t.default)).mkString(",") + ")") TODO
@@ -318,7 +344,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       }
     }
 
-    for (o <- unique(opsGrp.ops) if !Impls(o).isInstanceOf[Redirect]) {
+    for (o <- unique(opsGrp.ops) if !Impls(o).isInstanceOf[Redirect] && hasLibraryVersion(o)) {
       // no return tpe because not all of the tpes are in scope in the lib wrapper
       stream.println("  " + makeOpMethodSignature(o, withReturnTpe = Some(false)) + " = {")
       o.style match {

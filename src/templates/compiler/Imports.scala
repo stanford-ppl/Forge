@@ -19,7 +19,7 @@ trait DeliteGenImports extends BaseGenImports {
 
   def emitDeliteOpsImports(stream: PrintWriter) {
     emitDeliteCollectionImports(stream)
-    stream.println("import ppl.delite.framework.ops.{DeliteOpsExp, DeliteCollectionOpsExp}")
+    stream.println("import ppl.delite.framework.ops.{DeliteOpsExp, DeliteCollectionOpsExp, DeliteFigmentOpsExp}")
     stream.println("import ppl.delite.framework.Util._")
   }
 
@@ -36,6 +36,15 @@ trait DeliteGenImports extends BaseGenImports {
     stream.println("import ppl.delite.framework.transform._")
   }
 
+  def emitDeliteTraversalImports(stream: PrintWriter) {
+    stream.println("import ppl.delite.framework.{Config, DeliteApplication, ExpressionsOpt}")
+    stream.println("import ppl.delite.framework.analysis._")
+    stream.println("import ppl.delite.framework.transform._")
+    stream.println("import ppl.delite.framework.ops._")
+    stream.println("import ppl.delite.framework.datastructures._")
+    stream.println("import ppl.delite.framework.codegen.delite.overrides._")
+  }
+
   def emitDeliteRestageImports(stream: PrintWriter) {
     stream.println("import ppl.delite.framework.codegen.restage.{DeliteCodeGenRestage,TargetRestage}")
     stream.println("import ppl.delite.framework.{DeliteInteractive, DeliteInteractiveRunner, DeliteRestageOps, DeliteRestageOpsExp, DeliteRestageRunner}")
@@ -49,7 +58,7 @@ trait DeliteGenImports extends BaseGenImports {
     emitDelitePackageImports(stream)
     emitDeliteOpsImports(stream)
     emitDeliteRestageImports(stream)
-    emitDeliteTestImports(stream)    
+    emitDeliteTestImports(stream)
   }
 
   def emitScalaToolsImports(stream: PrintWriter) {
@@ -60,6 +69,7 @@ trait DeliteGenImports extends BaseGenImports {
     super.emitDSLImports(stream)
     stream.println("import " + packageName + "._")
     stream.println("import " + packageName + ".ops._")
+    stream.println("import " + packageName + ".transform._")
     // stream.println("import " + dsl.toLowerCase() + ".compiler.extern._")
   }
 
@@ -67,6 +77,6 @@ trait DeliteGenImports extends BaseGenImports {
     super.emitAllImports(stream)
     emitScalaToolsImports(stream)
     emitLMSImports(stream)
-    emitDeliteImports(stream)    
+    emitDeliteImports(stream)
   }
 }

@@ -19,7 +19,7 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
     if (addREPLOverride) stream.println("  with " + dsl + "REPLOverrides")
 
     stream.println()
-    stream.println("abstract class " + dsl + "ApplicationInterpreter extends " + dsl + "Application with " + dsl+"Lib {")
+    stream.println("abstract class " + dsl + "ApplicationInterpreter extends " + dsl + "Library {")
     stream.println("  var args: Rep[Array[String]] = _")
     stream.println("  var stagingArgs: Array[String] = _")
     stream.println("  final def main(argsIn: Array[String]) {")
@@ -31,7 +31,7 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
 
     emitBlockComment("Dismabiguations for interpreter mode", stream, indent=2)
     for (opsGrp <- opsGrps if !isTpeClass(opsGrp.grp) && !isTpeClassInst(opsGrp.grp)) {
-      for (o <- unique(opsGrp.ops) if (nameClashesUniversal(o).length > 1) && !o.args.exists(a => getHkTpe(a.tpe).name == "Var")) {
+      for (o <- unique(opsGrp.ops) if (nameClashesUniversal(o).length > 1) && !o.args.exists(a => getHkTpe(a.tpe).name == "Var") && hasLibraryVersion(o)) {
         var prefix = ""
         if (o.style == infixMethod && !noInfix(o))
           prefix = "  override def infix_"
@@ -61,7 +61,7 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
   }
 
   def emitDSLPackageDefinitions(opsGrps: List[DSLOps], stream: PrintWriter) {
-    emitBlockComment("dsl library definition", stream)
+    emitBlockComment("DSL library definition", stream)
 
     // base trait sets Rep[T] to T and mixes in the necessary portions of the front-end, without
     // bringing the abstract impls in scope, since they can cause a recursive loop in the library
@@ -71,30 +71,58 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
     stream.println("}")
     stream.println()
 
-    // compiler ops mixes in an application ops with compiler only ops
-    stream.println("trait " + dsl + "CompilerOps extends " + dsl + "Application")
+    // Library mixes in application ops with internal ops
+    stream.println("trait " + dsl + "LibraryOps extends " + dsl + "Application")
     for (opsGrp <- opsGrps) {
-      if (opsGrp.ops.exists(_.style == compilerMethod))
-        stream.print(" with " + opsGrp.grp.name + "CompilerOps")
+      if (opsGrp.ops.exists(_.backend == internalBackend))
+        stream.print(" with " + opsGrp.grp.name + "InternalOps")
+      if (opsGrp.ops.exists(_.backend == libraryBackend))
+        stream.print(" with " + opsGrp.grp.name + "LibraryOps")
     }
     for (e <- Externs) {
-      stream.print(" with " + e.opsGrp.grp.name + "CompilerOps")
+      stream.print(" with " + e.opsGrp.grp.name + "CompilerOps") // Legacy naming for internal ops
     }
-    stream.println()
+    stream.println("{")
+    stream.println("  this: " + dsl + "Library =>")
+    stream.println("}")
     stream.println()
 
     // library impl brings all of the library types in scope
-    stream.println("trait " + dsl + "Lib extends " + dsl + "Base with " + dsl + "CompilerOps with " + dsl + "Classes {")
-    stream.println("  this: " + dsl + "Application => ")
+    stream.println("trait " + dsl + "Library extends " + dsl + "Base with " + dsl + "LibraryOps with " + dsl + "Classes {")
+    //stream.println("  this: " + dsl + "Application => ")
     stream.println()
     stream.println("  // override required due to mix-in")
     stream.println("  override type Rep[+T] = T")
     stream.println()
-    emitBlockComment("dsl types", stream, indent=2)
-    for (tpe <- Tpes if (!isForgePrimitiveType(tpe) && DataStructs.contains(tpe))) {
+    emitBlockComment("DSL types", stream, indent=2)
+    for (tpe <- Tpes if (!isForgePrimitiveType(tpe) && DataStructs.contains(tpe)) && !isMetaType(tpe)) {
       stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")
     }
     stream.println()
+
+    // TODO: We should instead generate the actual class inheritances rather than making these shallow copies
+    if (TpeParents.size > 0) {
+      emitBlockComment("Figment type inheritance", stream, indent=2)
+      for ((tpe,parent) <- TpeParents) {
+        stream.println("  def m_" + tpe.name + "_to_" + parent.name + makeTpeParsWithBounds(tpe.tpePars) + "(__arg0: Rep[" + tpe.name + makeTpePars(tpe.tpePars) + "]): Rep[" + parent.name + makeTpePars(parent.tpePars) + "] = {")
+        if (DataStructs.contains(parent)) {
+          // Sanity check - child must have at least the fields that its parent does
+          // TODO: Should also check types?
+          val parentFields = DataStructs(parent).fields
+          val childFields = DataStructs(tpe).fields
+          if (!parentFields.forall(t => childFields.exists(f => f._1 == t._1)))
+            err(tpe.name + " must contain all fields in its parent to inherit from " + parent.name)
+
+          stream.println("    new " + quote(parent) + "(" + DataStructs(parent).fields.map(f => "__arg0." + f._1).mkString(",") + ")")
+        }
+        else {
+          // TODO: What to do here? No data backing means no class, so what's the library version?
+          stream.println("    __arg0.asInstanceOf[Rep[" + parent.name + makeTpePars(parent.tpePars) + "]]")
+        }
+        stream.println("  }")
+      }
+    }
+
     stream.println("}")
   }
 }

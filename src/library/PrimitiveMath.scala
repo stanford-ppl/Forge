@@ -119,13 +119,6 @@ trait PrimitiveMathGen {
       else t
     }
 
-    // We need versions of these types that will never be lifted to Rep, so that we can define our type class
-    // implementations on the unlifted Scala type. This is a bit awkward. See comment in Definitions.scala.
-    val SDouble = tpe("Double", stage = compile)
-    val SFloat = tpe("Float", stage = compile)
-    val SInt = tpe("Int", stage = compile)
-    val SLong = tpe("Long", stage = compile)
-
     val primitives = List(SDouble,MDouble,CVar(SDouble),SFloat,MFloat,CVar(SFloat),SInt,MInt,CVar(SInt),SLong,MLong,CVar(SLong))
 
     // All primitive combinations
@@ -147,7 +140,7 @@ trait PrimitiveMathGen {
    * Generate all primitive combinations as infix (or implicit) methods. Whether these generate as infix or implicits depends
    * on the contents of the 'noInfixList' and 'mustInfixList' lists.
    */
-  def importPrimitiveMathInfix(Prim: Rep[DSLGroup]) {    
+  def importPrimitiveMathInfix(Prim: Rep[DSLGroup]) {
     val primitives = List(CDouble,MDouble,MVar(MDouble),CFloat,MFloat,MVar(MFloat),CInt,MInt,MVar(MInt),CLong,MLong,MVar(MLong))
 
     // All primitive combinations

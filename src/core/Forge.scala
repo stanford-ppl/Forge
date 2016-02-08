@@ -15,6 +15,7 @@ trait ForgeApplication extends Forge with ForgeLift with ForgeLib {
   def dslName: String
   def specification(): Rep[Unit]
   def addREPLOverride = false // DSLs can override this to true if they need a REPL override trait
+  def clearTraversals = false // Override to true to empty Delite traversals list (for complete custom ordering)
 }
 
 /**
@@ -73,7 +74,6 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   this: ForgeApplication =>
 
   // -- for fast compile mode
-
   def flattenIR() {
     val flat = grp("$Flat")
     val newOps = new ArrayBuffer[Exp[DSLOp]]()
@@ -100,11 +100,13 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     }
   }
 
-  // -- IR helpers
+  // --- IR helpers
 
   def isForgePrimitiveType(t: Rep[DSLType]) = t match {
     case `MShort` | `MInt` | `MLong` | `MFloat` | `MDouble` | `MBoolean` | `MChar` | `MByte` | `MString` | `MUnit` | `MAny` | `MNothing` | `MLambda` | `MSourceContext` | `byName` => true
     case `CShort` | `CInt` | `CLong` | `CFloat` | `CDouble` | `CBoolean` | `CChar` | `CByte` | `CString` | `CUnit` | `CAny` | `CNothing` => true
+    case `SShort` | `SInt` | `SLong` | `SFloat` | `SDouble` | `SBoolean` | `SChar` | `SByte` | `SString` | `SUnit` | `SAny` | `SList`  => true
+    case `SymProps` | `ArrayProps` | `StructProps` | `ScalarProps` | `SOption` => true
     // case Def(Tpe(_,_,`now`)) => true
     case Def(Tpe(name,_,_)) if name.startsWith("Tuple") => true
     case Def(Tpe(name,_,_)) if primitiveTpePrefix exists { t => name.startsWith(t) } => true
@@ -112,6 +114,11 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case Def(Tpe("ForgeFileInputStream",_,_)) | Def(Tpe("ForgeFileOutputStream",_,_)) => true
     case Def(Tpe("Var",_,_)) => true
     case Def(Tpe("Overloaded",_,_)) => true
+    case _ => primitiveTypes.contains(t)
+  }
+
+  def isMetaType(a: Exp[DSLGroup]) = a match {
+    case Def(Meta(_,_)) => true
     case _ => false
   }
 
@@ -125,6 +132,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   }
 
   def grpIsTpe(grp: Rep[DSLGroup]) = grp match {
+    case Def(Meta(n,targs)) => true
     case Def(Tpe(n,targs,s)) => true
     case Def(TpeInst(t,args)) => true
     case Def(TpePar(n,ctx,s)) => true
@@ -134,6 +142,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case _ => false
   }
   def grpAsTpe(grp: Rep[DSLGroup]): Rep[DSLType] = grp match {
+    case t@Def(Meta(n,targs)) => t.asInstanceOf[Rep[DSLType]]
     case t@Def(Tpe(n,targs,s)) => t.asInstanceOf[Rep[DSLType]]
     case t@Def(TpeInst(hk,args)) => t.asInstanceOf[Rep[DSLType]]
     case t@Def(TpePar(n,ctx,s)) => t.asInstanceOf[Rep[DSLType]]
@@ -205,7 +214,17 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case _ => false
   }
 
+  // --- Utils for ops
   def isRedirect(o: Rep[DSLOp]) = Impls.contains(o) && Impls(o).isInstanceOf[Redirect]
+
+  def isFigmentOp(op: Rep[DSLOp]) = Impls(op) match {
+    case _:Figment | _:AllocatesFigment => true
+    case _ => false
+  }
+  def isUserFacing(op: Rep[DSLOp]) = op.backend == sharedBackend
+  def hasCompilerVersion(o: Rep[DSLOp]) = o.backend != libraryBackend
+  def hasLibraryVersion(o: Rep[DSLOp]) = o.backend != compilerBackend
+  def hasSharedVersion(o: Rep[DSLOp]) = o.backend == sharedBackend || o.backend == internalBackend
 }
 
 trait ForgeUtilities {
@@ -251,6 +270,7 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
       case List(Def(Arg(_,`byName`,_))) => " => " + repify(ret)
       case _ => "(" + args.map(repify).mkString(",") + ") => " + repify(ret)
     }
+    case Def(Meta(name,args)) => quote(a)
     case Def(Tpe(name, arg, `compile`)) => quote(a)
     case Def(Tpe("Var", arg, stage)) => repify(arg(0))
     case Def(TpePar(name, ctx, `compile`)) => quote(a)
@@ -268,6 +288,7 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
       case List(Def(Arg(_,`byName`,_))) => " => " + repifySome(ret)
       case _ => "(" + args.map(repifySome).mkString(",") + ") => " + repifySome(ret)
     }
+    case Def(Meta(name,args)) => quote(a)
     case Def(Tpe(name, arg, `now`)) => quote(a)
     case Def(Tpe("Var", arg, stage)) => varify(arg(0))
     case Def(TpePar(name, ctx, `now`)) => quote(a)
@@ -331,6 +352,7 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
   }
 
   override def quote(x: Exp[Any]): String = x match {
+    case Def(Meta(s,args)) => s + makeTpePars(args)
     case Def(Tpe(s,args,stage)) => s + makeTpePars(args)
     case Def(TpeInst(t,args)) => t.name + makeTpePars(args)
     case Def(TpePar(s,ctx,stage)) => s

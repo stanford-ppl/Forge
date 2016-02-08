@@ -21,9 +21,9 @@ trait DenseVectorViewOps {
 
     val DenseVectorViewOps = withTpe(DenseVectorView)
     DenseVectorViewOps {
-      compiler ("densevectorview_data") (Nil :: MArray(T)) implements getter(0, "_data")
-      compiler ("densevectorview_start") (Nil :: MInt) implements getter(0, "_start")
-      compiler ("densevectorview_stride") (Nil :: MInt) implements getter(0, "_stride")
+      internal ("densevectorview_data") (Nil :: MArray(T)) implements getter(0, "_data")
+      internal ("densevectorview_start") (Nil :: MInt) implements getter(0, "_start")
+      internal ("densevectorview_stride") (Nil :: MInt) implements getter(0, "_stride")
 
       infix ("length") (Nil :: MInt) implements getter(0, "_length")
       infix ("isRow") (Nil :: MBoolean) implements getter(0, "_isRow")
@@ -56,8 +56,8 @@ trait DenseVectorViewOps {
         repTo\${grpName}DenseVectorOpsCls(viewToDense($self))
       }
 
-      compiler ("densevectorview_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("DenseVectorViews cannot be allocated from a parallel op") }
-      compiler ("densevectorview_illegalupdate") ((MInt, T) :: MNothing, effect = simple) implements composite ${ fatal("DenseVectorViews cannot be updated") }
+      internal ("densevectorview_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("DenseVectorViews cannot be allocated from a parallel op") }
+      internal ("densevectorview_illegalupdate") ((MInt, T) :: MNothing, effect = simple) implements composite ${ fatal("DenseVectorViews cannot be updated") }
 
       parallelize as ParallelCollection(T, lookupOp("densevectorview_illegalalloc"), lookupOp("length"), lookupOverloaded("apply",1), lookupOp("densevectorview_illegalupdate"))
     }

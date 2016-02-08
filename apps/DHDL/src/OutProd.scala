@@ -8,7 +8,7 @@ object OutProdInterpreter extends DHDLApplicationInterpreter with OutProd
 
 trait OutProd extends DHDLApplication {
 	def printUsage = {
-    println("Usage: dotprod")
+    println("Usage: outprod")
     exit(-1)
 	}
   def main() = {

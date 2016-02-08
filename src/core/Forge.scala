@@ -112,7 +112,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case Def(Tpe("ForgeFileInputStream",_,_)) | Def(Tpe("ForgeFileOutputStream",_,_)) => true
     case Def(Tpe("Var",_,_)) => true
     case Def(Tpe("Overloaded",_,_)) => true
-    case _ => false
+    case _ => primitiveTypes.contains(t)
   }
 
   def opsGrpTpes(opsGrp: DSLOps) = {

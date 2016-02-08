@@ -15,12 +15,21 @@ trait DADLDSL extends ForgeApplication
 
   def specification() = {
 		importDADLArchOps()
+    importTuples()
     importModules()
+
+    val T = tpePar("T")
+    val rep = tpe("Rep", T, stage=compile)
+    primitiveTypes ::= rep
+    tpeAlias("Wire", rep)
 
 		val TypeOps = grp("TypeOps")
 		lift(TypeOps) (MInt)
 		lift(TypeOps) (MArray)
+    direct (TypeOps) ("println", List(), List(MAny) :: MUnit, effect = simple) implements codegen($cala, ${ println($0) })
+
 		importStrings()
+
     ()
 	}
 }

@@ -919,7 +919,9 @@ trait DeliteGenOps extends BaseGenOps {
       var first = true
       for (tpe <- classes if DataStructs.contains(tpe) && !FigmentTpes.contains(tpe) && !isMetaType(tpe)) {
         val d = DataStructs(tpe)
-        val fields = d.fields.zipWithIndex.map { case ((fieldName,fieldType),i) => ("\""+fieldName+"\"", if (isTpePar(fieldType)) "m.typeArguments("+i+")" else wrapManifest(fieldType)) }
+				val tpars = tpe.tpePars
+        val fields = d.fields.zipWithIndex.map { case ((fieldName,fieldType),i) =>
+				("\""+fieldName+"\"", if (isTpePar(fieldType)) "m.typeArguments("+tpars.indexOf(fieldType)+")" else wrapManifest(fieldType)) }
         val prefix = if (first) "    if " else "    else if "
         structStream += prefix + "(m.erasure == classOf["+erasureType(tpe)+"]) Some((classTag(m), collection.immutable.List("+fields.mkString(",")+")))" + nl
         first = false

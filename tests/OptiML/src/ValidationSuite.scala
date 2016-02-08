@@ -36,8 +36,8 @@ trait CrossValidation extends ForgeTestModule with OptiMLApplication {
   }
 }
 
-object HoldOutRunnerC extends ForgeTestRunnerCompiler with OptiMLApplicationCompiler with HoldOut
-object HoldOutRunnerI extends ForgeTestRunnerInterpreter with OptiMLApplicationInterpreter with HoldOut
+object HoldOutRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler with HoldOut
+object HoldOutRunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with HoldOut
 trait HoldOut extends ForgeTestModule with OptiMLApplication {
   def main() = {
     val x = DenseMatrix.rand(100,10)

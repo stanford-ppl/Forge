@@ -1,0 +1,16 @@
+if [[ $2 == *"i"* ]]; then
+	echo "--------run interpreter---------"
+	cp /Users/Yaqi/Documents/hyperdsl/forge/apps/DHDL/src/${1}.scala apps/src/;
+	sbt compile
+	bin/delitec ${1}Interpreter
+fi
+if [[ $2 == *"c"* ]]; then
+	echo "--------compile dhdl app--------"
+	cp /Users/Yaqi/Documents/hyperdsl/forge/apps/DHDL/src/${1}.scala apps/src/;
+	sbt compile
+	bin/delitec ${1}Compiler
+fi
+if [[ $2 == *"r"* ]]; then
+	echo "--------run dhdl app------------"
+	bin/delite ${1}Compiler.deg
+fi

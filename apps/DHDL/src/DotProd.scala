@@ -25,10 +25,10 @@ trait DotProd extends DHDLApplication {
 		MetaPipe1[FixPt](ctrs_out, accum_out, _+_, {case i::_ => 
 			val bm1 = BRAM[FixPt]("bm1", tileSize)
 			val bm2 = BRAM[FixPt]("bm2", tileSize)
-			//MetaGrp("parallel", {
+			MetaGrp("parallel", {
 				vec1.ld(bm1, i*tileSize, tileSize)
 				vec2.ld(bm2, i*tileSize, tileSize)
-			//})
+			})
 			val accum_in = Reg[FixPt]()
 			val ctrs_in = CtrChain(Ctr(max=tileSize))
 			Pipe1[FixPt](ctrs_in, accum_in, _+_, { case j::_ =>

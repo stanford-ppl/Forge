@@ -195,11 +195,10 @@ trait CtrlOps {
 			metaPipe
 		})
 
-		val meta_grp = direct (MetaPipe) ("MetaGrp", Nil, (("tpe", MString), ("func", MAny ==>
-			MUnit)) :: MetaPipe) 
+		val meta_grp = direct (MetaPipe) ("MetaGrp", Nil, (("tpe", MString), ("func", MThunk(MUnit))) :: MetaPipe) 
 		impl (meta_grp) (composite ${
 			val metaPipe = MetaPipe( CtrChain(Ctr(max=unit(1))) )
-			$func()
+			$func
 			metaPipe
 		})
 

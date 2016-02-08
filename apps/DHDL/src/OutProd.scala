@@ -32,19 +32,20 @@ trait OutProd extends DHDLApplication {
 		MetaPipe2(ctrs_out, {case i::j::_ => 
 			val bm1 = BRAM[FixPt]("bm1", tileSize)
 			val bm2 = BRAM[FixPt]("bm2", tileSize)
-			//MetaGrp("parallel", {
+			MetaGrp("parallel", {
 				vec1.ld(bm1, i, tileSize)
 				vec2.ld(bm2, j, tileSize)
-			//})
+			})
 			val bmResult = BRAM[FixPt]("bmResult", tileSize*tileSize)
 			val ctrs_in = CtrChain(Ctr(max=tileSize), Ctr(max=tileSize))
 			Pipe2(ctrs_in, { case ii::jj::_ =>
 				val addr = ii * tileSize + jj
 				bmResult.st(addr, bm1.ld(ii) * bm2.ld(jj))
 			})
-			//MetaGrp("sequential", {
+			MetaGrp("sequential", {
 				result.st(bmResult, j, i, tileSize, tileSize, dataSize)
-			//}
+			})
+			()
 		})
 
 		val fgold = gold.flatten

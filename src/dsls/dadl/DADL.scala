@@ -7,7 +7,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 object DADLDSLRunner extends ForgeApplicationRunner with DADLDSL
 
 trait DADLDSL extends ForgeApplication
-  with ArchOps {
+  with ArchOps with Modules {
 
   def dslName = "DADL"
 
@@ -15,6 +15,7 @@ trait DADLDSL extends ForgeApplication
 
   def specification() = {
 		importDADLArchOps()
+    importModules()
 
 		val TypeOps = grp("TypeOps")
 		lift(TypeOps) (MInt)

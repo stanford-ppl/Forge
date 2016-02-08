@@ -547,15 +547,16 @@ trait ScalaOps extends PrimitiveMathGen {
       val elems = (0 until arity).map(i => "_" + (i+1))
 
       // the abstract name needs to be different than the Scala name, since we don't want to shadow it.
-      val TT = tpe("Tup" + arity, pars)
+      val TT = tpe("Tup" + arity, pars) //type of argument?
       data(TT, elems.zip(pars): _*)
+
+      val CT = tpe("Tuple"+arity, pars, stage = compile) //return type?
 
       for (i <- 0 until arity) {
         val concrete = pars.zipWithIndex.map(t => if (t._2 == i) t._1 else e)
-        infix (TT) ("_"+(i+1), pars(i), TT(concrete: _*) :: pars(i)) implements getter(0, elems(i))
+        infix (TT) ("_"+(i+1), pars, TT(pars: _*) :: pars(i)) implements getter(0, elems(i))
       }
 
-      val CT = tpe("Tuple"+arity, pars, stage = compile)
       val unpackTupleStr = "(" + elems.zipWithIndex.map(t => "tup"+arity+"__"+(t._2+1)+"(t)").mkString("(",",",")") + ")"
       val parStr = elems.map(e => "t."+e)
 

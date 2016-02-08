@@ -494,10 +494,13 @@ trait BaseGenOps extends ForgeCodeGenBase {
   // certain ops (e.g. "apply" cannot be expressed with infix notation right now), so we use implicits as a workaround
   def noInfix(o: Rep[DSLOp]) = {
     // FIXME: we get scalac internal crashes when using the default-implicit mode now
-     if (true || Config.fastCompile) {
+     if (true || Config.fastCompile) { //testing this by default
        // default implicit mode (appears empirically slightly faster than infix)
+       //HACK: carefull max mustInfixList is a var and is modified is serveral places to include things such as tupe accessors etc.
        //(!mustInfixList.contains(o.name)) && (o.args.length > 0) && (!o.args.exists(hasDefaultValue))
-       (!macroInfix.contains(o.name)) && (o.args.length > 0) && (!o.args.exists(hasDefaultValue)) && !o.grp.name.startsWith("Tup")
+       if (o.args.exists(hasDefaultValue))
+         println(o.name+" has default value!" )
+       (!macroInfix.contains(o.name)) && (o.args.length > 0) //&& (!o.args.exists(hasDefaultValue))
      }
      else {
        //default infix mode (slightly easier to understand what's happening, also fails to apply less than implicits)
@@ -508,6 +511,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
      }
   }
 
+  var classmap:scala.collection.immutable.Map[String, Int] = new scala.collection.immutable.HashMap()
   def emitOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("Operations", stream)
     stream.println()
@@ -544,7 +548,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     // }
 
     // implicits go in a base class for lower priority
-    val implicitOps = opsGrp.ops.filter(e=>e.style==implicitMethod)
+    val implicitOps = opsGrp.ops.filter(e => e.style == implicitMethod)
     if (!implicitOps.isEmpty) {
       if (unique(implicitOps).length != implicitOps.length) err("non-unique implicit op variants (e.g. Var, T args) are not yet supported")
       stream.println("@virtualize")
@@ -592,14 +596,11 @@ trait BaseGenOps extends ForgeCodeGenBase {
     // infix ops
     val (_, noArgsOps) = opsGrp.ops.filter(e => e.style == infixMethod).partition( _.args.size > 0)
     val allOps = opsGrp.ops.filter(e => e.style == infixMethod)
-    for (op <- allOps)
-      if (op.name == "split")
-        println(op)
     //macro virtualized fix => output all methods as part of the implicit class and not as a "infix_" methods
     val (pimpOps, infixOps) = allOps.partition(noInfix) //macrovirt: virtualize a lot more!
     if (allOps.size > 0) { //should not be that many
       println("ClassName " + allOps(0).grp.name)
-      noArgsOps.foreach(x => println("no args: " + x.name))
+      noArgsOps.foreach(x => println("no args: " + x.name)) //only zero
     }
     print("pimpOps:")
     for (o <- pimpOps)
@@ -620,28 +621,80 @@ trait BaseGenOps extends ForgeCodeGenBase {
       //Get all the infix methods as pimp methods as well!
       val ops = pimpOps.filterNot(o =>
         (getHkTpe(o.args.apply(0).tpe).name == "Var") ||
-        (o.args.apply(0).tpe.stage == now && pimpOps.exists(o2 => o.args.apply(0).tpe.name == o2.args.apply(0).tpe.name && o2.args.apply(0).tpe.stage == future)))
-
+        (o.args.apply(0).tpe.stage == now &&
+          pimpOps.exists(o2 =>
+            o.args.apply(0).tpe.name == o2.args.apply(0).tpe.name &&
+            o2.args.apply(0).tpe.stage == future)))
       if (!noArgsOps.isEmpty) {
         println(noArgsOps.size+"operations with no arguments" )
-
       } else
         println("no operations with no arguments")
-      val tpes = ops.map(_.args.apply(0).tpe).distinct
-      tpes.foreach(x => print(x.name))
-      println("")
-      for (tpe <- tpes) { //OpsCls has to be defined for each different Type Instantiation
-        val tpePars = tpe match {
-          case Def(TpeInst(_,args)) => args.filter(isTpePar).asInstanceOf[List[Rep[TypePar]]]
-          case Def(TpePar(_,_,_)) => List(tpe.asInstanceOf[Rep[TypePar]])
-          case _ => tpe.tpePars
-        }
-        val tpeArgs = tpe match {
-          case Def(TpeInst(hk,args)) => args.filterNot(isTpePar)
-          case _ => Nil
-        }
 
-        val opsClsName = opsGrp.grp.name + tpe.name.replaceAll("\\.","") + tpeArgs.map(_.name).mkString("") + "OpsCls"
+      //symbol which represents the type wildcard "_"
+//      val wildcardTup = tpes.flatMap(_.tpeArgs).groupBy(x => x).toList.map{case (a,b) => (a, b.length)}.sortBy(_._2).reverse.head //element with most occurences on top
+//      if (wildcardTup._2 > tpes.length)
+//        println("more wildcard type parameters than operations")
+//      val wildcard:Def[DSLType] = wildcardTup._1
+
+      def getTpePars(tpe: Rep[DSLType]) = tpe match {
+        case Def(TpeInst(_,args)) => args.filter(isTpePar).asInstanceOf[List[Rep[TypePar]]] //no name DSLType, extends Def[DSLType]
+        case Def(TpePar(_,_,_)) => List(tpe.asInstanceOf[Rep[TypePar]]) //with name, extends Def[TypePar]
+        case _ => tpe.tpePars //Tpe or HkTpe
+      }
+
+      def getTypeArgs(tpe: Rep[DSLType]) = tpe match { //only a higher kinded type can have type arguments
+        case Def(TpeInst(hk,args)) => args.filterNot(isTpePar)
+        case _ => Nil
+      }
+
+//      def findWildCard(tpepars:List[Def[TypePar]]) = {
+//        val collect:List[Rep[DSLType]] = tpepars.map{x:Tpe => x.tpeArgs.apply(index)} //TpeInst
+//        val nonWildCard = collect.filter(_ != wildcard)
+//        println("number of non wildcard types: "+nonWildCard.length)
+//        nonWildCard(0)
+//      }
+
+    val tpes = ops.map(_.args.apply(0).tpe).distinct //how many different type arguments?
+    println("Ops.args")
+    ops.foreach(x => println(x.args))
+    val wildCard = tpes.flatMap(x => getTpePars(x)).find(_.name == "_") //Option
+
+
+
+//      val tpes = ops.map(_.args.apply(0).tpe).distinct. //get all possible type arguments
+//        groupBy(_.tpeArgs.length).toList.map { //groupBy length of type arguments -> hope they are the same and in the same order
+//          case (length: Int, tpees:List[Tpe]) => //Rep[DSLType] is it TpeInst??
+//            val newTpes = (0 until length).map{index =>
+//
+//            }.toList
+//            //tpeArgs = newTpes
+//            tpees.map{x:TpeInst => x.copy(tpeArgs = newTpes)} //
+//        }.flatten
+      //FROM FORGEOPS.SCALA
+      //case class Op(grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], ARGS: List[Rep[DSLArg]], curriedArgs: List[List[Rep[DSLArg]]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint)  extends Def[DSLOp]
+      //case class Arg(name: String, tpe: Rep[DSLType], default: Option[String]) extends Def[DSLArg]
+//      case class Tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag) extends Def[DSLType] /* A DSLType */
+//      case class TpeInst(hkTpe: Rep[DSLType], tpeArgs: List[Rep[DSLType]]) extends Def[DSLType] /* A DSLType instance of a higher-kinded type */
+//      case class HkTpePar(name: String, tpePars: List[Rep[TypePar]], ctxBounds: List[TypeClassSignature], stage: StageTag) extends Def[TypePar] /* HkTpePar represents a named higher-kinded type parameter for another DSLType */
+//      case class TpePar(name: String, ctxBounds: List[TypeClassSignature], stage: StageTag) extends Def[TypePar] /* TpePar represents a named type parameter for another DSLType */
+
+      println("tpes _.name:")
+      tpes.foreach{x => println(x.name+" -> "); println(x.tpeArgs); println(x.tpePars)}
+
+      for (tpe <- tpes) { //OpsCls has to be defined for each different Type Instantiation
+        val tpePars = getTpePars(tpe).filterNot(_.name == "_") //either maps to itself or wrapped type parameters
+        val tpeArgs = getTypeArgs(tpe) //only returns arguments of type instantiation
+
+
+        val clsName = opsGrp.grp.name + tpe.name.replaceAll("\\.","") + tpeArgs.map(_.name).mkString("") + "OpsCls"
+        //safety operation mainly for TupleOps to avoid defining the same class multiple times
+        val opsClsName = if (classmap.contains(clsName)) {
+          classmap = classmap + (clsName -> (classmap(clsName)+1))
+          clsName + classmap(clsName)
+        } else {
+          classmap = classmap + (clsName -> 0)
+          clsName //let's not change the name if there is only 1 instance
+        }
         val implicitParams = if (tpePars.length > 0) makeImplicitCtxBounds(tpePars) + ",__pos" else "__pos"
 
         if (tpe.stage == compile) {

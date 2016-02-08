@@ -201,6 +201,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case _ => false
   }
 
+  //"call-by-name": helper subroutine which calculates the value of the argument whose address is then passed to the original subroutine in place of the original argument
   def isThunk(f: Rep[DSLType]) = f match {
     case Def(FTpe(List(Def(Arg(_,`byName`,_))),ret,freq)) => true
     case _ => false

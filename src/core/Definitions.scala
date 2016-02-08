@@ -156,7 +156,7 @@ trait Definitions extends DerivativeTypes {
   // the two lists used below are used interchangeably depending on the configuration (normal or fast compile mode)
   var noInfixList = List("apply", "update", /*"+",*/ "-", "*", "/", "<", ">", "<=", ">=")  // string + doesn't resolve correctly in the compiler version using only implicits
   var mustInfixList = List("+"/*,"-","*","/"*/,"!=","length","toString")
-  val macroInfix = List("==", "!=", "##", "equals", "hashCode", "asInstanceOf", "toString", "eq", "ne", "notify", "notifyAll", "synchronized", "wait")
+  val macroInfix = List("==", "!=", "##", "equals", "hashCode", "asInstanceOf", "toString", "eq", "ne", "notify", "notifyAll", "synchronized", "wait") //TODO(macrovirt)
 
   // blacklist for op names that need to be overridden in instance methods
   var overrideList = Set("toString", "hashCode", "equals")

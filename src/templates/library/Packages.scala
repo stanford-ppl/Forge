@@ -45,7 +45,8 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
     }
 
     // other required overrides for embedded controls
-    stream.println("  override def __newVar[T](x: T) = super.__newVar(x)")
+    //TODO(macrotrans) why this?
+    // stream.println("  override def __newVar[T](x: T) = super.__newVar(x)")
     // TODO: this is ambiguous and unresolvable for some reason, even when supplying explicit arguments. possibly due to the thunks?
     // stream.println("  override def __whileDo(c: => Boolean, b: => Unit): Unit = super.__whileDo(c,b)")
     if (OpsGrp.keySet.exists(_.name == "Ordering")) {

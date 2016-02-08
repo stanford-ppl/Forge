@@ -1,8 +1,9 @@
 package LOWERCASE_DSL_NAME.library
 
 import scala.annotation.unchecked.uncheckedVariance
-import reflect.Manifest;
+import reflect.Manifest
 import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 import scala.virtualization.lms.common._
 
 trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
@@ -73,6 +74,7 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
     = array_length(__arg0)
 }
 
+@virtualize
 trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
   this: ForgeArrayWrapper with ForgeHashMapWrapper =>
 

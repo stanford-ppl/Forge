@@ -27,8 +27,8 @@ trait OutProd extends DHDLApplication {
 		val vec2 = OffChipMem[FixPt]("vec2", svec2.map(i => i.toFixPt): _*)
 		val result = OffChipMem[FixPt]("result", dataSize * dataSize)
 
-		val ctrs_out = CtrChain(Ctr(max=dataSize, step=tileSize), 
-														Ctr(max=dataSize, step=tileSize))
+		val ctrs_out = CtrChain(Ctr(dataSize, tileSize), 
+														Ctr(dataSize, tileSize))
 		MetaPipe2(ctrs_out, {case i::j::_ => 
 			val bm1 = BRAM[FixPt]("bm1", tileSize)
 			val bm2 = BRAM[FixPt]("bm2", tileSize)

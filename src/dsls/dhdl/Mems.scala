@@ -64,7 +64,7 @@ trait MemsElements {
 			}
 			infix ("ld") (MInt :: T) implements composite ${ array_apply( $self.data, $1) }
 			//TODO this should be $1*width + $2
-			infix ("ld") ((MInt, MInt) :: T) implements composite ${ $self.ld($1*$2)}
+			infix ("ld") ((MInt, MInt) :: T) implements composite ${ $self.ld($1*$2) }
 			infix ("mkString") (Nil :: MString) implements composite ${ unit("bram[") + array_mkstring[T]( $self.data,
 				unit(", ")) + unit("]")}
 		}
@@ -122,7 +122,7 @@ trait MemsElements {
 			impl (offst1) (composite ${
 				var i = unit(0)
 				while ( i < $offset ) {
-					array_update[T]( $self.data, i, $bram.data.apply(i + $start) )
+					array_update[T]( $self.data, i + $start, $bram.data.apply(i) )
 					i = i + unit(1)
 				}
 			})

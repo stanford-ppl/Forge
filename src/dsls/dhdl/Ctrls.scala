@@ -18,6 +18,9 @@ trait CtrlOps {
 																										 ("max", MInt), ("step", MInt, "unit(1)")),
 																								Ctr), effect=mutable) implements allocates(Ctr,
 			${$name}, ${$min}, ${$max}, ${$step}, ${ unit(0) })
+		static (Ctr) ("apply", Nil, (("max", MInt), ("step", MInt)) :: Ctr, effect=mutable) implements
+		redirect ${ Ctr.apply(name=unit(""), min=unit(0), max=$max, step=$step) }
+
 		val CtrOps = withTpe(Ctr)
 		CtrOps {
 			infix ("mkString") (Nil :: MString) implements composite ${
@@ -180,6 +183,19 @@ trait CtrlOps {
 			def ctr(i:Int):Rep[Ctr] = $ctrs.chain.apply(unit(i))
 			loop(ctr(0), (i:Rep[Int]) =>
 				loop(ctr(1), (j:Rep[Int]) => $mapFunc(Seq(i, j)))
+			)
+			metaPipe
+		})
+
+		val meta_map3 = direct (MetaPipe) ("MetaPipe3", Nil, (("ctrs", CtrChain), ("mapFunc", varArgs(MInt) ==>
+				MUnit)) :: MetaPipe)
+		impl (meta_map3) (composite ${
+			val metaPipe = MetaPipe( $ctrs )
+			def ctr(i:Int):Rep[Ctr] = $ctrs.chain.apply(unit(i))
+			loop(ctr(0), (i:Rep[Int]) =>
+				loop(ctr(1), (j:Rep[Int]) =>
+					loop(ctr(2), (k:Rep[Int]) => $mapFunc(Seq(i, j, k)))
+				)
 			)
 			metaPipe
 		})

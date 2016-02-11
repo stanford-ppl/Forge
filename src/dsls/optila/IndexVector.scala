@@ -130,8 +130,8 @@ trait IndexVectorOps {
         }
       }
 
-      direct ("__equal") (IndexVector :: MBoolean) implements composite ${ $self.toDense == $1 }
-      direct ("__equal") (DenseVector(MInt) :: MBoolean) implements composite ${ $1 == $self }
+      direct ("infix_==") (IndexVector :: MBoolean) implements composite ${ $self.toDense == $1 }
+      direct ("infix_==") (DenseVector(MInt) :: MBoolean) implements composite ${ $1 == $self }
 
       // compiler ("indexvector_filter_helper") (IndexVector, MInt ==> MBoolean) :: DenseVector(MInt)) implements filter((MInt,MInt), 0, ${e => $1(e)}, ${e => e})
       // infix ("filter") ((MInt ==> MBoolean) :: IndexVector) implements composite ${

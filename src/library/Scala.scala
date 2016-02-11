@@ -307,19 +307,19 @@ trait ScalaOps extends PrimitiveMathGen {
     val AC = tpePar("A", stage = now)
     val BC = tpePar("B", stage = now)
 
-    val eq = direct (Ord) ("__equal", (A,B), (A,B) :: MBoolean)
+    val eq = direct (Ord) ("infix_==", (A,B), (A,B) :: MBoolean)
     label (eq, "forge_equals")
     impl (eq) (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
     impl (eq) (codegen(cuda, quotedArg(0) + " == " + quotedArg(1)))
     impl (eq) (codegen(cpp, quotedArg(0) + " == " + quotedArg(1)))
 
-    direct (Ord) ("__equal", (A,B), (MVar(A),B) :: MBoolean) implements redirect ${ forge_equals(readVar($0), $1) }
-    direct (Ord) ("__equal", (A,B), (A,MVar(B)) :: MBoolean) implements redirect ${ forge_equals($0, readVar($1)) }
-    direct (Ord) ("__equal", (A,B), (MVar(A),MVar(B)) :: MBoolean) implements redirect ${ forge_equals(readVar($0), readVar($1)) }
-    direct (Ord) ("__equal", (A,BC), (A,BC) :: MBoolean) implements redirect ${ forge_equals($0, unit($1)) }
-    direct (Ord) ("__equal", (A,BC), (MVar(A),BC) :: MBoolean) implements redirect ${ forge_equals(readVar($0), unit($1)) }
-    direct (Ord) ("__equal", (AC,B), (AC,B) :: MBoolean) implements redirect ${ forge_equals(unit($0), $1) }
-    direct (Ord) ("__equal", (AC,B), (AC,MVar(B)) :: MBoolean) implements redirect ${ forge_equals(unit($0), readVar($1)) }
+    direct (Ord) ("infix_==", (A,B), (MVar(A),B) :: MBoolean) implements redirect ${ forge_equals(readVar($0), $1) }
+    direct (Ord) ("infix_==", (A,B), (A,MVar(B)) :: MBoolean) implements redirect ${ forge_equals($0, readVar($1)) }
+    direct (Ord) ("infix_==", (A,B), (MVar(A),MVar(B)) :: MBoolean) implements redirect ${ forge_equals(readVar($0), readVar($1)) }
+    direct (Ord) ("infix_==", (A,BC), (A,BC) :: MBoolean) implements redirect ${ forge_equals($0, unit($1)) }
+    direct (Ord) ("infix_==", (A,BC), (MVar(A),BC) :: MBoolean) implements redirect ${ forge_equals(readVar($0), unit($1)) }
+    direct (Ord) ("infix_==", (AC,B), (AC,B) :: MBoolean) implements redirect ${ forge_equals(unit($0), $1) }
+    direct (Ord) ("infix_==", (AC,B), (AC,MVar(B)) :: MBoolean) implements redirect ${ forge_equals(unit($0), readVar($1)) }
 
     val neq = infix (Ord) ("!=", (A,B), (A,B) :: MBoolean)
     label (neq, "forge_notequals")

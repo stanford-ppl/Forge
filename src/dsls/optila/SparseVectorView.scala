@@ -141,7 +141,7 @@ trait SparseVectorViewOps {
         sparsevector_alloc_raw($self.length, $self.isRow, outData.unsafeImmutable, outIndices.unsafeImmutable, outNnz)
       }
 
-      direct ("__equal") (SparseVectorView(T) :: MBoolean) implements composite ${
+      direct ("infix_==") (SparseVectorView(T) :: MBoolean) implements composite ${
         $self.length == $1.length &&
         $self.isRow == $1.isRow &&
         sparsevectorview_start($self) == sparsevectorview_start($1) &&
@@ -149,7 +149,7 @@ trait SparseVectorViewOps {
         sparsevectorview_source($self) == sparsevectorview_source($1)
       }
 
-      direct ("__equal") (SparseVector(T) :: MBoolean) implements composite ${
+      direct ("infix_==") (SparseVector(T) :: MBoolean) implements composite ${
         if ($self.length != $1.length || $self.nnz != $1.nnz || $self.isRow != $1.isRow) false
         else {
           val (startOffset, endOffset) = unpack(sparsevectorview_calc_offsets($self))

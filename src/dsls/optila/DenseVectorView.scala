@@ -46,7 +46,7 @@ trait DenseVectorViewOps {
 
       infix ("toDense") (Nil :: DenseVector(T)) implements composite ${ $self.map(e => e) }
 
-      direct ("__equal") (DenseVector(T) :: MBoolean) implements composite ${ $1 == $self }
+      direct ("infix_==") (DenseVector(T) :: MBoolean) implements composite ${ $1 == $self }
 
       infix ("filter") ((T ==> MBoolean) :: DenseVector(T)) implements composite ${ $self.toDense.filter($1) }
 

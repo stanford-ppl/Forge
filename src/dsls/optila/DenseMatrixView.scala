@@ -73,7 +73,7 @@ trait DenseMatrixViewOps {
 
       infix ("toDense") (Nil :: DenseMatrix(T)) implements composite ${ $self.map(e => e) }
 
-      direct ("__equal") (DenseMatrix(T) :: MBoolean) implements composite ${ $1 == $self }
+      direct ("infix_==") (DenseMatrix(T) :: MBoolean) implements composite ${ $1 == $self }
 
       fimplicit ("viewToDense") (Nil :: DenseMatrix(T)) implements composite ${
         if (Settings.verbose > 0) println("(performance warning): automatic conversion from DenseMatrixView to DenseMatrix")

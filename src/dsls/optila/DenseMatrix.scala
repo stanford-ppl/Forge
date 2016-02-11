@@ -483,7 +483,7 @@ trait DenseMatrixOps {
        infix (":<") (DenseMatrix(T) :: DenseMatrix(MBoolean), TOrdering(T)) implements zip((T,T,MBoolean), (0,1), ${ (a,b) => a < b })
 
        for (rhs <- List(DenseMatrix(T),DenseMatrixView(T))) {
-         direct ("__equal") (rhs :: MBoolean) implements composite ${
+         direct ("infix_==") (rhs :: MBoolean) implements composite ${
           if ($self.numRows != $1.numRows || $self.numCols != $1.numCols) false
             else {
               val c = sum($self.zip($1) { (a,b) => if (a == b) 0 else 1})
@@ -492,7 +492,7 @@ trait DenseMatrixOps {
          }
        }
 
-       direct ("__equal") (SparseMatrix(T) :: MBoolean) implements composite ${ $self == $1.toDense }
+       direct ("infix_==") (SparseMatrix(T) :: MBoolean) implements composite ${ $self == $1.toDense }
 
 
        /**

@@ -964,7 +964,7 @@ trait SparseMatrixOps {
       infix ("maxRows") (Nil :: SparseVector(T), (TOrdering(T), THasMinMax(T))) implements composite ${ $self.mapRowsToVector { row => max(row.toSparse) }}
       infix ("maxCols") (Nil :: SparseVector(T), (TOrdering(T), THasMinMax(T))) implements composite ${ $self.mapColsToVector { col => max(col.toSparse) }}
 
-      direct ("__equal") (SparseMatrix(T) :: MBoolean) implements composite ${
+      direct ("infix_==") (SparseMatrix(T) :: MBoolean) implements composite ${
         if ($self.numRows != $1.numRows || $self.numCols != $1.numCols) false
         else {
           val dataEqual = densevector_alloc_raw($self.nnz, true, sparsematrix_csr_data($self)) == densevector_alloc_raw($1.nnz, true, sparsematrix_csr_data($1))
@@ -974,7 +974,7 @@ trait SparseMatrixOps {
         }
       }
 
-      direct ("__equal") (DenseMatrix(T) :: MBoolean) implements composite ${ $self.toDense == $1 }
+      direct ("infix_==") (DenseMatrix(T) :: MBoolean) implements composite ${ $self.toDense == $1 }
 
 
       /**

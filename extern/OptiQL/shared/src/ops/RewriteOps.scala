@@ -1,6 +1,6 @@
 package optiql.shared.ops
 
-import scala.virtualization.lms.common.{Base,StructOps}
+import scala.virtualization.lms.common.{Base,StructOps, RecordOps}
 import optiql.shared._
 import optiql.shared.ops._
 import org.scala_lang.virtualized.{RefinedManifest,SourceContext}

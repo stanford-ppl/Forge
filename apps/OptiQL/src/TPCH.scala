@@ -3,6 +3,8 @@ import optiql.library._
 import optiql.shared._
 import reflect.Manifest;
 import scala.virtualization.lms.common.Record
+import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 
 object TPCHQ1Interpreter extends OptiQLApplicationInterpreter with TPCHQ1Trait
 object TPCHQ1Compiler extends OptiQLApplicationCompiler with TPCHQ1Trait
@@ -11,6 +13,7 @@ object TPCHQ6Compiler extends OptiQLApplicationCompiler with TPCHQ6Trait
 object TPCHQ14Interpreter extends OptiQLApplicationInterpreter with TPCHQ14Trait
 object TPCHQ14Compiler extends OptiQLApplicationCompiler with TPCHQ14Trait
 
+@virtualize
 trait TPCHBaseTrait extends OptiQLApplication with Types {
 
   def printUsage = {
@@ -50,7 +53,7 @@ trait TPCHBaseTrait extends OptiQLApplication with Types {
 
 }
 
-
+@virtualize
 trait TPCHQ1Trait extends TPCHBaseTrait {
 
   val queryName = "Q1"  
@@ -78,7 +81,7 @@ trait TPCHQ1Trait extends TPCHBaseTrait {
   }    
 }
 
-
+@virtualize
 trait TPCHQ6Trait extends TPCHBaseTrait {
   val queryName = "Q6"
 
@@ -95,6 +98,7 @@ trait TPCHQ6Trait extends TPCHBaseTrait {
   }
 }
 
+@virtualize
 trait TPCHQ14Trait extends TPCHBaseTrait {
   val queryName = "Q14"
 

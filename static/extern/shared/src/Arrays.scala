@@ -33,7 +33,7 @@ trait ForgeArrayOps extends Base with OverloadHack {
   implicit class ScalaArrayOps[T:Manifest](x: Rep[Array[T]]) {
     def apply(n: Rep[Int])(implicit ctx: SourceContext) = scala_array_apply(x,n)
     def length(implicit __imp0: SourceContext, o: Overloaded1) = scala_array_length(x)
-    def length = scala_array_length(x) //TODO(macrovirt): remove this?
+    //def length = scala_array_length(x) //TODO(macrovirt): remove this?
   }
   // the implicit class method 'length' is not working for an unknown reason, possibly related to the problem mentioned in ForgeArrayCompilerOps below
   // omitting SourceContext is a hacky way to avoid conflicts with Forge DSLs without using an arbitrary Overloaded parameter

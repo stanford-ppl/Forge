@@ -1,10 +1,13 @@
 import simplevector.compiler._
 import simplevector.library._
 import simplevector.shared._
+import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 
 object HelloSimpleCompiler extends SimpleVectorApplicationCompiler with HelloSimple
 object HelloSimpleInterpreter extends SimpleVectorApplicationInterpreter with HelloSimple
 
+@virtualize
 trait HelloSimple extends SimpleVectorApplication {
   def main() = {
     println("hello world")
@@ -21,6 +24,10 @@ trait HelloSimple extends SimpleVectorApplication {
       println("v2(" + i + "): " + v2(i))
       i += 1
     }
+    println("v1")
+    v1.pprint
+    println("v2")
+    v2.pprint
 
     // zip
     val v3 = v1+v2
@@ -30,6 +37,8 @@ trait HelloSimple extends SimpleVectorApplication {
       println("v3(" + i + "): " + v3(i))
       i += 1
     }
+    println("v3")
+    v3.pprint
 
     // single
     println("v4 = v3.slice(3,5)")
@@ -39,6 +48,7 @@ trait HelloSimple extends SimpleVectorApplication {
       println("v4(" + i + "): " + v4(i))
       i += 1
     }
+    v4.pprint
 
     // map
     println("v5 = v4*5")
@@ -48,6 +58,7 @@ trait HelloSimple extends SimpleVectorApplication {
       println("v5(" + i + "): " + v5(i))
       i += 1
     }
+    v5.pprint
 
     // reduce
     println("v5.sum:")
@@ -66,16 +77,18 @@ trait HelloSimple extends SimpleVectorApplication {
     println("vc2: " + vc2)
 
     // filter
-    // println("v6 = v1.filter(_ < 5)")
-    // val v6 = v1.filter(_ < 5)
-    // v6.pprint
+    println("v6 = v1.filter(_ < 5)")
+    val v6 = v1.filter(_ < 5)
+    v6.pprint
 
     // groupbyreduce
     println("v7 = v2.groupByReduce(e => e % 2 == 0, e => e*10, (a,b) => a+b)")
     val v7 = v2.groupByReduce[Boolean,Int](e => e % 2 == 0, e => e*10, (a,b) => a+b)
     // should be 2 elements (one for even group, one for odd group)
     println(v7(true))
+    // v7(true).pprint
     println(v7(false))
+    // v7(false).pprint
 
     // groupby
     println("v8 = v2.groupBy(e => e % 2 == 0, e => e*10)")
@@ -86,6 +99,7 @@ trait HelloSimple extends SimpleVectorApplication {
       v8(i).pprint
       i += 1
     }
+    v8.pprint
 
     // flatmap
     println("v9 = v2.flatMap(e => Vector[Int](5)")

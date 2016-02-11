@@ -511,7 +511,6 @@ trait BaseGenOps extends ForgeCodeGenBase {
      }
   }
 
-  var classmap:scala.collection.immutable.Map[String, Int] = new scala.collection.immutable.HashMap()
   def emitOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("Operations", stream)
     stream.println()
@@ -670,6 +669,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
 //            //tpeArgs = newTpes
 //            tpees.map{x:TpeInst => x.copy(tpeArgs = newTpes)} //
 //        }.flatten
+
       //FROM FORGEOPS.SCALA
       //case class Op(grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], ARGS: List[Rep[DSLArg]], curriedArgs: List[List[Rep[DSLArg]]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint)  extends Def[DSLOp]
       //case class Arg(name: String, tpe: Rep[DSLType], default: Option[String]) extends Def[DSLArg]
@@ -686,15 +686,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
         val tpeArgs = getTypeArgs(tpe) //only returns arguments of type instantiation
 
 
-        val clsName = opsGrp.grp.name + tpe.name.replaceAll("\\.","") + tpeArgs.map(_.name).mkString("") + "OpsCls"
-        //safety operation mainly for TupleOps to avoid defining the same class multiple times
-        val opsClsName = if (classmap.contains(clsName)) {
-          classmap = classmap + (clsName -> (classmap(clsName)+1))
-          clsName + classmap(clsName)
-        } else {
-          classmap = classmap + (clsName -> 0)
-          clsName //let's not change the name if there is only 1 instance
-        }
+        val opsClsName = opsGrp.grp.name + tpe.name.replaceAll("\\.","") + tpeArgs.map(_.name).mkString("") + "OpsCls"
         val implicitParams = if (tpePars.length > 0) makeImplicitCtxBounds(tpePars) + ",__pos" else "__pos"
 
         if (tpe.stage == compile) {

@@ -30,7 +30,7 @@ trait TPCHBaseTrait extends OptiQLApplication with Types {
 
   val queryName: String
   
-  var tpchDataPath: Rep[String] = _
+  var tpchDataPath: Rep[String] = unit("")
   val sep = "\\|"
   def loadLineItems() = Table.fromFile[LineItem](tpchDataPath+"/lineitem.csv", sep)
   def loadCustomers() = Table.fromFile[Customer](tpchDataPath+"/customer.csv", sep)
@@ -68,7 +68,7 @@ trait TPCHQ1Trait extends TPCHBaseTrait {
       sumQty = g.values.Sum(_.l_quantity),
       sumBasePrice = g.values.Sum(_.l_extendedprice),
       sumDiscountedPrice = g.values.Sum(l => l.l_extendedprice * (1.0 - l.l_discount)),
-      sumCharge = g.values.Sum(l => l.l_extendedprice * (1.0 - l.l_discount) * infix_+(1.0, l.l_tax)), //FIXME: infix_+ fails to resolve automatically
+      sumCharge = g.values.Sum(l => l.l_extendedprice * (1.0 - l.l_discount) * (1.0 + l.l_tax)), //FIXME: infix_+ fails to resolve automatically
       avgQty = g.values.Average(_.l_quantity),
       avgPrice = g.values.Average(_.l_extendedprice),
       avgDiscount = g.values.Average(_.l_discount),
@@ -90,7 +90,7 @@ trait TPCHQ6Trait extends TPCHBaseTrait {
     tic(lineItems.size)
 
     //FIXME: infix_&& fails to resolve automatically
-    val q = lineItems Where (l => infix_&&(l.l_shipdate >= Date("1994-01-01"), infix_&&(l.l_shipdate < Date("1995-01-01"), infix_&&(l.l_discount >= 0.05, infix_&&(l.l_discount <= 0.07, l.l_quantity < 24))))) 
+    val q = lineItems Where (l => (l.l_shipdate >= Date("1994-01-01") && (l.l_shipdate < Date("1995-01-01") && (l.l_discount >= 0.05 && (l.l_discount <= 0.07 && l.l_quantity < 24))))) 
     val revenue = q.Sum(l => l.l_extendedprice * l.l_discount)
 
     toc(revenue)

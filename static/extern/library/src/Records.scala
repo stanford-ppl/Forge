@@ -6,7 +6,7 @@ import org.scala_lang.virtualized.SourceContext
 import scala.virtualization.lms.common._
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
-trait RecordWrapper extends HUMAN_DSL_NAMEBase { //with scala.virtualization.lms.common.RecordOps
+trait RecordWrapper extends HUMAN_DSL_NAMEBase {
   this: StructOps =>
 
   //case class extends Record appears to be broken (scalac bug)

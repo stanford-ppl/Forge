@@ -436,13 +436,15 @@ trait ScalaOps extends PrimitiveMathGen {
     infix (Str) ("+", T, (MVar(MString), T) :: MString) implements redirect ${ forge_string_plus(readVar($0), $1) }
     infix (Str) ("+", T, (MVar(MString), MVar(T)) :: MString) implements redirect ${ forge_string_plus(readVar($0), readVar($1)) }
 
+    //all operations inside package string, not neceassary on strings!
     infix (Str) ("+", T, (T, CString) :: MString) implements redirect ${ forge_string_plus($0, unit($1)) }
     infix (Str) ("+", T, (T, MString) :: MString) implements redirect ${ forge_string_plus($0, $1) }
     infix (Str) ("+", T, (MVar(T), CString) :: MString) implements redirect ${ forge_string_plus(readVar($0), unit($1)) }
     infix (Str) ("+", T, (MVar(T), MString) :: MString) implements redirect ${ forge_string_plus(readVar($0), $1) }
     infix (Str) ("+", T, (MVar(T), MVar(MString)) :: MString) implements redirect ${ forge_string_plus(readVar($0), readVar($1)) }
 
-    // infix (Str) ("+", Nil, (MString, CString) :: MString) implements redirect ${ forge_string_plus($0, unit($1)) }
+    //check what was the issue with this one
+    infix (Str) ("+", Nil, (MString, CString) :: MString) implements redirect ${ forge_string_plus($0, unit($1)) }
     infix (Str) ("+", Nil, (CString, MString) :: MString) implements redirect ${ forge_string_plus(unit($0), $1) }
     infix (Str) ("+", Nil, (MString, MString) :: MString) implements redirect ${ forge_string_plus($0, $1) }
     infix (Str) ("+", Nil, (MString, MVar(MString)) :: MString) implements redirect ${ forge_string_plus($0, readVar($1)) }

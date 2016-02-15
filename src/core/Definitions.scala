@@ -97,6 +97,7 @@ trait Definitions extends DerivativeTypes {
   lazy val MInputStream = tpe("ForgeFileInputStream")
   lazy val MOutputStream = tpe("ForgeFileOutputStream")
   lazy val SList = tpe("List", tpePar("A"), stage = compile)
+  lazy val SSeq = tpe("Seq", tpePar("A"), stage = compile)
 
   // Metadata types
   // TODO: Is there a better way to expose these to the DSL author? Way to not expose them at all?
@@ -321,7 +322,7 @@ trait Definitions extends DerivativeTypes {
   /**
    * Allocates
    *
-   * @param data     The data struct that this op allocates
+   * @param tpe      The data struct that this op allocates
    * @param init     A sequence of tuples (fieldName, initialValue)
    */
   def forge_allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]): OpType
@@ -329,6 +330,21 @@ trait Definitions extends DerivativeTypes {
     def apply(tpe: Rep[DSLType], init: Rep[String]*) = forge_allocates(tpe, init)
   }
 
+
+  /**
+   * Record
+   *
+   * @param tpe      The type of record that this op creates
+   * @param fields   A sequence of tuples of (field type, field initial value)
+   */
+  def forge_record(tpe: Rep[DSLType], fields: Seq[String], fieldTpes: Seq[Rep[DSLType]], init: Seq[Rep[String]]): OpType
+  // TODO: Change the name of this one to something more descriptive
+  object recordX {
+    def apply(tpe: Rep[DSLType], fields: (Rep[DSLType], String)*) = forge_record(tpe, Nil, fields.map(_._1), fields.map(s => unit(s._2)))
+  }
+  object record {
+    def apply(tpe: Rep[DSLType], fields: (String, Rep[DSLType], String)*) = forge_record(tpe, fields.map(_._1), fields.map(_._2), fields.map(s => unit(s._3)))
+  }
 
   /**
    * SingleTask
@@ -525,6 +541,10 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
   def forge_figment(func: Rep[String]) = Figment(func)
 
   case class AllocatesFigment(tpe: Rep[DSLType], init: Seq[Rep[String]]) extends OpType
+
+  case class AllocatesRecord(tpe: Rep[DSLType], fields: Seq[String], fieldTpes: Seq[Rep[DSLType]], init: Seq[Rep[String]]) extends OpType
+  def forge_record(tpe: Rep[DSLType], fields: Seq[String], fieldTpes: Seq[Rep[DSLType]], init: Seq[Rep[String]]) = AllocatesRecord(tpe, fields, fieldTpes, init)
+
 
   /**
    * Delite ops

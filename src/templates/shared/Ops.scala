@@ -178,6 +178,11 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
   }
 
+  // Type name with _ type arguments
+  def erasureType(tpe: Rep[DSLType]) = {
+    tpe.name + (if (!tpe.tpePars.isEmpty) "[" + tpe.tpePars.map(t => "_").mkString(",") + "]" else "")
+  }
+
   /**
    * Op argument formatting
    */
@@ -311,7 +316,8 @@ trait BaseGenOps extends ForgeCodeGenBase {
                                                          "!" -> "bang",
                                                          ":" -> "cln",
                                                          "%" -> "pct",
-                                                         "~" -> "tld")
+                                                         "~" -> "tld",
+                                                         "@" -> "at")
   def sanitize(x: String) = {
     var out = x
     specialCharacters.keys.foreach { k => if (x.contains(k)) out = out.replace(k, specialCharacters(k)) }
@@ -514,6 +520,45 @@ trait BaseGenOps extends ForgeCodeGenBase {
       // blacklist or curried args or function args (in the latter two cases, infix doesn't always resolve correctly)
       !mustInfixList.contains(o.name) && (noInfixList.contains(o.name) || o.curriedArgs.length > 0 || hasFuncArgs(o))
     // }
+  }
+
+
+  // Currently in shared because these are exactly the same between compiler and library. Needs to be generated twice?
+  def emitRecordOp(o: Rep[DSLOp], tpe: Rep[DSLType], fields: Seq[String], fieldTpes: Seq[Rep[DSLType]], init: Seq[Rep[String]], stream: PrintWriter, indent: Int) {
+    emitWithIndent("def slf(x: Rep[_]) = (y: " + repify(tpe) + ") => x", stream, indent)
+
+    for (i <- 0 until fieldTpes.length) {
+      val func = init(i)
+      val ftpe = fieldTpes(i)
+      val name = if (fields.nonEmpty) fields(i) else "_" + i
+
+      emitWithIndentInline("val __" + name + " = {", stream, indent)
+      val lines = inline(o, func, quoteLiteral).split(nl)
+      if (lines.length > 1) {
+        stream.println()
+        lines.foreach{ line => emitWithIndent(line, stream, indent+2) }
+        emitWithIndent("}", stream, indent)
+      }
+      else stream.println(lines.head + "}")
+
+      if ((ftpe.name.startsWith("List") || ftpe.name.startsWith("Seq")) && ftpe.stage == compile) {
+        emitWithIndent("val m" + i + " = List.tabulate(__" + name + ".length){i => (\"" + name + "_\" + i) -> manifest[" + quote(ftpe.tpeArgs.head) + "] }", stream, indent)
+        emitWithIndent("val f" + i + " = List.tabulate(__" + name + ".length){i => (\"" + name + "_\" + i, false, slf(__" + name + "(i)) ) }", stream, indent)
+      }
+      else {
+        emitWithIndent("val m" + i + " = List( \"" + name + "\" -> manifest[" + quote(ftpe) + "])", stream, indent)
+        emitWithIndent("val f" + i + " = List((\"" + name + "\", false, slf(__" + name + ")))", stream, indent)
+      }
+    }
+    emitWithIndent("val mFields = " + List.tabulate(fieldTpes.length){i => "m" + i}.mkString(" ++ "), stream, indent)
+    emitWithIndent("val fFields = " + List.tabulate(fieldTpes.length){i => "f" + i}.mkString(" ++ "), stream, indent)
+
+    emitWithIndent("val tp = new scala.reflect.RefinedManifest[" + quote(tpe) + "] {", stream, indent)
+    emitWithIndent("def runtimeClass = classOf[" + quote(tpe) + "]", stream, indent+2)
+    emitWithIndent("val fields = mFields", stream, indent+2)
+    emitWithIndent("override val typeArguments = List(" + tpe.tpePars.map{t => "manifest[" + quote(t) + "]"}.mkString(",") + ")", stream, indent+2)
+    emitWithIndent("}",stream,indent)
+    emitWithIndent("record_new(fFields)(tp)",stream,indent)
   }
 
   /**

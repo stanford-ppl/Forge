@@ -71,6 +71,9 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         case figment:Figment =>
           inline(o, figment.func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent+2 )}
 
+        case AllocatesRecord(tpe, fields, fieldTpes, init) =>
+          emitRecordOp(o, tpe, fields, fieldTpes, init, stream, indent+2)
+
         case map:Map =>
           val outDc = ForgeCollections(getHkTpe(o.retTpe))
           val in = o.args.apply(map.argIndex)
@@ -311,37 +314,30 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
    */
   def emitGrpClasses(opsGrp: DSLOps, stream: PrintWriter) {
     val classes = opsGrpTpes(opsGrp)
-    for (tpe <- classes if !isMetaType(tpe)) {
-      val d = DataStructs.get(tpe)
-      d.foreach { data =>
-        val classType = if (data.tpe.name.startsWith("Tup")) "case class " else "class " //sketchy, but we want our special tuples to retain value equality (like Scala tuples)
-        stream.println(classType + data.tpe.name + makeTpeParsWithBounds(data.tpe.tpePars) + "(" + makeFieldArgs(data) + ") {")
-        stream.println(makeFieldsWithInitArgs(data))
+    // Do nothing for types with no data structure definition - they've already been generated as abstract classes
+    for (tpe <- classes if DataStructs.contains(tpe) && !isMetaType(tpe)) {
+      val data = DataStructs(tpe)
+      val classType = if (data.tpe.name.startsWith("Tup")) "case class " else "class " //sketchy, but we want our special tuples to retain value equality (like Scala tuples)
+      stream.println(classType + data.tpe.name + makeTpeParsWithBounds(data.tpe.tpePars) + "(" + makeFieldArgs(data) + ") extends LibStruct {")
+      stream.println(makeFieldsWithInitArgs(data))
+      stream.println("  def getFields = Map(" + data.fields.map{case (name,_) => "\"" + name + "\" -> " + name }.mkString(", ") + ")")
 
-        // Actually emitting the infix methods as instance methods, while a little more readable, makes the interpreter methods
-        // ambiguous with the op conversions unless they already exist on every instance and must be overridden (e.g. toString)
-        for (o <- unique(opsGrp.ops) if overrideList.contains(o.name) && !isRedirect(o) && o.style == infixMethod && o.args.length > 0 && quote(o.args.apply(0).tpe) == quote(tpe)) {
-          val otherTpePars = o.tpePars.filterNot(p => data.tpe.tpePars.map(_.name).contains(p.name))
-          stream.print("  "+makeDefWithOverride(o)+" " + o.name + makeTpeParsWithBounds(otherTpePars))
-          //stream.print("(" + o.args/*.drop(1)*/.map(t => t.name + ": " + repify(t.tpe) + " = " + unit(t.default)).mkString(",") + ")") TODO
-          stream.print("(" + o.args.drop(1).map(t => argify(t, repify)).mkString(",") + ")")
-          stream.print(makeImplicitArgsWithCtxBoundsWithType(o.tpePars diff otherTpePars, o.args, o.implicitArgs, without = data.tpe.tpePars))
-          stream.println(" = {")
-          emitWithIndent("val " + o.args.apply(0).name + " = this", stream, 4)
-          emitOp(o, stream, indent=4)
-          stream.println("  }")
-        }
-
-        stream.println("}")
-        stream.println()
+      // Actually emitting the infix methods as instance methods, while a little more readable, makes the interpreter methods
+      // ambiguous with the op conversions unless they already exist on every instance and must be overridden (e.g. toString)
+      for (o <- unique(opsGrp.ops) if overrideList.contains(o.name) && !isRedirect(o) && o.style == infixMethod && o.args.length > 0 && quote(o.args.apply(0).tpe) == quote(tpe)) {
+        val otherTpePars = o.tpePars.filterNot(p => data.tpe.tpePars.map(_.name).contains(p.name))
+        stream.print("  "+makeDefWithOverride(o)+" " + o.name + makeTpeParsWithBounds(otherTpePars))
+        //stream.print("(" + o.args/*.drop(1)*/.map(t => t.name + ": " + repify(t.tpe) + " = " + unit(t.default)).mkString(",") + ")") TODO
+        stream.print("(" + o.args.drop(1).map(t => argify(t, repify)).mkString(",") + ")")
+        stream.print(makeImplicitArgsWithCtxBoundsWithType(o.tpePars diff otherTpePars, o.args, o.implicitArgs, without = data.tpe.tpePars))
+        stream.println(" = {")
+        emitWithIndent("val " + o.args.apply(0).name + " = this", stream, 4)
+        emitOp(o, stream, indent=4)
+        stream.println("  }")
       }
 
-      if (d.isEmpty && !isForgePrimitiveType(tpe)) {
-        // do nothing -- abstract class will have been generated in the front-end
-        // warn("(library) no data structure found for tpe " + tpe.name + ". emitting empty class declaration")
-        // stream.println("  class " + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + "() {}")
-        // stream.println()
-      }
+      stream.println("}")
+      stream.println()
     }
 
     for (o <- unique(opsGrp.ops) if !Impls(o).isInstanceOf[Redirect] && hasLibraryVersion(o)) {
@@ -359,5 +355,21 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     }
     stream.println()
 
+  }
+
+  // TODO: Assumption here is that expressions are simple metadata instantiations
+  // TODO: May want to spread this out among Wrapper traits later?
+  def emitTypeMetadata(stream: PrintWriter) {
+    if (TypeMetadata.nonEmpty) {
+      emitBlockComment("Default type metadata", stream, indent=2)
+      stream.println("  override def defaultMetadata(e: Rep[Any]): List[Metadata] = { e match {")
+      for ((tpe,data) <- TypeMetadata) {
+        stream.print("    case e: " + erasureType(tpe) + " => List(")
+        stream.print(data.map(quoteLiteral).mkString(", "))
+        stream.println(")")
+      }
+      stream.println("    case _ => Nil")
+      stream.println("  }} ++ super.defaultMetadata(e)")
+    }
   }
 }

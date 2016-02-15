@@ -11,7 +11,7 @@ import scala.virtualization.lms.internal.{GenericFatCodegen, GenericCodegen}
 import core._
 import shared._
 
-trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages with BaseGenOps with LibGenImports with LibGenOps {
+trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages with BaseGenOps with BaseGenMetadata with LibGenImports with LibGenOps {
   val IR: ForgeApplicationRunner with ForgeExp
   import IR._
 
@@ -24,6 +24,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     Directory(Path(dslDir)).createDirectory()
     emitDSLDefinition()
     emitClasses()
+    emitMetadata()
   }
 
   /**
@@ -43,7 +44,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
   }
 
   def requiresLibraryBackend(opsGrp: DSLOps) = {
-    opsGrp.ops.exists(hasLibraryVersion) || opsGrpTpes(opsGrp).exists(t => !isMetaType(t))
+    opsGrp.ops.exists(hasLibraryVersion) || opsGrpTpes(opsGrp).nonEmpty
   }
 
   /**
@@ -112,7 +113,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     var conj = " extends "
     for ((grp,opsGrp) <- OpsGrp if requiresLibraryBackend(opsGrp)) {
       if (isTpeClass(grp)) {
-        stream.print(conj + opsGrp.name)
+        stream.print("conj" + opsGrp.name)
         conj = " with "
       }
       else if (!isTpeClassInst(grp)) {
@@ -130,11 +131,33 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
       stream.print(conj + e.opsGrp.grp.name + "Wrapper")
       conj = " with "
     }
+    val hasMetadata = Tpes.exists(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
+    if (hasMetadata) stream.print(conj + dsl + "Metadata")
+
     stream.println(" {")
     stream.println("  this: " + dsl + "Library => ")
+    stream.println()
+    // Bit awkward - normally we would have many small versions of these methods, but that would require every Wrapper
+    // trait to extend ForgeMetadataWrapper explicitly. Which version is better?
+    emitTypeMetadata(stream)
     stream.println("}")
     stream.println()
     stream.close()
   }
+
+  def emitMetadata() {
+    val MetaTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
+    if (MetaTpes.nonEmpty) {
+      val stream = new PrintWriter(new FileWriter(dslDir+File.separator+dsl+"Metadata.scala"))
+      stream.println("package " + packageName)
+      emitDSLImports(stream)
+      emitLMSImports(stream)
+      stream.println("import scala.virtualization.lms.common.MetadataOps")
+      stream.println()
+      emitMetadataClasses("Base", stream)
+      stream.close()
+    }
+  }
+
 }
 

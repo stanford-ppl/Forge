@@ -82,6 +82,9 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
     for (e <- Externs) {
       stream.print(" with " + e.opsGrp.grp.name + "CompilerOps") // Legacy naming for internal ops
     }
+    val hasMetadata = Tpes.exists(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
+    if (hasMetadata) stream.print(" with " + dsl + "Metadata")
+
     stream.println("{")
     stream.println("  this: " + dsl + "Library =>")
     stream.println("}")

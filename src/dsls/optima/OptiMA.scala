@@ -8,11 +8,15 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 // - Completeness checks for analyses
 // - Convergence conditions for analyses
 // - Pre- and Post-processing rules for analyses
-// - Module syntax sugar
+// - Blocks?
+// - figment should operate more like a redirect for library implementation
+// - allow and generate inheritance for any type with no data structure definition (w/o datastruct defs)
+// - add inheritance for identifiers (for enums)
+// - separate metadata meet, etc. functions into separate functions generated in Impls
 
 object OptiMADSLRunner extends ForgeApplicationRunner with OptiMADSL
-trait OptiMADSL extends ForgeApplication with MultiArrayOps with MultiArrayAnalysis with ArrayLowering
-  with VisibilityTestOps {
+trait OptiMADSL extends ForgeApplication with MultiArrays with MultiArrayImpls with MultiArrayMetadata
+  with ArrayLowering with MultiArrayAnalysis with RangeOps {
 
   def dslName = "OptiMA"
   override def clearTraversals = true
@@ -30,31 +34,40 @@ trait OptiMADSL extends ForgeApplication with MultiArrayOps with MultiArrayAnaly
     //importIndexingOps()
     //noInfixList :::= List("toInt", "toFloat", "toDouble", "toLong")
 
-    importVisibilityTest()
+    importRanges()
 
     // MultiArray figment types (with subtyping)
     val T = tpePar("T")
     val ArrayND = figmentTpe("ArrayND", T)
-    val Array1D = figmentTpe("Array1D", T) isA ArrayND
-    val Array2D = figmentTpe("Array2D", T) isA ArrayND
-    val Array3D = figmentTpe("Array3D", T) isA ArrayND
+    val Array1D = figmentTpe("Array1D", T) augments ArrayND
+    val Array2D = figmentTpe("Array2D", T) augments ArrayND
+    val Array3D = figmentTpe("Array3D", T) augments ArrayND
 
-    importMultiArrayOps()
-    importMultiArrayAnalysis()
-    importArrayLowering()
+    val Indices = figmentTpe("Indices")
+    val LoopIndices = figmentTpe("LoopIndices") augments Indices
+
+    val ImplND  = figmentTpe("ImplND", T) augments ArrayND
+    val FlatND  = figmentTpe("FlatND", T) augments ImplND
+
+    importIndices()
+
+    importMultiArrayMetadata()
+    importMultiArrays()
+    importMultiArrayImpls()
+    //importRankAnalysis()
+    //importArrayLowering()
 
     val RankAnalyzer = analyzer("Rank")
-
     //val RankChecker  = analyzer("RankCheck")
     //val ArrayWrapper = transformer("ArrayWrapper", isExtern=true)
     //val LayoutAnalyzer = analyzer("LayoutAnalyzer")
     val ArrayLowering = transformer("ArrayLowering")
 
-    schedule(RankAnalyzer)
+    //schedule(RankAnalyzer)
     //schedule(RankChecker)
     //schedule(ArrayWrapper)
     //schedule(LayoutAnalyzer)
-    schedule(ArrayLowering)
+    //schedule(ArrayLowering)
     //schedule(MultiloopSoA)
 
     // rewrites

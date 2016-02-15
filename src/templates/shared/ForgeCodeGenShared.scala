@@ -10,7 +10,7 @@ import scala.virtualization.lms.internal.{GenericFatCodegen, GenericCodegen}
 
 import core._
 
-trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with BaseGenLifts with BaseGenOps with BaseGenImports with BaseGenTypeClasses {
+trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with BaseGenLifts with BaseGenOps with BaseGenImports with BaseGenTypeClasses with BaseGenMetadata {
   val IR: ForgeApplicationRunner with ForgeExp
   import IR._
 

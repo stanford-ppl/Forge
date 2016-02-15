@@ -179,6 +179,13 @@ trait DeliteGenOps extends BaseGenOps {
           emitImplMethod(o, single.func, "", None, stream)
         case composite:Composite =>
           emitImplMethod(o, composite.func, "", None, stream)
+
+        case AllocatesRecord(tpe, fields, fieldTpes, init) =>
+          emitWithIndent(makeOpImplMethodSignature(o) + " = {", stream, 2)
+          emitRecordOp(o, tpe, fields, fieldTpes, init, stream, 4)
+          emitWithIndent("}", stream, 2)
+          stream.println()
+
         case map:Map =>
           emitImplMethod(o, map.func, "_map", makeFuncSignature(map.tpePars._1, map.tpePars._2), stream)
         case zip:Zip =>
@@ -273,7 +280,7 @@ trait DeliteGenOps extends BaseGenOps {
    * groupBy and groupByReduce are represented using several nodes
    */
   def hasIRNode(o: Rep[DSLOp]) = Impls(o) match {
-    case _:Composite | _:Redirect | _:Getter | _:Setter => false
+    case _:Composite | _:Redirect | _:Getter | _:Setter | _:AllocatesRecord => false
     case _ => hasCompilerVersion(o)
   }
   def hasMultipleIRNodes(o: Rep[DSLOp]) = Impls(o) match {
@@ -578,6 +585,7 @@ trait DeliteGenOps extends BaseGenOps {
       // composites, getters and setters are currently inlined
       // In the future, to support pattern matching and optimization, we should implement these as figments and use lowering transformers
       Impls(o) match {
+        case _:AllocatesRecord => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
         case c:Composite => emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, 4)
         case g@Getter(structArgIndex,field) =>
           val struct = o.args.apply(structArgIndex)
@@ -894,10 +902,6 @@ trait DeliteGenOps extends BaseGenOps {
         stream.println("  }")
       }
     }
-  }
-
-  def erasureType(tpe: Rep[DSLType]) = {
-    tpe.name + (if (!tpe.tpePars.isEmpty) "[" + tpe.tpePars.map(t => "_").mkString(",") + "]" else "")
   }
 
   /**

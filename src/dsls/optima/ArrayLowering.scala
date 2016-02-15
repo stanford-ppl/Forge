@@ -15,25 +15,22 @@ trait ArrayLowering { this: OptiMADSL =>
 
     val LoweringRules = withTransformer(ArrayLowering)
     LoweringRules {
-      /*lower (ArrayND, "multia_new") using rule ${ rank($0) match {
+      /*lower (ArrayND, "ma_new") using rule ${ rank($0) match {
         case 1 =>
         case 1 =>
         case 2 =>
         case _ =>
       }}
 
-      lower (ArrayND, "multia_size") using rule ${
+      lower (ArrayND, "size") using rule ${
 
       }
-      lower (ArrayND, "multia_dim") using rule ${
+      lower (ArrayND, "dim") using rule ${
 
       }
-      lower (ArrayND, "multia_apply") using rule ${
+      lower (ArrayND, "ma_apply") using rule ${
 
       }*/
-      lower (ArrayND, "multia_as_1d") using rule ${ $0 }
-      lower (ArrayND, "multia_as_2d") using rule ${ $0 }
-      lower (ArrayND, "multia_as_3d") using rule ${ $0 }
     }
 
   }

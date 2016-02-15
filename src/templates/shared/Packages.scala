@@ -66,7 +66,7 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     // --- DSL extends DSLIdentifiers
     // abstract types are not included in the identifiers trait above because they can clash with either the class definitions or Scala
     // types in the lib implementation, causing a nasty scalac typer crash. (occurs, for example, if we declare an abstract Vector type)
-    val StructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && !isMetaType(t))
+    val StructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t))
 
     stream.println("trait " + dsl + " extends " + dsl + "Identifiers")
     for (opsGrp <- opsGrps if opsGrp.ops.exists(hasSharedVersion)) {

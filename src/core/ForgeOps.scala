@@ -30,7 +30,7 @@ trait ForgeOps extends Base with ForgeTraversalOps {
   def lift(grp: Rep[DSLGroup])(tpe: Rep[DSLType]) = forge_lift(grp, tpe)
   def data(tpe: Rep[DSLType], fields: (String, Rep[DSLType])*) = forge_data(tpe, fields)
 
-  def figmentTpe(name: String, tpePars: List[Rep[TypePar]]) = forge_figment_tpe(name, tpePars)
+  def figmentTpe(name: String, tpePars: List[Rep[TypePar]] = Nil) = forge_figment_tpe(name, tpePars)
 
   implicit def namedTpeToArg(arg: (String, Rep[DSLType])): Rep[DSLArg] = forge_arg(arg._1, arg._2, None)
   implicit def namedTpeWithDefaultToArg(arg: (String, Rep[DSLType], String)): Rep[DSLArg] = forge_arg(arg._1, arg._2, Some(arg._3))
@@ -171,7 +171,7 @@ trait ForgeOps extends Base with ForgeTraversalOps {
   def forge_label(op: Rep[DSLOp], name: String): Rep[Unit]
 
   def forge_figment_tpe(name: String, tpePars: List[Rep[TypePar]]): Rep[DSLType]
-  def forge_add_parent_tpe(tpe: Rep[DSLType], parent: Rep[DSLType]): Rep[Unit]
+  def forge_add_parent_tpe(tpe: Rep[DSLType], parent: Rep[DSLType]): Rep[DSLType]
 }
 
 trait ForgeSugarLowPriority extends ForgeOps {
@@ -215,7 +215,7 @@ trait ForgeSugar extends ForgeSugarLowPriority with ForgeTraversalSugar {
   }
 
   // Experimental sugar for simple inheritance - for abstract types with lowering passes ONLY!
-  def infix_isA(tpe: Rep[DSLType], parent: Rep[DSLType]) = forge_add_parent_tpe(tpe, parent)
+  def infix_augments(tpe: Rep[DSLType], parent: Rep[DSLType]) = forge_add_parent_tpe(tpe, parent)
 
   /**
    * Uses Scala-Virtualized scopes to enable sugar for ops scoped on a particular DSLType
@@ -451,13 +451,15 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
     if (!TpeParents.contains(tpe)) {
       if (FigmentTpes.contains(parent) && FigmentTpes.contains(tpe)) {
         TpeParents += (tpe -> parent)
-        ()
       }
-      else
+      else {
         err("parent " + parent.name + " and child type " + tpe.name + " must both be abstract for subclassing")
+      }
     }
-    else
+    else {
       err("type " + tpe.name + " already has parent type " + TpeParents(tpe).name + " - DSL types can only have single inheritance")
+    }
+    tpe
   }
 
   // Array and Array[T] should be the same type

@@ -43,7 +43,7 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
       stream.print(" with " + e.opsGrp.grp.name + "CompilerOps") // Legacy naming for InternalOps
     }
     val hasMetadata = Tpes.exists(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
-    if (hasMetadata) stream.print(" with " + dsl + "MetadataOps")
+    if (hasMetadata) stream.print(" with " + dsl + "Metadata")
 
     stream.println(" {")
     stream.println("  this: " + dsl + "Exp with " + dsl + "Application => ")
@@ -144,7 +144,7 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
 
     // DSLCompiler
     stream.println("trait " + dsl + "Compiler extends " + dsl + "Exp with " + dsl + "Transform {") //with MultiloopSoATransformExp
-    stream.println(" self: " + dsl + "Application with DeliteApplication => ")
+    stream.println("  self: " + dsl + "Application with DeliteApplication => ")
     stream.println()
 
     if (!IR.enableSoA || !IR.enableFusion) {

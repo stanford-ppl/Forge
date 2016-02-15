@@ -43,7 +43,8 @@ trait OutProd extends DHDLApplication {
 				bmResult.st(addr, bm1.ld(ii) * bm2.ld(jj))
 			})
 			MetaPipe({
-				result.st(bmResult, j, i, tileSize, tileSize, dataSize)
+				//TODO:FIX THIS
+				result.st(bmResult, j, i, tileSize, tileSize, vecLength)
 			})
 			()
 		})

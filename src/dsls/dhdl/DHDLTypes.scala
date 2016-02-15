@@ -126,5 +126,6 @@ trait DHDLTypes {
 		//fimplicit (TpeOps) ("fixpt_to_float", Nil, FixPt::MFloat) implements composite ${ $0.toFloat }
 		//fimplicit (TpeOps) ("float_to_fixpt", Nil, MFloat::FixPt) implements composite ${ $0.toFixPt }
 		fimplicit (TpeOps) ("int_to_fixpt", Nil, MInt::FixPt) implements composite ${ $0.toFixPt }
+		fimplicit (TpeOps) ("sint_to_fixpt", Nil, SInt::FixPt) implements composite ${ unit($0).toFixPt }
 	}
 }

@@ -36,7 +36,7 @@ trait TPCHQ6 extends DHDLApplication {
 		val tileCtr = CtrChain(Ctr(dataSize, tileSize)) 
 
 		val outAccum = Reg[Float](unit(0.0f))
-		MetaPipe1[Float](tileCtr, outAccum, _+_, {case i::_ => 
+		MetaPipe[Float](1, true, tileCtr, outAccum, _+_, {case i::_ => 
 			val datesBm = BRAM[FixPt](tileSize)
 			val quantsBm = BRAM[FixPt](tileSize)
 			val discountsBm = BRAM[Float](tileSize)
@@ -49,7 +49,7 @@ trait TPCHQ6 extends DHDLApplication {
 			})
 			val inCtr = CtrChain(Ctr(max=tileSize))
 			val inAccum = Reg[Float](0.0f)
-			Pipe1[Float](inCtr, inAccum, _+_, { case j::_ =>
+			Pipe[Float](1, true, inCtr, inAccum, _+_, { case j::_ =>
 				val date = datesBm.ld(j)
 				val discount = discountsBm.ld(j)
 				val quant = quantsBm.ld(j)

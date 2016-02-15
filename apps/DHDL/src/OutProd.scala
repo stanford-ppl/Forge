@@ -32,7 +32,7 @@ trait OutProd extends DHDLApplication {
 		MetaPipe2(ctrs_out, {case i::j::_ => 
 			val bm1 = BRAM[FixPt]("bm1", tileSize)
 			val bm2 = BRAM[FixPt]("bm2", tileSize)
-			MetaGrp("parallel", {
+			Parallel({
 				vec1.ld(bm1, i, tileSize)
 				vec2.ld(bm2, j, tileSize)
 			})
@@ -42,7 +42,7 @@ trait OutProd extends DHDLApplication {
 				val addr = ii * tileSize + jj
 				bmResult.st(addr, bm1.ld(ii) * bm2.ld(jj))
 			})
-			MetaGrp("sequential", {
+			MetaPipe({
 				result.st(bmResult, j, i, tileSize, tileSize, dataSize)
 			})
 			()

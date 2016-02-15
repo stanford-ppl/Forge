@@ -136,7 +136,7 @@ trait BlackScholes extends DHDLApplication {
 		val seqCtr = CtrChain(Ctr(numOptions, tileSize))
 		MetaPipe1(seqCtr, {case i::_ => 
 			println("i:" + i)
-			MetaGrp("parallel", {
+			Parallel({
 				otype.ld(otypeRAM, i, tileSize)
 				sptprice.ld(sptpriceRAM, i, tileSize)
 				strike.ld(strikeRAM, i, tileSize)

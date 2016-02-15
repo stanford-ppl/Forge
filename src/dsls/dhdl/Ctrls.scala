@@ -38,13 +38,22 @@ trait CtrlOps {
 		}
 
 		val CtrChain = tpe("CtrChain")
+		//val MCtrChain = metadata("MCtrChain", ("size",SInt))
+		//meet (MCtrChain) ${ this }
+		//compiler.static (MCtrChain) ("update", Nil, (MAny, SInt) :: MUnit, effect = simple) implements
+		//composite ${ setMetadata($0, MCtrChain($1)) }
+		//compiler.static (MCtrChain) ("apply", Nil, MAny :: SInt) implements composite ${
+		//meta[MCtrChain]($0).get}
+
 		data (CtrChain, ("_chain", MArray(Ctr)))
     internal (CtrChain) ("ctrchain_from_array", Nil, MArray(Ctr) :: CtrChain,effect=mutable) implements allocates(CtrChain, ${$0})
 		static (CtrChain) ("apply", Nil, varArgs(Ctr) :: CtrChain) implements composite ${
       val array = array_empty[Ctr](unit($0.length))
       val ctrchain = ctrchain_from_array(array)
       for (i <- 0 until $0.length) { ctrchain(i) = $0.apply(i) }
-			ctrchain.unsafeImmutable
+			val ictrchain = ctrchain.unsafeImmutable
+			//MCtrChain(ictrchain) = $0.length
+			ictrchain
     }
 		val CtrChainOps = withTpe(CtrChain)
 		CtrChainOps {
@@ -103,25 +112,20 @@ trait CtrlOps {
 		})
 
 		//TODO: Won't work here until have metadata
-		val pipe_map = direct (Pipe) ("Pipe", Nil, (("ctrs", CtrChain), ("mapFunc", varArgs(MInt) ==> MUnit)) :: Pipe)
+		val pipe_map = direct (Pipe) ("Pipe", Nil, (("ctrSize", SInt), ("ctrs", CtrChain), ("mapFunc", varArgs(MInt) ==> MUnit)) :: Pipe)
 		impl (pipe_map) (composite ${
 
-			def prepend(x:Rep[Int], seq: Seq[Rep[Int]]) = {
-				Seq.tabulate[Rep[Int]](seq.length+1) ((i:Int) =>
-			 		if (i==0) x else seq(i-1)
-				)
-			}
-			def recPipe (idx:Rep[Int], idxs:Seq[Rep[Int]]): Rep[Unit] = {
-				val ctr = $ctrs.chain.apply(idx)
-				if (idx == unit(1)) {
-					loop(ctr, ( (i:Rep[Int]) => $mapFunc( prepend(i, idxs) )) )
+			def recPipe (idx:Int, idxs:Seq[Rep[Int]]): Rep[Unit] = {
+				val ctr = $ctrs.chain.apply(unit(idx))
+				if (idx == 1) {
+					loop(ctr, ( (i:Rep[Int]) => $mapFunc( i+:idxs )) )
 				} else {
-					loop(ctr, ( (i:Rep[Int]) => recPipe(idx - unit(1), prepend(i, idxs) ) ))
+					loop(ctr, ( (i:Rep[Int]) => recPipe(idx - 1, i+:idxs) ))
 				}
 			}
 			val pipe = Pipe( $ctrs )
 
-			recPipe( $ctrs.length, Seq.empty[Rep[Int]] )
+			recPipe( $ctrSize, Seq.empty[Rep[Int]] )
 
 			pipe
 		})
@@ -211,8 +215,15 @@ trait CtrlOps {
 			metaPipe
 		})
 
-		val meta_grp = direct (MetaPipe) ("MetaGrp", Nil, (("tpe", MString), ("func", MThunk(MUnit))) :: MetaPipe) 
-		impl (meta_grp) (composite ${
+		val meta_parallel = direct (MetaPipe) ("Parallel", Nil, ("func", MThunk(MUnit)) :: MetaPipe) 
+		impl (meta_parallel) (composite ${
+			val metaPipe = MetaPipe( CtrChain(Ctr(max=unit(1))) )
+			$func
+			metaPipe
+		})
+
+		val meta_1iter = direct (MetaPipe) ("MetaPipe", Nil, ("func", MThunk(MUnit)) :: MetaPipe) 
+		impl (meta_1iter) (composite ${
 			val metaPipe = MetaPipe( CtrChain(Ctr(max=unit(1))) )
 			$func
 			metaPipe

@@ -8,7 +8,7 @@ if [[ $2 == *"c"* ]]; then
 	echo "--------compile dhdl app--------"
 	cp /Users/Yaqi/Documents/hyperdsl/forge/apps/DHDL/src/${1}.scala apps/src/;
 	sbt compile
-	bin/delitec ${1}Compiler
+	bin/delitec ${1}Compiler > out
 fi
 if [[ $2 == *"r"* ]]; then
 	echo "--------run dhdl app------------"

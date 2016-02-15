@@ -22,11 +22,22 @@ trait MemsElements {
 													 ("tpe", MString, "unit(\"normal\")")), Reg(T)),
 			effect=mutable) implements allocates(Reg,
 			${$name}, ${$value}, ${$init})
-		static (Reg) ("apply", T, T :: Reg(T)) implements redirect ${ Reg.apply(value=$0, init=$0) }
-		direct (Reg) ("ArgIn", T, T :: Reg(T)) implements redirect ${ Reg.apply(value=$0, init=$0,
+		static (Reg) ("apply", T, T :: Reg(T)) implements redirect ${ Reg.apply[T](value=$0, init=$0) }
+		direct (Reg) ("ArgIn", T, T :: Reg(T)) implements redirect ${ Reg.apply[T](value=$0, init=$0,
 		tpe=unit("argin")) }
-		direct (Reg) ("ArgOut", T, T :: Reg(T)) implements redirect ${ Reg.apply(value=$0, init=$0,
+		direct (Reg) ("ArgOut", T, T :: Reg(T)) implements redirect ${ Reg.apply[T](value=$0, init=$0,
 		tpe=unit("argout")) }
+		/*
+		static (Reg) ("apply", FixPt, Nil :: Reg(FixPt)) implements redirect ${ Reg[FixPt](unit(0)) }
+		direct (Reg) ("ArgIn", FixPt, Nil :: Reg(FixPt)) implements redirect ${ ArgIn[FixPt](unit(0)) }
+		direct (Reg) ("ArgOut", FixPt, Nil :: Reg(FixPt)) implements redirect ${ ArgOut[FixPt](unit(0)) }
+		static (Reg) ("apply", MFloat, Nil :: Reg(MFloat)) implements redirect ${ Reg[Float](unit(0.0f)) }
+		direct (Reg) ("ArgIn", MFloat, Nil :: Reg(MFloat)) implements redirect ${ ArgIn[Float](unit(0.0f)) }
+		direct (Reg) ("ArgOut", MFloat, Nil :: Reg(MFloat)) implements redirect ${ ArgOut[Float](unit(0.0f)) }
+		static (Reg) ("apply", MBoolean, Nil :: Reg(MBoolean)) implements redirect ${ Reg[Boolean](unit(false)) }
+		direct (Reg) ("ArgIn", MBoolean, Nil :: Reg(MBoolean)) implements redirect ${ ArgIn[Boolean](unit(false)) }
+		direct (Reg) ("ArgOut", MBoolean, Nil :: Reg(MBoolean)) implements redirect ${ ArgOut[Boolean](unit(false)) }
+		*/
 
 		val RegOps = withTpe(Reg)
 		RegOps {

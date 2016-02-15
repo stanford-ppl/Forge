@@ -491,8 +491,14 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
 
   // vet codegen rules and update the ops list if necessary
   def reconcileCodegenRule(op: Rep[DSLOp], rule: CodeGen) {
-    if (op.args.exists(a => DataStructs.contains(getHkTpe(a.tpe))))
-      err("(op " + op.name + ") code generated ops should not have struct types as inputs, since structs may be eliminated at compile time. consider passing in one or more fields of the struct as input(s) to the op instead.")
+    // Commenting out the error check below. This check is to ensure that codegen nodes do not depend on structs,
+    // as typically the SoA transformer would run before code generation. This would mean that the data structure
+    // might not exist by the time code generation begins. However, for our (hardware generation/description)
+    // purposes, SoA doesn't make sense, and will typically be disabled. In lieu of that, this check makes no sense.
+    // ALSO, all new nodes are implemented as Tpes, and depend on other nodes which are also Tpes. This means that
+    // having data structure inputs to codegen nodes is a common case.
+//    if (op.args.exists(a => DataStructs.contains(getHkTpe(a.tpe))))
+//      err("(op " + op.name + ") code generated ops should not have struct types as inputs, since structs may be eliminated at compile time. consider passing in one or more fields of the struct as input(s) to the op instead.")
 
     // also may need to update opsGrp targets
     val opsGrp = OpsGrp.getOrElse(op.grp, err("couldn't find group " + op.grp.name + " for code generator declared on op " + op.name))

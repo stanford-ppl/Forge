@@ -15,11 +15,21 @@ trait CtrlOps {
 		data (Ctr, ("_name", MString), ("_min", MInt), ("_max", MInt), ("_step", MInt), ("_val", MInt))
 		static (Ctr) ("apply", Nil, MethodSignature(List(("name", MString, "unit(\"\")"),
 			                                               ("min", MInt, "unit(0)"),
-																										 ("max", MInt), ("step", MInt, "unit(1)")),
+																										 ("max", MInt), 
+																										 ("step", MInt, "unit(1)")),
 																								Ctr), effect=mutable) implements allocates(Ctr,
 			${$name}, ${$min}, ${$max}, ${$step}, ${ unit(0) })
+		static (Ctr) ("apply", Nil, MethodSignature(List(("par", SInt),
+																										 ("name", MString),
+			                                               ("min", MInt),
+																										 ("max", MInt), 
+																										 ("step", MInt)),
+																								Ctr), effect=mutable) implements
+		redirect ${ Ctr.apply($name, $min, $max, $step) }
 		static (Ctr) ("apply", Nil, (("max", MInt), ("step", MInt)) :: Ctr, effect=mutable) implements
-		redirect ${ Ctr.apply(name=unit(""), min=unit(0), max=$max, step=$step) }
+		redirect ${ Ctr.apply(unit(""), unit(0), $max, $step) }
+		static (Ctr) ("apply", Nil, (("par", SInt), ("max", MInt), ("step", MInt)) :: Ctr, effect=mutable) implements
+		redirect ${ Ctr.apply($par, unit(""), unit(0), $max, $step) }
 
 		val CtrOps = withTpe(Ctr)
 		CtrOps {
@@ -98,7 +108,7 @@ trait CtrlOps {
 			pipe
 		})
 		static (Pipe) ("apply", Nil, (("ctrSize", SInt), ("ctrs", CtrChain),
-			("mapFunc", varArgs(MInt) ==> MUnit)) :: Pipe) implements composite ${
+			("mapFunc", varArgs(MInt) ==> MUnit)) :: Pipe) implements redirect ${
 			Pipe($ctrSize, unit(true), $ctrs, $mapFunc)
 		}
 
@@ -120,7 +130,7 @@ trait CtrlOps {
 		})
 		/*
 		static (Pipe) ("apply", T, (("ctrSize", SInt), ("ctrs", CtrChain), ("accum", Reg(T)),
-			("reduceFunc", (T, T) ==> T) , ("mapFunc", varArgs(MInt) ==> T)) :: Pipe) implements composite ${
+			("reduceFunc", (T, T) ==> T) , ("mapFunc", varArgs(MInt) ==> T)) :: Pipe) implements redirect ${
 			Pipe[T]($ctrSize, unit(true), $ctrs, $accum, $reduceFunc, $mapFunc)
 		}
 		*/
@@ -146,7 +156,7 @@ trait CtrlOps {
 			metaPipe
 		})
 		static (MetaPipe) ("apply", Nil, (("ctrSize", SInt), ("ctrs", CtrChain),
-			("mapFunc", varArgs(MInt) ==> MUnit)) :: MetaPipe) implements composite ${
+			("mapFunc", varArgs(MInt) ==> MUnit)) :: MetaPipe) implements redirect ${
 				MetaPipe.apply($ctrSize, unit(true), $ctrs, $mapFunc)
 			}
 
@@ -170,7 +180,7 @@ trait CtrlOps {
 		/*
 		static (MetaPipe) ("apply", T, MethodSignature(List(("ctrSize", SInt), ("ctrs", CtrChain), ("accum", Reg(T)),
 			("reduceFunc", (T, T) ==> T) , ("mapFunc", varArgs(MInt) ==> T)),MetaPipe)) implements
-		composite ${
+		redirect ${
 			MetaPipe[T]($ctrSize, unit(true), $ctrs, $accum, $reduceFunc, $mapFunc)
 		}
 		*/

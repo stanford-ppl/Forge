@@ -9,7 +9,7 @@ trait DADLTest extends DADLApplication {
 	def main() = {
 		val bm = BRAM[Long]("bm", 128)
 
-    def Mux(sel: Wire[Boolean], x: Wire[Int], y: Wire[Int]): Wire[Int] = x
+    def Mux[T](sel: Wire[Boolean], x: Wire[T], y: Wire[T]): Wire[T] = x
     def Fanout(in: Wire[Int]): Wire[Tup2[Int,Int]] = pack((in, in))
 
     val in0 = unit(0)
@@ -21,10 +21,22 @@ trait DADLTest extends DADLApplication {
     println(inline)
 
     // Create "instances" of modules
-    val out = instance(Mux _)(sel, in0, in1)
+    val out = instance(Mux[Int] _)(sel, in0, in1)
     val (a,b) = instance(Fanout _)(in1)
     println(out)
     println(a)
     println(b)
+
+    // Unforunately can't do type ALU[T] = Record[T]{val in1: T; val in2: T; val out: T}
+
+    def ALU[T:Manifest](bits: Int) = {
+      val i1 = input[T]
+      val i2 = input[T]
+      val o  = instance(Mux[T] _)(sel, i1, i2) // Some function of i1 and i2
+      new IO { val in1 = i1; val in2 = i2; val out = o }
+    }
+
+    // Should take care not to assign things to the output of a module, or have unconnected inputs
+
 	}
 }

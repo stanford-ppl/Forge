@@ -36,6 +36,9 @@ trait DADLDSL extends ForgeApplication
 
     schedule(IRPrinter)
 
+
+    extern(grp("ModuleIO"), targets = Nil)
+
     ()
 	}
 }

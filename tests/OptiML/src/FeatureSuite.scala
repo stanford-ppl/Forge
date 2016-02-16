@@ -43,6 +43,7 @@ class FeatureSuiteInterpreter extends ForgeSuiteInterpreter {
   def testUniqueOps() { runTest(UniqueRunnerI) }
 }
 class FeatureSuiteCompiler extends ForgeSuiteCompiler {
+  override def enforceFullCoverage = false
   def testDateTimeOps() { runTest(DateTimeRunnerC) }
   def testUniqueOps() { runTest(UniqueRunnerC) }
 }

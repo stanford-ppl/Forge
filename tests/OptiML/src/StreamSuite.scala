@@ -285,33 +285,13 @@ class StreamSuiteInterpreter extends ForgeSuiteInterpreter {
   def testStreamForeach() { runTest(StreamForeachRunnerI) }
   def testStreamCorrectSmall() { runTest(StreamCorrectSmallRunnerI) }
   def testStreamCorrectLarge() { runTest(StreamCorrectLargeRunnerI) }
-  def testFileStream() {
-    runTest(FileStreamWriteARunnerI)
-    runTest(FileStreamWriteBRunnerI)
-    runTest(FileStreamReadRunnerI)
-    runTest(FileStreamDeleteRunnerI)
-  }
-  def testHashStream() {
-    runTest(HashStreamWriteARunnerI)
-    runTest(HashStreamWriteBRunnerI)
-    runTest(HashStreamReadRunnerI)
-    runTest(HashStreamDeleteRunnerI)
-  }
+  def testFileStream() { runTests(FileStreamWriteARunnerI, FileStreamWriteBRunnerI, FileStreamReadRunnerI, FileStreamDeleteRunnerI) }
+  def testHashStream() { runTests(HashStreamWriteARunnerI,HashStreamWriteBRunnerI,HashStreamReadRunnerI,HashStreamDeleteRunnerI) }
 }
 class StreamSuiteCompiler extends ForgeSuiteCompiler {
   def testStreamForeach() { runTest(StreamForeachRunnerC) }
   def testStreamCorrectSmall() { runTest(StreamCorrectSmallRunnerC) }
   def testStreamCorrectLarge() { runTest(StreamCorrectLargeRunnerC) }
-  def testFileStream() {
-    runTest(FileStreamWriteARunnerC)
-    runTest(FileStreamWriteBRunnerC)
-    runTest(FileStreamReadRunnerC)
-    runTest(FileStreamDeleteRunnerC)
-  }
-  def testHashStream() {
-    runTest(HashStreamWriteARunnerC)
-    runTest(HashStreamWriteBRunnerC)
-    runTest(HashStreamReadRunnerC)
-    runTest(HashStreamDeleteRunnerC)
-  }
+  def testFileStream() { runTests(FileStreamWriteARunnerC, FileStreamWriteBRunnerC, FileStreamReadRunnerC, FileStreamDeleteRunnerC) }
+  //def testHashStream() { runTests(HashStreamWriteARunnerC, HashStreamWriteBRunnerC, HashStreamReadRunnerC, HashStreamDeleteRunnerC) }
 }

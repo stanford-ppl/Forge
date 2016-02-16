@@ -245,20 +245,24 @@ trait BaseGenOps extends ForgeCodeGenBase {
    */
 
   // untyped implicit args
-  def makeImplicitCtxBounds(tpePars: List[Rep[TypePar]]) = {
-    tpePars.flatMap { a =>
-      a.ctxBounds.map(b => "implicitly["+b.name+"["+quote(a)+"]]")
-    }.mkString(",")
+  def makeImplicitCtxBoundsArgs(tpePars: List[Rep[TypePar]]): List[Rep[DSLArg]]  = {
+    tpePars.flatMap(
+      tp => tp.ctxBounds.map(
+        cb => arg(
+          "implicitly["+cb.name+"["+quote(tp)+"]]",
+          tpe(cb.name, List(tpePar(quote(tp), List(), now)), now),
+          None
+        )
+      )
+    )
   }
 
   def makeImplicitArgs(tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLArg]]) = {
     val hkInstantiations = getHkTpeParInstantiations(tpePars, args, implicitArgs)
 
     // passing order is: regular ctxBounds, then regular implicits, and finally hkInstantiations context bounds
-    val ctxBoundsStr = makeImplicitCtxBounds(withoutHkTpePars(tpePars))
-    val ctxBounds2 = if (ctxBoundsStr == "") "" else ctxBoundsStr+","
-    val allImplicitArgs = implicitArgs ++ hkInstantiations
-    if (allImplicitArgs.length > 0) "(" + ctxBounds2 + allImplicitArgs.map(quote).mkString(",") + ")"
+    val allImplicitArgs = makeImplicitCtxBoundsArgs(tpePars) ++ implicitArgs ++ hkInstantiations
+    if (allImplicitArgs.length > 0) "(" + allImplicitArgs.map(quote).mkString(",") + ")"
     else ""
   }
 
@@ -661,7 +665,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
         }
 
         val opsClsName = opsGrp.grp.name + tpe.name.replaceAll("\\.","") + tpeArgs.map(_.name).mkString("") + opsClsSuffix + "OpsCls"
-        val implicitParams = if (tpePars.length > 0) makeImplicitCtxBounds(tpePars) + ",__pos" else "__pos"
+        val implicitParams = if (tpePars.length > 0) makeImplicitCtxBoundsArgs(tpePars).map(quote).mkString(",") + ",__pos" else "__pos"
 
         if (tpe.stage == compile) {
           stream.println("  implicit def liftTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ")(implicit __pos: SourceContext) = new " + opsClsName + "(x)(" + implicitParams + ")")

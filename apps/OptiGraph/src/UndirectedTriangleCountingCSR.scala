@@ -1,11 +1,13 @@
 import optigraph.compiler._
 import optigraph.library._
 import optigraph.shared._
-
+import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 
 object UndirectedTriangleCountingCSRCompiler extends OptiGraphApplicationCompiler with UndirectedTriangleCountingCSR
 object UndirectedTriangleCountingCSRInterpreter extends OptiGraphApplicationInterpreter with UndirectedTriangleCountingCSR
 
+@virtualize
 trait UndirectedTriangleCountingCSR extends OptiGraphApplication {
   def main() = {
     if (args.length < 2) printUsage

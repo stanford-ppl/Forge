@@ -1,11 +1,14 @@
 import optigraph.compiler._
 import optigraph.library._
 import optigraph.shared._
+import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 
 
 object PageRankCSRCompiler extends OptiGraphApplicationCompiler with PageRankCSR
 object PageRankCSRInterpreter extends OptiGraphApplicationInterpreter with PageRankCSR
 
+@virtualize
 trait PageRankCSR extends OptiGraphApplication {
   
   def hackyReduce(a: Rep[NodeData[Double]], b: Rep[NodeData[Double]]): Rep[Double] = {

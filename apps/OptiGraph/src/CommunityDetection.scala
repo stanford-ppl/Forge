@@ -1,6 +1,8 @@
 import optigraph.compiler._
 import optigraph.library._
 import optigraph.shared._
+import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 
 object CommunityDetectionJar extends OptiGraphApplicationCompiler with CommDetection {
   registerFunction(CommunityDetection _)  
@@ -10,6 +12,7 @@ object CommunityDetectionJar extends OptiGraphApplicationCompiler with CommDetec
 object CommunityDetectionCompiler extends OptiGraphApplicationCompiler with CommDetection
 object CommunityDetectionInterpreter extends OptiGraphApplicationInterpreter with CommDetection
 
+@virtualize
 trait CommDetection extends OptiGraphApplication {
   def main() = {
     println("CommunityDetection")

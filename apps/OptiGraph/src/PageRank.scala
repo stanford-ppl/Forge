@@ -1,6 +1,8 @@
 import optigraph.compiler._
 import optigraph.library._
 import optigraph.shared._
+import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 
 // This object lets us run the Delite version of the code
 object PageRankCompiler extends OptiGraphApplicationCompiler with PageRank
@@ -8,6 +10,7 @@ object PageRankCompiler extends OptiGraphApplicationCompiler with PageRank
 // This object lets us run the Scala library version of the code
 object PageRankInterpreter extends OptiGraphApplicationInterpreter with PageRank
 
+@virtualize
 trait PageRank extends OptiGraphApplication {
   def main() = {
     println("PageRank")

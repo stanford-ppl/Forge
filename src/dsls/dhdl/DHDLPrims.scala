@@ -22,6 +22,7 @@ trait PrimOps {
 		val fltSub = infix (Prim) ("-", Nil, (MFloat, MFloat) :: MFloat)
 		impl (fltSub) (codegen($cala, ${$0 - $1}))
 
+		//TODO
 		val fxpMul = infix (Prim) ("*", Nil, (FixPt, FixPt) :: FixPt)
 		impl (fxpMul) (codegen($cala, ${$0 * $1}))
 		val fltMul = infix (Prim) ("*", Nil, (MFloat, MFloat) :: MFloat)
@@ -44,10 +45,20 @@ trait PrimOps {
 		val fltGt = infix (Prim) ("<", Nil, (MFloat, MFloat):: MBoolean)
 		impl (fltGt) (codegen ($cala, ${$0 < $1}))
 
+		val fixGe = infix (Prim) ("<=", Nil, (FixPt, FixPt):: MBoolean)
+		impl (fixGe) (codegen ($cala, ${$0 <= $1}))
+		val fltGe = infix (Prim) ("<=", Nil, (MFloat, MFloat):: MBoolean)
+		impl (fltGe) (codegen ($cala, ${$0 <= $1}))
+
 		val fixLt = infix (Prim) (">", Nil, (FixPt, FixPt):: MBoolean)
 		impl (fixLt) (codegen ($cala, ${$0 > $1}))
 		val fltLt = infix (Prim) (">", Nil, (MFloat, MFloat):: MBoolean)
 		impl (fltLt) (codegen ($cala, ${$0 > $1}))
+
+		val fixLe = infix (Prim) (">=", Nil, (FixPt, FixPt):: MBoolean)
+		impl (fixLe) (codegen ($cala, ${$0 >= $1}))
+		val fltLe = infix (Prim) (">=", Nil, (MFloat, MFloat):: MBoolean)
+		impl (fltLe) (codegen ($cala, ${$0 >= $1}))
 
 		val fxpAnd = infix (Prim) ("&", Nil, (FixPt, FixPt) :: FixPt)
 		impl (fxpAnd) (codegen($cala, ${$0 & $1}))
@@ -70,6 +81,30 @@ trait PrimOps {
 		val fltAbs = direct (Prim) ("abs", Nil, MFloat :: MFloat)
 		impl (fltAbs) (codegen($cala, ${scala.math.abs($0)}))
 
+		//TODO
+		//val fxpSqrt = direct (Prim) ("sqrt", Nil, MFixPt :: MFixPt)
+		//impl (fxpSqrt) (codegen($cala, ${(scala.math.sqrt($0.toDouble * 2^-0) * 2^0).toLong}))
+		val fltSqrt = direct (Prim) ("sqrt", Nil, MFloat :: MFloat)
+		impl (fltSqrt) (codegen($cala, ${scala.math.sqrt($0).toFloat}))
+
+		//TODO
+		//val fxpLog = direct (Prim) ("log", Nil, FixPt :: FixPt)
+		//impl (fxpLog) (codegen($cala, ${scala.math.log($0)}))
+		val fltLog = direct (Prim) ("log", Nil, MFloat :: MFloat)
+		impl (fltLog) (codegen($cala, ${scala.math.log($0).toFloat}))
+
+		//TODO
+		//val fxpExp = direct (Prim) ("exp", Nil, FixPt :: FixPt)
+		//impl (fxpExp) (codegen($cala, ${scala.math.exp($0)}))
+		val fltExp = direct (Prim) ("exp", Nil, MFloat :: MFloat)
+		impl (fltExp) (codegen($cala, ${scala.math.exp($0).toFloat}))
+
+		val fxpMux = direct (Prim) ("mux", Nil, (MBoolean,FixPt,FixPt) :: FixPt)
+		impl (fxpMux) (codegen($cala, ${ if ($0) $1 else $2 }))
+		val fltMux = direct (Prim) ("mux", Nil, (MBoolean,MFloat,MFloat) :: MFloat)
+		impl (fltMux) (codegen($cala, ${ if ($0) $1 else $2 }))
+		val booleanMux = direct (Prim) ("mux", Nil, (MBoolean,MBoolean,MBoolean) :: MBoolean)
+		impl (booleanMux) (codegen($cala, ${ if ($0) $1 else $2 }))
 	}
 }
 

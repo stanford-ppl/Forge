@@ -94,7 +94,7 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     for ((o,rules) <- Rewrites if rules.exists(_.isInstanceOf[ForwardingRule])) {
       val forwarder = rules.find(_.isInstanceOf[ForwardingRule]).get.asInstanceOf[ForwardingRule]
       val lines = inline(o, forwarder.rule, quoteLiteral).split(nl)
-      // TODO: Should have better way of determining which version to override
+      // TODO: Should have better way of determining which version to override. Is this even needed?
       val signature = o.name match {
         case "__ifThenElse" | "__whileDo" => makeSyntaxSignature(o)
         case _ => makeOpMethodSignature(o)
@@ -110,25 +110,25 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
 
     val StructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && !FigmentTpes.contains(t) && !isMetaType(t))
     val FigmentStructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && FigmentTpes.contains(t) && !isMetaType(t))
+    val MetaTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
 
     emitBlockComment("DSL types", stream, indent=2)
     for (tpe <- StructTpes) {
       stream.print("  abstract class " + quote(tpe))
-      stream.println(ForgeCollections.get(tpe).map(c => " extends DeliteCollection[" + quote(c.tpeArg) + "]").getOrElse(""))
+      stream.print(ForgeCollections.get(tpe).map(c => " extends DeliteCollection[" + quote(c.tpeArg) + "]").getOrElse(""))
+      //if (ForgeCollections.contains(tpe) && TpeParents.contains(tpe)) stream.print(" with " + quote(TpeParents(tpe)))
+      //else if (TpeParents.contains(tpe)) stream.print(" extends " + quote(TpeParents(tpe)))
+      stream.println()
     }
     for (tpe <- FigmentStructTpes) {
-      stream.print("  abstract class " + quote(tpe))
-      stream.print(ForgeCollections.get(tpe).map(c => " extends DeliteCollection[" + quote(c.tpeArg) + "]").getOrElse(""))
-
-      if (ForgeCollections.contains(tpe) && TpeParents.contains(tpe)) stream.print(" with ")
-      else if (TpeParents.contains(tpe)) stream.print(" extends ")
-
-      stream.print(TpeParents.get(tpe).map(p => quote(p)).getOrElse(""))
+      stream.print("  abstract class " + quote(tpe) + " extends FigmentStruct")
+      stream.print(ForgeCollections.get(tpe).map(c => " with DeliteCollection[" + quote(c.tpeArg) + "]").getOrElse(""))
+      //stream.print(TpeParents.get(tpe).map(p => " with " + quote(p)).getOrElse(""))
       stream.println()
     }
     stream.println()
     emitBlockComment("implicit manifests", stream, indent=2)
-    for (tpe <- StructTpes ++ FigmentStructTpes) {
+    for (tpe <- StructTpes ++ FigmentStructTpes ++ MetaTpes) {
       stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")
     }
 

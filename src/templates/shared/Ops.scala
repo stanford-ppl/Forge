@@ -556,7 +556,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     emitWithIndent("val tp = new scala.reflect.RefinedManifest[" + quote(tpe) + "] {", stream, indent)
     emitWithIndent("def runtimeClass = classOf[" + quote(tpe) + "]", stream, indent+2)
     emitWithIndent("val fields = mFields", stream, indent+2)
-    emitWithIndent("override val typeArguments = List(" + tpe.tpePars.map{t => "manifest[" + quote(t) + "]"}.mkString(",") + ")", stream, indent+2)
+    emitWithIndent("override val typeArguments = List(" + tpe.tpeArgs.map{t => "manifest[" + quote(t) + "]"}.mkString(",") + ")", stream, indent+2)
     emitWithIndent("}",stream,indent)
     emitWithIndent("record_new(fFields)(tp)",stream,indent)
   }

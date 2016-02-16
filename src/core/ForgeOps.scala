@@ -449,12 +449,12 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
 
   def forge_add_parent_tpe(tpe: Exp[DSLType], parent: Exp[DSLType]) = {
     if (!TpeParents.contains(tpe)) {
-      if (FigmentTpes.contains(parent) && FigmentTpes.contains(tpe)) {
+      //if (FigmentTpes.contains(parent) && FigmentTpes.contains(tpe)) {
         TpeParents += (tpe -> parent)
-      }
-      else {
-        err("parent " + parent.name + " and child type " + tpe.name + " must both be abstract for subclassing")
-      }
+      //}
+      //else {
+      //  err("parent " + parent.name + " and child type " + tpe.name + " must both be abstract for subclassing")
+      //}
     }
     else {
       err("type " + tpe.name + " already has parent type " + TpeParents(tpe).name + " - DSL types can only have single inheritance")

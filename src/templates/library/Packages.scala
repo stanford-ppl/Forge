@@ -98,7 +98,7 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
     stream.println("  override type Rep[+T] = T")
     stream.println()
     emitBlockComment("DSL types", stream, indent=2)
-    for (tpe <- Tpes if (!isForgePrimitiveType(tpe) && DataStructs.contains(tpe)) && !isMetaType(tpe)) {
+    for (tpe <- Tpes if (!isForgePrimitiveType(tpe) && DataStructs.contains(tpe))) {
       stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")
     }
     stream.println()

@@ -24,6 +24,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 // - allow and generate inheritance for any type with no data structure definition
 // - Move FigmentStruct to extern (Records)
 // - Add option to disable struct unwrapping in LMS
+// - Add new sugar for modules in DADL
 
 object OptiMADSLRunner extends ForgeApplicationRunner with OptiMADSL
 trait OptiMADSL extends ForgeApplication with MultiArrays with MultiArrayImpls with MultiArrayMetadata
@@ -36,11 +37,11 @@ trait OptiMADSL extends ForgeApplication with MultiArrays with MultiArrayImpls w
 
     // our selection of Scala ops
     // we don't use Numeric or Fractional, since they are replaced by Arith
+    importStrings()
     importMisc()
     importPrimitives()
     //importCasts()
     //importOrdering()
-    //importStrings()
     //importMath()
     //importTuples()
     //noInfixList :::= List("toInt", "toFloat", "toDouble", "toLong")

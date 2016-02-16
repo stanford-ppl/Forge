@@ -155,7 +155,7 @@ trait FlatMultiArrays { this: OptiMADSL =>
           case MLayout(1,Flat,Plain) => flatview_new($0.asFlat1D, newOfs, newStrides, dims)
           case MLayout(n,Flat,Plain) => flatview_new($0.asFlatND.data, newOfs, newStrides, dims)
           case MLayout(n,Flat,View)  => flatview_new($0.asFlatND.data, newOfs, newStrides, dims)
-          case _ => throw new Exception("Don't know how to implement layout " + $3 + " from layout " + $0)
+          case _ => throw new Exception("Don't know how to implement layout " + $3 + " from layout " + layout($0))
         }
         layout(view) = $3
         (view)

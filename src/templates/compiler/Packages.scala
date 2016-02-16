@@ -147,12 +147,11 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     stream.println("  self: " + dsl + "Application with DeliteApplication => ")
     stream.println()
 
-    if (!IR.enableSoA || !IR.enableFusion) {
-      emitBlockComment("Static config settings for DSL", stream, indent=2)
-      if (!IR.enableSoA) stream.println("  Config.soaEnabled = false")
-      if (!IR.enableFusion) stream.println("  Config.opfusionEnabled = false")
-      stream.println()
-    }
+    emitBlockComment("Static config settings for DSL", stream, indent=2)
+    if (!IR.enableSoA) stream.println("  Config.soaEnabled = false")
+    if (!IR.enableFusion) stream.println("  Config.opfusionEnabled = false")
+    if (!IR.enableStructUnwrapping) stream.println("  unwrapStructs = false")
+    stream.println()
     if (!IR.enableSoA && TraversalSchedule.contains(MultiloopSoA)) {
       warn("You've disabled SoA in the compiler but scheduled SoA as a transformer!")
     }

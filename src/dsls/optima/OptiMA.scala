@@ -15,7 +15,6 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 // - separate metadata meet, etc. functions into separate functions generated in Impls
 // - generate atomic writes from Forge
 // - Why are if-then-else statements being staged even when the condition is a Scala constant?
-// - Add option to disable struct unwrapping in LMS
 
 // TEST:
 
@@ -24,6 +23,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 // - Fix type arguments in creating RefinedManifest
 // - allow and generate inheritance for any type with no data structure definition
 // - Move FigmentStruct to extern (Records)
+// - Add option to disable struct unwrapping in LMS
 
 object OptiMADSLRunner extends ForgeApplicationRunner with OptiMADSL
 trait OptiMADSL extends ForgeApplication with MultiArrays with MultiArrayImpls with MultiArrayMetadata
@@ -33,6 +33,7 @@ trait OptiMADSL extends ForgeApplication with MultiArrays with MultiArrayImpls w
   override def clearTraversals = true
 
   def specification() = {
+
     // our selection of Scala ops
     // we don't use Numeric or Fractional, since they are replaced by Arith
     importMisc()
@@ -73,6 +74,7 @@ trait OptiMADSL extends ForgeApplication with MultiArrays with MultiArrayImpls w
     //val LayoutAnalyzer = analyzer("LayoutAnalyzer")
     val ArrayLowering = transformer("ArrayLowering")
 
+    schedule(IRPrinter)
     //schedule(RankAnalyzer)
     //schedule(RankChecker)
     //schedule(ArrayWrapper)

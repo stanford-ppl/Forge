@@ -95,7 +95,7 @@ trait ForgeTraversalOps extends Base {
   // --- Others
   def disableFusion(): Unit
   def disableSoA(): Unit
-
+  def disableStructUnwrapping(): Unit
 
   //----------
   //--- Stubs
@@ -209,8 +209,10 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
   // Override these to change Config settings across all DSL applications
   var enableFusion = true
   var enableSoA = true
+  var enableStructUnwrapping = true
   def disableFusion() { enableFusion = false }
   def disableSoA() { enableSoA = false }
+  def disableStructUnwrapping() { enableStructUnwrapping = false }
 
   /**
    * Compiler state

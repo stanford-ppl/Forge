@@ -17,26 +17,46 @@ trait NodeOps {
     data(linkTpe, ("_src", aluTpe), ("_dst", aluTpe))
 
     // Instantiating ALU
-    static (aluTpe) (
+    val aluApply = static (aluTpe) (
       name = "apply",
       List(),
       MInt :: aluTpe,
-      effect = simple) implements codegen (
-        $cala, ${ new ALU($0) { }})
+      effect = simple)
+
+    impl (aluApply) {  codegen ($cala, ${
+      new ALU($0) { }
+    })}
+
+    impl (aluApply) {  codegen (dot, ${
+      $sym [shape="color" style="filled" fillcolor="blue" color="white"]
+    })}
 
 
-    static (linkTpe) (
+    val linkApply = static (linkTpe) (
       name = "apply",
       List(),
       List(aluTpe, aluTpe) :: linkTpe,
-      effect = simple) implements codegen (
-        $cala, ${ new Link($0, $1) { }})
+      effect = simple)
 
+    impl (linkApply) { codegen ($cala, ${
+      new Link($0, $1) { }
+    })}
+
+    impl (linkApply) {  codegen (dot, ${
+      $0 -> $1
+    })}
 
     val aluOps = withTpe(aluTpe)
     aluOps {
 //      infix("->") (aluTpe :: linkTpe, effect = simple) implements codegen ($cala, ${new Link($self, $1) { }} )
-      infix("->") (aluTpe :: linkTpe, effect = simple) implements codegen ($cala, ${new Link($self, $1) { } })
+      val infixLinkOp = infix("->") (aluTpe :: linkTpe, effect = simple)
+      impl (infixLinkOp) { codegen ($cala, ${
+        new Link($self, $1) { }
+      })}
+
+      impl (infixLinkOp) { codegen (dot, ${
+        $self -> $1
+      })}
     }
 	}
 }

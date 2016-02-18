@@ -14,7 +14,6 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 // - figment should operate more like a redirect for library implementation
 // - separate metadata meet, etc. functions into separate functions generated in Impls
 // - generate atomic writes from Forge
-// - Why are if-then-else statements being staged even when the condition is a Scala constant?
 
 // TEST:
 
@@ -25,6 +24,8 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 // - Move FigmentStruct to extern (Records)
 // - Add option to disable struct unwrapping in LMS
 // - Add new sugar for modules in DADL
+// - Why are if-then-else statements being staged even when the condition is a Scala constant?
+//   - Unable to reproduce (try using System.out.println instead?)
 
 object OptiMADSLRunner extends ForgeApplicationRunner with OptiMADSL
 trait OptiMADSL extends ForgeApplication with MultiArrays with MultiArrayImpls with MultiArrayMetadata

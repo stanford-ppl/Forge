@@ -9,7 +9,7 @@ trait Test extends OptiMAApplication {
   def main() = {
 
     if (stagingArgs.length != 0) {
-      println("You lose!")
+      System.out.println("You lose! Good day sir!")
       sys.exit(-1)
     }
 

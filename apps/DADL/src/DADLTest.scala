@@ -33,8 +33,10 @@ trait DADLTest extends DADLApplication {
       val i1 = input[T]
       val i2 = input[T]
       val o  = instance(Mux[T] _)(sel, i1, i2) // Some function of i1 and i2
-      new IO { val in1 = i1; val in2 = i2; val out = o }
+
+      new IO { val in1 = i1; val in2 = i2; val out = o; val out2 = .. }
     }
+
 
     // Should take care not to assign things to the output of a module, or have unconnected inputs
 

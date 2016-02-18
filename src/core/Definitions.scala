@@ -219,6 +219,7 @@ trait Definitions extends DerivativeTypes {
   case object mutable extends EffectType
   case object simple extends EffectType
   case class write(args: Int*) extends EffectType
+  case class atomicWrite(arg: Int) extends EffectType
   case object global extends EffectType
 
   /**

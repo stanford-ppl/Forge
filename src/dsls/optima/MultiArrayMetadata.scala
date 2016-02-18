@@ -17,25 +17,27 @@ trait MultiArrayMetadata { this: OptiMADSL =>
     //--------------------------
 
     // --- Implementation form (used for views and buffers)
-    // TODO: Change to use enums?
-    val ImplForm = metadata("ImplForm", ("v", SInt))
-    meet (ImplForm) ${ if (this != that) ImplForm(1) else that }
+    // TODO: Ternary is more general, could be useful to move elsewhere (may want to change naming scheme)
+    val Ternary = tpe("Ternary", stage=compile)
+    identifier (Ternary) ("False_3")
+    identifier (Ternary) ("Partial_3")
+    identifier (Ternary) ("True_3")
 
-    internal (ImplForm) ("NoImpl", Nil, Nil :: ImplForm) implements composite ${ ImplForm(0) }
-    internal (ImplForm) ("PhysImpl", Nil, Nil :: ImplForm) implements composite ${ ImplForm(1) }
-    internal (ImplForm) ("TrueImpl", Nil, Nil :: ImplForm) implements composite ${ ImplForm(2) }
+    val Form = metadata("Form", ("v", Ternary))
+    meet (Form) ${ if (this != that) Form(Partial_3) else that }
+
 
     // --- MultiArray isBuffer
-    val MBuffer = metadata("MBuffer", ("impl", ImplForm))
-    meet (MBuffer) ${ MBuffer(meet(this.impl, that.impl)) }
+    val MBuffer = metadata("MBuffer", ("form", Form))
+    meet (MBuffer) ${ MBuffer(meet(this.form, that.form)) }
 
     // --- MultiArray isView
-    val MView = metadata("MView", ("impl", ImplForm))
-    meet (MView) ${ MView(meet(this.impl, that.impl)) }
+    val MView = metadata("MView", ("form", Form))
+    meet (MView) ${ MView(meet(this.form, that.form)) }
 
     for (MT <- List(MBuffer,MView)) {
-      internal.infix (MT) ("isTrue", Nil, MT :: SBoolean) implements composite ${ $0.impl == TrueImpl }
-      internal.infix (MT) ("isPhys", Nil, MT :: SBoolean) implements composite ${ $0.impl == PhysImpl }
+      internal.infix (MT) ("isTrue", Nil, MT :: SBoolean) implements composite ${ $0.form == True_3 }
+      internal.infix (MT) ("isPhys", Nil, MT :: SBoolean) implements composite ${ $0.form == Partial_3 }
     }
 
     // --- MultiArray rank

@@ -3,6 +3,7 @@ package optila.compiler.ops
 import scala.tools.nsc.io._
 import reflect.Manifest;
 import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 import scala.virtualization.lms.common.{Base,BaseExp,EffectExp,BaseFatExp}
 import scala.virtualization.lms.common.{ScalaGenBase,ScalaGenEffect,ScalaGenFat}
 import scala.virtualization.lms.util._
@@ -36,6 +37,7 @@ import optila.compiler.ops._
  * that must be specified for the op), we probably want to use Forge to generate the boilerplate for all targets.
  */
 
+@virtualize
 trait BLASOpsExp extends BLASOps with DenseMatrixOpsExp {
   this: OptiLAExp =>
 

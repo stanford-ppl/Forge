@@ -192,7 +192,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
 
   def makeArgs(args: List[Rep[DSLArg]], makeArgName: (Rep[DSLArg] => String) = simpleArgName, addParen: Boolean = true) = {
     if (args.length == 0 && !addParen) {
-      ""
+      "()"
     }
     else {
       "(" + args.map(makeArgName).mkString(",") + ")"
@@ -530,23 +530,6 @@ trait BaseGenOps extends ForgeCodeGenBase {
     //   def toFloat(implicit __cb0: Numeric[T],__pos: SourceContext,__imp1: Overload2) = primitive_tofloat[T](self)(implicitly[Numeric[T]],implicitly[Manifest[T]],__pos)
     //   def toDouble(implicit __cb0: Numeric[T],__pos: SourceContext,__imp1: Overload2) = primitive_todouble[T](self)(implicitly[Numeric[T]],implicitly[Manifest[T]],__pos)
     //   def toLong(implicit __cb0: Numeric[T],__pos: SourceContext,__imp1: Overload2) = primitive_tolong[T](self)(implicitly[Numeric[T]],implicitly[Manifest[T]],__pos)
-    // }
-
-    // def toInt(implicit __pos: SourceContext,__imp1: Overload2) = {
-    //   type T = Double
-    //   primitive_toint[T](self)(implicitly[Numeric[T]],implicitly[Manifest[T]],__pos)
-    // }
-    // def toFloat(implicit __pos: SourceContext,__imp1: Overload2) = {
-    //   type T = Double
-    //   primitive_tofloat[T](self)(implicitly[Numeric[T]],implicitly[Manifest[T]],__pos)
-    // }
-    // def toDouble(implicit __pos: SourceContext,__imp1: Overload2) = {
-    //   type T = Double
-    //   primitive_todouble[T](self)(implicitly[Numeric[T]],implicitly[Manifest[T]],__pos)
-    // }
-    // def toLong(implicit __pos: SourceContext,__imp1: Overload2) = {
-    //   type T = Double
-    //   primitive_tolong[T](self)(implicitly[Numeric[T]],implicitly[Manifest[T]],__pos)
     // }
 
     // implicits go in a base class for lower priority

@@ -10,6 +10,6 @@ trait ModuleIOOps {
 
   abstract class IO extends Record
 
-  def input[T:Manifest]: Rep[T]
+  //def input[T:Manifest]: Rep[T]
 }
 trait ModuleIOCompilerOps extends ModuleIOOps { this: DADL => }

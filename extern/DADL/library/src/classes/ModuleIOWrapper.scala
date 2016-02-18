@@ -8,5 +8,5 @@ import dadl.library.classes._
 trait ModuleIOWrapper {
   this: DADLBase with DADLClasses =>
 
-  def input[T:Manifest]: Rep[T] = { throw new Exception("Method 'input' is not supported in the library backend") }
+  //def input[T:Manifest]: Rep[T] = { throw new Exception("Method 'input' is not supported in the library backend") }
 }

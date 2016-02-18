@@ -10,6 +10,6 @@ import dadl.compiler.ops._
 trait ModuleIOOpsExp extends ModuleIOOps with BaseExp {
   this: DADLExp =>
 
-  def input[T:Manifest]: Wire[T] = fresh[T]
+  //def input[T:Manifest]: Wire[T] = fresh[T]
 }
 

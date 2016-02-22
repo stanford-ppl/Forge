@@ -14,7 +14,7 @@ trait DotProd extends DHDLApplication {
   def main() = {
 		val tileSize = 4
 		val sDataSize = 32
-		val dataSize = ArgIn[Int](sDataSize).value
+		val dataSize = ArgIn[FixPt](sDataSize).value
 		val svec1 = Seq.fill(sDataSize)(Random.nextInt(100))
 		val svec2 = Seq.fill(sDataSize)(Random.nextInt(100))
 		val gold = svec1.zip(svec2).map{case (x,y) => x*y}.reduce(_+_)

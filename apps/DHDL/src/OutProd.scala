@@ -22,7 +22,7 @@ trait OutProd extends DHDLApplication {
 			}
 		}
 
-		val dataSize = ArgIn[Int](vecLength).value
+		val dataSize = ArgIn[FixPt](vecLength).value
 		val vec1 = OffChipMem[FixPt]("vec1", svec1.map(i => i.toFixPt): _*)
 		val vec2 = OffChipMem[FixPt]("vec2", svec2.map(i => i.toFixPt): _*)
 		val result = OffChipMem[FixPt]("result", dataSize * dataSize)

@@ -62,7 +62,7 @@ trait MatMult extends DHDLApplication {
 		val M3 = OffChipMem[FixPt]("M3", M.value*N.value)
 		val ijkCounter = CounterChain(Counter(M.value, bm), (N.value,bn), (P.value,bp))
 
-		MetaPipe(3, ijkCounter, {case i::j::k::_ => 
+		MetaPipe(3, true, ijkCounter, {case i::j::k::_ => 
 			val m1Tile = BRAM[FixPt](bm*bp)
 			val m2Tile = BRAM[FixPt](bp*bn)
 			Parallel({
@@ -70,7 +70,6 @@ trait MatMult extends DHDLApplication {
 				M2.ld(m2Tile, k, j, bp, bn, P.value)
 				()
 			})
-
 			Parallel({
 				val multTile = BRAM[FixPt](bm*bn)
 				matmultTile(m1Tile, m2Tile, multTile, bm, bn, bp)
@@ -78,9 +77,9 @@ trait MatMult extends DHDLApplication {
 				M3.ld(accumTile, i, j, bm, bn, M.value)
 				()
 			})
+
 			()
 		})
-		val sumTile = BRAM[FixPt](bm*bn)
 
 	}
 }

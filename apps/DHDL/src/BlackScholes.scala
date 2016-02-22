@@ -116,7 +116,7 @@ trait BlackScholes extends DHDLApplication {
 		val svolatility = Seq.fill(sNumOptions)(Random.nextFloat())
 		val sotime 			= Seq.fill(sNumOptions)(Random.nextFloat())
 
-		val numOptions = ArgIn[Int](sNumOptions).value
+		val numOptions = ArgIn[FixPt](sNumOptions).value
 		val otype = OffChipMem[FixPt]("otype", sotype.map(i => i.toFixPt): _*)
 		val sptprice = OffChipMem[Float]("sptprice", ssptprice.map(i => unit(i)): _*)
 		val strike = OffChipMem[Float]("strke", sstrike.map(i => unit(i)): _*)

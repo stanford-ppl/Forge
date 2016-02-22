@@ -15,8 +15,13 @@ trait ModuleIOOpsExp extends ModuleIOOps with BaseExp {
 
   case class FeedbackWire[+T](val e: Exp[Feedback[T]])
 
+  // Node representing a new, unassigned feedback wire
   case class FreshFeedback[T](mT: Manifest[T]) extends Def[Feedback[T]]
+
+  // Assignment to a feedback wire
   case class Link[T:Manifest](lhs: Feedback[T], rhs: Exp[T]) extends Def[Unit]
+
+  // Read a feedback wire (needed because value may not have been available yet)
   case class ReadFeedback[T:Manifest](f: Feedback[T]) extends Def[T]
 
   def feedback_new[T:Manifest](implicit ctx: SourceContext): Feedback[T] = {

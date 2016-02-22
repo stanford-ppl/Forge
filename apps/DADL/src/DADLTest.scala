@@ -27,14 +27,13 @@ trait DADLTest extends DADLApplication {
     println(a)
     println(b)
 
-    // Unforunately can't do type ALU[T] = Record[T]{val in1: T; val in2: T; val out: T}
+    val alu1 = feedback[Int]
 
-    def ALU[T:Manifest](bits: Int)(in1: Wire[T], in2: Wire[T]) = {
-      val o  = instance(Mux[T] _)(sel, in1, in2) // Some function of i1 and i2
-
-      new IO { val out = o }
+    def ALU[T:Manifest](in1: Wire[T], in2: Wire[T]) = {
+      instance(Mux[T] _)(sel, in1, in2) // Some function of i1 and i2
     }
 
+    alu1 = instance(ALU[Int] _)(alu1, in1)
 
     // Should take care not to assign things to the output of a module, or have unconnected inputs
 	}

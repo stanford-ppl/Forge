@@ -35,6 +35,8 @@ trait DADLTest extends DADLApplication {
 
     alu1 = instance(ALU[Int] _)(alu1, in1)
 
+    println(alu1)
+
     // Should take care not to assign things to the output of a module, or have unconnected inputs
 	}
 }

@@ -55,24 +55,67 @@ trait MultiArrayImpls extends FlatMultiArrays { this: OptiMADSL =>
       internal.infix ("dims") (Nil :: SList(MInt)) implements composite ${ maimpl_dims($self) }
       internal.infix ("strides") (Nil :: SList(MInt)) implements composite ${ maimpl_strides($self) }
 
-      internal ("maimpl_ofs") (Nil :: MInt) implements composite ${ layout($self) match {
-        case lt if lt.isView => field[Int]($self, "ofs")
+      internal ("maimpl_ofs") (Nil :: MInt) implements composite ${ layout($0) match {
+        case lt if lt.isView => field[Int]($0, "ofs")
         case _ => unit(0)
       }}
-      internal ("maimpl_dim") (SInt :: MInt) implements composite ${ layout($self) match {
-        case MLayout(1,Flat,Plain) => array_length($self.asInstanceOf[Rep[ForgeArray[T]]])
-        case _ => field[Int]($self, "dim_" + $1)
+      internal ("maimpl_dim") (SInt :: MInt) implements composite ${ layout($0) match {
+        case MLayout(1,Flat,Plain) => array_length($0.asInstanceOf[Rep[ForgeArray[T]]])
+        case _ => field[Int]($0, "dim_" + $1)
       }}
-      internal ("maimpl_dims") (Nil :: SList(MInt)) implements composite ${ List.tabulate(rank($self)){i => maimpl_dim($self, i) } }
-      internal ("maimpl_size") (Nil :: MInt) implements composite ${ productTree(maimpl_dims($self)) }
+      internal ("maimpl_dims") (Nil :: SList(MInt)) implements composite ${ List.tabulate(rank($0)){i => maimpl_dim($0, i) } }
+      internal ("maimpl_size") (Nil :: MInt) implements composite ${ productTree(maimpl_dims($0)) }
 
-      internal ("maimpl_stride") (SInt :: MInt) implements composite ${ layout($self) match {
-        case lt if lt.isView => field[Int]($self, "stride_" + $1)
+      internal ("maimpl_stride") (SInt :: MInt) implements composite ${ layout($0) match {
+        case lt if lt.isView => field[Int]($0, "stride_" + $1)
         case _ => throw new Exception("Can't get single stride for non-view")
       }}
-      internal ("maimpl_strides") (Nil :: SList(MInt)) implements composite ${ layout($self) match {
-        case lt if lt.isView => List.tabulate(rank($self)){i => maimpl_stride($self, i) }
-        case _ => dimsToStrides(maimpl_dims($self))
+      internal ("maimpl_strides") (Nil :: SList(MInt)) implements composite ${ layout($0) match {
+        case lt if lt.isView => List.tabulate(rank($0)){i => maimpl_stride($0, i) }
+        case _ => dimsToStrides(maimpl_dims($0))
+      }}
+
+      internal ("maimpl_apply") (SList(MInt) :: T) implements composite ${ layout($0) match {
+        case MLayout(_,Flat,_) => maflat_apply($0, indices_new($1))
+        case lt => throw new Exception("Don't know how to implement apply for layout " + lt)
+      }}
+
+      // TODO: Better implementation would use StringBuilder (not sure what c++ equivalent is)
+      // Repeatedly appending to a var is the worst possible implementation in terms of performance
+      internal ("maimpl1d_mkstring") ((MString, T ==> MString) :: MString) implements single ${
+        if ($0 == null) unit("null")
+        else if (maimpl_dim($0, 0) == 0) unit("[ ]")
+        else {
+          val last = maimpl_dim($0, 0) - 1
+          var s = ""
+          for (i <- 0 until last) { s = s + $2(maimpl_apply($0, List(i))) + $1 }
+          s + $2(maimpl_apply($0, List(last)))
+        }
+      }
+      internal ("maimpl2d_mkstring") ((MString, MString, T ==> MString) :: MString) implements single ${
+        if ($0 == null) unit("null")
+        else if (maimpl_dim($0, 0) == 0) unit("[ ]")
+        else {
+          val lastRow = maimpl_dim($0, 0) - 1
+          val lastCol = maimpl_dim($0, 1) - 1
+          var s = ""
+          for (i <- 0 until lastRow) {
+            for (j <- 0 until lastCol) {
+              s = s + $3(maimpl_apply($0, List(i,j))) + $2
+            }
+            s = s + $3(maimpl_apply($0, List(i,lastCol))) + $1
+          }
+          for (j <- 0 until lastCol) {
+            s = s + $3(maimpl_apply($0, List(lastRow,j))) + $2
+          }
+          s + $3(maimpl_apply($0, List(lastRow,lastCol)))
+        }
+      }
+
+      internal ("maimpl_mkstring") ((SList(MString), T ==> MString) :: MString) implements composite ${ rank($0) match {
+        case 1 => maimpl1d_mkstring($0, $1.head, $2)
+        case 2 => maimpl2d_mkstring($0, $1(0), $1(1), $2)
+        case n => throw new Exception("mkString for arrays of rank " + n + " not yet implemented")
       }}
     }
 

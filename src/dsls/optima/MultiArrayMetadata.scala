@@ -36,8 +36,8 @@ trait MultiArrayMetadata { this: OptiMADSL =>
     meet (MView) ${ MView(meet(this.form, that.form)) }
 
     for (MT <- List(MBuffer,MView)) {
-      internal.infix (MT) ("isTrue", Nil, MT :: SBoolean) implements composite ${ $0.form == True_3 }
-      internal.infix (MT) ("isPhys", Nil, MT :: SBoolean) implements composite ${ $0.form == Partial_3 }
+      internal.infix (MT) ("isTrue", Nil, MT :: SBoolean) implements composite ${ $0.form.v == True_3 }
+      internal.infix (MT) ("isPhys", Nil, MT :: SBoolean) implements composite ${ $0.form.v == Partial_3 }
     }
 
     // --- MultiArray rank

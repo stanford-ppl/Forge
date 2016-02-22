@@ -14,6 +14,7 @@ trait DADLDSL extends ForgeApplication
   override def clearTraversals = true
   disableFusion()
   disableSoA()
+  disableStructUnwrapping()
 
   override def addREPLOverride = false
 

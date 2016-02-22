@@ -18,6 +18,7 @@ trait MultiArrays { this: OptiMADSL =>
   def importMultiArrays() {
     val T = tpePar("T")
     val R = tpePar("R")
+    val S = List(TStringable(T))
 
     val ArrayND = lookupTpe("ArrayND")
     val Array1D = lookupTpe("Array1D")
@@ -37,12 +38,16 @@ trait MultiArrays { this: OptiMADSL =>
       maflat_view($0, $1, $2, MLayout($1.length - $2.length,Flat,View))
     }
 
-    // --- Single element operators
-    internal (ArrayND) ("ma_apply", T, (ArrayND(T), Indices) :: T) implements figment ${ maflat_apply($0, $1) }
-    internal (ArrayND) ("ma_update", T, (ArrayND(T), Indices, T) :: MUnit, effect = write(0)) implements figment ${ maflat_update($0, $1, $2) }
+    val ArrayNDInternals = withTpe(ArrayND)
+    ArrayNDInternals {
 
-    // --- Misc.
-    //internal (ArrayND) ("ma_mkstring", T, (ArrayND(T), SList(MString), SOption(T ==> MString)) :: MString) implements figment ${ maimpl_mkstring($0, $1, $2) }
+      // --- Single element operators
+      internal ("ma_apply") (Indices :: T) implements figment ${ maflat_apply($0, $1) }
+      internal ("ma_update") ((Indices, T) :: MUnit, effect = write(0)) implements figment ${ maflat_update($0, $1, $2) }
+
+      // --- Misc.
+      internal ("ma_mkstring") ((SList(MString), T ==> MString) :: MString) implements figment ${ maimpl_mkstring($0, $1, $2) }
+    }
 
     //--------
     //--- API
@@ -52,8 +57,8 @@ trait MultiArrays { this: OptiMADSL =>
     static (Array2D) ("apply", T, (MInt, MInt) :: Array2D(T)) implements composite ${ ma_new[T](List($0, $1)).as2D }
     static (Array1D) ("apply", T, MInt :: Array1D(T)) implements composite ${ ma_new[T](List($0)).as1D }
 
-    val ArrayNDOps = withTpe(ArrayND)
-    ArrayNDOps {
+    val ArrayNDAPI = withTpe(ArrayND)
+    ArrayNDAPI {
       // --- Compiler shortcuts
       internal.infix ("as3D") (Nil :: Array3D(T)) implements redirect ${ $self.asInstanceOf[Rep[Array3D[T]]] }
       internal.infix ("as2D") (Nil :: Array2D(T)) implements redirect ${ $self.asInstanceOf[Rep[Array2D[T]]] }
@@ -69,6 +74,9 @@ trait MultiArrays { this: OptiMADSL =>
       // Note: Scala doesn't support varArgs in updates right now (without extra macro stuff anyway)
       infix ("apply") (varArgs(MInt) :: T) implements composite ${ ma_apply($self, indices_new($1.toList)) }
       infix ("update") ((SList(MInt), T) :: MUnit, effect = write(0)) implements composite ${ ma_update($self, indices_new($1), $2) }
+
+      // --- Misc.
+      infix ("makeString") (varArgs(MString) :: MString, S) implements composite ${ ma_mkstring($self, $1.toList, {e: Rep[T] => padspace(e.mkStr)}) }
     }
 
     val Array1DOps = withTpe(Array1D)
@@ -76,6 +84,10 @@ trait MultiArrays { this: OptiMADSL =>
       infix ("length") (Nil :: MInt) implements composite ${ $self.size }
       infix ("apply") (MInt :: T) implements composite ${ ma_apply($self, indices_new(List($1))) }
       infix ("update") ((MInt, T) :: MUnit, effect = write(0)) implements composite ${ ma_update($self, indices_new(List($1)), $2) }
+
+      // --- Misc.
+      infix ("makeString") (Nil :: MString, S) implements composite ${ ma_mkstring($self, List(""), {e: Rep[T] => padspace(e.mkStr)} )}
+      infix ("toString") (Nil :: MString) implements composite ${ ma_mkstring($self, List(""), {e: Rep[T] => padspace(format_numeric(e))} )}
     }
 
   }

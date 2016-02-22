@@ -10,12 +10,13 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 // - Completeness checks for analyses
 // - Convergence conditions for analyses
 // - Pre- and Post-processing rules for analyses
-// - Library version of Blocks? How to handle transformation rules for these?
 // - figment should operate more like a redirect for library implementation
 // - separate metadata meet, etc. functions into separate functions generated in Impls
 // - generate atomic writes from Forge
+// - Add Global precision to OptiMA extern
 
 // TEST:
+// - Library version of Blocks? How to handle transformation rules for these?
 
 // DONE:
 // - disable error with field shortcutting on figment types (new rule for unapply on structs for figments)
@@ -28,8 +29,9 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 //   - Unable to reproduce (try using System.out.println instead?)
 
 object OptiMADSLRunner extends ForgeApplicationRunner with OptiMADSL
-trait OptiMADSL extends ForgeApplication with MultiArrays with MultiArrayImpls with MultiArrayMetadata
-  with ArrayLowering with MultiArrayAnalysis with RangeOps {
+trait OptiMADSL extends ForgeApplication
+  with MultiArrays with MultiArrayImpls with MultiArrayMetadata with ArrayLowering with MultiArrayAnalysis
+  with RangeOps with Stringables {
 
   def dslName = "OptiMA"
   override def clearTraversals = true
@@ -48,6 +50,7 @@ trait OptiMADSL extends ForgeApplication with MultiArrays with MultiArrayImpls w
     //noInfixList :::= List("toInt", "toFloat", "toDouble", "toLong")
 
     importRanges()
+    importStringables()
 
     // MultiArray figment types (with subtyping)
     val T = tpePar("T")

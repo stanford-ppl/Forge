@@ -113,7 +113,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     var conj = " extends "
     for ((grp,opsGrp) <- OpsGrp if requiresLibraryBackend(opsGrp)) {
       if (isTpeClass(grp)) {
-        stream.print("conj" + opsGrp.name)
+        stream.print(conj + opsGrp.name)
         conj = " with "
       }
       else if (!isTpeClassInst(grp)) {

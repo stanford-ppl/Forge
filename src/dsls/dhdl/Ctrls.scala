@@ -11,6 +11,7 @@ trait CtrlOps {
 		val Reg = lookupTpe("Reg")
 		val FixPt = lookupTpe("Long")
 		val CtrlOps = grp("Ctrls")
+		val MetaOps = grp("CtrlMetadatas")
 
 		val Counter = tpe("Counter")
 		data (Counter, ("_name", MString), ("_min", FixPt), ("_max", FixPt), ("_step", FixPt), ("_val", FixPt))
@@ -49,12 +50,14 @@ trait CtrlOps {
 		}
 
 		val CounterChain = tpe("CounterChain")
+		/*
 		val MCounterChain = metadata("MCounterChain", ("size",SInt))
 		meet (MCounterChain) ${ this }
-		internal.static (MCounterChain) ("update", Nil, (CounterChain, SInt) :: MUnit, effect = simple) implements
+		internal.static (MetaOps) ("update", Nil, (CounterChain, SInt) :: MUnit, effect = simple) implements
 		composite ${ setMetadata($0, MCounterChain($1)) }
-		internal.static (MCounterChain) ("apply", Nil, CounterChain :: MCounterChain) implements composite ${
+		internal.static (MetaOps) ("apply", Nil, CounterChain :: MCounterChain) implements composite ${
 		meta[MCounterChain]($0).get}
+		*/
 
 		data (CounterChain, ("_chain", MArray(Counter)))
     internal (CounterChain) ("ctrchain_from_array", Nil, MArray(Counter) :: CounterChain,effect=mutable) implements allocates(CounterChain, ${$0})
@@ -63,7 +66,7 @@ trait CtrlOps {
       val ctrchain = ctrchain_from_array(array)
       for (i <- 0 until $0.length) { ctrchain(i) = $0.apply(i) }
 			val ictrchain = ctrchain.unsafeImmutable
-			MCounterChain(ictrchain) = $0.length
+			//MCounterChain(ictrchain) = $0.length
 			ictrchain
     }
 		val CounterChainOps = withTpe(CounterChain)
@@ -196,7 +199,7 @@ trait CtrlOps {
 			val wrapMapFun = (idxs:Seq[Rep[FixPt]]) => {
 				Seq($mapFunc(idxs:_*))
 			}
-			MetaReduceList[T]($ctrSize, $pipelined, $ctrs, Seq($accum), Seq(reduceFunc), wrapMapFun)
+			MetaReduceMany[T]($ctrSize, $pipelined, $ctrs, Seq($accum), Seq(reduceFunc), wrapMapFun)
 		})
 		direct (MetaPipe) ("Sequential", T, MethodSignature(List(("ctrSize", SInt), ("ctrs", CounterChain), ("accum", Reg(T)),
 			("reduceFunc", (T, T) ==> T) , ("mapFunc", varArgs(FixPt) ==> T)),MetaPipe)) implements
@@ -204,10 +207,10 @@ trait CtrlOps {
 			MetaPipe[T]($ctrSize, unit(false), $ctrs, $accum, $reduceFunc, $mapFunc)
 		}
 		val SSeq = tpe("scala.Seq", T, stage=compile)
-		val meta_reduce_list = direct (MetaPipe) ("MetaReduceList", T, MethodSignature(List(("ctrSize", SInt),
+		val meta_reduce_many = direct (MetaPipe) ("MetaReduceMany", T, MethodSignature(List(("ctrSize", SInt),
 			("pipelined", MBoolean), ("ctrs", CounterChain), ("accums", SSeq(Reg(T))),
 			("reduceFuncs", SSeq((T, T) ==> T)) , ("mapFunc", varArgs(FixPt) ==> SSeq(T))), MetaPipe))
-		impl (meta_reduce_list) (composite ${
+		impl (meta_reduce_many) (composite ${
 			def recMetaPipe (idx:Int, idxs:Seq[Rep[FixPt]]): Rep[Unit] = {
 				val ctr = $ctrs.chain.apply(unit(idx))
 				if (idx == 0) {
@@ -227,6 +230,46 @@ trait CtrlOps {
 			recMetaPipe( $ctrSize - 1, Seq.empty[Rep[FixPt]] )
 			metaPipe
 		})
+
+		//TODO:FIX this
+		val BRAM = lookupTpe("BRAM")
+		val bram_reduce_many = direct (MetaPipe) ("BramReduceMany", T, MethodSignature(List(("ctrSize", SInt), 
+			("bramSize", SInt), ("pipelined", MBoolean), ("ctrs", CounterChain), ("brams", SSeq(BRAM(T))),
+			("reduceFuncs", SSeq((T, T) ==> T)) , ("mapFunc", varArgs(FixPt) ==> SSeq(BRAM(T)))), MetaPipe))
+		impl (bram_reduce_many) (composite ${
+			def recMetaPipe (idx:Int, idxs:Seq[Rep[FixPt]]): Rep[Unit] = {
+				val ctr = $ctrs.chain.apply(unit(idx))
+				if (idx == 0) {
+					loop(ctr, { case i => 
+						val resultBms = $mapFunc(i+:idxs)
+						$brams.zipWithIndex.foreach{case (bram, accIdx) =>
+							val reduceFunc = reduceFuncs(accIdx)
+							val bramCtr = CounterChain(Counter(max=$bramSize))
+							Pipe(1, true, bramCtr, {case i::_ =>
+								bram.st(i, reduceFunc(bram.ld(i), resultBms(accIdx).ld(i))) 
+							})
+						}
+					})
+				} else {
+					loop(ctr, ( (i:Rep[FixPt]) => recMetaPipe(idx - 1, i+:idxs) ))
+				}
+			}
+			val metaPipe = MetaPipe( $ctrs)
+			//$brams.foreach(bram => bram.reset)
+			recMetaPipe( $ctrSize - 1, Seq.empty[Rep[FixPt]] )
+			metaPipe
+		})
+		val bram_reduce = direct (MetaPipe) ("BramReduce", T, MethodSignature(List(("ctrSize", SInt), 
+			("bramSize", SInt), ("pipelined", MBoolean), ("ctrs", CounterChain), ("bram", BRAM(T)),
+			("reduceFunc", (T, T) ==> T) , ("mapFunc", varArgs(FixPt) ==> BRAM(T))), MetaPipe))
+		impl (bram_reduce) (redirect ${
+			val wrapMapFun = (idxs:Seq[Rep[FixPt]]) => {
+				Seq($mapFunc(idxs:_*))
+			}
+			BramReduceMany[T]($ctrSize, $bramSize, $pipelined, $ctrs, Seq($bram), Seq(reduceFunc), wrapMapFun)
+		})
+		/*
+		*/
 
 		/* MetaPipe Parallel */
 		val meta_parallel = direct (MetaPipe) ("Parallel", Nil, ("func", MThunk(MUnit)) :: MetaPipe) 

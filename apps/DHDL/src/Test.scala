@@ -35,14 +35,15 @@ trait Test extends DHDLApplication {
 		val ctr1 = Counter("ctr1", 0, 3, 1)
 		val ctr2 = Counter("ctr2", 0, 4, 1)
 		val ctrs = CounterChain(ctr1, ctr2)
-		println(ctrs.mkString)
 
-		Pipe(2, ctrs, { case i::j::_ =>
-			//m.st(c, FixPt(c))
-			println(i)
-			println(j)
-			println("---")
+		/*
+		val accBm = BRAM[FixPt](5)
+		BramReduce[FixPt](1, false, ctrs, accBm, (_+_), { case i::_ =>
+			(i, j)
 		})
+		*/
+
+		println(accBm.mkString)
 
 
 	}

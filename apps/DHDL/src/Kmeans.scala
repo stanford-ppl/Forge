@@ -66,7 +66,7 @@ trait Kmeans extends DHDLApplication with KmeansTest{
 		val ptCtr = CounterChain(Counter(max=5))
 		val accum1 = Reg[FixPt](0)
 		val accum2 = Reg[FixPt](0)
-		MetaReduceList[FixPt](1, true, ptCtr, Seq(accum1, accum2), Seq(_+_, _+_), {case i::_ => 
+		MetaReduceMany[FixPt](1, true, ptCtr, Seq(accum1, accum2), Seq(_+_, _+_), {case i::_ => 
 			println(i)
 			Seq(i, i)
 		})

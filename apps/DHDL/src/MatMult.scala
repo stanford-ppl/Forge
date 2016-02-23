@@ -60,24 +60,22 @@ trait MatMult extends DHDLApplication {
 		//val M2 = OffChipMem[FixPt]("M2", sM2.map(i => i.toFixPt): _*)
 		val M2 = OffChipMem[FixPt]("M2", P.value*N.value)
 		val M3 = OffChipMem[FixPt]("M3", M.value*N.value)
-		val ijkCounter = CounterChain(Counter(M.value, bm), (N.value,bn), (P.value,bp))
+		val ijCounter = CounterChain(Counter(M.value, bm), (N.value,bn))
 
-		MetaPipe(3, true, ijkCounter, {case i::j::k::_ => 
+		MetaPipe(3, true, ijkCounter, {case i::j::_ => 
 			val m1Tile = BRAM[FixPt](bm*bp)
 			val m2Tile = BRAM[FixPt](bp*bn)
-			Parallel({
-				M1.ld(m1Tile, i, k, bm, bp, M.value)
-				M2.ld(m2Tile, k, j, bp, bn, P.value)
-				()
+			val multTile = BRAM[FixPt](bm*bn)
+			val kCounter = CounterChain(Counter(P.value, bp))
+			BramReduce[FixPt](1, true, kCounter, multTile, (_+_), {case k::_ =>
+				Parallel({
+					M1.ld(m1Tile, i, k, bm, bp, M.value)
+					M2.ld(m2Tile, k, j, bp, bn, P.value)
+				})
+				val result = BRAM[FixPt](bm*bn)
+				matmultTile(m1Tile, result, result, bm, bn, bp)
+				result
 			})
-			Parallel({
-				val multTile = BRAM[FixPt](bm*bn)
-				matmultTile(m1Tile, m2Tile, multTile, bm, bn, bp)
-				val accumTile = BRAM[FixPt](bm*bn)
-				M3.ld(accumTile, i, j, bm, bn, M.value)
-				()
-			})
-
 			()
 		})
 

@@ -70,8 +70,8 @@ trait OptiMADSL extends ForgeApplication
     importMultiArrayMetadata()
     importMultiArrays()
     importMultiArrayImpls()
-    //importRankAnalysis()
-    //importArrayLowering()
+    importRankAnalysis()
+    importArrayLowering()
 
     val RankAnalyzer = analyzer("Rank")
     //val RankChecker  = analyzer("RankCheck")

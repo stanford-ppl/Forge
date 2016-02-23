@@ -58,7 +58,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
   // TODO: Doesn't handle methods which require implicit overload arguments
   def makeLowerMethodSignature(o: Rep[DSLOp]) = {
     val implicitArgs = makeOpImplicitArgsWithType(o)
-    "def " + makeLowerMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + implicitArgs
+    "def " + makeLowerMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeArgsWithBoundSymsWithType(o.args, Impls(o), blockify) + implicitArgs
   }
 
   def emitTransformer(t: Rep[DSLTransformer], stream: PrintWriter) {
@@ -82,7 +82,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("  }")
 
     for ((op,rules) <- patterns) {
-      emitTraversalRules(op, rules, true, stream, 2, makeLowerMethodName)
+      emitTraversalRules(op, rules, stream, 2, Some(makeLowerMethodSignature))
     }
 
     stream.println("}")
@@ -112,7 +112,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
       if (!hasIRNode(op) || hasMultipleIRNodes(op)) {
         err("Cannot create analysis rule for op " + op.name + ": Op must be represented by exactly one IR node")
       }
-      emitTraversalRules(op, rules, false, stream, 4, makeOpMethodName)
+      emitTraversalRules(op, rules, stream, 4)
     }
 
     stream.println("    case _ => super.processTP(lhs, rhs)") // TODO: Should be able to change this

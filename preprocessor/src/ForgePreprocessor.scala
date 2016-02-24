@@ -100,7 +100,7 @@ trait ForgePreprocessor {
     }
 
     def scanBackToOp(start: Int, input: Array[Byte]): OpEncoding = {
-      val words = opStarters :+ "impl" // enclosing op definers
+      val words = opStarters ++ List("impl", "lower") // enclosing op definers
       //println("words: " + words.mkString(", "))
       var i = start
       var foundWord = ""
@@ -153,6 +153,25 @@ trait ForgePreprocessor {
 
           if (endOpIndex == start) err("could not find op binding following 'impl' declaration")
           OpFromImpl(new String(input.slice(startOpIndex+1,endOpIndex)))
+
+        // TODO: Only works in transformer scope right now
+        /*case "lower" =>
+          while (i < start && input(i) != '(') i += 1
+          val startOpIndex = i
+          while (i < start && input(i) != ')' && input(i) != ',') i += 1
+          val endOpIndex = i
+
+          if (input(i) == ',') {
+            // scan forwards to extract the op name
+            while (i < start && input(i) != '"') i += 1
+            val startNameIndex = i
+            i += 1
+            while (i < start && input(i) != '"') i += 1
+            val endNameIndex = i
+            OpFromOp(new String(input.slice(startOpIndex+1,endOpIndex)), new String(input.slice(startNameIndex+1,endNameIndex)))
+          }
+          else
+            OpFromImpl(new String(input.slice(startOpIndex+1,endOpIndex)))*/
 
         case _ => err("could not find lexically enclosing op declaration for formatted block")
       }

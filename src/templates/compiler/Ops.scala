@@ -1004,11 +1004,12 @@ trait DeliteGenOps extends BaseGenOps {
   }
 
   // TODO: This probably won't work for curried method signatures
-  def emitTraversalRules(op: Rep[DSLOp], rules: List[DSLRule], matchArgs: Boolean, stream: PrintWriter, indent: Int, funcName: Rep[DSLOp] => String, prefix: String = "") {
+  def emitTraversalRules(op: Rep[DSLOp], rules: List[DSLRule], stream: PrintWriter, indent: Int, funcSignature: Option[Rep[DSLOp] => String] = None, funcCall: Option[Rep[DSLOp] => String] = None, prefix: String = "") {
+    val matchArgs = funcSignature.isDefined
     val patternPrefix = if (matchArgs) "" else makeOpNodeName(op)
 
     val innerIndent = if (matchArgs) {
-      emitWithIndent(prefix + "def " + funcName(op) + makeOpArgsSignature(op, Some(false)) + " = " + makeArgs(op.args) + " match {", stream, indent)
+      emitWithIndent(prefix + funcSignature.get.apply(op) + " = " + makeArgs(op.args) + " match {", stream, indent)
       indent + 2
     }
     else indent
@@ -1023,6 +1024,7 @@ trait DeliteGenOps extends BaseGenOps {
       else
         stream.println(lines.head)
     }
+
     // Emit all pattern cases (in order) first
     for (r <- rules.flatMap{case r: PatternRule => Some(r) case _ => None}) {
       emitCase(r.pattern, r.rule)
@@ -1035,6 +1037,7 @@ trait DeliteGenOps extends BaseGenOps {
       emitWithIndentInline("case _ => ", stream, innerIndent)
     else
       emitWithIndentInline("case rhs@" + makeOpSimpleNodeNameWithAnonArgs(op) + " => ", stream, innerIndent)
+
     rules.find(r => r.isInstanceOf[SimpleRule]) match {
       case Some(SimpleRule(rule)) =>
         val lines = inline(op, rule, quoteLiteral).split(nl)
@@ -1044,7 +1047,7 @@ trait DeliteGenOps extends BaseGenOps {
         }
         else
           stream.println(lines.head)
-      case _ if matchArgs => stream.println("super." + funcName(op) + makeArgs(op.args))
+      case _ if funcCall.isDefined => stream.println("super." + funcCall.get.apply(op))
       case _ =>
     }
     if (matchArgs) {
@@ -1066,7 +1069,7 @@ trait DeliteGenOps extends BaseGenOps {
       stream.println("  this: " + dsl + "Exp => ")
       stream.println()
       rewrites foreach { case (o, rules) =>
-        emitTraversalRules(o, rules, true, stream, 2, makeOpMethodName, "override ")
+        emitTraversalRules(o, rules, stream, 2, Some(makeOpMethodSignature(_,None)), Some(makeOpMethodCall), "override ")
       }
       stream.println("}")
     }

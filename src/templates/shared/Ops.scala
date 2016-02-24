@@ -377,6 +377,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
       "def " + makeOpMethodName(o) + makeOpArgsSignature(o, withReturnTpe)
     // }
   }
+  def makeOpMethodCall(o: Rep[DSLOp]) = makeOpMethodName(o) + makeOpArgs(o, true)
 
   def makeSyntaxSignature(o: Rep[DSLOp], prefix: String = "def ", withReturnTpe: Option[Boolean] = None) = {
     // adding the return type increases verbosity in the generated code, so we omit it by default

@@ -31,6 +31,23 @@ trait ArrayLowering { this: OptiMADSL =>
       lower (ArrayND, "ma_apply") using rule ${
 
       }*/
+
+      // TODO: Referring to bound args should have simpler syntax than this
+      val arg2_0 = "f_"+quotedArg(2)+"___arg0"
+
+      lower (ArrayND, "ma_mkstring") using rule ${
+
+        def stringify(elem: Rep[T]): Rep[String] = {
+          val mirroredBody = withSubstScope(\$arg2_0 -> elem){ f($2) }
+          getBlockResultFull(mirroredBody)
+        }
+
+        maimpl_mkstring($0, $1, {e: Rep[T] => stringify(e)})
+
+        // TODO: Inlining blocks should have simpler syntax than this, should just expand to something like this
+        // ideally:
+        // ma_impl_mkstring($0, $1, {e: Rep[T] => inline[2](e) })
+      }
     }
 
   }

@@ -4,7 +4,7 @@ import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common._
 
-trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
+trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase with ForgeMetadataWrapper {
   this: ForgeHashMapWrapper =>
 
   type ForgeArray[T] = scala.Array[T]
@@ -70,9 +70,19 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
     = array_apply(__arg0,__arg1)
   def scala_array_length[T:Manifest](__arg0: Rep[Array[T]])(implicit __imp0: SourceContext): Rep[Int]
     = array_length(__arg0)
+
+  // TODO: This is a little strange since we can't inspect and initialize metadata on the inner type easily
+  // For now, if the array is empty, cannot easily initalize child's metadata.
+  override def initProps(e: Rep[Any], symData: PropMap[Datakey[_],Metadata], child: Option[SymbolProperties], index: Option[String])(implicit ctx: SourceContext): SymbolProperties = e match {
+    case e: ForgeArray[_] =>
+      val typeChild = if (e.length == 0) None else getProps(e.apply(0))
+      val symChild = meet(MetaTypeInit, child, typeChild)
+      ArrayProperties(symChild, symData)
+    case _ => super.initProps(e, symData, child, index)
+  }
 }
 
-trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
+trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase with ForgeMetadataWrapper {
   this: ForgeArrayWrapper with ForgeHashMapWrapper =>
 
   type ForgeArrayBuffer[T] = scala.collection.mutable.ArrayBuffer[T]
@@ -146,6 +156,17 @@ trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase {
   }
   def array_buffer_fromfunction[T:Manifest](__arg0: Rep[Int], __arg1: Rep[Int] => Rep[T])(implicit __imp0: SourceContext): Rep[ForgeArrayBuffer[T]] = {
     scala.collection.mutable.ArrayBuffer.tabulate[T](__arg0)(__arg1)
+  }
+
+  // TODO: This is a little strange since we can't inspect and initialize metadata on the inner type easily
+  // Also a bit weird since this is a struct in the compiler and a "primitive" in the library
+  // For now, if the array is empty, cannot easily initalize child's metadata.
+  override def initProps(e: Rep[Any], symData: PropMap[Datakey[_],Metadata], child: Option[SymbolProperties], index: Option[String])(implicit ctx: SourceContext): SymbolProperties = e match {
+    case e: ForgeArrayBuffer[_] =>
+      val typeChild = if (e.length == 0) None else getProps(e.apply(0))
+      val symChild = meet(MetaTypeInit, child, typeChild)
+      ArrayProperties(symChild, symData)
+    case _ => super.initProps(e, symData, child, index)
   }
 }
 

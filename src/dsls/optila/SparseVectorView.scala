@@ -26,11 +26,11 @@ trait SparseVectorViewOps {
 
     val SparseVectorViewOps = withTpe(SparseVectorView)
     SparseVectorViewOps {
-      compiler ("sparsevectorview_source") (Nil :: SparseMatrix(T)) implements getter(0, "_source")
-      compiler ("sparsevectorview_start") (Nil :: MLong) implements getter(0, "_start")
-      compiler ("sparsevectorview_stride") (Nil :: MInt) implements getter(0, "_stride")
+      internal ("sparsevectorview_source") (Nil :: SparseMatrix(T)) implements getter(0, "_source")
+      internal ("sparsevectorview_start") (Nil :: MLong) implements getter(0, "_start")
+      internal ("sparsevectorview_stride") (Nil :: MInt) implements getter(0, "_stride")
 
-      compiler ("sparsevectorview_calc_offsets_all") (Nil :: Tuple6(MInt,MInt,MInt,MInt,MInt,MInt)) implements composite ${
+      internal ("sparsevectorview_calc_offsets_all") (Nil :: Tuple6(MInt,MInt,MInt,MInt,MInt,MInt)) implements composite ${
         val numCols = sparsevectorview_source($self).numCols
         val (startRow,startCol) = unpack(matrix_shapeindex(sparsevectorview_start($self), numCols))
         val (endRow,endCol) = unpack(matrix_shapeindex(sparsevectorview_start($self)+sparsevectorview_stride($self).toLong*$self.length, numCols))
@@ -38,13 +38,13 @@ trait SparseVectorViewOps {
         pack(startRow,endRow,startCol,endCol,rowPtr(startRow),rowPtr(endRow))
       }
 
-      compiler ("sparsevectorview_calc_offsets") (Nil :: Tuple2(MInt,MInt)) implements composite ${
+      internal ("sparsevectorview_calc_offsets") (Nil :: Tuple2(MInt,MInt)) implements composite ${
         val (startRow,endRow,startCol,endCol,startOffset,endOffset) = unpack(sparsevectorview_calc_offsets_all($self))
         pack(startOffset,endOffset)
       }
 
       // since we don't pass in the logical row, this only checks if the column index matches the view's stride
-      compiler ("sparsevectorview_includeoffset") (MInt :: MBoolean) implements composite ${
+      internal ("sparsevectorview_includeoffset") (MInt :: MBoolean) implements composite ${
         val srcIndices = sparsematrix_csr_colindices(sparsevectorview_source($self))
         (sparsevectorview_stride($self) == 1) || ((srcIndices($1) % sparsevectorview_stride($self)) == sparsevectorview_start($self))
       }

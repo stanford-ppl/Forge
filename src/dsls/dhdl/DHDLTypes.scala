@@ -19,7 +19,7 @@ trait DHDLTypes {
 		importStrings()
 
 		//TODO: op checkFixPtPrec has return type Unit but no effects, so it is a no-op
-		compiler (TpeOps) ("checkFixPtPrec", Nil, (MInt,MInt)::MUnit, effect = simple) implements codegen ($cala, ${
+		internal (TpeOps) ("checkFixPtPrec", Nil, (MInt,MInt)::MUnit, effect = simple) implements codegen ($cala, ${
 			val intPrec = $0
 			val fracPrec = $1
 			val MAX_FIXPT_PRECISION = 64
@@ -96,7 +96,7 @@ trait DHDLTypes {
 
 		}
 
-		val fix_to_string = compiler (FixPt) ("fix_to_string", Nil, (("sign", FixPt), ("int", FixPt), ("frac", FixPt)) :: MString)
+		val fix_to_string = internal (FixPt) ("fix_to_string", Nil, (("sign", FixPt), ("int", FixPt), ("frac", FixPt)) :: MString)
 		impl (fix_to_string) (codegen ($cala, ${
 			(if ($sign == 0L) "" else "-") + $int + "." + $frac
 		}))
@@ -123,8 +123,9 @@ trait DHDLTypes {
 			impl (float2fix) (composite ${FixPt($self, 31, 0)})
 		}
 
-		fimplicit (TpeOps) ("fixpt_to_float", Nil, FixPt::MFloat) implements composite ${ $0.toFloat }
-		fimplicit (TpeOps) ("float_to_fixpt", Nil, MFloat::FixPt) implements composite ${ $0.toFixPt }
+		//fimplicit (TpeOps) ("fixpt_to_float", Nil, FixPt::MFloat) implements composite ${ $0.toFloat }
+		//fimplicit (TpeOps) ("float_to_fixpt", Nil, MFloat::FixPt) implements composite ${ $0.toFixPt }
 		fimplicit (TpeOps) ("int_to_fixpt", Nil, MInt::FixPt) implements composite ${ $0.toFixPt }
+		fimplicit (TpeOps) ("sint_to_fixpt", Nil, SInt::FixPt) implements composite ${ unit($0).toFixPt }
 	}
 }

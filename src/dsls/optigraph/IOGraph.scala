@@ -31,8 +31,8 @@ trait IOGraphOps {
       writeGraphData($path,ids,data.getRawArray,$data.length)
     }
 
-    val writeGraphData = compiler (IO) ("writeGraphData", T, (("path",MString),("ids",MArray(MInt)),("data",MArray(T)),("length",MInt)) :: MUnit, TNumeric(T), effect = simple) 
-        
+    val writeGraphData = internal (IO) ("writeGraphData", T, (("path",MString),("ids",MArray(MInt)),("data",MArray(T)),("length",MInt)) :: MUnit, TNumeric(T), effect = simple)
+
     impl (writeGraphData) (codegen($cala, ${
       val xfs = new java.io.BufferedWriter(new java.io.FileWriter($path))
       xfs.write("#node id\\tdata\\n")
@@ -91,7 +91,7 @@ trait IOGraphOps {
     direct (IO) ("loadDirectedEdgeList", Nil, MString :: NodeData(Tuple2(MInt,MInt))) implements composite ${
       val input_edges = ForgeFileReader.readLines($0)({line =>
           val fields = line.fsplit(" ")
-          pack(fields(0).toInt,fields(1).toInt) 
+          pack(fields(0).toInt,fields(1).toInt)
       })
       NodeData[Tup2[Int,Int]](input_edges).distinct
     }
@@ -106,7 +106,7 @@ trait IOGraphOps {
 ////////Undirected CSR Loader
 /////////////////////////////////////////////////////////////////////////////////////////////
     direct (IO) ("undirectedGraphFromCSR", Nil, ( (("nodes",MArray(MInt)),("edges",MArray(MInt))) :: UndirectedGraph)) implements composite ${
-      UndirectedGraph(array_length(nodes),array_fromfunction[Int](array_length(edges),e=>e),nodes,edges,array_fromfunction[Double](array_length(edges),e=>1d))    
+      UndirectedGraph(array_length(nodes),array_fromfunction[Int](array_length(edges),e=>e),nodes,edges,array_fromfunction[Double](array_length(edges),e=>1d))
     }
     direct (IO) ("undirectedGraphFromEdgeList", Nil, ("edge_data",NodeData(Tuple2(MInt,MInt))) :: UndirectedGraph) implements composite ${
       val src_groups = edge_data.groupBy(e => e._1, e => e._2)
@@ -118,10 +118,10 @@ trait IOGraphOps {
       val numNodes = ids.length
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       val idHashMap = idView.groupByReduce[Int,Int](n => ids(n), n => n, (a,b) => a)
-      
+
       val serial_out = assignUndirectedIndicies(numNodes,edge_data.length,ids,idHashMap,src_groups)
 
-      UndirectedGraph(numNodes,ids.getRawArray,serial_out._1,serial_out._2,array_fromfunction[Double](edge_data.length,e=>1d))    
+      UndirectedGraph(numNodes,ids.getRawArray,serial_out._1,serial_out._2,array_fromfunction[Double](edge_data.length,e=>1d))
     }
     direct (IO) ("assignUndirectedIndicies", Nil, MethodSignature(List(("numNodes",MInt),("numEdges",MInt),("distinct_ids",NodeData(MInt)),("idHashMap",MHashMap(MInt,MInt)),("src_groups",MHashMap(MInt,MArrayBuffer(MInt)))),Tuple2(MArray(MInt),MArray(MInt)))) implements single ${
       val src_edge_array = NodeData[Int](numEdges)
@@ -174,7 +174,7 @@ trait IOGraphOps {
       val dst_edge_array = dst_ids_ordered.flatMap(e => NodeData(dst_groups(distinct_ids(e))).map{n => fhashmap_get(idHashMap,n)})
 
       val serial_out = assignIndiciesSerialDirected(numNodes,distinct_ids,src_groups,src_ids_ordered,dst_groups,dst_ids_ordered)
-      
+
       println("finished file I/O")
       DirectedGraph(numNodes,distinct_ids.getRawArray,serial_out(0).getRawArray,src_edge_array.getRawArray,serial_out(1).getRawArray,dst_edge_array.getRawArray)
     }
@@ -193,14 +193,14 @@ trait IOGraphOps {
           if((src_array_index+1) < src_ids_ordered.length) src_array_index += 1
         }
         else src_node_array(i+1) = src_node_array(i)
-        
+
         if(dst_ids_ordered(dst_array_index)==i){
           degree += array_buffer_length(fhashmap_get(dst_groups,distinct_ids(i)))
           dst_node_array(i+1) = array_buffer_length(fhashmap_get(dst_groups,distinct_ids(i))) + dst_node_array(i)
           if((dst_array_index+1) < dst_ids_ordered.length) dst_array_index += 1
         }
         else dst_node_array(i+1) = dst_node_array(i)
-        
+
         i += 1
       }
 
@@ -228,7 +228,7 @@ trait IOGraphOps {
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       var numEdges = 0l
 
-      val csr = input.sortBy({ a => 
+      val csr = input.sortBy({ a =>
         numNodes - input(a).length
       })
 
@@ -240,7 +240,7 @@ trait IOGraphOps {
       }
 
       val serial_out = assignADJUndirectedIndicies(numNodes,numEdges.toInt,distinct_ids,idHashMap,csrNeighbors)
-      UndirectedGraph(numNodes,distinct_ids.getRawArray,serial_out._1,serial_out._2,array_fromfunction[Double](numEdges.toInt,e=>1d))    
+      UndirectedGraph(numNodes,distinct_ids.getRawArray,serial_out._1,serial_out._2,array_fromfunction[Double](numEdges.toInt,e=>1d))
     }
     direct (IO) ("assignADJUndirectedIndicies", Nil, MethodSignature(List(("numNodes",MInt),("numEdges",MInt),("distinct_ids",NodeData(MInt)),("idHashMap",MHashMap(MInt,MInt)),("src_groups",NodeData(NodeData(MInt)))),Tuple2(MArray(MInt),MArray(MInt)))) implements single ${
       val src_edge_array = NodeData[Int](numEdges)
@@ -263,6 +263,6 @@ trait IOGraphOps {
       }
       pack(src_node_array.getRawArray,src_edge_array.getRawArray)
     }
-/////////////////////////////////////////////////////////////////////////////////////////////    
+/////////////////////////////////////////////////////////////////////////////////////////////
   }
 }

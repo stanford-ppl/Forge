@@ -24,4 +24,5 @@ trait ForgeTestRunnerStandaloneCompiler extends ForgeTestModule with TestsOpsExp
 
 trait ForgeSuiteCompiler extends DeliteSuite {
   def runTest(app: ForgeTestRunnerCompiler) { compileAndTest(app) }
+  def runTests(apps: ForgeTestRunnerCompiler*) { compileAndTestAll(apps) }
 }

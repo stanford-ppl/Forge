@@ -18,7 +18,7 @@ import org.netlib.util.intW
 import org.netlib.lapack._
 
 trait LAPACKWrapper extends LAPACKWrapperBase with LAPACKWrapperImpl with LAPACKHelperOps {
-  this: OptiLALib with OptiLAApplication =>
+  this: OptiLALibrary with OptiLAApplication =>
 }
 
 trait LAPACKWrapperBase extends LinAlgWrapper {
@@ -66,7 +66,7 @@ trait LAPACKWrapperBase extends LinAlgWrapper {
 }
 
 trait LAPACKWrapperImpl {
-  this: OptiLAApplication with OptiLACompilerOps =>
+  this: OptiLAApplication with OptiLALibraryOps =>
 
   // ** getparams functions are computed on the original (untransposed) A!
 

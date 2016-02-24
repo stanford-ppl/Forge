@@ -5,11 +5,14 @@ import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common._
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
-trait RecordWrapper extends HUMAN_DSL_NAMEBase {
+// Parent class for all generated structs in library (primarily for metadata)
+trait LibStruct { def getFields: Map[String,Any] }
+
+trait RecordWrapper extends HUMAN_DSL_NAMEBase with ForgeMetadataWrapper {
   this: StructOps =>
 
   //case class extends Record appears to be broken (scalac bug)
-  class RecordImpl extends Record {
+  class RecordImpl extends Record with LibStruct {
     val fields: HashMap[String,Any] = new HashMap()
     val fieldNames: ArrayBuffer[String] = new ArrayBuffer() //maintains declared field order
 
@@ -18,6 +21,7 @@ trait RecordWrapper extends HUMAN_DSL_NAMEBase {
       case that: RecordImpl => this.fields == that.fields
       case _ => false
     }
+    def getFields = Map[String,Any]() ++ fields // Technically should be immutable or a copy
 
     override def hashCode: Int = fields.##
   }
@@ -44,6 +48,28 @@ trait RecordWrapper extends HUMAN_DSL_NAMEBase {
       case None =>
         sys.error("field " + field + " does not exist")
     }
+  }
+
+  // Extremely similar to the way Structs are initialized, but using actual fields instead of type manifests
+  // Issue if try to meet PropMap[String,Option[SymbolProperties]] since need to find implicit evidence of
+  // Meetable for SymbolProperties, Option, and PropMap
+  override def initProps(e: Rep[Any], symData: PropMap[Datakey[_],Metadata], child: Option[SymbolProperties], index: Option[String])(implicit ctx: SourceContext): SymbolProperties = e match {
+    case e: LibStruct =>
+      val children = e.getFields.map{ case (index,f) =>
+        val typeData = initRep(f.asInstanceOf[Rep[Any]])
+        metadata.get(f) match {
+          case Some(data) => index -> meet(MetaTypeInit, typeData, data)
+          case None => index -> typeData
+        }
+      }
+      val typeFields = PropMap(children)
+      val symFields = (index,child) match {
+        case (Some(index),Some(child)) => meet(MetaTypeInit, PropMap(index, child), typeFields)
+        case _ => typeFields
+      }
+      StructProperties(symFields, symData)
+
+    case _ => super.initProps(e,symData,child,index)
   }
 }
 

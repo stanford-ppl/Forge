@@ -34,6 +34,7 @@ trait BaseGenDataStructures extends ForgeCodeGenBase {
     fieldStr
   }
 
+  // TODO: Unused?
   def emitScalaStruct(s: Exp[DSLData], stream: PrintWriter) {
     stream.print("class " + s.tpe.name)
     stream.print(makeTpeParsWithBounds(s.tpe.tpePars))

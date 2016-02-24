@@ -1,7 +1,7 @@
 /*//////////////////////////////////////////////////////////////
 Author: Christopher R. Aberger
 
-Description: The main file for all UndirectedGraph operations.  Glues 
+Description: The main file for all UndirectedGraph operations.  Glues
 togther all structures and declares UndirectedGraph operations visible
 to user. Inherits from Graph.scala
 
@@ -9,7 +9,7 @@ Data is stored the same as in a directed graph but we only store
 out edges. In an undirected graph in=out edges.
 *///////////////////////////////////////////////////////////////
 package ppl.dsl.forge
-package dsls 
+package dsls
 package optigraph
 
 import core.{ForgeApplication,ForgeApplicationRunner}
@@ -24,9 +24,9 @@ trait UndirectedGraphOps{
     val NodeData = lookupTpe("NodeData")
     val NeighborView = lookupTpe("NeighborView")
     val NodeIdView = lookupTpe("NodeIdView")
-    
+
     //Actual UndirectedGraph declaration
-    val UndirectedGraph = tpe("UndirectedGraph") 
+    val UndirectedGraph = tpe("UndirectedGraph")
     val T = tpePar("T")
     val R = tpePar("R")
     val K = tpePar("K")
@@ -37,7 +37,7 @@ trait UndirectedGraphOps{
     static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt))), UndirectedGraph))) implements allocates(UndirectedGraph,${$count},${$exID},${$outNodes},${outEdges},${array_empty[Double](unit(0))})
     static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("weights",MArray(MDouble))), UndirectedGraph))) implements allocates(UndirectedGraph,${$count},${$exID},${$outNodes},${outEdges},${weights})
 
-    val UndirectedGraphOps = withTpe(UndirectedGraph)     
+    val UndirectedGraphOps = withTpe(UndirectedGraph)
     UndirectedGraphOps{
       infix ("numEdges")(Nil :: MInt) implements composite ${array_length($self.getCSREdges)}
 
@@ -83,14 +83,14 @@ trait UndirectedGraphOps{
         degree
       }
       infix ("degree") (Node :: MInt) implements composite ${
-        val end  = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1)) 
+        val end  = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1))
           else array_length($self.getCSREdges)
-        end - node_apply($self,$1.id) 
+        end - node_apply($self,$1.id)
       }
       infix ("outDegree") (Node :: MInt) implements composite ${
-        val end  = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1)) 
+        val end  = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1))
           else array_length($self.getCSREdges)
-        end - node_apply($self,$1.id) 
+        end - node_apply($self,$1.id)
       }
       infix ("getNeighborsAndWeights") (Node :: Tuple2(NeighborView(MInt),NeighborView(MDouble))) implements composite ${
         val start = node_apply($self,$1.id)
@@ -99,28 +99,28 @@ trait UndirectedGraphOps{
         pack(NeighborView[Int]($self.getCSREdges,start,end-start),NeighborView[Double](edge_weights($self),start,end-start))
       }
       infix ("inDegree") (Node :: MInt) implements composite ${$self.outDegree($1)}
-      infix ("outNeighbors") (Node :: NeighborView(MInt)) implements composite ${get_neighbors($self,$1)} 
+      infix ("outNeighbors") (Node :: NeighborView(MInt)) implements composite ${get_neighbors($self,$1)}
       infix ("inNeighbors") (Node :: NeighborView(MInt)) implements composite ${get_neighbors($self,$1)}
       infix ("neighbors") (Node :: NeighborView(MInt)) implements composite ${get_neighbors($self,$1)}
-      compiler ("get_neighbors") (Node :: NeighborView(MInt)) implements composite ${
+      internal ("get_neighbors") (Node :: NeighborView(MInt)) implements composite ${
         val start = node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1))
           else array_length($self.getCSREdges)
         NeighborView[Int]($self.getCSREdges,start,end-start)
       }
-      compiler ("get_edge_weights") (Node :: NeighborView(MDouble)) implements composite ${
+      internal ("get_edge_weights") (Node :: NeighborView(MDouble)) implements composite ${
         val start = node_apply($self,$1.id)
         val end = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1))
           else array_length(edge_weights($self))
         NeighborView[Double](edge_weights($self),start,end-start)
       }
       infix ("getCSREdgeWeights") (Nil :: MArray(MDouble)) implements getter(0, "_weights")
-      compiler ("edge_weights") (Nil :: MArray(MDouble)) implements getter(0, "_weights")
+      internal ("edge_weights") (Nil :: MArray(MDouble)) implements getter(0, "_weights")
       infix ("getCSRNodes") (Nil :: MArray(MInt)) implements getter(0, "_nodes")
-      compiler("node_apply")(MInt :: MInt) implements composite ${array_apply($self.getCSRNodes,$1)}
+      internal ("node_apply")(MInt :: MInt) implements composite ${array_apply($self.getCSRNodes,$1)}
       infix ("getCSREdges") (Nil :: MArray(MInt)) implements getter(0, "_edges")
-      compiler("edge_apply")(MInt :: MInt) implements composite ${array_apply($self.getCSREdges,$1)}
+      internal ("edge_apply")(MInt :: MInt) implements composite ${array_apply($self.getCSREdges,$1)}
     }
-    addGraphCommonOps(UndirectedGraph) 
-  } 
+    addGraphCommonOps(UndirectedGraph)
+  }
 }

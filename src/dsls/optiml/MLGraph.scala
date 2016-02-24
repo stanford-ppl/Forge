@@ -8,7 +8,7 @@ trait MLGraphOps {
   this: OptiMLDSL =>
 
   def importAllGraphOps() {
-    importCSROps() 
+    importCSROps()
   }
 
   def importCSROps() {
@@ -40,10 +40,10 @@ trait MLGraphOps {
 
     val CSRGraphOps = withTpe(CSRGraph)
     CSRGraphOps {
-      compiler ("csrgraph_get_numnodes") (Nil :: MInt) implements getter(0, "_numNodes")
-      compiler ("csrgraph_get_numedges") (Nil :: MInt) implements getter(0, "_numEdges")
-      compiler ("csrgraph_get_nodes") (Nil :: MArray(MInt)) implements getter(0, "_nodes")
-      compiler ("csrgraph_get_edges") (Nil :: MArray(MInt)) implements getter(0, "_edges")
+      internal ("csrgraph_get_numnodes") (Nil :: MInt) implements getter(0, "_numNodes")
+      internal ("csrgraph_get_numedges") (Nil :: MInt) implements getter(0, "_numEdges")
+      internal ("csrgraph_get_nodes") (Nil :: MArray(MInt)) implements getter(0, "_nodes")
+      internal ("csrgraph_get_edges") (Nil :: MArray(MInt)) implements getter(0, "_edges")
 
       infix ("numNodes") (Nil :: MInt) implements composite ${
         csrgraph_get_numnodes($self)
@@ -65,7 +65,7 @@ trait MLGraphOps {
         val eidx = array_apply(csrgraph_get_nodes($self), $1)
         val fidx = array_apply(csrgraph_get_nodes($self), $1 + unit(1))
         DenseVectorView(
-          csrgraph_get_edges($self), 
+          csrgraph_get_edges($self),
           eidx,
           unit(1),
           fidx - eidx,

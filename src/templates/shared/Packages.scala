@@ -11,6 +11,7 @@ trait BaseGenPackages extends ForgeCodeGenBase {
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
   import IR._
 
+  // DSLApplication extends DSL with DSLLift
   def emitApplicationRunnerBase(stream: PrintWriter) {
     emitComment("the trait that all " + dsl + " applications must extend", stream)
     stream.println("trait " + dsl + "Application extends " + dsl + " with " + dsl + "Lift {")
@@ -21,43 +22,63 @@ trait BaseGenPackages extends ForgeCodeGenBase {
   }
 
   def emitDSLPackageDefinitionsBase(opsGrps: List[DSLOps], stream: PrintWriter) {
-    emitBlockComment("dsl definition", stream)
+    emitBlockComment("DSL definition", stream)
 
-    // Lift
+    // --- DSLLift
     stream.println("trait " + dsl + "Lift")
     val liftOps = Lifts.keys.toList
     if (liftOps.length > 0) {
       stream.print("  extends Lift" + liftOps.head.name)
+      for (grp <- liftOps.drop(1)) stream.print(" with Lift" + grp.name)
+      for (e <- Externs if e.withLift) stream.print(" with Lift" + e.opsGrp.grp.name)
     }
-    for (grp <- liftOps.drop(1)) {
-      stream.print(" with Lift" + grp.name)
+    else {
+      val liftExterns = Externs.filter(_.withLift)
+      stream.print("  extends Lift" + liftExterns.head.opsGrp.grp.name)
+      for (e <- liftExterns.drop(1)) stream.print(" with Lift" + e.opsGrp.grp.name)
     }
-    for (e <- Externs if e.withLift) {
-      stream.print(" with Lift" + e.opsGrp.grp.name)
-    }
-    stream.print(" {")
-    stream.println("  this: " + dsl + " =>")
-    stream.println("}")
-    stream.println()
+    stream.println(" { \n    this: " + dsl + " => \n}")
     stream.println()
 
-    // dsl interface
+    // --- DSLInterface
+    val NonStructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && !DataStructs.contains(t) && !isMetaType(t))
+
     stream.println("trait " + dsl + "Identifiers extends Base with GenOverloadHack {")
-    emitBlockComment("singleton identifiers", stream, indent=2)
-    for (id <- Identifiers) {
-      stream.println("  object " + id.name + " extends " + quote(id.tpe))
+    if (Identifiers.length > 0) {
+      emitBlockComment("Singleton identifiers", stream, indent=2)
+      for (id <- Identifiers) {
+        stream.println("  object " + id.name + " extends " + quote(id.tpe))
+      }
     }
-    stream.println()
-    emitBlockComment("types with no associated data structure", stream, indent=2)
-    for (tpe <- Tpes if !isForgePrimitiveType(tpe) && !DataStructs.contains(tpe)) {
-      stream.println("  abstract class " + quote(tpe))
-      stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]") // needed?
+    if (NonStructTpes.length > 0) {
+      stream.println()
+      emitBlockComment("types with no associated data structure", stream, indent=2)
+      for (tpe <- NonStructTpes) {
+        stream.print("  abstract class " + quote(tpe))
+        stream.print(TpeParents.get(tpe).map(p => " extends " + quote(p)).getOrElse(""))
+        if (TpeParents.contains(tpe) && FigmentTpes.contains(tpe)) stream.print(" with FigmentStruct")
+        else if (FigmentTpes.contains(tpe)) stream.print(" extends FigmentStruct")
+
+        TpeParents.get(tpe).foreach{parent =>
+          if (DataStructs.contains(parent)) err("Type " + tpe.name + " cannot inherit from data structure " + parent.name + ". Inheritance on data structures is currently disallowed.")
+        }
+
+        stream.println()
+      }
+      for (tpe <- NonStructTpes) {
+        stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]") // needed?
+      }
     }
     stream.println("}")
-
     stream.println()
+
+    // --- DSL extends DSLIdentifiers
+    // abstract types are not included in the identifiers trait above because they can clash with either the class definitions or Scala
+    // types in the lib implementation, causing a nasty scalac typer crash. (occurs, for example, if we declare an abstract Vector type)
+    val StructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t))
+
     stream.println("trait " + dsl + " extends " + dsl + "Identifiers")
-    for (opsGrp <- opsGrps) {
+    for (opsGrp <- opsGrps if opsGrp.ops.exists(hasSharedVersion)) {
       stream.print(" with " + opsGrp.name)
     }
     for (e <- Externs) {
@@ -66,19 +87,30 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     stream.println(" {")
     stream.println("  this: " + dsl + "Application => ")
     stream.println()
-    // abstract types are not included in the identifiers trait above because they can clash with either the class definitions or Scala
-    // types in the lib implementation, causing a nasty scalac typer crash. (occurs, for example, if we declare an abstract Vector type)
-    emitBlockComment("abstract types", stream, indent=2)
-    for (tpe <- Tpes if !isForgePrimitiveType(tpe) && DataStructs.contains(tpe)) {
-      stream.println("  type " + quote(tpe))
-      stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + ": Manifest[" + quote(tpe) + "]")
+
+    if (StructTpes.length > 0) {
+      emitBlockComment("Abstract types", stream, indent=2)
+      for (tpe <- StructTpes) stream.println("  type " + quote(tpe))
+      for (tpe <- StructTpes) stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + ": Manifest[" + quote(tpe) + "]")
+
+      for (tpe <- StructTpes if TpeParents.contains(tpe)) {
+        err("Data structure " + tpe.name + " has a type parent. Inheritance on data structures is currently disallowed ")
+      }
     }
 
     if (TpeAliases.length > 0) {
       stream.println()
-      emitBlockComment("type aliases", stream, indent=2)
+      emitBlockComment("Type aliases", stream, indent=2)
       for (alias <- TpeAliases) {
         stream.println("  type " + alias.name + makeTpePars(alias.tpe.tpePars) + " = " + quote(alias.tpe))
+      }
+    }
+
+    if (TpeParents.size > 0) {
+      stream.println()
+      emitBlockComment("Figment type inheritance", stream, indent=2)
+      for ((tpe,parent) <- TpeParents) {
+        stream.println("  implicit def m_" + tpe.name + "_to_" + parent.name + makeTpeParsWithBounds(tpe.tpePars) + "(__arg0: Rep[" + tpe.name + makeTpePars(tpe.tpePars) + "]): Rep[" + parent.name + makeTpePars(parent.tpePars) + "]")
       }
     }
 
@@ -89,7 +121,6 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     stream.println("    case true => thenp")
     stream.println("    case false => elsep")
     stream.println("  }")
-
     stream.println()
     stream.println("}")
   }

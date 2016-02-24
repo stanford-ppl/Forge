@@ -92,7 +92,13 @@ object TablePrinter {
   }
 
   private def getCaseClassFields(clazz: Class[_]) = {
-    val fields = clazz.getDeclaredMethods.filter(_.getName.endsWith("_$eq")).map(_.getName.stripSuffix("_$eq"))
+    import scala.reflect.runtime.{universe => ru}
+    val mirror: ru.Mirror = ru.runtimeMirror(clazz.getClassLoader)
+    val membersSorted: List[ru.Symbol] = mirror.classSymbol(clazz).toType.members.sorted // sorts members in declaration order
+
+    val fields = membersSorted.map(_.toString).filter(_.endsWith("_="))
+                  .map(_.stripSuffix("_=")).map(_.stripPrefix("method "))
+                  .toArray
     if (fields.length == 0) Array("") else fields
   }
 

@@ -49,7 +49,7 @@ trait StreamOps {
       hash
     }
 
-    compiler (HashStream) ("hash_alloc_raw", V, (("table", MString), ("deserialize", (HashStream(V),MString) ==> V)) :: HashStream(V), effect = mutable) implements
+    internal (HashStream) ("hash_alloc_raw", V, (("table", MString), ("deserialize", (HashStream(V),MString) ==> V)) :: HashStream(V), effect = mutable) implements
       allocates(HashStream, ${$0}, "unit(null.asInstanceOf[org.iq80.leveldb.DB])", ${doLambda((t: Rep[Tup2[HashStream[V],String]]) => deserialize(t._1, t._2))})
 
 
@@ -58,7 +58,7 @@ trait StreamOps {
     // We use simple effects in lieu of read / write effects because these are codegen nodes,
     // so we cannot pass the struct to them (a limitation of Forge at the moment).
 
-    compiler (HashStream) ("hash_open_internal", Nil, MString :: LevelDB, effect = simple) implements codegen($cala, ${
+    internal (HashStream) ("hash_open_internal", Nil, MString :: LevelDB, effect = simple) implements codegen($cala, ${
       import org.iq80.leveldb._
       import org.fusesource.leveldbjni.JniDBFactory._
       val options = new Options()
@@ -68,7 +68,7 @@ trait StreamOps {
       db
     })
 
-    compiler (HashStream) ("hash_contains_internal", Nil, (LevelDB, MArray(MByte)) :: MBoolean, effect = simple) implements codegen($cala, ${
+    internal (HashStream) ("hash_contains_internal", Nil, (LevelDB, MArray(MByte)) :: MBoolean, effect = simple) implements codegen($cala, ${
       val key = $1
       val iterator = $0.iterator()
       iterator.seek(key)
@@ -80,11 +80,11 @@ trait StreamOps {
       res
     })
 
-    compiler (HashStream) ("hash_get_internal", Nil, (LevelDB, MArray(MByte)) :: MArray(MByte), effect = simple) implements codegen($cala, ${
+    internal (HashStream) ("hash_get_internal", Nil, (LevelDB, MArray(MByte)) :: MArray(MByte), effect = simple) implements codegen($cala, ${
       $0.get($1)
     })
 
-    compiler (HashStream) ("hash_get_all_internal", Nil, (LevelDB, MString) :: MArray(MArray(MByte)), effect = simple) implements codegen($cala, ${
+    internal (HashStream) ("hash_get_all_internal", Nil, (LevelDB, MString) :: MArray(MArray(MByte)), effect = simple) implements codegen($cala, ${
       // workaround for named arguments in codegen methods not working
       val db = $0
       val prefix = ($1 + "\$HASH_LOGICAL_KEY_SEPARATOR").getBytes
@@ -108,11 +108,11 @@ trait StreamOps {
       buf.toArray
     })
 
-    compiler (HashStream) ("hash_put_internal", Nil, (LevelDB, MArray(MByte), MArray(MByte)) :: MUnit, effect = simple) implements codegen($cala, ${
+    internal (HashStream) ("hash_put_internal", Nil, (LevelDB, MArray(MByte), MArray(MByte)) :: MUnit, effect = simple) implements codegen($cala, ${
       $0.put($1, $2)
     })
 
-    compiler (HashStream) ("hash_put_all_internal", Nil, (LevelDB, MArray(MArray(MByte)), MArray(MArray(MByte)), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
+    internal (HashStream) ("hash_put_all_internal", Nil, (LevelDB, MArray(MArray(MByte)), MArray(MArray(MByte)), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
       assert($1.length >= $3 && $2.length >= $3, "HashStream putAll called with too small arrays")
       val batch = $0.createWriteBatch()
       var i = 0
@@ -124,11 +124,11 @@ trait StreamOps {
       batch.close()
     })
 
-    compiler (HashStream) ("hash_close_internal", Nil, LevelDB :: MUnit, effect = simple) implements codegen($cala, ${
+    internal (HashStream) ("hash_close_internal", Nil, LevelDB :: MUnit, effect = simple) implements codegen($cala, ${
       $0.close()
     })
 
-    compiler (HashStream) ("hash_keys_internal", Nil, LevelDB :: MArray(MString)) implements codegen($cala, ${
+    internal (HashStream) ("hash_keys_internal", Nil, LevelDB :: MArray(MString)) implements codegen($cala, ${
       val buf = scala.collection.mutable.ArrayBuffer[String]()
       val iterator = $0.iterator()
       iterator.seekToFirst()
@@ -152,12 +152,12 @@ trait StreamOps {
 
     val HashStreamOps = withTpe(HashStream)
     HashStreamOps {
-      compiler ("hash_deserialize") (Nil :: MLambda(Tup2(HashStream(V),MString), V)) implements getter(0, "_deserialize")
-      compiler ("hash_table_name") (Nil :: MString) implements getter(0, "_table")
-      compiler ("hash_get_db") (Nil :: LevelDB) implements getter(0, "_db")
-      compiler ("hash_set_db") (LevelDB :: MUnit, effect = write(0)) implements setter(0, "_db", ${$1})
+      internal ("hash_deserialize") (Nil :: MLambda(Tup2(HashStream(V),MString), V)) implements getter(0, "_deserialize")
+      internal ("hash_table_name") (Nil :: MString) implements getter(0, "_table")
+      internal ("hash_get_db") (Nil :: LevelDB) implements getter(0, "_db")
+      internal ("hash_set_db") (LevelDB :: MUnit, effect = write(0)) implements setter(0, "_db", ${$1})
 
-      compiler ("hash_get_db_safe") (Nil :: LevelDB) implements composite ${
+      internal ("hash_get_db_safe") (Nil :: LevelDB) implements composite ${
         val db = hash_get_db($self)
         fassert(db != null, "No DB opened in HashStream")
         db
@@ -291,7 +291,7 @@ trait StreamOps {
     }
 
     // Create a lexicographically ordered key with the given prefix; the key suffix will be unique for every call
-    compiler (FileStream) ("hashMatrixNewKey", Nil, (MString, MInt) :: MString) implements codegen($cala, ${
+    internal (FileStream) ("hashMatrixNewKey", Nil, (MString, MInt) :: MString) implements codegen($cala, ${
       val uniqueId = new java.rmi.server.UID() //globally unique value on every call: machine + timestamp + counter
       //TODO: we could make smaller keys by serializing uniqueId as multiple ints rather than a string, but not sure if leveldb can handle null bytes in the middle of keys
       //we currently don't use the row index as part of the key generation, but still require it as a formal input to prevent unsafe code motion
@@ -504,7 +504,7 @@ trait StreamOps {
     ComputeStreamOps {
       infix ("numRows") (Nil :: MInt) implements getter(0, "_numRows")
       infix ("numCols") (Nil :: MInt) implements getter(0, "_numCols")
-      compiler ("stream_func") (Nil :: MLambda(Tup2(MInt,MInt), T)) implements getter(0, "_func")
+      internal ("stream_func") (Nil :: MLambda(Tup2(MInt,MInt), T)) implements getter(0, "_func")
 
       infix ("apply") ((MInt, MInt) :: T) implements composite ${
         val lambda = stream_func($self)

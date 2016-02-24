@@ -29,7 +29,7 @@ trait IndexVectorOps {
     direct (IndexVector) ("indexvector_fromarray", Nil, (MArray(MInt),MBoolean) :: IndexVector) implements
       allocates(IndexVector, quotedArg(0), ${ unit(0) }, ${ unit(0) }, quotedArg(1), ${ unit(false) })
 
-    compiler (IndexVector) ("indexvector_copyarray", Nil, DenseVector(MInt) :: MArray(MInt)) implements composite ${
+    internal (IndexVector) ("indexvector_copyarray", Nil, DenseVector(MInt) :: MArray(MInt)) implements composite ${
       val d = array_empty[Int]($0.length)
       $0.indices foreach { i => d(i) = $0(i) }
       d.unsafeImmutable
@@ -42,7 +42,7 @@ trait IndexVectorOps {
     // they should only be used if we know the intermediate reference is dead or immutable (to avoid unsafe aliasing)
     // TODO: for some reason this does not work when we think it should, so we are reverting to the safer copy-always policy.
 
-    // compiler (IndexVector) ("unsafe_dense_to_index", Nil, DenseVector(MInt) :: IndexVector) implements composite ${
+    // internal (IndexVector) ("unsafe_dense_to_index", Nil, DenseVector(MInt) :: IndexVector) implements composite ${
     //   indexvector_fromarray(densevector_raw_data($0), $0.isRow)
     // }
 
@@ -67,10 +67,10 @@ trait IndexVectorOps {
 
     val IndexVectorOps = withTpe(IndexVector)
     IndexVectorOps {
-      compiler ("indexvector_start") (Nil :: MInt) implements getter(0, "_start")
-      compiler ("indexvector_end") (Nil :: MInt) implements getter(0, "_end")
-      compiler ("indexvector_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_data")
-      compiler ("indexvector_is_range") (Nil :: MBoolean) implements getter(0, "_isRange")
+      internal ("indexvector_start") (Nil :: MInt) implements getter(0, "_start")
+      internal ("indexvector_end") (Nil :: MInt) implements getter(0, "_end")
+      internal ("indexvector_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_data")
+      internal ("indexvector_is_range") (Nil :: MBoolean) implements getter(0, "_isRange")
 
       // TODO: the _isRange field should be a compile-time constant. can this be optimized (or does it already) eliminate the conditional in length/apply?
 
@@ -129,7 +129,7 @@ trait IndexVectorOps {
       direct ("__equal") (IndexVector :: MBoolean) implements composite ${ $self.toDense == $1 }
       direct ("__equal") (DenseVector(MInt) :: MBoolean) implements composite ${ $1 == $self }
 
-      // compiler ("indexvector_filter_helper") (IndexVector, MInt ==> MBoolean) :: DenseVector(MInt)) implements filter((MInt,MInt), 0, ${e => $1(e)}, ${e => e})
+      // internal ("indexvector_filter_helper") (IndexVector, MInt ==> MBoolean) :: DenseVector(MInt)) implements filter((MInt,MInt), 0, ${e => $1(e)}, ${e => e})
       // infix ("filter") ((MInt ==> MBoolean) :: IndexVector) implements composite ${
       //   IndexVector(indexvector_filter_helper($self, $1))
       // }
@@ -143,8 +143,8 @@ trait IndexVectorOps {
       // These are required because reduce currently requires a collection of type A to be matched with a signature (A,A) => A.
       // Therefore, we need a method that takes as input a collection of type Int in order to reduce it with the proper zero values.
       val T = tpePar("T")
-      compiler ("min_index_of") (DenseVector(T) :: MInt, TOrdering(T), addTpePars = T) implements reduce(MInt, 0, "unit(Int.MaxValue)", ${ (a,b) => if ($1(a) < $1(b)) a else b})
-      compiler ("max_index_of") (DenseVector(T) :: MInt, TOrdering(T), addTpePars = T) implements reduce(MInt, 0, "unit(Int.MinValue)", ${ (a,b) => if ($1(a) > $1(b)) a else b})
+      internal ("min_index_of") (DenseVector(T) :: MInt, TOrdering(T), addTpePars = T) implements reduce(MInt, 0, "unit(Int.MaxValue)", ${ (a,b) => if ($1(a) < $1(b)) a else b})
+      internal ("max_index_of") (DenseVector(T) :: MInt, TOrdering(T), addTpePars = T) implements reduce(MInt, 0, "unit(Int.MinValue)", ${ (a,b) => if ($1(a) > $1(b)) a else b})
 
       // parallel, so the conversion can fuse with the consumer
       // is this fast and robust enough to capture parallel operators over index vectors?
@@ -162,8 +162,8 @@ trait IndexVectorOps {
         repTo\${grpName}DenseVectorIntOpsCls(indexToDense($self))
       }
 
-      compiler ("indexvector_illegalalloc") (MInt :: MNothing) implements composite ${ fatal("IndexVectors cannot be allocated from a parallel op") }
-      compiler ("indexvector_illegalupdate") ((MInt, MInt) :: MNothing) implements composite ${ fatal("IndexVectors cannot be updated") }
+      internal ("indexvector_illegalalloc") (MInt :: MNothing) implements composite ${ fatal("IndexVectors cannot be allocated from a parallel op") }
+      internal ("indexvector_illegalupdate") ((MInt, MInt) :: MNothing) implements composite ${ fatal("IndexVectors cannot be updated") }
 
       // IndexVectors can't be mapped over, but they can be zipped with or reduced
       parallelize as ParallelCollection(MInt, lookupOp("indexvector_illegalalloc"), lookupOp("length"), lookupOverloaded("apply",5), lookupOp("indexvector_illegalupdate"))

@@ -47,7 +47,7 @@ trait ValidateOps {
       pack((trainingSet, validationSet, testSet))
     }
 
-    compiler (Validate) ("confusionMatrixIndicator", Nil, (("trueLabel", MBoolean), ("predictedLabel", MBoolean)) :: DenseVector(MInt)) implements composite ${
+    internal (Validate) ("confusionMatrixIndicator", Nil, (("trueLabel", MBoolean), ("predictedLabel", MBoolean)) :: DenseVector(MInt)) implements composite ${
       if (trueLabel && predictedLabel) {
         DenseVector(1, 0, 0, 0)
       }

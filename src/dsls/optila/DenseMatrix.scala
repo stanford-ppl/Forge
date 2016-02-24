@@ -110,7 +110,7 @@ trait DenseMatrixOps {
     direct (DenseMatrix) ("densematrix_fromfunc", T, (MInt, MInt, (MInt,MInt) ==> T) :: DenseMatrix(T)) implements composite ${
       (0::$0, 0::$1) { (i,j) => $2(i,j) }
     }
-    compiler (DenseMatrix) ("matrix_shapeindex", Nil, (("idx",MLong),("numCols",MLong)) :: Tuple2(MInt,MInt)) implements composite ${
+    internal (DenseMatrix) ("matrix_shapeindex", Nil, (("idx",MLong),("numCols",MLong)) :: Tuple2(MInt,MInt)) implements composite ${
       val rowIndex = idx / numCols
       val colIndex = idx % numCols
       pack(rowIndex.toInt,colIndex.toInt)
@@ -119,8 +119,8 @@ trait DenseMatrixOps {
     val K = tpePar("K")
     val V = tpePar("V")
 
-    compiler (DenseMatrix) ("densematrix_grouprowsby_helper", (T,K,V), (IndexVector, DenseMatrix(T), DenseVectorView(T) ==> K, DenseVectorView(T) ==> V) :: MHashMap(K, MArrayBuffer(V))) implements groupBy((MInt,K,V), 0, ${i => $2($1.getRow(i))}, ${i => $3($1.getRow(i)) })
-    compiler (DenseMatrix) ("densematrix_groupcolsby_helper", (T,K,V), (IndexVector, DenseMatrix(T), DenseVectorView(T) ==> K, DenseVectorView(T) ==> V) :: MHashMap(K, MArrayBuffer(V))) implements groupBy((MInt,K,V), 0, ${i => $2($1.getCol(i))}, ${i => $3($1.getCol(i)) })
+    internal (DenseMatrix) ("densematrix_grouprowsby_helper", (T,K,V), (IndexVector, DenseMatrix(T), DenseVectorView(T) ==> K, DenseVectorView(T) ==> V) :: MHashMap(K, MArrayBuffer(V))) implements groupBy((MInt,K,V), 0, ${i => $2($1.getRow(i))}, ${i => $3($1.getRow(i)) })
+    internal (DenseMatrix) ("densematrix_groupcolsby_helper", (T,K,V), (IndexVector, DenseMatrix(T), DenseVectorView(T) ==> K, DenseVectorView(T) ==> V) :: MHashMap(K, MArrayBuffer(V))) implements groupBy((MInt,K,V), 0, ${i => $2($1.getCol(i))}, ${i => $3($1.getCol(i)) })
 
     static (DenseMatrix) ("zeros", Nil, (MInt,MInt) :: DenseMatrix(MDouble)) implements composite ${ densematrix_fromfunc($0, $1, (i,j) => 0.0 )}
     static (DenseMatrix) ("zerosf", Nil, (MInt,MInt) :: DenseMatrix(MFloat)) implements composite ${ densematrix_fromfunc($0, $1, (i,j) => 0f )}
@@ -139,7 +139,7 @@ trait DenseMatrixOps {
     // a non-type-safe way of passing the metadata required to allocate a DenseMatrix in a parallel op
     // ideally we would encode this is as a type class, but it's not clear we would get an instance of this type class in dc_alloc
     val CR = tpePar("CR")
-    compiler (DenseMatrix) ("densematrix_dc_alloc", (R,CR), (CR,MInt) :: DenseMatrix(R)) implements composite ${
+    internal (DenseMatrix) ("densematrix_dc_alloc", (R,CR), (CR,MInt) :: DenseMatrix(R)) implements composite ${
       val simpleName = manifest[CR].erasure.getSimpleName
       val (numRows, numCols) = simpleName match {
         case s if s.startsWith("DenseMatrixView") =>
@@ -173,7 +173,7 @@ trait DenseMatrixOps {
       infix ("numCols") (Nil :: MInt) implements getter(0, "_numCols")
       infix ("size") (Nil :: MInt) implements composite ${ $self.numRows*$self.numCols }
 
-      compiler ("densematrix_index") ((MInt,MInt) :: MInt) implements composite ${ $1*$self.numCols + $2 }
+      internal ("densematrix_index") ((MInt,MInt) :: MInt) implements composite ${ $1*$self.numCols + $2 }
       infix ("apply") ((MInt,MInt) :: T) implements composite ${ array_apply(densematrix_raw_data($self), densematrix_index($self,$1,$2)) }
 
       // vview, mview are "contains" because the view points-to the matrix; dereferencing the view returns the matrix.
@@ -240,10 +240,10 @@ trait DenseMatrixOps {
       /**
        * Data operations
        */
-      compiler ("densematrix_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
-      compiler ("densematrix_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements setter(0, "_data", ${$1})
-      compiler ("densematrix_set_numrows") (MInt :: MUnit, effect = write(0)) implements setter(0, "_numRows", ${$1})
-      compiler ("densematrix_set_numcols") (MInt :: MUnit, effect = write(0)) implements setter(0, "_numCols", ${$1})
+      internal ("densematrix_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
+      internal ("densematrix_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements setter(0, "_data", ${$1})
+      internal ("densematrix_set_numrows") (MInt :: MUnit, effect = write(0)) implements setter(0, "_numRows", ${$1})
+      internal ("densematrix_set_numcols") (MInt :: MUnit, effect = write(0)) implements setter(0, "_numCols", ${$1})
 
       infix ("toArray") (Nil :: MArray(T)) implements composite ${ densematrix_raw_data($self.map(e => e)) }
 
@@ -404,19 +404,19 @@ trait DenseMatrixOps {
         densematrix_set_numcols($self, newCols)
       }
 
-      compiler ("densematrix_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
+      internal ("densematrix_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
         fassert($pos >= 0 && $pos <= $self.size, "densematrix_insertspace: index out of bounds")
         densematrix_ensureextra($self,$len)
         val d = densematrix_raw_data($self)
         array_copy(d, $pos, d, $pos + $len, $self.size - $pos)
       }
-      compiler ("densematrix_ensureextra") (("extra",MInt) :: MUnit, effect = write(0)) implements single ${
+      internal ("densematrix_ensureextra") (("extra",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = densematrix_raw_data($self)
         if (array_length(data) - $self.size < $extra) {
           densematrix_realloc($self, $self.size+$extra)
         }
       }
-      compiler ("densematrix_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
+      internal ("densematrix_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = densematrix_raw_data($self)
         var n = max(4, array_length(data) * 2)
         while (n < minLen) n = n*2

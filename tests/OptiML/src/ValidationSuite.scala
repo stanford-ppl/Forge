@@ -80,6 +80,7 @@ class ValidationSuiteInterpreter extends ForgeSuiteInterpreter {
   def testHoldOutOps() { runTest(HoldOutRunnerI) }
 }
 class ValidationSuiteCompiler extends ForgeSuiteCompiler {
+  cppWhiteList ++= Seq("sortindex_helper")
   def testConfusionMatrixOps() { runTest(ConfusionMatrixRunnerC) }
   def testCrossValidationOps() { runTest(CrossValidationRunnerC) }
   def testHoldOutOps() { runTest(HoldOutRunnerC) }

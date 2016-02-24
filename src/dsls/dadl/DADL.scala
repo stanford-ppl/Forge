@@ -8,73 +8,38 @@ object DADLDSLRunner extends ForgeApplicationRunner with DADLDSL
 
 trait DADLDSL extends ForgeApplication
   with ArchOps
-  with NodeOps {
-//  with ArchOps {
-//  with Modules {
+  with NodeOps
+  with Modules {
 
   def dslName = "DADL"
 
-//  override def addREPLOverride = false
-  def testing() = {
-    val DirectOps = grp("Direct")
-    val myprintlnOp = direct (DirectOps) (
-      name = "myprintln",
-      tpePars = List(),
-      MAny :: MUnit,
-      effect = simple)
+  override def clearTraversals = true
+  disableFusion()
+  disableSoA()
+  disableStructUnwrapping()
 
-    impl (myprintlnOp) { codegen ($cala, ${println($0)}) }
-    impl (myprintlnOp) { codegen (cpp, ${ std::cout << $0 << std::endl }) }
-
-    /**
-     * Example composite op
-     */
-		lift(DirectOps) (MInt)
-		lift(DirectOps) (MBoolean)
-		importStrings()
-    importMisc()
-    val IntOps = withTpe (MInt)
-		IntOps {
-			infix ("+") (MInt :: MInt) implements codegen ($cala, ${ $self + $1 })
-		  infix ("<") (MInt :: MBoolean) implements codegen ($cala, ${ $self < $1 })
-		}
-
-    val T = tpePar("T")
-    val printLT = direct (DirectOps) (
-      name = "printLT",
-      tpePars = List(T),
-      MethodSignature(List(("arr", MArray(MInt)), ("maxnum", MInt)), MUnit),
-      effect = simple)
-
-    impl (printLT) { composite ${
-      var i = 0
-      while(i < $arr.length) {
-        if ($arr(i) < $maxnum) println(i)
-        i = i + 1
-      }
-    }}
-  }
-
-  def otherStuff() = {
-//		importDADLArchOps()
-
-//    importTuples()
-//    importModules()
-//    importDADLDirectOps()
-
-//    val T = tpePar("T")
-//    val rep = tpe("Rep", T, stage=compile)
-//    primitiveTypes ::= rep
-//    tpeAlias("Wire", rep)
-
-//		val TypeOps = grp("TypeOps")
-//		lift(TypeOps) (MArray)
-/*    direct (TypeOps) ("println", List(), List(MAny) :: MUnit, effect = simple) implements codegen($cala, ${ println($0) }) */
-  }
+  override def addREPLOverride = false
 
   def specification() = {
     importCore()
     importNodes()
+    importTuples()
+    importModules()
+
+    val T = tpePar("T")
+    val rep = tpe("Rep", T, stage=compile)
+    primitiveTypes ::= rep
+    tpeAlias("Wire", rep)
+
+    val TypeOps = grp("TypeOps")
+    lift(TypeOps) (MInt)
+
+    schedule(IRPrinter)
+
+    // TODO: Change this to list of codegen targets which support feedback (probably just dot and verilog)
+    // after adding in codegen in forge/extern/dadl/compiler/src/ops/ModuleIOOpsExp.scala
+    extern(grp("ModuleIO"), targets = Nil)
+
     ()
 	}
 }

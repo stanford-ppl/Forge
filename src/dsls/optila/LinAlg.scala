@@ -24,16 +24,16 @@ trait LinAlgOps {
     direct (LinAlg) ("chol", Nil, MethodSignature(List(("A",DenseMatrix(MDouble)), ("tri",MString,"unit(\"upper\")")),DenseMatrix(MDouble))) implements composite ${ fatal("no non-native chol method exists") }
 
     /* determinant */
-    compiler (LinAlg) ("densematrix_determinant_22", T withBound TNumeric withBound TArith, ("x",DenseMatrix(T)) :: T) implements composite ${
+    internal (LinAlg) ("densematrix_determinant_22", T withBound TNumeric withBound TArith, ("x",DenseMatrix(T)) :: T) implements composite ${
       x(0,0)*x(1,1)-x(0,1)*x(1,0)
     }
 
-    compiler (LinAlg) ("densematrix_determinant_33", T withBound TNumeric withBound TArith, ("x",DenseMatrix(T)) :: T) implements composite ${
+    internal (LinAlg) ("densematrix_determinant_33", T withBound TNumeric withBound TArith, ("x",DenseMatrix(T)) :: T) implements composite ${
       x(0,0)*x(1,1)*x(2,2) + x(0,1)*x(1,2)*x(2,0) + x(0,2)*x(1,0)*x(2,1) -
       x(0,2)*x(1,1)*x(2,0) - x(0,1)*x(1,0)*x(2,2) - x(0,0)*x(1,2)*x(2,1)
     }
 
-    compiler (LinAlg) ("densematrix_determinant_44", T withBound TNumeric withBound TArith, ("x",DenseMatrix(T)) :: T) implements composite ${
+    internal (LinAlg) ("densematrix_determinant_44", T withBound TNumeric withBound TArith, ("x",DenseMatrix(T)) :: T) implements composite ${
       val two = unit(2).AsInstanceOf[T]
 
       x(0,1)*x(0,1)*x(2,3)*x(2,3)     - x(2,2)*x(3,3)*x(0,1)*x(0,1)     + two*x(3,3)*x(0,1)*x(0,2)*x(1,2) -

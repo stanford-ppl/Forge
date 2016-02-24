@@ -12,8 +12,8 @@ trait NodeOps {
     val aluTpe = tpe("ALU")
     data(aluTpe, ("_bits", MInt))
 
-    // Define a 'Link' type
-    val linkTpe = tpe("Link")
+    // Define a 'LinkNode' type
+    val linkTpe = tpe("LinkNode")
     data(linkTpe, ("_src", aluTpe), ("_dst", aluTpe))
 
     // Instantiating ALU
@@ -39,7 +39,7 @@ trait NodeOps {
       effect = simple)
 
     impl (linkApply) { codegen ($cala, ${
-      new Link($0, $1) { }
+      new LinkNode($0, $1) { }
     })}
 
     impl (linkApply) {  codegen (dot, ${
@@ -48,13 +48,13 @@ trait NodeOps {
 
     val aluOps = withTpe(aluTpe)
     aluOps {
-//      infix("->") (aluTpe :: linkTpe, effect = simple) implements codegen ($cala, ${new Link($self, $1) { }} )
-      val infixLinkOp = infix("->") (aluTpe :: linkTpe, effect = simple)
-      impl (infixLinkOp) { codegen ($cala, ${
-        new Link($self, $1) { }
+//      infix("->") (aluTpe :: linkTpe, effect = simple) implements codegen ($cala, ${new LinkNode($self, $1) { }} )
+      val infixLinkNodeOp = infix("->") (aluTpe :: linkTpe, effect = simple)
+      impl (infixLinkNodeOp) { codegen ($cala, ${
+        new LinkNode($self, $1) { }
       })}
 
-      impl (infixLinkOp) { codegen (dot, ${
+      impl (infixLinkNodeOp) { codegen (dot, ${
         $self -> $1
       })}
     }

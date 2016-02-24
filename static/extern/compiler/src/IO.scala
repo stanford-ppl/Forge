@@ -68,6 +68,7 @@ trait ScalaGenInputOutputOps extends ScalaGenDeliteFileReaderOps with ScalaGenDe
 }
 trait CudaGenInputOutputOps
 trait OpenCLGenInputOutputOps
+trait DotGenInputOutputOps
 trait CGenInputOutputOps extends CGenDeliteFileReaderOps with CGenDeliteFileWriterOps {
   val IR: InputOutputOpsExp
 }

@@ -54,7 +54,16 @@ trait BaseGenPackages extends ForgeCodeGenBase {
       stream.println()
       emitBlockComment("types with no associated data structure", stream, indent=2)
       for (tpe <- NonStructTpes) {
-        stream.println("  abstract class " + quote(tpe) + TpeParents.get(tpe).map(p => " extends " + quote(p)).getOrElse(""))
+        stream.print("  abstract class " + quote(tpe))
+        stream.print(TpeParents.get(tpe).map(p => " extends " + quote(p)).getOrElse(""))
+        if (TpeParents.contains(tpe) && FigmentTpes.contains(tpe)) stream.print(" with FigmentStruct")
+        else if (FigmentTpes.contains(tpe)) stream.print(" extends FigmentStruct")
+
+        TpeParents.get(tpe).foreach{parent =>
+          if (DataStructs.contains(parent)) err("Type " + tpe.name + " cannot inherit from data structure " + parent.name + ". Inheritance on data structures is currently disallowed.")
+        }
+
+        stream.println()
       }
       for (tpe <- NonStructTpes) {
         stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]") // needed?
@@ -83,6 +92,10 @@ trait BaseGenPackages extends ForgeCodeGenBase {
       emitBlockComment("Abstract types", stream, indent=2)
       for (tpe <- StructTpes) stream.println("  type " + quote(tpe))
       for (tpe <- StructTpes) stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + ": Manifest[" + quote(tpe) + "]")
+
+      for (tpe <- StructTpes if TpeParents.contains(tpe)) {
+        err("Data structure " + tpe.name + " has a type parent. Inheritance on data structures is currently disallowed ")
+      }
     }
 
     if (TpeAliases.length > 0) {

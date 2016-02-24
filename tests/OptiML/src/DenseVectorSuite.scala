@@ -460,6 +460,7 @@ class DenseVectorSuiteInterpreter extends ForgeSuiteInterpreter {
 }
 
 class DenseVectorSuiteCompiler extends ForgeSuiteCompiler {
+  cppWhiteList ++= Seq("sortindex_helper")
   def testAccessors() { runTest(DenseVectorAccessorsRunnerC) }
   def testOperators() { runTest(DenseVectorOperatorsRunnerC) }
   def testUpdates() { runTest(DenseVectorUpdatesRunnerC) }

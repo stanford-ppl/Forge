@@ -14,6 +14,7 @@ trait DADLDSL extends ForgeApplication
   override def clearTraversals = true
   disableFusion()
   disableSoA()
+  disableStructUnwrapping()
 
   override def addREPLOverride = false
 
@@ -35,6 +36,10 @@ trait DADLDSL extends ForgeApplication
 		importStrings()
 
     schedule(IRPrinter)
+
+    // TODO: Change this to list of codegen targets which support feedback (probably just dot and verilog)
+    // after adding in codegen in forge/extern/dadl/compiler/src/ops/ModuleIOOpsExp.scala
+    extern(grp("ModuleIO"), targets = Nil)
 
     ()
 	}

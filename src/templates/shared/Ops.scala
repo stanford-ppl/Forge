@@ -245,20 +245,24 @@ trait BaseGenOps extends ForgeCodeGenBase {
    */
 
   // untyped implicit args
-  def makeImplicitCtxBounds(tpePars: List[Rep[TypePar]]) = {
-    tpePars.flatMap { a =>
-      a.ctxBounds.map(b => "implicitly["+b.name+"["+quote(a)+"]]")
-    }.mkString(",")
+  def makeImplicitCtxBoundsArgs(tpePars: List[Rep[TypePar]]): List[Rep[DSLArg]]  = {
+    tpePars.flatMap(
+      tp => tp.ctxBounds.map(
+        cb => arg(
+          "implicitly["+cb.name+"["+quote(tp)+"]]",
+          tpe(cb.name, List(tpePar(quote(tp), List(), now)), now),
+          None
+        )
+      )
+    )
   }
 
   def makeImplicitArgs(tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLArg]]) = {
     val hkInstantiations = getHkTpeParInstantiations(tpePars, args, implicitArgs)
 
     // passing order is: regular ctxBounds, then regular implicits, and finally hkInstantiations context bounds
-    val ctxBoundsStr = makeImplicitCtxBounds(withoutHkTpePars(tpePars))
-    val ctxBounds2 = if (ctxBoundsStr == "") "" else ctxBoundsStr+","
-    val allImplicitArgs = implicitArgs ++ hkInstantiations
-    if (allImplicitArgs.length > 0) "(" + ctxBounds2 + allImplicitArgs.map(quote).mkString(",") + ")"
+    val allImplicitArgs = makeImplicitCtxBoundsArgs(tpePars) ++ implicitArgs ++ hkInstantiations
+    if (allImplicitArgs.length > 0) "(" + allImplicitArgs.map(quote).mkString(",") + ")"
     else ""
   }
 
@@ -373,6 +377,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
       "def " + makeOpMethodName(o) + makeOpArgsSignature(o, withReturnTpe)
     // }
   }
+  def makeOpMethodCall(o: Rep[DSLOp]) = makeOpMethodName(o) + makeOpArgs(o, true)
 
   def makeSyntaxSignature(o: Rep[DSLOp], prefix: String = "def ", withReturnTpe: Option[Boolean] = None) = {
     // adding the return type increases verbosity in the generated code, so we omit it by default
@@ -556,7 +561,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     emitWithIndent("val tp = new scala.reflect.RefinedManifest[" + quote(tpe) + "] {", stream, indent)
     emitWithIndent("def runtimeClass = classOf[" + quote(tpe) + "]", stream, indent+2)
     emitWithIndent("val fields = mFields", stream, indent+2)
-    emitWithIndent("override val typeArguments = List(" + tpe.tpePars.map{t => "manifest[" + quote(t) + "]"}.mkString(",") + ")", stream, indent+2)
+    emitWithIndent("override val typeArguments = List(" + tpe.tpeArgs.map{t => "manifest[" + quote(t) + "]"}.mkString(",") + ")", stream, indent+2)
     emitWithIndent("}",stream,indent)
     emitWithIndent("record_new(fFields)(tp)",stream,indent)
   }
@@ -661,7 +666,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
         }
 
         val opsClsName = opsGrp.grp.name + tpe.name.replaceAll("\\.","") + tpeArgs.map(_.name).mkString("") + opsClsSuffix + "OpsCls"
-        val implicitParams = if (tpePars.length > 0) makeImplicitCtxBounds(tpePars) + ",__pos" else "__pos"
+        val implicitParams = if (tpePars.length > 0) makeImplicitCtxBoundsArgs(tpePars).map(quote).mkString(",") + ",__pos" else "__pos"
 
         if (tpe.stage == compile) {
           stream.println("  implicit def liftTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ")(implicit __pos: SourceContext) = new " + opsClsName + "(x)(" + implicitParams + ")")

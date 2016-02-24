@@ -39,4 +39,6 @@ trait ForgeSuiteInterpreter extends Suite {
       assert(b)
     }
   }
+
+  def runTests(apps: ForgeTestRunnerInterpreter*) = apps.foreach(runTest)
 }

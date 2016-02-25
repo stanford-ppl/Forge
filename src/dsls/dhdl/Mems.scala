@@ -55,13 +55,20 @@ trait MemsElements {
 			MethodSignature(List(("name", MString, "unit(\"\")"), ("size", MInt)), BRAM(T)),
 			effect = mutable) implements
 		allocates(BRAM, ${$name}, ${array_empty[T]($size)})
-		/* apply(name:String, width:Int, length:Int) */
 		static (BRAM) ("apply", T, SInt :: BRAM(T), effect = mutable) implements
-		redirect ${BRAM.apply[T](size=unit($0))}
+		redirect ${
+			val bram = BRAM.apply[T](size=unit($0))
+			size(bram) = $0::Nil
+			bram
+		}
 		static (BRAM) ("apply", T, (MString, SInt, SInt) :: BRAM(T), effect = mutable) implements
-		redirect ${BRAM.apply[T]($0, unit($1*$2))}
+		redirect ${
+			val bram = BRAM.apply[T]($0, unit($1*$2))
+			size(bram) = $1::$2::Nil
+			bram
+		}
 		static (BRAM) ("apply", T, (SInt, SInt) :: BRAM(T), effect = mutable) implements
-		redirect ${BRAM.apply[T](size=unit($0*$1))}
+		redirect ${BRAM.apply[T](unit(""), $0, $1)}
 
 		val BRAMOps = withTpe(BRAM)
 		BRAMOps {

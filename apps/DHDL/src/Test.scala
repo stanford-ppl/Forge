@@ -41,9 +41,8 @@ trait Test extends DHDLApplication {
 		BramReduce[FixPt](1, false, ctrs, accBm, (_+_), { case i::_ =>
 			(i, j)
 		})
-		*/
-
 		println(accBm.mkString)
+		*/
 
 
 	}

@@ -29,7 +29,7 @@ trait OutProd extends DHDLApplication {
 
 		val ctrs_out = CounterChain(Counter(dataSize, tileSize), 
 														Counter(dataSize, tileSize))
-		MetaPipe(2, ctrs_out, {case i::j::_ => 
+		MetaPipe(ctrs_out, {case i::j::_ => 
 			val bm1 = BRAM[FixPt]("bm1", tileSize)
 			val bm2 = BRAM[FixPt]("bm2", tileSize)
 			Parallel({
@@ -38,7 +38,7 @@ trait OutProd extends DHDLApplication {
 			})
 			val bmResult = BRAM[FixPt]("bmResult", tileSize*tileSize)
 			val ctrs_in = CounterChain(Counter(max=tileSize), Counter(max=tileSize))
-			Pipe(2, ctrs_in, { case ii::jj::_ =>
+			Pipe(ctrs_in, { case ii::jj::_ =>
 				val addr = ii * tileSize + jj
 				bmResult.st(addr, bm1.ld(ii) * bm2.ld(jj))
 			})

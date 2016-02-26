@@ -103,11 +103,11 @@ trait DeliteGenOps extends BaseGenOps {
       case Def(Arg(name, f@Def(FTpe(fargs,ret,freq)), d2)) if opTypeRequiresBlockify(opType) && !isThunk(f) => (simpleArgName(t) :: fargs.map(a => boundArgName(t,a))).mkString(",")
       case _ => simpleArgName(t)
   })
-  def makeArgsWithBoundSymsWithType(args: List[Rep[DSLArg]], opType: OpType, typify: Rep[DSLType] => String = repify) =
+  def makeArgsWithBoundSymsWithType(args: List[Rep[DSLArg]], opType: OpType, typify: Rep[DSLType] => String = repify, addParen: Boolean = true) =
     makeArgs(args, t => t match {
       case Def(Arg(name, f@Def(FTpe(fargs,ret,freq)), d2)) if opTypeRequiresBlockify(opType) && !isThunk(f) => ((simpleArgName(t) + ": " + typify(t.tpe)) :: fargs.map(a => boundArgName(t,a) + ": " + typify(a.tpe))).mkString(",")
       case _ => argify(t, typify)
-  })
+  }, addParen)
 
   def makeOpSimpleNodeNameWithArgs(o: Rep[DSLOp]) = makeOpNodeName(o) + makeArgsWithBoundSyms(o.args, Impls(o))
   def makeOpSimpleNodeNameWithAnonArgs(o: Rep[DSLOp], suffix: String = "") = {
@@ -702,8 +702,8 @@ trait DeliteGenOps extends BaseGenOps {
     }
   }
 
-  def makeTransformedArgs(o: Rep[DSLOp], xf: String = "f") = {
-    o.args.zipWithIndex.flatMap{case (arg,idx) => arg match {
+  def makeTransformedArgs(o: Rep[DSLOp], xf: String = "f", addParen: Boolean = true) = {
+    val xformArgs = o.args.zipWithIndex.flatMap{case (arg,idx) => arg match {
       case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if opTypeRequiresBlockify(Impls(o)) && !isThunk(f) => xf + "("+opArgPrefix+idx+")" :: args.map(a => boundArgAnonName(arg,a,idx))
       // -- workaround for apparent scalac bug (GADT skolem type error), with separate cases for regular tpes and function tpes. this may be too restrictive and miss cases we haven't seen yet that also trigger the bug.
       case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if isTpePar(o.retTpe) && !isThunk(f) && args.forall(a => a.tpe == o.retTpe || !isTpePar(a.tpe)) && ret == o.retTpe => List(xf + "("+opArgPrefix+idx+".asInstanceOf[" + repify(f).replaceAllLiterally(repify(o.retTpe), "Rep[A]") + "])")
@@ -720,7 +720,8 @@ trait DeliteGenOps extends BaseGenOps {
         case `compile` if !tpe.name.startsWith("Rep") && !tpe.name.startsWith("Exp") => List(opArgPrefix+idx)
         case _ => List(xf + "(" + opArgPrefix+idx + ")")
       }
-    }}.mkString("(",",",")")
+    }}
+    if (addParen) xformArgs.mkString("(",",",")") else xformArgs.mkString(",")
   }
   def makeTransformedImplicits(o: Rep[DSLOp], xf: String = "f") = {
     o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++
@@ -1008,11 +1009,9 @@ trait DeliteGenOps extends BaseGenOps {
     val matchArgs = funcSignature.isDefined
     val patternPrefix = if (matchArgs) "" else makeOpNodeName(op)
 
-    val innerIndent = if (matchArgs) {
-      emitWithIndent(prefix + funcSignature.get.apply(op) + " = " + makeArgs(op.args) + " match {", stream, indent)
-      indent + 2
-    }
-    else indent
+    if (matchArgs) emitWithIndent(prefix + funcSignature.get.apply(op) + " = " + makeArgs(op.args) + " match {", stream, indent)
+
+    val innerIndent = if (matchArgs) indent + 2 else indent
 
     def emitCase(pattern: List[String], rule: Rep[String]) {
       emitWithIndentInline("case " + patternPrefix + pattern.mkString("(",",",")") + " => ", stream, innerIndent)
@@ -1036,7 +1035,7 @@ trait DeliteGenOps extends BaseGenOps {
     if (matchArgs)
       emitWithIndentInline("case _ => ", stream, innerIndent)
     else
-      emitWithIndentInline("case rhs@" + makeOpSimpleNodeNameWithAnonArgs(op) + " => ", stream, innerIndent)
+      emitWithIndentInline("case rhs@" + makeOpSimpleNodeNameWithArgs(op) + " => ", stream, innerIndent)
 
     rules.find(r => r.isInstanceOf[SimpleRule]) match {
       case Some(SimpleRule(rule)) =>

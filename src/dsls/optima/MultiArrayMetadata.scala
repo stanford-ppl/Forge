@@ -24,31 +24,39 @@ trait MultiArrayMetadata { this: OptiMADSL =>
     identifier (Ternary) ("True_3")
 
     val Form = metadata("Form", ("v", Ternary))
-    meet (Form) ${ if (this != that) Form(Partial_3) else that }
+    onMeet (Form) ${ if (this != that) Form(Partial_3) else that }
 
 
     // --- MultiArray isBuffer
     val MBuffer = metadata("MBuffer", ("form", Form))
-    meet (MBuffer) ${ MBuffer(meet(this.form, that.form)) }
+    onMeet (MBuffer) ${ MBuffer(meet(this.form, that.form)) }
+
+    internal.infix (MBuffer) ("isTrue", Nil, MBuffer :: SBoolean) implements composite ${ $0.form.v == True_3 }
+    internal.infix (MBuffer) ("isPhys", Nil, MBuffer :: SBoolean) implements composite ${ $0.form.v == Partial_3 }
+    internal (MBuffer) ("enableBuffer", Nil, MAny :: MUnit, effect = simple) implements composite ${
+      setMetadata($0, MBuffer(Form(True_3)))
+      setUpdated($0)
+    }
 
     // --- MultiArray isView
     val MView = metadata("MView", ("form", Form))
-    meet (MView) ${ MView(meet(this.form, that.form)) }
+    onMeet (MView) ${ MView(meet(this.form, that.form)) }
 
-    for (MT <- List(MBuffer,MView)) {
-      internal.infix (MT) ("isTrue", Nil, MT :: SBoolean) implements composite ${ $0.form.v == True_3 }
-      internal.infix (MT) ("isPhys", Nil, MT :: SBoolean) implements composite ${ $0.form.v == Partial_3 }
-    }
+    internal.infix (MView) ("isTrue", Nil, MView :: SBoolean) implements composite ${ $0.form.v == True_3 }
+    internal.infix (MView) ("isPhys", Nil, MView :: SBoolean) implements composite ${ $0.form.v == Partial_3 }
+    internal (MView) ("enableView", Nil, MAny :: MUnit, effect = simple) implements composite ${ setMetadata($0, MView(Form(True_3))) }
 
     // --- MultiArray rank
     val MRank = metadata("MRank", ("rank", SInt))
     val rank = grp("rank")
-    meet (MRank) ${ MRank(this.rank) }
+    onMeet (MRank) ${ MRank(this.rank) }
     canMeet (MRank) ${ this.rank == that.rank }
 
     // --- MultiArray may be updated
     val MayUpdate = metadata("MayUpdate", ("mayUpdate", SBoolean))
-    meet (MayUpdate) ${ MayUpdate(this.mayUpdate || that.mayUpdate) }
+    onMeet (MayUpdate) ${ MayUpdate(this.mayUpdate || that.mayUpdate) }
+
+    internal (MayUpdate) ("setUpdated", Nil, MAny :: MUnit, effect = simple) implements composite ${ setMetadata($0, MayUpdate(true)) }
 
     // TODO: Bit annoying to specify both versions - better way to generate both from one?
     for (T <- List(SymProps, MAny)) {
@@ -89,7 +97,7 @@ trait MultiArrayMetadata { this: OptiMADSL =>
     identifier (LayoutSubtype) ("BuffView")
 
     val MLayout = metadata("MLayout", ("rank", SInt), ("tpe", LayoutType), ("subtpe", LayoutSubtype))
-    meet (MLayout) ${ that }
+    onMeet (MLayout) ${ that }
     canMeet (MLayout) ${ this == that }
 
     internal.infix (MLayout) ("isView", Nil, MLayout :: SBoolean) implements composite ${ $0.subtpe == View || $0.subtpe == BuffView }

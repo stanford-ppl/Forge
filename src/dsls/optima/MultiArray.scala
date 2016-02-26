@@ -10,8 +10,8 @@ trait MultiArrays { this: OptiMADSL =>
   def importIndices() {
     val Indices = lookupTpe("Indices")
     internal (Indices) ("indices_new", Nil, SList(MInt) :: Indices) implements record(Indices, ("i", SList(MInt), quotedArg(0)))
-    static (Indices) ("apply", Nil, varArgs(MInt) :: Indices) implements composite ${ indices_new($0.toList) }
-    infix (Indices) ("apply", Nil, (Indices, SInt) :: MInt) implements composite ${ field[Int]($0, "i_" + $1) }
+    internal.static (Indices) ("apply", Nil, varArgs(MInt) :: Indices) implements composite ${ indices_new($0.toList) }
+    internal.infix (Indices) ("apply", Nil, (Indices, SInt) :: MInt) implements composite ${ field[Int]($0, "i_" + $1) }
     internal.infix (Indices) ("toList", Nil, (Indices, SInt) :: SList(MInt)) implements composite ${ List.tabulate($1){i => $0(i)} }
   }
 
@@ -40,6 +40,10 @@ trait MultiArrays { this: OptiMADSL =>
 
     val ArrayNDInternals = withTpe(ArrayND)
     ArrayNDInternals {
+      // --- Compiler shortcuts
+      internal.infix ("as3D") (Nil :: Array3D(T)) implements redirect ${ $self.asInstanceOf[Rep[Array3D[T]]] }
+      internal.infix ("as2D") (Nil :: Array2D(T)) implements redirect ${ $self.asInstanceOf[Rep[Array2D[T]]] }
+      internal.infix ("as1D") (Nil :: Array1D(T)) implements redirect ${ $self.asInstanceOf[Rep[Array1D[T]]] }
 
       // --- Single element operators
       internal ("ma_apply") (Indices :: T) implements figment ${ maflat_apply($0, $1) }
@@ -59,15 +63,8 @@ trait MultiArrays { this: OptiMADSL =>
 
     val ArrayNDAPI = withTpe(ArrayND)
     ArrayNDAPI {
-      // --- Compiler shortcuts
-      internal.infix ("as3D") (Nil :: Array3D(T)) implements redirect ${ $self.asInstanceOf[Rep[Array3D[T]]] }
-      internal.infix ("as2D") (Nil :: Array2D(T)) implements redirect ${ $self.asInstanceOf[Rep[Array2D[T]]] }
-      internal.infix ("as1D") (Nil :: Array1D(T)) implements redirect ${ $self.asInstanceOf[Rep[Array1D[T]]] }
-
       // --- Properties
       infix ("size") (Nil :: MInt) implements figment ${ maimpl_size($self) }
-      infix ("nRows") (Nil :: MInt) implements figment ${ maimpl_dim($self, 0) }
-      infix ("nCols") (Nil :: MInt) implements figment ${ maimpl_dim($self, 1) }
       infix ("dim") (SInt :: MInt) implements figment ${ maimpl_dim($self, $1) }
 
       // --- Single elements
@@ -79,16 +76,32 @@ trait MultiArrays { this: OptiMADSL =>
       infix ("makeString") (varArgs(MString) :: MString, S) implements composite ${ ma_mkstring($self, $1.toList, {e: Rep[T] => padspace(e.mkStr)}) }
     }
 
-    val Array1DOps = withTpe(Array1D)
-    Array1DOps {
+    val Array1DAPI = withTpe(Array1D)
+    Array1DAPI {
       infix ("length") (Nil :: MInt) implements composite ${ $self.size }
-      infix ("apply") (MInt :: T) implements composite ${ ma_apply($self, indices_new(List($1))) }
-      infix ("update") ((MInt, T) :: MUnit, effect = write(0)) implements composite ${ ma_update($self, indices_new(List($1)), $2) }
+      infix ("apply") (MInt :: T) implements composite ${ ma_apply($self, Indices($1)) }
+      infix ("update") ((MInt, T) :: MUnit, effect = write(0)) implements composite ${ ma_update($self, Indices($1), $2) }
 
       // --- Misc.
       infix ("makeString") (Nil :: MString, S) implements composite ${ ma_mkstring($self, List(""), {e: Rep[T] => padspace(e.mkStr)} )}
       infix ("toString") (Nil :: MString) implements composite ${ ma_mkstring($self, List(""), {e: Rep[T] => padspace(format_numeric(e))} )}
+      infix ("pprint") (Nil :: MUnit, S, effect = simple) implements composite ${ println($self.makeString) }
     }
+
+    val Array2DAPI = withTpe(Array2D)
+    Array2DAPI {
+      infix ("nRows") (Nil :: MInt) implements composite ${ $self.dim(0) }
+      infix ("nCols") (Nil :: MInt) implements composite ${ $self.dim(1) }
+
+      infix ("apply") ((MInt,MInt) :: T) implements composite ${ ma_apply($self, Indices($1, $2)) }
+      infix ("update") ((MInt,MInt,T) :: MUnit, effect = write(0)) implements composite ${ ma_update($self, Indices($1, $2), $3) }
+
+      // --- Misc.
+      infix ("makeString") (Nil :: MString, S) implements composite ${ ma_mkstring($self, List("\\n",""), {e: Rep[T] => padspace(e.mkStr)} )}
+      infix ("toString") (Nil :: MString) implements composite ${ ma_mkstring($self, List("\\n",""), {e: Rep[T] => padspace(format_numeric(e))} )}
+      infix ("pprint") (Nil :: MUnit, S, effect = simple) implements composite ${ println($self.makeString) }
+    }
+
 
   }
 }

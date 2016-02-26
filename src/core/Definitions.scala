@@ -79,6 +79,7 @@ trait Definitions extends DerivativeTypes {
   lazy val SUnit = tpe("Unit", stage = compile) // Useful?
   lazy val MNothing = tpe("Nothing")
   lazy val CNothing = tpe("Nothing", stage = now)
+  lazy val SNothing = tpe("Nothing", stage = now)
   lazy val byName = tpe("Thunk")
   def MThunk(ret: Rep[DSLType], freq: Frequency = normal) = ftpe(List(forge_arg("", byName, None)),ret,freq) // TODO
   // unstaged (inlined) functions
@@ -192,9 +193,9 @@ trait Definitions extends DerivativeTypes {
    * Metadata meet functions
    * TODO: Add these as needed (not clear how complete this needs to be yet)
    */
-  case object branch extends MetaMeet       // Aliasing from if-then-else
-  case object mutate extends MetaMeet       // Aliasing from data mutation
-  case object metaUpdate extends MetaMeet   // Metadata updates (TODO: Is this needed?)
+  case object metaAlias extends MetaMeet    // Aliasing
+  case object metaInit extends MetaMeet     // Aliasing in type initialization
+  case object metaUpdate extends MetaMeet   // Metadata updates
   case object any extends MetaMeet          // All remaining aliasing forms
 
   // blacklist for op names that cannot be expressed with infix methods

@@ -13,8 +13,8 @@ trait BaseGenMetadata extends ForgeCodeGenBase {
 
   def quoteFunc(f: MetaMeet) = f match {
     case `metaUpdate` => "MetaOverwrite"
-    case `branch` => "BranchAlias"
-    case `mutate` => "UpdateAlias"
+    case `metaInit` => "MetaTypeInit"
+    case `metaAlias` => "MetaAlias"
     case `any` => "_"
   }
 
@@ -22,7 +22,7 @@ trait BaseGenMetadata extends ForgeCodeGenBase {
   def emitMetadataClasses(base: String, stream: PrintWriter) {
     val MetaTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
 
-    val meetFuncs = List(metaUpdate,branch,mutate,any)
+    val meetFuncs = List(metaUpdate,metaInit,metaAlias,any)
 
     stream.println("trait " + dsl + "Metadata extends MetadataOps {")
     stream.println("  this: " + dsl + base + " =>")

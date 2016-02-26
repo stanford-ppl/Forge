@@ -141,7 +141,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
       stream.println()
       emitScalaReflectImports(stream)
       emitDeliteTraversalImports(stream)
-      emitLMSImports(stream)
+      //emitLMSImports(stream)
       emitDSLImports(stream)
       stream.println()
       emitTraversalDefs(t, stream)
@@ -182,6 +182,17 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     emitTypeMetadata(stream)
     stream.println("}")
     stream.close()
+
+    val azstream = new PrintWriter(new FileWriter(traversalDir+File.separator+dsl+"AnalyzerBase.scala"))
+    azstream.println("package " + packageName + ".transform")
+    azstream.println()
+    emitScalaReflectImports(azstream)
+    emitDeliteTraversalImports(azstream)
+    emitDSLImports(azstream)
+    //emitLMSImports(azstream)
+    azstream.println()
+    emitAnalyzerBase(azstream)
+    azstream.println()
+    azstream.close()
   }
 }
-

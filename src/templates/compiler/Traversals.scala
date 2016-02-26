@@ -48,17 +48,20 @@ trait DeliteGenTraversals extends BaseGenTraversals {
   // --- Transformers
   def makeLowerMethodName(o: Rep[DSLOp]) = "lower_" + makeOpMethodName(o)
   def makeLowerMethodCall(o: Rep[DSLOp]) = {
-    val xformArgs = makeTransformedArgs(o)
+    val xformArgs = makeTransformedArgs(o, addParen = false)
+    val lhsArg = "lhs" + (if (o.args.isEmpty) "" else ", ")
     val implicits = makeTransformedImplicits(o)  // TODO: Need to transform these further to allow type changes
     val implicitsWithParens = if (implicits.isEmpty) "" else implicits.mkString("(",",",")")
 
-    makeLowerMethodName(o) + xformArgs + implicitsWithParens
+    makeLowerMethodName(o) + "(" + lhsArg + xformArgs + ")" + implicitsWithParens
   }
 
   // TODO: Doesn't handle methods which require implicit overload arguments
   def makeLowerMethodSignature(o: Rep[DSLOp]) = {
     val implicitArgs = makeOpImplicitArgsWithType(o)
-    "def " + makeLowerMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeArgsWithBoundSymsWithType(o.args, Impls(o), blockify) + implicitArgs
+    val lhsArg = "lhs: Exp[Any]" + (if (o.args.isEmpty) "" else ", ")
+    // TODO: makeArgs doesn't actually honor addParen in the way you would expect (changing it to also leads to weird issues elsewhere)
+    "def " + makeLowerMethodName(o) + makeTpeParsWithBounds(o.tpePars) + "(" + lhsArg + makeArgsWithBoundSymsWithType(o.args, Impls(o), blockify).drop(1) + implicitArgs
   }
 
   def emitTransformer(t: Rep[DSLTransformer], stream: PrintWriter) {
@@ -76,13 +79,13 @@ trait DeliteGenTraversals extends BaseGenTraversals {
       if (!hasIRNode(op) || hasMultipleIRNodes(op)) {
         err("Cannot create transformation rule for op " + op.name + ": Op must be represented by exactly one IR node")
       }
-      emitWithIndent("case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(op) + " => " + makeLowerMethodCall(op), stream, 4)
+      emitWithIndent("case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(op) + " => Some(" + makeLowerMethodCall(op) + ")", stream, 4)
     }
-    stream.println("    case _ => super.transformTP(lhs, rhs)") // TODO: Should be able to change this
-    stream.println("  }")
+    emitWithIndent("case _ => super.transformTP(lhs, rhs)", stream, 4) // TODO: Should be able to change this
+    stream.println("  } // End of transformTP")
 
     for ((op,rules) <- patterns) {
-      emitTraversalRules(op, rules, stream, 2, Some(makeLowerMethodSignature))
+      emitTraversalRules(op, rules, stream, 4, Some(makeLowerMethodSignature))
     }
 
     stream.println("}")
@@ -98,14 +101,15 @@ trait DeliteGenTraversals extends BaseGenTraversals {
   // --- Analyzers
   // TODO: Eventually want to handle TTP as well, but doesn't make sense to until after fusion changes
   def emitAnalyzer(az: Rep[DSLAnalyzer], stream: PrintWriter) {
-    stream.println("trait " + makeTraversalName(az) + " extends AnalyzerBase {")
+    stream.println("trait " + makeTraversalName(az) + " extends " + dsl + "AnalyzerBase {")
     stream.println("  val IR: " + makeTraversalIRName(az))
     stream.println("  import IR._")
     stream.println("  override val name = \"" + makeTraversalName(az) + "\"")
     stream.println("  override val debugMode = false")        // TODO: Should be able to change this
     stream.println("  override val autopropagate = true")     // TODO: Should be able to change this
+    stream.println("  override def completed(e: Exp[Any]) = true") // TODO: Should be able to change this
     stream.println()
-    stream.println("  override def processTP(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext) = rhs match {")
+    stream.println("  override def analyzeTP(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext) = rhs match {")
 
     val patterns = Analyzers(az).rules
     for ((op,rules) <- patterns) {
@@ -115,7 +119,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
       emitTraversalRules(op, rules, stream, 4)
     }
 
-    stream.println("    case _ => super.processTP(lhs, rhs)") // TODO: Should be able to change this
+    stream.println("    case _ => super.analyzeTP(lhs, rhs)") // TODO: Should be able to change this
     stream.println("  }")
     stream.println("}")
   }
@@ -126,4 +130,22 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication =>")
     stream.println("}")
   }
+
+  def emitAnalyzerBase(stream: PrintWriter) {
+    stream.println("trait " + dsl + "AnalyzerBase extends AnalyzerBase {")
+    stream.println("  val IR: " + dsl + "Exp")
+    stream.println("  import IR._")
+    stream.println()
+    stream.println("  override def propagateTP[A](lhs: Exp[A], rhs: Def[_])(implicit ctx: SourceContext) = rhs match {")
+    for ((op, rules) <- PropagationRules) {
+      if (!hasIRNode(op) || hasMultipleIRNodes(op)) {
+        err("Cannot create propagation rule for op " + op.name + ": Op must be represented by exactly one IR node")
+      }
+      emitTraversalRules(op, rules, stream, 4)
+    }
+    stream.println("    case _ => super.propagateTP(lhs,rhs)")
+    stream.println("  }")
+    stream.println("}")
+  }
+
 }

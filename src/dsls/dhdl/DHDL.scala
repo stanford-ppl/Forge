@@ -1,23 +1,25 @@
 package ppl.dsl.forge
 package dsls
-package dhdl 
+package dhdl
 
 import core.{ForgeApplication,ForgeApplicationRunner}
 
-object DHDLDSLRunner extends ForgeApplicationRunner with DHDLDSL 
+object DHDLDSLRunner extends ForgeApplicationRunner with DHDLDSL
 
-trait DHDLDSL extends ForgeApplication 
+trait DHDLDSL extends ForgeApplication
 	with PrimOps with MiscOps with DHDLTypes with MemsElements
 	with CtrlOps with DHDLMetas{
 
   def dslName = "DHDL"
-	
-  override def addREPLOverride = false 
+
+  override def addREPLOverride = false
+  override def clearTraversals = true
 
   def specification() = {
 		//disableSoA()
-		//disableStructUnwrapping()
+		disableStructUnwrapping()
 		disableFusion()
+
 		importDHDLTypes()
 		importDHDLPrimitives()
 		importMems()
@@ -26,6 +28,9 @@ trait DHDLDSL extends ForgeApplication
 		importMisc()
 		importDHDLMisc()
 		importDHDLMetadata ()
+
+    schedule(IRPrinter)
+
 		()
 	}
 }

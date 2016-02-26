@@ -178,6 +178,19 @@ trait ForgePreprocessor {
     }
 
     def isBlockArg(arg: String) = arg.startsWith("b[")
+    def isBoundArg(arg: String) = arg.startsWith("a[")
+
+    def endOfBoundArgName(arg: String) = arg.indexOf(']')
+    def parseBoundArguments(start: Int, input: Array[Byte], args: ArrayBuffer[String]): Int = {
+      var j = start
+      while (j < input.length && input(j) != ']') j += 1
+      val arg = new String(input.slice(start,j+1))
+      if (!args.contains(arg)) {
+        args += arg
+      }
+      j
+    }
+
     def endOfBlockArgName(arg: String) = if (arg.contains('(')) arg.indexOf('(') - 1 else arg.indexOf(']')
     def getCapturedArgs(arg: String, argMap: HashMap[String,String]) = {
       if (arg.contains('(')) {
@@ -284,6 +297,8 @@ trait ForgePreprocessor {
             val j =
               if (i+2 < input.length && input(i+1) == 't' && input(i+2) == '[')
                 parseTypeArgument(i+1, input, tpeArgs)
+              else if (i+2 < input.length && input(i+1) == 'a' && input(i+2) == '[')
+                parseBoundArguments(i+1,input,args)
               else
                 parseBlockArguments(i+1, input, args)
             i = j-1
@@ -322,6 +337,13 @@ trait ForgePreprocessor {
             val z: String = "arg"+argId // wtf? scala compiler error unless we break up z like this
             argMap += (a -> z)
           }
+          else if (isBoundArg(a)) {
+            val a2 = a.slice(2,endOfBoundArgName(a)).split(',')
+            val i1 = a2(0).toInt
+            val i2 = a2(1).toInt
+            val z: String = "f_" + "__arg" + i1 + "_" + "__arg" + i2
+            argMap += (a -> z)
+          }
           else {
             val i = a.toInt
             val z: String = "arg"+argId
@@ -335,6 +357,15 @@ trait ForgePreprocessor {
               val a2 = a.slice(2,endOfBlockArgName(a))
               argMap += (a -> a2)
             }
+            else if (isBoundArg(a)) {
+              println("Parsing bound arg: " + a)
+
+              val a2 = a.slice(2,endOfBoundArgName(a)).split(',')
+              val i1 = a2(0)
+              val i2 = a2(1).toInt
+              val z: String = "f_" + i1 + "_" + "__arg" + i2
+              argMap += (a -> z)
+            }
             else {
               argMap += (a -> a)
             }
@@ -347,7 +378,7 @@ trait ForgePreprocessor {
           val a2 = a.slice(2,endOfBlockArgName(a))
           output ++= (indentInterior + "val " + argMap(a) + " = quotedBlock("+quoteArgName(a2)+", "+enclosingOp.get+", List("+getCapturedArgs(a,argMap).mkString(",")+"))" + nl).getBytes
         }
-        else {
+        else if (!isBoundArg(a)) {
           output ++= (indentInterior + "val " + argMap(a) + " = quotedArg("+quoteArgName(a)+")" + nl).getBytes
         }
       }
@@ -383,7 +414,10 @@ trait ForgePreprocessor {
       // remap args inside the input block, outside-in
       for (a <- args.reverse) {
         if (argMap.contains(a)) {
-          strBlock = strBlock.replace("$"+a, "$"+argMap(a))
+          if (isBoundArg(a))
+            strBlock = strBlock.replace("$"+a, argMap(a)) // don't include the $ for bound args
+          else
+            strBlock = strBlock.replace("$"+a, "$"+argMap(a))
         }
       }
       // remap tpe args

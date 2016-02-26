@@ -44,6 +44,7 @@ trait OptiMADSL extends ForgeApplication
   with RangeOps with Stringables {
 
   def dslName = "OptiMA"
+  override def addREPLOverride = false
   override def clearTraversals = true
 
   def specification() = {

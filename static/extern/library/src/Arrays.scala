@@ -73,12 +73,9 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase with ForgeMetadataWrapper {
 
   // TODO: This is a little strange since we can't inspect and initialize metadata on the inner type easily
   // For now, if the array is empty, cannot easily initalize child's metadata.
-  override def initProps(e: Rep[Any], symData: PropMap[Datakey[_],Metadata], child: Option[SymbolProperties], index: Option[String])(implicit ctx: SourceContext): SymbolProperties = e match {
-    case e: ForgeArray[_] =>
-      val typeChild = if (e.length == 0) None else getProps(e.apply(0))
-      val symChild = meet(MetaTypeInit, child, typeChild)
-      ArrayProperties(symChild, symData)
-    case _ => super.initProps(e, symData, child, index)
+  override def unapplyArrayLike(e: Rep[Any]) = e match {
+    case e: Array[_] => Some((if (e.length > 0) getProps(e(0)) else None))
+    case _ => super.unapplyArrayLike(e)
   }
 }
 
@@ -161,12 +158,9 @@ trait ForgeArrayBufferWrapper extends HUMAN_DSL_NAMEBase with ForgeMetadataWrapp
   // TODO: This is a little strange since we can't inspect and initialize metadata on the inner type easily
   // Also a bit weird since this is a struct in the compiler and a "primitive" in the library
   // For now, if the array is empty, cannot easily initalize child's metadata.
-  override def initProps(e: Rep[Any], symData: PropMap[Datakey[_],Metadata], child: Option[SymbolProperties], index: Option[String])(implicit ctx: SourceContext): SymbolProperties = e match {
-    case e: ForgeArrayBuffer[_] =>
-      val typeChild = if (e.length == 0) None else getProps(e.apply(0))
-      val symChild = meet(MetaTypeInit, child, typeChild)
-      ArrayProperties(symChild, symData)
-    case _ => super.initProps(e, symData, child, index)
+  override def unapplyArrayLike(e: Rep[Any]) = e match {
+    case e: ForgeArrayBuffer[_] => Some((if (e.length > 0) getProps(e(0)) else None))
+    case _ => super.unapplyArrayLike(e)
   }
 }
 

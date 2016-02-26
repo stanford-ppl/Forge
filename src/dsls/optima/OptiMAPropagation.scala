@@ -11,12 +11,8 @@ trait OptiMAPropagation{ this: OptiMADSL =>
 
     propagate (ArrayND, "ma_view") using rule ${ setChild(lhs, getChild($0)) }
     propagate (ArrayND, "ma_apply") using rule ${ setProps(lhs, getChild($self)) }
-    propagate (ArrayND, "ma_update") using rule ${
-      setChild($self, meet(UpdateAlias, getChild($self), getProps($2)))
-    }
-    propagate (ArrayND, "ma_mkstring") using rule ${
-      //setChild($)
-    }
+    propagate (ArrayND, "ma_update") using rule ${ setChild($self, meet(getChild($self), getProps($2))) }
+    propagate (ArrayND, "ma_mkstring") using rule ${ setProps($a[2,0], getChild($self)) }
   }
 
 }

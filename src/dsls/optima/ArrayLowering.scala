@@ -33,13 +33,10 @@ trait ArrayLowering { this: OptiMADSL =>
         case MLayout(_,Flat,_) => maflat_update($0, $1, $2)
       }}
 
-      // TODO: Referring to bound args should have simpler syntax than this
-      val arg2_0 = "f_"+quotedArg(2)+"___arg0"
-
       lower (ArrayND, "ma_mkstring") using rule ${
 
         def stringify(elem: Rep[T]): Rep[String] = {
-          val mirroredBody = withSubstScope(\$arg2_0 -> elem){ f($2) }
+          val mirroredBody = withSubstScope($a[2,0] -> elem){ f($2) }
           getBlockResultFull(mirroredBody)
         }
 

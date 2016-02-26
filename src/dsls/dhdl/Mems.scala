@@ -109,7 +109,7 @@ trait MemsElements {
 		 	//TODO: not a right-hand coordinate, Fix?  x: height, y width, z: depth, zero, top, left. front
 			infix ("st") ((FixPt, FixPt, FixPt, T) :: MUnit, effect = write(0)) implements composite ${
 				if (size($self).size.length!=3) { 
-					throw new Exception("Try to store to non-2D Bram using bram.st(idx1, idx2), size of bram:"
+					throw new Exception("Try to store to non-3D Bram using bram.st(idx1, idx2, idx3), size of bram:"
 						+ size($self).size) 
 				}
 				val bramWidth0 = unit(getSize($self, 0)).toFixPt
@@ -131,7 +131,7 @@ trait MemsElements {
 		 	//TODO: not a right-hand coordinate, Fix?  x: height, y width, z: depth, zero, top, left. front
 			infix ("ld") ((FixPt, FixPt, FixPt) :: T) implements composite ${
 				if (size($self).size.length!=3) { 
-					throw new Exception("Try to load from non-2D Bram using bram.st(idx1, idx2), size of bram:" 
+					throw new Exception("Try to load from non-3D Bram using bram.st(idx1, idx2, idx3), size of bram:"
 						+ size($self).size) 
 				}
 				val bramWidth0 = unit(getSize($self, 0)).toFixPt

@@ -10,7 +10,7 @@ trait ForgeMetadataWrapper extends MetadataOps { this: HUMAN_DSL_NAMEBase =>
 
   // Directly add symbol property metadata mapping for symbol
   def setProps(e: Rep[Any], p: SymbolProperties)(implicit ctx: SourceContext): Unit = {
-    metadata += e -> (meet(metadata.get(e), Some(p))(MetaOverwrite)).get
+    metadata += e -> (meet(MetaOverwrite, metadata.get(e), Some(p))).get
   }
 
   def getProps(e: Rep[Any]): Option[SymbolProperties] = Some(metadata.getOrElse(e, initRep(e)))

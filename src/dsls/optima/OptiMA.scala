@@ -21,7 +21,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 //     where first # is argnum of lambda and second is argnum of lambda's arg
 // - Propagation of metadata via syms
 //   - Subproblem: can we define contain and extracts syms on DeliteArray or does this break things?
-// - Optional identification of figment types as "array-like" or "struct-like" - can this be done automatically?
+// - Optional identification of types as "array-like" or "struct-like" - can this be done automatically?
 
 // TEST:
 

@@ -15,9 +15,13 @@ trait DHDLDSL extends ForgeApplication
   override def addREPLOverride = false 
 
   def specification() = {
+		//disableSoA()
+		//disableStructUnwrapping()
+		disableFusion()
 		importDHDLTypes()
 		importDHDLPrimitives()
 		importMems()
+		importIndices()
 		importCtrls()
 		importMisc()
 		importDHDLMisc()

@@ -29,25 +29,25 @@ trait OutProd extends DHDLApplication {
 
 		val ctrs_out = CounterChain(Counter(dataSize, tileSize), 
 														Counter(dataSize, tileSize))
-		MetaPipe(ctrs_out, {case i::j::_ => 
+		MetaPipe(ctrs_out) {case i::j::_ => 
 			val bm1 = BRAM[FixPt]("bm1", tileSize)
 			val bm2 = BRAM[FixPt]("bm2", tileSize)
-			Parallel({
+			Parallel {
 				vec1.ld(bm1, i, tileSize)
 				vec2.ld(bm2, j, tileSize)
-			})
+			}
 			val bmResult = BRAM[FixPt]("bmResult", tileSize*tileSize)
 			val ctrs_in = CounterChain(Counter(max=tileSize), Counter(max=tileSize))
-			Pipe(ctrs_in, { case ii::jj::_ =>
+			Pipe(ctrs_in) { case ii::jj::_ =>
 				val addr = ii * tileSize + jj
 				bmResult.st(addr, bm1.ld(ii) * bm2.ld(jj))
-			})
-			MetaPipe({
+			}
+			MetaPipe {
 				//TODO:FIX THIS
 				result.st(bmResult, j, i, tileSize, tileSize, vecLength)
-			})
+			}
 			()
-		})
+		}
 
 		val fgold = gold.flatten
 		fgold.zipWithIndex.foreach{case (g, i) => 

@@ -7,8 +7,8 @@ trait DHDLMetas {
 
 	def importDHDLMetadata () = {
 		val sizes = grp("size")
+		val SList = lookupTpe("scala.List", stage=compile)
 		val T = tpePar("T")
-		val SList = tpe("scala.List", T, stage=compile)
 
 		/* Multidimension size */
 		val MSize = metadata("MSize", ("size",SList(SInt)))

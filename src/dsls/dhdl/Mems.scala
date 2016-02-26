@@ -77,12 +77,15 @@ trait MemsElements {
 			infix ("st") ((FixPt,T) :: MUnit, effect = write(0)) implements composite ${
 				array_update( $self.data, $1.toInt, $2 ) }
 			infix ("st") ((FixPt, FixPt, T) :: MUnit, effect = write(0)) implements composite ${
-				//TODO: This should be $1*width + $2
-				$self.st($1.toInt*$2.toInt, $3)
+				val bramWidth = getSize0($self)
+				$self.st($1*unit(bramWidth).toFixPt+$2, $3)
 			}
 			infix ("ld") (FixPt :: T) implements composite ${ array_apply( $self.data, $1.toInt) }
 			//TODO this should be $1*width + $2
-			infix ("ld") ((FixPt, FixPt) :: T) implements composite ${ $self.ld($1.toInt*$2.toInt) }
+			infix ("ld") ((FixPt, FixPt) :: T) implements composite ${
+				val bramWidth = getSize0($self)
+				$self.ld($1*unit(bramWidth).toFixPt+$2)
+			}
 			infix ("mkString") (Nil :: MString) implements composite ${ unit("bram[") + array_mkstring[T]( $self.data,
 				unit(", ")) + unit("]")}
 		}
@@ -119,17 +122,17 @@ trait MemsElements {
 			})
 			val offld2 = infix ("ld") (MethodSignature(
 				List(("bram", BRAM(T)), ("startx", FixPt), ("starty", FixPt), ("offsetx", SInt),
-					("offsety", SInt), ("width", SInt)), MUnit),
+					("offsety", SInt), ("width", FixPt)), MUnit),
 				effect = write(1))
 			impl (offld2) (composite ${
 				var j = unit(0)
 				while ( j <  unit($offsety) ) {
 					var i = unit(0)
 					while ( i <  unit($offsetx) ) {
-						val row = i + $startx.toInt
-						val col = j + $starty.toInt
-						val offaddr = col*unit($width) + row
-						val bramaddr = j*unit($offsetx) + i
+						val row:Rep[Int] = i + $startx.toInt
+						val col:Rep[Int] = j + $starty.toInt
+						val offaddr:Rep[Int] = col*$width.toInt + row
+						val bramaddr:Rep[Int] = j*unit($offsetx) + i
 						array_update[T]( $bram.data, bramaddr, $self.data.apply(offaddr) )
 						i = i + unit(1)
 					}

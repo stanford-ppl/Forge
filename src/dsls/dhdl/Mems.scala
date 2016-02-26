@@ -10,79 +10,88 @@ trait MemsElements {
 
 		val T = tpePar("T")
 		val FixPt = lookupTpe("Long")
+		val SString = lookupTpe("java.lang.String", stage=compile)
 
-		//TODO: Add argIn/argOut as metadata of Reg
 		val Reg = tpe("Reg", tpePar("T"))
-		//TODO: how to constrain T to be one of fixpt, mfloat, or boolean?
-		data(Reg, ("_name", MString), ("_value", T), ("_init", T))
-		static (Reg) ("apply", T,
-			MethodSignature(List(("name", MString, "unit(\"\")"),
-													 ("value", T, "unit(0)"),
-												 	 ("init", T, "unit(0)"),
-													 ("tpe", MString, "unit(\"normal\")")), Reg(T)),
-			effect=mutable) implements allocates(Reg,
-			${$name}, ${$value}, ${$init})
-		static (Reg) ("apply", T, T :: Reg(T)) implements redirect ${ Reg.apply[T](value=$0, init=$0) }
-		direct (Reg) ("ArgIn", T, T :: Reg(T)) implements redirect ${ Reg.apply[T](value=$0, init=$0,
-		tpe=unit("argin")) }
-		direct (Reg) ("ArgOut", T, T :: Reg(T)) implements redirect ${ Reg.apply[T](value=$0, init=$0,
-		tpe=unit("argout")) }
-		/*
-		static (Reg) ("apply", FixPt, Nil :: Reg(FixPt)) implements redirect ${ Reg[FixPt](unit(0)) }
-		direct (Reg) ("ArgIn", FixPt, Nil :: Reg(FixPt)) implements redirect ${ ArgIn[FixPt](unit(0)) }
-		direct (Reg) ("ArgOut", FixPt, Nil :: Reg(FixPt)) implements redirect ${ ArgOut[FixPt](unit(0)) }
-		static (Reg) ("apply", MFloat, Nil :: Reg(MFloat)) implements redirect ${ Reg[Float](unit(0.0f)) }
-		direct (Reg) ("ArgIn", MFloat, Nil :: Reg(MFloat)) implements redirect ${ ArgIn[Float](unit(0.0f)) }
-		direct (Reg) ("ArgOut", MFloat, Nil :: Reg(MFloat)) implements redirect ${ ArgOut[Float](unit(0.0f)) }
-		static (Reg) ("apply", MBoolean, Nil :: Reg(MBoolean)) implements redirect ${ Reg[Boolean](unit(false)) }
-		direct (Reg) ("ArgIn", MBoolean, Nil :: Reg(MBoolean)) implements redirect ${ ArgIn[Boolean](unit(false)) }
-		direct (Reg) ("ArgOut", MBoolean, Nil :: Reg(MBoolean)) implements redirect ${ ArgOut[Boolean](unit(false)) }
-		*/
+		//TODO: how to bound T to be one of fixpt, mfloat, or boolean?
+		data(Reg, ("_value", T), ("_init", T))
+		internal.direct (MemOps) ("newReg", T, ("init", T) :: Reg(T), effect=mutable) implements
+			allocates(Reg, ${$init}, ${$init})
+		static (Reg) ("apply", T, (SString, T) :: Reg(T)) implements composite ${
+			val reg = newReg[T](init=$1)
+			name(reg) = $0
+			dblbuf(reg) = false
+			regtpe(reg) = Regular 
+			reg
+		}
+		static (Reg) ("apply", T, T :: Reg(T)) implements composite ${ Reg[T]("", $0) }
+		direct (Reg) ("ArgIn", T, (SString, T) :: Reg(T)) implements composite ${
+			val reg = newReg[T](init=$1)
+			name(reg) = $0
+			dblbuf(reg) = false
+			regtpe(reg) = ArgIn 
+			reg
+		}
+		direct (Reg) ("ArgIn", T, T :: Reg(T)) implements composite ${ ArgIn[T]("", $0) }
+		direct (Reg) ("ArgOut", T, (SString, T) :: Reg(T)) implements composite ${
+			val reg = newReg[T](init=$1)
+			name(reg) = $0
+			dblbuf(reg) = false
+			regtpe(reg) = ArgOut 
+			reg
+		}
+		direct (Reg) ("ArgOut", T, T :: Reg(T)) implements composite ${ ArgOut[T]("", $0) }
 
 		val RegOps = withTpe(Reg)
 		RegOps {
-			infix ("name") (Nil :: MString) implements getter(0, "_name")
+			infix ("name") (Nil :: MString) implements composite ${ getName($self) }
 			infix ("value") (Nil :: T) implements getter(0, "_value")
 			infix ("init") (Nil :: T) implements getter(0, "_init")
 			infix ("write") (T :: MUnit, effect = write(0)) implements setter(0, "_value", ${$1})
-			infix ("reset") (Nil :: MUnit, effect = write(0)) implements redirect ${ $self.write($self.init) }
+			infix ("reset") (Nil :: MUnit, effect = write(0)) implements composite ${ $self.write($self.init) }
 		}
 
 		val BRAM = tpe("BRAM", tpePar("T"))
-		data(BRAM, ("_name", MString), ("_data", MArray(T)))
+		data(BRAM, ("_data", MArray(T)))
+		internal.direct (MemOps) ("newBRAM", T, ("size", MInt) :: BRAM(T), effect = mutable) implements
+			allocates(BRAM, ${array_empty[T]($size)})
 		/* 1-D BRAM */
-		static (BRAM) ("apply", T,
-			MethodSignature(List(("name", MString, "unit(\"\")"), ("size", MInt)), BRAM(T)),
-			effect = mutable) implements
-		allocates(BRAM, ${$name}, ${array_empty[T]($size)})
-		static (BRAM) ("apply", T, SInt :: BRAM(T), effect = mutable) implements
+		static (BRAM) ("apply", T, (SString, SInt) :: BRAM(T), effect = mutable) implements
 		composite ${
-			val bram = BRAM.apply[T](size=unit($0))
-			size(bram) = $0::Nil
+			val bram = newBRAM[T](size=unit($1))
+			size(bram) = $1::Nil
+			name(bram) = $0
+			dblbuf(bram) = false
 			bram
 		}
+		static (BRAM) ("apply", T, SInt :: BRAM(T), effect = mutable) implements
+		composite ${ BRAM[T]("",$0)}
 		/* 2-D BRAM */
-		static (BRAM) ("apply", T, (MString, SInt, SInt) :: BRAM(T), effect = mutable) implements
+		static (BRAM) ("apply", T, (SString, SInt, SInt) :: BRAM(T), effect = mutable) implements
 		composite ${
-			val bram = BRAM.apply[T]($0, unit($1*$2))
+			val bram = newBRAM[T](size=unit($1*$2))
 			size(bram) = $1::$2::Nil
+			name(bram) = $0
+			dblbuf(bram) = false
 			bram
 		}
 		static (BRAM) ("apply", T, (SInt, SInt) :: BRAM(T), effect = mutable) implements
-		composite ${BRAM.apply[T](unit(""), $0, $1)}
+		composite ${BRAM[T]("", $0, $1)}
 		/* 3-D BRAM */
-		static (BRAM) ("apply", T, (MString, SInt, SInt, SInt) :: BRAM(T), effect = mutable) implements
+		static (BRAM) ("apply", T, (SString, SInt, SInt, SInt) :: BRAM(T), effect = mutable) implements
 		composite ${
-			val bram = BRAM.apply[T]($0, unit($1*$2*$3))
+			val bram = newBRAM[T](size=unit($1*$2*$3))
 			size(bram) = $1::$2::$3::Nil
+			name(bram) = $0
+			dblbuf(bram) = false
 			bram
 		}
 		static (BRAM) ("apply", T, (SInt, SInt, SInt) :: BRAM(T), effect = mutable) implements
-		composite ${BRAM.apply[T](unit(""), $0, $1, $2)}
+		composite ${BRAM[T]("", $0, $1, $2)}
 
 		val BRAMOps = withTpe(BRAM)
 		BRAMOps {
-			infix ("name") (Nil :: MString) implements getter(0, "_name")
+			infix ("name") (Nil :: MString) implements composite ${ getName($self) }
 			infix ("data") (Nil :: MArray(T)) implements getter(0, "_data")
 			/* 1-D Store */
 			infix ("st") ((FixPt,T) :: MUnit, effect = write(0)) implements composite ${
@@ -134,28 +143,42 @@ trait MemsElements {
 		}
 
 		val OffChipMem = tpe("OffChipMem", tpePar("T"))
-		data(OffChipMem, ("_name", MString), ("_data", MArray(T)), ("_size", FixPt))
-		static (OffChipMem) ("apply", T,
-			MethodSignature(List(("name", MString, "unit(\"\")"), ("size", FixPt)), OffChipMem(T)),
-			effect = mutable) implements
-		allocates(OffChipMem, ${$name}, ${array_empty[T]( $size.toInt )}, ${$size})
+		data(OffChipMem, ("_data", MArray(T)), ("_size", FixPt))
+		internal.direct (MemOps) ("newOffChipMem", T, ("size", FixPt) :: OffChipMem(T), effect = mutable) implements
+		allocates(OffChipMem, ${array_empty[T]( $size.toInt )}, ${$size})
 
+		static (OffChipMem) ("apply", T, (SString, FixPt):: OffChipMem(T), effect = mutable) implements
+		composite ${
+			val offchip = newOffChipMem[T]($1)
+			name(offchip) = $0
+			dblbuf(offchip) = false
+			offchip
+		}
 		static (OffChipMem) ("apply", T, FixPt:: OffChipMem(T), effect = mutable) implements
-		redirect ${ OffChipMem[T](size=$0)}
+		composite ${ OffChipMem[T]($0) }
 
-		static (OffChipMem) ("apply", T, (MString, varArgs(T)) :: OffChipMem(T), effect = mutable) implements
-		allocates(OffChipMem, ${$0}, ${ array_fromseq[T]( $1 ) }, ${ $1.length })
+		/* Initialize OffChipMem to constant values. These apply functions are for testing purpose only! No codegen rule */
+		static (OffChipMem) ("apply", T, varArgs(T) :: OffChipMem(T), effect = mutable) implements
+			allocates(OffChipMem, ${ array_fromseq[T]( $0 ) }, ${ $0.length })
+		static (OffChipMem) ("apply", T, (SString, varArgs(T)) :: OffChipMem(T), effect = mutable) implements
+			composite ${
+			val offchip = OffChipMem[T]($1:_*)
+			name(offchip) = $0
+			dblbuf(offchip) = false
+			offchip
+		}
 
 		val OffChipMemOps = withTpe(OffChipMem)
 		OffChipMemOps {
-			infix ("name") (Nil :: MString) implements getter(0, "_name")
+			infix ("name") (Nil :: MString) implements composite ${ getName($self) }
 			infix ("data") (Nil :: MArray(T)) implements getter(0, "_data")
 			infix ("mkString") (Nil :: MString) implements composite ${ offchip_to_string[T]( $self.name,
 				$self.data )
 			}
-			/* This load is for debugging purpose only! */
+			/* Load signle element from OffChipArray. This load is for debugging purpose only! 
+			 	No codegen rule! */
 			infix ("ld") (FixPt :: T) implements composite ${ array_apply( $self.data, $1.toInt) }
-			/* load from offchip mem to bram. (BRAM, startIdx, offSet)*/
+			/* 1-D OffChipMem Load */
 			val offld1 = infix ("ld") ((("bram", BRAM(T)), ("start", FixPt), ("offset", SInt)) :: MUnit, effect = write(1))
 			impl (offld1) (composite ${
 				var i = unit(0)
@@ -164,6 +187,7 @@ trait MemsElements {
 					i = i + unit(1)
 				}
 			})
+			/* 2-D OffChipMem Load */
 			val offld2 = infix ("ld") (MethodSignature(
 				List(("bram", BRAM(T)), ("startx", FixPt), ("starty", FixPt), ("offsetx", SInt),
 					("offsety", SInt), ("width", FixPt)), MUnit),
@@ -183,7 +207,7 @@ trait MemsElements {
 					i = i + unit(1)
 				}
 			})
-			/* store from bram to offchip. (BRAM, stMUnitdx, offSet)*/
+			/* 1-D OffChipMem Store */
 		 val offst1 = infix ("st") ((("bram", BRAM), ("start", FixPt), ("offset",SInt)) :: MUnit, effect = write(0))
 		 impl (offst1) (composite ${
 			 var i = unit(0)
@@ -192,6 +216,7 @@ trait MemsElements {
 				 i = i + unit(1)
 			 }
 		 })
+			/* 2-D OffChipMem Store */
 		 val offst2 = infix ("st") (MethodSignature(
 			 List(("bram", BRAM), ("startx", FixPt), ("starty", FixPt), ("offsetx",SInt), ("offsety",
 				 SInt), ("width", FixPt)), MUnit),

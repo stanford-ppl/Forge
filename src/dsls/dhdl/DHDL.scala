@@ -8,19 +8,24 @@ object DHDLDSLRunner extends ForgeApplicationRunner with DHDLDSL
 
 trait DHDLDSL extends ForgeApplication 
 	with PrimOps with MiscOps with DHDLTypes with MemsElements
-	with CtrlOps{
+	with CtrlOps with DHDLMetas{
 
   def dslName = "DHDL"
 	
   override def addREPLOverride = false 
 
   def specification() = {
+		//disableSoA()
+		//disableStructUnwrapping()
+		disableFusion()
 		importDHDLTypes()
 		importDHDLPrimitives()
 		importMems()
+		importIndices()
 		importCtrls()
 		importMisc()
 		importDHDLMisc()
+		importDHDLMetadata ()
 		()
 	}
 }

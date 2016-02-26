@@ -6,6 +6,8 @@ trait DHDLTypes {
   this: DHDLDSL =>
 
 	def importDHDLTypes () = {
+		val T = tpePar("T")
+		val SList = tpe("scala.List", T, stage=compile)
 		val FixPt = tpe("Long", stage=future)
 		tpeAlias("FixPt", FixPt)
 

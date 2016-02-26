@@ -11,7 +11,6 @@ trait Test extends DHDLApplication {
     exit(-1)
   }
   def main() = {
-
     val om = OffChipMem[FixPt]("om", 1, 2, 3, 4, 5)
     val bm = BRAM[FixPt](5)
     om.ld(bm, 0, 5)

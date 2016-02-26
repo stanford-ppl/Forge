@@ -61,24 +61,24 @@ trait Kmeans extends DHDLApplication with KmeansTest{
 
 		val points = OffChipMem[FixPt]("points", sPoints.flatten.map(i => i.toFixPt): _*)
 		val cents = BRAM[FixPt]("cents", tileSize*sNumCents)
-		points.ld(cents,0, 0, sDim, sNumCents, sDim)
+		points.ld(cents,0, 0, sDim, sNumCents, FixPt(sDim))
 
 		val ptCtr = CounterChain(Counter(max=5))
 		val accum1 = Reg[FixPt](0)
 		val accum2 = Reg[FixPt](0)
-		MetaReduceMany[FixPt](1, true, ptCtr, Seq(accum1, accum2), Seq(_+_, _+_), {case i::_ => 
+		MetaReduceMany[FixPt](true, ptCtr, Seq(accum1, accum2), Seq(_+_, _+_)) {case i::_ => 
 			println(i)
 			Seq(i, i)
-		})
+		}
 		println(accum1.value)
 		println(accum2.value)
 		//val ptCtr = CounterChain(Counter(max=sDim))
 		//MetaPipe()
 		//
 		//val dimCtr = CounterChain(Counter(max=sDim))
-		//Pipe[Float](1, true, dimCtr, distAccum, _+_, {case i::_ =>
+		//Pipe[Float](1, true, dimCtr, distAccum, _+_,) {case i::_ =>
 		//	
-		//})
+		//}
 		println("DHDL:")
 		println("points")
 		println(points.mkString)
@@ -88,20 +88,20 @@ trait Kmeans extends DHDLApplication with KmeansTest{
 		/*
 		val ctrs_out = CounterChain(Counter(max=dataSize/tileSize))
 		val accum_out = ArgOut[FixPt](0)
-		MetaPipe[FixPt](1, true, ctrs_out, accum_out, _+_, {case i::_ => 
+		MetaPipe[FixPt](1, true, ctrs_out, accum_out, _+_) {case i::_ => 
 			val bm1 = BRAM[FixPt]("bm1", tileSize)
 			val bm2 = BRAM[FixPt]("bm2", tileSize)
-			Parallel({
+			Parallel {
 				vec1.ld(bm1, i*tileSize, tileSize)
 				vec2.ld(bm2, i*tileSize, tileSize)
-			})
+			}
 			val accum_in = Reg[FixPt]()
 			val ctrs_in = CounterChain(Counter(max=tileSize))
-			Pipe[FixPt](1, true, ctrs_in, accum_in, _+_, { case j::_ =>
+			Pipe[FixPt](1, true, ctrs_in, accum_in, _+_) { case j::_ =>
 				bm1.ld(j)*bm2.ld(j)
-			})
+			}
 			accum_in.value
-		})
+		}
 
 		assert(accum_out.value==FixPt(gold))
 		*/

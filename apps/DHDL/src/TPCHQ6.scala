@@ -36,20 +36,20 @@ trait TPCHQ6 extends DHDLApplication {
 		val tileCounter = CounterChain(Counter(dataSize, tileSize)) 
 
 		val outAccum = Reg[Float](unit(0.0f))
-		MetaPipe[Float](1, true, tileCounter, outAccum, _+_, {case i::_ => 
+		MetaPipe[Float](true, tileCounter, outAccum, _+_) {case i::_ => 
 			val datesBm = BRAM[FixPt](tileSize)
 			val quantsBm = BRAM[FixPt](tileSize)
 			val discountsBm = BRAM[Float](tileSize)
 			val pricesBm = BRAM[Float](tileSize)
-			Parallel({
+			Parallel {
 				dates.ld(datesBm, i, tileSize)
 				quants.ld(quantsBm, i, tileSize)
 				discounts.ld(discountsBm, i, tileSize)
 				prices.ld(pricesBm, i, tileSize)
-			})
+			}
 			val inCounter = CounterChain(Counter(max=tileSize))
 			val inAccum = Reg[Float](0.0f)
-			Pipe[Float](1, true, inCounter, inAccum, _+_, { case j::_ =>
+			Pipe[Float](true, inCounter, inAccum, _+_) { case j::_ =>
 				val date = datesBm.ld(j)
 				val discount = discountsBm.ld(j)
 				val quant = quantsBm.ld(j)
@@ -57,9 +57,9 @@ trait TPCHQ6 extends DHDLApplication {
 				val valid = ((date > minDate.value) && (date < maxDate.value) && (discount >= 0.05f) &&
 				 						 (discount <= 0.07f) && (quant < FixPt(24)))
 				mux(valid, price * discount, 0.0f)
-			})
+			}
 			inAccum.value
-		})
+		}
 		val result = ArgOut[Float](0.0f)
 		result.write(outAccum.value)
 

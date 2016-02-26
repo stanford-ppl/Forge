@@ -134,19 +134,19 @@ trait BlackScholes extends DHDLApplication {
     val volatilityRAM = BRAM[Float](tileSize)
     val otimeRAM = BRAM[Float](tileSize)
 		val seqCounter = CounterChain(Counter(numOptions, tileSize))
-		MetaPipe(1, seqCounter, {case i::_ => 
-			Parallel({
+		MetaPipe(seqCounter) {case i::_ => 
+			Parallel {
 				otype.ld(otypeRAM, i, tileSize)
 				sptprice.ld(sptpriceRAM, i, tileSize)
 				strike.ld(strikeRAM, i, tileSize)
 				rate.ld(rateRAM, i, tileSize)
 				volatility.ld(volatilityRAM, i, tileSize)
 				otime.ld(otimeRAM, i, tileSize)
-			})
+			}
 
       val optpriceRAM = BRAM[Float](tileSize)
 			val bsCounter = CounterChain(Counter(tileSize, 1))
-			Pipe(1, bsCounter, {case j::_ =>
+			Pipe(bsCounter) {case j::_ =>
 				val sptprice_d = sptpriceRAM.ld(j)
 				val strike_d = strikeRAM.ld(j)
 				val rate_d = rateRAM.ld(j)
@@ -155,9 +155,9 @@ trait BlackScholes extends DHDLApplication {
 				val otype_d = otypeRAM.ld(j)
         val optPrice = BlkSchlsEqEuroNoDiv(sptprice_d, strike_d, rate_d, volatility_d, otime_d, otype_d)
 				optpriceRAM.st(j, optPrice)
-			})
+			}
 			optprice.st(optpriceRAM, i, tileSize)
-		})
+		}
 		println(optprice.mkString)
 	}
 }

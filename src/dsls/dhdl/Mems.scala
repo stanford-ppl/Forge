@@ -50,41 +50,84 @@ trait MemsElements {
 
 		val BRAM = tpe("BRAM", tpePar("T"))
 		data(BRAM, ("_name", MString), ("_data", MArray(T)))
-		/* apply(name:String, size:Int) */
+		/* 1-D BRAM */
 		static (BRAM) ("apply", T,
 			MethodSignature(List(("name", MString, "unit(\"\")"), ("size", MInt)), BRAM(T)),
 			effect = mutable) implements
 		allocates(BRAM, ${$name}, ${array_empty[T]($size)})
 		static (BRAM) ("apply", T, SInt :: BRAM(T), effect = mutable) implements
-		redirect ${
+		composite ${
 			val bram = BRAM.apply[T](size=unit($0))
 			size(bram) = $0::Nil
 			bram
 		}
+		/* 2-D BRAM */
 		static (BRAM) ("apply", T, (MString, SInt, SInt) :: BRAM(T), effect = mutable) implements
-		redirect ${
+		composite ${
 			val bram = BRAM.apply[T]($0, unit($1*$2))
 			size(bram) = $1::$2::Nil
 			bram
 		}
 		static (BRAM) ("apply", T, (SInt, SInt) :: BRAM(T), effect = mutable) implements
-		redirect ${BRAM.apply[T](unit(""), $0, $1)}
+		composite ${BRAM.apply[T](unit(""), $0, $1)}
+		/* 3-D BRAM */
+		static (BRAM) ("apply", T, (MString, SInt, SInt, SInt) :: BRAM(T), effect = mutable) implements
+		composite ${
+			val bram = BRAM.apply[T]($0, unit($1*$2*$3))
+			size(bram) = $1::$2::$3::Nil
+			bram
+		}
+		static (BRAM) ("apply", T, (SInt, SInt, SInt) :: BRAM(T), effect = mutable) implements
+		composite ${BRAM.apply[T](unit(""), $0, $1, $2)}
 
 		val BRAMOps = withTpe(BRAM)
 		BRAMOps {
 			infix ("name") (Nil :: MString) implements getter(0, "_name")
 			infix ("data") (Nil :: MArray(T)) implements getter(0, "_data")
+			/* 1-D Store */
 			infix ("st") ((FixPt,T) :: MUnit, effect = write(0)) implements composite ${
 				array_update( $self.data, $1.toInt, $2 ) }
+			/* 2-D Store */
 			infix ("st") ((FixPt, FixPt, T) :: MUnit, effect = write(0)) implements composite ${
-				val bramWidth = getSize0($self)
-				$self.st($1*unit(bramWidth).toFixPt+$2, $3)
+				if (size($self).size.length!=2) { 
+					throw new Exception("Try to store to non-2D Bram using bram.st(idx1, idx2), size of bram:"
+						+ size($self).size) 
+				}
+				val bramWidth = unit(getSize($self, 1)).toFixPt
+				$self.st($1*bramWidth+$2, $3)
 			}
+			/* 3-D Store */
+		 	//TODO: not a right-hand coordinate, Fix?  x: height, y width, z: depth, zero, top, left. front
+			infix ("st") ((FixPt, FixPt, FixPt, T) :: MUnit, effect = write(0)) implements composite ${
+				if (size($self).size.length!=3) { 
+					throw new Exception("Try to store to non-2D Bram using bram.st(idx1, idx2), size of bram:"
+						+ size($self).size) 
+				}
+				val bramWidth0 = unit(getSize($self, 0)).toFixPt
+				val bramWidth1 = unit(getSize($self, 1)).toFixPt
+				$self.st(bramWidth0*bramWidth1*$3 + $1*bramWidth1+$2, $4)
+			}
+			/* 1-D Load */
 			infix ("ld") (FixPt :: T) implements composite ${ array_apply( $self.data, $1.toInt) }
-			//TODO this should be $1*width + $2
+			/* 2-D Load */
 			infix ("ld") ((FixPt, FixPt) :: T) implements composite ${
-				val bramWidth = getSize0($self)
-				$self.ld($1*unit(bramWidth).toFixPt+$2)
+				if (size($self).size.length!=2) { 
+					throw new Exception("Try to load from non-2D Bram using bram.st(idx1, idx2), size of bram:" 
+						+ size($self).size) 
+				}
+				val bramWidth = unit(getSize($self, 1)).toFixPt
+				$self.ld($1*bramWidth+$2)
+			}
+			/* 3-D Load */
+		 	//TODO: not a right-hand coordinate, Fix?  x: height, y width, z: depth, zero, top, left. front
+			infix ("ld") ((FixPt, FixPt, FixPt) :: T) implements composite ${
+				if (size($self).size.length!=3) { 
+					throw new Exception("Try to load from non-2D Bram using bram.st(idx1, idx2), size of bram:" 
+						+ size($self).size) 
+				}
+				val bramWidth0 = unit(getSize($self, 0)).toFixPt
+				val bramWidth1 = unit(getSize($self, 1)).toFixPt
+				$self.ld(bramWidth0*bramWidth1*$3 + $1*bramWidth1+$2)
 			}
 			infix ("mkString") (Nil :: MString) implements composite ${ unit("bram[") + array_mkstring[T]( $self.data,
 				unit(", ")) + unit("]")}
@@ -110,6 +153,7 @@ trait MemsElements {
 			infix ("mkString") (Nil :: MString) implements composite ${ offchip_to_string[T]( $self.name,
 				$self.data )
 			}
+			/* This load is for debugging purpose only! */
 			infix ("ld") (FixPt :: T) implements composite ${ array_apply( $self.data, $1.toInt) }
 			/* load from offchip mem to bram. (BRAM, startIdx, offSet)*/
 			val offld1 = infix ("ld") ((("bram", BRAM(T)), ("start", FixPt), ("offset", SInt)) :: MUnit, effect = write(1))
@@ -125,48 +169,48 @@ trait MemsElements {
 					("offsety", SInt), ("width", FixPt)), MUnit),
 				effect = write(1))
 			impl (offld2) (composite ${
-				var j = unit(0)
-				while ( j <  unit($offsety) ) {
-					var i = unit(0)
-					while ( i <  unit($offsetx) ) {
+				var i = unit(0)
+				while ( i <  unit($offsetx) ) {
+					var j = unit(0)
+					while ( j <  unit($offsety) ) {
 						val row:Rep[Int] = i + $startx.toInt
 						val col:Rep[Int] = j + $starty.toInt
-						val offaddr:Rep[Int] = col*$width.toInt + row
-						val bramaddr:Rep[Int] = j*unit($offsetx) + i
+						val offaddr:Rep[Int] = row*$width.toInt + col
+						val bramaddr:Rep[Int] = i*unit($offsety) + j
 						array_update[T]( $bram.data, bramaddr, $self.data.apply(offaddr) )
-						i = i + unit(1)
+						j = j + unit(1)
 					}
-					j = j + unit(1)
-				}
-			})
-			/* store from bram to offchip. (BRAM, stMUnitdx, offSet)*/
-		 	val offst1 = infix ("st") ((("bram", BRAM), ("start", FixPt), ("offset",SInt)) :: MUnit, effect = write(0))
-			impl (offst1) (composite ${
-				var i = unit(0)
-				while ( i < unit($offset) ) {
-					array_update[T]( $self.data, i + $start.toInt, $bram.data.apply(i) )
 					i = i + unit(1)
 				}
 			})
-		 	val offst2 = infix ("st") (MethodSignature(
-				List(("bram", BRAM), ("startx", FixPt), ("starty", FixPt), ("offsetx",SInt), ("offsety",
-					SInt), ("width", SInt)), MUnit),
-				effect = write(0))
-			impl (offst2) (composite ${
-				var j = unit(0)
-				while ( j <  unit($offsety) ) {
-					var i = unit(0)
-					while ( i <  unit($offsetx) ) {
-						val row = i + $startx.toInt
-						val col = j + $starty.toInt
-						val offaddr = col*unit($width) + row
-						val bramaddr = j*unit($offsetx) + i
-						array_update[T]( $self.data, offaddr, $bram.data.apply(bramaddr) )
-						i = i + unit(1)
-					}
-					j = j + unit(1)
-				}
-			})
+			/* store from bram to offchip. (BRAM, stMUnitdx, offSet)*/
+		 val offst1 = infix ("st") ((("bram", BRAM), ("start", FixPt), ("offset",SInt)) :: MUnit, effect = write(0))
+		 impl (offst1) (composite ${
+			 var i = unit(0)
+			 while ( i < unit($offset) ) {
+				 array_update[T]( $self.data, i + $start.toInt, $bram.data.apply(i) )
+				 i = i + unit(1)
+			 }
+		 })
+		 val offst2 = infix ("st") (MethodSignature(
+			 List(("bram", BRAM), ("startx", FixPt), ("starty", FixPt), ("offsetx",SInt), ("offsety",
+				 SInt), ("width", FixPt)), MUnit),
+	 effect = write(0))
+		 impl (offst2) (composite ${
+			 var i = unit(0)
+			 while ( i <  unit($offsetx) ) {
+				 var j = unit(0)
+				 while ( j <  unit($offsety) ) {
+					 val row = i + $startx.toInt
+					 val col = j + $starty.toInt
+					 val offaddr = row*$width.toInt + col
+					 val bramaddr = i*unit($offsetx) + j
+					 array_update[T]( $self.data, offaddr, $bram.data.apply(bramaddr) )
+					 j = j + unit(1)
+				 }
+				 i = i + unit(1)
+			 }
+		 })
 		}
 
 		internal (MemOps) ("offchip_to_string", T, (MString, MArray(T))::MString) implements

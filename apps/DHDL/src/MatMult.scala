@@ -11,37 +11,37 @@ trait MatMult extends DHDLApplication {
     println("Usage: matmult")
     exit(-1)
 	}
-	//def matmultTile(tileA: Rep[BRAM[FixPt]], tileB: Rep[BRAM[FixPt]], tileC: Rep[BRAM[FixPt]],
-	//	bm:Int, bn:Int, bp:Int) = {
-	//	val ijCounter = CounterChain(Counter(bn, 1), Counter(bn, 1))
-	//	Sequential(ijCounter) {case i::j::_ =>
-	//		val accum = Reg[FixPt](0)
-	//		val kCounter = CounterChain(Counter(bp, 1)) 
-	//		Pipe[FixPt](true, kCounter, accum, _+_) {case k::_ =>
-	//			val x = tileA.ld(i, k)
-	//			val y = tileB.ld(k, j)
-	//			x * y
-	//		}
-	//		Pipe {
-	//			tileC.st(i, j, accum.value)
-	//		}
-	//		()
-	//	}
-	//}
+	def matmultTile(tileA: Rep[BRAM[FixPt]], tileB: Rep[BRAM[FixPt]], tileC: Rep[BRAM[FixPt]],
+		bm:Int, bn:Int, bp:Int) = {
+		val ijCounter = CounterChain(Counter(bm, 1), Counter(bn, 1))
+		Sequential(ijCounter) {case i::j::_ =>
+			val accum = Reg[FixPt](0)
+			val kCounter = CounterChain(Counter(bp, 1)) 
+			Pipe[FixPt](kCounter, accum, _+_) {case k::_ =>
+				val x = tileA.ld(i, k)
+				val y = tileB.ld(k, j)
+				x * y
+			}
+			Pipe {
+				tileC.st(i, j, accum.value)
+			}
+			()
+		}
+	}
 
   def main() = {
 		val bm = 2
 		val bn = 2
 		val bp = 2
-		val sM = 4
-		val sN = 4
-		val sP = 2
+		val sM = 8
+		val sN = 6
+		val sP = 10
 		val sM1 = Seq.fill(sM)(Seq.fill(sP)(Random.nextInt(100)))
 		val sM2 = Seq.fill(sP)(Seq.fill(sN)(Random.nextInt(100)))
-		println("M1")
-		sM1.map{_.mkString(",")}.mkString("\n")
-		println("M2")
-		sM2.map{_.mkString(",")}.mkString("\n")
+		//println("M1")
+		//println(sM1.map{_.mkString(",")}.mkString("\n"))
+		//println("M2")
+		//println(sM2.map{_.mkString(",")}.mkString("\n"))
 		val M3Gold = Seq.tabulate(sM){i =>
 			val v1 = sM1(i)
 			Seq.tabulate(sN) {j =>
@@ -49,8 +49,8 @@ trait MatMult extends DHDLApplication {
 				v1.zip(v2).map{case (a,b) => a*b}.reduce(_+_)
 			}
 		}
-		println("M3Gold")
-		M3Gold.map{_.mkString(",")}.mkString("\n")
+		//println("M3Gold")
+		//println(M3Gold.map{_.mkString(",")}.mkString("\n"))
 
 		val M = ArgIn[FixPt](sM).value
 		val N = ArgIn[FixPt](sN).value
@@ -58,25 +58,30 @@ trait MatMult extends DHDLApplication {
 		val M1 = OffChipMem[FixPt]("M1", sM1.flatten.map(i => i.toFixPt): _*)
 		val M2 = OffChipMem[FixPt]("M2", sM2.flatten.map(i => i.toFixPt): _*)
 		val M3 = OffChipMem[FixPt]("M3", M*N)
-		//val ijCounter = CounterChain(Counter(M, bm), Counter(N,bn))
+		val ijCounter = CounterChain(Counter(M, bm), Counter(N,bn))
 
-		//MetaPipe(true, ijCounter) {case i::j::_ => 
-		//	val m1Tile = BRAM[FixPt](bm, bp)
-		//	val m2Tile = BRAM[FixPt](bp, bn)
-		//	val multTile = BRAM[FixPt](bm, bn)
-		//	val kCounter = CounterChain(Counter(P, bp))
-		//	//BramReduce[FixPt](true, kCounter, multTile, (_+_)) {case k::_ =>
-		//	//	Parallel{
-		//	//		M1.ld(m1Tile, i, k, bm, bp, M)
-		//	//		M2.ld(m2Tile, k, j, bp, bn, P)
-		//	//	}
-		//	//	val result = BRAM[FixPt](bm*bn)
-		//	//	//matmultTile(m1Tile, m2Tile, result, bm, bn, bp)
-		//	//	//println(result)
-		//	//	result
-		//	//}
-		//	()
-		//}
-
+		MetaPipe(ijCounter) {case i::j::_ => 
+			val m1Tile = BRAM[FixPt](bm, bp)
+			val m2Tile = BRAM[FixPt](bp, bn)
+			val multTile = BRAM[FixPt](bm, bn)
+			val kCounter = CounterChain(Counter(P, bp))
+			BramReduce[FixPt](true, kCounter, multTile, (_+_)) {case k::_ =>
+				Parallel{
+					M1.ld(m1Tile, i, k, bm, bp, P)
+					M2.ld(m2Tile, k, j, bp, bn, N)
+				}
+				val result = BRAM[FixPt](bm, bn)
+				matmultTile(m1Tile, m2Tile, result, bm, bn, bp)
+				result
+			}
+			M3.st(multTile, i, j, bm, bn, N)
+			()
+		}
+		//println("M3")
+		//println(M3.mkString)
+		val fgold = M3Gold.flatten
+		fgold.zipWithIndex.foreach{case (g, i) => 
+			assert(FixPt(g) == M3.ld(i))
+		}
 	}
 }

@@ -32,7 +32,7 @@ trait DotProd extends DHDLApplication {
 			}
 			val accum_in = Reg[FixPt]()
 			val ctrs_in = CounterChain(Counter(max=tileSize))
-			Pipe[FixPt](true, ctrs_in, accum_in, _+_) { case j::_ =>
+			Pipe[FixPt](ctrs_in, accum_in, _+_) { case j::_ =>
 				bm1.ld(j)*bm2.ld(j)
 			}
 			accum_in.value

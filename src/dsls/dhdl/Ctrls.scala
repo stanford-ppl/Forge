@@ -11,29 +11,30 @@ trait CtrlOps {
 		val Reg = lookupTpe("Reg")
 		val FixPt = lookupTpe("Long")
 		val CtrlOps = grp("Ctrls")
+		val MetaOps = grp("CtrlMetadatas")
 
-		val Ctr = tpe("Ctr")
-		data (Ctr, ("_name", MString), ("_min", FixPt), ("_max", FixPt), ("_step", FixPt), ("_val", FixPt))
-		static (Ctr) ("apply", Nil, MethodSignature(List(("name", MString, "unit(\"\")"),
+		val Counter = tpe("Counter")
+		data (Counter, ("_name", MString), ("_min", FixPt), ("_max", FixPt), ("_step", FixPt), ("_val", FixPt))
+		static (Counter) ("apply", Nil, MethodSignature(List(("name", MString, "unit(\"\")"),
 			                                               ("min", FixPt, "unit(0)"),
 																										 ("max", FixPt), 
 																										 ("step", FixPt, "unit(1)")),
-																								Ctr), effect=mutable) implements allocates(Ctr,
+																								Counter), effect=mutable) implements allocates(Counter,
 			${$name}, ${$min}, ${$max}, ${$step}, ${ unit(0) })
-		static (Ctr) ("apply", Nil, MethodSignature(List(("par", SInt),
+		static (Counter) ("apply", Nil, MethodSignature(List(("par", SInt),
 																										 ("name", MString),
 			                                               ("min", FixPt),
 																										 ("max", FixPt), 
 																										 ("step", FixPt)),
-																								Ctr), effect=mutable) implements
-		redirect ${ Ctr.apply($name, $min, $max, $step) }
-		static (Ctr) ("apply", Nil, (("max", FixPt), ("step", FixPt)) :: Ctr, effect=mutable) implements
-		redirect ${ Ctr.apply(unit(""), unit(0), $max, $step) }
-		static (Ctr) ("apply", Nil, (("par", SInt), ("max", FixPt), ("step", FixPt)) :: Ctr, effect=mutable) implements
-		redirect ${ Ctr.apply($par, unit(""), unit(0), $max, $step) }
+																								Counter), effect=mutable) implements
+		redirect ${ Counter.apply($name, $min, $max, $step) }
+		static (Counter) ("apply", Nil, (("max", FixPt), ("step", FixPt)) :: Counter, effect=mutable) implements
+		redirect ${ Counter.apply(unit(""), unit(0), $max, $step) }
+		static (Counter) ("apply", Nil, (("par", SInt), ("max", FixPt), ("step", FixPt)) :: Counter, effect=mutable) implements
+		redirect ${ Counter.apply($par, unit(""), unit(0), $max, $step) }
 
-		val CtrOps = withTpe(Ctr)
-		CtrOps {
+		val CounterOps = withTpe(Counter)
+		CounterOps {
 			infix ("mkString") (Nil :: MString) implements composite ${
 				unit("ctr(") +
         unit("name:") + $self.name +
@@ -48,43 +49,45 @@ trait CtrlOps {
 			infix ("step") (Nil :: FixPt) implements getter(0, "_step")
 		}
 
-		val CtrChain = tpe("CtrChain")
-		//val MCtrChain = metadata("MCtrChain", ("size",SInt))
-		//meet (MCtrChain) ${ this }
-		//compiler.static (MCtrChain) ("update", Nil, (MAny, SInt) :: MUnit, effect = simple) implements
-		//composite ${ setMetadata($0, MCtrChain($1)) }
-		//compiler.static (MCtrChain) ("apply", Nil, MAny :: SInt) implements composite ${
-		//meta[MCtrChain]($0).get}
+		val CounterChain = tpe("CounterChain")
+		/*
+		val MCounterChain = metadata("MCounterChain", ("size",SInt))
+		meet (MCounterChain) ${ this }
+		internal.static (MetaOps) ("update", Nil, (CounterChain, SInt) :: MUnit, effect = simple) implements
+		composite ${ setMetadata($0, MCounterChain($1)) }
+		internal.static (MetaOps) ("apply", Nil, CounterChain :: MCounterChain) implements composite ${
+		meta[MCounterChain]($0).get}
+		*/
 
-		data (CtrChain, ("_chain", MArray(Ctr)))
-    internal (CtrChain) ("ctrchain_from_array", Nil, MArray(Ctr) :: CtrChain,effect=mutable) implements allocates(CtrChain, ${$0})
-		static (CtrChain) ("apply", Nil, varArgs(Ctr) :: CtrChain) implements composite ${
-      val array = array_empty[Ctr](unit($0.length))
+		data (CounterChain, ("_chain", MArray(Counter)))
+    internal (CounterChain) ("ctrchain_from_array", Nil, MArray(Counter) :: CounterChain,effect=mutable) implements allocates(CounterChain, ${$0})
+		static (CounterChain) ("apply", Nil, varArgs(Counter) :: CounterChain) implements composite ${
+      val array = array_empty[Counter](unit($0.length))
       val ctrchain = ctrchain_from_array(array)
       for (i <- 0 until $0.length) { ctrchain(i) = $0.apply(i) }
 			val ictrchain = ctrchain.unsafeImmutable
-			//MCtrChain(ictrchain) = $0.length
+			//MCounterChain(ictrchain) = $0.length
 			ictrchain
     }
-		val CtrChainOps = withTpe(CtrChain)
-		CtrChainOps {
+		val CounterChainOps = withTpe(CounterChain)
+		CounterChainOps {
 			infix ("mkString") (Nil :: MString) implements composite ${
 				unit("ctrchain[") +
 				array_mkstring[String](
-					array_map[Ctr,String]($self.chain, c => c.mkString), ",") +
+					array_map[Counter,String]($self.chain, c => c.mkString), ",") +
 				unit("]")
 			}
-			infix ("chain") (Nil :: MArray(Ctr)) implements getter(0, "_chain")
-      infix ("update") ((MInt,Ctr) :: MUnit, effect = write(0)) implements composite ${ array_update($0.chain, $1, $2) }
+			infix ("chain") (Nil :: MArray(Counter)) implements getter(0, "_chain")
+      infix ("update") ((MInt,Counter) :: MUnit, effect = write(0)) implements composite ${ array_update($0.chain, $1, $2) }
 			infix ("length") (Nil :: MInt) implements composite ${ $self.chain.length }
 		}
 
 		val Pipe = tpe("Pipe")
-		data (Pipe, ("_ctrs", CtrChain)) //TODO: Modify pipe to keep track of nodes inside
-		static (Pipe) ("apply", Nil, (CtrChain) :: Pipe) implements
+		data (Pipe, ("_ctrs", CounterChain)) //TODO: Modify pipe to keep track of nodes inside
+		static (Pipe) ("apply", Nil, (CounterChain) :: Pipe) implements
 		allocates(Pipe, ${$0})
 
-		val loop = internal (CtrlOps) ("loop", Nil, (("ctr", Ctr), ("lambda", FixPt ==> MUnit)) :: MUnit)
+		val loop = internal (CtrlOps) ("loop", Nil, (("ctr", Counter), ("lambda", FixPt ==> MUnit)) :: MUnit)
 		impl (loop) (composite ${
 			var i = $ctr.min
 			while (i < $ctr.max) {
@@ -94,7 +97,7 @@ trait CtrlOps {
 		})
 
 		//TODO: Won't work here until have metadata
-		val pipe_map = static (Pipe) ("apply", Nil, (("ctrSize", SInt), ("pipelined", MBoolean), ("ctrs", CtrChain), ("mapFunc", varArgs(FixPt) ==> MUnit)) :: Pipe)
+		val pipe_map = static (Pipe) ("apply", Nil, (("ctrSize", SInt), ("pipelined", MBoolean), ("ctrs", CounterChain), ("mapFunc", varArgs(FixPt) ==> MUnit)) :: Pipe)
 		impl (pipe_map) (composite ${
 			def recPipe (idx:Int, idxs:Seq[Rep[FixPt]]): Rep[Unit] = {
 				val ctr = $ctrs.chain.apply(unit(idx))
@@ -108,13 +111,17 @@ trait CtrlOps {
 			recPipe( $ctrSize - 1, Seq.empty[Rep[FixPt]] )
 			pipe
 		})
-		static (Pipe) ("apply", Nil, (("ctrSize", SInt), ("ctrs", CtrChain),
+		static (Pipe) ("apply", Nil, (("ctrSize", SInt), ("ctrs", CounterChain),
 			("mapFunc", varArgs(FixPt) ==> MUnit)) :: Pipe) implements redirect ${
 			Pipe($ctrSize, unit(true), $ctrs, $mapFunc)
 		}
+		direct (Pipe) ("PipeSeq", Nil, (("ctrSize", SInt), ("ctrs", CounterChain),
+			("mapFunc", varArgs(FixPt) ==> MUnit)) :: Pipe) implements redirect ${
+			Pipe($ctrSize, unit(false), $ctrs, $mapFunc)
+		}
 
 		val pipe_reduce = static (Pipe) ("apply", T, MethodSignature(List(("ctrSize", SInt), ("pipelined", MBoolean),
-			("ctrs", CtrChain), ("accum", Reg(T)), ("reduceFunc", (T, T) ==> T) , ("mapFunc", varArgs(FixPt) ==> T)), Pipe))
+			("ctrs", CounterChain), ("accum", Reg(T)), ("reduceFunc", (T, T) ==> T) , ("mapFunc", varArgs(FixPt) ==> T)), Pipe))
 		impl (pipe_reduce) (composite ${
 			def recPipe (idx:Int, idxs:Seq[Rep[FixPt]]): Rep[Unit] = {
 				val ctr = $ctrs.chain.apply(unit(idx))
@@ -129,19 +136,19 @@ trait CtrlOps {
 			recPipe( $ctrSize - 1, Seq.empty[Rep[FixPt]] )
 			pipe
 		})
-		/*
-		static (Pipe) ("apply", T, (("ctrSize", SInt), ("ctrs", CtrChain), ("accum", Reg(T)),
+		direct (Pipe) ("PipeSeq", T, (("ctrSize", SInt), ("ctrs", CounterChain), ("accum", Reg(T)),
 			("reduceFunc", (T, T) ==> T) , ("mapFunc", varArgs(FixPt) ==> T)) :: Pipe) implements redirect ${
-			Pipe[T]($ctrSize, unit(true), $ctrs, $accum, $reduceFunc, $mapFunc)
+			Pipe[T]($ctrSize, unit(false), $ctrs, $accum, $reduceFunc, $mapFunc)
 		}
-		*/
 
+		/* MetaPipeline */
 		val MetaPipe = tpe("MetaPipe")
-		data (MetaPipe, ("_ctrs", CtrChain)) //TODO: Modify pipe to keep track of nodes inside
-		static (MetaPipe) ("apply", Nil, (CtrChain) :: MetaPipe) implements
+		data (MetaPipe, ("_ctrs", CounterChain)) //TODO: Modify pipe to keep track of nodes inside
+		static (MetaPipe) ("apply", Nil, (CounterChain) :: MetaPipe) implements
 		allocates(MetaPipe, ${$0})
 
-		val meta_map = static (MetaPipe) ("apply", Nil, (("ctrSize", SInt), ("pipelined", MBoolean), ("ctrs", CtrChain),
+		/* MetaPipe Map  */
+		val meta_map = static (MetaPipe) ("apply", Nil, (("ctrSize", SInt), ("pipelined", MBoolean), ("ctrs", CounterChain),
 			("mapFunc", varArgs(FixPt) ==> MUnit)) :: MetaPipe)
 		impl (meta_map) (composite ${
 			def recMetaPipe (idx:Int, idxs:Seq[Rep[FixPt]]): Rep[Unit] = {
@@ -156,13 +163,19 @@ trait CtrlOps {
 			recMetaPipe( $ctrSize - 1, Seq.empty[Rep[FixPt]] )
 			metaPipe
 		})
-		static (MetaPipe) ("apply", Nil, (("ctrSize", SInt), ("ctrs", CtrChain),
+		static (MetaPipe) ("apply", Nil, (("ctrSize", SInt), ("ctrs", CounterChain),
 			("mapFunc", varArgs(FixPt) ==> MUnit)) :: MetaPipe) implements redirect ${
 				MetaPipe.apply($ctrSize, unit(true), $ctrs, $mapFunc)
 			}
+		direct (MetaPipe) ("Sequential", Nil, (("ctrSize", SInt), ("ctrs", CounterChain),
+			("mapFunc", varArgs(FixPt) ==> MUnit)) :: MetaPipe) implements redirect ${
+				MetaPipe.apply($ctrSize, unit(false), $ctrs, $mapFunc)
+			}
 
+		/* MetaPipe Reduction */
+	 /*
 		val meta_reduce = static (MetaPipe) ("apply", T, MethodSignature(List(("ctrSize", SInt),
-			("pipelined", MBoolean), ("ctrs", CtrChain), ("accum", Reg(T)),
+			("pipelined", MBoolean), ("ctrs", CounterChain), ("accum", Reg(T)),
 			("reduceFunc", (T, T) ==> T) , ("mapFunc", varArgs(FixPt) ==> T)), MetaPipe))
 		impl (meta_reduce) (composite ${
 			def recMetaPipe (idx:Int, idxs:Seq[Rep[FixPt]]): Rep[Unit] = {
@@ -178,24 +191,98 @@ trait CtrlOps {
 			recMetaPipe( $ctrSize - 1, Seq.empty[Rep[FixPt]] )
 			metaPipe
 		})
-		/*
-		static (MetaPipe) ("apply", T, MethodSignature(List(("ctrSize", SInt), ("ctrs", CtrChain), ("accum", Reg(T)),
+		*/
+		val meta_reduce = static (MetaPipe) ("apply", T, MethodSignature(List(("ctrSize", SInt),
+			("pipelined", MBoolean), ("ctrs", CounterChain), ("accum", Reg(T)),
+			("reduceFunc", (T, T) ==> T) , ("mapFunc", varArgs(FixPt) ==> T)), MetaPipe))
+		impl (meta_reduce) (redirect ${
+			val wrapMapFun = (idxs:Seq[Rep[FixPt]]) => {
+				Seq($mapFunc(idxs:_*))
+			}
+			MetaReduceMany[T]($ctrSize, $pipelined, $ctrs, Seq($accum), Seq(reduceFunc), wrapMapFun)
+		})
+		direct (MetaPipe) ("Sequential", T, MethodSignature(List(("ctrSize", SInt), ("ctrs", CounterChain), ("accum", Reg(T)),
 			("reduceFunc", (T, T) ==> T) , ("mapFunc", varArgs(FixPt) ==> T)),MetaPipe)) implements
 		redirect ${
-			MetaPipe[T]($ctrSize, unit(true), $ctrs, $accum, $reduceFunc, $mapFunc)
+			MetaPipe[T]($ctrSize, unit(false), $ctrs, $accum, $reduceFunc, $mapFunc)
 		}
+		val SSeq = tpe("scala.Seq", T, stage=compile)
+		val meta_reduce_many = direct (MetaPipe) ("MetaReduceMany", T, MethodSignature(List(("ctrSize", SInt),
+			("pipelined", MBoolean), ("ctrs", CounterChain), ("accums", SSeq(Reg(T))),
+			("reduceFuncs", SSeq((T, T) ==> T)) , ("mapFunc", varArgs(FixPt) ==> SSeq(T))), MetaPipe))
+		impl (meta_reduce_many) (composite ${
+			def recMetaPipe (idx:Int, idxs:Seq[Rep[FixPt]]): Rep[Unit] = {
+				val ctr = $ctrs.chain.apply(unit(idx))
+				if (idx == 0) {
+					loop(ctr, { case i => 
+						val results = $mapFunc(i+:idxs)
+						$accums.zipWithIndex.foreach{case (accum, accIdx) =>
+							val reduceFunc = reduceFuncs(accIdx)
+							accum.write(reduceFunc(accum.value, results(accIdx))) 
+						}
+					})
+				} else {
+					loop(ctr, ( (i:Rep[FixPt]) => recMetaPipe(idx - 1, i+:idxs) ))
+				}
+			}
+			val metaPipe = MetaPipe( $ctrs)
+			$accums.foreach(accum => accum.reset)
+			recMetaPipe( $ctrSize - 1, Seq.empty[Rep[FixPt]] )
+			metaPipe
+		})
+
+		//TODO:FIX this
+		val BRAM = lookupTpe("BRAM")
+		val bram_reduce_many = direct (MetaPipe) ("BramReduceMany", T, MethodSignature(List(("ctrSize", SInt), 
+			("bramSize", SInt), ("pipelined", MBoolean), ("ctrs", CounterChain), ("brams", SSeq(BRAM(T))),
+			("reduceFuncs", SSeq((T, T) ==> T)) , ("mapFunc", varArgs(FixPt) ==> SSeq(BRAM(T)))), MetaPipe))
+		impl (bram_reduce_many) (composite ${
+			def recMetaPipe (idx:Int, idxs:Seq[Rep[FixPt]]): Rep[Unit] = {
+				val ctr = $ctrs.chain.apply(unit(idx))
+				if (idx == 0) {
+					loop(ctr, { case i => 
+						val resultBms = $mapFunc(i+:idxs)
+						$brams.zipWithIndex.foreach{case (bram, accIdx) =>
+							val reduceFunc = reduceFuncs(accIdx)
+							val bramCtr = CounterChain(Counter(max=$bramSize))
+							Pipe(1, true, bramCtr, {case i::_ =>
+								bram.st(i, reduceFunc(bram.ld(i), resultBms(accIdx).ld(i))) 
+							})
+						}
+					})
+				} else {
+					loop(ctr, ( (i:Rep[FixPt]) => recMetaPipe(idx - 1, i+:idxs) ))
+				}
+			}
+			val metaPipe = MetaPipe( $ctrs)
+			//$brams.foreach(bram => bram.reset)
+			recMetaPipe( $ctrSize - 1, Seq.empty[Rep[FixPt]] )
+			metaPipe
+		})
+		val bram_reduce = direct (MetaPipe) ("BramReduce", T, MethodSignature(List(("ctrSize", SInt), 
+			("bramSize", SInt), ("pipelined", MBoolean), ("ctrs", CounterChain), ("bram", BRAM(T)),
+			("reduceFunc", (T, T) ==> T) , ("mapFunc", varArgs(FixPt) ==> BRAM(T))), MetaPipe))
+		impl (bram_reduce) (redirect ${
+			val wrapMapFun = (idxs:Seq[Rep[FixPt]]) => {
+				Seq($mapFunc(idxs:_*))
+			}
+			BramReduceMany[T]($ctrSize, $bramSize, $pipelined, $ctrs, Seq($bram), Seq(reduceFunc), wrapMapFun)
+		})
+		/*
 		*/
 
+		/* MetaPipe Parallel */
 		val meta_parallel = direct (MetaPipe) ("Parallel", Nil, ("func", MThunk(MUnit)) :: MetaPipe) 
 		impl (meta_parallel) (composite ${
-			val metaPipe = MetaPipe( CtrChain(Ctr(max=unit(1))))
+			val metaPipe = MetaPipe( CounterChain(Counter(max=unit(1))))
 			$func
 			metaPipe
 		})
 
+		/* MetaPipe 1 iteration */
 		val meta_1iter = static (MetaPipe) ("apply", Nil, ("func", MThunk(MUnit)) :: MetaPipe) 
 		impl (meta_1iter) (composite ${
-			val metaPipe = MetaPipe( CtrChain(Ctr(max=unit(1))))
+			val metaPipe = MetaPipe( CounterChain(Counter(max=unit(1))))
 			$func
 			metaPipe
 		})

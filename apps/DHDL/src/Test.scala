@@ -13,13 +13,13 @@ trait Test extends DHDLApplication {
   def main() = {
 
 		val om = OffChipMem[FixPt]("om", 1, 2, 3, 4, 5)
-		val bm = BRAM[FixPt]("bm", 5)
+		val bm = BRAM[FixPt](5)
 		om.ld(bm, 0, 5)
 		assert(bm.ld(5)!=5)
 
 		val a = FixPt(5)
 		val b = FixPt(7)
-		val r = Reg("a", a)
+		val r = Reg(a)
 		println(a.mkString)
 		assert(r.value==a)
 		r.write(b)
@@ -28,26 +28,23 @@ trait Test extends DHDLApplication {
 		r.reset
 		assert(r.value==a)
 
-		val m = BRAM[FixPt]("m", 16)
+		val m = BRAM[FixPt](16)
 		m.st(3,b)
 		assert(m.ld(3)==b)
 
-		val ctr1 = Ctr("ctr1", 0, 3, 1)
-		val ctr2 = Ctr("ctr2", 0, 4, 1)
-		val ctrs = CtrChain(ctr1, ctr2)
-		println(ctrs.mkString)
+		val ctr1 = Counter("ctr1", 0, 3, 1)
+		val ctr2 = Counter("ctr2", 0, 4, 1)
+		val ctrs = CounterChain(ctr1, ctr2)
 
-		Pipe(2, ctrs, { case i::j::_ =>
-			//m.st(c, FixPt(c))
-			println(i)
-			println(j)
-			println("---")
+		/*
+		val accBm = BRAM[FixPt](5)
+		BramReduce[FixPt](1, false, ctrs, accBm, (_+_), { case i::_ =>
+			(i, j)
 		})
-		//assert(m.ld(9)!=9)
+		*/
 
-		//Reduce(ctrs, r, { (c:Rep[Int],reg:Rep[Reg[FixPt]]) => 
-		//	reg.write(reg.value + c)
-		//})
-		//assert(r.value!=50)
+		println(accBm.mkString)
+
+
 	}
 }

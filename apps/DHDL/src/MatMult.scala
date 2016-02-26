@@ -13,12 +13,12 @@ trait MatMult extends DHDLApplication {
 	}
 	def matmultTile(tileA: Rep[BRAM[FixPt]], tileB: Rep[BRAM[FixPt]], tileC: Rep[BRAM[FixPt]],
 		bm:Int, bn:Int, bp:Int) = {
-		val ijCtr = CtrChain(Ctr(bm, 1), Ctr(bn, 1))
+		val ijCounter = CounterChain(Counter(bm, 1), Counter(bn, 1))
 		//TODO: this is sequential
-		MetaPipe(1, ijCtr, {case i::j::_ =>
+		MetaPipe(1, ijCounter, {case i::j::_ =>
 			val accum = Reg[FixPt](0)
-			val kCtr = CtrChain(Ctr(bp, 1)) 
-			Pipe[FixPt](1, kCtr, accum, _+_, {case k::_ =>
+			val kCounter = CounterChain(Counter(bp, 1)) 
+			Pipe[FixPt](1, kCounter, accum, _+_, {case k::_ =>
 				val x = tileA.ld(i*bp+k)
 				//TODO: ???
 				val y = tileB.ld(k*bn+j)
@@ -60,27 +60,24 @@ trait MatMult extends DHDLApplication {
 		//val M2 = OffChipMem[FixPt]("M2", sM2.map(i => i.toFixPt): _*)
 		val M2 = OffChipMem[FixPt]("M2", P.value*N.value)
 		val M3 = OffChipMem[FixPt]("M3", M.value*N.value)
-		val ijkCtr = CtrChain(Ctr(M.value, bm), (N.value,bn), (P.value,bp))
+		val ijCounter = CounterChain(Counter(M.value, bm), (N.value,bn))
 
-		MetaPipe(3, ijkCtr, {case i::j::k::_ => 
+		MetaPipe(3, true, ijkCounter, {case i::j::_ => 
 			val m1Tile = BRAM[FixPt](bm*bp)
 			val m2Tile = BRAM[FixPt](bp*bn)
-			Parallel({
-				M1.ld(m1Tile, i, k, bm, bp, M.value)
-				M2.ld(m2Tile, k, j, bp, bn, P.value)
-				()
-			})
-
-			Parallel({
-				val multTile = BRAM[FixPt](bm*bn)
-				matmultTile(m1Tile, m2Tile, multTile, bm, bn, bp)
-				val accumTile = BRAM[FixPt](bm*bn)
-				M3.ld(accumTile, i, j, bm, bn, M.value)
-				()
+			val multTile = BRAM[FixPt](bm*bn)
+			val kCounter = CounterChain(Counter(P.value, bp))
+			BramReduce[FixPt](1, true, kCounter, multTile, (_+_), {case k::_ =>
+				Parallel({
+					M1.ld(m1Tile, i, k, bm, bp, M.value)
+					M2.ld(m2Tile, k, j, bp, bn, P.value)
+				})
+				val result = BRAM[FixPt](bm*bn)
+				matmultTile(m1Tile, result, result, bm, bn, bp)
+				result
 			})
 			()
 		})
-		val sumTile = BRAM[FixPt](bm*bn)
 
 	}
 }

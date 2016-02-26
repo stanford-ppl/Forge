@@ -81,17 +81,17 @@ trait MemsElements {
 		}
 
 		val OffChipMem = tpe("OffChipMem", tpePar("T"))
-		data(OffChipMem, ("_name", MString), ("_data", MArray(T)), ("_size", MInt))
+		data(OffChipMem, ("_name", MString), ("_data", MArray(T)), ("_size", FixPt))
 		static (OffChipMem) ("apply", T,
-			MethodSignature(List(("name", MString, "unit(\"\")"), ("size", MInt)), OffChipMem(T)),
+			MethodSignature(List(("name", MString, "unit(\"\")"), ("size", FixPt)), OffChipMem(T)),
 			effect = mutable) implements
-		allocates(OffChipMem, ${$name}, ${array_empty[T]( $size )}, ${$size})
+		allocates(OffChipMem, ${$name}, ${array_empty[T]( $size.toInt )}, ${$size})
 
-		static (OffChipMem) ("apply", T, MInt:: OffChipMem(T), effect = mutable) implements
+		static (OffChipMem) ("apply", T, FixPt:: OffChipMem(T), effect = mutable) implements
 		redirect ${ OffChipMem[T](size=$0)}
 
 		static (OffChipMem) ("apply", T, (MString, varArgs(T)) :: OffChipMem(T), effect = mutable) implements
-		allocates(OffChipMem, ${$0}, ${ array_fromseq[T]( $1 ) }, ${ unit($1.length) })
+		allocates(OffChipMem, ${$0}, ${ array_fromseq[T]( $1 ) }, ${ $1.length })
 
 		val OffChipMemOps = withTpe(OffChipMem)
 		OffChipMemOps {

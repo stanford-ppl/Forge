@@ -116,7 +116,7 @@ trait BlackScholes extends DHDLApplication {
 		val svolatility = Seq.fill(sNumOptions)(Random.nextFloat())
 		val sotime 			= Seq.fill(sNumOptions)(Random.nextFloat())
 
-		val numOptions = ArgIn[Int](sNumOptions).value
+		val numOptions = ArgIn[FixPt](sNumOptions).value
 		val otype = OffChipMem[FixPt]("otype", sotype.map(i => i.toFixPt): _*)
 		val sptprice = OffChipMem[Float]("sptprice", ssptprice.map(i => unit(i)): _*)
 		val strike = OffChipMem[Float]("strke", sstrike.map(i => unit(i)): _*)
@@ -133,8 +133,8 @@ trait BlackScholes extends DHDLApplication {
     val rateRAM = BRAM[Float](tileSize)
     val volatilityRAM = BRAM[Float](tileSize)
     val otimeRAM = BRAM[Float](tileSize)
-		val seqCtr = CtrChain(Ctr(numOptions, tileSize))
-		MetaPipe(1, seqCtr, {case i::_ => 
+		val seqCounter = CounterChain(Counter(numOptions, tileSize))
+		MetaPipe(1, seqCounter, {case i::_ => 
 			Parallel({
 				otype.ld(otypeRAM, i, tileSize)
 				sptprice.ld(sptpriceRAM, i, tileSize)
@@ -145,8 +145,8 @@ trait BlackScholes extends DHDLApplication {
 			})
 
       val optpriceRAM = BRAM[Float](tileSize)
-			val bsCtr = CtrChain(Ctr(tileSize, 1))
-			Pipe(1, bsCtr, {case j::_ =>
+			val bsCounter = CounterChain(Counter(tileSize, 1))
+			Pipe(1, bsCounter, {case j::_ =>
 				val sptprice_d = sptpriceRAM.ld(j)
 				val strike_d = strikeRAM.ld(j)
 				val rate_d = rateRAM.ld(j)

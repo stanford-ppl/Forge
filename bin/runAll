@@ -1,0 +1,4 @@
+bin/run cr DotProd
+bin/run cr OutProd 
+bin/run cr TPCHQ6
+bin/run cr BlackScholes

@@ -261,7 +261,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     val hkInstantiations = getHkTpeParInstantiations(tpePars, args, implicitArgs)
 
     // passing order is: regular ctxBounds, then regular implicits, and finally hkInstantiations context bounds
-    val allImplicitArgs = makeImplicitCtxBoundsArgs(tpePars) ++ implicitArgs ++ hkInstantiations
+    val allImplicitArgs = makeImplicitCtxBoundsArgs(withoutHkTpePars(tpePars)) ++ implicitArgs ++ hkInstantiations
     if (allImplicitArgs.length > 0) "(" + allImplicitArgs.map(quote).mkString(",") + ")"
     else ""
   }

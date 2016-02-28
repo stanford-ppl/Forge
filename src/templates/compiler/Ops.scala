@@ -1087,7 +1087,7 @@ trait DeliteGenOps extends BaseGenOps {
         val generatorRules = rules.flatMap{case (o,i) => i.asInstanceOf[CodeGen].decls.collect{case (k,r) if (k == g) => (o,r)}}
         if (generatorRules.length > 0) {
           stream.println("trait " + g.name + "Gen" + opsGrp.name + " extends " + g.name + "GenFat {")
-          stream.println("  val IR: " + opsGrp.name + "Exp")
+          stream.println("  val IR: " + /*opsGrp.name*/ dsl + "Exp")
           stream.println("  import IR._")
           stream.println()
           stream.println("  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {")

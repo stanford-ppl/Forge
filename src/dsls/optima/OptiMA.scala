@@ -17,8 +17,6 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 // - Error when creating static methods with same object group as Metadata (case class)
 //   - workaround: Use different group for now
 //   - separate metadata meet, etc. functions into separate functions generated in Impls, change case class to classes?
-// - Propagation of metadata via syms
-//   - Subproblem: can we define contain and extracts syms on DeliteArray or does this break things?
 // - Optional identification of types as "array-like" or "struct-like" - can this be done automatically?
 //   - types with data structure definition will always show up as struct-like, no change needed
 //   - types which have ops implemented as records should be struct-like
@@ -40,6 +38,8 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 // - Need quick syntax for referring to arguments of lambdas in analysis/transformer functions
 //   - bound args are named using f___arg#___arg#
 //     where first # is argnum of lambda and second is argnum of lambda's arg
+// - Propagation of metadata via syms
+//   - Subproblem: can we define contain and extracts syms on DeliteArray or does this break things?
 
 object OptiMADSLRunner extends ForgeApplicationRunner with OptiMADSL
 trait OptiMADSL extends ForgeApplication

@@ -13,7 +13,7 @@ trait MemsElements {
 		val SString = lookupTpe("java.lang.String", stage=compile)
 
 		val Reg = tpe("Reg", tpePar("T"))
-		//TODO: how to bound T to be one of fixpt, mfloat, or boolean?
+		//TODO: bound T to be one of fixpt, mfloat, or boolean?
 		data(Reg, ("_value", T), ("_init", T))
 		internal.direct (MemOps) ("newReg", T, ("init", T) :: Reg(T), effect=mutable) implements
 			allocates(Reg, ${$init}, ${$init})
@@ -47,8 +47,14 @@ trait MemsElements {
 			infix ("name") (Nil :: MString) implements composite ${ getName($self) }
 			infix ("value") (Nil :: T) implements getter(0, "_value")
 			infix ("init") (Nil :: T) implements getter(0, "_init")
-			infix ("write") (T :: MUnit, effect = write(0)) implements setter(0, "_value", ${$1})
-			infix ("reset") (Nil :: MUnit, effect = write(0)) implements composite ${ $self.write($self.init) }
+			//TODO: MaxJ
+			infix ("write") (T :: MUnit, effect = write(0)) implements codegen($cala, ${
+				$self._value = $1
+			})
+			//TODO: MaxJ
+			infix ("reset") (Nil :: MUnit, effect = write(0)) implements codegen($cala, ${
+				$self._value = $self._init
+			})
 		}
 
 		val BRAM = tpe("BRAM", tpePar("T"))
@@ -95,8 +101,11 @@ trait MemsElements {
 			infix ("name") (Nil :: MString) implements composite ${ getName($self) }
 			infix ("data") (Nil :: MArray(T)) implements getter(0, "_data")
 			/* 1-D Store */
-			infix ("st") ((FixPt,T) :: MUnit, effect = write(0)) implements composite ${
-				array_update( $self.data, $1.toInt, $2 ) }
+			//TODO: MaxJ
+		  //TODO: check precision to make sure addr is a int
+			infix ("st") ((FixPt,T) :: MUnit, effect = write(0)) implements codegen ($cala, ${
+				$self._data($1.toInt) = $2
+			})
 			/* 2-D Store */
 			infix ("st") ((FixPt, FixPt, T) :: MUnit, effect = write(0)) implements composite ${
 				if (size($self).size.length!=2) {
@@ -118,7 +127,11 @@ trait MemsElements {
 				$self.st(bramWidth0*bramWidth1*$3 + $1*bramWidth1+$2, $4)
 			}
 			/* 1-D Load */
-			infix ("ld") (FixPt :: T) implements composite ${ array_apply( $self.data, $1.toInt) }
+			//TODO: MaxJ
+			infix ("ld") (FixPt :: T) implements codegen ($cala, ${
+				//TODO: check precision here to make sure addr is int
+				$self._data($1.toInt)
+			})
 			/* 2-D Load */
 			infix ("ld") ((FixPt, FixPt) :: T) implements composite ${
 				if (size($self).size.length!=2) {
@@ -139,8 +152,19 @@ trait MemsElements {
 				val bramWidth1 = unit(getSize($self, 1)).toFixPt
 				$self.ld(bramWidth0*bramWidth1*$3 + $1*bramWidth1+$2)
 			}
-			infix ("mkString") (Nil :: MString) implements composite ${ unit("bram[") + array_mkstring[T]( $self.data,
-				unit(", ")) + unit("]")}
+			infix ("mkString") (Nil :: MString) implements codegen ($cala, ${
+				"bram[" + $self._data.mkString(", ") + "]"
+			})
+			/*
+			//TODO; need to implement tpeclass for fixpt, boolean, float
+			infix ("reset") (Nil :: MUnit) implements composite ${
+				val totalSize = size( $self ).size.reduce(_*_)
+				val ctr = CounterChain(Counter(totalSize, 1))
+				Pipe(ctr) { case i::_ =>
+					$self.st(i, 0)
+				}
+			}
+			*/
 		}
 
 		val OffChipMem = tpe("OffChipMem", tpePar("T"))
@@ -173,75 +197,77 @@ trait MemsElements {
 		OffChipMemOps {
 			infix ("name") (Nil :: MString) implements composite ${ getName($self) }
 			infix ("data") (Nil :: MArray(T)) implements getter(0, "_data")
-			infix ("mkString") (Nil :: MString) implements composite ${ offchip_to_string[T]( $self.name,
-				$self.data )
-			}
+			infix ("mkString") (Nil :: MString) implements codegen ($cala, ${
+				//TODO: how to call metadata functions inside codegen?
+				//"offchip: " + \${getName($self)} + " data: " + "--------->\\n[" + $self._data.mkString(",") +
+				"offchip: " + " data: " + "--------->\\n[" + $self._data.mkString(",") +
+			    "]\\n------------------>"
+				}
+			)
 			/* Load signle element from OffChipArray. This load is for debugging purpose only!
 			 	No codegen rule! */
 			infix ("ld") (FixPt :: T) implements composite ${ array_apply( $self.data, $1.toInt) }
 			/* 1-D OffChipMem Load */
-			val offld1 = infix ("ld") ((("bram", BRAM(T)), ("start", FixPt), ("offset", SInt)) :: MUnit, effect = write(1))
-			impl (offld1) (composite ${
-				var i = unit(0)
-				while ( i <  unit($offset) ) {
-					array_update[T]( $bram.data, i, $self.data.apply(i + $start.toInt) )
-					i = i + unit(1)
+			//TODO: MaxJ
+			val offld1 = infix ("ld") ((("bram", BRAM(T)), ("start", FixPt), ("offset", MInt)) :: MUnit, effect = write(1), aliasHint = aliases(Nil))
+			impl (offld1) (codegen($cala, ${
+				var i = 0
+				for(i <- 0 until $offset) {
+					//TODO: check precision of start to make sure it's an int
+					$bram._data(i) = $self._data(i+$start.toInt)
 				}
-			})
+			}))
 			/* 2-D OffChipMem Load */
+			//TODO: MaxJ
 			val offld2 = infix ("ld") (MethodSignature(
-				List(("bram", BRAM(T)), ("startx", FixPt), ("starty", FixPt), ("offsetx", SInt),
-					("offsety", SInt), ("width", FixPt)), MUnit),
-				effect = write(1))
-			impl (offld2) (composite ${
-				var i = unit(0)
-				while ( i <  unit($offsetx) ) {
-					var j = unit(0)
-					while ( j <  unit($offsety) ) {
-						val row:Rep[Int] = i + $startx.toInt
-						val col:Rep[Int] = j + $starty.toInt
-						val offaddr:Rep[Int] = row*$width.toInt + col
-						val bramaddr:Rep[Int] = i*unit($offsety) + j
-						array_update[T]( $bram.data, bramaddr, $self.data.apply(offaddr) )
-						j = j + unit(1)
+				List(("bram", BRAM(T)), ("startx", FixPt), ("starty", FixPt), ("offsetx", MInt),
+					("offsety", MInt), ("width", FixPt)), MUnit),
+				effect = write(1), aliasHint = aliases(Nil))
+			impl (offld2) (codegen($cala, ${
+				var i = 0
+				for (i <- 0 until $offsetx) {
+					var j = 0
+					for (j <- 0 until $offsety) {
+						//TODO: check precision of startx, starty, width to make sure they are int
+						val row = i + $startx.toInt
+						val col = j + $starty.toInt
+						val offaddr = row*$width.toInt + col
+						val bramaddr = i*$offsety + j
+						$bram._data(bramaddr) = $self._data(offaddr)
 					}
-					i = i + unit(1)
 				}
-			})
+			}))
 			/* 1-D OffChipMem Store */
-		 val offst1 = infix ("st") ((("bram", BRAM), ("start", FixPt), ("offset",SInt)) :: MUnit, effect = write(0))
-		 impl (offst1) (composite ${
-			 var i = unit(0)
-			 while ( i < unit($offset) ) {
-				 array_update[T]( $self.data, i + $start.toInt, $bram.data.apply(i) )
-				 i = i + unit(1)
+			//TODO: MaxJ
+		 val offst1 = infix ("st") ((("bram", BRAM), ("start", FixPt), ("offset",MInt)) :: MUnit, effect = write(0))
+		 impl (offst1) (codegen($cala, ${
+			 var i = 0
+			 for (i <- 0 until $offset) {
+					//TODO: check precision of start to make sure it's an int
+				 $self._data(i+$start.toInt) = $bram._data(i)
 			 }
-		 })
+		 }))
 			/* 2-D OffChipMem Store */
-		 val offst2 = infix ("st") (MethodSignature(
-			 List(("bram", BRAM), ("startx", FixPt), ("starty", FixPt), ("offsetx",SInt), ("offsety",
-				 SInt), ("width", FixPt)), MUnit),
-	 effect = write(0))
-		 impl (offst2) (composite ${
-			 var i = unit(0)
-			 while ( i <  unit($offsetx) ) {
-				 var j = unit(0)
-				 while ( j <  unit($offsety) ) {
-					 val row = i + $startx.toInt
-					 val col = j + $starty.toInt
-					 val offaddr = row*$width.toInt + col
-					 val bramaddr = i*unit($offsetx) + j
-					 array_update[T]( $self.data, offaddr, $bram.data.apply(bramaddr) )
-					 j = j + unit(1)
-				 }
-				 i = i + unit(1)
-			 }
-		 })
+			//TODO: MaxJ
+			val offst2 = infix ("st") (MethodSignature(
+				List(("bram", BRAM), ("startx", FixPt), ("starty", FixPt), ("offsetx",MInt), ("offsety",
+					MInt), ("width", FixPt)), MUnit), effect = write(0))
+			impl (offst2) (codegen($cala, ${
+				var i = 0
+				for ( i <- 0 until $offsetx) {
+					var j = 0
+					for ( j <- 0 until $offsety ) {
+						//TODO: check precision of startx, starty, width to make sure they are int
+						val row = i + $startx.toInt
+						val col = j + $starty.toInt
+						val offaddr = row*$width.toInt + col
+						val bramaddr = i*$offsetx + j
+						$self._data(offaddr) = $bram._data(bramaddr)
+					}
+				}
+			}))
 		}
 
-		internal (MemOps) ("offchip_to_string", T, (MString, MArray(T))::MString) implements
-		codegen ($cala, ${"offchip: " + $0 + " data: "+ "--------->\\n[" + $1.mkString(",") +
-		"]\\n------------------>"})
 	}
 }
 

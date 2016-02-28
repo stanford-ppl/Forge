@@ -22,7 +22,6 @@ trait DHDLTypes {
 		lift(TpeOps) (MArray)
 		importStrings()
 
-		//TODO: op checkFixPtPrec has return type Unit but no effects, so it is a no-op
 		internal (TpeOps) ("checkFixPtPrec", Nil, (MInt,MInt)::MUnit, effect = simple) implements codegen ($cala, ${
 			val intPrec = $0
 			val fracPrec = $1
@@ -105,6 +104,7 @@ trait DHDLTypes {
 			(if ($sign == 0L) "" else "-") + $int + "." + $frac
 		}))
 
+		/*TODO: these should be for internal use only. No codegen rules */
 		val IntOps = withTpe (MInt)
 		IntOps {
 			val int2fxp = infix ("toFixPt") (Nil::FixPt)

@@ -102,11 +102,11 @@ trait MemsElements {
 			/* 1-D Store */
 			//TODO: MaxJ
 		  //TODO: check precision to make sure addr is a int
-			infix ("st") ((FixPt,T) :: MUnit, effect = write(0)) implements codegen ($cala, ${
+			infix ("st") ((FixPt,T) :: MUnit, effect = write(0), aliasHint = aliases(Nil)) implements codegen ($cala, ${
 				$self._data($1.toInt) = $2
 			})
 			/* 2-D Store */
-			infix ("st") ((FixPt, FixPt, T) :: MUnit, effect = write(0)) implements composite ${
+			infix ("st") ((FixPt, FixPt, T) :: MUnit, effect = write(0), aliasHint = aliases(Nil)) implements composite ${
 				if (size($self).size.length!=2) { 
 					throw new Exception("Try to store to non-2D Bram using bram.st(idx1, idx2), size of bram:"
 						+ size($self).size) 
@@ -116,7 +116,7 @@ trait MemsElements {
 			}
 			/* 3-D Store */
 		 	//TODO: not a right-hand coordinate, Fix?  x: height, y width, z: depth, zero, top, left. front
-			infix ("st") ((FixPt, FixPt, FixPt, T) :: MUnit, effect = write(0)) implements composite ${
+			infix ("st") ((FixPt, FixPt, FixPt, T) :: MUnit, effect = write(0), aliasHint = aliases(Nil)) implements composite ${
 				if (size($self).size.length!=3) { 
 					throw new Exception("Try to store to non-3D Bram using bram.st(idx1, idx2, idx3), size of bram:"
 						+ size($self).size) 
@@ -127,12 +127,12 @@ trait MemsElements {
 			}
 			/* 1-D Load */
 			//TODO: MaxJ
-			infix ("ld") (FixPt :: T) implements codegen ($cala, ${
+			infix ("ld") (FixPt :: T, aliasHint = aliases(Nil)) implements codegen ($cala, ${
 				//TODO: check precision here to make sure addr is int
 				$self._data($1.toInt) 
 			})
 			/* 2-D Load */
-			infix ("ld") ((FixPt, FixPt) :: T) implements composite ${
+			infix ("ld") ((FixPt, FixPt) :: T, aliasHint = aliases(Nil)) implements composite ${
 				if (size($self).size.length!=2) { 
 					throw new Exception("Try to load from non-2D Bram using bram.st(idx1, idx2), size of bram:" 
 						+ size($self).size) 
@@ -142,7 +142,7 @@ trait MemsElements {
 			}
 			/* 3-D Load */
 		 	//TODO: not a right-hand coordinate, Fix?  x: height, y width, z: depth, zero, top, left. front
-			infix ("ld") ((FixPt, FixPt, FixPt) :: T) implements composite ${
+			infix ("ld") ((FixPt, FixPt, FixPt) :: T, aliasHint = aliases(Nil)) implements composite ${
 				if (size($self).size.length!=3) { 
 					throw new Exception("Try to load from non-3D Bram using bram.st(idx1, idx2, idx3), size of bram:"
 						+ size($self).size) 
@@ -208,7 +208,8 @@ trait MemsElements {
 			infix ("ld") (FixPt :: T) implements composite ${ array_apply( $self.data, $1.toInt) }
 			/* 1-D OffChipMem Load */
 			//TODO: MaxJ
-			val offld1 = infix ("ld") ((("bram", BRAM(T)), ("start", FixPt), ("offset", MInt)) :: MUnit, effect = write(1))
+			val offld1 = infix ("ld") ((("bram", BRAM(T)), ("start", FixPt), ("offset", MInt)) :: MUnit,
+				effect = write(1), aliasHint = aliases(Nil))
 			impl (offld1) (codegen($cala, ${
 				var i = 0
 				for(i <- 0 until $offset) {
@@ -221,7 +222,7 @@ trait MemsElements {
 			val offld2 = infix ("ld") (MethodSignature(
 				List(("bram", BRAM(T)), ("startx", FixPt), ("starty", FixPt), ("offsetx", MInt),
 					("offsety", MInt), ("width", FixPt)), MUnit),
-				effect = write(1))
+				effect = write(1), aliasHint = aliases(Nil))
 			impl (offld2) (codegen($cala, ${
 				var i = 0
 				for (i <- 0 until $offsetx) {
@@ -238,7 +239,8 @@ trait MemsElements {
 			}))
 			/* 1-D OffChipMem Store */
 			//TODO: MaxJ
-		 val offst1 = infix ("st") ((("bram", BRAM), ("start", FixPt), ("offset",MInt)) :: MUnit, effect = write(0))
+		 val offst1 = infix ("st") ((("bram", BRAM), ("start", FixPt), ("offset",MInt)) :: MUnit, effect
+			 = write(0), aliasHint = aliases(Nil))
 		 impl (offst1) (codegen($cala, ${
 			 var i = 0
 			 for (i <- 0 until $offset) {
@@ -250,7 +252,7 @@ trait MemsElements {
 			//TODO: MaxJ
 			val offst2 = infix ("st") (MethodSignature(
 				List(("bram", BRAM), ("startx", FixPt), ("starty", FixPt), ("offsetx",MInt), ("offsety",
-					MInt), ("width", FixPt)), MUnit), effect = write(0))
+					MInt), ("width", FixPt)), MUnit), effect = write(0), aliasHint = aliases(Nil))
 			impl (offst2) (codegen($cala, ${
 				var i = 0
 				for ( i <- 0 until $offsetx) {

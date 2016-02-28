@@ -27,7 +27,6 @@ trait DotProd extends DHDLApplication {
 			val bm1 = BRAM[FixPt]("bm1", tileSize)
 			val bm2 = BRAM[FixPt]("bm2", tileSize)
 			Parallel {
-				println(vec1.toString)
 				vec1.ld(bm1, i*tileSize, tileSize)
 				vec2.ld(bm2, i*tileSize, tileSize)
 			}

@@ -58,5 +58,30 @@ trait DHDLMetas {
 			meta[MRegTpe]($0).get}
 		internal.direct (regTpeOps) ("getRegTpe", T, T :: RegTpe) implements composite ${
 			regtpe($0).regTpe}
+
+		/* Parallelization Factor  */
+		val MPar = metadata("MPar", ("par",SInt))
+		val parOps = grp("par")
+		//TODO:
+		meet (MPar) ${ this }
+		internal.static (parOps) ("update", T, (T, SInt) :: MUnit, effect = simple) implements
+			composite ${ setMetadata($0, MPar($1)) }
+		internal.static (parOps) ("apply", T, T :: MPar) implements composite ${
+			meta[MPar]($0).get}
+		internal.direct (parOps) ("getPar", T, T :: SInt) implements composite ${
+			par($0).par}
+
+		/* Number of Bank  */
+		val MBank = metadata("MBank", ("bank",SInt))
+		val bankOps = grp("bank")
+		//TODO:
+		meet (MBank) ${ this }
+		internal.static (bankOps) ("update", T, (T, SInt) :: MUnit, effect = simple) implements
+			composite ${ setMetadata($0, MBank($1)) }
+		internal.static (bankOps) ("apply", T, T :: MBank) implements composite ${
+			meta[MBank]($0).get}
+		internal.direct (bankOps) ("getBank", T, T :: SInt) implements composite ${
+			bank($0).bank}
+
 	}
 }

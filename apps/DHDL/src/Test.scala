@@ -32,8 +32,8 @@ trait Test extends DHDLApplication {
 		m.st(3,b)
 		assert(m.ld(3)==b)
 
-		val ctr1 = Counter("ctr1", 0, 3, 1)
-		val ctr2 = Counter("ctr2", 0, 4, 1)
+		val ctr1 = Counter(ctrName="ctr1", max=3)
+		val ctr2 = Counter(ctrName="ctr2", max=4)
 		val ctrs = CounterChain(ctr1, ctr2)
 
 		/*

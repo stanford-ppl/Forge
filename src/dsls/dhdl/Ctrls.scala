@@ -21,38 +21,43 @@ trait CtrlOps {
 		val Reg = lookupTpe("Reg")
 		val FixPt = lookupTpe("Long")
 		val CtrlOps = grp("Ctrls")
+		val SString = lookupTpe("java.lang.String", stage=compile)
 
 		val Counter = tpe("Counter")
-		data (Counter, ("_name", MString), ("_min", FixPt), ("_max", FixPt), ("_step", FixPt), ("_val", FixPt))
-		static (Counter) ("apply", Nil, MethodSignature(List(("name", MString, "unit(\"\")"),
+		data (Counter, ("_min", FixPt), ("_max", FixPt), ("_step", FixPt), ("_val", FixPt))
+		internal.direct (CtrlOps) ("newCounter", Nil, MethodSignature(List(
+																										 ("min", FixPt),
+																										 ("max", FixPt), 
+																										 ("step", FixPt)),
+																								Counter)) implements 
+		allocates(Counter, ${$min}, ${$max}, ${$step}, ${ unit(0) })
+		static (Counter) ("apply", Nil, MethodSignature(List(
+																										 ("ctrPar", SInt, "0"),
+																										 ("ctrName", SString, "\"\""), 
 			                                               ("min", FixPt, "unit(0)"),
 																										 ("max", FixPt), 
 																										 ("step", FixPt, "unit(1)")),
-																								Counter)) implements allocates(Counter,
-			${$name}, ${$min}, ${$max}, ${$step}, ${ unit(0) })
-		static (Counter) ("apply", Nil, MethodSignature(List(("par", SInt),
-																										 ("name", MString),
-			                                               ("min", FixPt),
-																										 ("max", FixPt), 
-																										 ("step", FixPt)),
 																								Counter)) implements
-		redirect ${ Counter.apply($name, $min, $max, $step) }
-		static (Counter) ("apply", Nil, (("max", FixPt), ("step", FixPt)) :: Counter) implements
-		redirect ${ Counter.apply(unit(""), unit(0), $max, $step) }
-		static (Counter) ("apply", Nil, (("par", SInt), ("max", FixPt), ("step", FixPt)) :: Counter) implements
-		redirect ${ Counter.apply($par, unit(""), unit(0), $max, $step) }
+		composite ${
+			val ctr = newCounter($min, $max, $step)
+			par(ctr) = $ctrPar
+			name(ctr) = $ctrName
+			ctr
+		}
+		//static (Counter) ("apply", Nil, (("max", FixPt), ("step", FixPt)) :: Counter) implements
+		//composite ${ Counter.apply(max=$max, step=$step) }
 
 		val CounterOps = withTpe(Counter)
 		CounterOps {
-			infix ("mkString") (Nil :: MString) implements composite ${
-				unit("ctr(") +
-        unit("name:") + $self.name +
-			  unit(", min:") + $self.min +
-			  unit(", max:") + $self.max +
-			  unit(", step:") + $self.step +
-				unit(")")
-      }
-			infix ("name") (Nil :: MString) implements getter(0, "_name")
+			infix ("mkString") (Nil :: MString) implements codegen ($cala, ${
+				"ctr(" +
+        "name:" + getName($self) +
+			  ", min:" + $self._min +
+			  ", max:" + $self._max +
+			  ", step:" + $self._step +
+				")"
+      })
+			infix ("name") (Nil :: SString) implements composite ${ getName($self) }
 			infix ("min") (Nil :: FixPt) implements getter(0, "_min")
 			infix ("max") (Nil :: FixPt) implements getter(0, "_max")
 			infix ("step") (Nil :: FixPt) implements getter(0, "_step")
@@ -71,15 +76,16 @@ trait CtrlOps {
     }
 		val CounterChainOps = withTpe(CounterChain)
 		CounterChainOps {
-			infix ("mkString") (Nil :: MString) implements composite ${
-				unit("ctrchain[") +
-				array_mkstring[String](
-					array_map[Counter,String]($self.chain, c => c.mkString), ",") +
-				unit("]")
-			}
+			infix ("mkString") (Nil :: MString) implements codegen ($cala, ${
+				("ctrchain[" +
+				$self._chain.map(ctr => counter_mkstring(ctr)).mkString(",") +
+				"]")
+			})
 			infix ("chain") (Nil :: MArray(Counter)) implements getter(0, "_chain")
-      infix ("update") ((MInt,Counter) :: MUnit, effect = write(0)) implements composite ${ array_update($0.chain, $1, $2) }
-			infix ("length") (Nil :: MInt) implements composite ${ $self.chain.length }
+      infix ("update") ((MInt,Counter) :: MUnit, effect = write(0)) implements codegen ($cala, ${
+				$self._chain($1) = $2
+			})
+			infix ("length") (Nil :: MInt) implements codegen ($cala, ${ $self._chain.length })
 		}
 
 		val loop = internal (CtrlOps) ("loop", Nil, (("ctr", Counter), ("lambda", FixPt ==> MUnit)) :: MUnit)
@@ -173,10 +179,10 @@ trait CtrlOps {
 			}
 
 		/* MetaPipe Reduction */
-	 /*
-		val meta_reduce = static (MetaPipe) ("apply", T, MethodSignature(List(("ctrSize", SInt),
-			("pipelined", MBoolean), ("ctrs", CounterChain), ("accum", Reg(T)),
-			("reduceFunc", (T, T) ==> T) , ("mapFunc", varArgs(FixPt) ==> T)), MetaPipe))
+		val meta_reduce = static (MetaPipe) ("apply", T, CurriedMethodSignature(List(
+			List(("pipelined", MBoolean), ("ctrs", CounterChain), ("accum", Reg(T)), ("reduceFunc", (T, T) ==> T)),
+			List(("mapFunc", varArgs(FixPt) ==> T))),
+		MetaPipe))
 		impl (meta_reduce) (composite ${
 			def recMetaPipe (idx:Int, idxs:Seq[Rep[FixPt]]): Rep[Unit] = {
 				val ctr = $ctrs.chain.apply(unit(idx))
@@ -188,10 +194,47 @@ trait CtrlOps {
 			}
 			val metaPipe = newMetaPipe( $ctrs)
 			$accum.reset
-			recMetaPipe( $ctrSize - 1, Seq.empty[Rep[FixPt]] )
+			val ctrSize = getSize($ctrs, 0)
+			recMetaPipe( ctrSize - 1, Seq.empty[Rep[FixPt]] )
 			metaPipe
 		})
-		*/
+		direct (MetaPipe) ("Sequential", T, CurriedMethodSignature(List(
+			List(("ctrs", CounterChain), ("accum", Reg(T)), ("reduceFunc", (T, T) ==> T)),
+			List(("mapFunc", varArgs(FixPt) ==> T))),
+		MetaPipe)) implements
+		redirect ${
+			MetaPipe[T](unit(false), $ctrs, $accum, $reduceFunc) ($mapFunc)
+		}
+
+		val BRAM = lookupTpe("BRAM")
+		val bram_reduce = direct (MetaPipe) ("BramReduce", T, CurriedMethodSignature(List(
+			List(("pipelined", MBoolean), ("ctrs", CounterChain), ("bram", BRAM(T)),
+			("reduceFunc", (T, T) ==> T)),
+			List(("mapFunc", varArgs(FixPt) ==> BRAM(T)))),
+		MetaPipe))
+		impl (bram_reduce) (composite ${
+			val bramSize = size($bram).size.reduce(_*_) 
+			def recMetaPipe (idx:Int, idxs:Seq[Rep[FixPt]]): Rep[Unit] = {
+				val ctr = $ctrs.chain.apply(unit(idx))
+				if (idx == 0) {
+					loop(ctr, { case i => 
+						val bramCtr = CounterChain(Counter(max=bramSize))
+						val resultBram = $mapFunc(i+:idxs)
+						Pipe(bramCtr) {case j::_ =>
+							bram.st(j, $reduceFunc($bram.ld(j), resultBram.ld(j))) 
+						}
+					})
+				} else {
+					loop(ctr, ( (i:Rep[FixPt]) => recMetaPipe(idx - 1, i+:idxs) ))
+				}
+			}
+			val metaPipe = newMetaPipe( $ctrs )
+			//TODO: $brams.foreach(bram => bram.reset)
+			val ctrSize = getSize($ctrs, 0)
+			recMetaPipe( ctrSize - 1, Seq.empty[Rep[FixPt]] )
+			metaPipe
+		})
+		/*
 		val meta_reduce = static (MetaPipe) ("apply", T, CurriedMethodSignature(List(
 			List(("pipelined", MBoolean), ("ctrs", CounterChain), ("accum", Reg(T)), ("reduceFunc", (T, T) ==> T)),
 			List(("mapFunc", varArgs(FixPt) ==> T))),
@@ -202,13 +245,6 @@ trait CtrlOps {
 			}
 			MetaReduceMany[T]($pipelined, $ctrs, Seq($accum), Seq(reduceFunc)) (wrapMapFun)
 		})
-		direct (MetaPipe) ("Sequential", T, CurriedMethodSignature(List(
-			List(("ctrs", CounterChain), ("accum", Reg(T)), ("reduceFunc", (T, T) ==> T)),
-			List(("mapFunc", varArgs(FixPt) ==> T))),
-		MetaPipe)) implements
-		redirect ${
-			MetaPipe[T](unit(false), $ctrs, $accum, $reduceFunc) ($mapFunc)
-		}
 		val SSeq = tpe("scala.Seq", T, stage=compile)
 		val meta_reduce_many = direct (MetaPipe) ("MetaReduceMany", T, CurriedMethodSignature(List(
 			List(("pipelined", MBoolean), ("ctrs", CounterChain), ("accums", SSeq(Reg(T))),("reduceFuncs", SSeq((T, T) ==> T))),
@@ -235,8 +271,9 @@ trait CtrlOps {
 			recMetaPipe(ctrSize - 1, Seq.empty[Rep[FixPt]] )
 			metaPipe
 		})
+		*/
 
-		val BRAM = lookupTpe("BRAM")
+	 /*
 		val bram_reduce_many = direct (MetaPipe) ("BramReduceMany", T, CurriedMethodSignature(List(
 			List(("pipelined", MBoolean), ("ctrs", CounterChain), ("brams", SSeq(BRAM(T))),
 			("reduceFuncs", SSeq((T, T) ==> T))) , 
@@ -252,8 +289,8 @@ trait CtrlOps {
 						$brams.zipWithIndex.foreach{case (bram, accIdx) =>
 							val reduceFunc = reduceFuncs(accIdx)
 							val bramCtr = CounterChain(Counter(max=bramSize))
-							Pipe(bramCtr) {case i::_ =>
-								bram.st(i, reduceFunc(bram.ld(i), resultBms(accIdx).ld(i))) 
+							Pipe(bramCtr) {case j::_ =>
+								bram.st(j, reduceFunc(bram.ld(j), resultBms(accIdx).ld(j))) 
 							}
 						}
 					})
@@ -278,7 +315,6 @@ trait CtrlOps {
 			}
 			BramReduceMany[T]($pipelined, $ctrs, Seq($bram), Seq(reduceFunc)) (wrapMapFun)
 		})
-		/*
 		*/
 
 		/* MetaPipe Parallel */

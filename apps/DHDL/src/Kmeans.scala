@@ -64,14 +64,14 @@ trait Kmeans extends DHDLApplication with KmeansTest{
 		points.ld(cents,0, 0, sDim, sNumCents, FixPt(sDim))
 
 		val ptCtr = CounterChain(Counter(max=5))
-		val accum1 = Reg[FixPt](0)
-		val accum2 = Reg[FixPt](0)
-		MetaReduceMany[FixPt](true, ptCtr, Seq(accum1, accum2), Seq(_+_, _+_)) {case i::_ => 
-			println(i)
-			Seq(i, i)
-		}
-		println(accum1.value)
-		println(accum2.value)
+		//val accum1 = Reg[FixPt](0)
+		//val accum2 = Reg[FixPt](0)
+		//MetaReduceMany[FixPt](true, ptCtr, Seq(accum1, accum2), Seq(_+_, _+_)) {case i::_ => 
+		//	println(i)
+		//	Seq(i, i)
+		//}
+		//println(accum1.value)
+		//println(accum2.value)
 		//val ptCtr = CounterChain(Counter(max=sDim))
 		//MetaPipe()
 		//

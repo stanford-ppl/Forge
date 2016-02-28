@@ -68,6 +68,7 @@ trait MemsElements {
 			size(bram) = $1::Nil
 			name(bram) = $0
 			dblbuf(bram) = false
+			bank(bram) = 1
 			bram
 		}
 		static (BRAM) ("apply", T, SInt :: BRAM(T), effect = mutable) implements
@@ -79,6 +80,7 @@ trait MemsElements {
 			size(bram) = $1::$2::Nil
 			name(bram) = $0
 			dblbuf(bram) = false
+			bank(bram) = 1
 			bram
 		}
 		static (BRAM) ("apply", T, (SInt, SInt) :: BRAM(T), effect = mutable) implements
@@ -90,6 +92,7 @@ trait MemsElements {
 			size(bram) = $1::$2::$3::Nil
 			name(bram) = $0
 			dblbuf(bram) = false
+			bank(bram) = 1
 			bram
 		}
 		static (BRAM) ("apply", T, (SInt, SInt, SInt) :: BRAM(T), effect = mutable) implements

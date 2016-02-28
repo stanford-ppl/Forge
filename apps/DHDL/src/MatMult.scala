@@ -13,10 +13,10 @@ trait MatMult extends DHDLApplication {
 	}
 	def matmultTile(tileA: Rep[BRAM[FixPt]], tileB: Rep[BRAM[FixPt]], tileC: Rep[BRAM[FixPt]],
 		bm:Int, bn:Int, bp:Int) = {
-		val ijCounter = CounterChain(Counter(bm, 1), Counter(bn, 1))
+		val ijCounter = CounterChain(Counter(max=bm), Counter(max=bn))
 		Sequential(ijCounter) {case i::j::_ =>
 			val accum = Reg[FixPt](0)
-			val kCounter = CounterChain(Counter(bp, 1)) 
+			val kCounter = CounterChain(Counter(max=bp)) 
 			Pipe[FixPt](kCounter, accum, _+_) {case k::_ =>
 				val x = tileA.ld(i, k)
 				val y = tileB.ld(k, j)
@@ -33,9 +33,9 @@ trait MatMult extends DHDLApplication {
 		val bm = 2
 		val bn = 2
 		val bp = 2
-		val sM = 8
-		val sN = 6
-		val sP = 10
+		val sM = 4
+		val sN = 4
+		val sP = 4
 		val sM1 = Seq.fill(sM)(Seq.fill(sP)(Random.nextInt(100)))
 		val sM2 = Seq.fill(sP)(Seq.fill(sN)(Random.nextInt(100)))
 		//println("M1")
@@ -58,13 +58,13 @@ trait MatMult extends DHDLApplication {
 		val M1 = OffChipMem[FixPt]("M1", sM1.flatten.map(i => i.toFixPt): _*)
 		val M2 = OffChipMem[FixPt]("M2", sM2.flatten.map(i => i.toFixPt): _*)
 		val M3 = OffChipMem[FixPt]("M3", M*N)
-		val ijCounter = CounterChain(Counter(M, bm), Counter(N,bn))
+		val ijCounter = CounterChain(Counter(max=M, step=bm), Counter(max=N,step=bn))
 
 		MetaPipe(ijCounter) {case i::j::_ => 
 			val m1Tile = BRAM[FixPt](bm, bp)
 			val m2Tile = BRAM[FixPt](bp, bn)
 			val multTile = BRAM[FixPt](bm, bn)
-			val kCounter = CounterChain(Counter(P, bp))
+			val kCounter = CounterChain(Counter(max=P, step=bp))
 			BramReduce[FixPt](true, kCounter, multTile, (_+_)) {case k::_ =>
 				Parallel{
 					M1.ld(m1Tile, i, k, bm, bp, P)

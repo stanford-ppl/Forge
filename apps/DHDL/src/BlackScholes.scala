@@ -133,7 +133,7 @@ trait BlackScholes extends DHDLApplication {
     val rateRAM = BRAM[Float](tileSize)
     val volatilityRAM = BRAM[Float](tileSize)
     val otimeRAM = BRAM[Float](tileSize)
-		val seqCounter = CounterChain(Counter(numOptions, tileSize))
+		val seqCounter = CounterChain(Counter(max=numOptions, step=tileSize))
 		MetaPipe(seqCounter) {case i::_ => 
 			Parallel {
 				otype.ld(otypeRAM, i, tileSize)
@@ -145,7 +145,7 @@ trait BlackScholes extends DHDLApplication {
 			}
 
       val optpriceRAM = BRAM[Float](tileSize)
-			val bsCounter = CounterChain(Counter(tileSize, 1))
+			val bsCounter = CounterChain(Counter(max=tileSize))
 			Pipe(bsCounter) {case j::_ =>
 				val sptprice_d = sptpriceRAM.ld(j)
 				val strike_d = strikeRAM.ld(j)

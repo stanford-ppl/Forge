@@ -33,7 +33,7 @@ trait TPCHQ6 extends DHDLApplication {
 		val quants = OffChipMem[FixPt]("quants", sQuants.map(i => i.toFixPt): _*)
 		val discounts = OffChipMem[Float]("discounts", sDiscts.map(i => unit(i)): _*)
 		val prices = OffChipMem[Float]("prices", sPrices.map(i => unit(i)): _*)
-		val tileCounter = CounterChain(Counter(dataSize, tileSize)) 
+		val tileCounter = CounterChain(Counter(max=dataSize, step=tileSize)) 
 
 		val outAccum = Reg[Float](unit(0.0f))
 		MetaPipe[Float](true, tileCounter, outAccum, _+_) {case i::_ => 

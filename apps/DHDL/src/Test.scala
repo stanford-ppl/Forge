@@ -15,7 +15,7 @@ trait Test extends DHDLApplication {
 		val om = OffChipMem[FixPt]("om", 1, 2, 3, 4, 5)
 		val bm = BRAM[FixPt](5)
 		om.ld(bm, 0, 5)
-		assert(bm.ld(5)!=5)
+		assert(bm.ld(4)!=5)
 
 		val a = FixPt(5)
 		val b = FixPt(7)
@@ -36,6 +36,7 @@ trait Test extends DHDLApplication {
 		val ctr2 = Counter(ctrName="ctr2", max=4)
 		val ctrs = CounterChain(ctr1, ctr2)
 
+		assert((a*a*a)==a.pow(3))
 		/*
 		val accBm = BRAM[FixPt](5)
 		BramReduce[FixPt](1, false, ctrs, accBm, (_+_), { case i::_ =>

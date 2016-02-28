@@ -28,6 +28,27 @@ trait PrimOps {
 		val fltMul = infix (Prim) ("*", Nil, (MFloat, MFloat) :: MFloat)
 		impl (fltMul) (codegen($cala, ${$0 * $1}))
 
+		val fxpPow = infix (Prim) ("pow", Nil, (FixPt, SInt) :: FixPt)
+		impl (fxpPow) (composite ${
+			def recPow (curr:Rep[FixPt], i:Int):Rep[FixPt] = {
+				if (i==1)
+					curr
+				else
+					recPow(curr*$0, i-1)
+			} 
+			recPow($0, $1)
+		})
+		val fltPow = infix (Prim) ("pow", Nil, (MFloat, SInt) :: MFloat)
+		impl (fltPow) (composite ${
+			def recPow (curr:Rep[Float], i:Int):Rep[Float] = {
+				if (i==1)
+					curr
+				else
+					recPow(curr*$0, i-1)
+			} 
+			recPow($0, $1)
+		})
+
 		val fxpDiv = infix (Prim) ("/", Nil, (FixPt, FixPt) :: FixPt)
 		impl (fxpDiv) (codegen($cala, ${$0 / $1}))
 		val fltDiv = infix (Prim) ("/", Nil, (MFloat, MFloat) :: MFloat)

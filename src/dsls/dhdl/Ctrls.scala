@@ -137,20 +137,17 @@ trait CtrlOps {
 			List(("func", MThunk(MUnit)))),
 		MUnit)) 
 		impl (pipe_1iter) (composite ${
-			$func
+			Pipe(CounterChain(Counter(max=1))) {case i => $func}
 		})
 
 		/* MetaPipeline */
 		val MetaPipe = tpe("MetaPipe")
-		data (MetaPipe, ("_ctrs", CounterChain)) //TODO: Modify pipe to keep track of nodes inside
-		direct (MetaPipe) ("newMetaPipe", Nil, (CounterChain) :: MetaPipe) implements
-		allocates(MetaPipe, ${$0})
 
 		/* MetaPipe Map  */
 		val meta_map = static (MetaPipe) ("apply", Nil, CurriedMethodSignature(List(
 			List(("pipelined", MBoolean), ("ctrs", CounterChain)),
 			List(("mapFunc", varArgs(FixPt) ==> MUnit))),
-		MetaPipe))
+		MUnit))
 		impl (meta_map) (composite ${
 			def recMetaPipe (idx:Int, idxs:Seq[Rep[FixPt]]): Rep[Unit] = {
 				val ctr = $ctrs.chain.apply(unit(idx))
@@ -161,20 +158,18 @@ trait CtrlOps {
 				}
 			}
 			val ctrSize = getSize($ctrs, 0)
-			val metaPipe = newMetaPipe( $ctrs)
 			recMetaPipe( ctrSize - 1, Seq.empty[Rep[FixPt]] )
-			metaPipe
 		})
 		static (MetaPipe) ("apply", Nil, CurriedMethodSignature(List(
 			List(("ctrs", CounterChain)),
 			List(("mapFunc", varArgs(FixPt) ==> MUnit))),
-		MetaPipe)) implements redirect ${
+		MUnit)) implements redirect ${
 				MetaPipe(unit(true), $ctrs) ($mapFunc)
 			}
 		direct (MetaPipe) ("Sequential", Nil, CurriedMethodSignature(List(
 			List(("ctrs", CounterChain)),
 			List(("mapFunc", varArgs(FixPt) ==> MUnit))),
-		MetaPipe)) implements redirect ${
+		MUnit)) implements redirect ${
 				MetaPipe(unit(false), $ctrs) ($mapFunc)
 			}
 
@@ -182,7 +177,7 @@ trait CtrlOps {
 		val meta_reduce = static (MetaPipe) ("apply", T, CurriedMethodSignature(List(
 			List(("pipelined", MBoolean), ("ctrs", CounterChain), ("accum", Reg(T)), ("reduceFunc", (T, T) ==> T)),
 			List(("mapFunc", varArgs(FixPt) ==> T))),
-		MetaPipe))
+		MUnit))
 		impl (meta_reduce) (composite ${
 			def recMetaPipe (idx:Int, idxs:Seq[Rep[FixPt]]): Rep[Unit] = {
 				val ctr = $ctrs.chain.apply(unit(idx))
@@ -192,16 +187,14 @@ trait CtrlOps {
 					loop(ctr, ( (i:Rep[FixPt]) => recMetaPipe(idx - 1, i+:idxs) ))
 				}
 			}
-			val metaPipe = newMetaPipe( $ctrs)
 			$accum.reset
 			val ctrSize = getSize($ctrs, 0)
 			recMetaPipe( ctrSize - 1, Seq.empty[Rep[FixPt]] )
-			metaPipe
 		})
 		direct (MetaPipe) ("Sequential", T, CurriedMethodSignature(List(
 			List(("ctrs", CounterChain), ("accum", Reg(T)), ("reduceFunc", (T, T) ==> T)),
 			List(("mapFunc", varArgs(FixPt) ==> T))),
-		MetaPipe)) implements
+		MUnit)) implements
 		redirect ${
 			MetaPipe[T](unit(false), $ctrs, $accum, $reduceFunc) ($mapFunc)
 		}
@@ -211,7 +204,7 @@ trait CtrlOps {
 			List(("pipelined", MBoolean), ("ctrs", CounterChain), ("bram", BRAM(T)),
 			("reduceFunc", (T, T) ==> T)),
 			List(("mapFunc", varArgs(FixPt) ==> BRAM(T)))),
-		MetaPipe))
+		MUnit))
 		impl (bram_reduce) (composite ${
 			val bramSize = size($bram).size.reduce(_*_) 
 			def recMetaPipe (idx:Int, idxs:Seq[Rep[FixPt]]): Rep[Unit] = {
@@ -228,113 +221,27 @@ trait CtrlOps {
 					loop(ctr, ( (i:Rep[FixPt]) => recMetaPipe(idx - 1, i+:idxs) ))
 				}
 			}
-			val metaPipe = newMetaPipe( $ctrs )
 			//TODO: $brams.foreach(bram => bram.reset)
 			val ctrSize = getSize($ctrs, 0)
 			recMetaPipe( ctrSize - 1, Seq.empty[Rep[FixPt]] )
-			metaPipe
 		})
-		/*
-		val meta_reduce = static (MetaPipe) ("apply", T, CurriedMethodSignature(List(
-			List(("pipelined", MBoolean), ("ctrs", CounterChain), ("accum", Reg(T)), ("reduceFunc", (T, T) ==> T)),
-			List(("mapFunc", varArgs(FixPt) ==> T))),
-		MetaPipe))
-		impl (meta_reduce) (redirect ${
-			val wrapMapFun = (idxs:Seq[Rep[FixPt]]) => {
-				Seq($mapFunc(idxs:_*))
-			}
-			MetaReduceMany[T]($pipelined, $ctrs, Seq($accum), Seq(reduceFunc)) (wrapMapFun)
-		})
-		val SSeq = tpe("scala.Seq", T, stage=compile)
-		val meta_reduce_many = direct (MetaPipe) ("MetaReduceMany", T, CurriedMethodSignature(List(
-			List(("pipelined", MBoolean), ("ctrs", CounterChain), ("accums", SSeq(Reg(T))),("reduceFuncs", SSeq((T, T) ==> T))),
-			List(("mapFunc", varArgs(FixPt) ==> SSeq(T)))),
-		MetaPipe))
-		impl (meta_reduce_many) (composite ${
-			def recMetaPipe (idx:Int, idxs:Seq[Rep[FixPt]]): Rep[Unit] = {
-				val ctr = $ctrs.chain.apply(unit(idx))
-				if (idx == 0) {
-					loop(ctr, { case i => 
-						val results = $mapFunc(i+:idxs)
-						$accums.zipWithIndex.foreach{case (accum, accIdx) =>
-							val reduceFunc = reduceFuncs(accIdx)
-							accum.write(reduceFunc(accum.value, results(accIdx))) 
-						}
-					})
-				} else {
-					loop(ctr, ( (i:Rep[FixPt]) => recMetaPipe(idx - 1, i+:idxs) ))
-				}
-			}
-			val ctrSize = getSize($ctrs, 0)
-			val metaPipe = newMetaPipe( $ctrs)
-			$accums.foreach(accum => accum.reset)
-			recMetaPipe(ctrSize - 1, Seq.empty[Rep[FixPt]] )
-			metaPipe
-		})
-		*/
-
-	 /*
-		val bram_reduce_many = direct (MetaPipe) ("BramReduceMany", T, CurriedMethodSignature(List(
-			List(("pipelined", MBoolean), ("ctrs", CounterChain), ("brams", SSeq(BRAM(T))),
-			("reduceFuncs", SSeq((T, T) ==> T))) , 
-			List(("mapFunc", varArgs(FixPt) ==> SSeq(BRAM(T)) ))),
-		MetaPipe))
-		impl (bram_reduce_many) (composite ${
-			val bramSize = size($brams(0)).size.reduce(_*_) 
-			def recMetaPipe (idx:Int, idxs:Seq[Rep[FixPt]]): Rep[Unit] = {
-				val ctr = $ctrs.chain.apply(unit(idx))
-				if (idx == 0) {
-					loop(ctr, { case i => 
-						val resultBms = $mapFunc(i+:idxs)
-						$brams.zipWithIndex.foreach{case (bram, accIdx) =>
-							val reduceFunc = reduceFuncs(accIdx)
-							val bramCtr = CounterChain(Counter(max=bramSize))
-							Pipe(bramCtr) {case j::_ =>
-								bram.st(j, reduceFunc(bram.ld(j), resultBms(accIdx).ld(j))) 
-							}
-						}
-					})
-				} else {
-					loop(ctr, ( (i:Rep[FixPt]) => recMetaPipe(idx - 1, i+:idxs) ))
-				}
-			}
-			val metaPipe = newMetaPipe( $ctrs)
-			//$brams.foreach(bram => bram.reset)
-			val ctrSize = getSize($ctrs, 0)
-			recMetaPipe( ctrSize - 1, Seq.empty[Rep[FixPt]] )
-			metaPipe
-		})
-		val bram_reduce = direct (MetaPipe) ("BramReduce", T, CurriedMethodSignature(List(
-			List(("pipelined", MBoolean), ("ctrs", CounterChain), ("bram", BRAM(T)),
-			("reduceFunc", (T, T) ==> T)),
-			List(("mapFunc", varArgs(FixPt) ==> BRAM(T)))),
-		MetaPipe))
-		impl (bram_reduce) (redirect ${
-			val wrapMapFun = (idxs:Seq[Rep[FixPt]]) => {
-				Seq($mapFunc(idxs:_*))
-			}
-			BramReduceMany[T]($pipelined, $ctrs, Seq($bram), Seq(reduceFunc)) (wrapMapFun)
-		})
-		*/
 
 		/* MetaPipe Parallel */
+	 //TODO: should be list of funcs, but doesn't quite work
 		val meta_parallel = direct (MetaPipe) ("Parallel", Nil, CurriedMethodSignature(List(
-			List(("func", MThunk(MUnit)))),
-		MetaPipe)) 
-		impl (meta_parallel) (composite ${
-			val metaPipe = newMetaPipe( CounterChain(Counter(max=unit(1))))
-			$func
-			metaPipe
-		})
+			List(("func", MThunk(MUnit) ))),
+		MUnit)) 
+		impl (meta_parallel) (codegen ($cala, ${
+			$b[func]
+		}))
 
 		/* MetaPipe 1 iteration */
 		val meta_1iter = static (MetaPipe) ("apply", Nil, CurriedMethodSignature(List(
 			List(("func", MThunk(MUnit)))),
-		MetaPipe)) 
+		MUnit)) 
 		impl (meta_1iter) (composite ${
-			val metaPipe = newMetaPipe( CounterChain(Counter(max=unit(1))))
-			$func
-			metaPipe
+			Sequential(CounterChain(Counter(max=unit(1)))) { case i => $func}
 		})
+
 	}
 }

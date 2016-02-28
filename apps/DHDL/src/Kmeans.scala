@@ -58,32 +58,34 @@ trait Kmeans extends DHDLApplication with KmeansTest{
 		test(sPoints, sNumCents, sDim)
 
 		val numPoints = ArgIn[FixPt](sNumPoints).value
+		val numCents = ArgIn[FixPt](sNumCents).value
 
-		val points = OffChipMem[FixPt]("points", sPoints.flatten.map(i => i.toFixPt): _*)
-		val cents = BRAM[FixPt]("cents", tileSize*sNumCents)
-		points.ld(cents,0, 0, sDim, sNumCents, FixPt(sDim))
+		val points = OffChipMem[FixPt](sPoints.flatten.map(i => i.toFixPt): _*)
+		val oldCents = BRAM[FixPt](sNumCents, sDim)
+		points.ld(oldCents, 0, sNumCents*sDim)
 
-		val ptCtr = CounterChain(Counter(max=5))
-		//val accum1 = Reg[FixPt](0)
-		//val accum2 = Reg[FixPt](0)
-		//MetaReduceMany[FixPt](true, ptCtr, Seq(accum1, accum2), Seq(_+_, _+_)) {case i::_ => 
-		//	println(i)
-		//	Seq(i, i)
-		//}
-		//println(accum1.value)
-		//println(accum2.value)
-		//val ptCtr = CounterChain(Counter(max=sDim))
-		//MetaPipe()
-		//
-		//val dimCtr = CounterChain(Counter(max=sDim))
-		//Pipe[Float](1, true, dimCtr, distAccum, _+_,) {case i::_ =>
-		//	
-		//}
+		val tileCtr = CounterChain(Counter(max=numPoints, step=tileSize))
+		val pointsB = BRAM[FixPt](tileSize, sDim)
+		Sequential(tileCtr) { case iTile::_ => 
+			points.ld(pointsB, iTile, tileSize*sDim)
+			val ptCtr = CounterChain(Counter(max=tileSize))
+			MetaPipe(true, ptCtr) { case iP::_ =>
+				val ctCtr = CounterChain(Counter(max=numCents))
+				MetaPipe(true, ctCtr) { case iC::_ =>
+					val dimCtr = CounterChain(Counter(max=sDim))
+					val dist = Reg[FixPt](0)
+					Pipe[FixPt](dimCtr, dist, _+_) { case iD::_ =>
+						(pointsB.ld(iP, iD) - oldCents.ld(iC, iD)).pow(2)
+					}
+
+				}
+			}
+		}
 		println("DHDL:")
 		println("points")
 		println(points.mkString)
 		println("cents")
-		println(cents.mkString)
+		println(oldCents.mkString)
 
 		/*
 		val ctrs_out = CounterChain(Counter(max=dataSize/tileSize))

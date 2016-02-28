@@ -42,10 +42,7 @@ trait OutProd extends DHDLApplication {
 				val addr = ii * tileSize + jj
 				bmResult.st(addr, bm1.ld(ii) * bm2.ld(jj))
 			}
-			MetaPipe {
-				//TODO:FIX THIS
-				result.st(bmResult, j, i, tileSize, tileSize, vecLength)
-			}
+			result.st(bmResult, i, j, tileSize, tileSize, vecLength)
 			()
 		}
 

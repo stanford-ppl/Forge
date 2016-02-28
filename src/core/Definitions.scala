@@ -26,6 +26,7 @@ trait Definitions extends DerivativeTypes {
    */
   lazy val MultiloopSoA = transformer("MultiloopSoA", isExtern = true)
   lazy val IRPrinter = traversal("IRPrinter", isExtern = true)  // For debugging
+  lazy val IRPrinterPlus = traversal("IRPrinterPlus", isExtern = true) // Debugging metadata
 
   /**
    * Built-in types

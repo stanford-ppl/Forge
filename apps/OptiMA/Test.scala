@@ -13,7 +13,9 @@ trait Test extends OptiMAApplication {
       sys.exit(-1)
     }
 
-    val m = Array2D[Int](5, 5)
-    m.pprint
+
+
+    //val m = Array2D[Int](5, 5)
+    //m.pprint
   }
 }

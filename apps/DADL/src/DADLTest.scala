@@ -7,9 +7,9 @@ object DADLTestInterpreter extends DADLApplicationInterpreter with DADLTest
 
 trait DADLTest extends DADLApplication {
 	def main() = {
-		val bm = BRAM[Long]("bm", 128)
+		val bm = BRAM[Long](128)
 
-    def Mux[T](sel: Wire[Boolean], x: Wire[T], y: Wire[T]): Wire[T] = x
+    /*def Mux[T](sel: Wire[Boolean], x: Wire[T], y: Wire[T]): Wire[T] = x
     def Fanout(in: Wire[Int]): Wire[Tup2[Int,Int]] = pack((in, in))
 
     val in0 = unit(0)
@@ -33,9 +33,9 @@ trait DADLTest extends DADLApplication {
       instance(Mux[T] _)(sel, in1, in2) // Some function of i1 and i2
     }
 
-    alu1 = instance(ALU[Int] _)(alu1, in1)
+    alu1 = instance(ALU[Int] _)(alu1, in1)*/
 
-    println(alu1)
+    //println(alu1)
 
     // Should take care not to assign things to the output of a module, or have unconnected inputs
 	}

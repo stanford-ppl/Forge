@@ -49,7 +49,7 @@ trait TPCHQ6 extends DHDLApplication {
 			}
 			val inCounter = CounterChain(Counter(max=tileSize))
 			val inAccum = Reg[Float](0.0f)
-			Pipe[Float](true, inCounter, inAccum, _+_) { case j::_ =>
+			Pipe[Float](inCounter, inAccum, _+_) { case j::_ =>
 				val date = datesBm.ld(j)
 				val discount = discountsBm.ld(j)
 				val quant = quantsBm.ld(j)

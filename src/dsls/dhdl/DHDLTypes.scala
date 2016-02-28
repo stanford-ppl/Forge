@@ -8,6 +8,8 @@ trait DHDLTypes {
 	def importDHDLTypes () = {
 		val T = tpePar("T")
 		val SList = tpe("scala.List", T, stage=compile)
+		val SString = tpe("java.lang.String", stage=compile)
+		val SBoolean = tpe("scala.Boolean", stage=compile)
 		val FixPt = tpe("Long", stage=future)
 		tpeAlias("FixPt", FixPt)
 

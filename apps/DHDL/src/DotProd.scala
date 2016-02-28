@@ -30,9 +30,9 @@ trait DotProd extends DHDLApplication {
 				vec1.ld(bm1, i*tileSize, tileSize)
 				vec2.ld(bm2, i*tileSize, tileSize)
 			}
-			val accum_in = Reg[FixPt]()
+			val accum_in = Reg[FixPt](0)
 			val ctrs_in = CounterChain(Counter(max=tileSize))
-			Pipe[FixPt](true, ctrs_in, accum_in, _+_) { case j::_ =>
+			Pipe[FixPt](ctrs_in, accum_in, _+_) { case j::_ =>
 				bm1.ld(j)*bm2.ld(j)
 			}
 			accum_in.value

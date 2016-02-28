@@ -13,8 +13,8 @@ trait DADLDSL extends ForgeApplication
 
   override def clearTraversals = true
   disableFusion()
-  disableSoA()
-  disableStructUnwrapping()
+  //disableSoA()
+  //disableStructUnwrapping()
 
   override def addREPLOverride = false
 
@@ -30,7 +30,6 @@ trait DADLDSL extends ForgeApplication
 
 		val TypeOps = grp("TypeOps")
 		lift(TypeOps) (MInt)
-		lift(TypeOps) (MArray)
     direct (TypeOps) ("println", List(), List(MAny) :: MUnit, effect = simple) implements codegen($cala, ${ println($0) })
 
 		importStrings()
@@ -43,4 +42,10 @@ trait DADLDSL extends ForgeApplication
 
     ()
 	}
+
+  def bramTest() {
+
+
+  }
+
 }

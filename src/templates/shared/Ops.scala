@@ -250,7 +250,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     tpePars.flatMap(
       tp => tp.ctxBounds.map(
         cb => arg(
-          "implicitly["+cb.name+"["+quote(tp)+"]]", 
+          "implicitly["+cb.name+"["+quote(tp)+"]]",
           tpe(cb.name, List(tpePar(quote(tp), List(), now)), now),
           None
         )
@@ -262,7 +262,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     val hkInstantiations = getHkTpeParInstantiations(tpePars, args, implicitArgs)
 
     // passing order is: regular ctxBounds, then regular implicits, and finally hkInstantiations context bounds
-    val allImplicitArgs = makeImplicitCtxBoundsArgs(tpePars) ++ implicitArgs ++ hkInstantiations
+    val allImplicitArgs = makeImplicitCtxBoundsArgs(withoutHkTpePars(tpePars)) ++ implicitArgs ++ hkInstantiations
     if (allImplicitArgs.length > 0) "(" + allImplicitArgs.map(quote).mkString(",") + ")"
     else ""
   }

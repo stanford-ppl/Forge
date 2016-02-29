@@ -1093,13 +1093,44 @@ trait DeliteGenOps extends BaseGenOps {
           stream.println("  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {")
           for ((op,r) <- generatorRules) {
             stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(op) + " => ")
-            val body = quote(r.decl).trim.split(nl).toList
+
             // how do we decide whether to add stream.println?
-            def addPrint(s: String) = {
-              // hack! (or heuristic, if the glass is half full)
-              !s.startsWith("emit")
+            // hack! (or heuristic, if the glass is half full)
+            def shouldInline(s: String) = !s.startsWith("@")
+
+            val body = r.decl.trim.split(nl).toList.map(_.trim).map{ line =>
+              if (shouldInline(line)) inline(op, line, quoteLiteral)
+              else quote(line)
             }
-            val body2 = body map { l => if (addPrint(l)) "stream.print("+l+")" else l }
+
+            g match {
+              case `$cala` =>
+                emitWithIndent("stream.println(\"val \"+quote(sym)+\" = {\")", stream, 6)
+                body.foreach { line =>
+                  if (shouldInline(line)) emitWithIndent(line.drop(1), stream, 6)
+                  else emitWithIndent("stream.println(" + line + ")", stream, 6)
+                }
+                emitWithIndent("stream.println(\"}\")", stream, 6)
+
+              case `cuda` | `cpp` =>
+                if (op.retTpe == MUnit || op.retTpe == MNothing) {
+                  body.foreach{ line =>
+                    if (shouldInline(line)) emitWithIndent(line.drop(1), stream, 6)
+                    else emitWithIndent("stream.println(" + line + ")", stream, 6)
+                  }
+                  emitWithIndent("stream.println(\";\")", stream, 6)
+                }
+                else {
+
+                }
+
+              case _ => throw new RuntimeException("Unsupported codegen: " + g.toString)
+            }
+            stream.println()
+
+            val body = quote(r.decl).trim.split(nl).toList
+
+            val body2 = body map { l => if (!shouldInline(l)) "stream.print("+l+")" else l }
             // use stream.print, since the new lines from the original interpolated code block are still there
             g match {
               case `$cala` =>
@@ -1118,7 +1149,7 @@ trait DeliteGenOps extends BaseGenOps {
                 }
               case _ => throw new RuntimeException("Not supported codgen:" + g.toString)
             }
-            stream.println()
+            stream.println()*/
           }
           stream.println("    case _ => super.emitNode(sym, rhs)")
           stream.println("  }")

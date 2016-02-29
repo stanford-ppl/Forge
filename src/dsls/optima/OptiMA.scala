@@ -21,7 +21,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 //   - types with data structure definition will always show up as struct-like, no change needed
 //   - types which have ops implemented as records should be struct-like
 //   - all other types need to be specified as arrayLike or scalarLike (scalarLike is default)
-//   - use fig vs. figarray vs. figstruct?
+//   - use figTpe(, isPrimitive, isArrayLike)
 
 // TEST:
 

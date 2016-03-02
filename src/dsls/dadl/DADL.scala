@@ -36,9 +36,9 @@ trait DADLDSL extends ForgeApplication
 
     schedule(IRPrinter)
 
-    // TODO: Change this to list of codegen targets which support feedback (probably just dot and verilog)
-    // after adding in codegen in forge/extern/dadl/compiler/src/ops/ModuleIOOpsExp.scala
-    extern(grp("ModuleIO"), targets = Nil)
+    // TODO: This list should be updated as and when new backend support for feedback is added
+    // Codegen support should be added in forge/extern/dadl/compiler/src/ops/ModuleIOOpsExp.scala
+    extern(grp("ModuleIO"), targets = List(dot))
 
     ()
 	}

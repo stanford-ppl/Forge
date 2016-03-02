@@ -28,7 +28,9 @@ trait SimpleVectorDSL extends ForgeApplication {
     importVectorOps()
   }
 
+  import org.scala_lang.virtualized.virtualize
 
+  @virtualize
   def importVectorOps() {
     // generic type parameters we will use
     val T = tpePar("T")
@@ -46,11 +48,8 @@ trait SimpleVectorDSL extends ForgeApplication {
     //val VectorOps = withTpe (Vector)
 
     //VectorOps {
-    import org.scala_lang.virtualized.virtualize
 
-    magic()
-    @virtualize
-    def magic[R]() = withTpee(Vector){
+    val magic = withTpee(Vector){
       // getters and setters
       compiler ("vector_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
       compiler ("vector_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))

@@ -1,10 +1,13 @@
 import optiwrangler.compiler._
 import optiwrangler.library._
 import optiwrangler.shared._
+import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 
 object ExamplesCompiler extends OptiWranglerApplicationCompiler with Examples
 object ExamplesInterpreter extends OptiWranglerApplicationInterpreter with Examples
 
+@virtualize
 trait Examples extends OptiWranglerApplication {
   	
 	def main() = {

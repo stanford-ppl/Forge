@@ -239,12 +239,10 @@ trait ForgeSugar extends ForgeSugarLowPriority {
     def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup_op(lookupGrp(grpName),opName,index)
   }
 
-//  trait TpeScopeRunner[R] extends TpeScope {
-//    def apply: R
-  trait TpeScopeRunner extends TpeScope {
-    def apply: Any //List[Any]
-    val result = apply //should this execute what's inside?
-    _tpeScopeBox = _: Rep[DSLType] // reset
+  trait TpeScopeRunner /*[R]*/ extends TpeScope {
+    def apply: Any //List[Any] //: R
+    val result = apply
+    _tpeScopeBox = _: Rep[DSLType]
   }
 }
 

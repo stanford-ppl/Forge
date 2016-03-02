@@ -95,6 +95,7 @@ trait ScalaOps extends PrimitiveMathGen {
     val int_binary_or = direct (Prim) ("forge_int_or", Nil, (MInt,MInt) :: MInt)
     val int_shift_right = direct (Prim) ("forge_int_shift_right", Nil, (MInt,MInt) :: MInt)
     val int_mod = infix (Prim) ("%", Nil, (MInt,MInt) :: MInt)
+    val int_until = infix (Prim) ("until", Nil, (MInt,MInt) :: MRange)
     val int_bitwise_not = infix (Prim) ("unary_~", Nil, MInt :: MInt)
 
     val float_plus = direct (Prim) ("forge_float_plus", Nil, (MFloat,MFloat) :: MFloat)
@@ -130,6 +131,7 @@ trait ScalaOps extends PrimitiveMathGen {
       impl (int_shift_left) (codegen(g, ${$0 << $1}))
       impl (int_shift_right) (codegen(g, ${$0 >> $1}))
       impl (int_mod) (codegen(g, ${$0 % $1}))
+      impl (int_until) (codegen(g, ${$0 until $1}))
       impl (int_bitwise_not) (codegen(g, ${~$0}))
       impl (int_binary_and) (codegen(g, ${$0 & $1}))
       impl (int_binary_or) (codegen(g, ${$0 | $1}))
@@ -429,9 +431,9 @@ trait ScalaOps extends PrimitiveMathGen {
 
     // TODO: check these combinations to see if they could be condensed or if there is anything missing
 
-    infix (Str) ("+", T, (CString, T) :: MString) implements redirect ${ forge_string_plus(unit($0), $1) }
+    direct (Str) ("infix_+", T, (CString, T) :: MString) implements redirect ${ forge_string_plus(unit($0), $1) }
     infix (Str) ("+", T, (MString, T) :: MString) implements redirect ${ forge_string_plus($0, $1) }
-    infix (Str) ("+", T, (CString, MVar(T)) :: MString) implements redirect ${ forge_string_plus(unit($0), readVar($1)) }
+    direct (Str) ("infix_+", T, (CString, MVar(T)) :: MString) implements redirect ${ forge_string_plus(unit($0), readVar($1)) }
     infix (Str) ("+", T, (MString, MVar(T)) :: MString) implements redirect ${ forge_string_plus($0, readVar($1)) }
     infix (Str) ("+", T, (MVar(MString), T) :: MString) implements redirect ${ forge_string_plus(readVar($0), $1) }
     infix (Str) ("+", T, (MVar(MString), MVar(T)) :: MString) implements redirect ${ forge_string_plus(readVar($0), readVar($1)) }
@@ -445,7 +447,7 @@ trait ScalaOps extends PrimitiveMathGen {
 
     //check what was the issue with this one
     infix (Str) ("+", Nil, (MString, CString) :: MString) implements redirect ${ forge_string_plus($0, unit($1)) }
-    infix (Str) ("+", Nil, (CString, MString) :: MString) implements redirect ${ forge_string_plus(unit($0), $1) }
+    direct (Str) ("infix_+", Nil, (CString, MString) :: MString) implements redirect ${ forge_string_plus(unit($0), $1) }
     infix (Str) ("+", Nil, (MString, MString) :: MString) implements redirect ${ forge_string_plus($0, $1) }
     infix (Str) ("+", Nil, (MString, MVar(MString)) :: MString) implements redirect ${ forge_string_plus($0, readVar($1)) }
     infix (Str) ("+", Nil, (MVar(MString), MString) :: MString) implements redirect ${ forge_string_plus(readVar($0), $1) }

@@ -85,6 +85,7 @@ trait StringableOps {
       val pars = (0 until arity).map(i => tpePar(('A'.toInt+i).toChar.toString) withBound TStringable).toList
       val TupStringable = tpeClassInst("StringableTup"+arity, pars, Stringable(Tup))
 
+      //insert unit("(") here
       val makeTupStr = "\"(\"+" + (1 to arity).map(i => "t._"+i+".makeStr").mkString("+\",\"+") + "+\")\""
       infix (TupStringable) ("makeStr", pars, ("t",Tup) :: MString) implements composite ${ \$makeTupStr }
     }

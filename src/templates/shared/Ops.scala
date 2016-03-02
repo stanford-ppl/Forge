@@ -192,7 +192,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
 
   def makeArgs(args: List[Rep[DSLArg]], makeArgName: (Rep[DSLArg] => String) = simpleArgName, addParen: Boolean = true) = {
     if (args.length == 0 && !addParen) {
-      "()"
+      "" //TODO(macrotrans) this still causes an issue for operations with default parameters, have to be called with "()"
     }
     else {
       "(" + args.map(makeArgName).mkString(",") + ")"
@@ -669,9 +669,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
       for (tpe <- tpes) {
         //OpsCls has to be defined for each different Type Instantiation
         val tpePars = getTpePars(tpe) //.filterNot(_.name == "_") //either maps to itself or wrapped type parameters
-        
         val tpeArgs = getTypeArgs(tpe) //only returns arguments of type instantiation
-        
         val opsClsName = opsGrp.grp.name + tpe.name.replaceAll("\\.", "") + tpeArgs.map(_.name).mkString("") + "OpsCls"
         val implicitParams = if (tpePars.length > 0) makeImplicitCtxBounds(tpePars) + ",__pos" else "__pos"
 
@@ -688,8 +686,12 @@ trait BaseGenOps extends ForgeCodeGenBase {
             stream.println("  implicit def varTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + varify(tpe) + ")(implicit __pos: SourceContext) = new " + opsClsName + "(readVar(x))(" + implicitParams + ")")
           }
         }
-
         stream.println()
+      } //implicit resolutions have to be defined first before they are used. e.g. _.toDouble
+      for (tpe <- tpes) {
+        val tpePars = getTpePars(tpe) //.filterNot(_.name == "_") //either maps to itself or wrapped type parameters
+        val tpeArgs = getTypeArgs(tpe) //only returns arguments of type instantiation
+        val opsClsName = opsGrp.grp.name + tpe.name.replaceAll("\\.", "") + tpeArgs.map(_.name).mkString("") + "OpsCls"
         stream.println("  class " + opsClsName + makeTpeParsWithBounds(tpePars) + "(val self: " + repify(tpe) + ")(implicit __pos: SourceContext) {")
 
         for (o <- ops if quote(o.args.apply(0).tpe) == quote(tpe)) {

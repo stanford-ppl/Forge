@@ -55,7 +55,7 @@ trait OptiLADSL extends ForgeApplication
     compiler (Range) ("range_end", Nil, Range :: MInt) implements getter(0, "end")
 
     noInfixList :::= List("infix_foreach")
-    infix (Range) ("until", Nil, (MInt,MInt) :: Range) implements allocates(Range, quotedArg(0), quotedArg(1))
+    infix (Range) ("until", Nil, (MInt,MInt) :: MRange) implements allocates(Range, quotedArg(0), quotedArg(1))
 
     // infix_foreach must be compiler only both so that it is not used improperly and to not interfere with other codegen nodes in the library
     // this is a little convoluted unfortunately (because of the restriction on passing structs to codegen nodes)

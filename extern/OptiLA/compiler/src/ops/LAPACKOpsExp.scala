@@ -1,8 +1,9 @@
 package optila.compiler.ops
 
 import scala.tools.nsc.io._
-import reflect.Manifest;
+import reflect.Manifest
 import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 import scala.virtualization.lms.common.{Base,BaseExp,EffectExp,BaseFatExp}
 import scala.virtualization.lms.common.{ScalaGenBase,ScalaGenEffect,ScalaGenFat}
 import scala.virtualization.lms.util._
@@ -22,7 +23,7 @@ import optila.shared.typeclass._
 import optila.compiler._
 import optila.compiler.ops._
 
-
+@virtualize
 trait LAPACKOpsExp extends LAPACKOps with LinAlgOpsExp {
   this: OptiLAExp with LAPACKHelperOps =>
 

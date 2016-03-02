@@ -49,6 +49,8 @@ trait Definitions extends DerivativeTypes {
   lazy val CByte = tpe("Byte", stage = now)
   lazy val MChar = tpe("Char")
   lazy val CChar = tpe("Char", stage = now)
+  lazy val MRange = tpe("Range")
+  lazy val CRange = tpe("Range", stage = now)
   lazy val CTuple2 = tpe("Tuple2", (tpePar("A"),tpePar("B")), stage = compile)
   lazy val CTuple3 = tpe("Tuple3", (tpePar("A"),tpePar("B"),tpePar("C")), stage = compile)
   lazy val CTuple4 = tpe("Tuple4", (tpePar("A"),tpePar("B"),tpePar("C"),tpePar("D")), stage = compile)
@@ -156,7 +158,10 @@ trait Definitions extends DerivativeTypes {
   // the two lists used below are used interchangeably depending on the configuration (normal or fast compile mode)
   var noInfixList = List("apply", "update", /*"+",*/ "-", "*", "/", "<", ">", "<=", ">=")  // string + doesn't resolve correctly in the compiler version using only implicits
   var mustInfixList = List("+"/*,"-","*","/"*/,"!=","length","toString")
-  val macroInfix = List("==", "!=", "##", "equals", "hashCode", "asInstanceOf", "toString", "eq", "ne", "notify", "notifyAll", "synchronized", "wait") //TODO(macrovirt)
+  val macroInfix = List( //check what is up with plus!
+    //"+", //only for specific case of "Literal[String] + Something"
+    "==", "!=", "##", "equals", "hashCode", "asInstanceOf", "toString", "getClass", //Any
+    "eq", "ne", "notify", "notifyAll", "synchronized", "wait", "clone", "finalize") //AnyRef
 
   // blacklist for op names that need to be overridden in instance methods
   var overrideList = Set("toString", "hashCode", "equals")

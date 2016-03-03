@@ -14,10 +14,11 @@ trait KmeansTest {
 		def dist(p1:Seq[Int], p2:Seq[Int]):Int = {
 			p1.zip(p2).map{case (d1, d2) => (d1-d2)*(d1-d2)}.reduce(_+_)
 		}
-		var gold = Array.tabulate(sNumCents){i =>
+		var centSum = Array.tabulate(sNumCents){i =>
 			Array.tabulate(sDim){d => 0}
 		}
-		val closests = sPoints.map{p =>
+		var centCount = Array.tabulate(sNumCents){i => 0}
+		sPoints.foreach { p =>
 			var minCent = 0
 			var minDist = -1 
 			sCents.zipWithIndex.foreach{case (c, i) =>
@@ -27,16 +28,23 @@ trait KmeansTest {
 					minCent = i
 				}
 			}
-			gold(minCent).zipWithIndex.foreach{case (d, i) => 
-				gold(minCent)(i) = d + p(i)
+			centSum(minCent).zipWithIndex.foreach { case (d, i) => 
+				centSum(minCent)(i) = d + p(i)
 			} 
+			centCount(minCent) = centCount(minCent) + 1
 		}
-		println("points:")
-		println(sPoints.map(p => p.mkString(",")).mkString("\n"))
-		println("cents:")
-		println(sCents.map(c => c.mkString(",")).mkString("\n"))
-		println("newCents:")
-		println(gold.map(c => c.mkString(",")).mkString("\n"))
+		val gold = centSum.zipWithIndex.map{ case (c,i) =>
+			c.map(d => d/centCount(i))
+		}
+
+		//println("points:")
+		//println(sPoints.map(p => p.mkString(",")).mkString("\n"))
+		//println("cents:")
+		//println(sCents.map(c => c.mkString(",")).mkString("\n"))
+		//println("newCents:")
+		//println(gold.map(c => c.mkString(",")).mkString("\n"))
+
+		gold
 	}
 }
 trait Kmeans extends DHDLApplication with KmeansTest{
@@ -55,57 +63,63 @@ trait Kmeans extends DHDLApplication with KmeansTest{
 			}
 		}
 
-		test(sPoints, sNumCents, sDim)
+		val gold = test(sPoints, sNumCents, sDim)
 
 		val numPoints = ArgIn[FixPt](sNumPoints).value
 		val numCents = ArgIn[FixPt](sNumCents).value
 
 		val points = OffChipMem[FixPt](sPoints.flatten.map(i => i.toFixPt): _*)
 		val oldCents = BRAM[FixPt](sNumCents, sDim)
+		val newCents = BRAM[FixPt](sNumCents, sDim)
+		val centCount = BRAM[FixPt](sNumCents)
 		points.ld(oldCents, 0, sNumCents*sDim)
 
-		val tileCtr = CounterChain(Counter(max=numPoints, step=tileSize))
-		val pointsB = BRAM[FixPt](tileSize, sDim)
-		Sequential(tileCtr) { case iTile::_ => 
-			points.ld(pointsB, iTile, tileSize*sDim)
-			val ptCtr = CounterChain(Counter(max=tileSize))
-			MetaPipe(true, ptCtr) { case iP::_ =>
-				val ctCtr = CounterChain(Counter(max=numCents))
-				MetaPipe(true, ctCtr) { case iC::_ =>
-					val dimCtr = CounterChain(Counter(max=sDim))
-					val dist = Reg[FixPt](0)
-					Pipe[FixPt](dimCtr, dist, _+_) { case iD::_ =>
-						(pointsB.ld(iP, iD) - oldCents.ld(iC, iD)).pow(2)
+		MetaPipe {
+			val tileCtr = CounterChain(Counter(max=numPoints, step=tileSize))
+			val pointsB = BRAM[FixPt](tileSize, sDim)
+			Sequential(tileCtr) { case iTile::_ => 
+				points.ld(pointsB, iTile*sDim, tileSize*sDim)
+				val ptCtr = CounterChain(Counter(max=tileSize))
+				val minDist = Reg[FixPt](-1)
+				val minCent = Reg[FixPt](0)
+				Sequential(ptCtr) { case iP::_ =>
+					//TODO; this should be a reduce on two regs
+					minDist.reset
+					minCent.reset
+					val ctCtr = CounterChain(Counter(max=numCents))
+					MetaPipe(true, ctCtr) { case iC::_ =>
+						val dimCtr = CounterChain(Counter(max=sDim))
+						val dist = Reg[FixPt](0)
+						Pipe[FixPt](dimCtr, dist, _+_) { case iD::_ =>
+							(pointsB.ld(iP, iD) - oldCents.ld(iC, iD)).pow(2)
+						}
+						val closer = (dist.value < minDist.value) || (minDist.value < 0)
+						minDist.write(mux(closer, dist.value, minDist.value))
+						minCent.write(mux(closer, iC, minCent.value))
 					}
-
+					Parallel {
+						val dimCtr = CounterChain(Counter(max=sDim))
+						Pipe(dimCtr) { case iD::_ =>
+							newCents.st(minCent.value, iD,
+								pointsB.ld(iP, iD) + newCents.ld(minCent.value, iD)) 
+						}
+						centCount.st(minCent.value, centCount.ld(minCent.value) + FixPt(1))
+					}
 				}
 			}
-		}
-		println("DHDL:")
-		println("points")
-		println(points.mkString)
-		println("cents")
-		println(oldCents.mkString)
-
-		/*
-		val ctrs_out = CounterChain(Counter(max=dataSize/tileSize))
-		val accum_out = ArgOut[FixPt](0)
-		MetaPipe[FixPt](1, true, ctrs_out, accum_out, _+_) {case i::_ => 
-			val bm1 = BRAM[FixPt]("bm1", tileSize)
-			val bm2 = BRAM[FixPt]("bm2", tileSize)
-			Parallel {
-				vec1.ld(bm1, i*tileSize, tileSize)
-				vec2.ld(bm2, i*tileSize, tileSize)
+			val newCentCtr = CounterChain(Counter(max=numCents), Counter(max=sDim))
+			Pipe(newCentCtr) {case iC::iD::_ =>
+				newCents.st(iC, iD, newCents.ld(iC, iD)/centCount.ld(iC))
 			}
-			val accum_in = Reg[FixPt]()
-			val ctrs_in = CounterChain(Counter(max=tileSize))
-			Pipe[FixPt](1, true, ctrs_in, accum_in, _+_) { case j::_ =>
-				bm1.ld(j)*bm2.ld(j)
-			}
-			accum_in.value
 		}
-
-		assert(accum_out.value==FixPt(gold))
-		*/
+		//println("DHDL:")
+		//println("points")
+		//println(points.mkString)
+		//println("cents")
+		//println(newCents.mkString)
+		val fgold = gold.flatten
+		fgold.zipWithIndex.foreach{case (g, i) => 
+			assert(FixPt(g) == newCents.ld(i))
+		}
 	}
 }

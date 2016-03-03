@@ -97,6 +97,7 @@ trait Kmeans extends DHDLApplication with KmeansTest{
 						minDist.write(mux(closer, dist.value, minDist.value))
 						minCent.write(mux(closer, iC, minCent.value))
 					}
+					//TODO: following should be in reduction function
 					Parallel {
 						val dimCtr = CounterChain(Counter(max=sDim))
 						Pipe(dimCtr) { case iD::_ =>

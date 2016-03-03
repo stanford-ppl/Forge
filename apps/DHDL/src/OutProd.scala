@@ -11,6 +11,33 @@ trait OutProd extends DHDLApplication {
     println("Usage: outprod")
     exit(-1)
 	}
+
+
+	//TODO: need to give common interface to FixPt, and Float
+	//def tileOutProd[T:Manifest](b1:Rep[BRAM[T]], b2:Rep[BRAM[T]], br:Rep[BRAM[T]], tileSize:Int) = {
+	//	val ctrs_in = CounterChain(Counter(max=tileSize), Counter(max=tileSize))
+	//	Pipe(ctrs_in) { case ii::jj::_ =>
+	//		br.st(ii, jj, b1.ld(ii) * b2.ld(jj))
+	//	}
+	//}
+	//def outProd[T:Manifest](vec1:Rep[OffChipMem[T]], vec2:Rep[OffChipMem[T]], result:Rep[OffChipMem[T]],
+	//	dataSize:Rep[FixPt], tileSize:Int) = {
+	//	val ctrs_out = CounterChain(Counter(max=dataSize, step=tileSize), 
+	//															Counter(max=dataSize, step=tileSize))
+	//	MetaPipe(ctrs_out) {case i::j::_ => 
+	//		val bm1 = BRAM[T]("bm1", tileSize)
+	//		val bm2 = BRAM[T]("bm2", tileSize)
+	//		Parallel {
+	//			vec1.ld(bm1, i, tileSize)
+	//			vec2.ld(bm2, j, tileSize)
+	//		}
+	//		val bmResult = BRAM[T]("bmResult", tileSize, tileSize)
+	//		tileOutProd(bm1, bm2, bmResult, tileSize)
+	//		result.st(bmResult, i, j, tileSize, tileSize, dataSize)
+	//		()
+	//	}
+	//}
+
   def main() = {
 		val tileSize = 2
 		val vecLength = 4
@@ -36,13 +63,12 @@ trait OutProd extends DHDLApplication {
 				vec1.ld(bm1, i, tileSize)
 				vec2.ld(bm2, j, tileSize)
 			}
-			val bmResult = BRAM[FixPt]("bmResult", tileSize*tileSize)
+			val bmResult = BRAM[FixPt]("bmResult", tileSize, tileSize)
 			val ctrs_in = CounterChain(Counter(max=tileSize), Counter(max=tileSize))
 			Pipe(ctrs_in) { case ii::jj::_ =>
-				val addr = ii * tileSize + jj
-				bmResult.st(addr, bm1.ld(ii) * bm2.ld(jj))
+				bmResult.st(ii, jj, bm1.ld(ii) * bm2.ld(jj))
 			}
-			result.st(bmResult, i, j, tileSize, tileSize, vecLength)
+			result.st(bmResult, i, j, tileSize, tileSize, dataSize)
 			()
 		}
 

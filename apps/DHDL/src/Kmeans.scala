@@ -7,23 +7,23 @@ object KmeansCompiler extends DHDLApplicationCompiler with Kmeans
 object KmeansInterpreter extends DHDLApplicationInterpreter with Kmeans
 
 trait KmeansTest {
-	def test (sPoints:Seq[Seq[Int]], sNumCents:Int, sDim:Int) = {
+	def test (sPoints:Seq[Seq[Float]], sNumCents:Int, sDim:Int) = {
 		val sCents = Seq.tabulate(sNumCents){i =>
 			sPoints(i)
 		}
-		def dist(p1:Seq[Int], p2:Seq[Int]):Int = {
+		def dist(p1:Seq[Float], p2:Seq[Float]):Float = {
 			p1.zip(p2).map{case (d1, d2) => (d1-d2)*(d1-d2)}.reduce(_+_)
 		}
 		var centSum = Array.tabulate(sNumCents){i =>
-			Array.tabulate(sDim){d => 0}
+			Array.tabulate(sDim){d => 0f}
 		}
-		var centCount = Array.tabulate(sNumCents){i => 0}
+		var centCount = Array.tabulate(sNumCents){i => 0f}
 		sPoints.foreach { p =>
 			var minCent = 0
-			var minDist = -1 
+			var minDist = -1.0 
 			sCents.zipWithIndex.foreach{case (c, i) =>
 				val currDist = dist(p, c)
-				if ((currDist<minDist) || (minDist < 0)) {
+				if ((currDist<minDist) || (minDist < 0f)) {
 					minDist = currDist
 					minCent = i
 				}
@@ -34,7 +34,7 @@ trait KmeansTest {
 			centCount(minCent) = centCount(minCent) + 1
 		}
 		val gold = centSum.zipWithIndex.map{ case (c,i) =>
-			c.map(d => d/centCount(i))
+			c.map(d => d/centCount(i).toFloat)
 		}
 
 		//println("points:")
@@ -59,7 +59,7 @@ trait Kmeans extends DHDLApplication with KmeansTest{
 		val sNumCents = 4
 		val sPoints = Seq.tabulate(sNumPoints){i =>
 			Seq.tabulate(sDim){d => 
-				Random.nextInt(100)
+				Random.nextFloat()*100f
 			}
 		}
 
@@ -68,19 +68,19 @@ trait Kmeans extends DHDLApplication with KmeansTest{
 		val numPoints = ArgIn[FixPt](sNumPoints).value
 		val numCents = ArgIn[FixPt](sNumCents).value
 
-		val points = OffChipMem[FixPt](sPoints.flatten.map(i => i.toFixPt): _*)
-		val oldCents = BRAM[FixPt](sNumCents, sDim)
-		val newCents = BRAM[FixPt](sNumCents, sDim)
+		val points = OffChipMem[Float](sPoints.flatten.map(i => unit(i)): _*)
+		val oldCents = BRAM[Float](sNumCents, sDim)
+		val newCents = BRAM[Float](sNumCents, sDim)
 		val centCount = BRAM[FixPt](sNumCents)
 		points.ld(oldCents, 0, sNumCents*sDim)
 
 		MetaPipe {
 			val tileCtr = CounterChain(Counter(max=numPoints, step=tileSize))
-			val pointsB = BRAM[FixPt](tileSize, sDim)
+			val pointsB = BRAM[Float](tileSize, sDim)
 			Sequential(tileCtr) { case iTile::_ => 
 				points.ld(pointsB, iTile*sDim, tileSize*sDim)
 				val ptCtr = CounterChain(Counter(max=tileSize))
-				val minDist = Reg[FixPt](-1)
+				val minDist = Reg[Float](-1f)
 				val minCent = Reg[FixPt](0)
 				Sequential(ptCtr) { case iP::_ =>
 					//TODO; this should be a reduce on two regs
@@ -89,11 +89,11 @@ trait Kmeans extends DHDLApplication with KmeansTest{
 					val ctCtr = CounterChain(Counter(max=numCents))
 					MetaPipe(true, ctCtr) { case iC::_ =>
 						val dimCtr = CounterChain(Counter(max=sDim))
-						val dist = Reg[FixPt](0)
-						Pipe[FixPt](dimCtr, dist, _+_) { case iD::_ =>
+						val dist = Reg[Float](0)
+						Pipe[Float](dimCtr, dist, _+_) { case iD::_ =>
 							(pointsB.ld(iP, iD) - oldCents.ld(iC, iD)).pow(2)
 						}
-						val closer = (dist.value < minDist.value) || (minDist.value < 0)
+						val closer = (dist.value < minDist.value) || (minDist.value < unit(0f))
 						minDist.write(mux(closer, dist.value, minDist.value))
 						minCent.write(mux(closer, iC, minCent.value))
 					}
@@ -109,7 +109,7 @@ trait Kmeans extends DHDLApplication with KmeansTest{
 			}
 			val newCentCtr = CounterChain(Counter(max=numCents), Counter(max=sDim))
 			Pipe(newCentCtr) {case iC::iD::_ =>
-				newCents.st(iC, iD, newCents.ld(iC, iD)/centCount.ld(iC))
+				newCents.st(iC, iD, newCents.ld(iC, iD)/centCount.ld(iC).toFloat)
 			}
 		}
 		//println("DHDL:")
@@ -119,7 +119,7 @@ trait Kmeans extends DHDLApplication with KmeansTest{
 		//println(newCents.mkString)
 		val fgold = gold.flatten
 		fgold.zipWithIndex.foreach{case (g, i) => 
-			assert(FixPt(g) == newCents.ld(i))
+			assert(unit(g) == newCents.ld(i))
 		}
 	}
 }

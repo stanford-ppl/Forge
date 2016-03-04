@@ -50,14 +50,14 @@ trait DotGenModuleIOOps extends DotGenBase {
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case mn@FreshFeedback(_) =>
-      stream.println(quote(sym) + " [shape=\"color\" style=\"filled\" fillcolor=\"blue\" color=\"white\"]")
+      stream.println(quote(sym) + " [shape=\"box\" style=\"filled\" fillcolor=\"blue\" color=\"white\"]")
 
     case mn@Link(lhs, rhs) =>
-      stream.println(quote(sym) + " [shape=\"color\" style=\"filled\" fillcolor=\"blue\" color=\"white\"]")
+      stream.println(quote(sym) + " [shape=\"box\" style=\"filled\" fillcolor=\"blue\" color=\"white\"]")
       stream.println(s"""${quote(lhs.e)} -> ${quote(rhs)}""")
 
     case ReadFeedback(f) =>
-      stream.println(quote(sym) + " [shape=\"color\" style=\"filled\" fillcolor=\"blue\" color=\"white\"]")
+      stream.println(quote(sym) + " [shape=\"box\" style=\"filled\" fillcolor=\"blue\" color=\"white\"]")
       stream.println(s"""${quote(f.e)} -> ${quote(sym)}""")
 
     case _ => super.emitNode(sym, rhs)

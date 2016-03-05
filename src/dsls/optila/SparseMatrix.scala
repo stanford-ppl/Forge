@@ -511,7 +511,8 @@ trait SparseMatrixOps {
       infix ("size") (Nil :: MInt) implements composite ${ $self.numRows*$self.numCols }
       infix ("nnz") (Nil :: MInt) implements getter(0, "_nnz")
 
-      infix ("nz") (MethodSignature(List(("asRow",MBoolean,"unit(true)")), DenseVector(T))) implements composite ${ densevector_alloc_raw($self.nnz, $1, sparsematrix_csr_data($self)) }
+      // infix ("nz") (Nil :: DenseVector(T), aliasHint = contains(0)) ???
+      infix ("nz") (Nil :: DenseVector(T)) implements composite ${ densevector_alloc_raw($self.nnz, $1, sparsematrix_csr_data($self)) }
 
       compiler ("sparsematrix_csr_find_offset") ((("row",MInt),("col",MInt)) :: MInt) implements composite ${
         val rowPtr = sparsematrix_csr_rowptr($self)

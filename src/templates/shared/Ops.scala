@@ -626,7 +626,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
         val ret = tpe match {
           //only a higher kinded type can have type arguments
           case Def(TpeInst(hk, args)) =>
-            println(args.map(_.name))
+            // println(args.map(_.name))
             args.filterNot(isTpePar)
           // case Def(HkTpePar(name, tpePars, _, _)) =>
           //   println("HK: "+tpePars.map(_.name))
@@ -687,11 +687,11 @@ trait BaseGenOps extends ForgeCodeGenBase {
           }
         }
         stream.println()
-      } //implicit resolutions have to be defined first before they are used. e.g. _.toDouble
-      for (tpe <- tpes) {
-        val tpePars = getTpePars(tpe) //.filterNot(_.name == "_") //either maps to itself or wrapped type parameters
-        val tpeArgs = getTypeArgs(tpe) //only returns arguments of type instantiation
-        val opsClsName = opsGrp.grp.name + tpe.name.replaceAll("\\.", "") + tpeArgs.map(_.name).mkString("") + "OpsCls"
+      // } //implicit resolutions have to be defined first before they are used. e.g. _.toDouble
+      // for (tpe <- tpes) {
+      //   val tpePars = getTpePars(tpe) //.filterNot(_.name == "_") //either maps to itself or wrapped type parameters
+      //   val tpeArgs = getTypeArgs(tpe) //only returns arguments of type instantiation
+      //   val opsClsName = opsGrp.grp.name + tpe.name.replaceAll("\\.", "") + tpeArgs.map(_.name).mkString("") + "OpsCls"
         stream.println("  class " + opsClsName + makeTpeParsWithBounds(tpePars) + "(val self: " + repify(tpe) + ")(implicit __pos: SourceContext) {")
 
         for (o <- ops if quote(o.args.apply(0).tpe) == quote(tpe)) {

@@ -180,7 +180,7 @@ trait ForgeSugar extends ForgeSugarLowPriority {
    * Uses Scala-Virtualized scopes to enable sugar for ops scoped on a particular DSLType
    */
 
-  //FIXME: we rather use withTpee as nee nee direct code block injection
+  //FIXME: we rather use withTpee, which is captures by macro-virtualized, as we need direct code block injection
   var _tpeScopeBox: Rep[DSLType] = _
   def withTpe(tpe: Rep[DSLType]) = {
     _tpeScopeBox = tpe

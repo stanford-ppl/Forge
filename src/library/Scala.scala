@@ -54,27 +54,32 @@ trait ScalaOps extends PrimitiveMathGen {
     infix (Prim) ("unary_-", Nil, MFloat :: MFloat) implements redirect ${ unit(-1f)*$0 }
     infix (Prim) ("unary_-", Nil, MDouble :: MDouble) implements redirect ${ unit(-1)*$0 }
 
+    // val int_bitwise_not = infix (Prim) ("unary_~", Nil, MInt :: MInt)
+    // impl (int_bitwise_not) (codegen(g, ${~$0}))
+
     lift (Prim) (MShort)
     lift (Prim) (MInt)
     lift (Prim) (MLong)
     lift (Prim) (MFloat)
     lift (Prim) (MDouble)
 
-    val toInt = infix (Prim) ("toInt", T withBound TNumeric, T :: MInt)
-    val toFloat = infix (Prim) ("toFloat", T withBound TNumeric, T :: MFloat)
-    val toDouble = infix (Prim) ("toDouble", T withBound TNumeric, T :: MDouble)
-    val toLong = infix (Prim) ("toLong", T withBound TNumeric, T :: MLong)
+    for (MT <- List(MInt, MFloat, MDouble, MLong)) {
+      val toInt = infix (Prim) ("toInt", Nil, MT :: MInt)
+      val toFloat = infix (Prim) ("toFloat", Nil, MT :: MFloat)
+      val toDouble = infix (Prim) ("toDouble", Nil, MT :: MDouble)
+      val toLong = infix (Prim) ("toLong", Nil, MT :: MLong)
 
-    impl (toInt) (codegen($cala, ${ $0.toInt }))
-    impl (toFloat) (codegen($cala, ${ $0.toFloat }))
-    impl (toDouble) (codegen($cala, ${ $0.toDouble }))
-    impl (toLong) (codegen($cala, ${ $0.toLong }))
+      impl (toInt) (codegen($cala, ${ $0.toInt }))
+      impl (toFloat) (codegen($cala, ${ $0.toFloat }))
+      impl (toDouble) (codegen($cala, ${ $0.toDouble }))
+      impl (toLong) (codegen($cala, ${ $0.toLong }))
 
-    for (g <- List(cuda, cpp)) {
-      impl (toInt) (codegen(g, ${ (int32_t) $0 }))
-      impl (toFloat) (codegen(g, ${ (float) $0 }))
-      impl (toDouble) (codegen(g, ${ (double) $0 }))
-      impl (toLong) (codegen(g, ${ (int64_t) $0 }))
+      for (g <- List(cuda, cpp)) {
+        impl (toInt) (codegen(g, ${ (int32_t) $0 }))
+        impl (toFloat) (codegen(g, ${ (float) $0 }))
+        impl (toDouble) (codegen(g, ${ (double) $0 }))
+        impl (toLong) (codegen(g, ${ (int64_t) $0 }))
+      }
     }
 
     fimplicit (Prim) ("repInt2ToRepDouble", Nil, MInt :: MDouble) implements composite ${ $0.toDouble }
@@ -95,7 +100,6 @@ trait ScalaOps extends PrimitiveMathGen {
     val int_binary_or = direct (Prim) ("forge_int_or", Nil, (MInt,MInt) :: MInt)
     val int_shift_right = direct (Prim) ("forge_int_shift_right", Nil, (MInt,MInt) :: MInt)
     val int_mod = infix (Prim) ("%", Nil, (MInt,MInt) :: MInt)
-    val int_until = infix (Prim) ("until", Nil, (MInt,MInt) :: MRange)
     val int_bitwise_not = infix (Prim) ("unary_~", Nil, MInt :: MInt)
 
     val float_plus = direct (Prim) ("forge_float_plus", Nil, (MFloat,MFloat) :: MFloat)
@@ -131,7 +135,6 @@ trait ScalaOps extends PrimitiveMathGen {
       impl (int_shift_left) (codegen(g, ${$0 << $1}))
       impl (int_shift_right) (codegen(g, ${$0 >> $1}))
       impl (int_mod) (codegen(g, ${$0 % $1}))
-      impl (int_until) (codegen(g, ${$0 until $1}))
       impl (int_bitwise_not) (codegen(g, ${~$0}))
       impl (int_binary_and) (codegen(g, ${$0 & $1}))
       impl (int_binary_or) (codegen(g, ${$0 | $1}))
@@ -277,22 +280,22 @@ trait ScalaOps extends PrimitiveMathGen {
       impl (times) (codegen(g, quotedArg(0) + " * " + quotedArg(1)))
     }
 
-    //    val toInt = infix (Num) ("toInt", T withBound TNumeric, T :: MInt)
-    //    val toFloat = infix (Num) ("toFloat", T withBound TNumeric, T :: MFloat)
-    //    val toDouble = infix (Num) ("toDouble", T withBound TNumeric, T :: MDouble)
-    //    val toLong = infix (Num) ("toLong", T withBound TNumeric, T :: MLong)
-    //
-    //    impl (toInt) (codegen($cala, ${ $0.toInt }))
-    //    impl (toFloat) (codegen($cala, ${ $0.toFloat }))
-    //    impl (toDouble) (codegen($cala, ${ $0.toDouble }))
-    //    impl (toLong) (codegen($cala, ${ $0.toLong }))
-    //
-    //    for (g <- List(cuda, cpp)) {
-    //      impl (toInt) (codegen(g, ${ (int32_t) $0 }))
-    //      impl (toFloat) (codegen(g, ${ (float) $0 }))
-    //      impl (toDouble) (codegen(g, ${ (double) $0 }))
-    //      impl (toLong) (codegen(g, ${ (int64_t) $0 }))
-    //    }
+       // val toInt = infix (Num) ("toInt", T withBound TNumeric, T :: MInt)
+       // val toFloat = infix (Num) ("toFloat", T withBound TNumeric, T :: MFloat)
+       // val toDouble = infix (Num) ("toDouble", T withBound TNumeric, T :: MDouble)
+       // val toLong = infix (Num) ("toLong", T withBound TNumeric, T :: MLong)
+    
+       // impl (toInt) (codegen($cala, ${ $0.toInt }))
+       // impl (toFloat) (codegen($cala, ${ $0.toFloat }))
+       // impl (toDouble) (codegen($cala, ${ $0.toDouble }))
+       // impl (toLong) (codegen($cala, ${ $0.toLong }))
+    
+       // for (g <- List(cuda, cpp)) {
+       //   impl (toInt) (codegen(g, ${ (int32_t) $0 }))
+       //   impl (toFloat) (codegen(g, ${ (float) $0 }))
+       //   impl (toDouble) (codegen(g, ${ (double) $0 }))
+       //   impl (toLong) (codegen(g, ${ (int64_t) $0 }))
+       // }
 
     val Frac = grp("Fractional")
     val R = tpePar("R")

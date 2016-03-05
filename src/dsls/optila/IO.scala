@@ -84,8 +84,8 @@ trait IOOps {
 
     val readfirstline = compiler (IO) ("readFirstLine", Nil, ("path",MString) :: MString) implements composite ${
       val in = ForgeFileInputStream(path)
-      val line = in.readLine()
-      in.close()
+      val line = in.readLine
+      in.close
       line
     }
 

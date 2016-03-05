@@ -246,24 +246,20 @@ trait BaseGenOps extends ForgeCodeGenBase {
    */
 
   // untyped implicit args
-  def makeImplicitCtxBoundsArgs(tpePars: List[Rep[TypePar]]): List[Rep[DSLArg]]  = {
-    tpePars.flatMap(
-      tp => tp.ctxBounds.map(
-        cb => arg(
-          "implicitly["+cb.name+"["+quote(tp)+"]]",
-          tpe(cb.name, List(tpePar(quote(tp), List(), now)), now),
-          None
-        )
-      )
-    )
+  def makeImplicitCtxBoundsStringList(tpePars: List[Rep[TypePar]]): List[String]  = {
+    tpePars.flatMap { a =>
+      a.ctxBounds.map(b => "implicitly["+b.name+"["+quote(a)+"]]")
+    }
   }
 
   def makeImplicitArgs(tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLArg]]) = {
-    val hkInstantiations = getHkTpeParInstantiations(tpePars, args, implicitArgs)
+    val ctxBoundsStringList = makeImplicitCtxBoundsStringList(withoutHkTpePars(tpePars))
+    val implicitArgsStringList = implicitArgs.map(quote)
+    val hkInstantiationsStringList = getHkTpeParInstantiations(tpePars, args, implicitArgs).map(quote)
 
     // passing order is: regular ctxBounds, then regular implicits, and finally hkInstantiations context bounds
-    val allImplicitArgs = makeImplicitCtxBoundsArgs(withoutHkTpePars(tpePars)) ++ implicitArgs ++ hkInstantiations
-    if (allImplicitArgs.length > 0) "(" + allImplicitArgs.map(quote).mkString(",") + ")"
+    val allImplicitsStringList = ctxBoundsStringList ++ implicitArgsStringList ++ hkInstantiationsStringList
+    if (allImplicitsStringList.length > 0) "(" + allImplicitsStringList.mkString(",") + ")"
     else ""
   }
 
@@ -575,7 +571,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
         }
 
         val opsClsName = opsGrp.grp.name + tpe.name.replaceAll("\\.","") + tpeArgs.map(_.name).mkString("") + "OpsCls"
-        val implicitParams = if (tpePars.length > 0) makeImplicitCtxBoundsArgs(tpePars).map(quote).mkString(",") + ",__pos" else "__pos"
+        val implicitParams = if (tpePars.length > 0) makeImplicitCtxBoundsStringList(tpePars).mkString(",") + ",__pos" else "__pos"
 
         if (tpe.stage == compile) {
           stream.println("  implicit def liftTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ")(implicit __pos: SourceContext) = new " + opsClsName + "(x)(" + implicitParams + ")")

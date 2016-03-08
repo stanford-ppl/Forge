@@ -1133,6 +1133,8 @@ trait DeliteGenOps extends BaseGenOps {
                   emitWithIndent("stream.println(\";\")", stream, 6)
                 }
 
+              case `dot` => emitLines(body)
+
               case _ => err("Unsupported codegen: " + g.toString)
             }
             stream.println()

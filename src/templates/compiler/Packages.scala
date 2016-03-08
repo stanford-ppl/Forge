@@ -52,7 +52,9 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
 
     // metadata ops exp -- used in code generators
     // HACK: Only expose extern stuff and metadata in code generator to support metadata ops on DSL types
-    stream.println("trait " + dsl + "MetadataOpsExp extends " + dsl + "Metadata with " + dsl + "Identifiers")
+    stream.print("trait " + dsl + "MetadataOpsExp extends " + dsl + "Identifiers")
+    if (hasMetadata) stream.print(" with " + dsl + "Metadata")
+    stream.println()
     for (opsGrp <- opsGrps if isMetaType(opsGrp.grp)) {
       stream.print(" with " + opsGrp.name + "Exp")
     }

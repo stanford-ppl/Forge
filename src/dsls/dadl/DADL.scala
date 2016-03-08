@@ -15,8 +15,8 @@ trait DADLDSL extends ForgeApplication
 
   override def clearTraversals = true
   disableFusion()
-  //disableSoA()
-  //disableStructUnwrapping()
+  disableSoA()
+  disableStructUnwrapping()
 
   override def addREPLOverride = false
 
@@ -26,17 +26,10 @@ trait DADLDSL extends ForgeApplication
     importTuples()
     importModules()
 
-    importStrings()
-
-    // type Wire[T] = Rep[T]
     val T = tpePar("T")
     val rep = tpe("Rep", T, stage=compile)
     primitiveTypes ::= rep
     tpeAlias("Wire", rep)
-
-		val TypeOps = grp("TypeOps")
-		lift(TypeOps) (MInt)
-    direct (TypeOps) ("println", List(), List(MAny) :: MUnit, effect = simple) implements codegen($cala, ${ println($0) })
 
     schedule(IRPrinter)
 
@@ -45,11 +38,5 @@ trait DADLDSL extends ForgeApplication
     extern(grp("ModuleIO"), targets = List(dot))
 
     ()
-	}
-
-  def bramTest() {
-
-
   }
-
 }

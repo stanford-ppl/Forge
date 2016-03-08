@@ -127,7 +127,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
       emitLMSImports(stream)
       stream.println("import scala.virtualization.lms.common.MetadataOps")
       stream.println()
-      emitMetadataClasses("CompilerOps", stream)
+      emitMetadataClasses(dsl + "CompilerOps", stream, repify)
       stream.close()
     }
   }

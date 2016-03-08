@@ -58,6 +58,11 @@ trait BaseGenOps extends ForgeCodeGenBase {
     o
   }
 
+  override def quote(x: Any): String = x match {
+    case s: String => quote(Const(x))
+    case _ => super.quote(x)
+  }
+
   override def quote(x: Exp[Any]) : String = x match {
     case Def(QuoteBlockResult(func,args,ret,captured)) if (isThunk(func.tpe)) => func.name
     case Def(QuoteBlockResult(func,args,ret,captured)) => func.name + "(" + replaceWildcards(captured.mkString(",")) + ")"
@@ -612,6 +617,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
 
     // --- Implicit ops
     val base = emitOpImplicits(traitName + "Base", baseTrait, parentTrait, opsGrp, stream, backend)
+
     stream.println("trait " + traitName + "Ops extends " + base + " {")
     stream.println("  this: " + parentTrait + " => ")
     stream.println()

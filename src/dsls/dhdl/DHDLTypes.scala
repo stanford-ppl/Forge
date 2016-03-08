@@ -6,58 +6,103 @@ trait DHDLTypes {
   this: DHDLDSL =>
 
 	def importDHDLTypes () = {
-		val T = tpePar("T")
-		val SList = tpe("scala.List", T, stage=compile)
-		val SString = tpe("java.lang.String", stage=compile)
-		val SBoolean = tpe("scala.Boolean", stage=compile)
-		val FixPt = tpe("Long", stage=future)
-		tpeAlias("FixPt", FixPt)
+		val T = tpePar("T", stage = compile)
+    val Bit = lookupTpe("Bit")
+		val Fix = lookupTpe("Fix")
+    val Flt = lookupTpe("Flt")
 
-		val TpeOps = grp("Tpes")
+		val Tpes = grp("Tpes")
 
-		lift(TpeOps) (FixPt)
-		lift(TpeOps) (MInt)
-		lift(TpeOps) (MFloat)
-		lift(TpeOps) (MBoolean)
-		lift(TpeOps) (MArray)
-		importStrings()
-
-		internal (TpeOps) ("checkFixPtPrec", Nil, (MInt,MInt)::MUnit, effect = simple) implements codegen ($cala, ${
+    // TODO
+		/*internal (TpeOps) ("checkFixPtPrec", Nil, (MInt,MInt)::MUnit, effect = simple) implements codegen ($cala, ${
 			val intPrec = $0
 			val fracPrec = $1
 			val MAX_FIXPT_PRECISION = 64
 			if (intPrec>=MAX_FIXPT_PRECISION)
-				throw new Exception("Integer precision cannot exceed " + (MAX_FIXPT_PRECISION-1) + ": " +
-					intPrec)
+				throw new Exception("Integer precision cannot exceed " + (MAX_FIXPT_PRECISION-1) + ": " + intPrec)
 			if (fracPrec>=MAX_FIXPT_PRECISION)
 				throw new Exception("Fraction precision cannot exceed " + (MAX_FIXPT_PRECISION-1) + ": " + fracPrec)
 			if ((intPrec + fracPrec)>=MAX_FIXPT_PRECISION) {
 				throw new Exception("Sum of integer and fraction precisions cannot exceed "
 					(MAX_FIXPT_PRECISION-1) + ": " + (intPrec + fracPrec))
 			}
-		})
+		})*/
 
-		direct (TpeOps) ("FixPt", Nil, MInt :: FixPt) implements codegen ($cala, ${
-			val int = $0
+    val boolean_to_bit = direct (Tpes) ("cbit", Nil, CBoolean :: Bit)
+    val bit_to_string = direct (Tpes) ("bit_to_string", Nil, Bit :: MString)
+
+
+    val numeric_to_fixpt = direct (Fix) ("fixPt", T, T :: Fix, TNumeric(T))
+    val fixpt_to_string = direct (Fix) ("fixpt_to_string", Nil, Fix :: MString)
+    val fixpt_to_fltpt = direct (Fix) ("fixpt_to_fltpt", Nil, Fix :: Flt)
+
+    val numeric_to_fltpt = direct (Flt) ("fltPt", T, T :: Flt, TNumeric(T))
+    val fltpt_to_string = direct (Flt) ("fltpt_to_string", Nil, Flt :: MString)
+    val fltpt_to_fixpt = direct (Flt) ("fltpt_to_fixpt", Nil, Flt :: Fix)
+
+    infix (Tpes) ("toBit", Nil, SBoolean :: Bit) implements redirect ${ cbit($0) }
+    infix (Bit) ("toString", Nil, Bit :: MString) implements redirect ${ bit_to_string($0) }
+    infix (Bit) ("mkString", Nil, Bit :: MString) implements redirect ${ bit_to_string($0) }
+
+    infix (Tpes) ("toFixPt", T, T :: Fix, TNumeric(T)) implements redirect ${ fixPt($0) }
+    /*infix (Tpes) ("toFixPt", Nil, SInt :: Fix) implements redirect ${ long_to_fixpt($0.toLong) }
+    infix (Tpes) ("toFixPt", Nil, SLong :: Fix) implements redirect ${ long_to_fixpt($0) }
+    infix (Tpes) ("toFixPt", Nil, SFloat :: Fix) implements redirect ${ double_to_fixpt($0.toDouble) }
+    infix (Tpes) ("toFixPt", Nil, SDouble :: Fix) implements redirect ${ double_to_fixpt($0) }*/
+    infix (Fix) ("toString", Nil, Fix :: MString) implements redirect ${ fixpt_to_string($0) }
+    infix (Fix) ("mkString", Nil, Fix :: MString) implements redirect ${ fixpt_to_string($0) }
+    infix (Fix) ("toFltPt", Nil, Fix :: Flt) implements redirect ${ fixpt_to_fltpt($0) }
+
+
+    infix (Tpes) ("toFltPt", T, T :: Flt, TNumeric(T)) implements redirect ${ fltPt($0) }
+    /*infix (Tpes) ("toFltPt", Nil, SInt :: Flt) implements redirect ${ long_to_fltpt($0.toLong) }
+    infix (Tpes) ("toFltPt", Nil, SLong :: Flt) implements redirect ${ long_to_fltpt($0) }
+    infix (Tpes) ("toFltPt", Nil, SFloat :: Flt) implements redirect ${ double_to_fltpt($0.toDouble) }
+    infix (Tpes) ("toFltPt", Nil, SDouble :: Flt) implements redirect ${ double_to_fltpt($0) }*/
+    infix (Flt) ("toString", Nil, Flt :: MString) implements redirect ${ fltpt_to_string($0) }
+    infix (Flt) ("mkString", Nil, Flt :: MString) implements redirect ${ fltpt_to_string($0) }
+    infix (Flt) ("toFixPt", Nil, Flt :: Fix) implements redirect ${ fltpt_to_fixpt($0) }
+
+    fimplicit (Tpes) ("sboolean_to_bit", Nil, SBoolean :: Bit) implements redirect ${ cbit($0) }
+    fimplicit (Tpes) ("sint_to_fixpt", Nil, SInt :: Fix) implements redirect ${ fixPt($0) }
+    fimplicit (Tpes) ("sfloat_to_fltpt", Nil, SFloat :: Flt) implements redirect ${ fltPt($0) }
+
+
+    // --- Scala Backend
+    impl (boolean_to_bit) (codegen($cala, ${ $0 }))
+    impl (bit_to_string) (codegen($cala, ${ $0.toString }))
+
+    impl (numeric_to_fixpt) (codegen($cala, ${ $0.toLong }))
+    impl (fixpt_to_string) (codegen($cala, ${ $0.toString }))
+    impl (fixpt_to_fltpt) (codegen($cala, ${ $0.toDouble }))
+
+    impl (numeric_to_fltpt) (codegen($cala, ${ $0.toDouble }))
+    impl (fltpt_to_string) (codegen($cala, ${ $0.toString }))
+    impl (fltpt_to_fixpt) (codegen($cala, ${ $0.toLong }))
+
+    /*val fix_to_string = internal (FixPt) ("fix_to_string", Nil, (("sign", FixPt), ("int", FixPt), ("frac", FixPt)) :: MString)
+    impl (fix_to_string) (codegen ($cala, ${
+      (if ($sign == 0L) "" else "-") + $int + "." + $frac
+    }))*/
+
+    /*	val int = $0
 			val intPrec = 31
 			val fracPrec = 0
 			if (int > scala.math.pow(2,intPrec))
-				throw new Exception("Integer precision not enough to hold integer value of the fix point: "
-					+ int)
+				throw new Exception("Integer precision not enough to hold integer value " + int)
 			int.toLong
-		})
+		}))*/
 
-		direct (TpeOps) ("FixPt", Nil, (MFloat,MInt,MInt) :: FixPt) implements codegen ($cala, ${
+		/*direct (TpeOps) ("FixPt", Nil, (MFloat,MInt,MInt) :: FixPt) implements codegen ($cala, ${
 			val flt = $0
 			val intPrec = $1
 			val fracPrec = $2
 			if (scala.math.round(flt) > scala.math.pow(2,intPrec))
-				throw new Exception("Integer precision not enough to hold integer value of the fix point: "
-					+ scala.math.round(flt))
+				throw new Exception("Integer precision not enough to hold integer value " + scala.math.round(flt))
 			scala.math.round(flt * scala.math.pow(2,fracPrec)).toLong
-		})
+		})*/
 
-		val FixPtOps = withTpe (FixPt)
+		/*val FixPtOps = withTpe(FixPt)
 		FixPtOps {
 			infix ("getSign") (Nil :: FixPt) implements composite ${
 				val MAX_FIXPT_PRECISION = 64
@@ -96,16 +141,12 @@ trait DHDLTypes {
 				val fracprec = 0
 				($self >> fracprec.toLong).toInt
 			}))
+		}*/
 
-		}
 
-		val fix_to_string = internal (FixPt) ("fix_to_string", Nil, (("sign", FixPt), ("int", FixPt), ("frac", FixPt)) :: MString)
-		impl (fix_to_string) (codegen ($cala, ${
-			(if ($sign == 0L) "" else "-") + $int + "." + $frac
-		}))
 
 		/*TODO: these should be for internal use only. No codegen rules */
-		val IntOps = withTpe (MInt)
+		/*val IntOps = withTpe (MInt)
 		IntOps {
 			val int2fxp = infix ("toFixPt") (Nil::FixPt)
 			impl (int2fxp) (codegen($cala, ${ $self.toLong } ))
@@ -117,19 +158,11 @@ trait DHDLTypes {
 
 			infix ("==") (MInt :: MBoolean) implements codegen ($cala, ${ $self == $1 })
 			infix ("<") (MInt :: MBoolean) implements codegen ($cala, ${ $self < $1 })
-
-		}
-
-		val FloatOps = withTpe (MFloat)
-		FloatOps {
-			val float2fix = infix ("toFixPt") (Nil::FixPt)
-			//TODO: change precision
-			impl (float2fix) (composite ${FixPt($self, 31, 0)})
-		}
+		}*/
 
 		//fimplicit (TpeOps) ("fixpt_to_float", Nil, FixPt::MFloat) implements composite ${ $0.toFloat }
 		//fimplicit (TpeOps) ("float_to_fixpt", Nil, MFloat::FixPt) implements composite ${ $0.toFixPt }
-		fimplicit (TpeOps) ("int_to_fixpt", Nil, MInt::FixPt) implements composite ${ $0.toFixPt }
-		fimplicit (TpeOps) ("sint_to_fixpt", Nil, SInt::FixPt) implements composite ${ unit($0).toFixPt }
+		//fimplicit (TpeOps) ("int_to_fixpt", Nil, MInt::FixPt) implements composite ${ $0.toFixPt }
+		//fimplicit (TpeOps) ("sint_to_fixpt", Nil, SInt::FixPt) implements composite ${ unit($0).toFixPt }
 	}
 }

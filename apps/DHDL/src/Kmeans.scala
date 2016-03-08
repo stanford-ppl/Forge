@@ -3,107 +3,95 @@ import dhdl.library._
 import dhdl.shared._
 import scala.util.Random
 
-object KmeansCompiler extends DHDLApplicationCompiler with Kmeans 
+object KmeansCompiler extends DHDLApplicationCompiler with Kmeans
 object KmeansInterpreter extends DHDLApplicationInterpreter with Kmeans
+trait Kmeans extends DHDLApplication {
 
-trait KmeansTest {
-	def test (sPoints:Seq[Seq[Int]], sNumCents:Int, sDim:Int) = {
-		val sCents = Seq.tabulate(sNumCents){i =>
-			sPoints(i)
-		}
-		def dist(p1:Seq[Int], p2:Seq[Int]):Int = {
-			p1.zip(p2).map{case (d1, d2) => (d1-d2)*(d1-d2)}.reduce(_+_)
-		}
-		var gold = Array.tabulate(sNumCents){i =>
-			Array.tabulate(sDim){d => 0}
-		}
-		val closests = sPoints.map{p =>
-			var minCent = 0
-			var minDist = -1 
-			sCents.zipWithIndex.foreach{case (c, i) =>
-				val currDist = dist(p, c)
-				if ((currDist<minDist) || (minDist < 0)) {
-					minDist = currDist
-					minCent = i
-				}
-			}
-			gold(minCent).zipWithIndex.foreach{case (d, i) => 
-				gold(minCent)(i) = d + p(i)
-			} 
-		}
-		println("points:")
-		println(sPoints.map(p => p.mkString(",")).mkString("\n"))
-		println("cents:")
-		println(sCents.map(c => c.mkString(",")).mkString("\n"))
-		println("newCents:")
-		println(gold.map(c => c.mkString(",")).mkString("\n"))
+  override def stageArgNames = List("tileSize", "dim", "numCents")
+  lazy val tileSize  = stageArgOrElse[Int](0, 4)
+  lazy val dim       = stageArgOrElse[Int](1, 4)
+  lazy val numCents  = stageArgOrElse[Int](2, 4)
+  lazy val numPoints = ArgIn[Fix]("numPoints")
+
+  def kmeans(points: Rep[OffChipMem[Flt]], centroids: Rep[OffChipMem[Flt]]) = {
+    val oldCents = BRAM[Flt](numCents, dim)
+    val newCents = BRAM[Flt](numCents, dim)
+    val centCount = BRAM[Fix](numCents)
+
+    Sequential {
+      // Load initial centroids (from points)
+      points.ld(oldCents, 0, 0, numCents, dim)
+
+      Sequential {
+        val pointsTile = BRAM[Flt](tileSize, dim)
+        Sequential(numPoints by tileSize) { i =>
+          points.ld(pointsTile, i, 0, tileSize, dim)
+
+          Sequential(tileSize by 1){ pt =>
+            val minDist = Reg[Flt](-1.0f) // Minimum distance to closest centroid
+            val minCent = Reg[Fix](0)     // Index of closest centroid
+
+            MetaPipe(numCents by 1){ ct =>
+              val dist = Reg[Flt](0.0f)
+              Pipe(dim by 1, dist){d => (pointsTile(pt, d) - oldCents(ct, d)) ** 2 }{_+_}
+
+              val closer = dist.value < minDist.value || minDist.value < 0f
+              minDist := mux(closer, dist.value, minDist.value)
+              minCent := mux(closer, ct, minCent.value)
+            }
+            // Add point and increment point count
+            Parallel {
+              Pipe(dim by 1){d => newCents(minCent.value, d) = newCents(minCent.value, d) + pointsTile(pt, d) }
+              centCount(minCent.value) = centCount(minCent.value) + 1
+            }
+          } // End of points in tile
+        } // End of point tiles
+        Pipe(numCents by 1, dim by 1){(ct,d) =>
+          newCents(ct, d) = newCents(ct, d) / centCount(ct).toFltPt
+        }
+      } // End of metapipe
+
+      centroids.st(newCents, 0, 0, numCents, dim)
+    }
+  }
+
+  def main() {
+    val points = OffChipMem[Flt]("points", numPoints, dim)  // input points
+    val centroids = OffChipMem[Flt]("centroids", numCents, dim) // output centroids
+    kmeans(points, centroids)
 	}
 }
-trait Kmeans extends DHDLApplication with KmeansTest{
-	def printUsage = {
-    println("Usage: kmeans")
-    exit(-1)
-	}
-  def main() = {
-		val tileSize = 4
-		val sDim = 4
-		val sNumPoints = 16
-		val sNumCents = 4
-		val sPoints = Seq.tabulate(sNumPoints){i =>
-			Seq.tabulate(sDim){d => 
-				Random.nextInt(100)
-			}
-		}
 
-		test(sPoints, sNumCents, sDim)
 
-		val numPoints = ArgIn[FixPt](sNumPoints).value
+object KmeansTestCompiler extends DHDLApplicationCompiler with KmeansTest
+object KmeansTestInterpreter extends DHDLApplicationInterpreter with KmeansTest
+trait KmeansTest extends Kmeans {
+  override def stageArgNames = List("tileSize", "dim", "numCents", "numPoints")
+  lazy val snumPoints  = stageArgOrElse[Int](3, 16)
 
-		val points = OffChipMem[FixPt]("points", sPoints.flatten.map(i => i.toFixPt): _*)
-		val cents = BRAM[FixPt]("cents", tileSize*sNumCents)
-		points.ld(cents,0, 0, sDim, sNumCents, FixPt(sDim))
+  override def main() {
+    val sPoints = Seq.tabulate(snumPoints){i => Seq.tabulate(dim){d => Random.nextInt(100) }}
+    val sCents  = Seq.tabulate(numCents){i => Seq.tabulate(dim){d => sPoints(i)(d) }}
 
-		val ptCtr = CounterChain(Counter(max=5))
-		val accum1 = Reg[FixPt](0)
-		val accum2 = Reg[FixPt](0)
-		MetaReduceMany[FixPt](true, ptCtr, Seq(accum1, accum2), Seq(_+_, _+_)) {case i::_ => 
-			println(i)
-			Seq(i, i)
-		}
-		println(accum1.value)
-		println(accum2.value)
-		//val ptCtr = CounterChain(Counter(max=sDim))
-		//MetaPipe()
-		//
-		//val dimCtr = CounterChain(Counter(max=sDim))
-		//Pipe[Float](1, true, dimCtr, distAccum, _+_,) {case i::_ =>
-		//	
-		//}
-		println("DHDL:")
-		println("points")
-		println(points.mkString)
-		println("cents")
-		println(cents.mkString)
+    def dist(p1:Seq[Int], p2:Seq[Int]):Int = {
+      p1.zip(p2).map{case (d1, d2) => (d1-d2)*(d1-d2)}.reduce(_+_)
+    }
+    val gold = Array.tabulate(numCents){i => Array.tabulate(dim){d => 0}}
 
-		/*
-		val ctrs_out = CounterChain(Counter(max=dataSize/tileSize))
-		val accum_out = ArgOut[FixPt](0)
-		MetaPipe[FixPt](1, true, ctrs_out, accum_out, _+_) {case i::_ => 
-			val bm1 = BRAM[FixPt]("bm1", tileSize)
-			val bm2 = BRAM[FixPt]("bm2", tileSize)
-			Parallel {
-				vec1.ld(bm1, i*tileSize, tileSize)
-				vec2.ld(bm2, i*tileSize, tileSize)
-			}
-			val accum_in = Reg[FixPt]()
-			val ctrs_in = CounterChain(Counter(max=tileSize))
-			Pipe[FixPt](1, true, ctrs_in, accum_in, _+_) { case j::_ =>
-				bm1.ld(j)*bm2.ld(j)
-			}
-			accum_in.value
-		}
+    val closests = sPoints.map{ pt =>
+      val distWithIndex = sCents.map{ct => dist(pt, ct) }
+      val (minDist, minCent) = distWithIndex.zipWithIndex.reduce{(a,b) => if (a._1 < b._1) a else b}
+      gold(minCent).zipWithIndex.foreach{case (d, i) => gold(minCent)(i) = d + pt(i) }
+    }
+    println("points:")
+    sPoints.foreach{pt => println(pt.mkString(",")) }
+    println("centroids:")
+    gold.foreach{pt => println(pt.mkString(",")) }
 
-		assert(accum_out.value==FixPt(gold))
-		*/
-	}
+    val points = OffChipMem.withInit2D("points", sPoints.map(_.map(_.toFltPt)) )
+    val centroids = OffChipMem[Flt]("centroids", numCents, dim)
+    kmeans(points, centroids)
+
+    gold.flatten.zipWithIndex.foreach{case (g, i) => assert(centroids.ld(i) == g) }
+  }
 }

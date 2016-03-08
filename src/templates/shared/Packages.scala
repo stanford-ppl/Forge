@@ -17,6 +17,31 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     stream.println("trait " + dsl + "Application extends " + dsl + " with " + dsl + "Lift {")
     stream.println("  var args: Rep[Array[String]]")
     stream.println("  var stagingArgs: Array[String]")
+
+    // Helper functions for arguments
+    stream.println(s"""  def stageArgNames: List[String] = Nil
+  def argNames: List[String] = Nil
+  def stageArgOrElse[T:Manifest](index: Int, value: T): T = {
+    if (stagingArgs.length <= index) value
+    else {
+      try {
+        manifest[T] match {
+          case v if v == manifest[Boolean] => stagingArgs(index).toBoolean.asInstanceOf[T]
+          case v if v == manifest[Float] => stagingArgs(index).toFloat.asInstanceOf[T]
+          case v if v == manifest[Double] => stagingArgs(index).toDouble.asInstanceOf[T]
+          case v if v == manifest[Long] => stagingArgs(index).toLong.asInstanceOf[T]
+          case v if v == manifest[Int] => stagingArgs(index).toInt.asInstanceOf[T]
+          case v if v == manifest[String] => stagingArgs(index).asInstanceOf[T]
+        }
+      }
+      catch { case e: NumberFormatException =>
+        val name = if (stageArgNames.length > index) stageArgNames(index) else "" + index
+        System.err.println("Error: expected argument " + name + " to be of type " + manifest[T].erasure.getSimpleName + ", given: " + stagingArgs(index))
+        if (!stageArgNames.isEmpty) System.err.println("Usage: " + stageArgNames.mkString(", "))
+        sys.exit(-1)
+      }
+    }
+  }""")
     stream.println("  def main()")
     stream.println("}")
   }
@@ -65,9 +90,9 @@ trait BaseGenPackages extends ForgeCodeGenBase {
 
         stream.println()
       }
-      for (tpe <- NonStructTpes) {
+      /*for (tpe <- NonStructTpes) {
         stream.println("  implicit def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]") // needed?
-      }
+      }*/
     }
     stream.println("}")
     stream.println()

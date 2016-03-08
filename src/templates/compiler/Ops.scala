@@ -86,7 +86,7 @@ trait DeliteGenOps extends BaseGenOps {
     case Def(QuoteSeq(argName)) => "Seq("+unquotes(argName+".map(quote).mkString("+quotes(",")+")")+")"
 
     case Const(s: String) if quoteLiterally => s  // no quotes, wildcards will be replaced later in inline
-    case Const(s: String) => replaceWildcards(super.quote(s))  // quote first, then insert wildcards
+    case Const(s: String) => replaceWildcards(super.quote(x))  // quote first, then insert wildcards
 
     case _ => super.quote(x)
   }
@@ -1087,48 +1087,57 @@ trait DeliteGenOps extends BaseGenOps {
         val generatorRules = rules.flatMap{case (o,i) => i.asInstanceOf[CodeGen].decls.collect{case (k,r) if (k == g) => (o,r)}}
         if (generatorRules.length > 0) {
           stream.println("trait " + g.name + "Gen" + opsGrp.name + " extends " + g.name + "GenFat {")
-          stream.println("  val IR: " + /*opsGrp.name*/ dsl + "Exp")
+          stream.println("  val IR: " + opsGrp.name + "Exp with " + dsl + "MetadataOpsExp")
           stream.println("  import IR._")
           stream.println()
           stream.println("  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {")
           for ((op,r) <- generatorRules) {
             stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(op) + " => ")
 
+            // --- Experimental modified version of gen for codegen rules - may not work 100% yet for cpp/cuda!
+
             // how do we decide whether to add stream.println?
             // hack! (or heuristic, if the glass is half full)
-            def shouldInline(s: String) = !s.startsWith("@")
+            def shouldInline(s: String) = s.startsWith("@")
 
-            val body = r.decl.trim.split(nl).toList.map(_.trim).map{ line =>
-              if (shouldInline(line)) inline(op, line, quoteLiteral)
-              else quote(line)
+            val body = r.decl match {
+              case Const(s: String) => s.trim.split(nl).toList.map(_.trim).flatMap{ line =>
+                if (shouldInline(line)) List( inline(op, line, quoteLiteral) )
+                else quote(line).split(nl).toList
+              }
+              case x => err("Don't know how to generate codegen rules from type " + x.tp)
+            }
+
+            def emitLines(lines: List[String], lineEnd: String = "") = lines.foreach{ line =>
+              if (shouldInline(line)) emitWithIndent(line.drop(1), stream, 6)
+              else emitWithIndent("stream.println(" + line + " + \"" + lineEnd + "\")", stream, 6)
             }
 
             g match {
               case `$cala` =>
                 emitWithIndent("stream.println(\"val \"+quote(sym)+\" = {\")", stream, 6)
-                body.foreach { line =>
-                  if (shouldInline(line)) emitWithIndent(line.drop(1), stream, 6)
-                  else emitWithIndent("stream.println(" + line + ")", stream, 6)
-                }
+                emitLines(body)
                 emitWithIndent("stream.println(\"}\")", stream, 6)
 
               case `cuda` | `cpp` =>
                 if (op.retTpe == MUnit || op.retTpe == MNothing) {
-                  body.foreach{ line =>
-                    if (shouldInline(line)) emitWithIndent(line.drop(1), stream, 6)
-                    else emitWithIndent("stream.println(" + line + ")", stream, 6)
-                  }
-                  emitWithIndent("stream.println(\";\")", stream, 6)
+                  emitLines(body, lineEnd = ";")
                 }
                 else {
+                  if (shouldInline(body.last))
+                    err("Last line of cpp / cuda method must be return expression")
 
+                  emitLines(body.take(body.length - 1), lineEnd = ";")
+                  emitWithIndent("stream.print(remapWithRef(sym.tp) + \" \" + quote(sym) + \" = \")", stream, 6)
+                  emitWithIndent("stream.print(" + body.last + ")", stream, 6)
+                  emitWithIndent("stream.println(\";\")", stream, 6)
                 }
 
-              case _ => throw new RuntimeException("Unsupported codegen: " + g.toString)
+              case _ => err("Unsupported codegen: " + g.toString)
             }
             stream.println()
 
-            val body = quote(r.decl).trim.split(nl).toList
+            /*val body = quote(r.decl).trim.split(nl).toList
 
             val body2 = body map { l => if (!shouldInline(l)) "stream.print("+l+")" else l }
             // use stream.print, since the new lines from the original interpolated code block are still there
@@ -1143,7 +1152,7 @@ trait DeliteGenOps extends BaseGenOps {
                 }
                 else {
                   body2.take(body2.length-1).foreach { line => emitWithIndent(line, stream, 6) }
-                  emitWithIndent("stream.print(remapWithRef(sym.tp) + \" \" + quote(sym) + \" = \")", stream, 6)
+
                   emitWithIndent(body2.last, stream, 6)
                   emitWithIndent("stream.println(\";\")", stream, 6)
                 }

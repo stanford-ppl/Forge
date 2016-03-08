@@ -50,6 +50,20 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     stream.println("}")
     stream.println()
 
+    // metadata ops exp -- used in code generators
+    // HACK: Only expose extern stuff and metadata in code generator to support metadata ops on DSL types
+    stream.println("trait " + dsl + "MetadataOpsExp extends " + dsl + "Metadata with " + dsl + "Identifiers")
+    for (opsGrp <- opsGrps if isMetaType(opsGrp.grp)) {
+      stream.print(" with " + opsGrp.name + "Exp")
+    }
+    for (e <- Externs) {
+      stream.print(" with " + e.opsGrp.name + "Exp")
+    }
+    stream.println(" {")
+    stream.println("  this: " + dsl + "Exp =>")
+    stream.println("}")
+    stream.println()
+
     // scopes
     // NOTE: this currently only works in Delite mode. Is there a way to use scopes and still
     // delegate to a different implementation for interpreter mode?
@@ -71,16 +85,16 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     stream.println()
 
     // Exp
-    stream.println("trait " + dsl + "Exp extends " + dsl + "CompilerOps with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
-    for (opsGrp <- opsGrps) {
+    stream.println("trait " + dsl + "Exp extends " + dsl + "CompilerOps with " + dsl + "MetadataOpsExp with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
+    for (opsGrp <- opsGrps if !isMetaType(opsGrp.grp)) {
       // Group has an op with a set of rewrite rules that doesn't contain a Forwarding rule
       val hasRewrites = unique(opsGrp.ops).exists(o => Rewrites.get(o).map(rules => rules.nonEmpty && !rules.exists(_.isInstanceOf[ForwardingRule])).getOrElse(false))
       val opExpName = if (hasRewrites) opsGrp.grp.name + "RewriteOpsExp" else opsGrp.name + "Exp"
       stream.print(" with " + opExpName)
     }
-    for (e <- Externs) {
+    /*for (e <- Externs) {
       stream.print(" with " + e.opsGrp.name + "Exp")
-    }
+    }*/
     stream.println()
     stream.println(" with DeliteAllOverridesExp {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication => ")

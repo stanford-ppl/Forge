@@ -4,45 +4,21 @@ import dhdl.shared._
 
 object TestCompiler extends DHDLApplicationCompiler with Test
 object TestInterpreter extends DHDLApplicationInterpreter with Test
-
 trait Test extends DHDLApplication {
-  def printUsage = {
-    println("Usage: dotprod")
-    exit(-1)
-  }
-  def main() = {
-    val om = OffChipMem[FixPt]("om", 1, 2, 3, 4, 5)
-    val bm = BRAM[FixPt](5)
-    om.ld(bm, 0, 5)
-    assert(bm.ld(5)!=5)
 
-    val a = FixPt(5)
-    val b = FixPt(7)
-    val r = Reg(a)
-    println(a.mkString)
-    assert(r.value==a)
-    r.write(b)
-    assert(r.value==b)
-    assert(r.init==a)
-    r.reset
-    assert(r.value==a)
+  def main() {
+		val om = OffChipMem.withInit1D("om", Seq(1,2,3,4,5,6).map(_.toFixPt))
+		val bm = BRAM[Fix](6)
+    val out = ArgOut[Fix]("out")
 
-    val m = BRAM[FixPt](16)
-    m.st(3,b)
-    assert(m.ld(3)==b)
+    MetaPipe(6 by 2, out){i =>
+      om.ld(bm, i, 2)
+      val acc = Reg[Fix]("acc")
+      Pipe(0 until 2, acc){ii => bm(ii) }{_+_}
+      acc.value
+    }{_+_}
 
-    val ctr1 = Counter("ctr1", 0, 3, 1)
-    val ctr2 = Counter("ctr2", 0, 4, 1)
-    val ctrs = CounterChain(ctr1, ctr2)
-
-    /*
-    val accBm = BRAM[FixPt](5)
-    BramReduce[FixPt](1, false, ctrs, accBm, (_+_), { case i::_ =>
-      (i, j)
-    })
-    println(accBm.mkString)
-    */
-
-
-  }
+    println("out: " + out.value.mkString)
+    assert(out.value == 21)
+	}
 }

@@ -11,5 +11,11 @@ trait DHDLEnums {
     identifier (RegTpe) ("ArgIn")
 		identifier (RegTpe) ("ArgOut")
     identifier (RegTpe) ("Regular")
-	}
+
+    /* Pipeline style enum */
+    val PipeStyle = tpe("PipeStyle", stage=compile)
+    identifier (PipeStyle) ("Fine")     // inner-loop pipeline
+    identifier (PipeStyle) ("Coarse")   // metapipeline
+    identifier (PipeStyle) ("Disabled") // sequential metapipeline
+  }
 }

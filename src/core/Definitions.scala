@@ -141,8 +141,9 @@ trait Definitions extends DerivativeTypes {
   case object opencl extends CodeGenerator { def name = "OpenCL" }
   case object cpp extends CodeGenerator { def name = "C" }
   case object restage extends CodeGenerator { def name = "Restage" }
+  case object dot extends CodeGenerator { def name = "Dot" }
 
-  val generators = List($cala, cuda, opencl, cpp, restage)
+  val generators = List($cala, cuda, opencl, cpp, restage, dot)
 
   /**
    * Type classes

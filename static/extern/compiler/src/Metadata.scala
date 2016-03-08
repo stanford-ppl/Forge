@@ -9,4 +9,5 @@ trait ScalaGenForgeMetadataOps
 trait CudaGenForgeMetadataOps
 trait OpenCLGenForgeMetadataOps
 trait CGenForgeMetadataOps
+trait DotGenForgeMetadataOps
 

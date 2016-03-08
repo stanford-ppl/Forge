@@ -2,6 +2,7 @@
 *.log
 .DS_Store
 *.swp
+*.symlink
 
 # sbt specific
 dist/*

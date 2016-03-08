@@ -7,7 +7,9 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 object DADLDSLRunner extends ForgeApplicationRunner with DADLDSL
 
 trait DADLDSL extends ForgeApplication
-  with ArchOps with Modules {
+  with ArchOps
+  with NodeOps
+  with Modules {
 
   def dslName = "DADL"
 
@@ -19,10 +21,14 @@ trait DADLDSL extends ForgeApplication
   override def addREPLOverride = false
 
   def specification() = {
-		importDADLArchOps()
+    importCore()
+    importNodes()
     importTuples()
     importModules()
 
+    importStrings()
+
+    // type Wire[T] = Rep[T]
     val T = tpePar("T")
     val rep = tpe("Rep", T, stage=compile)
     primitiveTypes ::= rep
@@ -32,13 +38,11 @@ trait DADLDSL extends ForgeApplication
 		lift(TypeOps) (MInt)
     direct (TypeOps) ("println", List(), List(MAny) :: MUnit, effect = simple) implements codegen($cala, ${ println($0) })
 
-		importStrings()
-
     schedule(IRPrinter)
 
-    // TODO: Change this to list of codegen targets which support feedback (probably just dot and verilog)
-    // after adding in codegen in forge/extern/dadl/compiler/src/ops/ModuleIOOpsExp.scala
-    extern(grp("ModuleIO"), targets = Nil)
+    // TODO: This list should be updated as and when new backend support for feedback is added
+    // Codegen support should be added in forge/extern/dadl/compiler/src/ops/ModuleIOOpsExp.scala
+    extern(grp("ModuleIO"), targets = List(dot))
 
     ()
 	}

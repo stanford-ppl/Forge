@@ -11,3 +11,4 @@ trait ScalaGenReppableOps
 trait CudaGenReppableOps
 trait OpenCLGenReppableOps
 trait CGenReppableOps
+trait DotGenReppableOps

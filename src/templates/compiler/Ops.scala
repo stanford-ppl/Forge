@@ -1156,6 +1156,9 @@ trait DeliteGenOps extends BaseGenOps {
                   emitWithIndent(body2.last, stream, 6)
                   emitWithIndent("stream.println(\";\")", stream, 6)
                 }
+              case `dot` =>
+                val result = body2
+                result.foreach { line => emitWithIndent(line, stream, 6) }
               case _ => throw new RuntimeException("Not supported codgen:" + g.toString)
             }
             stream.println()*/

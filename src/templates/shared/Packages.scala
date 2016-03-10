@@ -42,6 +42,7 @@ trait BaseGenPackages extends ForgeCodeGenBase {
       }
     }
   }""")
+
     stream.println("  def main()")
     stream.println("}")
   }

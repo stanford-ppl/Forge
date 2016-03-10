@@ -27,7 +27,7 @@ trait MatMult extends DHDLApplication {
   lazy val n = ArgIn[Fix]("n")
   lazy val p = ArgIn[Fix]("p")
 
-  def matmult(a: Rep[OffChipMem[Elem]], b: Rep[OffChipMem[Elem]], c: Rep[OffChipMem[Elem]]) = {
+  def matmult(a: Rep[OffChipMem[Elem]], b: Rep[OffChipMem[Elem]], c: Rep[OffChipMem[Elem]]) {
     MetaPipe(m by bm, n by bn){ (i,j) =>
       val tileA = BRAM[Elem](bm, bp)
       val tileB = BRAM[Elem](bp, bn)
@@ -50,39 +50,35 @@ trait MatMult extends DHDLApplication {
   }
 
   def main() = {
+    val M = 8
+    val N = 8
+    val P = 8
+
 		val a = OffChipMem[Elem]("A", m, p)
 		val b = OffChipMem[Elem]("B", p, n)
 		val c = OffChipMem[Elem]("C", m, n)
-    matmult(a, b, c)
-	}
-}
 
+    val sa = Array.fill(M){ Array.fill(P){random[Elem] * 100} }
+    val sb = Array.fill(P){ Array.fill(N){random[Elem] * 100} }
 
-object MatMultTestCompiler extends DHDLApplicationCompiler with MatMultTest
-object MatMultTestInterpreter extends DHDLApplicationInterpreter with MatMultTest
-trait MatMultTest extends MatMult {
+    setArg(m, M)
+    setArg(n, N)
+    setArg(p, P)
+    setMem(a, sa.flatten)
+    setMem(b, sb.flatten)
+    Accel{ matmult(a, b, c) }
 
-  override def stageArgNames = List("bm", "bn", "bp", "m", "n", "p")
-  lazy val sm = stageArgOrElse[Int](3, 8)
-  lazy val sn = stageArgOrElse[Int](4, 8)
-  lazy val sp = stageArgOrElse[Int](5, 8)
-
-  override def main() {
-    val sa = Seq.fill(sm)(Seq.fill(sp)(Random.nextInt(100)))
-    val sb = Seq.fill(sp)(Seq.fill(sn)(Random.nextInt(100)))
-
-    val a = OffChipMem.withInit1D("A", sa.flatten.map(i => i.toFixPt))
-    val b = OffChipMem.withInit1D("B", sb.flatten.map(i => i.toFixPt))
-    val c = OffChipMem[Elem]("C", sm, sn)
-    matmult(a, b, c)
-
-    val cGold = Seq.tabulate(sm){i =>
-      val v1 = sa(i)
-      Seq.tabulate(sn) {j =>
-        val v2 = sb.map{row => row(j)}
-        v1.zip(v2).map{case (a,b) => a*b}.reduce(_+_)
+    val gold = Array.tabulate(M){i =>
+      val aRow = sa(i)
+      Array.tabulate(N){j =>
+        val bCol = sb.map{row => row(j)}
+        aRow.zip(bCol){_*_}.reduce{_+_}
       }
-    }
-    cGold.flatten.zipWithIndex.foreach{case (g, i) => assert( c.ld(i) == g) }
-  }
+    }.flatten
+
+    val result = Array.empty[Fix](M*N)
+    getMem(c, result)
+
+    assert(gold == result)
+	}
 }

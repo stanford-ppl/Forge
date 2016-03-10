@@ -27,34 +27,26 @@ trait OuterProduct extends DHDLApplication {
   }
 
   def main() = {
+    val N = 32
+
     val v1 = OffChipMem[Elem]("vec1", dataSize)
     val v2 = OffChipMem[Elem]("vec2", dataSize)
     val out = OffChipMem[Elem]("out", dataSize, dataSize)
-    outerProduct(v1, v2, out)
+
+    val vec1 = Array.fill(N)(random[Elem])
+    val vec2 = Array.fill(N)(random[Elem])
+
+    // Transfer data and start accelerator
+    setArg(dataSize, N)
+    setMem(v1, vec1)
+    setMem(v2, vec2)
+    Accel{ outerProduct(v1, v2, out) }
+
+    val gold = Array.tabulate(N){i => Array.tabulate(N){j => vec1(i) * vec2(j) }}.flatten
+
+    val result = Array.empty[Fix](N)
+    getMem(out, result)
+
+    assert( result == gold )
 	}
-}
-
-object OuterProductTestCompiler extends DHDLApplicationCompiler with OuterProductTest
-object OuterProductTestInterpreter extends DHDLApplicationInterpreter with OuterProductTest
-trait OuterProductTest extends OuterProduct {
-
-  override def stageArgNames = List("tileSize", "dataSize")
-  lazy val sdataSize = stageArgOrElse[Int](1, 32)
-
-  override def main() {
-    val svec1 = Seq.fill(sdataSize)(Random.nextInt(100))
-    val svec2 = Seq.fill(sdataSize)(Random.nextInt(100))
-    val gold = Seq.tabulate(sdataSize){i =>
-        Seq.tabulate(sdataSize){j =>
-        svec1(i)*svec2(j)
-      }
-    }
-
-    val vec1 = OffChipMem.withInit1D("vec1", svec1.map(i => i.toFixPt))
-    val vec2 = OffChipMem.withInit1D("vec2", svec2.map(i => i.toFixPt))
-    val out  = OffChipMem[Elem]("result", sdataSize, sdataSize)
-    outerProduct(vec1, vec2, out)
-
-    gold.flatten.zipWithIndex.foreach{case (g, i) => assert(out.ld(i) == g) }
-  }
 }

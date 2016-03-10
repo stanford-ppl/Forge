@@ -101,44 +101,36 @@ trait BlackScholes extends DHDLApplication {
   }
 
   def main() {
-    blackscholes(OffChipMem[Fix]("otype", numOptions),
-                 OffChipMem[Flt]("sptprice", numOptions),
-                 OffChipMem[Flt]("strke", numOptions),
-                 OffChipMem[Flt]("rate", numOptions),
-                 OffChipMem[Flt]("volatility", numOptions),
-                 OffChipMem[Flt]("otime", numOptions),
-                 OffChipMem[Flt]("optprice", numOptions)
-                )
+    val N = 32
+
+    val types  = OffChipMem[Fix]("otype", N)
+    val prices = OffChipMem[Flt]("sptprice", N)
+    val strike = OffChipMem[Flt]("strke", N)
+    val rate   = OffChipMem[Flt]("rate", N)
+    val vol    = OffChipMem[Flt]("volatility", N)
+    val time   = OffChipMem[Flt]("otime", N)
+    val optprice = OffChipMem[Flt]("optprice", N)
+
+    val sotype      = Array.fill(N)(randomFix(2))
+    val ssptprice   = Array.fill(N)(random[Flt])
+    val sstrike     = Array.fill(N)(random[Flt])
+    val srate       = Array.fill(N)(random[Flt])
+    val svolatility = Array.fill(N)(random[Flt])
+    val sotime      = Array.fill(N)(random[Flt])
+
+    setArg(numOptions, N)
+    setMem(types, sotype)
+    setMem(prices, ssptprice)
+    setMem(strike, sstrike)
+    setMem(rate, srate)
+    setMem(vol, svolatility)
+    setMem(time, sotime)
+
+    Accel{ blackscholes(types, prices, strike, rate, vol, time, optprice) }
+
+    val out = Array.empty[Flt](N)
+    getMem(optprice, out)
+
+    println(out.mkString(","))
 	}
-}
-
-
-
-object BlackScholesTestCompiler extends DHDLApplicationCompiler with BlackScholesTest
-object BlackScholesTestInterpreter extends DHDLApplicationInterpreter with BlackScholesTest
-trait BlackScholesTest extends BlackScholes {
-  override def stageArgNames = List("tileSize", "sNumOptions")
-
-  lazy val sNumOptions = stageArgOrElse[Int](1, 32)
-
-  override def main() {
-    val sotype      = Seq.fill(sNumOptions)(Random.nextInt(2))
-    val ssptprice   = Seq.fill(sNumOptions)(Random.nextFloat())
-    val sstrike     = Seq.fill(sNumOptions)(Random.nextFloat())
-    val srate       = Seq.fill(sNumOptions)(Random.nextFloat())
-    val svolatility = Seq.fill(sNumOptions)(Random.nextFloat())
-    val sotime      = Seq.fill(sNumOptions)(Random.nextFloat())
-    val optprice    = OffChipMem[Flt]("optprice", sNumOptions)
-
-    blackscholes(
-      OffChipMem.withInit1D("otype", sotype.map(i => i.toFixPt)),
-      OffChipMem.withInit1D("sptprice", ssptprice.map(i => i.toFltPt)),
-      OffChipMem.withInit1D("strke", sstrike.map(i => i.toFltPt)),
-      OffChipMem.withInit1D("rate", srate.map(i => i.toFltPt)),
-      OffChipMem.withInit1D("volatility", svolatility.map(i => i.toFltPt)),
-      OffChipMem.withInit1D("otime", sotime.map(i => i.toFltPt)),
-      optprice
-    )
-    println(optprice.mkString)
-  }
 }

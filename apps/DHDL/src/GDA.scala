@@ -3,7 +3,7 @@ import dhdl.library._
 import dhdl.shared._
 import scala.util.Random
 
-// TODO: Optimize automatically when cTileSize == cols?
+// TODO: How to optimize automatically when cTileSize == cols?
 object GDACompiler extends DHDLApplicationCompiler with GDA
 object GDAInterpreter extends DHDLApplicationInterpreter with GDA
 trait GDA extends DHDLApplication {
@@ -14,10 +14,14 @@ trait GDA extends DHDLApplication {
   lazy val rows = ArgIn[Fix]("rows")
   lazy val cols = ArgIn[Fix]("cols")
 
-  def gda(x: Rep[OffChipMem[Flt]], y: Rep[OffChipMem[Bit]], mu0: Rep[OffChipMem[Flt]], mu1: Rep[OffChipMem[Flt]]) = {
-
+  def gda(
+    x: Rep[OffChipMem[Flt]],
+    y: Rep[OffChipMem[Bit]],
+    mu0: Rep[OffChipMem[Flt]],
+    mu1: Rep[OffChipMem[Flt]],
+    sigma: Rep[OffChipMem[Flt]]
+  ) = {
     val sub = OffChipMem[Flt]("sub", cols)
-    val sigma = OffChipMem[Flt]("sigma", cols, cols)
 
     MetaPipe(rows by rTileSize){ r =>
       val yTile = BRAM[Bit]("yTile", rTileSize)
@@ -59,47 +63,41 @@ trait GDA extends DHDLApplication {
   }
 
   def main() {
-    val x = OffChipMem[Flt]("x", rows, cols)
-    val y = OffChipMem[Bit]("y", rows)
-    val mu0 = OffChipMem[Flt]("mu0", cols)
-    val mu1 = OffChipMem[Flt]("mu1", cols)
-    gda(x, y, mu0, mu1)
-  }
-}
+    val R = 6
+    val C = 8
 
+    val x = OffChipMem[Flt]("x", R, C)
+    val y = OffChipMem[Bit]("y", R)
+    val mu0 = OffChipMem[Flt]("mu0", C)
+    val mu1 = OffChipMem[Flt]("mu1", C)
+    val sigma = OffChipMem[Flt]("sigma", C, C)
 
-object GDATestCompiler extends DHDLApplicationCompiler with GDATest
-object GDATestInterpreter extends DHDLApplicationInterpreter with GDATest
-trait GDATest extends GDA {
+    val sX = Array.tabulate(R){i => Array.tabulate(C){j => random[Flt] * 100.0f }}
+    val sY = Array.tabulate(R){i => random[Bit] }
+    val sMu0 = Array.tabulate(C){i => random[Flt] }
+    val sMu1 = Array.tabulate(C){i => random[Flt] }
 
-  override def stageArgNames = List("rTileSize", "cTileSize", "rows", "cols")
-  lazy val srows = stageArgOrElse[Int](2, 6)
-  lazy val scols = stageArgOrElse[Int](3, 8)
+    // Transfer data and start accelerator
+    setArg(rows, R)
+    setArg(cols, R)
+    setMem(x, sX.flatten)
+    setMem(y, sY)
+    setMem(mu0, sMu0)
+    setMem(mu1, sMu1)
+    Accel{ gda(x, y, mu0, mu1, sigma) }
 
-  override def main() {
-    val sX = Seq.tabulate(srows){i => Seq.tabulate(scols){j => util.Random.nextInt(100)}}
-    val sY = Seq.tabulate(srows){i => util.Random.nextBoolean()}
-    val sMu0 = Seq.tabulate(scols){i => util.Random.nextFloat()*100}
-    val sMu1 = Seq.tabulate(scols){i => util.Random.nextFloat()*100}
-
-    val x = OffChipMem.withInit2D("x", sX.map(_.map(_.toFltPt)))
-    val y = OffChipMem.withInit1D("y", sY.map(_.toBit))
-    val mu0 = OffChipMem.withInit1D("mu0", sMu0.map(_.toFltPt))
-    val mu1 = OffChipMem.withInit1D("mu1", sMu1.map(_.toFltPt))
-
-    val gold = Array.fill(scols,scols){ 0f }
-    sY.zipWithIndex.foreach{ case (yi, r) =>
-      val sub = if (yi) (sX(r), sMu1).zipped.map(_-_) else (sX(r), sMu0).zipped.map(_-_)
-
-      gold.zipWithIndex.foreach{ case(row, i) =>
-        row.zipWithIndex.foreach{ case(elem, j) =>
-          gold(i)(j) = elem + sub(i)*sub(j)
+    val gold: Rep[ForgeArray[Flt]] = sX.zip(sY){ (row, y) =>
+      val sub = if (y) row.zip(sMu1){_-_} else row.zip(sMu0){_-_}
+      Array.tabulate(C){i =>
+        Array.tabulate(C){j =>
+          sub(i) * sub(j)
         }
-      }
-    }
+      }.flatten
+    }.reduce{(a,b) => a.zip(b){_+_}}
 
-    val sigma = gda(x, y, mu0, mu1)
 
-    gold.flatten.zipWithIndex.foreach{ case (g,i) => assert(sigma.ld(i) == g) }
+    val result = Array.empty[Flt](C*C)
+    getMem(sigma, result)
+    assert( result == gold )
   }
 }

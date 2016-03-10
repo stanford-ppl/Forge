@@ -23,7 +23,14 @@ trait DHDLMath {
     def wrapper = Some("ootype")
   }
 
+  object TColl extends TypeClassSignature {
+    def name = "Coll"
+    val prefix = "_cc"
+    def wrapper = Some("cctype")
+  }
+
   def importDHDLMath() {
+    importCollectionOps()
     importNumOps()
     importArithOps()
     importOrderOps()
@@ -32,6 +39,15 @@ trait DHDLMath {
     importBasicControl()
     importLiftingMath()
   }
+
+  // --- Reduceable Type Class
+  def importCollectionOps() {
+    val T = tpePar("T")
+    val Coll = tpeClass("Coll", TColl, T)
+    infix (Coll) ("empty", T, Nil :: T)
+    infix (Coll) ("zeros", T, T :: T)
+  }
+
 
   // --- Num Type Class
   // TODO: Replace with instances of existing Scala Numeric type class?
@@ -85,6 +101,7 @@ trait DHDLMath {
 
 
 	def importPrimitiveMath() {
+    val Coll = lookupGrp("Coll").asInstanceOf[Rep[DSLTypeClass]]
     val Num = lookupGrp("Num").asInstanceOf[Rep[DSLTypeClass]]
     val Arith = lookupGrp("Arith").asInstanceOf[Rep[DSLTypeClass]]
     val Order = lookupGrp("Order").asInstanceOf[Rep[DSLTypeClass]]
@@ -132,6 +149,10 @@ trait DHDLMath {
 
     // --- Type class instances
     // TODO: What should the precision of zero be? Should it take precision as an argument?
+    val FixColl = tpeClassInst("FixColl", Nil, Coll(Fix))
+    infix (FixColl) ("empty", Nil, Nil :: Fix) implements composite ${ 0.toFixPt }
+    infix (FixColl) ("zeros", Nil, Fix :: Fix) implements composite ${ 0.toFixPt }
+
     val FixNum = tpeClassInst("FixNum", Nil, Num(Fix))
     infix (FixNum) ("zero", Nil, Nil :: Fix) implements composite ${ 0.toFixPt }
 
@@ -150,6 +171,10 @@ trait DHDLMath {
     infix (FixOrder) ("eql", Nil, (Fix, Fix) :: Bit) implements composite ${ eql_fix($0, $1) }
 
 
+    val FltColl = tpeClassInst("FltColl", Nil, Coll(Flt))
+    infix (FltColl) ("empty", Nil, Nil :: Flt) implements composite ${ 0.toFltPt }
+    infix (FltColl) ("zeros", Nil, Flt :: Flt) implements composite ${ 0.toFltPt }
+
     val FltNum = tpeClassInst("FltNum", Nil, Num(Flt))
     infix (FltNum) ("zero", Nil, Nil :: Fix) implements composite ${ 0.toFltPt }
 
@@ -167,6 +192,10 @@ trait DHDLMath {
     infix (FltOrder) ("neq", Nil, (Flt, Flt) :: Bit) implements composite ${ neq_flt($0, $1) }
     infix (FltOrder) ("eql", Nil, (Flt, Flt) :: Bit) implements composite ${ eql_flt($0, $1) }
 
+
+    val BitColl = tpeClassInst("BitColl", Nil, Coll(Bit))
+    infix (BitColl) ("empty", Nil, Nil :: Bit) implements composite ${ false.toBit }
+    infix (BitColl) ("zeros", Nil, Bit :: Bit) implements composite ${ false.toBit }
 
     val BitNum = tpeClassInst("BitNum", Nil, Num(Bit))
     infix (BitNum) ("zero", Nil, Nil :: Bit) implements composite ${ false.toBit }

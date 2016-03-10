@@ -7,18 +7,22 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 object DADLDSLRunner extends ForgeApplicationRunner with DADLDSL
 
 trait DADLDSL extends ForgeApplication
-  with ArchOps with Modules {
+  with ArchOps
+  with NodeOps
+  with Modules {
 
   def dslName = "DADL"
 
   override def clearTraversals = true
   disableFusion()
   disableSoA()
+  disableStructUnwrapping()
 
   override def addREPLOverride = false
 
   def specification() = {
-		importDADLArchOps()
+    importCore()
+    importNodes()
     importTuples()
     importModules()
 
@@ -27,15 +31,12 @@ trait DADLDSL extends ForgeApplication
     primitiveTypes ::= rep
     tpeAlias("Wire", rep)
 
-		val TypeOps = grp("TypeOps")
-		lift(TypeOps) (MInt)
-		lift(TypeOps) (MArray)
-    direct (TypeOps) ("println", List(), List(MAny) :: MUnit, effect = simple) implements codegen($cala, ${ println($0) })
-
-		importStrings()
-
     schedule(IRPrinter)
 
+    // TODO: This list should be updated as and when new backend support for feedback is added
+    // Codegen support should be added in forge/extern/dadl/compiler/src/ops/ModuleIOOpsExp.scala
+    extern(grp("ModuleIO"), targets = List(dot))
+
     ()
-	}
+  }
 }

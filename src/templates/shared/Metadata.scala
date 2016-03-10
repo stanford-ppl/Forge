@@ -13,19 +13,19 @@ trait BaseGenMetadata extends ForgeCodeGenBase {
 
   def quoteFunc(f: MetaMeet) = f match {
     case `metaUpdate` => "MetaOverwrite"
-    case `branch` => "BranchAlias"
-    case `mutate` => "UpdateAlias"
+    case `metaInit` => "MetaTypeInit"
+    case `metaAlias` => "MetaAlias"
     case `any` => "_"
   }
 
   // --- Metadata
-  def emitMetadataClasses(base: String, stream: PrintWriter) {
+  def emitMetadataClasses(base: String, stream: PrintWriter, typify: Rep[DSLType] => String = repify) {
     val MetaTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
 
-    val meetFuncs = List(metaUpdate,branch,mutate,any)
+    val meetFuncs = List(metaUpdate,metaInit,metaAlias,any)
 
     stream.println("trait " + dsl + "Metadata extends MetadataOps {")
-    stream.println("  this: " + dsl + base + " =>")
+    stream.println("  this: " + base + " =>")
     stream.println()
     emitBlockComment("DSL metadata types", stream, 2)
     for (tpe <- MetaTpes) {
@@ -43,7 +43,7 @@ trait BaseGenMetadata extends ForgeCodeGenBase {
       stream.print("  case class " + m.name)
       stream.print(makeTpeParsWithBounds(struct.tpe.tpePars))
       stream.print("(")
-      stream.print(struct.fields.map{case (name,tpe) => name + ": " + quote(tpe) }.mkString(", "))
+      stream.print(struct.fields.map{case (name,tpe) => name + ": " + typify(tpe) }.mkString(", "))
       stream.println(") extends Metadata { self =>")
       stream.println("    def _meet(that: self.type)(implicit t: MeetFunc): Metadata = t match {")
       if (meetRules.contains(metaUpdate)) {

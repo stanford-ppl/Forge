@@ -50,6 +50,22 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     stream.println("}")
     stream.println()
 
+    // metadata ops exp -- used in code generators
+    // HACK: Only expose extern stuff and metadata in code generator to support metadata ops on DSL types
+    stream.print("trait " + dsl + "MetadataOpsExp extends " + dsl + "Identifiers")
+    if (hasMetadata) stream.print(" with " + dsl + "Metadata")
+    stream.println()
+    for (opsGrp <- opsGrps if isMetaType(opsGrp.grp)) {
+      stream.print(" with " + opsGrp.name + "Exp")
+    }
+    for (e <- Externs) {
+      stream.print(" with " + e.opsGrp.name + "Exp")
+    }
+    stream.println(" {")
+    stream.println("  this: " + dsl + "Exp =>")
+    stream.println("}")
+    stream.println()
+
     // scopes
     // NOTE: this currently only works in Delite mode. Is there a way to use scopes and still
     // delegate to a different implementation for interpreter mode?
@@ -71,16 +87,16 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     stream.println()
 
     // Exp
-    stream.println("trait " + dsl + "Exp extends " + dsl + "CompilerOps with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
-    for (opsGrp <- opsGrps) {
+    stream.println("trait " + dsl + "Exp extends " + dsl + "CompilerOps with " + dsl + "MetadataOpsExp with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
+    for (opsGrp <- opsGrps if !isMetaType(opsGrp.grp)) {
       // Group has an op with a set of rewrite rules that doesn't contain a Forwarding rule
       val hasRewrites = unique(opsGrp.ops).exists(o => Rewrites.get(o).map(rules => rules.nonEmpty && !rules.exists(_.isInstanceOf[ForwardingRule])).getOrElse(false))
       val opExpName = if (hasRewrites) opsGrp.grp.name + "RewriteOpsExp" else opsGrp.name + "Exp"
       stream.print(" with " + opExpName)
     }
-    for (e <- Externs) {
+    /*for (e <- Externs) {
       stream.print(" with " + e.opsGrp.name + "Exp")
-    }
+    }*/
     stream.println()
     stream.println(" with DeliteAllOverridesExp {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication => ")
@@ -94,7 +110,7 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     for ((o,rules) <- Rewrites if rules.exists(_.isInstanceOf[ForwardingRule])) {
       val forwarder = rules.find(_.isInstanceOf[ForwardingRule]).get.asInstanceOf[ForwardingRule]
       val lines = inline(o, forwarder.rule, quoteLiteral).split(nl)
-      // TODO: Should have better way of determining which version to override
+      // TODO: Should have better way of determining which version to override. Is this even needed?
       val signature = o.name match {
         case "__ifThenElse" | "__whileDo" => makeSyntaxSignature(o)
         case _ => makeOpMethodSignature(o)
@@ -110,25 +126,25 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
 
     val StructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && !FigmentTpes.contains(t) && !isMetaType(t))
     val FigmentStructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && FigmentTpes.contains(t) && !isMetaType(t))
+    val MetaTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
 
     emitBlockComment("DSL types", stream, indent=2)
     for (tpe <- StructTpes) {
       stream.print("  abstract class " + quote(tpe))
-      stream.println(ForgeCollections.get(tpe).map(c => " extends DeliteCollection[" + quote(c.tpeArg) + "]").getOrElse(""))
+      stream.print(ForgeCollections.get(tpe).map(c => " extends DeliteCollection[" + quote(c.tpeArg) + "]").getOrElse(""))
+      //if (ForgeCollections.contains(tpe) && TpeParents.contains(tpe)) stream.print(" with " + quote(TpeParents(tpe)))
+      //else if (TpeParents.contains(tpe)) stream.print(" extends " + quote(TpeParents(tpe)))
+      stream.println()
     }
     for (tpe <- FigmentStructTpes) {
-      stream.print("  abstract class " + quote(tpe))
-      stream.print(ForgeCollections.get(tpe).map(c => " extends DeliteCollection[" + quote(c.tpeArg) + "]").getOrElse(""))
-
-      if (ForgeCollections.contains(tpe) && TpeParents.contains(tpe)) stream.print(" with ")
-      else if (TpeParents.contains(tpe)) stream.print(" extends ")
-
-      stream.print(TpeParents.get(tpe).map(p => quote(p)).getOrElse(""))
+      stream.print("  abstract class " + quote(tpe) + " extends FigmentStruct")
+      stream.print(ForgeCollections.get(tpe).map(c => " with DeliteCollection[" + quote(c.tpeArg) + "]").getOrElse(""))
+      //stream.print(TpeParents.get(tpe).map(p => " with " + quote(p)).getOrElse(""))
       stream.println()
     }
     stream.println()
     emitBlockComment("implicit manifests", stream, indent=2)
-    for (tpe <- StructTpes ++ FigmentStructTpes) {
+    for (tpe <- StructTpes ++ FigmentStructTpes ++ MetaTpes) {
       stream.println("  def m_" + tpe.name + makeTpeParsWithBounds(tpe.tpePars) + " = manifest[" + quote(tpe) + "]")
     }
 
@@ -147,12 +163,11 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     stream.println("  self: " + dsl + "Application with DeliteApplication => ")
     stream.println()
 
-    if (!IR.enableSoA || !IR.enableFusion) {
-      emitBlockComment("Static config settings for DSL", stream, indent=2)
-      if (!IR.enableSoA) stream.println("  Config.soaEnabled = false")
-      if (!IR.enableFusion) stream.println("  Config.opfusionEnabled = false")
-      stream.println()
-    }
+    emitBlockComment("Static config settings for DSL", stream, indent=2)
+    if (!IR.enableSoA) stream.println("  Config.soaEnabled = false")
+    if (!IR.enableFusion) stream.println("  Config.opfusionEnabled = false")
+    if (!IR.enableStructUnwrapping) stream.println("  unwrapStructs = false")
+    stream.println()
     if (!IR.enableSoA && TraversalSchedule.contains(MultiloopSoA)) {
       warn("You've disabled SoA in the compiler but scheduled SoA as a transformer!")
     }

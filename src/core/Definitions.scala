@@ -26,6 +26,7 @@ trait Definitions extends DerivativeTypes {
    */
   lazy val MultiloopSoA = transformer("MultiloopSoA", isExtern = true)
   lazy val IRPrinter = traversal("IRPrinter", isExtern = true)  // For debugging
+  lazy val IRPrinterPlus = traversal("IRPrinterPlus", isExtern = true) // Debugging metadata
 
   /**
    * Built-in types
@@ -79,6 +80,7 @@ trait Definitions extends DerivativeTypes {
   lazy val SUnit = tpe("Unit", stage = compile) // Useful?
   lazy val MNothing = tpe("Nothing")
   lazy val CNothing = tpe("Nothing", stage = now)
+  lazy val SNothing = tpe("Nothing", stage = now)
   lazy val byName = tpe("Thunk")
   def MThunk(ret: Rep[DSLType], freq: Frequency = normal) = ftpe(List(forge_arg("", byName, None)),ret,freq) // TODO
   // unstaged (inlined) functions
@@ -139,8 +141,9 @@ trait Definitions extends DerivativeTypes {
   case object opencl extends CodeGenerator { def name = "OpenCL" }
   case object cpp extends CodeGenerator { def name = "C" }
   case object restage extends CodeGenerator { def name = "Restage" }
+  case object dot extends CodeGenerator { def name = "Dot" }
 
-  val generators = List($cala, cuda, opencl, cpp, restage)
+  val generators = List($cala, cuda, opencl, cpp, restage, dot)
 
   /**
    * Type classes
@@ -192,9 +195,9 @@ trait Definitions extends DerivativeTypes {
    * Metadata meet functions
    * TODO: Add these as needed (not clear how complete this needs to be yet)
    */
-  case object branch extends MetaMeet       // Aliasing from if-then-else
-  case object mutate extends MetaMeet       // Aliasing from data mutation
-  case object metaUpdate extends MetaMeet   // Metadata updates (TODO: Is this needed?)
+  case object metaAlias extends MetaMeet    // Aliasing
+  case object metaInit extends MetaMeet     // Aliasing in type initialization
+  case object metaUpdate extends MetaMeet   // Metadata updates
   case object any extends MetaMeet          // All remaining aliasing forms
 
   // blacklist for op names that cannot be expressed with infix methods
@@ -219,6 +222,7 @@ trait Definitions extends DerivativeTypes {
   case object mutable extends EffectType
   case object simple extends EffectType
   case class write(args: Int*) extends EffectType
+  case class atomicWrite(arg: Int) extends EffectType
   case object global extends EffectType
 
   /**
@@ -338,10 +342,14 @@ trait Definitions extends DerivativeTypes {
    * @param fields   A sequence of tuples of (field type, field initial value)
    */
   def forge_record(tpe: Rep[DSLType], fields: Seq[String], fieldTpes: Seq[Rep[DSLType]], init: Seq[Rep[String]]): OpType
-  // TODO: Change the name of this one to something more descriptive
-  object recordX {
+
+  // Create a record with a set of numbered fields starting with _1 (i.e. _1, _2, etc.). Scala lists and sequences are unpacked and named using _1_1, _1_1, etc.
+  // TODO: Change the name of this one to something more descriptive?
+  object anonRecord {
     def apply(tpe: Rep[DSLType], fields: (Rep[DSLType], String)*) = forge_record(tpe, Nil, fields.map(_._1), fields.map(s => unit(s._2)))
   }
+
+  // Create a record with a set of named fields. Scala lists and sequences are unpacked and named using fieldName_1, fieldName_2, etc.
   object record {
     def apply(tpe: Rep[DSLType], fields: (String, Rep[DSLType], String)*) = forge_record(tpe, fields.map(_._1), fields.map(_._2), fields.map(s => unit(s._3)))
   }

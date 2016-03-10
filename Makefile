@@ -9,18 +9,18 @@ ctags:
 
 dhdl: build
 	cd ${HYPER_HOME} && ${FORGE_HOME}/bin/update ppl.dsl.forge.dsls.dhdl.DHDLDSLRunner DHDL && cd ${FORGE_HOME}
-	ln -s ${HYPER_HOME}/published/DHDL DHDL
+	ln -s ${HYPER_HOME}/published/DHDL DHDL.symlink
 
 dhdl_clean:
-	rm -f DHDL
+	rm -f DHDL.symlink
 	rm -rf ${HYPER_HOME}/published/DHDL
 
 dadl: build
 	cd ${HYPER_HOME} && ${FORGE_HOME}/bin/update ppl.dsl.forge.dsls.dadl.DADLDSLRunner DADL && cd ${FORGE_HOME}
-	ln -s ${HYPER_HOME}/published/DADL DADL
+	ln -s ${HYPER_HOME}/published/DADL DADL.symlink
 
 dadl_clean:
-	rm -f DADL
+	rm -f DADL.symlink
 	rm -rf ${HYPER_HOME}/published/DADL
 
 

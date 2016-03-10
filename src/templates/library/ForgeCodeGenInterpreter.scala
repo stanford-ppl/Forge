@@ -84,7 +84,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
         emitScalaMathImports(implStream)
         emitDSLImports(implStream)
         implStream.println()
-        emitImpls(opsGrp, implStream)
+        emitImpls(opsGrp, implStream, isMetaType(grp))
         implStream.close()
       }
       if (opsGrp.ops.exists(_.backend == libraryBackend)) {
@@ -113,10 +113,16 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     var conj = " extends "
     for ((grp,opsGrp) <- OpsGrp if requiresLibraryBackend(opsGrp)) {
       if (isTpeClass(grp)) {
-        stream.print("conj" + opsGrp.name)
+        stream.print(conj + opsGrp.name)
         conj = " with "
       }
       else if (!isTpeClassInst(grp)) {
+        if (isMetaType(grp)) {
+          stream.print(conj + opsGrp.name)
+          conj = " with "
+          if (opsGrp.ops.exists(_.backend == internalBackend))
+            stream.print(conj + opsGrp.grp.name + "InternalOps")
+        }
         stream.print(conj + grp.name + "Wrapper")
         conj = " with "
         if (opsGrp.ops.exists(requiresImpl)) {
@@ -154,7 +160,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
       emitLMSImports(stream)
       stream.println("import scala.virtualization.lms.common.MetadataOps")
       stream.println()
-      emitMetadataClasses("Base", stream)
+      emitMetadataClasses(dsl + "Base with " + dsl + "Classes", stream, quote)
       stream.close()
     }
   }

@@ -30,10 +30,12 @@ trait DeliteGenImports extends BaseGenImports {
     stream.println("import ppl.delite.framework.codegen.cuda.TargetCuda")
     stream.println("import ppl.delite.framework.codegen.cpp.TargetCpp")
     stream.println("import ppl.delite.framework.codegen.opencl.TargetOpenCL")
+    stream.println("import ppl.delite.framework.codegen.dot.TargetDot")
     stream.println("import ppl.delite.framework.ops._")
     stream.println("import ppl.delite.framework.datastructures._")
     stream.println("import ppl.delite.framework.codegen.delite.overrides._")
     stream.println("import ppl.delite.framework.transform._")
+    stream.println("import ppl.delite.framework.analysis._")
   }
 
   def emitDeliteTraversalImports(stream: PrintWriter) {

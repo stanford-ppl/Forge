@@ -2,7 +2,6 @@
 *.log
 .DS_Store
 *.swp
-*.symlink
 
 # sbt specific
 dist/*
@@ -14,9 +13,6 @@ project/plugins/project/
 
 # Scala-IDE specific
 .scala_dependencies
-
-# IntelliJ IDEA IDE specific
-.idea/
 
 # forge specific
 build

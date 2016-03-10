@@ -445,6 +445,7 @@ trait ScalaOps extends PrimitiveMathGen {
     impl (concat) (codegen(cpp, "string_plus( convert_to_string< " + unquotes("remapWithRef("+opArgPrefix+"0.tp)") + ">(" + quotedArg(0) + "), convert_to_string< " + unquotes("remapWithRef("+opArgPrefix+"1.tp)") + ">(" + quotedArg(1) + "))"))
 
     // TODO: check these combinations to see if they could be condensed or if there is anything missing
+
     infix (Str) ("+", T, (CString, T) :: MString) implements redirect ${ forge_string_plus(unit($0), $1) }
     infix (Str) ("+", T, (MString, T) :: MString) implements redirect ${ forge_string_plus($0, $1) }
     infix (Str) ("+", T, (CString, MVar(T)) :: MString) implements redirect ${ forge_string_plus(unit($0), readVar($1)) }

@@ -54,13 +54,11 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
    * Emit implementation bodies for all ops except codegen, setter, getter, and allocates
    * These implementations are called from Wrapper (ops not generated here are inlined)
    */
-  def emitImpls(opsGrp: DSLOps, stream: PrintWriter, seeBase: Boolean = false) {
+  def emitImpls(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("SingleTask and Composite Impls", stream)
     stream.println()
     stream.println("trait " + opsGrp.grp.name + "WrapperImpl {")
-    stream.print("  this: " + dsl + "Application with " + dsl + "LibraryOps")
-    if (seeBase) stream.print(" with " + dsl + "Base with " + dsl + "Classes") // HACK: Metadata sees everything...
-    stream.println(" => ")
+    stream.println("  this: " + dsl + "Application with " + dsl + "LibraryOps => ")
     stream.println()
     val indent = 2
     for (o <- unique(opsGrp.ops) if requiresImpl(o)) {
@@ -291,23 +289,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   def emitOp(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) = Impls(o) match {
     case codegen:CodeGen =>
       val rule = codegen.decls.getOrElse($cala, err("could not find Scala codegen rule for op: " + o.name))
-
-      var lines = inline(o, rule.decl, quoteLiteral)
-
-      // HACK: inlining eliminates quotes for op args, but references to other variables declared
-      // in emitted lines using @ are also allowed
-      val valr = "@\\s*va[lr]\\s+([^ =]*)\\s*=".r.unanchored
-      val declaredVals = valr.findAllMatchIn(lines).map(_ group 1).map(_.trim).foreach{ name =>
-        lines = lines.replaceAllLiterally(quoteLiteral(quotedArg(name)), name)
-      }
-      lines.split(nl).foreach { line =>
-        // Drop the emission annotation (everything's inlined in the library!)
-        // Note that this means some things can be written which are correct in codegen but not
-        // valid Scala in the library. Extern should typically be used in this case
-        val scalaLine = if (line.startsWith("@")) line.drop(1) else line
-        emitWithIndent(scalaLine, stream, indent)
-      }
-
+      inline(o, rule.decl, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent) }
     case Getter(structArgIndex,field) =>
       emitOverloadShadows(o, stream, indent)
       emitWithIndent(inline(o, quotedArg(o.args.apply(structArgIndex).name)) + "." + field, stream, indent)

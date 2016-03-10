@@ -18,9 +18,9 @@ trait MultiArrayImpls extends FlatMultiArrays { this: OptiMADSL =>
       else if ($0.length % 2 == 0) reductionTree( List.tabulate($0.length/2){i => $1( $0(2*i), $0(2*i+1)) }, $1)
       else reductionTree( List.tabulate($0.length/2){i => $1( $0(2*i), $0(2*i+1)) } :+ $0.last, $1)
     }
-    internal (Utils) ("productTree", Nil, SList(MInt) :: MInt) implements composite ${ reductionTree[Int]($0, {(a,b) => a * b}).head }
-    internal (Utils) ("sumTree", Nil, SList(MInt) :: MInt) implements composite ${ reductionTree[Int]($0, {(a,b) => a + b}).head }
-
+    internal (Utils) ("productTree", Nil, SList(MInt) :: MInt) implements composite ${
+      reductionTree($0, {(a: Rep[Int],b: Rep[Int]) => a * b}).head
+    }
     internal (Utils) ("dimsToStrides", Nil, SList(MInt) :: SList(MInt)) implements composite ${
       List.tabulate($0.length){d =>
         if (d == $0.length - 1) unit(1)
@@ -30,17 +30,6 @@ trait MultiArrayImpls extends FlatMultiArrays { this: OptiMADSL =>
     internal (Utils) ("flattenIndices", Nil, (("indices", SList(MInt)), ("ofs", MInt), ("stride", SList(MInt))) :: MInt) implements composite ${
       List.tabulate($indices.length){i => $indices(i)*$stride(i) }.reduce{_+_} + $ofs
     }
-
-    // Flat offset
-    internal (Utils) ("createFlatViewOfs", Nil, (("targOfs", MInt), ("targStride", SList(MInt)), ("ofs", SList(MInt))) :: MInt) implements composite ${
-      $targOfs + sumTree( $ofs.zip($targStride).map{case (a,b) => a*b} )
-    }
-    internal (Utils) ("createFlatViewStrides", Nil, (("targRank", SInt), ("curRank", SInt), ("targStride", SList(MInt)), ("stride", SList(MInt)), ("unitDims", SList(SInt))) :: SList(MInt)) implements composite ${
-      if ($targRank == $curRank)  $stride.zip($targStride).map{case (a,b) => a*b}
-      else if ($targRank < $curRank) $stride.take($curRank - $targRank) ++ $stride.drop($curRank - $targRank).zip($targStride).map{case (a,b) => a*b}   // Reshape-view
-      else $targStride.zipWithIndex.filterNot{$unitDims contains _._2}.map{_._1}.zip($stride).map{case (a,b) => a*b}                                    // Sub-arity slice
-    }
-
   }
 
   def importMultiArrayImpls() {
@@ -48,76 +37,29 @@ trait MultiArrayImpls extends FlatMultiArrays { this: OptiMADSL =>
 
     val ArrayND = lookupTpe("ArrayND")
     val ImplND  = lookupTpe("ImplND")
-    val Indices = lookupTpe("Indices")
 
-    val Impls = withTpe(ArrayND)
-    Impls {
+    val ImplInfixOps = withTpe(ImplND)
+    ImplInfixOps {
+      // All MultiArray implementation versions are created using Records
+      internal.infix ("dim") (SInt :: MInt) implements composite ${ maimpl_dim($self, $1) }
+      internal.infix ("stride") (SInt :: MInt) implements composite ${ maimpl_stride($self, $1) }
       internal.infix ("ofs") (Nil :: MInt) implements composite ${ maimpl_ofs($self) }
+
       internal.infix ("dims") (Nil :: SList(MInt)) implements composite ${ maimpl_dims($self) }
       internal.infix ("strides") (Nil :: SList(MInt)) implements composite ${ maimpl_strides($self) }
 
-      internal ("maimpl_ofs") (Nil :: MInt) implements composite ${ layout($0) match {
-        case lt if lt.isView => field[Int]($0, "ofs")
-        case _ => unit(0)
-      }}
-      internal ("maimpl_dim") (SInt :: MInt) implements composite ${ layout($0) match {
-        case MLayout(1,Flat,Plain) => array_length($0.asInstanceOf[Rep[ForgeArray[T]]])
-        case _ => field[Int]($0, "dim_" + $1)
-      }}
-      internal ("maimpl_dims") (Nil :: SList(MInt)) implements composite ${ List.tabulate(rank($0)){i => maimpl_dim($0, i) } }
-      internal ("maimpl_size") (Nil :: MInt) implements composite ${ productTree(maimpl_dims($0)) }
+      internal.infix ("size") (Nil :: MInt) implements composite ${ maimpl_size($self) }
+    }
 
-      internal ("maimpl_stride") (SInt :: MInt) implements composite ${ layout($0) match {
-        case lt if lt.isView => field[Int]($0, "stride_" + $1)
-        case _ => throw new Exception("Can't get single stride for non-view")
-      }}
-      internal ("maimpl_strides") (Nil :: SList(MInt)) implements composite ${ layout($0) match {
-        case lt if lt.isView => List.tabulate(rank($0)){i => maimpl_stride($0, i) }
-        case _ => dimsToStrides(maimpl_dims($0))
-      }}
+    val Impls = withTpe(ArrayND)
+    Impls {
+      internal ("maimpl_ofs") (Nil :: MInt) implements composite ${ field[Int]($self, "ofs") }
+      internal ("maimpl_dim") (SInt :: MInt) implements composite ${ field[Int]($self, "dim_" + $1) }
+      internal ("maimpl_stride") (SInt :: MInt) implements composite ${ field[Int]($self, "stride_" + $1) }
+      internal ("maimpl_size") (Nil :: MInt) implements composite ${ productTree(maimpl_dims($self)) }
 
-      internal ("maimpl_apply") (Indices :: T) implements composite ${ layout($0) match {
-        case MLayout(_,Flat,_) => maflat_apply($0, $1)
-        case lt => throw new Exception("Don't know how to implement apply for layout " + lt)
-      }}
-
-      // TODO: Better implementation would use StringBuilder (not sure what c++ equivalent is)
-      // Repeatedly appending to a var is the worst possible implementation in terms of performance
-      internal ("maimpl1d_mkstring") ((MString, T ==> MString) :: MString) implements single ${
-        if ($0 == null) unit("null")
-        else if (maimpl_dim($0, 0) == 0) unit("[ ]")
-        else {
-          val last = maimpl_dim($0, 0) - 1
-          var s = ""
-          for (i <- 0 until last) { s = s + $2(maimpl_apply($0, Indices(i))) + $1 }
-          s + $2(maimpl_apply($0, Indices(last)))
-        }
-      }
-      internal ("maimpl2d_mkstring") ((MString, MString, T ==> MString) :: MString) implements single ${
-        if ($0 == null) unit("null")
-        else if (maimpl_dim($0, 0) == 0) unit("[ ]")
-        else {
-          val lastRow = maimpl_dim($0, 0) - 1
-          val lastCol = maimpl_dim($0, 1) - 1
-          var s = ""
-          for (i <- 0 until lastRow) {
-            for (j <- 0 until lastCol) {
-              s = s + $3(maimpl_apply($0, Indices(i,j))) + $2
-            }
-            s = s + $3(maimpl_apply($0, Indices(i,lastCol))) + $1
-          }
-          for (j <- 0 until lastCol) {
-            s = s + $3(maimpl_apply($0, Indices(lastRow,j))) + $2
-          }
-          s + $3(maimpl_apply($0, Indices(lastRow,lastCol)))
-        }
-      }
-
-      internal ("maimpl_mkstring") ((SList(MString), T ==> MString) :: MString) implements composite ${ rank($0) match {
-        case 1 => maimpl1d_mkstring($0, $1.head, $2)
-        case 2 => maimpl2d_mkstring($0, $1(0), $1(1), $2)
-        case n => throw new Exception("mkString for arrays of rank " + n + " not yet implemented")
-      }}
+      internal ("maimpl_dims") (Nil :: SList(MInt)) implements composite ${ List.tabulate(rank($self)){i => maimpl_dim($self, i) } }
+      internal ("maimpl_strides") (Nil :: SList(MInt)) implements composite ${ List.tabulate(rank($self)){i => maimpl_stride($self, i) } }
     }
 
     // --- Import concrete implementations
@@ -131,20 +73,19 @@ trait FlatMultiArrays { this: OptiMADSL =>
   def importFlatMultiArrayImpls() {
     val T = tpePar("T")
     val Indices = lookupTpe("Indices")
-    val Range   = lookupTpe("Range")
     val ArrayND = lookupTpe("ArrayND")
     val ImplND  = lookupTpe("ImplND")
     val FlatND  = lookupTpe("FlatND")
-    val MLayout  = lookupMeta("MLayout" )
+    val MLayout = lookupMeta("MLayout")
 
     val ArrayNDFlatOps = withTpe(ArrayND)
     ArrayNDFlatOps {
       internal.infix ("asFlat1D") (Nil :: MArray(T)) implements composite ${
-        assert(layout($self) == MLayout(1, Flat, Plain), "Cannot cast to DeliteArray")
+        assert(layout($self) == FlatLayout(1, Plain), "Cannot cast to DeliteArray")
         $self.asInstanceOf[Rep[ForgeArray[T]]]
       }
       internal.infix ("asFlatND") (Nil :: FlatND(T)) implements composite ${
-        assert(layout($self).tpe == Flat, "Cannot cast to flat array implementation")
+        assert(layout($self).layout == 0, "Cannot cast to flat array implementation")
         $self.asInstanceOf[Rep[FlatND[T]]]
       }
     }
@@ -161,8 +102,7 @@ trait FlatMultiArrays { this: OptiMADSL =>
       record(FlatND(T), ("data", MArray(T), ${$0}), ("dim", SList(MInt), ${$1}))
 
     /**
-     * Creates an ND view of a flat array
-     * @param data    - Flat array to be viewed
+     * @param data    - Full flat array to be viewed
      * @param ofs     - Flat offset for view of underlying data (always zero for non-views)
      * @param strides - Strides used to calculate actual flat indices
      * @param dims    - Number of elements contained along each dimension
@@ -174,51 +114,29 @@ trait FlatMultiArrays { this: OptiMADSL =>
       flatview_new($0, unit(0), dimsToStrides($1), $1)
     }
 
-    internal (FlatND) ("maflat_new", T, (SList(MInt), MLayout)  :: FlatND(T)) implements composite ${
+    internal (FlatND) ("maflat_new", T, (SList(MInt), MLayout) :: FlatND(T)) implements composite ${
       val array = $1 match {
-        case MLayout(1,Flat,Plain) => flat1d_new[T]($0.head).asInstanceOf[Rep[FlatND[T]]]
-        case MLayout(n,Flat,Plain) => flatnd_new[T](flat1d_new[T](productTree($0)), $0)
-        case MLayout(n,Flat,View)  => flatview_fake[T](flat1d_new[T](productTree($0)), $0)  // TODO: Does this ever occur?
+        case FlatLayout(1, 0) => flat1d_new[T]($0.head).asInstanceOf[Rep[FlatND[T]]]
+        case FlatLayout(n, 0) => flatnd_new[T](flat1d_new[T](productTree($0)), $0)
+        case FlatLayout(n, 1)  => flatview_fake[T](flat1d_new[T](productTree($0)), $0)  // TODO: Does this ever occur?
         case _ => throw new Exception("Don't know how to implement layout " + $1)
       }
       layout(array) = $1
       (array)
     }
+
     internal (FlatND) ("maflat_new_immutable", T, (SList(MInt), MLayout) :: FlatND(T)) implements composite ${ maflat_new($0, $1) }
 
-    internal (FlatND) ("maflat_view", T, (ArrayND(T), SList(Range), SList(SInt), MLayout)  :: FlatND(T)) implements composite ${
-      if (layout($0).tpe == Flat && $3.tpe == Flat) {
-        val offsets = $1.map(_.start)
-        val strides = $1.map(_.stride)
-        val dims    = $1.map(_.len)
-
-        val newOfs = createFlatViewOfs($0.ofs, $0.strides, offsets)
-        val newStrides = createFlatViewStrides(rank($0), $3.rank, $0.strides, strides, $2)
-
-        val view = layout($0) match {
-          case MLayout(1,Flat,Plain) => flatview_new($0.asFlat1D, newOfs, newStrides, dims)
-          case MLayout(n,Flat,Plain) => flatview_new($0.asFlatND.data, newOfs, newStrides, dims)
-          case MLayout(n,Flat,View)  => flatview_new($0.asFlatND.data, newOfs, newStrides, dims)
-          case _ => throw new Exception("Don't know how to implement layout " + $3 + " from layout " + layout($0))
-        }
-        layout(view) = $3
-        (view)
-      }
-      else throw new Exception("Target and view must both be flat.")
-    }
-
     internal (FlatND) ("maflat_apply", T, (ArrayND(T), Indices) :: T) implements composite ${ layout($0) match {
-      case MLayout(1,Flat,Plain) => flat1d_apply($0.asFlat1D, $1(0))
-      case MLayout(n,Flat,Plain) => flat1d_apply($0.asFlatND.data, flattenIndices($1.toList(n), $0.ofs, $0.strides))
-      case MLayout(n,Flat,View)  => flat1d_apply($0.asFlatND.data, flattenIndices($1.toList(n), $0.ofs, $0.strides))
-      case lt => throw new Exception("Don't know how to implement layout " + lt)
-    }}
-
-    internal (FlatND) ("maflat_update", T, (ArrayND(T), Indices, T) :: MUnit, effect = write(0)) implements composite ${ layout($0) match {
-      case MLayout(1,Flat,Plain) => array_update($0.asFlat1D, $1(0), $2)
-      case MLayout(n,Flat,Plain) => array_update($0.asFlatND.data, flattenIndices($1.toList(n), $0.ofs, $0.strides), $2)
-      // Technically shouldn't normally happen, but may be ok for accumulators in mutable reduce
-      case MLayout(n,Flat,View)  => array_update($0.asFlatND.data, flattenIndices($1.toList(n), $0.ofs, $0.strides), $2)
+      case FlatLayout(1, 0) => flat1d_apply($0.asFlat1D, $1(0))
+      case FlatLayout(n, 0) =>
+        val impl = $0.asFlatND
+        flat1d_apply(impl.data, flattenIndices($1.toList(n), unit(0), dimsToStrides(impl.dims)))
+      case FlatLayout(n, 1) =>
+        val impl = $0.asFlatND
+        flat1d_apply(impl.data, flattenIndices($1.toList(n), impl.ofs, impl.strides))
+      case lt =>
+        throw new Exception("Don't know how to implement layout " + lt)
     }}
 
   }

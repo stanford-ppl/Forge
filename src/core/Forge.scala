@@ -105,7 +105,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   def isForgePrimitiveType(t: Rep[DSLType]) = t match {
     case `MShort` | `MInt` | `MLong` | `MFloat` | `MDouble` | `MBoolean` | `MChar` | `MByte` | `MString` | `MUnit` | `MAny` | `MNothing` | `MLambda` | `MSourceContext` | `byName` => true
     case `CShort` | `CInt` | `CLong` | `CFloat` | `CDouble` | `CBoolean` | `CChar` | `CByte` | `CString` | `CUnit` | `CAny` | `CNothing` => true
-    case `SShort` | `SInt` | `SLong` | `SFloat` | `SDouble` | `SBoolean` | `SChar` | `SByte` | `SString` | `SUnit` | `SAny` | `SList` | `SSeq` => true
+    case `SShort` | `SInt` | `SLong` | `SFloat` | `SDouble` | `SBoolean` | `SChar` | `SByte` | `SString` | `SUnit` | `SAny` | `SList`  => true
     case `SymProps` | `ArrayProps` | `StructProps` | `ScalarProps` | `SOption` => true
     // case Def(Tpe(_,_,`now`)) => true
     case Def(Tpe(name,_,_)) if name.startsWith("Tuple") => true

@@ -58,11 +58,6 @@ trait BaseGenOps extends ForgeCodeGenBase {
     o
   }
 
-  override def quote(x: Any): String = x match {
-    case s: String => quote(Const(x))
-    case _ => super.quote(x)
-  }
-
   override def quote(x: Exp[Any]) : String = x match {
     case Def(QuoteBlockResult(func,args,ret,captured)) if (isThunk(func.tpe)) => func.name
     case Def(QuoteBlockResult(func,args,ret,captured)) => func.name + "(" + replaceWildcards(captured.mkString(",")) + ")"
@@ -250,20 +245,20 @@ trait BaseGenOps extends ForgeCodeGenBase {
    */
 
   // untyped implicit args
-  def makeImplicitCtxBoundsStringList(tpePars: List[Rep[TypePar]]): List[String]  = {
+  def makeImplicitCtxBounds(tpePars: List[Rep[TypePar]]) = {
     tpePars.flatMap { a =>
       a.ctxBounds.map(b => "implicitly["+b.name+"["+quote(a)+"]]")
-    }
+    }.mkString(",")
   }
 
   def makeImplicitArgs(tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLArg]]) = {
-    val ctxBoundsStringList = makeImplicitCtxBoundsStringList(withoutHkTpePars(tpePars))
-    val implicitArgsStringList = implicitArgs.map(quote)
-    val hkInstantiationsStringList = getHkTpeParInstantiations(tpePars, args, implicitArgs).map(quote)
+    val hkInstantiations = getHkTpeParInstantiations(tpePars, args, implicitArgs)
 
     // passing order is: regular ctxBounds, then regular implicits, and finally hkInstantiations context bounds
-    val allImplicitsStringList = ctxBoundsStringList ++ implicitArgsStringList ++ hkInstantiationsStringList
-    if (allImplicitsStringList.length > 0) "(" + allImplicitsStringList.mkString(",") + ")"
+    val ctxBoundsStr = makeImplicitCtxBounds(withoutHkTpePars(tpePars))
+    val ctxBounds2 = if (ctxBoundsStr == "") "" else ctxBoundsStr+","
+    val allImplicitArgs = implicitArgs ++ hkInstantiations
+    if (allImplicitArgs.length > 0) "(" + ctxBounds2 + allImplicitArgs.map(quote).mkString(",") + ")"
     else ""
   }
 
@@ -378,7 +373,6 @@ trait BaseGenOps extends ForgeCodeGenBase {
       "def " + makeOpMethodName(o) + makeOpArgsSignature(o, withReturnTpe)
     // }
   }
-  def makeOpMethodCall(o: Rep[DSLOp]) = makeOpMethodName(o) + makeOpArgs(o, true)
 
   def makeSyntaxSignature(o: Rep[DSLOp], prefix: String = "def ", withReturnTpe: Option[Boolean] = None) = {
     // adding the return type increases verbosity in the generated code, so we omit it by default
@@ -562,7 +556,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     emitWithIndent("val tp = new scala.reflect.RefinedManifest[" + quote(tpe) + "] {", stream, indent)
     emitWithIndent("def runtimeClass = classOf[" + quote(tpe) + "]", stream, indent+2)
     emitWithIndent("val fields = mFields", stream, indent+2)
-    emitWithIndent("override val typeArguments = List(" + tpe.tpeArgs.map{t => "manifest[" + quote(t) + "]"}.mkString(",") + ")", stream, indent+2)
+    emitWithIndent("override val typeArguments = List(" + tpe.tpePars.map{t => "manifest[" + quote(t) + "]"}.mkString(",") + ")", stream, indent+2)
     emitWithIndent("}",stream,indent)
     emitWithIndent("record_new(fFields)(tp)",stream,indent)
   }
@@ -613,7 +607,6 @@ trait BaseGenOps extends ForgeCodeGenBase {
 
     // --- Implicit ops
     val base = emitOpImplicits(traitName + "Base", baseTrait, parentTrait, opsGrp, stream, backend)
-
     stream.println("trait " + traitName + "Ops extends " + base + " {")
     stream.println("  this: " + parentTrait + " => ")
     stream.println()
@@ -668,7 +661,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
         }
 
         val opsClsName = opsGrp.grp.name + tpe.name.replaceAll("\\.","") + tpeArgs.map(_.name).mkString("") + opsClsSuffix + "OpsCls"
-        val implicitParams = if (tpePars.length > 0) makeImplicitCtxBoundsStringList(tpePars).mkString(",") + ",__pos" else "__pos"
+        val implicitParams = if (tpePars.length > 0) makeImplicitCtxBounds(tpePars) + ",__pos" else "__pos"
 
         if (tpe.stage == compile) {
           stream.println("  implicit def liftTo" + opsClsName + makeTpeParsWithBounds(tpePars) + "(x: " + repify(tpe) + ")(implicit __pos: SourceContext) = new " + opsClsName + "(x)(" + implicitParams + ")")

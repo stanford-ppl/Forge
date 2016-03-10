@@ -17,46 +17,36 @@ trait MultiArrayMetadata { this: OptiMADSL =>
     //--------------------------
 
     // --- Implementation form (used for views and buffers)
-    // TODO: Ternary is more general, could be useful to move elsewhere (may want to change naming scheme)
-    val Ternary = tpe("Ternary", stage=compile)
-    identifier (Ternary) ("False_3")
-    identifier (Ternary) ("Partial_3")
-    identifier (Ternary) ("True_3")
+    // TODO: Change to use enums?
+    val ImplForm = metadata("ImplForm", ("v", SInt))
+    meet (ImplForm) ${ if (this != that) ImplForm(1) else that }
 
-    val Form = metadata("Form", ("v", Ternary))
-    onMeet (Form) ${ if (this != that) Form(Partial_3) else that }
-
+    internal (ImplForm) ("NoImpl", Nil, Nil :: ImplForm) implements composite ${ ImplForm(0) }
+    internal (ImplForm) ("PhysImpl", Nil, Nil :: ImplForm) implements composite ${ ImplForm(1) }
+    internal (ImplForm) ("TrueImpl", Nil, Nil :: ImplForm) implements composite ${ ImplForm(2) }
 
     // --- MultiArray isBuffer
-    val MBuffer = metadata("MBuffer", ("form", Form))
-    onMeet (MBuffer) ${ MBuffer(meet(this.form, that.form)) }
-
-    internal.infix (MBuffer) ("isTrue", Nil, MBuffer :: SBoolean) implements composite ${ $0.form.v == True_3 }
-    internal.infix (MBuffer) ("isPhys", Nil, MBuffer :: SBoolean) implements composite ${ $0.form.v == Partial_3 }
-    internal (MBuffer) ("enableBuffer", Nil, MAny :: MUnit, effect = simple) implements composite ${
-      setMetadata($0, MBuffer(Form(True_3)))
-      setUpdated($0)
-    }
+    val MBuffer = metadata("MBuffer", ("impl", ImplForm))
+    meet (MBuffer) ${ MBuffer(meet(this.impl, that.impl)) }
 
     // --- MultiArray isView
-    val MView = metadata("MView", ("form", Form))
-    onMeet (MView) ${ MView(meet(this.form, that.form)) }
+    val MView = metadata("MView", ("impl", ImplForm))
+    meet (MView) ${ MView(meet(this.impl, that.impl)) }
 
-    internal.infix (MView) ("isTrue", Nil, MView :: SBoolean) implements composite ${ $0.form.v == True_3 }
-    internal.infix (MView) ("isPhys", Nil, MView :: SBoolean) implements composite ${ $0.form.v == Partial_3 }
-    internal (MView) ("enableView", Nil, MAny :: MUnit, effect = simple) implements composite ${ setMetadata($0, MView(Form(True_3))) }
+    for (MT <- List(MBuffer,MView)) {
+      internal.infix (MT) ("isTrue", Nil, MT :: SBoolean) implements composite ${ $0.impl == TrueImpl }
+      internal.infix (MT) ("isPhys", Nil, MT :: SBoolean) implements composite ${ $0.impl == PhysImpl }
+    }
 
     // --- MultiArray rank
     val MRank = metadata("MRank", ("rank", SInt))
     val rank = grp("rank")
-    onMeet (MRank) ${ MRank(this.rank) }
+    meet (MRank) ${ MRank(this.rank) }
     canMeet (MRank) ${ this.rank == that.rank }
 
     // --- MultiArray may be updated
     val MayUpdate = metadata("MayUpdate", ("mayUpdate", SBoolean))
-    onMeet (MayUpdate) ${ MayUpdate(this.mayUpdate || that.mayUpdate) }
-
-    internal (MayUpdate) ("setUpdated", Nil, MAny :: MUnit, effect = simple) implements composite ${ setMetadata($0, MayUpdate(true)) }
+    meet (MayUpdate) ${ MayUpdate(this.mayUpdate || that.mayUpdate) }
 
     // TODO: Bit annoying to specify both versions - better way to generate both from one?
     for (T <- List(SymProps, MAny)) {
@@ -87,20 +77,21 @@ trait MultiArrayMetadata { this: OptiMADSL =>
     defaultMetadata(Array3D) ${ MRank(3) }
 
     // --- MultiArray layout
-    val LayoutType = tpe("LayoutType", stage=compile)
-    identifier (LayoutType) ("Flat")
-
-    val LayoutSubtype = tpe("LayoutSubtype", stage=compile)
-    identifier (LayoutSubtype) ("Plain")
-    identifier (LayoutSubtype) ("View")
-    identifier (LayoutSubtype) ("Buffer")
-    identifier (LayoutSubtype) ("BuffView")
-
-    val MLayout = metadata("MLayout", ("rank", SInt), ("tpe", LayoutType), ("subtpe", LayoutSubtype))
-    onMeet (MLayout) ${ that }
+    val MLayout = metadata("MLayout", ("rank", SInt), ("subtype", SInt), ("layout", SInt))
+    meet (MLayout) ${ that }
     canMeet (MLayout) ${ this == that }
 
-    internal.infix (MLayout) ("isView", Nil, MLayout :: SBoolean) implements composite ${ $0.subtpe == View || $0.subtpe == BuffView }
+    // TODO: Change to enums
+    internal (MLayout) ("Plain", Nil, Nil :: SInt) implements composite ${ 0 }
+    internal (MLayout) ("View", Nil, Nil :: SInt) implements composite ${ 1 }
+    internal (MLayout) ("Buffer", Nil, Nil :: SInt) implements composite ${ 2 }
+    internal (MLayout) ("BuffView", Nil, Nil :: SInt) implements composite ${ 3 }
+
+    val FlatLayout = grp("FlatLayout")
+    internal.static (FlatLayout) ("apply", Nil, (SInt,SInt) :: MLayout) implements composite ${ MLayout($0, $1, 0) }
+    internal.static (FlatLayout) ("unapply", Nil, MLayout :: SOption(CTuple2(SInt,SInt))) implements composite ${
+      if ($0.layout == 0) Some(($0.rank, $0.subtype)) else None
+    }
 
     val layout = grp("layout")
 
@@ -112,4 +103,5 @@ trait MultiArrayMetadata { this: OptiMADSL =>
     internal.static (layout) ("update", Nil, (MAny, MLayout) :: MUnit, effect = simple) implements composite ${ setMetadata($0, $1) }
     internal.static (layout) ("update", Nil, (MAny, SOption(MLayout)) :: MUnit, effect = simple) implements composite ${ setMetadata($0, $1) }
   }
+
 }

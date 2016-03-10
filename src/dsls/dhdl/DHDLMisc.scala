@@ -130,6 +130,7 @@ trait DHDLMisc {
     val Bit = lookupTpe("Bit")
     val Fix = lookupTpe("Fix")
     val Flt = lookupTpe("Flt")
+    val LoopRange = lookupTpe("LoopRange")
     val OffChip = lookupTpe("OffChipMem")
     val Reg = lookupTpe("Reg")
     val T = tpePar("T")
@@ -159,12 +160,15 @@ trait DHDLMisc {
     //val flt_to_dbl = internal (Tst) ("flt_to_dbl", Nil, Flt :: MDouble)
     //val dbl_to_flt = internal (Tst) ("dbl_to_flt", Nil, MDouble :: Flt)
     val ifThenElse = direct (Tst) ("__ifThenElse", List(T), List(MBoolean,MThunk(T,cold),MThunk(T,cold)) :: T)
+    val whileDo = direct (Tst) ("__whileDo", Nil, List(MThunk(MBoolean),MThunk(MUnit)) :: MUnit)
+
+    val forLoop = internal (Tst) ("forloop", Nil, (("start", Fix), ("end", Fix), ("step", Fix), ("func", Fix ==> MUnit)) :: MUnit)
+    infix (Tst) ("foreach", Nil, (LoopRange, Fix ==> MUnit) :: MUnit) implements composite ${ forloop($0.start, $0.end, $0.step, $1) }
 
     // --- API
     val println  = direct (Tst) ("println", Nil, MAny :: MUnit, effect = simple)
     val println2 = direct (Tst) ("println", Nil, Nil :: MUnit, effect = simple)
     val assert   = direct (Tst) ("assert", Nil, Bit :: MUnit, effect = simple)
-
 
     direct (Tst) ("setMem", T, (OffChip(T), MArray(T)) :: MUnit, effect = write(0)) implements composite ${ set_mem($0, $1) }
     direct (Tst) ("getMem", T, (OffChip(T), MArray(T)) :: MUnit, effect = write(1)) implements composite ${ get_mem($0, $1) }
@@ -199,6 +203,18 @@ trait DHDLMisc {
         $b[2]
       }
     }))
+    impl (whileDo) (codegen($cala, ${
+      while ($b[0]) {
+        $b[1]
+      }
+    }))
+    impl (forLoop) (codegen($cala, ${
+      var i = $start
+      while (i < $end) {
+        $b[func](i)
+        i += $step
+      }
+    }))
 
     impl (set_mem)  (codegen($cala, ${ System.arraycopy($1, 0, $0, 0, $1.length) }))
     impl (get_mem)  (codegen($cala, ${ System.arraycopy($0, 0, $1, 0, $0.length) }))
@@ -215,5 +231,6 @@ trait DHDLMisc {
 
     // --- Rewrites
     rewrite (ifThenElse) using forwarding ${ delite_ifThenElse($0, $1, $2, false, true) }
+    rewrite (whileDo) using forwarding ${ delite_while($0, $1) }
 	}
 }

@@ -44,7 +44,7 @@ trait DHDLMemories {
 
     // --- Nodes
     val reg_new   = direct (Reg) ("reg_new", T, ("init", T) :: Reg(T), effect = mutable)
-    val reg_read  = direct (Reg) ("reg_read", T, ("reg", Reg(T)) :: T)
+    val reg_read  = direct (Reg) ("reg_read", T, ("reg", Reg(T)) :: T, aliasHint = aliases(Nil))  // aliasHint - extracted value doesn't change when reg is updated
     val reg_write = direct (Reg) ("reg_write", T, (("reg", Reg(T)), ("value", T)) :: MUnit, effect = write(0))
     val reg_reset = direct (Reg) ("reg_reset", T, ("reg", Reg(T)) :: MUnit, effect = write(0))
 

@@ -23,6 +23,8 @@ trait DotProduct extends DHDLApplication {
 			}
       val acc = Reg[Elem]("acc")
 			Pipe(0 until tileSize, acc){ ii => b1(ii) * b2(ii) }{_+_}
+
+      //println("acc @ " + i.mkString + ": " + acc.value.mkString)
       acc.value
 		}{_+_}
 	}

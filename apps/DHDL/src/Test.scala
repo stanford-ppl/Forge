@@ -7,26 +7,47 @@ object TestInterpreter extends DHDLApplicationInterpreter with Test
 trait Test extends DHDLApplication {
 
   def main() {
-		val om = OffChipMem[Fix]("om", 6)
-    val out = ArgOut[Fix]("out")
+		val outer = ArgOut[Fix]
 
-    val arr = Array.tabulate(6){i => i}
+    val v1 = OffChipMem[Fix]("v1", 10)
 
-    setMem(om, arr)
+    val vec1 = Array.fill(10)(randomFix(10))
+    setMem(v1, vec1)
 
     Accel {
-  		val bm = BRAM[Fix](6)
-      MetaPipe(6 by 2, out){i =>
-        om.ld(bm, i, 2)
-        val acc = Reg[Fix]("acc")
-        Pipe(0 until 2, acc){ii => bm(ii) }{_+_}
-        acc.value
+      val b1 = BRAM[Fix]("b1", 5)
+
+      MetaPipe(10 by 5, outer){i =>
+        v1.ld(b1, i, 5)
+        val inner = Reg[Fix]
+        Pipe(0 until 5, inner){ii => b1(ii) ** 2 }{_+_}
+        inner.value
       }{_+_}
     }
 
-    val result = getArg(out)
-    println("expected: 15")
-    println("out: " + result.mkString)
-    assert(result == 15)
-	}
+    val gold = vec1.map{_**2}.reduce{_+_}
+
+    println("outer: " + getArg(outer).mkString + " (should be " + gold.mkString + ")")
+
+    /*val v1 = Array.fill(10)(randomFix(10))
+    val outer = ArgOut[Fix] //Array.empty[Fix](1)
+
+    val blk = Array.empty[Fix](5)
+
+    MetaPipe(10 by 5){i => //for (i <- 0 until 10 by 5) {
+      for (j <- 0 until 5) { blk(j) = v1(i + j) }
+
+      val inner = Reg[Fix] //Array.empty[Fix](1)
+      Pipe(0 until 5) { j =>
+        //inner(0) = inner(0) + blk(j)**2
+        inner := inner.value + blk(j)**2
+      }
+      //outer(0) = outer(0) + inner(0)
+      outer := outer.value + inner.value
+    }
+
+    val gold = v1.map{_**2}.reduce{_+_}
+
+    println("outer: " + outer.value.mkString + " (should be " + gold.mkString + ")")*/
+  }
 }

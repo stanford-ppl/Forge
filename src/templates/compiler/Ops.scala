@@ -17,6 +17,7 @@ trait DeliteGenOps extends BaseGenOps {
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
   import IR._
 
+	
   var activeGenerator: CodeGenerator = _
   private var boundArg: String = _  // bound symbol for the captured variable of a block
 

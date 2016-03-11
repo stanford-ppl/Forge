@@ -70,6 +70,7 @@ trait DHDLMisc {
       array_fromfunction(fix_to_int($0), {i: Rep[Int] => $1(int_to_fix(i)) })
     }
 
+
     val API = grp("ForgeArrayAPI") // ForgeArrayOps already exists...
     infix (API) ("length", T, MArray(T) :: MInt) implements composite ${ array_length($0) }
     infix (API) ("apply", T, (MArray(T), Fix) :: T) implements composite ${ array_apply($0, fix_to_int($1)) }
@@ -122,6 +123,7 @@ trait DHDLMisc {
 
 
   // --- Unsynthesizable operations used for data transfer and/or testing
+  // TODO: getMem should probably take care of allocation too (rather than just copy)
   def importDHDLTestingOps() {
     importArrayAPI()
     importRandomOps()
@@ -171,7 +173,11 @@ trait DHDLMisc {
     val assert   = direct (Tst) ("assert", Nil, Bit :: MUnit, effect = simple)
 
     direct (Tst) ("setMem", T, (OffChip(T), MArray(T)) :: MUnit, effect = write(0)) implements composite ${ set_mem($0, $1) }
-    direct (Tst) ("getMem", T, (OffChip(T), MArray(T)) :: MUnit, effect = write(1)) implements composite ${ get_mem($0, $1) }
+    direct (Tst) ("getMem", T, OffChip(T) :: MArray(T)) implements composite ${
+      val arr = Array.empty[T](productTree(symSizeOf($0)))
+      get_mem($0, arr)
+      arr // could call unsafeImmutable here if desired
+    }
 
     direct (Tst) ("setArg", T, (Reg(T), T) :: MUnit, effect = write(0)) implements composite ${
       if (regtpe($0) != ArgumentIn) stageError("Can only set value of ArgIn registers")

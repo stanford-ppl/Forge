@@ -54,9 +54,9 @@ trait MatMult extends DHDLApplication {
     val N = 8
     val P = 8
 
-		val a = OffChipMem[Elem]("A", m, p)
-		val b = OffChipMem[Elem]("B", p, n)
-		val c = OffChipMem[Elem]("C", m, n)
+		val a = OffChipMem[Elem]("A", M, P)
+		val b = OffChipMem[Elem]("B", P, N)
+		val c = OffChipMem[Elem]("C", M, N)
 
     val sa = Array.fill(M){ Array.fill(P){random[Elem] * 100} }
     val sb = Array.fill(P){ Array.fill(N){random[Elem] * 100} }
@@ -76,9 +76,10 @@ trait MatMult extends DHDLApplication {
       }
     }.flatten
 
-    val result = Array.empty[Fix](M*N)
-    getMem(c, result)
+    val result = getMem(c)
 
+    println("expected: " + gold.mkString(", "))
+    println("result:   " + result.mkString(", "))
     assert(gold == result)
 	}
 }

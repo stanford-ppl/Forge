@@ -8,6 +8,8 @@ object GDACompiler extends DHDLApplicationCompiler with GDA
 object GDAInterpreter extends DHDLApplicationInterpreter with GDA
 trait GDA extends DHDLApplication {
 
+  type Elem = Fix
+
   override def stageArgNames = List("rTileSize", "cTileSize")
   lazy val rTileSize = stageArgOrElse[Int](0, 2)
   lazy val cTileSize = stageArgOrElse[Int](1, 4)
@@ -15,13 +17,13 @@ trait GDA extends DHDLApplication {
   lazy val cols = ArgIn[Fix]("cols")
 
   def gda(
-    x: Rep[OffChipMem[Flt]],
+    x: Rep[OffChipMem[Elem]],
     y: Rep[OffChipMem[Bit]],
-    mu0: Rep[OffChipMem[Flt]],
-    mu1: Rep[OffChipMem[Flt]],
-    sigma: Rep[OffChipMem[Flt]]
-  ) = {
-    val sub = OffChipMem[Flt]("sub", cols)
+    mu0: Rep[OffChipMem[Elem]],
+    mu1: Rep[OffChipMem[Elem]],
+    sigma: Rep[OffChipMem[Elem]]
+  ) {
+    val sub = OffChipMem[Elem]("sub", cols)
 
     MetaPipe(rows by rTileSize){ r =>
       val yTile = BRAM[Bit]("yTile", rTileSize)
@@ -29,24 +31,24 @@ trait GDA extends DHDLApplication {
 
       Sequential(rTileSize by 1){ rr =>
         MetaPipe(cols by cTileSize){ c =>
-          val xTile = BRAM[Flt]("xTile", rTileSize, cTileSize)
-          val mu0Tile = BRAM[Flt]("mu0Tile", cTileSize)
-          val mu1Tile = BRAM[Flt]("mu1Tile", cTileSize)
+          val xTile = BRAM[Elem]("xTile", rTileSize, cTileSize)
+          val mu0Tile = BRAM[Elem]("mu0Tile", cTileSize)
+          val mu1Tile = BRAM[Elem]("mu1Tile", cTileSize)
           Parallel {
             x.ld(xTile, r, c, rTileSize, cTileSize) // Load a tile of x
             mu0.ld(mu0Tile, c, cTileSize)           // Load a tile of mu0
             mu1.ld(mu1Tile, c, cTileSize)           // Load a tile of mu1
           }
-          val subTile = BRAM[Flt]("subTemp", cTileSize)
+          val subTile = BRAM[Elem]("subTemp", cTileSize)
           Pipe(cTileSize by 1){ cc =>
-            subTile(cc) = xTile(rr,cc) - mux(yTile(rr), mu0Tile(cc), mu1Tile(cc))
+            subTile(cc) = xTile(rr,cc) - mux(yTile(rr), mu1Tile(cc), mu0Tile(cc))
           }
           sub.st(subTile, c, cTileSize)
         }
         MetaPipe(cols by cTileSize, cols by cTileSize){ (i,j) =>
-          val subTile1 = BRAM[Flt]("subTile1", cTileSize)
-          val subTile2 = BRAM[Flt]("subTile2", cTileSize)
-          val sigmaTile = BRAM[Flt]("sigmaTile", cTileSize, cTileSize)
+          val subTile1 = BRAM[Elem]("subTile1", cTileSize)
+          val subTile2 = BRAM[Elem]("subTile2", cTileSize)
+          val sigmaTile = BRAM[Elem]("sigmaTile", cTileSize, cTileSize)
           Parallel {
             sub.ld(subTile1, i, cTileSize)
             sub.ld(subTile2, j, cTileSize)
@@ -59,45 +61,51 @@ trait GDA extends DHDLApplication {
         }
       }
     }
-    sigma
   }
 
   def main() {
     val R = 6
     val C = 8
 
-    val x = OffChipMem[Flt]("x", R, C)
+    val x = OffChipMem[Elem]("x", R, C)
     val y = OffChipMem[Bit]("y", R)
-    val mu0 = OffChipMem[Flt]("mu0", C)
-    val mu1 = OffChipMem[Flt]("mu1", C)
-    val sigma = OffChipMem[Flt]("sigma", C, C)
+    val mu0 = OffChipMem[Elem]("mu0", C)
+    val mu1 = OffChipMem[Elem]("mu1", C)
+    val sigma = OffChipMem[Elem]("sigma", C, C)
 
-    val sX = Array.tabulate(R){i => Array.tabulate(C){j => random[Flt] * 100.0f }}
-    val sY = Array.tabulate(R){i => random[Bit] }
-    val sMu0 = Array.tabulate(C){i => random[Flt] }
-    val sMu1 = Array.tabulate(C){i => random[Flt] }
+    val sX = Array.fill(R){ Array.fill(C){ randomFix(10) }} //Array.tabulate(C){j => random[Flt] * 100.0f }}
+    val sY = Array.fill(R){ random[Bit] }
+    val sMu0 = Array.fill(C){ randomFix(10) }
+    val sMu1 = Array.fill(C){ randomFix(10) }
+
+    println("x: " + sX.map(_.mkString(", ")).mkString("\n") )
+    println("y: " + sY.mkString("\n"))
+    println("mu0: " + sMu0.mkString(", "))
+    println("mu1: " + sMu1.mkString(", "))
 
     // Transfer data and start accelerator
     setArg(rows, R)
-    setArg(cols, R)
+    setArg(cols, C)
     setMem(x, sX.flatten)
     setMem(y, sY)
     setMem(mu0, sMu0)
     setMem(mu1, sMu1)
     Accel{ gda(x, y, mu0, mu1, sigma) }
 
-    val gold: Rep[ForgeArray[Flt]] = sX.zip(sY){ (row, y) =>
+    val gold = sX.zip(sY){ (row, y) =>
       val sub = if (y) row.zip(sMu1){_-_} else row.zip(sMu0){_-_}
-      Array.tabulate(C){i =>
-        Array.tabulate(C){j =>
-          sub(i) * sub(j)
-        }
-      }.flatten
+      Array.tabulate(C){i => Array.tabulate(C){j => sub(i) * sub(j) }}.flatten
     }.reduce{(a,b) => a.zip(b){_+_}}
 
+    val result = getMem(sigma)
 
-    val result = Array.empty[Flt](C*C)
-    getMem(sigma, result)
+    val xFlattened = getMem(x)
+    println("x: ")
+    println(xFlattened.mkString(", "))
+
+    println("expected: " + gold.mkString(", "))
+    println("result:   " + result.mkString(", "))
+    println("diff:     " + gold.zip(result){_-_}.mkString(", "))
     assert( result == gold )
   }
 }

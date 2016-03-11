@@ -50,9 +50,9 @@ trait TPCHQ6 extends DHDLApplication {
     val prices = OffChipMem[Flt]("prices", N)
     val out = ArgOut[Flt]("out")
 
-    val sDates  = Array.fill(N){randomFix(35) + 50}
-    val sQuants = Array.fill(N){randomFix(50) }
-    val sDiscts = Array.fill(N){random[Flt]}
+    val sDates  = Array.fill(N){randomFix(20) + 65}
+    val sQuants = Array.fill(N){randomFix(25) }
+    val sDiscts = Array.fill(N){random[Flt] * 0.05f + 0.02f}
     val sPrices = Array.fill(N){random[Flt] * 1000f}
 
     setArg(dataSize, N)
@@ -71,6 +71,9 @@ trait TPCHQ6 extends DHDLApplication {
     val gold = Array.tabulate(N){i => if (conds(i)) sPrices(i) * sDiscts(i) else 0.0f.toFltPt }.reduce{_+_}
 
     val result = getArg(out)
+
+    println("expected: " + gold.mkString)
+    println("result: " + result.mkString)
     assert(result == gold)
 	}
 }

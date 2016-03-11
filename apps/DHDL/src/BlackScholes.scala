@@ -128,8 +128,7 @@ trait BlackScholes extends DHDLApplication {
 
     Accel{ blackscholes(types, prices, strike, rate, vol, time, optprice) }
 
-    val out = Array.empty[Flt](N)
-    getMem(optprice, out)
+    val out = getMem(optprice)
 
     println(out.mkString(","))
 	}

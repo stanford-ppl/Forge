@@ -116,7 +116,7 @@ trait DHDLMemories {
     // --- Nodes
     val bram_new = internal (BRAM) ("bram_new", T, ("size", SInt) :: BRAM(T), effect = mutable)
     val bram_load = internal (BRAM) ("bram_load", T, (("bram", BRAM(T)), ("addr", Fix)) :: T)
-    val bram_store = internal (BRAM) ("bram_store", T, (("bram", BRAM(T)), ("addr", Fix), ("value", T)) :: MUnit, effect = write(0))
+    val bram_store = internal (BRAM) ("bram_store", T, (("bram", BRAM(T)), ("addr", Fix), ("value", T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
     val bram_reset = internal (BRAM) ("bram_reset", T, (("bram", BRAM(T)), ("zero", T)) :: MUnit, effect = write(0))
 
     // --- Internals
@@ -138,6 +138,9 @@ trait DHDLMemories {
       bram_store($0, addr, $2)
     }
 
+    // TODO: Flat addressing currently won't work with this type class instance
+    // Assumes # of indices = # of dimensions of BRAM
+    // TODO: Add size metadata to indices instead?
     direct (BRAM) ("bram_load_inds", T, (BRAM(T), Indices) :: T) implements composite ${
       val inds = $1.toList(sizeOf($0).length)
       bram_load_nd($0, inds)
@@ -147,8 +150,6 @@ trait DHDLMemories {
       bram_store_nd($0, inds, $2)
     }
 
-    // TODO: Flat addressing currently won't work with this type class instance
-    // Assumes # of indices = # of dimensions of BRAM
     val BramMem = tpeClassInst("BramMem", T, TMem(T, BRAM(T)))
     infix (BramMem) ("ld", T, (BRAM(T), Indices) :: T) implements composite ${ bram_load_inds($0, $1) }
     infix (BramMem) ("st", T, (BRAM(T), Indices, T) :: MUnit, effect = write(0)) implements composite ${ bram_store_inds($0, $1, $2) }
@@ -259,7 +260,7 @@ trait DHDLMemories {
       for (i <- 0 until $tileRows) {
         for (j <- 0 until $tileCols) {
           val offaddr  = $offCols*i + j + offchip_offset
-          val bramaddr = $tileRows*i + j
+          val bramaddr = $tileCols*i + j
           $bram(bramaddr.toInt) = $offchip(offaddr.toInt)
         }
       }
@@ -276,7 +277,7 @@ trait DHDLMemories {
       for (i <- 0 until $tileRows) {
         for (j <- 0 until $tileCols) {
           val offaddr  = $offCols*i + j + offchip_offset
-          val bramaddr = $tileRows*i + j
+          val bramaddr = $tileCols*i + j
           $offchip(offaddr.toInt) = $bram(bramaddr.toInt)
         }
       }

@@ -12,11 +12,11 @@ trait OuterProduct extends DHDLApplication {
   lazy val tileSize = stageArgOrElse[Int](0, 2)
   lazy val dataSize = ArgIn[Fix]("dataSize")
 
-  def outerProduct(vec1: Rep[OffChipMem[Elem]], vec2: Rep[OffChipMem[Elem]], out: Rep[OffChipMem[Elem]]) = {
+  def outerProduct(vec1: Rep[OffChipMem[Elem]], vec2: Rep[OffChipMem[Elem]], out: Rep[OffChipMem[Elem]]) {
     MetaPipe(dataSize by tileSize, dataSize by tileSize) { (i,j) =>
       val b1 = BRAM[Elem]("b1", tileSize)
       val b2 = BRAM[Elem]("b2", tileSize)
-      val outTile = BRAM[Elem]("outTile", tileSize*tileSize)
+      val outTile = BRAM[Elem]("outTile", tileSize, tileSize)
       Parallel {
         vec1.ld(b1, i, tileSize)
         vec2.ld(b2, j, tileSize)
@@ -27,11 +27,11 @@ trait OuterProduct extends DHDLApplication {
   }
 
   def main() = {
-    val N = 32
+    val N = 8
 
-    val v1 = OffChipMem[Elem]("vec1", dataSize)
-    val v2 = OffChipMem[Elem]("vec2", dataSize)
-    val out = OffChipMem[Elem]("out", dataSize, dataSize)
+    val v1 = OffChipMem[Elem]("vec1", N)
+    val v2 = OffChipMem[Elem]("vec2", N)
+    val out = OffChipMem[Elem]("out", N, N)
 
     val vec1 = Array.fill(N)(random[Elem])
     val vec2 = Array.fill(N)(random[Elem])
@@ -44,9 +44,10 @@ trait OuterProduct extends DHDLApplication {
 
     val gold = Array.tabulate(N){i => Array.tabulate(N){j => vec1(i) * vec2(j) }}.flatten
 
-    val result = Array.empty[Fix](N)
-    getMem(out, result)
+    val result = getMem(out)
 
+    println("expected: " + gold.mkString(", "))
+    println("result:   " + result.mkString(", "))
     assert( result == gold )
 	}
 }

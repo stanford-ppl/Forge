@@ -95,6 +95,46 @@ trait DHDLMemories {
       @ val init = resetValue($reg)
       $reg.update(0, $init)
     }))
+
+
+    // --- Dot backend
+    impl (reg_new)   (codegen(dot, ${
+			subgraph $sym {
+				@ regtpe(sym) match {
+					@ case Regular => 
+						color="none"
+						label=""
+						@ if (isDblBuf(sym)) {
+								$sym [margin=0, rankdir="LR", label="{<st> \$sym | <ld>}" shape="record" 
+											color="$dblbufBorderColor " style="filled" fillcolor="$regColor "]
+						@ } else {
+								$sym [label= "sym" shape="square" color="$regColor " style="filled" 
+										 fillcolor="$regColor "]
+						@ }
+					@ case ArgIn =>
+          	label = ""
+          	color = "white"
+          	$sym [label="ArgIn_\$sym" shape="Msquare"]
+					@ case ArgOut =>
+          	label = ""
+          	color = "white"
+          	$sym [label="ArgOut_\$sym" shape="Msquare"]
+				@ }
+			}
+		}))
+    impl (reg_read)  (codegen(dot, ${
+			$reg -> $sym
+			$sym [style="invisible" height=0 size=0 margin=0 label=""]
+		}))
+    impl (reg_write) (codegen(dot, ${
+			$value -> $reg
+			$value [style="invisible" height=0 size=0 margin=0 label=""]
+		}))
+    //impl (reg_reset) (codegen(dot, ${
+    //  @ val init = resetValue($reg)
+    //  $reg.update(0, $init)
+    //}))
+
   }
 
   // TODO: Generalize definition of BRAM store to be equivalent to St node in original DHDL?
@@ -175,6 +215,36 @@ trait DHDLMemories {
     impl (bram_store) (codegen($cala, ${ $bram.update($addr.toInt, $value) }))
     impl (bram_reset) (codegen($cala, ${ (0 until $bram.length).foreach{i => $bram.update(i, $zero) }}))
     impl (bram_mkstring) (codegen($cala, ${ "BRAM[" + $0.mkString(", ") + "]" }))
+
+    // --- Dot backend
+    impl (bram_new)   (codegen(dot, ${
+      subgraph $sym {
+      	color="none"
+      	label=""
+      	@ if (isDblBuf(sym)) {
+        	$sym [margin=0 rankdir="LR" label="{<st> \$sym | <ld> }" shape="record"
+								color="$dblbufBorderColor " style="filled" fillcolor="$memColor "]
+      	@ } else {
+      	  	$sym [label="\$sym" shape="square" style="filled" fillcolor="\$memColor"]
+      	@ }
+      }
+		})) // $t[T] refers to concrete type in IR
+		impl (bram_load)  (codegen(dot, ${ 
+			$addr -> $bram [label="addr"] 
+			$addr [style="invisible" height=0 size=0 margin=0 label=""]
+			$bram -> $sym [label="data"]
+			$sym [style="invisible" height=0 size=0 margin=0 label=""]
+		}))
+		impl (bram_store) (codegen(dot, ${ 
+			$addr -> $bram [label="addr"]
+			$addr [style="invisible" height=0 size=0 margin=0 label=""]
+			$value -> $bram [label="data"]
+			$value [style="invisible" height=0 size=0 margin=0 label=""]
+		}))
+		/*
+    impl (bram_reset) (codegen(dot, ${ (0 until $bram.length).foreach{i => $bram.update(i, $zero) }}))
+    impl (bram_mkstring) (codegen(dot, ${ "BRAM[" + $0.mkString(", ") + "]" }))
+		*/
   }
 
 
@@ -313,6 +383,22 @@ trait DHDLMemories {
       "offchip: " + $name + " data: " + "--------->\\n[" + $0.mkString(",") + "]\\n------------------>"
     }))
 
-    impl (offchip_from_array) (codegen($cala, ${ Array.tabulate($arr.length){i => $arr.apply(i)} }))
+		impl (offchip_from_array) (codegen($cala, ${ Array.tabulate($arr.length){i => $arr.apply(i)} }))
+
+		// --- Dot Backend
+		impl (offchip_new) (codegen(dot, ${
+			subgraph $sym {
+				color="none"
+				label=""
+				$sym [label="\$sym" shape="square" fontcolor="white" color="white" style="filled"
+				fillcolor="$offChipColor "]
+				$size -> $sym
+				$size [style="invisible" height=0 size=0 margin=0 label=""]
+			}
+		}))
+		//impl (offchip_load) (codegen(dot, ${
+
+		//}))
+
+		}
 	}
-}

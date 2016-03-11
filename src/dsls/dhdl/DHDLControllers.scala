@@ -66,12 +66,26 @@ trait DHDLControllers {
       infix ("mkString") (Nil :: MString) implements composite ${ counter_makestring($self) }
 		}
 
-    // --- Scala backend
+    // --- Scala Backend
     impl (counter_new) (codegen($cala, ${ ($start until $end by $step) }))
     impl (counter_mkstring) (codegen($cala, ${
       @ val name = nameOf($0)
       "counter(name: " + $name + ", start: " + $0.start + ", end: " + $0.end + ", step: " + $0.step + ")"
     }))
+
+    // --- Dot Backend
+    impl (counter_new) (codegen(dot, ${
+			@ val cic = "\\"" + quote(counterInnerColor) + "\\""
+      $sym [ label="\$sym" shape="box" style="filled,rounded"
+						color=$cic ]
+			$start -> $sym [ label="start" ]
+			$end -> $sym [ label="end" ]
+			$step -> $sym [ label="step" ]
+			$start [style="invisible" height=0 size=0 margin=0 label=""]
+			$end [style="invisible" height=0 size=0 margin=0 label=""]
+			$step [style="invisible" height=0 size=0 margin=0 label=""]
+		}))
+
   }
 
 
@@ -200,6 +214,27 @@ trait DHDLControllers {
       }
     }))
 
+    // --- Dot Backend
+    impl (pipe_parallel) (codegen (dot, ${
+      subgraph $sym {
+      	label = "\$sym"
+      	style = "filled"
+      	fillcolor = "$parallelFillColor "
+      	color = "$parallelBorderColor "
+			}
+			
+		}))
+
+    impl (block_reduce) (codegen(dot, ${
+      subgraph $sym {
+      	label = "\$sym"
+      	style = "filled"
+      	fillcolor = "$mpFillColor "
+      	color = "$mpBorderColor "
+				@ val sym_ctrl = sym + "_ctrl"
+      	$sym_ctrl [label="ctrl" height=0 style="filled" fillcolor="$mpBorderColor "]
+			}
+    }))
 
 		/*val bram_reduce = direct (MetaPipe) ("BramReduce", T, CurriedMethodSignature(List(
 			List(("pipelined", MBoolean), ("ctrs", CounterChain), ("bram", BRAM(T)),

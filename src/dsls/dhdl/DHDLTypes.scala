@@ -80,6 +80,18 @@ trait DHDLTypes {
     impl (fltpt_to_string) (codegen($cala, ${ $0.toString }))
     impl (fltpt_to_fixpt) (codegen($cala, ${ $0.toLong }))
 
+    // --- Dot Backend
+    impl (fixpt_to_fltpt) (codegen(dot, ${
+			$sym [ label="fix2flt" ]
+			$0 -> $sym
+			$0 [style="invisible" height=0 size=0 margin=0 label=""]
+		}))
+    impl (fltpt_to_fixpt) (codegen(dot, ${
+			$sym [ label="flt2fix" ]
+			$0 -> $sym
+			$0 [style="invisible" height=0 size=0 margin=0 label=""]
+		}))
+
     /*val fix_to_string = internal (FixPt) ("fix_to_string", Nil, (("sign", FixPt), ("int", FixPt), ("frac", FixPt)) :: MString)
     impl (fix_to_string) (codegen ($cala, ${
       (if ($sign == 0L) "" else "-") + $int + "." + $frac

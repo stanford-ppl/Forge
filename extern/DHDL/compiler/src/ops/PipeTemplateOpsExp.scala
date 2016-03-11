@@ -1,6 +1,6 @@
 package dhdl.compiler.ops
 
-import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect}
+import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, DotGenEffect}
 import scala.reflect.{Manifest,SourceContext}
 
 import dhdl.shared._
@@ -141,6 +141,39 @@ trait ScalaGenPipeTemplateOps extends ScalaGenEffect {
         emitBlock(stFunc)           // Write back to accumulator
       }
       emitValDef(sym, "()")
+
+    case _ => super.emitNode(sym, rhs)
+  }
+}
+
+trait DotGenPipeTemplateOps extends DotGenEffect {
+  val IR: PipeTemplateOpsExp 
+  import IR._
+
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case e@Counterchain_new(counters) =>
+			stream.println(s"""subgraph cluster_${quote(sym)} {""")
+      //stream.println(s"""	label=\"${quote(sym)}\"""")
+      stream.println("	style=\"rounded, filled\"")
+      stream.println("	fillcolor=\"" + counterColor + "\"")
+			counters.foreach{ ctr =>
+        stream.println(s"""   ${quote(ctr)}""")
+      }
+      stream.println("}")
+
+    case e@Pipe_foreach(cchain, func, inds) =>
+      stream.println(s"""subgraph cluster_${quote(sym)} {""")
+      stream.println(s"""label=\"${quote(sym)}\"""")
+      stream.println(s"""color=\"gray\"""")
+      emitBlock(func)             // Map function
+      stream.println("}")
+
+    case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
+      stream.println(s"""subgraph cluster_${quote(sym)} {""")
+      stream.println(s"""label=\"${quote(sym)}\"""")
+      stream.println(s"""color=\"gray\"""")
+      emitBlock(func)             // Map function
+      stream.println("}")
 
     case _ => super.emitNode(sym, rhs)
   }

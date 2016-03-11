@@ -3,6 +3,7 @@ package dsls
 package dhdl
 
 import core.{ForgeApplication,ForgeApplicationRunner}
+import scala.virtualization.lms.internal.GenericCodegen
 
 object DHDLDSLRunner extends ForgeApplicationRunner with DHDLDSL
 
@@ -59,10 +60,10 @@ trait DHDLDSL extends ForgeApplication
 		importDHDLControllers()
 		importDHDLMisc()
 
-    schedule(IRPrinterPlus)
+    //schedule(IRPrinterPlus)
 
     // Externs
-    extern(grp("PipeTemplate"), targets = List($cala))
+    extern(grp("PipeTemplate"), targets = List($cala, dot))
     extern(grp("MemoryTemplate"), targets = List($cala))
 		()
 	}

@@ -103,8 +103,8 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
     case _ => super.symsFreq(e)
   }
   override def boundSyms(e: Any): List[Sym[Any]] = e match {
-    case Pipe_foreach(_,_,inds) => inds
-    case e: Pipe_reduce[_,_] => e.inds ::: List(e.rV._1, e.rV._2, e.acc, e.res)
+    case Pipe_foreach(chain,func,inds) => inds ::: effectSyms(func) ::: effectSyms(chain)
+    case e: Pipe_reduce[_,_] => e.inds ::: List(e.rV._1, e.rV._2, e.acc, e.res) ::: effectSyms(e.cchain) ::: effectSyms(e.func) ::: effectSyms(e.rFunc) ::: effectSyms(e.ldFunc) ::: effectSyms(e.stFunc) ::: effectSyms(e.accum)
     case _ => super.boundSyms(e)
   }
 }

@@ -56,14 +56,18 @@ trait Kmeans extends DHDLApplication {
   }
 
   def main() {
-    val points = OffChipMem[Flt]("points", numPoints, dim)  // input points
+    val N = 16
+
+    val points = OffChipMem[Flt]("points", N, dim)  // input points
     val centroids = OffChipMem[Flt]("centroids", numCents, dim) // output centroids
-    kmeans(points, centroids)
+
+    setArg(numPoints, N)
+    Accel{ kmeans(points, centroids) }
 	}
 }
 
 
-object KmeansTestCompiler extends DHDLApplicationCompiler with KmeansTest
+/*object KmeansTestCompiler extends DHDLApplicationCompiler with KmeansTest
 object KmeansTestInterpreter extends DHDLApplicationInterpreter with KmeansTest
 trait KmeansTest extends Kmeans {
   override def stageArgNames = List("tileSize", "dim", "numCents", "numPoints")
@@ -94,4 +98,4 @@ trait KmeansTest extends Kmeans {
 
     gold.flatten.zipWithIndex.foreach{case (g, i) => assert(centroids.ld(i) == g) }
   }
-}
+}*/

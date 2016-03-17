@@ -29,22 +29,22 @@ trait DHDLMemories {
     infix (Mem) ("st", (T,C), (C, Indices, T) :: MUnit, effect = write(0))
   }
 
-  // TODO: ArgIn should be immutable (shouldn't be able to write to an input argument)
-  // TODO: Register initial values should be restricted to a constant value
+  // TODO: Register initial values should be restricted to a constant value. Some way of doing this?
   // TODO: Should we allow ArgIn / ArgOut with no given name? Way of automatically numbering them instead?
   // TODO: Better / more correct way of exposing register reset?
-  // TODO: Should we allow general access of initial value of register using reg.init? Only for debugging?
-  // TODO: Add implicit reset in the scope in which a register is created?
-  // TODO: Implicit from Reg to Reg.value?
+  // TODO: Add implicit reset in the scope in which a register is created? Immediately after reg_create?
   def importRegs() {
     val T = tpePar("T")
+    val Fix = lookupTpe("Fix")
+    val Flt = lookupTpe("Flt")
+    val Bit = lookupTpe("Bit")
     val Reg = lookupTpe("Reg")
     val RegTpe = lookupTpe("RegTpe", stage=compile)
     val Indices = lookupTpe("Indices")
 
     // --- Nodes
     val reg_new   = direct (Reg) ("reg_new", T, ("init", T) :: Reg(T), effect = mutable)
-    val reg_read  = direct (Reg) ("reg_read", T, ("reg", Reg(T)) :: T)
+    val reg_read  = direct (Reg) ("reg_read", T, ("reg", Reg(T)) :: T, aliasHint = aliases(Nil))  // aliasHint - extracted value doesn't change when reg is updated
     val reg_write = direct (Reg) ("reg_write", T, (("reg", Reg(T)), ("value", T)) :: MUnit, effect = write(0))
     val reg_reset = direct (Reg) ("reg_reset", T, ("reg", Reg(T)) :: MUnit, effect = write(0))
 
@@ -70,22 +70,27 @@ trait DHDLMemories {
     static (Reg) ("apply", T, Nil :: Reg(T), TNum(T)) implements composite ${ reg_create[T](None, zero[T], Regular) }
 
     /* ArgIn */
-    direct (Reg) ("ArgIn", T, (SString, T) :: T, TNum(T)) implements composite ${ reg_create[T](Some($0), $1, ArgIn).value }
-    direct (Reg) ("ArgIn", T, SString :: T, TNum(T)) implements composite ${ reg_create[T](Some($0), zero[T], ArgIn).value }
-    direct (Reg) ("ArgIn", T, T :: T, TNum(T)) implements composite ${ reg_create[T](None, $0, ArgIn).value }
-    direct (Reg) ("ArgIn", T, Nil :: T, TNum(T)) implements composite ${ reg_create[T](None, zero[T], ArgIn).value }
+    direct (Reg) ("ArgIn", T, ("name", SString) :: Reg(T), TNum(T)) implements composite ${ reg_create[T](Some($name), zero[T], ArgumentIn) }
+    direct (Reg) ("ArgIn", T, Nil :: Reg(T), TNum(T)) implements composite ${ reg_create[T](None, zero[T], ArgumentIn) }
 
     /* ArgOut */
-    direct (Reg) ("ArgOut", T, SString :: Reg(T), TNum(T)) implements composite ${ reg_create[T](Some($0), zero[T], ArgOut) }
-    direct (Reg) ("ArgOut", T, Nil :: Reg(T), TNum(T)) implements composite ${ reg_create[T](None, zero[T], ArgOut) }
+    direct (Reg) ("ArgOut", T, ("name", SString) :: Reg(T), TNum(T)) implements composite ${ reg_create[T](Some($name), zero[T], ArgumentOut) }
+    direct (Reg) ("ArgOut", T, Nil :: Reg(T), TNum(T)) implements composite ${ reg_create[T](None, zero[T], ArgumentOut) }
 
     val Reg_API = withTpe(Reg)
     Reg_API {
       infix ("value") (Nil :: T) implements composite ${ reg_read($self) }
-      //infix ("init") (Nil :: T) implements composite ${ resetValue($self) }
-      infix (":=") (T :: MUnit, effect = write(0)) implements composite ${ reg_write($self, $1) }
+      infix (":=") (T :: MUnit, effect = write(0)) implements composite ${
+        if (regtpe($self) == ArgumentIn) stageError("Writing to an input argument is disallowed")
+        reg_write($self, $1)
+      }
       infix ("rst") (Nil :: MUnit, effect = write(0)) implements composite ${ reg_reset($self) }
     }
+
+    // TODO: Should warn/error if not an ArgIn?
+    fimplicit (Reg) ("regFix_to_fix", Nil, Reg(Fix) :: Fix) implements composite ${ reg_read($0) }
+    fimplicit (Reg) ("regFlt_to_flt", Nil, Reg(Flt) :: Flt) implements composite ${ reg_read($0) }
+    fimplicit (Reg) ("regBit_to_bit", Nil, Reg(Bit) :: Bit) implements composite ${ reg_read($0) }
 
     // --- Scala backend
     impl (reg_new)   (codegen($cala, ${ Array($init) }))
@@ -137,6 +142,7 @@ trait DHDLMemories {
 
   }
 
+
   // TODO: Generalize definition of BRAM store to be equivalent to St node in original DHDL?
   // TODO: Check precision to make sure load/store address is an integer
   // TODO: Should dimensionality mismatches be errors or warnings? Either way, need source context
@@ -150,9 +156,8 @@ trait DHDLMemories {
     // --- Nodes
     val bram_new = internal (BRAM) ("bram_new", T, ("size", SInt) :: BRAM(T), effect = mutable)
     val bram_load = internal (BRAM) ("bram_load", T, (("bram", BRAM(T)), ("addr", Fix)) :: T)
-    val bram_store = internal (BRAM) ("bram_store", T, (("bram", BRAM(T)), ("addr", Fix), ("value", T)) :: MUnit, effect = write(0))
+    val bram_store = internal (BRAM) ("bram_store", T, (("bram", BRAM(T)), ("addr", Fix), ("value", T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
     val bram_reset = internal (BRAM) ("bram_reset", T, (("bram", BRAM(T)), ("zero", T)) :: MUnit, effect = write(0))
-    val bram_mkstring = internal (BRAM) ("bram_makestring", T, BRAM(T) :: MString)
 
     // --- Internals
     internal (BRAM) ("bram_create", T, (SOption(SString), SList(SInt)) :: BRAM(T)) implements composite ${
@@ -173,6 +178,9 @@ trait DHDLMemories {
       bram_store($0, addr, $2)
     }
 
+    // TODO: Flat addressing currently won't work with this type class instance
+    // Assumes # of indices = # of dimensions of BRAM
+    // TODO: Add size metadata to indices instead?
     direct (BRAM) ("bram_load_inds", T, (BRAM(T), Indices) :: T) implements composite ${
       val inds = $1.toList(sizeOf($0).length)
       bram_load_nd($0, inds)
@@ -182,8 +190,6 @@ trait DHDLMemories {
       bram_store_nd($0, inds, $2)
     }
 
-    // TODO: Flat addressing currently won't work with this type class instance
-    // Assumes # of indices = # of dimensions of BRAM
     val BramMem = tpeClassInst("BramMem", T, TMem(T, BRAM(T)))
     infix (BramMem) ("ld", T, (BRAM(T), Indices) :: T) implements composite ${ bram_load_inds($0, $1) }
     infix (BramMem) ("st", T, (BRAM(T), Indices, T) :: MUnit, effect = write(0)) implements composite ${ bram_store_inds($0, $1, $2) }
@@ -206,7 +212,6 @@ trait DHDLMemories {
       infix ("update") ((SSeq(Fix), T) :: MUnit, effect = write(0)) implements composite ${ bram_store_nd($self, $1.toList, $2) }
 
 			infix ("rst") (Nil :: MUnit, TNum(T), effect = write(0)) implements composite ${ bram_reset($self, zero[T]) }
-      infix ("mkString") (Nil :: MString) implements composite ${ bram_mkstring($self) }
 		}
 
     // --- Scala backend
@@ -214,7 +219,6 @@ trait DHDLMemories {
     impl (bram_load)  (codegen($cala, ${ $bram.apply($addr.toInt) }))
     impl (bram_store) (codegen($cala, ${ $bram.update($addr.toInt, $value) }))
     impl (bram_reset) (codegen($cala, ${ (0 until $bram.length).foreach{i => $bram.update(i, $zero) }}))
-    impl (bram_mkstring) (codegen($cala, ${ "BRAM[" + $0.mkString(", ") + "]" }))
 
     // --- Dot backend
     impl (bram_new)   (codegen(dot, ${
@@ -243,11 +247,11 @@ trait DHDLMemories {
 		}))
 		/*
     impl (bram_reset) (codegen(dot, ${ (0 until $bram.length).foreach{i => $bram.update(i, $zero) }}))
-    impl (bram_mkstring) (codegen(dot, ${ "BRAM[" + $0.mkString(", ") + "]" }))
 		*/
   }
 
-
+  // TODO: Size of offchip memory can be a staged value, but it can't be a value which is calculated in hardware
+  //       Any way to make this distinction?
   // TODO: Can probably change tile load/store "start" to a single flat offset
   // TODO: Change interface of tile load / store to words rather than BRAMs?
   // TODO: Improve syntax for tile load + store?
@@ -280,41 +284,12 @@ trait DHDLMemories {
                                                                 ) :: MUnit,
                                                                 effect = write(0), aliasHint = aliases(Nil))
 
-    // --- Scala Debugging Nodes
-    val offchip_apply = internal (OffChip) ("offchip_apply", T, (OffChip(T), Fix) :: T)
-    val offchip_mkstring = internal (OffChip) ("offchip_makestring", T, (OffChip(T)) :: MString)
-    val offchip_from_array = internal (OffChip) ("offchip_from_array", T, ("arr", MArray(T)) :: OffChip(T), effect = mutable)
-
     // --- Internals
     internal (OffChip) ("offchip_create", T, (SOption(SString), SSeq(Fix)) :: OffChip(T)) implements composite ${
       val offchip = offchip_new[T](productTree($1.toList))
       $0.foreach{name => nameOf(offchip) = name }
       symSizeOf(offchip) = if ($1.length == 1) 1.toFixPt +: $1.toList else $1.toList // 1D should be a row, not a column
       offchip
-    }
-
-    internal (OffChip) ("offchip_fromseq", T, (SOption(SString), SSeq(T), SSeq(SInt)) :: OffChip(T)) implements composite ${
-      val offchip = offchip_from_array(array_fromseq[T]($1))
-      $0.foreach{name => nameOf(offchip) = name }
-      symSizeOf(offchip) = if ($2.length == 1) 1.toFixPt +: $2.toList.map(_.toFixPt) else $2.toList.map(_.toFixPt)
-      offchip
-    }
-
-
-    // --- Debugging API
-    // Initialize OffChipMem to constant values. These apply functions are for Scala testing purpose only!
-    // Changed name (ambiguous with arbitrary dimensions otherwise)
-    static (OffChip) ("withInit1D", T, (SString, SSeq(T)) :: OffChip(T), TNum(T)) implements composite ${ offchip_fromseq(Some($0), $1, Seq($1.length)) }
-    static (OffChip) ("withInit1D", T, SSeq(T) :: OffChip(T), TNum(T)) implements composite ${ offchip_fromseq(None, $0, Seq($0.length)) }
-
-    static (OffChip) ("withInit2D", T, (SString, SSeq(SSeq(T))) :: OffChip(T), TNum(T)) implements composite ${ offchip_fromseq(Some($0), $1.flatten, Seq($1.length, $1.head.length)) }
-    static (OffChip) ("withInit2D", T, SSeq(SSeq(T)) :: OffChip(T), TNum(T)) implements composite ${ offchip_fromseq(None, $0.flatten, Seq($0.length, $0.head.length)) }
-
-    val OffChip_DebugAPI = withTpe(OffChip)
-    OffChip_DebugAPI {
-      // Load single element from OffChip. This load is for Scala testing purpose only!
-      infix ("ld") (Fix :: T) implements composite ${ offchip_apply($self, $1) }
-      infix ("mkString") (Nil :: MString) implements composite ${ offchip_makestring($self) }
     }
 
     // --- API
@@ -354,7 +329,7 @@ trait DHDLMemories {
       for (i <- 0 until $tileRows) {
         for (j <- 0 until $tileCols) {
           val offaddr  = $offCols*i + j + offchip_offset
-          val bramaddr = $tileRows*i + j
+          val bramaddr = $tileCols*i + j
           $bram(bramaddr.toInt) = $offchip(offaddr.toInt)
         }
       }
@@ -371,19 +346,11 @@ trait DHDLMemories {
       for (i <- 0 until $tileRows) {
         for (j <- 0 until $tileCols) {
           val offaddr  = $offCols*i + j + offchip_offset
-          val bramaddr = $tileRows*i + j
+          val bramaddr = $tileCols*i + j
           $offchip(offaddr.toInt) = $bram(bramaddr.toInt)
         }
       }
     }))
-
-    impl (offchip_apply) (codegen($cala, ${ $0.apply($1.toInt) }))
-    impl (offchip_mkstring) (codegen($cala, ${
-      @ val name = nameOf($0)
-      "offchip: " + $name + " data: " + "--------->\\n[" + $0.mkString(",") + "]\\n------------------>"
-    }))
-
-		impl (offchip_from_array) (codegen($cala, ${ Array.tabulate($arr.length){i => $arr.apply(i)} }))
 
 		// --- Dot Backend
 		impl (offchip_new) (codegen(dot, ${

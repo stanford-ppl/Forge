@@ -10,52 +10,51 @@ trait DotProduct extends DHDLApplication {
 
 	override def stageArgNames = List("tileSize")
   lazy val tileSize = stageArgOrElse[Int](0, 4)
-  lazy val dataSize = ArgIn[Elem]("dataSize", 32)
+  lazy val dataSize = ArgIn[Fix]("dataSize")
 
-  def dotproduct(vec1: Rep[OffChipMem[Elem]], vec2: Rep[OffChipMem[Elem]]): Rep[Elem] = {
+  def dotproduct(v1: Rep[OffChipMem[Elem]], v2: Rep[OffChipMem[Elem]], out: Rep[Reg[Fix]]) {
 		val b1 = BRAM[Elem]("b1", tileSize)
     val b2 = BRAM[Elem]("b2", tileSize)
-    val out = ArgOut[Elem]("out")
 
 		MetaPipe(dataSize by tileSize, out){ i =>
 			Parallel {
-				vec1.ld(b1, i, tileSize)
-				vec2.ld(b2, i, tileSize)
+				v1.ld(b1, i, tileSize)
+				v2.ld(b2, i, tileSize)
 			}
       val acc = Reg[Elem]("acc")
 			Pipe(0 until tileSize, acc){ ii => b1(ii) * b2(ii) }{_+_}
+
+      //println("acc @ " + i.mkString + ": " + acc.value.mkString)
       acc.value
 		}{_+_}
-
-    out.value
 	}
 
   def main() {
-    val v1 = OffChipMem[Elem]("v1", dataSize)
-    val v2 = OffChipMem[Elem]("v2", dataSize)
-    dotproduct(v1, v2)
-  }
-}
+    val N = 8
 
+    // Bad things will happen if you try to set the Offchip size from a register value
+    val v1 = OffChipMem[Elem]("v1", N)
+    val v2 = OffChipMem[Elem]("v2", N)
+    val out = ArgOut[Elem]("out")
 
-object DotProductTestCompiler extends DHDLApplicationCompiler with DotProductTest
-object DotProductTestInterpreter extends DHDLApplicationInterpreter with DotProductTest
-trait DotProductTest extends DotProduct {
-  override def stageArgNames = List("tileSize", "testSize")
+    val vec1 = Array.fill(N)(randomFix(10))
+    val vec2 = Array.fill(N)(randomFix(10))
 
-  lazy val testSize = stageArgOrElse[Int](1, 32)
+    println("vec1: " + vec1.mkString(", "))
+    println("vec2: " + vec2.mkString(", "))
 
-  override def main() {
-    val svec1 = Seq.fill(testSize)(Random.nextInt(100))
-    val svec2 = Seq.fill(testSize)(Random.nextInt(100))
-    val gold = svec1.zip(svec2).map{case (x,y) => x*y}.reduce(_+_)
+    setArg(dataSize, N)
+    setMem(v1, vec1)
+    setMem(v2, vec2)
 
-    val v1 = OffChipMem.withInit1D("v1", svec1.map(i => i.toFixPt))
-    val v2 = OffChipMem.withInit1D("v2", svec2.map(i => i.toFixPt))
-    val res = dotproduct(v1, v2)
+    Accel {
+      dotproduct(v1, v2, out)
+    }
 
-    println("out: " + res.mkString)
-
-    assert(res == gold.toFixPt)
+    val result = getArg(out)
+    val gold = vec1.zip(vec2){_*_}.reduce{_+_}
+    println("expected: " + gold.mkString)
+    println("result: " + result.mkString)
+    assert(result == gold)
   }
 }

@@ -48,7 +48,7 @@ trait BLASOpsExp extends BLASOps with DenseMatrixOpsExp {
     val _mT = implicitly[Manifest[T]]
 
     override def inputs = scala.List(xR,xC,x,yR,yC,y)
-    def alloc = Array.empty[T](xR * yC)
+    def alloc = array_empty[T](xR * yC)
     val funcName = "matMult"
   }
 
@@ -56,7 +56,7 @@ trait BLASOpsExp extends BLASOps with DenseMatrixOpsExp {
     val _mT = implicitly[Manifest[T]]
 
     override def inputs = scala.List(xR,xC,x,y)
-    def alloc = Array.empty[T](xR)
+    def alloc = array_empty[T](xR)
     val funcName = "matTimesVec"
   }
 

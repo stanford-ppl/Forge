@@ -28,23 +28,28 @@ trait DHDLTypes {
 			}
 		})*/
 
-    val boolean_to_bit = direct (Tpes) ("cbit", Nil, CBoolean :: Bit)
+    // --- Nodes
+    val boolean_to_bit = internal (Tpes) ("constBit", Nil, SBoolean :: Bit)
     val bit_to_string = direct (Tpes) ("bit_to_string", Nil, Bit :: MString)
 
-
-    val numeric_to_fixpt = direct (Fix) ("fixPt", T, T :: Fix, TNumeric(T))
+    val numeric_to_fixpt = internal (Fix) ("constFix", T, T :: Fix, TNumeric(T))
     val fixpt_to_string = direct (Fix) ("fixpt_to_string", Nil, Fix :: MString)
     val fixpt_to_fltpt = direct (Fix) ("fixpt_to_fltpt", Nil, Fix :: Flt)
 
-    val numeric_to_fltpt = direct (Flt) ("fltPt", T, T :: Flt, TNumeric(T))
+    val numeric_to_fltpt = internal (Flt) ("constFlt", T, T :: Flt, TNumeric(T))
     val fltpt_to_string = direct (Flt) ("fltpt_to_string", Nil, Flt :: MString)
     val fltpt_to_fixpt = direct (Flt) ("fltpt_to_fixpt", Nil, Flt :: Fix)
 
-    infix (Tpes) ("toBit", Nil, SBoolean :: Bit) implements redirect ${ cbit($0) }
+    // --- API
+    direct (Tpes) ("bit", T, SBoolean :: Bit) implements composite ${ constBit($0) }
+    direct (Tpes) ("fixPt", T, T :: Fix, TNumeric(T)) implements composite ${ constFix($0) }
+    direct (Tpes) ("fltPt", T, T :: Flt, TNumeric(T)) implements composite ${ constFlt($0) }
+
+    infix (Tpes) ("toBit", Nil, SBoolean :: Bit) implements composite ${ constBit($0) }
     infix (Bit) ("toString", Nil, Bit :: MString) implements redirect ${ bit_to_string($0) }
     infix (Bit) ("mkString", Nil, Bit :: MString) implements redirect ${ bit_to_string($0) }
 
-    infix (Tpes) ("toFixPt", T, T :: Fix, TNumeric(T)) implements redirect ${ fixPt($0) }
+    infix (Tpes) ("toFixPt", T, T :: Fix, TNumeric(T)) implements composite ${ constFix($0) }
     /*infix (Tpes) ("toFixPt", Nil, SInt :: Fix) implements redirect ${ long_to_fixpt($0.toLong) }
     infix (Tpes) ("toFixPt", Nil, SLong :: Fix) implements redirect ${ long_to_fixpt($0) }
     infix (Tpes) ("toFixPt", Nil, SFloat :: Fix) implements redirect ${ double_to_fixpt($0.toDouble) }
@@ -54,7 +59,7 @@ trait DHDLTypes {
     infix (Fix) ("toFltPt", Nil, Fix :: Flt) implements redirect ${ fixpt_to_fltpt($0) }
 
 
-    infix (Tpes) ("toFltPt", T, T :: Flt, TNumeric(T)) implements redirect ${ fltPt($0) }
+    infix (Tpes) ("toFltPt", T, T :: Flt, TNumeric(T)) implements composite ${ constFlt($0) }
     /*infix (Tpes) ("toFltPt", Nil, SInt :: Flt) implements redirect ${ long_to_fltpt($0.toLong) }
     infix (Tpes) ("toFltPt", Nil, SLong :: Flt) implements redirect ${ long_to_fltpt($0) }
     infix (Tpes) ("toFltPt", Nil, SFloat :: Flt) implements redirect ${ double_to_fltpt($0.toDouble) }
@@ -63,9 +68,10 @@ trait DHDLTypes {
     infix (Flt) ("mkString", Nil, Flt :: MString) implements redirect ${ fltpt_to_string($0) }
     infix (Flt) ("toFixPt", Nil, Flt :: Fix) implements redirect ${ fltpt_to_fixpt($0) }
 
-    fimplicit (Tpes) ("sboolean_to_bit", Nil, SBoolean :: Bit) implements redirect ${ cbit($0) }
-    fimplicit (Tpes) ("sint_to_fixpt", Nil, SInt :: Fix) implements redirect ${ fixPt($0) }
-    fimplicit (Tpes) ("sfloat_to_fltpt", Nil, SFloat :: Flt) implements redirect ${ fltPt($0) }
+    // TODO: Add more
+    fimplicit (Tpes) ("sboolean_to_bit", Nil, SBoolean :: Bit) implements composite ${ constBit($0) }
+    fimplicit (Tpes) ("sint_to_fixpt", Nil, SInt :: Fix) implements composite ${ constFix($0) }
+    fimplicit (Tpes) ("sfloat_to_fltpt", Nil, SFloat :: Flt) implements composite ${ constFlt($0) }
 
 
     // --- Scala Backend

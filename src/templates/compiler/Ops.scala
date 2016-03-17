@@ -1135,6 +1135,8 @@ trait DeliteGenOps extends BaseGenOps {
 
               case `dot` => emitLines(body)
 
+              case `maxj` => emitLines(body)
+
               case _ => err("Unsupported codegen: " + g.toString)
             }
             stream.println()

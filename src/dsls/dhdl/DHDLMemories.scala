@@ -387,14 +387,10 @@ trait DHDLMemories {
 
 		// --- Dot Backend
 		impl (offchip_new) (codegen(dot, ${
-			subgraph $sym {
-				color="none"
-				label=""
-				$sym [label="\$sym" shape="square" fontcolor="white" color="white" style="filled"
-				fillcolor="$offChipColor "]
-				$size -> $sym
-				$size [style="invisible" height=0 size=0 margin=0 label=""]
-			}
+			$sym [label="\$sym" shape="square" fontcolor="white" color="white" style="filled"
+			fillcolor="$offChipColor "]
+			$size -> $sym
+			$size [style="invisible" height=0 size=0 margin=0 label=""]
 		}))
 		//impl (offchip_load) (codegen(dot, ${
 

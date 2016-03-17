@@ -144,37 +144,63 @@ trait ScalaGenPipeTemplateOps extends ScalaGenEffect {
 
     case _ => super.emitNode(sym, rhs)
   }
+
+  override def quote(x: Exp[Any]) = x match {
+		case s@Sym(n) => s.tp.erasure.getSimpleName() + "_x" + n
+    case _ => super.quote(x)
+  }
 }
 
 trait DotGenPipeTemplateOps extends DotGenEffect {
   val IR: PipeTemplateOpsExp 
   import IR._
 
-  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case e@Counterchain_new(counters) =>
-			stream.println(s"""subgraph cluster_${quote(sym)} {""")
-      //stream.println(s"""	label=\"${quote(sym)}\"""")
-      stream.println("	style=\"rounded, filled\"")
-      stream.println("	fillcolor=\"" + counterColor + "\"")
-			counters.foreach{ ctr =>
-        stream.println(s"""   ${quote(ctr)}""")
-      }
-      stream.println("}")
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = { 
 
-    case e@Pipe_foreach(cchain, func, inds) =>
-      stream.println(s"""subgraph cluster_${quote(sym)} {""")
-      stream.println(s"""label=\"${quote(sym)}\"""")
-      stream.println(s"""color=\"gray\"""")
-      emitBlock(func)             // Map function
-      stream.println("}")
+			//stream = getPrintWriter(getFile("", singleFileName))
+			println("sym:" + quote(sym))
+			rhs match {
+  	  case e@Counterchain_new(counters) =>
+				stream.println(s"""subgraph cluster_${quote(sym)} {""")
+				println("stream:" + stream)
+  	    //stream.println(s"""	label=\"${quote(sym)}\"""")
+  	    stream.println("	style=\"rounded, filled\"")
+  	    stream.println("	fillcolor=\"" + counterColor + "\"")
+				counters.foreach{ ctr =>
+  	      stream.println(s"""   ${quote(ctr)}""")
+  	    }
+  	    stream.println("}")
 
-    case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
-      stream.println(s"""subgraph cluster_${quote(sym)} {""")
-      stream.println(s"""label=\"${quote(sym)}\"""")
-      stream.println(s"""color=\"gray\"""")
-      emitBlock(func)             // Map function
-      stream.println("}")
+  	  case e@Pipe_foreach(cchain, func, inds) =>
+				//stream = getPrintWriter(getFile("", singleFileName))
+				println("pipe_foreach: " + quote(sym) + " e:" + e)
+  	    stream.println(s"""//pipe_foreach :""" + quote(sym))
+  	    stream.println(s"""subgraph cluster_${quote(sym)} {""")
+  	    stream.println(s"""label=\"${quote(sym)}\"""")
+  	    stream.println(s"""color=\"gray\"""")
+  	    emitBlock(func)             // Map function
+  	    stream.println("}")
 
-    case _ => super.emitNode(sym, rhs)
+  	  case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
+				//stream = getPrintWriter(getFile("", singleFileName))
+				println("pipe_reduce: " + quote(sym) + " e:" + e)
+  	    stream.println(s"""//pipe_reduce :""" + quote(sym))
+  	    stream.println(s"""subgraph cluster_${quote(sym)} {""")
+  	    stream.println(s"""label=\"${quote(sym)}\"""")
+  	    stream.println(s"""color=\"gray\"""")
+  	    emitBlock(func)             // Map function
+  	    stream.println("}")
+
+  	  case e@_ => 
+				println("unmatched: " + quote(sym) + " e:" + e)
+				println("stream:" + stream)
+				super.emitNode(sym, rhs)
+  	}
+		//stream.flush()
+	}
+
+  override def quote(x: Exp[Any]) = x match {
+		case s@Sym(n) => s.tp.erasure.getSimpleName() + "_x" + n
+    case _ => super.quote(x)
   }
 }

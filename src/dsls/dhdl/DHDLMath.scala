@@ -260,165 +260,165 @@ trait DHDLMath {
     impl (xnor_bit) (codegen($cala, ${ $0 == $1 }))
 
     // --- Dot Backend
-    impl (neg_fix) (codegen(dot, ${ $sym [label="unary_-:fix"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
+    impl (neg_fix) (codegen(dot, ${ $sym [label="unary_-:fix" shape="square" style="filled" fillcolor="white"] \n $0->$sym }))
+		impl (add_fix) (codegen(dot, ${ $sym [label="+:fix" shape="square" style="filled" fillcolor="white"]  \n $0->$sym \n $1->$sym }))
+		impl (sub_fix) (codegen(dot, ${ $sym [label="-:fix" shape="square" style="filled" fillcolor="white"]  \n $0->$sym \n $1->$sym }))
+		impl (mul_fix) (codegen(dot, ${ $sym [label="*:fix" shape="square" style="filled" fillcolor="white"]  \n $0->$sym \n $1->$sym }))
+		impl (div_fix) (codegen(dot, ${ $sym [label="/:fix" shape="square" style="filled" fillcolor="white"]  \n $0->$sym \n $1->$sym }))
+		impl (lt_fix)  (codegen(dot, ${ $sym [label="<:fix" shape="square" style="filled" fillcolor="white"]  \n $0->$sym \n $1->$sym }))
+		impl (leq_fix) (codegen(dot, ${ $sym [label="<=:fix" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+		impl (neq_fix) (codegen(dot, ${ $sym [label="!=:fix" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+		impl (eql_fix) (codegen(dot, ${ $sym [label="==:fix" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+		impl (and_fix) (codegen(dot, ${ $sym [label="&:fix"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+		impl (or_fix)  (codegen(dot, ${ $sym [label="|:fix"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+		impl (lsh_fix) (codegen(dot, ${ $sym [label="<<:fix" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+		impl (rsh_fix) (codegen(dot, ${ $sym [label=">>:fix" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+
+    impl (neg_flt) (codegen(dot, ${ $sym [label="unary_-:flt"] \n $0->$sym }))
+    impl (add_flt) (codegen(dot, ${ $sym [label="+:flt"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+    impl (sub_flt) (codegen(dot, ${ $sym [label="-:flt"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+    impl (mul_flt) (codegen(dot, ${ $sym [label="*:flt"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+    impl (div_flt) (codegen(dot, ${ $sym [label="/:flt"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+    impl (lt_flt)  (codegen(dot, ${ $sym [label="<:flt"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+    impl (leq_flt) (codegen(dot, ${ $sym [label="<=:flt" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+    impl (neq_flt) (codegen(dot, ${ $sym [label="!=:flt" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+    impl (eql_flt) (codegen(dot, ${ $sym [label="==:flt" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+
+    impl (not_bit) (codegen(dot, 	${ $sym [label="~:bit" shape="square" style="filled" fillcolor="white"] \n $0->$sym }))
+    impl (and_bit) (codegen(dot, 	${ $sym [label="&:bit" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+    impl (or_bit)  (codegen(dot, 	${ $sym [label="|:bit" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+    impl (xor_bit) (codegen(dot, 	${ $sym [label="xor:bit"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+    impl (xnor_bit) (codegen(dot, ${ $sym [label="xnor:bit" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
+
+    // --- MaxJ Backend
+		//TODO: maxj negation?
+    impl (neg_fix) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = 0 - $0 ;
 		}))
-		impl (add_fix) (codegen(dot, ${ $sym [label="+:fix"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (add_fix) (codegen(maxj, ${ 
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 + $1 ;
 		}))
-    impl (sub_fix) (codegen(dot, ${ $sym [label="-:fix"] 
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (sub_fix) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 - $1 ;
 		}))
-    impl (mul_fix) (codegen(dot, ${ $sym [label="*:fix"] 
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (mul_fix) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 * $1 ;
 		}))
-    impl (div_fix) (codegen(dot, ${ $sym [label="/:fix"] 
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (div_fix) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 / $1 ;
 		}))
-    impl (lt_fix)  (codegen(dot, ${ $sym [label="<:fix"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (lt_fix)  (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+			$pre(n) $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
+    	$sym <== $0 < $1 ;
 		}))
-    impl (leq_fix) (codegen(dot, ${ $sym [label="<=:fix"] 
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (leq_fix) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+			$pre(n) $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
+			//TODO: maxj leq?
+    	$sym <== $0 <= $1 ;
 		}))
-    impl (neq_fix) (codegen(dot, ${ $sym [label="!=:fix"] 
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (neq_fix) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+			$pre(n) $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
+			//TODO: maxj neq?
+    	$sym <== $0 != $1 ;
 		}))
-    impl (eql_fix) (codegen(dot, ${ $sym [label="==:fix"] 
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (eql_fix) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+			$pre(n) $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
+    	$sym <== $0 === $1 ;
 		}))
-    impl (and_fix) (codegen(dot, ${ $sym [label="&:fix"] 
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (and_fix) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 & $1 ;
 		}))
-    impl (or_fix)  (codegen(dot, ${ $sym [label="|:fix"] 
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (or_fix)  (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 | $1 ;
 		}))
-    impl (lsh_fix) (codegen(dot, ${ $sym [label="<<:fix"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+			//TODO: maxj lsh?
+    impl (lsh_fix) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 + $1 ;
 		}))
-		impl (rsh_fix) (codegen(dot, ${ $sym [label=">>:fix"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+			//TODO: maxj rsh?
+    impl (rsh_fix) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 + $1 ;
 		}))
 
-    impl (neg_flt) (codegen(dot, ${ $sym [label="unary_-:flt"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
+		//TODO: maxj negation?
+    impl (neg_flt) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = 0 - $0 ;
 		}))
-    impl (add_flt) (codegen(dot, ${ $sym [label="+:flt"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (add_flt) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 + $1 ;
 		}))
-    impl (sub_flt) (codegen(dot, ${ $sym [label="-:flt"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (sub_flt) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 - $1 ;
 		}))
-    impl (mul_flt) (codegen(dot, ${ $sym [label="*:flt"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (mul_flt) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 * $1 ;
 		}))
-    impl (div_flt) (codegen(dot, ${ $sym [label="/:flt"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (div_flt) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 / $1 ;
 		}))
-    impl (lt_flt)  (codegen(dot, ${ $sym [label="<:flt"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (lt_flt)  (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+			$pre(n) $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
+    	$sym <== $0 < $1 ;
 		}))
-    impl (leq_flt) (codegen(dot, ${ $sym [label="<=:flt"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (leq_flt) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+			$pre(n) $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
+			//TODO: maxj leq?
+    	$sym <== $0 <= $1 ;
 		}))
-    impl (neq_flt) (codegen(dot, ${ $sym [label="!=:flt"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (neq_flt) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+			$pre(n) $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
+			//TODO: maxj neq?
+    	$sym <== $0 != $1 ;
 		}))
-    impl (eql_flt) (codegen(dot, ${ $sym [label="==:flt"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (eql_flt) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+			$pre(n) $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
+    	$sym <== $0 === $1 ;
 		}))
 
-    impl (not_bit) (codegen(dot, 	${ $sym [label="~:bit"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
+    impl (not_bit) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = ~( $0 );
 		}))
-    impl (and_bit) (codegen(dot, 	${ $sym [label="&:bit"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (and_bit) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 & $1 ;
 		}))
-    impl (or_bit)  (codegen(dot, 	${ $sym [label="|:bit"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+    impl (or_bit)  (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 | $1 ;
 		}))
-    impl (xor_bit) (codegen(dot, 	${ $sym [label="xor:bit"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+		//TODO: maxj xor?
+    impl (xor_bit) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 + $1 ;
 		}))
-    impl (xnor_bit) (codegen(dot, ${ $sym [label="xnor:bit"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
-			$1 [style="invisible" height=0 size=0 margin=0 label=""]
-			$0->$sym
-			$1->$sym
+		//TODO: maxj xnor?
+    impl (xnor_bit) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+    	$pre(n) $sym = $0 + $1 ;
 		}))
-
   }
 
   def importBasicMath() {
@@ -467,29 +467,46 @@ trait DHDLMath {
     impl (sqrt_flt) (codegen($cala, ${ scala.math.sqrt($0) }))
 
     // --- Dot Backend
-    impl (abs_fix) (codegen(dot,  ${ $sym [label="abs:fix"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
+    impl (abs_fix) (codegen(dot,  ${ $sym [label="abs:fix" shape="square" style="filled" fillcolor="white"]
 			$0 -> $sym
 		}))
 
-    impl (abs_flt) (codegen(dot,  ${ $sym [label="abs:flt"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
+    impl (abs_flt) (codegen(dot,  ${ $sym [label="abs:flt" shape="square" style="filled" fillcolor="white"]
 			$0->$sym
 		}))
-    impl (log_flt) (codegen(dot,  ${ $sym [label="log:flt"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
+    impl (log_flt) (codegen(dot,  ${ $sym [label="log:flt" shape="square" style="filled" fillcolor="white"]
 			$0->$sym
 		}))
-    impl (exp_flt) (codegen(dot,  ${ $sym [label="exp:flt"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
+    impl (exp_flt) (codegen(dot,  ${ $sym [label="exp:flt" shape="square" style="filled" fillcolor="white"]
 			$0->$sym
 		}))
-    impl (sqrt_flt) (codegen(dot, ${ $sym [label="sqrt:flt"]
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
+    impl (sqrt_flt) (codegen(dot, ${ $sym [label="sqrt:flt" shape="square" style="filled" fillcolor="white"]
 			$0->$sym
 		}))
-  }
 
+    // --- MaxJ Backend
+    impl (abs_fix) (codegen(maxj,  ${ 
+			//TODO: parallelized virsion
+			@ val pre = maxJPre(sym)
+    	$pre $sym = KernelMath.abs( $0 );
+		}))
+
+    impl (abs_flt) (codegen(maxj,  ${
+			//TODO: parallelized virsion
+			@ val pre = maxJPre(sym)
+    	$pre $sym = KernelMath.abs( $0 );
+		}))
+    //impl (log_flt) (codegen(maxj,  ${
+		//	//TODO: parallelized virsion
+		//	@ val pre = maxJPre(sym)
+    //	$pre $sym = KernelMath.log(new KernelMath.Range(-Float.MAX_VALUE, Float.MAX_VALUE), $0, $tpstr(sym) );
+		//}))
+    impl (exp_flt) (codegen(maxj,  ${ 
+		}))
+    impl (sqrt_flt) (codegen(maxj, ${ 
+		}))
+
+  }
 
   // TODO: Any reason for min and max to be nodes?
   def importBasicControl() {
@@ -506,7 +523,13 @@ trait DHDLMath {
     impl (mux) (codegen($cala, ${ if ($sel) $a else $b }))
 
     // --- Dot Backend
-    impl (mux) (codegen(dot, ${ $sym [label="mux", shape="diamond"] }))
+    impl (mux) (codegen(dot, ${ $sym [label="mux", shape="diamond" style="filled" fillcolor="white"] }))
+
+    // --- MaxJ Backend
+    impl (mux) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+			$pre $sym = $sel ? $a : $b ; 
+		}))
 	}
 
   // Infix operations with a Scala type on the LHS

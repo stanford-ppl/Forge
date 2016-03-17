@@ -216,11 +216,12 @@ trait DHDLControllers {
 
     // --- Dot Backend
     impl (pipe_parallel) (codegen (dot, ${
-      subgraph $sym {
-      	label = "\$sym"
+      subgraph cluster_$sym {
+      	label = "parallel_\$sym"
       	style = "filled"
       	fillcolor = "$parallelFillColor "
       	color = "$parallelBorderColor "
+				$b[func]
 			}
 			
 		}))

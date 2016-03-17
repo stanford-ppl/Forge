@@ -91,6 +91,44 @@ trait DHDLTypes {
 			$0 -> $sym
 			$0 [style="invisible" height=0 size=0 margin=0 label=""]
 		}))
+    impl (numeric_to_fixpt) (codegen(dot, ${
+			//TODO: value of const
+      $sym [label="value" style="filled" fillcolor="lightgray" color="none"]
+		}))
+    impl (numeric_to_fltpt) (codegen(dot, ${
+			//TODO: value of const
+      $sym [label="value" style="filled" fillcolor="lightgray" color="none"]
+		}))
+
+    // --- MaxJ Backend
+		//TODO: codegen based on precision
+  	//def tpstr(sym: ) : String = {
+  	//  val scalart = sym.tp match {
+  	//    //case CompositeType(ts) =>
+  	//    //  assert(par(sym) == 1, "Error: Composity types with parallelization factor > 1 not supported")
+  	//    //  "new DFEType[]{" + ts.map { tpstr(_) }.mkString(",") + "}"
+  	//    case DHDLFix =>
+		//			val s = signed(sym)
+		//			val d = decimal(sym)
+		//			val f = fraction(sym)
+		//			if (s) s"dfeFixOffset(${d+f}, $f, SignMode.TWOSCOMPLEMENT)"
+		//			else s"dfeFixOffset(${d+f}, $f, SignMode.UNSIGNED)"
+  	//    case DHDLFlt =>
+		//			val m = mantissa(sym)
+		//			val e = exponent(e)
+		//			s"dfeFloat($e, $m)"
+  	//    case _ => throw new Exception(s"Unknown type $t")
+  	//  }
+  	//  if (par(sym) > 1) s"new DFEVectorType<DFEVar>($scalart, ${par(sym)})" else scalart
+  	//}
+    //impl (fixpt_to_fltpt) (codegen(maxj, ${
+		//	@ val ts = \$tpstr(sym)
+    //	DFEVar $sym = $0.cast($ts);
+		//}))
+    //impl (fltpt_to_fixpt) (codegen(maxj, ${
+		//	@ val ts = \$tpstr(sym)
+    //	DFEVar $sym = $0.cast($ts);
+		//}))
 
     /*val fix_to_string = internal (FixPt) ("fix_to_string", Nil, (("sign", FixPt), ("int", FixPt), ("frac", FixPt)) :: MString)
     impl (fix_to_string) (codegen ($cala, ${

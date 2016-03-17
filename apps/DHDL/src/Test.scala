@@ -11,6 +11,14 @@ trait Test extends DHDLApplication {
 		val bm = BRAM[Fix](6)
     val out = ArgOut[Fix]("out")
 
+		Parallel{
+			val a = 3.toFixPt
+			val b = 4.toFixPt
+			val d = abs(b)
+			val c = a + d
+			println(c.mkString)
+		}
+
     MetaPipe(6 by 2, out){i =>
       om.ld(bm, i, 2)
       val acc = Reg[Fix]("acc")

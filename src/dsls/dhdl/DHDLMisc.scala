@@ -10,7 +10,7 @@ trait DHDLMisc {
     importDHDLTestingOps()
   }
 
-	def importDHDLHelpers() {
+  def importDHDLHelpers() {
     val Misc = grp("DHDLMisc")
 
     val T = tpePar("T")
@@ -269,5 +269,5 @@ trait DHDLMisc {
     // --- Rewrites
     rewrite (ifThenElse) using forwarding ${ delite_ifThenElse($0, $1, $2, false, true) }
     rewrite (whileDo) using forwarding ${ delite_while($0, $1) }
-	}
+  }
 }

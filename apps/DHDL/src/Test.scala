@@ -7,7 +7,9 @@ object TestInterpreter extends DHDLApplicationInterpreter with Test
 trait Test extends DHDLApplication {
 
   def main() {
-		val outer = ArgOut[Fix]
+    type Q16 = FixPt[Signed, B16, B16]
+
+    val outer = ArgOut[Fix]
 
     val v1 = OffChipMem[Fix]("v1", 10)
 

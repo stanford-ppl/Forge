@@ -49,5 +49,5 @@ trait OuterProduct extends DHDLApplication {
     println("expected: " + gold.mkString(", "))
     println("result:   " + result.mkString(", "))
     assert( result == gold )
-	}
+  }
 }

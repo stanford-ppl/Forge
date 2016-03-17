@@ -15,7 +15,7 @@ trait TypeInspectionWrapper extends TypeInspectionCompilerOps {
 }
 
 trait MemoryTemplateWrapper extends PipeTemplateWrapper with NumEmulation {
-  this: DHDLBase with DHDLClasses with DHDL =>
+  this: DHDLBase with DHDLClasses =>
 
   // Memories are all equivalent to Scala Arrays in library
   type OffChipMem[T] = Array[T]
@@ -54,8 +54,8 @@ trait MemoryTemplateWrapper extends PipeTemplateWrapper with NumEmulation {
     val localStrides = sdimsToStrides(tileDims).map(k => FixedPoint(k)(FixFormat(true,32,0)))
 
     loop(cchain, 0, Nil, {iters: Rep[Indices] =>
-      val offaddr   = List.tabulate(cchain.length){i => getIndex(iters, i) * strides(i) }.fold(memOfs)(_+_)
-      val localaddr = List.tabulate(cchain.length){i => getIndex(iters, i) * localStrides(i) }.reduce(_+_)
+      val offaddr   = List.tabulate(cchain.length){i => indices_getindex(iters, i) * strides(i) }.fold(memOfs)(_+_)
+      val localaddr = List.tabulate(cchain.length){i => indices_getindex(iters, i) * localStrides(i) }.reduce(_+_)
       if (store)
         mem(offaddr.toInt) = local(localaddr.toInt)
       else

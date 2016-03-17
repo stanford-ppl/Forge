@@ -15,7 +15,7 @@ trait RNTNOps extends OptiMLApplication with Utilities {
 	private val POSNEGNEUT = 5
 
 	private val WORDI 		  = true
-	//private val QRNN  		  = true
+	//private val QRNN  	  = true
 	private val NUMCLASSES 	  = 5
 	private val NEUTRALLABEL  = if (NUMCLASSES == 2)  POSNEGNEUT else (NUMCLASSES - 1)/2
 	//private val NEUTRALWEIGHT = if (NUMCLASSES == 2)  0.0		 else 1.0  	// 0.3 as default?

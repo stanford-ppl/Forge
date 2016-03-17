@@ -75,5 +75,5 @@ trait TPCHQ6 extends DHDLApplication {
     println("expected: " + gold.mkString)
     println("result: " + result.mkString)
     assert(result == gold)
-	}
+  }
 }

@@ -100,7 +100,7 @@ trait DHDLMath {
   }
 
 
-	def importPrimitiveMath() {
+  def importPrimitiveMath() {
 
     val Coll = lookupTpeClass("Coll").get
     val Num = lookupTpeClass("Num").get
@@ -108,7 +108,7 @@ trait DHDLMath {
     val Order = lookupTpeClass("Order").get
 
     val Prim = grp("DHDLPrim")
-		val FixPt = lookupTpe("FixPt")
+    val FixPt = lookupTpe("FixPt")
     val FltPt = lookupTpe("FltPt")
     val Bit   = lookupTpe("Bit")
 
@@ -219,7 +219,7 @@ trait DHDLMath {
     // --- API
     // Fixed Point
     infix (Prim) ("unary_-", (S,I,F), FixPt(S,I,F) :: FixPt(S,I,F))  implements redirect ${ neg_fix($0) }
-		infix (Prim) ("+",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ add_fix($0, $1) }
+    infix (Prim) ("+",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ add_fix($0, $1) }
     infix (Prim) ("-",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ sub_fix($0, $1) }
     infix (Prim) ("*",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ mul_fix($0, $1) }
     infix (Prim) ("/",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ div_fix($0, $1) }
@@ -359,7 +359,7 @@ trait DHDLMath {
     // --- Scala Backend
     impl (mux) (codegen($cala, ${ if ($sel) $a else $b }))
 
-	}
+  }
 
   // Infix operations with a Scala type on the LHS
   def importLiftingMath() {

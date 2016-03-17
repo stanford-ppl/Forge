@@ -18,7 +18,7 @@ trait DHDLControllers {
     val Idx          = lookupAlias("SInt")
 
     // --- Nodes
-		val counter_new = internal (Counter) ("counter_new", Nil, (("start", Idx), ("end", Idx), ("step", Idx)) :: Counter)
+    val counter_new = internal (Counter) ("counter_new", Nil, (("start", Idx), ("end", Idx), ("step", Idx)) :: Counter)
 
     // --- Internals
     internal (Counter) ("counter_create", Nil, (SOption(SString), LoopRange, SInt) :: Counter) implements composite ${
@@ -31,9 +31,9 @@ trait DHDLControllers {
     // --- API
     static (Counter) ("apply", Nil, ("max", Idx) :: Counter) implements composite ${ counter_create(None, 0 until $max, 1) }
     static (Counter) ("apply", Nil, (("name", SString), ("max",Idx)) :: Counter) implements composite ${ counter_create(Some($name), 0 until $max, 1) }
-		static (Counter) ("apply", Nil, LoopRange :: Counter) implements composite ${ counter_create(None, $0, 1) }
+    static (Counter) ("apply", Nil, LoopRange :: Counter) implements composite ${ counter_create(None, $0, 1) }
     static (Counter) ("apply", Nil, (SString, LoopRange) :: Counter) implements composite ${ counter_create(Some($0), $1, 1) }
-	  static (Counter) ("apply", Nil, (SString, LoopRange, SInt) :: Counter) implements composite ${ counter_create(Some($0), $1, $2) }
+    static (Counter) ("apply", Nil, (SString, LoopRange, SInt) :: Counter) implements composite ${ counter_create(Some($0), $1, $2) }
 
     static (CounterChain) ("apply", Nil, varArgs(Counter) :: CounterChain) implements composite ${
       val chain = counterchain_new($0.toList) // Defined in extern
@@ -59,7 +59,7 @@ trait DHDLControllers {
     val CounterChain = lookupTpe("CounterChain")
 
     val Pipe = grp("Pipe")
-		val MetaPipe = grp("MetaPipe")
+    val MetaPipe = grp("MetaPipe")
     val Sequential = grp("Sequential")
 
     // --- Nodes
@@ -143,5 +143,5 @@ trait DHDLControllers {
       }
     }))
 
-	}
+  }
 }

@@ -21,7 +21,7 @@ trait BlackScholes extends DHDLApplication {
 
     val xK2_2 = xK2 ** 2
     val xK2_3 = xK2_2 * xK2
-	  val xK2_4 = xK2_3 * xK2
+    val xK2_4 = xK2_3 * xK2
     val xK2_5 = xK2_4 * xK2
 
     val xLocal_10 = xK2 * 0.319381530f
@@ -62,7 +62,7 @@ trait BlackScholes extends DHDLApplication {
     val optionPrice1 = (sptprice * nofXd1) - (futureValueX * nofXd2)
     val optionPrice2 = (futureValueX * negNofXd2) - (sptprice * negNofXd1)
     mux(otype == 0, optionPrice2, optionPrice1)
-	}
+  }
 
   def blackscholes(
     otype:      Rep[OffChipMem[Fix]],
@@ -131,5 +131,5 @@ trait BlackScholes extends DHDLApplication {
     val out = getMem(optprice)
 
     println(out.mkString(","))
-	}
+  }
 }

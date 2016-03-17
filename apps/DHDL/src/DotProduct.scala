@@ -8,26 +8,26 @@ object DotProductInterpreter extends DHDLApplicationInterpreter with DotProduct
 trait DotProduct extends DHDLApplication {
   type Elem = Fix
 
-	override def stageArgNames = List("tileSize")
+  override def stageArgNames = List("tileSize")
   lazy val tileSize = stageArgOrElse[Int](0, 4)
   lazy val dataSize = ArgIn[Fix]("dataSize")
 
   def dotproduct(v1: Rep[OffChipMem[Elem]], v2: Rep[OffChipMem[Elem]], out: Rep[Reg[Fix]]) {
-		val b1 = BRAM[Elem]("b1", tileSize)
+    val b1 = BRAM[Elem]("b1", tileSize)
     val b2 = BRAM[Elem]("b2", tileSize)
 
-		MetaPipe(dataSize by tileSize, out){ i =>
-			Parallel {
-				v1.ld(b1, i, tileSize)
-				v2.ld(b2, i, tileSize)
-			}
+    MetaPipe(dataSize by tileSize, out){ i =>
+      Parallel {
+        v1.ld(b1, i, tileSize)
+        v2.ld(b2, i, tileSize)
+      }
       val acc = Reg[Elem]("acc")
-			Pipe(0 until tileSize, acc){ ii => b1(ii) * b2(ii) }{_+_}
+      Pipe(0 until tileSize, acc){ ii => b1(ii) * b2(ii) }{_+_}
 
       //println("acc @ " + i.mkString + ": " + acc.value.mkString)
       acc.value
-		}{_+_}
-	}
+    }{_+_}
+  }
 
   def main() {
     val N = 8

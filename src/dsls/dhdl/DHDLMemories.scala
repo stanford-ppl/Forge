@@ -3,7 +3,7 @@ package dsls
 package dhdl
 
 trait DHDLMemories {
-	this: DHDLDSL =>
+  this: DHDLDSL =>
 
   object TMem extends TypeClassSignature {
     def name = "Mem"
@@ -113,7 +113,7 @@ trait DHDLMemories {
     val T = tpePar("T")
     val BRAM    = lookupTpe("BRAM")
     val Tile    = lookupTpe("Tile")
-		val Idx     = lookupAlias("SInt")
+    val Idx     = lookupAlias("SInt")
     val Indices = lookupTpe("Indices")
 
     // --- Nodes
@@ -151,23 +151,23 @@ trait DHDLMemories {
 
 
     // --- API
-		static (BRAM) ("apply", T, (SString, SInt, varArgs(SInt)) :: BRAM(T), TNum(T)) implements composite ${ bram_create[T](Some($0), $1 +: $2.toList) }
-		static (BRAM) ("apply", T, (SInt, varArgs(SInt)) :: BRAM(T), TNum(T)) implements composite ${ bram_create[T](None, $0 +: $1.toList) }
+    static (BRAM) ("apply", T, (SString, SInt, varArgs(SInt)) :: BRAM(T), TNum(T)) implements composite ${ bram_create[T](Some($0), $1 +: $2.toList) }
+    static (BRAM) ("apply", T, (SInt, varArgs(SInt)) :: BRAM(T), TNum(T)) implements composite ${ bram_create[T](None, $0 +: $1.toList) }
 
-		val BRAM_API = withTpe(BRAM)
-		BRAM_API {
+    val BRAM_API = withTpe(BRAM)
+    BRAM_API {
       /* Load */
       infix ("apply") ((Idx, varArgs(Idx)) :: T) implements composite ${ bram_load_nd($self, $1 +: $2.toList) }
 
-			/* Store */
+      /* Store */
       // varArgs in update doesn't work in Scala
-			infix ("update") ((Idx, T) :: MUnit, effect = write(0)) implements composite ${ bram_store_nd($self, List($1), $2) }
+      infix ("update") ((Idx, T) :: MUnit, effect = write(0)) implements composite ${ bram_store_nd($self, List($1), $2) }
       infix ("update") ((Idx, Idx, T) :: MUnit, effect = write(0)) implements composite ${ bram_store_nd($self, List($1, $2), $3) }
       infix ("update") ((Idx, Idx, Idx, T) :: MUnit, effect = write(0)) implements composite ${ bram_store_nd($self, List($1, $2, $3), $4) }
       infix ("update") ((SSeq(Idx), T) :: MUnit, effect = write(0)) implements composite ${ bram_store_nd($self, $1.toList, $2) }
 
-			infix ("rst") (Nil :: MUnit, TNum(T), effect = write(0)) implements composite ${ bram_reset($self, zero[T]) }
-		  infix (":=") (Tile(T) :: MUnit, effect = write(0)) implements redirect ${ transferTile($1, $self, false) }
+      infix ("rst") (Nil :: MUnit, TNum(T), effect = write(0)) implements composite ${ bram_reset($self, zero[T]) }
+      infix (":=") (Tile(T) :: MUnit, effect = write(0)) implements redirect ${ transferTile($1, $self, false) }
     }
 
     // --- Scala backend
@@ -183,7 +183,7 @@ trait DHDLMemories {
   // TODO: Change interface of tile load / store to words rather than BRAMs?
   def importOffChip() {
     val T = tpePar("T")
-		val OffChip = lookupTpe("OffChipMem")
+    val OffChip = lookupTpe("OffChipMem")
     val Tile    = lookupTpe("Tile")
     val BRAM    = lookupTpe("BRAM")
     val Range   = lookupTpe("Range")
@@ -202,14 +202,14 @@ trait DHDLMemories {
     }
 
     // --- API
-		static (OffChip) ("apply", T, (SString, Idx, varArgs(Idx)) :: OffChip(T), TNum(T)) implements composite ${ offchip_create(Some($0), $1 +: $2) }
-		static (OffChip) ("apply", T, (Idx, varArgs(Idx)) :: OffChip(T), TNum(T)) implements composite ${ offchip_create(None, $0 +: $1) }
+    static (OffChip) ("apply", T, (SString, Idx, varArgs(Idx)) :: OffChip(T), TNum(T)) implements composite ${ offchip_create(Some($0), $1 +: $2) }
+    static (OffChip) ("apply", T, (Idx, varArgs(Idx)) :: OffChip(T), TNum(T)) implements composite ${ offchip_create(None, $0 +: $1) }
 
     infix (OffChip) ("apply", T, (OffChip(T), varArgs(Range)) :: Tile(T)) implements composite ${ tile_create($0, $1.toList) }
 
     // --- Scala Backend
     impl (offchip_new) (codegen($cala, ${ new Array[$t[T]]($size.toInt) }))
-	}
+  }
 
 
   def importTiles() {

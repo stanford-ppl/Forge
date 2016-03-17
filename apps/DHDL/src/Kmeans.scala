@@ -63,7 +63,7 @@ trait Kmeans extends DHDLApplication {
 
     setArg(numPoints, N)
     Accel{ kmeans(points, centroids) }
-	}
+  }
 }
 
 

@@ -7,8 +7,8 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 object DHDLDSLRunner extends ForgeApplicationRunner with DHDLDSL
 
 trait DHDLDSL extends ForgeApplication
-	with DHDLMath with DHDLMisc with DHDLTypes with DHDLMemories
-	with DHDLControllers with DHDLMetadata with DHDLEnums with DHDLSugar {
+  with DHDLMath with DHDLMisc with DHDLTypes with DHDLMemories
+  with DHDLControllers with DHDLMetadata with DHDLEnums with DHDLSugar {
 
   def dslName = "DHDL"
 
@@ -22,7 +22,7 @@ trait DHDLDSL extends ForgeApplication
   lazy val E = tpePar("E")
 
   def specification() = {
-		disableFusion()
+    disableFusion()
 
     val T = tpePar("T")
 
@@ -84,19 +84,25 @@ trait DHDLDSL extends ForgeApplication
 
     // DSL spec imports
     importSugar()
-		importDHDLTypes()
+    importDHDLTypes()
     importDHDLEnums()
     importDHDLMetadata()
 
     importDHDLMath()
+    /* importCollectionOps()
+      importNumOps()
+      importArithOps()
+      importOrderOps()
+      importPrimitiveMath()*/
 
-		//importDHDLMemories()
-      importMemOps()
+    importDHDLMemories()
+    //  importMemOps()
 
-		//importDHDLControllers()
-      importCounters()
+    importDHDLControllers()
+    //  importCounters()
 
-		importDHDLMisc()
+    importDHDLMisc()
+    //  importDHDLHelpers()
 
     schedule(IRPrinterPlus)
 
@@ -104,6 +110,6 @@ trait DHDLDSL extends ForgeApplication
     extern(grp("PipeTemplate"), targets = List($cala))
     extern(grp("MemoryTemplate"), targets = List($cala))
     extern(metadata("TypeInspection"), targets = Nil)
-		()
-	}
+    ()
+  }
 }

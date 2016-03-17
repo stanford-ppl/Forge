@@ -6,169 +6,188 @@ trait DHDLTypes {
   this: DHDLDSL =>
 
 	def importDHDLTypes () = {
+    val S2 = tpePar("S2")
+    val I2 = tpePar("I2")
+    val F2 = tpePar("F2")
+    val G2 = tpePar("G2")
+    val E2 = tpePar("E2")
+
+    val R = tpePar("R")
 		val T = tpePar("T", stage = compile)
-    val Bit = lookupTpe("Bit")
-		val Fix = lookupTpe("Fix")
-    val Flt = lookupTpe("Flt")
 
-		val Tpes = grp("Tpes")
+    val Bit   = lookupTpe("Bit")
+		val FixPt = lookupTpe("FixPt")
+    val FltPt = lookupTpe("FltPt")
 
-    // TODO
-		/*internal (TpeOps) ("checkFixPtPrec", Nil, (MInt,MInt)::MUnit, effect = simple) implements codegen ($cala, ${
-			val intPrec = $0
-			val fracPrec = $1
-			val MAX_FIXPT_PRECISION = 64
-			if (intPrec>=MAX_FIXPT_PRECISION)
-				throw new Exception("Integer precision cannot exceed " + (MAX_FIXPT_PRECISION-1) + ": " + intPrec)
-			if (fracPrec>=MAX_FIXPT_PRECISION)
-				throw new Exception("Fraction precision cannot exceed " + (MAX_FIXPT_PRECISION-1) + ": " + fracPrec)
-			if ((intPrec + fracPrec)>=MAX_FIXPT_PRECISION) {
-				throw new Exception("Sum of integer and fraction precisions cannot exceed "
-					(MAX_FIXPT_PRECISION-1) + ": " + (intPrec + fracPrec))
-			}
-		})*/
+    val Z = lookupTpe("B0", compile)
+
+    val Tpes = grp("Tpes")
 
     // --- Nodes
+    // Bordering on a ridiculous numbers of type parameters here
+    // Somewhat concerning since each type parameter means an implicit parameter, but maybe it's ok
+
     val boolean_to_bit = internal (Tpes) ("constBit", Nil, SBoolean :: Bit)
     val bit_to_string = direct (Tpes) ("bit_to_string", Nil, Bit :: MString)
 
-    val numeric_to_fixpt = internal (Fix) ("constFix", T, T :: Fix, TNumeric(T))
-    val fixpt_to_string = direct (Fix) ("fixpt_to_string", Nil, Fix :: MString)
-    val fixpt_to_fltpt = direct (Fix) ("fixpt_to_fltpt", Nil, Fix :: Flt)
+    val const_to_fixpt = internal (FixPt) ("constFixPt", (T,S,I,F), T :: FixPt(S,I,F), TNumeric(T))
+    val fixpt_to_string = direct (FixPt) ("fixpt_to_string", (S,I,F), FixPt(S,I,F) :: MString)
+    val fixpt_to_fltpt = direct (FixPt) ("fixpt_to_fltpt", (S,I,F,G,E), FixPt(S,I,F) :: FltPt(G,E))
+    val convert_fixpt = direct (FixPt) ("convert_fixpt", (S,I,F,S2,I2,F2), FixPt(S,I,F) :: FixPt(S2,I2,F2))
 
-    val numeric_to_fltpt = internal (Flt) ("constFlt", T, T :: Flt, TNumeric(T))
-    val fltpt_to_string = direct (Flt) ("fltpt_to_string", Nil, Flt :: MString)
-    val fltpt_to_fixpt = direct (Flt) ("fltpt_to_fixpt", Nil, Flt :: Fix)
+    val const_to_fltpt = internal (FltPt) ("constFltPt", (T,G,E), T :: FltPt(G,E), TNumeric(T))
+    val fltpt_to_string = direct (FltPt) ("fltpt_to_string", (G,E), FltPt(G,E) :: MString)
+    val fltpt_to_fixpt = direct (FltPt) ("fltpt_to_fixpt", (G,E,S,I,F), FltPt(G,E) :: FixPt(S,I,F))
+    val convert_fltpt = direct (FltPt) ("convert_fltpt", (G,E,G2,E2), FltPt(G,E) :: FltPt(G2,E2))
+
+
+    // For testing / compatibility with rest of Delite and LMS
+    val fix_to_rep_int = internal (Tpes) ("fix_to_int", (S,I), FixPt(S,I,Z) :: MInt)
+    val rep_int_to_fix = internal (Tpes) ("int_to_fix", (S,I), MInt :: FixPt(S,I,Z))
+    val bit_to_bool    = internal (Tpes) ("bit_to_bool", Nil, Bit :: MBoolean)
+
+
+    // --- Internals
+    direct (Tpes) ("lift_to", (T,R), T :: R, TNumeric(T)) implements composite ${
+      manifest[R] match {
+        case mR if isFixPtType(mR) =>
+          fixPt($0)(manifest[T], mR.typeArguments(0),mR.typeArguments(1),mR.typeArguments(1),implicitly[SourceContext],implicitly[Numeric[T]]).asInstanceOf[Rep[R]]
+
+        case mR if isFltPtType(mR) =>
+          fltPt($0)(manifest[T], mR.typeArguments(0),mR.typeArguments(1),implicitly[SourceContext],implicitly[Numeric[T]]).asInstanceOf[Rep[R]]
+
+        case mR =>
+          stageError("Don't know how to cast type " + manifest[T].runtimeClass.getSimpleName + " to " + mR.runtimeClass.getSimpleName)
+      }
+    }
+
+    direct (Tpes) ("cast_fixpt_to", (S,I,F,R), FixPt(S,I,F) :: R) implements composite ${
+      manifest[R] match {
+        case mR if isFixPtType(mR) =>
+          convert_fixpt($0)(manifest[S],manifest[I],manifest[F],mR.typeArguments(0),mR.typeArguments(1),mR.typeArguments(2), implicitly[SourceContext]).asInstanceOf[Rep[R]]
+
+        case mR if isFltPtType(mR) =>
+          fixpt_to_fltpt($0)(manifest[S],manifest[I],manifest[F],mR.typeArguments(0),mR.typeArguments(1), implicitly[SourceContext]).asInstanceOf[Rep[R]]
+
+        case mR =>
+          stageError("Don't know how to cast fixed point value to " + mR.runtimeClass.getSimpleName + ".")
+      }
+    }
+
+
+    direct (Tpes) ("cast_fltpt_to", (G,E,R), FltPt(G,E) :: R) implements composite ${
+      manifest[R] match {
+        case mR if isFltPtType(mR) =>
+          convert_fltpt($0)(manifest[G],manifest[E],mR.typeArguments(0),mR.typeArguments(1), implicitly[SourceContext]).asInstanceOf[Rep[R]]
+
+        case mR if isFixPtType(mR) =>
+          fltpt_to_fixpt($0)(manifest[G],manifest[E],mR.typeArguments(0),mR.typeArguments(1),mR.typeArguments(2), implicitly[SourceContext]).asInstanceOf[Rep[R]]
+
+        case mR =>
+          stageError("Don't know how to cast floating point value to " + mR.runtimeClass.getSimpleName + ".")
+      }
+    }
+
 
     // --- API
-    direct (Tpes) ("bit", T, SBoolean :: Bit) implements composite ${ constBit($0) }
-    direct (Tpes) ("fixPt", T, T :: Fix, TNumeric(T)) implements composite ${ constFix($0) }
-    direct (Tpes) ("fltPt", T, T :: Flt, TNumeric(T)) implements composite ${ constFlt($0) }
+    // TODO: Add precision checking (can this number fit in that representation?)
+    direct (Tpes) ("bit", Nil, SBoolean :: Bit) implements composite ${ constBit($0) }
 
+    // Primarily for internal use, but users can use this as well (but is less friendly syntax, e.g. fixPt[Int,...](value) )
+    direct (Tpes) ("fixPt", (T,S,I,F), T :: FixPt(S,I,F), TNumeric(T)) implements composite ${
+      constFixPt[T,S,I,F]($0)
+    }
+    direct (Tpes) ("fltPt", (T,G,E), T :: FltPt(G,E), TNumeric(T)) implements composite ${
+      constFltPt[T,G,E]($0)
+    }
+
+    // TODO: Can probably change this to be an infix defined for all T:Numeric
+    // Using "as" rather than "to" since "to" is already defined for int
     infix (Tpes) ("toBit", Nil, SBoolean :: Bit) implements composite ${ constBit($0) }
-    infix (Bit) ("toString", Nil, Bit :: MString) implements redirect ${ bit_to_string($0) }
-    infix (Bit) ("mkString", Nil, Bit :: MString) implements redirect ${ bit_to_string($0) }
-
-    infix (Tpes) ("toFixPt", T, T :: Fix, TNumeric(T)) implements composite ${ constFix($0) }
-    /*infix (Tpes) ("toFixPt", Nil, SInt :: Fix) implements redirect ${ long_to_fixpt($0.toLong) }
-    infix (Tpes) ("toFixPt", Nil, SLong :: Fix) implements redirect ${ long_to_fixpt($0) }
-    infix (Tpes) ("toFixPt", Nil, SFloat :: Fix) implements redirect ${ double_to_fixpt($0.toDouble) }
-    infix (Tpes) ("toFixPt", Nil, SDouble :: Fix) implements redirect ${ double_to_fixpt($0) }*/
-    infix (Fix) ("toString", Nil, Fix :: MString) implements redirect ${ fixpt_to_string($0) }
-    infix (Fix) ("mkString", Nil, Fix :: MString) implements redirect ${ fixpt_to_string($0) }
-    infix (Fix) ("toFltPt", Nil, Fix :: Flt) implements redirect ${ fixpt_to_fltpt($0) }
+    infix (Tpes) ("as", R, SInt :: R) implements redirect ${ lift_to[Int,R]($0) }
+    infix (Tpes) ("as", R, SLong :: R) implements redirect ${ lift_to[Long,R]($0) }
+    infix (Tpes) ("as", R, SFloat :: R) implements redirect ${ lift_to[Float,R]($0) }
+    infix (Tpes) ("as", R, SDouble :: R) implements redirect ${ lift_to[Double,R]($0) }
 
 
-    infix (Tpes) ("toFltPt", T, T :: Flt, TNumeric(T)) implements composite ${ constFlt($0) }
-    /*infix (Tpes) ("toFltPt", Nil, SInt :: Flt) implements redirect ${ long_to_fltpt($0.toLong) }
-    infix (Tpes) ("toFltPt", Nil, SLong :: Flt) implements redirect ${ long_to_fltpt($0) }
-    infix (Tpes) ("toFltPt", Nil, SFloat :: Flt) implements redirect ${ double_to_fltpt($0.toDouble) }
-    infix (Tpes) ("toFltPt", Nil, SDouble :: Flt) implements redirect ${ double_to_fltpt($0) }*/
-    infix (Flt) ("toString", Nil, Flt :: MString) implements redirect ${ fltpt_to_string($0) }
-    infix (Flt) ("mkString", Nil, Flt :: MString) implements redirect ${ fltpt_to_string($0) }
-    infix (Flt) ("toFixPt", Nil, Flt :: Fix) implements redirect ${ fltpt_to_fixpt($0) }
+    val Bit_API = withTpe(Bit)
+    Bit_API {
+      infix ("toString") (Nil :: MString) implements redirect ${ bit_to_string($0) }
+      infix ("mkString") (Nil :: MString) implements redirect ${ bit_to_string($0) }
+    }
 
-    // TODO: Add more
-    fimplicit (Tpes) ("sboolean_to_bit", Nil, SBoolean :: Bit) implements composite ${ constBit($0) }
-    fimplicit (Tpes) ("sint_to_fixpt", Nil, SInt :: Fix) implements composite ${ constFix($0) }
-    fimplicit (Tpes) ("sfloat_to_fltpt", Nil, SFloat :: Flt) implements composite ${ constFlt($0) }
+    val Fix_API = withTpe(FixPt)
+    Fix_API {
+      infix ("toString") (Nil :: MString) implements redirect ${ fixpt_to_string($self) }
+      infix ("mkString") (Nil :: MString) implements redirect ${ fixpt_to_string($self) }
+      infix ("to") (Nil :: R, addTpePars = R) implements redirect ${ cast_fixpt_to[S,I,F,R]($self) }
+    }
+
+    val Flt_API = withTpe(FltPt)
+    Flt_API {
+      infix ("toString") (Nil :: MString) implements redirect ${ fltpt_to_string($self) }
+      infix ("mkString") (Nil :: MString) implements redirect ${ fltpt_to_string($self) }
+      infix ("to") (Nil :: R, addTpePars = R) implements redirect ${ cast_fltpt_to[G,E,R]($self) }
+    }
+
+    // TODO: Add more?
+
+    // Needed for if-then-else and while (default requires Rep[Boolean] and overloading is tough in these cases)
+    fimplicit (Tpes) ("bit_to_boolean", Nil, Bit :: MBoolean) implements composite ${ bit_to_bool($0) }
+
+    fimplicit (Tpes) ("sboolean_to_bit", Nil, SBoolean :: Bit) implements redirect ${ bit($0) }
+    fimplicit (Tpes) ("scala_int_to_fixpt", (S,I,F), SInt :: FixPt(S,I,F)) implements redirect ${ fixPt[Int,S,I,F]($0) }
+    fimplicit (Tpes) ("scala_float_to_fltpt", (G,E), SFloat :: FltPt(G,E)) implements redirect ${ fltPt[Float,G,E]($0) }
 
 
     // --- Scala Backend
     impl (boolean_to_bit) (codegen($cala, ${ $0 }))
-    impl (bit_to_string) (codegen($cala, ${ $0.toString }))
+    impl (bit_to_string)  (codegen($cala, ${ $0.toString }))
+    impl (bit_to_bool)    (codegen($cala, ${ $0 }))
 
-    impl (numeric_to_fixpt) (codegen($cala, ${ $0.toLong }))
+    impl (const_to_fixpt) (codegen($cala, ${
+      @ val signed = sign[S]
+      @ val intbits = nbits[I]
+      @ val fracbits = nbits[F]
+      FixedPoint($0.toString)(FixFormat($signed,$intbits,$fracbits))
+    }))
     impl (fixpt_to_string) (codegen($cala, ${ $0.toString }))
-    impl (fixpt_to_fltpt) (codegen($cala, ${ $0.toDouble }))
+    impl (fixpt_to_fltpt) (codegen($cala, ${
+      @ val sigbits = nbits[G]
+      @ val expbits = nbits[E]
+      $0.toFloatPoint(FloatFormat($sigbits, $expbits))
+    }))
+    impl (convert_fixpt) (codegen($cala, ${
+      @ val signed = sign[S2]
+      @ val intbits = nbits[I2]
+      @ val fracbits = nbits[F2]
+      $0.changeFormat(FixFormat($signed,$intbits,$fracbits))
+    }))
+    impl (fix_to_rep_int) (codegen($cala, ${ $0.toInt }))
+    impl (rep_int_to_fix) (codegen($cala, ${
+      @ val signed = sign[S]
+      @ val intbits = nbits[I]
+      FixedPoint($0)(FixFormat($signed, $intbits, 0))
+    }))
 
-    impl (numeric_to_fltpt) (codegen($cala, ${ $0.toDouble }))
+
+    impl (const_to_fltpt) (codegen($cala, ${
+      @ val sigbits = nbits[G]
+      @ val expbits = nbits[E]
+      FloatPoint($0.toString)(FloatFormat($sigbits, $expbits))
+    }))
     impl (fltpt_to_string) (codegen($cala, ${ $0.toString }))
-    impl (fltpt_to_fixpt) (codegen($cala, ${ $0.toLong }))
+    impl (fltpt_to_fixpt) (codegen($cala, ${
+      @ val signed = sign[S]
+      @ val intbits = nbits[I]
+      @ val fracbits = nbits[F]
+      $0.toFixedPoint(FixFormat($signed, $intbits, $fracbits))
+    }))
+    impl (convert_fltpt) (codegen($cala, ${
+      @ val sigbits = nbits[G2]
+      @ val expbits = nbits[E2]
+      $0.changeFormat(FloatFormat($sigbits, $expbits))
+    }))
 
-    /*val fix_to_string = internal (FixPt) ("fix_to_string", Nil, (("sign", FixPt), ("int", FixPt), ("frac", FixPt)) :: MString)
-    impl (fix_to_string) (codegen ($cala, ${
-      (if ($sign == 0L) "" else "-") + $int + "." + $frac
-    }))*/
-
-    /*	val int = $0
-			val intPrec = 31
-			val fracPrec = 0
-			if (int > scala.math.pow(2,intPrec))
-				throw new Exception("Integer precision not enough to hold integer value " + int)
-			int.toLong
-		}))*/
-
-		/*direct (TpeOps) ("FixPt", Nil, (MFloat,MInt,MInt) :: FixPt) implements codegen ($cala, ${
-			val flt = $0
-			val intPrec = $1
-			val fracPrec = $2
-			if (scala.math.round(flt) > scala.math.pow(2,intPrec))
-				throw new Exception("Integer precision not enough to hold integer value " + scala.math.round(flt))
-			scala.math.round(flt * scala.math.pow(2,fracPrec)).toLong
-		})*/
-
-		/*val FixPtOps = withTpe(FixPt)
-		FixPtOps {
-			infix ("getSign") (Nil :: FixPt) implements composite ${
-				val MAX_FIXPT_PRECISION = 64
-				val SIGN_MASK = 1L << (MAX_FIXPT_PRECISION-1)
-				(SIGN_MASK & $0) << ((MAX_FIXPT_PRECISION-1).toFixPt)
-			}
-			/* getInt(intPrec, fracPrec): returns integer part of the fix point number */
-			infix ("getInt") (Nil:: FixPt) implements composite ${
-				val intPrec = 31L
-				val fracPrec = 0L
-				//val intPrec = $1
-				//val fracPrec = $2
-				val intMask = 1L << (intPrec + fracPrec) - 1L
-				(abs($self) & intMask) << (fracPrec)
-			}
-			/* getFrac(fracPrec): returns fraction part of the fix point number */
-			infix ("getFrac") (Nil :: FixPt) implements composite ${
-				val fracPrec = 0
-				//val fracPrec = $1
-				val fracMask = (1L << fracPrec.toFixPt) - 1L
-				(abs($self) & fracMask)
-			}
-			//TODO: Fix this. right now always print 0.0
-			infix ("mkString") (Nil:: MString) implements composite ${
-				fix_to_string($self.getSign, $self.getInt, $self.getFrac)
-			}
-			val fix2Float = infix ("toFloat") (Nil :: MFloat)
-			impl (fix2Float) (codegen($cala, ${
-				val intprec = 31
-				val fracprec = 0
-				$self.toFloat * scala.math.pow(2,-fracprec).toFloat
-			}))
-			val fix2Int = infix ("toInt") (Nil :: MInt)
-			impl (fix2Int) (codegen ($cala, ${
-				val intprec = 31
-				val fracprec = 0
-				($self >> fracprec.toLong).toInt
-			}))
-		}*/
-
-
-
-		/*TODO: these should be for internal use only. No codegen rules */
-		/*val IntOps = withTpe (MInt)
-		IntOps {
-			val int2fxp = infix ("toFixPt") (Nil::FixPt)
-			impl (int2fxp) (codegen($cala, ${ $self.toLong } ))
-
-			infix ("+") (MInt :: MInt) implements codegen ($cala, ${ $self + $1 })
-			infix ("-") (MInt :: MInt) implements codegen ($cala, ${ $self - $1 })
-			infix ("*") (MInt :: MInt) implements codegen ($cala, ${ $self * $1 })
-			infix ("/") (MInt :: MInt) implements codegen ($cala, ${ $self / $1 })
-
-			infix ("==") (MInt :: MBoolean) implements codegen ($cala, ${ $self == $1 })
-			infix ("<") (MInt :: MBoolean) implements codegen ($cala, ${ $self < $1 })
-		}*/
-
-		//fimplicit (TpeOps) ("fixpt_to_float", Nil, FixPt::MFloat) implements composite ${ $0.toFloat }
-		//fimplicit (TpeOps) ("float_to_fixpt", Nil, MFloat::FixPt) implements composite ${ $0.toFixPt }
-		//fimplicit (TpeOps) ("int_to_fixpt", Nil, MInt::FixPt) implements composite ${ $0.toFixPt }
-		//fimplicit (TpeOps) ("sint_to_fixpt", Nil, SInt::FixPt) implements composite ${ unit($0).toFixPt }
 	}
 }

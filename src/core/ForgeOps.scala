@@ -132,6 +132,7 @@ trait ForgeOps extends Base with ForgeTraversalOps {
   def infix_as(p: ParallelizeKey, dc: ParallelCollection) = forge_isparallelcollection(p.tpe, dc)
   def infix_as(p: ParallelizeKey, dc: ParallelCollectionBuffer) = forge_isparallelcollection_buffer(p.tpe, dc)
 
+  def lookupAlias(tpeName: String) = forge_lookup_alias(tpeName)
   def lookupTpe(tpeName: String, stage: StageTag = future) = forge_lookup_tpe(tpeName,stage)
   def lookupTpeClass(tpeClassName: String) = forge_lookup_tpe_class(tpeClassName)
   def lookupGrp(grpName: String) = forge_lookup_grp(grpName)
@@ -164,6 +165,7 @@ trait ForgeOps extends Base with ForgeTraversalOps {
   def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
   def forge_isparallelcollection(tpe: Rep[DSLType], dc: ParallelCollection): Rep[Unit]
   def forge_isparallelcollection_buffer(tpe: Rep[DSLType], dc: ParallelCollectionBuffer): Rep[Unit]
+  def forge_lookup_alias(tpeName: String): Rep[DSLType]
   def forge_lookup_tpe(tpeName: String, stage: StageTag): Rep[DSLType]
   def forge_lookup_tpe_class(tpeClassName: String): Option[Rep[DSLTypeClass]]
   def forge_lookup_grp(grpName: String): Rep[DSLGroup]
@@ -185,6 +187,7 @@ trait ForgeSugarLowPriority extends ForgeOps {
   implicit def tuple3ToList[T](t: (Rep[T],Rep[T],Rep[T])): List[Rep[T]] = List(t._1,t._2,t._3)
   implicit def tuple4ToList[T](t: (Rep[T],Rep[T],Rep[T],Rep[T])): List[Rep[T]] = List(t._1,t._2,t._3,t._4)
   implicit def tuple5ToList[T](t: (Rep[T],Rep[T],Rep[T],Rep[T],Rep[T])): List[Rep[T]] = List(t._1,t._2,t._3,t._4,t._5)
+  implicit def tuple6ToList[T](t: (Rep[T],Rep[T],Rep[T],Rep[T],Rep[T],Rep[T])): List[Rep[T]] = List(t._1,t._2,t._3,t._4,t._5,t._6)
 
   implicit def namedArgToList(t: (String,Rep[DSLType])): List[Rep[DSLArg]] = List(namedTpeToArg(t))
   implicit def namedArg2ToList(t: ((String,Rep[DSLType]),(String,Rep[DSLType]))): List[Rep[DSLArg]] = List(namedTpeToArg(t._1),namedTpeToArg(t._2))
@@ -351,10 +354,17 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
    * Convenience method providing access to defined ops in other modules
    */
 
+  def forge_lookup_alias(tpeName: String): Rep[DSLType] = {
+    val tpe = TpeAliases.find(_.name == tpeName)
+    if (tpe.isEmpty)
+      err("Lookup failed: no tpeAlias exists with name " + tpeName)
+    tpe.get
+  }
+
   def forge_lookup_tpe(tpeName: String, stage: StageTag): Rep[DSLType] = {
     val t = Tpes.find(t => t.name == tpeName && t.stage == stage)
     if (t.isEmpty) {
-      err("lookup failed: no tpe exists with name " + tpeName + " and stage " + stage)
+      err("Lookup failed: no tpe exists with name " + tpeName + " and stage " + stage)
     }
     t.get
   }

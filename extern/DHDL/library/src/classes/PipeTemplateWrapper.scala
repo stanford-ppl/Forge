@@ -12,10 +12,10 @@ trait PipeTemplateWrapper {
   this: DHDLBase with DHDLClasses =>
 
   // TODO: Better way to do this besides recursion?
-  private def loop(cchain: Rep[CounterChain], idx: Int, indices: List[Fix], func: Rep[Indices] => Rep[Unit]): Rep[Unit] = {
+  def loop(cchain: Rep[CounterChain], idx: Int, indices: List[FixPt[Signed,B32,B0]], func: Rep[Indices] => Rep[Unit]): Rep[Unit] = {
     val ctr = cchain(idx)
     if (idx == cchain.length - 1) {
-      for (i <- ctr) { func(indices_new(indices :+ i)) }
+      for (i <- ctr) { func(indices_create(indices :+ i)) }
     }
     else {
       for (i <- ctr) { loop(cchain, idx+1, indices :+ i, func) }

@@ -1074,9 +1074,36 @@ trait DeliteGenOps extends BaseGenOps {
     }
   }
 
+
   /**
    * Emit code generators for all codegen nodes in the given op group
    */
+  def makeNodeImplicits(o: Rep[DSLOp], xf: String = "f") = {
+    o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++
+    o.implicitArgs.map { a =>
+      val argName = opIdentifierPrefix + "." + a.name
+      if (isTpeClass(a.tpe)) asTpeClass(a.tpe).signature.wrapper.getOrElse("") + "(" + argName + ")" else argName
+    }
+  }
+
+  def makeEmitMethodName(o: Rep[DSLOp]) = "emit_" + makeOpMethodName(o)
+  def makeEmitMethodCall(o: Rep[DSLOp]) = {
+    val opArgs = makeArgsWithBoundSyms(o.args, Impls(o)).drop(1)
+    val lhsArg = "sym, " + opIdentifierPrefix + (if (o.args.isEmpty) "" else ", ")
+    val implicits = makeNodeImplicits(o)
+    val implicitsWithParens = if (implicits.isEmpty) "" else implicits.mkString("(",",",")")
+    makeEmitMethodName(o) + "(" + lhsArg + opArgs + implicitsWithParens
+  }
+
+  // TODO: Doesn't handle methods which require implicit overload arguments
+  def makeEmitMethodSignature(o: Rep[DSLOp]) = {
+    val implicitArgs = makeOpImplicitArgsWithType(o)
+    val lhsArg = "sym: Exp[Any], " + opIdentifierPrefix + ": " + makeOpNodeName(o) + makeTpePars(o.tpePars) + (if (o.args.isEmpty) "" else ", ")
+    // TODO: makeArgs doesn't actually honor addParen in the way you would expect (changing it to also leads to weird issues elsewhere)
+    "def " + makeEmitMethodName(o) + makeTpeParsWithBounds(o.tpePars) + "(" + lhsArg + makeArgsWithBoundSymsWithType(o.args, Impls(o), blockify).drop(1) + implicitArgs
+  }
+
+
   def emitOpCodegen(opsGrp: DSLOps, stream: PrintWriter) {
     val rules = unique(opsGrp.ops).map(o => (o,Impls(o))).filter(_._2.isInstanceOf[CodeGen])
     if (rules.length > 0){
@@ -1087,18 +1114,22 @@ trait DeliteGenOps extends BaseGenOps {
         val generatorRules = rules.flatMap{case (o,i) => i.asInstanceOf[CodeGen].decls.collect{case (k,r) if (k == g) => (o,r)}}
         if (generatorRules.length > 0) {
           stream.println("trait " + g.name + "Gen" + opsGrp.name + " extends " + g.name + "GenFat {")
-          stream.println("  val IR: " + opsGrp.name + "Exp with " + dsl + "MetadataOpsExp")
+          stream.println("  val IR: " + opsGrp.name + "Exp with " + dsl + "MetadataOpsExp with " + dsl + "TypeClasses")
           stream.println("  import IR._")
           stream.println()
-          stream.println("  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {")
+
+          // how do we decide whether to add stream.println?
+          // hack! (or heuristic, if the glass is half full)
+          def shouldInline(s: String) = s.startsWith("@")
+          def emitLines(lines: List[String], lineEnd: String = "") = lines.foreach{ line =>
+            if (shouldInline(line)) emitWithIndent(line.drop(1), stream, 4)
+            else emitWithIndent("stream.println(" + line + " + \"" + lineEnd + "\")", stream, 4)
+          }
+
+
+          // --- Experimental modified version of gen for codegen rules - may not work 100% yet for cpp/cuda
           for ((op,r) <- generatorRules) {
-            stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(op) + " => ")
-
-            // --- Experimental modified version of gen for codegen rules - may not work 100% yet for cpp/cuda!
-
-            // how do we decide whether to add stream.println?
-            // hack! (or heuristic, if the glass is half full)
-            def shouldInline(s: String) = s.startsWith("@")
+            stream.println("  private " + makeEmitMethodSignature(op) + " {")
 
             val body = r.decl match {
               case Const(s: String) => s.trim.split(nl).toList.map(_.trim).flatMap{ line =>
@@ -1107,17 +1138,11 @@ trait DeliteGenOps extends BaseGenOps {
               }
               case x => err("Don't know how to generate codegen rules from type " + x.tp)
             }
-
-            def emitLines(lines: List[String], lineEnd: String = "") = lines.foreach{ line =>
-              if (shouldInline(line)) emitWithIndent(line.drop(1), stream, 6)
-              else emitWithIndent("stream.println(" + line + " + \"" + lineEnd + "\")", stream, 6)
-            }
-
             g match {
               case `$cala` =>
-                emitWithIndent("stream.println(\"val \"+quote(sym)+\" = {\")", stream, 6)
+                emitWithIndent("stream.println(\"val \"+quote(sym)+\" = {\")", stream, 4)
                 emitLines(body)
-                emitWithIndent("stream.println(\"}\")", stream, 6)
+                emitWithIndent("stream.println(\"}\")", stream, 4)
 
               case `cuda` | `cpp` =>
                 if (op.retTpe == MUnit || op.retTpe == MNothing) {
@@ -1128,42 +1153,22 @@ trait DeliteGenOps extends BaseGenOps {
                     err("Last line of cpp / cuda method must be return expression")
 
                   emitLines(body.take(body.length - 1), lineEnd = ";")
-                  emitWithIndent("stream.print(remapWithRef(sym.tp) + \" \" + quote(sym) + \" = \")", stream, 6)
-                  emitWithIndent("stream.print(" + body.last + ")", stream, 6)
-                  emitWithIndent("stream.println(\";\")", stream, 6)
+                  emitWithIndent("stream.print(remapWithRef(sym.tp) + \" \" + quote(sym) + \" = \")", stream, 4)
+                  emitWithIndent("stream.print(" + body.last + ")", stream, 4)
+                  emitWithIndent("stream.println(\";\")", stream, 4)
                 }
 
               case `dot` => emitLines(body)
-
               case _ => err("Unsupported codegen: " + g.toString)
             }
+            stream.println("  }")
             stream.println()
+          }
 
-            /*val body = quote(r.decl).trim.split(nl).toList
 
-            val body2 = body map { l => if (!shouldInline(l)) "stream.print("+l+")" else l }
-            // use stream.print, since the new lines from the original interpolated code block are still there
-            g match {
-              case `$cala` =>
-                val result = ("stream.println(\"val \"+quote(sym)+\" = {\")" :: body2) :+ "stream.println(\"}\")"
-                result.foreach { line => emitWithIndent(line, stream, 6) }
-              case `cuda` | `cpp` =>
-                if (op.retTpe == MUnit || op.retTpe == MNothing) {
-                  body2.foreach { line => emitWithIndent(line, stream, 6) }
-                  emitWithIndent("stream.println(\";\")", stream, 6)
-                }
-                else {
-                  body2.take(body2.length-1).foreach { line => emitWithIndent(line, stream, 6) }
-
-                  emitWithIndent(body2.last, stream, 6)
-                  emitWithIndent("stream.println(\";\")", stream, 6)
-                }
-              case `dot` =>
-                val result = body2
-                result.foreach { line => emitWithIndent(line, stream, 6) }
-              case _ => throw new RuntimeException("Not supported codgen:" + g.toString)
-            }
-            stream.println()*/
+          stream.println("  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {")
+          for ((op,r) <- generatorRules) {
+            stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(op) + " => " + makeEmitMethodCall(op))
           }
           stream.println("    case _ => super.emitNode(sym, rhs)")
           stream.println("  }")

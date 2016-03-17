@@ -6,28 +6,60 @@ trait DHDLMisc {
   this: DHDLDSL =>
 
   def importDHDLMisc() {
-    importDHDLHelper()
+    importDHDLHelpers()
     importDHDLTestingOps()
   }
 
-	def importDHDLHelper() {
+	def importDHDLHelpers() {
     val Misc = grp("DHDLMisc")
 
     val T = tpePar("T")
-    val Fix = lookupTpe("Fix")
 
-    // Multi-dimensional addressing
-    internal (Misc) ("calcAddress", Nil, (("indices", SList(Fix)), ("dims", SList(SInt))) :: Fix) implements composite ${
+    val Idx = lookupAlias("SInt")
+
+    // Staging time warnings and errors
+    internal (Misc) ("stageWarn", Nil, SAny :: SUnit, effect = simple) implements composite ${
+      System.out.println("[\u001B[33mwarn\u001B[0m] " + __pos.fileName + ":" + __pos.line + ": " + $0)
+    }
+    internal (Misc) ("stageError", Nil, SAny :: SNothing, effect = simple) implements composite ${
+      System.out.println("[\u001B[31merror\u001B[0m] " + __pos.fileName + ":" + __pos.line + ": " + $0)
+      sys.exit(-1)
+    }
+
+
+    // --- Multi-dimensional addressing
+    // NOTE: Two versions (one for constant dimensions, one for staged dimensions)
+    internal (Misc) ("sdimsToStrides", Nil, ("dims", SList(SInt)) :: SList(SInt)) implements composite ${
+      List.tabulate($dims.length){d =>
+        if (d == $dims.length - 1) 1
+        else $dims.drop(d + 1).reduce(_*_)
+      }
+    }
+    internal (Misc) ("calcLocalAddress", Nil, (("indices", SList(Idx)), ("dims", SList(SInt))) :: Idx) implements composite ${
       if ($indices.length == 1) indices.apply(0)  // Flat indexing is always allowed
       else {
         if ($indices.length != $dims.length) {
-          stageWarn("Trying to address " + $dims.length + "D memory using " + $indices.length + "D addressing")
+          stageWarn("Trying to address local " + $dims.length + "D memory using " + $indices.length + "D addressing")
         }
-        val strides = List.tabulate($dims.length){d =>
-          if (d == $dims.length - 1) 1
-          else $dims.drop(d + 1).reduce(_*_)
-        }
-        List.tabulate($indices.length){i => strides(i).toFixPt * $indices(i) }.reduce{_+_}
+        val strides = sdimsToStrides($1)
+        sumTree( List.tabulate($indices.length){i => $indices(i) * strides(i) } )
+      }
+    }
+
+    internal (Misc) ("dimsToStrides", Nil, ("dims", SList(Idx)) :: SList(Idx)) implements composite ${
+      List.tabulate($dims.length){d =>
+        if (d == $dims.length - 1) 1.as[SInt]
+        else productTree( $dims.drop(d + 1) )
+      }
+    }
+    internal (Misc) ("calcFarAddress", Nil, (("indices", SList(Idx)), ("dims", SList(Idx))) :: Idx) implements composite ${
+      if ($indices.length == 1) indices.apply(0)
+      else {
+        if ($indices.length != $dims.length)
+          stageWarn("Trying to address far " + $dims.length + "D memory using " + $indices.length + "D addressing")
+
+        val strides = dimsToStrides($1)
+        sumTree( List.tabulate($indices.length){i => $indices(i) * strides(i) } )
       }
     }
 
@@ -52,29 +84,30 @@ trait DHDLMisc {
     val T = tpePar("T")
     val S = tpePar("S")
     val R = tpePar("R")
-    val Fix = lookupTpe("Fix")
-    val Bit = lookupTpe("Bit")
-    val Coll = lookupGrp("Coll").asInstanceOf[Rep[DSLTypeClass]]
+
+    val Idx  = lookupAlias("SInt")
+    val Bit  = lookupTpe("Bit")
+    val Coll = lookupTpeClass("Coll").get
 
     val ArrColl = tpeClassInst("ArrayColl", T, Coll(MArray(T)))
     infix (ArrColl) ("empty", T, Nil :: MArray(T)) implements composite ${ array_empty_imm[T](unit(0)) }
     infix (ArrColl) ("zeros", T, MArray(T) :: MArray(T)) implements composite ${ array_empty_imm[T]($0.length) }  // TODO: Should be recursive?
 
     val Arr = grp("Array")
-    static (Arr) ("empty", T, Fix :: MArray(T)) implements composite ${ array_empty[T](fix_to_int($0)) }
+    static (Arr) ("empty", T, Idx :: MArray(T)) implements composite ${ array_empty[T](fix_to_int($0)) }
 
-    static (Arr) ("fill", T, CurriedMethodSignature(List(List(Fix), List(MThunk(T))), MArray(T))) implements composite ${
+    static (Arr) ("fill", T, CurriedMethodSignature(List(List(Idx), List(MThunk(T))), MArray(T))) implements composite ${
       array_fromfunction(fix_to_int($0), {i: Rep[Int] => $1})
     }
-    static (Arr) ("tabulate", T, CurriedMethodSignature(List(List(Fix),List(Fix ==> T)), MArray(T))) implements composite ${
-      array_fromfunction(fix_to_int($0), {i: Rep[Int] => $1(int_to_fix(i)) })
+    static (Arr) ("tabulate", T, CurriedMethodSignature(List(List(Idx),List(Idx ==> T)), MArray(T))) implements composite ${
+      array_fromfunction(fix_to_int($0), {i: Rep[Int] => $1(int_to_fix[Signed,B32](i)) })
     }
 
 
     val API = grp("ForgeArrayAPI") // ForgeArrayOps already exists...
     infix (API) ("length", T, MArray(T) :: MInt) implements composite ${ array_length($0) }
-    infix (API) ("apply", T, (MArray(T), Fix) :: T) implements composite ${ array_apply($0, fix_to_int($1)) }
-    infix (API) ("update", T, (MArray(T), Fix, T) :: MUnit, effect = write(0)) implements composite ${ array_update($0, fix_to_int($1), $2) }
+    infix (API) ("apply", T, (MArray(T), Idx) :: T) implements composite ${ array_apply($0, fix_to_int($1)) }
+    infix (API) ("update", T, (MArray(T), Idx, T) :: MUnit, effect = write(0)) implements composite ${ array_update($0, fix_to_int($1), $2) }
 
     infix (API) ("map", (T,R), (MArray(T), T ==> R) :: MArray(R)) implements composite ${ array_map($0, $1) }
     infix (API) ("zip", (T,S,R), CurriedMethodSignature(List(List(MArray(T),MArray(S)), List( (T,S) ==> R)), MArray(R))) implements composite ${
@@ -91,33 +124,51 @@ trait DHDLMisc {
 
   def importRandomOps() {
     val Rand = grp("Rand")
+
     val A = tpePar("A")
-    val Bit = lookupTpe("Bit")
-    val Fix = lookupTpe("Fix")
-    val Flt = lookupTpe("Flt")
+
+    val Bit   = lookupTpe("Bit")
+    val FixPt = lookupTpe("FixPt")
+    val FltPt = lookupTpe("FltPt")
 
     // The "effect" here is a change to the pseudorandom generator (lifts out of loops otherwise)
-    val rand_fix_bnd = internal (Rand) ("rand_fix_bnd", Nil, Fix :: Fix, effect = simple)
-    val rand_fix = internal (Rand) ("rand_fix", Nil, Nil :: Fix, effect = simple)
-    val rand_flt = internal (Rand) ("rand_flt", Nil, Nil :: Flt, effect = simple)
+    val rand_fix_bnd = internal (Rand) ("rand_fix_bnd", (S,I,F), FixPt(S,I,F) :: FixPt(S,I,F), effect = simple)
+    val rand_fix = internal (Rand) ("rand_fix", (S,I,F), Nil :: FixPt(S,I,F), effect = simple)
+    val rand_flt = internal (Rand) ("rand_flt", (G,E), Nil :: FltPt(G,E), effect = simple)
     val rand_bit = internal (Rand) ("rand_bit", Nil, Nil :: Bit, effect = simple)
 
-    direct (Rand) ("randomFix", Nil, Fix :: Fix) implements composite ${ rand_fix_bnd($0) }
+    direct (Rand) ("randomFix", (S,I,F), FixPt(S,I,F) :: FixPt(S,I,F)) implements composite ${ rand_fix_bnd($0) }
 
+    // Holy hackery, batman!
     direct (Rand) ("random", A, Nil :: A) implements composite ${
       manifest[A] match {
-        case mA if mA == manifest[Fix] => rand_fix.asInstanceOf[Rep[A]]
-        case mA if mA == manifest[Flt] => rand_flt.asInstanceOf[Rep[A]]
-        case mA if mA == manifest[Bit] => rand_bit.asInstanceOf[Rep[A]]
-        case mA => stageError("No random implementation for type " + mA.toString)
+        case mA if isFixPtType(mA) =>
+          rand_fix()(mA.typeArguments(0), mA.typeArguments(1), mA.typeArguments(2), implicitly[SourceContext]).asInstanceOf[Rep[A]]
+
+        case mA if isFltPtType(mA) =>
+          rand_flt()(mA.typeArguments(0), mA.typeArguments(1), implicitly[SourceContext]).asInstanceOf[Rep[A]]
+
+        case mA if isBitType(mA) =>
+          rand_bit.asInstanceOf[Rep[A]]
+
+        case mA => stageError("No random implementation for type " + mA.runtimeClass.getSimpleName)
       }
     }
 
     // --- Scala backend
     // TODO: Assumes maximum value is an integer (not a Long)
-    impl (rand_fix_bnd) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextInt($0.toInt).toLong }))
-    impl (rand_fix) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextInt().toLong }))
-    impl (rand_flt) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextDouble() }))
+    impl (rand_fix_bnd) (codegen($cala, ${ FixedPoint.rand($0) }))
+    impl (rand_fix) (codegen($cala, ${
+      @val signed = sign[S]
+      @val intbits = nbits[I]
+      @val fracbits = nbits[F]
+      FixedPoint.rand(FixFormat($signed, $intbits, $fracbits))
+    }))
+    impl (rand_flt) (codegen($cala, ${
+      @val sigbits = nbits[G]
+      @val expbits = nbits[E]
+      FloatPoint.rand(FloatFormat($sigbits, $expbits))
+    }))
     impl (rand_bit) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextBoolean() }))
   }
 
@@ -128,24 +179,16 @@ trait DHDLMisc {
     importArrayAPI()
     importRandomOps()
 
-    val Tst = grp("Testing")
-    val Bit = lookupTpe("Bit")
-    val Fix = lookupTpe("Fix")
-    val Flt = lookupTpe("Flt")
-    val LoopRange = lookupTpe("LoopRange")
-    val OffChip = lookupTpe("OffChipMem")
-    val Reg = lookupTpe("Reg")
+    val Tst = grp("Nosynth")
+
     val T = tpePar("T")
 
-    // Staging time warnings and errors
-    internal (Tst) ("stageWarn", Nil, SAny :: SUnit, effect = simple) implements composite ${
-      System.out.println("[\u001B[33mwarn\u001B[0m] " + $0)
-    }
-    internal (Tst) ("stageError", Nil, SAny :: SNothing, effect = simple) implements composite ${
-      System.out.println("[\u001B[31merror\u001B[0m] " + $0)
-      sys.exit(-1)
-    }
+    val Bit = lookupTpe("Bit")
+    val Idx = lookupAlias("SInt")
 
+    val LoopRange = lookupTpe("LoopRange")
+    val OffChip   = lookupTpe("OffChipMem")
+    val Reg       = lookupTpe("Reg")
 
     // --- Nodes
     val set_mem = internal (Tst) ("set_mem", T, (OffChip(T), MArray(T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
@@ -154,48 +197,40 @@ trait DHDLMisc {
     val get_arg = internal (Tst) ("get_arg", T, Reg(T) :: T)
     val hwblock = internal (Tst) ("hwblock", T, MThunk(T) :: MUnit, effect = simple)
 
-    val fix_to_int = internal (Tst) ("fix_to_int", Nil, Fix :: MInt)
-    val int_to_fix = internal (Tst) ("int_to_fix", Nil, MInt :: Fix)
-    val bit_to_bool = internal (Tst) ("bit_to_bool", Nil, Bit :: MBoolean)
-    //val fix_to_dbl = internal (Tst) ("fix_to_dbl", Nil, Fix :: MDouble)
-    //val dbl_to_fix = internal (Tst) ("dbl_to_fix", Nil, MDouble :: Fix)
-    //val flt_to_dbl = internal (Tst) ("flt_to_dbl", Nil, Flt :: MDouble)
-    //val dbl_to_flt = internal (Tst) ("dbl_to_flt", Nil, MDouble :: Flt)
     val ifThenElse = direct (Tst) ("__ifThenElse", List(T), List(MBoolean,MThunk(T,cold),MThunk(T,cold)) :: T)
     val whileDo = direct (Tst) ("__whileDo", Nil, List(MThunk(MBoolean),MThunk(MUnit)) :: MUnit)
 
-    val forLoop = internal (Tst) ("forloop", Nil, (("start", Fix), ("end", Fix), ("step", Fix), ("func", Fix ==> MUnit)) :: MUnit)
-    infix (Tst) ("foreach", Nil, (LoopRange, Fix ==> MUnit) :: MUnit) implements composite ${ forloop($0.start, $0.end, $0.step, $1) }
+    val forLoop = internal (Tst) ("forloop", Nil, (("start", Idx), ("end", Idx), ("step", Idx), ("func", Idx ==> MUnit)) :: MUnit)
 
     // --- API
     val println  = direct (Tst) ("println", Nil, MAny :: MUnit, effect = simple)
     val println2 = direct (Tst) ("println", Nil, Nil :: MUnit, effect = simple)
     val assert   = direct (Tst) ("assert", Nil, Bit :: MUnit, effect = simple)
 
+    // Allows for(i <- x until y by z) construction
+    infix (Tst) ("foreach", Nil, (LoopRange, Idx ==> MUnit) :: MUnit) implements composite ${ forloop($0.start, $0.end, $0.step, $1) }
+
+
+    // --- Memory transfers
     direct (Tst) ("setMem", T, (OffChip(T), MArray(T)) :: MUnit, effect = write(0)) implements composite ${ set_mem($0, $1) }
     direct (Tst) ("getMem", T, OffChip(T) :: MArray(T)) implements composite ${
-      val arr = Array.empty[T](productTree(symSizeOf($0)))
+      val arr = Array.empty[T](productTree(symDimsOf($0)))
       get_mem($0, arr)
       arr // could call unsafeImmutable here if desired
     }
-
     direct (Tst) ("setArg", T, (Reg(T), T) :: MUnit, effect = write(0)) implements composite ${
-      if (regtpe($0) != ArgumentIn) stageError("Can only set value of ArgIn registers")
+      if (regType($0) != ArgumentIn) stageError("Can only set value of ArgIn registers")
       set_arg($0, $1)
     }
     direct (Tst) ("getArg", T, Reg(T) :: T) implements composite ${
-      if (regtpe($0) != ArgumentOut) stageError("Can only get value of ArgOut registers")
+      if (regType($0) != ArgumentOut) stageError("Can only get value of ArgOut registers")
       get_arg($0)
     }
 
-    // TODO: Should this always return Unit? (since need to facilitate communication in some other way)
     // TODO: Naming isn't final. Your favorite keyword here :)
     // TODO: This is a quick hack for scheduling acceleration initialization. Eventually this should act as a true annotation
     direct (Tst) ("Accel", T, MThunk(T) :: MUnit) implements composite ${ hwblock($0) }
 
-
-    // Needed for ifThenElse (since default requires Rep[Boolean] and overloading is tough in this case)
-    fimplicit (Tst) ("bitToBoolean", Nil, Bit :: MBoolean) implements composite ${ bit_to_bool($0) }
 
     // --- Scala backend
     impl (println)  (codegen($cala, ${ println($0) }))
@@ -230,10 +265,6 @@ trait DHDLMisc {
       $b[0]
       ()
     }))
-
-    impl (fix_to_int) (codegen($cala, ${ $0.toInt }))
-    impl (int_to_fix) (codegen($cala, ${ $0.toLong }))
-    impl (bit_to_bool) (codegen($cala, ${ $0 }))
 
     // --- Rewrites
     rewrite (ifThenElse) using forwarding ${ delite_ifThenElse($0, $1, $2, false, true) }

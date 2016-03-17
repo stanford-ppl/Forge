@@ -69,6 +69,14 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     // --- DSLInterface
     val NonStructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && !DataStructs.contains(t) && !isMetaType(t))
 
+    stream.print("trait " + dsl + "TypeClasses extends Base")
+    for (opsGrp <- opsGrps if isTpeClass(opsGrp.grp) ) {
+      stream.print(" with " + opsGrp.name)
+    }
+    stream.println("{")
+    stream.println("  this: DHDL =>")
+    stream.println("}")
+
     stream.println("trait " + dsl + "Identifiers extends Base with GenOverloadHack {")
     if (Identifiers.length > 0) {
       emitBlockComment("Singleton identifiers", stream, indent=2)

@@ -87,7 +87,7 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     stream.println()
 
     // Exp
-    stream.println("trait " + dsl + "Exp extends " + dsl + "CompilerOps with " + dsl + "MetadataOpsExp with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
+    stream.println("trait " + dsl + "Exp extends " + dsl + "CompilerOps with " + dsl + "TypeClasses with " + dsl + "MetadataOpsExp with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
     for (opsGrp <- opsGrps if !isMetaType(opsGrp.grp)) {
       // Group has an op with a set of rewrite rules that doesn't contain a Forwarding rule
       val hasRewrites = unique(opsGrp.ops).exists(o => Rewrites.get(o).map(rules => rules.nonEmpty && !rules.exists(_.isInstanceOf[ForwardingRule])).getOrElse(false))

@@ -206,6 +206,10 @@ trait ScalaOps extends PrimitiveMathGen {
   def importMisc() = {
     val Misc = grp("Misc")
 
+    // Assert (moved from extern)
+    val fassert = direct (Misc) ("fassert", Nil, (MBoolean, MString) :: MUnit, effect = simple)
+    impl (fassert) (codegen($cala, ${ assert($0, $1) }))
+
     val exit = direct (Misc) ("exit", Nil, MInt :: MNothing, effect = simple)
     impl (exit) (codegen($cala, ${sys.exit($0)}))
 
@@ -264,6 +268,12 @@ trait ScalaOps extends PrimitiveMathGen {
     rewrite (whileDo) using forwarding ${ delite_while($0, $1) }
     rewrite (immutable) using forwarding ${ delite_unsafe_immutable($0) }
     rewrite (ifThenElse) using forwarding ${ delite_ifThenElse($0, $1, $2, false, true) }
+
+    // Only assert when debug is true, since assert effects can interfere with optimizations
+    rewrite (fassert) using rule ${
+      if (Config.debug) super.misc_fassert($0, $1) // TODO: Should have more straightforward call here
+      else ()
+    }
   }
 
   def importCasts() = {

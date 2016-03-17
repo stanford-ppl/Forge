@@ -106,7 +106,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case `MShort` | `MInt` | `MLong` | `MFloat` | `MDouble` | `MBoolean` | `MChar` | `MByte` | `MString` | `MUnit` | `MAny` | `MNothing` | `MLambda` | `MSourceContext` | `byName` => true
     case `CShort` | `CInt` | `CLong` | `CFloat` | `CDouble` | `CBoolean` | `CChar` | `CByte` | `CString` | `CUnit` | `CAny` | `CNothing` => true
     case `SShort` | `SInt` | `SLong` | `SFloat` | `SDouble` | `SBoolean` | `SChar` | `SByte` | `SString` | `SUnit` | `SAny` | `SList` | `SSeq` => true
-    case `SymProps` | `ArrayProps` | `StructProps` | `ScalarProps` | `SOption` => true
+    case `SymProps` | `ArrayProps` | `StructProps` | `ScalarProps` | `SOption` | `SManifest` => true
     // case Def(Tpe(_,_,`now`)) => true
     case Def(Tpe(name,_,_)) if name.startsWith("Tuple") => true
     case Def(Tpe(name,_,_)) if primitiveTpePrefix exists { t => name.startsWith(t) } => true
@@ -354,6 +354,7 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
   override def quote(x: Exp[Any]): String = x match {
     case Def(Meta(s,args)) => s + makeTpePars(args)
     case Def(Tpe(s,args,stage)) => s + makeTpePars(args)
+    case Def(TpeAlias(name,tpe)) => quote(tpe) // type aliases have no type arguments right now
     case Def(TpeInst(t,args)) => t.name + makeTpePars(args)
     case Def(TpePar(s,ctx,stage)) => s
     case Def(HkTpePar(s,args,ctx,stage)) => s + makeTpePars(args)

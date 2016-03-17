@@ -7,32 +7,38 @@ trait DHDLMetadata {
 
 	def importDHDLMetadata () = {
 		val T = tpePar("T")
+
 		val RegTpe    = lookupTpe("RegTpe", stage=compile)
     val PipeStyle = lookupTpe("PipeStyle", stage=compile)
-    val Reg = lookupTpe("Reg")
-    val Fix = lookupTpe("Fix")
-    val Pipeline = lookupTpe("Pipeline")
+    val Reg       = lookupTpe("Reg")
+    val Pipeline  = lookupTpe("Pipeline")
+    val Idx       = lookupAlias("SInt")
 
-		/* Static multidimension size */
-		val MSize = metadata("MSize", "size" -> SList(SInt))
-		val sizeOps = metadata("sizeOf")
+		/* Static multidimension dims and size */
+		val MDims = metadata("MDims", "dims" -> SList(SInt))
+		val dimsOps = metadata("dimsOf")
 
-		onMeet (MSize) ${ this }
-		internal.static (sizeOps) ("update", T, (T, SList(SInt)) :: MUnit, effect = simple) implements
-			composite ${ setMetadata($0, MSize($1)) }
-		//internal.direct (sizeOps) ("setMSize", T, (T, SInt, SInt) :: MUnit, effect = simple) implements
-	  //	composite ${sizeOf($0) = sizeOf($0).updated($1, $2)}
-		internal.static (sizeOps) ("apply", T, T :: SList(SInt)) implements composite ${ meta[MSize]($0).get.size }
-		internal.direct (sizeOps) ("getDim", T, (T, SInt) :: SInt) implements composite ${ sizeOf($0).apply($1) }
+		onMeet (MDims) ${ this }
+		internal.static (dimsOps) ("update", T, (T, SList(SInt)) :: MUnit, effect = simple) implements
+			composite ${ setMetadata($0, MDims($1)) }
+		internal.static (dimsOps) ("apply", T, T :: SList(SInt)) implements composite ${ meta[MDims]($0).get.dims }
+		internal.direct (dimsOps) ("dimOf", T, (T, SInt) :: SInt) implements composite ${ dimsOf($0).apply($1) }
+    internal.direct (dimsOps) ("rankOf", T, T :: SInt) implements composite ${ dimsOf($0).length }
+
+    val sizeOps = metadata("sizeOf")
+    internal.static (sizeOps) ("update", T, (T, SInt) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MDims(List($1))) }
+    internal.static (sizeOps) ("apply", T, T :: SInt) implements composite ${ dimsOf($0).reduce{_*_} }
+
 
     /* Dynamic multidimension size */
-    val MDynamicSize = metadata("MDynamicSize", "size" -> SList(Fix))
-    val dynamicSizeOps = metadata("symSizeOf")
+    val MDynamicSize = metadata("MDynamicSize", "dims" -> SList(Idx))
+    val dynamicSizeOps = metadata("symDimsOf")
 
     onMeet(MDynamicSize) ${ this }
-    internal.static (dynamicSizeOps) ("update", T, (T, SList(Fix)) :: MUnit, effect = simple) implements
+    internal.static (dynamicSizeOps) ("update", T, (T, SList(Idx)) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MDynamicSize($1)) }
-    internal.static (dynamicSizeOps) ("apply", T, T :: SList(Fix)) implements composite ${ meta[MDynamicSize]($0).get.size }
+    internal.static (dynamicSizeOps) ("apply", T, T :: SList(Idx)) implements composite ${ meta[MDynamicSize]($0).get.dims }
 
 		/* Name of a node */
 		val MName = metadata("MName", "name" -> SString)
@@ -44,21 +50,19 @@ trait DHDLMetadata {
 
 		/* Is Double Buffer */
 		val MDblBuf = metadata("MDblBuf", "isDblBuf" -> SBoolean)
-		val dblBufOps = metadata("dblbuf")
+		val dblBufOps = metadata("isDblBuf")
 		onMeet (MDblBuf) ${ this }
 		internal.static (dblBufOps) ("update", T, (T, SBoolean) :: MUnit, effect = simple) implements
 			composite ${ setMetadata($0, MDblBuf($1)) }
-		internal.static (dblBufOps) ("apply", T, T :: MDblBuf) implements composite ${ meta[MDblBuf]($0).get }
-		internal.direct (dblBufOps) ("isDblBuf", T, T :: SBoolean) implements composite ${ dblbuf($0).isDblBuf }
+		internal.direct (dblBufOps) ("apply", T, T :: SBoolean) implements composite ${ meta[MDblBuf]($0).get.isDblBuf }
 
 		/* Register Type  */
 		val MRegTpe = metadata("MRegTpe", "regTpe" -> RegTpe)
-		val regTpeOps = metadata("regtpe")
+		val regTpeOps = metadata("regType")
 		onMeet (MRegTpe) ${ this }
 		internal.static (regTpeOps) ("update", T, (T, RegTpe) :: MUnit, effect = simple) implements
 			composite ${ setMetadata($0, MRegTpe($1)) }
-		internal.static (regTpeOps) ("apply", T, T :: RegTpe) implements
-      composite ${ meta[MRegTpe]($0).get.regTpe }
+		internal.static (regTpeOps) ("apply", T, T :: RegTpe) implements composite ${ meta[MRegTpe]($0).get.regTpe }
 
     /* Register Initial Value */
     val MRegInit = metadata("MRegInit", "value" -> MAny)
@@ -94,5 +98,14 @@ trait DHDLMetadata {
     internal.static (styleOps) ("update", Nil, (Pipeline, PipeStyle) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MPipeType($1)) }
     internal.static (styleOps) ("apply", Nil, Pipeline :: PipeStyle) implements composite ${ meta[MPipeType]($0).get.tpe }
-	}
+
+
+    /* Range is single dimension */
+    val MUnitRange = metadata("MUnitRange", "isUnit" -> SBoolean)
+    val unitOps = metadata("isUnit")
+    onMeet (MUnitRange) ${ this }
+    internal.static (unitOps) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MUnitRange($1)) }
+    internal.static (unitOps) ("apply", Nil, MAny :: SBoolean) implements composite ${ meta[MUnitRange]($0).get.isUnit }
+  }
 }

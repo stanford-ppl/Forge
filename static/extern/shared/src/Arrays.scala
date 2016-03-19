@@ -5,15 +5,17 @@ import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common._
 import scala.virtualization.lms.util.OverloadHack
 
-// Front-end
-trait ForgeArrayOps extends Base with OverloadHack {
-  this: ForgeHashMapOps =>
-
+trait ForgeArrayTypes {
   /**
    * We use ForgeArray[T] instead of T so we don't get any subtle errors related to shadowing Array[T]
    */
   type ForgeArray[T]
   implicit def forgeArrayManifest[T:Manifest]: Manifest[ForgeArray[T]]
+}
+
+// Front-end
+trait ForgeArrayOps extends ForgeArrayTypes with Base with OverloadHack {
+  this: ForgeHashMapOps =>
 
   /**
    * Applications may need direct access to ForgeArrays, if, for example, they use string fsplit
@@ -83,10 +85,11 @@ trait ForgeArrayCompilerOps extends ForgeArrayOps {
   def scala_array_length[T:Manifest](__arg0: Rep[Array[T]])(implicit __imp0: SourceContext): Rep[Int]
 }
 
-trait ForgeArrayBufferOps extends Base {
+trait ForgeArrayBufferTypes {
   type ForgeArrayBuffer[T]
   implicit def forgeArrayBufferManifest[T:Manifest]: Manifest[ForgeArrayBuffer[T]]
 }
+trait ForgeArrayBufferOps extends ForgeArrayBufferTypes with Base
 
 trait ForgeArrayBufferCompilerOps extends ForgeArrayBufferOps {
   this: ForgeArrayCompilerOps with ForgeHashMapCompilerOps =>

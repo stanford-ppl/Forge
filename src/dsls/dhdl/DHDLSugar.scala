@@ -32,6 +32,7 @@ trait DHDLSugar {
   def importRanges() {
     val Range = lookupTpe("Range")
     val Idx   = lookupAlias("SInt")
+    val FixPt = lookupTpe("FixPt")
 
     data(Range, ("_start", Idx), ("_end", Idx), ("_len", Idx))
     internal.infix (Range) ("start", Nil, Range :: Idx) implements getter(0, "_start")
@@ -45,12 +46,20 @@ trait DHDLSugar {
       range
     }
 
+    internal (Range) ("unitRange", Nil, Idx :: Range) implements composite ${
+      val range = range_new($0, $0 + 1.as[SInt], 1.as[SInt])
+      isUnit(range) = true
+      range
+    }
+
+    // Causes scalac to get stuck in implicit lookup :(
     /*fimplicit (Range) ("idx_to_range", Nil, Idx :: Range) implements composite ${
       val range = range_new($0, $0 + 1, 1)
       isUnit(range) = true
       range
-    }
-    fimplicit (Range) ("int_to_range", Nil, SInt :: Range) implements composite ${
+    }*/
+    // Causes compiler to have a hard time figuring out how to lift Ints... Fortunately not used too often
+    /*fimplicit (Range) ("int_to_range", Nil, SInt :: Range) implements composite ${
       val range = range_new($0, $0 + 1, 1)
       isUnit(range) = true
       range

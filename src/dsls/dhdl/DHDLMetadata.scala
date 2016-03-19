@@ -13,6 +13,8 @@ trait DHDLMetadata {
     val Reg       = lookupTpe("Reg")
     val Pipeline  = lookupTpe("Pipeline")
     val Idx       = lookupAlias("SInt")
+    val Tile      = lookupTpe("Tile")
+    val Range     = lookupTpe("Range")
 
     /* Static multidimension dims and size */
     val MDims = metadata("MDims", "dims" -> SList(SInt))
@@ -23,7 +25,7 @@ trait DHDLMetadata {
       composite ${ setMetadata($0, MDims($1)) }
     internal.static (dimsOps) ("apply", T, T :: SList(SInt)) implements composite ${ meta[MDims]($0).get.dims }
     internal.direct (dimsOps) ("dimOf", T, (T, SInt) :: SInt) implements composite ${ dimsOf($0).apply($1) }
-    internal.direct (dimsOps) ("rankOf", T, T :: SInt) implements composite ${ dimsOf($0).length }
+    //internal.direct (dimsOps) ("rankOf", T, T :: SInt) implements composite ${ dimsOf($0).length }
 
     val sizeOps = metadata("sizeOf")
     internal.static (sizeOps) ("update", T, (T, SInt) :: MUnit, effect = simple) implements
@@ -107,5 +109,13 @@ trait DHDLMetadata {
     internal.static (unitOps) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MUnitRange($1)) }
     internal.static (unitOps) ("apply", Nil, MAny :: SBoolean) implements composite ${ meta[MUnitRange]($0).get.isUnit }
+
+    /* Tile Offsets */
+    val MTileRanges = metadata("MTileRanges", "ranges" -> SList(Range))
+    val rangesOps = metadata("rangesOf")
+    onMeet (MTileRanges) ${ this }
+    internal.static (rangesOps) ("update", T, (Tile(T), SList(Range)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MTileRanges($1)) }
+    internal.static (rangesOps) ("apply", T, Tile(T) :: SList(Range)) implements composite ${ meta[MTileRanges]($0).get.ranges }
   }
 }

@@ -1,4 +1,4 @@
-import dhdl.compiler._
+/*import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
 import scala.util.Random
@@ -16,16 +16,16 @@ import scala.util.Random
 object MatMultCompiler extends DHDLApplicationCompiler with MatMult
 object MatMultInterpreter extends DHDLApplicationInterpreter with MatMult
 trait MatMult extends DHDLApplication {
-  type Elem = Fix
+  type Elem = FixPt[Signed,B16,B16]
 
   override def stageArgNames = List("bm", "bn", "bp")
   lazy val bm = stageArgOrElse[Int](0, 2)
   lazy val bn = stageArgOrElse[Int](1, 2)
   lazy val bp = stageArgOrElse[Int](2, 2)
 
-  lazy val m = ArgIn[Fix]("m")
-  lazy val n = ArgIn[Fix]("n")
-  lazy val p = ArgIn[Fix]("p")
+  lazy val m = ArgIn[SInt]("m")
+  lazy val n = ArgIn[SInt]("n")
+  lazy val p = ArgIn[SInt]("p")
 
   def matmult(a: Rep[OffChipMem[Elem]], b: Rep[OffChipMem[Elem]], c: Rep[OffChipMem[Elem]]) {
     MetaPipe(m by bm, n by bn){ (i,j) =>
@@ -34,8 +34,8 @@ trait MatMult extends DHDLApplication {
       val tileC = BRAM[Elem](bm, bn)
       BlockReduce(p by bp, tileC){ k =>
         Parallel {
-          a.ld(tileA, i, k, bm, bp)   // tileA = a(bm @@ i, bp @@ k)
-          b.ld(tileB, k, j, bp, bn)   // tileB = b(bp @@ k, bp @@ j)
+          tileA := a(i::i+bm, k::k+bp)
+          tileB := b(k::k+bp, j::j+bn)
         }
         val accTile = BRAM[Elem](bm, bn)
         Sequential(bm by 1, bn by 1){ (ii,jj) =>    // MetaPipe?
@@ -45,7 +45,7 @@ trait MatMult extends DHDLApplication {
         }
         accTile
       }{_+_}
-      c.st(tileC, i, j, bm, bn)      // c(bm at i, bn at j) = tileC
+      c(i::i+bm, j::j+bn) := tileC
     }
   }
 
@@ -58,8 +58,8 @@ trait MatMult extends DHDLApplication {
     val b = OffChipMem[Elem]("B", P, N)
     val c = OffChipMem[Elem]("C", M, N)
 
-    val sa = Array.fill(M){ Array.fill(P){random[Elem] * 100} }
-    val sb = Array.fill(P){ Array.fill(N){random[Elem] * 100} }
+    val sa = Array.fill(M){ Array.fill(P){random[Elem](100) } }
+    val sb = Array.fill(P){ Array.fill(N){random[Elem](100) } }
 
     setArg(m, M)
     setArg(n, N)
@@ -82,4 +82,4 @@ trait MatMult extends DHDLApplication {
     println("result:   " + result.mkString(", "))
     assert(gold == result)
   }
-}
+}*/

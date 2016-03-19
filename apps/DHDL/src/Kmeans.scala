@@ -1,4 +1,4 @@
-import dhdl.compiler._
+/*import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
 import scala.util.Random
@@ -11,12 +11,12 @@ trait Kmeans extends DHDLApplication {
   lazy val tileSize  = stageArgOrElse[Int](0, 4)
   lazy val dim       = stageArgOrElse[Int](1, 4)
   lazy val numCents  = stageArgOrElse[Int](2, 4)
-  lazy val numPoints = ArgIn[Fix]("numPoints")
+  lazy val numPoints = ArgIn[SInt]("numPoints")
 
   def kmeans(points: Rep[OffChipMem[Flt]], centroids: Rep[OffChipMem[Flt]]) = {
     val oldCents = BRAM[Flt](numCents, dim)
     val newCents = BRAM[Flt](numCents, dim)
-    val centCount = BRAM[Fix](numCents)
+    val centCount = BRAM[UInt](numCents)
 
     Sequential {
       // Load initial centroids (from points)
@@ -25,11 +25,11 @@ trait Kmeans extends DHDLApplication {
       Sequential {
         val pointsTile = BRAM[Flt](tileSize, dim)
         Sequential(numPoints by tileSize) { i =>
-          points.ld(pointsTile, i, 0, tileSize, dim)
+          pointsTile := points(i::i+tileSize, 0::dim) // TODO: change 0::dim with just *
 
           Sequential(tileSize by 1){ pt =>
             val minDist = Reg[Flt](-1.0f) // Minimum distance to closest centroid
-            val minCent = Reg[Fix](0)     // Index of closest centroid
+            val minCent = Reg[UInt](0)     // Index of closest centroid
 
             MetaPipe(numCents by 1){ ct =>
               val dist = Reg[Flt](0.0f)
@@ -47,11 +47,11 @@ trait Kmeans extends DHDLApplication {
           } // End of points in tile
         } // End of point tiles
         Pipe(numCents by 1, dim by 1){(ct,d) =>
-          newCents(ct, d) = newCents(ct, d) / centCount(ct).toFltPt
+          newCents(ct, d) = newCents(ct, d) / centCount(ct).to[Flt]
         }
       } // End of metapipe
 
-      centroids.st(newCents, 0, 0, numCents, dim)
+      centroids(0::numCents, 0::dim) := newCents  // TODO: Change to centroids(*,*) := newCents ?
     }
   }
 
@@ -64,7 +64,7 @@ trait Kmeans extends DHDLApplication {
     setArg(numPoints, N)
     Accel{ kmeans(points, centroids) }
   }
-}
+}*/
 
 
 /*object KmeansTestCompiler extends DHDLApplicationCompiler with KmeansTest

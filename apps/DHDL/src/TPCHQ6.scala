@@ -1,4 +1,4 @@
-import dhdl.compiler._
+/*import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
 import scala.util.Random
@@ -8,23 +8,23 @@ object TPCHQ6Interpreter extends DHDLApplicationInterpreter with TPCHQ6
 trait TPCHQ6 extends DHDLApplication {
 
   lazy val tileSize = stageArgOrElse[Int](0, 4)
-  lazy val dataSize = ArgIn[Fix]("dataSize")
-  lazy val minDate  = ArgIn[Fix]("minDate")
-  lazy val maxDate  = ArgIn[Fix]("maxDate")
+  lazy val dataSize = ArgIn[SInt]("dataSize")
+  lazy val minDate  = ArgIn[UInt]("minDate")
+  lazy val maxDate  = ArgIn[UInt]("maxDate")
 
-  def tpchq6(dates:  Rep[OffChipMem[Fix]], quants: Rep[OffChipMem[Fix]],
+  def tpchq6(dates:  Rep[OffChipMem[UInt]], quants: Rep[OffChipMem[UInt]],
              discts: Rep[OffChipMem[Flt]], prices: Rep[OffChipMem[Flt]], out: Rep[Reg[Flt]]) {
 
     MetaPipe(dataSize by tileSize, out) { i =>
-      val datesTile  = BRAM[Fix](tileSize)
-      val quantsTile = BRAM[Fix](tileSize)
+      val datesTile  = BRAM[UInt](tileSize)
+      val quantsTile = BRAM[UInt](tileSize)
       val disctsTile = BRAM[Flt](tileSize)
       val pricesTile = BRAM[Flt](tileSize)
       Parallel {
-        dates.ld(datesTile, i, tileSize)
-        quants.ld(quantsTile, i, tileSize)
-        discts.ld(disctsTile, i, tileSize)
-        prices.ld(pricesTile, i, tileSize)
+        datesTile  := dates(i::i+tileSize)
+        quantsTile := quants(i::i+tileSize)
+        disctsTile := discts(i::i+tileSize)
+        pricesTile := prices(i::i+tileSize)
       }
       val accum = Reg[Flt]
       Pipe(tileSize by 1, accum){ j =>
@@ -44,14 +44,14 @@ trait TPCHQ6 extends DHDLApplication {
     val MIN_DATE = 64
     val MAX_DATE = 80
 
-    val dates  = OffChipMem[Fix]("dates", N)
-    val quants = OffChipMem[Fix]("quants", N)
+    val dates  = OffChipMem[UInt]("dates", N)
+    val quants = OffChipMem[UInt]("quants", N)
     val discts = OffChipMem[Flt]("discounts", N)
     val prices = OffChipMem[Flt]("prices", N)
     val out = ArgOut[Flt]("out")
 
-    val sDates  = Array.fill(N){randomFix(20) + 65}
-    val sQuants = Array.fill(N){randomFix(25) }
+    val sDates  = Array.fill(N){random[UInt](20) + 65}
+    val sQuants = Array.fill(N){random[UInt](25) }
     val sDiscts = Array.fill(N){random[Flt] * 0.05f + 0.02f}
     val sPrices = Array.fill(N){random[Flt] * 1000f}
 
@@ -68,7 +68,7 @@ trait TPCHQ6 extends DHDLApplication {
     val conds = Array.tabulate(N){i => sDates(i) > MIN_DATE && sDates(i) < MAX_DATE &&
                                        sQuants(i) < 24 && sDiscts(i) >= 0.05f && sDiscts(i) <= 0.07f }
 
-    val gold = Array.tabulate(N){i => if (conds(i)) sPrices(i) * sDiscts(i) else 0.0f.toFltPt }.reduce{_+_}
+    val gold = Array.tabulate(N){i => if (conds(i)) sPrices(i) * sDiscts(i) else 0.0f.as[Flt] }.reduce{_+_}
 
     val result = getArg(out)
 
@@ -76,4 +76,4 @@ trait TPCHQ6 extends DHDLApplication {
     println("result: " + result.mkString)
     assert(result == gold)
   }
-}
+}*/

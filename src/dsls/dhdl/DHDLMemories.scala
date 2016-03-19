@@ -205,7 +205,28 @@ trait DHDLMemories {
     static (OffChip) ("apply", T, (SString, Idx, varArgs(Idx)) :: OffChip(T), TNum(T)) implements composite ${ offchip_create(Some($0), $1 +: $2) }
     static (OffChip) ("apply", T, (Idx, varArgs(Idx)) :: OffChip(T), TNum(T)) implements composite ${ offchip_create(None, $0 +: $1) }
 
-    infix (OffChip) ("apply", T, (OffChip(T), varArgs(Range)) :: Tile(T)) implements composite ${ tile_create($0, $1.toList) }
+    // Offer multiple versions of tile select since implicit cast from signed int to range isn't working
+    val OffChip_API = withTpe(OffChip)
+    OffChip_API {
+      //infix ("apply") (varArgs(Range) :: Tile(T)) implements composite ${ tile_create($self, $1.toList) }
+      infix ("apply") (Range :: Tile(T)) implements composite ${ tile_create($self, List($1)) }
+      infix ("apply") ((Range,Range) :: Tile(T)) implements composite ${ tile_create($self, List($1,$2)) }
+      infix ("apply") ((Range,Range,Range) :: Tile(T)) implements composite ${ tile_create($self, List($1,$2,$3)) }
+
+      // 2D -> 1D
+      infix ("apply") ((Idx, Range) :: Tile(T)) implements composite ${ tile_create($self, List(unitRange($1), $2)) }
+      infix ("apply") ((Range, Idx) :: Tile(T)) implements composite ${ tile_create($self, List($1, unitRange($2))) }
+
+      // 3D -> 2D
+      infix ("apply") ((Idx, Range, Range) :: Tile(T)) implements composite ${ tile_create($self, List(unitRange($1), $2, $3)) }
+      infix ("apply") ((Range, Idx, Range) :: Tile(T)) implements composite ${ tile_create($self, List($1, unitRange($2), $3)) }
+      infix ("apply") ((Range, Range, Idx) :: Tile(T)) implements composite ${ tile_create($self, List($1, $2, unitRange($3))) }
+
+      // 3D -> 1D
+      infix ("apply") ((Idx, Idx, Range) :: Tile(T)) implements composite ${ tile_create($self, List(unitRange($1), unitRange($2), $3)) }
+      infix ("apply") ((Idx, Range, Idx) :: Tile(T)) implements composite ${ tile_create($self, List(unitRange($1), $2, unitRange($3))) }
+      infix ("apply") ((Range, Idx, Idx) :: Tile(T)) implements composite ${ tile_create($self, List($1, unitRange($2), unitRange($3))) }
+    }
 
     // --- Scala Backend
     impl (offchip_new) (codegen($cala, ${ new Array[$t[T]]($size.toInt) }))
@@ -219,23 +240,24 @@ trait DHDLMemories {
     val Tile    = lookupTpe("Tile")
     val Range   = lookupTpe("Range")
 
-    internal (Tile) ("tile_new", T, (OffChip(T), SList(Range)) :: Tile(T)) implements record(Tile(T), ("mem", OffChip(T), quotedArg(0)), ("ii", SList(Range), quotedArg(1)))
+    // TODO: How to avoid CSE? Doesn't matter except that same symbol may be returned
+    // and need different symbols to manage offset staging metadata properly
+    data(Tile, ("_target", OffChip(T)))
+    internal (Tile) ("tile_new", T, OffChip(T) :: Tile(T)) implements allocates(Tile, ${$0})
     internal (Tile) ("tile_create", T, (OffChip(T), SList(Range)) :: Tile(T)) implements composite ${
-      if (rankOf($0) != $1.length) stageError("Attempting to access " + rankOf($0) + "D memory with " + $1.length + " indices")
-      val tile = tile_new($0, $1)
-      sizeOf(tile) = $1.length
+      if (symDimsOf($0).length != $1.length) stageError("Attempting to access " + symDimsOf($0).length + "D memory with " + $1.length + " indices")
+      val tile = tile_new($0)
+      rangesOf(tile) = $1
       tile
     }
-    internal.infix (Tile) ("mem", T, Tile(T) :: OffChip(T)) implements composite ${ field[OffChipMem[T]]($0, "mem") }
-    internal.infix (Tile) ("apply", T, (Tile(T), SInt) :: Range) implements composite ${ field[Range]($0, "ii_" + $1)  }
-    internal.infix (Tile) ("toList", T, Tile(T) :: SList(Range)) implements composite ${ List.tabulate(sizeOf($0)){i => $0(i)} }
+    internal.infix (Tile) ("mem", T, Tile(T) :: OffChip(T)) implements getter(0, "_target")
 
     infix (Tile) (":=", T, (Tile(T), BRAM(T)) :: MUnit, effect = write(0)) implements redirect ${ transferTile($0, $1, true) }
 
     // Actual effect depends on store, but this isn't a node anyway
     direct (Tile) ("transferTile", T, (("tile",Tile(T)), ("local",BRAM(T)), ("store", SBoolean)) :: MUnit, effect = simple) implements composite ${
       val mem      = $tile.mem
-      val ranges   = $tile.toList
+      val ranges   = rangesOf($tile)
       val offsets  = ranges.map(_.start)
       val unitDims = ranges.map(isUnit(_))
 

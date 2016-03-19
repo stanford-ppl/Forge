@@ -145,49 +145,16 @@ trait DHDLTypes {
     impl (bit_to_string)  (codegen($cala, ${ $0.toString }))
     impl (bit_to_bool)    (codegen($cala, ${ $0 }))
 
-    impl (const_to_fixpt) (codegen($cala, ${
-      @ val signed = sign[S]
-      @ val intbits = nbits[I]
-      @ val fracbits = nbits[F]
-      FixedPoint($0.toString)(FixFormat($signed,$intbits,$fracbits))
-    }))
+    impl (const_to_fixpt) (codegen($cala, ${ FixedPoint[$t[S],$t[I],$t[F]]($0.toString) }))
     impl (fixpt_to_string) (codegen($cala, ${ $0.toString }))
-    impl (fixpt_to_fltpt) (codegen($cala, ${
-      @ val sigbits = nbits[G]
-      @ val expbits = nbits[E]
-      $0.toFloatPoint(FloatFormat($sigbits, $expbits))
-    }))
-    impl (convert_fixpt) (codegen($cala, ${
-      @ val signed = sign[S2]
-      @ val intbits = nbits[I2]
-      @ val fracbits = nbits[F2]
-      $0.changeFormat(FixFormat($signed,$intbits,$fracbits))
-    }))
+    impl (fixpt_to_fltpt) (codegen($cala, ${ $0.toFloatPoint[$t[G],$t[E]] }))
+    impl (convert_fixpt) (codegen($cala, ${ $0.changeFormat[$t[S2],$t[I2],$t[F2]] }))
     impl (fix_to_rep_int) (codegen($cala, ${ $0.toInt }))
-    impl (rep_int_to_fix) (codegen($cala, ${
-      @ val signed = sign[S]
-      @ val intbits = nbits[I]
-      FixedPoint($0)(FixFormat($signed, $intbits, 0))
-    }))
+    impl (rep_int_to_fix) (codegen($cala, ${ FixedPoint[$t[S],$t[I],B0]($0) }))
 
-
-    impl (const_to_fltpt) (codegen($cala, ${
-      @ val sigbits = nbits[G]
-      @ val expbits = nbits[E]
-      FloatPoint($0.toString)(FloatFormat($sigbits, $expbits))
-    }))
+    impl (const_to_fltpt) (codegen($cala, ${ FloatPoint[$t[G],$t[E]]($0.toString) }))
     impl (fltpt_to_string) (codegen($cala, ${ $0.toString }))
-    impl (fltpt_to_fixpt) (codegen($cala, ${
-      @ val signed = sign[S]
-      @ val intbits = nbits[I]
-      @ val fracbits = nbits[F]
-      $0.toFixedPoint(FixFormat($signed, $intbits, $fracbits))
-    }))
-    impl (convert_fltpt) (codegen($cala, ${
-      @ val sigbits = nbits[G2]
-      @ val expbits = nbits[E2]
-      $0.changeFormat(FloatFormat($sigbits, $expbits))
-    }))
-
+    impl (fltpt_to_fixpt) (codegen($cala, ${ $0.toFixedPoint[$t[S],$t[I],$t[F]] }))
+    impl (convert_fltpt) (codegen($cala, ${ $0.changeFormat[$t[G2],$t[E2]] }))
 	}
 }

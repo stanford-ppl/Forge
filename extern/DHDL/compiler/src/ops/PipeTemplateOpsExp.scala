@@ -12,7 +12,7 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
   this: DHDLExp =>
 
   // --- Nodes
-  case class Pipe_foreach(cchain: Exp[CounterChain], func: Block[Unit], inds: List[Sym[Index]])(implicit ctx: SourceContext) extends Def[Pipeline]
+  case class Pipe_foreach(cchain: Exp[CounterChain], func: Block[Unit], inds: List[Sym[FixPt[Signed,B32,B0]]])(implicit ctx: SourceContext) extends Def[Pipeline]
   case class Pipe_reduce[T,C[T]] (
     // - Inputs
     cchain: Exp[CounterChain],  // Loop counter chain
@@ -23,7 +23,7 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
     func:   Block[T],           // Map function
     rFunc:  Block[T],           // Reduction function
     // - Bound args
-    inds:   List[Sym[Index]],   // Loop iterators
+    inds:   List[Sym[FixPt[Signed,B32,B0]]],   // Loop iterators
     acc:    Sym[C[T]],          // Reduction accumulator (bound argument, aliases with accum)
     res:    Sym[T],             // Reduction intermediate result (bound argument, aliases with rFunc.res)
     rV:    (Sym[T], Sym[T])     // Reduction function inputs (bound arguments, aliases with ldFunc.res and func.res)
@@ -37,13 +37,13 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
 
   // --- Internals
   def pipe_foreach(cchain: Rep[CounterChain], func: Rep[Indices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Pipeline] = {
-    val inds = List.fill(sizeOf(cchain)){ fresh[Index] } // Arbitrary number of bound args. Awww yeah.
+    val inds = List.fill(sizeOf(cchain)){ fresh[FixPt[Signed,B32,B0]] } // Arbitrary number of bound args. Awww yeah.
     val blk = reifyEffects( func(indices_create(inds)) )
     reflectEffect(Pipe_foreach(cchain, blk, inds), summarizeEffects(blk).star andAlso Simple())
   }
   def pipe_reduce[T,C[T]](cchain: Rep[CounterChain], accum: Rep[C[T]], func: Rep[Indices] => Rep[T], rFunc: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext, __mem: Mem[T,C], __mT: Manifest[T], __mC: Manifest[C[T]]): Rep[Pipeline]  = {
     // Loop indices
-    val is = List.fill(sizeOf(cchain)){ fresh[Index] }
+    val is = List.fill(sizeOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }
     val inds = indices_create(is)
 
     // Reified load function
@@ -113,7 +113,7 @@ trait ScalaGenPipeTemplateOps extends ScalaGenEffect {
   val IR: PipeTemplateOpsExp with DHDLIdentifiers
   import IR._
 
-  def emitNestedLoop(iters: List[Sym[Index]], cchain: Exp[CounterChain])(emitBlk: => Unit) = {
+  def emitNestedLoop(iters: List[Sym[FixPt[Signed,B32,B0]]], cchain: Exp[CounterChain])(emitBlk: => Unit) = {
     iters.zipWithIndex.foreach{ case (iter,idx) =>
       stream.println("for( " + quote(iter) + " <- " + quote(cchain) + ".apply(" + idx + ".toInt)) {")
     }

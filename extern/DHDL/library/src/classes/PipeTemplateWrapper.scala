@@ -14,7 +14,7 @@ trait PipeTemplateWrapper {
   // TODO: Better way to do this besides recursion?
   def loop(cchain: Rep[CounterChain], idx: Int, indices: List[FixPt[Signed,B32,B0]], func: Rep[Indices] => Rep[Unit]): Rep[Unit] = {
     val ctr = cchain(idx)
-    if (idx == cchain.length - 1) {
+    if (idx >= cchain.length - 1) {
       for (i <- ctr) { func(indices_create(indices :+ i)) }
     }
     else {

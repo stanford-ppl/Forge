@@ -1,6 +1,6 @@
 package dhdl.compiler.ops
 
-import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect}
+import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, Record}
 import scala.reflect.{Manifest,SourceContext}
 
 import dhdl.shared._
@@ -19,13 +19,18 @@ trait DHDLPipeline
 trait DHDLBit
 trait FixedPoint[SIGN,INT,FRAC]
 trait FloatPoint[SIG,EXP]
+trait DHDLIndices
 
 // Stub (nothing here for now)
-trait TypeInspectionOpsExp extends TypeInspectionCompilerOps { this: DHDLExp => }
-
-trait MemoryTemplateOpsExp extends MemoryTemplateCompilerOps with EffectExp {
+trait TypeInspectionOpsExp extends TypeInspectionCompilerOps {
   this: DHDLExp =>
 
+  def isFixPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FixedPoint[_,_,_]])
+  def isFltPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FloatPoint[_,_]])
+  def isBitType[T:Manifest]   = isSubtype(manifest[T].runtimeClass, classOf[DHDLBit])
+}
+
+trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
   type OffChipMem[T] = DRAM[T]
   type BRAM[T] = BlockRAM[T]
   type Reg[T] = Register[T]
@@ -33,6 +38,7 @@ trait MemoryTemplateOpsExp extends MemoryTemplateCompilerOps with EffectExp {
   type Counter = DHDLCounter
   type CounterChain = DHDLCounterChain
   type Pipeline = DHDLPipeline
+  type Indices = DHDLIndices
 
   type Bit = DHDLBit
   type FixPt[SIGN,INT,FRAC] = FixedPoint[SIGN,INT,FRAC]
@@ -45,31 +51,34 @@ trait MemoryTemplateOpsExp extends MemoryTemplateCompilerOps with EffectExp {
   def counterChainManifest: Manifest[CounterChain] = manifest[DHDLCounterChain]
   def pipelineManifest: Manifest[Pipeline] = manifest[DHDLPipeline]
 
+  // TODO: Should be refined manifest? But how to know how many fields to fill in?
+  def indicesManifest: Manifest[Indices] = manifest[DHDLIndices]
+
   def fixManifest[S:Manifest,I:Manifest,F:Manifest] = manifest[FixedPoint[S,I,F]]
   def fltManifest[G:Manifest,E:Manifest] = manifest[FloatPoint[G,E]]
   def bitManifest: Manifest[Bit] = manifest[DHDLBit]
+}
 
-  def isFixPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FixedPoint[_,_,_]])
-  def isFltPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FloatPoint[_,_]])
-  def isBitType[T:Manifest]   = isSubtype(manifest[T].runtimeClass, classOf[DHDLBit])
+trait MemoryTemplateOpsExp extends MemoryTemplateCompilerOps with MemoryTemplateTypesExp with EffectExp {
+  this: DHDLExp =>
 
   // --- Nodes
   case class TileTransfer[T:Manifest](
     mem:      Rep[OffChipMem[T]], // Offchip memory array
     local:    Rep[BRAM[T]],       // Local memory (BRAM)
-    strides:  List[Rep[Index]],   // Dimensions converted to strides for offchip memory
-    memOfs:   Rep[Index],         // Offset into offchip memory
+    strides:  List[Rep[FixPt[Signed,B32,B0]]],   // Dimensions converted to strides for offchip memory
+    memOfs:   Rep[FixPt[Signed,B32,B0]],         // Offset into offchip memory
     tileDims: List[Int],          // Tile dimensions
     cchain:   Rep[CounterChain],  // Counter chain for copy
-    iters:    List[Sym[Index]],   // Bound iterator variables
+    iters:    List[Sym[FixPt[Signed,B32,B0]]],   // Bound iterator variables
     store:    Boolean             // Is this transfer a store (true) or a load (false)
   )(implicit ctx: SourceContext) extends Def[Unit] {
     val mT = manifest[T]
   }
 
   // --- Internal API
-  def tile_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], strides: List[Rep[Index]], memOfs: Rep[Index], tileDims: List[Int], cchain: Rep[CounterChain], store: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
-    val iters = List.fill(sizeOf(cchain)){ fresh[Index] }
+  def tile_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], strides: List[Rep[FixPt[Signed,B32,B0]]], memOfs: Rep[FixPt[Signed,B32,B0]], tileDims: List[Int], cchain: Rep[CounterChain], store: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
+    val iters = List.fill(sizeOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }
 
     if (store) reflectWrite(mem)(TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters,store))
     else       reflectWrite(local)(TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters,store))
@@ -113,7 +122,7 @@ trait MemoryTemplateOpsExp extends MemoryTemplateCompilerOps with EffectExp {
 
 // Defines type remappings required in Scala gen (should be same as in library)
 trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenPipeTemplateOps {
-  val IR: MemoryTemplateOpsExp with PipeTemplateOpsExp with DHDLIdentifiers
+  val IR: PipeTemplateOpsExp with DHDLIdentifiers
   import IR._
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
@@ -143,7 +152,7 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenPipeTemplate
         val offaddr = (iters.zip(strides).map{case (i,s) => quote(i) + "*" + quote(s) } :+ quote(memOfs)).mkString(" + ")
         stream.println("val offaddr = " + offaddr)
 
-        val localStrides = localDimsToStrides(tileDims).map(k => "FixedPoint(" + k + ")(FixFormat(true,32,0))")
+        val localStrides = localDimsToStrides(tileDims).map(k => "FixedPoint[Signed,B32,B0](" + k + ")")
         val localAddr = iters.zip(localStrides).map{ case (i,s) => quote(i) + "*" + quote(s) }.mkString(" + ")
         stream.println("val localaddr = " + localAddr)
 

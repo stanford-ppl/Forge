@@ -78,7 +78,6 @@ trait DeliteGenImports extends BaseGenImports {
   override def emitAllImports(stream: PrintWriter) {
     super.emitAllImports(stream)
     emitScalaToolsImports(stream)
-    emitLMSImports(stream)
     emitDeliteImports(stream)
   }
 }

@@ -4,43 +4,6 @@ package optima
 
 import core.{ForgeApplication,ForgeApplicationRunner}
 
-// TODO:
-// - Autodoc
-// - Forge errors (source context is useless right now)
-// - Miscellaneous warnings and errors for improper use of forge API
-// - Completeness checks for analyses
-// - Convergence conditions for analyses
-// - Pre- and Post-processing rules for analyses
-// - figment should operate more like a redirect for library implementation?
-// - generate atomic writes from Forge
-// - Add Global precision to OptiMA extern
-// - Error when creating static methods with same object group as Metadata (case class)
-//   - workaround: Use different group for now
-//   - separate metadata meet, etc. functions into separate functions generated in Impls, change case class to classes?
-// - Optional identification of types as "array-like" or "struct-like" - can this be done automatically?
-//   - types with data structure definition will always show up as struct-like, no change needed
-//   - types which have ops implemented as records should be struct-like
-//   - all other types need to be specified as arrayLike or scalarLike (scalarLike is default)
-//   - use figTpe(, isPrimitive, isArrayLike)
-
-// TEST:
-
-// DONE:
-// - disable error with field shortcutting on figment types (new rule for unapply on structs for figments)
-// - Fix type arguments in creating RefinedManifest
-// - allow and generate inheritance for any type with no data structure definition
-// - Move FigmentStruct to extern (Records)
-// - Add option to disable struct unwrapping in LMS
-// - Add new sugar for modules in DADL
-// - Why are if-then-else statements being staged even when the condition is a Scala constant?
-//   - Unable to reproduce (try using System.out.println instead?)
-// - Library version of Blocks? How to handle transformation rules for these?
-// - Need quick syntax for referring to arguments of lambdas in analysis/transformer functions
-//   - bound args are named using f___arg#___arg#
-//     where first # is argnum of lambda and second is argnum of lambda's arg
-// - Propagation of metadata via syms
-//   - Subproblem: can we define contain and extracts syms on DeliteArray or does this break things?
-
 object OptiMADSLRunner extends ForgeApplicationRunner with OptiMADSL
 trait OptiMADSL extends ForgeApplication
   with OptiMAPropagation

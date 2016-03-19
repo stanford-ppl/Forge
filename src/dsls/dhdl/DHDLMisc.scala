@@ -118,7 +118,7 @@ trait DHDLMisc {
     infix (API) ("mkString", T, (MArray(T), MString) :: MString) implements composite ${ array_mkstring($0, $1) }
 
     direct (API) ("__equal", T, (MArray(T), MArray(T)) :: Bit, TOrder(T)) implements composite ${
-      $0.zip($1){(a,b) => implicitly[Order[T]].eql(a,b) }.reduce{_&&_}
+      array_zip($0, $1, {(a:Rep[T], b:Rep[T]) => implicitly[Order[T]].eql(a,b)}).reduce{_&&_}
     }
   }
 
@@ -137,7 +137,26 @@ trait DHDLMisc {
     val rand_flt = internal (Rand) ("rand_flt", (G,E), Nil :: FltPt(G,E), effect = simple)
     val rand_bit = internal (Rand) ("rand_bit", Nil, Nil :: Bit, effect = simple)
 
-    direct (Rand) ("randomFix", (S,I,F), FixPt(S,I,F) :: FixPt(S,I,F)) implements composite ${ rand_fix_bnd($0) }
+    internal (Rand) ("randomFixPt", (A,S,I,F), A :: FixPt(S,I,F)) implements composite ${
+      val fix = $0.asInstanceOf[Rep[FixPt[S,I,F]]]
+      rand_fix_bnd[S,I,F](fix)
+    }
+    internal (Rand) ("randomFltPt", (A,G,E), A :: FltPt(G,E)) implements composite ${
+      val flt = $0.asInstanceOf[Rep[FltPt[G,E]]]
+      rand_flt[G,E] * flt
+    }
+
+    direct (Rand) ("rand", A, A :: A) implements composite ${
+      manifest[A] match {
+        case mA if isFixPtType(mA) =>
+          randomFixPt($0)(manifest[A], mA.typeArguments(0), mA.typeArguments(1), mA.typeArguments(2), implicitly[SourceContext]).asInstanceOf[Rep[A]]
+
+        case mA if isFltPtType(mA) =>
+          randomFltPt($0)(manifest[A], mA.typeArguments(0), mA.typeArguments(1), implicitly[SourceContext]).asInstanceOf[Rep[A]]
+
+        case mA => stageError("No random implementation for type " + mA.runtimeClass.getSimpleName)
+      }
+    }
 
     // Holy hackery, batman!
     direct (Rand) ("random", A, Nil :: A) implements composite ${
@@ -157,18 +176,9 @@ trait DHDLMisc {
 
     // --- Scala backend
     // TODO: Assumes maximum value is an integer (not a Long)
-    impl (rand_fix_bnd) (codegen($cala, ${ FixedPoint.rand($0) }))
-    impl (rand_fix) (codegen($cala, ${
-      @val signed = sign[S]
-      @val intbits = nbits[I]
-      @val fracbits = nbits[F]
-      FixedPoint.rand(FixFormat($signed, $intbits, $fracbits))
-    }))
-    impl (rand_flt) (codegen($cala, ${
-      @val sigbits = nbits[G]
-      @val expbits = nbits[E]
-      FloatPoint.rand(FloatFormat($sigbits, $expbits))
-    }))
+    impl (rand_fix_bnd) (codegen($cala, ${ FixedPoint.randbnd[$t[S],$t[I],$t[F]]($0) }))
+    impl (rand_fix) (codegen($cala, ${ FixedPoint.rand[$t[S],$t[I],$t[F]] }))
+    impl (rand_flt) (codegen($cala, ${ FloatPoint.rand[$t[G],$t[E]] }))
     impl (rand_bit) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextBoolean() }))
   }
 

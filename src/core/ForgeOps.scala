@@ -86,30 +86,6 @@ trait ForgeOps extends Base with ForgeTraversalOps {
     def apply(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = Nil, effect: EffectType = pure, aliasHint: AliasHint = nohint)
       = forge_direct(grp,name,internalBackend,tpePars,signature,implicitArgs,effect,aliasHint)
   }
-  object library {
-    def static(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = Nil, effect: EffectType = pure, aliasHint: AliasHint = nohint)
-      = forge_static(grp,name,libraryBackend,tpePars,signature,implicitArgs,effect,aliasHint)
-    def infix(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = Nil, effect: EffectType = pure, aliasHint: AliasHint = nohint)
-      = forge_infix(grp,name,libraryBackend,tpePars,signature,implicitArgs,effect,aliasHint)
-    def direct(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = Nil, effect: EffectType = pure, aliasHint: AliasHint = nohint)
-      = forge_direct(grp,name,libraryBackend,tpePars,signature,implicitArgs,effect,aliasHint)
-    def fimplicit(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignature, implicitArgs: List[Rep[Any]] = Nil, effect: EffectType = pure, aliasHint: AliasHint = nohint)
-      = forge_implicit(grp,name,libraryBackend,tpePars,signature,implicitArgs,effect,aliasHint)
-    def apply(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = Nil, effect: EffectType = pure, aliasHint: AliasHint = nohint)
-      = forge_direct(grp,name,libraryBackend,tpePars,signature,implicitArgs,effect,aliasHint)
-  }
-  object compiler {
-    def static(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = Nil, effect: EffectType = pure, aliasHint: AliasHint = nohint)
-      = forge_static(grp,name,compilerBackend,tpePars,signature,implicitArgs,effect,aliasHint)
-    def infix(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = Nil, effect: EffectType = pure, aliasHint: AliasHint = nohint)
-      = forge_infix(grp,name,compilerBackend,tpePars,signature,implicitArgs,effect,aliasHint)
-    def direct(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = Nil, effect: EffectType = pure, aliasHint: AliasHint = nohint)
-      = forge_direct(grp,name,compilerBackend,tpePars,signature,implicitArgs,effect,aliasHint)
-    def fimplicit(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignature, implicitArgs: List[Rep[Any]] = Nil, effect: EffectType = pure, aliasHint: AliasHint = nohint)
-      = forge_implicit(grp,name,compilerBackend,tpePars,signature,implicitArgs,effect,aliasHint)
-    def apply(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = Nil, effect: EffectType = pure, aliasHint: AliasHint = nohint)
-      = forge_direct(grp,name,compilerBackend,tpePars,signature,implicitArgs,effect,aliasHint)
-  }
 
   def forge_static(grp: Rep[DSLGroup], name: String, backend: BackendType, tpePars: List[Rep[TypePar]], signature: MethodSignatureType, implicitArgs: List[Rep[Any]], effect: EffectType, aliasHint: AliasHint)
     = forge_op(grp,name,staticMethod,backend,tpePars,listToArgs(signature.args),listToCurriedArgs(signature.allArgs),listToImplicitArgs(implicitArgs),signature.retTpe,effect,aliasHint)
@@ -123,7 +99,7 @@ trait ForgeOps extends Base with ForgeTraversalOps {
 
 
   def impl(op: Rep[DSLOp])(rule: OpType) = forge_impl(op,rule)
-  def extern(grp: Rep[DSLGroup], withLift: Boolean = false, targets: List[CodeGenerator] = generators.filterNot(_ == restage)) = forge_extern(grp, withLift, targets)
+  def extern(grp: Rep[DSLGroup], withLift: Boolean = false, withTypes: Boolean = false, targets: List[CodeGenerator] = generators.filterNot(_ == restage)) = forge_extern(grp, withLift, withTypes, targets)
 
   case class ParallelizeKey(tpe: Rep[DSLType])
   object parallelize {
@@ -162,7 +138,7 @@ trait ForgeOps extends Base with ForgeTraversalOps {
   def forge_data(tpe: Rep[DSLType], fields: Seq[(String, Rep[DSLType])]): Rep[DSLData]
   def forge_op(_grp: Rep[DSLGroup], name: String, style: MethodType, backend: BackendType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], curriedArgs: List[List[Rep[DSLArg]]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint): Rep[DSLOp]
   def forge_impl(op: Rep[DSLOp], rule: OpType): Rep[DSLOp]
-  def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, targets: List[CodeGenerator]): Rep[Unit]
+  def forge_extern(grp: Rep[DSLGroup], withLift: Boolean, withTypes: Boolean, targets: List[CodeGenerator]): Rep[Unit]
   def forge_isparallelcollection(tpe: Rep[DSLType], dc: ParallelCollection): Rep[Unit]
   def forge_isparallelcollection_buffer(tpe: Rep[DSLType], dc: ParallelCollectionBuffer): Rep[Unit]
   def forge_lookup_alias(tpeName: String): Rep[DSLType]
@@ -286,30 +262,6 @@ trait ForgeSugar extends ForgeSugarLowPriority with ForgeTraversalSugar {
         = forge_implicit(name,internalBackend,addTpePars,signature,implicitArgs,effect,aliasHint)
       def apply(name: String)(signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint)
         = forge_direct(name,internalBackend,addTpePars,signature,implicitArgs,effect,aliasHint)
-    }
-    object library {
-      def static(name: String)(signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint)
-        = forge_static(name,libraryBackend,addTpePars,signature,implicitArgs,effect,aliasHint)
-      def infix(name: String)(signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint)
-        = forge_infix(name,libraryBackend,addTpePars,signature,implicitArgs,effect,aliasHint)
-      def direct(name: String)(signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint)
-        = forge_direct(name,libraryBackend,addTpePars,signature,implicitArgs,effect,aliasHint)
-      def fimplicit(name: String)(signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint)
-        = forge_implicit(name,libraryBackend,addTpePars,signature,implicitArgs,effect,aliasHint)
-      def apply(name: String)(signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint)
-        = forge_direct(name,libraryBackend,addTpePars,signature,implicitArgs,effect,aliasHint)
-    }
-    object compiler {
-      def static(name: String)(signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint)
-        = forge_static(name,compilerBackend,addTpePars,signature,implicitArgs,effect,aliasHint)
-      def infix(name: String)(signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint)
-        = forge_infix(name,compilerBackend,addTpePars,signature,implicitArgs,effect,aliasHint)
-      def direct(name: String)(signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint)
-        = forge_direct(name,compilerBackend,addTpePars,signature,implicitArgs,effect,aliasHint)
-      def fimplicit(name: String)(signature: MethodSignature, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint)
-        = forge_implicit(name,compilerBackend,addTpePars,signature,implicitArgs,effect,aliasHint)
-      def apply(name: String)(signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = List(), addTpePars: List[Rep[TypePar]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint)
-        = forge_direct(name,compilerBackend,addTpePars,signature,implicitArgs,effect,aliasHint)
     }
 
     val parallelize = ParallelizeKey(_tpeScopeBox)
@@ -612,13 +564,13 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
    */
   def forge_impl(op: Rep[DSLOp], rule: OpType) = {
     // Prior to adding an op rule, check to see if the op is implemented as a field getter/setter on a figment data structure
-    def checkFieldFigments(op: Rep[DSLOp], rule: OpType) = rule match {
+    /*def checkFieldFigments(op: Rep[DSLOp], rule: OpType) = rule match {
       case Getter(argIndex, field) if is_figment_tpe(op.args.apply(argIndex).tpe) && op.backend != `libraryBackend` =>
         err("getter method " + op.name + " for figment type " + op.args.apply(argIndex).tpe.name + " must be a library-only method")
       case Setter(argIndex, field, value) if is_figment_tpe(op.args.apply(argIndex).tpe) && op.backend != `libraryBackend` =>
         err("setter method " + op.name + " for figment type " + op.args.apply(argIndex).tpe.name + " must be a library-only method")
       case _ => rule
-    }
+    }*/
 
     (Impls.get(op),rule) match {
       // only codegen rules may have multiple declarations
@@ -630,9 +582,9 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
         }
       case (Some(x),y) =>
         if (Config.verbosity > 0) warn("op " + op.name + " already has implementation rule " + x + ". It is being overwritten with " + rule)
-        Impls(op) = checkFieldFigments(op,rule)
+        Impls(op) = rule //checkFieldFigments(op,rule)
       case _ =>
-        Impls(op) = checkFieldFigments(op,rule)
+        Impls(op) = rule //checkFieldFigments(op,rule)
     }
 
     // no matter what branch we took, we may need to reconcile codegen rules
@@ -696,14 +648,14 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
   }
 
   /* A reference to an external ops group */
-  case class Extern(opsGrp: DSLOps, withLift: Boolean) extends Def[Unit]
+  case class Extern(opsGrp: DSLOps, withLift: Boolean, withTypes: Boolean) extends Def[Unit]
 
-  def forge_extern(_grp: Rep[DSLGroup], withLift: Boolean, _targets: List[CodeGenerator]) = {
+  def forge_extern(_grp: Rep[DSLGroup], withLift: Boolean, withTypes: Boolean, _targets: List[CodeGenerator]) = {
     val opsGrp = new DSLOps {
       val grp = _grp
       override def targets = _targets
     }
-    val e = Extern(opsGrp, withLift)
+    val e = Extern(opsGrp, withLift, withTypes)
     if (!Externs.contains(e)) Externs += e
     e
   }

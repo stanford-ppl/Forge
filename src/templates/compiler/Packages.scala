@@ -28,44 +28,6 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
   def emitDSLPackageDefinitions(opsGrps: List[DSLOps], stream: PrintWriter) {
     emitBlockComment("DSL compiler definition", stream)
 
-    // compiler
-    stream.println("trait " + dsl + "CompilerOps extends " + dsl)
-    for (opsGrp <- opsGrps) {
-      // stream.print(" with " + opsGrp.name)
-      if (opsGrp.ops.exists(requiresImpl))
-        stream.print(" with " + opsGrp.name + "Impl")
-      if (opsGrp.ops.exists(_.backend == internalBackend))
-        stream.print(" with " + opsGrp.grp.name + "InternalOps")
-      if (opsGrp.ops.exists(_.backend == compilerBackend))
-        stream.print(" with " + opsGrp.grp.name + "CompilerOps")
-    }
-    for (e <- Externs) {
-      stream.print(" with " + e.opsGrp.grp.name + "CompilerOps") // Legacy naming for InternalOps
-    }
-    val hasMetadata = Tpes.exists(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
-    if (hasMetadata) stream.print(" with " + dsl + "Metadata")
-
-    stream.println(" {")
-    stream.println("  this: " + dsl + "Exp with " + dsl + "Application => ")
-    stream.println("}")
-    stream.println()
-
-    // metadata ops exp -- used in code generators
-    // HACK: Only expose extern stuff and metadata in code generator to support metadata ops on DSL types
-    stream.print("trait " + dsl + "MetadataOpsExp extends " + dsl + "Identifiers")
-    if (hasMetadata) stream.print(" with " + dsl + "Metadata")
-    stream.println()
-    for (opsGrp <- opsGrps if isMetaType(opsGrp.grp)) {
-      stream.print(" with " + opsGrp.name + "Exp")
-    }
-    for (e <- Externs) {
-      stream.print(" with " + e.opsGrp.name + "Exp")
-    }
-    stream.println(" {")
-    stream.println("  this: " + dsl + "Exp =>")
-    stream.println("}")
-    stream.println()
-
     // scopes
     // NOTE: this currently only works in Delite mode. Is there a way to use scopes and still
     // delegate to a different implementation for interpreter mode?
@@ -86,17 +48,46 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     stream.println("}")
     stream.println()
 
-    // Exp
-    stream.println("trait " + dsl + "Exp extends " + dsl + "CompilerOps with " + dsl + "TypeClasses with " + dsl + "MetadataOpsExp with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
-    for (opsGrp <- opsGrps if !isMetaType(opsGrp.grp)) {
+    // DSLCodegenOps -- imported by code generators
+    // Expose metadata in code generator to support metadata ops on DSL types
+    // Mix in type definitions together to make types match up in codegen
+    stream.print("trait " + dsl + "CodegenOps extends " + dsl + "Identifiers with " + dsl + "TypeClasses")
+    if (hasMetadata) stream.print(" with " + dsl + "MetadataClasses")
+    if (hasMetatype) stream.print(" with " + dsl + "MetaOps")
+    for (e <- Externs if e.withTypes) { stream.print(" with " + e.opsGrp.grp.name + "TypesExp") }
+    stream.println(" {")
+    stream.println("  this: " + dsl + "Exp =>")
+    stream.println("}")
+    stream.println()
+
+
+    // --- DSLCompilerOps
+    stream.println("trait " + dsl + "CompilerOps extends " + dsl + " with " + dsl + "CodegenOps")
+    for (opsGrp <- opsGrps if !isMetahelp(opsGrp.grp)) {
+      if (opsGrp.ops.exists(requiresImpl))
+        stream.print(" with " + opsGrp.name + "Impl")
+      if (!isMetaType(opsGrp.grp) && opsGrp.ops.exists(_.backend == internalBackend))
+        stream.print(" with " + opsGrp.grp.name + "InternalOps")
+    }
+    for (e <- Externs) { stream.print(" with " + e.opsGrp.grp.name + "CompilerOps") }
+    if (hasMetahelp)   { stream.print(" with " + dsl + "MetadataOpsImpl") }
+
+    stream.println(" {")
+    stream.println("  this: " + dsl + "Exp with " + dsl + "Application => ")
+    stream.println("}")
+    stream.println()
+
+
+    // --- DSLExp
+    stream.println("trait " + dsl + "Exp extends " + dsl + "CompilerOps with ExpressionsOpt with DeliteOpsExp with DeliteRestageOpsExp with DeliteTestOpsExp")
+    for (opsGrp <- opsGrps if !isMetahelp(opsGrp.grp)) {
       // Group has an op with a set of rewrite rules that doesn't contain a Forwarding rule
       val hasRewrites = unique(opsGrp.ops).exists(o => Rewrites.get(o).map(rules => rules.nonEmpty && !rules.exists(_.isInstanceOf[ForwardingRule])).getOrElse(false))
       val opExpName = if (hasRewrites) opsGrp.grp.name + "RewriteOpsExp" else opsGrp.name + "Exp"
       stream.print(" with " + opExpName)
     }
-    /*for (e <- Externs) {
-      stream.print(" with " + e.opsGrp.name + "Exp")
-    }*/
+    for (e <- Externs) { stream.print(" with " + e.opsGrp.name + "Exp") }
+    if (hasMetahelp) { stream.print(" with " + dsl + "MetadataOpsExp") }
     stream.println()
     stream.println(" with DeliteAllOverridesExp {")
     stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication => ")
@@ -126,14 +117,12 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
 
     val StructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && !FigmentTpes.contains(t) && !isMetaType(t))
     val FigmentStructTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && FigmentTpes.contains(t) && !isMetaType(t))
-    val MetaTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
+    val MetaTpes = Tpes.filter(t => !isForgePrimitiveType(t) && isMetadata(t))
 
     emitBlockComment("DSL types", stream, indent=2)
     for (tpe <- StructTpes) {
       stream.print("  abstract class " + quote(tpe))
       stream.print(ForgeCollections.get(tpe).map(c => " extends DeliteCollection[" + quote(c.tpeArg) + "]").getOrElse(""))
-      //if (ForgeCollections.contains(tpe) && TpeParents.contains(tpe)) stream.print(" with " + quote(TpeParents(tpe)))
-      //else if (TpeParents.contains(tpe)) stream.print(" extends " + quote(TpeParents(tpe)))
       stream.println()
     }
     for (tpe <- FigmentStructTpes) {
@@ -158,7 +147,8 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     stream.println("}")
     stream.println()
 
-    // DSLCompiler
+
+    // --- DSLCompiler
     stream.println("trait " + dsl + "Compiler extends " + dsl + "Exp with " + dsl + "Transform {") //with MultiloopSoATransformExp
     stream.println("  self: " + dsl + "Application with DeliteApplication => ")
     stream.println()

@@ -1,4 +1,4 @@
-import dhdl.compiler._
+/*import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
 import scala.util.Random
@@ -9,7 +9,7 @@ trait BlackScholes extends DHDLApplication {
   override def stageArgNames = List("tileSize")
 
   lazy val tileSize = stageArgOrElse[Int](0, 4)
-  lazy val numOptions = ArgIn[Fix]("numOptions")
+  lazy val numOptions = ArgIn[SInt]("numOptions")
 
   final val inv_sqrt_2xPI = 0.39894228040143270286f
 
@@ -43,7 +43,7 @@ trait BlackScholes extends DHDLApplication {
   }
 
   def BlkSchlsEqEuroNoDiv(sptprice: Rep[Flt], strike: Rep[Flt], rate: Rep[Flt],
-                          volatility: Rep[Flt], time: Rep[Flt], otype: Rep[Fix]) = {
+                          volatility: Rep[Flt], time: Rep[Flt], otype: Rep[UInt]) = {
 
     val xLogTerm = log( sptprice / strike )
     val xPowerTerm = 0.5f * (volatility ** 2)
@@ -65,7 +65,7 @@ trait BlackScholes extends DHDLApplication {
   }
 
   def blackscholes(
-    otype:      Rep[OffChipMem[Fix]],
+    otype:      Rep[OffChipMem[UInt]],
     sptprice:   Rep[OffChipMem[Flt]],
     strike:     Rep[OffChipMem[Flt]],
     rate:       Rep[OffChipMem[Flt]],
@@ -74,7 +74,7 @@ trait BlackScholes extends DHDLApplication {
     optprice:   Rep[OffChipMem[Flt]]
   ): Rep[Unit] = {
     //TODO: Need to duplicate these for parallelization but if put in the function, have no visibility
-    val otypeRAM      = BRAM[Fix](tileSize)
+    val otypeRAM      = BRAM[UInt](tileSize)
     val sptpriceRAM   = BRAM[Flt](tileSize)
     val strikeRAM     = BRAM[Flt](tileSize)
     val rateRAM       = BRAM[Flt](tileSize)
@@ -83,12 +83,12 @@ trait BlackScholes extends DHDLApplication {
 
     MetaPipe(numOptions by tileSize) { i =>
       Parallel {
-        otype.ld(otypeRAM, i, tileSize)
-        sptprice.ld(sptpriceRAM, i, tileSize)
-        strike.ld(strikeRAM, i, tileSize)
-        rate.ld(rateRAM, i, tileSize)
-        volatility.ld(volatilityRAM, i, tileSize)
-        otime.ld(otimeRAM, i, tileSize)
+        otypeRAM := otype(i::i+tileSize)
+        sptpriceRAM := sptprice(i::i+tileSize)
+        strikeRAM := strike(i::i+tileSize)
+        rateRAM := rate(i::i+tileSize)
+        volatilityRAM := volatility(i::i+tileSize)
+        otimeRAM := otime(i::i+tileSize)
       }
 
       val optpriceRAM = BRAM[Flt](tileSize)
@@ -96,14 +96,14 @@ trait BlackScholes extends DHDLApplication {
         val price = BlkSchlsEqEuroNoDiv(sptpriceRAM(j), strikeRAM(j), rateRAM(j), volatilityRAM(j), otimeRAM(j), otypeRAM(j))
         optpriceRAM(j) = price
       }
-      optprice.st(optpriceRAM, i, tileSize)
+      optprice(i::i+tileSize) := optpriceRAM
     }
   }
 
   def main() {
     val N = 32
 
-    val types  = OffChipMem[Fix]("otype", N)
+    val types  = OffChipMem[UInt]("otype", N)
     val prices = OffChipMem[Flt]("sptprice", N)
     val strike = OffChipMem[Flt]("strke", N)
     val rate   = OffChipMem[Flt]("rate", N)
@@ -111,7 +111,7 @@ trait BlackScholes extends DHDLApplication {
     val time   = OffChipMem[Flt]("otime", N)
     val optprice = OffChipMem[Flt]("optprice", N)
 
-    val sotype      = Array.fill(N)(randomFix(2))
+    val sotype      = Array.fill(N)(random[UInt](2))
     val ssptprice   = Array.fill(N)(random[Flt])
     val sstrike     = Array.fill(N)(random[Flt])
     val srate       = Array.fill(N)(random[Flt])
@@ -132,4 +132,4 @@ trait BlackScholes extends DHDLApplication {
 
     println(out.mkString(","))
   }
-}
+}*/

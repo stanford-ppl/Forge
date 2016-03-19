@@ -1,4 +1,4 @@
-import dhdl.compiler._
+/*import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
 import scala.util.Random
@@ -8,26 +8,26 @@ object GDACompiler extends DHDLApplicationCompiler with GDA
 object GDAInterpreter extends DHDLApplicationInterpreter with GDA
 trait GDA extends DHDLApplication {
 
-  type Elem = Fix
+  type Elem = FixPt[Signed,B16,B16]
 
   override def stageArgNames = List("rTileSize", "cTileSize")
   lazy val rTileSize = stageArgOrElse[Int](0, 2)
   lazy val cTileSize = stageArgOrElse[Int](1, 4)
-  lazy val rows = ArgIn[Fix]("rows")
-  lazy val cols = ArgIn[Fix]("cols")
+  lazy val rows = ArgIn[SInt]("rows")
+  lazy val cols = ArgIn[SInt]("cols")
 
   def gda(
-    x: Rep[OffChipMem[Elem]],
-    y: Rep[OffChipMem[Bit]],
-    mu0: Rep[OffChipMem[Elem]],
-    mu1: Rep[OffChipMem[Elem]],
+    x:     Rep[OffChipMem[Elem]],
+    y:     Rep[OffChipMem[Bit]],
+    mu0:   Rep[OffChipMem[Elem]],
+    mu1:   Rep[OffChipMem[Elem]],
     sigma: Rep[OffChipMem[Elem]]
   ) {
     val sub = OffChipMem[Elem]("sub", cols)
 
     MetaPipe(rows by rTileSize){ r =>
       val yTile = BRAM[Bit]("yTile", rTileSize)
-      y.ld(yTile, r, rTileSize)
+      yTile := y(r::r+rTileSize)
 
       Sequential(rTileSize by 1){ rr =>
         MetaPipe(cols by cTileSize){ c =>
@@ -35,29 +35,29 @@ trait GDA extends DHDLApplication {
           val mu0Tile = BRAM[Elem]("mu0Tile", cTileSize)
           val mu1Tile = BRAM[Elem]("mu1Tile", cTileSize)
           Parallel {
-            x.ld(xTile, r, c, rTileSize, cTileSize) // Load a tile of x
-            mu0.ld(mu0Tile, c, cTileSize)           // Load a tile of mu0
-            mu1.ld(mu1Tile, c, cTileSize)           // Load a tile of mu1
+            xTile   := x(r::r+rTileSize, c::c+cTileSize)  // Load tile of x
+            mu0Tile := mu0Tile(c::c+cTileSize)            // Load tile of mu0
+            mu1Tile := mu1Tile(c::c+cTileSize)            // Load tile of mu1
           }
           val subTile = BRAM[Elem]("subTemp", cTileSize)
           Pipe(cTileSize by 1){ cc =>
             subTile(cc) = xTile(rr,cc) - mux(yTile(rr), mu1Tile(cc), mu0Tile(cc))
           }
-          sub.st(subTile, c, cTileSize)
+          sub(c::c+cTileSize) := subTile
         }
         MetaPipe(cols by cTileSize, cols by cTileSize){ (i,j) =>
           val subTile1 = BRAM[Elem]("subTile1", cTileSize)
           val subTile2 = BRAM[Elem]("subTile2", cTileSize)
           val sigmaTile = BRAM[Elem]("sigmaTile", cTileSize, cTileSize)
           Parallel {
-            sub.ld(subTile1, i, cTileSize)
-            sub.ld(subTile2, j, cTileSize)
-            sigma.ld(sigmaTile, i, j, cTileSize, cTileSize)
+            subTile1 := sub(i::i+cTileSize)
+            subTile1 := sub(j::j+cTileSize)
+            sigmaTile := sigma(i::i+cTileSize, j::j+cTileSize)
           }
           Pipe(cTileSize by 1, cTileSize by 1){ (ii,jj) =>
             sigmaTile(ii,jj) = sigmaTile(ii,jj) + subTile1(ii) * subTile2(jj)
           }
-          sigma.st(sigmaTile, i, j, cTileSize, cTileSize)
+          sigma(i::i+cTileSize, j::j+cTileSize) := sigmaTile
         }
       }
     }
@@ -73,10 +73,10 @@ trait GDA extends DHDLApplication {
     val mu1 = OffChipMem[Elem]("mu1", C)
     val sigma = OffChipMem[Elem]("sigma", C, C)
 
-    val sX = Array.fill(R){ Array.fill(C){ randomFix(10) }} //Array.tabulate(C){j => random[Flt] * 100.0f }}
+    val sX = Array.fill(R){ Array.fill(C){ random[Elem](10) }} //Array.tabulate(C){j => random[Flt] * 100.0f }}
     val sY = Array.fill(R){ random[Bit] }
-    val sMu0 = Array.fill(C){ randomFix(10) }
-    val sMu1 = Array.fill(C){ randomFix(10) }
+    val sMu0 = Array.fill(C){ random[Elem](10) }
+    val sMu1 = Array.fill(C){ random[Elem](10) }
 
     println("x: " + sX.map(_.mkString(", ")).mkString("\n") )
     println("y: " + sY.mkString("\n"))
@@ -108,4 +108,4 @@ trait GDA extends DHDLApplication {
     println("diff:     " + gold.zip(result){_-_}.mkString(", "))
     assert( result == gold )
   }
-}
+}*/

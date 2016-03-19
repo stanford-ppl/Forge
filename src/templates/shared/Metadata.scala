@@ -24,7 +24,7 @@ trait BaseGenMetadata extends ForgeCodeGenBase {
 
     val meetFuncs = List(metaUpdate,metaInit,metaAlias,any)
 
-    stream.println("trait " + dsl + "Metadata extends MetadataOps {")
+    stream.println("trait " + dsl + "MetadataClasses extends MetadataOps {")
     stream.println("  this: " + base + " =>")
     stream.println()
     emitBlockComment("DSL metadata types", stream, 2)

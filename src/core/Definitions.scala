@@ -189,8 +189,8 @@ trait Definitions extends DerivativeTypes {
    */
   case object sharedBackend extends BackendType
   case object internalBackend extends BackendType
-  case object libraryBackend extends BackendType
-  case object compilerBackend extends BackendType
+  //case object libraryBackend extends BackendType
+  //case object compilerBackend extends BackendType
 
   /**
    * Metadata meet functions

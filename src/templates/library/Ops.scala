@@ -41,27 +41,20 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     case _:CodeGen | _:Redirect => false
     case _:Getter | _:Setter => false
     case _:Allocates | _:AllocatesFigment => false
-    case _ => hasLibraryVersion(o)
+    case _ => true //hasLibraryVersion(o)
   }
 
-  def emitLibraryOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
+  /*def emitLibraryOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
     val base = if (opsGrp.ops.exists(hasSharedVersion)) opsGrp.name else "Base"
     emitBlockComment("Library-only operations", stream)
-    emitOpSugar(opsGrp.grp.name + "Library", base, dsl, opsGrp, stream, libraryBackend)
-  }
+    emitOpSugar(opsGrp.grp.name + "Library", base, dsl, List(opsGrp), stream, libraryBackend)
+  }*/
 
   /**
    * Emit implementation bodies for all ops except codegen, setter, getter, and allocates
    * These implementations are called from Wrapper (ops not generated here are inlined)
    */
-  def emitImpls(opsGrp: DSLOps, stream: PrintWriter, seeBase: Boolean = false) {
-    emitBlockComment("SingleTask and Composite Impls", stream)
-    stream.println()
-    stream.println("trait " + opsGrp.grp.name + "WrapperImpl {")
-    stream.print("  this: " + dsl + "Application with " + dsl + "LibraryOps")
-    if (seeBase) stream.print(" with " + dsl + "Base with " + dsl + "Classes") // HACK: Metadata sees everything...
-    stream.println(" => ")
-    stream.println()
+  def emitImpls(opsGrp: DSLOps, stream: PrintWriter) {
     val indent = 2
     for (o <- unique(opsGrp.ops) if requiresImpl(o)) {
       emitWithIndent(makeOpImplMethodSignature(o) + " = {", stream, indent)
@@ -276,7 +269,6 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       emitWithIndent("}", stream, indent)
       stream.println()
     }
-    stream.println("}")
   }
 
   def emitOverloadShadows(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) {
@@ -358,7 +350,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       stream.println()
     }
 
-    for (o <- unique(opsGrp.ops) if !Impls(o).isInstanceOf[Redirect] && hasLibraryVersion(o)) {
+    for (o <- unique(opsGrp.ops) if !Impls(o).isInstanceOf[Redirect]) {
       // no return tpe because not all of the tpes are in scope in the lib wrapper
       stream.println("  " + makeOpMethodSignature(o, withReturnTpe = Some(false)) + " = {")
       o.style match {

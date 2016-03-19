@@ -73,7 +73,7 @@ trait DHDLDSL extends ForgeApplication
     val Indices   = tpe("Indices")
     val LoopRange = tpe("LoopRange")
     val Range     = tpe("Range")
-
+    primitiveTypes :::= List(Indices)
 
     // Compiler hangs if these aren't defined
     noInfixList :::= List(":=", "**", "as", "to", "rst")
@@ -89,11 +89,11 @@ trait DHDLDSL extends ForgeApplication
     importDHDLMetadata()
 
     importDHDLMath()
-    /* importCollectionOps()
-      importNumOps()
-      importArithOps()
-      importOrderOps()
-      importPrimitiveMath()*/
+    //  importCollectionOps()
+    //  importNumOps()
+    //  importArithOps()
+    //  importOrderOps()
+    //  importPrimitiveMath()
 
     importDHDLMemories()
     //  importMemOps()
@@ -108,7 +108,7 @@ trait DHDLDSL extends ForgeApplication
 
     // Externs
     extern(grp("PipeTemplate"), targets = List($cala))
-    extern(grp("MemoryTemplate"), targets = List($cala))
+    extern(grp("MemoryTemplate"), targets = List($cala), withTypes = true)
     extern(metadata("TypeInspection"), targets = Nil)
     ()
   }

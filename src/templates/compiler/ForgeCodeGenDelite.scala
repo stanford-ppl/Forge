@@ -77,6 +77,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     emitScalaReflectImports(stream)
     emitLMSImports(stream)
     emitDeliteOpsImports(stream)
+    stream.println("import ppl.delite.framework.Config") // e.g. used for rewrites
     emitDSLImports(stream)
     stream.println()
 

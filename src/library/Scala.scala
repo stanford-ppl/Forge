@@ -611,6 +611,21 @@ trait ScalaOps extends PrimitiveMathGen {
     direct (Tuple2) ("pack", (A,B), CTuple2(MVar(A),MVar(B)) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
   }
 
+  // Applications may need direct access to ForgeArrays, if, for example, they use string fsplit
+  // but don't want to expose all operations on arrays to users
+  def importArraySimpleAPI() {
+    val T = tpePar("T")
+    val R = tpePar("R")
+
+    val ForgeArrayAPI = grp("ForgeArrayAPI")
+    infix (ForgeArrayAPI) ("apply", T, (MArray(T), MInt) :: T) implements composite ${ array_apply($0, $1) }
+    infix (ForgeArrayAPI) ("length", T, MArray(T) :: MInt) implements composite ${ array_length($0) }
+
+    internal.infix (ForgeArrayAPI) ("update", T, (MArray(T), MInt, T) :: MUnit, effect = write(0)) implements composite ${ array_update($0, $1, $2) }
+    internal.infix (ForgeArrayAPI) ("map", (T,R), (MArray(T), T ==> R) :: MArray(R)) implements composite ${ array_map($0, $1) }
+    internal.infix (ForgeArrayAPI) ("Clone", T, MArray(T) :: MArray(T)) implements composite ${ array_clone($0) }
+  }
+
   // Forge's HashMap is not mutable, so a Scala HashMap can be used if updates are necessary.
   def importHashMap() = {
     val K = tpePar("K")

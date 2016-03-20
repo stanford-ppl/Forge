@@ -78,7 +78,9 @@ trait FixedPointEmulation {
     lazy val minValue = if (signed) -(BigInt(1) << (bits-1))    else BigInt(0)
   }
   private def check(a: FixFormat, b: FixFormat) {
-    if (a != b) throw new Exception("Operations on mismatched fixed point representations are unsupported")
+    if (a != b) {
+      throw new Exception("Operations on mismatched fixed point representations (" + a + " versus " + b + ") are unsupported")
+    }
   }
 
   // Could use NumericRange, but there's an absolutely excessive amount of stuff that needs to be defined in a type class to

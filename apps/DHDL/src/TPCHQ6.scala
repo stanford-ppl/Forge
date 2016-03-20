@@ -1,4 +1,4 @@
-/*import dhdl.compiler._
+import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
 import scala.util.Random
@@ -9,11 +9,14 @@ trait TPCHQ6 extends DHDLApplication {
 
   lazy val tileSize = stageArgOrElse[Int](0, 4)
   lazy val dataSize = ArgIn[SInt]("dataSize")
-  lazy val minDate  = ArgIn[UInt]("minDate")
-  lazy val maxDate  = ArgIn[UInt]("maxDate")
+  lazy val minDateIn = ArgIn[UInt]("minDate")
+  lazy val maxDateIn = ArgIn[UInt]("maxDate")
 
   def tpchq6(dates:  Rep[OffChipMem[UInt]], quants: Rep[OffChipMem[UInt]],
              discts: Rep[OffChipMem[Flt]], prices: Rep[OffChipMem[Flt]], out: Rep[Reg[Flt]]) {
+
+    val minDate = minDateIn.value
+    val maxDate = maxDateIn.value
 
     MetaPipe(dataSize by tileSize, out) { i =>
       val datesTile  = BRAM[UInt](tileSize)
@@ -56,8 +59,8 @@ trait TPCHQ6 extends DHDLApplication {
     val sPrices = Array.fill(N){random[Flt] * 1000f}
 
     setArg(dataSize, N)
-    setArg(minDate, MIN_DATE)
-    setArg(maxDate, MAX_DATE)
+    setArg(minDateIn, MIN_DATE)
+    setArg(maxDateIn, MAX_DATE)
     setMem(dates, sDates)
     setMem(quants, sQuants)
     setMem(discts, sDiscts)
@@ -76,4 +79,4 @@ trait TPCHQ6 extends DHDLApplication {
     println("result: " + result.mkString)
     assert(result == gold)
   }
-}*/
+}

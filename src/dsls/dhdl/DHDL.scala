@@ -8,7 +8,7 @@ object DHDLDSLRunner extends ForgeApplicationRunner with DHDLDSL
 
 trait DHDLDSL extends ForgeApplication
   with DHDLMath with DHDLMisc with DHDLTypes with DHDLMemories
-  with DHDLControllers with DHDLMetadata with DHDLEnums with DHDLSugar {
+  with DHDLControllers with DHDLMetadata with DHDLEnums with DHDLSugar with TupleJunk {
 
   def dslName = "DHDL"
 
@@ -20,6 +20,15 @@ trait DHDLDSL extends ForgeApplication
   lazy val F = tpePar("F")
   lazy val G = tpePar("G")
   lazy val E = tpePar("E")
+
+  object UnstagedNumerics {
+    lazy val prims = List(SInt, SLong, SFloat, SDouble)
+    lazy val types = List("Int", "Long", "Float", "Double")
+
+    def foreach(func: (Rep[DSLType],String) => Unit) = {
+      for (i <- 0 until prims.length) { func(prims(i),types(i)) }
+    }
+  }
 
   def specification() = {
     disableFusion()
@@ -40,19 +49,18 @@ trait DHDLDSL extends ForgeApplication
     // --- Common Type Aliases
     // Add more as needed
     val B0 = lookupTpe("B0", compile)
-    val B6 = lookupTpe("B6", compile)
-    val B9 = lookupTpe("B9", compile)
-    val B10 = lookupTpe("B10", compile)
-    val B12 = lookupTpe("B12", compile)
-    val B23 = lookupTpe("B23", compile)
+    val B5 = lookupTpe("B5", compile)
+    val B8 = lookupTpe("B8", compile)
+    val B11 = lookupTpe("B11", compile)
+    val B24 = lookupTpe("B24", compile)
     val B32 = lookupTpe("B32", compile)
-    val B52 = lookupTpe("B52", compile)
+    val B53 = lookupTpe("B53", compile)
 
     val SInt32 = tpeAlias("SInt", FixPt(Signed, B32, B0))  // Note: This is not a scala Int, this is a signed int!
     val UInt32 = tpeAlias("UInt", FixPt(Unsign, B32, B0))
-    val Half   = tpeAlias("Half", FltPt(B6, B10))
-    val Flt    = tpeAlias("Flt",  FltPt(B9, B23))
-    val Dbl    = tpeAlias("Dbl",  FltPt(B12, B52))
+    val Half   = tpeAlias("Half", FltPt(B11, B5))
+    val Flt    = tpeAlias("Flt",  FltPt(B24, B8))
+    val Dbl    = tpeAlias("Dbl",  FltPt(B53, B11))
 
     // --- Memory Types
     val OffChip = tpe("OffChipMem", T)
@@ -103,6 +111,9 @@ trait DHDLDSL extends ForgeApplication
 
     importDHDLMisc()
     //  importDHDLHelpers()
+
+    importTupleTypeClassInstances()
+
 
     schedule(IRPrinterPlus)
 

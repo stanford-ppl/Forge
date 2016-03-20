@@ -66,6 +66,7 @@ trait DHDLSugar {
     }*/
   }
 
+  // Need LoopRange for syntax like a until by c - need to be able to access start/end (could also use metadata...)
   def importLoopRanges() {
     val Counter   = lookupTpe("Counter")
     val LoopRange = lookupTpe("LoopRange")
@@ -75,14 +76,14 @@ trait DHDLSugar {
     internal.infix (LoopRange) ("start", Nil, LoopRange :: Idx) implements getter(0, "_start")
     internal.infix (LoopRange) ("end", Nil, LoopRange :: Idx) implements getter(0, "_end")
     internal.infix (LoopRange) ("step", Nil, LoopRange :: Idx) implements getter(0, "_step")
-    internal.static (LoopRange) ("apply", Nil, (Idx,Idx,Idx) :: LoopRange) implements allocates(LoopRange, ${$0},${$1},${$2})
+    static (LoopRange) ("apply", Nil, (Idx,Idx,Idx) :: LoopRange) implements allocates(LoopRange, ${$0},${$1},${$2})
 
-    fimplicit (LoopRange) ("rangeToCounter", Nil, LoopRange :: Counter) implements composite ${ counter_create(None, $0, 1) }
+    fimplicit (LoopRange) ("rangeToCounter", Nil, LoopRange :: Counter) implements composite ${ counter_create(None, $0.start, $0.end, $0.step, 1) }
 
     // --- API
-    infix (LoopRange) ("until", Nil, (Idx,Idx) :: LoopRange) implements composite ${ LoopRange($0, $1, 1) }
+    infix (LoopRange) ("until", Nil, (Idx,Idx) :: LoopRange) implements composite ${ LoopRange($0, $1, fixPt[Int,Signed,B32,B0](1)) }
     infix (LoopRange) ("by", Nil, (LoopRange, Idx) :: LoopRange) implements composite ${ LoopRange($0.start, $0.end, $1) }
-    infix (LoopRange) ("by", Nil, (Idx, Idx) :: LoopRange) implements composite ${ LoopRange(0, $0, $1) }
+    infix (LoopRange) ("by", Nil, (Idx, Idx) :: LoopRange) implements composite ${ LoopRange(fixPt[Int,Signed,B32,B0](0), $0, $1) }
   }
 
 }

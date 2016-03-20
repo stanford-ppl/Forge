@@ -68,12 +68,6 @@ trait DHDLMath {
     infix (Arith) ("sub", T, (T,T) :: T)
     infix (Arith) ("mul", T, (T,T) :: T)
     infix (Arith) ("div", T, (T,T) :: T)
-
-    val Prim = grp("DHDLPrim")
-    infix (Prim) ("+", T, (T,T) :: T, TArith(T)) implements redirect ${ implicitly[Arith[T]].add($0, $1) }
-    infix (Prim) ("-", T, (T,T) :: T, TArith(T)) implements redirect ${ implicitly[Arith[T]].sub($0, $1) }
-    infix (Prim) ("*", T, (T,T) :: T, TArith(T)) implements redirect ${ implicitly[Arith[T]].mul($0, $1) }
-    infix (Prim) ("/", T, (T,T) :: T, TArith(T)) implements redirect ${ implicitly[Arith[T]].div($0, $1) }
   }
 
   // --- Order Type Class
@@ -89,19 +83,9 @@ trait DHDLMath {
     infix (Order) ("geq", T, (T,T) :: Bit)
     infix (Order) ("neq", T, (T,T) :: Bit)
     infix (Order) ("eql", T, (T,T) :: Bit)
-
-    val Prim = grp("DHDLPrim")
-    infix (Prim) ("<", T, (T,T) :: Bit, TOrder(T)) implements redirect ${ implicitly[Order[T]].lt($0, $1) }
-    infix (Prim) (">", T, (T,T) :: Bit, TOrder(T)) implements redirect ${ implicitly[Order[T]].gt($0, $1) }
-    infix (Prim) ("<=", T, (T,T) :: Bit, TOrder(T)) implements redirect ${ implicitly[Order[T]].leq($0, $1) }
-    infix (Prim) (">=", T, (T,T) :: Bit, TOrder(T)) implements redirect ${ implicitly[Order[T]].geq($0, $1) }
-    infix (Prim) ("!=", T, (T,T) :: Bit, TOrder(T)) implements redirect ${ implicitly[Order[T]].neq($0, $1) }
-    direct (Prim) ("__equal", T, (T,T) :: Bit, TOrder(T)) implements redirect ${ implicitly[Order[T]].eql($0, $1) }
   }
 
-
   def importPrimitiveMath() {
-
     val Coll = lookupTpeClass("Coll").get
     val Num = lookupTpeClass("Num").get
     val Arith = lookupTpeClass("Arith").get
@@ -348,13 +332,21 @@ trait DHDLMath {
   // TODO: Any reason for min and max to be nodes?
   def importBasicControl() {
     val T = tpePar("T")
+    val CT = tpePar("CT", stage=compile)
     val Prim = grp("DHDLPrim")
     val Bit = lookupTpe("Bit")
 
     val mux = direct (Prim) ("mux", T, (("sel", Bit), ("a",T), ("b",T)) :: T, TNum(T))
 
-    direct (Prim) ("min", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux($a < $b, a, b) }
-    direct (Prim) ("max", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux($a > $b, a, b) }
+    direct (Prim) ("mux", (T,CT), (("sel", Bit), ("a", T), ("b", CT)) :: T, (TNum(T), TNumeric(CT))) implements composite ${
+      mux($sel, $a, lift_to[CT,T]($b))
+    }
+    direct (Prim) ("mux", (T,CT), (("sel", Bit), ("a", CT), ("b", T)) :: T, (TNum(T), TNumeric(CT))) implements composite ${
+      mux($sel, lift_to[CT,T]($a), $b)
+    }
+
+    direct (Prim) ("min", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].lt($a, $b), a, b) }
+    direct (Prim) ("max", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].gt($a, $b), a, b) }
 
     // --- Scala Backend
     impl (mux) (codegen($cala, ${ if ($sel) $a else $b }))
@@ -372,7 +364,7 @@ trait DHDLMath {
 
     val Z = lookupTpe("B0",compile)
 
-    // Fix point
+    // --- Fixed point
     infix (Prim) ("+",  (T,S,I,F), (T, FixPt(S,I,F)) :: FixPt(S,I,F), TNumeric(T)) implements redirect ${ add_fix(fixPt[T,S,I,F]($0), $1) }
     infix (Prim) ("-",  (T,S,I,F), (T, FixPt(S,I,F)) :: FixPt(S,I,F), TNumeric(T)) implements redirect ${ sub_fix(fixPt[T,S,I,F]($0), $1) }
     infix (Prim) ("*",  (T,S,I,F), (T, FixPt(S,I,F)) :: FixPt(S,I,F), TNumeric(T)) implements redirect ${ mul_fix(fixPt[T,S,I,F]($0), $1) }
@@ -384,18 +376,19 @@ trait DHDLMath {
     infix (Prim) ("<=", (T,S,I,F), (T, FixPt(S,I,F)) :: Bit, TNumeric(T)) implements redirect ${ leq_fix(fixPt[T,S,I,F]($0), $1) }
     infix (Prim) (">=", (T,S,I,F), (T, FixPt(S,I,F)) :: Bit, TNumeric(T)) implements redirect ${ leq_fix($1, fixPt[T,S,I,F]($0)) }
     infix (Prim) ("!=", (T,S,I,F), (T, FixPt(S,I,F)) :: Bit, TNumeric(T)) implements redirect ${ neq_fix(fixPt[T,S,I,F]($0), $1) }
-    infix (Prim) ("!=", (T,S,I,F), (FixPt(S,I,F), T) :: Bit, TNumeric(T)) implements redirect ${ neq_fix($0, fixPt[T,S,I,F]($1)) }
     direct (Prim) ("__equal", (T,S,I,F), (T, FixPt(S,I,F)) :: Bit, TNumeric(T)) implements redirect ${ eql_fix(fixPt[T,S,I,F]($0), $1) }
-    direct (Prim) ("__equal", (T,S,I,F), (FixPt(S,I,F), T) :: Bit, TNumeric(T)) implements redirect ${ eql_fix($0, fixPt[T,S,I,F]($1)) }
 
     infix (Prim) ("&", (T,S,I,F), (T, FixPt(S,I,F)) :: FixPt(S,I,F), TNumeric(T)) implements redirect ${ and_fix(fixPt[T,S,I,F]($0), $1) }
     infix (Prim) ("|", (T,S,I,F), (T, FixPt(S,I,F)) :: FixPt(S,I,F), TNumeric(T)) implements redirect ${ or_fix(fixPt[T,S,I,F]($0), $1) }
 
     // TODO: RHS can only be an integer, but LHS can be a float. What to do here? Is this an important case to support? (Probaby not)
-    //infix (Prim) ("<<", (T,S,I), (T, FixPt(S,I,Z)) :: FixPt(S,I,Z), TNumeric(T)) implements redirect ${ lsh_fix(fixPt[T,S,I,F]($0), $1) }
-    //infix (Prim) (">>", (T,S,I), (T, FixPt(S,I,Z)) :: FixPt(S,I,Z), TNumeric(T)) implements redirect ${ rsh_fix(fixPt[T,S,I,F]($0), $1) }
+    //infix (Prim) ("<<", (T,S,I), (T, FixPt(S,I,Z)) :: FixPt(S,I,Z)) implements redirect ${ lsh_fix($0, fixPt[Int,S,I,B0]($1)) }
+    //infix (Prim) (">>", (T,S,I), (T, FixPt(S,I,Z)) :: FixPt(S,I,Z)) implements redirect ${ rsh_fix($0, fixPt[Int,S,I,B0]($1)) }
 
-    // Float point
+    infix (Prim) ("<<", (S,I), (FixPt(S,I,Z), SInt) :: FixPt(S,I,Z)) implements redirect ${ lsh_fix($0, fixPt[Int,S,I,B0]($1)) }
+    infix (Prim) (">>", (S,I), (FixPt(S,I,Z), SInt) :: FixPt(S,I,Z)) implements redirect ${ rsh_fix($0, fixPt[Int,S,I,B0]($1)) }
+
+    // --- Floating point
     infix (Prim) ("+",  (T,G,E), (T, FltPt(G,E)) :: FltPt(G,E), TNumeric(T)) implements redirect ${ add_flt(fltPt[T,G,E]($0), $1) }
     infix (Prim) ("-",  (T,G,E), (T, FltPt(G,E)) :: FltPt(G,E), TNumeric(T)) implements redirect ${ sub_flt(fltPt[T,G,E]($0), $1) }
     infix (Prim) ("*",  (T,G,E), (T, FltPt(G,E)) :: FltPt(G,E), TNumeric(T)) implements redirect ${ mul_flt(fltPt[T,G,E]($0), $1) }
@@ -406,9 +399,39 @@ trait DHDLMath {
     infix (Prim) ("<=", (T,G,E), (T, FltPt(G,E)) :: Bit, TNumeric(T)) implements redirect ${ leq_flt(fltPt[T,G,E]($0), $1) }
     infix (Prim) (">=", (T,G,E), (T, FltPt(G,E)) :: Bit, TNumeric(T)) implements redirect ${ leq_flt($1, fltPt[T,G,E]($0)) }
     infix (Prim) ("!=", (T,G,E), (T, FltPt(G,E)) :: Bit, TNumeric(T)) implements redirect ${ neq_flt(fltPt[T,G,E]($0), $1) }
-    infix (Prim) ("!=", (T,G,E), (FltPt(G,E), T) :: Bit, TNumeric(T)) implements redirect ${ neq_flt($0, fltPt[T,G,E]($1)) }
     direct (Prim) ("__equal", (T,G,E), (T, FltPt(G,E)) :: Bit, TNumeric(T)) implements redirect ${ eql_flt(fltPt[T,G,E]($0), $1) }
-    direct (Prim) ("__equal", (T,G,E), (FltPt(G,E), T) :: Bit, TNumeric(T)) implements redirect ${ eql_flt($0, fltPt[T,G,E]($1)) }
+
+
+    // Have to resort to the exhaustive list version for RHS constants :(
+    UnstagedNumerics.foreach { (T, TT) =>
+      infix (Prim) ("+",  (S,I,F), (FixPt(S,I,F), T) :: FixPt(S,I,F)) implements redirect ${ add_fix($0, fixPt[\$TT,S,I,F]($1)) }
+      infix (Prim) ("-",  (S,I,F), (FixPt(S,I,F), T) :: FixPt(S,I,F)) implements redirect ${ sub_fix($0, fixPt[\$TT,S,I,F]($1)) }
+      infix (Prim) ("*",  (S,I,F), (FixPt(S,I,F), T) :: FixPt(S,I,F)) implements redirect ${ mul_fix($0, fixPt[\$TT,S,I,F]($1)) }
+      infix (Prim) ("/",  (S,I,F), (FixPt(S,I,F), T) :: FixPt(S,I,F)) implements redirect ${ div_fix($0, fixPt[\$TT,S,I,F]($1)) }
+      infix (Prim) ("%",  (S,I,F), (FixPt(S,I,Z), T) :: FixPt(S,I,Z)) implements redirect ${ mod_fix($0, fixPt[\$TT,S,I,B0]($1)) }
+
+      infix (Prim) ("<",  (S,I,F), (FixPt(S,I,F), T) :: Bit) implements redirect ${ lt_fix($0, fixPt[\$TT,S,I,F]($1)) }
+      infix (Prim) (">",  (S,I,F), (FixPt(S,I,F), T) :: Bit) implements redirect ${ lt_fix(fixPt[\$TT,S,I,F]($1), $0) }
+      infix (Prim) ("<=", (S,I,F), (FixPt(S,I,F), T) :: Bit) implements redirect ${ leq_fix($0, fixPt[\$TT,S,I,F]($1)) }
+      infix (Prim) (">=", (S,I,F), (FixPt(S,I,F), T) :: Bit) implements redirect ${ leq_fix(fixPt[\$TT,S,I,F]($1), $0) }
+      infix (Prim) ("!=", (S,I,F), (FixPt(S,I,F), T) :: Bit) implements redirect ${ neq_fix($0, fixPt[\$TT,S,I,F]($1)) }
+      direct (Prim) ("__equal", (S,I,F), (FixPt(S,I,F), T) :: Bit) implements redirect ${ eql_fix($0, fixPt[\$TT,S,I,F]($1)) }
+
+      infix (Prim) ("&", (S,I,F), (FixPt(S,I,F), T) :: FixPt(S,I,F)) implements redirect ${ and_fix($0, fixPt[\$TT,S,I,F]($1)) }
+      infix (Prim) ("|", (S,I,F), (FixPt(S,I,F), T) :: FixPt(S,I,F)) implements redirect ${ or_fix($0, fixPt[\$TT,S,I,F]($1)) }
+
+      infix (Prim) ("+",  (G,E), (FltPt(G,E), T) :: FltPt(G,E)) implements redirect ${ add_flt($0, fltPt[\$TT,G,E]($1)) }
+      infix (Prim) ("-",  (G,E), (FltPt(G,E), T) :: FltPt(G,E)) implements redirect ${ sub_flt($0, fltPt[\$TT,G,E]($1)) }
+      infix (Prim) ("*",  (G,E), (FltPt(G,E), T) :: FltPt(G,E)) implements redirect ${ mul_flt($0, fltPt[\$TT,G,E]($1)) }
+      infix (Prim) ("/",  (G,E), (FltPt(G,E), T) :: FltPt(G,E)) implements redirect ${ div_flt($0, fltPt[\$TT,G,E]($1)) }
+
+      infix (Prim) ("<",  (G,E), (FltPt(G,E), T) :: Bit) implements redirect ${ lt_flt($0, fltPt[\$TT,G,E]($1)) }
+      infix (Prim) (">",  (G,E), (FltPt(G,E), T) :: Bit) implements redirect ${ lt_flt(fltPt[\$TT,G,E]($1), $0) }
+      infix (Prim) ("<=", (G,E), (FltPt(G,E), T) :: Bit) implements redirect ${ leq_flt($0, fltPt[\$TT,G,E]($1)) }
+      infix (Prim) (">=", (G,E), (FltPt(G,E), T) :: Bit) implements redirect ${ leq_flt(fltPt[\$TT,G,E]($1), $0) }
+      infix (Prim) ("!=", (G,E), (FltPt(G,E), T) :: Bit) implements redirect ${ neq_flt($0, fltPt[\$TT,G,E]($1)) }
+      direct (Prim) ("__equal", (G,E), (FltPt(G,E), T) :: Bit) implements redirect ${ eql_flt($0, fltPt[\$TT,G,E]($1)) }
+    }
   }
 }
 

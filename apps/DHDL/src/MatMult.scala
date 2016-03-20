@@ -1,4 +1,4 @@
-/*import dhdl.compiler._
+import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
 import scala.util.Random
@@ -58,8 +58,8 @@ trait MatMult extends DHDLApplication {
     val b = OffChipMem[Elem]("B", P, N)
     val c = OffChipMem[Elem]("C", M, N)
 
-    val sa = Array.fill(M){ Array.fill(P){random[Elem](100) } }
-    val sb = Array.fill(P){ Array.fill(N){random[Elem](100) } }
+    val sa = Array.fill(M){ Array.fill(P){random[Elem](100)} }
+    val sb = Array.fill(P){ Array.fill(N){random[Elem](100)} }
 
     setArg(m, M)
     setArg(n, N)
@@ -82,4 +82,4 @@ trait MatMult extends DHDLApplication {
     println("result:   " + result.mkString(", "))
     assert(gold == result)
   }
-}*/
+}

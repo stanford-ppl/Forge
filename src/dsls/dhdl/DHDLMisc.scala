@@ -70,10 +70,10 @@ trait DHDLMisc {
       else reductionTree( List.tabulate($0.length/2){i => $1( $0(2*i), $0(2*i+1)) } :+ $0.last, $1)
     }
     internal (Misc) ("productTree", T, SList(T) :: T, TArith(T)) implements composite ${
-      reductionTree[T]($0, {(a,b) => a * b}).head
+      reductionTree[T]($0, {(a,b) => implicitly[Arith[T]].mul(a,b) }).head
     }
     internal (Misc) ("sumTree", T, SList(T) :: T, TArith(T)) implements composite ${
-      reductionTree[T]($0, {(a,b) => a + b}).head
+      reductionTree[T]($0, {(a,b) => implicitly[Arith[T]].add(a,b) }).head
     }
   }
 
@@ -87,6 +87,7 @@ trait DHDLMisc {
 
     val Idx  = lookupAlias("SInt")
     val Bit  = lookupTpe("Bit")
+    val Tup2 = lookupTpe("Tup2")
     val Coll = lookupTpeClass("Coll").get
 
     val ArrColl = tpeClassInst("ArrayColl", T, Coll(MArray(T)))
@@ -117,6 +118,10 @@ trait DHDLMisc {
     infix (API) ("flatten", T, (MArray(MArray(T))) :: MArray(T)) implements composite ${ array_flatmap($0, {e: Rep[ForgeArray[T]] => e}) }
     infix (API) ("mkString", T, (MArray(T), MString) :: MString) implements composite ${ array_mkstring($0, $1) }
 
+    infix (API) ("zipWithIndex", T, MArray(T) :: MArray(Tup2(T, Idx))) implements composite ${
+      Array.tabulate(int_to_fix[Signed,B32]($0.length)){i => pack(($0(i), i)) }
+    }
+
     direct (API) ("__equal", T, (MArray(T), MArray(T)) :: Bit, TOrder(T)) implements composite ${
       array_zip($0, $1, {(a:Rep[T], b:Rep[T]) => implicitly[Order[T]].eql(a,b)}).reduce{_&&_}
     }
@@ -146,7 +151,7 @@ trait DHDLMisc {
       rand_flt[G,E] * flt
     }
 
-    direct (Rand) ("rand", A, A :: A) implements composite ${
+    direct (Rand) ("random", A, A :: A) implements composite ${
       manifest[A] match {
         case mA if isFixPtType(mA) =>
           randomFixPt($0)(manifest[A], mA.typeArguments(0), mA.typeArguments(1), mA.typeArguments(2), implicitly[SourceContext]).asInstanceOf[Rep[A]]
@@ -156,6 +161,9 @@ trait DHDLMisc {
 
         case mA => stageError("No random implementation for type " + mA.runtimeClass.getSimpleName)
       }
+    }
+    UnstagedNumerics.foreach{ (T, _) =>
+      direct (Rand) ("random", A, T :: A) implements composite ${ random[A]($0.as[A]) }
     }
 
     // Holy hackery, batman!
@@ -232,6 +240,10 @@ trait DHDLMisc {
       if (regType($0) != ArgumentIn) stageError("Can only set value of ArgIn registers")
       set_arg($0, $1)
     }
+    UnstagedNumerics.foreach{(ST,_) =>
+      direct (Tst) ("setArg", T, (Reg(T), ST) :: MUnit, effect = write(0)) implements composite ${ setArg($0, $1.as[T]) }
+    }
+
     direct (Tst) ("getArg", T, Reg(T) :: T) implements composite ${
       if (regType($0) != ArgumentOut) stageError("Can only get value of ArgOut registers")
       get_arg($0)

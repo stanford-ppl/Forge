@@ -1,4 +1,4 @@
-/*import dhdl.compiler._
+import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
 
@@ -50,4 +50,4 @@ trait OuterProduct extends DHDLApplication {
     println("result:   " + result.mkString(", "))
     assert( result == gold )
   }
-}*/
+}

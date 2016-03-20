@@ -68,10 +68,18 @@ trait DHDLMemories {
 
     // --- API
     /* Reg */
-    static (Reg) ("apply", T, (("name", SString), ("init", T)) :: Reg(T), TNum(T)) implements composite ${ reg_create[T](Some($0), $1, Regular) }
     static (Reg) ("apply", T, ("name", SString) :: Reg(T), TNum(T)) implements composite ${ reg_create[T](Some($0), zero[T], Regular) }
-    static (Reg) ("apply", T, ("init", T) :: Reg(T), TNum(T)) implements composite ${ reg_create[T](None, $0, Regular) }
     static (Reg) ("apply", T, Nil :: Reg(T), TNum(T)) implements composite ${ reg_create[T](None, zero[T], Regular) }
+
+    UnstagedNumerics.foreach{ (ST,_) =>
+      static (Reg) ("apply", T, (("name", SString), ("init", ST)) :: Reg(T), TNum(T)) implements composite ${ reg_create[T](Some($0), $1.as[T], Regular) }
+      static (Reg) ("apply", T, ("init", ST) :: Reg(T), TNum(T)) implements composite ${ reg_create[T](None, $init.as[T], Regular) }
+    }
+
+    // Disallowing staged init values for now
+    //static (Reg) ("apply", T, (("name", SString), ("init", T)) :: Reg(T), TNum(T)) implements composite ${ reg_create[T](Some($0), $1, Regular) }
+    //static (Reg) ("apply", T, ("init", T) :: Reg(T), TNum(T)) implements composite ${ reg_create[T](None, $0, Regular) }
+
 
     /* ArgIn */
     direct (Reg) ("ArgIn", T, ("name", SString) :: Reg(T), TNum(T)) implements composite ${ reg_create[T](Some($name), zero[T], ArgumentIn) }

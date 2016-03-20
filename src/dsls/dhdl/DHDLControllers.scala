@@ -14,26 +14,28 @@ trait DHDLControllers {
   def importCounters() {
     val Counter      = lookupTpe("Counter")
     val CounterChain = lookupTpe("CounterChain")
-    val LoopRange    = lookupTpe("LoopRange")
     val Idx          = lookupAlias("SInt")
 
     // --- Nodes
     val counter_new = internal (Counter) ("counter_new", Nil, (("start", Idx), ("end", Idx), ("step", Idx)) :: Counter)
 
     // --- Internals
-    internal (Counter) ("counter_create", Nil, (SOption(SString), LoopRange, SInt) :: Counter) implements composite ${
-      val ctr = counter_new($1.start, $1.end, $1.step)
+    direct (Counter) ("counter_create", Nil, (SOption(SString), Idx, Idx, Idx, SInt) :: Counter) implements composite ${
+      val ctr = counter_new($1, $2, $3)
       $0.foreach{name => nameOf(ctr) = name}
-      par(ctr) = $2
+      par(ctr) = $4
       ctr
     }
 
     // --- API
-    static (Counter) ("apply", Nil, ("max", Idx) :: Counter) implements composite ${ counter_create(None, 0 until $max, 1) }
-    static (Counter) ("apply", Nil, (("name", SString), ("max",Idx)) :: Counter) implements composite ${ counter_create(Some($name), 0 until $max, 1) }
-    static (Counter) ("apply", Nil, LoopRange :: Counter) implements composite ${ counter_create(None, $0, 1) }
-    static (Counter) ("apply", Nil, (SString, LoopRange) :: Counter) implements composite ${ counter_create(Some($0), $1, 1) }
-    static (Counter) ("apply", Nil, (SString, LoopRange, SInt) :: Counter) implements composite ${ counter_create(Some($0), $1, $2) }
+    static (Counter) ("apply", Nil, ("max", Idx) :: Counter) implements redirect ${ counter_create(None, 0, $max, 1, 1) }
+    static (Counter) ("apply", Nil, (("min", Idx), ("max", Idx)) :: Counter) implements redirect ${ counter_create(None, $min, $max, 1, 1) }
+    static (Counter) ("apply", Nil, (("min", Idx), ("max", Idx), ("step", Idx)) :: Counter) implements redirect ${ counter_create(None, $min, $max, $step, 1) }
+    static (Counter) ("apply", Nil, (("name",SString), ("max",Idx)) :: Counter) implements redirect ${ counter_create(Some($name), 0, $max, 1, 1) }
+    static (Counter) ("apply", Nil, (("name",SString), ("min", Idx), ("max", Idx)) :: Counter) implements redirect ${ counter_create(Some($name), $min, $max, 1, 1) }
+    static (Counter) ("apply", Nil, (("name",SString), ("min",Idx), ("max",Idx), ("step",Idx)) :: Counter) implements redirect ${ counter_create(Some($name), $min, $max, $step, 1) }
+    static (Counter) ("apply", Nil, (("name",SString), ("min",Idx), ("max",Idx), ("step",Idx), ("par",SInt)) :: Counter) implements redirect ${ counter_create(Some($name), $min, $max, $step, $par) }
+
 
     static (CounterChain) ("apply", Nil, varArgs(Counter) :: CounterChain) implements composite ${
       val chain = counterchain_new($0.toList) // Defined in extern
@@ -136,8 +138,13 @@ trait DHDLControllers {
 
         for (__upIter <- $1.apply(0)) {
           val __a = __res.apply(__upIter.toInt)
-          val __b = $2.apply(__upIter.toInt)
-          val __r = $b[4](__a,__b)
+          val __r = if (__iter > FixedPoint[Signed,B32,B0](1)) { // Only reduce after first iteration
+            val __b = $2.apply(__upIter.toInt)
+            $b[4](__a,__b)
+          }
+          else {
+            __a
+          }
           $2.update(__upIter.toInt, __r)
         }
       }

@@ -51,7 +51,7 @@ trait DHDLTypes {
     direct (Tpes) ("lift_to", (T,R), T :: R, TNumeric(T)) implements composite ${
       manifest[R] match {
         case mR if isFixPtType(mR) =>
-          fixPt($0)(manifest[T], mR.typeArguments(0),mR.typeArguments(1),mR.typeArguments(1),implicitly[SourceContext],implicitly[Numeric[T]]).asInstanceOf[Rep[R]]
+          fixPt($0)(manifest[T], mR.typeArguments(0),mR.typeArguments(1),mR.typeArguments(2),implicitly[SourceContext],implicitly[Numeric[T]]).asInstanceOf[Rep[R]]
 
         case mR if isFltPtType(mR) =>
           fltPt($0)(manifest[T], mR.typeArguments(0),mR.typeArguments(1),implicitly[SourceContext],implicitly[Numeric[T]]).asInstanceOf[Rep[R]]
@@ -130,14 +130,16 @@ trait DHDLTypes {
       infix ("to") (Nil :: R, addTpePars = R) implements redirect ${ cast_fltpt_to[G,E,R]($self) }
     }
 
-    // TODO: Add more?
+
+    val SInt32 = lookupAlias("SInt")
+    val Flt    = lookupAlias("Flt")
 
     // Needed for if-then-else and while (default requires Rep[Boolean] and overloading is tough in these cases)
     fimplicit (Tpes) ("bit_to_boolean", Nil, Bit :: MBoolean) implements composite ${ bit_to_bool($0) }
 
     fimplicit (Tpes) ("sboolean_to_bit", Nil, SBoolean :: Bit) implements redirect ${ bit($0) }
-    fimplicit (Tpes) ("scala_int_to_fixpt", (S,I,F), SInt :: FixPt(S,I,F)) implements redirect ${ fixPt[Int,S,I,F]($0) }
-    fimplicit (Tpes) ("scala_float_to_fltpt", (G,E), SFloat :: FltPt(G,E)) implements redirect ${ fltPt[Float,G,E]($0) }
+    fimplicit (Tpes) ("scala_int_to_fixpt", Nil, SInt :: SInt32) implements redirect ${ fixPt[Int,Signed,B32,B0]($0) }
+    fimplicit (Tpes) ("scala_float_to_fltpt", Nil, SFloat :: Flt) implements redirect ${ fltPt[Float,B24,B8]($0) }
 
 
     // --- Scala Backend

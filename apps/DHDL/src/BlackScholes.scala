@@ -1,4 +1,4 @@
-/*import dhdl.compiler._
+import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
 import scala.util.Random
@@ -17,7 +17,7 @@ trait BlackScholes extends DHDLApplication {
     val ax = abs(x)
 
     val xNPrimeofX = exp((ax ** 2) * -0.05f) * inv_sqrt_2xPI
-    val xK2 = 1.0f / ((ax * 0.2316419f) + 1.0f)
+    val xK2 = 1.as[Flt] / ((ax * 0.2316419f) + 1.0f)
 
     val xK2_2 = xK2 ** 2
     val xK2_3 = xK2_2 * xK2
@@ -36,17 +36,16 @@ trait BlackScholes extends DHDLApplication {
     val xLocal_1 = xLocal_23 + xLocal_10
 
     val xLocal0 = xLocal_1 * xNPrimeofX
-    val xLocal  = 1.0f - xLocal0
-    val subFromOne = 1.0f - xLocal
+    val xLocal  = -xLocal0 + 1.0f
 
-    mux(x < 0.0f, subFromOne, xLocal)
+    mux(x < 0.0f, xLocal0, xLocal)
   }
 
   def BlkSchlsEqEuroNoDiv(sptprice: Rep[Flt], strike: Rep[Flt], rate: Rep[Flt],
                           volatility: Rep[Flt], time: Rep[Flt], otype: Rep[UInt]) = {
 
     val xLogTerm = log( sptprice / strike )
-    val xPowerTerm = 0.5f * (volatility ** 2)
+    val xPowerTerm = (volatility ** 2) * 0.5f
     val xNum = (rate + xPowerTerm) * time + xLogTerm
     val xDen = volatility * sqrt(time)
 
@@ -56,8 +55,8 @@ trait BlackScholes extends DHDLApplication {
 
     val futureValueX = strike * exp(-rate * time)
 
-    val negNofXd1 = 1.0f - nofXd1
-    val negNofXd2 = 1.0f - nofXd2
+    val negNofXd1 = -nofXd1 + 1.0f
+    val negNofXd2 = -nofXd2 + 1.0f
 
     val optionPrice1 = (sptprice * nofXd1) - (futureValueX * nofXd2)
     val optionPrice2 = (futureValueX * negNofXd2) - (sptprice * negNofXd1)
@@ -132,4 +131,4 @@ trait BlackScholes extends DHDLApplication {
 
     println(out.mkString(","))
   }
-}*/
+}

@@ -1,4 +1,4 @@
-/*import dhdl.compiler._
+import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
 import scala.util.Random
@@ -21,23 +21,24 @@ trait GDA extends DHDLApplication {
     y:     Rep[OffChipMem[Bit]],
     mu0:   Rep[OffChipMem[Elem]],
     mu1:   Rep[OffChipMem[Elem]],
+    sub:   Rep[OffChipMem[Elem]],
     sigma: Rep[OffChipMem[Elem]]
   ) {
-    val sub = OffChipMem[Elem]("sub", cols)
 
     MetaPipe(rows by rTileSize){ r =>
       val yTile = BRAM[Bit]("yTile", rTileSize)
       yTile := y(r::r+rTileSize)
 
       Sequential(rTileSize by 1){ rr =>
+        // Compute sub
         MetaPipe(cols by cTileSize){ c =>
           val xTile = BRAM[Elem]("xTile", rTileSize, cTileSize)
           val mu0Tile = BRAM[Elem]("mu0Tile", cTileSize)
           val mu1Tile = BRAM[Elem]("mu1Tile", cTileSize)
           Parallel {
             xTile   := x(r::r+rTileSize, c::c+cTileSize)  // Load tile of x
-            mu0Tile := mu0Tile(c::c+cTileSize)            // Load tile of mu0
-            mu1Tile := mu1Tile(c::c+cTileSize)            // Load tile of mu1
+            mu0Tile := mu0(c::c+cTileSize)                // Load tile of mu0
+            mu1Tile := mu1(c::c+cTileSize)                // Load tile of mu1
           }
           val subTile = BRAM[Elem]("subTemp", cTileSize)
           Pipe(cTileSize by 1){ cc =>
@@ -45,17 +46,21 @@ trait GDA extends DHDLApplication {
           }
           sub(c::c+cTileSize) := subTile
         }
+
+        // Compute outer product
         MetaPipe(cols by cTileSize, cols by cTileSize){ (i,j) =>
           val subTile1 = BRAM[Elem]("subTile1", cTileSize)
           val subTile2 = BRAM[Elem]("subTile2", cTileSize)
           val sigmaTile = BRAM[Elem]("sigmaTile", cTileSize, cTileSize)
           Parallel {
             subTile1 := sub(i::i+cTileSize)
-            subTile1 := sub(j::j+cTileSize)
-            sigmaTile := sigma(i::i+cTileSize, j::j+cTileSize)
+            subTile2 := sub(j::j+cTileSize)
+            sigmaTile := sigma(i::i+cTileSize, j::j+cTileSize)  // Only actually need this after first row
           }
+
           Pipe(cTileSize by 1, cTileSize by 1){ (ii,jj) =>
-            sigmaTile(ii,jj) = sigmaTile(ii,jj) + subTile1(ii) * subTile2(jj)
+            val prev = mux(r > 0 || rr > 0, sigmaTile(ii,jj),  0) // Don't add in garbage
+            sigmaTile(ii,jj) = prev + subTile1(ii) * subTile2(jj)
           }
           sigma(i::i+cTileSize, j::j+cTileSize) := sigmaTile
         }
@@ -71,17 +76,19 @@ trait GDA extends DHDLApplication {
     val y = OffChipMem[Bit]("y", R)
     val mu0 = OffChipMem[Elem]("mu0", C)
     val mu1 = OffChipMem[Elem]("mu1", C)
+    val sub = OffChipMem[Elem]("sub", C)
     val sigma = OffChipMem[Elem]("sigma", C, C)
 
-    val sX = Array.fill(R){ Array.fill(C){ random[Elem](10) }} //Array.tabulate(C){j => random[Flt] * 100.0f }}
+
+    val sX = Array.fill(R){ Array.fill(C){ random[Elem](10) }}
     val sY = Array.fill(R){ random[Bit] }
     val sMu0 = Array.fill(C){ random[Elem](10) }
     val sMu1 = Array.fill(C){ random[Elem](10) }
 
-    println("x: " + sX.map(_.mkString(", ")).mkString("\n") )
-    println("y: " + sY.mkString("\n"))
-    println("mu0: " + sMu0.mkString(", "))
-    println("mu1: " + sMu1.mkString(", "))
+    //println("x:   " + sX.map(_.mkString(", ")).mkString("\n") )
+    //println("y:   " + sY.mkString("\n\t"))
+    //println("mu0: " + sMu0.mkString(", "))
+    //println("mu1: " + sMu1.mkString(", "))
 
     // Transfer data and start accelerator
     setArg(rows, R)
@@ -90,7 +97,7 @@ trait GDA extends DHDLApplication {
     setMem(y, sY)
     setMem(mu0, sMu0)
     setMem(mu1, sMu1)
-    Accel{ gda(x, y, mu0, mu1, sigma) }
+    Accel{ gda(x, y, mu0, mu1, sub, sigma) }
 
     val gold = sX.zip(sY){ (row, y) =>
       val sub = if (y) row.zip(sMu1){_-_} else row.zip(sMu0){_-_}
@@ -99,13 +106,9 @@ trait GDA extends DHDLApplication {
 
     val result = getMem(sigma)
 
-    val xFlattened = getMem(x)
-    println("x: ")
-    println(xFlattened.mkString(", "))
-
-    println("expected: " + gold.mkString(", "))
-    println("result:   " + result.mkString(", "))
-    println("diff:     " + gold.zip(result){_-_}.mkString(", "))
+    println("actual: " + gold.mkString(", "))
+    println("result: " + result.mkString(", "))
+    println("diff:   " + gold.zip(result){_-_}.mkString(", "))
     assert( result == gold )
   }
-}*/
+}

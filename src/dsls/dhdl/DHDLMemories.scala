@@ -31,10 +31,9 @@ trait DHDLMemories {
   }
 
 
-  // TODO: Register initial values should be restricted to a constant value. Some way of doing this?
   // TODO: Should we allow ArgIn / ArgOut with no given name? Way of automatically numbering them instead?
   // TODO: Better / more correct way of exposing register reset?
-  // TODO: Add implicit reset in the scope in which a register is created? Immediately after reg_create?
+  // TODO: Add explicit reset in the IR in scope in which a register is created? Immediately after reg_create?
   def importRegs() {
     val T = tpePar("T")
 
@@ -125,14 +124,14 @@ trait DHDLMemories {
     val Indices = lookupTpe("Indices")
 
     // --- Nodes
-    val bram_new = internal (BRAM) ("bram_new", T, ("size", SInt) :: BRAM(T), effect = mutable)
+    val bram_new = internal (BRAM) ("bram_new", T, (("size", SInt), ("zero", T)) :: BRAM(T), effect = mutable)
     val bram_load = internal (BRAM) ("bram_load", T, (("bram", BRAM(T)), ("addr", Idx)) :: T)
     val bram_store = internal (BRAM) ("bram_store", T, (("bram", BRAM(T)), ("addr", Idx), ("value", T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
     val bram_reset = internal (BRAM) ("bram_reset", T, (("bram", BRAM(T)), ("zero", T)) :: MUnit, effect = write(0))
 
     // --- Internals
-    internal (BRAM) ("bram_create", T, (SOption(SString), SList(SInt)) :: BRAM(T)) implements composite ${
-      val bram = bram_new[T]($1.reduce(_*_))
+    internal (BRAM) ("bram_create", T, (SOption(SString), SList(SInt)) :: BRAM(T), TNum(T)) implements composite ${
+      val bram = bram_new[T]($1.reduce(_*_), zero[T])
       dimsOf(bram) = $1
       $0.foreach{name => nameOf(bram) = name }
       isDblBuf(bram) = false
@@ -179,7 +178,7 @@ trait DHDLMemories {
     }
 
     // --- Scala backend
-    impl (bram_new)   (codegen($cala, ${ new Array[$t[T]]($size) })) // $t[T] refers to concrete type in IR
+    impl (bram_new)   (codegen($cala, ${ Array.fill($size)($zero) })) // $t[T] refers to concrete type in IR
     impl (bram_load)  (codegen($cala, ${ $bram.apply($addr.toInt) }))
     impl (bram_store) (codegen($cala, ${ $bram.update($addr.toInt, $value) }))
     impl (bram_reset) (codegen($cala, ${ (0 until $bram.length).foreach{i => $bram.update(i, $zero) }}))

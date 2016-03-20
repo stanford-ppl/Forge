@@ -73,23 +73,27 @@ trait Kmeans extends DHDLApplication {
     val cts = Array.tabulate(numCents){i => pts(i) }
 
     val gold = Array.empty[ForgeArray[Flt]](numCents) // ew
+    val counts = Array.empty[UInt](numCents)
     for (i <- 0 until numCents) { gold(i) = Array.fill(dim)(0.as[Flt]) }
-
+    for (i <- 0 until numCents) { counts(i) = 0.as[UInt] }
     // Really bad imperative version
     def dist(p1: Rep[ForgeArray[Flt]], p2: Rep[ForgeArray[Flt]]) = p1.zip(p2){(a,b) => (a - b)**2 }.reduce(_+_)
     for (i <- 0 until N) {
       val pt = pts(i)
       val distWithIndex = cts.map{ct => dist(pt, ct) }.zipWithIndex
       val minIdx = distWithIndex.reduce{(a,b) => if (a._1 < b._1) a else b }._2
+
+      counts(minIdx) = counts(minIdx) + 1
       for (j <- 0 until dim) {
         gold(minIdx)(j) = gold(minIdx).apply(j) + pt(j)
       }
     }
+    val actual = gold.zip(counts){(ct,n) => ct.map{p => p / n.to[Flt] }}.flatten
 
     val result = getMem(centroids)
 
-    println("gold:   " + gold.flatten.mkString(", "))
+    println("gold:   " + actual.mkString(", "))
     println("result: " + result.mkString(", "))
-    assert( gold.flatten == result )
+    assert( actual == result )
   }
 }

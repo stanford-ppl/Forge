@@ -97,14 +97,14 @@ trait DHDLTypes {
 			$0 -> $sym
 			$0 [style="invisible" height=0 size=0 margin=0 label=""]
 		}))
+		/*
     impl (numeric_to_fixpt) (codegen(dot, ${
-			//TODO: value of const
-      $sym [label="value" style="filled" fillcolor="lightgray" color="none"]
+      $sym [label=$0 style="filled" fillcolor="lightgray" color="none"]
 		}))
     impl (numeric_to_fltpt) (codegen(dot, ${
-			//TODO: value of const
-      $sym [label="value" style="filled" fillcolor="lightgray" color="none"]
+      $sym [label=$0 style="filled" fillcolor="lightgray" color="none"]
 		}))
+		*/
 
     // --- MaxJ Backend
 		//TODO: codegen based on precision

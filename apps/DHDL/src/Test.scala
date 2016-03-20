@@ -17,6 +17,12 @@ trait Test extends DHDLApplication {
     Accel {
       val b1 = BRAM[Fix]("b1", 5)
 
+			Parallel {
+				val a = 3.toFixPt
+				val b = 3.toFixPt
+				val c = 3.toFixPt
+				println(a + b * c)
+			}
       MetaPipe(10 by 5, outer){i =>
 				Parallel{
 					val a = 3.toFixPt
@@ -58,4 +64,5 @@ trait Test extends DHDLApplication {
 
   }
 	*/
+  }
 }

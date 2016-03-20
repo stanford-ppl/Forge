@@ -110,7 +110,7 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
 }
 
 trait ScalaGenPipeTemplateOps extends ScalaGenEffect {
-  val IR: PipeTemplateOpsExp
+  val IR: PipeTemplateOpsExp  
   import IR._
 
   private def emitNestedLoop(iters: List[Sym[Fix]], cchain: Exp[CounterChain])(emitBlk: => Unit) = {
@@ -152,8 +152,17 @@ trait ScalaGenPipeTemplateOps extends ScalaGenEffect {
 }
 
 trait DotGenPipeTemplateOps extends DotGenEffect {
-  val IR: PipeTemplateOpsExp 
-  import IR._
+  val IR: PipeTemplateOpsExp with FixOpsExp with FltOpsExp with TpesOpsExp with TestingOpsExp
+  import IR.Counterchain_new
+  import IR.Set_arg
+  import IR.Pipe_foreach
+	import IR.Pipe_reduce
+	import IR.ConstFix
+	import IR.ConstFlt
+	import IR.ConstBit
+	import IR.Sym
+	import IR.Exp
+	import IR.Def
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = { 
 
@@ -163,13 +172,30 @@ trait DotGenPipeTemplateOps extends DotGenEffect {
   	  case e@Counterchain_new(counters) =>
 				stream.println(s"""subgraph cluster_${quote(sym)} {""")
 				println("stream:" + stream)
-  	    //stream.println(s"""	label=\"${quote(sym)}\"""")
-  	    stream.println("	style=\"rounded, filled\"")
-  	    stream.println("	fillcolor=\"" + counterColor + "\"")
+  	    //stream.println(s"""	label="${quote(sym)}" """)
+  	    stream.println(s"""	style="rounded, filled" """)
+  	    stream.println(s"""	fillcolor="" + ${counterColor} + "" """)
 				counters.foreach{ ctr =>
   	      stream.println(s"""   ${quote(ctr)}""")
   	    }
   	    stream.println("}")
+
+			//case e@ConstFix(value) =>
+			//	stream.println(s"""$value """)
+			case e@Set_arg(reg, value) =>
+				value match {
+					case Def(ConstFix(c)) =>
+						stream.println(s"""${quote(value)} [label=${c} style="filled" fillcolor="lightgray"
+							color="none"] """)
+					case Def(ConstFlt(c)) =>
+						stream.println(s"""${quote(value)} [label=${c} style="filled" fillcolor="lightgray"
+							color="none"] """)
+					case Def(ConstBit(c)) =>
+						stream.println(s"""${quote(value)} [label=${c} style="filled" fillcolor="lightgray"
+							color="none"] """)
+					case _ =>
+				}
+				stream.println(s"""${quote(value)} -> ${quote(reg)}""")
 
   	  case e@Pipe_foreach(cchain, func, inds) =>
 				//stream = getPrintWriter(getFile("", singleFileName))

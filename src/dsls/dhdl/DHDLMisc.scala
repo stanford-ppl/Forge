@@ -235,6 +235,14 @@ trait DHDLMisc {
     impl (int_to_fix) (codegen($cala, ${ $0.toLong }))
     impl (bit_to_bool) (codegen($cala, ${ $0 }))
 
+    // --- Dot backend
+    impl (hwblock)  (codegen(dot, ${
+			/************* Start of Hardware Accelerator ***********/
+      $b[0]
+			/************* End of Hardware Accelerator ***********/
+      ()
+    }))
+
     // --- Rewrites
     rewrite (ifThenElse) using forwarding ${ delite_ifThenElse($0, $1, $2, false, true) }
     rewrite (whileDo) using forwarding ${ delite_while($0, $1) }

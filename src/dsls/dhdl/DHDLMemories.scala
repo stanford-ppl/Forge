@@ -116,11 +116,11 @@ trait DHDLMemories {
 								$sym [label= "sym" shape="square" color="$regColor " style="filled" 
 										 fillcolor="$regColor "]
 						@ }
-					@ case ArgIn =>
+					@ case ArgumentIn =>
           	label = ""
           	color = "white"
           	$sym [label="ArgIn_\$sym" shape="Msquare"]
-					@ case ArgOut =>
+					@ case ArgumentOut =>
           	label = ""
           	color = "white"
           	$sym [label="ArgOut_\$sym" shape="Msquare"]
@@ -356,7 +356,7 @@ trait DHDLMemories {
 		impl (offchip_new) (codegen(dot, ${
 			$sym [label="\$sym" shape="square" fontcolor="white" color="white" style="filled"
 			fillcolor="$offChipColor "]
-			$size -> $sym
+			$size -> $sym [label="size"]
 			$size [style="invisible" height=0 size=0 margin=0 label=""]
 		}))
 		//impl (offchip_load) (codegen(dot, ${

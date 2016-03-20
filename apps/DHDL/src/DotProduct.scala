@@ -1,4 +1,4 @@
-/*import dhdl.compiler._
+import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
 import scala.util.Random
@@ -56,4 +56,4 @@ trait DotProduct extends DHDLApplication {
     println("result: " + result.mkString)
     assert(result == gold)
   }
-}*/
+}

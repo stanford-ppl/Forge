@@ -37,24 +37,24 @@ trait DotProduct extends DHDLApplication {
     val v2 = OffChipMem[Elem]("v2", N)
     val out = ArgOut[Elem]("out")
 
-    val vec1 = Array.fill(N)(randomFix(10))
-    val vec2 = Array.fill(N)(randomFix(10))
+    //val vec1 = Array.fill(N)(randomFix(10))
+    //val vec2 = Array.fill(N)(randomFix(10))
 
-    println("vec1: " + vec1.mkString(", "))
-    println("vec2: " + vec2.mkString(", "))
+    //println("vec1: " + vec1.mkString(", "))
+    //println("vec2: " + vec2.mkString(", "))
 
-    setArg(dataSize, N)
-    setMem(v1, vec1)
-    setMem(v2, vec2)
+    //setArg(dataSize, N)
+    //setMem(v1, vec1)
+    //setMem(v2, vec2)
 
     Accel {
       dotproduct(v1, v2, out)
     }
 
-    val result = getArg(out)
-    val gold = vec1.zip(vec2){_*_}.reduce{_+_}
-    println("expected: " + gold.mkString)
-    println("result: " + result.mkString)
-    assert(result == gold)
+    //val result = getArg(out)
+    //val gold = vec1.zip(vec2){_*_}.reduce{_+_}
+    //println("expected: " + gold.mkString)
+    //println("result: " + result.mkString)
+    //assert(result == gold)
   }
 }

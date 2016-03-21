@@ -105,17 +105,17 @@ trait DHDLTypes {
 		}))
 
     // --- MaxJ Backend
-    impl (boolean_to_bit) (codegen(dot, ${ }))
-    impl (bit_to_string) (codegen(dot, ${ }))
+    impl (boolean_to_bit) (codegen(maxj, ${ }))
+    impl (bit_to_string) (codegen(maxj, ${ }))
 
-    impl (numeric_to_fixpt) (codegen(dot, ${}))
-    impl (fixpt_to_string) (codegen(dot, ${ }))
-    impl (fixpt_to_fltpt) (codegen(dot, ${
+    impl (numeric_to_fixpt) (codegen(maxj, ${}))
+    impl (fixpt_to_string) (codegen(maxj, ${ }))
+    impl (fixpt_to_fltpt) (codegen(maxj, ${
 		}))
 
-    impl (numeric_to_fltpt) (codegen(dot, ${}))
-    impl (fltpt_to_string) (codegen(dot, ${ }))
-    impl (fltpt_to_fixpt) (codegen(dot, ${
+    impl (numeric_to_fltpt) (codegen(maxj, ${}))
+    impl (fltpt_to_string) (codegen(maxj, ${ }))
+    impl (fltpt_to_fixpt) (codegen(maxj, ${
 		}))
 
     // --- MaxJ Backend

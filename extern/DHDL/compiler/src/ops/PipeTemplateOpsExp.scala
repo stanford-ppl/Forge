@@ -262,9 +262,9 @@ trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
 				//TODO
 				//if (inHwScope) {}
 				if (false) {
-					emitComment(s"""inscope""")
+					emitComment(s"""Inside of HW Scope""")
 				} else { 
-					emitComment(s"""not inscope""")
+					emitComment(s"""Outside of HW Scope""")
 					rhs match {
   	  			case e@Counterchain_new(counters) =>
 
@@ -272,8 +272,6 @@ trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
 							println(quote(e))
 						case e@ConstFlt(c) =>
 						case e@ConstBit(c) =>
-
-						case e@Set_arg(reg, value) =>
 
   	  			case e@Pipe_foreach(cchain, func, inds) =>
 

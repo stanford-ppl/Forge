@@ -126,6 +126,13 @@ trait DHDLMisc {
     impl (rand_fix) (codegen(dot, ${  }))
     impl (rand_flt) (codegen(dot, ${  }))
     impl (rand_bit) (codegen(dot, ${  }))
+
+    // --- MaxJ Backend
+    // TODO: Assumes maximum value is an integer (not a Long)
+    impl (rand_fix_bnd) (codegen(maxj, ${  }))
+    impl (rand_fix) (codegen(maxj, ${  }))
+    impl (rand_flt) (codegen(maxj, ${  }))
+    impl (rand_bit) (codegen(maxj, ${  }))
   }
 
 
@@ -246,6 +253,8 @@ trait DHDLMisc {
     impl (println)  (codegen(dot, ${ 
 			@ emitComment("println")
 		}))
+		//TODO: dot shouldn't see these nodes if nodes inside hwblock aren't ramdomly moved
+		//outside
     impl (assert)   (codegen(dot, ${ }))
     impl (ifThenElse) (codegen(dot, ${
     }))
@@ -266,6 +275,33 @@ trait DHDLMisc {
     impl (fix_to_int) (codegen(dot, ${ }))
     impl (int_to_fix) (codegen(dot, ${ }))
     impl (bit_to_bool) (codegen(dot, ${ }))
+		
+    // --- MaxJ Backend
+    impl (println)  (codegen(maxj, ${ 
+			@ emitComment("println")
+		}))
+		//TODO: maxj shouldn't see these nodes if nodes inside hwblock aren't ramdomly moved
+		//outside
+    impl (assert)   (codegen(maxj, ${ }))
+    impl (ifThenElse) (codegen(maxj, ${
+    }))
+    impl (whileDo) (codegen(maxj, ${
+    }))
+    impl (forLoop) (codegen(maxj, ${
+    }))
+    impl (set_mem)  (codegen(maxj, ${
+		}))
+    impl (get_mem)  (codegen(maxj, ${ }))
+		impl (set_arg)  (codegen(maxj, ${ }))
+    impl (get_arg)  (codegen(maxj, ${ }))
+    impl (hwblock)  (codegen(maxj, ${
+			@ inHwScope = true
+      @ stream.println(emitBlock(__arg0) + "")
+			@ inHwScope = false 
+    }))
+    impl (fix_to_int) (codegen(maxj, ${ }))
+    impl (int_to_fix) (codegen(maxj, ${ }))
+    impl (bit_to_bool) (codegen(maxj, ${ }))
 
     // --- Rewrites
     rewrite (ifThenElse) using forwarding ${ delite_ifThenElse($0, $1, $2, false, true) }

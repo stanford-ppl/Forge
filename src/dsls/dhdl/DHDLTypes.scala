@@ -105,6 +105,20 @@ trait DHDLTypes {
 		}))
 
     // --- MaxJ Backend
+    impl (boolean_to_bit) (codegen(dot, ${ }))
+    impl (bit_to_string) (codegen(dot, ${ }))
+
+    impl (numeric_to_fixpt) (codegen(dot, ${}))
+    impl (fixpt_to_string) (codegen(dot, ${ }))
+    impl (fixpt_to_fltpt) (codegen(dot, ${
+		}))
+
+    impl (numeric_to_fltpt) (codegen(dot, ${}))
+    impl (fltpt_to_string) (codegen(dot, ${ }))
+    impl (fltpt_to_fixpt) (codegen(dot, ${
+		}))
+
+    // --- MaxJ Backend
 		//TODO: codegen based on precision
   	//def tpstr(sym: ) : String = {
   	//  val scalart = sym.tp match {

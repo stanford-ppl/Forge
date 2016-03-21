@@ -101,7 +101,6 @@ trait DHDLMemories {
       $reg.update(0, $init)
     }))
 
-
     // --- Dot Backend
     impl (reg_new)   (codegen(dot, ${
 			@ regtpe(sym) match {
@@ -128,6 +127,24 @@ trait DHDLMemories {
 			$value -> $reg
 		}))
     impl (reg_reset) (codegen(dot, ${
+    }))
+
+    // --- MaxJ Backend
+    impl (reg_new)   (codegen(maxj, ${
+			@ regtpe(sym) match {
+				@ case Regular => 
+					@ if (isDblBuf(sym)) {
+					@ } else {
+					@ }
+				@ case ArgumentIn =>
+				@ case ArgumentOut =>
+			@ }
+		}))
+    impl (reg_read)  (codegen(maxj, ${
+		}))
+    impl (reg_write) (codegen(maxj, ${
+		}))
+    impl (reg_reset) (codegen(maxj, ${
     }))
 
   }
@@ -230,8 +247,20 @@ trait DHDLMemories {
 			$value -> $bram [label="data"]
 		}))
     impl (bram_reset) (codegen(dot, ${ }))
-  }
 
+    // --- MaxJ Backend
+    impl (bram_new)   (codegen(maxj, ${
+      @ if (isDblBuf(sym)) {
+      @ } else {
+      @ }
+		})) // $t[T] refers to concrete type in IR
+		impl (bram_load)  (codegen(maxj, ${ 
+		}))
+		impl (bram_store) (codegen(maxj, ${ 
+		}))
+    impl (bram_reset) (codegen(maxj, ${ }))
+
+  }
   // TODO: Size of offchip memory can be a staged value, but it can't be a value which is calculated in hardware
   //       Any way to make this distinction?
   // TODO: Can probably change tile load/store "start" to a single flat offset
@@ -363,6 +392,22 @@ trait DHDLMemories {
 			@ }
 			@ start.foreach{s =>
 				$s -> $sym [label="start"]
+			@}
+		}))
+
+		// --- MaxJ Backend
+		impl (offchip_new) (codegen(maxj, ${
+		}))
+		impl (offchip_load) (codegen(maxj, ${
+			@ offDims.foreach{dim => 
+			@ }
+			@ start.foreach{s =>
+			@}
+		}))
+    impl (offchip_store) (codegen(maxj, ${
+			@ offDims.foreach{dim => 
+			@ }
+			@ start.foreach{s =>
 			@}
 		}))
 

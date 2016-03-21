@@ -88,6 +88,12 @@ trait DHDLControllers {
     impl (counter_mkstring) (codegen(dot, ${
     }))
 
+    // --- MaxJ Backend
+    impl (counter_new) (codegen(maxj, ${
+		}))
+    impl (counter_mkstring) (codegen(maxj, ${
+    }))
+
   }
 
 
@@ -117,6 +123,8 @@ trait DHDLControllers {
     impl (cchain_mkstring) (codegen($cala, ${ "ctrchain[" + $0.map{ctr => $b[1](ctr) }.mkString(", ") + "]" }))
     // --- Dot Backend
     impl (cchain_mkstring) (codegen(dot, ${ }))
+    // --- MaxJ Backend
+    impl (cchain_mkstring) (codegen(maxj, ${ }))
   }
 
 
@@ -229,7 +237,6 @@ trait DHDLControllers {
       	color = "$parallelBorderColor "
       	@ stream.println(emitBlock(func) + "")
 			}
-			
 		}))
 
     impl (block_reduce) (codegen(dot, ${
@@ -241,6 +248,13 @@ trait DHDLControllers {
 				@ val sym_ctrl = sym + "_ctrl"
       	$sym_ctrl [label="ctrl" height=0 style="filled" fillcolor="$mpBorderColor "]
 			}
+    }))
+
+    // --- MaxJ Backend
+    impl (pipe_parallel) (codegen (maxj, ${
+		}))
+
+    impl (block_reduce) (codegen(maxj, ${
     }))
 
 		/*val bram_reduce = direct (MetaPipe) ("BramReduce", T, CurriedMethodSignature(List(

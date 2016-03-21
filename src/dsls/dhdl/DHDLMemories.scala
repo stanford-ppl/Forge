@@ -92,7 +92,7 @@ trait DHDLMemories {
     fimplicit (Reg) ("regFlt_to_flt", Nil, Reg(Flt) :: Flt) implements composite ${ reg_read($0) }
     fimplicit (Reg) ("regBit_to_bit", Nil, Reg(Bit) :: Bit) implements composite ${ reg_read($0) }
 
-    // --- Scala backend
+    // --- Scala Backend
     impl (reg_new)   (codegen($cala, ${ Array($init) }))
     impl (reg_read)  (codegen($cala, ${ $reg.apply(0) }))
     impl (reg_write) (codegen($cala, ${ $reg.update(0, $value) }))
@@ -102,43 +102,33 @@ trait DHDLMemories {
     }))
 
 
-    // --- Dot backend
+    // --- Dot Backend
     impl (reg_new)   (codegen(dot, ${
-			subgraph $sym {
-				@ regtpe(sym) match {
-					@ case Regular => 
-						color="none"
-						label=""
-						@ if (isDblBuf(sym)) {
-								$sym [margin=0, rankdir="LR", label="{<st> \$sym | <ld>}" shape="record" 
-											color="$dblbufBorderColor " style="filled" fillcolor="$regColor "]
-						@ } else {
-								$sym [label= "sym" shape="square" color="$regColor " style="filled" 
-										 fillcolor="$regColor "]
-						@ }
-					@ case ArgumentIn =>
-          	label = ""
-          	color = "white"
-          	$sym [label="ArgIn_\$sym" shape="Msquare"]
-					@ case ArgumentOut =>
-          	label = ""
-          	color = "white"
-          	$sym [label="ArgOut_\$sym" shape="Msquare"]
-				@ }
-			}
+			@ regtpe(sym) match {
+				@ case Regular => 
+					@ if (isDblBuf(sym)) {
+							$sym [margin=0, rankdir="LR", label="{<st> \$sym | <ld>}" shape="record" 
+										color="$dblbufBorderColor " style="filled" fillcolor="$regColor "]
+					@ } else {
+							$sym [label= "\$sym" shape="square" color="$regColor " style="filled" 
+									 fillcolor="$regColor "]
+					@ }
+				@ case ArgumentIn =>
+					@ val l = "ArgIn_" + quote(sym).split("_")(1)
+        	$sym [label=$l shape="Msquare"]
+				@ case ArgumentOut =>
+					@ val l = "ArgOut_" + quote(sym).split("_")(1)
+        	$sym [label=$l shape="Msquare"]
+			@ }
 		}))
     impl (reg_read)  (codegen(dot, ${
-			$reg -> $sym
-			$sym [style="invisible" height=0 size=0 margin=0 label=""]
+			@ emitAlias(sym, reg)
 		}))
     impl (reg_write) (codegen(dot, ${
 			$value -> $reg
-			$value [style="invisible" height=0 size=0 margin=0 label=""]
 		}))
-    //impl (reg_reset) (codegen(dot, ${
-    //  @ val init = resetValue($reg)
-    //  $reg.update(0, $init)
-    //}))
+    impl (reg_reset) (codegen(dot, ${
+    }))
 
   }
 
@@ -214,40 +204,32 @@ trait DHDLMemories {
 			infix ("rst") (Nil :: MUnit, TNum(T), effect = write(0)) implements composite ${ bram_reset($self, zero[T]) }
 		}
 
-    // --- Scala backend
+    // --- Scala Backend
     impl (bram_new)   (codegen($cala, ${ new Array[$t[T]]($size) })) // $t[T] refers to concrete type in IR
     impl (bram_load)  (codegen($cala, ${ $bram.apply($addr.toInt) }))
     impl (bram_store) (codegen($cala, ${ $bram.update($addr.toInt, $value) }))
     impl (bram_reset) (codegen($cala, ${ (0 until $bram.length).foreach{i => $bram.update(i, $zero) }}))
 
-    // --- Dot backend
+    // --- Dot Backend
     impl (bram_new)   (codegen(dot, ${
-      subgraph $sym {
-      	color="none"
-      	label=""
-      	@ if (isDblBuf(sym)) {
-        	$sym [margin=0 rankdir="LR" label="{<st> \$sym | <ld> }" shape="record"
-								color="$dblbufBorderColor " style="filled" fillcolor="$memColor "]
-      	@ } else {
-      	  	$sym [label="\$sym" shape="square" style="filled" fillcolor="\$memColor"]
-      	@ }
-      }
+      @ if (isDblBuf(sym)) {
+      	$sym [margin=0 rankdir="LR" label="{<st> \$sym | <ld> }" shape="record"
+							color="$dblbufBorderColor " style="filled" fillcolor="$memColor "]
+      @ } else {
+        	$sym [label="\$sym" shape="square" style="filled" fillcolor="\$memColor"]
+      @ }
 		})) // $t[T] refers to concrete type in IR
 		impl (bram_load)  (codegen(dot, ${ 
 			$addr -> $bram [label="addr"] 
-			$addr [style="invisible" height=0 size=0 margin=0 label=""]
-			$bram -> $sym [label="data"]
-			$sym [style="invisible" height=0 size=0 margin=0 label=""]
+			//$sym [style="invisible" height=0 size=0 margin=0 label=""]
+			//$sym [label=$sym fillcolor="lightgray" style="filled"]
+			@ emitAlias(sym, bram)
 		}))
 		impl (bram_store) (codegen(dot, ${ 
 			$addr -> $bram [label="addr"]
-			$addr [style="invisible" height=0 size=0 margin=0 label=""]
 			$value -> $bram [label="data"]
-			$value [style="invisible" height=0 size=0 margin=0 label=""]
 		}))
-		/*
-    impl (bram_reset) (codegen(dot, ${ (0 until $bram.length).foreach{i => $bram.update(i, $zero) }}))
-		*/
+    impl (bram_reset) (codegen(dot, ${ }))
   }
 
   // TODO: Size of offchip memory can be a staged value, but it can't be a value which is calculated in hardware
@@ -357,11 +339,32 @@ trait DHDLMemories {
 			$sym [label="\$sym" shape="square" fontcolor="white" color="white" style="filled"
 			fillcolor="$offChipColor "]
 			$size -> $sym [label="size"]
-			$size [style="invisible" height=0 size=0 margin=0 label=""]
+			//$size [style="invisible" height=0 size=0 margin=0 label=""]
 		}))
-		//impl (offchip_load) (codegen(dot, ${
-
-		//}))
+		impl (offchip_load) (codegen(dot, ${
+			@ val l = "offld_" + quote(sym).split("_")(1)
+      $sym [ label=$l shape="rectangle" style="rounded, filled" fillcolor="white" color="black"]
+			$offchip -> $sym
+			$sym -> $bram
+			@ offDims.foreach{dim => 
+				$dim -> $sym [label="offdim"]
+			@ }
+			@ start.foreach{s =>
+				$s -> $sym [label="start"]
+			@}
+		}))
+    impl (offchip_store) (codegen(dot, ${
+			@ val l = "offst_" + quote(sym).split("_")(1)
+      $sym [ label=$l shape="rectangle" style="rounded, filled" fillcolor="white" color="black"]
+			$sym -> $offchip
+			$bram -> $sym
+			@ offDims.foreach{dim => 
+				$dim -> $sym [label="offdim"]
+			@ }
+			@ start.foreach{s =>
+				$s -> $sym [label="start"]
+			@}
+		}))
 
 		}
 	}

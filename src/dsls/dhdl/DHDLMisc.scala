@@ -113,12 +113,19 @@ trait DHDLMisc {
       }
     }
 
-    // --- Scala backend
+    // --- Scala Backend
     // TODO: Assumes maximum value is an integer (not a Long)
     impl (rand_fix_bnd) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextInt($0.toInt).toLong }))
     impl (rand_fix) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextInt().toLong }))
     impl (rand_flt) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextDouble() }))
     impl (rand_bit) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextBoolean() }))
+
+    // --- Dot Backend
+    // TODO: Assumes maximum value is an integer (not a Long)
+    impl (rand_fix_bnd) (codegen(dot, ${  }))
+    impl (rand_fix) (codegen(dot, ${  }))
+    impl (rand_flt) (codegen(dot, ${  }))
+    impl (rand_bit) (codegen(dot, ${  }))
   }
 
 
@@ -197,7 +204,7 @@ trait DHDLMisc {
     // Needed for ifThenElse (since default requires Rep[Boolean] and overloading is tough in this case)
     fimplicit (Tst) ("bitToBoolean", Nil, Bit :: MBoolean) implements composite ${ bit_to_bool($0) }
 
-    // --- Scala backend
+    // --- Scala Backend
     impl (println)  (codegen($cala, ${ println($0) }))
     impl (println2) (codegen($cala, ${ println() }))
     impl (assert)   (codegen($cala, ${ assert($0) }))
@@ -235,13 +242,30 @@ trait DHDLMisc {
     impl (int_to_fix) (codegen($cala, ${ $0.toLong }))
     impl (bit_to_bool) (codegen($cala, ${ $0 }))
 
-    // --- Dot backend
-    impl (hwblock)  (codegen(dot, ${
-			/************* Start of Hardware Accelerator ***********/
-      $b[0]
-			/************* End of Hardware Accelerator ***********/
-      ()
+    // --- Dot Backend
+    impl (println)  (codegen(dot, ${ 
+			@ emitComment("println")
+		}))
+    impl (assert)   (codegen(dot, ${ }))
+    impl (ifThenElse) (codegen(dot, ${
     }))
+    impl (whileDo) (codegen(dot, ${
+    }))
+    impl (forLoop) (codegen(dot, ${
+    }))
+    impl (set_mem)  (codegen(dot, ${
+		}))
+    impl (get_mem)  (codegen(dot, ${ }))
+		impl (set_arg)  (codegen(dot, ${ $1 -> $0 }))
+    impl (get_arg)  (codegen(dot, ${ }))
+    impl (hwblock)  (codegen(dot, ${
+			@ inHwScope = true
+      @ stream.println(emitBlock(__arg0) + "")
+			@ inHwScope = false 
+    }))
+    impl (fix_to_int) (codegen(dot, ${ }))
+    impl (int_to_fix) (codegen(dot, ${ }))
+    impl (bit_to_bool) (codegen(dot, ${ }))
 
     // --- Rewrites
     rewrite (ifThenElse) using forwarding ${ delite_ifThenElse($0, $1, $2, false, true) }

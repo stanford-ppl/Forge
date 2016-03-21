@@ -87,24 +87,22 @@ trait DHDLTypes {
     impl (fltpt_to_fixpt) (codegen($cala, ${ $0.toLong }))
 
     // --- Dot Backend
+    impl (boolean_to_bit) (codegen(dot, ${ }))
+    impl (bit_to_string) (codegen(dot, ${ }))
+
+    impl (numeric_to_fixpt) (codegen(dot, ${}))
+    impl (fixpt_to_string) (codegen(dot, ${ }))
     impl (fixpt_to_fltpt) (codegen(dot, ${
 			$sym [ label="fix2flt" ]
 			$0 -> $sym
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
 		}))
+
+    impl (numeric_to_fltpt) (codegen(dot, ${}))
+    impl (fltpt_to_string) (codegen(dot, ${ }))
     impl (fltpt_to_fixpt) (codegen(dot, ${
 			$sym [ label="flt2fix" ]
 			$0 -> $sym
-			$0 [style="invisible" height=0 size=0 margin=0 label=""]
 		}))
-		/*
-    impl (numeric_to_fixpt) (codegen(dot, ${
-      $sym [label=$0 style="filled" fillcolor="lightgray" color="none"]
-		}))
-    impl (numeric_to_fltpt) (codegen(dot, ${
-      $sym [label=$0 style="filled" fillcolor="lightgray" color="none"]
-		}))
-		*/
 
     // --- MaxJ Backend
 		//TODO: codegen based on precision

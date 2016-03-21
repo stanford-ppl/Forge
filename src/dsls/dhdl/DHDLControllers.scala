@@ -81,10 +81,12 @@ trait DHDLControllers {
 			$start -> $sym [ label="start" ]
 			$end -> $sym [ label="end" ]
 			$step -> $sym [ label="step" ]
-			$start [style="invisible" height=0 size=0 margin=0 label=""]
-			$end [style="invisible" height=0 size=0 margin=0 label=""]
-			$step [style="invisible" height=0 size=0 margin=0 label=""]
+			//$start [style="invisible" height=0 size=0 margin=0 label=""]
+			//$end [style="invisible" height=0 size=0 margin=0 label=""]
+			//$step [style="invisible" height=0 size=0 margin=0 label=""]
 		}))
+    impl (counter_mkstring) (codegen(dot, ${
+    }))
 
   }
 
@@ -113,6 +115,8 @@ trait DHDLControllers {
     // --- Scala Backend
     //impl (cchain_new) (codegen($cala, ${ $0 }))
     impl (cchain_mkstring) (codegen($cala, ${ "ctrchain[" + $0.map{ctr => $b[1](ctr) }.mkString(", ") + "]" }))
+    // --- Dot Backend
+    impl (cchain_mkstring) (codegen(dot, ${ }))
   }
 
 
@@ -216,12 +220,14 @@ trait DHDLControllers {
 
     // --- Dot Backend
     impl (pipe_parallel) (codegen (dot, ${
+			//TODO: why nodes inside parallel get generated even when emitblock is
+			// commented out??
       subgraph cluster_$sym {
       	label = "parallel_\$sym"
       	style = "filled"
       	fillcolor = "$parallelFillColor "
       	color = "$parallelBorderColor "
-				$b[func]
+      	@ stream.println(emitBlock(func) + "")
 			}
 			
 		}))

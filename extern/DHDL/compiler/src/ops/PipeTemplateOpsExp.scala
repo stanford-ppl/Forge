@@ -1,6 +1,6 @@
 package dhdl.compiler.ops
 
-import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, DotGenEffect}
+import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, DotGenEffect, MaxJGenEffect}
 import scala.reflect.{Manifest,SourceContext}
 
 import dhdl.shared._
@@ -151,78 +151,140 @@ trait ScalaGenPipeTemplateOps extends ScalaGenEffect {
   }
 }
 
-trait DotGenPipeTemplateOps extends DotGenEffect {
+trait DotGenPipeTemplateOps extends DotGenEffect{
   val IR: PipeTemplateOpsExp with FixOpsExp with FltOpsExp with TpesOpsExp with TestingOpsExp
-  import IR.Counterchain_new
-  import IR.Set_arg
-  import IR.Pipe_foreach
-	import IR.Pipe_reduce
-	import IR.ConstFix
-	import IR.ConstFlt
-	import IR.ConstBit
-	import IR.Sym
-	import IR.Exp
-	import IR.Def
+	with MemoryTemplateOpsExp with OffChipMemOpsExp with RegOpsExp
+  import IR.{Counterchain_new, Set_arg, Pipe_foreach, Pipe_reduce, ConstFix, ConstFlt , ConstBit,
+		Sym, Exp, Def, CounterChain, Fix, Offchip_new, Reg_Reg_new, Set_mem}
+	import IR.EatReflect
+
+	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[Fix]]) = {
+		cchain match {
+			case s@Sym(_) => s match {
+				case Def(EatReflect(Counterchain_new(counters))) =>
+					inds.zipWithIndex.foreach {case (iter, idx) =>
+						emitAlias(iter, counters(idx))
+					}	
+				case _ => 
+			}
+			case _ => 
+		}
+	}
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = { 
+		rhs match {
+			/* Generate Outside HW Block */
+			case e@Offchip_new(_) => super.emitNode(sym, rhs)
+			case e@Reg_Reg_new(_) => super.emitNode(sym, rhs)
+			case e@Set_arg(_,_) => super.emitNode(sym, rhs)
+			case e@Set_mem(_,_) => super.emitNode(sym, rhs)
+			case _ => {
+				//TODO
+				//if (inHwScope) {
+				if (false) {
+					emitComment(s"""inscope""")
+				} else { 
+					emitComment(s"""not inscope""")
+					rhs match {
+  				case e@Counterchain_new(counters) =>
+						emit(s"""subgraph cluster_${quote(sym)} {""")
+  				  emit(s"""	label=${quote(sym)} """)
+  				  emit(s"""	style="rounded, filled" """)
+  				  emit(s"""	fillcolor="${counterColor}" """)
+						counters.foreach{ ctr =>
+  				    emit(s"""   ${quote(ctr)}""")
+  				  }
+  				  emit("}")
 
-			//stream = getPrintWriter(getFile("", singleFileName))
-			println("sym:" + quote(sym))
-			rhs match {
-  	  case e@Counterchain_new(counters) =>
-				stream.println(s"""subgraph cluster_${quote(sym)} {""")
-				println("stream:" + stream)
-  	    //stream.println(s"""	label="${quote(sym)}" """)
-  	    stream.println(s"""	style="rounded, filled" """)
-  	    stream.println(s"""	fillcolor="" + ${counterColor} + "" """)
-				counters.foreach{ ctr =>
-  	      stream.println(s"""   ${quote(ctr)}""")
-  	    }
-  	    stream.println("}")
+					case e@ConstFix(c) =>
+						emit(s"""${quote(sym)} [label=${c} style="filled" fillcolor="lightgray"
+							color="none"] """)
+					case e@ConstFlt(c) =>
+						emit(s"""${quote(sym)} [label=${c} style="filled" fillcolor="lightgray"
+							color="none"] """)
+					case e@ConstBit(c) =>
+						emit(s"""${quote(sym)} [label=${c} style="filled" fillcolor="lightgray"
+							color="none"] """)
 
-			//case e@ConstFix(value) =>
-			//	stream.println(s"""$value """)
-			case e@Set_arg(reg, value) =>
-				value match {
-					case Def(ConstFix(c)) =>
-						stream.println(s"""${quote(value)} [label=${c} style="filled" fillcolor="lightgray"
-							color="none"] """)
-					case Def(ConstFlt(c)) =>
-						stream.println(s"""${quote(value)} [label=${c} style="filled" fillcolor="lightgray"
-							color="none"] """)
-					case Def(ConstBit(c)) =>
-						stream.println(s"""${quote(value)} [label=${c} style="filled" fillcolor="lightgray"
-							color="none"] """)
-					case _ =>
+  				case e@Pipe_foreach(cchain, func, inds) =>
+						emitNestedIdx(cchain, inds)
+  				  emit(s"""subgraph cluster_${quote(sym)} {""")
+  				  emit(s"""label=\"${quote(sym)}\"""")
+  				  emit(s"""color=\"gray\"""")
+  				  emitBlock(func)             // Map function
+  				  emit("}")
+
+  				case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
+	  			  emitAlias(acc, accum)
+						emitNestedIdx(cchain, inds)
+  				  emit(s"""subgraph cluster_${quote(sym)} {""")
+  				  emit(s"""label=\"${quote(sym)}\"""")
+  				  emit(s"""color=\"gray\"""")
+						emit(s"""define(`${quote(acc)}', `${quote(accum)}')""")
+  				  emitBlock(func)             
+    			  emitBlock(ldFunc)
+						emitAlias(rV._1, getBlockResult(ldFunc))
+						emitAlias(rV._2, getBlockResult(func))
+    			  emitBlock(rFunc)
+						emitAlias(res, getBlockResult(rFunc))
+    			  emitBlock(stFunc)
+						emit("}")
+
+  				case e@_ => 
+						println("notmatch:" + e)
+						super.emitNode(sym, rhs)
+					}
 				}
-				stream.println(s"""${quote(value)} -> ${quote(reg)}""")
+			}
+		}
+	}
 
-  	  case e@Pipe_foreach(cchain, func, inds) =>
-				//stream = getPrintWriter(getFile("", singleFileName))
-				println("pipe_foreach: " + quote(sym) + " e:" + e)
-  	    stream.println(s"""//pipe_foreach :""" + quote(sym))
-  	    stream.println(s"""subgraph cluster_${quote(sym)} {""")
-  	    stream.println(s"""label=\"${quote(sym)}\"""")
-  	    stream.println(s"""color=\"gray\"""")
-  	    emitBlock(func)             // Map function
-  	    stream.println("}")
+  override def quote(x: Exp[Any]) = x match {
+		case s@Sym(n) => s.tp.erasure.getSimpleName() + "_x" + n
+    case _ => super.quote(x)
+  }
+}
 
-  	  case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
-				//stream = getPrintWriter(getFile("", singleFileName))
-				println("pipe_reduce: " + quote(sym) + " e:" + e)
-  	    stream.println(s"""//pipe_reduce :""" + quote(sym))
-  	    stream.println(s"""subgraph cluster_${quote(sym)} {""")
-  	    stream.println(s"""label=\"${quote(sym)}\"""")
-  	    stream.println(s"""color=\"gray\"""")
-  	    emitBlock(func)             // Map function
-  	    stream.println("}")
+trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
+  val IR: PipeTemplateOpsExp with FixOpsExp with FltOpsExp with TpesOpsExp with TestingOpsExp
+	with MemoryTemplateOpsExp with OffChipMemOpsExp with RegOpsExp
+  import IR.{Counterchain_new, Set_arg, Pipe_foreach, Pipe_reduce, ConstFix, ConstFlt , ConstBit,
+		Sym, Exp, Def, CounterChain, Fix, Offchip_new, Reg_Reg_new, Set_mem}
+	import IR.EatReflect
 
-  	  case e@_ => 
-				println("unmatched: " + quote(sym) + " e:" + e)
-				println("stream:" + stream)
-				super.emitNode(sym, rhs)
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = { 
+		rhs match {
+			case e@Offchip_new(_) => super.emitNode(sym, rhs)
+			case e@Reg_Reg_new(_) => super.emitNode(sym, rhs)
+			case e@Set_arg(_,_) => super.emitNode(sym, rhs)
+			case e@Set_mem(_,_) => super.emitNode(sym, rhs)
+			case _ => {
+				//TODO
+				//if (inHwScope) {}
+				if (false) {
+					emitComment(s"""inscope""")
+				} else { 
+					emitComment(s"""not inscope""")
+					rhs match {
+  	  			case e@Counterchain_new(counters) =>
+
+						case e@ConstFix(c) =>
+							println(quote(e))
+						case e@ConstFlt(c) =>
+						case e@ConstBit(c) =>
+
+						case e@Set_arg(reg, value) =>
+
+  	  			case e@Pipe_foreach(cchain, func, inds) =>
+
+  	  			case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
+
+  	  			case e@_ => 
+							super.emitNode(sym, rhs)
+					}
+				}
+			}
   	}
-		//stream.flush()
 	}
 
   override def quote(x: Exp[Any]) = x match {

@@ -38,7 +38,7 @@ trait DADLDSL extends ForgeApplication
 
     // TODO: This list should be updated as and when new backend support for feedback is added
     // Codegen support should be added in forge/extern/dadl/compiler/src/ops/ModuleIOOpsExp.scala
-    extern(grp("ModuleIO"), targets = List(dot))
+    extern(grp("ModuleIO"), targets = List($cala, dot))
 
     ()
 	}

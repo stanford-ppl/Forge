@@ -2,8 +2,8 @@ package ppl.dsl.forge
 package dsls
 package dadl
 trait NodeOps {
-	this: DADLDSL =>
-	def importNodes() = {
+  this: DADLDSL =>
+  def importNodes() = {
 
     // Create a group for all nodes
     val NodeOps = grp("Node")
@@ -58,5 +58,5 @@ trait NodeOps {
         $self -> $1
       })}
     }
-	}
+  }
 }

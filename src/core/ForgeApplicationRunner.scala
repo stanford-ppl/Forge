@@ -30,7 +30,6 @@ trait ForgeApplicationRunner extends ForgeApplication with ForgeExp {
     extern(grp("Profiling"))
     extern(grp("Reppable"))
     extern(grp("Tests"))
-    extern(grp("Asserts"), targets = List($cala))
     extern(grp("ForgeMetadata"))
 
     // in order to use arrays and arraybuffers as parallel collections, we must be able to access their parallel collection methods.

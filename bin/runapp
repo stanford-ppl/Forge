@@ -7,10 +7,24 @@ fi
 if [[ $1 == *"c"* ]]; then
 	echo "--------compile dhdl app--------"
 	cp /Users/Yaqi/Documents/hyperdsl/forge/apps/DHDL/src/${2}.scala apps/src/;
-	sbt compile
-	bin/delitec ${2}Compiler
+	sbt -DshowSuppressedErrors=true compile
+	bin/delitec --dot --maxj ${2}Compiler
 fi
 if [[ $1 == *"r"* ]]; then
 	echo "--------run dhdl app------------"
 	bin/delite ${2}Compiler.deg
+fi
+if [[ $1 == *"d"* ]]; then
+	echo "--------generate dhdl dot graph------------"
+	# Move define macro to beginning of the file
+	cp generated/${2}Compiler/dot/kernels/${2}Compiler.dot generated/${2}Compiler/dot/kernels/${2}Compiler_pre.m4
+	grep 'define' generated/${2}Compiler/dot/kernels/${2}Compiler_pre.m4 > generated/${2}Compiler/dot/kernels/${2}Compiler.m4
+	grep -v '^define' generated/${2}Compiler/dot/kernels/${2}Compiler_pre.m4 >> generated/${2}Compiler/dot/kernels/${2}Compiler.m4
+	# Generate dot file
+	m4 generated/${2}Compiler/dot/kernels/${2}Compiler.m4 > generated/${2}Compiler/dot/kernels/${2}Compiler.dot
+	# Temp fix to dot gen
+	sed -i '' '/()/d' generated/${2}Compiler/dot/kernels/${2}Compiler.dot
+	# Generate dot graph
+	dot -Tpdf generated/${2}Compiler/dot/kernels/${2}Compiler.dot > Top.pdf
+	open Top.pdf
 fi

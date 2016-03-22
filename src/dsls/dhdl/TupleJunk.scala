@@ -39,8 +39,7 @@ trait TupleJunk {
       infix (TupArith) ("mul", arithPars, (("t1",Tup),("t2",Tup)) :: Tup) implements composite { tupFromBinSrcStr("Arith", "mul") }
       infix (TupArith) ("div", arithPars, (("t1",Tup),("t2",Tup)) :: Tup) implements composite { tupFromBinSrcStr("Arith", "div") }
 
-      // Have to define ordering explicitly (no good default)
+      // Have to define ordering explicitly (no good default to assume here)
     }
   }
-
 }

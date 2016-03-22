@@ -56,7 +56,7 @@ trait DHDLMetadata {
     onMeet (MDblBuf) ${ this }
     internal.static (dblBufOps) ("update", T, (T, SBoolean) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MDblBuf($1)) }
-    internal.direct (dblBufOps) ("apply", T, T :: SBoolean) implements composite ${ meta[MDblBuf]($0).get.isDblBuf }
+    internal.static (dblBufOps) ("apply", T, T :: SBoolean) implements composite ${ meta[MDblBuf]($0).get.isDblBuf }
 
     /* Register Type  */
     val MRegTpe = metadata("MRegTpe", "regTpe" -> RegTpe)
@@ -81,8 +81,22 @@ trait DHDLMetadata {
     //TODO:
     onMeet (MPar) ${ this }
     internal.static (parOps) ("update", T, (T, SInt) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MPar($1)) }
-    internal.static (parOps) ("apply", T, T :: SInt) implements composite ${ meta[MPar]($0).get.par }
+    composite ${ setMetadata($0, MPar($1)) }
+    internal.static (parOps) ("apply", T, T :: SInt) implements composite ${
+      meta[MPar]($0) match {
+        case Some(p) => p.par
+        case None => 1
+      }
+    }
+    internal.direct (parOps) ("maxJPre", T, T :: SString) implements composite ${
+      maxJPrefix(par( $0 ))
+    }
+
+    val normGrp = grp("normGrp")
+    internal.direct (normGrp) ("maxJPrefix", Nil, SInt :: SString) implements composite ${
+      if ( $0 == 1 ) "DFEVar"
+      else "DFEVector<DFEVar>"
+    }
 
     /* Number of Banks  */
     val MBank = metadata("MBank", "nBanks" -> SInt)

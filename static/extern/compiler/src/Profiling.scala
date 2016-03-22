@@ -39,6 +39,7 @@ trait ScalaGenProfilingOps extends ScalaGenEffect {
 trait CudaGenProfilingOps
 trait OpenCLGenProfilingOps
 trait DotGenProfilingOps
+trait MaxJGenProfilingOps
 
 trait CGenProfilingOps extends CGenEffect {
   val IR: ProfilingOpsExp

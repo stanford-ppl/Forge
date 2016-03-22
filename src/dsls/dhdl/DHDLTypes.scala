@@ -167,5 +167,25 @@ trait DHDLTypes {
     impl (fltpt_to_string) (codegen($cala, ${ $0.toString }))
     impl (fltpt_to_fixpt) (codegen($cala, ${ $0.toFixedPoint[$t[S],$t[I],$t[F]] }))
     impl (convert_fltpt) (codegen($cala, ${ $0.changeFormat[$t[G2],$t[E2]] }))
+
+    // --- Dot Backend
+
+    impl (fixpt_to_fltpt) (codegen(dot, ${
+			$sym [ label="fix2flt" ]
+			$0 -> $sym
+		}))
+
+    impl (fltpt_to_fixpt) (codegen(dot, ${
+			$sym [ label="flt2fix" ]
+			$0 -> $sym
+		}))
+
+    // --- MaxJ Backend
+    impl (fixpt_to_fltpt) (codegen(maxj, ${
+		}))
+
+    impl (fltpt_to_fixpt) (codegen(maxj, ${
+		}))
+
 	}
 }

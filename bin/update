@@ -79,7 +79,7 @@ DSL_NAME=$2
 if [ $SKIP -le 1 ];
 then
   echo "sbt compile (1/$NUM_STEPS)"
-  sbt compile
+  sbt -DshowSuppressedErrors=true compile
 fi
 
 FORGE_FLAGS=""

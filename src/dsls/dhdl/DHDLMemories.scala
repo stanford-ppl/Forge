@@ -103,7 +103,7 @@ trait DHDLMemories {
     fimplicit (Reg) ("regFlt_to_flt", (G,E), Reg(FltPt(G,E)) :: FltPt(G,E)) implements composite ${ reg_read($0) }
     fimplicit (Reg) ("regBit_to_bit", Nil, Reg(Bit) :: Bit) implements composite ${ reg_read($0) }
 
-    // --- Scala backend
+    // --- Scala Backend
     impl (reg_new)   (codegen($cala, ${ Array($init) }))
     impl (reg_read)  (codegen($cala, ${ $reg.apply(0) }))
     impl (reg_write) (codegen($cala, ${ $reg.update(0, $value) }))
@@ -111,6 +111,53 @@ trait DHDLMemories {
       @ val init = resetValue($reg)
       $reg.update(0, $init)
     }))
+
+    // --- Dot Backend
+    impl (reg_new)   (codegen(dot, ${
+			@ regType(sym) match {
+				@ case Regular =>
+					@ if (isDblBuf(sym)) {
+							$sym [margin=0, rankdir="LR", label="{<st> \$sym | <ld>}" shape="record"
+										color="$dblbufBorderColor " style="filled" fillcolor="$regColor "]
+					@ } else {
+							$sym [label= "\$sym" shape="square" color="$regColor " style="filled"
+									 fillcolor="$regColor "]
+					@ }
+				@ case ArgumentIn =>
+					@ val l = "ArgIn_" + quote(sym).split("_")(1)
+        	$sym [label=$l shape="Msquare"]
+				@ case ArgumentOut =>
+					@ val l = "ArgOut_" + quote(sym).split("_")(1)
+        	$sym [label=$l shape="Msquare"]
+			@ }
+		}))
+    impl (reg_read)  (codegen(dot, ${
+			@ emitAlias(sym, reg)
+		}))
+    impl (reg_write) (codegen(dot, ${
+			$value -> $reg
+		}))
+    impl (reg_reset) (codegen(dot, ${
+    }))
+
+    // --- MaxJ Backend
+    impl (reg_new)   (codegen(maxj, ${
+			@ regType(sym) match {
+				@ case Regular =>
+					@ if (isDblBuf(sym)) {
+					@ } else {
+					@ }
+				@ case ArgumentIn =>
+				@ case ArgumentOut =>
+			@ }
+		}))
+    impl (reg_read)  (codegen(maxj, ${
+		}))
+    impl (reg_write) (codegen(maxj, ${
+		}))
+    impl (reg_reset) (codegen(maxj, ${
+    }))
+
   }
 
 
@@ -177,14 +224,46 @@ trait DHDLMemories {
       infix (":=") (Tile(T) :: MUnit, effect = write(0)) implements redirect ${ transferTile($1, $self, false) }
     }
 
-    // --- Scala backend
+    // --- Scala Backend
     impl (bram_new)   (codegen($cala, ${ Array.fill($size)($zero) })) // $t[T] refers to concrete type in IR
     impl (bram_load)  (codegen($cala, ${ $bram.apply($addr.toInt) }))
     impl (bram_store) (codegen($cala, ${ $bram.update($addr.toInt, $value) }))
     impl (bram_reset) (codegen($cala, ${ (0 until $bram.length).foreach{i => $bram.update(i, $zero) }}))
+
+    // --- Dot Backend
+    impl (bram_new)   (codegen(dot, ${
+      @ if (isDblBuf(sym)) {
+      	$sym [margin=0 rankdir="LR" label="{<st> \$sym | <ld> }" shape="record"
+							color="$dblbufBorderColor " style="filled" fillcolor="$memColor "]
+      @ } else {
+        	$sym [label="\$sym" shape="square" style="filled" fillcolor="\$memColor"]
+      @ }
+		})) // $t[T] refers to concrete type in IR
+		impl (bram_load)  (codegen(dot, ${
+			$addr -> $bram [label="addr"]
+			//$sym [style="invisible" height=0 size=0 margin=0 label=""]
+			//$sym [label=$sym fillcolor="lightgray" style="filled"]
+			@ emitAlias(sym, bram)
+		}))
+		impl (bram_store) (codegen(dot, ${
+			$addr -> $bram [label="addr"]
+			$value -> $bram [label="data"]
+		}))
+    impl (bram_reset) (codegen(dot, ${ }))
+
+    // --- MaxJ Backend
+    impl (bram_new)   (codegen(maxj, ${
+      @ if (isDblBuf(sym)) {
+      @ } else {
+      @ }
+		})) // $t[T] refers to concrete type in IR
+		impl (bram_load)  (codegen(maxj, ${
+		}))
+		impl (bram_store) (codegen(maxj, ${
+		}))
+    impl (bram_reset) (codegen(maxj, ${ }))
+
   }
-
-
   // TODO: Size of offchip memory can be a staged value, but it can't be a value which is calculated in hardware
   //       Any way to make this distinction?
   // TODO: Change interface of tile load / store to words rather than BRAMs?
@@ -237,6 +316,18 @@ trait DHDLMemories {
 
     // --- Scala Backend
     impl (offchip_new) (codegen($cala, ${ new Array[$t[T]]($size.toInt) }))
+
+		// --- Dot Backend
+		impl (offchip_new) (codegen(dot, ${
+			$sym [label="\$sym" shape="square" fontcolor="white" color="white" style="filled"
+			fillcolor="$offChipColor "]
+			$size -> $sym [label="size"]
+			//$size [style="invisible" height=0 size=0 margin=0 label=""]
+		}))
+
+		// --- MaxJ Backend
+		impl (offchip_new) (codegen(maxj, ${
+		}))
   }
 
 
@@ -278,7 +369,6 @@ trait DHDLMemories {
       val chain = CounterChain(ctrs:_*)
       tile_transfer(mem, $local, nonUnitStrides, ofs, tileDims, chain, $store)
     }
-  }
 
-
+	}
 }

@@ -18,4 +18,5 @@ trait DHDLEnums {
     identifier (PipeStyle) ("Coarse")   // metapipeline
     identifier (PipeStyle) ("Disabled") // sequential metapipeline
   }
+
 }

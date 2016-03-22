@@ -182,17 +182,27 @@ trait DHDLMisc {
       }
     }
 
-    // --- Scala backend
-    // TODO: Assumes maximum value is an integer (not a Long)
+    // --- Scala Backend
     impl (rand_fix_bnd) (codegen($cala, ${ FixedPoint.randbnd[$t[S],$t[I],$t[F]]($0) }))
     impl (rand_fix) (codegen($cala, ${ FixedPoint.rand[$t[S],$t[I],$t[F]] }))
     impl (rand_flt) (codegen($cala, ${ FloatPoint.rand[$t[G],$t[E]] }))
     impl (rand_bit) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextBoolean() }))
+
+    // --- Dot Backend
+    //impl (rand_fix_bnd) (codegen(dot, ${  }))
+    //impl (rand_fix) (codegen(dot, ${  }))
+    //impl (rand_flt) (codegen(dot, ${  }))
+    //impl (rand_bit) (codegen(dot, ${  }))
+
+    // --- MaxJ Backend
+    //impl (rand_fix_bnd) (codegen(maxj, ${  }))
+    //impl (rand_fix) (codegen(maxj, ${  }))
+    //impl (rand_flt) (codegen(maxj, ${  }))
+    //impl (rand_bit) (codegen(maxj, ${  }))
   }
 
 
   // --- Unsynthesizable operations used for data transfer and/or testing
-  // TODO: getMem should probably take care of allocation too (rather than just copy)
   def importDHDLTestingOps() {
     importArrayAPI()
     importRandomOps()
@@ -254,7 +264,8 @@ trait DHDLMisc {
     direct (Tst) ("Accel", T, MThunk(T) :: MUnit) implements composite ${ hwblock($0) }
 
 
-    // --- Scala backend
+
+    // --- Scala Backend
     impl (println)  (codegen($cala, ${ println($0) }))
     impl (println2) (codegen($cala, ${ println() }))
     impl (assert)   (codegen($cala, ${ assert($0) }))
@@ -286,6 +297,48 @@ trait DHDLMisc {
     impl (hwblock)  (codegen($cala, ${
       $b[0]
       ()
+    }))
+
+    // --- Dot Backend
+    impl (println)  (codegen(dot, ${
+			@ emitComment("println")
+		}))
+		//TODO: dot shouldn't see these nodes if nodes inside hwblock aren't ramdomly moved
+		//outside
+    //impl (assert)   (codegen(dot, ${ }))
+    //impl (ifThenElse) (codegen(dot, ${ }))
+    //impl (whileDo) (codegen(dot, ${ }))
+    //impl (forLoop) (codegen(dot, ${ }))
+    impl (set_mem)  (codegen(dot, ${ }))
+    impl (get_mem)  (codegen(dot, ${ }))
+		impl (set_arg)  (codegen(dot, ${ $1 -> $0 }))
+    impl (get_arg)  (codegen(dot, ${ }))
+    impl (hwblock)  (codegen(dot, ${
+			@ inHwScope = true
+      @ stream.println(emitBlock(__arg0) + "")
+			@ inHwScope = false
+    }))
+
+    // --- MaxJ Backend
+    impl (println)  (codegen(maxj, ${
+			@ emitComment("println")
+		}))
+		//TODO: maxj shouldn't see these nodes if nodes inside hwblock aren't ramdomly moved outside
+    //impl (assert)   (codegen(maxj, ${ }))
+    //impl (ifThenElse) (codegen(maxj, ${
+    //}))
+    //impl (whileDo) (codegen(maxj, ${
+    //}))
+  //   impl (forLoop) (codegen(maxj, ${
+  //   }))
+    impl (set_mem)  (codegen(maxj, ${ }))
+    impl (get_mem)  (codegen(maxj, ${ }))
+    impl (set_arg)  (codegen(maxj, ${ }))
+    impl (get_arg)  (codegen(maxj, ${ }))
+    impl (hwblock)  (codegen(maxj, ${
+			@ inHwScope = true
+      @ stream.println(emitBlock(__arg0) + "")
+			@ inHwScope = false
     }))
 
     // --- Rewrites

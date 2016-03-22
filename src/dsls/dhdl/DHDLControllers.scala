@@ -45,6 +45,26 @@ trait DHDLControllers {
 
     // --- Scala backend
     impl (counter_new) (codegen($cala, ${ ($start until $end by $step) }))
+
+    // --- Dot Backend
+    // Moved this outside - was confusing sublime
+    val counterColor = "\"\\\"\" + quote(counterInnerColor) + \"\\\"\"" // "\"" + quote(..) + "\""
+
+    impl (counter_new) (codegen(dot, ${
+			@ val cic = \$counterColor //"\\"" + quote(counterInnerColor) + "\\""
+      $sym [ label="\$sym" shape="box" style="filled,rounded"
+						color=$cic ]
+			$start -> $sym [ label="start" ]
+			$end -> $sym [ label="end" ]
+			$step -> $sym [ label="step" ]
+			//$start [style="invisible" height=0 size=0 margin=0 label=""]
+			//$end [style="invisible" height=0 size=0 margin=0 label=""]
+			//$step [style="invisible" height=0 size=0 margin=0 label=""]
+		}))
+
+    // --- MaxJ Backend
+    impl (counter_new) (codegen(maxj, ${
+		}))
   }
 
 
@@ -150,5 +170,36 @@ trait DHDLControllers {
       }
     }))
 
-  }
+    // --- Dot Backend
+    impl (pipe_parallel) (codegen (dot, ${
+			//TODO: why nodes inside parallel get generated even when emitblock is
+			// commented out??
+      subgraph cluster_$sym {
+      	label = "parallel_\$sym"
+      	style = "filled"
+      	fillcolor = "$parallelFillColor "
+      	color = "$parallelBorderColor "
+      	@ stream.println(emitBlock(func) + "")
+			}
+		}))
+
+    impl (block_reduce) (codegen(dot, ${
+      subgraph $sym {
+      	label = "\$sym"
+      	style = "filled"
+      	fillcolor = "$mpFillColor "
+      	color = "$mpBorderColor "
+				@ val sym_ctrl = sym + "_ctrl"
+      	$sym_ctrl [label="ctrl" height=0 style="filled" fillcolor="$mpBorderColor "]
+			}
+    }))
+
+    // --- MaxJ Backend
+    impl (pipe_parallel) (codegen (maxj, ${
+		}))
+
+    impl (block_reduce) (codegen(maxj, ${
+    }))
+	}
+
 }

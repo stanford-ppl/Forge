@@ -1,7 +1,7 @@
 package dhdl.compiler.ops
 
 import java.io.{File,FileWriter,PrintWriter}
-import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, Record}
+import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, DotGenEffect, MaxJGenEffect, Record}
 import scala.reflect.{Manifest,SourceContext}
 
 import dhdl.shared._
@@ -23,12 +23,27 @@ trait FloatPoint[SIG,EXP]
 trait DHDLIndices
 
 // Stub (nothing here for now)
-trait TypeInspectionOpsExp extends TypeInspectionCompilerOps {
+trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp {
   this: DHDLExp =>
 
   def isFixPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FixedPoint[_,_,_]])
   def isFltPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FloatPoint[_,_]])
   def isBitType[T:Manifest]   = isSubtype(manifest[T].runtimeClass, classOf[DHDLBit])
+
+  // Shorthand versions for matching on ConstFixPt and ConstFltPt without the manifests
+  object ConstFix {
+    def unapply(x: Any): Option[Any] = x match {
+      case ConstFixPt(x,_,_,_) => Some(x)
+      case _ => None
+    }
+  }
+  object ConstFlt {
+    def unapply(x: Any): Option[Any] = x match {
+      case ConstFltPt(x,_,_) => Some(x)
+      case _ => None
+    }
+  }
+
 }
 
 trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
@@ -60,19 +75,19 @@ trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
   def bitManifest: Manifest[Bit] = manifest[DHDLBit]
 }
 
-trait MemoryTemplateOpsExp extends TypeInspectionCompilerOps with MemoryTemplateTypesExp with EffectExp {
+trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypesExp with EffectExp {
   this: DHDLExp =>
 
   // --- Nodes
   case class TileTransfer[T:Manifest](
-    mem:      Rep[OffChipMem[T]], // Offchip memory array
-    local:    Rep[BRAM[T]],       // Local memory (BRAM)
+    mem:      Rep[OffChipMem[T]],                // Offchip memory array
+    local:    Rep[BRAM[T]],                      // Local memory (BRAM)
     strides:  List[Rep[FixPt[Signed,B32,B0]]],   // Dimensions converted to strides for offchip memory
     memOfs:   Rep[FixPt[Signed,B32,B0]],         // Offset into offchip memory
-    tileDims: List[Int],          // Tile dimensions
-    cchain:   Rep[CounterChain],  // Counter chain for copy
+    tileDims: List[Int],                         // Tile dimensions
+    cchain:   Rep[CounterChain],                 // Counter chain for copy
     iters:    List[Sym[FixPt[Signed,B32,B0]]],   // Bound iterator variables
-    store:    Boolean             // Is this transfer a store (true) or a load (false)
+    store:    Boolean                            // Is this transfer a store (true) or a load (false)
   )(implicit ctx: SourceContext) extends Def[Unit] {
     val mT = manifest[T]
   }
@@ -161,7 +176,7 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenPipeTemplate
   }
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) => // Load
+    case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) =>
       emitNestedLoop(iters, cchain) {
         val offaddr = (iters.zip(strides).map{case (i,s) => quote(i) + "*" + quote(s) } :+ quote(memOfs)).mkString(" + ")
         stream.println("val offaddr = " + offaddr)
@@ -406,4 +421,66 @@ object FloatPoint {
   def rand[G:Manifest,E:Manifest] = FloatPoint[G,E](java.util.concurrent.ThreadLocalRandom.current().nextDouble())
 }
 """
+}
+
+trait DotGenMemoryTemplateOps extends DotGenEffect {
+  val IR: PipeTemplateOpsExp with DHDLIdentifiers
+  import IR._
+
+  // Note that tileDims are not fixed point values yet - they're just integers
+  private def localDimsToStrides(dims: List[Int]) = List.tabulate(dims.length){d =>
+    if (d == dims.length - 1) 1
+    else dims.drop(d + 1).reduce(_*_)
+  }
+
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) => // Load
+			val l = "offld_" + quote(sym).split("_")(1)
+      emit(s"""${quote(sym)} [ label=$l shape="rectangle" style="rounded, filled" fillcolor="white"
+				color="black"]""")
+			emit(s"""offchip -> $sym""")
+			emit(s"""sym -> $local""")
+			/*
+			tileDims.foreach{dim =>
+			 $dim -> $sym [label="offdim"]
+			 }
+			 start.foreach{s =>
+			 $s -> $sym [label="start"]
+			}
+			*/
+			//TODO:
+			/*
+      emitNestedLoop(iters, cchain) {
+        val offaddr = (iters.zip(strides).map{case (i,s) => quote(i) + "*" + quote(s) } :+ quote(memOfs)).mkString(" + ")
+        stream.println("val offaddr = " + offaddr)
+
+        val localStrides = localDimsToStrides(tileDims).map(k => "FixedPoint[Signed,B32,B0](" + k + ")")
+        val localAddr = iters.zip(localStrides).map{ case (i,s) => quote(i) + "*" + quote(s) }.mkString(" + ")
+        stream.println("val localaddr = " + localAddr)
+
+        if (store)
+          stream.println(quote(mem) + "(offaddr.toInt) = " + quote(local) + "(localaddr.toInt)")
+        else
+          stream.println(quote(local) + "(localaddr.toInt) = " + quote(mem) + "(offaddr.toInt)")
+				*/
+      //}
+    case _ => super.emitNode(sym, rhs)
+  }
+}
+
+trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
+  val IR: PipeTemplateOpsExp with DHDLIdentifiers
+  import IR._
+
+  // Note that tileDims are not fixed point values yet - they're just integers
+  private def localDimsToStrides(dims: List[Int]) = List.tabulate(dims.length){d =>
+    if (d == dims.length - 1) 1
+    else dims.drop(d + 1).reduce(_*_)
+  }
+
+  // TODO: match on store = true or store = false if want as different gen rules
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) =>
+    case _ => super.emitNode(sym, rhs)
+  }
 }

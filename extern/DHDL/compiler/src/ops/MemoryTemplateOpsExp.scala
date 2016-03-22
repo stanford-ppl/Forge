@@ -438,8 +438,8 @@ trait DotGenMemoryTemplateOps extends DotGenEffect {
 			val l = "offld_" + quote(sym).split("_")(1)
       emit(s"""${quote(sym)} [ label=$l shape="rectangle" style="rounded, filled" fillcolor="white"
 				color="black"]""")
-			emit(s"""offchip -> $sym""")
-			emit(s"""sym -> $local""")
+			//emit(s"""offchip -> ${quote(sym)}""")
+			//emit(s"""sym -> $local""")
 			/*
 			tileDims.foreach{dim =>
 			 $dim -> $sym [label="offdim"]

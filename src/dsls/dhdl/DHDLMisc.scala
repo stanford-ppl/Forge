@@ -222,7 +222,7 @@ trait DHDLMisc {
     val set_mem = internal (Tst) ("set_mem", T, (OffChip(T), MArray(T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
     val get_mem = internal (Tst) ("get_mem", T, (OffChip(T), MArray(T)) :: MUnit, effect = write(1), aliasHint = aliases(Nil))
     val set_arg = internal (Tst) ("set_arg", T, (Reg(T), T) :: MUnit, effect = write(0))
-    val get_arg = internal (Tst) ("get_arg", T, Reg(T) :: T)
+    val get_arg = internal (Tst) ("get_arg", T, Reg(T) :: T, effect = simple)
     val hwblock = internal (Tst) ("hwblock", T, MThunk(T) :: MUnit, effect = simple)
 
     val ifThenElse = direct (Tst) ("__ifThenElse", List(T), List(MBoolean,MThunk(T,cold),MThunk(T,cold)) :: T)

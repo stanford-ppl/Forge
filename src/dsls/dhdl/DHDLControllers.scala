@@ -17,7 +17,7 @@ trait DHDLControllers {
     val Idx          = lookupAlias("SInt")
 
     // --- Nodes
-    val counter_new = internal (Counter) ("counter_new", Nil, (("start", Idx), ("end", Idx), ("step", Idx)) :: Counter)
+    val counter_new = internal (Counter) ("counter_new", Nil, (("start", Idx), ("end", Idx), ("step", Idx)) :: Counter, effect = simple)
 
     // --- Internals
     direct (Counter) ("counter_create", Nil, (SOption(SString), Idx, Idx, Idx, SInt) :: Counter) implements composite ${

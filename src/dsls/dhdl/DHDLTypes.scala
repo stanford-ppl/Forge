@@ -171,8 +171,16 @@ trait DHDLTypes {
 
     // --- Dot Backend
     impl (boolean_to_bit) (codegen(dot, ${ $sym [label=$0 style="filled" fillcolor="lightgray" color="none"] }))
-    impl (const_to_fixpt) (codegen(dot, ${ $sym [label=$0 style="filled" fillcolor="lightgray" color="none"] }))
-    impl (const_to_fltpt) (codegen(dot, ${ $sym [label=$0 style="filled" fillcolor="lightgray" color="none"] }))
+    impl (const_to_fixpt) (codegen(dot, ${
+      @ alwaysGen {
+        $sym [label=$0 style="filled" fillcolor="lightgray" color="none"]
+      @ }
+    }))
+    impl (const_to_fltpt) (codegen(dot, ${
+      @ alwaysGen {
+        $sym [label=$0 style="filled" fillcolor="lightgray" color="none"]
+      @ }
+    }))
 
     impl (convert_fixpt) (codegen(dot, ${
       $sym [ label="fix2fix" ]

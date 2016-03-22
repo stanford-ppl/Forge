@@ -23,6 +23,13 @@ trait DHDLTypes {
 
     val Tpes = grp("Tpes")
 
+    // Want Manifest[S], not Manifest[Rep[S]]
+    val SS = tpePar("S",stage=compile)
+    val II = tpePar("I",stage=compile)
+    val FF = tpePar("F",stage=compile)
+    val GG = tpePar("G",stage=compile)
+    val EE = tpePar("E",stage=compile)
+
     // --- Nodes
     // Bordering on a ridiculous numbers of type parameters here
     // Somewhat concerning since each type parameter means an implicit parameter, but maybe it's ok
@@ -30,12 +37,14 @@ trait DHDLTypes {
     val boolean_to_bit = internal (Tpes) ("constBit", Nil, SBoolean :: Bit)
     val bit_to_string = direct (Tpes) ("bit_to_string", Nil, Bit :: MString)
 
-    val const_to_fixpt = internal (FixPt) ("constFixPt", (T,S,I,F), T :: FixPt(S,I,F), TNumeric(T))
+    // Include Manifests to avoid CSE issues
+    val const_to_fixpt = internal (FixPt) ("constFixPt", (T,S,I,F), (T, SManifest(SS), SManifest(II), SManifest(FF)) :: FixPt(S,I,F), TNumeric(T))
     val fixpt_to_string = direct (FixPt) ("fixpt_to_string", (S,I,F), FixPt(S,I,F) :: MString)
     val fixpt_to_fltpt = direct (FixPt) ("fixpt_to_fltpt", (S,I,F,G,E), FixPt(S,I,F) :: FltPt(G,E))
     val convert_fixpt = direct (FixPt) ("convert_fixpt", (S,I,F,S2,I2,F2), FixPt(S,I,F) :: FixPt(S2,I2,F2))
 
-    val const_to_fltpt = internal (FltPt) ("constFltPt", (T,G,E), T :: FltPt(G,E), TNumeric(T))
+    // Include Manifests to avoid CSE issues
+    val const_to_fltpt = internal (FltPt) ("constFltPt", (T,G,E), (T, SManifest(GG), SManifest(EE)) :: FltPt(G,E), TNumeric(T))
     val fltpt_to_string = direct (FltPt) ("fltpt_to_string", (G,E), FltPt(G,E) :: MString)
     val fltpt_to_fixpt = direct (FltPt) ("fltpt_to_fixpt", (G,E,S,I,F), FltPt(G,E) :: FixPt(S,I,F))
     val convert_fltpt = direct (FltPt) ("convert_fltpt", (G,E,G2,E2), FltPt(G,E) :: FltPt(G2,E2))
@@ -95,10 +104,10 @@ trait DHDLTypes {
 
     // Primarily for internal use, but users can use this as well (but is less friendly syntax, e.g. fixPt[Int,...](value) )
     direct (Tpes) ("fixPt", (T,S,I,F), T :: FixPt(S,I,F), TNumeric(T)) implements composite ${
-      constFixPt[T,S,I,F]($0)
+      constFixPt[T,S,I,F]($0, manifest[S], manifest[I], manifest[F])
     }
     direct (Tpes) ("fltPt", (T,G,E), T :: FltPt(G,E), TNumeric(T)) implements composite ${
-      constFltPt[T,G,E]($0)
+      constFltPt[T,G,E]($0, manifest[G], manifest[E])
     }
 
     // TODO: Can probably change this to be an infix defined for all T:Numeric

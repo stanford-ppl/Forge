@@ -125,11 +125,15 @@ trait DHDLMemories {
 					@ }
 				@ case ArgumentIn =>
 					@ val l = "ArgIn_" + quote(sym).split("_")(1)
-        	$sym [label=$l shape="Msquare"]
-				@ case ArgumentOut =>
+        	@ alwaysGen {
+            $sym [label=$l shape="Msquare"]
+				  @ }
+        @ case ArgumentOut =>
 					@ val l = "ArgOut_" + quote(sym).split("_")(1)
-        	$sym [label=$l shape="Msquare"]
-			@ }
+        	@ alwaysGen {
+            $sym [label=$l shape="Msquare"]
+			    @ }
+      @ }
 		}))
     impl (reg_read)  (codegen(dot, ${
 			@ emitAlias(sym, reg)
@@ -147,8 +151,8 @@ trait DHDLMemories {
 					@ if (isDblBuf(sym)) {
 					@ } else {
 					@ }
-				@ case ArgumentIn =>
-				@ case ArgumentOut =>
+				@ case ArgumentIn =>  // alwaysGen
+				@ case ArgumentOut => // alwaysGen
 			@ }
 		}))
     impl (reg_read)  (codegen(maxj, ${
@@ -319,11 +323,14 @@ trait DHDLMemories {
 
 		// --- Dot Backend
 		impl (offchip_new) (codegen(dot, ${
-			$sym [label="\$sym" shape="square" fontcolor="white" color="white" style="filled"
-			fillcolor="$offChipColor "]
-			$size -> $sym [label="size"]
-			//$size [style="invisible" height=0 size=0 margin=0 label=""]
+			@ alwaysGen {
+        $sym [label="\$sym" shape="square" fontcolor="white" color="white" style="filled"
+			  fillcolor="$offChipColor "]
+			  $size -> $sym [label="size"]
+			  //$size [style="invisible" height=0 size=0 margin=0 label=""]
+      @ }
 		}))
+
 
 		// --- MaxJ Backend
 		impl (offchip_new) (codegen(maxj, ${

@@ -160,85 +160,47 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
   import IR.{Counterchain_new, Offchip_new, Reg_Reg_new, Set_arg, Set_mem, Pipe_foreach, Pipe_reduce}
   import IR.{CounterChain, FixPt, Signed, B32, B0}
 
-	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = {
-		cchain match {
-			case s@Sym(_) => s match {
-				case Def(EatReflect(Counterchain_new(counters))) =>
-					inds.zipWithIndex.foreach {case (iter, idx) =>
-						emitAlias(iter, counters(idx))
-					}
-				case _ =>
-			}
-			case _ =>
-		}
+	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
+    case Def(EatReflect(Counterchain_new(counters))) =>
+	     inds.zipWithIndex.foreach {case (iter, idx) => emitAlias(iter, counters(idx)) }
 	}
 
-  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = {
-		rhs match {
-			/* Generate Outside HW Block */
-			case e@Offchip_new(_) => super.emitNode(sym, rhs)
-			case e@Reg_Reg_new(_) => super.emitNode(sym, rhs)
-			case e@Set_arg(_,_) => super.emitNode(sym, rhs)
-			case e@Set_mem(_,_) => super.emitNode(sym, rhs)
-			case _ => {
-				//TODO
-				//if (inHwScope) {
-				if (false) {
-					emitComment(s"""inscope""")
-				} else {
-					emitComment(s"""not inscope""")
-					rhs match {
-  				case e@Counterchain_new(counters) =>
-						emit(s"""subgraph cluster_${quote(sym)} {""")
-  				  emit(s"""	label=${quote(sym)} """)
-  				  emit(s"""	style="rounded, filled" """)
-  				  emit(s"""	fillcolor="${counterColor}" """)
-						counters.foreach{ ctr =>
-  				    emit(s"""   ${quote(ctr)}""")
-  				  }
-  				  emit("}")
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+	  case e@Counterchain_new(counters) =>
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+      emit(s""" label=${quote(sym)} """)
+      emit(s""" style="rounded, filled" """)
+      emit(s""" fillcolor="${counterColor}" """)
+      counters.foreach{ ctr =>
+        emit(s"""   ${quote(ctr)}""")
+      }
+      emit("}")
 
-					case e@ConstFix(c) =>
-						emit(s"""${quote(sym)} [label=${c} style="filled" fillcolor="lightgray"
-							color="none"] """)
-					case e@ConstFlt(c) =>
-						emit(s"""${quote(sym)} [label=${c} style="filled" fillcolor="lightgray"
-							color="none"] """)
-					case e@ConstBit(c) =>
-						emit(s"""${quote(sym)} [label=${c} style="filled" fillcolor="lightgray"
-							color="none"] """)
+    case e@Pipe_foreach(cchain, func, inds) =>
+      emitNestedIdx(cchain, inds)
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+      emit(s"""label=\"${quote(sym)}\"""")
+      emit(s"""color=\"gray\"""")
+      emitBlock(func)             // Map function
+      emit("}")
 
-  				case e@Pipe_foreach(cchain, func, inds) =>
-						emitNestedIdx(cchain, inds)
-  				  emit(s"""subgraph cluster_${quote(sym)} {""")
-  				  emit(s"""label=\"${quote(sym)}\"""")
-  				  emit(s"""color=\"gray\"""")
-  				  emitBlock(func)             // Map function
-  				  emit("}")
+    case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
+      emitAlias(acc, accum)
+      emitNestedIdx(cchain, inds)
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+      emit(s"""label=\"${quote(sym)}\"""")
+      emit(s"""color=\"gray\"""")
+      emit(s"""define(`${quote(acc)}', `${quote(accum)}')""")
+      emitBlock(func)
+      emitBlock(ldFunc)
+      emitAlias(rV._1, getBlockResult(ldFunc))
+      emitAlias(rV._2, getBlockResult(func))
+      emitBlock(rFunc)
+      emitAlias(res, getBlockResult(rFunc))
+      emitBlock(stFunc)
+      emit("}")
 
-  				case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
-	  			  emitAlias(acc, accum)
-						emitNestedIdx(cchain, inds)
-  				  emit(s"""subgraph cluster_${quote(sym)} {""")
-  				  emit(s"""label=\"${quote(sym)}\"""")
-  				  emit(s"""color=\"gray\"""")
-						emit(s"""define(`${quote(acc)}', `${quote(accum)}')""")
-  				  emitBlock(func)
-    			  emitBlock(ldFunc)
-						emitAlias(rV._1, getBlockResult(ldFunc))
-						emitAlias(rV._2, getBlockResult(func))
-    			  emitBlock(rFunc)
-						emitAlias(res, getBlockResult(rFunc))
-    			  emitBlock(stFunc)
-						emit("}")
-
-  				case e@_ =>
-						println("notmatch:" + e)
-						super.emitNode(sym, rhs)
-					}
-				}
-			}
-		}
+    case _ => super.emitNode(sym,rhs)
 	}
 
   override def quote(x: Exp[Any]) = x match {
@@ -256,38 +218,16 @@ trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
   import IR.{Counterchain_new, Offchip_new, Reg_Reg_new, Set_arg, Set_mem, Pipe_foreach, Pipe_reduce}
   import IR.{CounterChain, FixPt, Signed, B32, B0}
 
-  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = {
-		rhs match {
-			case e@Offchip_new(_) => super.emitNode(sym, rhs)
-			case e@Reg_Reg_new(_) => super.emitNode(sym, rhs)
-			case e@Set_arg(_,_) => super.emitNode(sym, rhs)
-			case e@Set_mem(_,_) => super.emitNode(sym, rhs)
-			case _ => {
-				//TODO
-				//if (inHwScope) {}
-				if (false) {
-					emitComment(s"""Inside of HW Scope""")
-				} else {
-					emitComment(s"""Outside of HW Scope""")
-					rhs match {
-  	  			case e@Counterchain_new(counters) =>
+  // TODO
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case e@Counterchain_new(counters) =>
 
-						case e@ConstFix(c) =>
-							println(quote(e))
-						case e@ConstFlt(c) =>
-						case e@ConstBit(c) =>
+    case e@Pipe_foreach(cchain, func, inds) =>
 
-  	  			case e@Pipe_foreach(cchain, func, inds) =>
+    case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
 
-  	  			case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
-
-  	  			case e@_ =>
-							super.emitNode(sym, rhs)
-					}
-				}
-			}
-  	}
-	}
+    case _ => super.emitNode(sym, rhs)
+  }
 
   override def quote(x: Exp[Any]) = x match {
 		case s@Sym(n) => s.tp.erasure.getSimpleName() + "_x" + n

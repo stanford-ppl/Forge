@@ -481,6 +481,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
   // TODO: match on store = true or store = false if want as different gen rules
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) =>
+
     case _ => super.emitNode(sym, rhs)
   }
 }

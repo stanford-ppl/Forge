@@ -100,6 +100,7 @@ trait Definitions extends DerivativeTypes {
   lazy val MOutputStream = tpe("ForgeFileOutputStream")
   lazy val SList = tpe("List", tpePar("A"), stage = compile)
   lazy val SSeq = tpe("Seq", tpePar("A"), stage = compile)
+  lazy val SManifest = tpe("Manifest", tpePar("A"), stage = compile)
 
   // Metadata types
   // TODO: Is there a better way to expose these to the DSL author? Way to not expose them at all?
@@ -189,8 +190,8 @@ trait Definitions extends DerivativeTypes {
    */
   case object sharedBackend extends BackendType
   case object internalBackend extends BackendType
-  case object libraryBackend extends BackendType
-  case object compilerBackend extends BackendType
+  //case object libraryBackend extends BackendType
+  //case object compilerBackend extends BackendType
 
   /**
    * Metadata meet functions

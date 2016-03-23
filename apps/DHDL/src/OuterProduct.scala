@@ -1,16 +1,15 @@
 import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
-import scala.util.Random
 
 object OuterProductCompiler extends DHDLApplicationCompiler with OuterProduct
 object OuterProductInterpreter extends DHDLApplicationInterpreter with OuterProduct
 trait OuterProduct extends DHDLApplication {
-  type Elem = Fix
+  type Elem = FixPt[Signed,B16,B16]
 
   override def stageArgNames = List("tileSize")
   lazy val tileSize = stageArgOrElse[Int](0, 2)
-  lazy val dataSize = ArgIn[Fix]("dataSize")
+  lazy val dataSize = ArgIn[SInt]("dataSize")
 
   def outerProduct(vec1: Rep[OffChipMem[Elem]], vec2: Rep[OffChipMem[Elem]], out: Rep[OffChipMem[Elem]]) {
     MetaPipe(dataSize by tileSize, dataSize by tileSize) { (i,j) =>
@@ -18,11 +17,12 @@ trait OuterProduct extends DHDLApplication {
       val b2 = BRAM[Elem]("b2", tileSize)
       val outTile = BRAM[Elem]("outTile", tileSize, tileSize)
       Parallel {
-        vec1.ld(b1, i, tileSize)
-        vec2.ld(b2, j, tileSize)
+        b1 := vec1(i::i+tileSize)
+        b2 := vec2(j::j+tileSize)
       }
       Pipe(tileSize by 1, tileSize by 1) { (ii,jj) => outTile(ii, jj) = b1(ii) * b2(jj) }
-      out.st(outTile, i, j, tileSize, tileSize)
+
+      out(i::i+tileSize, j::j+tileSize) := outTile
     }
   }
 
@@ -33,8 +33,8 @@ trait OuterProduct extends DHDLApplication {
     val v2 = OffChipMem[Elem]("vec2", N)
     val out = OffChipMem[Elem]("out", N, N)
 
-    val vec1 = Array.fill(N)(random[Elem])
-    val vec2 = Array.fill(N)(random[Elem])
+    val vec1 = Array.fill(N)(random[Elem](100))
+    val vec2 = Array.fill(N)(random[Elem](100))
 
     // Transfer data and start accelerator
     setArg(dataSize, N)
@@ -49,5 +49,5 @@ trait OuterProduct extends DHDLApplication {
     println("expected: " + gold.mkString(", "))
     println("result:   " + result.mkString(", "))
     assert( result == gold )
-	}
+  }
 }

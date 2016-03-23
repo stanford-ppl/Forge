@@ -12,7 +12,7 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
   this: DHDLExp =>
 
   // --- Nodes
-  case class Pipe_foreach(cchain: Exp[CounterChain], func: Block[Unit], inds: List[Sym[Fix]])(implicit ctx: SourceContext) extends Def[Pipeline]
+  case class Pipe_foreach(cchain: Exp[CounterChain], func: Block[Unit], inds: List[Sym[FixPt[Signed,B32,B0]]])(implicit ctx: SourceContext) extends Def[Pipeline]
   case class Pipe_reduce[T,C[T]] (
     // - Inputs
     cchain: Exp[CounterChain],  // Loop counter chain
@@ -23,7 +23,7 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
     func:   Block[T],           // Map function
     rFunc:  Block[T],           // Reduction function
     // - Bound args
-    inds:   List[Sym[Fix]],     // Loop iterators
+    inds:   List[Sym[FixPt[Signed,B32,B0]]],   // Loop iterators
     acc:    Sym[C[T]],          // Reduction accumulator (bound argument, aliases with accum)
     res:    Sym[T],             // Reduction intermediate result (bound argument, aliases with rFunc.res)
     rV:    (Sym[T], Sym[T])     // Reduction function inputs (bound arguments, aliases with ldFunc.res and func.res)
@@ -37,14 +37,14 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
 
   // --- Internals
   def pipe_foreach(cchain: Rep[CounterChain], func: Rep[Indices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Pipeline] = {
-    val inds = List.fill(getDim(cchain, 0)){ fresh[Fix] } // Arbitrary number of bound args. Awww yeah.
-    val blk = reifyEffects( func(indices_new(inds)) )
+    val inds = List.fill(sizeOf(cchain)){ fresh[FixPt[Signed,B32,B0]] } // Arbitrary number of bound args. Awww yeah.
+    val blk = reifyEffects( func(indices_create(inds)) )
     reflectEffect(Pipe_foreach(cchain, blk, inds), summarizeEffects(blk).star andAlso Simple())
   }
   def pipe_reduce[T,C[T]](cchain: Rep[CounterChain], accum: Rep[C[T]], func: Rep[Indices] => Rep[T], rFunc: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext, __mem: Mem[T,C], __mT: Manifest[T], __mC: Manifest[C[T]]): Rep[Pipeline]  = {
     // Loop indices
-    val is = List.fill(getDim(cchain, 0)){ fresh[Fix] }
-    val inds = indices_new(is)
+    val is = List.fill(sizeOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }
+    val inds = indices_create(is)
 
     // Reified load function
     val acc = reflectMutableSym( fresh[C[T]] )  // Has to be mutable since we write to "it"
@@ -110,10 +110,10 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
 }
 
 trait ScalaGenPipeTemplateOps extends ScalaGenEffect {
-  val IR: PipeTemplateOpsExp  
+  val IR: PipeTemplateOpsExp with DHDLIdentifiers
   import IR._
 
-  private def emitNestedLoop(iters: List[Sym[Fix]], cchain: Exp[CounterChain])(emitBlk: => Unit) = {
+  def emitNestedLoop(iters: List[Sym[FixPt[Signed,B32,B0]]], cchain: Exp[CounterChain])(emitBlk: => Unit) = {
     iters.zipWithIndex.foreach{ case (iter,idx) =>
       stream.println("for( " + quote(iter) + " <- " + quote(cchain) + ".apply(" + idx + ".toInt)) {")
     }
@@ -145,98 +145,62 @@ trait ScalaGenPipeTemplateOps extends ScalaGenEffect {
     case _ => super.emitNode(sym, rhs)
   }
 
-  override def quote(x: Exp[Any]) = x match {
+  /*override def quote(x: Exp[Any]) = x match {
 		case s@Sym(n) => s.tp.erasure.getSimpleName() + "_x" + n
     case _ => super.quote(x)
-  }
+  }*/
 }
 
 trait DotGenPipeTemplateOps extends DotGenEffect{
-  val IR: PipeTemplateOpsExp with FixOpsExp with FltOpsExp with TpesOpsExp with TestingOpsExp
-	with MemoryTemplateOpsExp with OffChipMemOpsExp with RegOpsExp
-  import IR.{Counterchain_new, Set_arg, Pipe_foreach, Pipe_reduce, ConstFix, ConstFlt , ConstBit,
-		Sym, Exp, Def, CounterChain, Fix, Offchip_new, Reg_Reg_new, Set_mem}
-	import IR.EatReflect
+  val IR: PipeTemplateOpsExp with FixPtOpsExp with FltPtOpsExp with TpesOpsExp with NosynthOpsExp
+	        with OffChipMemOpsExp with RegOpsExp with DHDLCodegenOps
 
-	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[Fix]]) = {
-		cchain match {
-			case s@Sym(_) => s match {
-				case Def(EatReflect(Counterchain_new(counters))) =>
-					inds.zipWithIndex.foreach {case (iter, idx) =>
-						emitAlias(iter, counters(idx))
-					}	
-				case _ => 
-			}
-			case _ => 
-		}
+  import IR.{Sym, Exp, Def}
+  import IR.{ConstFix, ConstFlt, ConstBit, EatReflect}
+  import IR.{Counterchain_new, Offchip_new, Reg_Reg_new, Set_arg, Set_mem, Pipe_foreach, Pipe_reduce}
+  import IR.{CounterChain, FixPt, Signed, B32, B0}
+
+	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
+    case Def(EatReflect(Counterchain_new(counters))) =>
+	     inds.zipWithIndex.foreach {case (iter, idx) => emitAlias(iter, counters(idx)) }
 	}
 
-  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = { 
-		rhs match {
-			/* Generate Outside HW Block */
-			case e@Offchip_new(_) => super.emitNode(sym, rhs)
-			case e@Reg_Reg_new(_) => super.emitNode(sym, rhs)
-			case e@Set_arg(_,_) => super.emitNode(sym, rhs)
-			case e@Set_mem(_,_) => super.emitNode(sym, rhs)
-			case _ => {
-				//TODO
-				//if (inHwScope) {
-				if (false) {
-					emitComment(s"""inscope""")
-				} else { 
-					emitComment(s"""not inscope""")
-					rhs match {
-  				case e@Counterchain_new(counters) =>
-						emit(s"""subgraph cluster_${quote(sym)} {""")
-  				  emit(s"""	label=${quote(sym)} """)
-  				  emit(s"""	style="rounded, filled" """)
-  				  emit(s"""	fillcolor="${counterColor}" """)
-						counters.foreach{ ctr =>
-  				    emit(s"""   ${quote(ctr)}""")
-  				  }
-  				  emit("}")
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+	  case e@Counterchain_new(counters) =>
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+      emit(s""" label=${quote(sym)} """)
+      emit(s""" style="rounded, filled" """)
+      emit(s""" fillcolor="${counterColor}" """)
+      counters.foreach{ ctr =>
+        emit(s"""   ${quote(ctr)}""")
+      }
+      emit("}")
 
-					case e@ConstFix(c) =>
-						emit(s"""${quote(sym)} [label=${c} style="filled" fillcolor="lightgray"
-							color="none"] """)
-					case e@ConstFlt(c) =>
-						emit(s"""${quote(sym)} [label=${c} style="filled" fillcolor="lightgray"
-							color="none"] """)
-					case e@ConstBit(c) =>
-						emit(s"""${quote(sym)} [label=${c} style="filled" fillcolor="lightgray"
-							color="none"] """)
+    case e@Pipe_foreach(cchain, func, inds) =>
+      emitNestedIdx(cchain, inds)
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+      emit(s"""label=\"${quote(sym)}\"""")
+      emit(s"""color=\"gray\"""")
+      emitBlock(func)             // Map function
+      emit("}")
 
-  				case e@Pipe_foreach(cchain, func, inds) =>
-						emitNestedIdx(cchain, inds)
-  				  emit(s"""subgraph cluster_${quote(sym)} {""")
-  				  emit(s"""label=\"${quote(sym)}\"""")
-  				  emit(s"""color=\"gray\"""")
-  				  emitBlock(func)             // Map function
-  				  emit("}")
+    case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
+      emitAlias(acc, accum)
+      emitNestedIdx(cchain, inds)
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+      emit(s"""label=\"${quote(sym)}\"""")
+      emit(s"""color=\"gray\"""")
+      emit(s"""define(`${quote(acc)}', `${quote(accum)}')""")
+      emitBlock(func)
+      emitBlock(ldFunc)
+      emitAlias(rV._1, getBlockResult(ldFunc))
+      emitAlias(rV._2, getBlockResult(func))
+      emitBlock(rFunc)
+      emitAlias(res, getBlockResult(rFunc))
+      emitBlock(stFunc)
+      emit("}")
 
-  				case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
-	  			  emitAlias(acc, accum)
-						emitNestedIdx(cchain, inds)
-  				  emit(s"""subgraph cluster_${quote(sym)} {""")
-  				  emit(s"""label=\"${quote(sym)}\"""")
-  				  emit(s"""color=\"gray\"""")
-						emit(s"""define(`${quote(acc)}', `${quote(accum)}')""")
-  				  emitBlock(func)             
-    			  emitBlock(ldFunc)
-						emitAlias(rV._1, getBlockResult(ldFunc))
-						emitAlias(rV._2, getBlockResult(func))
-    			  emitBlock(rFunc)
-						emitAlias(res, getBlockResult(rFunc))
-    			  emitBlock(stFunc)
-						emit("}")
-
-  				case e@_ => 
-						println("notmatch:" + e)
-						super.emitNode(sym, rhs)
-					}
-				}
-			}
-		}
+    case _ => super.emitNode(sym,rhs)
 	}
 
   override def quote(x: Exp[Any]) = x match {
@@ -246,44 +210,24 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
 }
 
 trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
-  val IR: PipeTemplateOpsExp with FixOpsExp with FltOpsExp with TpesOpsExp with TestingOpsExp
-	with MemoryTemplateOpsExp with OffChipMemOpsExp with RegOpsExp
-  import IR.{Counterchain_new, Set_arg, Pipe_foreach, Pipe_reduce, ConstFix, ConstFlt , ConstBit,
-		Sym, Exp, Def, CounterChain, Fix, Offchip_new, Reg_Reg_new, Set_mem}
-	import IR.EatReflect
+  val IR: PipeTemplateOpsExp with FixPtOpsExp with FltPtOpsExp with TpesOpsExp with NosynthOpsExp
+	        with OffChipMemOpsExp with RegOpsExp with DHDLCodegenOps
 
-  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = { 
-		rhs match {
-			case e@Offchip_new(_) => super.emitNode(sym, rhs)
-			case e@Reg_Reg_new(_) => super.emitNode(sym, rhs)
-			case e@Set_arg(_,_) => super.emitNode(sym, rhs)
-			case e@Set_mem(_,_) => super.emitNode(sym, rhs)
-			case _ => {
-				//TODO
-				//if (inHwScope) {}
-				if (false) {
-					emitComment(s"""Inside of HW Scope""")
-				} else { 
-					emitComment(s"""Outside of HW Scope""")
-					rhs match {
-  	  			case e@Counterchain_new(counters) =>
+  import IR.{Sym, Exp, Def}
+  import IR.{ConstFix, ConstFlt, ConstBit, EatReflect}
+  import IR.{Counterchain_new, Offchip_new, Reg_Reg_new, Set_arg, Set_mem, Pipe_foreach, Pipe_reduce}
+  import IR.{CounterChain, FixPt, Signed, B32, B0}
 
-						case e@ConstFix(c) =>
-							println(quote(e))
-						case e@ConstFlt(c) =>
-						case e@ConstBit(c) =>
+  // TODO
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case e@Counterchain_new(counters) =>
 
-  	  			case e@Pipe_foreach(cchain, func, inds) =>
+    case e@Pipe_foreach(cchain, func, inds) =>
 
-  	  			case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
+    case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
 
-  	  			case e@_ => 
-							super.emitNode(sym, rhs)
-					}
-				}
-			}
-  	}
-	}
+    case _ => super.emitNode(sym, rhs)
+  }
 
   override def quote(x: Exp[Any]) = x match {
 		case s@Sym(n) => s.tp.erasure.getSimpleName() + "_x" + n

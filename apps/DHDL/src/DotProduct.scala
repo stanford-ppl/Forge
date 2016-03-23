@@ -6,28 +6,27 @@ import scala.util.Random
 object DotProductCompiler extends DHDLApplicationCompiler with DotProduct
 object DotProductInterpreter extends DHDLApplicationInterpreter with DotProduct
 trait DotProduct extends DHDLApplication {
-  type Elem = Fix
+  type Elem = FixPt[Signed, B16, B16]
 
-	override def stageArgNames = List("tileSize")
+  override def stageArgNames = List("tileSize")
   lazy val tileSize = stageArgOrElse[Int](0, 4)
-  lazy val dataSize = ArgIn[Fix]("dataSize")
+  lazy val dataSize = ArgIn[SInt]("dataSize")
 
-  def dotproduct(v1: Rep[OffChipMem[Elem]], v2: Rep[OffChipMem[Elem]], out: Rep[Reg[Fix]]) {
-		val b1 = BRAM[Elem]("b1", tileSize)
+  def dotproduct(v1: Rep[OffChipMem[Elem]], v2: Rep[OffChipMem[Elem]], out: Rep[Reg[Elem]]) {
+    val b1 = BRAM[Elem]("b1", tileSize)
     val b2 = BRAM[Elem]("b2", tileSize)
 
-		MetaPipe(dataSize by tileSize, out){ i =>
-			Parallel {
-				v1.ld(b1, i, tileSize)
-				v2.ld(b2, i, tileSize)
-			}
+    MetaPipe(dataSize by tileSize, out){ i =>
+      Parallel {
+        b1 := v1(i::i+tileSize)
+        b2 := v2(i::i+tileSize)
+      }
       val acc = Reg[Elem]("acc")
-			Pipe(0 until tileSize, acc){ ii => b1(ii) * b2(ii) }{_+_}
+      Pipe(0 until tileSize, acc){ ii => b1(ii) * b2(ii) }{_+_}
 
-      //println("acc @ " + i.mkString + ": " + acc.value.mkString)
       acc.value
-		}{_+_}
-	}
+    }{_+_}
+  }
 
   def main() {
     val N = 8
@@ -37,8 +36,8 @@ trait DotProduct extends DHDLApplication {
     val v2 = OffChipMem[Elem]("v2", N)
     val out = ArgOut[Elem]("out")
 
-    //val vec1 = Array.fill(N)(randomFix(10))
-    //val vec2 = Array.fill(N)(randomFix(10))
+    val vec1 = Array.fill(N)(random[Elem](10))
+    val vec2 = Array.fill(N)(random[Elem](10))
 
     //println("vec1: " + vec1.mkString(", "))
     //println("vec2: " + vec2.mkString(", "))

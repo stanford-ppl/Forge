@@ -4,12 +4,14 @@ import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common._
 
-// Front-end
-trait ForgeHashMapOps extends Base {
-  this: ForgeArrayOps =>
-
+trait ForgeHashMapTypes {
   type ForgeHashMap[K,V]
   implicit def forgeMapManifest[K:Manifest,V:Manifest]: Manifest[ForgeHashMap[K,V]]
+}
+
+// Front-end
+trait ForgeHashMapOps extends ForgeHashMapTypes with Base {
+  this: ForgeArrayOps =>
 
   implicit class ForgeHashMapOps[K:Manifest,V:Manifest](m: Rep[ForgeHashMap[K,V]]) {
     def apply(key: Rep[K])(implicit ctx: SourceContext) = fhashmap_get(m,key)

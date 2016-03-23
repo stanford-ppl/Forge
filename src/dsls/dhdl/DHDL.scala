@@ -104,7 +104,7 @@ trait DHDLDSL extends ForgeApplication
     importDHDLMisc()
     importTupleTypeClassInstances()
 
-    schedule(IRPrinter)
+    schedule(IRPrinterPlus)
 
     // Externs
     extern(grp("PipeTemplate"), targets = List($cala, dot, maxj))

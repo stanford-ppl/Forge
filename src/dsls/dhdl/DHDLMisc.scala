@@ -223,7 +223,7 @@ trait DHDLMisc {
     val get_mem = internal (Tst) ("get_mem", T, (OffChip(T), MArray(T)) :: MUnit, effect = write(1), aliasHint = aliases(Nil))
     val set_arg = internal (Tst) ("set_arg", T, (Reg(T), T) :: MUnit, effect = write(0))
     val get_arg = internal (Tst) ("get_arg", T, Reg(T) :: T, effect = simple)
-    val hwblock = internal (Tst) ("hwblock", T, MThunk(T) :: MUnit, effect = simple)
+    val hwblock = internal (Tst) ("hwblock", Nil, MThunk(MUnit) :: MUnit, effect = simple)
 
     val ifThenElse = direct (Tst) ("__ifThenElse", List(T), List(MBoolean,MThunk(T,cold),MThunk(T,cold)) :: T)
     val whileDo = direct (Tst) ("__whileDo", Nil, List(MThunk(MBoolean),MThunk(MUnit)) :: MUnit)
@@ -261,7 +261,7 @@ trait DHDLMisc {
 
     // TODO: Naming isn't final. Your favorite keyword here :)
     // TODO: This is a quick hack for scheduling acceleration initialization. Eventually this should act as a true annotation
-    direct (Tst) ("Accel", T, MThunk(T) :: MUnit) implements composite ${ hwblock($0) }
+    direct (Tst) ("Accel", Nil, MThunk(MUnit) :: MUnit) implements composite ${ hwblock($0) }
 
 
 

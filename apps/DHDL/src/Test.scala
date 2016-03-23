@@ -38,6 +38,9 @@ trait Test extends DHDLApplication {
     val N = 8
     setArg(x, N)
 
+    val k = Array.fill(32)(0.as[Flt])
+    if (k.length > 30) println("hi")
+
     Accel {
       val b1 = BRAM[Flt]("b1", 10)
     }

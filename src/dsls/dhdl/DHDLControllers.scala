@@ -172,8 +172,6 @@ trait DHDLControllers {
 
     // --- Dot Backend
     impl (pipe_parallel) (codegen (dot, ${
-			//TODO: why nodes inside parallel get generated even when emitblock is
-			// commented out??
       subgraph cluster_$sym {
       	label = "parallel_\$sym"
       	style = "filled"
@@ -183,13 +181,14 @@ trait DHDLControllers {
 			}
 		}))
 
+		//TODO
     impl (block_reduce) (codegen(dot, ${
       subgraph $sym {
       	label = "\$sym"
       	style = "filled"
       	fillcolor = "$mpFillColor "
       	color = "$mpBorderColor "
-				@ val sym_ctrl = sym + "_ctrl"
+				@ val sym_ctrl = quote(sym) + "_blockreduce"
       	$sym_ctrl [label="ctrl" height=0 style="filled" fillcolor="$mpBorderColor "]
 			}
     }))

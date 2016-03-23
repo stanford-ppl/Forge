@@ -171,6 +171,7 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
       emit(s""" label=${quote(sym)} """)
       emit(s""" style="rounded, filled" """)
       emit(s""" fillcolor="${counterColor}" """)
+			//emit(s""" ${quote(sym)} [label="" style="invisible" height=0 size=0 margin=0 ]""")
       counters.foreach{ ctr =>
         emit(s"""   ${quote(ctr)}""")
       }

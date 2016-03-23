@@ -423,47 +423,40 @@ object FloatPoint {
 """
 }
 
-trait DotGenMemoryTemplateOps extends DotGenEffect {
+//trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps{
+trait DotGenMemoryTemplateOps extends DotGenEffect{
   val IR: PipeTemplateOpsExp with DHDLIdentifiers
   import IR._
 
-  // Note that tileDims are not fixed point values yet - they're just integers
-  private def localDimsToStrides(dims: List[Int]) = List.tabulate(dims.length){d =>
-    if (d == dims.length - 1) 1
-    else dims.drop(d + 1).reduce(_*_)
-  }
+	//TODO: use this function from DotGenPipeTemplateOps
+	def emitNestedIdx1(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
+    case Def(EatReflect(Counterchain_new(counters))) =>
+	     inds.zipWithIndex.foreach {case (iter, idx) => emitAlias(iter, counters(idx)) }
+	}
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) => // Load
-			val l = "offld_" + quote(sym).split("_")(1)
-      emit(s"""${quote(sym)} [ label=$l shape="rectangle" style="rounded, filled" fillcolor="white"
-				color="black"]""")
-			//emit(s"""offchip -> ${quote(sym)}""")
-			//emit(s"""sym -> $local""")
-			/*
-			tileDims.foreach{dim =>
-			 $dim -> $sym [label="offdim"]
-			 }
-			 start.foreach{s =>
-			 $s -> $sym [label="start"]
+			val l = s"Tile${if (store) "Store" else "Load"}_" + quote(sym).split("_")(1)
+      emit(s"""${quote(sym)} [ label=$l shape="rectangle" style="rounded, filled"
+				fillcolor="${tileTransFillColor}" color="black"]""")
+			if (store)
+				emitEdge(sym, mem)
+			else
+				emitEdge(mem, sym)
+			if (store)
+				emitEdge(local, sym)
+			else
+				emitEdge(sym, local)
+			//emit(s"""${quote(cchain)} -> ${quote(sym)}""")
+			emitNestedIdx1(cchain, iters)
+			strides.foreach{ s =>
+				emitEdge(s, sym, "stride")
 			}
-			*/
-			//TODO:
-			/*
-      emitNestedLoop(iters, cchain) {
-        val offaddr = (iters.zip(strides).map{case (i,s) => quote(i) + "*" + quote(s) } :+ quote(memOfs)).mkString(" + ")
-        stream.println("val offaddr = " + offaddr)
+			emitEdge(memOfs, sym)
+			iters.foreach{it =>
+				emitEdge(it, sym)
+			}
 
-        val localStrides = localDimsToStrides(tileDims).map(k => "FixedPoint[Signed,B32,B0](" + k + ")")
-        val localAddr = iters.zip(localStrides).map{ case (i,s) => quote(i) + "*" + quote(s) }.mkString(" + ")
-        stream.println("val localaddr = " + localAddr)
-
-        if (store)
-          stream.println(quote(mem) + "(offaddr.toInt) = " + quote(local) + "(localaddr.toInt)")
-        else
-          stream.println(quote(local) + "(localaddr.toInt) = " + quote(mem) + "(offaddr.toInt)")
-				*/
-      //}
     case _ => super.emitNode(sym, rhs)
   }
 }

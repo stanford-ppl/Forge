@@ -15,9 +15,9 @@ trait DHDLMisc {
 
     val T = tpePar("T")
 
-    val Idx = lookupAlias("SInt")
+    val Idx = lookupAlias("Index")
 
-    // Staging time warnings and errors
+    // --- Staging time warnings and errors
     internal (Misc) ("stageWarn", Nil, SAny :: SUnit, effect = simple) implements composite ${
       System.out.println("[\u001B[33mwarn\u001B[0m] " + __pos.fileName + ":" + __pos.line + ": " + $0)
     }
@@ -25,6 +25,10 @@ trait DHDLMisc {
       System.out.println("[\u001B[31merror\u001B[0m] " + __pos.fileName + ":" + __pos.line + ": " + $0)
       sys.exit(-1)
     }
+
+    // --- Powers of 2 checks
+    internal (Misc) ("isPow2", Nil, SInt :: SBoolean) implements composite ${ (x & (x - 1)) == 0 }
+    internal (Misc) ("isPow2", Nil, SLong :: SBoolean) implements composite ${ (x & (x - 1)) == 0 }
 
 
     // --- Multi-dimensional addressing
@@ -85,7 +89,7 @@ trait DHDLMisc {
     val S = tpePar("S")
     val R = tpePar("R")
 
-    val Idx  = lookupAlias("SInt")
+    val Idx  = lookupAlias("Index")
     val Bit  = lookupTpe("Bit")
     val Tup2 = lookupTpe("Tup2")
     val Coll = lookupTpeClass("Coll").get
@@ -212,7 +216,7 @@ trait DHDLMisc {
     val T = tpePar("T")
 
     val Bit = lookupTpe("Bit")
-    val Idx = lookupAlias("SInt")
+    val Idx = lookupAlias("Index")
 
     val LoopRange = lookupTpe("LoopRange")
     val OffChip   = lookupTpe("OffChipMem")

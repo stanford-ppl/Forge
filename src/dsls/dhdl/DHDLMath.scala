@@ -463,7 +463,10 @@ trait DHDLMath {
 
     // --- API
     // TODO: Support a more general pow
-    direct (Prim) ("pow", T, (T, SInt) :: T, TArith(T)) implements composite ${ productTree(List.fill($1){$0}) }
+    direct (Prim) ("pow", T, (T, SInt) :: T, TArith(T)) implements composite ${
+      if ($1 < 1) stageError("Power less than 1 is currently unsupported.")
+      productTree(List.fill($1){$0})
+    }
 
     // Fixed Point
     infix  (Prim) ("**", (S,I,F), (FixPt(S,I,F), SInt) :: FixPt(S,I,F)) implements redirect ${ pow($0, $1) }

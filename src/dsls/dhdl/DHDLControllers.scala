@@ -14,7 +14,7 @@ trait DHDLControllers {
   def importCounters() {
     val Counter      = lookupTpe("Counter")
     val CounterChain = lookupTpe("CounterChain")
-    val Idx          = lookupAlias("SInt")
+    val Idx          = lookupAlias("Index")
 
     // --- Nodes
     val counter_new = internal (Counter) ("counter_new", Nil, (("start", Idx), ("end", Idx), ("step", Idx)) :: Counter, effect = simple)
@@ -73,7 +73,7 @@ trait DHDLControllers {
     val C = hkTpePar("C", T) // high kinded type parameter - memory of type T
 
     val BRAM = lookupTpe("BRAM")
-    val Idx  = lookupAlias("SInt")
+    val Idx  = lookupAlias("Index")
 
     val Indices = lookupTpe("Indices")
 

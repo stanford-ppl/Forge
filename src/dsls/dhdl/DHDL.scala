@@ -63,6 +63,8 @@ trait DHDLDSL extends ForgeApplication
     val Flt    = tpeAlias("Flt",  FltPt(B24, B8))
     val Dbl    = tpeAlias("Dbl",  FltPt(B53, B11))
 
+    val Index  = tpeAlias("Index", FixPt(Signed, B32, B0))
+
     // --- Memory Types
     val OffChip = tpe("OffChipMem", T)
     val Tile    = tpe("Tile", T)

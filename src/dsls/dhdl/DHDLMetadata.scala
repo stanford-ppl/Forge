@@ -12,7 +12,7 @@ trait DHDLMetadata {
     val PipeStyle = lookupTpe("PipeStyle", stage=compile)
     val Reg       = lookupTpe("Reg")
     val Pipeline  = lookupTpe("Pipeline")
-    val Idx       = lookupAlias("SInt")
+    val Idx       = lookupAlias("Index")
     val Tile      = lookupTpe("Tile")
     val Range     = lookupTpe("Range")
 

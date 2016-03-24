@@ -13,7 +13,7 @@ trait DHDLSugar {
 
   def importIndices() {
     val Indices = lookupTpe("Indices")
-    val Idx     = lookupAlias("SInt")
+    val Idx     = lookupAlias("Index")
 
     internal (Indices) ("indices_new", Nil, SList(Idx) :: Indices) implements record(Indices, ("i", SList(Idx), quotedArg(0)))
     internal (Indices) ("indices_create", Nil, SList(Idx) :: Indices) implements composite ${
@@ -31,7 +31,7 @@ trait DHDLSugar {
 
   def importRanges() {
     val Range = lookupTpe("Range")
-    val Idx   = lookupAlias("SInt")
+    val Idx   = lookupAlias("Index")
     val FixPt = lookupTpe("FixPt")
 
     data(Range, ("_start", Idx), ("_end", Idx), ("_len", Idx))
@@ -70,7 +70,7 @@ trait DHDLSugar {
   def importLoopRanges() {
     val Counter   = lookupTpe("Counter")
     val LoopRange = lookupTpe("LoopRange")
-    val Idx       = lookupAlias("SInt")
+    val Idx       = lookupAlias("Index")
 
     data(LoopRange, ("_start", Idx), ("_end", Idx), ("_step", Idx))
     internal.infix (LoopRange) ("start", Nil, LoopRange :: Idx) implements getter(0, "_start")

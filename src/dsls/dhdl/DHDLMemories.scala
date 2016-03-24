@@ -45,10 +45,10 @@ trait DHDLMemories {
     val Indices = lookupTpe("Indices")
 
     // --- Nodes
-    val reg_new   = direct (Reg) ("reg_new", T, ("init", T) :: Reg(T), effect = mutable)
-    val reg_read  = direct (Reg) ("reg_read", T, ("reg", Reg(T)) :: T, aliasHint = aliases(Nil))  // aliasHint - extracted value doesn't change when reg is updated
-    val reg_write = direct (Reg) ("reg_write", T, (("reg", Reg(T)), ("value", T)) :: MUnit, effect = write(0))
-    val reg_reset = direct (Reg) ("reg_reset", T, ("reg", Reg(T)) :: MUnit, effect = write(0))
+    val reg_new   = internal (Reg) ("reg_new", T, ("init", T) :: Reg(T), effect = mutable)
+    val reg_read  = internal (Reg) ("reg_read", T, ("reg", Reg(T)) :: T, aliasHint = aliases(Nil))  // aliasHint - extracted value doesn't change when reg is updated
+    val reg_write = internal (Reg) ("reg_write", T, (("reg", Reg(T)), ("value", T)) :: MUnit, effect = write(0))
+    val reg_reset = internal (Reg) ("reg_reset", T, ("reg", Reg(T)) :: MUnit, effect = write(0))
 
     // --- Internals
     internal (Reg) ("reg_create", T, (SOption(SString), T, RegTpe) :: Reg(T), effect = mutable) implements composite ${
@@ -171,7 +171,7 @@ trait DHDLMemories {
     val T = tpePar("T")
     val BRAM    = lookupTpe("BRAM")
     val Tile    = lookupTpe("Tile")
-    val Idx     = lookupAlias("SInt")
+    val Idx     = lookupAlias("Index")
     val Indices = lookupTpe("Indices")
 
     // --- Nodes
@@ -277,7 +277,7 @@ trait DHDLMemories {
     val Tile    = lookupTpe("Tile")
     val BRAM    = lookupTpe("BRAM")
     val Range   = lookupTpe("Range")
-    val Idx     = lookupAlias("SInt")
+    val Idx     = lookupAlias("Index")
 
     // --- Nodes
     val offchip_new = internal (OffChip) ("offchip_new", T, ("size", Idx) :: OffChip(T), effect = mutable)

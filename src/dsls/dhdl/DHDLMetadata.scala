@@ -88,15 +88,6 @@ trait DHDLMetadata {
         case None => 1
       }
     }
-    internal.direct (parOps) ("maxJPre", T, T :: SString) implements composite ${
-      maxJPrefix(par( $0 ))
-    }
-
-    val normGrp = grp("normGrp")
-    internal.direct (normGrp) ("maxJPrefix", Nil, SInt :: SString) implements composite ${
-      if ( $0 == 1 ) "DFEVar"
-      else "DFEVector<DFEVar>"
-    }
 
     /* Number of Banks  */
     val MBank = metadata("MBank", "nBanks" -> SInt)
@@ -131,5 +122,44 @@ trait DHDLMetadata {
     internal.static (rangesOps) ("update", T, (Tile(T), SList(Range)) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MTileRanges($1)) }
     internal.static (rangesOps) ("apply", T, Tile(T) :: SList(Range)) implements composite ${ meta[MTileRanges]($0).get.ranges }
-  }
+
+
+		/* MaxJ Codegen Helper Functions */
+    val maxjgrp = grp("maxjGrp")
+		/* Not real metadata but need to be globally accessable */
+    val maxjmeta = metadata("maxjMeta")
+    internal.direct (maxjgrp) ("maxJPreG", Nil, SInt :: SString) implements composite ${
+      if ( $0 == 1 ) "DFEVar"
+      else "DFEVector<DFEVar>"
+    }
+    internal.direct (maxjmeta) ("maxJPre", T, T :: SString) implements composite ${
+      maxJPreG(par( $0 ))
+    }
+		internal.direct (maxjmeta) ("tpstr", T, (T, SInt) :: SString) implements composite 	${
+			tpstrG($0, $1 )
+		}
+		internal.direct (maxjgrp) ("tpstrG", T, (T, SInt) :: SString) implements composite 	${
+			val scalart = if (isFixPtType(manifest[T])) {
+				val s = sign(manifest[T].typeArguments(0))
+				val d = nbits(manifest[T].typeArguments(1))
+				val f = nbits(manifest[T].typeArguments(2))
+				if (s) "dfeFixOffset( "+ (d+f) + "," + f + ", SignMode.TWOSCOMPLEMENT)"
+				else "dfeFixOffset("+ (d+f) + "," + f + ", SignMode.UNSIGNED)"
+			} else if (isFltPtType(manifest[T])) {
+				val e = nbits(manifest[T].typeArguments(0))
+				val m = nbits(manifest[T].typeArguments(1))
+				"dfeFloat(" + e + "," + m + ")"
+			} else if (isBitType(manifest[T])) {
+				"TODO"
+			} else {
+				throw new Exception("Unknown type " + manifest[T])
+			}
+			if ($1 > 1) { 
+				"new DFEVectorType<DFEVar>(" + scalart + "," + $1 
+			} else {
+				scalart
+			}
+		}
+
+	}
 }

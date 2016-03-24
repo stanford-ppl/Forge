@@ -224,8 +224,13 @@ trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
     case e@Counterchain_new(counters) =>
 
     case e@Pipe_foreach(cchain, func, inds) =>
+      emitBlock(func)             // Map function
 
     case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
+      emitBlock(func)
+      emitBlock(ldFunc)
+      emitBlock(rFunc)
+      emitBlock(stFunc)
 
     case _ => super.emitNode(sym, rhs)
   }

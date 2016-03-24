@@ -146,18 +146,68 @@ trait DHDLMemories {
 
     // --- MaxJ Backend
     impl (reg_new)   (codegen(maxj, ${
+			@ val ts = tpstr(init, par(sym))
 			@ regType(sym) match {
 				@ case Regular =>
+					/*
+          val parent = if (!n.hasParent()) "top" else s"${quote(n.getParent())}"
+					*/
+          //@ val wen = s"${quote(parent)}_en"
+          //@ val rst = s"${quote(parent)}_rst_en"
+          //@ val din = n.input
 					@ if (isDblBuf(sym)) {
-					@ } else {
-					@ }
+					@		val symlib = quote(sym) + "_lib"
+					@		val p = par(sym)
+					@		val ts = tpstr(init, p)
+          		DblRegFileLib $symlib = new DblRegFileLib(this, $ts, $sym, $p);
+          @   if (p > 1) {
+					@			val symlibreadv = symlib + ".readv();" 
+								DFEVector<DFEVar> $sym = $symlibreadv
+          @    } else {
+					@			val symlibread = symlib + ".read();" 
+              	DFEVar $sym = $symlibread
+          @  }
+          //@  emit(s"""${quote(sym)}_lib.write($din, ${quote(sym.getWriter())}_done);""")
+          //@  emit(s"""${quote(sym)}_lib.connectWdone(${quote(n.getWriter())}_done);""")
+          //@  n.getReaders().map { r =>
+          //@    emit(s"""${quote(n)}_lib.connectRdone(${quote(r)}_done);""")
+          //@  }
+          @ } else {
+					@		val pre = maxJPre(sym)
+					@		val ts = tpstr(init, par(sym)) + ".newInstance(this);"
+          		$pre $sym = $ts
+          //@  if (!n.input.hasParent) {
+          //@    throw new Exception(s"""Reg ${quote(n)}'s input ${n.input} does not have a parent. How is that possible?""")
+          //@  }
+
+          //@  val enSignalStr = sym.producer match {
+          //@    case p@Pipe(ctr,_,_) =>
+          //@      s"${quote(ctr)}_en_from_pipesm"
+          //@    case _ =>
+          //@      s"${quote(sym.producer)}_en"
+          //@  }
+          //@  emit(s"""DFEVar ${quote(sym.input)}_real = $enSignalStr ? ${quote(sym.input)} : ${quote(sym)}; // enable""")
+          //@  emit(s"""DFEVar ${quote(sym)}_hold = Reductions.streamHold(${quote(sym.input)}_real, ($rst | ${quote(sym.producer)}_redLoop_done));""")
+          //@  emit(s"""${quote(sym)} <== $rst ? constant.var(${tpstr(init)},0) : stream.offset(${quote(sym)}_hold, -${quote(sym.producer)}_offset); // reset""")
+          @ }
 				@ case ArgumentIn =>  // alwaysGen
+          DFEVar $sym = io.scalarInput($sym, $ts);
 				@ case ArgumentOut => // alwaysGen
 			@ }
 		}))
     impl (reg_read)  (codegen(maxj, ${
 		}))
     impl (reg_write) (codegen(maxj, ${
+      //@ val valueStr = if (value.isInstanceOf[Reg]) {
+      //@   s"${value}_hold"
+      //@ } else {
+      //@   s"$value"
+      //@ }
+			@ val valueStr = "value"
+      //@ val controlStr = if (!n.hasParent()) s"top_done" else s"${quote(n.getParent())}_done"
+			@ val controlStr = "top_done"
+			@ val ts = tpstr(value, par(sym))
+      io.scalarOutput($sym, $valueStr, $ts, $controlStr);
 		}))
     impl (reg_reset) (codegen(maxj, ${
     }))
@@ -262,8 +312,34 @@ trait DHDLMemories {
       @ }
 		})) // $t[T] refers to concrete type in IR
 		impl (bram_load)  (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+			//@ val ts = tpstr(sym, par(sym)) + ".newInstance(this);"
+			//$pre $sym = $ts
 		}))
 		impl (bram_store) (codegen(maxj, ${
+      //val dataStr = if (data.isInstanceOf[Reg]) {
+      //  val regData = data.asInstanceOf[Reg]
+      //  s"${data}_hold"
+      //} else {
+      //  s"$data"
+      //}
+      //  if (mem.isAccum) {
+      //    val offsetStr = s"${data.getParent()}_offset"
+      //    val parentPipe = n.getParent().asInstanceOf[Pipe]
+      //    val parentCtr = parentPipe.ctr
+      //    if (mem.isDblBuf) {
+      //      fp(s"""$mem.connectWport(stream.offset(${quote(addr)}, -$offsetStr), stream.offset($dataStr, -$offsetStr), ${quote(parentCtr)}_en_from_pipesm, $start, $stride);""")
+      //    } else {
+      //      fp(s"""$mem.connectWport(stream.offset($addr, -$offsetStr), stream.offset($dataStr, -$offsetStr), ${quote(parentCtr)}_en_from_pipesm, $start, $stride);""")
+      //    }
+      //  } else {
+      //    if (mem.isDblBuf) {
+      //      fp(s"""// mem writer: ${mem.getWriter()} """)
+      //      fp(s"""$mem.connectWport(${quote(addr)}, $dataStr, ${quote(n.getParent())}_en, ${n.start}, ${n.stride});""")
+      //    } else {
+      //      fp(s"""$mem.connectWport($addr, $dataStr, ${quote(n.getParent())}_en, ${n.start}, ${n.stride});""")
+      //    }
+      //  }
 		}))
     impl (bram_reset) (codegen(maxj, ${ }))
 

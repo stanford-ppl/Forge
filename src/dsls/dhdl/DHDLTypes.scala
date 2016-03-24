@@ -170,7 +170,11 @@ trait DHDLTypes {
 
 
     // --- Dot Backend
-    impl (boolean_to_bit) (codegen(dot, ${ $sym [label=$0 style="filled" fillcolor="lightgray" color="none"] }))
+    impl (boolean_to_bit) (codegen(dot, ${ 
+      @ alwaysGen {
+				$sym [label=$0 style="filled" fillcolor="lightgray" color="none"] 
+      @ }
+		}))
     impl (const_to_fixpt) (codegen(dot, ${
       @ alwaysGen {
         $sym [label=$0 style="filled" fillcolor="lightgray" color="none"]
@@ -203,9 +207,17 @@ trait DHDLTypes {
     }))
 
     // --- MaxJ Backend
-    impl (boolean_to_bit) (codegen(maxj, ${ }))
-    impl (const_to_fixpt) (codegen(maxj, ${ }))
-    impl (const_to_fltpt) (codegen(maxj, ${ }))
+    impl (boolean_to_bit) (codegen(maxj, ${
+    	DFEVar $sym = constant.var( $0 );
+		}))
+    impl (const_to_fixpt) (codegen(maxj, ${
+			@ val ts = tpstr(sym, par(sym))
+      DFEVar $sym = constant.var( $ts, $0 );
+		}))
+    impl (const_to_fltpt) (codegen(maxj, ${
+			@ val ts = tpstr(sym, par(sym))
+      DFEVar $sym = constant.var( $ts, $0 );
+		}))
     impl (convert_fixpt)  (codegen(maxj, ${ }))
     impl (fixpt_to_fltpt) (codegen(maxj, ${ }))
     impl (fltpt_to_fixpt) (codegen(maxj, ${ }))

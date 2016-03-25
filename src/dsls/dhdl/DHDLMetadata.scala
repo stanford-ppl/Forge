@@ -135,10 +135,10 @@ trait DHDLMetadata {
     internal.direct (maxjmeta) ("maxJPre", T, T :: SString) implements composite ${
       maxJPreG(par( $0 ))
     }
-		internal.direct (maxjmeta) ("tpstr", T, (T, SInt) :: SString) implements composite 	${
-			tpstrG($0, $1 )
+		internal.direct (maxjmeta) ("tpstr", T, SInt :: SString) implements composite 	${
+			tpstrG[T]( $0 )
 		}
-		internal.direct (maxjgrp) ("tpstrG", T, (T, SInt) :: SString) implements composite 	${
+		internal.direct (maxjgrp) ("tpstrG", T, SInt :: SString) implements composite 	${
 			val scalart = if (isFixPtType(manifest[T])) {
 				val s = sign(manifest[T].typeArguments(0))
 				val d = nbits(manifest[T].typeArguments(1))
@@ -152,10 +152,11 @@ trait DHDLMetadata {
 			} else if (isBitType(manifest[T])) {
 				"TODO"
 			} else {
-				throw new Exception("Unknown type " + manifest[T])
+				//throw new Exception("Unknown type " + manifest[T])
+				""
 			}
-			if ($1 > 1) { 
-				"new DFEVectorType<DFEVar>(" + scalart + "," + $1 
+			if ( $0 > 1) { 
+				"new DFEVectorType<DFEVar>(" + scalart + "," + $0
 			} else {
 				scalart
 			}

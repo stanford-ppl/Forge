@@ -517,14 +517,18 @@ trait DHDLMath {
 			@ val pre = maxJPre(sym)
     	$pre $sym = KernelMath.abs( $0 );
 		}))
-    //impl (log_flt) (codegen(maxj,  ${
-		//	//TODO: parallelized virsion
-		//	@ val pre = maxJPre(sym)
-    //	$pre $sym = KernelMath.log(new KernelMath.Range(-Float.MAX_VALUE, Float.MAX_VALUE), $0, $tpstr(sym) );
-		//}))
+    impl (log_flt) (codegen(maxj,  ${
+			@ val pre = maxJPre(sym)
+			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+    	$pre $sym = KernelMath.log(new KernelMath.Range( -Float.MAX_VALUE, Float.MAX_VALUE), $0, $ts );
+		}))
     impl (exp_flt) (codegen(maxj,  ${
+			@ val pre = maxJPre(sym)
+			$pre $sym = KernelMath.exp( $0 )
 		}))
     impl (sqrt_flt) (codegen(maxj, ${
+			@ val pre = maxJPre(sym)
+			$pre $sym = KernelMath.sqrt( $0 )
 		}))
 
   }

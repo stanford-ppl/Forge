@@ -1,6 +1,7 @@
 package ppl.dsl.forge
 package dsls
 package dhdl
+import scala.reflect.SourceContext
 
 trait DHDLTypes {
   this: DHDLDSL =>
@@ -211,11 +212,11 @@ trait DHDLTypes {
     	DFEVar $sym = constant.var( $0 );
 		}))
     impl (const_to_fixpt) (codegen(maxj, ${
-			@ val ts = tpstr(sym, par(sym))
+			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
       DFEVar $sym = constant.var( $ts, $0 );
 		}))
     impl (const_to_fltpt) (codegen(maxj, ${
-			@ val ts = tpstr(sym, par(sym))
+			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
       DFEVar $sym = constant.var( $ts, $0 );
 		}))
     impl (convert_fixpt)  (codegen(maxj, ${ }))

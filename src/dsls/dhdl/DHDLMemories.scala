@@ -146,7 +146,7 @@ trait DHDLMemories {
 
     // --- MaxJ Backend
     impl (reg_new)   (codegen(maxj, ${
-			@ val ts = tpstr(init, par(sym))
+			@ val ts = tpstr[T](par(sym))
 			@ regType(sym) match {
 				@ case Regular =>
 					/*
@@ -158,7 +158,6 @@ trait DHDLMemories {
 					@ if (isDblBuf(sym)) {
 					@		val symlib = quote(sym) + "_lib"
 					@		val p = par(sym)
-					@		val ts = tpstr(init, p)
           		DblRegFileLib $symlib = new DblRegFileLib(this, $ts, $sym, $p);
           @   if (p > 1) {
 					@			val symlibreadv = symlib + ".readv();" 
@@ -174,8 +173,8 @@ trait DHDLMemories {
           //@  }
           @ } else {
 					@		val pre = maxJPre(sym)
-					@		val ts = tpstr(init, par(sym)) + ".newInstance(this);"
-          		$pre $sym = $ts
+					@ 	val tsinst = ts + ".newInstance(this);"
+          		$pre $sym = $tsinst
           //@  if (!n.input.hasParent) {
           //@    throw new Exception(s"""Reg ${quote(n)}'s input ${n.input} does not have a parent. How is that possible?""")
           //@  }
@@ -206,7 +205,7 @@ trait DHDLMemories {
 			@ val valueStr = "value"
       //@ val controlStr = if (!n.hasParent()) s"top_done" else s"${quote(n.getParent())}_done"
 			@ val controlStr = "top_done"
-			@ val ts = tpstr(value, par(sym))
+			@ val ts = tpstr[T](par(sym))
       io.scalarOutput($sym, $valueStr, $ts, $controlStr);
 		}))
     impl (reg_reset) (codegen(maxj, ${
@@ -313,8 +312,8 @@ trait DHDLMemories {
 		})) // $t[T] refers to concrete type in IR
 		impl (bram_load)  (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
-			//@ val ts = tpstr(sym, par(sym)) + ".newInstance(this);"
-			//$pre $sym = $ts
+			@ val ts = tpstr[T](par(sym)) + ".newInstance(this);"
+			$pre $sym = $ts
 		}))
 		impl (bram_store) (codegen(maxj, ${
       //val dataStr = if (data.isInstanceOf[Reg]) {

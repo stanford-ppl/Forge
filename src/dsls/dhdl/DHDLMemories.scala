@@ -308,6 +308,11 @@ trait DHDLMemories {
     impl (bram_new)   (codegen(maxj, ${
       @ if (isDblBuf(sym)) {
       @ } else {
+				//TODO: add stride once it's in language 
+        //BramLib $sym = new BramLib(this, $depth, $ts, $bks , $stride );
+				@ val ts = tpstr[T]( par(sym) )
+				@ val bks = banks(sym)
+        BramLib $sym = new BramLib(this, $size, $ts, $bks , 1 );
       @ }
 		})) // $t[T] refers to concrete type in IR
 		impl (bram_load)  (codegen(maxj, ${

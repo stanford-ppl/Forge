@@ -78,7 +78,6 @@ trait DHDLMetadata {
     /* Parallelization Factor  */
     val MPar = metadata("MPar", "par" -> SInt)
     val parOps = metadata("par")
-    //TODO:
     onMeet (MPar) ${ this }
     internal.static (parOps) ("update", T, (T, SInt) :: MUnit, effect = simple) implements
     composite ${ setMetadata($0, MPar($1)) }
@@ -123,6 +122,18 @@ trait DHDLMetadata {
       composite ${ setMetadata($0, MTileRanges($1)) }
     internal.static (rangesOps) ("apply", T, Tile(T) :: SList(Range)) implements composite ${ meta[MTileRanges]($0).get.ranges }
 
+    /* Parent of a node */
+    val MParent = metadata("MParent", "parent" -> MAny)
+    val parentOps = metadata("parentOf")
+    onMeet (MParent) ${ this }
+    internal.static (parentOps) ("update", T, (T, MAny) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MParent($1)) }
+    internal.static (parentOps) ("apply", T, T :: SOption(MAny)) implements composite ${
+    	meta[MParent]($0) match {
+    	  case Some(p) => Some(p.parent)
+    	  case None => None
+    	}
+		}
 
 		/* MaxJ Codegen Helper Functions */
     val maxjgrp = grp("maxjGrp")

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<buildProfile>
+<common>
+<boardModel type="MAIA"/>
+<simulation enabled="false"/>
+</common>
+<maxFiles>
+<maxFile buildName="Top" buildOrUseExisting="build">
+<runConfiguration askBeforeAutoBuild="true">
+<mainClass>engine.TopManager</mainClass>
+<maxHeapSize>2</maxHeapSize>
+</runConfiguration>
+<selectEngineTarget enabled="false">MAIA</selectEngineTarget>
+</maxFile>
+</maxFiles>
+<cpuCode targetType="executable">
+<libraryName></libraryName>
+<exeName>Top</exeName>
+<arguments></arguments>
+<remoteExecution enabled="false">
+<remoteMachineName></remoteMachineName>
+<scriptName></scriptName>
+</remoteExecution>
+<customDefinitions>USE_SLIC:=1</customDefinitions>
+</cpuCode>
+<simulator>
+<deleteDRAM enabled="false"/>
+<maxDRAMSize enabled="false"></maxDRAMSize>
+<DRAMFile enabled="false"></DRAMFile>
+<socketName></socketName>
+<startStopScript enabled="false"/>
+<numberOfDevices>1</numberOfDevices>
+<ethernetOneEnabled enabled="false"/>
+<ipAddressOne></ipAddressOne>
+<netmaskOne></netmaskOne>
+<pcapFileOne></pcapFileOne>
+<ethernetTwoEnabled enabled="false"/>
+<ipAddressTwo></ipAddressTwo>
+<netmaskTwo></netmaskTwo>
+<pcapFileTwo></pcapFileTwo>
+</simulator>
+</buildProfile>

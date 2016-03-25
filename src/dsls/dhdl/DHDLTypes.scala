@@ -219,10 +219,24 @@ trait DHDLTypes {
 			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
       DFEVar $sym = constant.var( $ts, $0 );
 		}))
-    impl (convert_fixpt)  (codegen(maxj, ${ }))
-    impl (fixpt_to_fltpt) (codegen(maxj, ${ }))
-    impl (fltpt_to_fixpt) (codegen(maxj, ${ }))
-    impl (convert_fltpt)  (codegen(maxj, ${ }))
+    impl (convert_fixpt)  (codegen(maxj, ${
+			//TODO: right way to do this?
+			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+      DFEVar $sym = $0.cast( $ts );
+		}))
+    impl (fixpt_to_fltpt) (codegen(maxj, ${
+			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+      DFEVar $sym = $0.cast( $ts );
+		}))
+    impl (fltpt_to_fixpt) (codegen(maxj, ${
+			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+      DFEVar $sym = $0.cast( $ts );
+		}))
+    impl (convert_fltpt)  (codegen(maxj, ${
+			//TODO: right way to do this?
+			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+      DFEVar $sym = $0.cast( $ts );
+		}))
 
 	}
 }

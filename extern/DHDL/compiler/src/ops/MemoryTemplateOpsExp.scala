@@ -44,8 +44,8 @@ trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp {
     }
   }
 
-  def nbits(e: Exp[Any]) = nbits(e.tp)
-  def sign(e: Exp[Any]) = sign(e.tp)
+  def nbits(e: Exp[Any]): Int = nbits(e.tp)
+  def sign(e: Exp[Any]): Boolean = sign(e.tp)
 }
 
 trait MemoryTemplateTypesExp extends MemoryTemplateTypes {

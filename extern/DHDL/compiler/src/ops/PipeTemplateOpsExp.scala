@@ -157,7 +157,7 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
 
   import IR.{Sym, Exp, Def}
   import IR.{ConstFix, ConstFlt, ConstBit, EatReflect}
-  import IR.{Counterchain_new, Offchip_new, Reg_Reg_new, Set_arg, Set_mem, Pipe_foreach, Pipe_reduce}
+  import IR.{Counterchain_new, Offchip_new, Reg_new, Set_arg, Set_mem, Pipe_foreach, Pipe_reduce}
   import IR.{CounterChain, FixPt, Signed, B32, B0}
 
 	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
@@ -215,7 +215,7 @@ trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
 
   import IR.{Sym, Exp, Def}
   import IR.{ConstFix, ConstFlt, ConstBit, EatReflect}
-  import IR.{Counterchain_new, Offchip_new, Reg_Reg_new, Set_arg, Set_mem, Pipe_foreach, Pipe_reduce}
+  import IR.{Counterchain_new, Offchip_new, Reg_new, Set_arg, Set_mem, Pipe_foreach, Pipe_reduce}
   import IR.{CounterChain, FixPt, Signed, B32, B0}
 
   // TODO

@@ -18,7 +18,7 @@ trait LatencyModel {
     case _ => 0
   }
 
-  def latencyOfNode(s: Exp[Any], d: Exp[Any]): Double = d match {
+  def latencyOfNode(s: Exp[Any], d: Def[Any]): Double = d match {
     case ConstBit(_) => 0
     case ConstFix(_) => 0
     case ConstFlt(_) => 0
@@ -115,7 +115,7 @@ trait LatencyModel {
       if (nbits(s) != 32) warn(s"Don't know latency for $d - using default")
       (28)
 
-    case DHDLPrim_Mux(_,_,_) => 1
+    case BasicCtrl1_Mux(_,_,_) => 1
 
     case Convert_fixpt(_) => 1
     //case Convert_fltpt(_) => // ???
@@ -123,7 +123,7 @@ trait LatencyModel {
       if (nbits(s) != 32 && nbits(x) != 32) warn(s"Don't know latency for $d - using default")
       (6)
 
-    case Fltpt_to_fixpt(_) =>
+    case Fltpt_to_fixpt(x) =>
       if (nbits(s) != 32 && nbits(x) != 32) warn(s"Don't know latency for $d - using default")
       (6)
 

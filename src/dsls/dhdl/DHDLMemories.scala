@@ -60,10 +60,13 @@ trait DHDLMemories {
       reg
     }
 
+    direct (Reg) ("readReg", T, ("reg", Reg(T)) :: T) implements composite ${ reg_read($0) }
+    direct (Reg) ("writeReg", T, (("reg", Reg(T)), ("value", T)) :: MUnit, effect = write(0)) implements composite ${ reg_write($0, $1) }
+
     val Mem = lookupTpeClass("Mem").get
     val RegMem = tpeClassInst("RegMem", T, TMem(T, Reg(T)))
-    infix (RegMem) ("ld", T, (Reg(T), Indices) :: T) implements composite ${ reg_read($0) } // Ignore address
-    infix (RegMem) ("st", T, (Reg(T), Indices, T) :: MUnit, effect = write(0)) implements composite ${ reg_write($0, $2) }
+    infix (RegMem) ("ld", T, (Reg(T), Indices) :: T) implements composite ${ readReg($0) } // Ignore address
+    infix (RegMem) ("st", T, (Reg(T), Indices, T) :: MUnit, effect = write(0)) implements composite ${ writeReg($0, $2) }
 
     // --- API
     /* Reg */
@@ -90,7 +93,7 @@ trait DHDLMemories {
 
     val Reg_API = withTpe(Reg)
     Reg_API {
-      infix ("value") (Nil :: T) implements composite ${ reg_read($self) }
+      infix ("value") (Nil :: T) implements redirect ${ readReg($self) }
       infix (":=") (T :: MUnit, effect = write(0)) implements composite ${
         if (regType($self) == ArgumentIn) stageError("Writing to an input argument is disallowed")
         reg_write($self, $1)
@@ -99,9 +102,9 @@ trait DHDLMemories {
     }
 
     // TODO: Should warn/error if not an ArgIn?
-    fimplicit (Reg) ("regFix_to_fix", (S,I,F), Reg(FixPt(S,I,F)) :: FixPt(S,I,F)) implements composite ${ reg_read($0) }
-    fimplicit (Reg) ("regFlt_to_flt", (G,E), Reg(FltPt(G,E)) :: FltPt(G,E)) implements composite ${ reg_read($0) }
-    fimplicit (Reg) ("regBit_to_bit", Nil, Reg(Bit) :: Bit) implements composite ${ reg_read($0) }
+    fimplicit (Reg) ("regFix_to_fix", (S,I,F), Reg(FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ readReg($0) }
+    fimplicit (Reg) ("regFlt_to_flt", (G,E), Reg(FltPt(G,E)) :: FltPt(G,E)) implements redirect ${ readReg($0) }
+    fimplicit (Reg) ("regBit_to_bit", Nil, Reg(Bit) :: Bit) implements redirect ${ readReg($0) }
 
     // --- Scala Backend
     impl (reg_new)   (codegen($cala, ${ Array($init) }))

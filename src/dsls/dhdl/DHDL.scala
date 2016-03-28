@@ -106,7 +106,11 @@ trait DHDLDSL extends ForgeApplication
     importDHDLMisc()
     importTupleTypeClassInstances()
 
+    // --- Traversals
+    val StageAnalyzer = analyzer("Stage", isExtern=true)
+
     schedule(IRPrinterPlus)
+    schedule(StageAnalyzer)
 
     // Externs
     extern(grp("PipeTemplate"), targets = List($cala, dot, maxj))

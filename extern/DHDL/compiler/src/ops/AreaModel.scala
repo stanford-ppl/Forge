@@ -35,7 +35,7 @@ case class FPGAResources(
   )
   def *(a: Int) = FPGAResources(a*lut7,a*lut6,a*lut5,a*lut4,a*lut3,a*mem64,a*mem32,a*mem16,
                                 a*regs,a*dsps,a*bram)
-  override def toString() = s"luts=$lut3,$lut4,$lut5,$lut6,$lut7,mems=$mem16,$mem32,$mem64,regs=$regs,dsps=$dsps,bram=$brams"
+  override def toString() = s"luts=$lut3,$lut4,$lut5,$lut6,$lut7,mems=$mem16,$mem32,$mem64,regs=$regs,dsps=$dsps,bram=$bram"
 }
 
 object NoArea extends FPGAResources()
@@ -54,7 +54,7 @@ trait AreaModel {
     case _ => false
   }
 
-  def areaOf(e: Exp[Any]) = x match {
+  def areaOf(e: Exp[Any]) = e match {
     case Def(d) => areaOfNode(e.asInstanceOf[Sym[Any]], d)
     case _ => NoArea  // Bound args and constants accounted for elsewhere
   }
@@ -65,7 +65,7 @@ trait AreaModel {
     val m16 = (nbits - m64*64 - m32*32)/16
     FPGAResources(mem64=m64, mem32=m32, mem16=m16)
   }
-  private def areaOfArg(nbits: Int) = 3*nbits/2
+  private def areaOfArg(nbits: Int) = FPGAResources(regs=3*nbits/2)
 
   /**
    * Area resources required for a BRAM with word size nbits, and with given depth,
@@ -104,12 +104,12 @@ trait AreaModel {
     case e@Bram_new(depth, _) => areaOfBRAM(nbits(e._mT), depth, banks(s), isDblBuf(s))
 
     // TODO: These are close but still need some refining
-    case e@Bram_load(ram, _)
+    case e@Bram_load(ram, _) =>
       val decode = if (isPow2(banks(ram))) 0 else Math.ceil(Math.log(banks(ram))).toInt
       val bits = nbits(e._mT)
       FPGAResources(lut3=decode+bits, regs=decode+bits)
 
-    case Bram_store(ram, _, _) =>
+    case e@Bram_store(ram, _, _) =>
       val decode = if (isPow2(banks(ram))) 0 else Math.ceil(Math.log(banks(ram))).toInt
       val bits = nbits(e._mT)
       FPGAResources(lut3=decode+bits, regs=decode+bits)
@@ -204,7 +204,7 @@ trait AreaModel {
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=476,lut4=6,lut5=6,mem32=11,regs=900)
 
-    case DHDLPrim_Mux(_,_,_) => FPGAResources(regs = nbits(s))
+    case BasicCtrl1_Mux(_,_,_) => FPGAResources(regs = nbits(s))
 
     case Convert_fixpt(_) => FPGAResources(regs=nbits(s))
     //case Convert_fltpt(_) => // ???
@@ -213,15 +213,15 @@ trait AreaModel {
       FPGAResources(lut4=50,lut6=132,regs=238)
 
     case Fltpt_to_fixpt(_) =>
-      PrefitResources(lut4=160,lut6=96,regs=223+nbits(s))
+      FPGAResources(lut4=160,lut6=96,regs=223+nbits(s))
 
 
     // TODO: These need new numbers after Raghu's changes
     case tt: TileTransfer[_] if tt.store =>
-      PrefitResources(lut3=1900,lut4=167,lut5=207,lut6=516,lut7=11,regs=5636,dsps=3,brams=46) // 2014.1 was dsp=3
+      FPGAResources(lut3=1900,lut4=167,lut5=207,lut6=516,lut7=11,regs=5636,dsps=3,bram=46) // 2014.1 was dsp=3
 
     case tt: TileTransfer[_] if !tt.store =>
-      PrefitResources(lut3=453, lut4=60, lut5=131,lut6=522,regs=1377,dsps=4,brams=46) // 2014.1 was dsp=4
+      FPGAResources(lut3=453, lut4=60, lut5=131,lut6=522,regs=1377,dsps=4,bram=46) // 2014.1 was dsp=4
 
     // TODO: Number of stages in metapipeline, sequential, and parallel?
     //case _:Pipe_parallel =>

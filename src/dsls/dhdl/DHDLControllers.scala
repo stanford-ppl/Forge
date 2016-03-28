@@ -79,6 +79,7 @@ trait DHDLControllers {
 
     val Counter = lookupTpe("Counter")
     val CounterChain = lookupTpe("CounterChain")
+    val Pipeline = lookupTpe("Pipeline")
 
     val Pipe = grp("Pipe")
     val MetaPipe = grp("MetaPipe")
@@ -87,7 +88,7 @@ trait DHDLControllers {
     // --- Nodes
     // pipe_foreach, pipe_reduce, pipe_bram_reduce - see Template in extern
     val pipe_parallel = internal (MetaPipe) ("pipe_parallel", Nil, ("func", MThunk(MUnit)) :: MUnit, effect = simple)
-    val block_reduce = internal (MetaPipe) ("block_reduce", T, (CounterChain, CounterChain, BRAM(T), Idx ==> BRAM(T), (T,T) ==> T) :: MUnit, effect = simple)
+    val block_reduce = internal (MetaPipe) ("block_reduce", T, (CounterChain, CounterChain, BRAM(T), Idx ==> BRAM(T), (T,T) ==> T) :: Pipeline, effect = simple)
 
     // --- API
     val grps = List(Pipe, MetaPipe, Sequential)
@@ -144,7 +145,8 @@ trait DHDLControllers {
     // TODO: Only single dimensional for now
     direct (MetaPipe) ("BlockReduce", T, CurriedMethodSignature(List(List(Counter, BRAM(T)), List(Idx ==> BRAM(T)), List((T,T) ==> T)), MUnit)) implements composite ${
       val bramSize = sizeOf($1)
-      block_reduce(CounterChain($0), CounterChain(bramSize by 1), $1, $2, $3)
+      val pipe = block_reduce(CounterChain($0), CounterChain(bramSize by 1), $1, $2, $3)
+      styleOf(pipe) = Coarse
     }
 
 

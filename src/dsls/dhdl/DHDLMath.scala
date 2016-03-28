@@ -184,11 +184,11 @@ trait DHDLMath {
 
 
     val BitColl = tpeClassInst("BitColl", Nil, Coll(Bit))
-    infix (BitColl) ("empty", Nil, Nil :: Bit) implements composite ${ false.toBit }
-    infix (BitColl) ("zeros", Nil, Bit :: Bit) implements composite ${ false.toBit }
+    infix (BitColl) ("empty", Nil, Nil :: Bit) implements composite ${ false.asBit }
+    infix (BitColl) ("zeros", Nil, Bit :: Bit) implements composite ${ false.asBit }
 
     val BitNum = tpeClassInst("BitNum", Nil, Num(Bit))
-    infix (BitNum) ("zero", Nil, Nil :: Bit) implements composite ${ false.toBit }
+    infix (BitNum) ("zero", Nil, Nil :: Bit) implements composite ${ false.asBit }
 
     // TODO: Is this needed?
     val BitOrder = tpeClassInst("BitOrder", Nil, Order(Bit))
@@ -536,20 +536,20 @@ trait DHDLMath {
   def importBasicControl() {
     val T = tpePar("T")
     val CT = tpePar("CT", stage=compile)
-    val Prim = grp("DHDLPrim")
+    val Ctrl = grp("BasicCtrl")
     val Bit = lookupTpe("Bit")
 
-    val mux = direct (Prim) ("mux", T, (("sel", Bit), ("a",T), ("b",T)) :: T, TNum(T))
+    val mux = direct (Ctrl) ("mux", T, (("sel", Bit), ("a",T), ("b",T)) :: T, TNum(T))
 
-    direct (Prim) ("mux", (T,CT), (("sel", Bit), ("a", T), ("b", CT)) :: T, (TNum(T), TNumeric(CT))) implements composite ${
+    direct (Ctrl) ("mux", (T,CT), (("sel", Bit), ("a", T), ("b", CT)) :: T, (TNum(T), TNumeric(CT))) implements composite ${
       mux($sel, $a, lift_to[CT,T]($b))
     }
-    direct (Prim) ("mux", (T,CT), (("sel", Bit), ("a", CT), ("b", T)) :: T, (TNum(T), TNumeric(CT))) implements composite ${
+    direct (Ctrl) ("mux", (T,CT), (("sel", Bit), ("a", CT), ("b", T)) :: T, (TNum(T), TNumeric(CT))) implements composite ${
       mux($sel, lift_to[CT,T]($a), $b)
     }
 
-    direct (Prim) ("min", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].lt($a, $b), a, b) }
-    direct (Prim) ("max", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].gt($a, $b), a, b) }
+    direct (Ctrl) ("min", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].lt($a, $b), a, b) }
+    direct (Ctrl) ("max", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].gt($a, $b), a, b) }
 
     // --- Scala Backend
     impl (mux) (codegen($cala, ${ if ($sel) $a else $b }))

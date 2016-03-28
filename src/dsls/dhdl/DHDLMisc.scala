@@ -27,8 +27,8 @@ trait DHDLMisc {
     }
 
     // --- Powers of 2 checks
-    internal (Misc) ("isPow2", Nil, SInt :: SBoolean) implements composite ${ (x & (x - 1)) == 0 }
-    internal (Misc) ("isPow2", Nil, SLong :: SBoolean) implements composite ${ (x & (x - 1)) == 0 }
+    internal (Misc) ("isPow2", Nil, SInt :: SBoolean) implements composite ${ ($0 & ($0 - 1)) == 0 }
+    internal (Misc) ("isPow2", Nil, SLong :: SBoolean) implements composite ${ ($0 & ($0 - 1)) == 0 }
 
 
     // --- Multi-dimensional addressing

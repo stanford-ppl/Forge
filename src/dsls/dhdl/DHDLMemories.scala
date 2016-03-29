@@ -124,14 +124,14 @@ trait DHDLMemories {
 									 fillcolor="$regColor "]
 					@ }
 				@ case ArgumentIn =>
-					@ val l = "ArgIn_" + quote(sym).split("_")(1)
+					@ val sn = "ArgIn" + quote(sym).substring(quote(sym).indexOf("_"))
         	@ alwaysGen {
-            $sym [label=$l shape="Msquare"]
+            $sym [label=$sn shape="Msquare"]
 				  @ }
         @ case ArgumentOut =>
-					@ val l = "ArgOut_" + quote(sym).split("_")(1)
+					@ val sn = "ArgOut" + quote(sym).substring(quote(sym).indexOf("_"))
         	@ alwaysGen {
-            $sym [label=$l shape="Msquare"]
+            $sym [label=$sn shape="Msquare"]
 			    @ }
       @ }
 		}))
@@ -190,8 +190,10 @@ trait DHDLMemories {
           //@  emit(s"""${quote(sym)} <== $rst ? constant.var(${tpstr(init)},0) : stream.offset(${quote(sym)}_hold, -${quote(sym.producer)}_offset); // reset""")
           @ }
 				@ case ArgumentIn =>  // alwaysGen
-          DFEVar $sym = io.scalarInput($sym, $ts);
+					@ val sn = "ArgIn" + quote(sym).substring(quote(sym).indexOf("_"))
+          DFEVar $sn = io.scalarInput($sn, $ts);
 				@ case ArgumentOut => // alwaysGen
+					@ val sn = "ArgOut" + quote(sym).substring(quote(sym).indexOf("_"))
 			@ }
 		}))
     impl (reg_read)  (codegen(maxj, ${

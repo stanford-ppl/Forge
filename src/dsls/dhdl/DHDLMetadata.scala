@@ -48,7 +48,12 @@ trait DHDLMetadata {
     onMeet (MName) ${ this }
     internal.static (nameOps) ("update", T, (T, SString) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MName($1)) }
-    internal.static (nameOps) ("apply", T, T :: SString) implements composite ${ meta[MName]($0).get.name }
+    internal.static (nameOps) ("apply", T, T :: SString) implements composite ${
+      meta[MName]($0) match {
+        case Some(n) => n.name
+        case None => ""
+      }
+    }
 
     /* Is Double Buffer */
     val MDblBuf = metadata("MDblBuf", "isDblBuf" -> SBoolean)

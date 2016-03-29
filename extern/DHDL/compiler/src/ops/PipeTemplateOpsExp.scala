@@ -155,59 +155,108 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
   val IR: PipeTemplateOpsExp with FixPtOpsExp with FltPtOpsExp with TpesOpsExp with NosynthOpsExp
 	        with OffChipMemOpsExp with RegOpsExp with DHDLCodegenOps
 
+					/*
   import IR.{Sym, Exp, Def}
   import IR.{ConstFix, ConstFlt, ConstBit, EatReflect}
   import IR.{Counterchain_new, Offchip_new, Reg_Reg_new, Set_arg, Set_mem, Pipe_foreach, Pipe_reduce}
   import IR.{CounterChain, FixPt, Signed, B32, B0}
+	*/
+ 	import IR.{__ifThenElse => _, Nosynth___ifThenElse => _, __whileDo => _,
+ 					Forloop => _, println => _ , _}
 
 	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
     case Def(EatReflect(Counterchain_new(counters))) =>
 	     inds.zipWithIndex.foreach {case (iter, idx) => emitAlias(iter, counters(idx)) }
 	}
 
+	var emittedCtrChain = Set.empty[Sym[Any]]
+
+  override def initializeGenerator(buildDir:String): Unit = {
+		emittedCtrChain = Set.empty[Sym[Any]]
+		super.initializeGenerator(buildDir)
+	}
+
+	def emitCtrChain(cchain: Exp[CounterChain]):Unit = {
+		val Def(EatReflect(d)) = cchain
+		emitCtrChain(cchain.asInstanceOf[Sym[CounterChain]],
+									 d.asInstanceOf[Def[Any]])
+	}
+
+	def emitCtrChain(sym: Sym[Any], rhs: Def[Any]):Unit = rhs match {
+	  case e@Counterchain_new(counters) =>
+			if (!emittedCtrChain.contains(sym)) {
+				emittedCtrChain = emittedCtrChain + sym
+    		emit(s"""subgraph cluster_${quote(sym)} {""")
+    		emit(s""" label=${quote(sym)} """)
+    		emit(s""" style="rounded, filled" """)
+    		emit(s""" fillcolor="${counterColor}" """)
+				//emit(s""" ${quote(sym)} [label="" style="invisible" height=0 size=0 margin=0 ]""")
+    		counters.foreach{ ctr =>
+    		  emit(s"""   ${quote(ctr)}""")
+    		}
+    		emit("}")
+			}
+		case _ => 
+	}
+
+  def emitBlock(y: Block[Any], name:String, color:String): Unit = { 
+      emit(s"""subgraph cluster_${name} {""")
+      emit(s"""label="${name}" """)
+      emit(s"""color="gray" """)
+      emit(s"""style="filled" """)
+			emit(s"""fillcolor="${color}"""")
+			emitBlock(y)
+			emit(s"""}""")
+	}
+
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
 	  case e@Counterchain_new(counters) =>
-      emit(s"""subgraph cluster_${quote(sym)} {""")
-      emit(s""" label=${quote(sym)} """)
-      emit(s""" style="rounded, filled" """)
-      emit(s""" fillcolor="${counterColor}" """)
-			//emit(s""" ${quote(sym)} [label="" style="invisible" height=0 size=0 margin=0 ]""")
-      counters.foreach{ ctr =>
-        emit(s"""   ${quote(ctr)}""")
-      }
-      emit("}")
+			parentOf(sym) match {
+				//TODO: check whether parent of cchain is empty, if is emit ctrchain
+				//emitCtrChain(sym, rhs)
+				//case None => emitCtrChain(sym, rhs)
+				case _ =>
+			}
 
     case e@Pipe_foreach(cchain, func, inds) =>
       emitNestedIdx(cchain, inds)
       emit(s"""subgraph cluster_${quote(sym)} {""")
-      emit(s"""label=\"${quote(sym)}\"""")
-      emit(s"""color=\"gray\"""")
-      emitBlock(func)             // Map function
+      emit(s"""label="${quote(sym)}"""")
+      emit(s"""color="gray"""")
+      emit(s"""style="filled" """)
+			emit(s"""fillcolor="${pipeFillColor}"""")
+			emitCtrChain(cchain)
+      emitBlock(func, "foreachFunc", mapFuncColor)             // Map function
       emit("}")
 
     case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
       emitAlias(acc, accum)
       emitNestedIdx(cchain, inds)
       emit(s"""subgraph cluster_${quote(sym)} {""")
-      emit(s"""label=\"${quote(sym)}\"""")
-      emit(s"""color=\"gray\"""")
+      emit(s"""label="${quote(sym)}"""")
+      emit(s"""color="gray"""")
+      emit(s"""style="filled" """)
+			emit(s"""fillcolor="${pipeFillColor}"""")
       emit(s"""define(`${quote(acc)}', `${quote(accum)}')""")
-      emitBlock(func)
-      emitBlock(ldFunc)
+			val Def(EatReflect(d)) = cchain
+			emitCtrChain(cchain)
+      emitBlock(func, "mapFunc", mapFuncColor)             // Map function
+      emitBlock(ldFunc, "ldFunc", ldFuncColor)             // Map function
       emitAlias(rV._1, getBlockResult(ldFunc))
       emitAlias(rV._2, getBlockResult(func))
-      emitBlock(rFunc)
+      emitBlock(rFunc, "reduceFunc", reduceFuncColor)             // Map function
       emitAlias(res, getBlockResult(rFunc))
-      emitBlock(stFunc)
+      emitBlock(stFunc, "stFunc", stFuncColor)             // Map function
       emit("}")
 
     case _ => super.emitNode(sym,rhs)
 	}
 
   override def quote(x: Exp[Any]) = x match {
-		case s@Sym(n) => s.tp.erasure.getSimpleName() + "_x" + n
+		case s@Sym(n) => s.tp.erasure.getSimpleName() + 
+										(if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
     case _ => super.quote(x)
-  }
+	}
 }
 
 trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
@@ -263,7 +312,8 @@ trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
   }
 
   override def quote(x: Exp[Any]) = x match {
-		case s@Sym(n) => s.tp.erasure.getSimpleName() + "_x" + n
+		case s@Sym(n) => s.tp.erasure.getSimpleName() + 
+										(if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
     case _ => super.quote(x)
   }
 
@@ -312,7 +362,7 @@ trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
     if (isUnitCtr && !writesToAccumRam) {
       emit(s"""${quote(sym)}_rst_done <== constant.var(true);""")
     } else {
-      emit(s"""OffsetExpr ${quote(sym)}_offset = stream.makeOffsetAutoLoop(\"${quote(sym)}_offset\");""")
+      emit(s"""OffsetExpr ${quote(sym)}_offset = stream.makeOffsetAutoLoop("${quote(sym)}_offset");""")
       emit(s"""${quote(sym)}_rst_done <== stream.offset(${quote(sym)}_rst_en, -${quote(sym)}_offset-1);""")
     }
 

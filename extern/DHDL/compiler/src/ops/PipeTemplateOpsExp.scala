@@ -164,6 +164,16 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
  	import IR.{__ifThenElse => _, Nosynth___ifThenElse => _, __whileDo => _,
  					Forloop => _, println => _ , _}
 
+	
+  override def emitFileHeader() {
+		super.emitFileHeader()
+    emit(s"compound=true")
+    emit(s"""graph [splines=\"ortho\" clusterrank=\"local\"]""")
+    emit(s"edge [arrowsize=$arrowSize penwidth=$edgeThickness]")
+    emit(s"""node [fontsize=$fontsize shape=$defaultShape style=\"filled\" fillcolor=\"$bgcolor\"]""")
+    emit(s"fontsize=$fontsize")
+	}
+
 	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
     case Def(EatReflect(Counterchain_new(counters))) =>
 	     inds.zipWithIndex.foreach {case (iter, idx) => emitAlias(iter, counters(idx)) }

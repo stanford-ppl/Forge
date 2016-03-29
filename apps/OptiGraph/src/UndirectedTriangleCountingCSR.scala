@@ -23,7 +23,7 @@ trait UndirectedTriangleCountingCSR extends OptiGraphApplication {
     
     val t = sumOverNodes(g.nodes){ n =>
       sumOverNeighbors(g.neighbors(n)){ nbr =>
-        if(nbr > n) g.commonNeighbors(n,nbr)
+        if(nbr > n) g.numCommonNeighbors(n,nbr)
         else 0l
       }
     }

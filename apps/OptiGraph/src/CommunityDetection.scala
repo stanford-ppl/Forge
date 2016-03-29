@@ -17,7 +17,7 @@ trait CommDetection extends OptiGraphApplication {
     if (args.length < 2) printUsage
 
     tic("input loading")
-    val edgeList = loadUndirectedEdgeList(args(0))
+    val edgeList = loadEdgeList(args(0), "\t")
     toc("input loading",edgeList)
 
     tic("creating graph",edgeList)

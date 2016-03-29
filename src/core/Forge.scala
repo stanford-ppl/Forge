@@ -20,7 +20,7 @@ trait ForgeApplication extends Forge with ForgeLift with ForgeLib {
 /**
  * These are libraries written in Forge that are available to be imported by DSL authors.
  */
-trait ForgeLib extends ScalaOps with AutoOps with BitSetOps {
+trait ForgeLib extends ScalaOps with AutoOps with BitSetOps with KeyValueStoreOps {
   this: ForgeApplication =>
 }
 

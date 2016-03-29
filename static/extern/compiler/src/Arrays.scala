@@ -69,6 +69,8 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
         else if (delite_greater_than(aV, bV)) unit(1)
         else unit(0)
       })
+  def array_sortIndices(__arg0: Rep[Int], __arg1: (Rep[Int],Rep[Int]) => Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[Int]]
+    = darray_sortIndices(__arg0, __arg1)
 
   // avoid mixing in LMS Array ops due to conflicts. alternatively, we could refactor LMS array ops to
   // put ArrayApply and ArrayLength in an isolated trait that we can use.

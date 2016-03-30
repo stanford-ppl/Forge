@@ -46,7 +46,7 @@ trait DHDLMemories {
 
     // --- Nodes
     val reg_new   = internal (Reg) ("reg_new", T, ("init", T) :: Reg(T), effect = mutable)
-    val reg_read  = internal (Reg) ("reg_read", T, ("reg", Reg(T)) :: T, aliasHint = aliases(Nil))  // aliasHint - extracted value doesn't change when reg is updated
+    val reg_read  = internal (Reg) ("reg_read", T, ("reg", Reg(T)) :: T, aliasHint = aliases(Nil), effect = simple)
     val reg_write = internal (Reg) ("reg_write", T, (("reg", Reg(T)), ("value", T)) :: MUnit, effect = write(0))
     val reg_reset = internal (Reg) ("reg_reset", T, ("reg", Reg(T)) :: MUnit, effect = write(0))
 
@@ -245,7 +245,7 @@ trait DHDLMemories {
       @ } else {
         	$sym [label="\$sym" shape="square" style="filled" fillcolor="\$memColor"]
       @ }
-		})) // $t[T] refers to concrete type in IR
+		}))
 		impl (bram_load)  (codegen(dot, ${
 			$addr -> $bram [label="addr"]
 			//$sym [style="invisible" height=0 size=0 margin=0 label=""]
@@ -263,7 +263,7 @@ trait DHDLMemories {
       @ if (isDblBuf(sym)) {
       @ } else {
       @ }
-		})) // $t[T] refers to concrete type in IR
+		}))
 		impl (bram_load)  (codegen(maxj, ${
 		}))
 		impl (bram_store) (codegen(maxj, ${

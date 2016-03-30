@@ -8,17 +8,23 @@ import dhdl.compiler._
 import dhdl.compiler.ops._
 
 trait LatencyModel {
-  this: DHDLExp =>
+  this: DHDLExp with CounterToolsExp =>
 
-  private val silentModel = false
+  private var silentModel = false
   private def warn(x: String) { if (!silentModel) warn(x) }
+  def silenceLatencyModel { silentModel = true }
 
-  def latencyOf(s: Exp[Any]) = s match {
-    case Def(d) => latencyOfNode(s, d)
+  def latencyOf(s: Exp[Any], inReduce: Boolean) = s match {
+    case Def(d) if inReduce  => latencyOfNodeInReduce(s, d)
+    case Def(d) if !inReduce => latencyOfNode(s, d)
     case _ => 0
   }
 
-  def latencyOfNode(s: Exp[Any], d: Def[Any]): Double = d match {
+  private def latencyOfNodeInReduce(s: Exp[Any], d: Def[Any]): Long = d match {
+    case _ => latencyOfNode(s, d)
+  }
+
+  private def latencyOfNode(s: Exp[Any], d: Def[Any]): Long = d match {
     case ConstBit(_) => 0
     case ConstFix(_) => 0
     case ConstFlt(_) => 0
@@ -132,12 +138,11 @@ trait LatencyModel {
     //case tt: TileTransfer[_] if tt.store =>
     //case tt: TileTransfer[_] if !tt.store =>
 
-
-    // TODO: Number of stages in metapipeline, sequential, and parallel?
     case _:Pipe_parallel => 1
     case _:Pipe_foreach  => 1
     case _:Pipe_reduce[_,_] => 1
     case _:Block_reduce[_]  => 1
+    case _:Unit_pipe => 0
 
     // Nodes with known zero area cost
     case Reg_read(s) if regType(s) == ArgumentIn => 0

@@ -116,12 +116,12 @@ trait DHDLMetadata {
     internal.static (styleOps) ("apply", Nil, MAny :: PipeStyle) implements composite ${ meta[MPipeType]($0).get.tpe }
 
     /* Pipeline stages */
-    val MStages = metadata("MStages", "stages" -> SList(MAny))
-    val stageOps = metadata("stagesOf")
-    onMeet (MStages) ${ this }
-    internal.static (stageOps) ("update", Nil, (MAny, SList(MAny)) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MStages($1)) }
-    internal.static (stageOps) ("apply", Nil, MAny :: SList(MAny)) implements composite ${ meta[MStages]($0).get.stages }
+    val MNumStages = metadata("MNumStages", "nStages" -> SInt)
+    val nstages    = metadata("nStages")
+    onMeet (MNumStages) ${ this }
+    internal.static (nstages) ("update", Nil, (MAny, SInt) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MNumStages($1)) }
+    internal.static (nstages) ("apply", Nil, MAny :: SInt) implements composite ${ meta[MNumStages]($0).get.nStages }
 
     /* Range is single dimension */
     val MUnitRange = metadata("MUnitRange", "isUnit" -> SBoolean)

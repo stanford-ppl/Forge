@@ -44,19 +44,20 @@ object NoArea extends FPGAResources()
 // TODO: Should get some of this from loading a file rather than hardcoding
 // All numbers here are from Stratix V profiling
 trait AreaModel {
-  this: DHDLExp =>
+  this: DHDLExp with CounterToolsExp =>
 
-  private val silentModel = false
+  private var silentModel = false
   private def warn(x: String) { if (!silentModel) warn(x) }
+  def silenceAreaModel { silentModel = true }
 
-  def isUnitCounter(e: Def[Any]) = e match {
-    case EatReflect(Counter_new(ConstFix(0),ConstFix(1),ConstFix(1))) => true
-    case _ => false
-  }
-
-  def areaOf(e: Exp[Any]) = e match {
-    case Def(d) => areaOfNode(e.asInstanceOf[Sym[Any]], d)
-    case _ => NoArea  // Bound args and constants accounted for elsewhere
+  /**
+   * Returns the area resources for a delay line with the given width (in bits) and length (in cycles)
+   * Models delays as registers for short delays, BRAM for long ones
+   **/
+  def areaOfDelayLine(width: Int, length: Int) = {
+    // TODO: Not sure what the cutoff is here
+    if (length < 32) FPGAResources(regs = width*length)
+    else             areaOfBRAM(width, length, 1, false)
   }
 
   private def areaOfMemWord(nbits: Int) = {
@@ -65,6 +66,7 @@ trait AreaModel {
     val m16 = (nbits - m64*64 - m32*32)/16
     FPGAResources(mem64=m64, mem32=m32, mem16=m16)
   }
+
   private def areaOfArg(nbits: Int) = FPGAResources(regs=3*nbits/2)
 
   /**
@@ -88,8 +90,33 @@ trait AreaModel {
     else        FPGAResources(bram = rams)
   }
 
+  def areaOfMetapipe(n: Int) = FPGAResources(
+    lut4 = (11*n*n + 45*n)/2 + 105,  // 0.5(11n^2 + 45n) + 105
+    regs = (n*n + 3*n)/2 + 35        // 0.5(n^2 + 3n) + 35
+  )
+  def areaOfSequential(n: Int) = FPGAResources(lut4=7*n+40, regs=2*n+35)
 
-  private def areaOfNode(s: Sym[Any], d: Def[Any]): FPGAResources = d match {
+
+  def areaOf(e: Exp[Any], inReduce: Boolean) = e match {
+    case Def(d) if inReduce  => areaOfNodeInReduce(e, d)
+    case Def(d) if !inReduce => areaOfNode(e, d)
+    case _ => NoArea  // Bound args and constants accounted for elsewhere
+  }
+
+
+  /**
+   * Returns the area resources for the given node when specialized for tight update cycles
+   * Accumulator calculation+update is often generated as a special case to minimize latencies in tight cycles
+   **/
+  private def areaOfNodeInReduce(s: Exp[Any], d: Def[Any]): FPGAResources = d match {
+    case _ => areaOfNode(s, d)
+  }
+
+
+  /**
+   * Returns the area resources for the given node
+   **/
+  private def areaOfNode(s: Exp[Any], d: Def[Any]): FPGAResources = d match {
     case ConstBit(_) => FPGAResources(lut3=1,regs=1)
     case ConstFix(_) => areaOfMemWord(nbits(s))
     case ConstFlt(_) => areaOfMemWord(nbits(s))
@@ -98,7 +125,7 @@ trait AreaModel {
     case Reg_new(_) if regType(s) == ArgumentOut => areaOfArg(nbits(s))
 
     case Reg_new(_) if regType(s) == Regular =>
-      if (isDblBuf(s)) FPGAResources(lut3 = nbits(s), regs = 4*nbits(s)) // Why 4?
+      if (isDblBuf(s)) FPGAResources(lut3 = nbits(s), regs = 4*nbits(s)) // TODO: Why 4?
       else             FPGAResources(regs = nbits(s))
 
     case e@Bram_new(depth, _) => areaOfBRAM(nbits(e._mT), depth, banks(s), isDblBuf(s))
@@ -119,7 +146,7 @@ trait AreaModel {
     case Counterchain_new(ctrs) => ctrs.map(ctr => areaOf(ctr)).fold(NoArea){_+_}
 
     // TODO: Have to get numbers for non-32 bit multiplies and divides
-    case DHDLPrim_Neg_fix(_)   => FPGAResources(lut3 = nbits(s), regs = nbits(s)) // ???
+    case DHDLPrim_Neg_fix(_)   => FPGAResources(lut3 = nbits(s), regs = nbits(s))
     case DHDLPrim_Add_fix(_,_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
     case DHDLPrim_Sub_fix(_,_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
     case DHDLPrim_Mul_fix(_,_) =>
@@ -223,21 +250,25 @@ trait AreaModel {
     case tt: TileTransfer[_] if !tt.store =>
       FPGAResources(lut3=453, lut4=60, lut5=131,lut6=522,regs=1377,dsps=4,bram=46) // 2014.1 was dsp=4
 
-    // TODO: Number of stages in metapipeline, sequential, and parallel?
-    //case _:Pipe_parallel =>
-    //case _:Pipe_foreach if styleOf(s) == Coarse =>
-    //case _:Pipe_reduce[_,_] if styleOf(s) == Coarse =>
-    //case _:Block_reduce[_] =>
-    //case _:Pipe_foreach if styleOf(s) == Disabled =>
-    //case _:Pipe_reduce[_,_] if styleOf(s) == Disabled =>
+    case _:Pipe_parallel => FPGAResources(lut4=9*nStages(s)/2, regs = nStages(s) + 3)
+
+    case _:Pipe_foreach if styleOf(s) == Coarse => areaOfMetapipe(nStages(s))
+    case _:Pipe_reduce[_,_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s))
+    case _:Block_reduce[_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s))
+
+    case _:Pipe_foreach if styleOf(s) == Disabled => areaOfSequential(nStages(s))
+    case _:Pipe_reduce[_,_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
+    case _:Block_reduce[_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
+    case _:Unit_pipe if styleOf(s) == Disabled => areaOfSequential(nStages(s))
 
     // Nodes with known zero area cost
     case Reg_read(_)    => NoArea
     case Reg_write(_,_) => NoArea
     case Reg_reset(_)   => NoArea
     case Offchip_new(_) => NoArea
-    case _:Pipe_foreach => NoArea
-    case _:Pipe_reduce[_,_] => NoArea
+    case _:Pipe_foreach if styleOf(s) == Fine => NoArea
+    case _:Pipe_reduce[_,_] if styleOf(s) == Fine => NoArea
+    case _:Unit_pipe if styleOf(s) == Fine => NoArea
 
     // Effects
     case Reflect(d,_,_) => areaOfNode(s,d)

@@ -312,8 +312,9 @@ class FixedPoint[S:Manifest,I:Manifest,F:Manifest](private val v: BigInt) {
   }
 
   def toFloatPoint[G:Manifest,E:Manifest] = {
-    val value = BigDecimal(v >> rep.f) + (BigDecimal(v & ((BigInt(1) << rep.f) - 1)) / BigDecimal(BigInt(1) << rep.f))
-    FloatPoint[G,E](value)
+    val vv = v.abs
+    val value = BigDecimal(vv >> rep.f) + (BigDecimal(vv & ((BigInt(1) << rep.f) - 1)) / BigDecimal(BigInt(1) << rep.f))
+    FloatPoint[G,E]((if (v < 0) -value else value))
   }
   def changeFormat[S2:Manifest,I2:Manifest,F2:Manifest] = {
     val rep2 = FixFormat(sign[S2],nbits[I2],nbits[F2])
@@ -325,7 +326,9 @@ class FixedPoint[S:Manifest,I:Manifest,F:Manifest](private val v: BigInt) {
 
   override def toString() = {
     if (rep.f > 0) {
-      (v >> rep.f).toString + "." + (BigDecimal(v & ((BigInt(1) << rep.f) - 1)) / BigDecimal(BigInt(1) << rep.f)).toString.split('.').last
+      val vv = v.abs
+      (vv >> rep.f).toString + "." + (BigDecimal(vv & ((BigInt(1) << rep.f) - 1)) / BigDecimal(BigInt(1) << rep.f)).toString.split('.').last
+      if (v < 0) "-"+str else str
     }
     else v.toString()
   }

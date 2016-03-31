@@ -8,7 +8,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait AreaAnalysisExp extends AreaModel with LatencyModel with CounterToolsExp {
+trait AreaAnalysisExp extends AreaModel with CounterToolsExp {
   this: DHDLExp =>
 
   // TODO: This shouldn't be hardcoded (or here at all really)
@@ -30,11 +30,27 @@ trait AreaAnalysisExp extends AreaModel with LatencyModel with CounterToolsExp {
 trait AreaAnalyzer extends Traversal {
   val IR: AreaAnalysisExp with DHDLExp
   import IR._
+  import ReductionTreeAnalysis._
+
+  private var silentTraversal = false
+  private def msg(x: => Any) { if (!silentTraversal) System.out.println(x) }
+  def silenceTraversal() {
+    silentTraversal = true
+    IR.silenceAreaModel()
+  }
 
   // Need separate traversal instance to do a different type of traversal
-  val latencyModel = new LatencyTools{val IR: this.IR.type = this.IR }
+  val latencyModel = new LatencyTools{val IR = AreaAnalyzer.this.IR }
+  def latencyOfBlock(b: Block[Any]): List[Long] = {
+    latencyModel.innerScope = this.innerScope
+    latencyModel.inHwScope = this.inHwScope
+    latencyModel.inReduce = this.inReduce
+    latencyModel.latencyOfBlock(b)
+  }
 
-  var totalArea: FPGAResources = NoArea
+  var inHwScope = false
+  var inReduce  = false
+  var totalArea = ResourceSummary()
   var areaScope: List[FPGAResources] = Nil
 
   def areaOf(e: Exp[Any]) = IR.areaOf(e, inReduce)
@@ -59,102 +75,116 @@ trait AreaAnalyzer extends Traversal {
     case TP(s, d) => traverseNode(s, d)
   }
 
-  /*
-    Calculate delay line costs:
-    a. Determine time (in cycles) any given input or internal signal needs to be delayed
-    b. Distinguish each delay line as a separate entity
-
-    Is there a concise equation that can capture this? Haven't been able to come up with one.
-    E.g.
-      8 inputs => perfectly balanced binary tree, no delay paths
-      9 inputs => 1 path of length 3
-      85 inputs => 3 paths with lengths 2, 1, and 1
-  */
-  def reductionDelays(nLeaves: Int): List[Int] = {
-    if (isPow2(nLeaves)) Nil
-    // Could also have 2^k + 1 case (delay = 1 path of length k)
-    else {
-      def reduceLayer(nNodes: Int, completePaths: List[Int], currentPath: Int): List[Int] = {
-        if (nNodes <= 1) completePaths  // Stop when 1 node is remaining
-        else if (nNodes % 2 == 0) {
-          // For an even number of nodes, we don't need any delays - all current delay paths end
-          val allPaths = completePaths ++ (if (currentPath > 0) List(currentPath) else Nil)
-          reduceLayer(nNodes/2, allPaths, 0)
-        }
-        // For odd number of nodes, always delay exactly one signal, and keep delaying that signal until it can be used
-        else reduceLayer((nNodes-1)/2 + 1, completePaths, currentPath+1)
-      }
-
-      reduceLayer(nLeaves, Nil, 0)
-    }
-  }
-
-
+  // TODO: loop index delay line in Metapipeline
   def traverseNode(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext) {
-    if (inHwScope) {
-      val area = rhs match {
-        case EatReflect(Counterchain_new(ctrs,nIters)) => areaOfBlock(nIters) + areaOf(lhs)
-        case EatReflect(Pipe_parallel(func)) => areaOfBlock(func) + areaOf(lhs)
-        case EatReflect(Unit_pipe(func)) => areaOfBlock(func) + areaOf(lhs)
-
-        case EatReflect(Pipe_foreach(cchain, func, _)) =>
-          val P = parOf(cchain).reduce(_*_)
-          areaOfBlock(func) * P + areaOf(lhs)
-
-        case EatReflect(Pipe_reduce(cchain,_,ld,st,func,rFunc,_,_,_,_)) =>
-          val P = parOf(cchain).reduce(_*_)
-          val body = areaOfBlock(func) * P // map duplicated P times
-          /*
-            Some simple math:
-            A full binary (reduction) tree is a tree in which every node is either
-            a leaf or has exactly two children.
-            The number of internal (non-leaf) nodes of a full tree with L leaves is L - 1
-            In our case, L is the map's parallelization factor P
-            and internal nodes represent duplicates of the reduction function
-            The reduction function is therefore duplicated P - 1 times
-            Plus the special, tightly cyclic reduction function to update the accumulator
-          */
-          val internal = areaOfBlock(rFunc) * (P - 1)
-          val rFuncLatency = latencyOfBlock(rFunc)
-          val internalDelays = reductionDelays(P).map{delay => areaOfDelayLine(nbits(e.mT), delay * rFuncLatency)}.fold(NoArea){_+_}
-          val load  = areaOfReduce(ld)    // Load from accumulator (happens once)
-          val cycle = areaOfReduce(rFunc) // Special case area of accumulator
-          val store = areaOfReduce(st)    // Store to accumulator (happens once)
-
-          body + internal + internalDelays + load + cycle + store + areaOf(lhs)
-
-        case EatReflect(Block_reduce(ccOuter,ccInner,_,func,ld1,ld2,rFunc,st,_,_,_,_,_,_)) =>
-          val Pm = parOf(ccOuter).reduce(_*_) // Parallelization factor for map
-          val Pr = parOf(ccInner).reduce(_*_) // Parallelization factor for reduce
-          val body = areaOfBlock(func) * Pm
-
-          val internal = areaOfBlock(rFunc) * (Pm - 1) * Pr
-          val rFuncLatency = latencyOfBlock(rFunc)
-          val internalDelays = reductionDelays(Pm).map{delay => areaOfDelayLine(nbits(e.mT), delay * rFuncLatency) * Pr}.fold(NoArea){_+_}
-          val load1 = areaOfBlock(ld1) * Pm * Pr
-          val load2 = areaOfReduce(ld2) * Pr
-          val cycle = areaOfReduce(rFunc) * Pr
-          val store = areaOfReduce(st) * Pr
-
-          body + internal + internalDelays + load1 + load2 + cycle + store + areaOf(lhs)
-
-        case _ => areaOf(lhs)
-      }
-      areaScope ::= area
-    }
-    else rhs match {
-       case Hwblock(blk) =>
+    val area = rhs match {
+      case EatReflect(Hwblock(blk)) =>
         inHwScope = true
-        traverseBlock(blk)
+        areaOfBlock(blk)
         inHwScope = false
 
-      case Reflect(d,_,_) => traverseNode(lhs, d)
-      case _ => blocks(rhs) foreach traverseBlock
+      case EatReflect(Counterchain_new(ctrs,nIters)) => areaOfBlock(nIters) + areaOf(lhs)
+      case EatReflect(Pipe_parallel(func)) => areaOfBlock(func) + areaOf(lhs)
+      case EatReflect(Unit_pipe(func)) => areaOfBlock(func) + areaOf(lhs)
+
+      case EatReflect(Pipe_foreach(cchain, func, _)) =>
+        val P = parOf(cchain).reduce(_*_)
+        areaOfBlock(func) * P + areaOf(lhs)
+
+      case EatReflect(Pipe_reduce(cchain,_,ld,st,func,rFunc,_,_,_,_)) =>
+        val P = parOf(cchain).reduce(_*_)
+        val body = areaOfBlock(func) * P // map duplicated P times
+        /*
+          Some simple math:
+          A full binary (reduction) tree is a tree in which every node is either
+          a leaf or has exactly two children.
+          The number of internal (non-leaf) nodes of a full tree with L leaves is L - 1
+          In our case, L is the map's parallelization factor P
+          and internal nodes represent duplicates of the reduction function
+          The reduction function is therefore duplicated P - 1 times
+          Plus the special, tightly cyclic reduction function to update the accumulator
+        */
+        val internal = areaOfBlock(rFunc) * (P - 1)
+        val rFuncLatency = latencyOfBlock(rFunc).sum
+        val internalDelays = reductionTreeDelays(P).map{delay => areaOfDelayLine(nbits(e.mT), delay * rFuncLatency)}.fold(NoArea){_+_}
+        val load  = areaOfReduce(ld)    // Load from accumulator (happens once)
+        val cycle = areaOfReduce(rFunc) // Special case area of accumulator
+        val store = areaOfReduce(st)    // Store to accumulator (happens once)
+
+        body + internal + internalDelays + load + cycle + store + areaOf(lhs)
+
+      case EatReflect(Block_reduce(ccOuter,ccInner,_,func,ld1,ld2,rFunc,st,_,_,_,_,_,_)) =>
+        val Pm = parOf(ccOuter).reduce(_*_) // Parallelization factor for map
+        val Pr = parOf(ccInner).reduce(_*_) // Parallelization factor for reduce
+        val body = areaOfBlock(func) * Pm
+
+        val internal = areaOfBlock(rFunc) * (Pm - 1) * Pr
+        val rFuncLatency = latencyOfBlock(rFunc).sum
+        val internalDelays = reductionTreeDelays(Pm).map{delay => areaOfDelayLine(nbits(e.mT), delay * rFuncLatency) * Pr}.fold(NoArea){_+_}
+        val load1 = areaOfBlock(ld1) * Pm * Pr
+        val load2 = areaOfReduce(ld2) * Pr
+        val cycle = areaOfReduce(rFunc) * Pr
+        val store = areaOfReduce(st) * Pr
+
+        body + internal + internalDelays + load1 + load2 + cycle + store + areaOf(lhs)
+
+      case _ =>
+        blocks(rhs).map(blk => areaOfBlock(blk)).fold(NoArea){_+_} + areaOf(lhs)
     }
+    areaScope ::= area
   }
 
   override def postprocess[A:Manifest](b: Block[A]): Block[A] = {
+    // TODO: Could potentially have multiple accelerator designs in a single program
+    // Eventually want to be able to support multiple accel scopes
+    val design = areaScope.fold(NoArea){_+_} + IR.BaseDesign
 
+    val routingLUTs = 21000 // lutRoutingModel.evaluate(design)
+    val fanoutRegs  = 3600  // regFanoutModel.evaluate(design)
+    val unavailable = 400   // unavailALMsModel.evaluate(design)
+
+    val recoverable = design.lut3/2 + design.lut4/2 + design.lut5/2 + design.lut6/10 + design.mem16/2  + routingLUTs/2
+
+    val logicALMs = design.lut3 + design.lut4 + design.lut5 + design.lut6 + design.lut7 +
+                    design.mem16 + design.mem32 + design.mem64 + routingLUTs - recoverable + unavailable
+    val totalRegs = design.regs + fanoutRegs
+
+    val regALMs = Math.max( ((totalRegs - (logicALMs*2.16))/3).toInt, 0)
+
+    val designALMs = logicALMs + regALMs
+
+    val dupBRAMs = Math.max(0.02*routingLUTs - 500, 0.0).toInt
+
+    val totalDSPs  = design.dsps
+    val totalBRAMs = design.bram + dupBRAMs
+
+    msg(s"Resource Estimate Breakdown: ")
+    msg(s"-----------------------------")
+    msg(s"Estimated unavailable ALMs: $unavailable")
+    msg(s"LUT3: ${total.lut3}")
+    msg(s"LUT4: ${total.lut4}")
+    msg(s"LUT5: ${total.lut5}")
+    msg(s"LUT6: ${total.lut6}")
+    msg(s"LUT7: ${total.lut7}")
+    msg(s"Estimated routing luts: $routingLUTs")
+    msg(s"MEM64: ${total.mem64}")
+    msg(s"MEM32: ${total.mem32}")
+    msg(s"MEM16: ${total.mem16}")
+    msg(s"Design registers: ${total.regs}")
+    msg(s"Fanout registers: $fanoutRegs")
+    msg(s"Design BRAMs: ${total.bram}")
+    msg(s"Fanout BRAMs: $dupBRAMs")
+    msg("")
+    msg(s"Resource Estimate Summary: ")
+    msg(s"---------------------------")
+    msg(s"Logic+register ALMs: $logicALMs")
+    msg(s"Register-only ALMS:  $regALMs")
+    msg(s"Recovered ALMs:      $recoverable")
+    msg(s"DSPs: ${total.dsps}")
+    msg(s"BRAMs: $totalBRAMs")
+    msg("")
+
+    totalArea = FPGAResourceSummary(totalALMs, totalRegs, totalDSPs, totalBRAMs)
     (b)
   }
 

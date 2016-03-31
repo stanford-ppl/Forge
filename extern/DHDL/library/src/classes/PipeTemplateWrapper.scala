@@ -33,6 +33,28 @@ trait PipeTemplateWrapper {
     loop(cchain, 0, Nil, {i: Rep[Indices] => stFunc(accum, i, rFunc(ldFunc(accum, i), func(i))) })
   }
 
+  def block_reduce[T:Manifest](chain: Rep[CounterChain], accum: Rep[BRAM[T]], func: Rep[Indices] => Rep[BRAM[T]], rFunc: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext): Rep[Pipeline] = {
+    val ldFunc(c: Rep[BRAM[T]], i: Rep[Indices]): Rep[T] = implicitly[Mem[T,BRAM[T]]].ld(c, i)
+    val stFunc(c: Rep[BRAM[T]], i: Rep[Indices], x: Rep[T]) = implicitly[Mem[T,BRAM[T]]].st(c, i, x)
+
+    val ctrsRed = dimsOf(accum).map{dim => Counter(max = dim) }
+    val cchainRed = CounterChain(ctrsred:_*)
+
+    //var first = true
+    loop(chain, 0, Nil, {i: Rep[Indices] =>
+      val part = func(i)
+
+      loop(cchainRed, 0, Nil, {j: Rep[Indices] =>
+        //if (first) stFunc(accum, j, ldFunc(part, j))
+        stFunc(accum, j, rFunc(ldFunc(part, j), ldFunc(accum, j)))
+      })
+      //first = false
+    })
+  }
+
+  def counter_new(start: Rep[FixPt[Signed,B32,B0]],end: Rep[FixPt[Signed,B32,B0]],step: Rep[FixPt[Signed,B32,B0]], par: Int)(implicit ctx: SourceContext) = {
+    start until end by step
+  }
   def counterchain_new(counters: List[Rep[Counter]])(implicit ctx: SourceContext): Rep[CounterChain] = {
     counters.toArray.asInstanceOf[Rep[CounterChain]]
   }

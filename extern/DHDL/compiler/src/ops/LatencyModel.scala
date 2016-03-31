@@ -12,7 +12,7 @@ trait LatencyModel {
 
   private var silentModel = false
   private def warn(x: String) { if (!silentModel) warn(x) }
-  def silenceLatencyModel { silentModel = true }
+  def silenceLatencyModel() { silentModel = true }
 
   def latencyOf(s: Exp[Any], inReduce: Boolean) = s match {
     case Def(d) if inReduce  => latencyOfNodeInReduce(s, d)
@@ -21,6 +21,8 @@ trait LatencyModel {
   }
 
   private def latencyOfNodeInReduce(s: Exp[Any], d: Def[Any]): Long = d match {
+    case DHDLPrim_Add_flt(_,_) => 2
+    case Reg_write(_,_) => 0
     case _ => latencyOfNode(s, d)
   }
 
@@ -44,7 +46,7 @@ trait LatencyModel {
     case DHDLPrim_Sub_fix(_,_) => 1
     case DHDLPrim_Mul_fix(_,_) =>
       if (nbits(s) > 32) warn(s"Don't know latency for $d - using default")
-      if (nbits(s) < 18) 1 else 2
+      if (nbits(s) <= 18) 1 else 2
 
     case DHDLPrim_Div_fix(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know latency for $d - using default")
@@ -146,9 +148,9 @@ trait LatencyModel {
 
     // Nodes with known zero area cost
     case Reg_read(s) if regType(s) == ArgumentIn => 0
-    case Reg_read(s) => 1
+    case Reg_read(s) => 0
 
-    case Reg_write(_,_) => 0
+    case Reg_write(_,_) => 1
     case Reg_reset(_)   => 0
     case Offchip_new(_) => 0
 

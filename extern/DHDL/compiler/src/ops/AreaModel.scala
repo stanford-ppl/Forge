@@ -7,6 +7,15 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
+// Struct for passing around completed FPGA area analysis results
+case class FPGAResourceSummary(
+  alms: Int = 0,
+  regs: Int = 0,
+  dsps: Int = 0,
+  bram: Int = 0
+)
+
+// Class for operating on intermediate FPGA resource counts
 case class FPGAResources(
   lut7: Int = 0,
   lut6: Int = 0,
@@ -35,6 +44,10 @@ case class FPGAResources(
   )
   def *(a: Int) = FPGAResources(a*lut7,a*lut6,a*lut5,a*lut4,a*lut3,a*mem64,a*mem32,a*mem16,
                                 a*regs,a*dsps,a*bram)
+
+  def isNonzero: Boolean = lut7 > 0 || lut6 > 0 || lut5 > 0 || lut4 > 0 || lut3 > 0 ||
+                           mem64 > 0 || mem32 > 0 || mem16 > 0 || regs > 0 || dsps > 0 || bram > 0
+
   override def toString() = s"luts=$lut3,$lut4,$lut5,$lut6,$lut7,mems=$mem16,$mem32,$mem64,regs=$regs,dsps=$dsps,bram=$bram"
 }
 
@@ -48,7 +61,7 @@ trait AreaModel {
 
   private var silentModel = false
   private def warn(x: String) { if (!silentModel) warn(x) }
-  def silenceAreaModel { silentModel = true }
+  def silenceAreaModel() { silentModel = true }
 
   /**
    * Returns the area resources for a delay line with the given width (in bits) and length (in cycles)
@@ -97,12 +110,18 @@ trait AreaModel {
   def areaOfSequential(n: Int) = FPGAResources(lut4=7*n+40, regs=2*n+35)
 
 
-  def areaOf(e: Exp[Any], inReduce: Boolean) = e match {
+  def areaOf(e: Exp[Any], inReduce: Boolean, inHwScope: Boolean) = e match {
+    case Def(d) if !inHwScope => areaOfNodeOutOfScope(e, d)
     case Def(d) if inReduce  => areaOfNodeInReduce(e, d)
     case Def(d) if !inReduce => areaOfNode(e, d)
     case _ => NoArea  // Bound args and constants accounted for elsewhere
   }
 
+
+  private def areaOfNodeOutOfScope(s: Exp[Any], d: Def[Any]): FPGAResources = d match {
+    case _:Reg_new[_] if regType(s) != Regular => areaOfNode(s, d)
+    case _ => NoArea
+  }
 
   /**
    * Returns the area resources for the given node when specialized for tight update cycles

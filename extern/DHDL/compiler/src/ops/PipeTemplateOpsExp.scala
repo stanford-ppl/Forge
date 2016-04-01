@@ -196,9 +196,9 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
   override def emitFileHeader() {
 		super.emitFileHeader()
     emit(s"compound=true")
-    emit(s"""graph [splines=\"ortho\" clusterrank=\"local\"]""")
+    emit(s"""graph [splines="ortho" clusterrank="local" rankdir = "LR"]""")
     emit(s"edge [arrowsize=$arrowSize penwidth=$edgeThickness]")
-    emit(s"""node [fontsize=$fontsize shape=$defaultShape style=\"filled\" fillcolor=$bgcolor ]""")
+    emit(s"""node [fontsize=$fontsize shape=$defaultShape style="filled" fillcolor=$bgcolor ]""")
     emit(s"fontsize=$fontsize")
 	}
 
@@ -255,9 +255,13 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
 	}
 
   override def quote(x: Exp[Any]) = x match {
-		case s@Sym(n) => 
-				s.tp.erasure.getSimpleName() + 
-					(if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
+		case s@Sym(n) => s match { 
+				case Def(ConstFix(n)) => n.toString
+				case Def(ConstFlt(n)) => n.toString
+				case _ =>
+					s.tp.erasure.getSimpleName().replace("DHDL", "") + 
+						(if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
+			}
     case _ => super.quote(x)
 	}
 }
@@ -315,7 +319,7 @@ trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
   }
 
   override def quote(x: Exp[Any]) = x match {
-		case s@Sym(n) => s.tp.erasure.getSimpleName() + 
+		case s@Sym(n) => s.tp.erasure.getSimpleName().replace("DHDL","") + 
 										(if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
     case _ => super.quote(x)
   }

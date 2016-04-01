@@ -50,11 +50,25 @@ trait DHDLControllers {
     // Moved this outside - was confusing sublime
 
     impl (counter_new) (codegen(dot, ${
-      $sym [ label=$sym shape="box" style="filled,rounded"
+			@ var label = "\\"" + quote(sym)
+			@ if (quote(start).forall(_.isDigit)) {
+			@ 	label += "|start=" + quote(start)
+			@ } else {
+					$start -> $sym [xlabel="start"]
+			@ }
+			@ if (quote(end).forall(_.isDigit)) {
+			@ 	label += "|end=" + quote(end)
+			@ } else {
+					$end -> $sym [xlabel="end"]
+			@ }
+			@ if (quote(step).forall(_.isDigit)) {
+			@ 	label += "|step=" + quote(step)
+			@ } else {
+					$step -> $sym [xlabel="step"]
+			@ }
+			@ label += "\\""
+      $sym [ label=$label shape="record" style="filled,rounded"
 						color=$counterInnerColor ]
-			$start -> $sym [ xlabel="start" ]
-			$end -> $sym [ xlabel="end" ]
-			$step -> $sym [ xlabel="step" ]
 		}))
 
     // --- MaxJ Backend

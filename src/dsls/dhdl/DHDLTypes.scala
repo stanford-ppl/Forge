@@ -22,6 +22,7 @@ trait DHDLTypes {
     val Z = lookupTpe("B0", compile)
 
     val Tpes = grp("Tpes")
+    val Lifts = grp("ConstLifts")
 
     // Want Manifest[S], not Manifest[Rep[S]]
     val SS = tpePar("S",stage=compile)
@@ -30,25 +31,28 @@ trait DHDLTypes {
     val GG = tpePar("G",stage=compile)
     val EE = tpePar("E",stage=compile)
 
+
+
     // --- Nodes
     // Bordering on a ridiculous numbers of type parameters here
     // Somewhat concerning since each type parameter means an implicit parameter, but maybe it's ok
 
-    val boolean_to_bit = internal (Tpes) ("constBit", Nil, SBoolean :: Bit)
+    val boolean_to_bit = internal (Lifts) ("constBit", Nil, SBoolean :: Bit)
+    val const_to_fixpt = internal (Lifts) ("constFixPt", (T,S,I,F), (T, SManifest(SS), SManifest(II), SManifest(FF)) :: FixPt(S,I,F), TNumeric(T))
+    val const_to_fltpt = internal (Lifts) ("constFltPt", (T,G,E), (T, SManifest(GG), SManifest(EE)) :: FltPt(G,E), TNumeric(T))
+
+
     val bit_to_string = direct (Tpes) ("bit_to_string", Nil, Bit :: MString)
 
     // Include Manifests to avoid CSE issues
-    val const_to_fixpt = internal (FixPt) ("constFixPt", (T,S,I,F), (T, SManifest(SS), SManifest(II), SManifest(FF)) :: FixPt(S,I,F), TNumeric(T))
-    val fixpt_to_string = direct (FixPt) ("fixpt_to_string", (S,I,F), FixPt(S,I,F) :: MString)
-    val fixpt_to_fltpt = internal (FixPt) ("fixpt_to_fltpt", (S,I,F,G,E), FixPt(S,I,F) :: FltPt(G,E))
-    val convert_fixpt = internal (FixPt) ("convert_fixpt", (S,I,F,S2,I2,F2), FixPt(S,I,F) :: FixPt(S2,I2,F2))
+    val fixpt_to_string = direct (Tpes) ("fixpt_to_string", (S,I,F), FixPt(S,I,F) :: MString)
+    val fixpt_to_fltpt = internal (Tpes) ("fixpt_to_fltpt", (S,I,F,G,E), FixPt(S,I,F) :: FltPt(G,E))
+    val convert_fixpt = internal (Tpes) ("convert_fixpt", (S,I,F,S2,I2,F2), FixPt(S,I,F) :: FixPt(S2,I2,F2))
 
     // Include Manifests to avoid CSE issues
-    val const_to_fltpt = internal (FltPt) ("constFltPt", (T,G,E), (T, SManifest(GG), SManifest(EE)) :: FltPt(G,E), TNumeric(T))
-    val fltpt_to_string = direct (FltPt) ("fltpt_to_string", (G,E), FltPt(G,E) :: MString)
-    val fltpt_to_fixpt = internal (FltPt) ("fltpt_to_fixpt", (G,E,S,I,F), FltPt(G,E) :: FixPt(S,I,F))
-    val convert_fltpt = internal (FltPt) ("convert_fltpt", (G,E,G2,E2), FltPt(G,E) :: FltPt(G2,E2))
-
+    val fltpt_to_string = direct (Tpes) ("fltpt_to_string", (G,E), FltPt(G,E) :: MString)
+    val fltpt_to_fixpt = internal (Tpes) ("fltpt_to_fixpt", (G,E,S,I,F), FltPt(G,E) :: FixPt(S,I,F))
+    val convert_fltpt = internal (Tpes) ("convert_fltpt", (G,E,G2,E2), FltPt(G,E) :: FltPt(G2,E2))
 
     // For testing / compatibility with rest of Delite and LMS
     val fix_to_rep_int = internal (Tpes) ("fix_to_int", (S,I), FixPt(S,I,Z) :: MInt)

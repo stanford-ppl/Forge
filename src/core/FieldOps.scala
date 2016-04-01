@@ -33,11 +33,17 @@ trait FieldOps extends Base with OverloadHack {
   // needed to generate primitive math combinations as type classes
   def infix_stage(x: Rep[DSLType]): StageTag
   def infix_tpeArgs(x: Rep[DSLType]): List[Rep[DSLType]]
+
+  def infix_ops(x: Rep[DSLGroup]): List[Rep[DSLOp]]
+  def infix_nodes(x: Rep[DSLGroup]): List[Rep[DSLOp]]
+  def infix_argNames(x: Rep[DSLOp]): List[String]
 }
 
 trait FieldOpsExp extends FieldOps {
   this: ForgeExp =>
 
+  def infix_ops(x: Rep[DSLGroup]): List[Rep[DSLOp]] = OpsGrp(x).ops
+  def infix_nodes(x: Rep[DSLGroup]): List[Rep[DSLOp]] = OpsGrp(x).ops.filter{op => Impls(op).isInstanceOf[CodeGen]}
  /**
   * TypeAlias
   */
@@ -143,6 +149,8 @@ trait FieldOpsExp extends FieldOps {
   /**
    * DSLOp
    */
+  def infix_argNames(x: Rep[DSLOp]): List[String] = x.args.map(_.name)
+
   def infix_args(x: Exp[DSLOp]) = x match {
     case Def(Op(grp,name,style,backend,tpePars,args,Nil,implArgs,retTpe,eff,alias)) => args
     case Def(Op(grp,name,style,backend,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => args ++ curArgs.flatten

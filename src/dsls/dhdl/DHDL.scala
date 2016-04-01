@@ -9,7 +9,9 @@ object DHDLDSLRunner extends ForgeApplicationRunner with DHDLDSL
 
 trait DHDLDSL extends ForgeApplication
   with DHDLMath with DHDLMisc with DHDLTypes with DHDLMemories
-  with DHDLControllers with DHDLMetadata with DHDLEnums with DHDLSugar with TupleJunk {
+  with DHDLControllers with DHDLMetadata with DHDLEnums with DHDLSugar with TupleJunk
+  with DHDLGlobalAnalysis
+  with DHDLBoundAnalysis {
 
   def dslName = "DHDL"
 
@@ -86,7 +88,7 @@ trait DHDLDSL extends ForgeApplication
     val Range     = tpe("Range")
     primitiveTypes :::= List(Indices)
 
-    // Compiler hangs if these aren't defined
+    // TODO: Compiler hangs if these aren't defined?
     noInfixList :::= List(":=", "**", "as", "to", "rst")
 
     // Scala.scala imports
@@ -106,13 +108,27 @@ trait DHDLDSL extends ForgeApplication
     importDHDLMisc()
     importTupleTypeClassInstances()
 
+
     // --- Traversals
     val StageAnalyzer = analyzer("Stage", isExtern=true)
+    val GlobalAnalyzer = analyzer("Global")
+    val BoundAnalyzer = analyzer("Bound")
+    //val DSE = analyzer("DSE", isExtern=true)
+    val AreaAnalyzer = analyzer("Area", isExtern=true)
+    val LatencyAnalyzer = analyzer("Latency", isExtern=true)
+
+    importGlobalAnalysis()
+    importBoundAnalysis()
 
     schedule(IRPrinterPlus)
     schedule(StageAnalyzer)
+    schedule(GlobalAnalyzer)
+    schedule(BoundAnalyzer)
+    // schedule(DSE)
+    schedule(AreaAnalyzer)
+    schedule(LatencyAnalyzer)
 
-    // Externs
+    // External groups
     extern(grp("PipeTemplate"), targets = List($cala, dot, maxj))
     extern(grp("MemoryTemplate"), targets = List($cala, dot, maxj), withTypes = true)
     extern(metadata("TypeInspection"), targets = Nil)

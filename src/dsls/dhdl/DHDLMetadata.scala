@@ -139,4 +139,29 @@ trait DHDLMetadata {
       composite ${ setMetadata($0, MTileRanges($1)) }
     internal.static (rangesOps) ("apply", T, Tile(T) :: SList(Range)) implements composite ${ meta[MTileRanges]($0).get.ranges }
   }
+
+
+  val MGlobal = metadata("MGlobal", "isGlobal" -> SBoolean)
+  val globalOps = metadata("isGlobal")
+  onMeet (MGlobal) ${ MGlobal(this.isGlobal && that.isGlobal) }
+  internal.static (globalOps) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements
+    composite ${ setMetadata($0, MGlobal($1)) }
+  internal.static (globalOps) ("apply", Nil, MAny :: SBoolean) implements composite ${ meta[MGlobal]($0).map(_.isGlobal).getOrElse(false) }
+
+
+  // TODO: Should probably change to BigDecimal or something to be accurate
+  // NOTE: The user gets to see these! Woah.
+  val MBound = metadata("MBound", "bound" -> SDouble)
+  val boundOps = metadata("bound")
+  onMeet(MBound) ${ MBound( Math.max(this.bound, that.bound)) }
+  static (boundOps) ("update", Nil, (MAny, SDouble) :: MUnit, effect = simple) implements
+    composite ${ setMetadata($0, MBound($1)) }
+  static (boundOps) ("update", Nil, (MAny, SOption(SDouble)) :: MUnit, effect = simple) implements
+    composite ${ $1.foreach{b => setMetadata($0, MBound(b)) } }
+
+  internal (boundOps) ("boundsOf", Nil, MAny :: SOption(SDouble)) implements composite ${ meta[MBound]($0).map(_.bound) }
+  static (boundOps) ("apply", Nil, MAny :: SOption(SDouble)) implements composite ${ boundsOf($0) }
+
+  val boundUnapply = metadata("Bound")
+  internal.static (boundUnapply) ("unapply", Nil, MAny :: SOption(SDouble)) implements composite ${ meta[MBound]($0).map(_.bound) }
 }

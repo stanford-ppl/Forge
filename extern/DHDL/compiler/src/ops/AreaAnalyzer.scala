@@ -8,7 +8,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait AreaAnalysisExp extends AreaModel with CounterToolsExp {
+trait AreaAnalysisExp extends AreaModel with LatencyModel with CounterToolsExp with PipeStageToolsExp {
   this: DHDLExp =>
 
   // TODO: This shouldn't be hardcoded (or here at all really)
@@ -27,43 +27,40 @@ trait AreaAnalysisExp extends AreaModel with CounterToolsExp {
   )
 }
 
-trait AreaAnalyzer extends Traversal {
+trait AreaAnalyzer extends ModelingTools {
   val IR: AreaAnalysisExp with DHDLExp
   import IR._
   import ReductionTreeAnalysis._
 
-  private var silentTraversal = false
-  private def msg(x: => Any) { if (!silentTraversal) System.out.println(x) }
-  def silenceTraversal() {
-    silentTraversal = true
+  private def silenceTraversal() {
+    super.silenceTraversal()
     IR.silenceAreaModel()
   }
 
-  // Need separate traversal instance to do a different type of traversal
-  val latencyModel = new LatencyTools{val IR = AreaAnalyzer.this.IR }
-  def latencyOfBlock(b: Block[Any]): List[Long] = {
-    latencyModel.innerScope = this.innerScope
-    latencyModel.inHwScope = this.inHwScope
-    latencyModel.inReduce = this.inReduce
-    latencyModel.latencyOfBlock(b)
-  }
-
-  var inHwScope = false
-  var inReduce  = false
-  var totalArea = ResourceSummary()
+  var totalArea = FPGAResourceSummary()
   var areaScope: List[FPGAResources] = Nil
 
-  def areaOf(e: Exp[Any]) = IR.areaOf(e, inReduce)
+  def areaOf(e: Exp[Any]) = IR.areaOf(e, inReduce, inHwScope)
 
-  def areaOfBlock(b: Block[Any]) = {
+  def areaOfBlock(b: Block[Any], includeDelayLines: Boolean) = {
     val outerScope = areaScope
     areaScope = Nil
     traverseBlock(b)
     val area = areaScope.fold(NoArea){_+_}
     areaScope = outerScope
-    (area)
+
+    if (includeDelayLines) {
+      val delays = pipeDelays(b)
+      val delayLineArea = delays.map {
+        case (sym,len) if isBits(sym.tp) => areaOfDelayLine(nbits(sym.tp), len)
+        case _ => NoArea
+      }
+      area + delayLineArea.fold(NoArea){_+_}
+    }
+    else
+      area
   }
-  def areaOfReduce(b: Block[Any]) = {
+  def areaOfCycle(b: Block[Any]) = {
     val outerReduce = inReduce
     inReduce = true
     val out = areaOfBlock(b)
@@ -71,29 +68,26 @@ trait AreaAnalyzer extends Traversal {
     out
   }
 
-  override def traverseStm(stm: Stm) = stm match {
-    case TP(s, d) => traverseNode(s, d)
-  }
-
   // TODO: loop index delay line in Metapipeline
   def traverseNode(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext) {
     val area = rhs match {
       case EatReflect(Hwblock(blk)) =>
         inHwScope = true
-        areaOfBlock(blk)
+        areaOfBlock(blk, false)
         inHwScope = false
 
-      case EatReflect(Counterchain_new(ctrs,nIters)) => areaOfBlock(nIters) + areaOf(lhs)
-      case EatReflect(Pipe_parallel(func)) => areaOfBlock(func) + areaOf(lhs)
-      case EatReflect(Unit_pipe(func)) => areaOfBlock(func) + areaOf(lhs)
+      case EatReflect(Counterchain_new(ctrs,nIters)) => areaOfBlock(nIters,true) + areaOf(lhs)
+      case EatReflect(Pipe_parallel(func)) => areaOfBlock(func,false) + areaOf(lhs)
+      case EatReflect(Unit_pipe(func)) =>
+        delayLines + areaOfBlock(func, styleOf(lhs) == Fine) + areaOf(lhs)
 
       case EatReflect(Pipe_foreach(cchain, func, _)) =>
         val P = parOf(cchain).reduce(_*_)
-        areaOfBlock(func) * P + areaOf(lhs)
+        areaOfBlock(func, styleOf(lhs) == Fine) * P + areaOf(lhs)
 
       case EatReflect(Pipe_reduce(cchain,_,ld,st,func,rFunc,_,_,_,_)) =>
         val P = parOf(cchain).reduce(_*_)
-        val body = areaOfBlock(func) * P // map duplicated P times
+        val body = areaOfBlock(func, styleOf(lhs) == Fine) * P // map duplicated P times
         /*
           Some simple math:
           A full binary (reduction) tree is a tree in which every node is either
@@ -104,12 +98,12 @@ trait AreaAnalyzer extends Traversal {
           The reduction function is therefore duplicated P - 1 times
           Plus the special, tightly cyclic reduction function to update the accumulator
         */
-        val internal = areaOfBlock(rFunc) * (P - 1)
-        val rFuncLatency = latencyOfBlock(rFunc).sum
+        val internal = areaOfBlock(rFunc, true) * (P - 1)
+        val rFuncLatency = latencyOfPipe(rFunc)
         val internalDelays = reductionTreeDelays(P).map{delay => areaOfDelayLine(nbits(e.mT), delay * rFuncLatency)}.fold(NoArea){_+_}
-        val load  = areaOfReduce(ld)    // Load from accumulator (happens once)
-        val cycle = areaOfReduce(rFunc) // Special case area of accumulator
-        val store = areaOfReduce(st)    // Store to accumulator (happens once)
+        val load  = areaOfCycle(ld)    // Load from accumulator (happens once)
+        val cycle = areaOfCycle(rFunc) // Special case area of accumulator
+        val store = areaOfCycle(st)    // Store to accumulator (happens once)
 
         body + internal + internalDelays + load + cycle + store + areaOf(lhs)
 
@@ -119,12 +113,12 @@ trait AreaAnalyzer extends Traversal {
         val body = areaOfBlock(func) * Pm
 
         val internal = areaOfBlock(rFunc) * (Pm - 1) * Pr
-        val rFuncLatency = latencyOfBlock(rFunc).sum
+        val rFuncLatency = latencyOfPipe(rFunc)
         val internalDelays = reductionTreeDelays(Pm).map{delay => areaOfDelayLine(nbits(e.mT), delay * rFuncLatency) * Pr}.fold(NoArea){_+_}
-        val load1 = areaOfBlock(ld1) * Pm * Pr
-        val load2 = areaOfReduce(ld2) * Pr
-        val cycle = areaOfReduce(rFunc) * Pr
-        val store = areaOfReduce(st) * Pr
+        val load1 = areaOfBlock(ld1,true) * Pm * Pr
+        val load2 = areaOfCycle(ld2) * Pr
+        val cycle = areaOfCycle(rFunc) * Pr
+        val store = areaOfCycle(st) * Pr
 
         body + internal + internalDelays + load1 + load2 + cycle + store + areaOf(lhs)
 
@@ -134,7 +128,12 @@ trait AreaAnalyzer extends Traversal {
     areaScope ::= area
   }
 
-  override def postprocess[A:Manifest](b: Block[A]): Block[A] = {
+  override def preprocess[A:Manifest](b: Block[A]) = {
+    areaScope = Nil
+    super.preprocess(b)
+  }
+
+  override def postprocess[A:Manifest](b: Block[A]) = {
     // TODO: Could potentially have multiple accelerator designs in a single program
     // Eventually want to be able to support multiple accel scopes
     val design = areaScope.fold(NoArea){_+_} + IR.BaseDesign

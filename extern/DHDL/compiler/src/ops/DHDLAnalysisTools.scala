@@ -107,6 +107,11 @@ trait CounterToolsExp extends EffectExp {
     case EatReflect(Counter_new(ConstFix(0),ConstFix(1),ConstFix(1))) => true
     case _ => false
   }
+
+  def nIters(x: Rep[CounterChain]) = x match {
+    case Def(EatReflect(Counterchain_new(_,nIters))) => bound(nIters.res).getOrElse(1)
+    case _ => 1
+  }
 }
 
 

@@ -45,8 +45,8 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
     rFunc: Block[T],            // Reduction function
     stFunc: Block[Unit],        // Accumulator store function
     // - Bound args
-    indsOuter: List[Sym[FixPt[Signed,B32,B0]]] // Map (outer) loop iterators
-    indsInner: List[Sym[FixPt[Signed,B32,B0]]] // Reduce (inner) loop iterators
+    indsOuter: List[Sym[FixPt[Signed,B32,B0]]],  // Map (outer) loop iterators
+    indsInner: List[Sym[FixPt[Signed,B32,B0]]],  // Reduce (inner) loop iterators
     part: Sym[BRAM[T]],
     acc: Sym[BRAM[T]],
     res: Sym[T],
@@ -105,11 +105,11 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
 
     val part = fresh[BRAM[T]]
     // Partial result load
-    val ldPartBlk = reifyEffects( implicitly[Mem[T,BRAM[T]]].ld(part, indsRed) )
+    val ldPartBlk = reifyEffects( part.ld(indsRed) )
 
     val acc = reflectMutableSym( fresh[BRAM[T]] )
     // Accumulator load
-    val ldBlk = reifyEffects( implicitly[Mem[T,BRAM[T]]].ld(acc, indsRed) )
+    val ldBlk = reifyEffects( acc.ld(indsRed) )
 
     val rV = (fresh[T],fresh[T])
     // Reified reduction function
@@ -117,7 +117,7 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
 
     val res = fresh[T]
     // Accumulator store function
-    val stBlk = reifyEffects( implicitly[Mem[T,BRAM[T]]].st(acc, indsRed, res) )
+    val stBlk = reifyEffects( acc.st(indsRed, res) )
 
     val effects = summarizeEffects(mBlk) andAlso summarizeEffects(ldPartBlk) andAlso
                   summarizeEffects(ldBlk) andAlso summarizeEffects(rBlk) andAlso summarizeEffects(stBlk) andAlso Write(List(accum.asInstanceOf[Sym[BRAM[T]]]))
@@ -327,14 +327,14 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
       emit("}")
 
     case e@Block_reduce(ccOuter, ccInner, accum, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, part, acc, res, rV) =>
-      subgraph $sym {
-        label = "\$sym"
-        style = "filled"
-        fillcolor = "$mpFillColor "
-        color = "$mpBorderColor "
-        @ val sym_ctrl = sym + "_ctrl"
-        $sym_ctrl [label="ctrl" height=0 style="filled" fillcolor="$mpBorderColor "]
-      }
+      emit(s"""subgraph ${quote(sym)} {""")
+      emit(s"""  label = quote(sym)""")
+      emit(s"""  style = "filled" """)
+      emit(s"""  fillcolor = "$quote{mpFillColor}" """)
+      emit(s"""  color = "$quote{mpBorderColor}" """)
+      val sym_ctrl = quote(sym) + "_ctrl"
+      emit(s"""  ${sym_ctrl} [label="ctrl" height=0 style="filled" fillcolor="${mpBorderColor} "]""")
+      emit(s"""}""")
 
     case _ => super.emitNode(sym,rhs)
 	}
@@ -364,7 +364,7 @@ trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
 
     case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
 
-    case e@Block_reduce(ccOuter, ccInner, accum, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, part, acc, res, rV)
+    case e@Block_reduce(ccOuter, ccInner, accum, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, part, acc, res, rV) =>
 
     case _ => super.emitNode(sym, rhs)
   }

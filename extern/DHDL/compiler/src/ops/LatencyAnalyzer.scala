@@ -2,14 +2,14 @@ package dhdl.compiler.ops
 
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.internal.Traversal
+import scala.collection.immutable.HashMap
 
 import dhdl.shared._
 import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-
-trait LatencyAnalysisExp extends DHDLExp with LatencyModel with CounterToolsExp {
+trait LatencyAnalysisExp extends LatencyModel with CounterToolsExp with PipeStageToolsExp {
   this: DHDLExp =>
 
   val interruptCycles = 96
@@ -18,16 +18,87 @@ trait LatencyAnalysisExp extends DHDLExp with LatencyModel with CounterToolsExp 
   val baseCycles = flushCycles + interruptCycles + pcieCycles
 }
 
-trait LatencyTools extends Traversal {
-  val IR: DHDLExp with LatencyModel
+
+trait ModelingTools extends Traversal with PipeStageTools {
+  val IR: DHDLExp with PipeStageToolsExp with LatencyModel
+  import IR._
+
+  // --- Debugging, etc.
+  private var silentTraversal = false
+  protected def msg(x: => Any) { if (!silentTraversal) System.out.println(x) }
+  def silenceTraversal() {
+    silentTraversal = true
+    IR.silenceLatencyModel()
+  }
+
+  // --- State
+  var inHwScope = false // In hardware scope
+  var inReduce = false  // In tight reduction cycle (accumulator update)
+  def latencyOf(e: Exp[Any]): Long = if (inHwScope) IR.latencyOf(e, inReduce) else 0L
+
+  // TODO: Could optimize further with dynamic programming
+  def quickDFS(cur: Exp[Any], scope: List[Exp[Any]]): Long = {
+    if (scope.contains(cur) && !isGlobal(cur))
+      latencyOf(cur) + syms(cur).map(quickDFS(_,scope)).max
+    else 0L
+  }
+  def latencyOfPipe(b: Block[Any]): Long = {
+    val nodes = getStages(b)
+    quickDFS(nodes.last, nodes)
+  }
+  def latencyOfCycle(b: Block[Any]): Long = {
+    val outerReduce = inReduce
+    inReduce = true
+    val out = latencyOfPipe(b)
+    inReduce = outerReduce
+    out
+  }
+
+  // Not a true traversal. Should it be?
+  def pipeDelays(b: Block[Any]): List[(Exp[Any],Long)] = {
+    val scope = getStages(b).filterNot(s => isGlobal(s))
+    var delays = HashMap[Exp[Any],Long]() ++ scope.map{node => node -> 0L}
+
+    def fullDFS(cur: Exp[Any]): Long = {
+      if (scope.contains(cur)) {
+        val deps = syms(cur)
+        val dlys = deps.map(fullDFS(_))
+        val critical = dlys.max
+
+        deps.zip(dlys).foreach{ case(dep, path) =>
+          if (path < critical && (critical - path) > delays(dep))
+            delays += dep -> (critical - path)
+        }
+        critical + latencyOf(cur)
+      }
+      else 0L
+    }
+    if (!scope.isEmpty) fullDFS(scope.last)
+    delays.toList
+  }
+
+  // Traversal
+  override def traverseStm(stm: Stm) = stm match {
+    case TP(s, d) => traverseNode(s, d)
+  }
+  def traverseNode(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext)
+
+  // Reset state
+  override def preprocess[A:Manifest](b: Block[A]) = {
+    inHwScope = false
+    inReduce = false
+    super.preprocess(b)
+  }
+}
+
+
+trait LatencyAnalyzer extends ModelingTools {
+  val IR: DHDLExp with LatencyAnalysisExp
   import IR._
   import ReductionTreeAnalysis._
 
-  var inHwScope = false // In hardware scope
-  var inReduce = false  // In tight reduction cycle (accumulator update)
   var cycleScope: List[Long] = Nil
-
-  def latencyOf(e: Exp[Any]): Long = if (inHwScope) IR.latencyOf(e, inReduce) else 0L
+  var totalCycles: Long = 0L
 
   def latencyOfBlock(b: Block[Any]): List[Long] = {
     val outerScope = cycleScope
@@ -36,17 +107,6 @@ trait LatencyTools extends Traversal {
     val cycles = cycleScope.fold(0L){_+_}
     cycleScope = outerScope
     (cycles)
-  }
-  def latencyOfReduce(b: Block[Any]): List[Long] = {
-    val outerReduce = inReduce
-    inReduce = true
-    val out = latencyOfBlock(b)
-    inReduce = outerReduce
-    out
-  }
-
-  override def traverseStm(stm: Stm) = stm match {
-    case TP(s, d) => traverseNode(s, d)
   }
 
   def traverseNode(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext) {
@@ -64,32 +124,40 @@ trait LatencyTools extends Traversal {
 
       // --- Pipe
       case EatReflect(Unit_pipe(func)) if styleOf(lhs) == Fine =>
-        latencyOfBlock(func).sum + latencyOf(lhs)
+        latencyOfPipe(func) + latencyOf(lhs)
 
       case EatReflect(Pipe_foreach(cchain, func, _)) if styleOf(lhs) == Fine =>
-        val N = 1 // TODO
-        latencyOfBlock(func).sum * N + latencyOf(lhs)
+        val N = nIters(cchain)
+        latencyOfPipe(func) + N - 1 + latencyOf(lhs)
 
       case EatReflect(Pipe_reduce(cchain,_,ld,st,func,rFunc,_,_,_,_)) if styleOf(lhs) == Fine =>
-        val N = 1 // TODO
+        val N = nIters(cchain)
+        val P = parOf(cchain).reduce(_*_)
+
+        val body = latencyOfPipe(func)
+        val internal = latencyOfPipe(rFunc) * reductionTreeHeight(P)
+        val cycle = latencyOfCycle(ld) + latencyOfCycle(rFunc) + latencyOfCycle(st)
+
+        body + internal + N*cycle + latencyOf(lhs)
 
       // --- Sequential
       case EatReflect(Unit_pipe(func)) if styleOf(lhs) == Disabled =>
         latencyOfBlock(func).sum + latencyOf(lhs)
 
+
       // --- Metapipeline and Sequential
       case EatReflect(Pipe_foreach(cchain, func, _)) =>
-        val N = 1 // TODO
+        val N = nIters(cchain)
         val stages = latencyOfBlock(func)
         if (styleOf(lhs) == Coarse) { stages.max * (N - 1) + stages.sum + latencyOf(lhs) }
         else                        { stages.sum * N + latencyOf(lhs) }
 
       case EatReflect(Pipe_reduce(cchain,_,ld,st,func,rFunc,_,_,_,_)) =>
-        val N = 1 // TODO
+        val N = nIters(cchain)
         val P = parOf(cchain).reduce(_*_)
         val mapStages = latencyOfBlock(func)
-        val internal = latencyOfBlock(rFunc).sum * reductionTreeHeight(P)
-        val cycle = latencyOfReduce(ld).sum + latencyOfReduce(rFunc).sum + latencyOfReduce(st).sum
+        val internal = latencyOfPipe(rFunc) * reductionTreeHeight(P)
+        val cycle = latencyOfCycle(ld) + latencyOfCycle(rFunc) + latencyOfCycle(st)
 
         val reduceStage = internal + cycle
         val stages = mapStages :+ reduceStage
@@ -97,14 +165,14 @@ trait LatencyTools extends Traversal {
         else                        { stages.sum * N + latencyOf(lhs) }
 
       case EatReflect(Block_reduce(ccOuter,ccInner,_,func,ld1,ld2,rFunc,st,_,_,_,_,_,_)) =>
-        val Nm = 1 // TODO
-        val Nr = 1 // TODO
+        val Nm = nIters(Nm)
+        val Nr = nIters(Nr)
         val Pm = parOf(ccOuter).reduce(_*_) // Parallelization factor for map
         val Pr = parOf(ccInner).reduce(_*_) // Parallelization factor for reduce
 
         val mapStages = latencyOfBlock(func)
-        val internal = (latencyOfBlock(ld1).sum) + latencyOfBlock(rFunc).sum) * reductionTreeHeight(Pm)
-        val cycle = latencyOfReduce(ld2).sum + latencyOfReduce(rFunc).sum + latencyOfReduce(st).sum
+        val internal = latencyOfPipe(ld1) + latencyOfPipe(rFunc) * reductionTreeHeight(Pm)
+        val cycle = latencyOfCycle(ld2) + latencyOfCycle(rFunc) + latencyOfCycle(st)
 
         val reduceStage = internal + Nr*cycle
         val stages = mapStages :+ reduceStage
@@ -118,25 +186,16 @@ trait LatencyTools extends Traversal {
     }
     cycleScope ::= cycles
   }
-}
 
-trait LatencyAnalyzer extends AnalyzerBase {
-  val IR: LatencyAnalysisExp with DHDLExp
-  import IR._
-
-  var totalCycles: Long = 0L
-
-  private var silentTraversal = false
-  private def msg(x: => Any) { if (!silentTraversal) System.out.println(x) }
-  def silenceTraversal {
-    silentTraversal = true
-    IR.silenceLatencyModel()
+  override def preprocess[A:Manifest](b: Block[A]) = {
+    cycleScope = Nil
+    super.preprocess(b)
   }
-
-
   override def postprocess[A:Manifest](b: Block[A]): Block[A] = {
-
+    // TODO: Could potentially have multiple accelerator designs in a single program
+    // Eventually want to be able to support multiple accel scopes
     totalCycles = cycleScope.sum + IR.baseCycles
     (b)
   }
+
 }

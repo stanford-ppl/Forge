@@ -23,8 +23,22 @@ trait FloatPoint[SIG,EXP]
 trait DHDLIndices
 
 // Stub (nothing here for now)
-trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp {
+trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp with DHDLMetaOps {
   this: DHDLExp =>
+
+  def grabNumericConstant[T:Manifest](x: T): Option[Double] = manifest[T] match {
+    case manifest[Int] => Some(x.asInstanceOf[Int].toDouble)
+    case manifest[Long] => Some(x.asInstanceOf[Long].toDouble)
+    case manifest[Float] => Some(x.asInstanceOf[Float].toDouble)
+    case manifest[Double] => Some(x.asInstanceOf[Double])
+    case _ => None
+  }
+
+  override def boundsOf(x: Rep[Any])(implicit ctx: SourceContext): Option[Double] = x match {
+    case Param(x) => grabNumericConstant(x)(x.tp)
+    case Const(x) => grabNumericConstant(x)(x.tp)
+    case _ => super.boundsOf(x)
+  }
 
   def isFixPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FixedPoint[_,_,_]])
   def isFltPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FloatPoint[_,_]])
@@ -34,18 +48,31 @@ trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp {
   object ConstFix {
     def unapply(x: Any): Option[Any] = x match {
       case ConstFixPt(x,_,_,_) => Some(x)
+      case Def(ConstFixPt(x,_,_,_)) => Some(x)
       case _ => None
     }
   }
   object ConstFlt {
     def unapply(x: Any): Option[Any] = x match {
       case ConstFltPt(x,_,_) => Some(x)
+      case Def(ConstFltPt(x,_,_)) => Some(x)
       case _ => None
     }
   }
 
+  override def nbits[T:Manifest]: Int = manifest[T] match {
+    case StructType(_,fields) => fields.map(f => nbits(f._2)).fold(0){_+_}
+    case _ => super.nbits[T]
+  }
+
   def nbits(e: Exp[Any]): Int = nbits(e.tp)
   def sign(e: Exp[Any]): Boolean = sign(e.tp)
+
+  def isBits[T:Manifest] = manifest[T] match {
+    case t if isFltPtType(t) || isFixPtType || isBitType => true
+    case StructType(_,fields) => fields.map(f => isBits(f._2)).fold(true){_&&_}
+    case _ => false
+  }
 }
 
 trait MemoryTemplateTypesExp extends MemoryTemplateTypes {

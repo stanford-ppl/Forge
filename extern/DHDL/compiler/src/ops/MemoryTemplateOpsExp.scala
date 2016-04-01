@@ -424,9 +424,15 @@ object FloatPoint {
 }
 
 //trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps{
-trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps{
-  val IR: PipeTemplateOpsExp with OffChipMemOpsExp  with DHDLCodegenOps
+trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps {
+  val IR: PipeTemplateOpsExp with OffChipMemOpsExp  with DHDLCodegenOps with RegOpsExp  
  	import IR._
+
+	var emittedSize = Set.empty[Exp[Any]]
+  override def initializeGenerator(buildDir:String): Unit = {
+		emittedSize = Set.empty[Exp[Any]]
+		super.initializeGenerator(buildDir)
+	}
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) => // Load
@@ -456,6 +462,28 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps{
 			//iters.foreach{it =>
 			//	emitEdge(it, sym)
 			//}
+
+		case Offchip_new(size) =>
+			/* Special case to hand nodes producing size of offchip outside hardware scope */
+			def hackGen(x: Exp[Any]): Unit = x match { 
+				case Def(EatReflect(_:Reg_Reg_new[_])) => // Nothing
+				case ConstFix(_) => // Nothing
+				case ConstFlt(_) => // Nothing
+				case Def(d) => 
+					alwaysGen {
+						emitNode(x.asInstanceOf[Sym[Any]], d)
+					}
+					syms(d).foreach{ s => s match {
+							case _ => hackGen(s)
+						}
+					}
+				case _ => // Nothing
+			}
+			if (!emittedSize.contains(size)) {
+				hackGen(size)
+				emittedSize = emittedSize + size
+			}
+			super.emitNode(sym, rhs)
 
     case _ => super.emitNode(sym, rhs)
   }

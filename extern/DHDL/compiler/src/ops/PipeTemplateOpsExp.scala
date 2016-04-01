@@ -160,6 +160,11 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
 
 	var emittedCtrChain = Set.empty[Sym[Any]]
 
+  override def initializeGenerator(buildDir:String): Unit = {
+		emittedCtrChain = Set.empty[Sym[Any]]
+		super.initializeGenerator(buildDir)
+	}
+
 	def emitCtrChain(cchain: Exp[CounterChain]):Unit = {
 		val Def(EatReflect(d)) = cchain
 		emitCtrChain(cchain.asInstanceOf[Sym[CounterChain]],
@@ -195,11 +200,6 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
     emit(s"edge [arrowsize=$arrowSize penwidth=$edgeThickness]")
     emit(s"""node [fontsize=$fontsize shape=$defaultShape style=\"filled\" fillcolor=$bgcolor ]""")
     emit(s"fontsize=$fontsize")
-	}
-
-  override def initializeGenerator(buildDir:String): Unit = {
-		emittedCtrChain = Set.empty[Sym[Any]]
-		super.initializeGenerator(buildDir)
 	}
 
   def emitBlock(y: Block[Any], name:String, label:String, color:String): Unit = { 

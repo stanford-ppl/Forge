@@ -424,21 +424,22 @@ object FloatPoint {
 }
 
 //trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps{
-trait DotGenMemoryTemplateOps extends DotGenEffect{
-  val IR: PipeTemplateOpsExp with DHDLIdentifiers
-  import IR._
-
-	//TODO: use this function from DotGenPipeTemplateOps
-	def emitNestedIdx1(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
-    case Def(EatReflect(Counterchain_new(counters))) =>
-	     inds.zipWithIndex.foreach {case (iter, idx) => emitAlias(iter, counters(idx)) }
-	}
+trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps{
+  val IR: PipeTemplateOpsExp with OffChipMemOpsExp  with DHDLCodegenOps
+ 	import IR._
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) => // Load
 			val l = s"Tile${if (store) "Store" else "Load"}_" + quote(sym).split("_")(1)
-      emit(s"""${quote(sym)} [ label=$l shape="rectangle" style="rounded, filled"
-				fillcolor="${tileTransFillColor}" color="black"]""")
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+			emit(s"""label="$l"""") 
+			emit(s"""shape="rectangle"""")
+			emit(s"""style="rounded, filled"""")
+			emit(s"""fillcolor=$tileTransFillColor""")
+			emit(s"""color="black"""")
+			emit(s"""${quote(sym)} [label="${if (store) "TileSt" else "TileLd"}" style="rounded, filled" color="black" fillcolor="gray"]""")
+			emitCtrChain(cchain)
+			emit(s"""} """)
 			if (store)
 				emitEdge(sym, mem)
 			else
@@ -447,15 +448,14 @@ trait DotGenMemoryTemplateOps extends DotGenEffect{
 				emitEdge(local, sym)
 			else
 				emitEdge(sym, local)
-			//emit(s"""${quote(cchain)} -> ${quote(sym)}""")
-			emitNestedIdx1(cchain, iters)
 			strides.foreach{ s =>
 				emitEdge(s, sym, "stride")
 			}
 			emitEdge(memOfs, sym)
-			iters.foreach{it =>
-				emitEdge(it, sym)
-			}
+			//emitNestedIdx(cchain, iters)
+			//iters.foreach{it =>
+			//	emitEdge(it, sym)
+			//}
 
     case _ => super.emitNode(sym, rhs)
   }

@@ -48,18 +48,13 @@ trait DHDLControllers {
 
     // --- Dot Backend
     // Moved this outside - was confusing sublime
-    val counterColor = "\"\\\"\" + quote(counterInnerColor) + \"\\\"\"" // "\"" + quote(..) + "\""
 
     impl (counter_new) (codegen(dot, ${
-			@ val cic = \$counterColor //"\\"" + quote(counterInnerColor) + "\\""
-      $sym [ label="\$sym" shape="box" style="filled,rounded"
-						color=$cic ]
-			$start -> $sym [ label="start" ]
-			$end -> $sym [ label="end" ]
-			$step -> $sym [ label="step" ]
-			//$start [style="invisible" height=0 size=0 margin=0 label=""]
-			//$end [style="invisible" height=0 size=0 margin=0 label=""]
-			//$step [style="invisible" height=0 size=0 margin=0 label=""]
+      $sym [ label=$sym shape="box" style="filled,rounded"
+						color=$counterInnerColor ]
+			$start -> $sym [ xlabel="start" ]
+			$end -> $sym [ xlabel="end" ]
+			$step -> $sym [ xlabel="step" ]
 		}))
 
     // --- MaxJ Backend
@@ -174,9 +169,9 @@ trait DHDLControllers {
     impl (pipe_parallel) (codegen (dot, ${
       subgraph cluster_$sym {
       	label = "parallel_\$sym"
-      	style = "filled"
-      	fillcolor = "$parallelFillColor "
-      	color = "$parallelBorderColor "
+      	style = "filled, bold"
+      	fillcolor = $parallelFillColor
+      	color = $parallelBorderColor
       	@ stream.println(emitBlock(func) + "")
 			}
 		}))
@@ -186,10 +181,10 @@ trait DHDLControllers {
       subgraph $sym {
       	label = "\$sym"
       	style = "filled"
-      	fillcolor = "$mpFillColor "
-      	color = "$mpBorderColor "
+      	fillcolor = $mpFillColor
+      	color = $mpBorderColor
 				@ val sym_ctrl = quote(sym) + "_blockreduce"
-      	$sym_ctrl [label="ctrl" height=0 style="filled" fillcolor="$mpBorderColor "]
+      	$sym_ctrl [label="ctrl" height=0 style="filled" fillcolor=$mpBorderColor ]
 			}
     }))
 

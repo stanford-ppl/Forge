@@ -118,20 +118,20 @@ trait DHDLMemories {
 				@ case Regular =>
 					@ if (isDblBuf(sym)) {
 							$sym [margin=0, rankdir="LR", label="{<st> \$sym | <ld>}" shape="record"
-										color="$dblbufBorderColor " style="filled" fillcolor="$regColor "]
+										color=$dblbufBorderColor style="filled" fillcolor=$regColor ]
 					@ } else {
-							$sym [label= "\$sym" shape="square" color="$regColor " style="filled"
-									 fillcolor="$regColor "]
+							$sym [label= "\$sym" shape="square" color=$regColor style="filled"
+									 fillcolor=$regColor ]
 					@ }
 				@ case ArgumentIn =>
 					@ val sn = "ArgIn" + quote(sym).substring(quote(sym).indexOf("_"))
         	@ alwaysGen {
-            $sym [label=$sn shape="Msquare"]
+            $sym [label=$sn shape="Msquare" style="filled" fillcolor=$regColor ]
 				  @ }
         @ case ArgumentOut =>
 					@ val sn = "ArgOut" + quote(sym).substring(quote(sym).indexOf("_"))
         	@ alwaysGen {
-            $sym [label=$sn shape="Msquare"]
+            $sym [label=$sn shape="Msquare" style="filled" fillcolor=$regColor ]
 			    @ }
       @ }
 		}))
@@ -287,22 +287,23 @@ trait DHDLMemories {
 
     // --- Dot Backend
     impl (bram_new)   (codegen(dot, ${
+			@ val sn = "BRAM" + quote(sym).substring(quote(sym).indexOf("_"))
       @ if (isDblBuf(sym)) {
-      	$sym [margin=0 rankdir="LR" label="{<st> \$sym | <ld> }" shape="record"
-							color="$dblbufBorderColor " style="filled" fillcolor="$memColor "]
+      	$sym [margin=0 rankdir="LR" label="{<st> $sn | <ld> }" shape="record"
+							color=$dblbufBorderColor  style="filled" fillcolor=$memColor ]
       @ } else {
-        	$sym [label="\$sym" shape="square" style="filled" fillcolor="\$memColor"]
+        	$sym [label="$sn " shape="square" style="filled" fillcolor=$memColor ]
       @ }
 		})) // $t[T] refers to concrete type in IR
 		impl (bram_load)  (codegen(dot, ${
-			$addr -> $bram [label="addr"]
+			$addr -> $bram [ xlabel="addr" ]
 			//$sym [style="invisible" height=0 size=0 margin=0 label=""]
 			//$sym [label=$sym fillcolor="lightgray" style="filled"]
 			@ emitAlias(sym, bram)
 		}))
 		impl (bram_store) (codegen(dot, ${
-			$addr -> $bram [label="addr"]
-			$value -> $bram [label="data"]
+			$addr -> $bram [ xlabel="addr" ]
+			$value -> $bram [ xlabel="data" ]
 		}))
     impl (bram_reset) (codegen(dot, ${ }))
 
@@ -406,10 +407,9 @@ trait DHDLMemories {
 		// --- Dot Backend
 		impl (offchip_new) (codegen(dot, ${
 			@ alwaysGen {
-        $sym [label="\$sym" shape="square" fontcolor="white" color="white" style="filled"
-			  fillcolor="$offChipColor "]
-			  $size -> $sym [label="size"]
-			  //$size [style="invisible" height=0 size=0 margin=0 label=""]
+        $sym [ label="\$sym" shape="square" fontcolor="white" color="white" style="filled"
+			  fillcolor=$offChipColor ]
+			  $size -> $sym [ xlabel="size" ]
       @ }
 		}))
 

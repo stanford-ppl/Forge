@@ -556,7 +556,12 @@ trait DHDLMath {
     impl (mux) (codegen($cala, ${ if ($sel) $a else $b }))
 
     // --- Dot Backend
-    impl (mux) (codegen(dot, ${ $sym [label="mux", shape="diamond" style="filled" fillcolor="white"] }))
+    impl (mux) (codegen(dot, ${ 
+			$sym [label="mux", shape="diamond" style="filled" fillcolor="white"] 
+			$sel -> $sym [ xlabel="sel" ]
+			$a -> $sym [ xlabel="a" ]
+			$b -> $sym [ xlabel="b" ]
+		}))
 
     // --- MaxJ Backend
     impl (mux) (codegen(maxj, ${

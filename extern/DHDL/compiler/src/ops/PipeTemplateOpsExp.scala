@@ -152,39 +152,13 @@ trait ScalaGenPipeTemplateOps extends ScalaGenEffect {
 }
 
 trait DotGenPipeTemplateOps extends DotGenEffect{
-  val IR: PipeTemplateOpsExp with FixPtOpsExp with FltPtOpsExp with TpesOpsExp with NosynthOpsExp
-	        with OffChipMemOpsExp with RegOpsExp with DHDLCodegenOps
+  val IR: PipeTemplateOpsExp with OffChipMemOpsExp  with DHDLCodegenOps
 
-					/*
-  import IR.{Sym, Exp, Def}
-  import IR.{ConstFix, ConstFlt, ConstBit, EatReflect}
-  import IR.{Counterchain_new, Offchip_new, Reg_Reg_new, Set_arg, Set_mem, Pipe_foreach, Pipe_reduce}
-  import IR.{CounterChain, FixPt, Signed, B32, B0}
-	*/
- 	import IR.{__ifThenElse => _, Nosynth___ifThenElse => _, __whileDo => _,
- 					Forloop => _, println => _ , _}
-
-	
-  override def emitFileHeader() {
-		super.emitFileHeader()
-    emit(s"compound=true")
-    emit(s"""graph [splines=\"ortho\" clusterrank=\"local\"]""")
-    emit(s"edge [arrowsize=$arrowSize penwidth=$edgeThickness]")
-    emit(s"""node [fontsize=$fontsize shape=$defaultShape style=\"filled\" fillcolor=\"$bgcolor\"]""")
-    emit(s"fontsize=$fontsize")
-	}
-
-	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
-    case Def(EatReflect(Counterchain_new(counters))) =>
-	     inds.zipWithIndex.foreach {case (iter, idx) => emitAlias(iter, counters(idx)) }
-	}
+ 	//import IR.{__ifThenElse => _, Nosynth___ifThenElse => _, __whileDo => _,
+ 	//				Forloop => _, println => _ , _}
+	import IR._
 
 	var emittedCtrChain = Set.empty[Sym[Any]]
-
-  override def initializeGenerator(buildDir:String): Unit = {
-		emittedCtrChain = Set.empty[Sym[Any]]
-		super.initializeGenerator(buildDir)
-	}
 
 	def emitCtrChain(cchain: Exp[CounterChain]):Unit = {
 		val Def(EatReflect(d)) = cchain
@@ -199,7 +173,7 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
     		emit(s"""subgraph cluster_${quote(sym)} {""")
     		emit(s""" label=${quote(sym)} """)
     		emit(s""" style="rounded, filled" """)
-    		emit(s""" fillcolor="${counterColor}" """)
+    		emit(s""" fillcolor=$counterColor""")
 				//emit(s""" ${quote(sym)} [label="" style="invisible" height=0 size=0 margin=0 ]""")
     		counters.foreach{ ctr =>
     		  emit(s"""   ${quote(ctr)}""")
@@ -209,12 +183,30 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
 		case _ => 
 	}
 
-  def emitBlock(y: Block[Any], name:String, color:String): Unit = { 
+	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
+    case Def(EatReflect(Counterchain_new(counters))) =>
+	     inds.zipWithIndex.foreach {case (iter, idx) => emitAlias(iter, counters(idx)) }
+	}
+	
+  override def emitFileHeader() {
+		super.emitFileHeader()
+    emit(s"compound=true")
+    emit(s"""graph [splines=\"ortho\" clusterrank=\"local\"]""")
+    emit(s"edge [arrowsize=$arrowSize penwidth=$edgeThickness]")
+    emit(s"""node [fontsize=$fontsize shape=$defaultShape style=\"filled\" fillcolor=$bgcolor ]""")
+    emit(s"fontsize=$fontsize")
+	}
+
+  override def initializeGenerator(buildDir:String): Unit = {
+		emittedCtrChain = Set.empty[Sym[Any]]
+		super.initializeGenerator(buildDir)
+	}
+
+  def emitBlock(y: Block[Any], name:String, label:String, color:String): Unit = { 
       emit(s"""subgraph cluster_${name} {""")
       emit(s"""label="${name}" """)
-      emit(s"""color="gray" """)
       emit(s"""style="filled" """)
-			emit(s"""fillcolor="${color}"""")
+			emit(s"""fillcolor=$color""")
 			emitBlock(y)
 			emit(s"""}""")
 	}
@@ -232,11 +224,11 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
       emitNestedIdx(cchain, inds)
       emit(s"""subgraph cluster_${quote(sym)} {""")
       emit(s"""label="${quote(sym)}"""")
-      emit(s"""color="gray"""")
-      emit(s"""style="filled" """)
-			emit(s"""fillcolor="${pipeFillColor}"""")
+      emit(s"""color=$pipeBorderColor""")
+      emit(s"""style="bold, filled" """)
+			emit(s"""fillcolor=$pipeFillColor""")
 			emitCtrChain(cchain)
-      emitBlock(func, "foreachFunc", mapFuncColor)             // Map function
+      emitBlock(func, quote(sym) + "foreachFunc", "foreachFunc", mapFuncColor)             // Map function
       emit("}")
 
     case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
@@ -244,27 +236,28 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
       emitNestedIdx(cchain, inds)
       emit(s"""subgraph cluster_${quote(sym)} {""")
       emit(s"""label="${quote(sym)}"""")
-      emit(s"""color="gray"""")
-      emit(s"""style="filled" """)
-			emit(s"""fillcolor="${pipeFillColor}"""")
+      emit(s"""color=$pipeBorderColor""")
+      emit(s"""style="bold, filled" """)
+			emit(s"""fillcolor=$pipeFillColor""")
       emit(s"""define(`${quote(acc)}', `${quote(accum)}')""")
 			val Def(EatReflect(d)) = cchain
 			emitCtrChain(cchain)
-      emitBlock(func, "mapFunc", mapFuncColor)             // Map function
-      emitBlock(ldFunc, "ldFunc", ldFuncColor)             // Map function
+      emitBlock(func, quote(sym) + "_mapFunc", "mapFunc", mapFuncColor)             // Map function
+      emitBlock(ldFunc, quote(sym) + "_ldFunc", "ldFunc", ldFuncColor)             // Map function
       emitAlias(rV._1, getBlockResult(ldFunc))
       emitAlias(rV._2, getBlockResult(func))
-      emitBlock(rFunc, "reduceFunc", reduceFuncColor)             // Map function
+      emitBlock(rFunc, quote(sym) + "_reduceFunc", "reduceFunc", reduceFuncColor)             // Map function
       emitAlias(res, getBlockResult(rFunc))
-      emitBlock(stFunc, "stFunc", stFuncColor)             // Map function
+      emitBlock(stFunc, quote(sym) + "_stFunc", "stFunc" , stFuncColor)             // Map function
       emit("}")
 
     case _ => super.emitNode(sym,rhs)
 	}
 
   override def quote(x: Exp[Any]) = x match {
-		case s@Sym(n) => s.tp.erasure.getSimpleName() + 
-										(if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
+		case s@Sym(n) => 
+				s.tp.erasure.getSimpleName() + 
+					(if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
     case _ => super.quote(x)
 	}
 }

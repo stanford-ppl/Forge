@@ -92,7 +92,7 @@ trait DHDLDSL extends ForgeApplication
     noInfixList :::= List(":=", "**", "as", "to", "rst")
 
     // Scala.scala imports
-    importTuples()
+    //importTuples()
     importStrings()
 
     // DSL spec imports
@@ -101,35 +101,45 @@ trait DHDLDSL extends ForgeApplication
     importDHDLEnums()
     importDHDLMetadata()
 
-    importDHDLMath()
+    //importDHDLMath()
+      importCollectionOps()
+      importNumOps()
+      importArithOps()
+      importOrderOps()
+      importPrimitiveMath()
 
     importDHDLMemories()
-    importDHDLControllers()
-    importDHDLMisc()
-    importTupleTypeClassInstances()
+
+    //importDHDLControllers()
+      importCounters()
+
+    //importDHDLMisc()
+      importDHDLHelpers()
+
+    //importTupleTypeClassInstances()
 
 
     // --- Traversals
-    val StageAnalyzer = analyzer("Stage", isExtern=true)
-    val GlobalAnalyzer = analyzer("Global")
-    val BoundAnalyzer = analyzer("Bound")
-    //val DSE = analyzer("DSE", isExtern=true)
-    val AreaAnalyzer = analyzer("Area", isExtern=true)
-    val LatencyAnalyzer = analyzer("Latency", isExtern=true)
+    //val StageAnalyzer = analyzer("Stage", isExtern=true)
+    //val GlobalAnalyzer = analyzer("Global")
+    //val BoundAnalyzer = analyzer("Bound")
+    //  val DSE = analyzer("DSE", isExtern=true)
+    //val AreaAnalyzer = analyzer("Area", isExtern=true)
+    //val LatencyAnalyzer = analyzer("Latency", isExtern=true)
 
-    importGlobalAnalysis()
-    importBoundAnalysis()
+    //importGlobalAnalysis()
+    //importBoundAnalysis()
 
     schedule(IRPrinterPlus)
-    schedule(StageAnalyzer)
-    schedule(GlobalAnalyzer)
-    schedule(BoundAnalyzer)
-    // schedule(DSE)
-    schedule(AreaAnalyzer)
-    schedule(LatencyAnalyzer)
+    //schedule(StageAnalyzer)
+    //schedule(GlobalAnalyzer)
+    //schedule(BoundAnalyzer)
+    //  schedule(DSE)
+    //schedule(AreaAnalyzer)
+    //schedule(LatencyAnalyzer)
 
     // External groups
-    extern(grp("PipeTemplate"), targets = List($cala, dot, maxj))
+    extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))
     extern(grp("MemoryTemplate"), targets = List($cala, dot, maxj), withTypes = true)
     extern(metadata("TypeInspection"), targets = Nil)
 		()

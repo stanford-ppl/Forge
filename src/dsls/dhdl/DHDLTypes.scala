@@ -123,25 +123,16 @@ trait DHDLTypes {
     infix (Tpes) ("as", R, SDouble :: R) implements redirect ${ lift_to[Double,R]($0) }
 
 
-    val Bit_API = withTpe(Bit)
-    Bit_API {
-      infix ("toString") (Nil :: MString) implements redirect ${ bit_to_string($0) }
-      infix ("mkString") (Nil :: MString) implements redirect ${ bit_to_string($0) }
-    }
+    infix (Tpes) ("toString", Nil, Bit :: MString) implements redirect ${ bit_to_string($0) }
+    infix (Tpes) ("mkString", Nil, Bit :: MString) implements redirect ${ bit_to_string($0) }
 
-    val Fix_API = withTpe(FixPt)
-    Fix_API {
-      infix ("toString") (Nil :: MString) implements redirect ${ fixpt_to_string($self) }
-      infix ("mkString") (Nil :: MString) implements redirect ${ fixpt_to_string($self) }
-      infix ("to") (Nil :: R, addTpePars = R) implements redirect ${ cast_fixpt_to[S,I,F,R]($self) }
-    }
+    infix (Tpes) ("toString", (S,I,F), FixPt(S,I,F) :: MString) implements redirect ${ fixpt_to_string($0) }
+    infix (Tpes) ("mkString", (S,I,F), FixPt(S,I,F) :: MString) implements redirect ${ fixpt_to_string($0) }
+    infix (Tpes) ("to", (S,I,F,R),  FixPt(S,I,F) :: R) implements redirect ${ cast_fixpt_to[S,I,F,R]($0) }
 
-    val Flt_API = withTpe(FltPt)
-    Flt_API {
-      infix ("toString") (Nil :: MString) implements redirect ${ fltpt_to_string($self) }
-      infix ("mkString") (Nil :: MString) implements redirect ${ fltpt_to_string($self) }
-      infix ("to") (Nil :: R, addTpePars = R) implements redirect ${ cast_fltpt_to[G,E,R]($self) }
-    }
+    infix (Tpes) ("toString", (G,E), FltPt(G,E) :: MString) implements redirect ${ fltpt_to_string($0) }
+    infix (Tpes) ("mkString", (G,E), FltPt(G,E) :: MString) implements redirect ${ fltpt_to_string($0) }
+    infix (Tpes) ("to", (G,E,R), FltPt(G,E) :: R) implements redirect ${ cast_fltpt_to[G,E,R]($0) }
 
 
     val SInt32 = lookupAlias("SInt")
@@ -150,9 +141,9 @@ trait DHDLTypes {
     // Needed for if-then-else and while (default requires Rep[Boolean] and overloading is tough in these cases)
     fimplicit (Tpes) ("bit_to_boolean", Nil, Bit :: MBoolean) implements composite ${ bit_to_bool($0) }
 
-    fimplicit (Tpes) ("sboolean_to_bit", Nil, SBoolean :: Bit) implements redirect ${ bit($0) }
-    fimplicit (Tpes) ("scala_int_to_fixpt", Nil, SInt :: SInt32) implements redirect ${ fixPt[Int,Signed,B32,B0]($0) }
-    fimplicit (Tpes) ("scala_float_to_fltpt", Nil, SFloat :: Flt) implements redirect ${ fltPt[Float,B24,B8]($0) }
+    //fimplicit (Tpes) ("sboolean_to_bit", Nil, SBoolean :: Bit) implements redirect ${ bit($0) }
+    //fimplicit (Tpes) ("scala_int_to_fixpt", Nil, SInt :: SInt32) implements redirect ${ fixPt[Int,Signed,B32,B0]($0) }
+    //fimplicit (Tpes) ("scala_float_to_fltpt", Nil, SFloat :: Flt) implements redirect ${ fltPt[Float,B24,B8]($0) }
 
 
     // --- Scala Backend

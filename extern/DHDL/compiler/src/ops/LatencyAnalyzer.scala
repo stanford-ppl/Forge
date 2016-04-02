@@ -34,13 +34,13 @@ trait ModelingTools extends Traversal with PipeStageTools {
   // --- State
   var inHwScope = false // In hardware scope
   var inReduce = false  // In tight reduction cycle (accumulator update)
-  def latencyOf(e: Exp[Any]): Long = if (inHwScope) IR.latencyOf(e, inReduce) else 0L
+  def latencyOf(e: Exp[Any]) = if (inHwScope) IR.latencyOf(e, inReduce) else 0L
 
   // TODO: Could optimize further with dynamic programming
-  def quickDFS(cur: Exp[Any], scope: List[Exp[Any]]): Long = {
-    if (scope.contains(cur) && !isGlobal(cur))
-      latencyOf(cur) + syms(cur).map(quickDFS(_,scope)).max
-    else 0L
+  def quickDFS(cur: Exp[Any], scope: List[Exp[Any]]): Long = cur match {
+    case Def(d) if scope.contains(cur) && !isGlobal(cur) =>
+      latencyOf(cur) + syms(d).map(quickDFS(_,scope)).max
+    case _ => 0L
   }
   def latencyOfPipe(b: Block[Any]): Long = {
     val nodes = getStages(b)
@@ -59,9 +59,9 @@ trait ModelingTools extends Traversal with PipeStageTools {
     val scope = getStages(b).filterNot(s => isGlobal(s))
     var delays = HashMap[Exp[Any],Long]() ++ scope.map{node => node -> 0L}
 
-    def fullDFS(cur: Exp[Any]): Long = {
-      if (scope.contains(cur)) {
-        val deps = syms(cur)
+    def fullDFS(cur: Exp[Any]): Long = cur match {
+      case Def(d) if scope.contains(cur) =>
+        val deps = syms(d)
         val dlys = deps.map(fullDFS(_))
         val critical = dlys.max
 
@@ -70,8 +70,8 @@ trait ModelingTools extends Traversal with PipeStageTools {
             delays += dep -> (critical - path)
         }
         critical + latencyOf(cur)
-      }
-      else 0L
+
+      case _ => 0L
     }
     if (!scope.isEmpty) fullDFS(scope.last)
     delays.toList
@@ -81,7 +81,7 @@ trait ModelingTools extends Traversal with PipeStageTools {
   override def traverseStm(stm: Stm) = stm match {
     case TP(s, d) => traverseNode(s, d)
   }
-  def traverseNode(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext)
+  def traverseNode(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext): Unit
 
   // Reset state
   override def preprocess[A:Manifest](b: Block[A]) = {
@@ -103,7 +103,13 @@ trait LatencyAnalyzer extends ModelingTools {
   def latencyOfBlock(b: Block[Any]): List[Long] = {
     val outerScope = cycleScope
     cycleScope = Nil
-    traverseBlock(b)
+
+    //traverseBlock(b) -- can cause us to see things like counters as "stages"
+    getControlNodes(b).foreach{
+      case s@Def(d) => traverseNode(s, d)
+      case _ =>
+    }
+
     val cycles = cycleScope.fold(0L){_+_}
     cycleScope = outerScope
     (cycles)

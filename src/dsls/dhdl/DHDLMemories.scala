@@ -375,7 +375,7 @@ trait DHDLMemories {
       val strides = dimsToStrides(memDims)
       val nonUnitStrides = strides.zip(unitDims).filterNot(_._2).map(_._1)
 
-      val ctrs = tileDims.map{d => Counter(d) }
+      val ctrs = tileDims.map{d => Counter(max = d.as[Index]) }
       val chain = CounterChain(ctrs:_*)
       tile_transfer(mem, $local, nonUnitStrides, ofs, tileDims, chain, $store)
     }

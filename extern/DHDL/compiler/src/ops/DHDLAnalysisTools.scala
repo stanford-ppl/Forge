@@ -78,13 +78,13 @@ trait PipeStageTools extends NestedBlockTraversal {
     stms
   }
 
-  def list(x: List[Exp[Any]]) = x.zipWithIndex.foreach{sym => sym match {
-    case (Def(d),i) if isOuterControl(sym._1) => println(s"   $i. [Ctrl] ${sym._1} = $d")
-    case (Def(d),i) if isInnerControl(sym._1) => println(s"   $i. [Pipe] ${sym._1} = $d")
-    case (Def(d),i) if isAllocation(sym._1)   => println(s"   $i. [Allc] ${sym._1} = $d")
-    case (Def(d),i)                           => println(s"   $i. [None] ${sym._1} = $d")
-    case (_,i)                                => println(s"   $i. [None] ${sym._1}")
-  }}
+  def list(x: List[Exp[Any]]) = x.zipWithIndex.foreach{
+    case (s@Def(d),i) if isOuterControl(s) => println(s"   $i. [Ctrl] $s = $d")
+    case (s@Def(d),i) if isInnerControl(s) => println(s"   $i. [Pipe] $s = $d")
+    case (s@Def(d),i) if isAllocation(s)   => println(s"   $i. [Allc] $s = $d")
+    case (s@Def(d),i)                      => println(s"   $i. [None] $s = $d")
+    case (s,i)                             => println(s"   $i. [None] $s")
+  }
 
   def getStages(blks: Block[Any]*): List[Exp[Any]] = {
     blks.toList.flatMap(b => getStmsInScope(b)).map{case TP(s,d) => s}
@@ -97,18 +97,18 @@ trait PipeStageTools extends NestedBlockTraversal {
 trait CounterToolsExp extends EffectExp {
   this: DHDLExp =>
 
-  def parOf(x: Rep[CounterChain]) = x match {
+  def parOf(x: Rep[CounterChain]): List[Int] = x match {
     case Def(EatReflect(Counterchain_new(ctrs,nIter))) => ctrs.map{
       case Def(EatReflect(Counter_new(_,_,_,par))) => par.x
     }
   }
 
-  def isUnitCounter(e: Def[Any]) = e match {
+  def isUnitCounter(e: Def[Any]): Boolean = e match {
     case EatReflect(Counter_new(ConstFix(0),ConstFix(1),ConstFix(1))) => true
     case _ => false
   }
 
-  def nIters(x: Rep[CounterChain]) = x match {
+  def nIters(x: Rep[CounterChain]): Int = x match {
     case Def(EatReflect(Counterchain_new(_,nIters))) => bound(nIters.res).getOrElse(1)
     case _ => 1
   }

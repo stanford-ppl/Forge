@@ -46,7 +46,7 @@ trait DHDLMisc {
           stageWarn("Trying to address local " + $dims.length + "D memory using " + $indices.length + "D addressing")
         }
         val strides = sdimsToStrides($1)
-        sumTree( List.tabulate($indices.length){i => $indices(i) * strides(i) } )
+        sumTree( List.tabulate($indices.length){i => $indices(i) * strides(i).as[Index] } )
       }
     }
 

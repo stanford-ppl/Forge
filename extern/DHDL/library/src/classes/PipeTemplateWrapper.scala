@@ -8,7 +8,7 @@ import dhdl.shared.ops._
 import dhdl.library._
 import dhdl.library.classes._
 
-trait PipeTemplateWrapper {
+trait ControllerTemplateWrapper {
   this: DHDLBase with DHDLClasses =>
 
   // TODO: Better way to do this besides recursion?

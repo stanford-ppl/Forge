@@ -15,7 +15,7 @@ trait TypeInspectionWrapper extends TypeInspectionCompilerOps {
   this: DHDLIdentifiers =>
 }
 
-trait MemoryTemplateWrapper extends PipeTemplateWrapper with TypeInspectionWrapper with NumEmulation {
+trait MemoryTemplateWrapper extends ControllerTemplateWrapper with TypeInspectionWrapper with NumEmulation {
   this: DHDLBase with DHDLClasses =>
 
   // Memories are all equivalent to Scala Arrays in library

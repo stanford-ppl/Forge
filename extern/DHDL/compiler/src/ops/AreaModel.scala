@@ -162,7 +162,7 @@ trait AreaModel {
 
     // TODO: Seems high, confirm
     case _:Counter_new => FPGAResources(lut3=106,regs=67)
-    case Counterchain_new(ctrs) => ctrs.map(ctr => areaOf(ctr)).fold(NoArea){_+_}
+    case _:Counterchain_new => NoArea
 
     // TODO: Have to get numbers for non-32 bit multiplies and divides
     case DHDLPrim_Neg_fix(_)   => FPGAResources(lut3 = nbits(s), regs = nbits(s))

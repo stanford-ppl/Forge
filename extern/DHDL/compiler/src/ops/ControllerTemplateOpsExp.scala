@@ -8,7 +8,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with EffectExp {
+trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplateOpsExp with EffectExp {
   this: DHDLExp =>
 
   // --- Nodes
@@ -35,11 +35,11 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
 
   case class Block_reduce[T:Manifest](
     // - Inputs
-    ccOuter: Exp[Counterchain], // Counter chain for map (outer) loop
+    ccOuter: Exp[CounterChain], // Counter chain for map (outer) loop
     ccInner: Exp[CounterChain], // Counter chain for reduce (inner) loop
     accum:  Exp[BRAM[T]],
     // - Reified blocks
-    func: Block[Unit],          // Map function
+    func: Block[BRAM[T]],       // Map function
     resLdFunc: Block[T],        // Partial result load function
     ldFunc: Block[T],           // Accumulator load function
     rFunc: Block[T],            // Reduction function
@@ -51,7 +51,7 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
     acc: Sym[BRAM[T]],
     res: Sym[T],
     rV:  (Sym[T], Sym[T])
-  )(implicit val ctx: SourceContext) {
+  )(implicit val ctx: SourceContext) extends Def[Pipeline] {
     val mT = manifest[T]
   }
 
@@ -87,29 +87,29 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
     val effects = summarizeEffects(mBlk) andAlso summarizeEffects(ldBlk) andAlso
                   summarizeEffects(rBlk) andAlso summarizeEffects(stBlk) andAlso Write(List(accum.asInstanceOf[Sym[C[T]]]))
 
-    reflectEffect(Pipe_reduce(cchain, accum, ldBlk, stBlk, mBlk, rBlk, is, acc, res, rV), effects.star)
+    reflectEffect(Pipe_reduce[T,C](cchain, accum, ldBlk, stBlk, mBlk, rBlk, is, acc, res, rV), effects.star)
   }
 
-  def block_reduce[T:Manifest](chain: Rep[CounterChain], accum: Rep[BRAM[T]], func: Rep[Indices] => Rep[BRAM[T]], rFunc: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext): Rep[Pipeline] = {
-    val is = List.fill(sizeOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }   // Map loop indices
-    val inds = indices_create(is)
+  def block_reduce[T:Manifest](cchain: Rep[CounterChain], accum: Rep[BRAM[T]], func: Rep[Indices] => Rep[BRAM[T]], rFunc: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext): Rep[Pipeline] = {
+    val isMap = List.fill(sizeOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }   // Map loop indices
+    val indsMap = indices_create(isMap)
 
     // Reified map function
-    val mBlk = reifyEffects( func(inds) )
+    val mBlk = reifyEffects( func(indsMap) )
 
     // Reduce loop indices
-    val ctrsRed = dimsOf(accum).map{dim => Counter(max = dim) }
-    val cchainRed = CounterChain(ctrsred:_*)
-    val isRed = List.fill(sizeOf(ccRed)){ fresh[FixPt[Signed,B32,B0]] } // Reduce loop indices
+    val ctrsRed = dimsOf(accum).map{dim => Counter(max = dim.as[Index]) }
+    val cchainRed = CounterChain(ctrsRed:_*)
+    val isRed = List.fill(sizeOf(cchainRed)){ fresh[FixPt[Signed,B32,B0]] } // Reduce loop indices
     val indsRed = indices_create(isRed)
 
     val part = fresh[BRAM[T]]
     // Partial result load
-    val ldPartBlk = reifyEffects( part.ld(indsRed) )
+    val ldPartBlk = reifyEffects( canBramMem[T].ld(part, indsRed) )
 
     val acc = reflectMutableSym( fresh[BRAM[T]] )
     // Accumulator load
-    val ldBlk = reifyEffects( acc.ld(indsRed) )
+    val ldBlk = reifyEffects( canBramMem[T].ld(acc, indsRed) )
 
     val rV = (fresh[T],fresh[T])
     // Reified reduction function
@@ -117,40 +117,40 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
 
     val res = fresh[T]
     // Accumulator store function
-    val stBlk = reifyEffects( acc.st(indsRed, res) )
+    val stBlk = reifyEffects( canBramMem[T].st(acc, indsRed, res) )
 
     val effects = summarizeEffects(mBlk) andAlso summarizeEffects(ldPartBlk) andAlso
                   summarizeEffects(ldBlk) andAlso summarizeEffects(rBlk) andAlso summarizeEffects(stBlk) andAlso Write(List(accum.asInstanceOf[Sym[BRAM[T]]]))
 
-    reflectEffect(Block_reduce(chain, cchainRed, accum, mBlk, ldPartBlk, ldBlk, rBlk, stBlk, inds, indsRed, part, acc, res, rV), effects.star)
+    reflectEffect(Block_reduce[T](cchain, cchainRed, accum, mBlk, ldPartBlk, ldBlk, rBlk, stBlk, isMap, isRed, part, acc, res, rV), effects.star)
   }
 
   def counter_new(start: Rep[FixPt[Signed,B32,B0]],end: Rep[FixPt[Signed,B32,B0]],step: Rep[FixPt[Signed,B32,B0]], par: Int)(implicit ctx: SourceContext) = {
     val p = param[Int](par)
-    reflectEffect[Counter](Counter_new(start,end,step,par)(ctx))
+    reflectEffect[Counter](Counter_new(start,end,step,p)(ctx))
   }
 
-  private def counterSplit(x: Rep[Counter]) = x match {
+  private def counterSplit(x: Rep[Counter]): (Rep[Index],Rep[Index],Rep[Index],Param[Int]) = x match {
     case Def(EatReflect(Counter_new(start,end,step,par))) => (start,end,step,par)
     case _ => throw new Exception("Could not find def for counter")
   }
 
   def counterchain_new(counters: List[Rep[Counter]])(implicit ctx: SourceContext): Rep[CounterChain] = {
     val ctrSplit = counters.map{ctr => counterSplit(ctr)}
-    val starts = ctrSplit.map(_._1)
-    val ends   = ctrSplit.map(_._2)
-    val strides = ctrSplit.map(_._3)
-    val pars = ctrSplit.map(_._4).map(int_to_fix(_)) // HACK: Convert to fixed point
+    val starts: List[Rep[Index]] = ctrSplit.map(_._1)
+    val ends:   List[Rep[Index]] = ctrSplit.map(_._2)
+    val steps:  List[Rep[Index]] = ctrSplit.map(_._3)
+    val pars:   List[Rep[Index]] = ctrSplit.map(_._4).map(int_to_fix(_)) // HACK: Convert Int param to fixed point
 
-    val nIter = reifyEffects[FixPt[Signed,B32,B0]] {
-      val lens = starts.zip(ends).map{
-        case (ConstFix(x),ConstFix(y)) => (y - x).as[FixPt[Signed,B32,B0]]
+    val nIter: Block[Index] = reifyEffects {
+      val lens: List[Rep[Index]] = starts.zip(ends).map{
+        case (ConstFix(x: Int),ConstFix(y: Int)) => (y - x).as[FixPt[Signed,B32,B0]]
         case (ConstFix(0), end) => end
-        case (start, end) => (end - start)
+        case (start, end) => sub_fix(end, start)
       }
-      val total = (lens,strides,pars).zipped.map{
-        case (len, ConstFix(1), par) => (len / par) // TODO: Should use ceiling here
-        case (len, stride, par) => (len / (stride * par))
+      val total: List[Rep[Index]] = (lens,steps,pars).zipped.map {
+        case (len, ConstFix(1), par) => div_fix(len, par) // Should round correctly here
+        case (len, step, par) => div_fix(len, mul_fix(step, par))
       }
       total.reduce{_*_}
     }
@@ -210,8 +210,8 @@ trait PipeTemplateOpsExp extends PipeTemplateOps with MemoryTemplateOpsExp with 
   }
 }
 
-trait ScalaGenPipeTemplateOps extends ScalaGenEffect {
-  val IR: PipeTemplateOpsExp with DHDLIdentifiers
+trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
+  val IR: ControllerTemplateOpsExp with DHDLIdentifiers
   import IR._
 
   def emitNestedLoop(iters: List[Sym[FixPt[Signed,B32,B0]]], cchain: Exp[CounterChain])(emitBlk: => Unit) = {
@@ -269,13 +269,13 @@ trait ScalaGenPipeTemplateOps extends ScalaGenEffect {
   }
 }
 
-trait DotGenPipeTemplateOps extends DotGenEffect{
-  val IR: PipeTemplateOpsExp with FixPtOpsExp with FltPtOpsExp with TpesOpsExp with NosynthOpsExp
+trait DotGenControllerTemplateOps extends DotGenEffect{
+  val IR: ControllerTemplateOpsExp with TpesOpsExp
 	        with OffChipMemOpsExp with RegOpsExp with DHDLCodegenOps
 
   import IR.{Sym, Exp, Def}
   import IR.{ConstFix, ConstFlt, ConstBit, EatReflect}
-  import IR.{Counterchain_new, Offchip_new, Reg_new, Set_arg, Set_mem, Pipe_foreach, Pipe_reduce}
+  import IR.{Counterchain_new, Offchip_new, Reg_new, Set_mem, Pipe_foreach, Pipe_reduce}
   import IR.{CounterChain, FixPt, Signed, B32, B0}
 
 	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
@@ -330,8 +330,8 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
       emit(s"""subgraph ${quote(sym)} {""")
       emit(s"""  label = quote(sym)""")
       emit(s"""  style = "filled" """)
-      emit(s"""  fillcolor = "$quote{mpFillColor}" """)
-      emit(s"""  color = "$quote{mpBorderColor}" """)
+      emit(s"""  fillcolor = "${quote(mpFillColor)}" """)
+      emit(s"""  color = "${quote(mpBorderColor)}" """)
       val sym_ctrl = quote(sym) + "_ctrl"
       emit(s"""  ${sym_ctrl} [label="ctrl" height=0 style="filled" fillcolor="${mpBorderColor} "]""")
       emit(s"""}""")
@@ -345,13 +345,13 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
   }
 }
 
-trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
-  val IR: PipeTemplateOpsExp with FixPtOpsExp with FltPtOpsExp with TpesOpsExp with NosynthOpsExp
+trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
+  val IR: ControllerTemplateOpsExp with TpesOpsExp
 	        with OffChipMemOpsExp with RegOpsExp with DHDLCodegenOps
 
   import IR.{Sym, Exp, Def}
   import IR.{ConstFix, ConstFlt, ConstBit, EatReflect}
-  import IR.{Counterchain_new, Offchip_new, Reg_new, Set_arg, Set_mem, Pipe_foreach, Pipe_reduce}
+  import IR.{Counterchain_new, Offchip_new, Reg_new, Set_mem, Pipe_foreach, Pipe_reduce}
   import IR.{CounterChain, FixPt, Signed, B32, B0}
 
   // TODO

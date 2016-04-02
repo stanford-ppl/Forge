@@ -42,7 +42,7 @@ trait AreaAnalyzer extends ModelingTools {
 
   def areaOf(e: Exp[Any]) = IR.areaOf(e, inReduce, inHwScope)
 
-  def areaOfBlock(b: Block[Any], includeDelayLines: Boolean) = {
+  def areaOfBlock(b: Block[Any], includeDelayLines: Boolean): FPGAResources = {
     val outerScope = areaScope
     areaScope = Nil
     traverseBlock(b)
@@ -60,7 +60,7 @@ trait AreaAnalyzer extends ModelingTools {
     else
       area
   }
-  def areaOfCycle(b: Block[Any]) = {
+  def areaOfCycle(b: Block[Any]): FPGAResources = {
     val outerReduce = inReduce
     inReduce = true
     val out = areaOfBlock(b)

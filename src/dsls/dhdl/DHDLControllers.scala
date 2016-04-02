@@ -27,11 +27,11 @@ trait DHDLControllers {
     }
 
     // --- API
-    static (Counter) ("apply", Nil, ("max", Idx) :: Counter) implements redirect ${ counter_create(None, 0, $max, 1, 1) }
-    static (Counter) ("apply", Nil, (("min", Idx), ("max", Idx)) :: Counter) implements redirect ${ counter_create(None, $min, $max, 1, 1) }
+    static (Counter) ("apply", Nil, ("max", Idx) :: Counter) implements redirect ${ counter_create(None, 0.as[Index], $max, 1.as[Index], 1) }
+    static (Counter) ("apply", Nil, (("min", Idx), ("max", Idx)) :: Counter) implements redirect ${ counter_create(None, $min, $max, 1.as[Index], 1) }
     static (Counter) ("apply", Nil, (("min", Idx), ("max", Idx), ("step", Idx)) :: Counter) implements redirect ${ counter_create(None, $min, $max, $step, 1) }
-    static (Counter) ("apply", Nil, (("name",SString), ("max",Idx)) :: Counter) implements redirect ${ counter_create(Some($name), 0, $max, 1, 1) }
-    static (Counter) ("apply", Nil, (("name",SString), ("min", Idx), ("max", Idx)) :: Counter) implements redirect ${ counter_create(Some($name), $min, $max, 1, 1) }
+    static (Counter) ("apply", Nil, (("name",SString), ("max",Idx)) :: Counter) implements redirect ${ counter_create(Some($name), 0.as[Index], $max, 1.as[Index], 1) }
+    static (Counter) ("apply", Nil, (("name",SString), ("min", Idx), ("max", Idx)) :: Counter) implements redirect ${ counter_create(Some($name), $min, $max, 1.as[Index], 1) }
     static (Counter) ("apply", Nil, (("name",SString), ("min",Idx), ("max",Idx), ("step",Idx)) :: Counter) implements redirect ${ counter_create(Some($name), $min, $max, $step, 1) }
     static (Counter) ("apply", Nil, (("name",SString), ("min",Idx), ("max",Idx), ("step",Idx), ("par",SInt)) :: Counter) implements redirect ${ counter_create(Some($name), $min, $max, $step, $par) }
 
@@ -125,17 +125,17 @@ trait DHDLControllers {
     /* BlockReduce */
     // BlockReduce(counter, accum){i => f(i) }{(a,b) => reduce(a,b) }
     direct (MetaPipe) ("BlockReduce", T, CurriedMethodSignature(List(List(Counter, BRAM(T)), List(Idx ==> BRAM(T)), List((T,T) ==> T)), MUnit)) implements composite ${
-      val pipe = block_reduce(CounterChain($0), $1, {inds: Rep[Indices] => $2(inds(0)) }, $3)
+      val pipe = block_reduce[T](CounterChain($0), $1, {inds: Rep[Indices] => $2(inds(0)) }, $3)
       styleOf(pipe) = Coarse
     }
     // BlockReduce(counter, counter, accum){i => f(i) }{(a,b) => reduce(a,b) }
     direct (MetaPipe) ("BlockReduce", T, CurriedMethodSignature(List(List(Counter, Counter, BRAM(T)), List((Idx,Idx) ==> BRAM(T)), List((T,T) ==> T)), MUnit)) implements composite ${
-      val pipe = block_reduce(CounterChain($0, $1), $2, {inds: Rep[Indices] => $3(inds(0), inds(1))}, $4)
+      val pipe = block_reduce[T](CounterChain($0, $1), $2, {inds: Rep[Indices] => $3(inds(0), inds(1))}, $4)
       styleOf(pipe) = Coarse
     }
     // BlockReduce(counter, counter, counter, accum){i => f(i) }{(a,b) => reduce(a,b) }
     direct (MetaPipe) ("BlockReduce", T, CurriedMethodSignature(List(List(Counter, Counter, Counter, BRAM(T)), List((Idx,Idx,Idx) ==> BRAM(T)), List((T,T) ==> T)), MUnit)) implements composite ${
-      val pipe = block_reduce(CounterChain($0, $1, $2), $3, {inds: Rep[Indices] => $4(inds(0), inds(1), inds(2))}, $5)
+      val pipe = block_reduce[T](CounterChain($0, $1, $2), $3, {inds: Rep[Indices] => $4(inds(0), inds(1), inds(2))}, $5)
       styleOf(pipe) = Coarse
     }
 

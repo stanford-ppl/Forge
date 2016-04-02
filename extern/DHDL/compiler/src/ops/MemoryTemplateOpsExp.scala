@@ -26,17 +26,24 @@ trait DHDLIndices
 trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp with DHDLMetaOps {
   this: DHDLExp =>
 
-  def grabNumericConstant[T:Manifest](x: T): Option[Double] = manifest[T] match {
-    case manifest[Int] => Some(x.asInstanceOf[Int].toDouble)
-    case manifest[Long] => Some(x.asInstanceOf[Long].toDouble)
-    case manifest[Float] => Some(x.asInstanceOf[Float].toDouble)
-    case manifest[Double] => Some(x.asInstanceOf[Double])
-    case _ => None
+  def grabNumericConstant[T:Manifest](x: T): Option[Double] = {
+    val mD = manifest[Double]
+    val mF = manifest[Float]
+    val mI = manifest[Int]
+    val mL = manifest[Long]
+
+    manifest[T] match {
+      case `mI` => Some(x.asInstanceOf[Int].toDouble)
+      case `mL` => Some(x.asInstanceOf[Long].toDouble)
+      case `mF` => Some(x.asInstanceOf[Float].toDouble)
+      case `mD` => Some(x.asInstanceOf[Double])
+      case _ => None
+    }
   }
 
   override def boundsOf(x: Rep[Any])(implicit ctx: SourceContext): Option[Double] = x match {
-    case Param(x) => grabNumericConstant(x)(x.tp)
-    case Const(x) => grabNumericConstant(x)(x.tp)
+    case Param(c) => grabNumericConstant(c)(x.tp)
+    case Const(c) => grabNumericConstant(c)(x.tp)
     case _ => super.boundsOf(x)
   }
 
@@ -166,8 +173,8 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
 }
 
 // Defines type remappings required in Scala gen (should be same as in library)
-trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenPipeTemplateOps {
-  val IR: PipeTemplateOpsExp with DHDLIdentifiers
+trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTemplateOps {
+  val IR: ControllerTemplateOpsExp with DHDLIdentifiers
   import IR._
 
   override def emitDataStructures(path: String) {
@@ -453,7 +460,7 @@ object FloatPoint {
 }
 
 trait DotGenMemoryTemplateOps extends DotGenEffect {
-  val IR: PipeTemplateOpsExp with DHDLIdentifiers
+  val IR: ControllerTemplateOpsExp with DHDLIdentifiers
   import IR._
 
   // Note that tileDims are not fixed point values yet - they're just integers
@@ -498,7 +505,7 @@ trait DotGenMemoryTemplateOps extends DotGenEffect {
 }
 
 trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
-  val IR: PipeTemplateOpsExp with DHDLIdentifiers
+  val IR: ControllerTemplateOpsExp with DHDLIdentifiers
   import IR._
 
   // Note that tileDims are not fixed point values yet - they're just integers

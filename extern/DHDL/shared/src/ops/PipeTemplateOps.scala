@@ -6,7 +6,7 @@ import scala.reflect.{Manifest,SourceContext}
 import dhdl.shared._
 import dhdl.shared.ops._
 
-trait PipeTemplateOps extends Base {
+trait ControllerTemplateOps extends Base {
   this: DHDL =>
 
   def pipe_foreach(cchain: Rep[CounterChain], func: Rep[Indices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Pipeline]
@@ -16,4 +16,4 @@ trait PipeTemplateOps extends Base {
   def counter_new(start: Rep[FixPt[Signed,B32,B0]],end: Rep[FixPt[Signed,B32,B0]],step: Rep[FixPt[Signed,B32,B0]], par: Int)(implicit ctx: SourceContext): Rep[Counter]
   def counterchain_new(counters: List[Rep[Counter]])(implicit ctx: SourceContext): Rep[CounterChain]
 }
-trait PipeTemplateCompilerOps extends PipeTemplateOps { this: DHDL => }
+trait ControllerTemplateCompilerOps extends ControllerTemplateOps { this: DHDL => }

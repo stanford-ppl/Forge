@@ -2,6 +2,7 @@ package dhdl.compiler.ops
 
 import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, DotGenEffect, MaxJGenEffect}
 import scala.reflect.{Manifest,SourceContext}
+import scala.collection.mutable.Set
 
 import dhdl.shared._
 import dhdl.shared.ops._
@@ -158,10 +159,10 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
  	//				Forloop => _, println => _ , _}
 	import IR._
 
-	var emittedCtrChain = Set.empty[Sym[Any]]
+	val emittedCtrChain = Set.empty[Sym[Any]]
 
   override def initializeGenerator(buildDir:String): Unit = {
-		emittedCtrChain = Set.empty[Sym[Any]]
+		emittedCtrChain.clear
 		super.initializeGenerator(buildDir)
 	}
 
@@ -174,7 +175,7 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
 	def emitCtrChain(sym: Sym[Any], rhs: Def[Any]):Unit = rhs match {
 	  case e@Counterchain_new(counters) =>
 			if (!emittedCtrChain.contains(sym)) {
-				emittedCtrChain = emittedCtrChain + sym
+				emittedCtrChain += sym
     		emit(s"""subgraph cluster_${quote(sym)} {""")
     		emit(s""" label=${quote(sym)} """)
     		emit(s""" style="rounded, filled" """)
@@ -213,12 +214,10 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
 	  case e@Counterchain_new(counters) =>
-			parentOf(sym) match {
-				//TODO: check whether parent of cchain is empty, if is emit ctrchain
-				//emitCtrChain(sym, rhs)
-				//case None => emitCtrChain(sym, rhs)
-				case _ =>
-			}
+			//TODO: check whether parent of cchain is empty, if is emit ctrchain
+			//if (parentOf(sym).isEmpty) {
+			//	emitCtrChain(sym, rhs)
+			//}
 
     case e@Pipe_foreach(cchain, func, inds) =>
       emitNestedIdx(cchain, inds)
@@ -268,18 +267,22 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
 
 trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
   val IR: PipeTemplateOpsExp with FixPtOpsExp with FltPtOpsExp with TpesOpsExp with NosynthOpsExp
-	        with OffChipMemOpsExp with RegOpsExp with CounterOpsExp with DHDLCodegenOps  
+	        with OffChipMemOpsExp with RegOpsExp with CounterOpsExp with MetaPipeOpsExp with DHDLCodegenOps  
 
-					/*
-  import IR.{Sym, Exp, Def, Rep}
-  import IR.{ConstFix, ConstFlt, ConstBit, EatReflect}
-  import IR.{Counterchain_new, Offchip_new, Reg_Reg_new, Set_arg, Set_mem, Pipe_foreach, Pipe_reduce}
-  import IR.{CounterChain, FixPt, Signed, B32, B0}
-	import IR.{Coarse, Fine, Disabled, styleOf}
-	import IR.{Pipeline, Overload57}
-	*/
  import IR.{__ifThenElse => _, Nosynth___ifThenElse => _, __whileDo => _,
  					Forloop => _, println => _ , _}
+
+  /* Set of control nodes which already have their enable signal emitted */
+  val enDeclaredSet = Set.empty[Exp[Any]]
+
+  /* Set of control nodes which already have their done signal emitted */
+  val doneDeclaredSet = Set.empty[Exp[Any]]
+
+  override def initializeGenerator(buildDir:String): Unit = {
+		enDeclaredSet.clear
+		doneDeclaredSet.clear
+		super.initializeGenerator(buildDir)
+	}
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case e@Counterchain_new(counters) =>
@@ -315,7 +318,45 @@ trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
       emitBlock(rFunc)
       emitBlock(stFunc)
 
-    case _ => super.emitNode(sym, rhs)
+		case e@Pipe_parallel(func: Block[Unit]) => {
+
+			//TODO: this should be emiited into a saperate file. where can I get output directory
+			//information?
+			//TODO: move this to an analysis pass?
+			withStream(stream) {
+				emitParallelSM(quote(sym), childrenOf(sym).length)
+			}
+
+			//TODO: nothing fundamental about parallel requires it ouside forge but preprocessor is so
+			//annoying! Move back to forge or move all parallel codegen to extern?
+			// If control signals have not yet been defined, define them here
+			if (parentOf(sym).isEmpty) {
+				emit(s"""DFEVar ${quote(sym)}_en = top_en;""")
+				emit(s"""DFEVar ${quote(sym)}_done = dfeBool().newInstance(this);""")
+				emit(s"""top_done <== ${quote(sym)}_done;""")
+				enDeclaredSet += sym
+				doneDeclaredSet += sym
+			}
+
+			emitComment(s"""Parallel ${quote(sym)} Start""")
+			emit(s"""
+				SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_ParSM(this));
+				${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);
+				${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);
+				""")
+
+			childrenOf(sym).zipWithIndex.foreach { case (c, idx) =>
+				emit(s"""DFEVar ${quote(c)}_done = dfeBool().newInstance(this);
+					${quote(sym)}_sm.connectInput("s${idx}_done", ${quote(c)}_done);
+					DFEVar ${quote(c)}_en = ${quote(sym)}_sm.getOutput("s${quote(idx)}_en");""")
+				enDeclaredSet += c
+				doneDeclaredSet += c
+			}
+
+			emitComment(s"""Parallel ${quote(sym)} End""")
+
+		}
+
   }
 
   override def quote(x: Exp[Any]) = x match {
@@ -324,6 +365,144 @@ trait MaxJGenPipeTemplateOps extends MaxJGenEffect {
     case _ => super.quote(x)
   }
 
+	def emitParallelSM(name: String, numParallel: Int) = {
+		emit(s"""
+			package engine;
+			import com.maxeler.maxcompiler.v2.kernelcompiler.KernelLib;
+			import com.maxeler.maxcompiler.v2.statemachine.DFEsmInput;
+			import com.maxeler.maxcompiler.v2.statemachine.DFEsmOutput;
+			import com.maxeler.maxcompiler.v2.statemachine.DFEsmStateEnum;
+			import com.maxeler.maxcompiler.v2.statemachine.DFEsmStateValue;
+			import com.maxeler.maxcompiler.v2.statemachine.kernel.KernelStateMachine;
+			import com.maxeler.maxcompiler.v2.statemachine.types.DFEsmValueType;
+
+			class ${name}_ParSM extends KernelStateMachine {
+
+				// States
+				enum States {
+					INIT,
+					RUN,
+					DONE
+				}
+
+				// State IO
+				private final DFEsmOutput sm_done;
+				private final DFEsmInput sm_en;""");
+
+		for(i <- 0 until numParallel) {
+			emit(s"""
+				private final DFEsmInput s${i}_done;
+				private final DFEsmOutput s${i}_en;
+				""")
+		}
+
+		emit(s"""
+			// State storage
+			private final DFEsmStateEnum<States> stateFF;
+			private final DFEsmStateValue[] bitVector;
+
+			private final int numParallel = $numParallel;
+			// Initialize state machine in constructor
+			public ${name}_ParSM(KernelLib owner) {
+				super(owner);
+
+				// Declare all types required to wire the state machine together
+				DFEsmValueType counterType = dfeUInt(32);
+				DFEsmValueType wireType = dfeBool();
+				// Define state machine IO
+				sm_done = io.output("sm_done", wireType);
+				sm_en = io.input("sm_en", wireType);
+				""")
+		for(i <- 0 until numParallel) {
+			emit(s"""
+				s${i}_done = io.input("s${i}_done", wireType);
+				s${i}_en = io.output("s${i}_en", wireType);
+				""")
+		}
+
+		emit(s"""
+			// Define state storage elements and initial state
+			stateFF = state.enumerated(States.class, States.INIT);
+
+			bitVector = new DFEsmStateValue[numParallel];
+			for (int i=0; i<numParallel; i++) {
+				bitVector[i] = state.value(wireType, 0);
+			}
+			}
+
+			private void resetBitVector() {
+				for (int i=0; i<numParallel; i++) {
+					bitVector[i].next <== 0;
+				}
+			}
+
+			@Override
+			protected void nextState() {
+				IF(sm_en) {
+					""")
+
+		for(i <- 0 until numParallel) {
+			emit(s"""
+				IF (s${i}_done) {
+					bitVector[$i].next <== 1;
+				}""")
+		}
+
+		emit(s"""
+			SWITCH(stateFF) {
+				CASE (States.INIT) {
+					stateFF.next <== States.RUN;
+				}
+				""")
+
+		emit(s"""
+			CASE (States.RUN) {""")
+				val condStr = (0 until numParallel).map("bitVector[" + _ + "]").reduce(_ + " & " + _)
+				emit(s"""
+					IF($condStr) {
+						resetBitVector();
+						stateFF.next <== States.DONE;
+					}
+			}
+
+			CASE (States.DONE) {
+				resetBitVector();
+				stateFF.next <== States.INIT;
+			}
+			OTHERWISE {
+				stateFF.next <== stateFF;
+			}
+			}
+				}
+			}
+			""")
+
+				emit("""
+					@Override
+					protected void outputFunction() {
+						sm_done <== 0;""")
+				for (i <- 0 until numParallel) {
+					emit(s"""
+						s${i}_en <== 0;""")
+				}
+
+				emit("""
+					IF (sm_en) {
+						SWITCH(stateFF) {
+							CASE(States.RUN) {""")
+								for (i <- 0 until numParallel) {
+									emit(s"""s${i}_en <== ~(bitVector[${i}] | s${i}_done);""")
+								}
+								emit(s"""
+							}
+							CASE(States.DONE) {
+								sm_done <== 1;
+							}
+						}
+					}
+					}
+			}""")
+	}
 	
 	def emitPipeProlog(sym: Sym[Any], cchain: Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]],
 		writesToAccumRam:Boolean) = {

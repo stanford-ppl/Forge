@@ -461,10 +461,6 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps {
 				emitEdge(s, sym, "stride")
 			}
 			emitEdge(memOfs, sym)
-			//emitNestedIdx(cchain, iters)
-			//iters.foreach{it =>
-			//	emitEdge(it, sym)
-			//}
 
 		case Offchip_new(size) =>
 			/* Special case to hand nodes producing size of offchip outside hardware scope */

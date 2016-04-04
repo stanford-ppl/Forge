@@ -202,10 +202,6 @@ trait DHDLControllers {
 			}
     }))
 
-    // --- MaxJ Backend
-    impl (pipe_parallel) (codegen (maxj, ${
-		}))
-
     impl (block_reduce) (codegen(maxj, ${
     }))
 	}

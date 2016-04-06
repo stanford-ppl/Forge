@@ -87,7 +87,8 @@ trait NodeDataTest extends ForgeTestModule with OptiGraphApplication {
       }
       collect(count == size-1)
     }
-
+    
+    nodeData.close()
     mkReport
   }
 }

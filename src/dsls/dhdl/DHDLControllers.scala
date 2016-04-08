@@ -160,7 +160,8 @@ trait DHDLControllers {
           val __a = __res.apply(__upIter.toInt)
           val __r = if (__iter > FixedPoint[Signed,B32,B0](1)) { // Only reduce after first iteration
             val __b = $2.apply(__upIter.toInt)
-            $b[4](__a,__b)
+            val __out = $b[4](__a,__b)
+            __out
           }
           else {
             __a

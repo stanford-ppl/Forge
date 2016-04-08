@@ -99,6 +99,22 @@ trait DeliteGenTraversals extends BaseGenTraversals {
   }
 
   // --- Analyzers
+  def makeAnalysisMethodName(o: Rep[DSLOp]) = "analyze_" + makeOpMethodName(o)
+  def makeAnalysisMethodCall(o: Rep[DSLOp]) = {
+    val args = makeArgsWithBoundSyms(o.args, Impls(o))
+    val lhsArg = "lhs" + (if (o.args.isEmpty) "" else ", ")
+    val implicits = makeNodeImplicits(o)
+    val implicitsWithParens = if (implicits.isEmpty) "" else implicits.mkString("(",",",")")
+
+    makeLowerMethodName(o) + "(" + lhsArg + args.drop(1) + implicitsWithParens
+  }
+  def makeAnalysisMethodSignature(o: Rep[DSLOp]) = {
+    val implicitArgs = makeOpImplicitArgsWithType(o)
+    val lhsArg = "lhs: Exp[Any]" + (if (o.args.isEmpty) "" else ", ")
+    // TODO: makeArgs doesn't actually honor addParen in the way you would expect (changing it to also leads to weird issues elsewhere)
+    "def " + makeAnalysisMethodName(o) + makeTpeParsWithBounds(o.tpePars) + "(" + lhsArg + makeArgsWithBoundSymsWithType(o.args, Impls(o), blockify).drop(1) + implicitArgs
+  }
+
   // TODO: Eventually want to handle TTP as well, but doesn't make sense to until after fusion changes
   def emitAnalyzer(az: Rep[DSLAnalyzer], stream: PrintWriter) {
     stream.println("trait " + makeTraversalName(az) + " extends " + dsl + "AnalyzerBase {")
@@ -109,18 +125,21 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("  override val autopropagate = true")     // TODO: Should be able to change this
     stream.println("  override def completed(e: Exp[Any]) = true") // TODO: Should be able to change this
     stream.println()
-    stream.println("  override def analyzeTP(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext) = rhs match {")
-
     val patterns = Analyzers(az).rules
+    for ((op,rules) <- patterns) {
+      emitTraversalRules(op, rules, stream, 4, Some(makeAnalysisMethodSignature))
+    }
+    stream.println()
+    stream.println("  override def analyzeTP(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext) = rhs match {")
     for ((op,rules) <- patterns) {
       if (!hasIRNode(op) || hasMultipleIRNodes(op)) {
         err("Cannot create analysis rule for op " + op.name + ": Op must be represented by exactly one IR node")
       }
-      emitTraversalRules(op, rules, stream, 4)
+      emitWithIndent("case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(op) + " => Some(" + makeAnalysisMethodCall(op) + ")", stream, 4)
     }
-
     stream.println("    case _ => super.analyzeTP(lhs, rhs)") // TODO: Should be able to change this
     stream.println("  }")
+
     stream.println("}")
   }
 

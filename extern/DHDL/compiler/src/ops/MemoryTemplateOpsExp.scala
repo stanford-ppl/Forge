@@ -312,8 +312,9 @@ class FixedPoint[S:Manifest,I:Manifest,F:Manifest](private val v: BigInt) {
   }
 
   def toFloatPoint[G:Manifest,E:Manifest] = {
-    val value = BigDecimal(v >> rep.f) + (BigDecimal(v & ((BigInt(1) << rep.f) - 1)) / BigDecimal(BigInt(1) << rep.f))
-    FloatPoint[G,E](value)
+    val vv = v.abs
+    val value = BigDecimal(vv >> rep.f) + (BigDecimal(vv & ((BigInt(1) << rep.f) - 1)) / BigDecimal(BigInt(1) << rep.f))
+    FloatPoint[G,E]((if (v < 0) -value else value))
   }
   def changeFormat[S2:Manifest,I2:Manifest,F2:Manifest] = {
     val rep2 = FixFormat(sign[S2],nbits[I2],nbits[F2])
@@ -325,7 +326,9 @@ class FixedPoint[S:Manifest,I:Manifest,F:Manifest](private val v: BigInt) {
 
   override def toString() = {
     if (rep.f > 0) {
-      (v >> rep.f).toString + "." + (BigDecimal(v & ((BigInt(1) << rep.f) - 1)) / BigDecimal(BigInt(1) << rep.f)).toString.split('.').last
+      val vv = v.abs
+      (vv >> rep.f).toString + "." + (BigDecimal(vv & ((BigInt(1) << rep.f) - 1)) / BigDecimal(BigInt(1) << rep.f)).toString.split('.').last
+      if (v < 0) "-"+str else str
     }
     else v.toString()
   }
@@ -424,21 +427,28 @@ object FloatPoint {
 }
 
 //trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps{
-trait DotGenMemoryTemplateOps extends DotGenEffect{
-  val IR: PipeTemplateOpsExp with DHDLIdentifiers
-  import IR._
+trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps {
+  val IR: PipeTemplateOpsExp with OffChipMemOpsExp  with DHDLCodegenOps with RegOpsExp  
+ 	import IR._
 
-	//TODO: use this function from DotGenPipeTemplateOps
-	def emitNestedIdx1(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
-    case Def(EatReflect(Counterchain_new(counters))) =>
-	     inds.zipWithIndex.foreach {case (iter, idx) => emitAlias(iter, counters(idx)) }
+	var emittedSize = Set.empty[Exp[Any]]
+  override def initializeGenerator(buildDir:String): Unit = {
+		emittedSize = Set.empty[Exp[Any]]
+		super.initializeGenerator(buildDir)
 	}
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) => // Load
 			val l = s"Tile${if (store) "Store" else "Load"}_" + quote(sym).split("_")(1)
-      emit(s"""${quote(sym)} [ label=$l shape="rectangle" style="rounded, filled"
-				fillcolor="${tileTransFillColor}" color="black"]""")
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+			emit(s"""label="$l"""") 
+			emit(s"""shape="rectangle"""")
+			emit(s"""style="rounded, filled"""")
+			emit(s"""fillcolor=$tileTransFillColor""")
+			emit(s"""color="black"""")
+			emit(s"""${quote(sym)} [label="${if (store) "TileSt" else "TileLd"}" style="rounded, filled" color="black" fillcolor="gray"]""")
+			emitCtrChain(cchain)
+			emit(s"""} """)
 			if (store)
 				emitEdge(sym, mem)
 			else
@@ -447,15 +457,32 @@ trait DotGenMemoryTemplateOps extends DotGenEffect{
 				emitEdge(local, sym)
 			else
 				emitEdge(sym, local)
-			//emit(s"""${quote(cchain)} -> ${quote(sym)}""")
-			emitNestedIdx1(cchain, iters)
 			strides.foreach{ s =>
 				emitEdge(s, sym, "stride")
 			}
 			emitEdge(memOfs, sym)
-			iters.foreach{it =>
-				emitEdge(it, sym)
+
+		case Offchip_new(size) =>
+			/* Special case to hand nodes producing size of offchip outside hardware scope */
+			def hackGen(x: Exp[Any]): Unit = x match { 
+				case Def(EatReflect(_:Reg_Reg_new[_])) => // Nothing
+				case ConstFix(_) => // Nothing
+				case ConstFlt(_) => // Nothing
+				case Def(d) => 
+					alwaysGen {
+						emitNode(x.asInstanceOf[Sym[Any]], d)
+					}
+					syms(d).foreach{ s => s match {
+							case _ => hackGen(s)
+						}
+					}
+				case _ => // Nothing
 			}
+			if (!emittedSize.contains(size)) {
+				hackGen(size)
+				emittedSize = emittedSize + size
+			}
+			super.emitNode(sym, rhs)
 
     case _ => super.emitNode(sym, rhs)
   }

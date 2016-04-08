@@ -127,7 +127,12 @@ trait DHDLMetadata {
       composite ${ setMetadata($0, MTileRanges($1)) }
     internal.static (rangesOps) ("apply", T, Tile(T) :: SList(Range)) implements composite ${ meta[MTileRanges]($0).get.ranges }
 
-    /* Parent of a node */
+    /* Parent of a node, which is a controller */
+	 	// TODO: confirm with Raghu
+		/* Reg: 1. reg.reset=(parent.reset its wen& parent.en) 2. reg.wen=din.parent.en */
+	 	/* Counter: parent is its counterchain */
+	 	/* Pipe/Metapipe/Sequential/Parallel: every node (includeing primitive nodes) inside the
+		 * controller has the controller as its parent*/ //TODO: is this necessary?
     val MParent = metadata("MParent", "parent" -> MAny)
     val parentOps = metadata("parentOf")
     onMeet (MParent) ${ this }
@@ -137,6 +142,22 @@ trait DHDLMetadata {
     	meta[MParent]($0) match {
     	  case Some(p) => Some(p.parent)
     	  case None => None
+    	}
+		}
+
+    /* A list of ctrl nodes inside current ctrl nodes. Order matters for sequential */
+	 	//TODO: need to confirm with Raghu whether ctrl node includes counterchain. looks like it
+		// it doesn't 
+		// It look like only sequential, metapipe, parallel, blockreduce? need to fill in this metadata 
+    val MChildren = metadata("MChildren", "children" -> SList(MAny))
+    val childrenOps = metadata("childrenOf")
+    onMeet (MChildren) ${ this }
+    internal.static (childrenOps) ("update", T, (T, SList(MAny)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MChildren($1)) }
+    internal.static (childrenOps) ("apply", T, T :: SList(MAny)) implements composite ${
+    	meta[MChildren]($0) match {
+    	  case Some(p) => p.children
+    	  case None => Nil 
     	}
 		}
 

@@ -92,7 +92,7 @@ trait DHDLMisc {
 
     val ArrColl = tpeClassInst("ArrayColl", T, Coll(MArray(T)))
     infix (ArrColl) ("empty", T, Nil :: MArray(T)) implements composite ${ array_empty_imm[T](unit(0)) }
-    infix (ArrColl) ("zeros", T, MArray(T) :: MArray(T)) implements composite ${ array_empty_imm[T]($0.length) }  // TODO: Should be recursive?
+    infix (ArrColl) ("zeros", T, MArray(T) :: MArray(T)) implements composite ${ array_empty_imm[T](array_length($0)) }  // TODO: Should be recursive?
 
     val Arr = grp("Array")
     static (Arr) ("empty", T, Idx :: MArray(T)) implements composite ${ array_empty[T](fix_to_int($0)) }
@@ -106,7 +106,7 @@ trait DHDLMisc {
 
 
     val API = grp("ForgeArrayAPI") // ForgeArrayOps already exists...
-    infix (API) ("length", T, MArray(T) :: MInt) implements composite ${ array_length($0) }
+    infix (API) ("length", T, MArray(T) :: Idx) implements composite ${ int_to_fix[Signed,B32](array_length($0)) }
     infix (API) ("apply", T, (MArray(T), Idx) :: T) implements composite ${ array_apply($0, fix_to_int($1)) }
     infix (API) ("update", T, (MArray(T), Idx, T) :: MUnit, effect = write(0)) implements composite ${ array_update($0, fix_to_int($1), $2) }
 
@@ -119,7 +119,7 @@ trait DHDLMisc {
     infix (API) ("mkString", T, (MArray(T), MString) :: MString) implements composite ${ array_mkstring($0, $1) }
 
     infix (API) ("zipWithIndex", T, MArray(T) :: MArray(Tup2(T, Idx))) implements composite ${
-      Array.tabulate(int_to_fix[Signed,B32]($0.length)){i => pack(($0(i), i)) }
+      Array.tabulate($0.length){i => pack(($0(i), i)) }
     }
 
     direct (API) ("__equal", T, (MArray(T), MArray(T)) :: Bit, TOrder(T)) implements composite ${

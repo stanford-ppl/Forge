@@ -69,6 +69,7 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
     stream.println("trait " + dsl + "Base extends " + dsl + "Identifiers {")
     stream.println("  type Rep[+T] = T")
     stream.println("  protected def unit[T:Manifest](x: T) = x")
+    stream.println("  protected def param[T:Manifest](x: T) = x")
     stream.println("}")
     stream.println()
 

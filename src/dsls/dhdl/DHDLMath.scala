@@ -311,10 +311,9 @@ trait DHDLMath {
     impl (xnor_bit) (codegen(dot, ${ $sym [label="xnor:bit" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
 
     // --- MaxJ Backend
-		//TODO: maxj negation?
     impl (neg_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
-    	$pre $sym = 0 - $0 ;
+    	$pre $sym = -$0 ;
 		}))
     impl (add_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
@@ -340,19 +339,19 @@ trait DHDLMath {
     impl (leq_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			$pre $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
-			//TODO: maxj leq?
     	$sym <== $0 <= $1 ;
 		}))
     impl (neq_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			$pre $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
-			//TODO: maxj neq?
-    	$sym <== $0 != $1 ;
+    	$sym <== $0.neq($1);
 		}))
     impl (eql_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			$pre $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
-    	$sym <== $0 === $1 ;
+    	//TODO: why in old dhdl use ===
+			//$sym <== $0 === $1 ;
+			$sym <== $0.eq($1) ;
 		}))
     impl (and_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
@@ -362,21 +361,18 @@ trait DHDLMath {
 			@ val pre = maxJPre(sym)
     	$pre $sym = $0 | $1 ;
 		}))
-			//TODO: maxj lsh?
     impl (lsh_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
-    	$pre $sym = $0 + $1 ;
+    	$pre $sym = $0 << $1 ;
 		}))
-			//TODO: maxj rsh?
     impl (rsh_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
-    	$pre $sym = $0 + $1 ;
+			$pre $sym = $0 >> $1 ;
 		}))
 
-		//TODO: maxj negation?
     impl (neg_flt) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
-    	$pre $sym = 0 - $0 ;
+    	$pre $sym = -$0 ;
 		}))
     impl (add_flt) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
@@ -402,19 +398,19 @@ trait DHDLMath {
     impl (leq_flt) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			$pre $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
-			//TODO: maxj leq?
     	$sym <== $0 <= $1 ;
 		}))
     impl (neq_flt) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			$pre $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
-			//TODO: maxj neq?
-    	$sym <== $0 != $1 ;
+    	$sym <== $0.neq($1);
 		}))
     impl (eql_flt) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			$pre $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
-    	$sym <== $0 === $1 ;
+    	//TODO: why in old dhdl use ===
+			//$sym <== $0 === $1 ;
+			$sym <== $0.eq($1) ;
 		}))
 
     impl (not_bit) (codegen(maxj, ${
@@ -429,15 +425,13 @@ trait DHDLMath {
 			@ val pre = maxJPre(sym)
     	$pre $sym = $0 | $1 ;
 		}))
-		//TODO: maxj xor?
     impl (xor_bit) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
-    	$pre $sym = $0 !== $1 ;
+    	$pre $sym = $0 ^ $1 ;
 		}))
-		//TODO: maxj xnor?
     impl (xnor_bit) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
-    	$pre $sym = $0 === $1 ;
+    	$pre $sym = ~ ( $0 ^ $1 ) ;
 		}))
   }
 
@@ -556,7 +550,12 @@ trait DHDLMath {
     impl (mux) (codegen($cala, ${ if ($sel) $a else $b }))
 
     // --- Dot Backend
-    impl (mux) (codegen(dot, ${ $sym [label="mux", shape="diamond" style="filled" fillcolor="white"] }))
+    impl (mux) (codegen(dot, ${ 
+			$sym [label="mux", shape="diamond" style="filled" fillcolor="white"] 
+			$sel -> $sym [ xlabel="sel" ]
+			$a -> $sym [ xlabel="a" ]
+			$b -> $sym [ xlabel="b" ]
+		}))
 
     // --- MaxJ Backend
     impl (mux) (codegen(maxj, ${

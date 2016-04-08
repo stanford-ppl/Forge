@@ -130,8 +130,8 @@ trait LogReg extends DHDLApplication {
 	 	val gold = sTheta 
 		/*
 		*/
-    //println("expected: " + gold.mkString)
-    //println("result: " + result.mkString)
+    println("expected: " + gold.mkString(","))
+    println("result: " + result.mkString(","))
     //assert(result == gold)
   }
 }

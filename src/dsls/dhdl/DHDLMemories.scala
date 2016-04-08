@@ -150,7 +150,6 @@ trait DHDLMemories {
 				@ case Regular =>
           @ val parent = if (parentOf(sym).isEmpty) "top" else quote(parentOf(sym).get)
           @ val wen = quote(parent) + "_en"
-          @ val rst = quote(parent) + "_rst_en"
 					@ if (isDblBuf(sym)) {
 					@		val symlib = quote(sym) + "_lib"
 					@		val p = par(sym)
@@ -188,9 +187,6 @@ trait DHDLMemories {
 					//@		}
           //@ }
 					//TODO: don't have input here
-          //@  emit(s"""DFEVar ${quote(sym.input)}_real = $enSignalStr ? ${quote(sym.input)} : ${quote(sym)}; // enable""")
-          //@  emit(s"""DFEVar ${quote(sym)}_hold = Reductions.streamHold(${quote(sym.input)}_real, ($rst | ${quote(sym.producer)}_redLoop_done));""")
-          //@  emit(s"""${quote(sym)} <== $rst ? constant.var(${tpstr(init)},0) : stream.offset(${quote(sym)}_hold, -${quote(sym.producer)}_offset); // reset""")
 					@ }
 				@ case ArgumentIn =>  // alwaysGen
 					@ val sn = "ArgIn" + quote(sym).substring(quote(sym).indexOf("_"))
@@ -202,6 +198,10 @@ trait DHDLMemories {
     impl (reg_read)  (codegen(maxj, ${
 			@		val pre = maxJPre(sym)
 			$pre $sym = $reg 
+      @ val rst = quote(parent) + "_rst_en"
+      //@  emit(s"""DFEVar ${quote(sym.input)}_real = $enSignalStr ? ${quote(sym.input)} : ${quote(sym)}; // enable""")
+      //@  emit(s"""DFEVar ${quote(sym)}_hold = Reductions.streamHold(${quote(sym.input)}_real, ($rst | ${quote(sym.producer)}_redLoop_done));""")
+      //@  emit(s"""${quote(sym)} <== $rst ? constant.var(${tpstr(init)},0) : stream.offset(${quote(sym)}_hold, -${quote(sym.producer)}_offset); // reset""")
 		}))
     impl (reg_write) (codegen(maxj, ${
 			@ if (isDblBuf(sym)) {

@@ -364,7 +364,7 @@ class FixedPoint[S:Manifest,I:Manifest,F:Manifest](private val v: BigInt) {
   override def toString() = {
     if (rep.f > 0) {
       val vv = v.abs
-      (vv >> rep.f).toString + "." + (BigDecimal(vv & ((BigInt(1) << rep.f) - 1)) / BigDecimal(BigInt(1) << rep.f)).toString.split('.').last
+      val str = (vv >> rep.f).toString + "." + (BigDecimal(vv & ((BigInt(1) << rep.f) - 1)) / BigDecimal(BigInt(1) << rep.f)).toString.split('.').last
       if (v < 0) "-"+str else str
     }
     else v.toString()

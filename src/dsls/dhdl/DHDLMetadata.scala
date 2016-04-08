@@ -69,7 +69,7 @@ trait DHDLMetadata {
     onMeet (MRegTpe) ${ this }
     internal.static (regTpeOps) ("update", T, (T, RegTpe) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MRegTpe($1)) }
-    internal.static (regTpeOps) ("apply", T, T :: RegTpe) implements composite ${ meta[MRegTpe]($0).get.regTpe }
+    internal.static (regTpeOps) ("apply", T, T :: RegTpe) implements composite ${ meta[MRegTpe]($0).map(_.regTpe).getOrElse(Regular) }
 
     /* Register Initial Value */
     val MRegInit = metadata("MRegInit", "value" -> MAny)

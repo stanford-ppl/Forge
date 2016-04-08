@@ -30,6 +30,7 @@ trait TypeInspectionCompilerOps extends TypeInspectionOps with MemoryTemplateCom
     case mA if isFixPtType(mA) => nbits(mA.typeArguments(1)) + nbits(mA.typeArguments(2))
     case mA if isFltPtType(mA) => nbits(mA.typeArguments(0)) + nbits(mA.typeArguments(1))
     case mA if isBitType(mA) => 1
+    case mA if isRegister(mA) => nbits(mA.typeArguments(0))
     case BXX(bits) => bits
     case mA => throw new Exception("Unknown type in nbits: " + mA.runtimeClass.getSimpleName)
   }
@@ -37,6 +38,7 @@ trait TypeInspectionCompilerOps extends TypeInspectionOps with MemoryTemplateCom
   def isFixPtType[T:Manifest]: Boolean
   def isFltPtType[T:Manifest]: Boolean
   def isBitType[T:Manifest]: Boolean
+  def isRegister[T:Manifest]: Boolean
 }
 
 

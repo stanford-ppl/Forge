@@ -11,7 +11,7 @@ trait LatencyModel {
   this: DHDLExp with CounterToolsExp =>
 
   private var silentModel = false
-  private def warn(x: String) { if (!silentModel) warn(x) }
+  private def warn(x: String) { if (!silentModel) stageWarn(x) }
   def silenceLatencyModel() { silentModel = true }
 
   def latencyOf(s: Exp[Any], inReduce: Boolean) = s match {
@@ -38,7 +38,7 @@ trait LatencyModel {
     case Bram_store(ram, _, _) => if (isDblBuf(ram)) 2 else 1
 
     case _:Counter_new => 0
-    case Counterchain_new(ctrs) => 0
+    case _:Counterchain_new => 0
 
     // TODO: Have to get numbers for non-32 bit multiplies and divides
     case DHDLPrim_Neg_fix(_)   => 1

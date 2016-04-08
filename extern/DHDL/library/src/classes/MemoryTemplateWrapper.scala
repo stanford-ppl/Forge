@@ -47,6 +47,7 @@ trait MemoryTemplateWrapper extends ControllerTemplateWrapper with TypeInspectio
   def isFixPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FixedPoint[_,_,_]])
   def isFltPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FloatPoint[_,_]])
   def isBitType[T:Manifest]   = isSubtype(manifest[T].runtimeClass, classOf[Boolean])
+  def isRegister[T:Manifest]  = isSubtype(manifest[T].runtimeClass, classOf[Array[_]])  // eh...
 
   def tile_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], strides: List[Rep[FixPt[Signed,B32,B0]]], memOfs: Rep[FixPt[Signed,B32,B0]], tileDims: List[Int], cchain: Rep[CounterChain], store: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
     val localStrides = sdimsToStrides(tileDims).map(k => FixedPoint[Signed,B32,B0](k))

@@ -25,6 +25,8 @@ trait AreaAnalysisExp extends AreaModel with LatencyModel with CounterToolsExp w
     dsps = 0,
     bram = 338
   )
+
+  val FPGATarget = FPGAResourceSummary(alms=262400,regs=0,dsps=1963,bram=2567)  // Stratix V on MAIA board
 }
 
 trait AreaAnalyzer extends ModelingTools {
@@ -32,7 +34,7 @@ trait AreaAnalyzer extends ModelingTools {
   import IR._
   import ReductionTreeAnalysis._
 
-  private def silenceTraversal() {
+  override def silenceTraversal() {
     super.silenceTraversal()
     IR.silenceAreaModel()
   }
@@ -42,14 +44,14 @@ trait AreaAnalyzer extends ModelingTools {
 
   def areaOf(e: Exp[Any]) = IR.areaOf(e, inReduce, inHwScope)
 
-  def areaOfBlock(b: Block[Any], includeDelayLines: Boolean): FPGAResources = {
+  def areaOfBlock(b: Block[Any], innerLoop: Boolean): FPGAResources = {
     val outerScope = areaScope
     areaScope = Nil
     traverseBlock(b)
     val area = areaScope.fold(NoArea){_+_}
     areaScope = outerScope
 
-    if (includeDelayLines) {
+    if (innerLoop) {
       val delays = pipeDelays(b)
       val delayLineArea = delays.map {
         case (sym,len) if isBits(sym.tp) => areaOfDelayLine(nbits(sym.tp), len)
@@ -63,7 +65,7 @@ trait AreaAnalyzer extends ModelingTools {
   def areaOfCycle(b: Block[Any]): FPGAResources = {
     val outerReduce = inReduce
     inReduce = true
-    val out = areaOfBlock(b)
+    val out = areaOfBlock(b, true)
     inReduce = outerReduce
     out
   }
@@ -73,19 +75,20 @@ trait AreaAnalyzer extends ModelingTools {
     val area = rhs match {
       case EatReflect(Hwblock(blk)) =>
         inHwScope = true
-        areaOfBlock(blk, false)
+        val body = areaOfBlock(blk, false)
         inHwScope = false
+        body
 
       case EatReflect(Counterchain_new(ctrs,nIters)) => areaOfBlock(nIters,true) + areaOf(lhs)
       case EatReflect(Pipe_parallel(func)) => areaOfBlock(func,false) + areaOf(lhs)
       case EatReflect(Unit_pipe(func)) =>
-        delayLines + areaOfBlock(func, styleOf(lhs) == Fine) + areaOf(lhs)
+        areaOfBlock(func, styleOf(lhs) == Fine) + areaOf(lhs)
 
       case EatReflect(Pipe_foreach(cchain, func, _)) =>
         val P = parOf(cchain).reduce(_*_)
         areaOfBlock(func, styleOf(lhs) == Fine) * P + areaOf(lhs)
 
-      case EatReflect(Pipe_reduce(cchain,_,ld,st,func,rFunc,_,_,_,_)) =>
+      case EatReflect(e@Pipe_reduce(cchain,_,ld,st,func,rFunc,_,_,_,_)) =>
         val P = parOf(cchain).reduce(_*_)
         val body = areaOfBlock(func, styleOf(lhs) == Fine) * P // map duplicated P times
         /*
@@ -100,21 +103,21 @@ trait AreaAnalyzer extends ModelingTools {
         */
         val internal = areaOfBlock(rFunc, true) * (P - 1)
         val rFuncLatency = latencyOfPipe(rFunc)
-        val internalDelays = reductionTreeDelays(P).map{delay => areaOfDelayLine(nbits(e.mT), delay * rFuncLatency)}.fold(NoArea){_+_}
+        val internalDelays = reductionTreeDelays(P).map{delay => areaOfDelayLine(nbits(e.mT), rFuncLatency * delay) }.fold(NoArea){_+_}
         val load  = areaOfCycle(ld)    // Load from accumulator (happens once)
         val cycle = areaOfCycle(rFunc) // Special case area of accumulator
         val store = areaOfCycle(st)    // Store to accumulator (happens once)
 
         body + internal + internalDelays + load + cycle + store + areaOf(lhs)
 
-      case EatReflect(Block_reduce(ccOuter,ccInner,_,func,ld1,ld2,rFunc,st,_,_,_,_,_,_)) =>
+      case EatReflect(e@Block_reduce(ccOuter,ccInner,_,func,ld1,ld2,rFunc,st,_,_,_,_,_,_)) =>
         val Pm = parOf(ccOuter).reduce(_*_) // Parallelization factor for map
         val Pr = parOf(ccInner).reduce(_*_) // Parallelization factor for reduce
-        val body = areaOfBlock(func) * Pm
+        val body = areaOfBlock(func,false) * Pm
 
-        val internal = areaOfBlock(rFunc) * (Pm - 1) * Pr
+        val internal = areaOfBlock(rFunc,true) * (Pm - 1) * Pr
         val rFuncLatency = latencyOfPipe(rFunc)
-        val internalDelays = reductionTreeDelays(Pm).map{delay => areaOfDelayLine(nbits(e.mT), delay * rFuncLatency) * Pr}.fold(NoArea){_+_}
+        val internalDelays = reductionTreeDelays(Pm).map{delay => areaOfDelayLine(nbits(e.mT), rFuncLatency * delay) * Pr}.fold(NoArea){_+_}
         val load1 = areaOfBlock(ld1,true) * Pm * Pr
         val load2 = areaOfCycle(ld2) * Pr
         val cycle = areaOfCycle(rFunc) * Pr
@@ -123,7 +126,7 @@ trait AreaAnalyzer extends ModelingTools {
         body + internal + internalDelays + load1 + load2 + cycle + store + areaOf(lhs)
 
       case _ =>
-        blocks(rhs).map(blk => areaOfBlock(blk)).fold(NoArea){_+_} + areaOf(lhs)
+        blocks(rhs).map(blk => areaOfBlock(blk,false)).fold(NoArea){_+_} + areaOf(lhs)
     }
     areaScope ::= area
   }
@@ -150,40 +153,42 @@ trait AreaAnalyzer extends ModelingTools {
 
     val regALMs = Math.max( ((totalRegs - (logicALMs*2.16))/3).toInt, 0)
 
-    val designALMs = logicALMs + regALMs
+    val totalALMs = logicALMs + regALMs
 
     val dupBRAMs = Math.max(0.02*routingLUTs - 500, 0.0).toInt
 
-    val totalDSPs  = design.dsps
-    val totalBRAMs = design.bram + dupBRAMs
+    val totalDSPs = design.dsps
+    val totalBRAM = design.bram + dupBRAMs
 
     msg(s"Resource Estimate Breakdown: ")
     msg(s"-----------------------------")
     msg(s"Estimated unavailable ALMs: $unavailable")
-    msg(s"LUT3: ${total.lut3}")
-    msg(s"LUT4: ${total.lut4}")
-    msg(s"LUT5: ${total.lut5}")
-    msg(s"LUT6: ${total.lut6}")
-    msg(s"LUT7: ${total.lut7}")
+    msg(s"LUT3: ${design.lut3}")
+    msg(s"LUT4: ${design.lut4}")
+    msg(s"LUT5: ${design.lut5}")
+    msg(s"LUT6: ${design.lut6}")
+    msg(s"LUT7: ${design.lut7}")
     msg(s"Estimated routing luts: $routingLUTs")
-    msg(s"MEM64: ${total.mem64}")
-    msg(s"MEM32: ${total.mem32}")
-    msg(s"MEM16: ${total.mem16}")
-    msg(s"Design registers: ${total.regs}")
+    msg(s"Logic+register ALMs: $logicALMs")
+    msg(s"Register-only ALMS:  $regALMs")
+    msg(s"Recovered ALMs:      $recoverable")
+    msg(s"MEM64: ${design.mem64}")
+    msg(s"MEM32: ${design.mem32}")
+    msg(s"MEM16: ${design.mem16}")
+    msg(s"Design registers: ${design.regs}")
     msg(s"Fanout registers: $fanoutRegs")
-    msg(s"Design BRAMs: ${total.bram}")
+    msg(s"Design BRAMs: ${design.bram}")
     msg(s"Fanout BRAMs: $dupBRAMs")
     msg("")
     msg(s"Resource Estimate Summary: ")
     msg(s"---------------------------")
-    msg(s"Logic+register ALMs: $logicALMs")
-    msg(s"Register-only ALMS:  $regALMs")
-    msg(s"Recovered ALMs:      $recoverable")
-    msg(s"DSPs: ${total.dsps}")
-    msg(s"BRAMs: $totalBRAMs")
+    msg(s"ALMs: $totalALMs / ${FPGATarget.alms} (" + "%.2f".format(100*totalALMs.toDouble/FPGATarget.alms) + "%)")
+    msg(s"Regs: $totalRegs")
+    msg(s"DSPs: $totalDSPs / ${FPGATarget.dsps} (" + "%.2f".format(100*totalDSPs.toDouble/FPGATarget.dsps) + "%)")
+    msg(s"BRAM: $totalBRAM / ${FPGATarget.bram} (" + "%.2f".format(100*totalBRAM.toDouble/FPGATarget.bram) + "%)")
     msg("")
 
-    totalArea = FPGAResourceSummary(totalALMs, totalRegs, totalDSPs, totalBRAMs)
+    totalArea = FPGAResourceSummary(totalALMs, totalRegs, totalDSPs, totalBRAM)
     (b)
   }
 

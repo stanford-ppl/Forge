@@ -110,7 +110,7 @@ trait LatencyAnalyzer extends ModelingTools {
       case _ =>
     }
 
-    val cycles = cycleScope.fold(0L){_+_}
+    val cycles = cycleScope
     cycleScope = outerScope
     (cycles)
   }
@@ -119,8 +119,9 @@ trait LatencyAnalyzer extends ModelingTools {
     val cycles = rhs match {
       case EatReflect(Hwblock(blk)) =>
         inHwScope = true
-        latencyOfBlock(blk).sum
+        val body = latencyOfBlock(blk).sum
         inHwScope = false
+        body
 
       case EatReflect(Counterchain_new(ctrs,nIters)) =>
         latencyOf(lhs)
@@ -171,16 +172,16 @@ trait LatencyAnalyzer extends ModelingTools {
         else                        { stages.sum * N + latencyOf(lhs) }
 
       case EatReflect(Block_reduce(ccOuter,ccInner,_,func,ld1,ld2,rFunc,st,_,_,_,_,_,_)) =>
-        val Nm = nIters(Nm)
-        val Nr = nIters(Nr)
+        val Nm = nIters(ccOuter)
+        val Nr = nIters(ccInner)
         val Pm = parOf(ccOuter).reduce(_*_) // Parallelization factor for map
         val Pr = parOf(ccInner).reduce(_*_) // Parallelization factor for reduce
 
-        val mapStages = latencyOfBlock(func)
-        val internal = latencyOfPipe(ld1) + latencyOfPipe(rFunc) * reductionTreeHeight(Pm)
-        val cycle = latencyOfCycle(ld2) + latencyOfCycle(rFunc) + latencyOfCycle(st)
+        val mapStages: List[Long] = latencyOfBlock(func)
+        val internal: Long = latencyOfPipe(ld1) + latencyOfPipe(rFunc) * reductionTreeHeight(Pm)
+        val cycle: Long = latencyOfCycle(ld2) + latencyOfCycle(rFunc) + latencyOfCycle(st)
 
-        val reduceStage = internal + Nr*cycle
+        val reduceStage: Long = internal + Nr*cycle
         val stages = mapStages :+ reduceStage
         if (styleOf(lhs) == Coarse) { stages.max * (Nm - 1) + stages.sum + latencyOf(lhs) }
         else                        { stages.sum * Nm + latencyOf(lhs) }

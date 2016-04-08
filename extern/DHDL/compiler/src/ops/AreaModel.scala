@@ -60,17 +60,21 @@ trait AreaModel {
   this: DHDLExp with CounterToolsExp =>
 
   private var silentModel = false
-  private def warn(x: String) { if (!silentModel) warn(x) }
+  private def warn(x: String) { if (!silentModel) stageWarn(x) }
   def silenceAreaModel() { silentModel = true }
 
   /**
    * Returns the area resources for a delay line with the given width (in bits) and length (in cycles)
    * Models delays as registers for short delays, BRAM for long ones
    **/
-  def areaOfDelayLine(width: Int, length: Int) = {
+  def areaOfDelayLine(width: Int, length: Int): FPGAResources = {
     // TODO: Not sure what the cutoff is here
     if (length < 32) FPGAResources(regs = width*length)
     else             areaOfBRAM(width, length, 1, false)
+  }
+  def areaOfDelayLine(width: Int, length: Long): FPGAResources = {
+    if(length > Int.MaxValue) throw new Exception(s"Casting delay line length to Int would result in overflow")
+    areaOfDelayLine(width, length.toInt)
   }
 
   private def areaOfMemWord(nbits: Int) = {

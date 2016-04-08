@@ -110,9 +110,9 @@ trait CounterToolsExp extends EffectExp {
   }
 
   // TODO: Default number of iterations if bound can't be computed?
-  def nIters(x: Rep[CounterChain]): Double = x match {
-    case Def(EatReflect(Counterchain_new(_,nIters))) => bound(nIters.res).getOrElse(1.0)
-    case _ => 1.0
+  def nIters(x: Rep[CounterChain]): Long = x match {
+    case Def(EatReflect(Counterchain_new(_,nIters))) => Math.ceil( bound(nIters.res).getOrElse(1.0) ).toLong
+    case _ => 1L
   }
 }
 
@@ -131,22 +131,22 @@ object ReductionTreeAnalysis {
       9 inputs => 1 path of length 3
       85 inputs => 3 paths with lengths 2, 1, and 1
   */
-  def reductionTreeDelays(nLeaves: Int): List[Int] = {
+  def reductionTreeDelays(nLeaves: Int): List[Long] = {
     if ( (nLeaves & (nLeaves - 1)) == 0) Nil // Specialize for powers of 2
     // Could also have 2^k + 1 case (delay = 1 path of length k)
     else {
-      def reduceLevel(nNodes: Int, completePaths: List[Int], currentPath: Int): List[Int] = {
+      def reduceLevel(nNodes: Int, completePaths: List[Long], currentPath: Long): List[Long] = {
         if (nNodes <= 1) completePaths  // Stop when 1 node is remaining
         else if (nNodes % 2 == 0) {
           // For an even number of nodes, we don't need any delays - all current delay paths end
           val allPaths = completePaths ++ (if (currentPath > 0) List(currentPath) else Nil)
-          reduceLevel(nNodes/2, allPaths, 0)
+          reduceLevel(nNodes/2, allPaths, 0L)
         }
         // For odd number of nodes, always delay exactly one signal, and keep delaying that signal until it can be used
         else reduceLevel((nNodes-1)/2 + 1, completePaths, currentPath+1)
       }
 
-      reduceLevel(nLeaves, Nil, 0)
+      reduceLevel(nLeaves, Nil, 0L)
     }
   }
 

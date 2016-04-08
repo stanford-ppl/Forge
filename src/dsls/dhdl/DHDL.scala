@@ -87,7 +87,6 @@ trait DHDLDSL extends ForgeApplication
     val Range     = tpe("Range")
     primitiveTypes :::= List(Indices)
 
-    // TODO: Compiler hangs if these aren't defined?
     noInfixList :::= List(":=", "**", "as", "to", "rst")
 
     // Scala.scala imports
@@ -110,23 +109,23 @@ trait DHDLDSL extends ForgeApplication
 
 
     // --- Traversals
-    //val StageAnalyzer = analyzer("Stage", isExtern=true)
-    //val GlobalAnalyzer = analyzer("Global")
-    //val BoundAnalyzer = analyzer("Bound")
+    val StageAnalyzer = analyzer("Stage", isExtern=true)
+    val GlobalAnalyzer = analyzer("Global")
+    val BoundAnalyzer = analyzer("Bound")
     //  val DSE = analyzer("DSE", isExtern=true)
-    //val AreaAnalyzer = analyzer("Area", isExtern=true)
-    //val LatencyAnalyzer = analyzer("Latency", isExtern=true)
+    val AreaAnalyzer = analyzer("Area", isExtern=true)
+    val LatencyAnalyzer = analyzer("Latency", isExtern=true)
 
-    //importGlobalAnalysis()
-    //importBoundAnalysis()
+    importGlobalAnalysis()
+    importBoundAnalysis()
 
     schedule(IRPrinterPlus)
-    //schedule(StageAnalyzer)
-    //schedule(GlobalAnalyzer)
-    //schedule(BoundAnalyzer)
+    schedule(StageAnalyzer)
+    schedule(GlobalAnalyzer)
+    schedule(BoundAnalyzer)
     //  schedule(DSE)
-    //schedule(AreaAnalyzer)
-    //schedule(LatencyAnalyzer)
+    schedule(AreaAnalyzer)
+    schedule(LatencyAnalyzer)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))

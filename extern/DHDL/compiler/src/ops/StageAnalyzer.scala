@@ -55,7 +55,7 @@ trait StageAnalyzer extends Traversal with PipeStageTools {
       list( stages )
       nStages(lhs) = stages.length + 1  // Account for implicit reduction pipe
 
-    case Block_reduce(cc1,cc2,ram,func,i,rFunc,rV1,rV2) =>
+    case Block_reduce(c1,c2,a,func,ld1,ld2,rFunc,st,inds1,inds2,part,acc,res,rV) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func,rFunc)
       list( stages )

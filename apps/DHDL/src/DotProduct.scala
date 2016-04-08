@@ -39,8 +39,8 @@ trait DotProduct extends DHDLApplication {
     val vec1 = Array.fill(N)(random[Elem](10))
     val vec2 = Array.fill(N)(random[Elem](10))
 
-    println("vec1: " + vec1.mkString(", "))
-    println("vec2: " + vec2.mkString(", "))
+    //println("vec1: " + vec1.mkString(", "))
+    //println("vec2: " + vec2.mkString(", "))
 
     setArg(dataSize, N)
     setMem(v1, vec1)

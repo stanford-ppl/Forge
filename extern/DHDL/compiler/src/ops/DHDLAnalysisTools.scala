@@ -33,30 +33,26 @@ trait PipeStageToolsExp extends EffectExp {
   }
 
   def isAllocation(d: Def[Any]): Boolean = d match {
-    case _:Reg_new[_] => true
-    case _:Bram_new[_] => true
-    case _:Offchip_new[_] => true
-    case _:Counter_new => true
-    case _:Counterchain_new => true
-    case Reflect(d,_,_) => isAllocation(d)
+    case EatReflect(_:Reg_new[_]) => true
+    case EatReflect(_:Bram_new[_]) => true
+    case EatReflect(_:Offchip_new[_]) => true
+    case EatReflect(_:Counter_new) => true
+    case EatReflect(_:Counterchain_new) => true
     case _ => false
   }
   def isTileTransfer(d: Def[Any]): Boolean = d match {
-    case _:TileTransfer[_] => true
-    case Reflect(_:TileTransfer[_],_,_) => true
+    case EatReflect(_:TileTransfer[_]) => true
     case _ => false
   }
   def isParallel(d: Def[Any]): Boolean = d match {
-    case _:Pipe_parallel => true
-    case Reflect(_:Pipe_parallel,_,_) => true
+    case EatReflect(_:Pipe_parallel) => true
     case _ => false
   }
   def isPipeline(d: Def[Any]): Boolean = d match {
-    case _:Pipe_foreach => true
-    case _:Pipe_reduce[_,_] => true
-    case _:Block_reduce[_] => true
-    case _:Unit_pipe => true
-    case Reflect(d,_,_) => isPipeline(d)
+    case EatReflect(_:Pipe_foreach) => true
+    case EatReflect(_:Pipe_reduce[_,_]) => true
+    case EatReflect(_:Block_reduce[_]) => true
+    case EatReflect(_:Unit_pipe) => true
     case _ => false
   }
 }
@@ -103,14 +99,20 @@ trait CounterToolsExp extends EffectExp {
     }
   }
 
-  def isUnitCounter(e: Def[Any]): Boolean = e match {
-    case EatReflect(Counter_new(ConstFix(0),ConstFix(1),ConstFix(1))) => true
+  def isUnitCounterChain(e: Exp[Any]): Boolean = e match {
+    case Def(EatReflect(Counterchain_new(ctrs,_))) if ctrs.length == 1 => isUnitCounter(ctrs(0))
     case _ => false
   }
 
-  def nIters(x: Rep[CounterChain]): Int = x match {
-    case Def(EatReflect(Counterchain_new(_,nIters))) => bound(nIters.res).getOrElse(1)
-    case _ => 1
+  def isUnitCounter(e: Exp[Any]): Boolean = e match {
+    case Def(EatReflect(Counter_new(ConstFix(0),ConstFix(1),ConstFix(1),_))) => true
+    case _ => false
+  }
+
+  // TODO: Default number of iterations if bound can't be computed?
+  def nIters(x: Rep[CounterChain]): Double = x match {
+    case Def(EatReflect(Counterchain_new(_,nIters))) => bound(nIters.res).getOrElse(1.0)
+    case _ => 1.0
   }
 }
 
@@ -130,7 +132,7 @@ object ReductionTreeAnalysis {
       85 inputs => 3 paths with lengths 2, 1, and 1
   */
   def reductionTreeDelays(nLeaves: Int): List[Int] = {
-    if (isPow2(nLeaves)) Nil
+    if ( (nLeaves & (nLeaves - 1)) == 0) Nil // Specialize for powers of 2
     // Could also have 2^k + 1 case (delay = 1 path of length k)
     else {
       def reduceLevel(nNodes: Int, completePaths: List[Int], currentPath: Int): List[Int] = {
@@ -149,11 +151,12 @@ object ReductionTreeAnalysis {
   }
 
   def reductionTreeHeight(nLeaves: Int): Int = {
-    def treeLevel(nNodes: Int, curHeight: Int) = {
+    def treeLevel(nNodes: Int, curHeight: Int): Int = {
       if (nNodes <= 1) curHeight + 1
       else if (nNodes % 2 == 0) treeLevel(nNodes/2, curHeight + 1)
       else treeLevel((nNodes - 1)/2 + 1, curHeight + 1)
     }
+    treeLevel(nLeaves, 0)
   }
 
 

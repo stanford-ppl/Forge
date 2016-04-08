@@ -48,7 +48,12 @@ trait DHDLMetadata {
     onMeet (MName) ${ this }
     internal.static (nameOps) ("update", T, (T, SString) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MName($1)) }
-    internal.static (nameOps) ("apply", T, T :: SString) implements composite ${ meta[MName]($0).get.name }
+    internal.static (nameOps) ("apply", T, T :: SString) implements composite ${
+      meta[MName]($0) match {
+        case Some(n) => n.name
+        case None => ""
+      }
+    }
 
     /* Is Double Buffer */
     val MDblBuf = metadata("MDblBuf", "isDblBuf" -> SBoolean)
@@ -78,7 +83,6 @@ trait DHDLMetadata {
     /* Parallelization Factor  */
     val MPar = metadata("MPar", "par" -> SInt)
     val parOps = metadata("par")
-    //TODO:
     onMeet (MPar) ${ this }
     internal.static (parOps) ("update", T, (T, SInt) :: MUnit, effect = simple) implements
     composite ${ setMetadata($0, MPar($1)) }
@@ -87,15 +91,6 @@ trait DHDLMetadata {
         case Some(p) => p.par
         case None => 1
       }
-    }
-    internal.direct (parOps) ("maxJPre", T, T :: SString) implements composite ${
-      maxJPrefix(par( $0 ))
-    }
-
-    val normGrp = grp("normGrp")
-    internal.direct (normGrp) ("maxJPrefix", Nil, SInt :: SString) implements composite ${
-      if ( $0 == 1 ) "DFEVar"
-      else "DFEVector<DFEVar>"
     }
 
     /* Number of Banks  */
@@ -138,30 +133,98 @@ trait DHDLMetadata {
     internal.static (rangesOps) ("update", T, (Tile(T), SList(Range)) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MTileRanges($1)) }
     internal.static (rangesOps) ("apply", T, Tile(T) :: SList(Range)) implements composite ${ meta[MTileRanges]($0).get.ranges }
-  }
+
+    /* Is global value (computed only once at setup) */
+    val MGlobal = metadata("MGlobal", "isGlobal" -> SBoolean)
+    val globalOps = metadata("isGlobal")
+    onMeet (MGlobal) ${ MGlobal(this.isGlobal && that.isGlobal) }
+    internal.static (globalOps) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MGlobal($1)) }
+    internal.static (globalOps) ("apply", Nil, MAny :: SBoolean) implements composite ${ meta[MGlobal]($0).map(_.isGlobal).getOrElse(false) }
 
 
-  val MGlobal = metadata("MGlobal", "isGlobal" -> SBoolean)
-  val globalOps = metadata("isGlobal")
-  onMeet (MGlobal) ${ MGlobal(this.isGlobal && that.isGlobal) }
-  internal.static (globalOps) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements
-    composite ${ setMetadata($0, MGlobal($1)) }
-  internal.static (globalOps) ("apply", Nil, MAny :: SBoolean) implements composite ${ meta[MGlobal]($0).map(_.isGlobal).getOrElse(false) }
+    // TODO: Should probably change to BigDecimal or something to be accurate
+    // NOTE: The user gets to see these! Woah.
+    val MBound = metadata("MBound", "bound" -> SDouble)
+    val boundOps = metadata("bound")
+    onMeet(MBound) ${ MBound( Math.max(this.bound, that.bound)) }
+    static (boundOps) ("update", Nil, (MAny, SDouble) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MBound($1)) }
+    static (boundOps) ("update", Nil, (MAny, SOption(SDouble)) :: MUnit, effect = simple) implements
+      composite ${ $1.foreach{b => setMetadata($0, MBound(b)) } }
+    static (boundOps) ("apply", Nil, MAny :: SOption(SDouble)) implements composite ${ boundsOf($0) }
 
+    internal (boundOps) ("boundsOf", Nil, MAny :: SOption(SDouble)) implements composite ${ meta[MBound]($0).map(_.bound) }
 
-  // TODO: Should probably change to BigDecimal or something to be accurate
-  // NOTE: The user gets to see these! Woah.
-  val MBound = metadata("MBound", "bound" -> SDouble)
-  val boundOps = metadata("bound")
-  onMeet(MBound) ${ MBound( Math.max(this.bound, that.bound)) }
-  static (boundOps) ("update", Nil, (MAny, SDouble) :: MUnit, effect = simple) implements
-    composite ${ setMetadata($0, MBound($1)) }
-  static (boundOps) ("update", Nil, (MAny, SOption(SDouble)) :: MUnit, effect = simple) implements
-    composite ${ $1.foreach{b => setMetadata($0, MBound(b)) } }
+    val boundUnapply = metadata("Bound")
+    internal.static (boundUnapply) ("unapply", Nil, MAny :: SOption(SDouble)) implements composite ${ boundsOf($0) }
 
-  internal (boundOps) ("boundsOf", Nil, MAny :: SOption(SDouble)) implements composite ${ meta[MBound]($0).map(_.bound) }
-  static (boundOps) ("apply", Nil, MAny :: SOption(SDouble)) implements composite ${ boundsOf($0) }
+    internal (boundOps) ("extractNumericConstant", T, T :: SOption(SDouble)) implements composite ${
+      val mD = manifest[Double]
+      val mF = manifest[Float]
+      val mI = manifest[Int]
+      val mL = manifest[Long]
 
-  val boundUnapply = metadata("Bound")
-  internal.static (boundUnapply) ("unapply", Nil, MAny :: SOption(SDouble)) implements composite ${ meta[MBound]($0).map(_.bound) }
+      manifest[T] match {
+        case `mI` => Some($0.asInstanceOf[Int].toDouble)
+        case `mL` => Some($0.asInstanceOf[Long].toDouble)
+        case `mF` => Some($0.asInstanceOf[Float].toDouble)
+        case `mD` => Some($0.asInstanceOf[Double])
+        case _ => None
+      }
+    }
+    rewrite (boundOps, "boundsOf") using pattern(${Param(x)} -> ${ extractNumericConstant(x) })
+    rewrite (boundOps, "boundsOf") using pattern(${Const(x)} -> ${ extractNumericConstant(x) })
+
+    /* Parent of a node */
+    val MParent = metadata("MParent", "parent" -> MAny)
+    val parentOps = metadata("parentOf")
+    onMeet (MParent) ${ this }
+    internal.static (parentOps) ("update", T, (T, MAny) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MParent($1)) }
+    internal.static (parentOps) ("apply", T, T :: SOption(MAny)) implements composite ${
+    	meta[MParent]($0) match {
+    	  case Some(p) => Some(p.parent)
+    	  case None => None
+    	}
+		}
+
+		/* MaxJ Codegen Helper Functions */
+    val maxjgrp = grp("maxjGrp")
+		/* Not real metadata but need to be globally accessable */
+    val maxjmeta = metadata("maxjMeta")
+    internal.direct (maxjgrp) ("maxJPreG", Nil, SInt :: SString) implements composite ${
+      if ( $0 == 1 ) "DFEVar"
+      else "DFEVector<DFEVar>"
+    }
+    internal.direct (maxjmeta) ("maxJPre", T, T :: SString) implements composite ${
+      maxJPreG(par( $0 ))
+    }
+		internal.direct (maxjmeta) ("tpstr", T, SInt :: SString) implements composite 	${
+			tpstrG[T]( $0 )
+		}
+		internal.direct (maxjgrp) ("tpstrG", T, SInt :: SString) implements composite 	${
+			val scalart = if (isFixPtType(manifest[T])) {
+				val s = sign(manifest[T].typeArguments(0))
+				val d = nbits(manifest[T].typeArguments(1))
+				val f = nbits(manifest[T].typeArguments(2))
+				if (s) "dfeFixOffset( "+ (d+f) + "," + f + ", SignMode.TWOSCOMPLEMENT)"
+				else "dfeFixOffset("+ (d+f) + "," + f + ", SignMode.UNSIGNED)"
+			} else if (isFltPtType(manifest[T])) {
+				val e = nbits(manifest[T].typeArguments(0))
+				val m = nbits(manifest[T].typeArguments(1))
+				"dfeFloat(" + e + "," + m + ")"
+			} else if (isBitType(manifest[T])) {
+				"TODO"
+			} else {
+				//throw new Exception("Unknown type " + manifest[T])
+				""
+			}
+			if ( $0 > 1) {
+				"new DFEVectorType<DFEVar>(" + scalart + "," + $0
+			} else {
+				scalart
+			}
+		}
+	}
 }

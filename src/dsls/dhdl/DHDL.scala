@@ -81,7 +81,6 @@ trait DHDLDSL extends ForgeApplication
     val Pipeline = tpe("Pipeline")
     primitiveTypes :::= List(Counter, CounterChain, Pipeline)
 
-
     // --- Other Types
     val Indices   = tpe("Indices")
     val LoopRange = tpe("LoopRange")
@@ -92,7 +91,7 @@ trait DHDLDSL extends ForgeApplication
     noInfixList :::= List(":=", "**", "as", "to", "rst")
 
     // Scala.scala imports
-    //importTuples()
+    importTuples()
     importStrings()
 
     // DSL spec imports
@@ -101,22 +100,13 @@ trait DHDLDSL extends ForgeApplication
     importDHDLEnums()
     importDHDLMetadata()
 
-    //importDHDLMath()
-      importCollectionOps()
-      importNumOps()
-      importArithOps()
-      importOrderOps()
-      importPrimitiveMath()
-
+    importDHDLMath()
     importDHDLMemories()
+    importDHDLControllers()
 
-    //importDHDLControllers()
-      importCounters()
+    importDHDLMisc()
 
-    //importDHDLMisc()
-      importDHDLHelpers()
-
-    //importTupleTypeClassInstances()
+    importTupleTypeClassInstances()
 
 
     // --- Traversals

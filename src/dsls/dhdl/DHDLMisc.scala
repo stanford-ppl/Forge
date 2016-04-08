@@ -309,10 +309,6 @@ trait DHDLMisc {
 		}))
 		//TODO: dot shouldn't see these nodes if nodes inside hwblock aren't ramdomly moved
 		//outside
-    //impl (assert)   (codegen(dot, ${ }))
-    //impl (ifThenElse) (codegen(dot, ${ }))
-    //impl (whileDo) (codegen(dot, ${ }))
-    //impl (forLoop) (codegen(dot, ${ }))
     impl (set_mem)  (codegen(dot, ${ }))
     impl (get_mem)  (codegen(dot, ${ }))
 		impl (set_arg)  (codegen(dot, ${ $1 -> $0 }))
@@ -328,13 +324,6 @@ trait DHDLMisc {
 			@ emitComment("println")
 		}))
 		//TODO: maxj shouldn't see these nodes if nodes inside hwblock aren't ramdomly moved outside
-    //impl (assert)   (codegen(maxj, ${ }))
-    //impl (ifThenElse) (codegen(maxj, ${
-    //}))
-    //impl (whileDo) (codegen(maxj, ${
-    //}))
-  //   impl (forLoop) (codegen(maxj, ${
-  //   }))
     impl (set_mem)  (codegen(maxj, ${ }))
     impl (get_mem)  (codegen(maxj, ${ }))
     impl (set_arg)  (codegen(maxj, ${ }))

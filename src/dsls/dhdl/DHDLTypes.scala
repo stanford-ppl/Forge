@@ -1,6 +1,7 @@
 package ppl.dsl.forge
 package dsls
 package dhdl
+import scala.reflect.SourceContext
 
 trait DHDLTypes {
   this: DHDLDSL =>
@@ -141,9 +142,9 @@ trait DHDLTypes {
     // Needed for if-then-else and while (default requires Rep[Boolean] and overloading is tough in these cases)
     fimplicit (Tpes) ("bit_to_boolean", Nil, Bit :: MBoolean) implements composite ${ bit_to_bool($0) }
 
-    //fimplicit (Tpes) ("sboolean_to_bit", Nil, SBoolean :: Bit) implements redirect ${ bit($0) }
-    //fimplicit (Tpes) ("scala_int_to_fixpt", Nil, SInt :: SInt32) implements redirect ${ fixPt[Int,Signed,B32,B0]($0) }
-    //fimplicit (Tpes) ("scala_float_to_fltpt", Nil, SFloat :: Flt) implements redirect ${ fltPt[Float,B24,B8]($0) }
+    fimplicit (Tpes) ("scala_boolean_to_bit", Nil, SBoolean :: Bit) implements redirect ${ bit($0) }
+    fimplicit (Tpes) ("scala_int_to_fixpt", Nil, SInt :: SInt32) implements redirect ${ fixPt[Int,Signed,B32,B0]($0) }
+    fimplicit (Tpes) ("scala_float_to_fltpt", Nil, SFloat :: Flt) implements redirect ${ fltPt[Float,B24,B8]($0) }
 
 
     // --- Scala Backend
@@ -165,7 +166,11 @@ trait DHDLTypes {
 
 
     // --- Dot Backend
-    impl (boolean_to_bit) (codegen(dot, ${ $sym [label=$0 style="filled" fillcolor="lightgray" color="none"] }))
+    impl (boolean_to_bit) (codegen(dot, ${
+      @ alwaysGen {
+				$sym [label=$0 style="filled" fillcolor="lightgray" color="none"]
+      @ }
+		}))
     impl (const_to_fixpt) (codegen(dot, ${
       @ alwaysGen {
         $sym [label=$0 style="filled" fillcolor="lightgray" color="none"]
@@ -197,15 +202,36 @@ trait DHDLTypes {
       $0 -> $sym
     }))
 
-
     // --- MaxJ Backend
-    impl (boolean_to_bit) (codegen(maxj, ${ }))
-    impl (const_to_fixpt) (codegen(maxj, ${ }))
-    impl (const_to_fltpt) (codegen(maxj, ${ }))
-    impl (convert_fixpt)  (codegen(maxj, ${ }))
-    impl (fixpt_to_fltpt) (codegen(maxj, ${ }))
-    impl (fltpt_to_fixpt) (codegen(maxj, ${ }))
-    impl (convert_fltpt)  (codegen(maxj, ${ }))
+    impl (boolean_to_bit) (codegen(maxj, ${
+    	DFEVar $sym = constant.var( $0 );
+		}))
+    impl (const_to_fixpt) (codegen(maxj, ${
+			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+      DFEVar $sym = constant.var( $ts, $0 );
+		}))
+    impl (const_to_fltpt) (codegen(maxj, ${
+			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+      DFEVar $sym = constant.var( $ts, $0 );
+		}))
+    impl (convert_fixpt)  (codegen(maxj, ${
+			//TODO: right way to do this?
+			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+      DFEVar $sym = $0.cast( $ts );
+		}))
+    impl (fixpt_to_fltpt) (codegen(maxj, ${
+			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+      DFEVar $sym = $0.cast( $ts );
+		}))
+    impl (fltpt_to_fixpt) (codegen(maxj, ${
+			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+      DFEVar $sym = $0.cast( $ts );
+		}))
+    impl (convert_fltpt)  (codegen(maxj, ${
+			//TODO: right way to do this?
+			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+      DFEVar $sym = $0.cast( $ts );
+		}))
 
 	}
 }

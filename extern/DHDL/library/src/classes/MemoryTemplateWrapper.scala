@@ -40,8 +40,8 @@ trait MemoryTemplateWrapper extends ControllerTemplateWrapper with TypeInspectio
   def indicesManifest: Manifest[Indices] = manifest[RecordImpl]
 
   // Library implementation needs to also have type parameters
-  def fixManifest[S:Manifest,I:Manifest,F:Manifest] = manifest[FixedPoint[S,I,F]]
-  def fltManifest[G:Manifest,E:Manifest] = manifest[FloatPoint[G,E]]
+  def fixManifest[S:Manifest,I:Manifest,F:Manifest]: Manifest[FixPt[S,I,F]] = manifest[FixedPoint[S,I,F]]
+  def fltManifest[G:Manifest,E:Manifest]: Manifest[FltPt[G,E]] = manifest[FloatPoint[G,E]]
   def bitManifest: Manifest[Bit] = manifest[Boolean]
 
   def isFixPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FixedPoint[_,_,_]])

@@ -23,10 +23,10 @@ trait FloatPoint[SIG,EXP]
 trait DHDLIndices
 
 // Stub (nothing here for now)
-trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp with DHDLMetaOps {
+trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp {
   this: DHDLExp =>
 
-  def grabNumericConstant[T:Manifest](x: T): Option[Double] = {
+  /*def extractNumericConstant[T:Manifest](x: T): Option[Double] = {
     val mD = manifest[Double]
     val mF = manifest[Float]
     val mI = manifest[Int]
@@ -42,14 +42,15 @@ trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp wit
   }
 
   override def boundsOf(x: Rep[Any])(implicit ctx: SourceContext): Option[Double] = x match {
-    case Param(c) => grabNumericConstant(c)(x.tp)
-    case Const(c) => grabNumericConstant(c)(x.tp)
+    case Param(c) => extractNumericConstant(c)(mtype(x.tp))
+    case Const(c) => extractNumericConstant(c)(mtype(x.tp))
     case _ => super.boundsOf(x)
-  }
+  }*/
 
   def isFixPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FixedPoint[_,_,_]])
   def isFltPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FloatPoint[_,_]])
   def isBitType[T:Manifest]   = isSubtype(manifest[T].runtimeClass, classOf[DHDLBit])
+  def isPipeline[T:Manifest]  = isSubtype(manifest[T].runtimeClass, classOf[DHDLPipeline])
 
   // Shorthand versions for matching on ConstFixPt and ConstFltPt without the manifests
   object ConstFix {
@@ -75,8 +76,8 @@ trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp wit
   def nbits(e: Exp[Any]): Int = nbits(e.tp)
   def sign(e: Exp[Any]): Boolean = sign(e.tp)
 
-  def isBits[T:Manifest] = manifest[T] match {
-    case t if isFltPtType(t) || isFixPtType || isBitType => true
+  def isBits[T:Manifest]: Boolean = manifest[T] match {
+    case t if isFltPtType(t) || isFixPtType(t) || isBitType(t) => true
     case StructType(_,fields) => fields.map(f => isBits(f._2)).fold(true){_&&_}
     case _ => false
   }
@@ -106,8 +107,8 @@ trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
   // TODO: Should be refined manifest? But how to know how many fields to fill in?
   def indicesManifest: Manifest[Indices] = manifest[DHDLIndices]
 
-  def fixManifest[S:Manifest,I:Manifest,F:Manifest] = manifest[FixedPoint[S,I,F]]
-  def fltManifest[G:Manifest,E:Manifest] = manifest[FloatPoint[G,E]]
+  def fixManifest[S:Manifest,I:Manifest,F:Manifest]: Manifest[FixPt[S,I,F]] = manifest[FixedPoint[S,I,F]]
+  def fltManifest[G:Manifest,E:Manifest]: Manifest[FltPt[G,E]] = manifest[FloatPoint[G,E]]
   def bitManifest: Manifest[Bit] = manifest[DHDLBit]
 }
 
@@ -466,43 +467,35 @@ trait DotGenMemoryTemplateOps extends DotGenEffect {
   val IR: ControllerTemplateOpsExp with DHDLIdentifiers
   import IR._
 
-  // Note that tileDims are not fixed point values yet - they're just integers
-  private def localDimsToStrides(dims: List[Int]) = List.tabulate(dims.length){d =>
-    if (d == dims.length - 1) 1
-    else dims.drop(d + 1).reduce(_*_)
-  }
+	//TODO: use this function from DotGenPipeTemplateOps
+	def emitNestedIdx1(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
+    case Def(EatReflect(Counterchain_new(counters, nIters))) =>
+	     inds.zipWithIndex.foreach {case (iter, idx) => emitAlias(iter, counters(idx)) }
+	}
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) => // Load
-			val l = "offld_" + quote(sym).split("_")(1)
-      emit(s"""${quote(sym)} [ label=$l shape="rectangle" style="rounded, filled" fillcolor="white"
-				color="black"]""")
-			//emit(s"""offchip -> ${quote(sym)}""")
-			//emit(s"""sym -> $local""")
-			/*
-			tileDims.foreach{dim =>
-			 $dim -> $sym [label="offdim"]
-			 }
-			 start.foreach{s =>
-			 $s -> $sym [label="start"]
+			val l = s"Tile${if (store) "Store" else "Load"}_" + quote(sym).split("_")(1)
+      emit(s"""${quote(sym)} [ label=$l shape="rectangle" style="rounded, filled"
+				fillcolor="${tileTransFillColor}" color="black"]""")
+			if (store)
+				emitEdge(sym, mem)
+			else
+				emitEdge(mem, sym)
+			if (store)
+				emitEdge(local, sym)
+			else
+				emitEdge(sym, local)
+			//emit(s"""${quote(cchain)} -> ${quote(sym)}""")
+			emitNestedIdx1(cchain, iters)
+			strides.foreach{ s =>
+				emitEdge(s, sym, "stride")
 			}
-			*/
-			//TODO:
-			/*
-      emitNestedLoop(iters, cchain) {
-        val offaddr = (iters.zip(strides).map{case (i,s) => quote(i) + "*" + quote(s) } :+ quote(memOfs)).mkString(" + ")
-        stream.println("val offaddr = " + offaddr)
+			emitEdge(memOfs, sym)
+			iters.foreach{it =>
+				emitEdge(it, sym)
+			}
 
-        val localStrides = localDimsToStrides(tileDims).map(k => "FixedPoint[Signed,B32,B0](" + k + ")")
-        val localAddr = iters.zip(localStrides).map{ case (i,s) => quote(i) + "*" + quote(s) }.mkString(" + ")
-        stream.println("val localaddr = " + localAddr)
-
-        if (store)
-          stream.println(quote(mem) + "(offaddr.toInt) = " + quote(local) + "(localaddr.toInt)")
-        else
-          stream.println(quote(local) + "(localaddr.toInt) = " + quote(mem) + "(offaddr.toInt)")
-				*/
-      //}
     case _ => super.emitNode(sym, rhs)
   }
 }

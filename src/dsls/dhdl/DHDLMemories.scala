@@ -45,10 +45,10 @@ trait DHDLMemories {
     val Indices = lookupTpe("Indices")
 
     // --- Nodes
-    val reg_new   = direct (Reg) ("reg_new", T, ("init", T) :: Reg(T), effect = mutable)
-    val reg_read  = direct (Reg) ("reg_read", T, ("reg", Reg(T)) :: T, aliasHint = aliases(Nil))  // aliasHint - extracted value doesn't change when reg is updated
-    val reg_write = direct (Reg) ("reg_write", T, (("reg", Reg(T)), ("value", T)) :: MUnit, effect = write(0))
-    val reg_reset = direct (Reg) ("reg_reset", T, ("reg", Reg(T)) :: MUnit, effect = write(0))
+    val reg_new   = internal (Reg) ("reg_new", T, ("init", T) :: Reg(T), effect = mutable)
+    val reg_read  = internal (Reg) ("reg_read", T, ("reg", Reg(T)) :: T, aliasHint = aliases(Nil), effect = simple)
+    val reg_write = internal (Reg) ("reg_write", T, (("reg", Reg(T)), ("value", T)) :: MUnit, effect = write(0))
+    val reg_reset = internal (Reg) ("reg_reset", T, ("reg", Reg(T)) :: MUnit, effect = write(0))
 
     // --- Internals
     internal (Reg) ("reg_create", T, (SOption(SString), T, RegTpe) :: Reg(T), effect = mutable) implements composite ${
@@ -60,10 +60,13 @@ trait DHDLMemories {
       reg
     }
 
+    direct (Reg) ("readReg", T, ("reg", Reg(T)) :: T) implements composite ${ reg_read($0) }
+    direct (Reg) ("writeReg", T, (("reg", Reg(T)), ("value", T)) :: MUnit, effect = write(0)) implements composite ${ reg_write($0, $1) }
+
     val Mem = lookupTpeClass("Mem").get
     val RegMem = tpeClassInst("RegMem", T, TMem(T, Reg(T)))
-    infix (RegMem) ("ld", T, (Reg(T), Indices) :: T) implements composite ${ reg_read($0) } // Ignore address
-    infix (RegMem) ("st", T, (Reg(T), Indices, T) :: MUnit, effect = write(0)) implements composite ${ reg_write($0, $2) }
+    infix (RegMem) ("ld", T, (Reg(T), Indices) :: T) implements composite ${ readReg($0) } // Ignore address
+    infix (RegMem) ("st", T, (Reg(T), Indices, T) :: MUnit, effect = write(0)) implements composite ${ writeReg($0, $2) }
 
     // --- API
     /* Reg */
@@ -90,7 +93,7 @@ trait DHDLMemories {
 
     val Reg_API = withTpe(Reg)
     Reg_API {
-      infix ("value") (Nil :: T) implements composite ${ reg_read($self) }
+      infix ("value") (Nil :: T) implements redirect ${ readReg($self) }
       infix (":=") (T :: MUnit, effect = write(0)) implements composite ${
         if (regType($self) == ArgumentIn) stageError("Writing to an input argument is disallowed")
         reg_write($self, $1)
@@ -99,9 +102,9 @@ trait DHDLMemories {
     }
 
     // TODO: Should warn/error if not an ArgIn?
-    fimplicit (Reg) ("regFix_to_fix", (S,I,F), Reg(FixPt(S,I,F)) :: FixPt(S,I,F)) implements composite ${ reg_read($0) }
-    fimplicit (Reg) ("regFlt_to_flt", (G,E), Reg(FltPt(G,E)) :: FltPt(G,E)) implements composite ${ reg_read($0) }
-    fimplicit (Reg) ("regBit_to_bit", Nil, Reg(Bit) :: Bit) implements composite ${ reg_read($0) }
+    fimplicit (Reg) ("regFix_to_fix", (S,I,F), Reg(FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ readReg($0) }
+    fimplicit (Reg) ("regFlt_to_flt", (G,E), Reg(FltPt(G,E)) :: FltPt(G,E)) implements redirect ${ readReg($0) }
+    fimplicit (Reg) ("regBit_to_bit", Nil, Reg(Bit) :: Bit) implements redirect ${ readReg($0) }
 
     // --- Scala Backend
     impl (reg_new)   (codegen($cala, ${ Array($init) }))
@@ -233,7 +236,7 @@ trait DHDLMemories {
     val T = tpePar("T")
     val BRAM    = lookupTpe("BRAM")
     val Tile    = lookupTpe("Tile")
-    val Idx     = lookupAlias("SInt")
+    val Idx     = lookupAlias("Index")
     val Indices = lookupTpe("Indices")
 
     // --- Nodes
@@ -305,7 +308,7 @@ trait DHDLMemories {
       @ } else {
         	$sym [label="$sn " shape="square" style="filled" fillcolor=$bramFillColor ]
       @ }
-		})) // $t[T] refers to concrete type in IR
+		}))
 		impl (bram_load)  (codegen(dot, ${
 			$addr -> $bram [ headlabel="addr" ]
 			//$sym [style="invisible" height=0 size=0 margin=0 label=""]
@@ -328,7 +331,7 @@ trait DHDLMemories {
 				@ val bks = banks(sym)
         BramLib $sym = new BramLib(this, $size, $ts, $bks , 1 );
       @ }
-		})) // $t[T] refers to concrete type in IR
+		}))
 		impl (bram_load)  (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			@ val ts = tpstr[T](par(sym)) + ".newInstance(this);"
@@ -374,7 +377,7 @@ trait DHDLMemories {
     val Tile    = lookupTpe("Tile")
     val BRAM    = lookupTpe("BRAM")
     val Range   = lookupTpe("Range")
-    val Idx     = lookupAlias("SInt")
+    val Idx     = lookupAlias("Index")
 
     // --- Nodes
     val offchip_new = internal (OffChip) ("offchip_new", T, ("size", Idx) :: OffChip(T), effect = mutable)
@@ -474,7 +477,7 @@ trait DHDLMemories {
       val strides = dimsToStrides(memDims)
       val nonUnitStrides = strides.zip(unitDims).filterNot(_._2).map(_._1)
 
-      val ctrs = tileDims.map{d => Counter(d) }
+      val ctrs = tileDims.map{d => Counter(max = d.as[Index]) }
       val chain = CounterChain(ctrs:_*)
       tile_transfer(mem, $local, nonUnitStrides, ofs, tileDims, chain, $store)
     }

@@ -106,7 +106,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     val implicits = makeNodeImplicits(o)
     val implicitsWithParens = if (implicits.isEmpty) "" else implicits.mkString("(",",",")")
 
-    makeLowerMethodName(o) + "(" + lhsArg + args.drop(1) + implicitsWithParens
+    makeAnalysisMethodName(o) + "(" + lhsArg + args.drop(1) + implicitsWithParens
   }
   def makeAnalysisMethodSignature(o: Rep[DSLOp]) = {
     val implicitArgs = makeOpImplicitArgsWithType(o)
@@ -135,7 +135,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
       if (!hasIRNode(op) || hasMultipleIRNodes(op)) {
         err("Cannot create analysis rule for op " + op.name + ": Op must be represented by exactly one IR node")
       }
-      emitWithIndent("case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithAnonArgs(op) + " => Some(" + makeAnalysisMethodCall(op) + ")", stream, 4)
+      emitWithIndent("case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(op) + " => Some(" + makeAnalysisMethodCall(op) + ")", stream, 4)
     }
     stream.println("    case _ => super.analyzeTP(lhs, rhs)") // TODO: Should be able to change this
     stream.println("  }")

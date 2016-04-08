@@ -12,7 +12,7 @@ trait DHDLMetadata {
     val PipeStyle = lookupTpe("PipeStyle", stage=compile)
     val Reg       = lookupTpe("Reg")
     val Pipeline  = lookupTpe("Pipeline")
-    val Idx       = lookupAlias("SInt")
+    val Idx       = lookupAlias("Index")
     val Tile      = lookupTpe("Tile")
     val Range     = lookupTpe("Range")
 
@@ -87,7 +87,7 @@ trait DHDLMetadata {
     onMeet (MRegTpe) ${ this }
     internal.static (regTpeOps) ("update", T, (T, RegTpe) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MRegTpe($1)) }
-    internal.static (regTpeOps) ("apply", T, T :: RegTpe) implements composite ${ meta[MRegTpe]($0).get.regTpe }
+    internal.static (regTpeOps) ("apply", T, T :: RegTpe) implements composite ${ meta[MRegTpe]($0).map(_.regTpe).getOrElse(Regular) }
 
     /* Register Initial Value */
     val MRegInit = metadata("MRegInit", "value" -> MAny)
@@ -124,9 +124,17 @@ trait DHDLMetadata {
     val MPipeType = metadata("MPipeType", "tpe" -> PipeStyle)
     val styleOps = metadata("styleOf")
     onMeet (MPipeType) ${ this }
-    internal.static (styleOps) ("update", Nil, (Pipeline, PipeStyle) :: MUnit, effect = simple) implements
+    internal.static (styleOps) ("update", Nil, (MAny, PipeStyle) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MPipeType($1)) }
-    internal.static (styleOps) ("apply", Nil, Pipeline :: PipeStyle) implements composite ${ meta[MPipeType]($0).get.tpe }
+    internal.static (styleOps) ("apply", Nil, MAny :: PipeStyle) implements composite ${ meta[MPipeType]($0).get.tpe }
+
+    /* Pipeline stages */
+    val MNumStages = metadata("MNumStages", "nStages" -> SInt)
+    val nstages    = metadata("nStages")
+    onMeet (MNumStages) ${ this }
+    internal.static (nstages) ("update", Nil, (MAny, SInt) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MNumStages($1)) }
+    internal.static (nstages) ("apply", Nil, MAny :: SInt) implements composite ${ meta[MNumStages]($0).get.nStages }
 
     /* Range is single dimension */
     val MUnitRange = metadata("MUnitRange", "isUnit" -> SBoolean)
@@ -143,6 +151,48 @@ trait DHDLMetadata {
     internal.static (rangesOps) ("update", T, (Tile(T), SList(Range)) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MTileRanges($1)) }
     internal.static (rangesOps) ("apply", T, Tile(T) :: SList(Range)) implements composite ${ meta[MTileRanges]($0).get.ranges }
+
+    /* Is global value (computed only once at setup) */
+    val MGlobal = metadata("MGlobal", "isGlobal" -> SBoolean)
+    val globalOps = metadata("isGlobal")
+    onMeet (MGlobal) ${ MGlobal(this.isGlobal && that.isGlobal) }
+    internal.static (globalOps) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MGlobal($1)) }
+    internal.static (globalOps) ("apply", Nil, MAny :: SBoolean) implements composite ${ meta[MGlobal]($0).map(_.isGlobal).getOrElse(false) }
+
+
+    // TODO: Should probably change to BigDecimal or something to be accurate
+    // NOTE: The user gets to see these! Woah.
+    val MBound = metadata("MBound", "bound" -> SDouble)
+    val boundOps = metadata("bound")
+    onMeet(MBound) ${ MBound( Math.max(this.bound, that.bound)) }
+    static (boundOps) ("update", Nil, (MAny, SDouble) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MBound($1)) }
+    static (boundOps) ("update", Nil, (MAny, SOption(SDouble)) :: MUnit, effect = simple) implements
+      composite ${ $1.foreach{b => setMetadata($0, MBound(b)) } }
+    static (boundOps) ("apply", Nil, MAny :: SOption(SDouble)) implements composite ${ boundsOf($0) }
+
+    internal (boundOps) ("boundsOf", Nil, MAny :: SOption(SDouble)) implements composite ${ meta[MBound]($0).map(_.bound) }
+
+    val boundUnapply = metadata("Bound")
+    internal.static (boundUnapply) ("unapply", Nil, MAny :: SOption(SDouble)) implements composite ${ boundsOf($0) }
+
+    internal (boundOps) ("extractNumericConstant", T, T :: SOption(SDouble)) implements composite ${
+      val mD = manifest[Double]
+      val mF = manifest[Float]
+      val mI = manifest[Int]
+      val mL = manifest[Long]
+
+      manifest[T] match {
+        case `mI` => Some($0.asInstanceOf[Int].toDouble)
+        case `mL` => Some($0.asInstanceOf[Long].toDouble)
+        case `mF` => Some($0.asInstanceOf[Float].toDouble)
+        case `mD` => Some($0.asInstanceOf[Double])
+        case _ => None
+      }
+    }
+    rewrite (boundOps, "boundsOf") using pattern(${Param(x)} -> ${ extractNumericConstant(x) })
+    rewrite (boundOps, "boundsOf") using pattern(${Const(x)} -> ${ extractNumericConstant(x) })
 
     /* Parent of a node, which is a controller : None if unset */
 	 	// Parent controls the reset of the node
@@ -239,12 +289,11 @@ trait DHDLMetadata {
 				//throw new Exception("Unknown type " + manifest[T])
 				""
 			}
-			if ( $0 > 1) { 
+			if ( $0 > 1) {
 				"new DFEVectorType<DFEVar>(" + scalart + "," + $0
 			} else {
 				scalart
 			}
 		}
-
 	}
 }

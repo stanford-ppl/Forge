@@ -552,9 +552,9 @@ trait DHDLMath {
     // --- Dot Backend
     impl (mux) (codegen(dot, ${ 
 			$sym [label="mux", shape="diamond" style="filled" fillcolor="white"] 
-			$sel -> $sym [ xlabel="sel" ]
-			$a -> $sym [ xlabel="a" ]
-			$b -> $sym [ xlabel="b" ]
+			$sel -> $sym [ headlabel="sel" ]
+			$a -> $sym [ headlabel="a" ]
+			$b -> $sym [ headlabel="b" ]
 		}))
 
     // --- MaxJ Backend

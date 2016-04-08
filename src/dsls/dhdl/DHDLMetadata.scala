@@ -55,13 +55,31 @@ trait DHDLMetadata {
       }
     }
 
-    /* Is Double Buffer */
+    /* Is Double Buffer: false if unset */
     val MDblBuf = metadata("MDblBuf", "isDblBuf" -> SBoolean)
     val dblBufOps = metadata("isDblBuf")
     onMeet (MDblBuf) ${ this }
     internal.static (dblBufOps) ("update", T, (T, SBoolean) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MDblBuf($1)) }
-    internal.static (dblBufOps) ("apply", T, T :: SBoolean) implements composite ${ meta[MDblBuf]($0).get.isDblBuf }
+    internal.static (dblBufOps) ("apply", T, T :: SBoolean) implements composite ${ 
+    	meta[MDblBuf]($0) match {
+    	  case Some(a) => a.isDblBuf 
+    	  case None => false 
+    	}
+		}
+
+    /* Is Accumulator: false if unset */
+    val MAccum = metadata("MAccum", "isAccum" -> SBoolean)
+    val accumOps = metadata("isAccum")
+    onMeet (MAccum) ${ this }
+    internal.static (accumOps) ("update", T, (T, SBoolean) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MAccum($1)) }
+    internal.static (accumOps) ("apply", T, T :: SBoolean) implements composite ${ 
+    	meta[MAccum]($0) match {
+    	  case Some(a) => a.isAccum 
+    	  case None => false 
+    	}
+		}
 
     /* Register Type  */
     val MRegTpe = metadata("MRegTpe", "regTpe" -> RegTpe)
@@ -80,7 +98,7 @@ trait DHDLMetadata {
     internal.static (regReset) ("apply", T, Reg(T) :: T) implements
       composite ${ meta[MRegInit]($0).get.value.asInstanceOf[Rep[T]] }
 
-    /* Parallelization Factor  */
+    /* Parallelization Factor: 0 if unset */
     val MPar = metadata("MPar", "par" -> SInt)
     val parOps = metadata("par")
     onMeet (MPar) ${ this }
@@ -93,7 +111,7 @@ trait DHDLMetadata {
       }
     }
 
-    /* Number of Banks  */
+    /* Number of Banks */
     val MBank = metadata("MBank", "nBanks" -> SInt)
     val bankOps = metadata("banks")
     //TODO:
@@ -109,7 +127,6 @@ trait DHDLMetadata {
     internal.static (styleOps) ("update", Nil, (Pipeline, PipeStyle) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MPipeType($1)) }
     internal.static (styleOps) ("apply", Nil, Pipeline :: PipeStyle) implements composite ${ meta[MPipeType]($0).get.tpe }
-
 
     /* Range is single dimension */
     val MUnitRange = metadata("MUnitRange", "isUnit" -> SBoolean)
@@ -127,7 +144,8 @@ trait DHDLMetadata {
       composite ${ setMetadata($0, MTileRanges($1)) }
     internal.static (rangesOps) ("apply", T, Tile(T) :: SList(Range)) implements composite ${ meta[MTileRanges]($0).get.ranges }
 
-    /* Parent of a node, which is a controller */
+    /* Parent of a node, which is a controller : None if unset */
+	 	// Parent controls the reset of the node
 	 	// TODO: confirm with Raghu
 		/* Reg: 1. reg.reset=(parent.reset its wen& parent.en) 2. reg.wen=din.parent.en */
 	 	/* Counter: parent is its counterchain */
@@ -160,6 +178,35 @@ trait DHDLMetadata {
     	  case None => Nil 
     	}
 		}
+
+		/* The controller that writes to the Mem. 
+		 * Right now assume only one writer per double buffer */
+    val MWriter = metadata("MWriter", "writer" -> MAny)
+    val writerOps = metadata("writerOf")
+    onMeet (MWriter) ${ this }
+    internal.static (writerOps) ("update", T, (T, MAny) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MWriter($1)) }
+    internal.static (writerOps) ("apply", T, T :: SOption(MAny)) implements composite ${
+    	meta[MWriter]($0) match {
+    	  case Some(p) => Some(p.writer)
+    	  case None => None
+    	}
+		}
+
+		/* Controllers that read from a Double Buffer. The metadata is only used for double buffer.
+		*/
+    val MReaders = metadata("MReaders", "readers" -> SList(MAny))
+    val readersOps = metadata("readersOf")
+    onMeet (MReaders) ${ this }
+    internal.static (readersOps) ("update", T, (T, SList(MAny)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MReaders($1)) }
+    internal.static (readersOps) ("apply", T, T :: SList(MAny)) implements composite ${
+    	meta[MReaders]($0) match {
+    	  case Some(p) => p.readers
+    	  case None => Nil 
+    	}
+		}
+
 
 		/* MaxJ Codegen Helper Functions */
     val maxjgrp = grp("maxjGrp")

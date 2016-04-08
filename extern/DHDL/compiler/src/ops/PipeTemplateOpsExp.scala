@@ -208,6 +208,7 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
       emit(s"""label="${name}" """)
       emit(s"""style="filled" """)
 			emit(s"""fillcolor=$color""")
+			emit(s"""color=none""")
 			emitBlock(y)
 			emit(s"""}""")
 	}
@@ -215,6 +216,7 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
 	  case e@Counterchain_new(counters) =>
 			//TODO: check whether parent of cchain is empty, if is emit ctrchain
+			//Uncomment after analysis complete
 			//if (parentOf(sym).isEmpty) {
 			//	emitCtrChain(sym, rhs)
 			//}
@@ -227,7 +229,7 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
       emit(s"""style="bold, filled" """)
 			emit(s"""fillcolor=$pipeFillColor""")
 			emitCtrChain(cchain)
-      emitBlock(func, quote(sym) + "foreachFunc", "foreachFunc", mapFuncColor)             // Map function
+      emitBlock(func, quote(sym) + "_foreachFunc", "foreachFunc", foreachFillColor)             // Map function
       emit("}")
 
     case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
@@ -241,13 +243,13 @@ trait DotGenPipeTemplateOps extends DotGenEffect{
       emit(s"""define(`${quote(acc)}', `${quote(accum)}')""")
 			val Def(EatReflect(d)) = cchain
 			emitCtrChain(cchain)
-      emitBlock(func, quote(sym) + "_mapFunc", "mapFunc", mapFuncColor)             // Map function
-      emitBlock(ldFunc, quote(sym) + "_ldFunc", "ldFunc", ldFuncColor)             // Map function
+      emitBlock(func, quote(sym) + "_mapFunc", "mapFunc", mapFillColor)             // Map function
+      emitBlock(ldFunc, quote(sym) + "_ldFunc", "ldFunc", ldFillColor)             // Map function
       emitAlias(rV._1, getBlockResult(ldFunc))
       emitAlias(rV._2, getBlockResult(func))
-      emitBlock(rFunc, quote(sym) + "_reduceFunc", "reduceFunc", reduceFuncColor)             // Map function
+      emitBlock(rFunc, quote(sym) + "_reduceFunc", "reduceFunc", reduceFillColor)             // Map function
       emitAlias(res, getBlockResult(rFunc))
-      emitBlock(stFunc, quote(sym) + "_stFunc", "stFunc" , stFuncColor)             // Map function
+      emitBlock(stFunc, quote(sym) + "_stFunc", "stFunc" , stFillColor)             // Map function
       emit("}")
 
     case _ => super.emitNode(sym,rhs)

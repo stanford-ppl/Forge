@@ -50,24 +50,24 @@ trait DHDLControllers {
     // Moved this outside - was confusing sublime
 
     impl (counter_new) (codegen(dot, ${
-			@ var label = "\\"" + quote(sym)
+			@ var l = "\\"" + quote(sym)
 			@ if (quote(start).forall(_.isDigit)) {
-			@ 	label += "|start=" + quote(start)
+			@ 	l += "|start=" + quote(start)
 			@ } else {
-					$start -> $sym [xlabel="start"]
+					$start -> $sym [headlabel="start"]
 			@ }
 			@ if (quote(end).forall(_.isDigit)) {
-			@ 	label += "|end=" + quote(end)
+			@ 	l += "|end=" + quote(end)
 			@ } else {
-					$end -> $sym [xlabel="end"]
+					$end -> $sym [headlabel="end"]
 			@ }
 			@ if (quote(step).forall(_.isDigit)) {
-			@ 	label += "|step=" + quote(step)
+			@ 	l += "|step=" + quote(step)
 			@ } else {
-					$step -> $sym [xlabel="step"]
+					$step -> $sym [headlabel="step"]
 			@ }
-			@ label += "\\""
-      $sym [ label=$label shape="record" style="filled,rounded"
+			@ l += "\\"" 
+      $sym [ label=$l shape="record" style="filled,rounded"
 						color=$counterInnerColor ]
 		}))
 

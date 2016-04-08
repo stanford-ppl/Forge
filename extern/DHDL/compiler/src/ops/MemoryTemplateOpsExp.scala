@@ -446,21 +446,31 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps {
 			emit(s"""style="rounded, filled"""")
 			emit(s"""fillcolor=$tileTransFillColor""")
 			emit(s"""color="black"""")
-			emit(s"""${quote(sym)} [label="${if (store) "TileSt" else "TileLd"}" style="rounded, filled" color="black" fillcolor="gray"]""")
+			var nl = if (store) "TileSt" else "TileLd"
+			nl += "|stride=\\{"
+			strides.zipWithIndex.foreach{ case (s, i) =>
+				if (quote(s).forall(_.isDigit)) {
+					nl += s"$i:${quote(s)}"
+					if (i!=strides.length-1) nl += ", "
+				} else {
+					emitEdge(s, sym, s"stride $i")
+				}
+			}
+			nl += "\\}"
+			if (quote(memOfs).forall(_.isDigit))
+				nl += s"|memOfs=${quote(memOfs)}"
+			else
+				emitEdge(memOfs, sym, "memOfs")
+			emit(s"""${quote(sym)} [label="$nl" shape="record" style="rounded, filled" color="black" fillcolor="gray"]""")
 			emitCtrChain(cchain)
 			emit(s"""} """)
-			if (store)
+			if (store) {
 				emitEdge(sym, mem)
-			else
-				emitEdge(mem, sym)
-			if (store)
 				emitEdge(local, sym)
-			else
+			} else {
+				emitEdge(mem, sym)
 				emitEdge(sym, local)
-			strides.foreach{ s =>
-				emitEdge(s, sym, "stride")
 			}
-			emitEdge(memOfs, sym)
 
 		case Offchip_new(size) =>
 			/* Special case to hand nodes producing size of offchip outside hardware scope */

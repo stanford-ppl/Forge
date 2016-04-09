@@ -2,9 +2,9 @@ import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
 
-object TestCompiler extends DHDLApplicationCompiler with Test
-object TestInterpreter extends DHDLApplicationInterpreter with Test
-trait Test extends DHDLApplication {
+object ArgInOutTestCompiler extends DHDLApplicationCompiler with ArgInOutTest
+object ArgInOutTestInterpreter extends DHDLApplicationInterpreter with ArgInOutTest
+trait ArgInOutTest extends DHDLApplication {
 
   lazy val x = ArgIn[SInt]("x")
   lazy val y = ArgOut[SInt]("y")

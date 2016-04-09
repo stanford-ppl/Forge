@@ -117,7 +117,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
 
   // TODO: Eventually want to handle TTP as well, but doesn't make sense to until after fusion changes
   def emitAnalyzer(az: Rep[DSLAnalyzer], stream: PrintWriter) {
-    stream.println("trait " + makeTraversalName(az) + " extends " + dsl + "AnalyzerBase {")
+    stream.println("trait " + makeTraversalName(az) + " extends AnalyzerBase {")
     stream.println("  val IR: " + makeTraversalIRName(az))
     stream.println("  import IR._")
     stream.println("  override val name = \"" + makeTraversalName(az) + "\"")
@@ -130,14 +130,14 @@ trait DeliteGenTraversals extends BaseGenTraversals {
       emitTraversalRules(op, rules, stream, 4, Some(makeAnalysisMethodSignature))
     }
     stream.println()
-    stream.println("  override def analyzeTP(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext) = rhs match {")
+    stream.println("  override def analyze(lhs: Exp[Any], rhs: Def[Any]) = rhs match {")
     for ((op,rules) <- patterns) {
       if (!hasIRNode(op) || hasMultipleIRNodes(op)) {
         err("Cannot create analysis rule for op " + op.name + ": Op must be represented by exactly one IR node")
       }
       emitWithIndent("case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(op) + " => Some(" + makeAnalysisMethodCall(op) + ")", stream, 4)
     }
-    stream.println("    case _ => super.analyzeTP(lhs, rhs)") // TODO: Should be able to change this
+    stream.println("    case _ => super.analyze(lhs, rhs)") // TODO: Should be able to change this
     stream.println("  }")
 
     stream.println("}")
@@ -150,7 +150,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("}")
   }
 
-  def emitAnalyzerBase(stream: PrintWriter) {
+  /*def emitAnalyzerBase(stream: PrintWriter) {
     stream.println("trait " + dsl + "AnalyzerBase extends AnalyzerBase {")
     stream.println("  val IR: " + dsl + "Exp")
     stream.println("  import IR._")
@@ -158,13 +158,12 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("  override def propagateTP[A](lhs: Exp[A], rhs: Def[_])(implicit ctx: SourceContext) = rhs match {")
     for ((op, rules) <- PropagationRules) {
       if (!hasIRNode(op) || hasMultipleIRNodes(op)) {
-        err("Cannot create propagation rule for op " + op.name + ": Op must be represented by exactly one IR node")
       }
       emitTraversalRules(op, rules, stream, 4)
     }
     stream.println("    case _ => super.propagateTP(lhs,rhs)")
     stream.println("  }")
     stream.println("}")
-  }
+  }*/
 
 }

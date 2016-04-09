@@ -16,6 +16,8 @@ trait LatencyAnalysisExp extends LatencyModel with CounterToolsExp with PipeStag
   val flushCycles = 512
   val pcieCycles = 42500
   val baseCycles = flushCycles + interruptCycles + pcieCycles
+
+  var CLK = 150.0f // Clock frequency in MHz
 }
 
 
@@ -61,15 +63,19 @@ trait ModelingTools extends Traversal with PipeStageTools {
 
     def fullDFS(cur: Exp[Any]): Long = cur match {
       case Def(d) if scope.contains(cur) =>
-        val deps = syms(d)
-        val dlys = deps.map(fullDFS(_))
-        val critical = dlys.max
+        val deps = syms(d) filter (scope contains _)
 
-        deps.zip(dlys).foreach{ case(dep, path) =>
-          if (path < critical && (critical - path) > delays(dep))
-            delays += dep -> (critical - path)
+        if (!deps.isEmpty) {
+          val dlys = deps.map(fullDFS(_))
+          val critical = dlys.max
+
+          deps.zip(dlys).foreach{ case(dep, path) =>
+            if (path < critical && (critical - path) > delays(dep))
+              delays += dep -> (critical - path)
+          }
+          critical + latencyOf(cur)
         }
-        critical + latencyOf(cur)
+        else latencyOf(cur)
 
       case _ => 0L
     }
@@ -202,6 +208,10 @@ trait LatencyAnalyzer extends ModelingTools {
     // TODO: Could potentially have multiple accelerator designs in a single program
     // Eventually want to be able to support multiple accel scopes
     totalCycles = cycleScope.sum + IR.baseCycles
+
+    msg(s"Estimated cycles: $totalCycles")
+    msg(s"Estimated runtime (at " + "%.2f".format(IR.CLK) +"MHz): " + "%.8f".format(totalCycles/(IR.CLK*1000000f)) + "s")
+
     (b)
   }
 

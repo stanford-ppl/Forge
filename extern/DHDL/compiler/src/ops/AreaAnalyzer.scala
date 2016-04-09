@@ -138,14 +138,21 @@ trait AreaAnalyzer extends ModelingTools {
     super.preprocess(b)
   }
 
+
+  // Neural net models for routing, fanout, unavailable ALMs
+  val lutRoutingModel  = new LUTRoutingModel()
+  val regFanoutModel   = new RegFanoutModel()
+  val unavailALMsModel = new UnavailALMsModel()
+
+
   override def postprocess[A:Manifest](b: Block[A]) = {
     // TODO: Could potentially have multiple accelerator designs in a single program
     // Eventually want to be able to support multiple accel scopes
     val design = areaScope.fold(NoArea){_+_} + IR.BaseDesign
 
-    val routingLUTs = 21000 // lutRoutingModel.evaluate(design)
-    val fanoutRegs  = 3600  // regFanoutModel.evaluate(design)
-    val unavailable = 400   // unavailALMsModel.evaluate(design)
+    val routingLUTs = lutRoutingModel.evaluate(design)  // 21000
+    val fanoutRegs  = regFanoutModel.evaluate(design)   // 3600
+    val unavailable = unavailALMsModel.evaluate(design) // 400
 
     val recoverable = design.lut3/2 + design.lut4/2 + design.lut5/2 + design.lut6/10 + design.mem16/2  + routingLUTs/2
 

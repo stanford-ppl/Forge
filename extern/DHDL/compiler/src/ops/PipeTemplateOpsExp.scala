@@ -74,6 +74,8 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
 
     // Reified load function
     val acc = reflectMutableSym( fresh[C[T]] )  // Has to be mutable since we write to "it"
+    setProps(acc, getProps(accum))
+
     val ldBlk = reifyEffects(__mem.ld(acc, inds))
 
    // Reified reduction function
@@ -104,10 +106,12 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     val indsRed = indices_create(isRed)
 
     val part = fresh[BRAM[T]]
+    setProps(part, getProps(mBlk))
     // Partial result load
     val ldPartBlk = reifyEffects( canBramMem[T].ld(part, indsRed) )
 
     val acc = reflectMutableSym( fresh[BRAM[T]] )
+    setProps(acc, getProps(accum))
     // Accumulator load
     val ldBlk = reifyEffects( canBramMem[T].ld(acc, indsRed) )
 
@@ -177,6 +181,22 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     case Reflect(e@Counterchain_new(counters,nIter), u, es) => reflectMirrored(Reflect(Counterchain_new(f(counters),f(nIter))(e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
 
     case _ => super.mirror(e, f)
+  }
+
+  override def propagate(lhs: Exp[Any], rhs: Def[Any]) = rhs match {
+    case Pipe_reduce(c,a,ld,st,func,rFunc,inds,acc,res,rV) =>
+      setProps(acc, getProps(a))
+      setProps(res, getProps(rFunc))
+      setProps(rV._1, getProps(func))
+      setProps(rV._2, getProps(func))
+    case Block_reduce(c1,c2,a,func,ld1,ld2,rFunc,st,inds1,inds2,part,acc,res,rV) =>
+      setProps(acc, getProps(a))
+      setProps(part, getProps(func))
+      setProps(res, getProps(rFunc))
+      setProps(rV._1, getProps(ld1))
+      setProps(rV._2, getProps(ld2))
+
+    case _ => super.propagate(lhs, rhs)
   }
 
   // --- Dependencies

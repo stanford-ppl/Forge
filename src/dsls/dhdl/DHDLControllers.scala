@@ -41,37 +41,6 @@ trait DHDLControllers {
       chain
     }
 
-    // --- Scala backend
-    impl (counter_new) (codegen($cala, ${ ($start until $end by $step) }))
-
-    // --- Dot Backend
-    // Moved this outside - was confusing sublime
-
-    impl (counter_new) (codegen(dot, ${
-			@ var l = "\\"" + quote(sym)
-			@ if (quote(start).forall(_.isDigit)) {
-			@ 	l += "|start=" + quote(start)
-			@ } else {
-					$start -> $sym [headlabel="start"]
-			@ }
-			@ if (quote(end).forall(_.isDigit)) {
-			@ 	l += "|end=" + quote(end)
-			@ } else {
-					$end -> $sym [headlabel="end"]
-			@ }
-			@ if (quote(step).forall(_.isDigit)) {
-			@ 	l += "|step=" + quote(step)
-			@ } else {
-					$step -> $sym [headlabel="step"]
-			@ }
-			@ l += "\\"" 
-      $sym [ label=$l shape="record" style="filled,rounded"
-						color=$counterInnerColor ]
-		}))
-
-    // --- MaxJ Backend
-    impl (counter_new) (codegen(maxj, ${
-		}))
   }
 
 

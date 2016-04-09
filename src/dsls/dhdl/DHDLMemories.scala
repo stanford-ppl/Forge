@@ -201,6 +201,7 @@ trait DHDLMemories {
     impl (reg_read)  (codegen(maxj, ${
 			@		val pre = maxJPre(sym)
 			$pre $sym = $reg 
+      @ val parent = if (parentOf(sym).isEmpty) "top" else quote(parentOf(sym).get)
       @ val rst = quote(parent) + "_rst_en"
       //@  emit(s"""DFEVar ${quote(sym.input)}_real = $enSignalStr ? ${quote(sym.input)} : ${quote(sym)}; // enable""")
       //@  emit(s"""DFEVar ${quote(sym)}_hold = Reductions.streamHold(${quote(sym.input)}_real, ($rst | ${quote(sym.producer)}_redLoop_done));""")

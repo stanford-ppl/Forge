@@ -344,14 +344,12 @@ trait DHDLMath {
     impl (neq_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			$pre $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
-    	$sym <== $0.neq($1);
+    	$sym <== ( $0 !== $1 );
 		}))
     impl (eql_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			$pre $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
-    	//TODO: why in old dhdl use ===
-			//$sym <== $0 === $1 ;
-			$sym <== $0.eq($1) ;
+			$sym <== ( $0 === $1) ;
 		}))
     impl (and_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
@@ -403,14 +401,12 @@ trait DHDLMath {
     impl (neq_flt) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			$pre $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
-    	$sym <== $0.neq($1);
+    	$sym <== ( $0 !== $1 );
 		}))
     impl (eql_flt) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			$pre $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
-    	//TODO: why in old dhdl use ===
-			//$sym <== $0 === $1 ;
-			$sym <== $0.eq($1) ;
+			$sym <== $0 === $1 ;
 		}))
 
     impl (not_bit) (codegen(maxj, ${

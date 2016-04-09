@@ -464,10 +464,9 @@ object FloatPoint {
 """
 }
 
-//trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps{
-trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps {
-  val IR: PipeTemplateOpsExp with OffChipMemOpsExp  with DHDLCodegenOps with RegOpsExp  
- 	import IR._
+trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplateOps{
+	  val IR: ControllerTemplateOpsExp with OffChipMemOpsExp with DHDLCodegenOps with RegOpsExp with DHDLIdentifiers
+		  import IR._
 
 	var emittedSize = Set.empty[Exp[Any]]
   override def initializeGenerator(buildDir:String): Unit = {
@@ -513,7 +512,7 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps {
 		case Offchip_new(size) =>
 			/* Special case to hand nodes producing size of offchip outside hardware scope */
 			def hackGen(x: Exp[Any]): Unit = x match { 
-				case Def(EatReflect(_:Reg_Reg_new[_])) => // Nothing
+				case Def(EatReflect(_:Reg_new[_])) => // Nothing
 				case ConstFix(_) => // Nothing
 				case ConstFlt(_) => // Nothing
 				case Def(d) => 

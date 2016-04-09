@@ -291,7 +291,7 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
 	}
 
 	def emitCtrChain(sym: Sym[Any], rhs: Def[Any]):Unit = rhs match {
-	  case e@Counterchain_new(counters) =>
+	  case e@Counterchain_new(counters, nIter) =>
 			if (!emittedCtrChain.contains(sym)) {
 				emittedCtrChain += sym
     		emit(s"""subgraph cluster_${quote(sym)} {""")
@@ -308,7 +308,7 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
 	}
 
 	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
-    case Def(EatReflect(Counterchain_new(counters))) =>
+    case Def(EatReflect(Counterchain_new(counters, nIter))) =>
 	     inds.zipWithIndex.foreach {case (iter, idx) => emitAlias(iter, counters(idx)) }
 	}
 	
@@ -333,14 +333,27 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case e@Counter_new(start,end,step,_) =>
-      val cic = "\"" + quote(counterInnerColor) + "\""
-      stream.println(""+quote(sym)+" [ label=\""+quote(sym)+"\" shape=\"box\" style=\"filled,rounded\"" + "")
-      stream.println("color="+quote(cic)+" ]" + "")
-      stream.println(""+quote(start)+" -> "+quote(sym)+" [ label=\"start\" ]" + "")
-      stream.println(""+quote(end)+" -> "+quote(sym)+" [ label=\"end\" ]" + "")
-      stream.println(""+quote(step)+" -> "+quote(sym)+" [ label=\"step\" ]" + "")
+			var l = s""""${quote(sym)}"""
+			if (quote(start).forall(_.isDigit)) {
+				l += "|start=" + quote(start)
+			} else {
+				emitEdge(start, sym, "start")
+			}
+			if (quote(end).forall(_.isDigit)) {
+				l += "|end=" + quote(end)
+			} else {
+				emitEdge(end, sym, "end")
+			}
+			if (quote(step).forall(_.isDigit)) {
+				l += "|step=" + quote(step)
+			} else {
+				emitEdge(step, sym, "step")
+			}
+			l += "\"" 
+      emit(s"""${quote(sym)} [ label=$l shape="record" style="filled,rounded"
+						color=$counterInnerColor ]""")
 
-	  case e@Counterchain_new(counters) =>
+	  case e@Counterchain_new(counters, nIter) =>
 			//TODO: check whether parent of cchain is empty, if is emit ctrchain
 			//Uncomment after analysis complete
 			//if (parentOf(sym).isEmpty) {
@@ -403,6 +416,7 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
   }
 }
 
+GenericCodegen
 trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
   val IR: ControllerTemplateOpsExp with TpesOpsExp //with NosynthOpsExp
           with OffChipMemOpsExp with RegOpsExp with CounterOpsExp with MetaPipeOpsExp with
@@ -443,17 +457,8 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 					emitPipeProlog(sym, cchain, inds, writesToAccumRam)
 					emitPipeForEachEpilog(sym, writesToAccumRam, cchain, inds(0))
 				case Disabled =>
-					val Def(EatReflect(Counterchain_new(counters))) = cchain
-					//TODO: what's the proper way to create these nodes in IR?
-					/*
-					val totIter = counters.map { case c =>
-						val Def(Counter_new(start, end, step)) = c
-						DHDLPrim_Div_fix(end, DHDLPrim_Mul_fix(step, Int_to_fix( par(c).asInstanceOf[Rep[Int]] )))	
-					}.reduce{ case (a,b) =>
-						DHDLPrim_Mul_fix(a,b)
-					}
-					emitSequential(sym, cchain, totIter)
-					*/
+					val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain
+					emitSequential(sym, cchain, nIters)
 			}
       emitBlock(func)             // Map function
 
@@ -934,7 +939,7 @@ package engine;
 	
 	def emitPipeProlog(sym: Sym[Any], cchain: Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]],
 		writesToAccumRam:Boolean) = {
-		val Def(EatReflect(Counterchain_new(counters))) = cchain
+		val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
     if (parentOf(sym).isEmpty) {
       emit(s"""DFEVar ${quote(sym)}_en = top_en;""")
       emit(s"""DFEVar ${quote(sym)}_done = dfeBool().newInstance(this);""")
@@ -1009,9 +1014,9 @@ package engine;
 
     // For Pipes, max must be derived from PipeSM
     // For everyone else, max is as mentioned in the ctr
-		val Def(EatReflect(Counterchain_new(counters))) = cchain
+		val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
 		counters.zipWithIndex.map {case (ctr,i) =>
-			val Def(EatReflect(Counter_new(start, end, step))) = ctr
+			val Def(EatReflect(Counter_new(start, end, step, _))) = ctr
 			val max = parentOf(cchain.asInstanceOf[Rep[CounterChain]]) match {
 				case Some(s) => s.tp match {
 					case p:Pipeline => s"${quote(ctr)}_max"

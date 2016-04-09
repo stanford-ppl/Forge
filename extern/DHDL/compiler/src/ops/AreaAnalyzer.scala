@@ -44,7 +44,7 @@ trait AreaAnalyzer extends ModelingTools {
 
   def areaOf(e: Exp[Any]) = IR.areaOf(e, inReduce, inHwScope)
 
-  def areaOfBlock(b: Block[Any], innerLoop: Boolean): FPGAResources = {
+  def areaOfBlock(b: Block[Any], innerLoop: Boolean, oos: Map[Exp[Any],Long] = Map.empty): FPGAResources = {
     val outerScope = areaScope
     areaScope = Nil
     traverseBlock(b)
@@ -62,7 +62,7 @@ trait AreaAnalyzer extends ModelingTools {
     else
       area
   }
-  def areaOfCycle(b: Block[Any]): FPGAResources = {
+  def areaOfCycle(b: Block[Any], oos: Map[Exp[Any],Long] = Map.empty): FPGAResources = {
     val outerReduce = inReduce
     inReduce = true
     val out = areaOfBlock(b, true)
@@ -88,7 +88,7 @@ trait AreaAnalyzer extends ModelingTools {
         val P = parOf(cchain).reduce(_*_)
         areaOfBlock(func, styleOf(lhs) == Fine) * P + areaOf(lhs)
 
-      case EatReflect(e@Pipe_reduce(cchain,_,ld,st,func,rFunc,_,_,_,_)) =>
+      case EatReflect(e@Pipe_reduce(cchain,_,iFunc,ld,st,func,rFunc,_,idx,_,_,_)) =>
         val P = parOf(cchain).reduce(_*_)
         val body = areaOfBlock(func, styleOf(lhs) == Fine) * P // map duplicated P times
         /*
@@ -104,13 +104,14 @@ trait AreaAnalyzer extends ModelingTools {
         val internal = areaOfBlock(rFunc, true) * (P - 1)
         val rFuncLatency = latencyOfPipe(rFunc)
         val internalDelays = reductionTreeDelays(P).map{delay => areaOfDelayLine(nbits(e.mT), rFuncLatency * delay) }.fold(NoArea){_+_}
+        val icalc = areaOfCycle(iFunc) // Calculate index for load/store
         val load  = areaOfCycle(ld)    // Load from accumulator (happens once)
         val cycle = areaOfCycle(rFunc) // Special case area of accumulator
-        val store = areaOfCycle(st)    // Store to accumulator (happens once)
+        val store = areaOfCycle(st, Map(idx -> -(latencyOfCycle(ld) + latencyOfCycle(rFunc))) )    // Store to accumulator (happens once)
 
-        body + internal + internalDelays + load + cycle + store + areaOf(lhs)
+        body + internal + internalDelays + icalc + load + cycle + store + areaOf(lhs)
 
-      case EatReflect(e@Block_reduce(ccOuter,ccInner,_,func,ld1,ld2,rFunc,st,_,_,_,_,_,_)) =>
+      case EatReflect(e@Block_reduce(ccOuter,ccInner,_,iFunc,func,ld1,ld2,rFunc,st,_,_,idx,_,_,_,_)) =>
         val Pm = parOf(ccOuter).reduce(_*_) // Parallelization factor for map
         val Pr = parOf(ccInner).reduce(_*_) // Parallelization factor for reduce
         val body = areaOfBlock(func,false) * Pm
@@ -118,12 +119,13 @@ trait AreaAnalyzer extends ModelingTools {
         val internal = areaOfBlock(rFunc,true) * (Pm - 1) * Pr
         val rFuncLatency = latencyOfPipe(rFunc)
         val internalDelays = reductionTreeDelays(Pm).map{delay => areaOfDelayLine(nbits(e.mT), rFuncLatency * delay) * Pr}.fold(NoArea){_+_}
+        val icalc = areaOfBlock(iFunc,true) * Pr
         val load1 = areaOfBlock(ld1,true) * Pm * Pr
-        val load2 = areaOfCycle(ld2) * Pr
+        val load2 = areaOfCycle(ld2, Map(idx -> -latencyOfPipe(ld1) )) * Pr
         val cycle = areaOfCycle(rFunc) * Pr
-        val store = areaOfCycle(st) * Pr
+        val store = areaOfCycle(st, Map(idx -> -(latencyOfPipe(ld2) + latencyOfPipe(rFunc))) ) * Pr
 
-        body + internal + internalDelays + load1 + load2 + cycle + store + areaOf(lhs)
+        body + internal + internalDelays + icalc + load1 + load2 + cycle + store + areaOf(lhs)
 
       case _ =>
         blocks(rhs).map(blk => areaOfBlock(blk,false)).fold(NoArea){_+_} + areaOf(lhs)

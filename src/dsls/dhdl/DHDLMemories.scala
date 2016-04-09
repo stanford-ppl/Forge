@@ -22,12 +22,14 @@ trait DHDLMemories {
   // Type class for local memories which can be used as accumulators in reductions
   def importMemOps() {
     val Indices = lookupTpe("Indices")
+    val Idx = lookupAlias("Index")
     val T = tpePar("T")       // data type
     val C = hkTpePar("C", T)  // memory type
 
     val Mem = tpeClass("Mem", TMem, (T, C))
-    infix (Mem) ("ld", (T,C), (C, Indices) :: T)
-    infix (Mem) ("st", (T,C), (C, Indices, T) :: MUnit, effect = write(0))
+    infix (Mem) ("ld", (T,C), (C, Idx) :: T)
+    infix (Mem) ("st", (T,C), (C, Idx, T) :: MUnit, effect = write(0))
+    infix (Mem) ("flatIdx", (T,C), (C, Indices) :: Idx)
   }
 
 
@@ -43,6 +45,7 @@ trait DHDLMemories {
     val Reg   = lookupTpe("Reg")
     val RegTpe  = lookupTpe("RegTpe", stage=compile)
     val Indices = lookupTpe("Indices")
+    val Idx     = lookupAlias("Index")
 
     // --- Nodes
     val reg_new   = internal (Reg) ("reg_new", T, ("init", T) :: Reg(T), effect = mutable)
@@ -65,8 +68,9 @@ trait DHDLMemories {
 
     val Mem = lookupTpeClass("Mem").get
     val RegMem = tpeClassInst("RegMem", T, TMem(T, Reg(T)))
-    infix (RegMem) ("ld", T, (Reg(T), Indices) :: T) implements composite ${ readReg($0) } // Ignore address
-    infix (RegMem) ("st", T, (Reg(T), Indices, T) :: MUnit, effect = write(0)) implements composite ${ writeReg($0, $2) }
+    infix (RegMem) ("ld", T, (Reg(T), Idx) :: T) implements composite ${ readReg($0) } // Ignore address
+    infix (RegMem) ("st", T, (Reg(T), Idx, T) :: MUnit, effect = write(0)) implements composite ${ writeReg($0, $2) }
+    infix (RegMem) ("flatIdx", T, (Reg(T), Indices) :: Idx) implements composite ${ 0.as[Index] }
 
     // --- API
     /* Reg */
@@ -163,10 +167,10 @@ trait DHDLMemories {
 					@		val p = par(sym)
           		DblRegFileLib $symlib = new DblRegFileLib(this, $ts, $sym, $p);
           @   if (p > 1) {
-					@			val symlibreadv = symlib + ".readv();" 
+					@			val symlibreadv = symlib + ".readv();"
 								DFEVector<DFEVar> $sym = $symlibreadv
           @    } else {
-					@			val symlibread = symlib + ".read();" 
+					@			val symlibread = symlib + ".read();"
               	DFEVar $sym = $symlibread
           @  }
           //@  emit(s"""${quote(sym)}_lib.write($din, ${quote(sym.getWriter())}_done);""")
@@ -244,22 +248,25 @@ trait DHDLMemories {
       bram
     }
 
-    internal (BRAM) ("bram_load_nd", T, (BRAM(T), SList(Idx)) :: T) implements composite ${
+    direct (BRAM) ("bram_load_nd", T, (BRAM(T), SList(Idx)) :: T) implements composite ${
       val addr = calcLocalAddress($1, dimsOf($0))
       bram_load($0, addr)
     }
-    internal (BRAM) ("bram_store_nd", T, (BRAM(T), SList(Idx), T) :: MUnit, effect = write(0)) implements composite ${
+    direct (BRAM) ("bram_store_nd", T, (BRAM(T), SList(Idx), T) :: MUnit, effect = write(0)) implements composite ${
       val addr = calcLocalAddress($1, dimsOf($0))
       bram_store($0, addr, $2)
     }
 
-    direct (BRAM) ("bram_load_inds", T, (BRAM(T), Indices) :: T) implements composite ${ bram_load_nd($0, $1.toList) }
-    direct (BRAM) ("bram_store_inds", T, (BRAM(T), Indices, T) :: MUnit, effect = write(0)) implements composite ${ bram_store_nd($0, $1.toList, $2) }
+    direct (BRAM) ("bram_calc_addr", T, (BRAM(T), Indices) :: Idx) implements composite ${ calcLocalAddress($1.toList, dimsOf($0)) }
+
+    // direct (BRAM) ("bram_load_inds", T, (BRAM(T), Indices) :: T) implements composite ${ bram_load_nd($0, $1.toList) }
+    // direct (BRAM) ("bram_store_inds", T, (BRAM(T), Indices, T) :: MUnit, effect = write(0)) implements composite ${ bram_store_nd($0, $1.toList, $2) }
 
     val Mem = lookupTpeClass("Mem").get
     val BramMem = tpeClassInst("BramMem", T, TMem(T, BRAM(T)))
-    infix (BramMem) ("ld", T, (BRAM(T), Indices) :: T) implements composite ${ bram_load_inds($0, $1) }
-    infix (BramMem) ("st", T, (BRAM(T), Indices, T) :: MUnit, effect = write(0)) implements composite ${ bram_store_inds($0, $1, $2) }
+    infix (BramMem) ("ld", T, (BRAM(T), Idx) :: T) implements composite ${ bram_load_nd($0, List($1)) }
+    infix (BramMem) ("st", T, (BRAM(T), Idx, T) :: MUnit, effect = write(0)) implements composite ${ bram_store_nd($0, List($1), $2) }
+    infix (BramMem) ("flatIdx", T, (BRAM(T), Indices) :: Idx) implements composite ${ bram_calc_addr($0, $1) }
 
 
     // --- API
@@ -313,7 +320,7 @@ trait DHDLMemories {
     impl (bram_new)   (codegen(maxj, ${
       @ if (isDblBuf(sym)) {
       @ } else {
-				//TODO: add stride once it's in language 
+				//TODO: add stride once it's in language
         //BramLib $sym = new BramLib(this, $depth, $ts, $bks , $stride );
 				@ val ts = tpstr[T]( par(sym) )
 				@ val bks = banks(sym)

@@ -75,7 +75,7 @@ trait PipeStageTools extends NestedBlockTraversal {
   }
 
   def list(x: List[Exp[Any]]) = x.zipWithIndex.foreach{
-    case (s@Def(d),i) if isOuterControl(s) => println(s"   $i. [Ctrl] $s = $d")
+    case (s@Def(d),i) if isControlNode(s)  => println(s"   $i. [Ctrl] $s = $d")
     case (s@Def(d),i) if isInnerControl(s) => println(s"   $i. [Pipe] $s = $d")
     case (s@Def(d),i) if isAllocation(s)   => println(s"   $i. [Allc] $s = $d")
     case (s@Def(d),i)                      => println(s"   $i. [None] $s = $d")

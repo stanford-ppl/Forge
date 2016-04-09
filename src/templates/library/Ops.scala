@@ -41,25 +41,20 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     case _:CodeGen | _:Redirect => false
     case _:Getter | _:Setter => false
     case _:Allocates | _:AllocatesFigment => false
-    case _ => hasLibraryVersion(o)
+    case _ => true //hasLibraryVersion(o)
   }
 
-  def emitLibraryOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
+  /*def emitLibraryOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
     val base = if (opsGrp.ops.exists(hasSharedVersion)) opsGrp.name else "Base"
     emitBlockComment("Library-only operations", stream)
-    emitOpSugar(opsGrp.grp.name + "Library", base, dsl, opsGrp, stream, libraryBackend)
-  }
+    emitOpSugar(opsGrp.grp.name + "Library", base, dsl, List(opsGrp), stream, libraryBackend)
+  }*/
 
   /**
    * Emit implementation bodies for all ops except codegen, setter, getter, and allocates
    * These implementations are called from Wrapper (ops not generated here are inlined)
    */
   def emitImpls(opsGrp: DSLOps, stream: PrintWriter) {
-    emitBlockComment("SingleTask and Composite Impls", stream)
-    stream.println()
-    stream.println("trait " + opsGrp.grp.name + "WrapperImpl {")
-    stream.println("  this: " + dsl + "Application with " + dsl + "LibraryOps => ")
-    stream.println()
     val indent = 2
     for (o <- unique(opsGrp.ops) if requiresImpl(o)) {
       emitWithIndent(makeOpImplMethodSignature(o) + " = {", stream, indent)
@@ -274,7 +269,6 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       emitWithIndent("}", stream, indent)
       stream.println()
     }
-    stream.println("}")
   }
 
   def emitOverloadShadows(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) {
@@ -289,7 +283,23 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   def emitOp(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) = Impls(o) match {
     case codegen:CodeGen =>
       val rule = codegen.decls.getOrElse($cala, err("could not find Scala codegen rule for op: " + o.name))
-      inline(o, rule.decl, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent) }
+
+      var lines = inline(o, rule.decl, quoteLiteral)
+
+      // HACK: inlining eliminates quotes for op args, but references to other variables declared
+      // in emitted lines using @ are also allowed
+      val valr = "@\\s*va[lr]\\s+([^ =]*)\\s*=".r.unanchored
+      val declaredVals = valr.findAllMatchIn(lines).map(_ group 1).map(_.trim).foreach{ name =>
+        lines = lines.replaceAllLiterally(quoteLiteral(quotedArg(name)), name)
+      }
+      lines.split(nl).foreach { line =>
+        // Drop the emission annotation (everything's inlined in the library!)
+        // Note that this means some things can be written which are correct in codegen but not
+        // valid Scala in the library. Extern should typically be used in this case
+        val scalaLine = if (line.startsWith("@")) line.drop(1) else line
+        emitWithIndent(scalaLine, stream, indent)
+      }
+
     case Getter(structArgIndex,field) =>
       emitOverloadShadows(o, stream, indent)
       emitWithIndent(inline(o, quotedArg(o.args.apply(structArgIndex).name)) + "." + field, stream, indent)
@@ -340,7 +350,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       stream.println()
     }
 
-    for (o <- unique(opsGrp.ops) if !Impls(o).isInstanceOf[Redirect] && hasLibraryVersion(o)) {
+    for (o <- unique(opsGrp.ops) if !Impls(o).isInstanceOf[Redirect]) {
       // no return tpe because not all of the tpes are in scope in the lib wrapper
       stream.println("  " + makeOpMethodSignature(o, withReturnTpe = Some(false)) + " = {")
       o.style match {

@@ -53,24 +53,21 @@ trait RecordWrapper extends HUMAN_DSL_NAMEBase with ForgeMetadataWrapper {
   // Extremely similar to the way Structs are initialized, but using actual fields instead of type manifests
   // Issue if try to meet PropMap[String,Option[SymbolProperties]] since need to find implicit evidence of
   // Meetable for SymbolProperties, Option, and PropMap
-  override def initProps(e: Rep[Any], symData: PropMap[Datakey[_],Metadata], child: Option[SymbolProperties], index: Option[String])(implicit ctx: SourceContext): SymbolProperties = e match {
-    case e: LibStruct =>
-      val children = e.getFields.map{ case (index,f) =>
-        val typeData = initRep(f.asInstanceOf[Rep[Any]])
-        metadata.get(f) match {
-          case Some(data) => index -> meet(MetaTypeInit, typeData, data)
-          case None => index -> typeData
-        }
-      }
-      val typeFields = PropMap(children)
-      val symFields = (index,child) match {
-        case (Some(index),Some(child)) => meet(MetaTypeInit, PropMap(index, child), typeFields)
-        case _ => typeFields
-      }
-      StructProperties(symFields, symData)
-
-    case _ => super.initProps(e,symData,child,index)
+  override def unapplyStructLike(e: Rep[Any]) = e match {
+    case e: LibStruct => Some(e.getFields.toList)
+    case _ => super.unapplyStructLike(e)
   }
+
+  // Copied directly from LMS
+  def isSubtype(x: java.lang.Class[_], cls: java.lang.Class[_]): Boolean = {
+    if ((x == cls) || x.getInterfaces().contains(cls)) true
+    else if (x.getSuperclass() == null && x.getInterfaces().length == 0) false
+    else {
+      val superIsSub = if (x.getSuperclass() != null) isSubtype(x.getSuperclass(), cls) else false
+      superIsSub || x.getInterfaces().exists(s=>isSubtype(s,cls))
+    }
+  }
+
 }
 
 

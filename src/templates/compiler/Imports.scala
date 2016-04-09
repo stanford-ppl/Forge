@@ -31,6 +31,7 @@ trait DeliteGenImports extends BaseGenImports {
     stream.println("import ppl.delite.framework.codegen.cpp.TargetCpp")
     stream.println("import ppl.delite.framework.codegen.opencl.TargetOpenCL")
     stream.println("import ppl.delite.framework.codegen.dot.TargetDot")
+    stream.println("import ppl.delite.framework.codegen.maxj.TargetMaxJ")
     stream.println("import ppl.delite.framework.ops._")
     stream.println("import ppl.delite.framework.datastructures._")
     stream.println("import ppl.delite.framework.codegen.delite.overrides._")
@@ -78,7 +79,6 @@ trait DeliteGenImports extends BaseGenImports {
   override def emitAllImports(stream: PrintWriter) {
     super.emitAllImports(stream)
     emitScalaToolsImports(stream)
-    emitLMSImports(stream)
     emitDeliteImports(stream)
   }
 }

@@ -18,3 +18,4 @@ trait CudaGenVarOps extends CudaGenVariables
 trait OpenCLGenVarOps extends OpenCLGenVariables
 trait CGenVarOps extends CGenVariables
 trait DotGenVarOps
+trait MaxJGenVarOps

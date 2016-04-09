@@ -31,7 +31,7 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
 
     emitBlockComment("Dismabiguations for interpreter mode", stream, indent=2)
     for (opsGrp <- opsGrps if !isTpeClass(opsGrp.grp) && !isTpeClassInst(opsGrp.grp)) {
-      for (o <- unique(opsGrp.ops) if (nameClashesUniversal(o).length > 1) && !o.args.exists(a => getHkTpe(a.tpe).name == "Var") && hasLibraryVersion(o)) {
+      for (o <- unique(opsGrp.ops) if (nameClashesUniversal(o).length > 1) && !o.args.exists(a => getHkTpe(a.tpe).name == "Var")) {
         var prefix = ""
         if (o.style == infixMethod && !noInfix(o))
           prefix = "  override def infix_"
@@ -63,33 +63,32 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
   def emitDSLPackageDefinitions(opsGrps: List[DSLOps], stream: PrintWriter) {
     emitBlockComment("DSL library definition", stream)
 
+    // --- DSLBase
     // base trait sets Rep[T] to T and mixes in the necessary portions of the front-end, without
     // bringing the abstract impls in scope, since they can cause a recursive loop in the library
     stream.println("trait " + dsl + "Base extends " + dsl + "Identifiers {")
     stream.println("  type Rep[+T] = T")
     stream.println("  protected def unit[T:Manifest](x: T) = x")
+    stream.println("  protected def param[T:Manifest](x: T) = x")
     stream.println("}")
     stream.println()
 
+    // --- DSLLibraryOps
     // Library mixes in application ops with internal ops
     stream.println("trait " + dsl + "LibraryOps extends " + dsl + "Application")
-    for (opsGrp <- opsGrps) {
-      if (opsGrp.ops.exists(_.backend == internalBackend))
-        stream.print(" with " + opsGrp.grp.name + "InternalOps")
-      if (opsGrp.ops.exists(_.backend == libraryBackend))
-        stream.print(" with " + opsGrp.grp.name + "LibraryOps")
+    for (opsGrp <- opsGrps if !isMetaType(opsGrp.grp) && opsGrp.ops.exists(_.backend == internalBackend)) {
+      stream.print(" with " + opsGrp.grp.name + "InternalOps")
     }
-    for (e <- Externs) {
-      stream.print(" with " + e.opsGrp.grp.name + "CompilerOps") // Legacy naming for internal ops
-    }
-    val hasMetadata = Tpes.exists(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
-    if (hasMetadata) stream.print(" with " + dsl + "Metadata")
-
-    stream.println("{")
+    for (e <- Externs) { stream.print(" with " + e.opsGrp.grp.name + "CompilerOps") }
+    if (hasMetadata)   { stream.print(" with " + dsl + "MetadataClasses") }
+    if (hasMetatype)   { stream.print(" with " + dsl + "MetadataInternalOps") }
+    stream.println(" {")
     stream.println("  this: " + dsl + "Library =>")
     stream.println("}")
     stream.println()
 
+
+    // --- DSLLibrary
     // library impl brings all of the library types in scope
     stream.println("trait " + dsl + "Library extends " + dsl + "Base with " + dsl + "LibraryOps with " + dsl + "Classes {")
     //stream.println("  this: " + dsl + "Application => ")

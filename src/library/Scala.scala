@@ -206,6 +206,10 @@ trait ScalaOps extends PrimitiveMathGen {
   def importMisc() = {
     val Misc = grp("Misc")
 
+    // Assert (moved from extern)
+    val fassert = direct (Misc) ("fassert", Nil, (MBoolean, MString) :: MUnit, effect = simple)
+    impl (fassert) (codegen($cala, ${ assert($0, $1) }))
+
     val exit = direct (Misc) ("exit", Nil, MInt :: MNothing, effect = simple)
     impl (exit) (codegen($cala, ${sys.exit($0)}))
 
@@ -264,6 +268,12 @@ trait ScalaOps extends PrimitiveMathGen {
     rewrite (whileDo) using forwarding ${ delite_while($0, $1) }
     rewrite (immutable) using forwarding ${ delite_unsafe_immutable($0) }
     rewrite (ifThenElse) using forwarding ${ delite_ifThenElse($0, $1, $2, false, true) }
+
+    // Only assert when debug is true, since assert effects can interfere with optimizations
+    rewrite (fassert) using rule ${
+      if (Config.debug) super.misc_fassert($0, $1) // TODO: Should have more straightforward call here
+      else ()
+    }
   }
 
   def importCasts() = {
@@ -599,6 +609,21 @@ trait ScalaOps extends PrimitiveMathGen {
     direct (Tuple2) ("pack", (A,B), CTuple2(MVar(A),B) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
     direct (Tuple2) ("pack", (A,B), CTuple2(A,MVar(B)) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
     direct (Tuple2) ("pack", (A,B), CTuple2(MVar(A),MVar(B)) :: Tuple2(A,B)) implements redirect ${ tup2_pack(($0._1,$0._2)) }
+  }
+
+  // Applications may need direct access to ForgeArrays, if, for example, they use string fsplit
+  // but don't want to expose all operations on arrays to users
+  def importArraySimpleAPI() {
+    val T = tpePar("T")
+    val R = tpePar("R")
+
+    val ForgeArrayAPI = grp("ForgeArrayAPI")
+    infix (ForgeArrayAPI) ("apply", T, (MArray(T), MInt) :: T) implements composite ${ array_apply($0, $1) }
+    infix (ForgeArrayAPI) ("length", T, MArray(T) :: MInt) implements composite ${ array_length($0) }
+
+    internal.infix (ForgeArrayAPI) ("update", T, (MArray(T), MInt, T) :: MUnit, effect = write(0)) implements composite ${ array_update($0, $1, $2) }
+    internal.infix (ForgeArrayAPI) ("map", (T,R), (MArray(T), T ==> R) :: MArray(R)) implements composite ${ array_map($0, $1) }
+    internal.infix (ForgeArrayAPI) ("Clone", T, MArray(T) :: MArray(T)) implements composite ${ array_clone($0) }
   }
 
   // Forge's HashMap is not mutable, so a Scala HashMap can be used if updates are necessary.

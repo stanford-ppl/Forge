@@ -33,11 +33,17 @@ trait FieldOps extends Base with OverloadHack {
   // needed to generate primitive math combinations as type classes
   def infix_stage(x: Rep[DSLType]): StageTag
   def infix_tpeArgs(x: Rep[DSLType]): List[Rep[DSLType]]
+
+  def infix_ops(x: Rep[DSLGroup]): List[Rep[DSLOp]]
+  def infix_nodes(x: Rep[DSLGroup]): List[Rep[DSLOp]]
+  def infix_argNames(x: Rep[DSLOp]): List[String]
 }
 
 trait FieldOpsExp extends FieldOps {
   this: ForgeExp =>
 
+  def infix_ops(x: Rep[DSLGroup]): List[Rep[DSLOp]] = OpsGrp(x).ops
+  def infix_nodes(x: Rep[DSLGroup]): List[Rep[DSLOp]] = OpsGrp(x).ops.filter{op => Impls(op).isInstanceOf[CodeGen]}
  /**
   * TypeAlias
   */
@@ -61,6 +67,7 @@ trait FieldOpsExp extends FieldOps {
    */
   def infix_name(x: Exp[DSLType])(implicit o: Overloaded1): String = x match {
     case Def(Tpe(name,tpePars,stage)) => name
+    case Def(TpeAlias(name, tpe)) => name
     case Def(TpeInst(t,args)) => infix_name(t)(o)
     case Def(TpeClass(name,sig,tpePars)) => name
     case Def(TpeClassEvidence(name,sig,tpePars)) => name
@@ -73,6 +80,7 @@ trait FieldOpsExp extends FieldOps {
   }
   def infix_tpePars(x: Exp[DSLType]) = x match {
     case Def(Tpe(s,tpePars,stage)) => tpePars
+    case Def(TpeAlias(name, tpe)) => Nil
     case Def(TpeInst(t,args)) => Nil
     case Def(TpePar(name,ctx,s)) => Nil
     case Def(HkTpePar(name,tpePars,ctx,s)) => tpePars
@@ -83,8 +91,9 @@ trait FieldOpsExp extends FieldOps {
     case Def(VarArgs(t)) => Nil
     case Def(Meta(name,tpePars)) => tpePars
   }
-  def infix_stage(x: Exp[DSLType]) = x match {
+  def infix_stage(x: Exp[DSLType]): StageTag = x match {
     case Def(Tpe(s,tpePars,stage)) => stage
+    case Def(TpeAlias(name, tpe)) => infix_stage(tpe)
     case Def(TpeInst(Def(Tpe(s,tpePars,stage)),args)) => stage
     case Def(TpePar(name,ctx,stage)) => stage
     case Def(HkTpePar(name,tpePars,ctx,stage)) => stage
@@ -140,6 +149,8 @@ trait FieldOpsExp extends FieldOps {
   /**
    * DSLOp
    */
+  def infix_argNames(x: Rep[DSLOp]): List[String] = x.args.map(_.name)
+
   def infix_args(x: Exp[DSLOp]) = x match {
     case Def(Op(grp,name,style,backend,tpePars,args,Nil,implArgs,retTpe,eff,alias)) => args
     case Def(Op(grp,name,style,backend,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => args ++ curArgs.flatten

@@ -26,6 +26,7 @@ trait Definitions extends DerivativeTypes {
    */
   lazy val MultiloopSoA = transformer("MultiloopSoA", isExtern = true)
   lazy val IRPrinter = traversal("IRPrinter", isExtern = true)  // For debugging
+  lazy val IRPrinterPlus = traversal("IRPrinterPlus", isExtern = true) // Debugging metadata
 
   /**
    * Built-in types
@@ -79,6 +80,7 @@ trait Definitions extends DerivativeTypes {
   lazy val SUnit = tpe("Unit", stage = compile) // Useful?
   lazy val MNothing = tpe("Nothing")
   lazy val CNothing = tpe("Nothing", stage = now)
+  lazy val SNothing = tpe("Nothing", stage = now)
   lazy val byName = tpe("Thunk")
   def MThunk(ret: Rep[DSLType], freq: Frequency = normal) = ftpe(List(forge_arg("", byName, None)),ret,freq) // TODO
   // unstaged (inlined) functions
@@ -98,6 +100,7 @@ trait Definitions extends DerivativeTypes {
   lazy val MOutputStream = tpe("ForgeFileOutputStream")
   lazy val SList = tpe("List", tpePar("A"), stage = compile)
   lazy val SSeq = tpe("Seq", tpePar("A"), stage = compile)
+  lazy val SManifest = tpe("Manifest", tpePar("A"), stage = compile)
 
   // Metadata types
   // TODO: Is there a better way to expose these to the DSL author? Way to not expose them at all?
@@ -140,8 +143,9 @@ trait Definitions extends DerivativeTypes {
   case object cpp extends CodeGenerator { def name = "C" }
   case object restage extends CodeGenerator { def name = "Restage" }
   case object dot extends CodeGenerator { def name = "Dot" }
+  case object maxj extends CodeGenerator { def name = "MaxJ" }
 
-  val generators = List($cala, cuda, opencl, cpp, restage, dot)
+  val generators = List($cala, cuda, opencl, cpp, restage, dot, maxj)
 
   /**
    * Type classes
@@ -186,16 +190,16 @@ trait Definitions extends DerivativeTypes {
    */
   case object sharedBackend extends BackendType
   case object internalBackend extends BackendType
-  case object libraryBackend extends BackendType
-  case object compilerBackend extends BackendType
+  //case object libraryBackend extends BackendType
+  //case object compilerBackend extends BackendType
 
   /**
    * Metadata meet functions
    * TODO: Add these as needed (not clear how complete this needs to be yet)
    */
-  case object branch extends MetaMeet       // Aliasing from if-then-else
-  case object mutate extends MetaMeet       // Aliasing from data mutation
-  case object metaUpdate extends MetaMeet   // Metadata updates (TODO: Is this needed?)
+  case object metaAlias extends MetaMeet    // Aliasing
+  case object metaInit extends MetaMeet     // Aliasing in type initialization
+  case object metaUpdate extends MetaMeet   // Metadata updates
   case object any extends MetaMeet          // All remaining aliasing forms
 
   // blacklist for op names that cannot be expressed with infix methods

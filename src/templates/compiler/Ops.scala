@@ -86,7 +86,7 @@ trait DeliteGenOps extends BaseGenOps {
     case Def(QuoteSeq(argName)) => "Seq("+unquotes(argName+".map(quote).mkString("+quotes(",")+")")+")"
 
     case Const(s: String) if quoteLiterally => s  // no quotes, wildcards will be replaced later in inline
-    case Const(s: String) => replaceWildcards(super.quote(s))  // quote first, then insert wildcards
+    case Const(s: String) => replaceWildcards(super.quote(x))  // quote first, then insert wildcards
 
     case _ => super.quote(x)
   }
@@ -103,11 +103,11 @@ trait DeliteGenOps extends BaseGenOps {
       case Def(Arg(name, f@Def(FTpe(fargs,ret,freq)), d2)) if opTypeRequiresBlockify(opType) && !isThunk(f) => (simpleArgName(t) :: fargs.map(a => boundArgName(t,a))).mkString(",")
       case _ => simpleArgName(t)
   })
-  def makeArgsWithBoundSymsWithType(args: List[Rep[DSLArg]], opType: OpType, typify: Rep[DSLType] => String = repify) =
+  def makeArgsWithBoundSymsWithType(args: List[Rep[DSLArg]], opType: OpType, typify: Rep[DSLType] => String = repify, addParen: Boolean = true) =
     makeArgs(args, t => t match {
       case Def(Arg(name, f@Def(FTpe(fargs,ret,freq)), d2)) if opTypeRequiresBlockify(opType) && !isThunk(f) => ((simpleArgName(t) + ": " + typify(t.tpe)) :: fargs.map(a => boundArgName(t,a) + ": " + typify(a.tpe))).mkString(",")
       case _ => argify(t, typify)
-  })
+  }, addParen)
 
   def makeOpSimpleNodeNameWithArgs(o: Rep[DSLOp]) = makeOpNodeName(o) + makeArgsWithBoundSyms(o.args, Impls(o))
   def makeOpSimpleNodeNameWithAnonArgs(o: Rep[DSLOp], suffix: String = "") = {
@@ -143,37 +143,29 @@ trait DeliteGenOps extends BaseGenOps {
   }
   def emitImplMethod(o: Rep[DSLOp], func: Rep[String], postfix: String, returnTpe: Option[String], stream: PrintWriter, indent: Int = 2) {
     emitWithIndent(makeOpImplMethodSignature(o, postfix, returnTpe) + " = {", stream, indent)
-    if (hasCompilerVersion(o))
-      inline(o, func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent+2 )}
-    else
-      emitNoCompilerErr(o, stream, indent+2)
+    inline(o, func, quoteLiteral).split(nl).foreach { line => emitWithIndent(line, stream, indent+2 )}
     emitWithIndent("}", stream, indent)
     stream.println()
   }
 
-  def emitCompilerOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
+  /*def emitCompilerOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
     val base = if (opsGrp.ops.exists(hasSharedVersion)) opsGrp.name else "Base"
     emitBlockComment("Compiler-only operations", stream)
-    emitOpSugar(opsGrp.grp.name + "Compiler", base, dsl + "CompilerOps", opsGrp, stream, compilerBackend)
-  }
+    emitOpSugar(opsGrp.grp.name + "Compiler", base, dsl + "CompilerOps", List(opsGrp), stream, compilerBackend)
+  }*/
 
   def requiresImpl(op: Rep[DSLOp]) = Impls(op) match {
     case _:CodeGen | _:Redirect => false
     case _:Getter | _:Setter => false
     case _:Allocates | _:AllocatesFigment => false
-    case _ => hasCompilerVersion(op)
+    case _ => true
   }
 
   /**
    * Emit op implementations for composite and single task n
    */
-  def emitImpls(opsGrp: DSLOps, stream: PrintWriter) {
-    emitBlockComment("Op Impls", stream)
-    stream.println()
-    stream.println("trait " + opsGrp.name + "Impl {")
-    stream.println("  this: " + dsl + "CompilerOps with " + dsl + "Lift => ")
-    stream.println()
-    for (o <- unique(opsGrp.ops) if requiresImpl(o)) {
+  def emitImpls(uniqueOps: List[Rep[DSLOp]], stream: PrintWriter) {
+    for (o <- uniqueOps if requiresImpl(o)) {
       Impls(o) match {
         case single:SingleTask =>
           emitImplMethod(o, single.func, "", None, stream)
@@ -225,8 +217,6 @@ trait DeliteGenOps extends BaseGenOps {
         case _ =>
       }
     }
-
-    stream.println("}")
   }
 
   /**
@@ -238,40 +228,11 @@ trait DeliteGenOps extends BaseGenOps {
   def baseOpsCls(opsGrp: DSLOps) = {
     var base = "BaseFatExp with EffectExp"
     base += { if (opsGrp.ops.exists(_.backend == internalBackend)) " with " + opsGrp.grp.name + "InternalOps"
-              else if (opsGrp.ops.exists(hasSharedVersion)) " with " + opsGrp.name
-              else "" }
+              else " with " + opsGrp.name }
     base += ( if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && ForgeCollections.contains(grpAsTpe(o.grp)))) " with DeliteCollectionOpsExp" else "" )
     base += ( if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && DataStructs.contains(grpAsTpe(o.grp)))) " with DeliteStructsExp" else "" )
     base += ( if (opsGrp.ops.exists(isFigmentOp)) " with DeliteFigmentOpsExp" else "" )
     base
-  }
-
-
-  def emitOpExp(opsGrp: DSLOps, stream: PrintWriter) {
-    emitBlockComment("IR Definitions", stream)
-    stream.println()
-
-    stream.println("trait " + opsGrp.name + "Exp extends " + baseOpsCls(opsGrp) + " {")
-    stream.println("  this: " + dsl + "Exp => ")
-    stream.println()
-
-    val uniqueOps = unique(opsGrp.ops).filter(hasCompilerVersion)
-
-    emitIRNodes(uniqueOps, stream)
-    stream.println()
-    emitNodeConstructors(uniqueOps, stream)
-    stream.println()
-    emitSyms(uniqueOps, stream)
-    stream.println()
-    emitAliasInfo(uniqueOps, stream)
-    stream.println()
-    emitMirrors(uniqueOps, stream)
-    stream.println()
-    emitDeliteCollection(opsGrp, stream)
-    stream.println()
-    emitStructMethods(opsGrp, stream)
-    stream.println()
-    stream.println("}")
   }
 
   /**
@@ -281,7 +242,7 @@ trait DeliteGenOps extends BaseGenOps {
    */
   def hasIRNode(o: Rep[DSLOp]) = Impls(o) match {
     case _:Composite | _:Redirect | _:Getter | _:Setter | _:AllocatesRecord => false
-    case _ => hasCompilerVersion(o)
+    case _ => true
   }
   def hasMultipleIRNodes(o: Rep[DSLOp]) = Impls(o) match {
     case _:GroupBy | _:GroupByReduce => true
@@ -702,8 +663,8 @@ trait DeliteGenOps extends BaseGenOps {
     }
   }
 
-  def makeTransformedArgs(o: Rep[DSLOp], xf: String = "f") = {
-    o.args.zipWithIndex.flatMap{case (arg,idx) => arg match {
+  def makeTransformedArgs(o: Rep[DSLOp], xf: String = "f", addParen: Boolean = true) = {
+    val xformArgs = o.args.zipWithIndex.flatMap{case (arg,idx) => arg match {
       case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if opTypeRequiresBlockify(Impls(o)) && !isThunk(f) => xf + "("+opArgPrefix+idx+")" :: args.map(a => boundArgAnonName(arg,a,idx))
       // -- workaround for apparent scalac bug (GADT skolem type error), with separate cases for regular tpes and function tpes. this may be too restrictive and miss cases we haven't seen yet that also trigger the bug.
       case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if isTpePar(o.retTpe) && !isThunk(f) && args.forall(a => a.tpe == o.retTpe || !isTpePar(a.tpe)) && ret == o.retTpe => List(xf + "("+opArgPrefix+idx+".asInstanceOf[" + repify(f).replaceAllLiterally(repify(o.retTpe), "Rep[A]") + "])")
@@ -720,7 +681,8 @@ trait DeliteGenOps extends BaseGenOps {
         case `compile` if !tpe.name.startsWith("Rep") && !tpe.name.startsWith("Exp") => List(opArgPrefix+idx)
         case _ => List(xf + "(" + opArgPrefix+idx + ")")
       }
-    }}.mkString("(",",",")")
+    }}
+    if (addParen) xformArgs.mkString("(",",",")") else xformArgs.mkString(",")
   }
   def makeTransformedImplicits(o: Rep[DSLOp], xf: String = "f") = {
     o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++
@@ -812,8 +774,7 @@ trait DeliteGenOps extends BaseGenOps {
   /**
    * Emit Delite collection function definitions for parallel collections in the given op group
    */
-  def emitDeliteCollection(opsGrp: DSLOps, stream: PrintWriter) {
-    val classes = opsGrpTpes(opsGrp)
+  def emitDeliteCollection(classes: List[Rep[DSLType]], stream: PrintWriter) {
     if (classes.length > 0 && classes.exists(c => ForgeCollections.contains(c))) {
       emitBlockComment("Delite collection", stream, indent=2)
       var dcSizeStream = ""
@@ -917,7 +878,7 @@ trait DeliteGenOps extends BaseGenOps {
   /**
    * Emit data structure definitions for types in the given op group
    */
-  def emitStructMethods(opsGrp: DSLOps, stream: PrintWriter) {
+  def emitStructMethods(classes: List[Rep[DSLType]], stream: PrintWriter) {
     def wrapManifest(t: Rep[DSLType]): String = t match {
       case Def(TpeInst(Def(Tpe(name,args,stage)), ps)) if ps != Nil =>
         val tpeArgIndices = ps.map(p => if (isTpePar(p)) 1 else 0).scan(0)(_+_).drop(1).map(_ - 1)
@@ -926,7 +887,6 @@ trait DeliteGenOps extends BaseGenOps {
         "manifest[" + quote(t) + "]"
     }
 
-    val classes = opsGrpTpes(opsGrp)
     if (classes.length > 0 && classes.exists(c => DataStructs.contains(c))) {
       emitBlockComment("Delite struct", stream, indent=2)
       var structStream = ""
@@ -1008,11 +968,9 @@ trait DeliteGenOps extends BaseGenOps {
     val matchArgs = funcSignature.isDefined
     val patternPrefix = if (matchArgs) "" else makeOpNodeName(op)
 
-    val innerIndent = if (matchArgs) {
-      emitWithIndent(prefix + funcSignature.get.apply(op) + " = " + makeArgs(op.args) + " match {", stream, indent)
-      indent + 2
-    }
-    else indent
+    if (matchArgs) emitWithIndent(prefix + funcSignature.get.apply(op) + " = " + makeArgs(op.args) + " match {", stream, indent)
+
+    val innerIndent = if (matchArgs) indent + 2 else indent
 
     def emitCase(pattern: List[String], rule: Rep[String]) {
       emitWithIndentInline("case " + patternPrefix + pattern.mkString("(",",",")") + " => ", stream, innerIndent)
@@ -1036,7 +994,7 @@ trait DeliteGenOps extends BaseGenOps {
     if (matchArgs)
       emitWithIndentInline("case _ => ", stream, innerIndent)
     else
-      emitWithIndentInline("case rhs@" + makeOpSimpleNodeNameWithAnonArgs(op) + " => ", stream, innerIndent)
+      emitWithIndentInline("case rhs@" + makeOpSimpleNodeNameWithArgs(op) + " => ", stream, innerIndent)
 
     rules.find(r => r.isInstanceOf[SimpleRule]) match {
       case Some(SimpleRule(rule)) =>
@@ -1075,9 +1033,32 @@ trait DeliteGenOps extends BaseGenOps {
     }
   }
 
+
   /**
    * Emit code generators for all codegen nodes in the given op group
    */
+  def makeNodeImplicits(o: Rep[DSLOp], xf: String = "f") = {
+    o.tpePars.flatMap(t => t.ctxBounds.map(b => makeTpeClsPar(b,t))) ++
+    o.implicitArgs.map { a =>
+      val argName = opIdentifierPrefix + "." + a.name
+      if (isTpeClass(a.tpe)) asTpeClass(a.tpe).signature.wrapper.getOrElse("") + "(" + argName + ")" else argName
+    }
+  }
+
+  def makeEmitMethodName(o: Rep[DSLOp]) = "emit_" + makeOpMethodName(o)
+  def makeEmitMethodCall(o: Rep[DSLOp]) = {
+    val args = "sym, " + opIdentifierPrefix
+    val implicits = makeNodeImplicits(o)
+    val implicitsWithParens = if (implicits.isEmpty) "" else implicits.mkString("(",",",")")
+    makeEmitMethodName(o) + "(" + args + ")" + implicitsWithParens
+  }
+  def makeEmitMethodSignature(o: Rep[DSLOp]) = {
+    val implicitArgs = makeOpImplicitArgsWithType(o)
+    val args = "sym: Exp[Any], rhs: " + makeOpNodeName(o) + makeTpePars(o.tpePars)
+    "def " + makeEmitMethodName(o) + makeTpeParsWithBounds(o.tpePars) + "(" + args + ")" + implicitArgs
+  }
+
+
   def emitOpCodegen(opsGrp: DSLOps, stream: PrintWriter) {
     val rules = unique(opsGrp.ops).map(o => (o,Impls(o))).filter(_._2.isInstanceOf[CodeGen])
     if (rules.length > 0){
@@ -1088,41 +1069,66 @@ trait DeliteGenOps extends BaseGenOps {
         val generatorRules = rules.flatMap{case (o,i) => i.asInstanceOf[CodeGen].decls.collect{case (k,r) if (k == g) => (o,r)}}
         if (generatorRules.length > 0) {
           stream.println("trait " + g.name + "Gen" + opsGrp.name + " extends " + g.name + "GenFat {")
-          stream.println("  val IR: " + opsGrp.name + "Exp")
+          stream.println("  val IR: " + opsGrp.name + "Exp with " + dsl + "CodegenOps")
           stream.println("  import IR._")
           stream.println()
-          stream.println("  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {")
+
+          // how do we decide whether to add stream.println?
+          // hack! (or heuristic, if the glass is half full)
+          def shouldInline(s: String) = s.startsWith("@")
+          def emitLines(lines: List[String], lineEnd: String = "") = lines.foreach{ line =>
+            if (shouldInline(line)) emitWithIndent(line.drop(1), stream, 6)
+            else emitWithIndent("stream.println(" + line + " + \"" + lineEnd + "\")", stream, 6)
+          }
+
+          // --- Experimental modified version of gen for codegen rules - may not work 100% yet for cpp/cuda
+          // Bit of a hack here: Want to get type parameters back but don't need/want to create a method with all
+          // arguments and types explicitly stated
           for ((op,r) <- generatorRules) {
+            stream.println("  private " + makeEmitMethodSignature(op) + ": Unit = rhs match {")
             stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(op) + " => ")
-            val body = quote(r.decl).trim.split(nl).toList
-            // how do we decide whether to add stream.println?
-            def addPrint(s: String) = {
-              // hack! (or heuristic, if the glass is half full)
-              !s.startsWith("emit")
+
+            val body = r.decl match {
+              case Const(s: String) => s.trim.split(nl).toList.map(_.trim).flatMap{ line =>
+                if (shouldInline(line)) List( inline(op, line, quoteLiteral) )
+                else quote(line).split(nl).toList
+              }
+              case x => err("Don't know how to generate codegen rules from type " + x.tp)
             }
-            val body2 = body map { l => if (addPrint(l)) "stream.print("+l+")" else l }
-            // use stream.print, since the new lines from the original interpolated code block are still there
             g match {
               case `$cala` =>
-                val result = ("stream.println(\"val \"+quote(sym)+\" = {\")" :: body2) :+ "stream.println(\"}\")"
-                result.foreach { line => emitWithIndent(line, stream, 6) }
+                emitWithIndent("stream.println(\"val \"+quote(sym)+\" = {\")", stream, 6)
+                emitLines(body)
+                emitWithIndent("stream.println(\"}\")", stream, 6)
+
               case `cuda` | `cpp` =>
                 if (op.retTpe == MUnit || op.retTpe == MNothing) {
-                  body2.foreach { line => emitWithIndent(line, stream, 6) }
-                  emitWithIndent("stream.println(\";\")", stream, 6)
+                  emitLines(body, lineEnd = ";")
                 }
                 else {
-                  body2.take(body2.length-1).foreach { line => emitWithIndent(line, stream, 6) }
+                  if (shouldInline(body.last))
+                    err("Last line of cpp / cuda method must be return expression")
+
+                  emitLines(body.take(body.length - 1), lineEnd = ";")
                   emitWithIndent("stream.print(remapWithRef(sym.tp) + \" \" + quote(sym) + \" = \")", stream, 6)
-                  emitWithIndent(body2.last, stream, 6)
+                  emitWithIndent("stream.print(" + body.last + ")", stream, 6)
                   emitWithIndent("stream.println(\";\")", stream, 6)
                 }
-              case `dot` =>
-                val result = body2
-                result.foreach { line => emitWithIndent(line, stream, 6) }
-              case _ => throw new RuntimeException("Not supported codgen:" + g.toString)
+
+              case `dot` => emitLines(body)
+
+              case `maxj` => emitLines(body)
+
+              case _ => err("Unsupported codegen: " + g.toString)
             }
+            stream.println("  }")
             stream.println()
+          }
+
+
+          stream.println("  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {")
+          for ((op,r) <- generatorRules) {
+            stream.println("    case " + opIdentifierPrefix + "@" + makeOpSimpleNodeNameWithArgs(op) + " => " + makeEmitMethodCall(op))
           }
           stream.println("    case _ => super.emitNode(sym, rhs)")
           stream.println("  }")

@@ -27,6 +27,7 @@ trait OptiLADSL extends ForgeApplication
     importStrings()
     importMath()
     importTuples()
+    importArraySimpleAPI()
     importHashMap()
     importConcurrentHashMap()
 

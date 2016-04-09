@@ -48,6 +48,7 @@ trait MultiArrayImpls extends FlatMultiArrays { this: OptiMADSL =>
 
     val ArrayND = lookupTpe("ArrayND")
     val ImplND  = lookupTpe("ImplND")
+    val Indices = lookupTpe("Indices")
 
     val Impls = withTpe(ArrayND)
     Impls {
@@ -75,8 +76,8 @@ trait MultiArrayImpls extends FlatMultiArrays { this: OptiMADSL =>
         case _ => dimsToStrides(maimpl_dims($0))
       }}
 
-      internal ("maimpl_apply") (SList(MInt) :: T) implements composite ${ layout($0) match {
-        case MLayout(_,Flat,_) => maflat_apply($0, indices_new($1))
+      internal ("maimpl_apply") (Indices :: T) implements composite ${ layout($0) match {
+        case MLayout(_,Flat,_) => maflat_apply($0, $1)
         case lt => throw new Exception("Don't know how to implement apply for layout " + lt)
       }}
 
@@ -88,8 +89,8 @@ trait MultiArrayImpls extends FlatMultiArrays { this: OptiMADSL =>
         else {
           val last = maimpl_dim($0, 0) - 1
           var s = ""
-          for (i <- 0 until last) { s = s + $2(maimpl_apply($0, List(i))) + $1 }
-          s + $2(maimpl_apply($0, List(last)))
+          for (i <- 0 until last) { s = s + $2(maimpl_apply($0, Indices(i))) + $1 }
+          s + $2(maimpl_apply($0, Indices(last)))
         }
       }
       internal ("maimpl2d_mkstring") ((MString, MString, T ==> MString) :: MString) implements single ${
@@ -101,14 +102,14 @@ trait MultiArrayImpls extends FlatMultiArrays { this: OptiMADSL =>
           var s = ""
           for (i <- 0 until lastRow) {
             for (j <- 0 until lastCol) {
-              s = s + $3(maimpl_apply($0, List(i,j))) + $2
+              s = s + $3(maimpl_apply($0, Indices(i,j))) + $2
             }
-            s = s + $3(maimpl_apply($0, List(i,lastCol))) + $1
+            s = s + $3(maimpl_apply($0, Indices(i,lastCol))) + $1
           }
           for (j <- 0 until lastCol) {
-            s = s + $3(maimpl_apply($0, List(lastRow,j))) + $2
+            s = s + $3(maimpl_apply($0, Indices(lastRow,j))) + $2
           }
-          s + $3(maimpl_apply($0, List(lastRow,lastCol)))
+          s + $3(maimpl_apply($0, Indices(lastRow,lastCol)))
         }
       }
 
@@ -183,7 +184,7 @@ trait FlatMultiArrays { this: OptiMADSL =>
       layout(array) = $1
       (array)
     }
-    internal (FlatND) ("maflat_new_immutable", T, (SList(MInt), MLayout)  :: FlatND(T)) implements composite ${ maflat_new($0, $1) }
+    internal (FlatND) ("maflat_new_immutable", T, (SList(MInt), MLayout) :: FlatND(T)) implements composite ${ maflat_new($0, $1) }
 
     internal (FlatND) ("maflat_view", T, (ArrayND(T), SList(Range), SList(SInt), MLayout)  :: FlatND(T)) implements composite ${
       if (layout($0).tpe == Flat && $3.tpe == Flat) {

@@ -14,8 +14,8 @@ trait Test extends OptiMAApplication {
     }
 
 
-    val inds = Indices(1, 2, 3)
-    println(inds(0))
-    println(inds(2))
+
+    //val m = Array2D[Int](5, 5)
+    //m.pprint
   }
 }

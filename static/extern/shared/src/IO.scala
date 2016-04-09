@@ -29,14 +29,19 @@ trait InputOutputOps extends Base {
   def forge_filewriter_writelines(path: Rep[String], numLines: Rep[Int], append: Rep[Boolean], f: Rep[Int] => Rep[String])(implicit ctx: SourceContext): Rep[Unit]
 }
 
-trait InputOutputCompilerOps extends InputOutputOps with OverloadHack {
+trait InputOutputTypes {
+  type ForgeFileInputStream
+  type ForgeFileOutputStream
+
+  implicit def forgeInputStreamManifest: Manifest[ForgeFileInputStream]
+  implicit def forgeOutputStreamManifest: Manifest[ForgeFileOutputStream]
+}
+
+trait InputOutputCompilerOps extends InputOutputOps with InputOutputTypes with OverloadHack {
 	this: ForgeArrayCompilerOps with ForgeArrayBufferCompilerOps =>
 
   // When using the Input/Output streams directly (instead of the reader/writer above), computation is sequential and explicitly effectful.
   // However, the path may still refer to data stores outside of the local filesystem (e.g. S3 or HDFS).
-
-  type ForgeFileInputStream
-  implicit def forgeInputStreamManifest: Manifest[ForgeFileInputStream]
 
   object ForgeFileInputStream {
     def apply(path: Rep[String])(implicit ctx: SourceContext): Rep[ForgeFileInputStream] = forge_fileinputstream_new(path)
@@ -50,10 +55,6 @@ trait InputOutputCompilerOps extends InputOutputOps with OverloadHack {
   def forge_fileinputstream_readline(stream: Rep[ForgeFileInputStream])(implicit ctx: SourceContext): Rep[String]
   def forge_fileinputstream_size(stream: Rep[ForgeFileInputStream])(implicit ctx: SourceContext): Rep[Long]
   def forge_fileinputstream_close(stream: Rep[ForgeFileInputStream])(implicit ctx: SourceContext): Rep[Unit]
-
-
-  type ForgeFileOutputStream
-  implicit def forgeOutputStreamManifest: Manifest[ForgeFileOutputStream]
 
   object ForgeFileOutputStream {
     def apply(path: Rep[String], append: Rep[Boolean] = unit(false))(implicit ctx: SourceContext): Rep[ForgeFileOutputStream] = forge_fileoutputstream_new(path, append)

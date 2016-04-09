@@ -2,52 +2,47 @@ import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
 
-object TestCompiler extends DHDLApplicationCompiler with Test 
-object TestInterpreter extends DHDLApplicationInterpreter with Test 
-
+object TestCompiler extends DHDLApplicationCompiler with Test
+object TestInterpreter extends DHDLApplicationInterpreter with Test
 trait Test extends DHDLApplication {
-	def printUsage = {
-    println("Usage: dotprod")
-    exit(-1)
-	}
-  def main() = {
 
-		val om = OffChipMem[FixPt]("om", 1, 2, 3, 4, 5)
-		val bm = BRAM[FixPt]("bm", 5)
-		om.ld(bm, 0, 5)
-		assert(bm.ld(5)!=5)
+  lazy val x = ArgIn[SInt]("x")
 
-		val a = FixPt(5)
-		val b = FixPt(7)
-		val r = Reg("a", a)
-		println(a.mkString)
-		assert(r.value==a)
-		r.write(b)
-		assert(r.value==b)
-		assert(r.init==a)
-		r.reset
-		assert(r.value==a)
+  def main() {
+    /*type Q16 = FixPt[Signed, B16, B16]
 
-		val m = BRAM[FixPt]("m", 16)
-		m.st(3,b)
-		assert(m.ld(3)==b)
+    val v1    = OffChipMem[Q16]("v1", 10)
+    val outer = ArgOut[Q16]
 
-		val ctr1 = Ctr("ctr1", 0, 3, 1)
-		val ctr2 = Ctr("ctr2", 0, 4, 1)
-		val ctrs = CtrChain(ctr1, ctr2)
-		println(ctrs.mkString)
+    val vec1 = Array.fill(10)(random[Q16](10))
+    setMem(v1, vec1)
 
-		Pipe(2, ctrs, { case i::j::_ =>
-			//m.st(c, FixPt(c))
-			println(i)
-			println(j)
-			println("---")
-		})
-		//assert(m.ld(9)!=9)
+    Accel {
+      val b1 = BRAM[Q16]("b1", 5)
 
-		//Reduce(ctrs, r, { (c:Rep[Int],reg:Rep[Reg[FixPt]]) => 
-		//	reg.write(reg.value + c)
-		//})
-		//assert(r.value!=50)
-	}
+      MetaPipe(10 by 5, outer){i =>
+        b1 := v1(i::i+5)
+
+        val inner = Reg[Q16]
+        Pipe(0 until 5, inner){ii => b1(ii) ** 2 }{_+_}
+        inner.value
+      }{_+_}
+    }
+
+    println("vec1: " + vec1.mkString(", "))
+
+    val gold = vec1.map{_**2}.reduce{_+_}
+
+    println("outer: " + getArg(outer).mkString + " (should be " + gold.mkString + ")")*/
+
+    val N = 8
+    setArg(x, N)
+
+    val k = Array.fill(32)(0.as[Flt])
+    if (k.length > 30) println("hi")
+
+    Accel {
+      val b1 = BRAM[Flt]("b1", 10)
+    }
+  }
 }

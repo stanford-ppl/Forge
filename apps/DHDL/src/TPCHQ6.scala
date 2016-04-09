@@ -3,66 +3,80 @@ import dhdl.library._
 import dhdl.shared._
 import scala.util.Random
 
-object TPCHQ6Compiler extends DHDLApplicationCompiler with TPCHQ6 
+object TPCHQ6Compiler extends DHDLApplicationCompiler with TPCHQ6
 object TPCHQ6Interpreter extends DHDLApplicationInterpreter with TPCHQ6
-
 trait TPCHQ6 extends DHDLApplication {
-	def printUsage = {
-		println("Usage: tpchq6 <dataSize> <tileSize>")
-    exit(-1)
-	}
-  def main() = {
+
+  lazy val tileSize = stageArgOrElse[Int](0, 4)
+  lazy val dataSize = ArgIn[SInt]("dataSize")
+  lazy val minDateIn = ArgIn[UInt]("minDate")
+  lazy val maxDateIn = ArgIn[UInt]("maxDate")
+
+  def tpchq6(dates:  Rep[OffChipMem[UInt]], quants: Rep[OffChipMem[UInt]],
+             discts: Rep[OffChipMem[Flt]], prices: Rep[OffChipMem[Flt]], out: Rep[Reg[Flt]]) {
+
+    val minDate = minDateIn.value
+    val maxDate = maxDateIn.value
+
+    MetaPipe(dataSize by tileSize, out) { i =>
+      val datesTile  = BRAM[UInt](tileSize)
+      val quantsTile = BRAM[UInt](tileSize)
+      val disctsTile = BRAM[Flt](tileSize)
+      val pricesTile = BRAM[Flt](tileSize)
+      Parallel {
+        datesTile  := dates(i::i+tileSize)
+        quantsTile := quants(i::i+tileSize)
+        disctsTile := discts(i::i+tileSize)
+        pricesTile := prices(i::i+tileSize)
+      }
+      val accum = Reg[Flt]
+      Pipe(tileSize by 1, accum){ j =>
+        val date  = datesTile(j)
+        val disct = disctsTile(j)
+        val quant = quantsTile(j)
+        val price = pricesTile(j)
+        val valid = date > minDate && date < maxDate && disct >= 0.05f && disct <= 0.07f && quant < 24
+        mux(valid, price * disct, 0.0f)
+      }{_+_}
+      accum.value
+    }{_+_}
+  }
+
+  def main() {
     val N = 12
-		val tileSize = 4
+    val MIN_DATE = 64
+    val MAX_DATE = 80
 
-    val sMinDate = 64; val sMaxDate = 80
-    val sDates = Seq.tabulate(N){i => util.Random.nextInt(35) + 50}
-    val sQuants = Seq.tabulate(N){i => util.Random.nextInt(50)}
-    val sDiscts = Seq.tabulate(N){i => util.Random.nextFloat() * 0.1f }
-    val sPrices = Seq.tabulate(N){i => util.Random.nextFloat() * 1000f }
-		val conds = Seq.tabulate(N){i => 
-			sDates(i) > sMinDate && sDates(i) < sMaxDate && sQuants(i) < 24 &&
-      sDiscts(i) >= 0.05f && sDiscts(i) <= 0.07f}
-    val gold = conds.zipWithIndex.filter(x=>x._1).map{i => sPrices(i._2) * sDiscts(i._2) }.sum
+    val dates  = OffChipMem[UInt]("dates", N)
+    val quants = OffChipMem[UInt]("quants", N)
+    val discts = OffChipMem[Flt]("discounts", N)
+    val prices = OffChipMem[Flt]("prices", N)
+    val out = ArgOut[Flt]("out")
 
-		val dataSize = ArgIn[Int](N).value
-		val minDate = ArgIn[Int](sMinDate)
-		val maxDate = ArgIn[Int](sMaxDate)
+    val sDates  = Array.fill(N){random[UInt](20) + 65}
+    val sQuants = Array.fill(N){random[UInt](25) }
+    val sDiscts = Array.fill(N){random[Flt] * 0.05f + 0.02f}
+    val sPrices = Array.fill(N){random[Flt] * 1000f}
 
-		val dates = OffChipMem[FixPt]("dates", sDates.map(i => i.toFixPt): _*)
-		val quants = OffChipMem[FixPt]("quants", sQuants.map(i => i.toFixPt): _*)
-		val discounts = OffChipMem[Float]("discounts", sDiscts.map(i => unit(i)): _*)
-		val prices = OffChipMem[Float]("prices", sPrices.map(i => unit(i)): _*)
-		val tileCtr = CtrChain(Ctr(dataSize, tileSize)) 
+    setArg(dataSize, N)
+    setArg(minDateIn, MIN_DATE)
+    setArg(maxDateIn, MAX_DATE)
+    setMem(dates, sDates)
+    setMem(quants, sQuants)
+    setMem(discts, sDiscts)
+    setMem(prices, sPrices)
+    Accel { tpchq6(dates, quants, discts, prices, out) }
 
-		val outAccum = Reg[Float](unit(0.0f))
-		MetaPipe[Float](1, true, tileCtr, outAccum, _+_, {case i::_ => 
-			val datesBm = BRAM[FixPt](tileSize)
-			val quantsBm = BRAM[FixPt](tileSize)
-			val discountsBm = BRAM[Float](tileSize)
-			val pricesBm = BRAM[Float](tileSize)
-			Parallel({
-				dates.ld(datesBm, i, tileSize)
-				quants.ld(quantsBm, i, tileSize)
-				discounts.ld(discountsBm, i, tileSize)
-				prices.ld(pricesBm, i, tileSize)
-			})
-			val inCtr = CtrChain(Ctr(max=tileSize))
-			val inAccum = Reg[Float](0.0f)
-			Pipe[Float](1, true, inCtr, inAccum, _+_, { case j::_ =>
-				val date = datesBm.ld(j)
-				val discount = discountsBm.ld(j)
-				val quant = quantsBm.ld(j)
-				val price = pricesBm.ld(j)
-				val valid = ((date > minDate.value) && (date < maxDate.value) && (discount >= 0.05f) &&
-				 						 (discount <= 0.07f) && (quant < FixPt(24)))
-				mux(valid, price * discount, 0.0f)
-			})
-			inAccum.value
-		})
-		val result = ArgOut[Float](0.0f)
-		result.write(outAccum.value)
+    // --- software version
+    val conds = Array.tabulate(N){i => sDates(i) > MIN_DATE && sDates(i) < MAX_DATE &&
+                                       sQuants(i) < 24 && sDiscts(i) >= 0.05f && sDiscts(i) <= 0.07f }
 
-		assert(unit(gold)==result.value)
-	}
+    val gold = Array.tabulate(N){i => if (conds(i)) sPrices(i) * sDiscts(i) else 0.0f.as[Flt] }.reduce{_+_}
+
+    val result = getArg(out)
+
+    println("expected: " + gold.mkString)
+    println("result: " + result.mkString)
+    assert(result == gold)
+  }
 }

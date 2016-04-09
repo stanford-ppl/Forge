@@ -1,3 +1,4 @@
+.PHONY: apps
 
 all: build ctags
 
@@ -11,6 +12,10 @@ dhdl: build
 	cd ${HYPER_HOME} && ${FORGE_HOME}/bin/update ppl.dsl.forge.dsls.dhdl.DHDLDSLRunner DHDL && cd ${FORGE_HOME}
 	ln -s ${HYPER_HOME}/published/DHDL DHDL.symlink
 
+apps:
+	cp ${FORGE_HOME}/apps/DHDL/src/* ${HYPER_HOME}/published/DHDL/apps/src/
+	cd ${HYPER_HOME}/published/DHDL && sbt compile
+
 dhdl_clean:
 	rm -f DHDL.symlink
 	rm -rf ${HYPER_HOME}/published/DHDL
@@ -22,6 +27,14 @@ dadl: build
 dadl_clean:
 	rm -f DADL.symlink
 	rm -rf ${HYPER_HOME}/published/DADL
+
+optiml: build
+	cd ${HYPER_HOME} && ${FORGE_HOME}/bin/update ppl.dsl.forge.dsls.optiml.OptiMLDSLRunner OptiML && cd ${FORGE_HOME}
+	ln -s ${HYPER_HOME}/published/OptiML OptiML.symlink
+
+optiml_clean:
+	rm -f OptiML.symlink
+	rm -rf ${HYPER_HOME}/published/OptiML
 
 
 clean:

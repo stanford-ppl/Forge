@@ -31,9 +31,6 @@ trait DADLDSL extends ForgeApplication
     primitiveTypes ::= rep
     tpeAlias("Wire", rep)
 
-    val TypeOps = grp("TypeOps")
-    lift(TypeOps) (MInt)
-
     schedule(IRPrinter)
 
     // TODO: This list should be updated as and when new backend support for feedback is added
@@ -41,5 +38,5 @@ trait DADLDSL extends ForgeApplication
     extern(grp("ModuleIO"), targets = List($cala, dot))
 
     ()
-	}
+  }
 }

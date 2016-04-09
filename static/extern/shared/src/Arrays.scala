@@ -5,24 +5,28 @@ import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.common._
 import scala.virtualization.lms.util.OverloadHack
 
-// Front-end
-trait ForgeArrayOps extends Base with OverloadHack {
-  this: ForgeHashMapOps =>
-
+trait ForgeArrayTypes {
   /**
    * We use ForgeArray[T] instead of T so we don't get any subtle errors related to shadowing Array[T]
    */
   type ForgeArray[T]
   implicit def forgeArrayManifest[T:Manifest]: Manifest[ForgeArray[T]]
+}
+
+// Front-end
+trait ForgeArrayOps extends ForgeArrayTypes with Base with OverloadHack {
+  this: ForgeHashMapOps =>
 
   /**
    * Applications may need direct access to ForgeArrays, if, for example, they use string fsplit
    * How do we allow DSLs to only optionally include the Array API for end users?
+   *
+   * Answer: generate from Forge using internal/shared infix functions (from Scala.scala or similar)
    */
-  implicit class ForgeArrayOps[T:Manifest](x: Rep[ForgeArray[T]]) {
-    def apply(n: Rep[Int])(implicit ctx: SourceContext) = array_apply(x,n)
-    def length = array_length(x)
-  }
+  //implicit class ForgeArrayOps[T:Manifest](x: Rep[ForgeArray[T]]) {
+    //def apply(n: Rep[Int])(implicit ctx: SourceContext) = array_apply(x,n)
+    //def length = array_length(x)
+  //}
 
   def array_apply[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int])(implicit __imp0: SourceContext): Rep[T]
   def array_length[T:Manifest](__arg0: Rep[ForgeArray[T]])(implicit __imp0: SourceContext): Rep[Int]
@@ -45,7 +49,7 @@ trait ForgeArrayCompilerOps extends ForgeArrayOps {
   /**
    * There are some unfortunate scalac typer crashes when we try to use the nicer front-end from DSLs :(
    */
-  object Array {
+  /*object Array {
     def empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext) = array_empty[T](__arg0)
     def copy[T:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[Int],__arg2: Rep[ForgeArray[T]],__arg3: Rep[Int],__arg4: Rep[Int])(implicit __imp0: SourceContext) = array_copy(__arg0,__arg1,__arg2,__arg3,__arg4)
   }
@@ -54,7 +58,7 @@ trait ForgeArrayCompilerOps extends ForgeArrayOps {
     def update(n: Rep[Int], y: Rep[T])(implicit ctx: SourceContext) = array_update(x,n,y)
     def map[R:Manifest](f: Rep[T] => Rep[R])(implicit ctx: SourceContext) = array_map[T,R](x,f)
     def Clone(implicit ctx: SourceContext) = array_clone(x)
-  }
+  }*/
 
   def farray_from_sarray[T:Manifest](__arg0: Rep[Array[T]])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
   def array_empty[T:Manifest](__arg0: Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[T]]
@@ -81,10 +85,11 @@ trait ForgeArrayCompilerOps extends ForgeArrayOps {
   def scala_array_length[T:Manifest](__arg0: Rep[Array[T]])(implicit __imp0: SourceContext): Rep[Int]
 }
 
-trait ForgeArrayBufferOps extends Base {
+trait ForgeArrayBufferTypes {
   type ForgeArrayBuffer[T]
   implicit def forgeArrayBufferManifest[T:Manifest]: Manifest[ForgeArrayBuffer[T]]
 }
+trait ForgeArrayBufferOps extends ForgeArrayBufferTypes with Base
 
 trait ForgeArrayBufferCompilerOps extends ForgeArrayBufferOps {
   this: ForgeArrayCompilerOps with ForgeHashMapCompilerOps =>

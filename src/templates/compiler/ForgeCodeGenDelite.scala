@@ -67,70 +67,108 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
   //   Directory(Path(dataDir)).createDirectory()
   //   emitStructs(dataDir)
   // }
-  def requiresCompilerBackend(opsGrp: DSLOps) = {
-    opsGrp.ops.exists(hasCompilerVersion) || opsGrpTpes(opsGrp).nonEmpty
+
+  def emitOpsExp(traitName: String, base: String, opsGrps: List[DSLOps], stream: PrintWriter) {
+    val ops = opsGrps.flatMap{opsGrp => unique(opsGrp.ops) }
+    val tpes = opsGrps.flatMap{opsGrp => opsGrpTpes(opsGrp) }
+
+    stream.println("package " + packageName + ".ops")
+    stream.println()
+    emitScalaReflectImports(stream)
+    emitLMSImports(stream)
+    emitDeliteOpsImports(stream)
+    stream.println("import ppl.delite.framework.Config") // e.g. used for rewrites
+    emitDSLImports(stream)
+    stream.println()
+
+    emitBlockComment("IR Definitions", stream)
+    stream.println("trait " + traitName + "OpsExp extends " + base + " {")
+    stream.println("  this: " + dsl + "Exp => ")
+    stream.println()
+    emitIRNodes(ops, stream)
+    stream.println()
+    emitNodeConstructors(ops, stream)
+    stream.println()
+    emitSyms(ops, stream)
+    stream.println()
+    emitAliasInfo(ops, stream)
+    stream.println()
+    emitMirrors(ops, stream)
+    stream.println()
+    emitDeliteCollection(tpes, stream)
+    stream.println()
+    emitStructMethods(tpes, stream)
+    stream.println()
+    stream.println("}")
+    stream.println()
   }
+
+  def emitOpsImpl(traitName: String, opsGrps: List[DSLOps], stream: PrintWriter) {
+    val ops = opsGrps.flatMap{opsGrp => unique(opsGrp.ops) }
+
+    stream.println("package " + packageName + ".ops")
+    stream.println()
+    emitScalaReflectImports(stream)
+    emitDSLImports(stream)
+    stream.println()
+
+    emitBlockComment("Op Implementations", stream)
+    stream.println("trait " + traitName + "OpsImpl {")
+    stream.println("  this: " + dsl + "CompilerOps with " + dsl + "Lift => ")
+    stream.println()
+    emitImpls(ops, stream)
+    stream.println("}")
+  }
+
 
   def emitOps() {
     val opsDir = dslDir + File.separator + "ops"
     Directory(Path(opsDir)).createDirectory()
 
-    // Up to 3 files per group: First includes OpsExp, Rewrites, and codegen
+    // 1 or 2 files per group: First includes OpsExp, Rewrites, and codegen
     // Second is an additional Impl file if the group contains SingleTask and Composite ops
-    // Third is compiler-only ops if the group contains any
-    // TODO: Would it make sense to just put all three of these in one file?
-    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp) && requiresCompilerBackend(opsGrp)) {
-      val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsExp"+".scala"))
-      stream.println("package " + packageName + ".ops")
-      stream.println()
-      emitScalaReflectImports(stream)
-      emitLMSImports(stream)
-      emitDeliteOpsImports(stream)
-      emitDSLImports(stream)
-      stream.println()
-      emitOpExp(opsGrp, stream)
-      stream.println()
+    // TODO: Would it make sense to just put both of these in one file?
+    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp) && !isMetahelp(grp)) {
+      val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsExp.scala"))
+      emitOpsExp(grp.name, baseOpsCls(opsGrp), List(opsGrp), stream)
       emitOpRewrites(opsGrp, stream)
       emitOpCodegen(opsGrp, stream)
       stream.close()
 
       if (opsGrp.ops.exists(requiresImpl)) {
-        val implStream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsImpl"+".scala"))
-        implStream.println("package " + packageName + ".ops")
-        implStream.println()
-        emitScalaReflectImports(implStream)
-        emitDSLImports(implStream)
-        implStream.println()
-        emitImpls(opsGrp, implStream)
+        val implStream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsImpl.scala"))
+        emitOpsImpl(grp.name, List(opsGrp), implStream)
         implStream.close()
       }
-      if (opsGrp.ops.exists(_.backend == compilerBackend)) {
-        val compStream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"CompilerOps.scala"))
-        compStream.println("package " + packageName + ".ops")
-        compStream.println()
-        emitScalaReflectImports(compStream)
-        emitLMSImports(compStream)
-        emitDSLImports(compStream)
-        compStream.println()
-        emitCompilerOpSyntax(opsGrp, compStream)
-        compStream.close()
-      }
+    }
+
+    val metahelpers = OpsGrp.toList.filter{case (grp,opsGrp) => isMetahelp(grp) }.map(_._2)
+    if (!metahelpers.isEmpty) {
+      val stream = new PrintWriter(new FileWriter(opsDir+File.separator+dsl+"MetadataOpsExp.scala"))
+      emitOpsExp(dsl+"Metadata", "EffectExp with "+dsl+"MetadataInternalOps", metahelpers, stream)
+      stream.close()
+
+      val implStream = new PrintWriter(new FileWriter(opsDir+File.separator+dsl+"MetadataOpsImpl.scala"))
+      emitOpsImpl(dsl+"Metadata", metahelpers, implStream)
+      implStream.close()
     }
   }
+
 
   def emitMetadata() {
     val MetaTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
     if (MetaTpes.nonEmpty) {
-      val stream = new PrintWriter(new FileWriter(dslDir+File.separator+dsl+"Metadata.scala"))
+      val stream = new PrintWriter(new FileWriter(dslDir+File.separator+dsl+"MetadataClasses.scala"))
       stream.println("package " + packageName)
       emitDSLImports(stream)
       emitLMSImports(stream)
       stream.println("import scala.virtualization.lms.common.MetadataOps")
       stream.println()
-      emitMetadataClasses("CompilerOps", stream)
+      emitMetadataClasses(dsl + "CompilerOps", stream, repify)
       stream.close()
     }
   }
+
 
   def emitTraversals() {
     val traversalDir = dslDir + File.separator + "transform"
@@ -141,7 +179,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
       stream.println()
       emitScalaReflectImports(stream)
       emitDeliteTraversalImports(stream)
-      emitLMSImports(stream)
+      //emitLMSImports(stream)
       emitDSLImports(stream)
       stream.println()
       emitTraversalDefs(t, stream)
@@ -182,6 +220,17 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     emitTypeMetadata(stream)
     stream.println("}")
     stream.close()
+
+    val azstream = new PrintWriter(new FileWriter(traversalDir+File.separator+dsl+"AnalyzerBase.scala"))
+    azstream.println("package " + packageName + ".transform")
+    azstream.println()
+    emitScalaReflectImports(azstream)
+    emitDeliteTraversalImports(azstream)
+    emitDSLImports(azstream)
+    //emitLMSImports(azstream)
+    azstream.println()
+    emitAnalyzerBase(azstream)
+    azstream.println()
+    azstream.close()
   }
 }
-

@@ -37,6 +37,13 @@ trait ForgeTraversalOps extends Base {
   def lower(xf: Rep[DSLTransformer])(op: Rep[DSLOp]): Rep[DSLPattern] = forge_lower(xf, op)
   def analyze(az: Rep[DSLAnalyzer])(op: Rep[DSLOp]): Rep[DSLPattern] = forge_analyze(az, op)
 
+  // TODO: API for this?
+  def propagate(op: Rep[DSLOp]): Rep[DSLPattern] = forge_propagate(op)
+  def propagate(grp: Rep[DSLGroup], name: String): Rep[DSLPattern] = {
+    val op = lookupOp(grp, name)
+    forge_propagate(op)
+  }
+
   // --- Traversal rules
   // In analysis and traversal rules, the symbol representing the IR node can be referred to
   // using the variable name "lhs". Note that in rewrite rules there is no symbol yet.
@@ -85,7 +92,7 @@ trait ForgeTraversalOps extends Base {
   // Creates a meet rule for given metadata type for given aliasing type
   // Rule is always on exactly two arguments of given metadata type: this and that
   // Meet rule should return the same type of metadata
-  def meet(meta: Rep[DSLMetadata], alias: MetaMeet = any)(rule: Rep[String]): Rep[Unit] = forge_meet(meta,alias,rule)
+  def onMeet(meta: Rep[DSLMetadata], alias: MetaMeet = any)(rule: Rep[String]): Rep[Unit] = forge_meet(meta,alias,rule)
   def canMeet(meta: Rep[DSLMetadata], alias: MetaMeet = any)(rule: Rep[String]): Rep[Unit] = forge_canMeet(meta,alias,rule)
   def matches(meta: Rep[DSLMetadata])(rule: Rep[String]): Rep[Unit] = forge_matches(meta, rule)
   def isComplete(meta: Rep[DSLMetadata])(rule: Rep[String]): Rep[Unit] = forge_complete(meta, rule)
@@ -103,6 +110,8 @@ trait ForgeTraversalOps extends Base {
   def forge_traversal(name: String, isExtern: Boolean): Rep[DSLTraversal]
   def forge_transformer(name: String, isExtern: Boolean): Rep[DSLTransformer]
   def forge_analyzer(name: String, isExtern: Boolean): Rep[DSLAnalyzer]
+  def forge_propagate(op: Rep[DSLOp]): Rep[DSLPattern]
+
   def forge_schedule(traversal: Rep[DSLTraversal]): Rep[Unit]
   def forge_metadata(name: String, tpePars: List[Rep[TypePar]]): Rep[DSLMetadata]
   def forge_lookup_metadata(name: String): Rep[DSLMetadata]
@@ -188,8 +197,6 @@ trait ForgeTraversalSugar extends ForgeTraversalSugarLowPriority with ForgeTrave
 
   // --- Analysis scope sugar
   trait AnalysisScope {
-    //def infix_propagates(op: Rep[DSLOp], rule: Rep[String]) = forge_propagates(_analysisScope.get, op, rule)
-    //def infix_updates(op: Rep[DSLOp], idx: Int, rule: Rep[String]) = forge_updates(_analysisScope.get, op, idx, rule)
     def analyze(op: Rep[DSLOp]) = forge_analyze(_analysisScope.get, op)
     def analyze(grp: Rep[DSLGroup], name: String) = {
       val op = lookupOp(grp, name)
@@ -223,6 +230,7 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
   val TraversalSchedule = ArrayBuffer[Exp[DSLTraversal]]()
   val MetaImpls = HashMap[Exp[DSLMetadata], MetaOps]()
 
+  val PropagationRules = HashMap[Exp[DSLOp], List[DSLRule]]()
   val Rewrites = HashMap[Exp[DSLOp], List[DSLRule]]()
   val TypeMetadata = HashMap[Exp[DSLType], List[Rep[String]]]()
 
@@ -233,6 +241,7 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
   case class RewriteSetPattern(op: List[Rep[DSLOp]]) extends Def[DSLPattern]
   case class LowerPattern(xf: Rep[DSLTransformer], op: Rep[DSLOp]) extends Def[DSLPattern]
   case class AnalysisPattern(az: Rep[DSLAnalyzer], op: Rep[DSLOp]) extends Def[DSLPattern]
+  case class PropagationPattern(op: Rep[DSLOp]) extends Def[DSLPattern]
 
   def forge_rewrite(ops: Seq[Rep[DSLOp]]): Rep[DSLPattern] = {
     if (ops.length == 1)
@@ -242,25 +251,7 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
   }
   def forge_lower(xf: Rep[DSLTransformer], op: Rep[DSLOp]): Rep[DSLPattern] = LowerPattern(xf, op)
   def forge_analyze(az: Rep[DSLAnalyzer], op: Rep[DSLOp]): Rep[DSLPattern] = AnalysisPattern(az, op)
-
-  /**
-   * Analysis (metadata propagation) rules
-   */
-  abstract class AnalysisRule
-  case class PropagationRule(rule: Rep[String]) extends AnalysisRule
-  case class UpdateRule(index: Int, rule: Rep[String]) extends AnalysisRule
-
-  /*def forge_analysis_propagates(az: Rep[DSLAnalyzer], op: Rep[DSLOp], rule: Rep[String]) = {
-    Analyzers
-  }
-  def forge_analysis_updates(az: Rep[DSLAnalyzer], op: Rep[Int], index: Int, rule: Rep[String]) = {
-
-  }*/
-
-  case class AnalysisRules(patterns: HashMap[Rep[DSLOp],List[AnalysisRule]])
-  object AnalysisRules {
-    def empty = AnalysisRules(HashMap[Rep[DSLOp],List[AnalysisRule]]())
-  }
+  def forge_propagate(op: Rep[DSLOp]): Rep[DSLPattern] = PropagationPattern(op)
 
   /**
    * Lowering/Rewrite (transformation) rules
@@ -268,7 +259,6 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
   case class SimpleRule(rule: Rep[String]) extends DSLRule
   case class PatternRule(pattern: List[String], rule: Rep[String], commutative: Boolean) extends DSLRule
   case class ForwardingRule(rule: Rep[String]) extends DSLRule
-
 
   def forge_rule(rule: Rep[String]) = SimpleRule(rule)
   def forge_forwarding(rule: Rep[String]) = ForwardingRule(rule)
@@ -285,7 +275,6 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
   // Create or append rules. Note that definition ordering must be maintained for pattern matching!
   // TODO: Should this return something besides Rep[Unit]?
   def forge_using(pattern: Rep[DSLPattern], rule: DSLRule)(implicit ctx: SourceContext): Rep[Unit] = {
-
     // Check that the user doesn't give two simple rules for one op pattern
     // TODO: Better stringify method for patterns for warnings/errors
     def append_rule_to(oldRules: List[DSLRule]) = {
@@ -306,8 +295,10 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
 
     pattern match {
       case Def(RewriteSetPattern(ops)) => ops.foreach(op => forge_using(forge_rewrite(op), rule))
-      case Def(RewritePattern(op)) if !Rewrites.contains(op) => Rewrites(op) = List(rule) // Create
-      case Def(RewritePattern(op)) => Rewrites(op) = append_rule_to(Rewrites(op))
+      case Def(RewritePattern(op)) =>
+        if (!Rewrites.contains(op)) Rewrites(op) = List(rule) // Create
+        else Rewrites(op) = append_rule_to(Rewrites(op))      // Append
+
       case Def(LowerPattern(xf, op)) =>
         val rules = Transformers(xf).rules
         if (!rules.contains(op)) rules(op) = List(rule)
@@ -317,6 +308,10 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
         val rules = Analyzers(az).rules
         if (!rules.contains(op)) rules(op) = List(rule)
         else rules(op) = append_rule_to(rules(op))
+
+      case Def(PropagationPattern(op)) =>
+        if (!PropagationRules.contains(op)) PropagationRules(op) = List(rule) // Create
+        else PropagationRules(op) = append_rule_to(PropagationRules(op))      // Append
     }
     ()
   }

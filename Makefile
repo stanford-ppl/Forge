@@ -28,6 +28,14 @@ dadl_clean:
 	rm -f DADL.symlink
 	rm -rf ${HYPER_HOME}/published/DADL
 
+optiml: build
+	cd ${HYPER_HOME} && ${FORGE_HOME}/bin/update ppl.dsl.forge.dsls.optiml.OptiMLDSLRunner OptiML && cd ${FORGE_HOME}
+	ln -s ${HYPER_HOME}/published/OptiML OptiML.symlink
+
+optiml_clean:
+	rm -f OptiML.symlink
+	rm -rf ${HYPER_HOME}/published/OptiML
+
 
 clean:
 	cd ${HYPER_HOME} && sbt "; project forge; clean" && cd ${FORGE_HOME}

@@ -124,7 +124,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(IRPrinterPlus)
     schedule(StageAnalyzer)
     schedule(GlobalAnalyzer)
-    schedule(BoundAnalyzer)
+    //schedule(BoundAnalyzer)
     schedule(DSE)
     //schedule(AreaAnalyzer)
     //schedule(LatencyAnalyzer)

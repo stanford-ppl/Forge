@@ -12,30 +12,29 @@ trait DSE extends Traversal {
   val IR: DHDLCompiler
   import IR._
 
-  val paramAnalyzer = new ParameterAnalyzer{val IR = DSE.this.IR}
-  def tileSizes  = paramAnalyzer.tileSizes
-  def parFactors = paramAnalyzer.parFactors
-  def metapipes  = paramAnalyzer.metapipes
-
-  val areaAnalyzer = new AreaAnalyzer{val IR = DSE.this.IR}
-  def totalArea = areaAnalyzer.totalArea
-
-  val cycleAnalyzer = new LatencyAnalyzer{val IR = DSE.this.IR}
-  def totalCycles = cycleAnalyzer.totalCycles
-
-
-  def run[A:Manifest](b: Block[A]): Block[A] = {
+  override def run[A:Manifest](b: Block[A]): Block[A] = {
     val bb = preprocess(b)
+
+    val paramAnalyzer = new ParameterAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
+    def tileSizes  = paramAnalyzer.tileSizes
+    def parFactors = paramAnalyzer.parFactors
+    def metapipes  = paramAnalyzer.metapipes
+
+    val areaAnalyzer = new AreaAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
+    def totalArea = areaAnalyzer.totalArea
+
+    val cycleAnalyzer = new LatencyAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
+    def totalCycles = cycleAnalyzer.totalCycles
 
     // --- Get lists of parameters
     paramAnalyzer.run(b)
 
-    areaAnalyzer.run(b)
-    cycleAnalyzer.run(b)
+    //areaAnalyzer.run(b)
+    //cycleAnalyzer.run(b)
 
     // --- Finalize parameters
-    tileSizes.foreach{p => p.finalize}
-    parFactors.foreach{p => p.finalize}
+    tileSizes.foreach{p => p.fix}
+    parFactors.foreach{p => p.fix}
 
     postprocess(bb)
   }

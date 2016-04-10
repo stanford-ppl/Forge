@@ -55,9 +55,8 @@ trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp {
 
   // Shorthand versions for matching on ConstFixPt and ConstFltPt without the manifests
   object ParamFix {
-    def unapply(x: Any): Option[Param[Any]] = x match {
-      case Def(EatReflect(Tpes_Int_to_fix(e: Param[_]))) => Some(e)
-      case EatReflect(Tpes_Int_to_fix(e: Param[_])) => Some(e)
+    def unapply(x: Exp[Any]): Option[Param[Int]] = x match {
+      case Def(EatReflect(Tpes_Int_to_fix(e: Param[Int]))) => Some(e)
       case _ => None
     }
   }

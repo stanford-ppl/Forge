@@ -426,8 +426,8 @@ trait DHDLMemories {
     // --- Scala Backend
     impl (offchip_new) (codegen($cala, ${ new Array[$t[T]]($size.toInt) }))
 
-    val lbl = "\\\" + quote(sym)"
-    val endlbl = "\\\""
+    val lbl = "\"\\\"\" + quote(sym)"
+    val endlbl = "\"\\\"\""
 
 		// --- Dot Backend
 		impl (offchip_new) (codegen(dot, ${

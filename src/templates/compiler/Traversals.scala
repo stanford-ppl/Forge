@@ -72,7 +72,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("  override val name = \"" + makeTraversalName(t) + "\"")
     stream.println("  override val debugMode = false")        // TODO: Should be able to change this
     stream.println()
-    stream.println("  override def transformTP[A](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext): Option[Exp[Any]] = rhs match {")
+    stream.println("  override def transform(lhs: Sym[Any], rhs: Def[Any])(implicit ctx: SourceContext): Option[Exp[Any]] = rhs match {")
 
     val patterns = Transformers(t).rules
     for ((op,rules) <- patterns) {

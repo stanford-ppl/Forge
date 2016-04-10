@@ -11,9 +11,11 @@ import dhdl.compiler.ops._
 import scala.collection.mutable.HashSet
 
 trait ParameterAnalyzer extends Traversal {
+  val IR: DHDLExp
+  import IR._
 
-  val tileSizes  = HashSet[Param[Any]]()  // Params used to calculate BRAM size
-  val parFactors = HashSet[Param[Any]]()  // Params used as parallelization factors for counters
+  val tileSizes  = HashSet[Param[Int]]()  // Params used to calculate BRAM size
+  val parFactors = HashSet[Param[Int]]()  // Params used as parallelization factors for counters
   val metapipes  = HashSet[Exp[Any]]()    // List of metapipes which can be sequentialized
 
   override def traverseStm(stm: Stm) = stm match {

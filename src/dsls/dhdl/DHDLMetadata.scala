@@ -212,7 +212,7 @@ trait DHDLMetadata {
     }
     rewrite (boundOps, "boundOf") using pattern(${p@Param(x)} -> ${
       val c = extractNumericConstant(x)
-      if (p.isFinal) fixed(c) else exact(c)
+      if (p.isFixed) fixed(c) else exact(c)
     })
     rewrite (boundOps, "boundOf") using pattern(${Const(x)} -> ${ fixed(extractNumericConstant(x)) })
 

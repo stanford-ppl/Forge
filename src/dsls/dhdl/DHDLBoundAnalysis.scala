@@ -11,6 +11,7 @@ trait DHDLBoundAnalysis {
     val Prim = lookupGrp("DHDLPrim")
     val Tpes = lookupGrp("Tpes")
     val Ctrl = lookupGrp("BasicCtrl")
+    val Tst  = lookupGrp("Nosynth")
     val Lifts = lookupGrp("ConstLifts")
     val Reg = lookupTpe("Reg")
 
@@ -22,9 +23,20 @@ trait DHDLBoundAnalysis {
       analyze(Tpes, "int_to_fix") using rule ${ bound(lhs) = boundOf($0) }
 
       // TODO: These could actually be structs! Handle using normal propagation instead
-      analyze(Reg, "reg_new") using rule ${ bound(lhs) = boundOf($0) }
+      analyze(Reg, "reg_new") using rule ${ bound(lhs) = bound($0).get }
       analyze(Reg, "reg_read") using rule ${ bound(lhs) = boundOf($0) }
-      analyze(Reg, "reg_write") using rule ${ bound($0) = boundOf($1) }
+      analyze(Reg, "reg_write") using rule ${
+        if (boundOf($0).isDefined && boundOf($1).isDefined)
+          bound($0) = Math.max(bound($0).get,bound($1).get)
+        else
+          bound($0) = boundOf($1)
+      }
+      analyze(Tst, "set_arg") using rule ${
+        if (boundOf($0).isDefined && boundOf($1).isDefined)
+          bound($0) = Math.max(bound($0).get,bound($1).get)
+        else
+          bound($0) = boundOf($1)
+      }
 
       // TODO: assumes values are non-negative (i.e. max(x * y) could actually be min(x) * min(y) for neg. values )
       // Only for use with index calculation right now

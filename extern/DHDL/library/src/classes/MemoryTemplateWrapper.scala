@@ -15,7 +15,7 @@ trait TypeInspectionWrapper extends TypeInspectionCompilerOps {
   this: DHDLIdentifiers =>
 }
 
-trait MemoryTemplateWrapper extends PipeTemplateWrapper with TypeInspectionWrapper with NumEmulation {
+trait MemoryTemplateWrapper extends ControllerTemplateWrapper with TypeInspectionWrapper with NumEmulation {
   this: DHDLBase with DHDLClasses =>
 
   // Memories are all equivalent to Scala Arrays in library
@@ -40,13 +40,14 @@ trait MemoryTemplateWrapper extends PipeTemplateWrapper with TypeInspectionWrapp
   def indicesManifest: Manifest[Indices] = manifest[RecordImpl]
 
   // Library implementation needs to also have type parameters
-  def fixManifest[S:Manifest,I:Manifest,F:Manifest] = manifest[FixedPoint[S,I,F]]
-  def fltManifest[G:Manifest,E:Manifest] = manifest[FloatPoint[G,E]]
+  def fixManifest[S:Manifest,I:Manifest,F:Manifest]: Manifest[FixPt[S,I,F]] = manifest[FixedPoint[S,I,F]]
+  def fltManifest[G:Manifest,E:Manifest]: Manifest[FltPt[G,E]] = manifest[FloatPoint[G,E]]
   def bitManifest: Manifest[Bit] = manifest[Boolean]
 
   def isFixPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FixedPoint[_,_,_]])
   def isFltPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FloatPoint[_,_]])
   def isBitType[T:Manifest]   = isSubtype(manifest[T].runtimeClass, classOf[Boolean])
+  def isRegister[T:Manifest]  = isSubtype(manifest[T].runtimeClass, classOf[Array[_]])  // eh...
 
   def tile_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], strides: List[Rep[FixPt[Signed,B32,B0]]], memOfs: Rep[FixPt[Signed,B32,B0]], tileDims: List[Int], cchain: Rep[CounterChain], store: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
     val localStrides = sdimsToStrides(tileDims).map(k => FixedPoint[Signed,B32,B0](k))

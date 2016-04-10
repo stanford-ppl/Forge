@@ -23,6 +23,7 @@ trait DHDLTypes {
     val Z = lookupTpe("B0", compile)
 
     val Tpes = grp("Tpes")
+    val Lifts = grp("ConstLifts")
 
     // Want Manifest[S], not Manifest[Rep[S]]
     val SS = tpePar("S",stage=compile)
@@ -31,25 +32,28 @@ trait DHDLTypes {
     val GG = tpePar("G",stage=compile)
     val EE = tpePar("E",stage=compile)
 
+
+
     // --- Nodes
     // Bordering on a ridiculous numbers of type parameters here
     // Somewhat concerning since each type parameter means an implicit parameter, but maybe it's ok
 
-    val boolean_to_bit = internal (Tpes) ("constBit", Nil, SBoolean :: Bit)
+    val boolean_to_bit = internal (Lifts) ("constBit", Nil, SBoolean :: Bit)
+    val const_to_fixpt = internal (Lifts) ("constFixPt", (T,S,I,F), (T, SManifest(SS), SManifest(II), SManifest(FF)) :: FixPt(S,I,F), TNumeric(T))
+    val const_to_fltpt = internal (Lifts) ("constFltPt", (T,G,E), (T, SManifest(GG), SManifest(EE)) :: FltPt(G,E), TNumeric(T))
+
+
     val bit_to_string = direct (Tpes) ("bit_to_string", Nil, Bit :: MString)
 
     // Include Manifests to avoid CSE issues
-    val const_to_fixpt = internal (FixPt) ("constFixPt", (T,S,I,F), (T, SManifest(SS), SManifest(II), SManifest(FF)) :: FixPt(S,I,F), TNumeric(T))
-    val fixpt_to_string = direct (FixPt) ("fixpt_to_string", (S,I,F), FixPt(S,I,F) :: MString)
-    val fixpt_to_fltpt = direct (FixPt) ("fixpt_to_fltpt", (S,I,F,G,E), FixPt(S,I,F) :: FltPt(G,E))
-    val convert_fixpt = direct (FixPt) ("convert_fixpt", (S,I,F,S2,I2,F2), FixPt(S,I,F) :: FixPt(S2,I2,F2))
+    val fixpt_to_string = direct (Tpes) ("fixpt_to_string", (S,I,F), FixPt(S,I,F) :: MString)
+    val fixpt_to_fltpt = internal (Tpes) ("fixpt_to_fltpt", (S,I,F,G,E), FixPt(S,I,F) :: FltPt(G,E))
+    val convert_fixpt = internal (Tpes) ("convert_fixpt", (S,I,F,S2,I2,F2), FixPt(S,I,F) :: FixPt(S2,I2,F2))
 
     // Include Manifests to avoid CSE issues
-    val const_to_fltpt = internal (FltPt) ("constFltPt", (T,G,E), (T, SManifest(GG), SManifest(EE)) :: FltPt(G,E), TNumeric(T))
-    val fltpt_to_string = direct (FltPt) ("fltpt_to_string", (G,E), FltPt(G,E) :: MString)
-    val fltpt_to_fixpt = direct (FltPt) ("fltpt_to_fixpt", (G,E,S,I,F), FltPt(G,E) :: FixPt(S,I,F))
-    val convert_fltpt = direct (FltPt) ("convert_fltpt", (G,E,G2,E2), FltPt(G,E) :: FltPt(G2,E2))
-
+    val fltpt_to_string = direct (Tpes) ("fltpt_to_string", (G,E), FltPt(G,E) :: MString)
+    val fltpt_to_fixpt = internal (Tpes) ("fltpt_to_fixpt", (G,E,S,I,F), FltPt(G,E) :: FixPt(S,I,F))
+    val convert_fltpt = internal (Tpes) ("convert_fltpt", (G,E,G2,E2), FltPt(G,E) :: FltPt(G2,E2))
 
     // For testing / compatibility with rest of Delite and LMS
     val fix_to_rep_int = internal (Tpes) ("fix_to_int", (S,I), FixPt(S,I,Z) :: MInt)
@@ -113,32 +117,23 @@ trait DHDLTypes {
 
     // TODO: Can probably change this to be an infix defined for all T:Numeric
     // Using "as" rather than "to" since "to" is already defined for int
-    infix (Tpes) ("toBit", Nil, SBoolean :: Bit) implements composite ${ constBit($0) }
+    infix (Tpes) ("asBit", Nil, SBoolean :: Bit) implements composite ${ constBit($0) }
     infix (Tpes) ("as", R, SInt :: R) implements redirect ${ lift_to[Int,R]($0) }
     infix (Tpes) ("as", R, SLong :: R) implements redirect ${ lift_to[Long,R]($0) }
     infix (Tpes) ("as", R, SFloat :: R) implements redirect ${ lift_to[Float,R]($0) }
     infix (Tpes) ("as", R, SDouble :: R) implements redirect ${ lift_to[Double,R]($0) }
 
 
-    val Bit_API = withTpe(Bit)
-    Bit_API {
-      infix ("toString") (Nil :: MString) implements redirect ${ bit_to_string($0) }
-      infix ("mkString") (Nil :: MString) implements redirect ${ bit_to_string($0) }
-    }
+    infix (Tpes) ("toString", Nil, Bit :: MString) implements redirect ${ bit_to_string($0) }
+    infix (Tpes) ("mkString", Nil, Bit :: MString) implements redirect ${ bit_to_string($0) }
 
-    val Fix_API = withTpe(FixPt)
-    Fix_API {
-      infix ("toString") (Nil :: MString) implements redirect ${ fixpt_to_string($self) }
-      infix ("mkString") (Nil :: MString) implements redirect ${ fixpt_to_string($self) }
-      infix ("to") (Nil :: R, addTpePars = R) implements redirect ${ cast_fixpt_to[S,I,F,R]($self) }
-    }
+    infix (Tpes) ("toString", (S,I,F), FixPt(S,I,F) :: MString) implements redirect ${ fixpt_to_string($0) }
+    infix (Tpes) ("mkString", (S,I,F), FixPt(S,I,F) :: MString) implements redirect ${ fixpt_to_string($0) }
+    infix (Tpes) ("to", (S,I,F,R),  FixPt(S,I,F) :: R) implements redirect ${ cast_fixpt_to[S,I,F,R]($0) }
 
-    val Flt_API = withTpe(FltPt)
-    Flt_API {
-      infix ("toString") (Nil :: MString) implements redirect ${ fltpt_to_string($self) }
-      infix ("mkString") (Nil :: MString) implements redirect ${ fltpt_to_string($self) }
-      infix ("to") (Nil :: R, addTpePars = R) implements redirect ${ cast_fltpt_to[G,E,R]($self) }
-    }
+    infix (Tpes) ("toString", (G,E), FltPt(G,E) :: MString) implements redirect ${ fltpt_to_string($0) }
+    infix (Tpes) ("mkString", (G,E), FltPt(G,E) :: MString) implements redirect ${ fltpt_to_string($0) }
+    infix (Tpes) ("to", (G,E,R), FltPt(G,E) :: R) implements redirect ${ cast_fltpt_to[G,E,R]($0) }
 
 
     val SInt32 = lookupAlias("SInt")
@@ -147,7 +142,7 @@ trait DHDLTypes {
     // Needed for if-then-else and while (default requires Rep[Boolean] and overloading is tough in these cases)
     fimplicit (Tpes) ("bit_to_boolean", Nil, Bit :: MBoolean) implements composite ${ bit_to_bool($0) }
 
-    fimplicit (Tpes) ("sboolean_to_bit", Nil, SBoolean :: Bit) implements redirect ${ bit($0) }
+    fimplicit (Tpes) ("scala_boolean_to_bit", Nil, SBoolean :: Bit) implements redirect ${ bit($0) }
     fimplicit (Tpes) ("scala_int_to_fixpt", Nil, SInt :: SInt32) implements redirect ${ fixPt[Int,Signed,B32,B0]($0) }
     fimplicit (Tpes) ("scala_float_to_fltpt", Nil, SFloat :: Flt) implements redirect ${ fltPt[Float,B24,B8]($0) }
 
@@ -171,9 +166,9 @@ trait DHDLTypes {
 
 
     // --- Dot Backend
-    impl (boolean_to_bit) (codegen(dot, ${ 
+    impl (boolean_to_bit) (codegen(dot, ${
       @ alwaysGen {
-				$sym [label=$0 style="filled" fillcolor="lightgray" color="none"] 
+				$sym [label=$0 style="filled" fillcolor="lightgray" color="none"]
       @ }
 		}))
     impl (const_to_fixpt) (codegen(dot, ${

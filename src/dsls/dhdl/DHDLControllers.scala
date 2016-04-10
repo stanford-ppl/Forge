@@ -14,28 +14,26 @@ trait DHDLControllers {
   def importCounters() {
     val Counter      = lookupTpe("Counter")
     val CounterChain = lookupTpe("CounterChain")
-    val Idx          = lookupAlias("SInt")
+    val Idx          = lookupAlias("Index")
 
     // --- Nodes
-    val counter_new = internal (Counter) ("counter_new", Nil, (("start", Idx), ("end", Idx), ("step", Idx)) :: Counter, effect = simple)
+    // counter_new - see extern
 
     // --- Internals
     direct (Counter) ("counter_create", Nil, (SOption(SString), Idx, Idx, Idx, SInt) :: Counter) implements composite ${
-      val ctr = counter_new($1, $2, $3)
+      val ctr = counter_new($1, $2, $3, $4)
       $0.foreach{name => nameOf(ctr) = name}
-      par(ctr) = $4
       ctr
     }
 
     // --- API
-    static (Counter) ("apply", Nil, ("max", Idx) :: Counter) implements redirect ${ counter_create(None, 0, $max, 1, 1) }
-    static (Counter) ("apply", Nil, (("min", Idx), ("max", Idx)) :: Counter) implements redirect ${ counter_create(None, $min, $max, 1, 1) }
+    static (Counter) ("apply", Nil, ("max", Idx) :: Counter) implements redirect ${ counter_create(None, 0.as[Index], $max, 1.as[Index], 1) }
+    static (Counter) ("apply", Nil, (("min", Idx), ("max", Idx)) :: Counter) implements redirect ${ counter_create(None, $min, $max, 1.as[Index], 1) }
     static (Counter) ("apply", Nil, (("min", Idx), ("max", Idx), ("step", Idx)) :: Counter) implements redirect ${ counter_create(None, $min, $max, $step, 1) }
-    static (Counter) ("apply", Nil, (("name",SString), ("max",Idx)) :: Counter) implements redirect ${ counter_create(Some($name), 0, $max, 1, 1) }
-    static (Counter) ("apply", Nil, (("name",SString), ("min", Idx), ("max", Idx)) :: Counter) implements redirect ${ counter_create(Some($name), $min, $max, 1, 1) }
+    static (Counter) ("apply", Nil, (("name",SString), ("max",Idx)) :: Counter) implements redirect ${ counter_create(Some($name), 0.as[Index], $max, 1.as[Index], 1) }
+    static (Counter) ("apply", Nil, (("name",SString), ("min", Idx), ("max", Idx)) :: Counter) implements redirect ${ counter_create(Some($name), $min, $max, 1.as[Index], 1) }
     static (Counter) ("apply", Nil, (("name",SString), ("min",Idx), ("max",Idx), ("step",Idx)) :: Counter) implements redirect ${ counter_create(Some($name), $min, $max, $step, 1) }
     static (Counter) ("apply", Nil, (("name",SString), ("min",Idx), ("max",Idx), ("step",Idx), ("par",SInt)) :: Counter) implements redirect ${ counter_create(Some($name), $min, $max, $step, $par) }
-
 
     static (CounterChain) ("apply", Nil, varArgs(Counter) :: CounterChain) implements composite ${
       val chain = counterchain_new($0.toList) // Defined in extern
@@ -43,37 +41,6 @@ trait DHDLControllers {
       chain
     }
 
-    // --- Scala backend
-    impl (counter_new) (codegen($cala, ${ ($start until $end by $step) }))
-
-    // --- Dot Backend
-    // Moved this outside - was confusing sublime
-
-    impl (counter_new) (codegen(dot, ${
-			@ var label = "\\"" + quote(sym)
-			@ if (quote(start).forall(_.isDigit)) {
-			@ 	label += "|start=" + quote(start)
-			@ } else {
-					$start -> $sym [xlabel="start"]
-			@ }
-			@ if (quote(end).forall(_.isDigit)) {
-			@ 	label += "|end=" + quote(end)
-			@ } else {
-					$end -> $sym [xlabel="end"]
-			@ }
-			@ if (quote(step).forall(_.isDigit)) {
-			@ 	label += "|step=" + quote(step)
-			@ } else {
-					$step -> $sym [xlabel="step"]
-			@ }
-			@ label += "\\""
-      $sym [ label=$label shape="record" style="filled,rounded"
-						color=$counterInnerColor ]
-		}))
-
-    // --- MaxJ Backend
-    impl (counter_new) (codegen(maxj, ${
-		}))
   }
 
 
@@ -82,21 +49,22 @@ trait DHDLControllers {
     val C = hkTpePar("C", T) // high kinded type parameter - memory of type T
 
     val BRAM = lookupTpe("BRAM")
-    val Idx  = lookupAlias("SInt")
+    val Idx  = lookupAlias("Index")
 
     val Indices = lookupTpe("Indices")
 
     val Counter = lookupTpe("Counter")
     val CounterChain = lookupTpe("CounterChain")
+    val Pipeline = lookupTpe("Pipeline")
 
     val Pipe = grp("Pipe")
     val MetaPipe = grp("MetaPipe")
     val Sequential = grp("Sequential")
 
     // --- Nodes
-    // pipe_foreach, pipe_reduce, pipe_bram_reduce - see Template in extern
+    // pipe_foreach, pipe_reduce, block_reduce - see Template in extern
     val pipe_parallel = internal (MetaPipe) ("pipe_parallel", Nil, ("func", MThunk(MUnit)) :: MUnit, effect = simple)
-    val block_reduce = internal (MetaPipe) ("block_reduce", T, (CounterChain, CounterChain, BRAM(T), Idx ==> BRAM(T), (T,T) ==> T) :: MUnit, effect = simple)
+    val unit_pipe = internal (MetaPipe) ("unit_pipe", Nil, ("func", MThunk(MUnit)) :: Pipeline, effect = simple)
 
     // --- API
     val grps = List(Pipe, MetaPipe, Sequential)
@@ -143,41 +111,39 @@ trait DHDLControllers {
       }
 
       /* Single iteration */
-      static (Ctrl) ("apply", Nil, MThunk(MUnit) :: MUnit) implements composite ${ \$obj(Counter(max=1)){i => $0} }
+      // Single iteration MetaPipe makes no sense
+      if (style != "MetaPipe") {
+        static (Ctrl) ("apply", Nil, MThunk(MUnit) :: MUnit) implements composite ${
+          val pipe = unit_pipe($0)
+          styleOf(pipe) = \$style
+        }
+      }
     }
 
     /* Parallel */
     direct (MetaPipe) ("Parallel", Nil, MThunk(MUnit) :: MUnit) implements composite ${ pipe_parallel($0) }
 
-
-    // TODO: Only single dimensional for now
+    /* BlockReduce */
+    // BlockReduce(counter, accum){i => f(i) }{(a,b) => reduce(a,b) }
     direct (MetaPipe) ("BlockReduce", T, CurriedMethodSignature(List(List(Counter, BRAM(T)), List(Idx ==> BRAM(T)), List((T,T) ==> T)), MUnit)) implements composite ${
-      val bramSize = sizeOf($1)
-      block_reduce(CounterChain($0), CounterChain(bramSize by 1), $1, $2, $3)
+      val pipe = block_reduce[T](CounterChain($0), $1, {inds: Rep[Indices] => $2(inds(0)) }, $3)
+      styleOf(pipe) = Coarse
     }
-
+    // BlockReduce(counter, counter, accum){i => f(i) }{(a,b) => reduce(a,b) }
+    direct (MetaPipe) ("BlockReduce", T, CurriedMethodSignature(List(List(Counter, Counter, BRAM(T)), List((Idx,Idx) ==> BRAM(T)), List((T,T) ==> T)), MUnit)) implements composite ${
+      val pipe = block_reduce[T](CounterChain($0, $1), $2, {inds: Rep[Indices] => $3(inds(0), inds(1))}, $4)
+      styleOf(pipe) = Coarse
+    }
+    // BlockReduce(counter, counter, counter, accum){i => f(i) }{(a,b) => reduce(a,b) }
+    direct (MetaPipe) ("BlockReduce", T, CurriedMethodSignature(List(List(Counter, Counter, Counter, BRAM(T)), List((Idx,Idx,Idx) ==> BRAM(T)), List((T,T) ==> T)), MUnit)) implements composite ${
+      val pipe = block_reduce[T](CounterChain($0, $1, $2), $3, {inds: Rep[Indices] => $4(inds(0), inds(1), inds(2))}, $5)
+      styleOf(pipe) = Coarse
+    }
 
     // --- Scala Backend
     // See TemplateOpsExp for others
     impl (pipe_parallel) (codegen ($cala, ${ $b[func] }))
-
-    impl (block_reduce) (codegen($cala, ${
-      for (__iter <- $0.apply(0)) {
-        val __res = $b[3](__iter)
-
-        for (__upIter <- $1.apply(0)) {
-          val __a = __res.apply(__upIter.toInt)
-          val __r = if (__iter > FixedPoint[Signed,B32,B0](1)) { // Only reduce after first iteration
-            val __b = $2.apply(__upIter.toInt)
-            $b[4](__a,__b)
-          }
-          else {
-            __a
-          }
-          $2.update(__upIter.toInt, __r)
-        }
-      }
-    }))
+    impl (unit_pipe) (codegen ($cala, ${ $b[func] }))
 
     // --- Dot Backend
     impl (pipe_parallel) (codegen (dot, ${
@@ -190,20 +156,6 @@ trait DHDLControllers {
 			}
 		}))
 
-		//TODO
-    impl (block_reduce) (codegen(dot, ${
-      subgraph $sym {
-      	label = "\$sym"
-      	style = "filled"
-      	fillcolor = $mpFillColor
-      	color = $mpBorderColor
-				@ val sym_ctrl = quote(sym) + "_blockreduce"
-      	$sym_ctrl [label="ctrl" height=0 style="filled" fillcolor=$mpBorderColor ]
-			}
-    }))
-
-    impl (block_reduce) (codegen(maxj, ${
-    }))
 	}
 
 }

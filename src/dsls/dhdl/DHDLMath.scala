@@ -184,11 +184,11 @@ trait DHDLMath {
 
 
     val BitColl = tpeClassInst("BitColl", Nil, Coll(Bit))
-    infix (BitColl) ("empty", Nil, Nil :: Bit) implements composite ${ false.toBit }
-    infix (BitColl) ("zeros", Nil, Bit :: Bit) implements composite ${ false.toBit }
+    infix (BitColl) ("empty", Nil, Nil :: Bit) implements composite ${ false.asBit }
+    infix (BitColl) ("zeros", Nil, Bit :: Bit) implements composite ${ false.asBit }
 
     val BitNum = tpeClassInst("BitNum", Nil, Num(Bit))
-    infix (BitNum) ("zero", Nil, Nil :: Bit) implements composite ${ false.toBit }
+    infix (BitNum) ("zero", Nil, Nil :: Bit) implements composite ${ false.asBit }
 
     // TODO: Is this needed?
     val BitOrder = tpeClassInst("BitOrder", Nil, Order(Bit))
@@ -344,14 +344,12 @@ trait DHDLMath {
     impl (neq_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			$pre $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
-    	$sym <== $0.neq($1);
+    	$sym <== ( $0 !== $1 );
 		}))
     impl (eql_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			$pre $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
-    	//TODO: why in old dhdl use ===
-			//$sym <== $0 === $1 ;
-			$sym <== $0.eq($1) ;
+			$sym <== ( $0 === $1) ;
 		}))
     impl (and_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
@@ -403,14 +401,12 @@ trait DHDLMath {
     impl (neq_flt) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			$pre $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
-    	$sym <== $0.neq($1);
+    	$sym <== ( $0 !== $1 );
 		}))
     impl (eql_flt) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			$pre $sym = dfeFixOffset(1, 0, SignMode.UNSIGNED).newInstance(this);
-    	//TODO: why in old dhdl use ===
-			//$sym <== $0 === $1 ;
-			$sym <== $0.eq($1) ;
+			$sym <== $0 === $1 ;
 		}))
 
     impl (not_bit) (codegen(maxj, ${
@@ -457,7 +453,10 @@ trait DHDLMath {
 
     // --- API
     // TODO: Support a more general pow
-    direct (Prim) ("pow", T, (T, SInt) :: T, TArith(T)) implements composite ${ productTree(List.fill($1){$0}) }
+    direct (Prim) ("pow", T, (T, SInt) :: T, TArith(T)) implements composite ${
+      if ($1 < 1) stageError("Power less than 1 is currently unsupported.")
+      productTree(List.fill($1){$0})
+    }
 
     // Fixed Point
     infix  (Prim) ("**", (S,I,F), (FixPt(S,I,F), SInt) :: FixPt(S,I,F)) implements redirect ${ pow($0, $1) }
@@ -531,20 +530,20 @@ trait DHDLMath {
   def importBasicControl() {
     val T = tpePar("T")
     val CT = tpePar("CT", stage=compile)
-    val Prim = grp("DHDLPrim")
+    val Ctrl = grp("BasicCtrl")
     val Bit = lookupTpe("Bit")
 
-    val mux = direct (Prim) ("mux", T, (("sel", Bit), ("a",T), ("b",T)) :: T, TNum(T))
+    val mux = direct (Ctrl) ("mux", T, (("sel", Bit), ("a",T), ("b",T)) :: T, TNum(T))
 
-    direct (Prim) ("mux", (T,CT), (("sel", Bit), ("a", T), ("b", CT)) :: T, (TNum(T), TNumeric(CT))) implements composite ${
+    direct (Ctrl) ("mux", (T,CT), (("sel", Bit), ("a", T), ("b", CT)) :: T, (TNum(T), TNumeric(CT))) implements composite ${
       mux($sel, $a, lift_to[CT,T]($b))
     }
-    direct (Prim) ("mux", (T,CT), (("sel", Bit), ("a", CT), ("b", T)) :: T, (TNum(T), TNumeric(CT))) implements composite ${
+    direct (Ctrl) ("mux", (T,CT), (("sel", Bit), ("a", CT), ("b", T)) :: T, (TNum(T), TNumeric(CT))) implements composite ${
       mux($sel, lift_to[CT,T]($a), $b)
     }
 
-    direct (Prim) ("min", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].lt($a, $b), a, b) }
-    direct (Prim) ("max", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].gt($a, $b), a, b) }
+    direct (Ctrl) ("min", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].lt($a, $b), a, b) }
+    direct (Ctrl) ("max", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].gt($a, $b), a, b) }
 
     // --- Scala Backend
     impl (mux) (codegen($cala, ${ if ($sel) $a else $b }))
@@ -552,9 +551,9 @@ trait DHDLMath {
     // --- Dot Backend
     impl (mux) (codegen(dot, ${ 
 			$sym [label="mux", shape="diamond" style="filled" fillcolor="white"] 
-			$sel -> $sym [ xlabel="sel" ]
-			$a -> $sym [ xlabel="a" ]
-			$b -> $sym [ xlabel="b" ]
+			$sel -> $sym [ headlabel="sel" ]
+			$a -> $sym [ headlabel="a" ]
+			$b -> $sym [ headlabel="b" ]
 		}))
 
     // --- MaxJ Backend

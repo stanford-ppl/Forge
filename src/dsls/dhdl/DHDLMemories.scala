@@ -45,10 +45,10 @@ trait DHDLMemories {
     val Indices = lookupTpe("Indices")
 
     // --- Nodes
-    val reg_new   = direct (Reg) ("reg_new", T, ("init", T) :: Reg(T), effect = mutable)
-    val reg_read  = direct (Reg) ("reg_read", T, ("reg", Reg(T)) :: T, aliasHint = aliases(Nil))  // aliasHint - extracted value doesn't change when reg is updated
-    val reg_write = direct (Reg) ("reg_write", T, (("reg", Reg(T)), ("value", T)) :: MUnit, effect = write(0))
-    val reg_reset = direct (Reg) ("reg_reset", T, ("reg", Reg(T)) :: MUnit, effect = write(0))
+    val reg_new   = internal (Reg) ("reg_new", T, ("init", T) :: Reg(T), effect = mutable)
+    val reg_read  = internal (Reg) ("reg_read", T, ("reg", Reg(T)) :: T, aliasHint = aliases(Nil), effect = simple)
+    val reg_write = internal (Reg) ("reg_write", T, (("reg", Reg(T)), ("value", T)) :: MUnit, effect = write(0))
+    val reg_reset = internal (Reg) ("reg_reset", T, ("reg", Reg(T)) :: MUnit, effect = write(0))
 
     // --- Internals
     internal (Reg) ("reg_create", T, (SOption(SString), T, RegTpe) :: Reg(T), effect = mutable) implements composite ${
@@ -60,10 +60,13 @@ trait DHDLMemories {
       reg
     }
 
+    direct (Reg) ("readReg", T, ("reg", Reg(T)) :: T) implements composite ${ reg_read($0) }
+    direct (Reg) ("writeReg", T, (("reg", Reg(T)), ("value", T)) :: MUnit, effect = write(0)) implements composite ${ reg_write($0, $1) }
+
     val Mem = lookupTpeClass("Mem").get
     val RegMem = tpeClassInst("RegMem", T, TMem(T, Reg(T)))
-    infix (RegMem) ("ld", T, (Reg(T), Indices) :: T) implements composite ${ reg_read($0) } // Ignore address
-    infix (RegMem) ("st", T, (Reg(T), Indices, T) :: MUnit, effect = write(0)) implements composite ${ reg_write($0, $2) }
+    infix (RegMem) ("ld", T, (Reg(T), Indices) :: T) implements composite ${ readReg($0) } // Ignore address
+    infix (RegMem) ("st", T, (Reg(T), Indices, T) :: MUnit, effect = write(0)) implements composite ${ writeReg($0, $2) }
 
     // --- API
     /* Reg */
@@ -90,7 +93,7 @@ trait DHDLMemories {
 
     val Reg_API = withTpe(Reg)
     Reg_API {
-      infix ("value") (Nil :: T) implements composite ${ reg_read($self) }
+      infix ("value") (Nil :: T) implements redirect ${ readReg($self) }
       infix (":=") (T :: MUnit, effect = write(0)) implements composite ${
         if (regType($self) == ArgumentIn) stageError("Writing to an input argument is disallowed")
         reg_write($self, $1)
@@ -99,9 +102,9 @@ trait DHDLMemories {
     }
 
     // TODO: Should warn/error if not an ArgIn?
-    fimplicit (Reg) ("regFix_to_fix", (S,I,F), Reg(FixPt(S,I,F)) :: FixPt(S,I,F)) implements composite ${ reg_read($0) }
-    fimplicit (Reg) ("regFlt_to_flt", (G,E), Reg(FltPt(G,E)) :: FltPt(G,E)) implements composite ${ reg_read($0) }
-    fimplicit (Reg) ("regBit_to_bit", Nil, Reg(Bit) :: Bit) implements composite ${ reg_read($0) }
+    fimplicit (Reg) ("regFix_to_fix", (S,I,F), Reg(FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ readReg($0) }
+    fimplicit (Reg) ("regFlt_to_flt", (G,E), Reg(FltPt(G,E)) :: FltPt(G,E)) implements redirect ${ readReg($0) }
+    fimplicit (Reg) ("regBit_to_bit", Nil, Reg(Bit) :: Bit) implements redirect ${ readReg($0) }
 
     // --- Scala Backend
     impl (reg_new)   (codegen($cala, ${ Array($init) }))
@@ -118,20 +121,19 @@ trait DHDLMemories {
 				@ case Regular =>
 					@ if (isDblBuf(sym)) {
 							$sym [margin=0, rankdir="LR", label="{<st> \$sym | <ld>}" shape="record"
-										color=$dblbufBorderColor style="filled" fillcolor=$regColor ]
+										color=$dblbufBorderColor style="filled" fillcolor=$regFillColor ]
 					@ } else {
-							$sym [label= "\$sym" shape="square" color=$regColor style="filled"
-									 fillcolor=$regColor ]
+							$sym [label= "\$sym" shape="square" style="filled" fillcolor=$regFillColor ]
 					@ }
 				@ case ArgumentIn =>
 					@ val sn = "ArgIn" + quote(sym).substring(quote(sym).indexOf("_"))
         	@ alwaysGen {
-            $sym [label=$sn shape="Msquare" style="filled" fillcolor=$regColor ]
+            $sym [label=$sn shape="Msquare" style="filled" fillcolor=$regFillColor ]
 				  @ }
         @ case ArgumentOut =>
 					@ val sn = "ArgOut" + quote(sym).substring(quote(sym).indexOf("_"))
         	@ alwaysGen {
-            $sym [label=$sn shape="Msquare" style="filled" fillcolor=$regColor ]
+            $sym [label=$sn shape="Msquare" style="filled" fillcolor=$regFillColor ]
 			    @ }
       @ }
 		}))
@@ -149,12 +151,8 @@ trait DHDLMemories {
 			@ val ts = tpstr[T](par(sym))
 			@ regType(sym) match {
 				@ case Regular =>
-					/*
-          val parent = if (!n.hasParent()) "top" else s"${quote(n.getParent())}"
-					*/
-          //@ val wen = s"${quote(parent)}_en"
-          //@ val rst = s"${quote(parent)}_rst_en"
-          //@ val din = n.input
+          @ val parent = if (parentOf(sym).isEmpty) "top" else quote(parentOf(sym).get)
+          @ val wen = quote(parent) + "_en"
 					@ if (isDblBuf(sym)) {
 					@		val symlib = quote(sym) + "_lib"
 					@		val p = par(sym)
@@ -165,48 +163,65 @@ trait DHDLMemories {
           @    } else {
 					@			val symlibread = symlib + ".read();" 
               	DFEVar $sym = $symlibread
-          @  }
-          //@  emit(s"""${quote(sym)}_lib.write($din, ${quote(sym.getWriter())}_done);""")
-          //@  emit(s"""${quote(sym)}_lib.connectWdone(${quote(n.getWriter())}_done);""")
-          //@  n.getReaders().map { r =>
-          //@    emit(s"""${quote(n)}_lib.connectRdone(${quote(r)}_done);""")
-          //@  }
+          @  	}
+          @  	emit(quote(sym) + "_lib.connectWdone(" + quote(writerOf(sym)) + "_done);")
+          @  	readersOf(sym).map { r =>
+          @  	  emit(quote(sym) +"_lib.connectRdone(" + quote(r) + "_done);")
+          @  	}
           @ } else {
 					@		val pre = maxJPre(sym)
 					@ 	val tsinst = ts + ".newInstance(this);"
           		$pre $sym = $tsinst
-          //@  if (!n.input.hasParent) {
-          //@    throw new Exception(s"""Reg ${quote(n)}'s input ${n.input} does not have a parent. How is that possible?""")
-          //@  }
-
-          //@  val enSignalStr = sym.producer match {
-          //@    case p@Pipe(ctr,_,_) =>
-          //@      s"${quote(ctr)}_en_from_pipesm"
-          //@    case _ =>
-          //@      s"${quote(sym.producer)}_en"
-          //@  }
-          //@  emit(s"""DFEVar ${quote(sym.input)}_real = $enSignalStr ? ${quote(sym.input)} : ${quote(sym)}; // enable""")
-          //@  emit(s"""DFEVar ${quote(sym)}_hold = Reductions.streamHold(${quote(sym.input)}_real, ($rst | ${quote(sym.producer)}_redLoop_done));""")
-          //@  emit(s"""${quote(sym)} <== $rst ? constant.var(${tpstr(init)},0) : stream.offset(${quote(sym)}_hold, -${quote(sym.producer)}_offset); // reset""")
-          @ }
+					//TODO: uncomment after analysis pass
+          //@  if (writerOf(sym).isEmpty) {
+          //@    throw new Exception("Reg " + quote(sym) + " is not written by a controller, which is not supported at the moment")
+					//TODO: move codegen of reg to extern? Don't have view of Pipe_foreach and Pipe_reduce
+					//here
+          //@ 	 val enSignalStr = writerOf(sym).get match {
+          //@ 	   case p@Def(Pipe_foreach(cchain,_,_)) => styleOf(sym.asInstanceOf[Pipeline]) match {
+					//@				case Fine =>
+          //@ 	     emit(quote(cchain) + "_en_from_pipesm")
+					//@				case _ =>
+          //@ 	     emit(quote(writerOf(sym).get) + "_en")
+					//@			}
+          //@ 	   case p@Def(Pipe_reduce(cchain, _, _, _, _, _, _, _, _, _)) =>
+          //@ 	     emit(quote(cchain) + "_en_from_pipesm")
+					//@			 case _ =>
+					//@		}
+          //@ }
+					//TODO: don't have input here
+					@ }
 				@ case ArgumentIn =>  // alwaysGen
 					@ val sn = "ArgIn" + quote(sym).substring(quote(sym).indexOf("_"))
-          DFEVar $sn = io.scalarInput($sn, $ts);
+          DFEVar $sn = io.scalarInput($sn , $ts );
 				@ case ArgumentOut => // alwaysGen
 					@ val sn = "ArgOut" + quote(sym).substring(quote(sym).indexOf("_"))
 			@ }
 		}))
     impl (reg_read)  (codegen(maxj, ${
+			@		val pre = maxJPre(sym)
+			$pre $sym = $reg 
+      @ val parent = if (parentOf(sym).isEmpty) "top" else quote(parentOf(sym).get)
+      @ val rst = quote(parent) + "_rst_en"
+      //@  emit(s"""DFEVar ${quote(sym.input)}_real = $enSignalStr ? ${quote(sym.input)} : ${quote(sym)}; // enable""")
+      //@  emit(s"""DFEVar ${quote(sym)}_hold = Reductions.streamHold(${quote(sym.input)}_real, ($rst | ${quote(sym.producer)}_redLoop_done));""")
+      //@  emit(s"""${quote(sym)} <== $rst ? constant.var(${tpstr(init)},0) : stream.offset(${quote(sym)}_hold, -${quote(sym.producer)}_offset); // reset""")
 		}))
     impl (reg_write) (codegen(maxj, ${
+			@ if (isDblBuf(sym)) {
+     	@ 	emit(quote(sym) + "_lib.write(" + value + ", " + quote(writerOf(sym)) + "_done);")
+      @ } else {
+			@ }
+
+			//TODO: need to redesign the naming convention here. Input now is only a wire, which can't
+			//distinguish whether it's from reg or not
       //@ val valueStr = if (value.isInstanceOf[Reg]) {
       //@   s"${value}_hold"
       //@ } else {
       //@   s"$value"
       //@ }
 			@ val valueStr = "value"
-      //@ val controlStr = if (!n.hasParent()) s"top_done" else s"${quote(n.getParent())}_done"
-			@ val controlStr = "top_done"
+      @ val controlStr = if (parentOf(sym).isEmpty) s"top_done" else quote(parentOf(sym).get) + "_done"
 			@ val ts = tpstr[T](par(sym))
       io.scalarOutput($sym, $valueStr, $ts, $controlStr);
 		}))
@@ -222,7 +237,7 @@ trait DHDLMemories {
     val T = tpePar("T")
     val BRAM    = lookupTpe("BRAM")
     val Tile    = lookupTpe("Tile")
-    val Idx     = lookupAlias("SInt")
+    val Idx     = lookupAlias("Index")
     val Indices = lookupTpe("Indices")
 
     // --- Nodes
@@ -290,20 +305,20 @@ trait DHDLMemories {
 			@ val sn = "BRAM" + quote(sym).substring(quote(sym).indexOf("_"))
       @ if (isDblBuf(sym)) {
       	$sym [margin=0 rankdir="LR" label="{<st> $sn | <ld> }" shape="record"
-							color=$dblbufBorderColor  style="filled" fillcolor=$memColor ]
+							color=$dblbufBorderColor  style="filled" fillcolor=$bramFillColor ]
       @ } else {
-        	$sym [label="$sn " shape="square" style="filled" fillcolor=$memColor ]
+        	$sym [label="$sn " shape="square" style="filled" fillcolor=$bramFillColor ]
       @ }
-		})) // $t[T] refers to concrete type in IR
+		}))
 		impl (bram_load)  (codegen(dot, ${
-			$addr -> $bram [ xlabel="addr" ]
+			$addr -> $bram [ headlabel="addr" ]
 			//$sym [style="invisible" height=0 size=0 margin=0 label=""]
 			//$sym [label=$sym fillcolor="lightgray" style="filled"]
 			@ emitAlias(sym, bram)
 		}))
 		impl (bram_store) (codegen(dot, ${
-			$addr -> $bram [ xlabel="addr" ]
-			$value -> $bram [ xlabel="data" ]
+			$addr -> $bram [ headlabel="addr" ]
+			$value -> $bram [ headlabel="data" ]
 		}))
     impl (bram_reset) (codegen(dot, ${ }))
 
@@ -317,36 +332,39 @@ trait DHDLMemories {
 				@ val bks = banks(sym)
         BramLib $sym = new BramLib(this, $size, $ts, $bks , 1 );
       @ }
-		})) // $t[T] refers to concrete type in IR
+		}))
 		impl (bram_load)  (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
 			@ val ts = tpstr[T](par(sym)) + ".newInstance(this);"
 			$pre $sym = $ts
 		}))
 		impl (bram_store) (codegen(maxj, ${
+			//TODO: redesign naming for reg to remove this
       //val dataStr = if (data.isInstanceOf[Reg]) {
       //  val regData = data.asInstanceOf[Reg]
       //  s"${data}_hold"
       //} else {
       //  s"$data"
       //}
-      //  if (mem.isAccum) {
-      //    val offsetStr = s"${data.getParent()}_offset"
-      //    val parentPipe = n.getParent().asInstanceOf[Pipe]
+			@ val dataStr = quote(value)
+      @ if (isAccum(bram)) {
+      @   val offsetStr = quote(writerOf(bram).get) + "_offset"
+      @   val parentPipe = parentOf(bram).get.asInstanceOf[Pipeline]
+			//TODO: same problem here. Don't have scope for Pipe_foreach and Pipe_reduce
       //    val parentCtr = parentPipe.ctr
-      //    if (mem.isDblBuf) {
+      @     if (isDblBuf(bram)) {
       //      fp(s"""$mem.connectWport(stream.offset(${quote(addr)}, -$offsetStr), stream.offset($dataStr, -$offsetStr), ${quote(parentCtr)}_en_from_pipesm, $start, $stride);""")
-      //    } else {
+      @     } else {
       //      fp(s"""$mem.connectWport(stream.offset($addr, -$offsetStr), stream.offset($dataStr, -$offsetStr), ${quote(parentCtr)}_en_from_pipesm, $start, $stride);""")
-      //    }
-      //  } else {
-      //    if (mem.isDblBuf) {
-      //      fp(s"""// mem writer: ${mem.getWriter()} """)
-      //      fp(s"""$mem.connectWport(${quote(addr)}, $dataStr, ${quote(n.getParent())}_en, ${n.start}, ${n.stride});""")
-      //    } else {
-      //      fp(s"""$mem.connectWport($addr, $dataStr, ${quote(n.getParent())}_en, ${n.start}, ${n.stride});""")
-      //    }
-      //  }
+      @     }
+      @   } else {
+      @     if (isDblBuf(bram)) {
+      //@       emit(quote(bram) + ".connectWport(" + quote(addr) + ", " + dataStr + ", " + quote(parentOf(bram).get) + "_en, " + n.start + ", " + n.stride + ";")
+      @     } else {
+							//TODO:Yaqi: what's the difference between two cases?
+      @       //emit(s"""$mem.connectWport($addr, $dataStr, ${quote(n.getParent())}_en, ${n.start}, ${n.stride});""")
+      @     }
+      @   }
 		}))
     impl (bram_reset) (codegen(maxj, ${ }))
 
@@ -360,7 +378,7 @@ trait DHDLMemories {
     val Tile    = lookupTpe("Tile")
     val BRAM    = lookupTpe("BRAM")
     val Range   = lookupTpe("Range")
-    val Idx     = lookupAlias("SInt")
+    val Idx     = lookupAlias("Index")
 
     // --- Nodes
     val offchip_new = internal (OffChip) ("offchip_new", T, ("size", Idx) :: OffChip(T), effect = mutable)
@@ -407,9 +425,15 @@ trait DHDLMemories {
 		// --- Dot Backend
 		impl (offchip_new) (codegen(dot, ${
 			@ alwaysGen {
-        $sym [ label="\$sym" shape="square" fontcolor="white" color="white" style="filled"
-			  fillcolor=$offChipColor ]
-			  $size -> $sym [ xlabel="size" ]
+				@ var label = "\\"" + quote(sym)
+				@ if (quote(size).forall(_.isDigit)) {
+					@ 	label += ", size=" + quote(size)
+				@ } else {
+			  	$size -> $sym [ headlabel="size" ]
+				@ }
+				@ label += "\\""
+        $sym [ label=$label shape="square" fontcolor="white" color="white" style="filled"
+			  fillcolor=$dramFillColor color=black]
       @ }
 		}))
 
@@ -454,7 +478,7 @@ trait DHDLMemories {
       val strides = dimsToStrides(memDims)
       val nonUnitStrides = strides.zip(unitDims).filterNot(_._2).map(_._1)
 
-      val ctrs = tileDims.map{d => Counter(d) }
+      val ctrs = tileDims.map{d => Counter(max = d.as[Index]) }
       val chain = CounterChain(ctrs:_*)
       tile_transfer(mem, $local, nonUnitStrides, ofs, tileDims, chain, $store)
     }

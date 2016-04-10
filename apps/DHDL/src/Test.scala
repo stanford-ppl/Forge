@@ -6,10 +6,8 @@ object TestCompiler extends DHDLApplicationCompiler with Test
 object TestInterpreter extends DHDLApplicationInterpreter with Test
 trait Test extends DHDLApplication {
 
-  lazy val x = ArgIn[SInt]("x")
-
   def main() {
-    /*type Q16 = FixPt[Signed, B16, B16]
+    type Q16 = FixPt[Signed, B16, B16]
 
     val v1    = OffChipMem[Q16]("v1", 10)
     val outer = ArgOut[Q16]
@@ -29,20 +27,7 @@ trait Test extends DHDLApplication {
       }{_+_}
     }
 
-    println("vec1: " + vec1.mkString(", "))
-
     val gold = vec1.map{_**2}.reduce{_+_}
-
-    println("outer: " + getArg(outer).mkString + " (should be " + gold.mkString + ")")*/
-
-    val N = 8
-    setArg(x, N)
-
-    val k = Array.fill(32)(0.as[Flt])
-    if (k.length > 30) println("hi")
-
-    Accel {
-      val b1 = BRAM[Flt]("b1", 10)
-    }
+    println("outer: " + getArg(outer).mkString + " (should be " + gold.mkString + ")")
   }
 }

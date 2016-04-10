@@ -26,24 +26,62 @@ trait DHDLIndices
 trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp {
   this: DHDLExp =>
 
+  /*def extractNumericConstant[T:Manifest](x: T): Option[Double] = {
+    val mD = manifest[Double]
+    val mF = manifest[Float]
+    val mI = manifest[Int]
+    val mL = manifest[Long]
+
+    manifest[T] match {
+      case `mI` => Some(x.asInstanceOf[Int].toDouble)
+      case `mL` => Some(x.asInstanceOf[Long].toDouble)
+      case `mF` => Some(x.asInstanceOf[Float].toDouble)
+      case `mD` => Some(x.asInstanceOf[Double])
+      case _ => None
+    }
+  }
+
+  override def boundsOf(x: Rep[Any])(implicit ctx: SourceContext): Option[Double] = x match {
+    case Param(c) => extractNumericConstant(c)(mtype(x.tp))
+    case Const(c) => extractNumericConstant(c)(mtype(x.tp))
+    case _ => super.boundsOf(x)
+  }*/
+
   def isFixPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FixedPoint[_,_,_]])
   def isFltPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FloatPoint[_,_]])
   def isBitType[T:Manifest]   = isSubtype(manifest[T].runtimeClass, classOf[DHDLBit])
+  def isPipeline[T:Manifest]  = isSubtype(manifest[T].runtimeClass, classOf[DHDLPipeline])
+  def isRegister[T:Manifest]  = isSubtype(manifest[T].runtimeClass, classOf[Register[_]])
 
   // Shorthand versions for matching on ConstFixPt and ConstFltPt without the manifests
   object ConstFix {
     def unapply(x: Any): Option[Any] = x match {
       case ConstFixPt(x,_,_,_) => Some(x)
+      case Def(ConstFixPt(x,_,_,_)) => Some(x)
       case _ => None
     }
   }
   object ConstFlt {
     def unapply(x: Any): Option[Any] = x match {
       case ConstFltPt(x,_,_) => Some(x)
+      case Def(ConstFltPt(x,_,_)) => Some(x)
       case _ => None
     }
   }
 
+  override def nbits[T:Manifest]: Int = manifest[T] match {
+    case StructType(_,fields) => fields.map(f => nbits(f._2)).fold(0){_+_}
+    case _ => super.nbits[T]
+  }
+
+  def nbits(e: Exp[Any]): Int = nbits(e.tp)
+  def sign(e: Exp[Any]): Boolean = sign(e.tp)
+
+  def isBits[T:Manifest]: Boolean = manifest[T] match {
+    case t if isFltPtType(t) || isFixPtType(t) || isBitType(t) => true
+    case StructType(_,fields) => fields.map(f => isBits(f._2)).fold(true){_&&_}
+    case _ => false
+  }
 }
 
 trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
@@ -70,8 +108,8 @@ trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
   // TODO: Should be refined manifest? But how to know how many fields to fill in?
   def indicesManifest: Manifest[Indices] = manifest[DHDLIndices]
 
-  def fixManifest[S:Manifest,I:Manifest,F:Manifest] = manifest[FixedPoint[S,I,F]]
-  def fltManifest[G:Manifest,E:Manifest] = manifest[FloatPoint[G,E]]
+  def fixManifest[S:Manifest,I:Manifest,F:Manifest]: Manifest[FixPt[S,I,F]] = manifest[FixedPoint[S,I,F]]
+  def fltManifest[G:Manifest,E:Manifest]: Manifest[FltPt[G,E]] = manifest[FloatPoint[G,E]]
   def bitManifest: Manifest[Bit] = manifest[DHDLBit]
 }
 
@@ -137,8 +175,8 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
 }
 
 // Defines type remappings required in Scala gen (should be same as in library)
-trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenPipeTemplateOps {
-  val IR: PipeTemplateOpsExp with DHDLIdentifiers
+trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTemplateOps {
+  val IR: ControllerTemplateOpsExp with DHDLIdentifiers
   import IR._
 
   override def emitDataStructures(path: String) {
@@ -327,7 +365,7 @@ class FixedPoint[S:Manifest,I:Manifest,F:Manifest](private val v: BigInt) {
   override def toString() = {
     if (rep.f > 0) {
       val vv = v.abs
-      (vv >> rep.f).toString + "." + (BigDecimal(vv & ((BigInt(1) << rep.f) - 1)) / BigDecimal(BigInt(1) << rep.f)).toString.split('.').last
+      val str = (vv >> rep.f).toString + "." + (BigDecimal(vv & ((BigInt(1) << rep.f) - 1)) / BigDecimal(BigInt(1) << rep.f)).toString.split('.').last
       if (v < 0) "-"+str else str
     }
     else v.toString()
@@ -426,10 +464,9 @@ object FloatPoint {
 """
 }
 
-//trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps{
-trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps {
-  val IR: PipeTemplateOpsExp with OffChipMemOpsExp  with DHDLCodegenOps with RegOpsExp  
- 	import IR._
+trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplateOps{
+	  val IR: ControllerTemplateOpsExp with OffChipMemOpsExp with DHDLCodegenOps with RegOpsExp with DHDLIdentifiers
+		  import IR._
 
 	var emittedSize = Set.empty[Exp[Any]]
   override def initializeGenerator(buildDir:String): Unit = {
@@ -446,26 +483,36 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps {
 			emit(s"""style="rounded, filled"""")
 			emit(s"""fillcolor=$tileTransFillColor""")
 			emit(s"""color="black"""")
-			emit(s"""${quote(sym)} [label="${if (store) "TileSt" else "TileLd"}" style="rounded, filled" color="black" fillcolor="gray"]""")
+			var nl = if (store) "TileSt" else "TileLd"
+			nl += "|stride=\\{"
+			strides.zipWithIndex.foreach{ case (s, i) =>
+				if (quote(s).forall(_.isDigit)) {
+					nl += s"$i:${quote(s)}"
+					if (i!=strides.length-1) nl += ", "
+				} else {
+					emitEdge(s, sym, s"stride $i")
+				}
+			}
+			nl += "\\}"
+			if (quote(memOfs).forall(_.isDigit))
+				nl += s"|memOfs=${quote(memOfs)}"
+			else
+				emitEdge(memOfs, sym, "memOfs")
+			emit(s"""${quote(sym)} [label="$nl" shape="record" style="rounded, filled" color="black" fillcolor="gray"]""")
 			emitCtrChain(cchain)
 			emit(s"""} """)
-			if (store)
+			if (store) {
 				emitEdge(sym, mem)
-			else
-				emitEdge(mem, sym)
-			if (store)
 				emitEdge(local, sym)
-			else
+			} else {
+				emitEdge(mem, sym)
 				emitEdge(sym, local)
-			strides.foreach{ s =>
-				emitEdge(s, sym, "stride")
 			}
-			emitEdge(memOfs, sym)
 
 		case Offchip_new(size) =>
 			/* Special case to hand nodes producing size of offchip outside hardware scope */
 			def hackGen(x: Exp[Any]): Unit = x match { 
-				case Def(EatReflect(_:Reg_Reg_new[_])) => // Nothing
+				case Def(EatReflect(_:Reg_new[_])) => // Nothing
 				case ConstFix(_) => // Nothing
 				case ConstFlt(_) => // Nothing
 				case Def(d) => 
@@ -489,7 +536,7 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenPipeTemplateOps {
 }
 
 trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
-  val IR: PipeTemplateOpsExp with DHDLIdentifiers
+  val IR: ControllerTemplateOpsExp with DHDLIdentifiers
   import IR._
 
   // Note that tileDims are not fixed point values yet - they're just integers

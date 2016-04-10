@@ -20,6 +20,8 @@ trait TypeInspectionCompilerOps extends TypeInspectionOps with MemoryTemplateCom
   }
 
   def sign[T:Manifest]: Boolean = manifest[T] match {
+    case mA if isFixPtType(mA) => sign(mA.typeArguments(0))
+    case mA if isFltPtType(mA) => true
     case mA if mA == manifest[Signed] => true
     case mA if mA == manifest[Unsign] => false
     case mA => throw new Exception("Unknown type in signed test: " + mA.runtimeClass.getSimpleName)
@@ -28,6 +30,7 @@ trait TypeInspectionCompilerOps extends TypeInspectionOps with MemoryTemplateCom
     case mA if isFixPtType(mA) => nbits(mA.typeArguments(1)) + nbits(mA.typeArguments(2))
     case mA if isFltPtType(mA) => nbits(mA.typeArguments(0)) + nbits(mA.typeArguments(1))
     case mA if isBitType(mA) => 1
+    case mA if isRegister(mA) => nbits(mA.typeArguments(0))
     case BXX(bits) => bits
     case mA => throw new Exception("Unknown type in nbits: " + mA.runtimeClass.getSimpleName)
   }
@@ -35,6 +38,7 @@ trait TypeInspectionCompilerOps extends TypeInspectionOps with MemoryTemplateCom
   def isFixPtType[T:Manifest]: Boolean
   def isFltPtType[T:Manifest]: Boolean
   def isBitType[T:Manifest]: Boolean
+  def isRegister[T:Manifest]: Boolean
 }
 
 

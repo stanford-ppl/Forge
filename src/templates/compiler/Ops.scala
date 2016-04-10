@@ -771,6 +771,22 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println("  }).asInstanceOf[Exp[A]]")
   }
 
+  def emitPropagationRules(ops: List[Rep[DSLOp]], stream: PrintWriter) {
+    val rules = ops.flatMap{op => PropagationRules.get(op).map((op,_)) }
+    if (!rules.isEmpty) {
+      emitBlockComment("Metadata propagation rules", stream)
+      stream.println("  override def propagate(lhs: Exp[Any], rhs: Def[Any]) = rhs match {")
+      for ((op,rule) <- rules) {
+        if (!hasIRNode(op) || hasMultipleIRNodes(op)) {
+            err("Cannot create propagation rule for op " + op.name + ": Op must be represented by exactly one IR node")
+        }
+        emitTraversalRules(op, rule, stream, 4)
+      }
+      stream.println("    case _ => super.propagate(lhs,rhs)")
+      stream.println("  }")
+    }
+  }
+
   /**
    * Emit Delite collection function definitions for parallel collections in the given op group
    */

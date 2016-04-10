@@ -34,15 +34,14 @@ trait ForgeTraversalOps extends Base {
   def schedule(traversal: Rep[DSLTraversal]): Rep[Unit] = forge_schedule(traversal)
 
   def rewrite(op: Rep[DSLOp]*): Rep[DSLPattern] = forge_rewrite(op)
+  def rewrite(grp: Rep[DSLGroup], name: String): Rep[DSLPattern] = forge_rewrite(lookupOp(grp, name))
+
   def lower(xf: Rep[DSLTransformer])(op: Rep[DSLOp]): Rep[DSLPattern] = forge_lower(xf, op)
   def analyze(az: Rep[DSLAnalyzer])(op: Rep[DSLOp]): Rep[DSLPattern] = forge_analyze(az, op)
 
   // TODO: API for this?
   def propagate(op: Rep[DSLOp]): Rep[DSLPattern] = forge_propagate(op)
-  def propagate(grp: Rep[DSLGroup], name: String): Rep[DSLPattern] = {
-    val op = lookupOp(grp, name)
-    forge_propagate(op)
-  }
+  def propagate(grp: Rep[DSLGroup], name: String): Rep[DSLPattern] = forge_propagate(lookupOp(grp, name))
 
   // --- Traversal rules
   // In analysis and traversal rules, the symbol representing the IR node can be referred to

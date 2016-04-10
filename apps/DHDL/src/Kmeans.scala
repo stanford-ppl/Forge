@@ -34,16 +34,18 @@ trait Kmeans extends DHDLApplication {
               val dist = Reg[Flt](0.0f)
               Pipe(dim by 1, dist){d => (pointsTile(pt, d) - oldCents(ct, d)) ** 2 }{_+_}
 
-              val closer = dist.value < minDist.value || minDist.value < 0f
-              minDist := mux(closer, dist.value, minDist.value)
-              minCent := mux(closer, ct, minCent.value)
+              Pipe {
+                val closer = dist.value < minDist.value || minDist.value < 0f
+                minDist := mux(closer, dist.value, minDist.value)
+                minCent := mux(closer, ct, minCent.value)
+              }
             }
             // Add point and increment point count
             Parallel {
               Pipe(dim by 1){d =>
                 newCents(minCent.value, d) = newCents(minCent.value, d) + pointsTile(pt, d)
               }
-              centCount(minCent.value) = centCount(minCent.value) + 1
+              Pipe{ centCount(minCent.value) = centCount(minCent.value) + 1 }
             }
           } // End of points in tile
         } // End of point tiles

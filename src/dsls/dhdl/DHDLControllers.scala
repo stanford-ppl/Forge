@@ -40,6 +40,7 @@ trait DHDLControllers {
       lenOf(chain) = $0.length
       chain
     }
+
   }
 
 
@@ -148,15 +149,12 @@ trait DHDLControllers {
     impl (pipe_parallel) (codegen (dot, ${
       subgraph cluster_$sym {
       	label = "parallel_\$sym"
-      	style = "filled"
-      	fillcolor = "$parallelFillColor "
-      	color = "$parallelBorderColor "
+      	style = "filled, bold"
+      	fillcolor = $parallelFillColor
+      	color = $parallelBorderColor
       	@ stream.println(emitBlock(func) + "")
 			}
 		}))
-
-    // --- MaxJ Backend
-    impl (pipe_parallel) (codegen (maxj, ${ }))
 
 	}
 

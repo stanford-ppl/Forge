@@ -26,7 +26,10 @@ trait LatencyModel {
     case _ => latencyOfNode(s, d)
   }
 
-  private def latencyOfNode(s: Exp[Any], d: Def[Any]): Long = d match {
+  private def latencyOfNode(s: Exp[Any], d: Def[Any]): Long = s match {
+    case Fixed(_) => 0
+    case Exact(_) => 0
+    case _ => d match {
     case ConstBit(_) => 0
     case ConstFix(_) => 0
     case ConstFlt(_) => 0
@@ -159,6 +162,6 @@ trait LatencyModel {
     case _ =>
       warn(s"Don't know latency of $d")
       (0)
-  }
+  }}
 }
 

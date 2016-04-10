@@ -54,6 +54,14 @@ trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp {
   def isRegister[T:Manifest]  = isSubtype(manifest[T].runtimeClass, classOf[Register[_]])
 
   // Shorthand versions for matching on ConstFixPt and ConstFltPt without the manifests
+  object ParamFix {
+    def unapply(x: Any): Option[Param[Any]] = x match {
+      case Def(EatReflect(Tpes_Int_to_fix(e: Param[_]))) => Some(e)
+      case EatReflect(Tpes_Int_to_fix(e: Param[_])) => Some(e)
+      case _ => None
+    }
+  }
+
   object ConstFix {
     def unapply(x: Any): Option[Any] = x match {
       case ConstFixPt(x,_,_,_) => Some(x)
@@ -143,7 +151,7 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
   override def bram_create[T:Manifest](__arg0: Option[String],__arg1: List[Rep[FixPt[Signed,B32,B0]]])(implicit __pos: SourceContext,__imp0: Num[T]) = {
     __arg1.foreach{
       case ConstFix(_) =>
-      case Def(EatReflect(Tpes_Int_to_fix(e: ConstExp[_]))) =>
+      case ParamFix(_) =>
       case _ => stageError("Only constants and DSE parameters are allowed as dimensions of BRAM")(__pos)
     }
     super.bram_create[T](__arg0,__arg1)(implicitly[Manifest[T]],__pos,__imp0)
@@ -468,38 +476,72 @@ object FloatPoint {
 """
 }
 
-trait DotGenMemoryTemplateOps extends DotGenEffect {
-  val IR: ControllerTemplateOpsExp with DHDLIdentifiers
-  import IR._
+trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplateOps{
+	  val IR: ControllerTemplateOpsExp with OffChipMemOpsExp with DHDLCodegenOps with RegOpsExp with DHDLIdentifiers
+		  import IR._
 
-	//TODO: use this function from DotGenPipeTemplateOps
-	def emitNestedIdx1(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
-    case Def(EatReflect(Counterchain_new(counters, nIters))) =>
-	     inds.zipWithIndex.foreach {case (iter, idx) => emitAlias(iter, counters(idx)) }
+	var emittedSize = Set.empty[Exp[Any]]
+  override def initializeGenerator(buildDir:String): Unit = {
+		emittedSize = Set.empty[Exp[Any]]
+		super.initializeGenerator(buildDir)
 	}
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) => // Load
 			val l = s"Tile${if (store) "Store" else "Load"}_" + quote(sym).split("_")(1)
-      emit(s"""${quote(sym)} [ label=$l shape="rectangle" style="rounded, filled"
-				fillcolor="${tileTransFillColor}" color="black"]""")
-			if (store)
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+			emit(s"""label="$l"""")
+			emit(s"""shape="rectangle"""")
+			emit(s"""style="rounded, filled"""")
+			emit(s"""fillcolor=$tileTransFillColor""")
+			emit(s"""color="black"""")
+			var nl = if (store) "TileSt" else "TileLd"
+			nl += "|stride=\\{"
+			strides.zipWithIndex.foreach{ case (s, i) =>
+				if (quote(s).forall(_.isDigit)) {
+					nl += s"$i:${quote(s)}"
+					if (i!=strides.length-1) nl += ", "
+				} else {
+					emitEdge(s, sym, s"stride $i")
+				}
+			}
+			nl += "\\}"
+			if (quote(memOfs).forall(_.isDigit))
+				nl += s"|memOfs=${quote(memOfs)}"
+			else
+				emitEdge(memOfs, sym, "memOfs")
+			emit(s"""${quote(sym)} [label="$nl" shape="record" style="rounded, filled" color="black" fillcolor="gray"]""")
+			emitCtrChain(cchain)
+			emit(s"""} """)
+			if (store) {
 				emitEdge(sym, mem)
-			else
-				emitEdge(mem, sym)
-			if (store)
 				emitEdge(local, sym)
-			else
+			} else {
+				emitEdge(mem, sym)
 				emitEdge(sym, local)
-			//emit(s"""${quote(cchain)} -> ${quote(sym)}""")
-			emitNestedIdx1(cchain, iters)
-			strides.foreach{ s =>
-				emitEdge(s, sym, "stride")
 			}
-			emitEdge(memOfs, sym)
-			iters.foreach{it =>
-				emitEdge(it, sym)
+
+		case Offchip_new(size) =>
+			/* Special case to hand nodes producing size of offchip outside hardware scope */
+			def hackGen(x: Exp[Any]): Unit = x match {
+				case Def(EatReflect(_:Reg_new[_])) => // Nothing
+				case ConstFix(_) => // Nothing
+				case ConstFlt(_) => // Nothing
+				case Def(d) =>
+					alwaysGen {
+						emitNode(x.asInstanceOf[Sym[Any]], d)
+					}
+					syms(d).foreach{ s => s match {
+							case _ => hackGen(s)
+						}
+					}
+				case _ => // Nothing
 			}
+			if (!emittedSize.contains(size)) {
+				hackGen(size)
+				emittedSize = emittedSize + size
+			}
+			super.emitNode(sym, rhs)
 
     case _ => super.emitNode(sym, rhs)
   }

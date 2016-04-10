@@ -138,10 +138,22 @@ trait AreaModel {
   }
 
 
+  def areaOfCounterRegs(lhs: Exp[Any], cchain: Exp[CounterChain]): FPGAResources = {
+    if (isPipeline(lhs.tp) && styleOf(lhs) == Coarse) {
+      val N = nStages(lhs) - 1          // Number of stages needed for delay
+      val P = parOf(cchain).reduce(_+_) // Number of duplications per counter
+      FPGAResources(lut3=N*P*32, regs = 4*N*P*32) // TODO: Hardcoded 32 bit index sizes
+    }
+    else NoArea
+  }
+
   /**
    * Returns the area resources for the given node
    **/
-  private def areaOfNode(s: Exp[Any], d: Def[Any]): FPGAResources = d match {
+  private def areaOfNode(s: Exp[Any], d: Def[Any]): FPGAResources = s match {
+    case Fixed(_) => areaOfMemWord(nbits(s))
+    case Exact(_) => areaOfMemWord(nbits(s))
+    case _ => d match {
     case ConstBit(_) => FPGAResources(lut3=1,regs=1)
     case ConstFix(_) => areaOfMemWord(nbits(s))
     case ConstFlt(_) => areaOfMemWord(nbits(s))
@@ -279,9 +291,9 @@ trait AreaModel {
 
     case _:Pipe_parallel => FPGAResources(lut4=9*nStages(s)/2, regs = nStages(s) + 3)
 
-    case _:Pipe_foreach if styleOf(s) == Coarse => areaOfMetapipe(nStages(s))
-    case _:Pipe_reduce[_,_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s))
-    case _:Block_reduce[_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s))
+    case e:Pipe_foreach if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.cchain)
+    case e:Pipe_reduce[_,_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.cchain)
+    case e:Block_reduce[_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.ccOuter)
 
     case _:Pipe_foreach if styleOf(s) == Disabled => areaOfSequential(nStages(s))
     case _:Pipe_reduce[_,_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
@@ -303,5 +315,5 @@ trait AreaModel {
     case _ =>
       warn(s"Don't know area for $d")
       NoArea
-  }
+  }}
 }

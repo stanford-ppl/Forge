@@ -16,8 +16,6 @@ trait DHDLMetadata {
     val Tile      = lookupTpe("Tile")
     val Range     = lookupTpe("Range")
 
-    val CTuple3   = lookupTpe("CTuple3")
-
     /* Static length (for indices and counterchain) */
     val MDims = metadata("MLength", "len" -> SInt)
     val lenOps = metadata("lenOf")
@@ -52,13 +50,31 @@ trait DHDLMetadata {
       }
     }
 
-    /* Is Double Buffer */
+    /* Is Double Buffer: false if unset */
     val MDblBuf = metadata("MDblBuf", "isDblBuf" -> SBoolean)
     val dblBufOps = metadata("isDblBuf")
     onMeet (MDblBuf) ${ this }
     internal.static (dblBufOps) ("update", T, (T, SBoolean) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MDblBuf($1)) }
-    internal.static (dblBufOps) ("apply", T, T :: SBoolean) implements composite ${ meta[MDblBuf]($0).get.isDblBuf }
+    internal.static (dblBufOps) ("apply", T, T :: SBoolean) implements composite ${
+    	meta[MDblBuf]($0) match {
+    	  case Some(a) => a.isDblBuf
+    	  case None => false
+    	}
+		}
+
+    /* Is Accumulator: false if unset */
+    val MAccum = metadata("MAccum", "isAccum" -> SBoolean)
+    val accumOps = metadata("isAccum")
+    onMeet (MAccum) ${ this }
+    internal.static (accumOps) ("update", T, (T, SBoolean) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MAccum($1)) }
+    internal.static (accumOps) ("apply", T, T :: SBoolean) implements composite ${
+    	meta[MAccum]($0) match {
+    	  case Some(a) => a.isAccum
+    	  case None => false
+    	}
+		}
 
     /* Register Type  */
     val MRegTpe = metadata("MRegTpe", "regTpe" -> RegTpe)
@@ -77,7 +93,7 @@ trait DHDLMetadata {
     internal.static (regReset) ("apply", T, Reg(T) :: T) implements
       composite ${ meta[MRegInit]($0).get.value.asInstanceOf[Rep[T]] }
 
-    /* Parallelization Factor  */
+    /* Parallelization Factor: 0 if unset */
     val MPar = metadata("MPar", "par" -> SInt)
     val parOps = metadata("par")
     onMeet (MPar) ${ this }
@@ -90,7 +106,7 @@ trait DHDLMetadata {
       }
     }
 
-    /* Number of Banks  */
+    /* Number of Banks */
     val MBank = metadata("MBank", "nBanks" -> SInt)
     val bankOps = metadata("banks")
     //TODO:
@@ -159,30 +175,26 @@ trait DHDLMetadata {
     static (boundOps) ("update", Nil, (MAny, SOption(MBound)) :: MUnit, effect = simple) implements
       composite ${ $1.foreach{bnd => setMetadata($0, bnd) } }
 
-    static (boundOps) ("apply", Nil, MAny :: SOption(MBound)) implements composite ${ meta[MBound] }
+    static (boundOps) ("apply", Nil, MAny :: SOption(SDouble)) implements composite ${ meta[MBound]($0).map(_.bound) }
 
-    internal (boundOps) ("boundsOf", Nil, MAny :: SOption(MBound)) implements composite ${ meta[MBound]($0) }
+    internal (boundOps) ("boundOf", Nil, MAny :: SOption(MBound)) implements composite ${ meta[MBound]($0) }
 
     val boundUnapply = metadata("Bound")
     internal.static (boundUnapply) ("unapply", Nil, MAny :: SOption(SDouble)) implements composite ${
-      val bnd = boundsOf($0)
-      if (bnd.isDefined) Some(bnd.get.bound) else None
+      boundOf($0).map(_.bound)
     }
 
     internal (boundOps) ("exact", Nil, SDouble :: MBound) implements composite ${ MBound($0, true, false) }
     internal (boundOps) ("fixed", Nil, SDouble :: MBound) implements composite ${ MBound($0, true, true) }
 
     val exactUnapply = metadata("Exact")
-    internal.static (boundUnapply) ("unapply", Nil, MAny :: SOption(SDouble)) implements composite ${
-      val bnd = boundsOf($0)
-      if (bnd.isDefined && bnd.get.exact) Some(bnd.get.bound) else None
+    internal.static (exactUnapply) ("unapply", Nil, MAny :: SOption(SDouble)) implements composite ${
+      boundOf($0) match { case Some(MBound(bnd,true,_   )) => Some(bnd);  case _ => None }
     }
     val lockUnapply = metadata("Fixed")
     internal.static (lockUnapply) ("unapply", Nil, MAny :: SOption(SDouble)) implements composite ${
-      val bnd = boundsOf($0)
-      if (bnd.isDefined && bnd.get.locked) Some(bnd.get.bound) else None
+      boundOf($0) match { case Some(MBound(bnd,true,true)) => Some(bnd);  case _ => None }
     }
-
 
     internal (boundOps) ("extractNumericConstant", T, T :: SOption(SDouble)) implements composite ${
       val mD = manifest[Double]
@@ -198,13 +210,20 @@ trait DHDLMetadata {
         case _ => None
       }
     }
-    rewrite (boundOps, "boundsOf") using pattern(${p@Param(x)} -> ${
+    rewrite (boundOps, "boundOf") using pattern(${p@Param(x)} -> ${
       val c = extractNumericConstant(x)
-      if (p.finalized) fixed(c) else exact(c)
+      if (p.isFinal) fixed(c) else exact(c)
     })
-    rewrite (boundOps, "boundsOf") using pattern(${Const(x)} -> ${ fixed(extractNumericConstant(x)) })
+    rewrite (boundOps, "boundOf") using pattern(${Const(x)} -> ${ fixed(extractNumericConstant(x)) })
 
-    /* Parent of a node */
+
+    /* Parent of a node, which is a controller : None if unset */
+	 	// Parent controls the reset of the node
+	 	// TODO: confirm with Raghu
+		/* Reg: 1. reg.reset=(parent.reset its wen& parent.en) 2. reg.wen=din.parent.en */
+	 	/* Counter: parent is its counterchain */
+	 	/* Pipe/Metapipe/Sequential/Parallel: every node (includeing primitive nodes) inside the
+		 * controller has the controller as its parent*/ //TODO: is this necessary?
     val MParent = metadata("MParent", "parent" -> MAny)
     val parentOps = metadata("parentOf")
     onMeet (MParent) ${ this }
@@ -216,6 +235,51 @@ trait DHDLMetadata {
     	  case None => None
     	}
 		}
+
+    /* A list of ctrl nodes inside current ctrl nodes. Order matters for sequential */
+	 	//TODO: need to confirm with Raghu whether ctrl node includes counterchain. looks like it
+		// it doesn't
+		// It look like only sequential, metapipe, parallel, blockreduce? need to fill in this metadata
+    val MChildren = metadata("MChildren", "children" -> SList(MAny))
+    val childrenOps = metadata("childrenOf")
+    onMeet (MChildren) ${ this }
+    internal.static (childrenOps) ("update", T, (T, SList(MAny)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MChildren($1)) }
+    internal.static (childrenOps) ("apply", T, T :: SList(MAny)) implements composite ${
+    	meta[MChildren]($0) match {
+    	  case Some(p) => p.children
+    	  case None => Nil
+    	}
+		}
+
+		/* The controller that writes to the Mem.
+		 * Right now assume only one writer per double buffer */
+    val MWriter = metadata("MWriter", "writer" -> MAny)
+    val writerOps = metadata("writerOf")
+    onMeet (MWriter) ${ this }
+    internal.static (writerOps) ("update", T, (T, MAny) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MWriter($1)) }
+    internal.static (writerOps) ("apply", T, T :: SOption(MAny)) implements composite ${
+    	meta[MWriter]($0) match {
+    	  case Some(p) => Some(p.writer)
+    	  case None => None
+    	}
+		}
+
+		/* Controllers that read from a Double Buffer. The metadata is only used for double buffer.
+		*/
+    val MReaders = metadata("MReaders", "readers" -> SList(MAny))
+    val readersOps = metadata("readersOf")
+    onMeet (MReaders) ${ this }
+    internal.static (readersOps) ("update", T, (T, SList(MAny)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MReaders($1)) }
+    internal.static (readersOps) ("apply", T, T :: SList(MAny)) implements composite ${
+    	meta[MReaders]($0) match {
+    	  case Some(p) => p.readers
+    	  case None => Nil
+    	}
+		}
+
 
 		/* MaxJ Codegen Helper Functions */
     val maxjgrp = grp("maxjGrp")

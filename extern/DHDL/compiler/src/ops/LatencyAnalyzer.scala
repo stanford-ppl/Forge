@@ -88,7 +88,7 @@ trait ModelingTools extends Traversal with PipeStageTools {
   override def traverseStm(stm: Stm) = stm match {
     case TP(s, d) => traverseNode(s, d)
   }
-  def traverseNode(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext): Unit
+  def traverseNode(lhs: Exp[Any], rhs: Def[Any]): Unit
 
   // Reset state
   override def preprocess[A:Manifest](b: Block[A]) = {
@@ -122,7 +122,7 @@ trait LatencyAnalyzer extends ModelingTools {
     (cycles)
   }
 
-  def traverseNode(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext) {
+  def traverseNode(lhs: Exp[Any], rhs: Def[Any]) {
     val cycles = rhs match {
       case EatReflect(Hwblock(blk)) =>
         inHwScope = true

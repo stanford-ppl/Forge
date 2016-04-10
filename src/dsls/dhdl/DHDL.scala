@@ -112,9 +112,11 @@ trait DHDLDSL extends ForgeApplication
     val StageAnalyzer = analyzer("Stage", isExtern=true)
     val GlobalAnalyzer = analyzer("Global")
     val BoundAnalyzer = analyzer("Bound")
-    //  val DSE = analyzer("DSE", isExtern=true)
+    val DSE = traversal("DSE", isExtern=true)
     val AreaAnalyzer = analyzer("Area", isExtern=true)
     val LatencyAnalyzer = analyzer("Latency", isExtern=true)
+
+    val ConstantFolding = traversal("ConstantFolding", isExtern=true)
 
     importGlobalAnalysis()
     importBoundAnalysis()
@@ -123,9 +125,12 @@ trait DHDLDSL extends ForgeApplication
     schedule(StageAnalyzer)
     schedule(GlobalAnalyzer)
     schedule(BoundAnalyzer)
-    //  schedule(DSE)
-    schedule(AreaAnalyzer)
-    schedule(LatencyAnalyzer)
+    schedule(DSE)
+    //schedule(AreaAnalyzer)
+    //schedule(LatencyAnalyzer)
+
+    schedule(BoundAnalyzer)
+    schedule(ConstantFolding)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))

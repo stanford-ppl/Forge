@@ -71,7 +71,7 @@ trait AreaAnalyzer extends ModelingTools {
   }
 
   // TODO: loop index delay line in Metapipeline
-  def traverseNode(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext) {
+  def traverseNode(lhs: Exp[Any], rhs: Def[Any]) {
     val area = rhs match {
       case EatReflect(Hwblock(blk)) =>
         inHwScope = true

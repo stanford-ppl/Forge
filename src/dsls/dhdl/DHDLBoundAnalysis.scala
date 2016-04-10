@@ -19,12 +19,12 @@ trait DHDLBoundAnalysis {
       analyze(Lifts, "constFixPt") using rule ${ bound(lhs) = fixed(implicitly[Numeric[T]].toDouble($0)) }
       analyze(Lifts, "constFltPt") using rule ${ bound(lhs) = fixed(implicitly[Numeric[T]].toDouble($0)) }
 
-      analyze(Tpes, "int_to_fix") using rule ${ bound(lhs) = bound($0) }
+      analyze(Tpes, "int_to_fix") using rule ${ bound(lhs) = boundOf($0) }
 
       // TODO: These could actually be structs! Handle using normal propagation instead
-      analyze(Reg, "reg_new") using rule ${ bound(lhs) = bound($0) }
-      analyze(Reg, "reg_read") using rule ${ bound(lhs) = bound($0) }
-      analyze(Reg, "reg_write") using rule ${ bound($0) = bound($1) }
+      analyze(Reg, "reg_new") using rule ${ bound(lhs) = boundOf($0) }
+      analyze(Reg, "reg_read") using rule ${ bound(lhs) = boundOf($0) }
+      analyze(Reg, "reg_write") using rule ${ bound($0) = boundOf($1) }
 
       // TODO: assumes values are non-negative (i.e. max(x * y) could actually be min(x) * min(y) for neg. values )
       // Only for use with index calculation right now

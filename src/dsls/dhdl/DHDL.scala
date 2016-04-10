@@ -119,13 +119,13 @@ trait DHDLDSL extends ForgeApplication
     importGlobalAnalysis()
     importBoundAnalysis()
 
-    schedule(IRPrinterPlus)
-    schedule(StageAnalyzer)
-    schedule(GlobalAnalyzer)
-    schedule(BoundAnalyzer)
-    //  schedule(DSE)
-    schedule(AreaAnalyzer)
-    schedule(LatencyAnalyzer)
+    //schedule(IRPrinterPlus)
+    //schedule(StageAnalyzer)
+    //schedule(GlobalAnalyzer)
+    //schedule(BoundAnalyzer)
+    ////  schedule(DSE)
+    //schedule(AreaAnalyzer)
+    //schedule(LatencyAnalyzer)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))

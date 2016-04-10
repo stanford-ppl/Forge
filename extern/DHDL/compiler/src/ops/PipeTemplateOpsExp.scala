@@ -318,7 +318,6 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
     		emit(s""" label=${quote(sym)} """)
     		emit(s""" style="rounded, filled" """)
     		emit(s""" fillcolor=$counterColor""")
-				//emit(s""" ${quote(sym)} [label="" style="invisible" height=0 size=0 margin=0 ]""")
     		counters.foreach{ ctr =>
     		  emit(s"""   ${quote(ctr)}""")
     		}
@@ -436,7 +435,6 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
   }
 }
 
-GenericCodegen
 trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
   val IR: ControllerTemplateOpsExp with TpesOpsExp //with NosynthOpsExp
           with OffChipMemOpsExp with RegOpsExp with CounterOpsExp with MetaPipeOpsExp with
@@ -478,7 +476,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 					emitPipeForEachEpilog(sym, writesToAccumRam, cchain, inds(0))
 				case Disabled =>
 					val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain
-					emitSequential(sym, cchain, nIters)
+					emitSequential(sym, cchain, getBlockResult(nIters))
 			}
       emitBlock(func)             // Map function
 

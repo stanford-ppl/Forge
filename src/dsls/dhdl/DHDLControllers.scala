@@ -37,7 +37,7 @@ trait DHDLControllers {
 
     static (CounterChain) ("apply", Nil, varArgs(Counter) :: CounterChain) implements composite ${
       val chain = counterchain_new($0.toList) // Defined in extern
-      sizeOf(chain) = $0.length
+      lenOf(chain) = $0.length
       chain
     }
   }

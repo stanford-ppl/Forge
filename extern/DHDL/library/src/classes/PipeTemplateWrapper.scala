@@ -42,7 +42,7 @@ trait ControllerTemplateWrapper {
     def ldFunc(c: Rep[BRAM[T]], i: Rep[FixPt[Signed,B32,B0]]): Rep[T] = canBramMem[T].ld(c, i)
     def stFunc(c: Rep[BRAM[T]], i: Rep[FixPt[Signed,B32,B0]], x: Rep[T]) = canBramMem[T].st(c, i, x)
 
-    val ctrsRed = dimsOf(accum).map{dim => counter_counter_create(None, tpes_lift_to[Int,FixPt[Signed,B32,B0]](0), tpes_lift_to[Int,FixPt[Signed,B32,B0]](dim), tpes_lift_to[Int,FixPt[Signed,B32,B0]](1), 1) }
+    val ctrsRed = dimsOf(accum).map{dim => counter_counter_create(None, tpes_lift_to[Int,FixPt[Signed,B32,B0]](0), dim, tpes_lift_to[Int,FixPt[Signed,B32,B0]](1), 1) }
     val cchainRed = counterchain_object_apply(ctrsRed)
 
     //var first = true

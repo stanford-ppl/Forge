@@ -113,7 +113,7 @@ trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
   def bitManifest: Manifest[Bit] = manifest[DHDLBit]
 }
 
-trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypesExp with EffectExp {
+trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypesExp with EffectExp with BRAMOpsExp {
   this: DHDLExp =>
 
   // --- Nodes
@@ -122,7 +122,7 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
     local:    Rep[BRAM[T]],                      // Local memory (BRAM)
     strides:  List[Rep[FixPt[Signed,B32,B0]]],   // Dimensions converted to strides for offchip memory
     memOfs:   Rep[FixPt[Signed,B32,B0]],         // Offset into offchip memory
-    tileDims: List[Int],                         // Tile dimensions
+    tileStrides: List[Rep[FixPt[Signed,B32,B0]]],   // Tile strides
     cchain:   Rep[CounterChain],                 // Counter chain for copy
     iters:    List[Sym[FixPt[Signed,B32,B0]]],   // Bound iterator variables
     store:    Boolean                            // Is this transfer a store (true) or a load (false)
@@ -131,11 +131,22 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
   }
 
   // --- Internal API
-  def tile_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], strides: List[Rep[FixPt[Signed,B32,B0]]], memOfs: Rep[FixPt[Signed,B32,B0]], tileDims: List[Int], cchain: Rep[CounterChain], store: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
-    val iters = List.fill(sizeOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }
+  def tile_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], strides: List[Rep[FixPt[Signed,B32,B0]]], memOfs: Rep[FixPt[Signed,B32,B0]], tileStrides: List[Rep[FixPt[Signed,B32,B0]]], cchain: Rep[CounterChain], store: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
+    val iters = List.fill(lenOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }
 
-    if (store) reflectWrite(mem)(TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters,store))
-    else       reflectWrite(local)(TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters,store))
+    if (store) reflectWrite(mem)(TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters,store))
+    else       reflectWrite(local)(TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters,store))
+  }
+
+
+  // HACK: Only want to allow DSE parameters or constants (ConstFix) here
+  override def bram_create[T:Manifest](__arg0: Option[String],__arg1: List[Rep[FixPt[Signed,B32,B0]]])(implicit __pos: SourceContext,__imp0: Num[T]) = {
+    __arg1.foreach{
+      case ConstFix(_) =>
+      case Def(EatReflect(Tpes_Int_to_fix(e: ConstExp[_]))) =>
+      case _ => stageError("Only constants and DSE parameters are allowed as dimensions of BRAM")(__pos)
+    }
+    super.bram_create[T](__arg0,__arg1)(implicitly[Manifest[T]],__pos,__imp0)
   }
 
 
@@ -148,7 +159,7 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
 
   // --- Dependencies
   override def syms(e: Any): List[Sym[Any]] = e match {
-    case e: TileTransfer[_] => syms(e.mem) ::: syms(e.local) ::: syms(e.strides) ::: syms(e.memOfs) ::: syms(e.cchain)
+    case e: TileTransfer[_] => syms(e.mem) ::: syms(e.local) ::: syms(e.strides) ::: syms(e.tileStrides) ::: syms(e.memOfs) ::: syms(e.cchain)
     case _ => super.syms(e)
   }
 
@@ -157,7 +168,7 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
     case _ => super.readSyms(e)
   }
   override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {
-    case e: TileTransfer[_] => freqNormal(e.mem) ::: freqNormal(e.local) ::: freqNormal(e.strides) ::: freqNormal(e.memOfs) ::: freqNormal(e.cchain)
+    case e: TileTransfer[_] => freqNormal(e.mem) ::: freqNormal(e.local) ::: freqNormal(e.strides) ::: freqNormal(e.tileStrides) ::: freqNormal(e.memOfs) ::: freqNormal(e.cchain)
 
     case _ => super.symsFreq(e)
   }
@@ -207,20 +218,13 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTe
     case _ => super.remap(m)
   }
 
-  // Note that tileDims are not fixed point values yet - they're just integers
-  private def localDimsToStrides(dims: List[Int]) = List.tabulate(dims.length){d =>
-    if (d == dims.length - 1) 1
-    else dims.drop(d + 1).reduce(_*_)
-  }
-
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) =>
+    case TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters, store) =>
       emitNestedLoop(iters, cchain) {
         val offaddr = (iters.zip(strides).map{case (i,s) => quote(i) + "*" + quote(s) } :+ quote(memOfs)).mkString(" + ")
         stream.println("val offaddr = " + offaddr)
 
-        val localStrides = localDimsToStrides(tileDims).map(k => "FixedPoint[Signed,B32,B0](" + k + ")")
-        val localAddr = iters.zip(localStrides).map{ case (i,s) => quote(i) + "*" + quote(s) }.mkString(" + ")
+        val localAddr = iters.zip(tileStrides).map{ case (i,s) => quote(i) + "*" + quote(s) }.mkString(" + ")
         stream.println("val localaddr = " + localAddr)
 
         if (store)

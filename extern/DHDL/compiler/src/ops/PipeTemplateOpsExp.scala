@@ -66,13 +66,13 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
 
   // --- Internals
   def pipe_foreach(cchain: Rep[CounterChain], func: Rep[Indices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Pipeline] = {
-    val inds = List.fill(sizeOf(cchain)){ fresh[Idx] } // Arbitrary number of bound args. Awww yeah.
+    val inds = List.fill(lenOf(cchain)){ fresh[Idx] } // Arbitrary number of bound args. Awww yeah.
     val blk = reifyEffects( func(indices_create(inds)) )
     reflectEffect(Pipe_foreach(cchain, blk, inds), summarizeEffects(blk).star andAlso Simple())
   }
   def pipe_reduce[T,C[T]](cchain: Rep[CounterChain], accum: Rep[C[T]], func: Rep[Indices] => Rep[T], rFunc: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext, __mem: Mem[T,C], __mT: Manifest[T], __mC: Manifest[C[T]]): Rep[Pipeline]  = {
     // Loop indices
-    val is = List.fill(sizeOf(cchain)){ fresh[Idx] }
+    val is = List.fill(lenOf(cchain)){ fresh[Idx] }
     val inds = indices_create(is)
 
     val idx = fresh[Idx]
@@ -102,16 +102,16 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
   }
 
   def block_reduce[T:Manifest](cchain: Rep[CounterChain], accum: Rep[BRAM[T]], func: Rep[Indices] => Rep[BRAM[T]], rFunc: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext): Rep[Pipeline] = {
-    val isMap = List.fill(sizeOf(cchain)){ fresh[Idx] }   // Map loop indices
+    val isMap = List.fill(lenOf(cchain)){ fresh[Idx] }   // Map loop indices
     val indsMap = indices_create(isMap)
 
     // Reified map function
     val mBlk = reifyEffects( func(indsMap) )
 
     // Reduce loop indices
-    val ctrsRed = dimsOf(accum).map{dim => Counter(max = dim.as[Idx]) }
+    val ctrsRed = dimsOf(accum).map{dim => Counter(max = dim) }
     val cchainRed = CounterChain(ctrsRed:_*)
-    val isRed = List.fill(sizeOf(cchainRed)){ fresh[Idx] } // Reduce loop indices
+    val isRed = List.fill(lenOf(cchainRed)){ fresh[Idx] } // Reduce loop indices
     val indsRed = indices_create(isRed)
 
     val idx = fresh[Idx]

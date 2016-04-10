@@ -233,14 +233,14 @@ trait DHDLMemories {
     val Indices = lookupTpe("Indices")
 
     // --- Nodes
-    val bram_new = internal (BRAM) ("bram_new", T, (("size", SInt), ("zero", T)) :: BRAM(T), effect = mutable)
+    val bram_new = internal (BRAM) ("bram_new", T, (("size", Idx), ("zero", T)) :: BRAM(T), effect = mutable)
     val bram_load = internal (BRAM) ("bram_load", T, (("bram", BRAM(T)), ("addr", Idx)) :: T)
     val bram_store = internal (BRAM) ("bram_store", T, (("bram", BRAM(T)), ("addr", Idx), ("value", T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
     val bram_reset = internal (BRAM) ("bram_reset", T, (("bram", BRAM(T)), ("zero", T)) :: MUnit, effect = write(0))
 
     // --- Internals
-    internal (BRAM) ("bram_create", T, (SOption(SString), SList(SInt)) :: BRAM(T), TNum(T)) implements composite ${
-      val bram = bram_new[T]($1.reduce(_*_), zero[T])
+    internal (BRAM) ("bram_create", T, (SOption(SString), SList(Idx)) :: BRAM(T), TNum(T)) implements composite ${
+      val bram = bram_new[T](productTree($1), zero[T])
       dimsOf(bram) = $1
       $0.foreach{name => nameOf(bram) = name }
       isDblBuf(bram) = false
@@ -249,18 +249,15 @@ trait DHDLMemories {
     }
 
     direct (BRAM) ("bram_load_nd", T, (BRAM(T), SList(Idx)) :: T) implements composite ${
-      val addr = calcLocalAddress($1, dimsOf($0))
+      val addr = calcAddress($1, dimsOf($0))
       bram_load($0, addr)
     }
     direct (BRAM) ("bram_store_nd", T, (BRAM(T), SList(Idx), T) :: MUnit, effect = write(0)) implements composite ${
-      val addr = calcLocalAddress($1, dimsOf($0))
+      val addr = calcAddress($1, dimsOf($0))
       bram_store($0, addr, $2)
     }
 
-    direct (BRAM) ("bram_calc_addr", T, (BRAM(T), Indices) :: Idx) implements composite ${ calcLocalAddress($1.toList, dimsOf($0)) }
-
-    // direct (BRAM) ("bram_load_inds", T, (BRAM(T), Indices) :: T) implements composite ${ bram_load_nd($0, $1.toList) }
-    // direct (BRAM) ("bram_store_inds", T, (BRAM(T), Indices, T) :: MUnit, effect = write(0)) implements composite ${ bram_store_nd($0, $1.toList, $2) }
+    direct (BRAM) ("bram_calc_addr", T, (BRAM(T), Indices) :: Idx) implements composite ${ calcAddress($1.toList, dimsOf($0)) }
 
     val Mem = lookupTpeClass("Mem").get
     val BramMem = tpeClassInst("BramMem", T, TMem(T, BRAM(T)))
@@ -270,8 +267,8 @@ trait DHDLMemories {
 
 
     // --- API
-    static (BRAM) ("apply", T, (SString, SInt, varArgs(SInt)) :: BRAM(T), TNum(T)) implements composite ${ bram_create[T](Some($0), $1 +: $2.toList) }
-    static (BRAM) ("apply", T, (SInt, varArgs(SInt)) :: BRAM(T), TNum(T)) implements composite ${ bram_create[T](None, $0 +: $1.toList) }
+    static (BRAM) ("apply", T, (SString, Idx, varArgs(Idx)) :: BRAM(T), TNum(T)) implements composite ${ bram_create[T](Some($0), $1 +: $2.toList) }
+    static (BRAM) ("apply", T, (Idx, varArgs(Idx)) :: BRAM(T), TNum(T)) implements composite ${ bram_create[T](None, $0 +: $1.toList) }
 
     val BRAM_API = withTpe(BRAM)
     BRAM_API {
@@ -290,7 +287,7 @@ trait DHDLMemories {
     }
 
     // --- Scala Backend
-    impl (bram_new)   (codegen($cala, ${ Array.fill($size)($zero) })) // $t[T] refers to concrete type in IR
+    impl (bram_new)   (codegen($cala, ${ Array.fill($size.toInt)($zero) })) // $t[T] refers to concrete type in IR
     impl (bram_load)  (codegen($cala, ${ $bram.apply($addr.toInt) }))
     impl (bram_store) (codegen($cala, ${ $bram.update($addr.toInt, $value) }))
     impl (bram_reset) (codegen($cala, ${ (0 until $bram.length).foreach{i => $bram.update(i, $zero) }}))
@@ -379,7 +376,7 @@ trait DHDLMemories {
     internal (OffChip) ("offchip_create", T, (SOption(SString), SSeq(Idx)) :: OffChip(T)) implements composite ${
       val offchip = offchip_new[T](productTree($1.toList))
       $0.foreach{name => nameOf(offchip) = name }
-      symDimsOf(offchip) = $1.toList
+      dimsOf(offchip) = $1.toList
       offchip
     }
 
@@ -442,7 +439,7 @@ trait DHDLMemories {
     data(Tile, ("_target", OffChip(T)))
     internal (Tile) ("tile_new", T, OffChip(T) :: Tile(T)) implements allocates(Tile, ${$0})
     internal (Tile) ("tile_create", T, (OffChip(T), SList(Range)) :: Tile(T)) implements composite ${
-      if (symDimsOf($0).length != $1.length) stageError("Attempting to access " + symDimsOf($0).length + "D memory with " + $1.length + " indices")
+      if (dimsOf($0).length != $1.length) stageError("Attempting to access " + dimsOf($0).length + "D memory with " + $1.length + " indices")
       val tile = tile_new($0)
       rangesOf(tile) = $1
       tile
@@ -458,15 +455,16 @@ trait DHDLMemories {
       val offsets  = ranges.map(_.start)
       val unitDims = ranges.map(isUnit(_))
 
-      val memDims = symDimsOf(mem)
+      val memDims = dimsOf(mem)
       val tileDims = dimsOf($local) // TODO: Allow this to be different than size of BRAM?
-      val ofs = calcFarAddress(offsets, memDims)
+      val tileStrides = dimsToStrides(tileDims)
+      val ofs = calcAddress(offsets, memDims)
       val strides = dimsToStrides(memDims)
       val nonUnitStrides = strides.zip(unitDims).filterNot(_._2).map(_._1)
 
-      val ctrs = tileDims.map{d => Counter(max = d.as[Index]) }
+      val ctrs = tileDims.map{d => Counter(max = d) }
       val chain = CounterChain(ctrs:_*)
-      tile_transfer(mem, $local, nonUnitStrides, ofs, tileDims, chain, $store)
+      tile_transfer(mem, $local, nonUnitStrides, ofs, tileStrides, chain, $store)
     }
 
 	}

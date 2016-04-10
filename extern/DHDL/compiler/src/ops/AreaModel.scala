@@ -153,7 +153,9 @@ trait AreaModel {
       if (isDblBuf(s)) FPGAResources(lut3 = nbits(s), regs = 4*nbits(s)) // TODO: Why 4?
       else             FPGAResources(regs = nbits(s))
 
-    case e@Bram_new(depth, _) => areaOfBRAM(nbits(e._mT), depth, banks(s), isDblBuf(s))
+    case e@Bram_new(depth, _) =>
+      val depBound = bound(depth).getOrElse{stageError("Cannot resolve bound of BRAM size"); 1.0}.toInt
+      areaOfBRAM(nbits(e._mT), depBound, banks(s), isDblBuf(s))
 
     // TODO: These are close but still need some refining
     case e@Bram_load(ram, _) =>

@@ -16,31 +16,26 @@ trait DHDLMetadata {
     val Tile      = lookupTpe("Tile")
     val Range     = lookupTpe("Range")
 
-    /* Static multidimension dims and size */
-    val MDims = metadata("MDims", "dims" -> SList(SInt))
-    val dimsOps = metadata("dimsOf")
-
-    onMeet (MDims) ${ this }
-    internal.static (dimsOps) ("update", T, (T, SList(SInt)) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MDims($1)) }
-    internal.static (dimsOps) ("apply", T, T :: SList(SInt)) implements composite ${ meta[MDims]($0).get.dims }
-    internal.direct (dimsOps) ("dimOf", T, (T, SInt) :: SInt) implements composite ${ dimsOf($0).apply($1) }
-    //internal.direct (dimsOps) ("rankOf", T, T :: SInt) implements composite ${ dimsOf($0).length }
-
-    val sizeOps = metadata("sizeOf")
-    internal.static (sizeOps) ("update", T, (T, SInt) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MDims(List($1))) }
-    internal.static (sizeOps) ("apply", T, T :: SInt) implements composite ${ dimsOf($0).reduce{_*_} }
+    /* Static length (for indices and counterchain) */
+    val MDims = metadata("MLength", "len" -> SInt)
+    val lenOps = metadata("lenOf")
+    onMeet(MDims) ${ this }
+    internal.static (lenOps) ("update", Nil, (MAny, SInt) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MLength($1)) }
+    internal.static (lenOps) ("apply", Nil, MAny :: SInt) implements composite ${ meta[MLength]($0).get.len }
 
 
-    /* Dynamic multidimension size */
-    val MDynamicSize = metadata("MDynamicSize", "dims" -> SList(Idx))
-    val dynamicSizeOps = metadata("symDimsOf")
+    /* Staged multidimension dimensions */
+    val MStagedDims = metadata("MStagedDims", "dims" -> SList(Idx))
+    val dimOps = metadata("dimsOf")
 
-    onMeet(MDynamicSize) ${ this }
-    internal.static (dynamicSizeOps) ("update", T, (T, SList(Idx)) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MDynamicSize($1)) }
-    internal.static (dynamicSizeOps) ("apply", T, T :: SList(Idx)) implements composite ${ meta[MDynamicSize]($0).get.dims }
+    onMeet(MStagedDims) ${ this }
+    internal.static (dimOps) ("update", T, (T, SList(Idx)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MStagedDims($1)) }
+    internal.static (dimOps) ("apply", T, T :: SList(Idx)) implements composite ${ meta[MStagedDims]($0).get.dims }
+
+    internal (dimOps) ("sizeOf", T, T :: Idx) implements composite ${ productTree(dimsOf($0)) }
+
 
     /* Name of a node */
     val MName = metadata("MName", "name" -> SString)

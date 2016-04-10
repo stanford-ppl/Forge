@@ -56,9 +56,9 @@ trait DHDLTypes {
     val convert_fltpt = internal (Tpes) ("convert_fltpt", (G,E,G2,E2), FltPt(G,E) :: FltPt(G2,E2))
 
     // For testing / compatibility with rest of Delite and LMS
-    val fix_to_rep_int = internal (Tpes) ("fix_to_int", (S,I), FixPt(S,I,Z) :: MInt)
-    val rep_int_to_fix = internal (Tpes) ("int_to_fix", (S,I), MInt :: FixPt(S,I,Z))
-    val bit_to_bool    = internal (Tpes) ("bit_to_bool", Nil, Bit :: MBoolean)
+    val fix_to_rep_int = direct (Tpes) ("fix_to_int", (S,I), FixPt(S,I,Z) :: MInt)
+    val rep_int_to_fix = direct (Tpes) ("int_to_fix", (S,I), MInt :: FixPt(S,I,Z))
+    val bit_to_bool    = direct (Tpes) ("bit_to_bool", Nil, Bit :: MBoolean)
 
 
     // --- Internals
@@ -144,6 +144,7 @@ trait DHDLTypes {
 
     fimplicit (Tpes) ("scala_boolean_to_bit", Nil, SBoolean :: Bit) implements redirect ${ bit($0) }
     fimplicit (Tpes) ("scala_int_to_fixpt", Nil, SInt :: SInt32) implements redirect ${ fixPt[Int,Signed,B32,B0]($0) }
+    fimplicit (Tpes) ("stage_int_to_fixpt", Nil, MInt :: SInt32) implements redirect ${ int_to_fix[Signed,B32]($0) }  // Needed for params
     fimplicit (Tpes) ("scala_float_to_fltpt", Nil, SFloat :: Flt) implements redirect ${ fltPt[Float,B24,B8]($0) }
 
 

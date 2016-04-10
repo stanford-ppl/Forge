@@ -32,31 +32,13 @@ trait DHDLMisc {
 
 
     // --- Multi-dimensional addressing
-    // NOTE: Two versions (one for constant dimensions, one for staged dimensions)
-    internal (Misc) ("sdimsToStrides", Nil, ("dims", SList(SInt)) :: SList(SInt)) implements composite ${
-      List.tabulate($dims.length){d =>
-        if (d == $dims.length - 1) 1
-        else $dims.drop(d + 1).reduce(_*_)
-      }
-    }
-    internal (Misc) ("calcLocalAddress", Nil, (("indices", SList(Idx)), ("dims", SList(SInt))) :: Idx) implements composite ${
-      if ($indices.length == 1) indices.apply(0)  // Flat indexing is always allowed
-      else {
-        if ($indices.length != $dims.length) {
-          stageWarn("Trying to address local " + $dims.length + "D memory using " + $indices.length + "D addressing")
-        }
-        val strides = sdimsToStrides($1)
-        sumTree( List.tabulate($indices.length){i => $indices(i) * strides(i).as[Index] } )
-      }
-    }
-
     internal (Misc) ("dimsToStrides", Nil, ("dims", SList(Idx)) :: SList(Idx)) implements composite ${
       List.tabulate($dims.length){d =>
         if (d == $dims.length - 1) 1.as[SInt]
         else productTree( $dims.drop(d + 1) )
       }
     }
-    internal (Misc) ("calcFarAddress", Nil, (("indices", SList(Idx)), ("dims", SList(Idx))) :: Idx) implements composite ${
+    internal (Misc) ("calcAddress", Nil, (("indices", SList(Idx)), ("dims", SList(Idx))) :: Idx) implements composite ${
       if ($indices.length == 1) indices.apply(0)
       else {
         if ($indices.length != $dims.length)
@@ -246,7 +228,7 @@ trait DHDLMisc {
     // --- Memory transfers
     direct (Tst) ("setMem", T, (OffChip(T), MArray(T)) :: MUnit, effect = write(0)) implements composite ${ set_mem($0, $1) }
     direct (Tst) ("getMem", T, OffChip(T) :: MArray(T)) implements composite ${
-      val arr = Array.empty[T](productTree(symDimsOf($0)))
+      val arr = Array.empty[T](sizeOf($0))
       get_mem($0, arr)
       arr // could call unsafeImmutable here if desired
     }

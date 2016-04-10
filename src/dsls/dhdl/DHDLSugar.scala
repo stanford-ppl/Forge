@@ -18,14 +18,14 @@ trait DHDLSugar {
     internal (Indices) ("indices_new", Nil, SList(Idx) :: Indices) implements record(Indices, ("i", SList(Idx), quotedArg(0)))
     internal (Indices) ("indices_create", Nil, SList(Idx) :: Indices) implements composite ${
       val inds = indices_new($0)
-      sizeOf(inds) = $0.length
+      lenOf(inds) = $0.length
       inds
     }
     direct (Indices) ("getIndex", Nil, (Indices, SInt) :: Idx) implements composite ${ field[SInt]($0, "i_" + $1) }
 
     static (Indices) ("apply", Nil, varArgs(Idx) :: Indices) implements composite ${ indices_create($0.toList) }
     infix (Indices) ("apply", Nil, (Indices, SInt) :: Idx) implements redirect ${ getIndex($0, $1) }
-    internal.infix (Indices) ("toList", Nil, Indices :: SList(Idx)) implements composite ${ List.tabulate(sizeOf($0)){i => $0(i)} }
+    internal.infix (Indices) ("toList", Nil, Indices :: SList(Idx)) implements composite ${ List.tabulate(lenOf($0)){i => $0(i)} }
   }
 
 

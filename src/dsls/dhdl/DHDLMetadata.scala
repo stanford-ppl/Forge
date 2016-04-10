@@ -16,6 +16,8 @@ trait DHDLMetadata {
     val Tile      = lookupTpe("Tile")
     val Range     = lookupTpe("Range")
 
+    val CTuple3   = lookupTpe("CTuple3")
+
     /* Static length (for indices and counterchain) */
     val MDims = metadata("MLength", "len" -> SInt)
     val lenOps = metadata("lenOf")
@@ -140,19 +142,47 @@ trait DHDLMetadata {
 
     // TODO: Should probably change to BigDecimal or something to be accurate
     // NOTE: The user gets to see these! Woah.
-    val MBound = metadata("MBound", "bound" -> SDouble)
-    val boundOps = metadata("bound")
-    onMeet(MBound) ${ MBound( Math.max(this.bound, that.bound)) }
-    static (boundOps) ("update", Nil, (MAny, SDouble) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MBound($1)) }
-    static (boundOps) ("update", Nil, (MAny, SOption(SDouble)) :: MUnit, effect = simple) implements
-      composite ${ $1.foreach{b => setMetadata($0, MBound(b)) } }
-    static (boundOps) ("apply", Nil, MAny :: SOption(SDouble)) implements composite ${ boundsOf($0) }
+    // Meant specifically for range analysis of non-negative size and index calculation
 
-    internal (boundOps) ("boundsOf", Nil, MAny :: SOption(SDouble)) implements composite ${ meta[MBound]($0).map(_.bound) }
+    // Couple of definitions for usage here:
+    // - Final = fixed value for all future time (constants or finalized parameters)
+    // - Exact = constant value but which may be changed (unfinalized parameters)
+    // - Bound = any other upper bound
+
+    val MBound = metadata("MBound", "bound" -> SDouble, "exact" -> SBoolean, "locked" -> SBoolean)
+    val boundOps = metadata("bound")
+    onMeet(MBound) ${ this }
+    static (boundOps) ("update", Nil, (MAny, SDouble) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MBound($1, false, false)) }
+    static (boundOps) ("update", Nil, (MAny, MBound) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, $1) }
+    static (boundOps) ("update", Nil, (MAny, SOption(MBound)) :: MUnit, effect = simple) implements
+      composite ${ $1.foreach{bnd => setMetadata($0, bnd) } }
+
+    static (boundOps) ("apply", Nil, MAny :: SOption(MBound)) implements composite ${ meta[MBound] }
+
+    internal (boundOps) ("boundsOf", Nil, MAny :: SOption(MBound)) implements composite ${ meta[MBound]($0) }
 
     val boundUnapply = metadata("Bound")
-    internal.static (boundUnapply) ("unapply", Nil, MAny :: SOption(SDouble)) implements composite ${ boundsOf($0) }
+    internal.static (boundUnapply) ("unapply", Nil, MAny :: SOption(SDouble)) implements composite ${
+      val bnd = boundsOf($0)
+      if (bnd.isDefined) Some(bnd.get.bound) else None
+    }
+
+    internal (boundOps) ("exact", Nil, SDouble :: MBound) implements composite ${ MBound($0, true, false) }
+    internal (boundOps) ("fixed", Nil, SDouble :: MBound) implements composite ${ MBound($0, true, true) }
+
+    val exactUnapply = metadata("Exact")
+    internal.static (boundUnapply) ("unapply", Nil, MAny :: SOption(SDouble)) implements composite ${
+      val bnd = boundsOf($0)
+      if (bnd.isDefined && bnd.get.exact) Some(bnd.get.bound) else None
+    }
+    val lockUnapply = metadata("Fixed")
+    internal.static (lockUnapply) ("unapply", Nil, MAny :: SOption(SDouble)) implements composite ${
+      val bnd = boundsOf($0)
+      if (bnd.isDefined && bnd.get.locked) Some(bnd.get.bound) else None
+    }
+
 
     internal (boundOps) ("extractNumericConstant", T, T :: SOption(SDouble)) implements composite ${
       val mD = manifest[Double]
@@ -168,8 +198,11 @@ trait DHDLMetadata {
         case _ => None
       }
     }
-    rewrite (boundOps, "boundsOf") using pattern(${Param(x)} -> ${ extractNumericConstant(x) })
-    rewrite (boundOps, "boundsOf") using pattern(${Const(x)} -> ${ extractNumericConstant(x) })
+    rewrite (boundOps, "boundsOf") using pattern(${p@Param(x)} -> ${
+      val c = extractNumericConstant(x)
+      if (p.finalized) fixed(c) else exact(c)
+    })
+    rewrite (boundOps, "boundsOf") using pattern(${Const(x)} -> ${ fixed(extractNumericConstant(x)) })
 
     /* Parent of a node */
     val MParent = metadata("MParent", "parent" -> MAny)

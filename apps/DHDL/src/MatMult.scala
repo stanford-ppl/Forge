@@ -29,15 +29,15 @@ trait MatMult extends DHDLApplication {
 
   def matmult(a: Rep[OffChipMem[Elem]], b: Rep[OffChipMem[Elem]], c: Rep[OffChipMem[Elem]]) {
     MetaPipe(m by bm, n by bn){ (i,j) =>
-      val tileA = BRAM[Elem](bm, bp)
-      val tileB = BRAM[Elem](bp, bn)
-      val tileC = BRAM[Elem](bm, bn)
+      val tileA = BRAM[Elem]("tileA", bm, bp)
+      val tileB = BRAM[Elem]("tileB", bp, bn)
+      val tileC = BRAM[Elem]("tileC", bm, bn)
       BlockReduce(p by bp, tileC){ k =>
         Parallel {
           tileA := a(i::i+bm, k::k+bp)
           tileB := b(k::k+bp, j::j+bn)
         }
-        val accTile = BRAM[Elem](bm, bn)
+        val accTile = BRAM[Elem]("accTile", bm, bn)
         Sequential(bm by 1, bn by 1){ (ii,jj) =>    // MetaPipe?
           val accum = Reg[Elem]
           Pipe(bp by 1, accum){ kk => tileA(ii, kk) * tileB(kk, jj) }{_+_}

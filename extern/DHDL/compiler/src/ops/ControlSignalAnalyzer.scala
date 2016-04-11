@@ -22,6 +22,8 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
 
   var level = 0
   var indsOwners: Map[Exp[Any], (Exp[Any], Boolean, Int)] = Map.empty
+  var localMems: List[Exp[Any]] = Nil
+
 
   def traverseWith(owner: Exp[Any], isReduce: Boolean, inds: List[Exp[Any]])(b: Block[Any]) = {
     level += 1
@@ -178,6 +180,9 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
 
     case EatReflect(Bram_store(ram,addr,value)) =>
       isAccum(ram) = hasDependency(value, ram)    // (6)
+
+    case EatReflect(_:Reg_new[_]) => localMems ::= lhs
+    case EatReflect(_:Bram_new[_]) => localMems ::= lhs
 
     case _ => blocks(rhs) foreach traverseBlock
   }

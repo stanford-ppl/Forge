@@ -232,7 +232,6 @@ trait DHDLMetadata {
     	  case None => None
     	}
 		}
-
     /* A list of ctrl nodes inside current ctrl nodes. Order matters for sequential */
 	 	//TODO: need to confirm with Raghu whether ctrl node includes counterchain. looks like it
 		// it doesn't

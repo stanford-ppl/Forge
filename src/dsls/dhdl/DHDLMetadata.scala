@@ -70,10 +70,7 @@ trait DHDLMetadata {
     internal.static (accumOps) ("update", T, (T, SBoolean) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MAccum($1)) }
     internal.static (accumOps) ("apply", T, T :: SBoolean) implements composite ${
-    	meta[MAccum]($0) match {
-    	  case Some(a) => a.isAccum
-    	  case None => false
-    	}
+    	meta[MAccum]($0).map(_.isAccum).getOrElse(false)
 		}
 
     /* Register Type  */
@@ -254,31 +251,37 @@ trait DHDLMetadata {
 
 		/* The controller that writes to the Mem.
 		 * Right now assume only one writer per double buffer */
-    val MWriter = metadata("MWriter", "writer" -> MAny)
+    val MWriter = metadata("MWriter", "writer" -> MAny, "isReduce" -> SBoolean)
     val writerOps = metadata("writerOf")
     onMeet (MWriter) ${ this }
     internal.static (writerOps) ("update", T, (T, MAny) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MWriter($1)) }
-    internal.static (writerOps) ("apply", T, T :: SOption(MAny)) implements composite ${
+      composite ${ setMetadata($0, MWriter($1,false)) }
+
+    internal.static (writerOps) ("update", T, (T, CTuple2(MAny,SBoolean)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MWriter($1._1,$1._2)) }
+
+    internal.static (writerOps) ("apply", T, T :: SOption(CTuple2(MAny,SBoolean))) implements composite ${
     	meta[MWriter]($0) match {
-    	  case Some(p) => Some(p.writer)
+    	  case Some(p) => Some((p.writer,p.isReduce))
     	  case None => None
     	}
 		}
 
 		/* Controllers that read from a Double Buffer. The metadata is only used for double buffer.
 		*/
-    val MReaders = metadata("MReaders", "readers" -> SList(MAny))
+    val MReaders = metadata("MReaders", "readers" -> SList(CTuple2(MAny, SBoolean)))
     val readersOps = metadata("readersOf")
     onMeet (MReaders) ${ this }
-    internal.static (readersOps) ("update", T, (T, SList(MAny)) :: MUnit, effect = simple) implements
+    internal.static (readersOps) ("update", T, (T, SList(CTuple2(MAny,SBoolean))) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MReaders($1)) }
-    internal.static (readersOps) ("apply", T, T :: SList(MAny)) implements composite ${
+    internal.static (readersOps) ("apply", T, T :: SList(CTuple2(MAny,SBoolean))) implements composite ${
     	meta[MReaders]($0) match {
     	  case Some(p) => p.readers
     	  case None => Nil
     	}
 		}
+
+
 
 
 		/* MaxJ Codegen Helper Functions */

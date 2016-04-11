@@ -34,6 +34,7 @@ trait DHDLDSL extends ForgeApplication
   }
 
   def specification() = {
+    // No fusion in DHDL (for now)
     disableFusion()
 
     val T = tpePar("T")
@@ -117,6 +118,7 @@ trait DHDLDSL extends ForgeApplication
     val LatencyAnalyzer = analyzer("Latency", isExtern=true)
 
     val ConstantFolding = traversal("ConstantFolding", isExtern=true)
+    val ControlSignalAnalyzer = analyzer("ControlSignal", isExtern=true)
 
     importGlobalAnalysis()
     importBoundAnalysis()
@@ -126,11 +128,15 @@ trait DHDLDSL extends ForgeApplication
     schedule(GlobalAnalyzer)
     //schedule(BoundAnalyzer)
     schedule(DSE)
+
+    // --- Post Parameter Selection
     //schedule(AreaAnalyzer)
     //schedule(LatencyAnalyzer)
-
     schedule(BoundAnalyzer)
     schedule(ConstantFolding)
+
+    schedule(ControlSignalAnalyzer)
+    schedule(IRPrinterPlus)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))

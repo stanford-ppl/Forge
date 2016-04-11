@@ -52,6 +52,7 @@ trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp {
   def isBitType[T:Manifest]   = isSubtype(manifest[T].runtimeClass, classOf[DHDLBit])
   def isPipeline[T:Manifest]  = isSubtype(manifest[T].runtimeClass, classOf[DHDLPipeline])
   def isRegister[T:Manifest]  = isSubtype(manifest[T].runtimeClass, classOf[Register[_]])
+  def isBRAM[T:Manifest]      = isSubtype(manifest[T].runtimeClass, classOf[BlockRAM[_]])
 
   // Shorthand versions for matching on ConstFixPt and ConstFltPt without the manifests
   object ParamFix {

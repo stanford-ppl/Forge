@@ -6,14 +6,14 @@ object ArgInOutTestCompiler extends DHDLApplicationCompiler with ArgInOutTest
 object ArgInOutTestInterpreter extends DHDLApplicationInterpreter with ArgInOutTest
 trait ArgInOutTest extends DHDLApplication {
 
-  lazy val x = ArgIn[SInt]("x")
-  lazy val y = ArgOut[SInt]("y")
 
   def main() {
     val N = 8
-    setArg(x, N)
 
+    val x = ArgIn[SInt]("x")
+    val y = ArgOut[SInt]("y")
     Accel {
+      setArg(x, N)
       y := x + 4
     }
     val result = getArg(y)

@@ -129,7 +129,7 @@ trait DHDLDSL extends ForgeApplication
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))
-    extern(grp("MemoryTemplate"), targets = List($cala, dot, maxj), withTypes = true)
+    extern(grp("MemoryTemplate"), targets = List($cala, dot, cpp, maxj), withTypes = true)
     extern(metadata("TypeInspection"), targets = Nil)
 		()
 	}

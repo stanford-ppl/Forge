@@ -1,7 +1,7 @@
 package dhdl.compiler.ops
 
 import java.io.{File,FileWriter,PrintWriter}
-import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, DotGenEffect, MaxJGenEffect, Record}
+import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, CGenEffect, DotGenEffect, MaxJGenEffect, Record}
 import scala.reflect.{Manifest,SourceContext}
 
 import dhdl.shared._
@@ -463,6 +463,30 @@ object FloatPoint {
 }
 """
 }
+
+trait CGenMemoryTemplateOps extends CGenEffect {
+  val IR: ControllerTemplateOpsExp with DHDLIdentifiers
+  import IR._
+
+  override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
+    case "BlockRAM" => "Array[" + remap(m.typeArguments(0)) + "]"
+    case "Register" => "Array[" + remap(m.typeArguments(0)) + "]"
+    case "DRAM"     => "Array[" + remap(m.typeArguments(0)) + "]"
+
+    case "DHDLCounter" => "FixedPointRange[Signed,B32,B0]"
+    case "DHDLCounterChain" => "Array[FixedPointRange[Signed,B32,B0]]"
+    case "DHDLPipeline" => "Unit"
+
+    case "DHDLBit" => "Boolean"
+    case "Signed" => "Signed"
+    case "Unsign" => "Unsign"
+    case "FixedPoint" => "FixedPoint[" + m.typeArguments.map(s=> remap(s)).mkString(",") + "]"
+    case "FloatPoint" => "FloatPoint[" + m.typeArguments.map(s=> remap(s)).mkString(",") + "]"
+    case bx(n) => "B"+n
+    case _ => super.remap(m)
+  }
+}
+
 
 trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplateOps{
 	  val IR: ControllerTemplateOpsExp with OffChipMemOpsExp with DHDLCodegenOps with RegOpsExp with DHDLIdentifiers

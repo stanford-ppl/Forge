@@ -468,21 +468,33 @@ trait CGenMemoryTemplateOps extends CGenEffect {
   val IR: ControllerTemplateOpsExp with DHDLIdentifiers
   import IR._
 
+  private def bitsToIntType(bits: Int) = {
+    if (bits <= 8) "8"
+    else if (bits <= 16) "16"
+    else if (bits <= 32) "32"
+    else "64"
+  }
+
+  private def bitsToFloatType(bits: Int) = {
+    if (bits <= 32) "float"
+    else "double"
+  }
+
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
-    case "BlockRAM" => "Array[" + remap(m.typeArguments(0)) + "]"
-    case "Register" => "Array[" + remap(m.typeArguments(0)) + "]"
-    case "DRAM"     => "Array[" + remap(m.typeArguments(0)) + "]"
+    case "BlockRAM" => remapWithRef(m.typeArguments(0))
+    case "Register" => remapWithRef(m.typeArguments(0))
+    case "DRAM"     => remapWithRef(m.typeArguments(0))
 
-    case "DHDLCounter" => "FixedPointRange[Signed,B32,B0]"
-    case "DHDLCounterChain" => "Array[FixedPointRange[Signed,B32,B0]]"
-    case "DHDLPipeline" => "Unit"
+    case "DHDLCounter" => "int32_t"
+    case "DHDLCounterChain" => "int32_t*"
+    case "DHDLPipeline" => "void"
 
-    case "DHDLBit" => "Boolean"
-    case "Signed" => "Signed"
-    case "Unsign" => "Unsign"
-    case "FixedPoint" => "FixedPoint[" + m.typeArguments.map(s=> remap(s)).mkString(",") + "]"
-    case "FloatPoint" => "FloatPoint[" + m.typeArguments.map(s=> remap(s)).mkString(",") + "]"
-    case bx(n) => "B"+n
+    case "DHDLBit" => "bool"
+    case "Signed" => ""
+    case "Unsign" => "u"
+    case "FixedPoint" => remap(m.typeArguments(0)) + "int" + bitsToIntType(remap(m.typeArguments(1)).toInt + remap(m.typeArguments(2)).toInt) + "_t"
+    case "FloatPoint" => bitsToFloatType(remap(m.typeArguments(0)).toInt + remap(m.typeArguments(1)).toInt)
+    case bx(n) => n
     case _ => super.remap(m)
   }
 }

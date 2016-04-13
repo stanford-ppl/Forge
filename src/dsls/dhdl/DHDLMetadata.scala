@@ -193,7 +193,8 @@ trait DHDLMetadata {
       boundOf($0) match { case Some(MBound(bnd,true,true)) => Some(bnd);  case _ => None }
     }
 
-    internal (boundOps) ("extractNumericConstant", T, T :: SOption(SDouble)) implements composite ${
+    // TODO: Allow rewrites on metadata helper functions
+    /*internal (boundOps) ("extractNumericConstant", T, T :: SOption(SDouble)) implements composite ${
       val mD = manifest[Double]
       val mF = manifest[Float]
       val mI = manifest[Int]
@@ -212,7 +213,7 @@ trait DHDLMetadata {
       if (p.isFixed) fixed(c) else exact(c)
     })
     rewrite (boundOps, "boundOf") using pattern(${Const(x)} -> ${ fixed(extractNumericConstant(x)) })
-
+    */
 
     /* Parent of a node, which is a controller : None if unset */
 	 	// Parent controls the reset of the node

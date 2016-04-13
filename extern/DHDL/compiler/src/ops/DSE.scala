@@ -2,14 +2,16 @@ package dhdl.compiler.ops
 
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.internal.Traversal
+import scala.virtualization.lms.common.EffectExp
 import ppl.delite.framework.analysis.IRPrinterPlus
-
-import scala.collection.immutable.HashMap
 
 import dhdl.shared._
 import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
+import dhdl.compiler.transform._
+
+import scala.collection.mutable.{HashMap,HashSet,ArrayBuffer}
 
 trait DSE extends Traversal {
   val IR: DHDLCompiler
@@ -17,30 +19,9 @@ trait DSE extends Traversal {
 
   override val debugMode = true
 
-  override def run[A:Manifest](b: Block[A]): Block[A] = {
-    val paramAnalyzer = new ParameterAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
-    def tileSizes  = paramAnalyzer.tileSizes
-    def parFactors = paramAnalyzer.parFactors
-    def metapipes  = paramAnalyzer.metapipes
 
-    val ctrlAnalyzer = new ControlSignalAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
-    def localMems = ctrlAnalyzer.localMems
+  def inferDoubleBuffers(localMems: List[Exp[Any]]) = {
 
-    val areaAnalyzer = new AreaAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
-    def totalArea = areaAnalyzer.totalArea
-
-    val cycleAnalyzer = new LatencyAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
-    def totalCycles = cycleAnalyzer.totalCycles
-
-    val printer = new IRPrinterPlus{val IR: DSE.this.IR.type = DSE.this.IR}
-
-    // A. Get lists of parameters
-    paramAnalyzer.run(b)
-    ctrlAnalyzer.run(b)
-
-    printer.run(b)
-
-    // B. Get lists of BRAMs/Regs for each Metapipe which require double buffering
     def leastCommonAncestor(x: (Exp[Any],Boolean), y: (Exp[Any],Boolean)): Option[Exp[Any]] = {
       var pathX: List[(Exp[Any],Boolean)] = List(x)
       var pathY: List[(Exp[Any],Boolean)] = List(y)
@@ -68,13 +49,9 @@ trait DSE extends Traversal {
       else {
         readersOf(mem) find (_ != writerOf(mem).get) match {
           case Some(reader) =>
-            debug(s"Found double buffer candidate: $mem")
-
             val lca = leastCommonAncestor(reader, writerOf(mem).get)
-            debug(s"  LCA = $lca")
-
             lca match {
-              case Some(x) if meta[MPipeType](x).isDefined && styleOf(x) == Coarse => Some(x -> mem)
+              case Some(x) if meta[MPipeType](x).isDefined && styleOf(x) == Coarse => Some(mem -> x)
               case _ => None
             }
 
@@ -82,35 +59,171 @@ trait DSE extends Traversal {
         }
       }
     }
-    dblBuffList foreach {
-      case (ctrl,mem) => debug(s"Found double buffer: $ctrl => $mem")
+    dblBuffList foreach {case (ctrl,mem) => debug(s"Found double buffer: $mem (in $ctrl)") }
+
+    dblBuffList
+  }
+
+  override def run[A:Manifest](b: Block[A]): Block[A] = {
+    // Specify FPGA target (hardcoded right now)
+    val target = FPGATarget
+
+    val ctrlAnalyzer = new ControlSignalAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
+    val paramAnalyzer = new ParameterAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
+
+    val bndAnalyzer = new BoundAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
+    val areaAnalyzer = new AreaAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
+    val cycleAnalyzer = new LatencyAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
+
+    val printer = new IRPrinterPlus{val IR: DSE.this.IR.type = DSE.this.IR}
+
+    cycleAnalyzer.silenceTraversal()
+    areaAnalyzer.silenceTraversal()
+
+    // A. Get lists of parameters
+    ctrlAnalyzer.run(b)
+    if (debugMode) printer.run(b)
+
+    paramAnalyzer.run(b)
+    val localMems  = ctrlAnalyzer.localMems
+    val metapipes  = ctrlAnalyzer.metapipes
+    val accFactors = ctrlAnalyzer.memAccessFactors.toList
+    val tileSizes  = paramAnalyzer.tileSizes.distinct
+    val parFactors = paramAnalyzer.parFactors.distinct
+    var restrict   = paramAnalyzer.restrict
+    val ranges     = paramAnalyzer.range
+
+    // HACK: All par factors for readers and writers of a given BRAM must be equal or one
+    for ((mem,factors) <- accFactors) { restrict ::= REqualOrOne(factors) }
+
+    // B. Get lists of BRAMs/Regs for each Metapipe which require double buffering
+    val dblBuffers = inferDoubleBuffers(localMems)
+
+    def isLegalSpace() = restrict.forall(_.evaluate)
+
+    def setDoubleBuffers() {
+      dblBuffers.foreach{case (mem,ctrl) => isDblBuf(mem) = styleOf(ctrl) == Coarse }
+    }
+    def setBanks() {
+      accFactors.foreach{case (mem,params) => banks(mem) = params.map(_.x).max } // TODO: LCM, not max
     }
 
-    val doubleBuffers = HashMap[Exp[Any],Exp[Any]]() ++ dblBuffList
+    def evaluate() = {
+      setDoubleBuffers()
+      setBanks()
+      bndAnalyzer.run(b)
+      areaAnalyzer.run(b)
+      cycleAnalyzer.run(b)
+      (areaAnalyzer.totalArea, cycleAnalyzer.totalCycles)
+    }
 
     // C. Calculate space
+    debug("Running DSE")
+    debug("Tile Sizes: ")
+    tileSizes.foreach{t => debug(s"  $t")}
+    debug("Parallelization Factors:")
+    parFactors.foreach{t => debug(s"  $t")}
+    debug("Metapipelining Toggles:")
+    metapipes.foreach{t => debug(s"  $t")}
+    debug("")
+    debug("Found the following parameter restrictions: ")
+    for (r <- restrict)   { debug(s"  $r") }
+    for ((p,r) <- ranges) { debug(s"  $p: ${r.start}:${r.step}:${r.end}") }
 
-    // D. DSE cycle
-    //   1. Get combination of parameters
-    //   2. Set direct parameters
-    //   3. Set metapipeline factors
-    //   4. Set double buffer values
-    //   5. Set number of banks for each
-    //   6. Run area and cycle analysis
-    //   7. Record results
+    val space = tileSizes.map{t => Domain(ranges(t)) } ++
+                parFactors.map{t => Domain(ranges(t)) } ++
+                metapipes.map{t => Domain(List(true,false)) }
 
-    // (6)
-    //areaAnalyzer.run(b)
-    //cycleAnalyzer.run(b)
+    val TS = tileSizes.length
+    val PF = tileSizes.length + parFactors.length
+
+    // D. DSE
+    val N = space.length
+    val dims = space.map(_.len)
+    val spaceSize = dims.map(_.toLong).fold(1L){_*_}
+    val prods = List.tabulate(N){i => dims.slice(i+1,N).map(_.toLong).fold(1L){_*_}}
+
+    debug(s"Total space size is $spaceSize")
+
+    val iStep = 1//: () => Int = if (spaceSize < 200000) {() => 1} else {() => util.Random.nextInt(100) } // TODO
+
+    var legalSize = 0
+    var validSize = 0
+
+    val indx = ArrayBuffer[Long]()
+    val alms = ArrayBuffer[Int]()
+    val dsps = ArrayBuffer[Int]()
+    val bram = ArrayBuffer[Int]()
+    val cycles = ArrayBuffer[Long]()
+
+    case class ParetoPt(idx: Int, alms: Int, cycles: Long)
+
+    val pareto = ArrayBuffer[ParetoPt]()
+
+    debug("And aaaawaaaay we go!")
+
+    val indexedSpace = (space, xrange(0,N,1).toList).zipped
+
+    val startTime = System.currentTimeMillis
+    var i = 0L
+    var pos = 0
+    while (i < spaceSize) {
+      // Get and set current parameter combination
+      val point = indexedSpace.map{case (domain,d) => domain( ((i / prods(d)) % dims(d)).toInt ) }
+      val ts = point.slice(0, TS).map(_.asInstanceOf[Int])
+      val pf = point.slice(TS,PF).map(_.asInstanceOf[Int])
+      val mp = point.drop(PF).map(_.asInstanceOf[Boolean])
+
+      tileSizes.zip(ts).foreach{case (ts: Param[Int], c: Int) => ts.setValue(c) }
+      parFactors.zip(pf).foreach{case (pf: Param[Int], c: Int) => pf.setValue(c) }
+      metapipes.zip(mp).foreach{case (mp,c) => styleOf(mp) = (if (c) Coarse else Disabled) }
+
+      if (isLegalSpace()) {
+        legalSize += 1
+        val (area,runtime) = evaluate()
+
+        if (area.alms < target.alms && area.dsps < target.dsps && area.bram < target.bram && area.streams < target.streams) {
+          validSize += 1
+          indx += i
+          alms += area.alms; dsps += area.dsps; bram += area.bram; cycles += runtime
+
+          var wasAdded = false
+          var candidate = true
+
+          var j = 0
+          while (j < pareto.size && !wasAdded && candidate) {
+            val p = pareto(j)
+            if (area.alms < p.alms && runtime < p.cycles) {
+              pareto(j) = ParetoPt(pos,area.alms,runtime) // Strictly less than existing frontier point: replace
+              wasAdded = true
+            }
+            candidate = area.alms < p.alms || runtime < p.cycles
+            j += 1
+          }
+          if (!wasAdded && candidate) pareto += ParetoPt(pos,area.alms,runtime)
+
+          pos += 1
+        }
+      }
+      i += iStep
+    }
+    val time = (System.currentTimeMillis - startTime)/1000.0
+    debug(s"Completed space search in $time seconds")
+    debug(s"Total legal space size: $legalSize / $spaceSize")
+    debug(s"Valid designs generated: $validSize / $spaceSize")
+    debug(s"Pareto frontier size: ${pareto.length} / $spaceSize")
 
     // E. Calculate pareto curve
     // F. Show user results, pick point on pareto curve
 
     // G. Set parameters
+    // TODO
+
     // H. Finalize parameters
     tileSizes.foreach{p => p.fix}
     parFactors.foreach{p => p.fix}
-
+    setDoubleBuffers()
+    setBanks()
     (b)
   }
 }

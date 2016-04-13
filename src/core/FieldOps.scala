@@ -215,12 +215,12 @@ trait FieldOpsExp extends FieldOps {
   def infix_name(x: Exp[DSLTraversal])(implicit o: Overloaded7): String = x match {
     case Def(Traverse(name,isExtern)) => name
     case Def(Transform(name,isExtern)) => name
-    case Def(Analyze(name,isExtern)) => name
+    case Def(Analyze(name,isExtern,isIterative)) => name
   }
   def infix_isExtern(x: Exp[DSLTraversal]): Boolean = x match {
     case Def(Traverse(name,isExtern)) => isExtern
     case Def(Transform(name,isExtern)) => isExtern
-    case Def(Analyze(name,isExtern)) => isExtern
+    case Def(Analyze(name,isExtern,isIterative)) => isExtern
   }
 }
 

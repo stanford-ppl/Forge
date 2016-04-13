@@ -112,13 +112,14 @@ trait DHDLDSL extends ForgeApplication
     // --- Traversals
     val StageAnalyzer = analyzer("Stage", isExtern=true)
     val GlobalAnalyzer = analyzer("Global")
-    val BoundAnalyzer = analyzer("Bound")
+    val BoundAnalyzer = analyzer("Bound", isIterative=false)
     val DSE = traversal("DSE", isExtern=true)
     val AreaAnalyzer = analyzer("Area", isExtern=true)
     val LatencyAnalyzer = analyzer("Latency", isExtern=true)
 
     val ConstantFolding = traversal("ConstantFolding", isExtern=true)
     val ControlSignalAnalyzer = analyzer("ControlSignal", isExtern=true)
+    val ParameterAnalyzer = analyzer("Parameter",isExtern=true)
 
     importGlobalAnalysis()
     importBoundAnalysis()
@@ -126,12 +127,11 @@ trait DHDLDSL extends ForgeApplication
     //schedule(IRPrinterPlus)
     schedule(StageAnalyzer)
     schedule(GlobalAnalyzer)
-    //schedule(BoundAnalyzer)
     schedule(DSE)
 
     // --- Post Parameter Selection
-    //schedule(AreaAnalyzer)
-    //schedule(LatencyAnalyzer)
+    schedule(AreaAnalyzer)
+    schedule(LatencyAnalyzer)
     schedule(BoundAnalyzer)
     schedule(ConstantFolding)
 

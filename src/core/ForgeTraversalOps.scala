@@ -28,7 +28,7 @@ trait ForgeTraversalOps extends Base {
 
   def traversal(name: String, isExtern: Boolean = false): Rep[DSLTraversal] = forge_traversal(name, isExtern)
   def transformer(name: String, isExtern: Boolean = false): Rep[DSLTransformer] = forge_transformer(name,isExtern)
-  def analyzer(name: String, isExtern: Boolean = false): Rep[DSLAnalyzer] = forge_analyzer(name,isExtern)
+  def analyzer(name: String, isExtern: Boolean = false, isIterative: Boolean = false): Rep[DSLAnalyzer] = forge_analyzer(name,isExtern,isIterative)
 
   // Add given traversal to compiler's IR traversal schedule
   def schedule(traversal: Rep[DSLTraversal]): Rep[Unit] = forge_schedule(traversal)
@@ -108,7 +108,7 @@ trait ForgeTraversalOps extends Base {
   //----------
   def forge_traversal(name: String, isExtern: Boolean): Rep[DSLTraversal]
   def forge_transformer(name: String, isExtern: Boolean): Rep[DSLTransformer]
-  def forge_analyzer(name: String, isExtern: Boolean): Rep[DSLAnalyzer]
+  def forge_analyzer(name: String, isExtern: Boolean,isIterative:Boolean): Rep[DSLAnalyzer]
   def forge_propagate(op: Rep[DSLOp]): Rep[DSLPattern]
 
   def forge_schedule(traversal: Rep[DSLTraversal]): Rep[Unit]
@@ -336,9 +336,9 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
     xf
   }
 
-  case class Analyze(name: String, isExtern: Boolean) extends Def[DSLAnalyzer]
-  def forge_analyzer(name: String, isExtern: Boolean) = {
-    val az: Exp[DSLAnalyzer] = Analyze(name,isExtern)
+  case class Analyze(name: String, isExtern: Boolean, isIterative: Boolean) extends Def[DSLAnalyzer]
+  def forge_analyzer(name: String, isExtern: Boolean, isIterative: Boolean) = {
+    val az: Exp[DSLAnalyzer] = Analyze(name,isExtern,isIterative)
     if (!Analyzers.contains(az)) {
       Analyzers += az -> TraversalRules.empty
       Traversals += az

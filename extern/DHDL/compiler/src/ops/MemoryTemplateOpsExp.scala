@@ -23,29 +23,8 @@ trait FloatPoint[SIG,EXP]
 trait DHDLIndices
 
 // Stub (nothing here for now)
-trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp {
+trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp with DHDLMetadataOpsExp {
   this: DHDLExp =>
-
-  /*def extractNumericConstant[T:Manifest](x: T): Option[Double] = {
-    val mD = manifest[Double]
-    val mF = manifest[Float]
-    val mI = manifest[Int]
-    val mL = manifest[Long]
-
-    manifest[T] match {
-      case `mI` => Some(x.asInstanceOf[Int].toDouble)
-      case `mL` => Some(x.asInstanceOf[Long].toDouble)
-      case `mF` => Some(x.asInstanceOf[Float].toDouble)
-      case `mD` => Some(x.asInstanceOf[Double])
-      case _ => None
-    }
-  }
-
-  override def boundsOf(x: Rep[Any])(implicit ctx: SourceContext): Option[Double] = x match {
-    case Param(c) => extractNumericConstant(c)(mtype(x.tp))
-    case Const(c) => extractNumericConstant(c)(mtype(x.tp))
-    case _ => super.boundsOf(x)
-  }*/
 
   def isFixPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FixedPoint[_,_,_]])
   def isFltPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FloatPoint[_,_]])
@@ -90,6 +69,33 @@ trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp {
     case StructType(_,fields) => fields.map(f => isBits(f._2)).fold(true){_&&_}
     case _ => false
   }
+
+  private def extractNumericConst[T:Manifest](x: T): Option[Double] = {
+    val mD = manifest[Double]
+    val mF = manifest[Float]
+    val mI = manifest[Int]
+    val mL = manifest[Long]
+
+    manifest[T] match {
+      case `mI` => Some(x.asInstanceOf[Int].toDouble)
+      case `mL` => Some(x.asInstanceOf[Long].toDouble)
+      case `mF` => Some(x.asInstanceOf[Float].toDouble)
+      case `mD` => Some(x.asInstanceOf[Double])
+      case _ => None
+    }
+  }
+  override def boundOf(__arg0: Rep[Any])(implicit __pos: SourceContext): Option[MBound] = __arg0 match {
+    case p: Param[_] if p.tp == manifest[Int] =>
+      val c = extractNumericConst(p.asInstanceOf[Param[Int]].x)
+      c.map{c => if (p.isFixed) fixed(c) else exact(c) }
+
+    case Const(x) =>
+      val c = extractNumericConst(x)
+      c.map{c => fixed(c) }
+
+    case _ => super.boundOf(__arg0)
+  }
+
 }
 
 trait MemoryTemplateTypesExp extends MemoryTemplateTypes {

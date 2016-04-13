@@ -116,9 +116,11 @@ trait PipeStageTools extends NestedBlockTraversal {
 trait CounterToolsExp extends EffectExp {
   this: DHDLExp =>
 
-  def parOf(x: Rep[CounterChain]): List[Int] = x match {
+  def parOf(cc: Rep[CounterChain]): List[Int] = parParamsOf(cc).map(_.x)
+
+  def parParamsOf(cc: Rep[CounterChain]): List[Param[Int]] = cc match {
     case Def(EatReflect(Counterchain_new(ctrs,nIter))) => ctrs.map{
-      case Def(EatReflect(Counter_new(_,_,_,par))) => par.x
+      case Def(EatReflect(Counter_new(_,_,_,par))) => par
     }
   }
 
@@ -138,7 +140,6 @@ trait CounterToolsExp extends EffectExp {
     case _ => 1L
   }
 }
-
 
 
 

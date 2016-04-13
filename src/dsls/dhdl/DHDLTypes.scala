@@ -43,7 +43,8 @@ trait DHDLTypes {
     val const_to_fltpt = internal (Lifts) ("constFltPt", (T,G,E), (T, SManifest(GG), SManifest(EE)) :: FltPt(G,E), TNumeric(T))
 
     impl (const_to_fixpt) (codegen(cpp, ${
-      const_to_fixpt;
+      @ val t = remap(sym.tp)
+      new $t {$0}
     }))
 
 

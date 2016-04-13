@@ -576,7 +576,7 @@ trait ScalaOps extends PrimitiveMathGen {
 
     val hashmap = direct (HashMapOps) ("SHashMap", (K,V), Nil :: SHashMap(K,V), effect = mutable)
     impl (hashmap) (codegen($cala, ${ new scala.collection.mutable.HashMap[$t[K],$t[V]]() }))
-    impl (hashmap) (codegen(cpp, ${ new std::map<$t[K],$t[V]>() }))
+    // impl (hashmap) (codegen(cpp, ${ new std::map<$t[K],$t[V]>() }))
 
     compiler (HashMapOps) ("shashmap_from_arrays", (K,V), (MArray(K),MArray(V)) :: SHashMap(K,V), effect = mutable) implements codegen($cala, ${ scala.collection.mutable.HashMap($0.zip($1): _*) })
     compiler (HashMapOps) ("shashmap_keys_array", (K,V), (SHashMap(K,V)) :: SArray(K)) implements codegen($cala, ${ $0.keys.toArray })
@@ -589,11 +589,11 @@ trait ScalaOps extends PrimitiveMathGen {
     infix (HashMapOps) ("values", (K,V), SHashMap(K,V) :: MArray(V)) implements composite ${ farray_from_sarray(shashmap_values_array($0)) }
 
     impl (apply) (codegen($cala, ${ $0($1) }))
-    impl (apply) (codegen(cpp, ${ $0->find($1)->second }))
+    // impl (apply) (codegen(cpp, ${ $0->find($1)->second }))
     impl (update) (codegen($cala, ${ $0.put($1,$2); () }))
-    impl (update) (codegen(cpp, ${ $0->insert(std::pair<$t[K],$t[V]>($1,$2)) }))
+    // impl (update) (codegen(cpp, ${ $0->insert(std::pair<$t[K],$t[V]>($1,$2)) }))
     impl (contains) (codegen($cala, ${ $0.contains($1) }))
-    impl (contains) (codegen(cpp, ${ $0->find($1) != $0->end() }))
+    // impl (contains) (codegen(cpp, ${ $0->find($1) != $0->end() }))
   }
 
   def importConcurrentHashMap() = {

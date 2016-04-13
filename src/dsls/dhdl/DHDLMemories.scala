@@ -115,6 +115,16 @@ trait DHDLMemories {
       $reg.update(0, $init)
     }))
 
+    // --- C++ Backend
+    impl (reg_new)   (codegen(cpp, ${
+      @ val tpname = remap(sym.tp.typeArguments(0))
+      new $tpname
+    }))
+    impl (reg_read)  (codegen(cpp, ${ <reg_read> $reg.apply(0) }))
+    impl (reg_write) (codegen(cpp, ${ <reg_write> $reg.update(0, $value) }))
+    impl (reg_reset) (codegen(cpp, ${ <reg reset> }))
+
+
     // --- Dot Backend
     impl (reg_new)   (codegen(dot, ${
 			@ regType(sym) match {

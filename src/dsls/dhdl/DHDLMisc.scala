@@ -303,6 +303,11 @@ trait DHDLMisc {
       ()
     }))
 
+    // C++ backend
+    impl (get_arg)  (codegen(cpp, ${ *$0 }))
+    impl (println)  (codegen(cpp, ${ cout << $0 << endl }))
+    impl (println2) (codegen(cpp, ${ cout << endl }))
+
     // --- Dot Backend
     impl (println)  (codegen(dot, ${
 			@ emitComment("println")

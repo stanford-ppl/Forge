@@ -122,11 +122,30 @@ trait LatencyAnalyzer extends ModelingTools {
     (cycles)
   }
 
+  var savedScope: List[Stm] = null
+  var savedBlock: Block[Any] = null
+
+  def save(b: Block[Any]) {
+    savedBlock = b
+    savedScope = innerScope
+  }
+
+  def resume() {
+    preprocess(savedBlock)
+    innerScope = savedScope
+    inHwScope = true
+    cycleScope ::= latencyOfBlock(savedBlock).sum
+    inHwScope = false
+    postprocess(savedBlock)
+  }
+
+
   def traverseNode(lhs: Exp[Any], rhs: Def[Any]) {
     val cycles = rhs match {
       case EatReflect(Hwblock(blk)) =>
         inHwScope = true
         val body = latencyOfBlock(blk).sum
+        //save(blk)
         inHwScope = false
         body
 

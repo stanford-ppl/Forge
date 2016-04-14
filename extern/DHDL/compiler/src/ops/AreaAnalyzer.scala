@@ -70,12 +70,33 @@ trait AreaAnalyzer extends ModelingTools {
     out
   }
 
+  var savedScope: List[Stm] = null
+  var savedBlock: Block[Any] = null
+  var savedArea: FPGAResources = null
+
+  def save(b: Block[Any]) {
+    savedArea = areaScope.fold(NoArea){_+_}
+    savedBlock = b
+    savedScope = innerScope
+  }
+
+  def resume() {
+    preprocess(savedBlock)
+    innerScope = savedScope
+    areaScope ::= savedArea
+    inHwScope = true
+    areaScope ::= areaOfBlock(savedBlock, false)
+    inHwScope = false
+    postprocess(savedBlock)
+  }
+
   // TODO: loop index delay line in Metapipeline
   def traverseNode(lhs: Exp[Any], rhs: Def[Any]) {
     val area = rhs match {
       case EatReflect(Hwblock(blk)) =>
         inHwScope = true
         val body = areaOfBlock(blk, false)
+        //save(blk) // Save HW scope to resume to later
         inHwScope = false
         body
 

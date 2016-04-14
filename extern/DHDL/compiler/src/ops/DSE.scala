@@ -4,6 +4,7 @@ import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.internal.Traversal
 import scala.virtualization.lms.common.EffectExp
 import ppl.delite.framework.analysis.IRPrinterPlus
+import ppl.delite.framework.Config
 
 import dhdl.shared._
 import dhdl.shared.ops._
@@ -19,9 +20,9 @@ trait DSE extends Traversal {
 
   override val debugMode = true
 
-
   def inferDoubleBuffers(localMems: List[Exp[Any]]) = {
 
+    // TODO: Can probably generalize this and move it elsewhere
     def leastCommonAncestor(x: (Exp[Any],Boolean), y: (Exp[Any],Boolean)): Option[Exp[Any]] = {
       var pathX: List[(Exp[Any],Boolean)] = List(x)
       var pathY: List[(Exp[Any],Boolean)] = List(y)
@@ -44,7 +45,7 @@ trait DSE extends Traversal {
 
     // Heuristic - find memories which have a reader and a writer which are different
     // but whose nearest common parent is a metapipeline.
-    val dblBuffList = localMems.flatMap{mem =>
+    localMems.flatMap{mem =>
       if (!writerOf(mem).isDefined) None
       else {
         readersOf(mem) find (_ != writerOf(mem).get) match {
@@ -59,54 +60,66 @@ trait DSE extends Traversal {
         }
       }
     }
-    dblBuffList foreach {case (ctrl,mem) => debug(s"Found double buffer: $mem (in $ctrl)") }
-
-    dblBuffList
   }
 
-  override def run[A:Manifest](b: Block[A]): Block[A] = {
+  lazy val ctrlAnalyzer = new ControlSignalAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
+  lazy val paramAnalyzer = new ParameterAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
+  lazy val printer = new IRPrinterPlus{val IR: DSE.this.IR.type = DSE.this.IR}
+  lazy val bndAnalyzer = new BoundAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
+
+  lazy val tileSizes  = paramAnalyzer.tileSizes.distinct
+  lazy val parFactors = paramAnalyzer.parFactors.distinct
+  lazy val accFactors = ctrlAnalyzer.memAccessFactors.toList
+  lazy val dblBuffers = inferDoubleBuffers(ctrlAnalyzer.localMems)
+
+  def setDoubleBuffers() {
+    dblBuffers.foreach{case (mem,ctrl) => isDblBuf(mem) = styleOf(ctrl) == Coarse }
+  }
+  def setBanks() {
+    accFactors.foreach{case (mem,params) => banks(mem) = params.map(_.x).max } // TODO: LCM, not max
+  }
+
+  override def run[A:Manifest](b: Block[A]) = {
+    ctrlAnalyzer.run(b)
+    paramAnalyzer.run(b)
+
+    if (debugMode) printer.run(b)
+    if (debugMode) dblBuffers foreach {case (ctrl,mem) => debug(s"Found double buffer: $mem (in $ctrl)") }
+
+    if (Config.enableDSE) dse(b)
+
+    bndAnalyzer.run(b)
+    tileSizes.foreach{p => p.fix}
+    parFactors.foreach{p => p.fix}
+    setDoubleBuffers()
+    setBanks()
+
+    (b)
+  }
+
+
+  def dse[A:Manifest](b: Block[A]) {
     // Specify FPGA target (hardcoded right now)
     val target = FPGATarget
 
-    val ctrlAnalyzer = new ControlSignalAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
-    val paramAnalyzer = new ParameterAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
-
-    val bndAnalyzer = new BoundAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
     val areaAnalyzer = new AreaAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
     val cycleAnalyzer = new LatencyAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
-
-    val printer = new IRPrinterPlus{val IR: DSE.this.IR.type = DSE.this.IR}
-
     cycleAnalyzer.silenceTraversal()
     areaAnalyzer.silenceTraversal()
 
     // A. Get lists of parameters
-    ctrlAnalyzer.run(b)
-    if (debugMode) printer.run(b)
-
-    paramAnalyzer.run(b)
-    val localMems  = ctrlAnalyzer.localMems
-    val metapipes  = ctrlAnalyzer.metapipes
-    val accFactors = ctrlAnalyzer.memAccessFactors.toList
-    val tileSizes  = paramAnalyzer.tileSizes.distinct
-    val parFactors = paramAnalyzer.parFactors.distinct
-    var restrict   = paramAnalyzer.restrict
-    val ranges     = paramAnalyzer.range
+    val metapipes = ctrlAnalyzer.metapipes
+    var restrict  = paramAnalyzer.restrict
+    val ranges    = paramAnalyzer.range
 
     // HACK: All par factors for readers and writers of a given BRAM must be equal or one
     for ((mem,factors) <- accFactors) { restrict ::= REqualOrOne(factors) }
 
-    // B. Get lists of BRAMs/Regs for each Metapipe which require double buffering
-    val dblBuffers = inferDoubleBuffers(localMems)
+    // B. Compress space
+    // TODO
+
 
     def isLegalSpace() = restrict.forall(_.evaluate)
-
-    def setDoubleBuffers() {
-      dblBuffers.foreach{case (mem,ctrl) => isDblBuf(mem) = styleOf(ctrl) == Coarse }
-    }
-    def setBanks() {
-      accFactors.foreach{case (mem,params) => banks(mem) = params.map(_.x).max } // TODO: LCM, not max
-    }
 
     def evaluate() = {
       setDoubleBuffers()
@@ -187,6 +200,7 @@ trait DSE extends Traversal {
           indx += i
           alms += area.alms; dsps += area.dsps; bram += area.bram; cycles += runtime
 
+          // Check if this is a pareto frontier candidate
           var wasAdded = false
           var candidate = true
 
@@ -213,17 +227,11 @@ trait DSE extends Traversal {
     debug(s"Valid designs generated: $validSize / $spaceSize")
     debug(s"Pareto frontier size: ${pareto.length} / $spaceSize")
 
-    // E. Calculate pareto curve
     // F. Show user results, pick point on pareto curve
+    // TODO
 
     // G. Set parameters
     // TODO
 
-    // H. Finalize parameters
-    tileSizes.foreach{p => p.fix}
-    parFactors.foreach{p => p.fix}
-    setDoubleBuffers()
-    setBanks()
-    (b)
   }
 }

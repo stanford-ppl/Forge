@@ -96,10 +96,14 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
   def setWriter(ctrl: Exp[Any], isReduce: Boolean, blks: Block[Any]*) {
     val writes = getLocalWriters(blks:_*)
     writes.foreach{
-      case Def(EatReflect(Reg_write(reg,_))) => writerOf(reg) = (ctrl, isReduce)
+      case Def(EatReflect(Reg_write(reg,_))) =>
+        writerOf(reg) = (ctrl, isReduce)
+        writtenIn(ctrl) = writtenIn(ctrl) :+ reg
+
       case Def(EatReflect(Bram_store(ram,addr,_))) =>
         val top = getTopController(ctrl, isReduce, addr)
         writerOf(ram) = top
+        writtenIn(ctrl) = writtenIn(ctrl) :+ ram
     }
   }
 

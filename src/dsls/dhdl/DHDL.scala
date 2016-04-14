@@ -105,7 +105,6 @@ trait DHDLDSL extends ForgeApplication
     importDHDLControllers()
 
     importDHDLMisc()
-
     importTupleTypeClassInstances()
 
 
@@ -120,6 +119,8 @@ trait DHDLDSL extends ForgeApplication
     val ConstantFolding = traversal("ConstantFolding", isExtern=true)
     val ControlSignalAnalyzer = analyzer("ControlSignal", isExtern=true)
     val ParameterAnalyzer = analyzer("Parameter",isExtern=true)
+    val ParSetter = traversal("ParSetter",isExtern=true)
+    val MetaPipeRegInsertion = traversal("MetaPipeRegInsertion",isExtern=true)
 
     importGlobalAnalysis()
     importBoundAnalysis()
@@ -134,8 +135,10 @@ trait DHDLDSL extends ForgeApplication
     schedule(LatencyAnalyzer)
     schedule(BoundAnalyzer)
     schedule(ConstantFolding)
+    schedule(MetaPipeRegInsertion)
 
     schedule(ControlSignalAnalyzer)
+    schedule(ParSetter)
     //schedule(IRPrinterPlus)
 
     // External groups

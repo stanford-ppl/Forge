@@ -90,7 +90,7 @@ trait DHDLMetadata {
     internal.static (regReset) ("apply", T, Reg(T) :: T) implements
       composite ${ meta[MRegInit]($0).get.value.asInstanceOf[Rep[T]] }
 
-    /* Parallelization Factor: 0 if unset */
+    /* Parallelization Factor: 1 if unset */
     val MPar = metadata("MPar", "par" -> SInt)
     val parOps = metadata("par")
     onMeet (MPar) ${ this }
@@ -106,7 +106,6 @@ trait DHDLMetadata {
     /* Number of Banks */
     val MBank = metadata("MBank", "nBanks" -> SInt)
     val bankOps = metadata("banks")
-    //TODO:
     onMeet (MBank) ${ this }
     internal.static (bankOps) ("update", T, (T, SInt) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MBank($1)) }
@@ -248,6 +247,15 @@ trait DHDLMetadata {
     	  case None => Nil
     	}
 		}
+
+    val MWritten = metadata("MWritten", "written" -> SList(MAny))
+    val writtenOps = metadata("writtenIn")
+    onMeet (MWritten) ${ this }
+    internal.static (writtenOps) ("update", T, (T, SList(MAny)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MWritten($1)) }
+    internal.static (writtenOps) ("apply", T, T :: SList(MAny)) implements composite ${
+      meta[MWritten]($0).map(_.written).getOrElse(Nil)
+    }
 
 		/* The controller that writes to the Mem.
 		 * Right now assume only one writer per double buffer */

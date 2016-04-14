@@ -587,7 +587,7 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplate
 				emittedSize = emittedSize + size
 			}
 			super.emitNode(sym, rhs)
-
+		
     case _ => super.emitNode(sym, rhs)
   }
 }
@@ -633,6 +633,74 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
 				emittedSize = emittedSize + size
 			}
 			super.emitNode(sym, rhs)
+
+		case Reg_new(init) =>
+			val ts = tpstr(par(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
+			regType(sym) match {
+				case Regular =>
+					//TODO
+          val parent = if (parentOf(sym).isEmpty) "Top" else quote(parentOf(sym).get)
+					if (isDblBuf(sym)) {
+						emit(s"""DblRegFileLib ${quote(sym)}_lib = 
+							new DblRegFileLib(this,$ts, ${quote(sym)}, ${par(sym)});""")
+            if (par(sym) > 1) {
+								emit(s"""DFEVector<DFEVar> ${quote(sym)} = ${quote(sym)}_lib.readv()""")
+             } else {
+              	emit(s"""DFEVar ${quote(sym)} = ${quote(sym)}_lib.read()""")
+           	}
+           	emit(quote(sym) + "_lib.connectWdone(" + quote(writerOf(sym).get) + "_done);")
+           	readersOf(sym).foreach { r =>
+           	  emit(quote(sym) +"_lib.connectRdone(" + quote(r) + "_done);")
+           	}
+          } else {
+          		emit(s"""${quote(maxJPre(sym))} ${quote(sym)} = ${quote(ts)}.newInstance(this);""")
+					}
+				case ArgumentIn =>  // alwaysGen
+        	alwaysGen {
+          	emit(s"""DFEVar ${quote(sym)} = io.scalarInput(${quote(sym)} , $ts );""")
+				  }
+				case ArgumentOut => //emitted in reg_write
+			}
+
+		case e@Reg_write(reg, value) => 
+			val ts = tpstr(par(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
+			if (isDblBuf(reg)) {
+     	//TODO:uncomment after analysis pass
+			// 	emit(quote(reg) + "_lib.write(" + value + ", " + quote(writerOf(reg).get) + "_done);")
+      } else {
+				regType(reg) match {
+					case Regular => //TODO
+      		//val parent = if (parentOf(reg).isEmpty) "top" else quote(parentOf(reg).get)
+      		//val rst = quote(parent) + "_rst_en"
+					//TODO: uncomment after analysis pass
+					//if (writerOf(reg).isEmpty) {
+					//	throw new Exception("Reg " + quote(reg) + " is not written by a controller, which is not supported at the moment")
+					//	val enSignalStr = writerOf(reg).get match {
+					//		case p@Def(Pipe_foreach(cchain,_,_)) => styleOf(reg) match {
+					//			case Fine =>
+					//				emit(quote(cchain) + "_en_from_pipesm")
+					//			case _ =>
+					//				emit(quote(writerOf(reg).get) + "_en")
+					//		}
+					//		case p@Def(Pipe_reduce(cchain, _, _, _, _, _, _, _, _, _)) => styleOf(reg) match {
+					//			case Fine =>
+					//				emit(quote(cchain) + "_en_from_pipesm")
+					//			case _ =>
+					//				emit(quote(writerOf(reg).get) + "_en")
+					//		}
+					//		case _ =>
+					//	}
+					//}
+      		//emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}; // enable""")
+					//TODO: uncomment after analysis
+      		//@  emit(s"""DFEVar ${quote(reg)}_hold = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writerOf(reg).get)}_redLoop_done));""")
+      		//@  emit(s"""${quote(reg)} <== $rst ? constant.var(${tpstr(init)},0):stream.offset(${quote(reg)}_hold, -${quote(writerOf(reg).get)}_offset); // reset""")
+				case ArgumentIn => new Exception("Cannot write to Argument Out! " + quote(reg))
+				case ArgumentOut =>
+				 	val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"
+      	  	emit(s"""io.scalarOutput(${quote(reg)}, ${quote(value)}, $ts, $controlStr);""")
+				}
+			}
 
     case _ => super.emitNode(sym, rhs)
   }

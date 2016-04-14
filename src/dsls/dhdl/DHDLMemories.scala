@@ -408,6 +408,23 @@ trait DHDLMemories {
       infix ("apply") ((Range,Range) :: Tile(T)) implements composite ${ tile_create($self, List($1,$2)) }
       infix ("apply") ((Range,Range,Range) :: Tile(T)) implements composite ${ tile_create($self, List($1,$2,$3)) }
 
+      // Hack version for adding explicit parallelization factors to a tile load / store
+      infix ("apply") ((Range,MInt) :: Tile(T)) implements composite ${
+        val tile = tile_create($self, List($1))
+        tilePar(tile) = $2
+        tile
+      }
+      infix ("apply") ((Range,Range,MInt) :: Tile(T)) implements composite ${
+        val tile = tile_create($self, List($1,$2))
+        tilePar(tile) = $3
+        tile
+      }
+      infix ("apply") ((Range,Range,Range,MInt) :: Tile(T)) implements composite ${
+        val tile = tile_create($self, List($1,$2,$3))
+        tilePar(tile) = $4
+        tile
+      }
+
       // 2D -> 1D
       infix ("apply") ((Idx, Range) :: Tile(T)) implements composite ${ tile_create($self, List(unitRange($1), $2)) }
       infix ("apply") ((Range, Idx) :: Tile(T)) implements composite ${ tile_create($self, List($1, unitRange($2))) }
@@ -484,7 +501,10 @@ trait DHDLMemories {
       val strides = dimsToStrides(memDims)
       val nonUnitStrides = strides.zip(unitDims).filterNot(_._2).map(_._1)
 
-      val ctrs = tileDims.map{d => Counter(max = d) }
+      val ctrs = tileDims.zipWithIndex.map{ case (d,i) =>
+        if (i != tileDims.length - 1) Counter(max = d)
+        else Counter(min = 0.as[Index], max = d, step = 1.as[Index], par = tilePar($tile).getOrElse(param(1)))
+      }
       val chain = CounterChain(ctrs:_*)
       tile_transfer(mem, $local, nonUnitStrides, ofs, tileStrides, chain, $store)
     }

@@ -1,7 +1,7 @@
 package dhdl.compiler.ops
 
 import scala.reflect.{Manifest,SourceContext}
-import scala.virtualization.lms.internal.Traversal
+import ppl.delite.framework.analysis.AnalyzerBase
 
 import dhdl.shared._
 import dhdl.shared.ops._
@@ -9,9 +9,11 @@ import dhdl.compiler._
 import dhdl.compiler.ops._
 
 
-trait ParSetter extends Traversal {
+trait ParSetter extends AnalyzerBase {
   val IR: DHDLExp with CounterToolsExp
   import IR._
+
+  override def hasCompleted = runs > 0
 
   var innerLoopPar: Option[Int] = None
   def traverseInner(p: Int)(b: Block[Any]) {
@@ -20,11 +22,10 @@ trait ParSetter extends Traversal {
     innerLoopPar = None
   }
 
-  override def traverseStm(stm: Stm) = stm match {
-    case TP(s, d) => traverseNode(s, d)
-  }
+  // Custom ordering for block traversal for some nodes
+  override def traverseStm(stm: Stm) = analyzeStm(stm)
 
-  def traverseNode(lhs: Exp[Any], rhs: Def[Any]): Unit = rhs match {
+  override def analyze(lhs: Exp[Any], rhs: Def[Any]): Unit = rhs match {
     case EatReflect(Pipe_foreach(cchain, func, _)) if styleOf(lhs) == Fine =>
       val P = parOf(cchain).reduce{_*_}
       traverseInner(P)(func)

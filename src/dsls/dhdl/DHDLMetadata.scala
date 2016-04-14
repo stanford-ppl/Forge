@@ -113,6 +113,15 @@ trait DHDLMetadata {
       }
     }
 
+    val MTilePar = metadata("MTilePar", "par" -> MInt)
+    val tileParOps = metadata("tilePar")
+    onMeet(MTilePar) ${ this }
+    internal.static (tileParOps) ("update", T, (T, MInt) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MTilePar($1)) }
+    internal.static (tileParOps) ("apply", T, T :: SOption(MInt)) implements composite ${
+      meta[MTilePar]($0).map(_.par)
+    }
+
     /* Number of Banks */
     val MBank = metadata("MBank", "nBanks" -> SInt)
     val bankOps = metadata("banks")
@@ -160,6 +169,17 @@ trait DHDLMetadata {
     internal.static (globalOps) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MGlobal($1)) }
     internal.static (globalOps) ("apply", Nil, MAny :: SBoolean) implements composite ${ meta[MGlobal]($0).map(_.isGlobal).getOrElse(false) }
+
+
+    val MParamRange = metadata("MParamRange", "minv" -> SInt, "maxv" -> SInt, "stepv" -> SInt)
+    val prangeOps = metadata("domainOf")
+    onMeet (MParamRange) ${ this }
+    static (prangeOps) ("update", Nil, (MAny, CTuple3(SInt,SInt,SInt)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MParamRange($1._1,$1._2,$1._3)) }
+
+    static (prangeOps) ("apply", Nil, MAny :: SOption(CTuple3(SInt,SInt,SInt))) implements composite ${
+      meta[MParamRange]($0).map(d => (d.minv, d.maxv, d.stepv))
+    }
 
 
     // TODO: Should probably change to BigDecimal or something to be accurate

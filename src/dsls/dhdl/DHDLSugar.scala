@@ -78,12 +78,15 @@ trait DHDLSugar {
     internal.infix (LoopRange) ("step", Nil, LoopRange :: Idx) implements getter(0, "_step")
     static (LoopRange) ("apply", Nil, (Idx,Idx,Idx) :: LoopRange) implements allocates(LoopRange, ${$0},${$1},${$2})
 
-    fimplicit (LoopRange) ("rangeToCounter", Nil, LoopRange :: Counter) implements composite ${ counter_create(None, $0.start, $0.end, $0.step, 1) }
+    fimplicit (LoopRange) ("rangeToCounter", Nil, LoopRange :: Counter) implements composite ${ counter_create(None, $0.start, $0.end, $0.step, unit(1)) }
 
     // --- API
     infix (LoopRange) ("until", Nil, (Idx,Idx) :: LoopRange) implements composite ${ LoopRange($0, $1, fixPt[Int,Signed,B32,B0](1)) }
     infix (LoopRange) ("by", Nil, (LoopRange, Idx) :: LoopRange) implements composite ${ LoopRange($0.start, $0.end, $1) }
     infix (LoopRange) ("by", Nil, (Idx, Idx) :: LoopRange) implements composite ${ LoopRange(fixPt[Int,Signed,B32,B0](0), $0, $1) }
+    infix (LoopRange) ("par", Nil, (LoopRange, MInt) :: Counter) implements composite ${
+      counter_create(None, $0.start, $0.end, $0.step, $1)
+    }
   }
 
 }

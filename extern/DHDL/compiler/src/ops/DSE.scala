@@ -14,6 +14,8 @@ import dhdl.compiler.transform._
 
 import scala.collection.mutable.{HashMap,HashSet,ArrayBuffer}
 
+import scala.virtualization.lms.util.GraphUtil._
+
 trait DSE extends Traversal {
   val IR: DHDLCompiler
   import IR._
@@ -97,6 +99,25 @@ trait DSE extends Traversal {
     (b)
   }
 
+  /*def compressSpace(space: Map[Param[Int],Domain[Int]], restrict: List[Restrict]) = {
+    val params = space.keys.toList
+    val edges = restrict.map(_.productIterator.flatMap{case p: Param[_] => Some(p.asInstanceOf[Param[Int]]), case _ => None })
+    val sccs = stronglyConnectedComponents(params, {param: Param[Int] =>
+      edges.flatMap{e => if (e.contains(param)) e.filter{p => p != param} else Nil }.distinct
+    })
+
+    // These are almost exactly the same as database joins - should talk to Chris A about this
+    sccs.flatMap{scc =>
+      if (scc.length > 1 && scc.map(_.len).reduce{_*_} < 50000) {
+        crossFilter(scc){pt =>
+          scc.zip(pt).foreach{case (domain,v) => domain.setValue(v) }
+          restrict.forall(_.evaluate)
+        }
+      }
+      else scc
+    }
+  }*/
+
 
   def dse[A:Manifest](b: Block[A]) {
     // Specify FPGA target (hardcoded right now)
@@ -113,11 +134,10 @@ trait DSE extends Traversal {
     val ranges    = paramAnalyzer.range
 
     // HACK: All par factors for readers and writers of a given BRAM must be equal or one
-    for ((mem,factors) <- accFactors) { restrict ::= REqualOrOne(factors) }
-
-    // B. Compress space
-    // TODO
-
+    for ((mem,factors) <- accFactors) {
+      val distFactors = factors.distinct
+      if (distFactors.length > 1) restrict ::= REqualOrOne(distFactors)
+    }
 
     def isLegalSpace() = restrict.forall(_.evaluate)
 
@@ -143,9 +163,14 @@ trait DSE extends Traversal {
     for (r <- restrict)   { debug(s"  $r") }
     for ((p,r) <- ranges) { debug(s"  $p: ${r.start}:${r.step}:${r.end}") }
 
-    val space = tileSizes.map{t => Domain(ranges(t)) } ++
-                parFactors.map{t => Domain(ranges(t)) } ++
-                metapipes.map{t => Domain(List(true,false)) }
+    val initialSpace = tileSizes.map{t => Domain(ranges(t), {c: Int => t.setValue(c)}) } ++
+                       parFactors.map{t => Domain(ranges(t), {c: Int => t.setValue(c)}) }
+
+    //val (compSpace, newRestrict) = compressSpace(initialSpace, restrict)
+    //restrict = newRestrict
+
+    // Compress space
+    val space = initialSpace ++ metapipes.map{mp => Domain(List(true,false), {c: Boolean => c match {case true => styleOf(mp) = Coarse; case false => styleOf(mp) = Disabled}; () }) }
 
     val TS = tileSizes.length
     val PF = tileSizes.length + parFactors.length
@@ -182,14 +207,13 @@ trait DSE extends Traversal {
     var pos = 0
     while (i < spaceSize) {
       // Get and set current parameter combination
-      val point = indexedSpace.map{case (domain,d) => domain( ((i / prods(d)) % dims(d)).toInt ) }
-      val ts = point.slice(0, TS).map(_.asInstanceOf[Int])
-      val pf = point.slice(TS,PF).map(_.asInstanceOf[Int])
-      val mp = point.drop(PF).map(_.asInstanceOf[Boolean])
-
-      tileSizes.zip(ts).foreach{case (ts: Param[Int], c: Int) => ts.setValue(c) }
-      parFactors.zip(pf).foreach{case (pf: Param[Int], c: Int) => pf.setValue(c) }
-      metapipes.zip(mp).foreach{case (mp,c) => styleOf(mp) = (if (c) Coarse else Disabled) }
+      val point = indexedSpace.foreach{case (domain,d) => domain.set( ((i / prods(d)) % dims(d)).toInt ) }
+      //val ts = point.slice(0, TS).map(_.asInstanceOf[Int])
+      //val pf = point.slice(TS,PF).map(_.asInstanceOf[Int])
+      //val mp = point.drop(PF).map(_.asInstanceOf[Boolean])
+      //tileSizes.zip(ts).foreach{case (ts: Param[Int], c: Int) => ts.setValue(c) }
+      //parFactors.zip(pf).foreach{case (pf: Param[Int], c: Int) => pf.setValue(c) }
+      //metapipes.zip(mp).foreach{case (mp,c) =>  }
 
       if (isLegalSpace()) {
         legalSize += 1

@@ -10,19 +10,23 @@ trait Test extends DHDLApplication {
     type Q16 = FixPt[Signed, B16, B16]
 
     val v1    = OffChipMem[Q16]("v1", 10)
+    val v2    = OffChipMem[Q16]("v2", 10)
     val outer = ArgOut[Q16]
 
     val vec1 = Array.fill(10)(random[Q16](10))
+    val vec2 = Array.fill(10)(random[Q16](10))
     setMem(v1, vec1)
+    setMem(v2, vec2)
 
     Accel {
       val b1 = BRAM[Q16]("b1", 5)
+      val b2 = BRAM[Q16]("b2", 5)
 
       MetaPipe(10 by 5, outer){i =>
         b1 := v1(i::i+5)
-
+        b2 := v2(i::i+5)
         val inner = Reg[Q16]
-        Pipe(0 until 5, inner){ii => b1(ii) ** 2 }{_+_}
+        Pipe(0 until 5, inner){ii => b1(ii) * b2(ii) }{_+_}
         inner.value
       }{_+_}
     }

@@ -73,6 +73,16 @@ trait DHDLMetadata {
     	meta[MAccum]($0).map(_.isAccum).getOrElse(false)
 		}
 
+    /* Is inserted metapipe register */
+    val MDelayReg = metadata("MDelayReg", "isDelay" -> SBoolean)
+    val delayRegOps = metadata("isDelayReg")
+    onMeet (MDelayReg) ${ this }
+    internal.static (delayRegOps) ("update", T, (T, SBoolean) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MDelayReg($1)) }
+    internal.static (delayRegOps) ("apply", T, T :: SBoolean) implements composite ${
+      meta[MDelayReg]($0).map(_.isDelay).getOrElse(false)
+    }
+
     /* Register Type  */
     val MRegTpe = metadata("MRegTpe", "regTpe" -> RegTpe)
     val regTpeOps = metadata("regType")

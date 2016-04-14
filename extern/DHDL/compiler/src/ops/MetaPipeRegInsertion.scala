@@ -11,9 +11,16 @@ import dhdl.compiler.ops._
 
 trait MetaPipeRegInsertion extends ForwardTransformer with PipeStageTools {
   val IR: DHDLExp with PipeStageToolsExp
-  import IR._
+  import IR.{assert => _, _}
 
   override val debugMode = true
+
+  /*var injectSubst: Map[Sym[Any], () => Exp[Any]] = Map.empty
+
+  def inject(sym: Exp[Any])(replace: () => Exp[Any]) {
+    if (!injectSubst.contains(sym))
+      injectSubst += sym.asInstanceOf[Sym[Any]] -> replace
+  }*/
 
   override def traverseStm(stm: Stm): Unit = stm match {
     case TP(sym, rhs) if apply(sym) == sym =>
@@ -56,6 +63,7 @@ trait MetaPipeRegInsertion extends ForwardTransformer with PipeStageTools {
           reg := ctr
           // Set metadata for this register
           isDblBuf(reg) = true
+          isDelayReg(reg) = true
           readersOf(reg) = List((stage,false))
           writerOf(reg) = stages(i - 1)
           writtenIn(stages(i-1)) = writtenIn(stages(i - 1)) :+ reg

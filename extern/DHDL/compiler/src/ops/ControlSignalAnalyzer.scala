@@ -34,7 +34,16 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
   var localMems = List[Exp[Any]]()    // Double buffer candidates
   var metapipes = List[Exp[Any]]()    // List of metapipes which can be sequentialized
 
-  val memAccessFactors = HashMap[Exp[Any],List[Param[Int]]]() // Parallelization factors for readers/writers
+  val memAccessFactors = HashMap[Exp[Any],List[Param[Int]]]() // Parallelization factors for memory readers/writers
+
+  override def preprocess[A:Manifest](b: Block[A]): Block[A] = {
+    // HACK: Clear out metadata that we append to in order to get rid of stale symbols
+    for ((s,p) <- metadata) {
+      if (meta[MReaders](s).isDefined && !isDelayReg(s)) readersOf(s) = Nil
+      if (meta[MWritten](s).isDefined) writtenIn(s) = Nil
+    }
+    b
+  }
 
 
   def traverseWith(owner: Exp[Any], isReduce: Boolean, inds: List[Exp[Any]], cc: Rep[CounterChain])(b: Block[Any]) = {
@@ -86,7 +95,9 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
   def setReaders(ctrl: Exp[Any], isReduce: Boolean, blks: Block[Any]*) {
     val reads = getLocalReaders(blks:_*)
     reads.foreach{
-      case Def(EatReflect(Reg_read(reg))) => readersOf(reg) = readersOf(reg) :+ (ctrl,isReduce)
+      case Def(EatReflect(Reg_read(reg))) =>
+        if (!isDelayReg(reg)) readersOf(reg) = readersOf(reg) :+ (ctrl,isReduce)
+
       case Def(EatReflect(Bram_load(ram,addr))) =>
         val top = getTopController(ctrl, isReduce, addr)
         readersOf(ram) = readersOf(ram) :+ top
@@ -97,8 +108,10 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
     val writes = getLocalWriters(blks:_*)
     writes.foreach{
       case Def(EatReflect(Reg_write(reg,_))) =>
-        writerOf(reg) = (ctrl, isReduce)
-        writtenIn(ctrl) = writtenIn(ctrl) :+ reg
+        if (!isDelayReg(reg)) {
+          writerOf(reg) = (ctrl, isReduce)
+          writtenIn(ctrl) = writtenIn(ctrl) :+ reg
+        }
 
       case Def(EatReflect(Bram_store(ram,addr,_))) =>
         val top = getTopController(ctrl, isReduce, addr)

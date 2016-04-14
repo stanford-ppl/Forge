@@ -192,10 +192,14 @@ trait DHDLMemories {
 					//TODO: don't have input here
 					@ }
 				@ case ArgumentIn =>  // alwaysGen
-					@ val sn = "ArgIn" + quote(sym).substring(quote(sym).indexOf("_"))
+        	@ alwaysGen {
+						@ val sn = "ArgIn" + quote(sym).substring(quote(sym).indexOf("_"))
+				  @ }
           DFEVar $sn = io.scalarInput($sn , $ts );
 				@ case ArgumentOut => // alwaysGen
-					@ val sn = "ArgOut" + quote(sym).substring(quote(sym).indexOf("_"))
+        	@ alwaysGen {
+						@ val sn = "ArgOut" + quote(sym).substring(quote(sym).indexOf("_"))
+			    @ }
 			@ }
 		}))
     impl (reg_read)  (codegen(maxj, ${
@@ -435,6 +439,8 @@ trait DHDLMemories {
 
 		// --- MaxJ Backend
 		impl (offchip_new) (codegen(maxj, ${
+			@ alwaysGen {
+      @ }
 		}))
   }
 

@@ -21,21 +21,6 @@ trait MaxJManagerGen {
     case _ => "" 
   }
 
-	//val intrIntf = if (Config.newMemAPI) intrIntfNew else intrIntfOld
-	val intrIntf = intrIntfNew 
-	//val cpuIntf = if (Config.newMemAPI) cpuIntfNew else cpuIntfOld
-	val cpuIntf = cpuIntfNew 
-
-  def emitImports() = {
-    mImports.foreach(i => emit(s"import $mImportPrefix.$i;"))
-    //if (Config.newMemAPI) {
-      newMemImports.foreach { i => emit(s"import $mImportPrefix.$i;") }
-    //} else {
-      //oldMemImports.map { i => emit(s"import $mImportPrefix.$i;") }
-    //}
-  }
-
-
   val mImportPrefix = "com.maxeler.maxcompiler.v2"
   val streamClock = 150
   val memClock = 400
@@ -188,7 +173,11 @@ trait MaxJManagerGen {
 	    DFELink intrStream = addStreamToLmem("intrStream", k.getOutput("intrCmd"));
 	    intrStream <== k.getOutput("intrStream");
 	"""
-	
+	//val intrIntf = if (Config.newMemAPI) intrIntfNew else intrIntfOld
+	val intrIntf = intrIntfNew 
+	//val cpuIntf = if (Config.newMemAPI) cpuIntfNew else cpuIntfOld
+	val cpuIntf = cpuIntfNew 
+
 	val mConstructorPreamble =
 	s"""
 	  TopManager(EngineParameters engineParameters) {
@@ -230,6 +219,15 @@ val mConstructorEpilogue =
 s"""
   }
 """
+
+  def emitImports() = {
+    mImports.foreach(i => emit(s"import $mImportPrefix.$i;"))
+    //if (Config.newMemAPI) {
+      newMemImports.foreach { i => emit(s"import $mImportPrefix.$i;") }
+    //} else {
+      //oldMemImports.map { i => emit(s"import $mImportPrefix.$i;") }
+    //}
+  }
 
   def emitConstructor(tileTsfs: Set[Sym[Unit]]) = {
     emit(mConstructorPreamble)

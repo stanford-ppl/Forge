@@ -119,7 +119,7 @@ trait DHDLDSL extends ForgeApplication
     importGlobalAnalysis()
     importBoundAnalysis()
 
-    //schedule(IRPrinterPlus)
+    schedule(IRPrinterPlus)
     //schedule(StageAnalyzer)
     //schedule(GlobalAnalyzer)
     //schedule(BoundAnalyzer)

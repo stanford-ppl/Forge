@@ -126,14 +126,12 @@ trait DHDLMemories {
 							$sym [label= "\$sym" shape="square" style="filled" fillcolor=$regFillColor ]
 					@ }
 				@ case ArgumentIn =>
-					@ val sn = "ArgIn" + quote(sym).substring(quote(sym).indexOf("_"))
         	@ alwaysGen {
-            $sym [label=$sn shape="Msquare" style="filled" fillcolor=$regFillColor ]
+            $sym [label=$sym shape="Msquare" style="filled" fillcolor=$regFillColor ]
 				  @ }
         @ case ArgumentOut =>
-					@ val sn = "ArgOut" + quote(sym).substring(quote(sym).indexOf("_"))
         	@ alwaysGen {
-            $sym [label=$sn shape="Msquare" style="filled" fillcolor=$regFillColor ]
+            $sym [label=$sym shape="Msquare" style="filled" fillcolor=$regFillColor ]
 			    @ }
       @ }
 		}))
@@ -147,88 +145,16 @@ trait DHDLMemories {
     }))
 
     // --- MaxJ Backend
-    impl (reg_new)   (codegen(maxj, ${
-			@ val ts = tpstr[T](par(sym))
-			@ regType(sym) match {
-				@ case Regular =>
-          @ val parent = if (parentOf(sym).isEmpty) "top" else quote(parentOf(sym).get)
-          @ val wen = quote(parent) + "_en"
-					@ if (isDblBuf(sym)) {
-					@		val symlib = quote(sym) + "_lib"
-					@		val p = par(sym)
-          		DblRegFileLib $symlib = new DblRegFileLib(this, $ts, $sym, $p);
-          @   if (p > 1) {
-					@			val symlibreadv = symlib + ".readv();" 
-								DFEVector<DFEVar> $sym = $symlibreadv
-          @    } else {
-					@			val symlibread = symlib + ".read();" 
-              	DFEVar $sym = $symlibread
-          @  	}
-          @  	emit(quote(sym) + "_lib.connectWdone(" + quote(writerOf(sym)) + "_done);")
-          @  	readersOf(sym).map { r =>
-          @  	  emit(quote(sym) +"_lib.connectRdone(" + quote(r) + "_done);")
-          @  	}
-          @ } else {
-					@		val pre = maxJPre(sym)
-					@ 	val tsinst = ts + ".newInstance(this);"
-          		$pre $sym = $tsinst
-					//TODO: uncomment after analysis pass
-          //@  if (writerOf(sym).isEmpty) {
-          //@    throw new Exception("Reg " + quote(sym) + " is not written by a controller, which is not supported at the moment")
-					//TODO: move codegen of reg to extern? Don't have view of Pipe_foreach and Pipe_reduce
-					//here
-          //@ 	 val enSignalStr = writerOf(sym).get match {
-          //@ 	   case p@Def(Pipe_foreach(cchain,_,_)) => styleOf(sym.asInstanceOf[Pipeline]) match {
-					//@				case Fine =>
-          //@ 	     emit(quote(cchain) + "_en_from_pipesm")
-					//@				case _ =>
-          //@ 	     emit(quote(writerOf(sym).get) + "_en")
-					//@			}
-          //@ 	   case p@Def(Pipe_reduce(cchain, _, _, _, _, _, _, _, _, _)) =>
-          //@ 	     emit(quote(cchain) + "_en_from_pipesm")
-					//@			 case _ =>
-					//@		}
-          //@ }
-					//TODO: don't have input here
-					@ }
-				@ case ArgumentIn =>  // alwaysGen
-        	@ alwaysGen {
-						@ val sn = "ArgIn" + quote(sym).substring(quote(sym).indexOf("_"))
-          	DFEVar $sn = io.scalarInput($sn , $ts );
-				  @ }
-				@ case ArgumentOut => // alwaysGen
-        	@ alwaysGen {
-						@ val sn = "ArgOut" + quote(sym).substring(quote(sym).indexOf("_"))
-			    @ }
-			@ }
-		}))
+		//reg_new (extern)
     impl (reg_read)  (codegen(maxj, ${
-			@		val pre = maxJPre(sym)
-			$pre $sym = $reg 
-      @ val parent = if (parentOf(sym).isEmpty) "top" else quote(parentOf(sym).get)
-      @ val rst = quote(parent) + "_rst_en"
-      //@  emit(s"""DFEVar ${quote(sym.input)}_real = $enSignalStr ? ${quote(sym.input)} : ${quote(sym)}; // enable""")
-      //@  emit(s"""DFEVar ${quote(sym)}_hold = Reductions.streamHold(${quote(sym.input)}_real, ($rst | ${quote(sym.producer)}_redLoop_done));""")
-      //@  emit(s"""${quote(sym)} <== $rst ? constant.var(${tpstr(init)},0) : stream.offset(${quote(sym)}_hold, -${quote(sym.producer)}_offset); // reset""")
-		}))
-    impl (reg_write) (codegen(maxj, ${
-			@ if (isDblBuf(sym)) {
-     	@ 	emit(quote(sym) + "_lib.write(" + value + ", " + quote(writerOf(sym)) + "_done);")
-      @ } else {
+			@	val pre = maxJPre(sym)
+			@ val regStr = regType(reg) match {
+			@ 	case Regular => quote(reg) + "_hold"
+			@ 	case _ => quote(reg)
 			@ }
-
-			//TODO: need to redesign the naming convention here. Input now is only a wire, which can't
-			//distinguish whether it's from reg or not
-      //@ val valueStr = if (value.isInstanceOf[Reg]) {
-      //@   s"${value}_hold"
-      //@ } else {
-      //@   s"$value"
-      //@ }
-			@ val valueStr = "value"
-      @ val controlStr = if (parentOf(sym).isEmpty) s"top_done" else quote(parentOf(sym).get) + "_done"
-			@ val ts = tpstr[T](par(sym))
-      io.scalarOutput($sym, $valueStr, $ts, $controlStr);
+			$pre $sym = $regStr 
 		}))
+		//reg_write (extern)
     impl (reg_reset) (codegen(maxj, ${
     }))
 
@@ -306,12 +232,11 @@ trait DHDLMemories {
 
     // --- Dot Backend
     impl (bram_new)   (codegen(dot, ${
-			@ val sn = "BRAM" + quote(sym).substring(quote(sym).indexOf("_"))
       @ if (isDblBuf(sym)) {
-      	$sym [margin=0 rankdir="LR" label="{<st> $sn | <ld> }" shape="record"
+      	$sym [margin=0 rankdir="LR" label="{<st> $sym | <ld> }" shape="record"
 							color=$dblbufBorderColor  style="filled" fillcolor=$bramFillColor ]
       @ } else {
-        	$sym [label="$sn " shape="square" style="filled" fillcolor=$bramFillColor ]
+        	$sym [label="$sym " shape="square" style="filled" fillcolor=$bramFillColor ]
       @ }
 		}))
 		impl (bram_load)  (codegen(dot, ${
@@ -343,13 +268,6 @@ trait DHDLMemories {
 			$pre $sym = $ts
 		}))
 		impl (bram_store) (codegen(maxj, ${
-			//TODO: redesign naming for reg to remove this
-      //val dataStr = if (data.isInstanceOf[Reg]) {
-      //  val regData = data.asInstanceOf[Reg]
-      //  s"${data}_hold"
-      //} else {
-      //  s"$data"
-      //}
 			@ val dataStr = quote(value)
       @ if (isAccum(bram)) {
       @   val offsetStr = quote(writerOf(bram).get) + "_offset"

@@ -194,8 +194,8 @@ trait DHDLMemories {
 				@ case ArgumentIn =>  // alwaysGen
         	@ alwaysGen {
 						@ val sn = "ArgIn" + quote(sym).substring(quote(sym).indexOf("_"))
+          	DFEVar $sn = io.scalarInput($sn , $ts );
 				  @ }
-          DFEVar $sn = io.scalarInput($sn , $ts );
 				@ case ArgumentOut => // alwaysGen
         	@ alwaysGen {
 						@ val sn = "ArgOut" + quote(sym).substring(quote(sym).indexOf("_"))

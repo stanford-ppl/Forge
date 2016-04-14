@@ -3,6 +3,7 @@ package dhdl.compiler.ops
 import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, DotGenEffect, MaxJGenEffect}
 import scala.reflect.{Manifest,SourceContext}
 import scala.collection.mutable.Set
+import java.io.{File, FileWriter, PrintWriter}
 
 import dhdl.shared._
 import dhdl.shared.ops._
@@ -380,9 +381,15 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
 			//}
 
     case e@Pipe_foreach(cchain, func, inds) =>
+			var label = quote(sym)
+			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
+				case Coarse => label = label.replace("DHDLPipeline", "MetaPipe")
+				case Fine => label = label.replace("DHDLPipeline", "Pipe")
+				case Disabled => label = label.replace("DHDLPipeline", "Sequential")
+			}
       emitNestedIdx(cchain, inds)
       emit(s"""subgraph cluster_${quote(sym)} {""")
-      emit(s"""label="${quote(sym)}"""")
+      emit(s"""label="$label"""")
       emit(s"""color=$pipeBorderColor""")
       emit(s"""style="bold, filled" """)
 			emit(s"""fillcolor=$pipeFillColor""")
@@ -391,6 +398,12 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
       emit("}")
 
     case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
+			var label = quote(sym)
+			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
+				case Coarse => label = label.replace("DHDLPipeline", "MetaPipe")
+				case Fine => label = label.replace("DHDLPipeline", "Pipe")
+				case Disabled => label = label.replace("DHDLPipeline", "Sequential")
+			}
       emitAlias(acc, accum)
       emitNestedIdx(cchain, inds)
       emit(s"""subgraph cluster_${quote(sym)} {""")
@@ -470,6 +483,11 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 				case Coarse =>
 				case Fine =>
 					//TODO: assume bram not write to accum
+			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
+				case Coarse => 
+				case Fine => 
+				case Disabled => 
+			}
     			//val writesToAccumRam = mapNode.nodes.filter { _.isInstanceOf[St] }.exists { _.asInstanceOf[St].mem.isAccum }
 					val writesToAccumRam = false
 					emitPipeProlog(sym, cchain, inds, writesToAccumRam)
@@ -491,16 +509,8 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 					val specializeReduce = false;
 					emitPipeReduceEpilog(sym, specializeReduce, cchain)
 				case Disabled =>
-					//TODO: what's the proper way to create these nodes in IR?
-					/*
-					val totIter = counters.map { case c =>
-						val Def(Counter_new(start, end, step)) = c
-						DHDLPrim_Div_fix(end, DHDLPrim_Mul_fix(step, Int_to_fix( par(c).asInstanceOf[Rep[Int]] )))	
-					}.reduce{ case (a,b) =>
-						DHDLPrim_Mul_fix(a,b)
-					}
-					emitSequential(sym, cchain, totIter)
-					*/
+					val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain
+					emitSequential(sym, cchain, getBlockResult(nIters))
 			}
       emitBlock(func)
       emitBlock(ldFunc)
@@ -508,14 +518,6 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       emitBlock(stFunc)
 
 		case e@Pipe_parallel(func: Block[Unit]) => 
-
-			//TODO: this should be emiited into a saperate file. where can I get output directory
-			//information?
-			//TODO: move this to an analysis pass?
-			//withStream(stream) {
-					//TODO: only work after analysis pass
-			//	emitParallelSM(quote(sym), childrenOf(sym).length)
-			//}
 
 			// If control signals have not yet been defined, define them here
 			if (parentOf(sym).isEmpty) {
@@ -547,10 +549,6 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
   }
 
 	def emitSequential(sym:Sym[Any], cchain: Exp[CounterChain], totIter: Rep[FixPt[Signed,B32,B0]]) = {
-		//TODO: emit this in a saperate file. move to an analysis pass?
-		withStream(stream) {
-    	emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
-		}
 
 		// If control signals have not yet been defined, define them here
 		if (parentOf(sym).isEmpty) {
@@ -587,374 +585,6 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 		emit(s"""} Sequential ${quote(sym)} """)
 	}
 
-  private def stateTextSeq(state: Int, N: Int) = {
-    val condStr = s"bitVector[ $state ]"
-    val max = N-1
-
-    stream.println(s"""IF($condStr) {
-      resetBitVector();""")
-    if (state == max) {
-      stream.println(s"""
-      counterFF.next <== counterFF + 1;
-      IF (counterFF === sizeFF-1) {
-        stateFF.next <== States.DONE;
-      } ELSE {
-        stateFF.next <== States.S0;
-      }""")
-      stream.println("}")
-    } else {
-      stream.println(s"stateFF.next <== States.S${state+1};")
-      stream.println("}")
-    }
-  }
-  private def stateStr(state:List[Int]) = {
-    "S" + state.map( _.toString).reduce(_+_)
-  }
-  def emitSeqSM(name: String, numStates: Int) = {
-    emit("""
-package engine;
-  import com.maxeler.maxcompiler.v2.kernelcompiler.KernelLib;
-  import com.maxeler.maxcompiler.v2.statemachine.DFEsmInput;
-  import com.maxeler.maxcompiler.v2.statemachine.DFEsmOutput;
-  import com.maxeler.maxcompiler.v2.statemachine.DFEsmStateEnum;
-  import com.maxeler.maxcompiler.v2.statemachine.DFEsmStateValue;
-  import com.maxeler.maxcompiler.v2.statemachine.kernel.KernelStateMachine;
-  import com.maxeler.maxcompiler.v2.statemachine.types.DFEsmValueType;
-""")
-
-  val smName = name
-  val states = (0 until numStates).map(List(_)).toList
-  emit(s"""class ${smName}_SeqSM extends KernelStateMachine {""")
-
-  val stateNames = states.map(stateStr(_))
-  emit(s"""
-    // States
-    enum States {
-      INIT,
-      RSET,
-      ${stateNames.reduce(_ + ",\n" + _) + ",\nDONE"}
-    }
-  """)
-
-  emit("""
-
-    // State IO
-    private final DFEsmOutput sm_done;
-//    private final DFEsmOutput sm_last;
-    private final DFEsmInput sm_en;
-    private final DFEsmInput sm_numIter;
-    private final DFEsmOutput rst_en;
-  """)
-
-  for(i <- 0 until numStates) {
-    emit(s"""
-    private final DFEsmInput s${i}_done;
-    private final DFEsmOutput s${i}_en;
-    """)
-  }
-
-  emit(s"""
-    // State storage
-    private final DFEsmStateValue sizeFF;
-//    private final DFEsmStateValue lastFF;
-    private final DFEsmStateEnum<States> stateFF;
-    private final DFEsmStateValue counterFF;
-    private final DFEsmStateValue rstCounterFF;
-    private final DFEsmStateValue[] bitVector;
-
-    private final int numStates = ${numStates};
-    private final int rstCycles = 10; // <-- hardcoded
-    // Initialize state machine in constructor
-    public ${smName}_SeqSM(KernelLib owner) {
-      super(owner);
-
-      // Declare all types required to wire the state machine together
-      DFEsmValueType counterType = dfeUInt(32);
-      DFEsmValueType wireType = dfeBool();
-
-      // Define state machine IO
-      sm_done = io.output("sm_done", wireType);
-//      sm_last = io.output("sm_last", wireType);
-      sm_en = io.input("sm_en", wireType);
-      sm_numIter = io.input("sm_numIter", counterType);
-      rst_en = io.output("rst_en", wireType);
-  """)
-
-  for(i <- 0 until numStates) {
-    emit(s"""
-      s${i}_done = io.input("s${i}_done", wireType);
-      s${i}_en = io.output("s${i}_en", wireType);
-    """)
-  }
-
-  emit("""
-    // Define state storage elements and initial state
-      stateFF = state.enumerated(States.class, States.INIT);
-      counterFF = state.value(counterType, 0);
-      rstCounterFF = state.value(counterType, 0);
-      sizeFF = state.value(counterType, 0);
-//      lastFF = state.value(wireType, 0);
-
-      // Bitvector keeps track of which kernels have finished execution
-      // This is a useful hardware synchronization structure to keep
-      // track of which kernels have executed/finished execution
-      bitVector = new DFEsmStateValue[numStates];
-      for (int i=0; i<numStates; i++) {
-        bitVector[i] = state.value(wireType, 0);
-      }
-    }
-
-    private void resetBitVector() {
-      for (int i=0; i<numStates; i++) {
-        bitVector[i].next <== 0;
-      }
-    }
-      """)
-
-  emit(s"""
-    @Override
-    protected void nextState() {
-      IF(sm_en) {
-        // State-agnostic update logic for bitVector
-    """)
-  for(i <- 0 until numStates) {
-    emit(s"""
-        IF (s${i}_done) {
-          bitVector[$i].next <== 1;
-        }""")
-  }
-
-  emit(s"""
-        SWITCH(stateFF) {
-          CASE (States.INIT) {
-            sizeFF.next <== sm_numIter;
-            stateFF.next <== States.RSET;
-            counterFF.next <== 0;
-            rstCounterFF.next <== 0;
-//            lastFF.next <== 0;
-          }
-
-          CASE (States.RSET) {
-            rstCounterFF.next <== rstCounterFF + 1;
-            IF (rstCounterFF === rstCycles) {
-              stateFF.next <== States.S0;
-            } ELSE {
-              stateFF.next <== States.RSET;
-            }
-          }
-          """)
-
-  for(i <- 0 until states.size) {
-    val state = states(i)
-    val name = stateNames(i)
-    emit(s"""
-          CASE (States.${name}) {""")
-      stateTextSeq(state(0), numStates)
-    emit(s"""
-          }""")
-  }
-
-  emit(s"""
-         CASE (States.DONE) {
-           resetBitVector();
-           stateFF.next <== States.INIT;
-         }
-
-         OTHERWISE {
-           stateFF.next <== stateFF;
-         }
-        }
-      }
-    }""")
-
-  emit(s"""
-  @Override
-    protected void outputFunction() {
-      sm_done <== 0;
-      rst_en <== 0;
-//      sm_last <== 0;
-      """)
-
-  for (i <- 0 until numStates) {
-    emit(s"""
-      s${i}_en <== 0;""")
-  }
-
-  emit(s"""
-     IF (sm_en) {
-//        IF (counterFF === sizeFF-1) {
-//          sm_last <== 1;
-//        } ELSE {
-//          sm_last <== 0;
-//        }
-       SWITCH(stateFF) {
-            CASE (States.RSET) {
-              rst_en <== 1;
-            }""")
-        for(i <- 0 until states.size) {
-          val state = states(i)
-          val name = stateNames(i)
-          emit(s"""
-            CASE (States.$name) {""")
-             for (s <- state) {
-               emit(s"""s${s}_en <== ~(bitVector[$s] | s${s}_done);""")
-             }
-          emit(s"""
-                }""")
-        }
-
-        emit(s"""
-          CASE (States.DONE) {
-            sm_done <== 1;
-          }""")
-
-  emit("""
-      }
-    }
-  }
-}
-  """)
-  }
-
-	def emitParallelSM(name: String, numParallel: Int) = {
-		emit(s"""
-			package engine;
-			import com.maxeler.maxcompiler.v2.kernelcompiler.KernelLib;
-			import com.maxeler.maxcompiler.v2.statemachine.DFEsmInput;
-			import com.maxeler.maxcompiler.v2.statemachine.DFEsmOutput;
-			import com.maxeler.maxcompiler.v2.statemachine.DFEsmStateEnum;
-			import com.maxeler.maxcompiler.v2.statemachine.DFEsmStateValue;
-			import com.maxeler.maxcompiler.v2.statemachine.kernel.KernelStateMachine;
-			import com.maxeler.maxcompiler.v2.statemachine.types.DFEsmValueType;
-
-			class ${name}_ParSM extends KernelStateMachine {
-
-				// States
-				enum States {
-					INIT,
-					RUN,
-					DONE
-				}
-
-				// State IO
-				private final DFEsmOutput sm_done;
-				private final DFEsmInput sm_en;""");
-
-		for(i <- 0 until numParallel) {
-			emit(s"""
-				private final DFEsmInput s${i}_done;
-				private final DFEsmOutput s${i}_en;
-				""")
-		}
-
-		emit(s"""
-			// State storage
-			private final DFEsmStateEnum<States> stateFF;
-			private final DFEsmStateValue[] bitVector;
-
-			private final int numParallel = $numParallel;
-			// Initialize state machine in constructor
-			public ${name}_ParSM(KernelLib owner) {
-				super(owner);
-
-				// Declare all types required to wire the state machine together
-				DFEsmValueType counterType = dfeUInt(32);
-				DFEsmValueType wireType = dfeBool();
-				// Define state machine IO
-				sm_done = io.output("sm_done", wireType);
-				sm_en = io.input("sm_en", wireType);
-				""")
-		for(i <- 0 until numParallel) {
-			emit(s"""
-				s${i}_done = io.input("s${i}_done", wireType);
-				s${i}_en = io.output("s${i}_en", wireType);
-				""")
-		}
-
-		emit(s"""
-			// Define state storage elements and initial state
-			stateFF = state.enumerated(States.class, States.INIT);
-
-			bitVector = new DFEsmStateValue[numParallel];
-			for (int i=0; i<numParallel; i++) {
-				bitVector[i] = state.value(wireType, 0);
-			}
-			}
-
-			private void resetBitVector() {
-				for (int i=0; i<numParallel; i++) {
-					bitVector[i].next <== 0;
-				}
-			}
-
-			@Override
-			protected void nextState() {
-				IF(sm_en) {
-					""")
-
-		for(i <- 0 until numParallel) {
-			emit(s"""
-				IF (s${i}_done) {
-					bitVector[$i].next <== 1;
-				}""")
-		}
-
-		emit(s"""
-			SWITCH(stateFF) {
-				CASE (States.INIT) {
-					stateFF.next <== States.RUN;
-				}
-				""")
-
-		emit(s"""
-			CASE (States.RUN) {""")
-				val condStr = (0 until numParallel).map("bitVector[" + _ + "]").reduce(_ + " & " + _)
-				emit(s"""
-					IF($condStr) {
-						resetBitVector();
-						stateFF.next <== States.DONE;
-					}
-			}
-
-			CASE (States.DONE) {
-				resetBitVector();
-				stateFF.next <== States.INIT;
-			}
-			OTHERWISE {
-				stateFF.next <== stateFF;
-			}
-			}
-				}
-			}
-			""")
-
-				emit("""
-					@Override
-					protected void outputFunction() {
-						sm_done <== 0;""")
-				for (i <- 0 until numParallel) {
-					emit(s"""
-						s${i}_en <== 0;""")
-				}
-
-				emit("""
-					IF (sm_en) {
-						SWITCH(stateFF) {
-							CASE(States.RUN) {""")
-								for (i <- 0 until numParallel) {
-									emit(s"""s${i}_en <== ~(bitVector[${i}] | s${i}_done);""")
-								}
-								emit(s"""
-							}
-							CASE(States.DONE) {
-								sm_done <== 1;
-							}
-						}
-					}
-					}
-			}""")
-	}
-	
 	def emitPipeProlog(sym: Sym[Any], cchain: Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]],
 		writesToAccumRam:Boolean) = {
 		val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain

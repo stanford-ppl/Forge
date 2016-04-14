@@ -2,6 +2,7 @@ package dhdl.compiler.ops
 
 import java.io.{File,FileWriter,PrintWriter}
 import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, CGenEffect, DotGenEffect, MaxJGenEffect, Record}
+import scala.virtualization.lms.internal.{Traversal}
 import scala.reflect.{Manifest,SourceContext}
 
 import dhdl.shared._
@@ -82,6 +83,26 @@ trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp {
     case StructType(_,fields) => fields.map(f => isBits(f._2)).fold(true){_&&_}
     case _ => false
   }
+}
+
+trait MaxJGenTypeInspectionOps extends MaxJGenEffect {
+	val IR:DHDLExp
+	import IR.{infix_until => _, looprange_until => _, println => _, _}
+
+	lazy val preCodegen = new MaxJPreCodegen {
+		val IR: MaxJGenTypeInspectionOps.this.IR.type = MaxJGenTypeInspectionOps.this.IR 
+	}
+
+  override def initializeGenerator(bd:String): Unit = { 
+		preCodegen.buildDir = bd
+		super.initializeGenerator(bd)
+	}
+
+  override def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, out: PrintWriter) = {
+		preCodegen.run(body)
+		super.emitSource(args, body, className, out)
+	}
+	
 }
 
 trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
@@ -572,8 +593,14 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplate
 }
 
 trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
-  val IR: ControllerTemplateOpsExp with DHDLIdentifiers
+	  val IR: ControllerTemplateOpsExp with OffChipMemOpsExp with DHDLCodegenOps with RegOpsExp with DHDLIdentifiers
   import IR._
+
+	var emittedSize = Set.empty[Exp[Any]]
+  override def initializeGenerator(buildDir:String): Unit = {
+		emittedSize = Set.empty[Exp[Any]]
+		super.initializeGenerator(buildDir)
+	}
 
   // Note that tileDims are not fixed point values yet - they're just integers
   private def localDimsToStrides(dims: List[Int]) = List.tabulate(dims.length){d =>
@@ -584,6 +611,28 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
   // TODO: match on store = true or store = false if want as different gen rules
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) =>
+
+		case Offchip_new(size) =>
+			/* Special case to hand nodes producing size of offchip outside hardware scope */
+			def hackGen(x: Exp[Any]): Unit = x match { 
+				case Def(EatReflect(_:Reg_new[_])) => // Nothing
+				case ConstFix(_) => // Nothing
+				case ConstFlt(_) => // Nothing
+				case Def(d) => 
+					alwaysGen {
+						emitNode(x.asInstanceOf[Sym[Any]], d)
+					}
+					syms(d).foreach{ s => s match {
+							case _ => hackGen(s)
+						}
+					}
+				case _ => // Nothing
+			}
+			if (!emittedSize.contains(size)) {
+				hackGen(size)
+				emittedSize = emittedSize + size
+			}
+			super.emitNode(sym, rhs)
 
     case _ => super.emitNode(sym, rhs)
   }

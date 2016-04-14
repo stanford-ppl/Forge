@@ -202,10 +202,14 @@ trait DHDLMemories {
 					//TODO: don't have input here
 					@ }
 				@ case ArgumentIn =>  // alwaysGen
-					@ val sn = "ArgIn" + quote(sym).substring(quote(sym).indexOf("_"))
-          DFEVar $sn = io.scalarInput($sn , $ts );
+        	@ alwaysGen {
+						@ val sn = "ArgIn" + quote(sym).substring(quote(sym).indexOf("_"))
+          	DFEVar $sn = io.scalarInput($sn , $ts );
+				  @ }
 				@ case ArgumentOut => // alwaysGen
-					@ val sn = "ArgOut" + quote(sym).substring(quote(sym).indexOf("_"))
+        	@ alwaysGen {
+						@ val sn = "ArgOut" + quote(sym).substring(quote(sym).indexOf("_"))
+			    @ }
 			@ }
 		}))
     impl (reg_read)  (codegen(maxj, ${
@@ -368,12 +372,7 @@ trait DHDLMemories {
       //      fp(s"""$mem.connectWport(stream.offset($addr, -$offsetStr), stream.offset($dataStr, -$offsetStr), ${quote(parentCtr)}_en_from_pipesm, $start, $stride);""")
       @     }
       @   } else {
-      @     if (isDblBuf(bram)) {
-      //@       emit(quote(bram) + ".connectWport(" + quote(addr) + ", " + dataStr + ", " + quote(parentOf(bram).get) + "_en, " + n.start + ", " + n.stride + ";")
-      @     } else {
-							//TODO:Yaqi: what's the difference between two cases?
-      @       //emit(s"""$mem.connectWport($addr, $dataStr, ${quote(n.getParent())}_en, ${n.start}, ${n.stride});""")
-      @     }
+      //@     emit(quote(bram) + ".connectWport(" + quote(addr) + ", " + dataStr + ", " + quote(parentOf(bram).get) + "_en, " + n.start + ", " + n.stride + ";")
       @   }
 		}))
     impl (bram_reset) (codegen(maxj, ${ }))
@@ -450,6 +449,8 @@ trait DHDLMemories {
 
 		// --- MaxJ Backend
 		impl (offchip_new) (codegen(maxj, ${
+			@ alwaysGen {
+      @ }
 		}))
   }
 

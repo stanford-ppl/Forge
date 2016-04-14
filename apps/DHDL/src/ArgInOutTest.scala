@@ -9,9 +9,9 @@ trait ArgInOutTest extends DHDLApplication {
 
   def main() {
     val N = 8
-
-    val x = ArgIn[SInt]("x")
-    val y = ArgOut[SInt]("y")
+  	val x = ArgIn[SInt]("x")
+  	val y = ArgOut[SInt]("y")
+    setArg(x, N)
     Accel {
       setArg(x, N)
       y := x + 4

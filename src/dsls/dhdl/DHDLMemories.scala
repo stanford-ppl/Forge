@@ -358,12 +358,7 @@ trait DHDLMemories {
       //      fp(s"""$mem.connectWport(stream.offset($addr, -$offsetStr), stream.offset($dataStr, -$offsetStr), ${quote(parentCtr)}_en_from_pipesm, $start, $stride);""")
       @     }
       @   } else {
-      @     if (isDblBuf(bram)) {
-      //@       emit(quote(bram) + ".connectWport(" + quote(addr) + ", " + dataStr + ", " + quote(parentOf(bram).get) + "_en, " + n.start + ", " + n.stride + ";")
-      @     } else {
-							//TODO:Yaqi: what's the difference between two cases?
-      @       //emit(s"""$mem.connectWport($addr, $dataStr, ${quote(n.getParent())}_en, ${n.start}, ${n.stride});""")
-      @     }
+      //@     emit(quote(bram) + ".connectWport(" + quote(addr) + ", " + dataStr + ", " + quote(parentOf(bram).get) + "_en, " + n.start + ", " + n.stride + ";")
       @   }
 		}))
     impl (bram_reset) (codegen(maxj, ${ }))

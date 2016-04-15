@@ -2,7 +2,7 @@ package dhdl.compiler.ops
 
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.internal.Traversal
-import scala.collection.immutable.HashMap
+import scala.collection.mutable.HashMap
 
 import dhdl.shared._
 import dhdl.shared.ops._
@@ -39,14 +39,21 @@ trait ModelingTools extends Traversal with PipeStageTools {
   def latencyOf(e: Exp[Any]) = if (inHwScope) IR.latencyOf(e, inReduce) else 0L
 
   // TODO: Could optimize further with dynamic programming
-  def quickDFS(cur: Exp[Any], scope: List[Exp[Any]]): Long = cur match {
-    case Def(d) if scope.contains(cur) && !isGlobal(cur) =>
-      latencyOf(cur) + syms(d).map(quickDFS(_,scope)).max
-    case _ => 0L
-  }
   def latencyOfPipe(b: Block[Any]): Long = {
-    val nodes = getStages(b)
-    if (nodes.isEmpty) 0L else quickDFS(nodes.last, nodes)
+    val scope = getStages(b)
+    var paths = HashMap[Exp[Any],Long]()
+    //debug(s"Pipe latency $b:")
+
+    def quickDFS(cur: Exp[Any]): Long = cur match {
+      case Def(d) if scope.contains(cur) && !isGlobal(cur) =>
+        //debug(s"Visit $cur in quickDFS (${latencyOf(cur)})")
+        latencyOf(cur) + syms(d).map{e => paths.getOrElseUpdate(e,quickDFS(e))}.max
+      case _ => 0L
+    }
+    if (scope.isEmpty) 0L else scope.last match {
+      case e@Def(d:Reify[_]) => syms(d).map{e => paths.getOrElseUpdate(e,quickDFS(e))}.max
+      case e => quickDFS(e)
+    }
   }
   def latencyOfCycle(b: Block[Any]): Long = {
     val outerReduce = inReduce
@@ -60,27 +67,37 @@ trait ModelingTools extends Traversal with PipeStageTools {
   def pipeDelays(b: Block[Any], oos: Map[Exp[Any],Long] = Map.empty): List[(Exp[Any],Long)] = {
     val scope = getStages(b).filterNot(s => isGlobal(s))
     var delays = HashMap[Exp[Any],Long]() ++ scope.map{node => node -> 0L}
+    var paths  = HashMap[Exp[Any],Long]() ++ oos
 
     def fullDFS(cur: Exp[Any]): Long = cur match {
       case Def(d) if scope.contains(cur) =>
         val deps = syms(d) filter (scope contains _)
 
         if (!deps.isEmpty) {
-          val dlys = deps.map(fullDFS(_))
+          val dlys = deps.map{e => paths.getOrElseUpdate(e, fullDFS(e)) }
           val critical = dlys.max
 
           deps.zip(dlys).foreach{ case(dep, path) =>
             if (path < critical && (critical - path) > delays(dep))
-              delays += dep -> (critical - path)
+              delays(dep) = critical - path
           }
           critical + latencyOf(cur)
         }
         else latencyOf(cur)
 
-      case s if oos.contains(s) => oos(s) // Get preset out of scope delay
-      case _ => 0L                        // Otherwise assume 0 offset
+      case s => paths.getOrElse(s, 0L) // Get preset out of scope delay
+                                       // Otherwise assume 0 offset
     }
-    if (!scope.isEmpty) fullDFS(scope.last)
+    if (!scope.isEmpty) scope.last match {
+      case Def(d: Reify[_]) =>
+        val deps = syms(d) filter (scope contains _)
+        for (e <- deps) {
+          paths.getOrElseUpdate(e,fullDFS(e)) // Not yet visited by any other path
+        }
+        // No synchronization between paths - we're done when the longest is done
+
+      case e => fullDFS(e)
+    }
     delays.toList
   }
 
@@ -103,6 +120,8 @@ trait LatencyAnalyzer extends ModelingTools {
   val IR: DHDLExp with LatencyAnalysisExp
   import IR._
   import ReductionTreeAnalysis._
+
+  override val debugMode = true
 
   var cycleScope: List[Long] = Nil
   var totalCycles: Long = 0L
@@ -139,7 +158,6 @@ trait LatencyAnalyzer extends ModelingTools {
     postprocess(savedBlock)
   }
 
-
   def traverseNode(lhs: Exp[Any], rhs: Def[Any]) {
     val cycles = rhs match {
       case EatReflect(Hwblock(blk)) =>
@@ -157,11 +175,18 @@ trait LatencyAnalyzer extends ModelingTools {
 
       // --- Pipe
       case EatReflect(Unit_pipe(func)) if styleOf(lhs) == Fine =>
-        latencyOfPipe(func) + latencyOf(lhs)
+        val pipe = latencyOfPipe(func)
+        debug(s"Pipe $lhs: ")
+        debug(s"  pipe = $pipe")
+        pipe + latencyOf(lhs)
 
       case EatReflect(Pipe_foreach(cchain, func, _)) if styleOf(lhs) == Fine =>
         val N = nIters(cchain)
-        latencyOfPipe(func) + N - 1 + latencyOf(lhs)
+        val pipe = latencyOfPipe(func)
+
+        debug(s"Foreach $lhs (N = $N):")
+        debug(s"  pipe = $pipe")
+        pipe + N - 1 + latencyOf(lhs)
 
       case EatReflect(Pipe_reduce(cchain,_,iFunc,ld,st,func,rFunc,_,_,_,_,_)) if styleOf(lhs) == Fine =>
         val N = nIters(cchain)
@@ -171,17 +196,28 @@ trait LatencyAnalyzer extends ModelingTools {
         val internal = latencyOfPipe(rFunc) * reductionTreeHeight(P)
         val cycle = latencyOfCycle(iFunc) + latencyOfCycle(ld) + latencyOfCycle(rFunc) + latencyOfCycle(st)
 
+        debug(s"Reduce $lhs (N = $N):")
+        debug(s"  body  = $body")
+        debug(s"  tree  = $internal")
+        debug(s"  cycle = $cycle")
         body + internal + N*cycle + latencyOf(lhs)
 
       // --- Sequential
       case EatReflect(Unit_pipe(func)) if styleOf(lhs) == Disabled =>
-        latencyOfBlock(func).sum + latencyOf(lhs)
+        debug(s"Outer Pipe:")
+        val stages = latencyOfBlock(func)
+        stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
+        stages.sum + latencyOf(lhs)
 
 
       // --- Metapipeline and Sequential
       case EatReflect(Pipe_foreach(cchain, func, _)) =>
         val N = nIters(cchain)
         val stages = latencyOfBlock(func)
+
+        debug(s"Outer Foreach (N = $N):")
+        stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
+
         if (styleOf(lhs) == Coarse) { stages.max * (N - 1) + stages.sum + latencyOf(lhs) }
         else                        { stages.sum * N + latencyOf(lhs) }
 
@@ -194,6 +230,10 @@ trait LatencyAnalyzer extends ModelingTools {
 
         val reduceStage = internal + cycle
         val stages = mapStages :+ reduceStage
+
+        debug(s"Outer Reduce $lhs (N = $N):")
+        stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
+
         if (styleOf(lhs) == Coarse) { stages.max * (N - 1) + stages.sum + latencyOf(lhs) }
         else                        { stages.sum * N + latencyOf(lhs) }
 
@@ -209,6 +249,10 @@ trait LatencyAnalyzer extends ModelingTools {
 
         val reduceStage: Long = internal + Nr*cycle
         val stages = mapStages :+ reduceStage
+
+        debug(s"Block Reduce $lhs (Nm = $Nm, Nr = $Nr)")
+        stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
+
         if (styleOf(lhs) == Coarse) { stages.max * (Nm - 1) + stages.sum + latencyOf(lhs) }
         else                        { stages.sum * Nm + latencyOf(lhs) }
 

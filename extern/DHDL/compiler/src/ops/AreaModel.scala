@@ -57,7 +57,7 @@ case class FPGAResources(
 
   override def toString() = s"luts=$lut3,$lut4,$lut5,$lut6,$lut7,mems=$mem16,$mem32,$mem64,regs=$regs,dsps=$dsps,bram=$bram,streams=$streams"
 
-  def toArray: Array[Int] = Array(lut7,lut6,lut5,lut4,lut3,mem64,mem32,mem16,regs,dsps,bram,streams)
+  def toArray: Array[Int] = Array(lut7,lut6,lut5,lut4,lut3,mem64,mem32,mem16,regs,dsps,bram)
 }
 
 object NoArea extends FPGAResources()
@@ -93,7 +93,7 @@ trait AreaModel {
     FPGAResources(mem64=m64, mem32=m32, mem16=m16)
   }
 
-  private def areaOfArg(nbits: Int) = FPGAResources(regs=3*nbits/2)
+  private def areaOfArg(nbits: Int) = FPGAResources(regs=nbits) //3*nbits/2)
 
   /**
    * Area resources required for a BRAM with word size nbits, and with given depth,
@@ -133,6 +133,7 @@ trait AreaModel {
 
   private def areaOfNodeOutOfScope(s: Exp[Any], d: Def[Any]): FPGAResources = d match {
     case _:Reg_new[_] if regType(s) != Regular => areaOfNode(s, d)
+    case Reflect(d,_,_) => areaOfNodeOutOfScope(s,d)
     case _ => NoArea
   }
 
@@ -141,6 +142,7 @@ trait AreaModel {
    * Accumulator calculation+update is often generated as a special case to minimize latencies in tight cycles
    **/
   private def areaOfNodeInReduce(s: Exp[Any], d: Def[Any]): FPGAResources = d match {
+    case Reflect(d,_,_) => areaOfNodeInReduce(s,d)
     case _ => areaOfNode(s, d)
   }
 

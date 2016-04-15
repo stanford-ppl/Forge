@@ -21,10 +21,26 @@ trait LatencyModel {
   }
 
   private def latencyOfNodeInReduce(s: Exp[Any], d: Def[Any]): Long = d match {
-    case DHDLPrim_Add_flt(_,_) => 2
+    case DHDLPrim_Add_flt(_,_) => 1
     case Reg_write(_,_) => 0
+    case Reflect(d,_,_) => latencyOfNodeInReduce(s,d)
     case _ => latencyOfNode(s, d)
   }
+
+  // c - contention (1 to 13) (number of readers/writers in parallel)
+  // r - number of commands (>= 1)
+  // b - number of words per command (step of 96)
+  // p - number of words read into buffer in parallel
+  def memoryModel(c: Int, r: Int, b: Int, p: Int) = {
+    val overhead12 = b match {
+      case 96  => 0.307/(1 + Math.exp(-0.096*r + 0.21))   // Logistic, bounded by 30.7%
+      case 192 => 0.185/(1 + Math.exp(-0.24*r - 0.8))     // Logistic, bounded by 18.5%
+      case _ => 0.165
+    }
+    val overhead = ((1/Math.log(12))*Math.log(c))*overhead12
+    Math.ceil( (1+overhead)*(110 + r*(53 + b)) ).toLong
+  }
+
 
   private def latencyOfNode(s: Exp[Any], d: Def[Any]): Long = s match {
     case Fixed(_) => 0
@@ -140,8 +156,18 @@ trait LatencyModel {
 
 
     // TODO: These need new numbers after Raghu's changes
-    //case tt: TileTransfer[_] if tt.store =>
-    //case tt: TileTransfer[_] if !tt.store =>
+    case TileTransfer(mem,local,_,_,_,cc,_,true) =>
+      val c = contentionOf(s)
+      val ts = dimsOf(local).map(d => bound(d).getOrElse(stageError("Cannot resolve bound of BRAM dimension")))
+      val r = if (ts.length == 1) 1 else ts(0)
+      val b = if (ts.length == 1) ts(0) else ts.drop(1).reduce{_*_}
+      val p = parOf(cc).reduce{_*_}
+      memoryModel(c,r.toInt,b.toInt,p)
+
+    case TileTransfer(mem,local,_,_,_,cc,_,false) =>
+      val p = parOf(cc).reduce{_*_}
+      val s = dimsOf(local).map(d => bound(d).getOrElse(stageError("Cannot resolve bound of BRAM dimension")))
+      Math.ceil(s.reduce{_*_}/p.toDouble).toLong
 
     case _:Pipe_parallel => 1
     case _:Pipe_foreach  => 1
@@ -149,7 +175,6 @@ trait LatencyModel {
     case _:Block_reduce[_]  => 1
     case _:Unit_pipe => 0
 
-    // Nodes with known zero area cost
     case Reg_read(s) if regType(s) == ArgumentIn => 0
     case Reg_read(s) => 0
 

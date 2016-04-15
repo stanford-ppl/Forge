@@ -244,6 +244,13 @@ trait DHDLMetadata {
     rewrite (boundOps, "boundOf") using pattern(${Const(x)} -> ${ fixed(extractNumericConstant(x)) })
     */
 
+    val MContention = metadata("MContention", "contention" -> SInt)
+    val contentionOps = metadata("contentionOf")
+    onMeet (MContention) ${ this }
+    internal.static (contentionOps) ("update", T, (T, SInt) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MContention($1)) }
+    internal.static (contentionOps) ("apply", T, T :: SInt) implements composite ${ meta[MContention]($0).map(_.contention).getOrElse(1) }
+
     /* Parent of a node, which is a controller : None if unset */
 	 	// Parent controls the reset of the node
 	 	// TODO: confirm with Raghu

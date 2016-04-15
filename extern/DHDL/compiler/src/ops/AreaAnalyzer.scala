@@ -34,6 +34,8 @@ trait AreaAnalyzer extends ModelingTools {
   import IR._
   import ReductionTreeAnalysis._
 
+  //override val debugMode = true
+
   override def silenceTraversal() {
     super.silenceTraversal()
     IR.silenceAreaModel()

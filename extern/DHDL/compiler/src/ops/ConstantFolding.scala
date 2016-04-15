@@ -17,7 +17,7 @@ trait ConstantFolding extends ForwardTransformer {
   val IR: DHDLExp
   import IR._
 
-  override val debugMode = true
+  override val debugMode = false
 
   def convertType[T:Manifest](x: Int)(implicit ctx: SourceContext) = x.as[T]
   def convertType[T:Manifest](x: Long)(implicit ctx: SourceContext) = x.as[T]

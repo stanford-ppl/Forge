@@ -122,14 +122,15 @@ trait DSE extends Traversal {
   def dse[A:Manifest](b: Block[A]) {
     // Specify FPGA target (hardcoded right now)
     val target = FPGATarget
-
     val areaAnalyzer = new AreaAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
     val cycleAnalyzer = new LatencyAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
+    val contention = new ContentionModel{val IR: DSE.this.IR.type = DSE.this.IR}
     cycleAnalyzer.silenceTraversal()
     areaAnalyzer.silenceTraversal()
     bndAnalyzer.run(b)
     areaAnalyzer.run(b)
     cycleAnalyzer.run(b)
+    contention.init()
 
     // A. Get lists of parameters
     val metapipes = ctrlAnalyzer.metapipes
@@ -148,6 +149,7 @@ trait DSE extends Traversal {
       setDoubleBuffers()
       setBanks()
       bndAnalyzer.run(b)
+      contention.run()
       //areaAnalyzer.resume()
       //cycleAnalyzer.resume()
       areaAnalyzer.run(b)

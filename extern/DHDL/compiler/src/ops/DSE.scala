@@ -85,8 +85,8 @@ trait DSE extends Traversal {
     ctrlAnalyzer.run(b)
     paramAnalyzer.run(b)
 
-    if (debugMode) printer.run(b)
-    if (debugMode) dblBuffers foreach {case (ctrl,mem) => debug(s"Found double buffer: $mem (in $ctrl)") }
+    //if (debugMode) printer.run(b)
+    //if (debugMode) dblBuffers foreach {case (ctrl,mem) => debug(s"Found double buffer: $mem (in $ctrl)") }
 
     if (Config.enableDSE) dse(b)
 
@@ -127,6 +127,9 @@ trait DSE extends Traversal {
     val cycleAnalyzer = new LatencyAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
     cycleAnalyzer.silenceTraversal()
     areaAnalyzer.silenceTraversal()
+    bndAnalyzer.run(b)
+    areaAnalyzer.run(b)
+    cycleAnalyzer.run(b)
 
     // A. Get lists of parameters
     val metapipes = ctrlAnalyzer.metapipes
@@ -145,6 +148,8 @@ trait DSE extends Traversal {
       setDoubleBuffers()
       setBanks()
       bndAnalyzer.run(b)
+      //areaAnalyzer.resume()
+      //cycleAnalyzer.resume()
       areaAnalyzer.run(b)
       cycleAnalyzer.run(b)
       (areaAnalyzer.totalArea, cycleAnalyzer.totalCycles)
@@ -205,6 +210,7 @@ trait DSE extends Traversal {
     val startTime = System.currentTimeMillis
     var i = 0L
     var pos = 0
+    var nextNotify = 0.0; val notifyStep = 200
     while (i < spaceSize) {
       // Get and set current parameter combination
       val point = indexedSpace.foreach{case (domain,d) => domain.set( ((i / prods(d)) % dims(d)).toInt ) }
@@ -242,6 +248,11 @@ trait DSE extends Traversal {
 
           pos += 1
         }
+      }
+      if (i > nextNotify) {
+        val time = System.currentTimeMillis - startTime
+        debug("%.4f".format(100*(i/spaceSize.toFloat)) + s"% ($i / $spaceSize) Complete after ${time/1000} seconds")
+        nextNotify += notifyStep
       }
       i += iStep
     }

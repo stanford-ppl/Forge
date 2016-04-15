@@ -514,17 +514,10 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case e@Counterchain_new(counters,nIters) =>
 
-			//TODO: this seems allow a pipe to be a sequential, which wouldn't work
     case e@Pipe_foreach(cchain, func, inds) =>
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
 				case Coarse =>
 				case Fine =>
-					//TODO: assume bram not write to accum
-			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
-				case Coarse => 
-				case Fine => 
-				case Disabled => 
-			}
     			//val writesToAccumRam = mapNode.nodes.filter { _.isInstanceOf[St] }.exists { _.asInstanceOf[St].mem.isAccum }
 					val writesToAccumRam = false
 					emitPipeProlog(sym, cchain, inds, writesToAccumRam)

@@ -647,36 +647,33 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
 		case e@Reg_write(reg, value) => 
 			val ts = tpstr(par(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
 			if (isDblBuf(reg)) {
-     	//TODO:uncomment after analysis pass
-			// 	emit(quote(reg) + "_lib.write(" + value + ", " + quote(writerOf(reg).get) + "_done);")
+			 	emit(quote(reg) + "_lib.write(" + value + ", " + quote(writerOf(reg).get) + "_done);")
       } else {
 				regType(reg) match {
 					case Regular => //TODO
-      		//val parent = if (parentOf(reg).isEmpty) "top" else quote(parentOf(reg).get)
-      		//val rst = quote(parent) + "_rst_en"
-					//TODO: uncomment after analysis pass
-					//if (writerOf(reg).isEmpty) {
-					//	throw new Exception("Reg " + quote(reg) + " is not written by a controller, which is not supported at the moment")
-					//	val enSignalStr = writerOf(reg).get match {
-					//		case p@Def(Pipe_foreach(cchain,_,_)) => styleOf(reg) match {
-					//			case Fine =>
-					//				emit(quote(cchain) + "_en_from_pipesm")
-					//			case _ =>
-					//				emit(quote(writerOf(reg).get) + "_en")
-					//		}
-					//		case p@Def(Pipe_reduce(cchain, _, _, _, _, _, _, _, _, _)) => styleOf(reg) match {
-					//			case Fine =>
-					//				emit(quote(cchain) + "_en_from_pipesm")
-					//			case _ =>
-					//				emit(quote(writerOf(reg).get) + "_en")
-					//		}
-					//		case _ =>
-					//	}
-					//}
-      		//emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}; // enable""")
-					//TODO: uncomment after analysis
-      		//@  emit(s"""DFEVar ${quote(reg)}_hold = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writerOf(reg).get)}_redLoop_done));""")
-      		//@  emit(s"""${quote(reg)} <== $rst ? constant.var(${tpstr(init)},0):stream.offset(${quote(reg)}_hold, -${quote(writerOf(reg).get)}_offset); // reset""")
+      		  val parent = if (parentOf(reg).isEmpty) "top" else quote(parentOf(reg).get)
+      		  val rst = quote(parent) + "_rst_en"
+					  if (writerOf(reg).isEmpty)
+					  	throw new Exception("Reg " + quote(reg) + " is not written by a controller, which is not supported at the moment")
+					  val enSignalStr = writerOf(reg).get match {
+					  	case p@Def(Pipe_foreach(cchain,_,_)) => styleOf(reg) match {
+					  		case Fine =>
+					  			emit(quote(cchain) + "_en_from_pipesm")
+					  		case _ =>
+					  			emit(quote(writerOf(reg).get) + "_en")
+					  	}
+					  	case p@Def(Pipe_reduce(cchain, _, _, _, _, _, _, _, _, _, _, _)) => styleOf(reg) match {
+					  		case Fine =>
+					  			emit(quote(cchain) + "_en_from_pipesm")
+					  		case _ =>
+					  			emit(quote(writerOf(reg).get) + "_en")
+					  	}
+					  	case _ =>
+					  }
+      		  emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}; // enable""")
+      		  emit(s"""DFEVar ${quote(reg)}_hold = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writerOf(reg).get)}_redLoop_done));""")
+						//TODO: Raghu
+      		  emit(s"""${quote(reg)} <== $rst ? constant.var(${tpstr(par(reg))(reg.tp, implicitly[SourceContext])}, ${quote(init)}):stream.offset(${quote(reg)}_hold, -${quote(writerOf(reg).get)}_offset); // reset""")
 				case ArgumentIn => new Exception("Cannot write to Argument Out! " + quote(reg))
 				case ArgumentOut =>
 				 	val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"

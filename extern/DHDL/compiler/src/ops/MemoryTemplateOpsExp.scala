@@ -24,37 +24,24 @@ trait FloatPoint[SIG,EXP]
 trait DHDLIndices
 
 // Stub (nothing here for now)
-trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp {
+trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp with DHDLMetadataOpsExp {
   this: DHDLExp =>
-
-  /*def extractNumericConstant[T:Manifest](x: T): Option[Double] = {
-    val mD = manifest[Double]
-    val mF = manifest[Float]
-    val mI = manifest[Int]
-    val mL = manifest[Long]
-
-    manifest[T] match {
-      case `mI` => Some(x.asInstanceOf[Int].toDouble)
-      case `mL` => Some(x.asInstanceOf[Long].toDouble)
-      case `mF` => Some(x.asInstanceOf[Float].toDouble)
-      case `mD` => Some(x.asInstanceOf[Double])
-      case _ => None
-    }
-  }
-
-  override def boundsOf(x: Rep[Any])(implicit ctx: SourceContext): Option[Double] = x match {
-    case Param(c) => extractNumericConstant(c)(mtype(x.tp))
-    case Const(c) => extractNumericConstant(c)(mtype(x.tp))
-    case _ => super.boundsOf(x)
-  }*/
 
   def isFixPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FixedPoint[_,_,_]])
   def isFltPtType[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FloatPoint[_,_]])
   def isBitType[T:Manifest]   = isSubtype(manifest[T].runtimeClass, classOf[DHDLBit])
   def isPipeline[T:Manifest]  = isSubtype(manifest[T].runtimeClass, classOf[DHDLPipeline])
   def isRegister[T:Manifest]  = isSubtype(manifest[T].runtimeClass, classOf[Register[_]])
+  def isBRAM[T:Manifest]      = isSubtype(manifest[T].runtimeClass, classOf[BlockRAM[_]])
 
   // Shorthand versions for matching on ConstFixPt and ConstFltPt without the manifests
+  object ParamFix {
+    def unapply(x: Exp[Any]): Option[Param[Int]] = x match {
+      case Def(EatReflect(Tpes_Int_to_fix(e: Param[Int]))) => Some(e)
+      case _ => None
+    }
+  }
+
   object ConstFix {
     def unapply(x: Any): Option[Any] = x match {
       case ConstFixPt(x,_,_,_) => Some(x)
@@ -83,6 +70,33 @@ trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp {
     case StructType(_,fields) => fields.map(f => isBits(f._2)).fold(true){_&&_}
     case _ => false
   }
+
+  private def extractNumericConst[T:Manifest](x: T): Option[Double] = {
+    val mD = manifest[Double]
+    val mF = manifest[Float]
+    val mI = manifest[Int]
+    val mL = manifest[Long]
+
+    manifest[T] match {
+      case `mI` => Some(x.asInstanceOf[Int].toDouble)
+      case `mL` => Some(x.asInstanceOf[Long].toDouble)
+      case `mF` => Some(x.asInstanceOf[Float].toDouble)
+      case `mD` => Some(x.asInstanceOf[Double])
+      case _ => None
+    }
+  }
+  override def boundOf(__arg0: Rep[Any])(implicit __pos: SourceContext): Option[MBound] = __arg0 match {
+    case p: Param[_] if p.tp == manifest[Int] =>
+      val c = extractNumericConst(p.asInstanceOf[Param[Int]].x)
+      c.map{c => if (p.isFixed) fixed(c) else exact(c) }
+
+    case Const(x) =>
+      val c = extractNumericConst(x)
+      c.map{c => fixed(c) }
+
+    case _ => super.boundOf(__arg0)
+  }
+
 }
 
 trait MaxJGenTypeInspectionOps extends MaxJGenEffect {
@@ -134,7 +148,7 @@ trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
   def bitManifest: Manifest[Bit] = manifest[DHDLBit]
 }
 
-trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypesExp with EffectExp {
+trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypesExp with EffectExp with BRAMOpsExp {
   this: DHDLExp =>
 
   // --- Nodes
@@ -143,7 +157,7 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
     local:    Rep[BRAM[T]],                      // Local memory (BRAM)
     strides:  List[Rep[FixPt[Signed,B32,B0]]],   // Dimensions converted to strides for offchip memory
     memOfs:   Rep[FixPt[Signed,B32,B0]],         // Offset into offchip memory
-    tileDims: List[Int],                         // Tile dimensions
+    tileStrides: List[Rep[FixPt[Signed,B32,B0]]],   // Tile strides
     cchain:   Rep[CounterChain],                 // Counter chain for copy
     iters:    List[Sym[FixPt[Signed,B32,B0]]],   // Bound iterator variables
     store:    Boolean                            // Is this transfer a store (true) or a load (false)
@@ -152,11 +166,22 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
   }
 
   // --- Internal API
-  def tile_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], strides: List[Rep[FixPt[Signed,B32,B0]]], memOfs: Rep[FixPt[Signed,B32,B0]], tileDims: List[Int], cchain: Rep[CounterChain], store: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
-    val iters = List.fill(sizeOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }
+  def tile_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], strides: List[Rep[FixPt[Signed,B32,B0]]], memOfs: Rep[FixPt[Signed,B32,B0]], tileStrides: List[Rep[FixPt[Signed,B32,B0]]], cchain: Rep[CounterChain], store: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
+    val iters = List.fill(lenOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }
 
-    if (store) reflectWrite(mem)(TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters,store))
-    else       reflectWrite(local)(TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters,store))
+    if (store) reflectWrite(mem)(TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters,store))
+    else       reflectWrite(local)(TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters,store))
+  }
+
+
+  // HACK: Only want to allow DSE parameters or constants (ConstFix) here
+  override def bram_create[T:Manifest](__arg0: Option[String],__arg1: List[Rep[FixPt[Signed,B32,B0]]])(implicit __pos: SourceContext,__imp0: Num[T]) = {
+    __arg1.foreach{
+      case ConstFix(_) =>
+      case ParamFix(_) =>
+      case _ => stageError("Only constants and DSE parameters are allowed as dimensions of BRAM")(__pos)
+    }
+    super.bram_create[T](__arg0,__arg1)(implicitly[Manifest[T]],__pos,__imp0)
   }
 
 
@@ -169,7 +194,7 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
 
   // --- Dependencies
   override def syms(e: Any): List[Sym[Any]] = e match {
-    case e: TileTransfer[_] => syms(e.mem) ::: syms(e.local) ::: syms(e.strides) ::: syms(e.memOfs) ::: syms(e.cchain)
+    case e: TileTransfer[_] => syms(e.mem) ::: syms(e.local) ::: syms(e.strides) ::: syms(e.tileStrides) ::: syms(e.memOfs) ::: syms(e.cchain)
     case _ => super.syms(e)
   }
 
@@ -178,7 +203,7 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
     case _ => super.readSyms(e)
   }
   override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {
-    case e: TileTransfer[_] => freqNormal(e.mem) ::: freqNormal(e.local) ::: freqNormal(e.strides) ::: freqNormal(e.memOfs) ::: freqNormal(e.cchain)
+    case e: TileTransfer[_] => freqNormal(e.mem) ::: freqNormal(e.local) ::: freqNormal(e.strides) ::: freqNormal(e.tileStrides) ::: freqNormal(e.memOfs) ::: freqNormal(e.cchain)
 
     case _ => super.symsFreq(e)
   }
@@ -228,20 +253,13 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTe
     case _ => super.remap(m)
   }
 
-  // Note that tileDims are not fixed point values yet - they're just integers
-  private def localDimsToStrides(dims: List[Int]) = List.tabulate(dims.length){d =>
-    if (d == dims.length - 1) 1
-    else dims.drop(d + 1).reduce(_*_)
-  }
-
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) =>
+    case TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters, store) =>
       emitNestedLoop(iters, cchain) {
         val offaddr = (iters.zip(strides).map{case (i,s) => quote(i) + "*" + quote(s) } :+ quote(memOfs)).mkString(" + ")
         stream.println("val offaddr = " + offaddr)
 
-        val localStrides = localDimsToStrides(tileDims).map(k => "FixedPoint[Signed,B32,B0](" + k + ")")
-        val localAddr = iters.zip(localStrides).map{ case (i,s) => quote(i) + "*" + quote(s) }.mkString(" + ")
+        val localAddr = iters.zip(tileStrides).map{ case (i,s) => quote(i) + "*" + quote(s) }.mkString(" + ")
         stream.println("val localaddr = " + localAddr)
 
         if (store)
@@ -499,7 +517,7 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplate
     case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) => // Load
 			val l = s"Tile${if (store) "Store" else "Load"}_" + quote(sym).split("_")(1)
       emit(s"""subgraph cluster_${quote(sym)} {""")
-			emit(s"""label="$l"""") 
+			emit(s"""label="$l"""")
 			emit(s"""shape="rectangle"""")
 			emit(s"""style="rounded, filled"""")
 			emit(s"""fillcolor=$tileTransFillColor""")
@@ -532,11 +550,11 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplate
 
 		case Offchip_new(size) =>
 			/* Special case to hand nodes producing size of offchip outside hardware scope */
-			def hackGen(x: Exp[Any]): Unit = x match { 
+			def hackGen(x: Exp[Any]): Unit = x match {
 				case Def(EatReflect(_:Reg_new[_])) => // Nothing
 				case ConstFix(_) => // Nothing
 				case ConstFlt(_) => // Nothing
-				case Def(d) => 
+				case Def(d) =>
 					alwaysGen {
 						emitNode(x.asInstanceOf[Sym[Any]], d)
 					}

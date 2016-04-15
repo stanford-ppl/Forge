@@ -49,13 +49,13 @@ trait StageAnalyzer extends Traversal with PipeStageTools {
       list( stages )
       nStages(lhs) = stages.length
 
-    case Pipe_reduce(c,a,ld,st,func,rFunc,inds,acc,res,rV) if styleOf(lhs) != Fine =>
+    case Pipe_reduce(c,a,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) if styleOf(lhs) != Fine =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(ld,func,rFunc,st)
       list( stages )
       nStages(lhs) = stages.length + 1  // Account for implicit reduction pipe
 
-    case Block_reduce(c1,c2,a,func,ld1,ld2,rFunc,st,inds1,inds2,part,acc,res,rV) =>
+    case Block_reduce(c1,c2,a,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func,rFunc)
       list( stages )

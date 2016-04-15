@@ -49,12 +49,10 @@ trait MemoryTemplateWrapper extends ControllerTemplateWrapper with TypeInspectio
   def isBitType[T:Manifest]   = isSubtype(manifest[T].runtimeClass, classOf[Boolean])
   def isRegister[T:Manifest]  = isSubtype(manifest[T].runtimeClass, classOf[Array[_]])  // eh...
 
-  def tile_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], strides: List[Rep[FixPt[Signed,B32,B0]]], memOfs: Rep[FixPt[Signed,B32,B0]], tileDims: List[Int], cchain: Rep[CounterChain], store: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
-    val localStrides = sdimsToStrides(tileDims).map(k => FixedPoint[Signed,B32,B0](k))
-
+  def tile_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], strides: List[Rep[FixPt[Signed,B32,B0]]], memOfs: Rep[FixPt[Signed,B32,B0]], tileStrides: List[Rep[FixPt[Signed,B32,B0]]], cchain: Rep[CounterChain], store: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
     loop(cchain, 0, Nil, {iters: Rep[Indices] =>
       val offaddr   = List.tabulate(cchain.length){i => indices_getindex(iters, i) * strides(i) }.fold(memOfs)(_+_)
-      val localaddr = List.tabulate(cchain.length){i => indices_getindex(iters, i) * localStrides(i) }.reduce(_+_)
+      val localaddr = List.tabulate(cchain.length){i => indices_getindex(iters, i) * tileStrides(i) }.reduce(_+_)
       if (store)
         mem(offaddr.toInt) = local(localaddr.toInt)
       else

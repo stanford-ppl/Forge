@@ -14,6 +14,27 @@ import ppl.delite.framework.DeliteApplication
 trait PipeStageToolsExp extends EffectExp {
   this: DHDLExp =>
 
+  def isWriter(s: Exp[Any]): Boolean = s match {
+    case Def(d) => isWriter(d)
+    case _ => false
+  }
+  def isWriter(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:Reg_write[_]) => true
+    case EatReflect(_:Bram_store[_]) => true
+    case _ => false
+  }
+
+  def isReader(s: Exp[Any]): Boolean = s match {
+    case Def(d) => isReader(d)
+    case _ => false
+  }
+  def isReader(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:Reg_read[_]) => true
+    case EatReflect(_:Bram_load[_]) => true
+    case _ => false
+  }
+
+
   def isControlNode(s: Exp[Any]): Boolean = s match {
     case Def(d) => isOuterControl(s) || isInnerControl(s) || isTileTransfer(d)
     case _ => false
@@ -31,7 +52,6 @@ trait PipeStageToolsExp extends EffectExp {
     case Def(d) => isAllocation(d)
     case _ => false
   }
-
   def isAllocation(d: Def[Any]): Boolean = d match {
     case EatReflect(_:Reg_new[_]) => true
     case EatReflect(_:Bram_new[_]) => true
@@ -75,7 +95,7 @@ trait PipeStageTools extends NestedBlockTraversal {
   }
 
   def list(x: List[Exp[Any]]) = x.zipWithIndex.foreach{
-    case (s@Def(d),i) if isOuterControl(s) => println(s"   $i. [Ctrl] $s = $d")
+    case (s@Def(d),i) if isControlNode(s)  => println(s"   $i. [Ctrl] $s = $d")
     case (s@Def(d),i) if isInnerControl(s) => println(s"   $i. [Pipe] $s = $d")
     case (s@Def(d),i) if isAllocation(s)   => println(s"   $i. [Allc] $s = $d")
     case (s@Def(d),i)                      => println(s"   $i. [None] $s = $d")
@@ -87,15 +107,20 @@ trait PipeStageTools extends NestedBlockTraversal {
   }
   def getControlNodes(blk: Block[Any]*) = getStages(blk:_*).filter{s => isControlNode(s) }
   def getAllocations(blk: Block[Any]*)  = getStages(blk:_*).filter{s => isAllocation(s) }
+
+  def getLocalReaders(blk: Block[Any]*) = getStages(blk:_*).filter{s => isReader(s)}
+  def getLocalWriters(blk: Block[Any]*) = getStages(blk:_*).filter{s => isWriter(s)}
 }
 
 
 trait CounterToolsExp extends EffectExp {
   this: DHDLExp =>
 
-  def parOf(x: Rep[CounterChain]): List[Int] = x match {
+  def parOf(cc: Rep[CounterChain]): List[Int] = parParamsOf(cc).map(_.x)
+
+  def parParamsOf(cc: Rep[CounterChain]): List[Param[Int]] = cc match {
     case Def(EatReflect(Counterchain_new(ctrs,nIter))) => ctrs.map{
-      case Def(EatReflect(Counter_new(_,_,_,par))) => par.x
+      case Def(EatReflect(Counter_new(_,_,_,par))) => par
     }
   }
 
@@ -115,7 +140,6 @@ trait CounterToolsExp extends EffectExp {
     case _ => 1L
   }
 }
-
 
 
 

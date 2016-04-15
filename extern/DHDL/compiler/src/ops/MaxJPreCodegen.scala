@@ -83,15 +83,21 @@ trait MaxJPreCodegen extends Traversal  {
     case e@Pipe_foreach(cchain, func, inds) =>
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
 				case Coarse => 
+					withStream(newStream("metapipe_" + quote(sym))) {
+    				emitMPSM(s"${quote(sym)}", childrenOf(sym).size)
+					}
 				case Fine => 
 				case Disabled => 
 					withStream(newStream("sequential_" + quote(sym))) {
     				emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
 			}
-    case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
+    case e@Pipe_reduce(cchain, accum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
 				case Coarse => 
+					withStream(newStream("metapipe_" + quote(sym))) {
+    				emitMPSM(s"${quote(sym)}", childrenOf(sym).size)
+					}
 				case Fine => 
 				case Disabled => 
 					withStream(newStream("sequential_" + quote(sym))) {
@@ -249,7 +255,11 @@ trait MaxJPreCodegen extends Traversal  {
     }
   }
 
-  def emitSeqSM(name: String, numStates: Int) = {
+  def emitSeqSM(name: String, numStates: Int):Unit = {
+		if (numStates==0) {
+			emit(s"""//Number of stages = 0 for ${name}. Nothing is emitted""")
+			return
+		}
     emit("""
 package engine;
   import com.maxeler.maxcompiler.v2.kernelcompiler.KernelLib;
@@ -653,7 +663,11 @@ package engine;
     emit("}")
   }
 
-  def emitMPSM(name: String, numStates: Int) = {
+  def emitMPSM(name: String, numStates: Int):Unit = {
+		if (numStates==0) {
+			emit(s"""//Number of stages = 0 for ${name}. Nothing is emitted""")
+			return
+		}
     emit("""
 package engine;
   import com.maxeler.maxcompiler.v2.kernelcompiler.KernelLib;

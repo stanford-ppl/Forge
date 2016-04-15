@@ -12,7 +12,8 @@ case class FPGAResourceSummary(
   alms: Int = 0,
   regs: Int = 0,
   dsps: Int = 0,
-  bram: Int = 0
+  bram: Int = 0,
+  streams: Int = 0
 )
 
 // Class for operating on intermediate FPGA resource counts
@@ -27,7 +28,8 @@ case class FPGAResources(
   mem16: Int = 0,
   regs: Int = 0,
   dsps: Int = 0,
-  bram: Int = 0
+  bram: Int = 0,
+  streams: Int = 0
 ) {
   def +(that: FPGAResources) = FPGAResources(
     lut7 = this.lut7 + that.lut7,
@@ -40,15 +42,22 @@ case class FPGAResources(
     mem16 = this.mem16 + that.mem16,
     regs = this.regs + that.regs,
     dsps = this.dsps + that.dsps,
-    bram = this.bram + that.bram
+    bram = this.bram + that.bram,
+    streams = this.streams + that.streams
   )
-  def *(a: Int) = FPGAResources(a*lut7,a*lut6,a*lut5,a*lut4,a*lut3,a*mem64,a*mem32,a*mem16,
-                                a*regs,a*dsps,a*bram)
+
+  // HACK: Don't duplicate BRAM in inner loops (bank instead)
+  def replicated(x: Int, inner: Boolean) = {
+    val bramNew = if (inner) bram else x*bram
+    FPGAResources(x*lut7,x*lut6,x*lut5,x*lut4,x*lut3,x*mem64,x*mem32,x*mem16,x*regs,x*dsps,bramNew,x*streams)
+  }
 
   def isNonzero: Boolean = lut7 > 0 || lut6 > 0 || lut5 > 0 || lut4 > 0 || lut3 > 0 ||
-                           mem64 > 0 || mem32 > 0 || mem16 > 0 || regs > 0 || dsps > 0 || bram > 0
+                           mem64 > 0 || mem32 > 0 || mem16 > 0 || regs > 0 || dsps > 0 || bram > 0 || streams > 0
 
-  override def toString() = s"luts=$lut3,$lut4,$lut5,$lut6,$lut7,mems=$mem16,$mem32,$mem64,regs=$regs,dsps=$dsps,bram=$bram"
+  override def toString() = s"luts=$lut3,$lut4,$lut5,$lut6,$lut7,mems=$mem16,$mem32,$mem64,regs=$regs,dsps=$dsps,bram=$bram,streams=$streams"
+
+  def toArray: Array[Int] = Array(lut7,lut6,lut5,lut4,lut3,mem64,mem32,mem16,regs,dsps,bram,streams)
 }
 
 object NoArea extends FPGAResources()
@@ -136,10 +145,22 @@ trait AreaModel {
   }
 
 
+  def areaOfCounterRegs(lhs: Exp[Any], cchain: Exp[CounterChain]): FPGAResources = {
+    if (isPipeline(lhs.tp) && styleOf(lhs) == Coarse) {
+      val N = nStages(lhs) - 1          // Number of stages needed for delay
+      val P = parOf(cchain).reduce(_+_) // Number of duplications per counter
+      FPGAResources(lut3=N*P*32, regs = 4*N*P*32) // TODO: Hardcoded 32 bit index sizes
+    }
+    else NoArea
+  }
+
   /**
    * Returns the area resources for the given node
    **/
-  private def areaOfNode(s: Exp[Any], d: Def[Any]): FPGAResources = d match {
+  private def areaOfNode(s: Exp[Any], d: Def[Any]): FPGAResources = s match {
+    case Fixed(_) => areaOfMemWord(nbits(s))
+    case Exact(_) => areaOfMemWord(nbits(s))
+    case _ => d match {
     case ConstBit(_) => FPGAResources(lut3=1,regs=1)
     case ConstFix(_) => areaOfMemWord(nbits(s))
     case ConstFlt(_) => areaOfMemWord(nbits(s))
@@ -151,7 +172,9 @@ trait AreaModel {
       if (isDblBuf(s)) FPGAResources(lut3 = nbits(s), regs = 4*nbits(s)) // TODO: Why 4?
       else             FPGAResources(regs = nbits(s))
 
-    case e@Bram_new(depth, _) => areaOfBRAM(nbits(e._mT), depth, banks(s), isDblBuf(s))
+    case e@Bram_new(depth, _) =>
+      val depBound = bound(depth).getOrElse{stageError("Cannot resolve bound of BRAM size"); 1.0}.toInt
+      areaOfBRAM(nbits(e._mT), depBound, banks(s), isDblBuf(s))
 
     // TODO: These are close but still need some refining
     case e@Bram_load(ram, _) =>
@@ -268,16 +291,16 @@ trait AreaModel {
 
     // TODO: These need new numbers after Raghu's changes
     case tt: TileTransfer[_] if tt.store =>
-      FPGAResources(lut3=1900,lut4=167,lut5=207,lut6=516,lut7=11,regs=5636,dsps=3,bram=46) // 2014.1 was dsp=3
+      FPGAResources(lut3=1900,lut4=167,lut5=207,lut6=516,lut7=11,regs=5636,dsps=3,bram=46,streams=1)
 
     case tt: TileTransfer[_] if !tt.store =>
-      FPGAResources(lut3=453, lut4=60, lut5=131,lut6=522,regs=1377,dsps=4,bram=46) // 2014.1 was dsp=4
+      FPGAResources(lut3=453, lut4=60, lut5=131,lut6=522,regs=1377,dsps=4,bram=46,streams=1)
 
     case _:Pipe_parallel => FPGAResources(lut4=9*nStages(s)/2, regs = nStages(s) + 3)
 
-    case _:Pipe_foreach if styleOf(s) == Coarse => areaOfMetapipe(nStages(s))
-    case _:Pipe_reduce[_,_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s))
-    case _:Block_reduce[_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s))
+    case e:Pipe_foreach if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.cchain)
+    case e:Pipe_reduce[_,_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.cchain)
+    case e:Block_reduce[_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.ccOuter)
 
     case _:Pipe_foreach if styleOf(s) == Disabled => areaOfSequential(nStages(s))
     case _:Pipe_reduce[_,_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
@@ -299,5 +322,5 @@ trait AreaModel {
     case _ =>
       warn(s"Don't know area for $d")
       NoArea
-  }
+  }}
 }

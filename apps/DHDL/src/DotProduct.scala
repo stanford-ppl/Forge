@@ -9,7 +9,7 @@ trait DotProduct extends DHDLApplication {
   type Elem = FixPt[Signed, B16, B16]
 
   override def stageArgNames = List("tileSize")
-  lazy val tileSize = stageArgOrElse[Int](0, 4)
+  lazy val tileSize = param(4)
   lazy val dataSize = ArgIn[SInt]("dataSize")
 
   def dotproduct(v1: Rep[OffChipMem[Elem]], v2: Rep[OffChipMem[Elem]], out: Rep[Reg[Elem]]) {
@@ -29,7 +29,7 @@ trait DotProduct extends DHDLApplication {
   }
 
   def main() {
-    val N = 8
+    val N = args(unit(0)).to[SInt];  bound(N) = 960000
 
     // Bad things will happen if you try to set the Offchip size from a register value
     val v1 = OffChipMem[Elem]("v1", N)
@@ -38,9 +38,6 @@ trait DotProduct extends DHDLApplication {
 
     val vec1 = Array.fill(N)(random[Elem](10))
     val vec2 = Array.fill(N)(random[Elem](10))
-
-    //println("vec1: " + vec1.mkString(", "))
-    //println("vec2: " + vec2.mkString(", "))
 
     setArg(dataSize, N)
     setMem(v1, vec1)

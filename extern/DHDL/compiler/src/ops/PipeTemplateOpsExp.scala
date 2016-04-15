@@ -13,19 +13,23 @@ import dhdl.compiler.ops._
 trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplateOpsExp with CounterToolsExp with EffectExp {
   this: DHDLExp =>
 
+  type Idx = FixPt[Signed,B32,B0]
+
   // --- Nodes
-  case class Pipe_foreach(cchain: Exp[CounterChain], func: Block[Unit], inds: List[Sym[FixPt[Signed,B32,B0]]])(implicit ctx: SourceContext) extends Def[Pipeline]
+  case class Pipe_foreach(cchain: Exp[CounterChain], func: Block[Unit], inds: List[Sym[Idx]])(implicit ctx: SourceContext) extends Def[Pipeline]
   case class Pipe_reduce[T,C[T]] (
     // - Inputs
     cchain: Exp[CounterChain],  // Loop counter chain
     accum:  Exp[C[T]],          // Reduction accumulator
     // - Reified blocks
-    ldFunc: Block[T],           // Accumulator load function (reified with acc, inds)
-    stFunc: Block[Unit],        // Accumulator store function (reified with acc, inds, res)
+    iFunc:  Block[Idx],         // Calculation of 1D index for load and store
+    ldFunc: Block[T],           // Accumulator load function (reified with acc, idx)
+    stFunc: Block[Unit],        // Accumulator store function (reified with acc, idx, res)
     func:   Block[T],           // Map function
     rFunc:  Block[T],           // Reduction function
     // - Bound args
-    inds:   List[Sym[FixPt[Signed,B32,B0]]],   // Loop iterators
+    inds:   List[Sym[Idx]],     // Loop iterators
+    idx:    Sym[Idx],           // Index for addressing in ldFunc and stFunc
     acc:    Sym[C[T]],          // Reduction accumulator (bound argument, aliases with accum)
     res:    Sym[T],             // Reduction intermediate result (bound argument, aliases with rFunc.res)
     rV:    (Sym[T], Sym[T])     // Reduction function inputs (bound arguments, aliases with ldFunc.res and func.res)
@@ -41,14 +45,16 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     ccInner: Exp[CounterChain], // Counter chain for reduce (inner) loop
     accum:  Exp[BRAM[T]],
     // - Reified blocks
+    iFunc:  Block[Idx],         // Calculation of 1D index for loads and stores
     func: Block[BRAM[T]],       // Map function
     resLdFunc: Block[T],        // Partial result load function
     ldFunc: Block[T],           // Accumulator load function
     rFunc: Block[T],            // Reduction function
     stFunc: Block[Unit],        // Accumulator store function
     // - Bound args
-    indsOuter: List[Sym[FixPt[Signed,B32,B0]]],  // Map (outer) loop iterators
-    indsInner: List[Sym[FixPt[Signed,B32,B0]]],  // Reduce (inner) loop iterators
+    indsOuter: List[Sym[Idx]],  // Map (outer) loop iterators
+    indsInner: List[Sym[Idx]],  // Reduce (inner) loop iterators
+    idx: Sym[Idx],
     part: Sym[BRAM[T]],
     acc: Sym[BRAM[T]],
     res: Sym[T],
@@ -57,19 +63,22 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     val mT = manifest[T]
   }
 
-  case class Counter_new(start: Rep[FixPt[Signed,B32,B0]], end: Rep[FixPt[Signed,B32,B0]], step: Rep[FixPt[Signed,B32,B0]], par: Param[Int])(implicit val ctx: SourceContext) extends Def[Counter]
-  case class Counterchain_new(counters: List[Rep[Counter]], nIter: Block[FixPt[Signed,B32,B0]])(implicit val ctx: SourceContext) extends Def[CounterChain]
+  case class Counter_new(start: Rep[Idx], end: Rep[Idx], step: Rep[Idx], par: Param[Int])(implicit val ctx: SourceContext) extends Def[Counter]
+  case class Counterchain_new(counters: List[Rep[Counter]], nIter: Block[Idx])(implicit val ctx: SourceContext) extends Def[CounterChain]
 
   // --- Internals
   def pipe_foreach(cchain: Rep[CounterChain], func: Rep[Indices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Pipeline] = {
-    val inds = List.fill(sizeOf(cchain)){ fresh[FixPt[Signed,B32,B0]] } // Arbitrary number of bound args. Awww yeah.
+    val inds = List.fill(lenOf(cchain)){ fresh[Idx] } // Arbitrary number of bound args. Awww yeah.
     val blk = reifyEffects( func(indices_create(inds)) )
     reflectEffect(Pipe_foreach(cchain, blk, inds), summarizeEffects(blk).star andAlso Simple())
   }
   def pipe_reduce[T,C[T]](cchain: Rep[CounterChain], accum: Rep[C[T]], func: Rep[Indices] => Rep[T], rFunc: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext, __mem: Mem[T,C], __mT: Manifest[T], __mC: Manifest[C[T]]): Rep[Pipeline]  = {
     // Loop indices
-    val is = List.fill(sizeOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }
+    val is = List.fill(lenOf(cchain)){ fresh[Idx] }
     val inds = indices_create(is)
+
+    val idx = fresh[Idx]
+    val iBlk = reifyEffects( __mem.flatIdx(accum, inds) )
 
     // Reified map function
     val mBlk = reifyEffects( func(inds) )
@@ -78,7 +87,7 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     val acc = reflectMutableSym( fresh[C[T]] )  // Has to be mutable since we write to "it"
     setProps(acc, getProps(accum))
 
-    val ldBlk = reifyEffects(__mem.ld(acc, inds))
+    val ldBlk = reifyEffects(__mem.ld(acc, idx))
 
    // Reified reduction function
     val rV = (fresh[T], fresh[T])
@@ -86,36 +95,39 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
 
     // Reified store function
     val res = fresh[T]
-    val stBlk = reifyEffects(__mem.st(acc, inds, res))
+    val stBlk = reifyEffects(__mem.st(acc, idx, res))
 
-    val effects = summarizeEffects(mBlk) andAlso summarizeEffects(ldBlk) andAlso
+    val effects = summarizeEffects(iBlk) andAlso summarizeEffects(mBlk) andAlso summarizeEffects(ldBlk) andAlso
                   summarizeEffects(rBlk) andAlso summarizeEffects(stBlk) andAlso Write(List(accum.asInstanceOf[Sym[C[T]]]))
 
-    reflectEffect(Pipe_reduce[T,C](cchain, accum, ldBlk, stBlk, mBlk, rBlk, is, acc, res, rV), effects.star)
+    reflectEffect(Pipe_reduce[T,C](cchain, accum, iBlk, ldBlk, stBlk, mBlk, rBlk, is, idx, acc, res, rV), effects.star)
   }
 
   def block_reduce[T:Manifest](cchain: Rep[CounterChain], accum: Rep[BRAM[T]], func: Rep[Indices] => Rep[BRAM[T]], rFunc: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext): Rep[Pipeline] = {
-    val isMap = List.fill(sizeOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }   // Map loop indices
+    val isMap = List.fill(lenOf(cchain)){ fresh[Idx] }   // Map loop indices
     val indsMap = indices_create(isMap)
 
     // Reified map function
     val mBlk = reifyEffects( func(indsMap) )
 
     // Reduce loop indices
-    val ctrsRed = dimsOf(accum).map{dim => Counter(max = dim.as[Index]) }
+    val ctrsRed = dimsOf(accum).map{dim => Counter(max = dim) }
     val cchainRed = CounterChain(ctrsRed:_*)
-    val isRed = List.fill(sizeOf(cchainRed)){ fresh[FixPt[Signed,B32,B0]] } // Reduce loop indices
+    val isRed = List.fill(lenOf(cchainRed)){ fresh[Idx] } // Reduce loop indices
     val indsRed = indices_create(isRed)
+
+    val idx = fresh[Idx]
+    val iBlk = reifyEffects( canBramMem[T].flatIdx(getBlockResult(mBlk), indsRed) )
 
     val part = fresh[BRAM[T]]
     setProps(part, getProps(mBlk))
     // Partial result load
-    val ldPartBlk = reifyEffects( canBramMem[T].ld(part, indsRed) )
+    val ldPartBlk = reifyEffects( canBramMem[T].ld(part, idx) )
 
     val acc = reflectMutableSym( fresh[BRAM[T]] )
     setProps(acc, getProps(accum))
     // Accumulator load
-    val ldBlk = reifyEffects( canBramMem[T].ld(acc, indsRed) )
+    val ldBlk = reifyEffects( canBramMem[T].ld(acc, idx) )
 
     val rV = (fresh[T],fresh[T])
     // Reified reduction function
@@ -123,38 +135,38 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
 
     val res = fresh[T]
     // Accumulator store function
-    val stBlk = reifyEffects( canBramMem[T].st(acc, indsRed, res) )
+    val stBlk = reifyEffects( canBramMem[T].st(acc, idx, res) )
 
-    val effects = summarizeEffects(mBlk) andAlso summarizeEffects(ldPartBlk) andAlso
+    val effects = summarizeEffects(iBlk) andAlso summarizeEffects(mBlk) andAlso summarizeEffects(ldPartBlk) andAlso
                   summarizeEffects(ldBlk) andAlso summarizeEffects(rBlk) andAlso summarizeEffects(stBlk) andAlso Write(List(accum.asInstanceOf[Sym[BRAM[T]]]))
 
-    reflectEffect(Block_reduce[T](cchain, cchainRed, accum, mBlk, ldPartBlk, ldBlk, rBlk, stBlk, isMap, isRed, part, acc, res, rV), effects.star)
+    reflectEffect(Block_reduce[T](cchain, cchainRed, accum, iBlk, mBlk, ldPartBlk, ldBlk, rBlk, stBlk, isMap, isRed, idx, part, acc, res, rV), effects.star)
   }
 
-  def counter_new(start: Rep[FixPt[Signed,B32,B0]],end: Rep[FixPt[Signed,B32,B0]],step: Rep[FixPt[Signed,B32,B0]], par: Int)(implicit ctx: SourceContext) = {
+  def counter_new(start: Rep[Idx],end: Rep[Idx],step: Rep[Idx], par: Int)(implicit ctx: SourceContext) = {
     val p = param[Int](par)
     reflectEffect[Counter](Counter_new(start,end,step,p)(ctx))
   }
 
-  private def counterSplit(x: Rep[Counter]): (Rep[Index],Rep[Index],Rep[Index],Param[Int]) = x match {
+  private def counterSplit(x: Rep[Counter]): (Rep[Idx],Rep[Idx],Rep[Idx],Param[Int]) = x match {
     case Def(EatReflect(Counter_new(start,end,step,par))) => (start,end,step,par)
     case _ => throw new Exception("Could not find def for counter")
   }
 
   def counterchain_new(counters: List[Rep[Counter]])(implicit ctx: SourceContext): Rep[CounterChain] = {
     val ctrSplit = counters.map{ctr => counterSplit(ctr)}
-    val starts: List[Rep[Index]] = ctrSplit.map(_._1)
-    val ends:   List[Rep[Index]] = ctrSplit.map(_._2)
-    val steps:  List[Rep[Index]] = ctrSplit.map(_._3)
-    val pars:   List[Rep[Index]] = ctrSplit.map(_._4).map(int_to_fix[Signed,B32](_)) // HACK: Convert Int param to fixed point
+    val starts: List[Rep[Idx]] = ctrSplit.map(_._1)
+    val ends:   List[Rep[Idx]] = ctrSplit.map(_._2)
+    val steps:  List[Rep[Idx]] = ctrSplit.map(_._3)
+    val pars:   List[Rep[Idx]] = ctrSplit.map(_._4).map(int_to_fix[Signed,B32](_)) // HACK: Convert Int param to fixed point
 
-    val nIter: Block[Index] = reifyEffects {
-      val lens: List[Rep[Index]] = starts.zip(ends).map{
-        case (ConstFix(x: Int),ConstFix(y: Int)) => (y - x).as[FixPt[Signed,B32,B0]]
+    val nIter: Block[Idx] = reifyEffects {
+      val lens: List[Rep[Idx]] = starts.zip(ends).map{
+        case (ConstFix(x: Int),ConstFix(y: Int)) => (y - x).as[Idx]
         case (ConstFix(0), end) => end
         case (start, end) => sub_fix(end, start)
       }
-      val total: List[Rep[Index]] = (lens,steps,pars).zipped.map {
+      val total: List[Rep[Idx]] = (lens,steps,pars).zipped.map {
         case (len, ConstFix(1), par) => div_fix(len, par) // Should round correctly here
         case (len, step, par) => div_fix(len, mul_fix(step, par))
       }
@@ -170,11 +182,11 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     case e@Pipe_foreach(c,func,inds) => reflectPure(Pipe_foreach(f(c),f(func),inds)(pos))(mtype(manifest[A]),pos)
     case Reflect(e@Pipe_foreach(c,func,inds), u, es) => reflectMirrored(Reflect(Pipe_foreach(f(c),f(func),inds)(pos), mapOver(f,u), f(es)))(mtype(manifest[A]),pos)
 
-    case e@Pipe_reduce(c,a,ld,st,func,rFunc,inds,acc,res,rV) => reflectPure(Pipe_reduce(f(c),f(a),f(ld),f(st),f(func),f(rFunc),inds,acc,res,rV)(pos, e.memC, e.mT, e.mC))(mtype(manifest[A]), pos)
-    case Reflect(e@Pipe_reduce(c,a,ld,st,func,rFunc,inds,acc,res,rV), u, es) => reflectMirrored(Reflect(Pipe_reduce(f(c),f(a),f(ld),f(st),f(func),f(rFunc),inds,acc,res,rV)(pos, e.memC, e.mT, e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case e@Pipe_reduce(c,a,ld,st,iFunc,func,rFunc,inds,idx,acc,res,rV) => reflectPure(Pipe_reduce(f(c),f(a),f(ld),f(st),f(iFunc),f(func),f(rFunc),inds,idx,acc,res,rV)(pos, e.memC, e.mT, e.mC))(mtype(manifest[A]), pos)
+    case Reflect(e@Pipe_reduce(c,a,ld,st,iFunc,func,rFunc,inds,idx,acc,res,rV), u, es) => reflectMirrored(Reflect(Pipe_reduce(f(c),f(a),f(ld),f(st),f(iFunc),f(func),f(rFunc),inds,idx,acc,res,rV)(pos, e.memC, e.mT, e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
 
-    case e@Block_reduce(c1,c2,a,func,ld1,ld2,rFunc,st,inds1,inds2,part,acc,res,rV) => reflectPure(Block_reduce(f(c1),f(c2),f(a),f(func),f(ld1),f(ld2),f(rFunc),f(st),inds1,inds2,part,acc,res,rV)(e.mT,e.ctx))(mtype(manifest[A]), pos)
-    case Reflect(e@Block_reduce(c1,c2,a,func,ld1,ld2,rFunc,st,inds1,inds2,part,acc,res,rV), u, es) => reflectMirrored(Reflect(Block_reduce(f(c1),f(c2),f(a),f(func),f(ld1),f(ld2),f(rFunc),f(st),inds1,inds2,part,acc,res,rV)(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case e@Block_reduce(c1,c2,a,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) => reflectPure(Block_reduce(f(c1),f(c2),f(a),f(iFunc),f(func),f(ld1),f(ld2),f(rFunc),f(st),inds1,inds2,idx,part,acc,res,rV)(e.mT,e.ctx))(mtype(manifest[A]), pos)
+    case Reflect(e@Block_reduce(c1,c2,a,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV), u, es) => reflectMirrored(Reflect(Block_reduce(f(c1),f(c2),f(a),f(iFunc),f(func),f(ld1),f(ld2),f(rFunc),f(st),inds1,inds2,idx,part,acc,res,rV)(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
 
     case e@Counter_new(s,end,t,p) => reflectPure( Counter_new(f(s),f(end),f(t),p)(pos) )(mtype(manifest[A]), pos)
     case Reflect(e@Counter_new(s,end,t,p), u, es) => reflectMirrored(Reflect(Counter_new(f(s),f(end),f(t),p)(e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
@@ -186,17 +198,19 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
   }
 
   override def propagate(lhs: Exp[Any], rhs: Def[Any]) = rhs match {
-    case Pipe_reduce(c,a,ld,st,func,rFunc,inds,acc,res,rV) =>
+    case Pipe_reduce(c,a,ld,st,iFunc,func,rFunc,inds,idx,acc,res,rV) =>
       setProps(acc, getProps(a))
       setProps(res, getProps(rFunc))
       setProps(rV._1, getProps(func))
       setProps(rV._2, getProps(func))
-    case Block_reduce(c1,c2,a,func,ld1,ld2,rFunc,st,inds1,inds2,part,acc,res,rV) =>
+      setProps(idx, getProps(iFunc))
+    case Block_reduce(c1,c2,a,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
       setProps(acc, getProps(a))
       setProps(part, getProps(func))
       setProps(res, getProps(rFunc))
       setProps(rV._1, getProps(ld1))
       setProps(rV._2, getProps(ld2))
+      setProps(idx, getProps(iFunc))
 
     case _ => super.propagate(lhs, rhs)
   }
@@ -204,29 +218,29 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
   // --- Dependencies
   override def syms(e: Any): List[Sym[Any]] = e match {
     case Pipe_foreach(chain, func, _) => syms(chain) ::: syms(func)
-    case e: Pipe_reduce[_,_] => syms(e.cchain) ::: syms(e.accum) ::: syms(e.func) ::: syms(e.rFunc) ::: syms(e.ldFunc) ::: syms(e.stFunc)
-    case e: Block_reduce[_] => syms(e.ccOuter) ::: syms(e.ccInner) ::: syms(e.accum) ::: syms(e.func) ::: syms(e.resLdFunc) ::: syms(e.ldFunc) ::: syms(e.rFunc) ::: syms(e.stFunc)
+    case e: Pipe_reduce[_,_] => syms(e.cchain) ::: syms(e.accum) ::: syms(e.iFunc) ::: syms(e.func) ::: syms(e.rFunc) ::: syms(e.ldFunc) ::: syms(e.stFunc)
+    case e: Block_reduce[_] => syms(e.ccOuter) ::: syms(e.ccInner) ::: syms(e.accum) ::: syms(e.iFunc) ::: syms(e.func) ::: syms(e.resLdFunc) ::: syms(e.ldFunc) ::: syms(e.rFunc) ::: syms(e.stFunc)
     case Counterchain_new(ctrs, nIters) => syms(ctrs) ::: syms(nIters)
     case _ => super.syms(e)
   }
   override def readSyms(e: Any): List[Sym[Any]] = e match {
     case Pipe_foreach(chain, func, _) => readSyms(chain) ::: readSyms(func)
-    case e: Pipe_reduce[_,_] => readSyms(e.cchain) ::: readSyms(e.accum) ::: readSyms(e.func) ::: readSyms(e.rFunc) ::: readSyms(e.ldFunc) ::: readSyms(e.stFunc)
-    case e: Block_reduce[_] => readSyms(e.ccOuter) ::: readSyms(e.ccInner) ::: readSyms(e.accum) ::: readSyms(e.func) ::: readSyms(e.resLdFunc) ::: readSyms(e.ldFunc) ::: readSyms(e.rFunc) ::: readSyms(e.stFunc)
+    case e: Pipe_reduce[_,_] => readSyms(e.cchain) ::: readSyms(e.accum) ::: readSyms(e.iFunc) ::: readSyms(e.func) ::: readSyms(e.rFunc) ::: readSyms(e.ldFunc) ::: readSyms(e.stFunc)
+    case e: Block_reduce[_] => readSyms(e.ccOuter) ::: readSyms(e.ccInner) ::: readSyms(e.accum) ::: readSyms(e.iFunc) ::: readSyms(e.func) ::: readSyms(e.resLdFunc) ::: readSyms(e.ldFunc) ::: readSyms(e.rFunc) ::: readSyms(e.stFunc)
     case Counterchain_new(ctrs, nIters) => readSyms(ctrs) ::: readSyms(nIters)
     case _ => super.readSyms(e)
   }
   override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {
     case Pipe_foreach(chain, func, _) => freqCold(func) ::: freqCold(chain)
-    case e: Pipe_reduce[_,_] => freqCold(e.func) ::: freqCold(e.rFunc) ::: freqCold(e.ldFunc) ::: freqCold(e.stFunc) ::: freqCold(e.cchain) ::: freqCold(e.accum)
-    case e: Block_reduce[_] => freqNormal(e.ccOuter) ::: freqNormal(e.ccInner) ::: freqNormal(e.accum) ::: freqNormal(e.func) ::: freqNormal(e.resLdFunc) ::: freqNormal(e.ldFunc) ::: freqNormal(e.rFunc) ::: freqNormal(e.stFunc)
+    case e: Pipe_reduce[_,_] => freqNormal(e.iFunc) ::: freqCold(e.func) ::: freqCold(e.rFunc) ::: freqCold(e.ldFunc) ::: freqCold(e.stFunc) ::: freqCold(e.cchain) ::: freqCold(e.accum)
+    case e: Block_reduce[_] => freqNormal(e.ccOuter) ::: freqNormal(e.ccInner) ::: freqNormal(e.accum) ::: freqNormal(e.iFunc) ::: freqNormal(e.func) ::: freqNormal(e.resLdFunc) ::: freqNormal(e.ldFunc) ::: freqNormal(e.rFunc) ::: freqNormal(e.stFunc)
     case Counterchain_new(ctrs, nIters) => freqNormal(ctrs) ::: freqNormal(nIters)
     case _ => super.symsFreq(e)
   }
   override def boundSyms(e: Any): List[Sym[Any]] = e match {
     case Pipe_foreach(chain,func,inds) => inds ::: effectSyms(func) ::: effectSyms(chain)
-    case e: Pipe_reduce[_,_] => e.inds ::: List(e.rV._1, e.rV._2, e.acc, e.res) ::: effectSyms(e.cchain) ::: effectSyms(e.func) ::: effectSyms(e.rFunc) ::: effectSyms(e.ldFunc) ::: effectSyms(e.stFunc) ::: effectSyms(e.accum)
-    case e: Block_reduce[_] => e.indsOuter ::: e.indsInner ::: List(e.rV._1, e.rV._2, e.acc, e.res, e.part) ::: effectSyms(e.ccOuter) ::: effectSyms(e.ccInner) ::: effectSyms(e.accum) ::: effectSyms(e.func) ::: effectSyms(e.resLdFunc) ::: effectSyms(e.ldFunc) ::: effectSyms(e.rFunc) ::: effectSyms(e.stFunc)
+    case e: Pipe_reduce[_,_] => e.inds ::: List(e.rV._1, e.rV._2, e.acc, e.res, e.idx) ::: effectSyms(e.cchain) ::: effectSyms(e.iFunc) ::: effectSyms(e.func) ::: effectSyms(e.rFunc) ::: effectSyms(e.ldFunc) ::: effectSyms(e.stFunc) ::: effectSyms(e.accum)
+    case e: Block_reduce[_] => e.indsOuter ::: e.indsInner ::: List(e.idx, e.rV._1, e.rV._2, e.acc, e.res, e.part) ::: effectSyms(e.ccOuter) ::: effectSyms(e.ccInner) ::: effectSyms(e.accum) ::: effectSyms(e.iFunc) ::: effectSyms(e.func) ::: effectSyms(e.resLdFunc) ::: effectSyms(e.ldFunc) ::: effectSyms(e.rFunc) ::: effectSyms(e.stFunc)
     case Counterchain_new(ctrs, nIters) => effectSyms(nIters)
     case _ => super.boundSyms(e)
   }
@@ -236,7 +250,7 @@ trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
   val IR: ControllerTemplateOpsExp with DHDLIdentifiers
   import IR._
 
-  def emitNestedLoop(iters: List[Sym[FixPt[Signed,B32,B0]]], cchain: Exp[CounterChain])(emitBlk: => Unit) = {
+  def emitNestedLoop(iters: List[Sym[Idx]], cchain: Exp[CounterChain])(emitBlk: => Unit) = {
     iters.zipWithIndex.foreach{ case (iter,idx) =>
       stream.println("for( " + quote(iter) + " <- " + quote(cchain) + ".apply(" + idx + ".toInt)) {")
     }
@@ -255,9 +269,11 @@ trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
       emitNestedLoop(inds, cchain){ emitBlock(func) }
       emitValDef(sym, "()")
 
-    case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
+    case e@Pipe_reduce(cchain, accum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
       emitValDef(acc, quote(accum)) // Assign bound accumulator to accum
       emitNestedLoop(inds, cchain){
+        emitBlock(iFunc)            // Idx function
+        emitValDef(idx, quote(getBlockResult(iFunc)))
         emitBlock(func)             // Map function
         emitBlock(ldFunc)           // Load corresponding value from accumulator
         emitValDef(rV._1, quote(getBlockResult(ldFunc)))
@@ -268,13 +284,15 @@ trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
       }
       emitValDef(sym, "()")
 
-    case e@Block_reduce(ccOuter, ccInner, accum, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, part, acc, res, rV) =>
+    case e@Block_reduce(ccOuter, ccInner, accum, iFunc, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, idx, part, acc, res, rV) =>
       emitValDef(acc, quote(accum)) // Assign bound accumulator to accum
       emitNestedLoop(indsOuter, ccOuter){
         emitBlock(func)
         emitValDef(part, quote(getBlockResult(func)))
 
         emitNestedLoop(indsInner, ccInner){
+          emitBlock(iFunc)
+          emitValDef(idx, quote(getBlockResult(iFunc)))
           emitBlock(ldPart)
           emitBlock(ldFunc)
           emitValDef(rV._1, quote(getBlockResult(ldPart)))
@@ -324,14 +342,14 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
     		}
     		emit("}")
 			}
-		case _ => 
+		case _ =>
 	}
 
 	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
     case Def(EatReflect(Counterchain_new(counters, nIter))) =>
-	     inds.zipWithIndex.foreach {case (iter, idx) => emitAlias(iter, counters(idx)) }
+	     inds.zipWithIndex.foreach {case (iter, idx) => emitValDef(iter, counters(idx)) }
 	}
-	
+
   override def emitFileHeader() {
 		super.emitFileHeader()
     emit(s"compound=true")
@@ -341,14 +359,14 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
     emit(s"fontsize=$fontsize")
 	}
 
-  def emitBlock(y: Block[Any], name:String, label:String, color:String): Unit = { 
-      emit(s"""subgraph cluster_${name} {""")
-      emit(s"""label="${name}" """)
-      emit(s"""style="filled" """)
-			emit(s"""fillcolor=$color""")
-			emit(s"""color=none""")
-			emitBlock(y)
-			emit(s"""}""")
+  def emitBlock(y: Block[Any], name:String, label:String, color:String): Unit = {
+    emit(s"""subgraph cluster_${name} {""")
+    emit(s"""label="${name}" """)
+    emit(s"""style="filled" """)
+		emit(s"""fillcolor=$color""")
+		emit(s"""color=none""")
+		emitBlock(y)
+		emit(s"""}""")
 	}
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
@@ -369,7 +387,7 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
 			} else {
 				emitEdge(step, sym, "step")
 			}
-			l += "\"" 
+			l += "\""
       emit(s"""${quote(sym)} [ label=$l shape="record" style="filled,rounded"
 						color=$counterInnerColor ]""")
 
@@ -397,14 +415,14 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
       emitBlock(func, quote(sym) + "_foreachFunc", "foreachFunc", foreachFillColor)             // Map function
       emit("}")
 
-    case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
+    case e@Pipe_reduce(cchain, accum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
 			var label = quote(sym)
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
 				case Coarse => label = label.replace("DHDLPipeline", "MetaPipe")
 				case Fine => label = label.replace("DHDLPipeline", "Pipe")
 				case Disabled => label = label.replace("DHDLPipeline", "Sequential")
 			}
-      emitAlias(acc, accum)
+      emitValDef(acc, accum)
       emitNestedIdx(cchain, inds)
       emit(s"""subgraph cluster_${quote(sym)} {""")
       emit(s"""label="${quote(sym)}"""")
@@ -414,16 +432,18 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
       emit(s"""define(`${quote(acc)}', `${quote(accum)}')""")
 			val Def(EatReflect(d)) = cchain
 			emitCtrChain(cchain)
-      emitBlock(func, quote(sym) + "_mapFunc", "mapFunc", mapFillColor)             // Map function
-      emitBlock(ldFunc, quote(sym) + "_ldFunc", "ldFunc", ldFillColor)             // Map function
-      emitAlias(rV._1, getBlockResult(ldFunc))
-      emitAlias(rV._2, getBlockResult(func))
-      emitBlock(rFunc, quote(sym) + "_reduceFunc", "reduceFunc", reduceFillColor)             // Map function
-      emitAlias(res, getBlockResult(rFunc))
-      emitBlock(stFunc, quote(sym) + "_stFunc", "stFunc" , stFillColor)             // Map function
+      emitBlock(iFunc, quote(sym) + "_idxFunc", "idxFunc", ldFillColor)
+			emitValDef(idx, quote(getBlockResult(iFunc)))
+      emitBlock(func, quote(sym) + "_mapFunc", "mapFunc", mapFillColor)
+      emitBlock(ldFunc, quote(sym) + "_ldFunc", "ldFunc", ldFillColor)
+      emitValDef(rV._1, getBlockResult(ldFunc))
+      emitValDef(rV._2, getBlockResult(func))
+      emitBlock(rFunc, quote(sym) + "_reduceFunc", "reduceFunc", reduceFillColor)  
+      emitValDef(res, getBlockResult(rFunc))
+      emitBlock(stFunc, quote(sym) + "_stFunc", "stFunc" , stFillColor)
       emit("}")
 
-    case e@Block_reduce(ccOuter, ccInner, accum, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, part, acc, res, rV) =>
+    case e@Block_reduce(ccOuter, ccInner, accum, iFunc, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, idx, part, acc, res, rV) =>
       emit(s"""subgraph ${quote(sym)} {""")
       emit(s"""  label = quote(sym)""")
       emit(s"""  style = "filled" """)
@@ -437,7 +457,7 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
   }
 
   override def quote(x: Exp[Any]) = x match {
-		case s@Sym(n) => s match { 
+		case s@Sym(n) => s match {
 				case Def(ConstFix(n)) => n.toString
 				case Def(ConstFlt(n)) => n.toString
 				case _ => {
@@ -515,8 +535,8 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 			}
       emitBlock(func)             // Map function
 
-    case e@Pipe_reduce(cchain, accum, ldFunc, stFunc, func, rFunc, inds, acc, res, rV) =>
-			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
+    case e@Pipe_reduce(cchain, accum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
+    	styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
 				case Coarse =>
 				case Fine =>
 					//TODO
@@ -534,7 +554,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       emitBlock(rFunc)
       emitBlock(stFunc)
 
-		case e@Pipe_parallel(func: Block[Unit]) => 
+		case e@Pipe_parallel(func: Block[Unit]) =>
 
 			// If control signals have not yet been defined, define them here
 			if (parentOf(sym).isEmpty) {
@@ -639,10 +659,9 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       emit(s"""OffsetExpr ${quote(sym)}_offset = stream.makeOffsetAutoLoop("${quote(sym)}_offset");""")
       emit(s"""${quote(sym)}_rst_done <== stream.offset(${quote(sym)}_rst_en, -${quote(sym)}_offset-1);""")
     }
-
   }
 
-	def emitPipeForEachEpilog(sym: Sym[Any], writesToAccumRam:Boolean, cchain:Exp[CounterChain],
+  def emitPipeForEachEpilog(sym: Sym[Any], writesToAccumRam:Boolean, cchain:Exp[CounterChain],
 		firstInd:Sym[FixPt[Signed,B32,B0]]) = {
     // Check if this is an accumulator map - whether it writes to a memory marked 'isAccum'
     if (writesToAccumRam) {
@@ -652,7 +671,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm"))
     }
 	}
-	
+
 	def emitPipeReduceEpilog(sym: Sym[Any], specializeReduce:Boolean, cchain:Exp[CounterChain]) = {
     if (specializeReduce) {
       emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm"))

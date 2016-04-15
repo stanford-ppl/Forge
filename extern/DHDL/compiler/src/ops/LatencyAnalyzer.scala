@@ -46,7 +46,7 @@ trait ModelingTools extends Traversal with PipeStageTools {
   }
   def latencyOfPipe(b: Block[Any]): Long = {
     val nodes = getStages(b)
-    quickDFS(nodes.last, nodes)
+    if (nodes.isEmpty) 0L else quickDFS(nodes.last, nodes)
   }
   def latencyOfCycle(b: Block[Any]): Long = {
     val outerReduce = inReduce
@@ -57,7 +57,7 @@ trait ModelingTools extends Traversal with PipeStageTools {
   }
 
   // Not a true traversal. Should it be?
-  def pipeDelays(b: Block[Any]): List[(Exp[Any],Long)] = {
+  def pipeDelays(b: Block[Any], oos: Map[Exp[Any],Long] = Map.empty): List[(Exp[Any],Long)] = {
     val scope = getStages(b).filterNot(s => isGlobal(s))
     var delays = HashMap[Exp[Any],Long]() ++ scope.map{node => node -> 0L}
 
@@ -77,7 +77,8 @@ trait ModelingTools extends Traversal with PipeStageTools {
         }
         else latencyOf(cur)
 
-      case _ => 0L
+      case s if oos.contains(s) => oos(s) // Get preset out of scope delay
+      case _ => 0L                        // Otherwise assume 0 offset
     }
     if (!scope.isEmpty) fullDFS(scope.last)
     delays.toList
@@ -87,7 +88,7 @@ trait ModelingTools extends Traversal with PipeStageTools {
   override def traverseStm(stm: Stm) = stm match {
     case TP(s, d) => traverseNode(s, d)
   }
-  def traverseNode(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext): Unit
+  def traverseNode(lhs: Exp[Any], rhs: Def[Any]): Unit
 
   // Reset state
   override def preprocess[A:Manifest](b: Block[A]) = {
@@ -121,7 +122,7 @@ trait LatencyAnalyzer extends ModelingTools {
     (cycles)
   }
 
-  def traverseNode(lhs: Exp[Any], rhs: Def[Any])(implicit ctx: SourceContext) {
+  def traverseNode(lhs: Exp[Any], rhs: Def[Any]) {
     val cycles = rhs match {
       case EatReflect(Hwblock(blk)) =>
         inHwScope = true
@@ -143,13 +144,13 @@ trait LatencyAnalyzer extends ModelingTools {
         val N = nIters(cchain)
         latencyOfPipe(func) + N - 1 + latencyOf(lhs)
 
-      case EatReflect(Pipe_reduce(cchain,_,ld,st,func,rFunc,_,_,_,_)) if styleOf(lhs) == Fine =>
+      case EatReflect(Pipe_reduce(cchain,_,iFunc,ld,st,func,rFunc,_,_,_,_,_)) if styleOf(lhs) == Fine =>
         val N = nIters(cchain)
         val P = parOf(cchain).reduce(_*_)
 
         val body = latencyOfPipe(func)
         val internal = latencyOfPipe(rFunc) * reductionTreeHeight(P)
-        val cycle = latencyOfCycle(ld) + latencyOfCycle(rFunc) + latencyOfCycle(st)
+        val cycle = latencyOfCycle(iFunc) + latencyOfCycle(ld) + latencyOfCycle(rFunc) + latencyOfCycle(st)
 
         body + internal + N*cycle + latencyOf(lhs)
 
@@ -165,26 +166,26 @@ trait LatencyAnalyzer extends ModelingTools {
         if (styleOf(lhs) == Coarse) { stages.max * (N - 1) + stages.sum + latencyOf(lhs) }
         else                        { stages.sum * N + latencyOf(lhs) }
 
-      case EatReflect(Pipe_reduce(cchain,_,ld,st,func,rFunc,_,_,_,_)) =>
+      case EatReflect(Pipe_reduce(cchain,_,iFunc,ld,st,func,rFunc,_,_,_,_,_)) =>
         val N = nIters(cchain)
         val P = parOf(cchain).reduce(_*_)
         val mapStages = latencyOfBlock(func)
         val internal = latencyOfPipe(rFunc) * reductionTreeHeight(P)
-        val cycle = latencyOfCycle(ld) + latencyOfCycle(rFunc) + latencyOfCycle(st)
+        val cycle = latencyOfCycle(iFunc) + latencyOfCycle(ld) + latencyOfCycle(rFunc) + latencyOfCycle(st)
 
         val reduceStage = internal + cycle
         val stages = mapStages :+ reduceStage
         if (styleOf(lhs) == Coarse) { stages.max * (N - 1) + stages.sum + latencyOf(lhs) }
         else                        { stages.sum * N + latencyOf(lhs) }
 
-      case EatReflect(Block_reduce(ccOuter,ccInner,_,func,ld1,ld2,rFunc,st,_,_,_,_,_,_)) =>
+      case EatReflect(Block_reduce(ccOuter,ccInner,_,iFunc,func,ld1,ld2,rFunc,st,_,_,_,_,_,_,_)) =>
         val Nm = nIters(ccOuter)
         val Nr = nIters(ccInner)
         val Pm = parOf(ccOuter).reduce(_*_) // Parallelization factor for map
         val Pr = parOf(ccInner).reduce(_*_) // Parallelization factor for reduce
 
         val mapStages: List[Long] = latencyOfBlock(func)
-        val internal: Long = latencyOfPipe(ld1) + latencyOfPipe(rFunc) * reductionTreeHeight(Pm)
+        val internal: Long = latencyOfPipe(iFunc) + latencyOfPipe(ld1) + latencyOfPipe(rFunc) * reductionTreeHeight(Pm)
         val cycle: Long = latencyOfCycle(ld2) + latencyOfCycle(rFunc) + latencyOfCycle(st)
 
         val reduceStage: Long = internal + Nr*cycle

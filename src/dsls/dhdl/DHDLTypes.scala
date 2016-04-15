@@ -46,19 +46,21 @@ trait DHDLTypes {
     val bit_to_string = direct (Tpes) ("bit_to_string", Nil, Bit :: MString)
 
     // Include Manifests to avoid CSE issues
+    val string_to_fixpt = direct (Tpes) ("string_to_fixpt", (S,I,F), MString :: FixPt(S,I,F))
     val fixpt_to_string = direct (Tpes) ("fixpt_to_string", (S,I,F), FixPt(S,I,F) :: MString)
     val fixpt_to_fltpt = internal (Tpes) ("fixpt_to_fltpt", (S,I,F,G,E), FixPt(S,I,F) :: FltPt(G,E))
     val convert_fixpt = internal (Tpes) ("convert_fixpt", (S,I,F,S2,I2,F2), FixPt(S,I,F) :: FixPt(S2,I2,F2))
 
     // Include Manifests to avoid CSE issues
+    val string_to_fltpt = direct (Tpes) ("string_to_fltpt", (G,E), MString :: FltPt(G,E))
     val fltpt_to_string = direct (Tpes) ("fltpt_to_string", (G,E), FltPt(G,E) :: MString)
     val fltpt_to_fixpt = internal (Tpes) ("fltpt_to_fixpt", (G,E,S,I,F), FltPt(G,E) :: FixPt(S,I,F))
     val convert_fltpt = internal (Tpes) ("convert_fltpt", (G,E,G2,E2), FltPt(G,E) :: FltPt(G2,E2))
 
     // For testing / compatibility with rest of Delite and LMS
-    val fix_to_rep_int = internal (Tpes) ("fix_to_int", (S,I), FixPt(S,I,Z) :: MInt)
-    val rep_int_to_fix = internal (Tpes) ("int_to_fix", (S,I), MInt :: FixPt(S,I,Z))
-    val bit_to_bool    = internal (Tpes) ("bit_to_bool", Nil, Bit :: MBoolean)
+    val fix_to_rep_int = direct (Tpes) ("fix_to_int", (S,I), FixPt(S,I,Z) :: MInt)
+    val rep_int_to_fix = direct (Tpes) ("int_to_fix", (S,I), MInt :: FixPt(S,I,Z))
+    val bit_to_bool    = direct (Tpes) ("bit_to_bool", Nil, Bit :: MBoolean)
 
 
     // --- Internals
@@ -102,6 +104,16 @@ trait DHDLTypes {
       }
     }
 
+    direct (Tpes) ("cast_string_to", R, MString :: R) implements composite ${
+      manifest[R] match {
+        case mR if isFltPtType(mR) =>
+          string_to_fltpt($0)(mR.typeArguments(0),mR.typeArguments(1),implicitly[SourceContext]).asInstanceOf[Rep[R]]
+        case mR if isFixPtType(mR) =>
+          string_to_fixpt($0)(mR.typeArguments(0),mR.typeArguments(1),mR.typeArguments(2),implicitly[SourceContext]).asInstanceOf[Rep[R]]
+        case mR =>
+          stageError("Don't know how to cast string to " + mR.runtimeClass.getSimpleName + ".")
+      }
+    }
 
     // --- API
     // TODO: Add precision checking (can this number fit in that representation?)
@@ -122,7 +134,7 @@ trait DHDLTypes {
     infix (Tpes) ("as", R, SLong :: R) implements redirect ${ lift_to[Long,R]($0) }
     infix (Tpes) ("as", R, SFloat :: R) implements redirect ${ lift_to[Float,R]($0) }
     infix (Tpes) ("as", R, SDouble :: R) implements redirect ${ lift_to[Double,R]($0) }
-
+    infix (Tpes) ("to", R, MString :: R) implements redirect ${ cast_string_to[R]($0) }
 
     infix (Tpes) ("toString", Nil, Bit :: MString) implements redirect ${ bit_to_string($0) }
     infix (Tpes) ("mkString", Nil, Bit :: MString) implements redirect ${ bit_to_string($0) }
@@ -144,6 +156,7 @@ trait DHDLTypes {
 
     fimplicit (Tpes) ("scala_boolean_to_bit", Nil, SBoolean :: Bit) implements redirect ${ bit($0) }
     fimplicit (Tpes) ("scala_int_to_fixpt", Nil, SInt :: SInt32) implements redirect ${ fixPt[Int,Signed,B32,B0]($0) }
+    fimplicit (Tpes) ("stage_int_to_fixpt", Nil, MInt :: SInt32) implements redirect ${ int_to_fix[Signed,B32]($0) }  // Needed for params
     fimplicit (Tpes) ("scala_float_to_fltpt", Nil, SFloat :: Flt) implements redirect ${ fltPt[Float,B24,B8]($0) }
 
 
@@ -152,6 +165,7 @@ trait DHDLTypes {
     impl (bit_to_string)  (codegen($cala, ${ $0.toString }))
     impl (bit_to_bool)    (codegen($cala, ${ $0 }))
 
+    impl (string_to_fixpt) (codegen($cala, ${ FixedPoint[$t[S],$t[I],$t[F]]($0) }))
     impl (const_to_fixpt) (codegen($cala, ${ FixedPoint[$t[S],$t[I],$t[F]]($0.toString) }))
     impl (fixpt_to_string) (codegen($cala, ${ $0.toString }))
     impl (fixpt_to_fltpt) (codegen($cala, ${ $0.toFloatPoint[$t[G],$t[E]] }))
@@ -159,6 +173,7 @@ trait DHDLTypes {
     impl (fix_to_rep_int) (codegen($cala, ${ $0.toInt }))
     impl (rep_int_to_fix) (codegen($cala, ${ FixedPoint[$t[S],$t[I],B0]($0) }))
 
+    impl (string_to_fltpt) (codegen($cala, ${ FloatPoint[$t[G],$t[E]]($0) }))
     impl (const_to_fltpt) (codegen($cala, ${ FloatPoint[$t[G],$t[E]]($0.toString) }))
     impl (fltpt_to_string) (codegen($cala, ${ $0.toString }))
     impl (fltpt_to_fixpt) (codegen($cala, ${ $0.toFixedPoint[$t[S],$t[I],$t[F]] }))

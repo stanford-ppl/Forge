@@ -34,6 +34,7 @@ trait DHDLDSL extends ForgeApplication
   }
 
   def specification() = {
+    // No fusion in DHDL (for now)
     disableFusion()
 
     val T = tpePar("T")
@@ -104,28 +105,42 @@ trait DHDLDSL extends ForgeApplication
     importDHDLControllers()
 
     importDHDLMisc()
-
     importTupleTypeClassInstances()
 
 
     // --- Traversals
     val StageAnalyzer = analyzer("Stage", isExtern=true)
     val GlobalAnalyzer = analyzer("Global")
-    val BoundAnalyzer = analyzer("Bound")
-    //  val DSE = analyzer("DSE", isExtern=true)
+    val BoundAnalyzer = analyzer("Bound", isIterative=false)
+    val DSE = traversal("DSE", isExtern=true)
     val AreaAnalyzer = analyzer("Area", isExtern=true)
     val LatencyAnalyzer = analyzer("Latency", isExtern=true)
+
+    val ConstantFolding = traversal("ConstantFolding", isExtern=true)
+    val ControlSignalAnalyzer = analyzer("ControlSignal", isExtern=true)
+    val ParameterAnalyzer = analyzer("Parameter",isExtern=true)
+    val ParSetter = traversal("ParSetter",isExtern=true)
+    val MetaPipeRegInsertion = traversal("MetaPipeRegInsertion",isExtern=true)
 
     importGlobalAnalysis()
     importBoundAnalysis()
 
-    schedule(IRPrinterPlus)
-    //schedule(StageAnalyzer)
+
+    schedule(StageAnalyzer)
     //schedule(GlobalAnalyzer)
-    //schedule(BoundAnalyzer)
-    ////  schedule(DSE)
+    schedule(DSE)
+
+    // --- Post Parameter Selection
     //schedule(AreaAnalyzer)
     //schedule(LatencyAnalyzer)
+    schedule(BoundAnalyzer)
+    schedule(ConstantFolding)
+    schedule(MetaPipeRegInsertion)
+
+    schedule(ControlSignalAnalyzer)
+    schedule(ParSetter)
+
+    //schedule(IRPrinterPlus)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))

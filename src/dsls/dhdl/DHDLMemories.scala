@@ -274,7 +274,7 @@ trait DHDLMemories {
 		impl (bram_store) (codegen(maxj, ${
 			@ val dataStr = quote(value)
       @ if (isAccum(bram)) {
-      @   val offsetStr = quote(writerOf(bram).get) + "_offset"
+      @   val offsetStr = quote(writerOf(bram).get._1) + "_offset"
       @   val parentPipe = parentOf(bram).get.asInstanceOf[Pipeline]
 			//TODO: same problem here. Don't have scope for Pipe_foreach and Pipe_reduce
       //    val parentCtr = parentPipe.ctr

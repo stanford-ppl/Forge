@@ -469,10 +469,20 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
 						case ArgumentOut => "ArgOut"
 					}) 
 					tstr = tstr.replace("BlockRAM", "BRAM")
-					tstr + (if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
+					val quoteStr = tstr + (if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
+					/*
+					*/
+					if quoteStr.contains("108") {
+						println("sym:" + quoteStr)
+						s match {
+							case Def(d) => println("def:" + d)
+							case _ => println("don't know what this is")
+						}
+					}
+					quoteStr
 				}
 			}
-    case _ => super.quote(x)
+    case s => super.quote(x) 
   }
 }
 

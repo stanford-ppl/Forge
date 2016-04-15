@@ -8,12 +8,14 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-import scala.collection.mutable.HashMap
+import scala.collection.mutable.{HashMap,ArrayBuffer}
 
 trait ParamRestrictions extends Expressions {
   type CRange = scala.collection.immutable.Range
 
-  abstract class Restrict { def evaluate: Boolean }
+  trait Restrict {this: Product =>
+    def evaluate: Boolean
+  }
 
   case class RLess(a: Param[Int], b: Param[Int]) extends Restrict { def evaluate = a.x < b.x }
   case class RLessEqual(a: Param[Int], b: Param[Int]) extends Restrict { def evaluate = a.x <= b.x }
@@ -35,18 +37,36 @@ trait ParamRestrictions extends Expressions {
     }
   }
 
-  case class Domain[T](options: List[T]) {
+  /*def crossFilter(x: List[Domain[T]])(pred: List[T] => Boolean) = {
+    val newOptions = ArrayBuffer[List[T]]()
+    val dims = x.map(_.len)
+    val prods = List.tabulate(x.length){i => dims.slice(i+1,x.length).fold(1){_*_}}
+    val Np = dims.map(_.toLong).reduce{_*_}
+    if (Np > Int.MaxValue) throw new Exception("Domain is too big!")
+
+    val N = Np.toInt
+    val indexedDomains = x.zipWithIndex
+    for (i <- 0 until N) {
+      val point = indexedDomains.map{case (domain,d) => domain( ((i / prods(d)) % dims(d)) )  }
+      if (pred(point)) newOptions += point
+    }
+    Domain[List[T]](newOptions.toList, {c: List[T] => x.zip(cs).foreach{case (domain,c) => domain.set(c) }})
+  }*/
+
+  case class Domain[T](options: List[T], setter: T => Unit) {
     def apply(i: Int) = options(i)
+    def set(i: Int) = setter(options(i))
+    def setValue(v: T) = setter(v)
     def len: Int = options.length
     override def toString = if (len < 10) "Domain(" + options.mkString(",") + ")" else "Domain( " + len + " x)"
   }
   object Domain {
-    def apply(r: CRange) = {
+    def apply(r: CRange, setter: Int => Unit) = {
       if (r.start % r.step != 0) {
         val start = r.step*(r.start/r.step + 1)
-        new Domain[Int]((start to r.end by r.step).toList :+ r.start)
+        new Domain[Int]((start to r.end by r.step).toList :+ r.start, setter)
       }
-      else new Domain[Int](r.toList)
+      else new Domain[Int](r.toList, setter)
     }
   }
 
@@ -75,6 +95,16 @@ trait ParameterAnalyzer extends Traversal {
 
   var restrict   = List[Restrict]()
   var innerLoop  = false
+
+  override def preprocess[A:Manifest](b: Block[A]) = {
+    for ((s,m) <- metadata) {
+      if (domainOf(s).isDefined && s.isInstanceOf[Param[_]] && s.tp == manifest[Int]) {
+        val d = domainOf(s).get
+        range(s.asInstanceOf[Param[Int]]) = xrange(d._1, d._2, d._3)
+      }
+    }
+    (b)
+  }
 
   def setRange(p: Param[Int], mn: Int, mx: Int, step: Int) = {
     if (!range.contains(p)) {
@@ -114,7 +144,7 @@ trait ParameterAnalyzer extends Traversal {
           else                         { setRange(p, 1, MAX_TILE_SIZE, MIN_TILE_SIZE) }
       }
 
-      if (tiles.nonEmpty) restrict ::= RProductLessThan(tiles, MAX_TILE / cSize)
+      if (tiles.length > 1) restrict ::= RProductLessThan(tiles, MAX_TILE / cSize)
 
 
     case EatReflect(Counter_new(start,end,step,par)) =>

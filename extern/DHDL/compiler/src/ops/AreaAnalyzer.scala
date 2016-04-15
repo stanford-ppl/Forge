@@ -103,7 +103,7 @@ trait AreaAnalyzer extends ModelingTools {
           The reduction function is therefore duplicated P - 1 times
           Plus the special, tightly cyclic reduction function to update the accumulator
         */
-        val internal = areaOfBlock(rFunc, true).replicated(P,true)
+        val internal = areaOfBlock(rFunc, true).replicated(P-1,true)
         val rFuncLatency = latencyOfPipe(rFunc)
         val internalDelays = reductionTreeDelays(P).map{delay => areaOfDelayLine(nbits(e.mT), rFuncLatency * delay) }.fold(NoArea){_+_}
         val icalc = areaOfCycle(iFunc) // Calculate index for load/store

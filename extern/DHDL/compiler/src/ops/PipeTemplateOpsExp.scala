@@ -143,9 +143,17 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     reflectEffect(Block_reduce[T](cchain, cchainRed, accum, iBlk, mBlk, ldPartBlk, ldBlk, rBlk, stBlk, isMap, isRed, idx, part, acc, res, rV), effects.star)
   }
 
-  def counter_new(start: Rep[Idx],end: Rep[Idx],step: Rep[Idx], par: Int)(implicit ctx: SourceContext) = {
-    val p = param[Int](par)
-    reflectEffect[Counter](Counter_new(start,end,step,p)(ctx))
+  def counter_new(start: Rep[Idx],end: Rep[Idx],step: Rep[Idx], par: Rep[Int])(implicit ctx: SourceContext) = {
+    val truePar: Param[Int] = par match {
+      case Const(c) =>
+        val p = param(c)
+        domainOf(p) = (c,c,1)
+        p
+      case p: Param[_] => p.asInstanceOf[Param[Int]]
+
+      case _ => stageError("Counter parallelization factor must be a parameter or a constant")
+    }
+    reflectEffect[Counter](Counter_new(start,end,step,truePar)(ctx))
   }
 
   private def counterSplit(x: Rep[Counter]): (Rep[Idx],Rep[Idx],Rep[Idx],Param[Int]) = x match {

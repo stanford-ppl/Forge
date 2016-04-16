@@ -68,11 +68,13 @@ trait DSE extends Traversal {
   lazy val paramAnalyzer = new ParameterAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val printer = new IRPrinterPlus{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val bndAnalyzer = new BoundAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
+  lazy val contention = new ContentionModel{val IR: DSE.this.IR.type = DSE.this.IR}
 
   lazy val tileSizes  = paramAnalyzer.tileSizes.distinct
   lazy val parFactors = paramAnalyzer.parFactors.distinct
   lazy val accFactors = ctrlAnalyzer.memAccessFactors.toList
   lazy val dblBuffers = inferDoubleBuffers(ctrlAnalyzer.localMems)
+  lazy val topController = ctrlAnalyzer.top
 
   def setDoubleBuffers() {
     dblBuffers.foreach{case (mem,ctrl) => isDblBuf(mem) = styleOf(ctrl) == Coarse }
@@ -90,12 +92,13 @@ trait DSE extends Traversal {
 
     if (Config.enableDSE) dse(b)
 
-    bndAnalyzer.run(b)
     tileSizes.foreach{p => p.fix}
     parFactors.foreach{p => p.fix}
     setDoubleBuffers()
     setBanks()
-
+    bndAnalyzer.run(b)
+    contention.run(topController)
+    printer.run(b)
     (b)
   }
 
@@ -124,13 +127,11 @@ trait DSE extends Traversal {
     val target = FPGATarget
     val areaAnalyzer = new AreaAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
     val cycleAnalyzer = new LatencyAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
-    val contention = new ContentionModel{val IR: DSE.this.IR.type = DSE.this.IR}
     cycleAnalyzer.silenceTraversal()
     areaAnalyzer.silenceTraversal()
     bndAnalyzer.run(b)
     areaAnalyzer.run(b)
     cycleAnalyzer.run(b)
-    contention.init()
 
     // A. Get lists of parameters
     val metapipes = ctrlAnalyzer.metapipes
@@ -149,7 +150,7 @@ trait DSE extends Traversal {
       setDoubleBuffers()
       setBanks()
       bndAnalyzer.run(b)
-      contention.run()
+      contention.run(topController)
       //areaAnalyzer.resume()
       //cycleAnalyzer.resume()
       areaAnalyzer.run(b)

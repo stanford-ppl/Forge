@@ -129,7 +129,6 @@ trait DHDLDSL extends ForgeApplication
 
     schedule(StageAnalyzer)
     schedule(GlobalAnalyzer)
-    schedule(IRPrinterPlus)
     schedule(DSE)
 
     // --- Post Parameter Selection

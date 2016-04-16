@@ -27,6 +27,8 @@ trait LatencyModel {
     case _ => latencyOfNode(s, d)
   }
 
+
+  // TODO: These need new numbers after Raghu's changes
   // c - contention (1 to 13) (number of readers/writers in parallel)
   // r - number of commands (>= 1)
   // b - number of words per command (step of 96)
@@ -154,17 +156,17 @@ trait LatencyModel {
       if (nbits(s) != 32 && nbits(x) != 32) warn(s"Don't know latency for $d - using default")
       (6)
 
-
-    // TODO: These need new numbers after Raghu's changes
-    case TileTransfer(mem,local,_,_,_,cc,_,true) =>
+    case TileTransfer(mem,local,_,_,_,cc,_,false) =>
       val c = contentionOf(s)
       val ts = dimsOf(local).map(d => bound(d).getOrElse(stageError("Cannot resolve bound of BRAM dimension")))
       val r = if (ts.length == 1) 1 else ts(0)
       val b = if (ts.length == 1) ts(0) else ts.drop(1).reduce{_*_}
       val p = parOf(cc).reduce{_*_}
+
+      System.out.println(s"Tile transfer $s: c = $c, r = $r, b = $b, p = $p")
       memoryModel(c,r.toInt,b.toInt,p)
 
-    case TileTransfer(mem,local,_,_,_,cc,_,false) =>
+    case TileTransfer(mem,local,_,_,_,cc,_,true) =>
       val p = parOf(cc).reduce{_*_}
       val s = dimsOf(local).map(d => bound(d).getOrElse(stageError("Cannot resolve bound of BRAM dimension")))
       Math.ceil(s.reduce{_*_}/p.toDouble).toLong

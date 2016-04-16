@@ -33,6 +33,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
 
   var localMems = List[Exp[Any]]()    // Double buffer candidates
   var metapipes = List[Exp[Any]]()    // List of metapipes which can be sequentialized
+  var top: Exp[Any] = null
 
   val memAccessFactors = HashMap[Exp[Any],List[Param[Int]]]() // Parallelization factors for memory readers/writers
 
@@ -145,7 +146,6 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       val par = parParamsOf(cc).last
       addAccessParam(local, par)
 
-
     case EatReflect(Pipe_parallel(func)) =>
       val allocs = getAllocations(func)
       val stages = getControlNodes(func)
@@ -156,6 +156,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       setReaders(lhs, false, func)            // (4)
       setWriter(lhs, false, func)             // (5)
       traverseBlock(func)
+      if (!parentOf(lhs).isDefined) top = lhs
 
     case EatReflect(Unit_pipe(func)) =>
       val allocs = getAllocations(func)
@@ -167,6 +168,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       setReaders(lhs, false, func)            // (4)
       setWriter(lhs, false, func)             // (5)
       traverseBlock(func)
+      if (!parentOf(lhs).isDefined) top = lhs
 
     case EatReflect(Pipe_foreach(cc,func,inds)) =>
       val allocs = getAllocations(func)
@@ -182,7 +184,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       traverseWith(lhs,false,inds,cc)(func)
 
       if (styleOf(lhs) == Coarse) metapipes ::= lhs  // (8)
-
+      if (!parentOf(lhs).isDefined) top = lhs
 
     case EatReflect(Pipe_reduce(cc,a,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV)) =>
       val isFine = styleOf(lhs) == Fine
@@ -208,6 +210,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       isAccum(a) = true                              // (6)
 
       if (styleOf(lhs) == Coarse) metapipes ::= lhs  // (8)
+      if (!parentOf(lhs).isDefined) top = lhs
 
     case EatReflect(Block_reduce(cc1,cc2,a,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV)) =>
       val allocs = getAllocations(func)
@@ -236,6 +239,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       isAccum(a) = true                          // (6)
 
       if (styleOf(lhs) == Coarse) metapipes ::= lhs  // (8)
+      if (!parentOf(lhs).isDefined) top = lhs
 
     case EatReflect(Reg_write(reg,value)) =>
       isAccum(reg) = hasDependency(value, reg)    // (6)

@@ -40,32 +40,27 @@ trait DirectedGraphOps{
     val DirectedGraphOps = withTpe(DirectedGraph)     
     DirectedGraphOps{
       infix ("numEdges")(Nil :: MInt) implements composite ${array_length(in_edge_raw_data($self)) + array_length(out_edge_raw_data($self))}
+      
       infix ("isDirected") (Nil :: MBoolean) implements composite ${true}
 
-      //get out neighbors
-      infix ("outNeighbors") (Node :: NeighborView(MInt)) implements composite ${
-        val start = out_node_apply($self,$1.id)
-        val end = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1))
-          else array_length(out_edge_raw_data($self))
-        NeighborView[Int](out_edge_raw_data($self),start,end-start)
-      }
-      //get in neighbors   
-      infix ("inNeighbors") (Node :: NeighborView(MInt)) implements composite ${
-        val start = in_node_apply($self,$1.id)
-        val end = if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) 
-            else array_length(in_edge_raw_data($self)) 
-        NeighborView[Int](in_edge_raw_data($self),start,end-start)
-      }
       infix ("outDegree") (Node :: MInt) implements composite ${
-        val end  = if( ($1.id+1) < array_length(out_node_raw_data($self)) ) out_node_apply($self,($1.id+1)) 
-          else array_length(out_edge_raw_data($self))
-        end - out_node_apply($self,$1.id) 
+        out_node_apply($self,($1.id+1)) - out_node_apply($self,$1.id) 
       }
       infix ("inDegree") (Node :: MInt) implements composite ${
-        val end = if( ($1.id+1) < array_length(in_node_raw_data($self)) ) in_node_apply($self,($1.id+1)) 
-            else array_length(in_edge_raw_data($self))
-        end - in_node_apply($self,$1.id)
+        in_node_apply($self,($1.id+1)) - in_node_apply($self,$1.id)
       }
+
+      infix ("outNeighbors") (Node :: NeighborView(MInt)) implements composite ${
+        val start = out_node_apply($self,$1.id)
+        val end = out_node_apply($self,($1.id+1))
+        NeighborView[Int](out_edge_raw_data($self),start,end-start)
+      }
+      infix ("inNeighbors") (Node :: NeighborView(MInt)) implements composite ${
+        val start = in_node_apply($self,$1.id)
+        val end = in_node_apply($self,($1.id+1)) 
+        NeighborView[Int](in_edge_raw_data($self),start,end-start)
+      }
+
       infix ("sumDownNeighbors") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",Node==>R)),R), TFractional(R), addTpePars=R) implements composite ${
         //only sum in neighbors a level up
         sumOverNeighborsC($self.outNeighbors(n))(data){e => (level(e.id)==(level(n.id)+1))}

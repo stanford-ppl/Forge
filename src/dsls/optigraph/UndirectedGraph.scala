@@ -41,15 +41,40 @@ trait UndirectedGraphOps{
     UndirectedGraphOps{
       infix ("numEdges")(Nil :: MInt) implements composite ${array_length($self.getCSREdges)}
 
-      //UndirectedGraph directed or not?
       infix ("isDirected") (Nil :: MBoolean) implements composite ${false}
 
-      infix ("commonNeighbors") ((Node,Node) :: MLong) implements composite ${
-        val neigh1 = $self.neighbors($1)
-        val neigh2 = $self.neighbors($2)
-        val max = if($1 > $2) $2.id else $1.id
+      infix ("degree") (Node :: MInt) implements composite ${ 
+        node_apply($self,($1.id+1))  - node_apply($self,$1.id) 
+      }
+      infix ("outDegree") (Node :: MInt) implements composite ${ $self.degree($1) }
+      infix ("inDegree") (Node :: MInt) implements composite ${ $self.degree($1) }
 
-        neigh1.intersectInRange(neigh2,max)
+      infix ("neighbors") (Node :: NeighborView(MInt)) implements composite ${
+        val start = node_apply($self,$1.id)
+        val end = node_apply($self,($1.id+1))
+        NeighborView[Int]($self.getCSREdges,start,end-start)
+      }
+      infix ("outNeighbors") (Node :: NeighborView(MInt)) implements composite ${ $self.neighbors($1) } 
+      infix ("inNeighbors") (Node :: NeighborView(MInt)) implements composite ${ $self.neighbors($1) }
+
+      // infix ("commonNeighbors") ((Node,Node) :: MLong) implements composite ${
+      //   val neigh1 = $self.neighbors($1)
+      //   val neigh2 = $self.neighbors($2)
+      //   val max = if($1 > $2) $2.id else $1.id
+
+      //   neigh1.intersectInRange(neigh2,max)
+      // }
+
+      infix ("getNeighborsAndWeights") (Node :: Tuple2(NeighborView(MInt),NeighborView(MDouble))) implements composite ${
+        val start = node_apply($self,$1.id)
+        val end = node_apply($self,($1.id+1))
+        pack(NeighborView[Int]($self.getCSREdges,start,end-start),NeighborView[Double](edge_weights($self),start,end-start))
+      }
+
+      compiler ("get_edge_weights") (Node :: NeighborView(MDouble)) implements composite ${
+        val start = node_apply($self,$1.id)
+        val end = node_apply($self,($1.id+1))
+        NeighborView[Double](edge_weights($self),start,end-start)
       }
 
       infix ("sumDownNeighbors") ( CurriedMethodSignature(List(List(("n",Node),("level",NodeData(MInt))),("data",Node==>R)),R), TNumeric(R), addTpePars=R) implements composite ${
@@ -82,38 +107,7 @@ trait UndirectedGraphOps{
         }
         degree
       }
-      infix ("degree") (Node :: MInt) implements composite ${
-        val end  = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1)) 
-          else array_length($self.getCSREdges)
-        end - node_apply($self,$1.id) 
-      }
-      infix ("outDegree") (Node :: MInt) implements composite ${
-        val end  = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1)) 
-          else array_length($self.getCSREdges)
-        end - node_apply($self,$1.id) 
-      }
-      infix ("getNeighborsAndWeights") (Node :: Tuple2(NeighborView(MInt),NeighborView(MDouble))) implements composite ${
-        val start = node_apply($self,$1.id)
-        val end = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1))
-          else array_length($self.getCSREdges)
-        pack(NeighborView[Int]($self.getCSREdges,start,end-start),NeighborView[Double](edge_weights($self),start,end-start))
-      }
-      infix ("inDegree") (Node :: MInt) implements composite ${$self.outDegree($1)}
-      infix ("outNeighbors") (Node :: NeighborView(MInt)) implements composite ${get_neighbors($self,$1)} 
-      infix ("inNeighbors") (Node :: NeighborView(MInt)) implements composite ${get_neighbors($self,$1)}
-      infix ("neighbors") (Node :: NeighborView(MInt)) implements composite ${get_neighbors($self,$1)}
-      compiler ("get_neighbors") (Node :: NeighborView(MInt)) implements composite ${
-        val start = node_apply($self,$1.id)
-        val end = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1))
-          else array_length($self.getCSREdges)
-        NeighborView[Int]($self.getCSREdges,start,end-start)
-      }
-      compiler ("get_edge_weights") (Node :: NeighborView(MDouble)) implements composite ${
-        val start = node_apply($self,$1.id)
-        val end = if( ($1.id+1) < array_length($self.getCSRNodes) ) node_apply($self,($1.id+1))
-          else array_length(edge_weights($self))
-        NeighborView[Double](edge_weights($self),start,end-start)
-      }
+
       infix ("getCSREdgeWeights") (Nil :: MArray(MDouble)) implements getter(0, "_weights")
       compiler ("edge_weights") (Nil :: MArray(MDouble)) implements getter(0, "_weights")
       infix ("getCSRNodes") (Nil :: MArray(MInt)) implements getter(0, "_nodes")
@@ -121,6 +115,7 @@ trait UndirectedGraphOps{
       infix ("getCSREdges") (Nil :: MArray(MInt)) implements getter(0, "_edges")
       compiler("edge_apply")(MInt :: MInt) implements composite ${array_apply($self.getCSREdges,$1)}
     }
+
     addGraphCommonOps(UndirectedGraph) 
   } 
 }

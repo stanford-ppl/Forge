@@ -16,43 +16,62 @@ import scala.util.Random
 object MatMultCompiler extends DHDLApplicationCompiler with MatMult
 object MatMultInterpreter extends DHDLApplicationInterpreter with MatMult
 trait MatMult extends DHDLApplication {
-  type Elem = FixPt[Signed,B16,B16]
+  type Elem = Flt //FixPt[Signed,B16,B16]
 
   override def stageArgNames = List("bm", "bn", "bp")
-  lazy val bm = stageArgOrElse[Int](0, 2)
-  lazy val bn = stageArgOrElse[Int](1, 2)
-  lazy val bp = stageArgOrElse[Int](2, 2)
+  lazy val bm = param(60)
+  lazy val bn = param(96)
+  lazy val bp = param(960)
+  lazy val outerPar  = param(1)
+  //lazy val blockPar  = param(1)
+  lazy val middlePar = param(1)
+  lazy val innerPar  = param(12)
 
   lazy val m = ArgIn[SInt]("m")
   lazy val n = ArgIn[SInt]("n")
   lazy val p = ArgIn[SInt]("p")
 
   def matmult(a: Rep[OffChipMem[Elem]], b: Rep[OffChipMem[Elem]], c: Rep[OffChipMem[Elem]]) {
-    MetaPipe(m by bm, n by bn){ (i,j) =>
-      val tileA = BRAM[Elem]("tileA", bm, bp)
-      val tileB = BRAM[Elem]("tileB", bp, bn)
-      val tileC = BRAM[Elem]("tileC", bm, bn)
-      BlockReduce(p by bp, tileC){ k =>
+    MetaPipe(m by bm, (n by bn) par outerPar){(i,j) =>
+      MetaPipe((p by bp) par unit(1)){k =>
+        val tileA = BRAM[Elem]("tileA", bm, bp)
+        val tileB = BRAM[Elem]("tileB", bp, bn)
+        val tileC = BRAM[Elem]("tileC", bm, bn)
+        //BlockReduce((p by bp) par blockPar, tileC){ k =>
         Parallel {
-          tileA := a(i::i+bm, k::k+bp)
-          tileB := b(k::k+bp, j::j+bn)
+          tileA := a(i::i+bm, k::k+bp, innerPar)
+          tileB := b(k::k+bp, j::j+bn, innerPar)
         }
-        val accTile = BRAM[Elem]("accTile", bm, bn)
-        Sequential(bm by 1, bn by 1){ (ii,jj) =>    // MetaPipe?
+        //val accTile = BRAM[Elem]("accTile", bm, bn)
+        Sequential(bm by 1, (bn by 1) par middlePar){ (ii,jj) =>    // MetaPipe?
           val accum = Reg[Elem]
-          Pipe(bp by 1, accum){ kk => tileA(ii, kk) * tileB(kk, jj) }{_+_}
-          Pipe{ accTile(ii,jj) = accum.value }
+          Pipe((bp by 1) par innerPar, accum){ kk => tileA(ii, kk) * tileB(kk, jj) }{_+_}
+          Pipe {
+            val prev = mux(k == 0, 0.as[Flt], tileC(ii,jj))
+            tileC(ii,jj) = prev + accum.value
+          }
         }
-        accTile
-      }{_+_}
-      c(i::i+bm, j::j+bn) := tileC
+        //accTile
+        //}{_+_}
+        c(i::i+bm, j::j+bn, param(1)) := tileC
+      }
     }
   }
 
   def main() = {
-    val M = 8
-    val N = 8
-    val P = 8
+    val M = args(unit(0)).to[SInt]
+    val N = args(unit(0)).to[SInt]
+    val P = args(unit(0)).to[SInt]
+
+    bound(M) = 1056
+    bound(N) = 1056
+    bound(P) = 1056
+    domainOf(bm) = (1,960,10)
+    domainOf(bn) = (96,960,96)
+    domainOf(bp) = (96,1920,96)
+    domainOf(outerPar)  = (1,6,1)
+    domainOf(middlePar) = (1,96,6)
+    domainOf(innerPar)  = (1,96,6)
 
     val a = OffChipMem[Elem]("A", M, P)
     val b = OffChipMem[Elem]("B", P, N)

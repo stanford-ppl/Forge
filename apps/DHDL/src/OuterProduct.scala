@@ -5,29 +5,37 @@ import dhdl.shared._
 object OuterProductCompiler extends DHDLApplicationCompiler with OuterProduct
 object OuterProductInterpreter extends DHDLApplicationInterpreter with OuterProduct
 trait OuterProduct extends DHDLApplication {
-  type Elem = FixPt[Signed,B16,B16]
+  type Elem = Flt //FixPt[Signed,B16,B16]
 
   override def stageArgNames = List("tileSize")
-  lazy val tileSize = stageArgOrElse[Int](0, 2)
   lazy val dataSize = ArgIn[SInt]("dataSize")
 
+  lazy val tileSize = param(192)
+  lazy val outerPar = param(4)
+  lazy val innerPar = param(96)
+
   def outerProduct(vec1: Rep[OffChipMem[Elem]], vec2: Rep[OffChipMem[Elem]], out: Rep[OffChipMem[Elem]]) {
-    MetaPipe(dataSize by tileSize, dataSize by tileSize) { (i,j) =>
+    MetaPipe(dataSize by tileSize, (dataSize by tileSize) par outerPar) { (i,j) =>
       val b1 = BRAM[Elem]("b1", tileSize)
       val b2 = BRAM[Elem]("b2", tileSize)
       val outTile = BRAM[Elem]("outTile", tileSize, tileSize)
       Parallel {
-        b1 := vec1(i::i+tileSize)
-        b2 := vec2(j::j+tileSize)
+        b1 := vec1(i::i+tileSize, innerPar)
+        b2 := vec2(j::j+tileSize, innerPar)
       }
-      Pipe(tileSize by 1, tileSize by 1) { (ii,jj) => outTile(ii, jj) = b1(ii) * b2(jj) }
+      Pipe(tileSize by 1, (tileSize by 1) par innerPar) { (ii,jj) => outTile(ii, jj) = b1(ii) * b2(jj) }
 
-      out(i::i+tileSize, j::j+tileSize) := outTile
+      out(i::i+tileSize, j::j+tileSize, param(1)) := outTile
     }
   }
 
   def main() = {
-    val N = 8
+    val N = args(unit(0)).to[SInt]
+
+    bound(N) = 3840
+    domainOf(tileSize) = (96,960,96)  // 10
+    domainOf(outerPar) = (1,4,1)      // 4
+    domainOf(innerPar) = (1,192,6)    // 32
 
     val v1 = OffChipMem[Elem]("vec1", N)
     val v2 = OffChipMem[Elem]("vec2", N)

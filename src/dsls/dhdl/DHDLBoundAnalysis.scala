@@ -58,11 +58,11 @@ trait DHDLBoundAnalysis {
       analyze(Prim, "mul_fix") using pattern((${Exact(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x * y) })
       analyze(Prim, "mul_fix") using pattern((${Bound(x)},${Bound(y)}) -> ${ bound(lhs) = x * y })
 
-      analyze(Prim, "div_fix") using pattern((${Fixed(x)},${Fixed(y)}) -> ${ bound(lhs) = fixed(x / y) })
-      analyze(Prim, "div_fix") using pattern((${Fixed(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x / y) })
-      analyze(Prim, "div_fix") using pattern((${Exact(x)},${Fixed(y)}) -> ${ bound(lhs) = exact(x / y) })
-      analyze(Prim, "div_fix") using pattern((${Exact(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x / y) })
-      analyze(Prim, "div_fix") using pattern((${Bound(x)},${Exact(y)}) -> ${ bound(lhs) = x / y })
+      analyze(Prim, "div_fix") using pattern((${Fixed(x)},${Fixed(y)}) -> ${ bound(lhs) = fixed(Math.floor(x / y)) })
+      analyze(Prim, "div_fix") using pattern((${Fixed(x)},${Exact(y)}) -> ${ bound(lhs) = exact(Math.floor(x / y)) })
+      analyze(Prim, "div_fix") using pattern((${Exact(x)},${Fixed(y)}) -> ${ bound(lhs) = exact(Math.floor(x / y)) })
+      analyze(Prim, "div_fix") using pattern((${Exact(x)},${Exact(y)}) -> ${ bound(lhs) = exact(Math.floor(x / y)) })
+      analyze(Prim, "div_fix") using pattern((${Bound(x)},${Exact(y)}) -> ${ bound(lhs) = Math.floor(x / y) })
     }
   }
 

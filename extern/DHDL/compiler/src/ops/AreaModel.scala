@@ -197,15 +197,22 @@ trait AreaModel {
     case DHDLPrim_Neg_fix(_)   => FPGAResources(lut3 = nbits(s), regs = nbits(s))
     case DHDLPrim_Add_fix(_,_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
     case DHDLPrim_Sub_fix(_,_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+
+    case DHDLPrim_Mul_fix(Exact(_),_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case DHDLPrim_Mul_fix(_,Exact(_)) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
     case DHDLPrim_Mul_fix(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(dsps = 2)
 
+    case DHDLPrim_Div_fix(Exact(_),_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case DHDLPrim_Div_fix(_,Exact(_)) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
     case DHDLPrim_Div_fix(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       if (sign(s)) FPGAResources(lut3=1192,lut5=2,regs=2700)
       else         FPGAResources(lut3=1317,lut5=6,regs=2900)
 
+    case DHDLPrim_Mod_fix(Exact(_),_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case DHDLPrim_Mod_fix(_,Exact(_)) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
     case DHDLPrim_Mod_fix(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       if (sign(s)) FPGAResources(lut3=1192,lut5=2,regs=2700)
@@ -242,20 +249,20 @@ trait AreaModel {
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=2384,lut4=448,lut5=149,lut6=385,lut7=1,regs=3048,mem32=25,mem16=9)
 
-    case DHDLPrim_Lt_flt(_,_)  =>
-      if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
+    case DHDLPrim_Lt_flt(a,_)  =>
+      if (nbits(a) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut4=42,lut6=26,regs=33)
 
-    case DHDLPrim_Leq_flt(_,_) =>
-      if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
+    case DHDLPrim_Leq_flt(a,_) =>
+      if (nbits(a) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut4=42,lut6=26,regs=33)
 
-    case DHDLPrim_Neq_flt(_,_) =>
-      if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
+    case DHDLPrim_Neq_flt(a,_) =>
+      if (nbits(a) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut4=42,lut6=26,regs=33)
 
-    case DHDLPrim_Eql_flt(_,_) =>
-      if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
+    case DHDLPrim_Eql_flt(a,_) =>
+      if (nbits(a) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut4=42,lut6=26,regs=33)
 
 

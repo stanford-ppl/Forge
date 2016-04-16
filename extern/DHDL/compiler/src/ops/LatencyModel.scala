@@ -108,20 +108,20 @@ trait LatencyModel {
       if (nbits(s) != 32) warn(s"Don't know latency for $d - using default")
       (33)
 
-    case DHDLPrim_Lt_flt(_,_)  =>
-      if (nbits(s) != 32) warn(s"Don't know latency for $d - using default")
+    case DHDLPrim_Lt_flt(a,_)  =>
+      if (nbits(a) != 32) warn(s"Don't know latency for $d - using default")
       (3)
 
-    case DHDLPrim_Leq_flt(_,_) =>
-      if (nbits(s) != 32) warn(s"Don't know latency for $d - using default")
+    case DHDLPrim_Leq_flt(a,_) =>
+      if (nbits(a) != 32) warn(s"Don't know latency for $d - using default")
       (3)
 
-    case DHDLPrim_Neq_flt(_,_) =>
-      if (nbits(s) != 32) warn(s"Don't know latency for $d - using default")
+    case DHDLPrim_Neq_flt(a,_) =>
+      if (nbits(a) != 32) warn(s"Don't know latency for $d - using default")
       (3)
 
-    case DHDLPrim_Eql_flt(_,_) =>
-      if (nbits(s) != 32) warn(s"Don't know latency for $d - using default")
+    case DHDLPrim_Eql_flt(a,_) =>
+      if (nbits(a) != 32) warn(s"Don't know latency for $d - using default")
       (3)
 
     case DHDLPrim_Not_bit(_)   => 1
@@ -163,7 +163,7 @@ trait LatencyModel {
       val b = if (ts.length == 1) ts(0) else ts.drop(1).reduce{_*_}
       val p = parOf(cc).reduce{_*_}
 
-      System.out.println(s"Tile transfer $s: c = $c, r = $r, b = $b, p = $p")
+      //System.out.println(s"Tile transfer $s: c = $c, r = $r, b = $b, p = $p")
       memoryModel(c,r.toInt,b.toInt,p)
 
     case TileTransfer(mem,local,_,_,_,cc,_,true) =>

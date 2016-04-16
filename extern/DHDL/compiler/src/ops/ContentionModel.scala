@@ -42,7 +42,8 @@ trait ContentionModel {
     else if (styleOf(x) == Disabled) {
       val ics = isolatedContention(x)
       val mx = ics.max
-      childrenOf(x).zip(ics).foreach{case (child,c) => markContention(child, (parent/mx)*c) }
+      // Can just skip case where mx = 0 - no offchip memory accesses in this sequential anyway
+      if (mx > 0) childrenOf(x).zip(ics).foreach{case (child,c) => markContention(child, (parent/mx)*c) }
     }
   }
 

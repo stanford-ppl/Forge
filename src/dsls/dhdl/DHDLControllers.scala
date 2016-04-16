@@ -125,21 +125,34 @@ trait DHDLControllers {
     /* Parallel */
     direct (MetaPipe) ("Parallel", Nil, MThunk(MUnit) :: MUnit) implements composite ${ pipe_parallel($0) }
 
+    direct (MetaPipe) ("block_reduce_create", T, (CounterChain, MInt, BRAM(T), Indices ==> BRAM(T), (T,T) ==> T) :: MUnit) implements composite ${
+      val tileDims = dimsOf($2)
+      val ctrs = tileDims.zipWithIndex.map{ case (d,i) =>
+        if (i != tileDims.length - 1) Counter(max = d)
+        else Counter(min = 0.as[Index], max = d, step = 1.as[Index], par = $1)
+      }
+      val chain = CounterChain(ctrs:_*)
+      val pipe = block_reduce($0, chain, $2, $3, $4)
+      styleOf(pipe) = Coarse
+    }
+
     /* BlockReduce */
     // BlockReduce(counter, accum){i => f(i) }{(a,b) => reduce(a,b) }
     direct (MetaPipe) ("BlockReduce", T, CurriedMethodSignature(List(List(Counter, BRAM(T)), List(Idx ==> BRAM(T)), List((T,T) ==> T)), MUnit)) implements composite ${
-      val pipe = block_reduce[T](CounterChain($0), $1, {inds: Rep[Indices] => $2(inds(0)) }, $3)
-      styleOf(pipe) = Coarse
+      block_reduce_create[T](CounterChain($0), param(1), $1, {inds: Rep[Indices] => $2(inds(0)) }, $3)
     }
     // BlockReduce(counter, counter, accum){i => f(i) }{(a,b) => reduce(a,b) }
     direct (MetaPipe) ("BlockReduce", T, CurriedMethodSignature(List(List(Counter, Counter, BRAM(T)), List((Idx,Idx) ==> BRAM(T)), List((T,T) ==> T)), MUnit)) implements composite ${
-      val pipe = block_reduce[T](CounterChain($0, $1), $2, {inds: Rep[Indices] => $3(inds(0), inds(1))}, $4)
-      styleOf(pipe) = Coarse
+      block_reduce_create[T](CounterChain($0, $1), param(1), $2, {inds: Rep[Indices] => $3(inds(0), inds(1))}, $4)
     }
     // BlockReduce(counter, counter, counter, accum){i => f(i) }{(a,b) => reduce(a,b) }
     direct (MetaPipe) ("BlockReduce", T, CurriedMethodSignature(List(List(Counter, Counter, Counter, BRAM(T)), List((Idx,Idx,Idx) ==> BRAM(T)), List((T,T) ==> T)), MUnit)) implements composite ${
-      val pipe = block_reduce[T](CounterChain($0, $1, $2), $3, {inds: Rep[Indices] => $4(inds(0), inds(1), inds(2))}, $5)
-      styleOf(pipe) = Coarse
+      block_reduce_create[T](CounterChain($0, $1, $2), param(1), $3, {inds: Rep[Indices] => $4(inds(0), inds(1), inds(2))}, $5)
+    }
+
+    // HACK: Explicit par factor
+    direct (MetaPipe) ("BlockReduce", T, CurriedMethodSignature(List(List(Counter, BRAM(T), MInt), List(Idx ==> BRAM(T)), List((T,T) ==> T)), MUnit)) implements composite ${
+      block_reduce_create[T](CounterChain($0), $2, $1, {inds: Rep[Indices] => $3(inds(0)) }, $4)
     }
 
     // --- Scala Backend

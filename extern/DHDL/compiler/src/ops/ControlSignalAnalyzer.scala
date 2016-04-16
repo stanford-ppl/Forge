@@ -236,7 +236,9 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
 
       readersOf(a) = readersOf(a) :+ (lhs, true) // (4)
       writerOf(a) = (lhs, true)                  // (5)
-      isAccum(a) = true                          // (6)
+      isAccum(a) = true
+      val ipars = parParamsOf(cc2)               // (6)
+      addAccessParam(a, ipars.last)
 
       if (styleOf(lhs) == Coarse) metapipes ::= lhs  // (8)
       if (!parentOf(lhs).isDefined) top = lhs

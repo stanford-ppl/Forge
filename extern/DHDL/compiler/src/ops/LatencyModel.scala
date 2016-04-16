@@ -11,7 +11,7 @@ trait LatencyModel {
   this: DHDLExp with CounterToolsExp =>
 
   private var silentModel = false
-  private def warn(x: String) { if (!silentModel) stageWarn(x) }
+  private def warn(x: => String) { if (!silentModel) stageWarn(x) }
   def silenceLatencyModel() { silentModel = true }
 
   def latencyOf(s: Exp[Any], inReduce: Boolean) = s match {

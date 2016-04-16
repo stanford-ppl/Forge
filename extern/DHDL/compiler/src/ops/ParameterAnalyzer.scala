@@ -15,6 +15,16 @@ trait ParamRestrictions extends Expressions {
 
   trait Restrict {this: Product =>
     def evaluate: Boolean
+    def deps = this.productIterator.flatMap{
+      case p: Param[Int] => List(p)
+      case x: List[_] => x.flatMap{case p: Param[Int] => Some(p); case _ => None}
+      case _ => Nil
+    }
+    def dependsOnlyOn(x: Param[Int]*) = {
+      val d = deps.toList.distinct
+      val c = x.toList.distinct
+      d.length == c.length && c.forall(d contains _)
+    }
   }
 
   case class RLess(a: Param[Int], b: Param[Int]) extends Restrict { def evaluate = a.x < b.x }
@@ -36,29 +46,16 @@ trait ParamRestrictions extends Expressions {
       p.length == 1 || (p.length == 2 && p.contains(1))
     }
   }
-
-  /*def crossFilter(x: List[Domain[T]])(pred: List[T] => Boolean) = {
-    val newOptions = ArrayBuffer[List[T]]()
-    val dims = x.map(_.len)
-    val prods = List.tabulate(x.length){i => dims.slice(i+1,x.length).fold(1){_*_}}
-    val Np = dims.map(_.toLong).reduce{_*_}
-    if (Np > Int.MaxValue) throw new Exception("Domain is too big!")
-
-    val N = Np.toInt
-    val indexedDomains = x.zipWithIndex
-    for (i <- 0 until N) {
-      val point = indexedDomains.map{case (domain,d) => domain( ((i / prods(d)) % dims(d)) )  }
-      if (pred(point)) newOptions += point
-    }
-    Domain[List[T]](newOptions.toList, {c: List[T] => x.zip(cs).foreach{case (domain,c) => domain.set(c) }})
-  }*/
-
   case class Domain[T](options: List[T], setter: T => Unit) {
     def apply(i: Int) = options(i)
     def set(i: Int) = setter(options(i))
     def setValue(v: T) = setter(v)
     def len: Int = options.length
     override def toString = if (len < 10) "Domain(" + options.mkString(",") + ")" else "Domain( " + len + " x)"
+
+    def filter(cond: () => Boolean) = {
+      new Domain(options.filter{t => setValue(t); cond()}, setter)
+    }
   }
   object Domain {
     def apply(r: CRange, setter: Int => Unit) = {
@@ -68,7 +65,31 @@ trait ParamRestrictions extends Expressions {
       }
       else new Domain[Int](r.toList, setter)
     }
+    def restricted(r: CRange, setter: Int => Unit, cond: () => Boolean) = {
+      val values = ArrayBuffer[Int]()
+      var start = r.start
+      if (r.start % r.step != 0) {
+        start = r.step*((r.start/r.step) + 1)
+        setter(r.start);
+        if (cond()) values += r.start
+      }
+      for (i <- start to r.end by r.step) {
+        setter(i)
+        if (cond()) values += i
+      }
+      new Domain[Int](values.toList, setter)
+    }
   }
+
+  def prune(params: List[Param[Int]], ranges: HashMap[Param[Int],CRange], restrict: List[Restrict]) = {
+    val pruneSingle = params.map{t =>
+      val restricts = restrict.filter(_.dependsOnlyOn(t))
+      t -> Domain.restricted(ranges(t), {c: Int => t.setValue(c)}, () => restricts.forall(_.evaluate))
+    }
+    // TODO: prune pairs
+    pruneSingle.map(_._2)
+  }
+
 
   def xrange(start: Int, end: Int, step: Int) = new scala.collection.immutable.Range(start,end,step)
 }

@@ -5,7 +5,7 @@ import dhdl.shared._
 object OuterProductCompiler extends DHDLApplicationCompiler with OuterProduct
 object OuterProductInterpreter extends DHDLApplicationInterpreter with OuterProduct
 trait OuterProduct extends DHDLApplication {
-  type Elem = Flt //FixPt[Signed,B16,B16]
+  type Elem = UInt //FixPt[Signed,B16,B16]
 
   override def stageArgNames = List("tileSize")
   lazy val dataSize = ArgIn[SInt]("dataSize")

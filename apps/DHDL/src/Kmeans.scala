@@ -7,81 +7,100 @@ object KmeansInterpreter extends DHDLApplicationInterpreter with Kmeans
 trait Kmeans extends DHDLApplication {
 
   override def stageArgNames = List("tileSize", "dim", "numCents")
-  lazy val tileSize  = stageArgOrElse[Int](0, 1)
-  lazy val dim       = stageArgOrElse[Int](1, 2)
-  lazy val numCents  = stageArgOrElse[Int](2, 2)
+  lazy val dim       = ArgIn[SInt]("dimension")
+  lazy val numCents  = ArgIn[SInt]("numCents")
   lazy val numPoints = ArgIn[SInt]("numPoints")
 
+  lazy val tileSize   = param(210)
+  lazy val dTileSize  = 96
+  lazy val kTileSize  = 16
+  lazy val ptLoopPar  = unit(1)
+  lazy val ctLoopPar  = param(1)
+  lazy val dstLoopPar = param(4)
+  lazy val accLoopPar = param(4)
+  lazy val avgLoopPar = param(1)
+
   def kmeans(points: Rep[OffChipMem[Flt]], centroids: Rep[OffChipMem[Flt]]) = {
-    val oldCents = BRAM[Flt](numCents, dim)
-    val newCents = BRAM[Flt](numCents, dim)
-    val centCount = BRAM[UInt](numCents)
+    val oldCents = BRAM[Flt](kTileSize, dTileSize)
+    val newCents = BRAM[Flt](kTileSize, dTileSize)
+    val centCount = BRAM[UInt](kTileSize)
+    val centsOut = BRAM[Flt](kTileSize, dTileSize)
 
     Sequential {
       // Load initial centroids (from points)
-      oldCents := points(0::numCents,0::dim)
+      oldCents := points(0::kTileSize,0::dTileSize, ctLoopPar)
 
-      Sequential {
-        val pointsTile = BRAM[Flt](tileSize, dim)
-        Sequential(numPoints by tileSize) { i =>
-          pointsTile := points(i::i+tileSize, 0::dim) // TODO: change 0::dim with just *
+      MetaPipe((numPoints by tileSize) par unit(1)) { i =>
+        val pointsTile = BRAM[Flt](tileSize, dTileSize)
+        pointsTile := points(i::i+tileSize, 0::dTileSize, dstLoopPar)
 
-          Sequential(tileSize by 1){ pt =>
-            val minDist = Reg[Flt](-1.0f) // Minimum distance to closest centroid
-            val minCent = Reg[SInt](0)    // Index of closest centroid
+        MetaPipe((tileSize by 1) par ptLoopPar){ pt =>
+          val minDist = Reg[Flt](-1.0f) // Minimum distance to closest centroid
+          val minCent = Reg[SInt](0)    // Index of closest centroid
 
-            MetaPipe(numCents by 1){ ct =>
-              val dist = Reg[Flt](0.0f)
-              Pipe(dim by 1, dist){d => (pointsTile(pt, d) - oldCents(ct, d)) ** 2 }{_+_}
+          MetaPipe((kTileSize by 1) par ctLoopPar){ ct =>
+            val dist = Reg[Flt](0.0f)
+            Pipe((dTileSize by 1) par dstLoopPar, dist){d => (pointsTile(pt, d) - oldCents(ct, d)) ** 2 }{_+_}
 
-              Pipe {
-                val closer = dist.value < minDist.value || minDist.value < 0f
-                minDist := mux(closer, dist.value, minDist.value)
-                minCent := mux(closer, ct, minCent.value)
-              }
+            Pipe {
+              val closer = dist.value < minDist.value || minDist.value < 0f
+              minDist := mux(closer, dist.value, minDist.value)
+              minCent := mux(closer, ct, minCent.value)
             }
-            // Add point and increment point count
-            Parallel {
-              Pipe(dim by 1){d =>
-                newCents(minCent.value, d) = newCents(minCent.value, d) + pointsTile(pt, d)
-              }
-              Pipe{ centCount(minCent.value) = centCount(minCent.value) + 1 }
+          }
+          // Add point and increment point count
+          Parallel {
+            Pipe((dTileSize by 1) par accLoopPar){d =>
+              newCents(minCent.value, d) = newCents(minCent.value, d) + pointsTile(pt, d)
             }
-          } // End of points in tile
-        } // End of point tiles
-        Pipe(numCents by 1, dim by 1){(ct,d) =>
-          newCents(ct, d) = newCents(ct, d) / centCount(ct).to[Flt]
-        }
-      } // End of metapipe
+            Pipe{ centCount(minCent.value) = centCount(minCent.value) + 1 }
+          }
+        } // End of points in tile
+      } // End of point tiles
 
-      centroids(0::numCents, 0::dim) := newCents  // TODO: Change to centroids(*,*) := newCents ?
+      Pipe(kTileSize by 1, (dTileSize by 1) par avgLoopPar){(ct,d) =>
+        centsOut(ct, d) = newCents(ct, d) / centCount(ct).to[Flt]
+      }
+
+      // TODO: Change parallelization here
+      centroids(0::kTileSize, 0::dTileSize, unit(1)) := centsOut
     }
   }
 
   def main() {
-    val N = 4
+    val N = args(unit(0)).to[SInt];   bound(N) = 960000
+    val K = args(unit(0)).to[SInt];   bound(K) = 16
+    val D = args(unit(0)).to[SInt];   bound(D) = 96
+    domainOf(tileSize) = (1,960,10)
+    domainOf(ctLoopPar) = (1,16,1)
+    domainOf(dstLoopPar) = (1,16,1)
+    domainOf(accLoopPar) = (1,16,1)
+    domainOf(avgLoopPar) = (1,16,1)
 
-    val points = OffChipMem[Flt]("points", N, dim)  // input points
-    val centroids = OffChipMem[Flt]("centroids", numCents, dim) // output centroids
 
-    val pts = Array.tabulate(N){i => Array.tabulate(dim){d => random[Flt](10) }}
+    val points = OffChipMem[Flt]("points", N, D)       // input points
+    val centroids = OffChipMem[Flt]("centroids", K, D) // output centroids
+
+    val pts = Array.tabulate(N){i => Array.tabulate(D){d => random[Flt](10) }}
 
     setMem(points, pts.flatten)
     setArg(numPoints, N)
+    setArg(numCents,  K)
+    setArg(dim, D)
 
     println("points: ")
     for (i <- 0 until N) { println(i.mkString + ": " + pts(i).mkString(", ")) }
 
     Accel{ kmeans(points, centroids) }
 
-    val cts = Array.tabulate(numCents){i => pts(i) }
+    val cts = Array.tabulate(K){i => pts(i) }
 
     val gold = Array.empty[ForgeArray[Flt]](numCents) // ew
     val counts = Array.empty[UInt](numCents)
     for (i <- 0 until numCents) {
-      gold(i) = Array.fill(dim)(0.as[Flt])  // TODO: Fix
+      gold(i) = Array.fill(D)(0.as[Flt])  // TODO: Fix
     }
-    for (i <- 0 until numCents) { counts(i) = 0.as[UInt] }
+    for (i <- 0 until K) { counts(i) = 0.as[UInt] }
     // Really bad imperative version
     def dist(p1: Rep[ForgeArray[Flt]], p2: Rep[ForgeArray[Flt]]) = p1.zip(p2){(a,b) => (a - b)**2 }.reduce(_+_)
     for (i <- 0 until N) {
@@ -90,12 +109,12 @@ trait Kmeans extends DHDLApplication {
       val minIdx = distWithIndex.reduce{(a,b) => if (a._1 < b._1) a else b }._2
 
       counts(minIdx) = counts(minIdx) + 1
-      for (j <- 0 until dim) {
+      for (j <- 0 until D) {
         gold(minIdx)(j) = gold(minIdx).apply(j) + pt(j)
       }
 
       println(counts.mkString(", "))
-      for (x <- 0 until numCents) { println(gold(x).mkString(", ")) }
+      for (x <- 0 until K) { println(gold(x).mkString(", ")) }
     }
     val actual = gold.zip(counts){(ct,n) => ct.map{p => p / n.to[Flt] }}.flatten
     println("gold:   " + actual.mkString(", "))

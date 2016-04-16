@@ -8,13 +8,18 @@ object GDACompiler extends DHDLApplicationCompiler with GDA
 object GDAInterpreter extends DHDLApplicationInterpreter with GDA
 trait GDA extends DHDLApplication {
 
-  type Elem = FixPt[Signed,B16,B16]
+  type Elem = Flt //FixPt[Signed,B16,B16]
 
   override def stageArgNames = List("rTileSize", "cTileSize")
-  lazy val rTileSize = stageArgOrElse[Int](0, 2)
-  lazy val cTileSize = stageArgOrElse[Int](1, 4)
   lazy val rows = ArgIn[SInt]("rows")
   lazy val cols = ArgIn[SInt]("cols")
+
+  lazy val rTileSize = param(960)
+  lazy val cTileSize = 96
+  lazy val outerPar   = param(1)
+  lazy val innerPar   = param(2)
+  lazy val subLoopPar = param(1)
+  lazy val prodLoopPar = param(16)
 
   def gda(
     x:     Rep[OffChipMem[Elem]],
@@ -25,52 +30,52 @@ trait GDA extends DHDLApplication {
     sigma: Rep[OffChipMem[Elem]]
   ) {
 
-    MetaPipe(rows by rTileSize){ r =>
-      val yTile = BRAM[Bit]("yTile", rTileSize)
-      yTile := y(r::r+rTileSize)
+    Sequential {
+      val mu0Tile = BRAM[Elem]("mu0Tile", cTileSize)
+      val mu1Tile = BRAM[Elem]("mu1Tile", cTileSize)
+      Parallel {
+        mu0Tile := mu0(0::cTileSize, subLoopPar)  // Load mu0
+        mu1Tile := mu1(0::cTileSize, subLoopPar)  // Load mu1
+      }
 
-      Sequential(rTileSize by 1){ rr =>
-        // Compute sub
-        MetaPipe(cols by cTileSize){ c =>
-          val xTile = BRAM[Elem]("xTile", rTileSize, cTileSize)
-          val mu0Tile = BRAM[Elem]("mu0Tile", cTileSize)
-          val mu1Tile = BRAM[Elem]("mu1Tile", cTileSize)
-          Parallel {
-            xTile   := x(r::r+rTileSize, c::c+cTileSize)  // Load tile of x
-            mu0Tile := mu0(c::c+cTileSize)                // Load tile of mu0
-            mu1Tile := mu1(c::c+cTileSize)                // Load tile of mu1
-          }
+      val sigmaOut = BRAM[Elem]("sigmaOut", cTileSize, cTileSize)
+
+      BlockReduce((rows by rTileSize) par outerPar, sigmaOut, prodLoopPar){ r =>
+        val yTile = BRAM[Bit]("yTile", rTileSize)
+        val xTile = BRAM[Elem]("xTile", rTileSize, cTileSize)
+        Parallel {
+          yTile := y(r::r+rTileSize, subLoopPar)
+          xTile := x(r::r+rTileSize, 0::cTileSize, subLoopPar)  // Load tile of x
+        }
+
+        val sigmaBlk = BRAM[Elem]("sigmaBlk", cTileSize, cTileSize)
+        BlockReduce((rTileSize by 1) par innerPar, sigmaBlk, prodLoopPar){rr =>
           val subTile = BRAM[Elem]("subTemp", cTileSize)
-          Pipe(cTileSize by 1){ cc =>
+          val sigmaTile = BRAM[Elem]("sigmaTile", cTileSize, cTileSize)
+          Pipe((cTileSize by 1) par subLoopPar){ cc =>
             subTile(cc) = xTile(rr,cc) - mux(yTile(rr), mu1Tile(cc), mu0Tile(cc))
           }
-          sub(c::c+cTileSize) := subTile
-        }
-
-        // Compute outer product
-        MetaPipe(cols by cTileSize, cols by cTileSize){ (i,j) =>
-          val subTile1 = BRAM[Elem]("subTile1", cTileSize)
-          val subTile2 = BRAM[Elem]("subTile2", cTileSize)
-          val sigmaTile = BRAM[Elem]("sigmaTile", cTileSize, cTileSize)
-          Parallel {
-            subTile1 := sub(i::i+cTileSize)
-            subTile2 := sub(j::j+cTileSize)
-            sigmaTile := sigma(i::i+cTileSize, j::j+cTileSize)  // Only actually need this after first row
+          Pipe(cTileSize by 1, (cTileSize by 1) par prodLoopPar){ (ii,jj) =>
+            sigmaTile(ii,jj) = subTile(ii) * subTile(jj)
           }
+          sigmaTile
+        }{_+_}
+        sigmaBlk
+      }{_+_}
 
-          Pipe(cTileSize by 1, cTileSize by 1){ (ii,jj) =>
-            val prev = mux(r > 0 || rr > 0, sigmaTile(ii,jj),  0) // Don't add in garbage
-            sigmaTile(ii,jj) = prev + subTile1(ii) * subTile2(jj)
-          }
-          sigma(i::i+cTileSize, j::j+cTileSize) := sigmaTile
-        }
-      }
+      // TODO: Change parallelization factor
+      sigma(0::cTileSize, 0::cTileSize, unit(1)) := sigmaOut
     }
   }
 
   def main() {
-    val R = 6
-    val C = 8
+    val R = args(unit(0)).to[SInt];   bound(R) = 360000
+    val C = args(unit(0)).to[SInt];   bound(C) = 96
+    domainOf(rTileSize)  = (960,1920,6) // 160
+    domainOf(outerPar)   = (1,4,1)      // 4
+    domainOf(innerPar)   = (1,6,1)      // 6
+    domainOf(subLoopPar) = (1,10,1)     // 10
+    domainOf(prodLoopPar) = (1,96,4)    // 24
 
     val x = OffChipMem[Elem]("x", R, C)
     val y = OffChipMem[Bit]("y", R)
@@ -78,7 +83,6 @@ trait GDA extends DHDLApplication {
     val mu1 = OffChipMem[Elem]("mu1", C)
     val sub = OffChipMem[Elem]("sub", C)
     val sigma = OffChipMem[Elem]("sigma", C, C)
-
 
     val sX = Array.fill(R){ Array.fill(C){ random[Elem](10) }}
     val sY = Array.fill(R){ random[Bit] }

@@ -83,17 +83,6 @@ trait PipeStageTools extends NestedBlockTraversal {
   val IR: PipeStageToolsExp
   import IR._
 
-  // Bit of a hack here - use scheduling to return list of statements
-  private def getStmsInScope(b: Block[Any]): List[Stm] = {
-    var stms: List[Stm] = Nil
-    focusBlock(b) {
-      focusExactScope(b){ levelScope =>
-        stms = levelScope
-      }
-    }
-    stms
-  }
-
   def list(x: List[Exp[Any]]) = x.zipWithIndex.foreach{
     case (s@Def(d),i) if isControlNode(s)  => println(s"   $i. [Ctrl] $s = $d")
     case (s@Def(d),i) if isInnerControl(s) => println(s"   $i. [Pipe] $s = $d")
@@ -103,7 +92,7 @@ trait PipeStageTools extends NestedBlockTraversal {
   }
 
   def getStages(blks: Block[Any]*): List[Exp[Any]] = {
-    blks.toList.flatMap(b => getStmsInScope(b)).map{case TP(s,d) => s}
+    blks.toList.flatMap(b => getStmsInBlock(b)).map{case TP(s,d) => s}
   }
   def getControlNodes(blk: Block[Any]*) = getStages(blk:_*).filter{s => isControlNode(s) }
   def getAllocations(blk: Block[Any]*)  = getStages(blk:_*).filter{s => isAllocation(s) }

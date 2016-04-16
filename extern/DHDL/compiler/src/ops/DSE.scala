@@ -18,7 +18,7 @@ import scala.virtualization.lms.util.GraphUtil._
 
 trait DSE extends Traversal {
   val IR: DHDLCompiler
-  import IR._
+  import IR.{infix_until => _, _}
 
   override val debugMode = true
 
@@ -67,7 +67,7 @@ trait DSE extends Traversal {
   lazy val ctrlAnalyzer = new ControlSignalAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val paramAnalyzer = new ParameterAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val printer = new IRPrinterPlus{val IR: DSE.this.IR.type = DSE.this.IR}
-  lazy val bndAnalyzer = new BoundAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
+  lazy val bndAnalyzer = new BoundAnalyzer with QuickTraversal{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val contention = new ContentionModel{val IR: DSE.this.IR.type = DSE.this.IR}
 
   lazy val tileSizes  = paramAnalyzer.tileSizes.distinct
@@ -86,7 +86,7 @@ trait DSE extends Traversal {
   override def run[A:Manifest](b: Block[A]) = {
     ctrlAnalyzer.run(b)
     paramAnalyzer.run(b)
-
+    //printer.run(b)
     //if (debugMode) printer.run(b)
     //if (debugMode) dblBuffers foreach {case (ctrl,mem) => debug(s"Found double buffer: $mem (in $ctrl)") }
 
@@ -98,7 +98,7 @@ trait DSE extends Traversal {
     setBanks()
     bndAnalyzer.run(b)
     contention.run(topController)
-    printer.run(b)
+
     (b)
   }
 
@@ -146,18 +146,6 @@ trait DSE extends Traversal {
 
     def isLegalSpace() = restrict.forall(_.evaluate)
 
-    def evaluate() = {
-      setDoubleBuffers()
-      setBanks()
-      bndAnalyzer.run(b)
-      contention.run(topController)
-      //areaAnalyzer.resume()
-      //cycleAnalyzer.resume()
-      areaAnalyzer.run(b)
-      cycleAnalyzer.run(b)
-      (areaAnalyzer.totalArea, cycleAnalyzer.totalCycles)
-    }
-
     // C. Calculate space
     debug("Running DSE")
     debug("Tile Sizes: ")
@@ -165,40 +153,51 @@ trait DSE extends Traversal {
     debug("Parallelization Factors:")
     parFactors.foreach{t => debug(s"  $t")}
     debug("Metapipelining Toggles:")
-    metapipes.foreach{t => debug(s"  $t")}
+    metapipes.foreach{t => debug(s"  ${mpos(t.pos).line}")}
     debug("")
     debug("Found the following parameter restrictions: ")
+    val numericFactors = tileSizes ++ parFactors
+
     for (r <- restrict)   { debug(s"  $r") }
-    for ((p,r) <- ranges) { debug(s"  $p: ${r.start}:${r.step}:${r.end}") }
+    for ((p,r) <- ranges if numericFactors.contains(p)) { debug(s"  $p: ${r.start}:${r.step}:${r.end}") }
 
-    val initialSpace = tileSizes.map{t => Domain(ranges(t), {c: Int => t.setValue(c)}) } ++
-                       parFactors.map{t => Domain(ranges(t), {c: Int => t.setValue(c)}) }
+    // Prune single factors
+    val initialSpace = prune(numericFactors, ranges, restrict)
 
-    //val (compSpace, newRestrict) = compressSpace(initialSpace, restrict)
-    //restrict = newRestrict
-
-    // Compress space
     val space = initialSpace ++ metapipes.map{mp => Domain(List(true,false), {c: Boolean => c match {case true => styleOf(mp) = Coarse; case false => styleOf(mp) = Disabled}; () }) }
 
-    val TS = tileSizes.length
-    val PF = tileSizes.length + parFactors.length
+    val N = space.length
+    val indexedSpace = (space, xrange(0,N,1).toList).zipped
 
     // D. DSE
-    val N = space.length
     val dims = space.map(_.len)
     val spaceSize = dims.map(_.toLong).fold(1L){_*_}
     val prods = List.tabulate(N){i => dims.slice(i+1,N).map(_.toLong).fold(1L){_*_}}
 
     debug(s"Total space size is $spaceSize")
 
-    val iStep = 1//: () => Int = if (spaceSize < 200000) {() => 1} else {() => util.Random.nextInt(100) } // TODO
+    val size = if (spaceSize < Int.MaxValue) spaceSize.toInt else stageError("Spaces over 2^32 currently unsupported.")
 
-    var legalSize = 0
-    var validSize = 0
+    // --- Find all legal points
+    // FIXME: This could take a long time if space size is really large
+    val legalPoints = ArrayBuffer[Int]()
 
-    val indx = ArrayBuffer[Long]()
-    val alms = ArrayBuffer[Int]()
-    val dsps = ArrayBuffer[Int]()
+    for (i <- 0 until size) {
+      indexedSpace.foreach{case (domain,d) => domain.set( ((i / prods(d)) % dims(d)).toInt ) }
+      if (isLegalSpace()) legalPoints += i
+    }
+    var legalSize = legalPoints.length
+    debug(s"Legal space size is $legalSize")
+
+    // Take 200,000 legal points at most
+    val points = util.Random.shuffle(legalPoints.toList).take(200000)
+    legalSize = points.length // = min(200000, legalSize)
+
+
+    // --- Run DSE
+    val validPts = ArrayBuffer[Int]() // Index into points of valid indices
+    val alms = ArrayBuffer[Int]()     // Resource and area estimates for all points
+    val dsps = ArrayBuffer[Int]()     // (including invalid ones)
     val bram = ArrayBuffer[Int]()
     val cycles = ArrayBuffer[Long]()
 
@@ -206,64 +205,112 @@ trait DSE extends Traversal {
 
     val pareto = ArrayBuffer[ParetoPt]()
 
+
+    // --- PROFILING
+    var clockRef = 0L
+    def resetClock() { clockRef = System.currentTimeMillis }
+
+    var setTime = 0L
+    def endSet() { setTime += System.currentTimeMillis - clockRef; resetClock() }
+    var bndTime = 0L
+    def endBnd() { bndTime += System.currentTimeMillis - clockRef; resetClock() }
+    var conTime = 0L
+    def endCon() { conTime += System.currentTimeMillis - clockRef; resetClock() }
+    var areaTime = 0L
+    def endArea() { areaTime += System.currentTimeMillis - clockRef; resetClock() }
+    var cyclTime = 0L
+    def endCycles() { cyclTime += System.currentTimeMillis - clockRef; resetClock() }
+    var paretoTime = 0L
+    def endPareto() { paretoTime += System.currentTimeMillis - clockRef; resetClock() }
+
+    def resetAllTimers() {
+      setTime = 0; bndTime = 0; conTime = 0; areaTime = 0; cyclTime = 0; paretoTime = 0;
+    }
+    def getPercentages(total: Long) = {
+      val t = total.toFloat
+      val set = 100*setTime / t
+      val bnd = 100*bndTime / t
+      val con = 100*conTime / t
+      val area = 100*areaTime / t
+      val cycl = 100*cyclTime / t
+      val pareto = 100*paretoTime / t
+      debug("set: %.1f, bnd: %.1f, con: %.1f, area: %.1f, cycles: %.1f, pareto: %.1f".format(set, bnd,con,area,cycl,pareto))
+    }
+
+    def evaluate() = {
+
+      setDoubleBuffers()
+      setBanks()
+
+      endSet()
+
+      bndAnalyzer.run(b)
+      endBnd()
+
+      contention.run(topController)
+      endCon()
+
+      areaAnalyzer.run(b)
+      endArea()
+
+      cycleAnalyzer.run(b)
+      endCycles()
+      (areaAnalyzer.totalArea, cycleAnalyzer.totalCycles)
+    }
+
     debug("And aaaawaaaay we go!")
-
-    val indexedSpace = (space, xrange(0,N,1).toList).zipped
-
     val startTime = System.currentTimeMillis
-    var i = 0L
-    var pos = 0
     var nextNotify = 0.0; val notifyStep = 200
-    while (i < spaceSize) {
+    for (p <- 0 until legalSize) {
+      resetClock() // PROFILING
+
       // Get and set current parameter combination
-      val point = indexedSpace.foreach{case (domain,d) => domain.set( ((i / prods(d)) % dims(d)).toInt ) }
-      //val ts = point.slice(0, TS).map(_.asInstanceOf[Int])
-      //val pf = point.slice(TS,PF).map(_.asInstanceOf[Int])
-      //val mp = point.drop(PF).map(_.asInstanceOf[Boolean])
-      //tileSizes.zip(ts).foreach{case (ts: Param[Int], c: Int) => ts.setValue(c) }
-      //parFactors.zip(pf).foreach{case (pf: Param[Int], c: Int) => pf.setValue(c) }
-      //metapipes.zip(mp).foreach{case (mp,c) =>  }
+      val pt = points(p)
+      indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt ) }
 
-      if (isLegalSpace()) {
-        legalSize += 1
-        val (area,runtime) = evaluate()
+      val (area,runtime) = evaluate()
+      alms += area.alms
+      dsps += area.dsps
+      bram += area.bram
+      cycles += runtime
 
-        if (area.alms < target.alms && area.dsps < target.dsps && area.bram < target.bram && area.streams < target.streams) {
-          validSize += 1
-          indx += i
-          alms += area.alms; dsps += area.dsps; bram += area.bram; cycles += runtime
+      if (area.alms < target.alms && area.dsps < target.dsps && area.bram < target.bram && area.streams < target.streams) {
+        validPts += p
 
-          // Check if this is a pareto frontier candidate
-          var wasAdded = false
-          var candidate = true
+        // Check if this is a pareto frontier candidate
+        var wasAdded = false
+        var candidate = true
 
-          var j = 0
-          while (j < pareto.size && !wasAdded && candidate) {
-            val p = pareto(j)
-            if (area.alms < p.alms && runtime < p.cycles) {
-              pareto(j) = ParetoPt(pos,area.alms,runtime) // Strictly less than existing frontier point: replace
-              wasAdded = true
-            }
-            candidate = area.alms < p.alms || runtime < p.cycles
-            j += 1
+        var j = 0
+        while (j < pareto.size && !wasAdded && candidate) {
+          val p = pareto(j)
+          if (area.alms < p.alms && runtime < p.cycles) {
+            pareto(j) = ParetoPt(pt,area.alms,runtime) // Strictly less than existing frontier point: replace
+            wasAdded = true
           }
-          if (!wasAdded && candidate) pareto += ParetoPt(pos,area.alms,runtime)
-
-          pos += 1
+          candidate = area.alms < p.alms || runtime < p.cycles
+          j += 1
         }
+        if (!wasAdded && candidate) pareto += ParetoPt(pt,area.alms,runtime)
       }
-      if (i > nextNotify) {
+      endPareto() // PROFILING
+
+      if (p > nextNotify) {
         val time = System.currentTimeMillis - startTime
-        debug("%.4f".format(100*(i/spaceSize.toFloat)) + s"% ($i / $spaceSize) Complete after ${time/1000} seconds")
+        debug("%.4f".format(100*(p/legalSize.toFloat)) + s"% ($p / $legalSize) Complete after ${time/1000} seconds")
+
+        getPercentages(time) // PROFILING
+
         nextNotify += notifyStep
       }
-      i += iStep
     }
+
+    val validSize = validPts.length
+    val paretoSize = pareto.length
     val time = (System.currentTimeMillis - startTime)/1000.0
     debug(s"Completed space search in $time seconds")
-    debug(s"Total legal space size: $legalSize / $spaceSize")
-    debug(s"Valid designs generated: $validSize / $spaceSize")
-    debug(s"Pareto frontier size: ${pareto.length} / $spaceSize")
+    debug(s"Valid designs generated: $validSize / $legalSize")
+    debug(s"Pareto frontier size: $paretoSize / $validSize")
 
     // F. Show user results, pick point on pareto curve
     // TODO

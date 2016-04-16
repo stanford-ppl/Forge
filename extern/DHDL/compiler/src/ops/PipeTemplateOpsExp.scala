@@ -102,7 +102,7 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     reflectEffect(Pipe_reduce[T,C](cchain, accum, iBlk, ldBlk, stBlk, mBlk, rBlk, is, idx, acc, res, rV), effects.star)
   }
 
-  def block_reduce[T:Manifest](cchain: Rep[CounterChain], accum: Rep[BRAM[T]], func: Rep[Indices] => Rep[BRAM[T]], rFunc: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext): Rep[Pipeline] = {
+  def block_reduce[T:Manifest](cchain: Rep[CounterChain], cchainRed: Rep[CounterChain], accum: Rep[BRAM[T]], func: Rep[Indices] => Rep[BRAM[T]], rFunc: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext): Rep[Pipeline] = {
     val isMap = List.fill(lenOf(cchain)){ fresh[Idx] }   // Map loop indices
     val indsMap = indices_create(isMap)
 
@@ -110,8 +110,6 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     val mBlk = reifyEffects( func(indsMap) )
 
     // Reduce loop indices
-    val ctrsRed = dimsOf(accum).map{dim => Counter(max = dim) }
-    val cchainRed = CounterChain(ctrsRed:_*)
     val isRed = List.fill(lenOf(cchainRed)){ fresh[Idx] } // Reduce loop indices
     val indsRed = indices_create(isRed)
 

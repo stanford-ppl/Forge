@@ -19,13 +19,13 @@ trait MatMult extends DHDLApplication {
   type Elem = Flt //FixPt[Signed,B16,B16]
 
   override def stageArgNames = List("bm", "bn", "bp")
-  lazy val bm = param(60)
+  lazy val bm = param(70)
   lazy val bn = param(96)
   lazy val bp = param(960)
   lazy val outerPar  = param(1)
   //lazy val blockPar  = param(1)
   lazy val middlePar = param(1)
-  lazy val innerPar  = param(12)
+  lazy val innerPar  = param(1)
 
   lazy val m = ArgIn[SInt]("m")
   lazy val n = ArgIn[SInt]("n")
@@ -47,7 +47,7 @@ trait MatMult extends DHDLApplication {
           val accum = Reg[Elem]
           Pipe((bp by 1) par innerPar, accum){ kk => tileA(ii, kk) * tileB(kk, jj) }{_+_}
           Pipe {
-            val prev = mux(k == 0, 0.as[Flt], tileC(ii,jj))
+            val prev = mux(k == 0, 0.as[Elem], tileC(ii,jj))
             tileC(ii,jj) = prev + accum.value
           }
         }

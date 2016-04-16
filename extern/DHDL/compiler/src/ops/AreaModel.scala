@@ -69,7 +69,7 @@ trait AreaModel {
   this: DHDLExp with CounterToolsExp =>
 
   private var silentModel = false
-  private def warn(x: String) { if (!silentModel) stageWarn(x) }
+  private def warn(x: => String) { if (!silentModel) stageWarn(x) }
   def silenceAreaModel() { silentModel = true }
 
   /**
@@ -142,6 +142,9 @@ trait AreaModel {
    * Accumulator calculation+update is often generated as a special case to minimize latencies in tight cycles
    **/
   private def areaOfNodeInReduce(s: Exp[Any], d: Def[Any]): FPGAResources = d match {
+    case DHDLPrim_Add_flt(_,_) =>
+      FPGAResources(lut3=397,lut4=29,lut5=125,lut6=34,lut7=5,regs=1606,mem16=50) // More registers
+
     case Reflect(d,_,_) => areaOfNodeInReduce(s,d)
     case _ => areaOfNode(s, d)
   }
@@ -154,6 +157,11 @@ trait AreaModel {
       FPGAResources(lut3=N*P*32, regs = 4*N*P*32) // TODO: Hardcoded 32 bit index sizes
     }
     else NoArea
+  }
+
+  // HACK: Need better way of checking const multiplications here
+  def areaOfConstMult(c: Int, nbits: Int) = {
+    FPGAResources(lut3 = nbits, regs = 2*nbits)
   }
 
   /**
@@ -198,8 +206,8 @@ trait AreaModel {
     case DHDLPrim_Add_fix(_,_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
     case DHDLPrim_Sub_fix(_,_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
 
-    case DHDLPrim_Mul_fix(Exact(_),_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
-    case DHDLPrim_Mul_fix(_,Exact(_)) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case DHDLPrim_Mul_fix(Exact(c),_) => areaOfConstMult(c.toInt, nbits(s)) // HACK
+    case DHDLPrim_Mul_fix(_,Exact(c)) => areaOfConstMult(c.toInt, nbits(s)) // HACK
     case DHDLPrim_Mul_fix(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(dsps = 2)

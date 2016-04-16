@@ -18,8 +18,6 @@ trait ContentionModel {
 
   def outerContention(x: Exp[Any], P: => Int): Int = {
     if (styleOf(x) != Fine) {
-      System.out.println(s"Visiting node $x in contention analysis")
-
       val ics = childrenOf(x).map{c => calcContention(c) * P}
       isolatedContention(x) = ics
       if (styleOf(x) == Coarse) ics.sum else ics.max
@@ -59,7 +57,6 @@ trait ContentionModel {
 
   def run(top: Exp[Any]) = {
     if (top eq null) stageError("Contention model was uninitialized when run")
-    System.out.println(s"top is $top")
     val c = calcContention(top)
     markContention(top, c)
   }

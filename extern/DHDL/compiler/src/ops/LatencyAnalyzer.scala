@@ -21,7 +21,51 @@ trait LatencyAnalysisExp extends LatencyModel with CounterToolsExp with PipeStag
 }
 
 
-trait ModelingTools extends Traversal with PipeStageTools {
+// TODO: Move elsewhere
+trait QuickTraversal extends Traversal {
+  import IR._
+
+  // --- Dependencies
+  val useSymsCache = true
+  val symsCache = HashMap[Any, List[Sym[Any]]]()
+
+  def symDeps(e: Any): List[Sym[Any]] = {
+    if (useSymsCache && symsCache.contains(e)) symsCache(e)
+    else {
+      val s = syms(e)
+      if (useSymsCache) symsCache(e) = s
+      s
+    }
+  }
+
+  // --- Scheduling
+  val useScopeCache = true
+  // Save inner and local scopes to avoid repeated recomputation
+  val scopeCache = HashMap[Block[Any],(List[Stm], List[Stm])]()
+
+  override def traverseBlock[A](block: Block[A]): Unit = {
+    if (useScopeCache && scopeCache.contains(block)) {
+      val scope = scopeCache(block)
+      withInnerScope(scope._1) { traverseStmsInBlock(scope._2) }
+    }
+    else super.traverseBlock(block)
+  }
+
+  override def traverseBlockFocused[A](block: Block[A]): Unit = {
+    focusExactScope(block) { levelScope =>
+      if (useScopeCache) scopeCache(block) = (innerScope, levelScope)
+      traverseStmsInBlock(levelScope)
+    }
+  }
+
+  override def getStmsInBlock[A](block: Block[A]): List[Stm] = {
+    if (scopeCache.contains(block)) scopeCache(block)._2
+    else super.getStmsInBlock(block)
+  }
+}
+
+
+trait ModelingTools extends QuickTraversal with PipeStageTools {
   val IR: DHDLExp with PipeStageToolsExp with LatencyModel
   import IR._
 
@@ -47,11 +91,11 @@ trait ModelingTools extends Traversal with PipeStageTools {
     def quickDFS(cur: Exp[Any]): Long = cur match {
       case Def(d) if scope.contains(cur) && !isGlobal(cur) =>
         //debug(s"Visit $cur in quickDFS (${latencyOf(cur)})")
-        latencyOf(cur) + syms(d).map{e => paths.getOrElseUpdate(e,quickDFS(e))}.max
+        latencyOf(cur) + symDeps(d).map{e => paths.getOrElseUpdate(e,quickDFS(e))}.max
       case _ => 0L
     }
     if (scope.isEmpty) 0L else scope.last match {
-      case e@Def(d:Reify[_]) => syms(d).map{e => paths.getOrElseUpdate(e,quickDFS(e))}.max
+      case e@Def(d:Reify[_]) => symDeps(d).map{e => paths.getOrElseUpdate(e,quickDFS(e))}.max
       case e => quickDFS(e)
     }
   }
@@ -71,7 +115,7 @@ trait ModelingTools extends Traversal with PipeStageTools {
 
     def fullDFS(cur: Exp[Any]): Long = cur match {
       case Def(d) if scope.contains(cur) =>
-        val deps = syms(d) filter (scope contains _)
+        val deps = symDeps(d) filter (scope contains _)
 
         if (!deps.isEmpty) {
           val dlys = deps.map{e => paths.getOrElseUpdate(e, fullDFS(e)) }
@@ -90,7 +134,7 @@ trait ModelingTools extends Traversal with PipeStageTools {
     }
     if (!scope.isEmpty) scope.last match {
       case Def(d: Reify[_]) =>
-        val deps = syms(d) filter (scope contains _)
+        val deps = symDeps(d) filter (scope contains _)
         for (e <- deps) {
           paths.getOrElseUpdate(e,fullDFS(e)) // Not yet visited by any other path
         }
@@ -121,7 +165,7 @@ trait LatencyAnalyzer extends ModelingTools {
   import IR._
   import ReductionTreeAnalysis._
 
-  override val debugMode = true
+  //override val debugMode = true
 
   var cycleScope: List[Long] = Nil
   var totalCycles: Long = 0L
@@ -204,9 +248,11 @@ trait LatencyAnalyzer extends ModelingTools {
 
       // --- Sequential
       case EatReflect(Unit_pipe(func)) if styleOf(lhs) == Disabled =>
-        debug(s"Outer Pipe:")
         val stages = latencyOfBlock(func)
-        stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
+
+        debug(s"Outer Pipe:")
+        if (debugMode) stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
+
         stages.sum + latencyOf(lhs)
 
 
@@ -216,7 +262,7 @@ trait LatencyAnalyzer extends ModelingTools {
         val stages = latencyOfBlock(func)
 
         debug(s"Outer Foreach (N = $N):")
-        stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
+        if (debugMode) stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
 
         if (styleOf(lhs) == Coarse) { stages.max * (N - 1) + stages.sum + latencyOf(lhs) }
         else                        { stages.sum * N + latencyOf(lhs) }
@@ -232,7 +278,7 @@ trait LatencyAnalyzer extends ModelingTools {
         val stages = mapStages :+ reduceStage
 
         debug(s"Outer Reduce $lhs (N = $N):")
-        stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
+        if (debugMode) stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
 
         if (styleOf(lhs) == Coarse) { stages.max * (N - 1) + stages.sum + latencyOf(lhs) }
         else                        { stages.sum * N + latencyOf(lhs) }
@@ -245,13 +291,13 @@ trait LatencyAnalyzer extends ModelingTools {
 
         val mapStages: List[Long] = latencyOfBlock(func)
         val internal: Long = latencyOfPipe(iFunc) + latencyOfPipe(ld1) + latencyOfPipe(rFunc) * reductionTreeHeight(Pm)
-        val cycle: Long = latencyOfCycle(ld2) + latencyOfCycle(rFunc) + latencyOfCycle(st)
+        val accumulate: Long = latencyOfPipe(ld2) + latencyOfPipe(rFunc) + latencyOfPipe(st)
 
-        val reduceStage: Long = internal + Nr*cycle
+        val reduceStage: Long = internal + accumulate + Nr - 1
         val stages = mapStages :+ reduceStage
 
         debug(s"Block Reduce $lhs (Nm = $Nm, Nr = $Nr)")
-        stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
+        if (debugMode) stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
 
         if (styleOf(lhs) == Coarse) { stages.max * (Nm - 1) + stages.sum + latencyOf(lhs) }
         else                        { stages.sum * Nm + latencyOf(lhs) }

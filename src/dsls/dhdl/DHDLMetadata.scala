@@ -30,9 +30,9 @@ trait DHDLMetadata {
     val dimOps = metadata("dimsOf")
 
     onMeet(MStagedDims) ${ this }
-    internal.static (dimOps) ("update", T, (T, SList(Idx)) :: MUnit, effect = simple) implements
+    internal.static (dimOps) ("update", Nil, (MAny, SList(Idx)) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MStagedDims($1)) }
-    internal.static (dimOps) ("apply", T, T :: SList(Idx)) implements composite ${ meta[MStagedDims]($0).get.dims }
+    internal.static (dimOps) ("apply", Nil, MAny :: SList(Idx)) implements composite ${ meta[MStagedDims]($0).get.dims }
 
     internal (dimOps) ("sizeOf", T, T :: Idx) implements composite ${ productTree(dimsOf($0)) }
 

@@ -55,7 +55,7 @@ case class FPGAResources(
   def isNonzero: Boolean = lut7 > 0 || lut6 > 0 || lut5 > 0 || lut4 > 0 || lut3 > 0 ||
                            mem64 > 0 || mem32 > 0 || mem16 > 0 || regs > 0 || dsps > 0 || bram > 0 || streams > 0
 
-  override def toString() = s"luts=$lut3,$lut4,$lut5,$lut6,$lut7,mems=$mem16,$mem32,$mem64,regs=$regs,dsps=$dsps,bram=$bram,streams=$streams"
+  override def toString() = s"lut3=$lut3, lut4=$lut4, lut5=$lut5, lut6=$lut6, lut7=$lut7, mem16=$mem16, mem32=$mem32, mem64=$mem64, regs=$regs, dsps=$dsps, bram=$bram, streams=$streams"
 
   def toArray: Array[Int] = Array(lut7,lut6,lut5,lut4,lut3,mem64,mem32,mem16,regs,dsps,bram)
 }
@@ -123,11 +123,16 @@ trait AreaModel {
   def areaOfSequential(n: Int) = FPGAResources(lut4=7*n+40, regs=2*n+35)
 
 
-  def areaOf(e: Exp[Any], inReduce: Boolean, inHwScope: Boolean) = e match {
-    case Def(d) if !inHwScope => areaOfNodeOutOfScope(e, d)
-    case Def(d) if inReduce  => areaOfNodeInReduce(e, d)
-    case Def(d) if !inReduce => areaOfNode(e, d)
-    case _ => NoArea  // Bound args and constants accounted for elsewhere
+  def areaOf(e: Exp[Any], inReduce: Boolean, inHwScope: Boolean) = {
+    val area = e match {
+      case Def(d) if !inHwScope => areaOfNodeOutOfScope(e, d)
+      case Def(d) if inReduce  => areaOfNodeInReduce(e, d)
+      case Def(d) if !inReduce => areaOfNode(e, d)
+      case _ => NoArea  // Bound args and constants accounted for elsewhere
+    }
+    if (area.dsps > 0) System.out.println(s"  $e (reduce = $inReduce): $area")
+
+    area
   }
 
 
@@ -308,10 +313,15 @@ trait AreaModel {
 
     // TODO: These need new numbers after Raghu's changes
     case tt: TileTransfer[_] if tt.store =>
-      FPGAResources(lut3=1900,lut4=167,lut5=207,lut6=516,lut7=11,regs=5636,dsps=3,bram=46,streams=1)
+      val nonConstDims = (dimsOf(tt.mem) ++ tt.memOfs).filterNot{case Fixed(_) => true; case _ => false}.length
+      val dsp = if (nonConstDims > 1) 3 else 0
+      FPGAResources(lut3=1900,lut4=167,lut5=207,lut6=516,lut7=11,regs=5636,dsps=dsp,bram=46,streams = 1)
 
     case tt: TileTransfer[_] if !tt.store =>
-      FPGAResources(lut3=453, lut4=60, lut5=131,lut6=522,regs=1377,dsps=4,bram=46,streams=1)
+      val nonConstDims = (dimsOf(tt.mem) ++ tt.memOfs).filterNot{case Fixed(_) => true; case _ => false}.length
+      val dsp = if (nonConstDims > 1) 4 else 0
+      FPGAResources(lut3=453, lut4=60, lut5=131,lut6=522,regs=1377,dsps=dsp,bram=46, streams=1)
+
 
     case _:Pipe_parallel => FPGAResources(lut4=9*nStages(s)/2, regs = nStages(s) + 3)
 

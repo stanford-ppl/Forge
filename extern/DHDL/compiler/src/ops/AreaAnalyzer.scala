@@ -34,7 +34,7 @@ trait AreaAnalyzer extends ModelingTools {
   import IR._
   import ReductionTreeAnalysis._
 
-  //override val debugMode = true
+  override val debugMode = true
 
   override def silenceTraversal() {
     super.silenceTraversal()
@@ -54,7 +54,7 @@ trait AreaAnalyzer extends ModelingTools {
     areaScope = outerScope
 
     if (innerLoop) {
-      val delays = pipeDelays(b)
+      val delays = pipeDelays(b) // oos unused for now
       val delayLineArea = delays.map {
         case (sym,len) if isBits(sym.tp) => areaOfDelayLine(nbits(sym.tp), len)
         case _ => NoArea
@@ -67,10 +67,14 @@ trait AreaAnalyzer extends ModelingTools {
   def areaOfCycle(b: Block[Any], oos: Map[Exp[Any],Long] = Map.empty): FPGAResources = {
     val outerReduce = inReduce
     inReduce = true
-    val out = areaOfBlock(b, true)
+    val out = areaOfBlock(b, true, oos)
     inReduce = outerReduce
     out
   }
+  def areaOfPipe(b: Block[Any], oos: Map[Exp[Any],Long] = Map.empty): FPGAResources = {
+    areaOfBlock(b, true, oos)
+  }
+
 
   var savedScope: List[Stm] = null
   var savedBlock: Block[Any] = null
@@ -105,16 +109,25 @@ trait AreaAnalyzer extends ModelingTools {
       case EatReflect(Counterchain_new(ctrs,nIters)) => areaOfBlock(nIters,true) + areaOf(lhs)
       case EatReflect(Pipe_parallel(func)) => areaOfBlock(func,false) + areaOf(lhs)
       case EatReflect(Unit_pipe(func)) =>
-        areaOfBlock(func, styleOf(lhs) == Fine) + areaOf(lhs)
+        val body = areaOfBlock(func, styleOf(lhs) == Fine)
+        debug(s"Pipe $lhs: ")
+        debug(s"  body: $body")
+        body + areaOf(lhs)
 
       case EatReflect(Pipe_foreach(cchain, func, _)) =>
         val P = parOf(cchain).reduce(_*_)
         val isInner = styleOf(lhs) == Fine
-        areaOfBlock(func, isInner).replicated(P,isInner) + areaOf(lhs)
+
+        val body = areaOfBlock(func, isInner).replicated(P,isInner)
+
+        if (isInner) debug(s"Foreach $lhs (P = $P):") else debug(s"Outer Foreach $lhs (P = $P):")
+        debug(s"  body: $body")
+        body + areaOf(lhs)
 
       case EatReflect(e@Pipe_reduce(cchain,_,iFunc,ld,st,func,rFunc,_,idx,_,_,_)) =>
         val P = parOf(cchain).reduce(_*_)
         val isInner = styleOf(lhs) == Fine
+
         val body = areaOfBlock(func, isInner).replicated(P, isInner) // map duplicated P times
         /*
           Some simple math:
@@ -134,21 +147,36 @@ trait AreaAnalyzer extends ModelingTools {
         val cycle = areaOfCycle(rFunc) // Special case area of accumulator
         val store = areaOfCycle(st, Map(idx -> -(latencyOfCycle(ld) + latencyOfCycle(rFunc))) )    // Store to accumulator (happens once)
 
+        if (isInner) debug(s"Reduce $lhs (P = $P):") else debug(s"Outer Reduce $lhs (P = $P):")
+        debug(s"  body: $body")
+        debug(s"  tree: $internal")
+        debug(s"  dlys: $internalDelays")
+        debug(s"  cycle: ${icalc + load + cycle + store}")
+
         body + internal + internalDelays + icalc + load + cycle + store + areaOf(lhs)
 
       case EatReflect(e@Block_reduce(ccOuter,ccInner,_,iFunc,func,ld1,ld2,rFunc,st,_,_,idx,_,_,_,_)) =>
         val Pm = parOf(ccOuter).reduce(_*_) // Parallelization factor for map
         val Pr = parOf(ccInner).reduce(_*_) // Parallelization factor for reduce
+
         val body = areaOfBlock(func,false).replicated(Pm,false)
 
         val internal = areaOfBlock(rFunc,true).replicated(Pm - 1,false).replicated(Pr,true)
         val rFuncLatency = latencyOfPipe(rFunc)
         val internalDelays = reductionTreeDelays(Pm).map{delay => areaOfDelayLine(nbits(e.mT), rFuncLatency * delay).replicated(Pr,true) }.fold(NoArea){_+_}
-        val icalc = areaOfBlock(iFunc,true).replicated(Pr,true)
-        val load1 = areaOfBlock(ld1,true).replicated(Pm,false).replicated(Pr,true)
-        val load2 = areaOfCycle(ld2, Map(idx -> -latencyOfPipe(ld1) )).replicated(Pr,true)
-        val cycle = areaOfCycle(rFunc).replicated(Pr,true)
-        val store = areaOfCycle(st, Map(idx -> -(latencyOfPipe(ld2) + latencyOfPipe(rFunc))) ).replicated(Pr,true)
+        val icalc = areaOfPipe(iFunc) //.replicated(Pr,true) // TODO: Shouldn't be duplicated? Taken care of by counter parallelization
+        val load1 = areaOfPipe(ld1).replicated(Pm,false).replicated(Pr,true)
+        val load2 = areaOfPipe(ld2, Map(idx -> -latencyOfPipe(ld1) )).replicated(Pr,true)
+        val cycle = areaOfPipe(rFunc).replicated(Pr,true)
+        val store = areaOfPipe(st, Map(idx -> -(latencyOfPipe(ld2) + latencyOfPipe(rFunc))) ).replicated(Pr,true)
+
+        debug(s"BlockReduce $lhs (Pm = $Pm, Pr = $Pr)")
+        debug(s"  body: $body (Pm)")
+        debug(s"  tree: $internal (Pm)")
+        debug(s"  dlys: $internalDelays (Pr)")
+        debug(s"  load: $load1 (Pm*Pr)")
+        debug(s"  indx: $icalc (Pr)")
+        debug(s"  accum: ${load2+cycle+store} (Pr)")
 
         body + internal + internalDelays + icalc + load1 + load2 + cycle + store + areaOf(lhs)
 

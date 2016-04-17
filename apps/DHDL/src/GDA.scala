@@ -17,9 +17,10 @@ trait GDA extends DHDLApplication {
   lazy val rTileSize = param(960)
   lazy val cTileSize = 96
   lazy val outerPar   = param(1)
-  lazy val innerPar   = param(2)
+  lazy val innerPar   = param(1)
   lazy val subLoopPar = param(1)
-  lazy val prodLoopPar = param(16)
+  lazy val prodLoopPar = param(1)
+  lazy val outerAccumPar = unit(1)  // Not used in old DHDL
 
   def gda(
     x:     Rep[OffChipMem[Elem]],
@@ -40,7 +41,7 @@ trait GDA extends DHDLApplication {
 
       val sigmaOut = BRAM[Elem]("sigmaOut", cTileSize, cTileSize)
 
-      BlockReduce((rows by rTileSize) par outerPar, sigmaOut, prodLoopPar){ r =>
+      BlockReduce((rows by rTileSize) par outerPar, sigmaOut, outerAccumPar){ r =>
         val yTile = BRAM[Bit]("yTile", rTileSize)
         val xTile = BRAM[Elem]("xTile", rTileSize, cTileSize)
         Parallel {
@@ -50,7 +51,7 @@ trait GDA extends DHDLApplication {
 
         val sigmaBlk = BRAM[Elem]("sigmaBlk", cTileSize, cTileSize)
         BlockReduce((rTileSize by 1) par innerPar, sigmaBlk, prodLoopPar){rr =>
-          val subTile = BRAM[Elem]("subTemp", cTileSize)
+          val subTile = BRAM[Elem]("subTile", cTileSize)
           val sigmaTile = BRAM[Elem]("sigmaTile", cTileSize, cTileSize)
           Pipe((cTileSize by 1) par subLoopPar){ cc =>
             subTile(cc) = xTile(rr,cc) - mux(yTile(rr), mu1Tile(cc), mu0Tile(cc))
@@ -76,6 +77,7 @@ trait GDA extends DHDLApplication {
     domainOf(innerPar)   = (1,6,1)      // 6
     domainOf(subLoopPar) = (1,10,1)     // 10
     domainOf(prodLoopPar) = (1,96,4)    // 24
+    domainOf(outerAccumPar) = (1,96,4)  // 24
 
     val x = OffChipMem[Elem]("x", R, C)
     val y = OffChipMem[Bit]("y", R)

@@ -113,6 +113,12 @@ trait CounterToolsExp extends EffectExp {
     }
   }
 
+  def offsets(cc: Rep[CounterChain]) = cc match {
+    case Def(EatReflect(Counterchain_new(ctrs,nIter))) => ctrs.map{
+      case Def(EatReflect(Counter_new(start,_,_,par))) => start
+    }
+  }
+
   def isUnitCounterChain(e: Exp[Any]): Boolean = e match {
     case Def(EatReflect(Counterchain_new(ctrs,_))) if ctrs.length == 1 => isUnitCounter(ctrs(0))
     case _ => false

@@ -23,7 +23,7 @@ trait OuterProduct extends DHDLApplication {
         b1 := vec1(i::i+tileSize, innerPar)
         b2 := vec2(j::j+tileSize, innerPar)
       }
-      Pipe(tileSize by 1, (tileSize by 1) par innerPar) { (ii,jj) => outTile(ii, jj) = b1(ii) * b2(jj) }
+      Pipe(tileSize by 1, (tileSize by 1) par innerPar) { (ii,jj) => outTile(ii, jj) = b1(ii) * b2(jj) } // 2
 
       out(i::i+tileSize, j::j+tileSize, param(1)) := outTile
     }

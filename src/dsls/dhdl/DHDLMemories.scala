@@ -497,7 +497,7 @@ trait DHDLMemories {
       val memDims = dimsOf(mem)
       val tileDims = dimsOf($local) // TODO: Allow this to be different than size of BRAM?
       val tileStrides = dimsToStrides(tileDims)
-      val ofs = calcAddress(offsets, memDims)
+      val ofs = offsets //calcAddress(offsets, memDims)
       val strides = dimsToStrides(memDims)
       val nonUnitStrides = strides.zip(unitDims).filterNot(_._2).map(_._1)
 

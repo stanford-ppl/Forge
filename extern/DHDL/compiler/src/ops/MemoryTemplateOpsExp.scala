@@ -135,8 +135,8 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
     mem:      Rep[OffChipMem[T]],                // Offchip memory array
     local:    Rep[BRAM[T]],                      // Local memory (BRAM)
     strides:  List[Rep[FixPt[Signed,B32,B0]]],   // Dimensions converted to strides for offchip memory
-    memOfs:   Rep[FixPt[Signed,B32,B0]],         // Offset into offchip memory
-    tileStrides: List[Rep[FixPt[Signed,B32,B0]]],   // Tile strides
+    memOfs:   List[Rep[FixPt[Signed,B32,B0]]],   // Offset into offchip memory
+    tileStrides: List[Rep[FixPt[Signed,B32,B0]]], // Tile strides
     cchain:   Rep[CounterChain],                 // Counter chain for copy
     iters:    List[Sym[FixPt[Signed,B32,B0]]],   // Bound iterator variables
     store:    Boolean                            // Is this transfer a store (true) or a load (false)
@@ -145,7 +145,7 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
   }
 
   // --- Internal API
-  def tile_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], strides: List[Rep[FixPt[Signed,B32,B0]]], memOfs: Rep[FixPt[Signed,B32,B0]], tileStrides: List[Rep[FixPt[Signed,B32,B0]]], cchain: Rep[CounterChain], store: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
+  def tile_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], strides: List[Rep[FixPt[Signed,B32,B0]]], memOfs: List[Rep[FixPt[Signed,B32,B0]]], tileStrides: List[Rep[FixPt[Signed,B32,B0]]], cchain: Rep[CounterChain], store: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
     val iters = List.fill(lenOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }
 
     if (store) reflectWrite(mem)(TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters,store))
@@ -235,7 +235,7 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTe
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters, store) =>
       emitNestedLoop(iters, cchain) {
-        val offaddr = (iters.zip(strides).map{case (i,s) => quote(i) + "*" + quote(s) } :+ quote(memOfs)).mkString(" + ")
+        val offaddr = (iters,strides,memOfs).zipped.map{case (i,s,o) => "(" + quote(i) + " + " + quote(o) + ") * " + quote(s) }.mkString(" + ")
         stream.println("val offaddr = " + offaddr)
 
         val localAddr = iters.zip(tileStrides).map{ case (i,s) => quote(i) + "*" + quote(s) }.mkString(" + ")
@@ -512,10 +512,10 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplate
 				}
 			}
 			nl += "\\}"
-			if (quote(memOfs).forall(_.isDigit))
+			/*if (quote(memOfs).forall(_.isDigit))
 				nl += s"|memOfs=${quote(memOfs)}"
 			else
-				emitEdge(memOfs, sym, "memOfs")
+				emitEdge(memOfs, sym, "memOfs")*/
 			emit(s"""${quote(sym)} [label="$nl" shape="record" style="rounded, filled" color="black" fillcolor="gray"]""")
 			emitCtrChain(cchain)
 			emit(s"""} """)

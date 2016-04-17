@@ -98,7 +98,7 @@ trait DSE extends Traversal {
     setBanks()
     bndAnalyzer.run(b)
     contention.run(topController)
-
+    printer.run(b)
     (b)
   }
 

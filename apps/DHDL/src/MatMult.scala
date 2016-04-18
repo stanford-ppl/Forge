@@ -63,9 +63,9 @@ trait MatMult extends DHDLApplication {
     val N = args(unit(0)).to[SInt]
     val P = args(unit(0)).to[SInt]
 
-    bound(M) = 1056
-    bound(N) = 1056
-    bound(P) = 1056
+    bound(M) = 1536
+    bound(N) = 1536
+    bound(P) = 1536
     domainOf(bm) = (1,960,10)
     domainOf(bn) = (96,960,96)
     domainOf(bp) = (96,1920,96)

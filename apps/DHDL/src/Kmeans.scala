@@ -11,36 +11,35 @@ trait Kmeans extends DHDLApplication {
   lazy val numCents  = ArgIn[SInt]("numCents")
   lazy val numPoints = ArgIn[SInt]("numPoints")
 
-  lazy val tileSize   = param(210)
+  lazy val tileSize   = param(310)
   lazy val dTileSize  = 96
-  lazy val kTileSize  = 16
   lazy val ptLoopPar  = unit(1)
-  lazy val ctLoopPar  = param(1)
+  lazy val ctLoopPar  = param(4)
   lazy val dstLoopPar = param(4)
   lazy val accLoopPar = param(4)
   lazy val avgLoopPar = param(1)
 
-  def kmeans(points: Rep[OffChipMem[Flt]], centroids: Rep[OffChipMem[Flt]]) = {
-    val oldCents = BRAM[Flt](kTileSize, dTileSize)
-    val newCents = BRAM[Flt](kTileSize, dTileSize)
-    val centCount = BRAM[UInt](kTileSize)
-    val centsOut = BRAM[Flt](kTileSize, dTileSize)
+  def kmeans(points: Rep[OffChipMem[Flt]], centroids: Rep[OffChipMem[Flt]], K: Rep[SInt], D: Rep[SInt]) = {
+    val oldCents = BRAM[Flt](tileSize, dTileSize)
+    val newCents = BRAM[Flt](tileSize, dTileSize)
+    val centCount = BRAM[UInt](tileSize)
+    val centsOut = BRAM[Flt](tileSize, dTileSize)
 
     Sequential {
       // Load initial centroids (from points)
-      oldCents := points(0::kTileSize,0::dTileSize, ctLoopPar)
+      oldCents := points(0::tileSize,0::dTileSize, ctLoopPar)
 
       MetaPipe((numPoints by tileSize) par unit(1)) { i =>
         val pointsTile = BRAM[Flt](tileSize, dTileSize)
-        pointsTile := points(i::i+tileSize, 0::dTileSize, dstLoopPar)
+        pointsTile := points(i::i+tileSize, 0::dTileSize, dstLoopPar) // 4
 
         MetaPipe((tileSize by 1) par ptLoopPar){ pt =>
           val minDist = Reg[Flt](-1.0f) // Minimum distance to closest centroid
           val minCent = Reg[SInt](0)    // Index of closest centroid
 
-          MetaPipe((kTileSize by 1) par ctLoopPar){ ct =>
+          MetaPipe((K by 1) par ctLoopPar){ ct =>
             val dist = Reg[Flt](0.0f)
-            Pipe((dTileSize by 1) par dstLoopPar, dist){d => (pointsTile(pt, d) - oldCents(ct, d)) ** 2 }{_+_}
+            Pipe((D by 1) par dstLoopPar, dist){d => (pointsTile(pt*D+d) - oldCents(ct,d)) ** 2 }{_+_} // 4
 
             Pipe {
               val closer = dist.value < minDist.value || minDist.value < 0f
@@ -50,7 +49,7 @@ trait Kmeans extends DHDLApplication {
           }
           // Add point and increment point count
           Parallel {
-            Pipe((dTileSize by 1) par accLoopPar){d =>
+            Pipe((D by 1) par accLoopPar){d =>
               newCents(minCent.value, d) = newCents(minCent.value, d) + pointsTile(pt, d)
             }
             Pipe{ centCount(minCent.value) = centCount(minCent.value) + 1 }
@@ -58,12 +57,12 @@ trait Kmeans extends DHDLApplication {
         } // End of points in tile
       } // End of point tiles
 
-      Pipe(kTileSize by 1, (dTileSize by 1) par avgLoopPar){(ct,d) =>
-        centsOut(ct, d) = newCents(ct, d) / centCount(ct).to[Flt]
+      Pipe(K by 1, (D by 1) par avgLoopPar){(ct,d) =>
+        centsOut(ct,d) = newCents(ct,d) / centCount(ct).to[Flt]
       }
 
       // TODO: Change parallelization here
-      centroids(0::kTileSize, 0::dTileSize, unit(1)) := centsOut
+      centroids(0::K, 0::D, unit(1)) := centsOut
     }
   }
 
@@ -91,7 +90,7 @@ trait Kmeans extends DHDLApplication {
     println("points: ")
     for (i <- 0 until N) { println(i.mkString + ": " + pts(i).mkString(", ")) }
 
-    Accel{ kmeans(points, centroids) }
+    Accel{ kmeans(points, centroids, K, D) }
 
     val cts = Array.tabulate(K){i => pts(i) }
 

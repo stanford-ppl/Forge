@@ -46,37 +46,37 @@ trait AreaAnalyzer extends ModelingTools {
 
   def areaOf(e: Exp[Any]) = IR.areaOf(e, inReduce, inHwScope)
 
-  def areaOfBlock(b: Block[Any], innerLoop: Boolean, oos: Map[Exp[Any],Long] = Map.empty): FPGAResources = {
+  def areaOfBlock(b: Block[Any], isInnerLoop: Boolean, par: Int, oos: Map[Exp[Any],Long] = Map.empty): FPGAResources = {
     val outerScope = areaScope
     areaScope = Nil
     traverseBlock(b)
     val area = areaScope.fold(NoArea){_+_}
     areaScope = outerScope
 
-    if (innerLoop) {
+    if (isInnerLoop) {
       val delays = pipeDelays(b) // oos unused for now
       val delayLineArea = delays.map {
-        case (sym,len) if isBits(sym.tp) => areaOfDelayLine(nbits(sym.tp), len)
+        case (sym,len) if isBits(sym.tp) => areaOfDelayLine(nbits(sym.tp), len, par)
         case _ => NoArea
       }
-      area + delayLineArea.fold(NoArea){_+_}
+      area.replicated(par,true) + delayLineArea.fold(NoArea){_+_}
     }
     else
-      area
+      area.replicated(par,false)
   }
-  def areaOfCycle(b: Block[Any], oos: Map[Exp[Any],Long] = Map.empty): FPGAResources = {
+  def areaOfCycle(b: Block[Any], par: Int, oos: Map[Exp[Any],Long] = Map.empty): FPGAResources = {
     val outerReduce = inReduce
     inReduce = true
-    val out = areaOfBlock(b, true, oos)
+    val out = areaOfBlock(b, true, par, oos)
     inReduce = outerReduce
     out
   }
-  def areaOfPipe(b: Block[Any], oos: Map[Exp[Any],Long] = Map.empty): FPGAResources = {
-    areaOfBlock(b, true, oos)
+  def areaOfPipe(b: Block[Any], par: Int, oos: Map[Exp[Any],Long] = Map.empty): FPGAResources = {
+    areaOfBlock(b, true, par, oos)
   }
 
 
-  var savedScope: List[Stm] = null
+  /*var savedScope: List[Stm] = null
   var savedBlock: Block[Any] = null
   var savedArea: FPGAResources = null
 
@@ -94,22 +94,22 @@ trait AreaAnalyzer extends ModelingTools {
     areaScope ::= areaOfBlock(savedBlock, false)
     inHwScope = false
     postprocess(savedBlock)
-  }
+  }*/
 
   // TODO: loop index delay line in Metapipeline
   def traverseNode(lhs: Exp[Any], rhs: Def[Any]) {
     val area = rhs match {
       case EatReflect(Hwblock(blk)) =>
         inHwScope = true
-        val body = areaOfBlock(blk, false)
+        val body = areaOfBlock(blk, false, 1)
         //save(blk) // Save HW scope to resume to later
         inHwScope = false
         body
 
-      case EatReflect(Counterchain_new(ctrs,nIters)) => areaOfBlock(nIters,true) + areaOf(lhs)
-      case EatReflect(Pipe_parallel(func)) => areaOfBlock(func,false) + areaOf(lhs)
+      case EatReflect(Counterchain_new(ctrs,nIters)) => areaOfBlock(nIters,true,1) + areaOf(lhs)
+      case EatReflect(Pipe_parallel(func)) => areaOfBlock(func,false,1) + areaOf(lhs)
       case EatReflect(Unit_pipe(func)) =>
-        val body = areaOfBlock(func, styleOf(lhs) == Fine)
+        val body = areaOfBlock(func, styleOf(lhs) == Fine, 1)
         debug(s"Pipe $lhs: ")
         debug(s"  body: $body")
         body + areaOf(lhs)
@@ -118,7 +118,7 @@ trait AreaAnalyzer extends ModelingTools {
         val P = parOf(cchain).reduce(_*_)
         val isInner = styleOf(lhs) == Fine
 
-        val body = areaOfBlock(func, isInner).replicated(P,isInner)
+        val body = areaOfBlock(func, isInner, P)
 
         if (isInner) debug(s"Foreach $lhs (P = $P):") else debug(s"Outer Foreach $lhs (P = $P):")
         debug(s"  body: $body")
@@ -128,7 +128,7 @@ trait AreaAnalyzer extends ModelingTools {
         val P = parOf(cchain).reduce(_*_)
         val isInner = styleOf(lhs) == Fine
 
-        val body = areaOfBlock(func, isInner).replicated(P, isInner) // map duplicated P times
+        val body = areaOfBlock(func, isInner, P) // map duplicated P times
         /*
           Some simple math:
           A full binary (reduction) tree is a tree in which every node is either
@@ -139,13 +139,13 @@ trait AreaAnalyzer extends ModelingTools {
           The reduction function is therefore duplicated P - 1 times
           Plus the special, tightly cyclic reduction function to update the accumulator
         */
-        val internal = areaOfBlock(rFunc, true).replicated(P-1,true)
+        val internal = areaOfBlock(rFunc, true, P - 1)
         val rFuncLatency = latencyOfPipe(rFunc)
-        val internalDelays = reductionTreeDelays(P).map{delay => areaOfDelayLine(nbits(e.mT), rFuncLatency * delay) }.fold(NoArea){_+_}
-        val icalc = areaOfCycle(iFunc) // Calculate index for load/store
-        val load  = areaOfCycle(ld)    // Load from accumulator (happens once)
-        val cycle = areaOfCycle(rFunc) // Special case area of accumulator
-        val store = areaOfCycle(st, Map(idx -> -(latencyOfCycle(ld) + latencyOfCycle(rFunc))) )    // Store to accumulator (happens once)
+        val internalDelays = reductionTreeDelays(P).map{delay => areaOfDelayLine(nbits(e.mT), rFuncLatency * delay, 1) }.fold(NoArea){_+_}
+        val icalc = areaOfCycle(iFunc, 1) // Calculate index for load/store
+        val load  = areaOfCycle(ld, 1)    // Load from accumulator (happens once)
+        val cycle = areaOfCycle(rFunc, 1) // Special case area of accumulator
+        val store = areaOfCycle(st, 1, Map(idx -> -(latencyOfCycle(ld) + latencyOfCycle(rFunc))) )    // Store to accumulator (happens once)
 
         if (isInner) debug(s"Reduce $lhs (P = $P):") else debug(s"Outer Reduce $lhs (P = $P):")
         debug(s"  body: $body")
@@ -159,16 +159,16 @@ trait AreaAnalyzer extends ModelingTools {
         val Pm = parOf(ccOuter).reduce(_*_) // Parallelization factor for map
         val Pr = parOf(ccInner).reduce(_*_) // Parallelization factor for reduce
 
-        val body = areaOfBlock(func,false).replicated(Pm,false)
+        val body = areaOfBlock(func,false, Pm)
 
-        val internal = areaOfBlock(rFunc,true).replicated(Pm - 1,false).replicated(Pr,true)
+        val internal = areaOfPipe(rFunc, 1).replicated(Pm - 1,false).replicated(Pr,true)
         val rFuncLatency = latencyOfPipe(rFunc)
-        val internalDelays = reductionTreeDelays(Pm).map{delay => areaOfDelayLine(nbits(e.mT), rFuncLatency * delay).replicated(Pr,true) }.fold(NoArea){_+_}
-        val icalc = areaOfPipe(iFunc) //.replicated(Pr,true) // TODO: Shouldn't be duplicated? Taken care of by counter parallelization
-        val load1 = areaOfPipe(ld1).replicated(Pm,false).replicated(Pr,true)
-        val load2 = areaOfPipe(ld2, Map(idx -> -latencyOfPipe(ld1) )).replicated(Pr,true)
-        val cycle = areaOfPipe(rFunc).replicated(Pr,true)
-        val store = areaOfPipe(st, Map(idx -> -(latencyOfPipe(ld2) + latencyOfPipe(rFunc))) ).replicated(Pr,true)
+        val internalDelays = reductionTreeDelays(Pm).map{delay => areaOfDelayLine(nbits(e.mT), rFuncLatency * delay, Pr) }.fold(NoArea){_+_}
+        val icalc = areaOfPipe(iFunc, 1) //.replicated(Pr,true) // TODO: Shouldn't be duplicated? Taken care of by counter parallelization
+        val load1 = areaOfPipe(ld1, 1).replicated(Pm,false).replicated(Pr,true)
+        val load2 = areaOfPipe(ld2, Pr, Map(idx -> -latencyOfPipe(ld1) ))
+        val cycle = areaOfPipe(rFunc, Pr)
+        val store = areaOfPipe(st, Pr, Map(idx -> -(latencyOfPipe(ld2) + latencyOfPipe(rFunc))) )
 
         debug(s"BlockReduce $lhs (Pm = $Pm, Pr = $Pr)")
         debug(s"  body: $body (Pm)")
@@ -181,7 +181,7 @@ trait AreaAnalyzer extends ModelingTools {
         body + internal + internalDelays + icalc + load1 + load2 + cycle + store + areaOf(lhs)
 
       case _ =>
-        blocks(rhs).map(blk => areaOfBlock(blk,false)).fold(NoArea){_+_} + areaOf(lhs)
+        blocks(rhs).map(blk => areaOfBlock(blk,false,1)).fold(NoArea){_+_} + areaOf(lhs)
     }
     areaScope ::= area
   }

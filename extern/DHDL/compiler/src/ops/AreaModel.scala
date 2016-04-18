@@ -76,14 +76,15 @@ trait AreaModel {
    * Returns the area resources for a delay line with the given width (in bits) and length (in cycles)
    * Models delays as registers for short delays, BRAM for long ones
    **/
-  def areaOfDelayLine(width: Int, length: Int): FPGAResources = {
-    // TODO: Not sure what the cutoff is here
-    if (length < 32) FPGAResources(regs = width*length)
-    else             areaOfBRAM(width, length, 1, false)
+  def areaOfDelayLine(width: Int, length: Int, par: Int): FPGAResources = {
+    //System.out.println(s"Delay line: w = $width x l = $length (${width*length}) ")
+    val nregs = width*length
+    if (nregs < 256) FPGAResources(regs = nregs*par)
+    else             areaOfBRAM(width*par, length, 1, false)
   }
-  def areaOfDelayLine(width: Int, length: Long): FPGAResources = {
+  def areaOfDelayLine(width: Int, length: Long, par: Int): FPGAResources = {
     if(length > Int.MaxValue) throw new Exception(s"Casting delay line length to Int would result in overflow")
-    areaOfDelayLine(width, length.toInt)
+    areaOfDelayLine(width, length.toInt, par)
   }
 
   private def areaOfMemWord(nbits: Int) = {
@@ -110,7 +111,11 @@ trait AreaModel {
 
     // Number of horizontally concatenated RAMs required to implement given word
     val width = if (nbits > 40) Math.ceil( nbits / 40.0 ).toInt else 1
-    val rams = width * Math.ceil(depth.toDouble/(wordDepth*banks)).toInt * banks
+
+    val bankDepth = Math.ceil(depth.toDouble/banks)       // Word depth per bank
+    val ramDepth = Math.ceil(bankDepth/wordDepth).toInt   // Number of rams needed per bank
+
+    val rams = width * ramDepth * banks
 
     if (dblBuf) FPGAResources(lut3=2*nbits, regs=2*nbits, bram = rams*2)
     else        FPGAResources(bram = rams)
@@ -130,7 +135,7 @@ trait AreaModel {
       case Def(d) if !inReduce => areaOfNode(e, d)
       case _ => NoArea  // Bound args and constants accounted for elsewhere
     }
-    if (area.dsps > 0) System.out.println(s"  $e (reduce = $inReduce): $area")
+    if (area.bram > 0) System.out.println(s"  $e (reduce = $inReduce): $area")
 
     area
   }

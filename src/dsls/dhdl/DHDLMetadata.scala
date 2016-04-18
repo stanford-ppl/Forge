@@ -54,9 +54,9 @@ trait DHDLMetadata {
     val MDblBuf = metadata("MDblBuf", "isDblBuf" -> SBoolean)
     val dblBufOps = metadata("isDblBuf")
     onMeet (MDblBuf) ${ this }
-    internal.static (dblBufOps) ("update", T, (T, SBoolean) :: MUnit, effect = simple) implements
+    static (dblBufOps) ("update", T, (T, SBoolean) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MDblBuf($1)) }
-    internal.static (dblBufOps) ("apply", T, T :: SBoolean) implements composite ${
+    static (dblBufOps) ("apply", T, T :: SBoolean) implements composite ${
     	meta[MDblBuf]($0) match {
     	  case Some(a) => a.isDblBuf
     	  case None => false

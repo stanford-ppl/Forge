@@ -11,13 +11,13 @@ trait Kmeans extends DHDLApplication {
   lazy val numCents  = ArgIn[SInt]("numCents")
   lazy val numPoints = ArgIn[SInt]("numPoints")
 
-  lazy val tileSize   = param(310)
+  lazy val tileSize   = param("tileSize", 310)
   lazy val dTileSize  = 96
   lazy val ptLoopPar  = unit(1)
-  lazy val ctLoopPar  = param(4)
-  lazy val dstLoopPar = param(4)
-  lazy val accLoopPar = param(4)
-  lazy val avgLoopPar = param(1)
+  lazy val ctLoopPar  = param("ctLoopPar", 4)
+  lazy val dstLoopPar = param("dstLoopPar", 4)
+  lazy val accLoopPar = param("accLoopPar", 4)
+  lazy val avgLoopPar = param("avgLoopPar", 1)
 
   def kmeans(points: Rep[OffChipMem[Flt]], centroids: Rep[OffChipMem[Flt]], K: Rep[SInt], D: Rep[SInt]) = {
     val oldCents = BRAM[Flt](tileSize, dTileSize)

@@ -13,8 +13,11 @@ import dhdl.compiler.ops._
 import dhdl.compiler.transform._
 
 import scala.collection.mutable.{HashMap,HashSet,ArrayBuffer}
+import java.io.PrintStream
 
 import scala.virtualization.lms.util.GraphUtil._
+import ppl.delite.framework.Config
+
 
 trait DSE extends Traversal {
   val IR: DHDLCompiler
@@ -124,7 +127,9 @@ trait DSE extends Traversal {
 
   def dse[A:Manifest](b: Block[A]) {
     // Specify FPGA target (hardcoded right now)
-    val target = FPGATarget
+    // HACK: BRAM tolerance increased by ~28% to allow for designs where coalescing occurs but we don't account for it
+    val target = FPGAResourceSummary(alms=262400,regs=524800,dsps=1963,bram=3300,streams=13)
+
     val areaAnalyzer = new AreaAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
     val cycleAnalyzer = new LatencyAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
     cycleAnalyzer.silenceTraversal()
@@ -194,19 +199,8 @@ trait DSE extends Traversal {
     legalSize = points.length // = min(200000, legalSize)
 
 
-    // --- Run DSE
-    val validPts = ArrayBuffer[Int]() // Index into points of valid indices
-    val alms = ArrayBuffer[Int]()     // Resource and area estimates for all points
-    val dsps = ArrayBuffer[Int]()     // (including invalid ones)
-    val bram = ArrayBuffer[Int]()
-    val cycles = ArrayBuffer[Long]()
-
-    case class ParetoPt(idx: Int, alms: Int, cycles: Long)
-
-    val pareto = ArrayBuffer[ParetoPt]()
-
-
     // --- PROFILING
+    val PROFILING = true
     var clockRef = 0L
     def resetClock() { clockRef = System.currentTimeMillis }
 
@@ -238,79 +232,134 @@ trait DSE extends Traversal {
     }
 
     def evaluate() = {
-
       setDoubleBuffers()
       setBanks()
-
-      endSet()
+      if (PROFILING) endSet()
 
       bndAnalyzer.run(b)
-      endBnd()
+      if (PROFILING) endBnd()
 
       contention.run(topController)
-      endCon()
+      if (PROFILING) endCon()
 
       areaAnalyzer.run(b)
-      endArea()
+      if (PROFILING) endArea()
 
       cycleAnalyzer.run(b)
-      endCycles()
+      if (PROFILING) endCycles()
       (areaAnalyzer.totalArea, cycleAnalyzer.totalCycles)
     }
+
+    // --- Run DSE
+    case class ParetoPt(idx: Int, alms: Int, cycles: Long)
+
+
+    val pareto = ArrayBuffer[ParetoPt]()     // Set of pareto points
+
+    // Resource and area estimates for all points (including legal but invalid ones)
+    val valid = new Array[Boolean](legalSize)
+    val alms = new Array[Int](legalSize)
+    val regs = new Array[Int](legalSize)
+    val dsps = new Array[Int](legalSize)
+    val bram = new Array[Int](legalSize)
+    val cycles = new Array[Long](legalSize)
+
+    var nValid = 0
 
     debug("And aaaawaaaay we go!")
     val startTime = System.currentTimeMillis
     var nextNotify = 0.0; val notifyStep = 200
     for (p <- 0 until legalSize) {
-      resetClock() // PROFILING
+      if (PROFILING) resetClock() // PROFILING
 
       // Get and set current parameter combination
       val pt = points(p)
       indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt ) }
 
       val (area,runtime) = evaluate()
-      alms += area.alms
-      dsps += area.dsps
-      bram += area.bram
-      cycles += runtime
+      alms(p) = area.alms
+      regs(p) = area.regs
+      dsps(p) = area.dsps
+      bram(p) = area.bram
+      cycles(p) = runtime
 
-      if (area.alms < target.alms && area.dsps < target.dsps && area.bram < target.bram && area.streams < target.streams) {
-        validPts += p
+      val isValid = area <= target
+      valid(p) = isValid
 
+      if (isValid) {
+        nValid += 1
         // Check if this is a pareto frontier candidate
         var wasAdded = false
         var candidate = true
 
         var j = 0
         while (j < pareto.size && !wasAdded && candidate) {
-          val p = pareto(j)
-          if (area.alms < p.alms && runtime < p.cycles) {
-            pareto(j) = ParetoPt(pt,area.alms,runtime) // Strictly less than existing frontier point: replace
+          val prev = pareto(j)
+          if (area.alms < prev.alms && runtime < prev.cycles) {
+            pareto(j) = ParetoPt(p,area.alms,runtime) // Strictly less than existing frontier point: replace
             wasAdded = true
           }
-          candidate = area.alms < p.alms || runtime < p.cycles
+          candidate = area.alms < prev.alms || runtime < prev.cycles
           j += 1
         }
-        if (!wasAdded && candidate) pareto += ParetoPt(pt,area.alms,runtime)
+        if (!wasAdded && candidate) pareto += ParetoPt(p,area.alms,runtime)
       }
-      endPareto() // PROFILING
+      if (PROFILING) endPareto()
 
       if (p > nextNotify) {
         val time = System.currentTimeMillis - startTime
         debug("%.4f".format(100*(p/legalSize.toFloat)) + s"% ($p / $legalSize) Complete after ${time/1000} seconds")
 
-        getPercentages(time) // PROFILING
+        if (PROFILING) getPercentages(time)
 
         nextNotify += notifyStep
       }
     }
 
-    val validSize = validPts.length
     val paretoSize = pareto.length
     val time = (System.currentTimeMillis - startTime)/1000.0
     debug(s"Completed space search in $time seconds")
-    debug(s"Valid designs generated: $validSize / $legalSize")
-    debug(s"Pareto frontier size: $paretoSize / $validSize")
+    debug(s"Valid designs generated: $nValid / $legalSize")
+    debug(s"Pareto frontier size: $paretoSize / $nValid")
+
+
+    val pwd = sys.env("HYPER_HOME")
+    val name = Config.degFilename.replace(".deg","")
+    val filename = s"${pwd}/data/${name}.csv"
+
+    debug(s"Printing results to file: $filename")
+    val printStart = System.currentTimeMillis
+    val pw = new PrintStream(filename)
+    pw.println("ALMS, Regs, DSPs, BRAM, Cycles, Valid, Pareto")
+    for (p <- 0 until legalSize) {
+      val isPareto = pareto.exists{pt => pt.idx == p}
+      pw.println(s"${alms(p)}, ${regs(p)}, ${dsps(p)}, ${bram(p)}, ${cycles(p)}, ${valid(p)}, $isPareto")
+    }
+    pw.close()
+    val printTime = System.currentTimeMillis - printStart
+    debug(s"Finished printing in ${printTime/1000} seconds")
+
+    val names = numericFactors.map{p =>
+      val name = nameOf(p)
+      if (name == "") s"$p" else name
+    } ++ metapipes.map{mp =>
+      val name = nameOf(mp)
+      if (name == "") s"$mp" else name
+    }
+    val ppw = new PrintStream(s"${pwd}/data/${name}_pareto.csv")
+    ppw.println(names.mkString(", ") + ", ALMs, Cycles")
+    pareto.foreach{paretoPt =>
+      val p = paretoPt.idx
+      val pt = points(p)
+      indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt ) }
+
+      val values = numericFactors.map{p => p.x.toString} ++ metapipes.map{mp => (styleOf(mp) == Coarse).toString}
+
+      ppw.println(values.mkString(", ") + s", ${paretoPt.alms}, ${paretoPt.cycles}")
+    }
+    ppw.close()
+
+    sys.exit()
 
     // F. Show user results, pick point on pareto curve
     // TODO

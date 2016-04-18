@@ -10,9 +10,9 @@ trait OuterProduct extends DHDLApplication {
   override def stageArgNames = List("tileSize")
   lazy val dataSize = ArgIn[SInt]("dataSize")
 
-  lazy val tileSize = param(192)
-  lazy val outerPar = param(4)
-  lazy val innerPar = param(96)
+  lazy val tileSize = param("tileSize", 384)
+  lazy val outerPar = param("outerPar", 1)
+  lazy val innerPar = param("innerPar", 16)
 
   def outerProduct(vec1: Rep[OffChipMem[Elem]], vec2: Rep[OffChipMem[Elem]], out: Rep[OffChipMem[Elem]]) {
     MetaPipe(dataSize by tileSize, (dataSize by tileSize) par outerPar) { (i,j) =>

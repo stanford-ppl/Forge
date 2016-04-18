@@ -26,7 +26,7 @@ trait AreaAnalysisExp extends AreaModel with LatencyModel with CounterToolsExp w
     bram = 338
   )
 
-  val FPGATarget = FPGAResourceSummary(alms=262400,regs=0,dsps=1963,bram=2567,streams=13)  // Stratix V on MAIA board
+  val FPGATarget = FPGAResourceSummary(alms=262400,regs=524800,dsps=1963,bram=2567,streams=13)  // Stratix V on MAIA board
 }
 
 trait AreaAnalyzer extends ModelingTools {
@@ -34,7 +34,7 @@ trait AreaAnalyzer extends ModelingTools {
   import IR._
   import ReductionTreeAnalysis._
 
-  override val debugMode = true
+  //override val debugMode = true
 
   override def silenceTraversal() {
     super.silenceTraversal()
@@ -76,25 +76,30 @@ trait AreaAnalyzer extends ModelingTools {
   }
 
 
-  /*var savedScope: List[Stm] = null
-  var savedBlock: Block[Any] = null
-  var savedArea: FPGAResources = null
+  var savedScope: Option[List[Stm]] = None
+  var savedBlock: Option[Block[Any]] = None
+  var savedArea: FPGAResources = NoArea
 
   def save(b: Block[Any]) {
     savedArea = areaScope.fold(NoArea){_+_}
-    savedBlock = b
-    savedScope = innerScope
+    savedBlock = Some(b)
+    savedScope = Some(innerScope)
   }
 
   def resume() {
-    preprocess(savedBlock)
-    innerScope = savedScope
+    preprocess(savedBlock.get)
+    innerScope = savedScope.get
     areaScope ::= savedArea
     inHwScope = true
-    areaScope ::= areaOfBlock(savedBlock, false)
+    areaScope ::= areaOfBlock(savedBlock.get, false, 1)
     inHwScope = false
-    postprocess(savedBlock)
-  }*/
+    postprocess(savedBlock.get)
+  }
+
+  override def run[A:Manifest](b: Block[A]): Block[A] = {
+    if (savedBlock.isDefined) { resume(); b }
+    else super.run(b)
+  }
 
   // TODO: loop index delay line in Metapipeline
   def traverseNode(lhs: Exp[Any], rhs: Def[Any]) {
@@ -102,7 +107,7 @@ trait AreaAnalyzer extends ModelingTools {
       case EatReflect(Hwblock(blk)) =>
         inHwScope = true
         val body = areaOfBlock(blk, false, 1)
-        //save(blk) // Save HW scope to resume to later
+        save(blk) // Save HW scope to resume to later
         inHwScope = false
         body
 

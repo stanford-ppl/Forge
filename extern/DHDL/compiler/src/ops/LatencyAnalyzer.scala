@@ -185,29 +185,35 @@ trait LatencyAnalyzer extends ModelingTools {
     (cycles)
   }
 
-  var savedScope: List[Stm] = null
-  var savedBlock: Block[Any] = null
+  var savedScope: Option[List[Stm]] = None
+  var savedBlock: Option[Block[Any]] = None
 
   def save(b: Block[Any]) {
-    savedBlock = b
-    savedScope = innerScope
+    savedBlock = Some(b)
+    savedScope = Some(innerScope)
   }
 
   def resume() {
-    preprocess(savedBlock)
-    innerScope = savedScope
+    preprocess(savedBlock.get)
+    innerScope = savedScope.get
     inHwScope = true
-    cycleScope ::= latencyOfBlock(savedBlock).sum
+    cycleScope ::= latencyOfBlock(savedBlock.get).sum
     inHwScope = false
-    postprocess(savedBlock)
+    postprocess(savedBlock.get)
   }
+
+  override def run[A:Manifest](b: Block[A]): Block[A] = {
+    if (savedBlock.isDefined) { resume(); b }
+    else super.run(b)
+  }
+
 
   def traverseNode(lhs: Exp[Any], rhs: Def[Any]) {
     val cycles = rhs match {
       case EatReflect(Hwblock(blk)) =>
         inHwScope = true
         val body = latencyOfBlock(blk).sum
-        //save(blk)
+        save(blk)
         inHwScope = false
         body
 

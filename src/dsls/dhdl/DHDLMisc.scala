@@ -14,8 +14,15 @@ trait DHDLMisc {
     val Misc = grp("DHDLMisc")
 
     val T = tpePar("T")
+    val CT = tpePar("T", stage=compile)
 
     val Idx = lookupAlias("Index")
+
+    direct (Misc) ("param", T, (SString,CT) :: T) implements composite ${
+      val p = param($1)
+      nameOf(p) = $0
+      p
+    }
 
     // --- Staging time warnings and errors
     internal (Misc) ("stageWarn", Nil, SAny :: SUnit, effect = simple) implements composite ${

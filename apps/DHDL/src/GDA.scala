@@ -14,12 +14,12 @@ trait GDA extends DHDLApplication {
   lazy val rows = ArgIn[SInt]("rows")
   lazy val cols = ArgIn[SInt]("cols")
 
-  lazy val rTileSize = param(960)
+  lazy val rTileSize = param("tileSize", 960)
   lazy val cTileSize = 96
-  lazy val outerPar   = param(1)
-  lazy val innerPar   = param(1)
-  lazy val subLoopPar = param(1)
-  lazy val prodLoopPar = param(1)
+  lazy val outerPar   = param("outerPar", 1)
+  lazy val innerPar   = param("innerPar", 1)
+  lazy val subLoopPar = param("subLoopPar", 1)
+  lazy val prodLoopPar = param("prodLoopPar", 1)
   lazy val outerAccumPar = unit(1)  // Not used in old DHDL
 
   def gda(

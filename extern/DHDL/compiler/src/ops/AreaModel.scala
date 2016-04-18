@@ -14,7 +14,12 @@ case class FPGAResourceSummary(
   dsps: Int = 0,
   bram: Int = 0,
   streams: Int = 0
-)
+) {
+  def <(that: FPGAResourceSummary)  = this.alms <  that.alms && this.regs <  that.regs && this.dsps <  that.dsps && this.bram <  that.bram && this.streams <  that.streams
+  def <=(that: FPGAResourceSummary) = this.alms <= that.alms && this.regs <= that.regs && this.dsps <= that.dsps && this.bram <= that.bram && this.streams <= that.streams
+  def >(that: FPGAResourceSummary)  = this.alms >  that.alms && this.regs >  that.regs && this.dsps >  that.dsps && this.bram >  that.bram && this.streams >  that.streams
+  def >=(that: FPGAResourceSummary) = this.alms >= that.alms && this.regs >= that.regs && this.dsps >= that.dsps && this.bram >= that.bram && this.streams >= that.streams
+}
 
 // Class for operating on intermediate FPGA resource counts
 case class FPGAResources(
@@ -128,6 +133,12 @@ trait AreaModel {
   def areaOfSequential(n: Int) = FPGAResources(lut4=7*n+40, regs=2*n+35)
 
 
+  /**
+   * Returns the area of the given expression, e.
+   * Note that this does not include the area of any function bodies
+   *   inReduce  - in a tight reduce-accumulate loop (generated hardware often optimized for latency)
+   *   inHwScope - used to ignore nodes outside the block being implemented in hardware
+   **/
   def areaOf(e: Exp[Any], inReduce: Boolean, inHwScope: Boolean) = {
     val area = e match {
       case Def(d) if !inHwScope => areaOfNodeOutOfScope(e, d)
@@ -135,7 +146,7 @@ trait AreaModel {
       case Def(d) if !inReduce => areaOfNode(e, d)
       case _ => NoArea  // Bound args and constants accounted for elsewhere
     }
-    if (area.bram > 0) System.out.println(s"  $e (reduce = $inReduce): $area")
+    //if (area.bram > 0) System.out.println(s"  $e (reduce = $inReduce): $area")
 
     area
   }

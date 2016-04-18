@@ -11,9 +11,9 @@ trait TPCHQ6 extends DHDLApplication {
   lazy val minDateIn = ArgIn[UInt]("minDate")
   lazy val maxDateIn = ArgIn[UInt]("maxDate")
 
-  lazy val tileSize = param(18720)
-  lazy val outerPar = param(3)
-  lazy val innerPar = param(48)
+  lazy val tileSize = param("tileSize", 18720)
+  lazy val outerPar = param("outerPar", 3)
+  lazy val innerPar = param("innerPar", 48)
 
   def tpchq6(dates:  Rep[OffChipMem[UInt]], quants: Rep[OffChipMem[UInt]],
              discts: Rep[OffChipMem[Flt]], prices: Rep[OffChipMem[Flt]], out: Rep[Reg[Flt]]) {

@@ -10,6 +10,14 @@ import dhdl.compiler.ops._
 trait LatencyModel {
   this: DHDLExp with CounterToolsExp =>
 
+  object Deff {
+    def unapply(e: Exp[Any]): Option[Any] = e match {
+      case Def(Reflect(inner, _, _)) => Some(inner)
+      case Def(d) => Some(d)
+      case _ => None
+    }
+  }
+
   private var silentModel = false
   private def warn(x: => String) { if (!silentModel) stageWarn(x) }
   def silenceLatencyModel() { silentModel = true }
@@ -44,6 +52,21 @@ trait LatencyModel {
   }
 
 
+  // Super hacky way of checking for dotproduct-like fusion
+  // Last operation in map was a multiply, only operation in reduce is add
+  def canFuse(map: Block[Any], reduce: Block[Any], rV: (Sym[Any],Sym[Any]), p: Int) = {
+    val rV1 = rV._1
+    val rV2 = rV._2
+    val m = getBlockResult(map)
+    val r = getBlockResult(reduce)
+    //System.out.println(s"Map: $m, Reduce: $r, rV: ($rV1, $rV2)")
+    val canFuse = (m,r) match {
+      case (Deff(DHDLPrim_Mul_flt(_,_)), Deff(DHDLPrim_Add_flt(`rV1`,`rV2`))) => true
+      case _ => false
+    }
+    canFuse && isPow2(p)
+  }
+
   private def latencyOfNode(s: Exp[Any], d: Def[Any]): Long = s match {
     case Fixed(_) => 0
     case Exact(_) => 0
@@ -63,8 +86,20 @@ trait LatencyModel {
 
     // TODO: Have to get numbers for non-32 bit multiplies and divides
     case DHDLPrim_Neg_fix(_)   => 1
+
+    // HACK: Fused multiply-add in index calculation
+    case DHDLPrim_Add_fix(Deff(DHDLPrim_Mul_fix(_,_)),Exact(_)) => 0
+    case DHDLPrim_Add_fix(Deff(DHDLPrim_Mul_fix(_,_)),Def(_)) => 1
+    case DHDLPrim_Add_fix(Deff(DHDLPrim_Mul_fix(_,_)),_) => 0
+    case DHDLPrim_Add_fix(Exact(_),Deff(DHDLPrim_Mul_fix(_,_))) => 0
+    case DHDLPrim_Add_fix(Def(_),Deff(DHDLPrim_Mul_fix(_,_))) => 1
+    case DHDLPrim_Add_fix(_,Deff(DHDLPrim_Mul_fix(_,_))) => 0
+
     case DHDLPrim_Add_fix(_,_) => 1
+
     case DHDLPrim_Sub_fix(_,_) => 1
+    case DHDLPrim_Mul_fix(Exact(_),_) => 1
+    case DHDLPrim_Mul_fix(_,Exact(_)) => 1
     case DHDLPrim_Mul_fix(_,_) =>
       if (nbits(s) > 32) warn(s"Don't know latency for $d - using default")
       if (nbits(s) <= 18) 1 else 2
@@ -99,6 +134,12 @@ trait LatencyModel {
     case DHDLPrim_Sub_flt(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know latency for $d - using default")
       (14)
+
+    // MaxJ does floating point multiply-add fusion
+    case DHDLPrim_Mul_flt(Deff(DHDLPrim_Add_flt(_,_)),Deff(DHDLPrim_Add_flt(_,_))) => 0
+    case DHDLPrim_Mul_flt(Deff(DHDLPrim_Add_flt(_,_)),Deff(DHDLPrim_Sub_flt(_,_))) => 0
+    case DHDLPrim_Mul_flt(Deff(DHDLPrim_Sub_flt(_,_)),Deff(DHDLPrim_Add_flt(_,_))) => 0
+    case DHDLPrim_Mul_flt(Deff(DHDLPrim_Sub_flt(_,_)),Deff(DHDLPrim_Sub_flt(_,_))) => 0
 
     case DHDLPrim_Mul_flt(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know latency for $d - using default")

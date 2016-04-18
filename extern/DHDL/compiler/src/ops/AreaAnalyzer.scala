@@ -216,7 +216,8 @@ trait AreaAnalyzer extends ModelingTools {
 
     val logicALMs = design.lut3 + design.lut4 + design.lut5 + design.lut6 + design.lut7 +
                     design.mem16 + design.mem32 + design.mem64 + routingLUTs - recoverable + unavailable
-    val totalRegs = design.regs + fanoutRegs
+
+    val totalRegs = design.regs + fanoutRegs + design.mregs
 
     val regALMs = Math.max( ((totalRegs - (logicALMs*2.16))/3).toInt, 0)
 
@@ -243,6 +244,7 @@ trait AreaAnalyzer extends ModelingTools {
     msg(s"MEM32: ${design.mem32}")
     msg(s"MEM16: ${design.mem16}")
     msg(s"Design registers: ${design.regs}")
+    msg(s"Memory registers: ${design.mregs}")
     msg(s"Fanout registers: $fanoutRegs")
     msg(s"Design BRAMs: ${design.bram}")
     msg(s"Fanout BRAMs: $dupBRAMs")

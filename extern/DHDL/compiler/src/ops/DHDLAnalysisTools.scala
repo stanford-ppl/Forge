@@ -171,7 +171,7 @@ object ReductionTreeAnalysis {
 
   def reductionTreeHeight(nLeaves: Int): Int = {
     def treeLevel(nNodes: Int, curHeight: Int): Int = {
-      if (nNodes <= 1) curHeight + 1
+      if (nNodes <= 1) curHeight
       else if (nNodes % 2 == 0) treeLevel(nNodes/2, curHeight + 1)
       else treeLevel((nNodes - 1)/2 + 1, curHeight + 1)
     }

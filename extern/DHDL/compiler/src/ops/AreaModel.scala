@@ -34,6 +34,7 @@ case class FPGAResources(
   regs: Int = 0,
   dsps: Int = 0,
   bram: Int = 0,
+  mregs: Int = 0,
   streams: Int = 0
 ) {
   def +(that: FPGAResources) = FPGAResources(
@@ -48,21 +49,23 @@ case class FPGAResources(
     regs = this.regs + that.regs,
     dsps = this.dsps + that.dsps,
     bram = this.bram + that.bram,
+    mregs = this.mregs + that.mregs,
     streams = this.streams + that.streams
   )
 
   // HACK: Don't duplicate BRAM in inner loops (bank instead)
   def replicated(x: Int, inner: Boolean) = {
     val bramNew = if (inner) bram else x*bram
-    FPGAResources(x*lut7,x*lut6,x*lut5,x*lut4,x*lut3,x*mem64,x*mem32,x*mem16,x*regs,x*dsps,bramNew,x*streams)
+    val mregsNew = if (inner) mregs else x*mregs
+    FPGAResources(x*lut7,x*lut6,x*lut5,x*lut4,x*lut3,x*mem64,x*mem32,x*mem16,x*regs,x*dsps,bramNew,mregsNew,x*streams)
   }
 
   def isNonzero: Boolean = lut7 > 0 || lut6 > 0 || lut5 > 0 || lut4 > 0 || lut3 > 0 ||
-                           mem64 > 0 || mem32 > 0 || mem16 > 0 || regs > 0 || dsps > 0 || bram > 0 || streams > 0
+                           mem64 > 0 || mem32 > 0 || mem16 > 0 || regs > 0 || dsps > 0 || bram > 0 || mregs > 0 || streams > 0
 
-  override def toString() = s"lut3=$lut3, lut4=$lut4, lut5=$lut5, lut6=$lut6, lut7=$lut7, mem16=$mem16, mem32=$mem32, mem64=$mem64, regs=$regs, dsps=$dsps, bram=$bram, streams=$streams"
+  override def toString() = s"lut3=$lut3, lut4=$lut4, lut5=$lut5, lut6=$lut6, lut7=$lut7, mem16=$mem16, mem32=$mem32, mem64=$mem64, regs=$regs, dsps=$dsps, bram=$bram, mregs=$mregs, streams=$streams"
 
-  def toArray: Array[Int] = Array(lut7,lut6,lut5,lut4,lut3,mem64,mem32,mem16,regs,dsps,bram)
+  def toArray: Array[Int] = Array(lut7,lut6,lut5,lut4,lut3,mem64,mem32,mem16,regs+mregs,dsps,bram)
 }
 
 object NoArea extends FPGAResources()
@@ -101,6 +104,9 @@ trait AreaModel {
 
   private def areaOfArg(nbits: Int) = FPGAResources(regs=nbits) //3*nbits/2)
 
+  // Set to 0 or lower to disable
+  val REG_RAM_DEPTH = 4
+
   /**
    * Area resources required for a BRAM with word size nbits, and with given depth,
    * number of banks, and double buffering
@@ -118,12 +124,19 @@ trait AreaModel {
     val width = if (nbits > 40) Math.ceil( nbits / 40.0 ).toInt else 1
 
     val bankDepth = Math.ceil(depth.toDouble/banks)       // Word depth per bank
-    val ramDepth = Math.ceil(bankDepth/wordDepth).toInt   // Number of rams needed per bank
 
-    val rams = width * ramDepth * banks
+    if (bankDepth < REG_RAM_DEPTH) {
+      val regs = width * bankDepth.toInt * banks
+      if (dblBuf) FPGAResources(lut3=2*nbits, regs=2*nbits, mregs = regs*2)
+      else        FPGAResources(mregs = regs)
+    }
+    else {
+      val ramDepth = Math.ceil(bankDepth/wordDepth).toInt   // Number of rams needed per bank
+      val rams = width * ramDepth * banks
 
-    if (dblBuf) FPGAResources(lut3=2*nbits, regs=2*nbits, bram = rams*2)
-    else        FPGAResources(bram = rams)
+      if (dblBuf) FPGAResources(lut3=2*nbits, regs=2*nbits, bram = rams*2)
+      else        FPGAResources(bram = rams)
+    }
   }
 
   def areaOfMetapipe(n: Int) = FPGAResources(

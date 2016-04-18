@@ -9,9 +9,9 @@ trait DotProduct extends DHDLApplication {
   type Elem = Flt //FixPt[Signed, B16, B16]
 
   override def stageArgNames = List("tileSize")
-  lazy val tileSize = param("tileSize", 4512)
-  lazy val outerPar = param("outerPar", 6)
-  lazy val innerPar = param("innerPar", 12)
+  lazy val tileSize = param("tileSize", 96)
+  lazy val outerPar = param("outerPar", 1)
+  lazy val innerPar = param("innerPar", 32)
   lazy val dataSize = ArgIn[SInt]("dataSize")
 
   def dotproduct(v1: Rep[OffChipMem[Elem]], v2: Rep[OffChipMem[Elem]], out: Rep[Reg[Elem]]) {
@@ -34,9 +34,9 @@ trait DotProduct extends DHDLApplication {
     val N = args(unit(0)).to[SInt]
 
     bound(N) = 9993600
-    domainOf(tileSize) = (1,9600,96) // 10
-    domainOf(outerPar) = (1,6,1)     // 6
-    domainOf(innerPar) = (1,96,6)    // 16
+    domainOf(tileSize) = (96,19200,96)
+    domainOf(outerPar) = (1,6,1)
+    domainOf(innerPar) = (1,96,1)
 
     val v1 = OffChipMem[Elem]("v1", N)
     val v2 = OffChipMem[Elem]("v2", N)

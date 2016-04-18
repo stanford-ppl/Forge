@@ -11,12 +11,12 @@ trait Kmeans extends DHDLApplication {
   lazy val numCents  = ArgIn[SInt]("numCents")
   lazy val numPoints = ArgIn[SInt]("numPoints")
 
-  lazy val tileSize   = param("tileSize", 310)
+  lazy val tileSize   = param("tileSize", 400)
   lazy val dTileSize  = 96
   lazy val ptLoopPar  = unit(1)
-  lazy val ctLoopPar  = param("ctLoopPar", 4)
-  lazy val dstLoopPar = param("dstLoopPar", 4)
-  lazy val accLoopPar = param("accLoopPar", 4)
+  lazy val ctLoopPar  = param("ctLoopPar", 8)
+  lazy val dstLoopPar = param("dstLoopPar", 3)
+  lazy val accLoopPar = param("accLoopPar", 3)
   lazy val avgLoopPar = param("avgLoopPar", 1)
 
   def kmeans(points: Rep[OffChipMem[Flt]], centroids: Rep[OffChipMem[Flt]], K: Rep[SInt], D: Rep[SInt]) = {
@@ -31,7 +31,7 @@ trait Kmeans extends DHDLApplication {
 
       MetaPipe((numPoints by tileSize) par unit(1)) { i =>
         val pointsTile = BRAM[Flt](tileSize, dTileSize)
-        pointsTile := points(i::i+tileSize, 0::dTileSize, dstLoopPar) // 4
+        pointsTile := points(i::i+tileSize, 0::dTileSize, dstLoopPar)
 
         MetaPipe((tileSize by 1) par ptLoopPar){ pt =>
           val minDist = Reg[Flt](-1.0f) // Minimum distance to closest centroid
@@ -39,7 +39,7 @@ trait Kmeans extends DHDLApplication {
 
           MetaPipe((K by 1) par ctLoopPar){ ct =>
             val dist = Reg[Flt](0.0f)
-            Pipe((D by 1) par dstLoopPar, dist){d => (pointsTile(pt*D+d) - oldCents(ct,d)) ** 2 }{_+_} // 4
+            Pipe((D by 1) par dstLoopPar, dist){d => (pointsTile(pt,d) - oldCents(ct,d)) ** 2 }{_+_} // 4
 
             Pipe {
               val closer = dist.value < minDist.value || minDist.value < 0f

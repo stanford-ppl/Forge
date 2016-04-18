@@ -169,16 +169,18 @@ trait LatencyAnalyzer extends ModelingTools {
 
   var cycleScope: List[Long] = Nil
   var totalCycles: Long = 0L
+  var scopeLevel: Int = 0
 
   def latencyOfBlock(b: Block[Any]): List[Long] = {
     val outerScope = cycleScope
     cycleScope = Nil
-
+    scopeLevel += 1
     //traverseBlock(b) -- can cause us to see things like counters as "stages"
     getControlNodes(b).foreach{
       case s@Def(d) => traverseNode(s, d)
       case _ =>
     }
+    scopeLevel -= 1
 
     val cycles = cycleScope
     cycleScope = outerScope
@@ -207,6 +209,8 @@ trait LatencyAnalyzer extends ModelingTools {
     else super.run(b)
   }
 
+  def debugs(x: => Any) = debug(".."*scopeLevel + x)
+
 
   def traverseNode(lhs: Exp[Any], rhs: Def[Any]) {
     val cycles = rhs match {
@@ -217,47 +221,57 @@ trait LatencyAnalyzer extends ModelingTools {
         inHwScope = false
         body
 
-      case EatReflect(Counterchain_new(ctrs,nIters)) =>
-        latencyOf(lhs)
+      case EatReflect(Counterchain_new(ctrs,nIters)) => latencyOf(lhs)
+      case EatReflect(_:TileTransfer[_]) =>
+        val cycles = latencyOf(lhs)
+        debugs(s"Tile Transfer $lhs ($cycles)")
+        cycles
 
       case EatReflect(Pipe_parallel(func)) =>
-        latencyOfBlock(func).max + latencyOf(lhs)
+        debugs(s"Parallel $lhs: ")
+        val blks = latencyOfBlock(func)
+        if (debugMode) blks.reverse.zipWithIndex.foreach{case (s,i) => debugs(s"- $i. $s")}
+        blks.max + latencyOf(lhs)
 
       // --- Pipe
       case EatReflect(Unit_pipe(func)) if styleOf(lhs) == Fine =>
+        debugs(s"Pipe $lhs: ")
         val pipe = latencyOfPipe(func)
-        debug(s"Pipe $lhs: ")
-        debug(s"  pipe = $pipe")
+        debugs(s"- pipe = $pipe")
         pipe + latencyOf(lhs)
 
       case EatReflect(Pipe_foreach(cchain, func, _)) if styleOf(lhs) == Fine =>
         val N = nIters(cchain)
+        debugs(s"Foreach $lhs (N = $N):")
         val pipe = latencyOfPipe(func)
 
-        debug(s"Foreach $lhs (N = $N):")
-        debug(s"  pipe = $pipe")
+        debugs(s"- pipe = $pipe")
         pipe + N - 1 + latencyOf(lhs)
 
-      case EatReflect(Pipe_reduce(cchain,_,iFunc,ld,st,func,rFunc,_,_,_,_,_)) if styleOf(lhs) == Fine =>
+      case EatReflect(Pipe_reduce(cchain,_,iFunc,ld,st,func,rFunc,_,_,_,_,rV)) if styleOf(lhs) == Fine =>
         val N = nIters(cchain)
         val P = parOf(cchain).reduce(_*_)
 
+        debugs(s"Reduce $lhs (N = $N):")
+
+        val fuseMapReduce = canFuse(func,rFunc,rV,P)
+
         val body = latencyOfPipe(func)
-        val internal = latencyOfPipe(rFunc) * reductionTreeHeight(P)
+        val internal = if (fuseMapReduce) Math.max(reductionTreeHeight(P) - 2, 0)
+                       else latencyOfPipe(rFunc) * reductionTreeHeight(P)
+
         val cycle = latencyOfCycle(iFunc) + latencyOfCycle(ld) + latencyOfCycle(rFunc) + latencyOfCycle(st)
 
-        debug(s"Reduce $lhs (N = $N):")
-        debug(s"  body  = $body")
-        debug(s"  tree  = $internal")
-        debug(s"  cycle = $cycle")
+        debugs(s"- body  = $body")
+        debugs(s"- tree  = $internal")
+        debugs(s"- cycle = $cycle")
         body + internal + N*cycle + latencyOf(lhs)
 
       // --- Sequential
       case EatReflect(Unit_pipe(func)) if styleOf(lhs) == Disabled =>
+        debugs(s"Outer Pipe $lhs:")
         val stages = latencyOfBlock(func)
-
-        debug(s"Outer Pipe:")
-        if (debugMode) stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
+        if (debugMode) stages.reverse.zipWithIndex.foreach{case (s,i) => debugs(s"- $i. $s")}
 
         stages.sum + latencyOf(lhs)
 
@@ -265,10 +279,9 @@ trait LatencyAnalyzer extends ModelingTools {
       // --- Metapipeline and Sequential
       case EatReflect(Pipe_foreach(cchain, func, _)) =>
         val N = nIters(cchain)
+        debugs(s"Outer Foreach $lhs (N = $N):")
         val stages = latencyOfBlock(func)
-
-        debug(s"Outer Foreach (N = $N):")
-        if (debugMode) stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
+        if (debugMode) stages.reverse.zipWithIndex.foreach{case (s,i) => debugs(s"- $i. $s")}
 
         if (styleOf(lhs) == Coarse) { stages.max * (N - 1) + stages.sum + latencyOf(lhs) }
         else                        { stages.sum * N + latencyOf(lhs) }
@@ -276,6 +289,8 @@ trait LatencyAnalyzer extends ModelingTools {
       case EatReflect(Pipe_reduce(cchain,_,iFunc,ld,st,func,rFunc,_,_,_,_,_)) =>
         val N = nIters(cchain)
         val P = parOf(cchain).reduce(_*_)
+        debugs(s"Outer Reduce $lhs (N = $N):")
+
         val mapStages = latencyOfBlock(func)
         val internal = latencyOfPipe(rFunc) * reductionTreeHeight(P)
         val cycle = latencyOfCycle(iFunc) + latencyOfCycle(ld) + latencyOfCycle(rFunc) + latencyOfCycle(st)
@@ -283,8 +298,7 @@ trait LatencyAnalyzer extends ModelingTools {
         val reduceStage = internal + cycle
         val stages = mapStages :+ reduceStage
 
-        debug(s"Outer Reduce $lhs (N = $N):")
-        if (debugMode) stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
+        if (debugMode) stages.reverse.zipWithIndex.foreach{case (s,i) => debugs(s"- $i. $s")}
 
         if (styleOf(lhs) == Coarse) { stages.max * (N - 1) + stages.sum + latencyOf(lhs) }
         else                        { stages.sum * N + latencyOf(lhs) }
@@ -295,6 +309,8 @@ trait LatencyAnalyzer extends ModelingTools {
         val Pm = parOf(ccOuter).reduce(_*_) // Parallelization factor for map
         val Pr = parOf(ccInner).reduce(_*_) // Parallelization factor for reduce
 
+        debugs(s"Block Reduce $lhs (Nm = $Nm, Nr = $Nr)")
+
         val mapStages: List[Long] = latencyOfBlock(func)
         val internal: Long = latencyOfPipe(iFunc) + latencyOfPipe(ld1) + latencyOfPipe(rFunc) * reductionTreeHeight(Pm)
         val accumulate: Long = latencyOfPipe(ld2) + latencyOfPipe(rFunc) + latencyOfPipe(st)
@@ -302,8 +318,7 @@ trait LatencyAnalyzer extends ModelingTools {
         val reduceStage: Long = internal + accumulate + Nr - 1
         val stages = mapStages :+ reduceStage
 
-        debug(s"Block Reduce $lhs (Nm = $Nm, Nr = $Nr)")
-        if (debugMode) stages.zipWithIndex.foreach{case (s,i) => debug(s"  $i. $s")}
+        if (debugMode) stages.reverse.zipWithIndex.foreach{case (s,i) => debugs(s"- $i. $s")}
 
         if (styleOf(lhs) == Coarse) { stages.max * (Nm - 1) + stages.sum + latencyOf(lhs) }
         else                        { stages.sum * Nm + latencyOf(lhs) }

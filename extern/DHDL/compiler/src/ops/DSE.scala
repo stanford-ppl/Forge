@@ -87,9 +87,13 @@ trait DSE extends Traversal {
   }
 
   override def run[A:Manifest](b: Block[A]) = {
+    bndAnalyzer.run(b)
     ctrlAnalyzer.run(b)
-    paramAnalyzer.run(b)
+
     //printer.run(b)
+
+    paramAnalyzer.run(b)
+
     //if (debugMode) printer.run(b)
     //if (debugMode) dblBuffers foreach {case (ctrl,mem) => debug(s"Found double buffer: $mem (in $ctrl)") }
 
@@ -101,7 +105,6 @@ trait DSE extends Traversal {
     setBanks()
     bndAnalyzer.run(b)
     contention.run(topController)
-    printer.run(b)
     (b)
   }
 
@@ -148,6 +151,7 @@ trait DSE extends Traversal {
       val distFactors = factors.distinct
       if (distFactors.length > 1) restrict ::= REqualOrOne(distFactors)
     }
+    restrict = restrict.distinct
 
     def isLegalSpace() = restrict.forall(_.evaluate)
 
@@ -187,12 +191,15 @@ trait DSE extends Traversal {
     // FIXME: This could take a long time if space size is really large
     val legalPoints = ArrayBuffer[Int]()
 
+    val legalStart = System.currentTimeMillis
+    debug(s"Enumerating all legal points...")
     for (i <- 0 until size) {
       indexedSpace.foreach{case (domain,d) => domain.set( ((i / prods(d)) % dims(d)).toInt ) }
       if (isLegalSpace()) legalPoints += i
     }
+    val legalCalcTime = System.currentTimeMillis - legalStart
     var legalSize = legalPoints.length
-    debug(s"Legal space size is $legalSize")
+    debug(s"Legal space size is $legalSize (elapsed time: ${legalCalcTime/1000} seconds)")
 
     // Take 200,000 legal points at most
     val points = util.Random.shuffle(legalPoints.toList).take(200000)
@@ -200,7 +207,7 @@ trait DSE extends Traversal {
 
 
     // --- PROFILING
-    val PROFILING = true
+    val PROFILING = false
     var clockRef = 0L
     def resetClock() { clockRef = System.currentTimeMillis }
 
@@ -322,6 +329,13 @@ trait DSE extends Traversal {
     debug(s"Valid designs generated: $nValid / $legalSize")
     debug(s"Pareto frontier size: $paretoSize / $nValid")
 
+    val names = numericFactors.map{p =>
+      val name = nameOf(p)
+      if (name == "") s"$p" else name
+    } ++ metapipes.map{mp =>
+      val name = nameOf(mp)
+      if (name == "") s"$mp" else name
+    }
 
     val pwd = sys.env("HYPER_HOME")
     val name = Config.degFilename.replace(".deg","")
@@ -330,29 +344,25 @@ trait DSE extends Traversal {
     debug(s"Printing results to file: $filename")
     val printStart = System.currentTimeMillis
     val pw = new PrintStream(filename)
-    pw.println("ALMS, Regs, DSPs, BRAM, Cycles, Valid, Pareto")
+    pw.println(names.mkString(", ") + ", ALMS, Regs, DSPs, BRAM, Cycles, Valid, Pareto")
     for (p <- 0 until legalSize) {
+      val pt = points(p)
+      indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt ) }
+      val values = numericFactors.map{p => p.x.toString} ++ metapipes.map{mp => (styleOf(mp) == Coarse).toString}
+
       val isPareto = pareto.exists{pt => pt.idx == p}
-      pw.println(s"${alms(p)}, ${regs(p)}, ${dsps(p)}, ${bram(p)}, ${cycles(p)}, ${valid(p)}, $isPareto")
+      pw.println(values.mkString(", ") + s", ${alms(p)}, ${regs(p)}, ${dsps(p)}, ${bram(p)}, ${cycles(p)}, ${valid(p)}, $isPareto")
     }
     pw.close()
     val printTime = System.currentTimeMillis - printStart
     debug(s"Finished printing in ${printTime/1000} seconds")
 
-    val names = numericFactors.map{p =>
-      val name = nameOf(p)
-      if (name == "") s"$p" else name
-    } ++ metapipes.map{mp =>
-      val name = nameOf(mp)
-      if (name == "") s"$mp" else name
-    }
     val ppw = new PrintStream(s"${pwd}/data/${name}_pareto.csv")
     ppw.println(names.mkString(", ") + ", ALMs, Cycles")
     pareto.foreach{paretoPt =>
       val p = paretoPt.idx
       val pt = points(p)
       indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt ) }
-
       val values = numericFactors.map{p => p.x.toString} ++ metapipes.map{mp => (styleOf(mp) == Coarse).toString}
 
       ppw.println(values.mkString(", ") + s", ${paretoPt.alms}, ${paretoPt.cycles}")

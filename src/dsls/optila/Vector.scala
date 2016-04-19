@@ -264,6 +264,7 @@ trait VectorOps {
       infix ("reduce") (((T,T) ==> T) :: T, A) implements reduce(T, 0, Z, ${ (a,b) => $1(a,b) })
       infix ("foreach") ((T ==> MUnit) :: MUnit) implements foreach(T, 0, ${ e => $1(e) })
       infix ("forall") ((T ==> MBoolean) :: MBoolean) implements composite ${ reduce_and($self.map($1)) }
+      infix ("exists") ((T ==> MBoolean) :: MBoolean) implements composite ${ $self.filter($1).length > 0 }
       infix ("find") ((T ==> MBoolean) :: IndexVector) implements composite ${ $self.indices.filter(i => $1($self(i))) }
 
       val filterMap = v.name.toLowerCase + "_densevector_filter_map"

@@ -132,51 +132,74 @@ trait IOGraphOps {
       })
     }
 
-    direct (IO) ("undirectedGraphFromEdgeList", Nil, ("edge_data",NodeData(Tuple2(MInt,MInt))) :: UndirectedGraph) implements composite ${
-      //println("edges: " + edge_data.length)
-      val allEdges = array_fromfunction(edge_data.length * 2, i => { //reverse every edge
-        if (i % 2 == 0) edge_data(i/2)
-        else pack(edge_data(i/2)._2, edge_data(i/2)._1)
+    // Generate a dense set of node ids from the ids in the given edge list, order preserving
+    compiler (IO) ("densifyNodes", Nil, ("edges",NodeData(Tuple2(MInt,MInt))) :: Tuple2(MArray(MInt), MHashMap(MInt,MInt))) implements composite ${
+      val distinctMap = SHashMap[Int,Boolean] // TODO: faster hashmap impl
+      edges.forloop(e => {
+        distinctMap(e._1) = true
+        distinctMap(e._2) = true
       })
-      //println("alledges: " + allEdges.length)
 
-      val sorted = sortEdges(NodeData(allEdges), forward = unit(true))
+      val nodes = array_sort(distinctMap.keys)
+      val nodeMap = array_groupByReduce(array_fromfunction(nodes.length, i => i), (i:Rep[Int]) => nodes(i), (i:Rep[Int]) => i, (a:Rep[Int],b:Rep[Int]) => a)
+      pack(nodes, nodeMap)
+    }
 
+    compiler (IO) ("buildCSRFromEdgeList", Nil, (("numNodes", MInt), ("edges", NodeData(Tuple2(MInt,MInt))), ("nodeMap", MHashMap(MInt,MInt)), ("withLoops", MBoolean), ("forward", CBoolean)) :: Tuple2(MArray(MInt),MArray(MInt))) implements composite ${
+      val sorted = sortEdges(edges, forward)
 
-      //TODO: if provided node ids aren't dense we need to compute node ids as we build the graph
-      val numNodes = allEdges(sorted(allEdges.length-1))._1 + 1
-      //println("nodes: " + numNodes)
-
-      val nodes = array_empty[Int](numNodes+1)
-      val edges_buffer = array_buffer_empty[Int](allEdges.length) //internally allocate to max possible size
+      val nodes = array_empty[Int](numNodes+1) // Pad nodes to make indexing neighborhoods simpler
+      val edges_buffer = array_buffer_empty[Int](edges.length) // Internally allocate to max possible size
 
       var i = 0
       var currentNode = 0
-      //nodes(0) = 0
+      nodes(0) = 0
       var numLocalEdges = 0
       var prevEdge_1 = -1; var prevEdge_2 = -1
-      while (i < allEdges.length) {
-        val currentEdge = allEdges(sorted(i))
-        if (!(currentEdge._1 == prevEdge_1 && currentEdge._2 == prevEdge_2)) { //skip duplicate edges
-          array_buffer_append(edges_buffer, currentEdge._2) //add unique edge
-          if (currentEdge._1 == currentNode) { //same start node as before
-            numLocalEdges += 1 //increment edge count for node
-          } else { //new start node
-            currentNode = currentEdge._1 //update to new start node
-            nodes(currentNode) = nodes(currentNode-1) + numLocalEdges //add pointer to nodes array for end of prev node
-            numLocalEdges = 1
-          }
-
+      while (i < edges.length) {
+        val inputEdge = edges(sorted(i))
+        val currentEdge_1 = nodeMap(if (forward) inputEdge._1 else inputEdge._2)
+        val currentEdge_2 = nodeMap(if (forward) inputEdge._2 else inputEdge._1)
+        
+        // New start node, so complete previous node
+        if (currentEdge_1 != currentNode) { 
+          currentNode = currentEdge_1
+          nodes(currentNode) = nodes(currentNode-1) + numLocalEdges // Add pointer to nodes array for end of prev node
+          numLocalEdges = 0
         }
-        prevEdge_1 = currentEdge._1; prevEdge_2 = currentEdge._2
+
+        // Check current edge for addition to graph
+        if (currentEdge_1 == prevEdge_1 && currentEdge_2 == prevEdge_2) { } // Skip duplicate edges
+        else if (!withLoops && currentEdge_1 == currentEdge_2) { } // Skip loop edge
+        else {
+          array_buffer_append(edges_buffer, currentEdge_2) // Add unique edge
+          numLocalEdges += 1
+        }
+        prevEdge_1 = currentEdge_1; prevEdge_2 = currentEdge_2
         i += 1
       }
       //println("final current node: " + currentNode)
 
-      val edges = array_buffer_result(edges_buffer)
-      nodes(numNodes) = edges.length
+      val edges_array = array_buffer_result(edges_buffer)
+      nodes(numNodes) = edges_array.length
 
-      val ids = array_fromfunction[Int](numNodes, i => i)
+      pack(nodes.unsafeImmutable, edges_array)
+    }
+
+    direct (IO) ("undirectedGraphFromEdgeList", Nil, MethodSignature(List(("edge_data",NodeData(Tuple2(MInt,MInt))), ("withLoops", MBoolean, "unit(true)")), UndirectedGraph)) implements composite ${
+      //println("edges: " + edge_data.length)
+      val allEdges = NodeData(array_fromfunction(edge_data.length * 2, i => { //reverse every edge
+        if (i % 2 == 0) edge_data(i/2)
+        else pack(edge_data(i/2)._2, edge_data(i/2)._1)
+      }))
+      //println("alledges: " + allEdges.length)
+
+      val (ids, nodeMap) = unpack(densifyNodes(allEdges))
+      val numNodes = ids.length
+      //println("nodes: " + numNodes)
+
+      val (nodes, edges) = unpack(buildCSRFromEdgeList(numNodes, allEdges, nodeMap, withLoops, forward = unit(true)))
+
       val weights = array_empty[Double](0).unsafeImmutable //array_fromfunction(numEdges, i => 1.0)
       //println("undirected graph loaded, edges: " + edges.length)
       UndirectedGraph(numNodes, ids, nodes.unsafeImmutable, edges, weights)
@@ -185,62 +208,14 @@ trait IOGraphOps {
 /////////////////////////////////////////////////////////////////////////////////////////////
 ////////Directed CSR Loaders
 /////////////////////////////////////////////////////////////////////////////////////////////
-    direct (IO) ("directedGraphFromEdgeList", Nil, ("edge_data",NodeData(Tuple2(MInt,MInt))) :: DirectedGraph) implements composite ${
-      
-      val sortedForward = sortEdges(edge_data, forward = unit(true))
+    direct (IO) ("directedGraphFromEdgeList", Nil, MethodSignature(List(("edge_data",NodeData(Tuple2(MInt,MInt))), ("withLoops", MBoolean, "unit(true)")), DirectedGraph)) implements composite ${
+      val (ids, nodeMap) = unpack(densifyNodes(edge_data))
+      val numNodes = ids.length
 
-      //TODO: if provided node ids aren't dense we need to compute these values as we build the graph
-      val numNodes = edge_data(sortedForward(edge_data.length-1))._1 + 1
-      val ids = array_fromfunction(numNodes, i => i)
+      val (out_nodes, out_edges) = unpack(buildCSRFromEdgeList(numNodes, edge_data, nodeMap, withLoops, forward = unit(true)))
+      val (in_nodes, in_edges) = unpack(buildCSRFromEdgeList(numNodes, edge_data, nodeMap, withLoops, forward = unit(false)))
 
-      //TODO: if edges in list aren't distinct this needs to be computed as we build the graph
-      val numEdges = edge_data.length
-
-      val src_nodes = array_empty[Int](numNodes+1)
-      val src_edges = array_empty[Int](numEdges)
-
-      var edgeIdx = 0
-      var currentNode = 0
-      var numLocalEdges = 0
-      while (edgeIdx < numEdges) {
-        val currentEdge = edge_data(sortedForward(edgeIdx))
-        //TODO: (duplicate edges): if (currentEdge._1 == prevEdge._1 && currentEdge._2 == prevEdge._2) skip duplicate
-        src_edges(edgeIdx) = currentEdge._2 
-        if (currentEdge._1 == currentNode) {
-          numLocalEdges += 1
-        } else {
-          currentNode = currentEdge._1
-          //TODO: (sparse ids): assign current node id to next dense id
-          src_nodes(currentNode) = src_nodes(currentNode-1) + numLocalEdges
-          numLocalEdges = 1
-        }
-        edgeIdx += 1
-      }
-      src_nodes(numNodes) = numEdges
-
-      val sortedReverse = sortEdges(edge_data, forward = unit(false))
-      val dst_nodes = array_empty[Int](numNodes+1)
-      val dst_edges = array_empty[Int](numEdges)
-
-      edgeIdx = 0
-      currentNode = 0
-      numLocalEdges = 0
-      while (edgeIdx < numEdges) {
-        val reverseEdge = edge_data(sortedReverse(edgeIdx))
-        val currentEdge = pack(reverseEdge._2, reverseEdge._1)
-        dst_edges(edgeIdx) = currentEdge._2 
-        if (currentEdge._1 == currentNode) {
-          numLocalEdges += 1
-        } else {
-          currentNode = currentEdge._1
-          dst_nodes(currentNode) = dst_nodes(currentNode-1) + numLocalEdges
-          numLocalEdges = 1
-        }
-        edgeIdx += 1
-      }
-      dst_nodes(numNodes) = numEdges
-
-      DirectedGraph(numNodes, ids, src_nodes.unsafeImmutable, src_edges.unsafeImmutable, dst_nodes.unsafeImmutable, dst_edges.unsafeImmutable)
+      DirectedGraph(numNodes, ids, out_nodes, out_edges, in_nodes, in_edges)
     }
 
 /////////////////////////////////////////////////////////////////////////////////////////////

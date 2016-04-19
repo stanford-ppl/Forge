@@ -129,12 +129,97 @@ class LUTRoutingModel extends AbstractNeuralModel { val OUT = RLUTS; val name = 
 class RegFanoutModel extends AbstractNeuralModel { val OUT = FREGS; val name = "FanoutRegisters"; val LAYER2 = 6 }
 class UnavailALMsModel extends AbstractNeuralModel { val OUT = UNVAIL; val name = "UnavailableALMs"; val LAYER2 = 6 }
 
-// Unused
-class BRAMDupModel extends AbstractNeuralModel {
-  val OUT = RBRAM
-  val name = "BRAMDuplication"
-  val LAYER2 = 16
-  override val filename = "StratixV-BRAM.csv"
-  override val verbose = true
-  override val MAX_EPOCH = 500
+
+
+
+class TileLoadModel {
+  val name = "TileLoadModel"
+  val filename = "TileLoadData.csv" // TODO: Shouldn't be hardcoded
+
+  var network: BasicNetwork = null
+  def needsInit = network eq null
+  val verbose = false
+  val MAX_EPOCH = 600
+
+  val pwd = sys.env("HYPER_HOME")
+
+  def init() {
+    val encogFile = s"${pwd}/data/${name}.eg"
+    val exists = new File(encogFile).exists
+
+    if (exists) {
+      println("Loaded " + name + " model from file")
+      network = EncogDirectoryPersistence.loadObject(new File(encogFile)).asInstanceOf[BasicNetwork]
+    }
+    else {
+      val MODELS = 1000
+
+      val data = Source.fromFile(s"${pwd}/data/${filename}").getLines().toArray.drop(1).map(_.split(",").map(_.trim.toDouble))
+
+      val input = data.map(_.take(4))
+
+      val output = data.map(_.slice(4,5))
+      if (verbose) println(output.map(_.mkString(", ")).mkString(", "))
+      val trainingSet = new BasicMLDataSet(input, output)
+      var iter = 0
+      var minError = Double.PositiveInfinity
+      var maxError = Double.PositiveInfinity
+      while (iter < MODELS) {
+        val (curNetwork, curError, curMax) = trainOne(trainingSet)
+        if (curMax < maxError) {
+          minError = curError
+          maxError = curMax
+          network = curNetwork
+        }
+        iter += 1
+      }
+      println(name + "\n-----------------")
+      println("Neural network results:")
+      println(s"Average error: ${100*minError/trainingSet.size}%")
+      println(s"Maximum observed error: ${100*maxError}")
+
+      EncogDirectoryPersistence.saveObject(new File(encogFile), network)
+    }
+  }
+
+  def trainOne(trainingSet: BasicMLDataSet) = {
+    val network = new BasicNetwork()
+    network.addLayer(new BasicLayer(null,true,4))
+    network.addLayer(new BasicLayer(new ActivationSigmoid(),true,6))
+    network.addLayer(new BasicLayer(new ActivationSigmoid(),false,1))
+    network.getStructure().finalizeStructure()
+    network.reset()
+
+    var epoch = 1
+    val train = new ResilientPropagation(network, trainingSet)
+    train.iteration()
+    while (epoch < MAX_EPOCH) {
+      //println(s"Epoch #$epoch Error: ${100*train.getError()}")
+      epoch += 1
+      train.iteration()
+    }
+    train.finishTraining()
+    //
+    //println(s"Completed training at epoch $epoch with error of ${100*train.getError()}")
+
+    var errors = 0.0
+    var maxError = 0.0
+    for (pair <- trainingSet.asScala) {
+      val output = network.compute(pair.getInput())
+      val diff = output.getData(0) - pair.getIdeal().getData(0)
+      val error = diff / pair.getIdeal().getData(0)
+
+      if (Math.abs(error) > maxError) maxError = Math.abs(error)
+      errors += Math.abs(error)
+    }
+
+    (network, errors, maxError)
+  }
+
+  def evaluate(c: Int, r: Int, b: Int, p: Int) = {
+    if (needsInit) init()
+    val input = Array(c.toDouble/15, r.toDouble/10000, b.toDouble/(96*256), p.toDouble/192)
+    val output = network.compute(new BasicMLData(input))
+    output.getData(0)
+  }
 }

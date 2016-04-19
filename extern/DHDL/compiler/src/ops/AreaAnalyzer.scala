@@ -23,7 +23,7 @@ trait AreaAnalysisExp extends AreaModel with LatencyModel with CounterToolsExp w
     mem16 = 559,
     regs = 75400,
     dsps = 0,
-    bram = 338
+    bram = 340
   )
 
   val FPGATarget = FPGAResourceSummary(alms=262400,regs=524800,dsps=1963,bram=2567,streams=13)  // Stratix V on MAIA board

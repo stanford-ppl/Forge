@@ -344,14 +344,14 @@ trait DSE extends Traversal {
     debug(s"Printing results to file: $filename")
     val printStart = System.currentTimeMillis
     val pw = new PrintStream(filename)
-    pw.println(names.mkString(", ") + ", ALMS, Regs, DSPs, BRAM, Cycles, Valid, Pareto")
+    pw.println(names.mkString(", ") + ", ALMS, Regs, DSPs, BRAM, Cycles, Valid, Pareto, Synthesized")
     for (p <- 0 until legalSize) {
       val pt = points(p)
       indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt ) }
       val values = numericFactors.map{p => p.x.toString} ++ metapipes.map{mp => (styleOf(mp) == Coarse).toString}
 
       val isPareto = pareto.exists{pt => pt.idx == p}
-      pw.println(values.mkString(", ") + s", ${alms(p)}, ${regs(p)}, ${dsps(p)}, ${bram(p)}, ${cycles(p)}, ${valid(p)}, $isPareto")
+      pw.println(values.mkString(", ") + s", ${alms(p)}, ${regs(p)}, ${dsps(p)}, ${bram(p)}, ${cycles(p)}, ${valid(p)}, $isPareto, false")
     }
     pw.close()
     val printTime = System.currentTimeMillis - printStart

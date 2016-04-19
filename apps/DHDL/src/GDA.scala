@@ -65,7 +65,7 @@ trait GDA extends DHDLApplication {
       }{_+_}
 
       // TODO: Change parallelization factor
-      sigma(0::cTileSize, 0::cTileSize, unit(1)) := sigmaOut
+      sigma(0::cTileSize, 0::cTileSize, prodLoopPar) := sigmaOut
     }
   }
 
@@ -76,8 +76,8 @@ trait GDA extends DHDLApplication {
     domainOf(outerPar)   = (1,4,1)      // 4
     domainOf(innerPar)   = (1,6,1)      // 6
     domainOf(subLoopPar) = (1,10,1)     // 10
-    domainOf(prodLoopPar) = (1,96,4)    // 24
-    domainOf(outerAccumPar) = (1,96,4)  // 24
+    domainOf(prodLoopPar) = (1,96,1)    // 24
+    domainOf(outerAccumPar) = (1,96,1)  // 24
 
     val x = OffChipMem[Elem]("x", R, C)
     val y = OffChipMem[Bit]("y", R)

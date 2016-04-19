@@ -105,7 +105,7 @@ trait AreaModel {
   private def areaOfArg(nbits: Int) = FPGAResources(regs=nbits) //3*nbits/2)
 
   // Set to 0 or lower to disable
-  val REG_RAM_DEPTH = 4
+  val REG_RAM_DEPTH = 5  // Non-inclusive
 
   /**
    * Area resources required for a BRAM with word size nbits, and with given depth,
@@ -341,16 +341,25 @@ trait AreaModel {
 
 
     // TODO: These need new numbers after Raghu's changes
-    case tt: TileTransfer[_] if tt.store =>
+    // Tile Store
+    case tt@TileTransfer(mem,local,_,_,_,cc,_,true) =>
       val nonConstDims = (dimsOf(tt.mem) ++ tt.memOfs).filterNot{case Fixed(_) => true; case _ => false}.length
-      val dsp = if (nonConstDims > 1) 3 else 0
-      FPGAResources(lut3=1900,lut4=167,lut5=207,lut6=516,lut7=11,regs=5636,dsps=dsp,bram=46,streams = 1)
+      val dsp = if (nonConstDims > 1) 2 else 0
+      // Old template
+      //FPGAResources(lut3=1900,lut4=167,lut5=207,lut6=516,lut7=11,regs=5636,dsps=dsp,bram=46,streams = 1)
+      // New template
+      FPGAResources(lut3=378,lut4=38,lut5=58,lut6=569,lut7=4, regs=3878, dsps=dsp, bram=46, streams=1)
 
-    case tt: TileTransfer[_] if !tt.store =>
+    // Tile Load
+    case tt@TileTransfer(mem,local,_,_,_,cc,_,false) =>
+      val p = parOf(cc).reduce{_*_}
       val nonConstDims = (dimsOf(tt.mem) ++ tt.memOfs).filterNot{case Fixed(_) => true; case _ => false}.length
       val dsp = if (nonConstDims > 1) 4 else 0
-      FPGAResources(lut3=453, lut4=60, lut5=131,lut6=522,regs=1377,dsps=dsp,bram=46, streams=1)
-
+      // New template
+      // FPGAResources(lut3=453, lut4=60, lut5=131,lut6=522,regs=1377,dsps=dsp,bram=46, streams=1)
+      val brams = 12 - p/8
+      // New template
+      FPGAResources(lut3=410, lut4=50, lut5=70, lut6=53, regs=920, dsps=dsp, bram=brams, streams=1)
 
     case _:Pipe_parallel => FPGAResources(lut4=9*nStages(s)/2, regs = nStages(s) + 3)
 

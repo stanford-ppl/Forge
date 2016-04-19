@@ -10,6 +10,8 @@ import dhdl.compiler.ops._
 trait LatencyModel {
   this: DHDLExp with CounterToolsExp =>
 
+  lazy val memModel = new TileLoadModel()
+
   object Deff {
     def unapply(e: Exp[Any]): Option[Any] = e match {
       case Def(Reflect(inner, _, _)) => Some(inner)
@@ -48,7 +50,13 @@ trait LatencyModel {
       case _ => 0.165
     }
     val overhead = ((1/Math.log(12))*Math.log(c))*overhead12
-    Math.ceil( (1+overhead)*(110 + r*(53 + b)) ).toLong
+    val base = Math.ceil( (1+overhead)*(110 + r*(53 + b)) )
+
+    val parSpeedup = memModel.evaluate(c, r, b, p)
+
+    //System.out.println(s"Base: $base, par: $parSpeedup")
+
+    (parSpeedup*base).toLong
   }
 
 
@@ -204,7 +212,7 @@ trait LatencyModel {
       val b = if (ts.length == 1) ts(0) else ts.drop(1).reduce{_*_}
       val p = parOf(cc).reduce{_*_}
 
-      //System.out.println(s"Tile transfer $s: c = $c, r = $r, b = $b, p = $p")
+      System.out.println(s"Tile transfer $s: c = $c, r = $r, b = $b, p = $p")
       memoryModel(c,r.toInt,b.toInt,p)
 
     case TileTransfer(mem,local,_,_,_,cc,_,true) =>

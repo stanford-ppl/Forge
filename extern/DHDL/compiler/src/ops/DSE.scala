@@ -358,14 +358,17 @@ trait DSE extends Traversal {
     debug(s"Finished printing in ${printTime/1000} seconds")
 
     val ppw = new PrintStream(s"${pwd}/data/${name}_pareto.csv")
-    ppw.println(names.mkString(", ") + ", ALMs, Cycles")
+    ppw.println(names.mkString(", ") + ", ALMs, Cycles, ALM Usage (%), Runtime (sec)")
     pareto.foreach{paretoPt =>
       val p = paretoPt.idx
       val pt = points(p)
       indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt ) }
       val values = numericFactors.map{p => p.x.toString} ++ metapipes.map{mp => (styleOf(mp) == Coarse).toString}
 
-      ppw.println(values.mkString(", ") + s", ${paretoPt.alms}, ${paretoPt.cycles}")
+      val runtime = paretoPt.cycles/(IR.CLK*1000000.0f)
+      val almUsage = 100.0f*paretoPt.alms/target.alms
+
+      ppw.println(values.mkString(", ") + s", ${paretoPt.alms}, ${paretoPt.cycles}, ${almUsage}, ${runtime}")
     }
     ppw.close()
 

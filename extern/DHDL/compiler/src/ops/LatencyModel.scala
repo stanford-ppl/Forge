@@ -212,7 +212,7 @@ trait LatencyModel {
       val b = if (ts.length == 1) ts(0) else ts.drop(1).reduce{_*_}
       val p = parOf(cc).reduce{_*_}
 
-      System.out.println(s"Tile transfer $s: c = $c, r = $r, b = $b, p = $p")
+      //System.out.println(s"Tile transfer $s: c = $c, r = $r, b = $b, p = $p")
       memoryModel(c,r.toInt,b.toInt,p)
 
     case TileTransfer(mem,local,_,_,_,cc,_,true) =>

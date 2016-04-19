@@ -72,10 +72,10 @@ trait GDA extends DHDLApplication {
   def main() {
     val R = args(unit(0)).to[SInt];   bound(R) = 360000
     val C = args(unit(0)).to[SInt];   bound(C) = 96
-    domainOf(rTileSize)  = (960,1920,6) // 160
+    domainOf(rTileSize)  = (960,9600,6) // 160
     domainOf(outerPar)   = (1,4,1)      // 4
-    domainOf(innerPar)   = (1,6,1)      // 6
-    domainOf(subLoopPar) = (1,10,1)     // 10
+    domainOf(innerPar)   = (1,12,1)      // 6
+    domainOf(subLoopPar) = (1,16,1)     // 10
     domainOf(prodLoopPar) = (1,96,1)    // 24
     domainOf(outerAccumPar) = (1,96,1)  // 24
 

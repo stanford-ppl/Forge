@@ -48,10 +48,10 @@ trait TPCHQ6 extends DHDLApplication {
   def main() {
     val N = args(unit(0)).to[SInt]
 
-    bound(N) = 9993600
-    domainOf(tileSize) = (4800,19200,96)
-    domainOf(outerPar) = (1,3,1)
-    domainOf(innerPar) = (1,192,6)
+    bound(N) = 18720000
+    domainOf(tileSize) = (96,192000,96)
+    domainOf(outerPar) = (1,6,1)
+    domainOf(innerPar) = (1,384,1)
 
     val MIN_DATE = 64
     val MAX_DATE = 80

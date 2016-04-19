@@ -33,10 +33,10 @@ trait DotProduct extends DHDLApplication {
   def main() {
     val N = args(unit(0)).to[SInt]
 
-    bound(N) = 9993600
+    bound(N) = 18720000
     domainOf(tileSize) = (96,19200,96)
     domainOf(outerPar) = (1,6,1)
-    domainOf(innerPar) = (1,96,1)
+    domainOf(innerPar) = (1,192,1)
 
     val v1 = OffChipMem[Elem]("v1", N)
     val v2 = OffChipMem[Elem]("v2", N)

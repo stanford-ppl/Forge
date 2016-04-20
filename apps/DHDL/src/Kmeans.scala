@@ -14,7 +14,7 @@ trait Kmeans extends DHDLApplication {
   lazy val tileSize   = param("tileSize", 768)
   lazy val dTileSize  = 96
   lazy val ptLoopPar  = param("ptLoopPar", 1)
-  lazy val ctLoopPar  = param("ctLoopPar", 1)
+  //lazy val ctLoopPar  = param("ctLoopPar", 1)
   lazy val dstLoopPar = param("dstLoopPar", 8)
   lazy val accLoopPar = param("accLoopPar", 8)
   lazy val avgLoopPar = param("avgLoopPar", 8)
@@ -23,14 +23,14 @@ trait Kmeans extends DHDLApplication {
 
   def reduceTree(x: List[(Rep[Flt], Rep[SInt])]): List[(Rep[Flt], Rep[SInt])] = {
     if (x.length == 1) x
-    else List.tabulate(x.length/2){i =>
+    else reduceTree(List.tabulate(x.length/2){i =>
       val (dist1,index1) = x(2*i)
       val (dist2,index2) = x(2*i+1)
       val closer = dist1 < dist2
       val minDist = mux(closer, dist1, dist2)
       val minIndx = mux(closer, index1, index2)
       (minDist, minIndx)
-    }
+    })
   }
 
   def kmeans(points: Rep[OffChipMem[Flt]], centroids: Rep[OffChipMem[Flt]], K: Rep[SInt], D: Rep[SInt]) = {
@@ -94,7 +94,7 @@ trait Kmeans extends DHDLApplication {
     val K = args(unit(0)).to[SInt];   bound(K) = 16
     val D = args(unit(0)).to[SInt];   bound(D) = 384
     domainOf(tileSize) = (1,9600,1)
-    domainOf(ctLoopPar) = (1,1,1)
+    //domainOf(ctLoopPar) = (1,1,1)
     domainOf(dstLoopPar) = (1,96,1)
     domainOf(accLoopPar) = (1,96,1)
     domainOf(avgLoopPar) = (1,96,1)

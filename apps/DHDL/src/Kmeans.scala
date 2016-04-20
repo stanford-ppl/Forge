@@ -62,16 +62,20 @@ trait Kmeans extends DHDLApplication {
               Pipe((D by 1) par dstLoopPar, dist){d => (pointsTile(pt,d) - cent(d)) ** 2 }{_+_} // 4
             }
           }
-          Pipe {
-            val distsWithIdx = distances.zipWithIndex.map{case (d, i) => (d.value,i.as[SInt])}
-            val (minDist,minCent) = reduceTree(distsWithIdx).last
+          Sequential {
+            val minCent = Reg[SInt](0)
+            Pipe {
+              val distsWithIdx = distances.zipWithIndex.map{case (d, i) => (d.value,i.as[SInt])}
+              val (minDist,minIdx) = reduceTree(distsWithIdx).last
+              minCent := minIdx
+            }
 
             // Add point and increment point count
             Parallel {
               Pipe((D by 1) par accLoopPar){d =>
-                newCents(minCent, d) = newCents(minCent, d) + pointsTile(pt, d)
+                newCents(minCent.value, d) = newCents(minCent.value, d) + pointsTile(pt, d)
               }
-              Pipe{ centCount(minCent) = centCount(minCent) + 1 }
+              Pipe{ centCount(minCent.value) = centCount(minCent.value) + 1 }
             }
           }
 

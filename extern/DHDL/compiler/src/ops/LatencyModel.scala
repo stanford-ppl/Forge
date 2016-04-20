@@ -44,15 +44,16 @@ trait LatencyModel {
   // b - number of words per command (step of 96)
   // p - number of words read into buffer in parallel
   def memoryModel(c: Int, r: Int, b: Int, p: Int) = {
-    val overhead12 = b match {
+    val cols = if (b < 96) 96 else b
+    val overhead12 = cols match {
       case 96  => 0.307/(1 + Math.exp(-0.096*r + 0.21))   // Logistic, bounded by 30.7%
       case 192 => 0.185/(1 + Math.exp(-0.24*r - 0.8))     // Logistic, bounded by 18.5%
       case _ => 0.165
     }
     val overhead = ((1/Math.log(12))*Math.log(c))*overhead12
-    val base = Math.ceil( (1+overhead)*(110 + r*(53 + b)) )
+    val base = Math.ceil( (1+overhead)*(110 + r*(53 + cols)) )
 
-    val parSpeedup = memModel.evaluate(c, r, b, p)
+    val parSpeedup = memModel.evaluate(c, r, cols, p)
 
     //System.out.println(s"Base: $base, par: $parSpeedup")
 
@@ -216,9 +217,19 @@ trait LatencyModel {
       memoryModel(c,r.toInt,b.toInt,p)
 
     case TileTransfer(mem,local,_,_,_,cc,_,true) =>
+      val c = contentionOf(s)
       val p = parOf(cc).reduce{_*_}
-      val s = dimsOf(local).map(d => bound(d).getOrElse(stageError("Cannot resolve bound of BRAM dimension")))
-      Math.ceil(s.reduce{_*_}/p.toDouble).toLong
+      val sizes = dimsOf(local).map(d => bound(d).getOrElse(stageError("Cannot resolve bound of BRAM dimension")))
+
+      val baseCycles = sizes.reduce{_*_} / p.toDouble
+
+      val oFactor = 0.02*c - 0.019
+      val smallOverhead = if (c < 8) 0.0 else 0.0175
+      val overhead = if (p < 8) 1.0 + smallOverhead*p else oFactor*p + (1 - (8*oFactor)) + smallOverhead*8
+
+      //System.out.println(s"Sizes: $sizes, base cycles: $baseCycles, ofactor: $oFactor, smallOverhead: $smallOverhead, overhead: $overhead")
+
+      Math.ceil(baseCycles*overhead).toLong
 
     case _:Pipe_parallel => 1
     case _:Pipe_foreach  => 1

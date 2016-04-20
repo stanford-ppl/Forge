@@ -344,11 +344,18 @@ trait AreaModel {
     // Tile Store
     case tt@TileTransfer(mem,local,_,_,_,cc,_,true) =>
       val nonConstDims = (dimsOf(tt.mem) ++ tt.memOfs).filterNot{case Fixed(_) => true; case _ => false}.length
-      val dsp = if (nonConstDims > 1) 2 else 0
+      val dsp = if (nonConstDims > 1) 3 else 0
+      val p = parOf(cc).reduce{_*_}
+
+      val brm = if (p < 25) 46 + Math.floor(0.75*(p-1)).toInt else if (p < 49) 62 - Math.floor(0.75*(p-24)).toInt else 42
+
+      //System.out.println(s"Tile store $tt: $brm")
       // Old template
       //FPGAResources(lut3=1900,lut4=167,lut5=207,lut6=516,lut7=11,regs=5636,dsps=dsp,bram=46,streams = 1)
       // New template
-      FPGAResources(lut3=378,lut4=38,lut5=58,lut6=569,lut7=4, regs=3878, dsps=dsp, bram=46, streams=1)
+      FPGAResources(lut3=893,lut4=91,lut5=96,lut6=618,lut7=10, regs=4692, dsps=dsp, bram=brm, streams=1)
+
+      //FPGAResources(lut3=378,lut4=38,lut5=58,lut6=569,lut7=4, regs=3878, dsps=dsp, bram=46, streams=1)
 
     // Tile Load
     case tt@TileTransfer(mem,local,_,_,_,cc,_,false) =>

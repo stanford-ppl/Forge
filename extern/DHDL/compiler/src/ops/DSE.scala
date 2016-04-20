@@ -131,7 +131,7 @@ trait DSE extends Traversal {
   def dse[A:Manifest](b: Block[A]) {
     // Specify FPGA target (hardcoded right now)
     // HACK: BRAM tolerance increased by ~28% to allow for designs where coalescing occurs but we don't account for it
-    val target = FPGAResourceSummary(alms=262400,regs=524800,dsps=1963,bram=3300,streams=13)
+    val target = FPGAResourceSummary(alms=262400,regs=524800,dsps=1963,bram=2567,streams=13)//bram=3300,streams=13)
 
     val areaAnalyzer = new AreaAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
     val cycleAnalyzer = new LatencyAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
@@ -158,9 +158,9 @@ trait DSE extends Traversal {
     // C. Calculate space
     debug("Running DSE")
     debug("Tile Sizes: ")
-    tileSizes.foreach{t => debug(s"  $t")}
+    tileSizes.foreach{t => val name = nameOf(t); if (name == "") debug(s"  $t") else debug(s"  $name")}
     debug("Parallelization Factors:")
-    parFactors.foreach{t => debug(s"  $t")}
+    parFactors.foreach{t => val name = nameOf(t); if (name == "") debug(s"  $t") else debug(s"  $name")}
     debug("Metapipelining Toggles:")
     metapipes.foreach{t => debug(s"  ${mpos(t.pos).line}")}
     debug("")

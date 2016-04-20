@@ -83,7 +83,7 @@ trait ParamRestrictions extends Expressions {
     def apply(r: CRange, setter: Int => Unit) = {
       if (r.start % r.step != 0) {
         val start = r.step*(r.start/r.step + 1)
-        new Domain[Int]((start to r.end by r.step).toList :+ r.start, setter)
+        new Domain[Int]((start until r.end by r.step).toList :+ r.start, setter)
       }
       else new Domain[Int](r.toList, setter)
     }
@@ -95,7 +95,7 @@ trait ParamRestrictions extends Expressions {
         setter(r.start);
         if (cond()) values += r.start
       }
-      for (i <- start to r.end by r.step) {
+      for (i <- start until r.end by r.step) {
         setter(i)
         if (cond()) values += i
       }
@@ -165,7 +165,7 @@ trait ParameterAnalyzer extends Traversal {
       range(p) = xrange(range(p).start,Math.min(mx,range(p).end),range(p).step)
   }
 
-  def canParallelize(e: Exp[Any]) = styleOf(e) != Disabled
+  def canParallelize(e: Exp[Any]) = true //styleOf(e) != Disabled
 
   override def traverseStm(stm: Stm) = stm match {
     case TP(s, d) =>
@@ -187,7 +187,7 @@ trait ParameterAnalyzer extends Traversal {
           else                         { setRange(p, 1, MAX_TILE_SIZE, MIN_TILE_SIZE) }
       }
 
-      if (tiles.length > 1) restrict ::= RProductLessThan(tiles, MAX_TILE / cSize)
+      //if (tiles.length > 1) restrict ::= RProductLessThan(tiles, )
 
 
     case EatReflect(Counter_new(start,end,step,par)) =>

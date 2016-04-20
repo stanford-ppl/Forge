@@ -11,71 +11,91 @@ trait Kmeans extends DHDLApplication {
   lazy val numCents  = ArgIn[SInt]("numCents")
   lazy val numPoints = ArgIn[SInt]("numPoints")
 
-  lazy val tileSize   = param("tileSize", 400)
+  lazy val tileSize   = param("tileSize", 768)
   lazy val dTileSize  = 96
-  lazy val ptLoopPar  = unit(1)
-  lazy val ctLoopPar  = param("ctLoopPar", 8)
-  lazy val dstLoopPar = param("dstLoopPar", 3)
-  lazy val accLoopPar = param("accLoopPar", 3)
-  lazy val avgLoopPar = param("avgLoopPar", 1)
+  lazy val ptLoopPar  = param("ptLoopPar", 1)
+  lazy val ctLoopPar  = param("ctLoopPar", 1)
+  lazy val dstLoopPar = param("dstLoopPar", 8)
+  lazy val accLoopPar = param("accLoopPar", 8)
+  lazy val avgLoopPar = param("avgLoopPar", 8)
+  lazy val ignorePar = param("IGNOREME",1)
+  lazy val MAXK = 16
+
+  def reduceTree(x: List[(Rep[Flt], Rep[SInt])]): List[(Rep[Flt], Rep[SInt])] = {
+    if (x.length == 1) x
+    else List.tabulate(x.length/2){i =>
+      val (dist1,index1) = x(2*i)
+      val (dist2,index2) = x(2*i+1)
+      val closer = dist1 < dist2
+      val minDist = mux(closer, dist1, dist2)
+      val minIndx = mux(closer, index1, index2)
+      (minDist, minIndx)
+    }
+  }
 
   def kmeans(points: Rep[OffChipMem[Flt]], centroids: Rep[OffChipMem[Flt]], K: Rep[SInt], D: Rep[SInt]) = {
-    val oldCents = BRAM[Flt](tileSize, dTileSize)
-    val newCents = BRAM[Flt](tileSize, dTileSize)
-    val centCount = BRAM[UInt](tileSize)
-    val centsOut = BRAM[Flt](tileSize, dTileSize)
+    val oldCents = BRAM[Flt](MAXK, dTileSize)
+    val newCents = BRAM[Flt](MAXK, dTileSize)
+    val centCount = BRAM[UInt](MAXK)
+    val centsOut = BRAM[Flt](MAXK, dTileSize)
+
+    // Runtime is roughly (N*K/(Pc)*(D/Pd + 19 + log2(D))
 
     Sequential {
       // Load initial centroids (from points)
-      oldCents := points(0::tileSize,0::dTileSize, ctLoopPar)
+      oldCents := points(0::K,0::dTileSize, dstLoopPar)
 
-      MetaPipe((numPoints by tileSize) par unit(1)) { i =>
+      val oldCent = List.tabulate(MAXK){i =>
+        val ram = BRAM[Flt](dTileSize)
+        Pipe((D by 1) par dstLoopPar){j => ram(j) = oldCents(i.as[SInt], j) }
+        ram
+      }
+
+      MetaPipe((numPoints by tileSize) par ignorePar) { i =>
         val pointsTile = BRAM[Flt](tileSize, dTileSize)
         pointsTile := points(i::i+tileSize, 0::dTileSize, dstLoopPar)
 
         MetaPipe((tileSize by 1) par ptLoopPar){ pt =>
-          val minDist = Reg[Flt](-1.0f) // Minimum distance to closest centroid
-          val minCent = Reg[SInt](0)    // Index of closest centroid
-
-          MetaPipe((K by 1) par ctLoopPar){ ct =>
-            val dist = Reg[Flt](0.0f)
-            Pipe((D by 1) par dstLoopPar, dist){d => (pointsTile(pt,d) - oldCents(ct,d)) ** 2 }{_+_} // 4
-
-            Pipe {
-              val closer = dist.value < minDist.value || minDist.value < 0f
-              minDist := mux(closer, dist.value, minDist.value)
-              minCent := mux(closer, ct, minCent.value)
-            }
-          }
-          // Add point and increment point count
+          val distances = List.tabulate(MAXK){i => Reg[Flt](0.0f) }
           Parallel {
-            Pipe((D by 1) par accLoopPar){d =>
-              newCents(minCent.value, d) = newCents(minCent.value, d) + pointsTile(pt, d)
+            oldCent.zip(distances).foreach{ case (cent, dist) =>
+              Pipe((D by 1) par dstLoopPar, dist){d => (pointsTile(pt,d) - cent(d)) ** 2 }{_+_} // 4
             }
-            Pipe{ centCount(minCent.value) = centCount(minCent.value) + 1 }
           }
+          Pipe {
+            val distsWithIdx = distances.zipWithIndex.map{case (d, i) => (d.value,i.as[SInt])}
+            val (minDist,minCent) = reduceTree(distsWithIdx).last
+
+            // Add point and increment point count
+            Parallel {
+              Pipe((D by 1) par accLoopPar){d =>
+                newCents(minCent, d) = newCents(minCent, d) + pointsTile(pt, d)
+              }
+              Pipe{ centCount(minCent) = centCount(minCent) + 1 }
+            }
+          }
+
         } // End of points in tile
       } // End of point tiles
 
       Pipe(K by 1, (D by 1) par avgLoopPar){(ct,d) =>
         centsOut(ct,d) = newCents(ct,d) / centCount(ct).to[Flt]
       }
-
-      // TODO: Change parallelization here
-      centroids(0::K, 0::D, unit(1)) := centsOut
+      centroids(0::K, 0::D, avgLoopPar) := centsOut
     }
   }
 
   def main() {
     val N = args(unit(0)).to[SInt];   bound(N) = 960000
     val K = args(unit(0)).to[SInt];   bound(K) = 16
-    val D = args(unit(0)).to[SInt];   bound(D) = 96
-    domainOf(tileSize) = (1,960,10)
-    domainOf(ctLoopPar) = (1,16,1)
-    domainOf(dstLoopPar) = (1,16,1)
-    domainOf(accLoopPar) = (1,16,1)
-    domainOf(avgLoopPar) = (1,16,1)
-
+    val D = args(unit(0)).to[SInt];   bound(D) = 384
+    domainOf(tileSize) = (1,9600,1)
+    domainOf(ctLoopPar) = (1,1,1)
+    domainOf(dstLoopPar) = (1,96,1)
+    domainOf(accLoopPar) = (1,96,1)
+    domainOf(avgLoopPar) = (1,96,1)
+    domainOf(ptLoopPar) = (1,1,1)
+    domainOf(ignorePar) = (1,1,1)
 
     val points = OffChipMem[Flt]("points", N, D)       // input points
     val centroids = OffChipMem[Flt]("centroids", K, D) // output centroids

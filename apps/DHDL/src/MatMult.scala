@@ -24,15 +24,18 @@ trait MatMult extends DHDLApplication {
   lazy val bp = param("tileSizeP", 960)
   lazy val outerPar  = param("outerPar", 1)
   lazy val middlePar = param("middlePar", 1)
-  lazy val innerPar  = param("innerPar", 1)
+  lazy val innerPar  = param("innerPar", 590)
+
+  lazy val upMidPar = param("upMidPar", 1)
+  lazy val stPar = param("stPar", 1)
 
   lazy val m = ArgIn[SInt]("m")
   lazy val n = ArgIn[SInt]("n")
   lazy val p = ArgIn[SInt]("p")
 
   def matmult(a: Rep[OffChipMem[Elem]], b: Rep[OffChipMem[Elem]], c: Rep[OffChipMem[Elem]]) {
-    MetaPipe(m by bm, (n by bn) par outerPar){(i,j) =>
-      MetaPipe((p by bp) par unit(1)){k =>
+    Sequential(m by bm, (n by bn) par outerPar){(i,j) =>
+      MetaPipe((p by bp) par upMidPar){k =>
         val tileA = BRAM[Elem]("tileA", bm, bp)
         val tileB = BRAM[Elem]("tileB", bp, bn)
         val tileC = BRAM[Elem]("tileC", bm, bn)
@@ -50,9 +53,7 @@ trait MatMult extends DHDLApplication {
             tileC(ii,jj) = prev + accum.value
           }
         }
-        //accTile
-        //}{_+_}
-        c(i::i+bm, j::j+bn, param(1)) := tileC
+        c(i::i+bm, j::j+bn, stPar) := tileC
       }
     }
   }
@@ -65,12 +66,16 @@ trait MatMult extends DHDLApplication {
     bound(M) = 1536
     bound(N) = 1536
     bound(P) = 1536
-    domainOf(bm) = (1,960,10)
-    domainOf(bn) = (96,960,96)
-    domainOf(bp) = (96,1920,96)
+    domainOf(bm) = (1,1536,1)
+    domainOf(bn) = (96,1536,96)
+    domainOf(bp) = (96,1536,96)
+
     domainOf(outerPar)  = (1,6,1)
-    domainOf(middlePar) = (1,96,6)
-    domainOf(innerPar)  = (1,96,6)
+    domainOf(middlePar) = (1,96,1)
+    domainOf(innerPar)  = (1,96,1)
+
+    domainOf(upMidPar) = (1,1,1)
+    domainOf(stPar) = (1,1,1)
 
     val a = OffChipMem[Elem]("A", M, P)
     val b = OffChipMem[Elem]("B", P, N)

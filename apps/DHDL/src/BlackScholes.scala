@@ -104,10 +104,10 @@ trait BlackScholes extends DHDLApplication {
   def main() {
     val N = args(unit(0)).to[SInt]
 
-    bound(N) = 10000032
-    domainOf(tileSize) = (4800,19200,96)
+    bound(N) = 9995328
+    domainOf(tileSize) = (96,19200,96)
     domainOf(outerPar) = (1,1,1)
-    domainOf(innerPar) = (1,96,6)
+    domainOf(innerPar) = (1,96,1)
 
     val types  = OffChipMem[UInt]("otype", N)
     val prices = OffChipMem[Flt]("sptprice", N)

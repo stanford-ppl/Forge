@@ -20,7 +20,7 @@ trait GDA extends DHDLApplication {
   lazy val innerPar   = param("innerPar", 1)
   lazy val subLoopPar = param("subLoopPar", 1)
   lazy val prodLoopPar = param("prodLoopPar", 1)
-  lazy val outerAccumPar = unit(1)  // Not used in old DHDL
+  lazy val outerAccumPar = param("outerAccumPar", 1)  // Not used in old DHDL
 
   def gda(
     x:     Rep[OffChipMem[Elem]],
@@ -64,7 +64,6 @@ trait GDA extends DHDLApplication {
         sigmaBlk
       }{_+_}
 
-      // TODO: Change parallelization factor
       sigma(0::cTileSize, 0::cTileSize, prodLoopPar) := sigmaOut
     }
   }
@@ -72,12 +71,12 @@ trait GDA extends DHDLApplication {
   def main() {
     val R = args(unit(0)).to[SInt];   bound(R) = 360000
     val C = args(unit(0)).to[SInt];   bound(C) = 96
-    domainOf(rTileSize)  = (960,9600,6) // 160
+    domainOf(rTileSize)  = (96,19200,1) // 160
     domainOf(outerPar)   = (1,4,1)      // 4
     domainOf(innerPar)   = (1,12,1)      // 6
     domainOf(subLoopPar) = (1,16,1)     // 10
     domainOf(prodLoopPar) = (1,96,1)    // 24
-    domainOf(outerAccumPar) = (1,96,1)  // 24
+    domainOf(outerAccumPar) = (1,1,1)  // 24
 
     val x = OffChipMem[Elem]("x", R, C)
     val y = OffChipMem[Bit]("y", R)

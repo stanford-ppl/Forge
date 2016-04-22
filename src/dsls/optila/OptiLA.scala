@@ -11,7 +11,7 @@ trait OptiLADSL extends ForgeApplication
   with BasicMathOps with RandomOps with IOOps
   with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps with SparseVectorOps with SparseVectorViewOps
   with MatrixOps with DenseMatrixOps with DenseMatrixViewOps with SparseMatrixOps
-  with ComplexOps with LinAlgOps {
+  with ComplexOps with LinAlgOps with SparseOps with SparseRowViewOps {
 
   def dslName = "OptiLA"
 
@@ -44,6 +44,15 @@ trait OptiLADSL extends ForgeApplication
     val SparseVectorView = tpe("SparseVectorView", T)
     val SparseMatrix = tpe("SparseMatrix", T)
     val SparseMatrixBuildable = tpe("SparseMatrixBuildable", T)
+    val R = tpePar("R")
+    val SparseCSR = tpe("SparseCSR", T)
+    val SparseCOO = tpe("SparseCOO", T)
+    val SparseBlockMatrix = tpe("SparseBlockMatrix", T)
+    val SparseRowView = tpe("SparseRowView", T)
+    val SparseDirectedGraph = tpe("SparseDirectedGraph", T)
+    val SparseUndirectedGraph = tpe("SparseUndirectedGraph", T)
+    importSparseOps()
+    importSparseRowViewOps()
 
     // OptiLA ops
     // note that the order matters with respect to 'lookup' calls

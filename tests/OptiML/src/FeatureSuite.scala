@@ -80,18 +80,12 @@ trait Indicator extends ForgeTestModule with OptiMLApplication {
 
 class FeatureSuiteInterpreter extends ForgeSuiteInterpreter {
   def testDateTimeOps() { runTest(DateTimeRunnerI) }
-  def testUniqueOps() {
-    runTest(UniqueRunnerI)
-    runTest(Unique2RunnerI)
-  }
+  def testUniqueOps() { runTests(UniqueRunnerI, Unique2RunnerI) }
   def testIndicatorOps() { runTest(IndicatorRunnerI) }
 }
 class FeatureSuiteCompiler extends ForgeSuiteCompiler {
   override def enforceFullCoverage = false
   def testDateTimeOps() { runTest(DateTimeRunnerC) }
-  def testUniqueOps() {
-    runTest(UniqueRunnerC)
-    runTest(Unique2RunnerC)
-  }
+  def testUniqueOps() { runTests(UniqueRunnerC, Unique2RunnerC) }
   def testIndicatorOps() { runTest(IndicatorRunnerC) }
 }

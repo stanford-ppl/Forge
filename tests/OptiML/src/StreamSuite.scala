@@ -289,6 +289,7 @@ class StreamSuiteInterpreter extends ForgeSuiteInterpreter {
   def testHashStream() { runTests(HashStreamWriteARunnerI,HashStreamWriteBRunnerI,HashStreamReadRunnerI,HashStreamDeleteRunnerI) }
 }
 class StreamSuiteCompiler extends ForgeSuiteCompiler {
+  override def enforceFullCoverage = false
   def testStreamForeach() { runTest(StreamForeachRunnerC) }
   def testStreamCorrectSmall() { runTest(StreamCorrectSmallRunnerC) }
   def testStreamCorrectLarge() { runTest(StreamCorrectLargeRunnerC) }

@@ -589,8 +589,8 @@ trait ScalaOps extends PrimitiveMathGen {
     val values_array = compiler (HashMapOps) ("shashmap_values_array", (K,V), (SHashMap(K,V)) :: SArray(V))
     impl (keys_array) (codegen($cala, ${ $0.keys.toArray }))
     impl (values_array) (codegen($cala, ${ $0.values.toArray }))
-    impl (keys_array) (codegen(cpp, "new " + unquotes("remap(sym.tp)") + ${ ($0->size()); int keys_idx_$0 = 0; for(std::map<$t[K],$t[V]>::iterator it = $0->begin(); it != $0->end(); ++it) } + unquotes("quote(sym)") + ${->update(keys_idx_$0++, it->first); }))
-    impl (values_array) (codegen(cpp, "new " + unquotes("remap(sym.tp)") + ${ ($0->size()); int values_idx_$0 = 0; for(std::map<$t[K],$t[V]>::iterator it = $0->begin(); it != $0->end(); ++it) } + unquotes("quote(sym)") + ${->update(values_idx_$0++, it->second); }))
+    // impl (keys_array) (codegen(cpp, "new " + unquotes("remap(sym.tp)") + ${ ($0->size()); int keys_idx_$0 = 0; for(std::map<$t[K],$t[V]>::iterator it = $0->begin(); it != $0->end(); ++it) } + unquotes("quote(sym)") + ${->update(keys_idx_$0++, it->first); }))
+    // impl (values_array) (codegen(cpp, "new " + unquotes("remap(sym.tp)") + ${ ($0->size()); int values_idx_$0 = 0; for(std::map<$t[K],$t[V]>::iterator it = $0->begin(); it != $0->end(); ++it) } + unquotes("quote(sym)") + ${->update(values_idx_$0++, it->second); }))
 
     val apply = infix (HashMapOps) ("apply", (K,V), (SHashMap(K,V), K) :: V)
     val update = infix (HashMapOps) ("update", (K,V), (SHashMap(K,V), K, V) :: MUnit, effect = write(0))

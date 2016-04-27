@@ -49,7 +49,7 @@ trait Unique2 extends ForgeTestModule with OptiMLApplication {
     val names = (0::1000) { i => "hello_" + i }
     val next = (0::1000) { i => unique("new_" + i) }
     val reverseIds = (0::1000) { i => reverseUnique(i) }
-    collect(names == reverseIds)
+    collect(names.sort == reverseIds.sort)
 
     dumpUniqueMappings("test_unique_db")
     mkReport

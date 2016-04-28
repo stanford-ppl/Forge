@@ -13,6 +13,8 @@ import format._
 
 trait ForgeApplication extends Forge with ForgeLift with ForgeLib {
   def dslName: String
+  def dslAuthor: String = "Stanford PPL"    // Used for auto-doc
+  def dslVersion: String = "0.1"            // Used for auto-doc
   def specification(): Rep[Unit]
   def addREPLOverride = false // DSLs can override this to true if they need a REPL override trait
 }

@@ -31,6 +31,7 @@ trait ForgeOps extends Base {
   def data(tpe: Rep[DSLType], fields: (String, Rep[DSLType])*) = forge_data(tpe, fields)
 
   def doc(blk: String): Rep[Unit] = forge_doc(blk)
+  def summary(blk: String): Rep[Unit] = forge_dsl_summary(blk)
 
   implicit def namedTpeToArg(arg: (String, Rep[DSLType])): Rep[DSLArg] = forge_arg(arg._1, arg._2, None)
   implicit def namedTpeWithDefaultToArg(arg: (String, Rep[DSLType], String)): Rep[DSLArg] = forge_arg(arg._1, arg._2, Some(arg._3))
@@ -122,6 +123,7 @@ trait ForgeOps extends Base {
   def forge_lookup_op(grp: Rep[DSLGroup], opName: String, overloadedIndex: Int): Rep[DSLOp]
   def forge_label(op: Rep[DSLOp], name: String): Rep[Unit]
   def forge_doc(blk: String): Rep[Unit]
+  def forge_dsl_summary(blk: String): Rep[Unit]
 }
 
 trait ForgeSugarLowPriority extends ForgeOps {
@@ -255,6 +257,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   val GrpDoc = HashMap[Exp[DSLGroup],String]()
   val IdDoc = HashMap[Exp[DSLIdentifier],String]()
   var DocBloc: Option[String] = None
+  var DSLBloc: Option[String] = None
 
   /**
    * Convenience method providing access to defined ops in other modules
@@ -611,8 +614,11 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
 
   /* Creates a local documentation to be used on the next op or data structure definition */
   def forge_doc(blk: String): Rep[Unit] = {
-    if (DocBloc.isDefined) warn("Already had unused documentation at document block starting with \"" + blk.take(10) + "...\"")
+    //if (DocBloc.isDefined) warn("Already had unused documentation at document block starting with \"" + blk.take(10) + "...\"")
     DocBloc = Some(blk)
+  }
+  def forge_dsl_summary(blk: String): Rep[Unit] = {
+    DSLBloc = Some(blk)
   }
 }
 

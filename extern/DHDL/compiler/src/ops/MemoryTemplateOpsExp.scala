@@ -623,19 +623,15 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
 					//TODO
           val parent = if (parentOf(sym).isEmpty) "Top" else quote(parentOf(sym).get)
 					if (isDblBuf(sym)) {
-						emit(s"""DblRegFileLib ${quote(sym)}_lib = 
-							new DblRegFileLib(this,$ts, ${quote(sym)}, ${par(sym)});""")
-            if (par(sym) > 1) {
-								emit(s"""DFEVector<DFEVar> ${quote(sym)} = ${quote(sym)}_lib.readv()""")
-             } else {
-              	emit(s"""DFEVar ${quote(sym)} = ${quote(sym)}_lib.read()""")
-           	}
+						emit(s"""DblRegFileLib ${quote(sym)}_lib = new DblRegFileLib(this, $ts, ${quote(sym)}, ${par(sym)});""")
+            val readstr = if (par(sym)>1) "readv" else "read" 
+            emit(s"""${maxJPre(sym)} ${quote(sym)} = ${quote(sym)}_lib.${readstr}()""")
            	emit(quote(sym) + "_lib.connectWdone(" + quote(writerOf(sym).get) + "_done);")
            	readersOf(sym).foreach { r =>
            	  emit(quote(sym) +"_lib.connectRdone(" + quote(r) + "_done);")
            	}
           } else {
-          		emit(s"""${quote(maxJPre(sym))} ${quote(sym)} = ${quote(ts)}.newInstance(this);""")
+            emit(s"""${quote(maxJPre(sym))} ${quote(sym)} = ${quote(ts)}.newInstance(this);""")
 					}
 				case ArgumentIn =>  // alwaysGen
         	alwaysGen {
@@ -673,11 +669,11 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
       		  emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}; // enable""")
       		  emit(s"""DFEVar ${quote(reg)}_hold = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writerOf(reg).get)}_redLoop_done));""")
 						//TODO: Raghu
-      		  emit(s"""${quote(reg)} <== $rst ? constant.var(${tpstr(par(reg))(reg.tp, implicitly[SourceContext])}, ${quote(init)}):stream.offset(${quote(reg)}_hold, -${quote(writerOf(reg).get)}_offset); // reset""")
-				case ArgumentIn => new Exception("Cannot write to Argument Out! " + quote(reg))
-				case ArgumentOut =>
-				 	val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"
-      	  	emit(s"""io.scalarOutput(${quote(reg)}, ${quote(value)}, $ts, $controlStr);""")
+      		  emit(s"""${quote(reg)} <== $rst ? constant.var(${tpstr(par(reg))(reg.tp, implicitly[SourceContext])}, ${quote(resetValue(reg))}):stream.offset(${quote(reg)}_hold, -${quote(writerOf(reg).get)}_offset); // reset""")
+				  case ArgumentIn => new Exception("Cannot write to Argument Out! " + quote(reg))
+				  case ArgumentOut =>
+				 	  val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"
+      	  	  emit(s"""io.scalarOutput(${quote(reg)}, ${quote(value)}, $ts, $controlStr);""")
 				}
 			}
 

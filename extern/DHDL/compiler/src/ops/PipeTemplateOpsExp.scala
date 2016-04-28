@@ -1,9 +1,11 @@
 package dhdl.compiler.ops
 
 import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, DotGenEffect, MaxJGenEffect}
+import scala.virtualization.lms.internal.{Traversal}
 import scala.reflect.{Manifest,SourceContext}
 import scala.collection.mutable.Set
 import java.io.{File, FileWriter, PrintWriter}
+import ppl.delite.framework.transform.{DeliteTransform}
 
 import dhdl.shared._
 import dhdl.shared.ops._
@@ -319,16 +321,38 @@ trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
 
 trait DotGenControllerTemplateOps extends DotGenEffect{
   val IR: ControllerTemplateOpsExp with TpesOpsExp // with NosynthOpsExp
-          with OffChipMemOpsExp with RegOpsExp with DHDLCodegenOps
+          with OffChipMemOpsExp with RegOpsExp with DeliteTransform with DHDLCodegenOps
 
   import IR._ //{__ifThenElse => _, Nosynth___ifThenElse => _, __whileDo => _,
               // Forloop => _, println => _ , _}
 
 	val emittedCtrChain = Set.empty[Exp[Any]]
 
+	var traversals: List[Traversal{val IR: DotGenControllerTemplateOps.this.IR.type}] = Nil
+
+  def runTraversals[A:Manifest](b: Block[A]): Block[A] = {
+    println("DotCodegen: applying transformations")
+    var curBlock = b
+    println("Traversals:\n\t" + traversals.map(_.name).mkString("\n\t"))
+
+    for (t <- traversals) {
+      printlog("  Block before transformation: " + curBlock)
+      curBlock = t.run(curBlock)
+      printlog("  Block after transformation: " + curBlock)
+    }
+    println("DotGodegen: done transforming")
+    (curBlock)
+  }
+
   override def initializeGenerator(buildDir:String): Unit = {
 		emittedCtrChain.clear
+		traversals = IR.traversals
 		super.initializeGenerator(buildDir)
+	}
+
+  override def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, out: PrintWriter) = {
+    val y = runTraversals(body)
+		super.emitSource(args, y, className, out)
 	}
 
 	def emitCtrChain(cchain: Exp[CounterChain]):Unit = {
@@ -471,11 +495,21 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
 				case _ => {
 					var tstr = s.tp.erasure.getSimpleName() 
 					tstr = tstr.replace("DHDL","") 
-					tstr = tstr.replace("Register", regType(s) match {
-						case Regular => "Reg"
-						case ArgumentIn => "ArgIn"
-						case ArgumentOut => "ArgOut"
-					}) 
+					s.tp match {
+						case ss:Register[_] =>
+							tstr = tstr.replace("Register", regType(s) match {
+								case Regular => "Reg"
+								case ArgumentIn => "ArgIn"
+								case ArgumentOut => "ArgOut"
+							}) 
+						case ss:Pipeline =>
+							tstr = tstr.replace("Pipeline", styleOf(s) match {
+								case Fine => "Pipe"
+								case Coarse => "MetaPipe"
+								case Disabled => "Sequential"
+							}) 
+						case _ => //println(s.tp)
+					}
 					tstr = tstr.replace("BlockRAM", "BRAM")
 					val quoteStr = tstr + (if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
 					/*
@@ -497,7 +531,7 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
 trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
   val IR: ControllerTemplateOpsExp with TpesOpsExp //with NosynthOpsExp
           with OffChipMemOpsExp with RegOpsExp with CounterOpsExp with MetaPipeOpsExp with
-					DHDLPrimOpsExp with DHDLCodegenOps with CounterToolsExp
+					DHDLPrimOpsExp with DHDLCodegenOps with CounterToolsExp with DeliteTransform
 
  import IR._ //{__ifThenElse => _, Nosynth___ifThenElse => _, __whileDo => _,
              // Forloop => _, println => _ , _}
@@ -523,10 +557,32 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
   /* Set of control nodes which already have their done signal emitted */
   val doneDeclaredSet = Set.empty[Exp[Any]]
 
+	var traversals: List[Traversal{val IR: MaxJGenControllerTemplateOps.this.IR.type}] = Nil
+
+  def runTraversals[A:Manifest](b: Block[A]): Block[A] = {
+    println("MaxJCodegen: applying transformations")
+    var curBlock = b
+    println("Traversals:\n\t" + traversals.map(_.name).mkString("\n\t"))
+
+    for (t <- traversals) {
+      printlog("  Block before transformation: " + curBlock)
+      curBlock = t.run(curBlock)
+      printlog("  Block after transformation: " + curBlock)
+    }
+    println("MaxJGodegen: done transforming")
+    (curBlock)
+  }
+
   override def initializeGenerator(buildDir:String): Unit = {
 		enDeclaredSet.clear
 		doneDeclaredSet.clear
+		traversals = IR.traversals
 		super.initializeGenerator(buildDir)
+	}
+
+  override def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, out: PrintWriter) = {
+    val y = runTraversals(body)
+		super.emitSource(args, y, className, out)
 	}
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
@@ -618,7 +674,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 
 		emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
 
-		childrenOf(sym).zipWithIndex.foreach {case (c, idx) =>
+		childrenOf(sym).zipWithIndex.foreach { case (c, idx) =>
 			emit(s"""DFEVar ${c}_done = dfeBool().newInstance(this);
 				${quote(sym)}_sm.connectInput("s${idx}_done", ${quote(c)}_done);
 				DFEVar ${quote(c)}_en = ${quote(sym)}_sm.getOutput("s${quote(idx)}_en");""")

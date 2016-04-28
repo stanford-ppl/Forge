@@ -4,6 +4,7 @@ import java.io.{File,FileWriter,PrintWriter}
 import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, DotGenEffect, MaxJGenEffect, Record}
 import scala.virtualization.lms.internal.{Traversal}
 import scala.reflect.{Manifest,SourceContext}
+import ppl.delite.framework.transform.{DeliteTransform}
 
 import dhdl.shared._
 import dhdl.shared.ops._
@@ -504,7 +505,8 @@ object FloatPoint {
 }
 
 trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplateOps{
-	  val IR: ControllerTemplateOpsExp with OffChipMemOpsExp with DHDLCodegenOps with RegOpsExp with DHDLIdentifiers
+	  val IR: ControllerTemplateOpsExp with OffChipMemOpsExp with DHDLCodegenOps with RegOpsExp with
+		DHDLIdentifiers with DeliteTransform
 		  import IR._
 
 	var emittedSize = Set.empty[Exp[Any]]
@@ -626,8 +628,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
 						emit(s"""DblRegFileLib ${quote(sym)}_lib = new DblRegFileLib(this, $ts, ${quote(sym)}, ${par(sym)});""")
             val readstr = if (par(sym)>1) "readv" else "read" 
             emit(s"""${maxJPre(sym)} ${quote(sym)} = ${quote(sym)}_lib.${readstr}()""")
-           	emit(quote(sym) + "_lib.connectWdone(" + quote(writerOf(sym).get) + "_done);")
-           	readersOf(sym).foreach { r =>
+           	emit(quote(sym) + "_lib.connectWdone(" + quote(writerOf(sym).get._1) + "_done);")
            	  emit(quote(sym) +"_lib.connectRdone(" + quote(r) + "_done);")
            	}
           } else {
@@ -643,7 +644,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
 		case e@Reg_write(reg, value) => 
 			val ts = tpstr(par(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
 			if (isDblBuf(reg)) {
-			 	emit(quote(reg) + "_lib.write(" + value + ", " + quote(writerOf(reg).get) + "_done);")
+			 	emit(quote(reg) + "_lib.write(" + value + ", " + quote(writerOf(reg).get._1) + "_done);")
       } else {
 				regType(reg) match {
 					case Regular => //TODO
@@ -651,25 +652,24 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
       		  val rst = quote(parent) + "_rst_en"
 					  if (writerOf(reg).isEmpty)
 					  	throw new Exception("Reg " + quote(reg) + " is not written by a controller, which is not supported at the moment")
-					  val enSignalStr = writerOf(reg).get match {
+					  val enSignalStr = writerOf(reg).get._1 match {
 					  	case p@Def(Pipe_foreach(cchain,_,_)) => styleOf(reg) match {
 					  		case Fine =>
 					  			emit(quote(cchain) + "_en_from_pipesm")
 					  		case _ =>
-					  			emit(quote(writerOf(reg).get) + "_en")
+					  			emit(quote(writerOf(reg).get._1) + "_en")
 					  	}
 					  	case p@Def(Pipe_reduce(cchain, _, _, _, _, _, _, _, _, _, _, _)) => styleOf(reg) match {
 					  		case Fine =>
 					  			emit(quote(cchain) + "_en_from_pipesm")
 					  		case _ =>
-					  			emit(quote(writerOf(reg).get) + "_en")
+					  			emit(quote(writerOf(reg).get._1) + "_en")
 					  	}
 					  	case _ =>
 					  }
       		  emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}; // enable""")
-      		  emit(s"""DFEVar ${quote(reg)}_hold = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writerOf(reg).get)}_redLoop_done));""")
-						//TODO: Raghu
-      		  emit(s"""${quote(reg)} <== $rst ? constant.var(${tpstr(par(reg))(reg.tp, implicitly[SourceContext])}, ${quote(resetValue(reg))}):stream.offset(${quote(reg)}_hold, -${quote(writerOf(reg).get)}_offset); // reset""")
+      		  emit(s"""DFEVar ${quote(reg)}_hold = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writerOf(reg).get._1)}_redLoop_done));""")
+      		  emit(s"""${quote(reg)} <== $rst ? constant.var(${tpstr(par(reg))(reg.tp, implicitly[SourceContext])}, ${quote(resetValue(reg))}):stream.offset(${quote(reg)}_hold, -${quote(writerOf(reg).get._1)}_offset); // reset""")
 				  case ArgumentIn => new Exception("Cannot write to Argument Out! " + quote(reg))
 				  case ArgumentOut =>
 				 	  val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"

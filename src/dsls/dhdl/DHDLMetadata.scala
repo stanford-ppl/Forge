@@ -285,6 +285,7 @@ trait DHDLMetadata {
     	}
 		}
 
+		/* Register or Bram written by current controller */
     val MWritten = metadata("MWritten", "written" -> SList(MAny))
     val writtenOps = metadata("writtenIn")
     onMeet (MWritten) ${ this }

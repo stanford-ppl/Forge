@@ -2,7 +2,9 @@ package dhdl.compiler.ops
 
 import java.io.{File,FileWriter,PrintWriter}
 import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, DotGenEffect, MaxJGenEffect, Record}
+import scala.virtualization.lms.internal.{Traversal}
 import scala.reflect.{Manifest,SourceContext}
+import ppl.delite.framework.transform.{DeliteTransform}
 
 import dhdl.shared._
 import dhdl.shared.ops._
@@ -96,6 +98,26 @@ trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp wit
     case _ => super.boundOf(__arg0)
   }
 
+}
+
+trait MaxJGenTypeInspectionOps extends MaxJGenEffect {
+	val IR:DHDLExp
+	import IR.{infix_until => _, looprange_until => _, println => _, _}
+
+	lazy val preCodegen = new MaxJPreCodegen {
+		val IR: MaxJGenTypeInspectionOps.this.IR.type = MaxJGenTypeInspectionOps.this.IR 
+	}
+
+  override def initializeGenerator(bd:String): Unit = { 
+		preCodegen.buildDir = bd
+		super.initializeGenerator(bd)
+	}
+
+  override def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, out: PrintWriter) = {
+		preCodegen.run(body)
+		super.emitSource(args, body, className, out)
+	}
+	
 }
 
 trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
@@ -483,7 +505,8 @@ object FloatPoint {
 }
 
 trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplateOps{
-	  val IR: ControllerTemplateOpsExp with OffChipMemOpsExp with DHDLCodegenOps with RegOpsExp with DHDLIdentifiers
+	  val IR: ControllerTemplateOpsExp with OffChipMemOpsExp with DHDLCodegenOps with RegOpsExp with
+		DHDLIdentifiers with DeliteTransform
 		  import IR._
 
 	var emittedSize = Set.empty[Exp[Any]]
@@ -548,14 +571,20 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplate
 				emittedSize = emittedSize + size
 			}
 			super.emitNode(sym, rhs)
-
+		
     case _ => super.emitNode(sym, rhs)
   }
 }
 
 trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
-  val IR: ControllerTemplateOpsExp with DHDLIdentifiers
+	  val IR: ControllerTemplateOpsExp with OffChipMemOpsExp with DHDLCodegenOps with RegOpsExp with DHDLIdentifiers
   import IR._
+
+	var emittedSize = Set.empty[Exp[Any]]
+  override def initializeGenerator(buildDir:String): Unit = {
+		emittedSize = Set.empty[Exp[Any]]
+		super.initializeGenerator(buildDir)
+	}
 
   // Note that tileDims are not fixed point values yet - they're just integers
   private def localDimsToStrides(dims: List[Int]) = List.tabulate(dims.length){d =>
@@ -566,6 +595,94 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
   // TODO: match on store = true or store = false if want as different gen rules
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) =>
+
+		case Offchip_new(size) =>
+			/* Special case to hand nodes producing size of offchip outside hardware scope */
+			def hackGen(x: Exp[Any]): Unit = x match { 
+				case Def(EatReflect(_:Reg_new[_])) => // Nothing
+				case ConstFix(_) => // Nothing
+				case ConstFlt(_) => // Nothing
+				case Def(d) => 
+					alwaysGen {
+						emitNode(x.asInstanceOf[Sym[Any]], d)
+					}
+					syms(d).foreach{ s => s match {
+							case _ => hackGen(s)
+						}
+					}
+				case _ => // Nothing
+			}
+			if (!emittedSize.contains(size)) {
+				hackGen(size)
+				emittedSize = emittedSize + size
+			}
+			super.emitNode(sym, rhs)
+
+		case Reg_new(init) =>
+			val ts = tpstr(par(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
+			regType(sym) match {
+				case Regular =>
+					//TODO
+          val parent = if (parentOf(sym).isEmpty) "Top" else quote(parentOf(sym).get)
+					if (isDblBuf(sym)) {
+						emit(s"""DblRegFileLib ${quote(sym)}_lib = 
+							new DblRegFileLib(this,$ts, ${quote(sym)}, ${par(sym)});""")
+            if (par(sym) > 1) {
+								emit(s"""DFEVector<DFEVar> ${quote(sym)} = ${quote(sym)}_lib.readv()""")
+             } else {
+              	emit(s"""DFEVar ${quote(sym)} = ${quote(sym)}_lib.read()""")
+           	}
+           	emit(quote(sym) + "_lib.connectWdone(" + quote(writerOf(sym).get._1) + "_done);")
+            readersOf(sym).foreach { case (r,_) =>
+           	  emit(quote(sym) +"_lib.connectRdone(" + quote(r) + "_done);")
+           	}
+          } else {
+          		emit(s"""${quote(maxJPre(sym))} ${quote(sym)} = ${quote(ts)}.newInstance(this);""")
+					}
+				case ArgumentIn =>  // alwaysGen
+        	alwaysGen {
+          	emit(s"""DFEVar ${quote(sym)} = io.scalarInput(${quote(sym)} , $ts );""")
+				  }
+				case ArgumentOut => //emitted in reg_write
+			}
+
+		case e@Reg_write(reg, value) => 
+			val ts = tpstr(par(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
+			if (isDblBuf(reg)) {
+			 	emit(quote(reg) + "_lib.write(" + value + ", " + quote(writerOf(reg).get._1) + "_done);")
+      } else {
+				regType(reg) match {
+					case Regular => //TODO
+      		  val parent = if (parentOf(reg).isEmpty) "top" else quote(parentOf(reg).get)
+      		  val rst = quote(parent) + "_rst_en"
+					  if (writerOf(reg).isEmpty)
+					  	throw new Exception("Reg " + quote(reg) + " is not written by a controller, which is not supported at the moment")
+					  val enSignalStr = writerOf(reg).get._1 match {
+					  	case p@Def(Pipe_foreach(cchain,_,_)) => styleOf(reg) match {
+					  		case Fine =>
+					  			emit(quote(cchain) + "_en_from_pipesm")
+					  		case _ =>
+					  			emit(quote(writerOf(reg).get._1) + "_en")
+					  	}
+					  	case p@Def(Pipe_reduce(cchain, _, _, _, _, _, _, _, _, _, _, _)) => styleOf(reg) match {
+					  		case Fine =>
+					  			emit(quote(cchain) + "_en_from_pipesm")
+					  		case _ =>
+					  			emit(quote(writerOf(reg).get._1) + "_en")
+					  	}
+					  	case _ =>
+					  }
+      		  emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}; // enable""")
+      		  emit(s"""DFEVar ${quote(reg)}_hold = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writerOf(reg).get._1)}_redLoop_done));""")
+						//TODO: check with Raghu
+						val Def(EatReflect(Reg_new(init))) = reg
+      		  emit(s"""${quote(reg)} <== $rst ? constant.var(${tpstr(par(reg))(reg.tp,implicitly[SourceContext])}, ${quote(init)}):stream.offset(${quote(reg)}_hold,-${quote(writerOf(reg).get._1)}_offset); // reset""")
+				case ArgumentIn => new Exception("Cannot write to Argument Out! " + quote(reg))
+				case ArgumentOut =>
+				 	val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"
+      	  	emit(s"""io.scalarOutput(${quote(reg)}, ${quote(value)}, $ts, $controlStr);""")
+				}
+			}
 
     case _ => super.emitNode(sym, rhs)
   }

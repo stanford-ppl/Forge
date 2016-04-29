@@ -125,15 +125,13 @@ trait DHDLDSL extends ForgeApplication
     importGlobalAnalysis()
     importBoundAnalysis()
 
-    //
-
     schedule(StageAnalyzer)
-    schedule(GlobalAnalyzer)
+    //schedule(GlobalAnalyzer)
     schedule(DSE)
 
     // --- Post Parameter Selection
-    schedule(AreaAnalyzer)
-    schedule(LatencyAnalyzer)
+    //schedule(AreaAnalyzer)
+    //schedule(LatencyAnalyzer)
     schedule(BoundAnalyzer)
     schedule(ConstantFolding)
     schedule(MetaPipeRegInsertion)
@@ -146,7 +144,7 @@ trait DHDLDSL extends ForgeApplication
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))
     extern(grp("MemoryTemplate"), targets = List($cala, dot, maxj), withTypes = true)
-    extern(metadata("TypeInspection"), targets = Nil)
+    extern(metadata("TypeInspection"), targets = List(maxj))
 		()
 	}
 }

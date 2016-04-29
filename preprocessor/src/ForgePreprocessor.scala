@@ -123,8 +123,18 @@ trait ForgePreprocessor {
       override def toString = "lookupOp("+grp+",\""+name+"\")"
     }
 
+    val opStarters = {
+      /*var list = List[String]()
+      for (back <- List("", "internal", "compiler", "library")) {
+        for (mtyp <- List("infix", "static", "direct")) {
+          list :+= back + (if (back == "") "" else ".") + mtyp
+      }}*/
+      List("internal", "compiler", "library", "infix", "static", "direct") // ++ list
+    }
+
     def scanBackToOp(start: Int, input: Array[Byte]): OpEncoding = {
-      val words = Array("static","infix","direct","compiler","impl") // enclosing op definers
+      val words = opStarters ++ List("impl", "lower") // enclosing op definers
+      //println("words: " + words.mkString(", "))
       var i = start
       var foundWord = ""
       val maxWordLength = words.map(_.length).max
@@ -137,7 +147,7 @@ trait ForgePreprocessor {
       }
 
       foundWord match {
-        case "static" | "infix" | "direct" | "compiler"  =>
+        case word if opStarters.contains(word) =>
           var inTpeScope = true
           var startGrpIndex = -1
           var endGrpIndex = -1
@@ -177,11 +187,43 @@ trait ForgePreprocessor {
           if (endOpIndex == start) err("could not find op binding following 'impl' declaration")
           OpFromImpl(new String(input.slice(startOpIndex+1,endOpIndex)))
 
+        // TODO: Only works in transformer scope right now
+        /*case "lower" =>
+          while (i < start && input(i) != '(') i += 1
+          val startOpIndex = i
+          while (i < start && input(i) != ')' && input(i) != ',') i += 1
+          val endOpIndex = i
+
+          if (input(i) == ',') {
+            // scan forwards to extract the op name
+            while (i < start && input(i) != '"') i += 1
+            val startNameIndex = i
+            i += 1
+            while (i < start && input(i) != '"') i += 1
+            val endNameIndex = i
+            OpFromOp(new String(input.slice(startOpIndex+1,endOpIndex)), new String(input.slice(startNameIndex+1,endNameIndex)))
+          }
+          else
+            OpFromImpl(new String(input.slice(startOpIndex+1,endOpIndex)))*/
+
         case _ => err("could not find lexically enclosing op declaration for formatted block")
       }
     }
 
     def isBlockArg(arg: String) = arg.startsWith("b[")
+    def isBoundArg(arg: String) = arg.startsWith("a[")
+
+    def endOfBoundArgName(arg: String) = arg.indexOf(']')
+    def parseBoundArguments(start: Int, input: Array[Byte], args: ArrayBuffer[String]): Int = {
+      var j = start
+      while (j < input.length && input(j) != ']') j += 1
+      val arg = new String(input.slice(start,j+1))
+      if (!args.contains(arg)) {
+        args += arg
+      }
+      j
+    }
+
     def endOfBlockArgName(arg: String) = if (arg.contains('(')) arg.indexOf('(') - 1 else arg.indexOf(']')
     def getCapturedArgs(arg: String, argMap: HashMap[String,String]) = {
       if (arg.contains('(')) {
@@ -288,6 +330,8 @@ trait ForgePreprocessor {
             val j =
               if (i+2 < input.length && input(i+1) == 't' && input(i+2) == '[')
                 parseTypeArgument(i+1, input, tpeArgs)
+              else if (i+2 < input.length && input(i+1) == 'a' && input(i+2) == '[')
+                parseBoundArguments(i+1,input,args)
               else
                 parseBlockArguments(i+1, input, args)
             i = j-1
@@ -302,8 +346,8 @@ trait ForgePreprocessor {
       val enclosingOp =
         if (args.exists(isBlockArg) || !tpeArgs.isEmpty) {
           // scan backwards until the lexically enclosing op identifier, which can be one of:
-          //   static | direct | infix | compiler (grp) (name, ....)
-          //   static | direct | infix | compiler (name) (....)
+          //   static | direct | infix | internal (grp) (name, ....)
+          //   static | direct | infix | internal (name) (....)
           //   impl (binding) (...)
           Some(scanBackToOp(i, input))
         }
@@ -326,6 +370,13 @@ trait ForgePreprocessor {
             val z: String = "arg"+argId // wtf? scala compiler error unless we break up z like this
             argMap += (a -> z)
           }
+          else if (isBoundArg(a)) {
+            val a2 = a.slice(2,endOfBoundArgName(a)).split(',')
+            val i1 = a2(0).toInt
+            val i2 = a2(1).toInt
+            val z: String = "f_" + "__arg" + i1 + "_" + "__arg" + i2
+            argMap += (a -> z)
+          }
           else {
             val i = a.toInt
             val z: String = "arg"+argId
@@ -339,6 +390,15 @@ trait ForgePreprocessor {
               val a2 = a.slice(2,endOfBlockArgName(a))
               argMap += (a -> a2)
             }
+            else if (isBoundArg(a)) {
+              println("Parsing bound arg: " + a)
+
+              val a2 = a.slice(2,endOfBoundArgName(a)).split(',')
+              val i1 = a2(0)
+              val i2 = a2(1).toInt
+              val z: String = "f_" + i1 + "_" + "__arg" + i2
+              argMap += (a -> z)
+            }
             else {
               argMap += (a -> a)
             }
@@ -351,7 +411,7 @@ trait ForgePreprocessor {
           val a2 = a.slice(2,endOfBlockArgName(a))
           output ++= (indentInterior + "val " + argMap(a) + " = quotedBlock("+quoteArgName(a2)+", "+enclosingOp.get+", List("+getCapturedArgs(a,argMap).mkString(",")+"))" + nl).getBytes
         }
-        else {
+        else if (!isBoundArg(a)) {
           output ++= (indentInterior + "val " + argMap(a) + " = quotedArg("+quoteArgName(a)+")" + nl).getBytes
         }
       }
@@ -387,7 +447,10 @@ trait ForgePreprocessor {
       // remap args inside the input block, outside-in
       for (a <- args.reverse) {
         if (argMap.contains(a)) {
-          strBlock = strBlock.replace("$"+a, "$"+argMap(a))
+          if (isBoundArg(a))
+            strBlock = strBlock.replace("$"+a, argMap(a)) // don't include the $ for bound args
+          else
+            strBlock = strBlock.replace("$"+a, "$"+argMap(a))
         }
       }
       // remap tpe args

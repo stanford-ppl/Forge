@@ -19,34 +19,57 @@ trait Definitions extends DerivativeTypes {
    */
   val maxTuples = 10
 
+
+  /**
+   * Delite/LMS transformers
+   * TODO: Add Fusion here when it is schedulable
+   */
+  lazy val MultiloopSoA = transformer("MultiloopSoA", isExtern = true)
+  lazy val IRPrinter = traversal("IRPrinter", isExtern = true)  // For debugging
+  lazy val IRPrinterPlus = traversal("IRPrinterPlus", isExtern = true) // Debugging metadata
+
   /**
    * Built-in types
    */
-  // concrete types (M stands for "Meta", C stands for "Current").. these aren't exactly consistent
+  // concrete types
+  // M- stands for "Meta"    (a staged symbolic expression)
+  // C- stands for "Current" (a staged constant)
+  // S- stands for "Scala"   (always a constant, never staged)
 
+  // TODO: These aren't exactly consistent
   // FIXME: Need to resolve discrepancy between 'compile' and 'now'. Ideally everything should have 'compile' behavior, but it breaks
   //        string lifting in Scala.scala, for example.
 
   lazy val MAny = tpe("Any")
   lazy val CAny = tpe("Any", stage = now)
+  lazy val SAny = tpe("Any", stage = compile)   // Scala Any (used during compilation)
   lazy val MInt = tpe("Int")
   lazy val CInt = tpe("Int", stage = now)
+  lazy val SInt = tpe("Int", stage = compile)   // Scala integer (used as constant during compilation)
   lazy val MLong = tpe("Long")
   lazy val CLong = tpe("Long", stage = now)
+  lazy val SLong = tpe("Long", stage = compile)
   lazy val MFloat = tpe("Float")
   lazy val CFloat = tpe("Float", stage = now)
+  lazy val SFloat = tpe("Float", stage = compile)
   lazy val MDouble = tpe("Double")
   lazy val CDouble = tpe("Double", stage = now)
+  lazy val SDouble = tpe("Double", stage = compile)
   lazy val MBoolean = tpe("Boolean")
   lazy val CBoolean = tpe("Boolean", stage = now)
+  lazy val SBoolean = tpe("Boolean", stage = compile)
   lazy val MString = tpe("String")
   lazy val CString = tpe("String", stage = now)
+  lazy val SString = tpe("String", stage = compile)
   lazy val MShort = tpe("Short")
   lazy val CShort = tpe("Short", stage = now)
+  lazy val SShort = tpe("Short", stage = compile)
   lazy val MByte = tpe("Byte")
   lazy val CByte = tpe("Byte", stage = now)
+  lazy val SByte = tpe("Byte", stage = compile)
   lazy val MChar = tpe("Char")
   lazy val CChar = tpe("Char", stage = now)
+  lazy val SChar = tpe("Char", stage = compile)
   lazy val CTuple2 = tpe("Tuple2", (tpePar("A"),tpePar("B")), stage = compile)
   lazy val CTuple3 = tpe("Tuple3", (tpePar("A"),tpePar("B"),tpePar("C")), stage = compile)
   lazy val CTuple4 = tpe("Tuple4", (tpePar("A"),tpePar("B"),tpePar("C"),tpePar("D")), stage = compile)
@@ -54,8 +77,10 @@ trait Definitions extends DerivativeTypes {
   lazy val CTuple6 = tpe("Tuple6", List(tpePar("A"),tpePar("B"),tpePar("C"),tpePar("D"),tpePar("E"),tpePar("F")), stage = compile)
   lazy val MUnit = tpe("Unit")
   lazy val CUnit = tpe("Unit", stage = now)
+  lazy val SUnit = tpe("Unit", stage = compile) // Useful?
   lazy val MNothing = tpe("Nothing")
   lazy val CNothing = tpe("Nothing", stage = now)
+  lazy val SNothing = tpe("Nothing", stage = now)
   lazy val byName = tpe("Thunk")
   def MThunk(ret: Rep[DSLType], freq: Frequency = normal) = ftpe(List(forge_arg("", byName, None)),ret,freq) // TODO
   // unstaged (inlined) functions
@@ -73,6 +98,17 @@ trait Definitions extends DerivativeTypes {
   lazy val MHashMap = tpe("ForgeHashMap",(tpePar("K"),tpePar("V"))) // Forge HashMap (immutable)
   lazy val MInputStream = tpe("ForgeFileInputStream")
   lazy val MOutputStream = tpe("ForgeFileOutputStream")
+  lazy val SList = tpe("List", tpePar("A"), stage = compile)
+  lazy val SSeq = tpe("Seq", tpePar("A"), stage = compile)
+  lazy val SManifest = tpe("Manifest", tpePar("A"), stage = compile)
+
+  // Metadata types
+  // TODO: Is there a better way to expose these to the DSL author? Way to not expose them at all?
+  lazy val SymProps = tpe("SymbolProperties", stage = compile)
+  lazy val ArrayProps = tpe("ArrayProperties", stage = compile)
+  lazy val StructProps = tpe("StructProperties", stage = compile)
+  lazy val ScalarProps = tpe("ScalarProperties", stage = compile)
+  lazy val SOption = tpe("Option", tpePar("A"), stage = compile)
 
   /* whitelist for primitive types (i.e. we should not generate a Forge shadow) */
   var primitiveTpePrefix = scala.List("scala","java")
@@ -106,8 +142,10 @@ trait Definitions extends DerivativeTypes {
   case object opencl extends CodeGenerator { def name = "OpenCL" }
   case object cpp extends CodeGenerator { def name = "C" }
   case object restage extends CodeGenerator { def name = "Restage" }
+  case object dot extends CodeGenerator { def name = "Dot" }
+  case object maxj extends CodeGenerator { def name = "MaxJ" }
 
-  val generators = List($cala, cuda, opencl, cpp, restage)
+  val generators = List($cala, cuda, opencl, cpp, restage, dot, maxj)
 
   /**
    * Type classes
@@ -145,8 +183,24 @@ trait Definitions extends DerivativeTypes {
   case object staticMethod extends MethodType
   case object infixMethod extends MethodType
   case object directMethod extends MethodType
-  case object compilerMethod extends MethodType
   case object implicitMethod extends MethodType
+
+  /**
+   * Method backend types
+   */
+  case object sharedBackend extends BackendType
+  case object internalBackend extends BackendType
+  //case object libraryBackend extends BackendType
+  //case object compilerBackend extends BackendType
+
+  /**
+   * Metadata meet functions
+   * TODO: Add these as needed (not clear how complete this needs to be yet)
+   */
+  case object metaAlias extends MetaMeet    // Aliasing
+  case object metaInit extends MetaMeet     // Aliasing in type initialization
+  case object metaUpdate extends MetaMeet   // Metadata updates
+  case object any extends MetaMeet          // All remaining aliasing forms
 
   // blacklist for op names that cannot be expressed with infix methods
   // we also blacklist some operators for improved compilation performance or to avoid ambiguities in the REPL version
@@ -161,6 +215,8 @@ trait Definitions extends DerivativeTypes {
   // blacklist for op names that need the SourceContext implicit parameter to be surpressed (usually because they construct an object with an apply method)
   var noSourceContextList = List[String]()
 
+  var primitiveTypes = List[Rep[DSLType]]()
+
   /**
    * Effect types
    */
@@ -168,6 +224,7 @@ trait Definitions extends DerivativeTypes {
   case object mutable extends EffectType
   case object simple extends EffectType
   case class write(args: Int*) extends EffectType
+  case class atomicWrite(arg: Int) extends EffectType
   case object global extends EffectType
 
   /**
@@ -246,6 +303,16 @@ trait Definitions extends DerivativeTypes {
   }
 
   /**
+   *
+   * "Figment" abstract node type
+   *
+   */
+  def forge_figment(func: Rep[String]): OpType
+  object figment {
+    def apply(func: Rep[String]) = forge_figment(func)
+  }
+
+  /**
    * Getters / setters for DSL structs
    */
   def forge_getter(structArgIndex: Int, field: String): OpType
@@ -261,14 +328,33 @@ trait Definitions extends DerivativeTypes {
   /**
    * Allocates
    *
-   * @param data     The data struct that this op allocates
+   * @param tpe      The data struct that this op allocates
    * @param init     A sequence of tuples (fieldName, initialValue)
    */
-  def forge_allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]): DeliteOpType
+  def forge_allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]): OpType
   object allocates {
     def apply(tpe: Rep[DSLType], init: Rep[String]*) = forge_allocates(tpe, init)
   }
 
+
+  /**
+   * Record
+   *
+   * @param tpe      The type of record that this op creates
+   * @param fields   A sequence of tuples of (field type, field initial value)
+   */
+  def forge_record(tpe: Rep[DSLType], fields: Seq[String], fieldTpes: Seq[Rep[DSLType]], init: Seq[Rep[String]]): OpType
+
+  // Create a record with a set of numbered fields starting with _1 (i.e. _1, _2, etc.). Scala lists and sequences are unpacked and named using _1_1, _1_1, etc.
+  // TODO: Change the name of this one to something more descriptive?
+  object anonRecord {
+    def apply(tpe: Rep[DSLType], fields: (Rep[DSLType], String)*) = forge_record(tpe, Nil, fields.map(_._1), fields.map(s => unit(s._2)))
+  }
+
+  // Create a record with a set of named fields. Scala lists and sequences are unpacked and named using fieldName_1, fieldName_2, etc.
+  object record {
+    def apply(tpe: Rep[DSLType], fields: (String, Rep[DSLType], String)*) = forge_record(tpe, fields.map(_._1), fields.map(_._2), fields.map(s => unit(s._3)))
+  }
 
   /**
    * SingleTask
@@ -456,11 +542,27 @@ trait DefinitionsExp extends Definitions with DerivativeTypesExp {
   case class Redirect(func: Rep[String]) extends OpType
   def forge_redirect(func: Rep[String]) = Redirect(func)
 
+
+  /**
+   * Figment op types
+   * TODO: Do we need a figment op type to pattern match on?
+   */
+  case class Figment(func: Rep[String]) extends OpType
+  def forge_figment(func: Rep[String]) = Figment(func)
+
+  case class AllocatesFigment(tpe: Rep[DSLType], init: Seq[Rep[String]]) extends OpType
+
+  case class AllocatesRecord(tpe: Rep[DSLType], fields: Seq[String], fieldTpes: Seq[Rep[DSLType]], init: Seq[Rep[String]]) extends OpType
+  def forge_record(tpe: Rep[DSLType], fields: Seq[String], fieldTpes: Seq[Rep[DSLType]], init: Seq[Rep[String]]) = AllocatesRecord(tpe, fields, fieldTpes, init)
+
+
   /**
    * Delite ops
    */
   case class Allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]) extends DeliteOpType
-  def forge_allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]) = Allocates(tpe,init)
+  def forge_allocates(tpe: Rep[DSLType], init: Seq[Rep[String]]) = {
+    if (FigmentTpes.contains(tpe)) { AllocatesFigment(tpe,init) } else { Allocates(tpe,init) }
+  }
 
   case class SingleTask(func: Rep[String]) extends DeliteOpType
   def forge_single(func: Rep[String]) = SingleTask(func)

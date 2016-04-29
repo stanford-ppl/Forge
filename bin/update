@@ -82,7 +82,7 @@ DSL_NAME=$2
 if [ $SKIP -le 1 ];
 then
   echo "sbt compile (1/$NUM_STEPS)"
-  sbt compile
+  sbt -DshowSuppressedErrors=true compile
 fi
 
 FORGE_FLAGS=""
@@ -124,6 +124,7 @@ then
   echo "sbt compile (4/$NUM_STEPS)"
   sbt compile
 
+  ## Uncomment these for pdf generation from sphinx
   #pushd .
   #echo "cd sphinx"
   #cd "sphinx"
@@ -138,7 +139,7 @@ then
   pushd .
   cd "sphinx"
   sphinx-build -b html source build
-  popd 
+  popd
 fi
 
 if [ $SKIP -le 5 ] && [ $INTERACTIVE == true ];

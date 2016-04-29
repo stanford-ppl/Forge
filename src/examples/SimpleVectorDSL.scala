@@ -53,9 +53,9 @@ trait SimpleVectorDSL extends ForgeApplication {
 
     VectorOps {
       // getters and setters
-      compiler ("vector_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
-      compiler ("vector_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
-      compiler ("vector_set_length") (MInt :: MUnit, effect = write(0)) implements setter(0, "_length", quotedArg(1))
+      internal ("vector_raw_data") (Nil :: MArray(T)) implements getter(0, "_data")
+      internal ("vector_set_raw_data") (MArray(T) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
+      internal ("vector_set_length") (MInt :: MUnit, effect = write(0)) implements setter(0, "_length", quotedArg(1))
 
       /** Gets the current length of the Vector
        * @return the current length
@@ -114,21 +114,21 @@ trait SimpleVectorDSL extends ForgeApplication {
         $self.insert($self.length, $2)
       }
 
-      compiler ("vector_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
+      internal ("vector_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
         vector_ensureextra($self,$len)
         val data = vector_raw_data($self)
         array_copy(data,$pos,data,$pos+$len,$self.length-$pos)
         vector_set_length($self,$self.length+$len)
       }
 
-      compiler ("vector_ensureextra") (("extra",MInt) :: MUnit, effect = write(0)) implements single ${
+      internal ("vector_ensureextra") (("extra",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = vector_raw_data($self)
         if (array_length(data) - $self.length < $extra) {
           vector_realloc($self, $self.length+$extra)
         }
       }
 
-      compiler ("vector_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
+      internal ("vector_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = vector_raw_data($self)
         var n = unit(4) max (array_length(data)*2)
         while (n < $minLen) n = n*2
@@ -193,7 +193,7 @@ trait SimpleVectorDSL extends ForgeApplication {
       val V = tpePar("V")
 
       // the Forge 'groupBy' pattern is currently limited to returning an MHashMap(K,MArrayBuffer(V)), so we need to convert that to a DSL type to return
-      compiler ("groupby_helper") ((T ==> K,T ==> V) :: MHashMap(K, MArrayBuffer(V)), addTpePars = (K,V)) implements groupBy((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)})
+      internal ("groupby_helper") ((T ==> K,T ==> V) :: MHashMap(K, MArrayBuffer(V)), addTpePars = (K,V)) implements groupBy((T,K,V), 0, ${e => $1(e)}, ${e => $2(e)})
 
       /** A somewhat strange implementation of groupBy
        * @param k: the key function, used to determine the bucket of each element
@@ -240,11 +240,11 @@ trait SimpleVectorDSL extends ForgeApplication {
       // This enables a tpe to be passed in as the collection type of a Delite op
 
       // by convention, the return tpe of alloc must be its last tpe parameter, if it has any
-      compiler ("vector_raw_alloc") (MInt :: Vector(R), addTpePars = R, effect = mutable) implements composite ${
+      internal ("vector_raw_alloc") (MInt :: Vector(R), addTpePars = R, effect = mutable) implements composite ${
         Vector[R]($1)
       }
-      compiler ("vector_appendable") ((MInt,T) :: MBoolean) implements single("true")
-      compiler ("vector_copy") ((MInt,Vector(T),MInt,MInt) :: MUnit, effect = write(2)) implements single ${
+      internal ("vector_appendable") ((MInt,T) :: MBoolean) implements single("true")
+      internal ("vector_copy") ((MInt,Vector(T),MInt,MInt) :: MUnit, effect = write(2)) implements single ${
         val src = vector_raw_data($self)
         val dest = vector_raw_data($2)
         array_copy(src, $1, dest, $3, $4)

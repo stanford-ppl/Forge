@@ -77,15 +77,21 @@ trait IdentGenOps extends BaseGenOps with BaseGenDataStructures {
 
       val Def(op: Op) = o
 
+      val back = op.backend match {
+        case `sharedBackend` => ""
+        case `internalBackend` => "internal."
+        //case `compilerBackend` => "compiler."
+        //case `libraryBackend` => "library."
+      }
+
       val (key,hg) = op.style match {
         case `staticMethod`   => ("static",true)
         case `infixMethod`    => ("infix",true)
         case `directMethod`   => ("direct",true)
-        case `compilerMethod` => ("compiler",false)
         case `implicitMethod` => ("fimplicit",false)
       }
 
-      forge_op0(key,hg)(op.grp)(op.name, op.tpePars, op.args, op.curriedArgs, op.implicitArgs, op.retTpe, op.effect, op.aliasHint)
+      forge_op0(back+key,hg)(op.grp)(op.name, op.tpePars, op.args, op.curriedArgs, op.implicitArgs, op.retTpe, op.effect, op.aliasHint)
 
       // TODO: implements clauses
 

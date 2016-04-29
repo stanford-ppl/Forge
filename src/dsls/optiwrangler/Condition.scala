@@ -16,12 +16,12 @@ trait ConditionOps {
 
   	val ConditionOps = withTpe (Condition)
   	ConditionOps {
-      compiler ("get_is_empty") (Nil :: MBoolean) implements getter(0, "isEmpty")
-  		compiler ("get_col_startswith") (Nil :: MString) implements getter(0, "colForStartsWith")
-  		compiler ("get_col_contains") (Nil :: MString) implements getter(0, "colForContains")
-  		compiler ("get_value_startswith") (Nil :: MString) implements getter(0, "valueForStartsWith")
-  		compiler ("get_value_contains") (Nil :: MString) implements getter(0, "valueForContains")
-  		compiler ("get_row_indices") (Nil :: MArray(MInt)) implements getter(0, "rowIndices")
+      internal ("get_is_empty") (Nil :: MBoolean) implements getter(0, "isEmpty")
+  		internal ("get_col_startswith") (Nil :: MString) implements getter(0, "colForStartsWith")
+  		internal ("get_col_contains") (Nil :: MString) implements getter(0, "colForContains")
+  		internal ("get_value_startswith") (Nil :: MString) implements getter(0, "valueForStartsWith")
+  		internal ("get_value_contains") (Nil :: MString) implements getter(0, "valueForContains")
+  		internal ("get_row_indices") (Nil :: MArray(MInt)) implements getter(0, "rowIndices")
   	}
   }
 }

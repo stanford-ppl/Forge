@@ -50,28 +50,28 @@ trait RandomOps {
     }))
     impl (reseed) (codegen(cpp, ${ fprintf(stderr, "WARNING: reseed is not currently implemented\\n") }))
 
-    val randdouble = compiler (Rand) ("optila_rand_double", Nil, Nil :: MDouble, effect = simple)
+    val randdouble = internal (Rand) ("optila_rand_double", Nil, Nil :: MDouble, effect = simple)
     impl (randdouble) (codegen($cala, ${
       if (Global.useThreadLocalRandom) java.util.concurrent.ThreadLocalRandom.current().nextDouble()
       else Global.randRef.nextDouble()
     }))
     impl (randdouble) (codegen(cpp, ${ resourceInfo->rand->nextDouble() }))
 
-    val randfloat = compiler (Rand) ("optila_rand_float", Nil, Nil :: MFloat, effect = simple)
+    val randfloat = internal (Rand) ("optila_rand_float", Nil, Nil :: MFloat, effect = simple)
     impl (randfloat) (codegen($cala, ${
       if (Global.useThreadLocalRandom) java.util.concurrent.ThreadLocalRandom.current().nextFloat()
       else Global.randRef.nextFloat()
     }))
     impl (randfloat) (codegen(cpp, ${ resourceInfo->rand->nextFloat() }))
 
-    val randint = compiler (Rand) ("optila_rand_int", Nil, Nil :: MInt, effect = simple)
+    val randint = internal (Rand) ("optila_rand_int", Nil, Nil :: MInt, effect = simple)
     impl (randint) (codegen($cala, ${
       if (Global.useThreadLocalRandom) java.util.concurrent.ThreadLocalRandom.current().nextInt()
       else Global.randRef.nextInt()
     }))
     impl (randint) (codegen(cpp, ${ resourceInfo->rand->nextInt() }))
 
-    val randboolean = compiler (Rand) ("optila_rand_boolean", Nil, Nil :: MBoolean, effect = simple)
+    val randboolean = internal (Rand) ("optila_rand_boolean", Nil, Nil :: MBoolean, effect = simple)
     impl (randboolean) (codegen($cala, ${
       if (Global.useThreadLocalRandom) java.util.concurrent.ThreadLocalRandom.current().nextBoolean()
       else Global.randRef.nextBoolean()
@@ -97,7 +97,7 @@ trait RandomOps {
     }
 
     // any good parallel implementation?
-    compiler (Rand) ("optila_shuffle_array", A, MArray(A) :: MArray(A), effect = simple) implements composite ${
+    internal (Rand) ("optila_shuffle_array", A, MArray(A) :: MArray(A), effect = simple) implements composite ${
       val len = array_length($0)
       val out = array_empty[A](len)
       array_copy($0, 0, out, 0, len)

@@ -21,9 +21,9 @@ trait FactorGraphOps {
     val FactorGraph = tpe("FactorGraph")
 
     data(FactorGraph,
-      ("_v2f", CSRGraph), 
-      ("_f2v", CSRGraph), 
-      ("_weightValue", DenseVector(MDouble)), 
+      ("_v2f", CSRGraph),
+      ("_f2v", CSRGraph),
+      ("_weightValue", DenseVector(MDouble)),
       ("_weightIsFixed", DenseVector(MBoolean)),
       ("_variableValue", DenseVector(MBoolean)),
       ("_variableIsEvidence", DenseVector(MBoolean)),
@@ -34,9 +34,9 @@ trait FactorGraphOps {
     )
 
     static (FactorGraph) ("apply", Nil, MethodSignature(List(
-      ("v2f", CSRGraph), 
-      ("f2v", CSRGraph), 
-      ("weightValue", DenseVector(MDouble)), 
+      ("v2f", CSRGraph),
+      ("f2v", CSRGraph),
+      ("weightValue", DenseVector(MDouble)),
       ("weightIsFixed", DenseVector(MBoolean)),
       ("variableValue", DenseVector(MBoolean)),
       ("variableIsEvidence", DenseVector(MBoolean)),
@@ -153,8 +153,8 @@ trait FactorGraphOps {
     val DDFGFEdge = tpe("DDFGFEdge")
 
     data(DDFGFWeight,
-      ("_weightId", MInt), 
-      ("_isFixed", MBoolean), 
+      ("_weightId", MInt),
+      ("_isFixed", MBoolean),
       ("_initialValue", MDouble)
     )
 
@@ -170,8 +170,8 @@ trait FactorGraphOps {
 
 
     data(DDFGFVariable,
-      ("_variableId", MInt), 
-      ("_isEvidence", MBoolean), 
+      ("_variableId", MInt),
+      ("_isEvidence", MBoolean),
       ("_initialValue", MDouble),
       ("_dataType", MInt),
       ("_edgeCount", MInt),
@@ -193,8 +193,8 @@ trait FactorGraphOps {
 
 
     data(DDFGFFactor,
-      ("_factorId", MInt), 
-      ("_weightId", MInt), 
+      ("_factorId", MInt),
+      ("_weightId", MInt),
       ("_factorFunction", MInt),
       ("_edgeCount", MInt)
     )
@@ -212,8 +212,8 @@ trait FactorGraphOps {
 
 
     data(DDFGFEdge,
-      ("_variableId", MInt), 
-      ("_factorId", MInt), 
+      ("_variableId", MInt),
+      ("_factorId", MInt),
       ("_position", MInt),
       ("_isPositive", MBoolean),
       ("_equalPredicate", MInt)
@@ -243,13 +243,13 @@ trait FactorGraphOps {
 
     val IO = grp("IO")
 
-    compiler (IO) ("ddfg_read_weights", Nil, ("path", MString) :: DenseVector(DDFGFWeight)) implements single ${
+    internal (IO) ("ddfg_read_weights", Nil, ("path", MString) :: DenseVector(DDFGFWeight)) implements single ${
       val dis = datainputstream_new($path)
       val out = DenseVector[DDFGFWeight](0, true)
       while (dis.available() > 0) {
         val weightId = dis.readLong().toInt
         val isFixed = dis.readBoolean()
-        val initialValue = dis.readDouble()   
+        val initialValue = dis.readDouble()
 
         out <<= DDFGFWeight(weightId, isFixed, initialValue)
       }
@@ -257,7 +257,7 @@ trait FactorGraphOps {
       out.unsafeImmutable
     }
 
-    compiler (IO) ("ddfg_read_variables", Nil, ("path",MString) :: DenseVector(DDFGFVariable)) implements single ${
+    internal (IO) ("ddfg_read_variables", Nil, ("path",MString) :: DenseVector(DDFGFVariable)) implements single ${
       val dis = datainputstream_new($path)
       val out = DenseVector[DDFGFVariable](0, true)
       while (dis.available() > 0) {
@@ -267,14 +267,14 @@ trait FactorGraphOps {
         val dataType = dis.readShort().toInt
         val edgeCount = dis.readLong().toInt
         val cardinality = dis.readLong().toInt
-        
+
         out <<= DDFGFVariable(variableId, isEvidence, initialValue, dataType, edgeCount, cardinality)
       }
       dis.fclose()
       out.unsafeImmutable
     }
 
-    compiler (IO) ("ddfg_read_edges", Nil, ("path",MString) :: DenseVector(DDFGFEdge)) implements single ${
+    internal (IO) ("ddfg_read_edges", Nil, ("path",MString) :: DenseVector(DDFGFEdge)) implements single ${
       val dis = datainputstream_new($path)
       val out = DenseVector[DDFGFEdge](0, true)
       while (dis.available() > 0) {
@@ -283,14 +283,14 @@ trait FactorGraphOps {
         val position = dis.readLong().toInt
         val isPositive = dis.readBoolean()
         val equalPredicate = dis.readLong().toInt
-        
+
         out <<= DDFGFEdge(variableId, factorId, position, isPositive, equalPredicate)
       }
       dis.fclose()
       out.unsafeImmutable
     }
 
-    compiler (IO) ("ddfg_read_factors", Nil, ("path",MString) :: DenseVector(DDFGFFactor)) implements single ${
+    internal (IO) ("ddfg_read_factors", Nil, ("path",MString) :: DenseVector(DDFGFFactor)) implements single ${
       val dis = datainputstream_new($path)
       val out = DenseVector[DDFGFFactor](0, true)
       while (dis.available() > 0) {
@@ -306,7 +306,7 @@ trait FactorGraphOps {
     }
 
     /* temporary cumulative sum */
-    compiler (IO) ("ddfg_util_cumsum", Nil, DenseVector(MInt) :: DenseVector(MInt)) implements composite ${
+    internal (IO) ("ddfg_util_cumsum", Nil, DenseVector(MInt) :: DenseVector(MInt)) implements composite ${
       val rv = ((0::($0.length + unit(1))) map { i => unit(0) }).mutable
       rv(0) = unit(0)
 
@@ -319,9 +319,9 @@ trait FactorGraphOps {
       rv.unsafeImmutable
     }
 
-    // ("v2f", CSRGraph), 
-    // ("f2v", CSRGraph), 
-    // ("weightValue", DenseVector(MDouble)), 
+    // ("v2f", CSRGraph),
+    // ("f2v", CSRGraph),
+    // ("weightValue", DenseVector(MDouble)),
     // ("weightIsFixed", DenseVector(MBoolean)),
     // ("variableValue", DenseVector(MBoolean)),
     // ("variableIsEvidence", DenseVector(MBoolean)),
@@ -374,7 +374,7 @@ trait FactorGraphOps {
       var vidx = unit(0)
       while (vidx < variablesRaw.length) {
         val v = variablesRaw(vidx)
-        variableValue(v.variableId) = (v.initialValue >= unit(0.5)) 
+        variableValue(v.variableId) = (v.initialValue >= unit(0.5))
         variableIsEvidence(v.variableId) = v.isEvidence
         vidx += unit(1)
       }
@@ -427,7 +427,7 @@ trait FactorGraphOps {
 
     val ReplicatedOps = withTpe(Replicated)
     ReplicatedOps {
-      compiler ("get_copies") (Nil :: MArray(T)) implements getter(0, "_copies")
+      internal ("get_copies") (Nil :: MArray(T)) implements getter(0, "_copies")
 
       infix ("local") (Nil :: T) implements composite ${
         val socketId = getSocket

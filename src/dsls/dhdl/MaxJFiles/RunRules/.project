@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectDescription>
+	<name>tutorial-chap14-example2-lmemloopback_RunRules</name>
+	<comment>Simulation</comment>
+	<manageMaxCompiler>true</manageMaxCompiler>
+	<manageMaxGenFD>true</manageMaxGenFD>
+	<manageMaxBlox>true</manageMaxBlox>
+	<maxelerVersion></maxelerVersion>
+	<projects>
+	</projects>
+	<buildSpec>
+		<buildCommand>
+			<name>com.maxeler.maxcompiler.core.maxCompilerBuilder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+	</buildSpec>
+	<natures>
+		<nature>com.maxeler.maxcompiler.core.maxCompilerNature</nature>
+	</natures>
+</projectDescription>

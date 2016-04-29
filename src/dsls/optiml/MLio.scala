@@ -23,7 +23,7 @@ trait MLIOOps {
     // -- temporary: use java.io.DataInputStream to read binary format, until Delite supports a fixed-length binary reader
 
     val DataInputStream = tpe("java.io.DataInputStream")
-    compiler (IO) ("datainputstream_new", Nil, ("path",MString) :: DataInputStream, effect = simple) implements codegen ($cala, ${
+    internal (IO) ("datainputstream_new", Nil, ("path",MString) :: DataInputStream, effect = simple) implements codegen ($cala, ${
       new java.io.DataInputStream(new java.io.FileInputStream($path))
     })
 

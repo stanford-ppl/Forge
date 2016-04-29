@@ -10,7 +10,7 @@ import scala.virtualization.lms.internal.{GenericFatCodegen, GenericCodegen}
 
 import core._
 
-trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with BaseGenLifts with BaseGenOps with BaseGenImports with BaseGenTypeClasses {
+trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with BaseGenLifts with BaseGenOps with BaseGenImports with BaseGenTypeClasses with BaseGenMetadata {
   val IR: ForgeApplicationRunner with ForgeExp
   import IR._
 
@@ -52,8 +52,8 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     Directory(Path(opsDir)).createDirectory()
 
     // 1 file per grp, includes only abstract Ops
-    for ((grp,ops) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp)) {
-      checkOps(ops)
+    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp) && !isMetahelp(grp)) {
+      checkOps(opsGrp)
 
       val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"Ops"+".scala"))
       emitHeader(packageName + ".ops", stream)
@@ -61,11 +61,11 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
         emitLifts(grp, Lifts(grp), stream)
         stream.println()
       }
-      emitOpSyntax(ops, stream)
+      emitSharedOpSyntax(opsGrp, stream)
       stream.close()
     }
 
-    // emit any lifts that did not have a corresponding ops
+    // Emit any lifts that did not have a corresponding ops
     for ((grp,a) <- Lifts.filterNot(p => OpsGrp.contains(p._1))) {
       val stream = new PrintWriter(new FileWriter(opsDir+File.separator+"Lift"+grp.name+".scala"))
       emitHeader(packageName + ".ops", stream)
@@ -73,7 +73,18 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
       stream.println()
       stream.close()
     }
+
+    // Emit metadata helpers
+    val metahelpers = OpsGrp.toList.filter{ case (grp,opsGrp) => isMetahelp(grp) }.map(_._2)
+    if (!metahelpers.isEmpty) {
+      val stream = new PrintWriter(new FileWriter(opsDir+File.separator+dsl+"Metadata.scala"))
+      emitHeader(packageName + ".ops", stream)
+      emitSharedMetadataSugar(metahelpers, stream)
+      stream.println()
+      stream.close()
+    }
   }
+
 
   def emitTypeClasses() {
     val typeClassDir = dslDir + File.separator + "typeclass"
@@ -87,9 +98,9 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     }
   }
 
+
   def emitOverloadHack() {
     val stream = new PrintWriter(new FileWriter(dslDir+"GenOverloadHack"+".scala"))
-
     var numOverloaded = 0
     var numRedirectOverloaded = 0
     for ((grp,opsGrp) <- OpsGrp) {

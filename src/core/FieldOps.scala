@@ -33,11 +33,17 @@ trait FieldOps extends Base with OverloadHack {
   // needed to generate primitive math combinations as type classes
   def infix_stage(x: Rep[DSLType]): StageTag
   def infix_tpeArgs(x: Rep[DSLType]): List[Rep[DSLType]]
+
+  def infix_ops(x: Rep[DSLGroup]): List[Rep[DSLOp]]
+  def infix_nodes(x: Rep[DSLGroup]): List[Rep[DSLOp]]
+  def infix_argNames(x: Rep[DSLOp]): List[String]
 }
 
 trait FieldOpsExp extends FieldOps {
   this: ForgeExp =>
 
+  def infix_ops(x: Rep[DSLGroup]): List[Rep[DSLOp]] = OpsGrp(x).ops
+  def infix_nodes(x: Rep[DSLGroup]): List[Rep[DSLOp]] = OpsGrp(x).ops.filter{op => Impls(op).isInstanceOf[CodeGen]}
  /**
   * TypeAlias
   */
@@ -61,6 +67,7 @@ trait FieldOpsExp extends FieldOps {
    */
   def infix_name(x: Exp[DSLType])(implicit o: Overloaded1): String = x match {
     case Def(Tpe(name,tpePars,stage)) => name
+    case Def(TpeAlias(name, tpe)) => name
     case Def(TpeInst(t,args)) => infix_name(t)(o)
     case Def(TpeClass(name,sig,tpePars)) => name
     case Def(TpeClassEvidence(name,sig,tpePars)) => name
@@ -69,9 +76,11 @@ trait FieldOpsExp extends FieldOps {
     case Def(TpePar(name,ctx,s)) => name
     case Def(HkTpePar(name,tpePars,ctx,s)) => name
     case Def(VarArgs(t)) => "*" + infix_name(t)(o)
+    case Def(Meta(name,tpePars)) => name
   }
   def infix_tpePars(x: Exp[DSLType]) = x match {
     case Def(Tpe(s,tpePars,stage)) => tpePars
+    case Def(TpeAlias(name, tpe)) => Nil
     case Def(TpeInst(t,args)) => Nil
     case Def(TpePar(name,ctx,s)) => Nil
     case Def(HkTpePar(name,tpePars,ctx,s)) => tpePars
@@ -80,9 +89,11 @@ trait FieldOpsExp extends FieldOps {
     case Def(TpeClassInst(name,tpePars,t)) => tpePars
     case Def(FTpe(args,ret,freq)) => Nil
     case Def(VarArgs(t)) => Nil
+    case Def(Meta(name,tpePars)) => tpePars
   }
-  def infix_stage(x: Exp[DSLType]) = x match {
+  def infix_stage(x: Exp[DSLType]): StageTag = x match {
     case Def(Tpe(s,tpePars,stage)) => stage
+    case Def(TpeAlias(name, tpe)) => infix_stage(tpe)
     case Def(TpeInst(Def(Tpe(s,tpePars,stage)),args)) => stage
     case Def(TpePar(name,ctx,stage)) => stage
     case Def(HkTpePar(name,tpePars,ctx,stage)) => stage
@@ -92,6 +103,7 @@ trait FieldOpsExp extends FieldOps {
     case Def(TpeClassInst(name,tpePars,t)) => future
     case Def(FTpe(args,ret,freq)) => future
     case Def(VarArgs(t)) => future
+    case Def(Meta(name,tpePars)) => compile
   }
   def infix_tpeArgs(x: Exp[DSLType]) = x match {
     case Def(TpeInst(t,args)) => args
@@ -137,39 +149,44 @@ trait FieldOpsExp extends FieldOps {
   /**
    * DSLOp
    */
+  def infix_argNames(x: Rep[DSLOp]): List[String] = x.args.map(_.name)
+
   def infix_args(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,Nil,implArgs,retTpe,eff,alias)) => args
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => args ++ curArgs.flatten
+    case Def(Op(grp,name,style,backend,tpePars,args,Nil,implArgs,retTpe,eff,alias)) => args
+    case Def(Op(grp,name,style,backend,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => args ++ curArgs.flatten
   }
   def infix_firstArgs(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => args
+    case Def(Op(grp,name,style,backend,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => args
   }
   def infix_curriedArgs(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => curArgs
+    case Def(Op(grp,name,style,backend,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => curArgs
   }
   def infix_implicitArgs(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => implArgs
+    case Def(Op(grp,name,style,backend,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => implArgs
   }
   def infix_grp(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => grp
+    case Def(Op(grp,name,style,backend,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => grp
   }
   def infix_name(x: Exp[DSLOp])(implicit o: Overloaded5) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => name
+    case Def(Op(grp,name,style,backend,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => name
   }
   def infix_style(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => style
+    case Def(Op(grp,name,style,backend,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => style
+  }
+  def infix_backend(x: Exp[DSLOp]) = x match {
+    case Def(Op(grp,name,style,backend,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => backend
   }
   def infix_tpePars(x: Exp[DSLOp])(implicit o: Overloaded1) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => tpePars
+    case Def(Op(grp,name,style,backend,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => tpePars
   }
   def infix_retTpe(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => retTpe
+    case Def(Op(grp,name,style,backend,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => retTpe
   }
   def infix_effect(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => eff
+    case Def(Op(grp,name,style,backend,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => eff
   }
   def infix_aliasHint(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => alias
+    case Def(Op(grp,name,style,backend,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => alias
   }
 
   /**
@@ -192,7 +209,19 @@ trait FieldOpsExp extends FieldOps {
     case Def(Identifier(name,tpe)) => tpe
   }
 
-
+  /**
+   * DSLTraversal
+   */
+  def infix_name(x: Exp[DSLTraversal])(implicit o: Overloaded7): String = x match {
+    case Def(Traverse(name,isExtern)) => name
+    case Def(Transform(name,isExtern)) => name
+    case Def(Analyze(name,isExtern,isIterative)) => name
+  }
+  def infix_isExtern(x: Exp[DSLTraversal]): Boolean = x match {
+    case Def(Traverse(name,isExtern)) => isExtern
+    case Def(Transform(name,isExtern)) => isExtern
+    case Def(Analyze(name,isExtern,isIterative)) => isExtern
+  }
 }
 
 

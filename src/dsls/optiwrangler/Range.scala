@@ -15,13 +15,13 @@ trait RangeOps {
 
 	val RangeOps = withTpe (Range)
 	RangeOps {
-	  compiler ("startIndex") (Nil :: MInt) implements getter (0, "start")
-	  compiler ("endIndex") (Nil :: MInt) implements getter (0, "end")
-	  compiler ("length") (Nil :: MInt) implements single ${endIndex($self) - startIndex($self)}
-	  compiler ("getElement") (MInt :: MInt) implements single ${$1 + startIndex($self)}
+	  internal ("startIndex") (Nil :: MInt) implements getter (0, "start")
+	  internal ("endIndex") (Nil :: MInt) implements getter (0, "end")
+	  internal ("length") (Nil :: MInt) implements single ${endIndex($self) - startIndex($self)}
+	  internal ("getElement") (MInt :: MInt) implements single ${$1 + startIndex($self)}
 
-	  compiler ("range_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("Range cannot be allocated from a parallel op") }
-	  compiler ("range_illegalupdate") ((MInt,MInt) :: MNothing, effect = simple) implements composite ${ fatal("Range cannot be updated") }
+	  internal ("range_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("Range cannot be allocated from a parallel op") }
+	  internal ("range_illegalupdate") ((MInt,MInt) :: MNothing, effect = simple) implements composite ${ fatal("Range cannot be updated") }
 
 	  infix ("foreach") ((MInt ==> MUnit) :: MUnit) implements foreach(MInt, 0, ${ e => $1(e) })
 

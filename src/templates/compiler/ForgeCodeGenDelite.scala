@@ -12,7 +12,7 @@ import core._
 import shared._
 import Utilities._
 
-trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with DeliteGenDataStructures with DeliteGenOps with DeliteGenImports {
+trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with DeliteGenDataStructures with DeliteGenOps with DeliteGenImports with DeliteGenTraversals with BaseGenMetadata {
   val IR: ForgeApplicationRunner with ForgeExp
   import IR._
 
@@ -43,6 +43,8 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     emitDSLDefinition()
     // emitDataStructures()
     emitOps()
+    emitMetadata()
+    emitTraversals()
   }
 
   def emitDSLDefinition() {
@@ -66,35 +68,171 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
   //   emitStructs(dataDir)
   // }
 
+  def emitOpsExp(traitName: String, base: String, opsGrps: List[DSLOps], stream: PrintWriter) {
+    val ops = opsGrps.flatMap{opsGrp => unique(opsGrp.ops) }
+    val tpes = opsGrps.flatMap{opsGrp => opsGrpTpes(opsGrp) }
+
+    stream.println("package " + packageName + ".ops")
+    stream.println()
+    emitScalaReflectImports(stream)
+    emitLMSImports(stream)
+    emitDeliteOpsImports(stream)
+    stream.println("import ppl.delite.framework.Config") // e.g. used for rewrites
+    emitDSLImports(stream)
+    stream.println()
+
+    emitBlockComment("IR Definitions", stream)
+    stream.println("trait " + traitName + "OpsExp extends " + base + " {")
+    stream.println("  this: " + dsl + "Exp => ")
+    stream.println()
+    emitIRNodes(ops, stream)
+    stream.println()
+    emitNodeConstructors(ops, stream)
+    stream.println()
+    emitSyms(ops, stream)
+    stream.println()
+    emitAliasInfo(ops, stream)
+    stream.println()
+    emitMirrors(ops, stream)
+    stream.println()
+    emitPropagationRules(ops, stream)
+    stream.println()
+    emitDeliteCollection(tpes, stream)
+    stream.println()
+    emitStructMethods(tpes, stream)
+    stream.println()
+    stream.println("}")
+    stream.println()
+  }
+
+  def emitOpsImpl(traitName: String, opsGrps: List[DSLOps], stream: PrintWriter) {
+    val ops = opsGrps.flatMap{opsGrp => unique(opsGrp.ops) }
+
+    stream.println("package " + packageName + ".ops")
+    stream.println()
+    emitScalaReflectImports(stream)
+    emitDSLImports(stream)
+    stream.println()
+
+    emitBlockComment("Op Implementations", stream)
+    stream.println("trait " + traitName + "OpsImpl {")
+    stream.println("  this: " + dsl + "CompilerOps with " + dsl + "Lift => ")
+    stream.println()
+    emitImpls(ops, stream)
+    stream.println("}")
+  }
+
+
   def emitOps() {
     val opsDir = dslDir + File.separator + "ops"
     Directory(Path(opsDir)).createDirectory()
 
-    // 1 file per tpe, includes Ops, OpsExp, and Gen, plus an additional Impl file if the group contains SingleTask and Composite ops
-    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp)) {
-      val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsExp"+".scala"))
-      stream.println("package " + packageName + ".ops")
-      stream.println()
-      emitScalaReflectImports(stream)
-      emitLMSImports(stream)
-      emitDeliteOpsImports(stream)
-      emitDSLImports(stream)
-      stream.println()
-      emitOpExp(opsGrp, stream)
-      stream.println()
-      if (opsGrp.ops.exists(o => Impls(o).isInstanceOf[SingleTask] || Impls(o).isInstanceOf[Composite])) {
-        val implStream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsImpl"+".scala"))
-        implStream.println("package " + packageName + ".ops")
-        implStream.println()
-        emitScalaReflectImports(implStream)
-        emitDSLImports(implStream)
-        implStream.println()
-        emitImpls(opsGrp, implStream)
+    // 1 or 2 files per group: First includes OpsExp, Rewrites, and codegen
+    // Second is an additional Impl file if the group contains SingleTask and Composite ops
+    // TODO: Would it make sense to just put both of these in one file?
+    for ((grp,opsGrp) <- OpsGrp if !isTpeClass(grp) && !isTpeClassInst(grp) && !isMetahelp(grp)) {
+      val stream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsExp.scala"))
+      emitOpsExp(grp.name, baseOpsCls(opsGrp), List(opsGrp), stream)
+      emitOpRewrites(opsGrp, stream)
+      emitOpCodegen(opsGrp, stream)
+      stream.close()
+
+      if (opsGrp.ops.exists(requiresImpl)) {
+        val implStream = new PrintWriter(new FileWriter(opsDir+File.separator+grp.name+"OpsImpl.scala"))
+        emitOpsImpl(grp.name, List(opsGrp), implStream)
         implStream.close()
       }
-      emitOpCodegen(opsGrp, stream)
+    }
+
+    val metahelpers = OpsGrp.toList.filter{case (grp,opsGrp) => isMetahelp(grp) }.map(_._2)
+    if (!metahelpers.isEmpty) {
+      val stream = new PrintWriter(new FileWriter(opsDir+File.separator+dsl+"MetadataOpsExp.scala"))
+      emitOpsExp(dsl+"Metadata", "EffectExp with "+dsl+"MetadataInternalOps", metahelpers, stream)
+      stream.close()
+
+      val implStream = new PrintWriter(new FileWriter(opsDir+File.separator+dsl+"MetadataOpsImpl.scala"))
+      emitOpsImpl(dsl+"Metadata", metahelpers, implStream)
+      implStream.close()
+    }
+  }
+
+
+  def emitMetadata() {
+    val MetaTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
+    if (MetaTpes.nonEmpty) {
+      val stream = new PrintWriter(new FileWriter(dslDir+File.separator+dsl+"MetadataClasses.scala"))
+      stream.println("package " + packageName)
+      emitDSLImports(stream)
+      emitLMSImports(stream)
+      stream.println("import scala.virtualization.lms.common.MetadataOps")
+      stream.println()
+      emitMetadataClasses(dsl + "CompilerOps", stream, repify)
       stream.close()
     }
   }
-}
 
+
+  def emitTraversals() {
+    val traversalDir = dslDir + File.separator + "transform"
+    Directory(Path(traversalDir)).createDirectory()
+    for (t <- Traversals if !t.isExtern) {
+      val stream = new PrintWriter(new FileWriter(traversalDir+File.separator+makeTraversalName(t)+".scala"))
+      stream.println("package " + packageName + ".transform")
+      stream.println()
+      emitScalaReflectImports(stream)
+      emitDeliteTraversalImports(stream)
+      //emitLMSImports(stream)
+      emitDSLImports(stream)
+      stream.println()
+      emitTraversalDefs(t, stream)
+      stream.close()
+    }
+
+    // DSLTransform
+    val stream = new PrintWriter(new FileWriter(traversalDir+File.separator+dsl+"Transform.scala"))
+    stream.println("package " + packageName + ".transform")
+    stream.println()
+    emitDSLImports(stream)
+    emitLMSImports(stream)
+    emitDelitePackageImports(stream)
+    stream.println()
+    stream.println("trait " + dsl + "Transforming extends " + dsl + "Exp with DeliteStructsExp with DeliteTransforming {")
+    stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication =>")
+    /*for ((grp,opsGrp) <- OpsGrp) {
+      for (op <- unique(opsGrp)) {
+        Impls(op) match {
+          case _:Figment | _:AllocatesFigment if op.backend != libraryBackend =>
+            if (!Transformers.exists{case (t,pattern) => pattern.rules.contains(op)})
+              warn("No lowering rule defined for op " + op.name + ". Instantiated figment ops must be lowered prior to code generation.")
+
+            stream.println(makeLowerMethodSignature(op, stream) + " = {")
+            stream.println("  throw new Exception(\"No lowering rule for op " + op.name + "\")")
+            stream.println("}")
+          case _ =>
+        }
+    }}*/
+    stream.println("}")
+
+
+    stream.print("trait " + dsl + "Transform extends DeliteTransform")
+    Traversals.filter(hasIR).foreach{t => stream.print(" with " + makeTraversalIRName(t))}
+    stream.println(" {")
+    stream.println("  this: " + dsl + "Compiler with " + dsl + "Application with DeliteApplication =>")
+    stream.println()
+    emitTypeMetadata(stream)
+    stream.println("}")
+    stream.close()
+
+    /*val azstream = new PrintWriter(new FileWriter(traversalDir+File.separator+dsl+"AnalyzerBase.scala"))
+    azstream.println("package " + packageName + ".transform")
+    azstream.println()
+    emitScalaReflectImports(azstream)
+    emitDeliteTraversalImports(azstream)
+    emitDSLImports(azstream)
+    //emitLMSImports(azstream)
+    azstream.println()
+    emitAnalyzerBase(azstream)
+    azstream.println()
+    azstream.close()*/
+  }
+}

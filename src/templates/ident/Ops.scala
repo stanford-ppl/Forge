@@ -77,11 +77,9 @@ trait IdentGenOps extends BaseGenOps with BaseGenDataStructures {
 
       val Def(op: Op) = o
 
-      val back = op.backend match {
-        case `sharedBackend` => ""
-        case `internalBackend` => "internal."
-        //case `compilerBackend` => "compiler."
-        //case `libraryBackend` => "library."
+      val back = op.visibility match {
+        case `publicMethod` => ""
+        case `privateMethod` => "internal."
       }
 
       val (key,hg) = op.style match {

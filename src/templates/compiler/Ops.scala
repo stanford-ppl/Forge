@@ -35,7 +35,7 @@ trait DeliteGenOps extends BaseGenOps {
       val i = nameClashId(o, clasher = nameClashesSimple)
       o.style match {
         case `staticMethod` => o.grp.name + i + "Object_" + sanitize(o.name).capitalize + suffix
-        case `directMethod` if o.backend != sharedBackend => sanitize(o.name).capitalize + suffix
+        case `directMethod` if o.visibility != publicMethod => sanitize(o.name).capitalize + suffix
         case _ => o.grp.name + i + "_" + sanitize(o.name).capitalize + suffix
       }
     }
@@ -148,12 +148,6 @@ trait DeliteGenOps extends BaseGenOps {
     stream.println()
   }
 
-  /*def emitCompilerOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
-    val base = if (opsGrp.ops.exists(hasSharedVersion)) opsGrp.name else "Base"
-    emitBlockComment("Compiler-only operations", stream)
-    emitOpSugar(opsGrp.grp.name + "Compiler", base, dsl + "CompilerOps", List(opsGrp), stream, compilerBackend)
-  }*/
-
   def requiresImpl(op: Rep[DSLOp]) = Impls(op) match {
     case _:CodeGen | _:Redirect => false
     case _:Getter | _:Setter => false
@@ -227,7 +221,7 @@ trait DeliteGenOps extends BaseGenOps {
    */
   def baseOpsCls(opsGrp: DSLOps) = {
     var base = "BaseFatExp with EffectExp"
-    base += { if (opsGrp.ops.exists(_.backend == internalBackend)) " with " + opsGrp.grp.name + "InternalOps"
+    base += { if (opsGrp.ops.exists(_.visibility == privateMethod)) " with " + opsGrp.grp.name + "InternalOps"
               else " with " + opsGrp.name }
     base += ( if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && ForgeCollections.contains(grpAsTpe(o.grp)))) " with DeliteCollectionOpsExp" else "" )
     base += ( if (opsGrp.ops.exists(o => grpIsTpe(o.grp) && DataStructs.contains(grpAsTpe(o.grp)))) " with DeliteStructsExp" else "" )

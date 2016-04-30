@@ -39,7 +39,7 @@ abstract class MetaMeet
  */
 abstract class StageTag
 abstract class MethodType
-abstract class BackendType
+abstract class MethodVisibility
 abstract class MethodSignatureType
 abstract class EffectType
 abstract class AliasHint

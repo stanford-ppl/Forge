@@ -66,7 +66,7 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
     for (opsGrp <- opsGrps if !isMetahelp(opsGrp.grp)) {
       if (opsGrp.ops.exists(requiresImpl))
         stream.print(" with " + opsGrp.name + "Impl")
-      if (!isMetaType(opsGrp.grp) && opsGrp.ops.exists(_.backend == internalBackend))
+      if (!isMetaType(opsGrp.grp) && opsGrp.ops.exists(_.visibility == privateMethod))
         stream.print(" with " + opsGrp.grp.name + "InternalOps")
     }
     for (e <- Externs) { stream.print(" with " + e.opsGrp.grp.name + "CompilerOps") }

@@ -72,8 +72,8 @@ trait ForgePreprocessor {
       else ((start,input)) match {
         case CommentLine()   if scope == NoComment    => (start+2, CommentLine)
         case NewLine()       if scope == CommentLine  => (start+1, NoComment)
-        case SummaryBlock()  if scope == NoComment && allowDoc => CommentBlock.nest += 1; SummaryBlock.in = true;  (start, SummaryBlock)
-        case DocumentBlock() if scope == NoComment && allowDoc => CommentBlock.nest += 1; DocumentBlock.in = true; (start, DocumentBlock)
+        case SummaryBlock()  if allowDoc => CommentBlock.nest += 1; SummaryBlock.in = true;  (start, SummaryBlock)
+        case DocumentBlock() if allowDoc => CommentBlock.nest += 1; DocumentBlock.in = true; (start, DocumentBlock)
         case CommentBlock()  if scope != CommentLine  => CommentBlock.nest += 1; (start+2, CommentBlock)
         case EndBlock()      if scope == CommentBlock || scope == DocumentBlock || scope == SummaryBlock =>
           CommentBlock.nest -= 1
@@ -92,7 +92,7 @@ trait ForgePreprocessor {
       var scope: CommentScope = NoComment
       var feature: Feature = NoFeature
       while (i < input.length && feature == NoFeature) {
-        val (nextI, nextScope) = scanComment(scope, i, input, isDSLScope)
+        val (nextI, nextScope) = scanComment(scope, i, input, isDSLScope && scope == NoComment)
         i = nextI; scope = nextScope;
 
         if (scope == NoComment) ((i,input)) match {

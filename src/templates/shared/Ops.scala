@@ -341,7 +341,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
       val i = /*if (Config.fastCompile) nameClashId(canonical(o), nameClashesGrp) else*/ ""
       o.style match {
         case `staticMethod` => o.grp.name.toLowerCase + "_object_" + sanitize(o.name).toLowerCase + i
-        case `directMethod` if o.backend != `sharedBackend` =>
+        case `directMethod` if o.visibility != `publicMethod` =>
           if (o.name != sanitize(o.name)) err("Non-user level op name has special characters that require reformatting: " + o.name)
           o.name // should be callable directly from impl code
         case _ => o.grp.name.toLowerCase + "_" + sanitize(o.name).toLowerCase + i
@@ -508,7 +508,14 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
   }
   def checkOps(opsGrp: DSLOps) {
-    for (o <- unique(opsGrp.ops)) check(o)
+    val ops = unique(opsGrp.ops)
+    for (o <- ops) check(o)
+
+    val publicStatic = ops.find{op => op.style == staticMethod && op.visibility == publicMethod}
+    val privateStatic = ops.find{op => op.style == staticMethod && op.visibility == privateMethod}
+    if (publicStatic.isDefined && privateStatic.isDefined) {
+      err("Static ops " + publicStatic.get.name + " and " + privateStatic.get.name + " are defined in the same group but have different visibilities. This is currently disallowed.")
+    }
   }
 
   /**
@@ -574,8 +581,8 @@ trait BaseGenOps extends ForgeCodeGenBase {
    * Conditionally generate this class depending on if there are any implicits
    * Returns name of trait to extend for implicits (either traitName or baseTrait if there are no implicits)
    */
-  def emitOpImplicits(traitName: String, baseTrait: String, parentTrait: String, opsGrps: List[DSLOps], stream: PrintWriter, backend: BackendType): String = {
-    val implicitOps = opsGrps.flatMap{opsGrp => opsGrp.ops.filter(e => e.style == implicitMethod && e.backend == backend)}
+  def emitOpImplicits(traitName: String, baseTrait: String, parentTrait: String, opsGrps: List[DSLOps], stream: PrintWriter, visibility: MethodVisibility): String = {
+    val implicitOps = opsGrps.flatMap{opsGrp => opsGrp.ops.filter(e => e.style == implicitMethod && e.visibility == visibility)}
 
     if (implicitOps.nonEmpty) {
       stream.println("trait " +  traitName + " extends " + baseTrait + " {")
@@ -599,7 +606,6 @@ trait BaseGenOps extends ForgeCodeGenBase {
     else (baseTrait)
   }
 
-  // TODO: Need to check that static methods are only generated at one visibility level
   /**
    * Emits all sugar for a group of ops at a specified visibility level
    * Also emits stub methods which need to be filled in by the backend(s)
@@ -607,16 +613,16 @@ trait BaseGenOps extends ForgeCodeGenBase {
    *   [traitName]Ops  - most of the sugar
    *   [traitName]Base - sugar for implicits (separated into a base class for lower priority)
    */
-  def emitOpSugar(traitName: String, baseTrait: String, parentTrait: String, opsGrps: List[DSLOps], stream: PrintWriter, backend: BackendType) {
+  def emitOpSugar(traitName: String, baseTrait: String, parentTrait: String, opsGrps: List[DSLOps], stream: PrintWriter, visibility: MethodVisibility) {
     // --- Implicit ops
-    val base = emitOpImplicits(traitName + "Base", baseTrait, parentTrait, opsGrps, stream, backend)
+    val base = emitOpImplicits(traitName + "Base", baseTrait, parentTrait, opsGrps, stream, visibility)
 
     stream.println("trait " + traitName + "Ops extends " + base + " {")
     stream.println("  this: " + parentTrait + " => ")
     stream.println()
 
     // --- Static ops
-    val staticOps = opsGrps.flatMap{opsGrp => opsGrp.ops.filter(e => e.style == staticMethod && e.backend == backend) }
+    val staticOps = opsGrps.flatMap{opsGrp => opsGrp.ops.filter(e => e.style == staticMethod && e.visibility == visibility) }
     val objects   = staticOps.groupBy(_.grp.name)
     for ((name, ops) <- objects) {
       stream.println("  object " + name + " {")
@@ -628,24 +634,24 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
 
     // --- Direct ops
-    val directOps = opsGrps.flatMap{opsGrp => opsGrp.ops.filter(e => e.style == directMethod && e.backend == backend) }
+    val directOps = opsGrps.flatMap{opsGrp => opsGrp.ops.filter(e => e.style == directMethod && e.visibility == visibility) }
 
     // Direct ops below the user-facing level are generated without indirection to make them
     // visible to allocators, setters, getters, and redirects
-    if (backend == sharedBackend) {
+    if (visibility == publicMethod) {
       for (o <- directOps) stream.println("  " + makeSyntaxMethod(o))
       if (directOps.length > 0) stream.println()
     }
 
 
     // --- Infix ops
-    val opsClsSuffix = backend match {
-      case `sharedBackend` => ""
-      case `internalBackend` => "Internal"
+    val opsClsSuffix = visibility match {
+      case `publicMethod` => ""
+      case `privateMethod` => "Internal"
     }
 
     for (opsGrp <- opsGrps) {
-      val allInfixOps = opsGrp.ops.filter(e => e.style == infixMethod && e.backend == backend)
+      val allInfixOps = opsGrp.ops.filter(e => e.style == infixMethod && e.visibility == visibility)
 
       val (pimpOps, infixOps) = allInfixOps.partition(noInfix)
       if (pimpOps.nonEmpty) {
@@ -704,7 +710,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
       stream.println()
 
       // Emit abstract methods (method stubs)
-      for (o <- unique(opsGrp.ops).filter(e=> e.backend == backend && e.style != implicitMethod && !isRedirect(e)) ) {
+      for (o <- unique(opsGrp.ops).filter(e=> e.visibility == visibility && e.style != implicitMethod && !isRedirect(e)) ) {
         stream.println("  " + makeOpMethodSignature(o, withReturnTpe = Some(true)))
       }
     }
@@ -715,21 +721,21 @@ trait BaseGenOps extends ForgeCodeGenBase {
   def emitSharedOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
     // Shared Ops (visible to user)
     emitBlockComment("Shared operations", stream)
-    emitOpSugar(opsGrp.grp.name, baseOpsCls(opsGrp.grp), dsl, List(opsGrp), stream, sharedBackend)
+    emitOpSugar(opsGrp.grp.name, baseOpsCls(opsGrp.grp), dsl, List(opsGrp), stream, publicMethod)
 
     // Internal Ops (not visible to user, called internally)
-    if (opsGrp.ops.exists(e=> e.backend == internalBackend)) {
+    if (opsGrp.ops.exists(e=> e.visibility == privateMethod)) {
       emitBlockComment("Internal operations", stream)
-      emitOpSugar(opsGrp.grp.name + "Internal", opsGrp.name, dsl, List(opsGrp), stream, internalBackend)
+      emitOpSugar(opsGrp.grp.name + "Internal", opsGrp.name, dsl, List(opsGrp), stream, privateMethod)
     }
   }
 
   def emitSharedMetadataSugar(opsGrps: List[DSLOps], stream: PrintWriter) {
     emitBlockComment("Shared metadata syntax sugar", stream)
-    emitOpSugar(dsl+"Metadata", "Base", dsl, opsGrps, stream, sharedBackend)
+    emitOpSugar(dsl+"Metadata", "Base", dsl, opsGrps, stream, publicMethod)
 
     emitBlockComment("Internal metadata syntax sugar", stream)
-    emitOpSugar(dsl+"MetadataInternal", dsl+"MetadataOps", dsl, opsGrps, stream, internalBackend)
+    emitOpSugar(dsl+"MetadataInternal", dsl+"MetadataOps", dsl, opsGrps, stream, privateMethod)
   }
 
 

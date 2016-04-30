@@ -26,6 +26,7 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
   def opsDir = srcDir + File.separator + "ops"
   def fileExt = "rst"
 
+  // Add links to types in method signatures
   override def quote(x: Exp[Any]): String = x match {
     case Def(Tpe(s,args,stage)) if docGroups.contains(x.asInstanceOf[Exp[DSLGroup]]) =>
       docref(relFileName(x.asInstanceOf[Exp[DSLGroup]])) + escapeSpecial(makeTpePars(args))
@@ -183,17 +184,22 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
   def emitOpFamilyHeader(style: String, stream: PrintWriter): Unit = {
     stream.println(subsect(style))
     stream.println()
-    //stream.println("+-+-+")
   }
 
-  def makeOpRows(desc: OpDescription, signature: String, stream: PrintWriter): Unit = {
-    //tableRow(code("def") + "\\ ", signature) // Signature was already "codified" during creation
-    //tableRow(" ", desc.desc)
+  def emitOpDescription(desc: OpDescription, signature: String, stream: PrintWriter): Unit = {
     stream.println(signature)
     stream.println(desc.desc)
     stream.println()
     desc.args.foreach{case (arg,desc) => if (desc != "") stream.println("\t* " + bold(arg) + " \\- " + desc) }
     desc.returns.foreach{desc => stream.println("\t* " + bold("returns") + " " + desc) }
+
+    if (desc.examples.nonEmpty) stream.println()
+    desc.examples.foreach{case (example, expl) =>
+      stream.println(code(example))
+      stream.println()
+      stream.println(expl)
+      stream.println()
+    }
   }
 
   def emitOpFamilyFooter(style: String, stream: PrintWriter): Unit = {

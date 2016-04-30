@@ -36,7 +36,7 @@ trait ForgeGenReStructuredText extends ForgeCodeGenDocBase {
   }*/
 
   override def code(x: String) = ".. parsed-literal::\n\n  " + x + "\n" //":code:`" + x + "`"
-  def code(x: List[String]) = ".. parsed-literal::\n  " + x.map(line => "  " + line).mkString("\n") + "\n"
+  def code(x: List[String]) = ".. parsed-literal::\n" + x.map(line => "  " + line).mkString("\n") + "\n"
   //"::\n\n" + x.map(line => "  " + line).mkString("\n") + "\n"
 
   private val specialChars = List("|", "/", "*", "_", "[", "]")

@@ -14,6 +14,7 @@ trait SimpleVectorDSL extends ForgeApplication {
   override def dslName    = "SimpleVector"
   override def dslAuthor  = "Stanford PPL"
   override def dslVersion = "0.1"
+  override def useReps    = false
 
   // The specification is the DSL definition (types, data structures, ops)
   /***

@@ -188,10 +188,8 @@ trait Definitions extends DerivativeTypes {
   /**
    * Method backend types
    */
-  case object sharedBackend extends BackendType
-  case object internalBackend extends BackendType
-  //case object libraryBackend extends BackendType
-  //case object compilerBackend extends BackendType
+  case object publicMethod extends MethodVisibility
+  case object privateMethod extends MethodVisibility
 
   /**
    * Metadata meet functions

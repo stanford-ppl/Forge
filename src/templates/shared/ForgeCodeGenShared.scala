@@ -77,6 +77,7 @@ trait ForgeCodeGenShared extends ForgeCodeGenBackend with BaseGenPackages with B
     // Emit metadata helpers
     val metahelpers = OpsGrp.toList.filter{ case (grp,opsGrp) => isMetahelp(grp) }.map(_._2)
     if (!metahelpers.isEmpty) {
+      for (opsGrp <- metahelpers) { checkOps(opsGrp) }
       val stream = new PrintWriter(new FileWriter(opsDir+File.separator+dsl+"Metadata.scala"))
       emitHeader(packageName + ".ops", stream)
       emitSharedMetadataSugar(metahelpers, stream)

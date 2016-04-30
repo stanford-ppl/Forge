@@ -125,17 +125,17 @@ then
   sbt compile
 
   ## Uncomment these for pdf generation from sphinx
-  #pushd .
-  #echo "cd sphinx"
-  #cd "sphinx"
-  #echo "sphinx-build -b latex source build"
-  #sphinx-build -b latex source build
-  #pushd .
-  #cd build
-  #make clean all > /dev/null
-  #popd
-  #popd
-  #cp "sphinx/build/$DSL_NAME.pdf" ./Manual.pdf
+  pushd .
+  echo "cd sphinx"
+  cd "sphinx"
+  echo "sphinx-build -b latex source build"
+  sphinx-build -b latex source build
+  pushd .
+  cd build
+  make clean all > /dev/null
+  popd
+  popd
+  cp "sphinx/build/$DSL_NAME.pdf" ./Manual.pdf
   pushd .
   cd "sphinx"
   sphinx-build -b html source build

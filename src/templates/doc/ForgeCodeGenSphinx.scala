@@ -76,6 +76,15 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
     val conf = new PrintWriter(new FileWriter(srcDir+File.separator+"conf.py"))
     conf.println("import os")
     conf.println("import sys")
+    conf.println("from sphinx.highlighting import PygmentsBridge")
+    conf.println("from pygments.formatters.latex import LatexFormatter")
+    conf.println("class CustomLatexFormatter(LatexFormatter):")
+    conf.println("  def __init__(self, **options):")
+    conf.println("    super(CustomLatexFormatter, self).__init__(**options)")
+    conf.println("    self.verboptions = r\"formatcom=\\footnotesize\" ")
+    conf.println("PygmentsBridge.latex_formatter = CustomLatexFormatter")
+
+    conf.println()
     conf.println("templates_path = ['_templates']")
     conf.println("source_suffix = '.rst'")
     conf.println("master_doc = 'index'")
@@ -100,7 +109,9 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
     conf.println("latex_elements = {")
     conf.println("  'classoptions': ',openany,oneside',")
     conf.println("  'babel': '\\\\usepackage[english]{babel}'") // ??????
+    //conf.println("  'preamble': '\\\\usepackage[dvipsnames]{xcolor}'")
     conf.println("}")
+    //conf.println("latex_additional_files = ['customcolors.sty'] ")
     conf.println()
     conf.println("### Manpage Info ###")
     conf.println("man_pages = [")
@@ -116,9 +127,23 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
     conf.println("]")
     conf.close()
 
+    /*val sty = new PrintWriter(new FileWriter(srcDir+File.separator+"customcolors.sty"))
+    colors.foreach{color =>
+      sty.println(color + ":")
+      sty.println("  parent: bodytext")
+      sty.println("  textColor: " + color)
+      sty.println()
+    }
+    sty.close()*/
+
+    val css = new PrintWriter(new FileWriter(staticDir+File.separator+"colors.css"))
+    colors.foreach{color => css.println("   ."+color+" { color:"+color+"; }" )}
+    css.close()
+
     // --- Index
     val index = new PrintWriter(new FileWriter(srcDir+File.separator+"index.rst"))
     val heading = dsl+" " + dslVersion + " Documentation"
+    index.println()
     index.println(sect(heading))
     index.println()
     index.println("Contents:")
@@ -133,8 +158,8 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
     intro.println()
     DSLBloc.getOrElse("<stub>").split(nl).map(_.trim()).foreach{line => intro.println(line) }
     intro.println()
-    intro.println("This document was auto-generated using the Sphinx markup language. For compliments, thank David Koeplinger.")
-    intro.println("For corrections or complaints, post an issue on `GitHub Issues <https://github.com/stanford-ppl/Forge/issues/>`_ . (Or quit being lazy and fix it yourself.)")
+    intro.println("This document was auto-generated using `Sphinx <http://www.sphinx-doc.org/en/stable/>`_.")
+    intro.println("For corrections, post an issue on `GitHub Issues <https://github.com/stanford-ppl/Forge/issues/>`_ .")
     intro.println()
     intro.close()
 
@@ -167,6 +192,9 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
   }
 
   def emitGroupHeader(grp: String, desc: GrpDescription, stream: PrintWriter): Unit = {
+    stream.println()
+    colors.foreach{color => stream.println(".. role:: " + color) }
+    stream.println()
     stream.println(label(grp))
     stream.println()
     stream.println(sect(grp))

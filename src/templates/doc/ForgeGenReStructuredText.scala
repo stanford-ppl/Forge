@@ -25,18 +25,21 @@ trait ForgeGenReStructuredText extends ForgeCodeGenDocBase {
   def subsect(x: String) =  x + "\n" + "-"*x.length
   def subsubsect(x: String) = x + "\n" + "^"*x.length
 
+  val colors = List("black","gray","silver","white","maroon","red","fuchsia","pink","orange","yellow","lime","green","olive","teal","cyan","aqua","blue","navy","purple")
+  def color(c: String, x: String) = ":"+c+":`"+x+"`"
+
   //val keywordColor =
-  /*val keywords = "val|var|def|implicit|for|do|while|if|else|override|private|protected|trait|class|abstract|case|match|with|extends|import|package|try|catch|finally|".r
+  val keywords = List("val","var","def","implicit","for","do","while","if","else","override","private","protected","trait","class","abstract","case",
+                      "match","with","extends","import","package","try","catch","finally").map(k => "(" + k + ")\\s+").map(_.r)
   val TypePattern = "([A-Z]\\w*)".r
   val ArgPattern = "(\\w+)\\s*:"
 
   def highlight(x: String) = {
-    var res = x
-    keywords.findAllIn(res).foreach{m => }
-  }*/
+    keywords.foldLeft(x){(str,key) => key.replaceAllIn(str, {m => color("maroon",m.group(1)) + " " })}
+  }
 
-  override def code(x: String) = ".. parsed-literal::\n\n  " + x + "\n" //":code:`" + x + "`"
-  def code(x: List[String]) = ".. parsed-literal::\n" + x.map(line => "  " + line).mkString("\n") + "\n"
+  override def code(x: String) = ".. parsed-literal::\n\n  " + highlight(x) + "\n"
+  def code(x: List[String]) = ".. parsed-literal::\n" + x.map{line => "  " + highlight(line)}.mkString("\n") + "\n"
   //"::\n\n" + x.map(line => "  " + line).mkString("\n") + "\n"
 
   private val specialChars = List("|", "/", "*", "_", "[", "]")
@@ -51,7 +54,7 @@ trait ForgeGenReStructuredText extends ForgeCodeGenDocBase {
     //if (inCodeBlock) "`:doc:`"+x+" </"+path+">`:code:`"
     ":doc:`"+x+" </"+path+">`"
   }
-  def docref(path:String) = ":ref:`"+path+"`"
+  def docref(path:String) = ":doc:`"+path+"`"//":ref:`"+path+"`"
   def ref(path: String) = path + "_"
   def label(path: String) = ".. _" + path + ":"
 }

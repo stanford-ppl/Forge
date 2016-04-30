@@ -32,7 +32,7 @@ trait ForgeCodeGenDocBase extends ForgeCodeGenBackend with BaseGenOps {
     case Def(HkTpePar(name, tpePars, ctx, _)) => "type_" + name.toLowerCase() + "_" + tpePars.map(a => quote(a).toLowerCase()).mkString("_")
     case _ => grp.name.toLowerCase()
   }
-  def relFileName(grp: Rep[DSLGroup]) = grp.name //"ops/"+fileName(grp)
+  def relFileName(grp: Rep[DSLGroup]) = fileName(grp)
 
 
   /*

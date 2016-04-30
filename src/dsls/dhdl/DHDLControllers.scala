@@ -123,7 +123,10 @@ trait DHDLControllers {
     }
 
     /* Parallel */
-    direct (MetaPipe) ("Parallel", Nil, MThunk(MUnit) :: MUnit) implements composite ${ pipe_parallel($0) }
+    direct (MetaPipe) ("Parallel", Nil, MThunk(MUnit) :: MUnit) implements composite ${
+      val pipe = pipe_parallel($0)
+      styleOf(pipe) = Parallel
+    }
 
     /* BlockReduce */
     // BlockReduce(counter, accum){i => f(i) }{(a,b) => reduce(a,b) }
@@ -157,6 +160,15 @@ trait DHDLControllers {
       	@ stream.println(emitBlock(func) + "")
 			}
 		}))
+    impl (unit_pipe) (codegen (dot, ${
+      $b[func]
+    }))
+    // --- MaxJ Backend
+    //pipe_parallel (extern)
+    //TODO
+    impl (unit_pipe) (codegen (maxj, ${
+      $b[func]
+    }))
 
 	}
 

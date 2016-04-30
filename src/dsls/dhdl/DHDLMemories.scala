@@ -124,8 +124,9 @@ trait DHDLMemories {
 			@ regType(sym) match {
 				@ case Regular =>
 					@ if (isDblBuf(sym)) {
-							$sym [margin=0, rankdir="LR", label="{<st> \$sym | <ld>}" shape="record"
-										color=$dblbufBorderColor style="filled" fillcolor=$regFillColor ]
+							$sym [margin=0, rankdir="LR", label="{<st> | <ld>}" xlabel="$sym "
+                    shape="record" color=$dblbufBorderColor style="filled"
+                    fillcolor=$regFillColor ]
 					@ } else {
 							$sym [label= "\$sym" shape="square" style="filled" fillcolor=$regFillColor ]
 					@ }
@@ -156,7 +157,7 @@ trait DHDLMemories {
 			@ 	case Regular => quote(reg) + "_hold"
 			@ 	case _ => quote(reg)
 			@ }
-			$pre $sym = $regStr 
+			$pre $sym = $regStr ; 
 		}))
 		//reg_write (extern)
     impl (reg_reset) (codegen(maxj, ${
@@ -237,8 +238,9 @@ trait DHDLMemories {
     // --- Dot Backend
     impl (bram_new)   (codegen(dot, ${
       @ if (isDblBuf(sym)) {
-      	$sym [margin=0 rankdir="LR" label="{<st> $sym | <ld> }" shape="record"
-							color=$dblbufBorderColor  style="filled" fillcolor=$bramFillColor ]
+      	$sym [margin=0 rankdir="LR" label="{<st> | <ld>}" xlabel="$sym " 
+              shape="record" color=$dblbufBorderColor  style="filled" 
+              fillcolor=$bramFillColor ]
       @ } else {
         	$sym [label="$sym " shape="square" style="filled" fillcolor=$bramFillColor ]
       @ }
@@ -253,41 +255,13 @@ trait DHDLMemories {
 			$addr -> $bram [ headlabel="addr" ]
 			$value -> $bram [ headlabel="data" ]
 		}))
-    impl (bram_reset) (codegen(dot, ${ }))
+    //impl (bram_reset) (codegen(dot, ${ }))
 
     // --- MaxJ Backend
-    impl (bram_new)   (codegen(maxj, ${
-      @ if (isDblBuf(sym)) {
-      @ } else {
-				//TODO: add stride once it's in language
-        //BramLib $sym = new BramLib(this, $depth, $ts, $bks , $stride );
-				@ val ts = tpstr[T]( par(sym) )
-				@ val bks = banks(sym)
-        BramLib $sym = new BramLib(this, $size, $ts, $bks , 1 );
-      @ }
-		}))
-		impl (bram_load)  (codegen(maxj, ${
-			@ val pre = maxJPre(sym)
-			@ val ts = tpstr[T](par(sym)) + ".newInstance(this);"
-			$pre $sym = $ts
-		}))
-		impl (bram_store) (codegen(maxj, ${
-			@ val dataStr = quote(value)
-      @ if (isAccum(bram)) {
-      @   val offsetStr = quote(writerOf(bram).get._1) + "_offset"
-      @   val parentPipe = parentOf(bram).get.asInstanceOf[Pipeline]
-			//TODO: same problem here. Don't have scope for Pipe_foreach and Pipe_reduce
-      //    val parentCtr = parentPipe.ctr
-      @     if (isDblBuf(bram)) {
-      //      fp(s"""$mem.connectWport(stream.offset(${quote(addr)}, -$offsetStr), stream.offset($dataStr, -$offsetStr), ${quote(parentCtr)}_en_from_pipesm, $start, $stride);""")
-      @     } else {
-      //      fp(s"""$mem.connectWport(stream.offset($addr, -$offsetStr), stream.offset($dataStr, -$offsetStr), ${quote(parentCtr)}_en_from_pipesm, $start, $stride);""")
-      @     }
-      @   } else {
-      //@     emit(quote(bram) + ".connectWport(" + quote(addr) + ", " + dataStr + ", " + quote(parentOf(bram).get) + "_en, " + n.start + ", " + n.stride + ";")
-      @   }
-		}))
-    impl (bram_reset) (codegen(maxj, ${ }))
+    // bram_new (extern)
+    // bram_load (extern)
+    // bram_store (extern)
+    // impl (bram_reset) (codegen(maxj, ${ })) TODO: removed from dhdl?
 
   }
   // TODO: Size of offchip memory can be a staged value, but it can't be a value which is calculated in hardware
@@ -379,7 +353,7 @@ trait DHDLMemories {
 		}))
 
 		// --- MaxJ Backend
-		//offchip_new (nothing generated for maxj)
+		//offchip_new (extern)
   }
 
 

@@ -375,10 +375,10 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
 		case _ =>
 	}
 
-	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = cchain match {
-    case Def(EatReflect(Counterchain_new(counters, nIter))) =>
-	     inds.zipWithIndex.foreach {case (iter, idx) => emitValDef(iter, counters(idx)) }
-	}
+	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = {
+    val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
+	  inds.zipWithIndex.foreach {case (iter, idx) => emitValDef(iter, counters(idx)) }
+  }
 
   override def emitFileHeader() {
 		super.emitFileHeader()
@@ -423,10 +423,9 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
 
 	  case e@Counterchain_new(counters, nIter) =>
 			//TODO: check whether parent of cchain is empty, if is emit ctrchain
-			//Uncomment after analysis complete
-			//if (parentOf(sym).isEmpty) {
-			//	emitCtrChain(sym, rhs)
-			//}
+			if (parentOf(sym).isEmpty) {
+				emitCtrChain(sym, rhs)
+			}
 
     case e@Pipe_foreach(cchain, func, inds) =>
 			var label = quote(sym)
@@ -510,15 +509,14 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
 					}
 					tstr = tstr.replace("BlockRAM", "BRAM")
 					val quoteStr = tstr + (if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
-
-					if (quoteStr.endsWith("x115")) {
-						println("sym:" + quoteStr + " tp:" +  s.tp)
+					/*
+					if (quoteStr.contains("108")) {
+						println("sym:" + quoteStr)
 						s match {
 							case Def(d) => println("def:" + d)
 							case _ => println("don't know what this is")
 						}
 					}
-					/*
 					*/
 					quoteStr
 				}
@@ -584,113 +582,63 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 		super.emitSource(args, y, className, out)
 	}
 
+  override def emitValDef(sym: Sym[Any], rhs: String): Unit = {
+    emit(s"""${maxJPre(sym)} ${quote(sym)} = ${quote(rhs)};""")
+  }
+
+  def emitValDef(sym: Sym[Any], exp: Exp[Any]): Unit = {
+    emitValDef(sym, quote(exp))
+  }
+
+  def emitBlock(y: Block[Any], blockName:String): Unit = {
+    emitComment(s"Block ${blockName} {")
+    emitBlock(y)
+    emitComment(s"} Block ${blockName}")
+  } 
+
+	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = {
+    val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
+	  inds.zipWithIndex.foreach {case (iter, idx) => emitValDef(iter, counters(idx)) }
+  }
+
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case e@Counterchain_new(counters,nIters) =>
 
     case e@Pipe_foreach(cchain, func, inds) =>
-			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
-				case Coarse =>
-				case Fine =>
-    			//val writesToAccumRam = mapNode.nodes.filter { _.isInstanceOf[St] }.exists { _.asInstanceOf[St].mem.isAccum }
-					val writesToAccumRam = false
-					emitPipeProlog(sym, cchain, inds, writesToAccumRam)
-					emitPipeForEachEpilog(sym, writesToAccumRam, cchain, inds(0))
-				case Disabled =>
-					val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain
-					emitSequential(sym, cchain, getBlockResult(nIters))
-			}
-      emitBlock(func)             // Map function
+      emitController(sym, Some(cchain))
+      emitNestedIdx(cchain, inds)
+      emitBlock(func, s"${quote(sym)} Foreach")             // Map function
 
     case e@Pipe_reduce(cchain, accum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
-    	styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
-				case Coarse =>
-				case Fine =>
-					//TODO
-					val writesToAccumRam = false
-					emitPipeProlog(sym, cchain, inds, writesToAccumRam)
-					//TODO
-					val specializeReduce = false;
-					emitPipeReduceEpilog(sym, specializeReduce, cchain)
-				case Disabled =>
-					val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain
-					emitSequential(sym, cchain, getBlockResult(nIters))
-			}
-      emitBlock(func)
-      emitBlock(ldFunc)
-      emitBlock(rFunc)
-      emitBlock(stFunc)
+      emitController(sym, Some(cchain))
+      emitNestedIdx(cchain, inds)
+      emitBlock(iFunc, s"${quote(sym)} Index Calculation")
+      emitValDef(idx, quote(getBlockResult(iFunc)))
+      emitBlock(func, s"${quote(sym)} Foreach")
+      emitBlock(ldFunc, s"${quote(sym)} Load")
+      emitValDef(rV._1, quote(getBlockResult(ldFunc)))
+      emitValDef(rV._2, quote(getBlockResult(func)))
+      emitBlock(rFunc, s"${quote(sym)} Reduce")
+      emitValDef(res, quote(getBlockResult(rFunc)))
+      emitBlock(stFunc, s"${quote(sym)} Store")
 
 		case e@Pipe_parallel(func: Block[Unit]) =>
-
-			// If control signals have not yet been defined, define them here
-			if (parentOf(sym).isEmpty) {
-				emit(s"""DFEVar ${quote(sym)}_en = top_en;""")
-				emit(s"""DFEVar ${quote(sym)}_done = dfeBool().newInstance(this);""")
-				emit(s"""top_done <== ${quote(sym)}_done;""")
-				enDeclaredSet += sym
-				doneDeclaredSet += sym
-			}
-
-			emitComment(s"""Parallel ${quote(sym)} { """)
-			emit(s"""
-				SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_ParSM(this));
-				${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);
-				${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);
-				""")
-
-			childrenOf(sym).zipWithIndex.foreach { case (c, idx) =>
-				emit(s"""DFEVar ${quote(c)}_done = dfeBool().newInstance(this);
-					${quote(sym)}_sm.connectInput("s${idx}_done", ${quote(c)}_done);
-					DFEVar ${quote(c)}_en = ${quote(sym)}_sm.getOutput("s${quote(idx)}_en");""")
-				enDeclaredSet += c
-				doneDeclaredSet += c
-			}
-
-			emitComment(s"""} Parallel ${quote(sym)} """)
+      emitController(sym, None)
+      emitBlock(func, s"${quote(sym)} Parallel")
 
     case _ => super.emitNode(sym,rhs)
   }
 
-	def emitSequential(sym:Sym[Any], cchain: Exp[CounterChain], totIter: Rep[FixPt[Signed,B32,B0]]) = {
+  def emitController(sym:Sym[Any], cchain:Option[Exp[CounterChain]]) {
+    val smStr = styleOf(sym) match {
+			case Coarse => "MPSM"
+      case Fine => "PipeSM"
+      case Disabled => "SeqSM"
+      case Parallel => "ParSM"
+    }
+    emitComment(s"""${smStr} ${quote(sym)} {""")
 
-		// If control signals have not yet been defined, define them here
-		if (parentOf(sym).isEmpty) {
-			emit(s"""DFEVar ${quote(sym)}_en = top_en;""")
-			emit(s"""DFEVar ${quote(sym)}_done = dfeBool().newInstance(this);""")
-			emit(s"""top_done <== ${quote(sym)}_done;""")
-			enDeclaredSet += sym
-			doneDeclaredSet += sym
-		}
-
-		emit(s"""DFEVar ${quote(sym)}_numIter = ${quote(totIter)};""")
-		emitComment(s"""Sequential ${quote(sym)} {""")
-		emit(s"""
-			SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_SeqSM(this));
-			${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);
-			${quote(sym)}_sm.connectInput("sm_numIter", ${quote(sym)}_numIter);
-			${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);
-			""")
-
-		emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
-
-		childrenOf(sym).zipWithIndex.foreach { case (c, idx) =>
-			emit(s"""DFEVar ${c}_done = dfeBool().newInstance(this);
-				${quote(sym)}_sm.connectInput("s${idx}_done", ${quote(c)}_done);
-				DFEVar ${quote(c)}_en = ${quote(sym)}_sm.getOutput("s${quote(idx)}_en");""")
-			enDeclaredSet += c
-			doneDeclaredSet += c
-		}
-
-		emit(s"""DFEVar ${quote(cchain)}_done = dfeBool().newInstance(this);""")
-		doneDeclaredSet += cchain
-		emitMaxJCounterChain(cchain, Some(s"${quote(childrenOf(sym).last)}_done"))
-
-		emit(s"""} Sequential ${quote(sym)} """)
-	}
-
-	def emitPipeProlog(sym: Sym[Any], cchain: Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]],
-		writesToAccumRam:Boolean) = {
-		val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
+    /* Emit done signal */
     if (parentOf(sym).isEmpty) {
       emit(s"""DFEVar ${quote(sym)}_en = top_en;""")
       emit(s"""DFEVar ${quote(sym)}_done = dfeBool().newInstance(this);""")
@@ -699,68 +647,125 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       doneDeclaredSet += sym
     }
 
-    emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new PipeSM(this, ${counters.size}));""")
+    /* State Machine Instatiation */
+    emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_${smStr}(this));""")
+    // IO 
     emit(s"""${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
     emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
+    styleOf(sym) match {
+      case Fine => 
+        emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
+      case Coarse =>
+		    val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
+        emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
+        emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
+      case Disabled =>
+		    val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
+        emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
+        emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
+      case Parallel =>
+    }
 
+    /* Control Signals to Children Controllers */
+    if (styleOf(sym)!=Fine) {
+		  childrenOf(sym).zipWithIndex.foreach { case (c, idx) =>
+		  	emit(s"""DFEVar ${quote(c)}_done = dfeBool().newInstance(this);""")
+		  	emit(s"""${quote(sym)}_sm.connectInput("s${idx}_done", ${quote(c)}_done);""")
+        emit(s"""DFEVar ${quote(c)}_en = ${quote(sym)}_sm.getOutput("s${quote(idx)}_en");""")
+		  	enDeclaredSet += c
+		  	doneDeclaredSet += c
+		  }
+    }
+    
+    if (styleOf(sym)!=Parallel) {
+      emitCChainCtrl(sym, cchain.get)
+    }
+    if (styleOf(sym)==Fine){
+      emit(s"""DFEVar ${quote(sym)}_rst_done = dfeBool().newInstance(this);""")
+      emit(s"""${quote(sym)}_sm.connectInput("rst_done", ${quote(sym)}_rst_done);""")
+      emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
+
+      emit(s"""OffsetExpr ${quote(sym)}_offset = stream.makeOffsetAutoLoop("${quote(sym)}_offset");""")
+      emit(s"""${quote(sym)}_rst_done <== stream.offset(${quote(sym)}_rst_en, -${quote(sym)}_offset-1);""")
+
+    }
+
+    emitComment(s"""} ${smStr} ${quote(sym)}""")
+  }
+
+  def emitCChainCtrl(sym: Sym[Any], cchain: Exp[CounterChain]) {
+		val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain
+
+    /* Reset CounterChain */
+    //TODO: support reset of counterchain to sequential and metapipe in templete
     counters.zipWithIndex.map {case (ctr,i) =>
       val Def(EatReflect(Counter_new(start, end, step, par))) = ctr
       emit(s"""${quote(sym)}_sm.connectInput("sm_maxIn_$i", ${quote(end)});""")
       emit(s"""DFEVar ${quote(ctr)}_max = ${quote(sym)}_sm.getOutput("ctr_maxOut");""")
     }
-
-    emit(s"""DFEVar ${quote(cchain)}_done = dfeBool().newInstance(this);""")
     emit(s"""${quote(sym)}_sm.connectInput("ctr_done", ${quote(cchain)}_done);""")
     emit(s"""DFEVar ${quote(cchain)}_en_from_pipesm = ${quote(sym)}_sm.getOutput("ctr_en");""")
-    doneDeclaredSet += cchain
 
-    emit(s"""DFEVar ${quote(sym)}_rst_done = dfeBool().newInstance(this);""")
-    emit(s"""${quote(sym)}_sm.connectInput("rst_done", ${quote(sym)}_rst_done);""")
-    emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
-
-    // TODO: Unit counter not as important with addition of unit pipe
-    if (isUnitCounterChain(cchain) && !writesToAccumRam) {
-      emit(s"""${quote(sym)}_rst_done <== constant.var(true);""")
-    } else {
-      emit(s"""OffsetExpr ${quote(sym)}_offset = stream.makeOffsetAutoLoop("${quote(sym)}_offset");""")
-      emit(s"""${quote(sym)}_rst_done <== stream.offset(${quote(sym)}_rst_en, -${quote(sym)}_offset-1);""")
+    /* Emit CounterChain */
+		emit(s"""DFEVar ${quote(cchain)}_done = dfeBool().newInstance(this);""")
+		doneDeclaredSet += cchain
+    styleOf(sym) match {
+      case Fine => 
+        val Def(EatReflect(d)) = sym; d match {
+          case n:Pipe_foreach =>
+            val writesToAccumRam = writtenIn(sym).exists {s => s match {
+                case Def(EatReflect(Bram_new(_,_))) => isAccum(sym)
+                case _ => false
+              }
+            }
+            if (writesToAccumRam) {
+              emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm | ${quote(sym)}_rst_en"),
+                    Some(s"stream.offset(${quote(cchain)}_en_from_pipesm & ${quote(cchain)}_chain.getCounterWrap(${quote(counters.head)}), -${quote(sym)}_offset-1)"))
+            } else {
+              emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm"))
+            }
+          case n:Pipe_reduce[_,_] =>
+			      //TODO : what is this? seems like all reduce supported are specialized
+            //  def specializeReduce(r: ReduceTree) = {
+            //  val lastGraph = r.graph.takeRight(1)(0)
+            //  (lastGraph.nodes.size == 1) & (r.accum.input match {
+            //    case in:Add => true
+            //    case in:MinWithMetadata => true
+            //    case in:MaxWithMetadata => true
+            //    case in:Max => true
+            //    case _ => false
+            //  })
+			      val specializeReduce = true;
+            if (specializeReduce) {
+              emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm"))
+            } else {
+              emit(s"""DFEVar ${quote(sym)}_loopLengthVal = ${quote(sym)}_offset.getDFEVar(this, dfeUInt(8));""")
+              emit(s"""CounterChain ${quote(sym)}_redLoopChain =
+		        		control.count.makeCounterChain(${quote(cchain)}_en_from_pipesm);""")
+              emit(s"""DFEVar ${quote(sym)}_redLoopCtr = ${quote(sym)}_redLoopChain.addCounter(${quote(sym)}_loopLengthVal, 1);""")
+              emit(s"""DFEVar ${quote(sym)}_redLoop_done = stream.offset(${quote(sym)}_redLoopChain.getCounterWrap(${quote(sym)}_redLoopCtr), -1);""")
+              emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm & ${quote(sym)}_redLoop_done"))
+            }
+        }
+      case Coarse =>
+        emitMaxJCounterChain(cchain, Some(s"${quote(childrenOf(sym).head)}_done"))
+      case Disabled =>
+		    emitMaxJCounterChain(cchain, Some(s"${quote(childrenOf(sym).last)}_done"))
     }
+
   }
-
-  def emitPipeForEachEpilog(sym: Sym[Any], writesToAccumRam:Boolean, cchain:Exp[CounterChain],
-		firstInd:Sym[FixPt[Signed,B32,B0]]) = {
-    // Check if this is an accumulator map - whether it writes to a memory marked 'isAccum'
-    if (writesToAccumRam) {
-      emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm | ${quote(sym)}_rst_en"),
-            Some(s"stream.offset(${quote(cchain)}_en_from_pipesm & ${quote(cchain)}_chain.getCounterWrap(${quote(firstInd)}), -${quote(sym)}_offset-1)"))
-    } else {
-      emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm"))
-    }
-	}
-
-	def emitPipeReduceEpilog(sym: Sym[Any], specializeReduce:Boolean, cchain:Exp[CounterChain]) = {
-    if (specializeReduce) {
-      emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm"))
-    } else {
-      emit(s"""DFEVar ${quote(sym)}_loopLengthVal = ${quote(sym)}_offset.getDFEVar(this, dfeUInt(8));""")
-      emit(s"""CounterChain ${quote(sym)}_redLoopChain =
-				control.count.makeCounterChain(${quote(cchain)}_en_from_pipesm);""")
-      emit(s"""DFEVar ${quote(sym)}_redLoopCtr = ${quote(sym)}_redLoopChain.addCounter(${quote(sym)}_loopLengthVal, 1);""")
-      emit(s"""DFEVar ${quote(sym)}_redLoop_done = stream.offset(${quote(sym)}_redLoopChain.getCounterWrap(${quote(sym)}_redLoopCtr), -1);""")
-      emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm & ${quote(sym)}_redLoop_done"))
-    }
-	}
 
 	def emitMaxJCounterChain(cchain: Exp[CounterChain], en: Option[String], done: Option[String]=None) = {
 		val sym = cchain
     // 'En' and 'done' signal contract: Enable signal is declared here, done signal must be
     // declared before this method is called.
     // Both signals are defined here.
+    emitComment("MaxJCounterChain {")
     if (!enDeclaredSet.contains(sym)) {
       emit(s"""DFEVar ${quote(sym)}_en = ${en.get};""")
       enDeclaredSet += sym
     }
-    emit(s"""CounterChain ${quote(sym)}_chain = control.count.makeCounterChain(${quote(sym)}_en);""")
+    emit(s"""CounterChain ${quote(sym)} = control.count.makeCounterChain(${quote(sym)}_en);""")
 
     // For Pipes, max must be derived from PipeSM
     // For everyone else, max is as mentioned in the ctr
@@ -769,21 +774,21 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 			val Def(EatReflect(Counter_new(start, end, step, _))) = ctr
 			val max = parentOf(cchain.asInstanceOf[Rep[CounterChain]]) match {
 				case Some(s) => s.tp match {
+          //TODO
 					case p:Pipeline => s"${quote(ctr)}_max"
 					case _ => quote(end)
 				}
 				case None => quote(end)
 			}
-      val pre = if (par(ctr) == 1) "DFEVar" else "DFEVector<DFEVar>"
       if (par(ctr) == 1) {
-        emit(s"""$pre ${quote(ctr)} = ${quote(cchain)}_chain.addCounter(${quote(max)}, ${quote(step)});""")
+        emit(s"""${maxJPre(ctr)} ${quote(ctr)} = ${quote(cchain)}.addCounter(${quote(max)}, ${quote(step)});""")
       } else {
-        emit(s"""$pre ${quote(ctr)} = ${quote(cchain)}_chain.addCounterVect(${quote(par)}, ${quote(max)}, ${quote(step)});""")
+        emit(s"""${maxJPre(ctr)} ${quote(ctr)} = ${quote(cchain)}.addCounterVect(${quote(par)}, ${quote(max)}, ${quote(step)});""")
       }
     }
 
     val doneStr = if (!done.isDefined) {
-        s"stream.offset(${quote(cchain)}_chain.getCounterWrap(${quote(counters(0))}),-1)"
+        s"stream.offset(${quote(cchain)}.getCounterWrap(${quote(counters(0))}),-1)"
     } else {
       done.get
     }
@@ -795,6 +800,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       emit(s"""${quote(sym)}_done <== $doneStr;""")
   	}
 
+    emitComment("} MaxJCounterChain")
   }
 
 

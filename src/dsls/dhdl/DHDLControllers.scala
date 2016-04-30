@@ -133,7 +133,10 @@ trait DHDLControllers {
     }
 
     /* Parallel */
-    direct (MetaPipe) ("Parallel", Nil, MThunk(MUnit) :: MUnit) implements composite ${ pipe_parallel($0) }
+    direct (MetaPipe) ("Parallel", Nil, MThunk(MUnit) :: MUnit) implements composite ${
+      val pipe = pipe_parallel($0)
+      styleOf(pipe) = Parallel
+    }
 
     direct (MetaPipe) ("block_reduce_create", T, (CounterChain, MInt, BRAM(T), Indices ==> BRAM(T), (T,T) ==> T) :: MUnit) implements composite ${
       val tileDims = dimsOf($2)
@@ -180,6 +183,15 @@ trait DHDLControllers {
       	@ stream.println(emitBlock(func) + "")
 			}
 		}))
+    impl (unit_pipe) (codegen (dot, ${
+      $b[func]
+    }))
+    // --- MaxJ Backend
+    //pipe_parallel (extern)
+    //TODO
+    impl (unit_pipe) (codegen (maxj, ${
+      $b[func]
+    }))
 
 	}
 

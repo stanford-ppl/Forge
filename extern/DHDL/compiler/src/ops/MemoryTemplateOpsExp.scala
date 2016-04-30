@@ -516,7 +516,7 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplate
 	}
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) => // Load
+    case TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters, store) => // Load
 			val l = s"Tile${if (store) "Store" else "Load"}_" + quote(sym).split("_")(1)
       emit(s"""subgraph cluster_${quote(sym)} {""")
 			emit(s"""label="$l"""")
@@ -551,7 +551,8 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplate
 			}
 
 		case Offchip_new(size) =>
-			/* Special case to hand nodes producing size of offchip outside hardware scope */
+			/* Special case to hand nodes producing size of offchip outside hardware scope. Not actual
+       * codegen to Offchip_new */
 			def hackGen(x: Exp[Any]): Unit = x match {
 				case Def(EatReflect(_:Reg_new[_])) => // Nothing
 				case ConstFix(_) => // Nothing
@@ -571,73 +572,121 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplate
 				emittedSize = emittedSize + size
 			}
 			super.emitNode(sym, rhs)
-		
+
     case _ => super.emitNode(sym, rhs)
   }
 }
 
-trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
-	  val IR: ControllerTemplateOpsExp with OffChipMemOpsExp with DHDLCodegenOps with RegOpsExp with DHDLIdentifiers
+trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTemplateOps{
+  val IR: ControllerTemplateOpsExp with TpesOpsExp //with NosynthOpsExp
+          with OffChipMemOpsExp with RegOpsExp with CounterOpsExp with MetaPipeOpsExp with
+					DHDLPrimOpsExp with DHDLCodegenOps with CounterToolsExp with DeliteTransform
   import IR._
+
+  // Current TileLd/St templates expect that LMem addresses are
+  // statically known during graph build time in MaxJ. That can be
+  // changed, but until then we have to assign LMem addresses
+  // statically. Assigning each OffChipArray a 384MB chunk now
+  val burstSize = 384
+  var nextLMemAddr = burstSize * 1024 * 1024
+  def getNextLMemAddr() = {
+    val addr = nextLMemAddr
+    nextLMemAddr += burstSize * 1024 * 1024;
+    addr/burstSize
+  }
 
 	var emittedSize = Set.empty[Exp[Any]]
   override def initializeGenerator(buildDir:String): Unit = {
 		emittedSize = Set.empty[Exp[Any]]
+    nextLMemAddr = burstSize * 1024 * 1024
 		super.initializeGenerator(buildDir)
 	}
 
-  // Note that tileDims are not fixed point values yet - they're just integers
-  private def localDimsToStrides(dims: List[Int]) = List.tabulate(dims.length){d =>
-    if (d == dims.length - 1) 1
-    else dims.drop(d + 1).reduce(_*_)
-  }
-
-  // TODO: match on store = true or store = false if want as different gen rules
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case TileTransfer(mem,local,strides,memOfs,tileDims,cchain,iters, store) =>
+    case TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters, store) =>
+      //TODO: new language construct is much more flexible. Refine templete to remove these
+      //TileTransfer makes ctrchain explicit in IR, which requires modification in templete
+      //constrain
+      assert(strides.size<=2, "Do not support TileTransfer > 2 dimensions")
+      //tileStrides are stride for brams, which was assume to be the same as bram size in templete
+      // If control signals have not yet been defined, define them here
+      emitComment(s"TileTransfer ${if (store) "(store)" else "(load)"} {")
+      if (parentOf(sym).isEmpty) { //TODO
+        emit(s"""DFEVar ${quote(sym)}_en = top_en;""")
+        emit(s"""DFEVar ${quote(sym)}_done = dfeBool().newInstance(this);""")
+        emit(s"""top_done <== ${quote(sym)}_done;""")
+        //enDeclaredSet += n
+        //doneDeclaredSet += n
+      }
+      emitMaxJCounterChain(cchain, Some("cchain_en_TODO"))
+      emitNestedIdx(cchain, iters)
+      val dims = dimsOf(mem)
+      val scalarAddrT = s"""dfeUInt(MathUtils.bitsToAddress(
+        ${strides.map(t => quote(t)).reduce[String]{ case (ts1, ts2) => ts1 + "*" + ts2 }}))"""
+      if (store) {
+        emit(s"""DFEVector<DFEVar> ${quote(sym)}_raddr =
+          new DFEVectorType<DFEVar>($scalarAddrT, ${par(sym)}).newInstance(this);""")
+        emit(s"""DFEVector<DFEVar> ${quote(sym)}_rdata =
+          ${quote(local)}.connectRport(${quote(sym)}_raddr);""")
+        if (isDblBuf(local)) {
+          //if (n.buf.getReaders().contains(n)) {
+          //  val r = n
+          //  if (!rdoneSet(n.buf).contains(r)) {
+              emit(s"""${quote(local)}.connectRdone(${quote(sym)}_done);""")
+          //    rdoneSet(n.buf) += r
+          //  }
+          //}
+        }
+      } else {
+			  val ts = tpstr(par(local))(local.tp.typeArguments.head, implicitly[SourceContext])
+        // Emit control signals
+        emit(s"""DFEVar ${quote(sym)}_wen = dfeBool().newInstance(this);""")
+        emit(s"""DFEVector<DFEVar> ${quote(sym)}_waddr =
+          new DFEVectorType<DFEVar>($scalarAddrT, ${par(sym)}).newInstance(this);""")
+        emit(s"""DFEVector<DFEVar> ${quote(sym)}_wdata =
+            new DFEVectorType<DFEVar>(${ts}, ${par(sym)}).newInstance(this);""")
+        emit(s"""${quote(local)}.connectWport(${quote(sym)}_waddr, ${quote(sym)}_wdata, ${quote(sym)}_wen);""")
+        //emit(s"""${n.isLoading} <== Reductions.streamHold(${quote(sym)}_isLoading, ${quote(sym)}_en);""")
+      }
+
+      emit(s"""DFEVar ${quote(sym)}_forceLdSt = force_TODO;""") //TODO
+      emit(s"""DFEVar ${quote(sym)}_isLoading = dfeBool().newInstance(this);""")
+
+      emit(s"""new BlockStorerLib( owner, """)
+      emit(s"""${quote(sym)}_en, ${quote(sym)}_done,""")
+      //emit(s"""${quote(sym)}_isLoading, ${quote(sym)}_forceLdSt,""") TODO
+      emit(s"""${if (dims.size==1) 1 else quote(dims(1))},""")
+      emit(s"""${quote(iters(0))}, ${quote(if (iters.size==1) 0 else iters(1))},""")
+      emit(s"""${quote(mem)}, "${quote(mem)}_${quote(sym)}_${if (store) "out" else "in"}",""")
+      emit(s"""${quote(strides(0))}, ${if (strides.size==1) 1 else quote(strides(1))},""")
+      if (store)
+        emit(s"""${quote(sym)}_raddr, ${quote(sym)}_rdata);""")
+      else
+        emit(s"""${quote(sym)}_waddr, ${quote(sym)}_wdata, ${quote(sym)}_wen);""")
+      
+      emitComment(s"} TileTransfer ${if (store) "(store)" else "(load)"}")
 
 		case Offchip_new(size) =>
-			/* Special case to hand nodes producing size of offchip outside hardware scope */
-			def hackGen(x: Exp[Any]): Unit = x match { 
-				case Def(EatReflect(_:Reg_new[_])) => // Nothing
-				case ConstFix(_) => // Nothing
-				case ConstFlt(_) => // Nothing
-				case Def(d) => 
-					alwaysGen {
-						emitNode(x.asInstanceOf[Sym[Any]], d)
-					}
-					syms(d).foreach{ s => s match {
-							case _ => hackGen(s)
-						}
-					}
-				case _ => // Nothing
-			}
-			if (!emittedSize.contains(size)) {
-				hackGen(size)
-				emittedSize = emittedSize + size
-			}
-			super.emitNode(sym, rhs)
+      alwaysGen {
+        emit(s"""int ${quote(sym)} = ${getNextLMemAddr()};""")
+      }
 
 		case Reg_new(init) =>
+      emitComment("Reg_new {")
 			val ts = tpstr(par(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
 			regType(sym) match {
 				case Regular =>
-					//TODO
-          val parent = if (parentOf(sym).isEmpty) "Top" else quote(parentOf(sym).get)
+          val parent = if (parentOf(sym).isEmpty) "Top" else quote(parentOf(sym).get) //TODO
 					if (isDblBuf(sym)) {
-						emit(s"""DblRegFileLib ${quote(sym)}_lib = 
-							new DblRegFileLib(this,$ts, ${quote(sym)}, ${par(sym)});""")
-            if (par(sym) > 1) {
-								emit(s"""DFEVector<DFEVar> ${quote(sym)} = ${quote(sym)}_lib.readv()""")
-             } else {
-              	emit(s"""DFEVar ${quote(sym)} = ${quote(sym)}_lib.read()""")
-           	}
+						emit(s"""DblRegFileLib ${quote(sym)}_lib = new DblRegFileLib(this, $ts, ${quote(sym)}, ${par(sym)});""")
+            val readstr = if (par(sym)>1) "readv" else "read" 
+            emit(s"""${maxJPre(sym)} ${quote(sym)} = ${quote(sym)}_lib.${readstr}()""")
            	emit(quote(sym) + "_lib.connectWdone(" + quote(writerOf(sym).get._1) + "_done);")
-            readersOf(sym).foreach { case (r,_) =>
+            readersOf(sym).foreach { case (r, _) =>
            	  emit(quote(sym) +"_lib.connectRdone(" + quote(r) + "_done);")
            	}
           } else {
-          		emit(s"""${quote(maxJPre(sym))} ${quote(sym)} = ${quote(ts)}.newInstance(this);""")
+            emit(s"""${quote(maxJPre(sym))} ${quote(sym)} = ${quote(ts)}.newInstance(this);""")
 					}
 				case ArgumentIn =>  // alwaysGen
         	alwaysGen {
@@ -645,44 +694,126 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
 				  }
 				case ArgumentOut => //emitted in reg_write
 			}
+      emitComment("} Reg_new")
 
 		case e@Reg_write(reg, value) => 
+      emitComment("Reg_write {")
 			val ts = tpstr(par(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
 			if (isDblBuf(reg)) {
-			 	emit(quote(reg) + "_lib.write(" + value + ", " + quote(writerOf(reg).get._1) + "_done);")
+			 	emit(s"""${quote(reg)}_lib.write(${value}, ${quote(writerOf(reg).get._1)}_done);""")
       } else {
 				regType(reg) match {
-					case Regular => //TODO
-      		  val parent = if (parentOf(reg).isEmpty) "top" else quote(parentOf(reg).get)
+					case Regular =>
+      		  val parent = if (parentOf(reg).isEmpty) "top" else quote(parentOf(reg).get) //TODO
       		  val rst = quote(parent) + "_rst_en"
 					  if (writerOf(reg).isEmpty)
-					  	throw new Exception("Reg " + quote(reg) + " is not written by a controller, which is not supported at the moment")
+					  	throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
 					  val enSignalStr = writerOf(reg).get._1 match {
-					  	case p@Def(Pipe_foreach(cchain,_,_)) => styleOf(reg) match {
-					  		case Fine =>
-					  			emit(quote(cchain) + "_en_from_pipesm")
-					  		case _ =>
-					  			emit(quote(writerOf(reg).get._1) + "_en")
+					  	case p@Def(EatReflect(Pipe_foreach(cchain,_,_))) => styleOf(p) match {
+					  		case Fine => quote(cchain) + "_en_from_pipesm"
+					  		case _ => quote(p) + "_en"
 					  	}
-					  	case p@Def(Pipe_reduce(cchain, _, _, _, _, _, _, _, _, _, _, _)) => styleOf(reg) match {
-					  		case Fine =>
-					  			emit(quote(cchain) + "_en_from_pipesm")
-					  		case _ =>
-					  			emit(quote(writerOf(reg).get._1) + "_en")
+					  	case p@Def(EatReflect(Pipe_reduce(cchain, _, _, _, _, _, _, _, _, _, _, _))) => styleOf(p) match {
+					  		case Fine => quote(cchain) + "_en_from_pipesm"
+					  		case _ => quote(p) + "_en"
 					  	}
-					  	case _ =>
+					  	case p@_ => val Def(d) = p 
+                          throw new Exception(s"Reg ${quote(reg)} is written by non Pipe node ${p} def:${d}")
 					  }
       		  emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}; // enable""")
       		  emit(s"""DFEVar ${quote(reg)}_hold = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writerOf(reg).get._1)}_redLoop_done));""")
-						//TODO: check with Raghu
-						val Def(EatReflect(Reg_new(init))) = reg
-      		  emit(s"""${quote(reg)} <== $rst ? constant.var(${tpstr(par(reg))(reg.tp,implicitly[SourceContext])}, ${quote(init)}):stream.offset(${quote(reg)}_hold,-${quote(writerOf(reg).get._1)}_offset); // reset""")
-				case ArgumentIn => new Exception("Cannot write to Argument Out! " + quote(reg))
-				case ArgumentOut =>
-				 	val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"
+      		  emit(s"""${quote(reg)} <== $rst ? constant.var($ts, ${quote(resetValue(reg))}):stream.offset(${quote(reg)}_hold, -${quote(writerOf(reg).get._1)}_offset); // reset""")
+				  case ArgumentIn => new Exception("Cannot write to Argument Out! " + quote(reg))
+				  case ArgumentOut =>
+				 	  val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done" //TODO
       	  	emit(s"""io.scalarOutput(${quote(reg)}, ${quote(value)}, $ts, $controlStr);""")
 				}
 			}
+      emitComment("} Reg_write")
+
+    case Bram_new (size, zero) =>
+      emitComment("Bram_new {")
+			val ts = tpstr(par(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
+      //TODO: does templete assume bram has 2 dimension?
+      val dims = dimsOf(sym)
+      val size0 = dims(0)
+      val size1 = if (dims.size==1) 1 else dims(1)
+      if (isDblBuf(sym)) {
+        //readers.foreach { r =>
+        //  if (!readerToMemMap.contains(r)) readerToMemMap += r -> Set[MemNode]()
+        //  readerToMemMap(r) += n
+        //}
+        //rdoneSet += n -> Set()
+
+        //emit(s"""// ${quote(sym)} has ${readersOf(sym).size} readers - ${readersOf(sym)}""")
+        emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_DblBufSM(this));""")
+        val dims = dimsOf(sym)
+        emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm, 
+          $size0, $size1, $ts, ${banks(sym)}, stride_TODO, ${readersOf(sym).size});""")
+        if (writerOf(sym).isEmpty)
+          throw new Exception(s"Bram ${quote(sym)} has no writer!")
+          //  If writer is a unit Pipe, wait until parent is finished
+        //val doneSig = n.getWriter().getOrElse(throw new Exception(s"BRAM $n has no writer")) match {
+        //  case p: Pipe if p.isUnitPipe =>
+        //    var writer = p.getParent()
+        //    while (!(writer.isInstanceOf[Sequential] || writer.isInstanceOf[MetaPipeline])) {
+        //      writer = writer.getParent()
+        //    }
+        //    s"${quote(writer)}_done"
+        //  case _ =>
+        //    s"${quote(n.getWriter())}_done"
+        //}
+
+      val doneSig = ""
+        emit(s"""${quote(sym)}.connectWdone($doneSig);""")
+      } else {
+        emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${size1}, ${ts}, ${banks(sym)}, stride_TODO);""")
+      }
+      emitComment("} Bram_new")
+		
+    case Bram_load(bram, addr) =>
+      emitComment("Bram_load {")
+			val pre = maxJPre(bram)
+      emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
+      if (isDblBuf(bram)) {
+        if (parentOf(bram).isEmpty)
+          throw new Exception("Bram (DblBuf)" + quote(bram) + " does not have a parent!")
+        val p = parentOf(bram).get
+        if (readersOf(bram).map(_._1).contains(p)) {
+          //if (!rdoneSet(mem).contains(r)) { TODO
+          emit(s"""${quote(bram)}.connectRdone(${p}_done);""")
+          //rdoneSet(mem) += r
+          //}
+        }
+      }
+      // Handle if loading a composite type
+      //n.compositeValues.zipWithIndex.map { t =>
+      //  val v = t._1
+      //  val idx = t._2
+      //  visitNode(v)
+      //  emit(s"""${quote(v)} <== ${quote(sym)}[$idx];""")
+      //}
+      emitComment("} Bram_load")
+
+    case Bram_store(bram, addr, value) =>
+      emitComment("Bram_store {")
+			val dataStr = quote(value)
+      if (isAccum(bram)) {
+        val offsetStr = quote(writerOf(bram).get._1) + "_offset"
+        val parentPipe = parentOf(bram).getOrElse(throw new Exception(s"Bram ${quote(bram)} does not have a parent!"))
+        val parentCtr = parentPipe match {
+          case Def(EatReflect(d)) => d match {
+            case d:Pipe_reduce[_,_] => d.cchain
+            case d:Pipe_foreach => d.cchain
+          }
+          case p => throw new Exception(s"Unknown parent type ${p}!")
+        }
+        emit(s"""$bram.connectWport(stream.offset($addr, -$offsetStr), 
+          stream.offset($dataStr, -$offsetStr), ${quote(parentCtr)}_en_from_pipesm, start_TODO, stride_TODO);""")
+      } else {
+         emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(parentOf(bram).get)}_en, start_TODO, stride_TODO ;""") //TODO
+      }
+      emitComment("} Bram_store")
 
     case _ => super.emitNode(sym, rhs)
   }

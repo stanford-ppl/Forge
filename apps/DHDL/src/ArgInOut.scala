@@ -9,21 +9,27 @@ trait ArgInOut extends DHDLApplication {
 
   def main() {
 
+  type Elem = SInt 
     //println("vec1: " + vec1.mkString(", "))
     //println("vec2: " + vec2.mkString(", "))
 
-  	val a = ArgIn[SInt]("a")
-  	val b = ArgIn[SInt]("b")
-    val out = ArgOut[SInt]("out")
+    val N = 8;
+    val tileSize = 4;
 
-    setArg(a, 1)
-    setArg(b, 1)
+    val out = ArgOut[Elem]("out")
 
+    val v1 = OffChipMem[Elem]("v1", N)
+    val v2 = OffChipMem[Elem]("v2", N)
     Accel {
-			Pipe{
-				out := a.value + b.value
-			}
+      val b1 = BRAM[Elem]("b1", tileSize)
+      val b2 = BRAM[Elem]("b2", tileSize)
+      Parallel {
+        b1 := v1(0::tileSize)
+        b2 := v2(0::tileSize)
+      }
+      Pipe((0 until N), out){ ii => b1(ii) * b2(ii) }{_+_}
     }
-
+    val result = getArg(out)
+    println(result)
   }
 }

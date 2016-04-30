@@ -17,6 +17,7 @@ trait DHDLEnums {
     identifier (PipeStyle) ("Fine")     // inner-loop pipeline
     identifier (PipeStyle) ("Coarse")   // metapipeline
     identifier (PipeStyle) ("Disabled") // sequential metapipeline
+    identifier (PipeStyle) ("Parallel") // parallel metapipeline 
   }
 
 }

@@ -52,7 +52,7 @@ trait ForgeGenReStructuredText extends ForgeCodeGenDocBase {
 
   def link(x: String, path: String) = {
     //if (inCodeBlock) "`:doc:`"+x+" </"+path+">`:code:`"
-    ":doc:`"+x+" </"+path+">`"
+    ":doc:`"+x+" <"+path+">`"
   }
   def docref(path:String) = ":doc:`"+path+"`"//":ref:`"+path+"`"
   def ref(path: String) = path + "_"

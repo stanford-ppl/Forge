@@ -504,7 +504,7 @@ trait ForgePreprocessor {
           if (input(j) == '*') { j += 1 }
           //if (j > i) { j = lineStart }
 
-          if (j < i) output ++= input.slice(j, i+1) // Add the line to the output
+          if (j <= i) output ++= input.slice(j, i+1) // Add the line to the output
           i += 1
         }
         output ++= ("\"\"\")").getBytes

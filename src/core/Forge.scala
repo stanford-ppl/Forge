@@ -122,7 +122,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
   def isForgePrimitiveType(t: Rep[DSLType]) = t match {
     case Def(Tpe("ForgeArray",_,_)) | Def(Tpe("ForgeArrayBuffer",_,_)) | Def(Tpe("ForgeHashMap",_,_)) => true
     case Def(Tpe("ForgeFileInputStream",_,_)) | Def(Tpe("ForgeFileOutputStream",_,_)) => true
-    case _ => isScalaPrimitiveType(t) || primitiveTypes.contains(t)
+    case _ => isScalaPrimitiveType(t) || primitiveTypes.contains(t) || primitiveStructs.contains(t)
   }
 
   def isMetaType(a: Exp[DSLGroup]) = a match {

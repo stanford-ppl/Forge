@@ -37,6 +37,14 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
     case Def(TpeClass(s,sig,args)) if docGroups.contains(x.asInstanceOf[Exp[DSLGroup]]) =>
       docref(relFileName(x.asInstanceOf[Exp[DSLGroup]])) + escapeSpecial(makeTpePars(args))
 
+    case Def(TpeAlias(s,t)) if docGroups.contains(extractTpe(t)) =>
+      link(s, relFileName(extractTpe(t).asInstanceOf[Exp[DSLGroup]])) + escapeSpecial(makeTpePars(t.tpePars))
+
+    case Def(FTpe(args,ret,freq)) =>
+      val a = args.map(a => quote(a.tpe)).mkString(", ")
+      val argsWithParens = if (args.length > 1) "(" + a + ")" else a
+      argsWithParens + " => " + quote(ret)
+
     case _ => super.quote(x)
   }
 
@@ -156,7 +164,7 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
     val intro = new PrintWriter(new FileWriter(srcDir+File.separator+"intro.rst"))
     intro.println(sect("Introduction"))
     intro.println()
-    DSLBloc.getOrElse("<stub>").split(nl).map(_.trim()).foreach{line => intro.println(line) }
+    DSLBloc.getOrElse("<stub>").split(nl).foreach{line => intro.println(line) }
     intro.println()
     intro.println("This document was auto-generated using `Sphinx <http://www.sphinx-doc.org/en/stable/>`_.")
     intro.println("For corrections, post an issue on `GitHub Issues <https://github.com/stanford-ppl/Forge/issues/>`_ .")
@@ -170,7 +178,7 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
         pw.println(sect(title))
         pw.println()
         pw.println(".. toctree::")
-        list.map(doc => fileName(doc.grp)).toArray.sorted.foreach{file => pw.println("   ops/"+file)}
+        list.toArray.sortBy(doc => doc.header.title).foreach{doc => pw.println("   ops/"+fileName(doc.grp)) }
         pw.close()
       }
     }
@@ -191,7 +199,7 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
     index.close()
   }
 
-  def emitGroupHeader(grp: String, desc: GrpDescription, stream: PrintWriter): Unit = {
+  def emitGroupHeader(grp: String, desc: GroupHeader, stream: PrintWriter): Unit = {
     stream.println()
     colors.foreach{color => stream.println(".. role:: " + color) }
     stream.println()
@@ -213,6 +221,21 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
     stream.println(subsect(style))
     stream.println()
   }
+
+  def emitAliases(aliases: List[Exp[TypeAlias]], stream: PrintWriter): Unit = {
+    stream.println(subsect("Type Aliases"))
+    stream.println()
+    asTable(stream){
+      aliases.foreach{alias =>
+        val desc = GrpDoc.get(alias).map{desc => desc.split(nl).map(_.trim()).mkString(" ")}.getOrElse("")
+        tableRow(bold("type"), alias.name + makeTpePars(alias.tpe.tpePars), quote(alias.tpe), desc)
+        //stream.println("  " + bold("type") + " " + alias.name  + " = " + quote(alias.tpe) + desc)
+        //stream.println()
+      }
+    }
+    stream.println()
+  }
+
 
   def emitOpDescription(desc: OpDescription, signature: String, stream: PrintWriter): Unit = {
     stream.println(signature)

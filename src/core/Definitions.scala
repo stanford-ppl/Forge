@@ -213,6 +213,7 @@ trait Definitions extends DerivativeTypes {
   // blacklist for op names that need the SourceContext implicit parameter to be surpressed (usually because they construct an object with an apply method)
   var noSourceContextList = List[String]()
 
+  var primitiveStructs = List[Rep[DSLType]]()
   var primitiveTypes = List[Rep[DSLType]]()
 
   /**

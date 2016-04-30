@@ -32,6 +32,7 @@ trait ForgeOps extends Base with ForgeTraversalOps {
   def figmentTpe(name: String, tpePars: List[Rep[TypePar]] = Nil) = forge_figment_tpe(name, tpePars)
 
   def doc(blk: String): Rep[Unit] = forge_doc(blk)
+  def docAs(tpe: Rep[DSLType], name: String): Rep[Unit] = forge_doc_as(tpe, name)
   def summary(blk: String): Rep[Unit] = forge_dsl_summary(blk)
 
   implicit def namedTpeToArg(arg: (String, Rep[DSLType])): Rep[DSLArg] = forge_arg(arg._1, arg._2, None)
@@ -154,6 +155,7 @@ trait ForgeOps extends Base with ForgeTraversalOps {
   def forge_add_parent_tpe(tpe: Rep[DSLType], parent: Rep[DSLType]): Rep[DSLType]
 
   def forge_doc(blk: String): Rep[Unit]
+  def forge_doc_as(tpe: Rep[DSLType], name: String): Rep[Unit]
   def forge_dsl_summary(blk: String): Rep[Unit]
 }
 
@@ -306,6 +308,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
   /*
    * Documentation
    */
+  val DocAs = HashMap[Exp[DSLType],String]()
   val OpDoc = HashMap[Exp[DSLOp],String]()
   val GrpDoc = HashMap[Exp[DSLGroup],String]()
   val IdDoc = HashMap[Exp[DSLIdentifier],String]()
@@ -326,6 +329,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
     val tpe = TpeAliases.find(_.name == tpeName)
     if (tpe.isEmpty)
       err("Lookup failed: no tpeAlias exists with name " + tpeName)
+
     tpe.get
   }
 
@@ -334,19 +338,22 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
     if (t.isEmpty) {
       err("Lookup failed: no tpe exists with name " + tpeName + " and stage " + stage)
     }
-    if (DocBloc.isDefined) {
+    /*if (DocBloc.isDefined && !GrpDoc.contains(t.get)) {
+      info("[ lookupTpe " + t.get.name + "] Using doc bloc " + DocBloc.get)
       GrpDoc += t.get -> DocBloc.get
       DocBloc = None
-    }
+    }*/
     t.get
   }
 
   def forge_lookup_tpe_class(tpeClassName: String): Option[Rep[DSLTypeClass]] = {
     val t = TpeClasses.find(t => t.signature.name == tpeClassName)
-    if (t.isDefined && DocBloc.isDefined) {
+    // Called implicitly - documentation here causes real docs to get swallowed
+    /*if (t.isDefined && DocBloc.isDefined) {
+      info("[ lookupTpeClass " + t.get.name + "] Using doc bloc " + DocBloc.get)
       GrpDoc += t.get -> DocBloc.get
       DocBloc = None
-    }
+    }*/
     t
   }
 
@@ -355,10 +362,11 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
     if (t.isEmpty) {
       err("lookup failed: no grp exists with name " + grpName)
     }
-    if (DocBloc.isDefined) {
+    /*if (DocBloc.isDefined && !GrpDoc.contains(t.get)) {
+      info("[ lookupGrp " + t.get.name + "] Using doc bloc " + DocBloc.get)
       GrpDoc += t.get -> DocBloc.get
       DocBloc = None
-    }
+    }*/
     t.get
   }
 
@@ -391,7 +399,8 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
 
   def forge_grp(name: String) = {
     val grp: Rep[DSLGroup] = Grp(name)
-    if (DocBloc.isDefined) {
+    if (DocBloc.isDefined && !GrpDoc.contains(grp)) {
+      info("[ grp " + grp.name + "] Using doc bloc " + DocBloc.get)
       GrpDoc += grp -> DocBloc.get
       DocBloc = None
     }
@@ -402,8 +411,14 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
   case class TpeAlias(name: String, tpe: Rep[DSLType]) extends Def[TypeAlias]
 
   def forge_tpealias(name: String, tpe: Rep[DSLType]) = {
-    val ta = TpeAlias(name,tpe)
+    val ta: Rep[TypeAlias] = TpeAlias(name,tpe)
     if (!TpeAliases.contains(ta)) TpeAliases += ta
+
+    if (DocBloc.isDefined && !GrpDoc.contains(ta)) {
+      GrpDoc += ta -> DocBloc.get
+      DocBloc = None
+    }
+
     ta
   }
 
@@ -423,7 +438,8 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
   def forge_tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag) = {
     val t: Exp[DSLType] = Tpe(name, tpePars, stage)
     if (!Tpes.contains(t)) Tpes += t
-    if (DocBloc.isDefined) {
+    if (DocBloc.isDefined && !GrpDoc.contains(t)) {
+      info("[ tpe " + t.name + "] Using doc bloc " + DocBloc.get)
       GrpDoc += t -> DocBloc.get
       DocBloc = None
     }
@@ -487,7 +503,8 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
   def forge_tpeclass(name: String, signature: TypeClassSignature, tpePars: List[Rep[TypePar]]) = {
     val t: Exp[DSLTypeClass] = TpeClass(name, signature, tpePars)
     if (!TpeClasses.contains(t)) TpeClasses += t
-    if (DocBloc.isDefined) {
+    if (DocBloc.isDefined && !GrpDoc.contains(t)) {
+      info("[ tpeClass " + t.name + "] Using doc bloc " + DocBloc.get)
       GrpDoc += t -> DocBloc.get
       DocBloc = None
     }
@@ -542,7 +559,8 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
     else {
       Identifiers += id
     }
-    if (DocBloc.isDefined) {
+    if (DocBloc.isDefined && !IdDoc.contains(id)) {
+      info("[ identifier " + id.name + "] Using doc bloc " + DocBloc.get)
       IdDoc += id -> DocBloc.get
       DocBloc = None
     }
@@ -605,7 +623,8 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
     val o = toAtom(Op(_grp, name, style, visibility, tpePars, args, curriedArgs, amendedImplicitArgs, retTpe, effect, aliasHint))
     opsGrp.ops :+=  o // append is required for lookups in declaration order
 
-    if (DocBloc.isDefined) {
+    if (DocBloc.isDefined && !OpDoc.contains(o)) {
+      info("[ op " + o.name + "] Using doc bloc " + DocBloc.get)
       OpDoc += o -> DocBloc.get
       DocBloc = None
     }
@@ -714,6 +733,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
 
   /* Creates a local documentation to be used on the next op or data structure definition */
   def forge_doc(blk: String): Rep[Unit] = { DocBloc = Some(blk) }
+  def forge_doc_as(tpe: Rep[DSLType], name: String): Rep[Unit] = { DocAs += tpe -> name; () }
   def forge_dsl_summary(blk: String): Rep[Unit] = { DSLBloc = Some(blk) }
 }
 

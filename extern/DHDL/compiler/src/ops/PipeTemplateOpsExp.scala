@@ -68,6 +68,7 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
   case class Counter_new(start: Rep[Idx], end: Rep[Idx], step: Rep[Idx], par: Param[Int])(implicit val ctx: SourceContext) extends Def[Counter]
   case class Counterchain_new(counters: List[Rep[Counter]], nIter: Block[Idx])(implicit val ctx: SourceContext) extends Def[CounterChain]
 
+
   // --- Internals
   def pipe_foreach(cchain: Rep[CounterChain], func: Rep[Indices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Pipeline] = {
     val inds = List.fill(lenOf(cchain)){ fresh[Idx] } // Arbitrary number of bound args. Awww yeah.
@@ -467,7 +468,7 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
       emitBlock(ldFunc, quote(sym) + "_ldFunc", "ldFunc", ldFillColor)
       emitValDef(rV._1, getBlockResult(ldFunc))
       emitValDef(rV._2, getBlockResult(func))
-      emitBlock(rFunc, quote(sym) + "_reduceFunc", "reduceFunc", reduceFillColor)  
+      emitBlock(rFunc, quote(sym) + "_reduceFunc", "reduceFunc", reduceFillColor)
       emitValDef(res, getBlockResult(rFunc))
       emitBlock(stFunc, quote(sym) + "_stFunc", "stFunc" , stFillColor)
       emit("}")
@@ -490,21 +491,21 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
 				case Def(ConstFix(n)) => n.toString
 				case Def(ConstFlt(n)) => n.toString
 				case _ => {
-					var tstr = s.tp.erasure.getSimpleName() 
-					tstr = tstr.replace("DHDL","") 
+					var tstr = s.tp.erasure.getSimpleName()
+					tstr = tstr.replace("DHDL","")
 					s.tp match {
 						case ss:Register[_] =>
 							tstr = tstr.replace("Register", regType(s) match {
 								case Regular => "Reg"
 								case ArgumentIn => "ArgIn"
 								case ArgumentOut => "ArgOut"
-							}) 
+							})
 						case ss:Pipeline =>
 							tstr = tstr.replace("Pipeline", styleOf(s) match {
 								case Fine => "Pipe"
 								case Coarse => "MetaPipe"
 								case Disabled => "Sequential"
-							}) 
+							})
 						case _ => //println(s.tp)
 					}
 					tstr = tstr.replace("BlockRAM", "BRAM")
@@ -521,7 +522,7 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
 					quoteStr
 				}
 			}
-    case s => super.quote(x) 
+    case s => super.quote(x)
   }
 }
 
@@ -535,13 +536,13 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 
   override def quote(x: Exp[Any]) = x match {
 		case s@Sym(n) => {
-			var tstr = s.tp.erasure.getSimpleName() 
-			tstr = tstr.replace("DHDL","") 
+			var tstr = s.tp.erasure.getSimpleName()
+			tstr = tstr.replace("DHDL","")
 			tstr = tstr.replace("Register", regType(s) match {
 				case Regular => "Reg"
 				case ArgumentIn => "ArgIn"
 				case ArgumentOut => "ArgOut"
-			}) 
+			})
 			tstr = tstr.replace("BlockRAM", "BRAM")
 			tstr + (if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
 		}
@@ -594,7 +595,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
     emitComment(s"Block ${blockName} {")
     emitBlock(y)
     emitComment(s"} Block ${blockName}")
-  } 
+  }
 
 	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = {
     val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
@@ -649,11 +650,11 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 
     /* State Machine Instatiation */
     emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_${smStr}(this));""")
-    // IO 
+    // IO
     emit(s"""${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
     emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
     styleOf(sym) match {
-      case Fine => 
+      case Fine =>
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case Coarse =>
 		    val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
@@ -676,7 +677,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 		  	doneDeclaredSet += c
 		  }
     }
-    
+
     if (styleOf(sym)!=Parallel) {
       emitCChainCtrl(sym, cchain.get)
     }
@@ -710,7 +711,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 		emit(s"""DFEVar ${quote(cchain)}_done = dfeBool().newInstance(this);""")
 		doneDeclaredSet += cchain
     styleOf(sym) match {
-      case Fine => 
+      case Fine =>
         val Def(EatReflect(d)) = sym; d match {
           case n:Pipe_foreach =>
             val writesToAccumRam = writtenIn(sym).exists {s => s match {

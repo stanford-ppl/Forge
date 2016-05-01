@@ -15,10 +15,9 @@ trait DotProduct extends DHDLApplication {
   lazy val dataSize = ArgIn[SInt]("dataSize")
 
   def dotproduct(v1: Rep[OffChipMem[Elem]], v2: Rep[OffChipMem[Elem]], out: Rep[Reg[Elem]]) {
-    val b1 = BRAM[Elem]("b1", tileSize)
-    val b2 = BRAM[Elem]("b2", tileSize)
-
     MetaPipe((dataSize by tileSize) par outerPar, out){ i =>
+      val b1 = BRAM[Elem]("b1", tileSize)
+      val b2 = BRAM[Elem]("b2", tileSize)
       Parallel {
         b1 := v1(i::i+tileSize, innerPar)
         b2 := v2(i::i+tileSize, innerPar)

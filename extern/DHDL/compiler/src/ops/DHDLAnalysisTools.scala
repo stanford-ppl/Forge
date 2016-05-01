@@ -39,7 +39,14 @@ trait PipeStageToolsExp extends EffectExp {
     case Def(d) => isOuterControl(s) || isInnerControl(s) || isTileTransfer(d)
     case _ => false
   }
-
+  def isOuterLoop(s: Exp[Any]): Boolean = s match {
+    case Def(d) => isLoop(d) && styleOf(s) != Fine
+    case _ => false
+  }
+  def isInnerLoop(s: Exp[Any]): Boolean = s match {
+    case Def(d) => isLoop(d) && styleOf(s) == Fine
+    case _ => false
+  }
   def isOuterControl(s: Exp[Any]): Boolean = s match {
     case Def(d) => (isPipeline(d) && styleOf(s) != Fine) || isParallel(d)
     case _ => false
@@ -73,6 +80,12 @@ trait PipeStageToolsExp extends EffectExp {
     case EatReflect(_:Pipe_reduce[_,_]) => true
     case EatReflect(_:Block_reduce[_]) => true
     case EatReflect(_:Unit_pipe) => true
+    case _ => false
+  }
+  def isLoop(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:Pipe_foreach) => true
+    case EatReflect(_:Pipe_reduce[_,_]) => true
+    case EatReflect(_:Block_reduce[_]) => true
     case _ => false
   }
 }

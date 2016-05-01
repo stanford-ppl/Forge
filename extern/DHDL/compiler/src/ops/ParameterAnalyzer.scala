@@ -18,7 +18,7 @@ trait ParamRestrictions extends Expressions {
     if (name == "") s"$x" else name
   }
 
-  type CRange = scala.collection.immutable.Range
+  type RRange = scala.collection.immutable.Range
 
   trait Restrict {this: Product =>
     def evaluate: Boolean
@@ -80,14 +80,14 @@ trait ParamRestrictions extends Expressions {
     }
   }
   object Domain {
-    def apply(r: CRange, setter: Int => Unit) = {
+    def apply(r: RRange, setter: Int => Unit) = {
       if (r.start % r.step != 0) {
         val start = r.step*(r.start/r.step + 1)
         new Domain[Int]((start until r.end by r.step).toList :+ r.start, setter)
       }
       else new Domain[Int](r.toList, setter)
     }
-    def restricted(r: CRange, setter: Int => Unit, cond: () => Boolean) = {
+    def restricted(r: RRange, setter: Int => Unit, cond: () => Boolean) = {
       val values = ArrayBuffer[Int]()
       var start = r.start
       if (r.start % r.step != 0) {
@@ -103,7 +103,7 @@ trait ParamRestrictions extends Expressions {
     }
   }
 
-  def prune(params: List[Param[Int]], ranges: HashMap[Param[Int],CRange], restrict: List[Restrict]) = {
+  def prune(params: List[Param[Int]], ranges: HashMap[Param[Int],RRange], restrict: List[Restrict]) = {
     val pruneSingle = params.map{t =>
       val restricts = restrict.filter(_.dependsOnlyOn(t))
       t -> Domain.restricted(ranges(t), {c: Int => t.setValue(c)}, () => restricts.forall(_.evaluate))
@@ -134,7 +134,7 @@ trait ParameterAnalyzer extends Traversal {
 
   var tileSizes  = List[Param[Int]]()  // Params used to calculate BRAM size
   var parFactors = List[Param[Int]]()  // Params used as parallelization factors for counters
-  val range      = HashMap[Param[Int],CRange]()
+  val range      = HashMap[Param[Int],RRange]()
 
   var restrict   = List[Restrict]()
   var innerLoop  = false

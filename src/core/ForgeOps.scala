@@ -400,7 +400,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
   def forge_grp(name: String) = {
     val grp: Rep[DSLGroup] = Grp(name)
     if (DocBloc.isDefined && !GrpDoc.contains(grp)) {
-      info("[ grp " + grp.name + "] Using doc bloc " + DocBloc.get)
+      //info("[ grp " + grp.name + "] Using doc bloc " + DocBloc.get)
       GrpDoc += grp -> DocBloc.get
       DocBloc = None
     }
@@ -439,7 +439,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
     val t: Exp[DSLType] = Tpe(name, tpePars, stage)
     if (!Tpes.contains(t)) Tpes += t
     if (DocBloc.isDefined && !GrpDoc.contains(t)) {
-      info("[ tpe " + t.name + "] Using doc bloc " + DocBloc.get)
+      //info("[ tpe " + t.name + "] Using doc bloc " + DocBloc.get)
       GrpDoc += t -> DocBloc.get
       DocBloc = None
     }
@@ -504,7 +504,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
     val t: Exp[DSLTypeClass] = TpeClass(name, signature, tpePars)
     if (!TpeClasses.contains(t)) TpeClasses += t
     if (DocBloc.isDefined && !GrpDoc.contains(t)) {
-      info("[ tpeClass " + t.name + "] Using doc bloc " + DocBloc.get)
+      //info("[ tpeClass " + t.name + "] Using doc bloc " + DocBloc.get)
       GrpDoc += t -> DocBloc.get
       DocBloc = None
     }
@@ -560,7 +560,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
       Identifiers += id
     }
     if (DocBloc.isDefined && !IdDoc.contains(id)) {
-      info("[ identifier " + id.name + "] Using doc bloc " + DocBloc.get)
+      //info("[ identifier " + id.name + "] Using doc bloc " + DocBloc.get)
       IdDoc += id -> DocBloc.get
       DocBloc = None
     }
@@ -624,7 +624,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp with ForgeTraversalOpsExp {
     opsGrp.ops :+=  o // append is required for lookups in declaration order
 
     if (DocBloc.isDefined && !OpDoc.contains(o)) {
-      info("[ op " + o.name + "] Using doc bloc " + DocBloc.get)
+      //info("[ op " + o.name + "] Using doc bloc " + DocBloc.get)
       OpDoc += o -> DocBloc.get
       DocBloc = None
     }

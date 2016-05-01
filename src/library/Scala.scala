@@ -7,6 +7,7 @@ import templates.Utilities.nl
 /**
  * This file re-implements LMS common ops in Forge.
  */
+@dsl
 trait ScalaOps extends PrimitiveMathGen {
   this: ForgeApplication =>
 
@@ -22,6 +23,7 @@ trait ScalaOps extends PrimitiveMathGen {
     importTuples()
     importHashMap()
     importByteBuffer()
+    importForgeArrayAPI()
   }
 
   /**
@@ -38,141 +40,202 @@ trait ScalaOps extends PrimitiveMathGen {
     val T = tpePar("T")
 
     lift (Prim) (MBoolean)
-
-    val not = infix (Prim) ("unary_!", Nil, MBoolean :: MBoolean)
-    val or = infix (Prim) ("||", Nil, (MBoolean, MBoolean) :: MBoolean)
-    val and = infix (Prim) ("&&", Nil, (MBoolean, MBoolean) :: MBoolean)
-
-    for (g <- List($cala, cuda, cpp)) {
-      impl (not) (codegen(g, "!" + quotedArg(0)))
-      impl (or) (codegen(g, quotedArg(0) + " || " + quotedArg(1)))
-      impl (and) (codegen(g, quotedArg(0) + " && " + quotedArg(1)))
-    }
-    // Forward boolean negation to Delite internal implementation
-    rewrite (not) using forwarding ${ delite_boolean_negate($0) }
-
-    infix (Prim) ("unary_-", Nil, MInt :: MInt) implements redirect ${ unit(-1)*$0 }
-    infix (Prim) ("unary_-", Nil, MLong :: MLong) implements redirect ${ unit(-1L)*$0 }
-    infix (Prim) ("unary_-", Nil, MFloat :: MFloat) implements redirect ${ unit(-1f)*$0 }
-    infix (Prim) ("unary_-", Nil, MDouble :: MDouble) implements redirect ${ unit(-1)*$0 }
-
     lift (Prim) (MShort)
     lift (Prim) (MInt)
     lift (Prim) (MLong)
     lift (Prim) (MFloat)
     lift (Prim) (MDouble)
 
-    val toInt = infix (Prim) ("toInt", T withBound TNumeric, T :: MInt)
-    val toFloat = infix (Prim) ("toFloat", T withBound TNumeric, T :: MFloat)
-    val toDouble = infix (Prim) ("toDouble", T withBound TNumeric, T :: MDouble)
-    val toLong = infix (Prim) ("toLong", T withBound TNumeric, T :: MLong)
+    // ------ Nodes
+    // specialized versions for primitives
+    // the forge_ prefix is to avoid conflicting with LMS primitive ops
 
+    // -- Numeric
+    val toInt = direct (Prim) ("numeric_to_int", T withBound TNumeric, T :: MInt)
+    val toLong = direct (Prim) ("numeric_to_long", T withBound TNumeric, T :: MLong)
+    val toFloat = direct (Prim) ("numeric_to_float", T withBound TNumeric, T :: MFloat)
+    val toDouble = direct (Prim) ("numeric_to_double", T withBound TNumeric, T :: MDouble)
+
+    // -- Boolean
+    val boolean_not = direct (Prim) ("forge_boolean_not", Nil, MBoolean :: MBoolean)
+    val boolean_and = direct (Prim) ("forge_boolean_and", Nil, (MBoolean,MBoolean) :: MBoolean)
+    val boolean_or  = direct (Prim) ("forge_boolean_or",  Nil, (MBoolean,MBoolean) :: MBoolean)
+
+    // -- Int
+    val int_add = direct (Prim) ("forge_int_plus", Nil, (MInt,MInt) :: MInt)   // Add
+    val int_sub = direct (Prim) ("forge_int_minus", Nil, (MInt,MInt) :: MInt)  // Subtract
+    val int_mul = direct (Prim) ("forge_int_times", Nil, (MInt,MInt) :: MInt)  // Multiply
+    val int_div = direct (Prim) ("forge_int_divide", Nil, (MInt,MInt) :: MInt) // Divide
+    val int_mod = direct (Prim) ("forge_int_mod", Nil, (MInt,MInt) :: MInt)    // Modulus
+    val int_not = direct (Prim) ("forge_int_not", Nil, MInt :: MInt)           // Bitwise NOT
+    val int_and = direct (Prim) ("forge_int_and", Nil, (MInt,MInt) :: MInt)    // Bitwise AND
+    val int_or  = direct (Prim) ("forge_int_or",  Nil, (MInt,MInt) :: MInt)    // Bitwise OR
+    val int_left_shift  = direct (Prim) ("forge_int_left_shift", Nil, (MInt,MInt) :: MInt)
+    val int_right_shift = direct (Prim) ("forge_int_right_shift", Nil, (MInt,MInt) :: MInt)
+    val int_unsigned_right_shift = direct (Prim) ("forge_int_unsigned_right_shift", Nil, (MInt,MInt) :: MInt)
+
+    // -- Long
+    val long_add = direct (Prim) ("forge_long_plus", Nil, (MLong,MLong) :: MLong)    // Add
+    val long_sub = direct (Prim) ("forge_long_minus", Nil, (MLong,MLong) :: MLong)   // Subtract
+    val long_mul = direct (Prim) ("forge_long_times", Nil, (MLong,MLong) :: MLong)   // Multiply
+    val long_div = direct (Prim) ("forge_long_divide", Nil, (MLong,MLong) :: MLong)  // Divide
+    val long_mod = direct (Prim) ("forge_long_mod", Nil, (MLong,MLong) :: MLong)     // Modulus
+    val long_not = direct (Prim) ("forge_long_not", Nil, MLong :: MLong)
+    val long_and = direct (Prim) ("forge_long_and", Nil, (MLong,MLong) :: MLong)     // Bitwise AND
+    val long_or  = direct (Prim) ("forge_long_or",  Nil, (MLong,MLong) :: MLong)     // Bitwise OR
+    val long_xor = direct (Prim) ("forge_long_xor", Nil, (MLong,MLong) :: MLong)     // Bitwise XOR
+
+    val long_left_shift  = direct (Prim) ("forge_long_left_shift", Nil, (MLong,MInt) :: MLong)
+    val long_right_shift = direct (Prim) ("forge_long_right_shift", Nil, (MLong,MInt) :: MLong)
+    val long_unisgned_right_shift = direct (Prim) ("forge_long_unsigned_right_shift", Nil, (MLong,MInt) :: MLong)
+    val long_divide_double  = direct (Prim) ("forge_long_divide_double", Nil, (MLong,MDouble) :: MDouble)
+
+    // -- Float
+    val float_add = direct (Prim) ("forge_float_plus", Nil, (MFloat,MFloat) :: MFloat)
+    val float_sub = direct (Prim) ("forge_float_minus", Nil, (MFloat,MFloat) :: MFloat)
+    val float_mul = direct (Prim) ("forge_float_times", Nil, (MFloat,MFloat) :: MFloat)
+    val float_div = direct (Prim) ("forge_float_divide", Nil, (MFloat,MFloat) :: MFloat)
+
+    // -- Double
+    val double_add = direct (Prim) ("forge_double_plus", Nil, (MDouble,MDouble) :: MDouble)
+    val double_sub = direct (Prim) ("forge_double_minus", Nil, (MDouble,MDouble) :: MDouble)
+    val double_mul = direct (Prim) ("forge_double_times", Nil, (MDouble,MDouble) :: MDouble)
+    val double_div = direct (Prim) ("forge_double_divide", Nil, (MDouble,MDouble) :: MDouble)
+
+
+    // ----- API
+
+    // -- Numeric
+    /** Converts this numeric value to an Int **/
+    infix (Prim) ("toInt", T withBound TNumeric, T :: MInt) implements redirect ${ numeric_to_int($0) }
+    /** Converts this numeric value to a Long **/
+    infix (Prim) ("toLong", T withBound TNumeric, T :: MLong) implements redirect ${ numeric_to_long($0) }
+    /** Converts this numeric value to a Float **/
+    infix (Prim) ("toFloat", T withBound TNumeric, T :: MFloat) implements redirect ${ numeric_to_float($0) }
+    /** Converts this numeric value to an Double **/
+    infix (Prim) ("toDouble", T withBound TNumeric, T :: MDouble) implements redirect ${ numeric_to_double($0) }
+
+    // -- Boolean
+    /** Boolean inverse **/
+    infix (Prim) ("unary_!", Nil, MBoolean :: MBoolean) implements redirect ${ forge_boolean_not($0) }
+    /** Boolean OR **/
+    infix (Prim) ("||", Nil, (MBoolean, MBoolean) :: MBoolean) implements redirect ${ forge_boolean_or($0,$1) }
+    /** Boolean AND **/
+    infix (Prim) ("&&", Nil, (MBoolean, MBoolean) :: MBoolean) implements redirect ${ forge_boolean_and($0, $1) }
+
+    // -- Int
+    /** Negation **/
+    infix (Prim) ("unary_-", Nil, MInt :: MInt) implements redirect ${ unit(-1)*$0 }
+    infix (Prim) ("%", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_mod($0, $1) }
+    infix (Prim) ("unary_~", Nil, MInt :: MInt)  implements redirect ${ forge_int_not($0) }
+    infix (Prim) ("&", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_and($0,$1) }
+    infix (Prim) ("|", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_or($0,$1) }
+    infix (Prim) ("<<",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_left_shift($0,$1) }
+    infix (Prim) (">>",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_right_shift($0,$1) }
+    infix (Prim) (">>>",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_unsigned_right_shift($0,$1) }
+
+    /** Negation **/
+    infix (Prim) ("unary_-", Nil, MLong :: MLong) implements redirect ${ unit(-1L)*$0 }
+    infix (Prim) ("%", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_mod($0,$1) }
+    infix (Prim) ("unary_~", Nil, MLong :: MLong) implements redirect ${ forge_long_not($0) }
+    infix (Prim) ("&", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_and($0,$1) }
+    infix (Prim) ("|", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_or($0,$1) }
+    infix (Prim) ("^", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_xor($0,$1) }
+    infix (Prim) ("<<", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_left_shift($0,$1) }
+    infix (Prim) (">>", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_right_shift($0,$1) }
+    infix (Prim) (">>>", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_unsigned_right_shift($0,$1) }
+
+    /** Negation **/
+    infix (Prim) ("unary_-", Nil, MFloat :: MFloat) implements redirect ${ unit(-1f)*$0 }
+    /** Negation **/
+    infix (Prim) ("unary_-", Nil, MDouble :: MDouble) implements redirect ${ unit(-1)*$0 }
+
+
+    /** Enables implicit conversion from Int to Double **/
+    fimplicit (Prim) ("repInt2ToRepDouble", Nil, MInt :: MDouble) implements composite ${ $0.toDouble }
+    /** Enables implicit conversion from Int to Float **/
+    fimplicit (Prim) ("repInt2ToRepFloat", Nil, MInt :: MFloat) implements composite ${ $0.toFloat }
+    /** Enables implicit conversion from Int to Long **/
+    fimplicit (Prim) ("repInt2ToRepLong", Nil, MInt :: MLong) implements composite ${ $0.toLong }
+    /** Enables implicit conversion from Float to Double **/
+    fimplicit (Prim) ("repFloat2ToRepDouble", Nil, MFloat :: MDouble) implements composite ${ $0.toDouble }
+
+
+    // --- Codegen
     impl (toInt) (codegen($cala, ${ $0.toInt }))
+    impl (toLong) (codegen($cala, ${ $0.toLong }))
     impl (toFloat) (codegen($cala, ${ $0.toFloat }))
     impl (toDouble) (codegen($cala, ${ $0.toDouble }))
-    impl (toLong) (codegen($cala, ${ $0.toLong }))
 
     for (g <- List(cuda, cpp)) {
       impl (toInt) (codegen(g, ${ (int32_t) $0 }))
+      impl (toLong) (codegen(g, ${ (int64_t) $0 }))
       impl (toFloat) (codegen(g, ${ (float) $0 }))
       impl (toDouble) (codegen(g, ${ (double) $0 }))
-      impl (toLong) (codegen(g, ${ (int64_t) $0 }))
     }
 
-    fimplicit (Prim) ("repInt2ToRepDouble", Nil, MInt :: MDouble) implements composite ${ $0.toDouble }
-    fimplicit (Prim) ("repInt2ToRepFloat", Nil, MInt :: MFloat) implements composite ${ $0.toFloat }
-    fimplicit (Prim) ("repInt2ToRepLong", Nil, MInt :: MLong) implements composite ${ $0.toLong }
-    fimplicit (Prim) ("repFloat2ToRepDouble", Nil, MFloat :: MDouble) implements composite ${ $0.toDouble }
+    impl (int_unsigned_right_shift)  (codegen($cala, ${ $0 >>> $1 }))
+    impl (long_unisgned_right_shift) (codegen($cala, ${ $0 >>> $1 }))
 
-    // specialized versions for primitives
-    // the forge_ prefix is to avoid conflicting with LMS primitive ops
-    val int_plus = direct (Prim) ("forge_int_plus", Nil, (MInt,MInt) :: MInt)
-    val int_minus = direct (Prim) ("forge_int_minus", Nil, (MInt,MInt) :: MInt)
-    val int_times = direct (Prim) ("forge_int_times", Nil, (MInt,MInt) :: MInt)
-    val int_divide = direct (Prim) ("forge_int_divide", Nil, (MInt,MInt) :: MInt)
-    // Forward integer operations used for index calc to Delite internal implementations
-    rewrite (int_plus) using forwarding ${ delite_int_plus($0, $1) }
-    rewrite (int_minus) using forwarding ${ delite_int_minus($0, $1) }
-    rewrite (int_times) using forwarding ${ delite_int_times($0, $1) }
-
-    val int_shift_left = direct (Prim) ("forge_int_shift_left", Nil, (MInt,MInt) :: MInt)
-    val int_shift_right_unsigned = direct (Prim) ("forge_int_shift_right_unsigned", Nil, (MInt,MInt) :: MInt)
-    impl (int_shift_right_unsigned) (codegen($cala, ${ $0 >>> $1 }))
-    val int_binary_and = direct (Prim) ("forge_int_and", Nil, (MInt,MInt) :: MInt)
-    val int_binary_or = direct (Prim) ("forge_int_or", Nil, (MInt,MInt) :: MInt)
-    val int_shift_right = direct (Prim) ("forge_int_shift_right", Nil, (MInt,MInt) :: MInt)
-    val int_mod = infix (Prim) ("%", Nil, (MInt,MInt) :: MInt)
-    val int_bitwise_not = infix (Prim) ("unary_~", Nil, MInt :: MInt)
-
-    val float_plus = direct (Prim) ("forge_float_plus", Nil, (MFloat,MFloat) :: MFloat)
-    val float_minus = direct (Prim) ("forge_float_minus", Nil, (MFloat,MFloat) :: MFloat)
-    val float_times = direct (Prim) ("forge_float_times", Nil, (MFloat,MFloat) :: MFloat)
-    val float_divide = direct (Prim) ("forge_float_divide", Nil, (MFloat,MFloat) :: MFloat)
-
-    val double_plus = direct (Prim) ("forge_double_plus", Nil, (MDouble,MDouble) :: MDouble)
-    val double_minus = direct (Prim) ("forge_double_minus", Nil, (MDouble,MDouble) :: MDouble)
-    val double_times = direct (Prim) ("forge_double_times", Nil, (MDouble,MDouble) :: MDouble)
-    val double_divide = direct (Prim) ("forge_double_divide", Nil, (MDouble,MDouble) :: MDouble)
-
-    val long_plus = direct (Prim) ("forge_long_plus", Nil, (MLong, MLong) :: MLong)
-    val long_minus = direct (Prim) ("forge_long_minus", Nil, (MLong, MLong) :: MLong)
-    val long_times = direct (Prim) ("forge_long_times", Nil, (MLong,MLong) :: MLong)
-    val long_divide = direct (Prim) ("forge_long_divide", Nil, (MLong,MLong) :: MLong)
-    val long_divide_double = direct (Prim) ("forge_long_divide_double", Nil, (MLong,MDouble) :: MDouble)
-    val long_binary_and = direct (Prim) ("forge_long_and", Nil, (MLong,MLong) :: MLong)
-    val long_binary_or = direct (Prim) ("forge_long_or", Nil, (MLong,MLong) :: MLong)
-    val long_binary_xor = direct (Prim) ("forge_long_xor", Nil, (MLong,MLong) :: MLong)
-    val long_shift_right_unsigned = direct (Prim) ("forge_long_shift_right_unsigned", Nil, (MLong,MInt) :: MLong)
-    val long_shift_right = direct (Prim) ("forge_long_shift_right", Nil, (MLong,MInt) :: MLong)
-    val long_shift_left = direct (Prim) ("forge_long_shift_left", Nil, (MLong,MInt) :: MLong)
-    val long_mod = infix (Prim) ("%", Nil, (MLong,MLong) :: MLong)
-    val long_bitwise_not = infix (Prim) ("unary_~", Nil, MLong :: MLong)
-    impl (long_shift_right_unsigned) (codegen($cala, ${ $0 >>> $1 }))
 
     for (g <- List($cala, cuda, cpp)) {
-      impl (int_plus) (codegen(g, ${$0 + $1}))
-      impl (int_minus) (codegen(g, ${$0 - $1}))
-      impl (int_times) (codegen(g, ${$0 * $1}))
-      impl (int_divide) (codegen(g, ${$0 / $1}))
-      impl (int_shift_left) (codegen(g, ${$0 << $1}))
-      impl (int_shift_right) (codegen(g, ${$0 >> $1}))
+      impl (boolean_not) (codegen(g, "!" + quotedArg(0)))
+      impl (boolean_and) (codegen(g, quotedArg(0) + " && " + quotedArg(1)))
+      impl (boolean_or) (codegen(g, quotedArg(0) + " || " + quotedArg(1)))
+
+      impl (int_add) (codegen(g, ${$0 + $1}))
+      impl (int_sub) (codegen(g, ${$0 - $1}))
+      impl (int_mul) (codegen(g, ${$0 * $1}))
+      impl (int_div) (codegen(g, ${$0 / $1}))
       impl (int_mod) (codegen(g, ${$0 % $1}))
-      impl (int_bitwise_not) (codegen(g, ${~$0}))
-      impl (int_binary_and) (codegen(g, ${$0 & $1}))
-      impl (int_binary_or) (codegen(g, ${$0 | $1}))
+      impl (int_not) (codegen(g, ${~$0}))
+      impl (int_and) (codegen(g, ${$0 & $1}))
+      impl (int_or)  (codegen(g, ${$0 | $1}))
+      impl (int_left_shift)  (codegen(g, ${$0 << $1}))
+      impl (int_right_shift) (codegen(g, ${$0 >> $1}))
 
-      impl (float_plus) (codegen(g, ${$0 + $1}))
-      impl (float_minus) (codegen(g, ${$0 - $1}))
-      impl (float_times) (codegen(g, ${$0 * $1}))
-      impl (float_divide) (codegen(g, ${$0 / $1}))
-
-      impl (double_plus) (codegen(g, ${$0 + $1}))
-      impl (double_minus) (codegen(g, ${$0 - $1}))
-      impl (double_times) (codegen(g, ${$0 * $1}))
-      impl (double_divide) (codegen(g, ${$0 / $1}))
-
-      impl (long_plus) (codegen(g, ${$0 + $1}))
-      impl (long_minus) (codegen(g, ${$0 - $1}))
-      impl (long_times) (codegen(g, ${$0 * $1}))
-      impl (long_divide) (codegen(g, ${$0 / $1}))
-      impl (long_divide_double) (codegen(g, ${$0 / $1}))
-      impl (long_binary_and) (codegen(g, ${$0 & $1}))
-      impl (long_binary_or) (codegen(g, ${$0 | $1}))
-      impl (long_binary_xor) (codegen(g, ${$0 ^ $1}))
-      impl (long_shift_right) (codegen(g, ${ $0 >> $1 }))
-      impl (long_shift_left) (codegen(g, ${ $0 << $1 }))
+      impl (long_add) (codegen(g, ${$0 + $1}))
+      impl (long_sub) (codegen(g, ${$0 - $1}))
+      impl (long_mul) (codegen(g, ${$0 * $1}))
+      impl (long_div) (codegen(g, ${$0 / $1}))
       impl (long_mod) (codegen(g, ${$0 % $1}))
-      impl (long_bitwise_not) (codegen(g, ${~$0}))
+      impl (long_not) (codegen(g, ${~$0}))
+      impl (long_and) (codegen(g, ${$0 & $1}))
+      impl (long_or)  (codegen(g, ${$0 | $1}))
+      impl (long_xor) (codegen(g, ${$0 ^ $1}))
+      impl (long_left_shift) (codegen(g, ${ $0 << $1 }))
+      impl (long_right_shift) (codegen(g, ${ $0 >> $1 }))
+      impl (long_divide_double) (codegen(g, ${$0 / $1}))
+
+      impl (float_add) (codegen(g, ${$0 + $1}))
+      impl (float_sub) (codegen(g, ${$0 - $1}))
+      impl (float_mul) (codegen(g, ${$0 * $1}))
+      impl (float_div) (codegen(g, ${$0 / $1}))
+
+      impl (double_add) (codegen(g, ${$0 + $1}))
+      impl (double_sub) (codegen(g, ${$0 - $1}))
+      impl (double_mul) (codegen(g, ${$0 * $1}))
+      impl (double_div) (codegen(g, ${$0 / $1}))
     }
 
     // --- Rewrite Ops (mostly constant propagation)
+
+    // Forward boolean negation to Delite internal implementation
+    rewrite (boolean_not) using forwarding ${ delite_boolean_negate($0) }
+
+    // Forward integer operations used for index calc to Delite internal implementations
+    rewrite (int_add) using forwarding ${ delite_int_plus($0, $1) }
+    rewrite (int_sub) using forwarding ${ delite_int_minus($0, $1) }
+    rewrite (int_mul) using forwarding ${ delite_int_times($0, $1) }
+
+
     val zero = "Const(0 | 0L | 0.0 | 0.0f | -0.0 | -0.0f)"
-    rewrite (float_plus,double_plus,long_plus) using pattern((${Const(x)}, ${Const(y)}) -> ${ unit(x + y)} )
-    rewrite (float_plus,double_plus,long_plus) using commutative((zero, ${x}) -> ${x} )
-    rewrite (float_minus,double_minus,long_minus) using pattern((${Const(x)}, ${Const(y)}) -> ${ unit(x - y)} )
-    rewrite (float_minus,double_minus,long_minus) using pattern((${x}, zero) -> ${x})
-    rewrite (float_times,double_times,long_times) using pattern((${Const(x)}, ${Const(y)}) -> ${ unit(x * y)} )
-    rewrite (float_divide,double_divide,long_divide) using pattern((${Const(x)}, ${Const(y)}) -> ${ unit(x / y)} )
+    rewrite (float_add,double_add,long_add) using pattern((${Const(x)}, ${Const(y)}) -> ${ unit(x + y)} )
+    rewrite (float_add,double_add,long_add) using commutative((zero, ${x}) -> ${x} )
+    rewrite (float_sub,double_sub,long_sub) using pattern((${Const(x)}, ${Const(y)}) -> ${ unit(x - y)} )
+    rewrite (float_sub,double_sub,long_sub) using pattern((${x}, zero) -> ${x})
+    rewrite (float_mul,double_mul,long_mul) using pattern((${Const(x)}, ${Const(y)}) -> ${ unit(x * y)} )
+    rewrite (float_div,double_div,long_div) using pattern((${Const(x)}, ${Const(y)}) -> ${ unit(x / y)} )
 
     // TODO: Should these be DSL specific? App specific? How often are these even important?
     //rewrite (float_times) using commutative((zero, ${x}) -> ${unit(0f)} ) // Not completely correct (Inf * 0 = NaN)
@@ -180,21 +243,9 @@ trait ScalaOps extends PrimitiveMathGen {
 
     // For some reason using the infix version of these casts was giving crazy scalac typer crashes
     rewrite (toInt) using pattern(${Const(x)} -> ${ unit(implicitly[Numeric[T]].toInt(x)) })
+    rewrite (toLong) using pattern(${Const(x)} -> ${ unit(implicitly[Numeric[T]].toLong(x)) })
     rewrite (toFloat) using pattern(${Const(x)} -> ${ unit(implicitly[Numeric[T]].toFloat(x)) })
     rewrite (toDouble) using pattern(${Const(x)} -> ${ unit(implicitly[Numeric[T]].toDouble(x)) })
-    rewrite (toLong) using pattern(${Const(x)} -> ${ unit(implicitly[Numeric[T]].toLong(x)) })
-
-    infix (Prim) ("<<",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_left($0,$1) }
-    infix (Prim) (">>",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_right($0,$1) }
-    infix (Prim) (">>>",Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_shift_right_unsigned($0,$1) }
-    infix (Prim) ("&", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_and($0,$1) }
-    infix (Prim) ("|", Nil, (MInt,MInt) :: MInt) implements redirect ${ forge_int_or($0,$1) }
-    infix (Prim) ("&", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_and($0,$1) }
-    infix (Prim) ("|", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_or($0,$1) }
-    infix (Prim) ("^", Nil, (MLong,MLong) :: MLong) implements redirect ${ forge_long_xor($0,$1) }
-    infix (Prim) (">>>", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_shift_right_unsigned($0,$1) }
-    infix (Prim) ("<<", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_shift_left($0,$1) }
-    infix (Prim) (">>", Nil, (MLong,MInt) :: MLong) implements redirect ${ forge_long_shift_right($0,$1) }
 
     // Uncomment this to generate type classes for primitive math combinations.
     // importPrimitiveMathTypeClasses()
@@ -204,27 +255,91 @@ trait ScalaOps extends PrimitiveMathGen {
   }
 
   def importMisc() = {
+    /**
+     * Miscellaneous operations, including assertions, console printing, and exception throwing.
+     **/
     val Misc = grp("Misc")
 
-    // Assert (moved from extern)
+    val T = tpePar("T")
+
+    // ------ API
+    /** Exits the program with given error code.
+     * @param code
+     **/
+    val exit = direct (Misc) ("exit", Nil, MInt :: MNothing, effect = simple)
+
+    /** Exits the program with a fatal exception message.
+     * @param message
+     **/
+    val fatal = direct (Misc) ("fatal", Nil, MString :: MNothing, effect = simple)
+
+    /** Prints the specified value to the console *without* a newline.
+     * At runtime, this will attempt to use the toString method to cast the value to string if one exists
+     * @param value
+     **/
+    val print = direct (Misc) ("print", Nil, MAny :: MUnit, effect = simple)
+
+    /** Prints the specified value to the console *with* a newline.
+     * At runtime, this will attempt to use the toString method to cast the value to string if one exists
+     * @param value
+     **/
+    val println = direct (Misc) ("println", Nil, List(MAny) :: MUnit, effect = simple)
+
+    /** Prints a newline to the console **/
+    val printnl = direct (Misc) ("println", Nil, Nil :: MUnit, effect = simple)
+
+    /** If the condition is true, does nothing. If it is false, terminates the program with the specified exception message.
+     * Assertions are only evaluated in the library backend and during compiler debugging. Otherwise, they are ignored to enable
+     * more fusion and code motion opportunities.
+     * @param cond: condition to be checked
+     * @param message: exception message to be shown to the user if the assertion fails
+     **/
     val fassert = direct (Misc) ("fassert", Nil, (MBoolean, MString) :: MUnit, effect = simple)
+
+    /** Returns the maximum heap size from the JVM **/
+    direct (Misc) ("getMaxHeapSize", Nil, Nil :: MLong) implements codegen($cala, ${
+      Runtime.getRuntime.maxMemory()
+    })
+
+    /** Gives a hint to the compiler to consider this value as immutable for future operations
+     * Note that this operation is unsafe as it does not prevent mutations prior to this call. For example, in:
+     * {{{
+     * val x = Array[Int](32)
+     * for (i <- 0 until N) {
+     *   x(i) = i
+     *   f(x.unsafeImmutable)
+     * }
+     * }}}
+     * This will tell the compiler that x is not mutable in the function x, but x can still be mutated
+     * after this call has been made (in the next iteration of the loop, for example).
+     **/
+    val immutable = infix (Misc) ("unsafeImmutable", List(T), List(T) :: T, aliasHint = copies(0))
+
+    /** Enables unsafe mutation of this value. **/
+    val mut = infix (Misc) ("unsafeMutable", List(T), List(T) :: T, effect = mutable, aliasHint = copies(0))
+
+
+    // ----- Nodes
+    impl (exit) (codegen($cala, ${sys.exit($0)}))
+    impl (fatal) (codegen($cala, ${throw new Exception($0)}))
+    impl (print) (codegen($cala, ${print($0)}))
+    impl (println) (codegen($cala, "println(" + quotedArg(0) + ")"))
+    impl (printnl) (codegen($cala, "println()"))
     impl (fassert) (codegen($cala, ${ assert($0, $1) }))
 
-    val exit = direct (Misc) ("exit", Nil, MInt :: MNothing, effect = simple)
-    impl (exit) (codegen($cala, ${sys.exit($0)}))
+    impl (immutable) (codegen($cala, quotedArg(0) + " /* unsafe immutable */"))
+    impl (mut) (codegen($cala, quotedArg(0) + " /* unsafe mutable */"))
 
-    val print = direct (Misc) ("print", Nil, MAny :: MUnit, effect = simple)
-    impl (print) (codegen($cala, ${print($0)}))
+   for (g <- List(cuda, cpp)) {
+      impl (exit) (codegen(g, ${exit($0)}))
+      impl (print) (codegen(g, ${std::cout << $0}))
+      impl (fatal) (codegen(g, ${assert(0)}))
+      impl (println) (codegen(g, ${std::cout << $0 << std::endl}))
+      impl (printnl) (codegen(g, ${std::cout << std::endl}))
+      impl (immutable) (codegen(g, ${$0}))
+    }
 
-    val fatal = direct (Misc) ("fatal", Nil, MString :: MNothing, effect = simple)
-    impl (fatal) (codegen($cala, ${throw new Exception($0)}))
-
-    val println = direct (Misc) ("println", List(), List(MAny) :: MUnit, effect = simple)
-    val println2 = direct (Misc) ("println", List(), List() :: MUnit, effect = simple)
-    impl (println) (codegen($cala, "println(" + quotedArg(0) + ")"))
-    impl (println2) (codegen($cala, "println()"))
-
-    val whileDo = direct (Misc) ("__whileDo", List(), List(MThunk(MBoolean),MThunk(MUnit)) :: MUnit)
+    val whileDo = direct (Misc) ("__whileDo", Nil, List(MThunk(MBoolean),MThunk(MUnit)) :: MUnit)
 
     // function (block) arguments should be referenced using $b[<arg name>]
     impl (whileDo) (codegen($cala, ${
@@ -234,7 +349,6 @@ trait ScalaOps extends PrimitiveMathGen {
     }))
 
     // TODO: something is broken with IfThenElse here; bound symbols (effects) are getting hoisted if the frequencies are not set to cold.
-    val T = tpePar("T")
     val ifThenElse = direct (Misc) ("__ifThenElse", List(T), List(MBoolean,MThunk(T,cold),MThunk(T,cold)) :: T)
     impl (ifThenElse) (codegen($cala, ${
       if ($0) {
@@ -245,25 +359,8 @@ trait ScalaOps extends PrimitiveMathGen {
       }
     }))
 
-    val immutable = infix (Misc) ("unsafeImmutable", List(T), List(T) :: T, aliasHint = copies(0))
-    impl (immutable) (codegen($cala, quotedArg(0) + " /* unsafe immutable */"))
 
-    val mut = infix (Misc) ("unsafeMutable", List(T), List(T) :: T, effect = mutable, aliasHint = copies(0))
-    impl (mut) (codegen($cala, quotedArg(0) + " /* unsafe mutable */"))
-
-    for (g <- List(cuda, cpp)) {
-      impl (exit) (codegen(g, ${exit($0)}))
-      impl (print) (codegen(g, ${std::cout << $0}))
-      impl (fatal) (codegen(g, ${assert(0)}))
-      impl (println) (codegen(g, ${std::cout << $0 << std::endl}))
-      impl (println2) (codegen(g, ${std::cout << std::endl}))
-      impl (immutable) (codegen(g, ${$0}))
-    }
-
-    direct (Misc) ("getMaxHeapSize", Nil, Nil :: MLong) implements codegen($cala, ${
-      Runtime.getRuntime.maxMemory()
-    })
-
+    // ------ Rewrites
     // Forward Misc methods to Delite internal implementations
     rewrite (whileDo) using forwarding ${ delite_while($0, $1) }
     rewrite (immutable) using forwarding ${ delite_unsafe_immutable($0) }
@@ -278,23 +375,22 @@ trait ScalaOps extends PrimitiveMathGen {
 
   def importCasts() = {
     val Cast = grp("Cast")
-    val A = tpePar("A")
-    val B = tpePar("B")
+    val T = tpePar("T")
+    val R = tpePar("R")
 
     // these don't work as infix_ methods
     noInfixList :::= List("AsInstanceOf", "IsInstanceOf")
 
-    val asinstance = infix (Cast) ("AsInstanceOf", (A,B), A :: B)
-    impl (asinstance) (codegen($cala, ${ $0.asInstanceOf[$t[B]] }))
-    //impl (asinstance) (codegen(cuda, ${ ($t[B])$0 }))
-    //impl (asinstance) (codegen(cpp, ${ ($t[B])$0 }))
-    //TODO: what is the proper way to get the result type (sym.tp) to call with remapWithRef?
-    impl (asinstance) (codegen(cuda, "(" + unquotes("remapWithRef(sym.tp)") + ")" + quotedArg(0)))
-    impl (asinstance) (codegen(cpp, "(" + unquotes("remapWithRef(sym.tp)") + ")" + quotedArg(0)))
+    /** Casts this to the given type **/
+    val asinstance = infix (Cast) ("AsInstanceOf", (T,R), T :: R)
+    impl (asinstance) (codegen($cala, ${ $0.asInstanceOf[$t[R]] }))
+    impl (asinstance) (codegen(cuda, "(" + unquotes("remapWithRef(manifest[T])") + ")" + quotedArg(0)))
+    impl (asinstance) (codegen(cpp, "(" + unquotes("remapWithRef(manifest[T])") + ")" + quotedArg(0)))
 
-    val isinstance = infix (Cast) ("IsInstanceOf", (A,B), A :: MBoolean)
-    impl (isinstance) (codegen($cala, ${ $0.isInstanceOf[$t[B]] }))
-    // todo: how to implement isinstance for clike targets?
+    /** Checks if this is the specified type **/
+    val isinstance = infix (Cast) ("IsInstanceOf", (T,R), T :: MBoolean)
+    impl (isinstance) (codegen($cala, ${ $0.isInstanceOf[$t[R]] }))
+    // TODO: how to implement isinstance for clike targets?
   }
 
   def importNumerics() = {
@@ -303,7 +399,7 @@ trait ScalaOps extends PrimitiveMathGen {
 
     lift (Num) (T withBound TNumeric)
 
-    val zero = infix (Num) ("zero", List(T withBound TNumeric), List() :: T)
+    val zero = infix (Num) ("zero", List(T withBound TNumeric), Nil :: T)
     val plus = infix (Num) ("+", List(T withBound TNumeric), List(T,T) :: T)
     val minus = infix (Num) ("-", List(T withBound TNumeric), List(T,T) :: T)
     val times = infix (Num) ("*", List(T withBound TNumeric), List(T,T) :: T)
@@ -613,7 +709,7 @@ trait ScalaOps extends PrimitiveMathGen {
 
   // Applications may need direct access to ForgeArrays, if, for example, they use string fsplit
   // but don't want to expose all operations on arrays to users
-  def importArraySimpleAPI() {
+  def importForgeArrayAPI() {
     val T = tpePar("T")
     val R = tpePar("R")
 
@@ -634,8 +730,11 @@ trait ScalaOps extends PrimitiveMathGen {
 
     // in order to define lifted operations on an existing Scala type, we must place the lifted ops in a separate group
     // to avoid Forge attempting to use the fully qualified type name in traits
+    /** @nodoc **/
     val SArray = tpe("scala.Array", T)
+    /** @nodoc **/
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
+    /** @nodoc **/
     val HashMapOps = grp("SHashMap")
 
     val hashmap = direct (HashMapOps) ("SHashMap", (K,V), Nil :: SHashMap(K,V), effect = mutable)
@@ -669,8 +768,11 @@ trait ScalaOps extends PrimitiveMathGen {
     val V = tpePar("V")
     val T = tpePar("T")
 
+    /** @nodoc **/
     val SArray = tpe("scala.Array", T)
+    /** @nodoc **/
     val CHashMap = tpe("java.util.concurrent.ConcurrentHashMap", (K,V))
+    /** @nodoc **/
     val HashMapOps = grp("CHashMap")
 
     direct (HashMapOps) ("CHashMap", (K,V), Nil :: CHashMap(K,V), effect = mutable) implements codegen($cala, ${ new java.util.concurrent.ConcurrentHashMap[$t[K],$t[V]]() })
@@ -692,10 +794,14 @@ trait ScalaOps extends PrimitiveMathGen {
   }
 
   def importByteBuffer() = {
+    /** @nodoc **/
     val ByteBuffer = tpe("java.nio.ByteBuffer")
+    /** @nodoc **/
     val IntBuffer = tpe("java.nio.IntBuffer")
+    /** @nodoc **/
     val DoubleBuffer = tpe("java.nio.DoubleBuffer")
 
+    /** @nodoc **/
     val ByteBufferOps = grp("SByteBuffer")
     direct (ByteBufferOps) ("ByteBuffer", Nil, MInt :: ByteBuffer, effect = mutable) implements codegen($cala, ${ java.nio.ByteBuffer.allocate($0) })
     direct (ByteBufferOps) ("ByteBufferWrap", Nil, MArray(MByte) :: ByteBuffer, effect = mutable) implements codegen($cala, ${ java.nio.ByteBuffer.wrap($0) })

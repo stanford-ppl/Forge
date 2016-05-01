@@ -8,4 +8,5 @@ object Config {
   val genIdent = System.getProperty("forge.gen.ident","false").toBoolean
   val genLib = System.getProperty("forge.gen.lib","true").toBoolean
   val genDelite = System.getProperty("forge.gen.delite","true").toBoolean
+  val genSphinx = System.getProperty("forge.gen.sphinx","true").toBoolean
 }

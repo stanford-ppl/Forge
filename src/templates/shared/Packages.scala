@@ -76,16 +76,10 @@ trait BaseGenPackages extends ForgeCodeGenBase {
 
     // --- DSLMetadataOps and DSLMetadataInternalOps
     if (hasMetatype) {
-      /*stream.print("trait " + dsl + "MetadataOps extends ")
-      if (hasMetahelp) stream.print(dsl + "MetadataSugar") else stream.println("Base")
-      for (opsGrp <- opsGrps if isMetadata(opsGrp.grp)) { stream.print(" with " + opsGrp.name) }
-      stream.println("{\n  this: " + dsl + " => \n}")
-      stream.println()*/
-
       stream.print("trait " + dsl + "MetaOps extends ")
       if (hasMetahelp) stream.print(dsl + "MetadataInternalOps") else stream.println("Base")
       for (opsGrp <- opsGrps if isMetadata(opsGrp.grp)) {
-        if (opsGrp.ops.exists(_.backend == internalBackend))
+        if (opsGrp.ops.exists(_.visibility == privateMethod))
           stream.print(" with " + opsGrp.grp.name + "InternalOps")
         else
           stream.print(" with " + opsGrp.name)

@@ -44,12 +44,6 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     case _ => true //hasLibraryVersion(o)
   }
 
-  /*def emitLibraryOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
-    val base = if (opsGrp.ops.exists(hasSharedVersion)) opsGrp.name else "Base"
-    emitBlockComment("Library-only operations", stream)
-    emitOpSugar(opsGrp.grp.name + "Library", base, dsl, List(opsGrp), stream, libraryBackend)
-  }*/
-
   /**
    * Emit implementation bodies for all ops except codegen, setter, getter, and allocates
    * These implementations are called from Wrapper (ops not generated here are inlined)

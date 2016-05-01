@@ -2,6 +2,7 @@ package ppl.dsl.forge
 package dsls
 package dhdl
 
+@dsl
 trait DHDLControllers {
   this: DHDLDSL =>
 
@@ -20,6 +21,7 @@ trait DHDLControllers {
     // counter_new - see extern
 
     // --- Internals
+    /** @nodoc **/
     direct (Counter) ("counter_create", Nil, (SOption(SString), Idx, Idx, Idx, MInt) :: Counter) implements composite ${
       val ctr = counter_new($1, $2, $3, $4)
       $0.foreach{name => nameOf(ctr) = name}
@@ -27,16 +29,24 @@ trait DHDLControllers {
     }
 
     // --- API
+    /** Creates an unnamed Counter with min of 0, given max, and step size of 1 **/
     static (Counter) ("apply", Nil, ("max", Idx) :: Counter) implements redirect ${ counter_create(None, 0.as[Index], $max, 1.as[Index], param(1)) }
+    /** Creates an unnamed Counter with given min and max, and step size of 1 **/
     static (Counter) ("apply", Nil, (("min", Idx), ("max", Idx)) :: Counter) implements redirect ${ counter_create(None, $min, $max, 1.as[Index], param(1)) }
+    /** Creates an unnamed Counter with given min, max and step size **/
     static (Counter) ("apply", Nil, (("min", Idx), ("max", Idx), ("step", Idx)) :: Counter) implements redirect ${ counter_create(None, $min, $max, $step, param(1)) }
+    /** Creates an unnamed Counter with given min, max, step size, and parallelization factor **/
     static (Counter) ("apply", Nil, (("min", Idx), ("max",Idx), ("step",Idx), ("par",MInt)) :: Counter) implements redirect ${ counter_create(None, $min, $max, $step, $par) }
+    /** Creates a named Counter with min of 0, given max, and step size of 1 **/
     static (Counter) ("apply", Nil, (("name",SString), ("max",Idx)) :: Counter) implements redirect ${ counter_create(Some($name), 0.as[Index], $max, 1.as[Index], param(1)) }
+    /** Creates a named Counter with given min and max, and step size of 1 **/
     static (Counter) ("apply", Nil, (("name",SString), ("min", Idx), ("max", Idx)) :: Counter) implements redirect ${ counter_create(Some($name), $min, $max, 1.as[Index], param(1)) }
+    /** Creates a named Counter with given min, max and step size **/
     static (Counter) ("apply", Nil, (("name",SString), ("min",Idx), ("max",Idx), ("step",Idx)) :: Counter) implements redirect ${ counter_create(Some($name), $min, $max, $step, param(1)) }
+    /** Creates a named Counter with given min, max, step size, and parallelization factor **/
     static (Counter) ("apply", Nil, (("name",SString), ("min",Idx), ("max",Idx), ("step",Idx), ("par",MInt)) :: Counter) implements redirect ${ counter_create(Some($name), $min, $max, $step, $par) }
 
-
+    /** Creates a chain of counters. Order is specified as outermost to innermost **/
     static (CounterChain) ("apply", Nil, varArgs(Counter) :: CounterChain) implements composite ${
       val chain = counterchain_new($0.toList) // Defined in extern
       lenOf(chain) = $0.length
@@ -128,21 +138,34 @@ trait DHDLControllers {
       styleOf(pipe) = Parallel
     }
 
+    direct (MetaPipe) ("block_reduce_create", T, (CounterChain, MInt, BRAM(T), Indices ==> BRAM(T), (T,T) ==> T) :: MUnit) implements composite ${
+      val tileDims = dimsOf($2)
+      val ctrs = tileDims.zipWithIndex.map{ case (d,i) =>
+        if (i != tileDims.length - 1) Counter(max = d)
+        else Counter(min = 0.as[Index], max = d, step = 1.as[Index], par = $1)
+      }
+      val chain = CounterChain(ctrs:_*)
+      val pipe = block_reduce($0, chain, $2, $3, $4)
+      styleOf(pipe) = Coarse
+    }
+
     /* BlockReduce */
     // BlockReduce(counter, accum){i => f(i) }{(a,b) => reduce(a,b) }
     direct (MetaPipe) ("BlockReduce", T, CurriedMethodSignature(List(List(Counter, BRAM(T)), List(Idx ==> BRAM(T)), List((T,T) ==> T)), MUnit)) implements composite ${
-      val pipe = block_reduce[T](CounterChain($0), $1, {inds: Rep[Indices] => $2(inds(0)) }, $3)
-      styleOf(pipe) = Coarse
+      block_reduce_create[T](CounterChain($0), param(1), $1, {inds: Rep[Indices] => $2(inds(0)) }, $3)
     }
     // BlockReduce(counter, counter, accum){i => f(i) }{(a,b) => reduce(a,b) }
     direct (MetaPipe) ("BlockReduce", T, CurriedMethodSignature(List(List(Counter, Counter, BRAM(T)), List((Idx,Idx) ==> BRAM(T)), List((T,T) ==> T)), MUnit)) implements composite ${
-      val pipe = block_reduce[T](CounterChain($0, $1), $2, {inds: Rep[Indices] => $3(inds(0), inds(1))}, $4)
-      styleOf(pipe) = Coarse
+      block_reduce_create[T](CounterChain($0, $1), param(1), $2, {inds: Rep[Indices] => $3(inds(0), inds(1))}, $4)
     }
     // BlockReduce(counter, counter, counter, accum){i => f(i) }{(a,b) => reduce(a,b) }
     direct (MetaPipe) ("BlockReduce", T, CurriedMethodSignature(List(List(Counter, Counter, Counter, BRAM(T)), List((Idx,Idx,Idx) ==> BRAM(T)), List((T,T) ==> T)), MUnit)) implements composite ${
-      val pipe = block_reduce[T](CounterChain($0, $1, $2), $3, {inds: Rep[Indices] => $4(inds(0), inds(1), inds(2))}, $5)
-      styleOf(pipe) = Coarse
+      block_reduce_create[T](CounterChain($0, $1, $2), param(1), $3, {inds: Rep[Indices] => $4(inds(0), inds(1), inds(2))}, $5)
+    }
+
+    // HACK: Explicit par factor
+    direct (MetaPipe) ("BlockReduce", T, CurriedMethodSignature(List(List(Counter, BRAM(T), MInt), List(Idx ==> BRAM(T)), List((T,T) ==> T)), MUnit)) implements composite ${
+      block_reduce_create[T](CounterChain($0), $2, $1, {inds: Rep[Indices] => $3(inds(0)) }, $4)
     }
 
     // --- Scala Backend

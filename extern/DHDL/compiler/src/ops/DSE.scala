@@ -13,12 +13,15 @@ import dhdl.compiler.ops._
 import dhdl.compiler.transform._
 
 import scala.collection.mutable.{HashMap,HashSet,ArrayBuffer}
+import java.io.PrintStream
 
 import scala.virtualization.lms.util.GraphUtil._
+import ppl.delite.framework.Config
+
 
 trait DSE extends Traversal {
   val IR: DHDLCompiler
-  import IR._
+  import IR.{infix_until => _, _}
 
   override val debugMode = true
 
@@ -67,12 +70,14 @@ trait DSE extends Traversal {
   lazy val ctrlAnalyzer = new ControlSignalAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val paramAnalyzer = new ParameterAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val printer = new IRPrinterPlus{val IR: DSE.this.IR.type = DSE.this.IR}
-  lazy val bndAnalyzer = new BoundAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
+  lazy val bndAnalyzer = new BoundAnalyzer with QuickTraversal{val IR: DSE.this.IR.type = DSE.this.IR}
+  lazy val contention = new ContentionModel{val IR: DSE.this.IR.type = DSE.this.IR}
 
   lazy val tileSizes  = paramAnalyzer.tileSizes.distinct
   lazy val parFactors = paramAnalyzer.parFactors.distinct
   lazy val accFactors = ctrlAnalyzer.memAccessFactors.toList
   lazy val dblBuffers = inferDoubleBuffers(ctrlAnalyzer.localMems)
+  lazy val topController = ctrlAnalyzer.top
 
   def setDoubleBuffers() {
     dblBuffers.foreach{case (mem,ctrl) => isDblBuf(mem) = styleOf(ctrl) == Coarse }
@@ -82,7 +87,11 @@ trait DSE extends Traversal {
   }
 
   override def run[A:Manifest](b: Block[A]) = {
+    bndAnalyzer.run(b)
     ctrlAnalyzer.run(b)
+
+    //printer.run(b)
+
     paramAnalyzer.run(b)
 
     //if (debugMode) printer.run(b)
@@ -90,12 +99,12 @@ trait DSE extends Traversal {
 
     if (Config.enableDSE) dse(b)
 
-    bndAnalyzer.run(b)
     tileSizes.foreach{p => p.fix}
     parFactors.foreach{p => p.fix}
     setDoubleBuffers()
     setBanks()
-
+    bndAnalyzer.run(b)
+    contention.run(topController)
     (b)
   }
 
@@ -121,7 +130,8 @@ trait DSE extends Traversal {
 
   def dse[A:Manifest](b: Block[A]) {
     // Specify FPGA target (hardcoded right now)
-    val target = FPGATarget
+    // HACK: BRAM tolerance increased by ~28% to allow for designs where coalescing occurs but we don't account for it
+    val target = FPGAResourceSummary(alms=262400,regs=524800,dsps=1963,bram=2567,streams=13)//bram=3300,streams=13)
 
     val areaAnalyzer = new AreaAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
     val cycleAnalyzer = new LatencyAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
@@ -141,126 +151,228 @@ trait DSE extends Traversal {
       val distFactors = factors.distinct
       if (distFactors.length > 1) restrict ::= REqualOrOne(distFactors)
     }
+    restrict = restrict.distinct
 
     def isLegalSpace() = restrict.forall(_.evaluate)
-
-    def evaluate() = {
-      setDoubleBuffers()
-      setBanks()
-      bndAnalyzer.run(b)
-      //areaAnalyzer.resume()
-      //cycleAnalyzer.resume()
-      areaAnalyzer.run(b)
-      cycleAnalyzer.run(b)
-      (areaAnalyzer.totalArea, cycleAnalyzer.totalCycles)
-    }
 
     // C. Calculate space
     debug("Running DSE")
     debug("Tile Sizes: ")
-    tileSizes.foreach{t => debug(s"  $t")}
+    tileSizes.foreach{t => val name = nameOf(t); if (name == "") debug(s"  $t") else debug(s"  $name")}
     debug("Parallelization Factors:")
-    parFactors.foreach{t => debug(s"  $t")}
+    parFactors.foreach{t => val name = nameOf(t); if (name == "") debug(s"  $t") else debug(s"  $name")}
     debug("Metapipelining Toggles:")
-    metapipes.foreach{t => debug(s"  $t")}
+    metapipes.foreach{t => debug(s"  ${mpos(t.pos).line}")}
     debug("")
     debug("Found the following parameter restrictions: ")
+    val numericFactors = tileSizes ++ parFactors
+
     for (r <- restrict)   { debug(s"  $r") }
-    for ((p,r) <- ranges) { debug(s"  $p: ${r.start}:${r.step}:${r.end}") }
+    for ((p,r) <- ranges if numericFactors.contains(p)) { debug(s"  $p: ${r.start}:${r.step}:${r.end}") }
 
-    val initialSpace = tileSizes.map{t => Domain(ranges(t), {c: Int => t.setValue(c)}) } ++
-                       parFactors.map{t => Domain(ranges(t), {c: Int => t.setValue(c)}) }
+    // Prune single factors
+    val initialSpace = prune(numericFactors, ranges, restrict)
 
-    //val (compSpace, newRestrict) = compressSpace(initialSpace, restrict)
-    //restrict = newRestrict
-
-    // Compress space
     val space = initialSpace ++ metapipes.map{mp => Domain(List(true,false), {c: Boolean => c match {case true => styleOf(mp) = Coarse; case false => styleOf(mp) = Disabled}; () }) }
 
-    val TS = tileSizes.length
-    val PF = tileSizes.length + parFactors.length
+    val N = space.length
+    val indexedSpace = (space, xrange(0,N,1).toList).zipped
 
     // D. DSE
-    val N = space.length
     val dims = space.map(_.len)
     val spaceSize = dims.map(_.toLong).fold(1L){_*_}
     val prods = List.tabulate(N){i => dims.slice(i+1,N).map(_.toLong).fold(1L){_*_}}
 
     debug(s"Total space size is $spaceSize")
 
-    val iStep = 1//: () => Int = if (spaceSize < 200000) {() => 1} else {() => util.Random.nextInt(100) } // TODO
+    val size = if (spaceSize < Int.MaxValue) spaceSize.toInt else stageError("Spaces over 2^32 currently unsupported.")
 
-    var legalSize = 0
-    var validSize = 0
+    // --- Find all legal points
+    // FIXME: This could take a long time if space size is really large
+    val legalPoints = ArrayBuffer[Int]()
 
-    val indx = ArrayBuffer[Long]()
-    val alms = ArrayBuffer[Int]()
-    val dsps = ArrayBuffer[Int]()
-    val bram = ArrayBuffer[Int]()
-    val cycles = ArrayBuffer[Long]()
+    val legalStart = System.currentTimeMillis
+    debug(s"Enumerating all legal points...")
+    for (i <- 0 until size) {
+      indexedSpace.foreach{case (domain,d) => domain.set( ((i / prods(d)) % dims(d)).toInt ) }
+      if (isLegalSpace()) legalPoints += i
+    }
+    val legalCalcTime = System.currentTimeMillis - legalStart
+    var legalSize = legalPoints.length
+    debug(s"Legal space size is $legalSize (elapsed time: ${legalCalcTime/1000} seconds)")
 
+    // Take 200,000 legal points at most
+    val points = util.Random.shuffle(legalPoints.toList).take(200000)
+    legalSize = points.length // = min(200000, legalSize)
+
+
+    // --- PROFILING
+    val PROFILING = false
+    var clockRef = 0L
+    def resetClock() { clockRef = System.currentTimeMillis }
+
+    var setTime = 0L
+    def endSet() { setTime += System.currentTimeMillis - clockRef; resetClock() }
+    var bndTime = 0L
+    def endBnd() { bndTime += System.currentTimeMillis - clockRef; resetClock() }
+    var conTime = 0L
+    def endCon() { conTime += System.currentTimeMillis - clockRef; resetClock() }
+    var areaTime = 0L
+    def endArea() { areaTime += System.currentTimeMillis - clockRef; resetClock() }
+    var cyclTime = 0L
+    def endCycles() { cyclTime += System.currentTimeMillis - clockRef; resetClock() }
+    var paretoTime = 0L
+    def endPareto() { paretoTime += System.currentTimeMillis - clockRef; resetClock() }
+
+    def resetAllTimers() {
+      setTime = 0; bndTime = 0; conTime = 0; areaTime = 0; cyclTime = 0; paretoTime = 0;
+    }
+    def getPercentages(total: Long) = {
+      val t = total.toFloat
+      val set = 100*setTime / t
+      val bnd = 100*bndTime / t
+      val con = 100*conTime / t
+      val area = 100*areaTime / t
+      val cycl = 100*cyclTime / t
+      val pareto = 100*paretoTime / t
+      debug("set: %.1f, bnd: %.1f, con: %.1f, area: %.1f, cycles: %.1f, pareto: %.1f".format(set, bnd,con,area,cycl,pareto))
+    }
+
+    def evaluate() = {
+      setDoubleBuffers()
+      setBanks()
+      if (PROFILING) endSet()
+
+      bndAnalyzer.run(b)
+      if (PROFILING) endBnd()
+
+      contention.run(topController)
+      if (PROFILING) endCon()
+
+      areaAnalyzer.run(b)
+      if (PROFILING) endArea()
+
+      cycleAnalyzer.run(b)
+      if (PROFILING) endCycles()
+      (areaAnalyzer.totalArea, cycleAnalyzer.totalCycles)
+    }
+
+    // --- Run DSE
     case class ParetoPt(idx: Int, alms: Int, cycles: Long)
 
-    val pareto = ArrayBuffer[ParetoPt]()
+
+    val pareto = ArrayBuffer[ParetoPt]()     // Set of pareto points
+
+    // Resource and area estimates for all points (including legal but invalid ones)
+    val valid = new Array[Boolean](legalSize)
+    val alms = new Array[Int](legalSize)
+    val regs = new Array[Int](legalSize)
+    val dsps = new Array[Int](legalSize)
+    val bram = new Array[Int](legalSize)
+    val cycles = new Array[Long](legalSize)
+
+    var nValid = 0
 
     debug("And aaaawaaaay we go!")
-
-    val indexedSpace = (space, xrange(0,N,1).toList).zipped
-
     val startTime = System.currentTimeMillis
-    var i = 0L
-    var pos = 0
     var nextNotify = 0.0; val notifyStep = 200
-    while (i < spaceSize) {
+    for (p <- 0 until legalSize) {
+      if (PROFILING) resetClock() // PROFILING
+
       // Get and set current parameter combination
-      val point = indexedSpace.foreach{case (domain,d) => domain.set( ((i / prods(d)) % dims(d)).toInt ) }
-      //val ts = point.slice(0, TS).map(_.asInstanceOf[Int])
-      //val pf = point.slice(TS,PF).map(_.asInstanceOf[Int])
-      //val mp = point.drop(PF).map(_.asInstanceOf[Boolean])
-      //tileSizes.zip(ts).foreach{case (ts: Param[Int], c: Int) => ts.setValue(c) }
-      //parFactors.zip(pf).foreach{case (pf: Param[Int], c: Int) => pf.setValue(c) }
-      //metapipes.zip(mp).foreach{case (mp,c) =>  }
+      val pt = points(p)
+      indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt ) }
 
-      if (isLegalSpace()) {
-        legalSize += 1
-        val (area,runtime) = evaluate()
+      val (area,runtime) = evaluate()
+      alms(p) = area.alms
+      regs(p) = area.regs
+      dsps(p) = area.dsps
+      bram(p) = area.bram
+      cycles(p) = runtime
 
-        if (area.alms < target.alms && area.dsps < target.dsps && area.bram < target.bram && area.streams < target.streams) {
-          validSize += 1
-          indx += i
-          alms += area.alms; dsps += area.dsps; bram += area.bram; cycles += runtime
+      val isValid = area <= target
+      valid(p) = isValid
 
-          // Check if this is a pareto frontier candidate
-          var wasAdded = false
-          var candidate = true
+      if (isValid) {
+        nValid += 1
+        // Check if this is a pareto frontier candidate
+        var wasAdded = false
+        var candidate = true
 
-          var j = 0
-          while (j < pareto.size && !wasAdded && candidate) {
-            val p = pareto(j)
-            if (area.alms < p.alms && runtime < p.cycles) {
-              pareto(j) = ParetoPt(pos,area.alms,runtime) // Strictly less than existing frontier point: replace
-              wasAdded = true
-            }
-            candidate = area.alms < p.alms || runtime < p.cycles
-            j += 1
+        var j = 0
+        while (j < pareto.size && !wasAdded && candidate) {
+          val prev = pareto(j)
+          if (area.alms < prev.alms && runtime < prev.cycles) {
+            pareto(j) = ParetoPt(p,area.alms,runtime) // Strictly less than existing frontier point: replace
+            wasAdded = true
           }
-          if (!wasAdded && candidate) pareto += ParetoPt(pos,area.alms,runtime)
-
-          pos += 1
+          candidate = area.alms < prev.alms || runtime < prev.cycles
+          j += 1
         }
+        if (!wasAdded && candidate) pareto += ParetoPt(p,area.alms,runtime)
       }
-      if (i > nextNotify) {
+      if (PROFILING) endPareto()
+
+      if (p > nextNotify) {
         val time = System.currentTimeMillis - startTime
-        debug("%.4f".format(100*(i/spaceSize.toFloat)) + s"% ($i / $spaceSize) Complete after ${time/1000} seconds")
+        debug("%.4f".format(100*(p/legalSize.toFloat)) + s"% ($p / $legalSize) Complete after ${time/1000} seconds")
+
+        if (PROFILING) getPercentages(time)
+
         nextNotify += notifyStep
       }
-      i += iStep
     }
+
+    val paretoSize = pareto.length
     val time = (System.currentTimeMillis - startTime)/1000.0
     debug(s"Completed space search in $time seconds")
-    debug(s"Total legal space size: $legalSize / $spaceSize")
-    debug(s"Valid designs generated: $validSize / $spaceSize")
-    debug(s"Pareto frontier size: ${pareto.length} / $spaceSize")
+    debug(s"Valid designs generated: $nValid / $legalSize")
+    debug(s"Pareto frontier size: $paretoSize / $nValid")
+
+    val names = numericFactors.map{p =>
+      val name = nameOf(p)
+      if (name == "") s"$p" else name
+    } ++ metapipes.map{mp =>
+      val name = nameOf(mp)
+      if (name == "") s"$mp" else name
+    }
+
+    val pwd = sys.env("HYPER_HOME")
+    val name = Config.degFilename.replace(".deg","")
+    val filename = s"${pwd}/data/${name}.csv"
+
+    debug(s"Printing results to file: $filename")
+    val printStart = System.currentTimeMillis
+    val pw = new PrintStream(filename)
+    pw.println(names.mkString(", ") + ", ALMS, Regs, DSPs, BRAM, Cycles, Valid, Pareto, Synthesized")
+    for (p <- 0 until legalSize) {
+      val pt = points(p)
+      indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt ) }
+      val values = numericFactors.map{p => p.x.toString} ++ metapipes.map{mp => (styleOf(mp) == Coarse).toString}
+
+      val isPareto = pareto.exists{pt => pt.idx == p}
+      pw.println(values.mkString(", ") + s", ${alms(p)}, ${regs(p)}, ${dsps(p)}, ${bram(p)}, ${cycles(p)}, ${valid(p)}, $isPareto, false")
+    }
+    pw.close()
+    val printTime = System.currentTimeMillis - printStart
+    debug(s"Finished printing in ${printTime/1000} seconds")
+
+    val ppw = new PrintStream(s"${pwd}/data/${name}_pareto.csv")
+    ppw.println(names.mkString(", ") + ", ALMs, Cycles, ALM Usage (%), Runtime (sec)")
+    pareto.foreach{paretoPt =>
+      val p = paretoPt.idx
+      val pt = points(p)
+      indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt ) }
+      val values = numericFactors.map{p => p.x.toString} ++ metapipes.map{mp => (styleOf(mp) == Coarse).toString}
+
+      val runtime = paretoPt.cycles/(IR.CLK*1000000.0f)
+      val almUsage = 100.0f*paretoPt.alms/target.alms
+
+      ppw.println(values.mkString(", ") + s", ${paretoPt.alms}, ${paretoPt.cycles}, ${almUsage}, ${runtime}")
+    }
+    ppw.close()
+
+    sys.exit()
 
     // F. Show user results, pick point on pareto curve
     // TODO

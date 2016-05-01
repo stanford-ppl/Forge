@@ -8,7 +8,9 @@ object BlackScholesInterpreter extends DHDLApplicationInterpreter with BlackScho
 trait BlackScholes extends DHDLApplication {
   override def stageArgNames = List("tileSize")
 
-  lazy val tileSize = stageArgOrElse[Int](0, 4)
+  lazy val tileSize = param("tileSize", 14496)
+  lazy val outerPar = param("outerPar", 1)
+  lazy val innerPar = param("innerPar", 7)
   lazy val numOptions = ArgIn[SInt]("numOptions")
 
   final val inv_sqrt_2xPI = 0.39894228040143270286f
@@ -80,27 +82,32 @@ trait BlackScholes extends DHDLApplication {
     val volatilityRAM = BRAM[Flt](tileSize)
     val otimeRAM      = BRAM[Flt](tileSize)
 
-    MetaPipe(numOptions by tileSize) { i =>
+    MetaPipe((numOptions by tileSize) par outerPar) { i =>
       Parallel {
-        otypeRAM := otype(i::i+tileSize)
-        sptpriceRAM := sptprice(i::i+tileSize)
-        strikeRAM := strike(i::i+tileSize)
-        rateRAM := rate(i::i+tileSize)
-        volatilityRAM := volatility(i::i+tileSize)
-        otimeRAM := otime(i::i+tileSize)
+        otypeRAM := otype(i::i+tileSize, innerPar)
+        sptpriceRAM := sptprice(i::i+tileSize, innerPar)
+        strikeRAM := strike(i::i+tileSize, innerPar)
+        rateRAM := rate(i::i+tileSize, innerPar)
+        volatilityRAM := volatility(i::i+tileSize, innerPar)
+        otimeRAM := otime(i::i+tileSize, innerPar)
       }
 
       val optpriceRAM = BRAM[Flt](tileSize)
-      Pipe(tileSize by 1) { j =>
+      Pipe((tileSize by 1) par innerPar) { j =>
         val price = BlkSchlsEqEuroNoDiv(sptpriceRAM(j), strikeRAM(j), rateRAM(j), volatilityRAM(j), otimeRAM(j), otypeRAM(j))
         optpriceRAM(j) = price
       }
-      optprice(i::i+tileSize) := optpriceRAM
+      optprice(i::i+tileSize, innerPar) := optpriceRAM
     }
   }
 
   def main() {
-    val N = 32
+    val N = args(unit(0)).to[SInt]
+
+    bound(N) = 9995328
+    domainOf(tileSize) = (96,19200,96)
+    domainOf(outerPar) = (1,1,1)
+    domainOf(innerPar) = (1,96,1)
 
     val types  = OffChipMem[UInt]("otype", N)
     val prices = OffChipMem[Flt]("sptprice", N)

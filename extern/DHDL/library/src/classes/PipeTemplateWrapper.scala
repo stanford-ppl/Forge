@@ -37,13 +37,10 @@ trait ControllerTemplateWrapper {
     })
   }
 
-  def block_reduce[T:Manifest](chain: Rep[CounterChain], accum: Rep[BRAM[T]], func: Rep[Indices] => Rep[BRAM[T]], rFunc: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext): Rep[Pipeline] = {
+  def block_reduce[T:Manifest](chain: Rep[CounterChain], cchainRed: Rep[CounterChain], accum: Rep[BRAM[T]], func: Rep[Indices] => Rep[BRAM[T]], rFunc: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext): Rep[Pipeline] = {
     def iFunc(c: Rep[BRAM[T]], i: Rep[Indices]): Rep[FixPt[Signed,B32,B0]] = canBramMem[T].flatIdx(c, i)
     def ldFunc(c: Rep[BRAM[T]], i: Rep[FixPt[Signed,B32,B0]]): Rep[T] = canBramMem[T].ld(c, i)
     def stFunc(c: Rep[BRAM[T]], i: Rep[FixPt[Signed,B32,B0]], x: Rep[T]) = canBramMem[T].st(c, i, x)
-
-    val ctrsRed = dimsOf(accum).map{dim => counter_counter_create(None, tpes_lift_to[Int,FixPt[Signed,B32,B0]](0), dim, tpes_lift_to[Int,FixPt[Signed,B32,B0]](1), 1) }
-    val cchainRed = counterchain_object_apply(ctrsRed)
 
     //var first = true
     loop(chain, 0, Nil, {i: Rep[Indices] =>

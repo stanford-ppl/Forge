@@ -11,64 +11,107 @@ import dhdl.compiler.ops._
 import scala.collection.mutable.{HashMap,ArrayBuffer}
 
 trait ParamRestrictions extends Expressions {
+  this: DHDLMetadataOpsExp with GenOverloadHack =>
+
+  private def qt(x: Param[_]) = {
+    val name = nameOf(x)
+    if (name == "") s"$x" else name
+  }
+
   type CRange = scala.collection.immutable.Range
 
   trait Restrict {this: Product =>
     def evaluate: Boolean
+    def deps = this.productIterator.flatMap{
+      case p: Param[Int] => List(p)
+      case x: List[_] => x.flatMap{case p: Param[Int] => Some(p); case _ => None}
+      case _ => Nil
+    }
+    def dependsOnlyOn(x: Param[Int]*) = {
+      val d = deps.toList.distinct
+      val c = x.toList.distinct
+      d.length == c.length && c.forall(d contains _)
+    }
   }
 
-  case class RLess(a: Param[Int], b: Param[Int]) extends Restrict { def evaluate = a.x < b.x }
-  case class RLessEqual(a: Param[Int], b: Param[Int]) extends Restrict { def evaluate = a.x <= b.x }
-  case class RDivides(a: Param[Int], b: Param[Int]) extends Restrict { def evaluate = b.x % a.x == 0 }
-  case class RDividesConst(a: Param[Int], b: Int) extends Restrict { def evaluate = b % a.x == 0}
+  case class RLess(a: Param[Int], b: Param[Int]) extends Restrict {
+    def evaluate = a.x < b.x
+    override def toString = s"${qt(a)} < ${qt(b)}"
+  }
+  case class RLessEqual(a: Param[Int], b: Param[Int]) extends Restrict {
+    def evaluate = a.x <= b.x
+    override def toString = s"${qt(a)} <= ${qt(b)}"
+  }
+  case class RDivides(a: Param[Int], b: Param[Int]) extends Restrict {
+    def evaluate = b.x % a.x == 0
+    override def toString = s"${qt(a)} divides ${qt(b)}"
+  }
+  case class RDividesConst(a: Param[Int], b: Int) extends Restrict {
+    def evaluate = b % a.x == 0
+    override def toString = s"${qt(a)} divides $b"
+  }
   case class RDividesQuotient(a: Param[Int], n: Int, d: Param[Int]) extends Restrict {
     def evaluate = {
       val q = Math.ceil(n.toDouble / d.x).toInt
       a.x < q && (q % a.x == 0)
     }
+    override def toString = s"${qt(a)} divides $n/${qt(d)}"
   }
   case class RProductLessThan(ps: List[Param[Int]], y: Int) extends Restrict {
     def evaluate = ps.map(_.x).fold(1){_*_} < y
+    override def toString = "product(" + ps.map(qt(_)).mkString(",") + s") < $y"
   }
   case class REqualOrOne(ps: List[Param[Int]]) extends Restrict {
     def evaluate = {
       val p = ps.map(_.x).distinct
       p.length == 1 || (p.length == 2 && p.contains(1))
     }
+    override def toString = "(" + ps.map(qt(_)).mkString(",") + ") equal or one"
   }
-
-  /*def crossFilter(x: List[Domain[T]])(pred: List[T] => Boolean) = {
-    val newOptions = ArrayBuffer[List[T]]()
-    val dims = x.map(_.len)
-    val prods = List.tabulate(x.length){i => dims.slice(i+1,x.length).fold(1){_*_}}
-    val Np = dims.map(_.toLong).reduce{_*_}
-    if (Np > Int.MaxValue) throw new Exception("Domain is too big!")
-
-    val N = Np.toInt
-    val indexedDomains = x.zipWithIndex
-    for (i <- 0 until N) {
-      val point = indexedDomains.map{case (domain,d) => domain( ((i / prods(d)) % dims(d)) )  }
-      if (pred(point)) newOptions += point
-    }
-    Domain[List[T]](newOptions.toList, {c: List[T] => x.zip(cs).foreach{case (domain,c) => domain.set(c) }})
-  }*/
-
   case class Domain[T](options: List[T], setter: T => Unit) {
     def apply(i: Int) = options(i)
     def set(i: Int) = setter(options(i))
     def setValue(v: T) = setter(v)
     def len: Int = options.length
     override def toString = if (len < 10) "Domain(" + options.mkString(",") + ")" else "Domain( " + len + " x)"
+
+    def filter(cond: () => Boolean) = {
+      new Domain(options.filter{t => setValue(t); cond()}, setter)
+    }
   }
   object Domain {
     def apply(r: CRange, setter: Int => Unit) = {
       if (r.start % r.step != 0) {
         val start = r.step*(r.start/r.step + 1)
-        new Domain[Int]((start to r.end by r.step).toList :+ r.start, setter)
+        new Domain[Int]((start until r.end by r.step).toList :+ r.start, setter)
       }
       else new Domain[Int](r.toList, setter)
     }
+    def restricted(r: CRange, setter: Int => Unit, cond: () => Boolean) = {
+      val values = ArrayBuffer[Int]()
+      var start = r.start
+      if (r.start % r.step != 0) {
+        start = r.step*((r.start/r.step) + 1)
+        setter(r.start);
+        if (cond()) values += r.start
+      }
+      for (i <- start until r.end by r.step) {
+        setter(i)
+        if (cond()) values += i
+      }
+      new Domain[Int](values.toList, setter)
+    }
   }
+
+  def prune(params: List[Param[Int]], ranges: HashMap[Param[Int],CRange], restrict: List[Restrict]) = {
+    val pruneSingle = params.map{t =>
+      val restricts = restrict.filter(_.dependsOnlyOn(t))
+      t -> Domain.restricted(ranges(t), {c: Int => t.setValue(c)}, () => restricts.forall(_.evaluate))
+    }
+    // TODO: prune pairs
+    pruneSingle.map(_._2)
+  }
+
 
   def xrange(start: Int, end: Int, step: Int) = new scala.collection.immutable.Range(start,end,step)
 }
@@ -80,7 +123,7 @@ trait ParameterAnalyzer extends Traversal {
   val IR: DHDLExp with ParameterAnalysisExp
   import IR._
 
-  override val debugMode = true
+  override val debugMode = false
 
   val MIN_TILE_SIZE  = 96   // words
   val MAX_TILE_SIZE  = 9600 // words
@@ -122,7 +165,7 @@ trait ParameterAnalyzer extends Traversal {
       range(p) = xrange(range(p).start,Math.min(mx,range(p).end),range(p).step)
   }
 
-  def canParallelize(e: Exp[Any]) = styleOf(e) != Disabled
+  def canParallelize(e: Exp[Any]) = true //styleOf(e) != Disabled
 
   override def traverseStm(stm: Stm) = stm match {
     case TP(s, d) =>
@@ -144,11 +187,12 @@ trait ParameterAnalyzer extends Traversal {
           else                         { setRange(p, 1, MAX_TILE_SIZE, MIN_TILE_SIZE) }
       }
 
-      if (tiles.length > 1) restrict ::= RProductLessThan(tiles, MAX_TILE / cSize)
+      //if (tiles.length > 1) restrict ::= RProductLessThan(tiles, )
 
 
     case EatReflect(Counter_new(start,end,step,par)) =>
       var max = MAX_PAR_FACTOR
+      debug(s"Found counter with start=$start, end=$end, step=$step, par=$par")
 
       // Set constraints on par factor
       (start,end,step) match {

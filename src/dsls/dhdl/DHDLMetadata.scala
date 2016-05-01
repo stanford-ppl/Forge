@@ -30,9 +30,9 @@ trait DHDLMetadata {
     val dimOps = metadata("dimsOf")
 
     onMeet(MStagedDims) ${ this }
-    internal.static (dimOps) ("update", T, (T, SList(Idx)) :: MUnit, effect = simple) implements
+    internal.static (dimOps) ("update", Nil, (MAny, SList(Idx)) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MStagedDims($1)) }
-    internal.static (dimOps) ("apply", T, T :: SList(Idx)) implements composite ${ meta[MStagedDims]($0).get.dims }
+    internal.static (dimOps) ("apply", Nil, MAny :: SList(Idx)) implements composite ${ meta[MStagedDims]($0).get.dims }
 
     internal (dimOps) ("sizeOf", T, T :: Idx) implements composite ${ productTree(dimsOf($0)) }
 
@@ -54,9 +54,9 @@ trait DHDLMetadata {
     val MDblBuf = metadata("MDblBuf", "isDblBuf" -> SBoolean)
     val dblBufOps = metadata("isDblBuf")
     onMeet (MDblBuf) ${ this }
-    internal.static (dblBufOps) ("update", T, (T, SBoolean) :: MUnit, effect = simple) implements
+    static (dblBufOps) ("update", T, (T, SBoolean) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MDblBuf($1)) }
-    internal.static (dblBufOps) ("apply", T, T :: SBoolean) implements composite ${
+    static (dblBufOps) ("apply", T, T :: SBoolean) implements composite ${
     	meta[MDblBuf]($0) match {
     	  case Some(a) => a.isDblBuf
     	  case None => false
@@ -175,7 +175,7 @@ trait DHDLMetadata {
     val prangeOps = metadata("domainOf")
     onMeet (MParamRange) ${ this }
     static (prangeOps) ("update", Nil, (MAny, CTuple3(SInt,SInt,SInt)) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MParamRange($1._1,$1._2,$1._3)) }
+      composite ${ setMetadata($0, MParamRange($1._1,$1._2+$1._3,$1._3)) }
 
     static (prangeOps) ("apply", Nil, MAny :: SOption(CTuple3(SInt,SInt,SInt))) implements composite ${
       meta[MParamRange]($0).map(d => (d.minv, d.maxv, d.stepv))
@@ -243,6 +243,13 @@ trait DHDLMetadata {
     })
     rewrite (boundOps, "boundOf") using pattern(${Const(x)} -> ${ fixed(extractNumericConstant(x)) })
     */
+
+    val MContention = metadata("MContention", "contention" -> SInt)
+    val contentionOps = metadata("contentionOf")
+    onMeet (MContention) ${ this }
+    internal.static (contentionOps) ("update", T, (T, SInt) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MContention($1)) }
+    internal.static (contentionOps) ("apply", T, T :: SInt) implements composite ${ meta[MContention]($0).map(_.contention).getOrElse(1) }
 
     /* Parent of a node, which is a controller : None if unset */
 	 	// Parent controls the reset of the node

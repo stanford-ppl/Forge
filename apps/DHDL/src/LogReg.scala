@@ -6,83 +6,80 @@ import scala.util.Random
 object LogRegCompiler extends DHDLApplicationCompiler with LogReg
 object LogRegInterpreter extends DHDLApplicationInterpreter with LogReg
 trait LogReg extends DHDLApplication {
-  type Elem = FltPt[B23, B8]
+  type Elem = Flt
 
-  override def stageArgNames = List("rts", "cts")
-  lazy val rts = stageArgOrElse[Int](0, 2)
-  lazy val cts = stageArgOrElse[Int](1, 2)
-  lazy val nrow = ArgIn[SInt]("nrow")
-  lazy val ncol = ArgIn[SInt]("ncol")
-  lazy val alpha = ArgIn[Elem]("alpha")
-  lazy val numIter = ArgIn[SInt]("numIter")
+  lazy val tileSize = param("tileSize", 96)
+  lazy val outerMpPar = param("outerMpPar", 1)
+  lazy val innerMpPar = param("innerMpPar", 1)
+  lazy val innerPar   = param("innerPar", 1)
+  lazy val noPar = param("noPar", 1)
 
-	def sigmoid(t:Rep[Elem]) = {
-		1.as[Elem]/(1+exp(-t))
-	}
+  lazy val N = ArgIn[SInt]("nrow")
+  lazy val D = 192.as[SInt]
+  lazy val A = ArgIn[Elem]("alpha")
+
+  def sigmoid(t:Rep[Elem]) = 1.as[Elem]/(exp(-t)+1)
+
   def logreg(x: Rep[OffChipMem[Elem]], y: Rep[OffChipMem[Elem]], theta: Rep[OffChipMem[Elem]]) {
-		//Sequential(numIter by 1) { iter =>
-    val tB = BRAM[Elem]("tB", cts)
     Sequential {
-			tB := theta(0::ncol.value)
-		  val gradAcc = BRAM[Elem]("gradAcc", cts)
-		  MetaPipe(nrow by rts) { itr =>
-        val xB = BRAM[Elem]("xB", rts, cts)
-        val yB = BRAM[Elem]("yB", rts)
-		  	Parallel {
-		  		xB := x(itr::itr+rts, 0::ncol.value)
-		  		yB := y(itr::itr+rts)
-		  	}
-		  	MetaPipe(rts by 1) { ir =>
-		  		val dotAccum = Reg[Elem]("dotAccum")
-		  	  Pipe(ncol by 1, dotAccum) { ic =>
-            xB(ir,ic) * tB(ic)
-		  		}{_+_}
-		  		val pipe2Res = Reg[Elem]("pipe2Res")
-		  	  Pipe {
-		  	    pipe2Res := (yB(ir) - sigmoid(dotAccum.value))
-		  	  }
-          val tB2 = BRAM[Elem]("tB2", cts)
-          Pipe (ncol by 1) {ic =>
-            tB2(ic) = xB(ir,ic) - pipe2Res.value
-          }
-          Pipe (ncol by 1) {ic =>
-            gradAcc(ic) = gradAcc(ic) + tB2(ic)
-          }
+      val gradAcc = BRAM[Elem]("gradAcc", D)
+      BlockReduce((N by tileSize) par outerMpPar, gradAcc, noPar) { i =>
+        val xB = BRAM[Elem]("xB", tileSize, D)
+        val yB = BRAM[Elem]("yB", tileSize)
+        val btheta = BRAM[Elem]("btheta", D)
+        Parallel {
+          xB := x(i::i+tileSize, 0::D, innerPar)
+          yB := y(i::i+tileSize, innerMpPar)
+          btheta := theta(0::D, innerPar)
         }
-		  }
-      Pipe (ncol by 1) { ic =>
-        tB(ic) = gradAcc(ic)*alpha.value + tB(ic)
-      }
-			theta(0::ncol.value) := tB
+        val gradient = BRAM[Elem]("gradient", D)
+        BlockReduce((tileSize by 1) par innerMpPar, gradient, innerPar) { ii =>
+          val dotAccum = Reg[Elem]("dotAccum")
+          val pipe2Res = Reg[Elem]("pipe2Res")
+          val subRam   = BRAM[Elem]("subRam", D)
+
+          Pipe((D by 1) par innerPar, dotAccum) { j => xB(ii,j) * btheta(j) }{_+_}
+          Pipe { pipe2Res := (yB(ii) - sigmoid(dotAccum.value)) }
+          Pipe((D by 1) par innerPar) {j => subRam(j) = xB(ii,j) - pipe2Res.value }
+          subRam
+        }{_+_}
+        gradient
+      }{_+_}
+
+      val outerTheta = BRAM[Elem]("theta", D)
+      val newTheta = BRAM[Elem]("newTheta", D)
+      outerTheta := theta(0::D, innerPar)
+      Pipe ((D by 1) par innerPar) { j => newTheta(j) = gradAcc(j)*A.value + outerTheta(j) }
+      theta(0::D, innerPar) := newTheta
     }
   }
 
   def main() {
-		val NR = 4 // Number of rows
-		val NC = 6 // Number of columns
-		val rts = 2 // Row tile size
-		val cts = 2 // Column tile size
-		val A = 1.0
-		val MI = 30
+    val nrows = args(unit(0)).to[SInt];   bound(nrows) = 9993600
+    val alpha = args(unit(1)).to[Elem]
 
-    val x = OffChipMem[Elem]("x", nrow.value, ncol.value)
-    val y = OffChipMem[Elem]("y", nrow.value)
-    val theta = OffChipMem[Elem]("theta", ncol.value)
+    domainOf(tileSize) = (96,9600,96)
+    domainOf(outerMpPar) = (1,3,1)
+    domainOf(innerMpPar) = (1,1,1)
+    domainOf(innerPar) = (1,192,1)
+    domainOf(noPar) = (1,1,1)
 
-		val sX = Array.fill(NR){ Array.fill(NC){ random[Elem](10.0)} }
-		val sY = Array.fill(NR)( random[Elem](10.0) )
+    val x = OffChipMem[Elem]("x", nrows, D)
+    val y = OffChipMem[Elem]("y", nrows)
+    val theta = OffChipMem[Elem]("theta", D)
+
+    val sX = Array.fill(nrows){ Array.fill(D){ random[Elem](10.0)} }
+    val sY = Array.fill(nrows)( random[Elem](10.0) )
 
     println("x: " + sX.mkString(", "))
-   	println("y: " + sY.mkString(", "))
+    println("y: " + sY.mkString(", "))
 
-    setArg(nrow, NR)
-    setArg(ncol, NC)
-    setArg(alpha, A)
-    setArg(numIter, MI)
+    setArg(N, nrows)
+    setArg(A, alpha)
     setMem(x, sX.flatten)
     setMem(y, sY)
 
-		/* OptiMl version
+    /* OptiMl version
     val w = untilconverged(theta, maxIter = 30) { (cur, iter) =>
       val gradient = ((0::x.numRows) { i =>
         x(i)*(y(i) - sigmoid(cur *:* x(i)))
@@ -90,7 +87,7 @@ trait LogReg extends DHDLApplication {
       val z = cur + gradient*alpha
       z
     }
-		*/
+    */
 
     Accel {
       logreg(x, y, theta)

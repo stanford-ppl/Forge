@@ -6,12 +6,12 @@ import scala.util.Random
 object DotProductCompiler extends DHDLApplicationCompiler with DotProduct
 object DotProductInterpreter extends DHDLApplicationInterpreter with DotProduct
 trait DotProduct extends DHDLApplication {
-  type Elem = FixPt[Signed, B16, B16]
+  type Elem = Flt //FixPt[Signed, B16, B16]
 
   override def stageArgNames = List("tileSize")
-  lazy val tileSize = param(96)
-  lazy val outerPar = param(1)
-  lazy val innerPar = param(1)
+  lazy val tileSize = param("tileSize", 9600)
+  lazy val outerPar = param("outerPar", 5)
+  lazy val innerPar = param("innerPar", 60)
   lazy val dataSize = ArgIn[SInt]("dataSize")
 
   def dotproduct(v1: Rep[OffChipMem[Elem]], v2: Rep[OffChipMem[Elem]], out: Rep[Reg[Elem]]) {
@@ -31,12 +31,13 @@ trait DotProduct extends DHDLApplication {
   }
 
   def main() {
-    val N = args(unit(0)).to[SInt];  bound(N) = 960000
-    domainOf(tileSize) = (1,9600,96)
-    domainOf(outerPar) = (1,7,1)
-    domainOf(innerPar) = (1,96,1)
+    val N = args(unit(0)).to[SInt]
 
-    // Bad things will happen if you try to set the Offchip size from a register value
+    bound(N) = 187200000
+    domainOf(tileSize) = (96,19200,96)
+    domainOf(outerPar) = (1,6,1)
+    domainOf(innerPar) = (1,192,1)
+
     val v1 = OffChipMem[Elem]("v1", N)
     val v2 = OffChipMem[Elem]("v2", N)
     val out = ArgOut[Elem]("out")

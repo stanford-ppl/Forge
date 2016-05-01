@@ -83,17 +83,6 @@ trait PipeStageTools extends NestedBlockTraversal {
   val IR: PipeStageToolsExp
   import IR._
 
-  // Bit of a hack here - use scheduling to return list of statements
-  private def getStmsInScope(b: Block[Any]): List[Stm] = {
-    var stms: List[Stm] = Nil
-    focusBlock(b) {
-      focusExactScope(b){ levelScope =>
-        stms = levelScope
-      }
-    }
-    stms
-  }
-
   def list(x: List[Exp[Any]]) = x.zipWithIndex.foreach{
     case (s@Def(d),i) if isControlNode(s)  => println(s"   $i. [Ctrl] $s = $d")
     case (s@Def(d),i) if isInnerControl(s) => println(s"   $i. [Pipe] $s = $d")
@@ -103,7 +92,7 @@ trait PipeStageTools extends NestedBlockTraversal {
   }
 
   def getStages(blks: Block[Any]*): List[Exp[Any]] = {
-    blks.toList.flatMap(b => getStmsInScope(b)).map{case TP(s,d) => s}
+    blks.toList.flatMap(b => getStmsInBlock(b)).map{case TP(s,d) => s}
   }
   def getControlNodes(blk: Block[Any]*) = getStages(blk:_*).filter{s => isControlNode(s) }
   def getAllocations(blk: Block[Any]*)  = getStages(blk:_*).filter{s => isAllocation(s) }
@@ -121,6 +110,12 @@ trait CounterToolsExp extends EffectExp {
   def parParamsOf(cc: Rep[CounterChain]): List[Param[Int]] = cc match {
     case Def(EatReflect(Counterchain_new(ctrs,nIter))) => ctrs.map{
       case Def(EatReflect(Counter_new(_,_,_,par))) => par
+    }
+  }
+
+  def offsets(cc: Rep[CounterChain]) = cc match {
+    case Def(EatReflect(Counterchain_new(ctrs,nIter))) => ctrs.map{
+      case Def(EatReflect(Counter_new(start,_,_,par))) => start
     }
   }
 
@@ -176,7 +171,7 @@ object ReductionTreeAnalysis {
 
   def reductionTreeHeight(nLeaves: Int): Int = {
     def treeLevel(nNodes: Int, curHeight: Int): Int = {
-      if (nNodes <= 1) curHeight + 1
+      if (nNodes <= 1) curHeight
       else if (nNodes % 2 == 0) treeLevel(nNodes/2, curHeight + 1)
       else treeLevel((nNodes - 1)/2 + 1, curHeight + 1)
     }

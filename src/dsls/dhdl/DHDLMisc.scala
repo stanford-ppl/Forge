@@ -2,6 +2,7 @@ package ppl.dsl.forge
 package dsls
 package dhdl
 
+@dsl
 trait DHDLMisc {
   this: DHDLDSL =>
 
@@ -11,11 +12,23 @@ trait DHDLMisc {
   }
 
   def importDHDLHelpers() {
+    /**
+     * @name Miscellaneous
+     *
+     **/
     val Misc = grp("DHDLMisc")
 
     val T = tpePar("T")
+    val CT = tpePar("T", stage=compile)
 
     val Idx = lookupAlias("Index")
+
+    /** Creates a design parameter with the given name and default value **/
+    direct (Misc) ("param", T, (("name",SString),("default",CT)) :: T) implements composite ${
+      val p = param($1)
+      nameOf(p) = $0
+      p
+    }
 
     // --- Staging time warnings and errors
     internal (Misc) ("stageWarn", Nil, SAny :: SUnit, effect = simple) implements composite ${
@@ -80,20 +93,41 @@ trait DHDLMisc {
     infix (ArrColl) ("empty", T, Nil :: MArray(T)) implements composite ${ array_empty_imm[T](unit(0)) }
     infix (ArrColl) ("zeros", T, MArray(T) :: MArray(T)) implements composite ${ array_empty_imm[T](array_length($0)) }  // TODO: Should be recursive?
 
+    /** Unsynthesizable helper object for creating arrays on the CPU **/
     val Arr = grp("Array")
+    /** Creates an empty array with given length
+     * @param length
+     **/
     static (Arr) ("empty", T, Idx :: MArray(T)) implements composite ${ array_empty[T](fix_to_int($0)) }
 
+    /**
+     * Creates an array with given length whose elements are determined by the supplied function
+     * @param length
+     * @param f
+     **/
     static (Arr) ("fill", T, CurriedMethodSignature(List(List(Idx), List(MThunk(T))), MArray(T))) implements composite ${
       array_fromfunction(fix_to_int($0), {i: Rep[Int] => $1})
     }
+    /** Creates an array with the given length whose elements are determined by the supplied indexed function
+     * @param length
+     * @param f
+     **/
     static (Arr) ("tabulate", T, CurriedMethodSignature(List(List(Idx),List(Idx ==> T)), MArray(T))) implements composite ${
       array_fromfunction(fix_to_int($0), {i: Rep[Int] => $1(int_to_fix[Signed,B32](i)) })
     }
 
 
     val API = grp("ForgeArrayAPI") // ForgeArrayOps already exists...
+    /** Returns the length of this Array **/
     infix (API) ("length", T, MArray(T) :: Idx) implements composite ${ int_to_fix[Signed,B32](array_length($0)) }
+    /** Returns the element at the given index
+     * @param i
+     **/
     infix (API) ("apply", T, (MArray(T), Idx) :: T) implements composite ${ array_apply($0, fix_to_int($1)) }
+    /** Updates the array at the given index
+     * @param i
+     * @param x
+     **/
     infix (API) ("update", T, (MArray(T), Idx, T) :: MUnit, effect = write(0)) implements composite ${ array_update($0, fix_to_int($1), $2) }
 
     infix (API) ("map", (T,R), (MArray(T), T ==> R) :: MArray(R)) implements composite ${ array_map($0, $1) }
@@ -114,6 +148,7 @@ trait DHDLMisc {
   }
 
   def importRandomOps() {
+    /** Unsynthesizable group of operations for generating random data for testing **/
     val Rand = grp("Rand")
 
     val A = tpePar("A")
@@ -137,6 +172,7 @@ trait DHDLMisc {
       rand_flt[G,E] * flt
     }
 
+    /** Returns a uniformly distributed random value of type A with the given maximum value **/
     direct (Rand) ("random", A, A :: A) implements composite ${
       manifest[A] match {
         case mA if isFixPtType(mA) =>
@@ -153,6 +189,7 @@ trait DHDLMisc {
     }
 
     // Holy hackery, batman!
+    /** Returns a uniformly distributed random value of type A. Fixed point types are unbounded, while floating point types are between 0 and 1 **/
     direct (Rand) ("random", A, Nil :: A) implements composite ${
       manifest[A] match {
         case mA if isFixPtType(mA) =>

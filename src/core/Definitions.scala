@@ -188,10 +188,8 @@ trait Definitions extends DerivativeTypes {
   /**
    * Method backend types
    */
-  case object sharedBackend extends BackendType
-  case object internalBackend extends BackendType
-  //case object libraryBackend extends BackendType
-  //case object compilerBackend extends BackendType
+  case object publicMethod extends MethodVisibility
+  case object privateMethod extends MethodVisibility
 
   /**
    * Metadata meet functions
@@ -215,6 +213,7 @@ trait Definitions extends DerivativeTypes {
   // blacklist for op names that need the SourceContext implicit parameter to be surpressed (usually because they construct an object with an apply method)
   var noSourceContextList = List[String]()
 
+  var primitiveStructs = List[Rep[DSLType]]()
   var primitiveTypes = List[Rep[DSLType]]()
 
   /**

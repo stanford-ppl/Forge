@@ -15,6 +15,7 @@ trait DHDLMemories {
     importMemOps()
     importRegs()
     importBRAM()
+    importCache()
     importOffChip()
     importTiles()
   }
@@ -264,6 +265,94 @@ trait DHDLMemories {
     // impl (bram_reset) (codegen(maxj, ${ })) TODO: removed from dhdl?
 
   }
+
+
+
+  def importCache() {
+    val T = tpePar("T")
+    val Cache = lookupTpe("Cache")
+    val Tile    = lookupTpe("Tile")
+    val OffChip = lookupTpe("OffChipMem")
+    val Idx     = lookupAlias("Index")
+    val Indices = lookupTpe("Indices")
+
+    // --- Nodes
+    val cache_new = internal (Cache) ("cache_new", T, ("offchip", OffChip(T)) :: Cache(T), effect = mutable)
+    val cache_load = internal (Cache) ("cache_load", T, (("cache", Cache(T)), ("addr", Idx)) :: T)
+    val cache_store = internal (Cache) ("cache_store", T, (("cache", Cache(T)), ("addr", Idx), ("value", T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
+    //TODO: cache_flush?
+
+    // --- Internals
+    internal (Cache) ("cache_create", T, (SOption(SString), OffChip(T)) :: Cache(T)) implements composite ${
+      val cache = cache_new[T]($1)
+      $0.foreach{name => nameOf(cache) = name }
+      dimsOf(cache) = dimsOf($1)
+      cache 
+    }
+
+    direct (Cache) ("cache_load_nd", T, (Cache(T), SList(Idx)) :: T) implements composite ${
+      val addr = calcAddress($1, dimsOf($0))
+      cache_load($0, addr)
+    }
+    direct (Cache) ("cache_store_nd", T, (Cache(T), SList(Idx), T) :: MUnit, effect = write(0)) implements composite ${
+      val addr = calcAddress($1, dimsOf($0))
+      cache_store($0, addr, $2)
+    }
+
+    direct (Cache) ("cache_calc_addr", T, (Cache(T), Indices) :: Idx) implements composite ${ calcAddress($1.toList, dimsOf($0)) }
+
+    val Mem = lookupTpeClass("Mem").get
+    val CacheMem = tpeClassInst("CacheMem", T, TMem(T, Cache(T)))
+    infix (CacheMem) ("ld", T, (Cache(T), Idx) :: T) implements composite ${ cache_load_nd($0, List($1)) }
+    infix (CacheMem) ("st", T, (Cache(T), Idx, T) :: MUnit, effect = write(0)) implements composite ${ cache_store_nd($0, List($1), $2) }
+    infix (CacheMem) ("flatIdx", T, (Cache(T), Indices) :: Idx) implements composite ${ cache_calc_addr($0, $1) }
+
+    // --- API
+    static (Cache) ("apply", T, (SString, OffChip(T)) :: Cache(T), TNum(T)) implements composite ${ cache_create(Some($0), $1) }
+    static (Cache) ("apply", T, OffChip(T) :: Cache(T), TNum(T)) implements composite ${ cache_create(None, $0) }
+
+    val Cache_API = withTpe(Cache)
+    Cache_API {
+      /* Load */
+      infix ("apply") ((Idx, varArgs(Idx)) :: T) implements composite ${ cache_load_nd($self, $1 +: $2.toList) }
+
+      /* Store */
+      // varArgs in update doesn't work in Scala
+      infix ("update") ((Idx, T) :: MUnit, effect = write(0)) implements composite ${ cache_store_nd($self, List($1), $2) }
+      infix ("update") ((Idx, Idx, T) :: MUnit, effect = write(0)) implements composite ${ cache_store_nd($self, List($1, $2), $3) }
+      infix ("update") ((Idx, Idx, Idx, T) :: MUnit, effect = write(0)) implements composite ${ cache_store_nd($self, List($1, $2, $3), $4) }
+      infix ("update") ((SSeq(Idx), T) :: MUnit, effect = write(0)) implements composite ${ cache_store_nd($self, $1.toList, $2) }
+
+    }
+
+    // --- Scala Backend
+    impl (cache_new)   (codegen($cala, ${ $offchip }))
+    impl (cache_load)  (codegen($cala, ${ $cache.apply($addr.toInt) }))
+    impl (cache_store) (codegen($cala, ${ $cache.update($addr.toInt, $value) }))
+
+    // --- Dot Backend
+    impl (cache_new)   (codegen(dot, ${
+      @ if (isDblBuf(sym)) {
+      	$sym [margin=0 rankdir="LR" label="{<st> | <ld>}" xlabel="$sym " 
+              shape="record" color=$dblbufBorderColor  style="filled" 
+              fillcolor=$cacheFillColor ]
+      @ } else {
+        	$sym [label="$sym " shape="square" style="filled" fillcolor=$cacheFillColor ]
+      @ }
+      $offchip -> $sym
+		}))
+		impl (cache_load)  (codegen(dot, ${
+			$addr -> $cache [ headlabel="addr" ]
+			@ emitValDef(sym, cache)
+		}))
+		impl (cache_store) (codegen(dot, ${
+			$addr -> $cache [ headlabel="addr" ]
+			$value -> $cache [ headlabel="data" ]
+		}))
+
+  }
+
+
   // TODO: Size of offchip memory can be a staged value, but it can't be a value which is calculated in hardware
   //       Any way to make this distinction?
   // TODO: Change interface of tile load / store to words rather than BRAMs?

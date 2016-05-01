@@ -45,6 +45,7 @@ trait TypeInspectionCompilerOps extends TypeInspectionOps with MemoryTemplateCom
 trait MemoryTemplateTypes {
   type OffChipMem[T]
   type BRAM[T]
+  type Cache[T]
   type Reg[T]
 
   type Counter
@@ -59,6 +60,7 @@ trait MemoryTemplateTypes {
 
   implicit def offchipMemManifest[T:Manifest]: Manifest[OffChipMem[T]]
   implicit def bramManifest[T:Manifest]: Manifest[BRAM[T]]
+  implicit def cacheManifest[T:Manifest]: Manifest[Cache[T]]
   implicit def regManifest[T:Manifest]: Manifest[Reg[T]]
   implicit def counterManifest: Manifest[Counter]
   implicit def counterChainManifest: Manifest[CounterChain]

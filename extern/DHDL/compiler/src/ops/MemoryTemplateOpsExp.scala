@@ -12,6 +12,7 @@ import dhdl.compiler._
 import dhdl.compiler.ops._
 
 trait BlockRAM[T]
+trait CACHE[T]
 trait Register[T]
 trait DRAM[T]
 
@@ -34,6 +35,7 @@ trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp wit
   def isPipeline[T:Manifest]  = isSubtype(manifest[T].runtimeClass, classOf[DHDLPipeline])
   def isRegister[T:Manifest]  = isSubtype(manifest[T].runtimeClass, classOf[Register[_]])
   def isBRAM[T:Manifest]      = isSubtype(manifest[T].runtimeClass, classOf[BlockRAM[_]])
+  def isCACHE[T:Manifest]      = isSubtype(manifest[T].runtimeClass, classOf[CACHE[_]])
 
   // Shorthand versions for matching on ConstFixPt and ConstFltPt without the manifests
   object ParamFix {
@@ -123,6 +125,7 @@ trait MaxJGenTypeInspectionOps extends MaxJGenEffect {
 trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
   type OffChipMem[T] = DRAM[T]
   type BRAM[T] = BlockRAM[T]
+  type Cache[T] = CACHE[T]
   type Reg[T] = Register[T]
 
   type Counter = DHDLCounter
@@ -136,6 +139,7 @@ trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
 
   def offchipMemManifest[T:Manifest]: Manifest[OffChipMem[T]] = manifest[DRAM[T]]
   def bramManifest[T:Manifest]: Manifest[BRAM[T]] = manifest[BlockRAM[T]]
+  def cacheManifest[T:Manifest]: Manifest[Cache[T]] = manifest[CACHE[T]]
   def regManifest[T:Manifest]: Manifest[Reg[T]] = manifest[Register[T]]
   def counterManifest: Manifest[Counter] = manifest[DHDLCounter]
   def counterChainManifest: Manifest[CounterChain] = manifest[DHDLCounterChain]
@@ -238,6 +242,7 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTe
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
     case "BlockRAM" => "Array[" + remap(m.typeArguments(0)) + "]"
+    case "CACHE"     => "Array[" + remap(m.typeArguments(0)) + "]"
     case "Register" => "Array[" + remap(m.typeArguments(0)) + "]"
     case "DRAM"     => "Array[" + remap(m.typeArguments(0)) + "]"
 

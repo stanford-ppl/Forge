@@ -72,8 +72,9 @@ trait DHDLDSL extends ForgeApplication
     val OffChip = tpe("OffChipMem", T)
     val Tile    = tpe("Tile", T)
     val BRAM    = tpe("BRAM", T)
+    val Cache     = tpe("Cache", T)
     val Reg     = tpe("Reg", T)
-    primitiveTypes :::= List(OffChip, BRAM, Reg)
+    primitiveTypes :::= List(OffChip, BRAM, Cache, Reg)
 
 
     // --- State Machine Types

@@ -9,7 +9,7 @@ object DHDLDSLRunner extends ForgeApplicationRunner with DHDLDSL
 
 @dsl
 trait DHDLDSL extends ForgeApplication
-  with DHDLMath with DHDLMisc with DHDLTypes with DHDLMemories
+  with DHDLMath with DHDLMisc with DHDLTypes with DHDLMemories with DHDLVectors
   with DHDLControllers with DHDLMetadata with DHDLEnums with DHDLSugar with TupleJunk
   with DHDLGlobalAnalysis
   with DHDLBoundAnalysis {
@@ -43,7 +43,7 @@ trait DHDLDSL extends ForgeApplication
    * in-memory as a parameterized, hierarchical dataflow graph.
    *
    * Templates in DHDL capture parallelism, locality, and access pattern information at multiple levels. This dramatically simplifies coarse-grained pipelining and
-   * enables us to explicitly capture and represent a large space of designs which other tools cannot capture, as shown in Figure 2.
+   * enables us to explicitly capture and represent a large space of designs which other tools cannot capture.
    * Every template is parameterized. A specific hardware design point is instantiated from a DHDL description by instantiating all the templates in the design with concrete
    * parameter values passed to the program. DHDL heavily uses metaprogramming, so these values are passed in as arguments to the DHDL program. The
    * generated design instance is represented internally as a graph that can be analyzed to provide estimates of metrics such as area and cycle count. The parameters
@@ -145,7 +145,12 @@ trait DHDLDSL extends ForgeApplication
      * are defined within. A Reg defined within a Pipe, for example, is reset at the beginning of each iteration of that Pipe.
      **/
     val Reg = tpe("Reg", T)
-    primitiveStructs :::= List(OffChip, BRAM, Reg)
+    /**
+     * Vector defines a fixed size collection of scalar values.
+     **/
+    val Vector = tpe("Vector", T)
+
+    primitiveStructs :::= List(OffChip, BRAM, Reg, Vector)
 
 
     // --- State Machine Types
@@ -168,6 +173,9 @@ trait DHDLDSL extends ForgeApplication
     val LoopRange = tpe("LoopRange")
     val Range     = tpe("Range")
     primitiveTypes :::= List(Indices)
+
+    val RangeWildcard = tpe("RangeWildcard", stage = compile)
+    identifier (RangeWildcard) ("*")
 
     noInfixList :::= List(":=", "**", "as", "to", "rst")
 

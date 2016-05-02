@@ -70,20 +70,20 @@ trait DHDLControllers {
     val Pipeline = lookupTpe("Pipeline")
 
     val Pipe = grp("Pipe")
-    val MetaPipe = grp("MetaPipe")
+    //val MetaPipe = grp("MetaPipe")
     val Sequential = grp("Sequential")
 
     // --- Nodes
     // pipe_foreach, pipe_reduce, block_reduce - see Template in extern
-    val pipe_parallel = internal (MetaPipe) ("pipe_parallel", Nil, ("func", MThunk(MUnit)) :: MUnit, effect = simple)
-    val unit_pipe = internal (MetaPipe) ("unit_pipe", Nil, ("func", MThunk(MUnit)) :: Pipeline, effect = simple)
+    val pipe_parallel = internal (Pipe) ("pipe_parallel", Nil, ("func", MThunk(MUnit)) :: MUnit, effect = simple)
+    val unit_pipe = internal (Pipe) ("unit_pipe", Nil, ("func", MThunk(MUnit)) :: Pipeline, effect = simple)
 
     // --- API
-    val grps = List(Pipe, MetaPipe, Sequential)
-    val styles = List("Fine", "Coarse", "Disabled")
-    val objs = List("Pipe", "MetaPipe", "Sequential")
+    val grps = List(Pipe, Sequential)
+    val styles = List("PipeUnk", "Disabled")
+    val objs = List("Pipe", "Sequential")
 
-    for (i <- 0 until 3) {  // Generate for Pipe, MetaPipe, and Sequential
+    for (i <- 0 until 2) {  // Generate for Pipe and Sequential
       val Ctrl = grps(i)
       val style = styles(i)
       val obj = objs(i)

@@ -10,10 +10,6 @@ trait LoweredOpsExp extends EffectExp {
   this: DHDLExp =>
 
   // --- Nodes
-  case class BusSlice[T:Manifest](bus: Exp[T], idx: Int) extends Def[T] {
-    val mT = manifest[T]
-  }
-
   case class PipeAccum[T:Manifest,C[T]](cc: Exp[CounterChain], accum: Exp[C[T]], func: Block[Unit], inds: List[Sym[Idx]], acc: Sym[C[T]])(implicit __mC: Manifest[C[T]], ctx: SourceContext) extends Def[Pipeline] {
     val mT = manifest[T]
     val mC = __mC
@@ -21,18 +17,8 @@ trait LoweredOpsExp extends EffectExp {
 
 
   // --- Internal API
-  def slice[T:Manifest](bus: Exp[T], idx: Int): Rep[T] = {
-    if (idx >= par(bus)) throw new Exception("Cannot index position " + idx + " of " + par(bus) " wide bus")
-    val x = reflectPure(BusSlice(bus,idx))
-    setProps(x, getProps(bus))
-    par(x) = 1
-    x
-  }
 
-  def expandBus[T:Manifest](bus: Exp[T]): List[Rep[T]] = {
-    if (par(bus) == 1) List(bus) else List.tabulate(par(bus)){i => slice(bus, i) }
-  }
-
+  // --- Mirroring
   override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = e match {
     case BusSlice(b,i) => slice(f(b),i)
     case Reflect(e@BusSlice(b,i), u, es) => refletMirrored(Reflect(BusSlice(f(b),i)(e.mT), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)

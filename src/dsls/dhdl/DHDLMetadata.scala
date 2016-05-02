@@ -327,8 +327,13 @@ trait DHDLMetadata {
     	}
 		}
 
+    val MAccessIndices = metadata("MAccessIndices", "indices" -> SList(Idx))
+    val accessOps = metadata("accessIndices")
 
-
+    onMeet (MAccessIndices) ${ this }
+    internal.static (accessOps) ("update", Nil, (MAny, SList(Idx)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MAccessIndices($1)) }
+    internal.static (accessOps) ("apply", Nil, MAny :: SList(Idx)) implements composite ${ meta[MAccessIndices]($0).map(_.indices).getOrElse(Nil) }
 
 		/* MaxJ Codegen Helper Functions */
     val maxjgrp = grp("maxjGrp")
@@ -341,10 +346,10 @@ trait DHDLMetadata {
     internal.direct (maxjmeta) ("maxJPre", T, T :: SString) implements composite ${
       maxJPreG(par( $0 ))
     }
-		internal.direct (maxjmeta) ("tpstr", T, SInt :: SString) implements composite 	${
+		internal.direct (maxjmeta) ("tpstr", T, SInt :: SString) implements composite ${
 			tpstrG[T]( $0 )
 		}
-		internal.direct (maxjgrp) ("tpstrG", T, SInt :: SString) implements composite 	${
+		internal.direct (maxjgrp) ("tpstrG", T, SInt :: SString) implements composite ${
 			val scalart = if (isFixPtType(manifest[T])) {
 				val s = sign(manifest[T].typeArguments(0))
 				val d = nbits(manifest[T].typeArguments(1))

@@ -14,10 +14,11 @@ trait DHDLEnums {
 
     /* Pipeline style enum */
     val PipeStyle = tpe("PipeStyle", stage=compile)
-    identifier (PipeStyle) ("Fine")     // inner-loop pipeline
-    identifier (PipeStyle) ("Coarse")   // metapipeline
-    identifier (PipeStyle) ("Disabled") // sequential metapipeline
-    identifier (PipeStyle) ("Parallel") // parallel metapipeline 
+    identifier (PipeStyle) ("PipeUnk")    // pipeline - granularity not yet determined
+    identifier (PipeStyle) ("Fine")       // inner-loop pipeline
+    identifier (PipeStyle) ("Coarse")     // metapipeline
+    identifier (PipeStyle) ("Disabled")   // sequential
+    identifier (PipeStyle) ("Parallel")   // parallel metapipeline
   }
 
 }

@@ -21,6 +21,7 @@ trait MemoryTemplateWrapper extends ControllerTemplateWrapper with TypeInspectio
   // Memories are all equivalent to Scala Arrays in library
   type OffChipMem[T] = Array[T]
   type BRAM[T] = Array[T]
+  type Vector[T] = Array[T]
   type Reg[T] = Array[T]
   type Counter = FixedPointRange[Signed,B32,B0]
   type CounterChain = Array[FixedPointRange[Signed,B32,B0]]
@@ -33,6 +34,7 @@ trait MemoryTemplateWrapper extends ControllerTemplateWrapper with TypeInspectio
 
   def offchipMemManifest[T:Manifest]: Manifest[OffChipMem[T]] = manifest[Array[T]]
   def bramManifest[T:Manifest]: Manifest[BRAM[T]] = manifest[Array[T]]
+  def vectorManifest[T:Manifest]: Manifest[Vector[T]] = manifest[Array[T]]
   def regManifest[T:Manifest]: Manifest[Reg[T]] = manifest[Array[T]]
   def counterManifest: Manifest[Counter] = manifest[FixedPointRange[Signed,B32,B0]]
   def counterChainManifest: Manifest[CounterChain] = manifest[Array[FixedPointRange[Signed,B32,B0]]]

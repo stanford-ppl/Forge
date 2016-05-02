@@ -34,9 +34,7 @@ trait DHDLMemories {
   }
 
 
-  // TODO: Should we allow ArgIn / ArgOut with no given name? Way of automatically numbering them instead?
   // TODO: Better / more correct way of exposing register reset?
-  // TODO: Add explicit reset in the IR in scope in which a register is created? Immediately after reg_create?
   def importRegs() {
     val T = tpePar("T")
 
@@ -329,8 +327,9 @@ trait DHDLMemories {
     val Idx     = lookupAlias("Index")
 
     // --- Nodes
-    val offchip_new = internal (OffChip) ("offchip_new", T, ("size", Idx) :: OffChip(T), effect = mutable)
-    // tile_transfer - see extern
+    val offchip_new   = internal (OffChip) ("offchip_new", T, ("size", Idx) :: OffChip(T), effect = mutable)
+    val offchip_load  = internal (OffChip) ("offchip_load", T, (OffChip(T), Idx, Range) :: Vector(T))
+    val offchip_store = internal (OffChip) ("offchip_store", T, (OffChip(T), Idx, Range, Vector(T)) :: MUnit, effect = write(0))
 
     // --- Internals
     internal (OffChip) ("offchip_create", T, (SOption(SString), SList(Idx)) :: OffChip(T)) implements composite ${
@@ -355,6 +354,25 @@ trait DHDLMemories {
     // Offer multiple versions of tile select since implicit cast from signed int to range isn't working
     val OffChip_API = withTpe(OffChip)
     OffChip_API {
+      /** Loads a fixed size tile of this 1D OffChipMem onto an on-chip Vector.
+       * @param cols
+       **/
+      infix ("load") (Range :: Vector(T)) implements composite ${ offchip_load($self, List(0.as[Index]), $1) }
+
+      /** Loads a fixed size 1D column tile of this 2D OffChipMem onto an on-chip Vector.
+       * @param row
+       * @param cols
+       **/
+      infix ("load") ((Idx, Range) :: Vector(T)) implements composite ${ offchip_load($self, List($1, 0.as[Index]), $2) }
+
+      /** Loads a fixed size 1D page tile of this 3D OffChipMem onto an on-chip Vector.
+       * @param row
+       * @param col
+       * @param pages
+       **/
+      infix ("load") ((Idx,Idx,Range) :: Vector(T)) implements composite ${ vector_load($self, List($1, $2, 0.as[Index]), $3) }
+
+
       /** Creates a reference to a 1D Tile of this 1D OffChipMem which can be loaded into on-chip BRAM.
        * @param cols
        **/
@@ -494,11 +512,11 @@ trait DHDLMemories {
     /** Creates a store from the given on-chip BRAM to this Tile of off-chip memory
      * @param bram
      **/
-    infix (Tile) (":=", T, (Tile(T), BRAM(T)) :: MUnit, effect = write(0)) implements redirect ${ transferTile($0, $1, true) }
+    infix (Tile) (":=", T, (Tile(T), BRAM(T)) :: MUnit, effect = write(0)) implements redirect ${ storeTile($0, $1, true) }
 
     // Actual effect depends on store, but this isn't a node anyway
     /** @nodoc - not actually a user-facing method for now **/
-    direct (Tile) ("transferTile", T, (("tile",Tile(T)), ("local",BRAM(T)), ("store", SBoolean)) :: MUnit, effect = simple) implements composite ${
+    direct (Tile) ("storeTile", T, (("tile",Tile(T)), ("local",BRAM(T))) :: MUnit, effect = simple) implements composite ${
       val mem      = $tile.mem
       val ranges   = rangesOf($tile)
       val offsets  = ranges.map(_.start)
@@ -507,15 +525,20 @@ trait DHDLMemories {
       val memDims = dimsOf(mem)
       val tileDims = dimsOf($local) // TODO: Allow this to be different than size of BRAM?
       val tileStrides = dimsToStrides(tileDims)
-      val ofs = offsets //calcAddress(offsets, memDims)
+      //val ofs = calcAddress(offsets, memDims)
       val strides = dimsToStrides(memDims)
       val nonUnitStrides = strides.zip(unitDims).filterNot(_._2).map(_._1)
 
-      val ctrs = tileDims.zipWithIndex.map{ case (d,i) =>
-        if (i != tileDims.length - 1) Counter(max = d)
-        else Counter(min = 0.as[Index], max = d, step = 1.as[Index], par = tilePar($tile).getOrElse(param(1)))
+      val cmdCtrs = if (tileDims.length > 1) tileDims.take(tileDims.length - 1).map{d => Counter(max = d) } else Counter(max = 1.as[Index])
+      val vecCtr = Counter(min = 0.as[Index], max = tileDims.last, step = 1.as[Index], par = tilePar($tile).getOrElse(param(1)))
+
+      val cmdCchain = CounterChain(cmdCtrs:_*)
+      Pipe(cmdCchain){indices =>
+        val vec = local.load(0 :: tileDims.last)
+        val ofs = calcAddress(offsets.zip(indices.toList :+ (0.as[Index])) )
+        offchip_store(mem, ofs, vec)
       }
-      val chain = CounterChain(ctrs:_*)
+
       tile_transfer(mem, $local, nonUnitStrides, ofs, tileStrides, chain, $store)
     }
 

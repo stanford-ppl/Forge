@@ -240,6 +240,7 @@ trait DHDLMemories {
 
     val BRAM_API = withTpe(BRAM)
     BRAM_API {
+      /* Load */
       /** Creates a read from this BRAM at the given multi-dimensional address. Number of indices given can either be 1 or the
        * same as the number of dimensions that the BRAM was declared with.
        * @param ii: multi-dimensional address
@@ -342,15 +343,18 @@ trait DHDLMemories {
       cache 
     }
 
+    /** @nodoc **/
     direct (Cache) ("cache_load_nd", T, (Cache(T), SList(Idx)) :: T) implements composite ${
       val addr = calcAddress($1, dimsOf($0))
       cache_load($0, addr)
     }
+    /** @nodoc **/
     direct (Cache) ("cache_store_nd", T, (Cache(T), SList(Idx), T) :: MUnit, effect = write(0)) implements composite ${
       val addr = calcAddress($1, dimsOf($0))
       cache_store($0, addr, $2)
     }
 
+    /** @nodoc **/
     direct (Cache) ("cache_calc_addr", T, (Cache(T), Indices) :: Idx) implements composite ${ calcAddress($1.toList, dimsOf($0)) }
 
     val Mem = lookupTpeClass("Mem").get
@@ -360,19 +364,63 @@ trait DHDLMemories {
     infix (CacheMem) ("flatIdx", T, (Cache(T), Indices) :: Idx) implements composite ${ cache_calc_addr($0, $1) }
 
     // --- API
+    /** Creates a Cache with given name and target OffChipMem. Dimensions is inherited from
+     *  OffChipMem 
+     * @param name
+     * @param offchip 
+     **/
     static (Cache) ("apply", T, (SString, OffChip(T)) :: Cache(T), TNum(T)) implements composite ${ cache_create(Some($0), $1) }
+
+    /** Creates a unnamed Cache with target OffChipMem. Dimensions is inherited from
+     *  OffChipMem 
+     * @param name
+     * @param offchip 
+     **/
     static (Cache) ("apply", T, OffChip(T) :: Cache(T), TNum(T)) implements composite ${ cache_create(None, $0) }
 
     val Cache_API = withTpe(Cache)
     Cache_API {
       /* Load */
+      /** Creates a read from this Cache at the given multi-dimensional address. Number of indices given can either be 1 or the
+       * same as the number of dimensions that the cached OffChipMem was declared with.
+       * During a miss, the innermost pipeline that contains current load will be stalled until data
+       * is loaded from offchip
+       * @param ii: multi-dimensional address
+       **/
       infix ("apply") ((Idx, varArgs(Idx)) :: T) implements composite ${ cache_load_nd($self, $1 +: $2.toList) }
 
       /* Store */
-      // varArgs in update doesn't work in Scala
+      /** Creates a write to this Cache at the given 1D address.
+       * During a miss, the innermost pipeline that contains current load will be stalled until data
+       * is loaded from offchip
+       * @param i: 1D address
+       * @param x: element to be stored to Cache 
+       **/
       infix ("update") ((Idx, T) :: MUnit, effect = write(0)) implements composite ${ cache_store_nd($self, List($1), $2) }
+      /** Creates a write to this Cache at the given 2D address. The cached OffChipMem must have initially been declared as 2D.
+       * During a miss, the innermost pipeline that contains current load will be stalled until data
+       * is loaded from offchip
+       * @param i: row index
+       * @param j: column index
+       * @param x: element to be stored to Cache 
+       **/
       infix ("update") ((Idx, Idx, T) :: MUnit, effect = write(0)) implements composite ${ cache_store_nd($self, List($1, $2), $3) }
+      /** Creates a write to this Cache at the given 3D address. The cached OffChipMem must have initially been declared as 3D.
+       * During a miss, the innermost pipeline that contains current load will be stalled until data
+       * is loaded from offchip
+       * @param i: row index
+       * @param j: column index
+       * @param k: page index
+       * @param x: element to be stored to Cache 
+       **/
       infix ("update") ((Idx, Idx, Idx, T) :: MUnit, effect = write(0)) implements composite ${ cache_store_nd($self, List($1, $2, $3), $4) }
+      /** Creates a write to this Cache at the given multi-dimensional address. The number of indices given can either be 1 or the
+       * same as the number of dimensions that the cached OffChipMem was declared with.
+       * During a miss, the innermost pipeline that contains current load will be stalled until data
+       * is loaded from offchip
+       * @param ii: multi-dimensional index
+       * @param x: element to be stored to Cache 
+       **/
       infix ("update") ((SSeq(Idx), T) :: MUnit, effect = write(0)) implements composite ${ cache_store_nd($self, $1.toList, $2) }
 
     }

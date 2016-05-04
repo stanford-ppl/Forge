@@ -87,11 +87,11 @@ trait DHDLMisc {
     val Idx  = lookupAlias("Index")
     val Bit  = lookupTpe("Bit")
     val Tup2 = lookupTpe("Tup2")
-    val Coll = lookupTpeClass("Coll").get
 
+    val Coll = lookupTpeClass("Collection").get
     val ArrColl = tpeClassInst("ArrayColl", T, Coll(MArray(T)))
     infix (ArrColl) ("empty", T, Nil :: MArray(T)) implements composite ${ array_empty_imm[T](unit(0)) }
-    infix (ArrColl) ("zeros", T, MArray(T) :: MArray(T)) implements composite ${ array_empty_imm[T](array_length($0)) }  // TODO: Should be recursive?
+    //infix (ArrColl) ("zeros", T, MArray(T) :: MArray(T)) implements composite ${ array_empty_imm[T](array_length($0)) }  // TODO: Should be recursive?
 
     /** Unsynthesizable helper object for creating arrays on the CPU **/
     val Arr = grp("Array")

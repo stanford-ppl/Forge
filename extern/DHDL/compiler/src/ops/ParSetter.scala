@@ -26,18 +26,20 @@ trait ParSetter extends AnalyzerBase {
   override def traverseStm(stm: Stm) = analyzeStm(stm)
 
   override def analyze(lhs: Exp[Any], rhs: Def[Any]): Unit = rhs match {
-    case EatReflect(Pipe_foreach(cchain, func, _)) if styleOf(lhs) == Fine =>
+    case EatReflect(Pipe_foreach(cchain, func, inds)) if styleOf(lhs) == Fine =>
       val P = parOf(cchain).reduce{_*_}
+      inds.foreach{i => par(i) = P}
       traverseInner(P)(func)
 
-    case EatReflect(Pipe_reduce(cchain,_,iFunc,ld,st,func,rFunc,_,_,_,_,_)) if styleOf(lhs) == Fine =>
+    case EatReflect(Pipe_reduce(cchain,accum,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV)) if styleOf(lhs) == Fine =>
       val P = parOf(cchain).reduce{_*_}
+      inds.foreach{i => par(i) = P}
       traverseInner(P)(iFunc)
       traverseInner(P)(func)
-      // Should rFunc have parallelization factor?
 
-    case EatReflect(Block_reduce(ccOuter,ccInner,_,iFunc,func,ld1,ld2,rFunc,st,_,_,_,_,_,_,_)) =>
+    case EatReflect(Block_reduce(ccOuter,ccInner,a,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV)) =>
       val P = parOf(ccInner).reduce{_*_}
+      inds2.foreach{i => par(i) = P}
       traverseInner(P)(iFunc)
       traverseInner(P)(ld1)
       traverseInner(P)(ld2)

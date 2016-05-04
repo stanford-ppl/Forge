@@ -22,21 +22,23 @@ trait DHDLMemories {
 
   // Type class for local memories which can be used as accumulators in reductions
   def importMemOps() {
-    val Indices = lookupTpe("Indices")
-    val Idx = lookupAlias("Index")
     val T = tpePar("T")       // data type
     val C = hkTpePar("C", T)  // memory type
+
+    val CounterChain = lookupTpe("CounterChain")
+    val Indices      = lookupTpe("Indices")
+    val Idx          = lookupAlias("Index")
 
     val Mem = tpeClass("Mem", TMem, (T, C))
     infix (Mem) ("ld", (T,C), (C, Idx) :: T)
     infix (Mem) ("st", (T,C), (C, Idx, T) :: MUnit, effect = write(0))
     infix (Mem) ("flatIdx", (T,C), (C, Indices) :: Idx)
+    infix (Mem) ("iterator", (T,C), (C, SList(MInt)) :: CounterChain)
+    infix (Mem) ("zeros", (T,C), varArgs(Idx) :: C, TNum(T))
   }
 
 
-  // TODO: Should we allow ArgIn / ArgOut with no given name? Way of automatically numbering them instead?
   // TODO: Better / more correct way of exposing register reset?
-  // TODO: Add explicit reset in the IR in scope in which a register is created? Immediately after reg_create?
   def importRegs() {
     val T = tpePar("T")
 
@@ -74,6 +76,8 @@ trait DHDLMemories {
     infix (RegMem) ("ld", T, (Reg(T), Idx) :: T) implements composite ${ readReg($0) } // Ignore address
     infix (RegMem) ("st", T, (Reg(T), Idx, T) :: MUnit, effect = write(0)) implements composite ${ writeReg($0, $2) }
     infix (RegMem) ("flatIdx", T, (Reg(T), Indices) :: Idx) implements composite ${ 0.as[Index] }
+    infix (RegMem) ("iterator", T, (Reg(T), SList(MInt)) :: CounterChain) implements composite ${ CounterChain(Counter(max=1)) }
+    infix (RegMem) ("zeros", T, varArgs(Idx) :: Reg(T), TNum(T)) implements composite ${ reg_create(None, zero[T], Regular) }
 
     // --- API
     /* Reg */
@@ -202,6 +206,14 @@ trait DHDLMemories {
       bram
     }
 
+    // TODO: Ask Raghu what the representation in the IR for these should be
+    internal (BRAM) ("bram_load_vector", T, (("bram", BRAM(T)), ("ofs",Idx), ("len",Idx), ("par", MInt)) :: Vector(T)) implements composite ${
+
+    }
+    internal (BRAM) ("bram_store_vector", T, (("bram", BRAM(T)), ("ofs", Idx), ("vec", Vector(T)), ("par", MInt)) :: MUnit, effect = write(0)) implements composite ${
+
+    }
+
     /** @nodoc **/
     direct (BRAM) ("bram_load_nd", T, (BRAM(T), SList(Idx)) :: T) implements composite ${
       if ($1.length < 1) stageError("Cannot load from zero indices")
@@ -223,6 +235,13 @@ trait DHDLMemories {
     infix (BramMem) ("ld", T, (BRAM(T), Idx) :: T) implements composite ${ bram_load_nd($0, List($1)) }
     infix (BramMem) ("st", T, (BRAM(T), Idx, T) :: MUnit, effect = write(0)) implements composite ${ bram_store_nd($0, List($1), $2) }
     infix (BramMem) ("flatIdx", T, (BRAM(T), Indices) :: Idx) implements composite ${ bram_calc_addr($0, $1) }
+    infix (BramMem) ("iterator", T, (BRAM(T), SList(MInt)) :: CounterChain) implements composite ${
+      val dims = dimsOf($0)
+      val pars = List.fill($1.length - dims.length)(param(1)) ++ $1
+      val ctrs = dims.zip(pars).map{case (d,p) => Counter(min = 0, max = d, step = 1, par = p) }
+      CounterChain(ctrs:_*)
+    }
+    infix (BramMem) ("zeros", T, varArgs(Idx) :: BRAM(T), TNum(T)) implements composite ${ bram_create(None, $0.toList) }
 
 
     // --- API
@@ -329,8 +348,9 @@ trait DHDLMemories {
     val Idx     = lookupAlias("Index")
 
     // --- Nodes
-    val offchip_new = internal (OffChip) ("offchip_new", T, ("size", Idx) :: OffChip(T), effect = mutable)
-    // tile_transfer - see extern
+    val offchip_new   = internal (OffChip) ("offchip_new", T, ("size", Idx) :: OffChip(T), effect = mutable)
+    val offchip_load  = internal (OffChip) ("offchip_load", T, (OffChip(T), Idx, Idx) :: Vector(T))
+    val offchip_store = internal (OffChip) ("offchip_store", T, (OffChip(T), Idx, Vector(T)) :: MUnit, effect = write(0))
 
     // --- Internals
     internal (OffChip) ("offchip_create", T, (SOption(SString), SList(Idx)) :: OffChip(T)) implements composite ${
@@ -355,6 +375,25 @@ trait DHDLMemories {
     // Offer multiple versions of tile select since implicit cast from signed int to range isn't working
     val OffChip_API = withTpe(OffChip)
     OffChip_API {
+      /** Loads a fixed size tile of this 1D OffChipMem onto an on-chip Vector.
+       * @param cols
+       **/
+      infix ("load") (Range :: Vector(T)) implements composite ${ offchip_load($self, List(0.as[Index]), $1) }
+
+      /** Loads a fixed size 1D column tile of this 2D OffChipMem onto an on-chip Vector.
+       * @param row
+       * @param cols
+       **/
+      infix ("load") ((Idx, Range) :: Vector(T)) implements composite ${ offchip_load($self, List($1, 0.as[Index]), $2) }
+
+      /** Loads a fixed size 1D page tile of this 3D OffChipMem onto an on-chip Vector.
+       * @param row
+       * @param col
+       * @param pages
+       **/
+      infix ("load") ((Idx,Idx,Range) :: Vector(T)) implements composite ${ offchip_load($self, List($1, $2, 0.as[Index]), $3) }
+
+
       /** Creates a reference to a 1D Tile of this 1D OffChipMem which can be loaded into on-chip BRAM.
        * @param cols
        **/
@@ -496,27 +535,32 @@ trait DHDLMemories {
      **/
     infix (Tile) (":=", T, (Tile(T), BRAM(T)) :: MUnit, effect = write(0)) implements redirect ${ transferTile($0, $1, true) }
 
-    // Actual effect depends on store, but this isn't a node anyway
     /** @nodoc - not actually a user-facing method for now **/
     direct (Tile) ("transferTile", T, (("tile",Tile(T)), ("local",BRAM(T)), ("store", SBoolean)) :: MUnit, effect = simple) implements composite ${
       val mem      = $tile.mem
       val ranges   = rangesOf($tile)
       val offsets  = ranges.map(_.start)
       val unitDims = ranges.map(isUnit(_))
+      val tileDims = ranges.map(_.len)
 
-      val memDims = dimsOf(mem)
-      val tileDims = dimsOf($local) // TODO: Allow this to be different than size of BRAM?
-      val tileStrides = dimsToStrides(tileDims)
-      val ofs = offsets //calcAddress(offsets, memDims)
-      val strides = dimsToStrides(memDims)
-      val nonUnitStrides = strides.zip(unitDims).filterNot(_._2).map(_._1)
+      val cmdCtrs = if (tileDims.length > 1) tileDims.take(tileDims.length - 1).map{d => Counter(max = d) } else Counter(max = 1.as[Index])
 
-      val ctrs = tileDims.zipWithIndex.map{ case (d,i) =>
-        if (i != tileDims.length - 1) Counter(max = d)
-        else Counter(min = 0.as[Index], max = d, step = 1.as[Index], par = tilePar($tile).getOrElse(param(1)))
+      Pipe(CounterChain(cmdCtrs:_*)){indices =>
+        val inds = indices.toList :+ 0.as[Index]
+        val indsDropUnits = inds.zip(unitDims).filter{case (i,isUnitDim) => !isUnitDim}
+
+        val memOfs = calcAddress(offsets.zip(inds).map{case (a,b) => a + b}, dimsOf(mem))
+        val localOfs = calcAddress(indsDropUnits, dimsOf(local))
+
+        if ($store) {
+          val vec = bram_load_vector(local, localOfs, tileDims.last)
+          offchip_store(mem, memOfs, vec, tilePar($tile).getOrElse(param(1)))
+        }
+        else {
+          val vec = offchip_load(mem, memOfs, tileDims.last)  // Load vector from offchip
+          bram_store_vector(local, localOfs, vec, tilePar($tile).getOrElse(param(1)))
+        }
       }
-      val chain = CounterChain(ctrs:_*)
-      tile_transfer(mem, $local, nonUnitStrides, ofs, tileStrides, chain, $store)
     }
 
 	}

@@ -129,13 +129,8 @@ trait DSE extends Traversal {
 
 
   def dse[A:Manifest](b: Block[A]) {
-    // Specify FPGA target (hardcoded right now)
-    // HACK: BRAM tolerance increased by ~28% to allow for designs where coalescing occurs but we don't account for it
-    val target = FPGAResourceSummary(alms=262400,regs=524800,dsps=1963,bram=2000,streams=13)
-
-    //FPGAResourceSummary(alms=262400,regs=524800,dsps=1963,bram=2567,streams=13)
-
-    ////bram=3300,streams=13)
+    // Specify FPGA target (hardcoded right now)/
+    val target = FPGAResourceSummary(alms=262400,regs=524800,dsps=1963,bram=2567,streams=13)
 
     val areaAnalyzer = new AreaAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
     val cycleAnalyzer = new LatencyAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}

@@ -279,7 +279,7 @@ trait AreaModel {
 
     case DHDLPrim_Add_flt(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
-      FPGAResources(lut3=397,lut4=29,lut5=125,lut6=34,lut7=5,regs=606,mem16=50)
+      FPGAResources(lut3=397,lut4=29,lut5=125,lut6=34,lut7=5,regs=606,mem16=50) // ~372 ALMs, 1 DSP (around 564)
 
     case DHDLPrim_Sub_flt(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
@@ -287,7 +287,7 @@ trait AreaModel {
 
     case DHDLPrim_Mul_flt(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
-      FPGAResources(lut3=152,lut4=10,lut5=21,lut6=2,dsps=1,regs=335,mem16=43)
+      FPGAResources(lut3=152,lut4=10,lut5=21,lut6=2,dsps=1,regs=335,mem16=43) // ~76 ALMs, 1 DSP (around 1967)
 
     case DHDLPrim_Div_flt(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
@@ -355,7 +355,7 @@ trait AreaModel {
       // Old template
       //FPGAResources(lut3=1900,lut4=167,lut5=207,lut6=516,lut7=11,regs=5636,dsps=dsp,bram=46,streams = 1)
       // New template
-      FPGAResources(lut3=893,lut4=91,lut5=96,lut6=618,lut7=10, regs=4692, dsps=dsp, bram=brm, streams=1)
+      FPGAResources(lut3=893,lut4=91,lut5=96,lut6=618,lut7=10, regs=4692, dsps=dsp, bram=brm, streams=1)  // ~1206 ALMs
 
       //FPGAResources(lut3=378,lut4=38,lut5=58,lut6=569,lut7=4, regs=3878, dsps=dsp, bram=46, streams=1)
 
@@ -368,7 +368,7 @@ trait AreaModel {
       // FPGAResources(lut3=453, lut4=60, lut5=131,lut6=522,regs=1377,dsps=dsp,bram=46, streams=1)
       val brams = 12 - p/8
       // New template
-      FPGAResources(lut3=410, lut4=50, lut5=70, lut6=53, regs=920, dsps=dsp, bram=brams, streams=1)
+      FPGAResources(lut3=410, lut4=50, lut5=70, lut6=53, regs=920, dsps=dsp, bram=brams, streams=1) // ~353 ALMs
 
     case _:Pipe_parallel => FPGAResources(lut4=9*nStages(s)/2, regs = nStages(s) + 3)
 

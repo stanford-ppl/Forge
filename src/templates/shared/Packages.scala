@@ -113,7 +113,10 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     if (Identifiers.length > 0) {
       emitBlockComment("Singleton identifiers", stream, indent=2)
       for (id <- Identifiers) {
-        stream.println("  object " + id.name + " extends " + quote(id.tpe))
+        if (OpsGrp.exists{case(g,opsGrp) => g.name == id.name && opsGrp.ops.exists(_.style == staticMethod)})
+          stream.println("  // object " + id.name + " - see ops")
+        else
+          stream.println("  object " + id.name + " extends " + quote(id.tpe))
       }
     }
     if (NonStructTpes.length > 0) {

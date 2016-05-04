@@ -12,6 +12,7 @@ import dhdl.compiler._
 import dhdl.compiler.ops._
 
 trait BlockRAM[T]
+trait DHDLVector[T]
 trait Register[T]
 trait DRAM[T]
 
@@ -105,10 +106,10 @@ trait MaxJGenTypeInspectionOps extends MaxJGenEffect {
 	import IR.{infix_until => _, looprange_until => _, println => _, _}
 
 	lazy val preCodegen = new MaxJPreCodegen {
-		val IR: MaxJGenTypeInspectionOps.this.IR.type = MaxJGenTypeInspectionOps.this.IR 
+		val IR: MaxJGenTypeInspectionOps.this.IR.type = MaxJGenTypeInspectionOps.this.IR
 	}
 
-  override def initializeGenerator(bd:String): Unit = { 
+  override def initializeGenerator(bd:String): Unit = {
 		preCodegen.buildDir = bd
 		super.initializeGenerator(bd)
 	}
@@ -117,12 +118,13 @@ trait MaxJGenTypeInspectionOps extends MaxJGenEffect {
 		preCodegen.run(body)
 		super.emitSource(args, body, className, out)
 	}
-	
+
 }
 
 trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
   type OffChipMem[T] = DRAM[T]
   type BRAM[T] = BlockRAM[T]
+  type Vector[T] = DHDLVector[T]
   type Reg[T] = Register[T]
 
   type Counter = DHDLCounter
@@ -136,6 +138,7 @@ trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
 
   def offchipMemManifest[T:Manifest]: Manifest[OffChipMem[T]] = manifest[DRAM[T]]
   def bramManifest[T:Manifest]: Manifest[BRAM[T]] = manifest[BlockRAM[T]]
+  def vectorManifest[T:Manifest]: Manifest[Vector[T]] = manifest[DHDLVector[T]]
   def regManifest[T:Manifest]: Manifest[Reg[T]] = manifest[Register[T]]
   def counterManifest: Manifest[Counter] = manifest[DHDLCounter]
   def counterChainManifest: Manifest[CounterChain] = manifest[DHDLCounterChain]
@@ -238,6 +241,7 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTe
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
     case "BlockRAM" => "Array[" + remap(m.typeArguments(0)) + "]"
+    case "DHDLVector" => "Array[" + remap(m.typeArguments(0)) + "]"
     case "Register" => "Array[" + remap(m.typeArguments(0)) + "]"
     case "DRAM"     => "Array[" + remap(m.typeArguments(0)) + "]"
 
@@ -663,7 +667,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
         emit(s"""${quote(sym)}_raddr, ${quote(sym)}_rdata);""")
       else
         emit(s"""${quote(sym)}_waddr, ${quote(sym)}_wdata, ${quote(sym)}_wen);""")
-      
+
       emitComment(s"} TileTransfer ${if (store) "(store)" else "(load)"}")
 
 		case Offchip_new(size) =>
@@ -679,7 +683,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
           val parent = if (parentOf(sym).isEmpty) "Top" else quote(parentOf(sym).get) //TODO
 					if (isDblBuf(sym)) {
 						emit(s"""DblRegFileLib ${quote(sym)}_lib = new DblRegFileLib(this, $ts, ${quote(sym)}, ${par(sym)});""")
-            val readstr = if (par(sym)>1) "readv" else "read" 
+            val readstr = if (par(sym)>1) "readv" else "read"
             emit(s"""${maxJPre(sym)} ${quote(sym)} = ${quote(sym)}_lib.${readstr}()""")
            	emit(quote(sym) + "_lib.connectWdone(" + quote(writerOf(sym).get._1) + "_done);")
             readersOf(sym).foreach { case (r, _) =>
@@ -696,7 +700,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 			}
       emitComment("} Reg_new")
 
-		case e@Reg_write(reg, value) => 
+		case e@Reg_write(reg, value) =>
       emitComment("Reg_write {")
 			val ts = tpstr(par(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
 			if (isDblBuf(reg)) {
@@ -717,7 +721,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 					  		case Fine => quote(cchain) + "_en_from_pipesm"
 					  		case _ => quote(p) + "_en"
 					  	}
-					  	case p@_ => val Def(d) = p 
+					  	case p@_ => val Def(d) = p
                           throw new Exception(s"Reg ${quote(reg)} is written by non Pipe node ${p} def:${d}")
 					  }
       		  emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}; // enable""")
@@ -748,7 +752,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
         //emit(s"""// ${quote(sym)} has ${readersOf(sym).size} readers - ${readersOf(sym)}""")
         emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_DblBufSM(this));""")
         val dims = dimsOf(sym)
-        emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm, 
+        emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
           $size0, $size1, $ts, ${banks(sym)}, stride_TODO, ${readersOf(sym).size});""")
         if (writerOf(sym).isEmpty)
           throw new Exception(s"Bram ${quote(sym)} has no writer!")
@@ -770,7 +774,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
         emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${size1}, ${ts}, ${banks(sym)}, stride_TODO);""")
       }
       emitComment("} Bram_new")
-		
+
     case Bram_load(bram, addr) =>
       emitComment("Bram_load {")
 			val pre = maxJPre(bram)
@@ -808,7 +812,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
           }
           case p => throw new Exception(s"Unknown parent type ${p}!")
         }
-        emit(s"""$bram.connectWport(stream.offset($addr, -$offsetStr), 
+        emit(s"""$bram.connectWport(stream.offset($addr, -$offsetStr),
           stream.offset($dataStr, -$offsetStr), ${quote(parentCtr)}_en_from_pipesm, start_TODO, stride_TODO);""")
       } else {
          emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(parentOf(bram).get)}_en, start_TODO, stride_TODO ;""") //TODO

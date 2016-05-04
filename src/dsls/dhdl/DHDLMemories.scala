@@ -614,6 +614,7 @@ trait DHDLMemories {
     val OffChip = lookupTpe("OffChipMem")
     val BRAM    = lookupTpe("BRAM")
     val Range   = lookupTpe("Range")
+    val Idx = lookupAlias("Index")
 
     // TODO: How to avoid CSE? Doesn't matter except that same symbol may be returned
     // and need different symbols to manage offset staging metadata properly
@@ -654,6 +655,16 @@ trait DHDLMemories {
       }
       val chain = CounterChain(ctrs:_*)
       tile_transfer(mem, $local, nonUnitStrides, ofs, tileStrides, chain, $store)
+    }
+
+    direct (Tile) ("gather", T, (("tile",Tile(T)), ("local",BRAM(T)), ("addrs", BRAM(Idx)), ("size", Idx)) :: MUnit, effect = simple) implements composite ${
+      val mem      = $tile.mem
+      tile_addr_transfer (mem, $local, $addrs, $size, true)
+    }
+
+    direct (Tile) ("scatter", T, (("tile",Tile(T)), ("local",BRAM(T)), ("addrs", BRAM(Idx)), ("size", Idx)) :: MUnit, effect = simple) implements composite ${
+      val mem      = $tile.mem
+      tile_addr_transfer (mem, $local, $addrs, $size, false)
     }
 
 	}

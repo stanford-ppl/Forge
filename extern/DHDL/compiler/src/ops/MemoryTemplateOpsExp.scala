@@ -170,12 +170,27 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
     val mT = manifest[T]
   }
 
+  case class TileAddrTransfer[T:Manifest](
+    mem:      Rep[OffChipMem[T]],                // Offchip memory array
+    local:    Rep[BRAM[T]],                      // Local memory (BRAM)
+    addrs:    Rep[BRAM[FixPt[Signed,B32,B0]]], // Addresses for gather or scatter 
+    size:     Rep[FixPt[Signed, B32, B0]],    // Size of addresses
+    gather:   Boolean                            // Is this a gather or scatter operation 
+  )(implicit ctx: SourceContext) extends Def[Unit] {
+    val mT = manifest[T]
+  }
+
   // --- Internal API
   def tile_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], strides: List[Rep[FixPt[Signed,B32,B0]]], memOfs: List[Rep[FixPt[Signed,B32,B0]]], tileStrides: List[Rep[FixPt[Signed,B32,B0]]], cchain: Rep[CounterChain], store: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
     val iters = List.fill(lenOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }
 
     if (store) reflectWrite(mem)(TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters,store))
     else       reflectWrite(local)(TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters,store))
+  }
+
+  def tile_addr_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], addrs: Rep[BRAM[FixPt[Signed,B32,B0]]], size: Rep[FixPt[Signed,B32,B0]], gather: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
+    if (gather) reflectWrite(local)(TileAddrTransfer(mem,local,addrs,size,gather))
+    else        reflectWrite(mem)(TileAddrTransfer(mem,local,addrs,size,gather))
   }
 
 
@@ -194,12 +209,15 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
   override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = e match {
     case e@TileTransfer(m,l,s,o,t,c,i,st) => reflectPure(TileTransfer(f(m),f(l),f(s),f(o),t,f(c),i,st)(e.mT,pos))(mtype(manifest[A]), pos)
     case Reflect(e@TileTransfer(m,l,s,o,t,c,i,st), u, es) => reflectMirrored(Reflect(TileTransfer(f(m),f(l),f(s),f(o),t,f(c),i,st)(e.mT,pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case e@TileAddrTransfer(m,l,a,s,g) => reflectPure(TileAddrTransfer(f(m),f(l),f(a),f(s),g)(e.mT,pos))(mtype(manifest[A]), pos)
+    case Reflect(e@TileAddrTransfer(m,l,a,s,g), u, es) => reflectMirrored(Reflect(TileAddrTransfer(f(m),f(l),f(a),f(s),g)(e.mT,pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e, f)
   }
 
   // --- Dependencies
   override def syms(e: Any): List[Sym[Any]] = e match {
     case e: TileTransfer[_] => syms(e.mem) ::: syms(e.local) ::: syms(e.strides) ::: syms(e.tileStrides) ::: syms(e.memOfs) ::: syms(e.cchain)
+    case e: TileAddrTransfer[_] => syms(e.mem) ::: syms(e.local) ::: syms(e.addrs) ::: syms(e.size)
     case _ => super.syms(e)
   }
 
@@ -209,6 +227,7 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
   }
   override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {
     case e: TileTransfer[_] => freqNormal(e.mem) ::: freqNormal(e.local) ::: freqNormal(e.strides) ::: freqNormal(e.tileStrides) ::: freqNormal(e.memOfs) ::: freqNormal(e.cchain)
+    case e: TileAddrTransfer[_] => freqNormal(e.mem) ::: freqNormal(e.local) ::: freqNormal(e.addrs) ::: freqNormal(e.size)
 
     case _ => super.symsFreq(e)
   }
@@ -220,6 +239,7 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
   // --- Aliasing
   override def aliasSyms(e: Any): List[Sym[Any]] = e match {
     case e: TileTransfer[_] => Nil
+    case e: TileAddrTransfer[_] => Nil
     case _ => super.aliasSyms(e)
   }
 
@@ -272,6 +292,17 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTe
           stream.println(quote(mem) + "(offaddr.toInt) = " + quote(local) + "(localaddr.toInt)")
         else
           stream.println(quote(local) + "(localaddr.toInt) = " + quote(mem) + "(offaddr.toInt)")
+      }
+
+    case TileAddrTransfer(mem,local,addrs,size,gather) =>
+      if (gather) {
+        stream.println(s"""(0 until ${quote(size)}).foreach { i =>""")
+        stream.println(s"""${quote(local)}(i) = ${quote(mem)}(${quote(addrs)}(i))""")
+        stream.println(s"""}""")
+      } else {
+        stream.println(s"""(0 until ${quote(size)}).foreach { i =>""")
+        stream.println(s"""${quote(mem)}(${quote(addrs)}(i)) = ${quote(local)}(i)""")
+        stream.println(s"""}""")
       }
 
     case _ => super.emitNode(sym, rhs)

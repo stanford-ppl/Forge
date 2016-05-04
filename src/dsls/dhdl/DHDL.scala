@@ -154,7 +154,7 @@ trait DHDLDSL extends ForgeApplication
      * are defined within. A Reg defined within a Pipe, for example, is reset at the beginning of each iteration of that Pipe.
      **/
     val Reg = tpe("Reg", T)
-    primitiveStructs :::= List(OffChip, BRAM, Reg)
+    primitiveStructs :::= List(OffChip, BRAM, Reg, Cache)
 
     // --- State Machine Types
     /** Counter is a single hardware counter with an associated minimum, maximum, step size, and parallelization factor.

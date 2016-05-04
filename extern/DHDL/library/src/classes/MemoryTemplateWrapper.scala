@@ -61,6 +61,19 @@ trait MemoryTemplateWrapper extends ControllerTemplateWrapper with TypeInspectio
         local(localaddr.toInt) = mem(offaddr.toInt)
     })
   }
+
+  def tile_addr_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], addrs: Rep[BRAM[FixPt[Signed,B32,B0]]], size: Rep[FixPt[Signed,B32,B0]], gather: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
+    if (gather) {
+      (0 until size.toInt).foreach{ idx =>
+        mem(addrs(idx).toInt) = local(idx)
+      }
+    }else {
+      (0 until size.toInt).foreach{ idx =>
+        local(idx) = mem(addrs(idx).toInt)
+      }
+    }
+  }
+
 }
 
 

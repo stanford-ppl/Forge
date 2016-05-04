@@ -625,7 +625,9 @@ trait BaseGenOps extends ForgeCodeGenBase {
     val staticOps = opsGrps.flatMap{opsGrp => opsGrp.ops.filter(e => e.style == staticMethod && e.visibility == visibility) }
     val objects   = staticOps.groupBy(_.grp.name)
     for ((name, ops) <- objects) {
-      stream.println("  object " + name + " {")
+      val parent = Identifiers.find(id => id.name == name).map(id => " extends " + quote(id.tpe)).getOrElse("")
+
+      stream.println("  object " + name + parent + " {")
       for (o <- ops) {
         stream.println("    " + makeSyntaxMethod(o))
       }

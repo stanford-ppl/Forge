@@ -68,10 +68,22 @@ trait DHDLControllers {
     val Counter = lookupTpe("Counter")
     val CounterChain = lookupTpe("CounterChain")
     val Pipeline = lookupTpe("Pipeline")
+    val PipeStyle = lookupTpe("PipeStyle")
 
     val Pipe = grp("Pipe")
     //val MetaPipe = grp("MetaPipe")
     val Sequential = grp("Sequential")
+
+
+    data(Pipeline, ("_cchain", CounterChain))
+
+    internal (Pipeline) ("pipeline_new", CounterChain :: Pipeline) implements allocates(Pipeline, ${$0})
+    internal (Pipeline) ("pipeline", (CounterChain, PipeStyle) :: Pipeline) implements composite ${
+      val pipe = pipeline_new($0)
+      styleOf(pipe) = $1
+      pipe
+    }
+    internal.infix (Pipeline) ("cchain", Pipeline :: CounterChain) implements getter(0, "_cchain")
 
     // --- Nodes
     // pipe_foreach, pipe_reduce, block_reduce - see Template in extern
@@ -79,46 +91,75 @@ trait DHDLControllers {
     val unit_pipe = internal (Pipe) ("unit_pipe", Nil, ("func", MThunk(MUnit)) :: Pipeline, effect = simple)
 
     // --- API
-    val grps = List(Pipe, Sequential)
-    val styles = List("PipeUnk", "Disabled")
-    val objs = List("Pipe", "Sequential")
+    static (Pipe) ("apply", Nil, CounterChain :: Pipeline) implements composite ${ pipeline($0, PipeUnk) }
+    static (Pipe) ("apply", Nil, varArgs(Counter) :: Pipeline) implements composite ${ pipeline(CounterChain($0:_*), PipeUnk) }
+    static (Sequential) ("apply", Nil, CounterChain:: Pipeline) implements composite ${ pipeline($0, Disabled) }
+    static (Sequential) ("apply", Nil, varArgs(Counter) :: Pipeline) implements composite ${ pipeline(CounterChain($0:_*), Disabled) }
 
-    for (i <- 0 until 2) {  // Generate for Pipe and Sequential
-      val Ctrl = grps(i)
-      val style = styles(i)
-      val obj = objs(i)
 
-      /* Foreach */
-      static (Ctrl) ("foreach", Nil, CurriedMethodSignature(List(List(CounterChain),List(Indices ==> MUnit)), MUnit)) implements composite ${
-        val pipe = pipe_foreach($0, $1)
-        styleOf(pipe) = \$style
+
+    val Pipeline_API = withTpe(Pipeline)
+    Pipeline_API {
+      infix ("forIndices") ((Indices ==> MUnit) :: MUnit) implements composite ${
+        val pipe = pipe_foreach($self.cchain, $1)
+        styleOf(pipe) = styleOf($self)
       }
-      static (Ctrl) ("apply", Nil, CurriedMethodSignature(List(List(Counter), List(Idx ==> MUnit)), MUnit)) implements composite ${
-        \$obj.foreach(CounterChain($0)){inds => $1(inds(0)) }
+      infix ("apply") ((Idx ==> MUnit) :: MUnit) implements composite ${ $self.forIndices{inds => $1(inds(0)) } }
+      infix ("apply") ((Idx,Idx) ==> MUnit) :: MUnit) implements composite ${ $self.forIndices{inds => $1(inds(0),inds(1)) } }
+      infix ("apply") ((Idx,Idx,Idx) ==> MUnit :: MUnit) implements composite ${ $self.forIndices{inds => $1(inds(0),inds(1),inds(2))} }
+
+      // Scalar result variant
+      infix ("foldIndices", CurriedMethodSignature(List(List(C(T)),List(Indices ==> T), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
+        val pipe = pipe_reduce[T,C]($self.cchain, $1, $2, $3)
+        styleOf(pipe) = styleOf($self)
+        $1
       }
-      static (Ctrl) ("apply", Nil, CurriedMethodSignature(List(List(Counter,Counter), List((Idx,Idx) ==> MUnit)), MUnit)) implements composite ${
-        \$obj.foreach(CounterChain($0,$1)){inds => $2(inds(0),inds(1)) }
+      infix ("fold", CurriedMethodSignature(List(List(C(T)),List(Idx ==> T), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
+        $self.fold($1){inds => $2(inds(0))}($3)
       }
-      static (Ctrl) ("apply", Nil, CurriedMethodSignature(List(List(Counter,Counter,Counter), List((Idx,Idx,Idx) ==> MUnit)), MUnit)) implements composite ${
-        \$obj.foreach(CounterChain($0,$1,$2)){inds => $3(inds(0),inds(1),inds(2)) }
+      infix ("fold", CurriedMethodSignature(List(List(C(T)),List((Idx,Idx) ==> T), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
+        $self.fold($1){inds => $2(inds(0),inds(1))}($3)
       }
+      infix ("fold", CurriedMethodSignature(List(List(C(T)),List((Idx,Idx,Idx) ==> T), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
+        $self.fold($1){inds => $2(inds(0),inds(1),inds(2))}($3)
+      }
+
+      // Collection result variant (a la BlockReduce)
+      infix ("foldIndices", CurriedMethodSignature(List(List(C(T)),List(Indices ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
+        val pipe = pipe_reduce_accums[T,C]($self.cchain, $1, $2, $3)
+        styleOf(pipe) = styleOf($self)
+        $1
+      }
+      infix ("fold", CurriedMethodSignature(List(List(C(T)),List(Idx ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
+        $self.fold($1){inds => $2(inds(0))}($3)
+      }
+      infix ("fold", CurriedMethodSignature(List(List(C(T)),List((Idx,Idx) ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
+        $self.fold($1){inds => $2(inds(0),inds(1))}($3)
+      }
+      infix ("fold", CurriedMethodSignature(List(List(C(T)),List((Idx,Idx,Idx) ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
+        $self.fold($1){inds => $2(inds(0),inds(1),inds(2))}($3)
+      }
+
+
+    }
 
       /* Reduce */
       // Pipe.reduce(chain, accum){inds => f(inds)}{(a,b) => reduce(a,b) }
-      static (Ctrl) ("reduce", (T,C), CurriedMethodSignature(List(List(CounterChain, C(T)), List(Indices ==> T), List((T,T) ==> T)), MUnit), TMem(T,C(T))) implements composite ${
+      static (Ctrl) ("reduce", (T,C), CurriedMethodSignature(List(List(CounterChain, C(T)), List(Indices ==> T), List((T,T) ==> T)), T), TMem(T,C(T))) implements composite ${
         val pipe = pipe_reduce[T,C]($0, $1, $2, $3)
         styleOf(pipe) = \$style
+        $1.value
       }
       // Pipe(counter, accum){i => f(i) }{(a,b) => reduce(a,b) }
-      static (Ctrl) ("apply", (T,C), CurriedMethodSignature(List(List(Counter, C(T)), List(Idx ==> T), List((T,T) ==> T)), MUnit), TMem(T,C(T))) implements composite ${
+      static (Ctrl) ("apply", (T,C), CurriedMethodSignature(List(List(Counter, C(T)), List(Idx ==> T), List((T,T) ==> T)), T), TMem(T,C(T))) implements composite ${
         \$obj.reduce(CounterChain($0), $1){inds => $2(inds(0)) }($3)
       }
       // Pipe(counter, counter, accum){(i,j) => f(i,j)}{(a,b) => reduce(a,b) }
-      static (Ctrl) ("apply", (T,C), CurriedMethodSignature(List(List(Counter, Counter, C(T)), List((Idx,Idx) ==> T), List((T,T) ==> T)), MUnit), TMem(T,C(T))) implements composite ${
+      static (Ctrl) ("apply", (T,C), CurriedMethodSignature(List(List(Counter, Counter, C(T)), List((Idx,Idx) ==> T), List((T,T) ==> T)), T), TMem(T,C(T))) implements composite ${
         \$obj.reduce(CounterChain($0,$1), $2){inds => $3(inds(0), inds(1))}($4)
       }
       // Pipe(counter, counter, counter, accum){(i,j,k) => f(i,j,k)}{(a,b) => reduce(a,b) }
-      static (Ctrl) ("apply", (T,C), CurriedMethodSignature(List(List(Counter, Counter, Counter, C(T)), List((Idx,Idx,Idx) ==> T), List((T,T) ==> T)), MUnit), TMem(T,C(T))) implements composite ${
+      static (Ctrl) ("apply", (T,C), CurriedMethodSignature(List(List(Counter, Counter, Counter, C(T)), List((Idx,Idx,Idx) ==> T), List((T,T) ==> T)), T), TMem(T,C(T))) implements composite ${
         \$obj.reduce(CounterChain($0,$1,$2), $3){inds => $4(inds(0), inds(1), inds(2))}($5)
       }
 

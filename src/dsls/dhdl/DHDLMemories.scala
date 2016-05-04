@@ -200,6 +200,14 @@ trait DHDLMemories {
       bram
     }
 
+    // TODO: Ask Raghu what the representation in the IR for these should be
+    internal (BRAM) ("bram_load_vector", T, (("bram", BRAM(T)), ("ofs",Idx), ("len",Idx), ("par", MInt)) :: Vector(T)) implements composite ${
+
+    }
+    internal (BRAM) ("bram_store_vector", T, (("bram", BRAM(T)), ("ofs", Idx), ("vec", Vector(T)), ("par", MInt)) :: MUnit, effect = write(0)) implements composite ${
+
+    }
+
     /** @nodoc **/
     direct (BRAM) ("bram_load_nd", T, (BRAM(T), SList(Idx)) :: T) implements composite ${
       if ($1.length < 1) stageError("Cannot load from zero indices")
@@ -328,8 +336,8 @@ trait DHDLMemories {
 
     // --- Nodes
     val offchip_new   = internal (OffChip) ("offchip_new", T, ("size", Idx) :: OffChip(T), effect = mutable)
-    val offchip_load  = internal (OffChip) ("offchip_load", T, (OffChip(T), Idx, Range) :: Vector(T))
-    val offchip_store = internal (OffChip) ("offchip_store", T, (OffChip(T), Idx, Range, Vector(T)) :: MUnit, effect = write(0))
+    val offchip_load  = internal (OffChip) ("offchip_load", T, (OffChip(T), Idx, Idx) :: Vector(T))
+    val offchip_store = internal (OffChip) ("offchip_store", T, (OffChip(T), Idx, Vector(T)) :: MUnit, effect = write(0))
 
     // --- Internals
     internal (OffChip) ("offchip_create", T, (SOption(SString), SList(Idx)) :: OffChip(T)) implements composite ${
@@ -370,7 +378,7 @@ trait DHDLMemories {
        * @param col
        * @param pages
        **/
-      infix ("load") ((Idx,Idx,Range) :: Vector(T)) implements composite ${ vector_load($self, List($1, $2, 0.as[Index]), $3) }
+      infix ("load") ((Idx,Idx,Range) :: Vector(T)) implements composite ${ offchip_load($self, List($1, $2, 0.as[Index]), $3) }
 
 
       /** Creates a reference to a 1D Tile of this 1D OffChipMem which can be loaded into on-chip BRAM.
@@ -512,34 +520,34 @@ trait DHDLMemories {
     /** Creates a store from the given on-chip BRAM to this Tile of off-chip memory
      * @param bram
      **/
-    infix (Tile) (":=", T, (Tile(T), BRAM(T)) :: MUnit, effect = write(0)) implements redirect ${ storeTile($0, $1, true) }
+    infix (Tile) (":=", T, (Tile(T), BRAM(T)) :: MUnit, effect = write(0)) implements redirect ${ transferTile($0, $1, true) }
 
-    // Actual effect depends on store, but this isn't a node anyway
     /** @nodoc - not actually a user-facing method for now **/
-    direct (Tile) ("storeTile", T, (("tile",Tile(T)), ("local",BRAM(T))) :: MUnit, effect = simple) implements composite ${
+    direct (Tile) ("transferTile", T, (("tile",Tile(T)), ("local",BRAM(T)), ("store", SBoolean)) :: MUnit, effect = simple) implements composite ${
       val mem      = $tile.mem
       val ranges   = rangesOf($tile)
       val offsets  = ranges.map(_.start)
       val unitDims = ranges.map(isUnit(_))
-
-      val memDims = dimsOf(mem)
-      val tileDims = dimsOf($local) // TODO: Allow this to be different than size of BRAM?
-      val tileStrides = dimsToStrides(tileDims)
-      //val ofs = calcAddress(offsets, memDims)
-      val strides = dimsToStrides(memDims)
-      val nonUnitStrides = strides.zip(unitDims).filterNot(_._2).map(_._1)
+      val tileDims = ranges.map(_.len)
 
       val cmdCtrs = if (tileDims.length > 1) tileDims.take(tileDims.length - 1).map{d => Counter(max = d) } else Counter(max = 1.as[Index])
-      val vecCtr = Counter(min = 0.as[Index], max = tileDims.last, step = 1.as[Index], par = tilePar($tile).getOrElse(param(1)))
 
-      val cmdCchain = CounterChain(cmdCtrs:_*)
-      Pipe(cmdCchain){indices =>
-        val vec = local.load(0 :: tileDims.last)
-        val ofs = calcAddress(offsets.zip(indices.toList :+ (0.as[Index])) )
-        offchip_store(mem, ofs, vec)
+      Pipe(CounterChain(cmdCtrs:_*)){indices =>
+        val inds = indices.toList :+ 0.as[Index]
+        val indsDropUnits = inds.zip(unitDims).filter{case (i,isUnitDim) => !isUnitDim}
+
+        val memOfs = calcAddress(offsets.zip(inds).map{case (a,b) => a + b}, dimsOf(mem))
+        val localOfs = calcAddress(indsDropUnits, dimsOf(local))
+
+        if ($store) {
+          val vec = bram_load_vector(local, localOfs, tileDims.last)
+          offchip_store(mem, memOfs, vec, tilePar($tile).getOrElse(param(1)))
+        }
+        else {
+          val vec = offchip_load(mem, memOfs, tileDims.last)  // Load vector from offchip
+          bram_store_vector(local, localOfs, vec, tilePar($tile).getOrElse(param(1)))
+        }
       }
-
-      tile_transfer(mem, $local, nonUnitStrides, ofs, tileStrides, chain, $store)
     }
 
 	}

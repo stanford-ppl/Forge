@@ -69,12 +69,7 @@ trait DHDLControllers {
     val CounterChain = lookupTpe("CounterChain")
     val Pipeline     = lookupTpe("Pipeline")
 
-    /* Controller style enum */
-    val ControlStyle = tpe("ControlStyle", stage=compile)
-    identifier (ControlStyle) ("Pipe")
-    identifier (ControlStyle) ("Sequential")
-    identifier (ControlStyle) ("Parallel")
-
+    val ControlType = lookupTpe("ControlType", stage=compile)
     val Pipe = grp("Pipe")
     val Sequential = grp("Sequential")
     val Parallel = grp("Parallel")
@@ -82,7 +77,7 @@ trait DHDLControllers {
     data(Pipeline, ("_cchain", CounterChain))
 
     internal (Pipeline) ("pipeline_new", CounterChain :: Pipeline) implements allocates(Pipeline, ${$0})
-    internal (Pipeline) ("pipeline", (CounterChain, PipeStyle) :: Pipeline) implements composite ${
+    internal (Pipeline) ("pipeline", (CounterChain, ControlType) :: Pipeline) implements composite ${
       val pipe = pipeline_new($0)
       styleOf(pipe) = $1
       pipe
@@ -92,7 +87,7 @@ trait DHDLControllers {
     // --- Nodes
     // pipe_foreach, pipe_reduce, block_reduce - see Template in extern
     val pipe_parallel = internal (Pipe) ("pipe_parallel", Nil, ("func", MThunk(MUnit)) :: MUnit, effect = simple)
-
+    val unit_pipe = internal (Pipe) ("unit_pipe", T, ("func", MThunk(T)) :: T)
 
     // --- API
     static (Pipe) ("apply", Nil, CounterChain :: Pipeline) implements composite ${ pipeline($0, Pipe) }
@@ -100,13 +95,21 @@ trait DHDLControllers {
       if ($0.length > 0) pipeline(CounterChain($0:_*), Pipe)
       else pipeline(CounterChain(Counter(max=1)), Pipe)
     }
-    static (Pipe) ("apply", T, MThunk(T) :: T) implements composite ${ pipeline(CounterChain(Counter(max=1.as[Index])), Pipe) }
+    static (Pipe) ("apply", T, MThunk(T) :: T) implements composite ${
+      val pipe = unit_pipe($0)
+      styleOf(pipe) = Pipe
+      pipe
+    }
     static (Sequential) ("apply", Nil, CounterChain:: Pipeline) implements composite ${ pipeline($0, Sequential) }
     static (Sequential) ("apply", Nil, varArgs(Counter) :: Pipeline) implements composite ${
       if ($0.length > 0) pipeline(CounterChain($0:_*), Sequential)
       else pipeline(CounterChain(Counter(max=1)), Sequential)
     }
-    static (Sequential) ("apply", T, MThunk(T) :: T) implements composite ${ pipeline(CounterChain(Counter(max=1.as[Index])), Sequential) }
+    static (Sequential) ("apply", T, MThunk(T) :: T) implements composite ${
+      val pipe = unit_pipe($0)
+      styleOf(pipe) = Sequential
+      pipe
+    }
 
     static (Parallel) ("apply", Nil, MThunk(MUnit) :: MUnit) implements composite ${
       val pipe = pipe_parallel($0)
@@ -162,6 +165,7 @@ trait DHDLControllers {
     // --- Scala Backend
     // See TemplateOpsExp for others
     impl (pipe_parallel) (codegen ($cala, ${ $b[func] }))
+    impl (unit_pipe) (codegen($cala, ${ $b[func] }))
 
     // --- Dot Backend
     impl (pipe_parallel) (codegen (dot, ${

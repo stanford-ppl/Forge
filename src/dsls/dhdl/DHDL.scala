@@ -177,6 +177,11 @@ trait DHDLDSL extends ForgeApplication
     val RangeWildcard = tpe("RangeWildcard", stage = compile)
     identifier (RangeWildcard) ("*")
 
+
+    // --- Enums
+    val ControlType = tpe("ControlType", stage=compile)
+    val RegType = lookupTpe("RegType", stage=compile)
+
     noInfixList :::= List(":=", "**", "as", "to", "rst")
 
     // Scala.scala imports

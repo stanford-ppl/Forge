@@ -23,7 +23,7 @@ trait DHDLMath {
     def wrapper = Some("ootype")
   }
 
-  object TColl extends TypeClassSignature {
+  object TCollection extends TypeClassSignature {
     def name = "Coll"
     val prefix = "_cc"
     def wrapper = Some("cctype")
@@ -43,9 +43,9 @@ trait DHDLMath {
   // --- Reduceable Type Class
   def importCollectionOps() {
     val T = tpePar("T")
-    val Coll = tpeClass("Coll", TColl, T)
-    infix (Coll) ("empty", T, Nil :: T)
-    infix (Coll) ("zeros", T, T :: T)
+    val Collection = tpeClass("Collection", TCollection, T)
+    infix (Collection) ("empty", T, Nil :: T)
+    //infix (Coll) ("zeros", T, T :: T)
   }
 
 
@@ -86,7 +86,7 @@ trait DHDLMath {
   }
 
   def importPrimitiveMath() {
-    val Coll = lookupTpeClass("Coll").get
+    val Coll = lookupTpeClass("Collection").get
     val Num = lookupTpeClass("Num").get
     val Arith = lookupTpeClass("Arith").get
     val Order = lookupTpeClass("Order").get
@@ -141,7 +141,7 @@ trait DHDLMath {
     // TODO: What should the precision of zero be? Should it take precision as an argument?
     val FixPtColl = tpeClassInst("FixPtColl", (S,I,F), Coll(FixPt(S,I,F)))
     infix (FixPtColl) ("empty", (S,I,F), Nil          :: FixPt(S,I,F)) implements composite ${ 0.as[FixPt[S,I,F]] }
-    infix (FixPtColl) ("zeros", (S,I,F), FixPt(S,I,F) :: FixPt(S,I,F)) implements composite ${ 0.as[FixPt[S,I,F]] }
+    //infix (FixPtColl) ("zeros", (S,I,F), FixPt(S,I,F) :: FixPt(S,I,F)) implements composite ${ 0.as[FixPt[S,I,F]] }
 
     val FixPtNum = tpeClassInst("FixPtNum", (S,I,F), Num(FixPt(S,I,F)))
     infix (FixPtNum) ("zero", (S,I,F), Nil :: FixPt(S,I,F)) implements composite ${ 0.as[FixPt[S,I,F]] }
@@ -163,7 +163,7 @@ trait DHDLMath {
 
     val FltPtColl = tpeClassInst("FltPtColl", (G,E), Coll(FltPt(G,E)))
     infix (FltPtColl) ("empty", (G,E), Nil        :: FltPt(G,E)) implements composite ${ 0.as[FltPt[G,E]] }
-    infix (FltPtColl) ("zeros", (G,E), FltPt(G,E) :: FltPt(G,E)) implements composite ${ 0.as[FltPt[G,E]] }
+    //infix (FltPtColl) ("zeros", (G,E), FltPt(G,E) :: FltPt(G,E)) implements composite ${ 0.as[FltPt[G,E]] }
 
     val FltPtNum = tpeClassInst("FltPtNum", (G,E), Num(FltPt(G,E)))
     infix (FltPtNum) ("zero", (G,E), Nil :: FltPt(G,E)) implements composite ${ 0.as[FltPt[G,E]] }
@@ -185,7 +185,7 @@ trait DHDLMath {
 
     val BitColl = tpeClassInst("BitColl", Nil, Coll(Bit))
     infix (BitColl) ("empty", Nil, Nil :: Bit) implements composite ${ false.asBit }
-    infix (BitColl) ("zeros", Nil, Bit :: Bit) implements composite ${ false.asBit }
+    //infix (BitColl) ("zeros", Nil, Bit :: Bit) implements composite ${ false.asBit }
 
     val BitNum = tpeClassInst("BitNum", Nil, Num(Bit))
     infix (BitNum) ("zero", Nil, Nil :: Bit) implements composite ${ false.asBit }
@@ -549,8 +549,8 @@ trait DHDLMath {
     impl (mux) (codegen($cala, ${ if ($sel) $a else $b }))
 
     // --- Dot Backend
-    impl (mux) (codegen(dot, ${ 
-			$sym [label="mux", shape="diamond" style="filled" fillcolor="white"] 
+    impl (mux) (codegen(dot, ${
+			$sym [label="mux", shape="diamond" style="filled" fillcolor="white"]
 			$sel -> $sym [ headlabel="sel" ]
 			$a -> $sym [ headlabel="a" ]
 			$b -> $sym [ headlabel="b" ]

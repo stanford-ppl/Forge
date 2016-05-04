@@ -22,17 +22,19 @@ trait DHDLMemories {
 
   // Type class for local memories which can be used as accumulators in reductions
   def importMemOps() {
-    val CounterChain = lookupTpe("CounterChain")
-    val Indices = lookupTpe("Indices")
-    val Idx = lookupAlias("Index")
     val T = tpePar("T")       // data type
     val C = hkTpePar("C", T)  // memory type
+
+    val CounterChain = lookupTpe("CounterChain")
+    val Indices      = lookupTpe("Indices")
+    val Idx          = lookupAlias("Index")
 
     val Mem = tpeClass("Mem", TMem, (T, C))
     infix (Mem) ("ld", (T,C), (C, Idx) :: T)
     infix (Mem) ("st", (T,C), (C, Idx, T) :: MUnit, effect = write(0))
     infix (Mem) ("flatIdx", (T,C), (C, Indices) :: Idx)
     infix (Mem) ("iterator", (T,C), (C, SList(MInt)) :: CounterChain)
+    infix (Mem) ("zeros", (T,C), varArgs(Idx) :: C, TNum(T))
   }
 
 
@@ -75,6 +77,7 @@ trait DHDLMemories {
     infix (RegMem) ("st", T, (Reg(T), Idx, T) :: MUnit, effect = write(0)) implements composite ${ writeReg($0, $2) }
     infix (RegMem) ("flatIdx", T, (Reg(T), Indices) :: Idx) implements composite ${ 0.as[Index] }
     infix (RegMem) ("iterator", T, (Reg(T), SList(MInt)) :: CounterChain) implements composite ${ CounterChain(Counter(max=1)) }
+    infix (RegMem) ("zeros", T, varArgs(Idx) :: Reg(T), TNum(T)) implements composite ${ reg_create(None, zero[T], Regular) }
 
     // --- API
     /* Reg */
@@ -238,6 +241,8 @@ trait DHDLMemories {
       val ctrs = dims.zip(pars).map{case (d,p) => Counter(min = 0, max = d, step = 1, par = p) }
       CounterChain(ctrs:_*)
     }
+    infix (BramMem) ("zeros", T, varArgs(Idx) :: BRAM(T), TNum(T)) implements composite ${ bram_create(None, $0.toList) }
+
 
     // --- API
     /** Creates a BRAM with given name and dimensions. Dimensions must be statically known signed integers (constants or parameters).

@@ -7,10 +7,16 @@ trait DHDLEnums {
 
   def importDHDLEnums () = {
     /* Reg Type Enum */
-    val RegTpe = tpe("RegTpe", stage=compile)
-    identifier (RegTpe) ("ArgumentIn")
-    identifier (RegTpe) ("ArgumentOut")
-    identifier (RegTpe) ("Regular")
+    val RegType = lookupTpe("RegType", stage=compile)
+    identifier (RegType) ("ArgumentIn")
+    identifier (RegType) ("ArgumentOut")
+    identifier (RegType) ("Regular")
+
+    /* Controller style enum */
+    val ControlType = lookupTpe("ControlType", stage=compile)
+    identifier (ControlType) ("Pipe")
+    identifier (ControlType) ("Sequential")
+    identifier (ControlType) ("Parallel")
   }
 
 }

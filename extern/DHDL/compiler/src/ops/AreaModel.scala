@@ -126,6 +126,8 @@ trait AreaModel {
     val bankDepth = Math.ceil(depth.toDouble/banks)       // Word depth per bank
 
     if (bankDepth < REG_RAM_DEPTH) {
+      //System.out.println("RAM can be implemented using registers")
+
       val regs = width * bankDepth.toInt * banks
       if (dblBuf) FPGAResources(lut3=2*nbits, regs=2*nbits, mregs = regs*2)
       else        FPGAResources(mregs = regs)

@@ -125,8 +125,8 @@ trait ParameterAnalyzer extends Traversal {
 
   override val debugMode = false
 
-  val MIN_TILE_SIZE  = 96   // words
-  val MAX_TILE_SIZE  = 9600 // words
+  val MIN_TILE_SIZE  = 96    // words
+  val MAX_TILE_SIZE  = 96000 // words
   val MAX_TILE       = 51340
 
   val MAX_PAR_FACTOR = 192  // duplications

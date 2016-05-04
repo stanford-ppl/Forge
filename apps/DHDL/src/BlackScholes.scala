@@ -8,9 +8,9 @@ object BlackScholesInterpreter extends DHDLApplicationInterpreter with BlackScho
 trait BlackScholes extends DHDLApplication {
   override def stageArgNames = List("tileSize")
 
-  lazy val tileSize = param("tileSize", 14496)
+  lazy val tileSize = param("tileSize", 7104)
   lazy val outerPar = param("outerPar", 1)
-  lazy val innerPar = param("innerPar", 7)
+  lazy val innerPar = param("innerPar", 16)
   lazy val numOptions = ArgIn[SInt]("numOptions")
 
   final val inv_sqrt_2xPI = 0.39894228040143270286f

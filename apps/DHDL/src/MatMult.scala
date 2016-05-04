@@ -19,12 +19,12 @@ trait MatMult extends DHDLApplication {
   type Elem = Flt //FixPt[Signed,B16,B16]
 
   override def stageArgNames = List("bm", "bn", "bp")
-  lazy val bm = param("tileSizeM", 70)
+  lazy val bm = param("tileSizeM", 50)
   lazy val bn = param("tileSizeN", 96)
-  lazy val bp = param("tileSizeP", 960)
-  lazy val outerPar  = param("outerPar", 1)
-  lazy val middlePar = param("middlePar", 1)
-  lazy val innerPar  = param("innerPar", 590)
+  lazy val bp = param("tileSizeP", 864)
+  lazy val outerPar  = param("outerPar", 2)
+  lazy val middlePar = param("middlePar", 2)
+  lazy val innerPar  = param("innerPar", 12)
 
   lazy val upMidPar = param("upMidPar", 1)
   lazy val stPar = param("stPar", 1)
@@ -41,8 +41,9 @@ trait MatMult extends DHDLApplication {
         val tileC = BRAM[Elem]("tileC", bm, bn)
         //BlockReduce((p by bp) par blockPar, tileC){ k =>
         Parallel {
-          tileA := a(i::i+bm, k::k+bp, innerPar)
-          tileB := b(k::k+bp, j::j+bn, innerPar)
+          tileA := a(i::i+bm, k::k+bp, param(1))
+          tileB := b(k::k+bp, j::j+bn, param(1))
+          tileC := c(i::i+bm, j::j+bn, param(1))
         }
         //val accTile = BRAM[Elem]("accTile", bm, bn)
         Sequential(bm by 1, (bn by 1) par middlePar){ (ii,jj) =>    // MetaPipe?

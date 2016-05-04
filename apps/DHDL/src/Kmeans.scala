@@ -11,15 +11,17 @@ trait Kmeans extends DHDLApplication {
   lazy val numCents  = ArgIn[SInt]("numCents")
   lazy val numPoints = ArgIn[SInt]("numPoints")
 
-  lazy val tileSize   = param("tileSize", 768)
+  lazy val tileSize   = param("tileSize", 320)
   lazy val dTileSize  = 96
   lazy val ptLoopPar  = param("ptLoopPar", 1)
   //lazy val ctLoopPar  = param("ctLoopPar", 1)
-  lazy val dstLoopPar = param("dstLoopPar", 8)
-  lazy val accLoopPar = param("accLoopPar", 8)
-  lazy val avgLoopPar = param("avgLoopPar", 8)
+  lazy val dstLoopPar = param("dstLoopPar", 1)
+  lazy val accLoopPar = param("accLoopPar", 1)
+  lazy val avgLoopPar = param("avgLoopPar", 1)
   lazy val ignorePar = param("IGNOREME",1)
-  lazy val MAXK = 16
+  lazy val MAXK = 8
+
+  lazy val loadPar = param(96)
 
   def reduceTree(x: List[(Rep[Flt], Rep[SInt])]): List[(Rep[Flt], Rep[SInt])] = {
     if (x.length == 1) x
@@ -43,12 +45,16 @@ trait Kmeans extends DHDLApplication {
 
     Sequential {
       // Load initial centroids (from points)
-      oldCents := points(0::K,0::dTileSize, dstLoopPar)
+      //oldCents := points(0::K,0::dTileSize, dstLoopPar)
 
-      val oldCent = List.tabulate(MAXK){i =>
-        val ram = BRAM[Flt](dTileSize)
-        Pipe((D by 1) par dstLoopPar){j => ram(j) = oldCents(i.as[SInt], j) }
-        ram
+      val oldCent = List.tabulate(MAXK){i => BRAM[Flt](dTileSize) }
+
+      Parallel {
+        List.tabulate(MAXK){i =>
+          val idx = i.as[SInt]
+          oldCent(i) := points(idx::idx+1, 0::dTileSize, dstLoopPar)
+        }
+        ()
       }
 
       MetaPipe((numPoints by tileSize) par ignorePar) { i =>
@@ -91,7 +97,7 @@ trait Kmeans extends DHDLApplication {
 
   def main() {
     val N = args(unit(0)).to[SInt];   bound(N) = 960000
-    val K = args(unit(0)).to[SInt];   bound(K) = 16
+    val K = args(unit(0)).to[SInt];   bound(K) = 8
     val D = args(unit(0)).to[SInt];   bound(D) = 384
     domainOf(tileSize) = (1,9600,1)
     //domainOf(ctLoopPar) = (1,1,1)
@@ -100,6 +106,7 @@ trait Kmeans extends DHDLApplication {
     domainOf(avgLoopPar) = (1,96,1)
     domainOf(ptLoopPar) = (1,1,1)
     domainOf(ignorePar) = (1,1,1)
+    domainOf(loadPar) = (96,96,1)
 
     val points = OffChipMem[Flt]("points", N, D)       // input points
     val centroids = OffChipMem[Flt]("centroids", K, D) // output centroids

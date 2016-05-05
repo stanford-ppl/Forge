@@ -1,12 +1,3 @@
-/*//////////////////////////////////////////////////////////////
-Author: Alex G B Jin
-
-Description: A row of a sparsematrix or graph. Could represent
-  1) just neighbor indices in a graph
-  2) edge with edge properties
-  3) a row of sparse vector
-  Note we don't do a view on columns because that's inefficient
-*///////////////////////////////////////////////////////////////
 package ppl.dsl.forge
 package dsls
 package optila
@@ -19,7 +10,14 @@ trait SparseRowViewOps {
   def importSparseRowViewOps() {
     val T = tpePar("T")
     val R = tpePar("R")
+    // val DenseVector = lookupTpe("DenseVector")
+    // val DenseVectorView = lookupTpe("DenseVectorView")
+    // val IndexVector = lookupTpe("IndexVector")
+    // val SparseVector = lookupTpe("SparseVector")
     val SparseRowView = lookupTpe("SparseRowView")
+    // val SparseMatrix = lookupTpe("SparseMatrix")
+    // val Tuple2 = lookupTpe("Tup2")
+    // val Tuple6 = lookupTpe("Tup6")
 
     data(SparseRowView, ("_data", MArray(T)), ("_start", MInt), ("_length", MInt))
     static (SparseRowView) ("apply", T, (MArray(T), MInt, MInt) :: SparseRowView(T)) implements allocates(SparseRowView, ${$0}, ${$1}, ${$2})

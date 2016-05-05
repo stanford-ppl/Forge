@@ -192,7 +192,9 @@ trait MatrixOps {
      infix ("*") (SparseMatrix(T) :: DenseMatrix(T), A) implements composite ${
        fassert($self.numCols == $1.numRows, "dimension mismatch: matrix multiply (lhs: " + $self.makeDimsStr + ", rhs: " + $1.makeDimsStr + ")")
        // Compute (rhs.t*lhs.t).t == lhs*rhs to reformulate as sparse*dense, which is supported by sparse BLAS
-       ($1.t*$self.t).t
+       // ($1.t*$self.t).t
+       // Transposing sparse is slow, we should just convert to dense or write a custom version
+       $self * $1.toDense
      }
 
      for (rhs <- List(DenseVector(T), SparseVector(T))) {

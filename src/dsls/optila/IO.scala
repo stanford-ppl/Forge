@@ -89,97 +89,6 @@ trait IOOps {
       line
     }
 
-    /* Sparse IOs */
-    val T = tpePar("T")
-    val SparseCOO = lookupTpe("SparseCOO")
-    val Sparse = lookupTpe("Sparse")
-
-    /* reads from standard COO format:
-     * numRow, numCol, nnz
-     * COO data
-     */
-    direct (IO) ("loadCOO", T, (MString, MString, MString ==> T) :: SparseCOO(T)) implements composite ${
-      println("LoadCOO: reading from file")
-      val rawCOO = ForgeFileReader.readLines($0)({line =>
-          val fields = line.fsplit($1)
-          pack(fields(0).toInt,fields(1).toInt,$2(fields(2))) 
-      })
-      println("LoadCOO: file read")
-      val COO_n   = rawCOO(0)._1
-      val COO_m   = rawCOO(0)._2
-      val COO_nnz = array_length(rawCOO) - 1
-      val col_1   = densevector_fromarray(rawCOO.map(_._1), true)
-      val col_2   = densevector_fromarray(rawCOO.map(_._2), true)
-      val col_3   = densevector_fromarray(rawCOO.map(_._3), true)
-      val rowIdx  = col_1.slice(1,col_1.length)
-      val colIdx  = col_2.slice(1,col_2.length)
-      val data    = col_3.slice(1,col_3.length)
-      val COO     = Sparse[T](COO_n, COO_m)
-      sparsecoo_set_rowindices(COO, rowIdx.get_data)
-      sparsecoo_set_colindices(COO, colIdx.get_data)
-      sparsecoo_set_data(COO, data.get_data)
-      sparsecoo_set_nnz(COO, COO_nnz)
-      COO
-    }
-    direct (IO) ("loadCOO_full_options", T, (("filename", MString), ("delimiter", MString), ("edgeProp", MBoolean), ("propParser", MString ==> T), ("nodeProp", MBoolean)) :: SparseCOO(T)) implements composite ${
-      println("LoadCOO: reading from file")
-      val rawCOO = ForgeFileReader.readLines(filename)({line =>
-          val fields = line.fsplit(delimiter)
-          pack(fields(0).toInt,fields(1).toInt,propParser(fields(2))) 
-      })
-      println("LoadCOO: file read")
-      val COO_n   = rawCOO(0)._1
-      val COO_m   = rawCOO(0)._2
-      val COO_nnz = array_length(rawCOO) - 1
-      val col_1   = densevector_fromarray(rawCOO.map(_._1), true)
-      val col_2   = densevector_fromarray(rawCOO.map(_._2), true)
-      val rowIdx  = col_1.slice(1,col_1.length)
-      val colIdx  = col_2.slice(1,col_2.length)
-      val COO     = Sparse[T](COO_n, COO_m)
-      sparsecoo_set_rowindices(COO, rowIdx.get_data)
-      sparsecoo_set_colindices(COO, colIdx.get_data)
-      sparsecoo_set_nnz(COO, COO_nnz)
-      if (edgeProp) {
-        val col_3   = densevector_fromarray(rawCOO.map(_._3), true)
-        val data    = col_3.slice(1,col_3.length)
-        sparsecoo_set_data(COO, data.get_data)
-      } else {
-        val data    = array_empty[T](col_2.length)
-        sparsecoo_set_data(COO, data)
-      }
-      if (nodeProp) {
-        val nodeprop = ForgeFileReader.readLines(filename + ".nodeprop")({line => propParser(line)})
-        sparsecoo_set_nodeprop(COO, nodeprop)
-      }
-      COO
-    }
-    // CSR has at most 4 files:
-    //   $filename.meta:
-    //     number of rows
-    //     number of columns
-    //     number of non-zeros
-    // csr info:
-    //   $filename.rowptr
-    //   $filename.colindices
-    //   $filename.data
-    direct (IO) ("loadCSR", T, (("filename", MString), ("edgeProp", MBoolean), ("propParser", MString ==> T)) :: SparseCSR(T)) implements composite ${
-      println("LoadCOO: reading from file")
-      val metadata = ForgeFileReader.readLines(filename + ".meta")({line =>line.toInt})
-      val rowPtr = ForgeFileReader.readLines(filename + ".rowptr")({line =>line.toInt})
-      val colIdx = ForgeFileReader.readLines(filename + ".colindices")({line =>line.toInt})
-      println("LoadCSR: file read")
-      val CSR_n   = metadata(0)
-      val CSR_m   = metadata(1)
-      val CSR_nnz = metadata(2)
-      var data = array_empty[T](unit(0))
-      if (edgeProp) {
-        val edgeprop = ForgeFileReader.readLines(filename + ".data")({line =>propParser(line)})
-        data = edgeprop
-      }
-      val CSR = Sparse[T](CSR_n, CSR_m, data, colIdx, rowPtr, CSR_nnz)
-      CSR
-    }
-
     // -- output
 
     direct (IO) ("writeVector", Elem withBound TStringable, (("v",DenseVector(Elem)),("path",MString)) :: MUnit, effect = simple) implements composite ${
@@ -212,10 +121,97 @@ trait IOOps {
     }))
     impl (deleteFile) (codegen(cpp, ${DeliteFileSystem::deleteRecursive($0)}))
 
-    direct (IO) ("fileExists", Nil, MString :: MBoolean, effect = simple) implements codegen($cala, ${
-      val f = new java.io.File($0)
-      f.exists
-    })
+/**************************************Sparse related code************************************/
+    /* Sparse IOs */
+    val T = tpePar("T")
+    val SparseCOO = lookupTpe("SparseCOO")
+    val Sparse = lookupTpe("Sparse")
 
+    /* reads from standard COO format:
+     * numRow, numCol, nnz
+     * COO data
+     */
+    direct (IO) ("loadCOO", T, (MString, MString, MString ==> T) :: SparseCOO(T)) implements composite ${
+      println("LoadCOO: reading from file")
+      val rawCOO = ForgeFileReader.readLines($0)({line =>
+          val fields = line.fsplit($1)
+          pack(fields(0).toInt,fields(1).toInt,$2(fields(2))) 
+      })
+      println("LoadCOO: file read")
+      val COO_n   = rawCOO(0)._1
+      val COO_m   = rawCOO(0)._2
+      val COO_nnz = array_length(rawCOO) - 1
+      val col_1   = densevector_fromarray(rawCOO.map(_._1), true)
+      val col_2   = densevector_fromarray(rawCOO.map(_._2), true)
+      val col_3   = densevector_fromarray(rawCOO.map(_._3), true)
+      val rowIdx  = col_1.slice(1,col_1.length)
+      val colIdx  = col_2.slice(1,col_2.length)
+      val data    = col_3.slice(1,col_3.length)
+      val COOMatrix = Sparse[T](COO_n, COO_m)
+      sparsecoo_set_rowindices(COOMatrix, densevector_raw_data(rowIdx))
+      sparsecoo_set_colindices(COOMatrix, densevector_raw_data(colIdx))
+      sparsecoo_set_data(COOMatrix, densevector_raw_data(data))
+      sparsecoo_set_nnz(COOMatrix, COO_nnz)
+      COOMatrix
+    }
+    direct (IO) ("loadCOO_full_options", T, (("filename", MString), ("delimiter", MString), ("edgeProp", MBoolean), ("propParser", MString ==> T), ("nodeProp", MBoolean)) :: SparseCOO(T)) implements composite ${
+      println("LoadCOO: reading from file")
+      val rawCOO = ForgeFileReader.readLines(filename)({line =>
+          val fields = line.fsplit(delimiter)
+          pack(fields(0).toInt,fields(1).toInt,propParser(fields(2))) 
+      })
+      println("LoadCOO: file read")
+      val COO_n   = rawCOO(0)._1
+      val COO_m   = rawCOO(0)._2
+      val COO_nnz = array_length(rawCOO) - 1
+      val col_1   = densevector_fromarray(rawCOO.map(_._1), true)
+      val col_2   = densevector_fromarray(rawCOO.map(_._2), true)
+      val rowIdx  = col_1.slice(1,col_1.length)
+      val colIdx  = col_2.slice(1,col_2.length)
+      val COOMatrix = Sparse[T](COO_n, COO_m)
+      sparsecoo_set_rowindices(COOMatrix, densevector_raw_data(rowIdx))
+      sparsecoo_set_colindices(COOMatrix, densevector_raw_data(colIdx))
+      sparsecoo_set_nnz(COOMatrix, COO_nnz)
+      if (edgeProp) {
+        val col_3   = densevector_fromarray(rawCOO.map(_._3), true)
+        val data    = col_3.slice(1,col_3.length)
+        sparsecoo_set_data(COOMatrix, densevector_raw_data(data))
+      } else {
+        val data    = array_empty[T](col_2.length)
+        sparsecoo_set_data(COOMatrix, data)
+      }
+      if (nodeProp) {
+        val nodeprop = ForgeFileReader.readLines(filename + ".nodeprop")({line => propParser(line)})
+        sparsecoo_set_nodeprop(COOMatrix, nodeprop)
+      }
+      COOMatrix
+    }
+    // CSR has at most 4 files:
+    //   $filename.meta:
+    //     number of rows
+    //     number of columns
+    //     number of non-zeros
+    // csr info:
+    //   $filename.rowptr
+    //   $filename.colindices
+    //   $filename.data
+    direct (IO) ("loadCSR", T, (("filename", MString), ("edgeProp", MBoolean), ("propParser", MString ==> T)) :: Sparse(T)) implements composite ${
+      println("LoadCOO: reading from file")
+      val metadata = ForgeFileReader.readLines(filename + ".meta")({line =>line.toInt})
+      val rowPtr = ForgeFileReader.readLines(filename + ".rowptr")({line =>line.toInt})
+      val colIdx = ForgeFileReader.readLines(filename + ".colindices")({line =>line.toInt})
+      println("LoadCSR: file read")
+      val CSR_n   = metadata(0)
+      val CSR_m   = metadata(1)
+      val CSR_nnz = metadata(2)
+      var data = array_empty[T](unit(0))
+      if (edgeProp) {
+        val edgeprop = ForgeFileReader.readLines(filename + ".data")({line =>propParser(line)})
+        data = edgeprop
+      }
+      val CSRMatrix = Sparse[T](CSR_n, CSR_m, data, colIdx, rowPtr, CSR_nnz)
+      CSRMatrix
+    }
+/**************************************Sparse related code************************************/
   }
 }

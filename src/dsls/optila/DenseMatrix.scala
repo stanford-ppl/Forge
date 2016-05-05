@@ -222,19 +222,21 @@ trait DenseMatrixOps {
          densematrix_fromarray(array_clone(densematrix_raw_data($self)), $self.numRows, $self.numCols)
        }
 
-       infix ("toSparse") (Nil :: SparseMatrix(T)) implements composite ${
-          val sparseElements = $self.indices.map { i =>
-            pack((densematrix_raw_apply($self, i), i / $self.numCols, i % $self.numCols))
-          }
+       // TODO: we should never do this
+       //       unless there are many zeros, which we are not checking
+       // infix ("toSparse") (Nil :: SparseMatrix(T)) implements composite ${
+       //    val sparseElements = $self.indices.map { i =>
+       //      pack((densematrix_raw_apply($self, i), i / $self.numCols, i % $self.numCols))
+       //    }
 
-          SparseMatrix.fromElements(
-            $self.numRows,
-            $self.numCols,
-            sparseElements.map(_._1),
-            sparseElements.map(_._2),
-            sparseElements.map(_._3)
-          )
-       }
+       //    SparseMatrix.fromElements(
+       //      $self.numRows,
+       //      $self.numCols,
+       //      sparseElements.map(_._1),
+       //      sparseElements.map(_._2),
+       //      sparseElements.map(_._3)
+       //    )
+       // }
 
 
       /**

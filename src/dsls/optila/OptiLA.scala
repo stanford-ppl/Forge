@@ -10,7 +10,7 @@ trait OptiLADSL extends ForgeApplication
   with ArithOps with HasMinMaxOps with StringableOps with ShapeOps
   with BasicMathOps with RandomOps with IOOps
   with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps with SparseVectorOps with SparseVectorViewOps
-  with MatrixOps with DenseMatrixOps with DenseMatrixViewOps with SparseMatrixOps
+  with MatrixOps with DenseMatrixOps with DenseMatrixViewOps 
   with ComplexOps with LinAlgOps with SparseOps with SparseRowViewOps {
 
   def dslName = "OptiLA"
@@ -44,15 +44,23 @@ trait OptiLADSL extends ForgeApplication
     val SparseVectorView = tpe("SparseVectorView", T)
     val SparseMatrix = tpe("SparseMatrix", T)
     val SparseMatrixBuildable = tpe("SparseMatrixBuildable", T)
+
+/**************************************Sparse related code************************************/
+    // Sparse types
+    // declare all tpes first, so that they are available to all ops (similar to Delite)
     val R = tpePar("R")
-    val SparseCSR = tpe("SparseCSR", T)
+    val Sparse    = tpe("Sparse", T)
     val SparseCOO = tpe("SparseCOO", T)
-    val SparseBlockMatrix = tpe("SparseBlockMatrix", T)
+    val SparseMat = tpe("SparseMat", T)
+    val SparseBlockMat = tpe("SparseBlockMat", T)
+    val SparseSymMat = tpe("SparseSymMat", T)
     val SparseRowView = tpe("SparseRowView", T)
     val SparseDirectedGraph = tpe("SparseDirectedGraph", T)
     val SparseUndirectedGraph = tpe("SparseUndirectedGraph", T)
     importSparseOps()
     importSparseRowViewOps()
+    importOptiLAUntilConverged()
+/**************************************Sparse related code************************************/
 
     // OptiLA ops
     // note that the order matters with respect to 'lookup' calls
@@ -123,7 +131,6 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
     importDenseMatrixViewOps()
     importSparseVectorOps()
     importSparseVectorViewOps()
-    importSparseMatrixOps()
     importVecMatConstructor()
     importIOOps()
     importLinAlgOps()
@@ -137,6 +144,38 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
     extern(grp("Rewrite"), targets = Nil)
     extern(grp("Distributed"), targets = List($cala))
   }
+
+/**************************************Sparse related code************************************/
+  def importOptiLAUntilConverged() {
+    val OptiLAControl = grp("OptiLAControl")
+    val T = tpePar("T")
+    // "block" should not mutate the input, but always produce a new copy. in this version, block can change the structure of the input across iterations (e.g. increase its size)
+    direct (OptiLAControl) ("optilauntilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, "unit(.001)"), ("minIter", MInt, "unit(1)"), ("maxIter", MInt, "unit(1000)"), ("verbose", MBoolean, "unit(false)")), ("block", (T,MInt) ==> T)), T), ("diff", (T,T) ==> MDouble)) implements composite ${
+      var delta = scala.Double.MaxValue
+      var cur = x
+      var iter = 0
+
+      while ((abs(delta) > tol && iter < maxIter) || iter < minIter) {
+        val prev = cur
+        val next = block(cur, iter)
+        delta = diff(prev, next)
+        if (verbose) println("[optiml]: iter " + iter + ", delta: " + delta)
+        iter += 1
+        cur = next
+      }
+
+      if (verbose) {
+        if (iter == maxIter) {
+          println("[optiml]: maximum iterations (" + iter + ") exceeded")
+        }
+        else {
+          println("[optiml]: converged in " + iter + " iterations")
+        }
+      }
+      cur
+    }
+  }
+/**************************************Sparse related code************************************/
 
   def importVecMatConstructor() {
     val DenseVector = lookupTpe("DenseVector")

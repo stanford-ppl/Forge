@@ -226,11 +226,11 @@ trait Example8 extends OptiMLApplication {
     // sparse matrices are split into separates phases for construction and use
     // they can only be mutated before 'finish' is called, and can only be
     // used in other operations (e.g. math) after 'finish' is called
-    val mBuilder = SparseMatrix[Double](1000,1000)
+    val mBuilder = Sparse[Double](1000,1000)
     mBuilder(10,100) = 5
     mBuilder(9,100) = 1
     mBuilder(9,722) = 722
-    val m = mBuilder.finish
+    val m = mBuilder.to_sparsematrix
     println("m numRows: " + m.numRows)
     println("m numCols: " + m.numCols)
     println("m nnz: " + m.nnz)

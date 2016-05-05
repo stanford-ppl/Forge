@@ -23,7 +23,7 @@ trait TrainingSetLikeOps {
     val TS = hkTpePar("TS", (D,L))
 
     val DenseTrainingSet = lookupTpe("DenseTrainingSet")
-    val SparseTrainingSet = lookupTpe("SparseTrainingSet")
+    // val SparseTrainingSet = lookupTpe("SparseTrainingSet")
     val DenseVector = lookupTpe("DenseVector")
     val SparseVector = lookupTpe("SparseVector")
     val IndexVector = lookupTpe("IndexVector")
@@ -64,24 +64,26 @@ trait TrainingSetLikeOps {
       $0($1) * $2
     }
 
-    val SparseTrainingSetTrainingSetLike = tpeClassInst("TrainingSetLikeSparseTrainingSet", (D, L), TTrainingSetLike(D,L,SparseTrainingSet(D,L)))
-    infix (SparseTrainingSetTrainingSetLike) ("labels", (D,L), SparseTrainingSet(D,L) :: DenseVector(L)) implements composite ${ $0.labels }
-    infix (SparseTrainingSetTrainingSetLike) ("numSamples", (D,L), SparseTrainingSet(D,L) :: MInt) implements composite ${ $0.numSamples }
-    infix (SparseTrainingSetTrainingSetLike) ("numFeatures", (D,L), SparseTrainingSet(D,L) :: MInt) implements composite ${ $0.numFeatures }
-    infix (SparseTrainingSetTrainingSetLike) ("getRows", (D,L), (SparseTrainingSet(D,L), IndexVector) :: SparseTrainingSet(D,L)) implements composite ${
-      SparseTrainingSet($0.data.apply($1), $0.labels.apply($1))
-    }
-    infix (SparseTrainingSetTrainingSetLike) ("getCols", (D,L), (SparseTrainingSet(D,L), IndexVector) :: SparseTrainingSet(D,L)) implements composite ${
-      SparseTrainingSet($0.data.getCols($1), $0.labels)
-    }
-    infix (SparseTrainingSetTrainingSetLike) ("dot", (D,L), (SparseTrainingSet(D,L), MInt, DenseVector(D)) :: D, TArith(D)) implements composite ${
-      $0($1) *:* $2
-    }
-    infix (SparseTrainingSetTrainingSetLike) ("times", (D,L), (SparseTrainingSet(D,L), MInt, DenseVector(D)) :: DenseVector(D), TArith(D)) implements composite ${
-      ($0($1)*$2).toDense
-    }
-    infix (SparseTrainingSetTrainingSetLike) ("timesScalar", (D,L), (SparseTrainingSet(D,L), MInt, D) :: DenseVector(D), TArith(D)) implements composite ${
-      ($0($1)*$2).toDense
-    }
+    // .getCols on CSR is generally very slow
+    // If we want to support this we need a structure that carries both CSR and CSC
+    // val SparseTrainingSetTrainingSetLike = tpeClassInst("TrainingSetLikeSparseTrainingSet", (D, L), TTrainingSetLike(D,L,SparseTrainingSet(D,L)))
+    // infix (SparseTrainingSetTrainingSetLike) ("labels", (D,L), SparseTrainingSet(D,L) :: DenseVector(L)) implements composite ${ $0.labels }
+    // infix (SparseTrainingSetTrainingSetLike) ("numSamples", (D,L), SparseTrainingSet(D,L) :: MInt) implements composite ${ $0.numSamples }
+    // infix (SparseTrainingSetTrainingSetLike) ("numFeatures", (D,L), SparseTrainingSet(D,L) :: MInt) implements composite ${ $0.numFeatures }
+    // infix (SparseTrainingSetTrainingSetLike) ("getRows", (D,L), (SparseTrainingSet(D,L), IndexVector) :: SparseTrainingSet(D,L)) implements composite ${
+    //   SparseTrainingSet($0.data.apply($1), $0.labels.apply($1))
+    // }
+    // infix (SparseTrainingSetTrainingSetLike) ("getCols", (D,L), (SparseTrainingSet(D,L), IndexVector) :: SparseTrainingSet(D,L)) implements composite ${
+    //   SparseTrainingSet($0.data.getCols($1), $0.labels)
+    // }
+    // infix (SparseTrainingSetTrainingSetLike) ("dot", (D,L), (SparseTrainingSet(D,L), MInt, DenseVector(D)) :: D, TArith(D)) implements composite ${
+    //   $0($1) *:* $2
+    // }
+    // infix (SparseTrainingSetTrainingSetLike) ("times", (D,L), (SparseTrainingSet(D,L), MInt, DenseVector(D)) :: DenseVector(D), TArith(D)) implements composite ${
+    //   ($0($1)*$2).toDense
+    // }
+    // infix (SparseTrainingSetTrainingSetLike) ("timesScalar", (D,L), (SparseTrainingSet(D,L), MInt, D) :: DenseVector(D), TArith(D)) implements composite ${
+    //   ($0($1)*$2).toDense
+    // }
   }
 }

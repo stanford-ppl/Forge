@@ -122,7 +122,7 @@ trait TopN extends OptiMLApplication {
     val userIds = (uniqueRatings map { grp => grp(0).profileA }) << (uniqueRatings map { grp => grp(0).profileB })
 
     // each similarity represents a unique (i,j) value in the similarity matrix - invert for fast look-up    
-    val similarityMatrixB = SparseMatrix[Double](userIds.max+1, userIds.max+1)    
+    val similarityMatrixB = Sparse[Double](userIds.max+1, userIds.max+1)    
     var s = 0
     while (s < similarities.length) {
       val sim = similarities(s)
@@ -130,7 +130,7 @@ trait TopN extends OptiMLApplication {
       similarityMatrixB(sim.b, sim.a) = sim.value 
       s += 1
     }
-    val similarityMatrix = similarityMatrixB.finish
+    val similarityMatrix = similarityMatrixB.to_sparsematrix
     
     /* compute prediction for desired user */
     val testRatings = userRatings filter { m => m(0,0) == testUser } // pretty inefficient unless this is fused...

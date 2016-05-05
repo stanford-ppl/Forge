@@ -186,7 +186,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       if (styleOf(lhs) == Coarse) metapipes ::= lhs  // (8)
       if (!parentOf(lhs).isDefined) top = lhs
 
-    case EatReflect(Pipe_reduce(cc,a,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV)) =>
+    case EatReflect(Pipe_fold(cc,a,_,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV)) =>
       val isFine = styleOf(lhs) == Fine
       val allocs = getAllocations(func)
       val stages = getControlNodes(func)
@@ -212,7 +212,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       if (styleOf(lhs) == Coarse) metapipes ::= lhs  // (8)
       if (!parentOf(lhs).isDefined) top = lhs
 
-    case EatReflect(Block_reduce(cc1,cc2,a,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV)) =>
+    case EatReflect(Accum_fold(cc1,cc2,a,_,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV)) =>
       val allocs = getAllocations(func)
       val stages = getControlNodes(func)
       allocs.foreach{a => parentOf(a) = lhs } // (1)

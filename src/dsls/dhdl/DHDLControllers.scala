@@ -52,7 +52,6 @@ trait DHDLControllers {
       lenOf(chain) = $0.length
       chain
     }
-
   }
 
 
@@ -86,8 +85,8 @@ trait DHDLControllers {
 
     // --- Nodes
     // pipe_foreach, pipe_reduce, block_reduce - see Template in extern
-    val pipe_parallel = internal (Pipe) ("pipe_parallel", Nil, ("func", MThunk(MUnit)) :: MUnit, effect = simple)
-    val unit_pipe = internal (Pipe) ("unit_pipe", T, ("func", MThunk(T)) :: T)
+    val pipe_parallel = internal (Pipe) ("pipeParallel", Nil, ("func", MThunk(MUnit)) :: MUnit, effect = simple)
+    val unit_pipe = internal (Pipe) ("unitPipe", T, ("func", MThunk(T)) :: T)
 
     // --- API
     static (Pipe) ("apply", Nil, CounterChain :: Pipeline) implements composite ${ pipeline($0, Pipe) }
@@ -96,7 +95,7 @@ trait DHDLControllers {
       else pipeline(CounterChain(Counter(max=1)), Pipe)
     }
     static (Pipe) ("apply", T, MThunk(T) :: T) implements composite ${
-      val pipe = unit_pipe($0)
+      val pipe = unitPipe($0)
       styleOf(pipe) = Pipe
       pipe
     }
@@ -106,13 +105,13 @@ trait DHDLControllers {
       else pipeline(CounterChain(Counter(max=1)), Sequential)
     }
     static (Sequential) ("apply", T, MThunk(T) :: T) implements composite ${
-      val pipe = unit_pipe($0)
+      val pipe = unitPipe($0)
       styleOf(pipe) = Sequential
       pipe
     }
 
     static (Parallel) ("apply", Nil, MThunk(MUnit) :: MUnit) implements composite ${
-      val pipe = pipe_parallel($0)
+      val pipe = pipeParallel($0)
       styleOf(pipe) = Parallel
     }
 
@@ -122,13 +121,13 @@ trait DHDLControllers {
         val pipe = pipe_foreach($self.cchain, $1)
         styleOf(pipe) = styleOf($self)
       }
-      infix ("apply") ((Idx ==> MUnit) :: MUnit) implements composite ${ $self.forIndices{inds => $1(inds(0)) } }
-      infix ("apply") ((Idx,Idx) ==> MUnit) :: MUnit) implements composite ${ $self.forIndices{inds => $1(inds(0),inds(1)) } }
-      infix ("apply") ((Idx,Idx,Idx) ==> MUnit :: MUnit) implements composite ${ $self.forIndices{inds => $1(inds(0),inds(1),inds(2))} }
+      infix ("apply") (Idx ==> MUnit :: MUnit) implements composite ${ $self.forIndices{inds => $1(inds(0)) } }
+      infix ("apply") ((Idx,Idx) ==> MUnit :: MUnit) implements composite ${ $self.forIndices{inds => $1(inds(0),inds(1)) } }
+      infix ("apply") ((Idx,Idx,Idx) ==> MUnit :: MUnit) implements composite ${ $self.forIndices{inds => $1(inds(0),inds(1),inds(2)) } }
 
       // Scalar result variant
       infix ("foldIndices", CurriedMethodSignature(List(List(C(T)),List(Indices ==> T), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
-        val pipe = pipe_reduce[T,C]($self.cchain, $1, $2, $3)
+        val pipe = pipe_fold[T,C]($self.cchain, $1, $2, $3)
         styleOf(pipe) = styleOf($self)
         $1
       }
@@ -145,21 +144,37 @@ trait DHDLControllers {
       // Collection result variant (a la BlockReduce)
       infix ("foldIndices", CurriedMethodSignature(List(List(C(T)),List(Indices ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
         val ccInner = $1.iterator(Nil)
-        val pipe = accum_reduce[T,C]($self.cchain, ccInner, $1, $2, $3)
+        val pipe = accum_fold[T,C]($self.cchain, ccInner, $1, $2, $3)
         styleOf(pipe) = styleOf($self)
         $1
       }
       infix ("fold", CurriedMethodSignature(List(List(C(T)),List(Idx ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
-        $self.fold($1){inds => $2(inds(0))}($3)
+        $self.foldIndices($1){inds => $2(inds(0))}($3)
       }
       infix ("fold", CurriedMethodSignature(List(List(C(T)),List((Idx,Idx) ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
-        $self.fold($1){inds => $2(inds(0),inds(1))}($3)
+        $self.foldIndices($1){inds => $2(inds(0),inds(1))}($3)
       }
       infix ("fold", CurriedMethodSignature(List(List(C(T)),List((Idx,Idx,Idx) ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
-        $self.fold($1){inds => $2(inds(0),inds(1),inds(2))}($3)
+        $self.foldIndices($1){inds => $2(inds(0),inds(1),inds(2))}($3)
       }
 
-      // TODO: Reduce (no explicit accumulator)?
+      // Reduce (no explicit accumulator)
+      infix ("reduceIndices", CurriedMethodSignature(List(List(Indices ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
+        val ccInner = $1.iterator(Nil)
+        val (accum, pipe) = accum_reduce[T,C]($self.cchain, ccInner, $1, $2)
+        styleOf(pipe) = styleOf($self)
+        accum
+      }
+      infix ("reduce", CurriedMethodSignature(List(List(C(T)),List(Idx ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
+        $self.reduceIndices{inds => $1(inds(0))}($2)
+      }
+      infix ("reduce", CurriedMethodSignature(List(List(C(T)),List((Idx,Idx) ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
+        $self.reduceIndices{inds => $1(inds(0),inds(1))}($2)
+      }
+      infix ("reduce", CurriedMethodSignature(List(List(C(T)),List((Idx,Idx,Idx) ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T)), addTpePars=(T,C)) implements composite ${
+        $self.reduceIndices{inds => $1(inds(0),inds(1),inds(2))}($2)
+      }
+
     }
 
     // --- Scala Backend

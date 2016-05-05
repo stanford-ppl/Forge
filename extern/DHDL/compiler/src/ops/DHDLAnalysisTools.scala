@@ -77,15 +77,15 @@ trait PipeStageToolsExp extends EffectExp {
   }
   def isPipeline(d: Def[Any]): Boolean = d match {
     case EatReflect(_:Pipe_foreach) => true
-    case EatReflect(_:Pipe_reduce[_,_]) => true
-    case EatReflect(_:Block_reduce[_]) => true
+    case EatReflect(_:Pipe_fold[_,_]) => true
+    case EatReflect(_:Accum_fold[_,_]) => true
     case EatReflect(_:Unit_pipe) => true
     case _ => false
   }
   def isLoop(d: Def[Any]): Boolean = d match {
     case EatReflect(_:Pipe_foreach) => true
-    case EatReflect(_:Pipe_reduce[_,_]) => true
-    case EatReflect(_:Block_reduce[_]) => true
+    case EatReflect(_:Pipe_fold[_,_]) => true
+    case EatReflect(_:Accum_fold[_,_]) => true
     case _ => false
   }
 }
@@ -113,43 +113,6 @@ trait PipeStageTools extends NestedBlockTraversal {
   def getLocalReaders(blk: Block[Any]*) = getStages(blk:_*).filter{s => isReader(s)}
   def getLocalWriters(blk: Block[Any]*) = getStages(blk:_*).filter{s => isWriter(s)}
 }
-
-
-trait CounterToolsExp extends EffectExp {
-  this: DHDLExp =>
-
-  def parOf(cc: Rep[CounterChain]): List[Int] = parParamsOf(cc).map(_.x)
-
-  def parParamsOf(cc: Rep[CounterChain]): List[Param[Int]] = cc match {
-    case Def(EatReflect(Counterchain_new(ctrs,nIter))) => ctrs.map{
-      case Def(EatReflect(Counter_new(_,_,_,par))) => par
-    }
-  }
-
-  def offsets(cc: Rep[CounterChain]) = cc match {
-    case Def(EatReflect(Counterchain_new(ctrs,nIter))) => ctrs.map{
-      case Def(EatReflect(Counter_new(start,_,_,par))) => start
-    }
-  }
-
-  def isUnitCounterChain(e: Exp[Any]): Boolean = e match {
-    case Def(EatReflect(Counterchain_new(ctrs,_))) if ctrs.length == 1 => isUnitCounter(ctrs(0))
-    case _ => false
-  }
-
-  def isUnitCounter(e: Exp[Any]): Boolean = e match {
-    case Def(EatReflect(Counter_new(ConstFix(0),ConstFix(1),ConstFix(1),_))) => true
-    case _ => false
-  }
-
-  // TODO: Default number of iterations if bound can't be computed?
-  def nIters(x: Rep[CounterChain]): Long = x match {
-    case Def(EatReflect(Counterchain_new(_,nIters))) => Math.ceil( bound(nIters.res).getOrElse(1.0) ).toLong
-    case _ => 1L
-  }
-}
-
-
 
 object ReductionTreeAnalysis {
   /*
@@ -190,6 +153,4 @@ object ReductionTreeAnalysis {
     }
     treeLevel(nLeaves, 0)
   }
-
-
 }

@@ -178,7 +178,7 @@ trait AreaModel {
    * Accumulator calculation+update is often generated as a special case to minimize latencies in tight cycles
    **/
   private def areaOfNodeInReduce(s: Exp[Any], d: Def[Any]): FPGAResources = d match {
-    case DHDLPrim_Add_flt(_,_) =>
+    case Add_flt(_,_) =>
       FPGAResources(lut3=397,lut4=29,lut5=125,lut6=34,lut7=5,regs=1606,mem16=50) // More registers
 
     case Reflect(d,_,_) => areaOfNodeInReduce(s,d)
@@ -211,126 +211,126 @@ trait AreaModel {
     case ConstFix(_) => areaOfMemWord(nbits(s))
     case ConstFlt(_) => areaOfMemWord(nbits(s))
 
-    case Reg_new(_) if regType(s) == ArgumentIn  => areaOfArg(nbits(s))
-    case Reg_new(_) if regType(s) == ArgumentOut => areaOfArg(nbits(s))
+    case RegNew(_) if regType(s) == ArgumentIn  => areaOfArg(nbits(s))
+    case RegNew(_) if regType(s) == ArgumentOut => areaOfArg(nbits(s))
 
-    case Reg_new(_) if regType(s) == Regular =>
+    case RegNew(_) if regType(s) == Regular =>
       if (isDblBuf(s)) FPGAResources(lut3 = nbits(s), regs = 4*nbits(s)) // TODO: Why 4?
       else             FPGAResources(regs = nbits(s))
 
-    case e@Bram_new(depth, _) =>
+    case e@BramNew(depth, _) =>
       val depBound = bound(depth).getOrElse{stageError("Cannot resolve bound of BRAM size"); 1.0}.toInt
       areaOfBRAM(nbits(e._mT), depBound, banks(s), isDblBuf(s))
 
     // TODO: These are close but still need some refining
-    case e@Bram_load(ram, _) =>
+    case e@BramLoad(ram, _) =>
       val decode = if (isPow2(banks(ram))) 0 else Math.ceil(Math.log(banks(ram))).toInt
       val bits = nbits(e._mT)
       FPGAResources(lut3=decode+bits, regs=decode+bits)
 
-    case e@Bram_store(ram, _, _) =>
+    case e@BramStore(ram, _, _) =>
       val decode = if (isPow2(banks(ram))) 0 else Math.ceil(Math.log(banks(ram))).toInt
       val bits = nbits(e._mT)
       FPGAResources(lut3=decode+bits, regs=decode+bits)
 
     // TODO: Seems high, confirm
-    case _:Counter_new => FPGAResources(lut3=106,regs=67)
-    case _:Counterchain_new => NoArea
+    case _:CounterNew => FPGAResources(lut3=106,regs=67)
+    case _:CounterChainNew => NoArea
 
     // TODO: Have to get numbers for non-32 bit multiplies and divides
-    case DHDLPrim_Neg_fix(_)   => FPGAResources(lut3 = nbits(s), regs = nbits(s))
-    case DHDLPrim_Add_fix(_,_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
-    case DHDLPrim_Sub_fix(_,_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case Neg_fix(_)   => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case Add_fix(_,_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case Sub_fix(_,_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
 
-    case DHDLPrim_Mul_fix(Exact(c),_) => areaOfConstMult(c.toInt, nbits(s)) // HACK
-    case DHDLPrim_Mul_fix(_,Exact(c)) => areaOfConstMult(c.toInt, nbits(s)) // HACK
-    case DHDLPrim_Mul_fix(_,_) =>
+    case Mul_fix(Exact(c),_) => areaOfConstMult(c.toInt, nbits(s)) // HACK
+    case Mul_fix(_,Exact(c)) => areaOfConstMult(c.toInt, nbits(s)) // HACK
+    case Mul_fix(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(dsps = 2)
 
-    case DHDLPrim_Div_fix(Exact(_),_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
-    case DHDLPrim_Div_fix(_,Exact(_)) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
-    case DHDLPrim_Div_fix(_,_) =>
+    case Div_fix(Exact(_),_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case Div_fix(_,Exact(_)) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case Div_fix(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       if (sign(s)) FPGAResources(lut3=1192,lut5=2,regs=2700)
       else         FPGAResources(lut3=1317,lut5=6,regs=2900)
 
-    case DHDLPrim_Mod_fix(Exact(_),_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
-    case DHDLPrim_Mod_fix(_,Exact(_)) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
-    case DHDLPrim_Mod_fix(_,_) =>
+    case Mod_fix(Exact(_),_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case Mod_fix(_,Exact(_)) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case Mod_fix(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       if (sign(s)) FPGAResources(lut3=1192,lut5=2,regs=2700)
       else         FPGAResources(lut3=1317,lut5=6,regs=2900)
 
-    case DHDLPrim_Lt_fix(_,_)  => FPGAResources(lut4=nbits(s), regs=nbits(s))
-    case DHDLPrim_Leq_fix(_,_) => FPGAResources(lut4=nbits(s), regs=nbits(s))
-    case DHDLPrim_Neq_fix(_,_) => FPGAResources(lut4=nbits(s)/2, lut5=nbits(s)/8, regs=nbits(s))
-    case DHDLPrim_Eql_fix(_,_) => FPGAResources(lut4=nbits(s)/2, lut5=nbits(s)/8, regs=nbits(s))
-    case DHDLPrim_And_fix(_,_) => FPGAResources(lut3=nbits(s), regs=nbits(s))
-    case DHDLPrim_Or_fix(_,_)  => FPGAResources(lut3=nbits(s), regs=nbits(s))
+    case Lt_fix(_,_)  => FPGAResources(lut4=nbits(s), regs=nbits(s))
+    case Leq_fix(_,_) => FPGAResources(lut4=nbits(s), regs=nbits(s))
+    case Neq_fix(_,_) => FPGAResources(lut4=nbits(s)/2, lut5=nbits(s)/8, regs=nbits(s))
+    case Eql_fix(_,_) => FPGAResources(lut4=nbits(s)/2, lut5=nbits(s)/8, regs=nbits(s))
+    case And_fix(_,_) => FPGAResources(lut3=nbits(s), regs=nbits(s))
+    case Or_fix(_,_)  => FPGAResources(lut3=nbits(s), regs=nbits(s))
 
-    //case DHDLPrim_Lsh_fix(_,_) => // ??? nbits(s)*nbits(s) ?
-    //case DHDLPrim_Rsh_fix(_,_) => // ???
+    //case Lsh_fix(_,_) => // ??? nbits(s)*nbits(s) ?
+    //case Rsh_fix(_,_) => // ???
 
     // TODO: Floating point for things besides single precision
-    case DHDLPrim_Neg_flt(_) =>
+    case Neg_flt(_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=397,lut4=29,lut5=125,lut6=34,lut7=5,regs=606,mem16=50)
 
-    case DHDLPrim_Add_flt(_,_) =>
+    case Add_flt(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=397,lut4=29,lut5=125,lut6=34,lut7=5,regs=606,mem16=50) // ~372 ALMs, 1 DSP (around 564)
 
-    case DHDLPrim_Sub_flt(_,_) =>
+    case Sub_flt(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=397,lut4=29,lut5=125,lut6=34,lut7=5,regs=606,mem16=50)
 
-    case DHDLPrim_Mul_flt(_,_) =>
+    case Mul_flt(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=152,lut4=10,lut5=21,lut6=2,dsps=1,regs=335,mem16=43) // ~76 ALMs, 1 DSP (around 1967)
 
-    case DHDLPrim_Div_flt(_,_) =>
+    case Div_flt(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=2384,lut4=448,lut5=149,lut6=385,lut7=1,regs=3048,mem32=25,mem16=9)
 
-    case DHDLPrim_Lt_flt(a,_)  =>
+    case Lt_flt(a,_)  =>
       if (nbits(a) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut4=42,lut6=26,regs=33)
 
-    case DHDLPrim_Leq_flt(a,_) =>
+    case Leq_flt(a,_) =>
       if (nbits(a) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut4=42,lut6=26,regs=33)
 
-    case DHDLPrim_Neq_flt(a,_) =>
+    case Neq_flt(a,_) =>
       if (nbits(a) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut4=42,lut6=26,regs=33)
 
-    case DHDLPrim_Eql_flt(a,_) =>
+    case Eql_flt(a,_) =>
       if (nbits(a) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut4=42,lut6=26,regs=33)
 
 
-    case DHDLPrim_Not_bit(_)   => FPGAResources(lut3=1,regs=1)
-    case DHDLPrim_And_bit(_,_) => FPGAResources(lut3=1,regs=1)
-    case DHDLPrim_Or_bit(_,_)  => FPGAResources(lut3=1,regs=1)
-    case DHDLPrim_Xor_bit(_,_)  => FPGAResources(lut3=1,regs=1)
-    case DHDLPrim_Xnor_bit(_,_)  => FPGAResources(lut3=1,regs=1)
+    case Not_bit(_)   => FPGAResources(lut3=1,regs=1)
+    case And_bit(_,_) => FPGAResources(lut3=1,regs=1)
+    case Or_bit(_,_)  => FPGAResources(lut3=1,regs=1)
+    case Xor_bit(_,_)  => FPGAResources(lut3=1,regs=1)
+    case Xnor_bit(_,_)  => FPGAResources(lut3=1,regs=1)
 
-    case DHDLPrim_Abs_fix(_) => FPGAResources(lut3=nbits(s),regs=nbits(s))
-    case DHDLPrim_Abs_flt(_) => FPGAResources(regs=nbits(s)-1)
-    case DHDLPrim_Log_flt(_) =>
+    case Abs_fix(_) => FPGAResources(lut3=nbits(s),regs=nbits(s))
+    case Abs_flt(_) => FPGAResources(regs=nbits(s)-1)
+    case Log_flt(_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=472,lut4=47,lut5=74,lut6=26,lut7=3,mem16=42,regs=950,dsps=7,bram=3)
 
-    case DHDLPrim_Exp_flt(_) =>
+    case Exp_flt(_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=368,lut4=102,lut5=137,lut6=38,mem16=24,regs=670,dsps=5,bram=2)
 
-    case DHDLPrim_Sqrt_flt(_) =>
+    case Sqrt_flt(_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=476,lut4=6,lut5=6,mem32=11,regs=900)
 
-    case BasicCtrl1_Mux(_,_,_) => FPGAResources(regs = nbits(s))
+    case Mux2(_,_,_) => FPGAResources(regs = nbits(s))
 
     case Convert_fixpt(_) => FPGAResources(regs=nbits(s))
     //case Convert_fltpt(_) => // ???
@@ -373,12 +373,12 @@ trait AreaModel {
     case _:Pipe_parallel => FPGAResources(lut4=9*nStages(s)/2, regs = nStages(s) + 3)
 
     case e:Pipe_foreach if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.cchain)
-    case e:Pipe_reduce[_,_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.cchain)
-    case e:Block_reduce[_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.ccOuter)
+    case e:Pipe_fold[_,_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.cchain)
+    case e:Accum_fold[_,_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.ccOuter)
 
     case _:Pipe_foreach if styleOf(s) == Disabled => areaOfSequential(nStages(s))
-    case _:Pipe_reduce[_,_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
-    case _:Block_reduce[_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
+    case _:Pipe_fold[_,_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
+    case _:Accum_fold[_,_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
     case _:Unit_pipe if styleOf(s) == Disabled => areaOfSequential(nStages(s))
 
     // Nodes with known zero area cost
@@ -387,7 +387,7 @@ trait AreaModel {
     case Reg_reset(_)   => NoArea
     case Offchip_new(_) => NoArea
     case _:Pipe_foreach if styleOf(s) == Fine => NoArea
-    case _:Pipe_reduce[_,_] if styleOf(s) == Fine => NoArea
+    case _:Pipe_fold[_,_] if styleOf(s) == Fine => NoArea
     case _:Unit_pipe if styleOf(s) == Fine => NoArea
 
     // Effects

@@ -34,7 +34,7 @@ trait DHDLMemories {
     infix (Mem) ("st", (T,C), (C, Idx, T) :: MUnit, effect = write(0))
     infix (Mem) ("flatIdx", (T,C), (C, Indices) :: Idx)
     infix (Mem) ("iterator", (T,C), (C, SList(MInt)) :: CounterChain)
-    infix (Mem) ("zeros", (T,C), varArgs(Idx) :: C, TNum(T))
+    infix (Mem) ("empty", (T,C), C :: C, TNum(T))
   }
 
 
@@ -77,7 +77,7 @@ trait DHDLMemories {
     infix (RegMem) ("st", T, (Reg(T), Idx, T) :: MUnit, effect = write(0)) implements composite ${ writeReg($0, $2) }
     infix (RegMem) ("flatIdx", T, (Reg(T), Indices) :: Idx) implements composite ${ 0.as[Index] }
     infix (RegMem) ("iterator", T, (Reg(T), SList(MInt)) :: CounterChain) implements composite ${ CounterChain(Counter(max=1)) }
-    infix (RegMem) ("zeros", T, varArgs(Idx) :: Reg(T), TNum(T)) implements composite ${ reg_create(None, zero[T], Regular) }
+    infix (RegMem) ("empty", T, Reg(T) :: Reg(T), TNum(T)) implements composite ${ reg_create[T](None, zero[T], Regular) }
 
     // --- API
     /* Reg */
@@ -176,7 +176,6 @@ trait DHDLMemories {
 		//reg_write (extern)
     impl (reg_reset) (codegen(maxj, ${
     }))
-
   }
 
 
@@ -186,14 +185,22 @@ trait DHDLMemories {
     val T = tpePar("T")
     val BRAM    = lookupTpe("BRAM")
     val Tile    = lookupTpe("Tile")
-    val Idx     = lookupAlias("Index")
     val Indices = lookupTpe("Indices")
+    val Idx     = lookupAlias("Index")
 
     // --- Nodes
     val bram_new = internal (BRAM) ("bram_new", T, (("size", Idx), ("zero", T)) :: BRAM(T), effect = mutable)
     val bram_load = internal (BRAM) ("bram_load", T, (("bram", BRAM(T)), ("addr", Idx)) :: T)
     val bram_store = internal (BRAM) ("bram_store", T, (("bram", BRAM(T)), ("addr", Idx), ("value", T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
     val bram_reset = internal (BRAM) ("bram_reset", T, (("bram", BRAM(T)), ("zero", T)) :: MUnit, effect = write(0))
+
+    internal (BRAM) ("bram_to_vector", T, (("bram", BRAM(T)), ("ofs",Idx), ("cchain", CounterChain)) :: Vector(T)) implements figment ${
+      Array.tabulate($len.toInt){i => $bram($ofs.toInt + i) }
+    }
+    internal (BRAM) ("vector_to_bram", T, (("bram", BRAM(T)), ("ofs", Idx), ("vec", Vector(T)), ("par", MInt)) :: MUnit, effect = write(0)) implements figment ${
+      $vec.zipWithIndex.foreach{case (e,i) => $bram($ofs.toInt+i) = e}
+    }
+
 
     // --- Internals
     internal (BRAM) ("bram_create", T, (SOption(SString), SList(Idx)) :: BRAM(T), TNum(T)) implements composite ${
@@ -204,14 +211,6 @@ trait DHDLMemories {
       isDblBuf(bram) = false
       banks(bram) = 1
       bram
-    }
-
-    // TODO: Ask Raghu what the representation in the IR for these should be
-    internal (BRAM) ("bram_load_vector", T, (("bram", BRAM(T)), ("ofs",Idx), ("len",Idx), ("par", MInt)) :: Vector(T)) implements composite ${
-
-    }
-    internal (BRAM) ("bram_store_vector", T, (("bram", BRAM(T)), ("ofs", Idx), ("vec", Vector(T)), ("par", MInt)) :: MUnit, effect = write(0)) implements composite ${
-
     }
 
     /** @nodoc **/
@@ -241,7 +240,7 @@ trait DHDLMemories {
       val ctrs = dims.zip(pars).map{case (d,p) => Counter(min = 0, max = d, step = 1, par = p) }
       CounterChain(ctrs:_*)
     }
-    infix (BramMem) ("zeros", T, varArgs(Idx) :: BRAM(T), TNum(T)) implements composite ${ bram_create(None, $0.toList) }
+    infix (BramMem) ("empty", T, BRAM(T) :: BRAM(T), TNum(T)) implements composite ${ bram_create[T](None, dimsOf($0)) }
 
 
     // --- API
@@ -263,6 +262,18 @@ trait DHDLMemories {
        * @param ii: multi-dimensional address
        **/
       infix ("apply") (varArgs(Idx) :: T) implements composite ${ bram_load_nd($self, $1.toList) }
+
+      infix ("load") (Counter :: Vector(T)) implements composite ${
+        bram_to_vector($self, 0.as[Index], CounterChain($1))
+      }
+
+      infix ("load") ((Idx, Counter) :: Vector(T)) implements composite ${
+        bram_to_vector($self, calcAddress(List($1,0.as[Index]), dimsOf($self)), CounterChain($2))
+      }
+
+      infix ("load") ((Idx, Idx, Counter) :: Vector(T)) implements composite ${
+        bram_to_vector($self, calcAddress(List($1,0.as[Index]), dimsOf($self)), CounterChain($3))
+      }
 
       /* Store */
       /** Creates a write to this BRAM at the given 1D address.
@@ -298,6 +309,7 @@ trait DHDLMemories {
        * @param tile
        **/
       infix (":=") (Tile(T) :: MUnit, effect = write(0)) implements redirect ${ transferTile($1, $self, false) }
+      infix (":=") (Vector(T) :: MUnit, effect = write(0)) implements composite ${ vector_to_bram($self, $0.as[Index], $1, param(1)) }
     }
 
     // --- Scala Backend
@@ -350,7 +362,7 @@ trait DHDLMemories {
     // --- Nodes
     val offchip_new   = internal (OffChip) ("offchip_new", T, ("size", Idx) :: OffChip(T), effect = mutable)
     val offchip_load  = internal (OffChip) ("offchip_load", T, (OffChip(T), Idx, Idx) :: Vector(T))
-    val offchip_store = internal (OffChip) ("offchip_store", T, (OffChip(T), Idx, Vector(T)) :: MUnit, effect = write(0))
+    val offchip_store = internal (OffChip) ("offchip_store", T, (OffChip(T), Idx, Idx, Vector(T)) :: MUnit, effect = write(0))
 
     // --- Internals
     internal (OffChip) ("offchip_create", T, (SOption(SString), SList(Idx)) :: OffChip(T)) implements composite ${
@@ -378,20 +390,24 @@ trait DHDLMemories {
       /** Loads a fixed size tile of this 1D OffChipMem onto an on-chip Vector.
        * @param cols
        **/
-      infix ("load") (Range :: Vector(T)) implements composite ${ offchip_load($self, List(0.as[Index]), $1) }
+      infix ("load") (Range :: Vector(T)) implements composite ${ offchip_load($self, $1.start, $1.len) }
 
       /** Loads a fixed size 1D column tile of this 2D OffChipMem onto an on-chip Vector.
        * @param row
        * @param cols
        **/
-      infix ("load") ((Idx, Range) :: Vector(T)) implements composite ${ offchip_load($self, List($1, 0.as[Index]), $2) }
+      infix ("load") ((Idx, Range) :: Vector(T)) implements composite ${
+        offchip_load($self, calcAddress(List($1, $2.start), dimsOf($self)), $2.len)
+      }
 
       /** Loads a fixed size 1D page tile of this 3D OffChipMem onto an on-chip Vector.
        * @param row
        * @param col
        * @param pages
        **/
-      infix ("load") ((Idx,Idx,Range) :: Vector(T)) implements composite ${ offchip_load($self, List($1, $2, 0.as[Index]), $3) }
+      infix ("load") ((Idx,Idx,Range) :: Vector(T)) implements composite ${
+        offchip_load($self, calcAddress(List($1, $2, $3.start), dimsOf($self)), $3.len)
+      }
 
 
       /** Creates a reference to a 1D Tile of this 1D OffChipMem which can be loaded into on-chip BRAM.

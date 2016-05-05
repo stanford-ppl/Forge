@@ -95,30 +95,21 @@ trait DHDLDSL extends ForgeApplication
     // --- Type parameters
     val Signed = tpe("Signed", stage=compile)
     val Unsign = tpe("Unsign", stage=compile)
-    (0 to 64).foreach{i => tpe("B" + i, stage=compile) } // B0 - B64
+    val B = (0 to 64).map{i => tpe("B" + i, stage=compile) } // B0 - B64
 
     // --- Common Type Aliases
-    // Add more as needed
-    val B0 = lookupTpe("B0", compile)
-    val B5 = lookupTpe("B5", compile)
-    val B8 = lookupTpe("B8", compile)
-    val B11 = lookupTpe("B11", compile)
-    val B24 = lookupTpe("B24", compile)
-    val B32 = lookupTpe("B32", compile)
-    val B53 = lookupTpe("B53", compile)
-
     /** Signed 32 bit integer **/
-    val SInt32 = tpeAlias("SInt", FixPt(Signed, B32, B0))  // Note: This is not a scala Int, this is a signed int!
+    val SInt32 = tpeAlias("SInt", FixPt(Signed, B(32), B(0)))  // Note: This is not a scala Int, this is a signed int!
     /** Signed 32 bit integer (indexing) **/
-    val Index  = tpeAlias("Index", FixPt(Signed, B32, B0))
+    val Index  = tpeAlias("Index", FixPt(Signed, B(32), B(0)))
     /** Unsigned 32 bit integer **/
-    val UInt32 = tpeAlias("UInt", FixPt(Unsign, B32, B0))
+    val UInt32 = tpeAlias("UInt", FixPt(Unsign, B(32), B(0)))
     /** IEEE-754 half precision **/
-    val Half   = tpeAlias("Half", FltPt(B11, B5))
+    val Half   = tpeAlias("Half", FltPt(B(11), B(5)))
     /** IEEE-754 single precision **/
-    val Flt    = tpeAlias("Flt",  FltPt(B24, B8))
+    val Flt    = tpeAlias("Flt",  FltPt(B(24), B(8)))
     /** IEEE-754 double precision **/
-    val Dbl    = tpeAlias("Dbl",  FltPt(B53, B11))
+    val Dbl    = tpeAlias("Dbl",  FltPt(B(53), B(11)))
 
     // --- Memory Types
     /**
@@ -237,6 +228,7 @@ trait DHDLDSL extends ForgeApplication
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))
+    extern(grp("CounterExtern"), targets = List($cala, dot))
     extern(grp("MemoryTemplate"), targets = List($cala, dot, maxj), withTypes = true)
     extern(metadata("TypeInspection"), targets = List(maxj))
 		()

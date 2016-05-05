@@ -24,9 +24,7 @@ trait DHDLVectors {
     static (Vector) ("apply", T, varArgs(T) :: Vector(T)) implements composite ${
       val elems = $0.toList
       if (elems.length < 1) stageError("Cannot create empty Vector")
-      val vec = transparentVector(elems)
-      lenOf(vec) = elems.length
-      vec
+      transparentVector(elems)
     }
 
     /** Creates a subvector of this vector with elements [start, end)

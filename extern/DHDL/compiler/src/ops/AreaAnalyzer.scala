@@ -1,7 +1,6 @@
 package dhdl.compiler.ops
 
 import scala.reflect.{Manifest,SourceContext}
-import scala.virtualization.lms.internal.Traversal
 
 import dhdl.shared._
 import dhdl.shared.ops._
@@ -34,15 +33,29 @@ trait AreaAnalyzer extends ModelingTools {
   import IR._
   import ReductionTreeAnalysis._
 
-  //override val debugMode = true
 
-  override def silenceTraversal() {
-    super.silenceTraversal()
+  override def silence() {
+    super.silence()
+    IR.silenceLatencyModel()
     IR.silenceAreaModel()
   }
 
   var totalArea = FPGAResourceSummary()
   var areaScope: List[FPGAResources] = Nil
+  var savedArea: FPGAResources = NoArea
+
+  override def save(b: Block[Any]) {
+    super.save(b)
+    savedArea = areaScope.fold(NoArea){_+_}
+  }
+
+  override def resume() {
+    areaScope ::= savedArea
+    inHwScope = true
+    areaScope ::= areaOfBlock(savedBlock.get, false, 1)
+    inHwScope = false
+  }
+
 
   def areaOf(e: Exp[Any]) = IR.areaOf(e, inReduce, inHwScope)
 
@@ -75,32 +88,6 @@ trait AreaAnalyzer extends ModelingTools {
     areaOfBlock(b, true, par, oos)
   }
 
-
-  var savedScope: Option[List[Stm]] = None
-  var savedBlock: Option[Block[Any]] = None
-  var savedArea: FPGAResources = NoArea
-
-  def save(b: Block[Any]) {
-    savedArea = areaScope.fold(NoArea){_+_}
-    savedBlock = Some(b)
-    savedScope = Some(innerScope)
-  }
-
-  def resume() {
-    preprocess(savedBlock.get)
-    innerScope = savedScope.get
-    areaScope ::= savedArea
-    inHwScope = true
-    areaScope ::= areaOfBlock(savedBlock.get, false, 1)
-    inHwScope = false
-    postprocess(savedBlock.get)
-  }
-
-  override def run[A:Manifest](b: Block[A]): Block[A] = {
-    if (savedBlock.isDefined) { resume(); b }
-    else super.run(b)
-  }
-
   // TODO: loop index delay line in Metapipeline
   def traverseNode(lhs: Exp[Any], rhs: Def[Any]) {
     val area = rhs match {
@@ -129,7 +116,7 @@ trait AreaAnalyzer extends ModelingTools {
         debug(s"  body: $body")
         body + areaOf(lhs)
 
-      case EatReflect(e@Pipe_reduce(cchain,_,iFunc,ld,st,func,rFunc,_,idx,_,_,_)) =>
+      case EatReflect(e@Pipe_fold(cchain,_,_,iFunc,ld,st,func,rFunc,_,idx,_,_,_)) =>
         val P = parOf(cchain).reduce(_*_)
         val isInner = styleOf(lhs) == Fine
 
@@ -160,7 +147,7 @@ trait AreaAnalyzer extends ModelingTools {
 
         body + internal + internalDelays + icalc + load + cycle + store + areaOf(lhs)
 
-      case EatReflect(e@Block_reduce(ccOuter,ccInner,_,iFunc,func,ld1,ld2,rFunc,st,_,_,idx,_,_,_,_)) =>
+      case EatReflect(e@Accum_fold(ccOuter,ccInner,_,_,iFunc,func,ld1,ld2,rFunc,st,_,_,idx,_,_,_,_)) =>
         val Pm = parOf(ccOuter).reduce(_*_) // Parallelization factor for map
         val Pr = parOf(ccInner).reduce(_*_) // Parallelization factor for reduce
 

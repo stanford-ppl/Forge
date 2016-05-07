@@ -137,6 +137,12 @@ trait DHDLDSL extends ForgeApplication
      * in hardware is always flat. The contents of BRAMs are currently persistent across loop iterations, even when they are declared in an inner scope.
      * BRAMs can have an arbitrary number of readers but only one writer. This writer may be an element-based store or a load from an OffChipMem.
      **/
+    val SparseTile = tpe("SparseTile", T)
+    /**
+     * BRAMs are on-chip scratchpads with fixed size. BRAMs can be specified as multi-dimensional, but the underlying addressing
+     * in hardware is always flat. The contents of BRAMs are currently persistent across loop iterations, even when they are declared in an inner scope.
+     * BRAMs can have an arbitrary number of readers but only one writer. This writer may be an element-based store or a load from an OffChipMem.
+     **/
     val BRAM = tpe("BRAM", T)
     /**
      * Caches are on-chip caches for a specific off-chip memory/data structure. Caches allow loading 
@@ -228,7 +234,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(ControlSignalAnalyzer)
     schedule(ParSetter)
 
-    schedule(IRPrinterPlus)
+    //schedule(IRPrinterPlus)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))

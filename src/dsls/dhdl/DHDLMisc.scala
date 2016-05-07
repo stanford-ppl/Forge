@@ -115,6 +115,11 @@ trait DHDLMisc {
     static (Arr) ("tabulate", T, CurriedMethodSignature(List(List(Idx),List(Idx ==> T)), MArray(T))) implements composite ${
       array_fromfunction(fix_to_int($0), {i: Rep[Int] => $1(int_to_fix[Signed,B32](i)) })
     }
+    /** Creates an array directly with apply function 
+     **/
+    static (Arr) ("apply", T, varArgs(T) :: MArray(T)) implements composite ${
+      array_fromseq( $0 )
+    }
 
 
     val API = grp("ForgeArrayAPI") // ForgeArrayOps already exists...
@@ -229,6 +234,7 @@ trait DHDLMisc {
   def importDHDLTestingOps() {
     importArrayAPI()
     importRandomOps()
+    importIOOps()
 
     val Tst = grp("Nosynth")
 
@@ -240,10 +246,13 @@ trait DHDLMisc {
     val LoopRange = lookupTpe("LoopRange")
     val OffChip   = lookupTpe("OffChipMem")
     val Reg       = lookupTpe("Reg")
+    val BRAM        = lookupTpe("BRAM")
 
     // --- Nodes
     val set_mem = internal (Tst) ("set_mem", T, (OffChip(T), MArray(T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
     val get_mem = internal (Tst) ("get_mem", T, (OffChip(T), MArray(T)) :: MUnit, effect = write(1), aliasHint = aliases(Nil))
+    val set_bram = internal (Tst) ("set_bram", T, (BRAM(T), MArray(T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
+    val get_bram = internal (Tst) ("get_bram", T, (BRAM(T), MArray(T)) :: MUnit, effect = write(1), aliasHint = aliases(Nil))
     val set_arg = internal (Tst) ("set_arg", T, (Reg(T), T) :: MUnit, effect = write(0))
     val get_arg = internal (Tst) ("get_arg", T, Reg(T) :: T, effect = simple)
     val hwblock = internal (Tst) ("hwblock", Nil, MThunk(MUnit) :: MUnit, effect = simple)
@@ -254,6 +263,7 @@ trait DHDLMisc {
     val forLoop = internal (Tst) ("forloop", Nil, (("start", Idx), ("end", Idx), ("step", Idx), ("func", Idx ==> MUnit)) :: MUnit)
 
     // --- API
+    val print = direct (Tst) ("print", Nil, MAny :: MUnit, effect = simple)
     val println  = direct (Tst) ("println", Nil, MAny :: MUnit, effect = simple)
     val println2 = direct (Tst) ("println", Nil, Nil :: MUnit, effect = simple)
     val assert   = direct (Tst) ("assert", Nil, Bit :: MUnit, effect = simple)
@@ -267,6 +277,13 @@ trait DHDLMisc {
     direct (Tst) ("getMem", T, OffChip(T) :: MArray(T)) implements composite ${
       val arr = Array.empty[T](sizeOf($0))
       get_mem($0, arr)
+      arr // could call unsafeImmutable here if desired
+    }
+    // --- Debuging purpose only
+    direct (Tst) ("setBram", T, (BRAM(T), MArray(T)) :: MUnit, effect = write(0)) implements composite ${ set_bram($0, $1) }
+    direct (Tst) ("getBram", T, BRAM(T) :: MArray(T)) implements composite ${
+      val arr = Array.empty[T](sizeOf($0))
+      get_bram($0, arr)
       arr // could call unsafeImmutable here if desired
     }
     direct (Tst) ("setArg", T, (Reg(T), T) :: MUnit, effect = write(0)) implements composite ${
@@ -289,6 +306,7 @@ trait DHDLMisc {
 
 
     // --- Scala Backend
+    impl (print)  (codegen($cala, ${ print($0) }))
     impl (println)  (codegen($cala, ${ println($0) }))
     impl (println2) (codegen($cala, ${ println() }))
     impl (assert)   (codegen($cala, ${ assert($0) }))
@@ -315,6 +333,8 @@ trait DHDLMisc {
 
     impl (set_mem)  (codegen($cala, ${ System.arraycopy($1, 0, $0, 0, $1.length) }))
     impl (get_mem)  (codegen($cala, ${ System.arraycopy($0, 0, $1, 0, $0.length) }))
+    impl (set_bram) (codegen($cala, ${ System.arraycopy($1, 0, $0, 0, $1.length) }))
+    impl (get_bram) (codegen($cala, ${ System.arraycopy($0, 0, $1, 0, $0.length) }))
     impl (set_arg)  (codegen($cala, ${ $0.update(0, $1) }))
     impl (get_arg)  (codegen($cala, ${ $0.apply(0) }))
     impl (hwblock)  (codegen($cala, ${
@@ -356,5 +376,117 @@ trait DHDLMisc {
     // --- Rewrites
     rewrite (ifThenElse) using forwarding ${ delite_ifThenElse($0, $1, $2, false, true) }
     rewrite (whileDo) using forwarding ${ delite_while($0, $1) }
+  }
+
+  def importIOOps() {
+    val IO = grp("GraphIO")
+    val T = tpePar("T")
+    val OffChip   = lookupTpe("OffChipMem")
+    val Idx = lookupAlias("Index")
+    val SArray = tpe("scala.Array", T)
+
+    direct (IO) ("loadDirEdgeList", Nil, (MString, MInt, SBoolean) :: MArray(MArray(MInt)), effect = simple) implements composite ${
+      load_dir_edge_list($0, Some($1), Some($2))
+    }
+
+    direct (IO) ("loadDirEdgeList", Nil, (MString,SBoolean) :: MArray(MArray(MInt)), effect = simple) implements composite ${
+      load_dir_edge_list($0, None, Some($1))
+    }
+
+    direct (IO) ("loadDirEdgeList", Nil, (MString, MInt) :: MArray(MArray(MInt)), effect = simple) implements composite ${
+      load_dir_edge_list($0, Some($1), None)
+    }
+
+    direct (IO) ("loadDirEdgeList", Nil, (MString) :: MArray(MArray(MInt)), effect = simple) implements composite ${
+      load_dir_edge_list($0, None, None)
+    }
+
+    direct (IO) ("load_dir_edge_list", Nil, (MString, SOption(MInt), SOption(SBoolean)) :: MArray(MArray(MInt)), effect = simple) implements codegen ($cala, ${
+      val path = $0
+      @ val qnumVert = $1.getOrElse(-1)
+      @ val qdot = $2.getOrElse(false)
+      val numVert = $qnumVert
+      val dot = $qdot
+
+      import scala.collection.mutable.{HashMap, ListBuffer}
+      import scala.io.Source
+      val map = new HashMap[Int, ListBuffer[Int]]
+      val edgeStr =  if (dot) "->" else " "
+      def parseLine(line:String):Unit = {
+        val fields = line.split(edgeStr)
+        val s = fields(0).toInt
+        val d = fields(1).toInt
+        if (s<0 || d<0)
+          return
+        if (!map.contains(d))
+          map += (d -> ListBuffer(s))
+        else
+          map.get(d).get += s
+      }
+      for (line <- Source.fromFile(path).getLines()) {
+        if (dot) {
+          if (!line.contains("digraph {") && !line.contains("}"))
+            parseLine(line)
+        } else {
+          parseLine(line)
+        }
+      }
+      val vertices = 
+        if (numVert>0) {
+          Array.tabulate(numVert)(i => i)
+        } else {
+          val temp = (map.values.flatMap(i=>i).toSet ++ map.keys.toSet).toArray 
+          scala.util.Sorting.quickSort(temp)
+          temp
+        }
+
+      // Flat array of Array[vertex, pointer, number of incoming edge]
+      val vertList = 
+        if (numVert>0)
+          vertices.flatMap(n => List(-1, map.get(n).getOrElse(Nil).size)) 
+        else
+          vertices.flatMap(n => List(n, -1, map.get(n).getOrElse(Nil).size)) 
+      // Update pointer
+      if (numVert>0)
+        (0 until vertices.size).fold(0) {case (p, i) => val size = vertList(2*i+1); vertList(2*i+0) = if (size==0) -1 else p; p+size}
+      else
+        (0 until vertices.size).fold(0) {case (p, i) => val size = vertList(3*i+2); vertList(3*i+1) = if (size==0) -1 else p; p+size}
+      // Flat edge list
+      val edgeList = vertices.flatMap(n => map.get(n).getOrElse(Nil))
+
+      Array(vertList, edgeList)
+    })
+
+    direct (IO) ("genRandDirEdgeList", Nil, (("path", MString), ("numVert", MInt), ("numEdge", MInt), ("dot", SBoolean)) :: MUnit, effect = simple) implements codegen ($cala, ${
+      import java.io.File
+      import java.io.PrintWriter
+      def randInt(max:Int) = scala.util.Random.nextInt( max )
+      val edgeStr =  if ($dot) "->" else " "
+      def printEdge(pw:PrintWriter) = {
+        val src = randInt( $numVert )
+        var dst = 0 
+        while ( src==dst ) {
+          dst = randInt( $numVert )
+        }
+        pw.println(src + edgeStr + dst)
+      }
+      val numLine = if ($dot) ($numEdge + 2) else $numEdge
+
+      val pw = new PrintWriter(new File($path))
+      for (i <- 0 until numLine) {
+        if ($dot) {
+          if (i==0)
+            pw.println("digraph {")
+          else if (i==(numLine - 1))
+            pw.println("}")
+          else
+            printEdge(pw)
+        } else {
+          printEdge(pw)
+        }
+      }
+      pw.close()
+    })
+
   }
 }

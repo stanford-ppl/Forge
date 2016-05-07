@@ -170,12 +170,12 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
     val mT = manifest[T]
   }
 
-  case class TileAddrTransfer[T:Manifest](
+  case class GatherScatterTransfer[T:Manifest](
     mem:      Rep[OffChipMem[T]],                // Offchip memory array
     local:    Rep[BRAM[T]],                      // Local memory (BRAM)
     addrs:    Rep[BRAM[FixPt[Signed,B32,B0]]], // Addresses for gather or scatter 
-    size:     Rep[FixPt[Signed, B32, B0]],    // Size of addresses
-    gather:   Boolean                            // Is this a gather or scatter operation 
+    numAddrs:     Rep[FixPt[Signed, B32, B0]],    // Size of addresses
+    scatter:   Boolean                            // Is this a scatter or gather operation 
   )(implicit ctx: SourceContext) extends Def[Unit] {
     val mT = manifest[T]
   }
@@ -188,9 +188,9 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
     else       reflectWrite(local)(TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters,store))
   }
 
-  def tile_addr_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], addrs: Rep[BRAM[FixPt[Signed,B32,B0]]], size: Rep[FixPt[Signed,B32,B0]], gather: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
-    if (gather) reflectWrite(local)(TileAddrTransfer(mem,local,addrs,size,gather))
-    else        reflectWrite(mem)(TileAddrTransfer(mem,local,addrs,size,gather))
+  def gather_scatter_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], addrs: Rep[BRAM[FixPt[Signed,B32,B0]]], numAddrs: Rep[FixPt[Signed,B32,B0]], scatter: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
+    if (scatter) reflectWrite(mem)(GatherScatterTransfer(mem,local,addrs,numAddrs,scatter))
+    else         reflectWrite(local)(GatherScatterTransfer(mem,local,addrs,numAddrs,scatter))
   }
 
 
@@ -209,15 +209,15 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
   override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = e match {
     case e@TileTransfer(m,l,s,o,t,c,i,st) => reflectPure(TileTransfer(f(m),f(l),f(s),f(o),t,f(c),i,st)(e.mT,pos))(mtype(manifest[A]), pos)
     case Reflect(e@TileTransfer(m,l,s,o,t,c,i,st), u, es) => reflectMirrored(Reflect(TileTransfer(f(m),f(l),f(s),f(o),t,f(c),i,st)(e.mT,pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
-    case e@TileAddrTransfer(m,l,a,s,g) => reflectPure(TileAddrTransfer(f(m),f(l),f(a),f(s),g)(e.mT,pos))(mtype(manifest[A]), pos)
-    case Reflect(e@TileAddrTransfer(m,l,a,s,g), u, es) => reflectMirrored(Reflect(TileAddrTransfer(f(m),f(l),f(a),f(s),g)(e.mT,pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case e@GatherScatterTransfer(m,l,a,s,g) => reflectPure(GatherScatterTransfer(f(m),f(l),f(a),f(s),g)(e.mT,pos))(mtype(manifest[A]), pos)
+    case Reflect(e@GatherScatterTransfer(m,l,a,s,g), u, es) => reflectMirrored(Reflect(GatherScatterTransfer(f(m),f(l),f(a),f(s),g)(e.mT,pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e, f)
   }
 
   // --- Dependencies
   override def syms(e: Any): List[Sym[Any]] = e match {
     case e: TileTransfer[_] => syms(e.mem) ::: syms(e.local) ::: syms(e.strides) ::: syms(e.tileStrides) ::: syms(e.memOfs) ::: syms(e.cchain)
-    case e: TileAddrTransfer[_] => syms(e.mem) ::: syms(e.local) ::: syms(e.addrs) ::: syms(e.size)
+    case e: GatherScatterTransfer[_] => syms(e.mem) ::: syms(e.local) ::: syms(e.addrs) ::: syms(e.numAddrs)
     case _ => super.syms(e)
   }
 
@@ -227,7 +227,7 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
   }
   override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {
     case e: TileTransfer[_] => freqNormal(e.mem) ::: freqNormal(e.local) ::: freqNormal(e.strides) ::: freqNormal(e.tileStrides) ::: freqNormal(e.memOfs) ::: freqNormal(e.cchain)
-    case e: TileAddrTransfer[_] => freqNormal(e.mem) ::: freqNormal(e.local) ::: freqNormal(e.addrs) ::: freqNormal(e.size)
+    case e: GatherScatterTransfer[_] => freqNormal(e.mem) ::: freqNormal(e.local) ::: freqNormal(e.addrs) ::: freqNormal(e.numAddrs)
 
     case _ => super.symsFreq(e)
   }
@@ -239,7 +239,7 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
   // --- Aliasing
   override def aliasSyms(e: Any): List[Sym[Any]] = e match {
     case e: TileTransfer[_] => Nil
-    case e: TileAddrTransfer[_] => Nil
+    case e: GatherScatterTransfer[_] => Nil
     case _ => super.aliasSyms(e)
   }
 
@@ -294,14 +294,14 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTe
           stream.println(quote(local) + "(localaddr.toInt) = " + quote(mem) + "(offaddr.toInt)")
       }
 
-    case TileAddrTransfer(mem,local,addrs,size,gather) =>
-      if (gather) {
-        stream.println(s"""(0 until ${quote(size)}).foreach { i =>""")
-        stream.println(s"""${quote(local)}(i) = ${quote(mem)}(${quote(addrs)}(i))""")
+    case GatherScatterTransfer(mem,local,addrs,numAddrs,scatter) =>
+      if (scatter) {
+        stream.println(s"""(0 until ${quote(numAddrs)}.toInt).foreach { i =>""")
+        stream.println(s"""${quote(mem)}(${quote(addrs)}(i).toInt) = ${quote(local)}(i)""")
         stream.println(s"""}""")
       } else {
-        stream.println(s"""(0 until ${quote(size)}).foreach { i =>""")
-        stream.println(s"""${quote(mem)}(${quote(addrs)}(i)) = ${quote(local)}(i)""")
+        stream.println(s"""(0 until ${quote(numAddrs)}.toInt).foreach { i =>""")
+        stream.println(s"""${quote(local)}(i) = ${quote(mem)}(${quote(addrs)}(i).toInt)""")
         stream.println(s"""}""")
       }
 

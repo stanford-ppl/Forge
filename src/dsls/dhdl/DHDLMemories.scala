@@ -19,6 +19,7 @@ trait DHDLMemories {
     importCache()
     importOffChip()
     importTiles()
+    importSparseTiles()
   }
 
   // Type class for local memories which can be used as accumulators in reductions
@@ -181,10 +182,11 @@ trait DHDLMemories {
   // TODO: Should we support a BRAM reset API? How to time this properly? Should this be a composite which creates a Pipe?
   def importBRAM() {
     val T = tpePar("T")
-    val BRAM    = lookupTpe("BRAM")
-    val Tile    = lookupTpe("Tile")
-    val Idx     = lookupAlias("Index")
-    val Indices = lookupTpe("Indices")
+    val BRAM        = lookupTpe("BRAM")
+    val Tile        = lookupTpe("Tile")
+    val SparseTile  = lookupTpe("SparseTile")
+    val Idx         = lookupAlias("Index")
+    val Indices     = lookupTpe("Indices")
 
     // --- Nodes
     val bram_new = internal (BRAM) ("bram_new", T, (("size", Idx), ("zero", T)) :: BRAM(T), effect = mutable)
@@ -281,6 +283,8 @@ trait DHDLMemories {
        * @param tile
        **/
       infix (":=") (Tile(T) :: MUnit, effect = write(0)) implements redirect ${ transferTile($1, $self, false) }
+
+      infix (":=") (SparseTile(T) :: MUnit, effect = write(0)) implements redirect ${ gatherScatter($1, $self, false) }
     }
 
     // --- Scala Backend
@@ -459,11 +463,12 @@ trait DHDLMemories {
   def importOffChip() {
     val T = tpePar("T")
 
-    val OffChip = lookupTpe("OffChipMem")
-    val Tile    = lookupTpe("Tile")
-    val BRAM    = lookupTpe("BRAM")
-    val Range   = lookupTpe("Range")
-    val Idx     = lookupAlias("Index")
+    val OffChip     = lookupTpe("OffChipMem")
+    val Tile        = lookupTpe("Tile")
+    val SparseTile  = lookupTpe("SparseTile")
+    val BRAM        = lookupTpe("BRAM")
+    val Range       = lookupTpe("Range")
+    val Idx         = lookupAlias("Index")
 
     // --- Nodes
     val offchip_new = internal (OffChip) ("offchip_new", T, ("size", Idx) :: OffChip(T), effect = mutable)
@@ -579,6 +584,9 @@ trait DHDLMemories {
        * @param page
        **/
       infix ("apply") ((Range, Idx, Idx) :: Tile(T)) implements composite ${ tile_create($self, List($1, unitRange($2), unitRange($3))) }
+
+      infix ("apply") ((BRAM(Idx), Idx) :: SparseTile(T)) implements composite ${ stile_create($self, $1, $2) }
+      infix ("apply") (BRAM(Idx) :: SparseTile(T)) implements composite ${ stile_create($self, $1, sizeOf($1)) }
     }
 
     // --- Scala Backend
@@ -657,14 +665,39 @@ trait DHDLMemories {
       tile_transfer(mem, $local, nonUnitStrides, ofs, tileStrides, chain, $store)
     }
 
-    direct (Tile) ("gather", T, (("tile",Tile(T)), ("local",BRAM(T)), ("addrs", BRAM(Idx)), ("size", Idx)) :: MUnit, effect = simple) implements composite ${
-      val mem      = $tile.mem
-      tile_addr_transfer (mem, $local, $addrs, $size, true)
-    }
+	}
 
-    direct (Tile) ("scatter", T, (("tile",Tile(T)), ("local",BRAM(T)), ("addrs", BRAM(Idx)), ("size", Idx)) :: MUnit, effect = simple) implements composite ${
+  def importSparseTiles() {
+    val T = tpePar("T")
+
+    val SparseTile    = lookupTpe("SparseTile")
+    val OffChip = lookupTpe("OffChipMem")
+    val BRAM    = lookupTpe("BRAM")
+    val Idx = lookupAlias("Index")
+
+    // TODO: How to avoid CSE? Doesn't matter except that same symbol may be returned
+    // and need different symbols to manage offset staging metadata properly
+    data(SparseTile, ("_target", OffChip(T)), ("_addrBram", BRAM(Idx)), ("_numAddrs", Idx))
+    internal (SparseTile) ("stile_new", T, (OffChip(T), BRAM(Idx), Idx) :: SparseTile(T)) implements allocates(SparseTile, ${$0}, ${$1}, ${$2})
+    internal (SparseTile) ("stile_create", T, (OffChip(T), BRAM(Idx), Idx) :: SparseTile(T)) implements composite ${
+      if (dimsOf($1).length!=1) stageError("Must provide flatten addresses for scatter and gather. Dimensions of address BRAM is " + dimsOf($1))
+      val stile = stile_new($0, $1, $2)
+      stile
+    }
+    internal.infix (SparseTile) ("mem", T, SparseTile(T) :: OffChip(T)) implements getter(0, "_target")
+    internal.infix (SparseTile) ("addr", T, SparseTile(T) :: BRAM(Idx)) implements getter(0, "_addrBram")
+    internal.infix (SparseTile) ("numAddrs", T, SparseTile(T) :: Idx) implements getter(0, "_numAddrs")
+
+    /** Creates a store from the given on-chip BRAM to this SparseTile of off-chip memory
+     * @param bram
+     **/
+    infix (SparseTile) (":=", T, (SparseTile(T), BRAM(T)) :: MUnit, effect = write(0)) implements redirect ${ gatherScatter($0, $1, true) }
+
+    direct (SparseTile) ("gatherScatter", T, (("tile",SparseTile(T)), ("local",BRAM(T)), ("scatter", SBoolean)) :: MUnit, effect = simple) implements composite ${
       val mem      = $tile.mem
-      tile_addr_transfer (mem, $local, $addrs, $size, false)
+      val addrs    = $tile.addr
+      val numAddrs  = $tile.numAddrs
+      gather_scatter_transfer (mem, $local, addrs, numAddrs, $scatter)
     }
 
 	}

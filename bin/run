@@ -24,7 +24,7 @@ fi
 if [[ $1 == *"r"* ]]; then
 	echo "--------run dhdl app------------"
   cd $HYPER_HOME/published/DHDL	
-  bin/delite ${2}Compiler.deg
+  bin/delite ${2}Compiler.deg ${@:3}
 fi
 if [[ $1 == *"d"* ]]; then
 	echo "--------generate dhdl dot graph------------"

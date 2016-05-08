@@ -697,8 +697,12 @@ trait BaseGenOps extends ForgeCodeGenBase {
             val curriedArgs = o.curriedArgs.map(a => makeArgsWithNowType(a)).mkString("")
             val otherTpePars = o.tpePars.filterNot(p => tpePars.map(_.name).contains(p.name))
             val ret = if (Config.fastCompile) ": " + repifySome(o.retTpe) else ""
+
+            val hkTpePars = otherTpePars filter{case Def(HkTpePar(n,t,sigs,s)) => true; case _ => false} //o.tpePars diff otherTpePars
+            if (hkTpePars.nonEmpty) println(opsGrp.grp.name + ", " + o.name + ": " + hkTpePars.mkString(", "))
+
             stream.println("    def " + o.name + makeTpeParsWithBounds(otherTpePars) + otherArgs + curriedArgs
-              + (makeImplicitArgsWithCtxBoundsWithType(o.tpePars diff otherTpePars, o.args, implicitArgsWithOverload(o), without = tpePars)) + ret + " = " + makeOpMethodNameWithFutureArgs(o, a => if (a.name ==  o.args.apply(0).name) "self" else simpleArgName(a)))
+              + (makeImplicitArgsWithCtxBoundsWithType(hkTpePars, o.args, implicitArgsWithOverload(o), without = tpePars)) + ret + " = " + makeOpMethodNameWithFutureArgs(o, a => if (a.name ==  o.args.apply(0).name) "self" else simpleArgName(a)))
           }
           stream.println("  }")
           stream.println()

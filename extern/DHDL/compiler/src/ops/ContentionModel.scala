@@ -26,16 +26,18 @@ trait ContentionModel {
   }
 
   def calcContention(x: Exp[Any]): Int = x match {
-    case Def(EatReflect(_:Pipe_parallel))    => childrenOf(x).map(calcContention).sum
-    case Def(EatReflect(_:Unit_pipe))        => outerContention(x, 1)
-    case Def(EatReflect(e:Pipe_foreach))     => outerContention(x, parOf(e.cchain).reduce{_*_})
-    case Def(EatReflect(e:Pipe_fold[_,_]))   => outerContention(x, parOf(e.cchain).reduce{_*_})
-    case Def(EatReflect(e:Accum_fold[_,_]))  => outerContention(x, parOf(e.ccOuter).reduce{_*_})
-    case Def(EatReflect(_:TileTransfer[_]))  => 1
+    case Def(EatReflect(Hwblock(_)))        => outerContention(x, 1)
+    case Def(EatReflect(_:Pipe_parallel))   => childrenOf(x).map(calcContention).sum
+    case Def(EatReflect(_:Unit_pipe[_]))    => outerContention(x, 1)
+    case Def(EatReflect(e:Pipe_foreach))    => outerContention(x, parOf(e.cchain).reduce{_*_})
+    case Def(EatReflect(e:Pipe_fold[_,_]))  => outerContention(x, parOf(e.cchain).reduce{_*_})
+    case Def(EatReflect(e:Accum_fold[_,_])) => outerContention(x, parOf(e.ccOuter).reduce{_*_})
+    case Def(EatReflect(_:Offchip_load_vector[_]))  => 1
+    case Def(EatReflect(_:Offchip_store_vector[_])) => 1
     case _ => 0
   }
 
-  def markOuterPipe(x: Exp[Any], parent: Int) {
+  def markPipe(x: Exp[Any], parent: Int) {
     if (styleOf(x) == Coarse) childrenOf(x).foreach{child => markContention(child,parent) }
     else if (styleOf(x) == Disabled) {
       val ics = isolatedContention(x)
@@ -46,17 +48,18 @@ trait ContentionModel {
   }
 
   def markContention(x: Exp[Any], parent: Int): Unit = x match {
-    case Def(EatReflect(_:Pipe_parallel))    => childrenOf(x).foreach{child => markContention(child,parent)}
-    case Def(EatReflect(_:Unit_pipe))        => markOuterPipe(x, parent)
-    case Def(EatReflect(_:Pipe_foreach))     => markOuterPipe(x, parent)
-    case Def(EatReflect(_:Pipe_fold[_,_]))   => markOuterPipe(x, parent)
-    case Def(EatReflect(_:Accum_fold[_,_]))  => markOuterPipe(x, parent)
-    case Def(EatReflect(_:TileTransfer[_]))  => contentionOf(x) = parent
+    case Def(EatReflect(Hwblock(_)))        => markPipe(x, parent)
+    case Def(EatReflect(_:Pipe_parallel))   => childrenOf(x).foreach{child => markContention(child,parent)}
+    case Def(EatReflect(_:Unit_pipe[_]))    => markPipe(x, parent)
+    case Def(EatReflect(_:Pipe_foreach))    => markPipe(x, parent)
+    case Def(EatReflect(_:Pipe_fold[_,_]))  => markPipe(x, parent)
+    case Def(EatReflect(_:Accum_fold[_,_])) => markPipe(x, parent)
+    case Def(EatReflect(_:Offchip_load_vector[_])) => contentionOf(x) = parent
+    case Def(EatReflect(_:Offchip_store_vector[_])) => contentionOf(x) = parent
     case _ => // do nothing
   }
 
   def run(top: Exp[Any]) = {
-    if (top eq null) stageError("Contention model was uninitialized when run")
     val c = calcContention(top)
     markContention(top, c)
   }

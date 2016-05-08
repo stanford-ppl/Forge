@@ -10,7 +10,7 @@ import dhdl.compiler.ops._
 
 
 trait ParSetter extends AnalyzerBase {
-  val IR: DHDLExp with CounterToolsExp
+  val IR: DHDLExp
   import IR._
 
   override def hasCompleted = runs > 0
@@ -31,13 +31,13 @@ trait ParSetter extends AnalyzerBase {
       inds.foreach{i => par(i) = P}
       traverseInner(P)(func)
 
-    case EatReflect(Pipe_reduce(cchain,accum,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV)) if styleOf(lhs) == Fine =>
+    case EatReflect(Pipe_fold(cchain,accum,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV)) if styleOf(lhs) == Fine =>
       val P = parOf(cchain).reduce{_*_}
       inds.foreach{i => par(i) = P}
       traverseInner(P)(iFunc)
       traverseInner(P)(func)
 
-    case EatReflect(Block_reduce(ccOuter,ccInner,a,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV)) =>
+    case EatReflect(Accum_fold(ccOuter,ccInner,a,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV)) =>
       val P = parOf(ccInner).reduce{_*_}
       inds2.foreach{i => par(i) = P}
       traverseInner(P)(iFunc)

@@ -57,11 +57,11 @@ trait Kmeans extends DHDLApplication {
         ()
       }
 
-      MetaPipe((numPoints by tileSize) par ignorePar) { i =>
+      Pipe((numPoints by tileSize) par ignorePar) { i =>
         val pointsTile = BRAM[Flt](tileSize, dTileSize)
         pointsTile := points(i::i+tileSize, 0::dTileSize, dstLoopPar)
 
-        MetaPipe((tileSize by 1) par ptLoopPar){ pt =>
+        Pipe((tileSize by 1) par ptLoopPar){ pt =>
           val distances = List.tabulate(MAXK){i => Reg[Flt](0.0f) }
           Parallel {
             oldCent.zip(distances).foreach{ case (cent, dist) =>

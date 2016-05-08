@@ -13,10 +13,7 @@ import scala.collection.mutable.{HashMap,ArrayBuffer}
 trait ParamRestrictions extends Expressions {
   this: DHDLMetadataOpsExp with GenOverloadHack =>
 
-  private def qt(x: Param[_]) = {
-    val name = nameOf(x)
-    if (name == "") s"$x" else name
-  }
+  private def qt(x: Param[_]) = nameOf(x).getOrElse(s"$x")
 
   type RRange = scala.collection.immutable.Range
 
@@ -123,7 +120,7 @@ trait ParameterAnalyzer extends Traversal {
   val IR: DHDLExp with ParameterAnalysisExp
   import IR._
 
-  override val debugMode = false
+  debugMode = false
 
   val MIN_TILE_SIZE  = 96    // words
   val MAX_TILE_SIZE  = 96000 // words
@@ -165,7 +162,7 @@ trait ParameterAnalyzer extends Traversal {
       range(p) = xrange(range(p).start,Math.min(mx,range(p).end),range(p).step)
   }
 
-  def canParallelize(e: Exp[Any]) = true //styleOf(e) != Disabled
+  def canParallelize(e: Exp[Any]) = styleOf(e) == Fine || styleOf(e) == Coarse
 
   override def traverseStm(stm: Stm) = stm match {
     case TP(s, d) =>
@@ -240,21 +237,23 @@ trait ParameterAnalyzer extends Traversal {
       parFactors :::= pars
       if (styleOf(lhs) != Fine) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
-    case EatReflect(e:Pipe_reduce[_,_]) if canParallelize(lhs) =>
+    case EatReflect(e:Pipe_fold[_,_]) if canParallelize(lhs) =>
       val pars = List( parParamsOf(e.cchain).last )
       parFactors :::= pars
       if (styleOf(lhs) != Fine) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
-    case EatReflect(e:Block_reduce[_]) if canParallelize(lhs) =>
+    case EatReflect(e:Accum_fold[_,_]) if canParallelize(lhs) =>
       val opars = List( parParamsOf(e.ccOuter).last )
       val ipars = List( parParamsOf(e.ccInner).last )
       parFactors :::= opars
       parFactors :::= ipars
       opars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
-    case EatReflect(e:TileTransfer[_]) =>
-      val pars = List( parParamsOf(e.cchain).last )
-      parFactors :::= pars
+    case EatReflect(Bram_store_vector(bram,ofs,vec,cchain)) =>
+      parFactors :::= List( parParamsOf(cchain).last )
+
+    case EatReflect(Bram_load_vector(bram,ofs,len,cchain)) => NoArea
+      parFactors :::= List( parParamsOf(cchain).last )
 
     case _ => //
   }

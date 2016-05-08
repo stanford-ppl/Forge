@@ -13,7 +13,8 @@ trait DHDLGlobalAnalysis {
 
   def importGlobalAnalysis() = {
     val GlobalAnalyzer = analyzer("Global")
-    val Prim = lookupGrp("DHDLPrim")
+    val FixPt = lookupTpe("FixPt")
+    val FltPt = lookupTpe("FltPt")
     val Tpes = lookupGrp("Tpes")
     val Ctrl = lookupGrp("BasicCtrl")
     val Lifts = lookupGrp("ConstLifts")
@@ -29,7 +30,7 @@ trait DHDLGlobalAnalysis {
       analyze(Reg, "reg_read") using rule ${ isGlobal(lhs) = regType($0) == ArgumentIn }
 
       // Holy hackery, batman!
-      for (op <- Prim.nodes ++ Tpes.nodes ++ Ctrl.nodes) {
+      for (op <- FixPt.nodes ++ FltPt.nodes ++ Tpes.nodes ++ Ctrl.nodes) {
         analyze(op) using rule { generateRule(op.argNames) }
       }
     }

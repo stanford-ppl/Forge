@@ -12,7 +12,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait CounterExternOpsExp extends CounterOpsExp {
+trait CounterExternOpsExp extends CounterOpsExp with CounterChainOpsExp {
   this: DHDLExp =>
 
   // --- Nodes
@@ -46,14 +46,15 @@ trait CounterExternOpsExp extends CounterOpsExp {
     val pars:   List[Rep[Idx]] = ctrSplit.map(_._4).map(int_to_fix[Signed,B32](_)) // HACK: Convert Int param to fixed point
 
     val nIter: Block[Idx] = reifyEffects {
+      // TODO: These should be more general rewrite rules
       val lens: List[Rep[Idx]] = starts.zip(ends).map{
         case (ConstFix(x: Int),ConstFix(y: Int)) => (y - x).as[Idx]
         case (ConstFix(0), end) => end
-        case (start, end) => sub_fix(end, start)
+        case (start, end) => sub(end, start)
       }
       val total: List[Rep[Idx]] = (lens,steps,pars).zipped.map {
-        case (len, ConstFix(1), par) => div_fix(len, par) // Should round correctly here
-        case (len, step, par) => div_fix(len, mul_fix(step, par))
+        case (len, ConstFix(1), par) => div(len, par) // Should round correctly here
+        case (len, step, par) => div(len, mul(step, par))
       }
       total.reduce{_*_}
     }
@@ -141,8 +142,42 @@ trait ScalaGenCounterExternOps extends ScalaGenEffect {
 }
 
 trait DotGenCounterExternOps extends DotGenEffect{
-  val IR: CounterExternOpsExp
+  val IR: CounterExternOpsExp with DeliteTransform with DHDLCodegenOps
   import IR._
+
+  val emittedCtrChain = Set.empty[Exp[Any]]
+  var traversals: List[Traversal{val IR: DotGenCounterExternOps.this.IR.type}] = Nil
+
+  def runTraversals[A:Manifest](b: Block[A]): Block[A] = {
+    println("DotCodegen: applying transformations")
+    var curBlock = b
+    println("Traversals:\n\t" + traversals.map(_.name).mkString("\n\t"))
+
+    for (t <- traversals) {
+      printlog("  Block before transformation: " + curBlock)
+      curBlock = t.run(curBlock)
+      printlog("  Block after transformation: " + curBlock)
+    }
+    println("DotGodegen: done transforming")
+    (curBlock)
+  }
+
+  override def initializeGenerator(buildDir:String): Unit = {
+    emittedCtrChain.clear
+    traversals = IR.traversals
+    super.initializeGenerator(buildDir)
+  }
+
+  override def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, out: PrintWriter) = {
+    val y = runTraversals(body)
+    super.emitSource(args, y, className, out)
+  }
+
+  def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = {
+    val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
+    inds.zipWithIndex.foreach {case (iter, idx) => emitValDef(iter, counters(idx)) }
+  }
+
 
   def emitCtrChain(cchain: Exp[CounterChain]):Unit = {
     val Def(EatReflect(d)) = cchain

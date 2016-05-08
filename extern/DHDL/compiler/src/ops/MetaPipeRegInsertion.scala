@@ -12,7 +12,7 @@ trait MetaPipeRegInsertion extends MultiPassTransformer with PipeStageTools {
   val IR: DHDLExp with PipeStageToolsExp
   import IR.{assert => _, _}
 
-  override val debugMode = true
+  debugMode = true
 
   // Transform stages to use increasingly delayed versions of inds
   def insertRegisters[A:Manifest](owner: Sym[Any], func: Block[A], inds: List[Sym[Idx]])(implicit ctx: SourceContext) = {
@@ -58,15 +58,15 @@ trait MetaPipeRegInsertion extends MultiPassTransformer with PipeStageTools {
       setProps(newPipe, getProps(lhs))
       Some(newPipe)
 
-    case Reflect(e@Pipe_reduce(cchain,accum,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV), u, es) if styleOf(lhs) == Coarse =>
+    case Reflect(e@Pipe_fold(cchain,accum,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV), u, es) if styleOf(lhs) == Coarse =>
       val newFunc = insertRegisters(lhs, func, inds)(mtype(getBlockResult(func).tp),ctx)
-      val newPipe = reflectMirrored(Reflect(Pipe_reduce(f(cchain),f(accum),f(iFunc),f(ld),f(st),newFunc,f(rFunc),inds,idx,acc,res,rV)(ctx, e.memC, e.mT, e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]),ctx)
+      val newPipe = reflectMirrored(Reflect(Pipe_fold(f(cchain),f(accum),fA,f(iFunc),f(ld),f(st),newFunc,f(rFunc),inds,idx,acc,res,rV)(e.ctx,e.memC,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]),ctx)
       setProps(newPipe, getProps(lhs))
       Some(newPipe)
 
-    case Reflect(e@Block_reduce(c1,c2,a,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV), u, es) if styleOf(lhs) == Coarse =>
+    case Reflect(e@Accum_fold(c1,c2,a,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV), u, es) if styleOf(lhs) == Coarse =>
       val newFunc = insertRegisters(lhs, func, inds1)(mtype(getBlockResult(func).tp),ctx)
-      val newPipe = reflectMirrored(Reflect(Block_reduce(f(c1),f(c2),f(a),f(iFunc),f(func),f(ld1),f(ld2),f(rFunc),f(st),inds1,inds2,idx,part,acc,res,rV)(e.mT,ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), ctx)
+      val newPipe = reflectMirrored(Reflect(Accum_fold(f(c1),f(c2),f(a),fA,f(iFunc),f(func),f(ld1),f(ld2),f(rFunc),f(st),inds1,inds2,idx,part,acc,res,rV)(e.ctx,e.memC,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), ctx)
       setProps(newPipe, getProps(lhs))
       Some(newPipe)
     case _ => None

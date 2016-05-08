@@ -15,36 +15,35 @@ import scala.collection.mutable.Set
 import ppl.delite.framework.DeliteApplication
 
 trait MaxJPreCodegen extends Traversal  {
-	val IR:DHDLExp  
+	val IR:DHDLExp
 	import IR.{infix_until => _, looprange_until => _, println => _, _}
 
 	var buildDir:String = _
 
-  override val debugMode: Boolean = false 
+  debugMode = false
   override val name = "MaxJPreCodegen"
 
 	lazy val maxJManagerGen = new MaxJManagerGen {
-		val IR: MaxJPreCodegen.this.IR.type = MaxJPreCodegen.this.IR 
+		val IR: MaxJPreCodegen.this.IR.type = MaxJPreCodegen.this.IR
 	}
 
   def quote(x: Exp[Any]):String = x match {
-		case s@Sym(n) => s.tp.erasure.getSimpleName().replace("DHDL","") + 
-										(if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
-    case _ => "" 
+		case s@Sym(n) => s.tp.erasure.getSimpleName().replace("DHDL","") + nameOf(s).map(nm=>"_"+nm).getOrElse("") + "_x" + n
+    case _ => ""
   }
 
 
-	val argInOuts = Set.empty[Sym[Register[_]]]
-	val tileTsfs = Set.empty[Sym[Unit]]
+	val argInOuts  = Set.empty[Sym[Register[_]]]
+	val memStreams = Set.empty[Sym[Any]]
 
   override def preprocess[A:Manifest](b: Block[A]): Block[A] = {
 		argInOuts.clear
-		tileTsfs.clear
+		memStreams.clear
 		b
 	}
-  override def postprocess[A:Manifest](b: Block[A]): Block[A] = { 
+  override def postprocess[A:Manifest](b: Block[A]): Block[A] = {
 		withStream(newStream("MaxJManager")) {
-			maxJManagerGen.emitManager(stream, argInOuts, tileTsfs)
+			maxJManagerGen.emitManager(stream, argInOuts, memStreams)
 		}
 		b
 	}
@@ -76,37 +75,40 @@ trait MaxJPreCodegen extends Traversal  {
 	}
 
   def preGenNodes(sym: Sym[Any], rhs: Def[Any]):Unit = rhs match {
-		case e@Pipe_parallel(func: Block[Unit]) => 
+		case e@Pipe_parallel(func: Block[Unit]) =>
 			withStream(newStream("parallel_" + quote(sym))) {
 				emitParallelSM(quote(sym), childrenOf(sym).length)
 			}
     case e@Pipe_foreach(cchain, func, inds) =>
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
-				case Coarse => 
+				case Coarse =>
 					withStream(newStream("metapipe_" + quote(sym))) {
     				emitMPSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
-				case Fine => 
-				case Disabled => 
+				case Fine =>
+				case Disabled =>
 					withStream(newStream("sequential_" + quote(sym))) {
     				emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
 			}
-    case e@Pipe_reduce(cchain, accum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
+    case e@Pipe_fold(cchain, accum, foldAccum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
-				case Coarse => 
+				case Coarse =>
 					withStream(newStream("metapipe_" + quote(sym))) {
     				emitMPSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
-				case Fine => 
-				case Disabled => 
+				case Fine =>
+				case Disabled =>
 					withStream(newStream("sequential_" + quote(sym))) {
     				emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
 			}
 		case e:Reg_new[_] if regType(sym) != Regular => argInOuts += sym.asInstanceOf[Sym[Register[_]]]
-		case e:TileTransfer[_] => tileTsfs += sym.asInstanceOf[Sym[Unit]]
-		case e@EatReflect(Bram_new(size, zero)) =>
+
+    case _:Offchip_store_vector[_] => memStreams += sym
+    case _:Offchip_load_vector[_] => memStreams += sym
+
+    case e@EatReflect(Bram_new(size, zero)) =>
 			withStream(newStream("bram_" + quote(sym))) {
 				emitDblBufSM(quote(sym), readersOf(sym).length)
 			}

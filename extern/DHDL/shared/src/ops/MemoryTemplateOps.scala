@@ -73,11 +73,10 @@ trait MemoryTemplateTypes {
 
 trait MemoryTemplateOps extends MemoryTemplateTypes with Base {
   this: DHDLIdentifiers =>
-
-  def tile_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], strides: List[Rep[FixPt[Signed,B32,B0]]], memOfs: List[Rep[FixPt[Signed,B32,B0]]], tileStrides: List[Rep[FixPt[Signed,B32,B0]]], cchain: Rep[CounterChain], store: Boolean)(implicit ctx: SourceContext): Rep[Unit]
-
 }
 trait MemoryTemplateCompilerOps extends MemoryTemplateOps {
   this: DHDLIdentifiers =>
+
+  def vector_from_list[T:Manifest](elems: List[Rep[T]])(implicit ctx: SourceContext): Rep[Vector[T]]
 }
 

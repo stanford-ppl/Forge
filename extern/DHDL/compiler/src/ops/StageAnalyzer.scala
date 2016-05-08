@@ -19,7 +19,7 @@ trait StageAnalyzer extends Traversal with PipeStageTools {
   val IR: DHDLExp with StageAnalysisExp
   import IR._
 
-  override val debugMode: Boolean = false
+  debugMode = false
   override val name = "Stage Analyzer"
 
   override def traverseStm(stm: Stm) = stm match {
@@ -33,32 +33,36 @@ trait StageAnalyzer extends Traversal with PipeStageTools {
     case Pipe_parallel(func) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func)
-      //list( stages )
+      if (debugMode) list(stages)
       nStages(lhs) = stages.length
 
     // MetaPipes / Sequentials
-    case Unit_pipe(func) if styleOf(lhs) != Fine =>
+    case Unit_pipe(func) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func)
-      //list(stages)
+      if (debugMode) list(stages)
+      if (styleOf(lhs) == Fine && stages.nonEmpty) styleOf(lhs) = Coarse
       nStages(lhs) = stages.length
 
-    case Pipe_foreach(_,func,_) if styleOf(lhs) != Fine =>
+    case Pipe_foreach(_,func,_) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func)
-      //list( stages )
+      if (debugMode) list( stages )
+      if (styleOf(lhs) == Fine && stages.nonEmpty) styleOf(lhs) = Coarse
       nStages(lhs) = stages.length
 
-    case Pipe_reduce(c,a,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) if styleOf(lhs) != Fine =>
+    case Pipe_fold(c,a,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(ld,func,rFunc,st)
-      //list( stages )
+      if (debugMode) list( stages )
+      if (styleOf(lhs) == Fine && stages.nonEmpty) styleOf(lhs) = Coarse
       nStages(lhs) = stages.length + 1  // Account for implicit reduction pipe
 
-    case Block_reduce(c1,c2,a,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
+    case Accum_fold(c1,c2,a,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func,rFunc)
-      //list( stages )
+      if (debugMode) list( stages )
+      if (styleOf(lhs) == Fine) styleOf(lhs) = Coarse
       nStages(lhs) = stages.length + 1  // Account for implicit reduction pipe
 
     // Pipe

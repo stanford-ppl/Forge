@@ -13,7 +13,7 @@ trait LayoutAnalyzer extends Traversal {
   val IR: OptiMAExp
   import IR._
   override val name = "LayoutAnalyzer"
-  override val debugMode = false
+  debugMode = false
 
   private def subtype(view: Boolean, buff: Boolean) = (view, buff) match {
     case (false,false) => Plain

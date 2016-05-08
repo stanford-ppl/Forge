@@ -82,7 +82,7 @@ trait BlackScholes extends DHDLApplication {
     val volatilityRAM = BRAM[Flt](tileSize)
     val otimeRAM      = BRAM[Flt](tileSize)
 
-    MetaPipe((numOptions by tileSize) par outerPar) { i =>
+    Pipe((numOptions by tileSize) par outerPar) { i =>
       Parallel {
         otypeRAM := otype(i::i+tileSize, innerPar)
         sptpriceRAM := sptprice(i::i+tileSize, innerPar)

@@ -99,15 +99,15 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     reflectEffect(Pipe_fold[T,C](cchain, accum, foldAccum, iBlk, ldBlk, stBlk, mBlk, rBlk, is, idx, acc, res, rV), effects.star)
   }
 
-  private def accum_common[T,C[T]](cchain: Rep[CounterChain], cchainRed: Rep[CounterChain], accum: Rep[C[T]], func: Block[C[T]], rFunc: (Rep[T],Rep[T]) => Rep[T], foldAccum: Boolean = true)(implicit ctx: SourceContext, __mem: Mem[T,C], __mT: Manifest[T], __mC: Manifest[C[T]]): Rep[Pipeline] = {
+  private def accum_common[T,C[T]](cchain: Rep[CounterChain], cchainRed: Rep[CounterChain], accum: Rep[C[T]], func: Block[C[T]], isMap: List[Sym[Idx]], rFunc: (Rep[T],Rep[T]) => Rep[T], foldAccum: Boolean = true)(implicit ctx: SourceContext, __mem: Mem[T,C], __mT: Manifest[T], __mC: Manifest[C[T]]): Rep[Pipeline] = {
     val isRed = List.fill(lenOf(cchainRed)){ fresh[Idx] } // Reduce loop indices
     val indsRed = indices_create(isRed)
 
     val idx = fresh[Idx]
-    val iBlk = reifyEffects( __mem.flatIdx(getBlockResult(mBlk), indsRed) )
+    val iBlk = reifyEffects( __mem.flatIdx(getBlockResult(func), indsRed) )
 
     val part = fresh[C[T]]
-    setProps(part, getProps(mBlk))
+    setProps(part, getProps(func))
     // Partial result load
     val ldPartBlk = reifyEffects( __mem.ld(part, idx) )
 
@@ -124,10 +124,10 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     // Accumulator store function
     val stBlk = reifyEffects( __mem.st(acc, idx, res) )
 
-    val effects = summarizeEffects(iBlk) andAlso summarizeEffects(mBlk) andAlso summarizeEffects(ldPartBlk) andAlso
+    val effects = summarizeEffects(iBlk) andAlso summarizeEffects(func) andAlso summarizeEffects(ldPartBlk) andAlso
                   summarizeEffects(ldBlk) andAlso summarizeEffects(rBlk) andAlso summarizeEffects(stBlk) andAlso Write(List(accum.asInstanceOf[Sym[C[T]]]))
 
-    reflectEffect(Accum_fold[T](cchain, cchainRed, accum, foldAccum, iBlk, mBlk, ldPartBlk, ldBlk, rBlk, stBlk, isMap, isRed, idx, part, acc, res, rV), effects.star)
+    reflectEffect(Accum_fold[T,C](cchain, cchainRed, accum, foldAccum, iBlk, func, ldPartBlk, ldBlk, rBlk, stBlk, isMap, isRed, idx, part, acc, res, rV), effects.star)
   }
 
 
@@ -136,28 +136,28 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     val indsMap = indices_create(isMap)
     val mBlk = reifyEffects( func(indsMap) )             // Reified map function
 
-    accum_common(cchain,cchainRed,accum,mBlk,rFunc,foldAccum)
+    accum_common(cchain, cchainRed, accum, mBlk, isMap, rFunc, foldAccum)
   }
 
-  def accum_reduce[T,C[T]](cchain: Rep[CounterChain], cchainRed: Rep[CounterChain], func: Rep[Indices] => Rep[C[T]], rFunc: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext, __mem: Mem[T,C], __mT: Manifest[T], __mC: Manifest[C[T]]): (Rep[C[T]], Rep[Pipeline]) = {
+  /*def accum_reduce[T,C[T]](cchain: Rep[CounterChain], cchainRed: Rep[CounterChain], func: Rep[Indices] => Rep[C[T]], rFunc: (Rep[T],Rep[T]) => Rep[T])(implicit ctx: SourceContext, __mem: Mem[T,C], __mT: Manifest[T], __mC: Manifest[C[T]]): (Rep[C[T]], Rep[Pipeline]) = {
     val isMap = List.fill(lenOf(cchain)){ fresh[Idx] }   // Map loop indices
     val indsMap = indices_create(isMap)
     val mBlk = reifyEffects( func(indsMap) )             // Reified map function
     val accum = __mem.empty(getBlockResult(mBlk))
-    val pipe = accum_common(cchain, cchainRed, accum, mBlk, rFunc, false)
+    val pipe = accum_common(cchain, cchainRed, accum, mBlk, isMap, rFunc, false)
     (accum, pipe)
-  }
+  }*/
 
   // --- Mirroring
   override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = e match {
     case e@Pipe_foreach(c,func,inds) => reflectPure(Pipe_foreach(f(c),f(func),inds)(pos))(mtype(manifest[A]),pos)
     case Reflect(e@Pipe_foreach(c,func,inds), u, es) => reflectMirrored(Reflect(Pipe_foreach(f(c),f(func),inds)(pos), mapOver(f,u), f(es)))(mtype(manifest[A]),pos)
 
-    case e@Pipe_fold(c,a,ld,st,iFunc,func,rFunc,inds,idx,acc,res,rV) => reflectPure(Pipe_fold(f(c),f(a),f(ld),f(st),f(iFunc),f(func),f(rFunc),inds,idx,acc,res,rV)(pos, e.memC, e.mT, e.mC))(mtype(manifest[A]), pos)
-    case Reflect(e@Pipe_fold(c,a,fA,ld,st,iFunc,func,rFunc,inds,idx,acc,res,rV), u, es) => reflectMirrored(Reflect(Pipe_fold(f(c),f(a),fA,f(ld),f(st),f(iFunc),f(func),f(rFunc),inds,idx,acc,res,rV)(pos, e.memC, e.mT, e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case e@Pipe_fold(c,a,fA,ld,st,iFunc,func,rFunc,inds,idx,acc,res,rV) => reflectPure(Pipe_fold(f(c),f(a),fA,f(ld),f(st),f(iFunc),f(func),f(rFunc),inds,idx,acc,res,rV)(e.ctx, e.memC, e.mT, e.mC))(mtype(manifest[A]), pos)
+    case Reflect(e@Pipe_fold(c,a,fA,ld,st,iFunc,func,rFunc,inds,idx,acc,res,rV), u, es) => reflectMirrored(Reflect(Pipe_fold(f(c),f(a),fA,f(ld),f(st),f(iFunc),f(func),f(rFunc),inds,idx,acc,res,rV)(e.ctx, e.memC, e.mT, e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
 
-    case e@Accum_fold(c1,c2,a,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) => reflectPure(Accum_fold(f(c1),f(c2),f(a),fA,f(iFunc),f(func),f(ld1),f(ld2),f(rFunc),f(st),inds1,inds2,idx,part,acc,res,rV)(e.mT,e.ctx))(mtype(manifest[A]), pos)
-    case Reflect(e@Accum_fold(c1,c2,a,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV), u, es) => reflectMirrored(Reflect(Accum_fold(f(c1),f(c2),f(a),fA,f(iFunc),f(func),f(ld1),f(ld2),f(rFunc),f(st),inds1,inds2,idx,part,acc,res,rV)(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case e@Accum_fold(c1,c2,a,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) => reflectPure(Accum_fold(f(c1),f(c2),f(a),fA,f(iFunc),f(func),f(ld1),f(ld2),f(rFunc),f(st),inds1,inds2,idx,part,acc,res,rV)(e.ctx,e.memC,e.mT,e.mC))(mtype(manifest[A]), pos)
+    case Reflect(e@Accum_fold(c1,c2,a,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV), u, es) => reflectMirrored(Reflect(Accum_fold(f(c1),f(c2),f(a),fA,f(iFunc),f(func),f(ld1),f(ld2),f(rFunc),f(st),inds1,inds2,idx,part,acc,res,rV)(e.ctx,e.memC,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
 
     case _ => super.mirror(e, f)
   }
@@ -184,25 +184,25 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
   override def syms(e: Any): List[Sym[Any]] = e match {
     case Pipe_foreach(chain, func, _) => syms(chain) ::: syms(func)
     case e: Pipe_fold[_,_] => syms(e.cchain) ::: syms(e.accum) ::: syms(e.iFunc) ::: syms(e.func) ::: syms(e.rFunc) ::: syms(e.ldFunc) ::: syms(e.stFunc)
-    case e: Accum_fold[_] => syms(e.ccOuter) ::: syms(e.ccInner) ::: syms(e.accum) ::: syms(e.iFunc) ::: syms(e.func) ::: syms(e.resLdFunc) ::: syms(e.ldFunc) ::: syms(e.rFunc) ::: syms(e.stFunc)
+    case e: Accum_fold[_,_] => syms(e.ccOuter) ::: syms(e.ccInner) ::: syms(e.accum) ::: syms(e.iFunc) ::: syms(e.func) ::: syms(e.resLdFunc) ::: syms(e.ldFunc) ::: syms(e.rFunc) ::: syms(e.stFunc)
     case _ => super.syms(e)
   }
   override def readSyms(e: Any): List[Sym[Any]] = e match {
     case Pipe_foreach(chain, func, _) => readSyms(chain) ::: readSyms(func)
     case e: Pipe_fold[_,_] => readSyms(e.cchain) ::: readSyms(e.accum) ::: readSyms(e.iFunc) ::: readSyms(e.func) ::: readSyms(e.rFunc) ::: readSyms(e.ldFunc) ::: readSyms(e.stFunc)
-    case e: Accum_fold[_] => readSyms(e.ccOuter) ::: readSyms(e.ccInner) ::: readSyms(e.accum) ::: readSyms(e.iFunc) ::: readSyms(e.func) ::: readSyms(e.resLdFunc) ::: readSyms(e.ldFunc) ::: readSyms(e.rFunc) ::: readSyms(e.stFunc)
+    case e: Accum_fold[_,_] => readSyms(e.ccOuter) ::: readSyms(e.ccInner) ::: readSyms(e.accum) ::: readSyms(e.iFunc) ::: readSyms(e.func) ::: readSyms(e.resLdFunc) ::: readSyms(e.ldFunc) ::: readSyms(e.rFunc) ::: readSyms(e.stFunc)
     case _ => super.readSyms(e)
   }
   override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {
     case Pipe_foreach(chain, func, _) => freqCold(func) ::: freqCold(chain)
     case e: Pipe_fold[_,_] => freqNormal(e.iFunc) ::: freqCold(e.func) ::: freqCold(e.rFunc) ::: freqCold(e.ldFunc) ::: freqCold(e.stFunc) ::: freqCold(e.cchain) ::: freqCold(e.accum)
-    case e: Accum_fold[_] => freqNormal(e.ccOuter) ::: freqNormal(e.ccInner) ::: freqNormal(e.accum) ::: freqNormal(e.iFunc) ::: freqNormal(e.func) ::: freqNormal(e.resLdFunc) ::: freqNormal(e.ldFunc) ::: freqNormal(e.rFunc) ::: freqNormal(e.stFunc)
+    case e: Accum_fold[_,_] => freqNormal(e.ccOuter) ::: freqNormal(e.ccInner) ::: freqNormal(e.accum) ::: freqNormal(e.iFunc) ::: freqNormal(e.func) ::: freqNormal(e.resLdFunc) ::: freqNormal(e.ldFunc) ::: freqNormal(e.rFunc) ::: freqNormal(e.stFunc)
     case _ => super.symsFreq(e)
   }
   override def boundSyms(e: Any): List[Sym[Any]] = e match {
     case Pipe_foreach(chain,func,inds) => inds ::: effectSyms(func) ::: effectSyms(chain)
     case e: Pipe_fold[_,_] => e.inds ::: List(e.rV._1, e.rV._2, e.acc, e.res, e.idx) ::: effectSyms(e.cchain) ::: effectSyms(e.iFunc) ::: effectSyms(e.func) ::: effectSyms(e.rFunc) ::: effectSyms(e.ldFunc) ::: effectSyms(e.stFunc) ::: effectSyms(e.accum)
-    case e: Accum_fold[_] => e.indsOuter ::: e.indsInner ::: List(e.idx, e.rV._1, e.rV._2, e.acc, e.res, e.part) ::: effectSyms(e.ccOuter) ::: effectSyms(e.ccInner) ::: effectSyms(e.accum) ::: effectSyms(e.iFunc) ::: effectSyms(e.func) ::: effectSyms(e.resLdFunc) ::: effectSyms(e.ldFunc) ::: effectSyms(e.rFunc) ::: effectSyms(e.stFunc)
+    case e: Accum_fold[_,_] => e.indsOuter ::: e.indsInner ::: List(e.idx, e.rV._1, e.rV._2, e.acc, e.res, e.part) ::: effectSyms(e.ccOuter) ::: effectSyms(e.ccInner) ::: effectSyms(e.accum) ::: effectSyms(e.iFunc) ::: effectSyms(e.func) ::: effectSyms(e.resLdFunc) ::: effectSyms(e.ldFunc) ::: effectSyms(e.rFunc) ::: effectSyms(e.stFunc)
     case _ => super.boundSyms(e)
   }
 }
@@ -224,7 +224,7 @@ trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
       emitNestedLoop(inds, cchain){ emitBlock(func) }
       emitValDef(sym, "()")
 
-    case e@Pipe_fold(cchain, accum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
+    case e@Pipe_fold(cchain, accum, fA, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
       emitValDef(acc, quote(accum)) // Assign bound accumulator to accum
       emitNestedLoop(inds, cchain){
         emitBlock(iFunc)            // Idx function
@@ -239,7 +239,7 @@ trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
       }
       emitValDef(sym, "()")
 
-    case e@Accum_fold(ccOuter, ccInner, accum, iFunc, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, idx, part, acc, res, rV) =>
+    case e@Accum_fold(ccOuter, ccInner, accum, fA, iFunc, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, idx, part, acc, res, rV) =>
       emitValDef(acc, quote(accum)) // Assign bound accumulator to accum
       emitNestedLoop(indsOuter, ccOuter){
         emitBlock(func)
@@ -264,45 +264,11 @@ trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
   }
 }
 
-trait DotGenControllerTemplateOps extends DotGenCounterOps {
-  val IR: ControllerTemplateOpsExp with TpesOpsExp
+trait DotGenControllerTemplateOps extends DotGenCounterExternOps {
+  val IR: ControllerTemplateOpsExp with TpesOpsExp with CounterExternOpsExp
           with OffChipMemOpsExp with RegOpsExp with DeliteTransform with DHDLCodegenOps
 
   import IR._
-
-	val emittedCtrChain = Set.empty[Exp[Any]]
-
-	var traversals: List[Traversal{val IR: DotGenControllerTemplateOps.this.IR.type}] = Nil
-
-  def runTraversals[A:Manifest](b: Block[A]): Block[A] = {
-    println("DotCodegen: applying transformations")
-    var curBlock = b
-    println("Traversals:\n\t" + traversals.map(_.name).mkString("\n\t"))
-
-    for (t <- traversals) {
-      printlog("  Block before transformation: " + curBlock)
-      curBlock = t.run(curBlock)
-      printlog("  Block after transformation: " + curBlock)
-    }
-    println("DotGodegen: done transforming")
-    (curBlock)
-  }
-
-  override def initializeGenerator(buildDir:String): Unit = {
-		emittedCtrChain.clear
-		traversals = IR.traversals
-		super.initializeGenerator(buildDir)
-	}
-
-  override def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, out: PrintWriter) = {
-    val y = runTraversals(body)
-		super.emitSource(args, y, className, out)
-	}
-
-	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = {
-    val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
-	  inds.zipWithIndex.foreach {case (iter, idx) => emitValDef(iter, counters(idx)) }
-  }
 
   override def emitFileHeader() {
 		super.emitFileHeader()
@@ -341,7 +307,7 @@ trait DotGenControllerTemplateOps extends DotGenCounterOps {
       emitBlock(func, quote(sym) + "_foreachFunc", "foreachFunc", foreachFillColor)             // Map function
       emit("}")
 
-    case e@Pipe_fold(cchain, accum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
+    case e@Pipe_fold(cchain, accum, foldAccum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
 			var label = quote(sym)
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
 				case Coarse => label = label.replace("DHDLPipeline", "MetaPipe")
@@ -356,7 +322,7 @@ trait DotGenControllerTemplateOps extends DotGenCounterOps {
       emit(s"""style="bold, filled" """)
 			emit(s"""fillcolor=$pipeFillColor""")
       emit(s"""define(`${quote(acc)}', `${quote(accum)}')""")
-			val Def(EatReflect(d)) = cchain
+			//val Def(EatReflect(d)) = cchain
 			emitCtrChain(cchain)
       emitBlock(iFunc, quote(sym) + "_idxFunc", "idxFunc", ldFillColor)
 			emitValDef(idx, quote(getBlockResult(iFunc)))
@@ -369,7 +335,7 @@ trait DotGenControllerTemplateOps extends DotGenCounterOps {
       emitBlock(stFunc, quote(sym) + "_stFunc", "stFunc" , stFillColor)
       emit("}")
 
-    case e@Accum_fold(ccOuter, ccInner, accum, iFunc, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, idx, part, acc, res, rV) =>
+    case e@Accum_fold(ccOuter, ccInner, accum, foldAccum, iFunc, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, idx, part, acc, res, rV) =>
       emit(s"""subgraph ${quote(sym)} {""")
       emit(s"""  label = quote(sym)""")
       emit(s"""  style = "filled" """)
@@ -405,7 +371,7 @@ trait DotGenControllerTemplateOps extends DotGenCounterOps {
 						case _ => //println(s.tp)
 					}
 					tstr = tstr.replace("BlockRAM", "BRAM")
-					val quoteStr = tstr + (if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
+					val quoteStr = tstr + nameOf(s).map(nm=>"_"+nm).getOrElse("") + "_x" + n
 					/*
 					if (quoteStr.contains("108")) {
 						println("sym:" + quoteStr)
@@ -423,9 +389,9 @@ trait DotGenControllerTemplateOps extends DotGenCounterOps {
 }
 
 trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
-  val IR: ControllerTemplateOpsExp with TpesOpsExp
-          with OffChipMemOpsExp with RegOpsExp with MetaPipeOpsExp
-          with DHDLPrimOpsExp with DHDLCodegenOps with DeliteTransform
+  val IR: ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
+          with OffChipMemOpsExp with RegOpsExp with CounterExternOpsExp
+          with DHDLCodegenOps with DeliteTransform
 
  import IR._ //{__ifThenElse => _, Nosynth___ifThenElse => _, __whileDo => _,
              // Forloop => _, println => _ , _}
@@ -440,7 +406,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 				case ArgumentOut => "ArgOut"
 			})
 			tstr = tstr.replace("BlockRAM", "BRAM")
-			tstr + (if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
+			tstr + nameOf(s).map(nm=>"_"+nm).getOrElse("") + "_x" + n
 		}
     case _ => super.quote(x)
   }
@@ -506,7 +472,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       emitNestedIdx(cchain, inds)
       emitBlock(func, s"${quote(sym)} Foreach")             // Map function
 
-    case e@Pipe_fold(cchain, accum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
+    case e@Pipe_fold(cchain, accum, fA, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
       emitController(sym, Some(cchain))
       emitNestedIdx(cchain, inds)
       emitBlock(iFunc, s"${quote(sym)} Index Calculation")
@@ -531,7 +497,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 			case Coarse => "MPSM"
       case Fine => "PipeSM"
       case Disabled => "SeqSM"
-      case Parallel => "ParSM"
+      case ForkJoin => "ParSM"
     }
     emitComment(s"""${smStr} ${quote(sym)} {""")
 
@@ -560,7 +526,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 		    val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
         emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
-      case Parallel =>
+      case ForkJoin =>
     }
 
     /* Control Signals to Children Controllers */
@@ -574,7 +540,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 		  }
     }
 
-    if (styleOf(sym)!=Parallel) {
+    if (styleOf(sym)!=ForkJoin) {
       emitCChainCtrl(sym, cchain.get)
     }
     if (styleOf(sym)==Fine){

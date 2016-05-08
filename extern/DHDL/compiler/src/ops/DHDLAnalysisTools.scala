@@ -11,6 +11,7 @@ import dhdl.compiler.ops._
 
 import ppl.delite.framework.DeliteApplication
 
+// TODO: Can these be derived automatically?
 trait PipeStageToolsExp extends EffectExp {
   this: DHDLExp =>
 
@@ -36,23 +37,25 @@ trait PipeStageToolsExp extends EffectExp {
 
 
   def isControlNode(s: Exp[Any]): Boolean = s match {
-    case Def(d) => isOuterControl(s) || isInnerControl(s) || isTileTransfer(d)
+    case Def(d) => isOuterControl(s) || isInnerControl(s)
     case _ => false
   }
   def isOuterLoop(s: Exp[Any]): Boolean = s match {
     case Def(d) => isLoop(d) && styleOf(s) != Fine
     case _ => false
   }
+  def isMetaPipe(s: Exp[Any]): Boolean = isOuterControl(s) && styleOf(s) == Coarse
+
   def isInnerLoop(s: Exp[Any]): Boolean = s match {
     case Def(d) => isLoop(d) && styleOf(s) == Fine
     case _ => false
   }
   def isOuterControl(s: Exp[Any]): Boolean = s match {
-    case Def(d) => (isPipeline(d) && styleOf(s) != Fine) || isParallel(d)
+    case Def(d) => isOuterLoop(s) || isParallel(d)
     case _ => false
   }
   def isInnerControl(s: Exp[Any]): Boolean = s match {
-    case Def(d) => isPipeline(d) && styleOf(s) == Fine
+    case Def(d) => isInnerLoop(s) || isBramTransfer(d) || isOffChipTransfer(d)
     case _ => false
   }
   def isAllocation(s: Exp[Any]): Boolean = s match {
@@ -60,15 +63,21 @@ trait PipeStageToolsExp extends EffectExp {
     case _ => false
   }
   def isAllocation(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:Reg_new[_]) => true
-    case EatReflect(_:Bram_new[_]) => true
-    case EatReflect(_:Offchip_new[_]) => true
-    case EatReflect(_:Counter_new) => true
+    case EatReflect(_:Reg_new[_])       => true
+    case EatReflect(_:Bram_new[_])      => true
+    case EatReflect(_:Offchip_new[_])   => true
+    case EatReflect(_:Counter_new)      => true
     case EatReflect(_:Counterchain_new) => true
     case _ => false
   }
-  def isTileTransfer(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:TileTransfer[_]) => true
+  def isBramTransfer(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:Bram_load_vector[_])  => true
+    case EatReflect(_:Bram_store_vector[_]) => true
+    case _ => false
+  }
+  def isOffChipTransfer(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:Offchip_load_vector[_])  => true
+    case EatReflect(_:Offchip_store_vector[_]) => true
     case _ => false
   }
   def isParallel(d: Def[Any]): Boolean = d match {
@@ -76,15 +85,15 @@ trait PipeStageToolsExp extends EffectExp {
     case _ => false
   }
   def isPipeline(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:Pipe_foreach) => true
-    case EatReflect(_:Pipe_fold[_,_]) => true
+    case EatReflect(_:Pipe_foreach)    => true
+    case EatReflect(_:Pipe_fold[_,_])  => true
     case EatReflect(_:Accum_fold[_,_]) => true
-    case EatReflect(_:Unit_pipe) => true
+    case EatReflect(_:Unit_pipe[_])    => true
     case _ => false
   }
   def isLoop(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:Pipe_foreach) => true
-    case EatReflect(_:Pipe_fold[_,_]) => true
+    case EatReflect(_:Pipe_foreach)    => true
+    case EatReflect(_:Pipe_fold[_,_])  => true
     case EatReflect(_:Accum_fold[_,_]) => true
     case _ => false
   }
@@ -113,6 +122,7 @@ trait PipeStageTools extends NestedBlockTraversal {
   def getLocalReaders(blk: Block[Any]*) = getStages(blk:_*).filter{s => isReader(s)}
   def getLocalWriters(blk: Block[Any]*) = getStages(blk:_*).filter{s => isWriter(s)}
 }
+
 
 object ReductionTreeAnalysis {
   /*

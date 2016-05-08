@@ -7,9 +7,9 @@ import ppl.delite.framework.transform.MultiPassTransformer
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait UnrollingExp extends DHDLExp with PipeStageToolsExp with CounterToolsExp with LoweredOpsExp
+trait UnrollingExp extends PipeStageToolsExp with LoweredOpsExp { this: DHDLExp => }
 
-trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
+/*trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
   val IR: UnrollingExp
   import IR.{infix_until => _, _}
 
@@ -84,5 +84,4 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
 
     case _ => None
   }
-
-}
+}*/

@@ -14,9 +14,10 @@ trait DHDLEnums {
 
     /* Controller style enum */
     val ControlType = lookupTpe("ControlType", stage=compile)
-    identifier (ControlType) ("Pipe")
-    identifier (ControlType) ("Sequential")
-    identifier (ControlType) ("Parallel")
+    identifier (ControlType) ("Fine")
+    identifier (ControlType) ("Coarse")
+    identifier (ControlType) ("Disabled")
+    identifier (ControlType) ("ForkJoin")
   }
 
 }

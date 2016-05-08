@@ -3,7 +3,8 @@ package dhdl.compiler.ops
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.internal.Traversal
 import scala.virtualization.lms.common.EffectExp
-import ppl.delite.framework.analysis.IRPrinterPlus
+
+import ppl.delite.framework.analysis.{QuickTraversal, IRPrinterPlus}
 import ppl.delite.framework.Config
 
 import dhdl.shared._
@@ -23,7 +24,7 @@ trait DSE extends Traversal {
   val IR: DHDLCompiler
   import IR.{infix_until => _, _}
 
-  override val debugMode = true
+  debugMode = true
 
   def inferDoubleBuffers(localMems: List[Exp[Any]]) = {
 
@@ -43,7 +44,7 @@ trait DSE extends Traversal {
 
       // Choose last node where paths are the same
       // Note this wouldn't work if paths could diverge and then converge again, but this is never the case
-      val intersect =pathX.zip(pathY).filter{case (x,y) => x == y}.map(_._1)
+      val intersect = pathX.zip(pathY).filter{case (x,y) => x == y}.map(_._1)
       if (intersect.isEmpty) None
       else Some(intersect.last._1)
     }
@@ -51,18 +52,9 @@ trait DSE extends Traversal {
     // Heuristic - find memories which have a reader and a writer which are different
     // but whose nearest common parent is a metapipeline.
     localMems.flatMap{mem =>
-      if (!writerOf(mem).isDefined) None
-      else {
-        readersOf(mem) find (_ != writerOf(mem).get) match {
-          case Some(reader) =>
-            val lca = leastCommonAncestor(reader, writerOf(mem).get)
-            lca match {
-              case Some(x) if meta[MPipeType](x).isDefined && styleOf(x) == Coarse => Some(mem -> x)
-              case _ => None
-            }
-
-          case None => None
-        }
+      writerOf(mem).map { writer =>
+        val lcas = readersOf(mem).filter(_ != writer).flatMap{reader => leastCommonAncestor(reader, writer).filter(isMetaPipe(_)) }
+        mem -> lcas.head // HACK: This could actually be much more complicated..
       }
     }
   }
@@ -157,9 +149,9 @@ trait DSE extends Traversal {
     // C. Calculate space
     debug("Running DSE")
     debug("Tile Sizes: ")
-    tileSizes.foreach{t => val name = nameOf(t); if (name == "") debug(s"  $t") else debug(s"  $name")}
+    tileSizes.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
     debug("Parallelization Factors:")
-    parFactors.foreach{t => val name = nameOf(t); if (name == "") debug(s"  $t") else debug(s"  $name")}
+    parFactors.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
     debug("Metapipelining Toggles:")
     metapipes.foreach{t => debug(s"  ${mpos(t.pos).line}")}
     debug("")
@@ -328,13 +320,7 @@ trait DSE extends Traversal {
     debug(s"Valid designs generated: $nValid / $legalSize")
     debug(s"Pareto frontier size: $paretoSize / $nValid")
 
-    val names = numericFactors.map{p =>
-      val name = nameOf(p)
-      if (name == "") s"$p" else name
-    } ++ metapipes.map{mp =>
-      val name = nameOf(mp)
-      if (name == "") s"$mp" else name
-    }
+    val names = numericFactors.map{p => nameOf(p).getOrElse(p.toString) } ++ metapipes.map{mp => nameOf(mp).getOrElse(mp.toString) }
 
     val pwd = sys.env("HYPER_HOME")
     val name = Config.degFilename.replace(".deg","")

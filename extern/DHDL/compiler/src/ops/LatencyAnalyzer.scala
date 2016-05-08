@@ -7,7 +7,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait LatencyAnalysisExp extends LatencyModel with CounterToolsExp with PipeStageToolsExp {
+trait LatencyAnalysisExp extends LatencyModel {
   this: DHDLExp =>
 
   val interruptCycles = 96
@@ -66,12 +66,6 @@ trait LatencyAnalyzer extends ModelingTools {
         save(blk)
         inHwScope = false
         body
-
-      case EatReflect(Counterchain_new(ctrs,nIters)) => latencyOf(lhs)
-      case EatReflect(_:TileTransfer[_]) =>
-        val cycles = latencyOf(lhs)
-        debugs(s"Tile Transfer $lhs ($cycles)")
-        cycles
 
       case EatReflect(Pipe_parallel(func)) =>
         debugs(s"Parallel $lhs: ")
@@ -168,6 +162,16 @@ trait LatencyAnalyzer extends ModelingTools {
 
         if (styleOf(lhs) == Coarse) { stages.max * (Nm - 1) + stages.sum + latencyOf(lhs) }
         else                        { stages.sum * Nm + latencyOf(lhs) }
+
+      case Bram_store_vector(bram,ofs,vec,cchain) =>
+        val N = nIters(cchain)
+        val P = parOf(cchain).reduce{_*_}
+        N + latencyOf(lhs) // TODO: This assumes each iteration takes 1 cycle, which may not be true (depends on access pattern)
+
+      case Bram_load_vector(bram,ofs,len,cchain) =>
+        val N = nIters(cchain)
+        val P = parOf(cchain).reduce{_*_}
+        N + latencyOf(lhs) // TODO: This assumes each iteration takes 1 cycle, which may not be true (depends on access pattern)
 
       case _ =>
         // No general rule for combining blocks

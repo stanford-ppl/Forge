@@ -7,7 +7,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait AreaAnalysisExp extends AreaModel with LatencyModel with CounterToolsExp with PipeStageToolsExp {
+trait AreaAnalysisExp extends AreaModel with LatencyModel {
   this: DHDLExp =>
 
   // TODO: This shouldn't be hardcoded (or here at all really)

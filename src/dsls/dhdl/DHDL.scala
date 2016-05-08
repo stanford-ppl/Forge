@@ -156,6 +156,7 @@ trait DHDLDSL extends ForgeApplication
      */
     val CounterChain = tpe("CounterChain")
     val Pipeline  = tpe("Pipeline")
+    val StateMachine = tpe("StateMachine")
     primitiveStructs :::= List(Counter, CounterChain)
     primitiveTypes :::= List(Pipeline)
 
@@ -171,7 +172,7 @@ trait DHDLDSL extends ForgeApplication
 
     // --- Enums
     val ControlType = tpe("ControlType", stage=compile)
-    val RegType = lookupTpe("RegType", stage=compile)
+    val RegType     = tpe("RegType", stage=compile)
 
     noInfixList :::= List(":=", "**", "as", "to", "rst")
 
@@ -187,6 +188,7 @@ trait DHDLDSL extends ForgeApplication
 
     importDHDLMath()
     importDHDLMemories()
+    importDHDLVectors()
     importDHDLControllers()
 
     importDHDLMisc()
@@ -211,20 +213,22 @@ trait DHDLDSL extends ForgeApplication
     importBoundAnalysis()
 
     schedule(StageAnalyzer)
-    //schedule(GlobalAnalyzer)
+    schedule(GlobalAnalyzer)
     schedule(DSE)
 
     // --- Post Parameter Selection
-    //schedule(AreaAnalyzer)
-    //schedule(LatencyAnalyzer)
+    schedule(AreaAnalyzer)
+    schedule(LatencyAnalyzer)
+
     schedule(BoundAnalyzer)
     schedule(ConstantFolding)
-    schedule(MetaPipeRegInsertion)
 
-    schedule(ControlSignalAnalyzer)
-    schedule(ParSetter)
+    //schedule(MetaPipeRegInsertion)
 
-    schedule(IRPrinterPlus)
+    //schedule(ControlSignalAnalyzer)
+    //schedule(ParSetter)
+
+    //schedule(IRPrinterPlus)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))

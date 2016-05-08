@@ -61,19 +61,6 @@ trait DHDLMisc {
         sumTree( List.tabulate($indices.length){i => $indices(i) * strides(i) } )
       }
     }
-
-    // Scala's fold and reduce don't produce a binary tree - use these functions instead
-    internal (Misc) ("reductionTree", T, (SList(T), ((T,T) ==> T)) :: SList(T)) implements composite ${
-      if ($0.length == 1) $0
-      else if ($0.length % 2 == 0) reductionTree( List.tabulate($0.length/2){i => $1( $0(2*i), $0(2*i+1)) }, $1)
-      else reductionTree( List.tabulate($0.length/2){i => $1( $0(2*i), $0(2*i+1)) } :+ $0.last, $1)
-    }
-    internal (Misc) ("productTree", T, SList(T) :: T, TArith(T)) implements composite ${
-      reductionTree[T]($0, {(a,b) => implicitly[Arith[T]].mul(a,b) }).head
-    }
-    internal (Misc) ("sumTree", T, SList(T) :: T, TArith(T)) implements composite ${
-      reductionTree[T]($0, {(a,b) => implicitly[Arith[T]].add(a,b) }).head
-    }
   }
 
   // Basic Array API (change out with OptiML / etc. later)
@@ -88,7 +75,7 @@ trait DHDLMisc {
     val Bit  = lookupTpe("Bit")
     val Tup2 = lookupTpe("Tup2")
 
-    val Coll = lookupTpeClass("Collection").get
+    val Coll = lookupTpeClass("Coll").get
     val ArrColl = tpeClassInst("ArrayColl", T, Coll(MArray(T)))
     infix (ArrColl) ("empty", T, Nil :: MArray(T)) implements composite ${ array_empty_imm[T](unit(0)) }
     //infix (ArrColl) ("zeros", T, MArray(T) :: MArray(T)) implements composite ${ array_empty_imm[T](array_length($0)) }  // TODO: Should be recursive?
@@ -284,7 +271,11 @@ trait DHDLMisc {
 
     // TODO: Naming isn't final. Your favorite keyword here :)
     // TODO: This is a quick hack for scheduling acceleration initialization. Eventually this should act as a true annotation
-    direct (Tst) ("Accel", Nil, MThunk(MUnit) :: MUnit) implements composite ${ hwblock($0) }
+    direct (Tst) ("Accel", Nil, MThunk(MUnit) :: MUnit) implements composite ${
+      val accel = hwblock($0)
+      styleOf(accel) = Disabled
+      accel
+    }
 
 
 

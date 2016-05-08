@@ -156,72 +156,38 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
   this: DHDLExp =>
 
   // --- Nodes
-  case class TileTransfer[T:Manifest](
-    mem:      Rep[OffChipMem[T]],                // Offchip memory array
-    local:    Rep[BRAM[T]],                      // Local memory (BRAM)
-    strides:  List[Rep[FixPt[Signed,B32,B0]]],   // Dimensions converted to strides for offchip memory
-    memOfs:   List[Rep[FixPt[Signed,B32,B0]]],   // Offset into offchip memory
-    tileStrides: List[Rep[FixPt[Signed,B32,B0]]], // Tile strides
-    cchain:   Rep[CounterChain],                 // Counter chain for copy
-    iters:    List[Sym[FixPt[Signed,B32,B0]]],   // Bound iterator variables
-    store:    Boolean                            // Is this transfer a store (true) or a load (false)
-  )(implicit ctx: SourceContext) extends Def[Unit] {
-    val mT = manifest[T]
-  }
+  case class Vector_from_list[T](elems: List[Exp[T]])(implicit val mT: Manifest[T], val ctx: SourceContext) extends Def[Vector[T]]
 
   // --- Internal API
-  def tile_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], strides: List[Rep[FixPt[Signed,B32,B0]]], memOfs: List[Rep[FixPt[Signed,B32,B0]]], tileStrides: List[Rep[FixPt[Signed,B32,B0]]], cchain: Rep[CounterChain], store: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
-    val iters = List.fill(lenOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }
-
-    if (store) reflectWrite(mem)(TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters,store))
-    else       reflectWrite(local)(TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters,store))
-  }
-
-
-  // HACK: Only want to allow DSE parameters or constants (ConstFix) here
-  override def bram_create[T:Manifest](__arg0: Option[String],__arg1: List[Rep[FixPt[Signed,B32,B0]]])(implicit __pos: SourceContext,__imp0: Num[T]) = {
-    __arg1.foreach{
-      case ConstFix(_) =>
-      case ParamFix(_) =>
-      case _ => stageError("Only constants and DSE parameters are allowed as dimensions of BRAM")(__pos)
-    }
-    super.bram_create[T](__arg0,__arg1)(implicitly[Manifest[T]],__pos,__imp0)
-  }
-
+  def vector_from_list[T:Manifest](elems: List[Rep[T]])(implicit ctx: SourceContext): Rep[Vector[T]] = reflectPure(Vector_from_list(elems))
 
   // --- Mirroring
   override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = e match {
-    case e@TileTransfer(m,l,s,o,t,c,i,st) => reflectPure(TileTransfer(f(m),f(l),f(s),f(o),t,f(c),i,st)(e.mT,pos))(mtype(manifest[A]), pos)
-    case Reflect(e@TileTransfer(m,l,s,o,t,c,i,st), u, es) => reflectMirrored(Reflect(TileTransfer(f(m),f(l),f(s),f(o),t,f(c),i,st)(e.mT,pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case e@Vector_from_list(elems) => reflectPure(Vector_from_list(f(elems))(e.mT, e.ctx))(mtype(manifest[A]), pos)
+    case Reflect(e@Vector_from_list(elems), u, es) => reflectMirrored(Reflect(Vector_from_list(f(elems))(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+
     case _ => super.mirror(e, f)
   }
 
   // --- Dependencies
   override def syms(e: Any): List[Sym[Any]] = e match {
-    case e: TileTransfer[_] => syms(e.mem) ::: syms(e.local) ::: syms(e.strides) ::: syms(e.tileStrides) ::: syms(e.memOfs) ::: syms(e.cchain)
     case _ => super.syms(e)
   }
 
   override def readSyms(e: Any): List[Sym[Any]] = e match {
-    case Pipe_foreach(chain, func, _) => readSyms(chain) ::: readSyms(func)
     case _ => super.readSyms(e)
   }
   override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {
-    case e: TileTransfer[_] => freqNormal(e.mem) ::: freqNormal(e.local) ::: freqNormal(e.strides) ::: freqNormal(e.tileStrides) ::: freqNormal(e.memOfs) ::: freqNormal(e.cchain)
-
     case _ => super.symsFreq(e)
   }
   override def boundSyms(e: Any): List[Sym[Any]] = e match {
-    case e: TileTransfer[_] => e.iters
     case _ => super.boundSyms(e)
   }
 
   // --- Aliasing
   override def aliasSyms(e: Any): List[Sym[Any]] = e match {
-    case e: TileTransfer[_] => Nil
     case _ => super.aliasSyms(e)
   }
-
 }
 
 // Defines type remappings required in Scala gen (should be same as in library)
@@ -259,19 +225,8 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTe
   }
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters, store) =>
-      emitNestedLoop(iters, cchain) {
-        val offaddr = (iters,strides,memOfs).zipped.map{case (i,s,o) => "(" + quote(i) + " + " + quote(o) + ") * " + quote(s) }.mkString(" + ")
-        stream.println("val offaddr = " + offaddr)
-
-        val localAddr = iters.zip(tileStrides).map{ case (i,s) => quote(i) + "*" + quote(s) }.mkString(" + ")
-        stream.println("val localaddr = " + localAddr)
-
-        if (store)
-          stream.println(quote(mem) + "(offaddr.toInt) = " + quote(local) + "(localaddr.toInt)")
-        else
-          stream.println(quote(local) + "(localaddr.toInt) = " + quote(mem) + "(offaddr.toInt)")
-      }
+    case Vector_from_list(elems) =>
+      emitValDef(sym, "Array" + elems.map(quote).mkString("(", ",", ")"))
 
     case _ => super.emitNode(sym, rhs)
   }
@@ -520,7 +475,7 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplate
 	}
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters, store) => // Load
+    /*case TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters, store) => // Load
 			val l = s"Tile${if (store) "Store" else "Load"}_" + quote(sym).split("_")(1)
       emit(s"""subgraph cluster_${quote(sym)} {""")
 			emit(s"""label="$l"""")
@@ -552,7 +507,7 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplate
 			} else {
 				emitEdge(mem, sym)
 				emitEdge(sym, local)
-			}
+			}*/
 
 		case Offchip_new(size) =>
 			/* Special case to hand nodes producing size of offchip outside hardware scope. Not actual
@@ -582,9 +537,9 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplate
 }
 
 trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTemplateOps{
-  val IR: ControllerTemplateOpsExp with TpesOpsExp //with NosynthOpsExp
-          with OffChipMemOpsExp with RegOpsExp with CounterOpsExp with MetaPipeOpsExp with
-					DHDLPrimOpsExp with DHDLCodegenOps with CounterToolsExp with DeliteTransform
+  val IR: ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
+          with OffChipMemOpsExp with RegOpsExp with CounterExternOpsExp
+          with DHDLCodegenOps with DeliteTransform
   import IR._
 
   // Current TileLd/St templates expect that LMem addresses are
@@ -607,7 +562,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 	}
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters, store) =>
+    /*case TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters, store) =>
       //TODO: new language construct is much more flexible. Refine templete to remove these
       //TileTransfer makes ctrchain explicit in IR, which requires modification in templete
       //constrain
@@ -668,7 +623,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
       else
         emit(s"""${quote(sym)}_waddr, ${quote(sym)}_wdata, ${quote(sym)}_wen);""")
 
-      emitComment(s"} TileTransfer ${if (store) "(store)" else "(load)"}")
+      emitComment(s"} TileTransfer ${if (store) "(store)" else "(load)"}")*/
 
 		case Offchip_new(size) =>
       alwaysGen {
@@ -713,12 +668,12 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 					  if (writerOf(reg).isEmpty)
 					  	throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
 					  val enSignalStr = writerOf(reg).get._1 match {
-					  	case p@Def(EatReflect(Pipe_foreach(cchain,_,_))) => styleOf(p) match {
-					  		case Fine => quote(cchain) + "_en_from_pipesm"
+					  	case p@Def(EatReflect(e:Pipe_foreach)) => styleOf(p) match {
+					  		case Fine => quote(e.cchain) + "_en_from_pipesm"
 					  		case _ => quote(p) + "_en"
 					  	}
-					  	case p@Def(EatReflect(Pipe_reduce(cchain, _, _, _, _, _, _, _, _, _, _, _))) => styleOf(p) match {
-					  		case Fine => quote(cchain) + "_en_from_pipesm"
+					  	case p@Def(EatReflect(e:Pipe_fold[_,_])) => styleOf(p) match {
+					  		case Fine => quote(e.cchain) + "_en_from_pipesm"
 					  		case _ => quote(p) + "_en"
 					  	}
 					  	case p@_ => val Def(d) = p
@@ -807,7 +762,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
         val parentPipe = parentOf(bram).getOrElse(throw new Exception(s"Bram ${quote(bram)} does not have a parent!"))
         val parentCtr = parentPipe match {
           case Def(EatReflect(d)) => d match {
-            case d:Pipe_reduce[_,_] => d.cchain
+            case d:Pipe_fold[_,_] => d.cchain
             case d:Pipe_foreach => d.cchain
           }
           case p => throw new Exception(s"Unknown parent type ${p}!")

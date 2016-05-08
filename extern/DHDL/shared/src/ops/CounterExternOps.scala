@@ -13,4 +13,4 @@ trait CounterExternOps extends Base {
   def counterchain_new(counters: List[Rep[Counter]])(implicit ctx: SourceContext): Rep[CounterChain]
 }
 
-trait CounterExterCompilerOps extends CounterExternOps { this: DHDL => }
+trait CounterExternCompilerOps extends CounterExternOps { this: DHDL => }

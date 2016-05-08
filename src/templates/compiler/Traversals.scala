@@ -74,7 +74,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("  val IR: " + makeTraversalIRName(t))
     stream.println("  import IR._")
     stream.println("  override val name = \"" + makeTraversalName(t) + "\"")
-    stream.println("  override val debugMode = false")        // TODO: Should be able to change this
+    stream.println("  debugMode = false")        // TODO: Should be able to change this
     stream.println()
     stream.println("  override def transform(lhs: Sym[Any], rhs: Def[Any])(implicit ctx: SourceContext): Option[Exp[Any]] = rhs match {")
 
@@ -125,8 +125,8 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("  val IR: " + makeTraversalIRName(az))
     stream.println("  import IR._")
     stream.println("  override val name = \"" + makeTraversalName(az) + "\"")
-    stream.println("  override val debugMode = false")        // TODO: Should be able to change this
-    stream.println("  override val autopropagate = true")     // TODO: Should be able to change this
+    stream.println("  debugMode = false")                          // TODO: Should be able to change this
+    stream.println("  override val autopropagate = true")          // TODO: Should be able to change this
     stream.println("  override def completed(e: Exp[Any]) = true") // TODO: Should be able to change this
     if (!isIterative(az))
       stream.println("  override def hasConverged: Boolean = runs > 0")

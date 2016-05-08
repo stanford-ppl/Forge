@@ -8,7 +8,7 @@ trait DHDLMetadata {
   def importDHDLMetadata () = {
     val T = tpePar("T")
 
-    val RegTpe      = lookupTpe("RegType", stage=compile)
+    val RegType     = lookupTpe("RegType", stage=compile)
     val ControlType = lookupTpe("ControlType", stage=compile)
     val Reg         = lookupTpe("Reg")
     val Pipeline    = lookupTpe("Pipeline")
@@ -80,9 +80,9 @@ trait DHDLMetadata {
     val MRegType = metadata("MRegType", "regType" -> RegType)
     val regTypeOps = metadata("regType")
     onMeet (MRegType) ${ this }
-    internal.static (regTpeOps) ("update", Nil, (MAny, RegType) :: MUnit, effect = simple) implements
+    internal.static (regTypeOps) ("update", Nil, (MAny, RegType) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MRegType($1)) }
-    internal.static (regTpeOps) ("apply", Nil, MAny :: RegType) implements
+    internal.static (regTypeOps) ("apply", Nil, MAny :: RegType) implements
       composite ${ meta[MRegType]($0).map(_.regType).getOrElse(Regular) }
 
     /* Register Initial Value */

@@ -456,8 +456,8 @@ trait DHDLMath {
     // Scala's fold and reduce don't produce a binary tree - use these functions instead
     internal (Math) ("reduceTreeLevel", T, (SList(T), ((T,T) ==> T)) :: SList(T)) implements composite ${
       if ($0.length == 1) $0
-      else if ($0.length % 2 == 0) List.tabulate($0.length/2){i => $1( $0(2*i), $0(2*i+1)) }
-      else List.tabulate($0.length/2){i => $1( $0(2*i), $0(2*i+1)) } :+ $0.last
+      else if ($0.length % 2 == 0) reduceTreeLevel(List.tabulate($0.length/2){i => $1( $0(2*i), $0(2*i+1)) }, $1)
+      else reduceTreeLevel(List.tabulate($0.length/2){i => $1( $0(2*i), $0(2*i+1)) } :+ $0.last, $1)
     }
 
     // TODO: User facing version should actually take Vectors!
@@ -466,9 +466,7 @@ trait DHDLMath {
      * @param rFunc: Associative reduction function
      **/
     direct (Math) ("reduceTree", T, CurriedMethodSignature(List(List(SList(T)), List((T,T) ==> T)),T)) implements composite ${
-      var level: List[Rep[T]] = $0
-      while (level.length > 1) { level = reduceTreeLevel(level, $1) }
-      level.head
+      reduceTreeLevel(level, $1).head
     }
     /** Creates a reduction tree which calculates the product of the given symbols **/
     direct (Math) ("productTree", T, SList(T) :: T, TArith(T)) implements composite ${

@@ -384,7 +384,7 @@ trait AreaModel extends PipeStageToolsExp {
     case _:Pipe_foreach if styleOf(s) == Disabled => areaOfSequential(nStages(s))
     case _:Pipe_fold[_,_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
     case _:Accum_fold[_,_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
-    case _:Unit_pipe[_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
+    case _:Unit_pipe if styleOf(s) == Disabled => areaOfSequential(nStages(s))
 
     // Nodes with known zero area cost
     case Reg_read(_)    => NoArea
@@ -393,7 +393,7 @@ trait AreaModel extends PipeStageToolsExp {
     case Offchip_new(_) => NoArea
     case _:Pipe_foreach if styleOf(s) == Fine => NoArea
     case _:Pipe_fold[_,_] if styleOf(s) == Fine => NoArea
-    case _:Unit_pipe[_] if styleOf(s) == Fine => NoArea
+    case _:Unit_pipe if styleOf(s) == Fine => NoArea
 
     // Effects
     case Reflect(d,_,_) => areaOfNode(s,d)

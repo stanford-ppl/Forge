@@ -156,7 +156,6 @@ trait DHDLDSL extends ForgeApplication
      */
     val CounterChain = tpe("CounterChain")
     val Pipeline  = tpe("Pipeline")
-    val StateMachine = tpe("StateMachine")
     primitiveStructs :::= List(Counter, CounterChain)
     primitiveTypes :::= List(Pipeline)
 

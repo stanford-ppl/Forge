@@ -34,8 +34,8 @@ trait MatMult extends DHDLApplication {
   lazy val p = ArgIn[SInt]("p")
 
   def matmult(a: Rep[OffChipMem[Elem]], b: Rep[OffChipMem[Elem]], c: Rep[OffChipMem[Elem]]) {
-    Sequential(m by bm, (n by bn) par outerPar){(i,j) =>
-      MetaPipe((p by bp) par upMidPar){k =>
+    Pipe(m by bm, (n by bn) par outerPar){(i,j) =>
+      Pipe((p by bp) par upMidPar){k =>
         val tileA = BRAM[Elem]("tileA", bm, bp)
         val tileB = BRAM[Elem]("tileB", bp, bn)
         val tileC = BRAM[Elem]("tileC", bm, bn)
@@ -48,7 +48,7 @@ trait MatMult extends DHDLApplication {
         //val accTile = BRAM[Elem]("accTile", bm, bn)
         Sequential(bm by 1, (bn by 1) par middlePar){ (ii,jj) =>    // MetaPipe?
           val accum = Reg[Elem]
-          Pipe((bp by 1) par innerPar, accum){ kk => tileA(ii, kk) * tileB(kk, jj) }{_+_}
+          Pipe.reduce((bp by 1) par innerPar)(accum){ kk => tileA(ii, kk) * tileB(kk, jj) }{_+_}
           Pipe {
             val prev = mux(k == 0, 0.as[Elem], tileC(ii,jj))
             tileC(ii,jj) = prev + accum.value

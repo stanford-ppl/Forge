@@ -24,14 +24,6 @@ trait DHDLBRAMs {
     val bram_store = internal (BRAM) ("bram_store", T, (("bram", BRAM(T)), ("addr", Idx), ("value", T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
     //val bram_reset = internal (BRAM) ("bram_reset", T, (("bram", BRAM(T)), ("zero", T)) :: MUnit, effect = write(0))
 
-    internal (BRAM) ("bram_load_vector", T, (("bram", BRAM(T)), ("ofs",Idx), ("len", Idx), ("cchain", CounterChain)) :: MVector(T)) implements figment ${
-      Array.tabulate($len){i => $bram(fix_to_int($ofs) + i)}.asInstanceOf[Rep[Vector[T]]] // HACK: Lie about type until compiler knows Vector = Array = ForgeArray
-    }
-    internal (BRAM) ("bram_store_vector", T, (("bram", BRAM(T)), ("ofs", Idx), ("vec", MVector(T)), ("cchain", CounterChain)) :: MUnit, effect = write(0)) implements figment ${
-      $vec.zipWithIndex.foreach{case (e,i) => $bram(fix_to_int($ofs) + i) = e}
-    }
-
-
     // --- Internals
     internal (BRAM) ("bramLoadVector", T, (("bram", BRAM(T)), ("ofs",Idx), ("len",Idx), ("p", MInt)) :: MVector(T)) implements composite ${
       val vec = bram_load_vector($bram,$ofs,$len,CounterChain(Counter(min=0.as[Index], max=len, step=1.as[Index], par=$p)))

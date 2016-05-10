@@ -88,7 +88,7 @@ trait PipeStageToolsExp extends EffectExp {
     case EatReflect(_:Pipe_foreach)    => true
     case EatReflect(_:Pipe_fold[_,_])  => true
     case EatReflect(_:Accum_fold[_,_]) => true
-    case EatReflect(_:Unit_pipe[_])    => true
+    case EatReflect(_:Unit_pipe)       => true
     case _ => false
   }
   def isLoop(d: Def[Any]): Boolean = d match {

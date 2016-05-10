@@ -27,7 +27,7 @@ trait ArgInOut extends DHDLApplication {
         b1 := v1(0::tileSize)
         b2 := v2(0::tileSize)
       }
-      Pipe(0 until N).fold(out){ ii => b1(ii) * b2(ii) }{_+_}
+      Pipe.reduce(0 until N)(out){ ii => b1(ii) * b2(ii) }{_+_}
     }
     val result = getArg(out)
     println(result)

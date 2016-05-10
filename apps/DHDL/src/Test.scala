@@ -22,12 +22,11 @@ trait Test extends DHDLApplication {
       val b1 = BRAM[Q16]("b1", 5)
       val b2 = BRAM[Q16]("b2", 5)
 
-      MetaPipe(10 by 5, outer){i =>
+      Pipe.fold(10 by 5)(outer){i =>
         b1 := v1(i::i+5)
         b2 := v2(i::i+5)
         val inner = Reg[Q16]
-        Pipe(0 until 5, inner){ii => b1(ii) * b2(ii) }{_+_}
-        inner.value
+        Pipe.reduce(0 until 5)(inner){ii => b1(ii) * b2(ii) }{_+_}
       }{_+_}
     }
 

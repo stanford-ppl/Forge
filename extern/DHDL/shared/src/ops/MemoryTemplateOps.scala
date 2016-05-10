@@ -78,5 +78,8 @@ trait MemoryTemplateCompilerOps extends MemoryTemplateOps {
   this: DHDLIdentifiers =>
 
   def vector_from_list[T:Manifest](elems: List[Rep[T]])(implicit ctx: SourceContext): Rep[Vector[T]]
+
+  def bram_load_vector[T:Manifest](bram: Rep[BRAM[T]], ofs: Rep[FixPt[Signed,B32,B0]], len: Rep[FixPt[Signed,B32,B0]], cchain: Rep[CounterChain])(implicit ctx: SourceContext): Rep[Vector[T]]
+  def bram_store_vector[T:Manifest](bram: Rep[BRAM[T]], ofs: Rep[FixPt[Signed,B32,B0]], vec: Rep[Vector[T]], cchain: Rep[CounterChain])(implicit ctx: SourceContext): Rep[Unit]
 }
 

@@ -15,7 +15,7 @@ trait DotProduct extends DHDLApplication {
   lazy val dataSize = ArgIn[SInt]("dataSize")
 
   def dotproduct(v1: Rep[OffChipMem[Elem]], v2: Rep[OffChipMem[Elem]], out: Rep[Reg[Elem]]) {
-    Pipe(dataSize by tileSize par outerPar).fold(out){ i =>
+    Pipe.fold(dataSize by tileSize par outerPar)(out){ i =>
       val b1 = BRAM[Elem]("b1", tileSize)
       val b2 = BRAM[Elem]("b2", tileSize)
       Parallel {
@@ -23,7 +23,7 @@ trait DotProduct extends DHDLApplication {
         b2 := v2(i::i+tileSize, innerPar)
       }
       val acc = Reg[Elem]("acc")
-      Pipe(0 until tileSize par innerPar).fold(acc){ ii => b1(ii) * b2(ii) }{_+_}
+      Pipe.reduce(0 until tileSize par innerPar)(acc){ ii => b1(ii) * b2(ii) }{_+_}
     }{_+_}
   }
 

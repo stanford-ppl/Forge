@@ -93,7 +93,7 @@ trait BlackScholes extends DHDLApplication {
       }
 
       val optpriceRAM = BRAM[Flt](tileSize)
-      Pipe((tileSize by 1) par innerPar) { j =>
+      Pipe((tileSize by 1) par innerPar){ j =>
         val price = BlkSchlsEqEuroNoDiv(sptpriceRAM(j), strikeRAM(j), rateRAM(j), volatilityRAM(j), otimeRAM(j), otypeRAM(j))
         optpriceRAM(j) = price
       }

@@ -200,7 +200,7 @@ trait DHDLMath {
     infix (FixPt) ("-",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ sub($0, $1) }
     infix (FixPt) ("*",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ mul($0, $1) }
     infix (FixPt) ("/",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ div($0, $1) }
-    infix (FixPt) ("%",  (S,I,F), (FixPt(S,I,Z), FixPt(S,I,Z)) :: FixPt(S,I,Z)) implements redirect ${ mod($0, $1) }
+    infix (FixPt) ("%",  (S,I),   (FixPt(S,I,Z), FixPt(S,I,Z)) :: FixPt(S,I,Z)) implements redirect ${ mod($0, $1) }
 
     infix (FixPt) ("<",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements redirect ${ lt($0, $1) }
     infix (FixPt) (">",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements redirect ${ lt($1, $0) }
@@ -466,7 +466,7 @@ trait DHDLMath {
      * @param rFunc: Associative reduction function
      **/
     direct (Math) ("reduceTree", T, CurriedMethodSignature(List(List(SList(T)), List((T,T) ==> T)),T)) implements composite ${
-      reduceTreeLevel(level, $1).head
+      reduceTreeLevel($0, $1).head
     }
     /** Creates a reduction tree which calculates the product of the given symbols **/
     direct (Math) ("productTree", T, SList(T) :: T, TArith(T)) implements composite ${

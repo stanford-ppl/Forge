@@ -237,10 +237,10 @@ trait LatencyModel extends PipeStageToolsExp {
     case _:Bram_load_vector[_] => 0
 
     case _:Pipe_parallel => 1
+    case _:Unit_pipe => 0
     case _:Pipe_foreach  => 1
     case _:Pipe_fold[_,_] => 1
     case _:Accum_fold[_,_]  => 1
-    case _:Unit_pipe[_] => 0
 
     case Reg_read(s) if regType(s) == ArgumentIn => 0
     case Reg_read(s) => 0

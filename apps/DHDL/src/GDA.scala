@@ -41,7 +41,7 @@ trait GDA extends DHDLApplication {
 
       val sigmaOut = BRAM[Elem]("sigmaOut", cTileSize, cTileSize)
 
-      Pipe((rows by rTileSize) par outerPar).fold(sigmaOut, outerAccumPar){ r =>
+      Pipe.fold((rows by rTileSize) par outerPar, outerAccumPar)(sigmaOut){ r =>
         val yTile = BRAM[Bit]("yTile", rTileSize)
         val xTile = BRAM[Elem]("xTile", rTileSize, cTileSize)
         Parallel {
@@ -50,7 +50,7 @@ trait GDA extends DHDLApplication {
         }
 
         val sigmaBlk = BRAM[Elem]("sigmaBlk", cTileSize, cTileSize)
-        Pipe((rTileSize by 1) par innerPar).fold(sigmaBlk, prodLoopPar){rr =>
+        Pipe.fold((rTileSize by 1) par innerPar, prodLoopPar)(sigmaBlk){rr =>
           val subTile = BRAM[Elem]("subTile", cTileSize)
           val sigmaTile = BRAM[Elem]("sigmaTile", cTileSize, cTileSize)
           Pipe((cTileSize by 1) par subLoopPar){ cc =>

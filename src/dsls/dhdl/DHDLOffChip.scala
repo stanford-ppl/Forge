@@ -237,7 +237,7 @@ trait DHDLOffChip {
 
       val par = tilePar($tile).getOrElse(param(1))
 
-      Pipe(CounterChain(cmdCtrs:_*)).forIndices{indices =>
+      Pipe(CounterChain(cmdCtrs:_*)){indices =>
         val inds = indices.toList :+ 0.as[Index]
         val indsDropUnits = inds.zip(unitDims).flatMap{case (i,isUnitDim) => if (!isUnitDim) Some(i) else None}
 

@@ -15,7 +15,7 @@ trait OuterProduct extends DHDLApplication {
   lazy val innerPar = param("innerPar", 96)
 
   def outerProduct(vec1: Rep[OffChipMem[Elem]], vec2: Rep[OffChipMem[Elem]], out: Rep[OffChipMem[Elem]]) {
-    MetaPipe(dataSize by tileSize, (dataSize by tileSize) par outerPar) { (i,j) =>
+    Pipe(dataSize by tileSize, (dataSize by tileSize) par outerPar) { (i,j) =>
       val b1 = BRAM[Elem]("b1", tileSize)
       val b2 = BRAM[Elem]("b2", tileSize)
       val outTile = BRAM[Elem]("outTile", tileSize, tileSize)

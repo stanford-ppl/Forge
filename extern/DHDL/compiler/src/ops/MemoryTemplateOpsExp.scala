@@ -158,6 +158,18 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
   // --- Nodes
   case class Vector_from_list[T](elems: List[Exp[T]])(implicit val mT: Manifest[T], val ctx: SourceContext) extends Def[Vector[T]]
 
+  case class Bram_load_vector[T](bram: Exp[BRAM[T]], ofs: Exp[FixPt[Signed,B32,B0]], len: Exp[FixPt[Signed,B32,B0]], cchain: Exp[CounterChain])(implicit val mT: Manifest[T], val ctx: SourceContext) extends Def[Vector[T]]
+  case class Bram_store_vector[T](bram: Exp[BRAM[T]], ofs: Exp[FixPt[Signed,B32,B0]], vec: Exp[Vector[T]], cchain: Exp[CounterChain])(implicit val mT: Manifest[T], val ctx: SourceContext) extends Def[Unit]
+
+  def bram_load_vector[T:Manifest](bram: Rep[BRAM[T]], ofs: Rep[FixPt[Signed,B32,B0]], len: Rep[FixPt[Signed,B32,B0]], cchain: Rep[CounterChain])(implicit ctx: SourceContext): Rep[Vector[T]] = {
+    reflectPure(Bram_load_vector(bram, ofs, len, cchain))
+  }
+
+  def bram_store_vector[T:Manifest](bram: Rep[BRAM[T]], ofs: Rep[FixPt[Signed,B32,B0]], vec: Rep[Vector[T]], cchain: Rep[CounterChain])(implicit ctx: SourceContext): Rep[Unit] = {
+    reflectEffect(Bram_store_vector(bram, ofs, vec, cchain), Write(List(bram.asInstanceOf[Sym[BRAM[T]]])))
+  }
+
+
   // --- Internal API
   def vector_from_list[T:Manifest](elems: List[Rep[T]])(implicit ctx: SourceContext): Rep[Vector[T]] = reflectPure(Vector_from_list(elems))
 
@@ -166,22 +178,11 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
     case e@Vector_from_list(elems) => reflectPure(Vector_from_list(f(elems))(e.mT, e.ctx))(mtype(manifest[A]), pos)
     case Reflect(e@Vector_from_list(elems), u, es) => reflectMirrored(Reflect(Vector_from_list(f(elems))(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
 
+    case e@Bram_load_vector(b,o,l,c) => bram_load_vector(f(b),f(o),f(l),f(c))(e.mT,e.ctx)
+    case Reflect(e@Bram_load_vector(b,o,l,c), u, es) => reflectMirrored(Reflect(Bram_load_vector(f(b),f(o),f(l),f(c))(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case e@Bram_store_vector(b,o,v,c) => bram_store_vector(f(b),f(o),f(v),f(c))(e.mT,e.ctx)
+    case Reflect(e@Bram_store_vector(b,o,v,c), u, es) => reflectMirrored(Reflect(Bram_store_vector(f(b),f(o),f(v),f(c))(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e, f)
-  }
-
-  // --- Dependencies
-  override def syms(e: Any): List[Sym[Any]] = e match {
-    case _ => super.syms(e)
-  }
-
-  override def readSyms(e: Any): List[Sym[Any]] = e match {
-    case _ => super.readSyms(e)
-  }
-  override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {
-    case _ => super.symsFreq(e)
-  }
-  override def boundSyms(e: Any): List[Sym[Any]] = e match {
-    case _ => super.boundSyms(e)
   }
 
   // --- Aliasing

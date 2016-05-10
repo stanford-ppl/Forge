@@ -14,7 +14,7 @@ trait TileStoreTest extends DHDLApplication {
   def stores(v1: Rep[OffChipMem[Flt]]) {
     val b1 = List.tabulate(c){i => BRAM[Flt]("b1", rows, cols) }
 
-    Sequential(0 until 5000) { i =>
+    Sequential.foreach(0 until 5000){ i =>
       Parallel {
         b1.foreach{b => v1(0::rows, 0::cols, p) := b }
       }

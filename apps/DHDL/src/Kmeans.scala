@@ -65,7 +65,7 @@ trait Kmeans extends DHDLApplication {
           val distances = List.tabulate(MAXK){i => Reg[Flt](0.0f) }
           Parallel {
             oldCent.zip(distances).foreach{ case (cent, dist) =>
-              Pipe((D by 1) par dstLoopPar, dist){d => (pointsTile(pt,d) - cent(d)) ** 2 }{_+_} // 4
+              Pipe.reduce((D by 1) par dstLoopPar)(dist){d => (pointsTile(pt,d) - cent(d)) ** 2 }{_+_} // 4
             }
           }
           Sequential {

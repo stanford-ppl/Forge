@@ -629,7 +629,7 @@ trait DHDLMemories {
     data(Tile, ("_target", OffChip(T)))
     internal (Tile) ("tile_new", T, OffChip(T) :: Tile(T)) implements allocates(Tile, ${$0})
     internal (Tile) ("tile_create", T, (OffChip(T), SList(Range)) :: Tile(T)) implements composite ${
-      if (dimsOf($0).length != $1.length) stageError("Attempting to access " + dimsOf($0).length + "D memory with " + $1.length + " indices")
+      if (dimsOf($0).length != $1.length) stageError("Attempting to access " + dimsOf($0).length + "D memory " + nameOf($0) " with " + $1.length + " indices")
       val tile = tile_new($0)
       rangesOf(tile) = $1
       tile

@@ -207,7 +207,7 @@ trait DHDLMath {
     infix (Prim) ("-",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ sub_fix($0, $1) }
     infix (Prim) ("*",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ mul_fix($0, $1) }
     infix (Prim) ("/",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ div_fix($0, $1) }
-    infix (Prim) ("%",  (S,I,F), (FixPt(S,I,Z), FixPt(S,I,Z)) :: FixPt(S,I,Z)) implements redirect ${ mod_fix($0, $1) }
+    infix (Prim) ("%",  (S,I),   (FixPt(S,I,Z), FixPt(S,I,Z)) :: FixPt(S,I,Z)) implements redirect ${ mod_fix($0, $1) }
 
     infix (Prim) ("<",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements redirect ${ lt_fix($0, $1) }
     infix (Prim) (">",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements redirect ${ lt_fix($1, $0) }
@@ -586,7 +586,7 @@ trait DHDLMath {
       infix (Prim) ("-",  (S,I,F), (T, FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ sub_fix(fixPt[\$TT,S,I,F]($0), $1) }
       infix (Prim) ("*",  (S,I,F), (T, FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ mul_fix(fixPt[\$TT,S,I,F]($0), $1) }
       infix (Prim) ("/",  (S,I,F), (T, FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ div_fix(fixPt[\$TT,S,I,F]($0), $1) }
-      infix (Prim) ("%",  (S,I,F), (T, FixPt(S,I,Z)) :: FixPt(S,I,Z)) implements redirect ${ mod_fix(fixPt[\$TT,S,I,B0]($0), $1) }
+      infix (Prim) ("%",  (S,I),   (T, FixPt(S,I,Z)) :: FixPt(S,I,Z)) implements redirect ${ mod_fix(fixPt[\$TT,S,I,B0]($0), $1) }
 
       infix (Prim) ("<",  (S,I,F), (T, FixPt(S,I,F)) :: Bit) implements redirect ${ lt_fix(fixPt[\$TT,S,I,F]($0), $1) }
       infix (Prim) (">",  (S,I,F), (T, FixPt(S,I,F)) :: Bit) implements redirect ${ lt_fix($1, fixPt[\$TT,S,I,F]($0)) }
@@ -615,7 +615,7 @@ trait DHDLMath {
       infix (Prim) ("-",  (S,I,F), (FixPt(S,I,F), T) :: FixPt(S,I,F)) implements redirect ${ sub_fix($0, fixPt[\$TT,S,I,F]($1)) }
       infix (Prim) ("*",  (S,I,F), (FixPt(S,I,F), T) :: FixPt(S,I,F)) implements redirect ${ mul_fix($0, fixPt[\$TT,S,I,F]($1)) }
       infix (Prim) ("/",  (S,I,F), (FixPt(S,I,F), T) :: FixPt(S,I,F)) implements redirect ${ div_fix($0, fixPt[\$TT,S,I,F]($1)) }
-      infix (Prim) ("%",  (S,I,F), (FixPt(S,I,Z), T) :: FixPt(S,I,Z)) implements redirect ${ mod_fix($0, fixPt[\$TT,S,I,B0]($1)) }
+      infix (Prim) ("%",  (S,I),   (FixPt(S,I,Z), T) :: FixPt(S,I,Z)) implements redirect ${ mod_fix($0, fixPt[\$TT,S,I,B0]($1)) }
 
       infix (Prim) ("<",  (S,I,F), (FixPt(S,I,F), T) :: Bit) implements redirect ${ lt_fix($0, fixPt[\$TT,S,I,F]($1)) }
       infix (Prim) (">",  (S,I,F), (FixPt(S,I,F), T) :: Bit) implements redirect ${ lt_fix(fixPt[\$TT,S,I,F]($1), $0) }

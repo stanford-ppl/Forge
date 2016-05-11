@@ -50,13 +50,17 @@ trait DHDLBRAMs {
     direct (BRAM) ("bram_load_nd", T, (BRAM(T), SList(Idx)) :: T) implements composite ${
       if ($1.length < 1) stageError("Cannot load from zero indices")
       val addr = calcAddress($1, dimsOf($0))
-      bram_load($0, addr)
+      val ld = bram_load($0, addr)
+      accessIndices(ld) = $1
+      ld
     }
     /** @nodoc -- only used for Mem typeclass instance **/
     direct (BRAM) ("bram_store_nd", T, (BRAM(T), SList(Idx), T) :: MUnit, effect = write(0)) implements composite ${
       if ($1.length < 1) stageError("Cannot store to zero indices")
       val addr = calcAddress($1, dimsOf($0))
-      bram_store($0, addr, $2)
+      val st = bram_store($0, addr, $2)
+      accessIndices(st) = $1
+      st
     }
 
     /** @nodoc -- only used for Mem typeclass instance **/

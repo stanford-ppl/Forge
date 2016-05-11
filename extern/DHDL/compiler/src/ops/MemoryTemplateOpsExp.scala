@@ -25,7 +25,6 @@ trait FixedPoint[SIGN,INT,FRAC]
 trait FloatPoint[SIG,EXP]
 trait DHDLIndices
 
-// Stub (nothing here for now)
 trait TypeInspectionOpsExp extends TypeInspectionCompilerOps with TpesOpsExp with DHDLMetadataOpsExp {
   this: DHDLExp =>
 

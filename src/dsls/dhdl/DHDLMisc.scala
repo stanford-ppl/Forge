@@ -432,8 +432,8 @@ trait DHDLMisc {
       val edgeStr =  if (dot) "->" else " "
       def parseLine(line:String):Unit = {
         val fields = line.split(edgeStr)
-        val s = fields(0).toInt
-        val d = fields(1).toInt
+        val s = fields(0).trim.toInt
+        val d = fields(1).trim.toInt
         if (!smap.contains(s))
           smap += (s -> ListBuffer(d))
         else

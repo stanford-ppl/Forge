@@ -220,26 +220,26 @@ trait DHDLDSL extends ForgeApplication
     importGlobalAnalysis()
     importBoundAnalysis()
 
-    schedule(IRPrinterPlus)
+    //schedule(IRPrinterPlus)
 
-    schedule(StageAnalyzer)
+    //schedule(StageAnalyzer)
     //schedule(GlobalAnalyzer)
     schedule(DSE)
 
     // --- Post Parameter Selection
     //schedule(AreaAnalyzer)
     //schedule(LatencyAnalyzer)
-    schedule(BoundAnalyzer)
-    schedule(ConstantFolding)
+    //schedule(BoundAnalyzer)
+    //schedule(ConstantFolding)
 
-    schedule(IRPrinterPlus)
+    //schedule(IRPrinterPlus)
 
-    schedule(MetaPipeRegInsertion)
+    //schedule(MetaPipeRegInsertion)
 
-    schedule(ControlSignalAnalyzer)
-    schedule(ParSetter)
+    //schedule(ControlSignalAnalyzer)
+    //schedule(ParSetter)
 
-    schedule(IRPrinterPlus)
+    //schedule(IRPrinterPlus)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))

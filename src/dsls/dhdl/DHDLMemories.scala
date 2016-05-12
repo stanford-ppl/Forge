@@ -657,9 +657,13 @@ trait DHDLMemories {
       val strides = dimsToStrides(memDims)
       val nonUnitStrides = strides.zip(unitDims).filterNot(_._2).map(_._1)
 
-      val ctrs = tileDims.zipWithIndex.map{ case (d,i) =>
-        if (i != tileDims.length - 1) Counter(max = d)
-        else Counter(min = 0.as[Index], max = d, step = 1.as[Index], par = tilePar($tile).getOrElse(param(1)))
+      //val ctrs = tileDims.zipWithIndex.map{ case (d,i) =>
+      val ctrs = ranges.zipWithIndex.map{ case (r,i) =>
+        //Load only specified range rather than entire bram
+        if (i != tileDims.length - 1) Counter(max = r.len)
+        else Counter(min = 0.as[Index], max = r.len, step = 1.as[Index], par = tilePar($tile).getOrElse(param(1)))
+        //if (i != tileDims.length - 1) Counter(max = d)
+        //else Counter(min = 0.as[Index], max = d, step = 1.as[Index], par = tilePar($tile).getOrElse(param(1)))
       }
       val chain = CounterChain(ctrs:_*)
       tile_transfer(mem, $local, nonUnitStrides, ofs, tileStrides, chain, $store)

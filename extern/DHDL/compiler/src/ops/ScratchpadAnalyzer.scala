@@ -34,19 +34,20 @@ trait ScratchpadToolsExp extends DHDLAffineAnalysisExp {
   sealed abstract class BankingFormat
   // Optimization for doing things like diagonal banking for a memory accessed
   // both row- and column-wise.
-  case class MultiWayBanks(strides: List[Int], banks: Int, bankFormat: BankingFormat) extends BankingFormat
+  case class MultiWayBanks(strides: List[Int], banks: Int) extends BankingFormat
   // "Hierarchical" banking scheme (banks of banks of ...)
   // Includes simple, 1D case
-  case class StridedBanks(stride: Int, banks: Int, bankFormat: BankingFormat) extends BankingFormat
+  case class StridedBanks(stride: Int, banks: Int) extends BankingFormat
   // "Banking" via duplication - used when the reader and writer access patterns
   // are either incompatible or unpredictable
-  case class DuplicatedMems(banks: Int, dupFormat: BankingFormat) extends BankingFormat
-
-  case object SingleBank extends BankingFormat
+  case class DuplicatedMems(banks: Int) extends BankingFormat
 
   object BankingFormat {
     def fromAccessPattern(pattern: List[IndexPattern], pars: List[Int], strides: List[Int]): BankingFormat = {
-      if (pattern.isEmpty) SingleBank
+      (pattern, pars, strides).zipped.map{
+        case (AffineAccess(Exact(a),i,b),par,stride) => StridedBanks(a*stide, par)
+        case ()
+      }
       else pattern.head match {
         case AffineAccess(Exact(a),i,b) => StridedBanks(a*strides.head, pars.head, BankingFormat.fromAccessPattern(pattern.tail,pars.tail,strides.tail))
 

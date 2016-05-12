@@ -195,6 +195,8 @@ trait DHDLDSL extends ForgeApplication
 
 
     // --- Traversals
+    val DHDLAffineAnalysis = analyzer("DHDLAffine", isExtern=true)
+
     val StageAnalyzer = analyzer("Stage", isExtern=true)
     val GlobalAnalyzer = analyzer("Global")
     val BoundAnalyzer = analyzer("Bound", isIterative=false)
@@ -208,11 +210,18 @@ trait DHDLDSL extends ForgeApplication
     val ParSetter = traversal("ParSetter",isExtern=true)
     val MetaPipeRegInsertion = traversal("MetaPipeRegInsertion",isExtern=true)
 
+    val BRAMVectorLowering = traversal("BRAMVectorLowering", isExtern=true)
+
     importGlobalAnalysis()
     importBoundAnalysis()
 
+    schedule(IRPrinterPlus)
+
     schedule(StageAnalyzer)
     schedule(GlobalAnalyzer)
+
+    schedule(DHDLAffineAnalysis)
+
     schedule(DSE)
 
     // --- Post Parameter Selection
@@ -227,7 +236,9 @@ trait DHDLDSL extends ForgeApplication
     //schedule(ControlSignalAnalyzer)
     //schedule(ParSetter)
 
-    //schedule(IRPrinterPlus)
+    schedule(BRAMVectorLowering)
+
+    schedule(IRPrinterPlus)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))

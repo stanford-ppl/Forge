@@ -26,39 +26,6 @@ trait DSE extends Traversal {
 
   debugMode = true
 
-  def inferDoubleBuffers(localMems: List[Exp[Any]]) = {
-
-    // TODO: Can probably generalize this and move it elsewhere
-    def leastCommonAncestor(x: (Exp[Any],Boolean), y: (Exp[Any],Boolean)): Option[Exp[Any]] = {
-      var pathX: List[(Exp[Any],Boolean)] = List(x)
-      var pathY: List[(Exp[Any],Boolean)] = List(y)
-
-      def hasParent(n: (Exp[Any],Boolean)) = n._2 || parentOf(n._1).isDefined
-      def getParent(n: (Exp[Any],Boolean)) = if (n._2) (n._1,false) else (parentOf(n._1).get,false)
-
-      var curX = x
-      while (hasParent(curX)) { curX = getParent(curX); pathX ::= curX }
-
-      var curY = y
-      while (hasParent(curY)) { curY = getParent(curY); pathY ::= curY }
-
-      // Choose last node where paths are the same
-      // Note this wouldn't work if paths could diverge and then converge again, but this is never the case
-      val intersect = pathX.zip(pathY).filter{case (x,y) => x == y}.map(_._1)
-      if (intersect.isEmpty) None
-      else Some(intersect.last._1)
-    }
-
-    // Heuristic - find memories which have a reader and a writer which are different
-    // but whose nearest common parent is a metapipeline.
-    localMems.flatMap{mem =>
-      writerOf(mem).map { writer =>
-        val lcas = readersOf(mem).filter(_ != writer).flatMap{reader => leastCommonAncestor(reader, writer).filter(isMetaPipe(_)) }
-        mem -> lcas.head // HACK: This could actually be much more complicated..
-      }
-    }
-  }
-
   lazy val ctrlAnalyzer = new ControlSignalAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val paramAnalyzer = new ParameterAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val printer = new IRPrinterPlus{val IR: DSE.this.IR.type = DSE.this.IR}

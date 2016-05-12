@@ -162,7 +162,7 @@ trait DHDLMemories {
 			@ 	case Regular => quote(reg) + "_hold"
 			@ 	case _ => quote(reg)
 			@ }
-			$pre $sym = $regStr 
+			$pre $sym = $regStr ;
 		}))
 		//reg_write (extern)
     impl (reg_reset) (codegen(maxj, ${

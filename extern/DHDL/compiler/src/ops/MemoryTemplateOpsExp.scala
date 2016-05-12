@@ -657,7 +657,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
 					}
 				case ArgumentIn =>  // alwaysGen
         	alwaysGen {
-          	emit(s"""DFEVar ${quote(sym)} = io.scalarInput(${quote(sym)} , $ts );""")
+          	emit(s"""DFEVar ${quote(sym)} = io.scalarInput("${quote(sym)}", $ts );""")
 				  }
 				case ArgumentOut => //emitted in reg_write
 			}
@@ -695,10 +695,10 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect {
 					//TODO: uncomment after analysis
       		//@  emit(s"""DFEVar ${quote(reg)}_hold = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writerOf(reg).get)}_redLoop_done));""")
       		//@  emit(s"""${quote(reg)} <== $rst ? constant.var(${tpstr(init)},0):stream.offset(${quote(reg)}_hold, -${quote(writerOf(reg).get)}_offset); // reset""")
-				case ArgumentIn => new Exception("Cannot write to Argument Out! " + quote(reg))
+				case ArgumentIn => new Exception("Cannot write to Argument In! " + quote(reg))
 				case ArgumentOut =>
 				 	val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"
-      	  	emit(s"""io.scalarOutput(${quote(reg)}, ${quote(value)}, $ts, $controlStr);""")
+      	  	emit(s"""io.scalarOutput("${quote(reg)}", ${quote(value)}, $ts, $controlStr);""")
 				}
 			}
 

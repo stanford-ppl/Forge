@@ -306,9 +306,8 @@ trait DHDLMisc {
     // C++ backend
     impl (set_arg)  (codegen(cpp, ${ *$0 = $1}))
     impl (get_arg)  (codegen(cpp, ${ *$0 }))
-    impl (println)  (codegen(cpp, ${ cout << $0 << endl }))
-    impl (println2) (codegen(cpp, ${ cout << endl }))
-
+    impl (println)  (codegen(cpp, ${ std::cout << $0 << std::endl }))
+    impl (println2) (codegen(cpp, ${ std::cout << std::endl }))
     // --- Dot Backend
     impl (println)  (codegen(dot, ${
 			@ emitComment("println")

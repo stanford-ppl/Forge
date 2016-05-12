@@ -321,7 +321,7 @@ trait DHDLMisc {
     impl (get_arg)  (codegen(dot, ${ }))
     impl (hwblock)  (codegen(dot, ${
 			@ inHwScope = true
-      @ stream.println(emitBlock(__arg0) + "")
+      @ emitBlock(__arg0)
 			@ inHwScope = false
     }))
 
@@ -336,7 +336,7 @@ trait DHDLMisc {
     impl (get_arg)  (codegen(maxj, ${ }))
     impl (hwblock)  (codegen(maxj, ${
 			@ inHwScope = true
-      @ stream.println(emitBlock(__arg0) + "")
+      @ emitBlock(__arg0)
 			@ inHwScope = false
     }))
 

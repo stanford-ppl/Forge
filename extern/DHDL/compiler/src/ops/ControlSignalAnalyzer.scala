@@ -43,6 +43,15 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
     for ((s,p) <- metadata) {
       if (meta[MReaders](s).isDefined && !isDelayReg(s)) readersOf(s) = Nil
       if (meta[MWritten](s).isDefined) writtenIn(s) = Nil
+      if (meta[MWriter](s).isDefined) writerOf(s) = None
+    }
+    b
+  }
+
+  override def postprocess[A:Manifest](b: Block[A]): Block[A] = {
+    for (mems <- localMems) {
+      if (writerOf(mem).isEmpty) stageWarn("Memory " + nameOf(mem).getOrElse("") + " defined here has no writer")(mpos(mem))
+      if (readersOf(mem).isEmpty) stageWarn("Memory " + nameOf(mem).getOrElse("") + " defined here has no readers")(mpos(mem))
     }
     b
   }
@@ -97,27 +106,37 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
   def setReaders(ctrl: Exp[Any], isReduce: Boolean, blks: Block[Any]*) {
     val reads = getLocalReaders(blks:_*)
     reads.foreach{
-      case Def(EatReflect(Reg_read(reg))) =>
-        if (!isDelayReg(reg)) readersOf(reg) = readersOf(reg) :+ (ctrl,isReduce)
+      case reader@Def(EatReflect(Reg_read(reg))) =>
+        if (!isDelayReg(reg)) readersOf(reg) = readersOf(reg) :+ (ctrl,isReduce,reader)
 
-      case Def(EatReflect(Bram_load(ram,addr))) =>
+      case reader@Def(EatReflect(Bram_load(ram,addr))) =>
         val top = getTopController(ctrl, isReduce, addr)
-        readersOf(ram) = readersOf(ram) :+ top
+        readersOf(ram) = readersOf(ram) :+ (top._1,top._2,reader)
+    }
+  }
+
+  def checkMultipleWriters(mem: Exp[Any], writer: Exp[Any]) {
+    if (writerOf(mem).isDefined) {
+      stageError("Memory " + nameOf(reg).getOrElse("") + " defined here has multiple writers: ")(mpos(reg.pos))
+      stageError("")(mpos(writerOf(reg)).get._3.pos)
+      stageError("")(mpos(writer.pos))
     }
   }
 
   def setWriter(ctrl: Exp[Any], isReduce: Boolean, blks: Block[Any]*) {
     val writes = getLocalWriters(blks:_*)
     writes.foreach{
-      case Def(EatReflect(Reg_write(reg,_))) =>
+      case writer@Def(EatReflect(Reg_write(reg,_))) =>
         if (!isDelayReg(reg)) {
-          writerOf(reg) = (ctrl, isReduce)
+          checkMultipleWriters(reg, writer)
+          writerOf(reg) = (ctrl, isReduce, writer)
           writtenIn(ctrl) = writtenIn(ctrl) :+ reg  // (10)
         }
 
-      case Def(EatReflect(Bram_store(ram,addr,_))) =>
+      case writer@Def(EatReflect(Bram_store(ram,addr,_))) =>
+        checkMultipleWriters(ram, writer)
         val top = getTopController(ctrl, isReduce, addr)
-        writerOf(ram) = top
+        writerOf(ram) = (top._1,top._2,writer)
         writtenIn(ctrl) = writtenIn(ctrl) :+ ram    // (10)
     }
   }
@@ -215,9 +234,10 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       traverseWith(lhs,false,inds,cc)(func)
       traverseWith(lhs,false,inds,cc)(rFunc)
 
-      readersOf(a) = readersOf(a) :+ (lhs, !isFine)  // (4)
-      writerOf(a) = (lhs, !isFine)                   // (5)
-      isAccum(a) = true                              // (6)
+      checkMultipleWriters(a, lhs)
+      readersOf(a) = readersOf(a) :+ (lhs, !isFine, lhs)  // (4)
+      writerOf(a) = (lhs, !isFine, lhs)                   // (5)
+      isAccum(a) = true                                   // (6)
 
       if (styleOf(lhs) == Coarse) metapipes ::= lhs  // (8)
       if (!parentOf(lhs).isDefined) top = lhs        // (11)
@@ -242,33 +262,34 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       traverseWith(lhs,true, inds2,cc2)(rFunc)
 
       val partial = getBlockResult(func)
-      readersOf(partial) = readersOf(partial) :+ (lhs,true) // (4)
+      readersOf(partial) = readersOf(partial) :+ (lhs,true,lhs) // (4)
 
-      readersOf(a) = readersOf(a) :+ (lhs, true) // (4)
-      writerOf(a) = (lhs, true)                  // (5)
+      checkMultipleWriters(a, writer)
+      readersOf(a) = readersOf(a) :+ (lhs, true, lhs)     // (4)
+      writerOf(a) = (lhs, true, lhs)                      // (5)
       isAccum(a) = true
-      val ipars = parParamsOf(cc2)               // (6)
+      val ipars = parParamsOf(cc2)                   // (6)
       addAccessParam(a, ipars.last)
 
       if (styleOf(lhs) == Coarse) metapipes ::= lhs  // (8)
       if (!parentOf(lhs).isDefined) top = lhs        // (11)
 
     case EatReflect(Reg_write(reg,value)) =>
-      isAccum(reg) = hasDependency(value, reg)    // (6)
+      isAccum(reg) = hasDependency(value, reg)      // (6)
 
     case EatReflect(Bram_load(bram,addr)) =>
-      addAccessFactor(bram, addr)                  // (9)
+      addAccessFactor(bram, addr)                   // (9)
 
     case EatReflect(Bram_store(bram,addr,value)) =>
       isAccum(bram) = hasDependency(value, bram)    // (6)
       addAccessFactor(bram, addr)                   // (9)
 
     case EatReflect(Bram_load_vector(bram,ofs,len,cchain)) =>
-      readersOf(bram) = readersOf(bram) :+ (lhs,false)  // (4)
-      addAccessParam(bram, parParamsOf(cchain).last)    // (9)
+      readersOf(bram) = readersOf(bram) :+ (lhs,false,lhs)  // (4)
+      addAccessParam(bram, parParamsOf(cchain).last)        // (9)
 
     case EatReflect(Bram_store_vector(bram,ofs,vec,cchain)) =>
-      writerOf(bram) = lhs                              // (4)
+      writerOf(bram) = (lhs,false,lhs)                  // (4)
       isAccum(bram) = hasDependency(vec, bram)          // (6)
       addAccessParam(bram, parParamsOf(cchain).last)    // (9)
       writtenIn(lhs) = writtenIn(lhs) :+ bram           // (11)

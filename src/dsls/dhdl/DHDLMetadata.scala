@@ -245,6 +245,10 @@ trait DHDLMetadata {
     internal.static (parentOps) ("apply", Nil, MAny :: SOption(MAny)) implements
       composite ${ meta[MParent]($0).map(_.parent) }
 
+    internal.static (parentOps) ("apply", Nil, CTuple2(MAny,SBoolean) :: SOption(CTuple2(MAny,SBoolean))) implements composite ${
+      if ($0._2) ($0._1, false) else parentOf($0._1).map{p => (p,false) }
+    }
+
     /* A list of ctrl nodes inside current ctrl nodes. Order matters for sequential */
 	 	//TODO: need to confirm with Raghu whether ctrl node includes counterchain. looks like it
 		// it doesn't
@@ -266,26 +270,26 @@ trait DHDLMetadata {
 
 		/* The controller that writes to the Mem.
 		 * Right now assume only one writer per double buffer */
-    val MWriter = metadata("MWriter", "writer" -> MAny, "isReduce" -> SBoolean)
+    val MWriter = metadata("MWriter", "writer" -> SOption(CTuple3(MAny,SBoolean,MAny)))
     val writerOps = metadata("writerOf")
-    internal.static (writerOps) ("update", T, (T, MAny) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MWriter($1,false)) }
-    internal.static (writerOps) ("update", T, (T, CTuple2(MAny,SBoolean)) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MWriter($1._1,$1._2)) }
+    internal.static (writerOps) ("update", T, (T, CTuple2(MAny,MAny)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MWriter( Some(($1._1,false,$1._2)) )) }
+    internal.static (writerOps) ("update", T, (T, CTuple3(MAny,SBoolean,MAny)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MWriter(Some($1))) }
 
-    internal.static (writerOps) ("apply", T, T :: SOption(CTuple2(MAny,SBoolean))) implements composite ${
-    	meta[MWriter]($0) match {
-    	  case Some(p) => Some((p.writer,p.isReduce))
-    	  case None => None
-    	}
-		}
+    internal.static (writerOps) ("update", T, (T, SOption(CTuple3(MAny,SBoolean,MAny))) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MWriter($1)) }
+
+
+    internal.static (writerOps) ("apply", T, T :: SOption(CTuple3(MAny,SBoolean,MAny))) implements
+      composite ${ meta[MWriter]($0).getOrElse(None) }
 
 		/* Controllers that read from a Double Buffer. The metadata is only used for double buffer. */
-    val MReaders = metadata("MReaders", "readers" -> SList(CTuple2(MAny, SBoolean)))
+    val MReaders = metadata("MReaders", "readers" -> SList(CTuple3(MAny,SBoolean,MAny)))
     val readersOps = metadata("readersOf")
-    internal.static (readersOps) ("update", T, (T, SList(CTuple2(MAny,SBoolean))) :: MUnit, effect = simple) implements
+    internal.static (readersOps) ("update", T, (T, SList(CTuple3(MAny,SBoolean,MAny))) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MReaders($1)) }
-    internal.static (readersOps) ("apply", T, T :: SList(CTuple2(MAny,SBoolean))) implements
+    internal.static (readersOps) ("apply", T, T :: SList(CTuple3(MAny,SBoolean,MAny))) implements
       composite ${ meta[MReaders]($0).map(_.readers).getOrElse(Nil) }
 
     /* N-dimensional accesses */

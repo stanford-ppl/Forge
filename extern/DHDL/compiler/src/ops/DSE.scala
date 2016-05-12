@@ -35,15 +35,15 @@ trait DSE extends Traversal {
   lazy val tileSizes  = paramAnalyzer.tileSizes.distinct
   lazy val parFactors = paramAnalyzer.parFactors.distinct
   lazy val accFactors = ctrlAnalyzer.memAccessFactors.toList
-  lazy val dblBuffers = inferDoubleBuffers(ctrlAnalyzer.localMems)
+  //lazy val dblBuffers = inferDoubleBuffers(ctrlAnalyzer.localMems)
   lazy val topController = ctrlAnalyzer.top
 
-  def setDoubleBuffers() {
+  /*def setDoubleBuffers() {
     dblBuffers.foreach{case (mem,ctrl) => isDblBuf(mem) = styleOf(ctrl) == Coarse }
   }
   def setBanks() {
     accFactors.foreach{case (mem,params) => banks(mem) = params.map(_.x).max } // TODO: LCM, not max
-  }
+  }*/
 
   override def run[A:Manifest](b: Block[A]) = {
     bndAnalyzer.run(b)
@@ -60,8 +60,8 @@ trait DSE extends Traversal {
 
     tileSizes.foreach{p => p.fix}
     parFactors.foreach{p => p.fix}
-    setDoubleBuffers()
-    setBanks()
+    //setDoubleBuffers()
+    //setBanks()
     bndAnalyzer.run(b)
     contention.run(topController)
     (b)
@@ -197,8 +197,8 @@ trait DSE extends Traversal {
     }
 
     def evaluate() = {
-      setDoubleBuffers()
-      setBanks()
+      //setDoubleBuffers()
+      //setBanks()
       if (PROFILING) endSet()
 
       bndAnalyzer.run(b)

@@ -284,7 +284,7 @@ trait DHDLMetadata {
 				val m = nbits(manifest[T].typeArguments(1))
 				"dfeFloat(" + e + "," + m + ")"
 			} else if (isBitType(manifest[T])) {
-				"TODO"
+			  "dfeFixOffset(1, 0, SignMode.UNSIGNED)"
 			} else {
 				//throw new Exception("Unknown type " + manifest[T])
 				""

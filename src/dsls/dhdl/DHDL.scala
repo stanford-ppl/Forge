@@ -145,12 +145,12 @@ trait DHDLDSL extends ForgeApplication
      **/
     val BRAM = tpe("BRAM", T)
     /**
-     * Caches are on-chip caches for a specific off-chip memory/data structure. Caches allow loading 
-     * with multi-dimentional address, whose dimensions are inherited from the cached off-chip memories. 
-     * The multi-dimentional address is converted to a single flat address in hardware. The 
-     * addressing scheme is word-based flat indexing of the offchip memory. Cache allows loading of a 
-     * single element at a time. During a miss, a cache automatically loads from its off-chip memory 
-     * and stalls the pipeline, and resumes pipeline when loading is complete. 
+     * Caches are on-chip caches for a specific off-chip memory/data structure. Caches allow loading
+     * with multi-dimentional address, whose dimensions are inherited from the cached off-chip memories.
+     * The multi-dimentional address is converted to a single flat address in hardware. The
+     * addressing scheme is word-based flat indexing of the offchip memory. Cache allows loading of a
+     * single element at a time. During a miss, a cache automatically loads from its off-chip memory
+     * and stalls the pipeline, and resumes pipeline when loading is complete.
      **/
     val Cache     = tpe("Cache", T)
     /**
@@ -220,6 +220,8 @@ trait DHDLDSL extends ForgeApplication
     importGlobalAnalysis()
     importBoundAnalysis()
 
+    schedule(IRPrinterPlus)
+
     schedule(StageAnalyzer)
     //schedule(GlobalAnalyzer)
     schedule(DSE)
@@ -229,12 +231,15 @@ trait DHDLDSL extends ForgeApplication
     //schedule(LatencyAnalyzer)
     schedule(BoundAnalyzer)
     schedule(ConstantFolding)
+
+    schedule(IRPrinterPlus)
+
     schedule(MetaPipeRegInsertion)
 
     schedule(ControlSignalAnalyzer)
     schedule(ParSetter)
 
-    //schedule(IRPrinterPlus)
+    schedule(IRPrinterPlus)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))

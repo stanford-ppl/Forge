@@ -12,14 +12,6 @@ trait LatencyModel {
 
   lazy val memModel = new TileLoadModel()
 
-  object Deff {
-    def unapply(e: Exp[Any]): Option[Any] = e match {
-      case Def(Reflect(inner, _, _)) => Some(inner)
-      case Def(d) => Some(d)
-      case _ => None
-    }
-  }
-
   private var silentModel = false
   private def warn(x: => String) { if (!silentModel) stageWarn(x) }
   def silenceLatencyModel() { silentModel = true }

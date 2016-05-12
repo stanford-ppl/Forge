@@ -123,7 +123,7 @@ trait ParameterAnalyzer extends Traversal {
   val IR: DHDLExp with ParameterAnalysisExp
   import IR._
 
-  override val debugMode = false
+  debugMode = false
 
   val MIN_TILE_SIZE  = 96   // words
   val MAX_TILE_SIZE  = 9600 // words

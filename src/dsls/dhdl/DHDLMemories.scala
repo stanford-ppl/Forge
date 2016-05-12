@@ -344,7 +344,7 @@ trait DHDLMemories {
       val cache = cache_new[T]($1)
       $0.foreach{name => nameOf(cache) = name }
       dimsOf(cache) = dimsOf($1)
-      cache 
+      cache
     }
 
     /** @nodoc **/
@@ -369,16 +369,16 @@ trait DHDLMemories {
 
     // --- API
     /** Creates a Cache with given name and target OffChipMem. Dimensions is inherited from
-     *  OffChipMem 
+     *  OffChipMem
      * @param name
-     * @param offchip 
+     * @param offchip
      **/
     static (Cache) ("apply", T, (SString, OffChip(T)) :: Cache(T), TNum(T)) implements composite ${ cache_create(Some($0), $1) }
 
     /** Creates a unnamed Cache with target OffChipMem. Dimensions is inherited from
-     *  OffChipMem 
+     *  OffChipMem
      * @param name
-     * @param offchip 
+     * @param offchip
      **/
     static (Cache) ("apply", T, OffChip(T) :: Cache(T), TNum(T)) implements composite ${ cache_create(None, $0) }
 
@@ -398,7 +398,7 @@ trait DHDLMemories {
        * During a miss, the innermost pipeline that contains current load will be stalled until data
        * is loaded from offchip
        * @param i: 1D address
-       * @param x: element to be stored to Cache 
+       * @param x: element to be stored to Cache
        **/
       infix ("update") ((Idx, T) :: MUnit, effect = write(0)) implements composite ${ cache_store_nd($self, List($1), $2) }
       /** Creates a write to this Cache at the given 2D address. The cached OffChipMem must have initially been declared as 2D.
@@ -406,7 +406,7 @@ trait DHDLMemories {
        * is loaded from offchip
        * @param i: row index
        * @param j: column index
-       * @param x: element to be stored to Cache 
+       * @param x: element to be stored to Cache
        **/
       infix ("update") ((Idx, Idx, T) :: MUnit, effect = write(0)) implements composite ${ cache_store_nd($self, List($1, $2), $3) }
       /** Creates a write to this Cache at the given 3D address. The cached OffChipMem must have initially been declared as 3D.
@@ -415,7 +415,7 @@ trait DHDLMemories {
        * @param i: row index
        * @param j: column index
        * @param k: page index
-       * @param x: element to be stored to Cache 
+       * @param x: element to be stored to Cache
        **/
       infix ("update") ((Idx, Idx, Idx, T) :: MUnit, effect = write(0)) implements composite ${ cache_store_nd($self, List($1, $2, $3), $4) }
       /** Creates a write to this Cache at the given multi-dimensional address. The number of indices given can either be 1 or the
@@ -423,7 +423,7 @@ trait DHDLMemories {
        * During a miss, the innermost pipeline that contains current load will be stalled until data
        * is loaded from offchip
        * @param ii: multi-dimensional index
-       * @param x: element to be stored to Cache 
+       * @param x: element to be stored to Cache
        **/
       infix ("update") ((SSeq(Idx), T) :: MUnit, effect = write(0)) implements composite ${ cache_store_nd($self, $1.toList, $2) }
 
@@ -437,8 +437,8 @@ trait DHDLMemories {
     // --- Dot Backend
     impl (cache_new)   (codegen(dot, ${
       @ if (isDblBuf(sym)) {
-      	$sym [margin=0 rankdir="LR" label="{<st> | <ld>}" xlabel="$sym " 
-              shape="record" color=$dblbufBorderColor  style="filled" 
+      	$sym [margin=0 rankdir="LR" label="{<st> | <ld>}" xlabel="$sym "
+              shape="record" color=$dblbufBorderColor  style="filled"
               fillcolor=$cacheFillColor ]
       @ } else {
         	$sym [label="$sym " shape="square" style="filled" fillcolor=$cacheFillColor ]
@@ -629,7 +629,7 @@ trait DHDLMemories {
     data(Tile, ("_target", OffChip(T)))
     internal (Tile) ("tile_new", T, OffChip(T) :: Tile(T)) implements allocates(Tile, ${$0})
     internal (Tile) ("tile_create", T, (OffChip(T), SList(Range)) :: Tile(T)) implements composite ${
-      if (dimsOf($0).length != $1.length) stageError("Attempting to access " + dimsOf($0).length + "D memory " + nameOf($0) " with " + $1.length + " indices")
+      if (dimsOf($0).length != $1.length) stageError("Attempting to access " + dimsOf($0).length + "D memory " + nameOf($0) + " with " + $1.length + " indices")
       val tile = tile_new($0)
       rangesOf(tile) = $1
       tile

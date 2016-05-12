@@ -13,7 +13,7 @@ trait MetaPipeRegInsertion extends ForwardTransformer with PipeStageTools {
   val IR: DHDLExp with PipeStageToolsExp
   import IR.{assert => _, _}
 
-  override val debugMode = true
+  debugMode = true
 
   /*var injectSubst: Map[Sym[Any], () => Exp[Any]] = Map.empty
 

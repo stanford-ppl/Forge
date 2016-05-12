@@ -23,7 +23,7 @@ trait DSE extends Traversal {
   val IR: DHDLCompiler
   import IR.{infix_until => _, _}
 
-  override val debugMode = true
+  debugMode = true
 
   def inferDoubleBuffers(localMems: List[Exp[Any]]) = {
 
@@ -135,8 +135,8 @@ trait DSE extends Traversal {
 
     val areaAnalyzer = new AreaAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
     val cycleAnalyzer = new LatencyAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
-    cycleAnalyzer.silenceTraversal()
-    areaAnalyzer.silenceTraversal()
+    cycleAnalyzer.silence()
+    areaAnalyzer.silence()
     bndAnalyzer.run(b)
     areaAnalyzer.run(b)
     cycleAnalyzer.run(b)

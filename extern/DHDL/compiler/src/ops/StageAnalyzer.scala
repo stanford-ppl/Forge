@@ -19,7 +19,7 @@ trait StageAnalyzer extends Traversal with PipeStageTools {
   val IR: DHDLExp with StageAnalysisExp
   import IR._
 
-  override val debugMode: Boolean = false
+  debugMode = false
   override val name = "Stage Analyzer"
 
   override def traverseStm(stm: Stm) = stm match {

@@ -443,13 +443,13 @@ trait DotGenControllerTemplateOps extends DotGenEffect{
 				case _ => {
 					var tstr = s.tp.erasure.getSimpleName() 
 					tstr = tstr.replace("DHDL","") 
-					tstr = tstr.replace("Register", regType(s) match {
-						case Regular => "Reg"
-						case ArgumentIn => "ArgIn"
-						case ArgumentOut => "ArgOut"
-					}) 
+//					tstr = tstr.replace("Register", regType(s) match {
+//						case Regular => "Reg"
+//						case ArgumentIn => "ArgIn"
+//						case ArgumentOut => "ArgOut"
+//					}) 
 					tstr = tstr.replace("BlockRAM", "BRAM")
-					tstr + (if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
+					tstr + (if (nameOf(s)!="") "_" else "") + nameOf(s) + n
 				}
 			}
     case _ => super.quote(x)
@@ -468,13 +468,13 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 		case s@Sym(n) => {
 			var tstr = s.tp.erasure.getSimpleName() 
 			tstr = tstr.replace("DHDL","") 
-			tstr = tstr.replace("Register", regType(s) match {
-				case Regular => "Reg"
-				case ArgumentIn => "ArgIn"
-				case ArgumentOut => "ArgOut"
-			}) 
+//			tstr = tstr.replace("Register", regType(s) match {
+//				case Regular => "Reg"
+//				case ArgumentIn => "ArgIn"
+//				case ArgumentOut => "ArgOut"
+//			}) 
 			tstr = tstr.replace("BlockRAM", "BRAM")
-			tstr + (if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
+			tstr + (if (nameOf(s)!="") "_" else "") + nameOf(s) + n
 		}
     case _ => super.quote(x)
   }

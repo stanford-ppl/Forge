@@ -8,8 +8,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-
-trait ParSetter extends AnalyzerBase {
+trait ParallelizationSetter extends AnalyzerBase {
   val IR: DHDLExp
   import IR._
 
@@ -27,26 +26,26 @@ trait ParSetter extends AnalyzerBase {
 
   override def analyze(lhs: Exp[Any], rhs: Def[Any]): Unit = rhs match {
     case EatReflect(Pipe_foreach(cchain, func, inds)) if styleOf(lhs) == Fine =>
-      val P = parOf(cchain).reduce{_*_}
-      inds.foreach{i => par(i) = P}
+      val Ps = parsOf(cchain)
+      inds.zip(Ps).foreach{case (i,p) => parOf(i) = p}
       traverseInner(P)(func)
 
     case EatReflect(Pipe_fold(cchain,accum,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV)) if styleOf(lhs) == Fine =>
-      val P = parOf(cchain).reduce{_*_}
-      inds.foreach{i => par(i) = P}
+      val Ps = parsOf(cchain)
+      inds.zip(Ps).foreach{case (i,p) => parOf(i) = p}
       traverseInner(P)(iFunc)
       traverseInner(P)(func)
 
     case EatReflect(Accum_fold(ccOuter,ccInner,a,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV)) =>
-      val P = parOf(ccInner).reduce{_*_}
-      inds2.foreach{i => par(i) = P}
+      val Ps = parsOf(ccInner)
+      inds.zip(Ps).foreach{case (i,p) => parOf(i) = p}
       traverseInner(P)(iFunc)
       traverseInner(P)(ld1)
       traverseInner(P)(ld2)
       traverseInner(P)(rFunc)
       traverseInner(P)(st)
 
-    case _ if innerLoopPar.isDefined => par(lhs) = innerLoopPar.get
+    case _ if innerLoopPar.isDefined => parOf(lhs) = innerLoopPar.get
     case _ => blocks(rhs).foreach{blk => traverseBlock(blk)}
   }
 }

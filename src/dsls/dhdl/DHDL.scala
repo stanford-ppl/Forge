@@ -207,7 +207,7 @@ trait DHDLDSL extends ForgeApplication
     val ConstantFolding = traversal("ConstantFolding", isExtern=true)
     val ControlSignalAnalyzer = analyzer("ControlSignal", isExtern=true)
     val ParameterAnalyzer = analyzer("Parameter",isExtern=true)
-    val ParSetter = traversal("ParSetter",isExtern=true)
+    val ParallelizationSetter = traversal("ParallelizationSetter",isExtern=true)
     val MetaPipeRegInsertion = traversal("MetaPipeRegInsertion",isExtern=true)
 
     val BRAMVectorLowering = traversal("BRAMVectorLowering", isExtern=true)
@@ -219,7 +219,8 @@ trait DHDLDSL extends ForgeApplication
 
     schedule(StageAnalyzer)
     schedule(GlobalAnalyzer)
-
+    schedule(ControlSignalAnalyzer)
+    schedule(ParallelizationSetter)
     schedule(DHDLAffineAnalysis)
 
     schedule(DSE)
@@ -233,9 +234,8 @@ trait DHDLDSL extends ForgeApplication
 
     //schedule(MetaPipeRegInsertion)
 
-    //schedule(ControlSignalAnalyzer)
-    //schedule(ParSetter)
-
+    //
+    //
     schedule(BRAMVectorLowering)
 
     schedule(IRPrinterPlus)

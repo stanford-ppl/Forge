@@ -88,10 +88,10 @@ trait DHDLMetadata {
 
     /* Parallelization Factor: 1 if unset */
     val MPar = metadata("MPar", "par" -> SInt)
-    val parOps = metadata("par")
-    internal.static (parOps) ("update", T, (T, SInt) :: MUnit, effect = simple) implements
+    val parOps = metadata("parOf")
+    internal.static (parOps) ("update", Nil, (MAny, SInt) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MPar($1)) }
-    internal.static (parOps) ("apply", T, T :: SInt) implements
+    internal.static (parOps) ("apply", Nil, MAny :: SInt) implements
       composite ${ meta[MPar]($0).map(_.par).getOrElse(1) }
 
 

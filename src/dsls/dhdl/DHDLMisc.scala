@@ -45,6 +45,10 @@ trait DHDLMisc {
 
 
     // --- Multi-dimensional addressing
+    internal (Misc) ("constDimsToStrides", Nil, ("dims", SList(SInt)) :: SList(SInt)) implements composite ${
+      List.tabulate($dims.length){d => $dims.drop(d + 1).fold(1){_*_} }
+    }
+
     internal (Misc) ("dimsToStrides", Nil, ("dims", SList(Idx)) :: SList(Idx)) implements composite ${
       List.tabulate($dims.length){d =>
         if (d == $dims.length - 1) 1.as[SInt]

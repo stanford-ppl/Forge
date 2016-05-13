@@ -107,7 +107,7 @@ trait AreaAnalyzer extends ModelingTools {
         body + areaOf(lhs)
 
       case EatReflect(Pipe_foreach(cchain, func, _)) =>
-        val P = parOf(cchain).reduce(_*_)
+        val P = parsOf(cchain).reduce(_*_)
         val isInner = styleOf(lhs) == Fine
 
         val body = areaOfBlock(func, isInner, P)
@@ -117,7 +117,7 @@ trait AreaAnalyzer extends ModelingTools {
         body + areaOf(lhs)
 
       case EatReflect(e@Pipe_fold(cchain,_,_,iFunc,ld,st,func,rFunc,_,idx,_,_,_)) =>
-        val P = parOf(cchain).reduce(_*_)
+        val P = parsOf(cchain).reduce(_*_)
         val isInner = styleOf(lhs) == Fine
 
         val body = areaOfBlock(func, isInner, P) // map duplicated P times
@@ -148,8 +148,8 @@ trait AreaAnalyzer extends ModelingTools {
         body + internal + internalDelays + icalc + load + cycle + store + areaOf(lhs)
 
       case EatReflect(e@Accum_fold(ccOuter,ccInner,_,_,iFunc,func,ld1,ld2,rFunc,st,_,_,idx,_,_,_,_)) =>
-        val Pm = parOf(ccOuter).reduce(_*_) // Parallelization factor for map
-        val Pr = parOf(ccInner).reduce(_*_) // Parallelization factor for reduce
+        val Pm = parsOf(ccOuter).reduce(_*_) // Parallelization factor for map
+        val Pr = parsOf(ccInner).reduce(_*_) // Parallelization factor for reduce
 
         val body = areaOfBlock(func,false, Pm)
 

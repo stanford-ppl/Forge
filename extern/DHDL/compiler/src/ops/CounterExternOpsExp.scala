@@ -64,7 +64,7 @@ trait CounterExternOpsExp extends CounterOpsExp with CounterChainOpsExp {
   }
 
   // --- Analysis tools
-  def parOf(cc: Rep[CounterChain]): List[Int] = parParamsOf(cc).map(_.x)
+  def parsOf(cc: Rep[CounterChain]): List[Int] = parParamsOf(cc).map(_.x)
 
   def parParamsOf(cc: Rep[CounterChain]): List[Param[Int]] = cc match {
     case Def(EatReflect(Counterchain_new(ctrs,nIter))) => ctrs.map{

@@ -90,7 +90,7 @@ trait LatencyAnalyzer extends ModelingTools {
 
       case EatReflect(Pipe_fold(cchain,_,_,iFunc,ld,st,func,rFunc,_,_,_,_,rV)) if styleOf(lhs) == Fine =>
         val N = nIters(cchain)
-        val P = parOf(cchain).reduce(_*_)
+        val P = parsOf(cchain).reduce(_*_)
 
         debugs(s"Reduce $lhs (N = $N):")
 
@@ -128,7 +128,7 @@ trait LatencyAnalyzer extends ModelingTools {
 
       case EatReflect(Pipe_fold(cchain,_,_,iFunc,ld,st,func,rFunc,_,_,_,_,_)) =>
         val N = nIters(cchain)
-        val P = parOf(cchain).reduce(_*_)
+        val P = parsOf(cchain).reduce(_*_)
         debugs(s"Outer Reduce $lhs (N = $N):")
 
         val mapStages = latencyOfBlock(func)
@@ -146,8 +146,8 @@ trait LatencyAnalyzer extends ModelingTools {
       case EatReflect(Accum_fold(ccOuter,ccInner,_,_,iFunc,func,ld1,ld2,rFunc,st,_,_,_,_,_,_,_)) =>
         val Nm = nIters(ccOuter)
         val Nr = nIters(ccInner)
-        val Pm = parOf(ccOuter).reduce(_*_) // Parallelization factor for map
-        val Pr = parOf(ccInner).reduce(_*_) // Parallelization factor for reduce
+        val Pm = parsOf(ccOuter).reduce(_*_) // Parallelization factor for map
+        val Pr = parsOf(ccInner).reduce(_*_) // Parallelization factor for reduce
 
         debugs(s"Block Reduce $lhs (Nm = $Nm, Nr = $Nr)")
 
@@ -165,12 +165,12 @@ trait LatencyAnalyzer extends ModelingTools {
 
       case Bram_store_vector(bram,ofs,vec,cchain) =>
         val N = nIters(cchain)
-        val P = parOf(cchain).reduce{_*_}
+        val P = parsOf(cchain).reduce{_*_}
         N + latencyOf(lhs) // TODO: This assumes each iteration takes 1 cycle, which may not be true (depends on access pattern)
 
       case Bram_load_vector(bram,ofs,len,cchain) =>
         val N = nIters(cchain)
-        val P = parOf(cchain).reduce{_*_}
+        val P = parsOf(cchain).reduce{_*_}
         N + latencyOf(lhs) // TODO: This assumes each iteration takes 1 cycle, which may not be true (depends on access pattern)
 
       case _ =>

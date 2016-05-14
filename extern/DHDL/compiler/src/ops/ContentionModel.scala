@@ -19,6 +19,9 @@ trait ContentionModel {
   def outerContention(x: Exp[Any], P: => Int): Int = {
     if (styleOf(x) != Fine) {
       val ics = childrenOf(x).map{c => calcContention(c) * P}
+
+      if (ics.isEmpty) stageError(s"Controller $x has no children!")
+
       isolatedContention(x) = ics
       if (styleOf(x) == Coarse) ics.sum else ics.max
     }

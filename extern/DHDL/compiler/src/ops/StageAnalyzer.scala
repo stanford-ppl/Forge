@@ -14,12 +14,19 @@ trait StageAnalyzer extends HungryTraversal with PipeStageTools {
   val IR: DHDLExp with StageAnalysisExp
   import IR._
 
-  //debugMode = true
+  debugMode = true
   override val name = "Stage Analyzer"
   override val recurseAlways = true  // Always follow default traversal scheme
   override val recurseElse = false   // Follow default traversal scheme when node was not matched
 
   override def traverse(lhs: Exp[Any], rhs: Def[Any]) = rhs match {
+    // Accel block (equivalent to a Sequential unit pipe)
+    case Hwblock(blk) =>
+      debug(s"$lhs = $rhs:")
+      val stages = getControlNodes(blk)
+      if (debugMode) list(stages)
+      nStages(lhs) = stages.length
+
     // Parallel
     case Pipe_parallel(func) =>
       debug(s"$lhs = $rhs:")

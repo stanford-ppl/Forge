@@ -224,6 +224,9 @@ trait DHDLDSL extends ForgeApplication
 
     schedule(ParallelizationSetter)
     schedule(DHDLAffineAnalysis)
+
+    schedule(IRPrinterPlus)
+
     schedule(DSE)
 
     // --- Post Parameter Selection

@@ -14,12 +14,12 @@ trait GDA extends DHDLApplication {
   lazy val rows = ArgIn[SInt]("rows")
   lazy val cols = ArgIn[SInt]("cols")
 
-  lazy val rTileSize = param("tileSize", 960)
+  lazy val rTileSize = param("tileSize", 288)
   lazy val cTileSize = 96
-  lazy val outerPar   = param("outerPar", 1)
-  lazy val innerPar   = param("innerPar", 1)
+  lazy val outerPar   = param("outerPar", 5)
+  lazy val innerPar   = param("innerPar", 2)
   lazy val subLoopPar = param("subLoopPar", 1)
-  lazy val prodLoopPar = param("prodLoopPar", 1)
+  lazy val prodLoopPar = param("prodLoopPar", 24)
   lazy val outerAccumPar = param("outerAccumPar", 1)  // Not used in old DHDL
 
   def gda(
@@ -30,41 +30,38 @@ trait GDA extends DHDLApplication {
     sub:   Rep[OffChipMem[Elem]],
     sigma: Rep[OffChipMem[Elem]]
   ) {
+    val mu0Tile = BRAM[Elem]("mu0Tile", cTileSize)
+    val mu1Tile = BRAM[Elem]("mu1Tile", cTileSize)
+    Parallel {
+      mu0Tile := mu0(0::cTileSize, subLoopPar)  // Load mu0
+      mu1Tile := mu1(0::cTileSize, subLoopPar)  // Load mu1
+    }
 
-    Sequential {
-      val mu0Tile = BRAM[Elem]("mu0Tile", cTileSize)
-      val mu1Tile = BRAM[Elem]("mu1Tile", cTileSize)
+    val sigmaOut = BRAM[Elem]("sigmaOut", cTileSize, cTileSize)
+
+    Pipe.fold((rows by rTileSize) par outerPar, outerAccumPar)(sigmaOut){ r =>
+      val yTile = BRAM[Bit]("yTile", rTileSize)
+      val xTile = BRAM[Elem]("xTile", rTileSize, cTileSize)
       Parallel {
-        mu0Tile := mu0(0::cTileSize, subLoopPar)  // Load mu0
-        mu1Tile := mu1(0::cTileSize, subLoopPar)  // Load mu1
+        yTile := y(r::r+rTileSize, subLoopPar)
+        xTile := x(r::r+rTileSize, 0::cTileSize, subLoopPar)  // Load tile of x
       }
 
-      val sigmaOut = BRAM[Elem]("sigmaOut", cTileSize, cTileSize)
-
-      Pipe.fold((rows by rTileSize) par outerPar, outerAccumPar)(sigmaOut){ r =>
-        val yTile = BRAM[Bit]("yTile", rTileSize)
-        val xTile = BRAM[Elem]("xTile", rTileSize, cTileSize)
-        Parallel {
-          yTile := y(r::r+rTileSize, subLoopPar)
-          xTile := x(r::r+rTileSize, 0::cTileSize, subLoopPar)  // Load tile of x
+      val sigmaBlk = BRAM[Elem]("sigmaBlk", cTileSize, cTileSize)
+      Pipe.fold((rTileSize by 1) par innerPar, prodLoopPar)(sigmaBlk){rr =>
+        val subTile = BRAM[Elem]("subTile", cTileSize)
+        val sigmaTile = BRAM[Elem]("sigmaTile", cTileSize, cTileSize)
+        Pipe((cTileSize by 1) par subLoopPar){ cc =>
+          subTile(cc) = xTile(rr,cc) - mux(yTile(rr), mu1Tile(cc), mu0Tile(cc))
         }
-
-        val sigmaBlk = BRAM[Elem]("sigmaBlk", cTileSize, cTileSize)
-        Pipe.fold((rTileSize by 1) par innerPar, prodLoopPar)(sigmaBlk){rr =>
-          val subTile = BRAM[Elem]("subTile", cTileSize)
-          val sigmaTile = BRAM[Elem]("sigmaTile", cTileSize, cTileSize)
-          Pipe((cTileSize by 1) par subLoopPar){ cc =>
-            subTile(cc) = xTile(rr,cc) - mux(yTile(rr), mu1Tile(cc), mu0Tile(cc))
-          }
-          Pipe(cTileSize by 1, (cTileSize by 1) par prodLoopPar){ (ii,jj) =>
-            sigmaTile(ii,jj) = subTile(ii) * subTile(jj)
-          }
-          sigmaTile
-        }{_+_}
+        Pipe(cTileSize by 1, (cTileSize by 1) par prodLoopPar){ (ii,jj) =>
+          sigmaTile(ii,jj) = subTile(ii) * subTile(jj)
+        }
+        sigmaTile
       }{_+_}
+    }{_+_}
 
-      sigma(0::cTileSize, 0::cTileSize, prodLoopPar) := sigmaOut
-    }
+    sigma(0::cTileSize, 0::cTileSize, prodLoopPar) := sigmaOut
   }
 
   def main() {

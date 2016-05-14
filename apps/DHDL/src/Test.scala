@@ -28,6 +28,8 @@ trait Test extends DHDLApplication {
         val inner = Reg[Q16]
         Pipe.reduce(0 until 5)(inner){ii => b1(ii) * b2(ii) }{_+_}
       }{_+_}
+
+      ()
     }
 
     val gold = vec1.map{_**2}.reduce{_+_}

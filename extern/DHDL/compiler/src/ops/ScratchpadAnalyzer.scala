@@ -155,10 +155,10 @@ trait ScratchpadAnalyzer extends HungryTraversal {
         if (i < bankWrite.length - 1) {
           // Special case for creating diagonally banked memories
           (bankWrite(i),bankWrite(i+1),bankRead(i),bankRead(i+1)) match {
-            case (Banking(1),StridedBanking(s1,p), StridedBanking(s2,q),Banking(1)) =>
+            case (Banking(1),StridedBanking(s1,p), StridedBanking(s2,q),Banking(1)) if p > 1 && q > 1 =>
               banking ::= MultiWayBanking(List(s2,s1), lcm(p,q))
               i += 2
-            case (StridedBanking(s1,p),Banking(1), Banking(1),StridedBanking(s2,q)) =>
+            case (StridedBanking(s1,p),Banking(1), Banking(1),StridedBanking(s2,q)) if p > 1 && q > 1 =>
               banking ::= MultiWayBanking(List(s1,s2), lcm(p,q))
               i += 2
 

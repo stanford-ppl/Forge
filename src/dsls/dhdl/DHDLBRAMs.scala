@@ -25,12 +25,12 @@ trait DHDLBRAMs {
     //val bram_reset = internal (BRAM) ("bram_reset", T, (("bram", BRAM(T)), ("zero", T)) :: MUnit, effect = write(0))
 
     // --- Internals
-    internal (BRAM) ("bramLoadVector", T, (("bram", BRAM(T)), ("ofs",Idx), ("len",Idx), ("p", MInt)) :: MVector(T)) implements composite ${
+    internal (BRAM) ("bramLoadVector", T, (("bram", BRAM(T)), ("ofs",SList(Idx)), ("len",Idx), ("p", MInt)) :: MVector(T)) implements composite ${
       val vec = bram_load_vector($bram,$ofs,$len,CounterChain(Counter(min=0.as[Index], max=len, step=1.as[Index], par=$p)))
       dimsOf(vec) = List($len)
       vec
     }
-    internal (BRAM) ("bramStoreVector", T, (("bram", BRAM(T)), ("ofs", Idx), ("vec", MVector(T)), ("p",MInt)) :: MUnit, effect = write(0)) implements composite ${
+    internal (BRAM) ("bramStoreVector", T, (("bram", BRAM(T)), ("ofs", SList(Idx)), ("vec", MVector(T)), ("p",MInt)) :: MUnit, effect = write(0)) implements composite ${
       val len = sizeOf(vec)
       bram_store_vector($bram,$ofs,$vec,CounterChain(Counter(min=0.as[Index], max=len, step=1.as[Index], par=$p)))
     }
@@ -107,15 +107,15 @@ trait DHDLBRAMs {
       infix ("apply") (varArgs(Idx) :: T) implements composite ${ bram_load_nd($self, $1.toList) }
 
       infix ("load") (Range :: MVector(T)) implements composite ${
-        bramLoadVector($self, $1.start, $1.len, param(1))
+        bramLoadVector($self, List($1.start), $1.len, param(1))
       }
 
       infix ("load") ((Idx, Range) :: MVector(T)) implements composite ${
-        bramLoadVector($self, calcAddress(List($1,$2.start), dimsOf($self)), $2.len, param(1))
+        bramLoadVector($self, List($1,$2.start), $2.len, param(1))
       }
 
       infix ("load") ((Idx, Idx, Range) :: MVector(T)) implements composite ${
-        bramLoadVector($self, calcAddress(List($1,$3.start), dimsOf($self)), $3.len, param(1))
+        bramLoadVector($self, List($1,$3.start), $3.len, param(1))
       }
 
       /* Store */

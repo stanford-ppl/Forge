@@ -11,16 +11,23 @@ trait DHDLVectors {
     val Vector = lookupTpe("Vector")
 
     // --- Nodes
-    // vector_from_list -- see extern
+    // vector_from_list, vector_new -- see extern
     val vector_slice = internal (Vector) ("vec_slice", T, (Vector(T), SInt, SInt) :: Vector(T))
     val vector_apply = internal (Vector) ("vec_apply", T, (Vector(T), SInt) :: T)
 
     // --- Internals
-    internal (Vector) ("vector_create", T, SList(T) :: Vector(T)) implements composite ${
+    internal (Vector) ("vector_list_create", T, SList(T) :: Vector(T)) implements composite ${
       val vec = vector_from_list($0)
       dimsOf(vec) = List($0.length.as[Index])
       vec
     }
+
+    // Not yet supported
+    /*val vector_create = internal (Vector) ("vector_create", T, MInt :: Vector(T)) implements composite ${
+      val vec = vector_new[T]($0)
+      dimsOf(vec) = List($0)
+      vec
+    }*/
 
     /** Creates a new Vector containing the given elements
      * @param elems
@@ -28,7 +35,7 @@ trait DHDLVectors {
     static (Vector) ("apply", T, varArgs(T) :: Vector(T)) implements composite ${
       val elems = $0.toList
       if (elems.length < 1) stageError("Cannot create empty Vector")
-      vector_create(elems)
+      vector_list_create(elems)
     }
 
     /** Creates a subvector of this vector with elements [start, end)
@@ -54,6 +61,14 @@ trait DHDLVectors {
       elems(i).asInstanceOf[Rep[T]]
     })
 
+    /*rewrite(vector_create) using rule ${
+      $0 match {
+        case ConstFix(_) =>
+        case ParamFix(_) =>
+        case _ => stageError("Only constants and DSE parameters are allowed as sizes of Vectors")
+      }
+      super.vector_create[T]($0)
+    }*/
 
     // --- Scala Backend
     impl (vector_slice) (codegen($cala, ${ $0.slice($1, $2) }))

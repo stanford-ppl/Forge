@@ -61,7 +61,6 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     rV:  (Sym[T], Sym[T])       // Reduction function inputs
   )(implicit val ctx: SourceContext, val memC: Mem[T,C], val mT: Manifest[T], val mC: Manifest[C[T]]) extends Def[Pipeline]
 
-
   // --- Internals
   def pipe_foreach(cchain: Rep[CounterChain], func: Rep[Indices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Pipeline] = {
     val inds = List.fill(lenOf(cchain)){ fresh[Idx] } // Arbitrary number of bound args. Awww yeah.

@@ -53,11 +53,24 @@ trait MemoryTemplateWrapper extends ControllerTemplateWrapper with TypeInspectio
 
   def vector_from_list[T:Manifest](elems: List[Rep[T]])(implicit ctx: SourceContext): Rep[Vector[T]] = elems.toArray
 
-  def bram_load_vector[T:Manifest](bram: Rep[BRAM[T]], ofs: Rep[FixPt[Signed,B32,B0]], len: Rep[FixPt[Signed,B32,B0]], cchain: Rep[CounterChain])(implicit ctx: SourceContext): Rep[Vector[T]] = {
-    array_fromfunction(len.toInt, {i => bram(ofs.toInt + i)})
+  def bram_load_vector[T:Manifest](bram: Rep[BRAM[T]], offsets: List[Rep[FixPt[Signed,B32,B0]]], len: Rep[FixPt[Signed,B32,B0]], cchain: Rep[CounterChain])(implicit ctx: SourceContext): Rep[Vector[T]] = {
+    val dims = cchain.map(ctr => ctr.len)
+    val vec = array_empty[T](dims.reduce{_*_}.toInt)
+    loop(cchain, 0, Nil, {i: Rep[Indices] =>
+      val bramAddr = calcAddress(offsets.zip(i.toList), dimsOf(bram))
+      val vecAddr = calcAddress(i.toList, dims)
+      vec(vecAddr) = bram(bramAddr)
+    })
+    vec
   }
-  def bram_store_vector[T:Manifest](bram: Rep[BRAM[T]], ofs: Rep[FixPt[Signed,B32,B0]], vec: Rep[Vector[T]], cchain: Rep[CounterChain])(implicit ctx: SourceContext): Rep[Unit] = {
-    vec.zipWithIndex.foreach{case (e,i) => bram(ofs.toInt + i) = e }
+
+  def bram_store_vector[T:Manifest](bram: Rep[BRAM[T]], offsets: List[Rep[FixPt[Signed,B32,B0]]], vec: Rep[Vector[T]], cchain: Rep[CounterChain])(implicit ctx: SourceContext): Rep[Unit] = {
+    val dims = cchain.map{ctr => ctr.len}
+    loop(cchain, 0, Nil, {i: Rep[Indices] =>
+      val bramAddr = calcAddress(offsets.zip(i.toList), dimsOf(bram))
+      val vecAddr = calcAddress(i.toList, dims)
+      bram(bramAddr) = vec(vecAddr)
+    })
   }
 }
 
@@ -93,6 +106,8 @@ trait FixedPointEmulation {
       }
     }
     def by(s: FixedPoint[S,I,F]) = FixedPointRange[S,I,F](start, end, s)
+
+    def len = (end - start)/step
   }
 
 

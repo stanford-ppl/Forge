@@ -239,10 +239,9 @@ trait DHDLOffChip {
 
       Pipe(CounterChain(cmdCtrs:_*)){indices =>
         val inds = indices.toList :+ 0.as[Index]
-        val indsDropUnits = inds.zip(unitDims).flatMap{case (i,isUnitDim) => if (!isUnitDim) Some(i) else None}
+        val localOfs = inds.zip(unitDims).flatMap{case (i,isUnitDim) => if (!isUnitDim) Some(i) else None}
 
         val memOfs = calcAddress(offsets.zip(inds).map{case (a,b) => a + b}, dimsOf(mem))
-        val localOfs = calcAddress(indsDropUnits, dimsOf(local))
 
         if ($store) {
           val vec = bramLoadVector(local, localOfs, tileDims.last, par) // Load MVector from BRAM

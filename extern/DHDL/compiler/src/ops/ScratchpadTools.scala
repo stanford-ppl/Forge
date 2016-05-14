@@ -46,7 +46,7 @@ trait ScratchpadToolsExp extends DHDLAffineAnalysisExp {
     (b(i), i)        (4,4)        Duplicated(4)
    (b(i), c(i))      (4,4)        Duplicated(4)
    (i,j)&(j,i)    (1,4)&(4,1)    MultiWay((C,1), 4)
-  
+
     Data (2x2)        Stride 1        Stride 4        Diagonal
                 B  0 | 1 | 2 | 3   0 | 1 | 2 | 3   0 | 1 | 2 | 3
                   --------------- --------------- ---------------
@@ -54,8 +54,22 @@ trait ScratchpadToolsExp extends DHDLAffineAnalysisExp {
      4 5 6 7       4 | 5 | 6 | 7   1   5   9   D   7   4   5   6
      8 9 A B       8 | 9 | A | B   2   6   A   E   A   B   8   9
      C D E F       C | D | E | F   3   7   B   F   D   E   F   C
-                   B = addr%S      B = (addr/S)%S  B = (i + j)%S
-                   A = addr/S      A = addr%S      A = 
+                   B = addr%N      B = (addr/S)%S  B = (i + j)%S
+                   A = addr/N      A =             A =
+
+     Stride 1  Stride 4     Diagonal
+   B  0 | 1     0 | 1        0 | 1
+     -------   -------      -------
+      0   1     0   4        0   1
+      2   3     1   5        2   3
+      4   5     2   6        7   4
+      6   7     3   7        5   6
+      8   9     8   C        8   9
+      A   B     9   D        A   B
+      C   D     A   E        D   E
+      E   F     B   F        F   C
+  B:   j%N       i%N        (i+j)%N
+  A:(i*S+j)/N  (i/N)*S+j      ???
   */
 
   sealed abstract class BankingFormat
@@ -67,23 +81,18 @@ trait ScratchpadToolsExp extends DHDLAffineAnalysisExp {
   // "Banking" via duplication - used when the reader and writer access patterns
   // are either incompatible or unpredictable
   case class DuplicatedMems(banks: Int) extends BankingFormat
-  // Not a real banking scheme - used to indicate wildcard banking scheme with some par factor
-  case class FlexibleBanks(banks: Int) extends BankingFormat
 
-  object BankingFormat {
-    def fromAccessPattern(mem: Exp[Any], indices: List[Exp[Any]], pattern: List[IndexPattern]): BankingFormat = {
-      val strides = constDimsToStrides(dimsOf(mem).map{case Exact(d) => d})
+  def bankingFromAccessPattern(mem: Exp[Any], indices: List[Exp[Any]], pattern: List[IndexPattern]) = {
+    val strides = constDimsToStrides(dimsOf(mem).map{case Exact(d) => d})
 
-      (pattern, indices, strides).zipped.map{ case (pattern, index, stride) => pattern match {
-        case AffineAccess(Exact(a),i,b) => StridedBanks(a*stride, parOf(i))
-        case StridedAccess(Exact(a),i) => StridedBanks(a*stride, parOf(i))
-        case OffsetAccess(i,b) => StridedBanks(stride, parOf(i))
-        case LinearAccess(i,b) => StridedBanks(stride, parOf(i))
-        case InvariantAccess(b) => DuplicatedMems(parOf(index))
-        case RandomAccess => DuplicatedMems(parOf(index))
-        case FlexibleAccess => FlexibleBanks(parOf(index))
-      }}
-    }
+    (pattern, indices, strides).zipped.map{ case (pattern, index, stride) => pattern match {
+      case AffineAccess(Exact(a),i,b) => StridedBanks(a*stride, parOf(i))
+      case StridedAccess(Exact(a),i) => StridedBanks(a*stride, parOf(i))
+      case OffsetAccess(i,b) => StridedBanks(stride, parOf(i))
+      case LinearAccess(i,b) => StridedBanks(stride, parOf(i))
+      case InvariantAccess(b) => DuplicatedMems(parOf(index))
+      case RandomAccess => DuplicatedMems(parOf(index))
+    }}
   }
 
   /**
@@ -93,21 +102,30 @@ trait ScratchpadToolsExp extends DHDLAffineAnalysisExp {
   */
   case class MemInstance(depth: Int, bankFormat: BankingFormat)
 
-  def unpairedAccess(access: (Exp[Any],Boolean,Exp[Any])): MemInstance = {
-
+  def unpairedAccess(mem: Exp[Any], access: (Exp[Any],Boolean,Exp[Any])): MemInstance = {
+    val banking = bankingFromAccessPattern(mem, accessIndicesOf(access._3), accessPatternOf(access._3))
+    MemInstance(1, banking)
+  }
+  def pairedAccess(mem: Exp[Any], write: (Exp[Any],Boolean,Exp[Any]), read: (Exp[Any],Boolean,Exp[Any])): MemInstance = {
+    val bankWrite = bankingFromAccessPattern(mem, accessIndicesOf(write._3), accessPatternOf(write._3))
+    val bankRead  = bankingFromAccessPattern(mem, accessIndicesOf(read._3), accessPatternOf(read._3))
 
   }
-  def pairedAccess(write: (Exp[Any],Boolean,Exp[Any]), read: (Exp[Any],Boolean,Exp[Any])): MemInstance = {
 
-  }
+  // TODO: How to express "tapped" block FIFO?
+  def coalesceDuplicates(dups: List[MemInstance]) = dups
+
 
   def getMemoryInstances(mem: Exp[Any]) = (writerOf(mem),readersOf(mem)) match {
     case (None, Nil) => Nil
-    case (Some(write), Nil) => List(unpairedAccess(write))
+    case (Some(write), Nil) => List(unpairedAccess(mem, write))
     case (None, reads) =>
-      reads.map(read => unpairedAccess(read))
+      // What to do here? No writer, so current version will always read garbage...
+      val dups = reads.map(read => unpairedAccess(mem, read))
+      coalesceDuplicates(dups)
     case (Some(write), reads) =>
-      reads.map(read => pairedAccess(write, read))
+      val dups = reads.map(read => pairedAccess(mem, write, read))
+      coalesceDuplicates(dups)
   }
 
 

@@ -56,16 +56,21 @@ trait DHDLAffineAnalyzer extends AffineAnalyzer {
   import IR._
 
   override def traverse(lhs: Exp[Any], rhs: Def[Any]): Unit = lhs match {
-    case Bram_load_vector(bram,ofs,len,cchain) => List.fill(lenOf(cchain))(FlexibleAccess)
-    case Bram_store_vector(bram,ofs,vec,cchain) => List.fill(lenOf(cchain))(FlexibleAccess)
+    case Bram_load_vector(bram,ofs,cchain,inds) =>
+      accessPatternOf(lhs) = accessIndicesOf(lhs).map{x => InvariantAccess(x)} ++ inds.map{i => LinearAccess(i) }
+
+    case Bram_store_vector(bram,ofs,cchain,inds) =>
+      accessPatternOf(lhs) = accessIndicesOf(lhs).map{x => InvariantAccess(x)} ++ inds.map{i => LinearAccess(i) }
 
     case Pipe_fold(cc,a,_,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) =>
       super.traverse(lhs,rhs)
-      accessPattern(lhs) = List(FlexibleAccess)
+      accessIndicesOf(lhs) = inds
+      accessPatternOf(lhs) = inds.map{i => LinearAccess(i)}
 
     case Accum_fold(cc1,cc2,a,_,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
       super.traverse(lhs,rhs)
-      accessPattern(lhs) = List(inds2.map{i => LinearAccess(i)})
+      accessIndicesOf(lhs) = inds2
+      accessPatternOf(lhs) = inds2.map{i => LinearAccess(i)}
 
     case _ => super.traverse(lhs,rhs)
   }

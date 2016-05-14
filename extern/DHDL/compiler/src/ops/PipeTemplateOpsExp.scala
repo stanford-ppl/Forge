@@ -12,7 +12,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplateOpsExp with CounterExternOpsExp with EffectExp {
+trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplateOpsExp with ExternCounterOpsExp with EffectExp {
   this: DHDLExp =>
 
   type Idx = FixPt[Signed,B32,B0]
@@ -263,8 +263,8 @@ trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
   }
 }
 
-trait DotGenControllerTemplateOps extends DotGenCounterExternOps {
-  val IR: ControllerTemplateOpsExp with TpesOpsExp with CounterExternOpsExp
+trait DotGenControllerTemplateOps extends DotGenExternCounterOps {
+  val IR: ControllerTemplateOpsExp with TpesOpsExp with ExternCounterOpsExp
           with OffChipMemOpsExp with RegOpsExp with DeliteTransform with DHDLCodegenOps
 
   import IR._
@@ -389,7 +389,7 @@ trait DotGenControllerTemplateOps extends DotGenCounterExternOps {
 
 trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
   val IR: ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
-          with OffChipMemOpsExp with RegOpsExp with CounterExternOpsExp
+          with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
           with DHDLCodegenOps with DeliteTransform
 
  import IR._ //{__ifThenElse => _, Nosynth___ifThenElse => _, __whileDo => _,

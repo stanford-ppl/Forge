@@ -12,7 +12,18 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait CounterExternOpsExp extends CounterOpsExp with CounterChainOpsExp {
+trait DHDLCounter
+trait DHDLCounterChain
+
+trait ExternCounterTypesExp extends ExternCounterTypes {
+  type Counter = DHDLCounter
+  type CounterChain = DHDLCounterChain
+
+  def counterManifest: Manifest[Counter] = manifest[DHDLCounter]
+  def counterChainManifest: Manifest[CounterChain] = manifest[DHDLCounterChain]
+}
+
+trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with CounterChainOpsExp {
   this: DHDLExp =>
 
   // --- Nodes
@@ -126,9 +137,15 @@ trait CounterExternOpsExp extends CounterOpsExp with CounterChainOpsExp {
 
 }
 
-trait ScalaGenCounterExternOps extends ScalaGenEffect {
-  val IR: CounterExternOpsExp
+trait ScalaGenExternCounterOps extends ScalaGenEffect {
+  val IR: ExternCounterOpsExp
   import IR._
+
+  override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
+    case "DHDLCounter" => "FixedPointRange[Signed,B32,B0]"
+    case "DHDLCounterChain" => "Array[FixedPointRange[Signed,B32,B0]]"
+    case _ => super.remap(m)
+  }
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case e@Counter_new(start,end,step,_) =>
@@ -141,12 +158,12 @@ trait ScalaGenCounterExternOps extends ScalaGenEffect {
   }
 }
 
-trait DotGenCounterExternOps extends DotGenEffect{
-  val IR: CounterExternOpsExp with DeliteTransform with DHDLCodegenOps
+trait DotGenExternCounterOps extends DotGenEffect{
+  val IR: ExternCounterOpsExp with DeliteTransform with DHDLCodegenOps
   import IR._
 
   val emittedCtrChain = Set.empty[Exp[Any]]
-  var traversals: List[Traversal{val IR: DotGenCounterExternOps.this.IR.type}] = Nil
+  var traversals: List[Traversal{val IR: DotGenExternCounterOps.this.IR.type}] = Nil
 
   def runTraversals[A:Manifest](b: Block[A]): Block[A] = {
     println("DotCodegen: applying transformations")

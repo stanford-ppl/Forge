@@ -122,6 +122,13 @@ trait ScratchpadAnalyzer extends HungryTraversal {
     }}
   }
 
+  def matchBanking(write: Banking, read: Banking) = (write,read) match {
+    case (StridedBanking(s1,p), StridedBanking(s2,q)) if s1 == s2 => StridedBanking(s1, lcm(p,q))
+    case (Banking(1), banking)                                    => banking
+    case (banking, Banking(1))                                    => banking
+    case (Banking(p), Banking(q))                                 => DuplicatedBanking(lcm(p,q))
+  }
+
   def unpairedAccess(mem: Exp[Any], access: (Exp[Any],Boolean,Exp[Any])): MemInstance = {
     val banking = bankingFromAccessPattern(mem, accessIndicesOf(access._3), accessPatternOf(access._3))
 
@@ -142,11 +149,6 @@ trait ScratchpadAnalyzer extends HungryTraversal {
     var banking: List[Banking] = Nil
     var i: Int = 0
 
-    def matchSingle(write: Banking, read: Banking) = (write,read) match {
-      case (StridedBanking(s1,p), StridedBanking(s2,q)) if s1 == s2 => StridedBanking(s1, lcm(p,q))
-      case (Banking(p), Banking(q))                                 => DuplicatedBanking(lcm(p,q))
-    }
-
     // TODO: Should we try to detect diagonal banking for more than 2 dimensions?
     // TODO: Should we try to detect diagonal banking for non-contiguous dimensions?
     if (bankWrite.length == bankRead.length) {
@@ -163,12 +165,12 @@ trait ScratchpadAnalyzer extends HungryTraversal {
               i += 2
 
             case _ =>
-              banking ::= matchSingle(bankWrite(i),bankRead(i))
+              banking ::= matchBanking(bankWrite(i),bankRead(i))
               i += 1
           }
         }
         else {
-          banking ::= matchSingle(bankWrite(i), bankRead(i))
+          banking ::= matchBanking(bankWrite(i), bankRead(i))
           i += 1
         }
       }

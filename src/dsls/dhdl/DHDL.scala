@@ -207,6 +207,7 @@ trait DHDLDSL extends ForgeApplication
     val Scratchpad = analyzer("Scratchpad", isExtern=true)
     val AreaAnalyzer = analyzer("Area", isExtern=true)
     val LatencyAnalyzer = analyzer("Latency", isExtern=true)
+    val OpsAnalyzer = analyzer("Ops", isExtern=true)
 
     val ConstantFolding = traversal("ConstantFolding", isExtern=true)
     val ParameterAnalyzer = analyzer("Parameter",isExtern=true)
@@ -217,7 +218,7 @@ trait DHDLDSL extends ForgeApplication
     importGlobalAnalysis()
     importBoundAnalysis()
 
-    //schedule(IRPrinterPlus)
+    // --- Estimation and tuning
     schedule(StageAnalyzer)
     schedule(GlobalAnalyzer)
     schedule(ControlSignalAnalyzer)
@@ -225,14 +226,14 @@ trait DHDLDSL extends ForgeApplication
     schedule(ParallelizationSetter)
     schedule(DHDLAffineAnalysis)
 
-    schedule(IRPrinterPlus)
-
     schedule(DSE)
 
-    // --- Post Parameter Selection
+    // --- Post-DSE Estimation
+    schedule(IRPrinterPlus)
     schedule(AreaAnalyzer)
-    schedule(LatencyAnalyzer)
+    schedule(OpsAnalyzer)
 
+    // --- Transformations
     schedule(BoundAnalyzer)
     schedule(ConstantFolding)
 
@@ -245,9 +246,9 @@ trait DHDLDSL extends ForgeApplication
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))
-    extern(grp("CounterExtern"), targets = List($cala, dot))
+    extern(grp("ExternCounter"), targets = List($cala, dot), withTypes = true)
     extern(grp("MemoryTemplate"), targets = List($cala, dot, maxj), withTypes = true)
-    extern(metadata("TypeInspection"), targets = List(maxj))
+    extern(metadata("ExternPrimitive"), targets = List($cala, maxj), withTypes = true)
 		()
 	}
 }

@@ -239,7 +239,6 @@ trait DHDLMath {
     infix (Bit) ("^",  Nil, (Bit, Bit) :: Bit) implements redirect ${ xor($0, $1) }
     direct (Bit) ("__equal", Nil, (Bit, Bit) :: Bit) implements redirect ${ xnor($0, $1) }
 
-
     // --- Scala Backend
     impl (neg_fix) (codegen($cala, ${ -$0 }))
     impl (add_fix) (codegen($cala, ${ $0 + $1 }))

@@ -9,6 +9,9 @@ trait DHDLGlobalAnalysis {
    * In DHDL, a "global" is any value which is solely a function of input arguments
    * and constants. These are computed prior to starting the main computation, and
    * therefore appear constant to the majority of the program.
+   *
+   * Note that this is only true for stateless nodes. These rules should not be generated
+   * for stateful hardware (e.g. accumulators, pseudo-random generators)
    **/
 
   def importGlobalAnalysis() = {

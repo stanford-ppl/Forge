@@ -74,15 +74,15 @@ trait BlackScholes extends DHDLApplication {
     otime:      Rep[OffChipMem[Flt]],
     optprice:   Rep[OffChipMem[Flt]]
   ): Rep[Unit] = {
-    //TODO: Need to duplicate these for parallelization but if put in the function, have no visibility
-    val otypeRAM      = BRAM[UInt](tileSize)
-    val sptpriceRAM   = BRAM[Flt](tileSize)
-    val strikeRAM     = BRAM[Flt](tileSize)
-    val rateRAM       = BRAM[Flt](tileSize)
-    val volatilityRAM = BRAM[Flt](tileSize)
-    val otimeRAM      = BRAM[Flt](tileSize)
 
     Pipe((numOptions by tileSize) par outerPar) { i =>
+      val otypeRAM      = BRAM[UInt]("typeTile", tileSize)
+      val sptpriceRAM   = BRAM[Flt]("sptpTile", tileSize)
+      val strikeRAM     = BRAM[Flt]("strkTile", tileSize)
+      val rateRAM       = BRAM[Flt]("rateTile", tileSize)
+      val volatilityRAM = BRAM[Flt]("voltTile", tileSize)
+      val otimeRAM      = BRAM[Flt]("timeTile", tileSize)
+
       Parallel {
         otypeRAM := otype(i::i+tileSize, innerPar)
         sptpriceRAM := sptprice(i::i+tileSize, innerPar)
@@ -92,7 +92,7 @@ trait BlackScholes extends DHDLApplication {
         otimeRAM := otime(i::i+tileSize, innerPar)
       }
 
-      val optpriceRAM = BRAM[Flt](tileSize)
+      val optpriceRAM = BRAM[Flt]("optpTile", tileSize)
       Pipe((tileSize by 1) par innerPar){ j =>
         val price = BlkSchlsEqEuroNoDiv(sptpriceRAM(j), strikeRAM(j), rateRAM(j), volatilityRAM(j), otimeRAM(j), otypeRAM(j))
         optpriceRAM(j) = price

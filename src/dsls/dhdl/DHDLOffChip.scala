@@ -22,7 +22,7 @@ trait DHDLOffChip {
     // --- Nodes
     val offchip_new   = internal (OffChip) ("offchip_new", T, ("size", Idx) :: OffChip(T), effect = mutable)
     val offchip_load  = internal (OffChip) ("offchip_load_vector", T, (("mem",OffChip(T)), ("ofs",Idx), ("len",Idx)) :: MVector(T))
-    val offchip_store = internal (OffChip) ("offchip_store_vector", T, (("mem",OffChip(T)), ("ofs",Idx), ("vec",MVector(T))) :: MUnit, effect = write(0))
+    val offchip_store = internal (OffChip) ("offchip_store_vector", T, (("mem",OffChip(T)), ("ofs",Idx), ("vec",MVector(T))) :: MUnit, effect = write(0), aliasHint=aliases(Nil))
 
     // --- Internals
     internal (OffChip) ("offchipCreate", T, (SOption(SString), SList(Idx)) :: OffChip(T)) implements composite ${

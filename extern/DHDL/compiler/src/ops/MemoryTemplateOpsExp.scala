@@ -151,7 +151,7 @@ trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
   def bitManifest: Manifest[Bit] = manifest[DHDLBit]
 }
 
-trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypesExp with EffectExp with BRAMOpsExp with ScratchpadToolsExp {
+trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypesExp with EffectExp with BRAMOpsExp {
   this: DHDLExp =>
 
   // --- Nodes
@@ -231,6 +231,7 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
 
   // --- Aliasing
   override def aliasSyms(e: Any): List[Sym[Any]] = e match {
+    case e: Bram_store_vector[_] => Nil
     case _ => super.aliasSyms(e)
   }
 }

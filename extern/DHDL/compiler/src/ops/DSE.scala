@@ -31,6 +31,7 @@ trait DSE extends Traversal {
   lazy val printer = new IRPrinterPlus{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val bndAnalyzer = new BoundAnalyzer with QuickTraversal{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val contention = new ContentionModel{val IR: DSE.this.IR.type = DSE.this.IR}
+  lazy val bufAnalyzer = new ScratchpadAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
 
   lazy val tileSizes  = paramAnalyzer.tileSizes.distinct
   lazy val parFactors = paramAnalyzer.parFactors.distinct
@@ -50,8 +51,8 @@ trait DSE extends Traversal {
 
     tileSizes.foreach{p => p.fix}
     parFactors.foreach{p => p.fix}
-    inferBuffers(localMems)
     bndAnalyzer.run(b)
+    bufAnalyzer.run(localMems)
     contention.run(topController)
     (b)
   }
@@ -186,12 +187,11 @@ trait DSE extends Traversal {
     }
 
     def evaluate() = {
-      inferBuffers(localMems)
-
-      if (PROFILING) endSet()
-
       bndAnalyzer.run(b)
       if (PROFILING) endBnd()
+
+      bufAnalyzer.run(localMems)
+      if (PROFILING) endSet()
 
       contention.run(topController)
       if (PROFILING) endCon()

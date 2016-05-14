@@ -1,7 +1,7 @@
 package dhdl.compiler.ops
 
 import scala.reflect.{Manifest,SourceContext}
-import scala.virtualization.lms.internal.Traversal
+import ppl.delite.framework.analysis.HungryTraversal
 
 import dhdl.shared._
 import dhdl.shared.ops._
@@ -10,7 +10,7 @@ import dhdl.compiler.ops._
 
 import scala.collection.mutable.{HashSet,HashMap}
 
-trait ControlSignalAnalysisExp extends PipeStageToolsExp { this: DHDLExp => }
+trait ControlSignalAnalysisExp extends PipeStageToolsExp {this: DHDLExp => }
 
 // (1)  Sets parent control nodes of local memories
 // (2)  Sets parent control nodes of controllers
@@ -23,9 +23,11 @@ trait ControlSignalAnalysisExp extends PipeStageToolsExp { this: DHDLExp => }
 // (9)  Set parallelization factors of memory readers and writers
 // (10) Sets written set of controllers
 // (11) Determines the top controller
-trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
+trait ControlSignalAnalyzer extends HungryTraversal with PipeStageTools {
   val IR: DHDLExp with ControlSignalAnalysisExp
   import IR._
+
+  override val name = "Control Signal Analyzer"
 
   var level = 0
   var indsOwners: Map[Exp[Any], (Exp[Any], Boolean, Int)] = Map.empty
@@ -159,11 +161,11 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
   }
 
 
-  def traverseNode(lhs: Exp[Any], rhs: Def[Any]): Unit = rhs match {
-    case EatReflect(Offchip_load_vector(mem,ofs,len)) =>   // ?
-    case EatReflect(Offchip_store_vector(mem,ofs,vec)) =>  // ?
+  override def traverse(lhs: Exp[Any], rhs: Def[Any]) = rhs match {
+    case Offchip_load_vector(mem,ofs,len) =>   // ?
+    case Offchip_store_vector(mem,ofs,vec) =>  // ?
 
-    case EatReflect(Hwblock(blk)) =>
+    case Hwblock(blk) =>
       val allocs = getAllocations(blk)
       val stages = getControlNodes(blk)
       allocs.foreach{a => parentOf(a) = lhs } // (1)
@@ -176,7 +178,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       traverseBlock(blk)
       top = lhs                               // (11)
 
-    case EatReflect(Pipe_parallel(func)) =>
+    case Pipe_parallel(func) =>
       val allocs = getAllocations(func)
       val stages = getControlNodes(func)
       allocs.foreach{a => parentOf(a) = lhs } // (1)
@@ -188,7 +190,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       traverseBlock(func)
       if (!parentOf(lhs).isDefined) top = lhs // (11)
 
-    case EatReflect(Unit_pipe(func)) =>
+    case Unit_pipe(func) =>
       val allocs = getAllocations(func)
       val stages = getControlNodes(func)
       allocs.foreach{a => parentOf(a) = lhs } // (1)
@@ -200,7 +202,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       traverseBlock(func)
       if (!parentOf(lhs).isDefined) top = lhs // (11)
 
-    case EatReflect(Pipe_foreach(cc,func,inds)) =>
+    case Pipe_foreach(cc,func,inds) =>
       val allocs = getAllocations(func)
       val stages = getControlNodes(func)
       allocs.foreach{a => parentOf(a) = lhs }       // (1)
@@ -216,7 +218,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       if (styleOf(lhs) == Coarse) metapipes ::= lhs  // (8)
       if (!parentOf(lhs).isDefined) top = lhs        // (11)
 
-    case EatReflect(Pipe_fold(cc,a,_,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV)) =>
+    case Pipe_fold(cc,a,_,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) =>
       val isFine = styleOf(lhs) == Fine
       val allocs = getAllocations(func)
       val stages = getControlNodes(func)
@@ -243,7 +245,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       if (styleOf(lhs) == Coarse) metapipes ::= lhs  // (8)
       if (!parentOf(lhs).isDefined) top = lhs        // (11)
 
-    case EatReflect(Accum_fold(cc1,cc2,a,_,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV)) =>
+    case Accum_fold(cc1,cc2,a,_,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
       val allocs = getAllocations(func)
       val stages = getControlNodes(func)
       allocs.foreach{a => parentOf(a) = lhs } // (1)
@@ -275,33 +277,28 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       if (styleOf(lhs) == Coarse) metapipes ::= lhs  // (8)
       if (!parentOf(lhs).isDefined) top = lhs        // (11)
 
-    case EatReflect(Reg_write(reg,value)) =>
+    case Reg_write(reg,value) =>
       isAccum(reg) = hasDependency(value, reg)      // (6)
 
-    case EatReflect(Bram_load(bram,addr)) =>
+    case Bram_load(bram,addr) =>
       addAccessFactor(bram, addr)                   // (9)
 
-    case EatReflect(Bram_store(bram,addr,value)) =>
+    case Bram_store(bram,addr,value) =>
       isAccum(bram) = hasDependency(value, bram)    // (6)
       addAccessFactor(bram, addr)                   // (9)
 
-    case EatReflect(Bram_load_vector(bram,ofs,cchain,inds)) =>
+    case Bram_load_vector(bram,ofs,cchain,inds) =>
       readersOf(bram) = readersOf(bram) :+ (lhs,false,lhs)  // (4)
       addAccessParam(bram, parParamsOf(cchain).last)        // (9)
 
-    case EatReflect(Bram_store_vector(bram,ofs,vec,cchain,inds)) =>
+    case Bram_store_vector(bram,ofs,vec,cchain,inds) =>
       writerOf(bram) = (lhs,false,lhs)                  // (4)
       isAccum(bram) = hasDependency(vec, bram)          // (6)
       addAccessParam(bram, parParamsOf(cchain).last)    // (9)
       writtenIn(lhs) = writtenIn(lhs) :+ bram           // (11)
 
-    case EatReflect(_:Reg_new[_]) => localMems ::= lhs    // (7)
-    case EatReflect(_:Bram_new[_]) => localMems ::= lhs   // (7)
-    case _ => blocks(rhs) foreach traverseBlock
+    case _:Reg_new[_] => localMems ::= lhs    // (7)
+    case _:Bram_new[_] => localMems ::= lhs   // (7)
+    case _ => super.traverse(lhs, rhs)
   }
-
-  override def traverseStm(stm: Stm) = stm match {
-    case TP(s, d) => traverseNode(s, d)
-  }
-
 }

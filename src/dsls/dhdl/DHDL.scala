@@ -195,19 +195,21 @@ trait DHDLDSL extends ForgeApplication
 
 
     // --- Traversals
-    val DHDLAffineAnalysis = analyzer("DHDLAffine", isExtern=true)
 
     val StageAnalyzer = analyzer("Stage", isExtern=true)
     val GlobalAnalyzer = analyzer("Global")
+    val ControlSignalAnalyzer = analyzer("ControlSignal", isExtern=true)
+    val ParallelizationSetter = traversal("ParallelizationSetter",isExtern=true)
+    val DHDLAffineAnalysis = analyzer("DHDLAffine", isExtern=true)
+
     val BoundAnalyzer = analyzer("Bound", isIterative=false)
     val DSE = traversal("DSE", isExtern=true)
+    val Scratchpad = analyzer("Scratchpad", isExtern=true)
     val AreaAnalyzer = analyzer("Area", isExtern=true)
     val LatencyAnalyzer = analyzer("Latency", isExtern=true)
 
     val ConstantFolding = traversal("ConstantFolding", isExtern=true)
-    val ControlSignalAnalyzer = analyzer("ControlSignal", isExtern=true)
     val ParameterAnalyzer = analyzer("Parameter",isExtern=true)
-    val ParallelizationSetter = traversal("ParallelizationSetter",isExtern=true)
     val MetaPipeRegInsertion = traversal("MetaPipeRegInsertion",isExtern=true)
 
     val BRAMVectorLowering = traversal("BRAMVectorLowering", isExtern=true)

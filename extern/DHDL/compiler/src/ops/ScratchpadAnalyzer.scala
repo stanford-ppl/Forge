@@ -13,9 +13,44 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait ScratchpadToolsExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
+trait ScratchpadAnalysisExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
   this: DHDLExp =>
 
+  sealed abstract class Banking(val banks: Int)
+  object Banking {
+    def unapply(x: Banking): Option[Int] = Some(x.banks)
+  }
+  // Optimization for doing things like diagonal banking for a memory accessed
+  // both row- and column-wise.
+  case class MultiWayBanking(strides: List[Int], override val banks: Int) extends Banking(banks)
+  // Strided banking scheme. Includes simple, 1D case
+  case class StridedBanking(stride: Int, override val banks: Int) extends Banking(banks)
+  // "Banking" via duplication - used when the reader and writer access patterns
+  // are either incompatible or unpredictable
+  case class DuplicatedBanking(override val banks: Int) extends Banking(banks)
+
+  /**
+    Metadata for duplicated instances of a single coherent scratchpad. When possible,
+    address generators should be coalesced to a single instance. However, this is only
+    possible when the addresses can be guaranteed to be in lockstep.
+  */
+  case class MemInstance(depth: Int, banking: List[Banking])
+
+  case class MemDuplicates(insts: List[MemInstance]) extends Metadata
+  object duplicatesOf {
+    def update(e: Exp[Any], m: List[MemInstance]) { setMetadata(e, MemDuplicates(m)) }
+    def apply(e: Exp[Any]) = meta[MemDuplicates](e).map(_.insts).getOrElse(Nil)
+  }
+}
+
+
+// Technically doesn't need a real traversal, but nice to have debugging, etc.
+trait ScratchpadAnalyzer extends HungryTraversal {
+  val IR: DHDLExp with ScratchpadAnalysisExp
+  import IR._
+
+  debugMode = true
+  override val name = "Scratchpad Analyzer"
 
   /**
     Metadata for various banking techniques for vectorization of reads/writes of
@@ -73,18 +108,6 @@ trait ScratchpadToolsExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
   A:(i*S+j)/N  (i/N)*S+j      ???
   */
 
-  sealed abstract class Banking(val banks: Int)
-  object Banking {
-    def unapply(x: Banking): Option[Int] = Some(x.banks)
-  }
-  // Optimization for doing things like diagonal banking for a memory accessed
-  // both row- and column-wise.
-  case class MultiWayBanking(strides: List[Int], override val banks: Int) extends Banking(banks)
-  // Strided banking scheme. Includes simple, 1D case
-  case class StridedBanking(stride: Int, override val banks: Int) extends Banking(banks)
-  // "Banking" via duplication - used when the reader and writer access patterns
-  // are either incompatible or unpredictable
-  case class DuplicatedBanking(override val banks: Int) extends Banking(banks)
 
   def bankingFromAccessPattern(mem: Exp[Any], indices: List[Exp[Any]], pattern: List[IndexPattern]): List[Banking] = {
     val strides = constDimsToStrides(dimsOf(mem).map{case Exact(d) => d.toInt})
@@ -99,21 +122,11 @@ trait ScratchpadToolsExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
     }}
   }
 
-  /**
-    Metadata for duplicated instances of a single coherent scratchpad. When possible,
-    address generators should be coalesced to a single instance. However, this is only
-    possible when the addresses can be guaranteed to be in lockstep.
-  */
-  case class MemInstance(depth: Int, banking: List[Banking])
-
-  case class MemDuplicates(insts: List[MemInstance]) extends Metadata
-  object duplicatesOf {
-    def update(e: Exp[Any], m: List[MemInstance]) { setMetadata(e, MemDuplicates(m)) }
-    def apply(e: Exp[Any]) = meta[MemDuplicates](e).map(_.insts).getOrElse(Nil)
-  }
-
   def unpairedAccess(mem: Exp[Any], access: (Exp[Any],Boolean,Exp[Any])): MemInstance = {
     val banking = bankingFromAccessPattern(mem, accessIndicesOf(access._3), accessPatternOf(access._3))
+
+    debug(" - Unpaired access " + access + ", inferred banking " + banking.mkString(", "))
+
     MemInstance(1, banking)
   }
   def pairedAccess(mem: Exp[Any], write: (Exp[Any],Boolean,Exp[Any]), read: (Exp[Any],Boolean,Exp[Any])): MemInstance = {
@@ -121,6 +134,10 @@ trait ScratchpadToolsExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
 
     val bankWrite = bankingFromAccessPattern(mem, accessIndicesOf(write._3), accessPatternOf(write._3))
     val bankRead  = bankingFromAccessPattern(mem, accessIndicesOf(read._3), accessPatternOf(read._3))
+
+    debug("  Write " + write + ", read " + read)
+    debug("    write banking: " + bankWrite.mkString(", "))
+    debug("    read banking:  " + bankRead.mkString(", "))
 
     var banking: List[Banking] = Nil
     var i: Int = 0
@@ -130,7 +147,8 @@ trait ScratchpadToolsExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
       case (Banking(p), Banking(q))                                 => DuplicatedBanking(lcm(p,q))
     }
 
-    // TODO: Only properly defined for up to 2 dimensions right now?
+    // TODO: Should we try to detect diagonal banking for more than 2 dimensions?
+    // TODO: Should we try to detect diagonal banking for non-contiguous dimensions?
     if (bankWrite.length == bankRead.length) {
       var i = 0
       while (i < bankWrite.length) {
@@ -178,10 +196,18 @@ trait ScratchpadToolsExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
       val (lca, writePath, readPath) = GraphUtil.leastCommonAncestorWithPaths[(Exp[Any],Boolean)](write, read, {node => parentOf(node)})
 
       if (lca.isDefined) {
+        debug("    write path: " + writePath.mkString(", "))
+        debug("    read path: " + readPath.mkString(", "))
+        debug("    lca: " + lca.get)
         if (isMetaPipe(lca.get)) {
-          val children = childrenOf(lca.get._1)
+          val parent = lca.get._1
+          val children = childrenOf(parent).map{x => (x,false)} :+ ((parent,true))
+
+          debug("    lca children: " + children.mkString(", "))
           val wIdx = children.indexOf(writePath.head)
           val rIdx = children.indexOf(readPath.head)
+          if (wIdx < 0 || rIdx < 0) stageError("FIXME: Bug in scratchpad analyzer")
+
           Math.abs(rIdx - wIdx) // write may happen after read in special cases - what to do there?
         }
         else 0
@@ -196,6 +222,8 @@ trait ScratchpadToolsExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
 
   // TODO: Also need pointer for each read/write to refer to instance(s) it accesses
   def getMemoryInstances(mem: Exp[Any]): List[MemInstance] = {
+    debug("")
+    debug("Inferring instances for memory " + nameOf(mem).getOrElse(mem.toString))
     if (isBRAM(mem.tp)) {
       (writerOf(mem),readersOf(mem)) match {
         case (None, Nil) => Nil
@@ -223,25 +251,29 @@ trait ScratchpadToolsExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
   }
 
 
+  def analyzeMemory(mem: Exp[Any]) {
+    val instances = getMemoryInstances(mem)
+    duplicatesOf(mem) = instances
 
-  def inferBuffers(localMems: List[Exp[Any]]) = {
-    localMems.foreach{mem =>
-      val instances = getMemoryInstances(mem)
-      duplicatesOf(mem) = instances
-
-      stageInfo("Inferred " + instances.length + " instances for memory " + nameOf(mem).getOrElse("") + " defined here: ")(mpos(mem.pos))
-      instances.zip(readersOf(mem)).zipWithIndex.foreach { case ((inst,read), i) =>
-        stageInfo("  Inst #" + i + ": Depth: " + inst.depth + ", Format: " + inst.banking.mkString(", "))(mpos(read._3.pos))
-      }
+    debug("  Inferred " + instances.length + " instances: ")
+    instances.zip(readersOf(mem)).zipWithIndex.foreach { case ((inst,read), i) =>
+      debug("    #" + i + " Depth: " + inst.depth + ", Format: " + inst.banking.mkString(", "))
     }
-    // Heuristic - find memories which have a reader and a writer which are different
-    // but whose nearest common parent is a metapipeline.
-    /*localMems.flatMap{mem =>
-      writerOf(mem).flatMap { writer =>
-        val lcas = readersOf(mem).filter(_ != writer).flatMap{reader => leastCommonAncestor(reader, writer, parentOf).filter(isMetaPipe(_)) }
-        if (lcas.isEmpty) None else Some(mem -> lcas.head) // HACK: This could actually be much more complicated..
-      }
-    }*/
   }
 
+  def run(localMems: List[Exp[Any]]): Unit = localMems.foreach{mem => analyzeMemory(mem) }
+  // Heuristic - find memories which have a reader and a writer which are different
+  // but whose nearest common parent is a metapipeline.
+  /*localMems.flatMap{mem =>
+    writerOf(mem).flatMap { writer =>
+      val lcas = readersOf(mem).filter(_ != writer).flatMap{reader => leastCommonAncestor(reader, writer, parentOf).filter(isMetaPipe(_)) }
+      if (lcas.isEmpty) None else Some(mem -> lcas.head) // HACK: This could actually be much more complicated..
+    }
+  }*/
+
+  override def traverse(lhs: Exp[Any], rhs: Def[Any]): Unit = rhs match {
+    case _:Reg_new[_] => analyzeMemory(lhs)
+    case _:Bram_new[_] => analyzeMemory(lhs)
+    case _ => super.traverse(lhs,rhs)
+  }
 }

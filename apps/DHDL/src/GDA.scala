@@ -8,7 +8,7 @@ object GDACompiler extends DHDLApplicationCompiler with GDA
 object GDAInterpreter extends DHDLApplicationInterpreter with GDA
 trait GDA extends DHDLApplication {
 
-  type Elem = Flt //FixPt[Signed,B16,B16]
+  type Elem = Flt
 
   override def stageArgNames = List("rTileSize", "cTileSize")
   lazy val rows = ArgIn[SInt]("rows")

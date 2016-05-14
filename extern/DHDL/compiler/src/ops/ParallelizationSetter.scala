@@ -12,6 +12,8 @@ trait ParallelizationSetter extends AnalyzerBase {
   val IR: DHDLExp
   import IR._
 
+  debugMode = true
+  override val name = "Parallelization Setter"
   override def hasCompleted = runs > 0
 
   var innerLoopPar: Option[Int] = None
@@ -60,6 +62,13 @@ trait ParallelizationSetter extends AnalyzerBase {
       traverseInner(P)(rFunc)
       traverseInner(P)(st)
       traverseBlock(func)
+
+    case EatReflect(Bram_load_vector(bram,ofs,cchain,inds)) =>
+      val Ps = parsOf(cchain)
+      inds.zip(Ps).foreach{case (i,p) => parOf(i) = p}
+    case EatReflect(Bram_store_vector(bram,ofs,vec,cchain,inds)) =>
+      val Ps = parsOf(cchain)
+      inds.zip(Ps).foreach{case (i,p) => parOf(i) = p}
 
     case _ =>
       if (innerLoopPar.isDefined) parOf(lhs) = innerLoopPar.get

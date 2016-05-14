@@ -75,12 +75,12 @@ trait DHDLMath {
     val T = tpePar("T")
     val Bit = lookupTpe("Bit")
     val Order = tpeClass("Order", TOrder, T)
-    infix (Order) ("lt", T, (T,T) :: Bit)
-    infix (Order) ("gt", T, (T,T) :: Bit)
-    infix (Order) ("leq", T, (T,T) :: Bit)
-    infix (Order) ("geq", T, (T,T) :: Bit)
-    infix (Order) ("neq", T, (T,T) :: Bit)
-    infix (Order) ("eql", T, (T,T) :: Bit)
+    infix (Order) ("lessThan", T, (T,T) :: Bit)
+    infix (Order) ("greaterThan", T, (T,T) :: Bit)
+    infix (Order) ("lessThanOrEqual", T, (T,T) :: Bit)
+    infix (Order) ("greaterThanOrEqual", T, (T,T) :: Bit)
+    infix (Order) ("notEqual", T, (T,T) :: Bit)
+    infix (Order) ("equals", T, (T,T) :: Bit)
   }
 
   def importPrimitiveMath() {
@@ -149,12 +149,12 @@ trait DHDLMath {
     infix (FixPtArith) ("divide", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F)) implements composite ${ div($0, $1) }
 
     val FixPtOrder = tpeClassInst("FixPtOrder", (S,I,F), Order(FixPt(S,I,F)))
-    infix (FixPtOrder) ("lt",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements composite ${ lt($0, $1) }
-    infix (FixPtOrder) ("gt",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements composite ${ lt($1, $0) }
-    infix (FixPtOrder) ("leq", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements composite ${ leq($0, $1) }
-    infix (FixPtOrder) ("geq", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements composite ${ leq($1, $0) }
-    infix (FixPtOrder) ("neq", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements composite ${ neq($0, $1) }
-    infix (FixPtOrder) ("eql", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements composite ${ eql($0, $1) }
+    infix (FixPtOrder) ("lessThan",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements composite ${ lt($0, $1) }
+    infix (FixPtOrder) ("greaterThan",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements composite ${ lt($1, $0) }
+    infix (FixPtOrder) ("lessThanOrEqual", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements composite ${ leq($0, $1) }
+    infix (FixPtOrder) ("greaterThanOrEqual", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements composite ${ leq($1, $0) }
+    infix (FixPtOrder) ("notEqual", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements composite ${ neq($0, $1) }
+    infix (FixPtOrder) ("equals", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit) implements composite ${ eql($0, $1) }
 
 
     val FltPtColl = tpeClassInst("FltPtColl", (G,E), Coll(FltPt(G,E)))
@@ -170,12 +170,12 @@ trait DHDLMath {
     infix (FltPtArith) ("divide", (G,E), (FltPt(G,E), FltPt(G,E)) :: FltPt(G,E)) implements composite ${ div($0, $1) }
 
     val FltPtOrder = tpeClassInst("FltPtOrder", (G,E), Order(FltPt(G,E)))
-    infix (FltPtOrder) ("lt",  (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit) implements composite ${ lt($0, $1) }
-    infix (FltPtOrder) ("gt",  (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit) implements composite ${ lt($1, $0) }
-    infix (FltPtOrder) ("leq", (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit) implements composite ${ leq($0, $1) }
-    infix (FltPtOrder) ("geq", (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit) implements composite ${ leq($1, $0) }
-    infix (FltPtOrder) ("neq", (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit) implements composite ${ neq($0, $1) }
-    infix (FltPtOrder) ("eql", (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit) implements composite ${ eql($0, $1) }
+    infix (FltPtOrder) ("lessThan",  (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit) implements composite ${ lt($0, $1) }
+    infix (FltPtOrder) ("greaterThan",  (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit) implements composite ${ lt($1, $0) }
+    infix (FltPtOrder) ("lessThanOrEqual", (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit) implements composite ${ leq($0, $1) }
+    infix (FltPtOrder) ("greaterThanOrEqual", (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit) implements composite ${ leq($1, $0) }
+    infix (FltPtOrder) ("notEqual", (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit) implements composite ${ neq($0, $1) }
+    infix (FltPtOrder) ("equals", (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit) implements composite ${ eql($0, $1) }
 
 
     val BitColl = tpeClassInst("BitColl", Nil, Coll(Bit))
@@ -185,12 +185,12 @@ trait DHDLMath {
     infix (BitNum) ("zero", Nil, Nil :: Bit) implements composite ${ false.asBit }
 
     val BitOrder = tpeClassInst("BitOrder", Nil, Order(Bit))
-    infix (BitOrder) ("lt",  Nil, (Bit, Bit) :: Bit) implements composite ${ !$0 && $1 }
-    infix (BitOrder) ("gt",  Nil, (Bit, Bit) :: Bit) implements composite ${ !$1 && $0 }
-    infix (BitOrder) ("leq", Nil, (Bit, Bit) :: Bit) implements composite ${ !$0 || $1 }
-    infix (BitOrder) ("geq", Nil, (Bit, Bit) :: Bit) implements composite ${ !$1 || $0 }
-    infix (BitOrder) ("neq", Nil, (Bit, Bit) :: Bit) implements composite ${ xor($0, $1) }
-    infix (BitOrder) ("eql", Nil, (Bit, Bit) :: Bit) implements composite ${ xnor($0, $1) }
+    infix (BitOrder) ("lessThan",  Nil, (Bit, Bit) :: Bit) implements composite ${ !$0 && $1 }
+    infix (BitOrder) ("greaterThan",  Nil, (Bit, Bit) :: Bit) implements composite ${ !$1 && $0 }
+    infix (BitOrder) ("lessThanOrEqual", Nil, (Bit, Bit) :: Bit) implements composite ${ !$0 || $1 }
+    infix (BitOrder) ("greaterThanOrEqual", Nil, (Bit, Bit) :: Bit) implements composite ${ !$1 || $0 }
+    infix (BitOrder) ("notEqual", Nil, (Bit, Bit) :: Bit) implements composite ${ xor($0, $1) }
+    infix (BitOrder) ("equals", Nil, (Bit, Bit) :: Bit) implements composite ${ xnor($0, $1) }
 
 
     // --- API
@@ -571,9 +571,9 @@ trait DHDLMath {
     direct (Ctrl) ("mux", (T,CT), (("sel", Bit), ("a", CT), ("b", T)) :: T, (TNum(T), TNumeric(CT))) implements composite ${ mux($sel, lift_to[CT,T]($a), $b) }
 
     /** Selects the minimum of two given values. Implemented as a mux with a less-than comparison **/
-    direct (Ctrl) ("min", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].lt($a, $b), a, b) }
+    direct (Ctrl) ("min", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].lessThan($a, $b), a, b) }
     /** Selects the maximum of two given values. Implemented as a mux with a greater-than comparison **/
-    direct (Ctrl) ("max", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].gt($a, $b), a, b) }
+    direct (Ctrl) ("max", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].greaterThan($a, $b), a, b) }
 
     // --- Scala Backend
     impl (mux) (codegen($cala, ${ if ($sel) $a else $b }))

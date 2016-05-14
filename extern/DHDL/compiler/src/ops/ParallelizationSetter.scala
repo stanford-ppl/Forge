@@ -12,7 +12,7 @@ trait ParallelizationSetter extends AnalyzerBase {
   val IR: DHDLExp
   import IR._
 
-  debugMode = true
+  //debugMode = true
   override val name = "Parallelization Setter"
   override def hasCompleted = runs > 0
 

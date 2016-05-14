@@ -14,7 +14,7 @@ trait StageAnalyzer extends HungryTraversal with PipeStageTools {
   val IR: DHDLExp with StageAnalysisExp
   import IR._
 
-  debugMode = true
+  //debugMode = true
   override val name = "Stage Analyzer"
   override val recurseAlways = true  // Always follow default traversal scheme
   override val recurseElse = false   // Follow default traversal scheme when node was not matched

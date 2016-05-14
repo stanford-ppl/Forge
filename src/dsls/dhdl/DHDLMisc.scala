@@ -138,7 +138,7 @@ trait DHDLMisc {
     }
 
     direct (API) ("__equal", T, (MArray(T), MArray(T)) :: Bit, TOrder(T)) implements composite ${
-      array_zip($0, $1, {(a:Rep[T], b:Rep[T]) => implicitly[Order[T]].eql(a,b)}).reduce{_&&_}
+      array_zip($0, $1, {(a:Rep[T], b:Rep[T]) => implicitly[Order[T]].equals(a,b)}).reduce{_&&_}
     }
   }
 

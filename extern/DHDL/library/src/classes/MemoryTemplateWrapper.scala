@@ -54,22 +54,22 @@ trait MemoryTemplateWrapper extends ControllerTemplateWrapper with TypeInspectio
   def vector_from_list[T:Manifest](elems: List[Rep[T]])(implicit ctx: SourceContext): Rep[Vector[T]] = elems.toArray
 
   def bram_load_vector[T:Manifest](bram: Rep[BRAM[T]], offsets: List[Rep[FixPt[Signed,B32,B0]]], len: Rep[FixPt[Signed,B32,B0]], cchain: Rep[CounterChain])(implicit ctx: SourceContext): Rep[Vector[T]] = {
-    val dims = cchain.map(ctr => ctr.len)
+    val dims = cchain.map(ctr => ctr.len).toList  // NOTE: This wouldn't work in compiler
     val vec = array_empty[T](dims.reduce{_*_}.toInt)
-    loop(cchain, 0, Nil, {i: Rep[Indices] =>
-      val bramAddr = calcAddress(offsets.zip(i.toList), dimsOf(bram))
-      val vecAddr = calcAddress(i.toList, dims)
-      vec(vecAddr) = bram(bramAddr)
+    loopList(cchain, 0, Nil, {i: List[Rep[FixPt[Signed,B32,B0]]] =>
+      val bramAddr = calcAddress(offsets.zip(i).map{case (a,b) => a+b}, dimsOf(bram))
+      val vecAddr = calcAddress(i, dims)
+      vec(vecAddr.toInt) = bram(bramAddr.toInt)
     })
     vec
   }
 
   def bram_store_vector[T:Manifest](bram: Rep[BRAM[T]], offsets: List[Rep[FixPt[Signed,B32,B0]]], vec: Rep[Vector[T]], cchain: Rep[CounterChain])(implicit ctx: SourceContext): Rep[Unit] = {
-    val dims = cchain.map{ctr => ctr.len}
-    loop(cchain, 0, Nil, {i: Rep[Indices] =>
-      val bramAddr = calcAddress(offsets.zip(i.toList), dimsOf(bram))
-      val vecAddr = calcAddress(i.toList, dims)
-      bram(bramAddr) = vec(vecAddr)
+    val dims = cchain.map{ctr => ctr.len}.toList // NOTE: This wouldn't work in compiler
+    loopList(cchain, 0, Nil, {i: List[Rep[FixPt[Signed,B32,B0]]] =>
+      val bramAddr = calcAddress(offsets.zip(i).map{case (a,b) => a + b}, dimsOf(bram))
+      val vecAddr = calcAddress(i, dims)
+      bram(bramAddr.toInt) = vec(vecAddr.toInt)
     })
   }
 }

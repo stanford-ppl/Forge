@@ -77,6 +77,9 @@ trait DHDLMetadata {
     internal.static (regTypeOps) ("apply", Nil, MAny :: RegType) implements
       composite ${ meta[MRegType]($0).map(_.regType).getOrElse(Regular) }
 
+    internal (regTypeOps) ("isArgIn", Nil, MAny :: SBoolean) implements composite ${ regType($0) == ArgumentIn }
+    internal (regTypeOps) ("isArgOut", Nil, MAny :: SBoolean) implements composite ${ regType($0) == ArgumentOut }
+
     /* Register Initial Value */
     val MRegInit = metadata("MRegInit", "value" -> MAny)
     val regReset = metadata("resetValue")
@@ -245,8 +248,15 @@ trait DHDLMetadata {
     internal.static (parentOps) ("apply", Nil, MAny :: SOption(MAny)) implements
       composite ${ meta[MParent]($0).map(_.parent) }
 
+    // Using verbose form here to avoid weird issue with if-statement in library
     internal.static (parentOps) ("apply", Nil, CTuple2(MAny,SBoolean) :: SOption(CTuple2(MAny,SBoolean))) implements composite ${
-      if ($0._2) ($0._1, false) else parentOf($0._1).map{p => (p,false) }
+      $0._2 match {
+        case true => Some(($0._1, false))
+        case false => parentOf($0._1) match {
+          case Some(p) => Some((p, false))
+          case None => None
+        }
+      }
     }
 
     /* A list of ctrl nodes inside current ctrl nodes. Order matters for sequential */
@@ -282,7 +292,7 @@ trait DHDLMetadata {
 
 
     internal.static (writerOps) ("apply", T, T :: SOption(CTuple3(MAny,SBoolean,MAny))) implements
-      composite ${ meta[MWriter]($0).getOrElse(None) }
+      composite ${ meta[MWriter]($0).map(_.writer).getOrElse(None) }
 
 		/* Controllers that read from a Double Buffer. The metadata is only used for double buffer. */
     val MReaders = metadata("MReaders", "readers" -> SList(CTuple3(MAny,SBoolean,MAny)))
@@ -294,7 +304,7 @@ trait DHDLMetadata {
 
     /* N-dimensional accesses */
     val MAccessIndices = metadata("MAccessIndices", "indices" -> SList(Idx))
-    val accessOps = metadata("accessIndices")
+    val accessOps = metadata("accessIndicesOf")
     internal.static (accessOps) ("update", Nil, (MAny, SList(Idx)) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MAccessIndices($1)) }
     internal.static (accessOps) ("apply", Nil, MAny :: SList(Idx)) implements
@@ -309,7 +319,7 @@ trait DHDLMetadata {
       else "DFEVector<DFEVar>"
     }
     internal.direct (maxjmeta) ("maxJPre", T, T :: SString) implements composite ${
-      maxJPreG(par( $0 ))
+      maxJPreG(parOf( $0 ))
     }
 		internal.direct (maxjmeta) ("tpstr", T, SInt :: SString) implements composite ${
 			tpstrG[T]( $0 )

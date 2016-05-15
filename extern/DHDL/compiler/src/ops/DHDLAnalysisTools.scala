@@ -45,6 +45,7 @@ trait PipeStageToolsExp extends EffectExp {
     case _ => false
   }
   def isMetaPipe(s: Exp[Any]): Boolean = isOuterControl(s) && styleOf(s) == Coarse
+  def isMetaPipe(s: (Exp[Any],Boolean)): Boolean = !s._2 && isMetaPipe(s._1)
 
   def isInnerLoop(s: Exp[Any]): Boolean = s match {
     case Def(d) => isLoop(d) && styleOf(s) == Fine

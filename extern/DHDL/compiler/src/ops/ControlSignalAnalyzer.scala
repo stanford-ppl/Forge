@@ -49,9 +49,9 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
   }
 
   override def postprocess[A:Manifest](b: Block[A]): Block[A] = {
-    for (mems <- localMems) {
-      if (writerOf(mem).isEmpty) stageWarn("Memory " + nameOf(mem).getOrElse("") + " defined here has no writer")(mpos(mem))
-      if (readersOf(mem).isEmpty) stageWarn("Memory " + nameOf(mem).getOrElse("") + " defined here has no readers")(mpos(mem))
+    for (mem <- localMems) {
+      if (writerOf(mem).isEmpty && !isArgIn(mem)) stageWarn("Memory " + nameOf(mem).getOrElse("") + " defined here has no writer")(mpos(mem.pos))
+      if (readersOf(mem).isEmpty && !isArgOut(mem)) stageWarn("Memory " + nameOf(mem).getOrElse("") + " defined here has no readers")(mpos(mem.pos))
     }
     b
   }
@@ -117,9 +117,10 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
 
   def checkMultipleWriters(mem: Exp[Any], writer: Exp[Any]) {
     if (writerOf(mem).isDefined) {
-      stageError("Memory " + nameOf(reg).getOrElse("") + " defined here has multiple writers: ")(mpos(reg.pos))
-      stageError("")(mpos(writerOf(reg)).get._3.pos)
-      stageError("")(mpos(writer.pos))
+      // This should be allowed for buffered types, e.g. the Hogwild buffer discussed for SGD
+      stageError("Memory " + nameOf(mem).getOrElse("") + " defined here has multiple writers.")(mpos(mem.pos))
+      //stageError("")(mpos(writerOf(mem)).get._3.pos)
+      //stageError("")(mpos(writer.pos))
     }
   }
 
@@ -264,7 +265,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       val partial = getBlockResult(func)
       readersOf(partial) = readersOf(partial) :+ (lhs,true,lhs) // (4)
 
-      checkMultipleWriters(a, writer)
+      checkMultipleWriters(a, lhs)
       readersOf(a) = readersOf(a) :+ (lhs, true, lhs)     // (4)
       writerOf(a) = (lhs, true, lhs)                      // (5)
       isAccum(a) = true
@@ -284,11 +285,11 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       isAccum(bram) = hasDependency(value, bram)    // (6)
       addAccessFactor(bram, addr)                   // (9)
 
-    case EatReflect(Bram_load_vector(bram,ofs,len,cchain)) =>
+    case EatReflect(Bram_load_vector(bram,ofs,cchain,inds)) =>
       readersOf(bram) = readersOf(bram) :+ (lhs,false,lhs)  // (4)
       addAccessParam(bram, parParamsOf(cchain).last)        // (9)
 
-    case EatReflect(Bram_store_vector(bram,ofs,vec,cchain)) =>
+    case EatReflect(Bram_store_vector(bram,ofs,vec,cchain,inds)) =>
       writerOf(bram) = (lhs,false,lhs)                  // (4)
       isAccum(bram) = hasDependency(vec, bram)          // (6)
       addAccessParam(bram, parParamsOf(cchain).last)    // (9)

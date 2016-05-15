@@ -39,6 +39,10 @@ trait DHDLMisc {
       sys.exit(-1)
     }
 
+    internal (Misc) ("stageInfo", Nil, SAny :: SUnit, effect = simple) implements composite ${
+      System.out.println("[\u001B[34minfo\u001B[0m] " + __pos.fileName + ":" + __pos.line + ": " + $0)
+    }
+
     // --- Powers of 2 checks
     internal (Misc) ("isPow2", Nil, SInt :: SBoolean) implements composite ${ ($0 & ($0 - 1)) == 0 }
     internal (Misc) ("isPow2", Nil, SLong :: SBoolean) implements composite ${ ($0 & ($0 - 1)) == 0 }

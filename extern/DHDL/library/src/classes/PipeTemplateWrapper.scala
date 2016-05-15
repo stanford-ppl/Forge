@@ -21,6 +21,16 @@ trait ControllerTemplateWrapper {
       for (i <- ctr) { loop(cchain, idx+1, indices :+ i, func) }
     }
   }
+  def loopList(cchain: Rep[CounterChain], idx: Int, indices: List[FixPt[Signed,B32,B0]], func: List[Rep[FixPt[Signed,B32,B0]]] => Rep[Unit]): Rep[Unit] = {
+    val ctr = cchain(idx)
+    if (idx >= cchain.length - 1) {
+      for (i <- ctr) { func(indices :+ i) }
+    }
+    else {
+      for (i <- ctr) { loopList(cchain, idx+1, indices :+ i, func) }
+    }
+  }
+
 
   def pipe_foreach(cchain: Rep[CounterChain], func: Rep[Indices] => Rep[Unit])(implicit ctx: SourceContext): Rep[Pipeline] = {
     loop(cchain, 0, Nil, func)

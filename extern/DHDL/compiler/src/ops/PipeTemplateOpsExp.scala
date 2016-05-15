@@ -642,10 +642,10 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 				}
 				case None => quote(end)
 			}
-      if (par(ctr) == 1) {
+      if (parOf(ctr) == 1) {
         emit(s"""${maxJPre(ctr)} ${quote(ctr)} = ${quote(cchain)}.addCounter(${quote(max)}, ${quote(step)});""")
       } else {
-        emit(s"""${maxJPre(ctr)} ${quote(ctr)} = ${quote(cchain)}.addCounterVect(${quote(par)}, ${quote(max)}, ${quote(step)});""")
+        emit(s"""${maxJPre(ctr)} ${quote(ctr)} = ${quote(cchain)}.addCounterVect(${quote(parOf(ctr))}, ${quote(max)}, ${quote(step)});""")
       }
     }
 

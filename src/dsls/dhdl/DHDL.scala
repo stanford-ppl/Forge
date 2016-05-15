@@ -215,14 +215,13 @@ trait DHDLDSL extends ForgeApplication
     importGlobalAnalysis()
     importBoundAnalysis()
 
-    schedule(IRPrinterPlus)
-
+    //schedule(IRPrinterPlus)
     schedule(StageAnalyzer)
     schedule(GlobalAnalyzer)
     schedule(ControlSignalAnalyzer)
+
     schedule(ParallelizationSetter)
     schedule(DHDLAffineAnalysis)
-
     schedule(DSE)
 
     // --- Post Parameter Selection
@@ -232,12 +231,11 @@ trait DHDLDSL extends ForgeApplication
     schedule(BoundAnalyzer)
     schedule(ConstantFolding)
 
+    schedule(HardStop)  // DEBUGGING
+
     //schedule(MetaPipeRegInsertion)
 
-    //
-    //
     schedule(BRAMVectorLowering)
-
     schedule(IRPrinterPlus)
 
     // External groups

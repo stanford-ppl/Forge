@@ -25,27 +25,44 @@ trait ParallelizationSetter extends AnalyzerBase {
   override def traverseStm(stm: Stm) = analyzeStm(stm)
 
   override def analyze(lhs: Exp[Any], rhs: Def[Any]): Unit = rhs match {
-    case EatReflect(Pipe_foreach(cchain, func, inds)) if styleOf(lhs) == Fine =>
+    case EatReflect(Pipe_foreach(cchain, func, inds)) =>
       val Ps = parsOf(cchain)
       inds.zip(Ps).foreach{case (i,p) => parOf(i) = p}
-      traverseInner(P)(func)
 
-    case EatReflect(Pipe_fold(cchain,accum,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV)) if styleOf(lhs) == Fine =>
+      if (styleOf(lhs) == Fine) {
+        val P = Ps.reduce{_*_}
+        traverseInner(P)(func)
+      }
+      else traverseBlock(func)
+
+    case EatReflect(Pipe_fold(cchain,accum,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV)) =>
       val Ps = parsOf(cchain)
       inds.zip(Ps).foreach{case (i,p) => parOf(i) = p}
-      traverseInner(P)(iFunc)
-      traverseInner(P)(func)
+
+      if (styleOf(lhs) == Fine) {
+        val P = Ps.reduce{_*_}
+        traverseInner(P)(iFunc)
+        traverseInner(P)(ld)
+        traverseInner(P)(st)
+        traverseInner(P)(func)
+      }
+      else blocks(rhs).foreach{blk => traverseBlock(blk)}
 
     case EatReflect(Accum_fold(ccOuter,ccInner,a,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV)) =>
+      val Pm = parsOf(ccOuter)
       val Ps = parsOf(ccInner)
-      inds.zip(Ps).foreach{case (i,p) => parOf(i) = p}
+      inds1.zip(Pm).foreach{case (i,p) => parOf(i) = p}
+      inds2.zip(Ps).foreach{case (i,p) => parOf(i) = p}
+      val P = Ps.reduce{_*_}
       traverseInner(P)(iFunc)
       traverseInner(P)(ld1)
       traverseInner(P)(ld2)
       traverseInner(P)(rFunc)
       traverseInner(P)(st)
+      traverseBlock(func)
 
-    case _ if innerLoopPar.isDefined => parOf(lhs) = innerLoopPar.get
-    case _ => blocks(rhs).foreach{blk => traverseBlock(blk)}
+    case _ =>
+      if (innerLoopPar.isDefined) parOf(lhs) = innerLoopPar.get
+      blocks(rhs).foreach{blk => traverseBlock(blk)}
   }
 }

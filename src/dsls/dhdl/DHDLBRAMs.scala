@@ -51,7 +51,7 @@ trait DHDLBRAMs {
       if ($1.length < 1) stageError("Cannot load from zero indices")
       val addr = calcAddress($1, dimsOf($0))
       val ld = bram_load($0, addr)
-      accessIndices(ld) = $1
+      accessIndicesOf(ld) = $1
       ld
     }
     /** @nodoc -- only used for Mem typeclass instance **/
@@ -59,7 +59,7 @@ trait DHDLBRAMs {
       if ($1.length < 1) stageError("Cannot store to zero indices")
       val addr = calcAddress($1, dimsOf($0))
       val st = bram_store($0, addr, $2)
-      accessIndices(st) = $1
+      accessIndicesOf(st) = $1
       st
     }
 
@@ -156,7 +156,9 @@ trait DHDLBRAMs {
       /** Stores the given MVector to this BRAM, starting at index 0
        * @param vec
        **/
-      infix (":=") (MVector(T) :: MUnit, effect = write(0)) implements composite ${ bramStoreVector($self, 0.as[Index], $1, param(1)) }
+      infix (":=") (MVector(T) :: MUnit, effect = write(0)) implements composite ${ 
+        bramStoreVector($self, dimsOf($self).map(dim => 0.as[Index]), $1, param(1)) 
+      }
     }
 
 

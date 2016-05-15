@@ -238,40 +238,40 @@ trait DHDLTypes {
 		}))
     impl (const_to_fixpt) (codegen(maxj, ${
       @ alwaysGen {
-				@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+				@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
 				DFEVar $sym = constant.var( $ts, $0 );
       @ }
 		}))
     impl (const_to_fltpt) (codegen(maxj, ${
       @ alwaysGen {
-				@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+				@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
       	DFEVar $sym = constant.var( $ts, $0 );
       @ }
 		}))
 
     impl (fixpt_to_fltpt) (codegen(maxj, ${
-			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+			@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
       DFEVar $sym = $0.cast( $ts );
 		}))
     impl (convert_fixpt)  (codegen(maxj, ${
 			//TODO: right way to do this?
-			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+			@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
       DFEVar $sym = $0.cast( $ts );
 		}))
     impl (rep_int_to_fix) (codegen(maxj, ${
 			@ alwaysGen {
-				@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+				@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
 				DFEVar $sym = constant.var( $ts, $0 );
 			@ }
     }))
 
     impl (fltpt_to_fixpt) (codegen(maxj, ${
-			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+			@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
       DFEVar $sym = $0.cast( $ts );
 		}))
     impl (convert_fltpt)  (codegen(maxj, ${
 			//TODO: right way to do this?
-			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+			@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
       DFEVar $sym = $0.cast( $ts );
 		}))
 

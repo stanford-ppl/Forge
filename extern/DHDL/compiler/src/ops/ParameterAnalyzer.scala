@@ -249,11 +249,11 @@ trait ParameterAnalyzer extends Traversal {
       parFactors :::= ipars
       opars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
-    case EatReflect(Bram_store_vector(bram,ofs,vec,cchain)) =>
-      parFactors :::= List( parParamsOf(cchain).last )
+    case EatReflect(e:Bram_store_vector[_]) =>
+      parFactors :::= List( parParamsOf(e.cchain).last )
 
-    case EatReflect(Bram_load_vector(bram,ofs,len,cchain)) => NoArea
-      parFactors :::= List( parParamsOf(cchain).last )
+    case EatReflect(e:Bram_load_vector[_]) => NoArea
+      parFactors :::= List( parParamsOf(e.cchain).last )
 
     case _ => //
   }

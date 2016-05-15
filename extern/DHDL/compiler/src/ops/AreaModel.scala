@@ -189,7 +189,7 @@ trait AreaModel extends PipeStageToolsExp {
   def areaOfCounterRegs(lhs: Exp[Any], cchain: Exp[CounterChain]): FPGAResources = {
     if (isOuterLoop(lhs) && styleOf(lhs) == Coarse) {
       val N = nStages(lhs) - 1          // Number of stages needed for delay
-      val P = parOf(cchain).reduce(_+_) // Number of duplications per counter
+      val P = parsOf(cchain).reduce(_+_) // Number of duplications per counter
       FPGAResources(lut3=N*P*32, regs = 4*N*P*32) // TODO: Hardcoded 32 bit index sizes
     }
     else NoArea
@@ -347,7 +347,7 @@ trait AreaModel extends PipeStageToolsExp {
     case Offchip_store_vector(mem,ofs,vec) =>
       //val nonConstDims = (dimsOf(tt.mem) ++ tt.memOfs).filterNot{case Fixed(_) => true; case _ => false}.length
       //val dsp = if (nonConstDims > 1) 3 else 0
-      //val p = parOf(cc).reduce{_*_}
+      //val p = parsOf(cc).reduce{_*_}
 
       //val brm = if (p < 25) 46 + Math.floor(0.75*(p-1)).toInt else if (p < 49) 62 - Math.floor(0.75*(p-24)).toInt else 42
 
@@ -361,7 +361,7 @@ trait AreaModel extends PipeStageToolsExp {
 
     // Tile Load
     case Offchip_load_vector(mem,ofs,len) =>
-      //val p = parOf(cc).reduce{_*_}
+      //val p = parsOf(cc).reduce{_*_}
       //val nonConstDims = (dimsOf(tt.mem) ++ tt.memOfs).filterNot{case Fixed(_) => true; case _ => false}.length
       //val dsp = if (nonConstDims > 1) 4 else 0
       // New template
@@ -371,8 +371,8 @@ trait AreaModel extends PipeStageToolsExp {
       FPGAResources(lut3=410, lut4=50, lut5=70, lut6=53, regs=920, dsps=0, bram=0, streams=1) // ~353 ALMs
 
     // TODO: New templates - needs recharacterization
-    case Bram_store_vector(bram,ofs,vec,cchain) => NoArea
-    case Bram_load_vector(bram,ofs,len,cchain) => NoArea
+    case Bram_store_vector(bram,ofs,vec,cchain,inds) => NoArea
+    case Bram_load_vector(bram,ofs,cchain,inds) => NoArea
 
 
     case _:Pipe_parallel => FPGAResources(lut4=9*nStages(s)/2, regs = nStages(s) + 3)

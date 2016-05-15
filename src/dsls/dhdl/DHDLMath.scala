@@ -539,7 +539,7 @@ trait DHDLMath {
 		}))
     impl (log_flt) (codegen(maxj,  ${
 			@ val pre = maxJPre(sym)
-			@ val ts = tpstr(par(sym)) (sym.tp, implicitly[SourceContext])
+			@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
     	$pre $sym = KernelMath.log(new KernelMath.Range( -Float.MAX_VALUE, Float.MAX_VALUE), $0, $ts );
 		}))
     impl (exp_flt) (codegen(maxj,  ${

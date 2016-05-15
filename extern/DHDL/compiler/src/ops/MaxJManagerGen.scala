@@ -257,7 +257,7 @@ s"""
 			regType(a) match {
 				case Regular =>
 				case ArgumentIn =>
-					val ts = tpstr(par(a)) (a.tp, implicitly[SourceContext])
+					val ts = tpstr(parOf(a)) (a.tp, implicitly[SourceContext])
       		emit(s"""    InterfaceParam ${quote(a)} = ei.addParam("${quote(a)}", ${ts});""")
       		emit(s"""    ei.setScalar("TopKernel", "${quote(a)}", ${quote(a)});""")
         case ArgumentOut =>

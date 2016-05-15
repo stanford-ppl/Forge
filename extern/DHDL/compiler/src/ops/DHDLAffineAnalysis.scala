@@ -31,17 +31,17 @@ trait DHDLAffineAnalysisExp extends AffineAnalysisExp {
     case Deff(Pipe_fold(cchain,accum,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV)) =>
       Some( List(inds -> List(iFunc,ld,st,func,rFunc)) )
     case Deff(Accum_fold(c1,c2,a,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV)) =>
-      Some( List(inds1 -> List(func), (inds1 ++ inds2) -> List(ld1,ld2,rFunc,st)) )
+      Some( List(inds1 -> List(func), (inds1 ++ inds2) -> List(iFunc,ld1,ld2,rFunc,st)) )
     case _ => None
   }
   // Memory being read + list of addresses (for N-D access)
   override def readUnapply(x: Exp[Any]): Option[(Exp[Any], List[Exp[Index]])] = x match {
-    case Deff(Bram_load(bram,addr)) => Some((bram, accessIndices(x)))
+    case Deff(Bram_load(bram,addr)) => Some((bram, accessIndicesOf(x)))
     case _ => None
   }
   // Memory being written + list of addresses (for N-D access)
   override def writeUnapply(x: Exp[Any]): Option[(Exp[Any], List[Exp[Index]])] = x match {
-    case Deff(Bram_store(bram,addr,y)) => Some((bram, accessIndices(x)))
+    case Deff(Bram_store(bram,addr,y)) => Some((bram, accessIndicesOf(x)))
     case _ => None
   }
   // Usually None, but allows other exceptions for symbols being loop invariant
@@ -55,19 +55,28 @@ trait DHDLAffineAnalyzer extends AffineAnalyzer {
   val IR: DHDLAffineAnalysisExp with DHDLExp
   import IR._
 
-  override def traverse(lhs: Exp[Any], rhs: Def[Any]): Unit = lhs match {
-    case Bram_load_vector(bram,ofs,cchain,inds) =>
-      accessPatternOf(lhs) = accessIndicesOf(lhs).map{x => InvariantAccess(x)} ++ inds.map{i => LinearAccess(i) }
+  private def patternOfVectorizedOp(offsets: List[Exp[FixPt[Signed,B32,B0]]], inds: List[Sym[FixPt[Signed,B32,B0]]]) = {
+    val trueOffsets = offsets.take(offsets.length - inds.length).map{x => InvariantAccess(x)}
+    val indices = inds.zip(offsets.drop(trueOffsets.length)).map{
+      case (i,Exact(0)) => LinearAccess(i)
+      case (i,b) => OffsetAccess(i,b)
+    }
+    trueOffsets ++ indices
+  }
 
-    case Bram_store_vector(bram,ofs,cchain,inds) =>
-      accessPatternOf(lhs) = accessIndicesOf(lhs).map{x => InvariantAccess(x)} ++ inds.map{i => LinearAccess(i) }
+  override def traverse(lhs: Exp[Any], rhs: Def[Any]): Unit = rhs match {
+    case EatReflect(Bram_load_vector(bram,ofs,cchain,inds)) =>
+      accessPatternOf(lhs) = patternOfVectorizedOp(accessIndicesOf(lhs), inds)
 
-    case Pipe_fold(cc,a,_,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) =>
+    case EatReflect(Bram_store_vector(bram,ofs,vec,cchain,inds)) =>
+      accessPatternOf(lhs) = patternOfVectorizedOp(accessIndicesOf(lhs), inds)
+
+    case EatReflect(Pipe_fold(cc,a,_,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV)) =>
       super.traverse(lhs,rhs)
       accessIndicesOf(lhs) = inds
       accessPatternOf(lhs) = inds.map{i => LinearAccess(i)}
 
-    case Accum_fold(cc1,cc2,a,_,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
+    case EatReflect(Accum_fold(cc1,cc2,a,_,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV)) =>
       super.traverse(lhs,rhs)
       accessIndicesOf(lhs) = inds2
       accessPatternOf(lhs) = inds2.map{i => LinearAccess(i)}

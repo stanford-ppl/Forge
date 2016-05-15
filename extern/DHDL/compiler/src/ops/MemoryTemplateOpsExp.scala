@@ -151,7 +151,7 @@ trait MemoryTemplateTypesExp extends MemoryTemplateTypes {
   def bitManifest: Manifest[Bit] = manifest[DHDLBit]
 }
 
-trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypesExp with EffectExp with BRAMOpsExp {
+trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypesExp with EffectExp with BRAMOpsExp with ScratchpadToolsExp {
   this: DHDLExp =>
 
   // --- Nodes
@@ -179,8 +179,9 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
 
   def bram_load_vector[T:Manifest](bram: Rep[BRAM[T]], offsets: List[Rep[FixPt[Signed,B32,B0]]], len: Rep[FixPt[Signed,B32,B0]], cchain: Rep[CounterChain])(implicit ctx: SourceContext): Rep[Vector[T]] = {
     val inds = List.fill(lenOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }
+    val ofs = calcAddress(offsets, dimsOf(bram))
     val vec = reflectPure(Bram_load_vector(bram, ofs, cchain, inds))
-    accessIndicesOf(vec) = ofs
+    accessIndicesOf(vec) = offsets
     vec
   }
 
@@ -188,7 +189,7 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
     val inds = List.fill(lenOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }
     val ofs = calcAddress(offsets, dimsOf(bram))
     val st = reflectEffect(Bram_store_vector(bram, ofs, vec, cchain, inds), Write(List(bram.asInstanceOf[Sym[BRAM[T]]])))
-    accessIndicesOf(st) = ofs
+    accessIndicesOf(st) = offsets
     st
   }
 
@@ -198,10 +199,10 @@ trait MemoryTemplateOpsExp extends TypeInspectionOpsExp with MemoryTemplateTypes
     case e@Vector_from_list(elems) => reflectPure(Vector_from_list(f(elems))(e.mT, e.ctx))(mtype(manifest[A]), pos)
     case Reflect(e@Vector_from_list(elems), u, es) => reflectMirrored(Reflect(Vector_from_list(f(elems))(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
 
-    case e@Bram_load_vector(b,o,c,i) => bram_load_vector(f(b),f(o),f(c),i)(e.mT,e.ctx)
+    case e@Bram_load_vector(b,o,c,i) => reflectPure(Bram_load_vector(f(b),f(o),f(c),i)(e.mT,e.ctx))(mtype(manifest[A]),pos)
     case Reflect(e@Bram_load_vector(b,o,c,i), u, es) => reflectMirrored(Reflect(Bram_load_vector(f(b),f(o),f(c),i)(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
 
-    case e@Bram_store_vector(b,o,v,c,i) => bram_store_vector(f(b),f(o),f(v),f(c),i)(e.mT,e.ctx)
+    case e@Bram_store_vector(b,o,v,c,i) => reflectPure(Bram_store_vector(f(b),f(o),f(v),f(c),i)(e.mT,e.ctx))(mtype(manifest[A]),pos)
     case Reflect(e@Bram_store_vector(b,o,v,c,i), u, es) => reflectMirrored(Reflect(Bram_store_vector(f(b),f(o),f(v),f(c),i)(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
 
     case _ => super.mirror(e, f)
@@ -606,69 +607,6 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 	}
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    /*case TileTransfer(mem,local,strides,memOfs,tileStrides,cchain,iters, store) =>
-      //TODO: new language construct is much more flexible. Refine templete to remove these
-      //TileTransfer makes ctrchain explicit in IR, which requires modification in templete
-      //constrain
-      assert(strides.size<=2, "Do not support TileTransfer > 2 dimensions")
-      //tileStrides are stride for brams, which was assume to be the same as bram size in templete
-      // If control signals have not yet been defined, define them here
-      emitComment(s"TileTransfer ${if (store) "(store)" else "(load)"} {")
-      if (parentOf(sym).isEmpty) { //TODO
-        emit(s"""DFEVar ${quote(sym)}_en = top_en;""")
-        emit(s"""DFEVar ${quote(sym)}_done = dfeBool().newInstance(this);""")
-        emit(s"""top_done <== ${quote(sym)}_done;""")
-        //enDeclaredSet += n
-        //doneDeclaredSet += n
-      }
-      emitMaxJCounterChain(cchain, Some("cchain_en_TODO"))
-      emitNestedIdx(cchain, iters)
-      val dims = dimsOf(mem)
-      val scalarAddrT = s"""dfeUInt(MathUtils.bitsToAddress(
-        ${strides.map(t => quote(t)).reduce[String]{ case (ts1, ts2) => ts1 + "*" + ts2 }}))"""
-      if (store) {
-        emit(s"""DFEVector<DFEVar> ${quote(sym)}_raddr =
-          new DFEVectorType<DFEVar>($scalarAddrT, ${par(sym)}).newInstance(this);""")
-        emit(s"""DFEVector<DFEVar> ${quote(sym)}_rdata =
-          ${quote(local)}.connectRport(${quote(sym)}_raddr);""")
-        if (isDblBuf(local)) {
-          //if (n.buf.getReaders().contains(n)) {
-          //  val r = n
-          //  if (!rdoneSet(n.buf).contains(r)) {
-              emit(s"""${quote(local)}.connectRdone(${quote(sym)}_done);""")
-          //    rdoneSet(n.buf) += r
-          //  }
-          //}
-        }
-      } else {
-			  val ts = tpstr(par(local))(local.tp.typeArguments.head, implicitly[SourceContext])
-        // Emit control signals
-        emit(s"""DFEVar ${quote(sym)}_wen = dfeBool().newInstance(this);""")
-        emit(s"""DFEVector<DFEVar> ${quote(sym)}_waddr =
-          new DFEVectorType<DFEVar>($scalarAddrT, ${par(sym)}).newInstance(this);""")
-        emit(s"""DFEVector<DFEVar> ${quote(sym)}_wdata =
-            new DFEVectorType<DFEVar>(${ts}, ${par(sym)}).newInstance(this);""")
-        emit(s"""${quote(local)}.connectWport(${quote(sym)}_waddr, ${quote(sym)}_wdata, ${quote(sym)}_wen);""")
-        //emit(s"""${n.isLoading} <== Reductions.streamHold(${quote(sym)}_isLoading, ${quote(sym)}_en);""")
-      }
-
-      emit(s"""DFEVar ${quote(sym)}_forceLdSt = force_TODO;""") //TODO
-      emit(s"""DFEVar ${quote(sym)}_isLoading = dfeBool().newInstance(this);""")
-
-      emit(s"""new BlockStorerLib( owner, """)
-      emit(s"""${quote(sym)}_en, ${quote(sym)}_done,""")
-      //emit(s"""${quote(sym)}_isLoading, ${quote(sym)}_forceLdSt,""") TODO
-      emit(s"""${if (dims.size==1) 1 else quote(dims(1))},""")
-      emit(s"""${quote(iters(0))}, ${quote(if (iters.size==1) 0 else iters(1))},""")
-      emit(s"""${quote(mem)}, "${quote(mem)}_${quote(sym)}_${if (store) "out" else "in"}",""")
-      emit(s"""${quote(strides(0))}, ${if (strides.size==1) 1 else quote(strides(1))},""")
-      if (store)
-        emit(s"""${quote(sym)}_raddr, ${quote(sym)}_rdata);""")
-      else
-        emit(s"""${quote(sym)}_waddr, ${quote(sym)}_wdata, ${quote(sym)}_wen);""")
-
-      emitComment(s"} TileTransfer ${if (store) "(store)" else "(load)"}")*/
-
 		case Offchip_new(size) =>
       alwaysGen {
         emit(s"""int ${quote(sym)} = ${getNextLMemAddr()};""")
@@ -676,16 +614,16 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 
 		case Reg_new(init) =>
       emitComment("Reg_new {")
-			val ts = tpstr(par(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
+			val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
 			regType(sym) match {
 				case Regular =>
           val parent = if (parentOf(sym).isEmpty) "Top" else quote(parentOf(sym).get) //TODO
 					if (isDblBuf(sym)) {
-						emit(s"""DblRegFileLib ${quote(sym)}_lib = new DblRegFileLib(this, $ts, ${quote(sym)}, ${par(sym)});""")
-            val readstr = if (par(sym)>1) "readv" else "read"
+						emit(s"""DblRegFileLib ${quote(sym)}_lib = new DblRegFileLib(this, $ts, ${quote(sym)}, ${parOf(sym)});""")
+            val readstr = if (parOf(sym)>1) "readv" else "read"
             emit(s"""${maxJPre(sym)} ${quote(sym)} = ${quote(sym)}_lib.${readstr}()""")
            	emit(quote(sym) + "_lib.connectWdone(" + quote(writerOf(sym).get._1) + "_done);")
-            readersOf(sym).foreach { case (r, _) =>
+            readersOf(sym).foreach { case (r, _, _) =>
            	  emit(quote(sym) +"_lib.connectRdone(" + quote(r) + "_done);")
            	}
           } else {
@@ -701,7 +639,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 
 		case e@Reg_write(reg, value) =>
       emitComment("Reg_write {")
-			val ts = tpstr(par(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
+			val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
 			if (isDblBuf(reg)) {
 			 	emit(s"""${quote(reg)}_lib.write(${value}, ${quote(writerOf(reg).get._1)}_done);""")
       } else {
@@ -736,7 +674,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 
     case Bram_new (size, zero) =>
       emitComment("Bram_new {")
-			val ts = tpstr(par(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
+			val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
       //TODO: does templete assume bram has 2 dimension?
       val dims = dimsOf(sym)
       val size0 = dims(0)

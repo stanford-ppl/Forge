@@ -60,16 +60,17 @@ trait MetaPipeRegInsertion extends ForwardTransformer with PipeStageTools {
       val newStages = stages.zipWithIndex.drop(1).map{ case (stage,i) =>
         val dly = prevDly.map{ctr =>
           val reg = Reg[Idx]
-          reg := ctr
+          val regWrite = reg := ctr
+          val regValue = reg.value
           // Set metadata for this register
           isDblBuf(reg) = true
           isDelayReg(reg) = true
-          readersOf(reg) = List((stage,false))
-          writerOf(reg) = stages(i - 1)
+          readersOf(reg) = List((stage,false,regValue))
+          writerOf(reg) = (stages(i - 1), false, regWrite)
           writtenIn(stages(i-1)) = writtenIn(stages(i - 1)) :+ reg
           parentOf(reg) = owner
           childrenOf(owner) = childrenOf(owner) :+ reg
-          reg.value.asInstanceOf[Sym[Idx]]
+          regValue.asInstanceOf[Sym[Idx]]
         }
         delayChain ::= dly
         prevDly = dly

@@ -163,14 +163,14 @@ trait LatencyAnalyzer extends ModelingTools {
         if (styleOf(lhs) == Coarse) { stages.max * (Nm - 1) + stages.sum + latencyOf(lhs) }
         else                        { stages.sum * Nm + latencyOf(lhs) }
 
-      case Bram_store_vector(bram,ofs,vec,cchain) =>
-        val N = nIters(cchain)
-        val P = parsOf(cchain).reduce{_*_}
+      case e:Bram_store_vector[_] =>
+        val N = nIters(e.cchain)
+        val P = parsOf(e.cchain).reduce{_*_}
         N + latencyOf(lhs) // TODO: This assumes each iteration takes 1 cycle, which may not be true (depends on access pattern)
 
-      case Bram_load_vector(bram,ofs,len,cchain) =>
-        val N = nIters(cchain)
-        val P = parsOf(cchain).reduce{_*_}
+      case e:Bram_load_vector[_] =>
+        val N = nIters(e.cchain)
+        val P = parsOf(e.cchain).reduce{_*_}
         N + latencyOf(lhs) // TODO: This assumes each iteration takes 1 cycle, which may not be true (depends on access pattern)
 
       case _ =>

@@ -16,7 +16,7 @@ trait DHDLVectors {
     val vector_apply = internal (Vector) ("vec_apply", T, (Vector(T), SInt) :: T)
 
     // --- Internals
-    internal (Vector) ("vector_list_create", T, SList(T) :: Vector(T)) implements composite ${
+    internal (Vector) ("vector_create_from_list", T, SList(T) :: Vector(T)) implements composite ${
       val vec = vector_from_list($0)
       dimsOf(vec) = List($0.length.as[Index])
       vec
@@ -35,7 +35,7 @@ trait DHDLVectors {
     static (Vector) ("apply", T, varArgs(T) :: Vector(T)) implements composite ${
       val elems = $0.toList
       if (elems.length < 1) stageError("Cannot create empty Vector")
-      vector_list_create(elems)
+      vector_create_from_list(elems)
     }
 
     /** Creates a subvector of this vector with elements [start, end)
@@ -54,7 +54,7 @@ trait DHDLVectors {
     rewrite (vector_slice) using pattern((${Def(EatReflect(Vector_from_list(elems)))},${start},${end}) -> ${
       if (start >= end) stageError("Cannot create empty Vector")
       if (end >= elems.length) stageError("Vector slice exceeds length of original Vector")
-      vector_create(elems.slice(start, end)).asInstanceOf[Rep[Vector[T]]]
+      vector_create_from_list(elems.slice(start, end)).asInstanceOf[Rep[Vector[T]]]
     })
     rewrite (vector_apply) using pattern((${Def(EatReflect(Vector_from_list(elems)))}, ${i}) -> ${
       if (i < 0 && i >= elems.length) stageError("Invalid Vector apply: " + i)

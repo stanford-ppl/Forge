@@ -74,8 +74,8 @@ trait DHDLControllers {
 
     // --- Nodes
     // pipe_foreach, pipe_reduce, block_reduce - see Template in extern
-    val pipe_parallel = internal (Parallel) ("pipe_parallel", Nil, ("func", MThunk(MAny)) :: MUnit, effect = simple)
-    val unit_pipe = internal (Pipe) ("unit_pipe", Nil, ("func", MThunk(MAny)) :: MUnit)
+    val pipe_parallel = internal (Parallel) ("pipe_parallel", Nil, ("func", MThunk(MUnit)) :: MUnit, effect = simple)
+    val unit_pipe = internal (Pipe) ("unit_pipe", Nil, ("func", MThunk(MUnit)) :: MUnit)
 
     val controllers = List(Pipe, Sequential)
     val styles  = List("Fine", "Disabled")
@@ -158,14 +158,14 @@ trait DHDLControllers {
       }
 
       // Unit Pipe
-      static (ctrl) ("apply", Nil, MThunk(MAny) :: MUnit) implements composite ${
+      static (ctrl) ("apply", Nil, MThunk(MUnit) :: MUnit) implements composite ${
         val pipe = unit_pipe($0)
         styleOf(pipe) = \$style
       }
     }
 
     // --- Parallel
-    static (Parallel) ("apply", Nil, MThunk(MAny) :: MUnit) implements composite ${
+    static (Parallel) ("apply", Nil, MThunk(MUnit) :: MUnit) implements composite ${
       val pipe = pipe_parallel($0)
       styleOf(pipe) = ForkJoin
     }

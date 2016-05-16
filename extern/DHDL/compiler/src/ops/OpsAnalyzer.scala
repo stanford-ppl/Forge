@@ -15,6 +15,9 @@ trait OpsAnalyzer extends ModelingTools {
   val IR: OpsAnalysisExp with DHDLExp
   import IR._
 
+  debugMode = true
+  override val name = "Ops Analyzer"
+
   var totalOps = AppStatistics()
   var opScope: List[AppStatistics] = Nil
 
@@ -41,12 +44,18 @@ trait OpsAnalyzer extends ModelingTools {
         opsInBlock(func)
 
       case EatReflect(Unit_pipe(func)) =>
-        opsInBlock(func)
+        val body = opsInBlock(func)
+        debug(s"Pipe $lhs: ")
+        debug(s"  body: $body")
+        body
 
       case EatReflect(Pipe_foreach(cchain, func, _)) =>
         val P = parsOf(cchain).reduce(_*_)
         val N = nIters(cchain)
         val body = opsInBlock(func)
+
+        debug(s"Foreach $lhs (N = $N, P = $P):")
+        debug(s"  body: $body")
         body * P * N
 
       case EatReflect(e@Pipe_fold(cchain,_,_,iFunc,ld,st,func,rFunc,_,idx,_,_,_)) =>
@@ -58,6 +67,12 @@ trait OpsAnalyzer extends ModelingTools {
         val load = opsInBlock(ld) * N * P
         val store = opsInBlock(st) * N * P
 
+        debug(s"Fold $lhs (N = $N, P = $P)")
+        debug(s"  body: $body")
+        debug(s"  reduce: $reduce")
+        debug(s"  icalc: $icalc")
+        debug(s"  load: $load")
+        debug(s"  store: $store")
         body + reduce + icalc + load + store
 
       case EatReflect(e@Accum_fold(ccOuter,ccInner,_,_,iFunc,func,ld1,ld2,rFunc,st,_,_,idx,_,_,_,_)) =>
@@ -72,10 +87,16 @@ trait OpsAnalyzer extends ModelingTools {
         val load = opsInBlock(ld1) * Nm * Pm * Nr * Pr
         val store = opsInBlock(ld2) * Nr * Pr
 
+        debug(s"AccumFold $lhs (Nm = $Nm, Pm = $Pm, Nr = $Nr, Pr = $Pr)")
+        debug(s"  body: $body")
+        debug(s"  reduce: $reduce")
+        debug(s"  icalc: $icalc")
+        debug(s"  load: $load")
+        debug(s"  store: $store")
         body + reduce + icalc + load + store
 
       case _ =>
-        blocks(rhs).map{blk => opsInBlock(blk)}.fold(NoOps){_+_}
+        blocks(rhs).map{blk => opsInBlock(blk)}.fold(NoOps){_+_} + opsIn(lhs)
     }
     opScope ::= ops
   }
@@ -86,15 +107,18 @@ trait OpsAnalyzer extends ModelingTools {
   }
 
   override def postprocess[A:Manifest](b: Block[A]) = {
+    val G = 1000f*1000f*1000f
+    val GB = 1024f*1024f*1024f*8f
+
     val total = opScope.fold(NoOps){_+_}
     totalOps = total
 
-    val totalInsts = total.insts.toFloat / (1000 * 1000)
-    val totalFLOPs = total.flops.toFloat / (1000 * 1000)
-    val totalOnChipIn = total.onChipIn.toFloat / (1024 * 1024)
-    val totalOnChipOut = total.onChipOut.toFloat / (1024 * 1024)
-    val totalOffChipIn = total.dataIn.toFloat / (1024 * 1024)
-    val totalOffChipOut = total.dataOut.toFloat / (1024 * 1024)
+    val totalInsts = total.insts.toFloat / G
+    val totalFLOPs = total.flops.toFloat / G
+    val totalOnChipIn = total.onChipIn.toFloat / GB
+    val totalOnChipOut = total.onChipOut.toFloat / GB
+    val totalOffChipIn = total.dataIn.toFloat / GB
+    val totalOffChipOut = total.dataOut.toFloat / GB
 
     val totalOnChip = totalOnChipIn + totalOnChipOut
     val totalOffChip = totalOffChipIn + totalOffChipOut
@@ -103,15 +127,15 @@ trait OpsAnalyzer extends ModelingTools {
     cycleAnalyzer.run(b)
 
     msg("Instruction statistics:")
-    msg(s"  Instructions: ${total.insts} " + "(%.1f MI)".format(totalInsts))
-    msg(s"  FLOPs: ${total.flops} " + "(%.1f MFLOPs)".format(totalFLOPs))
-    msg(s"  On-chip loads: ${total.onChipOut} bits " + "(%.2f MB)".format(totalOnChipOut))
-    msg(s"  On-chip stores: ${total.onChipIn} bits " + "(%.2f MB)".format(totalOnChipIn))
-    msg(s"  Off-chip loads: ${total.dataIn} bits " + "(%.2f MB)".format(totalOffChipIn))
-    msg(s"  Off-chip stores: ${total.dataOut} bits " + "(%.2f MB)".format(totalOffChipOut))
+    msg(s"  Instructions: ${total.insts} " + "(%.3f GI)".format(totalInsts))
+    msg(s"  FLOPs: ${total.flops} " + "(%.3f GFLOPs)".format(totalFLOPs))
+    msg(s"  On-chip loads: ${total.onChipOut} bits " + "(%.3f GB)".format(totalOnChipOut))
+    msg(s"  On-chip stores: ${total.onChipIn} bits " + "(%.3f GB)".format(totalOnChipIn))
+    msg(s"  Off-chip loads: ${total.dataIn} bits " + "(%.3f GB)".format(totalOffChipIn))
+    msg(s"  Off-chip stores: ${total.dataOut} bits " + "(%.3f GB)".format(totalOffChipOut))
     msg("--")
-    msg("  Total on-chip transfers: " + "%.3f MB".format(totalOnChip))
-    msg("  Total off-chip transfers: " + "%.3f MB".format(totalOffChip))
+    msg("  Total on-chip transfers: " + "%.3f GB".format(totalOnChip))
+    msg("  Total off-chip transfers: " + "%.3f GB".format(totalOffChip))
 
     val totalCycles = cycleAnalyzer.totalCycles
     val runtime = totalCycles/(IR.CLK*1000000f)
@@ -128,15 +152,15 @@ trait OpsAnalyzer extends ModelingTools {
     val totalOnChipBW = totalOnChip / runtime
     val totalOffChipBW = totalOffChip / runtime
 
-    msg("  Instructions: %.2f MIPS".format(MIPS))
-    msg("  Floating point: %.2f FLOPS".format(FLOPS))
-    msg("  On-chip load bandwidth: %.2f GB/s".format(onChipLdBW/1024))
-    msg("  On-chip store bandwidth: %.2f GB/s".format(onChipStBW/1024))
-    msg("  Off-chip load bandwidth: %.2f GB/s".format(offChipLdBW/1024))
-    msg("  Off-chip store bandwidth: %.2f GB/s".format(offChipStBW/1024))
+    msg("  Instructions: %.3f GIPS".format(MIPS))
+    msg("  Floating point: %.3f GFLOPS".format(FLOPS))
+    msg("  On-chip load bandwidth: %.3f GB/s".format(onChipLdBW))
+    msg("  On-chip store bandwidth: %.3f GB/s".format(onChipStBW))
+    msg("  Off-chip load bandwidth: %.3f GB/s".format(offChipLdBW))
+    msg("  Off-chip store bandwidth: %.3f GB/s".format(offChipStBW))
     msg("--")
-    msg("  Total on-chip bandwidth: %.2f GB/s".format(totalOnChipBW/1024))
-    msg("  Total off-chip bandwidth: %.2f GB/s".format(totalOffChipBW/1024))
+    msg("  Total on-chip bandwidth: %.3f GB/s".format(totalOnChipBW))
+    msg("  Total off-chip bandwidth: %.3f GB/s".format(totalOffChipBW))
 
     super.postprocess(b)
   }

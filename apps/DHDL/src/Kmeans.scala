@@ -51,8 +51,7 @@ trait Kmeans extends DHDLApplication {
 
       Parallel {
         List.tabulate(MAXK){i =>
-          val idx = i.as[SInt]
-          oldCent(i) := points(idx::idx+1, 0::dTileSize, dstLoopPar)
+          oldCent(i) := points(i.as[SInt], 0::dTileSize, dstLoopPar)
         }
         ()
       }

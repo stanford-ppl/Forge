@@ -27,7 +27,9 @@ trait ExternPrimitiveTypesExp extends ExternPrimitiveTypes with BaseExp {
   def bitManifest: Manifest[Bit] = manifest[DHDLBit]
 }
 
-trait ExternPrimitiveOpsExp extends ExternPrimitiveCompilerOps with ExternPrimitiveTypesExp with TpesOpsExp with DHDLMetadataOpsExp {
+trait ExternPrimitiveOpsExp extends ExternPrimitiveCompilerOps with ExternPrimitiveTypesExp with TpesOpsExp
+  with DHDLMetadataOpsExp with FixPtOpsExp {
+
   this: DHDLExp =>
 
   // --- Internal API
@@ -97,8 +99,24 @@ trait ExternPrimitiveOpsExp extends ExternPrimitiveCompilerOps with ExternPrimit
     case _ => super.boundOf(__arg0)
   }
 
+  // TODO: Move to spec later?
+  // Rewrite needed for length calculation of vectors, ranges
+  override def sub[S:Manifest,I:Manifest,F:Manifest](__arg0: Rep[FixPt[S,I,F]],__arg1: Rep[FixPt[S,I,F]])(implicit __pos: SourceContext,__imp1: Overload2) = {
+    (__arg0) match {
+      case Def(FixPt_Add(`__arg1`, y: Rep[FixPt[S,I,F]])) => y   // (x + y) - x == y
+      case Def(FixPt_Add(y: Rep[FixPt[S,I,F]], `__arg1`)) => y   // (y + x) - x == y
+      case _ => super.sub(__arg0, __arg1)(manifest[S],manifest[I],manifest[F],__pos,__imp1)
+    }
+  }
 
-
+  // Dual (just for completeness)
+  override def add[S:Manifest,I:Manifest,F:Manifest](__arg0: Rep[FixPt[S,I,F]],__arg1: Rep[FixPt[S,I,F]])(implicit __pos: SourceContext,__imp1: Overload2) = {
+    (__arg0,__arg1) match {
+      case (Def(FixPt_Sub(x: Rep[FixPt[S,I,F]], `__arg1`)), _) => x  // (x - y) + y == x
+      case (_, Def(FixPt_Sub(x: Rep[FixPt[S,I,F]], `__arg0`))) => x  // y + (x - y) == x
+      case _ => super.add(__arg0, __arg1)(manifest[S],manifest[I],manifest[F],__pos,__imp1)
+    }
+  }
 }
 
 

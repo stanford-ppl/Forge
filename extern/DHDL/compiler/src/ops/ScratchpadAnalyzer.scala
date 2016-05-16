@@ -197,10 +197,11 @@ trait ScratchpadAnalyzer extends HungryTraversal {
     else {
       val (lca, writePath, readPath) = GraphUtil.leastCommonAncestorWithPaths[(Exp[Any],Boolean)](write, read, {node => parentOf(node)})
 
+      debug("    lca: " + lca)
+      debug("    write path: " + writePath.mkString(", "))
+      debug("    read path: " + readPath.mkString(", "))
+
       if (lca.isDefined) {
-        debug("    write path: " + writePath.mkString(", "))
-        debug("    read path: " + readPath.mkString(", "))
-        debug("    lca: " + lca.get)
         if (isMetaPipe(lca.get)) {
           val parent = lca.get._1
           val children = childrenOf(parent).map{x => (x,false)} :+ ((parent,true))

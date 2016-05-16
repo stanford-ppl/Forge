@@ -39,13 +39,10 @@ trait MatMult extends DHDLApplication {
         val tileA = BRAM[Elem]("tileA", bm, bp)
         val tileB = BRAM[Elem]("tileB", bp, bn)
         val tileC = BRAM[Elem]("tileC", bm, bn)
-        //BlockReduce((p by bp) par blockPar, tileC){ k =>
         Parallel {
           tileA := a(i::i+bm, k::k+bp, param(1))
           tileB := b(k::k+bp, j::j+bn, param(1))
-          tileC := c(i::i+bm, j::j+bn, param(1))
         }
-        //val accTile = BRAM[Elem]("accTile", bm, bn)
         Sequential(bm by 1, (bn by 1) par middlePar){ (ii,jj) =>    // MetaPipe?
           val accum = Reg[Elem]
           Pipe.reduce((bp by 1) par innerPar)(accum){ kk => tileA(ii, kk) * tileB(kk, jj) }{_+_}

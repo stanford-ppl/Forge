@@ -62,7 +62,7 @@ trait OpsModel extends PipeStageToolsExp {
     case e: Reg_read[_] => Instruction
     case e: Reg_write[_] => Instruction
 
-    case e: Counterchain_new => AppStatistics(insts=lenOf(e))
+    case e: Counterchain_new => AppStatistics(insts=lenOf(s))
 
     case FixPt_Neg(_)   => Instruction
     case FixPt_Add(_,_) => Instruction

@@ -63,6 +63,7 @@ trait MetaPipeRegInsertion extends SinglePassTransformer with PipeStageTools {
               subst ++= inds.zip(dly)
               debug(s"Mirroring stage $owner : $stage")
               val mirroredStage = self_mirror(stage, stageDef)
+              subst += stage -> mirroredStage
 
               val Def(origDef) = stage
               val Def(newDef) = mirroredStage

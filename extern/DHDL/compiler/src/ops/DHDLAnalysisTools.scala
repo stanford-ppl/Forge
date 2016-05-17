@@ -40,6 +40,24 @@ trait PipeStageToolsExp extends EffectExp {
     case Def(d) => isOuterControl(s) || isInnerControl(s)
     case _ => false
   }
+  def isOuterControl(s: Exp[Any]): Boolean = s match {
+    case Def(d) => isOuterPipeline(s) || isParallel(d)
+    case _ => false
+  }
+  def isInnerControl(s: Exp[Any]): Boolean = s match {
+    case Def(d) => isInnerPipeline(s) || isBramTransfer(d) || isOffChipTransfer(d)
+    case _ => false
+  }
+
+  def isOuterPipeline(s: Exp[Any]): Boolean = s match {
+    case Def(d) => isPipeline(d) && styleOf(s) != Fine
+    case _ => false
+  }
+  def isInnerPipeline(s: Exp[Any]): Boolean = s match {
+    case Def(d) => isPipeline(d) && styleOf(s) == Fine
+    case _ => false
+  }
+
   def isOuterLoop(s: Exp[Any]): Boolean = s match {
     case Def(d) => isLoop(d) && styleOf(s) != Fine
     case _ => false
@@ -51,14 +69,7 @@ trait PipeStageToolsExp extends EffectExp {
     case Def(d) => isLoop(d) && styleOf(s) == Fine
     case _ => false
   }
-  def isOuterControl(s: Exp[Any]): Boolean = s match {
-    case Def(d) => isOuterLoop(s) || isParallel(d)
-    case _ => false
-  }
-  def isInnerControl(s: Exp[Any]): Boolean = s match {
-    case Def(d) => isInnerLoop(s) || isBramTransfer(d) || isOffChipTransfer(d)
-    case _ => false
-  }
+
   def isAllocation(s: Exp[Any]): Boolean = s match {
     case Def(d) => isAllocation(d)
     case _ => false

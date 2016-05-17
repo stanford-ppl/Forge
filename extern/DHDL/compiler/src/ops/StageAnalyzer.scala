@@ -19,6 +19,12 @@ trait StageAnalyzer extends HungryTraversal with PipeStageTools {
   override val recurseAlways = true  // Always follow default traversal scheme
   override val recurseElse = false   // Follow default traversal scheme when node was not matched
 
+  override def preprocess[A:Manifest](b: Block[A]) = {
+    val stages = getStages(b)
+    if (debugMode) list(stages)
+    super.preprocess(b)
+  }
+
   override def traverse(lhs: Exp[Any], rhs: Def[Any]) = rhs match {
     // Accel block (equivalent to a Sequential unit pipe)
     case Hwblock(blk) =>

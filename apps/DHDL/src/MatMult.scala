@@ -49,6 +49,7 @@ trait MatMult extends DHDLApplication {
           Pipe {
             val prev = mux(k == 0, 0.as[Elem], tileC(ii,jj))
             tileC(ii,jj) = prev + accum.value
+            ()
           }
         }
         c(i::i+bm, j::j+bn, stPar) := tileC

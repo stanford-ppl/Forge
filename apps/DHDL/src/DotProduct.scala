@@ -23,7 +23,10 @@ trait DotProduct extends DHDLApplication {
         b2 := v2(i::i+tileSize, param(24))
       }
       val acc = Reg[Elem]("acc")
-      Pipe.reduce(0 until tileSize par innerPar)(acc){ ii => b1(ii) * b2(ii) }{_+_}
+      Pipe.reduce(0 until tileSize par innerPar)(acc){ ii =>
+        println("b1: " + b1(ii))
+        b1(ii) * b2(ii)
+      }{_+_}
     }{_+_}
   }
 

@@ -239,12 +239,14 @@ trait DHDLDSL extends ForgeApplication
     schedule(BoundAnalyzer)
     schedule(ConstantFolding)
 
+    schedule(MetaPipeRegInsertion)
+
+    schedule(IRPrinterPlus)
     schedule(HardStop)  // DEBUGGING
 
-    //schedule(MetaPipeRegInsertion)
 
     schedule(BRAMVectorLowering)
-    schedule(IRPrinterPlus)
+
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))

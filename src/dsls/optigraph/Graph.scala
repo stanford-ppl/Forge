@@ -43,6 +43,7 @@ trait GraphOps{
         if(result >= $self.numNodes() || result < 0) fatal("ERROR. ID: " + $1 + " does not exist in this UndirectedGraph!")
         Node(result)
       }
+      
       infix ("foreachNode") ((Node ==> MUnit) :: MUnit, effect = simple) implements composite ${
         NodeData(array_fromfunction($self.numNodes,{n => n})).foreach{ i =>
           $1(Node(i))
@@ -50,6 +51,14 @@ trait GraphOps{
       }
       infix("mapNodes")( (Node==>R) :: NodeData(R), addTpePars=R) implements composite ${
         NodeData[R](array_fromfunction($self.numNodes,{n => $1(Node(n))}))
+      }
+
+      infix ("numCommonNeighbors") ((Node,Node) :: MLong) implements composite ${
+        val neigh1 = $self.outNeighbors($1)
+        val neigh2 = $self.outNeighbors($2)
+        val max = if($1 > $2) $2.id else $1.id
+
+        neigh1.intersectInRange(neigh2,max)
       }
 
       infix ("getExternalIDs") (Nil :: MArray(MInt)) implements getter(0, "_externalIDs")

@@ -1,9 +1,8 @@
 package optiml.library
 
-import scala.collection.JavaConverters._
-
 import java.io.{File,BufferedReader,FileReader,PrintWriter,BufferedWriter,FileWriter}
 import java.util.HashMap
+import scala.collection.JavaConverters._
 
 /*
  * Global values used by the interpreter.

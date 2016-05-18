@@ -58,6 +58,8 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase {
   }
   def array_sortIndices[R:Manifest:Ordering](__arg0: Rep[Int], __arg1: (Rep[Int] => Rep[R]))(implicit __imp0: SourceContext): Rep[ForgeArray[Int]]
     = array_empty[Int](__arg0).indices.toArray.sortBy(__arg1)
+  def array_sortIndices(__arg0: Rep[Int], __arg1: (Rep[Int],Rep[Int]) => Rep[Int])(implicit __imp0: SourceContext): Rep[ForgeArray[Int]]
+    = array_empty[Int](__arg0).indices.toArray.sortWith((a,b) => __arg1(a,b) < 0)
   def array_fromfunction[T:Manifest](__arg0: Rep[Int],__arg1: Rep[Int] => Rep[T])(implicit __imp0: SourceContext): Rep[ForgeArray[T]] = {
     Array.tabulate[T](__arg0)(__arg1)
   }

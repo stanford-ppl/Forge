@@ -19,8 +19,7 @@ trait NodeDataOps {
     val K = tpePar("K")
     val V = tpePar("V")
     val R = tpePar("R")
-    val Node
-     = lookupTpe("Node")
+    val Node = lookupTpe("Node")
     val NodeData = tpe("NodeData", T)
 
     data(NodeData,("_data",MArrayBuffer(T)))
@@ -28,6 +27,9 @@ trait NodeDataOps {
     static(NodeData)("apply", T, MArray(T) :: NodeData(T)) implements allocates(NodeData,${array_buffer_new_imm($0, array_length($0))})
     static(NodeData)("apply", T, MArrayBuffer(T) :: NodeData(T)) implements allocates(NodeData,${array_buffer_immutable($0)})
     static(NodeData)("fromFunction", T, (MInt,(MInt ==> T)) :: NodeData(T)) implements allocates(NodeData,${array_buffer_new_imm(array_fromfunction($0,$1), $0)})
+    static(NodeData)("fromFile", T,  CurriedMethodSignature(List(List(("path",MString)), List(("parser", MString ==> T))), NodeData)) implements composite ${
+      NodeData(ForgeFileReader.readLines(path)(parser))
+    }
 
     val NodeDataOps = withTpe(NodeData)
     NodeDataOps{
@@ -62,7 +64,7 @@ trait NodeDataOps {
       infix ("pack") (NodeData(T) :: NodeData(Tuple2(T,T))) implements zip( (T,T,Tuple2(T,T)), (0,1), ${ (a,b) => pack(a,b) })
       infix ("map") ((T ==> R) :: NodeData(R), addTpePars=R) implements map((T,R), 0, ${ e => $1(e) })
       infix ("flatMap") ((T ==> NodeData(R)) :: NodeData(R), addTpePars = R) implements flatMap((T,R), 0, ${ e => $1(e) })
-      infix ("filter") ( ((T ==> MBoolean),(T ==> R)) :: NodeData(R), addTpePars = R) implements filter((T,R), 0, ${w => $1(w)}, ${e => $2(e)})
+      infix ("filter") ( (T ==> MBoolean) :: NodeData(T)) implements filter((T,T), 0, ${w => $1(w)}, ${e => e})
       infix ("foreach") ((T ==> MUnit) :: MUnit, effect = simple) implements foreach(T, 0, ${ e => $1(e) })
       infix ("reduce") (((T,T) ==> T) :: T, TNumeric(T)) implements reduce(T, 0, ${numeric_zero[T]}, ${ (a,b) => $1(a,b) })
       infix ("reduceNested") ( (((T,T) ==> T),R):: T,addTpePars=R) implements reduce(T, 0, ${$2.asInstanceOf[Rep[T]]}, ${(a,b) => $1(a,b)})
@@ -98,6 +100,11 @@ trait NodeDataOps {
         }
       }
 
+      infix("makeString") (MString :: MString) implements composite ${
+        val buf = $self.getRawArrayBuffer
+        array_buffer_reduce(array_buffer_map(buf, (e:Rep[T]) => "" + e), (a:Rep[String],b:Rep[String]) => a + $1 + b, "")
+      }
+
       ///////////////methods for parallel collection buffer declaration/////////////////////////
       compiler ("nd_raw_data") (Nil :: MArrayBuffer(T)) implements getter(0, "_data")
       compiler("nd_raw_alloc")(MInt :: NodeData(R), addTpePars = R, effect=mutable) implements composite ${NodeData[R]($1)}
@@ -112,5 +119,81 @@ trait NodeDataOps {
       parallelize as ParallelCollectionBuffer(T,lookupOp("nd_raw_alloc"),lookupOp("length"),lookupOp("nd_apply"),lookupOp("nd_update"),lookupOp("nd_set_length"),lookupOp("nd_appendable"),lookupOp("nd_append"),lookupOp("nd_copy"))
     }
     compiler (NodeData) ("nd_fake_alloc", R, Nil :: NodeData(R)) implements single ${ NodeData[R](0) }
+  }
+
+  def importNodeDataDBOps() = {
+    val NodeDataDB = tpe("NodeDataDB") //we sacrifice genericity here in order to provide serializers
+    val NodeData = lookupTpe("NodeData")
+    val KeyValueStore = lookupTpe("KeyValueStore")
+    val Tuple2 = lookupTpe("Tup2")
+
+    data(NodeDataDB, ("_db", KeyValueStore(NodeData(MDouble))))
+    compiler (NodeDataDB) ("nd_alloc_db", Nil, KeyValueStore(NodeData(MDouble)) :: NodeDataDB) implements allocates (NodeDataDB, ${$0})
+
+    static (NodeDataDB) ("fromTable", Nil, (MString) :: NodeDataDB) implements composite ${
+      nd_alloc_db(KeyValueStore($0, nd_deserialize))
+    }
+
+    static (NodeDataDB) ("fromFile", Nil, CurriedMethodSignature(List(List(("path",MString), ("table",MString)), List(("parser",(MString,MInt) ==> Tuple2(MString,NodeData(MDouble))))), NodeDataDB)) implements composite ${
+      val db = NodeDataDB.fromTable(table)
+      val f = ForgeFileInputStream(path)
+      var line = f.readLine()
+      var lineno = 0
+      while (line != null) {
+        val res = parser(line, lineno)
+        db(res._1) = res._2
+        line = f.readLine()
+        lineno += 1
+      }
+      f.close()
+      db
+    }
+
+    static (NodeDataDB) ("fromFunction", Nil, CurriedMethodSignature(List(List(("length",MInt),("table",MString)), List(("func",MInt ==> Tuple2(MString,NodeData(MDouble))))), NodeDataDB)) implements composite ${
+      val db = NodeDataDB.fromTable(table)
+      NodeData.fromFunction(length, i => i).foreach(i => {
+        val res = func(i)
+        db(res._1) = res._2
+      })
+      db
+    }
+
+    direct (NodeDataDB) ("nd_deserialize", Nil, (("hash", KeyValueStore(NodeData(MDouble))), ("k", MString)) :: NodeData(MDouble)) implements composite ${
+      val buf = ByteBufferWrap(hash.get(k))
+      val length = buf.getInt()
+      val res = array_empty[Double](length)
+      buf.unsafeImmutable.get(res, 0, length)
+      NodeData(res.unsafeImmutable)
+    }
+
+    direct (NodeDataDB) ("nd_serialize", Nil, NodeData(MDouble) :: MArray(MByte)) implements composite ${
+      val arr = $0.getRawArrayBuffer
+      val len = array_buffer_length(arr)
+      val buf = ByteBuffer(4+8*len)
+      buf.putInt(len)
+      buf.put(array_buffer_unsafe_result(arr), 0, len)
+      buf.unsafeImmutable.array
+    }
+    
+    val NodeDataDBOps = withTpe(NodeDataDB)
+    NodeDataDBOps{
+      compiler ("nd_getdb") (Nil :: KeyValueStore(NodeData(MDouble))) implements getter(0, "_db")
+
+      infix ("apply") (MString :: NodeData(MDouble)) implements composite ${ nd_getdb($0).apply($1) }
+
+      infix ("contains") (MString :: MBoolean) implements composite ${ nd_getdb($0).get($1) != unit(null) }
+
+      infix ("update") ((MString, NodeData(MDouble)) :: MUnit, effect = write(0)) implements composite ${ nd_getdb($0).put($1, nd_serialize($2)) }
+    
+      infix ("close") (Nil :: MUnit, effect = write(0)) implements composite ${ nd_getdb($0).close() }
+    
+      infix("toFile") (MString :: MUnit, effect = simple) implements composite ${ 
+        val keys = nd_getdb($0).keys
+        ForgeFileWriter.writeLines($1, keys.length)(i => {
+          val data = $self(keys(i)).getRawArrayBuffer   
+          array_buffer_reduce(array_buffer_map(data, (e:Rep[Double]) => "" + e), (a:Rep[String],b:Rep[String]) => a + "|" + b, "")
+        })
+      }
+    }
   }
 }

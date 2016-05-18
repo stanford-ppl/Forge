@@ -22,12 +22,8 @@ trait InputOutputOpsExp extends DeliteFileReaderOpsExp with DeliteFileWriterOpsE
     DeliteFileReader.readLinesFlattened[A](path)(f)
   }
 
-  def forge_filereader_readlines_chunk[A:Manifest](path: Rep[String], offset: Rep[Long], numBytes: Rep[Long], f: Rep[String] => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
-    DeliteFileReader.readLinesChunk[A](path)(offset, numBytes)(f)
-  }
-
-  def forge_filewriter_writelines(path: Rep[String], numLines: Rep[Int], append: Rep[Boolean], f: Rep[Int] => Rep[String])(implicit ctx: SourceContext): Rep[Unit] = {
-    DeliteFileWriter.writeLines(path, numLines, append)(f)
+  def forge_filereader_readlines_chunk[A:Manifest](stream: Rep[ForgeFileInputStream], offset: Rep[Long], numBytes: Rep[Long], f: (Rep[String], Rep[String]) => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
+    DeliteFileReader.readLinesChunk[A](stream)(offset, numBytes)(f)
   }
 
   def forge_fileinputstream_new(path: Rep[String])(implicit ctx: SourceContext): Rep[ForgeFileInputStream] = {
@@ -46,12 +42,16 @@ trait InputOutputOpsExp extends DeliteFileReaderOpsExp with DeliteFileWriterOpsE
     dfis_close(stream)
   }
 
+  def forge_filewriter_writelines(path: Rep[String], numLines: Rep[Int], append: Rep[Boolean], f: Rep[Int] => Rep[String])(implicit ctx: SourceContext): Rep[Unit] = {
+    DeliteFileWriter.writeLines(path, numLines, append)(f)
+  }
+
 
   type ForgeFileOutputStream = DeliteFileOutputStream
   implicit def forgeOutputStreamManifest = manifest[ForgeFileOutputStream]
 
-  def forge_fileoutputstream_new(path: Rep[String], append: Rep[Boolean])(implicit ctx: SourceContext): Rep[ForgeFileOutputStream] = {
-    dfos_new(path, sequential = unit(true), append = append) // single-threaded / single-file
+  def forge_fileoutputstream_new(path: Rep[String], _append: Rep[Boolean])(implicit ctx: SourceContext): Rep[ForgeFileOutputStream] = {
+    dfos_new(path, append = _append) // single-threaded / single-file
   }
 
   def forge_fileoutputstream_writeline(stream: Rep[ForgeFileOutputStream], line: Rep[String])(implicit ctx: SourceContext): Rep[Unit] = {

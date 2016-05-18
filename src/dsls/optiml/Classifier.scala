@@ -8,6 +8,7 @@ trait ClassifierOps {
   this: OptiMLDSL =>
 
   def importClassifierOps() {
+    val Tup2 = lookupTpe("Tup2")
     val DenseVector = lookupTpe("DenseVector")
     val DenseMatrix = lookupTpe("DenseMatrix")
     val DenseTrainingSet = lookupTpe("DenseTrainingSet")
@@ -27,7 +28,7 @@ trait ClassifierOps {
     val Forest = tpe("RandomForest")
     data(Forest, ("_trees", DenseVector(Tree)))
 
-    compiler (Forest) ("alloc_forest", Nil, ("trees", DenseVector(Tree)) :: Forest) implements allocates(Forest, ${$0})
+    direct (Forest) ("alloc_forest", Nil, ("trees", DenseVector(Tree)) :: Forest) implements allocates(Forest, ${$0})
 
     // For each tree, we default to using approximately 2/3rds of the total available samples
     // http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#remarks
@@ -65,14 +66,43 @@ trait ClassifierOps {
     ForestOps {
       infix ("trees") (Nil :: DenseVector(Tree)) implements getter(0, "_trees")
 
-      infix ("predict") (("testPt", DenseVector(MDouble)) :: MDouble) implements composite ${
+      // Return a 2 element vector where v(0) is the probability the label is false,
+      // and v(1) is the probability the label is true
+      infix ("probabilities") (("testPt", DenseVector(MDouble)) :: DenseVector(MDouble)) implements composite ${
         fassert($self.trees.length > 0, "random forest is empty")
 
-        // Take majority vote
-        val predictions = $self.trees.map(t => t.predict(testPt))
-        val counts = predictions.histogram
-        val majorityIndex = counts.toVector.maxIndex
-        counts.keys.apply(majorityIndex)
+        // Return the probability for each label by averaging the probability from each tree
+        // Note: this only works correctly as written for the 2 label problem. This is because
+        // we don't currently store the full class probabilities in each leaf, but only the
+        // probability of the selected class.
+        val scores = $self.trees.map(t => t.predict(testPt))
+        val probs0 = scores.map(t => if (t._1 == 0.0) t._2 else (1.0-t._2))
+        val probs1 = scores.map(t => if (t._1 == 1.0) t._2 else (1.0-t._2))
+        DenseVector(sum(probs0) / scores.length.toDouble, sum(probs1) / scores.length.toDouble)
+      }
+
+      // Returns (label, probability) tuple
+      infix ("predict") (("testPt", DenseVector(MDouble)) :: Tup2(MDouble,MDouble)) implements composite ${
+        fassert($self.trees.length > 0, "random forest is empty")
+
+        // Select the label with highest mean probability
+        val probs = $self.probabilities(testPt)
+        val majorityIndex = probs.maxIndex
+        pack((majorityIndex.toDouble, probs(majorityIndex)))
+      }
+
+      // Returns a score in [0.0-1.0] that reflects the probability a testPt is true (i.e. 1.0)
+      infix ("score") (("testPt", DenseVector(MDouble)) :: MDouble) implements composite ${
+        val (label, prob) = unpack($self.predict(testPt))
+        if (label == 0.0) {
+          1.0-prob
+        }
+        else if (label == 1.0) {
+          prob
+        }
+        else {
+          fatal("unexpected label in rforest score: " + label)
+        }
       }
     }
 

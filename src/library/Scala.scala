@@ -582,15 +582,15 @@ trait ScalaOps extends PrimitiveMathGen {
 
     val hashmap = direct (HashMapOps) ("SHashMap", (K,V), Nil :: SHashMap(K,V), effect = mutable)
     impl (hashmap) (codegen($cala, ${ new scala.collection.mutable.HashMap[$t[K],$t[V]]() }))
-    impl (hashmap) (codegen(cpp, ${ new std::map<$t[K],$t[V]>() }))
+    // impl (hashmap) (codegen(cpp, ${ new std::map<$t[K],$t[V]>() }))
 
     compiler (HashMapOps) ("shashmap_from_arrays", (K,V), (MArray(K),MArray(V)) :: SHashMap(K,V), effect = mutable) implements codegen($cala, ${ scala.collection.mutable.HashMap($0.zip($1): _*) })
     val keys_array = compiler (HashMapOps) ("shashmap_keys_array", (K,V), (SHashMap(K,V)) :: SArray(K))
     val values_array = compiler (HashMapOps) ("shashmap_values_array", (K,V), (SHashMap(K,V)) :: SArray(V))
     impl (keys_array) (codegen($cala, ${ $0.keys.toArray }))
     impl (values_array) (codegen($cala, ${ $0.values.toArray }))
-    impl (keys_array) (codegen(cpp, "new " + unquotes("remap(sym.tp)") + ${ ($0->size()); int keys_idx_$0 = 0; for(std::map<$t[K],$t[V]>::iterator it = $0->begin(); it != $0->end(); ++it) } + unquotes("quote(sym)") + ${->update(keys_idx_$0++, it->first); }))
-    impl (values_array) (codegen(cpp, "new " + unquotes("remap(sym.tp)") + ${ ($0->size()); int values_idx_$0 = 0; for(std::map<$t[K],$t[V]>::iterator it = $0->begin(); it != $0->end(); ++it) } + unquotes("quote(sym)") + ${->update(values_idx_$0++, it->second); }))
+    // impl (keys_array) (codegen(cpp, "new " + unquotes("remap(sym.tp)") + ${ ($0->size()); int keys_idx_$0 = 0; for(std::map<$t[K],$t[V]>::iterator it = $0->begin(); it != $0->end(); ++it) } + unquotes("quote(sym)") + ${->update(keys_idx_$0++, it->first); }))
+    // impl (values_array) (codegen(cpp, "new " + unquotes("remap(sym.tp)") + ${ ($0->size()); int values_idx_$0 = 0; for(std::map<$t[K],$t[V]>::iterator it = $0->begin(); it != $0->end(); ++it) } + unquotes("quote(sym)") + ${->update(values_idx_$0++, it->second); }))
 
     val apply = infix (HashMapOps) ("apply", (K,V), (SHashMap(K,V), K) :: V)
     val update = infix (HashMapOps) ("update", (K,V), (SHashMap(K,V), K, V) :: MUnit, effect = write(0))
@@ -599,11 +599,11 @@ trait ScalaOps extends PrimitiveMathGen {
     infix (HashMapOps) ("values", (K,V), SHashMap(K,V) :: MArray(V)) implements composite ${ farray_from_sarray(shashmap_values_array($0)) }
 
     impl (apply) (codegen($cala, ${ $0($1) }))
-    impl (apply) (codegen(cpp, ${ $0->find($1)->second }))
+    // impl (apply) (codegen(cpp, ${ $0->find($1)->second }))
     impl (update) (codegen($cala, ${ $0.put($1,$2); () }))
-    impl (update) (codegen(cpp, ${ $0->insert(std::pair<$t[K],$t[V]>($1,$2)) }))
+    // impl (update) (codegen(cpp, ${ $0->insert(std::pair<$t[K],$t[V]>($1,$2)) }))
     impl (contains) (codegen($cala, ${ $0.contains($1) }))
-    impl (contains) (codegen(cpp, ${ $0->find($1) != $0->end() }))
+    // impl (contains) (codegen(cpp, ${ $0->find($1) != $0->end() }))
   }
 
   def importConcurrentHashMap() = {
@@ -631,6 +631,32 @@ trait ScalaOps extends PrimitiveMathGen {
     infix (HashMapOps) ("contains", (K,V), (CHashMap(K,V), K) :: MBoolean) implements codegen($cala, ${ $0.containsKey($1) })
     infix (HashMapOps) ("keys", (K,V), CHashMap(K,V) :: MArray(K)) implements composite ${ farray_from_sarray(chashmap_keys_array($0)) }
     infix (HashMapOps) ("values", (K,V), CHashMap(K,V) :: MArray(V)) implements composite ${ farray_from_sarray(chashmap_values_array($0)) }
+  }
+
+  def importConcurrentQueue() = {
+    val T = tpePar("T")
+    val CQueue = tpe("java.util.concurrent.ArrayBlockingQueue", T)
+    val CQueueOps = grp("CQueue")
+
+    direct (CQueueOps) ("CQueue", T, MInt :: CQueue(T), effect = mutable) implements codegen($cala, ${ new java.util.concurrent.ArrayBlockingQueue[$t[T]]($0) })
+
+    infix (CQueueOps) ("add", T, (CQueue(T), T) :: MBoolean) implements codegen($cala, ${ $0.add($1) })
+    infix (CQueueOps) ("contains", T, (CQueue(T), T) :: MBoolean) implements codegen($cala, ${ $0.contains($1) })
+    infix (CQueueOps) ("peek", T, (CQueue(T) :: T)) implements codegen($cala, ${ $0.peek() })
+    infix (CQueueOps) ("poll", T, (CQueue(T) :: T)) implements codegen($cala, ${ $0.poll() })
+  }
+
+  def importThreads() = {
+    val SThread = tpe("java.lang.Thread")
+    val SThreadOps = grp("SThread")
+
+    infix (SThreadOps) ("interrupt", Nil, SThread :: MUnit, effect = simple) implements codegen($cala, ${
+      $0.interrupt()
+    })
+
+    infix (SThreadOps) ("join", Nil, SThread :: MUnit, effect = simple) implements codegen($cala, ${
+      $0.join()
+    })
   }
 
   def importByteBuffer() = {

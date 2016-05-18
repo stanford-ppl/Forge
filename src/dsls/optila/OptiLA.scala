@@ -42,7 +42,6 @@ trait OptiLADSL extends ForgeApplication
     identifier (IndexWildcard) ("*")
     val SparseVector = tpe("SparseVector", T)
     val SparseVectorView = tpe("SparseVectorView", T)
-    val SparseMatrix = tpe("SparseMatrix", T)
     val SparseMatrixBuildable = tpe("SparseMatrixBuildable", T)
 
 /**************************************Sparse related code************************************/
@@ -51,8 +50,8 @@ trait OptiLADSL extends ForgeApplication
     val R = tpePar("R")
     val Sparse    = tpe("Sparse", T)
     val SparseCOO = tpe("SparseCOO", T)
-    val SparseMat = tpe("SparseMat", T)
-    val SparseBlockMat = tpe("SparseBlockMat", T)
+    val SparseMatrix = tpe("SparseMatrix", T)
+    val SparseBlockMatrix = tpe("SparseBlockMatrix", T)
     val SparseSymMat = tpe("SparseSymMat", T)
     val SparseRowView = tpe("SparseRowView", T)
     val SparseDirectedGraph = tpe("SparseDirectedGraph", T)

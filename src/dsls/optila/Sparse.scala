@@ -17,7 +17,7 @@ trait SparseOps {
   def importSparseOps() {
     importSparseCOOOps() // EdgeList
     importSparseMatrixOps()
-    importSparseBlockMatOps()
+    importSparseBlockMatrixOps()
     importSparseDirectedGraphOps()
     importSparseUndirectedGraphOps()
     importSparseCSROps()
@@ -34,7 +34,7 @@ trait SparseOps {
     val SparseVectorView = lookupTpe("SparseVectorView")
     data(SparseMatrix, ("_csr", Sparse(T)))
     // helper
-    compiler (SparseMatrix) ("sparse_mat_alloc_raw", T, MethodSignature(Sparse(T), SparseMatrix(T))) implements allocates(SparseMatrix, ${$0})
+    compiler (SparseMatrix) ("sparse_matrix_alloc_raw", T, MethodSignature(Sparse(T), SparseMatrix(T))) implements allocates(SparseMatrix, ${$0})
 
     val SparseMatrixOps = withTpe (SparseMatrix)
     SparseMatrixOps {
@@ -51,24 +51,24 @@ trait SparseOps {
       infix ("nnz") (Nil :: MInt) implements composite ${ get_csr($self).nnz }
       infix ("toDense") (Nil :: DenseMatrix(T)) implements composite ${ get_csr($self).toDense }
       infix ("pprint") (Nil :: MUnit, TStringable(T), effect = simple) implements composite ${ get_csr($self).pprint }
-      infix ("+")   (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements composite ${ sparse_mat_alloc_raw[T](get_csr($self) + get_csr($1)) }
-      infix ("-")   (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements composite ${ sparse_mat_alloc_raw[T](get_csr($self) - get_csr($1)) }
-      infix ("*:*") (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements composite ${ sparse_mat_alloc_raw[T](get_csr($self) *:* get_csr($1)) }
+      infix ("+")   (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self) + get_csr($1)) }
+      infix ("-")   (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self) - get_csr($1)) }
+      infix ("*:*") (SparseMatrix(T) :: SparseMatrix(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self) *:* get_csr($1)) }
       infix ("+")   (DenseMatrix(T)  :: DenseMatrix(T), TArith(T)) implements composite ${ get_csr($self) + $1 }
       infix ("-")   (DenseMatrix(T)  :: DenseMatrix(T), TArith(T)) implements composite ${ get_csr($self) - $1 }
       infix ("*:*") (DenseMatrix(T)  :: DenseMatrix(T), TArith(T)) implements composite ${ get_csr($self).toDense * $1 }
       infix ("*")   (DenseVector(T)  :: DenseVector(T), TArith(T)) implements composite ${ get_csr($self)*$1 }
       infix ("+")   (T :: DenseMatrix(T), TArith(T)) implements composite ${ get_csr($self).toDense + $1 }
       infix ("-")   (T :: DenseMatrix(T), TArith(T)) implements composite ${ get_csr($self).toDense - $1 }
-      infix ("*")   (T :: SparseMatrix(T), TArith(T)) implements composite ${ sparse_mat_alloc_raw[T](get_csr($self)*$1) }
-      infix ("/")   (T :: SparseMatrix(T), TArith(T)) implements composite ${ sparse_mat_alloc_raw[T](get_csr($self)/$1) }
+      infix ("*")   (T :: SparseMatrix(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self)*$1) }
+      infix ("/")   (T :: SparseMatrix(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self)/$1) }
       infix ("sum") (Nil :: T, TArith(T)) implements composite ${ get_csr($self).sum }
-      infix ("abs") (Nil :: SparseMatrix(T), TArith(T)) implements composite ${ sparse_mat_alloc_raw[T](get_csr($self).abs) }
+      infix ("abs") (Nil :: SparseMatrix(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self).abs) }
       infix ("mean") (Nil :: MDouble, ("conv",T ==> MDouble)) implements composite ${ get_csr($self).mapnz(conv).sum / $self.size }
       infix ("min") (Nil :: T, (TOrdering(T), THasMinMax(T))) implements composite ${ get_csr($self).min }
       infix ("max") (Nil :: T, (TOrdering(T), THasMinMax(T))) implements composite ${ get_csr($self).max }
       infix ("mapnz") ((T ==> R) :: SparseMatrix(R), addTpePars = R) implements composite ${
-        sparse_mat_alloc_raw( get_csr($self).mapnz($1) )
+        sparse_matrix_alloc_raw( get_csr($self).mapnz($1) )
       }
       infix ("makeDimsStr") (Nil :: MString) implements single ${
         $self.numRows + " x " + $self.numCols + ", " + $self.nnz + " nnz"
@@ -79,19 +79,19 @@ trait SparseOps {
   }
 
 
-  def importSparseBlockMatOps() {
+  def importSparseBlockMatrixOps() {
     val T = tpePar("T")
     val Sparse = lookupTpe("Sparse")
     val SparseMatrix = lookupTpe("SparseMatrix")
-    val SparseBlockMat = lookupTpe("SparseBlockMat")
+    val SparseBlockMatrix = lookupTpe("SparseBlockMatrix")
     val DenseVector = lookupTpe("DenseVector")
     val DenseMatrix = lookupTpe("DenseMatrix")
-    data(SparseBlockMat, ("_csr_blocks", DenseVector(SparseMatrix(T))))
+    data(SparseBlockMatrix, ("_csr_blocks", DenseVector(SparseMatrix(T))))
     // helper
-    compiler (SparseBlockMat) ("sparse_block_mat_alloc_raw", T, MethodSignature(DenseVector(SparseMatrix(T)), SparseBlockMat(T))) implements allocates(SparseBlockMat, ${$0})
+    compiler (SparseBlockMatrix) ("sparse_block_matrix_alloc_raw", T, MethodSignature(DenseVector(SparseMatrix(T)), SparseBlockMatrix(T))) implements allocates(SparseBlockMatrix, ${$0})
 
-    val SparseBlockMatOps = withTpe (SparseBlockMat)
-    SparseBlockMatOps {
+    val SparseBlockMatrixOps = withTpe (SparseBlockMatrix)
+    SparseBlockMatrixOps {
       /**
        * Data operations, Accessors and Mutators
        */
@@ -117,9 +117,9 @@ trait SparseOps {
           csr_blocks(i).pprint
         }
       }
-      // infix ("+")   (SparseMat(T)   ::   SparseMat(T), TArith(T)) implements composite ${ sparse_mat_alloc_raw[T](get_csr($self) + get_csr($1)) }
-      // infix ("-")   (SparseMat(T)   ::   SparseMat(T), TArith(T)) implements composite ${ sparse_mat_alloc_raw[T](get_csr($self) - get_csr($1)) }
-      // infix ("*:*") (SparseMat(T)   ::   SparseMat(T), TArith(T)) implements composite ${ sparse_mat_alloc_raw[T](get_csr($self) *:* get_csr($1)) }
+      // infix ("+")   (SparseMat(T)   ::   SparseMat(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self) + get_csr($1)) }
+      // infix ("-")   (SparseMat(T)   ::   SparseMat(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self) - get_csr($1)) }
+      // infix ("*:*") (SparseMat(T)   ::   SparseMat(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self) *:* get_csr($1)) }
       // infix ("+")   (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ get_csr($self) + $1 }
       // infix ("-")   (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ get_csr($self) - $1 }
       // infix ("*:*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ get_csr($self).toDense * $1 }
@@ -140,13 +140,13 @@ trait SparseOps {
       }
       // infix ("+")   (T :: DenseMatrix(T), TArith(T)) implements composite ${ get_csr($self).toDense + $1 }
       // infix ("-")   (T :: DenseMatrix(T), TArith(T)) implements composite ${ get_csr($self).toDense - $1 }
-      // infix ("*")   (T :: SparseMat(T), TArith(T)) implements composite ${ sparse_mat_alloc_raw[T](get_csr($self)*$1) }
-      // infix ("/")   (T :: SparseMat(T), TArith(T)) implements composite ${ sparse_mat_alloc_raw[T](get_csr($self)/$1) }
+      // infix ("*")   (T :: SparseMat(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self)*$1) }
+      // infix ("/")   (T :: SparseMat(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self)/$1) }
       infix ("sum") (Nil :: T, TArith(T)) implements composite ${
         val csr_blocks = get_csr_blocks($self)
         (0::$self.numBlocks).map({e => csr_blocks(e).sum}).sum
       }
-      // infix ("abs") (Nil :: SparseMat(T), TArith(T)) implements composite ${ sparse_mat_alloc_raw[T](get_csr($self).abs) }
+      // infix ("abs") (Nil :: SparseMat(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self).abs) }
     }
   }
 
@@ -265,7 +265,7 @@ trait SparseOps {
     val Sparse    = lookupTpe("Sparse")
     val SparseCOO = lookupTpe("SparseCOO")
     val SparseMatrix = lookupTpe("SparseMatrix")
-    val SparseBlockMat = lookupTpe("SparseBlockMat")
+    val SparseBlockMatrix = lookupTpe("SparseBlockMatrix")
     val SparseDirectedGraph = lookupTpe("SparseDirectedGraph")
     val SparseUndirectedGraph = lookupTpe("SparseUndirectedGraph")
 
@@ -384,10 +384,10 @@ trait SparseOps {
         val rowIndices = sparsecoo_get_rowindices($self)
         val colIndices = sparsecoo_get_colindices($self)
         val csr = sparsecoo_to_sparsecsr($self)
-        sparse_mat_alloc_raw[T](csr.unsafeImmutable)
+        sparse_matrix_alloc_raw[T](csr.unsafeImmutable)
       }
       // sizes in KB, Row_density = number of columns / number of nz per row
-      infix ("to_sparseblockmat") ((("L1_size", MInt), ("L2_size", MInt), ("L3_size", MInt), ("Row_density", MInt)) :: SparseBlockMat(T), TArith(T)) implements composite ${ 
+      infix ("to_sparseblockmat") ((("L1_size", MInt), ("L2_size", MInt), ("L3_size", MInt), ("Row_density", MInt)) :: SparseBlockMatrix(T), TArith(T)) implements composite ${ 
         val numCols = $self.numCols
         // assuming T >= 4 bytes
         val l1_s = L1_size * 1024 / 4
@@ -468,7 +468,7 @@ trait SparseOps {
                                             out_data_block.length,
                                             array_empty[T](unit(32)))
           val csr = sparsecoo_to_sparsecsr(coo)
-          csr_blocks(i) = sparse_mat_alloc_raw[T](csr.unsafeImmutable)
+          csr_blocks(i) = sparse_matrix_alloc_raw[T](csr.unsafeImmutable)
           j = 0
           i += 1
         }
@@ -487,9 +487,9 @@ trait SparseOps {
         // val sparsemat_1 = sparse_csr_alloc_raw[T]($self.numRows, $self.numCols, empty_data.unsafeImmutable, empty_colIndices.unsafeImmutable, empty_rowIndices.unsafeImmutable, block_size)
         // val sparsemat_2 = sparse_csr_alloc_raw[T]($self.numRows, $self.numCols, empty_data.unsafeImmutable, empty_colIndices.unsafeImmutable, empty_rowIndices.unsafeImmutable, block_size)
         // var out_blocks = DenseVector[SparseMat[T]](numBlocks, unit(true))
-        // out_blocks(1) = sparse_mat_alloc_raw[T](sparsemat_1.unsafeImmutable)
-        // out_blocks(2) = sparse_mat_alloc_raw[T](sparsemat_2.unsafeImmutable)
-        sparse_block_mat_alloc_raw[T](csr_blocks.unsafeImmutable)
+        // out_blocks(1) = sparse_matrix_alloc_raw[T](sparsemat_1.unsafeImmutable)
+        // out_blocks(2) = sparse_matrix_alloc_raw[T](sparsemat_2.unsafeImmutable)
+        sparse_block_matrix_alloc_raw[T](csr_blocks.unsafeImmutable)
       }
       infix ("to_sparsedirectedgraph") (Nil :: SparseDirectedGraph(T)) implements composite ${ 
         val data = sparsecoo_get_data($self)
@@ -758,7 +758,7 @@ trait SparseOps {
       // Note the following 3 should only be called if we loaded CSR from file.
       // Note we don't check if M and M^T are the same
       infix ("to_sparsematrix") (Nil :: SparseMatrix(T), TArith(T)) implements composite ${
-        sparse_mat_alloc_raw[T]($self.unsafeImmutable)
+        sparse_matrix_alloc_raw[T]($self.unsafeImmutable)
       }
       infix ("to_sparsedirectedgraph") ((("csrt", Sparse(T)), ("nodeProp", DenseVector(T))) :: SparseDirectedGraph(T)) implements composite ${ 
         sparse_directed_graph_alloc_raw[T]($self.unsafeImmutable, csrt.unsafeImmutable, nodeProp)

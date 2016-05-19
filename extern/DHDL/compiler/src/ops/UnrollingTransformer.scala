@@ -9,11 +9,28 @@ import dhdl.compiler.ops._
 
 trait UnrollingExp extends PipeStageToolsExp with LoweredOpsExp { this: DHDLExp => }
 
-/*trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
+trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
   val IR: UnrollingExp
   import IR.{infix_until => _, _}
 
-  def unrollForeach[A:Manifest](cchain: Exp[CounterChain], func: Block[A], inds: List[Exp[Index]]): Exp[A] = {
+  def unrollParallel[A](cchain: Exp[CounterChain], inds: List[Exp[Index]])(func: List[Sym[Idx]] => A): List[A] = {
+    val Ps = parOf(cchain)
+    val P = Ps.reduce(_*_)
+    val N = Ps.length
+
+    val prods = List.tabulate(N){i => Ps.slice(i+1,N).reduce(_*_) }
+
+    // Can actually have this in an outer reifyBlock since it has no defs or effects
+    val indices = Ps.map{p => List.fill(p){ fresh[Idx] } }
+
+    val vectors = indices.map{inds => Vector(inds:_*) }
+    (0 until P).foreach{p =>
+      val is = vectors.zipWithIndex.map{case (vec,d) => vec((p / prods(d)) % Ps(d)) }
+      f(is)
+    }
+  }
+
+  def unrollOuterForeach[A:Manifest](cchain: Exp[CounterChain], func: Block[A], inds: List[Exp[Index]]): Exp[A] = {
     val dims = parOf(cchain)
     val N = dims.length
     val prods = List.tabulate(N){i => dims.slice(i+1,N).reduce{_*_}}
@@ -67,15 +84,16 @@ trait UnrollingExp extends PipeStageToolsExp with LoweredOpsExp { this: DHDLExp 
   override def transform[A:Manifest](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext) = rhs match {
     case Reflect(Pipe_foreach(cchain, func, inds), u, es) if isOuterLoop(lhs) =>
       val cc = f(cchain)
-      val unrolledFunc = reifyBlock{ unrollForeach(cc, func, inds) }
+      val unrolledFunc = reifyBlock{ unrollOuterForeach(cc, func, inds) }
       val newPipe = reflectMirrored(Reflect(Pipe_foreach(cc,unrolledFunc,inds)(ctx), mapOver(f,u), f(es)))(mtype(manifest[A]),ctx)
       setProps(newPipe, getProps(lhs))
       Some(newPipe)
 
-    case Reflect(e@Pipe_reduce(cchain,accum,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV), u, es) if isInnerLoop(lhs) =>
+    case Reflect(e@Pipe_fold(cchain,accum,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV), u, es) if isInnerLoop(lhs) =>
       val cc = f(cchain)
+      val accum2 = f(accum)
       val unrolledMapReduce = unrollInnerMapReduce(cc, func, rFunc, iFunc, ld, st, idx, res, rV)
-      val newPipe = reflectMirrored(Reflect(PipeAccum(cc, f(accum), unrolledMapReduce, inds, acc)(ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), ctx)
+      val newPipe = reflectMirrored(Reflect(Pipe_fold(cc, accum2, unrolledMapReduce, inds, acc)(ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), ctx)
       setProps(newPipe, getProps(lhs))
       Some(newPipe)
 
@@ -84,4 +102,4 @@ trait UnrollingExp extends PipeStageToolsExp with LoweredOpsExp { this: DHDLExp 
 
     case _ => None
   }
-}*/
+}

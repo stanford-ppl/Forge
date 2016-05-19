@@ -14,6 +14,14 @@ trait MetaPipeRegInsertion extends SinglePassTransformer with PipeStageTools {
 
   debugMode = true
 
+  override def self_mirror[A](sym: Sym[A], rhs : Def[A]): Exp[A] = {
+    debug(s"Mirroring $sym = $rhs")
+    super.self_mirror(sym,rhs) match {
+      case s@Def(d) => debug(s"  => $s = $d"); s
+      case s => debug(s"  => $s"); s
+    }
+  }
+
   // Transform stages to use increasingly delayed versions of inds
   def insertRegisters[A:Manifest](owner: Sym[Any], func: Block[A], inds: List[Sym[Idx]])(implicit ctx: SourceContext) = {
     debug(s"Found MetaPipe $owner:")
@@ -83,7 +91,7 @@ trait MetaPipeRegInsertion extends SinglePassTransformer with PipeStageTools {
 
     case Reflect(e@Accum_fold(c1,c2,a,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV), u, es) if styleOf(lhs) == Coarse =>
       val newFunc = insertRegisters(lhs, func, inds1)(mtype(getBlockResult(func).tp),ctx)
-      val newPipe = reflectMirrored(Reflect(Accum_fold(f(c1),f(c2),f(a),fA,f(iFunc),f(func),f(ld1),f(ld2),f(rFunc),f(st),inds1,inds2,idx,part,acc,res,rV)(ctx, e.memC, e.mT, e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), ctx)
+      val newPipe = reflectMirrored(Reflect(Accum_fold(f(c1),f(c2),f(a),fA,f(iFunc),newFunc,f(ld1),f(ld2),f(rFunc),f(st),inds1,inds2,idx,part,acc,res,rV)(ctx, e.memC, e.mT, e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), ctx)
       setProps(newPipe, getProps(lhs))
       Some(newPipe)
     case _ => None

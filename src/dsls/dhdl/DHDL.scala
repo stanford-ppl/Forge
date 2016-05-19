@@ -218,7 +218,7 @@ trait DHDLDSL extends ForgeApplication
     importGlobalAnalysis()
     importBoundAnalysis()
 
-    schedule(IRPrinterPlus)
+    //schedule(IRPrinterPlus)
 
     // --- Estimation and tuning
     schedule(StageAnalyzer)
@@ -231,7 +231,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(DSE)
 
     // --- Post-DSE Estimation
-    schedule(IRPrinterPlus)
+    //schedule(IRPrinterPlus)
     schedule(AreaAnalyzer)
     schedule(OpsAnalyzer)
 
@@ -239,9 +239,11 @@ trait DHDLDSL extends ForgeApplication
     schedule(BoundAnalyzer)
     schedule(ConstantFolding)
 
+    schedule(IRPrinter)
+
     schedule(MetaPipeRegInsertion)
 
-    schedule(IRPrinterPlus)
+    schedule(IRPrinter)
     schedule(HardStop)  // DEBUGGING
 
 

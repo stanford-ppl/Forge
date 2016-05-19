@@ -43,55 +43,41 @@ trait Kmeans extends DHDLApplication {
 
     // Runtime is roughly (N*K/(Pc)*(D/Pd + 19 + log2(D))
 
-    Sequential {
-      // Load initial centroids (from points)
-      //oldCents := points(0::K,0::dTileSize, dstLoopPar)
+    // Load initial centroids (from points)
+    oldCents := points(0::K,0::dTileSize, dstLoopPar)
 
-      val oldCent = List.tabulate(MAXK){i => BRAM[Flt](dTileSize) }
+    Pipe((numPoints by tileSize) par ignorePar) { i =>
+      val pointsTile = BRAM[Flt](tileSize, dTileSize)
+      pointsTile := points(i::i+tileSize, 0::dTileSize, dstLoopPar)
 
-      Parallel {
-        List.tabulate(MAXK){i =>
-          oldCent(i) := points(i.as[SInt], 0::dTileSize, dstLoopPar)
-        }
-        ()
-      }
+      Pipe((tileSize by 1) par ptLoopPar){ pt =>
+        Pipe(numCents by 1){ct =>
+          val dist = Reg[Flt]
+          Pipe.reduce((D by 1) par dstLoopPar)(dist){d => (pointsTile(pt,d) - oldCents(ct,d)) ** 2 }{_+_}
 
-      Pipe((numPoints by tileSize) par ignorePar) { i =>
-        val pointsTile = BRAM[Flt](tileSize, dTileSize)
-        pointsTile := points(i::i+tileSize, 0::dTileSize, dstLoopPar)
+          val minCent = Reg[SInt](0)
+          val minDist = Reg[Flt](-1)
+          Pipe {
+            val closer = dist.value < minDist.value || minDist.value < 0
+            minCent := mux(closer, ct, minCent.value)
+            minDist := mux(closer, dist.value, minDist.value)
+          }
 
-        Pipe((tileSize by 1) par ptLoopPar){ pt =>
-          val distances = List.tabulate(MAXK){i => Reg[Flt](0.0f) }
           Parallel {
-            oldCent.zip(distances).foreach{ case (cent, dist) =>
-              Pipe.reduce((D by 1) par dstLoopPar)(dist){d => (pointsTile(pt,d) - cent(d)) ** 2 }{_+_} // 4
+            Pipe((D by 1) par accLoopPar){d =>
+              newCents(minCent.value, d) = newCents(minCent.value, d) + pointsTile(pt, d)
             }
+            Pipe{ centCount(minCent.value) = centCount(minCent.value) + 1 }
           }
-          Sequential {
-            val minCent = Reg[SInt](0)
-            Pipe {
-              val distsWithIdx = distances.zipWithIndex.map{case (d, i) => (d.value,i.as[SInt])}
-              val (minDist,minIdx) = reduceTree(distsWithIdx).last
-              minCent := minIdx
-            }
+        }
+      } // End of points in tile
+    } // End of point tiles
 
-            // Add point and increment point count
-            Parallel {
-              Pipe((D by 1) par accLoopPar){d =>
-                newCents(minCent.value, d) = newCents(minCent.value, d) + pointsTile(pt, d)
-              }
-              Pipe{ centCount(minCent.value) = centCount(minCent.value) + 1 }
-            }
-          }
-
-        } // End of points in tile
-      } // End of point tiles
-
-      Pipe(K by 1, (D by 1) par avgLoopPar){(ct,d) =>
-        centsOut(ct,d) = newCents(ct,d) / centCount(ct).to[Flt]
-      }
-      centroids(0::K, 0::D, avgLoopPar) := centsOut
+    Pipe(K by 1, (D by 1) par avgLoopPar){(ct,d) =>
+      centsOut(ct,d) = newCents(ct,d) / centCount(ct).to[Flt]
     }
+    centroids(0::K, 0::D, avgLoopPar) := centsOut
+
   }
 
   def main() {

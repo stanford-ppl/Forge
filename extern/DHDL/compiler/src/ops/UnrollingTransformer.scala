@@ -13,24 +13,67 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
   val IR: UnrollingExp
   import IR.{infix_until => _, _}
 
-  def unrollParallel[A](cchain: Exp[CounterChain], inds: List[Exp[Index]])(func: List[Sym[Idx]] => A): List[A] = {
+  def unrollInnerMap[A](cchain: Exp[CounterChain], inds: List[Exp[Index]])(func: List[Sym[Idx]] => A) = {
     val Ps = parOf(cchain)
     val P = Ps.reduce(_*_)
     val N = Ps.length
-
     val prods = List.tabulate(N){i => Ps.slice(i+1,N).reduce(_*_) }
+    val indices = Ps.map{p => List.fill(p){ fresh[Index] } }
 
-    // Can actually have this in an outer reifyBlock since it has no defs or effects
-    val indices = Ps.map{p => List.fill(p){ fresh[Idx] } }
-
-    val vectors = indices.map{inds => Vector(inds:_*) }
-    (0 until P).foreach{p =>
-      val is = vectors.zipWithIndex.map{case (vec,d) => vec((p / prods(d)) % Ps(d)) }
+    val out = (0 until P).map{p =>
+      val is = indices.zipWithIndex.map{case (vec,d) => vec((p / prods(d)) % Ps(d)) }
       f(is)
+    }
+    (indices, out.toList)
+  }
+
+  def unrollOuterMap[A:Manifest](cchain: Exp[CounterChain], func: Block[A], inds: List[Exp[Index]]) = {
+    val Ps = parOf(cchain)
+    val P = Ps.reduce(_*_)
+    val N = Ps.length
+    val prods = List.tabulate(N){i => Ps.slice(i+1,N).reduce(_*_) }
+    val indices = Ps.map{p => List.fill(p){ fresh[Index] } }
+
+    var out: List[Exp[A]] = Nil
+    var dupSubst = Array.tabulate(P){i => subst}
+
+    focusBlock(func){
+      focusExactScope(func){ stms =>
+        stms.zipWithIndex.foreach {
+          case (TP(s,d),i) if isControlNode(s) && P > 1 =>
+            val outerSubst = subst
+            Parallel {
+              (0 until N).foreach{i =>
+                subst = dupSubst(i)
+
+
+                dupSubst(i) = subst
+              }
+            }
+            subst = outerSubst
+
+          case (TP(s,d),i) =>
+            val duplicates =
+        }
+        out :::= stages.last
+
+
+      }
     }
   }
 
-  def unrollOuterForeach[A:Manifest](cchain: Exp[CounterChain], func: Block[A], inds: List[Exp[Index]]): Exp[A] = {
+  def unrollInnerForeach(cchain: Exp[CounterChain], func: Block[Unit], inds: List[Exp[Index]]) = {
+    var indices: List[Sym[Index]] = Nil
+    val blk = reifyBlock {
+      val (inds, _) = unrollParallel(cchain, inds){inds2 => withSubstScope(inds -> inds2){ inlineBlock(func) }
+      indices :::= inds
+    }
+    (indices, blk)
+  }
+
+  def unrollOuterForeach(cchain: Exp[CounterChain], func: Block[A], inds: List[Exp[Index]]): List[Exp[A]] = {
+    var out: List[Exp[A]] = Nil
+
     val dims = parOf(cchain)
     val N = dims.length
     val prods = List.tabulate(N){i => dims.slice(i+1,N).reduce{_*_}}

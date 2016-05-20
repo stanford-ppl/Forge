@@ -13,7 +13,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
   val IR: UnrollingExp
   import IR.{infix_until => _, _}
 
-  def unrollInnerMap[A](cchain: Exp[CounterChain], inds: List[Exp[Index]])(func: List[Sym[Idx]] => A) = {
+  def unrollInnerMap[A:Manifest](cchain: Exp[CounterChain], func: Block[A], inds: List[Exp[Index]]) = {
     val Ps = parOf(cchain)
     val P = Ps.reduce(_*_)
     val N = Ps.length
@@ -21,8 +21,8 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
     val indices = Ps.map{p => List.fill(p){ fresh[Index] } }
 
     val out = (0 until P).map{p =>
-      val is = indices.zipWithIndex.map{case (vec,d) => vec((p / prods(d)) % Ps(d)) }
-      f(is)
+      val inds2 = indices.zipWithIndex.map{case (vec,d) => vec((p / prods(d)) % Ps(d)) }
+      withSubstScope(inds -> inds2){ inlineBlock(func) }
     }
     (indices, out.toList)
   }
@@ -37,69 +37,50 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
     var out: List[Exp[A]] = Nil
     var dupSubst = Array.tabulate(P){i => subst}
 
+    def duplicateStage(s: Exp[Any], d: Exp[Any], i: Int) {
+      val outerSubst = subst
+
+      (0 until N).foreach{i =>
+        subst = dupSubst(i)
+        val mirroredStage = self_mirror(s,d)
+        subst += s -> mirroredStage
+        if (i == stms.length - 1) out ::= mirroredStage
+        dupSubst(i) = subst
+      }
+
+      subst = outerSubst
+    }
+
     focusBlock(func){
       focusExactScope(func){ stms =>
         stms.zipWithIndex.foreach {
-          case (TP(s,d),i) if isControlNode(s) && P > 1 =>
-            val outerSubst = subst
-            Parallel {
-              (0 until N).foreach{i =>
-                subst = dupSubst(i)
-
-
-                dupSubst(i) = subst
-              }
-            }
-            subst = outerSubst
-
-          case (TP(s,d),i) =>
-            val duplicates =
+          case (TP(s,d),i) if isControlNode(s) && P > 1 => Parallel { duplicateStage(s,d,i) }
+          case (TP(s,d),i) => duplicateStage(s,d,i)
         }
-        out :::= stages.last
-
-
       }
     }
+    (indices, out)
   }
 
   def unrollInnerForeach(cchain: Exp[CounterChain], func: Block[Unit], inds: List[Exp[Index]]) = {
-    var indices: List[Sym[Index]] = Nil
+    var indices: List[List[Sym[Index]]] = Nil
     val blk = reifyBlock {
-      val (inds, _) = unrollParallel(cchain, inds){inds2 => withSubstScope(inds -> inds2){ inlineBlock(func) }
-      indices :::= inds
+      val (unrolledInds, _) = unrollInnerMap(cchain, func, inds)
+      indices :::= unrolledInds
     }
     (indices, blk)
   }
 
-  def unrollOuterForeach(cchain: Exp[CounterChain], func: Block[A], inds: List[Exp[Index]]): List[Exp[A]] = {
-    var out: List[Exp[A]] = Nil
-
-    val dims = parOf(cchain)
-    val N = dims.length
-    val prods = List.tabulate(N){i => dims.slice(i+1,N).reduce{_*_}}
-
-    val P = dims.reduce(_*_)
-    if (P > 1) {
-      val stages = getControlNodes(func)
-
-      val indVectors = inds.map{i => expandBus(i) }
-
-      val newStages = stages.map{stage =>
-        Parallel {
-          (0 until P).foreach{p =>
-            val slicedInds = indVectors.zipWithIndex.map{case (bus,d) => bus(((p / prods(d)) % dims(d)) }
-            withSubstScope(inds.zip(slicedInds):_*){ mirrorExp(stage) }
-          }
-        }
-      }
-
-      // Traverse the block to add the transformed versions to the IR
-      withSubstScope(stages.zip(newStages):_*){ inlineBlock(func) }
+  def unrollOuterForeach(cchain: Exp[CounterChain], func: Block[Unit], inds: List[Exp[Index]]): List[Exp[A]] = {
+    var indices: List[List[Sym[Index]]] = Nil
+    val blk = reifyBlock {
+      val (unrolledInds, _) = unrollOuterMap(cchain, func, inds)
+      indices :::= unrolledInds
     }
-    else inlineBlock(func)
+    (indices, blk)
   }
 
-  def unrollReduce[A:Manifest](mapBus: Exp[A], rFunc: Block[A], iFunc: Block[Index], ld: Block[A], st: Block[Unit], idx: Exp[Index], res: Exp[A], rV: (Sym[A],Sym[A])) = {
+  def unrollReduce[A:Manifest](mapBus: List[Exp[A]], rFunc: Block[A], iFunc: Block[Index], ld: Block[A], st: Block[Unit], idx: Exp[Index], res: Exp[A], rV: (Sym[A],Sym[A])) = {
     def reduce(x: Exp[A], y: Exp[A]) = withSubstScope(rV._1 -> x, rV._2 -> y){ inlineBlock(rFunc) }
 
     val treeResult = reductionTree(mapBus, {(x,y) => reduce(x,y) }).head
@@ -111,16 +92,18 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
 
   // Create a single block with map + reduce + load + reduce + store
   // Still have to keep acc separate to make sure load isn't lifted out of the block (e.g. for registers)
-  def unrollMapReduce[A:Manifest](cc: Exp[CounterChain], func: Block[A], rFunc: Block[A], iFunc: Block[Index], ld: Block[A], st: Block[Unit], idx: Exp[Index], res: Exp[A], rV: (Sym[A],Sym[A]), innerLoop: Boolean): Block[Unit] = {
+  def unrollPipeFold[A:Manifest](cc: Exp[CounterChain], func: Block[A], rFunc: Block[A], iFunc: Block[Index], ld: Block[A], st: Block[Unit], idx: Exp[Index], res: Exp[A], rV: (Sym[A],Sym[A]), innerLoop: Boolean): Block[Unit] = {
     val P = parOf(cc).reduce(_*_)
 
     if (innerLoop) reifyBlock {
-      val funcRes = inlineBlock(func)
-      val mapBus = expandBus(funcRes)
-      unrollReduce(mapBus, rFunc, iFunc, ld, st, idx, res, rV)
+      val (unrolledInds, mapRes) = unrollInnerMap(cchain, func, inds)
+      unrollReduce(mapRes, rFunc, iFunc, ld, st, idx, res, rV)
     }
     else reifyBlock {
-      unrollForeach(cc, func, inds) // Unroll map
+      val (unrolledInds, mapRes) = unrollOuterMap(cc, func, inds)
+      Pipe {
+        unrollReduce(mapRes, rFunc, iFunc, ld, st, idx, res, rV)
+      }
     }
   }
 

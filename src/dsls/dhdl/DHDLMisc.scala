@@ -129,6 +129,15 @@ trait DHDLMisc {
      * @param i
      **/
     infix (API) ("apply", T, (MArray(T), Idx) :: T) implements composite ${ array_apply($0, fix_to_int($1)) }
+    /** Returns the element at the given two indices in an ForgeArray of ForgeArray
+     * @param i
+     * @param j
+     **/
+    //TODO: not sure why this curried function is not generated correctly. Manifest T is not
+    //generated in the class definition
+    //infix (API) ("apply", T, CurriedMethodSignature(List(List(MArray(MArray(T)),Idx), List(Idx)), T)) implements composite ${
+    //  array_apply(array_apply($0, fix_to_int($1)), fix_to_int($2))
+    //}
     /** Updates the array at the given index
      * @param i
      * @param x
@@ -402,18 +411,42 @@ trait DHDLMisc {
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
     val SListBuffer = tpe("scala.collection.mutable.ListBuffer", T)
 
+    /** 
+     * Returns Array(smap,dmap), where smap is the adjacency list in hashMap for source nodes and dmap is
+     * the adjacency list of the destination nodes 
+     * @param path full path to graph file
+     * @param numVert number of vertices 
+     * @param dot whether is loading from a dot graph 
+     **/
     direct (IO) ("loadDirEdgeList", Nil, (MString, Idx, SBoolean) :: MArray(SHashMap(SInt,SListBuffer(SInt))), effect = simple) implements composite ${
       load_dir_edge_list($0, Some(fix_to_int($1)), Some($2))
     }
 
+    /** 
+     * Returns Array(smap,dmap), where smap is the adjacency list in hashMap for source nodes and dmap is
+     * the adjacency list of the destination nodes 
+     * @param path full path to graph file
+     * @param dot whether is loading from a dot graph 
+     **/
     direct (IO) ("loadDirEdgeList", Nil, (MString,SBoolean) :: MArray(SHashMap(SInt,SListBuffer(SInt))), effect = simple) implements composite ${
       load_dir_edge_list($0, None, Some($1))
     }
 
+    /** 
+     * Returns Array(smap,dmap), where smap is the adjacency list in hashMap for source nodes and dmap is
+     * the adjacency list of the destination nodes 
+     * @param path full path to graph file
+     * @param numVert number of vertices 
+     **/
     direct (IO) ("loadDirEdgeList", Nil, (MString, Idx) :: MArray(SHashMap(SInt,SListBuffer(SInt))), effect = simple) implements composite ${
       load_dir_edge_list($0, Some(fix_to_int($1)), None)
     }
 
+    /** 
+     * Returns Array(smap,dmap), where smap is the adjacency list in hashMap for source nodes and dmap is
+     * the adjacency list of the destination nodes 
+     * @param path full path to graph file
+     **/
     direct (IO) ("loadDirEdgeList", Nil, (MString) :: MArray(SHashMap(SInt,SListBuffer(SInt))), effect = simple) implements composite ${
       load_dir_edge_list($0, None, None)
     }
@@ -445,7 +478,7 @@ trait DHDLMisc {
       }
       for (line <- Source.fromFile(path).getLines()) {
         if (dot) {
-          if (!line.contains("digraph {") && !line.contains("}"))
+          if (line.contains(edgeStr))
             parseLine(line)
         } else {
           parseLine(line)
@@ -453,16 +486,14 @@ trait DHDLMisc {
       }
 
       if (smap.keys.size < numVert) {
-        val vertices = Array.tabulate(numVert)(i => i)
-        vertices.foreach {v =>
+        for (v <- 0 until numVert) {
           if (!smap.contains(v))
             smap += (v -> ListBuffer())
         }
       }
 
       if (dmap.keys.size < numVert) {
-        val vertices = Array.tabulate(numVert)(i => i)
-        vertices.foreach {v =>
+        for (v <- 0 until numVert) {
           if (!dmap.contains(v))
             dmap += (v -> ListBuffer())
         }
@@ -471,49 +502,146 @@ trait DHDLMisc {
       Array(smap, dmap)
     })
 
-    /** Generating a flat array representing vertices and their pointer to the edge list based on
-     *  the adjacency list represented in the map. If explicitVert is set to be true, returned array is
-     *  a flatten array N by 3 array with each row corresponds to 1 vertex and column corresponds to
-     *  {vertex #, pointer to start of edge list (in flatten edgelist returned by getEdgeList), number of edges}. 
-     *  If explicitVert is set to be false, returned array is a flatten N by 2 column array with each column being
-     *  {pointer to start of edge list, number of edges}. The vertex # is implicit and is the same
-     *  as row index of the original unflatten array. If a vertex has no edge, the pointer
-     *  section is set to -1
+    /** 
+     * Returns an adjacency list in HashMap
+     * @param path full path to graph file
+     * @param numVert number of vertices 
+     * @param dot whether is loading from a dot graph 
+     **/
+    direct (IO) ("loadUnDirEdgeList", Nil, (MString, Idx, SBoolean) :: SHashMap(SInt,SListBuffer(SInt)), effect = simple) implements composite ${
+      load_undir_edge_list($0, Some(fix_to_int($1)), Some($2))
+    }
+
+    /** 
+     * Returns an adjacency list in HashMap
+     * @param path full path to graph file
+     * @param dot whether is loading from a dot graph 
+     **/
+    direct (IO) ("loadUnDirEdgeList", Nil, (MString,SBoolean) :: SHashMap(SInt,SListBuffer(SInt)), effect = simple) implements composite ${
+      load_undir_edge_list($0, None, Some($1))
+    }
+
+    /** 
+     * Returns an adjacency list in HashMap
+     * @param path full path to graph file
+     * @param numVert number of vertices 
+     **/
+    direct (IO) ("loadUnDirEdgeList", Nil, (MString, Idx) :: SHashMap(SInt,SListBuffer(SInt)), effect = simple) implements composite ${
+      load_undir_edge_list($0, Some(fix_to_int($1)), None)
+    }
+
+    /** 
+     * Returns an adjacency list in HashMap
+     * @param path full path to graph file
+     **/
+    direct (IO) ("loadUnDirEdgeList", Nil, (MString) :: SHashMap(SInt,SListBuffer(SInt)), effect = simple) implements composite ${
+      load_undir_edge_list($0, None, None)
+    }
+
+    direct (IO) ("load_undir_edge_list", Nil, (MString, SOption(MInt), SOption(SBoolean)) :: SHashMap(SInt,SListBuffer(SInt)), effect = simple) implements codegen ($cala, ${
+      val path = $0
+      @ val qnumVert = $1.getOrElse(-1)
+      val numVert = $qnumVert
+      @ val qdot = $2.getOrElse(false)
+      val dot = $qdot
+
+      import scala.collection.mutable.{HashMap, ListBuffer}
+      import scala.io.Source
+      val map = new HashMap[Int, ListBuffer[Int]]
+      val edgeStr =  if (dot) "--" else " "
+      def parseLine(line:String):Unit = {
+        val fields = line.split(edgeStr)
+        val n1 = fields(0).trim.toInt
+        val n2 = fields(1).trim.toInt
+        if (!map.contains(n1))
+          map += (n1 -> ListBuffer(n2))
+        else
+          map.get(n1).get += n2
+        if (!map.contains(n2))
+          map += (n2 -> ListBuffer(n1))
+        else
+          map.get(n2).get += n1
+      }
+      for (line <- Source.fromFile(path).getLines()) {
+        if (dot) {
+          if (line.contains(edgeStr))
+            parseLine(line)
+        } else {
+          parseLine(line)
+        }
+      }
+
+      if (map.keys.size < numVert) {
+        for (v <- 0 until numVert) {
+          if (!map.contains(v))
+            map += (v -> ListBuffer())
+        }
+      }
+      map
+    })
+
+    /** Generating an array of array representing vertices and their pointer to the edge list based on
+     *  the adjacency list represented in the map.
+     *  If explicitVert=true, withSize=true, returns an N by 3 Array of Array(vertex #, ptr, size) 
+     *  If explicitVert=true, withSize=false, returns an N by 2 Array of Array(vertex #, ptr)
+     *  If explicitVert=false, withSize=true, returns an N by 2 Array of Array(ptr, size) 
+     *  If explicitVert=false, withSize=false, returns an N by 1 Array of Array(ptr) 
+     *  size is the number of edges for correponding vertex.
      * @param map 
      * @param explicitVert
+     * @param withSize 
      **/
-    direct (IO) ("getVertList", Nil, (SHashMap(SInt, SListBuffer(SInt)), SBoolean) :: MArray(Idx), effect = simple) implements codegen ($cala, ${
+    direct (IO) ("getVertList", Nil, (SHashMap(SInt, SListBuffer(SInt)), SBoolean, SBoolean) :: MArray(Idx), effect = simple) implements codegen ($cala, ${
       val map = $0
       val explicitVert = $1
+      val withSize = $2
       val vertices = {
         val temp = (map.values.flatMap(i=>i).toSet ++ map.keys.toSet).toArray 
         scala.util.Sorting.quickSort(temp)
         temp
       }
       val numVert = vertices.length 
-      // Flat array of Array[vertex, pointer, number of incoming edge]
+
+      // Size of neighbors
+      val sizes = vertices.map {n => map.get(n).getOrElse(Nil).size}
+
+      // Pointers to neighbors in edge list
+      val pts = Array.fill(numVert)(0)
+      (0 until numVert).fold(0) {case (p, i) => pts(i) = if (sizes(i)==0) 0 else p; p+sizes(i)}
+
+      def fixpt(i:Int) = FixedPoint[Signed,B32,B0](i)
+
       val vertList = 
-        if (explicitVert)
-          vertices.flatMap(n => List(n, -1, map.get(n).getOrElse(Nil).size)) 
-        else
-          vertices.flatMap(n => List(-1, map.get(n).getOrElse(Nil).size)) 
-      // Update pointer
-      if (explicitVert)
-        (0 until numVert).fold(0) {case (p, i) => val size = vertList(3*i+2); vertList(3*i+1) = if (size==0) -1 else p; p+size}
-      else
-        (0 until numVert).fold(0) {case (p, i) => val size = vertList(2*i+1); vertList(2*i+0) = if (size==0) -1 else p; p+size}
-      vertList.map(i => FixedPoint[Signed,B32,B0](i))
+        if (explicitVert) {
+          if (withSize) {
+            vertices.zipWithIndex.flatMap {case (n,i) => Array(fixpt(n), fixpt(pts(i)), fixpt(sizes(i)))}
+          } else {
+            vertices.zipWithIndex.flatMap {case (n,i) => Array(fixpt(n), fixpt(pts(i)))}
+          }
+        } else {
+          if (withSize) {
+            vertices.zipWithIndex.flatMap {case (n,i) => Array(fixpt(pts(i)), fixpt(sizes(i)))}
+          } else {
+            vertices.zipWithIndex.flatMap {case (n,i) => Array(fixpt(pts(i)))}
+          }
+        }
+      vertList
     })
 
     direct (IO) ("getEdgeList", Nil, SHashMap(SInt, SListBuffer(SInt)) :: MArray(Idx), effect = simple) implements codegen ($cala, ${
       val map = $0
+      import scala.util.Sorting
       val vertices = {
         val temp = (map.values.flatMap(i=>i).toSet ++ map.keys.toSet).toArray 
-        scala.util.Sorting.quickSort(temp)
+        Sorting.quickSort(temp)
         temp
       }
       // Flat edge list
-      val edgeList = vertices.flatMap(n => map.get(n).getOrElse(Nil))
+      val edgeList = vertices.flatMap{n => 
+        val edges = map.get(n).getOrElse(Nil).toArray
+        Sorting.quickSort(edges)
+        edges
+      }
       edgeList.map(i => FixedPoint[Signed,B32,B0](i))
     })
 

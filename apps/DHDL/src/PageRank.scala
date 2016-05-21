@@ -15,19 +15,21 @@ trait PageRank extends DHDLApplication {
   lazy val damp = ArgIn[Elem]("damping")
 
   def main() {
-    val NV = args(unit(0)).to[SInt]
-    val NE = args(unit(1)).to[SInt]
-    val NI = args(unit(2)).to[SInt]
-    val DF = args(unit(3)).to[Elem]
+    val NI = args(unit(0)).to[SInt]
+    val DF = args(unit(1)).to[Elem]
+    val NV = args(unit(2)).to[SInt]
+    //val NE = args(unit(3)).to[SInt]
     //genRandDirEdgeList("/Users/Yaqi/Documents/hyperdsl/published/DHDL/graph.dot", NV, NE, true)
     //Verified with graph from http://www.cs.princeton.edu/~chazelle/courses/BIB/pagerank.htm
     //NV = 4, NE = 5, DF = 0.85
     val maps = loadDirEdgeList("/Users/Yaqi/Documents/hyperdsl/forge/apps/DHDL/graph/testPr.dot", NV, true)
     val smap = maps(0)
     val dmap = maps(1)
-    val svl:Rep[ForgeArray[SInt]] = getVertList(smap, false)
-    val dvl:Rep[ForgeArray[SInt]] = getVertList(dmap, false)
-    val del:Rep[ForgeArray[SInt]] = getEdgeList(dmap) 
+    val svl = getVertList(smap, false, true)
+    val dvl = getVertList(dmap, false, true)
+    val del = getEdgeList(dmap) 
+    val NE = del.length // Actual number of edges in graph
+    //val NV = svl(0).length/2 // Actual number of vertices in graph
     val sob = Array.tabulate(NE) { i => 
       svl(del(i)*2+1)
     }
@@ -35,8 +37,6 @@ trait PageRank extends DHDLApplication {
     //println("dvl: " + dvl.mkString(","))
     //println("del: " + del.mkString(","))
     //println("sob: " + sob.mkString(","))
-    //val NV = veArr(0).length/3 // Actual number of vertices in graph
-    //val NE = veArr(1).length // Actual number of vertices in graph
     val vertList = OffChipMem[Index]("VertList", NV, 2) // [pointer, size]
     val edgeList = OffChipMem[Index]("EdgeList", NE) // srcs of edges 
     val outBounds = OffChipMem[Index]("outBounds", NE) // number of outbound links for each src in edgeList 

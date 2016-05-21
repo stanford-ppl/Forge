@@ -10,7 +10,13 @@ trait LoweredOpsExp extends EffectExp {
   this: DHDLExp =>
 
   // --- Nodes
-  case class PipeAccum[T,C[T]](
+  case class ParPipeForeach[T,C[T]](
+    cc: Exp[CounterChain],
+    func: Block[Unit],
+    inds: List[List[Sym[Idx]]]
+  )(implicit val ctx: SourceContext)
+
+  case class ParPipeReduce[T,C[T]](
     cc: Exp[CounterChain],
     accum: Exp[C[T]],
     func: Block[Unit],
@@ -18,16 +24,15 @@ trait LoweredOpsExp extends EffectExp {
     acc: Sym[C[T]]
   )(implicit val ctx: SourceContext, val mT: Manifest[T], val mC: Manifest[C[T]]) extends Def[Pipeline]
 
-
   // --- Internal API
 
   // --- Mirroring
   override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = e match {
-    //case BusSlice(b,i) => slice(f(b),i)
-    //case Reflect(e@BusSlice(b,i), u, es) => refletMirrored(Reflect(BusSlice(f(b),i)(e.mT), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case e@ParPipeForeach(cc,func,i) => reflectPure(ParPipeForeach(f(cc),f(func),i)(e.ctx))(mtype(manifest[A]),pos)
+    case Reflect(e@ParPipeForeach(cc,func,i)) => reflectMirrored(Reflect(ParPipeForeach(f(cc),f(func),i)(e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]),pos)
 
-    case e@PipeAccum(cc,a,b,i,acc) => reflectPure(PipeAccum(f(cc),f(a),f(b),f(i),acc)(e.ctx,e.mT,e.mC))
-    case Reflect(e@PipeAccum(cc,a,b,i,acc), u, es) => reflectMirrored(Reflect(PipeAccum(f(cc),f(a),f(b),f(i),acc)(e.ctx,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case e@ParPipeReduce(cc,a,b,i,acc) => reflectPure(ParPipeReduce(f(cc),f(a),f(b),f(i),acc)(e.ctx,e.mT,e.mC))(mtype(manifest[A]),pos)
+    case Reflect(e@ParPipeReduce(cc,a,b,i,acc), u, es) => reflectMirrored(Reflect(ParPipeReduce(f(cc),f(a),f(b),f(i),acc)(e.ctx,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e,f)
   }
 

@@ -51,7 +51,11 @@ trait DHDLBRAMs {
       if ($1.length < 1) stageError("Cannot load from zero indices")
       val addr = calcAddress($1, dimsOf($0))
       val ld = bram_load($0, addr)
-      accessIndicesOf(ld) = $1
+
+      if ($1.length == 1 && dimsOf($0) > 1 && accessIndicesOf($1.head).nonEmpty)
+        accessIndicesOf(st) = accessIndicesOf($1.head)
+      else
+        accessIndicesOf(ld) = $1
       ld
     }
     /** @nodoc -- only used for Mem typeclass instance **/
@@ -59,9 +63,16 @@ trait DHDLBRAMs {
       if ($1.length < 1) stageError("Cannot store to zero indices")
       val addr = calcAddress($1, dimsOf($0))
       val st = bram_store($0, addr, $2)
-      accessIndicesOf(st) = $1
+
+      if ($1.length == 1 && dimsOf($0) > 1 && accessIndicesOf($1.head).nonEmpty)
+        accessIndicesOf(st) = accessIndicesOf($1.head)
+      else
+        accessIndicesOf(st) = $1
       st
     }
+
+    /** @nodoc -- only used for Mem typeclass instance **/
+    direct (BRAM) ("bram_zero_idx", T, BRAM(T) :: Indices) implements composite ${ indices_create(List.fill(dimsOf($0).length){0.as[Index]}) }
 
     /** @nodoc -- only used for Mem typeclass instance **/
     direct (BRAM) ("bram_calc_addr", T, (BRAM(T), Indices) :: Idx) implements composite ${ calcAddress($1.toList, dimsOf($0)) }
@@ -81,6 +92,7 @@ trait DHDLBRAMs {
     val BramMem = tpeClassInst("BramMem", T, TMem(T, BRAM(T)))
     infix (BramMem) ("ld", T, (BRAM(T), Idx) :: T) implements composite ${ bram_load_nd($0, List($1)) }
     infix (BramMem) ("st", T, (BRAM(T), Idx, T) :: MUnit, effect = write(0)) implements composite ${ bram_store_nd($0, List($1), $2) }
+    infix (BramMem) ("zeroIdx", T, (BRAM(T)) :: Indices) implements composite ${ bram_zero_idx($0) }
     infix (BramMem) ("flatIdx", T, (BRAM(T), Indices) :: Idx) implements composite ${ bram_calc_addr($0, $1) }
     infix (BramMem) ("iterator", T, (BRAM(T), SList(MInt)) :: CounterChain) implements composite ${ bram_iterator($0, $1) }
     infix (BramMem) ("empty", T, BRAM(T) :: BRAM(T), TNum(T)) implements composite ${ bram_empty($0) }
@@ -156,8 +168,8 @@ trait DHDLBRAMs {
       /** Stores the given MVector to this BRAM, starting at index 0
        * @param vec
        **/
-      infix (":=") (MVector(T) :: MUnit, effect = write(0)) implements composite ${ 
-        bramStoreVector($self, dimsOf($self).map(dim => 0.as[Index]), $1, param(1)) 
+      infix (":=") (MVector(T) :: MUnit, effect = write(0)) implements composite ${
+        bramStoreVector($self, dimsOf($self).map(dim => 0.as[Index]), $1, param(1))
       }
     }
 

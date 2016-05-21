@@ -59,25 +59,20 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
         }
       }
     }
-    (indices, out)
+    (indices, out.reverse)
   }
-
-  def unrollInnerForeach(cchain: Exp[CounterChain], func: Block[Unit], inds: List[Exp[Index]]) = {
-    var indices: List[List[Sym[Index]]] = Nil
+  def unrollForeach(lhs: Exp[Any], rhs: Pipe_foreach) = {
+    val Pipe_foreach(cchain, func, inds) = rhs
+    val cc2 = f(cchain)
+    var inds2: List[List[Sym[Index]]] = Nil
     val blk = reifyBlock {
-      val (unrolledInds, _) = unrollInnerMap(cchain, func, inds)
-      indices :::= unrolledInds
+      val (unrolledInds, _) = if (isOuterLoop(lhs)) unrollOuterMap(cc2, func, inds)
+                              else                  unrollInnerMap(cc2, func, inds)
+      inds2 :::= unrolledInds
     }
-    (indices, blk)
-  }
-
-  def unrollOuterForeach(cchain: Exp[CounterChain], func: Block[Unit], inds: List[Exp[Index]]): List[Exp[A]] = {
-    var indices: List[List[Sym[Index]]] = Nil
-    val blk = reifyBlock {
-      val (unrolledInds, _) = unrollOuterMap(cchain, func, inds)
-      indices :::= unrolledInds
-    }
-    (indices, blk)
+    val newPipe = reflectEffect(ParPipeForeach(cc2, blk, inds2), summarizeEffects(blk).star andAlso Simple())
+    setProps(newPipe, getProps(lhs))
+    newPipe
   }
 
   def unrollReduce[A:Manifest](mapBus: List[Exp[A]], rFunc: Block[A], iFunc: Block[Index], ld: Block[A], st: Block[Unit], idx: Exp[Index], res: Exp[A], rV: (Sym[A],Sym[A])) = {
@@ -92,40 +87,73 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
 
   // Create a single block with map + reduce + load + reduce + store
   // Still have to keep acc separate to make sure load isn't lifted out of the block (e.g. for registers)
-  def unrollPipeFold[A:Manifest](cc: Exp[CounterChain], func: Block[A], rFunc: Block[A], iFunc: Block[Index], ld: Block[A], st: Block[Unit], idx: Exp[Index], res: Exp[A], rV: (Sym[A],Sym[A]), innerLoop: Boolean): Block[Unit] = {
-    val P = parOf(cc).reduce(_*_)
+  def unrollPipeFold[T,C[T]](lhs: Exp[Any], rhs: Pipe_fold[T,C])(implicit ctx: SourceContext, mT: Manifest[T], mC: Manifest[T]) = {
+    val Pipe_fold(cchain,accum,foldAccum,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) = rhs
+    val cc = f(cchain)
+    val accum2 = f(accum)
+    var inds2: List[List[Sym[Index]]] = Nil
 
-    if (innerLoop) reifyBlock {
-      val (unrolledInds, mapRes) = unrollInnerMap(cchain, func, inds)
+    val blk = if (isInnerLoop(lhs)) reifyBlock {
+      val (unrolledInds, mapRes) = unrollInnerMap(cc, func, inds)
+      inds2 :::= unrolledInds
       unrollReduce(mapRes, rFunc, iFunc, ld, st, idx, res, rV)
     }
     else reifyBlock {
       val (unrolledInds, mapRes) = unrollOuterMap(cc, func, inds)
+      inds2 :::= unrolledInds
       Pipe {
         unrollReduce(mapRes, rFunc, iFunc, ld, st, idx, res, rV)
+      }
+    }
+    val newPipe = reflectEffect(ParPipeReduce(cc, accum2, blk, inds2, acc)(ctx,mT,mC))
+    setProps(newPipe, getProps(lhs))
+    newPipe
+  }
+
+  def unrollAccumFold[T,C[T]](lhs: Exp[Any], rhs: Accum_fold[T,C[T]])(implicit ctx: SourceContext, mT: Manifest[T], mC: Manifest[T]) = {
+    val Accum_fold(ccOuter,ccInner,accum,foldAccum,iFunc,func,ld1,ld2,rFunc,st,indsOuter,indsInner,idx,part,acc,res,rV) = rhs
+    val ccO2 = f(ccOuter)
+    val ccI2 = f(ccInner)
+    val accum2 = f(accum)
+    var indsO2: List[List[Sym[Index]]] = Nil
+
+    def reduce(x: Exp[A], y: Exp[A]) = withSubstScope(rV._1 -> x, rV._2 -> y){ inlineBlock(rFunc) }
+
+    val blk = reifyBlock {
+      val (unrolledInds, mapRes) = unrollOuterMap(ccO2, func, indsOuter)
+      indsO2 :::= unrolledInds
+
+      if (isUnitCounterChain(ccI2)) Pipe {
+        val newIdx = inlineBlock(iFunc)
+        val mapReads = mapRes.map{partial => withSubstScope(part -> partial, idx -> newIdx){inlineBlock(ld1)} }
+        val accRead  = withSubstScope(idx -> newIdx){ inlineBlock(ld2) }
+
+        val treeResult = reductionTree(mapReads, {(x,y) => reduce(x,y) }).head
+        val newRes = reduce(treeResult, accRead)
+        withSubstScope(res -> newRes, idx -> newIdx){ inlineBlock(st) }
+      }
+      else {
+        val Ps = parOf(ccI2)
+        val P = Ps.reduce(_*_)
+        val N = Ps.length
+        val prods = List.tabulate(N){i => Ps.slice(i+1,N).reduce(_*_) }
+        val indices = Ps.map{p => List.fill(p){ fresh[Index] } }
+
+        val innerBlk = reifyBlock {
+          (0 until P).foreach{p =>
+            val inds2 = indices.zipWithIndex.map{case (vec,d) => vec((p / prods(d)) % Ps(d)) }
+            withSubstScope(inds -> inds2){ inlineBlock(func) }
+          }
+        }
+        val innerPipe = reflectEffect(ParPipeForeach(ccI2, innerBlk, ))
       }
     }
   }
 
   override def transform[A:Manifest](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext) = rhs match {
-    case Reflect(Pipe_foreach(cchain, func, inds), u, es) if isOuterLoop(lhs) =>
-      val cc = f(cchain)
-      val unrolledFunc = reifyBlock{ unrollOuterForeach(cc, func, inds) }
-      val newPipe = reflectMirrored(Reflect(Pipe_foreach(cc,unrolledFunc,inds)(ctx), mapOver(f,u), f(es)))(mtype(manifest[A]),ctx)
-      setProps(newPipe, getProps(lhs))
-      Some(newPipe)
-
-    case Reflect(e@Pipe_fold(cchain,accum,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV), u, es) if isInnerLoop(lhs) =>
-      val cc = f(cchain)
-      val accum2 = f(accum)
-      val unrolledMapReduce = unrollInnerMapReduce(cc, func, rFunc, iFunc, ld, st, idx, res, rV)
-      val newPipe = reflectMirrored(Reflect(Pipe_fold(cc, accum2, unrolledMapReduce, inds, acc)(ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), ctx)
-      setProps(newPipe, getProps(lhs))
-      Some(newPipe)
-
-    case Reflect(e@Pipe_reduce(cchain,accum,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV), u, es) if isOuterLoop(lhs) =>
-    case Reflect(e@Block_reduce(c1,c2,a,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV), u, es) if isOuterLoop(lhs) =>
-
+    case EatReflect(e: Pipe_foreach) => Some( unrollForeach(lhs, e) )
+    case EatReflect(e: Pipe_fold[_,_]) => Some( unrollPipeFold(lhs, e)(e.ctx,e.mT,e.mC) )
+    case EatReflect(e: Accum_fold[_,_]) => Some( unrollAccumFold(lhs, e)(e.ctx,e.mT,e.mC) )
     case _ => None
   }
 }

@@ -82,31 +82,91 @@ trait DHDLControllers {
     val objects = List("Pipe", "Sequential")
 
     (controllers, styles, objects).zipped.foreach{case (ctrl, style, obj) =>
+      val desc = if (style == "Fine") "pipelined, parallelizable" else "sequential"
+      val exec = if (style == "Fine") "pipelined" else "sequential"
 
+      /** Creates a $desc state machine which iterates through the ND domain defined by the supplied counterchain,
+       * executing the specified function every iteration. If the function contains other state machines, this is executed
+       * as an outer loop with each inner state machine run as a stage in a $exec fashion.
+       * Note that this is the general form for N-dimensional domains. Use the specialized 1, 2, or 3D forms when possible.
+       * @param cchain: counterchain determining index domain
+       * @param func: the function to be executed each iteration
+       **/
       static (ctrl) ("foreach", Nil, CurriedMethodSignature(List(List(CounterChain),List(Indices ==> MUnit)), MUnit)) implements composite ${
         val pipe = pipe_foreach($0, $1)
         styleOf(pipe) = \$style
       }
+      /** Creates a $desc state machine which iterates through the 1D domain defined by the supplied counter, executing the specified function
+       * every iteration. If the function contains other state machines, this is executed as an outer as an outer loop with each inner state machine
+       * run as a stage in a $exec fashion.
+       * @param c0: counter specifying 1D index domain
+       * @param func: the function to be executed each iteration
+       **/
       static (ctrl) ("foreach", Nil, CurriedMethodSignature(List(List(Counter),List(Idx ==> MUnit)), MUnit)) implements composite ${
         \$obj.foreach(CounterChain($0)){inds => $1(inds(0))}
       }
+      /** Creates a $desc state machine which iterates through the 1D domain defined by the supplied counter, executing the specified function
+       * every iteration. If the function contains other state machines, this is executed as an outer as an outer loop with each inner state machine
+       * run as a stage in a $exec fashion.
+       * @param c0: counter for first dimension
+       * @param c1: counter for second dimension
+       * @param func: the function to be executed each iteration
+       **/
       static (ctrl) ("foreach", Nil, CurriedMethodSignature(List(List(Counter,Counter),List((Idx,Idx) ==> MUnit)), MUnit)) implements composite ${
         \$obj.foreach(CounterChain($0,$1)){inds => $2(inds(0),inds(1))}
       }
+      /** Creates a $desc state machine which iterates through the 3D domain defined by the supplied counter, executing the specified function
+       * every iteration. If the function contains other state machines, this is executed as an outer as an outer loop with each inner state machine
+       * run as a stage in a $exec fashion.
+       * @param c0: counter for first dimension
+       * @param c1: counter for second dimension
+       * @param c2: counter for third dimension
+       * @param func: the function to be executed each iteration
+       **/
       static (ctrl) ("foreach", Nil, CurriedMethodSignature(List(List(Counter,Counter,Counter),List((Idx,Idx,Idx) ==> MUnit)), MUnit)) implements composite ${
         \$obj.foreach(CounterChain($0,$1,$2)){inds => $3(inds(0),inds(1),inds(2))}
       }
 
-      // Conflicts with unit pipe...
+      /** Shorthand form for foreach. Creates a $desc state machine which iterates through the ND domain defined by the supplied counterchain,
+       * executing the specified function every iteration. If the function contains other state machines, this is executed
+       * as an outer loop with each inner state machine run as a stage in a $exec fashion.
+       *
+       * Note that this is the general form for N-dimensional domains. Use the specialized 1, 2, or 3D forms when possible.
+       * @param cchain: counterchain determining index domain
+       * @param func: the function to be executed each iteration
+       **/
       static (ctrl) ("apply", Nil, CurriedMethodSignature(List(List(CounterChain),List(Indices ==> MUnit)), MUnit)) implements composite ${
         \$obj.foreach($0)($1)
       }
+      /** Shorthand form for foreach. Creates a $desc state machine which iterates through the 1D domain defined by the supplied counter, executing the specified function
+       * every iteration. If the function contains other state machines, this is executed as an outer as an outer loop with each inner state machine
+       * run as a stage in a $exec fashion.
+       * @param c0: counter specifying 1D index domain
+       * @param func: the function to be executed each iteration
+       **/
       static (ctrl) ("apply", Nil, CurriedMethodSignature(List(List(Counter),List(Idx ==> MUnit)), MUnit)) implements composite ${
         \$obj.foreach(CounterChain($0)){inds => $1(inds(0))}
       }
+
+      /** Shorthand form for foreach. Creates a $desc state machine which iterates through the 2D domain defined by the supplied counter, executing the specified function
+       * every iteration. If the function contains other state machines, this is executed as an outer as an outer loop with each inner state machine
+       * run as a stage in a $exec fashion.
+       * @param c0: counter for first dimension
+       * @param c1: counter for second dimension
+       * @param func: the function to be executed each iteration
+       **/
       static (ctrl) ("apply", Nil, CurriedMethodSignature(List(List(Counter,Counter),List((Idx,Idx) ==> MUnit)), MUnit)) implements composite ${
         \$obj.foreach(CounterChain($0,$1)){inds => $2(inds(0),inds(1))}
       }
+
+      /** Shorthand form for foreach. Creates a $desc state machine which iterates through the 3D domain defined by the supplied counter, executing the specified function
+       * every iteration. If the function contains other state machines, this is executed as an outer as an outer loop with each inner state machine
+       * run as a stage in a $exec fashion.
+       * @param c0: counter for first dimension
+       * @param c1: counter for second dimension
+       * @param c2: counter for third dimension
+       * @param func: the function to be executed each iteration
+       **/
       static (ctrl) ("apply", Nil, CurriedMethodSignature(List(List(Counter,Counter,Counter),List((Idx,Idx,Idx) ==> MUnit)), MUnit)) implements composite ${
         \$obj.foreach(CounterChain($0,$1,$2)){inds => $3(inds(0),inds(1),inds(2))}
       }

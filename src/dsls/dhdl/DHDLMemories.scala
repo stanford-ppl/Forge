@@ -32,6 +32,7 @@ trait DHDLMemories extends DHDLRegs with DHDLBRAMs with DHDLOffChip {
     val Mem = tpeClass("Mem", TMem, (T, C))
     infix (Mem) ("ld", (T,C), (C, Idx) :: T)
     infix (Mem) ("st", (T,C), (C, Idx, T) :: MUnit, effect = write(0))
+    infix (Mem) ("zeroIdx", (T,C), C :: Indices)
     infix (Mem) ("flatIdx", (T,C), (C, Indices) :: Idx)
     infix (Mem) ("iterator", (T,C), (C, SList(MInt)) :: CounterChain)
     infix (Mem) ("empty", (T,C), C :: C, TNum(T))

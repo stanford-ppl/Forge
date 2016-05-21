@@ -25,14 +25,14 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     accum:  Exp[C[T]],          // Reduction accumulator
     foldAccum: Boolean,         // Act as a fold (true) or a reduce (false)
     // - Reified blocks
-    iFunc:  Block[Idx],         // Calculation of 1D index for load and store
+    iFunc:  Block[Idx],         // "Calculation" of reduction index (always 0)
     ldFunc: Block[T],           // Accumulator load function (reified with acc, idx)
     stFunc: Block[Unit],        // Accumulator store function (reified with acc, idx, res)
     func:   Block[T],           // Map function
     rFunc:  Block[T],           // Reduction function
     // - Bound args
     inds:   List[Sym[Idx]],     // Loop iterators
-    idx:    Sym[Idx],           // Index for addressing in ldFunc and stFunc (aliases with iFunc.res)
+    idx:    Sym[Idx],           // Reduction index (usually always 0)
     acc:    Sym[C[T]],          // Reduction accumulator (aliases with accum)
     res:    Sym[T],             // Reduction intermediate result (aliases with rFunc.res)
     rV:    (Sym[T], Sym[T])     // Reduction function inputs
@@ -72,8 +72,11 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     val is = List.fill(lenOf(cchain)){ fresh[Idx] }
     val inds = indices_create(is)
 
+    val redInds = __mem.zeroIdx(accum)
+    val iBlk = reifyEffects( __mem.flatIdx(mem, redInds.toList) )
+
     val idx = fresh[Idx]
-    val iBlk = reifyEffects( __mem.flatIdx(accum, inds) )
+    accessIndicesOf(idx) = redInds.toList
 
     // Reified map function
     val mBlk = reifyEffects( func(inds) )
@@ -103,6 +106,7 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     val indsRed = indices_create(isRed)
 
     val idx = fresh[Idx]
+    accessIndicesOf(idx) = isRed
     val iBlk = reifyEffects( __mem.flatIdx(getBlockResult(func), indsRed) )
 
     val part = fresh[C[T]]

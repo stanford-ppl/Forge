@@ -29,25 +29,25 @@ trait SparseOps {
     val R = tpePar("R")
     val Sparse = lookupTpe("Sparse")
     val SparseMatrix = lookupTpe("SparseMatrix")
+    val SparseMatrixNoTranspose = lookupTpe("SparseMatrixNoTranspose")
     val IndexVector = lookupTpe("IndexVector")
     val DenseVector = lookupTpe("DenseVector")
     val DenseMatrix = lookupTpe("DenseMatrix")
+    val SparseRowView = lookupTpe("SparseRowView")
     val SparseVectorView = lookupTpe("SparseVectorView")
     data(SparseMatrix, ("_csr", Sparse(T)), ("_csc", Sparse(T)))
-    // helper
     compiler (SparseMatrix) ("sparse_matrix_alloc_raw", T, MethodSignature(List(Sparse(T), Sparse(T)), SparseMatrix(T))) implements allocates(SparseMatrix, ${$0}, ${$1})
 
     val SparseMatrixOps = withTpe (SparseMatrix)
     SparseMatrixOps {
-      /**
-       * Data operations, Accessors and Mutators
-       */
       compiler ("get_csr" ) (Nil :: Sparse(T)) implements getter(0, "_csr")
       compiler ("get_csc" ) (Nil :: Sparse(T)) implements getter(0, "_csc")
       compiler ("set_csr" ) (Sparse(T) :: MUnit, effect = write(0)) implements setter(0,  "_csr", ${$1})
       compiler ("set_csc" ) (Sparse(T) :: MUnit, effect = write(0)) implements setter(0,  "_csc", ${$1})
       infix ("apply") ((MInt,MInt) :: T) implements composite ${ get_csr($self).apply($1,$2) }
       infix ("apply") (MInt :: SparseVectorView(T)) implements single ${ SparseVectorView[T](get_csr($self), $1.toLong*$self.numCols, 1, $self.numCols, true) }
+      infix ("getRow") (MInt :: SparseVectorView(T)) implements composite ${ $self.apply($1) }
+      infix ("getCol") (MInt :: SparseVectorView(T)) implements composite ${ SparseVectorView[T](get_csc($self), $1.toLong*$self.numRows, 1, $self.numRows, true) }
       infix ("numRows") (Nil :: MInt) implements composite ${ get_csr($self).numRows }
       infix ("numCols") (Nil :: MInt) implements composite ${ get_csr($self).numCols }
       infix ("size") (Nil :: MInt) implements composite ${ $self.numRows*$self.numCols }
@@ -82,6 +82,26 @@ trait SparseOps {
       }
       infix ("nzRows") (Nil :: IndexVector) implements composite ${ get_csc($self).nzCols }
       infix ("nzCols") (Nil :: IndexVector) implements composite ${ get_csr($self).nzCols }
+      direct ("__equal") (SparseMatrix(T) :: MBoolean) implements composite ${ get_csr($self) == get_csr($1) }
+      direct ("__equal") (SparseMatrixNoTranspose(T) :: MBoolean) implements composite ${ get_csr($self) == get_csr_no_transpose($1) }
+      direct ("__equal") (DenseMatrix(T) :: MBoolean) implements composite ${ get_csr($self) == $1 }
+      infix ("foreachnz") ((T ==> MUnit) :: MUnit) implements composite ${
+        get_csr($self).foreachnz($1)
+        get_csc($self).foreachnz($1)
+      }
+      infix ("countnz") ((T ==> MBoolean) :: MInt) implements composite ${ get_csr($self).countnz($1) }
+      infix ("mapRowsToDenseVector") ((SparseRowView(T) ==> R) :: DenseVector(R), addTpePars = R) implements composite ${
+         get_csr($self).mapRowsToDenseVector($1)
+      }
+      infix ("mapColsToDenseVector") ((SparseRowView(T) ==> R) :: DenseVector(R), addTpePars = R) implements composite ${
+         get_csc($self).mapRowsToDenseVector($1)
+      }
+      infix ("findRows") ((SparseVectorView(T) ==> MBoolean) :: IndexVector) implements composite ${
+        IndexVector($self.nzRows.filter(i => $1($self(i))))
+      }
+      infix ("findCols") ((SparseVectorView(T) ==> MBoolean) :: IndexVector) implements composite ${
+        IndexVector($self.nzCols.filter(i => $1($self.getCol(i))))
+      }
     }
   }
 
@@ -89,31 +109,29 @@ trait SparseOps {
     val T = tpePar("T")
     val R = tpePar("R")
     val Sparse = lookupTpe("Sparse")
+    val SparseMatrix = lookupTpe("SparseMatrix")
     val SparseMatrixNoTranspose = lookupTpe("SparseMatrixNoTranspose")
     val IndexVector = lookupTpe("IndexVector")
     val DenseVector = lookupTpe("DenseVector")
     val DenseMatrix = lookupTpe("DenseMatrix")
+    val SparseRowView = lookupTpe("SparseRowView")
     val SparseVectorView = lookupTpe("SparseVectorView")
     data(SparseMatrixNoTranspose, ("_csr", Sparse(T)))
-    // helper
     compiler (SparseMatrixNoTranspose) ("sparse_matrix_no_transpose_alloc_raw", T, MethodSignature(Sparse(T), SparseMatrixNoTranspose(T))) implements allocates(SparseMatrixNoTranspose, ${$0})
 
     val SparseMatrixNoTransposeOps = withTpe (SparseMatrixNoTranspose)
     SparseMatrixNoTransposeOps {
-      /**
-       * Data operations, Accessors and Mutators
-       */
       compiler ("get_csr_no_transpose" ) (Nil :: Sparse(T)) implements getter(0, "_csr")
       compiler ("set_csr_no_transpose" ) (Sparse(T) :: MUnit, effect = write(0)) implements setter(0,  "_csr", ${$1})
       infix ("apply") ((MInt,MInt) :: T) implements composite ${ get_csr_no_transpose($self).apply($1,$2) }
       infix ("apply") (MInt :: SparseVectorView(T)) implements single ${ SparseVectorView[T](get_csr_no_transpose($self), $1.toLong*$self.numCols, 1, $self.numCols, true) }
+      infix ("getRow") (MInt :: SparseVectorView(T)) implements composite ${ $self.apply($1) }
       infix ("numRows") (Nil :: MInt) implements composite ${ get_csr_no_transpose($self).numRows }
       infix ("numCols") (Nil :: MInt) implements composite ${ get_csr_no_transpose($self).numCols }
       infix ("size") (Nil :: MInt) implements composite ${ $self.numRows*$self.numCols }
       infix ("nnz") (Nil :: MInt) implements composite ${ get_csr_no_transpose($self).nnz }
       infix ("toDense") (Nil :: DenseMatrix(T)) implements composite ${ get_csr_no_transpose($self).toDense }
       infix ("pprint") (Nil :: MUnit, TStringable(T), effect = simple) implements composite ${ get_csr_no_transpose($self).pprint }
-      infix ("t") (Nil :: MUnit, effect = simple) implements composite ${ fatal("Type has no transpose!") }
       infix ("+")   (SparseMatrixNoTranspose(T) :: SparseMatrixNoTranspose(T), TArith(T)) implements composite ${ sparse_matrix_no_transpose_alloc_raw[T](get_csr_no_transpose($self) + get_csr_no_transpose($1)) }
       infix ("-")   (SparseMatrixNoTranspose(T) :: SparseMatrixNoTranspose(T), TArith(T)) implements composite ${ sparse_matrix_no_transpose_alloc_raw[T](get_csr_no_transpose($self) - get_csr_no_transpose($1)) }
       infix ("*:*") (SparseMatrixNoTranspose(T) :: SparseMatrixNoTranspose(T), TArith(T)) implements composite ${ sparse_matrix_no_transpose_alloc_raw[T](get_csr_no_transpose($self) *:* get_csr_no_transpose($1)) }
@@ -138,6 +156,14 @@ trait SparseOps {
       }
       infix ("nzRows") (Nil :: IndexVector) implements composite ${ get_csr_no_transpose($self).nzRows }
       infix ("nzCols") (Nil :: IndexVector) implements composite ${ get_csr_no_transpose($self).nzCols }
+      direct ("__equal") (SparseMatrix(T) :: MBoolean) implements composite ${ get_csr_no_transpose($self) == get_csr($1) }
+      direct ("__equal") (SparseMatrixNoTranspose(T) :: MBoolean) implements composite ${ get_csr_no_transpose($self) == get_csr_no_transpose($1) }
+      direct ("__equal") (DenseMatrix(T) :: MBoolean) implements composite ${ get_csr_no_transpose($self) == $1 }
+      infix ("foreachnz") ((T ==> MUnit) :: MUnit) implements composite ${ get_csr_no_transpose($self).foreachnz($1) }
+      infix ("countnz") ((T ==> MBoolean) :: MInt) implements composite ${ get_csr_no_transpose($self).countnz($1) }
+      infix ("mapRowsToDenseVector") ((SparseRowView(T) ==> R) :: DenseVector(R), addTpePars = R) implements composite ${
+         get_csr_no_transpose($self).mapRowsToDenseVector($1)
+      }
     }
   }
 
@@ -149,14 +175,10 @@ trait SparseOps {
     val DenseVector = lookupTpe("DenseVector")
     val DenseMatrix = lookupTpe("DenseMatrix")
     data(SparseBlockMatrix, ("_csr_blocks", DenseVector(SparseMatrix(T))))
-    // helper
     compiler (SparseBlockMatrix) ("sparse_block_matrix_alloc_raw", T, MethodSignature(DenseVector(SparseMatrix(T)), SparseBlockMatrix(T))) implements allocates(SparseBlockMatrix, ${$0})
 
     val SparseBlockMatrixOps = withTpe (SparseBlockMatrix)
     SparseBlockMatrixOps {
-      /**
-       * Data operations, Accessors and Mutators
-       */
       compiler ("get_csr_blocks" ) (Nil :: DenseVector(SparseMatrix(T))) implements getter(0, "_csr_blocks")
       infix ("numBlocks") (Nil :: MInt) implements composite ${ get_csr_blocks($self).length }
       infix ("numRows") (Nil :: MInt) implements composite ${
@@ -197,7 +219,6 @@ trait SparseOps {
         val vector_blocks = (0::$self.numBlocks).map({e =>
             $1.slice(e*block_size, (e+1)*block_size)
           })
-        //val out_blocks = (0::$self.numBlocks).map({e => csr_blocks(e) * vector_blocks(e)})
         val out_block = csr_blocks(0).asInstanceOf[Rep[SparseMatrix[T]]] * vector_blocks(0).asInstanceOf[Rep[DenseVector[T]]]
         var i = 1
         while (i < $self.numBlocks) {
@@ -239,14 +260,10 @@ trait SparseOps {
     val SparseDirectedGraph = lookupTpe("SparseDirectedGraph")
     val DenseVector = lookupTpe("DenseVector")
     data(SparseDirectedGraph, ("_outNeighbors", Sparse(T)), ("_inNeighbors", Sparse(T)), ("_nodeprop", DenseVector(T)))
-    // helper
     compiler (SparseDirectedGraph) ("sparse_directed_graph_alloc_raw", T, MethodSignature(List(Sparse(T), Sparse(T), DenseVector(T)), SparseDirectedGraph(T))) implements allocates(SparseDirectedGraph, ${$0}, ${$1}, ${$2})
 
     val SparseDirectedGraphOps = withTpe (SparseDirectedGraph)
     SparseDirectedGraphOps {
-      /**
-       * Data operations, Accessors and Mutators
-       */
       compiler ("get_outNeighbors" ) (Nil :: Sparse(T)) implements getter(0, "_outNeighbors")
       compiler ("get_inNeighbors") (Nil :: Sparse(T)) implements getter(0, "_inNeighbors")
       compiler ("get_nodeprop_directed" ) (Nil :: DenseVector(T)) implements getter(0, "_nodeprop")
@@ -299,14 +316,10 @@ trait SparseOps {
     val SparseUndirectedGraph = lookupTpe("SparseUndirectedGraph")
     val DenseVector = lookupTpe("DenseVector")
     data(SparseUndirectedGraph, ("_neighbors", Sparse(T)), ("_nodeprop", DenseVector(T)))
-    // helper
     compiler (SparseUndirectedGraph) ("sparse_undirected_graph_alloc_raw", T, MethodSignature(List(Sparse(T), DenseVector(T)), SparseUndirectedGraph(T))) implements allocates(SparseUndirectedGraph, ${$0}, ${$1})
 
     val SparseUndirectedGraphOps = withTpe (SparseUndirectedGraph)
     SparseUndirectedGraphOps {
-      /**
-       * Data operations, Accessors and Mutators
-       */
       compiler ("get_neighbors" ) (Nil :: Sparse(T)) implements getter(0, "_neighbors")
       compiler ("get_nodeprop_undirected" ) (Nil :: DenseVector(T)) implements getter(0, "_nodeprop")
       compiler ("set_neighbors" ) (Sparse(T) :: MUnit, effect = write(0)) implements setter(0,  "_neighbors", ${$1})
@@ -487,9 +500,7 @@ trait SparseOps {
         val l2_density = l2_s / Row_density
         val l3_density = l3_s / Row_density
         var block_size = numCols
-        // 100: Somewaht arbitary constant, computed from experiments
-        // There might be a better way to bound block_size
-        // Blocking has to be done here because we don't want to ever modify our CSRs after creation
+        // Idea: in most cases we want to block for L3, and only upgrade to L2 or L1 when possible
         if (l3_density > 100)
           block_size = L3_size
         if (l2_density > 100)
@@ -529,9 +540,6 @@ trait SparseOps {
           i += 1
         }
 
-        // val out_data_blocks = DenseVector[ForgeArray[T]](numBlocks, unit(true))
-        // val out_colIndices_blocks = DenseVector[ForgeArray[Int]](numBlocks, unit(true))
-        // val out_rowIndices_blocks = DenseVector[ForgeArray[Int]](numBlocks, unit(true))
         var csr_blocks = DenseVector[SparseMatrix[T]](numBlocks, unit(true))
         i = 0
         var j = 0
@@ -547,9 +555,6 @@ trait SparseOps {
             j += 1
             k += 1
           }
-          // out_data_blocks(i) = out_data_block
-          // out_colIndices_blocks(i) = out_colIndices_block
-          // out_rowIndices_blocks(i) = out_rowIndices_block
           val coo = sparse_coo_alloc_raw[T](block_size,
                                             $self.numRows,
                                             out_data_block.unsafeImmutable,
@@ -570,23 +575,6 @@ trait SparseOps {
           j = 0
           i += 1
         }
-        // val csr_blocks = (0::numBlocks).map({e => 
-        //     sparsecoo_to_sparsecsr(sparse_coo_alloc_raw[T](block_size,
-        //                                                    $self.numRows,
-        //                                                    out_data_blocks(e).get_data.unsafeImmutable,
-        //                                                    out_rowIndices_blocks(e).get_data.unsafeImmutable,
-        //                                                    out_colIndices_blocks(e).get_data.unsafeImmutable,
-        //                                                    out_data_blocks(e).length,
-        //                                                    array_empty[T](unit(32))))
-        //   })
-        // val empty_data = array_empty[T](block_size)
-        // val empty_colIndices = array_empty[Int](block_size)
-        // val empty_rowIndices = array_empty[Int](block_size)
-        // val sparsemat_1 = sparse_csr_alloc_raw[T]($self.numRows, $self.numCols, empty_data.unsafeImmutable, empty_colIndices.unsafeImmutable, empty_rowIndices.unsafeImmutable, block_size)
-        // val sparsemat_2 = sparse_csr_alloc_raw[T]($self.numRows, $self.numCols, empty_data.unsafeImmutable, empty_colIndices.unsafeImmutable, empty_rowIndices.unsafeImmutable, block_size)
-        // var out_blocks = DenseVector[SparseMat[T]](numBlocks, unit(true))
-        // out_blocks(1) = sparse_matrix_alloc_raw[T](sparsemat_1.unsafeImmutable)
-        // out_blocks(2) = sparse_matrix_alloc_raw[T](sparsemat_2.unsafeImmutable)
         sparse_block_matrix_alloc_raw[T](csr_blocks.unsafeImmutable)
       }
       infix ("to_sparsedirectedgraph") (Nil :: SparseDirectedGraph(T)) implements composite ${ 
@@ -701,29 +689,7 @@ trait SparseOps {
           i += 1
         }
         array_update(outRowPtr, $self.numRows, array_length(outData))
-
-        // -- debug
-        // println("indices.length: " + array_length(indices))
-        // println("input to coo->csr: ")
-        // println("data: " + data)
-        // println("colIndices: " + colIndices)
-        // println("rowIndices: " + rowIndices)
-        //
-        // println("output of coo->csr: ")
-        // println("data: " + outData)
-        // println("colIndices: " + outColIndices)
-        // println("rowPtr: " + outRowPtr)
-
         sparse_csr_alloc_raw[T]($self.numRows,$self.numCols,outData.unsafeImmutable,outColIndices.unsafeImmutable,outRowPtr.unsafeImmutable,array_length(outData))
-
-        // val rowSlicer = array_empty[Int](2*$self.numRows)
-        // i = 0
-        // while (i < $self.numRows) {
-        //   array_update(rowSlicer,   2*i, outRowPtr(i  ))
-        //   array_update(rowSlicer, 2*i+1, outRowPtr(i+1))
-        //   i += 1
-        // }
-        // sparse_csr_alloc_raw[T]($self.numRows,$self.numCols,outData.unsafeImmutable,outColIndices.unsafeImmutable,outRowPtr.unsafeImmutable,array_length(outData),rowSlicer.unsafeImmutable)
       }
     }
   }
@@ -745,8 +711,6 @@ trait SparseOps {
     val SparseMatrixNoTranspose = lookupTpe("SparseMatrixNoTranspose")
     val SparseDirectedGraph = lookupTpe("SparseDirectedGraph")
     val SparseUndirectedGraph = lookupTpe("SparseUndirectedGraph")
-    
-    // TODO: Add CSC fields and allocations
 
     // data fields
     data(Sparse, ("_numRows", MInt), ("_numCols", MInt), ("_data", MArray(T)), ("_colIndices",MArray(MInt)), ("_rowPtr",MArray(MInt)), ("_nnz",MInt))
@@ -782,12 +746,6 @@ trait SparseOps {
             out(i,colIndices(j)) = data(j)
           }
         }
-        // parallel (but irregular), disjoint writes to rows
-        // (0::$self.numRows).foreach { i =>
-        //   for (j <- rowPtr(i) until rowPtr(i+1)) {
-        //     out(i,colIndices(j)) = data(j)
-        //   }
-        // }
         out.unsafeImmutable
       }
 
@@ -856,6 +814,9 @@ trait SparseOps {
 
       // Note the following 3 should only be called if we loaded CSR from file.
       // Note we don't check if M and M^T are the same
+      infix ("to_sparsematrix") (Sparse(T) :: SparseMatrix(T), TArith(T)) implements composite ${
+        sparse_matrix_alloc_raw[T]($self.unsafeImmutable, $1.unsafeImmutable)
+      }
       infix ("to_sparsematrixnotranspose") (Nil :: SparseMatrixNoTranspose(T), TArith(T)) implements composite ${
         sparse_matrix_no_transpose_alloc_raw[T]($self.unsafeImmutable)
       }
@@ -871,7 +832,7 @@ trait SparseOps {
        * Math
        */
 
-       // SparseMatrix implementation of Sparse Math, need to be improved
+       // Sparse +/* Sparse needs to be improved
       compiler ("zipSparseUnion") ((Sparse(B), (T,B) ==> R) :: Sparse(R), addTpePars = (B,R)) implements single ${
         val aData         = sparse_get_data($self)
         val aColIndices   = sparse_get_colindices($self)
@@ -986,10 +947,7 @@ trait SparseOps {
         val colIndices = sparse_get_colindices($self)
         SparseRowView[Int](colIndices, colIndices(rowPtr($1)), colIndices(rowPtr($1+1))-colIndices(rowPtr($1)))
       }
-      infix ("mapnz") ((T ==> R) :: Sparse(R), addTpePars = R) implements composite ${
-        val out = $self.nz.map($1)
-        sparse_csr_alloc_raw($self.numRows, $self.numCols, densevector_raw_data(out), sparse_get_colindices($self), sparse_get_rowptr($self), $self.nnz)
-      }
+      // Warning: should use colIndices on the transpose whenever possible
       infix ("rowIndices") (Nil :: IndexVector) implements single ${
         val rowPtr = sparse_get_rowptr($self)
         val nnz = rowPtr(array_length(rowPtr)-1)
@@ -1013,6 +971,46 @@ trait SparseOps {
       }
       infix ("nzRows") (Nil :: IndexVector) implements redirect ${ IndexVector($self.rowIndices.distinct) }
       infix ("nzCols") (Nil :: IndexVector) implements redirect ${ IndexVector($self.colIndices.distinct) }
+      direct ("__equal") (Sparse(T) :: MBoolean) implements composite ${
+        if ($self.numRows != $1.numRows || $self.numCols != $1.numCols) false
+        else {
+          val dataEqual = densevector_alloc_raw($self.nnz, true, sparse_get_data($self)) == densevector_alloc_raw($1.nnz, true, sparse_get_data($1))
+          val colIndexEqual = densevector_alloc_raw($self.nnz, true, sparse_get_colindices($self)) == densevector_alloc_raw($1.nnz, true, sparse_get_colindices($1))
+          val rowPtrEqual = densevector_alloc_raw($self.numRows+1, true, sparse_get_rowptr($self)) == densevector_alloc_raw($1.numRows+1, true, sparse_get_rowptr($1))
+          dataEqual && colIndexEqual && rowPtrEqual
+        }
+      }
+      direct ("__equal") (DenseMatrix(T) :: MBoolean) implements composite ${ $self.toDense == $1 }
+
+      // Bulk
+      infix ("mapnz") ((T ==> R) :: Sparse(R), addTpePars = R) implements composite ${
+        val out = $self.nz.map($1)
+        sparse_csr_alloc_raw($self.numRows, $self.numCols, densevector_raw_data(out), sparse_get_colindices($self), sparse_get_rowptr($self), $self.nnz)
+      }
+      infix ("foreachnz") ((T ==> MUnit) :: MUnit) implements composite ${ $self.nz.foreach($1) }
+      infix ("countnz") ((T ==> MBoolean) :: MInt) implements composite ${ $self.nz.count($1) }
+      // Do we need the output as SparseVector?
+      // infix ("mapRowsToVector") ((SparseVectorView(T) ==> R) :: SparseVector(R), addTpePars = R) implements composite ${}
+      infix ("mapRowsToDenseVector") ((SparseRowView(T) ==> R) :: DenseVector(R), addTpePars = R) implements composite ${
+         IndexVector(0, $self.numRows, false).map(i => $1($self.getRow(i)))
+      }
+      // TODO: decide how we should suffer for methods that's only fast on one of csr or csc
+      //       either we suffer losing our transpose after getting the rows/cols
+      //       or we call suffer the slowness on one part
+      //       The following is a list of problem methods
+      // infix ("getRows") (IndexVector :: SparseMatrix(T)) implements composite
+      // infix ("getCols") (IndexVector :: SparseMatrix(T)) implements composite
+      // infix ("slice") ((("startRow",MInt),("endRow",MInt),("startCol",MInt),("endCol",MInt)) :: SparseMatrix(T))
+      // infix ("sliceRows") ((("start",MInt),("end",MInt)) :: SparseMatrix(T))
+      // infix ("sliceCols") ((("start",MInt),("end",MInt)) :: SparseMatrix(T))
+      // infix ("filterRows") ((SparseVectorView(T) ==> MBoolean) :: SparseMatrix(T))
+      // infix ("filterCols") ((SparseVectorView(T) ==> MBoolean) :: SparseMatrix(T))
+      // infix ("foreachRow") ((SparseVectorView(T) ==> MUnit) :: MUnit, effect = simple) implements composite ${
+      //   $self.nzRows foreach { i => $1($self(i)) }
+      // }
+      // infix ("foreachCol") ((SparseVectorView(T) ==> MUnit) :: MUnit, effect = simple) implements composite ${
+      //   $self.nzCols foreach { i => $1($self.getCol(i)) }
+      // }
     }
   }
 }

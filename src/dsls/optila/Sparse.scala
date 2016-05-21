@@ -184,12 +184,13 @@ trait SparseOps {
           csr_blocks(i).pprint
         }
       }
+      // These operations no longer make sense, unless we want to allow converting back and forth
       // infix ("+")   (SparseMat(T)   ::   SparseMat(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self) + get_csr($1)) }
       // infix ("-")   (SparseMat(T)   ::   SparseMat(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self) - get_csr($1)) }
       // infix ("*:*") (SparseMat(T)   ::   SparseMat(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self) *:* get_csr($1)) }
-      // infix ("+")   (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ get_csr($self) + $1 }
-      // infix ("-")   (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ get_csr($self) - $1 }
-      // infix ("*:*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ get_csr($self).toDense * $1 }
+      infix ("+")   (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ $self.toDense + $1 }
+      infix ("-")   (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ $self.toDense - $1 }
+      infix ("*:*") (DenseMatrix(T) :: DenseMatrix(T), TArith(T)) implements composite ${ $self.toDense * $1 }
       infix ("*")   (DenseVector(T) :: DenseVector(T), TArith(T)) implements composite ${
         val csr_blocks = get_csr_blocks($self)
         val block_size = csr_blocks(0).numCols
@@ -205,10 +206,18 @@ trait SparseOps {
         }
         out_block
       }
-      // infix ("+")   (T :: DenseMatrix(T), TArith(T)) implements composite ${ get_csr($self).toDense + $1 }
-      // infix ("-")   (T :: DenseMatrix(T), TArith(T)) implements composite ${ get_csr($self).toDense - $1 }
-      // infix ("*")   (T :: SparseMat(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self)*$1) }
-      // infix ("/")   (T :: SparseMat(T), TArith(T)) implements composite ${ sparse_matrix_alloc_raw[T](get_csr($self)/$1) }
+      infix ("+")   (T :: DenseMatrix(T), TArith(T)) implements composite ${ $self.toDense + $1 }
+      infix ("-")   (T :: DenseMatrix(T), TArith(T)) implements composite ${ $self.toDense - $1 }
+      infix ("*")   (T :: SparseBlockMatrix(T), TArith(T)) implements composite ${
+        val csr_blocks = get_csr_blocks($self)
+        val out_raw_blocks = (0::$self.numBlocks).map({e => csr_blocks(e) * $1})
+        sparse_block_matrix_alloc_raw[T](out_raw_blocks)
+      }
+      infix ("/")   (T :: SparseBlockMatrix(T), TArith(T)) implements composite ${
+        val csr_blocks = get_csr_blocks($self)
+        val out_raw_blocks = (0::$self.numBlocks).map({e => csr_blocks(e) / $1})
+        sparse_block_matrix_alloc_raw[T](out_raw_blocks)
+      }
       infix ("sum") (Nil :: T, TArith(T)) implements composite ${
         val csr_blocks = get_csr_blocks($self)
         (0::$self.numBlocks).map({e => csr_blocks(e).sum}).sum

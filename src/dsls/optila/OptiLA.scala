@@ -51,6 +51,7 @@ trait OptiLADSL extends ForgeApplication
     val Sparse    = tpe("Sparse", T)
     val SparseCOO = tpe("SparseCOO", T)
     val SparseMatrix = tpe("SparseMatrix", T)
+    val SparseMatrixNoTranspose = tpe("SparseMatrixNoTranspose", T)
     val SparseBlockMatrix = tpe("SparseBlockMatrix", T)
     val SparseSymMat = tpe("SparseSymMat", T)
     val SparseRowView = tpe("SparseRowView", T)

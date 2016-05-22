@@ -68,8 +68,8 @@ trait PageRank extends DHDLApplication {
             val oB = BRAM[Index]("outTile", maxNumEdge)
             val eprB = BRAM[Elem]("edgePageRank", maxNumEdge)
             val idxB = BRAM[Index]("idxTile", maxNumEdge)
-            val pt = mux(vB(iv,0) < 0.as[SInt], 0, vB(iv,0)) //If pointer is -1, set to 0
-            val numEdge = vB(iv,1.as[SInt])
+            val pt = vB(iv,0)
+            val numEdge = vB(iv,1)
             //println("iv:" + iv)
             //println("pt:" + pt)
             //println("numEdge:" + numEdge)

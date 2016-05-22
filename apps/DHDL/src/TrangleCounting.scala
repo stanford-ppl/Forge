@@ -6,74 +6,77 @@ import scala.util.Random
 object TrangleCountingCompiler extends DHDLApplicationCompiler with TrangleCounting
 object TrangleCountingInterpreter extends DHDLApplicationInterpreter with TrangleCounting
 trait TrangleCounting extends DHDLApplication {
-  type Elem = Flt //FixPt[Signed, B16, B16]
-
   override def stageArgNames = List("tileSize")
   lazy val tileSize = param("tileSize", 2)
-  lazy val numIter = ArgIn[SInt]("numIter")
+  lazy val maxNumEdge = 8.as[Index]
+  lazy val maxNumEdgeX2 = 16.as[Index]
 
+  // Limitation:
+  //  1. Number of vertices must be a multiple of tileSize
+  //  2. Assume number of edges of 1 vertex fits on chip
+  //  3. Intersection in DHDL of two sets is O(M*N) where M and N are sizes of two sets
   def main() {
     //val NV = args(unit(0)).to[SInt]
     ////genRandDirEdgeList("/Users/Yaqi/Documents/hyperdsl/published/DHDL/graph.dot", NV, NE, true)
-    val map = loadUnDirEdgeList("/Users/Yaqi/Documents/hyperdsl/forge/apps/DHDL/graph/testTc.dot", true)
-    val vl:Rep[ForgeArray[SInt]] = getVertList(map, false, true)
-    val el:Rep[ForgeArray[SInt]] = getEdgeList(map) 
-    println("vl: " + vl.mkString(","))
-    println("el: " + el.mkString(","))
+    val map = loadUnDirEdgeList("/Users/Yaqi/Documents/hyperdsl/forge/apps/DHDL/graph/testTc2.dot", true)
+    val vl = getVertList(map, false, true) // NV by 2 Array(pointer, numEdges)
+    val el = getEdgeList(map) // Flat edge list
     val NV = vl.length/2 // Actual number of vertices in graph
     val NE = el.length/2 // Divided by 2 b/c bi-directional edge
 
     val vertList = OffChipMem[Index]("VertList", NV, 2) // [pointer, size]
     val edgeList = OffChipMem[Index]("EdgeList", NE*2) // srcs of edges 
-    val count = ArgOut[Elem]("count")
+    val count = ArgOut[Index]("count")
     
     setMem(vertList, vl)
     setMem(edgeList, el)
 
     Accel {
-      MetaPipe(NV by tileSize) { ivt =>
-        //val vB = BRAM[Index]("vertTile", tileSize, 2)
-        //vB := vertList(ivt::ivt+tileSize, 0::2)
-        MetaPipe (tileSize by 1) { iv =>
-      //    val eB = BRAM[Index]("edgeTile", maxNumEdge)
-      //    val oB = BRAM[Index]("outTile", maxNumEdge)
-      //    val eprB = BRAM[Elem]("edgeTrangleCounting", maxNumEdge)
-      //    val idxB = BRAM[Index]("idxTile", maxNumEdge)
-      //    val pt = mux(vB(iv,0) < 0.as[SInt], 0, vB(iv,0)) //If pointer is -1, set to 0
-      //    val numEdge = vB(iv,1.as[SInt])
-      //    //println("iv:" + iv)
-      //    //println("pt:" + pt)
-      //    //println("numEdge:" + numEdge)
-      //    Parallel {
-      //      eB := edgeList(pt::pt+numEdge)
-      //      //printBram(eB)
-      //      oB := outBounds(pt::pt+numEdge)
-      //      //printBram(oB)
-      //    }
-      //    Pipe (numEdge by 1) { ie =>
-      //      idxB(ie) = eB(ie) * 2.as[SInt] + oldPrIdx 
-      //    }
-      //    //printBram(idxB)
-      //    eprB := pageRank(idxB, numEdge)
-      //    //printBram(eprB)
-      //    val sum = Reg[Elem]("sum")
-      //    Pipe (numEdge by 1, sum) { ie =>
-      //      eprB(ie) / oB(ie).to[Elem] 
-      //    } {_+_}
-      //    //println("sum:" + sum.value)
-      //    Pipe {
-      //      val pr = sum.value * damp + (1.as[Elem]-damp)
-      //      prNewB(iv) = pr
-      //    }
-        } 
-      //  //printBram(prNewB)
-      //  pageRank(ivt::ivt+tileSize, newPrIdx::newPrIdx+1.as[SInt]) := prNewB
-      }
-      Pipe {val a = 3}
+      MetaPipe(NV by tileSize, count) { ivt =>
+        val vB = BRAM[Index]("vertTile", tileSize, 2)
+        vB := vertList(ivt::ivt+tileSize, 0::2)
+        val sumTile = Reg[Index]("sumTile")
+        MetaPipe (tileSize by 1, sumTile) { iv =>
+          val eB = BRAM[Index]("edgeTile", maxNumEdge) // edge list of v
+          val nvIdxB = BRAM[Index]("neighborVertIdxTile", maxNumEdgeX2) // Index to gather vertice list of neighbors of v
+          val nvB = BRAM[Index]("neighborVertTile", maxNumEdgeX2) // vertice list of v's neighbors
+          val vpt = Reg[Index]("vpt") // ptr to v's edgelist
+          val vsize = Reg[Index]("vsize") // number of edges of v
+          Pipe {
+            vpt := vB(iv,0)
+            vsize := vB(iv,1)
+          }
+          eB := edgeList(vpt::vpt+vsize)
+          Pipe (vsize by 1) { ie =>
+            val nbr = eB(ie)
+            nvIdxB(ie*2) = nbr*2
+            nvIdxB(ie*2+1) = nbr*2+1
+          }
+          nvB := vertList(nvIdxB)
+          val sumNbr = Reg[Index]("sumNbr")
+          MetaPipe (vsize by 1, sumNbr) { ie =>
+            val neB = BRAM[Index]("neighborEdgeTile", maxNumEdgeX2) // edgeList of v's neighbors
+            val nbrpt = Reg[Index]("nbrpt") // ptr to neighbor's edgelist
+            val nbrsize = Reg[Index]("nbrsize") // number of edges of neighbor
+            val cntCommon = Reg[Index]("cntCommon")
+            Pipe {
+              nbrpt := nvB(ie*2)
+              nbrsize := nvB(ie*2+1)
+            }
+            neB := edgeList(nbrpt::nbrpt+nbrsize)
+            Pipe(vsize by 1, nbrsize by 1, cntCommon) { (ixv, ixn) =>
+              mux(eB(ixv)==neB(ixn), 1.as[Index], 0.as[Index])
+            }{_+_}
+            cntCommon.value
+          }{_+_}
+          sumNbr.value
+        }{_+_}
+        sumTile.value
+      }{_+_}
 
     }
     
-    //val result = getMem(pageRank)
+    val result = getArg(count) / 6
 
     /* OptiGraph Version */
     //val t = sumOverNodes(g.nodes){ n =>
@@ -82,56 +85,52 @@ trait TrangleCounting extends DHDLApplication {
     //    else 0l
     //  }
     //}
-    /* Scala Version */ 
 
+    /* Scala Version */ 
     def commonNeighbors(n1:Rep[Index], n2:Rep[Index], vl:Rep[ForgeArray[Index]], el:Rep[ForgeArray[Index]]):Rep[Index] = {
       val n1pt = vl(n1*2)
       val n1size = vl(n1*2+1)
       val n2pt = vl(n2*2)
       val n2size = vl(n2*2+1)
-      //TODO: adding this line causes error in lms code motion. But without this line, the entire
-      //function seems code motioned away?
-      //println("size=0:" + n1size==0.as[Index] + " " + n2size==0.as[Index])
-      if (n1size==0.as[Index] || n2size==0.as[Index])
-        return 0.as[Index]
-      println("n1pt:" + n1pt + " n1size:" + n1size + " n2pt:" + n2pt + " n2size:" + n2size)
-      //var count = 0.as[Index]
-      //var n1cur = n1pt
-      //var n2cur = n2pt
-      //for (i <- 0 until (n1size + n2size)) {
-      //  print("n1cur:" + n1cur + " n2cur:" + n2cur + " count:" + count)
-      //  if (n1cur == (n1pt+n1size) || n2cur == (n2pt+n2size))
-      //    return count
-      //  if (el(n1cur) < el(n2cur))
-      //    n1cur += 1
-      //  else if (el(n1cur) > el(n2cur))
-      //    n2cur +=1
-      //  else { //n1cur == n2cur
-      //    count +=1
-      //    if (n1cur < n1pt + n1size)
-      //      n1cur += 1
-      //  }
-      //}
-      -1.as[Index]
+      if (n1size==0.as[Index] || n2size==0.as[Index]) {
+        0.as[Index]
+      } else {
+        var count = 0.as[Index]
+        var n1cur = n1pt
+        var n2cur = n2pt
+        //Can use a while loop here but try to be consistent with DHDL 
+        for (i <- 0 until (n1size + n2size)) {
+          if (n1cur < (n1pt+n1size) && n2cur < n2pt + n2size) {
+            if (el(n1cur) < el(n2cur)) {
+                n1cur += 1.as[Index]
+            } else if (el(n1cur) > el(n2cur)) {
+              if (n2cur < (n2pt+n2size))
+                n2cur +=1.as[Index]
+            } else { //n1cur == n2cur
+              count +=1.as[Index]
+                n1cur += 1.as[Index]
+            }
+          }
+        }
+        count
+      }
     }
-
     val gold = Array.tabulate(NV){ iv=>
       val pt = vl(iv*2)
       val size = vl(iv*2+1) 
       Array.tabulate(size){ i =>
         val ie = pt + i
         val nbr = el(ie)
-        val cm = if (nbr > iv) commonNeighbors(iv, nbr, vl, el)
-                 else 0.as[Index]
-        println("iv:" + iv + " nbr:" + nbr + " cm:" + cm)
+        //val cm = if (nbr > iv) commonNeighbors(iv, nbr, vl, el)
+        //         else 0.as[Index]
+        val cm = commonNeighbors(iv, nbr, vl, el)
         cm
       }.reduce{_+_}
-    }.reduce{_+_}
+    }.reduce{_+_} / 6.as[Index]
 
-    val result = count.value
     println("expected: " + gold)
     println("result: " + result)
-    //assert(result == gold)
+    assert(result == gold)
 
   }
 }

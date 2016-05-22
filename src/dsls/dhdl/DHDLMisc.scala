@@ -129,15 +129,6 @@ trait DHDLMisc {
      * @param i
      **/
     infix (API) ("apply", T, (MArray(T), Idx) :: T) implements composite ${ array_apply($0, fix_to_int($1)) }
-    /** Returns the element at the given two indices in an ForgeArray of ForgeArray
-     * @param i
-     * @param j
-     **/
-    //TODO: not sure why this curried function is not generated correctly. Manifest T is not
-    //generated in the class definition
-    //infix (API) ("apply", T, CurriedMethodSignature(List(List(MArray(MArray(T)),Idx), List(Idx)), T)) implements composite ${
-    //  array_apply(array_apply($0, fix_to_int($1)), fix_to_int($2))
-    //}
     /** Updates the array at the given index
      * @param i
      * @param x

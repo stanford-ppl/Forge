@@ -9,6 +9,7 @@ import dhdl.compiler.ops._
 
 trait UnrollingExp extends PipeStageToolsExp with LoweredOpsExp { this: DHDLExp => }
 
+// TODO: Need to handle edge cases - currently par factor must be a divider of number of iterations
 trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
   val IR: UnrollingExp
   import IR.{infix_until => _, _}
@@ -22,7 +23,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
 
     val out = (0 until P).map{p =>
       val inds2 = indices.zipWithIndex.map{case (vec,d) => vec((p / prods(d)) % Ps(d)) }
-      withSubstScope(inds -> inds2){ inlineBlock(func) }
+      withSubstScope(inds.zip(inds2):_*){ inlineBlock(func) }
     }
     (indices, out.toList)
   }
@@ -78,7 +79,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
   def unrollReduce[A:Manifest](mapBus: List[Exp[A]], rFunc: Block[A], iFunc: Block[Index], ld: Block[A], st: Block[Unit], idx: Exp[Index], res: Exp[A], rV: (Sym[A],Sym[A])) = {
     def reduce(x: Exp[A], y: Exp[A]) = withSubstScope(rV._1 -> x, rV._2 -> y){ inlineBlock(rFunc) }
 
-    val treeResult = reductionTree(mapBus, {(x,y) => reduce(x,y) }).head
+    val treeResult = reduceTree(mapBus){(x,y) => reduce(x,y) }
     val newIdx = inlineBlock(iFunc)
     val accumLoad = withSubstScope(idx -> newIdx){ inlineBlock(ld) }
     val newRes = reduce(treeResult, accumLoad)
@@ -124,15 +125,16 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
       indsO2 :::= unrolledInds
 
       if (isUnitCounterChain(ccI2)) Pipe {
-        val newIdx = inlineBlock(iFunc)
+        val newIdx = inlineBlock(iFunc) // Should be zero or always unused
         val mapReads = mapRes.map{partial => withSubstScope(part -> partial, idx -> newIdx){inlineBlock(ld1)} }
         val accRead  = withSubstScope(idx -> newIdx){ inlineBlock(ld2) }
 
-        val treeResult = reductionTree(mapReads, {(x,y) => reduce(x,y) }).head
+        val treeResult = reduceTree(mapReads){(x,y) => reduce(x,y) }
         val newRes = reduce(treeResult, accRead)
         withSubstScope(res -> newRes, idx -> newIdx){ inlineBlock(st) }
       }
       else {
+        // Unroll the reduction loop
         val Ps = parOf(ccI2)
         val P = Ps.reduce(_*_)
         val N = Ps.length
@@ -142,12 +144,25 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
         val innerBlk = reifyBlock {
           (0 until P).foreach{p =>
             val inds2 = indices.zipWithIndex.map{case (vec,d) => vec((p / prods(d)) % Ps(d)) }
-            withSubstScope(inds -> inds2){ inlineBlock(func) }
+            withSubstScope(indsInner.zip(inds2):_*){
+              val newIdx = inlineBlock(iFunc)
+              val mapReads = mapRes.map{partial => withSubstScope(part -> partial, idx -> newIdx){inlineBlock(ld1)} }
+              val accRead = withSubstScope(idx -> newIdx){ inlineBlock(ld2) }
+              val treeResult = reduceTree(mapReads){(x,y) => reduce(x,y)}
+              val newRes = reduce(treeResult, accRead)
+              withSubstScope(res -> newRes, idx -> newIdx){ inlineBlock(st) }
+            }
           }
         }
-        val innerPipe = reflectEffect(ParPipeForeach(ccI2, innerBlk, ))
+        val innerPipe = reflectEffect(ParPipeForeach(ccI2, innerBlk, indices), summarizeEffects(innerBlk).star andAlso Simple())
+        styleOf(innerPipe) = Fine
       }
     }
+    val outerPipe = reflectEffect(ParPipeReduce(ccO2, accum2, blk, indsO2, acc), summarizeEffects(blk).star andAlso Simple() andAlso Write(List(accum.asInstanceOf[Sym[C[T]]])))
+
+    // Not completely correct - reduction is now an explicit child
+    setProps(outerPipe, getProps(outerPipe))
+    outerPipe
   }
 
   override def transform[A:Manifest](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext) = rhs match {

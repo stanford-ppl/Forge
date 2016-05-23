@@ -97,6 +97,8 @@ trait PipeStageToolsExp extends EffectExp {
     case _ => false
   }
   def isPipeline(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:ParPipeForeach)  => true
+    case EatReflect(_:ParPipeReduce[_,_]) => true
     case EatReflect(_:Pipe_foreach)    => true
     case EatReflect(_:Pipe_fold[_,_])  => true
     case EatReflect(_:Accum_fold[_,_]) => true
@@ -104,6 +106,8 @@ trait PipeStageToolsExp extends EffectExp {
     case _ => false
   }
   def isLoop(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:ParPipeForeach)  => true
+    case EatReflect(_:ParPipeReduce[_,_]) => true
     case EatReflect(_:Pipe_foreach)    => true
     case EatReflect(_:Pipe_fold[_,_])  => true
     case EatReflect(_:Accum_fold[_,_]) => true

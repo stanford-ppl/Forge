@@ -10,6 +10,7 @@ trait LoweredPipeOpsExp extends EffectExp with ExternPrimitiveTypesExp {
   this: DHDLExp =>
 
   // --- Nodes
+  // TODO: Can these two be combined? Do we still need the reduce abstraction here?
   case class ParPipeForeach(
     cc: Exp[CounterChain],
     func: Block[Unit],
@@ -28,11 +29,10 @@ trait LoweredPipeOpsExp extends EffectExp with ExternPrimitiveTypesExp {
 
   // --- Mirroring
   override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = e match {
-    case e@ParPipeForeach(cc,func,i) => reflectPure(ParPipeForeach(f(cc),f(func),i)(e.ctx))(mtype(manifest[A]),pos)
-    case Reflect(e@ParPipeForeach(cc,func,i), u, es) => reflectMirrored(Reflect(ParPipeForeach(f(cc),f(func),i)(e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]),pos)
-
-    case e@ParPipeReduce(cc,a,b,i,acc) => reflectPure(ParPipeReduce(f(cc),f(a),f(b),i,acc)(e.ctx,e.mT,e.mC))(mtype(manifest[A]),pos)
-    case Reflect(e@ParPipeReduce(cc,a,b,i,acc), u, es) => reflectMirrored(Reflect(ParPipeReduce(f(cc),f(a),f(b),i,acc)(e.ctx,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case Reflect(e@ParPipeForeach(cc,b,i), u, es) =>
+      reflectMirrored(Reflect(ParPipeForeach(f(cc),f(b),i)(e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]),pos)
+    case Reflect(e@ParPipeReduce(cc,a,b,i,acc), u, es) =>
+      reflectMirrored(Reflect(ParPipeReduce(f(cc),f(a),f(b),i,acc)(e.ctx, e.mT, e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]),pos)
     case _ => super.mirror(e,f)
   }
 

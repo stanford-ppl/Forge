@@ -52,8 +52,8 @@ trait DHDLBRAMs {
       val addr = calcAddress($1, dimsOf($0))
       val ld = bram_load($0, addr)
 
-      if ($1.length == 1 && dimsOf($0) > 1 && accessIndicesOf($1.head).nonEmpty)
-        accessIndicesOf(st) = accessIndicesOf($1.head)
+      if ($1.length == 1 && dimsOf($0).length > 1 && accessIndicesOf($1.head).nonEmpty)
+        accessIndicesOf(ld) = accessIndicesOf($1.head)
       else
         accessIndicesOf(ld) = $1
       ld
@@ -64,7 +64,7 @@ trait DHDLBRAMs {
       val addr = calcAddress($1, dimsOf($0))
       val st = bram_store($0, addr, $2)
 
-      if ($1.length == 1 && dimsOf($0) > 1 && accessIndicesOf($1.head).nonEmpty)
+      if ($1.length == 1 && dimsOf($0).length > 1 && accessIndicesOf($1.head).nonEmpty)
         accessIndicesOf(st) = accessIndicesOf($1.head)
       else
         accessIndicesOf(st) = $1

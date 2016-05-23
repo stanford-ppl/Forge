@@ -12,7 +12,7 @@ trait MetaPipeRegInsertion extends SinglePassTransformer with PipeStageTools {
   val IR: DHDLExp with PipeStageToolsExp
   import IR.{assert => _, _}
 
-  debugMode = true
+  debugMode = false
 
   override def self_mirror[A](sym: Sym[A], rhs : Def[A]): Exp[A] = {
     debug(s"Mirroring $sym = $rhs")

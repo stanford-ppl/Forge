@@ -129,7 +129,7 @@ trait MemoryTemplateOpsExp extends MemoryTemplateTypesExp with ExternPrimitiveOp
 
 // Defines type remappings required in Scala gen (should be same as in library)
 trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTemplateOps {
-  val IR: ControllerTemplateOpsExp with DHDLIdentifiers
+  val IR: ControllerTemplateOpsExp with DHDLCodegenOps
   import IR._
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
@@ -144,6 +144,24 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTe
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case Vector_from_list(elems) =>
       emitValDef(sym, "Array" + elems.map(quote).mkString("(", ",", ")"))
+
+    // TODO: Unrolling instead of codegen rule for these two!
+    case e@Bram_load_vector(bram,ofs,cchain,inds) =>
+      if (dimsOf(sym).length > 1) throw new Exception("Vectors above 1 dimension unsupported")
+      val len = dimsOf(sym).map{case Exact(c) => c}.reduce(_*_)
+      stream.println("val " + quote(sym) + " = new Array[" + remap(e.mT) + "](" + len + ")")
+      emitNestedLoop(inds, cchain){
+        stream.println("val bramAddr = " + quote(ofs) + ".toInt + " + quote(inds.head) + ".toInt")
+        stream.println(quote(sym) + "(" + quote(inds.head) + ".toInt) = " + quote(bram) + "(bramAddr)")
+      }
+
+    case e@Bram_store_vector(bram,ofs,vec,cchain,inds) =>
+      if (dimsOf(vec).length > 1) throw new Exception("Vectors above 1 dimension unsupported")
+      emitNestedLoop(inds, cchain){
+        stream.println("val bramAddr = " + quote(ofs) + ".toInt + " + quote(inds.head) + ".toInt")
+        stream.println(quote(bram) + "(bramAddr) = " + quote(vec) + "(" + quote(inds.head) + ".toInt)")
+      }
+      emitValDef(sym, "()")
 
     case _ => super.emitNode(sym, rhs)
   }

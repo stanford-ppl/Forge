@@ -148,8 +148,8 @@ trait ScalaGenExternCounterOps extends ScalaGenEffect {
   }
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case e@Counter_new(start,end,step,_) =>
-      stream.println("val "+quote(sym)+" = "+quote(start)+" until "+quote(end)+" by "+quote(step))
+    case e@Counter_new(start,end,step,par) =>
+      stream.println("val "+quote(sym)+" = "+quote(start)+" until "+quote(end)+" by ("+quote(step)+" * FixedPoint[Signed,B32,B0]("+quote(par)+"))")
 
     case e@Counterchain_new(counters, nIter) =>
       emitValDef(sym, "Array(" + counters.map(quote).mkString(", ") + ")")

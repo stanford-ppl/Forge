@@ -213,6 +213,7 @@ trait DHDLDSL extends ForgeApplication
     val ParameterAnalyzer = analyzer("Parameter",isExtern=true)
     val MetaPipeRegInsertion = traversal("MetaPipeRegInsertion",isExtern=true)
 
+    val Unrolling = transformer("Unrolling", isExtern=true)
     val BRAMVectorLowering = traversal("BRAMVectorLowering", isExtern=true)
 
     importGlobalAnalysis()
@@ -243,18 +244,19 @@ trait DHDLDSL extends ForgeApplication
 
     schedule(MetaPipeRegInsertion)
 
-    schedule(IRPrinter)
-    schedule(HardStop)  // DEBUGGING
-
-
     schedule(BRAMVectorLowering)
-
+    //schedule(IRPrinter)
+    //schedule(HardStop)  // DEBUGGING
+    schedule(Unrolling)
+    schedule(IRPrinter)
+    //schedule(HardStop)  // DEBUGGING
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))
     extern(grp("ExternCounter"), targets = List($cala, dot), withTypes = true)
     extern(grp("MemoryTemplate"), targets = List($cala, dot, maxj), withTypes = true)
     extern(metadata("ExternPrimitive"), targets = List($cala, maxj), withTypes = true)
+    extern(grp("LoweredPipe"), targets = List($cala))
 		()
 	}
 }

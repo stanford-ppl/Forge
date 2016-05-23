@@ -72,11 +72,11 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
     val is = List.fill(lenOf(cchain)){ fresh[Idx] }
     val inds = indices_create(is)
 
-    val redInds = __mem.zeroIdx(accum)
-    val iBlk = reifyEffects( __mem.flatIdx(mem, redInds.toList) )
+    val redIndices = __mem.zeroIdx(accum)
+    val iBlk = reifyEffects( __mem.flatIdx(accum, redIndices) )
 
     val idx = fresh[Idx]
-    accessIndicesOf(idx) = redInds.toList
+    accessIndicesOf(idx) = indices_to_list(redIndices)
 
     // Reified map function
     val mBlk = reifyEffects( func(inds) )
@@ -210,6 +210,7 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
   }
 }
 
+// TODO: Eventually phase out in favor of lowered ops?
 trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
   val IR: ControllerTemplateOpsExp with DHDLIdentifiers
   import IR._

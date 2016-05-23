@@ -454,9 +454,12 @@ trait DHDLMath {
     // --- API
     // Scala's fold and reduce don't produce a binary tree - use these functions instead
     internal (Math) ("reduceTreeLevel", T, (SList(T), ((T,T) ==> T)) :: SList(T)) implements composite ${
-      if ($0.length == 1) $0
-      else if ($0.length % 2 == 0) reduceTreeLevel(List.tabulate($0.length/2){i => $1( $0(2*i), $0(2*i+1)) }, $1)
-      else reduceTreeLevel(List.tabulate($0.length/2){i => $1( $0(2*i), $0(2*i+1)) } :+ $0.last, $1)
+      $0.length match {
+        case len if len < 1 => stageError("Cannot reduce empty list!")
+        case 1 => $0
+        case len if len % 2 == 0 => reduceTreeLevel(List.tabulate(len/2){i => $1( $0(2*i), $0(2*i+1)) }, $1)
+        case len => reduceTreeLevel(List.tabulate(len/2){i => $1( $0(2*i), $0(2*i+1)) } :+ $0.last, $1)
+      }
     }
 
     // TODO: User facing version should actually take Vectors!

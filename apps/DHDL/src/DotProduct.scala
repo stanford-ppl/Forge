@@ -9,7 +9,7 @@ trait DotProduct extends DHDLApplication {
   type Elem = Flt //FixPt[Signed, B16, B16]
 
   override def stageArgNames = List("tileSize")
-  lazy val tileSize = param("tileSize", 4512)
+  lazy val tileSize = param("tileSize", 4)
   lazy val outerPar = param("outerPar", 2)
   lazy val innerPar = param("innerPar", 2)
   lazy val dataSize = ArgIn[SInt]("dataSize")
@@ -19,8 +19,8 @@ trait DotProduct extends DHDLApplication {
       val b1 = BRAM[Elem]("b1", tileSize)
       val b2 = BRAM[Elem]("b2", tileSize)
       Parallel {
-        b1 := v1(i::i+tileSize, param(2))
-        b2 := v2(i::i+tileSize, param(2))
+        b1 := v1(i::i+tileSize, param(1))
+        b2 := v2(i::i+tileSize, param(1))
       }
       val acc = Reg[Elem]("acc")
       Pipe.reduce(0 until tileSize par innerPar)(acc){ ii =>

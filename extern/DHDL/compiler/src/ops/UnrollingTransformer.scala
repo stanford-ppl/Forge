@@ -79,7 +79,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
     val cc2 = f(cchain)
     var inds2: List[List[Sym[Index]]] = Nil
     val blk = reifyBlock {
-      val (unrolledInds, _) = if (isOuterLoop(lhs)) unrollOuterMap(cc2, func, inds)
+      val (unrolledInds, _) = if (isOuterLoop(lhs)) unrollOuterMap(cc2, f(func), inds)
                               else                  unrollInnerMap(cc2, func, inds)
       inds2 :::= unrolledInds
     }
@@ -105,15 +105,16 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
     val Pipe_fold(cchain,accum,foldAccum,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) = rhs
     val cc = f(cchain)
     val accum2 = f(accum)
+    val func2 = f(func)
     var inds2: List[List[Sym[Index]]] = Nil
 
     val blk = if (isInnerLoop(lhs)) reifyBlock {
-      val (unrolledInds, mapRes) = unrollInnerMap(cc, func, inds)(mT)
+      val (unrolledInds, mapRes) = unrollInnerMap(cc, func2, inds)(mT)
       inds2 :::= unrolledInds
       unrollReduce(mapRes, rFunc, iFunc, ld, st, idx, res, rV)(mT)
     }
     else reifyBlock {
-      val (unrolledInds, mapRes) = unrollOuterMap(cc, func, inds)(mT)
+      val (unrolledInds, mapRes) = unrollOuterMap(cc, func2, inds)(mT)
       inds2 :::= unrolledInds
       Pipe {
         unrollReduce(mapRes, rFunc, iFunc, ld, st, idx, res, rV)(mT)
@@ -131,6 +132,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
     val ccO2 = f(ccOuter)
     val ccI2 = f(ccInner)
     val accum2 = f(accum)
+    val func2 = f(func)
     var indsO2: List[List[Sym[Index]]] = Nil
 
     def reduce(x: Exp[T], y: Exp[T]) = withSubstScope(rV._1 -> x, rV._2 -> y){ inlineBlock(rFunc)(mT) }
@@ -144,7 +146,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
     }
 
     val blk = reifyBlock {
-      val (unrolledInds, mapRes) = unrollOuterMap(ccO2, func, indsOuter)
+      val (unrolledInds, mapRes) = unrollOuterMap(ccO2, func2, indsOuter)
       indsO2 :::= unrolledInds
 
       if (isUnitCounterChain(ccI2)) Pipe { unrollLoadReduce(mapRes) }

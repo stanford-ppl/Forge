@@ -20,8 +20,10 @@ trait LoweredPipeOpsExp extends EffectExp with ExternPrimitiveTypesExp {
     cc: Exp[CounterChain],
     accum: Exp[C[T]],
     func: Block[Unit],
+    rFunc: Block[T],
     inds: List[List[Sym[FixPt[Signed,B32,B0]]]],
-    acc: Sym[C[T]]
+    acc: Sym[C[T]],
+    rV: (Sym[T], Sym[T])
   )(implicit val ctx: SourceContext, val mT: Manifest[T], val mC: Manifest[C[T]]) extends Def[Pipeline]
 
   // --- Internal API
@@ -31,30 +33,30 @@ trait LoweredPipeOpsExp extends EffectExp with ExternPrimitiveTypesExp {
     case e@ParPipeForeach(cc,func,i) => reflectPure(ParPipeForeach(f(cc),f(func),i)(e.ctx))(mtype(manifest[A]),pos)
     case Reflect(e@ParPipeForeach(cc,func,i), u, es) => reflectMirrored(Reflect(ParPipeForeach(f(cc),f(func),i)(e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]),pos)
 
-    case e@ParPipeReduce(cc,a,b,i,acc) => reflectPure(ParPipeReduce(f(cc),f(a),f(b),i,acc)(e.ctx,e.mT,e.mC))(mtype(manifest[A]),pos)
-    case Reflect(e@ParPipeReduce(cc,a,b,i,acc), u, es) => reflectMirrored(Reflect(ParPipeReduce(f(cc),f(a),f(b),i,acc)(e.ctx,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case e@ParPipeReduce(cc,a,b,r,i,acc,rV) => reflectPure(ParPipeReduce(f(cc),f(a),f(b),f(r),i,acc,rV)(e.ctx,e.mT,e.mC))(mtype(manifest[A]),pos)
+    case Reflect(e@ParPipeReduce(cc,a,b,r,i,acc,rV), u, es) => reflectMirrored(Reflect(ParPipeReduce(f(cc),f(a),f(b),f(r),i,acc,rV)(e.ctx,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e,f)
   }
 
   // --- Dependencies
   override def syms(e: Any): List[Sym[Any]] = e match {
     case ParPipeForeach(cc,func,inds) => syms(cc) ::: syms(func)
-    case ParPipeReduce(cc,accum,func,inds,acc) => syms(cc) ::: syms(accum) ::: syms(func)
+    case ParPipeReduce(cc,accum,func,rFunc,inds,acc,rV) => syms(cc) ::: syms(accum) ::: syms(func) ::: syms(rFunc)
     case _ => super.syms(e)
   }
   override def readSyms(e: Any): List[Sym[Any]] = e match {
     case ParPipeForeach(cc,func,inds) => readSyms(cc) ::: readSyms(func)
-    case ParPipeReduce(cc,accum,func,inds,acc) => readSyms(cc) ::: readSyms(accum) ::: readSyms(func)
+    case ParPipeReduce(cc,accum,func,rFunc,inds,acc,rV) => readSyms(cc) ::: readSyms(accum) ::: readSyms(func) ::: readSyms(rFunc)
     case _ => super.readSyms(e)
   }
   override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {
     case ParPipeForeach(cc,func,inds) => freqNormal(cc) ::: freqNormal(func)
-    case ParPipeReduce(cc,accum,func,inds,acc) => freqNormal(cc) ::: freqNormal(accum) ::: freqNormal(func)
+    case ParPipeReduce(cc,accum,func,rFunc,inds,acc,rV) => freqNormal(cc) ::: freqNormal(accum) ::: freqNormal(func) ::: freqNormal(rFunc)
     case _ => super.symsFreq(e)
   }
   override def boundSyms(e: Any): List[Sym[Any]] = e match {
     case ParPipeForeach(cc,func,inds) => inds.flatten ::: effectSyms(func)
-    case ParPipeReduce(cc,accum,func,inds,acc) => inds.flatten ::: effectSyms(func) ::: List(acc)
+    case ParPipeReduce(cc,accum,func,rFunc,inds,acc,rV) => inds.flatten ::: effectSyms(func) ::: effectSyms(rFunc) ::: List(acc, rV._1, rV._2)
     case _ => super.boundSyms(e)
   }
 }
@@ -79,7 +81,7 @@ trait ScalaGenLoweredPipeOps extends ScalaGenEffect {
       emitParallelizedLoop(inds, cchain){ emitBlock(func) }
       emitValDef(sym, "()")
 
-    case e@ParPipeReduce(cchain, accum, func, inds, acc) =>
+    case e@ParPipeReduce(cchain, accum, func, rFunc, inds, acc, rV) =>
       emitValDef(acc, quote(accum))
       emitParallelizedLoop(inds, cchain){ emitBlock(func) }
       emitValDef(sym, "()")

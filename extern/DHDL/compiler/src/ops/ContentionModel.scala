@@ -17,11 +17,8 @@ trait ContentionModel {
   val isolatedContention = HashMap[Exp[Any],List[Int]]()
 
   def outerContention(x: Exp[Any], P: => Int): Int = {
-    if (styleOf(x) != Fine) {
+    if (styleOf(x) != Fine && childrenOf(x).nonEmpty) {
       val ics = childrenOf(x).map{c => calcContention(c) * P}
-
-      if (ics.isEmpty) stageError(s"Controller $x has no children!")
-
       isolatedContention(x) = ics
       if (styleOf(x) == Coarse) ics.sum else ics.max
     }
@@ -42,7 +39,7 @@ trait ContentionModel {
 
   def markPipe(x: Exp[Any], parent: Int) {
     if (styleOf(x) == Coarse) childrenOf(x).foreach{child => markContention(child,parent) }
-    else if (styleOf(x) == Disabled) {
+    else if (styleOf(x) == Disabled && childrenOf(x).nonEmpty) {
       val ics = isolatedContention(x)
       val mx = ics.max
       // Can just skip case where mx = 0 - no offchip memory accesses in this sequential anyway

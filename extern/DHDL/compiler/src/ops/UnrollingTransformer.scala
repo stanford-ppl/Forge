@@ -51,7 +51,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
 
       (0 until P).foreach{p =>
         subst = dupSubst(p)
-        val mirroredStage = self_mirror(s,d)
+        val mirroredStage = clone(s,d)
         subst += s -> mirroredStage
         if (isResult) out ::= mirroredStage.asInstanceOf[Exp[A]]
         dupSubst(p) = subst
@@ -65,7 +65,21 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
     focusBlock(func){
       focusExactScope(func){ stms =>
         stms.foreach {
-          case TP(s,d) if isControlNode(s) && P > 1 => Parallel { duplicateStage(s,d, s==origResult) }
+          case TP(s,d) if isControlNode(s) && P > 1 =>
+            val parBlk = reifyBlock { duplicateStage(s,d, s==origResult) }
+            val parStage = reflectEffect(Pipe_parallel(parBlk), summarizeEffects(parBlk) andAlso Simple())
+            styleOf(parStage) = ForkJoin
+
+            // Make sure later stages depend on the Parallel, not the inner controller
+            // (required to avoid effects ordering issues)
+            // Note that this assumes that control nodes have no meaningful return value (i.e. all are Pipeline or Unit)
+            (0 until P).foreach{p =>
+              var sub = dupSubst(p)
+              sub += s -> parStage
+              dupSubst(p) = sub
+            }
+
+          // Copy statements, tracking each copy independently in each branch of the duplication
           case TP(s,d) => duplicateStage(s,d, s==origResult)
         }
       }
@@ -84,6 +98,10 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
       inds2 :::= unrolledInds
     }
     val newPipe = reflectEffect(ParPipeForeach(cc2, blk, inds2), summarizeEffects(blk).star andAlso Simple())
+
+    val Def(d) = newPipe
+    debug(s"$newPipe = $d")
+
     setProps(newPipe, getProps(lhs))
     newPipe
   }
@@ -120,7 +138,11 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
         unrollReduce(mapRes, rFunc, iFunc, ld, st, idx, res, rV)(mT)
       }
     }
-    val newPipe = reflectEffect(ParPipeReduce(cc, accum2, blk, inds2, acc)(ctx,mT,mC))
+    val newPipe = reflectEffect(ParPipeReduce(cc, accum2, blk, f(rFunc), inds2, acc, rV)(ctx,mT,mC))
+
+    val Def(d) = newPipe
+    debug(s"$newPipe = $d")
+
     setProps(newPipe, getProps(lhs))
     newPipe
   }
@@ -149,7 +171,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
       val (unrolledInds, mapRes) = unrollOuterMap(ccO2, func2, indsOuter)
       indsO2 :::= unrolledInds
 
-      if (isUnitCounterChain(ccI2)) Pipe { unrollLoadReduce(mapRes) }
+      if (isUnitCounterChain(ccI2)) withSubstScope(acc -> accum2){ Pipe { unrollLoadReduce(mapRes) } }
       else {
         // Unroll the reduction loop
         val Ps = parsOf(ccI2)
@@ -164,15 +186,60 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
             withSubstScope(indsInner.zip(inds2):_*){ unrollLoadReduce(mapRes) }
           }
         }
-        val innerPipe = reflectEffect(ParPipeForeach(ccI2, innerBlk, indices), summarizeEffects(innerBlk).star andAlso Simple())
+        val innerPipe = reflectEffect(ParPipeReduce(ccI2, accum2, innerBlk, rFunc, indices, acc, rV), summarizeEffects(innerBlk).star andAlso Simple() andAlso Write(List(accum2.asInstanceOf[Sym[C[T]]])) )
         styleOf(innerPipe) = Fine
       }
     }
-    val outerPipe = reflectEffect(ParPipeReduce(ccO2, accum2, blk, indsO2, acc), summarizeEffects(blk).star andAlso Simple() andAlso Write(List(accum.asInstanceOf[Sym[C[T]]])))
+    val newPipe = reflectEffect(ParPipeForeach(ccO2, blk, indsO2), summarizeEffects(blk).star andAlso Simple() )
+
+    val Def(d) = newPipe
+    debug(s"$newPipe = $d")
 
     // Not completely correct - reduction is now an explicit child
-    setProps(outerPipe, getProps(outerPipe))
-    outerPipe
+    setProps(newPipe, getProps(newPipe))
+    newPipe
+  }
+
+  // Similar to self_mirror, but also duplicates bound vars
+  // TODO: Push down to transformers? Can this be generalized somehow?
+  def clone[A](sym: Sym[A], rhs : Def[A]): Exp[A] = {
+    val sym2 = clone(rhs)(mtype(sym.tp), mpos(sym.pos))
+    setProps(sym2, getProps(sym))
+
+    sym2 match {
+      case Def(d) => debug(s"$sym2 = $d")
+      case _ => debug(s"$sym2")
+    }
+    sym2
+  }
+
+  def clone[A:Manifest](rhs: Def[A])(implicit pos: SourceContext): Exp[A] = (rhs match {
+    case Reflect(e@ParPipeForeach(cc,b,i), u, es) =>
+      val i2 = i.map{is => is.map{index => fresh[FixPt[Signed,B32,B0]] }}
+      val b2 = withSubstScope(i.flatten.zip(i2.flatten):_*){ f(b) }
+      reflectMirrored(Reflect(ParPipeForeach(f(cc), b2, i2)(e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+      //reflectEffect(ParPipeForeach(f(cc), b2, i2)(e.ctx), summarizeEffects(b2).star andAlso Simple())
+
+    case Reflect(e@ParPipeReduce(cc,a,b,rF,i,acc,rV), u, es) =>
+      val a2 = f(a)
+      val i2 = i.map{ix => ix.map{u => fresh[FixPt[Signed,B32,B0]] }}
+      val acc2 = reflectMutableSym(fresh(List(e.ctx))(e.mC))
+      val rV2 = (fresh(List(e.ctx))(e.mT), fresh(List(e.ctx))(e.mT))
+      val b2 = withSubstScope( (i.flatten.zip(i2.flatten) ++ List(acc -> acc2)):_*) { f(b) }
+      val rF2 = withSubstScope(rV._1 -> rV2._1, rV._2 -> rV2._2){ f(rF) }
+      //reflectMirrored(Reflect(ParPipeReduce(f(cc),a2,b2,rF2,i2,acc2,rV2)(e.ctx,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+      reflectEffect(ParPipeReduce(f(cc),a2,b2,rF2,i2,acc2,rV2)(e.ctx,e.mT,e.mC), summarizeEffects(b2).star andAlso Simple())
+
+    case _ => mirror(rhs, f.asInstanceOf[Transformer])(mtype(manifest[A]), pos)
+  }).asInstanceOf[Exp[A]]
+
+  override def self_mirror[A](sym: Sym[A], rhs : Def[A]): Exp[A] = {
+    val sym2 = super.self_mirror(sym,rhs)
+    sym2 match {
+      case Def(d) => debug(s"$sym2 = $d")
+      case _ => debug(s"$sym2")
+    }
+    sym2
   }
 
   override def transform[A:Manifest](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext) = rhs match {

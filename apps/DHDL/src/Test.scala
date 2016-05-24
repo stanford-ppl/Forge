@@ -8,30 +8,35 @@ trait Test extends DHDLApplication {
 
   def main() {
     type Q16 = FixPt[Signed, B16, B16]
+    type A = SInt
 
     val N = 24
     val T = 6
     val PN = param(2)
-    val PT = param(2)
-    val v1 = OffChipMem[Q16]("v1", N)
-    val out = ArgOut[Q16]("out")
-    //val vec1 = Array.fill(N)(random[Q16](10))
-    //setMem(v1, vec1)
+    val PT = param(1)
+    val v1 = OffChipMem[A]("v1", N)
+    val out = ArgOut[A]("out")
+
+    val vec1 = Array.fill(N)(random[A](10))
+    setMem(v1, vec1)
 
     Accel {
-      val b1 = BRAM[Q16]("b1", N)
-
       Pipe.fold(N by T par PN)(out){i =>
+        val b1 = BRAM[A]("b1", N)
         b1 := v1(i::i+T)
-        Pipe.reduce(T par PT)(Reg[Q16]){ii => b1(ii) }{_+_}
+        Pipe.reduce(T par PT)(Reg[A]){ii =>
+          println(ii + ": " + b1(ii))
+          b1(ii)
+        }{_+_}
       }{_+_}
       ()
     }
-    /*println("vec1: " + vec1.mkString(", "))
+
+    println("vec1: " + vec1.mkString(", "))
+
     val result = getArg(out)
     println("result: " + result.mkString)
-
     val gold = vec1.reduce{_+_}
-    println("gold: " + gold.mkString)*/
+    println("gold: " + gold.mkString)
   }
 }

@@ -10,6 +10,7 @@ trait LoweredPipeOpsExp extends EffectExp with ExternPrimitiveTypesExp {
   this: DHDLExp =>
 
   // --- Nodes
+  // TODO: Can these two be combined? Do we still need the reduce abstraction here?
   case class ParPipeForeach(
     cc: Exp[CounterChain],
     func: Block[Unit],

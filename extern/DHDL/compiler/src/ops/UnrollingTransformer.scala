@@ -79,7 +79,6 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
               dupSubst(p) = sub
             }
 
-          // Copy statements, tracking each copy independently in each branch of the duplication
           case TP(s,d) => duplicateStage(s,d, s==origResult)
         }
       }
@@ -138,6 +137,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
         unrollReduce(mapRes, rFunc, iFunc, ld, st, idx, res, rV)(mT)
       }
     }
+
     val newPipe = reflectEffect(ParPipeReduce(cc, accum2, blk, f(rFunc), inds2, acc, rV)(ctx,mT,mC))
 
     val Def(d) = newPipe
@@ -218,7 +218,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
       val i2 = i.map{is => is.map{index => fresh[FixPt[Signed,B32,B0]] }}
       val b2 = withSubstScope(i.flatten.zip(i2.flatten):_*){ f(b) }
       reflectMirrored(Reflect(ParPipeForeach(f(cc), b2, i2)(e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
-      //reflectEffect(ParPipeForeach(f(cc), b2, i2)(e.ctx), summarizeEffects(b2).star andAlso Simple())
+     //reflectEffect(ParPipeForeach(f(cc), b2, i2)(e.ctx), summarizeEffects(b2).star andAlso Simple())
 
     case Reflect(e@ParPipeReduce(cc,a,b,rF,i,acc,rV), u, es) =>
       val a2 = f(a)

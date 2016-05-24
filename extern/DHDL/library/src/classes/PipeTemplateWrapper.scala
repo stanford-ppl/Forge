@@ -15,19 +15,19 @@ trait ControllerTemplateWrapper {
   def loop(cchain: Rep[CounterChain], idx: Int, indices: List[FixPt[Signed,B32,B0]], func: Rep[Indices] => Rep[Unit]): Rep[Unit] = {
     val ctr = cchain(idx)
     if (idx >= cchain.length - 1) {
-      for (i <- ctr) { func(indices_create(indices :+ i)) }
+      for (i <- ctr) { func(indices_create(indices :+ i.head)) }
     }
     else {
-      for (i <- ctr) { loop(cchain, idx+1, indices :+ i, func) }
+      for (i <- ctr) { loop(cchain, idx+1, indices :+ i.head, func) }
     }
   }
   def loopList(cchain: Rep[CounterChain], idx: Int, indices: List[FixPt[Signed,B32,B0]], func: List[Rep[FixPt[Signed,B32,B0]]] => Rep[Unit]): Rep[Unit] = {
     val ctr = cchain(idx)
     if (idx >= cchain.length - 1) {
-      for (i <- ctr) { func(indices :+ i) }
+      for (i <- ctr) { func(indices :+ i.head) }
     }
     else {
-      for (i <- ctr) { loopList(cchain, idx+1, indices :+ i, func) }
+      for (i <- ctr) { loopList(cchain, idx+1, indices :+ i.head, func) }
     }
   }
 

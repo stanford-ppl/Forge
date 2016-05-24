@@ -49,7 +49,7 @@ trait FixedPointEmulation {
   case class FixedPointRange[S:Manifest,I:Manifest,F:Manifest](start: FixedPoint[S,I,F], end: FixedPoint[S,I,F], step: FixedPoint[S,I,F], par: Int) {
     private val parStep = FixedPoint[S,I,F](par)
     private val fullStep = parStep * step
-    private val vecOffsets = Array.tabulate(par){p => FixedPoint[S,I,F](p) * parStep}
+    private val vecOffsets = Array.tabulate(par){p => FixedPoint[S,I,F](p) * step}
 
     def foreach(func: Array[FixedPoint[S,I,F]] => Unit) = {
       var i = start
@@ -59,7 +59,7 @@ trait FixedPointEmulation {
         i += fullStep
       }
     }
-    def by(s: FixedPoint[S,I,F]) = FixedPointRange[S,I,F](start, end, s)
+    def by(s: FixedPoint[S,I,F]) = FixedPointRange[S,I,F](start, end, s, 1)
     def par(p: Int) = FixedPointRange[S,I,F](start, end, step, p)
     def len = (end - start)/step
   }
@@ -132,7 +132,7 @@ trait FixedPointEmulation {
 
     def until(that: FixedPoint[S,I,F]) = {
       check(this.rep, that.rep)
-      FixedPointRange(this, that, FixedPoint[S,I,F](1))
+      FixedPointRange(this, that, FixedPoint[S,I,F](1), 1)
     }
   }
 

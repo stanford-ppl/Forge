@@ -25,7 +25,7 @@ trait Test extends DHDLApplication {
         val b1 = BRAM[A]("b1", N)
         b1 := v1(i::i+T)
         Pipe.reduce(T par PT)(Reg[A]){ii =>
-          println(ii + ": " + b1(ii))
+          println(i + ", " + ii + ": " + b1(ii))
           b1(ii)
         }{_+_}
       }{_+_}

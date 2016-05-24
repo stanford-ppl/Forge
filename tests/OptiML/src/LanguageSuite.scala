@@ -8,10 +8,10 @@ object SumRunnerC extends OptiMLApplicationCompiler with ForgeTestRunnerCompiler
 trait Sum extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
-		val x = sum(0,10) { i =>
-			i*2
-		}
-		collect(x == 90)
+    val x = sum(0,10) { i =>
+      i*2
+    }
+    collect(x == 90)
     mkReport
   }
 }
@@ -24,7 +24,7 @@ trait SumIf extends ForgeTestModule with OptiMLApplication {
     val y = DenseVector(true, false, true, false, true, false, false, false, true, true)
     val x = sumIf(0,10) { y(_) } { i => DenseVector.ones(5) }
     //x.pprint
-		collect(x == DenseVector(5.0, 5.0, 5.0, 5.0, 5.0))
+    collect(x == DenseVector(5.0, 5.0, 5.0, 5.0, 5.0))
     mkReport
   }
 }
@@ -34,10 +34,10 @@ trait SumIf extends ForgeTestModule with OptiMLApplication {
 // trait AggregateIf extends ForgeTestModule with OptiMLApplication {
 //   def main() = {
 
-// 		val x = aggregateIf(0, 10) { i => i > 4 } { i =>
-// 			i*2
-// 		}
-// 		collect(x == DenseVector(10, 12, 14, 16, 18))
+//     val x = aggregateIf(0, 10) { i => i > 4 } { i =>
+//       i*2
+//     }
+//     collect(x == DenseVector(10, 12, 14, 16, 18))
 //     mkReport
 //   }
 // }
@@ -73,8 +73,8 @@ object IndexVectorConstructRunnerC extends OptiMLApplicationCompiler with ForgeT
 trait IndexVectorConstruct extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
-		val x = (0::10) { i => i*2 }
-		collect(x == DenseVector(0,2,4,6,8,10,12,14,16,18))
+    val x = (0::10) { i => i*2 }
+    collect(x == DenseVector(0,2,4,6,8,10,12,14,16,18))
     mkReport
   }
 }
@@ -84,11 +84,11 @@ object IndexVectorConstruct2RunnerC extends OptiMLApplicationCompiler with Forge
 trait IndexVectorConstruct2 extends ForgeTestModule with OptiMLApplication {
   def main() = {
 
-		val x = (0::10, *) { i => DenseVector.ones(2) * i	}
-		collect(x == DenseMatrix(DenseVector(0.0,0.0), DenseVector(1.0,1.0), DenseVector(2.0,2.0), DenseVector(3.0,3.0), DenseVector(4.0,4.0), DenseVector(5.0,5.0), DenseVector(6.0, 6.0), DenseVector(7.0,7.0), DenseVector(8.0,8.0), DenseVector(9.0,9.0)))
+    val x = (0::10, *) { i => DenseVector.ones(2) * i  }
+    collect(x == DenseMatrix(DenseVector(0.0,0.0), DenseVector(1.0,1.0), DenseVector(2.0,2.0), DenseVector(3.0,3.0), DenseVector(4.0,4.0), DenseVector(5.0,5.0), DenseVector(6.0, 6.0), DenseVector(7.0,7.0), DenseVector(8.0,8.0), DenseVector(9.0,9.0)))
 
-		val y = (0::2, 0::3) { (i,j) =>	i*j	}
-		collect(y == DenseMatrix(DenseVector(0,0,0),DenseVector(0,1,2)))
+    val y = (0::2, 0::3) { (i,j) =>  i*j  }
+    collect(y == DenseMatrix(DenseVector(0,0,0),DenseVector(0,1,2)))
 
     mkReport
   }

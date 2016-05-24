@@ -21,13 +21,13 @@ trait DenseMatrixViewOps {
 
     val DenseMatrixViewOps = withTpe(DenseMatrixView)
     DenseMatrixViewOps {
-      compiler ("densematrixview_data") (Nil :: MArray(T)) implements getter(0, "_data")
-      compiler ("densematrixview_startrow") (Nil :: MInt) implements getter(0, "_startRow")
-      compiler ("densematrixview_endrow") (Nil :: MInt) implements getter(0, "_endRow")
-      compiler ("densematrixview_startcol") (Nil :: MInt) implements getter(0, "_startCol")
-      compiler ("densematrixview_endcol") (Nil :: MInt) implements getter(0, "_endCol")
-      compiler ("densematrixview_srcnumrows") (Nil :: MInt) implements getter(0, "_srcNumRows")
-      compiler ("densematrixview_srcnumcols") (Nil :: MInt) implements getter(0, "_srcNumCols")
+      internal ("densematrixview_data") (Nil :: MArray(T)) implements getter(0, "_data")
+      internal ("densematrixview_startrow") (Nil :: MInt) implements getter(0, "_startRow")
+      internal ("densematrixview_endrow") (Nil :: MInt) implements getter(0, "_endRow")
+      internal ("densematrixview_startcol") (Nil :: MInt) implements getter(0, "_startCol")
+      internal ("densematrixview_endcol") (Nil :: MInt) implements getter(0, "_endCol")
+      internal ("densematrixview_srcnumrows") (Nil :: MInt) implements getter(0, "_srcNumRows")
+      internal ("densematrixview_srcnumcols") (Nil :: MInt) implements getter(0, "_srcNumCols")
 
       infix ("numRows") (Nil :: MInt) implements composite ${ densematrixview_endrow($self) - densematrixview_startrow($self) }
       infix ("numCols") (Nil :: MInt) implements composite ${ densematrixview_endcol($self) - densematrixview_startcol($self) }
@@ -85,8 +85,8 @@ trait DenseMatrixViewOps {
         val (r,c) = unpack(matrix_shapeindex($1, $self.numCols))
         $self(r,c)
       }
-      compiler ("densematrixview_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("DenseMatrixViews cannot be allocated from a parallel op") }
-      compiler ("densematrixview_illegalupdate") ((MInt, T) :: MNothing, effect = simple) implements composite ${ fatal("DenseMatrixViews cannot be updated") }
+      internal ("densematrixview_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("DenseMatrixViews cannot be allocated from a parallel op") }
+      internal ("densematrixview_illegalupdate") ((MInt, T) :: MNothing, effect = simple) implements composite ${ fatal("DenseMatrixViews cannot be updated") }
 
       parallelize as ParallelCollection(T, lookupOp("densematrixview_illegalalloc"), lookupOp("size"), lookupOp("densematrixview_raw_apply"), lookupOp("densematrixview_illegalupdate"))
     }

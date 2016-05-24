@@ -12,3 +12,5 @@ trait ScalaGenLambdaOps extends ScalaGenFunctions
 trait CGenLambdaOps extends CGenFunctions
 trait CudaGenLambdaOps extends CudaGenFunctions
 trait OpenCLGenLambdaOps extends OpenCLGenFunctions
+trait DotGenLambdaOps
+trait MaxJGenLambdaOps

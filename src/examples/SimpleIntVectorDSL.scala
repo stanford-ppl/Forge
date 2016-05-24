@@ -24,10 +24,10 @@ trait SimpleIntVectorDSL extends ForgeApplication {
 
     val VectorOps = withTpe (Vector)
     VectorOps {
-      compiler ("vector_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_data")
-      compiler ("vector_set_raw_data") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
+      internal ("vector_raw_data") (Nil :: MArray(MInt)) implements getter(0, "_data")
+      internal ("vector_set_raw_data") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_data", quotedArg(1))
       infix ("length") (Nil :: MInt) implements getter(0, "_length")
-      compiler ("vector_set_length") (MInt :: MUnit, effect = write(0)) implements setter(0, "_length", quotedArg(1))
+      internal ("vector_set_length") (MInt :: MUnit, effect = write(0)) implements setter(0, "_length", quotedArg(1))
 
       infix ("apply") (MInt :: MInt) implements composite ${ array_apply(vector_raw_data($self), $1) }
       infix ("update") ((("i",MInt),("e",MInt)) :: MUnit, effect = write(0)) implements composite ${
@@ -53,21 +53,21 @@ trait SimpleIntVectorDSL extends ForgeApplication {
         $self.insert($self.length, $2)
       }
 
-      compiler ("vector_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
+      internal ("vector_insertspace") ((("pos",MInt),("len",MInt)) :: MUnit, effect = write(0)) implements single ${
         vector_ensureextra($self,$len)
         val data = vector_raw_data($self)
         array_copy(data,$pos,data,$pos+$len,$self.length-$pos)
         vector_set_length($self,$self.length+$len)
       }
 
-      compiler ("vector_ensureextra") (("extra",MInt) :: MUnit, effect = write(0)) implements single ${
+      internal ("vector_ensureextra") (("extra",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = vector_raw_data($self)
         if (array_length(data) - $self.length < $extra) {
           vector_realloc($self, $self.length+$extra)
         }
       }
 
-      compiler ("vector_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
+      internal ("vector_realloc") (("minLen",MInt) :: MUnit, effect = write(0)) implements single ${
         val data = vector_raw_data($self)
         var n = Math.max(unit(4), array_length(data)*2).toInt
         while (n < $minLen) n = n*2
@@ -99,11 +99,11 @@ trait SimpleIntVectorDSL extends ForgeApplication {
 
 
       // parallel collectionification
-      compiler ("vector_raw_alloc") (MInt :: Vector) implements single ${
+      internal ("vector_raw_alloc") (MInt :: Vector) implements single ${
         Vector($1)
       }
-      compiler ("vector_appendable") ((MInt,MInt) :: MBoolean) implements single("true")
-      compiler ("vector_copy") ((MInt,Vector,MInt,MInt) :: MUnit, effect = write(2)) implements single ${
+      internal ("vector_appendable") ((MInt,MInt) :: MBoolean) implements single("true")
+      internal ("vector_copy") ((MInt,Vector,MInt,MInt) :: MUnit, effect = write(2)) implements single ${
         val src = vector_raw_data($self)
         val dest = vector_raw_data($2)
         array_copy(src, $1, dest, $3, $4)

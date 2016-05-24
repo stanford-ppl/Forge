@@ -49,7 +49,7 @@ trait TreeOps {
         ("_impurity", MArray(MDouble)),    // impurity(i) is the value of the splitting criterion for node i
         ("_numNodeSamples", MArray(MInt))) // numNodeSamples(i) is the number of training samples reaching node i
 
-    compiler (Tree) ("alloc_tree", Nil, ("initCapacity", MInt) :: Tree, effect = mutable) implements allocates(Tree,
+    internal (Tree) ("alloc_tree", Nil, ("initCapacity", MInt) :: Tree, effect = mutable) implements allocates(Tree,
       ${unit(0)},
       ${initCapacity},
       ${array_empty[Boolean](initCapacity)},
@@ -93,37 +93,37 @@ trait TreeOps {
     TreeOps {
       // getters and setters
       infix ("numNodes") (Nil :: MInt) implements getter(0, "_numNodes")
-      compiler ("infix_set_num_nodes") (MInt :: MUnit, effect = write(0)) implements setter(0, "_numNodes", ${$1})
+      internal ("infix_set_num_nodes") (MInt :: MUnit, effect = write(0)) implements setter(0, "_numNodes", ${$1})
 
       infix ("capacity") (Nil :: MInt) implements getter(0, "_capacity")
-      compiler ("infix_set_capacity") (MInt :: MUnit, effect = write(0)) implements setter(0, "_capacity", ${$1})
+      internal ("infix_set_capacity") (MInt :: MUnit, effect = write(0)) implements setter(0, "_capacity", ${$1})
 
       infix("isLeaf") (Nil :: MArray(MBoolean)) implements getter(0, "_isLeaf")
-      compiler ("infix_set_is_leaf") (MArray(MBoolean) :: MUnit, effect = write(0)) implements setter(0, "_isLeaf", ${$1})
+      internal ("infix_set_is_leaf") (MArray(MBoolean) :: MUnit, effect = write(0)) implements setter(0, "_isLeaf", ${$1})
 
       infix ("leftChildren") (Nil :: MArray(MInt)) implements getter(0, "_leftChildren")
-      compiler ("infix_set_left_children") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_leftChildren", ${$1})
+      internal ("infix_set_left_children") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_leftChildren", ${$1})
 
       infix ("rightChildren") (Nil :: MArray(MInt)) implements getter(0, "_rightChildren")
-      compiler ("infix_set_right_children") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_rightChildren", ${$1})
+      internal ("infix_set_right_children") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_rightChildren", ${$1})
 
       infix ("feature") (Nil :: MArray(MInt)) implements getter(0, "_feature")
-      compiler ("infix_set_feature") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_feature", ${$1})
+      internal ("infix_set_feature") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_feature", ${$1})
 
       infix ("threshold") (Nil :: MArray(MDouble)) implements getter(0, "_threshold")
-      compiler ("infix_set_threshold") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_threshold", ${$1})
+      internal ("infix_set_threshold") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_threshold", ${$1})
 
       infix ("value") (Nil :: MArray(MDouble)) implements getter(0, "_value")
-      compiler ("infix_set_value") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_value", ${$1})
+      internal ("infix_set_value") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_value", ${$1})
 
       infix ("prob") (Nil :: MArray(MDouble)) implements getter(0, "_prob")
       compiler ("infix_set_prob") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_prob", ${$1})
 
       infix ("impurity") (Nil :: MArray(MDouble)) implements getter(0, "_impurity")
-      compiler ("infix_set_impurity") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_impurity", ${$1})
+      internal ("infix_set_impurity") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_impurity", ${$1})
 
       infix ("numNodeSamples") (Nil :: MArray(MInt)) implements getter(0, "_numNodeSamples")
-      compiler ("infix_set_num_node_samples") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_numNodeSamples", ${$1})
+      internal ("infix_set_num_node_samples") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_numNodeSamples", ${$1})
 
       // Adds a node to the tree. The new node registers itself as the child of its parent.
       infix ("addNode") (MethodSignature(List(
@@ -158,7 +158,7 @@ trait TreeOps {
       }
     }
 
-    compiler (Tree) ("tree_realloc", Nil, (("tree", Tree), ("minCapacity", MInt)) :: MUnit, effect = write(0)) implements composite ${
+    internal (Tree) ("tree_realloc", Nil, (("tree", Tree), ("minCapacity", MInt)) :: MUnit, effect = write(0)) implements composite ${
       var n = max(4, tree.capacity * 2)
       while (n < minCapacity) n = n*2
 
@@ -201,7 +201,7 @@ trait TreeOps {
       tree.set_capacity(n)
     }
 
-    compiler (Tree) ("init_tree", Nil, ("maxDepth", MInt) :: Tree) implements composite ${
+    internal (Tree) ("init_tree", Nil, ("maxDepth", MInt) :: Tree) implements composite ${
       val initCapacity =
         if (maxDepth <= 10) (pow(2.0, maxDepth+1.0) - 1).toInt
         else 2047
@@ -306,7 +306,7 @@ trait TreeOps {
       tree.unsafeImmutable
     }
 
-    compiler (Tree) ("tree_split", Nil, MethodSignature(List(("tree", Tree), ("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector), ("maxNumFeatures", MInt), ("impurity", MDouble), ("constantFeatures", DenseVector(MBoolean)), ("criterion", TCriterion)), Tup7(IndexVector,MInt,MDouble,MInt,MDouble,MDouble,DenseVector(MBoolean)))) implements composite ${
+    internal (Tree) ("tree_split", Nil, MethodSignature(List(("tree", Tree), ("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector), ("maxNumFeatures", MInt), ("impurity", MDouble), ("constantFeatures", DenseVector(MBoolean)), ("criterion", TCriterion)), Tup7(IndexVector,MInt,MDouble,MInt,MDouble,MDouble,DenseVector(MBoolean)))) implements composite ${
       fassert(samples.length > 1, "samples to split must be at least 2")
 
       // constants
@@ -388,7 +388,7 @@ trait TreeOps {
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Impurity Criterion
 
-    compiler (Tree) ("compute_impurity_improvement", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("impurity", MDouble), ("samples", IndexVector), ("splitPos", MInt), ("criterion", TCriterion)) :: Tup3(MDouble,MDouble,MDouble)) implements composite ${
+    internal (Tree) ("compute_impurity_improvement", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("impurity", MDouble), ("samples", IndexVector), ("splitPos", MInt), ("criterion", TCriterion)) :: Tup3(MDouble,MDouble,MDouble)) implements composite ${
       val leftSamples = samples(0::splitPos)
       val rightSamples = samples(splitPos::samples.length)
 
@@ -401,7 +401,7 @@ trait TreeOps {
       pack((improvement, impurityLeft, impurityRight))
     }
 
-    compiler (Tree) ("compute_impurity", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector), ("criterion", TCriterion)) :: MDouble) implements composite ${
+    internal (Tree) ("compute_impurity", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector), ("criterion", TCriterion)) :: MDouble) implements composite ${
       criterion match {
         case MSE => impurity_mse(trainingSet, samples)
         case Gini => impurity_gini(trainingSet, samples)
@@ -411,14 +411,14 @@ trait TreeOps {
     /*
      * Mean Squared Error (MSE) regression criterion
      */
-    compiler (Tree) ("impurity_mse", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
+    internal (Tree) ("impurity_mse", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
       variance(trainingSet.labels.apply(samples))
     }
 
     /**
      * Gini index classification criterion
      */
-    compiler (Tree) ("impurity_gini", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
+    internal (Tree) ("impurity_gini", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
       val labels = trainingSet.labels.apply(samples)
       val numSamplesByLabel = labels.groupByReduce(l => l, l => 1, (a: Rep[Int],b: Rep[Int]) => a+b)
 
@@ -433,19 +433,19 @@ trait TreeOps {
     /**
      * The value to store as the prediction for this leaf.
      */
-    compiler (Tree) ("tree_score", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector), ("criterion", TCriterion)) :: MDouble) implements composite ${
+    internal (Tree) ("tree_score", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector), ("criterion", TCriterion)) :: MDouble) implements composite ${
       criterion match {
         case MSE => tree_score_mse(trainingSet, samples)
         case Gini => tree_score_gini(trainingSet, samples)
       }
     }
 
-    compiler (Tree) ("tree_score_mse", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
+    internal (Tree) ("tree_score_mse", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
       // regression prediction value is the mean of values assigned to this node
       mean(trainingSet.labels.apply(samples))
     }
 
-    compiler (Tree) ("tree_score_gini", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
+    internal (Tree) ("tree_score_gini", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
       // select the label with the highest frequency in the sample
       val allLabels = trainingSet.labels.apply(samples)
       val samplesByLabel = allLabels.histogram

@@ -191,4 +191,8 @@ trait ScalaGenForgeArrayBufferOps extends ScalaGenDeliteArrayBufferOps { val IR:
 trait CudaGenForgeArrayBufferOps extends CudaGenDeliteArrayBufferOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp }
 trait OpenCLGenForgeArrayBufferOps // TODO
 trait CGenForgeArrayBufferOps /*extends CGenDeliteArrayBufferOps { val IR: DeliteArrayBufferOpsExp with DeliteOpsExp } */
+trait DotGenForgeArrayBufferOps
+trait DotGenForgeArrayOps
+trait MaxJGenForgeArrayBufferOps
+trait MaxJGenForgeArrayOps
 

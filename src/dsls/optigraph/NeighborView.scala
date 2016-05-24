@@ -1,13 +1,13 @@
 /*//////////////////////////////////////////////////////////////
 Author: Christopher R. Aberger
 
-Description: Lets us view part of an NodeData array as a 
-parallel collection.  This is especially useful when wanting 
+Description: Lets us view part of an NodeData array as a
+parallel collection.  This is especially useful when wanting
 to perform operations on neighbors (a subset of edge array).
 Here you look at actual data inside of the array.
 *///////////////////////////////////////////////////////////////
 package ppl.dsl.forge
-package	dsls 
+package	dsls
 package optigraph
 
 import core.{ForgeApplication,ForgeApplicationRunner,Config}
@@ -46,7 +46,7 @@ trait NeighborViewOps {
         val neighbors = $self
         val neighborsOfNeighbors = $1
         if(neighbors.length == 0 || neighborsOfNeighbors.length == 0) 0l
-        else if(neighbors(0) > neighborsOfNeighbors(neighborsOfNeighbors.length-1) || 
+        else if(neighbors(0) > neighborsOfNeighbors(neighborsOfNeighbors.length-1) ||
           neighborsOfNeighbors(0) > neighbors(neighbors.length-1)){
           0l
         }
@@ -54,7 +54,7 @@ trait NeighborViewOps {
           ndv_intersect_sets(neighbors,neighborsOfNeighbors)
         }
       }
-      compiler ("ndv_intersect_sets") (NeighborView(T) :: MLong, TNumeric(T)) implements single ${
+      internal ("ndv_intersect_sets") (NeighborView(T) :: MLong, TNumeric(T)) implements single ${
         val neighbors = $self
         val neighborsOfNeighbors = $1
         var i = 0
@@ -81,7 +81,7 @@ trait NeighborViewOps {
         while(large(j) > small(i) && i < (small.length-1)){
           i += 1
         }
-        if(small(i) == large(j)) t += 1 
+        if(small(i) == large(j)) t += 1
         t
       }
       infix ("intersectInRange") ((("neighborsOfNeighbors",NeighborView(T)),("neighborsMax",T)) :: MLong, TNumeric(T)) implements single ${
@@ -92,7 +92,7 @@ trait NeighborViewOps {
           neighborsMax <= neighbors(0)){
           0l
         }
-        else if(neighbors(0) > neighborsOfNeighbors(neighborsOfNeighbors.length-1) || 
+        else if(neighbors(0) > neighborsOfNeighbors(neighborsOfNeighbors.length-1) ||
           neighborsOfNeighbors(0) > neighbors(neighbors.length-1)){
           0l
         }
@@ -100,14 +100,14 @@ trait NeighborViewOps {
           ndv_intersect_sets_in_range($self,neighborsOfNeighbors,neighborsMax)
         }
       }
-      compiler ("ndv_intersect_sets_in_range") ((("neighborsOfNeighbors",NeighborView(T)),("neighborsMax",T)) :: MLong, TNumeric(T)) implements single ${
+      internal ("ndv_intersect_sets_in_range") ((("neighborsOfNeighbors",NeighborView(T)),("neighborsMax",T)) :: MLong, TNumeric(T)) implements single ${
         val neighbors = $self
         var t = 0l
         var i = 0
         var j = 0
         val small = if(neighbors.length < neighborsOfNeighbors.length) neighbors else neighborsOfNeighbors
         val large = if(neighbors.length < neighborsOfNeighbors.length) neighborsOfNeighbors else neighbors
-        val smallMax = neighborsMax 
+        val smallMax = neighborsMax
         val largeMax = neighborsMax
         //I understand there are simplier ways to write this, I tried a lot of versions
         //this is the fastest (that I tried).
@@ -133,15 +133,15 @@ trait NeighborViewOps {
           i += 1
           notFinished = small(i) < smallMax
         }
-        if(small(i) == large(j) && notFinished) t += 1 
+        if(small(i) == large(j) && notFinished) t += 1
         t
       }
 
-      compiler ("NeighborView_data") (Nil :: MArray(T)) implements getter(0, "_data")
-      compiler ("NeighborView_start") (Nil :: MInt) implements getter(0, "_start")
-      compiler ("NeighborView_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("NeighborViews cannot be allocated from a parallel op") }
-      compiler ("NeighborView_illegalupdate") ((MInt, T) :: MNothing, effect = simple) implements composite ${ fatal("NeighborViews cannot be updated") }
-      
+      internal ("NeighborView_data") (Nil :: MArray(T)) implements getter(0, "_data")
+      internal ("NeighborView_start") (Nil :: MInt) implements getter(0, "_start")
+      internal ("NeighborView_illegalalloc") (MInt :: MNothing, effect = simple) implements composite ${ fatal("NeighborViews cannot be allocated from a parallel op") }
+      internal ("NeighborView_illegalupdate") ((MInt, T) :: MNothing, effect = simple) implements composite ${ fatal("NeighborViews cannot be updated") }
+
       parallelize as ParallelCollection(T, lookupOp("NeighborView_illegalalloc"), lookupOp("length"), lookupOverloaded("apply",1), lookupOp("NeighborView_illegalupdate"))
     }
   }

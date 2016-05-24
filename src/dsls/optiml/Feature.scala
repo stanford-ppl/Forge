@@ -36,7 +36,7 @@ trait FeatureOps {
 
     val DiscreteFeature = tpe("DiscreteFeature")
     data(DiscreteFeature, ("_features", MHashMap(MString, MInt)))
-    compiler (DiscreteFeature) ("discrete_feature_alloc", Nil, (MHashMap(MString, MInt) :: DiscreteFeature)) implements allocates(DiscreteFeature, ${$0})
+    internal (DiscreteFeature) ("discrete_feature_alloc", Nil, (MHashMap(MString, MInt) :: DiscreteFeature)) implements allocates(DiscreteFeature, ${$0})
 
     // FIXME: this produces an illegal ordering of effect error when array_fromseq is mutable or when using 'single'.
     // What happens with MHashMap in this case?
@@ -48,7 +48,7 @@ trait FeatureOps {
 
     val DiscreteFeatureOps = withTpe(DiscreteFeature)
     DiscreteFeatureOps {
-      compiler ("getFeatures") (Nil :: MHashMap(MString, MInt)) implements getter(0, "_features")
+      internal ("getFeatures") (Nil :: MHashMap(MString, MInt)) implements getter(0, "_features")
 
       infix ("apply") (MString :: MDouble) implements composite ${
         val featureMap = getFeatures($self)
@@ -111,39 +111,39 @@ trait FeatureOps {
     // Internal DateTime operations. These are factored into separate methods so we don't
     // need to create multiple DateTime instances at run-time and can still define our own API.
 
-    compiler (DateFeature) ("dt_internal", Nil, MDouble :: SDateTime) implements codegen($cala, ${
+    internal (DateFeature) ("dt_internal", Nil, MDouble :: SDateTime) implements codegen($cala, ${
       new org.joda.time.DateTime($0.toLong)
     })
 
-    compiler (DateFeature) ("dt_internal_year", Nil, SDateTime :: MInt) implements codegen($cala, ${
+    internal (DateFeature) ("dt_internal_year", Nil, SDateTime :: MInt) implements codegen($cala, ${
       $0.getYear()
     })
 
-    compiler (DateFeature) ("dt_internal_month", Nil, SDateTime :: MInt) implements codegen($cala, ${
+    internal (DateFeature) ("dt_internal_month", Nil, SDateTime :: MInt) implements codegen($cala, ${
       $0.getMonthOfYear()
     })
 
-    compiler (DateFeature) ("dt_internal_hour", Nil, SDateTime :: MInt) implements codegen($cala, ${
+    internal (DateFeature) ("dt_internal_hour", Nil, SDateTime :: MInt) implements codegen($cala, ${
       $0.getHourOfDay()
     })
 
-    compiler (DateFeature) ("dt_internal_day", Nil, SDateTime :: MInt) implements codegen($cala, ${
+    internal (DateFeature) ("dt_internal_day", Nil, SDateTime :: MInt) implements codegen($cala, ${
       $0.getDayOfMonth()
     })
 
-    compiler (DateFeature) ("dt_internal_weekday", Nil, SDateTime :: MInt) implements codegen($cala, ${
+    internal (DateFeature) ("dt_internal_weekday", Nil, SDateTime :: MInt) implements codegen($cala, ${
       $0.getDayOfWeek()
     })
 
-    compiler (DateFeature) ("dt_internal_days_between", Nil, (SDateTime, SDateTime) :: MInt) implements codegen($cala, ${
+    internal (DateFeature) ("dt_internal_days_between", Nil, (SDateTime, SDateTime) :: MInt) implements codegen($cala, ${
       org.joda.time.Days.daysBetween($0.toLocalDate(), $1.toLocalDate()).getDays()
     })
 
-    compiler (DateFeature) ("dt_internal_months_between", Nil, (SDateTime, SDateTime) :: MInt) implements codegen($cala, ${
+    internal (DateFeature) ("dt_internal_months_between", Nil, (SDateTime, SDateTime) :: MInt) implements codegen($cala, ${
       org.joda.time.Months.monthsBetween($0.toLocalDate(), $1.toLocalDate()).getMonths()
     })
 
-    compiler (DateFeature) ("dt_internal_years_between", Nil, (SDateTime, SDateTime) :: MInt) implements codegen($cala, ${
+    internal (DateFeature) ("dt_internal_years_between", Nil, (SDateTime, SDateTime) :: MInt) implements codegen($cala, ${
       org.joda.time.Years.yearsBetween($0.toLocalDate(), $1.toLocalDate()).getYears()
     })
 

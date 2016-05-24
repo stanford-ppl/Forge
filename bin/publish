@@ -85,6 +85,10 @@ object ${dslName}Build extends Build {
     libraryDependencies += "org.apache.hadoop" % "hadoop-common" % "2.7.1",
     libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "2.7.1",
     libraryDependencies += "org.apache.hadoop" % "hadoop-hdfs" % "2.7.1",
+
+    // DHDL
+    libraryDependencies += "org.encog" % "encog-core" % "3.3.0",
+
     // used in delitec to access jars
     retrieveManaged := true,
     scalacOptions += "-Yno-generic-signatures",

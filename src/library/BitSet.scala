@@ -7,9 +7,9 @@
 //  of longs.  Bits are set by finding word indexes and and shifting proper
 //  bit value in.  Uses parallel ops and is defined as a parallel class.
 //  Can be distributed and has no set backs of Java BitSet class (although
-//  it is based highly off that source code).  For right now mutability is 
+//  it is based highly off that source code).  For right now mutability is
 //  only allowed if you allocate a bitset based of an integer size.  The
-//  bitset does not grow or shrink if you try to set a bit outset of the 
+//  bitset does not grow or shrink if you try to set a bit outset of the
 //  initial range and will error out.  If you want this support add it in
 //  yourself.  A basic starter class that can be improved.
 //
@@ -122,7 +122,7 @@ trait BitSetOps {
 
       //////////////////////////////Internal Operations////////////////////////////////////////
 
-      compiler("bs_set")(("bitIndex",MInt) :: MUnit, effect=write(0)) implements single ${
+      internal("bs_set")(("bitIndex",MInt) :: MUnit, effect=write(0)) implements single ${
         val wordIndex = bs_word_index(bitIndex)
         val oldValue = bs_get_word($self,wordIndex)
         val value = oldValue | (1L << bitIndex)
@@ -130,7 +130,7 @@ trait BitSetOps {
         bs_set_word($self,wordIndex,value)
       }
 
-      compiler("bs_clear")(("bitIndex",MInt) :: MUnit, effect=write(0)) implements single ${
+      internal("bs_clear")(("bitIndex",MInt) :: MUnit, effect=write(0)) implements single ${
         val wordIndex = bs_word_index(bitIndex)
         val oldValue = bs_get_word($self,wordIndex)
         val value = bs_get_word($self,wordIndex) & ~(1L << bitIndex)
@@ -138,32 +138,32 @@ trait BitSetOps {
         bs_set_word($self,wordIndex,value)
       }
 
-      compiler("bs_set_cardinality")(MInt :: MUnit, effect = write(0)) implements setter(0, "_cardinality", quotedArg(1))
-      compiler("bs_get")(("bitIndex",MInt) :: MBoolean) implements single ${(bs_get_word($self,bs_word_index(bitIndex)) & (1L << bitIndex)) != 0}
-      compiler("bs_get_word")(("wordIndex",MInt) :: MLong) implements single ${array_apply(bs_get_words($self),wordIndex)}
-      compiler("bs_get_words")(Nil :: MArray(MLong)) implements getter(0, "_words")
-      compiler("bs_set_word")(( ("wordIndex",MInt),("value",MLong)) :: MUnit, effect=write(0)) implements single ${array_update(bs_get_words($self),wordIndex,value)}
-      
-      compiler("bs_raw_alloc")(MInt :: BitSet) implements single ${BitSet($1)}
-      compiler("bs_apply")(MInt :: MBoolean) implements single ${ $self($1) }
+      internal("bs_set_cardinality")(MInt :: MUnit, effect = write(0)) implements setter(0, "_cardinality", quotedArg(1))
+      internal("bs_get")(("bitIndex",MInt) :: MBoolean) implements single ${(bs_get_word($self,bs_word_index(bitIndex)) & (1L << bitIndex)) != 0}
+      internal("bs_get_word")(("wordIndex",MInt) :: MLong) implements single ${array_apply(bs_get_words($self),wordIndex)}
+      internal("bs_get_words")(Nil :: MArray(MLong)) implements getter(0, "_words")
+      internal("bs_set_word")(( ("wordIndex",MInt),("value",MLong)) :: MUnit, effect=write(0)) implements single ${array_update(bs_get_words($self),wordIndex,value)}
+
+      internal("bs_raw_alloc")(MInt :: BitSet) implements single ${BitSet($1)}
+      internal("bs_apply")(MInt :: MBoolean) implements single ${ $self($1) }
       parallelize as ParallelCollection(MBoolean, lookupOp("bs_raw_alloc"), lookupOp("length"), lookupOp("bs_apply"), lookupOp("set"))
     }
 
     //////////////////////////////Operations Needed for Alloc////////////////////////////////////////
 
     // Given an index, give me the word it lies in. 6 bits per word.
-    compiler (BitSet) ("bs_word_index", Nil, ("bitIndex",MInt) :: MInt) implements single ${ bitIndex >> 6 } //ADDRESS BITS PER WORD
+    internal (BitSet) ("bs_word_index", Nil, ("bitIndex",MInt) :: MInt) implements single ${ bitIndex >> 6 } //ADDRESS BITS PER WORD
 
     // Gives you how many words you need to store a bitset with given input maximum value
-    compiler (BitSet) ("bs_get_alloc_length", Nil, MInt :: MInt) implements single ${ bs_word_index($0)+1 }
+    internal (BitSet) ("bs_get_alloc_length", Nil, MInt :: MInt) implements single ${ bs_word_index($0)+1 }
 
-    /* 
+    /*
      * Allocates a bit set that sets the corresponding indexes in the array of incoming
      * integers.  There are some special optimizations here that make it quicker than
      * just looping around the integers and calling the set method.
      * This could happen in parallel.  Theoretically seemed more complex to code using parallel OPs though.
      */
-    compiler (BitSet) ("bs_alloc_from_int_array", Nil, MArray(MInt) :: MArray(MLong)) implements single ${
+    internal (BitSet) ("bs_alloc_from_int_array", Nil, MArray(MInt) :: MArray(MLong)) implements single ${
       val sortedInput = bs_alloc_sort_array_in($0)
       // instead of sorting find max, place ints into numWords buckets, allocate in parallel with a map
       val words = array_empty[Long](bs_get_alloc_length(sortedInput(array_length(sortedInput)-1)))
@@ -191,7 +191,7 @@ trait BitSetOps {
     }
 
     // I separate this out in hopes that the compiler is smart enough not to do this work twice on allocations.
-    compiler (BitSet) ("bs_alloc_sort_array_in", Nil, MArray(MInt) :: MArray(MInt)) implements single ${array_sort($0)}
+    internal (BitSet) ("bs_alloc_sort_array_in", Nil, MArray(MInt) :: MArray(MInt)) implements single ${array_sort($0)}
   }
 }
 

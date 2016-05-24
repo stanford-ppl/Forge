@@ -14,7 +14,7 @@ import optila.shared.typeclass._
 import optila.library._
 import optila.library.classes._
 
-trait OptiLAREPLOverrides extends OptiLALib {
+trait OptiLAREPLOverrides extends OptiLALibrary {
   // shadow these implicits to disable them when Rep[T] = T (i.e., inside the REPL)
   override def canReppableLiteral[A:Manifest]: Reppable[A,A] = ???
 

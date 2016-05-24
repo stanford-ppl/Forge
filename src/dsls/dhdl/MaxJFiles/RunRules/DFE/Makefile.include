@@ -1,0 +1,133 @@
+#
+# This file is managed by MaxIDE. Do NOT change.
+# RunRule     : DFE
+#
+ifndef RUNRULE
+        $(error RUNRULE environment variable is not set.')
+endif
+
+nullstring :=
+space := $(nullstring) # a space at the end
+
+# Get path to this include file. Notice: we depend on being loaded second!
+# This respects spaces in the path.
+THIS_FILE:=$(subst $(space),\ ,$(wordlist 2, $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST)))
+# escape any spaces and get rid of the file name
+THIS_PATH:=$(subst Makefile.include,,$(THIS_FILE))
+
+# quote maxcompilerdir
+MAXCOMPILERDIR_QUOTE:=$(subst $(space),\ ,$(MAXCOMPILERDIR))
+RUNRULE_QUOTE:=$(subst $(space),\ ,$(RUNRULE))
+
+SHELL := /bin/bash
+
+ifndef MAXELEROSDIR
+        $(error MAXELEROSDIR environment variable is not set)
+endif
+ifndef MAXCOMPILERDIR
+        $(error MAXCOMPILERDIR environment variable is not set)
+endif
+
+export ANT_MAXELER_INTERNAL_MAXIDE_JARS = $(subst :,;,$(MAXELER_INTERNAL_MAXIDE_JARS))
+export MAXCOMPILER_ACTIVITY_FILE = $(THIS_PATH)/.maxcompiler-activity.be
+
+
+MAXCC ?= $(MAXCOMPILERDIR_QUOTE)/lib/gcc/bin/gcc
+MAXCXX ?= $(MAXCOMPILERDIR_QUOTE)/lib/gcc/bin/g++
+
+# include custom definitions before including MAXCOMPILER include file
+include $(THIS_PATH)Makefile.custom.include
+ifneq ($(USE_SLIC),0)
+USE_SLIC = 1
+endif
+
+IS_SIMULATION_PROFILE := 0
+IS_HARDWARE_PROFILE := 1
+
+ifeq ($(IS_SIMULATION_PROFILE),1)
+MAXELEROSDIR=$(MAXCOMPILERDIR)/lib/maxeleros-sim
+endif
+
+# include MAXCOMPILER include file for all definitions
+include $(MAXCOMPILERDIR_QUOTE)/lib/Makefile.include
+
+OBJDIR := $(THIS_PATH)objects
+BINDIR := $(THIS_PATH)binaries
+MAXDIR := $(THIS_PATH)maxfiles
+INCDIR := $(THIS_PATH)include
+
+MAXIDEDIR?=$(MAXCOMPILERDIR_QUOTE)/lib/MaxIDE
+PORT_NAME_SIM?=
+DEVICE_NAME_SIM:=$(PORT_NAME_SIM)0:$(PORT_NAME_SIM)
+DEVICE_NAME_HW:=/dev/maxeler0
+MAXELEROSDIR_SIM:=$(MAXCOMPILERDIR_QUOTE)/lib/maxeleros-sim
+DEVICE_NAME?=$(DEVICE_NAME_HW)
+#
+# 'all' needs to be the first target (dummy)
+#
+all:
+
+
+#
+# auto-regenerate this include file, if RunRule is more recent.
+#
+$(THIS_FILE): $(THIS_PATH)RunRules.settings
+	java -jar $(MAXIDEDIR)/projectAdmin.jar -u $(THIS_PATH)../../ DFE
+	
+#
+# MaxFile: Top
+#
+
+
+BUILDNAME_MAXFILE_1:=Top
+MAXFILE_1:=Top.max
+
+$(OBJDIR)/Top.o: $(MAXDIR)/Top.max
+	$(MAXFILECOMPILE) "$<" "$@" "Top"
+
+$(OBJDIR)/slic_Top.o: $(MAXDIR)/Top.max
+	$(SLICCOMPILE) "$<" "$@"
+
+$(MAXDIR)/Top.max: 
+	( cd "$(THIS_PATH)/" && if [ -z "$${MAXCOMPILER_BUILD_DIR+xxx}" ]; then export MAXCOMPILER_BUILD_DIR="$(realpath $(MAXDIR))"; fi ;  export MAX_BUILDPARAMS="DFEModel='MAIA' target='DFE' maxFileName='Top' " ; set -o pipefail ; ant -v -f "Top.xml" run 2>&1 | tee Top_cmd.log ; exit ${PIPESTATUS[0]} )
+	cp "`grep -o -e "^.*MaxFile: .*\.max" $(THIS_PATH)/Top_cmd.log | cut -d ':'  -f 4 | sed 's/^ //g'`" "$(MAXDIR)/Top.max"
+	cp "`grep -o -e "^.*MaxFile: .*\.max" $(THIS_PATH)/Top_cmd.log | cut -d ':'  -f 4 | sed 's/^ //g' | sed 's/\.max/.h/g'`" "$(MAXDIR)/Top.h"
+	cp -f "$(MAXDIR)/"*.h "$(INCDIR)/"
+
+
+MAXFILEBUILDNAMEDEFS=-DBUILDNAME_MAXFILE_1=Top -DMAXFILE_1="Top.max" 
+
+
+#
+# List of all MAX files
+#
+MAXFILEOBJECTS := $(OBJDIR)/Top.o 
+
+SLICFILEOBJECTS := $(OBJDIR)/slic_Top.o 
+
+
+#
+# Targets/Variables managing running of the app
+#
+EXE_SO_NAME=Top
+LIBLDFLAGS=
+LIBGCCFLAGS=
+
+RUNENV=export LD_LIBRARY_PATH="$$MAXELEROSDIR/lib:$$LD_LIBRARY_PATH" ; 
+
+RUNARGS?=
+
+ifneq (,$(ARGS))
+#if ARGS is defined
+override RUNARGS:= $(ARGS) $(EXTRAARGS)
+else
+override RUNARGS+= $(EXTRAARGS)
+endif
+
+startsim:
+
+
+stopsim:
+
+
+

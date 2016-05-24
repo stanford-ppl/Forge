@@ -49,8 +49,8 @@ trait BaseGenTypeClasses extends BaseGenOps {
     else if (tpeCls.tpePars.length == 1) {
       stream.println("  def " + tpeCls.signature.wrapper.get + "[A,B](x: " + tpeCls.name + "[A]) = x.asInstanceOf["+tpeCls.name+"[B]]")
     }
-    else {
-      warn("could not auto-generate type class wrapper " + tpeCls.signature.wrapper + " for " + tpeCls.name + " -- too many type parameters")
+    else if (tpeCls.signature.wrapper.isDefined) {
+      warn("could not auto-generate type class wrapper " + tpeCls.signature.wrapper.get + " for " + tpeCls.name + " -- too many type parameters")
     }
     stream.println()
 

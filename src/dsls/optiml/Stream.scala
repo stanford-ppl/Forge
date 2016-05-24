@@ -48,15 +48,15 @@ trait StreamOps {
       hash
     }
 
-    compiler (HashStream) ("hash_alloc_raw", V, KeyValueStore(V) :: HashStream(V)) implements allocates(HashStream, ${$0})
+    internal (HashStream) ("hash_alloc_raw", V, KeyValueStore(V) :: HashStream(V)) implements allocates(HashStream, ${$0})
 
     // --
 
     val HashStreamOps = withTpe(HashStream)
     HashStreamOps {
-      compiler ("hash_get_db") (Nil :: KeyValueStore(V)) implements getter(0, "_db")
-      //compiler ("hash_set_db") (KeyValueStore(V) :: MUnit, effect = write(0)) implements setter(0, "_db", ${$1})
-      compiler ("hash_deserialize") (Nil :: MLambda(Tup2(HashStream(V),MString), V)) implements composite ${
+      internal ("hash_get_db") (Nil :: KeyValueStore(V)) implements getter(0, "_db")
+      //internal ("hash_set_db") (KeyValueStore(V) :: MUnit, effect = write(0)) implements setter(0, "_db", ${$1})
+      internal ("hash_deserialize") (Nil :: MLambda(Tup2(HashStream(V),MString), V)) implements composite ${
         val d = kv_deserialize(hash_get_db($self))
         doLambda((t: Rep[Tup2[HashStream[V],String]]) => d(pack(hash_get_db(t._1), t._2)))
       }
@@ -170,7 +170,7 @@ trait StreamOps {
     }
 
     // Create a unique key suffix for the given record
-    compiler (FileStream) ("hashMatrixKeySuffix", Nil, MArray(MByte) :: MString) implements codegen($cala, ${
+    internal (FileStream) ("hashMatrixKeySuffix", Nil, MArray(MByte) :: MString) implements codegen($cala, ${
       val uniqueId = com.google.common.hash.Hashing.murmur3_128.hashBytes($0)
       uniqueId.toString
     })
@@ -400,7 +400,7 @@ trait StreamOps {
     ComputeStreamOps {
       infix ("numRows") (Nil :: MInt) implements getter(0, "_numRows")
       infix ("numCols") (Nil :: MInt) implements getter(0, "_numCols")
-      compiler ("stream_func") (Nil :: MLambda(Tup2(MInt,MInt), T)) implements getter(0, "_func")
+      internal ("stream_func") (Nil :: MLambda(Tup2(MInt,MInt), T)) implements getter(0, "_func")
 
       infix ("apply") ((MInt, MInt) :: T) implements composite ${
         val lambda = stream_func($self)

@@ -15,7 +15,7 @@ trait IOOps {
 
     // -- input
 
-    compiler (IO) ("optila_todouble", Nil, MString :: MDouble) implements composite ${
+    internal (IO) ("optila_todouble", Nil, MString :: MDouble) implements composite ${
       if ($0 == "Inf") INF
       else if ($0 == "-Inf") nINF
       else $0.toDouble
@@ -87,7 +87,7 @@ trait IOOps {
       densematrix_fromarray(a, array_length(a) / numCols, numCols)
     }
 
-    val readfirstline = compiler (IO) ("readFirstLine", Nil, ("path",MString) :: MString) implements composite ${
+    val readfirstline = internal (IO) ("readFirstLine", Nil, ("path",MString) :: MString) implements composite ${
       val in = ForgeFileInputStream(path)
       val line = in.readLine()
       in.close()

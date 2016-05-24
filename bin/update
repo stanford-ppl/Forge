@@ -18,6 +18,7 @@ usage() {
   echo "  -s <n>    skip to step n in the update process"
   echo "  -j        use jars instead of local class files"
   echo "  -f        (re-)generate forge specification"
+  echo "  -S        disable Sphinx documentation generation"
   echo "  -g <gen>  generate only the specified version"
   echo "  -r <app>  run the specified application after compiling"
   echo "  -d        run delite after compiling"
@@ -38,6 +39,7 @@ SKIP=0
 DELITE=false
 INTERACTIVE=false
 IDENT=false
+DOC=true
 TARGET=""
 USE_JARS=""
 
@@ -51,6 +53,7 @@ do
     s) SKIP=$OPTARG;;
     j) USE_JARS="--use-jars";;
     f) IDENT=true;;
+    S) DOC=false;;
     g) TARGET="$OPTARG";;
     r) APP_RUNNER="$OPTARG"
        NUM_STEPS=$(($NUM_STEPS+1))
@@ -79,7 +82,7 @@ DSL_NAME=$2
 if [ $SKIP -le 1 ];
 then
   echo "sbt compile (1/$NUM_STEPS)"
-  sbt compile
+  sbt -DshowSuppressedErrors=true compile
 fi
 
 FORGE_FLAGS=""
@@ -95,6 +98,10 @@ then
   elif [ "$TARGET" == "delite" ];
   then
     FORGE_FLAGS="$FORGE_FLAGS --no-lib"
+  fi
+  if [ $DOC == false ];
+  then
+    FORGE_FLAGS="$FORGE_FLAGS --no-doc"
   fi
 
   echo "forge $DSL_RUNNER $FORGE_FLAGS (2/$NUM_STEPS)"
@@ -116,6 +123,23 @@ if [ $SKIP -le 4 ];
 then
   echo "sbt compile (4/$NUM_STEPS)"
   sbt compile
+
+  ## Uncomment these for pdf generation from sphinx
+  pushd .
+  echo "cd sphinx"
+  cd "sphinx"
+  echo "sphinx-build -b latex source build"
+  sphinx-build -b latex source build
+  pushd .
+  cd build
+  make clean all > /dev/null
+  popd
+  popd
+  cp "sphinx/build/$DSL_NAME.pdf" ./Manual.pdf
+  pushd .
+  cd "sphinx"
+  sphinx-build -b html source build
+  popd
 fi
 
 if [ $SKIP -le 5 ] && [ $INTERACTIVE == true ];

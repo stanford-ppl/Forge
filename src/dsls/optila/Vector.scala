@@ -34,7 +34,7 @@ trait VectorOps {
 
     // we can also perform bulk operations generically, returning a DenseVector result for each operation
     // Arith is only required if T is actually a tpePar here, so we need to be careful.
-    if (!isTpePar(T)) compiler (v) ("zeroT", Nil, Nil :: T) implements composite ${ 0.asInstanceOf[\$TT] }
+    if (!isTpePar(T)) internal (v) ("zeroT", Nil, Nil :: T) implements composite ${ 0.asInstanceOf[\$TT] }
 
     // We need to be a little careful using empty for zero here. With nested vectors, the zero vector
     // will not be the correct dimension. This implementation relies on the fact that DeliteOps will not
@@ -268,7 +268,7 @@ trait VectorOps {
       infix ("find") ((T ==> MBoolean) :: IndexVector) implements composite ${ $self.indices.filter(i => $1($self(i))) }
 
       val filterMap = v.name.toLowerCase + "_densevector_filter_map"
-      compiler (filterMap) (((T ==> MBoolean), (T ==> R)) :: DenseVector(R), addTpePars = R) implements filter((T,R), 0, ${ e => $1(e) }, ${ e => $2(e) })
+      internal (filterMap) (((T ==> MBoolean), (T ==> R)) :: DenseVector(R), addTpePars = R) implements filter((T,R), 0, ${ e => $1(e) }, ${ e => $2(e) })
       infix ("count") ((T ==> MBoolean) :: MInt) implements composite ${
         val x = \$filterMap($self, $1, (e: Rep[\$TT]) => 1)
         if (x.length > 0) sum(x)

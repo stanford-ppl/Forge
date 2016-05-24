@@ -88,7 +88,8 @@ trait QuoteOpsExp extends QuoteOps {
   case class QuoteBlockResult(func: Rep[DSLArg], args: List[Rep[DSLArg]], ret: Rep[DSLType], capturedArgs: List[String]) extends Def[String]
 
   def quote_quotedblock(name: String, op: Rep[DSLOp], capturedArgs: List[String]) = op.args.find(_.name == name) match {
-    case None => err("could not quote arg - no arg name " + name + " in op " + op.name)
+    case None =>
+      throw new Exception("could not quote arg - no arg named '" + name + "'' in op '" + op.name + "'\nop args: " + op.args.map(_.name).mkString(", "))
     case Some(a@Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2))) =>
       if (!isThunk(f) && args.length != capturedArgs.length) err("wrong number of captured args for quoted block in op " + op.name + " (expected " + args.length + ")")
       symMarker + toAtom(QuoteBlockResult(a,args,ret,capturedArgs)).asInstanceOf[Sym[Any]].id + symMarker

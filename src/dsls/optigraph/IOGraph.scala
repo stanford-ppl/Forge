@@ -31,8 +31,8 @@ trait IOGraphOps {
       writeGraphData($path,ids,data.getRawArray,$data.length)
     }
 
-    val writeGraphData = compiler (IO) ("writeGraphData", T, (("path",MString),("ids",MArray(MInt)),("data",MArray(T)),("length",MInt)) :: MUnit, TNumeric(T), effect = simple) 
-        
+    val writeGraphData = internal (IO) ("writeGraphData", T, (("path",MString),("ids",MArray(MInt)),("data",MArray(T)),("length",MInt)) :: MUnit, TNumeric(T), effect = simple)
+
     impl (writeGraphData) (codegen($cala, ${
       val xfs = new java.io.BufferedWriter(new java.io.FileWriter($path))
       xfs.write("#node id\\tdata\\n")
@@ -106,7 +106,7 @@ trait IOGraphOps {
     direct (IO) ("loadUndirectedGraphFromCSR", Nil, ("path",MString) :: UndirectedGraph) implements composite ${
       val nodes = ForgeFileReader.readLines(path+".nodes"){ _.toInt }
       val edges = ForgeFileReader.readLines(path+".edges"){ _.toInt }
-      undirectedGraphFromCSR(nodes, edges)      
+      undirectedGraphFromCSR(nodes, edges)
     }
 
     direct (IO) ("undirectedGraphFromCSR", Nil, ( (("nodes",MArray(MInt)),("edges",MArray(MInt))) :: UndirectedGraph)) implements composite ${
@@ -115,25 +115,25 @@ trait IOGraphOps {
     }
 
     //lazy val IBoolean = tpe("Boolean", stage = compile) //FIXME: Rep-less Boolean doesn't compile
-    compiler (IO) ("sortEdges", Nil, (("edges",NodeData(Tuple2(MInt,MInt))), ("forward",CBoolean)) :: MArray(MInt)) implements composite ${
+    internal (IO) ("sortEdges", Nil, (("edges",NodeData(Tuple2(MInt,MInt))), ("forward",CBoolean)) :: MArray(MInt)) implements composite ${
       array_sortIndices($0.length, (i,j) => {
         val x1 = if ($1) $0(i)._1 else $0(i)._2
         val x2 = if ($1) $0(i)._2 else $0(i)._1
         val y1 = if ($1) $0(j)._1 else $0(j)._2
         val y2 = if ($1) $0(j)._2 else $0(j)._1
 
-        if (x1 == y1) { 
-          if (x2 == y2) 0 
+        if (x1 == y1) {
+          if (x2 == y2) 0
           else if (x2 > y2) 1
           else -1
-        } 
+        }
         else if (x1 > y1) 1
         else -1
       })
     }
 
     // Generate a dense set of node ids from the ids in the given edge list, order preserving
-    compiler (IO) ("densifyNodes", Nil, ("edges",NodeData(Tuple2(MInt,MInt))) :: Tuple2(MArray(MInt), MHashMap(MInt,MInt))) implements composite ${
+    internal (IO) ("densifyNodes", Nil, ("edges",NodeData(Tuple2(MInt,MInt))) :: Tuple2(MArray(MInt), MHashMap(MInt,MInt))) implements composite ${
       val distinctMap = SHashMap[Int,Boolean] // TODO: faster hashmap impl
       edges.forloop(e => {
         distinctMap(e._1) = true
@@ -145,7 +145,7 @@ trait IOGraphOps {
       pack(nodes, nodeMap)
     }
 
-    compiler (IO) ("buildCSRFromEdgeList", Nil, (("numNodes", MInt), ("edges", NodeData(Tuple2(MInt,MInt))), ("nodeMap", MHashMap(MInt,MInt)), ("withLoops", MBoolean), ("forward", CBoolean)) :: Tuple2(MArray(MInt),MArray(MInt))) implements composite ${
+    internal (IO) ("buildCSRFromEdgeList", Nil, (("numNodes", MInt), ("edges", NodeData(Tuple2(MInt,MInt))), ("nodeMap", MHashMap(MInt,MInt)), ("withLoops", MBoolean), ("forward", CBoolean)) :: Tuple2(MArray(MInt),MArray(MInt))) implements composite ${
       val sorted = sortEdges(edges, forward)
 
       val nodes = array_empty[Int](numNodes+1) // Pad nodes to make indexing neighborhoods simpler
@@ -160,9 +160,9 @@ trait IOGraphOps {
         val inputEdge = edges(sorted(i))
         val currentEdge_1 = nodeMap(if (forward) inputEdge._1 else inputEdge._2)
         val currentEdge_2 = nodeMap(if (forward) inputEdge._2 else inputEdge._1)
-        
+
         // New start node, so complete previous node
-        if (currentEdge_1 != currentNode) { 
+        if (currentEdge_1 != currentNode) {
           currentNode = currentEdge_1
           nodes(currentNode) = nodes(currentNode-1) + numLocalEdges // Add pointer to nodes array for end of prev node
           numLocalEdges = 0
@@ -235,7 +235,7 @@ trait IOGraphOps {
       val idView = NodeData(array_fromfunction(numNodes,{n => n}))
       var numEdges = 0l
 
-      val csr = input.sortBy({ a => 
+      val csr = input.sortBy({ a =>
         numNodes - input(a).length
       })
 
@@ -247,7 +247,7 @@ trait IOGraphOps {
       }
 
       val serial_out = assignADJUndirectedIndicies(numNodes,numEdges.toInt,distinct_ids,idHashMap,csrNeighbors)
-      UndirectedGraph(numNodes,distinct_ids.getRawArray,serial_out._1,serial_out._2,array_fromfunction[Double](numEdges.toInt,e=>1d))    
+      UndirectedGraph(numNodes,distinct_ids.getRawArray,serial_out._1,serial_out._2,array_fromfunction[Double](numEdges.toInt,e=>1d))
     }
 
     direct (IO) ("assignADJUndirectedIndicies", Nil, MethodSignature(List(("numNodes",MInt),("numEdges",MInt),("distinct_ids",NodeData(MInt)),("idHashMap",MHashMap(MInt,MInt)),("src_groups",NodeData(NodeData(MInt)))),Tuple2(MArray(MInt),MArray(MInt)))) implements single ${
@@ -271,6 +271,6 @@ trait IOGraphOps {
       }
       pack(src_node_array.getRawArray,src_edge_array.getRawArray)
     }
-/////////////////////////////////////////////////////////////////////////////////////////////    
+/////////////////////////////////////////////////////////////////////////////////////////////
   }
 }

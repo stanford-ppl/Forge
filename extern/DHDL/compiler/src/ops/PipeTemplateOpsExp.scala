@@ -217,7 +217,8 @@ trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
 
   def emitNestedLoop(iters: List[Sym[Idx]], cchain: Exp[CounterChain])(emitBlk: => Unit) = {
     iters.zipWithIndex.foreach{ case (iter,idx) =>
-      stream.println("for( " + quote(iter) + " <- " + quote(cchain) + ".apply(" + idx + ".toInt)) {")
+      stream.println("for( " + quote(iter) + "_vec <- " + quote(cchain) + ".apply(" + idx + ".toInt)) {")
+      stream.println("  val " + quote(iter) + " = " + quote(iter) + "_vec.head")
     }
     emitBlk
     stream.println("}" * iters.length)

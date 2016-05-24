@@ -67,9 +67,9 @@ trait ScalaGenLoweredPipeOps extends ScalaGenEffect {
 
   def emitParallelizedLoop(iters: List[List[Sym[FixPt[Signed,B32,B0]]]], cchain: Exp[CounterChain])(emitBlk: => Unit) = {
     iters.zipWithIndex.foreach{ case (is, i) =>
-      stream.println("for( " + quote(cchain) + "_iter <- " + quote(cchain) + ".apply(" + i + ".toInt)) {")
-      is.zipWithIndex.foreach{ case (iter, ofs) =>
-        stream.println("  val "+quote(iter)+" = " + quote(cchain) + "_iter" + " + FixedPoint[Signed,B32,B0]("+ofs+")")
+      stream.println("for( " + quote(cchain) + "_vec" + i + " <- " + quote(cchain) + ".apply(" + i + ".toInt)) {")
+      is.zipWithIndex.foreach{ case (iter, j) =>
+        stream.println("  val "+quote(iter)+" = " + quote(cchain) + "_vec" + i + ".apply(" + j + ".toInt)")
       }
     }
     emitBlk

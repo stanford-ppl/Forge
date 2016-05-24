@@ -46,18 +46,21 @@ trait FixedPointEmulation {
     }
   }
 
-  // Could use NumericRange, but there's an absolutely excessive amount of stuff that needs to be defined in a type class to
-  // get that off the ground. Going the quicky and dirty route for now.
-  case class FixedPointRange[S:Manifest,I:Manifest,F:Manifest](start: FixedPoint[S,I,F], end: FixedPoint[S,I,F], step: FixedPoint[S,I,F]) {
-    def foreach(func: FixedPoint[S,I,F] => Unit) = {
+  case class FixedPointRange[S:Manifest,I:Manifest,F:Manifest](start: FixedPoint[S,I,F], end: FixedPoint[S,I,F], step: FixedPoint[S,I,F], par: Int) {
+    private val parStep = FixedPoint[S,I,F](par)
+    private val fullStep = parStep * step
+    private val vecOffsets = Array.tabulate(par){p => FixedPoint[S,I,F](p) * parStep}
+
+    def foreach(func: Array[FixedPoint[S,I,F]] => Unit) = {
       var i = start
       while (i < end) {
-        func(i)
-        i += step
+        val vec = vecOffsets.map{ofs => ofs + i}
+        func(vec)
+        i += fullStep
       }
     }
     def by(s: FixedPoint[S,I,F]) = FixedPointRange[S,I,F](start, end, s)
-
+    def par(p: Int) = FixedPointRange[S,I,F](start, end, step, p)
     def len = (end - start)/step
   }
 

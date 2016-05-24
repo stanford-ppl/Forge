@@ -5,54 +5,55 @@ import dhdl.shared._
 object OuterProductCompiler extends DHDLApplicationCompiler with OuterProduct
 object OuterProductInterpreter extends DHDLApplicationInterpreter with OuterProduct
 trait OuterProduct extends DHDLApplication {
-  type Elem = Flt //FixPt[Signed,B16,B16]
+  type T = Flt
 
-  override def stageArgNames = List("tileSize")
-  lazy val dataSize = ArgIn[SInt]("dataSize")
+  def outerproduct(a: Rep[ForgeArray[T]], b: Rep[ForgeArray[T]]) = {
+    val tileSizeA = param("tileSizeA", 192); domainOf(tileSizeA) = (96, 38400, 96)
+    val tileSizeB = param("tileSizeB", 192); domainOf(tileSizeB) = (96, 38400, 96)
+    val outerPar  = param("outerPar", 4);    domainOf(outerPar) = (1, 4, 1)
+    val innerPar  = param("innerPar", 96);   domainOf(innerPar) = (1, 38400, 1)
 
-  lazy val tileSize = param("tileSize", 192)
-  lazy val outerPar = param("outerPar", 4)
-  lazy val innerPar = param("innerPar", 96)
+    val M = a.length;  bound(M) = 38400
+    val N = b.length;  bound(N) = 38400
 
-  def outerProduct(vec1: Rep[OffChipMem[Elem]], vec2: Rep[OffChipMem[Elem]], out: Rep[OffChipMem[Elem]]) {
-    Pipe(dataSize by tileSize, (dataSize by tileSize) par outerPar) { (i,j) =>
-      val b1 = BRAM[Elem]("b1", tileSize)
-      val b2 = BRAM[Elem]("b2", tileSize)
-      val outTile = BRAM[Elem]("outTile", tileSize, tileSize)
-      Parallel {
-        b1 := vec1(i::i+tileSize, innerPar)
-        b2 := vec2(j::j+tileSize, innerPar)
+    val vec1 = OffChipMem[T]("vec1", M)
+    val vec2 = OffChipMem[T]("vec2", N)
+    val out = OffChipMem[T]("out", M, N)
+    val sizeA = ArgIn[SInt]("sizeA")
+    val sizeB = ArgIn[SInt]("sizeB")
+
+    // Transfer data and start accelerator
+    setArg(sizeA, M)
+    setArg(sizeB, N)
+    setMem(vec1, a)
+    setMem(vec2, b)
+
+    Accel {
+      Pipe(sizeA by tileSizeA, sizeB by tileSizeB par outerPar){ (i,j) =>
+        val b1 = BRAM[T]("b1", tileSizeA)
+        val b2 = BRAM[T]("b2", tileSizeB)
+        val outTile = BRAM[T]("outTile", tileSizeA, tileSizeB)
+        Parallel {
+          b1 := vec1(i::i+tileSizeA)
+          b2 := vec2(j::j+tileSizeB)
+        }
+        Pipe(tileSizeA by 1, tileSizeB par innerPar){ (ii,jj) => outTile(ii, jj) = b1(ii) * b2(jj) } // 2
+
+        out(i::i+tileSizeA, j::j+tileSizeB) := outTile
       }
-      Pipe(tileSize by 1, (tileSize by 1) par innerPar) { (ii,jj) => outTile(ii, jj) = b1(ii) * b2(jj) } // 2
-
-      out(i::i+tileSize, j::j+tileSize, innerPar) := outTile
     }
+    getMem(out)
   }
 
   def main() = {
-    val N = args(unit(0)).to[SInt]
+    val M = args(unit(0)).to[SInt]
+    val N = args(unit(1)).to[SInt]
+    val vec1 = Array.fill(M)(random[T](100))
+    val vec2 = Array.fill(N)(random[T](100))
 
-    bound(N) = 38400
-    domainOf(tileSize) = (96,38400,96)
-    domainOf(outerPar) = (1,4,1)
-    domainOf(innerPar) = (1,38400,1)
-
-    val v1 = OffChipMem[Elem]("vec1", N)
-    val v2 = OffChipMem[Elem]("vec2", N)
-    val out = OffChipMem[Elem]("out", N, N)
-
-    val vec1 = Array.fill(N)(random[Elem](100))
-    val vec2 = Array.fill(N)(random[Elem](100))
-
-    // Transfer data and start accelerator
-    setArg(dataSize, N)
-    setMem(v1, vec1)
-    setMem(v2, vec2)
-    Accel{ outerProduct(v1, v2, out) }
+    val result = outerproduct(v1, v2)
 
     val gold = Array.tabulate(N){i => Array.tabulate(N){j => vec1(i) * vec2(j) }}.flatten
-
-    val result = getMem(out)
 
     println("expected: " + gold.mkString(", "))
     println("result:   " + result.mkString(", "))

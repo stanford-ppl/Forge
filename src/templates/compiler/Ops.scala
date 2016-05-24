@@ -32,7 +32,7 @@ trait DeliteGenOps extends BaseGenOps {
    */
   def makeOpNodeName(o: Rep[DSLOp], suffix: String = "") = {
     Labels.get(o).map(_.capitalize).getOrElse {
-      val i = nameClashId(o, clasher = nameClashesSimple)
+      val i = nameClashId(o, clasher = nameClashesGrp) // was nameClashesSimple - why?
       o.style match {
         case `staticMethod` => o.grp.name + i + "Object_" + sanitize(o.name).capitalize + suffix
         case `directMethod` if o.visibility != publicMethod => sanitize(o.name).capitalize + suffix

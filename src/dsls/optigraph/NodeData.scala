@@ -128,7 +128,7 @@ trait NodeDataOps {
     val Tuple2 = lookupTpe("Tup2")
 
     data(NodeDataDB, ("_db", KeyValueStore(NodeData(MDouble))))
-    compiler (NodeDataDB) ("nd_alloc_db", Nil, KeyValueStore(NodeData(MDouble)) :: NodeDataDB) implements allocates (NodeDataDB, ${$0})
+    internal (NodeDataDB) ("nd_alloc_db", Nil, KeyValueStore(NodeData(MDouble)) :: NodeDataDB) implements allocates (NodeDataDB, ${$0})
 
     static (NodeDataDB) ("fromTable", Nil, (MString) :: NodeDataDB) implements composite ${
       nd_alloc_db(KeyValueStore($0, nd_deserialize))
@@ -174,23 +174,23 @@ trait NodeDataOps {
       buf.put(array_buffer_unsafe_result(arr), 0, len)
       buf.unsafeImmutable.array
     }
-    
+
     val NodeDataDBOps = withTpe(NodeDataDB)
     NodeDataDBOps{
-      compiler ("nd_getdb") (Nil :: KeyValueStore(NodeData(MDouble))) implements getter(0, "_db")
+      internal ("nd_getdb") (Nil :: KeyValueStore(NodeData(MDouble))) implements getter(0, "_db")
 
       infix ("apply") (MString :: NodeData(MDouble)) implements composite ${ nd_getdb($0).apply($1) }
 
       infix ("contains") (MString :: MBoolean) implements composite ${ nd_getdb($0).get($1) != unit(null) }
 
       infix ("update") ((MString, NodeData(MDouble)) :: MUnit, effect = write(0)) implements composite ${ nd_getdb($0).put($1, nd_serialize($2)) }
-    
+
       infix ("close") (Nil :: MUnit, effect = write(0)) implements composite ${ nd_getdb($0).close() }
-    
-      infix("toFile") (MString :: MUnit, effect = simple) implements composite ${ 
+
+      infix("toFile") (MString :: MUnit, effect = simple) implements composite ${
         val keys = nd_getdb($0).keys
         ForgeFileWriter.writeLines($1, keys.length)(i => {
-          val data = $self(keys(i)).getRawArrayBuffer   
+          val data = $self(keys(i)).getRawArrayBuffer
           array_buffer_reduce(array_buffer_map(data, (e:Rep[Double]) => "" + e), (a:Rep[String],b:Rep[String]) => a + "|" + b, "")
         })
       }

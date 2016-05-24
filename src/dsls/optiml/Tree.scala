@@ -63,7 +63,7 @@ trait TreeOps {
       ${array_empty[Int](initCapacity)}
     )
 
-    compiler (Tree) ("alloc_tree_raw", Nil, MethodSignature(
+    internal (Tree) ("alloc_tree_raw", Nil, MethodSignature(
       List(("numNodes", MInt),
            ("capacity", MInt),
            ("isLeaf", MArray(MBoolean)),
@@ -117,7 +117,7 @@ trait TreeOps {
       internal ("infix_set_value") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_value", ${$1})
 
       infix ("prob") (Nil :: MArray(MDouble)) implements getter(0, "_prob")
-      compiler ("infix_set_prob") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_prob", ${$1})
+      internal ("infix_set_prob") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_prob", ${$1})
 
       infix ("impurity") (Nil :: MArray(MDouble)) implements getter(0, "_impurity")
       internal ("infix_set_impurity") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_impurity", ${$1})
@@ -456,18 +456,18 @@ trait TreeOps {
     /**
      * The probability to store for the prediction for this leaf.
      */
-    compiler (Tree) ("tree_prob", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("value", MDouble), ("samples", IndexVector), ("criterion", TCriterion)) :: MDouble) implements composite ${
+    internal (Tree) ("tree_prob", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("value", MDouble), ("samples", IndexVector), ("criterion", TCriterion)) :: MDouble) implements composite ${
       criterion match {
         case MSE => tree_prob_mse(trainingSet, value, samples)
         case Gini => tree_prob_gini(trainingSet, value, samples)
       }
     }
 
-    compiler (Tree) ("tree_prob_mse", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("value", MDouble), ("samples", IndexVector)) :: MDouble) implements composite ${
+    internal (Tree) ("tree_prob_mse", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("value", MDouble), ("samples", IndexVector)) :: MDouble) implements composite ${
       1.0
     }
 
-    compiler (Tree) ("tree_prob_gini", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("value", MDouble), ("samples", IndexVector)) :: MDouble) implements composite ${
+    internal (Tree) ("tree_prob_gini", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("value", MDouble), ("samples", IndexVector)) :: MDouble) implements composite ${
       // return the frequency of the selected label as a proportion of all labels in the sample
       val allLabels = trainingSet.labels.apply(samples)
       allLabels.count(_ == value).toDouble / allLabels.length

@@ -73,8 +73,8 @@ object NoArea extends FPGAResources()
 
 // TODO: Should get some of this from loading a file rather than hardcoding
 // All numbers here are from Stratix V profiling
-trait AreaModel {
-  this: DHDLExp with CounterToolsExp =>
+trait AreaModel extends PipeStageToolsExp {
+  this: DHDLExp =>
 
   private var silentModel = false
   private def warn(x: => String) { if (!silentModel) stageWarn(x) }
@@ -126,6 +126,8 @@ trait AreaModel {
     val bankDepth = Math.ceil(depth.toDouble/banks)       // Word depth per bank
 
     if (bankDepth < REG_RAM_DEPTH) {
+      //System.out.println("RAM can be implemented using registers")
+
       val regs = width * bankDepth.toInt * banks
       if (dblBuf) FPGAResources(lut3=2*nbits, regs=2*nbits, mregs = regs*2)
       else        FPGAResources(mregs = regs)
@@ -176,7 +178,7 @@ trait AreaModel {
    * Accumulator calculation+update is often generated as a special case to minimize latencies in tight cycles
    **/
   private def areaOfNodeInReduce(s: Exp[Any], d: Def[Any]): FPGAResources = d match {
-    case DHDLPrim_Add_flt(_,_) =>
+    case FltPt_Add(_,_) =>
       FPGAResources(lut3=397,lut4=29,lut5=125,lut6=34,lut7=5,regs=1606,mem16=50) // More registers
 
     case Reflect(d,_,_) => areaOfNodeInReduce(s,d)
@@ -185,9 +187,9 @@ trait AreaModel {
 
 
   def areaOfCounterRegs(lhs: Exp[Any], cchain: Exp[CounterChain]): FPGAResources = {
-    if (isPipeline(lhs.tp) && styleOf(lhs) == Coarse) {
+    if (isOuterLoop(lhs) && styleOf(lhs) == Coarse) {
       val N = nStages(lhs) - 1          // Number of stages needed for delay
-      val P = parOf(cchain).reduce(_+_) // Number of duplications per counter
+      val P = parsOf(cchain).reduce(_+_) // Number of duplications per counter
       FPGAResources(lut3=N*P*32, regs = 4*N*P*32) // TODO: Hardcoded 32 bit index sizes
     }
     else NoArea
@@ -236,99 +238,99 @@ trait AreaModel {
     case _:Counterchain_new => NoArea
 
     // TODO: Have to get numbers for non-32 bit multiplies and divides
-    case DHDLPrim_Neg_fix(_)   => FPGAResources(lut3 = nbits(s), regs = nbits(s))
-    case DHDLPrim_Add_fix(_,_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
-    case DHDLPrim_Sub_fix(_,_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case FixPt_Neg(_)   => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case FixPt_Add(_,_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case FixPt_Sub(_,_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
 
-    case DHDLPrim_Mul_fix(Exact(c),_) => areaOfConstMult(c.toInt, nbits(s)) // HACK
-    case DHDLPrim_Mul_fix(_,Exact(c)) => areaOfConstMult(c.toInt, nbits(s)) // HACK
-    case DHDLPrim_Mul_fix(_,_) =>
+    case FixPt_Mul(Exact(c),_) => areaOfConstMult(c.toInt, nbits(s)) // HACK
+    case FixPt_Mul(_,Exact(c)) => areaOfConstMult(c.toInt, nbits(s)) // HACK
+    case FixPt_Mul(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(dsps = 2)
 
-    case DHDLPrim_Div_fix(Exact(_),_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
-    case DHDLPrim_Div_fix(_,Exact(_)) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
-    case DHDLPrim_Div_fix(_,_) =>
+    case FixPt_Div(Exact(_),_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case FixPt_Div(_,Exact(_)) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case FixPt_Div(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       if (sign(s)) FPGAResources(lut3=1192,lut5=2,regs=2700)
       else         FPGAResources(lut3=1317,lut5=6,regs=2900)
 
-    case DHDLPrim_Mod_fix(Exact(_),_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
-    case DHDLPrim_Mod_fix(_,Exact(_)) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
-    case DHDLPrim_Mod_fix(_,_) =>
+    case FixPt_Mod(Exact(_),_) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case FixPt_Mod(_,Exact(_)) => FPGAResources(lut3 = nbits(s), regs = nbits(s))
+    case FixPt_Mod(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       if (sign(s)) FPGAResources(lut3=1192,lut5=2,regs=2700)
       else         FPGAResources(lut3=1317,lut5=6,regs=2900)
 
-    case DHDLPrim_Lt_fix(_,_)  => FPGAResources(lut4=nbits(s), regs=nbits(s))
-    case DHDLPrim_Leq_fix(_,_) => FPGAResources(lut4=nbits(s), regs=nbits(s))
-    case DHDLPrim_Neq_fix(_,_) => FPGAResources(lut4=nbits(s)/2, lut5=nbits(s)/8, regs=nbits(s))
-    case DHDLPrim_Eql_fix(_,_) => FPGAResources(lut4=nbits(s)/2, lut5=nbits(s)/8, regs=nbits(s))
-    case DHDLPrim_And_fix(_,_) => FPGAResources(lut3=nbits(s), regs=nbits(s))
-    case DHDLPrim_Or_fix(_,_)  => FPGAResources(lut3=nbits(s), regs=nbits(s))
+    case FixPt_Lt(_,_)  => FPGAResources(lut4=nbits(s), regs=nbits(s))
+    case FixPt_Leq(_,_) => FPGAResources(lut4=nbits(s), regs=nbits(s))
+    case FixPt_Neq(_,_) => FPGAResources(lut4=nbits(s)/2, lut5=nbits(s)/8, regs=nbits(s))
+    case FixPt_Eql(_,_) => FPGAResources(lut4=nbits(s)/2, lut5=nbits(s)/8, regs=nbits(s))
+    case FixPt_And(_,_) => FPGAResources(lut3=nbits(s), regs=nbits(s))
+    case FixPt_Or(_,_)  => FPGAResources(lut3=nbits(s), regs=nbits(s))
 
-    //case DHDLPrim_Lsh_fix(_,_) => // ??? nbits(s)*nbits(s) ?
-    //case DHDLPrim_Rsh_fix(_,_) => // ???
+    //case FixPt_Lsh(_,_) => // ??? nbits(s)*nbits(s) ?
+    //case FixPt_Rsh(_,_) => // ???
 
     // TODO: Floating point for things besides single precision
-    case DHDLPrim_Neg_flt(_) =>
+    case FltPt_Neg(_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=397,lut4=29,lut5=125,lut6=34,lut7=5,regs=606,mem16=50)
 
-    case DHDLPrim_Add_flt(_,_) =>
+    case FltPt_Add(_,_) =>
+      if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
+      FPGAResources(lut3=397,lut4=29,lut5=125,lut6=34,lut7=5,regs=606,mem16=50) // ~372 ALMs, 1 DSP (around 564)
+
+    case FltPt_Sub(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=397,lut4=29,lut5=125,lut6=34,lut7=5,regs=606,mem16=50)
 
-    case DHDLPrim_Sub_flt(_,_) =>
+    case FltPt_Mul(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
-      FPGAResources(lut3=397,lut4=29,lut5=125,lut6=34,lut7=5,regs=606,mem16=50)
+      FPGAResources(lut3=152,lut4=10,lut5=21,lut6=2,dsps=1,regs=335,mem16=43) // ~76 ALMs, 1 DSP (around 1967)
 
-    case DHDLPrim_Mul_flt(_,_) =>
-      if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
-      FPGAResources(lut3=152,lut4=10,lut5=21,lut6=2,dsps=1,regs=335,mem16=43)
-
-    case DHDLPrim_Div_flt(_,_) =>
+    case FltPt_Div(_,_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=2384,lut4=448,lut5=149,lut6=385,lut7=1,regs=3048,mem32=25,mem16=9)
 
-    case DHDLPrim_Lt_flt(a,_)  =>
+    case FltPt_Lt(a,_)  =>
       if (nbits(a) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut4=42,lut6=26,regs=33)
 
-    case DHDLPrim_Leq_flt(a,_) =>
+    case FltPt_Leq(a,_) =>
       if (nbits(a) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut4=42,lut6=26,regs=33)
 
-    case DHDLPrim_Neq_flt(a,_) =>
+    case FltPt_Neq(a,_) =>
       if (nbits(a) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut4=42,lut6=26,regs=33)
 
-    case DHDLPrim_Eql_flt(a,_) =>
+    case FltPt_Eql(a,_) =>
       if (nbits(a) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut4=42,lut6=26,regs=33)
 
 
-    case DHDLPrim_Not_bit(_)   => FPGAResources(lut3=1,regs=1)
-    case DHDLPrim_And_bit(_,_) => FPGAResources(lut3=1,regs=1)
-    case DHDLPrim_Or_bit(_,_)  => FPGAResources(lut3=1,regs=1)
-    case DHDLPrim_Xor_bit(_,_)  => FPGAResources(lut3=1,regs=1)
-    case DHDLPrim_Xnor_bit(_,_)  => FPGAResources(lut3=1,regs=1)
+    case Bit_Not(_)   => FPGAResources(lut3=1,regs=1)
+    case Bit_And(_,_) => FPGAResources(lut3=1,regs=1)
+    case Bit_Or(_,_)  => FPGAResources(lut3=1,regs=1)
+    case Bit_Xor(_,_)  => FPGAResources(lut3=1,regs=1)
+    case Bit_Xnor(_,_)  => FPGAResources(lut3=1,regs=1)
 
-    case DHDLPrim_Abs_fix(_) => FPGAResources(lut3=nbits(s),regs=nbits(s))
-    case DHDLPrim_Abs_flt(_) => FPGAResources(regs=nbits(s)-1)
-    case DHDLPrim_Log_flt(_) =>
+    case FixPt_Abs(_) => FPGAResources(lut3=nbits(s),regs=nbits(s))
+    case FltPt_Abs(_) => FPGAResources(regs=nbits(s)-1)
+    case FltPt_Log(_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=472,lut4=47,lut5=74,lut6=26,lut7=3,mem16=42,regs=950,dsps=7,bram=3)
 
-    case DHDLPrim_Exp_flt(_) =>
+    case FltPt_Exp(_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=368,lut4=102,lut5=137,lut6=38,mem16=24,regs=670,dsps=5,bram=2)
 
-    case DHDLPrim_Sqrt_flt(_) =>
+    case FltPt_Sqrt(_) =>
       if (nbits(s) != 32) warn(s"Don't know area for $d - using default")
       FPGAResources(lut3=476,lut4=6,lut5=6,mem32=11,regs=900)
 
-    case BasicCtrl1_Mux(_,_,_) => FPGAResources(regs = nbits(s))
+    case Mux2(_,_,_) => FPGAResources(regs = nbits(s))
 
     case Convert_fixpt(_) => FPGAResources(regs=nbits(s))
     //case Convert_fltpt(_) => // ???
@@ -340,43 +342,48 @@ trait AreaModel {
       FPGAResources(lut4=160,lut6=96,regs=223+nbits(s))
 
 
-    // TODO: These need new numbers after Raghu's changes
+    // TODO: New templates - needs recharacterization
     // Tile Store
-    case tt@TileTransfer(mem,local,_,_,_,cc,_,true) =>
-      val nonConstDims = (dimsOf(tt.mem) ++ tt.memOfs).filterNot{case Fixed(_) => true; case _ => false}.length
-      val dsp = if (nonConstDims > 1) 3 else 0
-      val p = parOf(cc).reduce{_*_}
+    case Offchip_store_vector(mem,ofs,vec) =>
+      //val nonConstDims = (dimsOf(tt.mem) ++ tt.memOfs).filterNot{case Fixed(_) => true; case _ => false}.length
+      //val dsp = if (nonConstDims > 1) 3 else 0
+      //val p = parsOf(cc).reduce{_*_}
 
-      val brm = if (p < 25) 46 + Math.floor(0.75*(p-1)).toInt else if (p < 49) 62 - Math.floor(0.75*(p-24)).toInt else 42
+      //val brm = if (p < 25) 46 + Math.floor(0.75*(p-1)).toInt else if (p < 49) 62 - Math.floor(0.75*(p-24)).toInt else 42
 
       //System.out.println(s"Tile store $tt: $brm")
       // Old template
       //FPGAResources(lut3=1900,lut4=167,lut5=207,lut6=516,lut7=11,regs=5636,dsps=dsp,bram=46,streams = 1)
       // New template
-      FPGAResources(lut3=893,lut4=91,lut5=96,lut6=618,lut7=10, regs=4692, dsps=dsp, bram=brm, streams=1)
+      FPGAResources(lut3=893,lut4=91,lut5=96,lut6=618,lut7=10, regs=4692, dsps=0, bram=0, streams=1)  // ~1206 ALMs
 
       //FPGAResources(lut3=378,lut4=38,lut5=58,lut6=569,lut7=4, regs=3878, dsps=dsp, bram=46, streams=1)
 
     // Tile Load
-    case tt@TileTransfer(mem,local,_,_,_,cc,_,false) =>
-      val p = parOf(cc).reduce{_*_}
-      val nonConstDims = (dimsOf(tt.mem) ++ tt.memOfs).filterNot{case Fixed(_) => true; case _ => false}.length
-      val dsp = if (nonConstDims > 1) 4 else 0
+    case Offchip_load_vector(mem,ofs,len) =>
+      //val p = parsOf(cc).reduce{_*_}
+      //val nonConstDims = (dimsOf(tt.mem) ++ tt.memOfs).filterNot{case Fixed(_) => true; case _ => false}.length
+      //val dsp = if (nonConstDims > 1) 4 else 0
       // New template
       // FPGAResources(lut3=453, lut4=60, lut5=131,lut6=522,regs=1377,dsps=dsp,bram=46, streams=1)
-      val brams = 12 - p/8
+      //val brams = 12 - p/8
       // New template
-      FPGAResources(lut3=410, lut4=50, lut5=70, lut6=53, regs=920, dsps=dsp, bram=brams, streams=1)
+      FPGAResources(lut3=410, lut4=50, lut5=70, lut6=53, regs=920, dsps=0, bram=0, streams=1) // ~353 ALMs
+
+    // TODO: New templates - needs recharacterization
+    case Bram_store_vector(bram,ofs,vec,cchain,inds) => NoArea
+    case Bram_load_vector(bram,ofs,cchain,inds) => NoArea
+
 
     case _:Pipe_parallel => FPGAResources(lut4=9*nStages(s)/2, regs = nStages(s) + 3)
 
     case e:Pipe_foreach if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.cchain)
-    case e:Pipe_reduce[_,_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.cchain)
-    case e:Block_reduce[_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.ccOuter)
+    case e:Pipe_fold[_,_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.cchain)
+    case e:Accum_fold[_,_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.ccOuter)
 
     case _:Pipe_foreach if styleOf(s) == Disabled => areaOfSequential(nStages(s))
-    case _:Pipe_reduce[_,_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
-    case _:Block_reduce[_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
+    case _:Pipe_fold[_,_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
+    case _:Accum_fold[_,_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
     case _:Unit_pipe if styleOf(s) == Disabled => areaOfSequential(nStages(s))
 
     // Nodes with known zero area cost
@@ -385,7 +392,7 @@ trait AreaModel {
     case Reg_reset(_)   => NoArea
     case Offchip_new(_) => NoArea
     case _:Pipe_foreach if styleOf(s) == Fine => NoArea
-    case _:Pipe_reduce[_,_] if styleOf(s) == Fine => NoArea
+    case _:Pipe_fold[_,_] if styleOf(s) == Fine => NoArea
     case _:Unit_pipe if styleOf(s) == Fine => NoArea
 
     // Effects

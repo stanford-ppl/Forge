@@ -37,7 +37,7 @@ trait KeyValueStoreOps {
       hash
     }
 
-    compiler (KeyValueStore) ("kv_alloc_raw", V, (("table", MString), ("deserialize", (KeyValueStore(V),MString) ==> V)) :: KeyValueStore(V), effect = mutable) implements
+    internal (KeyValueStore) ("kv_alloc_raw", V, (("table", MString), ("deserialize", (KeyValueStore(V),MString) ==> V)) :: KeyValueStore(V), effect = mutable) implements
       allocates(KeyValueStore, ${$0}, "unit(null.asInstanceOf[org.iq80.leveldb.DB])", ${doLambda((t: Rep[Tup2[KeyValueStore[V],String]]) => deserialize(t._1, t._2))})
 
     // -- code generated internal methods interface with the embedded db
@@ -45,7 +45,7 @@ trait KeyValueStoreOps {
     // We use simple effects in lieu of read / write effects because these are codegen nodes,
     // so we cannot pass the struct to them (a limitation of Forge at the moment).
 
-    compiler (KeyValueStore) ("kv_open_internal", Nil, MString :: LevelDB, effect = simple) implements codegen($cala, ${
+    internal (KeyValueStore) ("kv_open_internal", Nil, MString :: LevelDB, effect = simple) implements codegen($cala, ${
       import org.iq80.leveldb._
       import org.fusesource.leveldbjni.JniDBFactory._
       val options = new Options()
@@ -55,7 +55,7 @@ trait KeyValueStoreOps {
       db
     })
 
-    compiler (KeyValueStore) ("kv_contains_internal", Nil, (LevelDB, MArray(MByte)) :: MBoolean, effect = simple) implements codegen($cala, ${
+    internal (KeyValueStore) ("kv_contains_internal", Nil, (LevelDB, MArray(MByte)) :: MBoolean, effect = simple) implements codegen($cala, ${
       val key = $1
       val iterator = $0.iterator()
       iterator.seek(key)
@@ -67,11 +67,11 @@ trait KeyValueStoreOps {
       res
     })
 
-    compiler (KeyValueStore) ("kv_get_internal", Nil, (LevelDB, MArray(MByte)) :: MArray(MByte), effect = simple) implements codegen($cala, ${
+    internal (KeyValueStore) ("kv_get_internal", Nil, (LevelDB, MArray(MByte)) :: MArray(MByte), effect = simple) implements codegen($cala, ${
       $0.get($1)
     })
 
-    compiler (KeyValueStore) ("kv_get_all_internal", Nil, (LevelDB, MString) :: MArray(MArray(MByte)), effect = simple) implements codegen($cala, ${
+    internal (KeyValueStore) ("kv_get_all_internal", Nil, (LevelDB, MString) :: MArray(MArray(MByte)), effect = simple) implements codegen($cala, ${
       // workaround for named arguments in codegen methods not working
       val db = $0
       val prefix = ($1 + "\$KV_LOGICAL_KEY_SEPARATOR").getBytes
@@ -95,11 +95,11 @@ trait KeyValueStoreOps {
       if (buf.size > 0) buf.toArray else null
     })
 
-    compiler (KeyValueStore) ("kv_put_internal", Nil, (LevelDB, MArray(MByte), MArray(MByte)) :: MUnit, effect = simple) implements codegen($cala, ${
+    internal (KeyValueStore) ("kv_put_internal", Nil, (LevelDB, MArray(MByte), MArray(MByte)) :: MUnit, effect = simple) implements codegen($cala, ${
       $0.put($1, $2)
     })
 
-    compiler (KeyValueStore) ("kv_put_all_internal", Nil, (LevelDB, MArray(MString), MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
+    internal (KeyValueStore) ("kv_put_all_internal", Nil, (LevelDB, MArray(MString), MArray(MString), MArray(MArray(MByte)), MInt) :: MUnit, effect = simple) implements codegen($cala, ${
       assert($1.length >= $4 && $2.length >= $4 && $3.length >= $4, "KeyValueStore putAll called with too small arrays")
       val batch = $0.createWriteBatch()
       var i = 0
@@ -112,11 +112,11 @@ trait KeyValueStoreOps {
       batch.close()
     })
 
-    compiler (KeyValueStore) ("kv_close_internal", Nil, LevelDB :: MUnit, effect = simple) implements codegen($cala, ${
+    internal (KeyValueStore) ("kv_close_internal", Nil, LevelDB :: MUnit, effect = simple) implements codegen($cala, ${
       $0.close()
     })
 
-    compiler (KeyValueStore) ("kv_keys_internal", Nil, LevelDB :: MArray(MString)) implements codegen($cala, ${
+    internal (KeyValueStore) ("kv_keys_internal", Nil, LevelDB :: MArray(MString)) implements codegen($cala, ${
       val buf = scala.collection.mutable.ArrayBuffer[String]()
       val iterator = $0.iterator()
       iterator.seekToFirst()
@@ -140,12 +140,12 @@ trait KeyValueStoreOps {
 
     val KeyValueStoreOps = withTpe(KeyValueStore)
     KeyValueStoreOps {
-      compiler ("kv_deserialize") (Nil :: MLambda(Tup2(KeyValueStore(V),MString), V)) implements getter(0, "_deserialize")
-      compiler ("kv_table_name") (Nil :: MString) implements getter(0, "_table")
-      compiler ("kv_get_db") (Nil :: LevelDB) implements getter(0, "_db")
-      compiler ("kv_set_db") (LevelDB :: MUnit, effect = write(0)) implements setter(0, "_db", ${$1})
+      internal ("kv_deserialize") (Nil :: MLambda(Tup2(KeyValueStore(V),MString), V)) implements getter(0, "_deserialize")
+      internal ("kv_table_name") (Nil :: MString) implements getter(0, "_table")
+      internal ("kv_get_db") (Nil :: LevelDB) implements getter(0, "_db")
+      internal ("kv_set_db") (LevelDB :: MUnit, effect = write(0)) implements setter(0, "_db", ${$1})
 
-      compiler ("kv_get_db_safe") (Nil :: LevelDB) implements composite ${
+      internal ("kv_get_db_safe") (Nil :: LevelDB) implements composite ${
         val db = kv_get_db($self)
         fassert(db != null, "No DB opened in KeyValueStore")
         db

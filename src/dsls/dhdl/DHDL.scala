@@ -227,6 +227,7 @@ trait DHDLDSL extends ForgeApplication
     val MetaPipeRegInsertion = traversal("MetaPipeRegInsertion",isExtern=true)
 
     val Unrolling = transformer("Unrolling", isExtern=true)
+    val DotIRPrinter = traversal("DotIRPrinter", isExtern=true)
 
     importGlobalAnalysis()
     importBoundAnalysis()
@@ -239,10 +240,11 @@ trait DHDLDSL extends ForgeApplication
     schedule(ParallelizationSetter)
     schedule(DHDLAffineAnalysis)
 
+    schedule(DotIRPrinter)  // Prior to unrolling
+
     schedule(DSE)
 
     // --- Post-DSE Estimation
-    //schedule(IRPrinterPlus)
     schedule(AreaAnalyzer)
     schedule(OpsAnalyzer)
 
@@ -250,15 +252,10 @@ trait DHDLDSL extends ForgeApplication
     schedule(BoundAnalyzer)
     schedule(ConstantFolding)
 
-    //schedule(IRPrinter)
-
     schedule(MetaPipeRegInsertion)
 
-    //schedule(IRPrinter)
-    //schedule(HardStop)  // DEBUGGING
     schedule(Unrolling)
-    schedule(IRPrinter)
-    //schedule(HardStop)  // DEBUGGING
+    schedule(DotIRPrinter) // After unrolling
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))

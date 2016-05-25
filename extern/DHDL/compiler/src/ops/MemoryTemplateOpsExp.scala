@@ -5,6 +5,7 @@ import scala.virtualization.lms.common.{BaseExp, EffectExp, ScalaGenEffect, DotG
 import scala.virtualization.lms.internal.{Traversal}
 import scala.reflect.{Manifest,SourceContext}
 import ppl.delite.framework.transform.{DeliteTransform}
+import scala.collection.mutable.Set
 
 import dhdl.shared._
 import dhdl.shared.ops._
@@ -195,7 +196,7 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplate
 
 	var emittedSize = Set.empty[Exp[Any]]
   override def initializeGenerator(buildDir:String): Unit = {
-		emittedSize = Set.empty[Exp[Any]]
+		emittedSize.clear
 		super.initializeGenerator(buildDir)
 	}
 
@@ -219,7 +220,7 @@ trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplate
 			}
 			if (!emittedSize.contains(size)) {
 				hackGen(size)
-				emittedSize = emittedSize + size
+				emittedSize += size
 			}
 			super.emitNode(sym, rhs)
 

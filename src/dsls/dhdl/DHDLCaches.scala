@@ -116,6 +116,7 @@ trait DHDLCaches {
     impl (cache_store) (codegen($cala, ${ $cache.update($addr.toInt, $value) }))
 
     // --- Dot Backend
+    // TODO: Move to DotIRPrinter
     impl (cache_new)   (codegen(dot, ${
       @ if (isDblBuf(sym)) {
         $sym [margin=0 rankdir="LR" label="{<st> | <ld>}" xlabel="$sym "

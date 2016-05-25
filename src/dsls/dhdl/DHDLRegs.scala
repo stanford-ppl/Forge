@@ -108,36 +108,6 @@ trait DHDLRegs {
       $reg.update(0, $init)
     }))
 
-    // --- Dot Backend
-    impl (reg_new)   (codegen(dot, ${
-      @ regType(sym) match {
-        @ case Regular =>
-          @ if (isDblBuf(sym)) {
-              $sym [margin=0, rankdir="LR", label="{<st> | <ld>}" xlabel="$sym "
-                    shape="record" color=$dblbufBorderColor style="filled"
-                    fillcolor=$regFillColor ]
-          @ } else {
-              $sym [label= "\$sym" shape="square" style="filled" fillcolor=$regFillColor ]
-          @ }
-        @ case ArgumentIn =>
-          @ alwaysGen {
-            $sym [label=$sym shape="Msquare" style="filled" fillcolor=$regFillColor ]
-          @ }
-        @ case ArgumentOut =>
-          @ alwaysGen {
-            $sym [label=$sym shape="Msquare" style="filled" fillcolor=$regFillColor ]
-          @ }
-      @ }
-    }))
-    impl (reg_read)  (codegen(dot, ${
-      @ emitValDef(sym, reg)
-    }))
-    impl (reg_write) (codegen(dot, ${
-      $value -> $reg
-    }))
-    impl (reg_reset) (codegen(dot, ${
-    }))
-
     // --- MaxJ Backend
     //reg_new (extern)
     impl (reg_read)  (codegen(maxj, ${

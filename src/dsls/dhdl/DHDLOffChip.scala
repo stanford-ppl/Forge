@@ -187,24 +187,6 @@ trait DHDLOffChip {
       for (i <- 0 until $vec.length) { $mem(i + $ofs.toInt) = $vec(i) }
     }))
 
-    val lbl = "\"\\\"\" + quote(sym)"
-    val endlbl = "\"\\\"\""
-
-    // --- Dot Backend
-    impl (offchip_new) (codegen(dot, ${
-      @ alwaysGen {
-        @ var label = \$lbl
-        @ if (quote(size).forall(_.isDigit)) {
-          @   label += ", size=" + quote(size)
-        @ } else {
-          $size -> $sym [ headlabel="size" ]
-        @ }
-        @ label += \$endlbl
-        $sym [ label=$label shape="square" fontcolor="white" color="white" style="filled"
-        fillcolor=$dramFillColor color=black]
-      @ }
-    }))
-
     // --- MaxJ Backend
     //offchip_new (extern)
   }

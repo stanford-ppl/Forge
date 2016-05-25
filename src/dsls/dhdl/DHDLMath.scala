@@ -297,37 +297,6 @@ trait DHDLMath {
     impl (xor_bit) (codegen($cala, ${ $0 != $1 }))
     impl (xnor_bit) (codegen($cala, ${ $0 == $1 }))
 
-    // --- Dot Backend
-    impl (neg_fix) (codegen(dot, ${ $sym [label="unary_-:fix" shape="square" style="filled" fillcolor="white"] \n $0->$sym }))
-		impl (add_fix) (codegen(dot, ${ $sym [label="+:fix" shape="square" style="filled" fillcolor="white"]  \n $0->$sym \n $1->$sym }))
-		impl (sub_fix) (codegen(dot, ${ $sym [label="-:fix" shape="square" style="filled" fillcolor="white"]  \n $0->$sym \n $1->$sym }))
-		impl (mul_fix) (codegen(dot, ${ $sym [label="*:fix" shape="square" style="filled" fillcolor="white"]  \n $0->$sym \n $1->$sym }))
-		impl (div_fix) (codegen(dot, ${ $sym [label="/:fix" shape="square" style="filled" fillcolor="white"]  \n $0->$sym \n $1->$sym }))
-		impl (lt_fix)  (codegen(dot, ${ $sym [label="<:fix" shape="square" style="filled" fillcolor="white"]  \n $0->$sym \n $1->$sym }))
-		impl (leq_fix) (codegen(dot, ${ $sym [label="<=:fix" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-		impl (neq_fix) (codegen(dot, ${ $sym [label="!=:fix" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-		impl (eql_fix) (codegen(dot, ${ $sym [label="==:fix" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-		impl (and_fix) (codegen(dot, ${ $sym [label="&:fix"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-		impl (or_fix)  (codegen(dot, ${ $sym [label="|:fix"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-		impl (lsh_fix) (codegen(dot, ${ $sym [label="<<:fix" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-		impl (rsh_fix) (codegen(dot, ${ $sym [label=">>:fix" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-
-    impl (neg_flt) (codegen(dot, ${ $sym [label="unary_-:flt"] \n $0->$sym }))
-    impl (add_flt) (codegen(dot, ${ $sym [label="+:flt"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-    impl (sub_flt) (codegen(dot, ${ $sym [label="-:flt"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-    impl (mul_flt) (codegen(dot, ${ $sym [label="*:flt"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-    impl (div_flt) (codegen(dot, ${ $sym [label="/:flt"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-    impl (lt_flt)  (codegen(dot, ${ $sym [label="<:flt"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-    impl (leq_flt) (codegen(dot, ${ $sym [label="<=:flt" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-    impl (neq_flt) (codegen(dot, ${ $sym [label="!=:flt" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-    impl (eql_flt) (codegen(dot, ${ $sym [label="==:flt" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-
-    impl (not_bit) (codegen(dot, 	${ $sym [label="~:bit" shape="square" style="filled" fillcolor="white"] \n $0->$sym }))
-    impl (and_bit) (codegen(dot, 	${ $sym [label="&:bit" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-    impl (or_bit)  (codegen(dot, 	${ $sym [label="|:bit" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-    impl (xor_bit) (codegen(dot, 	${ $sym [label="xor:bit"  shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-    impl (xnor_bit) (codegen(dot, ${ $sym [label="xnor:bit" shape="square" style="filled" fillcolor="white"] \n $0->$sym \n $1->$sym }))
-
     // --- MaxJ Backend
     impl (neg_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
@@ -535,24 +504,6 @@ trait DHDLMath {
     impl (exp_flt) (codegen($cala, ${ FloatPoint.exp($0) }))
     impl (sqrt_flt) (codegen($cala, ${ FloatPoint.sqrt($0) }))
 
-    // --- Dot Backend
-    impl (abs_fix) (codegen(dot,  ${ $sym [label="abs:fix" shape="square" style="filled" fillcolor="white"]
-			$0 -> $sym
-		}))
-
-    impl (abs_flt) (codegen(dot,  ${ $sym [label="abs:flt" shape="square" style="filled" fillcolor="white"]
-			$0->$sym
-		}))
-    impl (log_flt) (codegen(dot,  ${ $sym [label="log:flt" shape="square" style="filled" fillcolor="white"]
-			$0->$sym
-		}))
-    impl (exp_flt) (codegen(dot,  ${ $sym [label="exp:flt" shape="square" style="filled" fillcolor="white"]
-			$0->$sym
-		}))
-    impl (sqrt_flt) (codegen(dot, ${ $sym [label="sqrt:flt" shape="square" style="filled" fillcolor="white"]
-			$0->$sym
-		}))
-
     // --- MaxJ Backend
     impl (abs_fix) (codegen(maxj,  ${
 			//TODO: parallelized virsion
@@ -605,14 +556,6 @@ trait DHDLMath {
 
     // --- Scala Backend
     impl (mux) (codegen($cala, ${ if ($sel) $a else $b }))
-
-    // --- Dot Backend
-    impl (mux) (codegen(dot, ${
-			$sym [label="mux", shape="diamond" style="filled" fillcolor="white"]
-			$sel -> $sym [ headlabel="sel" ]
-			$a -> $sym [ headlabel="a" ]
-			$b -> $sym [ headlabel="b" ]
-		}))
 
     // --- MaxJ Backend
     impl (mux) (codegen(maxj, ${

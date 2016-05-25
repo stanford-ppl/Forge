@@ -241,16 +241,6 @@ trait DHDLControllers {
       ()
     }))
 
-    // --- Dot Backend
-    impl (pipe_parallel) (codegen (dot, ${
-      subgraph cluster_$sym {
-      	label = "parallel_\$sym"
-      	style = "filled, bold"
-      	fillcolor = $parallelFillColor
-      	color = $parallelBorderColor
-      	@ stream.println(emitBlock(func) + "")
-			}
-		}))
     // --- MaxJ Backend
     //pipe_parallel (extern)
 

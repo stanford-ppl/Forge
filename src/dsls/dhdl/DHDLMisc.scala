@@ -110,7 +110,7 @@ trait DHDLMisc {
     static (Arr) ("tabulate", T, CurriedMethodSignature(List(List(Idx),List(Idx ==> T)), MArray(T))) implements composite ${
       array_fromfunction(fix_to_int($0), {i: Rep[Int] => $1(int_to_fix[Signed,B32](i)) })
     }
-    /** Creates an array directly with apply function 
+    /** Creates an array directly with apply function
      **/
     static (Arr) ("apply", T, varArgs(T) :: MArray(T)) implements composite ${
       array_fromseq( $0 )
@@ -211,12 +211,6 @@ trait DHDLMisc {
     impl (rand_flt) (codegen($cala, ${ FloatPoint.rand[$t[G],$t[E]] }))
     impl (rand_bit) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextBoolean() }))
 
-    // --- Dot Backend
-    //impl (rand_fix_bnd) (codegen(dot, ${  }))
-    //impl (rand_fix) (codegen(dot, ${  }))
-    //impl (rand_flt) (codegen(dot, ${  }))
-    //impl (rand_bit) (codegen(dot, ${  }))
-
     // --- MaxJ Backend
     //impl (rand_fix_bnd) (codegen(maxj, ${  }))
     //impl (rand_fix) (codegen(maxj, ${  }))
@@ -241,7 +235,7 @@ trait DHDLMisc {
     val LoopRange = lookupTpe("LoopRange")
     val OffChip   = lookupTpe("OffChipMem")
     val Reg       = lookupTpe("Reg")
-    val BRAM        = lookupTpe("BRAM")
+    val BRAM      = lookupTpe("BRAM")
 
     // --- Nodes
     val set_mem = internal (Tst) ("set_mem", T, (OffChip(T), MArray(T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
@@ -260,24 +254,24 @@ trait DHDLMisc {
     val println  = direct (Tst) ("println", Nil, MAny :: MUnit, effect = simple)
     val println2 = direct (Tst) ("println", Nil, Nil :: MUnit, effect = simple)
     val assert   = direct (Tst) ("assert", Nil, Bit :: MUnit, effect = simple)
-    /** Set content of BRAM to an array (debugging purpose only) 
-     * @param bram 
-     * @param array 
+    /** Set content of BRAM to an array (debugging purpose only)
+     * @param bram
+     * @param array
      **/
     val set_bram = direct (Tst) ("setBram", T, (BRAM(T), MArray(T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
-    /** Get content of BRAM in an array format (debugging purpose only) 
-     * @param bram 
+    /** Get content of BRAM in an array format (debugging purpose only)
+     * @param bram
      **/
     val get_bram = direct (Tst) ("getBram", T, BRAM(T) :: MArray(T), effect = simple, aliasHint = aliases(Nil))
 
-    /** Print content of a BRAM (debugging purpose only) 
-     * @param bram 
+    /** Print content of a BRAM (debugging purpose only)
+     * @param bram
      **/
     direct (Tst) ("printBram", T, BRAM(T) :: MUnit, effect = simple) implements composite ${
       println(nameOf($0) + ": "+ getBram($0).mkString(","))
     }
-    /** Print content of a OffChip (debugging purpose only) 
-     * @param bram 
+    /** Print content of a OffChip (debugging purpose only)
+     * @param bram
      **/
     direct (Tst) ("printMem", T, OffChip(T) :: MUnit, effect = simple) implements composite ${
       println(nameOf($0) + ": "+ getMem($0).mkString(","))
@@ -354,22 +348,6 @@ trait DHDLMisc {
       ()
     }))
 
-    // --- Dot Backend
-    impl (println)  (codegen(dot, ${
-			@ emitComment("println")
-		}))
-		//TODO: dot shouldn't see these nodes if nodes inside hwblock aren't ramdomly moved
-		//outside
-    impl (set_mem)  (codegen(dot, ${ }))
-    impl (get_mem)  (codegen(dot, ${ }))
-		impl (set_arg)  (codegen(dot, ${ $1 -> $0 }))
-    impl (get_arg)  (codegen(dot, ${ }))
-    impl (hwblock)  (codegen(dot, ${
-			@ inHwScope = true
-      @ stream.println(emitBlock(__arg0) + "")
-			@ inHwScope = false
-    }))
-
     // --- MaxJ Backend
     impl (println)  (codegen(maxj, ${
 			@ emitComment("println")
@@ -401,40 +379,40 @@ trait DHDLMisc {
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
     val SListBuffer = tpe("scala.collection.mutable.ListBuffer", T)
 
-    /** 
+    /**
      * Returns Array(smap,dmap), where smap is the adjacency list in hashMap for source nodes and dmap is
-     * the adjacency list of the destination nodes 
+     * the adjacency list of the destination nodes
      * @param path full path to graph file
-     * @param numVert number of vertices 
-     * @param dot whether is loading from a dot graph 
+     * @param numVert number of vertices
+     * @param dot whether is loading from a dot graph
      **/
     direct (IO) ("loadDirEdgeList", Nil, (MString, Idx, SBoolean) :: MArray(SHashMap(SInt,SListBuffer(SInt))), effect = simple) implements composite ${
       load_dir_edge_list($0, Some(fix_to_int($1)), Some($2))
     }
 
-    /** 
+    /**
      * Returns Array(smap,dmap), where smap is the adjacency list in hashMap for source nodes and dmap is
-     * the adjacency list of the destination nodes 
+     * the adjacency list of the destination nodes
      * @param path full path to graph file
-     * @param dot whether is loading from a dot graph 
+     * @param dot whether is loading from a dot graph
      **/
     direct (IO) ("loadDirEdgeList", Nil, (MString,SBoolean) :: MArray(SHashMap(SInt,SListBuffer(SInt))), effect = simple) implements composite ${
       load_dir_edge_list($0, None, Some($1))
     }
 
-    /** 
+    /**
      * Returns Array(smap,dmap), where smap is the adjacency list in hashMap for source nodes and dmap is
-     * the adjacency list of the destination nodes 
+     * the adjacency list of the destination nodes
      * @param path full path to graph file
-     * @param numVert number of vertices 
+     * @param numVert number of vertices
      **/
     direct (IO) ("loadDirEdgeList", Nil, (MString, Idx) :: MArray(SHashMap(SInt,SListBuffer(SInt))), effect = simple) implements composite ${
       load_dir_edge_list($0, Some(fix_to_int($1)), None)
     }
 
-    /** 
+    /**
      * Returns Array(smap,dmap), where smap is the adjacency list in hashMap for source nodes and dmap is
-     * the adjacency list of the destination nodes 
+     * the adjacency list of the destination nodes
      * @param path full path to graph file
      **/
     direct (IO) ("loadDirEdgeList", Nil, (MString) :: MArray(SHashMap(SInt,SListBuffer(SInt))), effect = simple) implements composite ${
@@ -492,35 +470,35 @@ trait DHDLMisc {
       Array(smap, dmap)
     })
 
-    /** 
+    /**
      * Returns an adjacency list in HashMap
      * @param path full path to graph file
-     * @param numVert number of vertices 
-     * @param dot whether is loading from a dot graph 
+     * @param numVert number of vertices
+     * @param dot whether is loading from a dot graph
      **/
     direct (IO) ("loadUnDirEdgeList", Nil, (MString, Idx, SBoolean) :: SHashMap(SInt,SListBuffer(SInt)), effect = simple) implements composite ${
       load_undir_edge_list($0, Some(fix_to_int($1)), Some($2))
     }
 
-    /** 
+    /**
      * Returns an adjacency list in HashMap
      * @param path full path to graph file
-     * @param dot whether is loading from a dot graph 
+     * @param dot whether is loading from a dot graph
      **/
     direct (IO) ("loadUnDirEdgeList", Nil, (MString,SBoolean) :: SHashMap(SInt,SListBuffer(SInt)), effect = simple) implements composite ${
       load_undir_edge_list($0, None, Some($1))
     }
 
-    /** 
+    /**
      * Returns an adjacency list in HashMap
      * @param path full path to graph file
-     * @param numVert number of vertices 
+     * @param numVert number of vertices
      **/
     direct (IO) ("loadUnDirEdgeList", Nil, (MString, Idx) :: SHashMap(SInt,SListBuffer(SInt)), effect = simple) implements composite ${
       load_undir_edge_list($0, Some(fix_to_int($1)), None)
     }
 
-    /** 
+    /**
      * Returns an adjacency list in HashMap
      * @param path full path to graph file
      **/
@@ -572,25 +550,25 @@ trait DHDLMisc {
 
     /** Generating an array of array representing vertices and their pointer to the edge list based on
      *  the adjacency list represented in the map.
-     *  If explicitVert=true, withSize=true, returns an N by 3 Array of Array(vertex #, ptr, size) 
+     *  If explicitVert=true, withSize=true, returns an N by 3 Array of Array(vertex #, ptr, size)
      *  If explicitVert=true, withSize=false, returns an N by 2 Array of Array(vertex #, ptr)
-     *  If explicitVert=false, withSize=true, returns an N by 2 Array of Array(ptr, size) 
-     *  If explicitVert=false, withSize=false, returns an N by 1 Array of Array(ptr) 
+     *  If explicitVert=false, withSize=true, returns an N by 2 Array of Array(ptr, size)
+     *  If explicitVert=false, withSize=false, returns an N by 1 Array of Array(ptr)
      *  size is the number of edges for correponding vertex.
-     * @param map 
+     * @param map
      * @param explicitVert
-     * @param withSize 
+     * @param withSize
      **/
     direct (IO) ("getVertList", Nil, (SHashMap(SInt, SListBuffer(SInt)), SBoolean, SBoolean) :: MArray(Idx), effect = simple) implements codegen ($cala, ${
       val map = $0
       val explicitVert = $1
       val withSize = $2
       val vertices = {
-        val temp = (map.values.flatMap(i=>i).toSet ++ map.keys.toSet).toArray 
+        val temp = (map.values.flatMap(i=>i).toSet ++ map.keys.toSet).toArray
         scala.util.Sorting.quickSort(temp)
         temp
       }
-      val numVert = vertices.length 
+      val numVert = vertices.length
 
       // Size of neighbors
       val sizes = vertices.map {n => map.get(n).getOrElse(Nil).size}
@@ -601,7 +579,7 @@ trait DHDLMisc {
 
       def fixpt(i:Int) = FixedPoint[Signed,B32,B0](i)
 
-      val vertList = 
+      val vertList =
         if (explicitVert) {
           if (withSize) {
             vertices.zipWithIndex.flatMap {case (n,i) => Array(fixpt(n), fixpt(pts(i)), fixpt(sizes(i)))}
@@ -622,12 +600,12 @@ trait DHDLMisc {
       val map = $0
       import scala.util.Sorting
       val vertices = {
-        val temp = (map.values.flatMap(i=>i).toSet ++ map.keys.toSet).toArray 
+        val temp = (map.values.flatMap(i=>i).toSet ++ map.keys.toSet).toArray
         Sorting.quickSort(temp)
         temp
       }
       // Flat edge list
-      val edgeList = vertices.flatMap{n => 
+      val edgeList = vertices.flatMap{n =>
         val edges = map.get(n).getOrElse(Nil).toArray
         Sorting.quickSort(edges)
         edges
@@ -647,7 +625,7 @@ trait DHDLMisc {
       val edgeStr =  if (dot) "->" else " "
       def printEdge(pw:PrintWriter) = {
         val src = randInt( numVert )
-        var dst = randInt( numVert ) 
+        var dst = randInt( numVert )
         while ( src==dst ) {
           dst = randInt( numVert )
         }

@@ -193,9 +193,7 @@ trait DHDLBRAMs {
       infix (":=") (SparseTile(T) :: MUnit, effect = write(0)) implements redirect ${
         gatherScatter($1, $self, false)
       }
-
     }
-
 
     // --- Rewrite rules
     // HACK: Check that sizes of BRAM are either constants or parameters (there should be a better way of doing this)
@@ -213,28 +211,6 @@ trait DHDLBRAMs {
     impl (bram_load)  (codegen($cala, ${ $bram.apply($addr.toInt) }))
     impl (bram_store) (codegen($cala, ${ $bram.update($addr.toInt, $value) }))
     //impl (bram_reset) (codegen($cala, ${ (0 until $bram.length).foreach{i => $bram.update(i, $zero) }}))
-
-    // --- Dot Backend
-    impl (bram_new)   (codegen(dot, ${
-      @ if (isDblBuf(sym)) {
-        $sym [margin=0 rankdir="LR" label="{<st> | <ld>}" xlabel="$sym "
-              shape="record" color=$dblbufBorderColor  style="filled"
-              fillcolor=$bramFillColor ]
-      @ } else {
-          $sym [label="$sym " shape="square" style="filled" fillcolor=$bramFillColor ]
-      @ }
-    }))
-    impl (bram_load)  (codegen(dot, ${
-      $addr -> $bram [ headlabel="addr" ]
-      //$sym [style="invisible" height=0 size=0 margin=0 label=""]
-      //$sym [label=$sym fillcolor="lightgray" style="filled"]
-      @ emitValDef(sym, bram)
-    }))
-    impl (bram_store) (codegen(dot, ${
-      $addr -> $bram [ headlabel="addr" ]
-      $value -> $bram [ headlabel="data" ]
-    }))
-    //impl (bram_reset) (codegen(dot, ${ }))
 
     // --- MaxJ Backend
     // bram_new (extern)

@@ -70,7 +70,7 @@ trait DHDLOffChip {
         offchipLoadVector($self, calcAddress(List($1, $2.start), dimsOf($self)), $2.len)
       }
 
-      /** Loads a fixed size 1D page tile of this 3D OffChipMem onto an on-chip MVector.
+      /** Loads a fixed size 1D page tile of this 3D OffChipMem onto an on-chip Vector.
        * @param row
        * @param col
        * @param pages
@@ -167,6 +167,17 @@ trait DHDLOffChip {
        * @param page
        **/
       infix ("apply") ((Range, Idx, Idx) :: Tile(T)) implements composite ${ tile_create($self, List($1, unitRange($2), unitRange($3))) }
+
+      /** Sets up a sparse gather from this OffChipMem using *size* addresses from the supplied BRAM
+       * @param addrs: BRAM with addresses to load
+       * @param size: the number of addresses
+       **/
+      infix ("apply") ((BRAM(Idx), Idx) :: SparseTile(T)) implements composite ${ stile_create($self, $1, $2) }
+
+      /** Sets up a sparse gather from this OffChipMem using all addresses from the supplied BRAM
+       * @param addrs: BRAM with addresses to load
+       **/
+      infix ("apply") (BRAM(Idx) :: SparseTile(T)) implements composite ${ stile_create($self, $1, sizeOf($1)) }
     }
 
     // --- Scala Backend
@@ -253,6 +264,42 @@ trait DHDLOffChip {
         }
       }
     }
+  }
+
+
+  def importSparseTiles() {
+    val T = tpePar("T")
+
+    val SparseTile    = lookupTpe("SparseTile")
+    val OffChip = lookupTpe("OffChipMem")
+    val BRAM    = lookupTpe("BRAM")
+    val Idx = lookupAlias("Index")
+
+    // TODO: How to avoid CSE? Doesn't matter except that same symbol may be returned
+    // and need different symbols to manage offset staging metadata properly
+    data(SparseTile, ("_target", OffChip(T)), ("_addrBram", BRAM(Idx)), ("_numAddrs", Idx))
+    internal (SparseTile) ("stile_new", T, (OffChip(T), BRAM(Idx), Idx) :: SparseTile(T)) implements allocates(SparseTile, ${$0}, ${$1}, ${$2})
+    internal (SparseTile) ("stile_create", T, (OffChip(T), BRAM(Idx), Idx) :: SparseTile(T)) implements composite ${
+      if (dimsOf($1).length!=1) stageError("Must provide flatten addresses for scatter and gather. Dimensions of address BRAM is " + dimsOf($1))
+      val stile = stile_new($0, $1, $2)
+      stile
+    }
+    internal.infix (SparseTile) ("mem", T, SparseTile(T) :: OffChip(T)) implements getter(0, "_target")
+    internal.infix (SparseTile) ("addr", T, SparseTile(T) :: BRAM(Idx)) implements getter(0, "_addrBram")
+    internal.infix (SparseTile) ("numAddrs", T, SparseTile(T) :: Idx) implements getter(0, "_numAddrs")
+
+    /** Creates a store from the given on-chip BRAM to this SparseTile of off-chip memory
+     * @param bram
+     **/
+    infix (SparseTile) (":=", T, (SparseTile(T), BRAM(T)) :: MUnit, effect = write(0)) implements redirect ${ gatherScatter($0, $1, true) }
+
+    direct (SparseTile) ("gatherScatter", T, (("tile",SparseTile(T)), ("local",BRAM(T)), ("scatter", SBoolean)) :: MUnit, effect = simple) implements composite ${
+      val mem      = $tile.mem
+      val addrs    = $tile.addr
+      val numAddrs  = $tile.numAddrs
+      gather_scatter_transfer (mem, $local, addrs, numAddrs, $scatter)
+    }
+
   }
 
 }

@@ -118,14 +118,29 @@ trait DHDLBRAMs {
        **/
       infix ("apply") (varArgs(Idx) :: T) implements composite ${ bram_load_nd($self, $1.toList) }
 
+      /** Creates a buffered load from this 1D BRAM.
+       * @param inds: address range of values to load
+       * @return a vector containing values in the supplied address range
+       **/
       infix ("load") (Range :: MVector(T)) implements composite ${
         bramLoadVector($self, List($1.start), $1.len, param(1))
       }
 
+      /** Creates a buffered load of a column tile from this 2D BRAM.
+       * @param row: row index
+       * @param cols: address range of values to load
+       * @return a Vector containing values in the supplied address range
+       **/
       infix ("load") ((Idx, Range) :: MVector(T)) implements composite ${
         bramLoadVector($self, List($1,$2.start), $2.len, param(1))
       }
 
+      /** Creates a buffered load of a page tile from this 3D BRAM.
+       * @param row: row index
+       * @param col: column index
+       * @param pages: address range of values to load
+       * @return a Vector containing values in the supplied address range
+       **/
       infix ("load") ((Idx, Idx, Range) :: MVector(T)) implements composite ${
         bramLoadVector($self, List($1,$3.start), $3.len, param(1))
       }
@@ -171,6 +186,14 @@ trait DHDLBRAMs {
       infix (":=") (MVector(T) :: MUnit, effect = write(0)) implements composite ${
         bramStoreVector($self, dimsOf($self).map(dim => 0.as[Index]), $1, param(1))
       }
+
+      /** Gathers the values from the supplied Sparse Tile into this BRAM
+       * @param tile
+       **/
+      infix (":=") (SparseTile(T) :: MUnit, effect = write(0)) implements redirect ${
+        gatherScatter($1, $self, false)
+      }
+
     }
 
 

@@ -14,14 +14,6 @@ trait MetaPipeRegInsertion extends SinglePassTransformer with PipeStageTools {
 
   debugMode = false
 
-  override def self_mirror[A](sym: Sym[A], rhs : Def[A]): Exp[A] = {
-    debug(s"Mirroring $sym = $rhs")
-    super.self_mirror(sym,rhs) match {
-      case s@Def(d) => debug(s"  => $s = $d"); s
-      case s => debug(s"  => $s"); s
-    }
-  }
-
   // Transform stages to use increasingly delayed versions of inds
   def insertRegisters[A:Manifest](owner: Sym[Any], func: Block[A], inds: List[Sym[Idx]])(implicit ctx: SourceContext) = {
     debug(s"Found MetaPipe $owner:")
@@ -97,8 +89,4 @@ trait MetaPipeRegInsertion extends SinglePassTransformer with PipeStageTools {
       Some(newPipe)
     case _ => None
   }
-
-//  override def postprocess[A:Manifest](b: Block[A]) =
-
-
 }

@@ -18,7 +18,6 @@ trait LatencyAnalysisExp extends LatencyModel {
   var CLK = 150.0f // Clock frequency in MHz
 }
 
-
 trait LatencyAnalyzer extends ModelingTools {
   val IR: DHDLExp with LatencyAnalysisExp
   import IR._
@@ -40,7 +39,6 @@ trait LatencyAnalyzer extends ModelingTools {
     cycleScope ::= latencyOfBlock(savedBlock.get).sum
     inHwScope = false
   }
-
 
   def latencyOfBlock(b: Block[Any]): List[Long] = {
     val outerScope = cycleScope

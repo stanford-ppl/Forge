@@ -3,7 +3,7 @@ package dsls
 package dhdl
 
 @dsl
-trait DHDLMemories extends DHDLRegs with DHDLBRAMs with DHDLOffChip {
+trait DHDLMemories extends DHDLRegs with DHDLBRAMs with DHDLOffChip with DHDLCaches {
   this: DHDLDSL =>
 
   object TMem extends TypeClassSignature {
@@ -16,8 +16,11 @@ trait DHDLMemories extends DHDLRegs with DHDLBRAMs with DHDLOffChip {
     importMemOps()
     importRegs()
     importBRAM()
+    importCache()
     importOffChip()
     importTiles()
+    importSparseTiles()
+    //importCache() Not yet finished
   }
 
   // Type class for local memories which can be used as accumulators in reductions

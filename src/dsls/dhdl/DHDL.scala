@@ -128,7 +128,22 @@ trait DHDLDSL extends ForgeApplication
      * in hardware is always flat. The contents of BRAMs are currently persistent across loop iterations, even when they are declared in an inner scope.
      * BRAMs can have an arbitrary number of readers but only one writer. This writer may be an element-based store or a load from an OffChipMem.
      **/
+    val SparseTile = tpe("SparseTile", T)
+    /**
+     * BRAMs are on-chip scratchpads with fixed size. BRAMs can be specified as multi-dimensional, but the underlying addressing
+     * in hardware is always flat. The contents of BRAMs are currently persistent across loop iterations, even when they are declared in an inner scope.
+     * BRAMs can have an arbitrary number of readers but only one writer. This writer may be an element-based store or a load from an OffChipMem.
+     **/
     val BRAM = tpe("BRAM", T)
+    /**
+     * Caches are on-chip caches for a specific off-chip memory/data structure. Caches allow loading
+     * with multi-dimentional address, whose dimensions are inherited from the cached off-chip memories.
+     * The multi-dimentional address is converted to a single flat address in hardware. The
+     * addressing scheme is word-based flat indexing of the offchip memory. Cache allows loading of a
+     * single element at a time. During a miss, a cache automatically loads from its off-chip memory
+     * and stalls the pipeline, and resumes pipeline when loading is complete.
+     **/
+    val Cache = tpe("Cache", T)
     /**
      * Reg defines a hardware register used to hold a scalar value. Regs have an optional name (primarily used for debugging) and reset value.
      * The default reset value for a Reg is the numeric zero value for it's specified type.
@@ -141,8 +156,7 @@ trait DHDLDSL extends ForgeApplication
      **/
     val Vector = tpe("Vector", T)
 
-    primitiveStructs :::= List(OffChip, BRAM, Reg, Vector)
-
+    primitiveStructs :::= List(OffChip, BRAM, Reg, Vector, Cache)
 
     // --- State Machine Types
     /** Counter is a single hardware counter with an associated minimum, maximum, step size, and parallelization factor.
@@ -195,7 +209,6 @@ trait DHDLDSL extends ForgeApplication
 
 
     // --- Traversals
-
     val StageAnalyzer = analyzer("Stage", isExtern=true)
     val GlobalAnalyzer = analyzer("Global")
     val ControlSignalAnalyzer = analyzer("ControlSignal", isExtern=true)
@@ -217,8 +230,6 @@ trait DHDLDSL extends ForgeApplication
 
     importGlobalAnalysis()
     importBoundAnalysis()
-
-    //schedule(IRPrinterPlus)
 
     // --- Estimation and tuning
     schedule(StageAnalyzer)

@@ -100,38 +100,64 @@ trait DHDLMath {
     // negation in hardware is simpler than figuring out that we're multiplying by -1.
     // NOTE: Modulus is only supported on integer types for now
     // NOTE: Right shift is arithmetic shift, not logical
-    // TODO: Should these be documented?
+    /** @nodoc **/
     val neg_fix = direct (FixPt) ("neg", (S,I,F), (FixPt(S,I,F)) :: FixPt(S,I,F))
+    /** @nodoc **/
     val add_fix = direct (FixPt) ("add", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F))
+    /** @nodoc **/
     val sub_fix = direct (FixPt) ("sub", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F))
+    /** @nodoc **/
     val mul_fix = direct (FixPt) ("mul", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F))
+    /** @nodoc **/
     val div_fix = direct (FixPt) ("div", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F))
+    /** @nodoc **/
     val mod_fix = direct (FixPt) ("mod", (S,I),   (FixPt(S,I,Z), FixPt(S,I,Z)) :: FixPt(S,I,Z))
+    /** @nodoc **/
     val lt_fix  = direct (FixPt) ("lt",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit)
+    /** @nodoc **/
     val leq_fix = direct (FixPt) ("leq", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit)
+    /** @nodoc **/
     val neq_fix = direct (FixPt) ("neq", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit)
+    /** @nodoc **/
     val eql_fix = direct (FixPt) ("eql", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: Bit)
+    /** @nodoc **/
     val and_fix = direct (FixPt) ("and", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F))
+    /** @nodoc **/
     val or_fix  = direct (FixPt) ("or",  (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F))
+    /** @nodoc **/
     val lsh_fix = direct (FixPt) ("lsh", (S,I,F), (FixPt(S,I,F), FixPt(S,I,Z)) :: FixPt(S,I,F))
+    /** @nodoc **/
     val rsh_fix = direct (FixPt) ("rsh", (S,I,F), (FixPt(S,I,F), FixPt(S,I,Z)) :: FixPt(S,I,F))
 
 
+    /** @nodoc **/
     val neg_flt = direct (FltPt) ("neg", (G,E), (FltPt(G,E)) :: FltPt(G,E))
+    /** @nodoc **/
     val add_flt = direct (FltPt) ("add", (G,E), (FltPt(G,E), FltPt(G,E)) :: FltPt(G,E))
+    /** @nodoc **/
     val sub_flt = direct (FltPt) ("sub", (G,E), (FltPt(G,E), FltPt(G,E)) :: FltPt(G,E))
+    /** @nodoc **/
     val mul_flt = direct (FltPt) ("mul", (G,E), (FltPt(G,E), FltPt(G,E)) :: FltPt(G,E))
+    /** @nodoc **/
     val div_flt = direct (FltPt) ("div", (G,E), (FltPt(G,E), FltPt(G,E)) :: FltPt(G,E))
+    /** @nodoc **/
     val lt_flt  = direct (FltPt) ("lt",  (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit)
+    /** @nodoc **/
     val leq_flt = direct (FltPt) ("leq", (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit)
+    /** @nodoc **/
     val neq_flt = direct (FltPt) ("neq", (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit)
+    /** @nodoc **/
     val eql_flt = direct (FltPt) ("eql", (G,E), (FltPt(G,E), FltPt(G,E)) :: Bit)
 
-
+    /** @nodoc **/
     val not_bit  = direct (Bit) ("not",  Nil, (Bit) :: Bit)
+    /** @nodoc **/
     val and_bit  = direct (Bit) ("and",  Nil, (Bit, Bit) :: Bit)
+    /** @nodoc **/
     val or_bit   = direct (Bit) ("or",   Nil, (Bit, Bit) :: Bit)
+    /** @nodoc **/
     val xor_bit  = direct (Bit) ("xor",  Nil, (Bit, Bit) :: Bit)    // aka !=
+    /** @nodoc **/
     val xnor_bit = direct (Bit) ("xnor", Nil, (Bit, Bit) :: Bit)    // aka ==
 
 
@@ -614,7 +640,7 @@ trait DHDLMath {
       infix (FixPt) ("-",  (S,I,F), (T, FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ sub(fixPt[\$TT,S,I,F]($0), $1) }
       infix (FixPt) ("*",  (S,I,F), (T, FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ mul(fixPt[\$TT,S,I,F]($0), $1) }
       infix (FixPt) ("/",  (S,I,F), (T, FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ div(fixPt[\$TT,S,I,F]($0), $1) }
-      infix (FixPt) ("%",  (S,I,F), (T, FixPt(S,I,Z)) :: FixPt(S,I,Z)) implements redirect ${ mod(fixPt[\$TT,S,I,B0]($0), $1) }
+      infix (FixPt) ("%",  (S,I),   (T, FixPt(S,I,Z)) :: FixPt(S,I,Z)) implements redirect ${ mod(fixPt[\$TT,S,I,B0]($0), $1) }
 
       infix (FixPt) ("<",  (S,I,F), (T, FixPt(S,I,F)) :: Bit) implements redirect ${ lt(fixPt[\$TT,S,I,F]($0), $1) }
       infix (FixPt) (">",  (S,I,F), (T, FixPt(S,I,F)) :: Bit) implements redirect ${ lt($1, fixPt[\$TT,S,I,F]($0)) }
@@ -630,7 +656,7 @@ trait DHDLMath {
       infix (FixPt) ("-",  (S,I,F), (FixPt(S,I,F), T) :: FixPt(S,I,F)) implements redirect ${ sub($0, fixPt[\$TT,S,I,F]($1)) }
       infix (FixPt) ("*",  (S,I,F), (FixPt(S,I,F), T) :: FixPt(S,I,F)) implements redirect ${ mul($0, fixPt[\$TT,S,I,F]($1)) }
       infix (FixPt) ("/",  (S,I,F), (FixPt(S,I,F), T) :: FixPt(S,I,F)) implements redirect ${ div($0, fixPt[\$TT,S,I,F]($1)) }
-      infix (FixPt) ("%",  (S,I,F), (FixPt(S,I,Z), T) :: FixPt(S,I,Z)) implements redirect ${ mod($0, fixPt[\$TT,S,I,B0]($1)) }
+      infix (FixPt) ("%",  (S,I),   (FixPt(S,I,Z), T) :: FixPt(S,I,Z)) implements redirect ${ mod($0, fixPt[\$TT,S,I,B0]($1)) }
 
       infix (FixPt) ("<",  (S,I,F), (FixPt(S,I,F), T) :: Bit) implements redirect ${ lt($0, fixPt[\$TT,S,I,F]($1)) }
       infix (FixPt) (">",  (S,I,F), (FixPt(S,I,F), T) :: Bit) implements redirect ${ lt(fixPt[\$TT,S,I,F]($1), $0) }

@@ -122,7 +122,7 @@ cd "published/$DSL_NAME/"
 if [ $SKIP -le 4 ];
 then
   echo "sbt compile (4/$NUM_STEPS)"
-  sbt compile
+  sbt -DshowSuppressedErrors=true compile
 
   ## Uncomment these for pdf generation from sphinx
   pushd .

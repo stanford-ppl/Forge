@@ -20,7 +20,7 @@ trait MaxJPreCodegen extends Traversal  {
 
 	var buildDir:String = _
 
-  debugMode = false
+  //debugMode = false
   override val name = "MaxJPreCodegen"
 
 	lazy val maxJManagerGen = new MaxJManagerGen {
@@ -31,7 +31,6 @@ trait MaxJPreCodegen extends Traversal  {
 		case s@Sym(n) => s.tp.erasure.getSimpleName().replace("DHDL","") + nameOf(s).map(nm=>"_"+nm).getOrElse("") + "_x" + n
     case _ => ""
   }
-
 
 	val argInOuts  = Set.empty[Sym[Register[_]]]
 	val memStreams = Set.empty[Sym[Any]]

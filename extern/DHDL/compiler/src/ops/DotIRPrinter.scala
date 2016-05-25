@@ -128,17 +128,6 @@ trait DotIRPrinter extends Traversal  {
 
     val filepath = s"${buildDir}${java.io.File.separator}DotIR"
 	  println("--------generate dhdl dot IR ------------")
-	  // Move define macro to beginning of the file
-	  Process(s"cp ${filepath}.dot ${filepath}_pre.m4")!
-	  Process(s"grep 'define' ${filepath}_pre.m4 > ${filepath}.m4")!
-	  Process(s"grep -v '^define' ${filepath}_pre.m4 >> ${filepath}.m4")!
-	  // Generate dot file
-	  Process(s"m4 ${filepath}.m4 > ${filepath}.dot")!
-	  // Temp fix to dot gen
-	  //s"sed -i '' '/()/d' ${filepath}.dot" !
-	  // Generate dot graph
-	  Process(s"dot -Tpdf ${filepath}.dot > ${filepath}.pdf")!
-	  Process(s"open ${filepath}.pdf")!
 
 		b
 	}

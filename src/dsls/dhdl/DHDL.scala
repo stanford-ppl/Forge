@@ -217,6 +217,8 @@ trait DHDLDSL extends ForgeApplication
     val ParSetter = traversal("ParSetter",isExtern=true)
     val MetaPipeRegInsertion = traversal("MetaPipeRegInsertion",isExtern=true)
 
+    val DotIRPrinter = traversal("DotIRPrinter", isExtern=true)
+
     importGlobalAnalysis()
     importBoundAnalysis()
 
@@ -230,8 +232,9 @@ trait DHDLDSL extends ForgeApplication
     //schedule(AreaAnalyzer)
     //schedule(LatencyAnalyzer)
     //schedule(BoundAnalyzer)
-    //schedule(ConstantFolding)
+    schedule(ConstantFolding)
 
+    schedule(DotIRPrinter)
     //schedule(IRPrinterPlus)
 
     //schedule(MetaPipeRegInsertion)

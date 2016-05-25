@@ -16,7 +16,6 @@ trait DHDLMemories extends DHDLRegs with DHDLBRAMs with DHDLOffChip with DHDLCac
     importMemOps()
     importRegs()
     importBRAM()
-    importCache()
     importOffChip()
     importTiles()
     importSparseTiles()

@@ -161,7 +161,7 @@ trait ControlSignalAnalyzer extends HungryTraversal with PipeStageTools {
   }
 
 
-  override def traverse(lhs: Exp[Any], rhs: Def[Any]) = rhs match {
+  override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
     case Offchip_load_vector(mem,ofs,len) =>   // ?
     case Offchip_store_vector(mem,ofs,vec) =>  // ?
 

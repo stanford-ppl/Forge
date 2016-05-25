@@ -274,7 +274,7 @@ trait ScratchpadAnalyzer extends HungryTraversal {
     }
   }*/
 
-  override def traverse(lhs: Exp[Any], rhs: Def[Any]): Unit = rhs match {
+  override def traverse(lhs: Sym[Any], rhs: Def[Any]): Unit = rhs match {
     case _:Reg_new[_] => analyzeMemory(lhs)
     case _:Bram_new[_] => analyzeMemory(lhs)
     case _ => super.traverse(lhs,rhs)

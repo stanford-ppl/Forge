@@ -41,7 +41,7 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
     case ConstFlt(_) => // Nothing
     case Def(d) if !emittedSize.contains(x) =>
       alwaysGen{ traverse(x.asInstanceOf[Sym[Any]], d) }
-      emittedSize += s
+      emittedSize += x
       syms(d).foreach{s => hackGen(s) }
     case _ => // Nothing
   }
@@ -123,8 +123,7 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
     stream.flush()
     stream.close()
 
-    val filepath = s"${buildDir}${java.io.File.separator}DotIR"
-	  println("--------generate dhdl dot IR ------------")
+    println("--------generate dhdl dot IR ------------")
 
 		b
 	}
@@ -174,12 +173,12 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 		case _ =>
 	}
 
-  override def traverse(lhs: Exp[Any], rhs: Def[Any]): Unit = {
+  override def traverse(lhs: Sym[Any], rhs: Def[Any]): Unit = {
     if (inHwScope) emitHWNode(lhs, rhs)
     else emitOtherNode(lhs, rhs)
   }
 
-  def emitOtherNode(sym: Exp[Any], rhs: Def[Any]) = rhs match {
+  def emitOtherNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case Hwblock(func) =>
       inHwScope = true
       emitBlock(func)
@@ -214,9 +213,9 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 
     case ConstBit(v) =>
       emit(s"""${quote(sym)} [label=${quote(v)} style="filled" fillcolor="lightgray" color="none"]""")
-    case ConstFixPt(v, _) =>
+    case ConstFixPt(v,_,_,_) =>
       emit(s"""${quote(sym)} [label=${quote(v)} style="filled" fillcolor="lightgray" color="none"]""")
-    case ConstFltPt(v, _) =>
+    case ConstFltPt(v,_,_) =>
       emit(s"""${quote(sym)} [label=${quote(v)} style="filled" fillcolor="lightgray" color="none"]""")
 
     case Tpes_Fix_to_int(v) => emitValDef(sym, quote(v))
@@ -343,7 +342,7 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
     case Fixpt_to_fltpt(x) =>
       emit(s"""${quote(sym)} [ label="fix2flt" ]""")
       emitEdge(x, sym)
-    case Fltpt_to_fixpt(x)
+    case Fltpt_to_fixpt(x) =>
       emit(s"""${quote(sym)} [ label="flt2fix" ]""")
       emitEdge(x, sym)
     case Convert_fixpt(x) =>
@@ -384,11 +383,11 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
     case Bit_Xor(a,b)  => emit(s"""${quote(sym)} [label="==" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym); emitEdge(b,sym)
     case Bit_Xnor(a,b) => emit(s"""${quote(sym)} [label="!=" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym); emitEdge(b,sym)
 
-    case FixPt_Abs(v)  => emit(s"""${quote(sym)} [label="abs" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
-    case FltPt_Abs(v)  => emit(s"""${quote(sym)} [label="abs" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
-    case FltPt_Log(v)  => emit(s"""${quote(sym)} [label="log" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
-    case FltPt_Exp(v)  => emit(s"""${quote(sym)} [label="exp" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
-    case FltPt_Sqrt(v) => emit(s"""${quote(sym)} [label="sqrt" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
+    case FixPt_Abs(a)  => emit(s"""${quote(sym)} [label="abs" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
+    case FltPt_Abs(a)  => emit(s"""${quote(sym)} [label="abs" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
+    case FltPt_Log(a)  => emit(s"""${quote(sym)} [label="log" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
+    case FltPt_Exp(a)  => emit(s"""${quote(sym)} [label="exp" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
+    case FltPt_Sqrt(a) => emit(s"""${quote(sym)} [label="sqrt" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
 
     case Mux2(s,a,b) =>
       emit(s"""${quote(sym)} [label="mux", shape="diamond" style="filled" fillcolor="white"]""")

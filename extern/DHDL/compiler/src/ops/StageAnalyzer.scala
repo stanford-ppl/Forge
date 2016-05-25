@@ -25,7 +25,7 @@ trait StageAnalyzer extends HungryTraversal with PipeStageTools {
     super.preprocess(b)
   }
 
-  override def traverse(lhs: Exp[Any], rhs: Def[Any]) = rhs match {
+  override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
     // Accel block (equivalent to a Sequential unit pipe)
     case Hwblock(blk) =>
       debug(s"$lhs = $rhs:")

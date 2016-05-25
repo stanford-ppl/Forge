@@ -64,7 +64,7 @@ trait DHDLAffineAnalyzer extends AffineAnalyzer {
     trueOffsets ++ indices
   }
 
-  override def traverse(lhs: Exp[Any], rhs: Def[Any]): Unit = rhs match {
+  override def traverse(lhs: Sym[Any], rhs: Def[Any]): Unit = rhs match {
     case EatReflect(Bram_load_vector(bram,ofs,cchain,inds)) =>
       accessPatternOf(lhs) = patternOfVectorizedOp(accessIndicesOf(lhs), inds)
 

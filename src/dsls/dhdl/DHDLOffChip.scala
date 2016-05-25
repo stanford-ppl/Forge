@@ -12,12 +12,13 @@ trait DHDLOffChip {
   def importOffChip() {
     val T = tpePar("T")
 
-    val OffChip = lookupTpe("OffChipMem")
-    val Tile    = lookupTpe("Tile")
-    val BRAM    = lookupTpe("BRAM")
-    val Range   = lookupTpe("Range")
-    val MVector = lookupTpe("Vector")
-    val Idx     = lookupAlias("Index")
+    val OffChip    = lookupTpe("OffChipMem")
+    val Tile       = lookupTpe("Tile")
+    val SparseTile = lookupTpe("SparseTile")
+    val BRAM       = lookupTpe("BRAM")
+    val Range      = lookupTpe("Range")
+    val MVector    = lookupTpe("Vector")
+    val Idx        = lookupAlias("Index")
 
     // --- Nodes
     val offchip_new   = internal (OffChip) ("offchip_new", T, ("size", Idx) :: OffChip(T), effect = mutable)

@@ -12,6 +12,7 @@ trait DHDLBRAMs {
     val T = tpePar("T")
     val BRAM         = lookupTpe("BRAM")
     val Tile         = lookupTpe("Tile")
+    val SparseTile   = lookupTpe("SparseTile")
     val Indices      = lookupTpe("Indices")
     val Range        = lookupTpe("Range")
     val MVector      = lookupTpe("Vector")

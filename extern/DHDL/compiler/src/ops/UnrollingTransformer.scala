@@ -15,7 +15,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
   val IR: UnrollingTransformExp with DHDLExp
   import IR.{infix_until => _, _}
 
-  debugMode = true
+  debugMode = false
   override val name = "Unrolling Transformer"
 
   def unrollInnerMap[A:Manifest](cchain: Exp[CounterChain], func: Block[A], inds: List[Exp[Index]]) = {
@@ -177,7 +177,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
         val Ps = parsOf(ccI2)
         val P = Ps.reduce(_*_)
         val N = Ps.length
-        val prods = List.tabulate(N){i => Ps.slice(i+1,N).reduce(_*_) }
+        val prods = List.tabulate(N){i => Ps.slice(i+1,N).fold(1)(_*_) }
         val indices = Ps.map{p => List.fill(p){ fresh[Index] } }
 
         val innerBlk = reifyBlock {
@@ -196,8 +196,32 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
     debug(s"$newPipe = $d")
 
     // Not completely correct - reduction is now an explicit child
-    setProps(newPipe, getProps(newPipe))
+    setProps(newPipe, getProps(lhs))
     newPipe
+  }
+
+  def unrollBramLoadVector[T:Manifest](lhs: Exp[Any], rhs: Bram_load_vector[T])(implicit ctx: SourceContext) = {
+    val Bram_load_vector(bram, ofs, cchain, inds) = rhs
+    val Ps = parsOf(cchain)
+    val P = Ps.reduce(_*_)
+    val N = Ps.length
+    val indices = Ps.map{p => List.fill(p){ fresh[Index] } }
+
+    val newLoad = reflectPure(ParBramLoadVector(f(bram), f(ofs), f(cchain), indices))
+    setProps(newLoad, getProps(lhs))
+    newLoad
+  }
+  def unrollBramStoreVector[T:Manifest](lhs: Exp[Any], rhs: Bram_store_vector[T])(implicit ctx: SourceContext) = {
+    val Bram_store_vector(bram, ofs, vec, cchain, inds) = rhs
+    val Ps = parsOf(cchain)
+    val P = Ps.reduce(_*_)
+    val N = Ps.length
+    val indices = Ps.map{p => List.fill(p){ fresh[Index] } }
+
+    val bram2 = f(bram)
+    val newStore = reflectEffect(ParBramStoreVector(bram2, f(ofs), f(vec), f(cchain), indices), Write(List(bram2.asInstanceOf[Sym[BRAM[T]]])) )
+    setProps(newStore, getProps(lhs))
+    newStore
   }
 
   // Similar to self_mirror, but also duplicates bound vars
@@ -205,47 +229,43 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
   def clone[A](sym: Sym[A], rhs : Def[A]): Exp[A] = {
     val sym2 = clone(rhs)(mtype(sym.tp), mpos(sym.pos))
     setProps(sym2, getProps(sym))
-
-    sym2 match {
-      case Def(d) => debug(s"$sym2 = $d")
-      case _ => debug(s"$sym2")
-    }
     sym2
   }
 
+  def cloneInds[I:Manifest](inds: List[List[Sym[I]]]) = inds.map{is => is.map{i => fresh[I] }}
+
   def clone[A:Manifest](rhs: Def[A])(implicit pos: SourceContext): Exp[A] = (rhs match {
     case Reflect(e@ParPipeForeach(cc,b,i), u, es) =>
-      val i2 = i.map{is => is.map{index => fresh[FixPt[Signed,B32,B0]] }}
+      val i2 = cloneInds(i)
       val b2 = withSubstScope(i.flatten.zip(i2.flatten):_*){ f(b) }
       reflectMirrored(Reflect(ParPipeForeach(f(cc), b2, i2)(e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
-     //reflectEffect(ParPipeForeach(f(cc), b2, i2)(e.ctx), summarizeEffects(b2).star andAlso Simple())
 
     case Reflect(e@ParPipeReduce(cc,a,b,rF,i,acc,rV), u, es) =>
       val a2 = f(a)
-      val i2 = i.map{ix => ix.map{u => fresh[FixPt[Signed,B32,B0]] }}
+      val i2 = cloneInds(i)
       val acc2 = reflectMutableSym(fresh(List(e.ctx))(e.mC))
       val rV2 = (fresh(List(e.ctx))(e.mT), fresh(List(e.ctx))(e.mT))
       val b2 = withSubstScope( (i.flatten.zip(i2.flatten) ++ List(acc -> acc2)):_*) { f(b) }
       val rF2 = withSubstScope(rV._1 -> rV2._1, rV._2 -> rV2._2){ f(rF) }
-      //reflectMirrored(Reflect(ParPipeReduce(f(cc),a2,b2,rF2,i2,acc2,rV2)(e.ctx,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
-      reflectEffect(ParPipeReduce(f(cc),a2,b2,rF2,i2,acc2,rV2)(e.ctx,e.mT,e.mC), summarizeEffects(b2).star andAlso Simple())
+      reflectMirrored(Reflect(ParPipeReduce(f(cc),a2,b2,rF2,i2,acc2,rV2)(e.ctx,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+
+    case e@ParBramLoadVector(b,o,c,i) =>
+      reflectPure(ParBramLoadVector(f(b),f(o),f(c),cloneInds(i))(e.mT,e.ctx))(mtype(manifest[A]), pos)
+    case Reflect(e@ParBramLoadVector(b,o,c,i), u, es) =>
+      reflectMirrored(Reflect(ParBramLoadVector(f(b),f(o),f(c), cloneInds(i) )(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+
+    case Reflect(e@ParBramStoreVector(b,o,v,c,i), u, es) =>
+      reflectMirrored(Reflect(ParBramStoreVector(f(b),f(o),f(v),f(c), cloneInds(i))(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
 
     case _ => mirror(rhs, f.asInstanceOf[Transformer])(mtype(manifest[A]), pos)
   }).asInstanceOf[Exp[A]]
-
-  override def self_mirror[A](sym: Sym[A], rhs : Def[A]): Exp[A] = {
-    val sym2 = super.self_mirror(sym,rhs)
-    sym2 match {
-      case Def(d) => debug(s"$sym2 = $d")
-      case _ => debug(s"$sym2")
-    }
-    sym2
-  }
 
   override def transform[A:Manifest](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext) = rhs match {
     case EatReflect(e: Pipe_foreach) => Some( unrollForeach(lhs, e) )
     case EatReflect(e: Pipe_fold[_,_]) => Some( unrollPipeFold(lhs, e)(e.ctx,e.mT,e.mC) )
     case EatReflect(e: Accum_fold[_,_]) => Some( unrollAccumFold(lhs, e)(e.ctx,e.mT,e.mC) )
+    case EatReflect(e: Bram_load_vector[_]) => Some( unrollBramLoadVector(lhs, e)(e.mT,ctx) )
+    case EatReflect(e: Bram_store_vector[_]) => Some( unrollBramStoreVector(lhs, e)(e.mT,ctx) )
     case _ => None
   }
 }

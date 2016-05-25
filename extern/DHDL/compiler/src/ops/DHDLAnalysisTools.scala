@@ -85,6 +85,8 @@ trait PipeStageToolsExp extends EffectExp {
   def isBramTransfer(d: Def[Any]): Boolean = d match {
     case EatReflect(_:Bram_load_vector[_])  => true
     case EatReflect(_:Bram_store_vector[_]) => true
+    case EatReflect(_:ParBramLoadVector[_]) => true
+    case EatReflect(_:ParBramStoreVector[_]) => true
     case _ => false
   }
   def isOffChipTransfer(d: Def[Any]): Boolean = d match {

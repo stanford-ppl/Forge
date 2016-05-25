@@ -214,7 +214,6 @@ trait DHDLDSL extends ForgeApplication
     val MetaPipeRegInsertion = traversal("MetaPipeRegInsertion",isExtern=true)
 
     val Unrolling = transformer("Unrolling", isExtern=true)
-    val BRAMVectorLowering = traversal("BRAMVectorLowering", isExtern=true)
 
     importGlobalAnalysis()
     importBoundAnalysis()
@@ -240,11 +239,10 @@ trait DHDLDSL extends ForgeApplication
     schedule(BoundAnalyzer)
     schedule(ConstantFolding)
 
-    schedule(IRPrinter)
+    //schedule(IRPrinter)
 
     schedule(MetaPipeRegInsertion)
 
-    schedule(BRAMVectorLowering)
     //schedule(IRPrinter)
     //schedule(HardStop)  // DEBUGGING
     schedule(Unrolling)

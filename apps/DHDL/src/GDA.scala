@@ -1,115 +1,100 @@
 import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
-import scala.util.Random
 
-// TODO: How to optimize automatically when cTileSize == cols?
 object GDACompiler extends DHDLApplicationCompiler with GDA
 object GDAInterpreter extends DHDLApplicationInterpreter with GDA
 trait GDA extends DHDLApplication {
+  type T = Flt
+  type Array[T] = ForgeArray[T]
 
-  type Elem = Flt
+  val Cmax = 16 //96
 
-  override def stageArgNames = List("rTileSize", "cTileSize")
-  lazy val rows = ArgIn[SInt]("rows")
-  lazy val cols = ArgIn[SInt]("cols")
+  def gda(xCPU: Rep[Array[T]], yCPU: Rep[Array[Bit]], mu0CPU: Rep[Array[T]], mu1CPU: Rep[Array[T]]) = {
+    val rTileSize     = param("tileSize", 4);      domainOf(rTileSize) = (96, 19200, 1)
+    val outerPar      = param("outerPar", 2);      domainOf(outerPar)  = (1, 4, 1)
+    val innerPar      = param("innerPar", 2);      domainOf(innerPar)  = (1, 12, 1)
+    val subLoopPar    = param("subLoopPar", 1);    domainOf(subLoopPar)    = (1, 16, 1)
+    val prodLoopPar   = param("prodLoopPar", 2);   domainOf(prodLoopPar)   = (1, 96, 1)
+    val outerAccumPar = param("outerAccumPar", 1); domainOf(outerAccumPar) = (1, 1, 1)
 
-  lazy val rTileSize = param("tileSize", 288)
-  lazy val cTileSize = 96
-  lazy val outerPar   = param("outerPar", 5)
-  lazy val innerPar   = param("innerPar", 2)
-  lazy val subLoopPar = param("subLoopPar", 1)
-  lazy val prodLoopPar = param("prodLoopPar", 24)
-  lazy val outerAccumPar = param("outerAccumPar", 1)  // Not used in old DHDL
+    val R = yCPU.length;   bound(R) = 360000
+    val C = mu0CPU.length; bound(C) = Cmax
 
-  def gda(
-    x:     Rep[OffChipMem[Elem]],
-    y:     Rep[OffChipMem[Bit]],
-    mu0:   Rep[OffChipMem[Elem]],
-    mu1:   Rep[OffChipMem[Elem]],
-    sub:   Rep[OffChipMem[Elem]],
-    sigma: Rep[OffChipMem[Elem]]
-  ) {
-    val mu0Tile = BRAM[Elem]("mu0Tile", cTileSize)
-    val mu1Tile = BRAM[Elem]("mu1Tile", cTileSize)
-    Parallel {
-      mu0Tile := mu0(0::cTileSize, subLoopPar)  // Load mu0
-      mu1Tile := mu1(0::cTileSize, subLoopPar)  // Load mu1
-    }
+    assert(C == Cmax) // TODO: Shouldn't be necessary, but addressing requires it at the moment
 
-    val sigmaOut = BRAM[Elem]("sigmaOut", cTileSize, cTileSize)
+    val x     = OffChipMem[T]("x", R, C)
+    val y     = OffChipMem[Bit]("y", R)
+    val mu0   = OffChipMem[T]("mu0", C)
+    val mu1   = OffChipMem[T]("mu1", C)
+    val sigma = OffChipMem[T]("sigma", C, C)
+    val rows  = ArgIn[SInt]("rows")
+    val cols  = ArgIn[SInt]("cols")
 
-    Pipe.fold((rows by rTileSize) par outerPar, outerAccumPar)(sigmaOut){ r =>
-      val yTile = BRAM[Bit]("yTile", rTileSize)
-      val xTile = BRAM[Elem]("xTile", rTileSize, cTileSize)
+    setArg(rows, R)
+    setArg(cols, C)
+    setMem(x, xCPU)
+    setMem(y, yCPU)
+    setMem(mu0, mu0CPU)
+    setMem(mu1, mu1CPU)
+
+    Accel {
+      val mu0Tile = BRAM[T]("mu0Tile", Cmax)
+      val mu1Tile = BRAM[T]("mu1Tile", Cmax)
       Parallel {
-        yTile := y(r::r+rTileSize, subLoopPar)
-        xTile := x(r::r+rTileSize, 0::cTileSize, subLoopPar)  // Load tile of x
+        mu0Tile := mu0(0::Cmax, subLoopPar)  // Load mu0
+        mu1Tile := mu1(0::Cmax, subLoopPar)  // Load mu1
       }
 
-      val sigmaBlk = BRAM[Elem]("sigmaBlk", cTileSize, cTileSize)
-      Pipe.fold((rTileSize by 1) par innerPar, prodLoopPar)(sigmaBlk){rr =>
-        val subTile = BRAM[Elem]("subTile", cTileSize)
-        val sigmaTile = BRAM[Elem]("sigmaTile", cTileSize, cTileSize)
-        Pipe((cTileSize by 1) par subLoopPar){ cc =>
-          subTile(cc) = xTile(rr,cc) - mux(yTile(rr), mu1Tile(cc), mu0Tile(cc))
-        }
-        Pipe(cTileSize by 1, (cTileSize by 1) par prodLoopPar){ (ii,jj) =>
-          sigmaTile(ii,jj) = subTile(ii) * subTile(jj)
-        }
-        sigmaTile
-      }{_+_}
-    }{_+_}
+      val sigmaOut = BRAM[T]("sigmaOut", Cmax, Cmax)
 
-    sigma(0::cTileSize, 0::cTileSize, prodLoopPar) := sigmaOut
+      Pipe.fold(rows by rTileSize par outerPar, outerAccumPar)(sigmaOut){ r =>
+        val yTile = BRAM[Bit]("yTile", rTileSize)
+        val xTile = BRAM[T]("xTile", rTileSize, Cmax)
+        Parallel {
+          yTile := y(r::r+rTileSize, subLoopPar)
+          xTile := x(r::r+rTileSize, 0::cols, subLoopPar)  // Load tile of x
+        }
+
+        val sigmaBlk = BRAM[T]("sigmaBlk", Cmax, Cmax)
+        Pipe.fold(rTileSize par innerPar, prodLoopPar)(sigmaBlk){rr =>
+          val subTile = BRAM[T]("subTile", Cmax)
+          val sigmaTile = BRAM[T]("sigmaTile", Cmax, Cmax)
+          Pipe(cols par subLoopPar){ cc =>
+            subTile(cc) = xTile(rr,cc) - mux(yTile(rr), mu1Tile(cc), mu0Tile(cc))
+          }
+          Pipe(cols by 1, cols par prodLoopPar){ (ii,jj) =>
+            sigmaTile(ii,jj) = subTile(ii) * subTile(jj)
+          }
+          sigmaTile
+        }{_+_}
+      }{_+_}
+
+      sigma(0::Cmax, 0::Cmax, prodLoopPar) := sigmaOut
+    }
+
+    getMem(sigma)
   }
 
   def main() {
-    val R = args(unit(0)).to[SInt];   bound(R) = 360000
-    val C = args(unit(0)).to[SInt];   bound(C) = 96
-    domainOf(rTileSize)  = (96,19200,1) // 160
-    domainOf(outerPar)   = (1,4,1)      // 4
-    domainOf(innerPar)   = (1,12,1)      // 6
-    domainOf(subLoopPar) = (1,16,1)     // 10
-    domainOf(prodLoopPar) = (1,96,1)    // 24
-    domainOf(outerAccumPar) = (1,1,1)  // 24
+    val R = args(unit(0)).to[SInt]
+    val C = Cmax.as[SInt] //args(unit(0)).to[SInt] // TODO: Should be selectable up to maximum
 
-    val x = OffChipMem[Elem]("x", R, C)
-    val y = OffChipMem[Bit]("y", R)
-    val mu0 = OffChipMem[Elem]("mu0", C)
-    val mu1 = OffChipMem[Elem]("mu1", C)
-    val sub = OffChipMem[Elem]("sub", C)
-    val sigma = OffChipMem[Elem]("sigma", C, C)
+    val x  = Array.fill(R){ Array.fill(C){ random[T](10) }}
+    val ys = Array.fill(R){ random[Bit] }
+    val mu0 = Array.fill(C){ random[T](10) }
+    val mu1 = Array.fill(C){ random[T](10) }
 
-    val sX = Array.fill(R){ Array.fill(C){ random[Elem](10) }}
-    val sY = Array.fill(R){ random[Bit] }
-    val sMu0 = Array.fill(C){ random[Elem](10) }
-    val sMu1 = Array.fill(C){ random[Elem](10) }
+    val result = gda(x.flatten, ys, mu0, mu1)
 
-    //println("x:   " + sX.map(_.mkString(", ")).mkString("\n") )
-    //println("y:   " + sY.mkString("\n\t"))
-    //println("mu0: " + sMu0.mkString(", "))
-    //println("mu1: " + sMu1.mkString(", "))
-
-    // Transfer data and start accelerator
-    setArg(rows, R)
-    setArg(cols, C)
-    setMem(x, sX.flatten)
-    setMem(y, sY)
-    setMem(mu0, sMu0)
-    setMem(mu1, sMu1)
-    Accel{ gda(x, y, mu0, mu1, sub, sigma) }
-
-    val gold = sX.zip(sY){ (row, y) =>
-      val sub = if (y) row.zip(sMu1){_-_} else row.zip(sMu0){_-_}
+    val gold = x.zip(ys){ (row, y) =>
+      val sub = if (y) row.zip(mu1){_-_} else row.zip(mu0){_-_}
       Array.tabulate(C){i => Array.tabulate(C){j => sub(i) * sub(j) }}.flatten
     }.reduce{(a,b) => a.zip(b){_+_}}
 
-    val result = getMem(sigma)
-
-    println("actual: " + gold.mkString(", "))
-    println("result: " + result.mkString(", "))
-    println("diff:   " + gold.zip(result){_-_}.mkString(", "))
+    //println("actual: " + gold.mkString(", "))
+    //println("result: " + result.mkString(", "))
+    println("Sum of differences: " + gold.zip(result){_-_}.reduce{_+_})
     assert( result == gold )
   }
 }

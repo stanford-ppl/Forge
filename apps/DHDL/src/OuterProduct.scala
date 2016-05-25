@@ -8,10 +8,10 @@ trait OuterProduct extends DHDLApplication {
   type T = Flt
 
   def outerproduct(a: Rep[ForgeArray[T]], b: Rep[ForgeArray[T]]) = {
-    val tileSizeA = param("tileSizeA", 192); domainOf(tileSizeA) = (96, 38400, 96)
-    val tileSizeB = param("tileSizeB", 192); domainOf(tileSizeB) = (96, 38400, 96)
-    val outerPar  = param("outerPar", 4);    domainOf(outerPar) = (1, 4, 1)
-    val innerPar  = param("innerPar", 96);   domainOf(innerPar) = (1, 38400, 1)
+    val tileSizeA = param("tileSizeA", 8);  domainOf(tileSizeA) = (96, 38400, 96)
+    val tileSizeB = param("tileSizeB", 8);  domainOf(tileSizeB) = (96, 38400, 96)
+    val outerPar  = param("outerPar", 2);   domainOf(outerPar) = (1, 4, 1)
+    val innerPar  = param("innerPar", 2);   domainOf(innerPar) = (1, 38400, 1)
 
     val M = a.length;  bound(M) = 38400
     val N = b.length;  bound(N) = 38400
@@ -48,15 +48,14 @@ trait OuterProduct extends DHDLApplication {
   def main() = {
     val M = args(unit(0)).to[SInt]
     val N = args(unit(1)).to[SInt]
-    val vec1 = Array.fill(M)(random[T](100))
-    val vec2 = Array.fill(N)(random[T](100))
+    val a = Array.fill(M)(random[T](100))
+    val b = Array.fill(N)(random[T](100))
 
-    val result = outerproduct(v1, v2)
+    val result = outerproduct(a, b)
 
-    val gold = Array.tabulate(N){i => Array.tabulate(N){j => vec1(i) * vec2(j) }}.flatten
-
-    println("expected: " + gold.mkString(", "))
-    println("result:   " + result.mkString(", "))
+    val gold = Array.tabulate(N){i => Array.tabulate(N){j => a(i) * b(j) }}.flatten
+    //println("expected: " + gold.mkString(", "))
+    //println("result:   " + result.mkString(", "))
     assert( result == gold )
   }
 }

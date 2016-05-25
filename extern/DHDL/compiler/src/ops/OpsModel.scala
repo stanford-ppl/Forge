@@ -114,12 +114,12 @@ trait OpsModel extends PipeStageToolsExp {
 
     case e@Offchip_load_vector(mem,ofs,len) =>
       val bits = nbits(e._mT)
-      val size = bound(len).getOrElse{stageError("Cannot resolve bound of tile vector load")}
+      val size = bound(len).getOrElse{stageError(s"Cannot resolve bound of tile vector load size $len")}
       AppStatistics(dataIn=bits*size.toLong)
 
     case e@Bram_store_vector(bram,ofs,vec,cchain,inds) =>
       val bits = nbits(e.mT)
-      val size = dimsOf(vec).map{case Exact(s) => s.toInt}.reduce{_*_}
+      val size = dimsOf(vec).map{d => bound(d).getOrElse{stageError(s"Cannot resolve bound of vector size $d")}.toInt}.reduce{_*_}
       AppStatistics(onChipIn = bits*size)
 
     case e@Bram_load_vector(bram,ofs,cchain,inds) =>
@@ -130,5 +130,4 @@ trait OpsModel extends PipeStageToolsExp {
     case Reflect(d,_,_) => opsInNode(s, d)
     case _ => NoOps
   }}
-
 }

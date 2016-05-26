@@ -44,8 +44,7 @@ trait DSE extends Traversal {
     ctrlAnalyzer.run(b)
     paramAnalyzer.run(b)
 
-    //if (debugMode) printer.run(b)
-    //if (debugMode) dblBuffers foreach {case (ctrl,mem) => debug(s"Found double buffer: $mem (in $ctrl)") }
+    if (debugMode && Config.enableDSE) printer.run(b)
 
     if (Config.enableDSE) dse(b)
 
@@ -116,12 +115,21 @@ trait DSE extends Traversal {
     val numericFactors = tileSizes ++ parFactors
 
     for (r <- restrict)   { debug(s"  $r") }
-    for ((p,r) <- ranges if numericFactors.contains(p)) { debug(s"  $p: ${r.start}:${r.step}:${r.end}") }
+    for ((p,r) <- ranges if numericFactors.contains(p)) { debug(s"  ${nameOf(p).getOrElse(p.toString)}: ${r.start}:${r.step}:${r.end}") }
 
     // Prune single factors
     val initialSpace = prune(numericFactors, ranges, restrict)
 
     val space = initialSpace ++ metapipes.map{mp => Domain(List(true,false), {c: Boolean => c match {case true => styleOf(mp) = Coarse; case false => styleOf(mp) = Disabled}; () }) }
+
+    if (debugMode) {
+      debug("")
+      debug("Pruned space:")
+      (numericFactors ++ metapipes).zip(space).foreach{case (p, d) =>
+        debug(nameOf(p).getOrElse(p.toString) + ": " + d.toString)
+      }
+    }
+
 
     val N = space.length
     val indexedSpace = (space, xrange(0,N,1).toList).zipped

@@ -70,7 +70,7 @@ trait ParamRestrictions extends Expressions {
     def set(i: Int) = setter(options(i))
     def setValue(v: T) = setter(v)
     def len: Int = options.length
-    override def toString = if (len < 10) "Domain(" + options.mkString(",") + ")" else "Domain( " + len + " x)"
+    override def toString = if (len < 10) "Domain(" + options.mkString(",") + ")" else "Domain(" + options.take(10).mkString(", ") + "... [" + (len-10) + " more])"
 
     def filter(cond: () => Boolean) = {
       new Domain(options.filter{t => setValue(t); cond()}, setter)

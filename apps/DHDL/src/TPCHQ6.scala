@@ -21,7 +21,7 @@ trait TPCHQ6 extends DHDLApplication {
     val minDate = minDateIn.value
     val maxDate = maxDateIn.value
 
-    MetaPipe((dataSize by tileSize) par outerPar, out) { i =>
+    Pipe.fold(dataSize by tileSize par outerPar)(out) { i =>
       val datesTile  = BRAM[UInt](tileSize)
       val quantsTile = BRAM[UInt](tileSize)
       val disctsTile = BRAM[Flt](tileSize)
@@ -33,7 +33,7 @@ trait TPCHQ6 extends DHDLApplication {
         pricesTile := prices(i::i+tileSize, innerPar)
       }
       val accum = Reg[Flt]
-      Pipe((tileSize by 1) par innerPar, accum){ j =>
+      Pipe.reduce(tileSize par innerPar)(accum){ j =>
         val date  = datesTile(j)
         val disct = disctsTile(j)
         val quant = quantsTile(j)
@@ -41,7 +41,6 @@ trait TPCHQ6 extends DHDLApplication {
         val valid = date > minDate && date < maxDate && disct >= 0.05f && disct <= 0.07f && quant < 24
         mux(valid, price * disct, 0.0f)
       }{_+_}
-      accum.value
     }{_+_}
   }
 

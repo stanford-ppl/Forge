@@ -23,7 +23,7 @@ trait LogReg extends DHDLApplication {
   def logreg(x: Rep[OffChipMem[Elem]], y: Rep[OffChipMem[Elem]], theta: Rep[OffChipMem[Elem]]) {
     Sequential {
       val gradAcc = BRAM[Elem]("gradAcc", D)
-      BlockReduce((N by tileSize) par outerMpPar, gradAcc, noPar) { i =>
+      Pipe.fold((N by tileSize) par outerMpPar, noPar)(gradAcc){ i =>
         val xB = BRAM[Elem]("xB", tileSize, D)
         val yB = BRAM[Elem]("yB", tileSize)
         val btheta = BRAM[Elem]("btheta", D)
@@ -33,17 +33,16 @@ trait LogReg extends DHDLApplication {
           btheta := theta(0::D, innerPar)
         }
         val gradient = BRAM[Elem]("gradient", D)
-        BlockReduce((tileSize by 1) par innerMpPar, gradient, innerPar) { ii =>
+        Pipe.fold((tileSize by 1) par innerMpPar, innerPar)(gradient){ ii =>
           val dotAccum = Reg[Elem]("dotAccum")
           val pipe2Res = Reg[Elem]("pipe2Res")
           val subRam   = BRAM[Elem]("subRam", D)
 
-          Pipe((D by 1) par innerPar, dotAccum) { j => xB(ii,j) * btheta(j) }{_+_}
+          Pipe.reduce((D by 1) par innerPar)(dotAccum){ j => xB(ii,j) * btheta(j) }{_+_}
           Pipe { pipe2Res := (yB(ii) - sigmoid(dotAccum.value)) }
           Pipe((D by 1) par innerPar) {j => subRam(j) = xB(ii,j) - pipe2Res.value }
           subRam
         }{_+_}
-        gradient
       }{_+_}
 
       val outerTheta = BRAM[Elem]("theta", D)

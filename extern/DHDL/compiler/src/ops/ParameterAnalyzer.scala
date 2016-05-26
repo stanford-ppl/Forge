@@ -13,12 +13,9 @@ import scala.collection.mutable.{HashMap,ArrayBuffer}
 trait ParamRestrictions extends Expressions {
   this: DHDLMetadataOpsExp with GenOverloadHack =>
 
-  private def qt(x: Param[_]) = {
-    val name = nameOf(x)
-    if (name == "") s"$x" else name
-  }
+  private def qt(x: Param[_]) = nameOf(x).getOrElse(s"$x")
 
-  type CRange = scala.collection.immutable.Range
+  type RRange = scala.collection.immutable.Range
 
   trait Restrict {this: Product =>
     def evaluate: Boolean
@@ -80,14 +77,14 @@ trait ParamRestrictions extends Expressions {
     }
   }
   object Domain {
-    def apply(r: CRange, setter: Int => Unit) = {
+    def apply(r: RRange, setter: Int => Unit) = {
       if (r.start % r.step != 0) {
         val start = r.step*(r.start/r.step + 1)
         new Domain[Int]((start until r.end by r.step).toList :+ r.start, setter)
       }
       else new Domain[Int](r.toList, setter)
     }
-    def restricted(r: CRange, setter: Int => Unit, cond: () => Boolean) = {
+    def restricted(r: RRange, setter: Int => Unit, cond: () => Boolean) = {
       val values = ArrayBuffer[Int]()
       var start = r.start
       if (r.start % r.step != 0) {
@@ -103,7 +100,7 @@ trait ParamRestrictions extends Expressions {
     }
   }
 
-  def prune(params: List[Param[Int]], ranges: HashMap[Param[Int],CRange], restrict: List[Restrict]) = {
+  def prune(params: List[Param[Int]], ranges: HashMap[Param[Int],RRange], restrict: List[Restrict]) = {
     val pruneSingle = params.map{t =>
       val restricts = restrict.filter(_.dependsOnlyOn(t))
       t -> Domain.restricted(ranges(t), {c: Int => t.setValue(c)}, () => restricts.forall(_.evaluate))
@@ -123,10 +120,10 @@ trait ParameterAnalyzer extends Traversal {
   val IR: DHDLExp with ParameterAnalysisExp
   import IR._
 
-  override val debugMode = false
+  debugMode = false
 
-  val MIN_TILE_SIZE  = 96   // words
-  val MAX_TILE_SIZE  = 9600 // words
+  val MIN_TILE_SIZE  = 96    // words
+  val MAX_TILE_SIZE  = 96000 // words
   val MAX_TILE       = 51340
 
   val MAX_PAR_FACTOR = 192  // duplications
@@ -134,7 +131,7 @@ trait ParameterAnalyzer extends Traversal {
 
   var tileSizes  = List[Param[Int]]()  // Params used to calculate BRAM size
   var parFactors = List[Param[Int]]()  // Params used as parallelization factors for counters
-  val range      = HashMap[Param[Int],CRange]()
+  val range      = HashMap[Param[Int],RRange]()
 
   var restrict   = List[Restrict]()
   var innerLoop  = false
@@ -165,7 +162,7 @@ trait ParameterAnalyzer extends Traversal {
       range(p) = xrange(range(p).start,Math.min(mx,range(p).end),range(p).step)
   }
 
-  def canParallelize(e: Exp[Any]) = true //styleOf(e) != Disabled
+  def canParallelize(e: Exp[Any]) = styleOf(e) == Fine || styleOf(e) == Coarse
 
   override def traverseStm(stm: Stm) = stm match {
     case TP(s, d) =>
@@ -240,21 +237,23 @@ trait ParameterAnalyzer extends Traversal {
       parFactors :::= pars
       if (styleOf(lhs) != Fine) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
-    case EatReflect(e:Pipe_reduce[_,_]) if canParallelize(lhs) =>
+    case EatReflect(e:Pipe_fold[_,_]) if canParallelize(lhs) =>
       val pars = List( parParamsOf(e.cchain).last )
       parFactors :::= pars
       if (styleOf(lhs) != Fine) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
-    case EatReflect(e:Block_reduce[_]) if canParallelize(lhs) =>
+    case EatReflect(e:Accum_fold[_,_]) if canParallelize(lhs) =>
       val opars = List( parParamsOf(e.ccOuter).last )
       val ipars = List( parParamsOf(e.ccInner).last )
       parFactors :::= opars
       parFactors :::= ipars
       opars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
-    case EatReflect(e:TileTransfer[_]) =>
-      val pars = List( parParamsOf(e.cchain).last )
-      parFactors :::= pars
+    case EatReflect(e:Bram_store_vector[_]) =>
+      parFactors :::= List( parParamsOf(e.cchain).last )
+
+    case EatReflect(e:Bram_load_vector[_]) => NoArea
+      parFactors :::= List( parParamsOf(e.cchain).last )
 
     case _ => //
   }

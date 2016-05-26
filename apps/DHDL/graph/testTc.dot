@@ -1,0 +1,7 @@
+graph {
+	graph [splines=line]
+	node [shape=circle]
+	1 -- 2
+	0 -- 1
+	0 -- 2
+}

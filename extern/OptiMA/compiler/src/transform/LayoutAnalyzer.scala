@@ -12,8 +12,9 @@ import scala.reflect.SourceContext
 trait LayoutAnalyzer extends Traversal {
   val IR: OptiMAExp
   import IR._
+
+  debugMode = false
   override val name = "LayoutAnalyzer"
-  override val debugMode = false
 
   private def subtype(view: Boolean, buff: Boolean) = (view, buff) match {
     case (false,false) => Plain

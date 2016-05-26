@@ -8,7 +8,8 @@ trait DHDLBoundAnalysis {
 
   def importBoundAnalysis() = {
     val BoundAnalyzer = analyzer("Bound")
-    val Prim = lookupGrp("DHDLPrim")
+    val FixPt = lookupTpe("FixPt")
+    val FltPt = lookupTpe("FltPt")
     val Tpes = lookupGrp("Tpes")
     val Ctrl = lookupGrp("BasicCtrl")
     val Tst  = lookupGrp("Nosynth")
@@ -40,29 +41,29 @@ trait DHDLBoundAnalysis {
 
       // TODO: assumes values are non-negative (i.e. max(x * y) could actually be min(x) * min(y) for neg. values )
       // Only for use with index calculation right now
-      analyze(Prim, "add_fix") using pattern((${Fixed(x)},${Fixed(y)}) -> ${ bound(lhs) = fixed(x + y) })
-      analyze(Prim, "add_fix") using pattern((${Fixed(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x + y) })
-      analyze(Prim, "add_fix") using pattern((${Exact(x)},${Fixed(y)}) -> ${ bound(lhs) = exact(x + y) })
-      analyze(Prim, "add_fix") using pattern((${Exact(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x + y) })
-      analyze(Prim, "add_fix") using pattern((${Bound(x)},${Bound(y)}) -> ${ bound(lhs) = x + y })
+      analyze(FixPt, "add") using pattern((${Fixed(x)},${Fixed(y)}) -> ${ bound(lhs) = fixed(x + y) })
+      analyze(FixPt, "add") using pattern((${Fixed(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x + y) })
+      analyze(FixPt, "add") using pattern((${Exact(x)},${Fixed(y)}) -> ${ bound(lhs) = exact(x + y) })
+      analyze(FixPt, "add") using pattern((${Exact(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x + y) })
+      analyze(FixPt, "add") using pattern((${Bound(x)},${Bound(y)}) -> ${ bound(lhs) = x + y })
 
-      analyze(Prim, "sub_fix") using pattern((${Fixed(x)},${Fixed(y)}) -> ${ bound(lhs) = fixed(x - y) })
-      analyze(Prim, "sub_fix") using pattern((${Fixed(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x - y) })
-      analyze(Prim, "sub_fix") using pattern((${Exact(x)},${Fixed(y)}) -> ${ bound(lhs) = exact(x - y) })
-      analyze(Prim, "sub_fix") using pattern((${Exact(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x - y) })
-      analyze(Prim, "sub_fix") using pattern((${Bound(x)},${Exact(y)}) -> ${ bound(lhs) = x - y })
+      analyze(FixPt, "sub") using pattern((${Fixed(x)},${Fixed(y)}) -> ${ bound(lhs) = fixed(x - y) })
+      analyze(FixPt, "sub") using pattern((${Fixed(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x - y) })
+      analyze(FixPt, "sub") using pattern((${Exact(x)},${Fixed(y)}) -> ${ bound(lhs) = exact(x - y) })
+      analyze(FixPt, "sub") using pattern((${Exact(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x - y) })
+      analyze(FixPt, "sub") using pattern((${Bound(x)},${Exact(y)}) -> ${ bound(lhs) = x - y })
 
-      analyze(Prim, "mul_fix") using pattern((${Fixed(x)},${Fixed(y)}) -> ${ bound(lhs) = fixed(x * y) })
-      analyze(Prim, "mul_fix") using pattern((${Fixed(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x * y) })
-      analyze(Prim, "mul_fix") using pattern((${Exact(x)},${Fixed(y)}) -> ${ bound(lhs) = exact(x * y) })
-      analyze(Prim, "mul_fix") using pattern((${Exact(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x * y) })
-      analyze(Prim, "mul_fix") using pattern((${Bound(x)},${Bound(y)}) -> ${ bound(lhs) = x * y })
+      analyze(FixPt, "mul") using pattern((${Fixed(x)},${Fixed(y)}) -> ${ bound(lhs) = fixed(x * y) })
+      analyze(FixPt, "mul") using pattern((${Fixed(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x * y) })
+      analyze(FixPt, "mul") using pattern((${Exact(x)},${Fixed(y)}) -> ${ bound(lhs) = exact(x * y) })
+      analyze(FixPt, "mul") using pattern((${Exact(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x * y) })
+      analyze(FixPt, "mul") using pattern((${Bound(x)},${Bound(y)}) -> ${ bound(lhs) = x * y })
 
-      analyze(Prim, "div_fix") using pattern((${Fixed(x)},${Fixed(y)}) -> ${ bound(lhs) = fixed(Math.floor(x / y)) })
-      analyze(Prim, "div_fix") using pattern((${Fixed(x)},${Exact(y)}) -> ${ bound(lhs) = exact(Math.floor(x / y)) })
-      analyze(Prim, "div_fix") using pattern((${Exact(x)},${Fixed(y)}) -> ${ bound(lhs) = exact(Math.floor(x / y)) })
-      analyze(Prim, "div_fix") using pattern((${Exact(x)},${Exact(y)}) -> ${ bound(lhs) = exact(Math.floor(x / y)) })
-      analyze(Prim, "div_fix") using pattern((${Bound(x)},${Exact(y)}) -> ${ bound(lhs) = Math.floor(x / y) })
+      analyze(FixPt, "div") using pattern((${Fixed(x)},${Fixed(y)}) -> ${ bound(lhs) = fixed(Math.floor(x / y)) })
+      analyze(FixPt, "div") using pattern((${Fixed(x)},${Exact(y)}) -> ${ bound(lhs) = exact(Math.floor(x / y)) })
+      analyze(FixPt, "div") using pattern((${Exact(x)},${Fixed(y)}) -> ${ bound(lhs) = exact(Math.floor(x / y)) })
+      analyze(FixPt, "div") using pattern((${Exact(x)},${Exact(y)}) -> ${ bound(lhs) = exact(Math.floor(x / y)) })
+      analyze(FixPt, "div") using pattern((${Bound(x)},${Exact(y)}) -> ${ bound(lhs) = Math.floor(x / y) })
     }
   }
 

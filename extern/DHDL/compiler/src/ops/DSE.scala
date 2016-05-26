@@ -3,7 +3,8 @@ package dhdl.compiler.ops
 import scala.reflect.{Manifest,SourceContext}
 import scala.virtualization.lms.internal.Traversal
 import scala.virtualization.lms.common.EffectExp
-import ppl.delite.framework.analysis.IRPrinterPlus
+
+import ppl.delite.framework.analysis.{QuickTraversal, IRPrinterPlus}
 import ppl.delite.framework.Config
 
 import dhdl.shared._
@@ -23,75 +24,24 @@ trait DSE extends Traversal {
   val IR: DHDLCompiler
   import IR.{infix_until => _, _}
 
-  override val debugMode = true
-
-  def inferDoubleBuffers(localMems: List[Exp[Any]]) = {
-
-    // TODO: Can probably generalize this and move it elsewhere
-    def leastCommonAncestor(x: (Exp[Any],Boolean), y: (Exp[Any],Boolean)): Option[Exp[Any]] = {
-      var pathX: List[(Exp[Any],Boolean)] = List(x)
-      var pathY: List[(Exp[Any],Boolean)] = List(y)
-
-      def hasParent(n: (Exp[Any],Boolean)) = n._2 || parentOf(n._1).isDefined
-      def getParent(n: (Exp[Any],Boolean)) = if (n._2) (n._1,false) else (parentOf(n._1).get,false)
-
-      var curX = x
-      while (hasParent(curX)) { curX = getParent(curX); pathX ::= curX }
-
-      var curY = y
-      while (hasParent(curY)) { curY = getParent(curY); pathY ::= curY }
-
-      // Choose last node where paths are the same
-      // Note this wouldn't work if paths could diverge and then converge again, but this is never the case
-      val intersect =pathX.zip(pathY).filter{case (x,y) => x == y}.map(_._1)
-      if (intersect.isEmpty) None
-      else Some(intersect.last._1)
-    }
-
-    // Heuristic - find memories which have a reader and a writer which are different
-    // but whose nearest common parent is a metapipeline.
-    localMems.flatMap{mem =>
-      if (!writerOf(mem).isDefined) None
-      else {
-        readersOf(mem) find (_ != writerOf(mem).get) match {
-          case Some(reader) =>
-            val lca = leastCommonAncestor(reader, writerOf(mem).get)
-            lca match {
-              case Some(x) if meta[MPipeType](x).isDefined && styleOf(x) == Coarse => Some(mem -> x)
-              case _ => None
-            }
-
-          case None => None
-        }
-      }
-    }
-  }
+  debugMode = true
 
   lazy val ctrlAnalyzer = new ControlSignalAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val paramAnalyzer = new ParameterAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val printer = new IRPrinterPlus{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val bndAnalyzer = new BoundAnalyzer with QuickTraversal{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val contention = new ContentionModel{val IR: DSE.this.IR.type = DSE.this.IR}
+  lazy val bufAnalyzer = new ScratchpadAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
 
   lazy val tileSizes  = paramAnalyzer.tileSizes.distinct
   lazy val parFactors = paramAnalyzer.parFactors.distinct
+  lazy val localMems  = ctrlAnalyzer.localMems
   lazy val accFactors = ctrlAnalyzer.memAccessFactors.toList
-  lazy val dblBuffers = inferDoubleBuffers(ctrlAnalyzer.localMems)
   lazy val topController = ctrlAnalyzer.top
-
-  def setDoubleBuffers() {
-    dblBuffers.foreach{case (mem,ctrl) => isDblBuf(mem) = styleOf(ctrl) == Coarse }
-  }
-  def setBanks() {
-    accFactors.foreach{case (mem,params) => banks(mem) = params.map(_.x).max } // TODO: LCM, not max
-  }
 
   override def run[A:Manifest](b: Block[A]) = {
     bndAnalyzer.run(b)
     ctrlAnalyzer.run(b)
-
-    //printer.run(b)
-
     paramAnalyzer.run(b)
 
     //if (debugMode) printer.run(b)
@@ -101,9 +51,8 @@ trait DSE extends Traversal {
 
     tileSizes.foreach{p => p.fix}
     parFactors.foreach{p => p.fix}
-    setDoubleBuffers()
-    setBanks()
     bndAnalyzer.run(b)
+    bufAnalyzer.run(localMems)
     contention.run(topController)
     (b)
   }
@@ -129,14 +78,13 @@ trait DSE extends Traversal {
 
 
   def dse[A:Manifest](b: Block[A]) {
-    // Specify FPGA target (hardcoded right now)
-    // HACK: BRAM tolerance increased by ~28% to allow for designs where coalescing occurs but we don't account for it
-    val target = FPGAResourceSummary(alms=262400,regs=524800,dsps=1963,bram=2567,streams=13)//bram=3300,streams=13)
+    // Specify FPGA target (hardcoded right now)/
+    val target = FPGAResourceSummary(alms=262400,regs=524800,dsps=1963,bram=2567,streams=13)
 
     val areaAnalyzer = new AreaAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
     val cycleAnalyzer = new LatencyAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
-    cycleAnalyzer.silenceTraversal()
-    areaAnalyzer.silenceTraversal()
+    cycleAnalyzer.silence()
+    areaAnalyzer.silence()
     bndAnalyzer.run(b)
     areaAnalyzer.run(b)
     cycleAnalyzer.run(b)
@@ -158,9 +106,9 @@ trait DSE extends Traversal {
     // C. Calculate space
     debug("Running DSE")
     debug("Tile Sizes: ")
-    tileSizes.foreach{t => val name = nameOf(t); if (name == "") debug(s"  $t") else debug(s"  $name")}
+    tileSizes.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
     debug("Parallelization Factors:")
-    parFactors.foreach{t => val name = nameOf(t); if (name == "") debug(s"  $t") else debug(s"  $name")}
+    parFactors.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
     debug("Metapipelining Toggles:")
     metapipes.foreach{t => debug(s"  ${mpos(t.pos).line}")}
     debug("")
@@ -239,12 +187,11 @@ trait DSE extends Traversal {
     }
 
     def evaluate() = {
-      setDoubleBuffers()
-      setBanks()
-      if (PROFILING) endSet()
-
       bndAnalyzer.run(b)
       if (PROFILING) endBnd()
+
+      bufAnalyzer.run(localMems)
+      if (PROFILING) endSet()
 
       contention.run(topController)
       if (PROFILING) endCon()
@@ -329,13 +276,7 @@ trait DSE extends Traversal {
     debug(s"Valid designs generated: $nValid / $legalSize")
     debug(s"Pareto frontier size: $paretoSize / $nValid")
 
-    val names = numericFactors.map{p =>
-      val name = nameOf(p)
-      if (name == "") s"$p" else name
-    } ++ metapipes.map{mp =>
-      val name = nameOf(mp)
-      if (name == "") s"$mp" else name
-    }
+    val names = numericFactors.map{p => nameOf(p).getOrElse(p.toString) } ++ metapipes.map{mp => nameOf(mp).getOrElse(mp.toString) }
 
     val pwd = sys.env("HYPER_HOME")
     val name = Config.degFilename.replace(".deg","")

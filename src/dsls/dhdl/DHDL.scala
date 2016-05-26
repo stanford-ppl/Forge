@@ -9,7 +9,7 @@ object DHDLDSLRunner extends ForgeApplicationRunner with DHDLDSL
 
 @dsl
 trait DHDLDSL extends ForgeApplication
-  with DHDLMath with DHDLMisc with DHDLTypes with DHDLMemories
+  with DHDLMath with DHDLMisc with DHDLTypes with DHDLMemories with DHDLVectors
   with DHDLControllers with DHDLMetadata with DHDLEnums with DHDLSugar with TupleJunk
   with DHDLGlobalAnalysis
   with DHDLBoundAnalysis {
@@ -43,7 +43,7 @@ trait DHDLDSL extends ForgeApplication
    * in-memory as a parameterized, hierarchical dataflow graph.
    *
    * Templates in DHDL capture parallelism, locality, and access pattern information at multiple levels. This dramatically simplifies coarse-grained pipelining and
-   * enables us to explicitly capture and represent a large space of designs which other tools cannot capture, as shown in Figure 2.
+   * enables us to explicitly capture and represent a large space of designs which other tools cannot capture.
    * Every template is parameterized. A specific hardware design point is instantiated from a DHDL description by instantiating all the templates in the design with concrete
    * parameter values passed to the program. DHDL heavily uses metaprogramming, so these values are passed in as arguments to the DHDL program. The
    * generated design instance is represented internally as a graph that can be analyzed to provide estimates of metrics such as area and cycle count. The parameters
@@ -95,30 +95,21 @@ trait DHDLDSL extends ForgeApplication
     // --- Type parameters
     val Signed = tpe("Signed", stage=compile)
     val Unsign = tpe("Unsign", stage=compile)
-    (0 to 64).foreach{i => tpe("B" + i, stage=compile) } // B0 - B64
+    val B = (0 to 64).map{i => tpe("B" + i, stage=compile) } // B0 - B64
 
     // --- Common Type Aliases
-    // Add more as needed
-    val B0 = lookupTpe("B0", compile)
-    val B5 = lookupTpe("B5", compile)
-    val B8 = lookupTpe("B8", compile)
-    val B11 = lookupTpe("B11", compile)
-    val B24 = lookupTpe("B24", compile)
-    val B32 = lookupTpe("B32", compile)
-    val B53 = lookupTpe("B53", compile)
-
     /** Signed 32 bit integer **/
-    val SInt32 = tpeAlias("SInt", FixPt(Signed, B32, B0))  // Note: This is not a scala Int, this is a signed int!
+    val SInt32 = tpeAlias("SInt", FixPt(Signed, B(32), B(0)))  // Note: This is not a scala Int, this is a signed int!
     /** Signed 32 bit integer (indexing) **/
-    val Index  = tpeAlias("Index", FixPt(Signed, B32, B0))
+    val Index  = tpeAlias("Index", FixPt(Signed, B(32), B(0)))
     /** Unsigned 32 bit integer **/
-    val UInt32 = tpeAlias("UInt", FixPt(Unsign, B32, B0))
+    val UInt32 = tpeAlias("UInt", FixPt(Unsign, B(32), B(0)))
     /** IEEE-754 half precision **/
-    val Half   = tpeAlias("Half", FltPt(B11, B5))
+    val Half   = tpeAlias("Half", FltPt(B(11), B(5)))
     /** IEEE-754 single precision **/
-    val Flt    = tpeAlias("Flt",  FltPt(B24, B8))
+    val Flt    = tpeAlias("Flt",  FltPt(B(24), B(8)))
     /** IEEE-754 double precision **/
-    val Dbl    = tpeAlias("Dbl",  FltPt(B53, B11))
+    val Dbl    = tpeAlias("Dbl",  FltPt(B(53), B(11)))
 
     // --- Memory Types
     /**
@@ -137,7 +128,22 @@ trait DHDLDSL extends ForgeApplication
      * in hardware is always flat. The contents of BRAMs are currently persistent across loop iterations, even when they are declared in an inner scope.
      * BRAMs can have an arbitrary number of readers but only one writer. This writer may be an element-based store or a load from an OffChipMem.
      **/
+    val SparseTile = tpe("SparseTile", T)
+    /**
+     * BRAMs are on-chip scratchpads with fixed size. BRAMs can be specified as multi-dimensional, but the underlying addressing
+     * in hardware is always flat. The contents of BRAMs are currently persistent across loop iterations, even when they are declared in an inner scope.
+     * BRAMs can have an arbitrary number of readers but only one writer. This writer may be an element-based store or a load from an OffChipMem.
+     **/
     val BRAM = tpe("BRAM", T)
+    /**
+     * Caches are on-chip caches for a specific off-chip memory/data structure. Caches allow loading
+     * with multi-dimentional address, whose dimensions are inherited from the cached off-chip memories.
+     * The multi-dimentional address is converted to a single flat address in hardware. The
+     * addressing scheme is word-based flat indexing of the offchip memory. Cache allows loading of a
+     * single element at a time. During a miss, a cache automatically loads from its off-chip memory
+     * and stalls the pipeline, and resumes pipeline when loading is complete.
+     **/
+    val Cache = tpe("Cache", T)
     /**
      * Reg defines a hardware register used to hold a scalar value. Regs have an optional name (primarily used for debugging) and reset value.
      * The default reset value for a Reg is the numeric zero value for it's specified type.
@@ -145,8 +151,12 @@ trait DHDLDSL extends ForgeApplication
      * are defined within. A Reg defined within a Pipe, for example, is reset at the beginning of each iteration of that Pipe.
      **/
     val Reg = tpe("Reg", T)
-    primitiveStructs :::= List(OffChip, BRAM, Reg)
+    /**
+     * Vector defines a fixed size collection of scalar values.
+     **/
+    val Vector = tpe("Vector", T)
 
+    primitiveStructs :::= List(OffChip, BRAM, Reg, Vector, Cache)
 
     // --- State Machine Types
     /** Counter is a single hardware counter with an associated minimum, maximum, step size, and parallelization factor.
@@ -169,6 +179,14 @@ trait DHDLDSL extends ForgeApplication
     val Range     = tpe("Range")
     primitiveTypes :::= List(Indices)
 
+    val RangeWildcard = tpe("RangeWildcard", stage = compile)
+    identifier (RangeWildcard) ("*")
+
+
+    // --- Enums
+    val ControlType = tpe("ControlType", stage=compile)
+    val RegType     = tpe("RegType", stage=compile)
+
     noInfixList :::= List(":=", "**", "as", "to", "rst")
 
     // Scala.scala imports
@@ -183,6 +201,7 @@ trait DHDLDSL extends ForgeApplication
 
     importDHDLMath()
     importDHDLMemories()
+    importDHDLVectors()
     importDHDLControllers()
 
     importDHDLMisc()
@@ -192,40 +211,58 @@ trait DHDLDSL extends ForgeApplication
     // --- Traversals
     val StageAnalyzer = analyzer("Stage", isExtern=true)
     val GlobalAnalyzer = analyzer("Global")
+    val ControlSignalAnalyzer = analyzer("ControlSignal", isExtern=true)
+    val ParallelizationSetter = traversal("ParallelizationSetter",isExtern=true)
+    val DHDLAffineAnalysis = analyzer("DHDLAffine", isExtern=true)
+
     val BoundAnalyzer = analyzer("Bound", isIterative=false)
     val DSE = traversal("DSE", isExtern=true)
+    val Scratchpad = analyzer("Scratchpad", isExtern=true)
     val AreaAnalyzer = analyzer("Area", isExtern=true)
     val LatencyAnalyzer = analyzer("Latency", isExtern=true)
+    val OpsAnalyzer = analyzer("Ops", isExtern=true)
 
     val ConstantFolding = traversal("ConstantFolding", isExtern=true)
-    val ControlSignalAnalyzer = analyzer("ControlSignal", isExtern=true)
     val ParameterAnalyzer = analyzer("Parameter",isExtern=true)
-    val ParSetter = traversal("ParSetter",isExtern=true)
     val MetaPipeRegInsertion = traversal("MetaPipeRegInsertion",isExtern=true)
+
+    val Unrolling = transformer("Unrolling", isExtern=true)
+    val DotIRPrinter = traversal("DotIRPrinter", isExtern=true)
 
     importGlobalAnalysis()
     importBoundAnalysis()
 
+    // --- Estimation and tuning
     schedule(StageAnalyzer)
-    //schedule(GlobalAnalyzer)
+    schedule(GlobalAnalyzer)
+    schedule(ControlSignalAnalyzer)
+
+    schedule(ParallelizationSetter)
+    schedule(DHDLAffineAnalysis)
+
+    schedule(DotIRPrinter)  // Prior to unrolling
+
     schedule(DSE)
 
-    // --- Post Parameter Selection
-    //schedule(AreaAnalyzer)
-    //schedule(LatencyAnalyzer)
+    // --- Post-DSE Estimation
+    schedule(AreaAnalyzer)
+    schedule(OpsAnalyzer)
+
+    // --- Transformations
     schedule(BoundAnalyzer)
     schedule(ConstantFolding)
+
     schedule(MetaPipeRegInsertion)
 
-    schedule(ControlSignalAnalyzer)
-    schedule(ParSetter)
-
-    schedule(IRPrinterPlus)
+    schedule(Unrolling)
+    schedule(DotIRPrinter) // After unrolling
 
     // External groups
-    extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))
-    extern(grp("MemoryTemplate"), targets = List($cala, dot, maxj), withTypes = true)
-    extern(metadata("TypeInspection"), targets = List(maxj))
+    extern(grp("ControllerTemplate"), targets = List($cala, maxj))
+    extern(grp("ExternCounter"), targets = List($cala), withTypes = true)
+    extern(grp("MemoryTemplate"), targets = List($cala, maxj), withTypes = true)
+    extern(metadata("ExternPrimitive"), targets = List($cala, maxj), withTypes = true)
+    extern(grp("LoweredPipe"), targets = List($cala))
 		()
 	}
 }

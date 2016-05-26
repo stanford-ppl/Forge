@@ -21,11 +21,15 @@ trait DHDLSugar {
       lenOf(inds) = $0.length
       inds
     }
-    direct (Indices) ("getIndex", Nil, (Indices, SInt) :: Idx) implements composite ${ field[SInt]($0, "i_" + $1) }
+    /** @nodoc **/
+    direct (Indices) ("indices_get_index", Nil, (Indices, SInt) :: Idx) implements composite ${ field[SInt]($0, "i_" + $1) }
+    /** @nodoc **/
+    direct (Indices) ("indices_to_list", Nil, Indices :: SList(Idx)) implements composite ${ List.tabulate(lenOf($0)){i => $0(i)} }
 
+    /** @nodoc **/
     static (Indices) ("apply", Nil, varArgs(Idx) :: Indices) implements composite ${ indices_create($0.toList) }
-    infix (Indices) ("apply", Nil, (Indices, SInt) :: Idx) implements redirect ${ getIndex($0, $1) }
-    internal.infix (Indices) ("toList", Nil, Indices :: SList(Idx)) implements composite ${ List.tabulate(lenOf($0)){i => $0(i)} }
+    infix (Indices) ("apply", Nil, (Indices, SInt) :: Idx) implements redirect ${ indices_get_index($0, $1) }
+    internal.infix (Indices) ("toList", Nil, Indices :: SList(Idx)) implements redirect ${ indices_to_list($0) }
   }
 
 
@@ -52,7 +56,7 @@ trait DHDLSugar {
       range
     }
 
-    // Causes scalac to get stuck in implicit lookup :(
+    // Causes scalac to get stuck in implicit lookup?
     /*fimplicit (Range) ("idx_to_range", Nil, Idx :: Range) implements composite ${
       val range = range_new($0, $0 + 1, 1)
       isUnit(range) = true
@@ -76,14 +80,20 @@ trait DHDLSugar {
     internal.infix (LoopRange) ("start", Nil, LoopRange :: Idx) implements getter(0, "_start")
     internal.infix (LoopRange) ("end", Nil, LoopRange :: Idx) implements getter(0, "_end")
     internal.infix (LoopRange) ("step", Nil, LoopRange :: Idx) implements getter(0, "_step")
+    /** @nodoc **/
     static (LoopRange) ("apply", Nil, (Idx,Idx,Idx) :: LoopRange) implements allocates(LoopRange, ${$0},${$1},${$2})
 
-    fimplicit (LoopRange) ("rangeToCounter", Nil, LoopRange :: Counter) implements composite ${ counter_create(None, $0.start, $0.end, $0.step, unit(1)) }
+    fimplicit (LoopRange) ("rangeToCounter", Nil, LoopRange :: Counter) implements composite ${
+      counter_create(None, $0.start, $0.end, $0.step, unit(1))
+    }
 
     // --- API
     infix (LoopRange) ("until", Nil, (Idx,Idx) :: LoopRange) implements composite ${ LoopRange($0, $1, fixPt[Int,Signed,B32,B0](1)) }
     infix (LoopRange) ("by", Nil, (LoopRange, Idx) :: LoopRange) implements composite ${ LoopRange($0.start, $0.end, $1) }
     infix (LoopRange) ("by", Nil, (Idx, Idx) :: LoopRange) implements composite ${ LoopRange(fixPt[Int,Signed,B32,B0](0), $0, $1) }
+    infix (LoopRange) ("par", Nil, (Idx, MInt) :: Counter) implements composite ${
+      counter_create(None, fixPt[Int,Signed,B32,B0](0), $0, fixPt[Int,Signed,B32,B0](1), $1)
+    }
     infix (LoopRange) ("par", Nil, (LoopRange, MInt) :: Counter) implements composite ${
       counter_create(None, $0.start, $0.end, $0.step, $1)
     }

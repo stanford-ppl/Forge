@@ -33,7 +33,6 @@ trait AreaAnalyzer extends ModelingTools {
   import IR._
   import ReductionTreeAnalysis._
 
-
   override def silence() {
     super.silence()
     IR.silenceLatencyModel()

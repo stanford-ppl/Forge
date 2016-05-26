@@ -8,10 +8,10 @@ trait MLGraphOps {
   this: OptiMLDSL =>
 
   def importAllGraphOps() {
-    importCSROps() 
+    importCSRGraphOps() 
   }
 
-  def importCSROps() {
+  def importCSRGraphOps() {
     val DenseVector = lookupTpe("DenseVector")
     val DenseVectorView = lookupTpe("DenseVectorView")
     val IndexVector = lookupTpe("IndexVector")

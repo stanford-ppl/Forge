@@ -11,7 +11,9 @@ trait OptiLADSL extends ForgeApplication
   with BasicMathOps with RandomOps with IOOps
   with VectorOps with DenseVectorOps with IndexVectorOps with DenseVectorViewOps with SparseVectorOps with SparseVectorViewOps
   with MatrixOps with DenseMatrixOps with DenseMatrixViewOps 
-  with ComplexOps with LinAlgOps with SparseOps with SparseRowViewOps {
+  with ComplexOps with LinAlgOps with COOOps with CSROps with SparseOps
+  with SparseMatrixOps with SparseMatrixNoTransposeOps with SparseBlockMatrixOps
+  with SparseRowViewOps {
 
   def dslName = "OptiLA"
 
@@ -48,8 +50,8 @@ trait OptiLADSL extends ForgeApplication
     // Sparse types
     // declare all tpes first, so that they are available to all ops (similar to Delite)
     val R = tpePar("R")
-    val Sparse    = tpe("Sparse", T)
-    val SparseCOO = tpe("SparseCOO", T)
+    val COO = tpe("COO", T)
+    val CSR = tpe("CSR", T)
     val SparseMatrix = tpe("SparseMatrix", T)
     val SparseMatrixNoTranspose = tpe("SparseMatrixNoTranspose", T)
     val SparseBlockMatrix = tpe("SparseBlockMatrix", T)
@@ -57,9 +59,13 @@ trait OptiLADSL extends ForgeApplication
     val SparseRowView = tpe("SparseRowView", T)
     val SparseDirectedGraph = tpe("SparseDirectedGraph", T)
     val SparseUndirectedGraph = tpe("SparseUndirectedGraph", T)
+    importCOOOps()
+    importCSROps()
     importSparseOps()
     importSparseRowViewOps()
-    importOptiLAUntilConverged()
+    importSparseMatrixOps()
+    importSparseMatrixNoTransposeOps()
+    importSparseBlockMatrixOps()
 /**************************************Sparse related code************************************/
 
     // OptiLA ops
@@ -144,38 +150,6 @@ if ($a.isInstanceOf[Double] || $a.isInstanceOf[Float]) numericStr($a) else ("" +
     extern(grp("Rewrite"), targets = Nil)
     extern(grp("Distributed"), targets = List($cala))
   }
-
-/**************************************Sparse related code************************************/
-  def importOptiLAUntilConverged() {
-    val OptiLAControl = grp("OptiLAControl")
-    val T = tpePar("T")
-    // "block" should not mutate the input, but always produce a new copy. in this version, block can change the structure of the input across iterations (e.g. increase its size)
-    direct (OptiLAControl) ("optilauntilconverged", T, CurriedMethodSignature(List(List(("x", T), ("tol", MDouble, "unit(.001)"), ("minIter", MInt, "unit(1)"), ("maxIter", MInt, "unit(1000)"), ("verbose", MBoolean, "unit(false)")), ("block", (T,MInt) ==> T)), T), ("diff", (T,T) ==> MDouble)) implements composite ${
-      var delta = scala.Double.MaxValue
-      var cur = x
-      var iter = 0
-
-      while ((abs(delta) > tol && iter < maxIter) || iter < minIter) {
-        val prev = cur
-        val next = block(cur, iter)
-        delta = diff(prev, next)
-        if (verbose) println("[optiml]: iter " + iter + ", delta: " + delta)
-        iter += 1
-        cur = next
-      }
-
-      if (verbose) {
-        if (iter == maxIter) {
-          println("[optiml]: maximum iterations (" + iter + ") exceeded")
-        }
-        else {
-          println("[optiml]: converged in " + iter + " iterations")
-        }
-      }
-      cur
-    }
-  }
-/**************************************Sparse related code************************************/
 
   def importVecMatConstructor() {
     val DenseVector = lookupTpe("DenseVector")

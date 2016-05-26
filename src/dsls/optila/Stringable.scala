@@ -51,8 +51,8 @@ trait StringableOps {
     val DenseMatrix = lookupTpe("DenseMatrix")
     val DenseMatrixView = lookupTpe("DenseMatrixView")
     val SparseVector = lookupTpe("SparseVector")
-    val Sparse = lookupTpe("Sparse")
-    val SparseCOO = lookupTpe("SparseCOO")
+    val CSR = lookupTpe("CSR")
+    val COO = lookupTpe("COO")
 
     val DenseVectorStringable = tpeClassInst("StringableDenseVector", T withBound TStringable, Stringable(DenseVector(T)))
     infix (DenseVectorStringable) ("makeStr", Nil, DenseVector(T) :: MString) implements composite ${ $0.makeString }
@@ -72,11 +72,11 @@ trait StringableOps {
     val SparseVectorStringable = tpeClassInst("StringableSparseVector", T withBound TStringable, Stringable(SparseVector(T)))
     infix (SparseVectorStringable) ("makeStr", Nil, SparseVector(T) :: MString) implements composite ${ $0.makeString }
 
-    val SparseCOOStringable = tpeClassInst("StringableSparseCOO", T withBound TStringable, Stringable(SparseCOO(T)))
-    infix (SparseCOOStringable) ("makeStr", Nil, SparseCOO(T) :: MString) implements composite ${ $0.makeString }
+    val COOStringable = tpeClassInst("StringableCOO", T withBound TStringable, Stringable(COO(T)))
+    infix (COOStringable) ("makeStr", Nil, COO(T) :: MString) implements composite ${ $0.makeString }
 
-    val SparseStringable = tpeClassInst("StringableSparse", T withBound TStringable, Stringable(Sparse(T)))
-    infix (SparseStringable) ("makeStr", Nil, Sparse(T) :: MString) implements composite ${ $0.makeString }
+    val CSRStringable = tpeClassInst("StringableCSR", T withBound TStringable, Stringable(CSR(T)))
+    infix (CSRStringable) ("makeStr", Nil, CSR(T) :: MString) implements composite ${ $0.makeString }
 
 
     // tuples of stringables

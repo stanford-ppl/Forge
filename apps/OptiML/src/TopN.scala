@@ -122,7 +122,7 @@ trait TopN extends OptiMLApplication {
     val userIds = (uniqueRatings map { grp => grp(0).profileA }) << (uniqueRatings map { grp => grp(0).profileB })
 
     // each similarity represents a unique (i,j) value in the similarity matrix - invert for fast look-up    
-    val similarityMatrixB = Sparse[Double](userIds.max+1, userIds.max+1)    
+    val similarityMatrixB = COO[Double](userIds.max+1, userIds.max+1)    
     var s = 0
     while (s < similarities.length) {
       val sim = similarities(s)

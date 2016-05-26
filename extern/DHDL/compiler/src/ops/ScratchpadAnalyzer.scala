@@ -49,7 +49,7 @@ trait ScratchpadAnalyzer extends HungryTraversal {
   val IR: DHDLExp with ScratchpadAnalysisExp
   import IR._
 
-  debugMode = true
+  debugMode = false
   override val name = "Scratchpad Analyzer"
 
   /**

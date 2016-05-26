@@ -21,9 +21,10 @@ trait MemoryTemplateWrapper extends ControllerTemplateWrapper with ExternPrimiti
   type Pipeline = Unit
   type Indices = RecordImpl
 
-  // Library can't definitively tell the difference between BRAM and Reg
+  // Library can't definitively tell the difference between BRAM, Reg, and Cache
   def isBRAM[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[Array[_]])
   def isRegister[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[Array[_]])
+  def isCache[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[Array[_]])
 
   def offchipMemManifest[T:Manifest]: Manifest[OffChipMem[T]] = manifest[Array[T]]
   def bramManifest[T:Manifest]: Manifest[BRAM[T]] = manifest[Array[T]]

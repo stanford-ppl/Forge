@@ -28,7 +28,7 @@ trait Definitions extends DerivativeTypes {
   lazy val IRPrinter = traversal("IRPrinter", isExtern = true)  // For debugging
   lazy val IRPrinterPlus = traversal("IRPrinterPlus", isExtern = true) // Debugging metadata
   lazy val HardStop = traversal("HardStop", isExtern=true) // For debugging
-  
+
   /**
    * Built-in types
    */
@@ -146,7 +146,7 @@ trait Definitions extends DerivativeTypes {
   case object dot extends CodeGenerator { def name = "Dot" }
   case object maxj extends CodeGenerator { def name = "MaxJ" }
 
-  val generators = List($cala, cuda, opencl, cpp, restage, dot, maxj)
+  val generators = List($cala, cuda, opencl, cpp, restage, maxj)
 
   /**
    * Type classes

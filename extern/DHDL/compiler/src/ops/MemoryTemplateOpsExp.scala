@@ -185,52 +185,6 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTe
   }
 }
 
-
-
-
-trait DotGenMemoryTemplateOps extends DotGenEffect with DotGenControllerTemplateOps{
-	val IR: ControllerTemplateOpsExp with OffChipMemOpsExp with DHDLCodegenOps with RegOpsExp
-            with DHDLIdentifiers with DeliteTransform
-
-  import IR._
-
-	var emittedSize = Set.empty[Exp[Any]]
-  override def initializeGenerator(buildDir:String): Unit = {
-		emittedSize.clear
-		super.initializeGenerator(buildDir)
-	}
-
-  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-		case Offchip_new(size) =>
-			/* Special case to hand nodes producing size of offchip outside hardware scope. Not actual
-       * codegen to Offchip_new */
-			def hackGen(x: Exp[Any]): Unit = x match {
-				case Def(EatReflect(_:Reg_new[_])) => // Nothing
-				case ConstFix(_) => // Nothing
-				case ConstFlt(_) => // Nothing
-				case Def(d) =>
-					alwaysGen {
-						emitNode(x.asInstanceOf[Sym[Any]], d)
-					}
-					syms(d).foreach{ s => s match {
-							case _ => hackGen(s)
-						}
-					}
-				case _ => // Nothing
-			}
-			if (!emittedSize.contains(size)) {
-				hackGen(size)
-				emittedSize += size
-			}
-			super.emitNode(sym, rhs)
-
-    case _ => super.emitNode(sym, rhs)
-  }
-}
-
-
-
-
 trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTemplateOps{
   val IR: ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
           with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp

@@ -15,7 +15,7 @@ trait OpsAnalyzer extends ModelingTools {
   val IR: OpsAnalysisExp with DHDLExp
   import IR._
 
-  debugMode = true
+  debugMode = false
   override val name = "Ops Analyzer"
 
   var totalOps = AppStatistics()

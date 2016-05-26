@@ -42,11 +42,12 @@ trait DHDLCaches {
     /** @nodoc **/
     direct (Cache) ("cache_calc_addr", T, (Cache(T), Indices) :: Idx) implements composite ${ calcAddress($1.toList, dimsOf($0)) }
 
-    val Mem = lookupTpeClass("Mem").get
+    // Mem type class is primarily used for accumulator reductions. Using a cache for this is not well defined right now
+    /*val Mem = lookupTpeClass("Mem").get
     val CacheMem = tpeClassInst("CacheMem", T, TMem(T, Cache(T)))
     infix (CacheMem) ("ld", T, (Cache(T), Idx) :: T) implements composite ${ cache_load_nd($0, List($1)) }
     infix (CacheMem) ("st", T, (Cache(T), Idx, T) :: MUnit, effect = write(0)) implements composite ${ cache_store_nd($0, List($1), $2) }
-    infix (CacheMem) ("flatIdx", T, (Cache(T), Indices) :: Idx) implements composite ${ cache_calc_addr($0, $1) }
+    infix (CacheMem) ("flatIdx", T, (Cache(T), Indices) :: Idx) implements composite ${ cache_calc_addr($0, $1) }*/
 
     // --- API
     /** Creates a Cache with given name and target OffChipMem. Dimensions is inherited from
@@ -114,27 +115,5 @@ trait DHDLCaches {
     impl (cache_new)   (codegen($cala, ${ $offchip }))
     impl (cache_load)  (codegen($cala, ${ $cache.apply($addr.toInt) }))
     impl (cache_store) (codegen($cala, ${ $cache.update($addr.toInt, $value) }))
-
-    // --- Dot Backend
-    // TODO: Move to DotIRPrinter
-    impl (cache_new)   (codegen(dot, ${
-      @ if (isDblBuf(sym)) {
-        $sym [margin=0 rankdir="LR" label="{<st> | <ld>}" xlabel="$sym "
-              shape="record" color=$dblbufBorderColor  style="filled"
-              fillcolor=$cacheFillColor ]
-      @ } else {
-          $sym [label="$sym " shape="square" style="filled" fillcolor=$cacheFillColor ]
-      @ }
-      $offchip -> $sym
-    }))
-    impl (cache_load)  (codegen(dot, ${
-      $addr -> $cache [ headlabel="addr" ]
-      @ emitValDef(sym, cache)
-    }))
-    impl (cache_store) (codegen(dot, ${
-      $addr -> $cache [ headlabel="addr" ]
-      $value -> $cache [ headlabel="data" ]
-    }))
-
   }
 }

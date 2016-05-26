@@ -25,7 +25,7 @@ trait TestCache extends DHDLApplication {
       val c2 = Cache[Q16]("c2", v2)
       val c3 = Cache[Q16]("c3", v3)
 
-      Pipe(0 until N, outer){ii => c1(ii) * c2(ii) }{_+_}
+      Pipe.reduce(0 until N)(outer){ii => c1(ii) * c2(ii) }{_+_}
       Pipe(N by 1) {ii => c3(ii) = c1(ii) * c2(ii) }
     }
 

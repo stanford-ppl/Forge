@@ -21,9 +21,10 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 	val IR: DHDLExp
 	import IR.{infix_until => _, looprange_until => _, println => _, _}
 
-  debugMode = true
+  debugMode = false
   override val name = "DotIRPrinter"
   var inHwScope = false
+  var fileNum = 0
   val emittedCtrChain = Set.empty[Exp[Any]]
   val emittedSize = Set.empty[Exp[Any]]
 
@@ -106,7 +107,8 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 	}
 
   override def preprocess[A:Manifest](b: Block[A]): Block[A] = {
-    stream = newStream("DotIR")
+    val filename = Config.degFilename.replace(".deg", "")
+    stream = newStream(filename + fileNum)
 		emittedCtrChain.clear
 		emittedSize.clear
     emit("digraph{")
@@ -122,9 +124,7 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
     emit("}")
     stream.flush()
     stream.close()
-
-    println("--------generate dhdl dot IR ------------")
-
+    fileNum += 1
 		b
 	}
 
@@ -315,6 +315,25 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
       emit(s"""  ${sym_ctrl} [label="ctrl" height=0 style="filled" fillcolor="${mpBorderColor} "]""")
       emit(s"""}""")
 
+    case Cache_new(offchip) =>
+      if (isDblBuf(sym)) {
+        emit(s"""${quote(sym)} [margin=0 rankdir="LR" label="{<st> | <ld>}" xlabel="${quote(sym)}"""")
+        emit(s"""               shape="record" color=$dblbufBorderColor  style="filled" """)
+        emit(s"""               fillcolor=$cacheFillColor ]""")
+      }
+      else {
+        emit(s"""${quote(sym)} [label="${quote(sym)}" shape="square" style="filled" fillcolor=$cacheFillColor ]""")
+      }
+      emitEdge(offchip, sym)
+
+    case Cache_load(cache, addr) =>
+      emitEdge(addr, cache, "addr")
+      emitValDef(sym, cache)
+
+    case Cache_store(cache, addr, value) =>
+      emitEdge(addr, cache, "addr")
+      emitEdge(value, cache, "data")
+
 		case Bram_new(size, zero) =>
       val qsym = quote(sym)
       if (isDblBuf(sym)) {
@@ -326,18 +345,18 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
       }
 
     case Bram_load(bram,addr) =>
-			emit(s"""${quote(addr)} -> ${quote(bram)} [ headlabel="addr" ]""")
+      emitEdge(addr, bram, "addr")
 			emitValDef(sym, bram)
 
     case Bram_store(bram,addr,value) =>
-			emit(s"""${quote(addr)} -> ${quote(bram)} [ headlabel="addr" ]""")
-			emit(s"""${quote(value)} -> ${quote(bram)} [ headlabel="data" ]""")
+      emitEdge(addr, bram, "addr")
+      emitEdge(value, bram, "data")
 
     case Reg_read(reg) =>
       emitValDef(sym, reg)
 
     case Reg_write(reg, value) =>
-      emit(s"""${quote(value)} -> ${quote(reg)}""")
+      emitEdge(value, reg)
 
     case Fixpt_to_fltpt(x) =>
       emit(s"""${quote(sym)} [ label="fix2flt" ]""")

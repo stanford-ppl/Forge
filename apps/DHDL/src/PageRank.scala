@@ -27,10 +27,10 @@ trait PageRank extends DHDLApplication {
     val dmap = maps(1)
     val svl = getVertList(smap, false, true)
     val dvl = getVertList(dmap, false, true)
-    val del = getEdgeList(dmap) 
+    val del = getEdgeList(dmap)
     val NE = del.length // Actual number of edges in graph
     //val NV = svl(0).length/2 // Actual number of vertices in graph
-    val sob = Array.tabulate(NE) { i => 
+    val sob = Array.tabulate(NE) { i =>
       svl(del(i)*2+1)
     }
     //println("svl: " + svl.mkString(","))
@@ -38,10 +38,10 @@ trait PageRank extends DHDLApplication {
     //println("del: " + del.mkString(","))
     //println("sob: " + sob.mkString(","))
     val vertList = OffChipMem[Index]("VertList", NV, 2) // [pointer, size]
-    val edgeList = OffChipMem[Index]("EdgeList", NE) // srcs of edges 
-    val outBounds = OffChipMem[Index]("outBounds", NE) // number of outbound links for each src in edgeList 
+    val edgeList = OffChipMem[Index]("EdgeList", NE) // srcs of edges
+    val outBounds = OffChipMem[Index]("outBounds", NE) // number of outbound links for each src in edgeList
     val pageRank = OffChipMem[Elem]("PageRank", NV, 2) // [PR iter even, PR iter odd]
-    
+
     setArg(numIter, NI)
     setArg(damp, DF)
     setMem(vertList, dvl)
@@ -53,17 +53,17 @@ trait PageRank extends DHDLApplication {
     //println("initial page rank: " + getMem(pageRank).mkString(","))
 
     Accel {
-      Sequential(numIter by 1) { iter =>
+      Sequential(numIter by 1){ iter =>
         //println("iter:" + iter + " ---------------------")
         val oldPrIdx = iter % 2.as[Index]
         val newPrIdx = (iter + 1.as[Index]) % 2.as[Index]
-        MetaPipe(NV by tileSize) { ivt =>
+        Pipe(NV by tileSize){ ivt =>
           val prOldB = BRAM[Elem]("prOldTile", tileSize)
           val prNewB = BRAM[Elem]("prNewTile", tileSize)
           val vB = BRAM[Index]("vertTile", tileSize, 2)
           prOldB := pageRank(ivt::ivt+tileSize, oldPrIdx::oldPrIdx+1.as[SInt])
           vB := vertList(ivt::ivt+tileSize, 0::2)
-          MetaPipe (tileSize by 1) { iv =>
+          Pipe(tileSize by 1){ iv =>
             val eB = BRAM[Index]("edgeTile", maxNumEdge)
             val oB = BRAM[Index]("outTile", maxNumEdge)
             val eprB = BRAM[Elem]("edgePageRank", maxNumEdge)
@@ -81,30 +81,30 @@ trait PageRank extends DHDLApplication {
             }
             //TODO: Flatten idx in app, move into dhdl
             Pipe (numEdge by 1) { ie =>
-              idxB(ie) = eB(ie) * 2.as[SInt] + oldPrIdx 
+              idxB(ie) = eB(ie) * 2.as[SInt] + oldPrIdx
             }
             //printBram(idxB)
             eprB := pageRank(idxB, numEdge)
             //printBram(eprB)
             val sum = Reg[Elem]("sum")
-            Pipe (numEdge by 1, sum) { ie =>
-              eprB(ie) / oB(ie).to[Elem] 
-            } {_+_}
+            Pipe.reduce(numEdge by 1)(sum){ ie =>
+              eprB(ie) / oB(ie).to[Elem]
+            }{_+_}
             //println("sum:" + sum.value)
             Pipe {
               val pr = sum.value * damp + (1.as[Elem]-damp)
               prNewB(iv) = pr
             }
-          } 
+          }
           //printBram(prNewB)
           pageRank(ivt::ivt+tileSize, newPrIdx::newPrIdx+1.as[SInt]) := prNewB
         }
       }
     }
-    
+
     val result = getMem(pageRank)
 
-    /* Scala Version */ 
+    /* Scala Version */
     val gold = Array.fill (NV*2)(1.as[Elem]/NV.to[Elem])
     for (iter <- 0.as[Index] until NI) {
       val oldPrIdx = iter % 2.as[Index]
@@ -115,11 +115,11 @@ trait PageRank extends DHDLApplication {
         val pt = dvl(iv*2)
         val numEdge = dvl(iv*2+1)
         val sum = if (numEdge == 0.as[Index]) {
-          0.as[Elem]  
+          0.as[Elem]
         } else {
-          Array.tabulate(numEdge){ ie => 
+          Array.tabulate(numEdge){ ie =>
             val e = del(pt + ie)
-            getPr(e) / sob(pt + ie).to[Elem] 
+            getPr(e) / sob(pt + ie).to[Elem]
           }.reduce(_+_)
         }
         setPr(iv, sum * DF + (1.as[Elem] - DF))

@@ -19,7 +19,7 @@ trait DHDLMemories extends DHDLRegs with DHDLBRAMs with DHDLOffChip with DHDLCac
     importOffChip()
     importTiles()
     importSparseTiles()
-    //importCache() Not yet finished
+    importCache()
   }
 
   // Type class for local memories which can be used as accumulators in reductions

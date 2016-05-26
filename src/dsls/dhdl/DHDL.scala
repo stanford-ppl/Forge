@@ -258,9 +258,9 @@ trait DHDLDSL extends ForgeApplication
     schedule(DotIRPrinter) // After unrolling
 
     // External groups
-    extern(grp("ControllerTemplate"), targets = List($cala, dot, maxj))
-    extern(grp("ExternCounter"), targets = List($cala, dot), withTypes = true)
-    extern(grp("MemoryTemplate"), targets = List($cala, dot, maxj), withTypes = true)
+    extern(grp("ControllerTemplate"), targets = List($cala, maxj))
+    extern(grp("ExternCounter"), targets = List($cala), withTypes = true)
+    extern(grp("MemoryTemplate"), targets = List($cala, maxj), withTypes = true)
     extern(metadata("ExternPrimitive"), targets = List($cala, maxj), withTypes = true)
     extern(grp("LoweredPipe"), targets = List($cala))
 		()

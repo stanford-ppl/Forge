@@ -25,18 +25,18 @@ trait TrangleCounting extends DHDLApplication {
     val NE = el.length/2 // Divided by 2 b/c bi-directional edge
 
     val vertList = OffChipMem[Index]("VertList", NV, 2) // [pointer, size]
-    val edgeList = OffChipMem[Index]("EdgeList", NE*2) // srcs of edges 
+    val edgeList = OffChipMem[Index]("EdgeList", NE*2) // srcs of edges
     val count = ArgOut[Index]("count")
-    
+
     setMem(vertList, vl)
     setMem(edgeList, el)
 
     Accel {
-      MetaPipe(NV by tileSize, count) { ivt =>
+      Pipe.fold(NV by tileSize)(count){ ivt =>
         val vB = BRAM[Index]("vertTile", tileSize, 2)
         vB := vertList(ivt::ivt+tileSize, 0::2)
         val sumTile = Reg[Index]("sumTile")
-        MetaPipe (tileSize by 1, sumTile) { iv =>
+        Pipe.fold(tileSize by 1)(sumTile){ iv =>
           val eB = BRAM[Index]("edgeTile", maxNumEdge) // edge list of v
           val nvIdxB = BRAM[Index]("neighborVertIdxTile", maxNumEdgeX2) // Index to gather vertice list of neighbors of v
           val nvB = BRAM[Index]("neighborVertTile", maxNumEdgeX2) // vertice list of v's neighbors
@@ -54,7 +54,7 @@ trait TrangleCounting extends DHDLApplication {
           }
           nvB := vertList(nvIdxB)
           val sumNbr = Reg[Index]("sumNbr")
-          MetaPipe (vsize by 1, sumNbr) { ie =>
+          Pipe.fold(vsize by 1)(sumNbr){ ie =>
             val neB = BRAM[Index]("neighborEdgeTile", maxNumEdgeX2) // edgeList of v's neighbors
             val nbrpt = Reg[Index]("nbrpt") // ptr to neighbor's edgelist
             val nbrsize = Reg[Index]("nbrsize") // number of edges of neighbor
@@ -64,18 +64,15 @@ trait TrangleCounting extends DHDLApplication {
               nbrsize := nvB(ie*2+1)
             }
             neB := edgeList(nbrpt::nbrpt+nbrsize)
-            Pipe(vsize by 1, nbrsize by 1, cntCommon) { (ixv, ixn) =>
+            Pipe.reduce(vsize by 1, nbrsize by 1)(cntCommon){ (ixv, ixn) =>
               mux(eB(ixv)==neB(ixn), 1.as[Index], 0.as[Index])
-            }{_+_}
-            cntCommon.value
-          }{_+_}
-          sumNbr.value
-        }{_+_}
-        sumTile.value
-      }{_+_}
-
+            }{_+_} // Sum for one neighbor
+          }{_+_} // Sum across all node's neighbors
+        }{_+_} // Sum across a tile of nodes
+      }{_+_} // Sum across all tiles
+      ()
     }
-    
+
     val result = getArg(count) / 6
 
     /* OptiGraph Version */
@@ -86,7 +83,7 @@ trait TrangleCounting extends DHDLApplication {
     //  }
     //}
 
-    /* Scala Version */ 
+    /* Scala Version */
     def commonNeighbors(n1:Rep[Index], n2:Rep[Index], vl:Rep[ForgeArray[Index]], el:Rep[ForgeArray[Index]]):Rep[Index] = {
       val n1pt = vl(n1*2)
       val n1size = vl(n1*2+1)
@@ -98,7 +95,7 @@ trait TrangleCounting extends DHDLApplication {
         var count = 0.as[Index]
         var n1cur = n1pt
         var n2cur = n2pt
-        //Can use a while loop here but try to be consistent with DHDL 
+        //Can use a while loop here but try to be consistent with DHDL
         for (i <- 0 until (n1size + n2size)) {
           if (n1cur < (n1pt+n1size) && n2cur < n2pt + n2size) {
             if (el(n1cur) < el(n2cur)) {
@@ -117,7 +114,7 @@ trait TrangleCounting extends DHDLApplication {
     }
     val gold = Array.tabulate(NV){ iv=>
       val pt = vl(iv*2)
-      val size = vl(iv*2+1) 
+      val size = vl(iv*2+1)
       Array.tabulate(size){ i =>
         val ie = pt + i
         val nbr = el(ie)

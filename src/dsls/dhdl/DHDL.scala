@@ -217,7 +217,7 @@ trait DHDLDSL extends ForgeApplication
 
     val BoundAnalyzer = analyzer("Bound", isIterative=false)
     val DSE = traversal("DSE", isExtern=true)
-    val Scratchpad = analyzer("Scratchpad", isExtern=true)
+    val MemoryAnalyzer = analyzer("Memory", isExtern=true)
     val AreaAnalyzer = analyzer("Area", isExtern=true)
     val LatencyAnalyzer = analyzer("Latency", isExtern=true)
     val OpsAnalyzer = analyzer("Ops", isExtern=true)
@@ -232,30 +232,42 @@ trait DHDLDSL extends ForgeApplication
     importGlobalAnalysis()
     importBoundAnalysis()
 
-    // --- Estimation and tuning
-    schedule(StageAnalyzer)
-    schedule(GlobalAnalyzer)
-    schedule(ControlSignalAnalyzer)
+    // --- Pre-DSE analysis
+    schedule(StageAnalyzer)         // Number of stages in each control node
+    schedule(GlobalAnalyzer)        // Values computed outside of all controllers
+    schedule(ControlSignalAnalyzer) // Variety of control signal related metadata
 
-    schedule(ParallelizationSetter)
-    schedule(DHDLAffineAnalysis)
+    schedule(ParallelizationSetter) // Parallelization factors
+    schedule(DHDLAffineAnalysis)    // Access patterns
 
-    schedule(DotIRPrinter)  // Prior to unrolling
+    schedule(DotIRPrinter)          // Graph prior to unrolling
 
-    schedule(DSE)
+    // --- Design Space Exploration
+    schedule(DSE)                   // Design space exploration. Runs a host of other analyses:
+                                    // Pre-DSE:
+                                    //   Bound analyzer (for finding constants)
+                                    //   Parameter analyzer (for calculating design space)
+                                    //   Control signal analyzer (needed for others)
+                                    // During DSE:
+                                    //   Bound analyzer (to propagate new constant values)
+                                    //   Memory analyzer (for banking/buffering of memories)
+                                    //   Contention analyzer (to estimate contention in main memory)
+                                    //   Area analyzer (to estimate area)
+                                    //   Latency analyzer (to estimate runtime)
+                                    // Post-DSE:
+                                    //   Bound analyzer (to finalize parameter values)
+                                    //   Memory analyzer (to finalize banking/buffering)
+                                    //   Contention analyzer (to finalize contention estimates)
 
     // --- Post-DSE Estimation
-    schedule(AreaAnalyzer)
-    schedule(OpsAnalyzer)
+    schedule(AreaAnalyzer)          // Area estimation
+    schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
 
     // --- Transformations
-    schedule(BoundAnalyzer)
-    schedule(ConstantFolding)
-
-    schedule(MetaPipeRegInsertion)
-
-    schedule(Unrolling)
-    schedule(DotIRPrinter) // After unrolling
+    schedule(ConstantFolding)       // Constant folding
+    schedule(MetaPipeRegInsertion)  // Inserts registers between metapipe stages for counter signals
+    schedule(Unrolling)             // Pipeline unrolling
+    schedule(DotIRPrinter)          // Graph after unrolling
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, maxj))

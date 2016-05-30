@@ -66,5 +66,6 @@ class IOSuiteInterpreter extends ForgeSuiteInterpreter {
   def testSimpleWriteRead() { runTests(SimpleWriteRunnerI, SimpleReadRunnerI, SimpleDeleteRunnerI) }
 }
 class IOSuiteCompiler extends ForgeSuiteCompiler {
+  override def enforceFullCoverage = false
   def testSimpleWriteRead() { runTests(SimpleWriteRunnerC, SimpleReadRunnerC, SimpleDeleteRunnerC) }
 }

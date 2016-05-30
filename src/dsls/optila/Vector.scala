@@ -224,7 +224,24 @@ trait VectorOps {
       infix ("sum") (Nil :: T, A) implements composite ${ self.reduce((a,b) => a+b ) }
       infix ("prod") (Nil :: T, A) implements reduce(T, 0, ${unit(1.asInstanceOf[\$TT])}, ${ (a,b) => a*b })
       infix ("mean") (Nil :: MDouble, ("conv",T ==> MDouble)) implements composite ${ $self.map(conv).sum / $self.length }
+      infix ("variance") (Nil :: MDouble, ("conv",T ==> MDouble)) implements composite ${
+        fassert($0.length > 0, "variance: input argument must have > 0 elements")
+        val dbls = $0.toDouble
+        val avg = mean(dbls)
+        val diffs = dbls map { e => square(e-avg) }
 
+        // same default normalization as MATLAB:
+        if ($0.length == 1) {
+          sum(diffs)
+        }
+        else {
+          sum(diffs) / (diffs.length-1.0)
+        }
+
+        // alternative normalization:
+        // mean(diffs)
+      }
+      infix ("stddev") (Nil :: MDouble, ("conv",T ==> MDouble)) implements composite ${ sqrt($0.variance) }
 
       /**
        * Ordering
@@ -247,6 +264,7 @@ trait VectorOps {
       infix ("reduce") (((T,T) ==> T) :: T, A) implements reduce(T, 0, Z, ${ (a,b) => $1(a,b) })
       infix ("foreach") ((T ==> MUnit) :: MUnit) implements foreach(T, 0, ${ e => $1(e) })
       infix ("forall") ((T ==> MBoolean) :: MBoolean) implements composite ${ reduce_and($self.map($1)) }
+      infix ("exists") ((T ==> MBoolean) :: MBoolean) implements composite ${ $self.filter($1).length > 0 }
       infix ("find") ((T ==> MBoolean) :: IndexVector) implements composite ${ $self.indices.filter(i => $1($self(i))) }
 
       val filterMap = v.name.toLowerCase + "_densevector_filter_map"

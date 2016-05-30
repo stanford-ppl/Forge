@@ -15,7 +15,7 @@ trait UndirectedTriangleCounting extends OptiGraphApplication {
     if (args.length < 1) printUsage
 
     tic("input loading")
-    val edgeList = loadUndirectedEdgeList(args(0))
+    val edgeList = loadEdgeList(args(0), "\t")
     toc("input loading",edgeList)
 
     tic("creating graph",edgeList)
@@ -27,7 +27,7 @@ trait UndirectedTriangleCounting extends OptiGraphApplication {
     
     val t = sumOverNodes(g.nodes){ n =>
       sumOverNeighbors(g.neighbors(n)){ nbr =>
-        if(nbr > n) g.commonNeighbors(n,nbr)
+        if(nbr > n) g.numCommonNeighbors(n,nbr)
         else 0l
       }
     }

@@ -45,6 +45,7 @@ trait TreeOps {
         ("_feature", MArray(MInt)),        // feature(i) is the index j of the feature to split on for node i
         ("_threshold", MArray(MDouble)),   // threshold(i) is the splitting threshold for node i
         ("_value", MArray(MDouble)),       // value(i) is the constant prediction value for node i
+        ("_prob", MArray(MDouble)),        // prob(i) is the probability of the prediction value for node i
         ("_impurity", MArray(MDouble)),    // impurity(i) is the value of the splitting criterion for node i
         ("_numNodeSamples", MArray(MInt))) // numNodeSamples(i) is the number of training samples reaching node i
 
@@ -58,7 +59,34 @@ trait TreeOps {
       ${array_empty[Double](initCapacity)},
       ${array_empty[Double](initCapacity)},
       ${array_empty[Double](initCapacity)},
+      ${array_empty[Double](initCapacity)},
       ${array_empty[Int](initCapacity)}
+    )
+
+    internal (Tree) ("alloc_tree_raw", Nil, MethodSignature(
+      List(("numNodes", MInt),
+           ("capacity", MInt),
+           ("isLeaf", MArray(MBoolean)),
+           ("leftChildren", MArray(MInt)),
+           ("rightChildren", MArray(MInt)),
+           ("feature", MArray(MInt)),
+           ("threshold", MArray(MDouble)),
+           ("value", MArray(MDouble)),
+           ("prob", MArray(MDouble)),
+           ("impurity", MArray(MDouble)),
+           ("numNodeSamples", MArray(MInt))), Tree)) implements allocates (Tree,
+
+      ${numNodes},
+      ${capacity},
+      ${isLeaf},
+      ${leftChildren},
+      ${rightChildren},
+      ${feature},
+      ${threshold},
+      ${value},
+      ${prob},
+      ${impurity},
+      ${numNodeSamples}
     )
 
     val TreeOps = withTpe(Tree)
@@ -87,6 +115,9 @@ trait TreeOps {
 
       infix ("value") (Nil :: MArray(MDouble)) implements getter(0, "_value")
       internal ("infix_set_value") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_value", ${$1})
+
+      infix ("prob") (Nil :: MArray(MDouble)) implements getter(0, "_prob")
+      internal ("infix_set_prob") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_prob", ${$1})
 
       infix ("impurity") (Nil :: MArray(MDouble)) implements getter(0, "_impurity")
       internal ("infix_set_impurity") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_impurity", ${$1})
@@ -154,6 +185,10 @@ trait TreeOps {
       val newValue = array_empty[Double](n)
       array_copy(tree.value, 0, newValue, 0, $tree.numNodes)
       tree.set_value(newValue)
+
+      val newProb = array_empty[Double](n)
+      array_copy(tree.prob, 0, newProb, 0, $tree.numNodes)
+      tree.set_prob(newProb)
 
       val newImpurity = array_empty[Double](n)
       array_copy(tree.impurity, 0, newImpurity, 0, $tree.numNodes)
@@ -236,6 +271,7 @@ trait TreeOps {
         if (isLeaf) {
           val nodeId = tree.addNode(parent, isLeft, isLeaf, 0, 0.0, impurity, numNodeSamples)
           tree.value(nodeId) = tree_score(trainingSet, samples, criterion)
+          tree.prob(nodeId) = tree_prob(trainingSet, tree.value.apply(nodeId), samples, criterion)
           ()
         }
         else {
@@ -245,6 +281,7 @@ trait TreeOps {
           if (pos == -1) { // failed to split, add node as leaf
             val nodeId = tree.addNode(parent, isLeft, true, 0, 0.0, impurity, numNodeSamples)
             tree.value(nodeId) = tree_score(trainingSet, samples, criterion)
+            tree.prob(nodeId) = tree_prob(trainingSet, tree.value.apply(nodeId), samples, criterion)
             ()
           }
           else {
@@ -411,16 +448,35 @@ trait TreeOps {
     internal (Tree) ("tree_score_gini", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("samples", IndexVector)) :: MDouble) implements composite ${
       // select the label with the highest frequency in the sample
       val allLabels = trainingSet.labels.apply(samples)
-      val samplesByLabel = allLabels.groupByReduce(l => l, l => 1, (a: Rep[Int],b: Rep[Int]) => a+b)
+      val samplesByLabel = allLabels.histogram
       val mostFrequent = densevector_fromarray(fhashmap_values(samplesByLabel), true).maxIndex
       samplesByLabel.keys.apply(mostFrequent)
     }
 
+    /**
+     * The probability to store for the prediction for this leaf.
+     */
+    internal (Tree) ("tree_prob", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("value", MDouble), ("samples", IndexVector), ("criterion", TCriterion)) :: MDouble) implements composite ${
+      criterion match {
+        case MSE => tree_prob_mse(trainingSet, value, samples)
+        case Gini => tree_prob_gini(trainingSet, value, samples)
+      }
+    }
+
+    internal (Tree) ("tree_prob_mse", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("value", MDouble), ("samples", IndexVector)) :: MDouble) implements composite ${
+      1.0
+    }
+
+    internal (Tree) ("tree_prob_gini", Nil, (("trainingSet", DenseTrainingSet(MDouble,MDouble)), ("value", MDouble), ("samples", IndexVector)) :: MDouble) implements composite ${
+      // return the frequency of the selected label as a proportion of all labels in the sample
+      val allLabels = trainingSet.labels.apply(samples)
+      allLabels.count(_ == value).toDouble / allLabels.length
+    }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Prediction
 
-    infix (Tree) ("predict", Nil, (("tree", Tree), ("testPt", DenseVector(MDouble))) :: MDouble) implements composite ${
+    infix (Tree) ("predict", Nil, (("tree", Tree), ("testPt", DenseVector(MDouble))) :: Tup2(MDouble,MDouble)) implements composite ${
       fassert(tree.numNodes > 1, "decision tree is empty")
 
       var node = 0
@@ -435,8 +491,51 @@ trait TreeOps {
         }
       }
 
-      // prediction value for this leaf
-      tree.value.apply(node)
+      // prediction value for this leaf with corresponding probability
+      pack((tree.value.apply(node), tree.prob.apply(node)))
+    }
+
+
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Serialization
+
+    /**
+     * For now we use a simple text-format to persist the tree. Eventually, we probably will want
+     * to switch to a binary format for efficiency in saving and loading large forests.
+     */
+    infix (Tree) ("serialize", Nil, (("tree", Tree)) :: MString) implements composite ${
+      tree.numNodes.makeStr + "," +
+      tree.capacity.makeStr + "," +
+      array_mkstring(tree.isLeaf, "|") + "," +
+      array_mkstring(tree.leftChildren, "|") + "," +
+      array_mkstring(tree.rightChildren, "|") + "," +
+      array_mkstring(tree.feature, "|") + "," +
+      array_mkstring(tree.threshold, "|") + "," +
+      array_mkstring(tree.value, "|") + "," +
+      array_mkstring(tree.prob, "|") + "," +
+      array_mkstring(tree.impurity, "|") + "," +
+      array_mkstring(tree.numNodeSamples, "|")
+    }
+
+    static (Tree) ("deserialize", Nil, (("encodedTree", MString)) :: Tree) implements composite ${
+      // Extra backslashes are because we are in a 'composite' scope.
+      // See comment in Forge.scala line 315.
+      val tokens = encodedTree.split(",")
+      val numNodes = tokens(0).toInt
+      val capacity = tokens(1).toInt
+      val isLeaf = tokens(2).split("\\\\|").map(_.toBoolean)
+      val leftChildren = tokens(3).split("\\\\|").map(_.toInt)
+      val rightChildren = tokens(4).split("\\\\|").map(_.toInt)
+      val feature = tokens(5).split("\\\\|").map(_.toInt)
+      val threshold = tokens(6).split("\\\\|").map(_.toDouble)
+      val value = tokens(7).split("\\\\|").map(_.toDouble)
+      val prob = tokens(8).split("\\\\|").map(_.toDouble)
+      val impurity = tokens(9).split("\\\\|").map(_.toDouble)
+      val numNodeSamples = tokens(10).split("\\\\|").map(_.toInt)
+
+      alloc_tree_raw(numNodes, capacity, isLeaf, leftChildren, rightChildren, feature, threshold,
+                     value, prob, impurity, numNodeSamples)
     }
 
 

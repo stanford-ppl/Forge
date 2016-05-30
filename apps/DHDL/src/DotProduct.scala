@@ -28,8 +28,8 @@ trait DotProduct extends DHDLApplication {
         val b1 = BRAM[T]("b1", tileSize)
         val b2 = BRAM[T]("b2", tileSize)
         Parallel {
-          b1 := v1(i::i+tileSize, param(1))
-          b2 := v2(i::i+tileSize, param(1))
+          b1 := v1(i::i+tileSize)
+          b2 := v2(i::i+tileSize)
         }
         Pipe.reduce(tileSize par innerPar)(Reg[T]){ii => b1(ii) * b2(ii) }{_+_}
       }{_+_}

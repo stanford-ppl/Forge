@@ -162,9 +162,9 @@ object HashStreamWriteARunnerC extends OptiMLApplicationCompiler with ForgeTestR
 object HashStreamWriteARunnerI extends OptiMLApplicationInterpreter with ForgeTestRunnerInterpreter with HashStreamWriteA
 trait HashStreamWriteA extends ForgeTestModule with OptiMLApplication with StreamSuitePaths {
   def main() = {
-    val raw = DenseMatrix.rand(10000,8)
-    val custIds = (0::10000) { i => (i % 100).toDouble }
-    val accountIds = (0::10000) { i => (i % 1000).toDouble }
+    val raw = DenseMatrix.rand(1000,8)
+    val custIds = (0::1000) { i => (i % 10).toDouble }
+    val accountIds = (0::1000) { i => (i % 100).toDouble }
     val initialData = custIds.t.toMat <<| accountIds.t.toMat <<| raw
     writeMatrix(initialData, testMat, "|")
 
@@ -183,7 +183,7 @@ trait HashStreamWriteB extends ForgeTestModule with OptiMLApplication with Strea
 
     // Set stream chunk byteSize to be small, so that we test HashStreams with multiple chunks
     val p = System.getProperties()
-    p.setProperty("optiml.stream.chunk.bytesize", "1e5") // 10KB
+    p.setProperty("optiml.stream.chunk.bytesize", "1e4") // 1KB
     System.setProperties(p)
 
     // There is some weirdness going in converting a double value to a string key here.
@@ -289,9 +289,10 @@ class StreamSuiteInterpreter extends ForgeSuiteInterpreter {
   def testHashStream() { runTests(HashStreamWriteARunnerI,HashStreamWriteBRunnerI,HashStreamReadRunnerI,HashStreamDeleteRunnerI) }
 }
 class StreamSuiteCompiler extends ForgeSuiteCompiler {
+  override def enforceFullCoverage = false
   def testStreamForeach() { runTest(StreamForeachRunnerC) }
   def testStreamCorrectSmall() { runTest(StreamCorrectSmallRunnerC) }
   def testStreamCorrectLarge() { runTest(StreamCorrectLargeRunnerC) }
   def testFileStream() { runTests(FileStreamWriteARunnerC, FileStreamWriteBRunnerC, FileStreamReadRunnerC, FileStreamDeleteRunnerC) }
-  //def testHashStream() { runTests(HashStreamWriteARunnerC, HashStreamWriteBRunnerC, HashStreamReadRunnerC, HashStreamDeleteRunnerC) }
+  def testHashStream() { runTests(HashStreamWriteARunnerC, HashStreamWriteBRunnerC, HashStreamReadRunnerC, HashStreamDeleteRunnerC) }
 }

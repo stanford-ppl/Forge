@@ -205,26 +205,10 @@ trait BasicMathOps {
       direct (Math) ("sum", P, V :: R2, A) implements redirect ${ $0.sum }
       direct (Math) ("prod", P, V :: R2, A) implements redirect ${ $0.prod }
       direct (Math) ("mean", P, V :: MDouble, C) implements redirect ${ $0.mean }
-      direct (Math) ("variance", P, V :: MDouble, C) implements composite ${
-        fassert($0.\$size > 0, "variance: input argument must have > 0 elements")
-        val dbls = $0.toDouble
-        val avg = mean(dbls)
-        val diffs = dbls map { e => square(e-avg) }
-
-        // same default normalization as MATLAB:
-        if ($0.\$size == 1) {
-          sum(diffs)
-        }
-        else {
-          sum(diffs) / (diffs.\$size-1.0)
-        }
-
-        // alternative normalization:
-        // mean(diffs)
-      }
-      direct (Math) ("stddev", P, V :: MDouble, C) implements composite ${ sqrt(variance($0)) }
       direct (Math) ("min", P, V :: R2, O ::: H) implements redirect ${ $0.min }
       direct (Math) ("max", P, V :: R2, O ::: H) implements redirect ${ $0.max }
+      direct (Math) ("variance", P, V :: MDouble, C) implements redirect ${ $0.variance }
+      direct (Math) ("stddev", P, V :: MDouble, C) implements redirect ${ $0.stddev }
 
       // only DenseVector has sort, and therefore median, defined right now
       if (V == DenseVector(T)) {

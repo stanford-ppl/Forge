@@ -46,7 +46,7 @@ trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
 
 // Technically doesn't need a real traversal, but nice to have debugging, etc.
 trait MemoryAnalyzer extends HungryTraversal {
-  val IR: DHDLExp with ScratchpadAnalysisExp
+  val IR: DHDLExp with MemoryAnalysisExp
   import IR._
 
   debugMode = false

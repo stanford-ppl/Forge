@@ -38,7 +38,7 @@ trait DHDLDSL extends ForgeApplication
   }
 
   /***
-   * DHDL is an intermediate language for describing hardware datapaths. A DHDL program describes a dataflow graph consisting of various kinds of nodes
+   * DHDL is a domain-specific language for describing hardware datapaths. A DHDL program describes a dataflow graph consisting of various kinds of nodes
    * connected to each other by data dependencies. Each node in a DHDL program corresponds to a architectural template. DHDL is represented
    * in-memory as a parameterized, hierarchical dataflow graph.
    *

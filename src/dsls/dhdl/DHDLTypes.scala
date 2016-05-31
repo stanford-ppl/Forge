@@ -168,6 +168,27 @@ trait DHDLTypes {
     impl (fltpt_to_fixpt) (codegen($cala, ${ $0.toFixedPoint[$t[S],$t[I],$t[F]] }))
     impl (convert_fltpt) (codegen($cala, ${ $0.changeFormat[$t[G2],$t[E2]] }))
 
+    // --- C++ Backend
+    impl (boolean_to_bit) (codegen(cpp, ${ $0 }))
+    impl (bit_to_string)  (codegen(cpp, ${ $0.toString }))
+    impl (bit_to_bool)    (codegen(cpp, ${ $0 }))
+
+    impl (const_to_fixpt) (codegen(cpp, ${ FixedPoint[$t[S],$t[I],$t[F]]($0.toString) }))
+    impl (fixpt_to_string) (codegen(cpp, ${ $0.toString }))
+    impl (fixpt_to_fltpt) (codegen(cpp, ${ $0.toFloatPoint[$t[G],$t[E]] }))
+    impl (convert_fixpt) (codegen(cpp, ${ $0.changeFormat[$t[S2],$t[I2],$t[F2]] }))
+    impl (fix_to_rep_int) (codegen(cpp, ${
+      (int32_t) $0
+    }))
+    impl (rep_int_to_fix) (codegen(cpp, ${
+      @ val fixPtType = remap($0.tp)
+      ($fixPtType) ($0)
+    }))
+
+    impl (const_to_fltpt) (codegen(cpp, ${ FloatPoint[$t[G],$t[E]]($0.toString) }))
+    impl (fltpt_to_string) (codegen(cpp, ${ $0.toString }))
+    impl (fltpt_to_fixpt) (codegen(cpp, ${ $0.toFixedPoint[$t[S],$t[I],$t[F]] }))
+    impl (convert_fltpt) (codegen(cpp, ${ $0.changeFormat[$t[G2],$t[E2]] }))
 
     // --- Dot Backend
     impl (boolean_to_bit) (codegen(dot, ${

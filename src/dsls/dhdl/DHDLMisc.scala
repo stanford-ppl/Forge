@@ -192,6 +192,24 @@ trait DHDLMisc {
     impl (rand_flt) (codegen($cala, ${ FloatPoint.rand[$t[G],$t[E]] }))
     impl (rand_bit) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextBoolean() }))
 
+    // --- C++ Backend
+    impl (rand_fix_bnd) (codegen(cpp, ${
+      @ val remapTp = remap($0.tp)
+      ($remapTp) rand() % $0
+    }))
+    impl (rand_fix) (codegen(cpp, ${
+      @ val remapTp = remap(sym.tp)
+      ($remapTp) rand()
+    }))
+    impl (rand_flt) (codegen(cpp, ${
+      @ val remapTp = remap(sym.tp)
+      ($remapTp) rand() / ($remapTp) RAND_MAX
+    }))
+    impl (rand_bit) (codegen(cpp, ${
+      (bool) rand() % 2
+    }))
+
+
     // --- Dot Backend
     //impl (rand_fix_bnd) (codegen(dot, ${  }))
     //impl (rand_fix) (codegen(dot, ${  }))
@@ -304,10 +322,37 @@ trait DHDLMisc {
     }))
 
     // C++ backend
+    impl (set_mem)  (codegen(cpp, ${ memcpy($1, 0, $0, 0, $1.length) }))
+    impl (get_mem)  (codegen(cpp, ${ memcpy($0, 0, $1, 0, $0.length) }))
     impl (set_arg)  (codegen(cpp, ${ *$0 = $1}))
     impl (get_arg)  (codegen(cpp, ${ *$0 }))
+    impl (hwblock)  (codegen(cpp, ${
+      $b[0]
+    }))
     impl (println)  (codegen(cpp, ${ std::cout << $0 << std::endl }))
     impl (println2) (codegen(cpp, ${ std::cout << std::endl }))
+    impl (assert)   (codegen(cpp, ${ assert($0) }))
+    impl (ifThenElse) (codegen(cpp, ${
+      if ($0) {
+        $b[1]
+      }
+      else {
+        $b[2]
+      }
+    }))
+    impl (whileDo) (codegen(cpp, ${
+      while ($b[0]) {
+        $b[1]
+      }
+    }))
+    impl (forLoop) (codegen(cpp, ${
+      @ val itp = remap($start.tp)
+      $itp i = $start ;
+      for (i = $start ; i < $end ; i += $step) {
+        $b[func](i)
+      }
+    }))
+
     // --- Dot Backend
     impl (println)  (codegen(dot, ${
 			@ emitComment("println")

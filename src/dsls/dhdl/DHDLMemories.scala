@@ -240,6 +240,9 @@ trait DHDLMemories {
     impl (bram_store) (codegen($cala, ${ $bram.update($addr.toInt, $value) }))
     impl (bram_reset) (codegen($cala, ${ (0 until $bram.length).foreach{i => $bram.update(i, $zero) }}))
 
+    // --- C++ Backend
+    impl (bram_new) (codegen(cpp, ${new $t[T]($size) }))
+
     // --- Dot Backend
     impl (bram_new)   (codegen(dot, ${
       @ if (isDblBuf(sym)) {
@@ -348,6 +351,9 @@ trait DHDLMemories {
 
     // --- Scala Backend
     impl (offchip_new) (codegen($cala, ${ new Array[$t[T]]($size.toInt) }))
+
+    // --- C++ Backend
+    impl (offchip_new) (codegen(cpp, ${new $t[T]($size) }))
 
 		// --- Dot Backend
 		impl (offchip_new) (codegen(dot, ${

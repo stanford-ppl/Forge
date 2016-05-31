@@ -1,17 +1,17 @@
 package ppl.dsl.forge
 package dsls
-package dadl
+package spade
 
 import core.{ForgeApplication,ForgeApplicationRunner}
 
-object DADLDSLRunner extends ForgeApplicationRunner with DADLDSL
+object SpadeDSLRunner extends ForgeApplicationRunner with SpadeDSL
 
-trait DADLDSL extends ForgeApplication
+trait SpadeDSL extends ForgeApplication
   with ArchOps
   with NodeOps
   with Modules {
 
-  def dslName = "DADL"
+  def dslName = "Spade"
 
   override def clearTraversals = true
   disableFusion()

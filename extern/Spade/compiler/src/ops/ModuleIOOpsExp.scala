@@ -1,17 +1,17 @@
-package dadl.compiler.ops
+package spade.compiler.ops
 
 import scala.virtualization.lms.common.BaseExp
 import scala.virtualization.lms.common.DotGenBase
 import scala.virtualization.lms.common.ScalaGenBase
 import scala.reflect.{Manifest,SourceContext}
 
-import dadl.shared._
-import dadl.shared.ops._
-import dadl.compiler._
-import dadl.compiler.ops._
+import spade.shared._
+import spade.shared.ops._
+import spade.compiler._
+import spade.compiler.ops._
 
 trait ModuleIOOpsExp extends ModuleIOOps with BaseExp {
-  this: DADLExp =>
+  this: SpadeExp =>
 
   type Feedback[+T] = FeedbackWire[T]
   case class FeedbackWire[+T](val e: Exp[Feedback[T]])

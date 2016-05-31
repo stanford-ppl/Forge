@@ -1,6 +1,6 @@
 package ppl.dsl.forge
 package dsls
-package dadl
+package spade
 
 // This method for creating modules currently can't handle an arbitrary number of inputs or outputs, as it is
 // fundamentally limited by typing using Scala tuples.
@@ -8,7 +8,7 @@ package dadl
 // TODO: More general way to define/instantiate modules? Can always define records instead to get around this
 // TODO: Bad things will probably happen here if maxTuples + maxOutputArity > 26
 trait Modules {
-  this: DADLDSL =>
+  this: SpadeDSL =>
 
   val maxOutputArity = 4
 

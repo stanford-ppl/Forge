@@ -1,15 +1,15 @@
-package dadl.library.classes
+package spade.library.classes
 
 import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}
 
-import dadl.shared._
-import dadl.shared.ops._
-import dadl.library._
-import dadl.library.classes._
+import spade.shared._
+import spade.shared.ops._
+import spade.library._
+import spade.library.classes._
 
 trait ModuleIOWrapper {
-  this: DADLBase with DADLClasses =>
+  this: SpadeBase with SpadeClasses =>
 
   type Feedback[+T] = FeedbackWire[T @uncheckedVariance]
 

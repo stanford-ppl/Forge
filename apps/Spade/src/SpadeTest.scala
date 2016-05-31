@@ -1,12 +1,12 @@
-import dadl.compiler._
-import dadl.library._
-import dadl.shared._
+import spade.compiler._
+import spade.library._
+import spade.shared._
 import scala.collection.mutable.ListBuffer
 
-object DADLTestCompiler extends DADLApplicationCompiler with DADLTest
-object DADLTestInterpreter extends DADLApplicationInterpreter with DADLTest
+object SpadeTestCompiler extends SpadeApplicationCompiler with SpadeTest
+object SpadeTestInterpreter extends SpadeApplicationInterpreter with SpadeTest
 
-trait DADLTest extends DADLApplication {
+trait SpadeTest extends SpadeApplication {
   def main() = {
 //    val bm = BRAM[Long]("bm", 128)
     def Mux[T](sel: Wire[Boolean], x: Wire[T], y: Wire[T]): Wire[T] = x

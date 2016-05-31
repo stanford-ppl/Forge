@@ -1,6 +1,6 @@
 package ppl.dsl.forge
 package dsls
-package dadl
+package spade
 /*
 trait ArchOps {
   this: DADLDSL =>

@@ -1,8 +1,8 @@
 package ppl.dsl.forge
 package dsls
-package dadl
+package spade
 trait NodeOps {
-  this: DADLDSL =>
+  this: SpadeDSL =>
   def importNodes() = {
 
     // Create a group for all nodes

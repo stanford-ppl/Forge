@@ -21,7 +21,7 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 	val IR: DHDLExp
 	import IR.{infix_until => _, looprange_until => _, println => _, _}
 
-  debugMode = true
+  debugMode = false
   override val name = "DotIRPrinter"
   var inHwScope = false
   var fileNum = 0

@@ -1,7 +1,7 @@
 package ppl.dsl.forge
 package dsls
 package spade
-trait ArchOps {
+trait CoreOps {
   this: SpadeDSL =>
   def importCore() = {
     val DirectOps = grp("Direct")

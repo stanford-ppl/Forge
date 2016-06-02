@@ -7,7 +7,7 @@ import core.{ForgeApplication,ForgeApplicationRunner}
 object SpadeDSLRunner extends ForgeApplicationRunner with SpadeDSL
 
 trait SpadeDSL extends ForgeApplication
-  with ArchOps
+  with CoreOps
   with NodeOps
   with Modules {
 
@@ -36,6 +36,7 @@ trait SpadeDSL extends ForgeApplication
     // TODO: This list should be updated as and when new backend support for feedback is added
     // Codegen support should be added in forge/extern/dadl/compiler/src/ops/ModuleIOOpsExp.scala
     extern(grp("ModuleIO"), targets = List($cala, dot))
+    extern(grp("Graph"), targets = List($cala, dot))
 
     ()
   }

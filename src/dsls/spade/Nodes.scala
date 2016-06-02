@@ -37,7 +37,7 @@ trait NodeOps {
       effect = simple)
 
     impl (aluApply) {  codegen ($cala, ${
-      new ALU($0) { }
+      @ Console.println("new ALU")
     })}
 
     impl (aluApply) {  codegen (dot, ${
@@ -53,7 +53,7 @@ trait NodeOps {
       effect = simple)
 
     impl (switchApply) {  codegen ($cala, ${
-      new Switch() { }
+      @ Console.println("new Switch ")
     })}
 
     impl (switchApply) {  codegen (dot, ${
@@ -66,7 +66,7 @@ trait NodeOps {
       List(aluTpe, aluTpe) :: linkTpe_alu2alu,
       effect = simple)
     impl (linkApply_alu2alu) { codegen ($cala, ${
-      new LinkNode($0, $1) { }
+      @ Console.println("new Link")
     })}
     impl (linkApply_alu2alu) {  codegen (dot, ${
       $0 -> $1
@@ -78,7 +78,7 @@ trait NodeOps {
       List(aluTpe, switchTpe) :: linkTpe_alu2switch,
       effect = simple)
     impl (linkApply_alu2switch) { codegen ($cala, ${
-      new LinkNode($0, $1) { }
+      @ Console.println("new Link")
     })}
     impl (linkApply_alu2switch) {  codegen (dot, ${
       $0 -> $1
@@ -90,7 +90,7 @@ trait NodeOps {
       List(switchTpe, aluTpe) :: linkTpe_switch2alu,
       effect = simple)
     impl (linkApply_switch2alu) { codegen ($cala, ${
-      new LinkNode($0, $1) { }
+      @ Console.println("new Link")
     })}
     impl (linkApply_switch2alu) {  codegen (dot, ${
       $0 -> $1
@@ -102,7 +102,7 @@ trait NodeOps {
       List(switchTpe, switchTpe) :: linkTpe_switch2switch,
       effect = simple)
     impl (linkApply_switch2switch) { codegen ($cala, ${
-      new LinkNode($0, $1) { }
+      @ Console.println("new Link")
     })}
     impl (linkApply_switch2switch) {  codegen (dot, ${
       $0 -> $1

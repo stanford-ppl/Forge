@@ -11,11 +11,7 @@ trait NodeOps {
 //  }
 
   def importNodes() = {
-    createHWTypeClass()
     importALU()
-  }
-
-  def createHWTypeClass() = {
   }
 
   def importALU() {
@@ -63,6 +59,10 @@ trait NodeOps {
     // --- API
     static (aluTpe) ("apply", List(), Nil :: aluTpe) implements composite ${ alu_create }
     infix (aluTpe) ("->", T, (aluTpe, T) :: linkTpe) implements composite ${ link_create($0, $1)}
+    infix (aluTpe) ("<->", T, (aluTpe, T) :: linkTpe) implements composite ${
+      link_create($0, $1)
+      link_create($1, $0)
+    }
 
     // --- Scala Backend
     impl (alu_new) (codegen($cala, ${ new ALU { } }))
@@ -72,5 +72,35 @@ trait NodeOps {
       $sym [label= "\$sym" shape="square" style="filled" fillcolor=$regFillColor ]
 		}))
     // Import ALU }
+
+    // Import Switch {
+    val switchTpe = tpe("Switch")
+
+    // --- Nodes
+    val switch_new   = internal (switchTpe) ("switch_new", List(), Nil :: switchTpe, effect = simple)
+
+    // --- Internals
+    internal (switchTpe) ("switch_create", List(), Nil :: switchTpe, effect = simple) implements composite ${
+      val switch = switch_new
+      switch
+    }
+
+    // --- API
+    static (switchTpe) ("apply", List(), Nil :: switchTpe) implements composite ${ switch_create }
+    infix (switchTpe) ("->", T, (switchTpe, T) :: linkTpe) implements composite ${ link_create($0, $1)}
+    infix (switchTpe) ("<->", T, (switchTpe, T) :: linkTpe) implements composite ${
+      link_create($0, $1)
+      link_create($1, $0)
+    }
+
+    // --- Scala Backend
+    impl (switch_new) (codegen($cala, ${ new Switch { } }))
+
+    // --- Dot Backend
+    impl (switch_new) (codegen(dot, ${
+      $sym [label= "\$sym" shape="square" style="filled" fillcolor=$regFillColor ]
+		}))
+    // Import Switch }
+
   }
 }

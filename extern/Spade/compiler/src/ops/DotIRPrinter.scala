@@ -113,6 +113,8 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
     case mn@Reflect(n,_,_) =>
       emitAnyNode(sym, n)
     case mn@Alu_new() =>
+      emit(s"""${quote(sym)} [label=\"${quote(sym)}\" style="filled" fillcolor="blue" color="white"]""")
+    case mn@Switch_new() =>
       emit(s"""${quote(sym)} [label=\"${quote(sym)}\" style="filled" fillcolor="lightgray" color="none"]""")
     case mn@Link_new(n1,n2) =>
       emitEdge(n1, n2)

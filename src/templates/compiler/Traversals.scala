@@ -19,11 +19,15 @@ trait BaseGenTraversals extends ForgeCodeGenBase {
   def makeTraversalName(t: Rep[DSLTraversal]) = t match {
     case Def(Traverse(name,isExtern)) => name
     case Def(Transform(name,isExtern)) => name + "Transformer"
-    case Def(Analyze(name,isExtern)) => name + "Analyzer"
+    case Def(Analyze(name,isExtern,isIterative)) => name + "Analyzer"
   }
   def makeTraversalIRName(t: Rep[DSLTraversal]) = t match {
     case Def(Transform(name,isExtern)) => name + "TransformExp"
-    case Def(Analyze(name,isExtern)) => name + "AnalysisExp"
+    case Def(Analyze(name,isExtern,isIterative)) => name + "AnalysisExp"
+  }
+  def isIterative(t: Rep[DSLTraversal]) = t match {
+    case Def(Transform(name,isExtern)) => false
+    case Def(Analyze(name,isExtern,isIterative)) => isIterative
   }
 }
 
@@ -33,7 +37,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
 
   // --- Traversals
   def emitTraversalDefs(t: Rep[DSLTraversal], stream: PrintWriter) = t match {
-    case Def(Analyze(_,_)) =>
+    case Def(Analyze(_,_,_)) =>
       val az = t.asInstanceOf[Rep[DSLAnalyzer]]
       emitAnalyzer(az, stream)
       stream.println()
@@ -70,9 +74,9 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("  val IR: " + makeTraversalIRName(t))
     stream.println("  import IR._")
     stream.println("  override val name = \"" + makeTraversalName(t) + "\"")
-    stream.println("  override val debugMode = false")        // TODO: Should be able to change this
+    stream.println("  debugMode = false")        // TODO: Should be able to change this
     stream.println()
-    stream.println("  override def transformTP[A](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext): Option[Exp[Any]] = rhs match {")
+    stream.println("  override def transform(lhs: Sym[Any], rhs: Def[Any])(implicit ctx: SourceContext): Option[Exp[Any]] = rhs match {")
 
     val patterns = Transformers(t).rules
     for ((op,rules) <- patterns) {
@@ -121,9 +125,11 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("  val IR: " + makeTraversalIRName(az))
     stream.println("  import IR._")
     stream.println("  override val name = \"" + makeTraversalName(az) + "\"")
-    stream.println("  override val debugMode = false")        // TODO: Should be able to change this
-    stream.println("  override val autopropagate = true")     // TODO: Should be able to change this
+    stream.println("  debugMode = false")                          // TODO: Should be able to change this
+    stream.println("  override val autopropagate = true")          // TODO: Should be able to change this
     stream.println("  override def completed(e: Exp[Any]) = true") // TODO: Should be able to change this
+    if (!isIterative(az))
+      stream.println("  override def hasConverged: Boolean = runs > 0")
     stream.println()
     val patterns = Analyzers(az).rules
     for ((op,rules) <- patterns) {

@@ -76,7 +76,7 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
     // --- DSLLibraryOps
     // Library mixes in application ops with internal ops
     stream.println("trait " + dsl + "LibraryOps extends " + dsl + "Application")
-    for (opsGrp <- opsGrps if !isMetaType(opsGrp.grp) && opsGrp.ops.exists(_.backend == internalBackend)) {
+    for (opsGrp <- opsGrps if !isMetaType(opsGrp.grp) && opsGrp.ops.exists(_.visibility == privateMethod)) {
       stream.print(" with " + opsGrp.grp.name + "InternalOps")
     }
     for (e <- Externs) { stream.print(" with " + e.opsGrp.grp.name + "CompilerOps") }

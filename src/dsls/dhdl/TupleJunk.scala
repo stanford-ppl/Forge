@@ -26,7 +26,6 @@ trait TupleJunk {
       val collPars = pars.map(_ withBound TColl)
       val TupColl = tpeClassInst("CollTup"+arity, collPars, Coll(Tup))
       infix (TupColl) ("empty", collPars, Nil :: Tup) implements composite { tupFromStr("Coll","empty") }
-      infix (TupColl) ("zeros", collPars, ("t",Tup) :: Tup) implements composite { tupFromSrcStr("Coll", "zeros") }
 
       val numPars = pars.map(_ withBound TNum)
       val TupNum = tpeClassInst("NumTup"+arity, numPars, Num(Tup))
@@ -34,10 +33,10 @@ trait TupleJunk {
 
       val arithPars = pars.map(_ withBound TArith)
       val TupArith = tpeClassInst("ArithTup"+arity, arithPars, Arith(Tup))
-      infix (TupArith) ("add", arithPars, (("t1",Tup),("t2",Tup)) :: Tup) implements composite { tupFromBinSrcStr("Arith", "add") }
-      infix (TupArith) ("sub", arithPars, (("t1",Tup),("t2",Tup)) :: Tup) implements composite { tupFromBinSrcStr("Arith", "sub") }
-      infix (TupArith) ("mul", arithPars, (("t1",Tup),("t2",Tup)) :: Tup) implements composite { tupFromBinSrcStr("Arith", "mul") }
-      infix (TupArith) ("div", arithPars, (("t1",Tup),("t2",Tup)) :: Tup) implements composite { tupFromBinSrcStr("Arith", "div") }
+      infix (TupArith) ("plus", arithPars, (("t1",Tup),("t2",Tup)) :: Tup) implements composite { tupFromBinSrcStr("Arith", "plus") }
+      infix (TupArith) ("minus", arithPars, (("t1",Tup),("t2",Tup)) :: Tup) implements composite { tupFromBinSrcStr("Arith", "minus") }
+      infix (TupArith) ("times", arithPars, (("t1",Tup),("t2",Tup)) :: Tup) implements composite { tupFromBinSrcStr("Arith", "times") }
+      infix (TupArith) ("divide", arithPars, (("t1",Tup),("t2",Tup)) :: Tup) implements composite { tupFromBinSrcStr("Arith", "divide") }
 
       // Have to define ordering explicitly (no good default to assume here)
     }

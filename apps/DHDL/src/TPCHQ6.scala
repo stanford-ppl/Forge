@@ -7,10 +7,13 @@ object TPCHQ6Compiler extends DHDLApplicationCompiler with TPCHQ6
 object TPCHQ6Interpreter extends DHDLApplicationInterpreter with TPCHQ6
 trait TPCHQ6 extends DHDLApplication {
 
-  lazy val tileSize = stageArgOrElse[Int](0, 4)
   lazy val dataSize = ArgIn[SInt]("dataSize")
   lazy val minDateIn = ArgIn[UInt]("minDate")
   lazy val maxDateIn = ArgIn[UInt]("maxDate")
+
+  lazy val tileSize = param("tileSize", 18720)
+  lazy val outerPar = param("outerPar", 3)
+  lazy val innerPar = param("innerPar", 48)
 
   def tpchq6(dates:  Rep[OffChipMem[UInt]], quants: Rep[OffChipMem[UInt]],
              discts: Rep[OffChipMem[Flt]], prices: Rep[OffChipMem[Flt]], out: Rep[Reg[Flt]]) {
@@ -18,19 +21,19 @@ trait TPCHQ6 extends DHDLApplication {
     val minDate = minDateIn.value
     val maxDate = maxDateIn.value
 
-    MetaPipe(dataSize by tileSize, out) { i =>
+    Pipe.fold(dataSize by tileSize par outerPar)(out) { i =>
       val datesTile  = BRAM[UInt](tileSize)
       val quantsTile = BRAM[UInt](tileSize)
       val disctsTile = BRAM[Flt](tileSize)
       val pricesTile = BRAM[Flt](tileSize)
       Parallel {
-        datesTile  := dates(i::i+tileSize)
-        quantsTile := quants(i::i+tileSize)
-        disctsTile := discts(i::i+tileSize)
-        pricesTile := prices(i::i+tileSize)
+        datesTile  := dates(i::i+tileSize, innerPar)
+        quantsTile := quants(i::i+tileSize, innerPar)
+        disctsTile := discts(i::i+tileSize, innerPar)
+        pricesTile := prices(i::i+tileSize, innerPar)
       }
       val accum = Reg[Flt]
-      Pipe(tileSize by 1, accum){ j =>
+      Pipe.reduce(tileSize par innerPar)(accum){ j =>
         val date  = datesTile(j)
         val disct = disctsTile(j)
         val quant = quantsTile(j)
@@ -38,12 +41,17 @@ trait TPCHQ6 extends DHDLApplication {
         val valid = date > minDate && date < maxDate && disct >= 0.05f && disct <= 0.07f && quant < 24
         mux(valid, price * disct, 0.0f)
       }{_+_}
-      accum.value
     }{_+_}
   }
 
   def main() {
-    val N = 12
+    val N = args(unit(0)).to[SInt]
+
+    bound(N) = 18720000
+    domainOf(tileSize) = (96,192000,96)
+    domainOf(outerPar) = (1,6,1)
+    domainOf(innerPar) = (1,384,1)
+
     val MIN_DATE = 64
     val MAX_DATE = 80
 

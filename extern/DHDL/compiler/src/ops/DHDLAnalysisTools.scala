@@ -11,37 +11,87 @@ import dhdl.compiler.ops._
 
 import ppl.delite.framework.DeliteApplication
 
+// TODO: Can these be derived automatically?
 trait PipeStageToolsExp extends EffectExp {
   this: DHDLExp =>
 
-  def isControlNode(s: Exp[Any]): Boolean = s match {
-    case Def(d) => isOuterControl(s) || isInnerControl(s) || isTileTransfer(d)
+  def isWriter(s: Exp[Any]): Boolean = s match {
+    case Def(d) => isWriter(d)
+    case _ => false
+  }
+  def isWriter(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:Reg_write[_]) => true
+    case EatReflect(_:Bram_store[_]) => true
     case _ => false
   }
 
+  def isReader(s: Exp[Any]): Boolean = s match {
+    case Def(d) => isReader(d)
+    case _ => false
+  }
+  def isReader(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:Reg_read[_]) => true
+    case EatReflect(_:Bram_load[_]) => true
+    case _ => false
+  }
+
+
+  def isControlNode(s: Exp[Any]): Boolean = s match {
+    case Def(d) => isOuterControl(s) || isInnerControl(s)
+    case _ => false
+  }
   def isOuterControl(s: Exp[Any]): Boolean = s match {
-    case Def(d) => (isPipeline(d) && styleOf(s) != Fine) || isParallel(d)
+    case Def(d) => isOuterPipeline(s) || isParallel(d)
     case _ => false
   }
   def isInnerControl(s: Exp[Any]): Boolean = s match {
+    case Def(d) => isInnerPipeline(s) || isBramTransfer(d) || isOffChipTransfer(d)
+    case _ => false
+  }
+
+  def isOuterPipeline(s: Exp[Any]): Boolean = s match {
+    case Def(d) => isPipeline(d) && styleOf(s) != Fine
+    case _ => false
+  }
+  def isInnerPipeline(s: Exp[Any]): Boolean = s match {
     case Def(d) => isPipeline(d) && styleOf(s) == Fine
     case _ => false
   }
+
+  def isOuterLoop(s: Exp[Any]): Boolean = s match {
+    case Def(d) => isLoop(d) && styleOf(s) != Fine
+    case _ => false
+  }
+  def isMetaPipe(s: Exp[Any]): Boolean = isOuterControl(s) && styleOf(s) == Coarse
+  def isMetaPipe(s: (Exp[Any],Boolean)): Boolean = !s._2 && isMetaPipe(s._1)
+
+  def isInnerLoop(s: Exp[Any]): Boolean = s match {
+    case Def(d) => isLoop(d) && styleOf(s) == Fine
+    case _ => false
+  }
+
   def isAllocation(s: Exp[Any]): Boolean = s match {
     case Def(d) => isAllocation(d)
     case _ => false
   }
-
   def isAllocation(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:Reg_new[_]) => true
-    case EatReflect(_:Bram_new[_]) => true
-    case EatReflect(_:Offchip_new[_]) => true
-    case EatReflect(_:Counter_new) => true
+    case EatReflect(_:Reg_new[_])       => true
+    case EatReflect(_:Bram_new[_])      => true
+    case EatReflect(_:Offchip_new[_])   => true
+    case EatReflect(_:Counter_new)      => true
     case EatReflect(_:Counterchain_new) => true
     case _ => false
   }
-  def isTileTransfer(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:TileTransfer[_]) => true
+  def isBramTransfer(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:Bram_load_vector[_])  => true
+    case EatReflect(_:Bram_store_vector[_]) => true
+    case EatReflect(_:ParBramLoadVector[_]) => true
+    case EatReflect(_:ParBramStoreVector[_]) => true
+    case _ => false
+  }
+  def isOffChipTransfer(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:Offchip_load_vector[_])  => true
+    case EatReflect(_:Offchip_store_vector[_]) => true
     case _ => false
   }
   def isParallel(d: Def[Any]): Boolean = d match {
@@ -49,10 +99,20 @@ trait PipeStageToolsExp extends EffectExp {
     case _ => false
   }
   def isPipeline(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:Pipe_foreach) => true
-    case EatReflect(_:Pipe_reduce[_,_]) => true
-    case EatReflect(_:Block_reduce[_]) => true
-    case EatReflect(_:Unit_pipe) => true
+    case EatReflect(_:ParPipeForeach)  => true
+    case EatReflect(_:ParPipeReduce[_,_]) => true
+    case EatReflect(_:Pipe_foreach)    => true
+    case EatReflect(_:Pipe_fold[_,_])  => true
+    case EatReflect(_:Accum_fold[_,_]) => true
+    case EatReflect(_:Unit_pipe)       => true
+    case _ => false
+  }
+  def isLoop(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:ParPipeForeach)  => true
+    case EatReflect(_:ParPipeReduce[_,_]) => true
+    case EatReflect(_:Pipe_foreach)    => true
+    case EatReflect(_:Pipe_fold[_,_])  => true
+    case EatReflect(_:Accum_fold[_,_]) => true
     case _ => false
   }
 }
@@ -63,19 +123,8 @@ trait PipeStageTools extends NestedBlockTraversal {
   val IR: PipeStageToolsExp
   import IR._
 
-  // Bit of a hack here - use scheduling to return list of statements
-  private def getStmsInScope(b: Block[Any]): List[Stm] = {
-    var stms: List[Stm] = Nil
-    focusBlock(b) {
-      focusExactScope(b){ levelScope =>
-        stms = levelScope
-      }
-    }
-    stms
-  }
-
   def list(x: List[Exp[Any]]) = x.zipWithIndex.foreach{
-    case (s@Def(d),i) if isOuterControl(s) => println(s"   $i. [Ctrl] $s = $d")
+    case (s@Def(d),i) if isControlNode(s)  => println(s"   $i. [Ctrl] $s = $d")
     case (s@Def(d),i) if isInnerControl(s) => println(s"   $i. [Pipe] $s = $d")
     case (s@Def(d),i) if isAllocation(s)   => println(s"   $i. [Allc] $s = $d")
     case (s@Def(d),i)                      => println(s"   $i. [None] $s = $d")
@@ -83,40 +132,14 @@ trait PipeStageTools extends NestedBlockTraversal {
   }
 
   def getStages(blks: Block[Any]*): List[Exp[Any]] = {
-    blks.toList.flatMap(b => getStmsInScope(b)).map{case TP(s,d) => s}
+    blks.toList.flatMap(b => getStmsInBlock(b)).map{case TP(s,d) => s}
   }
   def getControlNodes(blk: Block[Any]*) = getStages(blk:_*).filter{s => isControlNode(s) }
   def getAllocations(blk: Block[Any]*)  = getStages(blk:_*).filter{s => isAllocation(s) }
+
+  def getLocalReaders(blk: Block[Any]*) = getStages(blk:_*).filter{s => isReader(s)}
+  def getLocalWriters(blk: Block[Any]*) = getStages(blk:_*).filter{s => isWriter(s)}
 }
-
-
-trait CounterToolsExp extends EffectExp {
-  this: DHDLExp =>
-
-  def parOf(x: Rep[CounterChain]): List[Int] = x match {
-    case Def(EatReflect(Counterchain_new(ctrs,nIter))) => ctrs.map{
-      case Def(EatReflect(Counter_new(_,_,_,par))) => par.x
-    }
-  }
-
-  def isUnitCounterChain(e: Exp[Any]): Boolean = e match {
-    case Def(EatReflect(Counterchain_new(ctrs,_))) if ctrs.length == 1 => isUnitCounter(ctrs(0))
-    case _ => false
-  }
-
-  def isUnitCounter(e: Exp[Any]): Boolean = e match {
-    case Def(EatReflect(Counter_new(ConstFix(0),ConstFix(1),ConstFix(1),_))) => true
-    case _ => false
-  }
-
-  // TODO: Default number of iterations if bound can't be computed?
-  def nIters(x: Rep[CounterChain]): Long = x match {
-    case Def(EatReflect(Counterchain_new(_,nIters))) => Math.ceil( bound(nIters.res).getOrElse(1.0) ).toLong
-    case _ => 1L
-  }
-}
-
-
 
 
 object ReductionTreeAnalysis {
@@ -152,12 +175,10 @@ object ReductionTreeAnalysis {
 
   def reductionTreeHeight(nLeaves: Int): Int = {
     def treeLevel(nNodes: Int, curHeight: Int): Int = {
-      if (nNodes <= 1) curHeight + 1
+      if (nNodes <= 1) curHeight
       else if (nNodes % 2 == 0) treeLevel(nNodes/2, curHeight + 1)
       else treeLevel((nNodes - 1)/2 + 1, curHeight + 1)
     }
     treeLevel(nLeaves, 0)
   }
-
-
 }

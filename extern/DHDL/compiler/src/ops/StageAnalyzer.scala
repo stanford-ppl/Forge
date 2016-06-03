@@ -1,75 +1,74 @@
 package dhdl.compiler.ops
 
 import scala.reflect.{Manifest,SourceContext}
-import scala.virtualization.lms.internal.{Traversal,NestedBlockTraversal}
-import scala.virtualization.lms.common.EffectExp
+import ppl.delite.framework.analysis.HungryTraversal
 
 import dhdl.shared._
 import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-import ppl.delite.framework.DeliteApplication
+trait StageAnalysisExp extends PipeStageToolsExp {this: DHDLExp => }
 
-trait StageAnalysisExp extends PipeStageToolsExp {
-  this: DHDLExp =>
-}
-
-trait StageAnalyzer extends Traversal with PipeStageTools {
+trait StageAnalyzer extends HungryTraversal with PipeStageTools {
   val IR: DHDLExp with StageAnalysisExp
   import IR._
 
-  override val debugMode: Boolean = true
+  debugMode = false
   override val name = "Stage Analyzer"
+  override val recurseAlways = true  // Always follow default traversal scheme
+  override val recurseElse = false   // Follow default traversal scheme when node was not matched
 
-  override def traverseStm(stm: Stm) = stm match {
-    case TP(s, d) =>
-      super.traverseStm(stm)
-      traverseNode(s, d)
+  override def preprocess[A:Manifest](b: Block[A]) = {
+    val stages = getStages(b)
+    if (debugMode) list(stages)
+    super.preprocess(b)
   }
 
-  def traverseNode(lhs: Exp[Any], rhs: Def[Any]): Unit = rhs match {
+  override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
+    // Accel block (equivalent to a Sequential unit pipe)
+    case Hwblock(blk) =>
+      debug(s"$lhs = $rhs:")
+      val stages = getControlNodes(blk)
+      if (debugMode) list(stages)
+      nStages(lhs) = stages.length
+
     // Parallel
     case Pipe_parallel(func) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func)
-      list( stages )
+      if (debugMode) list(stages)
       nStages(lhs) = stages.length
 
     // MetaPipes / Sequentials
-    case Unit_pipe(func) if styleOf(lhs) != Fine =>
+    case Unit_pipe(func) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func)
-      list(stages)
+      if (debugMode) list(stages)
+      if (styleOf(lhs) == Fine && stages.nonEmpty) styleOf(lhs) = Coarse
       nStages(lhs) = stages.length
 
-    case Pipe_foreach(_,func,_) if styleOf(lhs) != Fine =>
+    case Pipe_foreach(_,func,_) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func)
-      list( stages )
+      if (debugMode) list( stages )
+      if (styleOf(lhs) == Fine && stages.nonEmpty) styleOf(lhs) = Coarse
       nStages(lhs) = stages.length
 
-    case Pipe_reduce(c,a,ld,st,func,rFunc,inds,acc,res,rV) if styleOf(lhs) != Fine =>
+    case Pipe_fold(c,a,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(ld,func,rFunc,st)
-      list( stages )
+      if (debugMode) list( stages )
+      if (styleOf(lhs) == Fine && stages.nonEmpty) styleOf(lhs) = Coarse
       nStages(lhs) = stages.length + 1  // Account for implicit reduction pipe
 
-    case Block_reduce(c1,c2,a,func,ld1,ld2,rFunc,st,inds1,inds2,part,acc,res,rV) =>
+    case Accum_fold(c1,c2,a,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func,rFunc)
-      list( stages )
+      if (debugMode) list( stages )
+      if (styleOf(lhs) == Fine) styleOf(lhs) = Coarse
       nStages(lhs) = stages.length + 1  // Account for implicit reduction pipe
 
-    // Pipe
-    /*case Pipe_foreach(_,func,_) if styleOf(lhs) == Fine =>
-      debug(s"$lhs = $rhs:")
-      list( getControlNodes(func) )
-    case Pipe_reduce(c,a,ld,st,func,rFunc,inds,acc,res,rV) if styleOf(lhs) == Fine =>
-      debug(s"$lhs = $rhs:")
-      list( getControlNodes(ld,func,rFunc,st) )*/
-
-    case Reflect(d, _, _) => traverseNode(lhs, d)
-    case _ =>
+    case _ => super.traverse(lhs, rhs)
   }
 }

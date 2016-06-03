@@ -27,6 +27,7 @@ trait Definitions extends DerivativeTypes {
   lazy val MultiloopSoA = transformer("MultiloopSoA", isExtern = true)
   lazy val IRPrinter = traversal("IRPrinter", isExtern = true)  // For debugging
   lazy val IRPrinterPlus = traversal("IRPrinterPlus", isExtern = true) // Debugging metadata
+  lazy val HardStop = traversal("HardStop", isExtern=true) // For debugging
 
   /**
    * Built-in types
@@ -145,7 +146,7 @@ trait Definitions extends DerivativeTypes {
   case object dot extends CodeGenerator { def name = "Dot" }
   case object maxj extends CodeGenerator { def name = "MaxJ" }
 
-  val generators = List($cala, cuda, opencl, cpp, restage, dot, maxj)
+  val generators = List($cala, cuda, opencl, cpp, restage, maxj)
 
   /**
    * Type classes
@@ -188,10 +189,8 @@ trait Definitions extends DerivativeTypes {
   /**
    * Method backend types
    */
-  case object sharedBackend extends BackendType
-  case object internalBackend extends BackendType
-  //case object libraryBackend extends BackendType
-  //case object compilerBackend extends BackendType
+  case object publicMethod extends MethodVisibility
+  case object privateMethod extends MethodVisibility
 
   /**
    * Metadata meet functions
@@ -215,6 +214,7 @@ trait Definitions extends DerivativeTypes {
   // blacklist for op names that need the SourceContext implicit parameter to be surpressed (usually because they construct an object with an apply method)
   var noSourceContextList = List[String]()
 
+  var primitiveStructs = List[Rep[DSLType]]()
   var primitiveTypes = List[Rep[DSLType]]()
 
   /**

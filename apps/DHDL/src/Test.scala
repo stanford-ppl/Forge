@@ -8,26 +8,37 @@ trait Test extends DHDLApplication {
 
   def main() {
     type Q16 = FixPt[Signed, B16, B16]
+    type A = SInt
 
-    val v1    = OffChipMem[Q16]("v1", 10)
-    val outer = ArgOut[Q16]
+    val N = 10
+    val T = 5
+    val PN = param(2)
+    val PT = param(2)
+    val v1 = OffChipMem[A]("v1", N)
+    val v2 = OffChipMem[A]("v2", N)
+    val out = OffChipMem[A]("out", N, N)
 
-    val vec1 = Array.fill(10)(random[Q16](10))
+    val vec1 = Array.fill(N)(random[A](10))
+    val vec2 = Array.fill(N)(random[A](10))
     setMem(v1, vec1)
+    setMem(v2, vec2)
 
     Accel {
-      val b1 = BRAM[Q16]("b1", 5)
+      Pipe(N by T, N by T par PN) { (i,j) =>
+        val b1 = BRAM[A]("b1", T)
+        val b2 = BRAM[A]("b2", T)
+        val outTile = BRAM[A]("outTile", T, T)
+        Parallel {
+          b1 := v1(i::i+T)
+          b2 := v2(j::j+T)
+        }
+        Pipe(T by 1, T by 1 par PT) { (ii,jj) => outTile(ii, jj) = b1(ii) * b2(jj) } // 2
 
-      MetaPipe(10 by 5, outer){i =>
-        b1 := v1(i::i+5)
-
-        val inner = Reg[Q16]
-        Pipe(0 until 5, inner){ii => b1(ii) ** 2 }{_+_}
-        inner.value
-      }{_+_}
+        out(i::i+T, j::j+T) := outTile
+      }
+      ()
     }
-
-    val gold = vec1.map{_**2}.reduce{_+_}
-    println("outer: " + getArg(outer).mkString + " (should be " + gold.mkString + ")")
+    val result = getMem(out)
+    println( result.mkString(", ") )
   }
 }

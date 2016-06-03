@@ -31,44 +31,36 @@ trait BaseGenMetadata extends ForgeCodeGenBase {
     for (tpe <- MetaTpes) {
       val m = tpe.asInstanceOf[Rep[DSLMetadata]]
 
-      if (!MetaImpls.contains(m))
-        err("No generic meet function defined on metadata type " + m.name + ". Define one using 'alias = any'")
+      val impl = if (!MetaImpls.contains(m)) MetaOps.empty else MetaImpls(m)
 
       val struct = DataStructs(tpe)
-      val meetRules = MetaImpls(m).meet
-      val matchesRule = MetaImpls(m).matches
-      val canMeetRules = MetaImpls(m).canMeet
-      val completeRule = MetaImpls(m).complete
+      val meetRules = impl.meet
+      val matchesRule = impl.matches
+      val canMeetRules = impl.canMeet
+      val completeRule = impl.complete
 
       stream.print("  case class " + m.name)
       stream.print(makeTpeParsWithBounds(struct.tpe.tpePars))
       stream.print("(")
       stream.print(struct.fields.map{case (name,tpe) => name + ": " + typify(tpe) }.mkString(", "))
       stream.println(") extends Metadata { self =>")
-      stream.println("    def _meet(that: self.type)(implicit t: MeetFunc): Metadata = t match {")
-      if (meetRules.contains(metaUpdate)) {
-        stream.println("      case " + quoteFunc(metaUpdate) + " =>")
-        quoteLiteral(meetRules(metaUpdate)).split(nl).foreach{ line => emitWithIndent(line, stream, 8) }
-      }
-      else stream.println("      case " + quoteFunc(metaUpdate) + " => that")
 
-      if (!meetRules.contains(any))
-        err("No generic meet function defined on metadata type " + m.name + ". Define one using 'alias = any'")
-
-      for (func <- meetFuncs.drop(1) if meetRules.contains(func)) {
+      stream.println("    override def _meet(that: self.type)(implicit t: MeetFunc): Metadata = t match {")
+      for (func <- meetFuncs if meetRules.contains(func)) {
         stream.println("      case " + quoteFunc(func) + " =>")
         quoteLiteral(meetRules(func)).split(nl).foreach{ line => emitWithIndent(line, stream, 8) }
       }
-
+      if (!meetRules.contains(any)) {
+        stream.println("      case _ => this")
+      }
       stream.println("    }")
 
       // Matching tests
-      stream.println("    def _matches(that: self.type): Boolean = {")
-      if (matchesRule.isEmpty)
-        stream.println("      this == that")
-      else
+      if (!matchesRule.isEmpty) {
+        stream.println("    override def _matches(that: self.type): Boolean = {")
         quoteLiteral(matchesRule.get).split(nl).foreach{ line => emitWithIndent(line, stream, 6) }
-      stream.println("    }")
+        stream.println("    }")
+      }
 
       // Compatibility tests
       stream.println("    override def _canMeet(that: self.type)(implicit t: MeetFunc): Boolean = t match {")
@@ -81,13 +73,13 @@ trait BaseGenMetadata extends ForgeCodeGenBase {
       }
       stream.println("    }")
       // Incompatibility error strings
-      stream.println("    def _incompatibilities(that: self.type)(implicit t: MeetFunc): List[String] = {")
+      stream.println("    override def _incompatibilities(that: self.type)(implicit t: MeetFunc): List[String] = {")
       stream.println("      if (_canMeet(that)) Nil else List(\"Incompatible metadata\")")
       stream.println("    }")
 
       // Completeness check
       if (completeRule.isDefined) {
-        stream.println("    def _isComplete: Boolean = {")
+        stream.println("    override def _isComplete: Boolean = {")
         quoteLiteral(completeRule.get).split(nl).foreach{ line => emitWithIndent(line, stream, 6) }
         stream.println("    }")
       }

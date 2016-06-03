@@ -8,7 +8,7 @@ import scala.reflect.SourceContext
 import java.io.{PrintWriter}
 
 trait MaxJManagerGen {
-	val IR:DHDLExp 
+	val IR:DHDLExp
 	import IR.{infix_until => _, looprange_until => _, println => _, _}
 
 	var stream:PrintWriter = _
@@ -100,17 +100,17 @@ trait MaxJManagerGen {
 	  private static final CPUTypes FLOAT = CPUTypes.FLOAT;
 	  private static final CPUTypes DOUBLE = CPUTypes.DOUBLE;
 	"""
-	
+
 	  val mEpilogue =
 	s"""
 	  public static void main(String[] args) {
 	    TopManager m = new TopManager(new EngineParameters(args));
-	
+
 	    BuildConfig c = new BuildConfig(BuildConfig.Level.FULL_BUILD);
 	    c.setBuildEffort(BuildConfig.Effort.HIGH);
 	    c.setEnableTimingAnalysis(true);
 	    m.setBuildConfig(c);
-	
+
 	    m.createSLiCinterface(interfaceRead("readLMem"));
 	    m.createSLiCinterface(interfaceWrite("writeLMem"));
 	    m.createSLiCinterface(interfaceDefault());
@@ -118,7 +118,7 @@ trait MaxJManagerGen {
 	  }
 	}
 	"""
-	
+
 	val mReadIntf =
 	s"""
 	  // CPU -> LMEM (read interface)
@@ -127,10 +127,10 @@ trait MaxJManagerGen {
 	    InterfaceParam size = ei.addParam("size", uint32_t);
 	    InterfaceParam start = ei.addParam("start", uint32_t);
 	    InterfaceParam sizeInBytes = size;
-	
+
 	    // Stop the kernel from running
 	    ei.setScalar("TopKernel", "en", 0);
-	
+
 	    // Setup address map and access pattern
 	    ei.setLMemLinear("fromlmem", start, sizeInBytes);
 	    ei.setStream("tocpu", uint32_t, sizeInBytes);
@@ -138,7 +138,7 @@ trait MaxJManagerGen {
 	    return ei;
 	  }
 	"""
-	
+
 	val mWriteIntf =
 	s"""
 	  // LMEM -> CPU (write interface)
@@ -147,10 +147,10 @@ trait MaxJManagerGen {
 	    InterfaceParam size = ei.addParam("size", uint32_t);
 	    InterfaceParam start = ei.addParam("start", uint32_t);
 	    InterfaceParam sizeInBytes = size;
-	
+
 	    // Stop the kernel from running
 	    ei.setScalar("TopKernel", "en", 0);
-	
+
 	    // Setup address map and access pattern
 	    ei.setLMemLinear("tolmem", start, sizeInBytes);
 	    ei.setStream("fromcpu", uint32_t, sizeInBytes);
@@ -158,7 +158,7 @@ trait MaxJManagerGen {
 	    return ei;
 	  }
 	"""
-	
+
 	val mDefaultIntfPreamble =
 	s"""
 	  // Interface to run DFE (default interface)
@@ -167,7 +167,7 @@ trait MaxJManagerGen {
 	    ei.setTicks("TopKernel", Long.MAX_VALUE);
 	    ei.setScalar("TopKernel", "en", 1);
 	"""
-	
+
 	val mDefaultIntfEpilogue =
 	s"""
 	    ei.setLMemInterruptOn("intrStream");
@@ -175,7 +175,7 @@ trait MaxJManagerGen {
 	    return ei;
 	  }
 	"""
-	
+
 	val cpuIntfOld =
 	s"""
 	    // Setup CPU <-> FPGA stream
@@ -196,7 +196,7 @@ trait MaxJManagerGen {
 	    tolmem <== fromcpu;
 	    tocpu <== fromlmem;
 	"""
-	
+
 	val intrIntfOld =
 	s"""
 	    // Setup interrupt stream
@@ -218,17 +218,17 @@ trait MaxJManagerGen {
 	s"""
 	  TopManager(EngineParameters engineParameters) {
 	    super(engineParameters);
-	
+
 	    // Disable stream status blocks
 	    DebugLevel debugLevel = new DebugLevel();
 	    debugLevel.setHasStreamStatus(false);
 	    debug.setDebugLevel(debugLevel);
-	
+
 	    // Setup stream clock and memory clock
 	    config.setDefaultStreamClockFrequency($streamClock);
 	    config.setOnCardMemoryFrequency(LMemFrequency.MAX4MAIA_$memClock);
 	    config.setEnableAddressGeneratorsInSlowClock(true);
-	
+
 	    // Setup memory controller clock and config
 	//    MemoryControllerConfig mem_cfg = new MemoryControllerConfig();
 	////    mem_cfg.setBurstSize(4); //MAX3: 4 = 4*384 bits, 8 = 8*384 bits
@@ -236,18 +236,18 @@ trait MaxJManagerGen {
 	//    mem_cfg.setDataFIFOExtraPipelineRegInFabric(true); //timing-23may
 	//    //mem_cfg.setDataFIFOPrimitiveWidth(5*72);
 	//    config.setMemoryControllerConfig(mem_cfg);
-	
+
 	    // Create a KernelConfiguration object that sets the OptimizationTechnique
 	    // to optimize for area, which is the default in the 2014.1 compiler
 	    // TODO: This causes build failures with MaxJ during source annotation. Investigate why
 	    // KernelConfiguration kernelConfig = getCurrentKernelConfig();
 	    // kernelConfig.optimization.setOptimizationTechnique(OptimizationTechnique.AREA);
 	    // KernelBlock k = addKernel(new TopKernel(makeKernelParameters("TopKernel", kernelConfig)));
-	
+
 	    KernelBlock k = addKernel(new TopKernel(makeKernelParameters("TopKernel")));
-	
+
 	    $cpuIntf
-	
+
 	    $intrIntf
 	"""
 
@@ -265,20 +265,20 @@ s"""
     //}
   }
 
-  def emitConstructor(tileTsfs: Set[Sym[Unit]]) = {
+  def emitConstructor(memStreams: Set[Sym[Any]]) = {
     emit(mConstructorPreamble)
     emit("    // Setup LMEM -> DFE streams (input streams to DFE)")
     emit("    // Setup DFE -> LMEM (output streams from DFE)")
-    tileTsfs.foreach{ tt =>
-     	val Def(EatReflect(TileTransfer(mem,_,_,_,_,_,_,store))) = tt 
-      val streamName = s"${quote(mem)}_${quote(tt)}"
-			if (store) {
-      	emit(s"""    DFELink ${streamName}_out = addStreamToOnCardMemory("${streamName}_out", k.getOutput("${streamName}_out_cmd"));""")
-      	emit(s"""    ${streamName}_out <== k.getOutput("${streamName}_out");""")
-			} else {
-      	emit(s"""    DFELink ${streamName}_in = addStreamFromOnCardMemory("${streamName}_in", k.getOutput("${streamName}_in_cmd"));""")
-      	emit(s"""    k.getInput("${streamName}_in") <== ${streamName}_in;""")
-			}	
+    memStreams.foreach{
+      case tt@Def(EatReflect(Offchip_store_vector(mem,ofs,vec))) =>
+        val streamName = s"${quote(mem)}_${quote(tt)}"
+        emit(s"""    DFELink ${streamName}_out = addStreamToOnCardMemory("${streamName}_out", k.getOutput("${streamName}_out_cmd"));""")
+        emit(s"""    ${streamName}_out <== k.getOutput("${streamName}_out");""")
+
+      case tt@Def(EatReflect(Offchip_load_vector(mem,ofs,len))) =>
+     	  val streamName = s"${quote(mem)}_${quote(tt)}"
+        emit(s"""    DFELink ${streamName}_in = addStreamFromOnCardMemory("${streamName}_in", k.getOutput("${streamName}_in_cmd"));""")
+        emit(s"""    k.getInput("${streamName}_in") <== ${streamName}_in;""")
     }
     emit(mConstructorEpilogue)
   }
@@ -305,14 +305,14 @@ s"""
     emit(mDefaultIntfEpilogue)
   }
 
-  def emitManager(stream:PrintWriter, argInOuts:Set[Sym[Register[_]]], tileTsfs:Set[Sym[Unit]]) = {
+  def emitManager(stream:PrintWriter, argInOuts:Set[Sym[Register[_]]], memStreams:Set[Sym[Any]]) = {
 		this.stream = stream
     initPass()
     //println(s"""tileTransfers: """)
 		//tileTsfs.foreach { tt => println(quote(tt)) }
     //println(s"""argIns and argOuts: """)
 		//argInOuts.foreach { a => println(quote(a)) }
-    emitConstructor(tileTsfs)
+    emitConstructor(memStreams)
     emitRWInterface()
     emitDefaultInterface(argInOuts)
 

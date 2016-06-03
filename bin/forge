@@ -37,6 +37,7 @@ def main():
     parser.add_option("--ident", dest="gen_ident", action="store_true", default=False, help="enable identity generation (re-generate a Forge spec)")
     parser.add_option("--no-delite", dest="gen_delite", action="store_false", default=True, help="disable delite generation")
     parser.add_option("--no-lib", dest="gen_lib", action="store_false", default=True, help="disable library generation")
+    parser.add_option("--no-doc", dest="gen_doc", action="store_false", default=True, help="disable Sphinx document generation")
 
     (opts, args) = parser.parse_args()
     if len(args) < 1:
@@ -92,6 +93,8 @@ def stage(runner, params, opts):
       java_opts = java_opts + " -Dforge.gen.delite=false"
     if opts.gen_lib == False:
       java_opts = java_opts + " -Dforge.gen.lib=false"
+    if opts.gen_doc == False:
+      java_opts = java_opts + " -Dforge.gen.sphinx=false"
 
     #add classpaths
     cp = " -cp "

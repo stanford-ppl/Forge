@@ -76,16 +76,10 @@ trait BaseGenPackages extends ForgeCodeGenBase {
 
     // --- DSLMetadataOps and DSLMetadataInternalOps
     if (hasMetatype) {
-      /*stream.print("trait " + dsl + "MetadataOps extends ")
-      if (hasMetahelp) stream.print(dsl + "MetadataSugar") else stream.println("Base")
-      for (opsGrp <- opsGrps if isMetadata(opsGrp.grp)) { stream.print(" with " + opsGrp.name) }
-      stream.println("{\n  this: " + dsl + " => \n}")
-      stream.println()*/
-
       stream.print("trait " + dsl + "MetaOps extends ")
       if (hasMetahelp) stream.print(dsl + "MetadataInternalOps") else stream.println("Base")
       for (opsGrp <- opsGrps if isMetadata(opsGrp.grp)) {
-        if (opsGrp.ops.exists(_.backend == internalBackend))
+        if (opsGrp.ops.exists(_.visibility == privateMethod))
           stream.print(" with " + opsGrp.grp.name + "InternalOps")
         else
           stream.print(" with " + opsGrp.name)
@@ -119,7 +113,10 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     if (Identifiers.length > 0) {
       emitBlockComment("Singleton identifiers", stream, indent=2)
       for (id <- Identifiers) {
-        stream.println("  object " + id.name + " extends " + quote(id.tpe))
+        if (OpsGrp.exists{case(g,opsGrp) => g.name == id.name && opsGrp.ops.exists(_.style == staticMethod)})
+          stream.println("  // object " + id.name + " - see ops")
+        else
+          stream.println("  object " + id.name + " extends " + quote(id.tpe))
       }
     }
     if (NonStructTpes.length > 0) {

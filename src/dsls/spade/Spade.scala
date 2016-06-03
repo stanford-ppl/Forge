@@ -31,12 +31,13 @@ trait SpadeDSL extends ForgeApplication
     primitiveTypes ::= rep
     tpeAlias("Wire", rep)
 
+    val DotIRPrinter = traversal("DotIRPrinter", isExtern=true)
     schedule(IRPrinter)
+    schedule(DotIRPrinter)
 
     // TODO: This list should be updated as and when new backend support for feedback is added
     // Codegen support should be added in forge/extern/dadl/compiler/src/ops/ModuleIOOpsExp.scala
     extern(grp("ModuleIO"), targets = List($cala, dot))
-//    extern(grp("Graph"), targets = List($cala, dot))
 
     ()
   }

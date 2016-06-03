@@ -56,39 +56,31 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 	}
 
   override def quote(x: Exp[Any]):String = x match {
-    case s@Sym(n) => s match {
-			case Def(ConstFix(n)) => n.toString
-			case Def(ConstFlt(n)) => n.toString
+    case s@Sym(id) => s match {
+			case Def(ConstFix(c)) => c.toString
+			case Def(ConstFlt(c)) => c.toString
 			case _ =>
 				var tstr = s.tp.erasure.getSimpleName()
 				tstr = tstr.replace("DHDL","")
-				s.tp match {
-					case ss:Register[_] =>
-						tstr = tstr.replace("Register", regType(s) match {
-							case Regular => "Reg"
-							case ArgumentIn => "ArgIn"
-							case ArgumentOut => "ArgOut"
-						})
-					case ss:Pipeline =>
-						tstr = tstr.replace("Pipeline", styleOf(s) match {
-							case Fine => "Pipe"
-							case Coarse => "MetaPipe"
-							case Disabled => "Sequential"
-						})
-					case _ => //println(s.tp)
+			  if (isRegister(s.tp)) {
+					tstr = tstr.replace("Register", regType(s) match {
+						case Regular => "Reg"
+						case ArgumentIn => "ArgIn"
+						case ArgumentOut => "ArgOut"
+					})
+			  }
+        else if (isPipeline(s.tp)) {
+          tstr = tstr.replace("Pipeline", styleOf(s) match {
+						case Fine => "Pipe"
+						case Coarse => "MetaPipe"
+						case Disabled => "Sequential"
+					})
 				}
-				tstr = tstr.replace("BlockRAM", "BRAM")
-				val quoteStr = tstr + nameOf(s).map{n => "_"+n}.getOrElse("") + "_x" + n
-				/*
-				if (quoteStr.contains("108")) {
-					println("sym:" + quoteStr)
-					s match {
-						case Def(d) => println("def:" + d)
-						case _ => println("don't know what this is")
-					}
-				}
-				*/
-				quoteStr
+        else if (isBRAM(s.tp)) {
+          tstr = tstr.replace("BlockRAM", "BRAM")
+        }
+
+        tstr + nameOf(s).map{n => "_"+n}.getOrElse("") + "_x" + id
 		}
     case _ => super.quote(x)
   }
@@ -149,7 +141,12 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 
 	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = {
     val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
-	  inds.zipWithIndex.foreach {case (iter, idx) => emitValDef(iter, counters(idx)) }
+	  inds.zip(counters).foreach{case (iter, ctr) => emitValDef(iter, ctr) }
+  }
+
+  def emitParallelNestedIdx(cchain: Exp[CounterChain], inds: List[List[Sym[FixPt[Signed,B32,B0]]]]) = {
+    val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
+    inds.zip(counters).foreach{case (iters, ctr) => iters.foreach{iter => emitValDef(iter, ctr) }}
   }
 
 	def emitCtrChain(cchain: Exp[CounterChain]):Unit = {
@@ -173,20 +170,30 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 		case _ =>
 	}
 
+  def emitVector(sym: Sym[Any]) = {
+    if (isDblBuf(sym)) {
+      emit(s"""${quote(sym)} [margin=0 rankdir="LR" label="{<st> | <ld>}" xlabel="${quote(sym)}"""")
+      emit(s"""shape="record" color=$dblbufBorderColor  style="filled"""")
+      emit(s"""fillcolor=$vectorFillColor ]""")
+    }
+    else {
+      emit(s"""${quote(sym)} [label="${quote(sym)}" shape="square" style="filled" fillcolor=$vectorFillColor]""")
+    }
+  }
+
   override def traverse(lhs: Sym[Any], rhs: Def[Any]): Unit = {
+    debug(s"[$inHwScope] $lhs = $rhs")
     if (inHwScope) emitHWNode(lhs, rhs)
     else emitOtherNode(lhs, rhs)
   }
 
   def emitOtherNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case Hwblock(func) =>
-      inHwScope = true
-      emitBlock(func)
-      inHwScope = false
+      alwaysGen { emitBlock(func) }
 
     case _:Reg_new[_] => regType(sym) match {
       case Regular if isDblBuf(sym) =>
-        emit(s"""${quote(sym)} [margin=0, rankdir="LR", label="{<st> | <ld>}" xlabel="${quote(sym)}""")
+        emit(s"""${quote(sym)} [margin=0, rankdir="LR", label="{<st> | <ld>}" xlabel="${quote(sym)}" """)
         emit(s"""      shape="record" color=$dblbufBorderColor style="filled" """)
         emit(s"""      fillcolor=$regFillColor ]""")
 
@@ -220,7 +227,11 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 
     case Tpes_Fix_to_int(v) => emitValDef(sym, quote(v))
     case Tpes_Int_to_fix(v) => emitValDef(sym, quote(v))
-    case _ => super.traverse(sym, rhs)
+
+    case Reflect(d, u, es) => traverse(sym, d)
+    case _ =>
+      debug(s"...ignored")
+      if (recurseElse) blocks(rhs).foreach{blk => traverseBlock(blk)}
   }
 
   def emitHWNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
@@ -253,23 +264,26 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 
 		case e@Pipe_parallel(func) =>
       emit(s"""subgraph cluster_${quote(sym)} {""")
-      emit(s"""	label = "parallel_${quote(sym)}"""")
+      emit(s"""	label = "parallel ${quote(sym)}"""")
       emit(s"""	style = "filled, bold"""")
       emit(s"""	fillcolor = $parallelFillColor""")
       emit(s"""	color = $parallelBorderColor""")
       emitBlock(func)
 			emit(s"""}""")
 
-    case e@Pipe_foreach(cchain, func, inds) =>
-			var label = quote(sym)
-			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
-				case Coarse => label = label.replace("DHDLPipeline", "MetaPipe")
-				case Fine => label = label.replace("DHDLPipeline", "Pipe")
-				case Disabled => label = label.replace("DHDLPipeline", "Sequential")
-			}
-      emitNestedIdx(cchain, inds)
+    case e@Unit_pipe(func) =>
       emit(s"""subgraph cluster_${quote(sym)} {""")
-      emit(s"""label="$label"""")
+      emit(s""" label = "pipe ${quote(sym)}"""")
+      emit(s""" style = "filled, bold"""")
+      emit(s""" fillcolor = $pipeFillColor""")
+      emit(s""" color = $pipeBorderColor""")
+      emitBlock(func)
+      emit(s"""}""")
+
+    case e@Pipe_foreach(cchain, func, inds) =>
+			emitNestedIdx(cchain, inds)
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+      emit(s"""label="${quote(sym)}"""")
       emit(s"""color=$pipeBorderColor""")
       emit(s"""style="bold, filled" """)
 			emit(s"""fillcolor=$pipeFillColor""")
@@ -278,21 +292,14 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
       emit("}")
 
     case e@Pipe_fold(cchain, accum, fA, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
-			var label = quote(sym)
-			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
-				case Coarse => label = label.replace("DHDLPipeline", "MetaPipe")
-				case Fine => label = label.replace("DHDLPipeline", "Pipe")
-				case Disabled => label = label.replace("DHDLPipeline", "Sequential")
-			}
-      emitValDef(acc, accum)
+			emitValDef(acc, accum)
       emitNestedIdx(cchain, inds)
       emit(s"""subgraph cluster_${quote(sym)} {""")
-      emit(s"""label="$label"""")
+      emit(s"""label="${quote(sym)}"""")
       emit(s"""color=$pipeBorderColor""")
       emit(s"""style="bold, filled" """)
 			emit(s"""fillcolor=$pipeFillColor""")
-      emit(s"""define(`${quote(acc)}', `${quote(accum)}')""")
-			val Def(EatReflect(d)) = cchain
+      emitValDef(acc, accum)
 			emitCtrChain(cchain)
       emitBlock(iFunc, quote(sym) + "_idxFunc", "idxFunc", ldFillColor)
 			emitValDef(idx, quote(getBlockResult(iFunc)))
@@ -306,14 +313,30 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
       emit("}")
 
     case e@Accum_fold(ccOuter, ccInner, accum, fA, iFunc, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, idx, part, acc, res, rV) =>
-      emit(s"""subgraph ${quote(sym)} {""")
-      emit(s"""  label = "${quote(sym)}"""")
-      emit(s"""  style = "filled" """)
-      emit(s"""  fillcolor = "${mpFillColor}" """)
-      emit(s"""  color = "${mpBorderColor}" """)
-      val sym_ctrl = quote(sym) + "_ctrl"
-      emit(s"""  ${sym_ctrl} [label="ctrl" height=0 style="filled" fillcolor=${mpBorderColor}]""")
-      emit(s"""}""")
+      emitValDef(acc, accum)
+      emitNestedIdx(ccOuter, indsOuter)
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+      emit(s"""  label="${quote(sym)}"""")
+      emit(s"""  style="bold, filled" """)
+      emit(s"""  fillcolor=$mpFillColor""")
+      emit(s"""  color=$mpBorderColor""")
+      emitCtrChain(ccOuter)
+      if (!isUnitCounterChain(ccInner)) {
+        emitCtrChain(ccInner)
+        emitNestedIdx(ccInner, indsInner)
+      }
+      emitBlock(func, quote(sym) + "_mapFunc", "mapFunc", mapFillColor)
+      emitValDef(part, getBlockResult(func))
+      emitBlock(iFunc, quote(sym) + "_idxFunc", "idxFunc", ldFillColor)
+      emitValDef(idx, getBlockResult(iFunc))
+      emitBlock(ldPart, quote(sym) + "_ldPart", "ldPart", ldFillColor)
+      emitBlock(ldFunc, quote(sym) + "_ldFunc", "ldFunc", ldFillColor)
+      emitValDef(rV._1, getBlockResult(ldPart))
+      emitValDef(rV._2, getBlockResult(ldFunc))
+      emitBlock(rFunc, quote(sym) + "_reduceFunc", "reduceFunc", reduceFillColor)
+      emitValDef(res, getBlockResult(rFunc))
+      emitBlock(stFunc, quote(sym) + "_stFund", "stFunc", stFillColor)
+      emit("}")
 
     case Cache_new(offchip) =>
       if (isDblBuf(sym)) {
@@ -340,7 +363,8 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
       	emit(s"""$qsym [margin=0 rankdir="LR" label="{<st> | <ld>}" xlabel="$qsym """")
         emit(s"""shape="record" color=$dblbufBorderColor  style="filled"""")
         emit(s"""fillcolor=$bramFillColor ]""")
-      } else {
+      }
+      else {
         emit(s"""$qsym [label="$qsym " shape="square" style="filled" fillcolor=$bramFillColor ]""")
       }
 
@@ -351,6 +375,38 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
     case Bram_store(bram,addr,value) =>
       emitEdge(addr, bram, "addr")
       emitEdge(value, bram, "data")
+
+    case e@Bram_store_vector(bram,ofs,vec,cchain,inds) =>
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+      emit(s"""label="vector store"""")
+      emit(s"""color=$pipeBorderColor""")
+      emit(s"""style="bold, filled" """)
+      emit(s"""fillcolor=$pipeFillColor""")
+      emitEdge(ofs, bram, "addr")
+      emitEdge(vec, bram, "data")
+      emitCtrChain(cchain)
+      emit("}")
+
+    case e@Bram_load_vector(bram,ofs,cchain,inds) =>
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+      emit(s"""label="vector load"""")
+      emit(s"""color=$pipeBorderColor""")
+      emit(s"""style="bold, filled" """)
+      emit(s"""fillcolor=$pipeFillColor""")
+      emitVector(sym)
+      emitEdge(bram, sym, "data")
+      emitEdge(ofs, bram, "addr")
+      emitCtrChain(cchain)
+      emit("}")
+
+    case e@Offchip_store_vector(mem,ofs,vec) =>
+      emitEdge(vec, mem, "data")
+      emitEdge(ofs, mem, "addr")
+
+    case e@Offchip_load_vector(mem,ofs,len) =>
+      emitEdge(ofs, mem, "addr")
+      emitVector(sym)
+      emitEdge(mem, sym, "data")
 
     case Reg_read(reg) =>
       emitValDef(sym, reg)
@@ -414,6 +470,52 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
       emitEdge(a, sym, "a")
       emitEdge(b, sym, "b")
 
+    case ParPipeForeach(cc,func,inds) =>
+      emitParallelNestedIdx(cc, inds)
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+      emit(s"""label="${quote(sym)}"""")
+      emit(s"""color=$pipeBorderColor""")
+      emit(s"""style="bold, filled" """)
+      emit(s"""fillcolor=$pipeFillColor""")
+      emitCtrChain(cc)
+      emitBlock(func, quote(sym) + "_foreach", "foreach", foreachFillColor)             // Map function
+      emit("}")
+
+    case ParPipeReduce(cc,accum,func,rFunc,inds,acc,rV) =>
+      emitValDef(acc, accum)
+      emitParallelNestedIdx(cc, inds)
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+      emit(s"""label="${quote(sym)}"""")
+      emit(s"""color=$pipeBorderColor""")
+      emit(s"""style="bold, filled" """)
+      emit(s"""fillcolor=$pipeFillColor""")
+      emitCtrChain(cc)
+      emitBlock(func, quote(sym) + "_mapreduce", "mapreduce", foreachFillColor)             // Map function
+      emit("}")
+
+    case ParBramLoadVector(bram,ofs,cc,inds) =>
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+      emit(s"""label="vector load"""")
+      emit(s"""color=$pipeBorderColor""")
+      emit(s"""style="bold, filled" """)
+      emit(s"""fillcolor=$pipeFillColor""")
+      emitVector(sym)
+      emitEdge(bram, sym, "data")
+      emitEdge(ofs, bram, "addr")
+      emitCtrChain(cc)
+      emit("}")
+
+    case ParBramStoreVector(bram,ofs,vec,cc,inds) =>
+      emit(s"""subgraph cluster_${quote(sym)} {""")
+      emit(s"""label="vector store"""")
+      emit(s"""color=$pipeBorderColor""")
+      emit(s"""style="bold, filled" """)
+      emit(s"""fillcolor=$pipeFillColor""")
+      emitEdge(ofs, bram, "addr")
+      emitEdge(vec, bram, "data")
+      emitCtrChain(cc)
+      emit("}")
+
 		case _ => emitOtherNode(sym, rhs)
 	}
 
@@ -456,6 +558,7 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 	val tileTransFillColor = s""""#FFA500""""
 
 	// Memories
+  val vectorFillColor = s""""#8bd645""""
 	val bramFillColor = s""""#70C6E6""""
 	val cacheFillColor = s""""#B3A582""""
 	val dramFillColor = s""""#685643""""

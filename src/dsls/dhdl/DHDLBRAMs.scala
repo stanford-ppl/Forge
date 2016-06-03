@@ -21,7 +21,7 @@ trait DHDLBRAMs {
 
     // --- Nodes
     val bram_new = internal (BRAM) ("bram_new", T, (("size", Idx), ("zero", T)) :: BRAM(T), effect = mutable)
-    val bram_load = internal (BRAM) ("bram_load", T, (("bram", BRAM(T)), ("addr", Idx)) :: T)
+    val bram_load = internal (BRAM) ("bram_load", T, (("bram", BRAM(T)), ("addr", Idx)) :: T, aliasHint = aliases(Nil))
     val bram_store = internal (BRAM) ("bram_store", T, (("bram", BRAM(T)), ("addr", Idx), ("value", T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
     //val bram_reset = internal (BRAM) ("bram_reset", T, (("bram", BRAM(T)), ("zero", T)) :: MUnit, effect = write(0))
 
@@ -31,7 +31,7 @@ trait DHDLBRAMs {
       dimsOf(vec) = List($len)
       vec
     }
-    internal (BRAM) ("bramStoreVector", T, (("bram", BRAM(T)), ("ofs", SList(Idx)), ("vec", MVector(T)), ("p",MInt)) :: MUnit, effect = write(0)) implements composite ${
+    internal (BRAM) ("bramStoreVector", T, (("bram", BRAM(T)), ("ofs", SList(Idx)), ("vec", MVector(T)), ("p",MInt)) :: MUnit) implements composite ${
       val len = sizeOf(vec)
       bram_store_vector($bram,$ofs,$vec,CounterChain(Counter(min=0.as[Index], max=len, step=1.as[Index], par=$p)))
     }

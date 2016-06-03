@@ -114,8 +114,8 @@ trait DHDLDSL extends ForgeApplication
     // --- Memory Types
     /**
      * OffChipMems are pointers to locations in the accelerators main memory to dense multi-dimensional arrays. They are the primary form of communication
-     * of data between the host and the accelerator. Data may be loaded to and from the accelerator in contiguous chunks (Tiles). Other access patterns
-     * will be supported soon!
+     * of data between the host and the accelerator. Data may be loaded to and from the accelerator in contiguous chunks (Tiles), by random access addresses,
+     * or by gather operations (SparseTiles).
      **/
     val OffChip = tpe("OffChipMem", T)
     /**

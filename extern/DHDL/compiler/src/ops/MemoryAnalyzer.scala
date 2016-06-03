@@ -49,7 +49,7 @@ trait MemoryAnalyzer extends HungryTraversal {
   val IR: DHDLExp with MemoryAnalysisExp
   import IR._
 
-  debugMode = false
+  debugMode = true
   override val name = "Scratchpad Analyzer"
 
   /**

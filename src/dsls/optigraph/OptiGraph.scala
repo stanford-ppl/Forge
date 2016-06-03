@@ -27,6 +27,7 @@ trait OptiGraphDSL extends ForgeApplication
      */
     importScalaOps()
     importBitSetOps()
+    importKeyValueStoreOps()
 
     /**
      * Expose some arrays ops (used in PageRankCSR right now)
@@ -44,6 +45,7 @@ trait OptiGraphDSL extends ForgeApplication
     importNodeOps() //Primitives.scala
     importEdgeOps() //Primitives.scala
     importNodeDataOps() //NodeData.scala
+    importNodeDataDBOps() //NodeData.scala
     importAtomicBooleanOps() //Atomics.scala
     importAtomicIntArrayOps() //Atomics.scala
     importAtomicDoubleArrayOps() //Atomics.scala

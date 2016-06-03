@@ -78,7 +78,7 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 					case _ => //println(s.tp)
 				}
 				tstr = tstr.replace("BlockRAM", "BRAM")
-				val quoteStr = tstr + (if (nameOf(s)!="") "_" else "") + nameOf(s) + "_x" + n
+				val quoteStr = tstr + nameOf(s).map{n => "_"+n}.getOrElse("") + "_x" + n
 				/*
 				if (quoteStr.contains("108")) {
 					println("sym:" + quoteStr)
@@ -220,7 +220,7 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 
     case Tpes_Fix_to_int(v) => emitValDef(sym, quote(v))
     case Tpes_Int_to_fix(v) => emitValDef(sym, quote(v))
-    case _ =>
+    case _ => super.traverse(sym, rhs)
   }
 
   def emitHWNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
@@ -287,7 +287,7 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
       emitValDef(acc, accum)
       emitNestedIdx(cchain, inds)
       emit(s"""subgraph cluster_${quote(sym)} {""")
-      emit(s"""label="${quote(sym)}"""")
+      emit(s"""label="$label"""")
       emit(s"""color=$pipeBorderColor""")
       emit(s"""style="bold, filled" """)
 			emit(s"""fillcolor=$pipeFillColor""")
@@ -307,12 +307,12 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 
     case e@Accum_fold(ccOuter, ccInner, accum, fA, iFunc, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, idx, part, acc, res, rV) =>
       emit(s"""subgraph ${quote(sym)} {""")
-      emit(s"""  label = quote(sym)""")
+      emit(s"""  label = "${quote(sym)}"""")
       emit(s"""  style = "filled" """)
       emit(s"""  fillcolor = "${mpFillColor}" """)
       emit(s"""  color = "${mpBorderColor}" """)
       val sym_ctrl = quote(sym) + "_ctrl"
-      emit(s"""  ${sym_ctrl} [label="ctrl" height=0 style="filled" fillcolor="${mpBorderColor} "]""")
+      emit(s"""  ${sym_ctrl} [label="ctrl" height=0 style="filled" fillcolor=${mpBorderColor}]""")
       emit(s"""}""")
 
     case Cache_new(offchip) =>

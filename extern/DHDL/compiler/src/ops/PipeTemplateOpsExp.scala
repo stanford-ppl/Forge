@@ -271,7 +271,7 @@ trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
 
 trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
   val IR: ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
-          with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
+          with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
           with DHDLCodegenOps with DeliteTransform
 
  import IR._ //{__ifThenElse => _, Nosynth___ifThenElse => _, __whileDo => _,
@@ -287,7 +287,8 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 //				case ArgumentOut => "ArgOut"
 //			}) 
 			tstr = tstr.replace("BlockRAM", "BRAM")
-			tstr + (if (nameOf(s)!="") "_" else "") + nameOf(s) + n
+//			tstr + (if (nameOf(s)!="") "_" else "") + nameOf(s) + n
+			tstr + n
 		}
     case _ => super.quote(x)
   }
@@ -298,32 +299,10 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
   /* Set of control nodes which already have their done signal emitted */
   val doneDeclaredSet = Set.empty[Exp[Any]]
 
-	var traversals: List[Traversal{val IR: MaxJGenControllerTemplateOps.this.IR.type}] = Nil
-
-  def runTraversals[A:Manifest](b: Block[A]): Block[A] = {
-    println("MaxJCodegen: applying transformations")
-    var curBlock = b
-    println("Traversals:\n\t" + traversals.map(_.name).mkString("\n\t"))
-
-    for (t <- traversals) {
-      printlog("  Block before transformation: " + curBlock)
-      curBlock = t.run(curBlock)
-      printlog("  Block after transformation: " + curBlock)
-    }
-    println("MaxJGodegen: done transforming")
-    (curBlock)
-  }
-
   override def initializeGenerator(buildDir:String): Unit = {
 		enDeclaredSet.clear
 		doneDeclaredSet.clear
-		traversals = IR.traversals
 		super.initializeGenerator(buildDir)
-	}
-
-  override def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, out: PrintWriter) = {
-    val y = runTraversals(body)
-		super.emitSource(args, y, className, out)
 	}
 
   override def emitValDef(sym: Sym[Any], rhs: String): Unit = {
@@ -370,6 +349,10 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       emitController(sym, None)
       emitBlock(func, s"${quote(sym)} Parallel")
 
+		case e@Unit_pipe(func: Block[Unit]) =>
+      emitController(sym, None)
+      emitBlock(func, s"${quote(sym)} Unit")
+
     case _ => super.emitNode(sym,rhs)
   }
 
@@ -404,8 +387,12 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
         emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case Disabled =>
-		    val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
-        emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
+        if (cchain.isDefined) {
+          val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
+          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
+        } else {
+          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter, constant.var(1);""")
+        }
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case ForkJoin =>
     }
@@ -422,7 +409,9 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
     }
 
     if (styleOf(sym)!=ForkJoin) {
-      emitCChainCtrl(sym, cchain.get)
+      if (cchain.isDefined) {
+        emitCChainCtrl(sym, cchain.get)
+      }
     }
     if (styleOf(sym)==Fine){
       emit(s"""DFEVar ${quote(sym)}_rst_done = dfeBool().newInstance(this);""")

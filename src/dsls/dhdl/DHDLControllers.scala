@@ -347,6 +347,7 @@ trait DHDLControllers {
     // --- MaxJ Backend
     //pipe_parallel (extern)
 
+    //unit_pipe (extern)
 	}
 
 }

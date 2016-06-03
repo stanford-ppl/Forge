@@ -206,9 +206,11 @@ trait DHDLTypes {
     impl (bit_to_bool)    (codegen(cpp, ${ $0 }))
 
     impl (const_to_fixpt) (codegen(cpp, ${ $0 }))
-    impl (fixpt_to_string) (codegen(cpp, ${ $0.toString }))
-    impl (fixpt_to_fltpt) (codegen(cpp, ${ $0.toFloatPoint[$t[G],$t[E]] }))
-    impl (convert_fixpt) (codegen(cpp, ${ $0.changeFormat[$t[S2],$t[I2],$t[F2]] }))
+    impl (string_to_fixpt) (codegen(cpp, ${ std::stoi($0) }))
+    impl (string_to_fltpt) (codegen(cpp, ${ std::stof($0) }))
+    impl (fixpt_to_string) (codegen(cpp, ${ std::to_string($0) }))
+    impl (fixpt_to_fltpt) (codegen(cpp, ${ (float)($0) }))
+    impl (convert_fixpt) (codegen(cpp, ${ $0 }))
     impl (fix_to_rep_int) (codegen(cpp, ${
       (int32_t) $0
     }))
@@ -217,8 +219,8 @@ trait DHDLTypes {
       ($fixPtType) ($0)
     }))
 
-    impl (const_to_fltpt) (codegen(cpp, ${ FloatPoint[$t[G],$t[E]]($0.toString) }))
-    impl (fltpt_to_string) (codegen(cpp, ${ $0.toString }))
+    impl (const_to_fltpt) (codegen(cpp, ${ (float) ($0) }))
+    impl (fltpt_to_string) (codegen(cpp, ${ std::to_string($0) }))
     impl (fltpt_to_fixpt) (codegen(cpp, ${ $0.toFixedPoint[$t[S],$t[I],$t[F]] }))
     impl (convert_fltpt) (codegen(cpp, ${ $0.changeFormat[$t[G2],$t[E2]] }))
 
@@ -266,6 +268,14 @@ trait DHDLTypes {
 			@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
       DFEVar $sym = $0.cast( $ts );
 		}))
+    impl (string_to_fixpt)  (codegen(maxj, ${
+      DFEVar $sym = String_to_fixpt($0)
+		}))
+    impl (fix_to_rep_int) (codegen(maxj, ${
+			@ alwaysGen {
+				DFEVar $sym = Fix_to_int($0)
+			@ }
+    }))
 
 	}
 }

@@ -223,7 +223,7 @@ trait CGenMemoryTemplateOps extends CGenEffect {
 
 trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTemplateOps{
   val IR: ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
-          with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
+          with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
           with DHDLCodegenOps with DeliteTransform
   import IR._
 
@@ -249,7 +249,19 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
 		case Offchip_new(size) =>
       alwaysGen {
+        emitComment(s""" Offchip_new(${quote(size)}) {""")
         emit(s"""int ${quote(sym)} = ${getNextLMemAddr()};""")
+        emitComment(s""" Offchip_new(${quote(size)}) }""")
+      }
+
+		case Offchip_load_vector(mem, ofs, len) =>
+      alwaysGen {
+        emitComment(s"""${remap(sym.tp)} ${quote(sym)} = Offchip_load_vector(burstAddr = ${quote(mem)}, offset = ${quote(ofs)}, numBursts=${quote(len)})""")
+      }
+
+		case Offchip_store_vector(mem, ofs, vec) =>
+      alwaysGen {
+        emit(s"""// Offchip_store_vector(${quote(mem)}, ${quote(ofs)}, ${quote(vec)})""")
       }
 
 		case Reg_new(init) =>
@@ -348,7 +360,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
       val doneSig = ""
         emit(s"""${quote(sym)}.connectWdone($doneSig);""")
       } else {
-        emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${size1}, ${ts}, ${banks(sym)}, stride_TODO);""")
+        emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, ${banks(sym)}, stride_TODO);""")
       }
       emitComment("} Bram_new")
 

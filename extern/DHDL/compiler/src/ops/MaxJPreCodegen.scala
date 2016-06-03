@@ -28,7 +28,10 @@ trait MaxJPreCodegen extends Traversal  {
 	}
 
   def quote(x: Exp[Any]):String = x match {
-		case s@Sym(n) => s.tp.erasure.getSimpleName().replace("DHDL","") + nameOf(s).map(nm=>"_"+nm).getOrElse("") + "_x" + n
+//		case s@Sym(n) => s.tp.erasure.getSimpleName().replace("DHDL","") + nameOf(s).map(nm=>"_"+nm).getOrElse("") + n
+		case s@Sym(n) =>
+      val str = s.tp.erasure.getSimpleName().replace("DHDL","") + n
+      str
     case _ => ""
   }
 
@@ -102,6 +105,20 @@ trait MaxJPreCodegen extends Traversal  {
     				emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
 			}
+
+    case e@ParPipeForeach(cc, func, inds) =>
+			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
+				case Coarse =>
+					withStream(newStream("metapipe_" + quote(sym))) {
+    				emitMPSM(s"${quote(sym)}", childrenOf(sym).size)
+					}
+				case Fine =>
+				case Disabled =>
+					withStream(newStream("sequential_" + quote(sym))) {
+    				emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
+					}
+			}
+
 		case e:Reg_new[_] if regType(sym) != Regular => argInOuts += sym.asInstanceOf[Sym[Register[_]]]
 
     case _:Offchip_store_vector[_] => memStreams += sym

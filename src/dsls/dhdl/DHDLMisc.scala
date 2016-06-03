@@ -232,7 +232,9 @@ trait DHDLMisc {
     // --- MaxJ Backend
     //impl (rand_fix_bnd) (codegen(maxj, ${  }))
     //impl (rand_fix) (codegen(maxj, ${  }))
-    //impl (rand_flt) (codegen(maxj, ${  }))
+    impl (rand_flt) (codegen(maxj, ${
+      DFEVar $sym = Rand_flt
+    }))
     //impl (rand_bit) (codegen(maxj, ${  }))
   }
 
@@ -372,7 +374,7 @@ trait DHDLMisc {
     impl (set_arg)  (codegen(cpp, ${ *$0 = $1}))
     impl (get_arg)  (codegen(cpp, ${ *$0 }))
     impl (hwblock)  (codegen(cpp, ${
-      $b[0]
+      std::cout << "hwblock" << std::endl
     }))
     impl (println)  (codegen(cpp, ${ std::cout << $0 << std::endl }))
     impl (println2) (codegen(cpp, ${ std::cout << std::endl }))

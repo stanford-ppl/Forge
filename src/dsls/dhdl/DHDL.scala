@@ -260,14 +260,17 @@ trait DHDLDSL extends ForgeApplication
                                     //   Contention analyzer (to finalize contention estimates)
 
     // --- Post-DSE Estimation
-//    schedule(AreaAnalyzer)          // Area estimation
+    schedule(IRPrinterPlus)
+    schedule(AreaAnalyzer)          // Area estimation
     schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
+
 
     // --- Transformations
     schedule(ConstantFolding)       // Constant folding
     schedule(MetaPipeRegInsertion)  // Inserts registers between metapipe stages for counter signals
     schedule(Unrolling)             // Pipeline unrolling
     schedule(DotIRPrinter)          // Graph after unrolling
+    schedule(IRPrinterPlus)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, maxj))

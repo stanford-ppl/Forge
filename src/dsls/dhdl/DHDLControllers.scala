@@ -321,6 +321,10 @@ trait DHDLControllers {
       }
 
       // Unit Pipe
+      /**
+       * Create a "unit" pipeline. Used as a wrapper node around simple logic in the body.
+       * @param body
+       **/
       static (ctrl) ("apply", Nil, MThunk(MUnit) :: MUnit) implements composite ${
         val pipe = unit_pipe($0)
         styleOf(pipe) = \$style
@@ -328,6 +332,10 @@ trait DHDLControllers {
     }
 
     // --- Parallel
+    /**
+     * Create a parallel fork-join controller. Synchronizes all state machines in the body.
+     * @param body
+     **/
     static (Parallel) ("apply", Nil, MThunk(MUnit) :: MUnit) implements composite ${
       val pipe = pipe_parallel($0)
       styleOf(pipe) = ForkJoin

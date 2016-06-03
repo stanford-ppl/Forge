@@ -124,9 +124,8 @@ trait DHDLDSL extends ForgeApplication
      **/
     val Tile = tpe("Tile", T)
     /**
-     * BRAMs are on-chip scratchpads with fixed size. BRAMs can be specified as multi-dimensional, but the underlying addressing
-     * in hardware is always flat. The contents of BRAMs are currently persistent across loop iterations, even when they are declared in an inner scope.
-     * BRAMs can have an arbitrary number of readers but only one writer. This writer may be an element-based store or a load from an OffChipMem.
+     * A Sparse Tile describes a sparse section of an OffChipMem which can be loaded onto the accelerator using a gather operation, or which can
+     * be updated using a scatter operation.
      **/
     val SparseTile = tpe("SparseTile", T)
     /**

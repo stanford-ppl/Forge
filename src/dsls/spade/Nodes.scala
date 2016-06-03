@@ -3,123 +3,74 @@ package dsls
 package spade
 trait NodeOps {
   this: SpadeDSL =>
+
+//  object HwNodeClass extends TypeClassSignature {
+//    def name = "HwNode"
+//    def prefix = "_hw"
+//    def wrapper = None
+//  }
+
   def importNodes() = {
+    createHWTypeClass()
+    importALU()
+  }
 
-    // Create a group for all nodes
-    val NodeOps = grp("Node")
+  def createHWTypeClass() = {
+  }
 
-    // Define a 'ALU' type
+  def importALU() {
+    // Import MyLink {
+    val linkTpe = tpe("MyLink")
+    val T1 = tpePar("T1")
+    val T2 = tpePar("T2")
+
+    val link_new = internal (linkTpe) ("link_new", List(T1, T2), (T1, T2) :: linkTpe, effect = simple)
+
+    val link_create = internal (linkTpe) ("link_create", List(T1, T2), (T1, T2) :: linkTpe, effect = simple) implements composite ${
+      val link = link_new($0, $1)
+      link
+    }
+
+    // --- Scala Backend
+    impl (link_new) (codegen($cala, ${ new MyLink { } }))
+
+    // --- Dot Backend
+    impl (link_new) (codegen(dot, ${
+      $0 -> $1
+		}))
+    // Import MyLink }
+
+    // Create a "HwNode" type class {
+
+//    val HwNode = tpeClass("HwNode", HwNodeClass, (T1, T2))
+//    infix (HwNode) ("->", (T1, T2), (T1, T2) :: linkTpe)
+    // Create a "HwNode" type class }
+
+
+    // Import ALU {
     val aluTpe = tpe("ALU")
-//    data(aluTpe, ("_bits", MInt))
+    val T = tpePar("T")
 
-    // Define a 'ALU' type
-    val switchTpe = tpe("Switch")
+    // --- Nodes
+    val alu_new   = internal (aluTpe) ("alu_new", List(), Nil :: aluTpe, effect = simple)
 
-    // Define all combinations of the 'LinkNode' type
-    val linkTpe_alu2alu = tpe("Link_alu2alu")
-    data(linkTpe_alu2alu, ("_src", aluTpe), ("_dst", aluTpe))
+    // --- Internals
+    internal (aluTpe) ("alu_create", List(), Nil :: aluTpe, effect = simple) implements composite ${
+      val alu = alu_new
+      alu
+    }
 
-    val linkTpe_alu2switch = tpe("Link_alu2switch")
-    data(linkTpe_alu2switch, ("_src", aluTpe), ("_dst", switchTpe))
+    // --- API
+    static (aluTpe) ("apply", List(), Nil :: aluTpe) implements composite ${ alu_create }
+    infix (aluTpe) ("->", T, (aluTpe, T) :: linkTpe) implements composite ${ link_create($0, $1)}
 
-    val linkTpe_switch2alu = tpe("Link_switch2alu")
-    data(linkTpe_switch2alu, ("_src", switchTpe), ("_dst", aluTpe))
+    // --- Scala Backend
+    impl (alu_new) (codegen($cala, ${ new ALU { } }))
 
-    val linkTpe_switch2switch = tpe("Link_switch2switch")
-    data(linkTpe_switch2switch, ("_src", switchTpe), ("_dst", switchTpe))
-
-
-    // Instantiating ALU
-    val aluApply = static (aluTpe) (
-      name = "apply",
-      List(),
-      MInt :: aluTpe,
-      effect = simple)
-
-    impl (aluApply) {  codegen ($cala, ${
-      @ Console.println("new ALU")
-    })}
-
-    impl (aluApply) {  codegen (dot, ${
-      $sym [shape="square" style="filled" fillcolor="blue" color="white"]
-    })}
-
-
-    // Instantiating Switch
-    val switchApply = static (switchTpe) (
-      name = "apply",
-      List(),
-      MUnit :: switchTpe,
-      effect = simple)
-
-    impl (switchApply) {  codegen ($cala, ${
-      @ Console.println("new Switch ")
-    })}
-
-    impl (switchApply) {  codegen (dot, ${
-      $sym [shape="circle" style="filled" fillcolor="yellow" color="white"]
-    })}
-
-    val linkApply_alu2alu = static (linkTpe_alu2alu) (
-      name = "apply",
-      List(),
-      List(aluTpe, aluTpe) :: linkTpe_alu2alu,
-      effect = simple)
-    impl (linkApply_alu2alu) { codegen ($cala, ${
-      @ Console.println("new Link")
-    })}
-    impl (linkApply_alu2alu) {  codegen (dot, ${
-      $0 -> $1
-    })}
-
-    val linkApply_alu2switch = static (linkTpe_alu2switch) (
-      name = "apply",
-      List(),
-      List(aluTpe, switchTpe) :: linkTpe_alu2switch,
-      effect = simple)
-    impl (linkApply_alu2switch) { codegen ($cala, ${
-      @ Console.println("new Link")
-    })}
-    impl (linkApply_alu2switch) {  codegen (dot, ${
-      $0 -> $1
-    })}
-
-    val linkApply_switch2alu = static (linkTpe_switch2alu) (
-      name = "apply",
-      List(),
-      List(switchTpe, aluTpe) :: linkTpe_switch2alu,
-      effect = simple)
-    impl (linkApply_switch2alu) { codegen ($cala, ${
-      @ Console.println("new Link")
-    })}
-    impl (linkApply_switch2alu) {  codegen (dot, ${
-      $0 -> $1
-    })}
-
-    val linkApply_switch2switch = static (linkTpe_switch2switch) (
-      name = "apply",
-      List(),
-      List(switchTpe, switchTpe) :: linkTpe_switch2switch,
-      effect = simple)
-    impl (linkApply_switch2switch) { codegen ($cala, ${
-      @ Console.println("new Link")
-    })}
-    impl (linkApply_switch2switch) {  codegen (dot, ${
-      $0 -> $1
-    })}
-
-
-//    val aluOps = withTpe(aluTpe)
-//    aluOps {
-////      infix("->") (aluTpe :: linkTpe, effect = simple) implements codegen ($cala, ${new LinkNode($self, $1) { }} )
-//      val infixLinkNodeOp = infix("->") (aluTpe :: linkTpe, effect = simple)
-//      impl (infixLinkNodeOp) { codegen ($cala, ${
-//        new LinkNode($self, $1) { }
-//      })}
-//
-//      impl (infixLinkNodeOp) { codegen (dot, ${
-//        $self -> $1
-//      })}
-//    }
+    // --- Dot Backend
+    impl (alu_new) (codegen(dot, ${
+      $sym [label= "\$sym" shape="square" style="filled" fillcolor=$regFillColor ]
+		}))
+    // Import ALU }
   }
 }

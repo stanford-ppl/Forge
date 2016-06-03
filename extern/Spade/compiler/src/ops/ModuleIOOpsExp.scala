@@ -41,6 +41,9 @@ trait ScalaGenModuleIOOps extends ScalaGenBase {
   override def remap[T](mT: Manifest[T]): String = {
     mT.erasure.getSimpleName match {
       case "FeedbackWire" => remap(mT.typeArguments(0))
+      case "ALU" => "Array[String]"
+      case "Switch" => "Array[String]"
+      case "MyLink" => "Array[String]"
       case _ => super.remap(mT)
     }
   }

@@ -30,7 +30,6 @@ trait DHDLMemories {
     infix (Mem) ("st", (T,C), (C, Indices, T) :: MUnit, effect = write(0))
   }
 
-
   // TODO: Should we allow ArgIn / ArgOut with no given name? Way of automatically numbering them instead?
   // TODO: Better / more correct way of exposing register reset?
   // TODO: Add explicit reset in the IR in scope in which a register is created? Immediately after reg_create?

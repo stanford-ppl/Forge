@@ -145,6 +145,7 @@ trait MemoryTemplateOpsExp extends MemoryTemplateTypesExp with ExternPrimitiveOp
 
   // --- Aliasing
   override def aliasSyms(e: Any): List[Sym[Any]] = e match {
+    case e: Bram_load_vector[_] => Nil // Don't alias with BRAM
     case e: Bram_store_vector[_] => Nil
     case e: GatherScatterTransfer[_] => Nil
     case _ => super.aliasSyms(e)

@@ -13,7 +13,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait ScratchpadAnalysisExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
+trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
   this: DHDLExp =>
 
   sealed abstract class Banking(val banks: Int)
@@ -45,11 +45,11 @@ trait ScratchpadAnalysisExp extends DHDLAffineAnalysisExp with PipeStageToolsExp
 
 
 // Technically doesn't need a real traversal, but nice to have debugging, etc.
-trait ScratchpadAnalyzer extends HungryTraversal {
-  val IR: DHDLExp with ScratchpadAnalysisExp
+trait MemoryAnalyzer extends HungryTraversal {
+  val IR: DHDLExp with MemoryAnalysisExp
   import IR._
 
-  debugMode = false
+  debugMode = true
   override val name = "Scratchpad Analyzer"
 
   /**

@@ -239,6 +239,7 @@ trait DHDLMath {
     infix (FixPt) ("|", (S,I,F), (FixPt(S,I,F), FixPt(S,I,F)) :: FixPt(S,I,F)) implements redirect ${ or($0, $1) }
 
     infix (FixPt) ("<<", (S,I,F), (FixPt(S,I,F), FixPt(S,I,Z)) :: FixPt(S,I,F)) implements redirect ${ lsh($0, $1) }
+    /** Arithmetic shift right **/
     infix (FixPt) (">>", (S,I,F), (FixPt(S,I,F), FixPt(S,I,Z)) :: FixPt(S,I,F)) implements redirect ${ rsh($0, $1) }
 
 

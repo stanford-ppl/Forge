@@ -65,12 +65,43 @@ trait DirectedGraphTest extends ForgeTestModule with OptiGraphApplication {
   }
 }
 
+object NodeDataI extends OptiGraphApplicationInterpreter with ForgeTestRunnerInterpreter with NodeDataTest
+object NodeDataC extends OptiGraphApplicationCompiler with ForgeTestRunnerCompiler with NodeDataTest
+trait NodeDataTest extends ForgeTestModule with OptiGraphApplication {
+  def main() = {
+    val size = 10
+    val g = undirectedGraphFromEdgeList(createMeshEdgeList(size))
+
+    val mapping = NodeData.fromFunction(size, i => "q"+i)
+    val nodeData = NodeDataDB.fromFunction(size, "test.db"){ i =>
+      pack("q"+i, NodeData.fromFunction(i, i => 0.0))
+    }
+
+    for (n <- g.nodes) {
+      collect(nodeData(mapping(n)).length == n)
+      var count = 0
+      for (neighbor <- g.neighbors(Node(n))) {
+        collect(nodeData.contains(mapping(neighbor)))
+        collect(nodeData(mapping(neighbor)).length == neighbor)
+        count += 1
+      }
+      collect(count == size-1)
+    }
+
+    nodeData.close()
+    mkReport
+  }
+}
+
 class GraphSuiteInterpreter extends ForgeSuiteInterpreter {
   def testUndirectedGraph() { runTest(UndirectedGraphI) }
   def testDirectedGraph() { runTest(DirectedGraphI) }
+  def testNodeData(){ runTest(NodeDataI) }
 }
 
 class GraphSuiteCompiler extends ForgeSuiteCompiler {
+  override def enforceFullCoverage = false
   def testUndirectedGraph() { runTest(UndirectedGraphC) }
   def testDirectedGraph() { runTest(DirectedGraphC) }
+  def testNodeData(){ runTest(NodeDataC) }
 }

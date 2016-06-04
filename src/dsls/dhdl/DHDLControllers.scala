@@ -174,45 +174,148 @@ trait DHDLControllers {
       // Scalar reduction
       // Originally wanted to have scalar and collection reduction have the same syntax, but the difference
       // between Idx => T and Idx => C[T] is ambiguous
+
+      /** Multi-dimensional scalar fused map-reduce.
+       * Creates a state machine which iterates over the given multi-dimensional domain, reducing the scalar
+       * result of each iteration of the map using the supplied associative
+       * reduction function. If the map function contains other state machines, this is executed
+       * as an outer loop with each inner state machine run as a stage in a $exec fashion.
+       * Note that this is the general form for N-dimensional domains. Use the specialized 1, 2, or 3D forms when possible.
+       * @param cchain: counterchain determining index domain
+       * @param accum: scalar accumulator for holding intermediate reduction values
+       * @param map: scalar map function
+       * @param reduce: associative reduction function
+       * @return the accumulator used in this reduction (identical to *accum*)
+       **/
       static (ctrl) ("reduce", (T,C), CurriedMethodSignature(List(List(CounterChain), List(C(T)), List(Indices ==> T), List((T,T) ==> T)), C(T)), TMem(T,C(T))) implements composite ${
         val pipe = pipe_fold[T,C]($0, $1, $2, $3)
         styleOf(pipe) = \$style
         $1
       }
+      /** 1-dimensional scalar fused map-reduce.
+       * Creates a state machine which iterates over the supplied 1D domain, reducing the scalar result of
+       * each iteration of the map using the supplied associative reduction function. If the map function
+       * contains other state machines, this is executed as an outer loop with each inner state machine
+       * run as a stage in a $exec fashion.
+       * @param c0: counter specifying the 1D index domain
+       * @param accum: scalar accumulator for holding intermediate reduction values
+       * @param map: scalar map function
+       * @param reduce: associative reduction function
+       * @return the accumulator used in this reduction (identical to *accum*)
+       **/
       static (ctrl) ("reduce", (T,C), CurriedMethodSignature(List(List(Counter), List(C(T)), List(Idx ==> T), List((T,T) ==> T)), C(T)), TMem(T,C(T))) implements composite ${
         \$obj.reduce(CounterChain($0))($1){inds => $2(inds(0))}($3)
       }
+      /** 2-dimensional scalar fused map-reduce.
+       * Creates a state machine which iterates over the supplied 2D domain, reducing the scalar result of
+       * each iteration of the map using the supplied associative reduction function. If the map function
+       * contains other state machines, this is executed as an outer loop with each inner state machine
+       * run as a stage in a $exec fashion.
+       * @param c0: counter for the first dimension
+       * @param c1: counter for the second dimension
+       * @param accum: scalar accumulator for holding intermediate reduction values
+       * @param map: scalar map function
+       * @param reduce: associative reduction function
+       * @return the accumulator used in this reduction (identical to *accum*)
+       **/
       static (ctrl) ("reduce", (T,C), CurriedMethodSignature(List(List(Counter,Counter), List(C(T)), List((Idx,Idx) ==> T), List((T,T) ==> T)), C(T)), TMem(T,C(T))) implements composite ${
         \$obj.reduce(CounterChain($0,$1))($2){inds => $3(inds(0),inds(1))}($4)
       }
+      /** 3-dimensional scalar fused map-reduce.
+       * Creates a state machine which iterates over the supplied 3D domain, reducing the scalar result of
+       * each iteration of the map using the supplied associative reduction function. If the map function
+       * contains other state machines, this is executed as an outer loop with each inner state machine
+       * run as a stage in a $exec fashion.
+       * @param c0: counter for the first dimension
+       * @param c1: counter for the second dimension
+       * @param c2: counter for the third dimension
+       * @param accum: scalar accumulator for holding intermediate reduction values
+       * @param map: scalar map function
+       * @param reduce: associative reduction function
+       * @return the accumulator used in this reduction (identical to *accum*)
+       **/
       static (ctrl) ("reduce", (T,C), CurriedMethodSignature(List(List(Counter,Counter,Counter), List(C(T)), List((Idx,Idx,Idx) ==> T), List((T,T) ==> T)), C(T)), TMem(T,C(T))) implements composite ${
         \$obj.reduce(CounterChain($0,$1,$2))($3){inds => $4(inds(0),inds(1),inds(2))}($5)
       }
 
       // Accumulator reduction
+      /** Multi-dimensional fused map-reduce of memories.
+       * Creates a state machine which iterates over the supplied multi-dimensional domain, reducing the collection resulting from
+       * each iteration of the map using the supplied associative scalar reduction function. This state machine is always
+       * run as an outer loop of state machines. If the memory result of the map function has multiple elements (e.g. BRAMs), the reduction is
+       * run as an inner loop where the supplied associative reduction is used on each iteration.
+       * Supported memory types are: Regs and BRAMs.
+       * @param cchain: counterchain specifying the index domain
+       * @param accum: scalar accumulator for holding intermediate reduction values
+       * @param map: map function
+       * @param reduce: associative reduction function
+       * @return the accumulator used in this reduction (identical to *accum*)
+       **/
       static (ctrl) ("fold", (T,C), CurriedMethodSignature(List(List(CounterChain, MInt),List(C(T)),List(Indices ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T))) implements composite ${
         val ccInner = $2.iterator(List($1))
         val pipe = accum_fold[T,C]($0, ccInner, $2, $3, $4)
         styleOf(pipe) = \$style
         $2
       }
+      /** 1-dimensional fused map-reduce of memories.
+       * Creates a state machine which iterates over the supplied 1D domain, reducing the collection resulting from
+       * each iteration of the map using the supplied associative scalar reduction function. This state machine is always
+       * run as an outer loop of state machines. If the memory result of the map function has multiple elements (e.g. BRAMs), the reduction is
+       * run as an inner loop where the supplied associative reduction is used on each iteration.
+       * Supported memory types are: Regs and BRAMs.
+       * @param c0: counter specifying the 1D index domain
+       * @param accum: scalar accumulator for holding intermediate reduction values
+       * @param map: map function
+       * @param reduce: associative reduction function
+       * @return the accumulator used in this reduction (identical to *accum*)
+       **/
       static (ctrl) ("fold", (T,C), CurriedMethodSignature(List(List(Counter),List(C(T)),List(Idx ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T))) implements composite ${
         \$obj.fold(CounterChain($0),param(1))($1){inds => $2(inds(0))}($3)
       }
+      /** 2-dimensional fused map-reduce of memories.
+       * Creates a state machine which iterates over the supplied 2D domain, reducing the collection resulting from
+       * each iteration of the map using the supplied associative scalar reduction function. This state machine is always
+       * run as an outer loop of state machines. If the memory result of the map function has multiple elements (e.g. BRAMs), the reduction is
+       * run as an inner loop where the supplied associative reduction is used on each iteration.
+       * Supported memory types are: Regs and BRAMs.
+       * @param c0: counter for the first dimension
+       * @param c1: counter for the second dimension
+       * @param accum: scalar accumulator for holding intermediate reduction values
+       * @param map: map function
+       * @param reduce: associative reduction function
+       * @return the accumulator used in this reduction (identical to *accum*)
+       **/
       static (ctrl) ("fold", (T,C), CurriedMethodSignature(List(List(Counter,Counter),List(C(T)),List((Idx,Idx) ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T))) implements composite ${
         \$obj.fold(CounterChain($0,$1),param(1))($2){inds => $3(inds(0),inds(1))}($4)
       }
+      /** 3-dimensional fused map-reduce of memories.
+       * Creates a state machine which iterates over the supplied 3D domain, reducing the collection resulting from
+       * each iteration of the map using the supplied associative scalar reduction function. This state machine is always
+       * run as an outer loop of state machines. If the memory result of the map function has multiple elements (e.g. BRAMs), the reduction is
+       * run as an inner loop where the supplied associative reduction is used on each iteration.
+       * Supported memory types are: Regs and BRAMs.
+       * @param c0: counter for the first dimension
+       * @param c1: counter for the second dimension
+       * @param c2: counter for the third dimension
+       * @param accum: scalar accumulator for holding intermediate reduction values
+       * @param map: map function
+       * @param reduce: associative reduction function
+       * @return the accumulator used in this reduction (identical to *accum*)
+       **/
       static (ctrl) ("fold", (T,C), CurriedMethodSignature(List(List(Counter,Counter,Counter),List(C(T)),List((Idx,Idx,Idx) ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T))) implements composite ${
         \$obj.fold(CounterChain($0,$1,$2),param(1))($3){inds => $4(inds(0),inds(1),inds(2))}($5)
       }
 
       // Fold with explicit inner parallelization factor (unused for Regs)
+      /** @nodoc -- syntax TBD **/
       static (ctrl) ("fold", (T,C), CurriedMethodSignature(List(List(Counter,MInt),List(C(T)),List(Idx ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T))) implements composite ${
         \$obj.fold(CounterChain($0),$1)($2){inds => $3(inds(0))}($4)
       }
+      /** @nodoc -- syntax TBD **/
       static (ctrl) ("fold", (T,C), CurriedMethodSignature(List(List(Counter,Counter,MInt),List(C(T)),List((Idx,Idx) ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T))) implements composite ${
         \$obj.fold(CounterChain($0,$1),$2)($3){inds => $4(inds(0),inds(1))}($5)
       }
+      /** @nodoc -- syntax TBD **/
       static (ctrl) ("fold", (T,C), CurriedMethodSignature(List(List(Counter,Counter,Counter,MInt),List(C(T)),List((Idx,Idx,Idx) ==> C(T)), List((T,T) ==> T)), C(T)), TMem(T,C(T))) implements composite ${
         \$obj.fold(CounterChain($0,$1,$2),$3)($4){inds => $5(inds(0),inds(1),inds(2))}($6)
       }

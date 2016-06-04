@@ -44,6 +44,10 @@ trait DHDLSugar {
     internal.infix (Range) ("len", Nil, Range :: Idx) implements getter(0, "_len")
 
     internal (Range) ("range_new", Nil, (Idx, Idx, Idx) :: Range) implements allocates(Range, ${$0}, ${$1}, ${$2})
+    /** Creates a range with specified start (inclusive) and end (noninclusive)
+     * @param end
+     * @param start
+     **/
     infix (Range) ("::", Nil, (Idx, Idx) :: Range) implements composite ${
       val range = range_new($1, $0, $0 - $1)
       isUnit(range) = false
@@ -88,12 +92,25 @@ trait DHDLSugar {
     }
 
     // --- API
+    /** Creates a LoopRange with specified start (inclusive) and end (noninclusive) and step 1
+     * @param start
+     * @param end
+     **/
     infix (LoopRange) ("until", Nil, (Idx,Idx) :: LoopRange) implements composite ${ LoopRange($0, $1, fixPt[Int,Signed,B32,B0](1)) }
+    /** Changes given LoopRange's step to specified value
+     * @param step
+     **/
     infix (LoopRange) ("by", Nil, (LoopRange, Idx) :: LoopRange) implements composite ${ LoopRange($0.start, $0.end, $1) }
+    /** Creates a LoopRange with start of 0 (inclusive), specified end (noninclusive) and step
+     * @param end
+     * @param step
+     **/
     infix (LoopRange) ("by", Nil, (Idx, Idx) :: LoopRange) implements composite ${ LoopRange(fixPt[Int,Signed,B32,B0](0), $0, $1) }
+    /** @nodoc - syntax TBD **/
     infix (LoopRange) ("par", Nil, (Idx, MInt) :: Counter) implements composite ${
       counter_create(None, fixPt[Int,Signed,B32,B0](0), $0, fixPt[Int,Signed,B32,B0](1), $1)
     }
+    /** @nodoc - syntax TBD **/
     infix (LoopRange) ("par", Nil, (LoopRange, MInt) :: Counter) implements composite ${
       counter_create(None, $0.start, $0.end, $0.step, $1)
     }

@@ -6,6 +6,7 @@ import scala.collection.JavaConverters._
 
 import org.iq80.leveldb._
 import org.fusesource.leveldbjni.JniDBFactory._
+import java.nio.ByteBuffer
 import ppl.delite.runtime.Config
 
 /*
@@ -22,7 +23,7 @@ object MLGlobal {
   private object lock
   private var identifierDB: DB = null // intentionally null until loaded
   private var reverseIdentifierDB: DB = null // intentionally null until loaded
-  private val nextId = new AtomicInteger(0)
+  private var nextId: AtomicInteger = null // intentionally null until loaded
 
   def intToBytes(i: Int) = java.nio.ByteBuffer.allocate(4).putInt(i).array
   def bytesToInt(a: Array[Byte]) = java.nio.ByteBuffer.wrap(a).getInt()
@@ -37,12 +38,12 @@ object MLGlobal {
     }
     else {
       lock.synchronized {
-        val id = nextId.getAndIncrement()
         val e = identifierDB.get(s.getBytes)
         if (e != null) {
           bytesToInt(e)
         }
         else {
+          val id = nextId.getAndIncrement()
           val (k, v) = (s.getBytes, intToBytes(id))
           identifierDB.put(k, v)
           reverseIdentifierDB.put(v, k)
@@ -89,12 +90,38 @@ object MLGlobal {
 
   private def reverseIdentifierPath(path: String) = { path + "_reverse" }
 
+  /**
+   * We use a custom comparator for the reverseIdentifierDB map, which stores integer
+   * ids as keys. The default comparator stores keys in lexicographic order, whereas we
+   * want the natural (integer) ordering. This allows us to quickly retrieve the last id
+   * stored in the DB, which is necessary to initialize our state.
+   */
+  private val intComparator = new DBComparator() {
+    def compare(key1: Array[Byte], key2: Array[Byte]): Int ={
+      bytesToInt(key1).compareTo(bytesToInt(key2))
+    }
+
+    def name(): String = "IntComparator"
+    def findShortestSeparator(start: Array[Byte], limit: Array[Byte]) = start
+    def findShortSuccessor(key: Array[Byte]) = key
+  }
+
   def loadUniqueMappings(path: String) = {
-    val options = new Options()
-    options.createIfMissing(true)
-    // options.cacheSize(100000000L)
-    identifierDB = factory.open(new java.io.File(path), options)
-    reverseIdentifierDB = factory.open(new java.io.File(reverseIdentifierPath(path)), options)
+    val idOptions = new Options()
+    idOptions.createIfMissing(true)
+    // idOptions.cacheSize(100000000L)
+    identifierDB = factory.open(new java.io.File(path), idOptions)
+
+    val reverseIdOptions = new Options()
+    reverseIdOptions.createIfMissing(true)
+    reverseIdOptions.comparator(intComparator)
+    reverseIdentifierDB = factory.open(new java.io.File(reverseIdentifierPath(path)), reverseIdOptions)
+
+    val i = reverseIdentifierDB.iterator()
+    i.seekToLast()
+    val lastId = if (i.hasNext) bytesToInt(i.next.getKey) else -1
+    nextId = new AtomicInteger(lastId + 1)
+    i.close()
   }
 
   def dumpUniqueMappings(path: String) = {

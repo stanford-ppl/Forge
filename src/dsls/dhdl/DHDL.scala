@@ -38,7 +38,7 @@ trait DHDLDSL extends ForgeApplication
   }
 
   /***
-   * DHDL is an intermediate language for describing hardware datapaths. A DHDL program describes a dataflow graph consisting of various kinds of nodes
+   * DHDL is a domain-specific language for describing hardware datapaths. A DHDL program describes a dataflow graph consisting of various kinds of nodes
    * connected to each other by data dependencies. Each node in a DHDL program corresponds to a architectural template. DHDL is represented
    * in-memory as a parameterized, hierarchical dataflow graph.
    *
@@ -114,8 +114,8 @@ trait DHDLDSL extends ForgeApplication
     // --- Memory Types
     /**
      * OffChipMems are pointers to locations in the accelerators main memory to dense multi-dimensional arrays. They are the primary form of communication
-     * of data between the host and the accelerator. Data may be loaded to and from the accelerator in contiguous chunks (Tiles). Other access patterns
-     * will be supported soon!
+     * of data between the host and the accelerator. Data may be loaded to and from the accelerator in contiguous chunks (Tiles), by random access addresses,
+     * or by gather operations (SparseTiles).
      **/
     val OffChip = tpe("OffChipMem", T)
     /**
@@ -217,7 +217,7 @@ trait DHDLDSL extends ForgeApplication
 
     val BoundAnalyzer = analyzer("Bound", isIterative=false)
     val DSE = traversal("DSE", isExtern=true)
-    val Scratchpad = analyzer("Scratchpad", isExtern=true)
+    val MemoryAnalyzer = analyzer("Memory", isExtern=true)
     val AreaAnalyzer = analyzer("Area", isExtern=true)
     val LatencyAnalyzer = analyzer("Latency", isExtern=true)
     val OpsAnalyzer = analyzer("Ops", isExtern=true)
@@ -232,30 +232,42 @@ trait DHDLDSL extends ForgeApplication
     importGlobalAnalysis()
     importBoundAnalysis()
 
-    // --- Estimation and tuning
-    schedule(StageAnalyzer)
-    schedule(GlobalAnalyzer)
-    schedule(ControlSignalAnalyzer)
+    // --- Pre-DSE analysis
+    schedule(StageAnalyzer)         // Number of stages in each control node
+    schedule(GlobalAnalyzer)        // Values computed outside of all controllers
+    schedule(ControlSignalAnalyzer) // Variety of control signal related metadata
 
-    schedule(ParallelizationSetter)
-    schedule(DHDLAffineAnalysis)
+    schedule(ParallelizationSetter) // Parallelization factors
+    schedule(DHDLAffineAnalysis)    // Access patterns
 
-    schedule(DotIRPrinter)  // Prior to unrolling
+    schedule(DotIRPrinter)          // Graph prior to unrolling
 
-    schedule(DSE)
+    // --- Design Space Exploration
+    schedule(DSE)                   // Design space exploration. Runs a host of other analyses:
+                                    // Pre-DSE:
+                                    //   Bound analyzer (for finding constants)
+                                    //   Parameter analyzer (for calculating design space)
+                                    //   Control signal analyzer (needed for others)
+                                    // During DSE:
+                                    //   Bound analyzer (to propagate new constant values)
+                                    //   Memory analyzer (for banking/buffering of memories)
+                                    //   Contention analyzer (to estimate contention in main memory)
+                                    //   Area analyzer (to estimate area)
+                                    //   Latency analyzer (to estimate runtime)
+                                    // Post-DSE:
+                                    //   Bound analyzer (to finalize parameter values)
+                                    //   Memory analyzer (to finalize banking/buffering)
+                                    //   Contention analyzer (to finalize contention estimates)
 
     // --- Post-DSE Estimation
-    schedule(AreaAnalyzer)
-    schedule(OpsAnalyzer)
+    schedule(AreaAnalyzer)          // Area estimation
+    schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
 
     // --- Transformations
-    schedule(BoundAnalyzer)
-    schedule(ConstantFolding)
-
-    schedule(MetaPipeRegInsertion)
-
-    schedule(Unrolling)
-    schedule(DotIRPrinter) // After unrolling
+    schedule(ConstantFolding)       // Constant folding
+    schedule(MetaPipeRegInsertion)  // Inserts registers between metapipe stages for counter signals
+    schedule(Unrolling)             // Pipeline unrolling
+    schedule(DotIRPrinter)          // Graph after unrolling
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, maxj))

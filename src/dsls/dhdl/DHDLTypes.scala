@@ -3,10 +3,11 @@ package dsls
 package dhdl
 import scala.reflect.SourceContext
 
+@dsl
 trait DHDLTypes {
   this: DHDLDSL =>
 
-	def importDHDLTypes () = {
+	def importDHDLTypes() {
     val S2 = tpePar("S2")
     val I2 = tpePar("I2")
     val F2 = tpePar("F2")
@@ -67,6 +68,7 @@ trait DHDLTypes {
     val bit_to_bool    = direct (Tpes) ("bit_to_bool", Nil, Bit :: MBoolean)
 
     // --- Internals
+    /**@nodoc **/
     direct (Tpes) ("lift_to", (T,R), T :: R, TNumeric(T)) implements composite ${
       manifest[R] match {
         case mR if isFixPtType(mR) =>
@@ -80,6 +82,7 @@ trait DHDLTypes {
       }
     }
 
+    /** @nodoc **/
     direct (Tpes) ("cast_fixpt_to", (S,I,F,R), FixPt(S,I,F) :: R) implements composite ${
       manifest[R] match {
         case mR if isFixPtType(mR) =>
@@ -93,7 +96,7 @@ trait DHDLTypes {
       }
     }
 
-
+    /** @nodoc **/
     direct (Tpes) ("cast_fltpt_to", (G,E,R), FltPt(G,E) :: R) implements composite ${
       manifest[R] match {
         case mR if isFltPtType(mR) =>
@@ -107,6 +110,7 @@ trait DHDLTypes {
       }
     }
 
+    /** @nodoc **/
     direct (Tpes) ("cast_string_to", R, MString :: R) implements composite ${
       manifest[R] match {
         case mR if isFltPtType(mR) =>
@@ -120,23 +124,32 @@ trait DHDLTypes {
 
     // --- API
     // TODO: Add precision checking (can this number fit in that representation?)
+    /** @nodoc **/
     direct (Tpes) ("bit", Nil, SBoolean :: Bit) implements composite ${ constBit($0) }
 
     // Primarily for internal use, but users can use this as well (but is less friendly syntax, e.g. fixPt[Int,...](value) )
+    /** @nodoc **/
     direct (Tpes) ("fixPt", (T,S,I,F), T :: FixPt(S,I,F), TNumeric(T)) implements composite ${
       constFixPt[T,S,I,F]($0, manifest[S], manifest[I], manifest[F])
     }
+    /** @nodoc **/
     direct (Tpes) ("fltPt", (T,G,E), T :: FltPt(G,E), TNumeric(T)) implements composite ${
       constFltPt[T,G,E]($0, manifest[G], manifest[E])
     }
 
     // TODO: Can probably change this to be an infix defined for all T:Numeric
     // Using "as" rather than "to" since "to" is already defined for int
+    /** Stages this constant boolean as a Bit **/
     infix (Tpes) ("asBit", Nil, SBoolean :: Bit) implements composite ${ constBit($0) }
+    /** Stages this constant Int as the specified type **/
     infix (Tpes) ("as", R, SInt :: R) implements redirect ${ lift_to[Int,R]($0) }
+    /** Stages this constant Long as the specified type **/
     infix (Tpes) ("as", R, SLong :: R) implements redirect ${ lift_to[Long,R]($0) }
+    /** Stages this constant Float as the specified type **/
     infix (Tpes) ("as", R, SFloat :: R) implements redirect ${ lift_to[Float,R]($0) }
+    /** Stages this constant Double as the specified type **/
     infix (Tpes) ("as", R, SDouble :: R) implements redirect ${ lift_to[Double,R]($0) }
+    /** Converts this String to the specified type **/
     infix (Tpes) ("to", R, MString :: R) implements redirect ${ cast_string_to[R]($0) }
 
     infix (Tpes) ("toString", Nil, Bit :: MString) implements redirect ${ bit_to_string($0) }
@@ -144,10 +157,12 @@ trait DHDLTypes {
 
     infix (Tpes) ("toString", (S,I,F), FixPt(S,I,F) :: MString) implements redirect ${ fixpt_to_string($0) }
     infix (Tpes) ("mkString", (S,I,F), FixPt(S,I,F) :: MString) implements redirect ${ fixpt_to_string($0) }
+    /** Creates a conversion of this value to the given type**/
     infix (Tpes) ("to", (S,I,F,R),  FixPt(S,I,F) :: R) implements redirect ${ cast_fixpt_to[S,I,F,R]($0) }
 
     infix (Tpes) ("toString", (G,E), FltPt(G,E) :: MString) implements redirect ${ fltpt_to_string($0) }
     infix (Tpes) ("mkString", (G,E), FltPt(G,E) :: MString) implements redirect ${ fltpt_to_string($0) }
+    /** Creates a conversion of this value to the given type **/
     infix (Tpes) ("to", (G,E,R), FltPt(G,E) :: R) implements redirect ${ cast_fltpt_to[G,E,R]($0) }
 
 
@@ -155,11 +170,16 @@ trait DHDLTypes {
     val Flt    = lookupAlias("Flt")
 
     // Needed for if-then-else and while (default requires Rep[Boolean] and overloading is tough in these cases)
+    /** @nodoc **/
     fimplicit (Tpes) ("bit_to_boolean", Nil, Bit :: MBoolean) implements composite ${ bit_to_bool($0) }
 
+    /** @nodoc **/
     fimplicit (Tpes) ("scala_boolean_to_bit", Nil, SBoolean :: Bit) implements redirect ${ bit($0) }
+    /** @nodoc **/
     fimplicit (Tpes) ("scala_int_to_fixpt", Nil, SInt :: SInt32) implements redirect ${ fixPt[Int,Signed,B32,B0]($0) }
+    /** @nodoc **/
     fimplicit (Tpes) ("stage_int_to_fixpt", Nil, MInt :: SInt32) implements redirect ${ int_to_fix[Signed,B32]($0) }  // Needed for params
+    /** @nodoc **/
     fimplicit (Tpes) ("scala_float_to_fltpt", Nil, SFloat :: Flt) implements redirect ${ fltPt[Float,B24,B8]($0) }
 
 

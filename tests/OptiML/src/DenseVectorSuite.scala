@@ -292,6 +292,26 @@ trait Distinct extends ForgeTestModule with OptiMLApplication {
     collect(v2.contains(5.0))
     collect(v2.contains(0.0))
 
+    // NOTE: distinct on vector of vectors is not currently supported as hashcode is not defined properly.
+
+    val v3 = DenseVector(pack((unit(3),unit(2),unit(1))),
+                         pack((unit(1),unit(2),unit(3))),
+                         pack((unit(7),unit(7),unit(7))),
+                         pack((unit(3),unit(2),unit(1))),
+                         pack((unit(3),unit(2),unit(1))),
+                         pack((unit(1),unit(5),unit(2))),
+                         pack((unit(7),unit(7),unit(7))))
+    collect(v3.distinct.length == 4)
+
+    val v4 = DenseVector("321",
+                         "123",
+                         "3210",
+                         "321",
+                         "152",
+                         "3210",
+                         "777",
+                         "123")
+    collect(v4.distinct.length == 5)
     mkReport
   }
 }

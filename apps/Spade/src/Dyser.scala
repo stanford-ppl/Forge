@@ -7,6 +7,11 @@ object DyserCompiler extends SpadeApplicationCompiler with Dyser
 object DyserInterpreter extends SpadeApplicationInterpreter with Dyser
 
 trait Dyser extends SpadeApplication {
+
+  override def stageArgNames = List("rows", "cols")
+  lazy val rows = stageArgOrElse[Int](0, 4)  // <-- Breaks when staged arguments are passed with delitec. Why?
+  lazy val cols = stageArgOrElse[Int](1, 4)  // <-- Breaks when staged arguments are passed with delitec. Why?
+
   def dyser(rows: Int, cols: Int)  {
     val switches = ListBuffer[ListBuffer[Rep[Switch]]]()
     for (i <- 0 to rows) {
@@ -30,12 +35,8 @@ trait Dyser extends SpadeApplication {
   }
 
   def main() = {
-    if (stagingArgs.length < 2) {
-      println("Usage: DyserCompiler <rows> <cols>")
-      sys.exit(-1)
-    }
-    val rows = stagingArgs(0).toInt
-    val cols = stagingArgs(1).toInt
-    dyser(rows, cols)
+    val r = rows
+    val c = cols
+    dyser(r, c)
   }
 }

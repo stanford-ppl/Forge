@@ -4,7 +4,7 @@ from optparse import OptionParser
 from time import localtime, strftime
 from string import *
 import ConfigParser
-import os, sys, shutil
+import os, sys, shutil, glob
 import stat
 import math
 import fileinput
@@ -330,6 +330,12 @@ def publish(dsl, opts):
 
         cp_executable_script(DELITE_HOME + "/bin/delitep", build_dir + "/bin/delitep")
         cp_executable_script(DELITE_HOME + "/bin/server.py", build_dir + "/bin/server.py")
+
+        # DSL-specific execution scripts go here
+        dsl_scripts_dir = FORGE_HOME + "/static/" + dsl
+        if os.path.isdir(dsl_scripts_dir):
+            for f in glob.glob(r"%s/*" %(dsl_scripts_dir)):
+                shutil.copy2(f, build_dir+"/bin")  # copy2 == copy + copystat
 
     print "[forge]: Publishing complete."
 

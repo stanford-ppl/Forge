@@ -5,4 +5,4 @@ if [ $# -ne 1 ]; then
   exit -1
 fi
 
-bin/delitec --cpp --maxj  $1
+bin/delitec --cpp --maxj --dump_exception $1

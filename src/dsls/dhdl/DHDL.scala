@@ -260,7 +260,7 @@ trait DHDLDSL extends ForgeApplication
                                     //   Contention analyzer (to finalize contention estimates)
 
     // --- Post-DSE Estimation
-    schedule(AreaAnalyzer)          // Area estimation
+//    schedule(AreaAnalyzer)          // Area estimation
     schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
 
     // --- Transformations
@@ -272,7 +272,7 @@ trait DHDLDSL extends ForgeApplication
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, maxj))
     extern(grp("ExternCounter"), targets = List($cala), withTypes = true)
-    extern(grp("MemoryTemplate"), targets = List($cala, maxj), withTypes = true)
+    extern(grp("MemoryTemplate"), targets = List($cala, cpp, maxj), withTypes = true)
     extern(metadata("ExternPrimitive"), targets = List($cala, maxj), withTypes = true)
     extern(grp("LoweredPipe"), targets = List($cala))
 		()

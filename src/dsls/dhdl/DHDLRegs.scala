@@ -108,6 +108,15 @@ trait DHDLRegs {
       $reg.update(0, $init)
     }))
 
+    // --- C++ Backend
+    impl (reg_new)   (codegen(cpp, ${
+      @ val tpname = remap(sym.tp.typeArguments(0))
+      new $tpname {$init}
+    }))
+    impl (reg_read)  (codegen(cpp, ${ <todo_reg_read> $reg.apply(0) }))
+    impl (reg_write) (codegen(cpp, ${ <todo_reg_write> $reg.update(0, $value) }))
+    impl (reg_reset) (codegen(cpp, ${ <todo_reg_reset> }))
+
     // --- MaxJ Backend
     //reg_new (extern)
     impl (reg_read)  (codegen(maxj, ${

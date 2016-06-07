@@ -213,6 +213,9 @@ trait DHDLBRAMs {
     impl (bram_store) (codegen($cala, ${ $bram.update($addr.toInt, $value) }))
     //impl (bram_reset) (codegen($cala, ${ (0 until $bram.length).foreach{i => $bram.update(i, $zero) }}))
 
+    // --- C++ Backend
+    impl (bram_new) (codegen(cpp, ${new $t[T]($size) }))
+
     // --- MaxJ Backend
     // bram_new (extern)
     // bram_load (extern)

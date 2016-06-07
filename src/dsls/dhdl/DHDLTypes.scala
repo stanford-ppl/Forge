@@ -43,9 +43,7 @@ trait DHDLTypes {
     val const_to_fixpt = internal (Lifts) ("constFixPt", (T,S,I,F), (T, SManifest(SS), SManifest(II), SManifest(FF)) :: FixPt(S,I,F), TNumeric(T))
     val const_to_fltpt = internal (Lifts) ("constFltPt", (T,G,E), (T, SManifest(GG), SManifest(EE)) :: FltPt(G,E), TNumeric(T))
 
-    impl (const_to_fixpt) (codegen(cpp, ${
-        $0
-    }))
+
 
 
     val bit_to_string = direct (Tpes) ("bit_to_string", Nil, Bit :: MString)
@@ -207,7 +205,7 @@ trait DHDLTypes {
     impl (bit_to_string)  (codegen(cpp, ${ $0.toString }))
     impl (bit_to_bool)    (codegen(cpp, ${ $0 }))
 
-    impl (const_to_fixpt) (codegen(cpp, ${ FixedPoint[$t[S],$t[I],$t[F]]($0.toString) }))
+    impl (const_to_fixpt) (codegen(cpp, ${ $0 }))
     impl (fixpt_to_string) (codegen(cpp, ${ $0.toString }))
     impl (fixpt_to_fltpt) (codegen(cpp, ${ $0.toFloatPoint[$t[G],$t[E]] }))
     impl (convert_fixpt) (codegen(cpp, ${ $0.changeFormat[$t[S2],$t[I2],$t[F2]] }))

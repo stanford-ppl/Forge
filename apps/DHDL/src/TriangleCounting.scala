@@ -15,6 +15,10 @@ trait TrangleCounting extends DHDLApplication {
   //  1. Number of vertices must be a multiple of tileSize
   //  2. Assume number of edges of 1 vertex fits on chip
   //  3. Intersection in DHDL of two sets is O(M*N) where M and N are sizes of two sets
+  //  4. Edge must have weight of 1
+  //  5. The counts is 6 X the number of trangle because not using visited set. This is because dhdl
+  //     currently doesn't support control branch, so using visited set doesn't reduce execution
+  //     time.
   def main() {
     //val NV = args(unit(0)).to[SInt]
     ////genRandDirEdgeList("/Users/Yaqi/Documents/hyperdsl/published/DHDL/graph.dot", NV, NE, true)
@@ -42,15 +46,17 @@ trait TrangleCounting extends DHDLApplication {
           val nvB = BRAM[Index]("neighborVertTile", maxNumEdgeX2) // vertice list of v's neighbors
           val vpt = Reg[Index]("vpt") // ptr to v's edgelist
           val vsize = Reg[Index]("vsize") // number of edges of v
-          Pipe {
-            vpt := vB(iv,0)
-            vsize := vB(iv,1)
-          }
-          eB := edgeList(vpt::vpt+vsize)
+          //var x:Rep[Index] = null
+          //var y:Rep[Index] = null
+          //Pipe {
+          //  x := vB(iv,0)
+          //  y := vB(iv,1)
+          //}
+          //eB := edgeList(x::x+y)
           Pipe (vsize by 1) { ie =>
             val nbr = eB(ie)
             nvIdxB(ie*2) = nbr*2
-            nvIdxB(ie*2+1) = nbr*2+1
+            //nvIdxB(ie*2+1) = nbr*2+1
           }
           nvB := vertList(nvIdxB)
           val sumNbr = Reg[Index]("sumNbr")

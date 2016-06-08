@@ -1,0 +1,11 @@
+digraph {
+	graph [splines=line]
+	node [shape=circle]
+	0 -> 1
+	0 -> 2
+	0 -> 3
+	3 -> 7
+	3 -> 5
+	5 -> 4
+	5 -> 6
+}

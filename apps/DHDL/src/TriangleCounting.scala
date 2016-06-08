@@ -3,9 +3,9 @@ import dhdl.library._
 import dhdl.shared._
 import scala.util.Random
 
-object TrangleCountingCompiler extends DHDLApplicationCompiler with TrangleCounting
-object TrangleCountingInterpreter extends DHDLApplicationInterpreter with TrangleCounting
-trait TrangleCounting extends DHDLApplication {
+object TriangleCountingCompiler extends DHDLApplicationCompiler with TriangleCounting
+object TriangleCountingInterpreter extends DHDLApplicationInterpreter with TriangleCounting
+trait TriangleCounting extends DHDLApplication {
   override def stageArgNames = List("tileSize")
   lazy val tileSize = param("tileSize", 2)
   lazy val maxNumEdge = 8.as[Index]

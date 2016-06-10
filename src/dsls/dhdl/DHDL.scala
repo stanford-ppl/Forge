@@ -243,7 +243,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(DotIRPrinter)          // Graph prior to unrolling
 
     // --- Design Space Exploration
-    schedule(DSE)                   // Design space exploration. Runs a host of other analyses:
+//    schedule(DSE)                   // Design space exploration. Runs a host of other analyses:
                                     // Pre-DSE:
                                     //   Bound analyzer (for finding constants)
                                     //   Parameter analyzer (for calculating design space)
@@ -261,7 +261,7 @@ trait DHDLDSL extends ForgeApplication
 
     // --- Post-DSE Estimation
 //    schedule(AreaAnalyzer)          // Area estimation
-    schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
+//    schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
 
     // --- Transformations
     schedule(ConstantFolding)       // Constant folding

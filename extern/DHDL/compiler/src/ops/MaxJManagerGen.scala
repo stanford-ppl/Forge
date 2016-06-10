@@ -16,8 +16,11 @@ trait MaxJManagerGen {
 		stream.println(str)
 	}
   def quote(x: Exp[Any]):String = x match {
-		case s@Sym(n) => s.tp.erasure.getSimpleName().replace("DHDL","") +
-										(if (nameOf(s)!="") "_" else "") + nameOf(s) + n
+		case s@Sym(n) =>
+      val tp = s.tp.erasure.getSimpleName().replace("DHDL", "")
+      Console.println(s"[MaxJManager] tp = $tp, n = $n")
+      tp + n
+//										(if (nameOf(s)!="") "_" else "") + nameOf(s) + n
     case _ => ""
   }
 

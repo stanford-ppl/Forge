@@ -28,7 +28,10 @@ trait MaxJPreCodegen extends Traversal  {
 	}
 
   def quote(x: Exp[Any]):String = x match {
-		case s@Sym(n) => s.tp.erasure.getSimpleName().replace("DHDL","") + nameOf(s).map(nm=>"_"+nm).getOrElse("") + "_x" + n
+//		case s@Sym(n) => s.tp.erasure.getSimpleName().replace("DHDL","") + nameOf(s).map(nm=>"_"+nm).getOrElse("") + n
+		case s@Sym(n) =>
+      val str = s.tp.erasure.getSimpleName().replace("DHDL","") + n
+      str
     case _ => ""
   }
 

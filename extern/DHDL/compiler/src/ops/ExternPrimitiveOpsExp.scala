@@ -1,7 +1,9 @@
 package dhdl.compiler.ops
 
 import java.io.{File,FileWriter,PrintWriter}
+import scala.virtualization.lms.internal.{Traversal}
 import scala.virtualization.lms.common.{BaseExp, EffectExp, ScalaGenEffect, DotGenEffect, MaxJGenEffect}
+import ppl.delite.framework.transform.{DeliteTransform}
 import scala.reflect.{Manifest,SourceContext}
 
 import dhdl.shared._
@@ -121,8 +123,12 @@ trait ExternPrimitiveOpsExp extends ExternPrimitiveCompilerOps with ExternPrimit
 
 
 trait MaxJGenExternPrimitiveOps extends MaxJGenEffect {
-  val IR:DHDLExp
+  val IR:DHDLExp with DeliteTransform
+
+
   import IR.{infix_until => _, looprange_until => _, println => _, _}
+
+	var traversals: List[Traversal{val IR: MaxJGenExternPrimitiveOps.this.IR.type}] = Nil
 
   lazy val preCodegen = new MaxJPreCodegen {
     val IR: MaxJGenExternPrimitiveOps.this.IR.type = MaxJGenExternPrimitiveOps.this.IR
@@ -130,12 +136,29 @@ trait MaxJGenExternPrimitiveOps extends MaxJGenEffect {
 
   override def initializeGenerator(bd:String): Unit = {
     preCodegen.buildDir = bd
+		traversals = IR.traversals
     super.initializeGenerator(bd)
   }
 
+
+  def runTraversals[A:Manifest](b: Block[A]): Block[A] = {
+    println("MaxJCodegen: applying transformations")
+    var curBlock = b
+    println("Traversals:\n\t" + traversals.map(_.name).mkString("\n\t"))
+
+    for (t <- traversals) {
+      printlog("  Block before transformation: " + curBlock)
+      curBlock = t.run(curBlock)
+      printlog("  Block after transformation: " + curBlock)
+    }
+    println("MaxJGodegen: done transforming")
+    (curBlock)
+  }
+
   override def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, out: PrintWriter) = {
-    preCodegen.run(body)
-    super.emitSource(args, body, className, out)
+    val y = runTraversals(body)
+    preCodegen.run(y)
+    super.emitSource(args, y, className, out)
   }
 }
 

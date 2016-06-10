@@ -223,7 +223,7 @@ trait CGenMemoryTemplateOps extends CGenEffect {
 
 trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTemplateOps{
   val IR: ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
-          with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
+          with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
           with DHDLCodegenOps with DeliteTransform
   import IR._
 

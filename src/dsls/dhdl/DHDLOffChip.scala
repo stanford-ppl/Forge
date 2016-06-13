@@ -188,6 +188,10 @@ trait DHDLOffChip {
       for (i <- 0 until $vec.length) { $mem(i + $ofs.toInt) = $vec(i) }
     }))
 
+
+    // --- C++ Backend
+    impl (offchip_new) (codegen(cpp, ${new $t[T]($size) }))
+
     // --- MaxJ Backend
     //offchip_new (extern)
   }

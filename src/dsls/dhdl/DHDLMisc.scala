@@ -232,7 +232,9 @@ trait DHDLMisc {
     // --- MaxJ Backend
     //impl (rand_fix_bnd) (codegen(maxj, ${  }))
     //impl (rand_fix) (codegen(maxj, ${  }))
-    //impl (rand_flt) (codegen(maxj, ${  }))
+    impl (rand_flt) (codegen(maxj, ${
+      DFEVar $sym = Rand_flt
+    }))
     //impl (rand_bit) (codegen(maxj, ${  }))
   }
 

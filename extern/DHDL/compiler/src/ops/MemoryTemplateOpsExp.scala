@@ -249,7 +249,19 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
 		case Offchip_new(size) =>
       alwaysGen {
+        emitComment(s""" Offchip_new(${quote(size)}) {""")
         emit(s"""int ${quote(sym)} = ${getNextLMemAddr()};""")
+        emitComment(s""" Offchip_new(${quote(size)}) }""")
+      }
+
+		case Offchip_load_vector(mem, ofs, len) =>
+      alwaysGen {
+        emitComment(s"""${remap(sym.tp)} ${quote(sym)} = Offchip_load_vector(${quote(mem)}, ${quote(ofs)}, ${quote(len)})""")
+      }
+
+		case Offchip_store_vector(mem, ofs, vec) =>
+      alwaysGen {
+        emit(s"""// Offchip_store_vector(${quote(mem)}, ${quote(ofs)}, ${quote(vec)})""")
       }
 
 		case Reg_new(init) =>

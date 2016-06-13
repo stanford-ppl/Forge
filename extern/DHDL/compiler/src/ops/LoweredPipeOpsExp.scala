@@ -143,3 +143,45 @@ trait ScalaGenLoweredPipeOps extends ScalaGenEffect {
     case _ => super.emitNode(sym, rhs)
   }
 }
+
+trait MaxJGenLoweredPipeOps extends MaxJGenEffect {
+  val IR: LoweredPipeOpsExp with DHDLCodegenOps
+  import IR._
+
+  def emitParallelizedLoop(iters: List[List[Sym[FixPt[Signed,B32,B0]]]], cchain: Exp[CounterChain])(emitBlk: => Unit) = {
+    iters.zipWithIndex.foreach{ case (is, i) =>
+      stream.println("for( " + quote(cchain) + "_vec" + i + " <- " + quote(cchain) + ".apply(" + i + ".toInt)) {")
+      is.zipWithIndex.foreach{ case (iter, j) =>
+        stream.println("  val "+quote(iter)+" = " + quote(cchain) + "_vec" + i + ".apply(" + j + ".toInt)")
+      }
+    }
+    emitBlk
+    stream.println("}" * iters.length)
+  }
+
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case e@ParPipeForeach(cchain, func, inds) =>
+      emitComment(s"""ParPipeForeach ${quote(sym)} = ParPipeForeach(${quote(cchain)}) {""")
+      emitParallelizedLoop(inds, cchain){ emitBlock(func) }
+      emitValDef(sym, "()")
+      emitComment(s"""} ParPipeForeach ${quote(sym)}""")
+
+//    case e@ParPipeForeach(cchain, func, inds) =>
+//      stream.println(s"""// ParPipeForeach ${quote(sym)} = ParPipeForeach(${quote(cchain)})""")
+//      emitBlock(func)
+//      stream.println(s"""/// End ParPipeForeach(${quote(sym)})""")
+
+
+    case e@ParPipeReduce(cchain, accum, func, rFunc, inds, acc, rV) =>
+      stream.println(s"""// ParPipeReduce ${quote(sym)} = ParPipeReduce(${quote(cchain)}, ${quote(accum)})""")
+
+    // TODO: Further unrolling for these two?
+    case e@ParBramLoadVector(bram,ofs,cchain,inds) =>
+      stream.println(s"""// ParBramLoadVector ${quote(sym)} = ParBramLoadVector(${quote(bram)}, ${quote(ofs)}, ${quote(cchain)})""")
+
+    case e@ParBramStoreVector(bram,ofs,vec,cchain,inds) =>
+      stream.println(s"""// ParBramStoreVector ${quote(sym)} = ParBramStoreVector(${quote(bram)}, ${quote(ofs)}, ${quote(vec)}})""")
+
+    case _ => super.emitNode(sym, rhs)
+  }
+}

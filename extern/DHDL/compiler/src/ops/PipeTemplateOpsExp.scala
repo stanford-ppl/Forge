@@ -387,8 +387,12 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
         emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case Disabled =>
-		    val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
-        emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
+        if (cchain.isDefined) {
+          val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
+          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
+        } else {
+          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter, constant.var(1);""")
+        }
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case ForkJoin =>
     }
@@ -405,7 +409,9 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
     }
 
     if (styleOf(sym)!=ForkJoin) {
-      emitCChainCtrl(sym, cchain.get)
+      if (cchain.isDefined) {
+        emitCChainCtrl(sym, cchain.get)
+      }
     }
     if (styleOf(sym)==Fine){
       emit(s"""DFEVar ${quote(sym)}_rst_done = dfeBool().newInstance(this);""")

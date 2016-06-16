@@ -159,7 +159,7 @@ trait ScalaGenExternCounterOps extends ScalaGenEffect {
 }
 
 trait MaxJGenExternCounterOps extends MaxJGenEffect {
-  val IR: ExternCounterOpsExp
+  val IR: ExternCounterOpsExp with DHDLMetadataOpsExp
   import IR._
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
@@ -170,15 +170,26 @@ trait MaxJGenExternCounterOps extends MaxJGenEffect {
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case e@Counter_new(start,end,step,par) =>
-      val pre = if (quote(par).toInt == 1) "DFEVar" else "DFEVector<DFEVar>"  // <-- TODO: Better way?
-      if (par == 1) {
-        stream.println(s"""$pre ${quote(sym)} = ${quote(sym)}_chain.addCounter(${quote(end)}, ${quote(step)});""")
-      } else {
-        stream.println(s"""$pre ${quote(sym)} = ${quote(sym)}_chain.addCounterVect(${quote(par)}, ${quote(end)}, ${quote(step)});""")
-      }
+
 
     case e@Counterchain_new(counters, nIter) =>
+//      val parent = parentOf(sym)
+//      stream.println(s"""DFEVar ${quote(sym)}_en = ${quote(parent)}_en);""")
       stream.println(s"""CounterChain ${quote(sym)}_chain = control.count.makeCounterChain(${quote(sym)}_en);""")
+      val pars = parsOf(sym.asInstanceOf[Sym[CounterChain]])
+      counters.zipWithIndex.map { t =>
+        val c = t._1
+        val i = t._2
+        val Def(EatReflect(Counter_new(start, end, step, p))) = c
+        val par = pars(i)
+        val pre = if (par == 1) "DFEVar" else "DFEVector<DFEVar>"  // <-- TODO: Better way?
+        if (par == 1) {
+          stream.println(s"""$pre ${quote(c)} = ${quote(sym)}_chain.addCounter(${quote(end)}, ${quote(step)});""")
+        } else {
+          stream.println(s"""$pre ${quote(c)} = ${quote(sym)}_chain.addCounterVect(${quote(par)}, ${quote(end)}, ${quote(step)});""")
+        }
+      }
+
 
     case _ => super.emitNode(sym,rhs)
   }

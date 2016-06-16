@@ -268,6 +268,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(MetaPipeRegInsertion)  // Inserts registers between metapipe stages for counter signals
     schedule(Unrolling)             // Pipeline unrolling
     schedule(DotIRPrinter)          // Graph after unrolling
+    schedule(IRPrinter)          // Graph after unrolling
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, maxj))

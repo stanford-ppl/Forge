@@ -256,7 +256,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 
 		case Offchip_load_vector(mem, ofs, len) =>
       alwaysGen {
-        emitComment(s"""${remap(sym.tp)} ${quote(sym)} = Offchip_load_vector(${quote(mem)}, ${quote(ofs)}, ${quote(len)})""")
+        emitComment(s"""${remap(sym.tp)} ${quote(sym)} = Offchip_load_vector(burstAddr = ${quote(mem)}, offset = ${quote(ofs)}, numBursts=${quote(len)})""")
       }
 
 		case Offchip_store_vector(mem, ofs, vec) =>
@@ -360,7 +360,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
       val doneSig = ""
         emit(s"""${quote(sym)}.connectWdone($doneSig);""")
       } else {
-        emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${size1}, ${ts}, ${banks(sym)}, stride_TODO);""")
+        emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, ${banks(sym)}, stride_TODO);""")
       }
       emitComment("} Bram_new")
 

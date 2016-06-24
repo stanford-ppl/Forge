@@ -61,22 +61,23 @@ trait BFS extends DHDLApplication {
             val vsize = Reg[Index]("vsize") // number of edges of v
             Pipe {
               vpt := vB(iv,0)
-              vsize := vB(iv,1)
+            //  vsize := vB(iv,1)
             }
             Parallel { 
-              //TODO: doesn't support using function of register value as range of tile load
-              eB := edgeList(vpt.value::vpt.value+vsize.value)
-              eDistB := distList(eB, vpt.value+vsize.value)
+            //  //TODO: doesn't support using function of register value as range of tile load
+              eB := edgeList(vpt.value::vpt.value+tileSize)
+              //eB := edgeList(vpt.value::vpt.value+vsize.value)
+            //  //eDistB := distList(eB, vpt.value+vsize.value)
             }
-            Pipe { //TODO: has to wrap the innerpipe inside another pipe to make use of vsize not in parent of Pipe where it's created
-              Pipe (vsize.value by 1) { ie =>
-                val nbr = eB(ie)
-                val isCurLevel = (distB(iv) == level)
-                val isNbrNotSet = (distB(nbr) < 0.as[SInt])
-                eDistB(ie) = mux(isCurLevel && isNbrNotSet, level+1, eDistB(ie))
-              }
-            }
-            distList(eB) := eDistB
+            //Pipe { //TODO: has to wrap the innerpipe inside another pipe to make use of vsize not in parent of Pipe where it's created
+            //  Pipe (vsize.value by 1) { ie =>
+            //    val nbr = eB(ie)
+            //    val isCurLevel = (distB(iv) == level)
+            //    val isNbrNotSet = (distB(nbr) < 0.as[SInt])
+            //    eDistB(ie) = mux(isCurLevel && isNbrNotSet, level+1, eDistB(ie))
+            //  }
+            //}
+            //distList(eB) := eDistB
           }
         }
       }

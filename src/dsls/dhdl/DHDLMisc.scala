@@ -63,7 +63,7 @@ trait DHDLMisc {
       if ($indices.length == 1) indices.apply(0)
       else {
         if ($indices.length != $dims.length)
-          stageWarn("Trying to address far " + $dims.length + "D memory using " + $indices.length + "D addressing")
+          stageWarn("Trying to address " + $dims.length + "D memory using " + $indices.length + "D addressing")
 
         val strides = dimsToStrides($1)
         sumTree( List.tabulate($indices.length){i => $indices(i) * strides(i) } )

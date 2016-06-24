@@ -25,7 +25,7 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
   override val name = "DotIRPrinter"
   var inHwScope = false
   var fileNum = 0
-  val emittedCtrChain = Set.empty[Exp[Any]]
+  //val emittedCtrChain = Set.empty[Exp[Any]]
   val emittedSize = Set.empty[Exp[Any]]
 
   def alwaysGen(x: => Any) {
@@ -55,32 +55,50 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 		pw
 	}
 
+  def quoteOthers(s: Sym[Any], id:Int):String = {
+		var tstr = s.tp.erasure.getSimpleName()
+		tstr = tstr.replace("DHDL","")
+		if (isRegister(s.tp)) {
+			tstr = tstr.replace("Register", regType(s) match {
+				case Regular => "Reg"
+				case ArgumentIn => "ArgIn"
+				case ArgumentOut => "ArgOut"
+			})
+		}
+    else if (isPipeline(s.tp)) {
+      tstr = tstr.replace("Pipeline", styleOf(s) match {
+				case Fine => "Pipe"
+				case Coarse => "MetaPipe"
+				case Disabled => "Sequential"
+			})
+		}
+    else if (isBRAM(s.tp)) {
+      tstr = tstr.replace("BlockRAM", "BRAM")
+    }
+    tstr + nameOf(s).map{n => "_"+n}.getOrElse("") + "_x" + id
+  }
+
+  def getId(x: Exp[Any]):Int = x match {
+    case s@Sym(id) => id
+    case _ => -1
+  }
+
   override def quote(x: Exp[Any]):String = x match {
     case s@Sym(id) => s match {
 			case Def(ConstFix(c)) => c.toString
 			case Def(ConstFlt(c)) => c.toString
+			case Def(ConstBit(c)) => c.toString
+      case Def(Tpes_Fix_to_int(v)) => 
+        val symStr = quoteOthers(s, id)
+        emitValDef(symStr, v)
+        symStr
+      case Def(Tpes_Int_to_fix(v)) => 
+        val symStr = quoteOthers(s, id)
+        emitValDef(symStr, v)
+        symStr
+      case Def(Tpes_String_to_fixpt(s)) => "args_x" + id
 			case _ =>
-				var tstr = s.tp.erasure.getSimpleName()
-				tstr = tstr.replace("DHDL","")
-			  if (isRegister(s.tp)) {
-					tstr = tstr.replace("Register", regType(s) match {
-						case Regular => "Reg"
-						case ArgumentIn => "ArgIn"
-						case ArgumentOut => "ArgOut"
-					})
-			  }
-        else if (isPipeline(s.tp)) {
-          tstr = tstr.replace("Pipeline", styleOf(s) match {
-						case Fine => "Pipe"
-						case Coarse => "MetaPipe"
-						case Disabled => "Sequential"
-					})
-				}
-        else if (isBRAM(s.tp)) {
-          tstr = tstr.replace("BlockRAM", "BRAM")
-        }
-
-        tstr + nameOf(s).map{n => "_"+n}.getOrElse("") + "_x" + id
+        quoteOthers(s, id)
 		}
     case _ => super.quote(x)
   }
@@ -99,9 +117,10 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 	}
 
   override def preprocess[A:Manifest](b: Block[A]): Block[A] = {
+    println("-------Start DotIRPrinter --------")
     val filename = Config.degFilename.replace(".deg", "")
     stream = newStream(filename + fileNum)
-		emittedCtrChain.clear
+		//emittedCtrChain.clear
 		emittedSize.clear
     emit("digraph{")
     emit(s"compound=true")
@@ -135,8 +154,14 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 	def emitValDef(lhs: Exp[Any], rhs: Exp[Any]):Unit = {
 		emitValDef(lhs.asInstanceOf[Sym[Any]], quote(rhs))
 	}
+	def emitValDef(lhs: String, rhs: Exp[Any]):Unit = {
+		emitValDef(lhs, quote(rhs))
+	}
   def emitValDef(sym: Sym[Any], rhs: String): Unit = {
-		stream.println(s"""define(`${quote(sym)}', `${rhs}')""")
+    emitValDef(quote(sym), rhs)
+  }
+  def emitValDef(sym: String, rhs: String): Unit = {
+		stream.println(s"""define(`${sym}', `${rhs}')""")
   }
 
 	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = {
@@ -149,28 +174,56 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
     inds.zip(counters).foreach{case (iters, ctr) => iters.foreach{iter => emitValDef(iter, ctr) }}
   }
 
+  def emitCounter(sym:Exp[Any]) = {
+    val Def(EatReflect(d)) = sym; d match {
+      case e@Counter_new(start,end,step,_) =>
+		  	var l = s""""${quote(sym)}"""
+        if (isConst(start)) {
+		  		l += "|start=" + quote(start)
+		  	} else {
+		  		emitEdge(start, sym, "start")
+		  	}
+		  	if (isConst(end)) {
+		  		l += "|end=" + quote(end)
+		  	} else {
+		  		emitEdge(end, sym, "end")
+		  	}
+		  	if (isConst(step)) {
+		  		l += "|step=" + quote(step)
+		  	} else {
+		  		emitEdge(step, sym, "step")
+		  	}
+		  	l += "\""
+        emit(s"""${quote(sym)} [ label=$l shape="record" style="filled,rounded"
+		  				color=$counterInnerColor ]""")
+    }
+  }
+
 	def emitCtrChain(cchain: Exp[CounterChain]):Unit = {
 		val Def(EatReflect(d)) = cchain
-		emitCtrChain(cchain.asInstanceOf[Sym[CounterChain]],
-									 d.asInstanceOf[Def[Any]])
+		emitCtrChain(cchain, d.asInstanceOf[Def[Any]])
 	}
-	def emitCtrChain(sym: Sym[Any], rhs: Def[Any]):Unit = rhs match {
+
+	def emitCtrChain(sym: Exp[Any], rhs: Def[Any]):Unit = rhs match {
 	  case e@Counterchain_new(counters, nIter) =>
-			if (!emittedCtrChain.contains(sym)) {
-				emittedCtrChain += sym
-    		emit(s"""subgraph cluster_${quote(sym)} {""")
-    		emit(s""" label=${quote(sym)} """)
-    		emit(s""" style="rounded, filled" """)
-    		emit(s""" fillcolor=$counterColor""")
-    		counters.foreach{ ctr =>
-    		  emit(s"""   ${quote(ctr)}""")
-    		}
-    		emit("}")
-			}
+    	counters.foreach{ ctr =>
+        emitCounter(ctr)
+    	}
+    	emit(s"""subgraph cluster_${quote(sym)} {""")
+    	emit(s""" label=${quote(sym)} """)
+    	emit(s""" style="rounded, filled" """)
+    	emit(s""" fillcolor=$counterColor""")
+    	counters.foreach{ ctr =>
+    	  emit(s"""   ${quote(ctr)}""")
+    	}
+    	emit("}")
+			//if (!emittedCtrChain.contains(sym)) {
+			//	emittedCtrChain += sym
+			//}
 		case _ =>
 	}
 
-  def emitVector(sym: Sym[Any]) = {
+  def emitVector(sym: Sym[Any]):Unit = {
     if (isDblBuf(sym)) {
       emit(s"""${quote(sym)} [margin=0 rankdir="LR" label="{<st> | <ld>}" xlabel="${quote(sym)}"""")
       emit(s"""shape="record" color=$dblbufBorderColor  style="filled"""")
@@ -181,10 +234,45 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
     }
   }
 
+  def emitOp(sym:Exp[Any], s:String):Unit = {
+    emit(s"""${quote(sym)} [label="$s"  shape="square" style="filled" fillcolor="white"]""")
+  }
+
+  def emitOp(sym:Exp[Any], s:String, a:Exp[Any]):Unit = {
+    var lab = s
+    if (isConst(a))
+      lab = s"${lab}(${quote(a)})"
+    emitOp(sym, lab)
+    if (!isConst(a))
+      emitEdge(a, sym)
+  }
+
+  def emitOp(sym:Exp[Any], s:String, a:Exp[Any], b:Exp[Any]):Unit = {
+    var lab = s
+    if (isConst(a))
+      lab = s"${quote(a)} ${lab}"
+    if (isConst(b))
+      lab = s"${lab} ${quote(b)}"
+    emitOp(sym, lab)
+    if (!isConst(a))
+      emitEdge(a, sym)
+    if (!isConst(b))
+      emitEdge(b, sym)
+  }
+
   override def traverse(lhs: Sym[Any], rhs: Def[Any]): Unit = {
     debug(s"[$inHwScope] $lhs = $rhs")
+    //println(s"[$inHwScope] $lhs = $rhs")
     if (inHwScope) emitHWNode(lhs, rhs)
     else emitOtherNode(lhs, rhs)
+  }
+
+  def isConst(sym: Exp[Any]) = sym match {
+    case Def(ConstBit(_)) => true 
+    case Def(ConstFix(_)) => true 
+    case Def(ConstFlt(_)) => true 
+    case Def(Tpes_Int_to_fix(v)) => true
+    case _ => false 
   }
 
   def emitOtherNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
@@ -208,12 +296,12 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
     }
 
     case Offchip_new(size) =>
-      if (!emittedSize.contains(size)) hackGen(size)
+      //if (!emittedSize.contains(size)) hackGen(size)
       var label = s""" "${quote(sym)} """
-      if (quote(size).forall(_.isDigit)) {
-        label += ", size = " + quote(size)
-      }
-      else emitEdge(size, sym, "size")
+      //if (isConst(size)) {
+      //  label += ", size = " + quote(size)
+      //}
+      //else emitEdge(size, sym, "size")
       label += "\""
       emit(s"""${quote(sym)} [label=$label shape="square" fontcolor="white" color="white" style="filled" """)
       emit(s"""               fillcolor=$dramFillColor color=black]""")
@@ -225,42 +313,19 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
     case ConstFltPt(v,_,_) =>
       emit(s"""${quote(sym)} [label=${quote(v)} style="filled" fillcolor="lightgray" color="none"]""")
 
-    case Tpes_Fix_to_int(v) => emitValDef(sym, quote(v))
-    case Tpes_Int_to_fix(v) => emitValDef(sym, quote(v))
+    case Tpes_Fix_to_int(v) => emitValDef(sym, v)
+    case Tpes_Int_to_fix(v) => emitValDef(sym, v)
 
     case Reflect(d, u, es) => traverse(sym, d)
     case _ =>
+      //println(sym + "=" + rhs)
       debug(s"...ignored")
       if (recurseElse) blocks(rhs).foreach{blk => traverseBlock(blk)}
   }
 
   def emitHWNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case e@Counter_new(start,end,step,_) =>
-			var l = s""""${quote(sym)}"""
-			if (quote(start).forall(_.isDigit)) {
-				l += "|start=" + quote(start)
-			} else {
-				emitEdge(start, sym, "start")
-			}
-			if (quote(end).forall(_.isDigit)) {
-				l += "|end=" + quote(end)
-			} else {
-				emitEdge(end, sym, "end")
-			}
-			if (quote(step).forall(_.isDigit)) {
-				l += "|step=" + quote(step)
-			} else {
-				emitEdge(step, sym, "step")
-			}
-			l += "\""
-      emit(s"""${quote(sym)} [ label=$l shape="record" style="filled,rounded"
-						color=$counterInnerColor ]""")
 
 	  case e@Counterchain_new(counters, nIter) =>
-			//TODO: check whether parent of cchain is empty, if is emit ctrchain
-			if (parentOf(sym).isEmpty) {
-				emitCtrChain(sym, rhs)
-			}
 
 		case e@Pipe_parallel(func) =>
       emit(s"""subgraph cluster_${quote(sym)} {""")
@@ -427,42 +492,50 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
       emit(s"""${quote(sym)} [ label="flt2flt" ]""")
       emitEdge(x, sym)
 
-    case FixPt_Neg(a)   => emit(s"""${quote(sym)} [label="neg" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym)
-    case FixPt_Add(a,b) => emit(s"""${quote(sym)} [label="+"  shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FixPt_Sub(a,b) => emit(s"""${quote(sym)} [label="-"  shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FixPt_Mul(a,b) => emit(s"""${quote(sym)} [label="*"  shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FixPt_Div(a,b) => emit(s"""${quote(sym)} [label="/"  shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FixPt_Mod(a,b) => emit(s"""${quote(sym)} [label="%"  shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FixPt_Lt(a,b)  => emit(s"""${quote(sym)} [label="<"  shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FixPt_Leq(a,b) => emit(s"""${quote(sym)} [label="<=" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FixPt_Neq(a,b) => emit(s"""${quote(sym)} [label="!=" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FixPt_Eql(a,b) => emit(s"""${quote(sym)} [label="==" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FixPt_And(a,b) => emit(s"""${quote(sym)} [label="&"  shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FixPt_Or(a,b)  => emit(s"""${quote(sym)} [label="|"  shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FixPt_Lsh(a,b) => emit(s"""${quote(sym)} [label="<<" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FixPt_Rsh(a,b) => emit(s"""${quote(sym)} [label=">>" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
+    case FixPt_Neg(a)   => emitOp(sym, "neg", a)
+    case FixPt_Add(a,b) => emitOp(sym, "+"  , a, b)
+    case FixPt_Sub(a,b) => emitOp(sym, "-"  , a, b)
+    case FixPt_Mul(a,b) => emitOp(sym, "*"  , a, b)
+    case FixPt_Div(a,b) => emitOp(sym, "/"  , a, b)
+    case FixPt_Mod(a,b) => emitOp(sym, "%"  , a, b)
+    case FixPt_Lt(a,b)  => emitOp(sym, "<"  , a, b)
+    case FixPt_Leq(a,b) => emitOp(sym, "<=" , a, b)
+    case FixPt_Neq(a,b) => emitOp(sym, "!=" , a, b)
+    case FixPt_Eql(a,b) => emitOp(sym, "==" , a, b)
+    case FixPt_And(a,b) => emitOp(sym, "&"  , a, b)
+    case FixPt_Or(a,b)  => emitOp(sym, "|"  , a, b)
+    case FixPt_Lsh(a,b) => emitOp(sym, "<<" , a, b)
+    case FixPt_Rsh(a,b) => emitOp(sym, ">>" , a, b)
 
-    case FltPt_Neg(a)   => emit(s"""${quote(sym)} [label="neg" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym)
-    case FltPt_Add(a,b) => emit(s"""${quote(sym)} [label="+"  shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FltPt_Sub(a,b) => emit(s"""${quote(sym)} [label="-"  shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FltPt_Mul(a,b) => emit(s"""${quote(sym)} [label="*"  shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FltPt_Div(a,b) => emit(s"""${quote(sym)} [label="/"  shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FltPt_Lt(a,b)  => emit(s"""${quote(sym)} [label="<"  shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FltPt_Leq(a,b) => emit(s"""${quote(sym)} [label="<=" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FltPt_Neq(a,b) => emit(s"""${quote(sym)} [label="!=" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
-    case FltPt_Eql(a,b) => emit(s"""${quote(sym)} [label="==" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a, sym); emitEdge(b, sym)
+    case FltPt_Neg(a)   => emitOp(sym, "neg", a)
+    case FltPt_Add(a,b) => emitOp(sym, "+"  , a, b)
+    case FltPt_Sub(a,b) => emitOp(sym, "-"  , a, b)
+    case FltPt_Mul(a,b) => emitOp(sym, "*"  , a, b)
+    case FltPt_Div(a,b) => emitOp(sym, "/"  , a, b)
+    case FltPt_Lt(a,b)  => emitOp(sym, "<"  , a, b)
+    case FltPt_Leq(a,b) => emitOp(sym, "<=" , a, b)
+    case FltPt_Neq(a,b) => emitOp(sym, "!=" , a, b)
+    case FltPt_Eql(a,b) => emitOp(sym, "==" , a, b)
 
-    case Bit_Not(a)    => emit(s"""${quote(sym)} [label="~" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
-    case Bit_And(a,b)  => emit(s"""${quote(sym)} [label="&&" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym); emitEdge(b,sym)
-    case Bit_Or(a,b)   => emit(s"""${quote(sym)} [label="||" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym); emitEdge(b,sym)
-    case Bit_Xor(a,b)  => emit(s"""${quote(sym)} [label="==" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym); emitEdge(b,sym)
-    case Bit_Xnor(a,b) => emit(s"""${quote(sym)} [label="!=" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym); emitEdge(b,sym)
+    case Bit_Not(a)    => emitOp(sym, "~"  , a)
+    case Bit_And(a,b)  => emitOp(sym, "&&" , a, b)
+    case Bit_Or(a,b)   => emitOp(sym, "||" , a, b)
+    case Bit_Xor(a,b)  => emitOp(sym, "==" , a, b)
+    case Bit_Xnor(a,b) => emitOp(sym, "!=" , a, b)
 
-    case FixPt_Abs(a)  => emit(s"""${quote(sym)} [label="abs" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
-    case FltPt_Abs(a)  => emit(s"""${quote(sym)} [label="abs" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
-    case FltPt_Log(a)  => emit(s"""${quote(sym)} [label="log" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
-    case FltPt_Exp(a)  => emit(s"""${quote(sym)} [label="exp" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
-    case FltPt_Sqrt(a) => emit(s"""${quote(sym)} [label="sqrt" shape="square" style="filled" fillcolor="white"]"""); emitEdge(a,sym)
+    case FixPt_Abs(a)  => emitOp(sym, "abs" , a)
+    case FltPt_Abs(a)  => emitOp(sym, "abs" , a)
+    case FltPt_Log(a)  => emitOp(sym, "log" , a)
+    case FltPt_Exp(a)  => emitOp(sym, "exp" , a)
+    case FltPt_Sqrt(a) => emitOp(sym, "sqrt", a)
+
+    case Rand_flt() => emitOp(sym, s"RandFlt_x${getId(sym)}")
+    case Rand_fix() => emitOp(sym, s"RandFix_x${getId(sym)}")
+    case Rand_bit() => emitOp(sym, s"RandBit_x${getId(sym)}")
+
+    //case Rand_flt() => emit(s"""${quote(sym)} [label="RandFlt_x${getId(sym)}" shape="square" style="filled" fillcolor="white"]""")
+    //case Rand_fix() => emit(s"""${quote(sym)} [label="RandFix_x${getId(sym)}" shape="square" style="filled" fillcolor="white"]""")
+    //case Rand_bit() => emit(s"""${quote(sym)} [label="RandBit_x${getId(sym)}" shape="square" style="filled" fillcolor="white"]""")
 
     case Mux2(s,a,b) =>
       emit(s"""${quote(sym)} [label="mux", shape="diamond" style="filled" fillcolor="white"]""")

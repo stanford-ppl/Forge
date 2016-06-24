@@ -241,6 +241,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(DHDLAffineAnalysis)    // Access patterns
 
     schedule(DotIRPrinter)          // Graph prior to unrolling
+    schedule(IRPrinterPlus)          // Graph prior to unrolling
 
     // --- Design Space Exploration
     schedule(DSE)                   // Design space exploration. Runs a host of other analyses:

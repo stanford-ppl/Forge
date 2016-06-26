@@ -228,7 +228,7 @@ trait MemoryAnalyzer extends HungryTraversal {
     debug("")
     debug("Inferring instances for memory " + nameOf(mem).getOrElse(mem.toString))
     if (isBRAM(mem.tp)) {
-      (writerOf(mem),readersOf(mem)) match {
+      (writersOf(mem).headOption,readersOf(mem)) match {
         case (None, Nil) => Nil
         case (Some(write), Nil) => List(unpairedAccess(mem, write))
         case (None, reads) =>
@@ -241,7 +241,7 @@ trait MemoryAnalyzer extends HungryTraversal {
       }
     }
     else if (isRegister(mem.tp)) {    // Registers don't need banking, but they do need buffering
-      (writerOf(mem), readersOf(mem)) match {
+      (writersOf(mem).headOption, readersOf(mem)) match {
         case (None, Nil) => Nil
         case (Some(write), Nil) => List(MemInstance(1, List(DuplicatedBanking(1))))
         case (None, reads) => List(MemInstance(1, List(DuplicatedBanking(1))))
@@ -265,14 +265,6 @@ trait MemoryAnalyzer extends HungryTraversal {
   }
 
   def run(localMems: List[Exp[Any]]): Unit = localMems.foreach{mem => analyzeMemory(mem) }
-  // Heuristic - find memories which have a reader and a writer which are different
-  // but whose nearest common parent is a metapipeline.
-  /*localMems.flatMap{mem =>
-    writerOf(mem).flatMap { writer =>
-      val lcas = readersOf(mem).filter(_ != writer).flatMap{reader => leastCommonAncestor(reader, writer, parentOf).filter(isMetaPipe(_)) }
-      if (lcas.isEmpty) None else Some(mem -> lcas.head) // HACK: This could actually be much more complicated..
-    }
-  }*/
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]): Unit = rhs match {
     case _:Reg_new[_] => analyzeMemory(lhs)

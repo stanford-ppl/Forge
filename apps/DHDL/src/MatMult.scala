@@ -21,10 +21,10 @@ trait MatMult extends DHDLApplication {
   override def stageArgNames = List("bm", "bn", "bp")
   lazy val bm = param("tileSizeM", 50)
   lazy val bn = param("tileSizeN", 96)
-  lazy val bp = param("tileSizeP", 864)
-  lazy val outerPar  = param("outerPar", 2)
+  lazy val bp = param("tileSizeP", 896)
+  lazy val outerPar  = param("outerPar", 1)
   lazy val middlePar = param("middlePar", 2)
-  lazy val innerPar  = param("innerPar", 12)
+  lazy val innerPar  = param("innerPar", 4)
 
   lazy val upMidPar = param("upMidPar", 1)
   lazy val stPar = param("stPar", 1)
@@ -59,8 +59,8 @@ trait MatMult extends DHDLApplication {
 
   def main() = {
     val M = args(unit(0)).to[SInt]
-    val N = args(unit(0)).to[SInt]
-    val P = args(unit(0)).to[SInt]
+    val N = args(unit(1)).to[SInt]
+    val P = args(unit(2)).to[SInt]
 
     bound(M) = 1536
     bound(N) = 1536

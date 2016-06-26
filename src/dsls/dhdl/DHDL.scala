@@ -124,7 +124,7 @@ trait DHDLDSL extends ForgeApplication
      **/
     val Tile = tpe("Tile", T)
     /**
-     * A Sparse Tile describes a sparse section of an OffChipMem which can be loaded onto the accelerator using a gather operation, or which can
+     * A SparseTile describes a sparse section of an OffChipMem which can be loaded onto the accelerator using a gather operation, or which can
      * be updated using a scatter operation.
      **/
     val SparseTile = tpe("SparseTile", T)
@@ -211,6 +211,7 @@ trait DHDLDSL extends ForgeApplication
     val StageAnalyzer = analyzer("Stage", isExtern=true)
     val GlobalAnalyzer = analyzer("Global")
     val ControlSignalAnalyzer = analyzer("ControlSignal", isExtern=true)
+    val UnrolledControlAnalyzer = analyzer("UnrolledControlSignal", isExtern=true)
     val ParallelizationSetter = traversal("ParallelizationSetter",isExtern=true)
     val DHDLAffineAnalysis = analyzer("DHDLAffine", isExtern=true)
 
@@ -259,7 +260,6 @@ trait DHDLDSL extends ForgeApplication
                                     //   Contention analyzer (to finalize contention estimates)
 
     // --- Post-DSE Estimation
-    schedule(IRPrinterPlus)
     schedule(AreaAnalyzer)          // Area estimation
     schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
 
@@ -267,8 +267,9 @@ trait DHDLDSL extends ForgeApplication
     schedule(ConstantFolding)       // Constant folding
     schedule(MetaPipeRegInsertion)  // Inserts registers between metapipe stages for counter signals
     schedule(Unrolling)             // Pipeline unrolling
+    schedule(UnrolledControlAnalyzer) // Control signal metadata after unrolling
     schedule(DotIRPrinter)          // Graph after unrolling
-    schedule(IRPrinter)             // Graph after unrolling
+    schedule(IRPrinterPlus)         // Graph after unrolling
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, maxj))

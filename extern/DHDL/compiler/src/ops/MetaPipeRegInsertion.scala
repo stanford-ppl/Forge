@@ -43,7 +43,7 @@ trait MetaPipeRegInsertion extends SinglePassTransformer with PipeStageTools {
                 isDblBuf(reg) = true
                 isDelayReg(reg) = true
                 readersOf(reg) = List((stage,false,regValue))
-                writerOf(reg) = (prevStage.get, false, regWrite)
+                writersOf(reg) = (prevStage.get, false, regWrite)
                 writtenIn(prevStage.get) = writtenIn(prevStage.get) :+ reg
                 parentOf(reg) = owner
                 childrenOf(owner) = childrenOf(owner) :+ reg

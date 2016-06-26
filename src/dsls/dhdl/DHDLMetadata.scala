@@ -280,19 +280,19 @@ trait DHDLMetadata {
 
 		/* The controller that writes to the Mem.
 		 * Right now assume only one writer per double buffer */
-    val MWriter = metadata("MWriter", "writer" -> SOption(CTuple3(MAny,SBoolean,MAny)))
-    val writerOps = metadata("writerOf")
-    internal.static (writerOps) ("update", T, (T, CTuple2(MAny,MAny)) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MWriter( Some(($1._1,false,$1._2)) )) }
-    internal.static (writerOps) ("update", T, (T, CTuple3(MAny,SBoolean,MAny)) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MWriter(Some($1))) }
+    val MWriter = metadata("MWriters", "writers" -> SList(CTuple3(MAny,SBoolean,MAny)))
+    val writersOps = metadata("writersOf")
+    internal.static (writersOps) ("update", T, (T, CTuple2(MAny,MAny)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MWriters( List(($1._1,false,$1._2)) )) }
+    internal.static (writersOps) ("update", T, (T, CTuple3(MAny,SBoolean,MAny)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MWriters(List($1))) }
 
-    internal.static (writerOps) ("update", T, (T, SOption(CTuple3(MAny,SBoolean,MAny))) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MWriter($1)) }
+    internal.static (writersOps) ("update", T, (T, SList(CTuple3(MAny,SBoolean,MAny))) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MWriters($1)) }
 
 
-    internal.static (writerOps) ("apply", T, T :: SOption(CTuple3(MAny,SBoolean,MAny))) implements
-      composite ${ meta[MWriter]($0).map(_.writer).getOrElse(None) }
+    internal.static (writersOps) ("apply", T, T :: SList(CTuple3(MAny,SBoolean,MAny))) implements
+      composite ${ meta[MWriters]($0).map(_.writers).getOrElse(Nil) }
 
 		/* Controllers that read from a Double Buffer. The metadata is only used for double buffer. */
     val MReaders = metadata("MReaders", "readers" -> SList(CTuple3(MAny,SBoolean,MAny)))

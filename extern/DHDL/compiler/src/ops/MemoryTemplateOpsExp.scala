@@ -274,7 +274,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 						emit(s"""DblRegFileLib ${quote(sym)}_lib = new DblRegFileLib(this, $ts, ${quote(sym)}, ${parOf(sym)});""")
             val readstr = if (parOf(sym)>1) "readv" else "read"
             emit(s"""${maxJPre(sym)} ${quote(sym)} = ${quote(sym)}_lib.${readstr}()""")
-           	emit(quote(sym) + "_lib.connectWdone(" + quote(writerOf(sym).get._1) + "_done);")
+           	emit(quote(sym) + "_lib.connectWdone(" + quote(writersOf(sym).head._1) + "_done);")
             readersOf(sym).foreach { case (r, _, _) =>
            	  emit(quote(sym) +"_lib.connectRdone(" + quote(r) + "_done);")
            	}
@@ -293,15 +293,15 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
       emitComment("Reg_write {")
 			val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
 			if (isDblBuf(reg)) {
-			 	emit(s"""${quote(reg)}_lib.write(${value}, ${quote(writerOf(reg).get._1)}_done);""")
+			 	emit(s"""${quote(reg)}_lib.write(${value}, ${quote(writersOf(reg).head._1)}_done);""")
       } else {
 				regType(reg) match {
 					case Regular =>
       		  val parent = if (parentOf(reg).isEmpty) "top" else quote(parentOf(reg).get) //TODO
       		  val rst = quote(parent) + "_rst_en"
-					  if (writerOf(reg).isEmpty)
+					  if (writersOf(reg).isEmpty)
 					  	throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
-					  val enSignalStr = writerOf(reg).get._1 match {
+					  val enSignalStr = writersOf(reg).head._1 match {
 					  	case p@Def(EatReflect(e:Pipe_foreach)) => styleOf(p) match {
 					  		case Fine => quote(e.cchain) + "_en_from_pipesm"
 					  		case _ => quote(p) + "_en"
@@ -314,8 +314,8 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
                           throw new Exception(s"Reg ${quote(reg)} is written by non Pipe node ${p} def:${d}")
 					  }
       		  emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}; // enable""")
-      		  emit(s"""DFEVar ${quote(reg)}_hold = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writerOf(reg).get._1)}_redLoop_done));""")
-      		  emit(s"""${quote(reg)} <== $rst ? constant.var($ts, ${quote(resetValue(reg))}):stream.offset(${quote(reg)}_hold, -${quote(writerOf(reg).get._1)}_offset); // reset""")
+      		  emit(s"""DFEVar ${quote(reg)}_hold = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writersOf(reg).head._1)}_redLoop_done));""")
+      		  emit(s"""${quote(reg)} <== $rst ? constant.var($ts, ${quote(resetValue(reg))}):stream.offset(${quote(reg)}_hold, -${quote(writersOf(reg).head._1)}_offset); // reset""")
 				  case ArgumentIn => new Exception("Cannot write to Argument Out! " + quote(reg))
 				  case ArgumentOut =>
 				 	  val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done" //TODO
@@ -343,7 +343,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
         val dims = dimsOf(sym)
         emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
           $size0, $size1, $ts, ${banks(sym)}, stride_TODO, ${readersOf(sym).size});""")
-        if (writerOf(sym).isEmpty)
+        if (writersOf(sym).isEmpty)
           throw new Exception(s"Bram ${quote(sym)} has no writer!")
           //  If writer is a unit Pipe, wait until parent is finished
         //val doneSig = n.getWriter().getOrElse(throw new Exception(s"BRAM $n has no writer")) match {
@@ -392,7 +392,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
       emitComment("Bram_store {")
 			val dataStr = quote(value)
       if (isAccum(bram)) {
-        val offsetStr = quote(writerOf(bram).get._1) + "_offset"
+        val offsetStr = quote(writersOf(bram).head._1) + "_offset"
         val parentPipe = parentOf(bram).getOrElse(throw new Exception(s"Bram ${quote(bram)} does not have a parent!"))
         val parentCtr = parentPipe match {
           case Def(EatReflect(d)) => d match {

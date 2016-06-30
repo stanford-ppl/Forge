@@ -167,11 +167,11 @@ trait DHDLMetadata {
 
 
     // TODO: Should probably change to BigDecimal or something to be accurate
-    // NOTE: The user gets to see these! Woah.
+    // NOTE: The user gets to see these!
     // Meant specifically for range analysis of non-negative size and index calculation
 
     // Couple of definitions for usage here:
-    // - Final = fixed value for all future time (constants or finalized parameters)
+    // - Fixed = fixed value for all future time (constants or finalized parameters)
     // - Exact = constant value but which may be changed (unfinalized parameters)
     // - Bound = any other upper bound
 

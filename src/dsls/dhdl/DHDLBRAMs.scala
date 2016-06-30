@@ -31,7 +31,7 @@ trait DHDLBRAMs {
       dimsOf(vec) = List($len)
       vec
     }
-    internal (BRAM) ("bramStoreVector", T, (("bram", BRAM(T)), ("ofs", SList(Idx)), ("vec", MVector(T)), ("p",MInt)) :: MUnit) implements composite ${
+    internal (BRAM) ("bramStoreVector", T, (("bram", BRAM(T)), ("ofs", SList(Idx)), ("vec", MVector(T)), ("p",MInt)) :: MUnit, effect = write(0)) implements composite ${
       val len = sizeOf(vec)
       bram_store_vector($bram,$ofs,$vec,CounterChain(Counter(min=0.as[Index], max=len, step=1.as[Index], par=$p)))
     }

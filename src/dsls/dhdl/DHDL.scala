@@ -243,7 +243,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(DotIRPrinter)          // Graph prior to unrolling
 
     // --- Design Space Exploration
-//    schedule(DSE)                   // Design space exploration. Runs a host of other analyses:
+    schedule(DSE)                   // Design space exploration. Runs a host of other analyses:
                                     // Pre-DSE:
                                     //   Bound analyzer (for finding constants)
                                     //   Parameter analyzer (for calculating design space)
@@ -260,15 +260,16 @@ trait DHDLDSL extends ForgeApplication
                                     //   Contention analyzer (to finalize contention estimates)
 
     // --- Post-DSE Estimation
-//    schedule(AreaAnalyzer)          // Area estimation
-//    schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
+    schedule(IRPrinterPlus)
+    schedule(AreaAnalyzer)          // Area estimation
+    schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
 
     // --- Transformations
     schedule(ConstantFolding)       // Constant folding
     schedule(MetaPipeRegInsertion)  // Inserts registers between metapipe stages for counter signals
     schedule(Unrolling)             // Pipeline unrolling
     schedule(DotIRPrinter)          // Graph after unrolling
-    schedule(IRPrinter)          // Graph after unrolling
+    schedule(IRPrinter)             // Graph after unrolling
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, maxj))

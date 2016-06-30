@@ -204,6 +204,7 @@ trait CGenMemoryTemplateOps extends CGenEffect {
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
     case "BlockRAM" => remapWithRef(m.typeArguments(0))
+    case "DHDLVector" => remapWithRef(m.typeArguments(0))
     case "Register" => remapWithRef(m.typeArguments(0))
     case "DRAM"     => remapWithRef(m.typeArguments(0))
 
@@ -226,6 +227,11 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
           with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
           with DHDLCodegenOps with DeliteTransform
   import IR._
+
+  override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
+    case "DHDLVector" => "DFEVector<DFEVar>"
+    case _ => super.remap(m)
+  }
 
   // Current TileLd/St templates expect that LMem addresses are
   // statically known during graph build time in MaxJ. That can be

@@ -225,7 +225,7 @@ trait CGenMemoryTemplateOps extends CGenEffect {
 trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTemplateOps{
   val IR: ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
           with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
-          with DHDLCodegenOps with DeliteTransform
+          with DHDLCodegenOps with NosynthOpsExp with DeliteTransform
   import IR._
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {

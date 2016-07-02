@@ -272,7 +272,7 @@ trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
 trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
   val IR: ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
           with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
-          with DHDLCodegenOps with DeliteTransform
+          with DHDLCodegenOps with NosynthOpsExp with DeliteTransform
 
  import IR._ //{__ifThenElse => _, Nosynth___ifThenElse => _, __whileDo => _,
              // Forloop => _, println => _ , _}
@@ -365,13 +365,16 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
     }
     emitComment(s"""${smStr} ${quote(sym)} {""")
 
-    /* Emit done signal */
-    if (parentOf(sym).isEmpty) {
-      emit(s"""DFEVar ${quote(sym)}_en = top_en;""")
-      emit(s"""DFEVar ${quote(sym)}_done = dfeBool().newInstance(this);""")
-      emit(s"""top_done <== ${quote(sym)}_done;""")
-      enDeclaredSet += sym
-      doneDeclaredSet += sym
+    // Emit done signal
+    val Def(EatReflect(d)) = parentOf(sym).get
+    d match {
+      case n: Hwblock =>
+          emit(s"""DFEVar ${quote(sym)}_en = top_en;""")
+          emit(s"""DFEVar ${quote(sym)}_done = dfeBool().newInstance(this);""")
+          emit(s"""top_done <== ${quote(sym)}_done;""")
+          enDeclaredSet += sym
+          doneDeclaredSet += sym
+      case _ =>
     }
 
     /* State Machine Instatiation */
@@ -382,6 +385,11 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
     styleOf(sym) match {
       case Fine =>
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
+        emit(s"""DFEVar ${quote(sym)}_rst_done = dfeBool().newInstance(this);""")
+        emit(s"""${quote(sym)}_sm.connectInput("rst_done", ${quote(sym)}_rst_done);""")
+        emit(s"""OffsetExpr ${quote(sym)}_offset = stream.makeOffsetAutoLoop("${quote(sym)}_offset");""")
+        emit(s"""${quote(sym)}_rst_done <== stream.offset(${quote(sym)}_rst_en, -${quote(sym)}_offset-1);""")
+
       case Coarse =>
 		    val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
         emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
@@ -412,15 +420,6 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       if (cchain.isDefined) {
         emitCChainCtrl(sym, cchain.get)
       }
-    }
-    if (styleOf(sym)==Fine){
-      emit(s"""DFEVar ${quote(sym)}_rst_done = dfeBool().newInstance(this);""")
-      emit(s"""${quote(sym)}_sm.connectInput("rst_done", ${quote(sym)}_rst_done);""")
-      emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
-
-      emit(s"""OffsetExpr ${quote(sym)}_offset = stream.makeOffsetAutoLoop("${quote(sym)}_offset");""")
-      emit(s"""${quote(sym)}_rst_done <== stream.offset(${quote(sym)}_rst_en, -${quote(sym)}_offset-1);""")
-
     }
 
     emitComment(s"""} ${smStr} ${quote(sym)}""")

@@ -358,10 +358,10 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 
   def emitController(sym:Sym[Any], cchain:Option[Exp[CounterChain]]) {
     val smStr = styleOf(sym) match {
-			case Coarse => "MPSM"
+			case Coarse => s"${quote(sym)}_MPSM"
       case Fine => "PipeSM"
-      case Disabled => "SeqSM"
-      case ForkJoin => "ParSM"
+      case Disabled => s"${quote(sym)}_SeqSM"
+      case ForkJoin => s"${quote(sym)}_ParSM"
     }
     emitComment(s"""${smStr} ${quote(sym)} {""")
 
@@ -378,23 +378,52 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
     }
 
     /* State Machine Instatiation */
-    emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_${smStr}(this));""")
     // IO
-    emit(s"""${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
-    emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
     styleOf(sym) match {
       case Fine =>
+        val numCounters = if (cchain.isDefined) {
+          val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
+          counters.size
+        } else {
+          1
+        }
+        emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${smStr}(this, $numCounters));""")
+        emit(s"""${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
+        emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
+
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
         emit(s"""DFEVar ${quote(sym)}_rst_done = dfeBool().newInstance(this);""")
         emit(s"""${quote(sym)}_sm.connectInput("rst_done", ${quote(sym)}_rst_done);""")
         emit(s"""OffsetExpr ${quote(sym)}_offset = stream.makeOffsetAutoLoop("${quote(sym)}_offset");""")
         emit(s"""${quote(sym)}_rst_done <== stream.offset(${quote(sym)}_rst_en, -${quote(sym)}_offset-1);""")
-
+        if (cchain.isDefined) {
+          val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
+          (0 until counters.size) map { i =>
+            val Def(EatReflect(Counter_new(start, end, step, par))) = counters(i)
+            emit(s"""${quote(sym)}_sm.connectInput("sm_maxIn_$i", ${quote(end)});""")
+            emit(s"""DFEVar ${quote(cchain.get)}_max_$i = ${quote(sym)}_sm.getOutput("ctr_maxOut_$i");""")
+          }
+          emit(s"""DFEVar ${quote(cchain.get)}_done = dfeBool().newInstance(this);""")
+          emit(s"""${quote(sym)}_sm.connectInput("ctr_done", ${quote(cchain.get)}_done);""")
+          emit(s"""DFEVar ${quote(cchain.get)}_en_from_pipesm = ${quote(sym)}_sm.getOutput("ctr_en");""")
+          doneDeclaredSet += cchain.get
+        } else {
+          // Unit pipe, emit constant 1's wherever required
+          emit(s"""${quote(sym)}_sm.connectInput("sm_maxIn_0", constant.var(dfeUInt(32), 1));""")
+          emit(s"""${quote(sym)}_sm.connectInput("ctr_done", stream.offset(${quote(sym)}_sm.getOutput("ctr_en"), -1));""")
+        }
       case Coarse =>
+        emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${smStr}(this));""")
+        emit(s"""${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
+        emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
+
 		    val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
         emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case Disabled =>
+        emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${smStr}(this));""")
+        emit(s"""${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
+        emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
         if (cchain.isDefined) {
           val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
           emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
@@ -403,6 +432,10 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
         }
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case ForkJoin =>
+        emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${smStr}(this));""")
+        emit(s"""${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
+        emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
+
     }
 
     /* Control Signals to Children Controllers */

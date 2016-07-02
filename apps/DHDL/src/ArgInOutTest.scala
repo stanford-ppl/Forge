@@ -13,7 +13,7 @@ trait ArgInOutTest extends DHDLApplication {
   	val y = ArgOut[SInt]("y")
     setArg(x, N)
     Accel {
-      y := x + 4
+      Pipe { y := x + 4 }
     }
     val result = getArg(y)
     println("result = " + result)

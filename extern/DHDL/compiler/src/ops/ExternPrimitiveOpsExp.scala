@@ -155,13 +155,11 @@ trait MaxJGenExternPrimitiveOps extends MaxJGenEffect {
     (curBlock)
   }
 
-  override def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, out: PrintWriter) = {
-    val y = runTraversals(body)
-    preCodegen.run(y)
-    super.emitSource(args, y, className, out)
+  override def preProcess[A: Manifest](body: Block[A]) = {
+    preCodegen.run(body)
+    super.preProcess(body)
   }
 }
-
 
 
 // Defines type remappings required in Scala gen (should be same as in library)

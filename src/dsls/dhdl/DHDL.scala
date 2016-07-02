@@ -124,9 +124,8 @@ trait DHDLDSL extends ForgeApplication
      **/
     val Tile = tpe("Tile", T)
     /**
-     * BRAMs are on-chip scratchpads with fixed size. BRAMs can be specified as multi-dimensional, but the underlying addressing
-     * in hardware is always flat. The contents of BRAMs are currently persistent across loop iterations, even when they are declared in an inner scope.
-     * BRAMs can have an arbitrary number of readers but only one writer. This writer may be an element-based store or a load from an OffChipMem.
+     * A SparseTile describes a sparse section of an OffChipMem which can be loaded onto the accelerator using a gather operation, or which can
+     * be updated using a scatter operation.
      **/
     val SparseTile = tpe("SparseTile", T)
     /**
@@ -212,6 +211,7 @@ trait DHDLDSL extends ForgeApplication
     val StageAnalyzer = analyzer("Stage", isExtern=true)
     val GlobalAnalyzer = analyzer("Global")
     val ControlSignalAnalyzer = analyzer("ControlSignal", isExtern=true)
+    val UnrolledControlAnalyzer = analyzer("UnrolledControlSignal", isExtern=true)
     val ParallelizationSetter = traversal("ParallelizationSetter",isExtern=true)
     val DHDLAffineAnalysis = analyzer("DHDLAffine", isExtern=true)
 
@@ -260,7 +260,6 @@ trait DHDLDSL extends ForgeApplication
                                     //   Contention analyzer (to finalize contention estimates)
 
     // --- Post-DSE Estimation
-    schedule(IRPrinterPlus)
     schedule(AreaAnalyzer)          // Area estimation
     schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
 
@@ -268,8 +267,9 @@ trait DHDLDSL extends ForgeApplication
     schedule(ConstantFolding)       // Constant folding
     schedule(MetaPipeRegInsertion)  // Inserts registers between metapipe stages for counter signals
     schedule(Unrolling)             // Pipeline unrolling
+    schedule(UnrolledControlAnalyzer) // Control signal metadata after unrolling
     schedule(DotIRPrinter)          // Graph after unrolling
-    schedule(IRPrinter)             // Graph after unrolling
+    schedule(IRPrinterPlus)         // Graph after unrolling
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, maxj))

@@ -78,30 +78,36 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
   def parsOf(cc: Rep[CounterChain]): List[Int] = parParamsOf(cc).map(_.x)
 
   def parParamsOf(cc: Rep[CounterChain]): List[Param[Int]] = cc match {
-    case Def(EatReflect(Counterchain_new(ctrs,nIter))) => ctrs.map{
-      case Def(EatReflect(Counter_new(_,_,_,par))) => par
+    case Deff(Counterchain_new(ctrs,nIter)) => ctrs.map{
+      case Deff(Counter_new(_,_,_,par)) => par
     }
   }
 
   def offsets(cc: Rep[CounterChain]) = cc match {
-    case Def(EatReflect(Counterchain_new(ctrs,nIter))) => ctrs.map{
-      case Def(EatReflect(Counter_new(start,_,_,par))) => start
+    case Deff(Counterchain_new(ctrs,nIter)) => ctrs.map{
+      case Deff(Counter_new(start,_,_,par)) => start
+    }
+  }
+
+  def ccMaxes(cc: Rep[CounterChain]) = cc match {
+    case Deff(Counterchain_new(ctrs, nIter)) => ctrs.map{
+      case Deff(Counter_new(start,end,_,_)) => end
     }
   }
 
   def isUnitCounterChain(e: Exp[Any]): Boolean = e match {
-    case Def(EatReflect(Counterchain_new(ctrs,_))) if ctrs.length == 1 => isUnitCounter(ctrs(0))
+    case Deff(Counterchain_new(ctrs,_)) if ctrs.length == 1 => isUnitCounter(ctrs(0))
     case _ => false
   }
 
   def isUnitCounter(e: Exp[Any]): Boolean = e match {
-    case Def(EatReflect(Counter_new(ConstFix(0),ConstFix(1),ConstFix(1),_))) => true
+    case Deff(Counter_new(ConstFix(0),ConstFix(1),ConstFix(1),_)) => true
     case _ => false
   }
 
   // TODO: Default number of iterations if bound can't be computed?
   def nIters(x: Rep[CounterChain]): Long = x match {
-    case Def(EatReflect(Counterchain_new(_,nIters))) => Math.ceil( bound(nIters.res).getOrElse(1.0) ).toLong
+    case Deff(Counterchain_new(_,nIters)) => Math.ceil( bound(nIters.res).getOrElse(1.0) ).toLong
     case _ => 1L
   }
 

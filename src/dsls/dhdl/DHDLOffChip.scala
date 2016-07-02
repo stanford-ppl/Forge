@@ -8,7 +8,7 @@ trait DHDLOffChip {
 
   // TODO: Size of offchip memory can be a staged value, but it can't be a value which is calculated in hardware
   //       Any way to make this distinction?
-  // TODO: Change interface of tile load / store to words rather than BRAMs?
+  // TODO: Tile load/store sugar for stream loads (to/from FIFO)
   def importOffChip() {
     val T = tpePar("T")
 
@@ -16,81 +16,43 @@ trait DHDLOffChip {
     val Tile       = lookupTpe("Tile")
     val SparseTile = lookupTpe("SparseTile")
     val BRAM       = lookupTpe("BRAM")
+    val FIFO       = lookupTpe("FIFO")
     val Range      = lookupTpe("Range")
     val MVector    = lookupTpe("Vector")
     val Idx        = lookupAlias("Index")
 
     // --- Nodes
     val offchip_new   = internal (OffChip) ("offchip_new", T, ("size", Idx) :: OffChip(T), effect = mutable)
-    val offchip_load  = internal (OffChip) ("offchip_load_vector", T, (("mem",OffChip(T)), ("ofs",Idx), ("len",Idx)) :: MVector(T))
-    val offchip_store = internal (OffChip) ("offchip_store_vector", T, (("mem",OffChip(T)), ("ofs",Idx), ("vec",MVector(T))) :: MUnit, effect = write(0), aliasHint=aliases(Nil))
+    val offchip_load  = internal (OffChip) ("offchip_load_cmd", T, (("mem",OffChip(T)), ("fifo", FIFO(T)), ("ofs",Idx), ("len",Idx), ("par", MInt)) :: MUnit, effect = write(1), aliasHint = aliases(Nil))
+    val offchip_store = internal (OffChip) ("offchip_store_cmd", T, (("mem",OffChip(T)), ("fifo", FIFO(T)), ("ofs",Idx), ("len", Idx), ("par", MInt)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
 
-    // --- Internals
-    internal (OffChip) ("offchipCreate", T, (SOption(SString), SList(Idx)) :: OffChip(T)) implements composite ${
-      if ($1.length < 1) stageError("Cannot create an OffChipMem with zero dimensions")
-      val offchip = offchip_new[T](productTree($1))
-      $0.foreach{name => nameOf(offchip) = name }
-      dimsOf(offchip) = $1
-      offchip
-    }
-
-    internal (OffChip) ("offchipLoadVector", T, (("mem",OffChip(T)), ("ofs",Idx), ("len",Idx)) :: MVector(T)) implements composite ${
-      val vec = offchip_load_vector($mem,$ofs,$len)
-      dimsOf(vec) = List($len)
-      vec
-    }
-    internal (OffChip) ("offchipStoreVector", T, (("mem",OffChip(T)), ("ofs",Idx), ("vec",MVector(T))) :: MUnit, effect = write(0)) implements composite ${
-      offchip_store_vector($mem,$ofs,$vec)
-    }
-
+    val gather  = internal (OffChip) ("gather", T, (("mem", OffChip(T)), ("local", BRAM(T)), ("addrs", BRAM(Idx)), ("len", Idx)) :: MUnit, effect = write(1), aliasHint = aliases(Nil))
+    val scatter = internal (OffChip) ("scatter", T, (("mem", OffChip(T)), ("local", BRAM(T)), ("addrs", BRAM(Idx)), ("len", Idx)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
 
     // --- API
-    /** Creates a reference to a multi-dimensional array in main memory with given name and dimensions
-     * @param name
+    /** Creates a reference to a multi-dimensional array in main memory with given dimensions
      * @param dims
      **/
-    static (OffChip) ("apply", T, (SString, varArgs(Idx)) :: OffChip(T), TNum(T)) implements composite ${ offchipCreate(Some($0), $1.toList) }
-    /** Creates a reference to an unnamed multi-dimensional array in main memory with given dimensions
-     * @param dims
-     **/
-    static (OffChip) ("apply", T, (varArgs(Idx)) :: OffChip(T), TNum(T)) implements composite ${ offchipCreate(None, $0.toList) }
+    static (OffChip) ("apply", T, (varArgs(Idx)) :: OffChip(T), TNum(T)) implements composite ${
+      if ($0.length < 1) stageError("Cannot create an OffChipMem with zero dimensions")
+      val offchip = offchip_new[T](productTree($0.toList))
+      dimsOf(offchip) = $0.toList
+      offchip
+    }
 
     // Offer multiple versions of tile select since implicit cast from signed int to range isn't working
     val OffChip_API = withTpe(OffChip)
     OffChip_API {
-      /** Loads a fixed size tile of this 1D OffChipMem onto an on-chip MVector.
-       * @param cols
-       **/
-      infix ("load") (Range :: MVector(T)) implements composite ${ offchipLoadVector($self, $1.start, $1.len) }
-
-      /** Loads a fixed size 1D column tile of this 2D OffChipMem onto an on-chip MVector.
-       * @param row
-       * @param cols
-       **/
-      infix ("load") ((Idx, Range) :: MVector(T)) implements composite ${
-        offchipLoadVector($self, calcAddress(List($1, $2.start), dimsOf($self)), $2.len)
-      }
-
-      /** Loads a fixed size 1D page tile of this 3D OffChipMem onto an on-chip Vector.
-       * @param row
-       * @param col
-       * @param pages
-       **/
-      infix ("load") ((Idx,Idx,Range) :: MVector(T)) implements composite ${
-        offchipLoadVector($self, calcAddress(List($1, $2, $3.start), dimsOf($self)), $3.len)
-      }
-
-
-      /** Creates a reference to a 1D Tile of this 1D OffChipMem which can be loaded into on-chip BRAM.
+      /** Creates a reference to a 1D Tile of this 1D OffChipMem which can be loaded into local memory.
        * @param cols
        **/
       infix ("apply") (Range :: Tile(T)) implements composite ${ tile_create($self, List($1)) }
-      /** Creates a reference to a 2D Tile of this 2D OffChipMem which can be loaded into on-chip BRAM.
+      /** Creates a reference to a 2D Tile of this 2D OffChipMem which can be loaded into local memory.
        * @param rows
        * @param cols
        **/
       infix ("apply") ((Range,Range) :: Tile(T)) implements composite ${ tile_create($self, List($1,$2)) }
-      /** Creates a reference to a 3D Tile of this 3D OffChipMem which can be loaded into on-chip BRAM.
+      /** Creates a reference to a 3D Tile of this 3D OffChipMem which can be loaded into local memory.
        * @param rows
        * @param cols
        * @param pages
@@ -183,11 +145,19 @@ trait DHDLOffChip {
 
     // --- Scala Backend
     impl (offchip_new) (codegen($cala, ${ new Array[$t[T]]($size.toInt) }))
-    impl (offchip_load) (codegen($cala, ${ $mem.slice($ofs.toInt, ($ofs+$len).toInt) }))
+    impl (offchip_load) (codegen($cala, ${
+      for (i <- 0 until $len.toInt) { $fifo.push( $mem(i + $ofs.toInt) ) }
+    }))
     impl (offchip_store) (codegen($cala, ${
-      for (i <- 0 until $vec.length) { $mem(i + $ofs.toInt) = $vec(i) }
+      for (i <- 0 until $len.toInt) { $mem(i + $ofs.toInt) = $fifo.pop() }
     }))
 
+    impl (scatter) (codegen($cala, ${
+      for (i <- 0 until $len.toInt) { $mem( $addrs(i).toInt ) = $local(i) }
+    }))
+    impl (gather) (codegen($cala, ${
+      for (i <- 0 until $len.toInt) { $local(i) = $mem( $addrs(i).toInt ) }
+    }))
 
     // --- C++ Backend
     impl (offchip_new) (codegen(cpp, ${new $t[T]($size) }))
@@ -221,70 +191,89 @@ trait DHDLOffChip {
     /** Creates a store from the given on-chip BRAM to this Tile of off-chip memory
      * @param bram
      **/
-    infix (Tile) (":=", T, (Tile(T), BRAM(T)) :: MUnit, effect = write(0)) implements redirect ${ transferTile($0, $1, true) }
+    infix (Tile) (":=", T, (Tile(T), BRAM(T)) :: MUnit, TNum(T), effect = write(0)) implements redirect ${ copyTile($0, $1, true) }
+
+    // TODO: Storing from FIFO
+    //infix (Tile) (":=", T, (Tile(T), FIFO(T)) :: MUnit, effect = write(0)) implements redirect ${ streamTile($0, $1, true) }
+
+    /*direct (Tile) ("streamTile", T, (("tile", Tile(T)), ("fifo", FIFO(T)), ("store", SBoolean)) :: MUnit, effect = simple) implements composite ${
+      val mem = $tile.mem
+      val ranges = rangesOf($tile)
+    }*/
 
     /** @nodoc - not actually a user-facing method for now **/
-    direct (Tile) ("transferTile", T, (("tile",Tile(T)), ("local",BRAM(T)), ("store", SBoolean)) :: MUnit, effect = simple) implements composite ${
+    direct (Tile) ("copyTile", T, (("tile",Tile(T)), ("local",BRAM(T)), ("store", SBoolean)) :: MUnit, TNum(T), effect = simple) implements composite ${
       val mem      = $tile.mem
-      val ranges   = rangesOf($tile)
-      val offsets  = ranges.map(_.start)
-      val unitDims = ranges.map(isUnit(_))
-      val tileDims = ranges.map(_.len)
+      val offsets  = rangesOf($tile).map(_.start)
+      val tileDims = rangesOf($tile).map(_.len)
+      val unitDims = rangesOf($tile).map(isUnit(_))
+
+      val p = tilePar($tile).getOrElse(param(1))
+      val len = tileDims.last
+
+      val fifo = FIFO[T](512) // TODO: How to determine FIFO depth?
 
       val cmdCtrs = if (tileDims.length > 1) tileDims.take(tileDims.length - 1).map{d => Counter(max = d) } else List(Counter(max = 1.as[Index]))
 
-      val par = tilePar($tile).getOrElse(param(1))
+      Pipe(CounterChain(cmdCtrs:_*)){inds =>
+        val indices = inds.toList :+ 0.as[Index]
 
-      Sequential(CounterChain(cmdCtrs:_*)){indices =>
-        val inds = indices.toList :+ 0.as[Index]
-        val localOfs = inds.zip(unitDims).flatMap{case (i,isUnitDim) => if (!isUnitDim) Some(i) else None}
-
-        val memOfs = calcAddress(offsets.zip(inds).map{case (a,b) => a + b}, dimsOf(mem))
+        val localOfs = indices.zip(unitDims).flatMap{case (i,isUnitDim) => if (!isUnitDim) Some(i) else None}
+        val memOfs = calcAddress(offsets.zip(indices).map{case (a,b) => a + b}, dimsOf(mem))
 
         if ($store) {
-          val vec = bramLoadVector(local, localOfs, tileDims.last, par) // Load MVector from BRAM
-          offchipStoreVector(mem, memOfs, vec)  // Store to offchip
+          offchip_store_cmd(mem, fifo, memOfs, len, p)
+
+          Pipe(len par p){i =>
+            val localAddr = localOfs.take(localOfs.length - 1) :+ (localOfs.last + i)
+            fifo.push($local(localAddr:_*))
+          }
         }
         else {
-          val vec = offchipLoadVector(mem, memOfs, tileDims.last)  // Load MVector from offchip
-          bramStoreVector(local, localOfs, vec, par) // Store to BRAM
+          offchip_load_cmd(mem, fifo, memOfs, len, p)
+
+          Pipe(len par p){i =>
+            val localAddr = localOfs.take(localOfs.length - 1) :+ (localOfs.last + i)
+            $local(localAddr) = fifo.pop()
+          }
         }
       }
     }
-  }
 
+  }
 
   def importSparseTiles() {
     val T = tpePar("T")
 
-    val SparseTile    = lookupTpe("SparseTile")
-    val OffChip = lookupTpe("OffChipMem")
-    val BRAM    = lookupTpe("BRAM")
+    val SparseTile = lookupTpe("SparseTile")
+    val OffChip    = lookupTpe("OffChipMem")
+    val BRAM       = lookupTpe("BRAM")
     val Idx = lookupAlias("Index")
 
     // TODO: How to avoid CSE? Doesn't matter except that same symbol may be returned
     // and need different symbols to manage offset staging metadata properly
-    data(SparseTile, ("_target", OffChip(T)), ("_addrBram", BRAM(Idx)), ("_numAddrs", Idx))
+    data(SparseTile, ("_target", OffChip(T)), ("_addrs", BRAM(Idx)), ("_len", Idx))
     internal (SparseTile) ("stile_new", T, (OffChip(T), BRAM(Idx), Idx) :: SparseTile(T)) implements allocates(SparseTile, ${$0}, ${$1}, ${$2})
     internal (SparseTile) ("stile_create", T, (OffChip(T), BRAM(Idx), Idx) :: SparseTile(T)) implements composite ${
-      if (dimsOf($1).length!=1) stageError("Must provide flatten addresses for scatter and gather. Dimensions of address BRAM is " + dimsOf($1))
+      if (dimsOf($1).length!=1) stageError("Must provide flattened addresses for scatter and gather. Dimensions of address BRAM is " + dimsOf($1))
       val stile = stile_new($0, $1, $2)
       stile
     }
     internal.infix (SparseTile) ("mem", T, SparseTile(T) :: OffChip(T)) implements getter(0, "_target")
-    internal.infix (SparseTile) ("addr", T, SparseTile(T) :: BRAM(Idx)) implements getter(0, "_addrBram")
-    internal.infix (SparseTile) ("numAddrs", T, SparseTile(T) :: Idx) implements getter(0, "_numAddrs")
+    internal.infix (SparseTile) ("addr", T, SparseTile(T) :: BRAM(Idx)) implements getter(0, "_addrs")
+    internal.infix (SparseTile) ("len", T, SparseTile(T) :: Idx) implements getter(0, "_len")
 
     /** Creates a store from the given on-chip BRAM to this SparseTile of off-chip memory
      * @param bram
      **/
-    infix (SparseTile) (":=", T, (SparseTile(T), BRAM(T)) :: MUnit, effect = write(0)) implements redirect ${ gatherScatter($0, $1, true) }
+    infix (SparseTile) (":=", T, (SparseTile(T), BRAM(T)) :: MUnit, effect = write(0)) implements redirect ${ copySparse($0, $1, true) }
 
-    direct (SparseTile) ("gatherScatter", T, (("tile",SparseTile(T)), ("local",BRAM(T)), ("scatter", SBoolean)) :: MUnit, effect = simple) implements composite ${
-      val mem      = $tile.mem
-      val addrs    = $tile.addr
-      val numAddrs  = $tile.numAddrs
-      gather_scatter_transfer (mem, $local, addrs, numAddrs, $scatter)
+    direct (SparseTile) ("copySparse", T, (("tile",SparseTile(T)), ("local",BRAM(T)), ("isScatter", SBoolean)) :: MUnit, effect = simple) implements composite ${
+      val mem   = $tile.mem
+      val addrs = $tile.addr
+      val len   = $tile.len
+      if ($isScatter) { scatter(mem, $local, addrs, len) }
+      else            { gather(mem, $local, addrs, len) }
     }
 
   }

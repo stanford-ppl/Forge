@@ -15,23 +15,53 @@ import ppl.delite.framework.DeliteApplication
 trait PipeStageToolsExp extends EffectExp {
   this: DHDLExp =>
 
+  // Returns written memory, data, optional address
+  def writerUnapply(d: Def[Any]): Option[(Exp[Any], Exp[Any], Option[Exp[Any]])] = d match {
+    case EatReflect(Reg_write(reg,value)) => Some((reg,value,None))
+    case EatReflect(Bram_store(bram,addr,value)) => Some((bram,value,Some(addr)))
+    case EatReflect(Push_fifo(fifo,value,_)) => Some((fifo,value,None))
+    case _ => None
+  }
+
+  // Returns read memory, optional address
+  def readerUnapply(d: Def[Any]): Option[(Exp[Any], Option[Exp[Any]])] = d match {
+    case EatReflect(Reg_read(reg)) => Some((reg,None))
+    case EatReflect(Bram_load(bram,addr)) => Some((bram,Some(addr)))
+    case EatReflect(Pop_fifo(fifo)) => Some((fifo,None))
+    case _ => None
+  }
+
+  object LocalWriter {
+    def unapply(s: Exp[Any]): Option[(Exp[Any], Exp[Any], Option[Exp[Any]])] = s match {
+      case Def(d) => writerUnapply(d)
+      case _ => None
+    }
+    def unapply(d: Def[Any]): Option[(Exp[Any], Exp[Any], Option[Exp[Any]])] = writerUnapply(d)
+  }
+
+  object LocalReader {
+    def unapply(s: Exp[Any]): Option[(Exp[Any], Option[Exp[Any]])] = s match {
+      case Def(d) => readerUnapply(d)
+      case _ => None
+    }
+    def unapply(d: Def[Any]): Option[(Exp[Any], Option[Exp[Any]])] = readerUnapply(d)
+  }
+
   def isWriter(s: Exp[Any]): Boolean = s match {
-    case Def(d) => isWriter(d)
+    case LocalWriter(_,_,_) => true
     case _ => false
   }
   def isWriter(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:Reg_write[_]) => true
-    case EatReflect(_:Bram_store[_]) => true
+    case LocalWriter(_,_,_) => true
     case _ => false
   }
 
   def isReader(s: Exp[Any]): Boolean = s match {
-    case Def(d) => isReader(d)
+    case LocalReader(_,_) => true
     case _ => false
   }
   def isReader(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:Reg_read[_]) => true
-    case EatReflect(_:Bram_load[_]) => true
+    case LocalReader(_,_) => true
     case _ => false
   }
 
@@ -45,30 +75,41 @@ trait PipeStageToolsExp extends EffectExp {
     case _ => false
   }
   def isInnerControl(s: Exp[Any]): Boolean = s match {
-    case Def(d) => isInnerPipeline(s) || isBramTransfer(d) || isOffChipTransfer(d)
+    case Def(d) => isInnerPipeline(s) || isOffChipTransfer(d)
     case _ => false
   }
 
   def isOuterPipeline(s: Exp[Any]): Boolean = s match {
-    case Def(d) => isPipeline(d) && styleOf(s) != Fine
+    case Def(d) => isPipeline(d) && styleOf(s) != InnerPipe
     case _ => false
   }
   def isInnerPipeline(s: Exp[Any]): Boolean = s match {
-    case Def(d) => isPipeline(d) && styleOf(s) == Fine
+    case Def(d) => isPipeline(d) && styleOf(s) == InnerPipe
     case _ => false
   }
 
   def isOuterLoop(s: Exp[Any]): Boolean = s match {
-    case Def(d) => isLoop(d) && styleOf(s) != Fine
+    case Def(d) => isLoop(d) && styleOf(s) != InnerPipe
     case _ => false
   }
-  def isMetaPipe(s: Exp[Any]): Boolean = isOuterControl(s) && styleOf(s) == Coarse
-  def isMetaPipe(s: (Exp[Any],Boolean)): Boolean = !s._2 && isMetaPipe(s._1)
 
   def isInnerLoop(s: Exp[Any]): Boolean = s match {
-    case Def(d) => isLoop(d) && styleOf(s) == Fine
+    case Def(d) => isLoop(d) && styleOf(s) == InnerPipe
     case _ => false
   }
+
+  def isInnerPipe(s: Exp[Any]): Boolean = isInnerLoop(s)
+  def isInnerPipe(s: (Exp[Any],Boolean)): Boolean = s._2 || isInnerLoop(s._1)
+
+  def isStreamPipe(s: Exp[Any]): Boolean = isOuterControl(s) && styleOf(s) == StreamPipe
+  def isStreamPipe(s: (Exp[Any],Boolean)): Boolean = !s._2 && isStreamPipe(s._1)
+
+  def isMetaPipe(s: Exp[Any]): Boolean = isOuterControl(s) && styleOf(s) == CoarsePipe
+  def isMetaPipe(s: (Exp[Any],Boolean)): Boolean = !s._2 && isMetaPipe(s._1)
+
+  def isSequential(s: Exp[Any]): Boolean = isOuterControl(s) && styleOf(s) == SequentialPipe
+  def isSequential(s: (Exp[Any],Boolean)): Boolean = !s._2 && isSequential(s._1)
+
 
   def isAllocation(s: Exp[Any]): Boolean = s match {
     case Def(d) => isAllocation(d)
@@ -77,21 +118,15 @@ trait PipeStageToolsExp extends EffectExp {
   def isAllocation(d: Def[Any]): Boolean = d match {
     case EatReflect(_:Reg_new[_])       => true
     case EatReflect(_:Bram_new[_])      => true
+    case EatReflect(_:Fifo_new[_])      => true
     case EatReflect(_:Offchip_new[_])   => true
     case EatReflect(_:Counter_new)      => true
     case EatReflect(_:Counterchain_new) => true
     case _ => false
   }
-  def isBramTransfer(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:Bram_load_vector[_])  => true
-    case EatReflect(_:Bram_store_vector[_]) => true
-    case EatReflect(_:ParBramLoadVector[_]) => true
-    case EatReflect(_:ParBramStoreVector[_]) => true
-    case _ => false
-  }
   def isOffChipTransfer(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:Offchip_load_vector[_])  => true
-    case EatReflect(_:Offchip_store_vector[_]) => true
+    case EatReflect(_:Offchip_load_cmd[_])  => true
+    case EatReflect(_:Offchip_store_cmd[_]) => true
     case _ => false
   }
   def isParallel(d: Def[Any]): Boolean = d match {

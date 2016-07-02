@@ -34,6 +34,7 @@ trait ForgeArrayOps extends ForgeArrayTypes with Base with OverloadHack {
 
   /* Required for apps to be able use 'args' */
   implicit class ScalaArrayOps[T:Manifest](x: Rep[Array[T]]) {
+    def apply(n: Int)(implicit ctx: SourceContext) = scala_array_apply(x, unit(n))
     def apply(n: Rep[Int])(implicit ctx: SourceContext) = scala_array_apply(x,n)
     def length = scala_array_length(x)
   }

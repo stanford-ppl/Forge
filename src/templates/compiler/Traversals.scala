@@ -121,7 +121,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
 
   // TODO: Eventually want to handle TTP as well, but doesn't make sense to until after fusion changes
   def emitAnalyzer(az: Rep[DSLAnalyzer], stream: PrintWriter) {
-    stream.println("trait " + makeTraversalName(az) + " extends AnalyzerBase {")
+    stream.println("trait " + makeTraversalName(az) + " extends DeliteAnalyzer {")
     stream.println("  val IR: " + makeTraversalIRName(az))
     stream.println("  import IR._")
     stream.println("  override val name = \"" + makeTraversalName(az) + "\"")

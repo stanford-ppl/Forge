@@ -1,17 +1,16 @@
 import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
-import scala.util.Random
 
 object BlackScholesCompiler extends DHDLApplicationCompiler with BlackScholes
 object BlackScholesInterpreter extends DHDLApplicationInterpreter with BlackScholes
 trait BlackScholes extends DHDLApplication {
   override def stageArgNames = List("tileSize")
 
-  lazy val tileSize = param("tileSize", 7104)
-  lazy val outerPar = param("outerPar", 1)
-  lazy val innerPar = param("innerPar", 16)
-  lazy val numOptions = ArgIn[SInt]("numOptions")
+  lazy val tileSize = param(7104)
+  lazy val outerPar = param(1)
+  lazy val innerPar = param(16)
+  lazy val numOptions = ArgIn[SInt]
 
   final val inv_sqrt_2xPI = 0.39894228040143270286f
 
@@ -76,12 +75,12 @@ trait BlackScholes extends DHDLApplication {
   ): Rep[Unit] = {
 
     Pipe((numOptions by tileSize) par outerPar) { i =>
-      val otypeRAM      = BRAM[UInt]("typeTile", tileSize)
-      val sptpriceRAM   = BRAM[Flt]("sptpTile", tileSize)
-      val strikeRAM     = BRAM[Flt]("strkTile", tileSize)
-      val rateRAM       = BRAM[Flt]("rateTile", tileSize)
-      val volatilityRAM = BRAM[Flt]("voltTile", tileSize)
-      val otimeRAM      = BRAM[Flt]("timeTile", tileSize)
+      val otypeRAM      = BRAM[UInt](tileSize)
+      val sptpriceRAM   = BRAM[Flt](tileSize)
+      val strikeRAM     = BRAM[Flt](tileSize)
+      val rateRAM       = BRAM[Flt](tileSize)
+      val volatilityRAM = BRAM[Flt](tileSize)
+      val otimeRAM      = BRAM[Flt](tileSize)
 
       Parallel {
         otypeRAM := otype(i::i+tileSize, innerPar)
@@ -92,7 +91,7 @@ trait BlackScholes extends DHDLApplication {
         otimeRAM := otime(i::i+tileSize, innerPar)
       }
 
-      val optpriceRAM = BRAM[Flt]("optpTile", tileSize)
+      val optpriceRAM = BRAM[Flt](tileSize)
       Pipe((tileSize by 1) par innerPar){ j =>
         val price = BlkSchlsEqEuroNoDiv(sptpriceRAM(j), strikeRAM(j), rateRAM(j), volatilityRAM(j), otimeRAM(j), otypeRAM(j))
         optpriceRAM(j) = price
@@ -102,20 +101,20 @@ trait BlackScholes extends DHDLApplication {
   }
 
   def main() {
-    val N = args(unit(0)).to[SInt]
+    val N = args(0).to[SInt]
 
     bound(N) = 9995328
     domainOf(tileSize) = (96,19200,96)
     domainOf(outerPar) = (1,1,1)
     domainOf(innerPar) = (1,96,1)
 
-    val types  = OffChipMem[UInt]("otype", N)
-    val prices = OffChipMem[Flt]("sptprice", N)
-    val strike = OffChipMem[Flt]("strke", N)
-    val rate   = OffChipMem[Flt]("rate", N)
-    val vol    = OffChipMem[Flt]("volatility", N)
-    val time   = OffChipMem[Flt]("otime", N)
-    val optprice = OffChipMem[Flt]("optprice", N)
+    val types  = OffChipMem[UInt](N)
+    val prices = OffChipMem[Flt](N)
+    val strike = OffChipMem[Flt](N)
+    val rate   = OffChipMem[Flt](N)
+    val vol    = OffChipMem[Flt](N)
+    val time   = OffChipMem[Flt](N)
+    val optprice = OffChipMem[Flt](N)
 
     val sotype      = Array.fill(N)(random[UInt](2))
     val ssptprice   = Array.fill(N)(random[Flt])

@@ -11,12 +11,12 @@ trait OpsAnalysisExp extends LatencyAnalysisExp with OpsModel {
   this: DHDLExp =>
 }
 
-trait OpsAnalyzer extends ModelingTools {
+trait OpsAnalyzer extends ModelingTraversal {
   val IR: OpsAnalysisExp with DHDLExp
   import IR._
 
-  debugMode = false
   override val name = "Ops Analyzer"
+  debugMode = false
 
   var totalOps = AppStatistics()
   var opScope: List[AppStatistics] = Nil
@@ -32,7 +32,7 @@ trait OpsAnalyzer extends ModelingTools {
     ops
   }
 
-  def traverseNode(lhs: Exp[Any], rhs: Def[Any]) {
+  override def traverse(lhs: Sym[Any], rhs: Def[Any]) {
     val ops = rhs match {
       case EatReflect(Hwblock(blk)) =>
         inHwScope = true
@@ -58,7 +58,7 @@ trait OpsAnalyzer extends ModelingTools {
         debug(s"  body: $body")
         body * P * N
 
-      case EatReflect(e@Pipe_fold(cchain,_,_,iFunc,ld,st,func,rFunc,_,idx,_,_,_)) =>
+      case EatReflect(e@Pipe_fold(cchain,accum,zero,fA,iFunc,ld,st,func,rFunc,_,idx,_,_,_)) =>
         val P = parsOf(cchain).reduce(_*_)
         val N = nIters(cchain)
         val body = opsInBlock(func) * N * P
@@ -75,7 +75,7 @@ trait OpsAnalyzer extends ModelingTools {
         debug(s"  store: $store")
         body + reduce + icalc + load + store
 
-      case EatReflect(e@Accum_fold(ccOuter,ccInner,_,_,iFunc,func,ld1,ld2,rFunc,st,_,_,idx,_,_,_,_)) =>
+      case EatReflect(e@Accum_fold(ccOuter,ccInner,accum,zero,fA,iFunc,func,ld1,ld2,rFunc,st,_,_,idx,_,_,_,_)) =>
         val Pm = parsOf(ccOuter).reduce(_*_)
         val Pr = parsOf(ccInner).reduce(_*_)
         val Nm = nIters(ccOuter)

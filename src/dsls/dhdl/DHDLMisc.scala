@@ -145,6 +145,7 @@ trait DHDLMisc {
     direct (API) ("__equal", T, (MArray(T), MArray(T)) :: Bit, TOrder(T)) implements composite ${
       array_zip($0, $1, {(a:Rep[T], b:Rep[T]) => implicitly[Order[T]].equals(a,b)}).reduce{_&&_}
     }
+
   }
 
   def importRandomOps() {
@@ -325,7 +326,7 @@ trait DHDLMisc {
     // TODO: This is a quick hack for scheduling acceleration initialization. Eventually this should act as a true annotation
     direct (Tst) ("Accel", Nil, MThunk(MUnit) :: MUnit) implements composite ${
       val accel = hwblock($0)
-      styleOf(accel) = Disabled
+      styleOf(accel) = SequentialPipe
       accel
     }
 

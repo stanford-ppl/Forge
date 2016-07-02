@@ -6,19 +6,18 @@ object KmeansCompiler extends DHDLApplicationCompiler with Kmeans
 object KmeansInterpreter extends DHDLApplicationInterpreter with Kmeans
 trait Kmeans extends DHDLApplication {
 
-  override def stageArgNames = List("tileSize", "dim", "numCents")
-  lazy val dim       = ArgIn[SInt]("dimension")
-  lazy val numCents  = ArgIn[SInt]("numCents")
-  lazy val numPoints = ArgIn[SInt]("numPoints")
+  lazy val dim       = ArgIn[SInt]
+  lazy val numCents  = ArgIn[SInt]
+  lazy val numPoints = ArgIn[SInt]
 
-  lazy val tileSize   = param("tileSize", 320)
+  lazy val tileSize   = param(320)
   lazy val dTileSize  = 96
-  lazy val ptLoopPar  = param("ptLoopPar", 1)
-  //lazy val ctLoopPar  = param("ctLoopPar", 1)
-  lazy val dstLoopPar = param("dstLoopPar", 1)
-  lazy val accLoopPar = param("accLoopPar", 1)
-  lazy val avgLoopPar = param("avgLoopPar", 1)
-  lazy val ignorePar = param("IGNOREME",1)
+  lazy val ptLoopPar  = param(1)
+  //lazy val ctLoopPar  = param(1)
+  lazy val dstLoopPar = param(1)
+  lazy val accLoopPar = param(1)
+  lazy val avgLoopPar = param(1)
+  lazy val ignorePar = param(1)
   lazy val MAXK = 8
 
   lazy val loadPar = param(96)
@@ -81,9 +80,9 @@ trait Kmeans extends DHDLApplication {
   }
 
   def main() {
-    val N = args(unit(0)).to[SInt];   bound(N) = 960000
-    val K = args(unit(0)).to[SInt];   bound(K) = 8
-    val D = args(unit(0)).to[SInt];   bound(D) = 384
+    val N = args(0).to[SInt];   bound(N) = 960000
+    val K = args(1).to[SInt];   bound(K) = 8
+    val D = args(2).to[SInt];   bound(D) = 384
     domainOf(tileSize) = (1,9600,1)
     //domainOf(ctLoopPar) = (1,1,1)
     domainOf(dstLoopPar) = (1,96,1)
@@ -93,8 +92,8 @@ trait Kmeans extends DHDLApplication {
     domainOf(ignorePar) = (1,1,1)
     domainOf(loadPar) = (96,96,1)
 
-    val points = OffChipMem[Flt]("points", N, D)       // input points
-    val centroids = OffChipMem[Flt]("centroids", K, D) // output centroids
+    val points = OffChipMem[Flt](N, D)      // input points
+    val centroids = OffChipMem[Flt](K, D)   // output centroids
 
     val pts = Array.tabulate(N){i => Array.tabulate(D){d => random[Flt](10) }}
 

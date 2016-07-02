@@ -59,11 +59,11 @@ trait DHDLBoundAnalysis {
       analyze(FixPt, "mul") using pattern((${Exact(x)},${Exact(y)}) -> ${ bound(lhs) = exact(x * y) })
       analyze(FixPt, "mul") using pattern((${Bound(x)},${Bound(y)}) -> ${ bound(lhs) = x * y })
 
-      analyze(FixPt, "div") using pattern((${Fixed(x)},${Fixed(y)}) -> ${ bound(lhs) = fixed(Math.floor(x / y)) })
-      analyze(FixPt, "div") using pattern((${Fixed(x)},${Exact(y)}) -> ${ bound(lhs) = exact(Math.floor(x / y)) })
-      analyze(FixPt, "div") using pattern((${Exact(x)},${Fixed(y)}) -> ${ bound(lhs) = exact(Math.floor(x / y)) })
-      analyze(FixPt, "div") using pattern((${Exact(x)},${Exact(y)}) -> ${ bound(lhs) = exact(Math.floor(x / y)) })
-      analyze(FixPt, "div") using pattern((${Bound(x)},${Exact(y)}) -> ${ bound(lhs) = Math.floor(x / y) })
+      analyze(FixPt, "div") using pattern((${Fixed(x)},${Fixed(y)}) -> ${ bound(lhs) = fixed(Math.ceil(x / y)) })
+      analyze(FixPt, "div") using pattern((${Fixed(x)},${Exact(y)}) -> ${ bound(lhs) = exact(Math.ceil(x / y)) })
+      analyze(FixPt, "div") using pattern((${Exact(x)},${Fixed(y)}) -> ${ bound(lhs) = exact(Math.ceil(x / y)) })
+      analyze(FixPt, "div") using pattern((${Exact(x)},${Exact(y)}) -> ${ bound(lhs) = exact(Math.ceil(x / y)) })
+      analyze(FixPt, "div") using pattern((${Bound(x)},${Exact(y)}) -> ${ bound(lhs) = Math.ceil(x / y) })
     }
   }
 

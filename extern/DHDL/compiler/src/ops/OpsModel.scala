@@ -55,6 +55,10 @@ trait OpsModel extends PipeStageToolsExp {
     case Fixed(_) => NoOps
     case _ => d match {
 
+    case e: Push_fifo[_] => AppStatistics(insts=2, onChipIn = nbits(e._mT))
+    case e: Pop_fifo[_] => AppStatistics(insts=2, onChipOut = nbits(e._mT))
+    case e: Count_fifo[_] => Instruction
+
     // TODO: Should this count if ram will be implemented as regs?
     case e: Bram_load[_] => AppStatistics(insts=1,onChipOut = nbits(e._mT))
     case e: Bram_store[_] => AppStatistics(insts=1,onChipIn = nbits(e._mT))
@@ -107,25 +111,15 @@ trait OpsModel extends PipeStageToolsExp {
     case Fixpt_to_fltpt(x) => FLOP // ???
     case Fltpt_to_fixpt(_) => FLOP // ???
 
-    case e@Offchip_store_vector(mem,ofs,vec) =>
+    case e@Offchip_store_cmd(mem,stream,ofs,len,p) =>
       val bits = nbits(e._mT)
-      val size = dimsOf(vec).map{case Exact(s) => s.toInt}.reduce{_*_}
-      AppStatistics(dataOut=bits*size)
+      val size = bound(len).getOrElse{stageError(s"Cannot resolve bound of tile vector store size $len")}
+      AppStatistics(dataOut=bits*size.toLong)
 
-    case e@Offchip_load_vector(mem,ofs,len) =>
+    case e@Offchip_load_cmd(mem,stream,ofs,len,p) =>
       val bits = nbits(e._mT)
       val size = bound(len).getOrElse{stageError(s"Cannot resolve bound of tile vector load size $len")}
       AppStatistics(dataIn=bits*size.toLong)
-
-    case e@Bram_store_vector(bram,ofs,vec,cchain,inds) =>
-      val bits = nbits(e.mT)
-      val size = dimsOf(vec).map{d => bound(d).getOrElse{stageError(s"Cannot resolve bound of vector size $d")}.toInt}.reduce{_*_}
-      AppStatistics(onChipIn = bits*size)
-
-    case e@Bram_load_vector(bram,ofs,cchain,inds) =>
-      val bits = nbits(e.mT)
-      val size = nIters(cchain) * parsOf(cchain).reduce{_*_}
-      AppStatistics(onChipOut = bits*size)
 
     case Reflect(d,_,_) => opsInNode(s, d)
     case _ => NoOps

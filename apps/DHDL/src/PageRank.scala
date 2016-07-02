@@ -1,24 +1,22 @@
 import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
-import scala.util.Random
 
 object PageRankCompiler extends DHDLApplicationCompiler with PageRank
 object PageRankInterpreter extends DHDLApplicationInterpreter with PageRank
 trait PageRank extends DHDLApplication {
   type Elem = Flt //FixPt[Signed, B16, B16]
 
-  override def stageArgNames = List("tileSize")
-  lazy val tileSize = param("tileSize", 2)
-  lazy val maxNumEdge = param("maxNumEdge", 8)
-  lazy val numIter = ArgIn[SInt]("numIter")
-  lazy val damp = ArgIn[Elem]("damping")
+  lazy val tileSize = param(2)
+  lazy val maxNumEdge = param(8)
+  lazy val numIter = ArgIn[SInt]
+  lazy val damp = ArgIn[Elem]
 
   def main() {
-    val NI = args(unit(0)).to[SInt]
-    val DF = args(unit(1)).to[Elem]
-    val NV = args(unit(2)).to[SInt]
-    //val NE = args(unit(3)).to[SInt]
+    val NI = args(0).to[SInt]
+    val DF = args(1).to[Elem]
+    val NV = args(2).to[SInt]
+    //val NE = args(3).to[SInt]
     //genRandDirEdgeList("/Users/Yaqi/Documents/hyperdsl/published/DHDL/graph.dot", NV, NE, true)
     //Verified with graph from http://www.cs.princeton.edu/~chazelle/courses/BIB/pagerank.htm
     //NV = 4, NE = 5, DF = 0.85
@@ -37,10 +35,10 @@ trait PageRank extends DHDLApplication {
     //println("dvl: " + dvl.mkString(","))
     //println("del: " + del.mkString(","))
     //println("sob: " + sob.mkString(","))
-    val vertList = OffChipMem[Index]("VertList", NV, 2) // [pointer, size]
-    val edgeList = OffChipMem[Index]("EdgeList", NE) // srcs of edges
-    val outBounds = OffChipMem[Index]("outBounds", NE) // number of outbound links for each src in edgeList
-    val pageRank = OffChipMem[Elem]("PageRank", NV, 2) // [PR iter even, PR iter odd]
+    val vertList = OffChipMem[Index](NV, 2) // [pointer, size]
+    val edgeList = OffChipMem[Index](NE) // srcs of edges
+    val outBounds = OffChipMem[Index](NE) // number of outbound links for each src in edgeList
+    val pageRank = OffChipMem[Elem](NV, 2) // [PR iter even, PR iter odd]
 
     setArg(numIter, NI)
     setArg(damp, DF)
@@ -58,16 +56,16 @@ trait PageRank extends DHDLApplication {
         val oldPrIdx = iter % 2.as[Index]
         val newPrIdx = (iter + 1.as[Index]) % 2.as[Index]
         Pipe(NV by tileSize){ ivt =>
-          val prOldB = BRAM[Elem]("prOldTile", tileSize)
-          val prNewB = BRAM[Elem]("prNewTile", tileSize)
-          val vB = BRAM[Index]("vertTile", tileSize, 2)
+          val prOldB = BRAM[Elem](tileSize)
+          val prNewB = BRAM[Elem](tileSize)
+          val vB = BRAM[Index](tileSize, 2)
           prOldB := pageRank(ivt::ivt+tileSize, oldPrIdx::oldPrIdx+1.as[SInt])
           vB := vertList(ivt::ivt+tileSize, 0::2)
           Pipe(tileSize by 1){ iv =>
-            val eB = BRAM[Index]("edgeTile", maxNumEdge)
-            val oB = BRAM[Index]("outTile", maxNumEdge)
-            val eprB = BRAM[Elem]("edgePageRank", maxNumEdge)
-            val idxB = BRAM[Index]("idxTile", maxNumEdge)
+            val eB = BRAM[Index](maxNumEdge)
+            val oB = BRAM[Index](maxNumEdge)
+            val eprB = BRAM[Elem](maxNumEdge)
+            val idxB = BRAM[Index](maxNumEdge)
             val pt = vB(iv,0)
             val numEdge = vB(iv,1)
             //println("iv:" + iv)
@@ -86,7 +84,7 @@ trait PageRank extends DHDLApplication {
             //printBram(idxB)
             eprB := pageRank(idxB, numEdge)
             //printBram(eprB)
-            val sum = Reg[Elem]("sum")
+            val sum = Reg[Elem]
             Pipe.reduce(numEdge by 1)(sum){ ie =>
               eprB(ie) / oB(ie).to[Elem]
             }{_+_}

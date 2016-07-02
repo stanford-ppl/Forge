@@ -10,8 +10,8 @@ import dhdl.compiler.ops._
 
 import scala.collection.mutable.{HashMap,ArrayBuffer}
 
-trait ParamRestrictions extends Expressions {
-  this: DHDLMetadataOpsExp with GenOverloadHack =>
+trait ParamRestrictions extends Expressions with NameOpsExp {
+  this: GenOverloadHack =>
 
   private def qt(x: Param[_]) = nameOf(x).getOrElse(s"$x")
 
@@ -120,6 +120,9 @@ trait ParameterAnalyzer extends Traversal {
   val IR: DHDLExp with ParameterAnalysisExp
   import IR._
 
+  override val name = "Parameter Analyzer"
+  override val recurse = Always
+  override val eatReflect = true
   debugMode = false
 
   val MIN_TILE_SIZE  = 96    // words
@@ -162,18 +165,17 @@ trait ParameterAnalyzer extends Traversal {
       range(p) = xrange(range(p).start,Math.min(mx,range(p).end),range(p).step)
   }
 
-  def canParallelize(e: Exp[Any]) = styleOf(e) == Fine || styleOf(e) == Coarse
+  def canParallelize(e: Exp[Any]) = isInnerPipe(e) || isMetaPipe(e) || isStreamPipe(e)
 
-  override def traverseStm(stm: Stm) = stm match {
-    case TP(s, d) =>
-      traverseNode(s, d)
-      super.traverseStm(stm)
-  }
-  def traverseNode(lhs: Exp[Any], rhs: Def[Any]) = rhs match {
-    case EatReflect(Bram_new(_,_)) =>
+  override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
+    case Fifo_new(ParamFix(p),_) =>
+      tileSizes ::= p
+      setRange(p, 1, MAX_TILE_SIZE, MIN_TILE_SIZE)
+
+    case Bram_new(_,_) =>
       val dims = dimsOf(lhs)
-      val (consts,params) = dims.partition{ case Const(_) => true; case _ => false }
-      val cSize = consts.map{case Const(c) => c.asInstanceOf[Int] }.fold(1){_*_}
+      val (consts,params) = dims.partition{ case ConstFix(_) => true; case _ => false }
+      val cSize = consts.map{case ConstFix(c) => c.asInstanceOf[Int] }.fold(1){_*_}
 
       val tiles = params.flatMap{case ParamFix(p) => Some(p); case _ => None}
 
@@ -186,8 +188,7 @@ trait ParameterAnalyzer extends Traversal {
 
       //if (tiles.length > 1) restrict ::= RProductLessThan(tiles, )
 
-
-    case EatReflect(Counter_new(start,end,step,par)) =>
+    case Counter_new(start,end,step,par) =>
       var max = MAX_PAR_FACTOR
       debug(s"Found counter with start=$start, end=$end, step=$step, par=$par")
 
@@ -232,28 +233,22 @@ trait ParameterAnalyzer extends Traversal {
       }
 
     // HACK: Parallelize innermost loop only
-    case EatReflect(e:Pipe_foreach) if canParallelize(lhs) =>
+    case e:Pipe_foreach if canParallelize(lhs) =>
       val pars = List( parParamsOf(e.cchain).last )
       parFactors :::= pars
-      if (styleOf(lhs) != Fine) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
+      if (!isInnerPipe(lhs)) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
-    case EatReflect(e:Pipe_fold[_,_]) if canParallelize(lhs) =>
+    case e:Pipe_fold[_,_] if canParallelize(lhs) =>
       val pars = List( parParamsOf(e.cchain).last )
       parFactors :::= pars
-      if (styleOf(lhs) != Fine) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
+      if (!isInnerPipe(lhs)) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
-    case EatReflect(e:Accum_fold[_,_]) if canParallelize(lhs) =>
+    case e:Accum_fold[_,_] if canParallelize(lhs) =>
       val opars = List( parParamsOf(e.ccOuter).last )
       val ipars = List( parParamsOf(e.ccInner).last )
       parFactors :::= opars
       parFactors :::= ipars
       opars.foreach{p => setMax(p, MAX_OUTER_PAR) }
-
-    case EatReflect(e:Bram_store_vector[_]) =>
-      parFactors :::= List( parParamsOf(e.cchain).last )
-
-    case EatReflect(e:Bram_load_vector[_]) => NoArea
-      parFactors :::= List( parParamsOf(e.cchain).last )
 
     case _ => //
   }

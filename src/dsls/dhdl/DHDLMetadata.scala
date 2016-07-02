@@ -5,7 +5,7 @@ package dhdl
 trait DHDLMetadata {
   this: DHDLDSL =>
 
-  def importDHDLMetadata () = {
+  def importDHDLMetadata() = {
     val T = tpePar("T")
 
     val RegType     = lookupTpe("RegType", stage=compile)
@@ -33,24 +33,6 @@ trait DHDLMetadata {
       composite ${ meta[MStagedDims]($0).get.dims }
 
     internal (dimOps) ("sizeOf", T, T :: Idx) implements composite ${ productTree(dimsOf($0)) }
-
-
-    /* Name of a node */
-    val MName = metadata("MName", "name" -> SString)
-    val nameOps = metadata("nameOf")
-    internal.static (nameOps) ("update", Nil, (MAny, SString) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MName($1)) }
-    internal.static (nameOps) ("apply", Nil, MAny :: SOption(SString)) implements
-      composite ${ meta[MName]($0).map(_.name) }
-
-
-    /* Is Double Buffer: false if unset */
-    val MDblBuf = metadata("MDblBuf", "isDblBuf" -> SBoolean)
-    val dblBufOps = metadata("isDblBuf")
-    static (dblBufOps) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MDblBuf($1)) }
-    static (dblBufOps) ("apply", Nil, MAny :: SBoolean) implements
-      composite ${ meta[MDblBuf]($0).map(_.isDblBuf).getOrElse(false) }
 
 
     /* Is Accumulator: false if unset */
@@ -104,14 +86,6 @@ trait DHDLMetadata {
       composite ${ setMetadata($0, MTilePar($1)) }
     internal.static (tileParOps) ("apply", Nil, MAny :: SOption(MInt)) implements
       composite ${ meta[MTilePar]($0).map(_.par) }
-
-    /* Number of Banks */
-    val MBank = metadata("MBank", "nBanks" -> SInt)
-    val bankOps = metadata("banks")
-    internal.static (bankOps) ("update", Nil, (MAny, SInt) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MBank($1)) }
-    internal.static (bankOps) ("apply", Nil, MAny :: SInt) implements
-      composite ${ meta[MBank]($0).get.nBanks }
 
     /* Pipeline style */
     val MControlType = metadata("MControlType", "tpe" -> ControlType)

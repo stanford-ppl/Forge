@@ -8,7 +8,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait ModelingTools extends QuickTraversal with PipeStageTools {
+trait ModelingTraversal extends QuickTraversal with PipeStageTools {
   val IR: DHDLExp with PipeStageToolsExp with LatencyModel
   import IR._
 
@@ -79,12 +79,6 @@ trait ModelingTools extends QuickTraversal with PipeStageTools {
     }
     delays.toList
   }
-
-  // Traversal
-  override def traverseStm(stm: Stm) = stm match {
-    case TP(s, d) => traverseNode(s, d)
-  }
-  def traverseNode(lhs: Exp[Any], rhs: Def[Any]): Unit
 
   // Reset state
   override def preprocess[A:Manifest](b: Block[A]) = {

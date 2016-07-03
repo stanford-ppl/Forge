@@ -415,6 +415,9 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
         emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
         if (cchain.isDefined) {
           val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
+          emitBlock(nIters, "nIters")
+          val Def(d) = getBlockResult(nIters)
+          emit(s"""// ${quote(getBlockResult(nIters))} = $d""")
           emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
         } else {
           emit(s"""${quote(sym)}_sm.connectInput("sm_numIter, constant.var(1);""")

@@ -125,9 +125,11 @@ trait MaxJPreCodegen extends Traversal  {
     case _:Offchip_load_vector[_] => memStreams += sym
 
     case e@EatReflect(Bram_new(size, zero)) =>
-			withStream(newStream("bram_" + quote(sym))) {
-				emitDblBufSM(quote(sym), readersOf(sym).length)
-			}
+      if (isDblBuf(e)) {
+        withStream(newStream("bram_" + quote(sym))) {
+          emitDblBufSM(quote(sym), readersOf(sym).length)
+        }
+      }
     case Reflect(s, u, effects) =>
       preGenNodes(sym, s)
     case Reify(s, u, effects) =>

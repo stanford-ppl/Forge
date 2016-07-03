@@ -2,6 +2,7 @@ package dhdl.compiler.ops
 
 import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, DotGenEffect, MaxJGenEffect}
 import scala.reflect.{Manifest,SourceContext}
+import ppl.delite.framework.transform.{DeliteTransform}
 
 import dhdl.compiler._
 import dhdl.compiler.ops._
@@ -144,93 +145,25 @@ trait ScalaGenLoweredPipeOps extends ScalaGenEffect {
   }
 }
 
-trait MaxJGenLoweredPipeOps extends MaxJGenEffect {
-  val IR: LoweredPipeOpsExp with DHDLCodegenOps with DHDLMetadataOpsExp with ExternCounterOpsExp
+trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
+  val IR: LoweredPipeOpsExp with ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
+          with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
+          with DHDLCodegenOps with NosynthOpsExp with DeliteTransform
   import IR._
 
-  def emitParallelizedLoop(iters: List[List[Sym[FixPt[Signed,B32,B0]]]], cchain: Exp[CounterChain])(emitBlk: => Unit) = {
+  def emitParallelizedLoop(iters: List[List[Sym[FixPt[Signed,B32,B0]]]], cchain: Exp[CounterChain]) = {
+    val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
+
     iters.zipWithIndex.foreach{ case (is, i) =>
-      stream.println("for( " + quote(cchain) + "_vec" + i + " <- " + quote(cchain) + ".apply(" + i + ".toInt)) {")
-      is.zipWithIndex.foreach{ case (iter, j) =>
-        stream.println("  val "+quote(iter)+" = " + quote(cchain) + "_vec" + i + ".apply(" + j + ".toInt)")
+      if (is.size == 1) { // This level is not parallelized, so assign the iter as-is
+          emit("DFEVar " + quote(is(0)) + " = " + quote(counters(i)) + ";");
+      } else { // This level IS parallelized, index into the counters correctly
+        is.zipWithIndex.foreach{ case (iter, j) =>
+          emit("DFEVar " + quote(iter) + " = " + quote(counters(i)) + "[" + j + "];")
+        }
       }
     }
-    emitBlk
-    stream.println("}" * iters.length)
   }
-
-  def emitController_again(sym:Sym[Any], cchain:Option[Exp[CounterChain]]) {
-    val smStr = styleOf(sym) match {
-			case Coarse => "MPSM"
-      case Fine => "PipeSM"
-      case Disabled => "SeqSM"
-      case ForkJoin => "ParSM"
-    }
-    emitComment(s"""${smStr} ${quote(sym)} {""")
-
-    /* Emit done signal */
-    if (parentOf(sym).isEmpty) {
-      emit(s"""DFEVar ${quote(sym)}_en = top_en;""")
-      emit(s"""DFEVar ${quote(sym)}_done = dfeBool().newInstance(this);""")
-      emit(s"""top_done <== ${quote(sym)}_done;""")
-//      enDeclaredSet += sym
-//      doneDeclaredSet += sym
-    } else {
-      emitComment(s"""parentOf(${quote(sym)}) = ${quote(parentOf(sym).get)}""")
-    }
-
-    /* State Machine Instatiation */
-    emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_${smStr}(this));""")
-    // IO
-    emit(s"""DFEVar ${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
-    emit(s"""DFEVar ${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
-    styleOf(sym) match {
-      case Fine =>
-        emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
-      case Coarse =>
-		    val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
-        emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
-        emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
-      case Disabled =>
-        if (cchain.isDefined) {
-          val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
-          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
-        } else {
-          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter, constant.var(1);""")
-        }
-        emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
-      case ForkJoin =>
-    }
-
-    /* Control Signals to Children Controllers */
-    if (styleOf(sym)!=Fine) {
-		  childrenOf(sym).zipWithIndex.foreach { case (c, idx) =>
-		  	emit(s"""DFEVar ${quote(c)}_done = dfeBool().newInstance(this);""")
-		  	emit(s"""${quote(sym)}_sm.connectInput("s${idx}_done", ${quote(c)}_done);""")
-        emit(s"""DFEVar ${quote(c)}_en = ${quote(sym)}_sm.getOutput("s${quote(idx)}_en");""")
-//		  	enDeclaredSet += c
-//		  	doneDeclaredSet += c
-		  }
-    }
-
-    if (styleOf(sym)!=ForkJoin) {
-//      if (cchain.isDefined) {
-//        emitCChainCtrl(sym, cchain.get)
-//      }
-    }
-    if (styleOf(sym)==Fine){
-      emit(s"""DFEVar ${quote(sym)}_rst_done = dfeBool().newInstance(this);""")
-      emit(s"""${quote(sym)}_sm.connectInput("rst_done", ${quote(sym)}_rst_done);""")
-      emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
-
-      emit(s"""OffsetExpr ${quote(sym)}_offset = stream.makeOffsetAutoLoop("${quote(sym)}_offset");""")
-      emit(s"""${quote(sym)}_rst_done <== stream.offset(${quote(sym)}_rst_en, -${quote(sym)}_offset-1);""")
-
-    }
-
-    emitComment(s"""} ${smStr} ${quote(sym)}""")
-  }
-
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case e@ParPipeForeach(cchain, func, inds) =>
@@ -241,9 +174,8 @@ trait MaxJGenLoweredPipeOps extends MaxJGenEffect {
         case Disabled => emitComment(s"""SeqSM to be emitted""")
         case _ => emitComment(s"""ParPipeForeach style: ${styleOf(sym)}""")
       }
-      emitController_again(sym, Some(cchain))
-//      emitParallelizedLoop(inds, cchain){ emitBlock(func) }
-//      emitValDef(sym, "()")
+      emitController(sym, Some(cchain))
+      emitParallelizedLoop(inds, cchain)
       emitBlock(func)
       emitComment(s"""} ParPipeForeach ${quote(sym)}""")
 

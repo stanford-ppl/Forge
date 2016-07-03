@@ -331,7 +331,9 @@ trait DHDLMetadata {
 				val f = nbits(manifest[T].typeArguments(2))
 				if (s) "dfeFixOffset( "+ (d+f) + "," + f + ", SignMode.TWOSCOMPLEMENT)"
 				else "dfeFixOffset("+ (d+f) + "," + f + ", SignMode.UNSIGNED)"
-			} else if (isFltPtType(manifest[T])) {
+			} else if (manifest[T].erasure.getSimpleName == "DHDLCounter") {  // [TODO] Raghu: There must be a better way to do this
+		    "dfeInt(32)"
+      } else if (isFltPtType(manifest[T])) {
 				val e = nbits(manifest[T].typeArguments(0))
 				val m = nbits(manifest[T].typeArguments(1))
 				"dfeFloat(" + e + "," + m + ")"
@@ -339,7 +341,7 @@ trait DHDLMetadata {
 			  "dfeFixOffset(1, 0, SignMode.UNSIGNED)"
 			} else {
 				//throw new Exception("Unknown type " + manifest[T])
-				""
+				"Unknown type " + manifest[T]
 			}
 			if ( $0 > 1) {
 				"new DFEVectorType<DFEVar>(" + scalart + "," + $0

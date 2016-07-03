@@ -550,17 +550,36 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 				}
 				case None => quote(end)
 			}
+
+      // Scala - MaxJ Types: A short story
+      // MaxJ's counter library expects 'counter max' values for each counter to be of
+      // type "dfeUInt()". The output counter object created from both addCounter() and
+      // addCountervect() returns a counter of type dfeUInt().
+      // Scala treats all fixed point numbers as signed numbers by default. This means that
+      // all lifted constants, default types for ArgIns etc are signed numbers. Counter values,
+      // therefore, are treated as signed numbers.
+      // Temporary fix: The following logic adds typecasts to satisfy both Scala and MaxJ.
+      // [TODO] Real fix: Replace MaxJ's counter chain library with our home-grown state machine
+      // which offers more flexibility.
+      // [TODO]: The following typecasts (and state machines like PipeSM) assume that counters
+      // are always 32-bit. This is almost always overkill, and must be fixed.
+      val maxType = "dfeUInt(32)"
+      val maxWithCast = s"""${max}.cast($maxType)"""
+      val counterType = tpstr(parOf(ctr))(ctr.tp, implicitly[SourceContext])
+      val counterObject = s"""${quote(ctr)}_obj"""
       val Def(d) = step
       val ConstFix(constStep) = d
+
       if (parOf(ctr) == 1) {
-        emit(s"""${maxJPre(ctr)} ${quote(ctr)} = ${quote(cchain)}.addCounter(${quote(max)}, ${quote(constStep)});""")
+        emit(s"""${maxJPre(ctr)} $counterObject = ${quote(cchain)}.addCounter(${quote(maxWithCast)}, ${quote(constStep)});""")
       } else {
-        emit(s"""${maxJPre(ctr)} ${quote(ctr)} = ${quote(cchain)}.addCounterVect(${quote(parOf(ctr))}, ${quote(max)}, ${quote(constStep)});""")
+        emit(s"""${maxJPre(ctr)} $counterObject = ${quote(cchain)}.addCounterVect(${quote(parOf(ctr))}, ${quote(maxWithCast)}, ${quote(constStep)});""")
       }
+      emit(s"""${maxJPre(ctr)} ${quote(ctr)} = $counterObject.cast($counterType);""")
     }
 
     val doneStr = if (!done.isDefined) {
-        s"stream.offset(${quote(cchain)}.getCounterWrap(${quote(counters(0))}),-1)"
+        s"stream.offset(${quote(cchain)}.getCounterWrap(${quote(counters(0))}_obj),-1)"
     } else {
       done.get
     }

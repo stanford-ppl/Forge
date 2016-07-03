@@ -268,14 +268,5 @@ trait DHDLTypes {
 			@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
       DFEVar $sym = $0.cast( $ts );
 		}))
-    impl (string_to_fixpt)  (codegen(maxj, ${
-      DFEVar $sym = String_to_fixpt($0)
-		}))
-    impl (fix_to_rep_int) (codegen(maxj, ${
-			@ alwaysGen {
-				DFEVar $sym = Fix_to_int($0)
-			@ }
-    }))
-
 	}
 }

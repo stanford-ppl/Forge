@@ -223,9 +223,9 @@ trait CGenMemoryTemplateOps extends CGenEffect {
 }
 
 trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTemplateOps{
-  val IR: ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
+  val IR: LoweredPipeOpsExp with ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
           with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
-          with DHDLCodegenOps with NosynthOpsExp with DeliteTransform
+          with ExternPrimitiveOpsExp with DHDLCodegenOps with NosynthOpsExp with DeliteTransform
   import IR._
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
@@ -335,8 +335,15 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 			val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
       //TODO: does templete assume bram has 2 dimension?
       val dims = dimsOf(sym)
-      val size0 = dims(0)
-      val size1 = if (dims.size==1) 1 else dims(1)
+      val Def(d0) = dims(0)
+      val Tpes_Int_to_fix(size0) = d0
+      val size1 = if (dims.size == 1) {
+          1
+        } else {
+          val Def(d1) = dims(1)
+          val Tpes_Int_to_fix(v) = d1
+          v
+        }
       if (isDblBuf(sym)) {
         //readers.foreach { r =>
         //  if (!readerToMemMap.contains(r)) readerToMemMap += r -> Set[MemNode]()
@@ -366,7 +373,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
       val doneSig = ""
         emit(s"""${quote(sym)}.connectWdone($doneSig);""")
       } else {
-        emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, ${banks(sym)}, stride_TODO);""")
+        emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, ${banks(sym)}, 1 /* [TODO: stride from metadata */);""") // [TODO] Raghu: Stride from metadata
       }
       emitComment("} Bram_new")
 
@@ -410,7 +417,10 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
         emit(s"""$bram.connectWport(stream.offset($addr, -$offsetStr),
           stream.offset($dataStr, -$offsetStr), ${quote(parentCtr)}_en_from_pipesm, start_TODO, stride_TODO);""")
       } else {
-         emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(parentOf(bram).get)}_en, start_TODO, stride_TODO ;""") //TODO
+        // [TODO] Raghu: Current assumption is that this always returns the parent
+        // writing to the BRAM. Is this always true? Confirm
+        val writer = quote(writersOf(bram).head._1)
+        emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(writer)}_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
       }
       emitComment("} Bram_store")
 

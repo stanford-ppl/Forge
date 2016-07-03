@@ -270,9 +270,9 @@ trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
 }
 
 trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
-  val IR: ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
+  val IR: LoweredPipeOpsExp with ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
           with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
-          with DHDLCodegenOps with NosynthOpsExp with DeliteTransform
+          with ExternPrimitiveOpsExp with DHDLCodegenOps with NosynthOpsExp with DeliteTransform
 
  import IR._ //{__ifThenElse => _, Nosynth___ifThenElse => _, __whileDo => _,
              // Forloop => _, println => _ , _}
@@ -396,18 +396,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
         emit(s"""${quote(sym)}_sm.connectInput("rst_done", ${quote(sym)}_rst_done);""")
         emit(s"""OffsetExpr ${quote(sym)}_offset = stream.makeOffsetAutoLoop("${quote(sym)}_offset");""")
         emit(s"""${quote(sym)}_rst_done <== stream.offset(${quote(sym)}_rst_en, -${quote(sym)}_offset-1);""")
-        if (cchain.isDefined) {
-          val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
-          (0 until counters.size) map { i =>
-            val Def(EatReflect(Counter_new(start, end, step, par))) = counters(i)
-            emit(s"""${quote(sym)}_sm.connectInput("sm_maxIn_$i", ${quote(end)});""")
-            emit(s"""DFEVar ${quote(cchain.get)}_max_$i = ${quote(sym)}_sm.getOutput("ctr_maxOut_$i");""")
-          }
-          emit(s"""DFEVar ${quote(cchain.get)}_done = dfeBool().newInstance(this);""")
-          emit(s"""${quote(sym)}_sm.connectInput("ctr_done", ${quote(cchain.get)}_done);""")
-          emit(s"""DFEVar ${quote(cchain.get)}_en_from_pipesm = ${quote(sym)}_sm.getOutput("ctr_en");""")
-          doneDeclaredSet += cchain.get
-        } else {
+        if (!cchain.isDefined) {
           // Unit pipe, emit constant 1's wherever required
           emit(s"""${quote(sym)}_sm.connectInput("sm_maxIn_0", constant.var(dfeUInt(32), 1));""")
           emit(s"""${quote(sym)}_sm.connectInput("ctr_done", stream.offset(${quote(sym)}_sm.getOutput("ctr_en"), -1));""")
@@ -466,14 +455,15 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
     counters.zipWithIndex.map {case (ctr,i) =>
       val Def(EatReflect(Counter_new(start, end, step, par))) = ctr
       emit(s"""${quote(sym)}_sm.connectInput("sm_maxIn_$i", ${quote(end)});""")
-      emit(s"""DFEVar ${quote(ctr)}_max = ${quote(sym)}_sm.getOutput("ctr_maxOut");""")
+      emit(s"""DFEVar ${quote(ctr)}_max_$i = ${quote(sym)}_sm.getOutput("ctr_maxOut_$i");""")
     }
+
+		emit(s"""DFEVar ${quote(cchain)}_done = dfeBool().newInstance(this);""")
+		doneDeclaredSet += cchain
     emit(s"""${quote(sym)}_sm.connectInput("ctr_done", ${quote(cchain)}_done);""")
     emit(s"""DFEVar ${quote(cchain)}_en_from_pipesm = ${quote(sym)}_sm.getOutput("ctr_en");""")
 
     /* Emit CounterChain */
-		emit(s"""DFEVar ${quote(cchain)}_done = dfeBool().newInstance(this);""")
-		doneDeclaredSet += cchain
     styleOf(sym) match {
       case Fine =>
         val Def(EatReflect(d)) = sym; d match {
@@ -489,6 +479,20 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
             } else {
               emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm"))
             }
+
+          case n:ParPipeForeach =>
+            val writesToAccumRam = writtenIn(sym).exists {s => s match {
+                case Def(EatReflect(Bram_new(_,_))) => isAccum(sym)
+                case _ => false
+              }
+            }
+            if (writesToAccumRam) {
+              emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm | ${quote(sym)}_rst_en"),
+                    Some(s"stream.offset(${quote(cchain)}_en_from_pipesm & ${quote(cchain)}_chain.getCounterWrap(${quote(counters.head)}), -${quote(sym)}_offset-1)"))
+            } else {
+              emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm"))
+            }
+
           case n:Pipe_fold[_,_] =>
 			      //TODO : what is this? seems like all reduce supported are specialized
             //  def specializeReduce(r: ReduceTree) = {
@@ -538,17 +542,20 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 		counters.zipWithIndex.map {case (ctr,i) =>
 			val Def(EatReflect(Counter_new(start, end, step, _))) = ctr
 			val max = parentOf(cchain.asInstanceOf[Rep[CounterChain]]) match {
-				case Some(s) => s.tp match {
-          //TODO
-					case p:Pipeline => s"${quote(ctr)}_max"
+				case Some(s) =>
+          s.tp.erasure.getSimpleName match {  // <- There's got to be a better way
+					case "Pipeline" => s"${quote(ctr)}_max_$i"
+					case "DHDLPipeline" => s"${quote(ctr)}_max_$i"
 					case _ => quote(end)
 				}
 				case None => quote(end)
 			}
+      val Def(d) = step
+      val ConstFix(constStep) = d
       if (parOf(ctr) == 1) {
-        emit(s"""${maxJPre(ctr)} ${quote(ctr)} = ${quote(cchain)}.addCounter(${quote(max)}, ${quote(step)});""")
+        emit(s"""${maxJPre(ctr)} ${quote(ctr)} = ${quote(cchain)}.addCounter(${quote(max)}, ${quote(constStep)});""")
       } else {
-        emit(s"""${maxJPre(ctr)} ${quote(ctr)} = ${quote(cchain)}.addCounterVect(${quote(parOf(ctr))}, ${quote(max)}, ${quote(step)});""")
+        emit(s"""${maxJPre(ctr)} ${quote(ctr)} = ${quote(cchain)}.addCounterVect(${quote(parOf(ctr))}, ${quote(max)}, ${quote(constStep)});""")
       }
     }
 

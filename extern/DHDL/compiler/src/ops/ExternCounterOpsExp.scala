@@ -173,22 +173,7 @@ trait MaxJGenExternCounterOps extends MaxJGenEffect {
 
 
     case e@Counterchain_new(counters, nIter) =>
-//      val parent = parentOf(sym)
-//      stream.println(s"""DFEVar ${quote(sym)}_en = ${quote(parent)}_en);""")
-      stream.println(s"""CounterChain ${quote(sym)}_chain = control.count.makeCounterChain(${quote(sym)}_en);""")
-      val pars = parsOf(sym.asInstanceOf[Sym[CounterChain]])
-      counters.zipWithIndex.map { t =>
-        val c = t._1
-        val i = t._2
-        val Def(EatReflect(Counter_new(start, end, step, p))) = c
-        val par = pars(i)
-        val pre = if (par == 1) "DFEVar" else "DFEVector<DFEVar>"  // <-- TODO: Better way?
-        if (par == 1) {
-          stream.println(s"""$pre ${quote(c)} = ${quote(sym)}_chain.addCounter(${quote(end)}, ${quote(step)});""")
-        } else {
-          stream.println(s"""$pre ${quote(c)} = ${quote(sym)}_chain.addCounterVect(${quote(par)}, ${quote(end)}, ${quote(step)});""")
-        }
-      }
+      // See emitMaxJCounterChain() in PipeTemplateOpsExp.scala
 
 
     case _ => super.emitNode(sym,rhs)

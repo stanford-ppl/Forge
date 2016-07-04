@@ -496,6 +496,13 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
               emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm"))
             }
 
+          case n@ParPipeReduce(cchain, accum, func, rFunc, inds, acc, rV) =>
+            emit(s"""DFEVar ${quote(sym)}_loopLengthVal = ${quote(sym)}_offset.getDFEVar(this, dfeUInt(8));""")
+            emit(s"""CounterChain ${quote(sym)}_redLoopChain = control.count.makeCounterChain(${quote(cchain)}_en_from_pipesm);""")
+            emit(s"""DFEVar ${quote(sym)}_redLoopCtr = ${quote(sym)}_redLoopChain.addCounter(${quote(sym)}_loopLengthVal, 1);""")
+            emit(s"""DFEVar ${quote(sym)}_redLoop_done = stream.offset(${quote(sym)}_redLoopChain.getCounterWrap(${quote(sym)}_redLoopCtr), -1);""")
+            emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm & ${quote(sym)}_redLoop_done"))
+
           case n:Pipe_fold[_,_] =>
 			      //TODO : what is this? seems like all reduce supported are specialized
             //  def specializeReduce(r: ReduceTree) = {

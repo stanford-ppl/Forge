@@ -180,7 +180,19 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
       emitComment(s"""} ParPipeForeach ${quote(sym)}""")
 
     case e@ParPipeReduce(cchain, accum, func, rFunc, inds, acc, rV) =>
-      stream.println(s"""// ParPipeReduce ${quote(sym)} = ParPipeReduce(${quote(cchain)}, ${quote(accum)})""")
+      emitComment(s"""ParPipeReduce ${quote(sym)} = ParPipeReduce(${quote(cchain)}, ${quote(accum)}) {""")
+      styleOf(sym) match {
+        case Coarse => emitComment(s"""MPSM to be emitted""")
+        case Fine => emitComment(s"""PipeSM to be emitted""")
+        case Disabled => emitComment(s"""SeqSM to be emitted""")
+        case _ => emitComment(s"""ParPipeForeach style: ${styleOf(sym)}""")
+      }
+      emitValDef(acc, quote(accum))
+      emitController(sym, Some(cchain))
+      emitParallelizedLoop(inds, cchain)
+      emitBlock(func)
+
+      emitComment(s"""} ParPipeReduce ${quote(sym)}""")
 
     // TODO: Further unrolling for these two?
     case e@ParBramLoadVector(bram,ofs,cchain,inds) =>

@@ -398,7 +398,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
         emit(s"""${quote(sym)}_rst_done <== stream.offset(${quote(sym)}_rst_en, -${quote(sym)}_offset-1);""")
         if (!cchain.isDefined) {
           // Unit pipe, emit constant 1's wherever required
-          emit(s"""${quote(sym)}_sm.connectInput("sm_maxIn_0", constant.var(dfeUInt(32), 1));""")
+          emit(s"""${quote(sym)}_sm.connectInput("sm_maxIn_0", constant.var(dfeInt(32), 1));""")
           emit(s"""${quote(sym)}_sm.connectInput("ctr_done", stream.offset(${quote(sym)}_sm.getOutput("ctr_en"), -1));""")
         }
       case Coarse =>

@@ -202,13 +202,14 @@ trait DHDLTypes {
 
     // --- C++ Backend
     impl (boolean_to_bit) (codegen(cpp, ${ $0 }))
-    impl (bit_to_string)  (codegen(cpp, ${ $0.toString }))
+    impl (bit_to_string) (codegen(cpp, "convert_to_string< " + unquotes("remapWithRef("+opArgPrefix+"0.tp)") + ">(" + quotedArg(0)))
     impl (bit_to_bool)    (codegen(cpp, ${ $0 }))
 
     impl (const_to_fixpt) (codegen(cpp, ${ $0 }))
-    impl (string_to_fixpt) (codegen(cpp, ${ std::stoi($0) }))
-    impl (string_to_fltpt) (codegen(cpp, ${ std::stof($0) }))
-    impl (fixpt_to_string) (codegen(cpp, ${ std::to_string($0) }))
+
+    impl (string_to_fixpt) (codegen(cpp, ${ string_toInt($0) }))
+
+    impl (fixpt_to_string) (codegen(cpp, "convert_to_string< " + unquotes("remapWithRef("+opArgPrefix+"0.tp)") + ">(" + quotedArg(0)))
     impl (fixpt_to_fltpt) (codegen(cpp, ${ (float)($0) }))
     impl (convert_fixpt) (codegen(cpp, ${ $0 }))
     impl (fix_to_rep_int) (codegen(cpp, ${
@@ -220,7 +221,8 @@ trait DHDLTypes {
     }))
 
     impl (const_to_fltpt) (codegen(cpp, ${ (float) ($0) }))
-    impl (fltpt_to_string) (codegen(cpp, ${ std::to_string($0) }))
+    impl (string_to_fltpt) (codegen(cpp, ${ string_toFloat($0) }))
+    impl (fltpt_to_string) (codegen(cpp, "convert_to_string< " + unquotes("remapWithRef("+opArgPrefix+"0.tp)") + ">(" + quotedArg(0)))
     impl (fltpt_to_fixpt) (codegen(cpp, ${ $0.toFixedPoint[$t[S],$t[I],$t[F]] }))
     impl (convert_fltpt) (codegen(cpp, ${ $0.changeFormat[$t[G2],$t[E2]] }))
 

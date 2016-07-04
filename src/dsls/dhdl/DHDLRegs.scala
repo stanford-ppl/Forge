@@ -125,7 +125,7 @@ trait DHDLRegs {
     impl (reg_read)  (codegen(maxj, ${
       @ val pre = maxJPre(sym)
       @ val regStr = regType(reg) match {
-      @   case Regular => quote(reg) + "_hold"
+      @   case Regular => quote(reg)
       @   case _ => quote(reg)
       @ }
       $pre $sym = $regStr ;

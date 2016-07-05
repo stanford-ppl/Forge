@@ -42,11 +42,10 @@ trait SimpleMap extends DHDLApplication {
 
     val result = simplemap(x)
 
-//    val b1 = Array.tabulate[SInt](96) { i => x * i }
-//    val gold = b1.reduce {_+_}
-//    println("expected: " + gold.mkString)
-//    println("result:   " + result.mkString)
-//    assert(result == gold)
+    val b1 = Array.tabulate[SInt](96) { i => x * i }
+    val gold = b1.reduce {_+_}
+    println("expected: " + gold)
     println("result:   " + result)
+    assert(result == gold)
   }
 }

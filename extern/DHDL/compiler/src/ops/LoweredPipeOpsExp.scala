@@ -167,6 +167,7 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case e@ParPipeForeach(cchain, func, inds) =>
+      controlNodeStack.push(sym)
       emitComment(s"""ParPipeForeach ${quote(sym)} = ParPipeForeach(${quote(cchain)}) {""")
       styleOf(sym) match {
         case Coarse => emitComment(s"""MPSM to be emitted""")
@@ -178,8 +179,10 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
       emitParallelizedLoop(inds, cchain)
       emitBlock(func)
       emitComment(s"""} ParPipeForeach ${quote(sym)}""")
+      controlNodeStack.pop
 
     case e@ParPipeReduce(cchain, accum, func, rFunc, inds, acc, rV) =>
+      controlNodeStack.push(sym)
       emitComment(s"""ParPipeReduce ${quote(sym)} = ParPipeReduce(${quote(cchain)}, ${quote(accum)}) {""")
       styleOf(sym) match {
         case Coarse => emitComment(s"""MPSM to be emitted""")
@@ -187,12 +190,14 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
         case Disabled => emitComment(s"""SeqSM to be emitted""")
         case _ => emitComment(s"""ParPipeForeach style: ${styleOf(sym)}""")
       }
-      emitValDef(acc, quote(accum))
+      emit(s"""DFEVar ${quote(acc)}_delayed = ${tpstr(1)(acc.tp.typeArguments.head, implicitly[SourceContext])}.newInstance(this);""")
       emitController(sym, Some(cchain))
       emitParallelizedLoop(inds, cchain)
       emitBlock(func)
+      emit(s"""${quote(accum)} <== ${quote(acc)};""")
 
       emitComment(s"""} ParPipeReduce ${quote(sym)}""")
+      controlNodeStack.pop
 
     // TODO: Further unrolling for these two?
     case e@ParBramLoadVector(bram,ofs,cchain,inds) =>

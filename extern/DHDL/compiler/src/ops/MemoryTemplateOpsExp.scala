@@ -295,6 +295,20 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 			}
       emitComment("} Reg_new")
 
+    case e@Reg_read(reg) =>
+      val pre = maxJPre(sym)
+      val suffix = if (!controlNodeStack.isEmpty) {
+        val Def(EatReflect(curPipe)) = controlNodeStack.top
+        curPipe match {
+            case n: ParPipeReduce[_,_] => if (n.acc == reg) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
+            case _ => ""
+        }
+      } else {
+        ""
+      }
+      val regStr = quote(reg) + suffix
+      emit(s"""$pre ${quote(sym)} = $regStr;""")
+
 		case e@Reg_write(reg, value) =>
       emitComment("Reg_write {")
 			val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
@@ -323,9 +337,9 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 					  	case p@_ => val Def(d) = p
                           throw new Exception(s"Reg ${quote(reg)} is written by non Pipe node ${p} def:${d}")
 					  }
-      		  emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}; // enable""")
-      		  emit(s"""DFEVar ${quote(reg)}_hold = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writersOf(reg).head._1)}_redLoop_done));""")
-      		  emit(s"""${quote(reg)} <== $rst ? ${quote(resetValue(reg))} : stream.offset(${quote(reg)}_hold, -${quote(writersOf(reg).head._1)}_offset); // reset""")
+            emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}_delayed; // enable""")
+            emit(s"""DFEVar ${quote(reg)} = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writersOf(reg).head._1)}_redLoop_done));""")
+            emit(s"""${quote(reg)}_delayed <== $rst ? ${quote(resetValue(reg))} : stream.offset(${quote(reg)}, -${quote(writersOf(reg).head._1)}_offset); // reset""")
 				  case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
 				  case ArgumentOut =>
 				 	  val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done" //TODO

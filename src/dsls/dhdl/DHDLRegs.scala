@@ -122,14 +122,7 @@ trait DHDLRegs {
 
     // --- MaxJ Backend
     //reg_new (extern)
-    impl (reg_read)  (codegen(maxj, ${
-      @ val pre = maxJPre(sym)
-      @ val regStr = regType(reg) match {
-      @   case Regular => quote(reg)
-      @   case _ => quote(reg)
-      @ }
-      $pre $sym = $regStr ;
-    }))
+
     //reg_write (extern)
     impl (reg_reset) (codegen(maxj, ${
     }))

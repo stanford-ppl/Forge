@@ -331,8 +331,10 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       emitController(sym, Some(cchain))
       emitNestedIdx(cchain, inds)
       emitBlock(func, s"${quote(sym)} Foreach")             // Map function
+      controlNodeStack.pop
 
     case e@Pipe_fold(cchain, accum, fA, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
+      controlNodeStack.push(sym)
       emitController(sym, Some(cchain))
       emitNestedIdx(cchain, inds)
       emitBlock(iFunc, s"${quote(sym)} Index Calculation")
@@ -344,14 +346,19 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       emitBlock(rFunc, s"${quote(sym)} Reduce")
       emitValDef(res, quote(getBlockResult(rFunc)))
       emitBlock(stFunc, s"${quote(sym)} Store")
+      controlNodeStack.pop
 
 		case e@Pipe_parallel(func: Block[Unit]) =>
+      controlNodeStack.push(sym)
       emitController(sym, None)
       emitBlock(func, s"${quote(sym)} Parallel")
+      controlNodeStack.pop
 
 		case e@Unit_pipe(func: Block[Unit]) =>
+      controlNodeStack.push(sym)
       emitController(sym, None)
       emitBlock(func, s"${quote(sym)} Unit")
+      controlNodeStack.pop
 
     case _ => super.emitNode(sym,rhs)
   }

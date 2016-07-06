@@ -481,10 +481,6 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
         case Fine =>
           emit(s"""${quote(sym)}_sm.connectInput("sm_maxIn_$i", ${quote(end)});""")
           emit(s"""DFEVar ${quote(ctr)}_max_$i = ${quote(sym)}_sm.getOutput("ctr_maxOut_$i");""")
-          emit(s"""DFEVar ${quote(cchain)}_done = dfeBool().newInstance(this);""")
-          doneDeclaredSet += cchain
-          emit(s"""${quote(sym)}_sm.connectInput("ctr_done", ${quote(cchain)}_done);""")
-          emit(s"""DFEVar ${quote(cchain)}_en_from_pipesm = ${quote(sym)}_sm.getOutput("ctr_en");""")
         case ForkJoin => throw new Exception("Cannot have counter chain control logic for fork-join (parallel) controller!")
         case _ =>
           emit(s"""DFEVar ${quote(ctr)}_max_$i = ${quote(end)};""")
@@ -492,6 +488,15 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       }
     }
 
+    styleOf(sym) match {
+      case Fine =>
+        emit(s"""DFEVar ${quote(cchain)}_done = dfeBool().newInstance(this);""")
+        doneDeclaredSet += cchain
+        emit(s"""${quote(sym)}_sm.connectInput("ctr_done", ${quote(cchain)}_done);""")
+        emit(s"""DFEVar ${quote(cchain)}_en_from_pipesm = ${quote(sym)}_sm.getOutput("ctr_en");""")
+      case ForkJoin => throw new Exception("Cannot have counter chain control logic for fork-join (parallel) controller!")
+      case _ =>
+    }
 
 
     /* Emit CounterChain */

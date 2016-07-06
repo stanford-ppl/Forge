@@ -277,18 +277,31 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
  import IR._ //{__ifThenElse => _, Nosynth___ifThenElse => _, __whileDo => _,
              // Forloop => _, println => _ , _}
 
+  // HACK alert [TODO Raghu] : This code is duplicated in MaxJManagerGen so that argin and argout
+  // have a consistent name. Code is duplicated because MaxJManagerGen is currently
+  // a standalone thing that does not have a means to share things.
+  // The correct fix is to put common things in a trait that is mixed into both
+  // code generators
   override def quote(x: Exp[Any]) = x match {
 		case s@Sym(n) => {
-			var tstr = s.tp.erasure.getSimpleName() 
-			tstr = tstr.replace("DHDL","") 
-//			tstr = tstr.replace("Register", regType(s) match {
-//				case Regular => "Reg"
-//				case ArgumentIn => "ArgIn"
-//				case ArgumentOut => "ArgOut"
-//			}) 
-			tstr = tstr.replace("BlockRAM", "BRAM")
-//			tstr + (if (nameOf(s)!="") "_" else "") + nameOf(s) + n
-			tstr + n
+			val tstr = s.tp.erasure.getSimpleName()
+                  .replace("DHDL","")
+                  .replace("BlockRAM", "BRAM")
+      val customStr = tstr match {
+        case "Pipeline" => styleOf(s) match {
+          case Coarse => "metapipe"
+          case Fine => "pipe"
+          case Disabled => "seq"
+          case ForkJoin => "parallel"
+        }
+        case "Register" => regType(s) match {
+          case Regular => "reg"
+          case ArgumentIn => "argin"
+          case ArgumentOut => "argout"
+        }
+        case _ => tstr
+      }
+			customStr + n
 		}
     case _ => super.quote(x)
   }

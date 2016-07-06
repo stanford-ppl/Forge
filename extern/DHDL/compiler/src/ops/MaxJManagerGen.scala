@@ -15,14 +15,36 @@ trait MaxJManagerGen {
 	def emit(str: String):Unit = {
 		stream.println(str)
 	}
-  def quote(x: Exp[Any]):String = x match {
-		case s@Sym(n) =>
-      val tp = s.tp.erasure.getSimpleName().replace("DHDL", "")
-      Console.println(s"[MaxJManager] tp = $tp, n = $n")
-      tp + n
-//										(if (nameOf(s)!="") "_" else "") + nameOf(s) + n
+
+  def quote(x: Exp[Any]) = x match {
+		case s@Sym(n) => {
+			val tstr = s.tp.erasure.getSimpleName()
+                  .replace("DHDL","")
+                  .replace("BlockRAM", "BRAM")
+      val customStr = tstr match {
+        case "Pipeline" => styleOf(s) match {
+          case Coarse => "metapipe"
+          case Fine => "pipe"
+          case Disabled => "seq"
+          case ForkJoin => "parallel"
+        }
+        case "Register" => regType(s) match {
+          case Regular => "reg"
+          case ArgumentIn => "argin"
+          case ArgumentOut => "argout"
+        }
+        case _ => tstr
+      }
+			customStr + n
+		}
     case _ => ""
   }
+//  def quote(x: Exp[Any]):String = x match {
+//		case s@Sym(n) =>
+//      val tp = s.tp.erasure.getSimpleName().replace("DHDL", "")
+//      tp + n
+//    case _ => ""
+//  }
 
   /**
    * The following three methods are largely duplicated in CGenMemoryTemplateOps.

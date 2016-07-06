@@ -477,14 +477,22 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
     //TODO: support reset of counterchain to sequential and metapipe in templete
     counters.zipWithIndex.map {case (ctr,i) =>
       val Def(EatReflect(Counter_new(start, end, step, par))) = ctr
-      emit(s"""${quote(sym)}_sm.connectInput("sm_maxIn_$i", ${quote(end)});""")
-      emit(s"""DFEVar ${quote(ctr)}_max_$i = ${quote(sym)}_sm.getOutput("ctr_maxOut_$i");""")
+      styleOf(sym) match {
+        case Fine =>
+          emit(s"""${quote(sym)}_sm.connectInput("sm_maxIn_$i", ${quote(end)});""")
+          emit(s"""DFEVar ${quote(ctr)}_max_$i = ${quote(sym)}_sm.getOutput("ctr_maxOut_$i");""")
+          emit(s"""DFEVar ${quote(cchain)}_done = dfeBool().newInstance(this);""")
+          doneDeclaredSet += cchain
+          emit(s"""${quote(sym)}_sm.connectInput("ctr_done", ${quote(cchain)}_done);""")
+          emit(s"""DFEVar ${quote(cchain)}_en_from_pipesm = ${quote(sym)}_sm.getOutput("ctr_en");""")
+        case ForkJoin => throw new Exception("Cannot have counter chain control logic for fork-join (parallel) controller!")
+        case _ =>
+          emit(s"""DFEVar ${quote(ctr)}_max_$i = ${quote(end)};""")
+
+      }
     }
 
-		emit(s"""DFEVar ${quote(cchain)}_done = dfeBool().newInstance(this);""")
-		doneDeclaredSet += cchain
-    emit(s"""${quote(sym)}_sm.connectInput("ctr_done", ${quote(cchain)}_done);""")
-    emit(s"""DFEVar ${quote(cchain)}_en_from_pipesm = ${quote(sym)}_sm.getOutput("ctr_en");""")
+
 
     /* Emit CounterChain */
     styleOf(sym) match {

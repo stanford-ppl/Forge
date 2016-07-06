@@ -7,26 +7,24 @@ object SimpleSequentialInterpreter extends DHDLApplicationInterpreter with Simpl
 trait SimpleSequential extends DHDLApplication {
   type Array[T] = ForgeArray[T]
 
-  def simplemap(xin: Rep[SInt]) = {
+  def simpleseq(xin: Rep[SInt], yin: Rep[SInt]) = {
     val innerPar = param("innerPar", 1); domainOf(innerPar) = (1, 1, 1)
     val tileSize = param("tileSize", 96); domainOf(tileSize) = (96, 96, 96)
-//    bound(N) = 187200000
 
     val x = ArgIn[SInt]("x")
+    val y = ArgIn[SInt]("y")
     val out = ArgOut[SInt]("out")
     setArg(x, xin)
+    setArg(y, yin)
 
     Accel {
-      val accumOut = Reg[SInt]("accumOut")
-      Sequential.reduce (tileSize by tileSize)(accumOut) { i =>
-        val b1 = BRAM[SInt]("b1", tileSize)
+      val b1 = BRAM[SInt]("b1", tileSize)
+      Sequential (tileSize by tileSize) { i =>
         Pipe.foreach(tileSize par innerPar) { ii =>
           b1(ii) = x.value * ii
         }
-        val accumIn = Reg[SInt]("accumIn")
-        Pipe.reduce(tileSize par innerPar)(accumIn) { ii =>  b1(ii) } {_+_}
-      } {_+_}
-      out := accumOut
+        Pipe { out := b1(y) }
+      }
       ()
     }
     getArg(out)
@@ -34,12 +32,12 @@ trait SimpleSequential extends DHDLApplication {
 
   def main() {
     val x = args(unit(0)).to[SInt]
-//    val N = args(unit(1)).to[SInt]
+    val y = args(unit(1)).to[SInt]
 
-    val result = simplemap(x)
+    val result = simpleseq(x, y)
 
     val b1 = Array.tabulate[SInt](96) { i => x * i }
-    val gold = b1.reduce {_+_}
+    val gold = b1(y)
     println("expected: " + gold)
     println("result:   " + result)
     assert(result == gold)

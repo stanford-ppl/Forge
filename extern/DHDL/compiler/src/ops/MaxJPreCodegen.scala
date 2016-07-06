@@ -27,13 +27,7 @@ trait MaxJPreCodegen extends Traversal  {
 		val IR: MaxJPreCodegen.this.IR.type = MaxJPreCodegen.this.IR
 	}
 
-  def quote(x: Exp[Any]):String = x match {
-//		case s@Sym(n) => s.tp.erasure.getSimpleName().replace("DHDL","") + nameOf(s).map(nm=>"_"+nm).getOrElse("") + n
-		case s@Sym(n) =>
-      val str = s.tp.erasure.getSimpleName().replace("DHDL","") + n
-      str
-    case _ => ""
-  }
+  def quote(x: Exp[Any]) = maxJManagerGen.quote(x)
 
 	val argInOuts  = Set.empty[Sym[Register[_]]]
 	val memStreams = Set.empty[Sym[Any]]

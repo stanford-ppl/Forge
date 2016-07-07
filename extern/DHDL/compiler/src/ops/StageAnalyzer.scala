@@ -45,28 +45,24 @@ trait StageAnalyzer extends Traversal with PipeStageTools {
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func)
       if (debugMode) list(stages)
-      if (styleOf(lhs) == InnerPipe && stages.nonEmpty) styleOf(lhs) = CoarsePipe
       nStages(lhs) = stages.length
 
     case Pipe_foreach(_,func,_) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func)
       if (debugMode) list( stages )
-      if (styleOf(lhs) == InnerPipe && stages.nonEmpty) styleOf(lhs) = CoarsePipe
       nStages(lhs) = stages.length
 
     case Pipe_fold(c,a,z,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(ld,func,rFunc,st)
       if (debugMode) list( stages )
-      if (styleOf(lhs) == InnerPipe && stages.nonEmpty) styleOf(lhs) = CoarsePipe
       nStages(lhs) = stages.length + 1  // Account for implicit reduction pipe
 
     case Accum_fold(c1,c2,a,z,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func,rFunc)
       if (debugMode) list( stages )
-      if (styleOf(lhs) == InnerPipe) styleOf(lhs) = CoarsePipe
       nStages(lhs) = stages.length + 1  // Account for implicit reduction pipe
 
     case _ => super.traverse(lhs, rhs)

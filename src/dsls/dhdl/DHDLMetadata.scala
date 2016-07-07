@@ -95,6 +95,9 @@ trait DHDLMetadata {
     internal.static (styleOps) ("apply", Nil, MAny :: ControlType) implements
       composite ${ meta[MControlType]($0).get.tpe }
 
+    internal (styleOps) ("styleOption", Nil, MAny :: SOption(ControlType)) implements
+      composite ${ meta[MControlType]($0).map(_.tpe) }
+
     /* Pipeline stages */
     val MNumStages = metadata("MNumStages", "nStages" -> SInt)
     val nstages    = metadata("nStages")
@@ -158,7 +161,7 @@ trait DHDLMetadata {
     static (boundOps) ("update", Nil, (MAny, SOption(MBound)) :: MUnit, effect = simple) implements
       composite ${ $1.foreach{bnd => setMetadata($0, bnd) } }
 
-    static (boundOps) ("apply", Nil, MAny :: SOption(SDouble)) implements composite ${ meta[MBound]($0).map(_.bound) }
+    static (boundOps) ("apply", Nil, MAny :: SOption(SDouble)) implements composite ${ boundOf($0).map(_.bound) }
 
     internal (boundOps) ("boundOf", Nil, MAny :: SOption(MBound)) implements composite ${ meta[MBound]($0) }
 

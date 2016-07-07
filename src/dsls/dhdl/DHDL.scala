@@ -215,6 +215,8 @@ trait DHDLDSL extends ForgeApplication
 
 
     // --- Traversals
+    val LevelAnalyzer = analyzer("PipeLevel", isExtern=true)
+    val UnitPipeTransformer = transformer("UnitPipe", isExtern=true)
     val StageAnalyzer = analyzer("Stage", isExtern=true)
     val GlobalAnalyzer = analyzer("Global")
     val ControlSignalAnalyzer = analyzer("ControlSignal", isExtern=true)
@@ -243,7 +245,10 @@ trait DHDLDSL extends ForgeApplication
 
     // --- Pre-DSE analysis
     schedule(NameAnalyzer)
-    schedule(StageAnalyzer)         // Number of stages in each control node
+    schedule(LevelAnalyzer)         // Sanity checks and pipe style annotation fixes
+    schedule(IRPrinterPlus)
+    schedule(UnitPipeTransformer)   // Wrap primitives in outer pipes
+    schedule(StageAnalyzer)         // Get number of stages in each control node
     schedule(GlobalAnalyzer)        // Values computed outside of all controllers
     schedule(ControlSignalAnalyzer) // Variety of control signal related metadata
 

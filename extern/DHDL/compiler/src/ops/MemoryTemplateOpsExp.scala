@@ -75,7 +75,7 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTe
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
     case "BlockRAM" => "Array[" + remap(m.typeArguments(0)) + "]"
-    case "DHDLFIFO" => "scala.collection.mutable.Stack[" + remap(m.typeArguments(0)) + "]"
+    case "DHDLFIFO" => "scala.collection.mutable.Queue[" + remap(m.typeArguments(0)) + "]"
     case "DHDLVector" => "Array[" + remap(m.typeArguments(0)) + "]"
     case "CACHE"     => "Array[" + remap(m.typeArguments(0)) + "]"
     case "Register" => "Array[" + remap(m.typeArguments(0)) + "]"

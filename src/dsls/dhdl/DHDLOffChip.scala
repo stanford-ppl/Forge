@@ -146,17 +146,17 @@ trait DHDLOffChip {
     // --- Scala Backend
     impl (offchip_new) (codegen($cala, ${ new Array[$t[T]]($size.toInt) }))
     impl (offchip_load) (codegen($cala, ${
-      for (i <- 0 until $len.toInt) { $fifo.push( $mem(i + $ofs.toInt) ) }
+      for (i <- 0 until $len.toInt) { if (i + $ofs.toInt < $mem.length) $fifo.enqueue( $mem(i + $ofs.toInt) ) else $fifo.enqueue($mem(0)) }
     }))
     impl (offchip_store) (codegen($cala, ${
-      for (i <- 0 until $len.toInt) { $mem(i + $ofs.toInt) = $fifo.pop() }
+      for (i <- 0 until $len.toInt) { if (i + $ofs.toInt < $mem.length) $mem(i + $ofs.toInt) = $fifo.dequeue() }
     }))
 
     impl (scatter) (codegen($cala, ${
-      for (i <- 0 until $len.toInt) { $mem( $addrs(i).toInt ) = $local(i) }
+      for (i <- 0 until $len.toInt) { if (i < $addrs.length && $addrs(i).toInt < $mem.length) $mem( $addrs(i).toInt ) = $local(i) }
     }))
     impl (gather) (codegen($cala, ${
-      for (i <- 0 until $len.toInt) { $local(i) = $mem( $addrs(i).toInt ) }
+      for (i <- 0 until $len.toInt) { if (i < $local.length && i < $addrs.length && $addrs(i).toInt < $mem.length) $local(i) = $mem( $addrs(i).toInt ) }
     }))
 
     // --- C++ Backend
@@ -173,6 +173,7 @@ trait DHDLOffChip {
     val Tile    = lookupTpe("Tile")
     val OffChip = lookupTpe("OffChipMem")
     val BRAM    = lookupTpe("BRAM")
+    val FIFO    = lookupTpe("FIFO")
     val Range   = lookupTpe("Range")
 
     // TODO: How to avoid CSE? Doesn't matter except that same symbol may be returned
@@ -194,12 +195,33 @@ trait DHDLOffChip {
     infix (Tile) (":=", T, (Tile(T), BRAM(T)) :: MUnit, TNum(T), effect = write(0)) implements redirect ${ copyTile($0, $1, true) }
 
     // TODO: Storing from FIFO
-    //infix (Tile) (":=", T, (Tile(T), FIFO(T)) :: MUnit, effect = write(0)) implements redirect ${ streamTile($0, $1, true) }
+    infix (Tile) (":=", T, (Tile(T), FIFO(T)) :: MUnit, TNum(T), effect = write(0)) implements redirect ${ streamTile($0, $1, true) }
 
-    /*direct (Tile) ("streamTile", T, (("tile", Tile(T)), ("fifo", FIFO(T)), ("store", SBoolean)) :: MUnit, effect = simple) implements composite ${
+    direct (Tile) ("streamTile", T, (("tile", Tile(T)), ("fifo", FIFO(T)), ("store", SBoolean)) :: MUnit, TNum(T), effect = simple) implements composite ${
       val mem = $tile.mem
-      val ranges = rangesOf($tile)
-    }*/
+      val offsets = rangesOf($tile).map(_.start)
+      val tileDims = rangesOf($tile).map(_.len)
+
+      val p = tilePar($tile).getOrElse(param(1))
+      val len = tileDims.last
+
+      if (tileDims.length > 1) {
+        Pipe(CounterChain(tileDims.take(tileDims.length - 1).map{d => Counter(max = d) }:_*)){inds =>
+          val indices = inds.toList :+ 0.as[Index]
+          val memOfs = calcAddress(offsets.zip(indices).map{case (a,b) => a + b}, dimsOf(mem))
+
+          if ($store) { offchip_store_cmd(mem, $fifo, memOfs, len, p) }
+          else        { offchip_load_cmd(mem, $fifo, memOfs, len, p) }
+        }
+      }
+      else {
+        Pipe {
+          val memOfs = calcAddress(offsets, dimsOf(mem))
+          if ($store) { offchip_store_cmd(mem, $fifo, memOfs, len, p) }
+          else        { offchip_load_cmd(mem, $fifo, memOfs, len, p) }
+        }
+      }
+    }
 
     /** @nodoc - not actually a user-facing method for now **/
     direct (Tile) ("copyTile", T, (("tile",Tile(T)), ("local",BRAM(T)), ("store", SBoolean)) :: MUnit, TNum(T), effect = simple) implements composite ${
@@ -213,33 +235,44 @@ trait DHDLOffChip {
 
       val fifo = FIFO[T](512) // TODO: How to determine FIFO depth?
 
-      val cmdCtrs = if (tileDims.length > 1) tileDims.take(tileDims.length - 1).map{d => Counter(max = d) } else List(Counter(max = 1.as[Index]))
+      if (tileDims.length > 1) {
+        Pipe(CounterChain(tileDims.take(tileDims.length - 1).map{d => Counter(max = d) }:_*)){inds =>
+          val indices = inds.toList :+ 0.as[Index]
+          val localOfs = indices.zip(unitDims).flatMap{case (i,isUnitDim) => if (!isUnitDim) Some(i) else None}
+          val memOfs = calcAddress(offsets.zip(indices).map{case (a,b) => a + b}, dimsOf(mem))
 
-      Pipe(CounterChain(cmdCtrs:_*)){inds =>
-        val indices = inds.toList :+ 0.as[Index]
+          if ($store) {
+            offchip_store_cmd(mem, fifo, memOfs, len, p)
 
-        val localOfs = indices.zip(unitDims).flatMap{case (i,isUnitDim) => if (!isUnitDim) Some(i) else None}
-        val memOfs = calcAddress(offsets.zip(indices).map{case (a,b) => a + b}, dimsOf(mem))
+            Pipe(len par p){i =>
+              val localAddr = localOfs.take(localOfs.length - 1) :+ (localOfs.last + i)
+              fifo.push($local(localAddr:_*))
+            }
+          }
+          else {
+            offchip_load_cmd(mem, fifo, memOfs, len, p)
 
-        if ($store) {
-          offchip_store_cmd(mem, fifo, memOfs, len, p)
-
-          Pipe(len par p){i =>
-            val localAddr = localOfs.take(localOfs.length - 1) :+ (localOfs.last + i)
-            fifo.push($local(localAddr:_*))
+            Pipe(len par p){i =>
+              val localAddr = localOfs.take(localOfs.length - 1) :+ (localOfs.last + i)
+              $local(localAddr) = fifo.pop()
+            }
           }
         }
-        else {
-          offchip_load_cmd(mem, fifo, memOfs, len, p)
-
-          Pipe(len par p){i =>
-            val localAddr = localOfs.take(localOfs.length - 1) :+ (localOfs.last + i)
-            $local(localAddr) = fifo.pop()
+      }
+      else {
+        Pipe {
+          val memOfs = calcAddress(offsets, dimsOf(mem))
+          if ($store) {
+            offchip_store_cmd(mem, fifo, memOfs, len, p)
+            Pipe(len par p){i => fifo.push($local(i)) }
+          }
+          else {
+            offchip_load_cmd(mem, fifo, memOfs, len, p)
+            Pipe(len par p){i => $local(i) = fifo.pop() }
           }
         }
       }
     }
-
   }
 
   def importSparseTiles() {

@@ -66,7 +66,6 @@ trait FixedPointEmulation {
     def len = (end - start)/step
   }
 
-
   class FixedPoint[S:Manifest,I:Manifest,F:Manifest](private val v: BigInt) {
     private def rep = FixFormat(sign[S],nbits[I],nbits[F])
 

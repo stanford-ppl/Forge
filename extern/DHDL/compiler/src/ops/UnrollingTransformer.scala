@@ -10,7 +10,6 @@ import dhdl.compiler.ops._
 
 trait UnrollingTransformExp extends PipeStageToolsExp with LoweredPipeOpsExp { this: DHDLExp => }
 
-// TODO: Need to handle edge cases - currently par factor must be a divider of number of iterations
 trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
   val IR: UnrollingTransformExp with DHDLExp
   import IR.{infix_until => _, _}
@@ -185,7 +184,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
       inds2 :::= unrolledInds
 
       val validMapRes = if (zero.isDefined) {
-        mapRes.zip(valids(cchain,inds2)).map{case (res,v) => mux(v,res,zero.get) }
+        mapRes.zip(valids(cc,inds2)).map{case (res,v) => mux(v,res,zero.get) }
       }
       else {
         stageError("Reduction without zero is not yet supported")
@@ -220,10 +219,10 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
       val mapReads = inputs.map{partial => withSubstScope(part -> partial, idx -> newIdx){inlineBlock(ld1)(mT) } }
 
       val valid = if (cchain.isDefined && inds.isDefined) {
-        valids(ccOuter,indsO2).zip(valids(cchain.get,inds.get)).map{case(v1,v2) => v1 && v2}
+        valids(ccO2,indsO2).zip(valids(cchain.get,inds.get)).map{case(v1,v2) => v1 && v2}
       }
       else {
-        valids(ccOuter,indsO2)
+        valids(ccO2,indsO2)
       }
 
       val validMapReads = if (zero.isDefined) {
@@ -256,7 +255,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
         val innerBlk = reifyBlock {
           (0 until P).foreach{p =>
             val inds2 = indices.zipWithIndex.map{case (vec,d) => vec((p / prods(d)) % Ps(d)) }
-            withSubstScope(indsInner.zip(inds2):_*){ unrollLoadReduce(mapRes, Some(ccInner), Some(indices)) }
+            withSubstScope(indsInner.zip(inds2):_*){ unrollLoadReduce(mapRes, Some(ccI2), Some(indices)) }
           }
         }
         val innerPipe = reflectEffect(ParPipeReduce(ccI2, accum2, innerBlk, rFunc, indices, acc, rV), summarizeEffects(innerBlk).star andAlso Simple() andAlso Write(List(accum2.asInstanceOf[Sym[C[T]]])) )
@@ -273,6 +272,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
     newPipe
   }
 
+  // TODO: Move clone to IR?
   // Similar to self_mirror, but also duplicates bound vars
   def clone[A](sym: Sym[A], rhs : Def[A]): Exp[A] = {
     val sym2 = clone(rhs)(mtype(sym.tp), mpos(sym.pos))

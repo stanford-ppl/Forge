@@ -44,6 +44,9 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
 
   // HACK: During preprocessing, clear out metadata that we append to in order to get rid of stale symbols
   override def preprocess[A:Manifest](b: Block[A]): Block[A] = {
+    localMems = Nil
+    metapipes = Nil
+    top = null
     for ((s,p) <- metadata) {
       if (meta[MReaders](s).isDefined) readersOf(s) = Nil
       if (meta[MWritten](s).isDefined) writtenIn(s) = Nil
@@ -146,8 +149,11 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
 
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
-    case Offchip_load_cmd(mem,stream,ofs,len,p) =>   // ?
-    case Offchip_store_cmd(mem,stream,ofs,len,p) =>  // ?
+    case Offchip_load_cmd(mem,stream,ofs,len,p) =>
+      writersOf(stream) = writersOf(stream) :+ (lhs, false, lhs)
+
+    case Offchip_store_cmd(mem,stream,ofs,len,p) =>
+      readersOf(stream) = readersOf(stream) :+ (lhs, false, lhs)
 
     case Hwblock(blk) =>
       val allocs = getAllocations(blk)

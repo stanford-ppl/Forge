@@ -20,6 +20,8 @@ trait PipeStageToolsExp extends EffectExp {
     case EatReflect(Reg_write(reg,value)) => Some((reg,value,None))
     case EatReflect(Bram_store(bram,addr,value)) => Some((bram,value,Some(addr)))
     case EatReflect(Push_fifo(fifo,value,_)) => Some((fifo,value,None))
+    case EatReflect(Par_bram_store(bram,addr,value)) => Some((bram,value,Some(addr)))
+    case EatReflect(Par_push_fifo(fifo,value,_,_)) => Some((fifo,value,None))
     case _ => None
   }
 
@@ -28,6 +30,8 @@ trait PipeStageToolsExp extends EffectExp {
     case EatReflect(Reg_read(reg)) => Some((reg,None))
     case EatReflect(Bram_load(bram,addr)) => Some((bram,Some(addr)))
     case EatReflect(Pop_fifo(fifo)) => Some((fifo,None))
+    case EatReflect(Par_bram_load(bram,addr)) => Some((bram,Some(addr)))
+    case EatReflect(Par_pop_fifo(fifo,_)) => Some((fifo,None))
     case _ => None
   }
 
@@ -65,6 +69,24 @@ trait PipeStageToolsExp extends EffectExp {
     case _ => false
   }
 
+  // Register reads are currently "special" nodes - neither controllers nor primitives
+  def isRegisterRead(s: Exp[Any]): Boolean = s match {
+    case Deff(_:Reg_read[_]) => true
+    case _ => false
+  }
+
+  def isConstantExp(s: Exp[Any]): Boolean = s match {
+    case Deff(_:ConstFixPt[_,_,_,_]) => true
+    case Deff(_:ConstFltPt[_,_,_]) => true
+    case Deff(_:ConstBit) => true
+    case Const(_) => true
+    case _ => false
+  }
+
+  def isPrimitiveNode(s: Exp[Any]): Boolean = s match {
+    case Def(Reify(_,_,_)) => false
+    case _ => !isControlNode(s) && !isRegisterRead(s) && !isAllocation(s) && !isConstantExp(s)
+  }
 
   def isControlNode(s: Exp[Any]): Boolean = s match {
     case Def(d) => isOuterControl(s) || isInnerControl(s)
@@ -127,6 +149,8 @@ trait PipeStageToolsExp extends EffectExp {
   def isOffChipTransfer(d: Def[Any]): Boolean = d match {
     case EatReflect(_:Offchip_load_cmd[_])  => true
     case EatReflect(_:Offchip_store_cmd[_]) => true
+    case EatReflect(_:Gather[_]) => true
+    case EatReflect(_:Scatter[_]) => true
     case _ => false
   }
   def isParallel(d: Def[Any]): Boolean = d match {
@@ -134,12 +158,13 @@ trait PipeStageToolsExp extends EffectExp {
     case _ => false
   }
   def isPipeline(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:ParPipeForeach)  => true
-    case EatReflect(_:ParPipeReduce[_,_]) => true
     case EatReflect(_:Pipe_foreach)    => true
     case EatReflect(_:Pipe_fold[_,_])  => true
     case EatReflect(_:Accum_fold[_,_]) => true
     case EatReflect(_:Unit_pipe)       => true
+    case EatReflect(_:Hwblock)         => true
+    case EatReflect(_:ParPipeForeach)  => true
+    case EatReflect(_:ParPipeReduce[_,_]) => true
     case _ => false
   }
   def isLoop(d: Def[Any]): Boolean = d match {

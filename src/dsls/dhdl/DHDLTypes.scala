@@ -43,9 +43,6 @@ trait DHDLTypes {
     val const_to_fixpt = internal (Lifts) ("constFixPt", (T,S,I,F), (T, SManifest(SS), SManifest(II), SManifest(FF)) :: FixPt(S,I,F), TNumeric(T))
     val const_to_fltpt = internal (Lifts) ("constFltPt", (T,G,E), (T, SManifest(GG), SManifest(EE)) :: FltPt(G,E), TNumeric(T))
 
-
-
-
     val bit_to_string = direct (Tpes) ("bit_to_string", Nil, Bit :: MString)
 
     // Include Manifests to avoid CSE issues

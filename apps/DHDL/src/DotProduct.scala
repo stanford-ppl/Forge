@@ -5,7 +5,7 @@ import dhdl.shared._
 object DotProductCompiler extends DHDLApplicationCompiler with DotProduct
 object DotProductInterpreter extends DHDLApplicationInterpreter with DotProduct
 trait DotProduct extends DHDLApplication {
-  type T = Flt //FixPt[Signed, B16, B16]
+  type T = SInt
   type Array[T] = ForgeArray[T]
 
   def dotproduct(a: Rep[Array[T]], b: Rep[Array[T]]) = {
@@ -24,14 +24,16 @@ trait DotProduct extends DHDLApplication {
     setArg(dataSize, N)
 
     Accel {
-      Pipe.fold(dataSize by tileSize par outerPar)(out){ i =>
-        val b1 = BRAM[T](tileSize)
-        val b2 = BRAM[T](tileSize)
+      Fold(dataSize by tileSize par outerPar)(out, 0.as[T]){ i =>
+        val b1 = FIFO[T](512)
+        val b2 = FIFO[T](512)
         Parallel {
           b1 := v1(i::i+tileSize)
           b2 := v2(i::i+tileSize)
         }
-        Pipe.reduce(tileSize par innerPar)(Reg[T]){ii => b1(ii) * b2(ii) }{_+_}
+        Reduce(tileSize par innerPar)(0.as[T]){ii =>
+          b1.pop() * b2.pop()
+        }{_+_}
       }{_+_}
       ()
     }
@@ -42,6 +44,9 @@ trait DotProduct extends DHDLApplication {
     val N = args(0).to[SInt]
     val a = Array.fill(N)(random[T](10))
     val b = Array.fill(N)(random[T](10))
+
+    println("a: " + a.mkString(", "))
+    println("b: " + b.mkString(", "))
 
     val result = dotproduct(a, b)
     val gold = a.zip(b){_*_}.reduce{_+_}

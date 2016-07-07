@@ -174,11 +174,11 @@ trait DHDLBRAMs {
     val store = internal (BRAM) ("par_bram_store", T, (("bram", BRAM(T)), ("addr", MVector(Idx)), ("value", MVector(T))) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
 
     impl (load) (codegen($cala, ${
-      $addr.map{addr => $bram(addr.toInt) }
+      $addr.map{addr => if (addr.toInt < $bram.length) $bram(addr.toInt) else $bram(0) }
     }))
 
     impl (store) (codegen($cala, ${
-      $value.zip($addr).foreach{ case (v,a) => $bram(a.toInt) = v }
+      $value.zip($addr).foreach{ case (v,a) => if (a.toInt < $bram.length) $bram(a.toInt) = v }
     }))
 
   }

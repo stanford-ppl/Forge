@@ -58,14 +58,19 @@ trait DHDLFIFOs {
       infix ("pop") (Nil :: T) implements composite ${ pop_fifo($self) }
 
       infix ("count") (Nil :: Idx) implements composite ${ count_fifo($self) }
+
+      /** Streams a Tile of an OffChipMem to this FIFO.
+       * @param tile
+       **/
+      infix (":=") (Tile(T) :: MUnit, TNum(T), effect = write(0)) implements redirect ${ streamTile($1, $self, false) }
     }
 
     // --- Scala Backend
-    impl (fifo_new)   (codegen($cala, ${ scala.collection.mutable.Stack.fill(0.toInt)($zero) }))
+    impl (fifo_new)   (codegen($cala, ${ scala.collection.mutable.Queue.fill(0.toInt)($zero) }))
     impl (fifo_load)  (codegen($cala, ${ $fifo.apply($addr.toInt) }))
     impl (fifo_store) (codegen($cala, ${ $fifo.update($addr.toInt, $value) }))
-    impl (fifo_push)  (codegen($cala, ${ if ($en) $fifo.push($value); () }))
-    impl (fifo_pop)   (codegen($cala, ${ $fifo.pop() }))
+    impl (fifo_push)  (codegen($cala, ${ if ($en) $fifo.enqueue($value); () }))
+    impl (fifo_pop)   (codegen($cala, ${ $fifo.dequeue() }))
     impl (fifo_count) (codegen($cala, ${ FixedPoint[Signed,B32,B0]($fifo.length) }))
 
 
@@ -74,11 +79,18 @@ trait DHDLFIFOs {
     val pop  = internal (FIFO) ("par_pop_fifo", T, (("fifo", FIFO(T)), ("len", SInt)) :: MVector(T), aliasHint = aliases(Nil))
 
     impl (push) (codegen($cala, ${
-      $value.zip($en).foreach{ case (v,e) => if (e) $fifo.push(v) }
+      $value.zip($en).foreach{ case (v,e) => if (e) $fifo.enqueue(v) }
     }))
 
     impl (pop) (codegen($cala, ${
-      $fifo.slice(0, $len).toArray ++ new Array[$t[T]]($len - $fifo.length)
+      if ($len < $fifo.length) {
+        // Assumes there's at least one element
+        val first = $fifo.front
+        Array.tabulate($len){i => if ($fifo.nonEmpty) $fifo.dequeue() else first }
+      }
+      else {
+        Array.tabulate($len){i => $fifo.dequeue() }
+      }
     }))
 
   }

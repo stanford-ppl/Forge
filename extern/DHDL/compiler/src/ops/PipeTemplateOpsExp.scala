@@ -18,7 +18,7 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
   type Idx = FixPt[Signed,B32,B0]
 
   // --- Nodes
-  case class Pipe_foreach(cchain: Exp[CounterChain], func: Block[Unit], inds: List[Sym[Idx]])(implicit ctx: SourceContext) extends Def[Pipeline]
+  case class Pipe_foreach(cchain: Exp[CounterChain], func: Block[Unit], inds: List[Sym[Idx]])(implicit val ctx: SourceContext) extends Def[Pipeline]
   case class Pipe_fold[T,C[T]] (
     // - Inputs
     cchain: Exp[CounterChain],  // Loop counter chain
@@ -155,8 +155,8 @@ trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplate
 
   // --- Mirroring
   override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = e match {
-    case e@Pipe_foreach(c,func,inds) => reflectPure(Pipe_foreach(f(c),f(func),inds)(pos))(mtype(manifest[A]),pos)
-    case Reflect(e@Pipe_foreach(c,func,inds), u, es) => reflectMirrored(Reflect(Pipe_foreach(f(c),f(func),inds)(pos), mapOver(f,u), f(es)))(mtype(manifest[A]),pos)
+    case e@Pipe_foreach(c,func,inds) => reflectPure(Pipe_foreach(f(c),f(func),inds)(e.ctx))(mtype(manifest[A]),pos)
+    case Reflect(e@Pipe_foreach(c,func,inds), u, es) => reflectMirrored(Reflect(Pipe_foreach(f(c),f(func),inds)(e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]),pos)
 
     case e@Pipe_fold(c,a,z,fA,ld,st,iFunc,func,rFunc,inds,idx,acc,res,rV) => reflectPure(Pipe_fold(f(c),f(a),f(z),fA,f(ld),f(st),f(iFunc),f(func),f(rFunc),inds,idx,acc,res,rV)(e.ctx, e.memC, e.numT, e.mT, e.mC))(mtype(manifest[A]), pos)
     case Reflect(e@Pipe_fold(c,a,z,fA,ld,st,iFunc,func,rFunc,inds,idx,acc,res,rV), u, es) => reflectMirrored(Reflect(Pipe_fold(f(c),f(a),f(z),fA,f(ld),f(st),f(iFunc),f(func),f(rFunc),inds,idx,acc,res,rV)(e.ctx, e.memC, e.numT, e.mT, e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)

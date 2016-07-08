@@ -31,16 +31,20 @@ trait DHDLMisc {
     }
 
     // --- Staging time warnings and errors
+    // TODO: These aren't DSL specific, move elsewhere
     internal (Misc) ("stageWarn", Nil, SAny :: SUnit, effect = simple) implements composite ${
-      System.out.println("[\u001B[33mwarn\u001B[0m] " + __pos.fileName + ":" + __pos.line + ": " + $0)
+      val ctx = topContext(__pos)
+      System.out.println("[\u001B[33mwarn\u001B[0m] " + ctx.fileName + ":" + ctx.line + ": " + $0)
     }
     internal (Misc) ("stageError", Nil, SAny :: SNothing, effect = simple) implements composite ${
-      System.out.println("[\u001B[31merror\u001B[0m] " + __pos.fileName + ":" + __pos.line + ": " + $0)
+      val ctx = topContext(__pos)
+      System.out.println("[\u001B[31merror\u001B[0m] " + ctx.fileName + ":" + ctx.line + ": " + $0)
       sys.exit(-1)
     }
 
     internal (Misc) ("stageInfo", Nil, SAny :: SUnit, effect = simple) implements composite ${
-      System.out.println("[\u001B[34minfo\u001B[0m] " + __pos.fileName + ":" + __pos.line + ": " + $0)
+      val ctx = topContext(__pos)
+      System.out.println("[\u001B[34minfo\u001B[0m] " + ctx.fileName + ":" + ctx.line + ": " + $0)
     }
 
     // --- Powers of 2 checks

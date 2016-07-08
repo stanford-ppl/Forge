@@ -215,7 +215,7 @@ trait DHDLOffChip {
         }
       }
       else {
-        Pipe {
+        Pipe {  // TODO: Is this needed?
           val memOfs = calcAddress(offsets, dimsOf(mem))
           if ($store) { offchip_store_cmd(mem, $fifo, memOfs, len, p) }
           else        { offchip_load_cmd(mem, $fifo, memOfs, len, p) }

@@ -98,7 +98,6 @@ trait AreaAnalyzer extends ModelingTraversal {
         inHwScope = false
         body
 
-      case EatReflect(Counterchain_new(ctrs,nIters)) => areaOfBlock(nIters,true,1) + areaOf(lhs)
       case EatReflect(Pipe_parallel(func)) => areaOfBlock(func,false,1) + areaOf(lhs)
       case EatReflect(Unit_pipe(func)) =>
         val body = areaOfBlock(func, isInnerPipe(lhs), 1)

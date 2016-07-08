@@ -31,12 +31,12 @@ trait UnitPipeTransformer extends MultiPassTransformer with PipeStageTools {
 
   // HACK: Have to get a reset value for inserted registers for writing out of unit pipes
   // TODO: Tuples? Custom records?
-  private def zeroHack[T](mT: Manifest[T])(implicit ctx: SourceContext): Exp[T] = (mT match {
-    case mT if isFixPtType(mT) => canFixPtNum(mT.typeArguments(0),mT.typeArguments(1),mT.typeArguments(2))
-    case mT if isFltPtType(mT) => canFltPtNum(mT.typeArguments(0),mT.typeArguments(1))
-    case mT if isBitType(mT) => canBitNum
-    case _ => stageError("Disallowed primitive expression with non-numeric type")(ctx)
-  }).zero.asInstanceOf[T]
+  private def zeroHack[T](mT: Manifest[T])(implicit ctx: SourceContext): Exp[T] = mT match {
+    case mT if isFixPtType(mT) => canFixPtNum(mT.typeArguments(0),mT.typeArguments(1),mT.typeArguments(2)).zero.asInstanceOf[Exp[T]]
+    case mT if isFltPtType(mT) => canFltPtNum(mT.typeArguments(0),mT.typeArguments(1)).zero.asInstanceOf[Exp[T]]
+    case mT if isBitType(mT) => canBitNum.zero.asInstanceOf[Exp[T]]
+    case _ => stageError("Primitive expressions with non-numeric type")(ctx)
+  }
 
   def wrapPrimitives[T:Manifest](blk: Block[T])(implicit ctx: SourceContext): Block[T] = {
     scope += 1
@@ -80,34 +80,43 @@ trait UnitPipeTransformer extends MultiPassTransformer with PipeStageTools {
             debug("")
           }
 
-          stages.zipWithIndex.foreach{ (stage,i) => stage.head match {
+          stages.zipWithIndex.foreach{ case (stage,i) => stage.head match {
             case TP(s,d) if isPrimitiveNode(s) =>
               val calculatedSyms = stage.map{case TP(s,d) => s}
               val neededSyms = deps.drop(i+1).flatten
               // Determine which symbols escape (can be empty)
-              val escapeSyms = calculatedSyms filter (neededSyms contains _)
-              var regs: List[Exp[Reg[Any]]] = Nil
+              val escapingSyms = calculatedSyms.filter{sym => neededSyms.contains(sym)}
+              val (escapingUnits, escapingValues) = escapingSyms.partition{sym => sym.tp == manifest[Unit]}
 
-              Pipe {
+              debugs("Escaping symbols: " + escapingValues.mkString(", "))
+              // Create registers for escaping symbols
+              val regs = escapingValues.map{sym =>
+                val reg = reg_create(zeroHack(sym.tp)(mpos(sym.pos)), Regular)(sym.tp, mpos(sym.pos))
+                debugs(s"Created new register $reg for primitive $s = $d")
+                reg
+              }
+
+              val primBlk = reifyBlock {
                 stage.foreach{stm => traverseStm(stm) } // Mirror each statement
 
                 // Write all escaping symbols to newly created registers
-                val mirroredEscapeSyms = escapeSyms.map{sym => f(sym)}
-                regs = mirroredEscapeSyms.foreach{sym =>
-                  val reg = reg_create(zeroHack(sym.tp)(mpos(sym.pos)), Regular)
-                  reg := sym
-                  reg
-                }
+                escapingValues.zip(regs).foreach{case (sym,reg) => reg_write(reg, f(sym))(sym.tp, mpos(sym.pos)) }
+                ()
               }
+              val pipe = reflectEffect(Unit_pipe(primBlk)(ctx), summarizeEffects(primBlk) andAlso Simple())
+              styleOf(pipe) = InnerPipe
 
               // Replace substitutions of original symbol with register reads
-              escapeSyms.zip(regs){case (sym,reg) => subst(sym) = reg_read(reg) }
+              escapingValues.zip(regs).foreach{case (sym,reg) => subst += sym -> reg_read(reg)(sym.tp,mpos(sym.pos)) }
+              // Replace all dependencies on effectful (Unit) symbols with dependencies on newly created Pipe
+              escapingUnits.foreach{sym => subst += sym -> pipe}
 
-            case TP(s,d) => self_mirror(s, d)
+            case TP(s,d) => stage.foreach{stm => traverseStm(stm) } // Mirror non-primitives to update
           }}
 
         }
       }
+      f(getBlockResult(blk))
     }
     scope -= 1
 
@@ -115,36 +124,36 @@ trait UnitPipeTransformer extends MultiPassTransformer with PipeStageTools {
   }
 
   def wrapPrimitives_Hwblock(lhs: Sym[Any], rhs: Hwblock)(implicit ctx: SourceContext) = {
-    debugs(s"$lhs = $rhs")
     val Hwblock(blk) = rhs
-    val wrappedBlk = wrapPrimitives(f(blk))
+    debugs(s"$lhs = $rhs")
+    val wrappedBlk = wrapPrimitives(blk)
     val pipe2 = reflectEffect(Hwblock(wrappedBlk)(ctx), summarizeEffects(blk) andAlso Simple())
     setProps(pipe2, getProps(lhs))
     pipe2
   }
   def wrapPrimitives_UnitPipe(lhs: Sym[Any], rhs: Unit_pipe)(implicit ctx: SourceContext) = {
-    debugs(s"$lhs = $rhs")
     val Unit_pipe(func) = rhs
-    val wrappedBlk = wrapPrimitives(f(func))
+    debugs(s"$lhs = $rhs")
+    val wrappedBlk = wrapPrimitives(func)
     val pipe2 = reflectEffect(Unit_pipe(wrappedBlk)(ctx), summarizeEffects(wrappedBlk) andAlso Simple())
     setProps(pipe2, getProps(lhs))
     pipe2
   }
 
   def wrapPrimitives_PipeForeach(lhs: Sym[Any], rhs: Pipe_foreach)(implicit ctx: SourceContext) = {
-    debugs(s"$lhs = $rhs")
     val Pipe_foreach(cchain, func, inds) = rhs
-    val wrappedBlk = wrapPrimitives(f(func))
+    debugs(s"$lhs = $rhs")
+    val wrappedBlk = wrapPrimitives(func)
     val pipe2 = reflectEffect(Pipe_foreach(f(cchain), wrappedBlk, inds)(ctx), summarizeEffects(wrappedBlk).star andAlso Simple())
     setProps(pipe2, getProps(lhs))
     pipe2
   }
 
   def wrapPrimitives_PipeFold[T,C[T]](lhs: Sym[Any], rhs: Pipe_fold[T,C])(implicit ctx: SourceContext, memC: Mem[T,C], numT: Num[T], mT: Manifest[T], mC: Manifest[C[T]]) = {
-    debugs(s"$lhs = $rhs")
     val Pipe_fold(cchain,accum,zero,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) = rhs
     val accum2 = f(accum)
-    val mBlk = wrapPrimitives(f(func))
+    debugs(s"$lhs = $rhs")
+    val mBlk = wrapPrimitives(func)
     val iBlk = f(iFunc)
     val ldBlk = f(ld)
     val stBlk = f(st)
@@ -159,11 +168,11 @@ trait UnitPipeTransformer extends MultiPassTransformer with PipeStageTools {
   }
 
   def wrapPrimitives_AccumFold[T,C[T]](lhs: Sym[Any], rhs: Accum_fold[T,C])(implicit ctx: SourceContext, memC: Mem[T,C], numT: Num[T], mT: Manifest[T], mC: Manifest[C[T]]) = {
-    debugs(s"$lhs = $rhs")
     val Accum_fold(ccOuter,ccInner,accum,zero,fA,iFunc,func,ld1,ld2,rFunc,st,indsOuter,indsInner,idx,part,acc,res,rV) = rhs
     val accum2 = f(accum)
     val iBlk = f(iFunc)
-    val mBlk = wrapPrimitives(f(func))
+    debugs(s"$lhs = $rhs")
+    val mBlk = wrapPrimitives(func)
     val ldPartBlk = f(ld1)
     val ldBlk = f(ld2)
     val rBlk = f(rFunc)

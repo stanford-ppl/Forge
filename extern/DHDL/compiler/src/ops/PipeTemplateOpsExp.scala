@@ -388,12 +388,12 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case CoarsePipe =>
 		    val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
-        emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
+        emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)});""")
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case SequentialPipe =>
         if (cchain.isDefined) {
           val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
-          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
+          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)});""")
         } else {
           emit(s"""${quote(sym)}_sm.connectInput("sm_numIter, constant.var(1);""")
         }

@@ -17,13 +17,7 @@ trait StageAnalyzer extends Traversal with PipeStageTools {
   override val name = "Stage Analyzer"
   override val recurse = Always    // Always follow default traversal scheme
   override val eatReflect = true   // Ignore reflect wrappers
-  debugMode = false
-
-  override def preprocess[A:Manifest](b: Block[A]) = {
-    val stages = getStages(b)
-    if (debugMode) list(stages)
-    super.preprocess(b)
-  }
+  debugMode = true
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
     // Accel block (equivalent to a Sequential unit pipe)

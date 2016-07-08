@@ -59,8 +59,8 @@ trait DHDLControllers {
 
     // --- Nodes
     // pipe_foreach, pipe_reduce, accum_fold - see Template in extern
-    val pipe_parallel = internal (Parallel) ("pipe_parallel", Nil, ("func", MThunk(MUnit)) :: MUnit, effect = simple)
-    val unit_pipe = internal (Pipe) ("unit_pipe", Nil, ("func", MThunk(MUnit)) :: MUnit, effect = simple)
+    val pipe_parallel = internal (Parallel) ("pipe_parallel", Nil, ("func", MThunk(MUnit,cold)) :: MUnit, effect = simple)
+    val unit_pipe = internal (Pipe) ("unit_pipe", Nil, ("func", MThunk(MUnit,cold)) :: MUnit, effect = simple)
 
     val controllers = List(Pipe, Sequential)
     val styles  = List("InnerPipe", "SequentialPipe")

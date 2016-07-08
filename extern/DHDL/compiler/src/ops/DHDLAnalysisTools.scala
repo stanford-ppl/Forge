@@ -120,8 +120,8 @@ trait PipeStageToolsExp extends EffectExp {
     case _ => false
   }
 
-  def isInnerPipe(s: Exp[Any]): Boolean = isInnerLoop(s)
-  def isInnerPipe(s: (Exp[Any],Boolean)): Boolean = s._2 || isInnerLoop(s._1)
+  def isInnerPipe(s: Exp[Any]): Boolean = isInnerControl(s)
+  def isInnerPipe(s: (Exp[Any],Boolean)): Boolean = s._2 || isInnerControl(s._1)
 
   def isStreamPipe(s: Exp[Any]): Boolean = isOuterControl(s) && styleOf(s) == StreamPipe
   def isStreamPipe(s: (Exp[Any],Boolean)): Boolean = !s._2 && isStreamPipe(s._1)

@@ -246,8 +246,8 @@ trait DHDLDSL extends ForgeApplication
     // --- Pre-DSE analysis
     schedule(NameAnalyzer)
     schedule(LevelAnalyzer)         // Sanity checks and pipe style annotation fixes
-    schedule(IRPrinterPlus)
     schedule(UnitPipeTransformer)   // Wrap primitives in outer pipes
+
     schedule(StageAnalyzer)         // Get number of stages in each control node
     schedule(GlobalAnalyzer)        // Values computed outside of all controllers
     schedule(ControlSignalAnalyzer) // Variety of control signal related metadata
@@ -256,6 +256,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(DHDLAffineAnalysis)    // Access patterns
 
     schedule(DotIRPrinter)          // Graph prior to unrolling
+    schedule(IRPrinterPlus)
 
     // --- Design Space Exploration
     schedule(DSE)                   // Design space exploration. Runs a host of other analyses:

@@ -28,7 +28,7 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
 
   // --- Nodes
   case class Counter_new(start: Rep[Idx], end: Rep[Idx], step: Rep[Idx], par: Param[Int])(implicit val ctx: SourceContext) extends Def[Counter]
-  case class Counterchain_new(counters: List[Rep[Counter]], nIter: Block[Idx])(implicit val ctx: SourceContext) extends Def[CounterChain]
+  case class Counterchain_new(counters: List[Rep[Counter]], nIter: Rep[Idx])(implicit val ctx: SourceContext) extends Def[CounterChain]
 
   // --- Internal API
   def counter_new(start: Rep[Idx],end: Rep[Idx],step: Rep[Idx], par: Rep[Int])(implicit ctx: SourceContext) = {
@@ -56,7 +56,7 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
     val steps:  List[Rep[Idx]] = ctrSplit.map(_._3)
     val pars:   List[Rep[Idx]] = ctrSplit.map(_._4).map(int_to_fix[Signed,B32](_)) // HACK: Convert Int param to fixed point
 
-    val nIter: Block[Idx] = reifyEffects {
+    val nIter = {
       // TODO: These should be more general rewrite rules
       val lens: List[Rep[Idx]] = starts.zip(ends).map{
         case (ConstFix(x: Int),ConstFix(y: Int)) => (y - x).as[Idx]
@@ -67,7 +67,7 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
         case (len, ConstFix(1), par) => div(len, par) // Should round correctly here
         case (len, step, par) => div(len, mul(step, par))
       }
-      total.reduce{_*_}
+      productTree(total)
     }
 
     // HACK: Not actually mutable, but isn't being scheduled properly otherwise
@@ -107,7 +107,7 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
 
   // TODO: Default number of iterations if bound can't be computed?
   def nIters(x: Rep[CounterChain]): Long = x match {
-    case Deff(Counterchain_new(_,nIters)) => Math.ceil( bound(nIters.res).getOrElse(1.0) ).toLong
+    case Deff(Counterchain_new(_,nIters)) => Math.ceil( bound(nIters).getOrElse(1.0) ).toLong
     case _ => 1L
   }
 
@@ -122,25 +122,6 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
 
     case _ => super.mirror(e,f)
   }
-
-  // --- Syms
-  override def syms(e: Any): List[Sym[Any]] = e match {
-    case Counterchain_new(ctrs, nIters) => syms(ctrs) ::: syms(nIters)
-    case _ => super.syms(e)
-  }
-  override def readSyms(e: Any): List[Sym[Any]] = e match {
-    case Counterchain_new(ctrs, nIters) => readSyms(ctrs) ::: readSyms(nIters)
-    case _ => super.readSyms(e)
-  }
-  override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {
-    case Counterchain_new(ctrs, nIters) => freqNormal(ctrs) ::: freqNormal(nIters)
-    case _ => super.symsFreq(e)
-  }
-  override def boundSyms(e: Any): List[Sym[Any]] = e match {
-    case Counterchain_new(ctrs, nIters) => effectSyms(nIters)
-    case _ => super.boundSyms(e)
-  }
-
 }
 
 trait ScalaGenExternCounterOps extends ScalaGenEffect {

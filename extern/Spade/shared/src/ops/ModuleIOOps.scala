@@ -1,10 +1,10 @@
-package dadl.shared.ops
+package spade.shared.ops
 
 import scala.virtualization.lms.common.{Base, Record}
 import scala.reflect.{Manifest,SourceContext}
 
-import dadl.shared._
-import dadl.shared.ops._
+import spade.shared._
+import spade.shared.ops._
 
 trait FeedbackImplicits {
   this: ModuleIOOps =>
@@ -13,7 +13,7 @@ trait FeedbackImplicits {
 }
 
 trait ModuleIOOps extends Base with FeedbackImplicits {
-  this: DADL =>
+  this: Spade =>
 
   abstract class Port extends Record
 
@@ -27,4 +27,4 @@ trait ModuleIOOps extends Base with FeedbackImplicits {
   def feedback_assign[T:Manifest](lhs: Feedback[T], rhs: Rep[T])(implicit ctx: SourceContext): Rep[Unit]
   def feedback_read[T:Manifest](f: Feedback[T])(implicit ctx: SourceContext): Rep[T]
 }
-trait ModuleIOCompilerOps extends ModuleIOOps { this: DADL => }
+trait ModuleIOCompilerOps extends ModuleIOOps { this: Spade => }

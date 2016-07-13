@@ -43,7 +43,6 @@ trait DHDLTypes {
     val const_to_fixpt = internal (Lifts) ("constFixPt", (T,S,I,F), (T, SManifest(SS), SManifest(II), SManifest(FF)) :: FixPt(S,I,F), TNumeric(T))
     val const_to_fltpt = internal (Lifts) ("constFltPt", (T,G,E), (T, SManifest(GG), SManifest(EE)) :: FltPt(G,E), TNumeric(T))
 
-
     val bit_to_string = direct (Tpes) ("bit_to_string", Nil, Bit :: MString)
 
     // Include Manifests to avoid CSE issues
@@ -198,6 +197,30 @@ trait DHDLTypes {
     impl (fltpt_to_fixpt) (codegen($cala, ${ $0.toFixedPoint[$t[S],$t[I],$t[F]] }))
     impl (convert_fltpt) (codegen($cala, ${ $0.changeFormat[$t[G2],$t[E2]] }))
 
+    // --- C++ Backend
+    impl (boolean_to_bit) (codegen(cpp, ${ $0 }))
+    impl (bit_to_string)  (codegen(cpp, ${ $0.toString }))
+    impl (bit_to_bool)    (codegen(cpp, ${ $0 }))
+
+    impl (const_to_fixpt) (codegen(cpp, ${ $0 }))
+    impl (string_to_fixpt) (codegen(cpp, ${ std::stoi($0) }))
+    impl (string_to_fltpt) (codegen(cpp, ${ std::stof($0) }))
+    impl (fixpt_to_string) (codegen(cpp, ${ std::to_string($0) }))
+    impl (fixpt_to_fltpt) (codegen(cpp, ${ (float)($0) }))
+    impl (convert_fixpt) (codegen(cpp, ${ $0 }))
+    impl (fix_to_rep_int) (codegen(cpp, ${
+      (int32_t) $0
+    }))
+    impl (rep_int_to_fix) (codegen(cpp, ${
+      @ val fixPtType = remap($0.tp)
+      ($fixPtType) ($0)
+    }))
+
+    impl (const_to_fltpt) (codegen(cpp, ${ (float) ($0) }))
+    impl (fltpt_to_string) (codegen(cpp, ${ std::to_string($0) }))
+    impl (fltpt_to_fixpt) (codegen(cpp, ${ $0.toFixedPoint[$t[S],$t[I],$t[F]] }))
+    impl (convert_fltpt) (codegen(cpp, ${ $0.changeFormat[$t[G2],$t[E2]] }))
+
     // --- MaxJ Backend
     impl (boolean_to_bit) (codegen(maxj, ${
       @ alwaysGen {
@@ -242,6 +265,14 @@ trait DHDLTypes {
 			@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
       DFEVar $sym = $0.cast( $ts );
 		}))
+    impl (string_to_fixpt)  (codegen(maxj, ${
+      DFEVar $sym = String_to_fixpt($0)
+		}))
+    impl (fix_to_rep_int) (codegen(maxj, ${
+			@ alwaysGen {
+				DFEVar $sym = Fix_to_int($0)
+			@ }
+    }))
 
 	}
 }

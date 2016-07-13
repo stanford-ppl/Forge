@@ -40,10 +40,10 @@ trait MetaPipeRegInsertion extends SinglePassTransformer with PipeStageTools {
                 val regWrite = reg := ctr
                 val regValue = reg.value
                 // Set metadata for this register
-                isDblBuf(reg) = true
+                //isDblBuf(reg) = true
                 isDelayReg(reg) = true
                 readersOf(reg) = List((stage,false,regValue))
-                writerOf(reg) = (prevStage.get, false, regWrite)
+                writersOf(reg) = (prevStage.get, false, regWrite)
                 writtenIn(prevStage.get) = writtenIn(prevStage.get) :+ reg
                 parentOf(reg) = owner
                 childrenOf(owner) = childrenOf(owner) :+ reg
@@ -70,21 +70,21 @@ trait MetaPipeRegInsertion extends SinglePassTransformer with PipeStageTools {
   }
 
   override def transform[A:Manifest](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext): Option[Exp[Any]] = rhs match {
-    case Reflect(Pipe_foreach(cchain, func, inds), u, es) if styleOf(lhs) == Coarse =>
+    case Reflect(Pipe_foreach(cchain, func, inds), u, es) if isMetaPipe(lhs) =>
       val newFunc = insertRegisters(lhs, func, inds)(mtype(getBlockResult(func).tp),ctx)
       val newPipe = reflectMirrored(Reflect(Pipe_foreach(f(cchain),newFunc,inds)(ctx), mapOver(f,u), f(es)))(mtype(manifest[A]),ctx)
       setProps(newPipe, getProps(lhs))
       Some(newPipe)
 
-    case Reflect(e@Pipe_fold(cchain,accum,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV), u, es) if styleOf(lhs) == Coarse =>
+    case Reflect(e@Pipe_fold(cchain,accum,zero,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV), u, es) if isMetaPipe(lhs) =>
       val newFunc = insertRegisters(lhs, func, inds)(mtype(getBlockResult(func).tp),ctx)
-      val newPipe = reflectMirrored(Reflect(Pipe_fold(f(cchain),f(accum),fA,f(iFunc),f(ld),f(st),newFunc,f(rFunc),inds,idx,acc,res,rV)(ctx, e.memC, e.mT, e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]),ctx)
+      val newPipe = reflectMirrored(Reflect(Pipe_fold(f(cchain),f(accum),f(zero),fA,f(iFunc),f(ld),f(st),newFunc,f(rFunc),inds,idx,acc,res,rV)(ctx, e.memC, e.numT, e.mT, e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]),ctx)
       setProps(newPipe, getProps(lhs))
       Some(newPipe)
 
-    case Reflect(e@Accum_fold(c1,c2,a,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV), u, es) if styleOf(lhs) == Coarse =>
+    case Reflect(e@Accum_fold(c1,c2,a,zero,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV), u, es) if isMetaPipe(lhs) =>
       val newFunc = insertRegisters(lhs, func, inds1)(mtype(getBlockResult(func).tp),ctx)
-      val newPipe = reflectMirrored(Reflect(Accum_fold(f(c1),f(c2),f(a),fA,f(iFunc),newFunc,f(ld1),f(ld2),f(rFunc),f(st),inds1,inds2,idx,part,acc,res,rV)(ctx, e.memC, e.mT, e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), ctx)
+      val newPipe = reflectMirrored(Reflect(Accum_fold(f(c1),f(c2),f(a),f(zero),fA,f(iFunc),newFunc,f(ld1),f(ld2),f(rFunc),f(st),inds1,inds2,idx,part,acc,res,rV)(ctx, e.memC, e.numT, e.mT, e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), ctx)
       setProps(newPipe, getProps(lhs))
       Some(newPipe)
     case _ => None

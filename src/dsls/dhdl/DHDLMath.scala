@@ -298,6 +298,38 @@ trait DHDLMath {
     impl (xor_bit) (codegen($cala, ${ $0 != $1 }))
     impl (xnor_bit) (codegen($cala, ${ $0 == $1 }))
 
+    // --- C++ Backend
+    impl (neg_fix) (codegen(cpp, ${ -$0 }))
+    impl (add_fix) (codegen(cpp, ${ $0 + $1 }))
+    impl (sub_fix) (codegen(cpp, ${ $0 - $1 }))
+    impl (mul_fix) (codegen(cpp, ${ $0 * $1 }))
+    impl (div_fix) (codegen(cpp, ${ $0 / $1 }))
+    impl (mod_fix) (codegen(cpp, ${ $0 % $1 }))
+    impl (lt_fix)  (codegen(cpp, ${ $0 < $1 }))
+    impl (leq_fix) (codegen(cpp, ${ $0 <= $1 }))
+    impl (neq_fix) (codegen(cpp, ${ $0 != $1 }))
+    impl (eql_fix) (codegen(cpp, ${ $0 == $1 }))
+    impl (and_fix) (codegen(cpp, ${ $0 & $1 }))
+    impl (or_fix)  (codegen(cpp, ${ $0 | $1 }))
+    impl (lsh_fix) (codegen(cpp, ${ $0 << $1 }))
+    impl (rsh_fix) (codegen(cpp, ${ $0 >> $1 }))
+
+    impl (neg_flt) (codegen(cpp, ${ -$0 }))
+    impl (add_flt) (codegen(cpp, ${ $0 + $1 }))
+    impl (sub_flt) (codegen(cpp, ${ $0 - $1 }))
+    impl (mul_flt) (codegen(cpp, ${ $0 * $1 }))
+    impl (div_flt) (codegen(cpp, ${ $0 / $1 }))
+    impl (lt_flt)  (codegen(cpp, ${ $0 < $1 }))
+    impl (leq_flt) (codegen(cpp, ${ $0 <= $1 }))
+    impl (neq_flt) (codegen(cpp, ${ $0 != $1 }))
+    impl (eql_flt) (codegen(cpp, ${ $0 == $1 }))
+
+    impl (not_bit) (codegen(cpp, ${ !$0 }))
+    impl (and_bit) (codegen(cpp, ${ $0 && $1 }))
+    impl (or_bit)  (codegen(cpp, ${ $0 || $1 }))
+    impl (xor_bit) (codegen(cpp, ${ $0 != $1 }))
+    impl (xnor_bit) (codegen(cpp, ${ $0 == $1 }))
+
     // --- MaxJ Backend
     impl (neg_fix) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)

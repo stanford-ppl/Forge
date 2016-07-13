@@ -1,17 +1,17 @@
 package ppl.dsl.forge
 package dsls
-package dadl
+package spade
 
 import core.{ForgeApplication,ForgeApplicationRunner}
 
-object DADLDSLRunner extends ForgeApplicationRunner with DADLDSL
+object SpadeDSLRunner extends ForgeApplicationRunner with SpadeDSL
 
-trait DADLDSL extends ForgeApplication
-  with ArchOps
+trait SpadeDSL extends ForgeApplication
+  with CoreOps
   with NodeOps
   with Modules {
 
-  def dslName = "DADL"
+  def dslName = "Spade"
 
   override def clearTraversals = true
   disableFusion()
@@ -31,11 +31,13 @@ trait DADLDSL extends ForgeApplication
     primitiveTypes ::= rep
     tpeAlias("Wire", rep)
 
+    val DotIRPrinter = traversal("DotIRPrinter", isExtern=true)
     schedule(IRPrinter)
+    schedule(DotIRPrinter)
 
     // TODO: This list should be updated as and when new backend support for feedback is added
     // Codegen support should be added in forge/extern/dadl/compiler/src/ops/ModuleIOOpsExp.scala
-    extern(grp("ModuleIO"), targets = List(dot))
+    extern(grp("ModuleIO"), targets = List($cala, dot))
 
     ()
   }

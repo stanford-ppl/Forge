@@ -2,7 +2,7 @@ package dhdl.compiler.ops
 
 import scala.reflect.{Manifest,SourceContext}
 
-import ppl.delite.framework.analysis.HungryTraversal
+import scala.virtualization.lms.internal.Traversal
 import scala.virtualization.lms.common.EffectExp
 import scala.virtualization.lms.util.GraphUtil
 
@@ -15,6 +15,10 @@ import dhdl.compiler.ops._
 
 trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
   this: DHDLExp =>
+
+  // TODO
+  def isDblBuf(e: Exp[Any]) = true
+  def banks(e: Exp[Any]) = 1
 
   sealed abstract class Banking(val banks: Int)
   object Banking {
@@ -45,12 +49,13 @@ trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
 
 
 // Technically doesn't need a real traversal, but nice to have debugging, etc.
-trait MemoryAnalyzer extends HungryTraversal {
+trait MemoryAnalyzer extends Traversal {
   val IR: DHDLExp with MemoryAnalysisExp
   import IR._
 
-  debugMode = true
   override val name = "Scratchpad Analyzer"
+  override val eatReflect = true
+  debugMode = true
 
   /**
     Metadata for various banking techniques for vectorization of reads/writes of
@@ -195,6 +200,9 @@ trait MemoryAnalyzer extends HungryTraversal {
   def distanceBetween(write: (Exp[Any], Boolean), read: (Exp[Any], Boolean)): Int = {
     if (write == read) 0
     else {
+      debug("    write: " + write)
+      debug("    read:  " + read)
+
       val (lca, writePath, readPath) = GraphUtil.leastCommonAncestorWithPaths[(Exp[Any],Boolean)](write, read, {node => parentOf(node)})
 
       debug("    lca: " + lca)
@@ -228,7 +236,7 @@ trait MemoryAnalyzer extends HungryTraversal {
     debug("")
     debug("Inferring instances for memory " + nameOf(mem).getOrElse(mem.toString))
     if (isBRAM(mem.tp)) {
-      (writerOf(mem),readersOf(mem)) match {
+      (writersOf(mem).headOption,readersOf(mem)) match {
         case (None, Nil) => Nil
         case (Some(write), Nil) => List(unpairedAccess(mem, write))
         case (None, reads) =>
@@ -241,7 +249,7 @@ trait MemoryAnalyzer extends HungryTraversal {
       }
     }
     else if (isRegister(mem.tp)) {    // Registers don't need banking, but they do need buffering
-      (writerOf(mem), readersOf(mem)) match {
+      (writersOf(mem).headOption, readersOf(mem)) match {
         case (None, Nil) => Nil
         case (Some(write), Nil) => List(MemInstance(1, List(DuplicatedBanking(1))))
         case (None, reads) => List(MemInstance(1, List(DuplicatedBanking(1))))
@@ -249,6 +257,10 @@ trait MemoryAnalyzer extends HungryTraversal {
           val dups = reads.map{read => MemInstance(1 + distanceBetween( (write._1,write._2), (read._1,read._2) ), List(DuplicatedBanking(1))) }
           coalesceDuplicates(dups)
       }
+    }
+    else if (isFIFO(mem.tp)) {
+      // TODO?
+      List(MemInstance(1, List(DuplicatedBanking(1))))
     }
     else stageError("TODO: Don't yet know how to bank memory of type " + mem.tp)
   }
@@ -265,18 +277,4 @@ trait MemoryAnalyzer extends HungryTraversal {
   }
 
   def run(localMems: List[Exp[Any]]): Unit = localMems.foreach{mem => analyzeMemory(mem) }
-  // Heuristic - find memories which have a reader and a writer which are different
-  // but whose nearest common parent is a metapipeline.
-  /*localMems.flatMap{mem =>
-    writerOf(mem).flatMap { writer =>
-      val lcas = readersOf(mem).filter(_ != writer).flatMap{reader => leastCommonAncestor(reader, writer, parentOf).filter(isMetaPipe(_)) }
-      if (lcas.isEmpty) None else Some(mem -> lcas.head) // HACK: This could actually be much more complicated..
-    }
-  }*/
-
-  override def traverse(lhs: Sym[Any], rhs: Def[Any]): Unit = rhs match {
-    case _:Reg_new[_] => analyzeMemory(lhs)
-    case _:Bram_new[_] => analyzeMemory(lhs)
-    case _ => super.traverse(lhs,rhs)
-  }
 }

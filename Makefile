@@ -20,13 +20,13 @@ dhdl_clean:
 	rm -f DHDL.symlink
 	rm -rf ${HYPER_HOME}/published/DHDL
 
-dadl: build
-	cd ${HYPER_HOME} && ${FORGE_HOME}/bin/update ppl.dsl.forge.dsls.dadl.DADLDSLRunner DADL && cd ${FORGE_HOME}
-	ln -s ${HYPER_HOME}/published/DADL DADL.symlink
+spade: build
+	cd ${HYPER_HOME} && ${FORGE_HOME}/bin/update ppl.dsl.forge.dsls.spade.SpadeDSLRunner Spade && cd ${FORGE_HOME}
+	ln -s ${HYPER_HOME}/published/Spade Spade.symlink
 
-dadl_clean:
-	rm -f DADL.symlink
-	rm -rf ${HYPER_HOME}/published/DADL
+spade_clean:
+	rm -f Spade.symlink
+	rm -rf ${HYPER_HOME}/published/Spade
 
 optiml: build
 	cd ${HYPER_HOME} && ${FORGE_HOME}/bin/update ppl.dsl.forge.dsls.optiml.OptiMLDSLRunner OptiML && cd ${FORGE_HOME}
@@ -40,4 +40,4 @@ optiml_clean:
 clean:
 	cd ${HYPER_HOME} && sbt "; project forge; clean" && cd ${FORGE_HOME}
 
-distclean: clean dhdl_clean dadl_clean
+distclean: clean dhdl_clean spade_clean

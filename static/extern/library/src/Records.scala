@@ -57,19 +57,4 @@ trait RecordWrapper extends HUMAN_DSL_NAMEBase with ForgeMetadataWrapper {
     case e: LibStruct => Some(e.getFields.toList)
     case _ => super.unapplyStructLike(e)
   }
-
-  // Copied directly from LMS
-  def isSubtype(x: java.lang.Class[_], cls: java.lang.Class[_]): Boolean = {
-    if ((x == cls) || x.getInterfaces().contains(cls)) true
-    else if (x.getSuperclass() == null && x.getInterfaces().length == 0) false
-    else {
-      val superIsSub = if (x.getSuperclass() != null) isSubtype(x.getSuperclass(), cls) else false
-      superIsSub || x.getInterfaces().exists(s=>isSubtype(s,cls))
-    }
-  }
-
 }
-
-
-
-

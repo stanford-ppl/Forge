@@ -8,19 +8,19 @@ trait OuterProduct extends DHDLApplication {
   type T = Flt
 
   def outerproduct(a: Rep[ForgeArray[T]], b: Rep[ForgeArray[T]]) = {
-    val tileSizeA = param("tileSizeA", 8);  domainOf(tileSizeA) = (96, 38400, 96)
-    val tileSizeB = param("tileSizeB", 8);  domainOf(tileSizeB) = (96, 38400, 96)
-    val outerPar  = param("outerPar", 2);   domainOf(outerPar) = (1, 4, 1)
-    val innerPar  = param("innerPar", 2);   domainOf(innerPar) = (1, 38400, 1)
+    val tileSizeA = param(8);  domainOf(tileSizeA) = (96, 38400, 96)
+    val tileSizeB = param(8);  domainOf(tileSizeB) = (96, 38400, 96)
+    val outerPar  = param(2);  domainOf(outerPar) = (1, 4, 1)
+    val innerPar  = param(2);  domainOf(innerPar) = (1, 38400, 1)
 
     val M = a.length;  bound(M) = 38400
     val N = b.length;  bound(N) = 38400
 
-    val vec1 = OffChipMem[T]("vec1", M)
-    val vec2 = OffChipMem[T]("vec2", N)
-    val out = OffChipMem[T]("out", M, N)
-    val sizeA = ArgIn[SInt]("sizeA")
-    val sizeB = ArgIn[SInt]("sizeB")
+    val vec1 = OffChipMem[T](M)
+    val vec2 = OffChipMem[T](N)
+    val out = OffChipMem[T](M, N)
+    val sizeA = ArgIn[SInt]
+    val sizeB = ArgIn[SInt]
 
     // Transfer data and start accelerator
     setArg(sizeA, M)
@@ -30,9 +30,9 @@ trait OuterProduct extends DHDLApplication {
 
     Accel {
       Pipe(sizeA by tileSizeA, sizeB by tileSizeB par outerPar){ (i,j) =>
-        val b1 = BRAM[T]("b1", tileSizeA)
-        val b2 = BRAM[T]("b2", tileSizeB)
-        val outTile = BRAM[T]("outTile", tileSizeA, tileSizeB)
+        val b1 = BRAM[T](tileSizeA)
+        val b2 = BRAM[T](tileSizeB)
+        val outTile = BRAM[T](tileSizeA, tileSizeB)
         Parallel {
           b1 := vec1(i::i+tileSizeA)
           b2 := vec2(j::j+tileSizeB)
@@ -46,8 +46,8 @@ trait OuterProduct extends DHDLApplication {
   }
 
   def main() = {
-    val M = args(unit(0)).to[SInt]
-    val N = args(unit(1)).to[SInt]
+    val M = args(0).to[SInt]
+    val N = args(1).to[SInt]
     val a = Array.fill(M)(random[T](100))
     val b = Array.fill(N)(random[T](100))
 

@@ -49,4 +49,6 @@ trait ExternPrimitiveCompilerOps extends ExternPrimitiveOps with MemoryTemplateT
     case BXX(bits) => bits
     case mA => throw new Exception("Unknown type in nbits: " + mA.runtimeClass.getSimpleName)
   }
+
+  def isStaticSize[T:Manifest](x: Rep[T]): Boolean
 }

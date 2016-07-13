@@ -31,16 +31,20 @@ trait DHDLMisc {
     }
 
     // --- Staging time warnings and errors
+    // TODO: These aren't DSL specific, move elsewhere
     internal (Misc) ("stageWarn", Nil, SAny :: SUnit, effect = simple) implements composite ${
-      System.out.println("[\u001B[33mwarn\u001B[0m] " + __pos.fileName + ":" + __pos.line + ": " + $0)
+      val ctx = topContext(__pos)
+      System.out.println("[\u001B[33mwarn\u001B[0m] " + ctx.fileName + ":" + ctx.line + ": " + $0)
     }
     internal (Misc) ("stageError", Nil, SAny :: SNothing, effect = simple) implements composite ${
-      System.out.println("[\u001B[31merror\u001B[0m] " + __pos.fileName + ":" + __pos.line + ": " + $0)
+      val ctx = topContext(__pos)
+      System.out.println("[\u001B[31merror\u001B[0m] " + ctx.fileName + ":" + ctx.line + ": " + $0)
       sys.exit(-1)
     }
 
     internal (Misc) ("stageInfo", Nil, SAny :: SUnit, effect = simple) implements composite ${
-      System.out.println("[\u001B[34minfo\u001B[0m] " + __pos.fileName + ":" + __pos.line + ": " + $0)
+      val ctx = topContext(__pos)
+      System.out.println("[\u001B[34minfo\u001B[0m] " + ctx.fileName + ":" + ctx.line + ": " + $0)
     }
 
     // --- Powers of 2 checks
@@ -145,6 +149,7 @@ trait DHDLMisc {
     direct (API) ("__equal", T, (MArray(T), MArray(T)) :: Bit, TOrder(T)) implements composite ${
       array_zip($0, $1, {(a:Rep[T], b:Rep[T]) => implicitly[Order[T]].equals(a,b)}).reduce{_&&_}
     }
+
   }
 
   def importRandomOps() {
@@ -211,10 +216,30 @@ trait DHDLMisc {
     impl (rand_flt) (codegen($cala, ${ FloatPoint.rand[$t[G],$t[E]] }))
     impl (rand_bit) (codegen($cala, ${ java.util.concurrent.ThreadLocalRandom.current().nextBoolean() }))
 
+    // --- C++ Backend
+    impl (rand_fix_bnd) (codegen(cpp, ${
+      @ val remapTp = remap($0.tp)
+      ($remapTp) rand() % $0
+    }))
+    impl (rand_fix) (codegen(cpp, ${
+      @ val remapTp = remap(sym.tp)
+      ($remapTp) rand()
+    }))
+    impl (rand_flt) (codegen(cpp, ${
+      @ val remapTp = remap(sym.tp)
+      ($remapTp) rand() / ($remapTp) RAND_MAX
+    }))
+    impl (rand_bit) (codegen(cpp, ${
+      (bool) rand() % 2
+    }))
+
+
     // --- MaxJ Backend
     //impl (rand_fix_bnd) (codegen(maxj, ${  }))
     //impl (rand_fix) (codegen(maxj, ${  }))
-    //impl (rand_flt) (codegen(maxj, ${  }))
+    impl (rand_flt) (codegen(maxj, ${
+      DFEVar $sym = Rand_flt
+    }))
     //impl (rand_bit) (codegen(maxj, ${  }))
   }
 
@@ -305,7 +330,7 @@ trait DHDLMisc {
     // TODO: This is a quick hack for scheduling acceleration initialization. Eventually this should act as a true annotation
     direct (Tst) ("Accel", Nil, MThunk(MUnit) :: MUnit) implements composite ${
       val accel = hwblock($0)
-      styleOf(accel) = Disabled
+      styleOf(accel) = SequentialPipe
       accel
     }
 
@@ -348,6 +373,38 @@ trait DHDLMisc {
       ()
     }))
 
+    // C++ backend
+    impl (set_mem)  (codegen(cpp, ${ memcpy($1, 0, $0, 0, $1.length) }))
+    impl (get_mem)  (codegen(cpp, ${ memcpy($0, 0, $1, 0, $0.length) }))
+    impl (set_arg)  (codegen(cpp, ${ *$0 = $1}))
+    impl (get_arg)  (codegen(cpp, ${ *$0 }))
+    impl (hwblock)  (codegen(cpp, ${
+      std::cout << "hwblock" << std::endl
+    }))
+    impl (println)  (codegen(cpp, ${ std::cout << $0 << std::endl }))
+    impl (println2) (codegen(cpp, ${ std::cout << std::endl }))
+    impl (assert)   (codegen(cpp, ${ assert($0) }))
+    impl (ifThenElse) (codegen(cpp, ${
+      if ($0) {
+        $b[1]
+      }
+      else {
+        $b[2]
+      }
+    }))
+    impl (whileDo) (codegen(cpp, ${
+      while ($b[0]) {
+        $b[1]
+      }
+    }))
+    impl (forLoop) (codegen(cpp, ${
+      @ val itp = remap($start.tp)
+      $itp i = $start ;
+      for (i = $start ; i < $end ; i += $step) {
+        $b[func](i)
+      }
+    }))
+
     // --- MaxJ Backend
     impl (println)  (codegen(maxj, ${
 			@ emitComment("println")
@@ -359,7 +416,7 @@ trait DHDLMisc {
     impl (get_arg)  (codegen(maxj, ${ }))
     impl (hwblock)  (codegen(maxj, ${
 			@ inHwScope = true
-      @ stream.println(emitBlock(__arg0) + "")
+      @ emitBlock(__arg0)
 			@ inHwScope = false
     }))
 

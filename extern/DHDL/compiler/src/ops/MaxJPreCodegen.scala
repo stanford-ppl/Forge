@@ -28,7 +28,10 @@ trait MaxJPreCodegen extends Traversal  {
 	}
 
   def quote(x: Exp[Any]):String = x match {
-		case s@Sym(n) => s.tp.erasure.getSimpleName().replace("DHDL","") + nameOf(s).map(nm=>"_"+nm).getOrElse("") + "_x" + n
+//		case s@Sym(n) => s.tp.erasure.getSimpleName().replace("DHDL","") + nameOf(s).map(nm=>"_"+nm).getOrElse("") + n
+		case s@Sym(n) =>
+      val str = s.tp.erasure.getSimpleName().replace("DHDL","") + n
+      str
     case _ => ""
   }
 
@@ -80,32 +83,46 @@ trait MaxJPreCodegen extends Traversal  {
 			}
     case e@Pipe_foreach(cchain, func, inds) =>
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
-				case Coarse =>
+				case CoarsePipe =>
 					withStream(newStream("metapipe_" + quote(sym))) {
     				emitMPSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
-				case Fine =>
-				case Disabled =>
+				case InnerPipe =>
+				case SequentialPipe =>
 					withStream(newStream("sequential_" + quote(sym))) {
     				emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
 			}
-    case e@Pipe_fold(cchain, accum, foldAccum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
+    case e@Pipe_fold(cchain, accum, zero, foldAccum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
-				case Coarse =>
+				case CoarsePipe =>
 					withStream(newStream("metapipe_" + quote(sym))) {
     				emitMPSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
-				case Fine =>
-				case Disabled =>
+				case InnerPipe =>
+				case SequentialPipe =>
 					withStream(newStream("sequential_" + quote(sym))) {
     				emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
 			}
+
+    case e@ParPipeForeach(cc, func, inds) =>
+			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
+				case CoarsePipe =>
+					withStream(newStream("metapipe_" + quote(sym))) {
+    				emitMPSM(s"${quote(sym)}", childrenOf(sym).size)
+					}
+				case InnerPipe =>
+				case SequentialPipe =>
+					withStream(newStream("sequential_" + quote(sym))) {
+    				emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
+					}
+			}
+
 		case e:Reg_new[_] if regType(sym) != Regular => argInOuts += sym.asInstanceOf[Sym[Register[_]]]
 
-    case _:Offchip_store_vector[_] => memStreams += sym
-    case _:Offchip_load_vector[_] => memStreams += sym
+    case _:Offchip_store_cmd[_] => memStreams += sym
+    case _:Offchip_load_cmd[_] => memStreams += sym
 
     case e@EatReflect(Bram_new(size, zero)) =>
 			withStream(newStream("bram_" + quote(sym))) {

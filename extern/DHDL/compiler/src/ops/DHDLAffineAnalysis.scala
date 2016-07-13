@@ -28,9 +28,9 @@ trait DHDLAffineAnalysisExp extends AffineAnalysisExp {
   override def loopUnapply(x: Exp[Any]): Option[List[(List[Sym[Index]], List[Block[Any]])]] = x match {
     case Deff(Pipe_foreach(cchain, func, inds)) =>
       Some( List(inds -> List(func)) )
-    case Deff(Pipe_fold(cchain,accum,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV)) =>
+    case Deff(Pipe_fold(cchain,accum,zero,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV)) =>
       Some( List(inds -> List(iFunc,ld,st,func,rFunc)) )
-    case Deff(Accum_fold(c1,c2,a,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV)) =>
+    case Deff(Accum_fold(c1,c2,a,zero,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV)) =>
       Some( List(inds1 -> List(func), (inds1 ++ inds2) -> List(iFunc,ld1,ld2,rFunc,st)) )
     case _ => None
   }
@@ -65,18 +65,12 @@ trait DHDLAffineAnalyzer extends AffineAnalyzer {
   }
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]): Unit = rhs match {
-    case EatReflect(Bram_load_vector(bram,ofs,cchain,inds)) =>
-      accessPatternOf(lhs) = patternOfVectorizedOp(accessIndicesOf(lhs), inds)
-
-    case EatReflect(Bram_store_vector(bram,ofs,vec,cchain,inds)) =>
-      accessPatternOf(lhs) = patternOfVectorizedOp(accessIndicesOf(lhs), inds)
-
-    case EatReflect(Pipe_fold(cc,a,_,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV)) =>
+    case Pipe_fold(cc,a,zero,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) =>
       super.traverse(lhs,rhs)
       accessIndicesOf(lhs) = inds
       accessPatternOf(lhs) = inds.map{i => LinearAccess(i)}
 
-    case EatReflect(Accum_fold(cc1,cc2,a,_,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV)) =>
+    case Accum_fold(cc1,cc2,a,zero,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
       super.traverse(lhs,rhs)
       accessIndicesOf(lhs) = inds2
       accessPatternOf(lhs) = inds2.map{i => LinearAccess(i)}

@@ -5,10 +5,9 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-import scala.virtualization.lms.internal.QuotingExp
+import scala.virtualization.lms.internal.{Traversal, QuotingExp}
 
 import scala.reflect.{Manifest,SourceContext}
-import ppl.delite.framework.analysis.HungryTraversal
 import java.io.{File, PrintWriter}
 import sys.process._
 import scala.language.postfixOps
@@ -17,12 +16,14 @@ import scala.collection.mutable.Set
 
 import ppl.delite.framework.Config
 
-trait DotIRPrinter extends HungryTraversal with QuotingExp {
-	val IR: DHDLExp
+trait DotIRPrinter extends Traversal with QuotingExp {
+	val IR: DHDLExp with MemoryAnalysisExp
 	import IR.{infix_until => _, looprange_until => _, println => _, _}
 
-  debugMode = false
   override val name = "DotIRPrinter"
+  override val eatReflect = true
+  debugMode = false
+
   var inHwScope = false
   var fileNum = 0
   //val emittedCtrChain = Set.empty[Exp[Any]]
@@ -320,7 +321,7 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
     case _ =>
       //println(sym + "=" + rhs)
       debug(s"...ignored")
-      if (recurseElse) blocks(rhs).foreach{blk => traverseBlock(blk)}
+      blocks(rhs).foreach{blk => traverseBlock(blk)}
   }
 
   def emitHWNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
@@ -356,7 +357,7 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
       emitBlock(func, quote(sym) + "_foreachFunc", "foreachFunc", foreachFillColor)             // Map function
       emit("}")
 
-    case e@Pipe_fold(cchain, accum, fA, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
+    case e@Pipe_fold(cchain, accum, zero, fA, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
 			emitValDef(acc, accum)
       emitNestedIdx(cchain, inds)
       emit(s"""subgraph cluster_${quote(sym)} {""")
@@ -377,7 +378,7 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
       emitBlock(stFunc, quote(sym) + "_stFunc", "stFunc" , stFillColor)
       emit("}")
 
-    case e@Accum_fold(ccOuter, ccInner, accum, fA, iFunc, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, idx, part, acc, res, rV) =>
+    case e@Accum_fold(ccOuter, ccInner, accum, zero, fA, iFunc, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, idx, part, acc, res, rV) =>
       emitValDef(acc, accum)
       emitNestedIdx(ccOuter, indsOuter)
       emit(s"""subgraph cluster_${quote(sym)} {""")
@@ -422,6 +423,26 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
       emitEdge(addr, cache, "addr")
       emitEdge(value, cache, "data")
 
+    case Fifo_new(size, zero) =>
+      val qsym = quote(sym)
+      if (isDblBuf(sym)) {
+        emit(s"""$qsym [margin=0 rankdir="LR" label="{<st> | <ld>}" xlabel="$qsym """")
+        emit(s"""shape="record" color=$dblbufBorderColor  style="filled"""")
+        emit(s"""fillcolor=$bramFillColor ]""")
+      }
+      else {
+        emit(s"""$qsym [label="$qsym " shape="square" style="filled" fillcolor=$bramFillColor ]""")
+      }
+    case Push_fifo(fifo,value,en) =>
+      emitEdge(value,fifo, "data")
+      emitEdge(en,fifo,"en")
+
+    case Pop_fifo(fifo) =>
+      emitValDef(sym, fifo)
+
+    case Count_fifo(fifo) =>
+      emitValDef(sym, fifo)
+
 		case Bram_new(size, zero) =>
       val qsym = quote(sym)
       if (isDblBuf(sym)) {
@@ -441,37 +462,13 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
       emitEdge(addr, bram, "addr")
       emitEdge(value, bram, "data")
 
-    case e@Bram_store_vector(bram,ofs,vec,cchain,inds) =>
-      emit(s"""subgraph cluster_${quote(sym)} {""")
-      emit(s"""label="vector store"""")
-      emit(s"""color=$pipeBorderColor""")
-      emit(s"""style="bold, filled" """)
-      emit(s"""fillcolor=$pipeFillColor""")
-      emitEdge(ofs, bram, "addr")
-      emitEdge(vec, bram, "data")
-      emitCtrChain(cchain)
-      emit("}")
-
-    case e@Bram_load_vector(bram,ofs,cchain,inds) =>
-      emit(s"""subgraph cluster_${quote(sym)} {""")
-      emit(s"""label="vector load"""")
-      emit(s"""color=$pipeBorderColor""")
-      emit(s"""style="bold, filled" """)
-      emit(s"""fillcolor=$pipeFillColor""")
-      emitVector(sym)
-      emitEdge(bram, sym, "data")
-      emitEdge(ofs, bram, "addr")
-      emitCtrChain(cchain)
-      emit("}")
-
-    case e@Offchip_store_vector(mem,ofs,vec) =>
-      emitEdge(vec, mem, "data")
+    case e@Offchip_store_cmd(mem,stream,ofs,len,p) =>
+      emitEdge(stream, mem, "data")
       emitEdge(ofs, mem, "addr")
 
-    case e@Offchip_load_vector(mem,ofs,len) =>
+    case e@Offchip_load_cmd(mem,stream,ofs,len,p) =>
       emitEdge(ofs, mem, "addr")
-      emitVector(sym)
-      emitEdge(mem, sym, "data")
+      emitEdge(mem, stream, "data")
 
     case Reg_read(reg) =>
       emitValDef(sym, reg)
@@ -566,29 +563,6 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
       emitBlock(func, quote(sym) + "_mapreduce", "mapreduce", foreachFillColor)             // Map function
       emit("}")
 
-    case ParBramLoadVector(bram,ofs,cc,inds) =>
-      emit(s"""subgraph cluster_${quote(sym)} {""")
-      emit(s"""label="vector load"""")
-      emit(s"""color=$pipeBorderColor""")
-      emit(s"""style="bold, filled" """)
-      emit(s"""fillcolor=$pipeFillColor""")
-      emitVector(sym)
-      emitEdge(bram, sym, "data")
-      emitEdge(ofs, bram, "addr")
-      emitCtrChain(cc)
-      emit("}")
-
-    case ParBramStoreVector(bram,ofs,vec,cc,inds) =>
-      emit(s"""subgraph cluster_${quote(sym)} {""")
-      emit(s"""label="vector store"""")
-      emit(s"""color=$pipeBorderColor""")
-      emit(s"""style="bold, filled" """)
-      emit(s"""fillcolor=$pipeFillColor""")
-      emitEdge(ofs, bram, "addr")
-      emitEdge(vec, bram, "data")
-      emitCtrChain(cc)
-      emit("}")
-
 		case _ => emitOtherNode(sym, rhs)
 	}
 
@@ -632,6 +606,7 @@ trait DotIRPrinter extends HungryTraversal with QuotingExp {
 
 	// Memories
   val vectorFillColor = s""""#8bd645""""
+  val fifoFillColor = s""""70C6E6""""
 	val bramFillColor = s""""#70C6E6""""
 	val cacheFillColor = s""""#B3A582""""
 	val dramFillColor = s""""#685643""""

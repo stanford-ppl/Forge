@@ -1,13 +1,12 @@
 import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
-import scala.util.Random
 
 object TriangleCountingCompiler extends DHDLApplicationCompiler with TriangleCounting
 object TriangleCountingInterpreter extends DHDLApplicationInterpreter with TriangleCounting
 trait TriangleCounting extends DHDLApplication {
-  override def stageArgNames = List("tileSize")
-  lazy val tileSize = param("tileSize", 2)
+
+  lazy val tileSize = param(2)
   lazy val maxNumEdge = 8.as[Index]
   lazy val maxNumEdgeX2 = 16.as[Index]
 
@@ -20,7 +19,7 @@ trait TriangleCounting extends DHDLApplication {
   //     currently doesn't support control branch, so using visited set doesn't reduce execution
   //     time.
   def main() {
-    //val NV = args(unit(0)).to[SInt]
+    //val NV = args(0).to[SInt]
     ////genRandDirEdgeList("/Users/Yaqi/Documents/hyperdsl/published/DHDL/graph.dot", NV, NE, true)
     val map = loadUnDirEdgeList("/Users/Yaqi/Documents/hyperdsl/forge/apps/DHDL/graph/testTc2.dot", true)
     val vl = getVertList(map, false, true) // NV by 2 Array(pointer, numEdges)
@@ -28,43 +27,41 @@ trait TriangleCounting extends DHDLApplication {
     val NV = vl.length/2 // Actual number of vertices in graph
     val NE = el.length/2 // Divided by 2 b/c bi-directional edge
 
-    val vertList = OffChipMem[Index]("VertList", NV, 2) // [pointer, size]
-    val edgeList = OffChipMem[Index]("EdgeList", NE*2) // srcs of edges
-    val count = ArgOut[Index]("count")
+    val vertList = OffChipMem[Index](NV, 2) // [pointer, size]
+    val edgeList = OffChipMem[Index](NE*2) // srcs of edges
+    val count = ArgOut[Index]
 
     setMem(vertList, vl)
     setMem(edgeList, el)
 
     Accel {
       Pipe.fold(NV by tileSize)(count){ ivt =>
-        val vB = BRAM[Index]("vertTile", tileSize, 2)
+        val vB = BRAM[Index](tileSize, 2)
         vB := vertList(ivt::ivt+tileSize, 0::2)
-        val sumTile = Reg[Index]("sumTile")
+        val sumTile = Reg[Index]
         Pipe.fold(tileSize by 1)(sumTile){ iv =>
-          val eB = BRAM[Index]("edgeTile", maxNumEdge) // edge list of v
-          val nvIdxB = BRAM[Index]("neighborVertIdxTile", maxNumEdgeX2) // Index to gather vertice list of neighbors of v
-          val nvB = BRAM[Index]("neighborVertTile", maxNumEdgeX2) // vertice list of v's neighbors
-          val vpt = Reg[Index]("vpt") // ptr to v's edgelist
-          val vsize = Reg[Index]("vsize") // number of edges of v
-          //var x:Rep[Index] = null
-          //var y:Rep[Index] = null
-          //Pipe {
-          //  x := vB(iv,0)
-          //  y := vB(iv,1)
-          //}
-          //eB := edgeList(x::x+y)
+          val eB = BRAM[Index](maxNumEdge)       // edge list of v
+          val nvIdxB = BRAM[Index](maxNumEdgeX2) // Index to gather vertice list of neighbors of v
+          val nvB = BRAM[Index](maxNumEdgeX2)    // vertice list of v's neighbors
+          val vpt = Reg[Index]                   // ptr to v's edgelist
+          val vsize = Reg[Index]                 // number of edges of v
+          Pipe {
+            vpt := vB(iv,0)
+            vsize := vB(iv,1)
+          }
+          eB := edgeList(vpt::vpt+vsize)
           Pipe (vsize by 1) { ie =>
             val nbr = eB(ie)
             nvIdxB(ie*2) = nbr*2
             //nvIdxB(ie*2+1) = nbr*2+1
           }
           nvB := vertList(nvIdxB)
-          val sumNbr = Reg[Index]("sumNbr")
+          val sumNbr = Reg[Index]
           Pipe.fold(vsize by 1)(sumNbr){ ie =>
-            val neB = BRAM[Index]("neighborEdgeTile", maxNumEdgeX2) // edgeList of v's neighbors
-            val nbrpt = Reg[Index]("nbrpt") // ptr to neighbor's edgelist
-            val nbrsize = Reg[Index]("nbrsize") // number of edges of neighbor
-            val cntCommon = Reg[Index]("cntCommon")
+            val neB = BRAM[Index](maxNumEdgeX2)   // edgeList of v's neighbors
+            val nbrpt = Reg[Index]                // ptr to neighbor's edgelist
+            val nbrsize = Reg[Index]              // number of edges of neighbor
+            val cntCommon = Reg[Index]
             Pipe {
               nbrpt := nvB(ie*2)
               nbrsize := nvB(ie*2+1)

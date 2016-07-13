@@ -1,16 +1,17 @@
-package dadl.compiler.ops
+package spade.compiler.ops
 
 import scala.virtualization.lms.common.BaseExp
 import scala.virtualization.lms.common.DotGenBase
+import scala.virtualization.lms.common.ScalaGenBase
 import scala.reflect.{Manifest,SourceContext}
 
-import dadl.shared._
-import dadl.shared.ops._
-import dadl.compiler._
-import dadl.compiler.ops._
+import spade.shared._
+import spade.shared.ops._
+import spade.compiler._
+import spade.compiler.ops._
 
 trait ModuleIOOpsExp extends ModuleIOOps with BaseExp {
-  this: DADLExp =>
+  this: SpadeExp =>
 
   type Feedback[+T] = FeedbackWire[T]
   case class FeedbackWire[+T](val e: Exp[Feedback[T]])
@@ -31,6 +32,34 @@ trait ModuleIOOpsExp extends ModuleIOOps with BaseExp {
     reflectWrite(lhs.e)(Link(lhs, rhs))
   }
   def feedback_read[T:Manifest](f: Feedback[T])(implicit ctx: SourceContext): Rep[T] = ReadFeedback(f)
+}
+
+trait ScalaGenModuleIOOps extends ScalaGenBase {
+  val IR: ModuleIOOpsExp
+  import IR._
+
+  override def remap[T](mT: Manifest[T]): String = {
+    mT.erasure.getSimpleName match {
+      case "FeedbackWire" => remap(mT.typeArguments(0))
+      case "ALU" => "Array[String]"
+      case "Switch" => "Array[String]"
+      case "MyLink" => "Array[String]"
+      case _ => super.remap(mT)
+    }
+  }
+
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case mn@FreshFeedback(_) =>
+      stream.println(" // " + quote(sym) + " " + rhs)
+
+    case mn@Link(lhs, rhs) =>
+      stream.println(" // " + quote(sym) + " " + rhs)
+
+    case ReadFeedback(f) =>
+      stream.println(" // " + quote(sym) + " " + rhs)
+
+    case _ => super.emitNode(sym, rhs)
+  }
 }
 
 trait DotGenModuleIOOps extends DotGenBase {

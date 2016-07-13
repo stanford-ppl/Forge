@@ -28,7 +28,7 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
 
   // --- Nodes
   case class Counter_new(start: Rep[Idx], end: Rep[Idx], step: Rep[Idx], par: Param[Int])(implicit val ctx: SourceContext) extends Def[Counter]
-  case class Counterchain_new(counters: List[Rep[Counter]], nIter: Block[Idx])(implicit val ctx: SourceContext) extends Def[CounterChain]
+  case class Counterchain_new(counters: List[Rep[Counter]], nIter: Rep[Idx])(implicit val ctx: SourceContext) extends Def[CounterChain]
 
   // --- Internal API
   def counter_new(start: Rep[Idx],end: Rep[Idx],step: Rep[Idx], par: Rep[Int])(implicit ctx: SourceContext) = {
@@ -56,7 +56,7 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
     val steps:  List[Rep[Idx]] = ctrSplit.map(_._3)
     val pars:   List[Rep[Idx]] = ctrSplit.map(_._4).map(int_to_fix[Signed,B32](_)) // HACK: Convert Int param to fixed point
 
-    val nIter: Block[Idx] = reifyEffects {
+    val nIter = {
       // TODO: These should be more general rewrite rules
       val lens: List[Rep[Idx]] = starts.zip(ends).map{
         case (ConstFix(x: Int),ConstFix(y: Int)) => (y - x).as[Idx]
@@ -67,7 +67,7 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
         case (len, ConstFix(1), par) => div(len, par) // Should round correctly here
         case (len, step, par) => div(len, mul(step, par))
       }
-      total.reduce{_*_}
+      productTree(total)
     }
 
     // HACK: Not actually mutable, but isn't being scheduled properly otherwise
@@ -78,30 +78,36 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
   def parsOf(cc: Rep[CounterChain]): List[Int] = parParamsOf(cc).map(_.x)
 
   def parParamsOf(cc: Rep[CounterChain]): List[Param[Int]] = cc match {
-    case Def(EatReflect(Counterchain_new(ctrs,nIter))) => ctrs.map{
-      case Def(EatReflect(Counter_new(_,_,_,par))) => par
+    case Deff(Counterchain_new(ctrs,nIter)) => ctrs.map{
+      case Deff(Counter_new(_,_,_,par)) => par
     }
   }
 
   def offsets(cc: Rep[CounterChain]) = cc match {
-    case Def(EatReflect(Counterchain_new(ctrs,nIter))) => ctrs.map{
-      case Def(EatReflect(Counter_new(start,_,_,par))) => start
+    case Deff(Counterchain_new(ctrs,nIter)) => ctrs.map{
+      case Deff(Counter_new(start,_,_,par)) => start
+    }
+  }
+
+  def ccMaxes(cc: Rep[CounterChain]) = cc match {
+    case Deff(Counterchain_new(ctrs, nIter)) => ctrs.map{
+      case Deff(Counter_new(start,end,_,_)) => end
     }
   }
 
   def isUnitCounterChain(e: Exp[Any]): Boolean = e match {
-    case Def(EatReflect(Counterchain_new(ctrs,_))) if ctrs.length == 1 => isUnitCounter(ctrs(0))
+    case Deff(Counterchain_new(ctrs,_)) if ctrs.length == 1 => isUnitCounter(ctrs(0))
     case _ => false
   }
 
   def isUnitCounter(e: Exp[Any]): Boolean = e match {
-    case Def(EatReflect(Counter_new(ConstFix(0),ConstFix(1),ConstFix(1),_))) => true
+    case Deff(Counter_new(ConstFix(0),ConstFix(1),ConstFix(1),_)) => true
     case _ => false
   }
 
   // TODO: Default number of iterations if bound can't be computed?
   def nIters(x: Rep[CounterChain]): Long = x match {
-    case Def(EatReflect(Counterchain_new(_,nIters))) => Math.ceil( bound(nIters.res).getOrElse(1.0) ).toLong
+    case Deff(Counterchain_new(_,nIters)) => Math.ceil( bound(nIters).getOrElse(1.0) ).toLong
     case _ => 1L
   }
 
@@ -116,25 +122,6 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
 
     case _ => super.mirror(e,f)
   }
-
-  // --- Syms
-  override def syms(e: Any): List[Sym[Any]] = e match {
-    case Counterchain_new(ctrs, nIters) => syms(ctrs) ::: syms(nIters)
-    case _ => super.syms(e)
-  }
-  override def readSyms(e: Any): List[Sym[Any]] = e match {
-    case Counterchain_new(ctrs, nIters) => readSyms(ctrs) ::: readSyms(nIters)
-    case _ => super.readSyms(e)
-  }
-  override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {
-    case Counterchain_new(ctrs, nIters) => freqNormal(ctrs) ::: freqNormal(nIters)
-    case _ => super.symsFreq(e)
-  }
-  override def boundSyms(e: Any): List[Sym[Any]] = e match {
-    case Counterchain_new(ctrs, nIters) => effectSyms(nIters)
-    case _ => super.boundSyms(e)
-  }
-
 }
 
 trait ScalaGenExternCounterOps extends ScalaGenEffect {
@@ -153,6 +140,43 @@ trait ScalaGenExternCounterOps extends ScalaGenEffect {
 
     case e@Counterchain_new(counters, nIter) =>
       emitValDef(sym, "Array(" + counters.map(quote).mkString(", ") + ")")
+
+    case _ => super.emitNode(sym,rhs)
+  }
+}
+
+trait MaxJGenExternCounterOps extends MaxJGenEffect {
+  val IR: ExternCounterOpsExp with DHDLMetadataOpsExp
+  import IR._
+
+  override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
+    case "DHDLCounter" => "DHDLCounter"
+    case "DHDLCounterChain" => "CounterChain"
+    case _ => super.remap(m)
+  }
+
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case e@Counter_new(start,end,step,par) =>
+
+
+    case e@Counterchain_new(counters, nIter) =>
+//      val parent = parentOf(sym)
+//      stream.println(s"""DFEVar ${quote(sym)}_en = ${quote(parent)}_en);""")
+      stream.println(s"""CounterChain ${quote(sym)}_chain = control.count.makeCounterChain(${quote(sym)}_en);""")
+      val pars = parsOf(sym.asInstanceOf[Sym[CounterChain]])
+      counters.zipWithIndex.map { t =>
+        val c = t._1
+        val i = t._2
+        val Def(EatReflect(Counter_new(start, end, step, p))) = c
+        val par = pars(i)
+        val pre = if (par == 1) "DFEVar" else "DFEVector<DFEVar>"  // <-- TODO: Better way?
+        if (par == 1) {
+          stream.println(s"""$pre ${quote(c)} = ${quote(sym)}_chain.addCounter(${quote(end)}, ${quote(step)});""")
+        } else {
+          stream.println(s"""$pre ${quote(c)} = ${quote(sym)}_chain.addCounterVect(${quote(par)}, ${quote(end)}, ${quote(step)});""")
+        }
+      }
+
 
     case _ => super.emitNode(sym,rhs)
   }

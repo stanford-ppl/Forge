@@ -5,7 +5,7 @@ package dhdl
 trait DHDLMetadata {
   this: DHDLDSL =>
 
-  def importDHDLMetadata () = {
+  def importDHDLMetadata() = {
     val T = tpePar("T")
 
     val RegType     = lookupTpe("RegType", stage=compile)
@@ -33,24 +33,6 @@ trait DHDLMetadata {
       composite ${ meta[MStagedDims]($0).get.dims }
 
     internal (dimOps) ("sizeOf", T, T :: Idx) implements composite ${ productTree(dimsOf($0)) }
-
-
-    /* Name of a node */
-    val MName = metadata("MName", "name" -> SString)
-    val nameOps = metadata("nameOf")
-    internal.static (nameOps) ("update", Nil, (MAny, SString) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MName($1)) }
-    internal.static (nameOps) ("apply", Nil, MAny :: SOption(SString)) implements
-      composite ${ meta[MName]($0).map(_.name) }
-
-
-    /* Is Double Buffer: false if unset */
-    val MDblBuf = metadata("MDblBuf", "isDblBuf" -> SBoolean)
-    val dblBufOps = metadata("isDblBuf")
-    static (dblBufOps) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MDblBuf($1)) }
-    static (dblBufOps) ("apply", Nil, MAny :: SBoolean) implements
-      composite ${ meta[MDblBuf]($0).map(_.isDblBuf).getOrElse(false) }
 
 
     /* Is Accumulator: false if unset */
@@ -105,14 +87,6 @@ trait DHDLMetadata {
     internal.static (tileParOps) ("apply", Nil, MAny :: SOption(MInt)) implements
       composite ${ meta[MTilePar]($0).map(_.par) }
 
-    /* Number of Banks */
-    val MBank = metadata("MBank", "nBanks" -> SInt)
-    val bankOps = metadata("banks")
-    internal.static (bankOps) ("update", Nil, (MAny, SInt) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MBank($1)) }
-    internal.static (bankOps) ("apply", Nil, MAny :: SInt) implements
-      composite ${ meta[MBank]($0).get.nBanks }
-
     /* Pipeline style */
     val MControlType = metadata("MControlType", "tpe" -> ControlType)
     val styleOps = metadata("styleOf")
@@ -120,6 +94,9 @@ trait DHDLMetadata {
       composite ${ setMetadata($0, MControlType($1)) }
     internal.static (styleOps) ("apply", Nil, MAny :: ControlType) implements
       composite ${ meta[MControlType]($0).get.tpe }
+
+    internal (styleOps) ("styleOption", Nil, MAny :: SOption(ControlType)) implements
+      composite ${ meta[MControlType]($0).map(_.tpe) }
 
     /* Pipeline stages */
     val MNumStages = metadata("MNumStages", "nStages" -> SInt)
@@ -167,11 +144,11 @@ trait DHDLMetadata {
 
 
     // TODO: Should probably change to BigDecimal or something to be accurate
-    // NOTE: The user gets to see these! Woah.
+    // NOTE: The user gets to see these!
     // Meant specifically for range analysis of non-negative size and index calculation
 
     // Couple of definitions for usage here:
-    // - Final = fixed value for all future time (constants or finalized parameters)
+    // - Fixed = fixed value for all future time (constants or finalized parameters)
     // - Exact = constant value but which may be changed (unfinalized parameters)
     // - Bound = any other upper bound
 
@@ -184,7 +161,7 @@ trait DHDLMetadata {
     static (boundOps) ("update", Nil, (MAny, SOption(MBound)) :: MUnit, effect = simple) implements
       composite ${ $1.foreach{bnd => setMetadata($0, bnd) } }
 
-    static (boundOps) ("apply", Nil, MAny :: SOption(SDouble)) implements composite ${ meta[MBound]($0).map(_.bound) }
+    static (boundOps) ("apply", Nil, MAny :: SOption(SDouble)) implements composite ${ boundOf($0).map(_.bound) }
 
     internal (boundOps) ("boundOf", Nil, MAny :: SOption(MBound)) implements composite ${ meta[MBound]($0) }
 
@@ -280,19 +257,19 @@ trait DHDLMetadata {
 
 		/* The controller that writes to the Mem.
 		 * Right now assume only one writer per double buffer */
-    val MWriter = metadata("MWriter", "writer" -> SOption(CTuple3(MAny,SBoolean,MAny)))
-    val writerOps = metadata("writerOf")
-    internal.static (writerOps) ("update", T, (T, CTuple2(MAny,MAny)) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MWriter( Some(($1._1,false,$1._2)) )) }
-    internal.static (writerOps) ("update", T, (T, CTuple3(MAny,SBoolean,MAny)) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MWriter(Some($1))) }
+    val MWriter = metadata("MWriters", "writers" -> SList(CTuple3(MAny,SBoolean,MAny)))
+    val writersOps = metadata("writersOf")
+    internal.static (writersOps) ("update", T, (T, CTuple2(MAny,MAny)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MWriters( List(($1._1,false,$1._2)) )) }
+    internal.static (writersOps) ("update", T, (T, CTuple3(MAny,SBoolean,MAny)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MWriters(List($1))) }
 
-    internal.static (writerOps) ("update", T, (T, SOption(CTuple3(MAny,SBoolean,MAny))) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MWriter($1)) }
+    internal.static (writersOps) ("update", T, (T, SList(CTuple3(MAny,SBoolean,MAny))) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MWriters($1)) }
 
 
-    internal.static (writerOps) ("apply", T, T :: SOption(CTuple3(MAny,SBoolean,MAny))) implements
-      composite ${ meta[MWriter]($0).map(_.writer).getOrElse(None) }
+    internal.static (writersOps) ("apply", T, T :: SList(CTuple3(MAny,SBoolean,MAny))) implements
+      composite ${ meta[MWriters]($0).map(_.writers).getOrElse(Nil) }
 
 		/* Controllers that read from a Double Buffer. The metadata is only used for double buffer. */
     val MReaders = metadata("MReaders", "readers" -> SList(CTuple3(MAny,SBoolean,MAny)))
@@ -336,7 +313,7 @@ trait DHDLMetadata {
 				val m = nbits(manifest[T].typeArguments(1))
 				"dfeFloat(" + e + "," + m + ")"
 			} else if (isBitType(manifest[T])) {
-				"TODO"
+			  "dfeFixOffset(1, 0, SignMode.UNSIGNED)"
 			} else {
 				//throw new Exception("Unknown type " + manifest[T])
 				""

@@ -27,15 +27,14 @@ trait Definitions extends DerivativeTypes {
   lazy val MultiloopSoA = transformer("MultiloopSoA", isExtern = true)
   lazy val IRPrinter = traversal("IRPrinter", isExtern = true)  // For debugging
   lazy val IRPrinterPlus = traversal("IRPrinterPlus", isExtern = true) // Debugging metadata
-  lazy val HardStop = traversal("HardStop", isExtern=true) // For debugging
+  lazy val HardStop = traversal("HardStop", isExtern=true)  // For debugging
 
   /**
    * Built-in types
+   * M - stands for "Meta"    (a staged symbolic expression)
+   * C - stands for "Current" (a staged constant)
+   * S - stands for "Scala"   (always a constant, never staged)
    */
-  // concrete types
-  // M- stands for "Meta"    (a staged symbolic expression)
-  // C- stands for "Current" (a staged constant)
-  // S- stands for "Scala"   (always a constant, never staged)
 
   // TODO: These aren't exactly consistent
   // FIXME: Need to resolve discrepancy between 'compile' and 'now'. Ideally everything should have 'compile' behavior, but it breaks

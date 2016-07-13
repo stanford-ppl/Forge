@@ -1,0 +1,130 @@
+package ppl.dsl.forge
+package dsls
+package spade
+trait NodeOps {
+  this: SpadeDSL =>
+  def importNodes() = {
+
+    // Create a group for all nodes
+    val NodeOps = grp("Node")
+
+    // Define a 'ALU' type
+    val aluTpe = tpe("ALU")
+//    data(aluTpe, ("_bits", MInt))
+
+    // Define a 'ALU' type
+    val switchTpe = tpe("Switch")
+
+    // Define all combinations of the 'LinkNode' type
+    // NOTE: This is crazy. We need to describe the following:
+    // abstract class HwNode extends Def
+    // case class ALU extends HwNode
+    // case class Switch extends HwNode
+    // case class Link(val src: HwNode, val dst: HwNode) extends Def
+    val linkTpe_alu2alu = tpe("Link_alu2alu")
+    data(linkTpe_alu2alu, ("_src", aluTpe), ("_dst", aluTpe))
+
+    val linkTpe_alu2switch = tpe("Link_alu2switch")
+    data(linkTpe_alu2switch, ("_src", aluTpe), ("_dst", switchTpe))
+
+    val linkTpe_switch2alu = tpe("Link_switch2alu")
+    data(linkTpe_switch2alu, ("_src", switchTpe), ("_dst", aluTpe))
+
+    val linkTpe_switch2switch = tpe("Link_switch2switch")
+    data(linkTpe_switch2switch, ("_src", switchTpe), ("_dst", switchTpe))
+
+
+    // Instantiating ALU
+    val aluApply = static (aluTpe) (
+      name = "apply",
+      List(),
+      MInt :: aluTpe,
+      effect = simple)
+
+    impl (aluApply) {  codegen ($cala, ${
+      @ Console.println("new ALU")
+    })}
+
+    impl (aluApply) {  codegen (dot, ${
+      $sym [shape="square" style="filled" fillcolor="blue" color="white"]
+    })}
+
+
+    // Instantiating Switch
+    val switchApply = static (switchTpe) (
+      name = "apply",
+      List(),
+      Nil :: switchTpe,
+      effect = simple)
+
+    impl (switchApply) {  codegen ($cala, ${
+      @ Console.println("new Switch ")
+    })}
+
+    impl (switchApply) {  codegen (dot, ${
+      $sym [shape="circle" style="filled" fillcolor="yellow" color="white"]
+    })}
+
+    val linkApply_alu2alu = static (linkTpe_alu2alu) (
+      name = "apply",
+      List(),
+      List(aluTpe, aluTpe) :: linkTpe_alu2alu,
+      effect = simple)
+    impl (linkApply_alu2alu) { codegen ($cala, ${
+      @ Console.println("new Link")
+    })}
+    impl (linkApply_alu2alu) {  codegen (dot, ${
+      $0 -> $1
+    })}
+
+    val linkApply_alu2switch = static (linkTpe_alu2switch) (
+      name = "apply",
+      List(),
+      List(aluTpe, switchTpe) :: linkTpe_alu2switch,
+      effect = simple)
+    impl (linkApply_alu2switch) { codegen ($cala, ${
+      @ Console.println("new Link")
+    })}
+    impl (linkApply_alu2switch) {  codegen (dot, ${
+      $0 -> $1
+    })}
+
+    val linkApply_switch2alu = static (linkTpe_switch2alu) (
+      name = "apply",
+      List(),
+      List(switchTpe, aluTpe) :: linkTpe_switch2alu,
+      effect = simple)
+    impl (linkApply_switch2alu) { codegen ($cala, ${
+      @ Console.println("new Link")
+    })}
+    impl (linkApply_switch2alu) {  codegen (dot, ${
+      $0 -> $1
+    })}
+
+    val linkApply_switch2switch = static (linkTpe_switch2switch) (
+      name = "apply",
+      List(),
+      List(switchTpe, switchTpe) :: linkTpe_switch2switch,
+      effect = simple)
+    impl (linkApply_switch2switch) { codegen ($cala, ${
+      @ Console.println("new Link")
+    })}
+    impl (linkApply_switch2switch) {  codegen (dot, ${
+      $0 -> $1
+    })}
+
+
+//    val aluOps = withTpe(aluTpe)
+//    aluOps {
+////      infix("->") (aluTpe :: linkTpe, effect = simple) implements codegen ($cala, ${new LinkNode($self, $1) { }} )
+//      val infixLinkNodeOp = infix("->") (aluTpe :: linkTpe, effect = simple)
+//      impl (infixLinkNodeOp) { codegen ($cala, ${
+//        new LinkNode($self, $1) { }
+//      })}
+//
+//      impl (infixLinkNodeOp) { codegen (dot, ${
+//        $self -> $1
+//      })}
+//    }
+  }
+}

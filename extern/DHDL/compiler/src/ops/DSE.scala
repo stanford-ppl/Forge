@@ -120,7 +120,8 @@ trait DSE extends Traversal {
     // Prune single factors
     val initialSpace = prune(numericFactors, ranges, restrict)
 
-    val space = initialSpace ++ metapipes.map{mp => Domain(List(true,false), {c: Boolean => c match {case true => styleOf(mp) = Coarse; case false => styleOf(mp) = Disabled}; () }) }
+    val mps = metapipes.map{mp => Domain(List(true,false), {c: Boolean => c match {case true => styleOf(mp) = CoarsePipe; case false => styleOf(mp) = SequentialPipe}; () }) }
+    val space = initialSpace ++ mps
 
     if (debugMode) {
       debug("")
@@ -297,7 +298,7 @@ trait DSE extends Traversal {
     for (p <- 0 until legalSize) {
       val pt = points(p)
       indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt ) }
-      val values = numericFactors.map{p => p.x.toString} ++ metapipes.map{mp => (styleOf(mp) == Coarse).toString}
+      val values = numericFactors.map{p => p.x.toString} ++ metapipes.map{mp => isMetaPipe(mp).toString}
 
       val isPareto = pareto.exists{pt => pt.idx == p}
       pw.println(values.mkString(", ") + s", ${alms(p)}, ${regs(p)}, ${dsps(p)}, ${bram(p)}, ${cycles(p)}, ${valid(p)}, $isPareto, false")
@@ -312,7 +313,7 @@ trait DSE extends Traversal {
       val p = paretoPt.idx
       val pt = points(p)
       indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt ) }
-      val values = numericFactors.map{p => p.x.toString} ++ metapipes.map{mp => (styleOf(mp) == Coarse).toString}
+      val values = numericFactors.map{p => p.x.toString} ++ metapipes.map{mp => isMetaPipe(mp).toString}
 
       val runtime = paretoPt.cycles/(IR.CLK*1000000.0f)
       val almUsage = 100.0f*paretoPt.alms/target.alms
@@ -320,8 +321,6 @@ trait DSE extends Traversal {
       ppw.println(values.mkString(", ") + s", ${paretoPt.alms}, ${paretoPt.cycles}, ${almUsage}, ${runtime}")
     }
     ppw.close()
-
-    sys.exit()
 
     // F. Show user results, pick point on pareto curve
     // TODO

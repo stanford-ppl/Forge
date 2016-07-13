@@ -6,7 +6,6 @@ package dhdl
 trait DHDLBRAMs {
   this: DHDLDSL =>
 
-  // TODO: Generalize definition of BRAM store to be equivalent to St node in original DHDL?
   // TODO: Should we support a BRAM reset API? How to time this properly? Should this be a composite which creates a Pipe?
   def importBRAM() {
     val T = tpePar("T")
@@ -26,27 +25,6 @@ trait DHDLBRAMs {
     //val bram_reset = internal (BRAM) ("bram_reset", T, (("bram", BRAM(T)), ("zero", T)) :: MUnit, effect = write(0))
 
     // --- Internals
-    internal (BRAM) ("bramLoadVector", T, (("bram", BRAM(T)), ("ofs",SList(Idx)), ("len",Idx), ("p", MInt)) :: MVector(T)) implements composite ${
-      val vec = bram_load_vector($bram,$ofs,$len,CounterChain(Counter(min=0.as[Index], max=len, step=1.as[Index], par=$p)))
-      dimsOf(vec) = List($len)
-      vec
-    }
-    internal (BRAM) ("bramStoreVector", T, (("bram", BRAM(T)), ("ofs", SList(Idx)), ("vec", MVector(T)), ("p",MInt)) :: MUnit) implements composite ${
-      val len = sizeOf(vec)
-      bram_store_vector($bram,$ofs,$vec,CounterChain(Counter(min=0.as[Index], max=len, step=1.as[Index], par=$p)))
-    }
-
-
-    val bramCreate = internal (BRAM) ("bramCreate", T, (SOption(SString), SList(Idx)) :: BRAM(T), TNum(T)) implements composite ${
-      val bram = bram_new[T](productTree($1), zero[T])
-      if ($1.length < 1) stageError("Cannot create a BRAM with no dimensions")
-      dimsOf(bram) = $1
-      $0.foreach{name => nameOf(bram) = name }
-      isDblBuf(bram) = false
-      banks(bram) = 1
-      bram
-    }
-
     /** @nodoc -- only used for Mem typeclass instance **/
     direct (BRAM) ("bram_load_nd", T, (BRAM(T), SList(Idx)) :: T) implements composite ${
       if ($1.length < 1) stageError("Cannot load from zero indices")
@@ -87,7 +65,7 @@ trait DHDLBRAMs {
     }
 
     /** @nodoc -- only used for Mem typeclass instance **/
-    direct (BRAM) ("bram_empty", T, BRAM(T) :: BRAM(T), TNum(T)) implements composite ${ bramCreate[T](None, dimsOf($0)) }
+    direct (BRAM) ("bram_empty", T, BRAM(T) :: BRAM(T), TNum(T)) implements composite ${ BRAM[T](dimsOf($0):_*) }
 
     val Mem = lookupTpeClass("Mem").get
     val BramMem = tpeClassInst("BramMem", T, TMem(T, BRAM(T)))
@@ -100,16 +78,17 @@ trait DHDLBRAMs {
 
 
     // --- API
-    /** Creates a BRAM with given name and dimensions. Dimensions must be statically known signed integers (constants or parameters).
-     * @param name
+    /** Creates a BRAM with given dimensions. Dimensions must be statically known signed integers (constants or parameters).
      * @param dims
      **/
-    static (BRAM) ("apply", T, (SString, varArgs(Idx)) :: BRAM(T), TNum(T)) implements composite ${ bramCreate[T](Some($0), $1.toList) }
+    static (BRAM) ("apply", T, (varArgs(Idx)) :: BRAM(T), TNum(T)) implements composite ${
+      if ($0.length < 1) stageError("Cannot create a BRAM with no dimensions")
+      $0.foreach{dim => if (!isStaticSize(dim)) stageError("Only constants and DSE parameters are allowed as dimensions of BRAM") }
 
-    /** Creates an unnamed BRAM with given dimensions. Dimensions must be statically known signed integers (constants or parameters).
-     * @param dims
-     **/
-    static (BRAM) ("apply", T, (varArgs(Idx)) :: BRAM(T), TNum(T)) implements composite ${ bramCreate[T](None, $0.toList) }
+      val bram = bram_new[T](productTree($0.toList), zero[T])
+      dimsOf(bram) = $0.toList
+      bram
+    }
 
     val BRAM_API = withTpe(BRAM)
     BRAM_API {
@@ -119,32 +98,15 @@ trait DHDLBRAMs {
        **/
       infix ("apply") (varArgs(Idx) :: T) implements composite ${ bram_load_nd($self, $1.toList) }
 
-      /** Creates a buffered load from this 1D BRAM.
-       * @param inds: address range of values to load
-       * @return a vector containing values in the supplied address range
-       **/
-      infix ("load") (Range :: MVector(T)) implements composite ${
+      /*infix ("load") (Range :: MVector(T)) implements composite ${
         bramLoadVector($self, List($1.start), $1.len, param(1))
       }
-
-      /** Creates a buffered load of a column tile from this 2D BRAM.
-       * @param row: row index
-       * @param cols: address range of values to load
-       * @return a Vector containing values in the supplied address range
-       **/
       infix ("load") ((Idx, Range) :: MVector(T)) implements composite ${
         bramLoadVector($self, List($1,$2.start), $2.len, param(1))
       }
-
-      /** Creates a buffered load of a page tile from this 3D BRAM.
-       * @param row: row index
-       * @param col: column index
-       * @param pages: address range of values to load
-       * @return a Vector containing values in the supplied address range
-       **/
       infix ("load") ((Idx, Idx, Range) :: MVector(T)) implements composite ${
         bramLoadVector($self, List($1,$3.start), $3.len, param(1))
-      }
+      }*/
 
       /* Store */
       /** Creates a write to this BRAM at the given 1D address.
@@ -171,7 +133,7 @@ trait DHDLBRAMs {
        * @param ii: multi-dimensional index
        * @param x: element to be stored to BRAM
        **/
-      infix ("update") ((SSeq(Idx), T) :: MUnit, effect = write(0)) implements composite ${ bram_store_nd($self, $1.toList, $2) }
+      infix ("update") ((SList(Idx), T) :: MUnit, effect = write(0)) implements composite ${ bram_store_nd($self, $1.toList, $2) }
 
       /** @nodoc - BRAM reset is not yet well defined **/
       //infix ("rst") (Nil :: MUnit, TNum(T), effect = write(0)) implements composite ${ bram_reset($self, zero[T]) }
@@ -179,32 +141,16 @@ trait DHDLBRAMs {
       /** Stores a Tile of an OffChipMem to this BRAM.
        * @param tile
        **/
-      infix (":=") (Tile(T) :: MUnit, effect = write(0)) implements redirect ${ transferTile($1, $self, false) }
+      infix (":=") (Tile(T) :: MUnit, TNum(T), effect = write(0)) implements redirect ${ copyTile($1, $self, false) }
 
-      /** Stores the given MVector to this BRAM, starting at index 0
-       * @param vec
-       **/
-      infix (":=") (MVector(T) :: MUnit, effect = write(0)) implements composite ${
+      /*infix (":=") (MVector(T) :: MUnit, effect = write(0)) implements composite ${
         bramStoreVector($self, dimsOf($self).map(dim => 0.as[Index]), $1, param(1))
-      }
+      }*/
 
-      /** Gathers the values from the supplied Sparse Tile into this BRAM
+      /** Gathers the values from the supplied SparseTile into this BRAM
        * @param tile
        **/
-      infix (":=") (SparseTile(T) :: MUnit, effect = write(0)) implements redirect ${
-        gatherScatter($1, $self, false)
-      }
-    }
-
-    // --- Rewrite rules
-    // HACK: Check that sizes of BRAM are either constants or parameters (there should be a better way of doing this)
-    rewrite (bramCreate) using rule ${
-      $1.foreach{
-        case ConstFix(_) =>
-        case ParamFix(_) =>
-        case _ => stageError("Only constants and DSE parameters are allowed as dimensions of BRAM")
-      }
-      super.bramCreate[T]($0,$1)
+      infix (":=") (SparseTile(T) :: MUnit, effect = write(0)) implements redirect ${ copySparse($1, $self, false) }
     }
 
     // --- Scala Backend
@@ -213,11 +159,27 @@ trait DHDLBRAMs {
     impl (bram_store) (codegen($cala, ${ $bram.update($addr.toInt, $value) }))
     //impl (bram_reset) (codegen($cala, ${ (0 until $bram.length).foreach{i => $bram.update(i, $zero) }}))
 
+    // --- C++ Backend
+    impl (bram_new) (codegen(cpp, ${new $t[T]($size) }))
+
     // --- MaxJ Backend
     // bram_new (extern)
     // bram_load (extern)
     // bram_store (extern)
     // impl (bram_reset) (codegen(maxj, ${ })) TODO: removed from dhdl?
+
+
+    // --- Unrolled nodes
+    val load = internal (BRAM) ("par_bram_load", T, (("bram", BRAM(T)), ("addr", MVector(Idx))) :: MVector(T), aliasHint = aliases(Nil))
+    val store = internal (BRAM) ("par_bram_store", T, (("bram", BRAM(T)), ("addr", MVector(Idx)), ("value", MVector(T))) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
+
+    impl (load) (codegen($cala, ${
+      $addr.map{addr => if (addr.toInt < $bram.length) $bram(addr.toInt) else $bram(0) }
+    }))
+
+    impl (store) (codegen($cala, ${
+      $value.zip($addr).foreach{ case (v,a) => if (a.toInt < $bram.length) $bram(a.toInt) = v }
+    }))
 
   }
 }

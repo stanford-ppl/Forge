@@ -1,7 +1,7 @@
 package dhdl.compiler.ops
 
 import java.io.{File,FileWriter,PrintWriter}
-import scala.virtualization.lms.common.{BaseExp, EffectExp, ScalaGenEffect, DotGenEffect, MaxJGenEffect}
+import scala.virtualization.lms.common.{BaseExp, EffectExp, ScalaGenEffect, CGenEffect, DotGenEffect, MaxJGenEffect, Record}
 import scala.virtualization.lms.internal.{Traversal}
 import scala.reflect.{Manifest,SourceContext}
 import ppl.delite.framework.transform.{DeliteTransform}
@@ -13,6 +13,7 @@ import dhdl.compiler._
 import dhdl.compiler.ops._
 
 trait BlockRAM[T]
+trait DHDLFIFO[T]
 trait DHDLVector[T]
 trait CACHE[T]
 trait Register[T]
@@ -24,6 +25,7 @@ trait DHDLIndices
 trait MemoryTemplateTypesExp extends MemoryTemplateTypes with BaseExp {
   type OffChipMem[T] = DRAM[T]
   type BRAM[T] = BlockRAM[T]
+  type FIFO[T] = DHDLFIFO[T]
   type Vector[T] = DHDLVector[T]
   type Cache[T] = CACHE[T]
   type Reg[T] = Register[T]
@@ -34,10 +36,12 @@ trait MemoryTemplateTypesExp extends MemoryTemplateTypes with BaseExp {
   def isPipeline[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[DHDLPipeline])
   def isRegister[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[Register[_]])
   def isBRAM[T:Manifest]     = isSubtype(manifest[T].runtimeClass, classOf[BlockRAM[_]])
+  def isFIFO[T:Manifest]     = isSubtype(manifest[T].runtimeClass, classOf[DHDLFIFO[_]])
   def isCache[T:Manifest]    = isSubtype(manifest[T].runtimeClass, classOf[CACHE[_]])
 
   def offchipMemManifest[T:Manifest]: Manifest[OffChipMem[T]] = manifest[DRAM[T]]
   def bramManifest[T:Manifest]: Manifest[BRAM[T]] = manifest[BlockRAM[T]]
+  def fifoManifest[T:Manifest]: Manifest[FIFO[T]] = manifest[DHDLFIFO[T]]
   def vectorManifest[T:Manifest]: Manifest[Vector[T]] = manifest[DHDLVector[T]]
   def cacheManifest[T:Manifest]: Manifest[Cache[T]] = manifest[CACHE[T]]
   def regManifest[T:Manifest]: Manifest[Reg[T]] = manifest[Register[T]]
@@ -53,102 +57,14 @@ trait MemoryTemplateOpsExp extends MemoryTemplateTypesExp with ExternPrimitiveOp
   // --- Nodes
   case class Vector_from_list[T](elems: List[Exp[T]])(implicit val mT: Manifest[T], val ctx: SourceContext) extends Def[Vector[T]]
 
-  // TODO: Can generalize to Mem[T] rather than BRAM?
-  case class Bram_load_vector[T](
-    bram:   Exp[BRAM[T]],
-    ofs:    Exp[FixPt[Signed,B32,B0]],
-    cchain: Exp[CounterChain],
-    inds:   List[Sym[FixPt[Signed,B32,B0]]]
-  )(implicit val mT: Manifest[T], val ctx: SourceContext) extends Def[Vector[T]]
-
-  case class Bram_store_vector[T](
-    bram:   Exp[BRAM[T]],
-    ofs:    Exp[FixPt[Signed,B32,B0]],
-    vec:    Exp[Vector[T]],
-    cchain: Exp[CounterChain],
-    inds:   List[Sym[FixPt[Signed,B32,B0]]]
-  )(implicit val mT: Manifest[T], val ctx: SourceContext) extends Def[Unit]
-
-
-  case class GatherScatterTransfer[T:Manifest](
-    mem:      Rep[OffChipMem[T]],                // Offchip memory array
-    local:    Rep[BRAM[T]],                      // Local memory (BRAM)
-    addrs:    Rep[BRAM[FixPt[Signed,B32,B0]]], // Addresses for gather or scatter
-    numAddrs:     Rep[FixPt[Signed, B32, B0]],    // Size of addresses
-    scatter:   Boolean                            // Is this a scatter or gather operation
-  )(implicit ctx: SourceContext) extends Def[Unit] {
-    val mT = manifest[T]
-  }
-
   // --- Internal API
   def vector_from_list[T:Manifest](elems: List[Rep[T]])(implicit ctx: SourceContext): Rep[Vector[T]] = reflectPure(Vector_from_list(elems))
-
-  def bram_load_vector[T:Manifest](bram: Rep[BRAM[T]], offsets: List[Rep[FixPt[Signed,B32,B0]]], len: Rep[FixPt[Signed,B32,B0]], cchain: Rep[CounterChain])(implicit ctx: SourceContext): Rep[Vector[T]] = {
-    val inds = List.fill(lenOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }
-    val ofs = calcAddress(offsets, dimsOf(bram))
-    val vec = reflectPure(Bram_load_vector(bram, ofs, cchain, inds))
-    accessIndicesOf(vec) = offsets
-    vec
-  }
-
-  def bram_store_vector[T:Manifest](bram: Rep[BRAM[T]], offsets: List[Rep[FixPt[Signed,B32,B0]]], vec: Rep[Vector[T]], cchain: Rep[CounterChain])(implicit ctx: SourceContext): Rep[Unit] = {
-    val inds = List.fill(lenOf(cchain)){ fresh[FixPt[Signed,B32,B0]] }
-    val ofs = calcAddress(offsets, dimsOf(bram))
-    val st = reflectEffect(Bram_store_vector(bram, ofs, vec, cchain, inds), Write(List(bram.asInstanceOf[Sym[BRAM[T]]])))
-    accessIndicesOf(st) = offsets
-    st
-  }
-
-  def gather_scatter_transfer[T:Manifest](mem: Rep[OffChipMem[T]], local: Rep[BRAM[T]], addrs: Rep[BRAM[FixPt[Signed,B32,B0]]], numAddrs: Rep[FixPt[Signed,B32,B0]], scatter: Boolean)(implicit ctx: SourceContext): Rep[Unit] = {
-    if (scatter) reflectWrite(mem)(GatherScatterTransfer(mem,local,addrs,numAddrs,scatter))
-    else         reflectWrite(local)(GatherScatterTransfer(mem,local,addrs,numAddrs,scatter))
-  }
 
   // --- Mirroring
   override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = e match {
     case e@Vector_from_list(elems) => reflectPure(Vector_from_list(f(elems))(e.mT, e.ctx))(mtype(manifest[A]), pos)
     case Reflect(e@Vector_from_list(elems), u, es) => reflectMirrored(Reflect(Vector_from_list(f(elems))(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
-
-    case e@Bram_load_vector(b,o,c,i) => reflectPure(Bram_load_vector(f(b),f(o),f(c),i)(e.mT,e.ctx))(mtype(manifest[A]),pos)
-    case Reflect(e@Bram_load_vector(b,o,c,i), u, es) => reflectMirrored(Reflect(Bram_load_vector(f(b),f(o),f(c),i)(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
-
-    case e@Bram_store_vector(b,o,v,c,i) => reflectPure(Bram_store_vector(f(b),f(o),f(v),f(c),i)(e.mT,e.ctx))(mtype(manifest[A]),pos)
-    case Reflect(e@Bram_store_vector(b,o,v,c,i), u, es) => reflectMirrored(Reflect(Bram_store_vector(f(b),f(o),f(v),f(c),i)(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
-
-    case e@GatherScatterTransfer(m,l,a,s,g) => reflectPure(GatherScatterTransfer(f(m),f(l),f(a),f(s),g)(e.mT,pos))(mtype(manifest[A]), pos)
-    case Reflect(e@GatherScatterTransfer(m,l,a,s,g), u, es) => reflectMirrored(Reflect(GatherScatterTransfer(f(m),f(l),f(a),f(s),g)(e.mT,pos), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
     case _ => super.mirror(e, f)
-  }
-
-  override def syms(e: Any): List[Sym[Any]] = e match {
-    case e: Bram_load_vector[_] => syms(e.bram) ::: syms(e.ofs) ::: syms(e.cchain)
-    case e: Bram_store_vector[_] => syms(e.bram) ::: syms(e.ofs) ::: syms(e.vec) ::: syms(e.cchain)
-    case e: GatherScatterTransfer[_] => syms(e.mem) ::: syms(e.local) ::: syms(e.addrs) ::: syms(e.numAddrs)
-    case _ => super.syms(e)
-  }
-  override def readSyms(e: Any): List[Sym[Any]] = e match {
-    case e: Bram_load_vector[_] => readSyms(e.bram) ::: readSyms(e.ofs) ::: readSyms(e.cchain)
-    case e: Bram_store_vector[_] => readSyms(e.bram) ::: readSyms(e.ofs) ::: readSyms(e.vec) ::: readSyms(e.cchain)
-    case _ => super.readSyms(e)
-  }
-  override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {
-    case e: Bram_load_vector[_] => freqNormal(e.bram) ::: freqNormal(e.ofs) ::: freqNormal(e.cchain)
-    case e: Bram_store_vector[_] => freqNormal(e.bram) ::: freqNormal(e.ofs) ::: freqNormal(e.vec) ::: freqNormal(e.cchain)
-    case e: GatherScatterTransfer[_] => freqNormal(e.mem) ::: freqNormal(e.local) ::: freqNormal(e.addrs) ::: freqNormal(e.numAddrs)
-    case _ => super.symsFreq(e)
-  }
-  override def boundSyms(e: Any): List[Sym[Any]] = e match {
-    case e: Bram_load_vector[_] => e.inds
-    case e: Bram_store_vector[_] => e.inds
-    case _ => super.boundSyms(e)
-  }
-
-  // --- Aliasing
-  override def aliasSyms(e: Any): List[Sym[Any]] = e match {
-    case e: Bram_load_vector[_] => Nil // Don't alias with BRAM
-    case e: Bram_store_vector[_] => Nil
-    case e: GatherScatterTransfer[_] => Nil
-    case _ => super.aliasSyms(e)
   }
 }
 
@@ -159,6 +75,7 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTe
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
     case "BlockRAM" => "Array[" + remap(m.typeArguments(0)) + "]"
+    case "DHDLFIFO" => "scala.collection.mutable.Queue[" + remap(m.typeArguments(0)) + "]"
     case "DHDLVector" => "Array[" + remap(m.typeArguments(0)) + "]"
     case "CACHE"     => "Array[" + remap(m.typeArguments(0)) + "]"
     case "Register" => "Array[" + remap(m.typeArguments(0)) + "]"
@@ -171,25 +88,50 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTe
     case Vector_from_list(elems) =>
       emitValDef(sym, "Array" + elems.map(quote).mkString("(", ",", ")"))
 
-    case GatherScatterTransfer(mem,local,addrs,numAddrs,scatter) =>
-      if (scatter) {
-        stream.println(s"""(0 until ${quote(numAddrs)}.toInt).foreach { i =>""")
-        stream.println(s"""${quote(mem)}(${quote(addrs)}(i).toInt) = ${quote(local)}(i)""")
-        stream.println(s"""}""")
-      } else {
-        stream.println(s"""(0 until ${quote(numAddrs)}.toInt).foreach { i =>""")
-        stream.println(s"""${quote(local)}(i) = ${quote(mem)}(${quote(addrs)}(i).toInt)""")
-        stream.println(s"""}""")
-      }
-
     case _ => super.emitNode(sym, rhs)
+  }
+}
+
+trait CGenMemoryTemplateOps extends CGenEffect {
+  val IR: ControllerTemplateOpsExp with DHDLIdentifiers
+  import IR._
+
+  private def bitsToIntType(bits: Int) = {
+    if (bits <= 8) "8"
+    else if (bits <= 16) "16"
+    else if (bits <= 32) "32"
+    else "64"
+  }
+
+  private def bitsToFloatType(bits: Int) = {
+    if (bits <= 32) "float"
+    else "double"
+  }
+
+  override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
+    case "BlockRAM" => remapWithRef(m.typeArguments(0))
+    // case "DHDLFIFO" => ???
+    case "Register" => remapWithRef(m.typeArguments(0))
+    case "DRAM"     => remapWithRef(m.typeArguments(0))
+
+    case "DHDLCounter" => "int32_t"
+    case "DHDLCounterChain" => "int32_t*"
+    case "DHDLPipeline" => "void"
+
+    case "DHDLBit" => "bool"
+    case "Signed" => ""
+    case "Unsign" => "u"
+    case "FixedPoint" => remap(m.typeArguments(0)) + "int" + bitsToIntType(remap(m.typeArguments(1)).toInt + remap(m.typeArguments(2)).toInt) + "_t"
+    case "FloatPoint" => bitsToFloatType(remap(m.typeArguments(0)).toInt + remap(m.typeArguments(1)).toInt)
+    case bx(n) => n
+    case _ => super.remap(m)
   }
 }
 
 trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTemplateOps{
   val IR: ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
-          with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
-          with DHDLCodegenOps with DeliteTransform
+          with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
+          with DHDLCodegenOps with DeliteTransform with MemoryAnalysisExp
   import IR._
 
   // Current TileLd/St templates expect that LMem addresses are
@@ -214,8 +156,16 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
 		case Offchip_new(size) =>
       alwaysGen {
+        emitComment(s""" Offchip_new(${quote(size)}) {""")
         emit(s"""int ${quote(sym)} = ${getNextLMemAddr()};""")
+        emitComment(s""" Offchip_new(${quote(size)}) }""")
       }
+
+		case Offchip_load_cmd(mem, fifo, ofs, len, par) =>
+      emitComment("Offchip load to fifo")
+
+		case Offchip_store_cmd(mem, fifo, ofs, len, par) =>
+      emitComment("Offchip store from fifo")
 
 		case Reg_new(init) =>
       emitComment("Reg_new {")
@@ -227,7 +177,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 						emit(s"""DblRegFileLib ${quote(sym)}_lib = new DblRegFileLib(this, $ts, ${quote(sym)}, ${parOf(sym)});""")
             val readstr = if (parOf(sym)>1) "readv" else "read"
             emit(s"""${maxJPre(sym)} ${quote(sym)} = ${quote(sym)}_lib.${readstr}()""")
-           	emit(quote(sym) + "_lib.connectWdone(" + quote(writerOf(sym).get._1) + "_done);")
+           	emit(quote(sym) + "_lib.connectWdone(" + quote(writersOf(sym).head._1) + "_done);")
             readersOf(sym).foreach { case (r, _, _) =>
            	  emit(quote(sym) +"_lib.connectRdone(" + quote(r) + "_done);")
            	}
@@ -236,7 +186,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 					}
 				case ArgumentIn =>  // alwaysGen
         	alwaysGen {
-          	emit(s"""DFEVar ${quote(sym)} = io.scalarInput(${quote(sym)} , $ts );""")
+          	emit(s"""DFEVar ${quote(sym)} = io.scalarInput("${quote(sym)}", $ts );""")
 				  }
 				case ArgumentOut => //emitted in reg_write
 			}
@@ -246,38 +196,38 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
       emitComment("Reg_write {")
 			val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
 			if (isDblBuf(reg)) {
-			 	emit(s"""${quote(reg)}_lib.write(${value}, ${quote(writerOf(reg).get._1)}_done);""")
+			 	emit(s"""${quote(reg)}_lib.write(${value}, ${quote(writersOf(reg).head._1)}_done);""")
       } else {
 				regType(reg) match {
 					case Regular =>
       		  val parent = if (parentOf(reg).isEmpty) "top" else quote(parentOf(reg).get) //TODO
       		  val rst = quote(parent) + "_rst_en"
-					  if (writerOf(reg).isEmpty)
+					  if (writersOf(reg).isEmpty)
 					  	throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
-					  val enSignalStr = writerOf(reg).get._1 match {
+					  val enSignalStr = writersOf(reg).head._1 match {
 					  	case p@Def(EatReflect(e:Pipe_foreach)) => styleOf(p) match {
-					  		case Fine => quote(e.cchain) + "_en_from_pipesm"
+					  		case InnerPipe => quote(e.cchain) + "_en_from_pipesm"
 					  		case _ => quote(p) + "_en"
 					  	}
 					  	case p@Def(EatReflect(e:Pipe_fold[_,_])) => styleOf(p) match {
-					  		case Fine => quote(e.cchain) + "_en_from_pipesm"
+					  		case InnerPipe => quote(e.cchain) + "_en_from_pipesm"
 					  		case _ => quote(p) + "_en"
 					  	}
 					  	case p@_ => val Def(d) = p
                           throw new Exception(s"Reg ${quote(reg)} is written by non Pipe node ${p} def:${d}")
 					  }
       		  emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}; // enable""")
-      		  emit(s"""DFEVar ${quote(reg)}_hold = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writerOf(reg).get._1)}_redLoop_done));""")
-      		  emit(s"""${quote(reg)} <== $rst ? constant.var($ts, ${quote(resetValue(reg))}):stream.offset(${quote(reg)}_hold, -${quote(writerOf(reg).get._1)}_offset); // reset""")
+      		  emit(s"""DFEVar ${quote(reg)}_hold = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writersOf(reg).head._1)}_redLoop_done));""")
+      		  emit(s"""${quote(reg)} <== $rst ? constant.var($ts, ${quote(resetValue(reg))}):stream.offset(${quote(reg)}_hold, -${quote(writersOf(reg).head._1)}_offset); // reset""")
 				  case ArgumentIn => new Exception("Cannot write to Argument Out! " + quote(reg))
 				  case ArgumentOut =>
 				 	  val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done" //TODO
-      	  	emit(s"""io.scalarOutput(${quote(reg)}, ${quote(value)}, $ts, $controlStr);""")
+      	  	emit(s"""io.scalarOutput("${quote(reg)}", ${quote(value)}, $ts, $controlStr);""")
 				}
 			}
       emitComment("} Reg_write")
 
-    case Bram_new (size, zero) =>
+    case Bram_new(size, zero) =>
       emitComment("Bram_new {")
 			val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
       //TODO: does templete assume bram has 2 dimension?
@@ -296,7 +246,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
         val dims = dimsOf(sym)
         emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
           $size0, $size1, $ts, ${banks(sym)}, stride_TODO, ${readersOf(sym).size});""")
-        if (writerOf(sym).isEmpty)
+        if (writersOf(sym).isEmpty)
           throw new Exception(s"Bram ${quote(sym)} has no writer!")
           //  If writer is a unit Pipe, wait until parent is finished
         //val doneSig = n.getWriter().getOrElse(throw new Exception(s"BRAM $n has no writer")) match {
@@ -313,7 +263,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
       val doneSig = ""
         emit(s"""${quote(sym)}.connectWdone($doneSig);""")
       } else {
-        emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${size1}, ${ts}, ${banks(sym)}, stride_TODO);""")
+        emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, ${banks(sym)}, stride_TODO);""")
       }
       emitComment("} Bram_new")
 
@@ -345,7 +295,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
       emitComment("Bram_store {")
 			val dataStr = quote(value)
       if (isAccum(bram)) {
-        val offsetStr = quote(writerOf(bram).get._1) + "_offset"
+        val offsetStr = quote(writersOf(bram).head._1) + "_offset"
         val parentPipe = parentOf(bram).getOrElse(throw new Exception(s"Bram ${quote(bram)} does not have a parent!"))
         val parentCtr = parentPipe match {
           case Def(EatReflect(d)) => d match {

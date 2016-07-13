@@ -1,7 +1,6 @@
 import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
-import scala.util.Random
 
 object TileStoreCompiler extends DHDLApplicationCompiler with TileStoreTest
 trait TileStoreTest extends DHDLApplication {
@@ -12,7 +11,7 @@ trait TileStoreTest extends DHDLApplication {
   lazy val cols = 1920.as[SInt]
 
   def stores(v1: Rep[OffChipMem[Flt]]) {
-    val b1 = List.tabulate(c){i => BRAM[Flt]("b1", rows, cols) }
+    val b1 = List.tabulate(c){i => BRAM[Flt](rows, cols) }
 
     Sequential.foreach(0 until 5000){ i =>
       Parallel {
@@ -22,12 +21,12 @@ trait TileStoreTest extends DHDLApplication {
   }
 
   def main() {
-    val N = args(unit(0)).to[SInt]
-    val C = args(unit(1)).to[SInt]
+    val N = args(0).to[SInt]
+    val C = args(1).to[SInt]
 
     bound(N) = 9993600
     bound(C) = 9993600
-    val v1 = OffChipMem[Flt]("v1", N, C)
+    val v1 = OffChipMem[Flt](N, C)
 
     val vec1 = Array.fill(N)(random[Flt](10))
 

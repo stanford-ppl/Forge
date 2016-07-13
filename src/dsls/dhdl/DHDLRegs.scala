@@ -26,12 +26,10 @@ trait DHDLRegs {
 
     // --- Internals
     /** @nodoc **/
-    direct (Reg) ("regCreate", T, (SOption(SString), T, RegType) :: Reg(T), effect = mutable) implements composite ${
-      val reg = reg_new[T](init = $1)
-      $0.foreach{name => nameOf(reg) = name }
-      isDblBuf(reg) = false
-      regType(reg) = $2
-      resetValue(reg) = $1
+    direct (Reg) ("reg_create", T, (T, RegType) :: Reg(T), effect = mutable) implements composite ${
+      val reg = reg_new[T](init = $0)
+      regType(reg) = $1
+      resetValue(reg) = $0
       reg
     }
 
@@ -50,31 +48,21 @@ trait DHDLRegs {
     infix (RegMem) ("zeroIdx", T, (Reg(T)) :: Indices) implements composite ${ reg_zero_idx }
     infix (RegMem) ("flatIdx", T, (Reg(T), Indices) :: Idx) implements composite ${ 0.as[Index] }
     infix (RegMem) ("iterator", T, (Reg(T), SList(MInt)) :: CounterChain) implements composite ${ CounterChain(Counter(max=1)) }
-    infix (RegMem) ("empty", T, Reg(T) :: Reg(T), TNum(T)) implements composite ${ regCreate[T](None, zero[T], Regular) }
+    infix (RegMem) ("empty", T, Reg(T) :: Reg(T), TNum(T)) implements composite ${ reg_create[T](zero[T], Regular) }
 
     // --- API
     /* Reg */
-    /** Creates a register with type T and given name **/
-    static (Reg) ("apply", T, ("name", SString) :: Reg(T), TNum(T)) implements composite ${ regCreate[T](Some($0), zero[T], Regular) }
-    /** Creates an unnamed register with type T **/
-    static (Reg) ("apply", T, Nil :: Reg(T), TNum(T)) implements composite ${ regCreate[T](None, zero[T], Regular) }
+    /** Creates a register with type T **/
+    static (Reg) ("apply", T, Nil :: Reg(T), TNum(T)) implements composite ${ reg_create[T](zero[T], Regular) }
 
     UnstagedNumerics.foreach{ (ST,_) =>
-      /** Creates a register of type T with given name and reset value **/
-      static (Reg) ("apply", T, (("name", SString), ("reset", ST)) :: Reg(T), TNum(T)) implements composite ${ regCreate[T](Some($name), $reset.as[T], Regular) }
       /** Creates an unnamed register with type T and given reset value **/
-      static (Reg) ("apply", T, ("reset", ST) :: Reg(T), TNum(T)) implements composite ${ regCreate[T](None, $reset.as[T], Regular) }
+      static (Reg) ("apply", T, ("reset", ST) :: Reg(T), TNum(T)) implements composite ${ reg_create[T]($reset.as[T], Regular) }
     }
-
-    /** Creates a named input argument from the host CPU **/
-    direct (Reg) ("ArgIn", T, ("name", SString) :: Reg(T), TNum(T)) implements composite ${ regCreate[T](Some($name), zero[T], ArgumentIn) }
     /** Creates an unnamed input argument from the host CPU **/
-    direct (Reg) ("ArgIn", T, Nil :: Reg(T), TNum(T)) implements composite ${ regCreate[T](None, zero[T], ArgumentIn) }
-
-    /** Creats a named output argument to the host CPU **/
-    direct (Reg) ("ArgOut", T, ("name", SString) :: Reg(T), TNum(T)) implements composite ${ regCreate[T](Some($name), zero[T], ArgumentOut) }
+    direct (Reg) ("ArgIn", T, Nil :: Reg(T), TNum(T)) implements composite ${ reg_create[T](zero[T], ArgumentIn) }
     /** Creats an unnamed output argument to the host CPU **/
-    direct (Reg) ("ArgOut", T, Nil :: Reg(T), TNum(T)) implements composite ${ regCreate[T](None, zero[T], ArgumentOut) }
+    direct (Reg) ("ArgOut", T, Nil :: Reg(T), TNum(T)) implements composite ${ reg_create[T](zero[T], ArgumentOut) }
 
     val Reg_API = withTpe(Reg)
     Reg_API {
@@ -106,6 +94,18 @@ trait DHDLRegs {
     impl (reg_reset) (codegen($cala, ${
       @ val init = resetValue($reg)
       $reg.update(0, $init)
+    }))
+
+    // --- C++ Backend
+    impl (reg_new)   (codegen(cpp, ${
+      @ val tpname = remap(sym.tp.typeArguments(0))
+      new $tpname {$init}
+    }))
+    impl (reg_read)  (codegen(cpp, ${ *$reg }))
+    impl (reg_write)  (codegen(cpp, ${ *$reg = $value}))
+    impl (reg_reset) (codegen(cpp, ${
+      @ val init = resetValue($reg)
+      *$reg = $init
     }))
 
     // --- MaxJ Backend

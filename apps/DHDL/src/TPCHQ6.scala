@@ -1,19 +1,18 @@
 import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
-import scala.util.Random
 
 object TPCHQ6Compiler extends DHDLApplicationCompiler with TPCHQ6
 object TPCHQ6Interpreter extends DHDLApplicationInterpreter with TPCHQ6
 trait TPCHQ6 extends DHDLApplication {
 
-  lazy val dataSize = ArgIn[SInt]("dataSize")
-  lazy val minDateIn = ArgIn[UInt]("minDate")
-  lazy val maxDateIn = ArgIn[UInt]("maxDate")
+  lazy val dataSize = ArgIn[SInt]
+  lazy val minDateIn = ArgIn[UInt]
+  lazy val maxDateIn = ArgIn[UInt]
 
-  lazy val tileSize = param("tileSize", 18720)
-  lazy val outerPar = param("outerPar", 3)
-  lazy val innerPar = param("innerPar", 48)
+  lazy val tileSize = param(12)
+  lazy val outerPar = param(2)
+  lazy val innerPar = param(2)
 
   def tpchq6(dates:  Rep[OffChipMem[UInt]], quants: Rep[OffChipMem[UInt]],
              discts: Rep[OffChipMem[Flt]], prices: Rep[OffChipMem[Flt]], out: Rep[Reg[Flt]]) {
@@ -45,7 +44,7 @@ trait TPCHQ6 extends DHDLApplication {
   }
 
   def main() {
-    val N = args(unit(0)).to[SInt]
+    val N = args(0).to[SInt]
 
     bound(N) = 18720000
     domainOf(tileSize) = (96,192000,96)
@@ -55,11 +54,11 @@ trait TPCHQ6 extends DHDLApplication {
     val MIN_DATE = 64
     val MAX_DATE = 80
 
-    val dates  = OffChipMem[UInt]("dates", N)
-    val quants = OffChipMem[UInt]("quants", N)
-    val discts = OffChipMem[Flt]("discounts", N)
-    val prices = OffChipMem[Flt]("prices", N)
-    val out = ArgOut[Flt]("out")
+    val dates  = OffChipMem[UInt](N)
+    val quants = OffChipMem[UInt](N)
+    val discts = OffChipMem[Flt](N)
+    val prices = OffChipMem[Flt](N)
+    val out = ArgOut[Flt]
 
     val sDates  = Array.fill(N){random[UInt](20) + 65}
     val sQuants = Array.fill(N){random[UInt](25) }

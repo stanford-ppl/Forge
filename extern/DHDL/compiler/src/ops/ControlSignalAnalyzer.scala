@@ -1,7 +1,7 @@
 package dhdl.compiler.ops
 
 import scala.reflect.{Manifest,SourceContext}
-import ppl.delite.framework.analysis.HungryTraversal
+import scala.virtualization.lms.internal.Traversal
 
 import dhdl.shared._
 import dhdl.shared.ops._
@@ -11,6 +11,7 @@ import dhdl.compiler.ops._
 import scala.collection.mutable.{HashSet,HashMap}
 
 trait ControlSignalAnalysisExp extends PipeStageToolsExp {this: DHDLExp => }
+trait UnrolledControlSignalAnalysisExp extends ControlSignalAnalysisExp {this: DHDLExp => }
 
 // (1)  Sets parent control nodes of local memories
 // (2)  Sets parent control nodes of controllers
@@ -23,11 +24,12 @@ trait ControlSignalAnalysisExp extends PipeStageToolsExp {this: DHDLExp => }
 // (9)  Set parallelization factors of memory readers and writers
 // (10) Sets written set of controllers
 // (11) Determines the top controller
-trait ControlSignalAnalyzer extends HungryTraversal with PipeStageTools {
+trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
   val IR: DHDLExp with ControlSignalAnalysisExp
   import IR._
 
   override val name = "Control Signal Analyzer"
+  override val eatReflect = true
 
   var level = 0
   var indsOwners: Map[Exp[Any], (Exp[Any], Boolean, Int)] = Map.empty
@@ -42,18 +44,21 @@ trait ControlSignalAnalyzer extends HungryTraversal with PipeStageTools {
 
   // HACK: During preprocessing, clear out metadata that we append to in order to get rid of stale symbols
   override def preprocess[A:Manifest](b: Block[A]): Block[A] = {
+    localMems = Nil
+    metapipes = Nil
+    top = null
     for ((s,p) <- metadata) {
-      if (meta[MReaders](s).isDefined && !isDelayReg(s)) readersOf(s) = Nil
+      if (meta[MReaders](s).isDefined) readersOf(s) = Nil
       if (meta[MWritten](s).isDefined) writtenIn(s) = Nil
-      if (meta[MWriter](s).isDefined) writerOf(s) = None
+      if (meta[MWriters](s).isDefined) writersOf(s) = Nil
     }
     b
   }
 
   override def postprocess[A:Manifest](b: Block[A]): Block[A] = {
     for (mem <- localMems) {
-      if (writerOf(mem).isEmpty && !isArgIn(mem)) stageWarn("Memory " + nameOf(mem).getOrElse("") + " defined here has no writer")(mpos(mem.pos))
-      if (readersOf(mem).isEmpty && !isArgOut(mem)) stageWarn("Memory " + nameOf(mem).getOrElse("") + " defined here has no readers")(mpos(mem.pos))
+      if (writersOf(mem).isEmpty && !isArgIn(mem)) stageWarn("Memory " + nameOf(mem).map{n => n + " "}.getOrElse("") + "defined here has no writer")(mpos(mem.pos))
+      if (readersOf(mem).isEmpty && !isArgOut(mem)) stageWarn("Memory " + nameOf(mem).map{n => n + " "}.getOrElse("") + "defined here has no readers")(mpos(mem.pos))
     }
     b
   }
@@ -105,43 +110,25 @@ trait ControlSignalAnalyzer extends HungryTraversal with PipeStageTools {
   }
 
 
-  def setReaders(ctrl: Exp[Any], isReduce: Boolean, blks: Block[Any]*) {
-    val reads = getLocalReaders(blks:_*)
-    reads.foreach{
-      case reader@Def(EatReflect(Reg_read(reg))) =>
-        if (!isDelayReg(reg)) readersOf(reg) = readersOf(reg) :+ (ctrl,isReduce,reader)
-
-      case reader@Def(EatReflect(Bram_load(ram,addr))) =>
-        val top = getTopController(ctrl, isReduce, addr)
-        readersOf(ram) = readersOf(ram) :+ (top._1,top._2,reader)
-    }
+  def setReaders(ctrl: Exp[Any], isReduce: Boolean, blks: Block[Any]*) = getLocalReaders(blks:_*).foreach {
+    case reader@LocalReader(mem,addr) =>
+      val top = addr.map{a => getTopController(ctrl, isReduce, a)}.getOrElse( (ctrl,isReduce) )
+      readersOf(mem) = readersOf(mem) :+ (top._1, top._2, reader)
   }
 
   def checkMultipleWriters(mem: Exp[Any], writer: Exp[Any]) {
-    if (writerOf(mem).isDefined) {
+    if (writersOf(mem).nonEmpty) {
       // This should be allowed for buffered types, e.g. the Hogwild buffer discussed for SGD
       stageError("Memory " + nameOf(mem).getOrElse("") + " defined here has multiple writers.")(mpos(mem.pos))
-      //stageError("")(mpos(writerOf(mem)).get._3.pos)
-      //stageError("")(mpos(writer.pos))
     }
   }
 
-  def setWriter(ctrl: Exp[Any], isReduce: Boolean, blks: Block[Any]*) {
-    val writes = getLocalWriters(blks:_*)
-    writes.foreach{
-      case writer@Def(EatReflect(Reg_write(reg,_))) =>
-        if (!isDelayReg(reg)) {
-          checkMultipleWriters(reg, writer)
-          writerOf(reg) = (ctrl, isReduce, writer)
-          writtenIn(ctrl) = writtenIn(ctrl) :+ reg  // (10)
-        }
-
-      case writer@Def(EatReflect(Bram_store(ram,addr,_))) =>
-        checkMultipleWriters(ram, writer)
-        val top = getTopController(ctrl, isReduce, addr)
-        writerOf(ram) = (top._1,top._2,writer)
-        writtenIn(ctrl) = writtenIn(ctrl) :+ ram    // (10)
-    }
+  def setWriters(ctrl: Exp[Any], isReduce: Boolean, blks: Block[Any]*) = getLocalWriters(blks:_*).foreach {
+    case writer@LocalWriter(mem,value,addr) =>
+      checkMultipleWriters(mem, writer)
+      val top = addr.map{a => getTopController(ctrl, isReduce, a)}.getOrElse( (ctrl, isReduce) )
+      writersOf(mem) = writersOf(mem) :+ (top._1, top._2, writer)
+      writtenIn(ctrl) = writtenIn(ctrl) :+ mem
   }
 
   // Checks to see if lhs is dependent on rhs (used for checking for accum. cycles)
@@ -162,8 +149,11 @@ trait ControlSignalAnalyzer extends HungryTraversal with PipeStageTools {
 
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
-    case Offchip_load_vector(mem,ofs,len) =>   // ?
-    case Offchip_store_vector(mem,ofs,vec) =>  // ?
+    case Offchip_load_cmd(mem,stream,ofs,len,p) =>
+      writersOf(stream) = writersOf(stream) :+ (lhs, false, lhs)
+
+    case Offchip_store_cmd(mem,stream,ofs,len,p) =>
+      readersOf(stream) = readersOf(stream) :+ (lhs, false, lhs)
 
     case Hwblock(blk) =>
       val allocs = getAllocations(blk)
@@ -174,7 +164,7 @@ trait ControlSignalAnalyzer extends HungryTraversal with PipeStageTools {
 
       // TODO: Are these necessary?
       setReaders(lhs, false, blk)             // (4)
-      setWriter(lhs, false, blk)              // (5)
+      setWriters(lhs, false, blk)             // (5)
       traverseBlock(blk)
       top = lhs                               // (11)
 
@@ -186,7 +176,7 @@ trait ControlSignalAnalyzer extends HungryTraversal with PipeStageTools {
       childrenOf(lhs) = stages                // (3)
 
       setReaders(lhs, false, func)            // (4)
-      setWriter(lhs, false, func)             // (5)
+      setWriters(lhs, false, func)            // (5)
       traverseBlock(func)
       if (!parentOf(lhs).isDefined) top = lhs // (11)
 
@@ -198,7 +188,7 @@ trait ControlSignalAnalyzer extends HungryTraversal with PipeStageTools {
       childrenOf(lhs) = stages                // (3)
 
       setReaders(lhs, false, func)            // (4)
-      setWriter(lhs, false, func)             // (5)
+      setWriters(lhs, false, func)             // (5)
       traverseBlock(func)
       if (!parentOf(lhs).isDefined) top = lhs // (11)
 
@@ -212,14 +202,14 @@ trait ControlSignalAnalyzer extends HungryTraversal with PipeStageTools {
       childrenOf(lhs) = stages                      // (3)
 
       setReaders(lhs, false, func)                  // (4)
-      setWriter(lhs, false, func)                   // (5)
+      setWriters(lhs, false, func)                   // (5)
       traverseWith(lhs,false,inds,cc)(func)
 
-      if (styleOf(lhs) == Coarse) metapipes ::= lhs  // (8)
+      if (isMetaPipe(lhs)) metapipes ::= lhs  // (8)
       if (!parentOf(lhs).isDefined) top = lhs        // (11)
 
-    case Pipe_fold(cc,a,_,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) =>
-      val isFine = styleOf(lhs) == Fine
+    case Pipe_fold(cc,a,zero,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) =>
+      val isFine = isInnerPipe(lhs)
       val allocs = getAllocations(func)
       val stages = getControlNodes(func)
       allocs.foreach{a => parentOf(a) = lhs } // (1)
@@ -229,23 +219,23 @@ trait ControlSignalAnalyzer extends HungryTraversal with PipeStageTools {
       childrenOf(lhs) = stages                // (3)
 
       setReaders(lhs, false, func)            // (4)
-      setWriter(lhs, false, func)             // (5)
+      setWriters(lhs, false, func)             // (5)
 
       setReaders(lhs, !isFine, rFunc)         // (4)
-      setWriter(lhs, !isFine, rFunc)          // (5)
+      setWriters(lhs, !isFine, rFunc)          // (5)
 
       traverseWith(lhs,false,inds,cc)(func)
       traverseWith(lhs,false,inds,cc)(rFunc)
 
       checkMultipleWriters(a, lhs)
       readersOf(a) = readersOf(a) :+ (lhs, !isFine, lhs)  // (4)
-      writerOf(a) = (lhs, !isFine, lhs)                   // (5)
+      writersOf(a) = writersOf(a) :+ (lhs, !isFine, lhs)  // (5)
       isAccum(a) = true                                   // (6)
 
-      if (styleOf(lhs) == Coarse) metapipes ::= lhs  // (8)
+      if (isMetaPipe(lhs)) metapipes ::= lhs  // (8)
       if (!parentOf(lhs).isDefined) top = lhs        // (11)
 
-    case Accum_fold(cc1,cc2,a,_,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
+    case Accum_fold(cc1,cc2,a,zero,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
       val allocs = getAllocations(func)
       val stages = getControlNodes(func)
       allocs.foreach{a => parentOf(a) = lhs } // (1)
@@ -256,10 +246,10 @@ trait ControlSignalAnalyzer extends HungryTraversal with PipeStageTools {
       childrenOf(lhs) = stages                // (3)
 
       setReaders(lhs, false, func)            // (4)
-      setWriter(lhs, false, func)             // (5)
+      setWriters(lhs, false, func)            // (5)
 
       setReaders(lhs, true, rFunc)            // (4)
-      setWriter(lhs, true, rFunc)             // (5)
+      setWriters(lhs, true, rFunc)            // (5)
 
       traverseWith(lhs,false,inds1,cc1)(func)
       traverseWith(lhs,true, inds2,cc2)(rFunc)
@@ -269,12 +259,13 @@ trait ControlSignalAnalyzer extends HungryTraversal with PipeStageTools {
 
       checkMultipleWriters(a, lhs)
       readersOf(a) = readersOf(a) :+ (lhs, true, lhs)     // (4)
-      writerOf(a) = (lhs, true, lhs)                      // (5)
+      writersOf(a) = writersOf(a) :+ (lhs, true, lhs)     // (5)
+
       isAccum(a) = true
       val ipars = parParamsOf(cc2)                   // (6)
       addAccessParam(a, ipars.last)
 
-      if (styleOf(lhs) == Coarse) metapipes ::= lhs  // (8)
+      if (isMetaPipe(lhs)) metapipes ::= lhs  // (8)
       if (!parentOf(lhs).isDefined) top = lhs        // (11)
 
     case Reg_write(reg,value) =>
@@ -287,18 +278,80 @@ trait ControlSignalAnalyzer extends HungryTraversal with PipeStageTools {
       isAccum(bram) = hasDependency(value, bram)    // (6)
       addAccessFactor(bram, addr)                   // (9)
 
-    case Bram_load_vector(bram,ofs,cchain,inds) =>
-      readersOf(bram) = readersOf(bram) :+ (lhs,false,lhs)  // (4)
-      addAccessParam(bram, parParamsOf(cchain).last)        // (9)
-
-    case Bram_store_vector(bram,ofs,vec,cchain,inds) =>
-      writerOf(bram) = (lhs,false,lhs)                  // (4)
-      isAccum(bram) = hasDependency(vec, bram)          // (6)
-      addAccessParam(bram, parParamsOf(cchain).last)    // (9)
-      writtenIn(lhs) = writtenIn(lhs) :+ bram           // (11)
+    case Push_fifo(fifo,value,en) =>
+      isAccum(fifo) = hasDependency(value,fifo)             // (6)
+    case Pop_fifo(fifo) =>
 
     case _:Reg_new[_] => localMems ::= lhs    // (7)
     case _:Bram_new[_] => localMems ::= lhs   // (7)
+    case _:Fifo_new[_] => localMems ::= lhs   // (7)
+
     case _ => super.traverse(lhs, rhs)
   }
+}
+
+
+
+// --- Control analysis on unrolled IR
+// Same as above, without access factors
+trait UnrolledControlSignalAnalyzer extends ControlSignalAnalyzer {
+  val IR: DHDLExp with ControlSignalAnalysisExp
+  import IR._
+
+  // All cases of multiple writers are ok now (we banked for parallelized writes already)
+  override def checkMultipleWriters(mem: Exp[Any], writer: Exp[Any]) { }
+
+
+  override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
+    case Reg_write(reg,value) =>
+      isAccum(reg) = hasDependency(value, reg)      // (6)
+
+    case Par_bram_store(bram,addr,value) =>
+      isAccum(bram) = hasDependency(value, bram)    // (6)
+
+    case Par_push_fifo(fifo,value,en,_) =>
+      isAccum(fifo) = hasDependency(value, fifo)    // (6)
+
+    case Par_pop_fifo(fifo,_) =>
+    case Par_bram_load(bram,addr) =>
+    case Reg_read(reg) =>
+
+
+    case ParPipeForeach(cc,func,inds) =>
+      val allocs = getAllocations(func)
+      val stages = getControlNodes(func)
+      allocs.foreach{a => parentOf(a) = lhs } // (1)
+      stages.foreach{s => parentOf(s) = lhs } // (2)
+      parentOf(cc) = lhs
+      childrenOf(lhs) = stages                // (3)
+
+      setReaders(lhs, false, func)            // (4)
+      setWriters(lhs, false, func)            // (5)
+
+      traverseBlock(func)
+
+      if (!parentOf(lhs).isDefined) top = lhs        // (11)
+
+    case ParPipeReduce(cc,accum,func,rFunc,inds,acc,rV) =>
+      val allocs = getAllocations(func)
+      val stages = getControlNodes(func)
+      allocs.foreach{a => parentOf(a) = lhs } // (1)
+      stages.foreach{s => parentOf(s) = lhs } // (2)
+      parentOf(cc) = lhs
+      childrenOf(lhs) = stages                // (3)
+
+      setReaders(lhs, false, func)            // (4)
+      setWriters(lhs, false, func)            // (5)
+      traverseBlock(func)
+      //traverseWith(lhs,true, inds2,cc2)(rFunc)
+
+      readersOf(accum) = readersOf(accum) ++ readersOf(acc) // (4)
+      writersOf(accum) = writersOf(accum) ++ writersOf(acc) // (5)
+      isAccum(accum) = true
+
+      if (!parentOf(lhs).isDefined) top = lhs        // (11)
+
+    case _ => super.traverse(lhs, rhs)
+  }
+
 }

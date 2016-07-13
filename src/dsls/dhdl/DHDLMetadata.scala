@@ -38,9 +38,9 @@ trait DHDLMetadata {
     /* Is Accumulator: false if unset */
     val MAccum = metadata("MAccum", "isAccum" -> SBoolean)
     val accumOps = metadata("isAccum")
-    internal.static (accumOps) ("update", T, (T, SBoolean) :: MUnit, effect = simple) implements
+    internal.static (accumOps) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MAccum($1)) }
-    internal.static (accumOps) ("apply", T, T :: SBoolean) implements
+    internal.static (accumOps) ("apply", Nil, MAny :: SBoolean) implements
       composite ${ meta[MAccum]($0).map(_.isAccum).getOrElse(false) }
 
     /* Is inserted metapipe register */
@@ -130,9 +130,13 @@ trait DHDLMetadata {
     internal.static (globalOps) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MGlobal($1)) }
     internal.static (globalOps) ("apply", Nil, MAny :: SBoolean) implements
+      composite ${ globalCheck($0) }
+
+    internal (globalOps) ("globalCheck", Nil, MAny :: SBoolean) implements
       composite ${ meta[MGlobal]($0).map(_.isGlobal).getOrElse(false) }
 
 
+    /* Parameter ranges */
     val MParamRange = metadata("MParamRange", "minv" -> SInt, "maxv" -> SInt, "stepv" -> SInt)
     val prangeOps = metadata("domainOf")
     static (prangeOps) ("update", Nil, (MAny, CTuple3(SInt,SInt,SInt)) :: MUnit, effect = simple) implements
@@ -237,9 +241,6 @@ trait DHDLMetadata {
     }
 
     /* A list of ctrl nodes inside current ctrl nodes. Order matters for sequential */
-	 	//TODO: need to confirm with Raghu whether ctrl node includes counterchain. looks like it
-		// it doesn't
-		// It look like only sequential, metapipe, parallel, blockreduce? need to fill in this metadata
     val MChildren = metadata("MChildren", "children" -> SList(MAny))
     val childrenOps = metadata("childrenOf")
     internal.static (childrenOps) ("update", T, (T, SList(MAny)) :: MUnit, effect = simple) implements

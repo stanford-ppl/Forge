@@ -1,6 +1,7 @@
 package dhdl.library.classes
 
 import scala.math.BigDecimal.RoundingMode
+import scala.reflect.SourceContext
 
 import dhdl.shared._
 import dhdl.shared.ops._
@@ -24,6 +25,9 @@ trait ExternPrimitiveWrapper extends ExternPrimitiveCompilerOps with NumEmulatio
   def bitManifest: Manifest[Bit] = manifest[Boolean]
 
   def isStaticSize[T:Manifest](x: Rep[T]): Boolean = true
+
+  def min2[T:Manifest:Order:Num](a: Rep[T], b: Rep[T])(implicit ctx: SourceContext) = if (implicitly[Order[T]].lessThan(a,b)) a else b
+  def max2[T:Manifest:Order:Num](a: Rep[T], b: Rep[T])(implicit ctx: SourceContext) = if (implicitly[Order[T]].lessThan(b,a)) a else b
 }
 
 

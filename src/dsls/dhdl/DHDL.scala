@@ -54,6 +54,8 @@ trait DHDLDSL extends ForgeApplication
     disableFusion()
 
     val T = tpePar("T")
+    val K = tpePar("K")
+    val V = tpePar("V")
 
     // --- Primitive Types
     /** Bit represents a single bit, equivalent to a Boolean **/
@@ -142,6 +144,11 @@ trait DHDLDSL extends ForgeApplication
     val FIFO = tpe("FIFO", T)
 
     /**
+     * CAMs (content addressable memories) are used for associative key-value stores.
+     **/
+    val CAM = tpe("CAM", (K,V))
+
+    /**
      * Caches are on-chip caches for a specific off-chip memory/data structure. Caches allow loading
      * with multi-dimentional address, whose dimensions are inherited from the cached off-chip memories.
      * The multi-dimentional address is converted to a single flat address in hardware. The
@@ -162,7 +169,7 @@ trait DHDLDSL extends ForgeApplication
      **/
     val Vector = tpe("Vector", T)
 
-    primitiveStructs :::= List(OffChip, BRAM, FIFO, Reg, Vector, Cache)
+    primitiveStructs :::= List(OffChip, BRAM, FIFO, CAM, Reg, Vector, Cache)
 
     // --- State Machine Types
     /** Counter is a single hardware counter with an associated minimum, maximum, step size, and parallelization factor.
@@ -230,6 +237,7 @@ trait DHDLDSL extends ForgeApplication
     val AreaAnalyzer = analyzer("Area", isExtern=true)
     val LatencyAnalyzer = analyzer("Latency", isExtern=true)
     val OpsAnalyzer = analyzer("Ops", isExtern=true)
+    val ReductionAnalyzer = analyzer("Reduction", isExtern=true)
 
     val ConstantFolding = traversal("ConstantFolding", isExtern=true)
     val ParameterAnalyzer = analyzer("Parameter",isExtern=true)
@@ -246,6 +254,7 @@ trait DHDLDSL extends ForgeApplication
     // --- Pre-DSE analysis
     schedule(NameAnalyzer)
     schedule(LevelAnalyzer)         // Sanity checks and pipe style annotation fixes
+    schedule(GlobalAnalyzer)        // Values computed outside of all controllers
     schedule(UnitPipeTransformer)   // Wrap primitives in outer pipes
 
     schedule(StageAnalyzer)         // Get number of stages in each control node
@@ -256,7 +265,6 @@ trait DHDLDSL extends ForgeApplication
     schedule(DHDLAffineAnalysis)    // Access patterns
 
     schedule(DotIRPrinter)          // Graph prior to unrolling
-    schedule(IRPrinterPlus)
 
     // --- Design Space Exploration
     schedule(DSE)                   // Design space exploration. Runs a host of other analyses:
@@ -275,16 +283,20 @@ trait DHDLDSL extends ForgeApplication
                                     //   Memory analyzer (to finalize banking/buffering)
                                     //   Contention analyzer (to finalize contention estimates)
 
+    schedule(IRPrinterPlus)
+
+    // --- Post-DSE Constants
+    schedule(ConstantFolding)       // Constant folding
+
     // --- Post-DSE Estimation
-    //schedule(IRPrinterPlus)
     schedule(AreaAnalyzer)          // Area estimation
     schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
 
-    // --- Transformations
-    schedule(ConstantFolding)       // Constant folding
 // Temporarily disabled until moved to unrolling
 //    schedule(MetaPipeRegInsertion)  // Inserts registers between metapipe stages for counter signals
 
+    // --- Design Elaboration
+    schedule(ReductionAnalyzer)     // Reduce/accumulator specialization
     schedule(Unrolling)             // Pipeline unrolling
     schedule(UnrolledControlAnalyzer) // Control signal metadata after unrolling
     schedule(DotIRPrinter)          // Graph after unrolling

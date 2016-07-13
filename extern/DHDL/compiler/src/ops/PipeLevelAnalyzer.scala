@@ -19,6 +19,7 @@ trait PipeLevelAnalysisExp extends PipeStageToolsExp {this: DHDLExp => }
  *
  * Sanity checks:
  * 1. Control nodes are not allowed within reduction functions
+ * 2. Parallel must contain at least one control node, no primitive nodes (HACK: Temporary check until Parallel is removed)
  **/
 trait PipeLevelAnalyzer extends Traversal with PipeStageTools {
   val IR: DHDLExp with PipeLevelAnalysisExp
@@ -30,6 +31,7 @@ trait PipeLevelAnalyzer extends Traversal with PipeStageTools {
   debugMode = false
 
   def hasControlNodes(blocks: Block[Any]*) = blocks.map(getControlNodes(_).nonEmpty).fold(false)(_||_)
+  def hasPrimitiveNodes(blocks: Block[Any]*) = getStages(blocks:_*).map(isPrimitiveNode(_)).fold(false)(_||_)
 
   def annotatePipeStyle(pipe: Sym[Any], blocks: Block[Any]*) = (styleOption(pipe), hasControlNodes(blocks:_*)) match {
     case (None, false) => styleOf(pipe) = InnerPipe                   // No annotations, no control nodes
@@ -45,7 +47,13 @@ trait PipeLevelAnalyzer extends Traversal with PipeStageTools {
   }
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
-    case _:Pipe_parallel   => styleOf(lhs) = ForkJoin
+    case Pipe_parallel(blk) =>
+      styleOf(lhs) = ForkJoin
+      if (hasPrimitiveNodes(blk))
+        stageError("Parallel must not have any primitive nodes.")(mpos(lhs.pos))
+      if (!hasControlNodes(blk))
+        stageError("Parallel must have at least one control node.")(mpos(lhs.pos))
+
     case Hwblock(blk)      => annotatePipeStyle(lhs, blk)
     case Unit_pipe(func)   => annotatePipeStyle(lhs, func)
     case e:Pipe_foreach    => annotatePipeStyle(lhs, e.func)

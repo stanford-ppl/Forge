@@ -36,7 +36,7 @@ trait DSE extends Traversal {
   lazy val tileSizes  = paramAnalyzer.tileSizes.distinct
   lazy val parFactors = paramAnalyzer.parFactors.distinct
   lazy val localMems  = ctrlAnalyzer.localMems
-  lazy val accFactors = ctrlAnalyzer.memAccessFactors.toList
+  //lazy val accFactors = ctrlAnalyzer.memAccessFactors.toList
   lazy val topController = ctrlAnalyzer.top
 
   override def run[A:Manifest](b: Block[A]) = {
@@ -94,10 +94,10 @@ trait DSE extends Traversal {
     val ranges    = paramAnalyzer.range
 
     // HACK: All par factors for readers and writers of a given BRAM must be equal or one
-    for ((mem,factors) <- accFactors) {
+    /*for ((mem,factors) <- accFactors) {
       val distFactors = factors.distinct
       if (distFactors.length > 1) restrict ::= REqualOrOne(distFactors)
-    }
+    }*/
     restrict = restrict.distinct
 
     def isLegalSpace() = restrict.forall(_.evaluate)

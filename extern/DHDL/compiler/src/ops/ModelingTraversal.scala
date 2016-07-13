@@ -25,7 +25,7 @@ trait ModelingTraversal extends QuickTraversal with PipeStageTools {
 
     def quickDFS(cur: Exp[Any]): Long = cur match {
       case Def(d) if scope.contains(cur) && !isGlobal(cur) =>
-        //debug(s"Visit $cur in quickDFS (${latencyOf(cur)})")
+        //debug(s"Visit $cur in quickDFS")
         latencyOf(cur) + symDeps(d).map{e => paths.getOrElseUpdate(e,quickDFS(e))}.max
       case _ => 0L
     }

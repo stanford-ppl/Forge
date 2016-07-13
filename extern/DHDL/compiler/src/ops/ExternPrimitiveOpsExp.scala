@@ -34,6 +34,12 @@ trait ExternPrimitiveOpsExp extends ExternPrimitiveCompilerOps with ExternPrimit
 
   this: DHDLExp =>
 
+  case class Min2[T](a: Rep[T],b:Rep[T])(implicit val mT: Manifest[T], val oT: Order[T], val nT: Num[T], val ctx: SourceContext) extends Def[T]
+  case class Max2[T](a: Rep[T],b:Rep[T])(implicit val mT: Manifest[T], val oT: Order[T], val nT: Num[T], val ctx: SourceContext) extends Def[T]
+
+  def min2[T:Manifest:Order:Num](a: Rep[T], b: Rep[T])(implicit ctx: SourceContext) = reflectPure(Min2(a,b))
+  def max2[T:Manifest:Order:Num](a: Rep[T], b: Rep[T])(implicit ctx: SourceContext) = reflectPure(Max2(a,b))
+
   // --- Internal API
   // Shorthand versions for matching on ConstFixPt and ConstFltPt without the manifests
   object ParamFix {
@@ -106,6 +112,12 @@ trait ExternPrimitiveOpsExp extends ExternPrimitiveCompilerOps with ExternPrimit
     case _ => super.boundOf(__arg0)
   }
 
+  override def globalCheck(__arg0: Rep[Any])(implicit __pos: SourceContext): Boolean = __arg0 match {
+    case p: Param[_] => true
+    case Const(x) => true
+    case _ => super.globalCheck(__arg0)
+  }
+
   // TODO: Move to spec later?
   // Rewrite needed for length calculation of vectors, ranges
   override def sub[S:Manifest,I:Manifest,F:Manifest](__arg0: Rep[FixPt[S,I,F]],__arg1: Rep[FixPt[S,I,F]])(implicit __pos: SourceContext,__imp1: Overload2) = {
@@ -124,6 +136,12 @@ trait ExternPrimitiveOpsExp extends ExternPrimitiveCompilerOps with ExternPrimit
       case _ => super.add(__arg0, __arg1)(manifest[S],manifest[I],manifest[F],__pos,__imp1)
     }
   }
+
+  override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = (e match {
+    case EatReflect(e@Min2(a,b)) => reflectPure(Min2(f(a),f(b))(e.mT,e.oT,e.nT,e.ctx))(mtype(manifest[A]),pos)
+    case EatReflect(e@Max2(a,b)) => reflectPure(Max2(f(a),f(b))(e.mT,e.oT,e.nT,e.ctx))(mtype(manifest[A]),pos)
+    case _ => super.mirror(e,f)
+  }).asInstanceOf[Exp[A]]
 }
 
 

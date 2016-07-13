@@ -15,57 +15,79 @@ import ppl.delite.framework.DeliteApplication
 trait PipeStageToolsExp extends EffectExp {
   this: DHDLExp =>
 
-  // Returns written memory, data, optional address
-  def writerUnapply(d: Def[Any]): Option[(Exp[Any], Exp[Any], Option[Exp[Any]])] = d match {
-    case EatReflect(Reg_write(reg,value)) => Some((reg,value,None))
-    case EatReflect(Bram_store(bram,addr,value)) => Some((bram,value,Some(addr)))
-    case EatReflect(Push_fifo(fifo,value,_)) => Some((fifo,value,None))
-    case EatReflect(Par_bram_store(bram,addr,value)) => Some((bram,value,Some(addr)))
-    case EatReflect(Par_push_fifo(fifo,value,_,_)) => Some((fifo,value,None))
+  // TODO: Type parameters?
+  type LocalWrite = (Exp[Any], Option[Exp[Any]], Option[Exp[Any]]) // Memory, optional value, optional address
+  type LocalRead  = (Exp[Any], Option[Exp[Any]])                   // Memory, optional address
+
+  // Returns written memory, optional value, optional address
+  def writerUnapply(d: Def[Any]): Option[List[LocalWrite]] = d match {
+    case EatReflect(Reg_write(reg,value))             => Some(LocalWrite(reg,value))
+    case EatReflect(Bram_store(bram,addr,value))      => Some(LocalWrite(bram,value,addr))
+    case EatReflect(Push_fifo(fifo,value,_))          => Some(LocalWrite(fifo,value))
+    case EatReflect(Cam_store(cam,key,value))         => Some(LocalWrite(cam,value,key))
+    case EatReflect(Par_bram_store(bram,addr,value))  => Some(LocalWrite(bram,value,addr))
+    case EatReflect(Par_push_fifo(fifo,value,_,_))    => Some(LocalWrite(fifo,value))
+    case EatReflect(Offchip_load_cmd(mem,fifo,_,_,_)) => Some(LocalWrite(fifo))
+    case EatReflect(Gather(mem,local,addrs,_))        => Some(LocalWrite(local))
     case _ => None
   }
 
   // Returns read memory, optional address
-  def readerUnapply(d: Def[Any]): Option[(Exp[Any], Option[Exp[Any]])] = d match {
-    case EatReflect(Reg_read(reg)) => Some((reg,None))
-    case EatReflect(Bram_load(bram,addr)) => Some((bram,Some(addr)))
-    case EatReflect(Pop_fifo(fifo)) => Some((fifo,None))
-    case EatReflect(Par_bram_load(bram,addr)) => Some((bram,Some(addr)))
-    case EatReflect(Par_pop_fifo(fifo,_)) => Some((fifo,None))
+  def readerUnapply(d: Def[Any]): Option[List[LocalRead]] = d match {
+    case EatReflect(Reg_read(reg))                     => Some(LocalRead(reg))
+    case EatReflect(Bram_load(bram,addr))              => Some(LocalRead(bram,addr))
+    case EatReflect(Pop_fifo(fifo))                    => Some(LocalRead(fifo))
+    case EatReflect(Cam_load(cam,key))                 => Some(LocalRead(cam,key))
+    case EatReflect(Par_bram_load(bram,addr))          => Some(LocalRead(bram,addr))
+    case EatReflect(Par_pop_fifo(fifo,_))              => Some(LocalRead(fifo))
+    case EatReflect(Offchip_store_cmd(mem,fifo,_,_,_)) => Some(LocalRead(fifo))
+    case EatReflect(Gather(mem,local,addrs,_))         => Some(LocalRead(addrs))
+    case EatReflect(Scatter(mem,local,addrs,_))        => Some(LocalRead(local) ++ LocalRead(addrs))
     case _ => None
   }
 
+  object LocalWrite {
+    def apply(mem: Exp[Any]): List[LocalWrite] = List( (mem, None, None) )
+    def apply(mem: Exp[Any], value: Exp[Any]): List[LocalWrite] = List( (mem, Some(value), None) )
+    def apply(mem: Exp[Any], value: Exp[Any], addr: Exp[Any]): List[LocalWrite] = List( (mem, Some(value), Some(addr)) )
+  }
+
+  object LocalRead {
+    def apply(mem: Exp[Any]): List[LocalRead] = List( (mem,None) )
+    def apply(mem: Exp[Any], addr: Exp[Any]): List[LocalRead] = List( (mem,Some(addr)) )
+  }
+
   object LocalWriter {
-    def unapply(s: Exp[Any]): Option[(Exp[Any], Exp[Any], Option[Exp[Any]])] = s match {
+    def unapply(s: Exp[Any]): Option[List[LocalWrite]] = s match {
       case Def(d) => writerUnapply(d)
       case _ => None
     }
-    def unapply(d: Def[Any]): Option[(Exp[Any], Exp[Any], Option[Exp[Any]])] = writerUnapply(d)
+    def unapply(d: Def[Any]): Option[List[LocalWrite]] = writerUnapply(d)
   }
 
   object LocalReader {
-    def unapply(s: Exp[Any]): Option[(Exp[Any], Option[Exp[Any]])] = s match {
+    def unapply(s: Exp[Any]): Option[List[LocalRead]] = s match {
       case Def(d) => readerUnapply(d)
       case _ => None
     }
-    def unapply(d: Def[Any]): Option[(Exp[Any], Option[Exp[Any]])] = readerUnapply(d)
+    def unapply(d: Def[Any]): Option[List[LocalRead]] = readerUnapply(d)
   }
 
   def isWriter(s: Exp[Any]): Boolean = s match {
-    case LocalWriter(_,_,_) => true
+    case LocalWriter(_) => true
     case _ => false
   }
   def isWriter(d: Def[Any]): Boolean = d match {
-    case LocalWriter(_,_,_) => true
+    case LocalWriter(_) => true
     case _ => false
   }
 
   def isReader(s: Exp[Any]): Boolean = s match {
-    case LocalReader(_,_) => true
+    case LocalReader(_) => true
     case _ => false
   }
   def isReader(d: Def[Any]): Boolean = d match {
-    case LocalReader(_,_) => true
+    case LocalReader(_) => true
     case _ => false
   }
 
@@ -85,7 +107,7 @@ trait PipeStageToolsExp extends EffectExp {
 
   def isPrimitiveNode(s: Exp[Any]): Boolean = s match {
     case Def(Reify(_,_,_)) => false
-    case _ => !isControlNode(s) && !isRegisterRead(s) && !isAllocation(s) && !isConstantExp(s)
+    case _ => !isControlNode(s) && !isRegisterRead(s) && !isAllocation(s) && !isConstantExp(s) && !isGlobal(s)
   }
 
   def isControlNode(s: Exp[Any]): Boolean = s match {
@@ -132,6 +154,9 @@ trait PipeStageToolsExp extends EffectExp {
   def isSequential(s: Exp[Any]): Boolean = isOuterControl(s) && styleOf(s) == SequentialPipe
   def isSequential(s: (Exp[Any],Boolean)): Boolean = !s._2 && isSequential(s._1)
 
+  def isLocalMemory(s: Exp[Any]) = {
+    isRegister(s.tp) || isBRAM(s.tp) || isFIFO(s.tp) || isCache(s.tp)
+  }
 
   def isAllocation(s: Exp[Any]): Boolean = s match {
     case Def(d) => isAllocation(d)
@@ -141,6 +166,7 @@ trait PipeStageToolsExp extends EffectExp {
     case EatReflect(_:Reg_new[_])       => true
     case EatReflect(_:Bram_new[_])      => true
     case EatReflect(_:Fifo_new[_])      => true
+    case EatReflect(_:Cam_new[_,_])     => true
     case EatReflect(_:Offchip_new[_])   => true
     case EatReflect(_:Counter_new)      => true
     case EatReflect(_:Counterchain_new) => true
@@ -174,6 +200,21 @@ trait PipeStageToolsExp extends EffectExp {
     case EatReflect(_:Pipe_fold[_,_])  => true
     case EatReflect(_:Accum_fold[_,_]) => true
     case _ => false
+  }
+
+
+  // Checks to see if lhs is dependent on rhs (used for checking for accum. cycles)
+  def hasDependency(lhs: Exp[Any], rhs: Exp[Any]): Boolean = {
+    def dfs(frontier: List[Exp[Any]]): Boolean = (frontier.map{
+      case s if s == rhs => true
+      case Def(d) => dfs(syms(d))
+      case _ => false
+    }).fold(false){_||_}
+
+    lhs match {
+      case Def(d) => dfs(syms(d))
+      case _ => false
+    }
   }
 }
 

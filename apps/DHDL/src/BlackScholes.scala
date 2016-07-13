@@ -5,9 +5,8 @@ import dhdl.shared._
 object BlackScholesCompiler extends DHDLApplicationCompiler with BlackScholes
 object BlackScholesInterpreter extends DHDLApplicationInterpreter with BlackScholes
 trait BlackScholes extends DHDLApplication {
-  override def stageArgNames = List("tileSize")
 
-  lazy val tileSize = param(7104)
+  lazy val tileSize = param(16)
   lazy val outerPar = param(1)
   lazy val innerPar = param(16)
   lazy val numOptions = ArgIn[SInt]

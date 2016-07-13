@@ -219,6 +219,12 @@ trait AreaModel extends PipeStageToolsExp {
     case Pop_fifo(_) => NoArea
     case Count_fifo(_) => NoArea
 
+    // TODO
+    case Cam_new(_,_) => NoArea
+    case Cam_load(_,_) => NoArea
+    case Cam_store(_,_,_) => NoArea
+
+
     case Reg_new(_) if regType(s) == ArgumentIn  => areaOfArg(nbits(s))
     case Reg_new(_) if regType(s) == ArgumentOut => areaOfArg(nbits(s))
 
@@ -229,7 +235,7 @@ trait AreaModel extends PipeStageToolsExp {
 
     // TODO: Number of banks and buffer depth of BRAM
     case e@Bram_new(depth, _) =>
-      val depBound = bound(depth).getOrElse{stageError("Cannot resolve bound of BRAM size"); 1.0}.toInt
+      val depBound = bound(depth).getOrElse{stageWarn("Cannot resolve bound of BRAM size"); 1.0}.toInt
       areaOfBRAM(nbits(e._mT), depBound, 1, false) // TODO
 
     case e@Bram_load(ram, _) =>
@@ -340,6 +346,14 @@ trait AreaModel extends PipeStageToolsExp {
       FPGAResources(lut3=476,lut4=6,lut5=6,mem32=11,regs=900)
 
     case Mux2(_,_,_) => FPGAResources(regs = nbits(s))
+
+    // TODO: Duplication here...
+    case Min2(_,_) =>
+      val lt = if (isFixPtType(s.tp)) FPGAResources(lut3 = nbits(s)+1,regs=1) else FPGAResources(lut4=42,lut6=26,regs=34)
+      lt + FPGAResources(regs = nbits(s))
+    case Max2(_,_) =>
+      val lt = if (isFixPtType(s.tp)) FPGAResources(lut3 = nbits(s)+1,regs=1) else FPGAResources(lut4=42,lut6=26,regs=34)
+      lt + FPGAResources(regs = nbits(s))
 
     case Convert_fixpt(_) => FPGAResources(regs=nbits(s))
     //case Convert_fltpt(_) => // ???

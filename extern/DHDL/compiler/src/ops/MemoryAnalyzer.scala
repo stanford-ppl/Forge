@@ -122,7 +122,7 @@ trait MemoryAnalyzer extends Traversal {
       case StridedAccess(Exact(a),i) => StridedBanking(a.toInt*stride, parOf(i))
       case OffsetAccess(i,b) => StridedBanking(stride, parOf(i))
       case LinearAccess(i) => StridedBanking(stride, parOf(i))
-      case InvariantAccess(b) => DuplicatedBanking(parOf(index))
+      case InvariantAccess(b) => DuplicatedBanking(parOf(index))  // TODO: Is this right?
       case RandomAccess => DuplicatedBanking(parOf(index))
     }}
   }
@@ -212,8 +212,13 @@ trait MemoryAnalyzer extends Traversal {
       if (lca.isDefined) {
         if (isMetaPipe(lca.get)) {
           val parent = lca.get._1
-          val children = childrenOf(parent).map{x => (x,false)} :+ ((parent,true))
+          // FIXME: Reads and writes owned by the parent are assumed to occur at controller setup time
+          if (write == lca && read != write) stageWarn("The parent of the write node here is the LCA - likely a bug")
+          if (read  == lca && read != write) stageWarn("The parent of the read node here is the LCA - likely a bug")
 
+          val children = lca +: childrenOf(parent).map{x => (x,false)} :+ ((parent,true))
+
+          // FIXME: (#2) Metapipe children assumed to be a linear sequence of stages, not an arbitrary graph
           debug("    lca children: " + children.mkString(", "))
           val wIdx = children.indexOf(writePath.head)
           val rIdx = children.indexOf(readPath.head)

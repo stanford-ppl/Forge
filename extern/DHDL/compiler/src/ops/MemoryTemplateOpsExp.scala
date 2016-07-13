@@ -14,6 +14,7 @@ import dhdl.compiler.ops._
 
 trait BlockRAM[T]
 trait DHDLFIFO[T]
+trait DHDLCAM[K,V]
 trait DHDLVector[T]
 trait CACHE[T]
 trait Register[T]
@@ -26,6 +27,7 @@ trait MemoryTemplateTypesExp extends MemoryTemplateTypes with BaseExp {
   type OffChipMem[T] = DRAM[T]
   type BRAM[T] = BlockRAM[T]
   type FIFO[T] = DHDLFIFO[T]
+  type CAM[K,V] = DHDLCAM[K,V]
   type Vector[T] = DHDLVector[T]
   type Cache[T] = CACHE[T]
   type Reg[T] = Register[T]
@@ -38,10 +40,12 @@ trait MemoryTemplateTypesExp extends MemoryTemplateTypes with BaseExp {
   def isBRAM[T:Manifest]     = isSubtype(manifest[T].runtimeClass, classOf[BlockRAM[_]])
   def isFIFO[T:Manifest]     = isSubtype(manifest[T].runtimeClass, classOf[DHDLFIFO[_]])
   def isCache[T:Manifest]    = isSubtype(manifest[T].runtimeClass, classOf[CACHE[_]])
+  def isCAM[T:Manifest]      = isSubtype(manifest[T].runtimeClass, classOf[DHDLCAM[_,_]])
 
   def offchipMemManifest[T:Manifest]: Manifest[OffChipMem[T]] = manifest[DRAM[T]]
   def bramManifest[T:Manifest]: Manifest[BRAM[T]] = manifest[BlockRAM[T]]
   def fifoManifest[T:Manifest]: Manifest[FIFO[T]] = manifest[DHDLFIFO[T]]
+  def camManifest[K:Manifest,V:Manifest]: Manifest[CAM[K,V]] = manifest[DHDLCAM[K,V]]
   def vectorManifest[T:Manifest]: Manifest[Vector[T]] = manifest[DHDLVector[T]]
   def cacheManifest[T:Manifest]: Manifest[Cache[T]] = manifest[CACHE[T]]
   def regManifest[T:Manifest]: Manifest[Reg[T]] = manifest[Register[T]]
@@ -76,6 +80,7 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTe
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
     case "BlockRAM" => "Array[" + remap(m.typeArguments(0)) + "]"
     case "DHDLFIFO" => "scala.collection.mutable.Queue[" + remap(m.typeArguments(0)) + "]"
+    case "DHDLCAM"  => "scala.collection.mutable.HashMap[" + remap(m.typeArguments(0)) + ", " + remap(m.typeArguments(1)) + "]"
     case "DHDLVector" => "Array[" + remap(m.typeArguments(0)) + "]"
     case "CACHE"     => "Array[" + remap(m.typeArguments(0)) + "]"
     case "Register" => "Array[" + remap(m.typeArguments(0)) + "]"

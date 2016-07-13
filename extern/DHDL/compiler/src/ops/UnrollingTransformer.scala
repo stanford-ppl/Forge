@@ -107,6 +107,13 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
         dimsOf(parPop) = List(P.as[Index])
         splitVector(s, parPop, isResult)
 
+      case EatReflect(e: Cam_load[_,_]) =>
+        if (P > 1) stageError("Cannot parallelize CAM operations")(mpos(s.pos))
+        duplicateStage(s, d, isResult)
+      case EatReflect(e: Cam_store[_,_]) =>
+        if (P > 1) stageError("Cannot parallelize CAM operations")(mpos(s.pos))
+        duplicateStage(s, d, isResult)
+
       case EatReflect(e@Bram_store(bram,addr,value)) =>
         val values = groupDuplicates(value)
         val addrs  = groupDuplicates(addr)

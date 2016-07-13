@@ -10,6 +10,7 @@ trait MemoryTemplateTypes {
   type OffChipMem[T]
   type BRAM[T]
   type FIFO[T]
+  type CAM[K,V]
   type Vector[T]
   type Cache[T]
   type Reg[T]
@@ -21,10 +22,12 @@ trait MemoryTemplateTypes {
   def isBRAM[T:Manifest]: Boolean
   def isFIFO[T:Manifest]: Boolean
   def isRegister[T:Manifest]: Boolean
+  def isCAM[T:Manifest]: Boolean
 
   implicit def offchipMemManifest[T:Manifest]: Manifest[OffChipMem[T]]
   implicit def bramManifest[T:Manifest]: Manifest[BRAM[T]]
   implicit def fifoManifest[T:Manifest]: Manifest[FIFO[T]]
+  implicit def camManifest[K:Manifest,V:Manifest]: Manifest[CAM[K,V]]
   implicit def vectorManifest[T:Manifest]: Manifest[Vector[T]]
   implicit def cacheManifest[T:Manifest]: Manifest[Cache[T]]
   implicit def regManifest[T:Manifest]: Manifest[Reg[T]]

@@ -8,6 +8,8 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
+// TODO: Eventually this analyzer should be superceded by more generalized coarse controller dataflow
+
 trait StageAnalysisExp extends PipeStageToolsExp {this: DHDLExp => }
 
 trait StageAnalyzer extends Traversal with PipeStageTools {

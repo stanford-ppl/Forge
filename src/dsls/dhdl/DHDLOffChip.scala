@@ -242,12 +242,12 @@ trait DHDLOffChip {
           val memOfs = calcAddress(offsets.zip(indices).map{case (a,b) => a + b}, dimsOf(mem))
 
           if ($store) {
-            offchip_store_cmd(mem, fifo, memOfs, len, p)
-
             Pipe(len par p){i =>
               val localAddr = localOfs.take(localOfs.length - 1) :+ (localOfs.last + i)
               fifo.push($local(localAddr:_*))
             }
+
+            offchip_store_cmd(mem, fifo, memOfs, len, p)
           }
           else {
             offchip_load_cmd(mem, fifo, memOfs, len, p)
@@ -263,8 +263,8 @@ trait DHDLOffChip {
         Pipe {
           val memOfs = calcAddress(offsets, dimsOf(mem))
           if ($store) {
-            offchip_store_cmd(mem, fifo, memOfs, len, p)
             Pipe(len par p){i => fifo.push($local(i)) }
+            offchip_store_cmd(mem, fifo, memOfs, len, p)
           }
           else {
             offchip_load_cmd(mem, fifo, memOfs, len, p)

@@ -59,6 +59,9 @@ trait OpsModel extends PipeStageToolsExp {
     case e: Pop_fifo[_] => AppStatistics(insts=2, onChipOut = nbits(e._mT))
     case e: Count_fifo[_] => Instruction
 
+    case e: Cam_load[_,_] => AppStatistics(insts=1, onChipOut = nbits(e._mV))
+    case e: Cam_store[_,_] => AppStatistics(insts=1, onChipIn = nbits(e._mV))
+
     // TODO: Should this count if ram will be implemented as regs?
     case e: Bram_load[_] => AppStatistics(insts=1,onChipOut = nbits(e._mT))
     case e: Bram_store[_] => AppStatistics(insts=1,onChipIn = nbits(e._mT))
@@ -106,6 +109,8 @@ trait OpsModel extends PipeStageToolsExp {
     case FltPt_Sqrt(_) => AppStatistics(insts=1, flops=3) // ???
 
     case Mux2(_,_,_) => Instruction
+    case Min2(_,_) => AppStatistics(insts=2)
+    case Max2(_,_) => AppStatistics(insts=2)
     case Convert_fixpt(_) => Instruction
     case Convert_fltpt(_) => FLOP // ???
     case Fixpt_to_fltpt(x) => FLOP // ???

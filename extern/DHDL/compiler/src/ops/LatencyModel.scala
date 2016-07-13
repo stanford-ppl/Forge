@@ -78,11 +78,16 @@ trait LatencyModel extends PipeStageToolsExp {
     case Reg_new(_) => 0
     case Bram_new(_,_) => 0
     case Fifo_new(_,_) => 0
+    case Cam_new(_,_) => 0
 
     // TODO
     case Push_fifo(fifo,_,_) => 1
     case Pop_fifo(fifo) => 1
     case Count_fifo(fifo) => 0
+
+    // TODO
+    case Cam_load(cam,key) => 1
+    case Cam_store(cam,key,value) => 1
 
     // TODO: Not a function of number of banks?
     case Bram_load(ram, _) => 1 //if (isDblBuf(ram)) 2 else 1
@@ -193,6 +198,8 @@ trait LatencyModel extends PipeStageToolsExp {
       (28)
 
     case Mux2(_,_,_) => 1
+    case Min2(_,_) => 1
+    case Max2(_,_) => 1
 
     case Convert_fixpt(_) => 1
     //case Convert_fltpt(_) => // ???

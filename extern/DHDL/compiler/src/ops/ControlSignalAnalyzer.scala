@@ -39,7 +39,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
   var level = 0
   var indsOwners: Map[Exp[Any], (Exp[Any], Boolean, Int)] = Map.empty // Used to identify the top-most controller for a given address
   var controller: Option[(Exp[Any], Boolean)] = None
-  var pendingReads = List[Exp[Any]]()     // Memory reads outside of inner pipes (maintained like a stack to minimize number of "live" reads to check)
+  var pendingReads: Map[Exp[Any],Exp[Any]] = Map.empty                // Memory reads outside of inner pipes
 
   //var indexMap: Map[Exp[Any], (Param[Int], Int)] = Map.empty
 
@@ -149,7 +149,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
     if (isInnerPipe((ctrl,isReduce)))
       appendReader(ctrl, isReduce, reader)
     else {
-      pendingReads = pendingReads :+ reader
+      pendingReads += reader -> reader
       debug(s"Added pending reader: $reader")
     }
   }
@@ -201,20 +201,29 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
   }
 
   def addMemoryOps(lhs: Exp[Any], rhs: Def[Any]) {
-    if (!isOuterControl(lhs) && controller.isDefined) {
+    if (controller.isDefined) {
       // Add pending readers
       val ctrl = controller.get
       val deps = readSyms(rhs)
       val parent = if (isControlNode(lhs)) (lhs,false) else ctrl
 
-      if (pendingReads.nonEmpty) {
+      val delayedReads = deps.filter(pendingReads.keySet contains _)
+
+      if (delayedReads.nonEmpty) {
         debug(s"$lhs = $rhs")
         debug(deps.mkString(", "))
       }
+      delayedReads.foreach{sym =>
+        val reader = pendingReads(sym)
 
-      pendingReads.filter(deps contains _ ).foreach{reader =>
-        appendReader(parent._1, parent._2, reader)
-        debug(s"Found dep on pending reader $reader")
+        if (isAllocation(lhs)) { // TODO: Other propagaters?
+          pendingReads += lhs -> reader
+          debug(s"Found propagating dep on pending reader $reader")
+        }
+        else {
+          appendReader(parent._1, parent._2, reader)
+          debug(s"Found true dep on pending reader $reader")
+        }
       }
 
       if (isAllocation(lhs)) addAllocation(parent._1, lhs)        // (1,7)

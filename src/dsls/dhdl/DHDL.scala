@@ -258,7 +258,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(UnitPipeTransformer)   // Wrap primitives in outer pipes
 
     schedule(StageAnalyzer)         // Get number of stages in each control node
-    schedule(GlobalAnalyzer)        // Values computed outside of all controllers
+    schedule(GlobalAnalyzer)        // Values computed outside of all controllers (TODO: Needed again?)
     schedule(ControlSignalAnalyzer) // Variety of control signal related metadata
 
     schedule(ParallelizationSetter) // Parallelization factors

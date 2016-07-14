@@ -24,7 +24,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
     Directory(Path(dslDir)).createDirectory()
     emitDSLDefinition()
     emitClasses()
-    emitMetadata()
+    emitDSLMetadata()
   }
 
   /**
@@ -152,7 +152,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
   }
 
   // --- DSLMetadataClasses (library backend)
-  def emitMetadata() {
+  def emitDSLMetadata() {
     val MetaTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
     if (MetaTpes.nonEmpty) {
       val stream = new PrintWriter(new FileWriter(dslDir+File.separator+dsl+"MetadataClasses.scala"))
@@ -161,7 +161,7 @@ trait ForgeCodeGenInterpreter extends ForgeCodeGenBackend with LibGenPackages wi
       emitLMSImports(stream)
       stream.println("import scala.virtualization.lms.common.MetadataOps")
       stream.println()
-      emitMetadataClasses(dsl + "Base with " + dsl + "Classes", stream, quote)
+      emitMetadata(dsl + "Base with " + dsl + "Classes", "MetadataOps", stream, quote)
       stream.close()
     }
   }

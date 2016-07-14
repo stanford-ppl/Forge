@@ -17,8 +17,6 @@ import scala.collection.mutable.{HashMap,HashSet,ArrayBuffer}
 import java.io.PrintStream
 
 import scala.virtualization.lms.util.GraphUtil._
-import ppl.delite.framework.Config
-
 
 trait DSE extends Traversal {
   val IR: DHDLCompiler
@@ -44,9 +42,9 @@ trait DSE extends Traversal {
     ctrlAnalyzer.run(b)
     paramAnalyzer.run(b)
 
-    if (debugMode && Config.enableDSE) printer.run(b)
+    if (debugMode && SpatialConfig.enableDSE) printer.run(b)
 
-    if (Config.enableDSE) dse(b)
+    if (SpatialConfig.enableDSE) dse(b)
 
     tileSizes.foreach{p => p.fix}
     parFactors.foreach{p => p.fix}

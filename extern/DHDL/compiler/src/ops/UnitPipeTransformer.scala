@@ -11,7 +11,7 @@ import dhdl.compiler.ops._
 trait UnitPipeTransformExp extends PipeStageToolsExp with LoweredPipeOpsExp { this: DHDLExp => }
 
 /**
- * Inserts UnitPipe wrappers for primitive nodes in outer control nodes, along with registers for communication
+ * Inserts unit Pipe wrappers for primitive nodes in outer control nodes, along with registers for communication
  **/
 trait UnitPipeTransformer extends MultiPassTransformer with PipeStageTools {
   val IR: UnitPipeTransformExp with DHDLExp
@@ -35,7 +35,7 @@ trait UnitPipeTransformer extends MultiPassTransformer with PipeStageTools {
     case mT if isFixPtType(mT) => canFixPtNum(mT.typeArguments(0),mT.typeArguments(1),mT.typeArguments(2)).zero.asInstanceOf[Exp[T]]
     case mT if isFltPtType(mT) => canFltPtNum(mT.typeArguments(0),mT.typeArguments(1)).zero.asInstanceOf[Exp[T]]
     case mT if isBitType(mT) => canBitNum.zero.asInstanceOf[Exp[T]]
-    case _ => stageError("Primitive expressions with non-numeric type")(ctx)
+    case _ => stageError("Primitive expressions with unrecognized type: " + mT.toString)(ctx)
   }
 
   def wrapPrimitives[T:Manifest](blk: Block[T])(implicit ctx: SourceContext): Block[T] = {
@@ -122,6 +122,9 @@ trait UnitPipeTransformer extends MultiPassTransformer with PipeStageTools {
 
     blk2
   }
+
+  // TODO: More general way of expressing this transformation?
+  // The block wrapping itself is quite general, but reflecting the effects in node mirroring is not.
 
   def wrapPrimitives_Hwblock(lhs: Sym[Any], rhs: Hwblock)(implicit ctx: SourceContext) = {
     val Hwblock(blk) = rhs

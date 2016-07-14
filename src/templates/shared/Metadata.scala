@@ -18,22 +18,26 @@ trait BaseGenMetadata extends ForgeCodeGenBase {
     case `any` => "_"
   }
 
-  // --- Metadata
-  def emitMetadataClasses(base: String, stream: PrintWriter, typify: Rep[DSLType] => String = repify) {
-    val MetaTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
+  def emitMetadata(selfType: String, base: String, stream: PrintWriter, typify: Rep[DSLType] => String = repify) {
+    stream.println("trait " + dsl + "MetadataClasses extends " + base + " {")
+    stream.println("  this: " + selfType + " =>")
+    stream.println()
 
+    val metaTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t)).map(_.asInstanceOf[Rep[DSLMetadata]])
+    emitMetadataClasses(metaTpes.toList, stream, typify)
+
+    stream.println("}")
+  }
+
+  // --- Metadata
+  def emitMetadataClasses(metaTpes: List[Rep[DSLMetadata]], stream: PrintWriter, typify: Rep[DSLType] => String = repify) {
     val meetFuncs = List(metaUpdate,metaInit,metaAlias,any)
 
-    stream.println("trait " + dsl + "MetadataClasses extends MetadataOps {")
-    stream.println("  this: " + base + " =>")
-    stream.println()
     emitBlockComment("DSL metadata types", stream, 2)
-    for (tpe <- MetaTpes) {
-      val m = tpe.asInstanceOf[Rep[DSLMetadata]]
-
+    for (m <- metaTpes) {
       val impl = if (!MetaImpls.contains(m)) MetaOps.empty else MetaImpls(m)
 
-      val struct = DataStructs(tpe)
+      val struct = DataStructs(m)
       val meetRules = impl.meet
       val matchesRule = impl.matches
       val canMeetRules = impl.canMeet
@@ -86,8 +90,6 @@ trait BaseGenMetadata extends ForgeCodeGenBase {
 
       stream.println("  }")
     }
-    stream.println("}")
   }
-
 
 }

@@ -186,28 +186,6 @@ trait DHDLMetadata {
       boundOf($0) match { case Some(MBound(bnd,true,true)) => Some(bnd);  case _ => None }
     }
 
-    // TODO: Allow rewrites on metadata helper functions
-    /*internal (boundOps) ("extractNumericConstant", T, T :: SOption(SDouble)) implements composite ${
-      val mD = manifest[Double]
-      val mF = manifest[Float]
-      val mI = manifest[Int]
-      val mL = manifest[Long]
-
-      manifest[T] match {
-        case `mI` => Some($0.asInstanceOf[Int].toDouble)
-        case `mL` => Some($0.asInstanceOf[Long].toDouble)
-        case `mF` => Some($0.asInstanceOf[Float].toDouble)
-        case `mD` => Some($0.asInstanceOf[Double])
-        case _ => None
-      }
-    }
-    rewrite (boundOps, "boundOf") using pattern(${p@Param(x)} -> ${
-      val c = extractNumericConstant(x)
-      if (p.isFixed) fixed(c) else exact(c)
-    })
-    rewrite (boundOps, "boundOf") using pattern(${Const(x)} -> ${ fixed(extractNumericConstant(x)) })
-    */
-
     val MContention = metadata("MContention", "contention" -> SInt)
     val contentionOps = metadata("contentionOf")
     internal.static (contentionOps) ("update", Nil, (MAny, SInt) :: MUnit, effect = simple) implements

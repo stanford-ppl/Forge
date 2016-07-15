@@ -4,7 +4,7 @@ import graph._
 import graph.traversal._
 import plasticine._
 import plasticine.config._
-import plasticine.graph._
+//import plasticine.graph._
 
 //import analysis._
 
@@ -117,7 +117,7 @@ trait Design { self =>
         assert(!nameMap.contains(s),
           s"Already create primitive with name ${s} for controller ${p.ctrler}")
         nameMap += (s -> p)
-      case w:Wire =>
+      case w:Port =>
         //assert(false, "No support for adding name for wire yet!")
     }
   }

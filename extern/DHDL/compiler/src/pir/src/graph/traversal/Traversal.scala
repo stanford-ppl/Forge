@@ -53,7 +53,7 @@ abstract class Traversal(implicit val design: Design) {
           visitNode(p.result)
         case p:Pipeline => p.stages.foreach(s => visitNode(s))
       }
-      case n:Wire =>
+      case n:Port =>
       case _ =>
         throw new Exception(s"Don't know how to visit $node")
     }

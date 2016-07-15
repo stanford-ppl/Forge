@@ -44,7 +44,7 @@ trait CounterChain extends Primitive {
     this.copy = Some(cp)
     toUpdate = false
   }
-  def update(bds: Seq[(Wire, Wire, Wire)])(implicit design: Design):Unit = {
+  def update(bds: Seq[(Port, Port, Port)])(implicit design: Design):Unit = {
     counters = bds.zipWithIndex.map {case (bd,i) => Counter(bd)}.toList
     this.copy = None 
     toUpdate = false
@@ -54,9 +54,9 @@ object CounterChain {
   val typeStr = "CC"
   def apply(name:Option[String])(implicit design: Design):CounterChain =
     new Primitive(name, typeStr) with CounterChain { toUpdate = true }
-  def apply(bds: (Wire, Wire, Wire)*)(implicit design: Design):CounterChain =
+  def apply(bds: (Port, Port, Port)*)(implicit design: Design):CounterChain =
     {val c = CounterChain(None); c.update(bds); c}
-  def apply(name:String, bds: (Wire, Wire, Wire)*)(implicit design: Design):CounterChain =
+  def apply(name:String, bds: (Port, Port, Port)*)(implicit design: Design):CounterChain =
     {val c = CounterChain(Some(name)); c.update(bds); c}
   def copy(from:String, name:String) (implicit design: Design):CounterChain = {
     val cc = CounterChain(Some(s"${from}_${name}_copy"))
@@ -69,13 +69,13 @@ object CounterChain {
   }
 }
 
-trait Counter extends Primitive with Wire {
-  var bound: (Wire, Wire, Wire) = _
+trait Counter extends Primitive with Port {
+  var bound: (Port, Port, Port) = _
   def copy(c:Counter)(implicit design: Design) = {
     assert(bound==null, s"Overriding existing counter ${this} with bound (${bound._1}, ${bound._2}, ${bound._3})")
     bound = (c.bound._1.copy, c.bound._2.copy, c.bound._3.copy)
   } 
-  def create(bd: (Wire, Wire, Wire))(implicit design: Design):Unit = {
+  def create(bd: (Port, Port, Port))(implicit design: Design):Unit = {
     bound = bd
     toUpdate = false
   }
@@ -84,14 +84,14 @@ object Counter{
   val typeStr = "Ctr"
   def apply(name:Option[String])(implicit design: Design):Counter =
     new Primitive(name, typeStr) with Counter { toUpdate = true }
-  def apply(bd: (Wire, Wire, Wire))(implicit design: Design):Counter =
+  def apply(bd: (Port, Port, Port))(implicit design: Design):Counter =
     { val c = Counter(None); c.create(bd); c }
-  def apply(name:String, bd: (Wire, Wire, Wire))(implicit design: Design):Counter =
+  def apply(name:String, bd: (Port, Port, Port))(implicit design: Design):Counter =
     { val c = Counter(Some(name)); c.create(bd); c }
   def apply()(implicit design: Design):Counter = Counter(None)
 }
 
-trait MemPort extends Primitive with Wire {
+trait MemPort extends Primitive with Port {
   val id:Int
   var mem:SRAM = _
 }
@@ -114,11 +114,11 @@ object MemPort {
  */
 trait SRAM extends Primitive {
   val size:Int
-  var readAddr: Wire = _
-  var writeAddr: Wire = _
+  var readAddr: Port = _
+  var writeAddr: Port = _
   val writePort: Controller
   val readPort: MemPort 
-  def update (ra:Wire, wa:Wire) = {
+  def update (ra:Port, wa:Port) = {
     this.readAddr = ra
     this.writeAddr = wa
     toUpdate = false
@@ -139,16 +139,16 @@ object SRAM {
     = SRAM(None, size, write)
   def apply(name:String, size:Int, write:Controller)(implicit design: Design): SRAM
     = SRAM(Some(name), size, write)
-  def apply(size:Int, write:Controller, readAddr:Wire, writeAddr:Wire)(implicit design: Design): SRAM
+  def apply(size:Int, write:Controller, readAddr:Port, writeAddr:Port)(implicit design: Design): SRAM
     = { val s = SRAM(None, size, write); s.update(readAddr, writeAddr); s } 
-  def apply(name:String, size:Int, write:Controller, readAddr:Wire, writeAddr:Wire)(implicit design: Design): SRAM
+  def apply(name:String, size:Int, write:Controller, readAddr:Port, writeAddr:Port)(implicit design: Design): SRAM
     = { val s = SRAM(Some(name), size, write); s.update(readAddr, writeAddr); s } 
 }
 
 trait Stage extends Primitive {
-  var operands:List[Wire] = _
+  var operands:List[Port] = _
   var op:Op = _
-  var result:Wire = _
+  var result:Port = _
   val pipeline:Pipeline
 } 
 object Stage {
@@ -156,7 +156,7 @@ object Stage {
   def apply(name:Option[String], prm:Pipeline)(implicit design: Design):Stage = 
       new { override val pipeline = prm } with Primitive(name, typeStr) with Stage
 
-  def apply(stage:Stage, opds:List[Wire], o:Op, r:Wire, prm:Pipeline)
+  def apply(stage:Stage, opds:List[Port], o:Op, r:Port, prm:Pipeline)
     (implicit design: Design):Unit= {
     stage.operands = opds
     stage.op = o
@@ -168,13 +168,13 @@ object Stage {
     Stage(stage, List(prm.reduce(stage), prm.reduce(stage)), op, prm.reduce(stage), prm)
   }
 
-  def apply(stage:Stage, op1:Wire, op:Op, result:Wire)
+  def apply(stage:Stage, op1:Port, op:Op, result:Port)
            (implicit prm:Pipeline, design: Design):Unit =
     Stage(stage, List(op1), op, result, prm)
-  def apply(stage:Stage, op1:Wire, op2:Wire, op:Op, result:Wire)
+  def apply(stage:Stage, op1:Port, op2:Port, op:Op, result:Port)
            (implicit prm:Pipeline, design: Design):Unit = 
     Stage(stage, List(op1, op2), op, result, prm)
-  def apply(stage:Stage, op1:Wire, op2:Wire, op3:Wire, op:Op, result:Wire)
+  def apply(stage:Stage, op1:Port, op2:Port, op3:Port, op:Op, result:Port)
            (implicit prm:Pipeline, design: Design):Unit =
     Stage(stage, List(op1, op2, op3), op, result, prm)
 }
@@ -340,8 +340,8 @@ object Pipeline {
   }
 }
 
-trait Reg extends Primitive with Wire{
-  var in:Option[Wire] = None
+trait Reg extends Primitive with Port{
+  var in:Option[Port] = None
 }
 
 trait PipeReg extends Reg {
@@ -367,7 +367,7 @@ object PipeReg {
 trait ArgIn extends Reg 
 object ArgIn {
   def apply(nameStr:Option[String], w:Option[Int])(implicit design: Design):ArgIn = new {
-    //override val out = Wire(if (nameStr.isDefined) Some(s"${nameStr.get}_out") else None, w)
+    //override val out = Port(if (nameStr.isDefined) Some(s"${nameStr.get}_out") else None, w)
   } with Primitive(nameStr, "ArgIn") with ArgIn
   def apply() (implicit design: Design):ArgIn = ArgIn(None, None)
   def apply(w:Int) (implicit design: Design):ArgIn = ArgIn(None, Some(w))
@@ -380,10 +380,10 @@ object ArgIn {
  */
 trait ArgOut extends Reg
 object ArgOut {
-  def apply(nameStr:Option[String], value:Wire, w:Option[Int])(implicit design: Design) = new {
-    //override val out = Wire(if (nameStr.isDefined) Some(s"${nameStr.get}_out") else None, w)
+  def apply(nameStr:Option[String], value:Port, w:Option[Int])(implicit design: Design) = new {
+    //override val out = Port(if (nameStr.isDefined) Some(s"${nameStr.get}_out") else None, w)
   } with Primitive(nameStr, "ArgOut") with ArgOut { in = Some(value) }
-  def apply(value:Wire) (implicit design: Design):ArgOut = ArgOut(None, value, None)
-  def apply(value:Wire, w:Int) (implicit design: Design):ArgOut = ArgOut(None, value, Some(w))
-  def apply(name:String, value:Wire, w:Int) (implicit design: Design):ArgOut = ArgOut(Some(name), value, Some(w))
+  def apply(value:Port) (implicit design: Design):ArgOut = ArgOut(None, value, None)
+  def apply(value:Port, w:Int) (implicit design: Design):ArgOut = ArgOut(None, value, Some(w))
+  def apply(name:String, value:Port, w:Int) (implicit design: Design):ArgOut = ArgOut(Some(name), value, Some(w))
 }

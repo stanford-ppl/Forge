@@ -7,24 +7,24 @@ import scala.math.max
 import dhdl.Design
 import dhdl.graph._
 
-class Range (s:Wire, e:Wire) {
-  val start:Wire = s
-  val end:Wire = e
-  def by(step:Wire) = (start, end, step)
+class Range (s:Port, e:Port) {
+  val start:Port = s
+  val end:Port = e
+  def by(step:Port) = (start, end, step)
 }
 
 /**
  * A type representing a group of wires in pir
  */
-trait Wire extends Node {
+trait Port extends Node {
   def width(implicit design:Design) = design.arch.wordWidth
-  def by(step:Wire) (implicit design:Design) = (Const(0l, step.width), this, step)
-  def until(max:Wire) = new Range(this, max)
+  def by(step:Port) (implicit design:Design) = (Const(0l, step.width), this, step)
+  def until(max:Port) = new Range(this, max)
   def isConst = this.isInstanceOf[Const] 
   def copy(implicit design: Design) = this 
 }
 
-trait Const extends Wire {
+trait Const extends Port {
   val value:Long
   override def toString = s"Const(${value})"
   override def copy(implicit design: Design) = Const(name, value, Some(width))

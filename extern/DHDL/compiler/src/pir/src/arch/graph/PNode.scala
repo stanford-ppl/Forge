@@ -4,23 +4,27 @@ import dhdl.graph._
 
 import scala.collection.mutable.ListBuffer
 
-class PNode { 
-  val id : Int = PNode.nextId
+class Node { 
+  val id : Int = Node.nextId
 }
-object PNode {
+object Node {
   var nextSym = 0
   def nextId = {val temp = nextSym; nextSym +=1; temp}
 }
 
+/** Type of nodes that can connect to pipeline registers */
 trait RegMapping {
-  var preg:PReg = _
-  def mapTo(r:PReg) = {
+  var preg:Reg = _
+  /** create a mapping to a pipeline register
+   *  @param r: mapped register */
+  def mapTo(r:Reg) = {
     preg = r
     r.map(this)
   }
 }
 
-case class PReg() extends PNode{
+/** 1 mapping of pipeline register (1 row of reg for all stages) */
+case class Reg() extends Node{
   val mapping = ListBuffer[RegMapping]()
   def map(n:RegMapping) = {
     if (!mapping.contains(n))
@@ -28,37 +32,71 @@ case class PReg() extends PNode{
   }
 }
 
-case class PSRAM(numPort:Int) extends PNode with RegMapping{
+/** Physical SRAM 
+ *  @param numPort: number of banks. Usually equals to number of lanes in CU */
+case class SRAM(numBanks:Int) extends Node with RegMapping{
 }
-case class PCounter() extends PNode with RegMapping{
+object SRAM {
+  def apply(numBanks:Int, reg:Reg):SRAM = {
+    val s = SRAM(numBanks)
+    s.mapTo(reg)
+    s
+  }
 }
 
-case class Port() extends PNode with RegMapping {
+/** Physical Counter  */
+case class Counter() extends Node with RegMapping{
 }
-sealed trait PortType
-trait InPort extends PortType
+object Counter {
+  def apply(reg:Reg):Counter = {
+    val c = Counter()
+    c.mapTo(reg)
+    c
+  }
+}
+
+/** Physical Port of CU  */
+case class Port() extends Node with RegMapping {
+}
+trait InPort
 object InPort {
-  def apply() = {
-    new Port() with InPort
+  def apply(reg:Reg) = {
+    val p = new Port() with InPort
+    p.mapTo(reg)
+    p
   }
 }
-trait OutPort extends PortType
+trait OutPort
 object OutPort {
-  def apply() = {
-    new Port() with OutPort
+  def apply(reg:Reg) = {
+    val p = new Port() with OutPort
+    p.mapTo(reg)
+    p
   }
 }
 
-case class PComputeUnit(regs:List[PReg], srams:List[PSRAM], ctrs:List[PCounter], 
-  inports:List[InPort], outports:List[InPort]) extends PNode{
+/** Physical ComputeUnit 
+ *  @param regs: one set of pipeline registers in a pipeline register block 
+ *  @param srams: one set of SRAMs availabe in the CU
+ *  @param ctrs: one set of Counters availabe in the CU
+ *  @param inports: one set of input ports availabe in the CU
+ *  @param outports: one set of output ports availabe in the CU
+ *  */
+case class ComputeUnit(regs:List[Reg], srams:List[SRAM], ctrs:List[Counter], 
+  inports:List[InPort], outports:List[OutPort], reduce:Reg) extends Node{
+  def numPRs = regs.size 
+  def numCtrs = ctrs.size
+  def numSRAMs = srams.size
+  def numInPorts = inports.size 
+  def numOutPorts = outports.size 
 }
 
-trait PMemoryController {
+trait MemoryController {
 }
-object PMemoryController {
-  def apply(regs:List[PReg], srams:List[PSRAM], ctrs:List[PCounter], 
-    inports:List[InPort], outports:List[InPort]) = {
-    new PComputeUnit(regs, srams, ctrs, inports, outports) with PMemoryController 
+object MemoryController {
+  def apply(regs:List[Reg], srams:List[SRAM], ctrs:List[Counter], 
+    inports:List[InPort], outports:List[OutPort], reduce:Reg) = {
+    new ComputeUnit(regs, srams, ctrs, inports, outports, reduce) with MemoryController 
   }
 }
 

@@ -7,87 +7,79 @@ import scala.math.max
 import dhdl.Design
 import dhdl.graph._
 
-class Controller(name: Option[String], block: => Any,typeStr:String)(implicit design: Design) extends Node(name, typeStr) {
-  val nodes = design.addBlock(block, (n:Node) => true) 
+abstract class Controller(name: Option[String],typeStr:String)(implicit design: Design) extends Node(name, typeStr) {
+  val nodes:List[Node] 
 }
 
-abstract class ComputeUnit(name: Option[String], block: => Any,typeStr:String)(implicit design: Design) extends Controller(name, block, typeStr) {
-  val tpe:CtrlType
+case class ComputeUnit(n: Option[String], tpe:CtrlType, nds:List[Node], 
+  cchains:List[CounterChain], srams:List[SRAM], pipeline:Pipeline)
+(implicit design: Design) extends Controller(n, "CU") {
   var parent:Controller = _
   toUpdate = true
-  val cchains = nodes.filter(n => n.isInstanceOf[CounterChain]).asInstanceOf[List[CounterChain]] 
-  val srams:List[SRAM] = nodes.filter(n => n.isInstanceOf[SRAM]).asInstanceOf[List[SRAM]]
-  val pipeline = {
-    val temp = nodes.filter(n => n.isInstanceOf[Pipeline]) 
-    assert(temp.size <= 1, "ComputeUnit has less than or equals to 1 Pipeline")
-    if (temp.size == 1)
-      temp(0).asInstanceOf[Pipeline]
-    else
-      { val p = Pipeline{}; p.ctrler = this; p }
-  }
-  val mapping:PipeRegMapping
+  override val nodes = nds
   nodes.foreach {n => n match {
       case n:Primitive => n.ctrler = this
       case _ =>
     }
   }
   def update = (p:Controller) => {this.parent = p; toUpdate = false}
-
 }
 object ComputeUnit {
-  val typeStr = "CU"
-  def apply (parent:String, tpe:CtrlType) (block: PipeRegMapping => Any) (implicit design: Design):ComputeUnit =
+  def apply (parent:String, tpe:CtrlType) (block: Pipeline => Any) (implicit design: Design):ComputeUnit =
     ComputeUnit(None, parent, tpe) (block)
-  def apply (name:String, parent: String, tpe:CtrlType) (block:PipeRegMapping => Any) (implicit design: Design):ComputeUnit =
+  def apply (name:String, parent: String, tpe:CtrlType) (block:Pipeline => Any) (implicit design: Design):ComputeUnit =
     ComputeUnit(Some(name), parent, tpe) (block)
-  def apply (parent:Controller, tpe:CtrlType) (block:PipeRegMapping => Any) (implicit design: Design):ComputeUnit =
+  def apply (parent:Controller, tpe:CtrlType) (block:Pipeline => Any) (implicit design: Design):ComputeUnit =
     ComputeUnit(None, parent, tpe) (block)
-  def apply (name:String, parent: Controller, tpe:CtrlType) (block:PipeRegMapping => Any) (implicit design: Design):ComputeUnit =
+  def apply (name:String, parent: Controller, tpe:CtrlType) (block:Pipeline => Any) (implicit design: Design):ComputeUnit =
     ComputeUnit(Some(name), parent, tpe) (block)
-  def apply (name:Option[String], parent: String, tpe:CtrlType) (block:PipeRegMapping => Any) (implicit design: Design):ComputeUnit = {
+  def apply (name:Option[String], parent: String, tpe:CtrlType) (block:Pipeline => Any) (implicit design: Design):ComputeUnit = {
     val c = ComputeUnit(name, block, tpe); 
     design.updateLater(parent, (n:Node) => c.update(n.asInstanceOf[Controller]))
     c
   }
-  def apply (name:Option[String], parent: Controller, tpe:CtrlType) (block:PipeRegMapping => Any) (implicit design: Design):ComputeUnit = {
+  def apply(name:Option[String], parent: Controller, tpe:CtrlType) (block:Pipeline => Any) (implicit design: Design):ComputeUnit = {
     val c = ComputeUnit(name, block, tpe); c.update(parent); c
   }
-  def apply (name:Option[String], block:PipeRegMapping => Any, t:CtrlType) (implicit design: Design):ComputeUnit = {
-    val m = PipeRegMapping(if(name.isDefined) Some(name.get + "_mapping") else None)
-    val c = new { override val mapping = m; override val tpe = t }
-            with ComputeUnit(name, block(m), typeStr)
-    m.ctrler = c
-    c
+  def apply(name:Option[String], block:Pipeline => Any, tpe:CtrlType) (implicit design: Design):ComputeUnit = {
+    val (nodes, cchains, srams, pipeline) = unwrapBlock(block)
+    new ComputeUnit(name, tpe, nodes, cchains, srams, pipeline)
+  }
+  def unwrapBlock(block: Pipeline => Any)(implicit design: Design):
+    (List[Node], List[CounterChain], List[SRAM], Pipeline) = {
+    val pipeline = Pipeline(None)
+    val (nds, cchains, srams) = 
+      design.addBlock[Node, CounterChain, SRAM](block(pipeline), 
+                            (n:Node) => true, 
+                            (n:Node) => n.isInstanceOf[CounterChain], 
+                            (n:Node) => n.isInstanceOf[SRAM]) 
+    (nds :+ pipeline, cchains, srams, pipeline)
   }
 }
 
 trait MemoryController extends ComputeUnit {
   val dram:String
+  override val typeStr = "MemCtrl"
 } 
 object MemoryController extends {
-  val typeStr = "MemCtrl"
-  def apply (parent:String, dram:String) (block: PipeRegMapping => Any) (implicit design: Design):MemoryController =
+  def apply (parent:String, dram:String) (block: Pipeline => Any) (implicit design: Design):MemoryController =
     MemoryController(None, parent, dram) (block)
-  def apply (name:String, parent: String, dram:String) (block:PipeRegMapping => Any) (implicit design: Design):MemoryController =
+  def apply (name:String, parent: String, dram:String) (block:Pipeline => Any) (implicit design: Design):MemoryController =
     MemoryController(Some(name), parent, dram) (block)
-  def apply (parent:Controller, dram:String) (block:PipeRegMapping => Any) (implicit design: Design):MemoryController =
+  def apply (parent:Controller, dram:String) (block:Pipeline => Any) (implicit design: Design):MemoryController =
     MemoryController(None, parent, dram) (block)
-  def apply (name:String, parent: Controller, dram:String) (block:PipeRegMapping => Any) (implicit design: Design):MemoryController =
+  def apply (name:String, parent: Controller, dram:String) (block:Pipeline => Any) (implicit design: Design):MemoryController =
     MemoryController(Some(name), parent, dram) (block)
-  def apply (name:Option[String], parent: String, dram:String) (block:PipeRegMapping => Any) (implicit design: Design):MemoryController = {
+  def apply (name:Option[String], parent: String, dram:String) (block:Pipeline => Any) (implicit design: Design):MemoryController = {
     val c = MemoryController(name, block, dram); 
     design.updateLater(parent, (n:Node) => c.update(n.asInstanceOf[Controller]))
     c
   }
-  def apply (name:Option[String], parent: Controller, dram:String) (block:PipeRegMapping => Any) (implicit design: Design):MemoryController = {
-    val c = MemoryController(name, block, dram); c.update(parent); c
-  }
-  def apply (name:Option[String], block:PipeRegMapping => Any, d:String) (implicit design: Design):MemoryController = {
-    val m = PipeRegMapping(if(name.isDefined) Some(name.get + "_mapping") else None)
-    val c = new { override val mapping = m; override val tpe = Pipe; override val dram = d}
-            with ComputeUnit(name, block(m), typeStr) with MemoryController
-    m.ctrler = c
-    c
+  def apply (name:Option[String], parent: Controller, dram:String)(block:Pipeline => Any) (implicit design: Design):MemoryController = {
+    val c = MemoryController(name, block, dram); c.update(parent); c }
+  def apply(name:Option[String], block:Pipeline => Any, d:String) (implicit design: Design):MemoryController = {
+    val (nodes, cchains, srams, pipeline) = ComputeUnit.unwrapBlock(block)
+    new {override val dram = d} with ComputeUnit(name, Pipe, nodes, cchains, srams, pipeline) with MemoryController
   }
 }
 
@@ -96,7 +88,8 @@ trait Top extends Controller {
     nodes.filter(_.isInstanceOf[Controller]).asInstanceOf[List[Controller]] 
 }
 object Top {
-  val typeStr = "Top"
-  def apply (block: => Any) (implicit design: Design):Top =
-    new Controller(Some("Top"), block, typeStr) with Top
+  def apply (block: => Any) (implicit design: Design):Top = {
+    new { override val nodes = design.addBlock[Node](block, (n:Node) => true) } 
+    with Controller(Some("Top"), "Top") with Top
+  }
 }

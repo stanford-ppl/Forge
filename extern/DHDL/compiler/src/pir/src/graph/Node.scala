@@ -7,17 +7,17 @@ import scala.math.max
 import dhdl.Design
 import dhdl.graph._
 
-/** Base class for all DHDL nodes. This class contains
-  * implementations of common methods that every DHDL node
-  * can use and override
+/** Base class for all PIR nodes. 
+  * @param name: optional user name for a node 
+  * @param typeStr: Consice name for a type of node for printing purpose 
   */
 class Node(val name:Option[String], val typeStr:String) (implicit design: Design) { 
 	design.addNode(this)
-  val id : Int = design.nextId
-  var toUpdate:Boolean = false 
+  val id : Int = design.nextId // Unique id for each node
+  var toUpdate:Boolean = false // Whether fields of the node is not yet defined, 
+                               // which would be updated later. Debug purpose only 
 
   override def toString = s"${typeStr}${id}${if(name.isDefined) "_" else ""}${name.getOrElse("")}" 
 }
 object Node {
-  val DefaultPrecision = 32
 }

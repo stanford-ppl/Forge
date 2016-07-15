@@ -2,6 +2,9 @@ package dhdl
 
 import graph._
 import graph.traversal._
+import plasticine._
+import plasticine.config._
+import plasticine.graph._
 
 //import analysis._
 
@@ -17,7 +20,7 @@ import scala.io.Source
 
 import scala.collection.mutable.{Set,Map}
 
-trait Design extends Misc { self =>
+trait Design { self =>
 
   implicit val design: Design = self
 
@@ -40,21 +43,66 @@ trait Design extends Misc { self =>
     nodeStack.foreach { case (f,i) => if (f(n)) i+= n }
   }
 
-  def addBlock(block: => Any, f1:Node => Boolean, filters: Node => Boolean *):List[List[Node]] = {
-    nodeStack.push((f1, ListBuffer[Node]()))
-    filters.foreach { f => 
-      nodeStack.push( (f, ListBuffer[Node]()) )
-    }
-    block
-    (0 to filters.size).foldLeft(List[List[Node]]()) { case (a, i) =>
-      nodeStack.pop()._2.toList :: a 
-    }
-  }
+  //def addBlock(block: => Any, f1:Node => Boolean, filters: Node => Boolean *):List[List[Node]] = {
+  //  nodeStack.push((f1, ListBuffer[Node]()))
+  //  filters.foreach { f => 
+  //    nodeStack.push( (f, ListBuffer[Node]()) )
+  //  }
+  //  block
+  //  (0 to filters.size).foldLeft(List[List[Node]]()) { case (a, i) =>
+  //    nodeStack.pop()._2.toList :: a 
+  //  }
+  //}
 
-  def addBlock(block: => Any, filter: Node => Boolean):List[Node] = {
+  def addBlock[T](block: => Any, filter: Node => Boolean):List[T] = {
     nodeStack.push((filter, ListBuffer[Node]()))
     block
-    nodeStack.pop()._2.toList
+    nodeStack.pop()._2.toList.asInstanceOf[List[T]]
+  }
+
+  def addBlock[T1, T2](block: => Any,
+                       f1: Node => Boolean,
+                       f2: Node => Boolean
+                       ):(List[T1], List[T2]) = {
+    nodeStack.push((f1, ListBuffer[Node]()))
+    nodeStack.push((f2, ListBuffer[Node]()))
+    block
+    val l2 = nodeStack.pop()._2.toList.asInstanceOf[List[T2]]
+    val l1 = nodeStack.pop()._2.toList.asInstanceOf[List[T1]]
+    (l1, l2)
+  }
+
+  def addBlock[T1, T2, T3](block: => Any,
+                       f1: Node => Boolean, 
+                       f2: Node => Boolean,
+                       f3: Node => Boolean
+                       ):(List[T1], List[T2], List[T3]) = {
+    nodeStack.push((f1, ListBuffer[Node]()))
+    nodeStack.push((f2, ListBuffer[Node]()))
+    nodeStack.push((f3, ListBuffer[Node]()))
+    block
+    val l3 = nodeStack.pop()._2.toList.asInstanceOf[List[T3]]
+    val l2 = nodeStack.pop()._2.toList.asInstanceOf[List[T2]]
+    val l1 = nodeStack.pop()._2.toList.asInstanceOf[List[T1]]
+    (l1, l2, l3)
+  }
+
+  def addBlock[T1, T2, T3, T4](block: => Any,
+                       f1: Node => Boolean, 
+                       f2: Node => Boolean,
+                       f3: Node => Boolean,
+                       f4: Node => Boolean
+                       ):(List[T1], List[T2], List[T3], List[T4]) = {
+    nodeStack.push((f1, ListBuffer[Node]()))
+    nodeStack.push((f2, ListBuffer[Node]()))
+    nodeStack.push((f3, ListBuffer[Node]()))
+    nodeStack.push((f4, ListBuffer[Node]()))
+    block
+    val l4 = nodeStack.pop()._2.toList.asInstanceOf[List[T4]]
+    val l3 = nodeStack.pop()._2.toList.asInstanceOf[List[T3]]
+    val l2 = nodeStack.pop()._2.toList.asInstanceOf[List[T2]]
+    val l1 = nodeStack.pop()._2.toList.asInstanceOf[List[T1]]
+    (l1, l2, l3, l4)
   }
 
   def addName(n:Node):Unit = if (n.name.isDefined) {
@@ -83,13 +131,9 @@ trait Design extends Misc { self =>
 
   def msg(x: String) = if (Config.dse) () else println(x)
 
-  def main(args: String*): Any 
-  def main(args: Array[String]): Unit = {
+  val arch:Spade
 
-    msg(args.mkString(", "))
-    val top:Top = Top(main(args:_*))
-
-    println("-------- Finishing graph construction ----------")
+  def run(top:Top) {
     addName(top)
     top.nodes.foreach(n => addName(n))
     toUpdate.foreach { case (k,f) =>
@@ -119,13 +163,24 @@ trait Design extends Misc { self =>
     //    dot.run(transformedTop)
     //  }
     //}
-    
   }
-
 }
 
-trait Misc {
+trait PIRApp extends Design with PIRMisc{
+  override val arch = Config0 
+
+  def main(args: String*): Any 
+  def main(args: Array[String]): Unit = {
+    msg(args.mkString(", "))
+    val top:Top = Top(main(args:_*))
+    println("-------- Finishing graph construction ----------")
+    run(top)
+  }
+}
+
+trait PIRMisc {
   //implicit def reg_to_wire(reg:Reg):Wire = {
   //  reg.read
   //}
 }
+

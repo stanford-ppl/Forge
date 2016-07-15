@@ -3,37 +3,33 @@ import dhdl.graph.{MemoryController => MemCtrl, MetaPipeline => MetaPipe}
 import dhdl.graph
 import dhdl.codegen._
 import dhdl.Design
+import dhdl.PIRApp
 
-object DotProduct extends Design {
-
+object DotProduct extends PIRApp {
   def main(args: String*) = {
     val tileSize = Const(4l)
     val dataSize = ArgIn()
 
     // Pipe.fold(dataSize by tileSize par outerPar)(out){ i =>
-    val outer = ComputeUnit(parent="Top", tpe=Sequential){ implicit PR =>
+    val outer = ComputeUnit(parent="Top", tpe=MetaPipeline){ implicit PL =>
       CounterChain(name="i", dataSize by tileSize)
     }
     // b1 := v1(i::i+tileSize)
-    val tileLoadA = MemCtrl (name="A", parent=outer, dram="A"){ implicit PR =>
+    val tileLoadA = MemCtrl (name="A", parent=outer, dram="A"){ implicit PL =>
       val ic = CounterChain.copy(outer, "i")
       val it = CounterChain(name="it", Const(0) until tileSize by Const(1))
       val s0::_ = Stages(1)
-      Pipeline {
-        Stage(s0, op1=it(0), op2=ic(0), op=FixAdd, result=PR.networkOut(s0))
-      }
+      Stage(s0, op1=it(0), op2=ic(0), op=FixAdd, result=PL.vecOut(s0))
     }
     // b2 := v2(i::i+tileSize)
-    val tileLoadB = MemCtrl (name="B", parent=outer, dram="B"){ implicit PR =>
+    val tileLoadB = MemCtrl (name="B", parent=outer, dram="B"){ implicit PL =>
       val ic = CounterChain.copy(outer, "i")
       val it = CounterChain(name="it", ic(0) until Const(-1) by Const(1))
       val s0::_ = Stages(1)
-      Pipeline {
-        Stage(s0, op1=it(0), op2=ic(0), op=FixAdd, result=PR.networkOut(s0))
-      }
+      Stage(s0, op1=it(0), op2=ic(0), op=FixAdd, result=PL.vecOut(s0))
     }
     //Pipe.reduce(tileSize par innerPar)(Reg[T]){ii => b1(ii) * b2(ii) }{_+_}
-    ComputeUnit (name="inner", parent=outer, tpe=Pipe) { implicit PR =>
+    ComputeUnit (name="inner", parent=outer, tpe=Pipe) { implicit PL =>
       
       // StateMachines / CounterChain
       val ii = CounterChain(tileSize by Const(1l)) //Local
@@ -46,12 +42,10 @@ object DotProduct extends Design {
       val B = SRAM(size=32, write=tileLoadB, readAddr=ii(0), writeAddr=itB(0))
 
       // Pipeline Stages 
-      Pipeline {
-        Stage(s0, op1=A.load, op2=B.load, op=FixMul, result=PR.reduce(s0))
-        Stage.reduce(s1, op=FixAdd) 
-        Stage(s2, op1=PR.reduce(s1), op=Bypass, result=PR.temp(s0)) 
-      }
-      //Last stage can be removed if PR.reduce and PR.scalarOut map to the same register
+      Stage(s0, op1=A.load, op2=B.load, op=FixMul, result=PL.reduce(s0))
+      Stage.reduce(s1, op=FixAdd) 
+      Stage(s2, op1=PL.reduce(s1), op=Bypass, result=PL.vecOut(s0)) 
+      //Last stage can be removed if PL.reduce and PL.scalarOut map to the same register
     }
   }
 

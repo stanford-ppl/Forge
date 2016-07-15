@@ -14,11 +14,10 @@ class Range (s:Wire, e:Wire) {
 }
 
 /**
- * An unassigned wire used to represent scalar outputs prior to assignment
- * @param tp: The type of value represented by this wire
+ * A type representing a group of wires in pir
  */
 trait Wire extends Node {
-  val width = Node.DefaultPrecision //TODO 
+  def width(implicit design:Design) = design.arch.wordWidth
   def by(step:Wire) (implicit design:Design) = (Const(0l, step.width), this, step)
   def until(max:Wire) = new Range(this, max)
   def isConst = this.isInstanceOf[Const] 
@@ -34,8 +33,9 @@ object Const {
   def apply(nameStr:Option[String], v:Long, w:Option[Int])(implicit design: Design) =
    new {
      override val value = v
-     override val width = w.getOrElse(Node.DefaultPrecision) 
-   } with Node(nameStr, "Const") with Const
+   } with Node(nameStr, "Const") with Const {
+     override def width(implicit design:Design) = w.getOrElse(design.arch.wordWidth) 
+   }
   def apply(v:Long, w:Int) (implicit design:Design):Const = Const(None, v, Some(w))
   def apply(v:Long) (implicit design:Design):Const = Const(None, v, None)
   def apply(name:String, v:Long) (implicit design:Design):Const = Const(Some(name), v, None)

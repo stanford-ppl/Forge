@@ -145,114 +145,182 @@ object SRAM {
     = { val s = SRAM(Some(name), size, write); s.update(readAddr, writeAddr); s } 
 }
 
-/** SRAM 
- *  @param nameStr: user defined name of SRAM 
- *  @param Size: size of SRAM in all dimensions 
- */
-trait Pipeline extends Primitive {
-  lazy val stages:List[Stage] = ctrler.nodes.filter(n => n.isInstanceOf[Stage]).asInstanceOf[List[Stage]]
-}
-object Pipeline {
-  val typeStr = "Pipeline"
-  def apply(name:Option[String])(block: => Any) (implicit design: Design):Pipeline = 
-    { block; new Primitive(name, typeStr) with Pipeline }
-  def apply(block: => Any) (implicit design: Design):Pipeline =
-    Pipeline(None)(block)
-  def apply(name:String) (block: => Any) (implicit design: Design):Pipeline =
-    Pipeline(Some(name))(block)
-}
-
 trait Stage extends Primitive {
   var operands:List[Wire] = _
   var op:Op = _
   var result:Wire = _
-  val mapping:PipeRegMapping
+  val pipeline:Pipeline
 } 
 object Stage {
   val typeStr = "Stage"
-  def apply(name:Option[String], prm:PipeRegMapping)(implicit design: Design):Stage = 
-      new { override val mapping = prm } with Primitive(name, typeStr) with Stage
+  def apply(name:Option[String], prm:Pipeline)(implicit design: Design):Stage = 
+      new { override val pipeline = prm } with Primitive(name, typeStr) with Stage
 
-  def apply(stage:Stage, opds:List[Wire], o:Op, r:Wire, prm:PipeRegMapping)
+  def apply(stage:Stage, opds:List[Wire], o:Op, r:Wire, prm:Pipeline)
     (implicit design: Design):Unit= {
-    opds.foreach { opd => opd match {
-        case pr:PipeReg => prm.addUse(pr)
-        case _ =>
-      } 
-    }
-    r match {
-      case pr:PipeReg => prm.addDef(pr)
-      case _ =>
-    }
     stage.operands = opds
     stage.op = o
     stage.result = r 
+    prm.addStage(stage)
   }
+  //TODO
+  def reduce(stage:Stage, op:Op) (implicit prm:Pipeline, design: Design):Unit = {
+    Stage(stage, List(prm.reduce(stage), prm.reduce(stage)), op, prm.reduce(stage), prm)
+  }
+
   def apply(stage:Stage, op1:Wire, op:Op, result:Wire)
-           (implicit prm:PipeRegMapping, design: Design):Unit =
+           (implicit prm:Pipeline, design: Design):Unit =
     Stage(stage, List(op1), op, result, prm)
   def apply(stage:Stage, op1:Wire, op2:Wire, op:Op, result:Wire)
-           (implicit prm:PipeRegMapping, design: Design):Unit = 
+           (implicit prm:Pipeline, design: Design):Unit = 
     Stage(stage, List(op1, op2), op, result, prm)
   def apply(stage:Stage, op1:Wire, op2:Wire, op3:Wire, op:Op, result:Wire)
-           (implicit prm:PipeRegMapping, design: Design):Unit =
+           (implicit prm:Pipeline, design: Design):Unit =
     Stage(stage, List(op1, op2, op3), op, result, prm)
-  //TODO
-  def reduce(stage:Stage, op:Op) (implicit prm:PipeRegMapping, design: Design):Unit =
-    Stage(stage, List(prm.reduce(stage), prm.reduce(stage)), op, prm.reduce(stage), prm)
 }
 object Stages{
-  def apply(n:Int) (implicit prm:PipeRegMapping, design: Design):List[Stage] = {
+  def apply(n:Int) (implicit prm:Pipeline, design: Design):List[Stage] = {
     List.tabulate(n) {i => Stage(None, prm)}
   }
 }
 
-trait PipeRegMapping extends Primitive {
+trait Pipeline extends Primitive {
   var regId = 0
   private def newTemp = {val temp = regId; regId +=1; temp}
 
+  val stages = ListBuffer[Stage]()
+
   /* Register Mapping */
   val reduceReg = newTemp
-  val networkIns = ListBuffer[Int]() 
-  //val networkOut = ListBuffer[Int]() 
-  val networkOut = newTemp 
+  val vecIn = newTemp
+  val vecOut = newTemp
+  val scalarIns = ListBuffer[Int]() 
+  val scalarOuts = ListBuffer[Int]() 
   val loadRegs  = HashMap[SRAM, Int]()
+  val writeRegs  = HashMap[SRAM, Int]()
   val ctrRegs   = HashMap[Counter, Int]()
   val tempRegs  = ListBuffer[Int]()
 
   val stageUses = HashMap[Stage, PipeReg]()
   val stageDefs = HashMap[Stage, PipeReg]()
   val stagePRs  = HashMap[Stage, HashMap[Int,PipeReg]]()
-  def reset     = { regId = 0; loadRegs.clear; ctrRegs.clear; stageUses.clear; stageDefs.clear }
+  def reset     = { regId = 0; loadRegs.clear; writeRegs.clear; ctrRegs.clear; stageUses.clear; stageDefs.clear }
 
-  def addUse(p:PipeReg) = stageUses += (p.stage -> p) 
-  def addDef(p:PipeReg) = stageDefs += (p.stage -> p) 
+  def addStage(s:Stage):Unit = {
+    stages += s
+    s.operands.foreach { opd => opd match {
+        case pr:PipeReg => addUse(pr)
+        case _ =>
+      } 
+    }
+    s.result match {
+      case pr:PipeReg => addDef(pr)
+      case _ =>
+    }
+  }
+  private def addUse(p:PipeReg) = stageUses += (p.stage -> p) 
+  private def addDef(p:PipeReg) = stageDefs += (p.stage -> p) 
 
-  def load(stage:Stage, s:SRAM)(implicit design: Design):PipeReg = {
+ /** Create a pipeline register for a stage corresponding to 
+  *  the register that loads from the sram
+  * @param stage: Stage for the pipeline register 
+  * @param s: sram to load from 
+  */
+ def load(stage:Stage, s:SRAM)(implicit design: Design):PipeReg = {
     if (!loadRegs.contains(s))
       loadRegs += (s -> newTemp)
     getPR(stage, loadRegs(s))
   }
+ /** Create a pipeline register for a stage corresponding to 
+  *  the register that writes to the sram
+  * @param stage: Stage for the pipeline register 
+  * @param s: sram to load from 
+  */
+  def write(stage:Stage, s:SRAM)(implicit design: Design):PipeReg = {
+    if (!writeRegs.contains(s))
+      writeRegs += (s -> newTemp)
+    getPR(stage, writeRegs(s))
+  }
+ /** Create a pipeline register for a stage corresponding to 
+  *  the register that connects to the counter 
+  * @param stage: Stage for the pipeline register 
+  * @param c: counter 
+  */
   def ctr(stage:Stage, c:Counter)(implicit design: Design):PipeReg = {
     if (!ctrRegs.contains(c))
       ctrRegs += (c -> newTemp)
     getPR(stage, ctrRegs(c))
   }
+ /** Create a pipeline register for a stage corresponding to 
+  *  the register that connects to the reduction network 
+  * @param stage: Stage for the pipeline register 
+  */
   def reduce(stage:Stage)(implicit design: Design):PipeReg = {
     getPR(stage, reduceReg)
   }
-  //def networkIn(stage:Stage, c:Controller)(implicit design: Design):PipeReg = {
-  //  if (!networkIns.contains(c))
-  //    networkIns += (c -> newTemp)
-  //  getPR(stage, ctrRegs(c))
-  //}
-  def networkOut(stage:Stage)(implicit design: Design):PipeReg = {
-    getPR(stage, networkOut)
+ /** Create a pipeline register for a stage corresponding to 
+  *  the register that connects to 1 scalarIn buffer 
+  * @param stage: Stage for the pipeline register 
+  */
+  def scalarIn(stage:Stage)(implicit design: Design):PipeReg = {
+    val id = newTemp
+    scalarIns += id 
+    getPR(stage, id)
+  }
+ /** Create a pipeline register for a stage corresponding to 
+  *  the register that connects to the scalarIn buffer with register id
+  * @param stage: Stage for the pipeline register 
+  * @param id: reg id of scalar input 
+  */
+  def scalarIn(stage:Stage, id:Int)(implicit design: Design):PipeReg = {
+    if (!scalarIns.contains(id))
+      scalarIns += id 
+    getPR(stage, id)
+  }
+ /** Create a pipeline register for a stage corresponding to 
+  *  the register that connects to 1 scalarOut buffer 
+  * @param stage: Stage for the pipeline register 
+  */
+  def scalarOut(stage:Stage)(implicit design: Design):PipeReg = {
+    val id = newTemp
+    scalarOuts += id 
+    getPR(stage, id)
+  }
+ /** Create a pipeline register for a stage corresponding to 
+  *  the register that connects to the scalarOut buffer with register id
+  * @param stage: Stage for the pipeline register 
+  * @param id: reg id of scalar input 
+  */
+  def scalarOut(stage:Stage, id:Int)(implicit design: Design):PipeReg = {
+    if (!scalarOuts.contains(id))
+      scalarOuts += id 
+    getPR(stage, id)
+  }
+ /** Create a pipeline register for a stage corresponding to 
+  *  the register that directly connects to CU input ports in streaming communication 
+  * @param stage: Stage for the pipeline register 
+  */
+ //TODO 
+  def vecIn(stage:Stage)(implicit design: Design):PipeReg = {
+    getPR(stage, vecIn)
+  }
+ /** Create a pipeline register for a stage corresponding to 
+  *  the register that directly connects to CU output ports 
+  * @param stage: Stage for the pipeline register 
+  */
+  def vecOut(stage:Stage)(implicit design: Design):PipeReg = {
+    getPR(stage, vecOut)
   }
   def temp = newTemp
+ /** Get the pipeline register for stage with regId 
+  * @param stage: Stage for the pipeline register 
+  */
   def temp(stage:Stage, regId:Int)(implicit design: Design):PipeReg = {
     getPR(stage, regId)
   }
+ /** Allocate a new pipeline register in the stage 
+  * @param stage: Stage for the pipeline register 
+  */
   def temp(stage:Stage)(implicit design: Design):PipeReg = {
     PipeReg(stage, newTemp)
   }
@@ -266,9 +334,9 @@ trait PipeRegMapping extends Primitive {
   }
 
 }
-object PipeRegMapping {
-  def apply(nameStr:Option[String])(implicit design: Design):PipeRegMapping = {
-    new Primitive(nameStr, "PipelineRegisters") with PipeRegMapping 
+object Pipeline {
+  def apply(nameStr:Option[String])(implicit design: Design):Pipeline = {
+    new Primitive(nameStr, "Pipeline") with Pipeline 
   }
 }
 
@@ -278,12 +346,12 @@ trait Reg extends Primitive with Wire{
 
 trait PipeReg extends Reg {
   var stage:Stage = _
-  val mapping:Int
-  override def toString = s"${super.toString}_${stage.name.getOrElse("")}${mapping}"
+  val pipeline:Int
+  override def toString = s"${super.toString}_${stage.name.getOrElse("")}${pipeline}"
 }
 object PipeReg {
   def apply(nameStr:Option[String], s:Option[Stage], m:Int)(implicit design: Design):PipeReg = new {
-    override val mapping = m
+    override val pipeline = m
   } with Primitive(nameStr, "PR") with PipeReg {
     if (s.isDefined)
       stage = s.get

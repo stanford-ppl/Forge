@@ -1,0 +1,13 @@
+#!/bin/bash
+
+if [ $# -lt 1 ]; then
+  echo "Usage: $0 <App> <arg0> <arg1> .. <argN>"
+  exit -1
+fi
+
+argsArray=( "$@" )
+
+sbtArgs=${argsArray[@]:0:$#}
+
+echo "Running $sbtArgs.."
+sbt "; project apps; run-main $sbtArgs"

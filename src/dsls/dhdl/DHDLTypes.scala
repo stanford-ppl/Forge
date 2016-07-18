@@ -177,6 +177,7 @@ trait DHDLTypes {
     /** @nodoc **/
     fimplicit (Tpes) ("scala_float_to_fltpt", Nil, SFloat :: Flt) implements redirect ${ fltPt[Float,B24,B8]($0) }
 
+    fimplicit (Tpes) ("insert_unit", Nil, MAny :: MUnit) implements composite ${ unit(()) }
 
     // --- Scala Backend
     impl (boolean_to_bit) (codegen($cala, ${ $0 }))

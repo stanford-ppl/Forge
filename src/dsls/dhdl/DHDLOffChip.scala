@@ -26,8 +26,8 @@ trait DHDLOffChip {
     val offchip_load  = internal (OffChip) ("offchip_load_cmd", T, (("mem",OffChip(T)), ("fifo", FIFO(T)), ("ofs",Idx), ("len",Idx), ("par", MInt)) :: MUnit, effect = write(1), aliasHint = aliases(Nil))
     val offchip_store = internal (OffChip) ("offchip_store_cmd", T, (("mem",OffChip(T)), ("fifo", FIFO(T)), ("ofs",Idx), ("len", Idx), ("par", MInt)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
 
-    val gather  = internal (OffChip) ("gather", T, (("mem", OffChip(T)), ("local", BRAM(T)), ("addrs", BRAM(Idx)), ("len", Idx)) :: MUnit, effect = write(1), aliasHint = aliases(Nil))
-    val scatter = internal (OffChip) ("scatter", T, (("mem", OffChip(T)), ("local", BRAM(T)), ("addrs", BRAM(Idx)), ("len", Idx)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
+    val gather  = internal (OffChip) ("gather", T, (("mem", OffChip(T)), ("local", BRAM(T)), ("addrs", BRAM(Idx)), ("len", Idx), ("par", MInt)) :: MUnit, effect = write(1), aliasHint = aliases(Nil))
+    val scatter = internal (OffChip) ("scatter", T, (("mem", OffChip(T)), ("local", BRAM(T)), ("addrs", BRAM(Idx)), ("len", Idx), ("par", MInt)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
 
     // --- API
     /** Creates a reference to a multi-dimensional array in main memory with given dimensions
@@ -305,8 +305,10 @@ trait DHDLOffChip {
       val mem   = $tile.mem
       val addrs = $tile.addr
       val len   = $tile.len
-      if ($isScatter) { scatter(mem, $local, addrs, len) }
-      else            { gather(mem, $local, addrs, len) }
+      val p     = tilePar($tile).getOrElse(param(1))
+
+      if ($isScatter) { scatter(mem, $local, addrs, len, p) }
+      else            { gather(mem, $local, addrs, len, p) }
     }
 
   }

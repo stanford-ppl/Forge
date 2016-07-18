@@ -252,10 +252,12 @@ trait DHDLDSL extends ForgeApplication
     importBoundAnalysis()
 
     // --- Pre-DSE analysis
+    schedule(IRPrinterPlus)
     schedule(NameAnalyzer)
     schedule(LevelAnalyzer)         // Sanity checks and pipe style annotation fixes
     schedule(GlobalAnalyzer)        // Values computed outside of all controllers
     schedule(UnitPipeTransformer)   // Wrap primitives in outer pipes
+    schedule(IRPrinterPlus)
 
     schedule(StageAnalyzer)         // Get number of stages in each control node
     schedule(GlobalAnalyzer)        // Values computed outside of all controllers (TODO: Needed again?)
@@ -282,8 +284,6 @@ trait DHDLDSL extends ForgeApplication
                                     //   Bound analyzer (to finalize parameter values)
                                     //   Memory analyzer (to finalize banking/buffering)
                                     //   Contention analyzer (to finalize contention estimates)
-
-    schedule(IRPrinterPlus)
 
     // --- Post-DSE Constants
     schedule(ConstantFolding)       // Constant folding

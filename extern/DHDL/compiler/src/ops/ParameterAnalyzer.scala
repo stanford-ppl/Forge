@@ -113,9 +113,8 @@ trait ParamRestrictions extends Expressions with NameOpsExp {
   def xrange(start: Int, end: Int, step: Int) = new scala.collection.immutable.Range(start,end,step)
 }
 
+
 trait ParameterAnalysisExp extends ParamRestrictions with PipeStageToolsExp { this: DHDLExp => }
-
-
 trait ParameterAnalyzer extends Traversal {
   val IR: DHDLExp with ParameterAnalysisExp
   import IR._
@@ -123,7 +122,7 @@ trait ParameterAnalyzer extends Traversal {
   override val name = "Parameter Analyzer"
   override val recurse = Always
   override val eatReflect = true
-  debugMode = false
+  debugMode = true
 
   val MIN_TILE_SIZE  = 96    // words
   val MAX_TILE_SIZE  = 96000 // words
@@ -169,15 +168,18 @@ trait ParameterAnalyzer extends Traversal {
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
     case Fifo_new(ParamFix(p),_) =>
+      stageWarn("Paramterized fifo size is not yet supported")
       tileSizes ::= p
       setRange(p, 1, MAX_TILE_SIZE, MIN_TILE_SIZE)
 
     case Bram_new(_,_) =>
       val dims = dimsOf(lhs)
+
       val (consts,params) = dims.partition{ case ConstFix(_) => true; case _ => false }
       val cSize = consts.map{case ConstFix(c) => c.asInstanceOf[Int] }.fold(1){_*_}
 
       val tiles = params.flatMap{case ParamFix(p) => Some(p); case _ => None}
+      debug(s"Found BRAM with parameterized dimensions: " + tiles.map(p => nameOf(p).getOrElse(p.toString)).mkString(", "))
 
       tiles.zipWithIndex.foreach{
         case (p, idx) =>
@@ -250,7 +252,7 @@ trait ParameterAnalyzer extends Traversal {
       parFactors :::= ipars
       opars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
-    case _ => //
+    case _ => super.traverse(lhs,rhs)
   }
 }
 

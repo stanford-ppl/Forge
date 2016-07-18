@@ -361,6 +361,16 @@ trait DHDLControllers {
       Fold(CounterChain($0,$1,$2), param(1))($3, $4){inds => $5(inds(0),inds(1),inds(2))}($6)
     }
 
+    direct (Pipe) ("Fold", (T,C), CurriedMethodSignature(List(List(Counter, MInt),List(C(T),T),List(Idx ==> C(T)), List((T,T) ==> T)), C(T)), (TMem(T,C(T)),TNum(T))) implements composite ${
+      Fold(CounterChain($0), $1)($2, $3){inds => $4(inds(0))}($5)
+    }
+    direct (Pipe) ("Fold", (T,C), CurriedMethodSignature(List(List(Counter,Counter, MInt),List(C(T),T),List((Idx,Idx) ==> C(T)), List((T,T) ==> T)), C(T)), (TMem(T,C(T)),TNum(T))) implements composite ${
+      Fold(CounterChain($0,$1), $2)($3, $4){inds => $5(inds(0),inds(1))}($6)
+    }
+    direct (Pipe) ("Fold", (T,C), CurriedMethodSignature(List(List(Counter,Counter,Counter, MInt),List(C(T),T),List((Idx,Idx,Idx) ==> C(T)), List((T,T) ==> T)), C(T)), (TMem(T,C(T)),TNum(T))) implements composite ${
+      Fold(CounterChain($0,$1,$2), $3)($4, $5){inds => $6(inds(0),inds(1),inds(2))}($7)
+    }
+
     // --- Scala Backend
     // See TemplateOpsExp for others
     impl (pipe_parallel) (codegen ($cala, ${

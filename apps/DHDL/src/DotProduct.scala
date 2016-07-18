@@ -35,7 +35,6 @@ trait DotProduct extends DHDLApplication {
           b1.pop() * b2.pop()
         }{_+_}
       }{_+_}
-      ()
     }
     getArg(out)
   }

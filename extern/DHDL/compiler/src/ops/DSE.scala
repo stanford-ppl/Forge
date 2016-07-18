@@ -34,6 +34,7 @@ trait DSE extends Traversal {
   lazy val tileSizes  = paramAnalyzer.tileSizes.distinct
   lazy val parFactors = paramAnalyzer.parFactors.distinct
   lazy val localMems  = ctrlAnalyzer.localMems
+  lazy val metapipes = ctrlAnalyzer.metapipes
   //lazy val accFactors = ctrlAnalyzer.memAccessFactors.toList
   lazy val topController = ctrlAnalyzer.top
 
@@ -44,8 +45,16 @@ trait DSE extends Traversal {
 
     if (debugMode && SpatialConfig.enableDSE) printer.run(b)
 
+    debug("Tile Sizes: ")
+    tileSizes.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
+    debug("Parallelization Factors:")
+    parFactors.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
+    debug("Metapipelining Toggles:")
+    metapipes.foreach{t => debug(s"  ${mpos(t.pos).line}")}
+
     if (SpatialConfig.enableDSE) dse(b)
 
+    debug("Freezing DSE parameters")
     tileSizes.foreach{p => p.fix}
     parFactors.foreach{p => p.fix}
     bndAnalyzer.run(b)
@@ -87,7 +96,6 @@ trait DSE extends Traversal {
     cycleAnalyzer.run(b)
 
     // A. Get lists of parameters
-    val metapipes = ctrlAnalyzer.metapipes
     var restrict  = paramAnalyzer.restrict
     val ranges    = paramAnalyzer.range
 
@@ -102,12 +110,6 @@ trait DSE extends Traversal {
 
     // C. Calculate space
     debug("Running DSE")
-    debug("Tile Sizes: ")
-    tileSizes.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
-    debug("Parallelization Factors:")
-    parFactors.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
-    debug("Metapipelining Toggles:")
-    metapipes.foreach{t => debug(s"  ${mpos(t.pos).line}")}
     debug("")
     debug("Found the following parameter restrictions: ")
     val numericFactors = tileSizes ++ parFactors

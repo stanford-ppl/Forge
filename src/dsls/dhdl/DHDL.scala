@@ -287,6 +287,7 @@ trait DHDLDSL extends ForgeApplication
 
     // --- Post-DSE Constants
     schedule(ConstantFolding)       // Constant folding
+    schedule(GlobalAnalyzer)        // Add "global" annotations for newly created symbols after folding
 
     // --- Post-DSE Estimation
     schedule(AreaAnalyzer)          // Area estimation

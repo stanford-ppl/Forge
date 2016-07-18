@@ -26,7 +26,14 @@ trait ModelingTraversal extends QuickTraversal with PipeStageTools {
     def quickDFS(cur: Exp[Any]): Long = cur match {
       case Def(d) if scope.contains(cur) && !isGlobal(cur) =>
         //debug(s"Visit $cur in quickDFS")
-        latencyOf(cur) + symDeps(d).map{e => paths.getOrElseUpdate(e,quickDFS(e))}.max
+        val deps = symDeps(d)
+        if (deps.isEmpty) {
+          stageWarn(s"$cur = $d has no dependencies but is not global")
+          latencyOf(cur)
+        }
+        else {
+          latencyOf(cur) + deps.map{e => paths.getOrElseUpdate(e,quickDFS(e))}.max
+        }
       case _ => 0L
     }
     if (scope.isEmpty) 0L else scope.last match {

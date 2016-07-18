@@ -121,3 +121,20 @@ trait FilterTest extends DHDLApplication {
     println("result = " + result)
   }
 }
+
+
+// TODO: Eventually this should be banked properly (mem should be duplicated but banked?)
+object UnrollTest1Compiler extends DHDLApplicationCompiler with UnrollTest1
+trait UnrollTest1 extends DHDLApplication {
+  def main() {
+    val N = 16
+    val out = ArgOut[SInt]
+
+    Accel {
+      out := Reduce(N by 1 par unit(2))(0){i =>
+        val mem = BRAM[SInt](32)
+        mem(i)
+      }{_+_}
+    }
+  }
+}

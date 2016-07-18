@@ -12,9 +12,9 @@ trait UnrollingTransformExp extends PipeStageToolsExp with LoweredPipeOpsExp { t
 
 trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
   val IR: UnrollingTransformExp with DHDLExp
-  import IR.{infix_until => _, Array => _, _}
+  import IR.{infix_until => _, Array => _, assert => _, _}
 
-  debugMode = false
+  debugMode = true
   override val name = "Unrolling Transformer"
 
   /**
@@ -71,6 +71,14 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
       foreach{p => subst += orig -> unrolled}
       List(unrolled)
     }
+
+    // If this is a memory that is being unrolled in this scope, the symbol will be the un-mirrored version prior to duplication
+    // If it is not being unrolled in this scope, the symbol will be the already mirrored version
+    def isUnrolled(e: Exp[Any]) = {
+      val inScope = laneSubst.exists(_ contains e)
+      assert(!inScope || laneSubst.forall(_ contains e), s"Symbol $e only exists in some duplicated lanes!")
+      inScope
+    }
   }
 
   /**
@@ -90,14 +98,14 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
   // FIXME: Assumes FIFO and BRAM are outside of this unrolling scope!
   def unroll[T](s: Sym[T], d: Def[T], lanes: Unroller)(implicit ctx: SourceContext): List[Exp[Any]] = d match {
     // Account for the edge case with FIFO writing
-    case EatReflect(e@Push_fifo(fifo, value, en)) =>
+    case EatReflect(e@Push_fifo(fifo, value, en)) if !lanes.isUnrolled(fifo) =>
       val values  = lanes.vectorize{p => f(value)}
       val valids  = boundChecks(lanes.cchain, lanes.indices)
       val enables = lanes.vectorize{p => f(en) && valids(p) }
       val parPush = par_push_fifo(f(fifo), values, enables, true)(e._mT,e.__pos)
       lanes.unify(s, parPush)
 
-    case EatReflect(e@Pop_fifo(fifo)) =>
+    case EatReflect(e@Pop_fifo(fifo)) if !lanes.isUnrolled(fifo) =>
       val parPop = par_pop_fifo(f(fifo), lanes.length)(e._mT,e.__pos)
       dimsOf(parPop) = List(lanes.length.as[Index])
       lanes.split(s, parPop)
@@ -109,13 +117,13 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
       if (lanes.length > 1) stageError("Cannot parallelize CAM operations")(mpos(s.pos))
       lanes.duplicate(s, d)
 
-    case EatReflect(e@Bram_store(bram,addr,value)) =>
+    case EatReflect(e@Bram_store(bram,addr,value)) if !lanes.isUnrolled(bram) =>
       val values = lanes.vectorize{p => f(value)}
       val addrs  = lanes.vectorize{p => f(addr)}
       val parStore = par_bram_store(f(bram), addrs, values)(e._mT, e.__pos)
       lanes.unify(s, parStore)
 
-    case EatReflect(e@Bram_load(bram,addr)) =>
+    case EatReflect(e@Bram_load(bram,addr)) if !lanes.isUnrolled(bram) =>
       val addrs = lanes.vectorize{p => f(addr)}
       val parLoad = par_bram_load(f(bram), addrs)(e._mT, e.__pos)
       dimsOf(parLoad) = List(lanes.length.as[Index])

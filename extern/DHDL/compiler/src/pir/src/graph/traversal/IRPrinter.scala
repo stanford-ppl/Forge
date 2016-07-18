@@ -7,7 +7,7 @@ import dhdl.Config
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.Set
 
-class IRPrinter(implicit design: Design) extends Traversal{
+class IRPrinter(implicit design: Design) extends DFSTraversal{
 
   override def initPass() = {
     super.initPass

@@ -30,8 +30,7 @@ trait Design extends PIRMisc { self =>
   def nextId = {nextSym += 1; nextSym }
 
   private val nodeStack = Stack[(Node => Boolean, ListBuffer[Node])]()
-  private val nameMap = HashMap[String, Node]()
-  private val toUpdate = ListBuffer[(String, Node => Unit)]()
+  val toUpdate = ListBuffer[(String, Node => Unit)]()
   val allNodes = ListBuffer[Node]()
 
   def reset() {
@@ -39,9 +38,10 @@ trait Design extends PIRMisc { self =>
     nodeStack.clear()
     allNodes.clear()
     nodeStack.push(((n:Node) => true), allNodes)
-    nameMap.clear()
     toUpdate.clear()
     nextSym = 0
+    top = null
+    traversals.foreach(_.reset)
   }
 
   def addNode(n: Node) { 
@@ -110,45 +110,20 @@ trait Design extends PIRMisc { self =>
     (l1, l2, l3, l4)
   }
 
-  def addName(n:Node):Unit = if (n.name.isDefined) {
-    n match {
-      case c:Controller => 
-        val s = n.name.get  
-        assert(!nameMap.contains(s), s"Already create controller with name ${s}: ${n}")
-        nameMap += (s -> c)
-      case p:Primitive =>
-        assert(p.ctrler!=null, s"Primitive ${p} doesn't have ctriler!")
-        val s = s"${p.ctrler}_${n.name.get}"
-        assert(!nameMap.contains(s),
-          s"Already create primitive with name ${s} for controller ${p.ctrler}")
-        nameMap += (s -> p)
-      case w:Port =>
-        //assert(false, "No support for adding name for wire yet!")
-    }
-  }
-
-  def getByName(s:String):Node = {
-    assert(nameMap.contains(s), s"No node defined with name:${s}. nameMap:${nameMap}")
-    nameMap(s)
-  }
 
   def updateLater(s:String, f:Node => Unit) = { val u = (s,f); toUpdate += u }
 
   def msg(x: String) = if (Config.dse) () else println(x)
 
   val arch:Spade
+  var top:Top = _
 
-  def run(top:Top) {
-    allNodes.foreach(n => addName(n))
-    toUpdate.foreach { case (k,f) =>
-      val n:Node = getByName(k)
-      f(n)
-    }
-    toUpdate.clear()
-    println("-------- Finishing updating forward referenced nodes ----------")
-     
-    val printer = new IRPrinter()
-    printer.run(top)
+  val traversals:ListBuffer[Traversal]
+  traversals += new ForwardRef()
+  traversals += new IRPrinter()
+
+  def run {
+    traversals.foreach(_.run)
     //if (Config.genDot) {
     //  val origGraph = new GraphvizCodegen(s"orig")
     //  origGraph.run(top)
@@ -175,9 +150,9 @@ trait PIRApp extends Design{
     msg(args.mkString(", "))
     reset()
     val ctrlList = addBlock(main(args:_*), (n:Node) => n.isInstanceOf[Controller])
-    val top:Top = Top(ctrlList)
+    top = Top(ctrlList)
     println("-------- Finishing graph construction ----------")
-    run(top)
+    run
   }
 }
 

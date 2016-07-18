@@ -14,7 +14,6 @@ object Config {
   // Properties go here
   var test = getProperty("dhdl.test", "false") == "true"
   var newMemAPI = getProperty("dhdl.newMemAPI", "false") == "true"
-  //var eval = getProperty("dhdl.eval", "false") == "true"
   var genScala = getProperty("dhdl.scala", "true") == "true"
   var genDot = getProperty("dhdl.dot", "true") == "true"
   var genMaxJ = getProperty("dhdl.maxj", "true") == "true"

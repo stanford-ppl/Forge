@@ -1,14 +1,14 @@
 package dhdl.codegen
 
 import dhdl.graph._
-import dhdl.graph.traversal.Traversal
+import dhdl.graph.traversal.DFSTraversal
 import dhdl.Design
 
 import scala.collection.mutable.Set
 import java.io.PrintWriter
 import java.io.{File, FileInputStream, FileOutputStream}
 
-abstract class Codegen(implicit design: Design) extends Traversal {
+abstract class Codegen(implicit design: Design) extends DFSTraversal {
   val ext: String
   val pwd = new File(".").getAbsolutePath().dropRight(2)
   def clearOldFiles = true

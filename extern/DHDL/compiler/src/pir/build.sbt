@@ -11,5 +11,5 @@
   //
   //addCommandAlias("make", ";project dhdl;compile")
   //
-    addCommandAlias("make", ";project dhdl;compile")
+    addCommandAlias("make", ";project dhdl; compile")
     addCommandAlias("pir", "; project apps; run-main")

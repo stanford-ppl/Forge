@@ -45,7 +45,7 @@ trait CounterChain extends Primitive {
     toUpdate = false
   }
   def update(bds: Seq[(Port, Port, Port)])(implicit design: Design):Unit = {
-    counters = bds.zipWithIndex.map {case (bd,i) => Counter(bd)}.toList
+    counters = bds.zipWithIndex.map {case ((mi, ma, s),i) => Counter(mi, ma, s)}.toList
     this.copy = None 
     toUpdate = false
   }
@@ -69,55 +69,48 @@ object CounterChain {
   }
 }
 
-trait Counter extends Primitive with Port {
-  var bound: (Port, Port, Port) = _
-  def copy(c:Counter)(implicit design: Design) = {
-    assert(bound==null, s"Overriding existing counter ${this} with bound (${bound._1}, ${bound._2}, ${bound._3})")
-    bound = (c.bound._1.copy, c.bound._2.copy, c.bound._3.copy)
-  } 
-  def create(bd: (Port, Port, Port))(implicit design: Design):Unit = {
-    bound = bd
+case class Counter(n:Option[String])(implicit design: Design) extends Primitive(n, "Ctr"){
+  var min:Port = _
+  var max:Port = _
+  var step:Port = _
+  val out:Port = Port(this, {s"${this}.out"}) 
+  toUpdate = true
+
+  def update(mi:Port, ma:Port, s:Port)(implicit design: Design):Unit = {
+    min = mi
+    max  = ma
+    step = s
     toUpdate = false
   }
+  def copy(c:Counter)(implicit design: Design) = {
+    assert(min==null, 
+      s"Overriding existing counter ${this} with min ${min}")
+    assert(max==null, 
+      s"Overriding existing counter ${this} with min ${max}")
+    assert(step==null, 
+      s"Overriding existing counter ${this} with min ${step}")
+    update(c.min.copy, c.max.copy, c.step.copy)
+  } 
 }
 object Counter{
-  val typeStr = "Ctr"
-  def apply(name:Option[String])(implicit design: Design):Counter =
-    new Primitive(name, typeStr) with Counter { toUpdate = true }
-  def apply(bd: (Port, Port, Port))(implicit design: Design):Counter =
-    { val c = Counter(None); c.create(bd); c }
-  def apply(name:String, bd: (Port, Port, Port))(implicit design: Design):Counter =
-    { val c = Counter(Some(name)); c.create(bd); c }
+  def apply(min:Port, max:Port, step:Port)(implicit design: Design):Counter =
+    { val c = Counter(None); c.update(min, max, step); c }
+  def apply(name:String, min:Port, max:Port, step:Port)(implicit design: Design):Counter =
+    { val c = Counter(Some(name)); c.update(min, max, step); c }
   def apply()(implicit design: Design):Counter = Counter(None)
 }
 
-trait MemPort extends Primitive with Port {
-  val id:Int
-  var mem:SRAM = _
-}
-object MemPort {
-  def apply(i:Int)(implicit design: Design) = { 
-    new {
-      override val id = i
-    } with Primitive(None, "Port") with MemPort
-  }
-  def apply(m:SRAM, i:Int)(implicit design: Design) = { 
-    val name = if (m.name.isDefined) Some(s"${m.name.get}_port${i}") else None
-    new {
-      override val id = i
-    } with Primitive(name, "Port") with MemPort { mem = m }
-  }
-}
 /** SRAM 
  *  @param nameStr: user defined name of SRAM 
  *  @param Size: size of SRAM in all dimensions 
  */
-trait SRAM extends Primitive {
-  val size:Int
+case class SRAM(n: Option[String], size: Int, writer:Controller)(implicit design: Design) 
+  extends Primitive(n, "SRAM") {
   var readAddr: Port = _
   var writeAddr: Port = _
-  val writePort: Controller
-  val readPort: MemPort 
+  val readPort: Port = Port(this, s"s${this}.rp") 
+
+  toUpdate = true
   def update (ra:Port, wa:Port) = {
     this.readAddr = ra
     this.writeAddr = wa
@@ -126,15 +119,6 @@ trait SRAM extends Primitive {
   def load = readPort
 }
 object SRAM {
-  def apply(nameStr: Option[String], s: Int, wp:Controller)(implicit design: Design) = { 
-    val sram:SRAM = new {
-      override val size = s
-      override val writePort = wp 
-      override val readPort = MemPort(0) //TODO
-    } with Primitive(nameStr, "SRAM") with SRAM { toUpdate = true }
-    sram.readPort.mem = sram
-    sram
-  }
   def apply(size:Int, write:Controller)(implicit design: Design): SRAM
     = SRAM(None, size, write)
   def apply(name:String, size:Int, write:Controller)(implicit design: Design): SRAM
@@ -145,17 +129,12 @@ object SRAM {
     = { val s = SRAM(Some(name), size, write); s.update(readAddr, writeAddr); s } 
 }
 
-trait Stage extends Primitive {
+case class Stage(n:Option[String], pipeline:Pipeline)(implicit design: Design) extends Primitive(n, "Stage") {
   var operands:List[Port] = _
   var op:Op = _
   var result:Port = _
-  val pipeline:Pipeline
 } 
 object Stage {
-  val typeStr = "Stage"
-  def apply(name:Option[String], prm:Pipeline)(implicit design: Design):Stage = 
-      new { override val pipeline = prm } with Primitive(name, typeStr) with Stage
-
   def apply(stage:Stage, opds:List[Port], o:Op, r:Port, prm:Pipeline)
     (implicit design: Design):Unit= {
     stage.operands = opds
@@ -165,7 +144,7 @@ object Stage {
   }
   //TODO
   def reduce(stage:Stage, op:Op) (implicit prm:Pipeline, design: Design):Unit = {
-    Stage(stage, List(prm.reduce(stage), prm.reduce(stage)), op, prm.reduce(stage), prm)
+    Stage(stage, List(prm.reduce(stage).read, prm.reduce(stage).read), op, prm.reduce(stage).read, prm)
   }
 
   def apply(stage:Stage, op1:Port, op:Op, result:Port)
@@ -178,13 +157,13 @@ object Stage {
            (implicit prm:Pipeline, design: Design):Unit =
     Stage(stage, List(op1, op2, op3), op, result, prm)
 }
-object Stages{
+object Stages {
   def apply(n:Int) (implicit prm:Pipeline, design: Design):List[Stage] = {
     List.tabulate(n) {i => Stage(None, prm)}
   }
 }
 
-trait Pipeline extends Primitive {
+case class Pipeline(n:Option[String])(implicit design: Design) extends Primitive(n, "Pipeline"){
   var regId = 0
   private def newTemp = {val temp = regId; regId +=1; temp}
 
@@ -334,34 +313,29 @@ trait Pipeline extends Primitive {
   }
 
 }
-object Pipeline {
-  def apply(nameStr:Option[String])(implicit design: Design):Pipeline = {
-    new Primitive(nameStr, "Pipeline") with Pipeline 
+
+trait Reg extends Primitive {
+  var in:Option[Port] = None
+  val out:Port = Port(this, {s"${this}.out"}) 
+  def read:Port = out
+}
+
+case class PipeReg(n:Option[String], mapping:Int)(implicit design: Design) 
+  extends Primitive(n, "PR") with Reg {
+  var stage:Stage = _
+  toUpdate = true
+  override def toString = s"${super.toString}_${stage.name.getOrElse("")}${mapping}"
+
+  def this(n:Option[String], m:Int, s:Stage)(implicit design: Design) = {
+    this(n, m)
+    stage = s
+    toUpdate = false
   }
 }
-
-trait Reg extends Primitive with Port{
-  var in:Option[Port] = None
-}
-
-trait PipeReg extends Reg {
-  var stage:Stage = _
-  val pipeline:Int
-  override def toString = s"${super.toString}_${stage.name.getOrElse("")}${pipeline}"
-}
 object PipeReg {
-  def apply(nameStr:Option[String], s:Option[Stage], m:Int)(implicit design: Design):PipeReg = new {
-    override val pipeline = m
-  } with Primitive(nameStr, "PR") with PipeReg {
-    if (s.isDefined)
-      stage = s.get
-    else
-      toUpdate = true 
-  } 
-  def apply(s:Stage, m:Int) (implicit design: Design):PipeReg = PipeReg(None, Some(s), m)
-  def apply(name:String, s:Stage, m:Int) (implicit design: Design):PipeReg = 
-    PipeReg(Some(name), Some(s), m)
-  def apply(m:Int) (implicit design: Design):PipeReg = PipeReg(None, None, m)
+  def apply(s:Stage, m:Int) (implicit design: Design):PipeReg = new PipeReg(None, m, s)
+  def apply(name:String, s:Stage, m:Int) (implicit design: Design):PipeReg = new PipeReg(Some(name), m, s)
+  def apply(m:Int) (implicit design: Design):PipeReg = PipeReg(None, m)
 }
 
 trait ArgIn extends Reg 

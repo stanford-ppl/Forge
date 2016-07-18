@@ -83,13 +83,13 @@ object MemoryController extends {
   }
 }
 
-trait Top extends Controller {
-  val ctrlList:List[Controller] =
-    nodes.filter(_.isInstanceOf[Controller]).asInstanceOf[List[Controller]] 
-}
+abstract case class Top(ctrlList:List[Controller])(implicit design: Design) 
+  extends Controller(Some("Top"), "Top")
 object Top {
   def apply (block: => Any) (implicit design: Design):Top = {
-    new { override val nodes = design.addBlock[Node](block, (n:Node) => true) } 
-    with Controller(Some("Top"), "Top") with Top
+    val (nds,cl) = design.addBlock[Node, Controller](block, 
+      (n:Node) => true,
+      (n:Node) => n.isInstanceOf[Controller])
+    new { override val nodes = nds } with Top(cl)
   }
 }

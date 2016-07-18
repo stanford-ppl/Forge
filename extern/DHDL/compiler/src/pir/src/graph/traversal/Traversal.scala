@@ -30,7 +30,7 @@ abstract class Traversal(implicit val design: Design) {
 
   /* Depth first search traversal on node and their fields */
   def visitNode(node: Node) : Unit = {
-    assert(!visited.contains(node), s"Revisiting visited node ${node}!")
+    assert(!visited.contains(node), s"Revisiting visited node ${node}! visitedNodes:${visited}")
     node match {
       case n:Controller => n match {
         case c:Top => 
@@ -49,11 +49,11 @@ abstract class Traversal(implicit val design: Design) {
         case p:CounterChain => p.counters.foreach(c => visitNode(c))
         case p:SRAM => 
         case p:Stage =>
-          p.operands.foreach(op => visitNode(op))
-          visitNode(p.result)
+          p.operands.foreach(op => visitNode(op.src))
+          visitNode(p.result.src)
         case p:Pipeline => p.stages.foreach(s => visitNode(s))
       }
-      case n:Port =>
+      case n:Const =>
       case _ =>
         throw new Exception(s"Don't know how to visit $node")
     }

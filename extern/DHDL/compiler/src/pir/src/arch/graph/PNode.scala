@@ -12,21 +12,11 @@ object Node {
   def nextId = {val temp = nextSym; nextSym +=1; temp}
 }
 
-/** Type of nodes that can connect to pipeline registers */
-trait RegMapping {
-  var preg:Reg = _
-  /** create a mapping to a pipeline register
-   *  @param r: mapped register */
-  def mapTo(r:Reg) = {
-    preg = r
-    r.map(this)
-  }
-}
-
 /** 1 mapping of pipeline register (1 row of reg for all stages) */
 case class Reg() extends Node{
-  val mapping = ListBuffer[RegMapping]()
-  def map(n:RegMapping) = {
+  // List of connections one register can mapp to
+  val mapping = ListBuffer[RMPort]()
+  def map(n:RMPort) = {
     if (!mapping.contains(n))
       mapping += n
   }
@@ -34,44 +24,30 @@ case class Reg() extends Node{
 
 /** Physical SRAM 
  *  @param numPort: number of banks. Usually equals to number of lanes in CU */
-case class SRAM(numBanks:Int) extends Node with RegMapping{
+case class SRAM(numBanks:Int) extends Node{
+  val readPort = RMPort(this)
+  val writePort = RMPort(this) 
+  def load = readPort
+  def write = writePort
 }
 object SRAM {
-  def apply(numBanks:Int, reg:Reg):SRAM = {
+  def apply(numBanks:Int, rreg:Reg, wreg:Reg):SRAM = {
     val s = SRAM(numBanks)
-    s.mapTo(reg)
+    s.load.mapTo(rreg)
+    s.write.mapTo(wreg)
     s
   }
 }
 
 /** Physical Counter  */
-case class Counter() extends Node with RegMapping{
+case class Counter() extends Node{
+  val out = RMPort(this)
 }
 object Counter {
   def apply(reg:Reg):Counter = {
     val c = Counter()
-    c.mapTo(reg)
+    c.out.mapTo(reg)
     c
-  }
-}
-
-/** Physical Port of CU  */
-case class Port() extends Node with RegMapping {
-}
-trait InPort
-object InPort {
-  def apply(reg:Reg) = {
-    val p = new Port() with InPort
-    p.mapTo(reg)
-    p
-  }
-}
-trait OutPort
-object OutPort {
-  def apply(reg:Reg) = {
-    val p = new Port() with OutPort
-    p.mapTo(reg)
-    p
   }
 }
 
@@ -83,20 +59,66 @@ object OutPort {
  *  @param outports: one set of output ports availabe in the CU
  *  */
 case class ComputeUnit(regs:List[Reg], srams:List[SRAM], ctrs:List[Counter], 
-  inports:List[InPort], outports:List[OutPort], reduce:Reg) extends Node{
+  inRegs:List[Reg], outRegs:List[Reg], reduceReg:Reg) extends Node{
+  val reducePort = RMPort(this, reduceReg)
+  val inPorts = inRegs.map{r => RMPort(this, r)} 
+  val outPorts = outRegs.map{r => RMPort(this, r)} 
   def numPRs = regs.size 
   def numCtrs = ctrs.size
   def numSRAMs = srams.size
-  def numInPorts = inports.size 
-  def numOutPorts = outports.size 
+  def numInPorts = inPorts.size
+  def numPorts = outPorts.size 
 }
 
 trait MemoryController {
 }
 object MemoryController {
   def apply(regs:List[Reg], srams:List[SRAM], ctrs:List[Counter], 
-    inports:List[InPort], outports:List[OutPort], reduce:Reg) = {
-    new ComputeUnit(regs, srams, ctrs, inports, outports, reduce) with MemoryController 
+    inRegs:List[Reg], outRegs:List[Reg], reduceReg:Reg) = {
+    new ComputeUnit(regs, srams, ctrs, inRegs, outRegs, reduceReg) with MemoryController 
   }
 }
+
+trait RMPort { self:Port =>
+  var preg:Reg = _
+  /** create a mapping to a pipeline register
+   *  @param r: mapped register */
+  def mapTo(r:Reg) = {
+    preg = r
+    r.map(this)
+  }
+}
+object RMPort {
+  def apply(s: Node, reg:Reg) = {
+    val p = new {override val src = s} with Port with RMPort 
+    p.mapTo(reg)
+    p
+  }
+  def apply(s:Node) = new {override val src = s} with Port with RMPort 
+}
+/** Physical Port of a module. Can map to a pipeline register */
+trait Port {
+  val src:Node
+}
+object Port{
+  def apply(s: Node) = new {override val src = s} with Port
+}
+
+//trait CUPort
+//trait CUInPort extends CUPort
+//object CUInPort {
+//  def apply(reg:Reg) = {
+//    val p = new Port() with CUInPort
+//    p.mapTo(reg)
+//    p
+//  }
+//}
+//trait CUOutPort extends CUPort
+//object CUOutPort {
+//  def apply(reg:Reg) = {
+//    val p = new Port() with CUOutPort
+//    p.mapTo(reg)
+//    p
+//  }
+//}
 

@@ -37,7 +37,7 @@ class IRPrinter(implicit design: Design) extends Traversal{
           case p:Stage =>
             fields += s"operands=[${p.operands.mkString(",")}], op=${p.op}, result=${p.result}"
           case p:Counter => 
-            fields += s"min=${p.bound._1}, max=${p.bound._2}, step=${p.bound._3}"
+            fields += s"min=${p.min}, max=${p.max}, step=${p.step}"
           case _ =>
         }
       }

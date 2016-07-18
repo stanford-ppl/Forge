@@ -17,6 +17,10 @@ class Node(val name:Option[String], val typeStr:String) (implicit design: Design
   var toUpdate:Boolean = false // Whether fields of the node is not yet defined, 
                                // which would be updated later. Debug purpose only 
 
+  override def equals(that: Any) = that match {
+    case n: Node => super.equals(that) && id == n.id
+    case _ => super.equals(that)
+  }
   override def toString = s"${typeStr}${id}${if(name.isDefined) "_" else ""}${name.getOrElse("")}" 
 }
 object Node {

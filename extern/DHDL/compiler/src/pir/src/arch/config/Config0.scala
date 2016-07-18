@@ -11,7 +11,7 @@ object Config0 extends Spade {
   override val numLanes = 4
   
   private val cus = List.tabulate(5) { i =>
-    val numPRs = 20
+    val numPRs = 40
     val numCtrs = 10
     val numSRAMs = 2
     val numInPorts = numLanes * numSRAMs
@@ -20,14 +20,14 @@ object Config0 extends Spade {
     // No overlapping between mappings
     val regs = List.tabulate(numPRs) { ir => Reg() }
     val ctrs = List.tabulate(numCtrs) { ic => Counter(regs(ic)) }
-    val srams = List.tabulate(numSRAMs) { is => SRAM(numLanes, regs(is + numCtrs)) } 
-    val inports = List.tabulate(numInPorts) { ip => InPort(regs(ip + numCtrs + numSRAMs)) }
-    val outports = List.tabulate(numOutPorts) { ip => OutPort(regs(ip + numCtrs + numSRAMs + numInPorts)) }
-    ComputeUnit(regs, srams, ctrs, inports, outports, regs(numCtrs + numSRAMs + numInPorts + numOutPorts))
+    val srams = List.tabulate(numSRAMs) { is => SRAM(numLanes, regs(is + numCtrs), regs(is + numCtrs)) } 
+    val inRegs = List.tabulate(numInPorts) { ip => regs(ip + numCtrs + numSRAMs) }
+    val outRegs = List.tabulate(numOutPorts) { ip => regs(ip + numCtrs + numSRAMs + numInPorts) }
+    ComputeUnit(regs, srams, ctrs, inRegs, outRegs, regs(numCtrs + numSRAMs + numInPorts + numOutPorts))
   } 
 
   private val memCtrls = List.tabulate(4) { i =>
-    val numPRs = 20
+    val numPRs = 40
     val numCtrs = 10
     val numSRAMs = 2
     val numInPorts = numLanes * numSRAMs
@@ -36,10 +36,10 @@ object Config0 extends Spade {
     // No overlapping between mappings
     val regs = List.tabulate(numPRs) { ir => Reg() }
     val ctrs = List.tabulate(numCtrs) { ic => Counter(regs(ic)) }
-    val srams = List.tabulate(numSRAMs) { is => SRAM(numLanes, regs(is + numCtrs)) } 
-    val inports = List.tabulate(numInPorts) { ip => InPort(regs(ip + numCtrs + numSRAMs)) }
-    val outports = List.tabulate(numOutPorts) { ip => OutPort(regs(ip + numCtrs + numSRAMs + numInPorts)) }
-    MemoryController(regs, srams, ctrs, inports, outports, regs(numCtrs + numSRAMs + numInPorts + numOutPorts))
+    val srams = List.tabulate(numSRAMs) { is => SRAM(numLanes, regs(is + numCtrs), regs(is + numCtrs)) } 
+    val inRegs = List.tabulate(numInPorts) { ip => regs(ip + numCtrs + numSRAMs) }
+    val outRegs = List.tabulate(numOutPorts) { ip => regs(ip + numCtrs + numSRAMs + numInPorts) }
+    MemoryController(regs, srams, ctrs, inRegs, outRegs, regs(numCtrs + numSRAMs + numInPorts + numOutPorts))
   }
 
   override val computeUnits = cus ++ memCtrls 

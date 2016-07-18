@@ -4,6 +4,7 @@ import graph._
 import graph.traversal._
 import plasticine._
 import plasticine.config._
+import plasticine.config.Config0
 //import plasticine.graph._
 
 //import analysis._
@@ -11,6 +12,7 @@ import plasticine.config._
 import codegen._
 import codegen.dot._
 
+import scala.language.implicitConversions
 import scala.collection.mutable.Queue
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
@@ -20,7 +22,7 @@ import scala.io.Source
 
 import scala.collection.mutable.{Set,Map}
 
-trait Design { self =>
+trait Design extends PIRMisc { self =>
 
   implicit val design: Design = self
 
@@ -166,7 +168,7 @@ trait Design { self =>
   }
 }
 
-trait PIRApp extends Design with PIRMisc{
+trait PIRApp extends Design{
   override val arch = Config0 
 
   def main(args: String*): Any 
@@ -179,8 +181,11 @@ trait PIRApp extends Design with PIRMisc{
 }
 
 trait PIRMisc {
-  //implicit def reg_to_wire(reg:Reg):Wire = {
-  //  reg.read
-  //}
+  implicit def reg_to_port(reg:Reg):Port = {
+    reg.out
+  }
+  implicit def ctr_to_port(ctr:Counter):Port = {
+    ctr.out
+  }
 }
 

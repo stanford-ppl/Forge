@@ -20,6 +20,8 @@ object DHDLBuild extends Build {
 
     retrieveManaged := true,
     scalacOptions += "-Yno-generic-signatures",
+    scalacOptions += "-feature",
+    scalacOptions += "-deprecation",
 
     parallelExecution in Test := false,
     concurrentRestrictions in Global := (Tags.limitAll(1) :: Nil)

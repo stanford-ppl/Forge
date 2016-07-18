@@ -7,21 +7,16 @@ import scala.math.max
 import dhdl.Design
 import dhdl.graph._
 
-abstract class Controller(name: Option[String],typeStr:String)(implicit design: Design) extends Node(name, typeStr) {
-  val nodes:List[Node] 
-}
+trait Controller extends Node
 
-case class ComputeUnit(n: Option[String], tpe:CtrlType, nds:List[Node], 
-  cchains:List[CounterChain], srams:List[SRAM], pipeline:Pipeline)
-(implicit design: Design) extends Controller(n, "CU") {
+case class ComputeUnit(n: Option[String], tpe:CtrlType, cchains:List[CounterChain], srams:List[SRAM], 
+  pipeline:Pipeline) (implicit design: Design) extends Node(n, "CU") with Controller {
   var parent:Controller = _
   toUpdate = true
-  override val nodes = nds
-  nodes.foreach {n => n match {
-      case n:Primitive => n.ctrler = this
-      case _ =>
-    }
-  }
+  cchains.foreach(_.updateCtrler(this))
+  srams.foreach(_.updateCtrler(this))
+  pipeline.updateCtrler(this)
+
   def update = (p:Controller) => {this.parent = p; toUpdate = false}
 }
 object ComputeUnit {
@@ -42,18 +37,17 @@ object ComputeUnit {
     val c = ComputeUnit(name, block, tpe); c.update(parent); c
   }
   def apply(name:Option[String], block:Pipeline => Any, tpe:CtrlType) (implicit design: Design):ComputeUnit = {
-    val (nodes, cchains, srams, pipeline) = unwrapBlock(block)
-    new ComputeUnit(name, tpe, nodes, cchains, srams, pipeline)
+    val (cchains, srams, pipeline) = unwrapBlock(block)
+    new ComputeUnit(name, tpe, cchains, srams, pipeline)
   }
   def unwrapBlock(block: Pipeline => Any)(implicit design: Design):
-    (List[Node], List[CounterChain], List[SRAM], Pipeline) = {
+    (List[CounterChain], List[SRAM], Pipeline) = {
     val pipeline = Pipeline(None)
-    val (nds, cchains, srams) = 
-      design.addBlock[Node, CounterChain, SRAM](block(pipeline), 
-                            (n:Node) => true, 
+    val (cchains, srams) = 
+      design.addBlock[CounterChain, SRAM](block(pipeline), 
                             (n:Node) => n.isInstanceOf[CounterChain], 
                             (n:Node) => n.isInstanceOf[SRAM]) 
-    (nds :+ pipeline, cchains, srams, pipeline)
+    (cchains, srams, pipeline)
   }
 }
 
@@ -78,18 +72,10 @@ object MemoryController extends {
   def apply (name:Option[String], parent: Controller, dram:String)(block:Pipeline => Any) (implicit design: Design):MemoryController = {
     val c = MemoryController(name, block, dram); c.update(parent); c }
   def apply(name:Option[String], block:Pipeline => Any, d:String) (implicit design: Design):MemoryController = {
-    val (nodes, cchains, srams, pipeline) = ComputeUnit.unwrapBlock(block)
-    new {override val dram = d} with ComputeUnit(name, Pipe, nodes, cchains, srams, pipeline) with MemoryController
+    val (cchains, srams, pipeline) = ComputeUnit.unwrapBlock(block)
+    new {override val dram = d} with ComputeUnit(name, Pipe, cchains, srams, pipeline) with MemoryController
   }
 }
 
-abstract case class Top(ctrlList:List[Controller])(implicit design: Design) 
-  extends Controller(Some("Top"), "Top")
-object Top {
-  def apply (block: => Any) (implicit design: Design):Top = {
-    val (nds,cl) = design.addBlock[Node, Controller](block, 
-      (n:Node) => true,
-      (n:Node) => n.isInstanceOf[Controller])
-    new { override val nodes = nds } with Top(cl)
-  }
-}
+case class Top(ctrlList:List[Controller])(implicit design: Design) 
+  extends Node(Some("Top"), "Top") with Controller

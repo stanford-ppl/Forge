@@ -32,10 +32,13 @@ trait Design extends PIRMisc { self =>
   private val nodeStack = Stack[(Node => Boolean, ListBuffer[Node])]()
   private val nameMap = HashMap[String, Node]()
   private val toUpdate = ListBuffer[(String, Node => Unit)]()
+  val allNodes = ListBuffer[Node]()
 
   def reset() {
     nodeStack.foreach { case (f,i) => i.clear() }
     nodeStack.clear()
+    allNodes.clear()
+    nodeStack.push(((n:Node) => true), allNodes)
     nameMap.clear()
     toUpdate.clear()
     nextSym = 0
@@ -125,7 +128,7 @@ trait Design extends PIRMisc { self =>
   }
 
   def getByName(s:String):Node = {
-    assert(nameMap.contains(s), s"No node defined with name:${s}")
+    assert(nameMap.contains(s), s"No node defined with name:${s}. nameMap:${nameMap}")
     nameMap(s)
   }
 
@@ -136,19 +139,14 @@ trait Design extends PIRMisc { self =>
   val arch:Spade
 
   def run(top:Top) {
-    addName(top)
-    top.nodes.foreach(n => addName(n))
+    allNodes.foreach(n => addName(n))
     toUpdate.foreach { case (k,f) =>
       val n:Node = getByName(k)
       f(n)
     }
     toUpdate.clear()
-    println("-------- Finishing updating nodes ----------")
+    println("-------- Finishing updating forward referenced nodes ----------")
      
-    //nodes.foreach {i => println(i)}
-    //cuList.foreach {i => println(i)}
-    //mcList.foreach {i => println(i)}
-    //top.ctrlList.foreach {i => println(i)}
     val printer = new IRPrinter()
     printer.run(top)
     //if (Config.genDot) {
@@ -166,6 +164,7 @@ trait Design extends PIRMisc { self =>
     //  }
     //}
   }
+
 }
 
 trait PIRApp extends Design{
@@ -174,7 +173,9 @@ trait PIRApp extends Design{
   def main(args: String*): Any 
   def main(args: Array[String]): Unit = {
     msg(args.mkString(", "))
-    val top:Top = Top(main(args:_*))
+    reset()
+    val ctrlList = addBlock(main(args:_*), (n:Node) => n.isInstanceOf[Controller])
+    val top:Top = Top(ctrlList)
     println("-------- Finishing graph construction ----------")
     run(top)
   }

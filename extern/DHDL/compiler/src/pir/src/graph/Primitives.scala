@@ -11,6 +11,7 @@ import dhdl.graph._
 class Primitive(nameStr:Option[String], typeStr:String)(implicit design: Design) 
   extends Node(nameStr, typeStr) { 
   var ctrler:Controller = _
+  def updateCtrler(c:Controller) = ctrler = c
 } 
 /** Counter node. Represents a chain of counters where each counter counts upto a certain max value. When
  *  the topmost counter reaches its maximum value, the entire counter chain ''saturates'' and does not
@@ -20,14 +21,17 @@ class Primitive(nameStr:Option[String], typeStr:String)(implicit design: Design)
  *  Maximum values and strides are specified in the order of topmost to bottommost counter.
  */
 trait CounterChain extends Primitive {
+  /* Fields */
   var counters:List[Counter] = Nil 
+  /* Pointers */
   var dep:Option[CounterChain] = None
   var copy:Option[CounterChain] = None
+
+  override def updateCtrler(c:Controller) = {super.updateCtrler(c); counters.foreach(_.updateCtrler(c))} 
   def apply(i: Int)(implicit design: Design):Counter = {
     if (counters.size == 0) {
-      // Speculatively allocate wires base on need
-      this.counters = (0 to i).map { j => 
-        Counter() }.toList
+      // Speculatively create counters base on need and check index out of bound during update
+      this.counters = (0 to i).map { j => Counter() }.toList
     }
     counters(i)
   }
@@ -70,6 +74,7 @@ object CounterChain {
 }
 
 case class Counter(n:Option[String])(implicit design: Design) extends Primitive(n, "Ctr"){
+  /* Fields */
   var min:Port = _
   var max:Port = _
   var step:Port = _
@@ -167,7 +172,9 @@ case class Pipeline(n:Option[String])(implicit design: Design) extends Primitive
   var regId = 0
   private def newTemp = {val temp = regId; regId +=1; temp}
 
+  /* Fields */
   val stages = ListBuffer[Stage]()
+  override def updateCtrler(c:Controller) = {super.updateCtrler(c); stages.foreach(_.updateCtrler(c))} 
 
   /* Register Mapping */
   val reduceReg = newTemp

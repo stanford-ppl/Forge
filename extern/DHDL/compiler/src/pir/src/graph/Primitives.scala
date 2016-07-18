@@ -140,6 +140,7 @@ case class Stage(n:Option[String], pipeline:Pipeline)(implicit design: Design) e
   var result:Port = _
 } 
 object Stage {
+  /* No Sugar API */
   def apply(stage:Stage, opds:List[Port], o:Op, r:Port, prm:Pipeline)
     (implicit design: Design):Unit= {
     stage.operands = opds
@@ -147,11 +148,7 @@ object Stage {
     stage.result = r 
     prm.addStage(stage)
   }
-  //TODO
-  def reduce(stage:Stage, op:Op) (implicit prm:Pipeline, design: Design):Unit = {
-    Stage(stage, List(prm.reduce(stage).read, prm.reduce(stage).read), op, prm.reduce(stage).read, prm)
-  }
-
+  /* Sugar API */
   def apply(stage:Stage, op1:Port, op:Op, result:Port)
            (implicit prm:Pipeline, design: Design):Unit =
     Stage(stage, List(op1), op, result, prm)
@@ -161,6 +158,11 @@ object Stage {
   def apply(stage:Stage, op1:Port, op2:Port, op3:Port, op:Op, result:Port)
            (implicit prm:Pipeline, design: Design):Unit =
     Stage(stage, List(op1, op2, op3), op, result, prm)
+  //TODO
+  def reduce(stage:Stage, op:Op) (implicit prm:Pipeline, design: Design):Unit = {
+    Stage(stage, List(prm.reduce(stage).read, prm.reduce(stage).read), op, prm.reduce(stage).read, prm)
+  }
+
 }
 object Stages {
   def apply(n:Int) (implicit prm:Pipeline, design: Design):List[Stage] = {

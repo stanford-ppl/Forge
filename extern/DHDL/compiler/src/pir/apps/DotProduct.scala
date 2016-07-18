@@ -5,6 +5,7 @@ import dhdl.codegen._
 import dhdl.Design
 import dhdl.PIRApp
 
+/* Example PIR using block (User facing PIR)*/
 object DotProduct extends PIRApp {
   def main(args: String*) = {
     val tileSize = Const(4l)
@@ -15,16 +16,16 @@ object DotProduct extends PIRApp {
       CounterChain(name="i", dataSize by tileSize)
     }
     // b1 := v1(i::i+tileSize)
-    val tileLoadA = MemCtrl (name="A", parent=outer, dram="A"){ implicit PL =>
+    val tileLoadA = MemCtrl (name="tileLoadA", parent=outer, dram="A"){ implicit PL =>
       val ic = CounterChain.copy(outer, "i")
       val it = CounterChain(name="it", Const(0) until tileSize by Const(1))
       val s0::_ = Stages(1)
       Stage(s0, op1=it(0), op2=ic(0), op=FixAdd, result=PL.vecOut(s0))
     }
     // b2 := v2(i::i+tileSize)
-    val tileLoadB = MemCtrl (name="B", parent=outer, dram="B"){ implicit PL =>
+    val tileLoadB = MemCtrl (name="tileLoadB", parent=outer, dram="B"){ implicit PL =>
       val ic = CounterChain.copy(outer, "i")
-      val it = CounterChain(name="it", ic(0) until Const(-1) by Const(1))
+      val it = CounterChain(name="it", Const(0) until tileSize by Const(1))
       val s0::_ = Stages(1)
       Stage(s0, op1=it(0), op2=ic(0), op=FixAdd, result=PL.vecOut(s0))
     }

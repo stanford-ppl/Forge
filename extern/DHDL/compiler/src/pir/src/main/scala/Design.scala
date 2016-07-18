@@ -118,12 +118,8 @@ trait Design extends PIRMisc { self =>
   val arch:Spade
   var top:Top = _
 
-  val traversals:ListBuffer[Traversal]
-  traversals += new ForwardRef()
-  traversals += new IRPrinter()
+  def run = traversals.foreach(_.run)
 
-  def run {
-    traversals.foreach(_.run)
     //if (Config.genDot) {
     //  val origGraph = new GraphvizCodegen(s"orig")
     //  origGraph.run(top)
@@ -138,7 +134,10 @@ trait Design extends PIRMisc { self =>
     //    dot.run(transformedTop)
     //  }
     //}
-  }
+  val traversals = ListBuffer[Traversal]()
+  traversals += new ForwardRef()
+  traversals += new IRPrinter()
+  reset()
 
 }
 
@@ -148,7 +147,6 @@ trait PIRApp extends Design{
   def main(args: String*): Any 
   def main(args: Array[String]): Unit = {
     msg(args.mkString(", "))
-    reset()
     val ctrlList = addBlock(main(args:_*), (n:Node) => n.isInstanceOf[Controller])
     top = Top(ctrlList)
     println("-------- Finishing graph construction ----------")

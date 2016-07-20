@@ -1,3 +1,0 @@
-cd out/dot
-make
-evince outfile.pdf

@@ -104,7 +104,7 @@ object ${dslName}Build extends Build {
 
 # this version uses local classes rather than jars. is it any better from an incremental compilation standpoint?
 def sbtBuildFileLocal(dsl):
-    s = Template("""
+    deps = """
 ${header}
 
   lazy val LMS_HOME = sys.env.get("LMS_HOME").getOrElse(error("Please set the LMS_HOME environment variable."))
@@ -116,7 +116,7 @@ ${header}
   lazy val deliteRuntime = file(DELITE_HOME + "/runtime" + scalacp)
   lazy val deliteTest = file(DELITE_HOME + "/framework/delite-test" + scalacp)
 
-  val deps = Seq(
+  var deps = Seq(
     unmanagedClasspath in Compile <+= (baseDirectory) map { bd => Attributed.blank(lms) },
     unmanagedClasspath in Compile <+= (baseDirectory) map { bd => Attributed.blank(deliteFramework) },
     unmanagedClasspath in Compile <+= (baseDirectory) map { bd => Attributed.blank(deliteRuntime) },
@@ -126,9 +126,20 @@ ${header}
     unmanagedClasspath in Test <+= (baseDirectory) map { bd => Attributed.blank(deliteRuntime) },
     unmanagedClasspath in Test <+= (baseDirectory) map { bd => Attributed.blank(deliteTest) }
   )
+"""
 
-${footer}
-""")
+    if dsl == "DHDL":
+        deps = deps + """
+  lazy val PIR_HOME = sys.env.get("PIR_HOME").getOrElse(error("Please set the PIR_HOME environment variable."))
+  lazy val pir = file(PIR_HOME + scalacp)
+  deps ++= Seq(
+    unmanagedClasspath in Compile <+= (baseDirectory) map { bd => Attributed.blank(pir) }
+  )
+
+"""
+    deps = deps + """${footer}"""
+
+    s = Template(deps)
     return s.substitute(header=sbtBuildFileHeader(dsl), footer=sbtBuildFileFooter(dsl), scala_major_vers=SCALA_MAJOR_VERS, scala_minor_vers=SCALA_MINOR_VERS)
 
 def sbtBuildFile(dsl):

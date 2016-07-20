@@ -8,7 +8,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait PipeLevelAnalysisExp extends PipeStageToolsExp {this: DHDLExp => }
+trait PipeLevelAnalysisExp extends NodeMetadataOpsExp {this: DHDLExp => }
 
 /**
  * Analysis traversal - rectifies annotations on the "level" of each controller
@@ -21,7 +21,7 @@ trait PipeLevelAnalysisExp extends PipeStageToolsExp {this: DHDLExp => }
  * 1. Control nodes are not allowed within reduction functions
  * 2. Parallel must contain at least one control node, no primitive nodes (HACK: Temporary check until Parallel is removed)
  **/
-trait PipeLevelAnalyzer extends Traversal with PipeStageTools {
+trait PipeLevelAnalyzer extends Traversal with SpatialTraversalTools {
   val IR: DHDLExp with PipeLevelAnalysisExp
   import IR._
 

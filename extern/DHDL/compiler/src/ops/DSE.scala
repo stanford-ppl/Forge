@@ -31,9 +31,9 @@ trait DSE extends Traversal {
   lazy val contention = new ContentionModel{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val bufAnalyzer = new MemoryAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
 
-  lazy val tileSizes  = paramAnalyzer.tileSizes.distinct
-  lazy val parFactors = paramAnalyzer.parFactors.distinct
-  lazy val localMems  = ctrlAnalyzer.localMems
+  lazy val tileSizes = paramAnalyzer.tileSizes.distinct
+  lazy val parParams = paramAnalyzer.parParams.distinct
+  lazy val localMems = ctrlAnalyzer.localMems
   lazy val metapipes = ctrlAnalyzer.metapipes
   //lazy val accFactors = ctrlAnalyzer.memAccessFactors.toList
   lazy val topController = ctrlAnalyzer.top
@@ -48,7 +48,7 @@ trait DSE extends Traversal {
     debug("Tile Sizes: ")
     tileSizes.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
     debug("Parallelization Factors:")
-    parFactors.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
+    parParams.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
     debug("Metapipelining Toggles:")
     metapipes.foreach{t => debug(s"  ${mpos(t.pos).line}")}
 
@@ -56,7 +56,7 @@ trait DSE extends Traversal {
 
     debug("Freezing DSE parameters")
     tileSizes.foreach{p => p.fix}
-    parFactors.foreach{p => p.fix}
+    parParams.foreach{p => p.fix}
     bndAnalyzer.run(b)
     bufAnalyzer.run(localMems)
     contention.run(topController)
@@ -112,7 +112,7 @@ trait DSE extends Traversal {
     debug("Running DSE")
     debug("")
     debug("Found the following parameter restrictions: ")
-    val numericFactors = tileSizes ++ parFactors
+    val numericFactors = tileSizes ++ parParams
 
     for (r <- restrict)   { debug(s"  $r") }
     for ((p,r) <- ranges if numericFactors.contains(p)) { debug(s"  ${nameOf(p).getOrElse(p.toString)}: ${r.start}:${r.step}:${r.end}") }

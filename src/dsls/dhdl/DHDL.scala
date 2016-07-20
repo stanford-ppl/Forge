@@ -228,7 +228,6 @@ trait DHDLDSL extends ForgeApplication
     val GlobalAnalyzer = analyzer("Global")
     val ControlSignalAnalyzer = analyzer("ControlSignal", isExtern=true)
     val UnrolledControlAnalyzer = analyzer("UnrolledControlSignal", isExtern=true)
-    val ParallelizationSetter = traversal("ParallelizationSetter",isExtern=true)
     val DHDLAffineAnalysis = analyzer("DHDLAffine", isExtern=true)
 
     val BoundAnalyzer = analyzer("Bound", isIterative=false)
@@ -263,7 +262,6 @@ trait DHDLDSL extends ForgeApplication
     schedule(GlobalAnalyzer)        // Values computed outside of all controllers (TODO: Needed again?)
     schedule(ControlSignalAnalyzer) // Variety of control signal related metadata
 
-    schedule(ParallelizationSetter) // Parallelization factors
     schedule(DHDLAffineAnalysis)    // Access patterns
 
     schedule(DotIRPrinter)          // Graph prior to unrolling
@@ -308,6 +306,7 @@ trait DHDLDSL extends ForgeApplication
     extern(grp("ExternCounter"), targets = List($cala, maxj), withTypes = true)
     extern(grp("MemoryTemplate"), targets = List($cala, cpp, maxj), withTypes = true)
     extern(metadata("ExternPrimitive"), targets = List($cala, maxj), withTypes = true)
+    extern(metadata("NodeMetadata"), targets = Nil, withTypes = true)
     extern(grp("LoweredPipe"), targets = List($cala, maxj))
     extern(grp("Name"), targets = Nil)
 		()

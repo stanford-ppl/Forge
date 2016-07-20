@@ -10,9 +10,9 @@ import dhdl.compiler.ops._
 
 // TODO: Eventually this analyzer should be superceded by more generalized coarse controller dataflow
 
-trait StageAnalysisExp extends PipeStageToolsExp {this: DHDLExp => }
+trait StageAnalysisExp extends NodeMetadataOpsExp {this: DHDLExp => }
 
-trait StageAnalyzer extends Traversal with PipeStageTools {
+trait StageAnalyzer extends Traversal with SpatialTraversalTools {
   val IR: DHDLExp with StageAnalysisExp
   import IR._
 

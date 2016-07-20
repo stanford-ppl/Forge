@@ -11,7 +11,7 @@ import dhdl.compiler.transform._
 import scala.collection.mutable.HashMap
 
 trait ContentionModel {
-  val IR: DHDLExp with PipeStageToolsExp
+  val IR: DHDLExp with NodeMetadataOpsExp
   import IR._
 
   val isolatedContention = HashMap[Exp[Any],List[Int]]()

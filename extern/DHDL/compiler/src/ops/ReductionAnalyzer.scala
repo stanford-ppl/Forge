@@ -10,7 +10,7 @@ import dhdl.compiler.ops._
 
 // TODO: Eventually this analyzer should be superceded by more generalized reduction code generation
 
-trait ReductionAnalysisExp extends PipeStageToolsExp {
+trait ReductionAnalysisExp extends NodeMetadataOpsExp {
   this: DHDLExp =>
 
   sealed abstract class ReduceFunction
@@ -35,7 +35,7 @@ trait ReductionAnalysisExp extends PipeStageToolsExp {
   }
 }
 
-trait ReductionAnalyzer extends Traversal with PipeStageTools {
+trait ReductionAnalyzer extends Traversal with SpatialTraversalTools {
   val IR: DHDLExp with ReductionAnalysisExp
   import IR._
 

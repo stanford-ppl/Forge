@@ -8,8 +8,8 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait ModelingTraversal extends QuickTraversal with PipeStageTools {
-  val IR: DHDLExp with PipeStageToolsExp with LatencyModel
+trait ModelingTraversal extends QuickTraversal with SpatialTraversalTools {
+  val IR: DHDLExp with NodeMetadataOpsExp with LatencyModel
   import IR._
 
   // --- State

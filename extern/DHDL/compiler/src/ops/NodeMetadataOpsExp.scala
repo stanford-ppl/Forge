@@ -9,10 +9,18 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-import ppl.delite.framework.DeliteApplication
+trait NodeMetadataTypesExp extends DHDLMetadataOpsExp {
+  this: DHDLExp =>
 
-// TODO: Can these be derived automatically?
-trait PipeStageToolsExp extends EffectExp {
+  def parsOf(e: Exp[Any]): List[Int] = parFactorsOf(e).map{
+    case Const(c: Int) => c
+    case Param(p: Int) => p
+  }
+  def parOf(e: Rep[Any]): Int = if (parsOf(e).isEmpty) 1 else parsOf(e).head
+}
+
+// TODO: Can these somehow be derived automatically?
+trait NodeMetadataOpsExp extends NodeMetadataTypesExp {
   this: DHDLExp =>
 
   // TODO: Type parameters?
@@ -20,7 +28,7 @@ trait PipeStageToolsExp extends EffectExp {
   type LocalRead  = (Exp[Any], Option[Exp[Any]])                   // Memory, optional address
 
   // Returns written memory, optional value, optional address
-  def writerUnapply(d: Def[Any]): Option[List[LocalWrite]] = d match {
+  private def writerUnapply(d: Def[Any]): Option[List[LocalWrite]] = d match {
     case EatReflect(Reg_write(reg,value))             => Some(LocalWrite(reg,value))
     case EatReflect(Bram_store(bram,addr,value))      => Some(LocalWrite(bram,value,addr))
     case EatReflect(Push_fifo(fifo,value,_))          => Some(LocalWrite(fifo,value))
@@ -33,7 +41,7 @@ trait PipeStageToolsExp extends EffectExp {
   }
 
   // Returns read memory, optional address
-  def readerUnapply(d: Def[Any]): Option[List[LocalRead]] = d match {
+  private def readerUnapply(d: Def[Any]): Option[List[LocalRead]] = d match {
     case EatReflect(Reg_read(reg))                     => Some(LocalRead(reg))
     case EatReflect(Bram_load(bram,addr))              => Some(LocalRead(bram,addr))
     case EatReflect(Pop_fifo(fifo))                    => Some(LocalRead(fifo))
@@ -45,6 +53,59 @@ trait PipeStageToolsExp extends EffectExp {
     case EatReflect(Scatter(mem,local,addrs,_,_))      => Some(LocalRead(local) ++ LocalRead(addrs))
     case _ => None
   }
+
+  // Parallelization factors associated with this node
+  override def parFactors(e: Exp[Any])(implicit ctx: SourceContext): List[Exp[Int]] = e match {
+    case Deff(Counterchain_new(ctrs,nIter))   => ctrs.flatMap{ctr => parFactors(ctr) }
+    case Deff(Counter_new(_,_,_,par))         => List(par)
+    case Deff(Offchip_load_cmd(_,_,_,_,par))  => List(par)
+    case Deff(Offchip_store_cmd(_,_,_,_,par)) => List(par)
+    case Deff(Scatter(_,_,_,_,par))           => List(par)
+    case Deff(Gather(_,_,_,_,par))            => List(par)
+    case _ => super.parFactors(e)
+  }
+
+  def isAllocation(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:Reg_new[_])       => true
+    case EatReflect(_:Bram_new[_])      => true
+    case EatReflect(_:Fifo_new[_])      => true
+    case EatReflect(_:Cam_new[_,_])     => true
+    case EatReflect(_:Offchip_new[_])   => true
+    case EatReflect(_:Counter_new)      => true
+    case EatReflect(_:Counterchain_new) => true
+    case _ => false
+  }
+  def isOffChipTransfer(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:Offchip_load_cmd[_])  => true
+    case EatReflect(_:Offchip_store_cmd[_]) => true
+    case EatReflect(_:Gather[_]) => true
+    case EatReflect(_:Scatter[_]) => true
+    case _ => false
+  }
+  def isParallel(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:Pipe_parallel) => true
+    case _ => false
+  }
+  def isPipeline(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:Pipe_foreach)    => true
+    case EatReflect(_:Pipe_fold[_,_])  => true
+    case EatReflect(_:Accum_fold[_,_]) => true
+    case EatReflect(_:Unit_pipe)       => true
+    case EatReflect(_:Hwblock)         => true
+    case EatReflect(_:ParPipeForeach)  => true
+    case EatReflect(_:ParPipeReduce[_,_]) => true
+    case _ => false
+  }
+  def isLoop(d: Def[Any]): Boolean = d match {
+    case EatReflect(_:ParPipeForeach)  => true
+    case EatReflect(_:ParPipeReduce[_,_]) => true
+    case EatReflect(_:Pipe_foreach)    => true
+    case EatReflect(_:Pipe_fold[_,_])  => true
+    case EatReflect(_:Accum_fold[_,_]) => true
+    case _ => false
+  }
+
+  // --- Syntax sugar
 
   object LocalWrite {
     def apply(mem: Exp[Any]): List[LocalWrite] = List( (mem, None, None) )
@@ -154,54 +215,14 @@ trait PipeStageToolsExp extends EffectExp {
   def isSequential(s: Exp[Any]): Boolean = isOuterControl(s) && styleOf(s) == SequentialPipe
   def isSequential(s: (Exp[Any],Boolean)): Boolean = !s._2 && isSequential(s._1)
 
-  def isLocalMemory(s: Exp[Any]) = {
-    isRegister(s.tp) || isBRAM(s.tp) || isFIFO(s.tp) || isCache(s.tp)
-  }
+  def isParallelizableLoop(e: Exp[Any]) = isInnerPipe(e) || isMetaPipe(e) || isStreamPipe(e)
+
 
   def isAllocation(s: Exp[Any]): Boolean = s match {
     case Def(d) => isAllocation(d)
     case _ => false
   }
-  def isAllocation(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:Reg_new[_])       => true
-    case EatReflect(_:Bram_new[_])      => true
-    case EatReflect(_:Fifo_new[_])      => true
-    case EatReflect(_:Cam_new[_,_])     => true
-    case EatReflect(_:Offchip_new[_])   => true
-    case EatReflect(_:Counter_new)      => true
-    case EatReflect(_:Counterchain_new) => true
-    case _ => false
-  }
-  def isOffChipTransfer(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:Offchip_load_cmd[_])  => true
-    case EatReflect(_:Offchip_store_cmd[_]) => true
-    case EatReflect(_:Gather[_]) => true
-    case EatReflect(_:Scatter[_]) => true
-    case _ => false
-  }
-  def isParallel(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:Pipe_parallel) => true
-    case _ => false
-  }
-  def isPipeline(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:Pipe_foreach)    => true
-    case EatReflect(_:Pipe_fold[_,_])  => true
-    case EatReflect(_:Accum_fold[_,_]) => true
-    case EatReflect(_:Unit_pipe)       => true
-    case EatReflect(_:Hwblock)         => true
-    case EatReflect(_:ParPipeForeach)  => true
-    case EatReflect(_:ParPipeReduce[_,_]) => true
-    case _ => false
-  }
-  def isLoop(d: Def[Any]): Boolean = d match {
-    case EatReflect(_:ParPipeForeach)  => true
-    case EatReflect(_:ParPipeReduce[_,_]) => true
-    case EatReflect(_:Pipe_foreach)    => true
-    case EatReflect(_:Pipe_fold[_,_])  => true
-    case EatReflect(_:Accum_fold[_,_]) => true
-    case _ => false
-  }
-
+  def isLocalMemory(s: Exp[Any]) = isRegister(s.tp) || isBRAM(s.tp) || isFIFO(s.tp) || isCache(s.tp)
 
   // Checks to see if lhs is dependent on rhs (used for checking for accum. cycles)
   def hasDependency(lhs: Exp[Any], rhs: Exp[Any]): Boolean = {
@@ -220,8 +241,8 @@ trait PipeStageToolsExp extends EffectExp {
 
 
 // Uses scheduling to get all statements in a given block
-trait PipeStageTools extends NestedBlockTraversal {
-  val IR: PipeStageToolsExp
+trait SpatialTraversalTools extends NestedBlockTraversal {
+  val IR: NodeMetadataOpsExp
   import IR._
 
   def list(x: List[Exp[Any]]) = x.zipWithIndex.foreach{

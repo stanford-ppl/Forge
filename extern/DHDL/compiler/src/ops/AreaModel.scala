@@ -73,7 +73,7 @@ object NoArea extends FPGAResources()
 
 // TODO: Should get some of this from loading a file rather than hardcoding
 // All numbers here are from Stratix V profiling
-trait AreaModel extends PipeStageToolsExp {
+trait AreaModel extends NodeMetadataOpsExp {
   this: DHDLExp =>
 
   private var silentModel = false

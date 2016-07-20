@@ -8,13 +8,13 @@ import scala.collection.mutable.HashMap
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait UnrollingTransformExp extends PipeStageToolsExp with LoweredPipeOpsExp { this: DHDLExp => }
+trait UnrollingTransformExp extends NodeMetadataOpsExp with LoweredPipeOpsExp { this: DHDLExp => }
 
-trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
+trait UnrollingTransformer extends MultiPassTransformer {
   val IR: UnrollingTransformExp with DHDLExp
   import IR.{infix_until => _, Array => _, assert => _, _}
 
-  debugMode = true
+  debugMode = false
   override val name = "Unrolling Transformer"
 
   /**
@@ -95,7 +95,6 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
    * Create duplicates of the given node or special case, vectorized version
    * NOTE: Only can be used within reify scope
    **/
-  // FIXME: Assumes FIFO and BRAM are outside of this unrolling scope!
   def unroll[T](s: Sym[T], d: Def[T], lanes: Unroller)(implicit ctx: SourceContext): List[Exp[Any]] = d match {
     // Account for the edge case with FIFO writing
     case EatReflect(e@Push_fifo(fifo, value, en)) if !lanes.isUnrolled(fifo) =>
@@ -311,7 +310,7 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
     case _ => mirror(rhs, f.asInstanceOf[Transformer])(mtype(manifest[A]), pos)
   }).asInstanceOf[Exp[A]]
 
-  // Mirrors first prior to attempting to transform
+  // Mirrors first prior to attempting to transform -- need to scrub mirrored symbols if they are not used
   override def transform[A:Manifest](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext) = self_mirror(lhs, rhs) match {
     case lhs2@Deff(e: Pipe_foreach) => Some( unrollForeach(lhs2, e) )
     case lhs2@Deff(e: Pipe_fold[_,_]) => Some( unrollPipeFold(lhs2, e)(e.ctx,e.numT,e.mT,e.mC) )

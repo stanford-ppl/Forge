@@ -23,7 +23,7 @@ trait ExternCounterTypesExp extends ExternCounterTypes {
   def counterChainManifest: Manifest[CounterChain] = manifest[DHDLCounterChain]
 }
 
-trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with CounterChainOpsExp {
+trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with CounterChainOpsExp with NodeMetadataOpsExp {
   this: DHDLExp =>
 
   // --- Nodes
@@ -75,14 +75,6 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
   }
 
   // --- Analysis tools
-  def parsOf(cc: Rep[CounterChain]): List[Int] = parParamsOf(cc).map(_.x)
-
-  def parParamsOf(cc: Rep[CounterChain]): List[Param[Int]] = cc match {
-    case Deff(Counterchain_new(ctrs,nIter)) => ctrs.map{
-      case Deff(Counter_new(_,_,_,par)) => par
-    }
-  }
-
   def offsets(cc: Rep[CounterChain]) = cc match {
     case Deff(Counterchain_new(ctrs,nIter)) => ctrs.map{
       case Deff(Counter_new(start,_,_,par)) => start

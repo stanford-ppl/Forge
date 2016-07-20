@@ -10,7 +10,7 @@ import dhdl.compiler.ops._
 
 import scala.collection.mutable.{HashSet,HashMap}
 
-trait ControlSignalAnalysisExp extends PipeStageToolsExp {this: DHDLExp => }
+trait ControlSignalAnalysisExp extends NodeMetadataOpsExp {this: DHDLExp => }
 trait UnrolledControlSignalAnalysisExp extends ControlSignalAnalysisExp {this: DHDLExp => }
 
 // TODO: This analyzer has a somewhat different pattern of "do x for all nodes" prior to the usual pattern matching traversal rules
@@ -26,30 +26,29 @@ trait UnrolledControlSignalAnalysisExp extends ControlSignalAnalysisExp {this: D
 // (6)  Flags accumulators
 // (7)  Records list of local memories
 // (8)  Records set of metapipes
-// (9)  Set parallelization factors of memory readers and writers
+// (9)  Set parallelization factors of memory readers and writers relative to memory
 // (10) Sets written set of controllers
 // (11) Determines the top controller
-trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
+trait ControlSignalAnalyzer extends Traversal {
   val IR: DHDLExp with ControlSignalAnalysisExp
   import IR._
 
   override val name = "Control Signal Analyzer"
   debugMode = true
 
+  // --- State
   var level = 0
   var indsOwners: Map[Exp[Any], (Exp[Any], Boolean, Int)] = Map.empty // Used to identify the top-most controller for a given address
-  var controller: Option[(Exp[Any], Boolean)] = None
+  var controller: Option[(Exp[Any], Boolean)] = None                  // Parent controller for the current scope
   var pendingReads: Map[Exp[Any],Exp[Any]] = Map.empty                // Memory reads outside of inner pipes
+  var unrollFactors = List[Exp[Int]]()                                // Unrolling factors for the current scope
 
-  //var indexMap: Map[Exp[Any], (Param[Int], Int)] = Map.empty
-
+  // --- Output (to DSE)
   var localMems = List[Exp[Any]]()    // Local memories
   var metapipes = List[Exp[Any]]()    // List of metapipes which can be sequentialized
   var top: Exp[Any] = null
 
-  //val memAccessFactors = HashMap[Exp[Any],List[Param[Int]]]() // Parallelization factors for memory readers/writers
-
-  // HACK: During preprocessing, clear out metadata that we append to in order to get rid of stale symbols
+  // During preprocessing, clear out metadata that we append to in order to get rid of stale symbols
   override def preprocess[A:Manifest](b: Block[A]): Block[A] = {
     localMems = Nil
     metapipes = Nil
@@ -61,7 +60,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       if (meta[MWriters](s).isDefined) writersOf(s) = Nil
       if (meta[MChildren](s).isDefined) childrenOf(s) = Nil
     }
-    b
+    super.preprocess(b)
   }
 
   override def postprocess[A:Manifest](b: Block[A]): Block[A] = {
@@ -72,6 +71,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
     b
   }
 
+  // Traverse the scope of the given controller
   def traverseWith(owner: Exp[Any], isReduce: Boolean)(b: Block[Any]) {
     level += 1
     val prevCtrl = controller
@@ -84,19 +84,26 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
     pendingReads = prevReads
     level -= 1
   }
-
+  // Traverse the scope of the given iterative controller
   def traverseWith(owner: Exp[Any], isReduce: Boolean, inds: List[Exp[Any]], cc: Rep[CounterChain])(b: Block[Any]) {
     val prevOwners = indsOwners
-    //val prevIdxMap = indexMap
     inds.foreach{ind => indsOwners += ind -> (owner, isReduce, level) }
 
-    // HACK: Currently only parallelize the innermost loop index
-    //val pars = parParamsOf(cc)
-    //if (!inds.isEmpty) { indexMap += inds.last -> (pars.last, level) }
-    traverseWith(owner, isReduce)(b)
+    val prevUnrollFactors = unrollFactors
+    if (isParallelizableLoop(owner)) {
+      // ASSUMPTION: Only parallelize by innermost loop currently
+      parFactorOf(inds.last) = parFactorsOf(cc).last
+      unrollFactors ++= List(parFactors(cc).last)
 
+      // More complete:
+      // val factors = parFactorsOf(cc)
+      // inds.zip(factors).foreach{case (i,p) => parFactorOf(i) = p }
+      // unrollFactors ++= factors
+    }
+
+    traverseWith(owner, isReduce)(b)
+    unrollFactors = prevUnrollFactors
     indsOwners = prevOwners
-    //indexMap = prevIdxMap
   }
 
   private def dfs(frontier: List[Exp[Any]]): List[Exp[Any]] = {
@@ -112,23 +119,6 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
     (top._1, top._2)
   }
 
-  // FIXME
-  /*def getAddressParFactor(addr: Exp[Any]): Option[Param[Int]] = {
-    val bnds = dfs(List(addr))
-    // Get all indices in the innermost loop
-    val pars = bnds.flatMap{i => indexMap.get(i) }.filter{ _._2 == level }.map(_._1)
-    // HACK: Only parallelize the innermost loop index right now
-    if (pars.isEmpty) None else Some(pars.last)
-  }
-  def addAccessFactor(mem: Exp[Any], addr: Exp[Any]) {
-    val par = getAddressParFactor(addr)
-    par.foreach{ p => addAccessParam(mem, p) }
-  }
-  def addAccessParam(mem: Exp[Any], p: Param[Int]) {
-    if (memAccessFactors.contains(mem)) memAccessFactors(mem) = memAccessFactors(mem) :+ p
-    else memAccessFactors(mem) = List(p)
-  }*/
-
   /**
    * In general, we assume that primitive nodes are wrapped within controllers for scheduling purposes
    * (The Unit Pipe Transformer inserts these wrappers for users to simplify programs)
@@ -140,6 +130,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
    **/
   def appendReader(ctrl: Exp[Any], isReduce: Boolean, reader: Exp[Any]) = reader match {
     case LocalReader(reads) => reads.foreach{ case (mem,addr) =>
+      checkMultipleReaders(mem, reader)
       val top = addr.map{a => getTopController(ctrl, isReduce, a)}.getOrElse( (ctrl,isReduce) )
       readersOf(mem) = readersOf(mem) :+ (top._1, top._2, reader)
     }
@@ -154,13 +145,16 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
     }
   }
 
-  /**
-   * Primitive writers are currently only allowed in inner pipes
-   **/
   def checkMultipleWriters(mem: Exp[Any], writer: Exp[Any]) {
     // TODO: Multiple writers should be allowed for memory templates which have buffering support
     if (writersOf(mem).nonEmpty) {
       stageError("Memory " + nameOf(mem).getOrElse("") + " defined here has multiple writers.")(mpos(mem.pos))
+    }
+  }
+
+  def checkMultipleReaders(mem: Exp[Any], reader: Exp[Any]) {
+    if (isFIFO(mem.tp) && readersOf(mem).nonEmpty) {
+      stageError("FIFO " + nameOf(mem).getOrElse("") + " defined here has multiple readers.")(mpos(mem.pos))
     }
   }
 
@@ -200,7 +194,11 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
     childrenOf(ctrl) = childrenOf(ctrl) :+ child  // (3)
   }
 
+  // TODO: Name this function something else more descriptive
   def addMemoryOps(lhs: Exp[Any], rhs: Def[Any]) {
+    // Set total unrolling factors of this node's scope + internal unrolling factors in this node
+    unrollFactorsOf(lhs) = unrollFactors ++ parFactors(lhs) // (9)
+
     if (controller.isDefined) {
       // Add pending readers
       val ctrl = controller.get
@@ -264,6 +262,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
 
       // TODO: Can these be generalized too?
       checkMultipleWriters(a, lhs)
+      checkMultipleReaders(a, lhs)
       readersOf(a) = readersOf(a) :+ (lhs, isOuter, lhs)  // (4)
       writersOf(a) = writersOf(a) :+ (lhs, isOuter, lhs)  // (5)
       isAccum(a) = true                                   // (6)
@@ -278,6 +277,7 @@ trait ControlSignalAnalyzer extends Traversal with PipeStageTools {
       readersOf(partial) = readersOf(partial) :+ (lhs,true,lhs) // (4)
 
       checkMultipleWriters(a, lhs)
+      checkMultipleReaders(a, lhs)
       readersOf(a) = readersOf(a) :+ (lhs, true, lhs)     // (4)
       writersOf(a) = writersOf(a) :+ (lhs, true, lhs)     // (5)
       isAccum(a) = true                                   // (6)
@@ -296,8 +296,9 @@ trait UnrolledControlSignalAnalyzer extends ControlSignalAnalyzer {
   val IR: DHDLExp with ControlSignalAnalysisExp
   import IR._
 
-  // All cases of multiple writers are ok now (we banked for unrolled writes already)
+  // All cases of multiple access are ok now (we banked for unrolled accesses already)
   override def checkMultipleWriters(mem: Exp[Any], writer: Exp[Any]) { }
+  override def checkMultipleReaders(mem: Exp[Any], reader: Exp[Any]) { }
 
   def traverseUnrolled(owner: Exp[Any], isReduce: Boolean, inds: List[List[Exp[Any]]], cc: Rep[CounterChain])(b: Block[Any]) {
     val prevOwners = indsOwners

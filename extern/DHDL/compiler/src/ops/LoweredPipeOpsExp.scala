@@ -6,7 +6,7 @@ import scala.reflect.{Manifest,SourceContext}
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait LoweredPipeOpsExp extends PipeStageToolsExp with ExternPrimitiveTypesExp with MemoryTemplateOpsExp {
+trait LoweredPipeOpsExp extends ExternPrimitiveTypesExp with MemoryTemplateOpsExp {
   this: DHDLExp =>
 
   // --- Nodes

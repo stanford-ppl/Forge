@@ -138,3 +138,20 @@ trait UnrollTest1 extends DHDLApplication {
     }
   }
 }
+
+object BankingTest1Compiler extends DHDLApplicationCompiler with BankingTest1
+trait BankingTest1 extends DHDLApplicationCompiler {
+  def main() {
+    Accel {
+      val mem = BRAM[SInt](8, 8)
+      val out = Reg[SInt]
+      Fold(8 by 1 par unit(2))(out, 0){i =>
+        Reduce(8 by 1 par unit(8))(0){j =>
+          // Contrived example:
+          // Total parallelization relative to memory is 16, but par of j is only 8
+          mem(j)
+        }{_+_}
+      }{_+_}
+    }
+  }
+}

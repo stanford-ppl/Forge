@@ -8,8 +8,8 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait MetaPipeRegInsertion extends SinglePassTransformer with PipeStageTools {
-  val IR: DHDLExp with PipeStageToolsExp
+trait MetaPipeRegInsertion extends SinglePassTransformer with SpatialTraversalTools {
+  val IR: DHDLExp with NodeMetadataOpsExp
   import IR.{assert => _, _}
 
   debugMode = false

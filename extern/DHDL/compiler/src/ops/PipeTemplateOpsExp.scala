@@ -12,7 +12,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplateOpsExp with ExternCounterOpsExp with PipeStageToolsExp {
+trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplateOpsExp with ExternCounterOpsExp {
   this: DHDLExp =>
 
   type Idx = FixPt[Signed,B32,B0]

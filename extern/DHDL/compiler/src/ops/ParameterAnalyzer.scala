@@ -114,7 +114,7 @@ trait ParamRestrictions extends Expressions with NameOpsExp {
 }
 
 
-trait ParameterAnalysisExp extends ParamRestrictions with PipeStageToolsExp { this: DHDLExp => }
+trait ParameterAnalysisExp extends ParamRestrictions with NodeMetadataOpsExp { this: DHDLExp => }
 trait ParameterAnalyzer extends Traversal {
   val IR: DHDLExp with ParameterAnalysisExp
   import IR._
@@ -131,9 +131,9 @@ trait ParameterAnalyzer extends Traversal {
   val MAX_PAR_FACTOR = 192  // duplications
   val MAX_OUTER_PAR  = 15
 
-  var tileSizes  = List[Param[Int]]()  // Params used to calculate BRAM size
-  var parFactors = List[Param[Int]]()  // Params used as parallelization factors for counters
-  val range      = HashMap[Param[Int],RRange]()
+  var tileSizes = List[Param[Int]]()  // Params used to calculate BRAM size
+  var parParams = List[Param[Int]]()  // Params used as parallelization factors for counters
+  val range     = HashMap[Param[Int],RRange]()
 
   var restrict   = List[Restrict]()
   var innerLoop  = false
@@ -164,7 +164,11 @@ trait ParameterAnalyzer extends Traversal {
       range(p) = xrange(range(p).start,Math.min(mx,range(p).end),range(p).step)
   }
 
-  def canParallelize(e: Exp[Any]) = isInnerPipe(e) || isMetaPipe(e) || isStreamPipe(e)
+  // ASSUMPTION: Parallelize by only last parameter
+  def getParams(x: List[Exp[Int]]): List[Param[Int]] = x.last match {
+    case p: Param[_] => List(p.asInstanceOf[Param[Int]])
+    case _ => Nil
+  }
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
     case Fifo_new(ParamFix(p),_) =>
@@ -235,21 +239,21 @@ trait ParameterAnalyzer extends Traversal {
       }
 
     // HACK: Parallelize innermost loop only
-    case e:Pipe_foreach if canParallelize(lhs) =>
-      val pars = List( parParamsOf(e.cchain).last )
-      parFactors :::= pars
+    case e:Pipe_foreach if isParallelizableLoop(lhs) =>
+      val pars = getParams(parFactorsOf(e.cchain))
+      parParams :::= pars
       if (!isInnerPipe(lhs)) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
-    case e:Pipe_fold[_,_] if canParallelize(lhs) =>
-      val pars = List( parParamsOf(e.cchain).last )
-      parFactors :::= pars
+    case e:Pipe_fold[_,_] if isParallelizableLoop(lhs) =>
+      val pars = getParams(parFactorsOf(e.cchain))
+      parParams :::= pars
       if (!isInnerPipe(lhs)) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
-    case e:Accum_fold[_,_] if canParallelize(lhs) =>
-      val opars = List( parParamsOf(e.ccOuter).last )
-      val ipars = List( parParamsOf(e.ccInner).last )
-      parFactors :::= opars
-      parFactors :::= ipars
+    case e:Accum_fold[_,_] if isParallelizableLoop(lhs) =>
+      val opars = getParams(parFactorsOf(e.ccOuter))
+      val ipars = getParams(parFactorsOf(e.ccInner))
+      parParams :::= opars
+      parParams :::= ipars
       opars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
     case _ => super.traverse(lhs,rhs)

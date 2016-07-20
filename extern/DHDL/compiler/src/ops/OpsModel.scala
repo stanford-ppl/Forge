@@ -37,7 +37,7 @@ case class AppStatistics(
 }
 
 // Helps to provide an estimate of ops and bandwidth
-trait OpsModel extends PipeStageToolsExp {
+trait OpsModel extends NodeMetadataOpsExp {
   this: DHDLExp =>
 
   object NoOps extends AppStatistics()

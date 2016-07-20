@@ -8,12 +8,12 @@ import scala.collection.mutable.HashMap
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait UnitPipeTransformExp extends PipeStageToolsExp with LoweredPipeOpsExp { this: DHDLExp => }
+trait UnitPipeTransformExp extends NodeMetadataOpsExp with LoweredPipeOpsExp { this: DHDLExp => }
 
 /**
  * Inserts unit Pipe wrappers for primitive nodes in outer control nodes, along with registers for communication
  **/
-trait UnitPipeTransformer extends MultiPassTransformer with PipeStageTools {
+trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTools {
   val IR: UnitPipeTransformExp with DHDLExp
   import IR.{infix_until => _, _}
 

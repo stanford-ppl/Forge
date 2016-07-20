@@ -7,7 +7,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait LatencyModel extends PipeStageToolsExp {
+trait LatencyModel extends NodeMetadataOpsExp {
   this: DHDLExp =>
 
   lazy val memModel = new TileLoadModel()

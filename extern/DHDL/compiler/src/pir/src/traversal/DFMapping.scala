@@ -1,10 +1,10 @@
 package dhdl.graph.traversal
 import dhdl.graph._
-import dhdl.Design
-import dhdl.Config
+import dhdl._
 import dhdl.graph.mapping._
 
 class DFMapping(implicit val design: Design) extends Traversal{
+  import DFMapping._
 
   val mapping = new CUMapping() 
 
@@ -26,6 +26,9 @@ class DFMapping(implicit val design: Design) extends Traversal{
   override def finPass = {
     println("-------- Finishing Depth First Mapping ----------")
     mapping.printMap
+    close
   }
-
+}
+object DFMapping extends Printer {
+  override val stream = Printer.newStream("Mapping.txt") 
 }

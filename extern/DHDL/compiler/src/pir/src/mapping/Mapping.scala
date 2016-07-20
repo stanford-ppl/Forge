@@ -1,7 +1,6 @@
 package dhdl.graph.mapping
 import dhdl.graph.{ComputeUnit => CU, MemoryController => MC, _}
-import dhdl.Design
-import dhdl.Config
+import dhdl._
 import dhdl.plasticine.config._
 import dhdl.plasticine.graph.{ComputeUnit => PCU, MemoryController => PMC}
 
@@ -14,13 +13,6 @@ abstract class Mapping[N,R,V](implicit design:Design) {
   def reset:Unit = { mapping = null }
   def map:(Boolean, List[Hint])
   def printMap:Unit
-
-  def pln(s:String) = println(s"${design.tab*design.level}${s}")
-  def pBS(s:String) = { 
-    println(s"${design.tab*design.level}${s}{")
-    design.level += 1 
-  }
-  def pBE = { design.level -= 1; println(s"${design.tab*design.level}}") }
 
   def simAneal(allRes:List[R], allNodes:List[N], initMap:Map[N,V], 
     constrains:List[(N, R, Map[N, V]) => (Boolean, List[Hint], Map[N, V])]):

@@ -113,8 +113,6 @@ trait Design extends PIRMisc { self =>
   def updateLater(s:String, f:Node => Unit) = { val u = (s,f); toUpdate += u }
 
   def msg(x: String) = if (Config.dse) () else println(x)
-  val tab = "  "
-  var level = 0
 
   val arch:Spade
   var top:Top = _

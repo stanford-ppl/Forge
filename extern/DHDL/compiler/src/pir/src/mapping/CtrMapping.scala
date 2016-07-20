@@ -6,6 +6,7 @@ import dhdl.graph.{Counter => Ctr, _}
 import dhdl.plasticine.graph.{ComputeUnit => PCU, MemoryController => PMC}
 import dhdl.plasticine.graph.{Counter => PCtr, SRAM => PSRAM}
 import dhdl.graph.mapping.CUMapping.PrimMapping
+import dhdl.graph.traversal.DFMapping
 
 import scala.collection.immutable.Set
 import scala.collection.immutable.HashMap
@@ -34,12 +35,13 @@ case class CtrMapping(cu:CU, pcu:PCU, cuMap:Map[CU, PrimMapping])(implicit val d
     }
   }
 
+  import DFMapping._
   override def printMap = {
-    pBS("ctrMap")
+    emitBS("ctrMap")
     mapping.foreach{ case (k,v) =>
-      pln(s"($k -> $v)")
+      emitln(s"($k -> $v)")
     }
-    pBE
+    emitBE
   }
 
 }

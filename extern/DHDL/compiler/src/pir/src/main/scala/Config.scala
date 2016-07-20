@@ -1,6 +1,8 @@
 package dhdl
 
 object Config {
+  val outDir = "out"
+
   private def getProperty(prop: String, default: String) = {
     val p1 = System.getProperty(prop)
     val p2 = System.getProperty(prop.substring(1))

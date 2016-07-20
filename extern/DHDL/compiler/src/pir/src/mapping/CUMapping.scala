@@ -6,6 +6,7 @@ import dhdl.Config
 import dhdl.plasticine.graph.{ComputeUnit => PCU, MemoryController => PMC}
 import dhdl.graph.mapping
 import dhdl.graph.mapping.CUMapping.PrimMapping
+import dhdl.graph.traversal.DFMapping
 
 import scala.collection.immutable.Set
 import scala.collection.immutable.HashMap
@@ -96,14 +97,15 @@ class CUMapping(implicit val design: Design) extends Mapping[CU, PCU, PrimMappin
     (mcSuc, hints)
   }
 
+  import DFMapping._
   override def printMap = {
-    pBS("cuMap")
+    emitBS("cuMap")
     mapping.foreach{ case (cu, (pcu, sm, cm)) =>
-      pln(s"[$cu -> $pcu]")
+      emitln(s"[$cu -> $pcu]")
       sm.printMap
       cm.printMap
     }
-    pBE
+    emitBE 
   }
 
 }

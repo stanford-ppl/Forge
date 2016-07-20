@@ -339,6 +339,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 					  }
             emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}_delayed; // enable""")
             emit(s"""DFEVar ${quote(reg)} = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writersOf(reg).head._1)}_redLoop_done));""")
+            Console.println(s"""controlNodeStack = ${controlNodeStack}, reg = ${nameOf(reg)}, writersOf(reg) = ${writersOf(reg)}""")
             emit(s"""${quote(reg)}_delayed <== $rst ? ${quote(resetValue(reg))} : stream.offset(${quote(reg)}, -${quote(writersOf(reg).head._1)}_offset); // reset""")
 				  case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
 				  case ArgumentOut =>

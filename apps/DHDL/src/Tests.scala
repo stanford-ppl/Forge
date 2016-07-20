@@ -139,6 +139,21 @@ trait UnrollTest1 extends DHDLApplication {
   }
 }
 
+object BankingTest0Compiler extends DHDLApplicationCompiler with BankingTest0
+trait BankingTest0 extends DHDLApplicationCompiler {
+  def main() {
+    Accel {
+      val mem = BRAM[SInt](8, 8)
+      val out = Reg[SInt]
+      Fold(8 by 1 par unit(2))(out, 0){i =>
+        Reduce(8 by 1 par unit(8))(0){j =>
+          mem(i, j)
+        }{_+_}
+      }{_+_}
+    }
+  }
+}
+
 object BankingTest1Compiler extends DHDLApplicationCompiler with BankingTest1
 trait BankingTest1 extends DHDLApplicationCompiler {
   def main() {
@@ -150,6 +165,66 @@ trait BankingTest1 extends DHDLApplicationCompiler {
           // Contrived example:
           // Total parallelization relative to memory is 16, but par of j is only 8
           mem(j)
+        }{_+_}
+      }{_+_}
+    }
+  }
+}
+
+object BankingTest2Compiler extends DHDLApplicationCompiler with BankingTest2
+trait BankingTest2 extends DHDLApplicationCompiler {
+  def main() {
+    Accel {
+      val mem = BRAM[SInt](8, 8)
+      val out = Reg[SInt]
+      Fold(8 by 1 par unit(2))(out, 0){i =>
+        Reduce(8 by 1 par unit(8))(0){j =>
+          mem(0, j)
+        }{_+_}
+      }{_+_}
+    }
+  }
+}
+
+object BankingTest3Compiler extends DHDLApplicationCompiler with BankingTest3
+trait BankingTest3 extends DHDLApplicationCompiler {
+  def main() {
+    Accel {
+      val mem = BRAM[SInt](8, 8)
+      val out = Reg[SInt]
+      Fold(8 by 1 par unit(2))(out, 0){i =>
+        Reduce(8 by 1 par unit(8))(0){j =>
+          mem(j, j)
+        }{_+_}
+      }{_+_}
+    }
+  }
+}
+
+object BankingTest4Compiler extends DHDLApplicationCompiler with BankingTest4
+trait BankingTest4 extends DHDLApplicationCompiler {
+  def main() {
+    Accel {
+      val mem = BRAM[SInt](8, 8)
+      val out = Reg[SInt]
+      Fold(8 by 1 par unit(2))(out, 0){i =>
+        Reduce(8 by 1 par unit(8))(0){j =>
+          mem(i, i)
+        }{_+_}
+      }{_+_}
+    }
+  }
+}
+
+object BankingTest5Compiler extends DHDLApplicationCompiler with BankingTest5
+trait BankingTest5 extends DHDLApplicationCompiler {
+  def main() {
+    Accel {
+      val mem = BRAM[SInt](8, 8)
+      val out = Reg[SInt]
+      Fold(8 by 1 par unit(2))(out, 0){i =>
+        Reduce(8 by 1 par unit(8))(0){j =>
+          mem(j, i)
         }{_+_}
       }{_+_}
     }

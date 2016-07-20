@@ -251,12 +251,10 @@ trait DHDLDSL extends ForgeApplication
     importBoundAnalysis()
 
     // --- Pre-DSE analysis
-    schedule(IRPrinterPlus)
     schedule(NameAnalyzer)
     schedule(LevelAnalyzer)         // Sanity checks and pipe style annotation fixes
     schedule(GlobalAnalyzer)        // Values computed outside of all controllers
     schedule(UnitPipeTransformer)   // Wrap primitives in outer pipes
-    schedule(IRPrinterPlus)
 
     schedule(StageAnalyzer)         // Get number of stages in each control node
     schedule(GlobalAnalyzer)        // Values computed outside of all controllers (TODO: Needed again?)
@@ -287,6 +285,8 @@ trait DHDLDSL extends ForgeApplication
     schedule(ConstantFolding)       // Constant folding
     schedule(GlobalAnalyzer)        // Add "global" annotations for newly created symbols after folding
 
+    schedule(IRPrinterPlus)
+
     // --- Post-DSE Estimation
     schedule(AreaAnalyzer)          // Area estimation
     schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
@@ -299,7 +299,6 @@ trait DHDLDSL extends ForgeApplication
     schedule(Unrolling)             // Pipeline unrolling
     schedule(UnrolledControlAnalyzer) // Control signal metadata after unrolling
     schedule(DotIRPrinter)          // Graph after unrolling
-    schedule(IRPrinterPlus)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, maxj))

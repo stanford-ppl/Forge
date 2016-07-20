@@ -4,6 +4,7 @@ import dhdl.graph
 import dhdl.codegen._
 import dhdl.Design
 import dhdl.PIRApp
+import dhdl.PIRMisc._
 
 /* Example PIR using block (User facing PIR)*/
 object DotProduct extends PIRApp {
@@ -45,7 +46,7 @@ object DotProduct extends PIRApp {
       // Pipeline Stages 
       Stage(s0, op1=A.load, op2=B.load, op=FixMul, result=PL.reduce(s0))
       Stage.reduce(s1, op=FixAdd) 
-      Stage(s2, op1=PL.reduce(s1), op=Bypass, result=PL.vecOut(s0)) 
+      Stage(s2, op1=PL.reduce(s1), op=Bypass, result=PL.vecOut(s2)) 
       //Last stage can be removed if PL.reduce and PL.scalarOut map to the same register
     }
   }

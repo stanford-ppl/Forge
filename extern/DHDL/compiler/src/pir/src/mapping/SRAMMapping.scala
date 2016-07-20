@@ -6,7 +6,7 @@ import dhdl.graph.{Counter => Ctr, _}
 import dhdl.plasticine.graph.{ComputeUnit => PCU, MemoryController => PMC}
 import dhdl.plasticine.graph.{Counter => PCtr, SRAM => PSRAM}
 import dhdl.graph.mapping.CUMapping.PrimMapping
-import dhdl.graph.traversal.DFMapping
+import dhdl.graph.traversal.PIRMapping
 
 import scala.collection.immutable.Set
 import scala.collection.immutable.HashMap
@@ -34,7 +34,7 @@ case class SRAMMapping(cu:CU, pcu:PCU, cuMap:Map[CU, PrimMapping])(implicit val 
     }
   }
 
-  import DFMapping._
+  import PIRMapping._
   override def printMap = {
     emitBS("sramMap")
     mapping.foreach{ case (k,v) =>

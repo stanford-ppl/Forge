@@ -1,8 +1,6 @@
 package dhdl
 
 object Config {
-  val outDir = "out"
-
   private def getProperty(prop: String, default: String) = {
     val p1 = System.getProperty(prop)
     val p2 = System.getProperty(prop.substring(1))
@@ -20,6 +18,8 @@ object Config {
   var genDot = getProperty("dhdl.dot", "true") == "true"
   var genMaxJ = getProperty("dhdl.maxj", "true") == "true"
   var quick = getProperty("dhdl.quick", "false") == "true"
+  var outDir = getProperty("dhdl.outDir", "out")
+  var debug = getProperty("dhdl.debug", "true") == "true"
 
   var dse = false
 

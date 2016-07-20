@@ -4,6 +4,7 @@ import dhdl.graph
 import dhdl.codegen._
 import dhdl.plasticine.config._
 import dhdl.Design
+import dhdl.PIRMisc._
 
 /* Example PIR without using block (Spatial to PIR generation)*/
 object DotProductNoSugar extends Design {

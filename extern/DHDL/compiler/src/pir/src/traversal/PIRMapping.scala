@@ -1,10 +1,11 @@
 package dhdl.graph.traversal
 import dhdl.graph._
 import dhdl._
+import dhdl.PIRMisc._
 import dhdl.graph.mapping._
 
-class DFMapping(implicit val design: Design) extends Traversal{
-  import DFMapping._
+class PIRMapping(implicit val design: Design) extends Traversal{
+  import PIRMapping._
 
   val mapping = new CUMapping() 
 
@@ -15,20 +16,22 @@ class DFMapping(implicit val design: Design) extends Traversal{
   override def traverse = {
     val (suc, hints) = mapping.map
     if (suc)
-      println(s"--------- mapping successed --------")
+      info(s"Mapping succeeded") 
     else
-      println(s"--------- mapping failed -----------")
-    hints.foreach { h =>
-      println(h)
+      info(s"Mapping failed")
+    if (Config.debug) {
+      hints.foreach { h =>
+        dprintln(h)
+      }
     }
   } 
 
   override def finPass = {
-    println("-------- Finishing Depth First Mapping ----------")
+    info("Finishing PIR Mapping")
     mapping.printMap
     close
   }
 }
-object DFMapping extends Printer {
+object PIRMapping extends Printer {
   override val stream = Printer.newStream("Mapping.txt") 
 }

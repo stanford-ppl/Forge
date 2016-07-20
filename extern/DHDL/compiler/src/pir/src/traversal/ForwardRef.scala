@@ -1,7 +1,7 @@
 package dhdl.graph.traversal
 import dhdl.graph._
-import dhdl.Design
-import dhdl.Config
+import dhdl._
+import dhdl.PIRMisc._
 
 import scala.collection.mutable.Set
 import scala.collection.mutable.HashMap
@@ -18,10 +18,11 @@ class ForwardRef(implicit val design: Design) extends Traversal{
       f(n)
     }
     design.toUpdate.clear()
+    design.allNodes.foreach(n => assert(!n.toUpdate, s"Node ${n} contains unupdated field/fields!"))
   } 
 
   override def finPass = {
-    println("-------- Finishing updating forward referenced nodes ----------")
+    info("Finishing updating forward referenced nodes")
   }
 
   def addName(n:Node):Unit = if (n.name.isDefined) {

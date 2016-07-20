@@ -1,7 +1,9 @@
 package dhdl
 
+import dhdl.PIRMisc._
 import graph._
 import graph.traversal._
+import graph.mapping._
 import plasticine._
 import plasticine.config._
 //import plasticine.graph._
@@ -21,7 +23,7 @@ import scala.io.Source
 
 import scala.collection.mutable.{Set,Map}
 
-trait Design extends PIRMisc { self =>
+trait Design { self =>
 
   implicit val design: Design = self
 
@@ -112,27 +114,13 @@ trait Design extends PIRMisc { self =>
 
   def updateLater(s:String, f:Node => Unit) = { val u = (s,f); toUpdate += u }
 
-  def msg(x: String) = if (Config.dse) () else println(x)
-
   val arch:Spade
   var top:Top = _
 
-    //if (Config.genDot) {
-    //  val origGraph = new GraphvizCodegen(s"orig")
-    //  origGraph.run(top)
-    //}
-
-    //if (Config.genMaxJ) {
-    //  if (Config.genDot) {
-    //    msg("Generating dot graph")
-    //    val dot = new GraphvizCodegen()
-    //    dot.run(transformedTop)
-    //  }
-    //}
   val traversals = ListBuffer[Traversal]()
   traversals += new ForwardRef()
   traversals += new IRPrinter()
-  val dfmapping = new DFMapping()
+  val dfmapping = new PIRMapping()
   traversals += dfmapping 
 
   reset()
@@ -146,20 +134,26 @@ trait PIRApp extends Design{
 
   def main(args: String*): Any 
   def main(args: Array[String]): Unit = {
-    msg(args.mkString(", "))
+    println(args.mkString(", "))
     val ctrlNodes = addBlock(main(args:_*), (n:Node) => n.isInstanceOf[Controller])
     top = Top(ctrlNodes)
-    println("-------- Finishing graph construction ----------")
+    info("Finishing graph construction")
     run
   }
 }
 
-trait PIRMisc {
+object PIRMisc {
   implicit def reg_to_port(reg:Reg):Port = {
     reg.out
   }
   implicit def ctr_to_port(ctr:Counter):Port = {
     ctr.out
   }
+  implicit def hint_to_string(hint:Hint):String = {
+    hint.toString
+  }
+  def dprintln(s:String) = if (Config.debug) println(s)
+  def dprint(s:String) = if (Config.debug) print(s)
+  def info(s:String) = println(s"[pir] ${s}")
 }
 

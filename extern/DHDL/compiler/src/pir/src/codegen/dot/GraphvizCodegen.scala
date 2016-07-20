@@ -43,20 +43,6 @@ class GraphvizCodegen(file: String = "outfile")(implicit design: Design) extends
 
   def fp(a: Any) = pw.println(a)
 
-
-  override def run(node: Node) = {
-    // Always call initPass first
-    initPass()
-
-    visitNode(node)
-
-    finPass()
-  }
-
-  override def initPass() = {
-    super.initPass()
-  }
-
   override def finPass() = {
     fp(s"}")
     pw.flush()

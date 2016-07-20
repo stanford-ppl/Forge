@@ -11,15 +11,18 @@ class ForwardRef(implicit val design: Design) extends Traversal{
   private val nameMap = HashMap[String, Node]()
 
   override def reset = nameMap.clear()
-  override def run = {
+  override def traverse = {
     design.allNodes.foreach(n => addName(n))
     design.toUpdate.foreach { case (k,f) =>
       val n:Node = getByName(k)
       f(n)
     }
     design.toUpdate.clear()
-    println("-------- Finishing updating forward referenced nodes ----------")
   } 
+
+  override def finPass = {
+    println("-------- Finishing updating forward referenced nodes ----------")
+  }
 
   def addName(n:Node):Unit = if (n.name.isDefined) {
     n match {

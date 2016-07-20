@@ -98,5 +98,5 @@ object MemoryController extends {
   }
 }
 
-case class Top(ctrlList:List[Controller])(implicit design: Design) 
+case class Top(ctrlNodes:List[Controller])(implicit design: Design) 
   extends Node(Some("Top"), "Top") with Controller

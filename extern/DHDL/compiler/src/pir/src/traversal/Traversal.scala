@@ -18,11 +18,17 @@ trait Traversal {
     isInit = false
   }
   
-  def run:Unit
+  def run = {
+    initPass
+    traverse
+    finPass
+  }
 
-  def initPass() = {
+  def traverse:Unit
+
+  def initPass = {
     isInit = true
   }
 
-  def finPass() = {}
+  def finPass:Unit
 }

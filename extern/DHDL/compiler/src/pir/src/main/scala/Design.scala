@@ -4,7 +4,6 @@ import graph._
 import graph.traversal._
 import plasticine._
 import plasticine.config._
-import plasticine.config.Config0
 //import plasticine.graph._
 
 //import analysis._
@@ -114,18 +113,16 @@ trait Design extends PIRMisc { self =>
   def updateLater(s:String, f:Node => Unit) = { val u = (s,f); toUpdate += u }
 
   def msg(x: String) = if (Config.dse) () else println(x)
+  val tab = "  "
+  var level = 0
 
   val arch:Spade
   var top:Top = _
-
-  def run = traversals.foreach(_.run)
 
     //if (Config.genDot) {
     //  val origGraph = new GraphvizCodegen(s"orig")
     //  origGraph.run(top)
     //}
-
-    //val transformedTop = processTop(top)
 
     //if (Config.genMaxJ) {
     //  if (Config.genDot) {
@@ -137,7 +134,12 @@ trait Design extends PIRMisc { self =>
   val traversals = ListBuffer[Traversal]()
   traversals += new ForwardRef()
   traversals += new IRPrinter()
+  val dfmapping = new DFMapping()
+  traversals += dfmapping 
+
   reset()
+
+  def run = traversals.foreach(_.run)
 
 }
 
@@ -147,8 +149,8 @@ trait PIRApp extends Design{
   def main(args: String*): Any 
   def main(args: Array[String]): Unit = {
     msg(args.mkString(", "))
-    val ctrlList = addBlock(main(args:_*), (n:Node) => n.isInstanceOf[Controller])
-    top = Top(ctrlList)
+    val ctrlNodes = addBlock(main(args:_*), (n:Node) => n.isInstanceOf[Controller])
+    top = Top(ctrlNodes)
     println("-------- Finishing graph construction ----------")
     run
   }

@@ -12,7 +12,7 @@ object DotProduct extends PIRApp {
     val dataSize = ArgIn()
 
     // Pipe.fold(dataSize by tileSize par outerPar)(out){ i =>
-    val outer = ComputeUnit(parent="Top", tpe=MetaPipeline){ implicit PL =>
+    val outer = ComputeUnit(name="outer", parent="Top", tpe=MetaPipeline){ implicit PL =>
       CounterChain(name="i", dataSize by tileSize)
     }
     // b1 := v1(i::i+tileSize)

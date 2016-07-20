@@ -6,13 +6,11 @@ import dhdl.Config
 import scala.collection.mutable.Set
 
 abstract class DFSTraversal(implicit val design: Design) extends Traversal{
-  def run(node: Node) = {
-    initPass()
+  def traverse(node: Node) = {
     visitNode(node)
-    finPass()
   }
   
-  override def run = run(design.top)
+  override def traverse = traverse(design.top)
 
   /* Depth first search traversal on node and their fields */
   def visitNode(node: Node) : Unit = {
@@ -20,7 +18,7 @@ abstract class DFSTraversal(implicit val design: Design) extends Traversal{
     node match {
       case n:Controller => n match {
         case c:Top => 
-          c.ctrlList.foreach(n => visitNode(n))
+          c.ctrlNodes.foreach(n => visitNode(n))
         case c:ComputeUnit => {
           c.cchains.foreach { cc => visitNode(cc) }
           c.srams.foreach { s => visitNode(s) }

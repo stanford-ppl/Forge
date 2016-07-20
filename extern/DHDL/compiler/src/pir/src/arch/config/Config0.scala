@@ -3,6 +3,7 @@ package dhdl.plasticine.config
 import dhdl.plasticine.graph._
 
 object Config0 extends Spade {
+  override def toString = "Plasticine_Config0"
 
   // Assume all CUs are homogenous for now
 
@@ -23,7 +24,8 @@ object Config0 extends Spade {
     val srams = List.tabulate(numSRAMs) { is => SRAM(numLanes, regs(is + numCtrs), regs(is + numCtrs)) } 
     val inRegs = List.tabulate(numInPorts) { ip => regs(ip + numCtrs + numSRAMs) }
     val outRegs = List.tabulate(numOutPorts) { ip => regs(ip + numCtrs + numSRAMs + numInPorts) }
-    ComputeUnit(regs, srams, ctrs, inRegs, outRegs, regs(numCtrs + numSRAMs + numInPorts + numOutPorts))
+    val reduceReg = regs(numCtrs + numSRAMs + numInPorts + numOutPorts)
+    ComputeUnit(regs, srams, ctrs, inRegs, outRegs, reduceReg)
   } 
 
   private val memCtrls = List.tabulate(4) { i =>
@@ -39,7 +41,8 @@ object Config0 extends Spade {
     val srams = List.tabulate(numSRAMs) { is => SRAM(numLanes, regs(is + numCtrs), regs(is + numCtrs)) } 
     val inRegs = List.tabulate(numInPorts) { ip => regs(ip + numCtrs + numSRAMs) }
     val outRegs = List.tabulate(numOutPorts) { ip => regs(ip + numCtrs + numSRAMs + numInPorts) }
-    MemoryController(regs, srams, ctrs, inRegs, outRegs, regs(numCtrs + numSRAMs + numInPorts + numOutPorts))
+    val reduceReg = regs(numCtrs + numSRAMs + numInPorts + numOutPorts)
+    MemoryController(regs, srams, ctrs, inRegs, outRegs, reduceReg)
   }
 
   override val computeUnits = cus ++ memCtrls 

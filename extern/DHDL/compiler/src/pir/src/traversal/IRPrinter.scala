@@ -65,5 +65,7 @@ class IRPrinter(implicit design: Design) extends DFSTraversal{
     println(s"")
   }
 
-  override def finPass() = {}
+  override def finPass() = {
+    println("-------- Finishing IR Printing----------")
+  }
 }

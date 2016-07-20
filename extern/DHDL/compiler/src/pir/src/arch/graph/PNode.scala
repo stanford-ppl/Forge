@@ -6,6 +6,13 @@ import scala.collection.mutable.ListBuffer
 
 class Node { 
   val id : Int = Node.nextId
+  override def equals(that: Any) = that match {
+    case n: Node => super.equals(that) && id == n.id
+    case _ => super.equals(that)
+  }
+
+  val typeStr = this.getClass().getSimpleName()
+  override def toString = s"${typeStr}_${id}" 
 }
 object Node {
   var nextSym = 0
@@ -60,6 +67,7 @@ object Counter {
  *  */
 case class ComputeUnit(regs:List[Reg], srams:List[SRAM], ctrs:List[Counter], 
   inRegs:List[Reg], outRegs:List[Reg], reduceReg:Reg) extends Node{
+  override val typeStr = "CU"
   val reducePort = RMPort(this, reduceReg)
   val inPorts = inRegs.map{r => RMPort(this, r)} 
   val outPorts = outRegs.map{r => RMPort(this, r)} 
@@ -70,12 +78,13 @@ case class ComputeUnit(regs:List[Reg], srams:List[SRAM], ctrs:List[Counter],
   def numPorts = outPorts.size 
 }
 
-trait MemoryController {
+trait MemoryController extends ComputeUnit{
 }
 object MemoryController {
   def apply(regs:List[Reg], srams:List[SRAM], ctrs:List[Counter], 
     inRegs:List[Reg], outRegs:List[Reg], reduceReg:Reg) = {
-    new ComputeUnit(regs, srams, ctrs, inRegs, outRegs, reduceReg) with MemoryController 
+    new {override val typeStr = "MemCtrl"} 
+    with ComputeUnit(regs, srams, ctrs, inRegs, outRegs, reduceReg) with MemoryController 
   }
 }
 

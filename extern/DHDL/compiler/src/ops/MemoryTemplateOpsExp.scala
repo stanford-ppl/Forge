@@ -196,13 +196,15 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
           } else {
             emit(s"""${quote(maxJPre(sym))} ${quote(sym)} = ${quote(ts)}.newInstance(this);""")
 					}
-				case ArgumentIn =>  // alwaysGen
-        	alwaysGen {
-          	emit(s"""DFEVar ${quote(sym)} = io.scalarInput("${quote(sym)}", $ts );""")
-				  }
-				case ArgumentOut => //emitted in reg_write
+				case _ => throw new Exception(s"""Unknown reg type ${regType(sym)}""")
 			}
-      emitComment("} Reg_new")
+		case Argin_new(init) =>
+			val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
+      alwaysGen {
+          	emit(s"""DFEVar ${quote(sym)} = io.scalarInput("${quote(sym)}", $ts );""")
+			}
+
+    case Argout_new(init) => //emitted in reg_write
 
     case e@Reg_read(reg) =>
       val pre = maxJPre(sym)

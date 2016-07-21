@@ -7,7 +7,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait LatencyModel extends PipeStageToolsExp {
+trait LatencyModel extends NodeMetadataOpsExp {
   this: DHDLExp =>
 
   lazy val memModel = new TileLoadModel()
@@ -77,10 +77,21 @@ trait LatencyModel extends PipeStageToolsExp {
     case ConstFlt(_) => 0
     case Reg_new(_) => 0
     case Bram_new(_,_) => 0
+    case Fifo_new(_,_) => 0
+    case Cam_new(_,_) => 0
+
+    // TODO
+    case Push_fifo(fifo,_,_) => 1
+    case Pop_fifo(fifo) => 1
+    case Count_fifo(fifo) => 0
+
+    // TODO
+    case Cam_load(cam,key) => 1
+    case Cam_store(cam,key,value) => 1
 
     // TODO: Not a function of number of banks?
-    case Bram_load(ram, _) => if (isDblBuf(ram)) 2 else 1
-    case Bram_store(ram, _, _) => if (isDblBuf(ram)) 2 else 1
+    case Bram_load(ram, _) => 1 //if (isDblBuf(ram)) 2 else 1
+    case Bram_store(ram, _, _) => 1 //if (isDblBuf(ram)) 2 else 1
 
     case _:Counter_new => 0
     case _:Counterchain_new => 0
@@ -187,6 +198,8 @@ trait LatencyModel extends PipeStageToolsExp {
       (28)
 
     case Mux2(_,_,_) => 1
+    case Min2(_,_) => 1
+    case Max2(_,_) => 1
 
     case Convert_fixpt(_) => 1
     //case Convert_fltpt(_) => // ???
@@ -199,34 +212,28 @@ trait LatencyModel extends PipeStageToolsExp {
       (6)
 
     // TODO
-    case Offchip_store_vector(mem,ofs,vec) =>
+    case Offchip_store_cmd(mem,stream,ofs,len,par) =>
       val c = contentionOf(s)
-      val p = 1
-      val sizes = dimsOf(vec).map(d => bound(d).getOrElse(stageError("Cannot resolve bound of Vector dimension")))
+      val p = bound(par).get
+      val size = bound(len).getOrElse{stageError("Cannot resolve bound of offchip store")}
 
-      val baseCycles = sizes.reduce{_*_} / p.toDouble
+      val baseCycles = size / p.toDouble
 
       val oFactor = 0.02*c - 0.019
       val smallOverhead = if (c < 8) 0.0 else 0.0175
       val overhead = if (p < 8) 1.0 + smallOverhead*p else oFactor*p + (1 - (8*oFactor)) + smallOverhead*8
 
       //System.out.println(s"Sizes: $sizes, base cycles: $baseCycles, ofactor: $oFactor, smallOverhead: $smallOverhead, overhead: $overhead")
-
       Math.ceil(baseCycles*overhead).toLong
 
-
-    case Offchip_load_vector(mem,ofs,len) =>
+    case Offchip_load_cmd(mem,stream,ofs,len,par) =>
       val c = contentionOf(s)
-      val ts = bound(len).getOrElse(stageError("Cannot resolve bound of Vector dimension"))
+      val ts = bound(len).getOrElse(stageError("Cannot resolve bound of offchip load"))
       val b = ts  // TODO - max of this and max command size
       val r = 1.0 // TODO - number of commands needed (probably 1)
-      val p = 1   // TODO - need to recharacterize this...
+      val p = bound(par).get
       //System.out.println(s"Tile transfer $s: c = $c, r = $r, b = $b, p = $p")
-      memoryModel(c,r.toInt,b.toInt,p)
-
-
-    case _:Bram_store_vector[_] => 0
-    case _:Bram_load_vector[_] => 0
+      memoryModel(c,r.toInt,b.toInt,p.toInt)
 
     case _:Pipe_parallel => 1
     case _:Unit_pipe => 0

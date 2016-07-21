@@ -10,9 +10,9 @@ trait TestCache extends DHDLApplication {
     type Q16 = FixPt[Signed, B16, B16]
     val N = 10
 
-    val v1    = OffChipMem[Q16]("v1", N)
-    val v2    = OffChipMem[Q16]("v2", N)
-    val v3    = OffChipMem[Q16]("v3", N)
+    val v1    = OffChipMem[Q16](N)
+    val v2    = OffChipMem[Q16](N)
+    val v3    = OffChipMem[Q16](N)
     val outer = ArgOut[Q16]
 
     val vec1 = Array.fill(N)(random[Q16](N))
@@ -21,9 +21,9 @@ trait TestCache extends DHDLApplication {
     setMem(v2, vec2)
 
     Accel {
-      val c1 = Cache[Q16]("c1", v1)
-      val c2 = Cache[Q16]("c2", v2)
-      val c3 = Cache[Q16]("c3", v3)
+      val c1 = Cache[Q16](v1)
+      val c2 = Cache[Q16](v2)
+      val c3 = Cache[Q16](v3)
 
       Pipe.reduce(0 until N)(outer){ii => c1(ii) * c2(ii) }{_+_}
       Pipe(N by 1) {ii => c3(ii) = c1(ii) * c2(ii) }

@@ -3,7 +3,7 @@ package dsls
 package dhdl
 
 @dsl
-trait DHDLMemories extends DHDLRegs with DHDLBRAMs with DHDLOffChip with DHDLCaches {
+trait DHDLMemories extends DHDLRegs with DHDLBRAMs with DHDLFIFOs with DHDLCAMs with DHDLOffChip with DHDLCaches {
   this: DHDLDSL =>
 
   object TMem extends TypeClassSignature {
@@ -16,6 +16,8 @@ trait DHDLMemories extends DHDLRegs with DHDLBRAMs with DHDLOffChip with DHDLCac
     importMemOps()
     importRegs()
     importBRAM()
+    importFIFO()
+    importCAM()
     importOffChip()
     importTiles()
     importSparseTiles()

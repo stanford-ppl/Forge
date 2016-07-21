@@ -21,12 +21,6 @@ trait DHDLCaches {
     //TODO: cache_flush?
 
     // --- Internals
-    internal (Cache) ("cache_create", T, (SOption(SString), OffChip(T)) :: Cache(T)) implements composite ${
-      val cache = cache_new[T]($1)
-      $0.foreach{name => nameOf(cache) = name }
-      dimsOf(cache) = dimsOf($1)
-      cache
-    }
 
     /** @nodoc **/
     direct (Cache) ("cache_load_nd", T, (Cache(T), SList(Idx)) :: T) implements composite ${
@@ -50,19 +44,15 @@ trait DHDLCaches {
     infix (CacheMem) ("flatIdx", T, (Cache(T), Indices) :: Idx) implements composite ${ cache_calc_addr($0, $1) }*/
 
     // --- API
-    /** Creates a Cache with given name and target OffChipMem. Dimensions is inherited from
-     *  OffChipMem
+    /** Creates a Cache with target OffChipMem. Dimensions is inherited from OffChipMem
      * @param name
      * @param offchip
      **/
-    static (Cache) ("apply", T, (SString, OffChip(T)) :: Cache(T), TNum(T)) implements composite ${ cache_create(Some($0), $1) }
-
-    /** Creates a unnamed Cache with target OffChipMem. Dimensions is inherited from
-     *  OffChipMem
-     * @param name
-     * @param offchip
-     **/
-    static (Cache) ("apply", T, OffChip(T) :: Cache(T), TNum(T)) implements composite ${ cache_create(None, $0) }
+    static (Cache) ("apply", T, OffChip(T) :: Cache(T), TNum(T)) implements composite ${
+      val cache = cache_new[T]($0)
+      dimsOf(cache) = dimsOf($0)
+      cache
+    }
 
     val Cache_API = withTpe(Cache)
     Cache_API {

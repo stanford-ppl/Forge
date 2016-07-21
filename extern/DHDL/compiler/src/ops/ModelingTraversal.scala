@@ -8,8 +8,8 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait ModelingTools extends QuickTraversal with PipeStageTools {
-  val IR: DHDLExp with PipeStageToolsExp with LatencyModel
+trait ModelingTraversal extends QuickTraversal with SpatialTraversalTools {
+  val IR: DHDLExp with NodeMetadataOpsExp with LatencyModel
   import IR._
 
   // --- State
@@ -25,8 +25,15 @@ trait ModelingTools extends QuickTraversal with PipeStageTools {
 
     def quickDFS(cur: Exp[Any]): Long = cur match {
       case Def(d) if scope.contains(cur) && !isGlobal(cur) =>
-        //debug(s"Visit $cur in quickDFS (${latencyOf(cur)})")
-        latencyOf(cur) + symDeps(d).map{e => paths.getOrElseUpdate(e,quickDFS(e))}.max
+        //debug(s"Visit $cur in quickDFS")
+        val deps = symDeps(d)
+        if (deps.isEmpty) {
+          stageWarn(s"$cur = $d has no dependencies but is not global")
+          latencyOf(cur)
+        }
+        else {
+          latencyOf(cur) + deps.map{e => paths.getOrElseUpdate(e,quickDFS(e))}.max
+        }
       case _ => 0L
     }
     if (scope.isEmpty) 0L else scope.last match {
@@ -79,12 +86,6 @@ trait ModelingTools extends QuickTraversal with PipeStageTools {
     }
     delays.toList
   }
-
-  // Traversal
-  override def traverseStm(stm: Stm) = stm match {
-    case TP(s, d) => traverseNode(s, d)
-  }
-  def traverseNode(lhs: Exp[Any], rhs: Def[Any]): Unit
 
   // Reset state
   override def preprocess[A:Manifest](b: Block[A]) = {

@@ -2,7 +2,7 @@ package dhdl.compiler.ops
 
 import scala.reflect.{Manifest,SourceContext}
 
-import ppl.delite.framework.analysis.HungryTraversal
+import scala.virtualization.lms.internal.Traversal
 import scala.virtualization.lms.common.EffectExp
 import scala.virtualization.lms.util.GraphUtil
 
@@ -13,8 +13,12 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
+trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with NodeMetadataOpsExp {
   this: DHDLExp =>
+
+  // TODO
+  def isDblBuf(e: Exp[Any]) = false
+  def banks(e: Exp[Any]) = 1
 
   sealed abstract class Banking(val banks: Int)
   object Banking {
@@ -25,37 +29,88 @@ trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with PipeStageToolsExp {
   case class MultiWayBanking(strides: List[Int], override val banks: Int) extends Banking(banks)
   // Strided banking scheme. Includes simple, 1D case
   case class StridedBanking(stride: Int, override val banks: Int) extends Banking(banks)
-  // "Banking" via duplication - used when the reader and writer access patterns
-  // are either incompatible or unpredictable
-  case class DuplicatedBanking(override val banks: Int) extends Banking(banks)
+  // No banking
+  case object NoBanking extends Banking(1)
 
   /**
     Metadata for duplicated instances of a single coherent scratchpad. When possible,
     address generators should be coalesced to a single instance. However, this is only
     possible when the addresses can be guaranteed to be in lockstep.
   */
-  case class MemInstance(depth: Int, banking: List[Banking])
+  case class MemInstance(depth: Int, duplicates: Int, banking: List[Banking])
 
   case class MemDuplicates(insts: List[MemInstance]) extends Metadata
   object duplicatesOf {
     def update(e: Exp[Any], m: List[MemInstance]) { setMetadata(e, MemDuplicates(m)) }
     def apply(e: Exp[Any]) = meta[MemDuplicates](e).map(_.insts).getOrElse(Nil)
   }
+
 }
 
-
 // Technically doesn't need a real traversal, but nice to have debugging, etc.
-trait MemoryAnalyzer extends HungryTraversal {
+trait BankingBase extends Traversal {
   val IR: DHDLExp with MemoryAnalysisExp
   import IR._
 
-  debugMode = true
-  override val name = "Scratchpad Analyzer"
+  def lcm(a: Int, b: Int): Int = {
+    val bigA = BigInt(a)
+    val bigB = BigInt(b)
+    (bigA*bigB / bigA.gcd(bigB)).intValue() // Unchecked overflow, but hey...
+  }
 
-  /**
-    Metadata for various banking techniques for vectorization of reads/writes of
-    a single scratchpad.
+  // Defined as the number of coarse-grained pipeline stages between the read and the write
+  // In other words, the number of writes that can happen to a memory before the first read happens
+  def distanceBetween(write: (Exp[Any], Boolean), read: (Exp[Any], Boolean)): Int = {
+    if (write == read) 0
+    else {
+      debug("    write: " + write)
+      debug("    read:  " + read)
 
+      val (lca, writePath, readPath) = GraphUtil.leastCommonAncestorWithPaths[(Exp[Any],Boolean)](write, read, {node => parentOf(node)})
+
+      debug("    lca: " + lca)
+      debug("    write path: " + writePath.mkString(", "))
+      debug("    read path: " + readPath.mkString(", "))
+
+      if (lca.isDefined) {
+        if (isMetaPipe(lca.get)) {
+          val parent = lca.get._1
+          // FIXME: Reads and writes owned by the parent are assumed to occur at controller setup time
+          if (write == lca && read != write) stageWarn("The parent of the write node here is the LCA - likely a bug")
+          if (read  == lca && read != write) stageWarn("The parent of the read node here is the LCA - likely a bug")
+
+          val children = lca +: childrenOf(parent).map{x => (x,false)} :+ ((parent,true))
+
+          // FIXME: (#2) Metapipe children assumed to be a linear sequence of stages, not an arbitrary graph
+          debug("    lca children: " + children.mkString(", "))
+          val wIdx = children.indexOf(writePath.head)
+          val rIdx = children.indexOf(readPath.head)
+          if (wIdx < 0 || rIdx < 0) stageError("FIXME: Bug in scratchpad analyzer")
+
+          Math.abs(rIdx - wIdx) // write may happen after read in special cases
+        }
+        else 0
+      }
+      else stageError("No common controller found between read and write") // TODO: Would need better error here
+    }
+  }
+
+  // TODO: How to handle non-matching strides? Just don't bank?
+  def matchBanking(write: Banking, read: Banking) = (write,read) match {
+    case (StridedBanking(s1,p), StridedBanking(s2,q)) if s1 == s2 => StridedBanking(s1, lcm(p,q))
+    case (Banking(1), banking)                                    => banking
+    case (banking, Banking(1))                                    => banking
+    case _ => stageError("TODO: What to do for non-matching strided banking?")
+  }
+
+  // TODO: How to express "tapped" block FIFO? What information is needed here?
+  def coalesceDuplicates(dups: List[MemInstance]) = dups
+
+  def bank(mem: Exp[Any]): List[MemInstance] = stageError("Don't know how to bank memory of type " + mem.tp)
+}
+
+/**
+    BRAM BANKING
     stride - number of contiguous elements mapped to the same bank
     banks  - number of independent address generators corresponding to a single vectorized load
     depth  - number of writes that occur before one read (number of blocks needed to be saved)
@@ -78,9 +133,9 @@ trait MemoryAnalyzer extends HungryTraversal {
      (i,j)           (1,4)        Strided(1, 4)
      (i,j)           (4,1)        Strided(C, 4)
      (i,j)           (4,4)        Strided((C,1), (4,4)) // Does order matter here?
-      b(i)            (4)         Duplicated(4)
-    (b(i), i)        (4,4)        Duplicated(4)
-   (b(i), c(i))      (4,4)        Duplicated(4)
+      b(i)            (4)         Duplicate(4)
+    (b(i), i)        (4,4)        Duplicate(4), Strided(1, 4)
+   (b(i), c(i))      (4,4)        Duplicate(4), Duplicate(1)
    (i,j)&(j,i)    (1,4)&(4,1)    MultiWay((C,1), 4)
 
     Data (2x2)        Stride 1        Stride 4        Diagonal
@@ -106,45 +161,60 @@ trait MemoryAnalyzer extends HungryTraversal {
       E   F     B   F        F   C
   B:   j%N       i%N        (i+j)%N
   A:(i*S+j)/N  (i/N)*S+j      ???
-  */
+**/
+trait BRAMBanking extends BankingBase {
+  import IR._
 
-
-  def bankingFromAccessPattern(mem: Exp[Any], indices: List[Exp[Any]], pattern: List[IndexPattern]): List[Banking] = {
+  def bankingFromAccessPattern(mem: Exp[Any], access: Exp[Any]) = {
+    val isWrite = isWriter(access)
+    val indices = accessIndicesOf(access)
+    val pattern = accessPatternOf(access)
     val strides = constDimsToStrides(dimsOf(mem).map{case Exact(d) => d.toInt})
 
-    (pattern, indices, strides).zipped.map{ case (pattern, index, stride) => pattern match {
-      case AffineAccess(Exact(a),i,b) => StridedBanking(a.toInt*stride, parOf(i))
-      case StridedAccess(Exact(a),i) => StridedBanking(a.toInt*stride, parOf(i))
-      case OffsetAccess(i,b) => StridedBanking(stride, parOf(i))
-      case LinearAccess(i) => StridedBanking(stride, parOf(i))
-      case InvariantAccess(b) => DuplicatedBanking(parOf(index))
-      case RandomAccess => DuplicatedBanking(parOf(index))
-    }}
-  }
+    val factors = unrollFactorsOf(access) diff unrollFactorsOf(mem) // Parallelization factors relative to this memory
+    var used: Map[Exp[Any], Boolean] = Map.empty
+    factors.foreach{factor => used += factor -> false}
 
-  def matchBanking(write: Banking, read: Banking) = (write,read) match {
-    case (StridedBanking(s1,p), StridedBanking(s2,q)) if s1 == s2 => StridedBanking(s1, lcm(p,q))
-    case (Banking(1), banking)                                    => banking
-    case (banking, Banking(1))                                    => banking
-    case (Banking(p), Banking(q))                                 => DuplicatedBanking(lcm(p,q))
+    def bankFactor(i: Exp[Any]): Int = {
+      val factor = parFactorOf(i)
+      if (used.contains(factor) && !used(factor)) {
+        used += factor -> true
+        parOf(i)
+      }
+      else 1
+    }
+
+    val banking = (pattern, indices, strides).zipped.map{ case (pattern, index, stride) => pattern match {
+      case AffineAccess(Exact(a),i,b) => StridedBanking(a.toInt*stride, bankFactor(i))
+      case StridedAccess(Exact(a),i)  => StridedBanking(a.toInt*stride, bankFactor(i))
+      case OffsetAccess(i,b)          => StridedBanking(stride, bankFactor(i))
+      case LinearAccess(i)            => StridedBanking(stride, bankFactor(i))
+      case InvariantAccess(b)         => NoBanking // Single "bank" in this dimension
+      case RandomAccess               => NoBanking // Single "bank" in this dimension
+    }}
+
+    val duplicates = factors.filter{factor => !used(factor)}.map{case Exact(p) => p.toInt}.fold(1){_*_}
+
+    MemInstance(1, duplicates, banking)
   }
 
   def unpairedAccess(mem: Exp[Any], access: (Exp[Any],Boolean,Exp[Any])): MemInstance = {
-    val banking = bankingFromAccessPattern(mem, accessIndicesOf(access._3), accessPatternOf(access._3))
-
-    debug(" - Unpaired access " + access + ", inferred banking " + banking.mkString(", "))
-
-    MemInstance(1, banking)
+    val memInstance = bankingFromAccessPattern(mem, access._3)
+    debug(" - Unpaired access " + access + ", inferred banking " + memInstance)
+    memInstance
   }
+
   def pairedAccess(mem: Exp[Any], write: (Exp[Any],Boolean,Exp[Any]), read: (Exp[Any],Boolean,Exp[Any])): MemInstance = {
     val dims = dimsOf(mem)
 
-    val bankWrite = bankingFromAccessPattern(mem, accessIndicesOf(write._3), accessPatternOf(write._3))
-    val bankRead  = bankingFromAccessPattern(mem, accessIndicesOf(read._3), accessPatternOf(read._3))
+    val writeInstances = bankingFromAccessPattern(mem, write._3)
+    val readInstances  = bankingFromAccessPattern(mem, write._3)
 
     debug("  Write " + write + ", read " + read)
-    debug("    write banking: " + bankWrite.mkString(", "))
-    debug("    read banking:  " + bankRead.mkString(", "))
+    debug("    write banking: " + writeInstances)
+    debug("    read banking:  " + readInstances)
+    val bankWrite = writeInstances.banking
+    val bankRead  = readInstances.banking
 
     var banking: List[Banking] = Nil
     var i: Int = 0
@@ -181,94 +251,84 @@ trait MemoryAnalyzer extends HungryTraversal {
     }
     else stageError("Memory " + nameOf(mem).getOrElse("") + " defined here is treated as both " + bankWrite.length + "D and " + bankRead.length + "D. This is currently unsupported.")
 
-    MemInstance(1 + distanceBetween((write._1,write._2), (read._1,read._2)), banking.reverse)
+    // Buffering factor
+    val depth = 1 + distanceBetween((write._1,write._2), (read._1,read._2))
+
+    // Duplication factor
+    val duplicates = Math.max(writeInstances.duplicates, readInstances.duplicates)
+
+    MemInstance(depth, duplicates, banking.reverse)
   }
 
-  def lcm(a: Int, b: Int): Int = {
-    val bigA = BigInt(a)
-    val bigB = BigInt(b)
-    (bigA*bigB / bigA.gcd(bigB)).intValue() // Unchecked overflow, but hey...
-  }
-
-  // Defined as the number of coarse-grained pipeline stages between the read and the write
-  // In other words, the number of writes that can happen to a memory before the first read happens
-  def distanceBetween(write: (Exp[Any], Boolean), read: (Exp[Any], Boolean)): Int = {
-    if (write == read) 0
-    else {
-      val (lca, writePath, readPath) = GraphUtil.leastCommonAncestorWithPaths[(Exp[Any],Boolean)](write, read, {node => parentOf(node)})
-
-      debug("    lca: " + lca)
-      debug("    write path: " + writePath.mkString(", "))
-      debug("    read path: " + readPath.mkString(", "))
-
-      if (lca.isDefined) {
-        if (isMetaPipe(lca.get)) {
-          val parent = lca.get._1
-          val children = childrenOf(parent).map{x => (x,false)} :+ ((parent,true))
-
-          debug("    lca children: " + children.mkString(", "))
-          val wIdx = children.indexOf(writePath.head)
-          val rIdx = children.indexOf(readPath.head)
-          if (wIdx < 0 || rIdx < 0) stageError("FIXME: Bug in scratchpad analyzer")
-
-          Math.abs(rIdx - wIdx) // write may happen after read in special cases - what to do there?
-        }
-        else 0
-      }
-      else stageError("No common controller found between read and write") // TODO: Would need better error here
+  override def bank(mem: Exp[Any]) = if (isBRAM(mem.tp)) {
+    (writersOf(mem).headOption,readersOf(mem)) match {
+      case (None, Nil) => Nil
+      case (Some(write), Nil) => List(unpairedAccess(mem, write))
+      case (None, reads) =>
+        // What to do here? No writer, so current version will always read garbage...
+        val dups = reads.map(read => unpairedAccess(mem, read))
+        coalesceDuplicates(dups)
+      case (Some(write), reads) =>
+        val dups = reads.map(read => pairedAccess(mem, write, read))
+        coalesceDuplicates(dups)
     }
+  } else super.bank(mem)
+}
+
+trait RegisterBanking extends BankingBase {
+  import IR._
+
+  override def bank(mem: Exp[Any]) = if (isRegister(mem.tp)) {
+    (writersOf(mem).headOption, readersOf(mem)) match {
+      case (None, Nil)          => Nil
+      case (Some(write), Nil)   => List(MemInstance(1, 1, List(NoBanking)))
+      case (None, reads)        => List(MemInstance(1, 1, List(NoBanking)))
+      case (Some(write), reads) =>
+        val dups = reads.map{read => MemInstance(1 + distanceBetween( (write._1,write._2), (read._1,read._2) ), 1, List(NoBanking)) }
+        coalesceDuplicates(dups)
+    }
+  } else super.bank(mem)
+}
+
+trait FIFOBanking extends BankingBase {
+  import IR._
+
+  def accessPar(mem: Exp[Any], access: Exp[Any]) = {
+    (unrollFactorsOf(access) diff unrollFactorsOf(mem)).map{case Exact(p) => p.toInt}.fold(1){_*_}
   }
 
-  // TODO: How to express "tapped" block FIFO? What information is needed here?
-  def coalesceDuplicates(dups: List[MemInstance]) = dups
+  override def bank(mem: Exp[Any]) = if (isFIFO(mem.tp)) {
+    (writersOf(mem).headOption, readersOf(mem).headOption) match {
+      case (None,None)         => Nil
+      case (Some(write), None) => List(MemInstance(1, 1, List(StridedBanking(1, accessPar(mem,write._3))) ))
+      case (None, Some(read))  => List(MemInstance(1, 1, List(StridedBanking(1, accessPar(mem,read._3))) ))
+      case (Some(write),Some(read)) =>
+        val banks = Math.max(accessPar(mem,write._3), accessPar(mem,read._3))
+        List(MemInstance(1, 1, List(StridedBanking(1, banks)) ))
+    }
+  } else super.bank(mem)
+}
 
+
+trait MemoryAnalyzer extends BRAMBanking with RegisterBanking with FIFOBanking {
+  import IR._
+
+  override val name = "Scratchpad Analyzer"
+  override val eatReflect = true
+  debugMode = true
 
   // TODO: Also need pointer for each read/write to refer to instance(s) it accesses
-  def getMemoryInstances(mem: Exp[Any]): List[MemInstance] = {
+  def analyzeMemory(mem: Exp[Any]) {
     debug("")
     debug("Inferring instances for memory " + nameOf(mem).getOrElse(mem.toString))
-    if (isBRAM(mem.tp)) {
-      (writersOf(mem).headOption,readersOf(mem)) match {
-        case (None, Nil) => Nil
-        case (Some(write), Nil) => List(unpairedAccess(mem, write))
-        case (None, reads) =>
-          // What to do here? No writer, so current version will always read garbage...
-          val dups = reads.map(read => unpairedAccess(mem, read))
-          coalesceDuplicates(dups)
-        case (Some(write), reads) =>
-          val dups = reads.map(read => pairedAccess(mem, write, read))
-          coalesceDuplicates(dups)
-      }
-    }
-    else if (isRegister(mem.tp)) {    // Registers don't need banking, but they do need buffering
-      (writersOf(mem).headOption, readersOf(mem)) match {
-        case (None, Nil) => Nil
-        case (Some(write), Nil) => List(MemInstance(1, List(DuplicatedBanking(1))))
-        case (None, reads) => List(MemInstance(1, List(DuplicatedBanking(1))))
-        case (Some(write), reads) =>
-          val dups = reads.map{read => MemInstance(1 + distanceBetween( (write._1,write._2), (read._1,read._2) ), List(DuplicatedBanking(1))) }
-          coalesceDuplicates(dups)
-      }
-    }
-    else stageError("TODO: Don't yet know how to bank memory of type " + mem.tp)
-  }
-
-
-  def analyzeMemory(mem: Exp[Any]) {
-    val instances = getMemoryInstances(mem)
+    val instances = bank(mem)
     duplicatesOf(mem) = instances
 
     debug("  Inferred " + instances.length + " instances: ")
-    instances.zip(readersOf(mem)).zipWithIndex.foreach { case ((inst,read), i) =>
-      debug("    #" + i + " Depth: " + inst.depth + ", Format: " + inst.banking.mkString(", "))
+    instances.zipWithIndex.foreach{ case (inst, i) =>
+      debug("    #" + i + " Depth: " + inst.depth + ", Duplicates: " + inst.duplicates + ", Format: " + inst.banking.mkString(", "))
     }
   }
 
   def run(localMems: List[Exp[Any]]): Unit = localMems.foreach{mem => analyzeMemory(mem) }
-
-  override def traverse(lhs: Sym[Any], rhs: Def[Any]): Unit = rhs match {
-    case _:Reg_new[_] => analyzeMemory(lhs)
-    case _:Bram_new[_] => analyzeMemory(lhs)
-    case _ => super.traverse(lhs,rhs)
-  }
 }

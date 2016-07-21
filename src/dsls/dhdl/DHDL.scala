@@ -54,6 +54,8 @@ trait DHDLDSL extends ForgeApplication
     disableFusion()
 
     val T = tpePar("T")
+    val K = tpePar("K")
+    val V = tpePar("V")
 
     // --- Primitive Types
     /** Bit represents a single bit, equivalent to a Boolean **/
@@ -134,6 +136,18 @@ trait DHDLDSL extends ForgeApplication
      * BRAMs can have an arbitrary number of readers but only one writer. This writer may be an element-based store or a load from an OffChipMem.
      **/
     val BRAM = tpe("BRAM", T)
+
+    /**
+     * FIFOs are on-chip scratchpads with additional control logic for address-less push/pop operations. FIFOs can have an arbitrary number of readers
+     * but only one writer.
+     **/
+    val FIFO = tpe("FIFO", T)
+
+    /**
+     * CAMs (content addressable memories) are used for associative key-value stores.
+     **/
+    val CAM = tpe("CAM", (K,V))
+
     /**
      * Caches are on-chip caches for a specific off-chip memory/data structure. Caches allow loading
      * with multi-dimentional address, whose dimensions are inherited from the cached off-chip memories.
@@ -155,7 +169,7 @@ trait DHDLDSL extends ForgeApplication
      **/
     val Vector = tpe("Vector", T)
 
-    primitiveStructs :::= List(OffChip, BRAM, Reg, Vector, Cache)
+    primitiveStructs :::= List(OffChip, BRAM, FIFO, CAM, Reg, Vector, Cache)
 
     // --- State Machine Types
     /** Counter is a single hardware counter with an associated minimum, maximum, step size, and parallelization factor.
@@ -208,11 +222,12 @@ trait DHDLDSL extends ForgeApplication
 
 
     // --- Traversals
+    val LevelAnalyzer = analyzer("PipeLevel", isExtern=true)
+    val UnitPipeTransformer = transformer("UnitPipe", isExtern=true)
     val StageAnalyzer = analyzer("Stage", isExtern=true)
     val GlobalAnalyzer = analyzer("Global")
     val ControlSignalAnalyzer = analyzer("ControlSignal", isExtern=true)
     val UnrolledControlAnalyzer = analyzer("UnrolledControlSignal", isExtern=true)
-    val ParallelizationSetter = traversal("ParallelizationSetter",isExtern=true)
     val DHDLAffineAnalysis = analyzer("DHDLAffine", isExtern=true)
 
     val BoundAnalyzer = analyzer("Bound", isIterative=false)
@@ -221,23 +236,32 @@ trait DHDLDSL extends ForgeApplication
     val AreaAnalyzer = analyzer("Area", isExtern=true)
     val LatencyAnalyzer = analyzer("Latency", isExtern=true)
     val OpsAnalyzer = analyzer("Ops", isExtern=true)
+    val ReductionAnalyzer = analyzer("Reduction", isExtern=true)
 
     val ConstantFolding = traversal("ConstantFolding", isExtern=true)
     val ParameterAnalyzer = analyzer("Parameter",isExtern=true)
     val MetaPipeRegInsertion = traversal("MetaPipeRegInsertion",isExtern=true)
 
     val Unrolling = transformer("Unrolling", isExtern=true)
+
     val DotIRPrinter = traversal("DotIRPrinter", isExtern=true)
+    val NameAnalyzer = traversal("NameAnalyzer", isExtern=true)
 
     importGlobalAnalysis()
     importBoundAnalysis()
 
     // --- Pre-DSE analysis
-    schedule(StageAnalyzer)         // Number of stages in each control node
+    schedule(IRPrinterPlus)
+    schedule(NameAnalyzer)
+    schedule(LevelAnalyzer)         // Sanity checks and pipe style annotation fixes
     schedule(GlobalAnalyzer)        // Values computed outside of all controllers
+    schedule(UnitPipeTransformer)   // Wrap primitives in outer pipes
+    schedule(IRPrinterPlus)
+
+    schedule(StageAnalyzer)         // Get number of stages in each control node
+    schedule(GlobalAnalyzer)        // Values computed outside of all controllers (TODO: Needed again?)
     schedule(ControlSignalAnalyzer) // Variety of control signal related metadata
 
-    schedule(ParallelizationSetter) // Parallelization factors
     schedule(DHDLAffineAnalysis)    // Access patterns
 
     schedule(DotIRPrinter)          // Graph prior to unrolling
@@ -259,24 +283,32 @@ trait DHDLDSL extends ForgeApplication
                                     //   Memory analyzer (to finalize banking/buffering)
                                     //   Contention analyzer (to finalize contention estimates)
 
+    // --- Post-DSE Constants
+    schedule(ConstantFolding)       // Constant folding
+    schedule(GlobalAnalyzer)        // Add "global" annotations for newly created symbols after folding
+
     // --- Post-DSE Estimation
     schedule(AreaAnalyzer)          // Area estimation
     schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
 
-    // --- Transformations
-    schedule(ConstantFolding)       // Constant folding
-    schedule(MetaPipeRegInsertion)  // Inserts registers between metapipe stages for counter signals
+// Temporarily disabled until moved to unrolling
+//    schedule(MetaPipeRegInsertion)  // Inserts registers between metapipe stages for counter signals
+
+    // --- Design Elaboration
+    schedule(ReductionAnalyzer)     // Reduce/accumulator specialization
     schedule(Unrolling)             // Pipeline unrolling
     schedule(UnrolledControlAnalyzer) // Control signal metadata after unrolling
     schedule(DotIRPrinter)          // Graph after unrolling
-    schedule(IRPrinterPlus)         // Graph after unrolling
+    schedule(IRPrinterPlus)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, maxj))
     extern(grp("ExternCounter"), targets = List($cala, maxj), withTypes = true)
     extern(grp("MemoryTemplate"), targets = List($cala, cpp, maxj), withTypes = true)
     extern(metadata("ExternPrimitive"), targets = List($cala, maxj), withTypes = true)
+    extern(metadata("NodeMetadata"), targets = Nil, withTypes = true)
     extern(grp("LoweredPipe"), targets = List($cala, maxj))
+    extern(grp("Name"), targets = Nil)
 		()
 	}
 }

@@ -43,9 +43,6 @@ trait DHDLTypes {
     val const_to_fixpt = internal (Lifts) ("constFixPt", (T,S,I,F), (T, SManifest(SS), SManifest(II), SManifest(FF)) :: FixPt(S,I,F), TNumeric(T))
     val const_to_fltpt = internal (Lifts) ("constFltPt", (T,G,E), (T, SManifest(GG), SManifest(EE)) :: FltPt(G,E), TNumeric(T))
 
-
-
-
     val bit_to_string = direct (Tpes) ("bit_to_string", Nil, Bit :: MString)
 
     // Include Manifests to avoid CSE issues
@@ -180,6 +177,7 @@ trait DHDLTypes {
     /** @nodoc **/
     fimplicit (Tpes) ("scala_float_to_fltpt", Nil, SFloat :: Flt) implements redirect ${ fltPt[Float,B24,B8]($0) }
 
+    fimplicit (Tpes) ("insert_unit", Nil, MAny :: MUnit) implements composite ${ unit(()) }
 
     // --- Scala Backend
     impl (boolean_to_bit) (codegen($cala, ${ $0 }))

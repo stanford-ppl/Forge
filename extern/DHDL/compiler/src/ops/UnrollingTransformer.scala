@@ -8,137 +8,203 @@ import scala.collection.mutable.HashMap
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait UnrollingTransformExp extends PipeStageToolsExp with LoweredPipeOpsExp { this: DHDLExp => }
+trait UnrollingTransformExp extends NodeMetadataOpsExp with LoweredPipeOpsExp { this: DHDLExp => }
 
-// TODO: Need to handle edge cases - currently par factor must be a divider of number of iterations
-trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
+trait UnrollingTransformer extends MultiPassTransformer {
   val IR: UnrollingTransformExp with DHDLExp
-  import IR.{infix_until => _, _}
+  import IR.{infix_until => _, Array => _, assert => _, _}
 
   debugMode = false
   override val name = "Unrolling Transformer"
 
-  def unrollInnerMap[A:Manifest](cchain: Exp[CounterChain], func: Block[A], inds: List[Exp[Index]]) = {
+  /**
+   * Helper class for unrolling
+   * Tracks multiple substitution contexts in 'laneSubst' array
+   **/
+  case class Unroller(cchain: Exp[CounterChain], inds: List[Exp[Index]]) {
     val Ps = parsOf(cchain)
     val P = Ps.reduce(_*_)
     val N = Ps.length
     val prods = List.tabulate(N){i => Ps.slice(i+1,N).fold(1)(_*_) }
     val indices = Ps.map{p => List.fill(p){ fresh[Index] } }
 
-    val out = (0 until P).map{p =>
+    def length = P // TODO: better term for this
+
+    // Substitution for each duplication "lane"
+    val laneSubst = Array.tabulate(P){p =>
       val inds2 = indices.zipWithIndex.map{case (vec,d) => vec((p / prods(d)) % Ps(d)) }
-      withSubstScope(inds.zip(inds2):_*){ inlineBlock(func) }
+      withSubstScope(inds.zip(inds2):_*){ subst }
     }
-    (indices, out.toList)
+
+    def map[A](block: Int => A): List[A] = {
+      val outerSubst = subst
+      val out = (0 until P).map{p =>
+        subst = laneSubst(p)
+        val result = block(p)
+        laneSubst(p) = subst
+        result
+      }
+      subst = outerSubst
+      out.toList
+    }
+    def foreach(block: Int => Unit) { map(block) }
+
+    def vectorize[T:Manifest](block: Int => Exp[T]): Exp[Vector[T]] = vector_create_from_list(map(block))
+
+    // --- Each unrolling rule should do at least one of three things:
+    // 1. Split a given vector as the substitution for the single original symbol
+    def duplicate(s: Sym[Any], d: Def[Any]): List[Exp[Any]] = map{p =>
+      val s2 = self_clone(s,d)
+      subst += s -> s2
+      s2
+    }
+    // 2. Make later stages depend on the given substitution across all lanes
+    // NOTE: This assumes that the node has no meaningful return value (i.e. all are Pipeline or Unit)
+    // Bad things can happen here if you're not careful!
+    def split[T:Manifest](orig: Sym[Any], vec: Exp[Vector[T]]): List[Exp[T]] = map{p =>
+      val element = vec(p)
+      subst += orig -> element
+      element
+    }
+    // 3. Create an unrolled clone of symbol s for each lane
+    def unify(orig: Exp[Any], unrolled: Exp[Any]): List[Exp[Any]] = {
+      foreach{p => subst += orig -> unrolled}
+      List(unrolled)
+    }
+
+    // If this is a memory that is being unrolled in this scope, the symbol will be the un-mirrored version prior to duplication
+    // If it is not being unrolled in this scope, the symbol will be the already mirrored version
+    def isUnrolled(e: Exp[Any]) = {
+      val inScope = laneSubst.exists(_ contains e)
+      assert(!inScope || laneSubst.forall(_ contains e), s"Symbol $e only exists in some duplicated lanes!")
+      inScope
+    }
   }
 
-  def unrollOuterMap[A:Manifest](cchain: Exp[CounterChain], func: Block[A], inds: List[Exp[Index]]) = {
-    val Ps = parsOf(cchain)
-    val P = Ps.reduce(_*_)
-    val N = Ps.length
-    val prods = List.tabulate(N){i => Ps.slice(i+1,N).fold(1)(_*_) }
-    val indices = Ps.map{p => List.fill(p){ fresh[Index] } }
+  /**
+   * Create index bound checks
+   * NOTE: Only can be used within reify scope
+   **/
+  def boundChecks2D(cchain: Exp[CounterChain], inds: List[List[Exp[Index]]]): List[List[Exp[Bit]]] = {
+    val ccMax = ccMaxes(cchain)
+    inds.zip(ccMax).map{case (ind,max) => ind.map{i => i < max}}
+  }
+  def boundChecks(cchain: Exp[CounterChain], inds: List[List[Exp[Index]]]): List[Exp[Bit]] = boundChecks2D(cchain,inds).flatten
 
-    var out: List[Exp[A]] = Nil
-    val dupSubst = HashMap[Int,Map[Exp[Any],Exp[Any]]]()
-    (0 until P).foreach{p =>
-      val inds2 = indices.zipWithIndex.map{case (vec,d) => vec((p / prods(d)) % Ps(d)) }
-      withSubstScope(inds.zip(inds2):_*){ dupSubst(p) = subst }
-    }
+  /**
+   * Create duplicates of the given node or special case, vectorized version
+   * NOTE: Only can be used within reify scope
+   **/
+  def unroll[T](s: Sym[T], d: Def[T], lanes: Unroller)(implicit ctx: SourceContext): List[Exp[Any]] = d match {
+    // Account for the edge case with FIFO writing
+    case EatReflect(e@Push_fifo(fifo, value, en)) if !lanes.isUnrolled(fifo) =>
+      val values  = lanes.vectorize{p => f(value)}
+      val valids  = boundChecks(lanes.cchain, lanes.indices)
+      val enables = lanes.vectorize{p => f(en) && valids(p) }
+      val parPush = par_push_fifo(f(fifo), values, enables, true)(e._mT,e.__pos)
+      lanes.unify(s, parPush)
 
-    def duplicateStage(s: Sym[Any], d: Def[Any], isResult: Boolean) {
-      val outerSubst = subst
+    case EatReflect(e@Pop_fifo(fifo)) if !lanes.isUnrolled(fifo) =>
+      val parPop = par_pop_fifo(f(fifo), lanes.length)(e._mT,e.__pos)
+      dimsOf(parPop) = List(lanes.length.as[Index])
+      lanes.split(s, parPop)
 
-      (0 until P).foreach{p =>
-        subst = dupSubst(p)
-        val mirroredStage = clone(s,d)
-        subst += s -> mirroredStage
-        if (isResult) out ::= mirroredStage.asInstanceOf[Exp[A]]
-        dupSubst(p) = subst
-      }
+    case EatReflect(e: Cam_load[_,_]) =>
+      if (lanes.length > 1) stageError("Cannot parallelize CAM operations")(mpos(s.pos))
+      lanes.duplicate(s, d)
+    case EatReflect(e: Cam_store[_,_]) =>
+      if (lanes.length > 1) stageError("Cannot parallelize CAM operations")(mpos(s.pos))
+      lanes.duplicate(s, d)
 
-      subst = outerSubst
-    }
+    case EatReflect(e@Bram_store(bram,addr,value)) if !lanes.isUnrolled(bram) =>
+      val values = lanes.vectorize{p => f(value)}
+      val addrs  = lanes.vectorize{p => f(addr)}
+      val parStore = par_bram_store(f(bram), addrs, values)(e._mT, e.__pos)
+      lanes.unify(s, parStore)
 
+    case EatReflect(e@Bram_load(bram,addr)) if !lanes.isUnrolled(bram) =>
+      val addrs = lanes.vectorize{p => f(addr)}
+      val parLoad = par_bram_load(f(bram), addrs)(e._mT, e.__pos)
+      dimsOf(parLoad) = List(lanes.length.as[Index])
+      lanes.split(s, parLoad)
+
+    case d if isControlNode(s) && lanes.length > 1 =>
+      val parBlk = reifyBlock { lanes.duplicate(s, d); () }
+      val parStage = reflectEffect(Pipe_parallel(parBlk), summarizeEffects(parBlk) andAlso Simple())
+      styleOf(parStage) = ForkJoin
+      lanes.unify(s, parStage)
+
+    case _ => lanes.duplicate(s, d)
+  }
+
+  /*
+    Unrolls purely independent loop iterations
+    NOTE: The func block should already have been mirrored to update dependencies prior to unrolling
+  */
+  def unrollMap[A:Manifest](func: Block[A], lanes: Unroller): List[Exp[A]] = {
     val origResult = getBlockResult(func)
 
     focusBlock(func){
       focusExactScope(func){ stms =>
-        stms.foreach {
-          case TP(s,d) if isControlNode(s) && P > 1 =>
-            val parBlk = reifyBlock { duplicateStage(s,d, s==origResult) }
-            val parStage = reflectEffect(Pipe_parallel(parBlk), summarizeEffects(parBlk) andAlso Simple())
-            styleOf(parStage) = ForkJoin
-
-            // Make sure later stages depend on the Parallel, not the inner controller
-            // (required to avoid effects ordering issues)
-            // Note that this assumes that control nodes have no meaningful return value (i.e. all are Pipeline or Unit)
-            (0 until P).foreach{p =>
-              var sub = dupSubst(p)
-              sub += s -> parStage
-              dupSubst(p) = sub
-            }
-
-          case TP(s,d) => duplicateStage(s,d, s==origResult)
-        }
+        stms.foreach { case TP(s,d) => unroll(s, d, lanes)(mpos(s.pos)) }
       }
     }
-    (indices, out.reverse)
+    // Get the list of duplicates for the original result of this block
+    lanes.map{p => f(origResult).asInstanceOf[Exp[A]] }
   }
   def unrollForeach(lhs: Exp[Any], rhs: Pipe_foreach) = {
-    debug(s"Unrolling $lhs = $rhs")
-
     val Pipe_foreach(cchain, func, inds) = rhs
-    val cc2 = f(cchain)
-    var inds2: List[List[Sym[Index]]] = Nil
-    val blk = reifyBlock {
-      val (unrolledInds, _) = if (isOuterLoop(lhs)) unrollOuterMap(cc2, f(func), inds)
-                              else                  unrollInnerMap(cc2, func, inds)
-      inds2 :::= unrolledInds
-    }
-    val newPipe = reflectEffect(ParPipeForeach(cc2, blk, inds2), summarizeEffects(blk).star andAlso Simple())
+    scrubSym(lhs.asInstanceOf[Sym[Any]])
 
-    val Def(d) = newPipe
-    debug(s"$newPipe = $d")
+    val lanes = Unroller(cchain, inds)
+    val blk = reifyBlock { unrollMap(func, lanes); () }
+    val inds2 = lanes.indices
 
+    val newPipe = reflectEffect(ParPipeForeach(cchain, blk, inds2), summarizeEffects(blk).star andAlso Simple())
     setProps(newPipe, getProps(lhs))
     newPipe
   }
 
-  def unrollReduce[A:Manifest](inputs: List[Exp[A]], rFunc: Block[A], iFunc: Block[Index], ld: Block[A], st: Block[Unit], idx: Exp[Index], res: Exp[A], rV: (Sym[A],Sym[A])) = {
+  // TODO: General (more expensive) case for when no zero is given
+  def unrollReduce[A:Manifest:Num](inputs: List[Exp[A]], valids: List[Exp[Bit]], zero: Option[Exp[A]], rFunc: Block[A], newIdx: Exp[Index], ld: Block[A], st: Block[Unit], idx: Exp[Index], res: Exp[A], rV: (Sym[A],Sym[A])) = {
     def reduce(x: Exp[A], y: Exp[A]) = withSubstScope(rV._1 -> x, rV._2 -> y){ inlineBlock(rFunc) }
+
+    val validInputs = if (zero.isDefined) {
+      inputs.zip(valids).map{case (res,v) => mux(v, res, zero.get) }
+    }
+    else {
+      stageError("Reduction without explicit zero is not yet supported")
+    }
+
     val treeResult = reduceTree(inputs){(x,y) => reduce(x,y) }
-    val newIdx = inlineBlock(iFunc)
     val accumLoad = withSubstScope(idx -> newIdx){ inlineBlock(ld) }
     val newRes = reduce(treeResult, accumLoad)
     withSubstScope(res -> newRes, idx -> newIdx){ inlineBlock(st) }
   }
 
+  object PipeIf {
+    def apply(cond: Boolean)(x: => Rep[Unit]) = if (cond) Pipe { x } else x
+  }
+
   // Create a single block with map + reduce + load + reduce + store
   // Still have to keep acc separate to make sure load isn't lifted out of the block (e.g. for registers)
-  def unrollPipeFold[T,C[T]](lhs: Exp[Any], rhs: Pipe_fold[T,C])(implicit ctx: SourceContext, mT: Manifest[T], mC: Manifest[C[T]]) = {
-    debug(s"Unrolling $lhs = $rhs")
+  def unrollPipeFold[T,C[T]](lhs: Exp[Any], rhs: Pipe_fold[T,C])(implicit ctx: SourceContext, numT: Num[T], mT: Manifest[T], mC: Manifest[C[T]]) = {
+    val Pipe_fold(cchain,accum,zero,foldAccum,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) = rhs
+    scrubSym(lhs.asInstanceOf[Sym[Any]])
 
-    val Pipe_fold(cchain,accum,foldAccum,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) = rhs
-    val cc = f(cchain)
-    val accum2 = f(accum)
-    val func2 = f(func)
-    var inds2: List[List[Sym[Index]]] = Nil
+    val lanes = Unroller(cchain, inds)
+    val inds2 = lanes.indices
 
-    val blk = if (isInnerLoop(lhs)) reifyBlock {
-      val (unrolledInds, mapRes) = unrollInnerMap(cc, func2, inds)(mT)
-      inds2 :::= unrolledInds
-      unrollReduce(mapRes, rFunc, iFunc, ld, st, idx, res, rV)(mT)
-    }
-    else reifyBlock {
-      val (unrolledInds, mapRes) = unrollOuterMap(cc, func2, inds)(mT)
-      inds2 :::= unrolledInds
-      Pipe {
-        unrollReduce(mapRes, rFunc, iFunc, ld, st, idx, res, rV)(mT)
+    val blk = reifyBlock {
+      val mapResults = unrollMap(func, lanes)(mT)
+      val valids = boundChecks(cchain, inds2)
+
+      PipeIf(isOuterLoop(lhs)){
+        val newIdx = inlineBlock(iFunc)
+        unrollReduce(mapResults, valids, zero, rFunc, newIdx, ld, st, idx, res, rV)(mT,numT)
       }
     }
-
-    val newPipe = reflectEffect(ParPipeReduce(cc, accum2, blk, f(rFunc), inds2, acc, rV)(ctx,mT,mC))
+    val newPipe = reflectEffect(ParPipeReduce(cchain, accum, blk, rFunc, inds2, acc, rV)(ctx,mT,mC))
 
     val Def(d) = newPipe
     debug(s"$newPipe = $d")
@@ -147,50 +213,67 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
     newPipe
   }
 
-  def unrollAccumFold[T,C[T]](lhs: Exp[Any], rhs: Accum_fold[T,C])(implicit ctx: SourceContext, mT: Manifest[T], mC: Manifest[C[T]]) = {
-    debug(s"Unrolling $lhs = $rhs")
-
-    val Accum_fold(ccOuter,ccInner,accum,foldAccum,iFunc,func,ld1,ld2,rFunc,st,indsOuter,indsInner,idx,part,acc,res,rV) = rhs
-    val ccO2 = f(ccOuter)
-    val ccI2 = f(ccInner)
-    val accum2 = f(accum)
-    val func2 = f(func)
-    var indsO2: List[List[Sym[Index]]] = Nil
+  def unrollAccumFold[T,C[T]](lhs: Exp[Any], rhs: Accum_fold[T,C])(implicit ctx: SourceContext, numT: Num[T], mT: Manifest[T], mC: Manifest[C[T]]) = {
+    val Accum_fold(ccMap,ccRed,accum,zero,foldAccum,iFunc,func,ld1,ld2,rFunc,st,indsMap,indsRed,idx,part,acc,res,rV) = rhs
+    scrubSym(lhs.asInstanceOf[Sym[Any]])
 
     def reduce(x: Exp[T], y: Exp[T]) = withSubstScope(rV._1 -> x, rV._2 -> y){ inlineBlock(rFunc)(mT) }
-    def unrollLoadReduce(inputs: List[Exp[C[T]]]) = {
-      val newIdx = inlineBlock(iFunc) // Should be zero or always unused
-      val mapReads = inputs.map{partial => withSubstScope(part -> partial, idx -> newIdx){inlineBlock(ld1)(mT) } }
-      val accRead  = withSubstScope(idx -> newIdx){ inlineBlock(ld2)(mT) }
-      val treeResult = reduceTree(mapReads){(x,y) => reduce(x,y)}
-      val newRes = reduce(treeResult, accRead)
-      withSubstScope(res -> newRes, idx -> newIdx){ inlineBlock(st) }
-    }
+
+    val mapLanes = Unroller(ccMap, indsMap)
+    val indsMap2 = mapLanes.indices
 
     val blk = reifyBlock {
-      val (unrolledInds, mapRes) = unrollOuterMap(ccO2, func2, indsOuter)
-      indsO2 :::= unrolledInds
+      val mapResults = unrollMap(func, mapLanes)
+      val validsMap = boundChecks(ccMap, indsMap2)
 
-      if (isUnitCounterChain(ccI2)) withSubstScope(acc -> accum2){ Pipe { unrollLoadReduce(mapRes) } }
-      else {
-        // Unroll the reduction loop
-        val Ps = parsOf(ccI2)
-        val P = Ps.reduce(_*_)
-        val N = Ps.length
-        val prods = List.tabulate(N){i => Ps.slice(i+1,N).fold(1)(_*_) }
-        val indices = Ps.map{p => List.fill(p){ fresh[Index] } }
-
-        val innerBlk = reifyBlock {
-          (0 until P).foreach{p =>
-            val inds2 = indices.zipWithIndex.map{case (vec,d) => vec((p / prods(d)) % Ps(d)) }
-            withSubstScope(indsInner.zip(inds2):_*){ unrollLoadReduce(mapRes) }
+      if (isUnitCounterChain(ccRed)) {
+        withSubstScope(acc -> accum){
+          Pipe {
+            val newIdx = inlineBlock(iFunc)
+            val loads = mapResults.map{mem => withSubstScope(part -> mem, idx -> newIdx){inlineBlock(ld1)(mT)} }
+            unrollReduce(loads, validsMap, zero, rFunc, newIdx, ld2, st, idx, res, rV)(mT,numT)
           }
         }
-        val innerPipe = reflectEffect(ParPipeReduce(ccI2, accum2, innerBlk, rFunc, indices, acc, rV), summarizeEffects(innerBlk).star andAlso Simple() andAlso Write(List(accum2.asInstanceOf[Sym[C[T]]])) )
-        styleOf(innerPipe) = Fine
+      }
+      else {
+        val reduceLanes = Unroller(ccRed, indsRed)
+        val indsRed2 = reduceLanes.indices
+
+        val innerBlk = reifyBlock {
+          val validsReduce = boundChecks2D(ccRed, indsRed2)
+
+          reduceLanes.foreach{mem =>
+            val newIdx = inlineBlock(iFunc)                // Inline index calculation for each parallel lane
+            subst += idx -> newIdx                         // Save address substitution rule for this lane
+          }
+          val loads = mapResults.map{mem =>                // Calculate list of loaded results for each memory
+            reduceLanes.foreach{p => subst += part -> mem} // Set partial result to be this memory
+            unrollMap(ld1, reduceLanes)(mT)                // Unroll the load of the partial result
+          }
+          val results = reduceLanes.map{p =>
+            val loadsT  = loads.map(_.apply(p))                               // Pth "column" of loads
+            val validsLane = validsReduce.map{valids => valids(p) }           // Valids for just this reduce lane
+            val valids = validsMap.zip(validsLane).map{case (a,b) => a && b}  // Valid map index & valid reduce index
+
+            val validLoads = if (zero.isDefined) {
+              loadsT.zip(valids).map{case (res,v) => mux(v,res,zero.get) }
+            }
+            else {
+              stageError("Reduction without explicit zero is not yet supported")
+            }
+            val accRead = inlineBlock(ld2)(mT)
+            val treeResult = reduceTree(validLoads){(x,y) => reduce(x,y) }
+            val newRes = reduce(treeResult, accRead)
+            subst += res -> newRes
+          }
+          unrollMap(st, reduceLanes)    // Parallel store. Already have substitutions for idx and res
+          ()
+        }
+        val innerPipe = reflectEffect(ParPipeReduce(ccRed, accum, innerBlk, rFunc, indsRed2, acc, rV), summarizeEffects(innerBlk).star andAlso Simple() andAlso Write(List(accum.asInstanceOf[Sym[C[T]]])) )
+        styleOf(innerPipe) = InnerPipe
       }
     }
-    val newPipe = reflectEffect(ParPipeForeach(ccO2, blk, indsO2), summarizeEffects(blk).star andAlso Simple() )
+    val newPipe = reflectEffect(ParPipeForeach(ccMap, blk, indsMap2), summarizeEffects(blk).star andAlso Simple() )
 
     val Def(d) = newPipe
     debug(s"$newPipe = $d")
@@ -200,33 +283,8 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
     newPipe
   }
 
-  def unrollBramLoadVector[T:Manifest](lhs: Exp[Any], rhs: Bram_load_vector[T])(implicit ctx: SourceContext) = {
-    val Bram_load_vector(bram, ofs, cchain, inds) = rhs
-    val Ps = parsOf(cchain)
-    val P = Ps.reduce(_*_)
-    val N = Ps.length
-    val indices = Ps.map{p => List.fill(p){ fresh[Index] } }
-
-    val newLoad = reflectPure(ParBramLoadVector(f(bram), f(ofs), f(cchain), indices))
-    setProps(newLoad, getProps(lhs))
-    newLoad
-  }
-  def unrollBramStoreVector[T:Manifest](lhs: Exp[Any], rhs: Bram_store_vector[T])(implicit ctx: SourceContext) = {
-    val Bram_store_vector(bram, ofs, vec, cchain, inds) = rhs
-    val Ps = parsOf(cchain)
-    val P = Ps.reduce(_*_)
-    val N = Ps.length
-    val indices = Ps.map{p => List.fill(p){ fresh[Index] } }
-
-    val bram2 = f(bram)
-    val newStore = reflectEffect(ParBramStoreVector(bram2, f(ofs), f(vec), f(cchain), indices), Write(List(bram2.asInstanceOf[Sym[BRAM[T]]])) )
-    setProps(newStore, getProps(lhs))
-    newStore
-  }
-
   // Similar to self_mirror, but also duplicates bound vars
-  // TODO: Push down to transformers? Can this be generalized somehow?
-  def clone[A](sym: Sym[A], rhs : Def[A]): Exp[A] = {
+  def self_clone[A](sym: Sym[A], rhs : Def[A]): Exp[A] = {
     val sym2 = clone(rhs)(mtype(sym.tp), mpos(sym.pos))
     setProps(sym2, getProps(sym))
     sym2
@@ -249,23 +307,14 @@ trait UnrollingTransformer extends MultiPassTransformer with PipeStageTools {
       val rF2 = withSubstScope(rV._1 -> rV2._1, rV._2 -> rV2._2){ f(rF) }
       reflectMirrored(Reflect(ParPipeReduce(f(cc),a2,b2,rF2,i2,acc2,rV2)(e.ctx,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
 
-    case e@ParBramLoadVector(b,o,c,i) =>
-      reflectPure(ParBramLoadVector(f(b),f(o),f(c),cloneInds(i))(e.mT,e.ctx))(mtype(manifest[A]), pos)
-    case Reflect(e@ParBramLoadVector(b,o,c,i), u, es) =>
-      reflectMirrored(Reflect(ParBramLoadVector(f(b),f(o),f(c), cloneInds(i) )(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
-
-    case Reflect(e@ParBramStoreVector(b,o,v,c,i), u, es) =>
-      reflectMirrored(Reflect(ParBramStoreVector(f(b),f(o),f(v),f(c), cloneInds(i))(e.mT,e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
-
     case _ => mirror(rhs, f.asInstanceOf[Transformer])(mtype(manifest[A]), pos)
   }).asInstanceOf[Exp[A]]
 
-  override def transform[A:Manifest](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext) = rhs match {
-    case EatReflect(e: Pipe_foreach) => Some( unrollForeach(lhs, e) )
-    case EatReflect(e: Pipe_fold[_,_]) => Some( unrollPipeFold(lhs, e)(e.ctx,e.mT,e.mC) )
-    case EatReflect(e: Accum_fold[_,_]) => Some( unrollAccumFold(lhs, e)(e.ctx,e.mT,e.mC) )
-    case EatReflect(e: Bram_load_vector[_]) => Some( unrollBramLoadVector(lhs, e)(e.mT,ctx) )
-    case EatReflect(e: Bram_store_vector[_]) => Some( unrollBramStoreVector(lhs, e)(e.mT,ctx) )
-    case _ => None
+  // Mirrors first prior to attempting to transform -- need to scrub mirrored symbols if they are not used
+  override def transform[A:Manifest](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext) = self_mirror(lhs, rhs) match {
+    case lhs2@Deff(e: Pipe_foreach) => Some( unrollForeach(lhs2, e) )
+    case lhs2@Deff(e: Pipe_fold[_,_]) => Some( unrollPipeFold(lhs2, e)(e.ctx,e.numT,e.mT,e.mC) )
+    case lhs2@Deff(e: Accum_fold[_,_]) => Some( unrollAccumFold(lhs2, e)(e.ctx,e.numT,e.mT,e.mC) )
+    case lhs2 => Some(lhs2) // Just use mirrored symbol by default
   }
 }

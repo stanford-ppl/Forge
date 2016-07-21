@@ -12,7 +12,7 @@ import core._
 import shared._
 import Utilities._
 
-trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with DeliteGenDataStructures with DeliteGenOps with DeliteGenImports with DeliteGenTraversals with BaseGenMetadata {
+trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with DeliteGenDataStructures with DeliteGenOps with DeliteGenImports with DeliteGenTraversals with DeliteGenMetadata {
   val IR: ForgeApplicationRunner with ForgeExp
   import IR._
 
@@ -43,7 +43,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
     emitDSLDefinition()
     // emitDataStructures()
     emitOps()
-    emitMetadata()
+    emitDSLMetadata()
     emitTraversals()
   }
 
@@ -157,7 +157,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
   }
 
 
-  def emitMetadata() {
+  def emitDSLMetadata() {
     val MetaTpes = Tpes.filter(t => !isForgePrimitiveType(t) && DataStructs.contains(t) && isMetaType(t))
     if (MetaTpes.nonEmpty) {
       val stream = new PrintWriter(new FileWriter(dslDir+File.separator+dsl+"MetadataClasses.scala"))
@@ -166,7 +166,7 @@ trait ForgeCodeGenDelite extends ForgeCodeGenBackend with DeliteGenPackages with
       emitLMSImports(stream)
       stream.println("import scala.virtualization.lms.common.MetadataOps")
       stream.println()
-      emitMetadataClasses(dsl + "CompilerOps", stream, repify)
+      emitMetadata(dsl + "CompilerOps", "MetadataOps with MetaTransforming", stream, repify)
       stream.close()
     }
   }

@@ -17,8 +17,6 @@ import scala.collection.mutable.{HashMap,HashSet,ArrayBuffer}
 import java.io.PrintStream
 
 import scala.virtualization.lms.util.GraphUtil._
-import ppl.delite.framework.Config
-
 
 trait DSE extends Traversal {
   val IR: DHDLCompiler
@@ -33,10 +31,11 @@ trait DSE extends Traversal {
   lazy val contention = new ContentionModel{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val bufAnalyzer = new MemoryAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
 
-  lazy val tileSizes  = paramAnalyzer.tileSizes.distinct
-  lazy val parFactors = paramAnalyzer.parFactors.distinct
-  lazy val localMems  = ctrlAnalyzer.localMems
-  lazy val accFactors = ctrlAnalyzer.memAccessFactors.toList
+  lazy val tileSizes = paramAnalyzer.tileSizes.distinct
+  lazy val parParams = paramAnalyzer.parParams.distinct
+  lazy val localMems = ctrlAnalyzer.localMems
+  lazy val metapipes = ctrlAnalyzer.metapipes
+  //lazy val accFactors = ctrlAnalyzer.memAccessFactors.toList
   lazy val topController = ctrlAnalyzer.top
 
   override def run[A:Manifest](b: Block[A]) = {
@@ -44,12 +43,20 @@ trait DSE extends Traversal {
     ctrlAnalyzer.run(b)
     paramAnalyzer.run(b)
 
-    if (debugMode && Config.enableDSE) printer.run(b)
+    if (debugMode && SpatialConfig.enableDSE) printer.run(b)
 
-    if (Config.enableDSE) dse(b)
+    debug("Tile Sizes: ")
+    tileSizes.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
+    debug("Parallelization Factors:")
+    parParams.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
+    debug("Metapipelining Toggles:")
+    metapipes.foreach{t => debug(s"  ${mpos(t.pos).line}")}
 
+    if (SpatialConfig.enableDSE) dse(b)
+
+    debug("Freezing DSE parameters")
     tileSizes.foreach{p => p.fix}
-    parFactors.foreach{p => p.fix}
+    parParams.foreach{p => p.fix}
     bndAnalyzer.run(b)
     bufAnalyzer.run(localMems)
     contention.run(topController)
@@ -89,30 +96,23 @@ trait DSE extends Traversal {
     cycleAnalyzer.run(b)
 
     // A. Get lists of parameters
-    val metapipes = ctrlAnalyzer.metapipes
     var restrict  = paramAnalyzer.restrict
     val ranges    = paramAnalyzer.range
 
     // HACK: All par factors for readers and writers of a given BRAM must be equal or one
-    for ((mem,factors) <- accFactors) {
+    /*for ((mem,factors) <- accFactors) {
       val distFactors = factors.distinct
       if (distFactors.length > 1) restrict ::= REqualOrOne(distFactors)
-    }
+    }*/
     restrict = restrict.distinct
 
     def isLegalSpace() = restrict.forall(_.evaluate)
 
     // C. Calculate space
     debug("Running DSE")
-    debug("Tile Sizes: ")
-    tileSizes.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
-    debug("Parallelization Factors:")
-    parFactors.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
-    debug("Metapipelining Toggles:")
-    metapipes.foreach{t => debug(s"  ${mpos(t.pos).line}")}
     debug("")
     debug("Found the following parameter restrictions: ")
-    val numericFactors = tileSizes ++ parFactors
+    val numericFactors = tileSizes ++ parParams
 
     for (r <- restrict)   { debug(s"  $r") }
     for ((p,r) <- ranges if numericFactors.contains(p)) { debug(s"  ${nameOf(p).getOrElse(p.toString)}: ${r.start}:${r.step}:${r.end}") }
@@ -120,7 +120,8 @@ trait DSE extends Traversal {
     // Prune single factors
     val initialSpace = prune(numericFactors, ranges, restrict)
 
-    val space = initialSpace ++ metapipes.map{mp => Domain(List(true,false), {c: Boolean => c match {case true => styleOf(mp) = Coarse; case false => styleOf(mp) = Disabled}; () }) }
+    val mps = metapipes.map{mp => Domain(List(true,false), {c: Boolean => c match {case true => styleOf(mp) = CoarsePipe; case false => styleOf(mp) = SequentialPipe}; () }) }
+    val space = initialSpace ++ mps
 
     if (debugMode) {
       debug("")
@@ -297,7 +298,7 @@ trait DSE extends Traversal {
     for (p <- 0 until legalSize) {
       val pt = points(p)
       indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt ) }
-      val values = numericFactors.map{p => p.x.toString} ++ metapipes.map{mp => (styleOf(mp) == Coarse).toString}
+      val values = numericFactors.map{p => p.x.toString} ++ metapipes.map{mp => isMetaPipe(mp).toString}
 
       val isPareto = pareto.exists{pt => pt.idx == p}
       pw.println(values.mkString(", ") + s", ${alms(p)}, ${regs(p)}, ${dsps(p)}, ${bram(p)}, ${cycles(p)}, ${valid(p)}, $isPareto, false")
@@ -312,7 +313,7 @@ trait DSE extends Traversal {
       val p = paretoPt.idx
       val pt = points(p)
       indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt ) }
-      val values = numericFactors.map{p => p.x.toString} ++ metapipes.map{mp => (styleOf(mp) == Coarse).toString}
+      val values = numericFactors.map{p => p.x.toString} ++ metapipes.map{mp => isMetaPipe(mp).toString}
 
       val runtime = paretoPt.cycles/(IR.CLK*1000000.0f)
       val almUsage = 100.0f*paretoPt.alms/target.alms

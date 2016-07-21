@@ -15,7 +15,7 @@ import scala.collection.mutable.Set
 import ppl.delite.framework.DeliteApplication
 
 trait MaxJPreCodegen extends Traversal  {
-	val IR:DHDLExp
+	val IR:DHDLExp with MemoryAnalysisExp
 	import IR.{infix_until => _, looprange_until => _, println => _, _}
 
 	var buildDir:String = _
@@ -77,24 +77,24 @@ trait MaxJPreCodegen extends Traversal  {
 			}
     case e@Pipe_foreach(cchain, func, inds) =>
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
-				case Coarse =>
+				case CoarsePipe =>
 					withStream(newStream("metapipe_" + quote(sym))) {
     				emitMPSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
-				case Fine =>
-				case Disabled =>
+				case InnerPipe =>
+				case SequentialPipe =>
 					withStream(newStream("sequential_" + quote(sym))) {
     				emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
 			}
-    case e@Pipe_fold(cchain, accum, foldAccum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
+    case e@Pipe_fold(cchain, accum, zero, foldAccum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
-				case Coarse =>
+				case CoarsePipe =>
 					withStream(newStream("metapipe_" + quote(sym))) {
     				emitMPSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
-				case Fine =>
-				case Disabled =>
+				case InnerPipe =>
+				case SequentialPipe =>
 					withStream(newStream("sequential_" + quote(sym))) {
     				emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
@@ -102,12 +102,12 @@ trait MaxJPreCodegen extends Traversal  {
 
     case e@ParPipeForeach(cc, func, inds) =>
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
-				case Coarse =>
+				case CoarsePipe =>
 					withStream(newStream("metapipe_" + quote(sym))) {
     				emitMPSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
-				case Fine =>
-				case Disabled =>
+				case InnerPipe =>
+				case SequentialPipe =>
 					withStream(newStream("sequential_" + quote(sym))) {
     				emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
@@ -115,8 +115,8 @@ trait MaxJPreCodegen extends Traversal  {
 
 		case e:Reg_new[_] if regType(sym) != Regular => argInOuts += sym.asInstanceOf[Sym[Register[_]]]
 
-    case _:Offchip_store_vector[_] => memStreams += sym
-    case _:Offchip_load_vector[_] => memStreams += sym
+    case _:Offchip_store_cmd[_] => memStreams += sym
+    case _:Offchip_load_cmd[_] => memStreams += sym
 
     case e@EatReflect(Bram_new(size, zero)) =>
       if (isDblBuf(e)) {

@@ -28,10 +28,12 @@ trait AreaAnalysisExp extends AreaModel with LatencyModel {
   val FPGATarget = FPGAResourceSummary(alms=262400,regs=524800,dsps=1963,bram=2567,streams=13)  // Stratix V on MAIA board
 }
 
-trait AreaAnalyzer extends ModelingTools {
+trait AreaAnalyzer extends ModelingTraversal {
   val IR: AreaAnalysisExp with DHDLExp
   import IR._
   import ReductionTreeAnalysis._
+
+  override val name = "Area Analyzer"
 
   override def silence() {
     super.silence()
@@ -87,8 +89,7 @@ trait AreaAnalyzer extends ModelingTools {
     areaOfBlock(b, true, par, oos)
   }
 
-  // TODO: loop index delay line in Metapipeline
-  def traverseNode(lhs: Exp[Any], rhs: Def[Any]) {
+  override def traverse(lhs: Sym[Any], rhs: Def[Any]) {
     val area = rhs match {
       case EatReflect(Hwblock(blk)) =>
         inHwScope = true
@@ -97,29 +98,26 @@ trait AreaAnalyzer extends ModelingTools {
         inHwScope = false
         body
 
-      case EatReflect(Counterchain_new(ctrs,nIters)) => areaOfBlock(nIters,true,1) + areaOf(lhs)
       case EatReflect(Pipe_parallel(func)) => areaOfBlock(func,false,1) + areaOf(lhs)
       case EatReflect(Unit_pipe(func)) =>
-        val body = areaOfBlock(func, styleOf(lhs) == Fine, 1)
+        val body = areaOfBlock(func, isInnerPipe(lhs), 1)
         debug(s"Pipe $lhs: ")
         debug(s"  body: $body")
         body + areaOf(lhs)
 
       case EatReflect(Pipe_foreach(cchain, func, _)) =>
         val P = parsOf(cchain).reduce(_*_)
-        val isInner = styleOf(lhs) == Fine
 
-        val body = areaOfBlock(func, isInner, P)
+        val body = areaOfBlock(func, isInnerPipe(lhs), P)
 
-        if (isInner) debug(s"Foreach $lhs (P = $P):") else debug(s"Outer Foreach $lhs (P = $P):")
+        if (isInnerPipe(lhs)) debug(s"Foreach $lhs (P = $P):") else debug(s"Outer Foreach $lhs (P = $P):")
         debug(s"  body: $body")
         body + areaOf(lhs)
 
-      case EatReflect(e@Pipe_fold(cchain,_,_,iFunc,ld,st,func,rFunc,_,idx,_,_,_)) =>
+      case EatReflect(e@Pipe_fold(cchain,accum,zero,fA,iFunc,ld,st,func,rFunc,_,idx,_,_,_)) =>
         val P = parsOf(cchain).reduce(_*_)
-        val isInner = styleOf(lhs) == Fine
 
-        val body = areaOfBlock(func, isInner, P) // map duplicated P times
+        val body = areaOfBlock(func, isInnerPipe(lhs), P) // map duplicated P times
         /*
           Some simple math:
           A full binary (reduction) tree is a tree in which every node is either
@@ -138,7 +136,7 @@ trait AreaAnalyzer extends ModelingTools {
         val cycle = areaOfCycle(rFunc, 1) // Special case area of accumulator
         val store = areaOfCycle(st, 1, Map(idx -> -(latencyOfCycle(ld) + latencyOfCycle(rFunc))) )    // Store to accumulator (happens once)
 
-        if (isInner) debug(s"Reduce $lhs (P = $P):") else debug(s"Outer Reduce $lhs (P = $P):")
+        if (isInnerPipe(lhs)) debug(s"Reduce $lhs (P = $P):") else debug(s"Outer Reduce $lhs (P = $P):")
         debug(s"  body: $body")
         debug(s"  tree: $internal")
         debug(s"  dlys: $internalDelays")
@@ -146,7 +144,7 @@ trait AreaAnalyzer extends ModelingTools {
 
         body + internal + internalDelays + icalc + load + cycle + store + areaOf(lhs)
 
-      case EatReflect(e@Accum_fold(ccOuter,ccInner,_,_,iFunc,func,ld1,ld2,rFunc,st,_,_,idx,_,_,_,_)) =>
+      case EatReflect(e@Accum_fold(ccOuter,ccInner,accum,zero,fA,iFunc,func,ld1,ld2,rFunc,st,_,_,idx,_,_,_,_)) =>
         val Pm = parsOf(ccOuter).reduce(_*_) // Parallelization factor for map
         val Pr = parsOf(ccInner).reduce(_*_) // Parallelization factor for reduce
 

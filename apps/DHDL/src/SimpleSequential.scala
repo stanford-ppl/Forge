@@ -11,14 +11,18 @@ trait SimpleSequential extends DHDLApplication {
     val innerPar = param("innerPar", 1); domainOf(innerPar) = (1, 1, 1)
     val tileSize = param("tileSize", 96); domainOf(tileSize) = (96, 96, 96)
 
-    val x = ArgIn[SInt]("x")
-    val y = ArgIn[SInt]("y")
-    val out = ArgOut[SInt]("out")
+//    val x = ArgIn[SInt]("x")
+//    val y = ArgIn[SInt]("y")
+//    val out = ArgOut[SInt]("out")
+    val x = ArgIn[SInt]
+    val y = ArgIn[SInt]
+    val out = ArgOut[SInt]
     setArg(x, xin)
     setArg(y, yin)
 
     Accel {
-      val b1 = BRAM[SInt]("b1", tileSize)
+//      val b1 = BRAM[SInt]("b1", tileSize)
+      val b1 = BRAM[SInt](tileSize)
       Sequential (tileSize by tileSize) { i =>
         Pipe.foreach(tileSize par innerPar) { ii =>
           b1(ii) = x.value * ii

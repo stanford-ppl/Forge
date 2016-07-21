@@ -1,10 +1,9 @@
 import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
-import scala.util.Random
 import scala.collection.mutable.PriorityQueue
 
-object KNNCompiler extends DHDLApplicationCompiler with KNN 
+object KNNCompiler extends DHDLApplicationCompiler with KNN
 object KNNInterpreter extends DHDLApplicationInterpreter with KNN
 
 trait KNNTest {
@@ -20,12 +19,12 @@ trait KNNTest {
 			sPoints.zipWithIndex.foreach {case (p,i) =>
 				pq.enqueue( dist(t, p) -> sLabels(i) )
 			}
-			val counts = Array.tabulate(sK)(i => 0); 
+			val counts = Array.tabulate(sK)(i => 0);
 			for (i <- 0 until sK) {
 				val n = pq.dequeue
 				counts(n._2) += 1
 			}
-			val maxCount = counts.zipWithIndex.reduce[(Int,Int)]{ case ((c1,i1),(c2,i2)) => 
+			val maxCount = counts.zipWithIndex.reduce[(Int,Int)]{ case ((c1,i1),(c2,i2)) =>
 				if (c2>c1) (c2,i2) else (c1,i1)
 			}
 			maxCount._2
@@ -55,12 +54,12 @@ trait KNN extends DHDLApplication with KNNTest{
 		val sNumTest = 6
 
 		val sPoints = Seq.tabulate(sNumPoints){i =>
-			Seq.tabulate(sDim){d => 
+			Seq.tabulate(sDim){d =>
 				Random.nextFloat()*100f
 			}
 		}
 		val sTests = Seq.tabulate(sNumTest){i =>
-			Seq.tabulate(sDim){d => 
+			Seq.tabulate(sDim){d =>
 				Random.nextFloat()*100f
 			}
 		}
@@ -96,7 +95,7 @@ trait KNN extends DHDLApplication with KNNTest{
 		MetaPipe {
 			val tileCtr = CounterChain(Counter(max=numPoints, step=tileSize))
 			val pointsB = BRAM[Float](tileSize, sDim)
-			Sequential(tileCtr) { case iTile::_ => 
+			Sequential(tileCtr) { case iTile::_ =>
 				points.ld(pointsB, iTile*sDim, tileSize*sDim)
 				val ptCtr = CounterChain(Counter(max=tileSize))
 				val minDist = Reg[Float](-1f)
@@ -121,7 +120,7 @@ trait KNN extends DHDLApplication with KNNTest{
 						val dimCtr = CounterChain(Counter(max=sDim))
 						Pipe(dimCtr) { case iD::_ =>
 							newCents.st(minCent.value, iD,
-								pointsB.ld(iP, iD) + newCents.ld(minCent.value, iD)) 
+								pointsB.ld(iP, iD) + newCents.ld(minCent.value, iD))
 						}
 						centCount.st(minCent.value, centCount.ld(minCent.value) + FixPt(1))
 					}
@@ -138,7 +137,7 @@ trait KNN extends DHDLApplication with KNNTest{
 		//println("cents")
 		//println(newCents.mkString)
 		val fgold = gold.flatten
-		fgold.zipWithIndex.foreach{case (g, i) => 
+		fgold.zipWithIndex.foreach{case (g, i) =>
 			assert(unit(g) == newCents.ld(i))
 		}
 		*/

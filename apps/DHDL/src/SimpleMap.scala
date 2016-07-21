@@ -12,8 +12,10 @@ trait SimpleMap extends DHDLApplication {
     val tileSize = param("tileSize", 96); domainOf(tileSize) = (96, 96, 96)
 //    bound(N) = 187200000
 
-    val x = ArgIn[SInt]("x")
-    val out = ArgOut[SInt]("out")
+//    val x = ArgIn[SInt]("x")
+//    val out = ArgOut[SInt]("out")
+    val x = ArgIn[SInt]
+    val out = ArgOut[SInt]
     setArg(x, xin)
 
     Accel {

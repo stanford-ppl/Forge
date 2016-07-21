@@ -657,6 +657,18 @@ trait DeliteGenOps extends BaseGenOps {
     }
   }
 
+
+  // Hack for dealing with "immediate" DSL types (e.g. Lists of Reps)
+  // TODO: Doesn't cover arbitrarily nested cases, e.g. List[List[Rep[Int]]]
+  def makeTransformedArg(idx: Int, tpe: Rep[DSLType], xf: String = "f"): String = tpe.stage match {
+    case `compile` if tpe.name.startsWith("List") || tpe.name.startsWith("Seq") =>
+      val tP = tpe.tpeArgs.head
+      if (tP.name.startsWith("Rep") || tP.name.startsWith("Exp") || tP.stage != compile) opArgPrefix+idx+".map{x => " + xf + "(x)}"
+      else opArgPrefix+idx
+    case `compile` if !tpe.name.startsWith("Rep") && !tpe.name.startsWith("Exp") => opArgPrefix+idx
+    case _ => xf + "(" + opArgPrefix+idx + ")"
+  }
+
   def makeTransformedArgs(o: Rep[DSLOp], xf: String = "f", addParen: Boolean = true) = {
     val xformArgs = o.args.zipWithIndex.flatMap{case (arg,idx) => arg match {
       case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if opTypeRequiresBlockify(Impls(o)) && !isThunk(f) => xf + "("+opArgPrefix+idx+")" :: args.map(a => boundArgAnonName(arg,a,idx))
@@ -664,17 +676,7 @@ trait DeliteGenOps extends BaseGenOps {
       case Def(Arg(name, f@Def(FTpe(args,ret,freq)), d2)) if isTpePar(o.retTpe) && !isThunk(f) && args.forall(a => a.tpe == o.retTpe || !isTpePar(a.tpe)) && ret == o.retTpe => List(xf + "("+opArgPrefix+idx+".asInstanceOf[" + repify(f).replaceAllLiterally(repify(o.retTpe), "Rep[A]") + "])")
       case Def(Arg(name, tpe, d2)) if !isFuncArg(arg) && isTpePar(o.retTpe) && tpe.tpePars.length == 1 && tpe.tpePars.apply(0) == o.retTpe => List(xf + "("+opArgPrefix+idx+".asInstanceOf[Rep[" + tpe.name + "[A]]])")
       // -- end workaround
-
-      // Hack for dealing with "immediate" DSL types (e.g. Lists of Reps)
-      // TODO: Doesn't cover arbitrarily nested cases, e.g. List[List[Rep[Int]]]
-      case Def(Arg(name, tpe, _)) => tpe.stage match {
-        case `compile` if tpe.name.startsWith("List") || tpe.name.startsWith("Seq") =>
-          val tP = tpe.tpeArgs.head
-          if (tP.name.startsWith("Rep") || tP.name.startsWith("Exp") || tP.stage != compile) List(opArgPrefix+idx+".map{x => " + xf + "(x)}")
-          else List(opArgPrefix+idx)
-        case `compile` if !tpe.name.startsWith("Rep") && !tpe.name.startsWith("Exp") => List(opArgPrefix+idx)
-        case _ => List(xf + "(" + opArgPrefix+idx + ")")
-      }
+      case Def(Arg(_, tpe, _)) => List(makeTransformedArg(idx, tpe, xf))
     }}
     if (addParen) xformArgs.mkString("(",",",")") else xformArgs.mkString(",")
   }

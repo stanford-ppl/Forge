@@ -565,7 +565,7 @@ trait DHDLMath {
 
   }
 
-  // TODO: Any reason for min and max to be nodes?
+  // NOTE: Min and Max don't really need to be nodes, but this simplifies maxj codegen a little
   def importBasicControl() {
     val T = tpePar("T")
     val CT = tpePar("CT", stage=compile)
@@ -576,16 +576,27 @@ trait DHDLMath {
 
     /** 2 input multiplexer **/
     direct (Ctrl) ("mux", T, (("sel", Bit), ("a",T), ("b",T)) :: T, TNum(T)) implements composite ${ mux2(sel,a,b) }
-
     /** @nodoc - 2 input multiplexer with a constant second argument **/
     direct (Ctrl) ("mux", (T,CT), (("sel", Bit), ("a", T), ("b", CT)) :: T, (TNum(T), TNumeric(CT))) implements composite ${ mux($sel, $a, lift_to[CT,T]($b)) }
     /** @nodoc - 2 input multiplexer with a constant first argument **/
     direct (Ctrl) ("mux", (T,CT), (("sel", Bit), ("a", CT), ("b", T)) :: T, (TNum(T), TNumeric(CT))) implements composite ${ mux($sel, lift_to[CT,T]($a), $b) }
 
+
     /** Selects the minimum of two given values. Implemented as a mux with a less-than comparison **/
-    direct (Ctrl) ("min", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].lessThan($a, $b), a, b) }
+    direct (Ctrl) ("min", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ min2(a,b) }
+    /** @nodoc - 2 input minimum with a constant second argument **/
+    direct (Ctrl) ("min", (T,CT), (("a", T), ("b", CT)) :: T, (TNum(T), TNumeric(CT), TOrder(T))) implements composite ${ min2($a, lift_to[CT,T]($b)) }
+    /** @nodoc - 2 input minimum with a constant first argument **/
+    direct (Ctrl) ("min", (T,CT), (("a", CT), ("b", T)) :: T, (TNum(T), TNumeric(CT), TOrder(T))) implements composite ${ min2(lift_to[CT,T]($a), $b) }
+
+
     /** Selects the maximum of two given values. Implemented as a mux with a greater-than comparison **/
-    direct (Ctrl) ("max", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ mux(implicitly[Order[T]].greaterThan($a, $b), a, b) }
+    direct (Ctrl) ("max", T, (("a", T), ("b", T)) :: T, (TOrder(T), TNum(T))) implements composite ${ max2(a,b) }
+    /** @nodoc - 2 input maximum with a constant second argument **/
+    direct (Ctrl) ("max", (T,CT), (("a", T), ("b", CT)) :: T, (TNum(T), TNumeric(CT), TOrder(T))) implements composite ${ max2($a, lift_to[CT,T]($b)) }
+    /** @nodoc - 2 input maximum with a constant first argument **/
+    direct (Ctrl) ("max", (T,CT), (("a", CT), ("b", T)) :: T, (TNum(T), TNumeric(CT), TOrder(T))) implements composite ${ max2(lift_to[CT,T]($a), $b) }
+
 
     // --- Scala Backend
     impl (mux) (codegen($cala, ${ if ($sel) $a else $b }))

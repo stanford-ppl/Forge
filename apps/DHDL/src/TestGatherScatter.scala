@@ -10,8 +10,8 @@ trait TestGatherScatter extends DHDLApplication {
     type Elem = Flt //FixPt[Signed, B16, B16]
     val N = 10
 
-    val v1    = OffChipMem[Elem]("v1", N)
-    val v2    = OffChipMem[Elem]("v2", N)
+    val v1    = OffChipMem[Elem](N)
+    val v2    = OffChipMem[Elem](N)
 
     val vec1 = Array.fill(N)(random[Elem](N))
     setMem(v1, vec1)
@@ -20,8 +20,8 @@ trait TestGatherScatter extends DHDLApplication {
     val sAddr = Array(3,2,5,1,4)
 
     Accel {
-      val addr = BRAM[Index]("addr", 5)
-      val value = BRAM[Elem]("value", 5)
+      val addr = BRAM[Index](5)
+      val value = BRAM[Elem](5)
       Sequential {
         setBram(addr, sAddr)
         println("addrs:" + getBram(addr).mkString(","))

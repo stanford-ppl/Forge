@@ -23,9 +23,10 @@ trait MaxJManagerGen {
                   .replace("BlockRAM", "BRAM")
       val customStr = tstr match {
         case "Pipeline" => styleOf(s) match {
-          case Coarse => "metapipe"
-          case Fine => "pipe"
-          case Disabled => "seq"
+          case CoarsePipe => "metapipe"
+          case InnerPipe => "pipe"
+          case StreamPipe => "strm"
+          case SequentialPipe => "seq"
           case ForkJoin => "parallel"
         }
         case "Register" => regType(s) match {
@@ -295,12 +296,12 @@ s"""
     emit("    // Setup LMEM -> DFE streams (input streams to DFE)")
     emit("    // Setup DFE -> LMEM (output streams from DFE)")
     memStreams.foreach{
-      case tt@Def(EatReflect(Offchip_store_vector(mem,ofs,vec))) =>
+      case tt@Def(EatReflect(Offchip_store_cmd(mem,stream,ofs,len,p))) =>
         val streamName = s"${quote(mem)}_${quote(tt)}"
         emit(s"""    DFELink ${streamName}_out = addStreamToOnCardMemory("${streamName}_out", k.getOutput("${streamName}_out_cmd"));""")
         emit(s"""    ${streamName}_out <== k.getOutput("${streamName}_out");""")
 
-      case tt@Def(EatReflect(Offchip_load_vector(mem,ofs,len))) =>
+      case tt@Def(EatReflect(Offchip_load_cmd(mem,stream,ofs,len,p))) =>
      	  val streamName = s"${quote(mem)}_${quote(tt)}"
         emit(s"""    DFELink ${streamName}_in = addStreamFromOnCardMemory("${streamName}_in", k.getOutput("${streamName}_in_cmd"));""")
         emit(s"""    k.getInput("${streamName}_in") <== ${streamName}_in;""")

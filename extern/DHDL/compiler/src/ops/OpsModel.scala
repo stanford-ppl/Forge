@@ -37,7 +37,7 @@ case class AppStatistics(
 }
 
 // Helps to provide an estimate of ops and bandwidth
-trait OpsModel extends PipeStageToolsExp {
+trait OpsModel extends NodeMetadataOpsExp {
   this: DHDLExp =>
 
   object NoOps extends AppStatistics()
@@ -54,6 +54,13 @@ trait OpsModel extends PipeStageToolsExp {
   private def opsInNode(s: Exp[Any], d: Def[Any]): AppStatistics = s match {
     case Fixed(_) => NoOps
     case _ => d match {
+
+    case e: Push_fifo[_] => AppStatistics(insts=2, onChipIn = nbits(e._mT))
+    case e: Pop_fifo[_] => AppStatistics(insts=2, onChipOut = nbits(e._mT))
+    case e: Count_fifo[_] => Instruction
+
+    case e: Cam_load[_,_] => AppStatistics(insts=1, onChipOut = nbits(e._mV))
+    case e: Cam_store[_,_] => AppStatistics(insts=1, onChipIn = nbits(e._mV))
 
     // TODO: Should this count if ram will be implemented as regs?
     case e: Bram_load[_] => AppStatistics(insts=1,onChipOut = nbits(e._mT))
@@ -102,30 +109,22 @@ trait OpsModel extends PipeStageToolsExp {
     case FltPt_Sqrt(_) => AppStatistics(insts=1, flops=3) // ???
 
     case Mux2(_,_,_) => Instruction
+    case Min2(_,_) => AppStatistics(insts=2)
+    case Max2(_,_) => AppStatistics(insts=2)
     case Convert_fixpt(_) => Instruction
     case Convert_fltpt(_) => FLOP // ???
     case Fixpt_to_fltpt(x) => FLOP // ???
     case Fltpt_to_fixpt(_) => FLOP // ???
 
-    case e@Offchip_store_vector(mem,ofs,vec) =>
+    case e@Offchip_store_cmd(mem,stream,ofs,len,p) =>
       val bits = nbits(e._mT)
-      val size = dimsOf(vec).map{case Exact(s) => s.toInt}.reduce{_*_}
-      AppStatistics(dataOut=bits*size)
+      val size = bound(len).getOrElse{stageError(s"Cannot resolve bound of tile vector store size $len")}
+      AppStatistics(dataOut=bits*size.toLong)
 
-    case e@Offchip_load_vector(mem,ofs,len) =>
+    case e@Offchip_load_cmd(mem,stream,ofs,len,p) =>
       val bits = nbits(e._mT)
       val size = bound(len).getOrElse{stageError(s"Cannot resolve bound of tile vector load size $len")}
       AppStatistics(dataIn=bits*size.toLong)
-
-    case e@Bram_store_vector(bram,ofs,vec,cchain,inds) =>
-      val bits = nbits(e.mT)
-      val size = dimsOf(vec).map{d => bound(d).getOrElse{stageError(s"Cannot resolve bound of vector size $d")}.toInt}.reduce{_*_}
-      AppStatistics(onChipIn = bits*size)
-
-    case e@Bram_load_vector(bram,ofs,cchain,inds) =>
-      val bits = nbits(e.mT)
-      val size = nIters(cchain) * parsOf(cchain).reduce{_*_}
-      AppStatistics(onChipOut = bits*size)
 
     case Reflect(d,_,_) => opsInNode(s, d)
     case _ => NoOps

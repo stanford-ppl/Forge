@@ -1,29 +1,25 @@
 package dhdl.compiler.ops
 
 import scala.reflect.{Manifest,SourceContext}
-import ppl.delite.framework.analysis.HungryTraversal
+import scala.virtualization.lms.internal.Traversal
 
 import dhdl.shared._
 import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait StageAnalysisExp extends PipeStageToolsExp {this: DHDLExp => }
+// TODO: Eventually this analyzer should be superceded by more generalized coarse controller dataflow
 
-trait StageAnalyzer extends HungryTraversal with PipeStageTools {
+trait StageAnalysisExp extends NodeMetadataOpsExp {this: DHDLExp => }
+
+trait StageAnalyzer extends Traversal with SpatialTraversalTools {
   val IR: DHDLExp with StageAnalysisExp
   import IR._
 
-  debugMode = false
   override val name = "Stage Analyzer"
-  override val recurseAlways = true  // Always follow default traversal scheme
-  override val recurseElse = false   // Follow default traversal scheme when node was not matched
-
-  override def preprocess[A:Manifest](b: Block[A]) = {
-    val stages = getStages(b)
-    if (debugMode) list(stages)
-    super.preprocess(b)
-  }
+  override val recurse = Always    // Always follow default traversal scheme
+  override val eatReflect = true   // Ignore reflect wrappers
+  debugMode = true
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
     // Accel block (equivalent to a Sequential unit pipe)
@@ -45,28 +41,24 @@ trait StageAnalyzer extends HungryTraversal with PipeStageTools {
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func)
       if (debugMode) list(stages)
-      if (styleOf(lhs) == Fine && stages.nonEmpty) styleOf(lhs) = Coarse
       nStages(lhs) = stages.length
 
     case Pipe_foreach(_,func,_) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func)
       if (debugMode) list( stages )
-      if (styleOf(lhs) == Fine && stages.nonEmpty) styleOf(lhs) = Coarse
       nStages(lhs) = stages.length
 
-    case Pipe_fold(c,a,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) =>
+    case Pipe_fold(c,a,z,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(ld,func,rFunc,st)
       if (debugMode) list( stages )
-      if (styleOf(lhs) == Fine && stages.nonEmpty) styleOf(lhs) = Coarse
       nStages(lhs) = stages.length + 1  // Account for implicit reduction pipe
 
-    case Accum_fold(c1,c2,a,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
+    case Accum_fold(c1,c2,a,z,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
       debug(s"$lhs = $rhs:")
       val stages = getControlNodes(func,rFunc)
       if (debugMode) list( stages )
-      if (styleOf(lhs) == Fine) styleOf(lhs) = Coarse
       nStages(lhs) = stages.length + 1  // Account for implicit reduction pipe
 
     case _ => super.traverse(lhs, rhs)

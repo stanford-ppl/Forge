@@ -1,6 +1,7 @@
 package dhdl.library.classes
 
 import scala.math.BigDecimal.RoundingMode
+import scala.reflect.SourceContext
 
 import dhdl.shared._
 import dhdl.shared.ops._
@@ -22,6 +23,11 @@ trait ExternPrimitiveWrapper extends ExternPrimitiveCompilerOps with NumEmulatio
   def fixManifest[S:Manifest,I:Manifest,F:Manifest]: Manifest[FixPt[S,I,F]] = manifest[FixedPoint[S,I,F]]
   def fltManifest[G:Manifest,E:Manifest]: Manifest[FltPt[G,E]] = manifest[FloatPoint[G,E]]
   def bitManifest: Manifest[Bit] = manifest[Boolean]
+
+  def isStaticSize[T:Manifest](x: Rep[T]): Boolean = true
+
+  def min2[T:Manifest:Order:Num](a: Rep[T], b: Rep[T])(implicit ctx: SourceContext) = if (implicitly[Order[T]].lessThan(a,b)) a else b
+  def max2[T:Manifest:Order:Num](a: Rep[T], b: Rep[T])(implicit ctx: SourceContext) = if (implicitly[Order[T]].lessThan(b,a)) a else b
 }
 
 
@@ -63,7 +69,6 @@ trait FixedPointEmulation {
     def par(p: Int) = FixedPointRange[S,I,F](start, end, step, p)
     def len = (end - start)/step
   }
-
 
   class FixedPoint[S:Manifest,I:Manifest,F:Manifest](private val v: BigInt) {
     private def rep = FixFormat(sign[S],nbits[I],nbits[F])

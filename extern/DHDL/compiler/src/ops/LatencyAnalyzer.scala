@@ -18,10 +18,12 @@ trait LatencyAnalysisExp extends LatencyModel {
   var CLK = 150.0f // Clock frequency in MHz
 }
 
-trait LatencyAnalyzer extends ModelingTools {
+trait LatencyAnalyzer extends ModelingTraversal {
   val IR: DHDLExp with LatencyAnalysisExp
   import IR._
   import ReductionTreeAnalysis._
+
+  override val name = "Latency Analyzer"
 
   override def silence() {
     IR.silenceLatencyModel()
@@ -46,7 +48,7 @@ trait LatencyAnalyzer extends ModelingTools {
     scopeLevel += 1
     //traverseBlock(b) -- can cause us to see things like counters as "stages"
     getControlNodes(b).foreach{
-      case s@Def(d) => traverseNode(s, d)
+      case s@Def(d) => traverse(s.asInstanceOf[Sym[Any]], d)
       case _ =>
     }
     scopeLevel -= 1
@@ -56,7 +58,7 @@ trait LatencyAnalyzer extends ModelingTools {
     (cycles)
   }
 
-  def traverseNode(lhs: Exp[Any], rhs: Def[Any]) {
+  override def traverse(lhs: Sym[Any], rhs: Def[Any]) {
     val cycles = rhs match {
       case EatReflect(Hwblock(blk)) =>
         inHwScope = true
@@ -72,13 +74,13 @@ trait LatencyAnalyzer extends ModelingTools {
         blks.max + latencyOf(lhs)
 
       // --- Pipe
-      case EatReflect(Unit_pipe(func)) if styleOf(lhs) == Fine =>
+      case EatReflect(Unit_pipe(func)) if isInnerPipe(lhs) =>
         debugs(s"Pipe $lhs: ")
         val pipe = latencyOfPipe(func)
         debugs(s"- pipe = $pipe")
         pipe + latencyOf(lhs)
 
-      case EatReflect(Pipe_foreach(cchain, func, _)) if styleOf(lhs) == Fine =>
+      case EatReflect(Pipe_foreach(cchain, func, _)) if isInnerPipe(lhs) =>
         val N = nIters(cchain)
         debugs(s"Foreach $lhs (N = $N):")
         val pipe = latencyOfPipe(func)
@@ -86,7 +88,7 @@ trait LatencyAnalyzer extends ModelingTools {
         debugs(s"- pipe = $pipe")
         pipe + N - 1 + latencyOf(lhs)
 
-      case EatReflect(Pipe_fold(cchain,_,_,iFunc,ld,st,func,rFunc,_,_,_,_,rV)) if styleOf(lhs) == Fine =>
+      case EatReflect(Pipe_fold(cchain,accum,zero,fA,iFunc,ld,st,func,rFunc,_,_,_,_,rV)) if isInnerPipe(lhs) =>
         val N = nIters(cchain)
         val P = parsOf(cchain).reduce(_*_)
 
@@ -106,7 +108,7 @@ trait LatencyAnalyzer extends ModelingTools {
         body + internal + N*cycle + latencyOf(lhs)
 
       // --- Sequential
-      case EatReflect(Unit_pipe(func)) if styleOf(lhs) == Disabled =>
+      case EatReflect(Unit_pipe(func)) if isSequential(lhs) =>
         debugs(s"Outer Pipe $lhs:")
         val stages = latencyOfBlock(func)
         if (debugMode) stages.reverse.zipWithIndex.foreach{case (s,i) => debugs(s"- $i. $s")}
@@ -121,10 +123,10 @@ trait LatencyAnalyzer extends ModelingTools {
         val stages = latencyOfBlock(func)
         if (debugMode) stages.reverse.zipWithIndex.foreach{case (s,i) => debugs(s"- $i. $s")}
 
-        if (styleOf(lhs) == Coarse) { stages.max * (N - 1) + stages.sum + latencyOf(lhs) }
-        else                        { stages.sum * N + latencyOf(lhs) }
+        if (isMetaPipe(lhs)) { stages.max * (N - 1) + stages.sum + latencyOf(lhs) }
+        else                 { stages.sum * N + latencyOf(lhs) }
 
-      case EatReflect(Pipe_fold(cchain,_,_,iFunc,ld,st,func,rFunc,_,_,_,_,_)) =>
+      case EatReflect(Pipe_fold(cchain,accum,zero,fA,iFunc,ld,st,func,rFunc,_,_,_,_,_)) =>
         val N = nIters(cchain)
         val P = parsOf(cchain).reduce(_*_)
         debugs(s"Outer Reduce $lhs (N = $N):")
@@ -138,10 +140,10 @@ trait LatencyAnalyzer extends ModelingTools {
 
         if (debugMode) stages.reverse.zipWithIndex.foreach{case (s,i) => debugs(s"- $i. $s")}
 
-        if (styleOf(lhs) == Coarse) { stages.max * (N - 1) + stages.sum + latencyOf(lhs) }
-        else                        { stages.sum * N + latencyOf(lhs) }
+        if (isMetaPipe(lhs)) { stages.max * (N - 1) + stages.sum + latencyOf(lhs) }
+        else                 { stages.sum * N + latencyOf(lhs) }
 
-      case EatReflect(Accum_fold(ccOuter,ccInner,_,_,iFunc,func,ld1,ld2,rFunc,st,_,_,_,_,_,_,_)) =>
+      case EatReflect(Accum_fold(ccOuter,ccInner,accum,zero,fA,iFunc,func,ld1,ld2,rFunc,st,_,_,_,_,_,_,_)) =>
         val Nm = nIters(ccOuter)
         val Nr = nIters(ccInner)
         val Pm = parsOf(ccOuter).reduce(_*_) // Parallelization factor for map
@@ -158,18 +160,8 @@ trait LatencyAnalyzer extends ModelingTools {
 
         if (debugMode) stages.reverse.zipWithIndex.foreach{case (s,i) => debugs(s"- $i. $s")}
 
-        if (styleOf(lhs) == Coarse) { stages.max * (Nm - 1) + stages.sum + latencyOf(lhs) }
-        else                        { stages.sum * Nm + latencyOf(lhs) }
-
-      case e:Bram_store_vector[_] =>
-        val N = nIters(e.cchain)
-        val P = parsOf(e.cchain).reduce{_*_}
-        N + latencyOf(lhs) // TODO: This assumes each iteration takes 1 cycle, which may not be true (depends on access pattern)
-
-      case e:Bram_load_vector[_] =>
-        val N = nIters(e.cchain)
-        val P = parsOf(e.cchain).reduce{_*_}
-        N + latencyOf(lhs) // TODO: This assumes each iteration takes 1 cycle, which may not be true (depends on access pattern)
+        if (isMetaPipe(lhs)) { stages.max * (Nm - 1) + stages.sum + latencyOf(lhs) }
+        else                 { stages.sum * Nm + latencyOf(lhs) }
 
       case _ =>
         // No general rule for combining blocks

@@ -31,16 +31,20 @@ trait DHDLMisc {
     }
 
     // --- Staging time warnings and errors
+    // TODO: These aren't DSL specific, move elsewhere
     internal (Misc) ("stageWarn", Nil, SAny :: SUnit, effect = simple) implements composite ${
-      System.out.println("[\u001B[33mwarn\u001B[0m] " + __pos.fileName + ":" + __pos.line + ": " + $0)
+      val ctx = topContext(__pos)
+      System.out.println("[\u001B[33mwarn\u001B[0m] " + ctx.fileName + ":" + ctx.line + ": " + $0)
     }
     internal (Misc) ("stageError", Nil, SAny :: SNothing, effect = simple) implements composite ${
-      System.out.println("[\u001B[31merror\u001B[0m] " + __pos.fileName + ":" + __pos.line + ": " + $0)
+      val ctx = topContext(__pos)
+      System.out.println("[\u001B[31merror\u001B[0m] " + ctx.fileName + ":" + ctx.line + ": " + $0)
       sys.exit(-1)
     }
 
     internal (Misc) ("stageInfo", Nil, SAny :: SUnit, effect = simple) implements composite ${
-      System.out.println("[\u001B[34minfo\u001B[0m] " + __pos.fileName + ":" + __pos.line + ": " + $0)
+      val ctx = topContext(__pos)
+      System.out.println("[\u001B[34minfo\u001B[0m] " + ctx.fileName + ":" + ctx.line + ": " + $0)
     }
 
     // --- Powers of 2 checks
@@ -145,6 +149,7 @@ trait DHDLMisc {
     direct (API) ("__equal", T, (MArray(T), MArray(T)) :: Bit, TOrder(T)) implements composite ${
       array_zip($0, $1, {(a:Rep[T], b:Rep[T]) => implicitly[Order[T]].equals(a,b)}).reduce{_&&_}
     }
+
   }
 
   def importRandomOps() {
@@ -262,7 +267,7 @@ trait DHDLMisc {
     val get_mem = internal (Tst) ("get_mem", T, (OffChip(T), MArray(T)) :: MUnit, effect = write(1), aliasHint = aliases(Nil))
     val set_arg = internal (Tst) ("set_arg", T, (Reg(T), T) :: MUnit, effect = write(0))
     val get_arg = internal (Tst) ("get_arg", T, Reg(T) :: T, effect = simple)
-    val hwblock = internal (Tst) ("hwblock", Nil, MThunk(MUnit) :: MUnit, effect = simple)
+    val hwblock = internal (Tst) ("hwblock", Nil, MThunk(MUnit,cold) :: MUnit, effect = simple)
 
     val ifThenElse = direct (Tst) ("__ifThenElse", List(T), List(MBoolean,MThunk(T,cold),MThunk(T,cold)) :: T)
     val whileDo = direct (Tst) ("__whileDo", Nil, List(MThunk(MBoolean),MThunk(MUnit)) :: MUnit)
@@ -325,7 +330,7 @@ trait DHDLMisc {
     // TODO: This is a quick hack for scheduling acceleration initialization. Eventually this should act as a true annotation
     direct (Tst) ("Accel", Nil, MThunk(MUnit) :: MUnit) implements composite ${
       val accel = hwblock($0)
-      styleOf(accel) = Disabled
+      styleOf(accel) = SequentialPipe
       accel
     }
 

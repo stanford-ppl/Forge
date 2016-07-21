@@ -73,7 +73,7 @@ object NoArea extends FPGAResources()
 
 // TODO: Should get some of this from loading a file rather than hardcoding
 // All numbers here are from Stratix V profiling
-trait AreaModel extends PipeStageToolsExp {
+trait AreaModel extends NodeMetadataOpsExp {
   this: DHDLExp =>
 
   private var silentModel = false
@@ -141,7 +141,9 @@ trait AreaModel extends PipeStageToolsExp {
     }
   }
 
-  def areaOfMetapipe(n: Int) = FPGAResources(
+  def areaOfStreamPipe(n: Int) = NoArea // TODO
+
+  def areaOfMetaPipe(n: Int) = FPGAResources(
     lut4 = (11*n*n + 45*n)/2 + 105,  // 0.5(11n^2 + 45n) + 105
     regs = (n*n + 3*n)/2 + 35        // 0.5(n^2 + 3n) + 35
   )
@@ -187,7 +189,7 @@ trait AreaModel extends PipeStageToolsExp {
 
 
   def areaOfCounterRegs(lhs: Exp[Any], cchain: Exp[CounterChain]): FPGAResources = {
-    if (isOuterLoop(lhs) && styleOf(lhs) == Coarse) {
+    if (isMetaPipe(lhs)) {
       val N = nStages(lhs) - 1          // Number of stages needed for delay
       val P = parsOf(cchain).reduce(_+_) // Number of duplications per counter
       FPGAResources(lut3=N*P*32, regs = 4*N*P*32) // TODO: Hardcoded 32 bit index sizes
@@ -211,25 +213,38 @@ trait AreaModel extends PipeStageToolsExp {
     case ConstFix(_) => areaOfMemWord(nbits(s))
     case ConstFlt(_) => areaOfMemWord(nbits(s))
 
+    // TODO
+    case Fifo_new(_,_) => NoArea
+    case Push_fifo(_,_,_) => NoArea
+    case Pop_fifo(_) => NoArea
+    case Count_fifo(_) => NoArea
+
+    // TODO
+    case Cam_new(_,_) => NoArea
+    case Cam_load(_,_) => NoArea
+    case Cam_store(_,_,_) => NoArea
+
+
     case Reg_new(_) if regType(s) == ArgumentIn  => areaOfArg(nbits(s))
     case Reg_new(_) if regType(s) == ArgumentOut => areaOfArg(nbits(s))
 
     case Reg_new(_) if regType(s) == Regular =>
-      if (isDblBuf(s)) FPGAResources(lut3 = nbits(s), regs = 4*nbits(s)) // TODO: Why 4?
-      else             FPGAResources(regs = nbits(s))
+      //if (isDblBuf(s)) FPGAResources(lut3 = nbits(s), regs = 4*nbits(s)) // TODO: Why 4?
+      //else             FPGAResources(regs = nbits(s))
+      FPGAResources(regs = nbits(s))
 
+    // TODO: Number of banks and buffer depth of BRAM
     case e@Bram_new(depth, _) =>
-      val depBound = bound(depth).getOrElse{stageError("Cannot resolve bound of BRAM size"); 1.0}.toInt
-      areaOfBRAM(nbits(e._mT), depBound, banks(s), isDblBuf(s))
+      val depBound = bound(depth).getOrElse{stageWarn("Cannot resolve bound of BRAM size"); 1.0}.toInt
+      areaOfBRAM(nbits(e._mT), depBound, 1, false) // TODO
 
-    // TODO: These are close but still need some refining
     case e@Bram_load(ram, _) =>
-      val decode = if (isPow2(banks(ram))) 0 else Math.ceil(Math.log(banks(ram))).toInt
+      val decode = 0 //if (isPow2(banks(ram))) 0 else Math.ceil(Math.log(banks(ram))).toInt
       val bits = nbits(e._mT)
       FPGAResources(lut3=decode+bits, regs=decode+bits)
 
     case e@Bram_store(ram, _, _) =>
-      val decode = if (isPow2(banks(ram))) 0 else Math.ceil(Math.log(banks(ram))).toInt
+      val decode = 0 //if (isPow2(banks(ram))) 0 else Math.ceil(Math.log(banks(ram))).toInt
       val bits = nbits(e._mT)
       FPGAResources(lut3=decode+bits, regs=decode+bits)
 
@@ -332,6 +347,14 @@ trait AreaModel extends PipeStageToolsExp {
 
     case Mux2(_,_,_) => FPGAResources(regs = nbits(s))
 
+    // TODO: Duplication here...
+    case Min2(_,_) =>
+      val lt = if (isFixPtType(s.tp)) FPGAResources(lut3 = nbits(s)+1,regs=1) else FPGAResources(lut4=42,lut6=26,regs=34)
+      lt + FPGAResources(regs = nbits(s))
+    case Max2(_,_) =>
+      val lt = if (isFixPtType(s.tp)) FPGAResources(lut3 = nbits(s)+1,regs=1) else FPGAResources(lut4=42,lut6=26,regs=34)
+      lt + FPGAResources(regs = nbits(s))
+
     case Convert_fixpt(_) => FPGAResources(regs=nbits(s))
     //case Convert_fltpt(_) => // ???
     case Fixpt_to_fltpt(x) =>
@@ -344,7 +367,7 @@ trait AreaModel extends PipeStageToolsExp {
 
     // TODO: New templates - needs recharacterization
     // Tile Store
-    case Offchip_store_vector(mem,ofs,vec) =>
+    case Offchip_store_cmd(mem,stream,ofs,len,p) =>
       //val nonConstDims = (dimsOf(tt.mem) ++ tt.memOfs).filterNot{case Fixed(_) => true; case _ => false}.length
       //val dsp = if (nonConstDims > 1) 3 else 0
       //val p = parsOf(cc).reduce{_*_}
@@ -360,7 +383,7 @@ trait AreaModel extends PipeStageToolsExp {
       //FPGAResources(lut3=378,lut4=38,lut5=58,lut6=569,lut7=4, regs=3878, dsps=dsp, bram=46, streams=1)
 
     // Tile Load
-    case Offchip_load_vector(mem,ofs,len) =>
+    case Offchip_load_cmd(mem,stream,ofs,len,p) =>
       //val p = parsOf(cc).reduce{_*_}
       //val nonConstDims = (dimsOf(tt.mem) ++ tt.memOfs).filterNot{case Fixed(_) => true; case _ => false}.length
       //val dsp = if (nonConstDims > 1) 4 else 0
@@ -370,30 +393,33 @@ trait AreaModel extends PipeStageToolsExp {
       // New template
       FPGAResources(lut3=410, lut4=50, lut5=70, lut6=53, regs=920, dsps=0, bram=0, streams=1) // ~353 ALMs
 
-    // TODO: New templates - needs recharacterization
-    case Bram_store_vector(bram,ofs,vec,cchain,inds) => NoArea
-    case Bram_load_vector(bram,ofs,cchain,inds) => NoArea
-
-
     case _:Pipe_parallel => FPGAResources(lut4=9*nStages(s)/2, regs = nStages(s) + 3)
 
-    case e:Pipe_foreach if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.cchain)
-    case e:Pipe_fold[_,_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.cchain)
-    case e:Accum_fold[_,_] if styleOf(s) == Coarse => areaOfMetapipe(nStages(s)) + areaOfCounterRegs(s, e.ccOuter)
+    case e:Pipe_foreach if isInnerPipe(s)  => NoArea
+    case e:Pipe_foreach if isStreamPipe(s) => areaOfStreamPipe(nStages(s))
+    case e:Pipe_foreach if isMetaPipe(s)   => areaOfMetaPipe(nStages(s)) + areaOfCounterRegs(s, e.cchain)
+    case e:Pipe_foreach if isSequential(s) => areaOfSequential(nStages(s))
 
-    case _:Pipe_foreach if styleOf(s) == Disabled => areaOfSequential(nStages(s))
-    case _:Pipe_fold[_,_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
-    case _:Accum_fold[_,_] if styleOf(s) == Disabled => areaOfSequential(nStages(s))
-    case _:Unit_pipe if styleOf(s) == Disabled => areaOfSequential(nStages(s))
+    case e:Pipe_fold[_,_] if isInnerPipe(s)  => NoArea
+    case e:Pipe_fold[_,_] if isStreamPipe(s) => areaOfStreamPipe(nStages(s))
+    case e:Pipe_fold[_,_] if isMetaPipe(s)   => areaOfMetaPipe(nStages(s)) + areaOfCounterRegs(s, e.cchain)
+    case e:Pipe_fold[_,_] if isSequential(s) => areaOfSequential(nStages(s))
+
+    case e:Accum_fold[_,_] if isInnerPipe(s)  => NoArea // Should not exist
+    case e:Accum_fold[_,_] if isStreamPipe(s) => areaOfStreamPipe(nStages(s))
+    case e:Accum_fold[_,_] if isMetaPipe(s)   => areaOfMetaPipe(nStages(s)) + areaOfCounterRegs(s, e.ccOuter)
+    case e:Accum_fold[_,_] if isSequential(s) => areaOfSequential(nStages(s))
+
+    case _:Unit_pipe if isInnerPipe(s)  => NoArea
+    case _:Unit_pipe if isStreamPipe(s) => NoArea // Should not exist
+    case _:Unit_pipe if isMetaPipe(s)   => NoArea // Should not exist
+    case _:Unit_pipe if isSequential(s) => areaOfSequential(nStages(s))
 
     // Nodes with known zero area cost
     case Reg_read(_)    => NoArea
     case Reg_write(_,_) => NoArea
     case Reg_reset(_)   => NoArea
     case Offchip_new(_) => NoArea
-    case _:Pipe_foreach if styleOf(s) == Fine => NoArea
-    case _:Pipe_fold[_,_] if styleOf(s) == Fine => NoArea
-    case _:Unit_pipe if styleOf(s) == Fine => NoArea
 
     // Effects
     case Reflect(d,_,_) => areaOfNode(s,d)

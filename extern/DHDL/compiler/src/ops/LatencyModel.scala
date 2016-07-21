@@ -76,6 +76,8 @@ trait LatencyModel extends NodeMetadataOpsExp {
     case ConstFix(_) => 0
     case ConstFlt(_) => 0
     case Reg_new(_) => 0
+    case Argin_new(_) => 0
+    case Argout_new(_) => 0
     case Bram_new(_,_) => 0
     case Fifo_new(_,_) => 0
     case Cam_new(_,_) => 0
@@ -241,7 +243,6 @@ trait LatencyModel extends NodeMetadataOpsExp {
     case _:Pipe_fold[_,_] => 1
     case _:Accum_fold[_,_]  => 1
 
-    case Reg_read(s) if regType(s) == ArgumentIn => 0
     case Reg_read(s) => 0
 
     case Reg_write(_,_) => 1

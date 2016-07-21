@@ -193,21 +193,19 @@ trait DotIRPrinter extends Traversal with QuotingExp {
     case Hwblock(func) =>
       alwaysGen { emitBlock(func) }
 
-    case _:Reg_new[_] => regType(sym) match {
-      case Regular if isDblBuf(sym) =>
-        emit(s"""${quote(sym)} [margin=0, rankdir="LR", label="{<st> | <ld>}" xlabel="${quote(sym)}" """)
-        emit(s"""      shape="record" color=$dblbufBorderColor style="filled" """)
-        emit(s"""      fillcolor=$regFillColor ]""")
+    case _:Reg_new[_] if isDblBuf(sym) =>
+      emit(s"""${quote(sym)} [margin=0, rankdir="LR", label="{<st> | <ld>}" xlabel="${quote(sym)}" """)
+      emit(s"""      shape="record" color=$dblbufBorderColor style="filled" """)
+      emit(s"""      fillcolor=$regFillColor ]""")
 
-      case Regular =>
-        emit(s"""${quote(sym)} [label="${quote(sym)}" shape="square" style="filled" fillcolor=$regFillColor ]""")
+    case _:Reg_new[_] =>
+      emit(s"""${quote(sym)} [label="${quote(sym)}" shape="square" style="filled" fillcolor=$regFillColor ]""")
 
-      case ArgumentIn =>
-        emit(s"""${quote(sym)} [label="${quote(sym)}" shape="Msquare" style="filled" fillcolor=$regFillColor ]""")
+    case _:Argin_new[_] =>
+      emit(s"""${quote(sym)} [label="${quote(sym)}" shape="Msquare" style="filled" fillcolor=$regFillColor ]""")
 
-      case ArgumentOut =>
-        emit(s"""${quote(sym)} [label="${quote(sym)}" shape="Msquare" style="filled" fillcolor=$regFillColor ]""")
-    }
+    case _:Argout_new[_] =>
+      emit(s"""${quote(sym)} [label="${quote(sym)}" shape="Msquare" style="filled" fillcolor=$regFillColor ]""")
 
     case Offchip_new(size) =>
       if (!emittedSize.contains(size)) hackGen(size)

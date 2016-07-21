@@ -19,16 +19,18 @@ trait DHDLRegs {
     val Idx          = lookupAlias("Index")
 
     // --- Nodes
-    val reg_new   = internal (Reg) ("reg_new", T, ("init", T) :: Reg(T), effect = mutable)
-    val reg_read  = internal (Reg) ("reg_read", T, ("reg", Reg(T)) :: T, aliasHint = aliases(Nil))
-    val reg_write = internal (Reg) ("reg_write", T, (("reg", Reg(T)), ("value", T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
-    val reg_reset = internal (Reg) ("reg_reset", T, ("reg", Reg(T)) :: MUnit, effect = write(0))
+    val reg_new    = internal (Reg) ("reg_new", T, ("init", T) :: Reg(T), effect = mutable)
+    val argin_new  = internal (Reg) ("argin_new", T, ("init", T) :: Reg(T), effect = mutable)
+    val argout_new = internal (Reg) ("argout_new", T, ("init", T) :: Reg(T), effect = mutable)
+    val reg_read   = internal (Reg) ("reg_read", T, ("reg", Reg(T)) :: T, aliasHint = aliases(Nil))
+    val reg_write  = internal (Reg) ("reg_write", T, (("reg", Reg(T)), ("value", T)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
+    val reg_reset  = internal (Reg) ("reg_reset", T, ("reg", Reg(T)) :: MUnit, effect = write(0))
 
     // --- Internals
     /** @nodoc **/
-    direct (Reg) ("reg_create", T, (T, RegType) :: Reg(T), effect = mutable) implements composite ${
+    direct (Reg) ("reg_create", T, (T) :: Reg(T), effect = mutable) implements composite ${
       val reg = reg_new[T](init = $0)
-      regType(reg) = $1
+      regType(reg) = Regular
       resetValue(reg) = $0
       reg
     }
@@ -48,21 +50,33 @@ trait DHDLRegs {
     infix (RegMem) ("zeroIdx", T, (Reg(T)) :: Indices) implements composite ${ reg_zero_idx }
     infix (RegMem) ("flatIdx", T, (Reg(T), Indices) :: Idx) implements composite ${ 0.as[Index] }
     infix (RegMem) ("iterator", T, (Reg(T), SList(MInt)) :: CounterChain) implements composite ${ CounterChain(Counter(max=1)) }
-    infix (RegMem) ("empty", T, Reg(T) :: Reg(T), TNum(T)) implements composite ${ reg_create[T](zero[T], Regular) }
+    infix (RegMem) ("empty", T, Reg(T) :: Reg(T), TNum(T)) implements composite ${ reg_create[T](zero[T]) }
 
     // --- API
     /* Reg */
     /** Creates a register with type T **/
-    static (Reg) ("apply", T, Nil :: Reg(T), TNum(T)) implements composite ${ reg_create[T](zero[T], Regular) }
+    static (Reg) ("apply", T, Nil :: Reg(T), TNum(T)) implements composite ${ reg_create[T](zero[T]) }
 
     UnstagedNumerics.foreach{ (ST,_) =>
       /** Creates an unnamed register with type T and given reset value **/
-      static (Reg) ("apply", T, ("reset", ST) :: Reg(T), TNum(T)) implements composite ${ reg_create[T]($reset.as[T], Regular) }
+      static (Reg) ("apply", T, ("reset", ST) :: Reg(T), TNum(T)) implements composite ${ reg_create[T]($reset.as[T]) }
     }
     /** Creates an unnamed input argument from the host CPU **/
-    direct (Reg) ("ArgIn", T, Nil :: Reg(T), TNum(T)) implements composite ${ reg_create[T](zero[T], ArgumentIn) }
+    direct (Reg) ("ArgIn", T, Nil :: Reg(T), TNum(T)) implements composite ${
+      val rst = zero[T]
+      val argIn = argin_new[T](init = rst)
+      regType(argIn) = ArgumentIn
+      resetValue(argIn) = rst
+      argIn
+    }
     /** Creats an unnamed output argument to the host CPU **/
-    direct (Reg) ("ArgOut", T, Nil :: Reg(T), TNum(T)) implements composite ${ reg_create[T](zero[T], ArgumentOut) }
+    direct (Reg) ("ArgOut", T, Nil :: Reg(T), TNum(T)) implements composite ${
+      val rst = zero[T]
+      val argOut = argout_new[T](init = rst)
+      regType(argOut) = ArgumentOut
+      resetValue(argOut) = rst
+      argOut
+    }
 
     val Reg_API = withTpe(Reg)
     Reg_API {
@@ -88,16 +102,26 @@ trait DHDLRegs {
 
 
     // --- Scala Backend
-    impl (reg_new)   (codegen($cala, ${ Array($init) }))
-    impl (reg_read)  (codegen($cala, ${ $reg.apply(0) }))
-    impl (reg_write) (codegen($cala, ${ $reg.update(0, $value) }))
-    impl (reg_reset) (codegen($cala, ${
+    impl (reg_new)    (codegen($cala, ${ Array($init) }))
+    impl (argin_new)  (codegen($cala, ${ Array($init) }))
+    impl (argout_new) (codegen($cala, ${ Array($init) }))
+    impl (reg_read)   (codegen($cala, ${ $reg.apply(0) }))
+    impl (reg_write)  (codegen($cala, ${ $reg.update(0, $value) }))
+    impl (reg_reset)  (codegen($cala, ${
       @ val init = resetValue($reg)
       $reg.update(0, $init)
     }))
 
     // --- C++ Backend
     impl (reg_new)   (codegen(cpp, ${
+      @ val tpname = remap(sym.tp.typeArguments(0))
+      new $tpname {$init}
+    }))
+    impl (argin_new) (codegen(cpp, ${
+      @ val tpname = remap(sym.tp.typeArguments(0))
+      new $tpname {$init}
+    }))
+    impl (argout_new) (codegen(cpp, ${
       @ val tpname = remap(sym.tp.typeArguments(0))
       new $tpname {$init}
     }))

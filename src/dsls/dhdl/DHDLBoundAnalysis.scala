@@ -25,6 +25,8 @@ trait DHDLBoundAnalysis {
 
       // TODO: These could actually be structs! Handle using normal propagation instead
       analyze(Reg, "reg_new") using rule ${ bound(lhs) = bound($0).get }
+      analyze(Reg, "argin_new") using rule ${ bound(lhs) = bound($0).get }
+      analyze(Reg, "argout_new") using rule ${ bound(lhs) = bound($0).get }
       analyze(Reg, "reg_read") using rule ${ bound(lhs) = boundOf($0) }
       /*analyze(Reg, "reg_write") using rule ${
         if (boundOf($0).isDefined && boundOf($1).isDefined)

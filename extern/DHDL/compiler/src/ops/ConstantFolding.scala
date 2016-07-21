@@ -36,6 +36,7 @@ trait ConstantFolding extends SinglePassTransformer {
         val Def(cRhs) = c
         debug(s"Replacing $lhs = $rhs ")
         debug(s"with $c = $cRhs")
+        setProps(c, getProps(lhs))
         Some(c)
       }
       else None

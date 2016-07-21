@@ -113,7 +113,8 @@ trait MaxJPreCodegen extends Traversal  {
 					}
 			}
 
-		case e:Reg_new[_] if regType(sym) != Regular => argInOuts += sym.asInstanceOf[Sym[Register[_]]]
+		case e:Argin_new[_] => argInOuts += sym.asInstanceOf[Sym[Register[_]]]
+    case e:Argout_new[_] => argInOuts += sym.asInstanceOf[Sym[Register[_]]]
 
     case _:Offchip_store_cmd[_] => memStreams += sym
     case _:Offchip_load_cmd[_] => memStreams += sym

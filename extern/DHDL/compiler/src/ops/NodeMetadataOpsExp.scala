@@ -67,6 +67,8 @@ trait NodeMetadataOpsExp extends NodeMetadataTypesExp {
 
   def isAllocation(d: Def[Any]): Boolean = d match {
     case EatReflect(_:Reg_new[_])       => true
+    case EatReflect(_:Argin_new[_])     => true
+    case EatReflect(_:Argout_new[_])    => true
     case EatReflect(_:Bram_new[_])      => true
     case EatReflect(_:Fifo_new[_])      => true
     case EatReflect(_:Cam_new[_,_])     => true

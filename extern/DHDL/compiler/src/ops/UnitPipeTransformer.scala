@@ -91,7 +91,7 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
               debugs("Escaping symbols: " + escapingValues.mkString(", "))
               // Create registers for escaping symbols
               val regs = escapingValues.map{sym =>
-                val reg = reg_create(zeroHack(sym.tp)(mpos(sym.pos)), Regular)(sym.tp, mpos(sym.pos))
+                val reg = reg_create(zeroHack(sym.tp)(mpos(sym.pos)))(sym.tp, mpos(sym.pos))
                 debugs(s"Created new register $reg for primitive $s = $d")
                 reg
               }

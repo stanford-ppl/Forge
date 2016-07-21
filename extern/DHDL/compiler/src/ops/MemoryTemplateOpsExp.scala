@@ -224,7 +224,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
       		  emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}; // enable""")
       		  emit(s"""DFEVar ${quote(reg)}_hold = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writersOf(reg).head._1)}_redLoop_done));""")
       		  emit(s"""${quote(reg)} <== $rst ? constant.var($ts, ${quote(resetValue(reg))}):stream.offset(${quote(reg)}_hold, -${quote(writersOf(reg).head._1)}_offset); // reset""")
-				  case ArgumentIn => new Exception("Cannot write to Argument Out! " + quote(reg))
+				  case ArgumentIn => new Exception("Cannot write to Argument In! " + quote(reg))
 				  case ArgumentOut =>
 				 	  val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done" //TODO
       	  	emit(s"""io.scalarOutput("${quote(reg)}", ${quote(value)}, $ts, $controlStr);""")

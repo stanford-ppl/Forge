@@ -225,10 +225,9 @@ trait AreaModel extends NodeMetadataOpsExp {
     case Cam_store(_,_,_) => NoArea
 
 
-    case Reg_new(_) if regType(s) == ArgumentIn  => areaOfArg(nbits(s))
-    case Reg_new(_) if regType(s) == ArgumentOut => areaOfArg(nbits(s))
-
-    case Reg_new(_) if regType(s) == Regular =>
+    case Argin_new(_) => areaOfArg(nbits(s))
+    case Argout_new(_) => areaOfArg(nbits(s))
+    case Reg_new(_) =>
       //if (isDblBuf(s)) FPGAResources(lut3 = nbits(s), regs = 4*nbits(s)) // TODO: Why 4?
       //else             FPGAResources(regs = nbits(s))
       FPGAResources(regs = nbits(s))

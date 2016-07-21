@@ -6,8 +6,10 @@ import scala.virtualization.lms.common.EffectExp
 
 import LOWERCASE_DSL_NAME.shared.NameOps
 
+trait NameTypesExp extends NameOps
+
 // Candidate for being pushed into Delite
-trait NameOpsExp extends NameOps with EffectExp with FatExpressions {
+trait NameOpsExp extends NameTypesExp with EffectExp with FatExpressions {
 
   override def getSymName(e: Rep[Any]) = meta[MName](e) match {
     case Some(mname) => Some(mname.name)

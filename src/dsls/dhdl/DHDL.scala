@@ -307,7 +307,7 @@ trait DHDLDSL extends ForgeApplication
     extern(metadata("ExternPrimitive"), targets = List($cala, maxj), withTypes = true)
     extern(metadata("NodeMetadata"), targets = Nil, withTypes = true)
     extern(grp("LoweredPipe"), targets = List($cala, maxj))
-    extern(grp("Name"), targets = Nil)
+    extern(metadata("Name"), targets = Nil, withTypes = true)
 		()
 	}
 }

@@ -97,7 +97,7 @@ trait ExternPrimitiveOpsExp extends ExternPrimitiveCompilerOps with ExternPrimit
       case `mL` => Some(x.asInstanceOf[Long].toDouble)
       case `mF` => Some(x.asInstanceOf[Float].toDouble)
       case `mD` => Some(x.asInstanceOf[Double])
-      case _ => None
+      case mT => stageWarn("Unrecognized type: " + mT + " for symbol " + x); None
     }
   }
   override def boundOf(__arg0: Rep[Any])(implicit __pos: SourceContext): Option[MBound] = __arg0 match {
@@ -106,7 +106,7 @@ trait ExternPrimitiveOpsExp extends ExternPrimitiveCompilerOps with ExternPrimit
       c.map{c => if (p.isFixed) fixed(c) else exact(c) }
 
     case Const(x) =>
-      val c = extractNumericConst(x)
+      val c = extractNumericConst(x)(__arg0.tp)
       c.map{c => fixed(c) }
 
     case _ => super.boundOf(__arg0)

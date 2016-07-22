@@ -18,6 +18,7 @@ trait ReductionAnalysisExp extends NodeMetadataOpsExp {
   case object FltPtSum extends ReduceFunction
   case object FixPtMin extends ReduceFunction
   case object FixPtMax extends ReduceFunction
+  case object OtherReduction extends ReduceFunction
 
   case class MReduceType(func: ReduceFunction) extends Metadata
 
@@ -26,12 +27,12 @@ trait ReductionAnalysisExp extends NodeMetadataOpsExp {
     def apply(e: Exp[Any]) = meta[MReduceType](e).map(_.func)
   }
 
-  def identifyReduceFunc(rFunc: Block[Any], a: Exp[Any], b: Exp[Any]): Option[ReduceFunction] = getBlockResult(rFunc) match {
-    case Deff(FixPt_Add(`a`,`b`)) => Some(FixPtSum)
-    case Deff(FltPt_Add(`a`,`b`)) => Some(FltPtSum)
-    case Deff(Min2(`a`,`b`)) if isFixPtType(a.tp) => Some(FixPtMin)
-    case Deff(Max2(`a`,`b`)) if isFixPtType(a.tp) => Some(FixPtMax)
-    case _ => None
+  def identifyReduceFunc(rFunc: Block[Any], a: Exp[Any], b: Exp[Any]) = getBlockResult(rFunc) match {
+    case Deff(FixPt_Add(`a`,`b`)) => FixPtSum
+    case Deff(FltPt_Add(`a`,`b`)) => FltPtSum
+    case Deff(Min2(`a`,`b`)) if isFixPtType(a.tp) => FixPtMin
+    case Deff(Max2(`a`,`b`)) if isFixPtType(a.tp) => FixPtMax
+    case _ => OtherReduction
   }
 }
 
@@ -45,23 +46,18 @@ trait ReductionAnalyzer extends Traversal with SpatialTraversalTools {
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
     case Pipe_fold(c,a,z,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) =>
-      identifyReduceFunc(rFunc, rV._1, rV._2).foreach{funcType =>
-        // Not sure where Raghu needs this info, so just sticking it everywhere
-        getStages(rFunc).foreach{sym => reduceType(sym) = funcType}
-        reduceType(a) = funcType
-        reduceType(acc) = funcType
-        reduceType(lhs) = funcType
-      }
+      val funcType = identifyReduceFunc(rFunc, rV._1, rV._2)
+      getStages(rFunc).foreach{sym => reduceType(sym) = funcType}
+      reduceType(a) = funcType
+      reduceType(acc) = funcType
+      reduceType(lhs) = funcType
 
-    // TODO: Necessary here?
     case Accum_fold(c1,c2,a,z,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
-      identifyReduceFunc(rFunc, rV._1, rV._2).foreach{funcType =>
-        // Not sure where Raghu needs this info, so just sticking it everywhere
-        getStages(rFunc).foreach{sym => reduceType(sym) = funcType}
-        reduceType(a) = funcType
-        reduceType(acc) = funcType
-        reduceType(lhs) = funcType
-      }
+      val funcType = identifyReduceFunc(rFunc, rV._1, rV._2)
+      getStages(rFunc).foreach{sym => reduceType(sym) = funcType}
+      reduceType(a) = funcType
+      reduceType(acc) = funcType
+      reduceType(lhs) = funcType
 
     case _ => super.traverse(lhs, rhs)
   }

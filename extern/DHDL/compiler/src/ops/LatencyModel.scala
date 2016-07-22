@@ -217,7 +217,7 @@ trait LatencyModel extends NodeMetadataOpsExp {
     case Offchip_store_cmd(mem,stream,ofs,len,par) =>
       val c = contentionOf(s)
       val p = bound(par).get
-      val size = bound(len).getOrElse{stageError("Cannot resolve bound of offchip store")}
+      val size = bound(len).getOrElse{stageWarn("Cannot resolve bound of offchip store"); 96.0}
 
       val baseCycles = size / p.toDouble
 
@@ -230,7 +230,7 @@ trait LatencyModel extends NodeMetadataOpsExp {
 
     case Offchip_load_cmd(mem,stream,ofs,len,par) =>
       val c = contentionOf(s)
-      val ts = bound(len).getOrElse(stageError("Cannot resolve bound of offchip load"))
+      val ts = bound(len).getOrElse{stageWarn("Cannot resolve bound of offchip load"); 96.0}
       val b = ts  // TODO - max of this and max command size
       val r = 1.0 // TODO - number of commands needed (probably 1)
       val p = bound(par).get

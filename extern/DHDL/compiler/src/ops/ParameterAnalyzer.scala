@@ -239,22 +239,25 @@ trait ParameterAnalyzer extends Traversal {
       }
 
     // HACK: Parallelize innermost loop only
-    case e:Pipe_foreach if isParallelizableLoop(lhs) =>
+    case e:Pipe_foreach =>
       val pars = getParams(parFactorsOf(e.cchain))
       parParams :::= pars
-      if (!isInnerPipe(lhs)) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
+      if (!isParallelizableLoop(lhs)) pars.foreach{p => domainOf(p) = (1,1,1) }
+      else if (!isInnerPipe(lhs)) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
-    case e:Pipe_fold[_,_] if isParallelizableLoop(lhs) =>
+    case e:Pipe_fold[_,_] =>
       val pars = getParams(parFactorsOf(e.cchain))
       parParams :::= pars
-      if (!isInnerPipe(lhs)) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
+      if (!isParallelizableLoop(lhs)) pars.foreach{p => domainOf(p) = (1,1,1) }
+      else if (!isInnerPipe(lhs)) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
-    case e:Accum_fold[_,_] if isParallelizableLoop(lhs) =>
+    case e:Accum_fold[_,_] =>
       val opars = getParams(parFactorsOf(e.ccOuter))
       val ipars = getParams(parFactorsOf(e.ccInner))
       parParams :::= opars
       parParams :::= ipars
-      opars.foreach{p => setMax(p, MAX_OUTER_PAR) }
+      if (!isParallelizableLoop(lhs)) opars.foreach{p => domainOf(p) = (1,1,1) }
+      else opars.foreach{p => setMax(p, MAX_OUTER_PAR) }
 
     case _ => super.traverse(lhs,rhs)
   }

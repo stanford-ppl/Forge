@@ -310,6 +310,8 @@ trait UnrollingTransformer extends MultiPassTransformer {
     case _ => mirror(rhs, f.asInstanceOf[Transformer])(mtype(manifest[A]), pos)
   }).asInstanceOf[Exp[A]]
 
+  def shouldUnroll(lhs: Exp[Any]) = !SpatialConfig.genCGRA || !isInnerControl(lhs)
+
   // Mirrors first prior to attempting to transform -- need to scrub mirrored symbols if they are not used
   override def transform[A:Manifest](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext) = self_mirror(lhs, rhs) match {
     case lhs2@Deff(e: Pipe_foreach) => Some( unrollForeach(lhs2, e) )

@@ -230,3 +230,74 @@ trait BankingTest5 extends DHDLApplicationCompiler {
     }
   }
 }
+
+// Previously having issue with primitive operations being code motioned out of Accel
+// despite the fact that all
+object LiftTestCompiler extends DHDLApplicationCompiler with LiftTest
+trait LiftTest extends DHDLApplication {
+  type Array[T] = ForgeArray[T]
+
+  def simpleseq(xin: Rep[SInt], yin: Rep[SInt]) = {
+    val innerPar = param("innerPar", 1); domainOf(innerPar) = (1, 1, 1)
+    val tileSize = param("tileSize", 96); domainOf(tileSize) = (96, 96, 96)
+
+    val x = ArgIn[SInt]
+    val y = ArgIn[SInt]
+    val out = ArgOut[SInt]
+    setArg(x, xin)
+    setArg(y, yin)
+
+    Accel {
+      val b1 = BRAM[SInt](tileSize)
+      Sequential (tileSize by tileSize) { i =>
+        Pipe.foreach(tileSize par innerPar) { ii =>
+          b1(ii) = x.value * ii
+        }
+        Pipe { out := b1(y) }
+      }
+      ()
+    }
+    getArg(out)
+  }
+
+  def main() {
+    val x = args(unit(0)).to[SInt]
+    val y = args(unit(1)).to[SInt]
+
+    val result = simpleseq(x, y)
+
+    val b1 = Array.tabulate[SInt](96) { i => x * i }
+    val gold = b1(y)
+    println("expected: " + gold)
+    println("result:   " + result)
+    assert(result == gold)
+  }
+}
+
+object LiftTest2Compiler extends DHDLApplicationCompiler with LiftTest2
+trait LiftTest2 extends DHDLApplication {
+  def main() {
+    val tileSize = param(32)
+    val out = ArgOut[SInt]
+    Accel {
+      out := 16.as[SInt] * tileSize
+    }
+    println(getArg(out))
+  }
+}
+
+
+object LiftTest3Compiler extends DHDLApplicationCompiler with LiftTest3
+trait LiftTest3 extends DHDLApplication {
+  def main() {
+    val T = unit(32)
+    val P = unit(16)
+    val out = ArgOut[SInt]
+    Accel {
+      val sum = Reduce(T by P)(0){i => i}{_+_}
+      out := sum
+    }
+    println(getArg(out))
+  }
+}
+

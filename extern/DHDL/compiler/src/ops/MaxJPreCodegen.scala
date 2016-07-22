@@ -112,6 +112,18 @@ trait MaxJPreCodegen extends Traversal  {
     				emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
 			}
+    case e@Unit_pipe(func) =>
+			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
+				case CoarsePipe =>
+					withStream(newStream("metapipe_" + quote(sym))) {
+            emitMPSM(s"${quote(sym)}", childrenOf(sym).size)
+					}
+				case InnerPipe =>
+				case SequentialPipe =>
+          withStream(newStream("sequential_" + quote(sym))) {
+            emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
+					}
+			}
 
 		case e:Argin_new[_] => argInOuts += sym.asInstanceOf[Sym[Register[_]]]
     case e:Argout_new[_] => argInOuts += sym.asInstanceOf[Sym[Register[_]]]

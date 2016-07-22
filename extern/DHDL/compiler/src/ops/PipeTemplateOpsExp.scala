@@ -431,7 +431,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
         emit(s"""${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
         emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
 		    val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
-        emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)});""")
+        emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)}.cast(dfeUInt(32)));""")
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case SequentialPipe =>
         emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${smStr}(this));""")
@@ -443,7 +443,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 //          val Def(d) = getBlockResult(nIters)
 //          emit(s"""// ${quote(getBlockResult(nIters))} = $d""")
 //          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
-          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)});""")
+          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)}.cast(dfeUInt(32)));""")
         } else {
           emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", constant.var(dfeUInt(32), 1));""")
         }

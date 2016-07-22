@@ -182,6 +182,19 @@ trait MaxJGenExternPrimitiveOps extends MaxJGenEffect {
     preCodegen.run(body)
     super.preProcess(body)
   }
+
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case Tpes_Int_to_fix(x) =>  // Emit this node in MaxJ only if x is a const
+      val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
+      x match {
+        case Const(_) =>
+          alwaysGen {
+            emit(s"""DFEVar ${quote(sym)} = constant.var($ts, ${quote(x)});""")
+          }
+        case _ => emit(s"""// DFEVar $sym = ${quote(x)}.cast($ts)""")
+      }
+    case _ => super.emitNode(sym, rhs)
+  }
 }
 
 

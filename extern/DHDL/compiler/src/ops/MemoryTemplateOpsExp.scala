@@ -165,6 +165,55 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 		super.initializeGenerator(buildDir)
 	}
 
+  def bramLoad(sym: Sym[Any], bram: Exp[BRAM[Any]], addr: Exp[Any]) {
+    emitComment("Bram_load {")
+    val pre = maxJPre(bram)
+    emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
+    if (isDblBuf(bram)) {
+      if (parentOf(bram).isEmpty)
+        throw new Exception("Bram (DblBuf)" + quote(bram) + " does not have a parent!")
+      val p = parentOf(bram).get
+      if (readersOf(bram).map(_._1).contains(p)) {
+        //if (!rdoneSet(mem).contains(r)) { TODO
+        emit(s"""${quote(bram)}.connectRdone(${p}_done);""")
+        //rdoneSet(mem) += r
+        //}
+      }
+    }
+    // Handle if loading a composite type
+    //n.compositeValues.zipWithIndex.map { t =>
+    //  val v = t._1
+    //  val idx = t._2
+    //  visitNode(v)
+    //  emit(s"""${quote(v)} <== ${quote(sym)}[$idx];""")
+    //}
+    emitComment("} Bram_load")
+  }
+
+  def bramStore(bram: Exp[BRAM[Any]], addr: Exp[Any], value: Exp[Any]) {
+    emitComment("Bram_store {")
+    val dataStr = quote(value)
+    if (isAccum(bram)) {
+      val offsetStr = quote(writersOf(bram).head._1) + "_offset"
+      val parentPipe = parentOf(bram).getOrElse(throw new Exception(s"Bram ${quote(bram)} does not have a parent!"))
+      val parentCtr = parentPipe match {
+        case Def(EatReflect(d)) => d match {
+          case d:Pipe_fold[_,_] => d.cchain
+          case d:Pipe_foreach => d.cchain
+        }
+        case p => throw new Exception(s"Unknown parent type ${p}!")
+      }
+      emit(s"""$bram.connectWport(stream.offset($addr, -$offsetStr),
+        stream.offset($dataStr, -$offsetStr), ${quote(parentCtr)}_en_from_pipesm, start_TODO, stride_TODO);""")
+    } else {
+      // [TODO] Raghu: Current assumption is that this always returns the parent
+      // writing to the BRAM. Is this always true? Confirm
+      val writer = quote(writersOf(bram).head._1)
+      emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(writer)}_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+    }
+    emitComment("} Bram_store")
+  }
+
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
 		case Offchip_new(size) =>
       alwaysGen {
@@ -310,51 +359,17 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
       emitComment("} Bram_new")
 
     case Bram_load(bram, addr) =>
-      emitComment("Bram_load {")
-			val pre = maxJPre(bram)
-      emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
-      if (isDblBuf(bram)) {
-        if (parentOf(bram).isEmpty)
-          throw new Exception("Bram (DblBuf)" + quote(bram) + " does not have a parent!")
-        val p = parentOf(bram).get
-        if (readersOf(bram).map(_._1).contains(p)) {
-          //if (!rdoneSet(mem).contains(r)) { TODO
-          emit(s"""${quote(bram)}.connectRdone(${p}_done);""")
-          //rdoneSet(mem) += r
-          //}
-        }
-      }
-      // Handle if loading a composite type
-      //n.compositeValues.zipWithIndex.map { t =>
-      //  val v = t._1
-      //  val idx = t._2
-      //  visitNode(v)
-      //  emit(s"""${quote(v)} <== ${quote(sym)}[$idx];""")
-      //}
-      emitComment("} Bram_load")
+      bramLoad(sym, bram, addr)
 
-    case Bram_store(bram, addr, value) =>
-      emitComment("Bram_store {")
-			val dataStr = quote(value)
-      if (isAccum(bram)) {
-        val offsetStr = quote(writersOf(bram).head._1) + "_offset"
-        val parentPipe = parentOf(bram).getOrElse(throw new Exception(s"Bram ${quote(bram)} does not have a parent!"))
-        val parentCtr = parentPipe match {
-          case Def(EatReflect(d)) => d match {
-            case d:Pipe_fold[_,_] => d.cchain
-            case d:Pipe_foreach => d.cchain
-          }
-          case p => throw new Exception(s"Unknown parent type ${p}!")
-        }
-        emit(s"""$bram.connectWport(stream.offset($addr, -$offsetStr),
-          stream.offset($dataStr, -$offsetStr), ${quote(parentCtr)}_en_from_pipesm, start_TODO, stride_TODO);""")
-      } else {
-        // [TODO] Raghu: Current assumption is that this always returns the parent
-        // writing to the BRAM. Is this always true? Confirm
-        val writer = quote(writersOf(bram).head._1)
-        emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(writer)}_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
-      }
-      emitComment("} Bram_store")
+    case Par_bram_load(bram, addr) =>
+      bramLoad(sym, bram, addr)
+
+    case Par_bram_store(bram, addr, value) =>
+      bramStore(bram, addr, value)
+
+    case Vector_from_list(elems) =>
+			val ts = tpstr(elems.size)(elems(0).tp, implicitly[SourceContext])
+      emit(s"""DFEVector<DFEVar> ${quote(sym)} = new DFEVectorType<DFEVar>($ts, ${elems.size}).newInstance(this, ${elems.map(quote).mkString(",")});""")
 
     case _ => super.emitNode(sym, rhs)
   }

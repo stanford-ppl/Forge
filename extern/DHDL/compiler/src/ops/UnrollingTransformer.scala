@@ -62,7 +62,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
     // NOTE: This assumes that the node has no meaningful return value (i.e. all are Pipeline or Unit)
     // Bad things can happen here if you're not careful!
     def split[T:Manifest](orig: Sym[Any], vec: Exp[Vector[T]]): List[Exp[T]] = map{p =>
-      val element = vec(p)
+      val element = vec_apply[T](vec, p)
       subst += orig -> element
       element
     }
@@ -107,7 +107,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
     case EatReflect(e@Pop_fifo(fifo)) if !lanes.isUnrolled(fifo) =>
       val parPop = par_pop_fifo(f(fifo), lanes.length)(e._mT,e.__pos)
       dimsOf(parPop) = List(lanes.length.as[Index])
-      lanes.split(s, parPop)
+      lanes.split(s, parPop)(e._mT)
 
     case EatReflect(e: Cam_load[_,_]) =>
       if (lanes.length > 1) stageError("Cannot parallelize CAM operations")(mpos(s.pos))
@@ -126,7 +126,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
       val addrs = lanes.vectorize{p => f(addr)}
       val parLoad = par_bram_load(f(bram), addrs)(e._mT, e.__pos)
       dimsOf(parLoad) = List(lanes.length.as[Index])
-      lanes.split(s, parLoad)
+      lanes.split(s, parLoad)(e._mT)
 
     case d if isControlNode(s) && lanes.length > 1 =>
       val parBlk = reifyBlock { lanes.duplicate(s, d); () }

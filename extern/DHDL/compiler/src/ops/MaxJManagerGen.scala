@@ -159,7 +159,7 @@ trait MaxJManagerGen {
 
 	    // Setup address map and access pattern
 	    ei.setLMemLinear("fromlmem", start, sizeInBytes);
-	    ei.setStream("tocpu", uint32_t, sizeInBytes);
+	    ei.setStream("tocpu", uint8_t, sizeInBytes);
 	    ei.ignoreAll(Direction.IN_OUT);
 	    return ei;
 	  }
@@ -179,7 +179,7 @@ trait MaxJManagerGen {
 
 	    // Setup address map and access pattern
 	    ei.setLMemLinear("tolmem", start, sizeInBytes);
-	    ei.setStream("fromcpu", uint32_t, sizeInBytes);
+	    ei.setStream("fromcpu", uint8_t, sizeInBytes);
 	    ei.ignoreAll(Direction.IN_OUT);
 	    return ei;
 	  }

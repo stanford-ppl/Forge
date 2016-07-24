@@ -98,15 +98,35 @@ trait ScalaGenMemoryTemplateOps extends ScalaGenEffect with ScalaGenControllerTe
 }
 
 trait CGenMemoryTemplateOps extends CGenEffect {
-  val IR: ControllerTemplateOpsExp with DHDLIdentifiers
+  val IR: ControllerTemplateOpsExp with DHDLIdentifiers with OffChipMemOpsExp
+  with NosynthOpsExp
   import IR._
 
-  private def bitsToIntType(bits: Int) = {
-    if (bits <= 8) "8"
-    else if (bits <= 16) "16"
-    else if (bits <= 32) "32"
-    else "64"
+  // Current TileLd/St templates expect that LMem addresses are
+  // statically known during graph build time in MaxJ. That can be
+  // changed, but until then we have to assign LMem addresses
+  // statically. Assigning each OffChipArray a 384MB chunk now
+  val burstSize = 384
+  var nextLMemAddr = burstSize * 1024 * 1024
+  def getNextLMemAddr() = {
+    val addr = nextLMemAddr
+    nextLMemAddr += burstSize * 1024 * 1024;
+    addr
   }
+
+  def bitsToStringInt(x: Int) = x match {
+    case n: Int if n <= 8 => "8"
+    case n: Int if n <= 16 => "16"
+    case n: Int if n <= 32 => "32"
+    case _ => "64"
+  }
+
+//  private def bitsToStringInt(bits: Int): String = {
+//    if (bits <= 8) "8"
+//    else if (bits <= 16) "16"
+//    else if (bits <= 32) "32"
+//    else "64"
+//  }
 
   private def bitsToFloatType(bits: Int) = {
     if (bits <= 32) "float"
@@ -118,7 +138,7 @@ trait CGenMemoryTemplateOps extends CGenEffect {
     case "DHDLVector" => remapWithRef(m.typeArguments(0))
     // case "DHDLFIFO" => ???
     case "Register" => remapWithRef(m.typeArguments(0))
-    case "DRAM"     => remapWithRef(m.typeArguments(0))
+    case "DRAM"     => "maxjLmem"
 
     case "DHDLCounter" => "int32_t"
     case "DHDLCounterChain" => "int32_t*"
@@ -127,17 +147,80 @@ trait CGenMemoryTemplateOps extends CGenEffect {
     case "DHDLBit" => "bool"
     case "Signed" => ""
     case "Unsign" => "u"
-    case "FixedPoint" => remap(m.typeArguments(0)) + "int" + bitsToIntType(remap(m.typeArguments(1)).toInt + remap(m.typeArguments(2)).toInt) + "_t"
+    case "FixedPoint" => remap(m.typeArguments(0)) + "int" + bitsToStringInt(remap(m.typeArguments(1)).toInt + remap(m.typeArguments(2)).toInt) + "_t"
     case "FloatPoint" => bitsToFloatType(remap(m.typeArguments(0)).toInt + remap(m.typeArguments(1)).toInt)
     case bx(n) => n
     case _ => super.remap(m)
+  }
+
+
+  override def emitDataStructures(path: String) {
+    super.emitDataStructures(path)
+    val stream = new PrintWriter(path + "maxjLmem.h")
+    stream.println(
+"""
+#ifndef __MAXJLMEM_H__
+#define __MAXJLMEM_H__
+#include <stdint.h>
+
+class maxjLmem {
+public:
+  uint64_t baseAddr;
+  uint32_t size;
+
+  maxjLmem(uint64_t base, int size) {
+    this->baseAddr = base;
+    this->size = size;
+  }
+};
+#endif
+""")
+    stream.close()
+
+    typesStream.println(s"""#include "maxjLmem.h"""")
+    typesStream.println(s"""#include <Top.h>""")
+    typesStream.println(s"""extern max_engine_t *engine;""")
+  }
+
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case Set_mem(fpgamem, cpumem) =>
+      stream.println(s"""
+      // Transfer DRAM -> LMEM
+      Top_writeLMem_actions_t ${quote(fpgamem)}_wrAct;
+      ${quote(fpgamem)}_wrAct.param_size = ${quote(cpumem)}->length * sizeof(${remap(fpgamem.tp.typeArguments.head)});
+      ${quote(fpgamem)}_wrAct.param_start = ${quote(fpgamem)}->baseAddr;
+      ${quote(fpgamem)}_wrAct.instream_fromcpu = (const uint8_t*) ${quote(cpumem)}->data;
+      Top_writeLMem_run(engine, &${quote(fpgamem)}_wrAct);""")
+    case Get_mem(fpgamem, cpumem) =>
+      stream.println(s"""
+      // Transfer LMEM -> DRAM
+      // (sizeInBytes, address, dstptr)
+      Top_readLMem_actions_t ${quote(fpgamem)}_rdAct;
+      ${quote(fpgamem)}_rdAct.param_size = ${quote(cpumem)}->length *sizeof(${remap(fpgamem.tp.typeArguments.head)});
+      ${quote(fpgamem)}_rdAct.param_start = ${quote(fpgamem)}->baseAddr;
+      ${quote(fpgamem)}_rdAct.outstream_tocpu = (uint8_t*) ${quote(cpumem)}->data;
+      fprintf(stderr, "Starting FPGA -> CPU copy\\n");
+      Top_readLMem_run(engine, &${quote(fpgamem)}_rdAct);
+      fprintf(stderr, "FPGA -> CPU copy done\\n");""")
+    case Offchip_new(size) =>
+      emitValDef(sym, s"""new maxjLmem(${getNextLMemAddr()}, ${quote(size)})""")
+
+    case Forloop(start, end, step, body, idx) =>
+      val itp = remap(start.tp)
+      stream.println(s"""for(${quote(itp)} i=${quote(start)}; i<${quote(end)}; i+=${quote(step)}) {""")
+      stream.println(s"""${quote(itp)} ${quote(idx)} = i;""")
+      emitBlock(body)
+      stream.println(s"""}""")
+
+
+    case _ => super.emitNode(sym, rhs)
   }
 }
 
 trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTemplateOps{
   val IR: LoweredPipeOpsExp with ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
           with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
-          with ExternPrimitiveOpsExp with DHDLCodegenOps with NosynthOpsExp with MemoryAnalysisExp
+          with ExternPrimitiveOpsExp with DHDLCodegenOps with NosynthOpsExp with MemoryAnalysisExp with FIFOOpsExp with VectorOpsExp
           with DeliteTransform
   import IR._
 
@@ -223,10 +306,18 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
       }
 
 		case Offchip_load_cmd(mem, fifo, ofs, len, par) =>
-      emitComment("Offchip load to fifo")
+      emit(s"""// ${quote(sym)}: Offchip_load_cmd(${quote(mem)},${quote(fifo)}, ${quote(ofs)}, ${quote(len)}, ${quote(par)})""")
+      emit(s"""MemoryCmdGenLib ${quote(sym)} = new MemoryCmdGenLib(
+          this,
+          ${quote(sym)}_en, ${quote(sym)}_done,
+          ${quote(mem)}, ${quote(ofs)},
+          "${quote(mem)}_${quote(sym)}_in",
+          ${quote(len)},
+          ${quote(fifo)}_readEn, ${quote(fifo)}_rdata);""")
 
 		case Offchip_store_cmd(mem, fifo, ofs, len, par) =>
-      emitComment("Offchip store from fifo")
+      emit(s"""// ${quote(sym)}: Offchip_store_cmd(${quote(mem)},${quote(fifo)}, ${quote(ofs)}, ${quote(len)}, ${quote(par)})""")
+//      emitComment("Offchip store from fifo")
 
 		case Reg_new(init) =>
       emitComment("Reg_new {")
@@ -366,6 +457,26 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 
     case Par_bram_store(bram, addr, value) =>
       bramStore(bram, addr, value)
+
+    case Fifo_new(a, b) =>  // FIFO is always parallel
+			val ts = tpstr(1)(sym.tp.typeArguments.head, implicitly[SourceContext])
+      emit(s"""// FIFO ${quote(sym)} = Fifo_new[$ts](${quote(a)}, ${quote(b)});""")
+      emit(s"""DFEVector<DFEVar> ${quote(sym)}_rdata = new DFEVectorType<DFEVar>($ts, ${parOf(sym)}).newInstance(this);""")
+      emit(s"""DFEVector<DFEVar> ${quote(sym)}_wdata = new DFEVectorType<DFEVar>($ts, ${parOf(sym)}).newInstance(this);""")
+      emit(s"""DFEVar ${quote(sym)}_readEn = dfeBool().newInstance(this);""")
+      emit(s"""DFEVar ${quote(sym)}_writeEn = dfeBool().newInstance(this);""")
+
+    case Par_push_fifo(a, b, c, d) =>
+      emit(s"""// Par_push_fifo(${quote(a)}, ${quote(b)}, ${quote(c)}, ${quote(d)});""")
+
+    case Par_pop_fifo(fifo, par) =>
+      emit(s"""// DFEVar ${quote(sym)} = Par_pop_fifo(${quote(fifo)}, ${quote(par)});""")
+      val reader = quote(readersOf(fifo).head._1)  // Assuming that each fifo has a unique reader
+      emit(s"""${quote(fifo)}_readEn <== ${reader}_en;""")
+      emit(s"""DFEVector<DFEVar> ${quote(sym)} = ${quote(fifo)}_rdata;""")
+
+    case Vec_apply(vec, idx) =>
+      emit(s"""DFEVar ${quote(sym)} = ${quote(vec)}[${quote(idx)}];""")
 
     case Vector_from_list(elems) =>
 			val ts = tpstr(elems.size)(elems(0).tp, implicitly[SourceContext])

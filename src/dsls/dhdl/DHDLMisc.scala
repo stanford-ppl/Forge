@@ -374,13 +374,13 @@ trait DHDLMisc {
     }))
 
     // C++ backend
-    impl (set_mem)  (codegen(cpp, ${ memcpy($1, 0, $0, 0, $1.length) }))
-    impl (get_mem)  (codegen(cpp, ${ memcpy($0, 0, $1, 0, $0.length) }))
+
     impl (set_arg)  (codegen(cpp, ${ *$0 = $1}))
     impl (get_arg)  (codegen(cpp, ${ *$0 }))
     impl (hwblock)  (codegen(cpp, ${
       std::cout << "hwblock" << std::endl
     }))
+    impl (print)    (codegen(cpp, ${ std::cout << $0 }))
     impl (println)  (codegen(cpp, ${ std::cout << $0 << std::endl }))
     impl (println2) (codegen(cpp, ${ std::cout << std::endl }))
     impl (assert)   (codegen(cpp, ${ assert($0) }))
@@ -395,13 +395,6 @@ trait DHDLMisc {
     impl (whileDo) (codegen(cpp, ${
       while ($b[0]) {
         $b[1]
-      }
-    }))
-    impl (forLoop) (codegen(cpp, ${
-      @ val itp = remap($start.tp)
-      $itp i = $start ;
-      for (i = $start ; i < $end ; i += $step) {
-        $b[func](i)
       }
     }))
 

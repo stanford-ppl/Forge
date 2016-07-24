@@ -65,7 +65,7 @@ trait DeviceMemcpy extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
 
-  def memcpyViaFPGA(srcHost: Rep[Array[T]]) {
+  def memcpyViaFPGA(srcHost: Rep[Array[T]]) = {
     val N = srcHost.length
     val fpgamem = OffChipMem[SInt](N)
     setMem(fpgamem, srcHost)

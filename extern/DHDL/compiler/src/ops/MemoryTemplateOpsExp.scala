@@ -248,9 +248,9 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 		super.initializeGenerator(buildDir)
 	}
 
-  def bramLoad(sym: Sym[Any], bram: Exp[BRAM[Any]], addr: Exp[Any]) {
+  def bramLoad(sym: Sym[Any], bram: Exp[BRAM[Any]], addr: Exp[Any], par: Boolean = false) {
     emitComment("Bram_load {")
-    val pre = maxJPre(bram)
+    val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
     emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
     if (isDblBuf(bram)) {
       if (parentOf(bram).isEmpty)
@@ -317,6 +317,14 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 
 		case Offchip_store_cmd(mem, fifo, ofs, len, par) =>
       emit(s"""// ${quote(sym)}: Offchip_store_cmd(${quote(mem)},${quote(fifo)}, ${quote(ofs)}, ${quote(len)}, ${quote(par)})""")
+      emit(s"""MemoryCmdStLib ${quote(sym)} = new MemoryCmdStLib(
+          this,
+          ${quote(sym)}_en, ${quote(sym)}_done,
+          ${quote(mem)}, ${quote(ofs)},
+          "${quote(mem)}_${quote(sym)}_out",
+          ${quote(len)},
+          ${quote(fifo)}_writeEn, ${quote(fifo)}_wdata);""")
+
 //      emitComment("Offchip store from fifo")
 
 		case Reg_new(init) =>
@@ -453,7 +461,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
       bramLoad(sym, bram, addr)
 
     case Par_bram_load(bram, addr) =>
-      bramLoad(sym, bram, addr)
+      bramLoad(sym, bram, addr, true)
 
     case Par_bram_store(bram, addr, value) =>
       bramStore(bram, addr, value)
@@ -466,8 +474,12 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
       emit(s"""DFEVar ${quote(sym)}_readEn = dfeBool().newInstance(this);""")
       emit(s"""DFEVar ${quote(sym)}_writeEn = dfeBool().newInstance(this);""")
 
-    case Par_push_fifo(a, b, c, d) =>
-      emit(s"""// Par_push_fifo(${quote(a)}, ${quote(b)}, ${quote(c)}, ${quote(d)});""")
+    case Par_push_fifo(fifo, value, en, shuffle) =>
+      emit(s"""// Par_push_fifo(${quote(fifo)}, ${quote(value)}, ${quote(en)}, ${quote(shuffle)});""")
+      val writer = quote(writersOf(fifo).head._1)  // Not using 'en' or 'shuffle'
+      emit(s"""${quote(fifo)}_writeEn <== ${writer}_datapath_en;""")
+      emit(s"""${quote(fifo)}_wdata <== ${quote(value)};""")
+
 
     case Par_pop_fifo(fifo, par) =>
       emit(s"""// DFEVar ${quote(sym)} = Par_pop_fifo(${quote(fifo)}, ${quote(par)});""")

@@ -98,45 +98,49 @@ object SimpleTileLoadStoreTest extends DHDLApplicationCompiler with SimpleTileLo
 trait SimpleTileLoadStore extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
-  def simpleLoadStore(a1Host: Rep[Array[T]], a2Host: Rep[Array[T]], idx: Rep[SInt]) = {
+  def simpleLoadStore(srcHost: Rep[Array[T]], value: Rep[SInt]) = {
     val loadPar = param("loadPar", 1); domainOf(loadPar) = (1, 1, 1)
     val storePar = param("storePar", 1); domainOf(storePar) = (1, 1, 1)
     val tileSize = param("tileSize", 96); domainOf(tileSize) = (96, 96, 96)
-    val N = a1Host.length; bound(N) = 9216
+    val N = srcHost.length; bound(N) = 9216
 
-    val a1FPGA = OffChipMem[SInt](N)
-//    val a2FPGA = OffChipMem[SInt](N)
-    setMem(a1FPGA, a1Host)
-//    setMem(a2FPGA, a2Host)
+    val srcFPGA = OffChipMem[SInt](N)
+    val dstFPGA = OffChipMem[SInt](N)
+    setMem(srcFPGA, srcHost)
 
   	val x = ArgIn[SInt]
-  	val y = ArgOut[SInt]
-    setArg(x, idx)
+    setArg(x, value)
     Accel {
       val b1 = BRAM[SInt](tileSize)
       Sequential {
-        b1 := a1FPGA(0::tileSize)
-//        a2FPGA(0::tileSize) := b1
-        Pipe { y := b1(x) }
+        b1 := srcFPGA(0::tileSize)
+
+        val b2 = BRAM[SInt](tileSize)
+        Pipe (tileSize by 1) { i =>
+          b2(i) = b1(i) * x
+        }
+
+        dstFPGA(0::tileSize) := b2
       }
       ()
     }
-//    getMem(a2FPGA)
-    getArg(y)
+    getMem(dstFPGA)
   }
 
   def main() {
     val arraySize = args(unit(0)).to[SInt]
-    val idx = args(unit(1)).to[SInt]
+    val value = args(unit(1)).to[SInt]
 
-    val a1 = Array.tabulate[SInt](arraySize) { i => i }
-    val a2 = Array.fill[SInt](arraySize) { 0 }
-    val y = simpleLoadStore(a1, a2, idx)
-    println("y = " + y)
-//    val result = simpleLoadStore(a1, a2)
-//    (0 until result.length) foreach { i => println(s"""result($i) = ${result(i)}""") }
-//    val gold = a1
-//    assert(result == gold)
+    val src = Array.tabulate[SInt](arraySize) { i => i }
+    val dst = simpleLoadStore(src, value)
+
+    val gold = src.map { _ * value }
+
+    println("dst:")
+    (0 until arraySize) foreach { i => print(dst(i) + " ") }
+    println("")
+
+    (0 until arraySize) foreach { i => assert(dst(i) == gold(i)) }
   }
 }
 

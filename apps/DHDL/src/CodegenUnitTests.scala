@@ -78,8 +78,9 @@ trait DeviceMemcpy extends DHDLApplication {
 
   def main() {
     val arraySize = args(unit(0)).to[SInt]
+    val c = args(unit(1)).to[SInt]
 
-    val src = Array.tabulate[SInt](arraySize) { i => i }
+    val src = Array.tabulate[SInt](arraySize) { i => i*c }
     val dst = memcpyViaFPGA(src)
 
     println("src");

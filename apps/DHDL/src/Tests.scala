@@ -290,12 +290,11 @@ trait LiftTest2 extends DHDLApplication {
 object LiftTest3Compiler extends DHDLApplicationCompiler with LiftTest3
 trait LiftTest3 extends DHDLApplication {
   def main() {
-    val T = unit(32)
-    val P = unit(16)
+    val T = param(32)
+    val P = param(16)
     val out = ArgOut[SInt]
     Accel {
-      val sum = Reduce(T by P)(0){i => i}{_+_}
-      out := sum
+      out := 32.as[SInt] * T * P
     }
     println(getArg(out))
   }

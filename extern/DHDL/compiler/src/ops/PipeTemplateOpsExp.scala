@@ -514,9 +514,10 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
         emit(s"""DFEVar ${quote(cchain)}_done = dfeBool().newInstance(this);""")
         doneDeclaredSet += cchain
         emit(s"""${quote(sym)}_sm.connectInput("ctr_done", ${quote(cchain)}_done);""")
-        emit(s"""DFEVar ${quote(cchain)}_en_from_pipesm = ${quote(sym)}_sm.getOutput("ctr_en");""")
+        emit(s"""DFEVar ${quote(sym)}_datapath_en = ${quote(sym)}_sm.getOutput("ctr_en");""")
       case ForkJoin => throw new Exception("Cannot have counter chain control logic for fork-join (parallel) controller!")
       case _ =>
+        emit(s"""DFEVar ${quote(sym)}_datapath_en = ${quote(sym)}_en;""")
     }
 
 
@@ -531,10 +532,10 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
               }
             }
             if (writesToAccumRam) {
-              emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm | ${quote(sym)}_rst_en"),
-                    Some(s"stream.offset(${quote(cchain)}_en_from_pipesm & ${quote(cchain)}_chain.getCounterWrap(${quote(counters.head)}), -${quote(sym)}_offset-1)"))
+              emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en | ${quote(sym)}_rst_en"),
+                    Some(s"stream.offset(${quote(sym)}_datapath_en & ${quote(cchain)}_chain.getCounterWrap(${quote(counters.head)}), -${quote(sym)}_offset-1)"))
             } else {
-              emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm"))
+              emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en"))
             }
 
           case n:ParPipeForeach =>
@@ -544,18 +545,18 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
               }
             }
             if (writesToAccumRam) {
-              emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm | ${quote(sym)}_rst_en"),
-                    Some(s"stream.offset(${quote(cchain)}_en_from_pipesm & ${quote(cchain)}_chain.getCounterWrap(${quote(counters.head)}), -${quote(sym)}_offset-1)"))
+              emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en | ${quote(sym)}_rst_en"),
+                    Some(s"stream.offset(${quote(sym)}_datapath_en & ${quote(cchain)}_chain.getCounterWrap(${quote(counters.head)}), -${quote(sym)}_offset-1)"))
             } else {
-              emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm"))
+              emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en"))
             }
 
           case n@ParPipeReduce(cchain, accum, func, rFunc, inds, acc, rV) =>
             emit(s"""DFEVar ${quote(sym)}_loopLengthVal = ${quote(sym)}_offset.getDFEVar(this, dfeUInt(8));""")
-            emit(s"""CounterChain ${quote(sym)}_redLoopChain = control.count.makeCounterChain(${quote(cchain)}_en_from_pipesm);""")
+            emit(s"""CounterChain ${quote(sym)}_redLoopChain = control.count.makeCounterChain(${quote(sym)}_datapath_en);""")
             emit(s"""DFEVar ${quote(sym)}_redLoopCtr = ${quote(sym)}_redLoopChain.addCounter(${quote(sym)}_loopLengthVal, 1);""")
             emit(s"""DFEVar ${quote(sym)}_redLoop_done = stream.offset(${quote(sym)}_redLoopChain.getCounterWrap(${quote(sym)}_redLoopCtr), -1);""")
-            emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm & ${quote(sym)}_redLoop_done"))
+            emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en & ${quote(sym)}_redLoop_done"))
 
           case n:Pipe_fold[_,_] =>
 			      //TODO : what is this? seems like all reduce supported are specialized
@@ -570,14 +571,14 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
             //  })
 			      val specializeReduce = true;
             if (specializeReduce) {
-              emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm"))
+              emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en"))
             } else {
               emit(s"""DFEVar ${quote(sym)}_loopLengthVal = ${quote(sym)}_offset.getDFEVar(this, dfeUInt(8));""")
               emit(s"""CounterChain ${quote(sym)}_redLoopChain =
-		        		control.count.makeCounterChain(${quote(cchain)}_en_from_pipesm);""")
+		        		control.count.makeCounterChain(${quote(sym)}_datapath_en);""")
               emit(s"""DFEVar ${quote(sym)}_redLoopCtr = ${quote(sym)}_redLoopChain.addCounter(${quote(sym)}_loopLengthVal, 1);""")
               emit(s"""DFEVar ${quote(sym)}_redLoop_done = stream.offset(${quote(sym)}_redLoopChain.getCounterWrap(${quote(sym)}_redLoopCtr), -1);""")
-              emitMaxJCounterChain(cchain, Some(s"${quote(cchain)}_en_from_pipesm & ${quote(sym)}_redLoop_done"))
+              emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en & ${quote(sym)}_redLoop_done"))
             }
         }
       case CoarsePipe =>

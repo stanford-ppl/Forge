@@ -287,12 +287,12 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
         case p => throw new Exception(s"Unknown parent type ${p}!")
       }
       emit(s"""$bram.connectWport(stream.offset($addr, -$offsetStr),
-        stream.offset($dataStr, -$offsetStr), ${quote(parentCtr)}_en_from_pipesm, start_TODO, stride_TODO);""")
+        stream.offset($dataStr, -$offsetStr), ${quote(parentPipe)}_datapath_en, start_TODO, stride_TODO);""")
     } else {
       // [TODO] Raghu: Current assumption is that this always returns the parent
       // writing to the BRAM. Is this always true? Confirm
       val writer = quote(writersOf(bram).head._1)
-      emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(writer)}_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+      emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
     }
     emitComment("} Bram_store")
   }
@@ -374,15 +374,15 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 					  	throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
 					  val enSignalStr = writersOf(reg).head._1 match {
 					  	case p@Def(EatReflect(pipe:Pipe_foreach)) => styleOf(p) match {
-					  		case InnerPipe => quote(pipe.cchain) + "_en_from_pipesm"
+					  		case InnerPipe => quote(pipe.cchain) + "_datapath_en"
 					  		case _ => quote(p) + "_en"
 					  	}
 					  	case p@Def(EatReflect(pipe:Pipe_fold[_,_])) => styleOf(p) match {
-					  		case InnerPipe => quote(pipe.cchain) + "_en_from_pipesm"
+					  		case InnerPipe => quote(pipe.cchain) + "_datapath_en"
 					  		case _ => quote(p) + "_en"
 					  	}
 					  	case p@Def(EatReflect(pipe:ParPipeReduce[_,_])) => styleOf(p) match {
-					  		case InnerPipe => quote(pipe.cc) + "_en_from_pipesm"
+					  		case InnerPipe => quote(pipe.cc) + "_datapath_en"
 					  		case _ => quote(p) + "_en"
 					  	}
 					  	case p@_ =>
@@ -472,7 +472,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
     case Par_pop_fifo(fifo, par) =>
       emit(s"""// DFEVar ${quote(sym)} = Par_pop_fifo(${quote(fifo)}, ${quote(par)});""")
       val reader = quote(readersOf(fifo).head._1)  // Assuming that each fifo has a unique reader
-      emit(s"""${quote(fifo)}_readEn <== ${reader}_en;""")
+      emit(s"""${quote(fifo)}_readEn <== ${reader}_datapath_en;""")
       emit(s"""DFEVector<DFEVar> ${quote(sym)} = ${quote(fifo)}_rdata;""")
 
     case Vec_apply(vec, idx) =>

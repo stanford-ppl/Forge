@@ -483,7 +483,7 @@ trait DHDLMetadata {
 				"Unknown type " + manifest[T]
 			}
 			if ( $0 > 1) {
-				"new DFEVectorType<DFEVar>(" + scalart + "," + $0
+				"new DFEVectorType<DFEVar>(" + scalart + "," + $0 + ")"
 			} else {
 				scalart
 			}

@@ -247,6 +247,9 @@ trait DHDLDSL extends ForgeApplication
     val DotIRPrinter = traversal("DotIRPrinter", isExtern=true)
     val NameAnalyzer = traversal("NameAnalyzer", isExtern=true)
 
+    val PIRScheduling = analyzer("PIRSchedule", isExtern=true)
+    val PIRGen = traversal("PIRGen", isExtern=true)
+
     importGlobalAnalysis()
     importBoundAnalysis()
 
@@ -299,6 +302,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(Unrolling)             // Pipeline unrolling
     schedule(UnrolledControlAnalyzer) // Control signal metadata after unrolling
     schedule(DotIRPrinter)          // Graph after unrolling
+    schedule(IRPrinterPlus)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, maxj))

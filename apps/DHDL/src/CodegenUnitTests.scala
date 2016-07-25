@@ -268,3 +268,47 @@ trait SimpleReduce extends DHDLApplication {
     assert(result == gold)
   }
 }
+
+object NiterTest extends DHDLApplicationCompiler with Niter
+trait Niter extends DHDLApplication {
+  type T = SInt
+  type Array[T] = ForgeArray[T]
+  val constTileSize = 96
+
+  def nIterTest(len: Rep[SInt]) = {
+    val innerPar = param("innerPar", 1); domainOf(innerPar) = (1, 1, 1)
+    val tileSize = param("tileSize", constTileSize); domainOf(constTileSize) = (constTileSize, constTileSize, constTileSize)
+    bound(len) = 9216
+
+    val N = ArgIn[SInt]
+    val out = ArgOut[SInt]
+    setArg(N, len)
+
+    Accel {
+      Sequential {
+        Sequential (N by tileSize) { i =>
+          val accum = Reduce (tileSize par innerPar)(0.as[T]) { ii =>
+            i * ii
+          } {_+_}
+          Pipe { out := accum }
+        }
+      }
+      ()
+    }
+
+    getArg(out)
+  }
+
+  def main() {
+    val len = args(unit(0)).to[SInt]
+
+    val result = nIterTest(len)
+
+    val b1 = Array.tabulate[SInt](len) { i => i }
+
+    val gold = b1.reduce {_+_}
+    println("expected: " + gold)
+    println("result:   " + result)
+    assert(result == gold)
+  }
+}

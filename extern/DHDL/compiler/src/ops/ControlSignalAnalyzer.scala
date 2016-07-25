@@ -320,7 +320,8 @@ trait UnrolledControlSignalAnalyzer extends ControlSignalAnalyzer {
       writersOf(accum) = writersOf(accum) ++ writersOf(acc) // (5)
       isAccum(accum) = true                                 // (6)
       writtenIn(lhs) = writtenIn(lhs) :+ accum              // (10)
-      parentOf(accum) = lhs  // Reset accumulator with reduction, not allocation
+      parentOf(accum) = lhs           // Reset accumulator with reduction, not allocation
+      setProps(acc, getProps(accum))  // Reset value, etc.
 
     case _ => super.analyze(lhs, rhs)
   }

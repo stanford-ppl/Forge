@@ -633,7 +633,15 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       val counterType = tpstr(parOf(ctr))(ctr.tp, implicitly[SourceContext])
       val counterObject = s"""${quote(ctr)}_obj"""
       val Def(d) = step
-      val ConstFix(constStep) = d
+      val constStep = d match {
+        case n@ConstFix(value) => value
+        case n@Tpes_Int_to_fix(v) => v match {
+          case c@Const(value) => value
+          case c@Param(value) => value
+          case _ => throw new Exception(s"""Step is of unhandled node $n, $v""")
+        }
+        case _ => throw new Exception(s"""Step is of unhandled node $d""")
+      }
 
       if (parOf(ctr) == 1) {
         emit(s"""${maxJPre(ctr)} $counterObject = ${quote(cchain)}.addCounter(${quote(maxWithCast)}, ${quote(constStep)});""")

@@ -407,9 +407,9 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 // so disabling using nameOf until it is fixed.
 //            Console.println(s"""controlNodeStack = ${controlNodeStack}, reg = ${nameOf(reg)}, writersOf(reg) = ${writersOf(reg)}""")
 
-//            emit(s"""${quote(reg)}_delayed <== $rst ? constant.var(${quote(reg)}.getType(), 0) : stream.offset(${quote(reg)}, -${quote(writersOf(reg).head._1)}_offset); // reset""")
+            emit(s"""${quote(reg)}_delayed <== $rst ? constant.var(${quote(reg)}.getType(), 0) : stream.offset(${quote(reg)}, -${quote(writersOf(reg).head._1)}_offset); // reset""")
             // Issue #7: 'resetValue(reg)' is throwing a None.get exception
-            emit(s"""${quote(reg)}_delayed <== $rst ? ${quote(resetValue(reg))} : stream.offset(${quote(reg)}, -${quote(writersOf(reg).head._1)}_offset); // reset""")
+//            emit(s"""${quote(reg)}_delayed <== $rst ? ${quote(resetValue(reg))} : stream.offset(${quote(reg)}, -${quote(writersOf(reg).head._1)}_offset); // reset""")
 				  case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
 				  case ArgumentOut =>
 				 	  val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done" //TODO

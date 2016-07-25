@@ -473,6 +473,8 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
     if (styleOf(sym)!=ForkJoin) {
       if (cchain.isDefined) {
         emitCChainCtrl(sym, cchain.get)
+      } else {
+        emit(s"""DFEVar ${quote(sym)}_datapath_en = ${quote(sym)}_en;""")
       }
     }
 // HEAD

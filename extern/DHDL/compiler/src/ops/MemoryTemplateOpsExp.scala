@@ -1,7 +1,7 @@
 package dhdl.compiler.ops
 
 import java.io.{File,FileWriter,PrintWriter}
-import scala.virtualization.lms.common.{BaseExp, EffectExp, ScalaGenEffect, CGenEffect, DotGenEffect, MaxJGenEffect, Record}
+import scala.virtualization.lms.common.{BaseExp, EffectExp, ScalaGenEffect, CGenEffect, DotGenEffect, MaxJGenEffect, MaxJGenFat, Record}
 import scala.virtualization.lms.internal.{Traversal}
 import scala.reflect.{Manifest,SourceContext}
 import ppl.delite.framework.transform.{DeliteTransform}
@@ -217,7 +217,7 @@ public:
   }
 }
 
-trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTemplateOps{
+trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGenControllerTemplateOps {
   val IR: LoweredPipeOpsExp with ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
           with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
           with ExternPrimitiveOpsExp with DHDLCodegenOps with NosynthOpsExp with MemoryAnalysisExp with FIFOOpsExp with VectorOpsExp
@@ -298,9 +298,24 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
   }
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case Hwblock(func) =>
+			inHwScope = true
+			emitComment("Emitting Hwblock dependencies {")
+      hwblockDeps = recursiveDeps(rhs)
+      hwblockDeps.foreach { s =>
+        val Def(d) = s
+        d match {
+           case Reflect(Offchip_new(size),_,_) =>  // Avoid emitting Offchip_new here as it would've been emitted already
+           case Offchip_new(size) =>  // Avoid emitting Offchip_new here as it would've been emitted already
+           case _ => emitNode(s, d)
+         }
+      }
+			emitComment(" End Hwblock dependencies }")
+      emitBlock(func)
+			inHwScope = false
 		case Offchip_new(size) =>
         emitComment(s""" Offchip_new(${quote(size)}) {""")
-        emit(s"""int ${quote(sym)} = ${getNextLMemAddr()};""")
+        alwaysGen { emit(s"""int ${quote(sym)} = ${getNextLMemAddr()};""") }
         emitComment(s""" Offchip_new(${quote(size)}) }""")
 
 		case Offchip_load_cmd(mem, fifo, ofs, len, par) =>

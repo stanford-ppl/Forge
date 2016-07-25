@@ -407,16 +407,6 @@ trait DHDLMisc {
     impl (get_mem)  (codegen(maxj, ${ }))
     impl (set_arg)  (codegen(maxj, ${ }))
     impl (get_arg)  (codegen(maxj, ${ }))
-    impl (hwblock)  (codegen(maxj, ${
-			@ inHwScope = true
-      @ hwblockDeps = recursiveDeps(rhs)
-      @ hwblockDeps.foreach { s =>
-      @   val Def(d) = s
-      @   emitNode(s, d)
-      @ }
-      @ emitBlock(__arg0)
-			@ inHwScope = false
-    }))
 
     // --- Rewrites
     rewrite (ifThenElse) using forwarding ${ delite_ifThenElse($0, $1, $2, false, true) }

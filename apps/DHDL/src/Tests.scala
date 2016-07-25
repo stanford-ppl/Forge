@@ -299,34 +299,3 @@ trait LiftTest3 extends DHDLApplication {
     println(getArg(out))
   }
 }
-
-
-object DeviceMemcpyCompiler extends DHDLApplicationCompiler with DeviceMemcpy
-trait DeviceMemcpy extends DHDLApplication {
-  type T = SInt
-  type Array[T] = ForgeArray[T]
-
-  def memcpyViaFPGA(srcHost: Rep[Array[T]]) = {
-    val N = srcHost.length
-    val fpgamem = OffChipMem[T](N)
-    setMem(fpgamem, srcHost)
-
-    val y = ArgOut[T]
-    Accel { Pipe { y := 10 } }
-
-    getMem(fpgamem)
-  }
-
-  def main() {
-    val arraySize = args(unit(0)).to[T]
-    val src = Array.tabulate[T](arraySize) { i => i }
-    val dst = memcpyViaFPGA(src)
-
-    println("src");
-    (0 until arraySize) foreach { i => print(src(i) + " ") }
-    println("dst");
-    (0 until arraySize) foreach { i => print(dst(i) + " ") }
-    println("")
-  }
-}
-

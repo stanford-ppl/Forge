@@ -57,8 +57,6 @@ trait DSE extends Traversal {
     debug("Freezing DSE parameters")
     tileSizes.foreach{p => p.fix}
     parParams.foreach{p => p.fix}
-    bndAnalyzer.run(b)
-    bufAnalyzer.run(localMems)
     contention.run(topController)
     (b)
   }

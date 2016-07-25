@@ -285,12 +285,14 @@ trait DHDLDSL extends ForgeApplication
                                     //   Contention analyzer (to finalize contention estimates)
 
     // --- Post-DSE Constants
+    schedule(ParamFinalizer)        // Finalize all parameters in preparation for constant folding
+    schedule(BoundAnalyzer)         // Constant propagation in metadata
     schedule(ConstantFolding)       // Constant folding
     schedule(GlobalAnalyzer)        // Add "global" annotations for newly created symbols after folding
-
     schedule(IRPrinterPlus)
 
     // --- Post-DSE Estimation
+    schedule(MemoryAnalyzer)
     schedule(AreaAnalyzer)          // Area estimation
     schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
 

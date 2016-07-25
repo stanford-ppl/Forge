@@ -409,6 +409,11 @@ trait DHDLMisc {
     impl (get_arg)  (codegen(maxj, ${ }))
     impl (hwblock)  (codegen(maxj, ${
 			@ inHwScope = true
+      @ hwblockDeps = recursiveDeps(rhs)
+      @ hwblockDeps.foreach { s =>
+      @   val Def(d) = s
+      @   emitNode(s, d)
+      @ }
       @ emitBlock(__arg0)
 			@ inHwScope = false
     }))

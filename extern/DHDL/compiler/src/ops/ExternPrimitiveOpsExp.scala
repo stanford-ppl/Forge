@@ -188,17 +188,11 @@ trait MaxJGenExternPrimitiveOps extends MaxJGenEffect {
       val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
       x match {
         case Const(_) =>
-          alwaysGen {
             emit(s"""DFEVar ${quote(sym)} = constant.var($ts, ${quote(x)});""")
-          }
         case Param(_) =>
-          alwaysGen {
             emit(s"""DFEVar ${quote(sym)} = constant.var($ts, ${quote(x)});""")
-          }
         case _ =>
-          alwaysGen {
             emit(s"""// DFEVar $sym = ${quote(x)}.cast($ts)""")
-          }
       }
     case _ => super.emitNode(sym, rhs)
   }

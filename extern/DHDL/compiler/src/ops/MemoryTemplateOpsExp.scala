@@ -299,11 +299,9 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
 		case Offchip_new(size) =>
-      alwaysGen {
         emitComment(s""" Offchip_new(${quote(size)}) {""")
         emit(s"""int ${quote(sym)} = ${getNextLMemAddr()};""")
         emitComment(s""" Offchip_new(${quote(size)}) }""")
-      }
 
 		case Offchip_load_cmd(mem, fifo, ofs, len, par) =>
       emit(s"""// ${quote(sym)}: Offchip_load_cmd(${quote(mem)},${quote(fifo)}, ${quote(ofs)}, ${quote(len)}, ${quote(par)})""")
@@ -351,9 +349,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 			}
 		case Argin_new(init) =>
 			val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
-      alwaysGen {
           	emit(s"""DFEVar ${quote(sym)} = io.scalarInput("${quote(sym)}", $ts );""")
-			}
 
     case Argout_new(init) => //emitted in reg_write
 

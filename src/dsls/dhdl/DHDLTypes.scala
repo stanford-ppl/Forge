@@ -226,21 +226,15 @@ trait DHDLTypes {
 
     // --- MaxJ Backend
     impl (boolean_to_bit) (codegen(maxj, ${
-      @ alwaysGen {
     		DFEVar $sym = constant.var( $0 );
-      @ }
 		}))
     impl (const_to_fixpt) (codegen(maxj, ${
-      @ alwaysGen {
 				@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
 				DFEVar $sym = constant.var( $ts, $0 );
-      @ }
 		}))
     impl (const_to_fltpt) (codegen(maxj, ${
-      @ alwaysGen {
 				@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
       	DFEVar $sym = constant.var( $ts, $0 );
-      @ }
 		}))
 
     impl (fixpt_to_fltpt) (codegen(maxj, ${

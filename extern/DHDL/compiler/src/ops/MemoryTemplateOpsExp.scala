@@ -314,6 +314,8 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
           "${quote(mem)}_${quote(sym)}_in",
           ${quote(len)},
           ${quote(fifo)}_readEn, ${quote(fifo)}_rdata);""")
+      emit(s"""${quote(fifo)}_writeEn <== ${quote(sym)}_en;""")
+      emit(s"""${quote(fifo)}_wdata <== ${quote(fifo)}_rdata;""")
 
 		case Offchip_store_cmd(mem, fifo, ofs, len, par) =>
       emit(s"""// ${quote(sym)}: Offchip_store_cmd(${quote(mem)},${quote(fifo)}, ${quote(ofs)}, ${quote(len)}, ${quote(par)})""")
@@ -324,6 +326,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
           "${quote(mem)}_${quote(sym)}_out",
           ${quote(len)},
           ${quote(fifo)}_writeEn, ${quote(fifo)}_wdata);""")
+      emit(s"""${quote(fifo)}_readEn <== ${quote(sym)}_en;""")
 
 //      emitComment("Offchip store from fifo")
 
@@ -370,38 +373,43 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 
 		case e@Reg_write(reg, value) =>
       emitComment("Reg_write {")
+      val writer = writersOf(reg).head._1  // Regs have unique writer which also drives reset
 			val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
 			if (isDblBuf(reg)) {
 			 	emit(s"""${quote(reg)}_lib.write(${value}, ${quote(writersOf(reg).head._1)}_done);""")
       } else {
 				regType(reg) match {
 					case Regular =>
-      		  val parent = if (parentOf(reg).isEmpty) "top" else quote(parentOf(reg).get) //TODO
-      		  val rst = quote(parent) + "_rst_en"
+      		  val rst = quote(writer) + "_rst_en"
 					  if (writersOf(reg).isEmpty)
 					  	throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
-					  val enSignalStr = writersOf(reg).head._1 match {
+					  val enSignalStr = writer match {
 					  	case p@Def(EatReflect(pipe:Pipe_foreach)) => styleOf(p) match {
-					  		case InnerPipe => quote(pipe.cchain) + "_datapath_en"
+					  		case InnerPipe => quote(p) + "_datapath_en"
 					  		case _ => quote(p) + "_en"
 					  	}
 					  	case p@Def(EatReflect(pipe:Pipe_fold[_,_])) => styleOf(p) match {
-					  		case InnerPipe => quote(pipe.cchain) + "_datapath_en"
+					  		case InnerPipe => quote(p) + "_datapath_en"
 					  		case _ => quote(p) + "_en"
 					  	}
 					  	case p@Def(EatReflect(pipe:ParPipeReduce[_,_])) => styleOf(p) match {
-					  		case InnerPipe => quote(pipe.cc) + "_datapath_en"
+					  		case InnerPipe => quote(p) + "_datapath_en"
 					  		case _ => quote(p) + "_en"
 					  	}
 					  	case p@_ =>
-                          throw new Exception(s"Reg ${quote(reg)} is written by non Pipe node ${p}")
+//                          throw new Exception(s"Reg ${quote(reg)} is written by non Pipe node ${p}")
+                          emit(s"// Reg ${quote(reg)} is written by non Pipe node ${quote(p)}")
+                          "constant.var(true)"
 					  }
             emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}_delayed; // enable""")
             emit(s"""DFEVar ${quote(reg)} = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writersOf(reg).head._1)}_redLoop_done));""")
 // If nameOf(sym) is to be used, mix in NameOpsExp. This shouldn't have to be done by hand,
 // so disabling using nameOf until it is fixed.
 //            Console.println(s"""controlNodeStack = ${controlNodeStack}, reg = ${nameOf(reg)}, writersOf(reg) = ${writersOf(reg)}""")
-            emit(s"""${quote(reg)}_delayed <== $rst ? ${quote(resetValue(reg))} : stream.offset(${quote(reg)}, -${quote(writersOf(reg).head._1)}_offset); // reset""")
+
+            // Hardcode reset value to 0 temporarily; 'resetValue(reg)' is throwing a None.get exception
+            emit(s"""${quote(reg)}_delayed <== $rst ? constant.var(${quote(reg)}.getType(), 0) : stream.offset(${quote(reg)}, -${quote(writersOf(reg).head._1)}_offset); // reset""")
+//            emit(s"""${quote(reg)}_delayed <== $rst ? ${quote(resetValue(reg))} : stream.offset(${quote(reg)}, -${quote(writersOf(reg).head._1)}_offset); // reset""")
 				  case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
 				  case ArgumentOut =>
 				 	  val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done" //TODO

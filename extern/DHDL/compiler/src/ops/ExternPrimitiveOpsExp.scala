@@ -191,7 +191,14 @@ trait MaxJGenExternPrimitiveOps extends MaxJGenEffect {
           alwaysGen {
             emit(s"""DFEVar ${quote(sym)} = constant.var($ts, ${quote(x)});""")
           }
-        case _ => emit(s"""// DFEVar $sym = ${quote(x)}.cast($ts)""")
+        case Param(_) =>
+          alwaysGen {
+            emit(s"""DFEVar ${quote(sym)} = constant.var($ts, ${quote(x)});""")
+          }
+        case _ =>
+          alwaysGen {
+            emit(s"""// DFEVar $sym = ${quote(x)}.cast($ts)""")
+          }
       }
     case _ => super.emitNode(sym, rhs)
   }

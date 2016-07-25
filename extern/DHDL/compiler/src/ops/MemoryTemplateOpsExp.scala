@@ -378,43 +378,48 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenControllerTempl
 			if (isDblBuf(reg)) {
 			 	emit(s"""${quote(reg)}_lib.write(${value}, ${quote(writersOf(reg).head._1)}_done);""")
       } else {
-				regType(reg) match {
-					case Regular =>
-      		  val rst = quote(writer) + "_rst_en"
-					  if (writersOf(reg).isEmpty)
-					  	throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
-					  val enSignalStr = writer match {
-					  	case p@Def(EatReflect(pipe:Pipe_foreach)) => styleOf(p) match {
-					  		case InnerPipe => quote(p) + "_datapath_en"
-					  		case _ => quote(p) + "_en"
-					  	}
-					  	case p@Def(EatReflect(pipe:Pipe_fold[_,_])) => styleOf(p) match {
-					  		case InnerPipe => quote(p) + "_datapath_en"
-					  		case _ => quote(p) + "_en"
-					  	}
-					  	case p@Def(EatReflect(pipe:ParPipeReduce[_,_])) => styleOf(p) match {
-					  		case InnerPipe => quote(p) + "_datapath_en"
-					  		case _ => quote(p) + "_en"
-					  	}
-					  	case p@_ =>
-//                          throw new Exception(s"Reg ${quote(reg)} is written by non Pipe node ${p}")
-                          emit(s"// Reg ${quote(reg)} is written by non Pipe node ${quote(p)}")
-                          "constant.var(true)"
-					  }
-            emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}_delayed; // enable""")
-            emit(s"""DFEVar ${quote(reg)} = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writersOf(reg).head._1)}_redLoop_done));""")
-// If nameOf(sym) is to be used, mix in NameOpsExp. This shouldn't have to be done by hand,
-// so disabling using nameOf until it is fixed.
-//            Console.println(s"""controlNodeStack = ${controlNodeStack}, reg = ${nameOf(reg)}, writersOf(reg) = ${writersOf(reg)}""")
-
-            emit(s"""${quote(reg)}_delayed <== $rst ? constant.var(${quote(reg)}.getType(), 0) : stream.offset(${quote(reg)}, -${quote(writersOf(reg).head._1)}_offset); // reset""")
-            // Issue #7: 'resetValue(reg)' is throwing a None.get exception
-//            emit(s"""${quote(reg)}_delayed <== $rst ? ${quote(resetValue(reg))} : stream.offset(${quote(reg)}, -${quote(writersOf(reg).head._1)}_offset); // reset""")
-				  case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
-				  case ArgumentOut =>
-				 	  val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done" //TODO
-      	  	emit(s"""io.scalarOutput("${quote(reg)}", ${quote(value)}, $ts, $controlStr);""")
-				}
+        if (isAccum(reg)) {
+          regType(reg) match {
+            case Regular =>
+              val rst = quote(writer) + "_rst_en"
+              if (writersOf(reg).isEmpty)
+                throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
+              val enSignalStr = writer match {
+                case p@Def(EatReflect(pipe:Pipe_foreach)) => styleOf(p) match {
+                  case InnerPipe => quote(p) + "_datapath_en"
+                  case _ => quote(p) + "_en"
+                }
+                case p@Def(EatReflect(pipe:Pipe_fold[_,_])) => styleOf(p) match {
+                  case InnerPipe => quote(p) + "_datapath_en"
+                  case _ => quote(p) + "_en"
+                }
+                case p@Def(EatReflect(pipe:ParPipeReduce[_,_])) => styleOf(p) match {
+                  case InnerPipe => quote(p) + "_datapath_en"
+                  case _ => quote(p) + "_en"
+                }
+                case p@_ =>
+                            emit(s"// Reg ${quote(reg)} is written by non Pipe node ${quote(p)}")
+                            "constant.var(true)"
+              }
+              emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}_delayed; // enable""")
+              emit(s"""DFEVar ${quote(reg)} = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writersOf(reg).head._1)}_redLoop_done));""")
+              // If nameOf(sym) is to be used, mix in NameOpsExp. This shouldn't have to be done by hand,
+              // so disabling using nameOf until it is fixed.
+              emit(s"""${quote(reg)}_delayed <== $rst ? ${quote(resetValue(reg))} : stream.offset(${quote(reg)}, -${quote(writersOf(reg).head._1)}_offset); // reset""")
+            case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
+            case ArgumentOut => throw new Exception(s"""ArgOut (${quote(reg)}) cannot be used as an accumulator!""")
+          }
+        } else { // Non-accumulator registers
+          regType(reg) match {
+            case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
+            case ArgumentOut =>
+              val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done" 
+              emit(s"""io.scalarOutput("${quote(reg)}", ${quote(value)}, $ts, $controlStr);""")
+            case Regular =>
+              val rst = quote(writer) + "_rst_en"
+              emit(s"""${quote(reg)} <== $rst ? ${quote(resetValue(reg))} : ${quote(value)};""")
+          }
+        }
 			}
       emitComment("} Reg_write")
 

@@ -248,20 +248,41 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 		super.initializeGenerator(buildDir)
 	}
 
+  val brams = Set[Exp[BRAM[Any]]]()
+
+  override def emitFileFooter() = {
+    emit(s"""// rdone signals for BRAMs go here""")
+    brams.foreach { b =>
+      if (isDblBuf(b)) {
+        readersOf(b).foreach { r =>
+          val reader = r._1
+          emit(s"""${quote(b)}.connectRdone(${quote(reader)}_done);""")
+        }
+        if (writersOf(b).isEmpty) throw new Exception(s"Bram ${quote(b)} has no writer!")
+        val writer = writersOf(b).head._1
+        emit(s"""${quote(b)}.connectWdone(${quote(writer)}_done);""")
+          //  If writer is a unit Pipe, wait until parent is finished
+        //val doneSig = n.getWriter().getOrElse(throw new Exception(s"BRAM $n has no writer")) match {
+        //  case p: Pipe if p.isUnitPipe =>
+        //    var writer = p.getParent()
+        //    while (!(writer.isInstanceOf[Sequential] || writer.isInstanceOf[MetaPipeline])) {
+        //      writer = writer.getParent()
+        //    }
+        //    s"${quote(writer)}_done"
+        //  case _ =>
+        //    s"${quote(n.getWriter())}_done"
+        //}
+      }
+    }
+    super.emitFileFooter()
+  }
+
   def bramLoad(sym: Sym[Any], bram: Exp[BRAM[Any]], addr: Exp[Any], par: Boolean = false) {
     emitComment("Bram_load {")
     val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
     emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
     if (isDblBuf(bram)) {
-      if (parentOf(bram).isEmpty)
-        throw new Exception("Bram (DblBuf)" + quote(bram) + " does not have a parent!")
-      val p = parentOf(bram).get
-      if (readersOf(bram).map(_._1).contains(p)) {
-        //if (!rdoneSet(mem).contains(r)) { TODO
-        emit(s"""${quote(bram)}.connectRdone(${p}_done);""")
-        //rdoneSet(mem) += r
-        //}
-      }
+      brams += bram
     }
     // Handle if loading a composite type
     //n.compositeValues.zipWithIndex.map { t =>
@@ -464,23 +485,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
         emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_DblBufSM(this));""")
         val dims = dimsOf(sym)
         emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
-          $size0, $size1, $ts, ${banks(sym)}, stride_TODO, ${readersOf(sym).size});""")
-        if (writersOf(sym).isEmpty)
-          throw new Exception(s"Bram ${quote(sym)} has no writer!")
-          //  If writer is a unit Pipe, wait until parent is finished
-        //val doneSig = n.getWriter().getOrElse(throw new Exception(s"BRAM $n has no writer")) match {
-        //  case p: Pipe if p.isUnitPipe =>
-        //    var writer = p.getParent()
-        //    while (!(writer.isInstanceOf[Sequential] || writer.isInstanceOf[MetaPipeline])) {
-        //      writer = writer.getParent()
-        //    }
-        //    s"${quote(writer)}_done"
-        //  case _ =>
-        //    s"${quote(n.getWriter())}_done"
-        //}
-
-      val doneSig = ""
-        emit(s"""${quote(sym)}.connectWdone($doneSig);""")
+          ${quote(size0)}, ${quote(size1)}, $ts, ${banks(sym)}, /* stride_TODO */ 1, ${readersOf(sym).size});""")
       } else {
         emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, ${banks(sym)}, 1 /* [TODO: stride from metadata */);""") // [TODO] Raghu: Stride from metadata
       }

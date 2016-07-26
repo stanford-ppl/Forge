@@ -305,6 +305,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(UnrolledControlAnalyzer) // Control signal metadata after unrolling
     schedule(DotIRPrinter)          // Graph after unrolling
     schedule(IRPrinterPlus)
+    schedule(PIRGen)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, maxj))

@@ -43,23 +43,37 @@ trait PIRGen extends Traversal with QuotingExp {
     case Const(c: Long) => "Const(" + c + "l)"
     case Const(c: Double) => "Const(" + c + ".toLong)"  // TODO
     case Const(c: Float) => "Const(" + c + ".toLong)"   // TODO
+    case Param(p) => "Const(" + p + ".toLong)"  // TODO
     case _ => super.quote(x)
   }
 
   override def run[A:Manifest](b: Block[A]) = {
     if (SpatialConfig.genCGRA) {
-      collector.run(b)
-      scheduler.run(b)
-
       stream = new PrintWriter(dir + filename)
-      generateHeader()
-      generateGlobals()
-      generateCompute(top.get)
-      generateFooter()
-      stream.flush()
-      stream.close()
+      try {
+        emitPIR(b)
+      }
+      catch { case e: Throwable =>
+        stageWarn("Exception during PIR generation: " + e)
+        if (debugMode) e.printStackTrace;
+      }
+      finally {
+        stream.flush()
+        stream.close()
+      }
     }
     (b)
+  }
+
+  def emitPIR(b: Block[Any]) {
+    collector.run(b)
+    scheduler.run(b)
+
+    debug("Scheduling complete. Generating...")
+    generateHeader()
+    generateGlobals()
+    generateCompute(top.get)
+    generateFooter()
   }
 
   def generateHeader() {

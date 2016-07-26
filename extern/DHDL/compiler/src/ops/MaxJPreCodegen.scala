@@ -146,7 +146,7 @@ trait MaxJPreCodegen extends Traversal  {
 	}
 
   def emitDblBufSM(name: String, numReaders: Int) = {
-  emit(s"""
+  stream.println(s"""
   package engine;
   import com.maxeler.maxcompiler.v2.kernelcompiler.KernelLib;
   import com.maxeler.maxcompiler.v2.statemachine.DFEsmInput;
@@ -169,19 +169,18 @@ trait MaxJPreCodegen extends Traversal  {
     private final DFEsmOutput curBuf;""");
 
     for(i <- 0 until numReaders) {
-  emit(s"""
+  stream.println(s"""
   private final DFEsmInput r_done_$i;
   """)
     }
 
-  emit(s"""
+  stream.println(s"""
     // State storage
     private final DFEsmStateEnum<States> stateFF;
     private final DFEsmStateValue curBufFF;
-    private final DFEsmStateValue numRdoneFF;
 
+    private final DFEsmStateValue[] rdoneBitVectorFF;
     private final DFEsmValue allRdone;
-    private final DFEsmValue anyRdone;
 
     // Initialize state machine in constructor
     public ${name}_DblBufSM(KernelLib owner) {
@@ -196,28 +195,49 @@ trait MaxJPreCodegen extends Traversal  {
   """)
 
   for(i <- 0 until numReaders) {
-      emit(s"""
+      stream.println(s"""
         r_done_${i} = io.input("r_done_${i}", wireType);
       """)
     }
 
-  emit(s"""
+
+  stream.println(s"""
       curBuf = io.output("curBuf", wireType);
 
       // Define state storage elements and initial state
       stateFF = state.enumerated(States.class, States.W);
       curBufFF = state.value(wireType, 0);
-      numRdoneFF = state.value(wireType, 0);""")
 
-  val anydoneStr = (0 until numReaders).map { "r_done_"+_ }.mkString(" | ")
-  emit(s"""
-      anyRdone = ($anydoneStr);
-      allRdone = numRdoneFF & anyRdone;
+      rdoneBitVectorFF = new DFEsmStateValue[$numReaders];
+      for (int i = 0; i < $numReaders; i++) {
+        rdoneBitVectorFF[i] = state.value(wireType, 0);
+      }
+""")
+
+   stream.println(s"""allRdone = ${(0 until numReaders) map ("rdoneBitVectorFF["+_+"]") mkString(" & ")};""")
+
+
+  stream.println(s"""
     }
 
+    private void resetBitVector() {
+      for (int i=0; i<$numReaders; i++) {
+        rdoneBitVectorFF[i].next <== 0;
+      }
+    }
+
+
+
   @Override
-  protected void nextState() {
-    numRdoneFF.next <== anyRdone | numRdoneFF;
+  protected void nextState() {""")
+
+  (0 until numReaders) map { i =>
+    stream.println(s"""
+      IF (r_done_$i) {
+        rdoneBitVectorFF[$i].next <== 1;
+      }""")
+  }
+  stream.println(s"""
     SWITCH(stateFF) {
       CASE(States.W) {
         IF (w_done) {
@@ -245,7 +265,7 @@ trait MaxJPreCodegen extends Traversal  {
       CASE(States.SWAP) {
         curBufFF.next <== ~curBufFF;
         stateFF.next <== States.RW;
-        numRdoneFF.next <== 0;
+        resetBitVector();
       }
       OTHERWISE {
         stateFF.next <== stateFF;

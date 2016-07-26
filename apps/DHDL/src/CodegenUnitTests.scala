@@ -312,3 +312,52 @@ trait Niter extends DHDLApplication {
     assert(result == gold)
   }
 }
+
+object SimpleFoldTest extends DHDLApplicationCompiler with SimpleFold
+trait SimpleFold extends DHDLApplication {
+  type T = SInt
+  type Array[T] = ForgeArray[T]
+  val constTileSize = 96
+
+  def nIterTest(src: Rep[Array[T]]) = {
+    val innerPar = param("innerPar", 1); domainOf(innerPar) = (1, 1, 1)
+    val tileSize = param("tileSize", constTileSize); domainOf(constTileSize) = (constTileSize, constTileSize, constTileSize)
+    val len = src.length; bound(len) = 9216
+
+    val N = ArgIn[T]
+    val out = ArgOut[T]
+    setArg(N, len)
+
+    val v1 = OffChipMem[T](N)
+    setMem(v1, src)
+
+    Accel {
+      Sequential {
+        val accum = Reg[T]
+        Fold (N by tileSize)(accum, 0.as[T]) { i =>
+          val b1 = BRAM[T](tileSize)
+          b1 := v1(i::i+tileSize)
+          Reduce (tileSize par innerPar)(0.as[T]) { ii =>
+            b1(ii)
+          } {_+_}
+        } {_+_}
+        Pipe { out := accum }
+      }
+      ()
+    }
+
+    getArg(out)
+  }
+
+  def main() {
+    val len = args(unit(0)).to[T]
+
+    val src = Array.tabulate[T](len) { i => i }
+    val result = nIterTest(src)
+
+    val gold = src.reduce {_+_}
+    println("expected: " + gold)
+    println("result:   " + result)
+    assert(result == gold)
+  }
+}

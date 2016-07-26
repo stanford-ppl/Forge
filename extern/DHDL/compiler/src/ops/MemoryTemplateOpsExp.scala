@@ -374,6 +374,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
         val Def(EatReflect(curPipe)) = controlNodeStack.top
         curPipe match {
             case n: ParPipeReduce[_,_] => if (n.acc == reg) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
+            case Unit_pipe(_) => if (isAccum(reg) && writtenIn(controlNodeStack.top).contains(reg)) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
             case _ => ""
         }
       } else {
@@ -408,12 +409,16 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                   case InnerPipe => quote(p) + "_datapath_en"
                   case _ => quote(p) + "_en"
                 }
+                case p@Def(EatReflect(Unit_pipe(func))) => styleOf(p) match {
+                  case InnerPipe => quote(p) + "_datapath_en"
+                  case _ => quote(p) + "_en"
+                }
                 case p@_ =>
                             emit(s"// Reg ${quote(reg)} is written by non Pipe node ${quote(p)}")
                             "constant.var(true)"
               }
               emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}_delayed; // enable""")
-              emit(s"""DFEVar ${quote(reg)} = Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writersOf(reg).head._1)}_redLoop_done));""")
+              emit(s"""${quote(reg)} <== Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writersOf(reg).head._1)}_redLoop_done));""")
               // If nameOf(sym) is to be used, mix in NameOpsExp. This shouldn't have to be done by hand,
               // so disabling using nameOf until it is fixed.
               emit(s"""${quote(reg)}_delayed <== $rst ? ${quote(resetValue(reg))} : stream.offset(${quote(reg)}, -${quote(writersOf(reg).head._1)}_offset); // reset""")

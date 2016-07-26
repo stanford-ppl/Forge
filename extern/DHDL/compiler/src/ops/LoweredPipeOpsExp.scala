@@ -138,6 +138,7 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
         case SequentialPipe => emitComment(s"""SeqSM to be emitted""")
         case _ => emitComment(s"""ParPipeForeach style: ${styleOf(sym)}""")
       }
+      emit(s"""DFEVar ${quote(acc)} = ${tpstr(1)(acc.tp.typeArguments.head, implicitly[SourceContext])}.newInstance(this);""")
       emit(s"""DFEVar ${quote(acc)}_delayed = ${tpstr(1)(acc.tp.typeArguments.head, implicitly[SourceContext])}.newInstance(this);""")
       emitController(sym, Some(cchain))
       emitParallelizedLoop(inds, cchain)

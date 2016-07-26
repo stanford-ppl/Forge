@@ -373,8 +373,36 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 
 		case e@Unit_pipe(func: Block[Unit]) =>
       controlNodeStack.push(sym)
+      emit(s"""// Unit pipe writtenIn(${quote(sym)}) = ${writtenIn(sym)}""")
+      writtenIn(sym) foreach { s =>
+        val Def(d) = s
+        emit(s"""// ${quote(s)} = $d, isAccum(${quote(s)}) = isAccum(${quote(s)})""")
+      }
+      val writesToAccumReg = writtenIn(sym).exists {s => s match {
+          case Def(EatReflect(Reg_new(_))) => isAccum(s)
+          case _ => false
+        }
+      }
+      if (writesToAccumReg) {
+        val acc = writtenIn(sym).filter { s => s match {
+            case Def(EatReflect(Reg_new(_))) => isAccum(s)
+            case _ => false
+          }
+        }.head
+        emit(s"""// Unit pipe accum reg""")
+        emit(s"""DFEVar ${quote(acc)}_delayed = ${tpstr(1)(acc.tp.typeArguments.head, implicitly[SourceContext])}.newInstance(this);""")
+      }
       emitController(sym, None)
-      emitBlock(func, s"${quote(sym)} Unit")
+
+      if (writesToAccumReg) {
+        emit(s"""DFEVar ${quote(sym)}_loopLengthVal = ${quote(sym)}_offset.getDFEVar(this, dfeUInt(8));""")
+        emit(s"""CounterChain ${quote(sym)}_redLoopChain = control.count.makeCounterChain(${quote(sym)}_datapath_en);""")
+        emit(s"""DFEVar ${quote(sym)}_redLoopCtr = ${quote(sym)}_redLoopChain.addCounter(${quote(sym)}_loopLengthVal, 1);""")
+        emit(s"""DFEVar ${quote(sym)}_redLoop_done = stream.offset(${quote(sym)}_redLoopChain.getCounterWrap(${quote(sym)}_redLoopCtr), -1);""")
+      }
+
+      emitBlock(func, s"${quote(sym)} Unitpipe")
+
       controlNodeStack.pop
 
     case _ => super.emitNode(sym,rhs)
@@ -474,7 +502,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       if (cchain.isDefined) {
         emitCChainCtrl(sym, cchain.get)
       } else {
-        emit(s"""DFEVar ${quote(sym)}_datapath_en = ${quote(sym)}_en;""")
+        emit(s"""DFEVar ${quote(sym)}_datapath_en = ${quote(sym)}_en & ~${quote(sym)}_rst_en;""")
       }
     }
 // HEAD
@@ -533,12 +561,14 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
                 case _ => false
               }
             }
+
             if (writesToAccumRam) {
               emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en | ${quote(sym)}_rst_en"),
                     Some(s"stream.offset(${quote(sym)}_datapath_en & ${quote(cchain)}_chain.getCounterWrap(${quote(counters.head)}), -${quote(sym)}_offset-1)"))
             } else {
               emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en"))
             }
+
 
           case n:ParPipeForeach =>
             val writesToAccumRam = writtenIn(sym).exists {s => s match {

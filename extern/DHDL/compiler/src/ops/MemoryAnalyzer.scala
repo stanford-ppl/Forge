@@ -17,8 +17,14 @@ trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with NodeMetadataOpsExp {
   this: DHDLExp =>
 
   // TODO
-  def isDblBuf(e: Exp[Any]) = false
-  def banks(e: Exp[Any]) = 1
+  def isDblBuf(e: Exp[Any]) = duplicatesOf(e).headOption match {
+    case Some(meminst) => meminst.depth == 2
+    case _ => false
+  }
+  def banks(e: Exp[Any]) = duplicatesOf(e).headOption match {
+    case Some(meminst) => meminst.banking.head.banks
+    case _ => 1
+  }
 
   sealed abstract class Banking(val banks: Int)
   object Banking {

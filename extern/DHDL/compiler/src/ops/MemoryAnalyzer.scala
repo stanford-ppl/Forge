@@ -160,7 +160,7 @@ trait BankingBase extends Traversal {
       C   D     A   E        D   E
       E   F     B   F        F   C
   B:   j%N       i%N        (i+j)%N
-  A:(i*S+j)/N  (i/N)*S+j      ???
+  A:(i*C+j)/N  (i/N)*C+j      ???
 **/
 trait BRAMBanking extends BankingBase {
   import IR._

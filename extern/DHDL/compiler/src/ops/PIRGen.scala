@@ -27,8 +27,7 @@ trait PIRGen extends Traversal with QuotingExp {
   lazy val scheduler = new PIRScheduleAnalyzer{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
   lazy val collector = new SymbolCollector{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
   lazy val constants = collector.constants
-  lazy val argIns    = collector.argIns
-  lazy val argOuts   = collector.argOuts
+  lazy val globals   = scheduler.globals
   lazy val top       = scheduler.top
   lazy val cus       = scheduler.cuMapping
 
@@ -83,8 +82,10 @@ trait PIRGen extends Traversal with QuotingExp {
     emit("import pir.plasticine.config._")
     emit("import pir.Design")
     emit("import pir.PIRMisc._")
+    emit("")
     open(s"""object ${app}Design extends Design {""")
     emit(s"""override val arch = Config0""")
+    emit(s"""top = Top()""")
   }
 
   def generateGlobals() {
@@ -92,13 +93,24 @@ trait PIRGen extends Traversal with QuotingExp {
       case Const(c) =>
       case c@Exact(d) => emit(s"val ${quote(c)} = Const(${d.toLong}l)") // TODO
     }
-    argIns.foreach{argIn => emit(s"val ${quote(argIn)} = ArgIn()")}
-    argOuts.foreach{argOut => emit(s"val ${quote(argOut)} = ArgOut()")}
+    val (mems, memCtrls) = globals.partition{case MemCtrl(_,_,_) => false; case _ => true}
+    mems.foreach(emitComponent(_))
+    memCtrls.foreach(emitComponent(_))
   }
 
   def generateFooter() {
+    val args = globals.flatMap{case InputArg(name)=>Some(name); case OutputArg(name)=>Some(name); case _ => None}.mkString(", ")
+    val mcs  = globals.flatMap{case MemCtrl(name,_,_)=>Some(name); case _ => None}.mkString(", ")
+    emit(s"top.updateFields(List(${cus(top.get).name}), List($args), List($mcs))")
+    emit(s"")
     emit("def main(args: Array[String]): Unit = run")
     close("}")
+  }
+
+  // HACK: Ignore parallels
+  def childrenOfHack(e: Exp[Any]): List[Exp[Any]] = childrenOf(e).flatMap{
+    case child@Deff(Pipe_parallel(_)) => childrenOfHack(child)
+    case child => List(child)
   }
 
   def generateCompute(top: Exp[Any]) {
@@ -106,48 +118,51 @@ trait PIRGen extends Traversal with QuotingExp {
     while (frontier.nonEmpty) {
       for (pipe <- frontier) generateCU(pipe, cus(pipe))
 
-      frontier = frontier.flatMap{case pipe => childrenOf(pipe) }
+      frontier = frontier.flatMap{case pipe => childrenOfHack(pipe) }
     }
   }
 
-  def cuVariant(cu: PIRCompute) = cu match {
-    case cu: BasicComputeUnit => "ComputeUnit"
-    case cu: MemoryComputeUnit => "MemoryController"
+  def cuDeclaration(cu: ComputeUnit) = cu match {
+    case cu: BasicComputeUnit =>
+      s"""ComputeUnit(name=Some("${cu.name}"), tpe = ${quoteControl(cu.tpe)})"""
+    case cu: TileTransferUnit =>
+      s"""TileTransfer(name=Some("${cu.name}"), memctrl=${cu.ctrl}, mctpe=${cu.mode})"""
   }
-  def controlType(tpe: ControlType) = tpe match {
+  def quoteControl(tpe: ControlType) = tpe match {
     case InnerPipe => "Pipe"
     case CoarsePipe => "MetaPipeline"
     case SequentialPipe => "Sequential"
     case StreamPipe => stageError("Stream pipe not yet supported in PIR")
   }
 
-  def generateCU(pipe: Exp[Any], cu: PIRCompute, suffix: String = "") {
-    val parentName = cu.parent.map(_.name).getOrElse("Top")
+  def generateCU(pipe: Exp[Any], cu: ComputeUnit, suffix: String = "") {
+    val parent = cu.parent.map(_.name).getOrElse("top")
 
     open(s"val ${cu.name} = {")
-    for (cc <- cu.cchains) emitComponent(cc)
-    for (mem <- cu.srams) emitComponent(mem)
-    for ((iter,ccIdx) <- cu.iterators) {
-      emit(s"val $iter = ${ccIdx._1.name}(${ccIdx._2})")
-    }
-    emit(s"val PL = Pipeline(None)")
+    emit(s"implicit val CU = ${cuDeclaration(cu)}")
+    emit(s"CU.updateParent($parent)")
+    // Inputs and outputs
+    cu.scalarIn.foreach(emitComponent(_))
+    cu.scalarOut.foreach(emitComponent(_))
+    cu.vectorIn.foreach(emitComponent(_))
+    cu.vectorOut.foreach(emitComponent(_))
 
-    open(s"""${cuVariant(cu)}(""")
-    emit(s"""name    = Some("${cu.name}"), """)
-    emit(s"""parent  = "$parentName", """)
+    // Counterchains and iterators
+    cu.cchains.foreach(emitComponent(_))
+    cu.srams.foreach(emitComponent(_))
+
+    for ((iter,ccIdx) <- cu.iterators) {
+      emit(s"val ${quote(iter)} = ${ccIdx._1.name}(${ccIdx._2})")
+    }
+    // TODO: Stages
+
+    open(s"""CU.updateFields(""")
     emit(s"""cchains = List(${cu.cchains.map(_.name).mkString(", ")}), """)
     emit(s"""srams   = List(${cu.srams.map(_.name).mkString(", ")}), """)
-    emit(s"""sins    = List(${cu.scalarIn.map(quote(_)).mkString(", ")}), """)
-    emit(s"""souts   = List(${cu.scalarOut.map(quote(_)).mkString(", ")}), """)
-    emit(s"""pipeline = PL,""")
-
-    cu match {
-      case BasicComputeUnit(name,parent,tpe) =>
-        emit(s"""tpe = ${controlType(tpe)}""")
-
-      case MemoryComputeUnit(name,parent,dram) =>
-        emit(s"""dram = "$dram" """)
-    }
+    emit(s"""sins    = List(${cu.scalarIn.map(_.name).mkString(", ")}), """)
+    emit(s"""souts   = List(${cu.scalarOut.map(_.name).mkString(", ")}), """)
+    emit(s"""vins    = List(${cu.vectorIn.map(_.name).mkString(", ")}), """)
+    emit(s"""vouts   = List(${cu.vectorOut.map(_.name).mkString(", ")}) """)
     close(")")
     close("}")
   }
@@ -167,6 +182,18 @@ trait PIRGen extends Traversal with QuotingExp {
 
     case PIRMemory(name, size, Some(writer), Some(readAddr), Some(writeAddr)) =>
       emit(s"""val $name = SRAM(size = $size, writer = ${writer.name}, readAddr = ${quote(readAddr)}, writeAddr = ${quote(writeAddr)})""")
+
+    case ScalarIn(name, mem)  => emit(s"val $name = ScalarIn(${mem.name})")
+    case ScalarOut(name, mem) => emit(s"val $name = ScalarOut(${mem.name})")
+    case VectorIn(name, mem)  => emit(s"val $name = VecIn(${mem.name})")
+    case VectorOut(name, mem) => emit(s"val $name = VecOut(${mem.name})")
+
+    case MemCtrl(name,region,mode) => emit(s"val $name = MemoryController(${region.name}, $mode)")
+    case Offchip(name) => emit(s"val $name = Offchip()")
+    case InputArg(name) => emit(s"val $name = ArgIn()")
+    case OutputArg(name) => emit(s"val $name = ArgOut()")
+    case ScalarMem(name) => emit(s"val $name = Scalar()")
+    case VectorMem(name) => emit(s"val $name = Vector()")
 
     case _ => stageError(s"Don't know how to generate CGRA component: $x")
   }

@@ -95,7 +95,8 @@ trait ScalaGenLoweredPipeOps extends ScalaGenEffect {
 trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
   val IR: LoweredPipeOpsExp with ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
           with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
-          with DHDLCodegenOps with NosynthOpsExp with DeliteTransform
+          with DHDLCodegenOps with NosynthOpsExp with MemoryAnalysisExp
+          with DeliteTransform
   import IR._
 
   def emitParallelizedLoop(iters: List[List[Sym[FixPt[Signed,B32,B0]]]], cchain: Exp[CounterChain]) = {
@@ -139,19 +140,19 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
         case _ => emitComment(s"""ParPipeForeach style: ${styleOf(sym)}""")
       }
 
-      val ConstFix(rstVal) = resetValue(acc.asInstanceOf[Sym[Reg[Any]]])
-			val ts = tpstr(parOf(acc))(acc.tp.typeArguments.head, implicitly[SourceContext])
-      emit(s"""DelayLib ${quote(acc)}_lib = new DelayLib(this, $ts, new Bits($ts.getTotalBits(), $rstVal));""")
-      if (parOf(acc) > 1) {
-        emit(s"""${quote(maxJPre(acc))} ${quote(acc)} = ${quote(acc)}_lib.readv();""")
-      } else {
-        emit(s"""${quote(maxJPre(acc))} ${quote(acc)} = ${quote(acc)}_lib.read();""")
-      }
-      emit(s"""DFEVar ${quote(acc)}_delayed = ${quote(acc)}.getType().newInstance(this);""")
+      // The body of ParPipeReduce uses 'acc' to refer to the accumulator
+      // The rest of the world uses 'accum'. Make sure their metadata matches up here
+      val Def(d) = accum  // CHEATING!
+      duplicatesOf(acc) = duplicatesOf(accum)
+      readersOf(acc) = readersOf(accum)
+      emitNode(acc, d)
+
       emitController(sym, Some(cchain))
       emitParallelizedLoop(inds, cchain)
       emitBlock(func)
-      emit(s"""${quote(accum)}_lib.write(${quote(acc)}, constant.var(true), constant.var(false));""")
+      (0 until duplicatesOf(accum).size) foreach { i =>
+        emit(s"""${quote(accum)}_${i}_lib.write(${quote(acc)}_0, constant.var(true), constant.var(false));""")
+      }
 
       emitComment(s"""} ParPipeReduce ${quote(sym)}""")
       controlNodeStack.pop

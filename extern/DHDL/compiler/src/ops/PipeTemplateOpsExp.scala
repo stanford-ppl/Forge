@@ -389,8 +389,6 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
             case _ => false
           }
         }.head
-        emit(s"""// Unit pipe accum reg""")
-        emit(s"""DFEVar ${quote(acc)}_delayed = ${quote(acc)}.getType().newInstance(this);""")
       }
       emitController(sym, None)
 

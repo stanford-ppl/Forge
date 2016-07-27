@@ -249,7 +249,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 	}
 
   val brams = Set[Exp[BRAM[Any]]]()
-
+  val regs = Set[(Exp[Reg[Any]], Int)]()
   override def emitFileFooter() = {
     emit(s"""// rdone signals for BRAMs go here""")
     brams.foreach { b =>
@@ -272,6 +272,17 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
         //  case _ =>
         //    s"${quote(n.getWriter())}_done"
         //}
+      }
+    }
+    regs.foreach { case (b, i) =>
+      val meminst = duplicatesOf(b)(i)
+      if (meminst.depth > 1) {
+        val readers = readersOf(b)
+        val reader = readers(i)._1
+        emit(s"""${quote(b)}_${i}_lib.connectRdone(${quote(reader)}_done);""")
+        if (writersOf(b).isEmpty) throw new Exception(s"Reg ${quote(b)} has no writer!")
+        val writer = writersOf(b).head._1
+        emit(s"""${quote(b)}_${i}_lib.connectWdone(${quote(writer)}_done);""")
       }
     }
     super.emitFileFooter()
@@ -366,29 +377,29 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 
 		case Reg_new(init) =>
       emitComment("Reg_new {")
-			val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
-			regType(sym) match {
-				case Regular =>
-          val parent = if (parentOf(sym).isEmpty) "Top" else quote(parentOf(sym).get) //TODO
-					if (isDblBuf(sym)) {
-						emit(s"""DblRegFileLib ${quote(sym)}_lib = new DblRegFileLib(this, $ts, ${quote(sym)}, ${parOf(sym)});""")
-            val readstr = if (parOf(sym)>1) "readv" else "read"
-            emit(s"""${maxJPre(sym)} ${quote(sym)} = ${quote(sym)}_lib.${readstr}()""")
-           	emit(quote(sym) + "_lib.connectWdone(" + quote(writersOf(sym).head._1) + "_done);")
-            readersOf(sym).foreach { case (r, _, _) =>
-           	  emit(quote(sym) +"_lib.connectRdone(" + quote(r) + "_done);")
-           	}
-          } else {
-            val ConstFix(rstVal) = resetValue(sym.asInstanceOf[Sym[Reg[Any]]])
-            emit(s"""DelayLib ${quote(sym)}_lib = new DelayLib(this, ${quote(ts)}, new Bits(${quote(ts)}.getTotalBits(), $rstVal));""")
-            if (parOf(sym) > 1) {
-              emit(s"""${quote(maxJPre(sym))} ${quote(sym)} = ${quote(sym)}_lib.readv();""")
+      val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
+      val duplicates = duplicatesOf(sym)
+      val ConstFix(rstVal) = resetValue(sym.asInstanceOf[Sym[Reg[Any]]])
+      duplicates.zipWithIndex.foreach { case (d, i) =>
+        regType(sym) match {
+          case Regular =>
+            val parent = if (parentOf(sym).isEmpty) "top" else quote(parentOf(sym).get) //TODO
+            if (d.depth > 1) {
+              emit(s"""DblBufReg ${quote(sym)}_${i}_lib = new DblBufReg(this, $ts, "${quote(sym)}", ${parOf(sym)}, new Bits(${quote(ts)}.getTotalBits(), $rstVal));""")
+              val readstr = if (parOf(sym)>1) "readv" else "read"
+              emit(s"""${maxJPre(sym)} ${quote(sym)}_$i = ${quote(sym)}_${i}_lib.${readstr}();""")
+              emit(s"""${maxJPre(sym)} ${quote(sym)}_${i}_delayed = ${ts}.newInstance(this);""")
+              regs += ((sym.asInstanceOf[Sym[Reg[Any]]], i))
             } else {
-              emit(s"""${quote(maxJPre(sym))} ${quote(sym)} = ${quote(sym)}_lib.read();""")
+              emit(s"""DelayLib ${quote(sym)}_${i}_lib = new DelayLib(this, ${quote(ts)}, new Bits(${quote(ts)}.getTotalBits(), $rstVal));""")
+              val readstr = if (parOf(sym) > 1) "readv" else "read"
+              emit(s"""${maxJPre(sym)} ${quote(sym)}_$i = ${quote(sym)}_${i}_lib.${readstr}();""")
+              emit(s"""${maxJPre(sym)} ${quote(sym)}_${i}_delayed = ${ts}.newInstance(this);""")
             }
-					}
-				case _ => throw new Exception(s"""Unknown reg type ${regType(sym)}""")
-			}
+          case _ => throw new Exception(s"""Unknown reg type ${regType(sym)}""")
+        }
+      }
+
 		case Argin_new(init) =>
 			val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
           	emit(s"""DFEVar ${quote(sym)} = io.scalarInput("${quote(sym)}", $ts );""")
@@ -397,17 +408,23 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 
     case e@Reg_read(reg) =>
       val pre = maxJPre(sym)
-      val suffix = if (!controlNodeStack.isEmpty) {
-        val Def(EatReflect(curPipe)) = controlNodeStack.top
-        curPipe match {
-            case n: ParPipeReduce[_,_] => if (n.acc == reg) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
-            case Unit_pipe(_) => if (isAccum(reg) && writtenIn(controlNodeStack.top).contains(reg)) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
-            case _ => ""
-        }
-      } else {
-        ""
+      val regStr = regType(reg) match {
+        case Regular =>
+          val suffix = if (!controlNodeStack.isEmpty) {
+            val Def(EatReflect(curPipe)) = controlNodeStack.top
+            curPipe match {
+                case n: ParPipeReduce[_,_] => if (n.acc == reg) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
+                case Unit_pipe(_) => if (isAccum(reg) && writtenIn(controlNodeStack.top).contains(reg)) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
+                case _ => ""
+            }
+          } else {
+            ""
+          }
+          val regIdx = readersOf(reg).map{_._3}.indexOf(sym)
+          quote(reg) + s"_${regIdx}" + suffix
+        case _ =>
+          quote(reg)
       }
-      val regStr = quote(reg) + suffix
       emit(s"""$pre ${quote(sym)} = $regStr;""")
 
 		case e@Reg_write(reg, value) =>
@@ -416,60 +433,61 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
       val writer = writersOf(reg).head._1  // Regs have unique writer which also drives reset
 			val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
-      val duplicates = duplicatesOf(reg)
-      emit(s"""// duplicates: $duplicates""")
-			if (isDblBuf(reg)) {
-			 	emit(s"""${quote(reg)}_lib.write(${value}, ${quote(writersOf(reg).head._1)}_done);""")
-      } else {
-        if (isAccum(reg)) {
-          regType(reg) match {
-            case Regular =>
-              val rstStr = quote(writer) + "_rst_en"
-              val enStr = writer match {
-                case p@Def(EatReflect(pipe:Pipe_foreach)) => styleOf(p) match {
-                  case InnerPipe => quote(p) + "_datapath_en"
-                  case _ => quote(p) + "_en"
-                }
-                case p@Def(EatReflect(pipe:Pipe_fold[_,_])) => styleOf(p) match {
-                  case InnerPipe => quote(p) + "_datapath_en"
-                  case _ => quote(p) + "_en"
-                }
-                case p@Def(EatReflect(pipe:ParPipeReduce[_,_])) => styleOf(p) match {
-                  case InnerPipe => quote(p) + "_datapath_en"
-                  case _ => quote(p) + "_en"
-                }
-                case p@Def(EatReflect(Unit_pipe(func))) => styleOf(p) match {
-                  case InnerPipe => quote(p) + "_datapath_en"
-                  case _ => quote(p) + "_en"
-                }
-                case p@_ =>
-                            emit(s"// Reg ${quote(reg)} is written by non Pipe node ${quote(p)}")
-                            "constant.var(true)"
-              }
+      val numDuplicates = duplicatesOf(reg).length
+      regType(reg) match {
+        case ArgumentOut =>
+          val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"
+          emit(s"""io.scalarOutput("${quote(reg)}", ${quote(value)}, $ts, $controlStr);""")
+        case _ =>
+          (0 until numDuplicates) foreach { i =>
+            val regname = s"${quote(reg)}_$i"
+            if (isAccum(reg)) {
+              regType(reg) match {
+                case Regular =>
+                  val rstStr = quote(parentOf(reg).get) + "_rst_en"
+                  val enStr = writer match {
+                    case p@Def(EatReflect(pipe:Pipe_foreach)) => styleOf(p) match {
+                      case InnerPipe => quote(p) + "_datapath_en"
+                      case _ => quote(p) + "_en"
+                    }
+                    case p@Def(EatReflect(pipe:Pipe_fold[_,_])) => styleOf(p) match {
+                      case InnerPipe => quote(p) + "_datapath_en"
+                      case _ => quote(p) + "_en"
+                    }
+                    case p@Def(EatReflect(pipe:ParPipeReduce[_,_])) => styleOf(p) match {
+                      case InnerPipe => quote(p) + "_datapath_en"
+                      case _ => quote(p) + "_en"
+                    }
+                    case p@Def(EatReflect(Unit_pipe(func))) => styleOf(p) match {
+                      case InnerPipe => quote(p) + "_datapath_en"
+                      case _ => quote(p) + "_en"
+                    }
+                    case p@_ =>
+                                emit(s"// Reg ${quote(reg)} is written by non Pipe node ${quote(p)}")
+                                "constant.var(true)"
+                  }
 
-              emit(s"""DFEVar ${quote(reg)}_en = $enStr & ${quote(writer)}_redLoop_done;""")
-              emit(s"""${quote(reg)}_lib.write(${quote(value)}, ${quote(reg)}_en, $rstStr);""")
-              emit(s"""${quote(reg)}_delayed <== stream.offset(${quote(reg)}, -${quote(writer)}_offset);""")
-              // If nameOf(sym) is to be used, mix in NameOpsExp. This shouldn't have to be done by hand,
-              // so disabling using nameOf until it is fixed.
-            case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
-            case ArgumentOut => throw new Exception(s"""ArgOut (${quote(reg)}) cannot be used as an accumulator!""")
+                  emit(s"""DFEVar ${regname}_en = $enStr & ${quote(writer)}_redLoop_done;""")
+                  emit(s"""${regname}_lib.write(${quote(value)}, ${regname}_en, $rstStr);""")
+                  emit(s"""${regname}_delayed <== stream.offset(${regname}, -${quote(writer)}_offset);""")
+                  // If nameOf(sym) is to be used, mix in NameOpsExp. This shouldn't have to be done by hand,
+                  // so disabling using nameOf until it is fixed.
+                case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
+                case ArgumentOut => throw new Exception(s"""ArgOut (${quote(reg)}) cannot be used as an accumulator!""")
+              }
+            } else { // Non-accumulator registers
+              regType(reg) match {
+                case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
+                case Regular =>
+                  val rstStr = quote(parentOf(reg).get) + "_rst_en"
+                  // Using an enable signal instead of "always true" is causing an invalid loop.
+                  // And using it doesn't make any difference anyway.
+                  emit(s"""${regname}_lib.write(${quote(value)}, constant.var(true), $rstStr);""")
+              }
+            }
           }
-        } else { // Non-accumulator registers
-          regType(reg) match {
-            case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
-            case ArgumentOut =>
-              val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"
-              emit(s"""io.scalarOutput("${quote(reg)}", ${quote(value)}, $ts, $controlStr);""")
-            case Regular =>
-              val rstStr = quote(writer) + "_rst_en"
-              // Using an enable signal instead of "always true" is causing an invalid loop.
-              // And using it doesn't make any difference anyway.
-              emit(s"""${quote(reg)}_lib.write(${quote(value)}, constant.var(true), $rstStr);""")
-          }
-        }
-			}
-      emitComment("} Reg_write")
+      }
+      emitComment(s"} Reg_write // regType ${regType(reg)}, numDuplicates = $numDuplicates")
 
     case Bram_new(size, zero) =>
       emitComment("Bram_new {")

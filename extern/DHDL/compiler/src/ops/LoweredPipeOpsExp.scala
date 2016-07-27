@@ -138,12 +138,20 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
         case SequentialPipe => emitComment(s"""SeqSM to be emitted""")
         case _ => emitComment(s"""ParPipeForeach style: ${styleOf(sym)}""")
       }
-      emit(s"""DFEVar ${quote(acc)} = ${tpstr(1)(acc.tp.typeArguments.head, implicitly[SourceContext])}.newInstance(this);""")
-      emit(s"""DFEVar ${quote(acc)}_delayed = ${tpstr(1)(acc.tp.typeArguments.head, implicitly[SourceContext])}.newInstance(this);""")
+
+      val ConstFix(rstVal) = resetValue(acc.asInstanceOf[Sym[Reg[Any]]])
+			val ts = tpstr(parOf(acc))(acc.tp.typeArguments.head, implicitly[SourceContext])
+      emit(s"""DelayLib ${quote(acc)}_lib = new DelayLib(this, $ts, new Bits($ts.getTotalBits(), $rstVal));""")
+      if (parOf(acc) > 1) {
+        emit(s"""${quote(maxJPre(acc))} ${quote(acc)} = ${quote(acc)}_lib.readv();""")
+      } else {
+        emit(s"""${quote(maxJPre(acc))} ${quote(acc)} = ${quote(acc)}_lib.read();""")
+      }
+      emit(s"""DFEVar ${quote(acc)}_delayed = ${quote(acc)}.getType().newInstance(this);""")
       emitController(sym, Some(cchain))
       emitParallelizedLoop(inds, cchain)
       emitBlock(func)
-      emit(s"""${quote(accum)} <== ${quote(acc)};""")
+      emit(s"""${quote(accum)}_lib.write(${quote(acc)}, constant.var(true), constant.var(false));""")
 
       emitComment(s"""} ParPipeReduce ${quote(sym)}""")
       controlNodeStack.pop

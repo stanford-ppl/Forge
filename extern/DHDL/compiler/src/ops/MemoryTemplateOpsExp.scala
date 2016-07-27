@@ -379,7 +379,13 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
            	  emit(quote(sym) +"_lib.connectRdone(" + quote(r) + "_done);")
            	}
           } else {
-            emit(s"""${quote(maxJPre(sym))} ${quote(sym)} = ${quote(ts)}.newInstance(this);""")
+            val ConstFix(rstVal) = resetValue(sym.asInstanceOf[Sym[Reg[Any]]])
+            emit(s"""DelayLib ${quote(sym)}_lib = new DelayLib(this, ${quote(ts)}, new Bits(${quote(ts)}.getTotalBits(), $rstVal));""")
+            if (parOf(sym) > 1) {
+              emit(s"""${quote(maxJPre(sym))} ${quote(sym)} = ${quote(sym)}_lib.readv();""")
+            } else {
+              emit(s"""${quote(maxJPre(sym))} ${quote(sym)} = ${quote(sym)}_lib.read();""")
+            }
 					}
 				case _ => throw new Exception(s"""Unknown reg type ${regType(sym)}""")
 			}
@@ -441,13 +447,11 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                             "constant.var(true)"
               }
 
-              val ConstFix(rstVal) = resetValue(reg)
-
               emit(s"""DFEVar ${quote(reg)}_en = $enStr & ${quote(writer)}_redLoop_done;""")
-              emit(s"""${quote(reg)} <== Reductions.streamHold(${quote(value)}, ${quote(reg)}_en, $rstStr, new Bits(${quote(reg)}.getType().getTotalBits(), $rstVal));""")
+              emit(s"""${quote(reg)}_lib.write(${quote(value)}, ${quote(reg)}_en, $rstStr);""")
+              emit(s"""${quote(reg)}_delayed <== stream.offset(${quote(reg)}, -${quote(writer)}_offset);""")
               // If nameOf(sym) is to be used, mix in NameOpsExp. This shouldn't have to be done by hand,
               // so disabling using nameOf until it is fixed.
-              emit(s"""${quote(reg)}_delayed <== stream.offset(${quote(reg)}, -${quote(writer)}_offset);""")
             case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
             case ArgumentOut => throw new Exception(s"""ArgOut (${quote(reg)}) cannot be used as an accumulator!""")
           }
@@ -455,11 +459,13 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           regType(reg) match {
             case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
             case ArgumentOut =>
-              val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done" 
+              val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"
               emit(s"""io.scalarOutput("${quote(reg)}", ${quote(value)}, $ts, $controlStr);""")
             case Regular =>
-              val rst = quote(writer) + "_rst_en"
-              emit(s"""${quote(reg)} <== $rst ? ${quote(resetValue(reg))} : ${quote(value)};""")
+              val rstStr = quote(writer) + "_rst_en"
+              // Using an enable signal instead of "always true" is causing an invalid loop.
+              // And using it doesn't make any difference anyway.
+              emit(s"""${quote(reg)}_lib.write(${quote(value)}, constant.var(true), $rstStr);""")
           }
         }
 			}

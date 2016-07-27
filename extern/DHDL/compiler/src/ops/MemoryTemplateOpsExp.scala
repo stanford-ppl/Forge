@@ -406,18 +406,20 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 
 		case e@Reg_write(reg, value) =>
       emitComment("Reg_write {")
+      if (writersOf(reg).isEmpty)
+          throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
       val writer = writersOf(reg).head._1  // Regs have unique writer which also drives reset
 			val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
+      val duplicates = duplicatesOf(reg)
+      emit(s"""// duplicates: $duplicates""")
 			if (isDblBuf(reg)) {
 			 	emit(s"""${quote(reg)}_lib.write(${value}, ${quote(writersOf(reg).head._1)}_done);""")
       } else {
         if (isAccum(reg)) {
           regType(reg) match {
             case Regular =>
-              val rst = quote(writer) + "_rst_en"
-              if (writersOf(reg).isEmpty)
-                throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
-              val enSignalStr = writer match {
+              val rstStr = quote(writer) + "_rst_en"
+              val enStr = writer match {
                 case p@Def(EatReflect(pipe:Pipe_foreach)) => styleOf(p) match {
                   case InnerPipe => quote(p) + "_datapath_en"
                   case _ => quote(p) + "_en"
@@ -438,11 +440,14 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                             emit(s"// Reg ${quote(reg)} is written by non Pipe node ${quote(p)}")
                             "constant.var(true)"
               }
-              emit(s"""DFEVar ${quote(value)}_real = $enSignalStr ? ${quote(value)}:${quote(reg)}_delayed; // enable""")
-              emit(s"""${quote(reg)} <== Reductions.streamHold(${quote(value)}_real, ($rst | ${quote(writersOf(reg).head._1)}_redLoop_done));""")
+
+              val ConstFix(rstVal) = resetValue(reg)
+
+              emit(s"""DFEVar ${quote(reg)}_en = $enStr & ${quote(writer)}_redLoop_done;""")
+              emit(s"""${quote(reg)} <== Reductions.streamHold(${quote(value)}, ${quote(reg)}_en, $rstStr, new Bits(${quote(reg)}.getType().getTotalBits(), $rstVal));""")
               // If nameOf(sym) is to be used, mix in NameOpsExp. This shouldn't have to be done by hand,
               // so disabling using nameOf until it is fixed.
-              emit(s"""${quote(reg)}_delayed <== $rst ? ${quote(resetValue(reg))} : stream.offset(${quote(reg)}, -${quote(writersOf(reg).head._1)}_offset); // reset""")
+              emit(s"""${quote(reg)}_delayed <== stream.offset(${quote(reg)}, -${quote(writer)}_offset);""")
             case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
             case ArgumentOut => throw new Exception(s"""ArgOut (${quote(reg)}) cannot be used as an accumulator!""")
           }

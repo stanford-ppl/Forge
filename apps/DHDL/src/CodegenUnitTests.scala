@@ -187,6 +187,54 @@ trait FifoLoad extends DHDLApplication {
   }
 }
 
+object ParFifoLoadTest extends DHDLApplicationCompiler with ParFifoLoad
+trait ParFifoLoad extends DHDLApplication {
+  type T = SInt
+  type Array[T] = ForgeArray[T]
+  def parFifoLoad(src1: Rep[Array[T]], src2: Rep[Array[T]]) = {
+    val tileSize = param("tileSize", 96); domainOf(tileSize) = (96, 96, 96)
+    val N = src1.length; bound(N) = 9216
+
+    val src1FPGA = OffChipMem[T](N)
+    val src2FPGA = OffChipMem[T](N)
+    val in = ArgIn[T]
+    val out = ArgOut[T]
+    setArg(in, N)
+    setMem(src1FPGA, src1)
+    setMem(src2FPGA, src2)
+
+    Accel {
+      val f1 = FIFO[T](tileSize)
+      val f2 = FIFO[T](tileSize)
+      Pipe (in by tileSize) { i =>
+        Parallel {
+          f1 := src1FPGA(i::i+tileSize)
+          f2 := src2FPGA(i::i+tileSize)
+        }
+        val accum = Reduce(tileSize by 1)(0.as[T]) { i =>
+          f1.pop() * f2.pop()
+        }{_+_}
+        Pipe { out := accum }
+      }
+      ()
+    }
+    getArg(out)
+  }
+
+  def main() {
+    val arraySize = args(unit(0)).to[SInt]
+
+    val src1 = Array.tabulate[SInt](arraySize) { i => i }
+    val src2 = Array.tabulate[SInt](arraySize) { i => i*2 }
+    val out = parFifoLoad(src1, src2)
+
+//    val gold = ((arraySize - 96 until arraySize)) map { i => src1(i) * src2(i) }.reduce{_+_}
+//    println(s"out = " + out + ",gold = " + gold)
+    println(s"out = " + out)
+
+//    assert(out == gold)
+  }
+}
 
 object FifoLoadStoreTest extends DHDLApplicationCompiler with FifoLoadStore
 trait FifoLoadStore extends DHDLApplication {

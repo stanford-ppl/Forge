@@ -515,6 +515,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
         emitCChainCtrl(sym, cchain.get)
       } else {
         emit(s"""DFEVar ${quote(sym)}_datapath_en = ${quote(sym)}_en & ~${quote(sym)}_rst_en;""")
+        emit(s"""DFEVar ${quote(sym)}_ctr_en = ${quote(sym)}_datapath_en;""")
       }
     }
 // HEAD
@@ -575,10 +576,14 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
             }
 
             if (writesToAccumRam) {
-              emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en | ${quote(sym)}_rst_en"),
+              val ctrEn = s"${quote(sym)}_datapath_en | ${quote(sym)}_rst_en"
+              emit(s"""DFEVar ${quote(sym)}_ctr_en = $ctrEn;""")
+              emitMaxJCounterChain(cchain, Some(ctrEn),
                     Some(s"stream.offset(${quote(sym)}_datapath_en & ${quote(cchain)}_chain.getCounterWrap(${quote(counters.head)}), -${quote(sym)}_offset-1)"))
             } else {
-              emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en"))
+              val ctrEn = s"${quote(sym)}_datapath_en"
+              emit(s"""DFEVar ${quote(sym)}_ctr_en = $ctrEn;""")
+              emitMaxJCounterChain(cchain, Some(ctrEn))
             }
 
 
@@ -589,10 +594,14 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
               }
             }
             if (writesToAccumRam) {
-              emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en | ${quote(sym)}_rst_en"),
+              val ctrEn = s"${quote(sym)}_datapath_en | ${quote(sym)}_rst_en"
+              emit(s"""DFEVar ${quote(sym)}_ctr_en = $ctrEn;""")
+              emitMaxJCounterChain(cchain, Some(ctrEn),
                     Some(s"stream.offset(${quote(sym)}_datapath_en & ${quote(cchain)}_chain.getCounterWrap(${quote(counters.head)}), -${quote(sym)}_offset-1)"))
             } else {
-              emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en"))
+              val ctrEn = s"${quote(sym)}_datapath_en"
+              emit(s"""DFEVar ${quote(sym)}_ctr_en = $ctrEn;""")
+              emitMaxJCounterChain(cchain, Some(ctrEn))
             }
 
           case n@ParPipeReduce(cchain, accum, func, rFunc, inds, acc, rV) =>
@@ -600,7 +609,9 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
             emit(s"""CounterChain ${quote(sym)}_redLoopChain = control.count.makeCounterChain(${quote(sym)}_datapath_en);""")
             emit(s"""DFEVar ${quote(sym)}_redLoopCtr = ${quote(sym)}_redLoopChain.addCounter(${quote(sym)}_loopLengthVal, 1);""")
             emit(s"""DFEVar ${quote(sym)}_redLoop_done = stream.offset(${quote(sym)}_redLoopChain.getCounterWrap(${quote(sym)}_redLoopCtr), -1);""")
-            emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en & ${quote(sym)}_redLoop_done"))
+            val ctrEn = s"${quote(sym)}_datapath_en & ${quote(sym)}_redLoop_done"
+            emit(s"""DFEVar ${quote(sym)}_ctr_en = $ctrEn;""")
+            emitMaxJCounterChain(cchain, Some(ctrEn))
 
           case n:Pipe_fold[_,_] =>
 			      //TODO : what is this? seems like all reduce supported are specialized
@@ -615,20 +626,28 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
             //  })
 			      val specializeReduce = true;
             if (specializeReduce) {
-              emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en"))
+              val ctrEn = s"${quote(sym)}_datapath_en"
+              emit(s"""DFEVar ${quote(sym)}_ctr_en = $ctrEn;""")
+              emitMaxJCounterChain(cchain, Some(ctrEn))
             } else {
               emit(s"""DFEVar ${quote(sym)}_loopLengthVal = ${quote(sym)}_offset.getDFEVar(this, dfeUInt(8));""")
               emit(s"""CounterChain ${quote(sym)}_redLoopChain =
 		        		control.count.makeCounterChain(${quote(sym)}_datapath_en);""")
               emit(s"""DFEVar ${quote(sym)}_redLoopCtr = ${quote(sym)}_redLoopChain.addCounter(${quote(sym)}_loopLengthVal, 1);""")
               emit(s"""DFEVar ${quote(sym)}_redLoop_done = stream.offset(${quote(sym)}_redLoopChain.getCounterWrap(${quote(sym)}_redLoopCtr), -1);""")
-              emitMaxJCounterChain(cchain, Some(s"${quote(sym)}_datapath_en & ${quote(sym)}_redLoop_done"))
+              val ctrEn = s"${quote(sym)}_datapath_en & ${quote(sym)}_redLoop_done"
+              emit(s"""DFEVar ${quote(sym)}_ctr_en = $ctrEn;""")
+              emitMaxJCounterChain(cchain, Some(ctrEn))
             }
         }
       case CoarsePipe =>
-        emitMaxJCounterChain(cchain, Some(s"${quote(childrenOf(sym).head)}_done"))
+        val ctrEn = s"${quote(childrenOf(sym).head)}_done"
+        emit(s"""DFEVar ${quote(sym)}_ctr_en = $ctrEn;""")
+        emitMaxJCounterChain(cchain, Some(ctrEn))
       case SequentialPipe =>
-		    emitMaxJCounterChain(cchain, Some(s"${quote(childrenOf(sym).last)}_done"))
+        val ctrEn = s"${quote(childrenOf(sym).last)}_done"
+        emit(s"""DFEVar ${quote(sym)}_ctr_en = $ctrEn;""")
+		    emitMaxJCounterChain(cchain, Some(ctrEn))
     }
 
   }

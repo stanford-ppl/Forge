@@ -525,14 +525,14 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
     case Par_push_fifo(fifo, value, en, shuffle) =>
       emit(s"""// Par_push_fifo(${quote(fifo)}, ${quote(value)}, ${quote(en)}, ${quote(shuffle)});""")
       val writer = quote(writersOf(fifo).head._1)  // Not using 'en' or 'shuffle'
-      emit(s"""${quote(fifo)}_writeEn <== ${writer}_datapath_en;""")
+      emit(s"""${quote(fifo)}_writeEn <== ${writer}_ctr_en;""")
       emit(s"""${quote(fifo)}_wdata <== ${quote(value)};""")
 
 
     case Par_pop_fifo(fifo, par) =>
       emit(s"""// DFEVar ${quote(sym)} = Par_pop_fifo(${quote(fifo)}, ${quote(par)});""")
       val reader = quote(readersOf(fifo).head._1)  // Assuming that each fifo has a unique reader
-      emit(s"""${quote(fifo)}_readEn <== ${reader}_datapath_en;""")
+      emit(s"""${quote(fifo)}_readEn <== ${reader}_ctr_en;""")
       emit(s"""DFEVector<DFEVar> ${quote(sym)} = ${quote(fifo)}_rdata;""")
 
     case Vec_apply(vec, idx) =>

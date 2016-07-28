@@ -55,23 +55,32 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Quot
     case _ => Nil
   }
 
-  def copyParentCChains(x: Option[Exp[Any]]): List[CounterChainCopy] = x match {
-    case Some(ctrl) =>
-      val cu = cuMapping(ctrl)
-      deps(ctrl).flatMap {
-        case cc@Deff(Counterchain_new) => Some(CounterChainCopy(quote(cc), cu))
-        case _ => None
-      } ++ copyParentCChains(parentOfHack(ctrl))
-    case None => Nil
+  def copyParentIterators(cu: ComputeUnit, parent: Option[Exp[Any]]): Unit = parent match {
+    case Some(parent) =>
+      val parentCU = allocateCU(parent)
+      val cchainCopies = parentCU.cchains.map{
+        case cc@CounterChainCopy(name, owner) => cc -> cc
+        case cc@CounterChainInstance(name, ctrs) => cc -> CounterChainCopy(name, parentCU)
+      }
+      val cchainMapping = Map[PIRCounterChain,PIRCounterChain](cchainCopies:_*)
+      cu.cchains ++= cchainCopies.map(_._2)
+
+      val iteratorCopies = parentCU.iterators.toList.map{
+        case (iter,(cchain,ctrIdx)) => iter -> ((cchainMapping(cchain), ctrIdx))
+      }
+      cu.iterators ++= iteratorCopies
+
+    case _ =>
   }
-  def allocateCChains(pipe: Exp[Any]): List[PIRCounterChain] = {
-    debug(s"Deps of $pipe = ${deps(pipe)}")
-    deps(pipe).flatMap {
+  def allocateCChains(cu: ComputeUnit, pipe: Exp[Any]) = {
+    copyParentIterators(cu, parentOfHack(pipe))
+    val ccs = deps(pipe).flatMap {
       case cc@Deff(Counterchain_new(ctrs,nIter)) =>
         val ctrInsts = ctrs.map{case ctr@Deff(Counter_new(start,end,stride,par)) => PIRCounter(quote(ctr),start,end,stride,par) }
         Some(CounterChainInstance(quote(cc),ctrInsts))
       case _ => None
-    } ++ copyParentCChains(parentOfHack(pipe))
+    }
+    cu.cchains ++= ccs
   }
 
   // --- Compute Units
@@ -79,8 +88,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Quot
   def initCU[T<:ComputeUnit](cu: T, pipe: Exp[Any]): T = {
     cuMapping(pipe) = cu
     pipes ::= pipe
-    cu.cchains ++= allocateCChains(pipe)
-    cu.iterators ++= parentOfHack(pipe).map{parent => cuMapping(parent).iterators.toList}.getOrElse(Nil)
+    allocateCChains(cu, pipe)
     cu
   }
 
@@ -99,7 +107,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Quot
   def allocateMemoryCU(pipe: Exp[Any], mem: Exp[Any], mode: MemoryMode): TileTransferUnit = {
     if (cuMapping.contains(pipe)) cuMapping(pipe).asInstanceOf[TileTransferUnit]
     else {
-      val region = allocateRemoteMem(mem).asInstanceOf[Offchip]
+      val region = allocateMem(mem).asInstanceOf[Offchip]
       val mc = MemCtrl(quote(pipe)+"_mc", region, mode)
       globals += mc
       val parent = parentOfHack(pipe).map(cuMapping(_))
@@ -119,18 +127,23 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Quot
     case Deff(e:Offchip_load_cmd[_])  => allocateMemoryCU(pipe, e.mem, MemLoad)
     case Deff(e:Offchip_store_cmd[_]) => allocateMemoryCU(pipe, e.mem, MemStore)
   }
-  def allocateRemoteMem(mem: Exp[Any]) = {
-    val writer = writersOf(mem).headOption.map{writer => "_"+quote(writer._3)}.getOrElse("")
-    val name = quote(mem) + writer
-    val comm = mem match {
-      case Deff(Offchip_new(_)) => Offchip(name)
-      case Deff(Argin_new(_))   => InputArg(name)
-      case Deff(Argout_new(_))  => OutputArg(name)
-      case Deff(Reg_new(_))     => ScalarMem(name)
-      case _                    => VectorMem(name)
-    }
-    globals += comm
-    comm
+
+  // Create a vector with some naming convention for communication to/from a given memory
+  def allocateMem(mem: Exp[Any]) = writersOf(mem).headOption match {
+    case Some((_,_,writer@Deff(_:Offchip_load_cmd[_]))) =>
+      TileTxVector(quote(writer)+".out")
+
+    case writer =>
+      val name = quote(mem) + writer.map{writer => "_"+quote(writer._3)}.getOrElse("")
+      val comm = mem match {
+        case Deff(Offchip_new(_)) => Offchip(name)
+        case Deff(Argin_new(_))   => InputArg(name)
+        case Deff(Argout_new(_))  => OutputArg(name)
+        case Deff(Reg_new(_))     => ScalarMem(name)
+        case _                    => VectorMem(name)
+      }
+      globals += comm
+      comm
   }
 
   def memSize(mem: Exp[Any]) = mem match {
@@ -140,39 +153,43 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Quot
   }
   def isBuffer(mem: Exp[Any]) = isFIFO(mem.tp) || isBRAM(mem.tp)
 
-  def allocateWrittenSRAM(writer: Exp[Any], mem: Exp[Any], addr: Option[Exp[Any]], writerCU: ComputeUnit, stages: List[PIRStage]): Boolean = {
+  def allocateWrittenSRAM(writer: Exp[Any], mem: Exp[Any], addr: Option[Exp[Any]], writerCU: ComputeUnit, stages: List[PIRStage]) = {
+    val vector = allocateMem(mem)
+
     val isLocallyRead = readersOf(mem).exists{case (ctrl,_,_) =>
       val readerCU = allocateCU(ctrl)
       readerCU.srams.find{_.name == quote(mem)} match {
         case Some(readMem) =>
           readMem.writeAddr = addr
-          readMem.writer = Some(writerCU)
+          readMem.vector = Some(vector)
         case None =>
-          readerCU.srams ::= PIRMemory(quote(mem), memSize(mem), writer = Some(writerCU), writeAddr = addr)
+          readerCU.srams ::= PIRMemory(quote(mem), memSize(mem), vector = Some(vector), writeAddr = addr)
       }
       val isLocalRead = readerCU == writerCU
       if (!isLocalRead) readerCU.stages ++= stages
       isLocalRead
     }
-    if (!isLocallyRead) {
-      val vector = allocateRemoteMem(mem)
+    if (!isLocallyRead && !vector.isInstanceOf[TileTxVector])
       writerCU.vectorOut ::= VectorOut(quote(writer), vector)
-    }
+
     isLocallyRead
   }
-  def allocateReadSRAM(reader: Exp[Any], mem: Exp[Any], addr: Option[Exp[Any]], readerCU: ComputeUnit): Boolean = {
+  def allocateReadSRAM(reader: Exp[Any], mem: Exp[Any], addr: Option[Exp[Any]], readerCU: ComputeUnit) = {
+    val vector = allocateMem(mem)
+
     readerCU.srams.find{_.name == quote(mem)} match {
       case Some(readMem) =>
-        readMem.readAddr = addr
+        if (!readMem.readAddr.isDefined || addr.isDefined)
+          readMem.readAddr = addr
+
       case None =>
         readerCU.srams ::= PIRMemory(quote(mem), memSize(mem), readAddr = addr)
     }
     val isLocallyWritten = writersOf(mem).headOption.map{case (writeCtrl,_,_) => allocateCU(writeCtrl) == readerCU }.getOrElse(true)
 
-    if (!isLocallyWritten) {
-      val vector = allocateRemoteMem(mem)
+    if (!isLocallyWritten && !vector.isInstanceOf[TileTxVector])
       readerCU.vectorIn ::= VectorIn(quote(reader), vector)
-    }
+
     isLocallyWritten
   }
 
@@ -203,8 +220,8 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Quot
        */
       case writer@LocalWriter(writes) => writes.flatMap{
         case (mem,value,addr) if isRegister(mem.tp) =>
-          if (readersOf(mem).exists(_._1 != pipe)) {// Read remotely
-            val scalar = allocateRemoteMem(mem)
+          if (readersOf(mem).exists(_._1 != pipe) || isArgOut(mem)) {// Read remotely
+            val scalar = allocateMem(mem)
             cu.scalarOut ::= ScalarOut(quote(writer), scalar)
           }
           Nil
@@ -239,11 +256,11 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Quot
           val readCtrl = readersOf(mem).find(_._3 == reader).get._1
           val writeCtrl = writersOf(mem).headOption.map(_._1) // ASSUMPTION: At least one writer
           val isLocallyRead = readCtrl == pipe
-          val isLocallyWritten = writeCtrl.map(_ == pipe).getOrElse(true)
+          val isLocallyWritten = !isArgIn(mem) && writeCtrl.map(_ == pipe).getOrElse(true)
           val readerCU = allocateCU(readCtrl)
 
           if (!isLocallyRead || !isLocallyWritten) {
-            val scalar = allocateRemoteMem(mem)
+            val scalar = allocateMem(mem)
             readerCU.scalarIn ::= ScalarIn(quote(reader),scalar)
             List(reader)
           }
@@ -303,18 +320,38 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Quot
       val cc = CounterChainInstance(quote(lhs)+"_cc", List(PIRCounter(quote(lhs)+"_ctr",Const(0),len,Const(1),p)))
       val i = fresh[Index]
       cu.cchains ++= List(cc)
+      cu.iterators += i -> (cc, 0)
       readersOf(stream).foreach{case (readCtrl,_,reader) =>
         val readCU = allocateCU(readCtrl)
         readCU.cchains ++= List(cc)
         readCU.iterators += i -> (cc, 0)
       }
-      //allocateWrittenSRAM(lhs, stream, i, cu, stages)
+      allocateWrittenSRAM(lhs, stream, Some(i), cu, Nil)
+
+      // HACK!! Fake a read addresss for the FIFO stream
+      readersOf(stream).foreach{case (ctrl,_,_) =>
+        val readerCU = allocateCU(ctrl)
+        val chain = readerCU.cchains.filter(_.isInstanceOf[CounterChainInstance]).last
+        val iters = readerCU.iterators.toList.filter{case (iter,pair) => pair._1 == chain}
+        val iter = iters.reduce{(a,b) => if (a._2._2 > b._2._2) a else b}
+
+        debug(s"HACK: Adding read address to $stream for CU: ")
+        debug(readerCU.dumpString)
+
+        val readMem = readerCU.srams.find{_.name == quote(stream)}.get
+        readMem.readAddr = Some(iter._1)
+      }
+      // TODO: Add stages for offset calculation
 
       //stageError("Offchip loading in PIR is not yet fully supported")
 
     case Offchip_store_cmd(mem,stream,ofs,len,p) =>
       val cu = allocateCU(lhs)
-      cu.cchains ++= List(CounterChainInstance(quote(lhs)+"_cc", List(PIRCounter(quote(lhs)+"_ctr",Const(0),len,Const(1),p))))
+      val cc = CounterChainInstance(quote(lhs)+"_cc", List(PIRCounter(quote(lhs)+"_ctr",Const(0),len,Const(1),p)))
+      val i = fresh[Index]
+      cu.cchains ++= List(cc)
+      cu.iterators += i -> (cc, 0)
+      allocateReadSRAM(lhs, stream, Some(i), cu)
       //stageError("Offchip storing in PIR is not yet fully supported")
 
     case _ => super.traverse(lhs, rhs)

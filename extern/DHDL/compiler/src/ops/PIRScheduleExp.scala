@@ -23,6 +23,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case class OutputArg(override val name: String) extends CommMem(name)
   case class ScalarMem(override val name: String) extends CommMem(name)
   case class VectorMem(override val name: String) extends CommMem(name)
+  case class TileTxVector(override val name: String) extends CommMem(name)
 
   case class ScalarIn(name: String, mem: CommMem)
   case class ScalarOut(name: String, mem: CommMem)
@@ -106,7 +107,7 @@ ${super.dumpString}
   case class PIRMemory(
     name: String,
     size: Int,
-    var writer: Option[ComputeUnit] = None,
+    var vector: Option[CommMem] = None,
     var readAddr: Option[Exp[Any]] = None,
     var writeAddr: Option[Exp[Any]] = None
   )

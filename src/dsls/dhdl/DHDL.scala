@@ -247,6 +247,9 @@ trait DHDLDSL extends ForgeApplication
     val DotIRPrinter = traversal("DotIRPrinter", isExtern=true)
     val NameAnalyzer = traversal("NameAnalyzer", isExtern=true)
 
+    val PIRScheduling = analyzer("PIRSchedule", isExtern=true)
+    val PIRGen = traversal("PIRGen", isExtern=true)
+
     importGlobalAnalysis()
     importBoundAnalysis()
 
@@ -282,9 +285,10 @@ trait DHDLDSL extends ForgeApplication
                                     //   Contention analyzer (to finalize contention estimates)
 
     // --- Post-DSE Constants
+    schedule(ParamFinalizer)        // Finalize all parameters in preparation for constant folding
+    schedule(BoundAnalyzer)         // Constant propagation in metadata
     schedule(ConstantFolding)       // Constant folding
     schedule(GlobalAnalyzer)        // Add "global" annotations for newly created symbols after folding
-
     schedule(IRPrinterPlus)
 
     // --- Post-DSE Estimation
@@ -299,6 +303,8 @@ trait DHDLDSL extends ForgeApplication
     schedule(Unrolling)             // Pipeline unrolling
     schedule(UnrolledControlAnalyzer) // Control signal metadata after unrolling
     schedule(DotIRPrinter)          // Graph after unrolling
+    schedule(IRPrinterPlus)
+    schedule(PIRGen)
 
     // External groups
     extern(grp("ControllerTemplate"), targets = List($cala, maxj))

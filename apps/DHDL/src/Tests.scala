@@ -299,4 +299,3 @@ trait LiftTest3 extends DHDLApplication {
     println(getArg(out))
   }
 }
-

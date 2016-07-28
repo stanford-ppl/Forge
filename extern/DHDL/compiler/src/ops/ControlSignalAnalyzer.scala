@@ -300,6 +300,8 @@ trait UnrolledControlSignalAnalyzer extends ControlSignalAnalyzer {
   override def checkMultipleWriters(mem: Exp[Any], writer: Exp[Any]) { }
   override def checkMultipleReaders(mem: Exp[Any], reader: Exp[Any]) { }
 
+  var propagationPairs = List[(Exp[Any],Exp[Any])]()
+
   def traverseUnrolled(owner: Exp[Any], isReduce: Boolean, inds: List[List[Exp[Any]]], cc: Rep[CounterChain])(b: Block[Any]) {
     val prevOwners = indsOwners
     inds.foreach{indSet => indSet.foreach{ind => indsOwners += ind -> (owner, isReduce, level) }}
@@ -321,9 +323,21 @@ trait UnrolledControlSignalAnalyzer extends ControlSignalAnalyzer {
       isAccum(accum) = true                                 // (6)
       writtenIn(lhs) = writtenIn(lhs) :+ accum              // (10)
       parentOf(accum) = lhs           // Reset accumulator with reduction, not allocation
+
+      // TODO: Investigate why all metadata isn't copied properly
       setProps(acc, getProps(accum))  // Reset value, etc.
+      propagationPairs ::= (accum, acc)
 
     case _ => super.analyze(lhs, rhs)
+  }
+
+  override def postprocess[A:Manifest](b: Block[A]): Block[A] = {
+    propagationPairs.foreach{case (src,dest) =>
+      setProps(dest,getProps(src))
+      //getProps(src).foreach{m => debug(s"$src" + makeString(m)) }
+      //getProps(dest).foreach{m => debug(s"$dest" + makeString(m)) }
+    }
+    b
   }
 
 }

@@ -6,9 +6,9 @@ object BlackScholesCompiler extends DHDLApplicationCompiler with BlackScholes
 object BlackScholesInterpreter extends DHDLApplicationInterpreter with BlackScholes
 trait BlackScholes extends DHDLApplication {
 
-  lazy val tileSize = param(16)
+  lazy val tileSize = param(96)
   lazy val outerPar = param(1)
-  lazy val innerPar = param(16)
+  lazy val innerPar = param(2)
   lazy val numOptions = ArgIn[SInt]
 
   final val inv_sqrt_2xPI = 0.39894228040143270286f
@@ -99,6 +99,11 @@ trait BlackScholes extends DHDLApplication {
     }
   }
 
+  def printArr(a: Rep[ForgeArray[Flt]], str: String = "") {
+    println(str)
+    (0 until a.length) foreach { i => print(i + " ") }
+    println("")
+  }
   def main() {
     val N = args(0).to[SInt]
 
@@ -134,6 +139,6 @@ trait BlackScholes extends DHDLApplication {
 
     val out = getMem(optprice)
 
-    println(out.mkString(","))
+    printArr(out, "result:")
   }
 }

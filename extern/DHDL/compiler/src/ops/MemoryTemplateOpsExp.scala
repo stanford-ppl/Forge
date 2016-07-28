@@ -107,7 +107,7 @@ trait CGenMemoryTemplateOps extends CGenEffect {
   // changed, but until then we have to assign LMem addresses
   // statically. Assigning each OffChipArray a 384MB chunk now
   val burstSize = 384
-  var nextLMemAddr = burstSize * 1024 * 1024
+  var nextLMemAddr: Long = burstSize * 1024 * 1024
   def getNextLMemAddr() = {
     val addr = nextLMemAddr
     nextLMemAddr += burstSize * 1024 * 1024;
@@ -239,7 +239,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
   // changed, but until then we have to assign LMem addresses
   // statically. Assigning each OffChipArray a 384MB chunk now
   val burstSize = 384
-  var nextLMemAddr = burstSize * 1024 * 1024
+  var nextLMemAddr: Long = burstSize * 1024 * 1024
   def getNextLMemAddr() = {
     val addr = nextLMemAddr
     nextLMemAddr += burstSize * 1024 * 1024;

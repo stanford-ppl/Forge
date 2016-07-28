@@ -514,11 +514,15 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
     case Par_bram_store(bram, addr, value) =>
       bramStore(bram, addr, value)
 
-    case Fifo_new(a, b) =>  // FIFO is always parallel
+    case Fifo_new(size, zero) =>  // FIFO is always parallel
+      val duplicates = duplicatesOf(sym)
+      if (duplicates.size != 1) throw new Exception(s"More than 1 duplicates: $duplicates. Don't know how to handle.")
+      if (duplicates.head.banking.size != 1) throw new Exception(s"More than 1 banking dimension: Don't know how to handle.")
+      val par = duplicates.head.banking.head.banks
 			val ts = tpstr(1)(sym.tp.typeArguments.head, implicitly[SourceContext])
       emit(s"""// FIFO ${quote(sym)} = Fifo_new[$ts](${quote(a)}, ${quote(b)});""")
-      emit(s"""DFEVector<DFEVar> ${quote(sym)}_rdata = new DFEVectorType<DFEVar>($ts, ${parOf(sym)}).newInstance(this);""")
-      emit(s"""DFEVector<DFEVar> ${quote(sym)}_wdata = new DFEVectorType<DFEVar>($ts, ${parOf(sym)}).newInstance(this);""")
+      emit(s"""DFEVector<DFEVar> ${quote(sym)}_rdata = new DFEVectorType<DFEVar>($ts, $par).newInstance(this);""")
+      emit(s"""DFEVector<DFEVar> ${quote(sym)}_wdata = new DFEVectorType<DFEVar>($ts, $par).newInstance(this);""")
       emit(s"""DFEVar ${quote(sym)}_readEn = dfeBool().newInstance(this);""")
       emit(s"""DFEVar ${quote(sym)}_writeEn = dfeBool().newInstance(this);""")
 

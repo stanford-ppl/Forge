@@ -18,10 +18,11 @@ trait PIRGen extends Traversal with QuotingExp {
   import IR._
 
   override val name = "PIR Generation"
+  override val recurse = Always
   debugMode = true
 
   val dir = sys.env("PIR_HOME") + "/apps/"
-  val app = Config.degFilename.drop(4)
+  val app = Config.degFilename.take(Config.degFilename.length - 4)
   val filename = app + ".scala"
 
   lazy val scheduler = new PIRScheduleAnalyzer{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
@@ -56,10 +57,8 @@ trait PIRGen extends Traversal with QuotingExp {
         stageWarn("Exception during PIR generation: " + e)
         if (debugMode) e.printStackTrace;
       }
-      finally {
-        stream.flush()
-        stream.close()
-      }
+      stream.flush()
+      stream.close()
     }
     (b)
   }
@@ -71,7 +70,7 @@ trait PIRGen extends Traversal with QuotingExp {
     debug("Scheduling complete. Generating...")
     generateHeader()
     generateGlobals()
-    generateCompute(top.get)
+    traverseBlock(b)
     generateFooter()
   }
 
@@ -113,14 +112,19 @@ trait PIRGen extends Traversal with QuotingExp {
     case child => List(child)
   }
 
-  def generateCompute(top: Exp[Any]) {
+  override def traverse(lhs: Sym[Any], rhs: Def[Any]) {
+    if (isControlNode(lhs) && cus.contains(lhs))
+      generateCU(lhs, cus(lhs))
+  }
+
+  /*def generateCompute(top: Exp[Any]) {
     var frontier = List(top)
     while (frontier.nonEmpty) {
       for (pipe <- frontier) generateCU(pipe, cus(pipe))
 
       frontier = frontier.flatMap{case pipe => childrenOfHack(pipe) }
     }
-  }
+  }*/
 
   def cuDeclaration(cu: ComputeUnit) = cu match {
     case cu: BasicComputeUnit =>
@@ -136,6 +140,9 @@ trait PIRGen extends Traversal with QuotingExp {
   }
 
   def generateCU(pipe: Exp[Any], cu: ComputeUnit, suffix: String = "") {
+    debug(s"Generating CU for $pipe")
+    debug(cu.dumpString)
+
     val parent = cu.parent.map(_.name).getOrElse("top")
 
     open(s"val ${cu.name} = {")
@@ -149,11 +156,13 @@ trait PIRGen extends Traversal with QuotingExp {
 
     // Counterchains and iterators
     cu.cchains.foreach(emitComponent(_))
-    cu.srams.foreach(emitComponent(_))
 
     for ((iter,ccIdx) <- cu.iterators) {
       emit(s"val ${quote(iter)} = ${ccIdx._1.name}(${ccIdx._2})")
     }
+
+    // TODO: How to communicate a non-iter address to SRAM?
+    cu.srams.foreach(emitComponent(_))
     // TODO: Stages
 
     open(s"""CU.updateFields(""")
@@ -197,8 +206,4 @@ trait PIRGen extends Traversal with QuotingExp {
 
     case _ => stageError(s"Don't know how to generate CGRA component: $x")
   }
-
-  /*override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
-
-  }*/
 }

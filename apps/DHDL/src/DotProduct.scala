@@ -10,8 +10,8 @@ trait DotProduct extends DHDLApplication {
 
   def dotproduct(a: Rep[Array[T]], b: Rep[Array[T]]) = {
     val tileSize = param(4); domainOf(tileSize) = (96, 19200, 96)
-    val outerPar = param(2); domainOf(outerPar) = (1, 6, 1)
-    val innerPar = param(2); domainOf(innerPar) = (1, 192, 1)
+    val outerPar = param(1); domainOf(outerPar) = (1, 6, 1)
+    val innerPar = param(1); domainOf(innerPar) = (1, 192, 1)
     val N = a.length; bound(N) = 187200000
 
     val v1 = OffChipMem[T](N)

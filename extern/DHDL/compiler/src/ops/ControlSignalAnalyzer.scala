@@ -91,14 +91,11 @@ trait ControlSignalAnalyzer extends Traversal {
 
     val prevUnrollFactors = unrollFactors
     if (isParallelizableLoop(owner)) {
-      // ASSUMPTION: Only parallelize by innermost loop currently
-      parFactorOf(inds.last) = parFactorsOf(cc).last
-      unrollFactors ++= List(parFactors(cc).last)
+      val factors = parFactorsOf(cc)
+      inds.zip(factors).foreach{case (i,p) => parFactorOf(i) = p }
 
-      // More complete:
-      // val factors = parFactorsOf(cc)
-      // inds.zip(factors).foreach{case (i,p) => parFactorOf(i) = p }
-      // unrollFactors ++= factors
+      // ASSUMPTION: Only parallelize by innermost loop currently
+      unrollFactors ++= List(parFactors(cc).last) //unrollFactors ++= factors
     }
 
     traverseWith(owner, isReduce)(b)
@@ -213,7 +210,6 @@ trait ControlSignalAnalyzer extends Traversal {
       }
       delayedReads.foreach{sym =>
         val reader = pendingReads(sym)
-
         if (isAllocation(lhs)) { // TODO: Other propagaters?
           pendingReads += lhs -> reader
           debug(s"Found propagating dep on pending reader $reader")

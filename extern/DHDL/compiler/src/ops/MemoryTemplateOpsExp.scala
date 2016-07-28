@@ -330,21 +330,6 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
   }
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case Hwblock(func) =>
-			inHwScope = true
-			emitComment("Emitting Hwblock dependencies {")
-      hwblockDeps = recursiveDeps(rhs)
-      hwblockDeps.foreach { s =>
-        val Def(d) = s
-        d match {
-           case Reflect(Offchip_new(size),_,_) =>  // Avoid emitting Offchip_new here as it would've been emitted already
-           case Offchip_new(size) =>  // Avoid emitting Offchip_new here as it would've been emitted already
-           case _ => emitNode(s, d)
-         }
-      }
-			emitComment(" End Hwblock dependencies }")
-      emitBlock(func)
-			inHwScope = false
 		case Offchip_new(size) =>
         emitComment(s""" Offchip_new(${quote(size)}) {""")
         alwaysGen { emit(s"""int ${quote(sym)} = ${getNextLMemAddr()};""") }

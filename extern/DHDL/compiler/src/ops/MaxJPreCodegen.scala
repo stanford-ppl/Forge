@@ -71,6 +71,10 @@ trait MaxJPreCodegen extends Traversal  {
 	}
 
   def preGenNodes(sym: Sym[Any], rhs: Def[Any]):Unit = rhs match {
+    case e@Hwblock(func) =>
+			withStream(newStream("sequential_" + quote(sym))) {
+				emitSeqSM(quote(sym), childrenOf(sym).length)
+			}
 		case e@Pipe_parallel(func: Block[Unit]) =>
 			withStream(newStream("parallel_" + quote(sym))) {
 				emitParallelSM(quote(sym), childrenOf(sym).length)

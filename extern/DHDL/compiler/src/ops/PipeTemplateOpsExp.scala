@@ -1,6 +1,6 @@
 package dhdl.compiler.ops
 
-import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, DotGenEffect, MaxJGenEffect}
+import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, DotGenEffect, MaxJGenEffect, MaxJGenFat}
 import scala.virtualization.lms.internal.{Traversal}
 import scala.reflect.{Manifest,SourceContext}
 import scala.collection.mutable.Set
@@ -272,7 +272,7 @@ trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
   }
 }
 
-trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
+trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
   val IR: LoweredPipeOpsExp with ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
           with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
           with ExternPrimitiveOpsExp with DHDLCodegenOps with NosynthOpsExp with DeliteTransform
@@ -342,6 +342,27 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
   }
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case Hwblock(func) =>
+			inHwScope = true
+			emitComment("Emitting Hwblock dependencies {")
+      hwblockDeps = recursiveDeps(rhs)
+      hwblockDeps.foreach { s =>
+        val Def(d) = s
+        d match {
+           case Reflect(Offchip_new(size),_,_) =>  // Avoid emitting Offchip_new here as it would've been emitted already
+           case Offchip_new(size) =>  // Avoid emitting Offchip_new here as it would've been emitted already
+           case _ => emitNode(s, d)
+         }
+      }
+			emitComment(" End Hwblock dependencies }")
+      emit(s"""DFEVar ${quote(sym)}_en = top_en;""")
+      emit(s"""DFEVar ${quote(sym)}_done = dfeBool().newInstance(this);""")
+      emit(s"""top_done <== ${quote(sym)}_done;""")
+      emit(s"""// Hwblock: childrenOf(${quote(sym)}) = ${childrenOf(sym)}""")
+      emitController(sym, None)
+      emitBlock(func)
+			inHwScope = false
+
     case e@Counterchain_new(counters,nIters) =>
 
     case e@Pipe_foreach(cchain, func, inds) =>
@@ -420,18 +441,6 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       case ForkJoin => s"${quote(sym)}_ParSM"
     }
     emitComment(s"""${smStr} ${quote(sym)} {""")
-
-    // Emit done signal
-    val Def(EatReflect(d)) = parentOf(sym).get
-    d match {
-      case n: Hwblock =>
-          emit(s"""DFEVar ${quote(sym)}_en = top_en;""")
-          emit(s"""DFEVar ${quote(sym)}_done = dfeBool().newInstance(this);""")
-          emit(s"""top_done <== ${quote(sym)}_done;""")
-          enDeclaredSet += sym
-          doneDeclaredSet += sym
-      case _ =>
-    }
 
     /* State Machine Instatiation */
     // IO

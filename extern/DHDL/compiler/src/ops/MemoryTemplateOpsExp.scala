@@ -520,7 +520,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       if (duplicates.head.banking.size != 1) throw new Exception(s"More than 1 banking dimension: Don't know how to handle.")
       val par = duplicates.head.banking.head.banks
 			val ts = tpstr(1)(sym.tp.typeArguments.head, implicitly[SourceContext])
-      emit(s"""// FIFO ${quote(sym)} = Fifo_new[$ts](${quote(a)}, ${quote(b)});""")
+      emit(s"""// FIFO ${quote(sym)} = Fifo_new[$ts](${quote(size)}, ${quote(zero)});""")
       emit(s"""DFEVector<DFEVar> ${quote(sym)}_rdata = new DFEVectorType<DFEVar>($ts, $par).newInstance(this);""")
       emit(s"""DFEVector<DFEVar> ${quote(sym)}_wdata = new DFEVectorType<DFEVar>($ts, $par).newInstance(this);""")
       emit(s"""DFEVar ${quote(sym)}_readEn = dfeBool().newInstance(this);""")

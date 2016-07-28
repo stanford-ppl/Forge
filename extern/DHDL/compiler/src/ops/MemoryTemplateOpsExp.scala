@@ -121,6 +121,11 @@ trait CGenMemoryTemplateOps extends CGenEffect {
     case _ => "64"
   }
 
+  def bitsToFloatType(bits: Int) = bits match {
+    case n: Int if n <= 32 => "float"
+    case _ => "double"
+  }
+
 //  private def bitsToStringInt(bits: Int): String = {
 //    if (bits <= 8) "8"
 //    else if (bits <= 16) "16"
@@ -128,10 +133,10 @@ trait CGenMemoryTemplateOps extends CGenEffect {
 //    else "64"
 //  }
 
-  private def bitsToFloatType(bits: Int) = {
-    if (bits <= 32) "float"
-    else "double"
-  }
+//  private def bitsToFloatType(bits: Int) = {
+//    if (bits <= 32) "float"
+//    else "double"
+//  }
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
     case "BlockRAM" => remapWithRef(m.typeArguments(0))
@@ -543,8 +548,8 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       emit(s"""DFEVar ${quote(sym)} = ${quote(vec)}[${quote(idx)}];""")
 
     case Vector_from_list(elems) =>
-			val ts = tpstr(elems.size)(elems(0).tp, implicitly[SourceContext])
-      emit(s"""DFEVector<DFEVar> ${quote(sym)} = new DFEVectorType<DFEVar>($ts, ${elems.size}).newInstance(this, ${elems.map(quote).mkString(",")});""")
+			val ts = tpstr(1)(elems(0).tp, implicitly[SourceContext])
+      emit(s"""DFEVector<DFEVar> ${quote(sym)} = new DFEVectorType<DFEVar>($ts, ${elems.size}).newInstance(this, Arrays.asList(${elems.map(quote).mkString(",")}));""")
 
     case _ => super.emitNode(sym, rhs)
   }

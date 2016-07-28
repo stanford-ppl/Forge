@@ -9,7 +9,7 @@ trait DotProduct extends DHDLApplication {
   type Array[T] = ForgeArray[T]
 
   def dotproduct(a: Rep[Array[T]], b: Rep[Array[T]]) = {
-    val tileSize = param(4); domainOf(tileSize) = (96, 19200, 96)
+    val tileSize = param(96); domainOf(tileSize) = (96, 19200, 96)
     val outerPar = param(2); domainOf(outerPar) = (1, 6, 1)
     val innerPar = param(2); domainOf(innerPar) = (1, 192, 1)
     val N = a.length; bound(N) = 187200000
@@ -24,17 +24,21 @@ trait DotProduct extends DHDLApplication {
     setArg(dataSize, N)
 
     Accel {
-      Fold(dataSize by tileSize par outerPar)(out, 0.as[T]){ i =>
-        val b1 = FIFO[T](512)
-        val b2 = FIFO[T](512)
-        Parallel {
-          b1 := v1(i::i+tileSize)
-          b2 := v2(i::i+tileSize)
-        }
-        Reduce(tileSize par innerPar)(0.as[T]){ii =>
-          b1.pop() * b2.pop()
+      val accum = Reg[T]
+      Sequential {
+        Fold(dataSize by tileSize par outerPar)(accum, 0.as[T]){ i =>
+          val b1 = FIFO[T](512)
+          val b2 = FIFO[T](512)
+          Parallel {
+            b1 := v1(i::i+tileSize)
+            b2 := v2(i::i+tileSize)
+          }
+          Reduce(tileSize par innerPar)(0.as[T]){ii =>
+            b1.pop() * b2.pop()
+          }{_+_}
         }{_+_}
-      }{_+_}
+        Pipe { out := accum }
+      }
     }
     getArg(out)
   }

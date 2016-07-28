@@ -473,8 +473,8 @@ trait DHDLMetadata {
 			} else if (manifest[T].erasure.getSimpleName == "DHDLCounter") {  // [TODO] Raghu: There must be a better way to do this
 		    "dfeInt(32)"
       } else if (isFltPtType(manifest[T])) {
-				val e = nbits(manifest[T].typeArguments(0))
-				val m = nbits(manifest[T].typeArguments(1))
+				val m = nbits(manifest[T].typeArguments(0))
+				val e = nbits(manifest[T].typeArguments(1))
 				"dfeFloat(" + e + "," + m + ")"
 			} else if (isBitType(manifest[T])) {
 			  "dfeFixOffset(1, 0, SignMode.UNSIGNED)"

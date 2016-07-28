@@ -556,11 +556,11 @@ trait DHDLMath {
 		}))
     impl (exp_flt) (codegen(maxj,  ${
 			@ val pre = maxJPre(sym)
-			$pre $sym = KernelMath.exp( $0 )
+			$pre $sym = KernelMath.exp( $0 );
 		}))
     impl (sqrt_flt) (codegen(maxj, ${
 			@ val pre = maxJPre(sym)
-			$pre $sym = KernelMath.sqrt( $0 )
+			$pre $sym = KernelMath.sqrt( $0 );
 		}))
 
   }

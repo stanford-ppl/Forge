@@ -101,7 +101,7 @@ trait BlackScholes extends DHDLApplication {
 
   def printArr(a: Rep[ForgeArray[Flt]], str: String = "") {
     println(str)
-    (0 until a.length) foreach { i => print(i + " ") }
+    (0 until a.length) foreach { i => print(a(i) + " ") }
     println("")
   }
   def main() {
@@ -139,6 +139,7 @@ trait BlackScholes extends DHDLApplication {
 
     val out = getMem(optprice)
 
+    printArr(sstrike, "sstrike:")
     printArr(out, "result:")
   }
 }

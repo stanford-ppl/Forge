@@ -323,12 +323,12 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
   }
 
 	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = {
-    val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
+    val Deff(Counterchain_new(counters)) = cchain
 	  inds.zipWithIndex.foreach {case (iter, idx) => emitValDef(iter, counters(idx)) }
   }
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case e@Counterchain_new(counters,nIters) =>
+    case e@Counterchain_new(counters) =>
 
     case e@Pipe_foreach(cchain, func, inds) =>
       emitController(sym, Some(cchain))
@@ -387,13 +387,15 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
       case InnerPipe =>
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case CoarsePipe =>
-		    val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
-        emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)});""")
+		    val Def(EatReflect(Counterchain_new(counters))) = cchain.get
+        // RAGHU FIX THIS
+        //emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)});""")
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case SequentialPipe =>
         if (cchain.isDefined) {
-          val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
-          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)});""")
+          val Def(EatReflect(Counterchain_new(counters))) = cchain.get
+          // RAGHU FIX THIS
+          //emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)});""")
         } else {
           emit(s"""${quote(sym)}_sm.connectInput("sm_numIter, constant.var(1);""")
         }
@@ -431,7 +433,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
   }
 
   def emitCChainCtrl(sym: Sym[Any], cchain: Exp[CounterChain]) {
-		val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain
+		val Deff(Counterchain_new(counters)) = cchain
 
     /* Reset CounterChain */
     //TODO: support reset of counterchain to sequential and metapipe in templete
@@ -506,7 +508,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect {
 
     // For Pipes, max must be derived from PipeSM
     // For everyone else, max is as mentioned in the ctr
-		val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
+		val Deff(Counterchain_new(counters)) = cchain
 		counters.zipWithIndex.map {case (ctr,i) =>
 			val Def(EatReflect(Counter_new(start, end, step, _))) = ctr
 			val max = parentOf(cchain.asInstanceOf[Rep[CounterChain]]) match {

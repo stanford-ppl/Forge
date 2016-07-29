@@ -69,7 +69,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
     def dumpString = s"""  cchains = ${cchains.mkString(", ")}
   iters   = ${iterators.mkString(", ")}
   srams   = ${srams.mkString(", ")}
-  stages  = ${stages.mkString(", ")}
+  stages  = ${if (stages.isEmpty) "" else stages.mkString("\n    ","\n    ","")}
   scIns   = ${scalarIn.mkString(", ")}
   scOuts  = ${scalarOut.mkString(", ")}
   vecIns  = ${vectorIn.mkString(", ")}

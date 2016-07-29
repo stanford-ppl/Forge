@@ -56,7 +56,7 @@ trait NodeMetadataOpsExp extends NodeMetadataTypesExp {
 
   // Parallelization factors associated with this node
   override def parFactors(e: Exp[Any])(implicit ctx: SourceContext): List[Exp[Int]] = e match {
-    case Deff(Counterchain_new(ctrs,nIter))   => ctrs.flatMap{ctr => parFactors(ctr) }
+    case Deff(Counterchain_new(ctrs))         => ctrs.flatMap{ctr => parFactors(ctr) }
     case Deff(Counter_new(_,_,_,par))         => List(par)
     case Deff(Offchip_load_cmd(_,_,_,_,par))  => List(par)
     case Deff(Offchip_store_cmd(_,_,_,_,par)) => List(par)

@@ -142,12 +142,12 @@ trait DotIRPrinter extends Traversal with QuotingExp {
   }
 
 	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = {
-    val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
+    val Deff(Counterchain_new(counters)) = cchain
 	  inds.zip(counters).foreach{case (iter, ctr) => emitValDef(iter, ctr) }
   }
 
   def emitParallelNestedIdx(cchain: Exp[CounterChain], inds: List[List[Sym[FixPt[Signed,B32,B0]]]]) = {
-    val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
+    val Deff(Counterchain_new(counters)) = cchain
     inds.zip(counters).foreach{case (iters, ctr) => iters.foreach{iter => emitValDef(iter, ctr) }}
   }
 
@@ -157,7 +157,7 @@ trait DotIRPrinter extends Traversal with QuotingExp {
 									 d.asInstanceOf[Def[Any]])
 	}
 	def emitCtrChain(sym: Sym[Any], rhs: Def[Any]):Unit = rhs match {
-	  case e@Counterchain_new(counters, nIter) =>
+	  case e@Counterchain_new(counters) =>
 			if (!emittedCtrChain.contains(sym)) {
 				emittedCtrChain += sym
     		emit(s"""subgraph cluster_${quote(sym)} {""")
@@ -256,7 +256,7 @@ trait DotIRPrinter extends Traversal with QuotingExp {
       emit(s"""${quote(sym)} [ label=$l shape="record" style="filled,rounded"
 						color=$counterInnerColor ]""")
 
-	  case e@Counterchain_new(counters, nIter) =>
+	  case e@Counterchain_new(counters) =>
 			//TODO: check whether parent of cchain is empty, if is emit ctrchain
 			if (parentOf(sym).isEmpty) {
 				emitCtrChain(sym, rhs)

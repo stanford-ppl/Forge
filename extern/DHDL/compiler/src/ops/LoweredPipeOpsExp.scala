@@ -136,13 +136,15 @@ trait MaxJGenLoweredPipeOps extends MaxJGenEffect {
       case InnerPipe =>
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case CoarsePipe =>
-		    val Deff(Counterchain_new(counters, nIters)) = cchain.get
-        emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)});""")
+		    val Deff(Counterchain_new(counters)) = cchain.get
+        // RAGHU FIX THIS
+        //emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)});""")
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case SequentialPipe =>
         if (cchain.isDefined) {
-          val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
-          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)});""")
+          val Def(EatReflect(Counterchain_new(counters))) = cchain.get
+          // RAGHU FIX THIS
+          //emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)});""")
         } else {
           emit(s"""${quote(sym)}_sm.connectInput("sm_numIter, constant.var(1);""")
         }

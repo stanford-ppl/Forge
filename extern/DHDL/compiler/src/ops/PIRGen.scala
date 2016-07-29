@@ -13,7 +13,7 @@ import dhdl.compiler.ops._
 import java.io.PrintWriter
 import ppl.delite.framework.Config
 
-trait PIRGen extends Traversal with QuotingExp {
+trait PIRGen extends Traversal with SubstQuotingExp {
   val IR: DHDLExp with PIRScheduleAnalysisExp
   import IR._
 
@@ -66,6 +66,7 @@ trait PIRGen extends Traversal with QuotingExp {
   def emitPIR(b: Block[Any]) {
     collector.run(b)
     scheduler.run(b)
+    subst ++= scheduler.subst.toList
 
     debug("Scheduling complete. Generating...")
     generateHeader()
@@ -197,7 +198,7 @@ trait PIRGen extends Traversal with QuotingExp {
     case VectorIn(name, mem)  => emit(s"val $name = VecIn(${mem.name})")
     case VectorOut(name, mem) => emit(s"val $name = VecOut(${mem.name})")
 
-    case MemCtrl(name,region,mode) => emit(s"val $name = MemoryController(${region.name}, $mode)")
+    case MemCtrl(name,region,mode) => emit(s"val $name = MemoryController($mode, ${region.name})")
     case Offchip(name) => emit(s"val $name = Offchip()")
     case InputArg(name) => emit(s"val $name = ArgIn()")
     case OutputArg(name) => emit(s"val $name = ArgOut()")

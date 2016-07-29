@@ -460,3 +460,55 @@ trait Memcpy2D extends DHDLApplication {
     (0 until rows*cols) foreach { i => assert(dst(i) == src(i)) }
   }
 }
+
+object BlockReduce1DTest extends DHDLApplicationCompiler with BlockReduce1D
+trait BlockReduce1D extends DHDLApplication {
+  type T = SInt
+  type Array[T] = ForgeArray[T]
+
+  val tileSize = 96
+
+  def blockreduce_1d(src: Rep[ForgeArray[T]], size: Rep[SInt]) = {
+
+    val sizeIn = ArgIn[SInt]; setArg(sizeIn, size)
+    val colsIn = ArgIn[SInt]
+
+    val srcFPGA = OffChipMem[T](size)
+    val dstFPGA = OffChipMem[T](tileSize)
+
+    setMem(srcFPGA, src)
+
+    Accel {
+      val accum = BRAM[T](tileSize)
+      Fold (sizeIn by tileSize)(accum, 0.as[T]) { i  =>
+        val tile = BRAM[T](tileSize)
+        tile := srcFPGA(i::i+tileSize)
+        tile
+      }{_+_}
+      dstFPGA (0::tileSize) := accum
+    }
+    getMem(dstFPGA)
+  }
+
+  def printArr(a: Rep[Array[T]], str: String = "") {
+    println(str)
+    (0 until a.length) foreach { i => print(a(i) + " ") }
+    println("")
+  }
+
+  def main() = {
+    val size = args(0).to[SInt]
+    val src = Array.tabulate(size) { i => i }
+
+    val dst = blockreduce_1d(src, size)
+
+//    val gold = Array.tabulate(tileSize) { i =>
+////      {for(ii <- i until size by tileSize)  yield src(ii) }.reduce{_+_}
+//      (i until size by tileSize).map { ii => src(ii) }.reduce{_+_}
+//    }
+
+    printArr(src, "src:")
+    printArr(dst, "dst:")
+//    (0 until tileSize) foreach { i => assert(dst(i) == gold(i)) }
+  }
+}

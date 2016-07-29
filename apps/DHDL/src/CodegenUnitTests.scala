@@ -108,19 +108,21 @@ trait SimpleTileLoadStore extends DHDLApplication {
     val dstFPGA = OffChipMem[SInt](N)
     setMem(srcFPGA, srcHost)
 
+  	val size = ArgIn[SInt]
   	val x = ArgIn[SInt]
     setArg(x, value)
+    setArg(size, N)
     Accel {
       val b1 = BRAM[SInt](tileSize)
-      Sequential {
-        b1 := srcFPGA(0::tileSize)
+      Sequential(size by tileSize) { i =>
+        b1 := srcFPGA(i::i+tileSize)
 
         val b2 = BRAM[SInt](tileSize)
-        Pipe (tileSize by 1) { i =>
-          b2(i) = b1(i) * x
+        Pipe (tileSize by 1) { ii =>
+          b2(ii) = b1(ii) * x
         }
 
-        dstFPGA(0::tileSize) := b2
+        dstFPGA(i::i+tileSize) := b2
       }
       ()
     }
@@ -407,5 +409,54 @@ trait SimpleFold extends DHDLApplication {
     println("expected: " + gold)
     println("result:   " + result)
     assert(result == gold)
+  }
+}
+
+object Memcpy2DTest extends DHDLApplicationCompiler with Memcpy2D
+trait Memcpy2D extends DHDLApplication {
+  type T = SInt
+  type Array[T] = ForgeArray[T]
+
+  def memcpy_2d(src: Rep[ForgeArray[T]], rows: Rep[SInt], cols: Rep[SInt]) = {
+    val tileDim1 = param(2);
+    val tileDim2 = param(96);  domainOf(tileDim2) = (96, 96, 96)
+
+    val rowsIn = ArgIn[SInt]
+    val colsIn = ArgIn[SInt]
+
+    val srcFPGA = OffChipMem[T](rows, cols)
+    val dstFPGA = OffChipMem[T](rows, cols)
+
+    // Transfer data and start accelerator
+    setArg(rowsIn, rows)
+    setArg(colsIn, cols)
+    setMem(srcFPGA, src)
+
+    Accel {
+      Sequential(rowsIn by tileDim1, colsIn by tileDim2) { (i,j) =>
+        val tile = BRAM[T](tileDim1, tileDim2)
+        tile := srcFPGA(i::i+tileDim1, j::j+tileDim2)
+        dstFPGA (i::i+tileDim1, j::j+tileDim2) := tile
+      }
+    }
+    getMem(dstFPGA)
+  }
+
+  def printArr(a: Rep[Array[T]], str: String = "") {
+    println(str)
+    (0 until a.length) foreach { i => print(a(i) + " ") }
+    println("")
+  }
+
+  def main() = {
+    val rows = args(0).to[SInt]
+    val cols = args(1).to[SInt]
+    val src = Array.tabulate(rows*cols) { i => i }
+
+    val dst = memcpy_2d(src, rows, cols)
+
+    printArr(src, "src:")
+    printArr(dst, "dst:")
+    (0 until rows*cols) foreach { i => assert(dst(i) == src(i)) }
   }
 }

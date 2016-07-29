@@ -8,9 +8,9 @@ trait OuterProduct extends DHDLApplication {
   type T = Flt
 
   def outerproduct(a: Rep[ForgeArray[T]], b: Rep[ForgeArray[T]]) = {
-    val tileSizeA = param(8);  domainOf(tileSizeA) = (96, 38400, 96)
-    val tileSizeB = param(8);  domainOf(tileSizeB) = (96, 38400, 96)
-    val outerPar  = param(2);  domainOf(outerPar) = (1, 4, 1)
+    val tileSizeA = param(96);  domainOf(tileSizeA) = (96, 38400, 96)
+    val tileSizeB = param(96);  domainOf(tileSizeB) = (96, 38400, 96)
+    val outerPar  = param(1);  domainOf(outerPar) = (1, 4, 1)
     val innerPar  = param(2);  domainOf(innerPar) = (1, 38400, 1)
 
     val M = a.length;  bound(M) = 38400
@@ -53,9 +53,10 @@ trait OuterProduct extends DHDLApplication {
 
     val result = outerproduct(a, b)
 
-    val gold = Array.tabulate(N){i => Array.tabulate(N){j => a(i) * b(j) }}.flatten
+    val gold = Array.tabulate(M){i => Array.tabulate(N){j => a(i) * b(j) }}.flatten
     //println("expected: " + gold.mkString(", "))
     //println("result:   " + result.mkString(", "))
+    (0 until M*N) foreach { i => assert(result(i) == gold(i)) }
     assert( result == gold )
   }
 }

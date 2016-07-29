@@ -11,6 +11,7 @@ import dhdl.shared._
 import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
+import scala.collection.mutable.HashMap
 
 trait ControllerTemplateOpsExp extends ControllerTemplateOps with MemoryTemplateOpsExp with ExternCounterOpsExp {
   this: DHDLExp =>
@@ -341,13 +342,32 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
 	  inds.zipWithIndex.foreach {case (iter, idx) => emitValDef(iter, counters(idx)) }
   }
 
+	var expToArg = HashMap[Exp[Any],Exp[Reg[Any]]]()
+	var argToExp = HashMap[Exp[Reg[Any]],Exp[Any]]()
+  override def preProcess[A:Manifest](body: Block[A]) = {
+    val argInPass = new MaxJArgInPass {
+      val IR: MaxJGenControllerTemplateOps.this.IR.type = MaxJGenControllerTemplateOps.this.IR
+    }
+    argInPass.run(body)
+    expToArg = argInPass.expToArg
+    argToExp = argInPass.argToExp
+    super.preProcess(body)
+  }
+
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case Hwblock(func) =>
 			inHwScope = true
 			emitComment("Emitting Hwblock dependencies {")
+      emit(s"""// ArgInMap: ${expToArg}""")
       hwblockDeps = recursiveDeps(rhs)
+      expToArg.keys.filterNot { hwblockDeps.contains(_) } foreach { argToExp -= expToArg(_) }
       hwblockDeps.foreach { s =>
         val Def(d) = s
+        emit(s"""// Dep: ${quote(s)} = $d""")
+        if (expToArg.contains(s)) {
+          val ts = tpstr(parOf(s))(s.tp, implicitly[SourceContext])
+          emit(s"""DFEVar ${quote(s)} = $ts.newInstance(this);""")
+        }
         d match {
            case Reflect(Offchip_new(size),_,_) =>  // Avoid emitting Offchip_new here as it would've been emitted already
            case Offchip_new(size) =>  // Avoid emitting Offchip_new here as it would've been emitted already
@@ -425,7 +445,9 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
     DFEVar ${quote(sym)}_redLoop_done = ${quote(sym)}_redLoopCounter.getCount() === ${quote(sym)}_loopLengthVal-1;""")
       }
 
+//      emit("{")
       emitBlock(func, s"${quote(sym)} Unitpipe")
+//      emit("}")
 
       controlNodeStack.pop
 

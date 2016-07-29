@@ -393,6 +393,9 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 		case Argin_new(init) =>
 			val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
           	emit(s"""DFEVar ${quote(sym)} = io.scalarInput("${quote(sym)}", $ts );""")
+            if (argToExp.contains(sym.asInstanceOf[Sym[Reg[Any]]])) {
+              emit(s"""${quote(argToExp(sym.asInstanceOf[Sym[Reg[Any]]]))} <== ${quote(sym)};""")
+            }
 
     case Argout_new(init) => //emitted in reg_write
 
@@ -423,6 +426,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
       val writer = writersOf(reg).head._1  // Regs have unique writer which also drives reset
 			val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
+      val duplicates = duplicatesOf(reg)
       val numDuplicates = duplicatesOf(reg).length
       regType(reg) match {
         case ArgumentOut =>
@@ -470,9 +474,15 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                 case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
                 case Regular =>
                   val rstStr = quote(parentOf(reg).get) + "_rst_en"
-                  // Using an enable signal instead of "always true" is causing an invalid loop.
-                  // And using it doesn't make any difference anyway.
-                  emit(s"""${regname}_lib.write(${quote(value)}, constant.var(true), $rstStr);""")
+//                  emit(s"""${regname}_lib.write(${quote(value)}, constant.var(true), $rstStr);""")
+                  if (duplicates(i).depth > 1) {
+                    emit(s"""${regname}_lib.write(${quote(value)}, ${quote(writer)}_done, constant.var(false));""")
+                  } else {
+                    // Using an enable signal instead of "always true" is causing an illegal loop.
+                    // Using a reset signal instead of "always false" is causing an illegal loop.
+                    // These signals don't matter for pass-through registers anyways.
+                    emit(s"""${regname}_lib.write(${quote(value)}, constant.var(true), constant.var(false));""")
+                  }
               }
             }
           }

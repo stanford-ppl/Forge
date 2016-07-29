@@ -55,26 +55,29 @@ trait DHDLAffineAnalyzer extends AffineAnalyzer {
   val IR: DHDLAffineAnalysisExp with DHDLExp
   import IR._
 
-  private def patternOfVectorizedOp(offsets: List[Exp[FixPt[Signed,B32,B0]]], inds: List[Sym[FixPt[Signed,B32,B0]]]) = {
+  override val name = "Affine Analysis"
+  debugMode = true
+
+  // TODO: Unused?
+  /*private def patternOfVectorizedOp(offsets: List[Exp[FixPt[Signed,B32,B0]]], inds: List[Sym[FixPt[Signed,B32,B0]]]) = {
     val trueOffsets = offsets.take(offsets.length - inds.length).map{x => InvariantAccess(x)}
     val indices = inds.zip(offsets.drop(trueOffsets.length)).map{
       case (i,Exact(0)) => LinearAccess(i)
       case (i,b) => OffsetAccess(i,b)
     }
     trueOffsets ++ indices
-  }
+  }*/
 
-  override def traverse(lhs: Sym[Any], rhs: Def[Any]): Unit = rhs match {
-    case Pipe_fold(cc,a,zero,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) =>
-      super.traverse(lhs,rhs)
-      accessIndicesOf(lhs) = inds
-      accessPatternOf(lhs) = inds.map{i => LinearAccess(i)}
-
-    case Accum_fold(cc1,cc2,a,zero,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
-      super.traverse(lhs,rhs)
-      accessIndicesOf(lhs) = inds2
-      accessPatternOf(lhs) = inds2.map{i => LinearAccess(i)}
-
-    case _ => super.traverse(lhs,rhs)
+  override def traverse(lhs: Sym[Any], rhs: Def[Any]) {
+    rhs match {
+      case EatReflect(e:Pipe_fold[_,_]) =>
+        accessIndicesOf(lhs) = e.inds
+        accessPatternOf(lhs) = e.inds.map{i => LinearAccess(i)}
+      case EatReflect(e:Accum_fold[_,_]) =>
+        accessIndicesOf(lhs) = e.indsInner
+        accessPatternOf(lhs) = e.indsInner.map{i => LinearAccess(i)}
+      case _ =>
+    }
+    super.traverse(lhs,rhs)
   }
 }

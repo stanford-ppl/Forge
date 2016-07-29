@@ -289,7 +289,6 @@ trait DHDLDSL extends ForgeApplication
     schedule(BoundAnalyzer)         // Constant propagation in metadata
     schedule(ConstantFolding)       // Constant folding
     schedule(GlobalAnalyzer)        // Add "global" annotations for newly created symbols after folding
-    schedule(IRPrinterPlus)
 
     // --- Post-DSE Estimation
     schedule(AreaAnalyzer)          // Area estimation

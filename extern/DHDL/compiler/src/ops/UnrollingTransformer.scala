@@ -283,6 +283,8 @@ trait UnrollingTransformer extends MultiPassTransformer {
     newPipe
   }
 
+  override def self_mirror[A](sym: Sym[A], rhs : Def[A]): Exp[A] = self_clone(sym,rhs)
+
   // Similar to self_mirror, but also duplicates bound vars
   def self_clone[A](sym: Sym[A], rhs : Def[A]): Exp[A] = {
     val sym2 = clone(rhs)(mtype(sym.tp), mpos(sym.pos))

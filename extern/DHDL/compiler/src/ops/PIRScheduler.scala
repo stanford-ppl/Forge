@@ -55,25 +55,22 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Quot
     case _ => Nil
   }
 
-  def copyParentIterators(cu: ComputeUnit, parent: Option[Exp[Any]]): Unit = parent match {
-    case Some(parent) =>
-      val parentCU = allocateCU(parent)
-      val cchainCopies = parentCU.cchains.map{
-        case cc@CounterChainCopy(name, owner) => cc -> cc
-        case cc@CounterChainInstance(name, ctrs) => cc -> CounterChainCopy(name, parentCU)
-      }
-      val cchainMapping = Map[PIRCounterChain,PIRCounterChain](cchainCopies:_*)
-      cu.cchains ++= cchainCopies.map(_._2)
+  def copyIterators(destCU: ComputeUnit, srcCU: ComputeUnit) {
+    val cchainCopies = srcCU.cchains.map{
+      case cc@CounterChainCopy(name, owner) => cc -> cc
+      case cc@CounterChainInstance(name, ctrs) => cc -> CounterChainCopy(name, srcCU)
+    }
+    val cchainMapping = Map[PIRCounterChain,PIRCounterChain](cchainCopies.toList:_*)
+    destCU.cchains ++= cchainCopies.map(_._2)
 
-      val iteratorCopies = parentCU.iterators.toList.map{
-        case (iter,(cchain,ctrIdx)) => iter -> ((cchainMapping(cchain), ctrIdx))
-      }
-      cu.iterators ++= iteratorCopies
-
-    case _ =>
+    val iteratorCopies = srcCU.iterators.toList.map{
+      case (iter,(cchain,ctrIdx)) => iter -> ((cchainMapping(cchain), ctrIdx))
+    }
+    destCU.iterators ++= iteratorCopies
   }
   def allocateCChains(cu: ComputeUnit, pipe: Exp[Any]) = {
-    copyParentIterators(cu, parentOfHack(pipe))
+    parentOfHack(pipe).foreach{parent => copyIterators(cu, allocateCU(parent)) }
+
     val ccs = deps(pipe).flatMap {
       case cc@Deff(Counterchain_new(ctrs,nIter)) =>
         val ctrInsts = ctrs.map{case ctr@Deff(Counter_new(start,end,stride,par)) => PIRCounter(quote(ctr),start,end,stride,par) }
@@ -81,6 +78,14 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Quot
       case _ => None
     }
     cu.cchains ++= ccs
+  }
+  def addIterators(cu: ComputeUnit, cc: Exp[CounterChain], inds: List[List[Exp[Index]]]) {
+    debug(s"Adding iterators for cu: ${cu.dumpString}")
+    debug(s"Counterchain: $cc, inds: $inds")
+    val cchain = cu.cchains.find(_.name == quote(cc)).get
+    inds.zipWithIndex.foreach{case (indSet, i) =>
+      indSet.foreach{ind => cu.iterators += ind -> (cchain, i) }
+    }
   }
 
   // --- Compute Units
@@ -96,11 +101,17 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Quot
   def allocateBasicCU(pipe: Exp[Any]): BasicComputeUnit = {
     if (cuMapping.contains(pipe)) cuMapping(pipe).asInstanceOf[BasicComputeUnit]
     else {
-      if (top.isEmpty && parentOfHack(pipe).isEmpty) top = Some(pipe)
-
       val parent = parentOfHack(pipe).map(cuMapping(_))
       val cu = BasicComputeUnit(quote(pipe), parent, styleOf(pipe))
       initCU(cu, pipe)
+      pipe match {
+        case Deff(e:ParPipeForeach)     => addIterators(cu, e.cc, e.inds)
+        case Deff(e:ParPipeReduce[_,_]) => addIterators(cu, e.cc, e.inds)
+        case _ =>
+      }
+      if (top.isEmpty && parent.isEmpty) top = Some(pipe)
+
+      cu
     }
   }
 
@@ -166,7 +177,10 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Quot
           readerCU.srams ::= PIRMemory(quote(mem), memSize(mem), vector = Some(vector), writeAddr = addr)
       }
       val isLocalRead = readerCU == writerCU
-      if (!isLocalRead) readerCU.stages ++= stages
+      if (!isLocalRead) {
+        readerCU.stages ++= stages
+        copyIterators(readerCU, writerCU)
+      }
       isLocalRead
     }
     if (!isLocallyRead && !vector.isInstanceOf[TileTxVector])
@@ -280,37 +294,26 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Quot
     cu.stages ++= localCompute.map{case TP(s,d) => DefStage(s, isReduce = reduceType(s).isDefined) }
   }
 
-  def addIterators(cu: ComputeUnit, cc: Exp[CounterChain], inds: List[List[Exp[Index]]]) {
-    debug(s"Adding iterators for cu: ${cu.dumpString}")
-    debug(s"Counterchain: $cc, inds: $inds")
-    val cchain = cu.cchains.find(_.name == quote(cc)).get
-    inds.zipWithIndex.foreach{case (indSet, i) =>
-      indSet.foreach{ind => cu.iterators += ind -> (cchain, i) }
-    }
-  }
+
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
     case Hwblock(func) =>
-      val cu = allocateBasicCU(lhs)
+      val cu = allocateCU(lhs)
       if (isInnerControl(lhs)) scheduleStages(lhs, func)
       else traverseBlock(func)
 
     case ParPipeForeach(cc, func, inds) =>
-      val cu = allocateBasicCU(lhs)
-      addIterators(cu, cc, inds)
-
+      val cu = allocateCU(lhs)
       if (isInnerControl(lhs)) scheduleStages(lhs, func)
       else traverseBlock(func)
 
     case ParPipeReduce(cc, accum, func, rFunc, inds, acc, rV) =>
-      val cu = allocateBasicCU(lhs)
-      addIterators(cu, cc, inds)
-
+      val cu = allocateCU(lhs)
       if (isInnerControl(lhs)) scheduleStages(lhs, func)
       else traverseBlock(func)
 
     case Unit_pipe(func) =>
-      val cu = allocateBasicCU(lhs)
+      val cu = allocateCU(lhs)
       if (isInnerControl(lhs)) scheduleStages(lhs, func)
       else traverseBlock(func)
 
@@ -319,24 +322,19 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Quot
       val cu = allocateCU(lhs)
       val cc = CounterChainInstance(quote(lhs)+"_cc", List(PIRCounter(quote(lhs)+"_ctr",Const(0),len,Const(1),p)))
       val i = fresh[Index]
-      cu.cchains ++= List(cc)
+      cu.cchains += cc
       cu.iterators += i -> (cc, 0)
-      readersOf(stream).foreach{case (readCtrl,_,reader) =>
-        val readCU = allocateCU(readCtrl)
-        readCU.cchains ++= List(cc)
-        readCU.iterators += i -> (cc, 0)
-      }
       allocateWrittenSRAM(lhs, stream, Some(i), cu, Nil)
 
       // HACK!! Fake a read addresss for the FIFO stream
       readersOf(stream).foreach{case (ctrl,_,_) =>
         val readerCU = allocateCU(ctrl)
+        debug(s"HACK: Adding read address to $stream for CU: ")
+        debug(readerCU.dumpString)
+
         val chain = readerCU.cchains.filter(_.isInstanceOf[CounterChainInstance]).last
         val iters = readerCU.iterators.toList.filter{case (iter,pair) => pair._1 == chain}
         val iter = iters.reduce{(a,b) => if (a._2._2 > b._2._2) a else b}
-
-        debug(s"HACK: Adding read address to $stream for CU: ")
-        debug(readerCU.dumpString)
 
         val readMem = readerCU.srams.find{_.name == quote(stream)}.get
         readMem.readAddr = Some(iter._1)
@@ -349,7 +347,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Quot
       val cu = allocateCU(lhs)
       val cc = CounterChainInstance(quote(lhs)+"_cc", List(PIRCounter(quote(lhs)+"_ctr",Const(0),len,Const(1),p)))
       val i = fresh[Index]
-      cu.cchains ++= List(cc)
+      cu.cchains += cc
       cu.iterators += i -> (cc, 0)
       allocateReadSRAM(lhs, stream, Some(i), cu)
       //stageError("Offchip storing in PIR is not yet fully supported")

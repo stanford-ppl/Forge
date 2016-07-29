@@ -130,7 +130,7 @@ trait PIRGen extends Traversal with QuotingExp {
     case cu: BasicComputeUnit =>
       s"""ComputeUnit(name=Some("${cu.name}"), tpe = ${quoteControl(cu.tpe)})"""
     case cu: TileTransferUnit =>
-      s"""TileTransfer(name=Some("${cu.name}"), memctrl=${cu.ctrl}, mctpe=${cu.mode})"""
+      s"""TileTransfer(name=Some("${cu.name}"), memctrl=${cu.ctrl.name}, mctpe=${cu.mode})"""
   }
   def quoteControl(tpe: ControlType) = tpe match {
     case InnerPipe => "Pipe"

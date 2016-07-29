@@ -57,7 +57,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   ) extends PIRStage(isReduce, isWrite)
 
   sealed abstract class ComputeUnit(val name: String, val parent: Option[ComputeUnit]) {
-    var cchains: List[PIRCounterChain] = Nil
+    var cchains: Set[PIRCounterChain] = Set.empty
     var iterators: Map[Exp[Any], (PIRCounterChain, Int)] = Map.empty
     var srams: List[PIRMemory] = Nil
     var stages: List[PIRStage] = Nil
@@ -84,6 +84,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
     override def dumpString = s"""BasicComputeUnit($name, $parent, $tpe){
 ${super.dumpString}
 }"""
+  override def toString() = s"BasicComputeUnit($name, ${parent.map(_.name)})"
   }
 
   case class TileTransferUnit(
@@ -95,6 +96,7 @@ ${super.dumpString}
     override def dumpString = s"""TileTransferUnit($name, $parent, $ctrl, $mode){
 ${super.dumpString}
 }"""
+    override def toString() = s"TileTransferUnit($name, ${parent.map(_.name)}, $ctrl, $mode)"
   }
 
   // TODO: Parallelism?

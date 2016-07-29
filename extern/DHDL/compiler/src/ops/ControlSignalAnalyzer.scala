@@ -40,7 +40,7 @@ trait ControlSignalAnalyzer extends Traversal {
   var level = 0
   var indsOwners: Map[Exp[Any], (Exp[Any], Boolean, Int)] = Map.empty // Used to identify the top-most controller for a given address
   var controller: Option[(Exp[Any], Boolean)] = None                  // Parent controller for the current scope
-  var pendingReads: Map[Exp[Any],Exp[Any]] = Map.empty                // Memory reads outside of inner pipes
+  var pendingReads: Map[Exp[Any],List[Exp[Any]]] = Map.empty          // Memory reads outside of inner pipes
   var unrollFactors = List[Exp[Int]]()                                // Unrolling factors for the current scope
 
   // --- Output (to DSE)
@@ -137,7 +137,7 @@ trait ControlSignalAnalyzer extends Traversal {
     if (isInnerPipe((ctrl,isReduce)))
       appendReader(ctrl, isReduce, reader)
     else {
-      pendingReads += reader -> reader
+      pendingReads += reader -> List(reader)
       debug(s"Added pending reader: $reader")
     }
   }
@@ -203,20 +203,20 @@ trait ControlSignalAnalyzer extends Traversal {
       val parent = if (isControlNode(lhs)) (lhs,false) else ctrl
 
       val delayedReads = deps.filter(pendingReads.keySet contains _)
+      val readers = delayedReads.flatMap{sym => pendingReads(sym)}
 
-      if (delayedReads.nonEmpty) {
-        debug(s"$lhs = $rhs")
-        debug(deps.mkString(", "))
-      }
-      delayedReads.foreach{sym =>
-        val reader = pendingReads(sym)
+      if (readers.nonEmpty) {
+        debug(s"Checking node for dependencies on pending readers:")
+        debug(s"  $lhs = $rhs")
+        debug("  " + deps.mkString(", "))
+
         if (isAllocation(lhs)) { // TODO: Other propagaters?
-          pendingReads += lhs -> reader
-          debug(s"Found propagating dep on pending reader $reader")
+          debug(s"""  Found propagating dep ($lhs) for pending readers (${readers.mkString(",")})""")
+          pendingReads += lhs -> readers
         }
         else {
-          appendReader(parent._1, parent._2, reader)
-          debug(s"Found true dep on pending reader $reader")
+          debug(s"""  Found true dep ($lhs) of pending readers (${readers.mkString(",")})""")
+          readers.foreach{reader => appendReader(parent._1, parent._2, reader) }
         }
       }
 

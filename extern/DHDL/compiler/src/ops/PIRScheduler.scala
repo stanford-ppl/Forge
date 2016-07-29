@@ -287,16 +287,19 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Subs
         debug(s"local reader: $reader")
         reads.foreach{case (mem,addr) =>
           if (isRegister(mem.tp)) {
-            val readCtrl = readersOf(mem).find(_._3 == reader).get._1
             val writeCtrl = writersOf(mem).headOption.map(_._1) // ASSUMPTION: At least one writer
-            val isLocallyRead = readCtrl == pipe
-            val isLocallyWritten = !isArgIn(mem) && writeCtrl.map(_ == pipe).getOrElse(true)
-            val readerCU = allocateCU(readCtrl)
 
-            if (!isLocallyRead || !isLocallyWritten) {
-              val scalar = allocateMem(mem)
-              readerCU.scalarIn ::= ScalarIn(quote(reader),scalar)
-              remoteStages ::= reader
+            // Register reads may be used by more than one pipe
+            readersOf(mem).filter(_._3 == reader).map(_._1).foreach{readCtrl =>
+              val isLocallyRead = readCtrl == pipe
+              val isLocallyWritten = !isArgIn(mem) && writeCtrl.map(_ == pipe).getOrElse(true)
+
+              if (!isLocallyRead || !isLocallyWritten) {
+                val readerCU = allocateCU(readCtrl)
+                val scalar = allocateMem(mem)
+                readerCU.scalarIn ::= ScalarIn(quote(reader),scalar)
+                remoteStages ::= reader
+              }
             }
           }
           else if (isBuffer(mem)) {

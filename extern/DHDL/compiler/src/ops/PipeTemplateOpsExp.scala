@@ -359,15 +359,18 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
 			inHwScope = true
 			emitComment("Emitting Hwblock dependencies {")
       emit(s"""// ArgInMap: ${expToArg}""")
-      hwblockDeps = recursiveDeps(rhs)
+      val hwblockDeps = recursiveDeps(rhs)
       expToArg.keys.filterNot { hwblockDeps.contains(_) } foreach { argToExp -= expToArg(_) }
       hwblockDeps.foreach { s =>
         val Def(d) = s
         emit(s"""// Dep: ${quote(s)} = $d""")
-        if (expToArg.contains(s)) {
-          val ts = tpstr(parOf(s))(s.tp, implicitly[SourceContext])
-          emit(s"""DFEVar ${quote(s)} = $ts.newInstance(this);""")
+
+        if (argToExp.contains(s.asInstanceOf[Sym[Reg[Any]]])) {
+          val e = argToExp(s.asInstanceOf[Sym[Reg[Any]]])
+          val ts = tpstr(parOf(e))(e.tp, implicitly[SourceContext])
+          emit(s"""DFEVar ${quote(e)} = $ts.newInstance(this);""")
         }
+
         d match {
            case Reflect(Offchip_new(size),_,_) =>  // Avoid emitting Offchip_new here as it would've been emitted already
            case Offchip_new(size) =>  // Avoid emitting Offchip_new here as it would've been emitted already

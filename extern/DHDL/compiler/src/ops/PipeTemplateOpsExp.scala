@@ -363,14 +363,27 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
       emit(s"""// ArgInMap: ${expToArg}""")
       val hwblockDeps = recursiveDeps(rhs)
       expToArg.keys.filterNot { hwblockDeps.contains(_) } foreach { argToExp -= expToArg(_) }
+
+      val emitted = Set[Exp[Any]]()
+      def emitIfUndeclared(e: Exp[Any]) = {
+        if (!emitted.contains(e)) {
+          val ts = tpstr(parOf(e))(e.tp, implicitly[SourceContext])
+          emit(s"""DFEVar ${quote(e)} = $ts.newInstance(this);""")
+          emitted += e
+        }
+      }
+
       hwblockDeps.foreach { s =>
         val Def(d) = s
         emit(s"""// Dep: ${quote(s)} = $d""")
 
         if (argToExp.contains(s.asInstanceOf[Sym[Reg[Any]]])) {
           val e = argToExp(s.asInstanceOf[Sym[Reg[Any]]])
-          val ts = tpstr(parOf(e))(e.tp, implicitly[SourceContext])
-          emit(s"""DFEVar ${quote(e)} = $ts.newInstance(this);""")
+          emitIfUndeclared(e)
+        }
+
+        if (expToArg.contains(s)) {
+          emitIfUndeclared(s)
         }
 
         d match {

@@ -13,7 +13,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with NodeMetadataOpsExp {
+trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with ControlSignalAnalysisExp {
   this: DHDLExp =>
 
   // TODO
@@ -332,4 +332,13 @@ trait MemoryAnalyzer extends BRAMBanking with RegisterBanking with FIFOBanking {
   }
 
   def run(localMems: List[Exp[Any]]): Unit = localMems.foreach{mem => analyzeMemory(mem) }
+
+  lazy val ctrlAnalyzer = new ControlSignalAnalyzer{val IR: MemoryAnalyzer.this.IR.type = MemoryAnalyzer.this.IR}
+
+  override def runOnce[A:Manifest](b: Block[A]): Block[A] = {
+    ctrlAnalyzer.run(b)
+    run(ctrlAnalyzer.localMems)
+    b
+  }
+
 }

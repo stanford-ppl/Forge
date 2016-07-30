@@ -58,10 +58,6 @@ trait DSE extends Traversal {
     tileSizes.foreach{p => p.fix}
     parParams.foreach{p => p.fix}
     contention.run(topController)
-
-    printer.run(b)
-    memAnalyzer.run(localMems)
-    printer.run(b)
     (b)
   }
 

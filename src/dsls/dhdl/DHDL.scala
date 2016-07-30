@@ -280,8 +280,6 @@ trait DHDLDSL extends ForgeApplication
                                     //   Area analyzer (to estimate area)
                                     //   Latency analyzer (to estimate runtime)
                                     // Post-DSE:
-                                    //   Bound analyzer (to finalize parameter values)
-                                    //   Memory analyzer (to finalize banking/buffering)
                                     //   Contention analyzer (to finalize contention estimates)
 
     // --- Post-DSE Constants
@@ -291,8 +289,10 @@ trait DHDLDSL extends ForgeApplication
     schedule(GlobalAnalyzer)        // Add "global" annotations for newly created symbols after folding
 
     // --- Post-DSE Estimation
+    schedule(MemoryAnalyzer)        // Memory analyzer (to finalize banking/buffering)
     schedule(AreaAnalyzer)          // Area estimation
     schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
+    schedule(IRPrinterPlus)
 
 // Temporarily disabled until moved to unrolling
 //    schedule(MetaPipeRegInsertion)  // Inserts registers between metapipe stages for counter signals

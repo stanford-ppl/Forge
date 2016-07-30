@@ -395,7 +395,7 @@ trait DHDLMetadata {
       composite ${ meta[MWritten]($0).map(_.written).getOrElse(Nil) }
 
 		/**
-     * List of writers for a given memory
+     * List of writers for a given memory and owning controller
      * Tuple is (Controller, IsReduction, Writer)
      * IsReduction is only true for nodes within the inner reduction loop of AccumFold
 		 * User facing: No
@@ -417,6 +417,22 @@ trait DHDLMetadata {
     internal.static (writersOps) ("apply", Nil, (MAny) :: SList(CTuple3(MAny,SBoolean,MAny))) implements
       composite ${ meta[MWriters]($0).map(_.writers).getOrElse(Nil) }
 
+    /**
+     * List of OUTER writers for a given memory
+     * Same as writersOf, but defined as the controller which determines when a write is complete
+     * rather than the controller directly above the write
+     * Used for setting control signals for double+ buffers
+     * User facing: No
+     * Set: topWritersOf(Rep[Any]) = List[(Rep[Any], Boolean, Rep[Any])]
+     * Get: topWritersOf(Rep[Any])   // Returns List[(Rep[Any], Boolean, Rep[Any])]. Nil if undefined.
+     **/
+    val MTopWriters = metadata("MTopWriters", "writers" -> SList(CTuple3(MAny, SBoolean, MAny)))
+    val topWriterOps = metadata("topWritersOf")
+    internal.static (topWriterOps) ("update", Nil, (MAny, SList(CTuple3(MAny, SBoolean, MAny))) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MTopWriters($1)) }
+
+    internal.static (topWriterOps) ("apply", Nil, (MAny) :: SList(CTuple3(MAny,SBoolean,MAny))) implements
+      composite ${ meta[MTopWriters]($0).map(_.writers).getOrElse(Nil) }
 
 		/**
      * List of readers for a given memory

@@ -126,6 +126,7 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
       }
       emitController(sym, Some(cchain))
       emitParallelizedLoop(inds, cchain)
+      emitRegChains(sym, inds.flatten)
       emitBlock(func)
       emitComment(s"""} ParPipeForeach ${quote(sym)}""")
       controlNodeStack.pop

@@ -286,6 +286,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
   // a standalone thing that does not have a means to share things.
   // The correct fix is to put common things in a trait that is mixed into both
   // code generators
+	var quoteSuffix = HashMap[Sym[Any],HashMap[Sym[Any], String]]()
   override def quote(x: Exp[Any]) = x match {
 		case s@Sym(n) => {
 			val tstr = s.tp.erasure.getSimpleName()
@@ -306,7 +307,19 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
         }
         case _ => tstr
       }
-			customStr + n
+      val suffix = if (controlNodeStack.isEmpty) "" else controlNodeStack.map { c =>
+        if (quoteSuffix.contains(c)) {
+          val suffixMap = quoteSuffix(c)
+          if (suffixMap.contains(x.asInstanceOf[Sym[Any]])) {
+            suffixMap(x.asInstanceOf[Sym[Any]])
+          } else {
+            ""
+          }
+        } else {
+          ""
+        }
+      }.reduce{_+_}
+			customStr + n + suffix
 		}
     case _ => super.quote(x)
   }
@@ -344,6 +357,19 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
 	  inds.zipWithIndex.foreach {case (iter, idx) => emitValDef(iter, counters(idx)) }
   }
 
+	def emitRegChains(controller: Sym[Any], inds:List[Sym[FixPt[Signed,B32,B0]]]) = {
+    styleOf(controller) match {
+      case CoarsePipe =>
+        val stages = childrenOf(controller)
+        inds.foreach { idx =>
+          emit(s"""DblBufReg[] ${quote(idx)}_chain = spatialUtils.getRegChain(
+              "${quote(controller)}", ${stages.size}, ${quote(idx)},
+              new DFEVar[]{${stages.map{s => quote(s)+"_done"}.mkString(",")}});""")
+        }
+      case _ =>
+    }
+  }
+
 	var expToArg = HashMap[Exp[Any],Exp[Reg[Any]]]()
 	var argToExp = HashMap[Exp[Reg[Any]],Exp[Any]]()
   override def preProcess[A:Manifest](body: Block[A]) = {
@@ -353,14 +379,20 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
     argInPass.run(body)
     expToArg = argInPass.expToArg
     argToExp = argInPass.argToExp
+
+    val regChainPass = new RegChainPass {
+      val IR: MaxJGenControllerTemplateOps.this.IR.type = MaxJGenControllerTemplateOps.this.IR
+    }
+    regChainPass.run(body)
+    quoteSuffix = regChainPass.quoteSuffix
     super.preProcess(body)
   }
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case Hwblock(func) =>
+      controlNodeStack.push(sym)
 			inHwScope = true
 			emitComment("Emitting Hwblock dependencies {")
-      emit(s"""// ArgInMap: ${expToArg}""")
       val hwblockDeps = recursiveDeps(rhs)
       expToArg.keys.filterNot { hwblockDeps.contains(_) } foreach { argToExp -= expToArg(_) }
 
@@ -393,6 +425,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
          }
       }
 			emitComment(" End Hwblock dependencies }")
+      emitComment(s"quoteSuffix = $quoteSuffix")
       emit(s"""DFEVar ${quote(sym)}_en = top_en;""")
       emitGlobalWire(s"""${quote(sym)}_done""")
       emit(s"""top_done <== ${quote(sym)}_done;""")
@@ -400,12 +433,15 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
       emitController(sym, None)
       emitBlock(func)
 			inHwScope = false
+      controlNodeStack.pop
 
     case e@Counterchain_new(counters,nIters) =>
 
     case e@Pipe_foreach(cchain, func, inds) =>
+      controlNodeStack.push(sym)
       emitController(sym, Some(cchain))
       emitNestedIdx(cchain, inds)
+      emitRegChains(sym, inds)
       emitBlock(func, s"${quote(sym)} Foreach")             // Map function
       controlNodeStack.pop
 
@@ -413,6 +449,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
       controlNodeStack.push(sym)
       emitController(sym, Some(cchain))
       emitNestedIdx(cchain, inds)
+      emitRegChains(sym, inds)
       emitBlock(iFunc, s"${quote(sym)} Index Calculation")
       emitValDef(idx, quote(getBlockResult(iFunc)))
       emitBlock(func, s"${quote(sym)} Foreach")

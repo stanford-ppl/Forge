@@ -366,28 +366,31 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 //      emitComment("Offchip store from fifo")
 
 		case Reg_new(init) =>
-      emitComment("Reg_new {")
-      val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
-      val duplicates = duplicatesOf(sym)
-      val ConstFix(rstVal) = resetValue(sym.asInstanceOf[Sym[Reg[Any]]])
-      duplicates.zipWithIndex.foreach { case (d, i) =>
-        regType(sym) match {
-          case Regular =>
-            val parent = if (parentOf(sym).isEmpty) "top" else quote(parentOf(sym).get) //TODO
-            if (d.depth > 1) {
-              emit(s"""DblBufReg ${quote(sym)}_${i}_lib = new DblBufReg(this, $ts, "${quote(sym)}", ${parOf(sym)}, new Bits(${quote(ts)}.getTotalBits(), $rstVal));""")
-              val readstr = if (parOf(sym)>1) "readv" else "read"
-              emit(s"""${maxJPre(sym)} ${quote(sym)}_$i = ${quote(sym)}_${i}_lib.${readstr}();""")
-              emit(s"""${maxJPre(sym)} ${quote(sym)}_${i}_delayed = ${ts}.newInstance(this);""")
-              regs += ((sym.asInstanceOf[Sym[Reg[Any]]], i))
-            } else {
-              emit(s"""DelayLib ${quote(sym)}_${i}_lib = new DelayLib(this, ${quote(ts)}, new Bits(${quote(ts)}.getTotalBits(), $rstVal));""")
-              val readstr = if (parOf(sym) > 1) "readv" else "read"
-              emit(s"""${maxJPre(sym)} ${quote(sym)}_$i = ${quote(sym)}_${i}_lib.${readstr}();""")
-              emit(s"""${maxJPre(sym)} ${quote(sym)}_${i}_delayed = ${ts}.newInstance(this);""")
-            }
-          case _ => throw new Exception(s"""Unknown reg type ${regType(sym)}""")
+      withStream(baseStream) {
+        emitComment("Reg_new {")
+        val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
+        val duplicates = duplicatesOf(sym)
+        val ConstFix(rstVal) = resetValue(sym.asInstanceOf[Sym[Reg[Any]]])
+        duplicates.zipWithIndex.foreach { case (d, i) =>
+          regType(sym) match {
+            case Regular =>
+              val parent = if (parentOf(sym).isEmpty) "top" else quote(parentOf(sym).get) //TODO
+              if (d.depth > 1) {
+                emit(s"""DblBufReg ${quote(sym)}_${i}_lib = new DblBufReg(this, $ts, "${quote(sym)}", ${parOf(sym)}, new Bits(${quote(ts)}.getTotalBits(), $rstVal));""")
+                val readstr = if (parOf(sym)>1) "readv" else "read"
+                emit(s"""${maxJPre(sym)} ${quote(sym)}_$i = ${quote(sym)}_${i}_lib.${readstr}();""")
+                emit(s"""${maxJPre(sym)} ${quote(sym)}_${i}_delayed = ${ts}.newInstance(this);""")
+                regs += ((sym.asInstanceOf[Sym[Reg[Any]]], i))
+              } else {
+                emit(s"""DelayLib ${quote(sym)}_${i}_lib = new DelayLib(this, ${quote(ts)}, new Bits(${quote(ts)}.getTotalBits(), $rstVal));""")
+                val readstr = if (parOf(sym) > 1) "readv" else "read"
+                emit(s"""${maxJPre(sym)} ${quote(sym)}_$i = ${quote(sym)}_${i}_lib.${readstr}();""")
+                emit(s"""${maxJPre(sym)} ${quote(sym)}_${i}_delayed = ${ts}.newInstance(this);""")
+              }
+            case _ => throw new Exception(s"""Unknown reg type ${regType(sym)}""")
+          }
         }
+        emitComment("Reg_new }")
       }
 
 		case Argin_new(init) =>
@@ -490,35 +493,37 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       emitComment(s"} Reg_write // regType ${regType(reg)}, numDuplicates = $numDuplicates")
 
     case Bram_new(size, zero) =>
-      emitComment("Bram_new {")
-			val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
-      //TODO: does templete assume bram has 2 dimension?
-      val dims = dimsOf(sym)
-      val Def(d0) = dims(0)
-      val Tpes_Int_to_fix(size0) = d0
-      val size1 = if (dims.size == 1) {
-          1
-        } else {
-          val Def(d1) = dims(1)
-          val Tpes_Int_to_fix(v) = d1
-          v
-        }
-      if (isDblBuf(sym)) {
-        //readers.foreach { r =>
-        //  if (!readerToMemMap.contains(r)) readerToMemMap += r -> Set[MemNode]()
-        //  readerToMemMap(r) += n
-        //}
-        //rdoneSet += n -> Set()
-
-        //emit(s"""// ${quote(sym)} has ${readersOf(sym).size} readers - ${readersOf(sym)}""")
-        emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_DblBufSM(this));""")
+      withStream(baseStream) {
+        emitComment("Bram_new {")
+        val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
+        //TODO: does templete assume bram has 2 dimension?
         val dims = dimsOf(sym)
-        emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
-          ${quote(size0)}, ${quote(size1)}, $ts, ${banks(sym)}, /* stride_TODO */ 1, ${readersOf(sym).size});""")
-      } else {
-        emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, ${banks(sym)}, 1 /* [TODO: stride from metadata */);""") // [TODO] Raghu: Stride from metadata
+        val Def(d0) = dims(0)
+        val Tpes_Int_to_fix(size0) = d0
+        val size1 = if (dims.size == 1) {
+            1
+          } else {
+            val Def(d1) = dims(1)
+            val Tpes_Int_to_fix(v) = d1
+            v
+          }
+        if (isDblBuf(sym)) {
+          //readers.foreach { r =>
+          //  if (!readerToMemMap.contains(r)) readerToMemMap += r -> Set[MemNode]()
+          //  readerToMemMap(r) += n
+          //}
+          //rdoneSet += n -> Set()
+
+          //emit(s"""// ${quote(sym)} has ${readersOf(sym).size} readers - ${readersOf(sym)}""")
+          emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_DblBufSM(this));""")
+          val dims = dimsOf(sym)
+          emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
+            ${quote(size0)}, ${quote(size1)}, $ts, ${banks(sym)}, /* stride_TODO */ 1, ${readersOf(sym).size});""")
+        } else {
+          emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, ${banks(sym)}, 1 /* [TODO: stride from metadata */);""") // [TODO] Raghu: Stride from metadata
+        }
+        emitComment("} Bram_new")
       }
-      emitComment("} Bram_new")
 
     case Bram_load(bram, addr) =>
       bramLoad(sym, bram, addr)

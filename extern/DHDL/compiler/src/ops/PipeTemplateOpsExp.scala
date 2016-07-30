@@ -333,7 +333,9 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
 
   def emitBlock(y: Block[Any], blockName:String): Unit = {
     emitComment(s"Block ${blockName} {")
+    emit("{")
     emitBlock(y)
+    emit("}")
     emitComment(s"} Block ${blockName}")
   }
 
@@ -379,7 +381,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
       }
 			emitComment(" End Hwblock dependencies }")
       emit(s"""DFEVar ${quote(sym)}_en = top_en;""")
-      emit(s"""DFEVar ${quote(sym)}_done = dfeBool().newInstance(this);""")
+      emitGlobalWire(s"""${quote(sym)}_done""")
       emit(s"""top_done <== ${quote(sym)}_done;""")
       emit(s"""// Hwblock: childrenOf(${quote(sym)}) = ${childrenOf(sym)}""")
       emitController(sym, None)
@@ -448,9 +450,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
     DFEVar ${quote(sym)}_redLoop_done = ${quote(sym)}_redLoopCounter.getCount() === ${quote(sym)}_loopLengthVal-1;""")
       }
 
-//      emit("{")
       emitBlock(func, s"${quote(sym)} Unitpipe")
-//      emit("}")
 
       controlNodeStack.pop
 
@@ -482,7 +482,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
         emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
 
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
-        emit(s"""DFEVar ${quote(sym)}_rst_done = dfeBool().newInstance(this);""")
+        emitGlobalWire(s"""${quote(sym)}_rst_done""")
         emit(s"""${quote(sym)}_sm.connectInput("rst_done", ${quote(sym)}_rst_done);""")
         emit(s"""OffsetExpr ${quote(sym)}_offset = stream.makeOffsetAutoLoop("${quote(sym)}_offset");""")
         emit(s"""${quote(sym)}_rst_done <== stream.offset(${quote(sym)}_rst_en, -${quote(sym)}_offset-1);""")
@@ -527,7 +527,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
     /* Control Signals to Children Controllers */
     if (!isInnerPipe(sym)) {
 		  childrenOf(sym).zipWithIndex.foreach { case (c, idx) =>
-		  	emit(s"""DFEVar ${quote(c)}_done = dfeBool().newInstance(this);""")
+		  	emitGlobalWire(s"""${quote(c)}_done""")
 		  	emit(s"""${quote(sym)}_sm.connectInput("s${idx}_done", ${quote(c)}_done);""")
         emit(s"""DFEVar ${quote(c)}_en = ${quote(sym)}_sm.getOutput("s${quote(idx)}_en");""")
 		  	enDeclaredSet += c
@@ -579,7 +579,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
 
     styleOf(sym) match {
       case InnerPipe =>
-        emit(s"""DFEVar ${quote(cchain)}_done = dfeBool().newInstance(this);""")
+        emitGlobalWire(s"""${quote(cchain)}_done""")
         doneDeclaredSet += cchain
         emit(s"""${quote(sym)}_sm.connectInput("ctr_done", ${quote(cchain)}_done);""")
         emit(s"""DFEVar ${quote(sym)}_datapath_en = ${quote(sym)}_sm.getOutput("ctr_en");""")

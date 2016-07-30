@@ -16,19 +16,30 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case object MemScatter extends MemoryMode { override def toString() = "Scatter" }
   case object MemGather extends MemoryMode { override def toString() = "Gather" }
 
-  sealed abstract class CommMem(val name: String)
-  case class Offchip(override val name: String) extends CommMem(name)
-  case class MemCtrl(override val name: String, region: Offchip, mode: MemoryMode) extends CommMem(name)
-  case class InputArg(override val name: String) extends CommMem(name)
-  case class OutputArg(override val name: String) extends CommMem(name)
-  case class ScalarMem(override val name: String) extends CommMem(name)
-  case class VectorMem(override val name: String) extends CommMem(name)
-  case class TileTxVector(override val name: String) extends CommMem(name)
+  // Inter-CU communication
+  sealed abstract class GlobalMem(val name: String)
+  case class Offchip(override val name: String) extends GlobalMem(name)
+  case class MemCtrl(override val name: String, region: Offchip, mode: MemoryMode) extends GlobalMem(name)
+  case class InputArg(override val name: String) extends GlobalMem(name)
+  case class OutputArg(override val name: String) extends GlobalMem(name)
+  case class ScalarMem(override val name: String) extends GlobalMem(name)
+  case class VectorMem(override val name: String) extends GlobalMem(name)
+  case class TileTxVector(override val name: String) extends GlobalMem(name)
 
-  case class ScalarIn(name: String, mem: CommMem)
-  case class ScalarOut(name: String, mem: CommMem)
-  case class VectorIn(name: String, mem: CommMem)
-  case class VectorOut(name: String, mem: CommMem)
+  case class ScalarIn(name: String, mem: GlobalMem)
+  case class ScalarOut(name: String, mem: GlobalMem)
+  case class VectorIn(name: String, mem: GlobalMem)
+  case class VectorOut(name: String, mem: GlobalMem)
+
+  // Intra-CU communication
+  sealed abstract class LocalMem
+  case class ReduceReg(producer: Int) extends LocalMem
+  case class TempReg(producer: Int) extends LocalMem
+  case class InputReg(in: ScalarIn) extends LocalMem
+  case class OutputReg(producer: Int, out: ScalarOut) extends LocalMem
+  case class InputMem(mem: PIRMemory) extends LocalMem
+  case class CounterReg(cchain: PIRCounterChain, idx: Int) extends LocalMem
+  case class ConstReg(const: String) extends LocalMem
 
   // TODO: This is VERY redundant with PIR
   sealed abstract class PIROp
@@ -43,18 +54,12 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case object FltMul extends PIROp
   case object FltDiv extends PIROp
 
-  sealed abstract class PIRStage(val isReduce: Boolean = false, val isWrite: Boolean = false)
-  case class DefStage(
-    op: Exp[Any],
-    override val isReduce: Boolean = false,
-    override val isWrite: Boolean = false
-  ) extends PIRStage(isReduce, isWrite)
+  sealed abstract class PIRStage
+  case class DefStage(op: Exp[Any], isReduce: Boolean = false, isWrite: Boolean = false) extends PIRStage
+  case class PseudoStage(op: PIROp, inputs: List[Exp[Any]], isReduce: Boolean, isWrite: Boolean) extends PIRStage
 
-  case class PseudoStage(
-    op: PIROp,
-    override val isReduce: Boolean = false,
-    override val isWrite: Boolean = false
-  ) extends PIRStage(isReduce, isWrite)
+  case class Stage(op: PIROp, inputs: List[LocalMem], var out: LocalMem) extends PIRStage
+  case class ReduceStage(op: PIROp) extends PIRStage
 
   sealed abstract class ComputeUnit(val name: String, val parent: Option[ComputeUnit]) {
     var cchains: Set[PIRCounterChain] = Set.empty
@@ -109,7 +114,7 @@ ${super.dumpString}
   case class PIRMemory(
     name: String,
     size: Int,
-    var vector: Option[CommMem] = None,
+    var vector: Option[GlobalMem] = None,
     var readAddr: Option[Exp[Any]] = None,
     var writeAddr: Option[Exp[Any]] = None
   )

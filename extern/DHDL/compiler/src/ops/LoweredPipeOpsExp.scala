@@ -51,8 +51,8 @@ trait LoweredPipeOpsExp extends ExternPrimitiveTypesExp with MemoryTemplateOpsEx
     case _ => super.readSyms(e)
   }
   override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {
-    case ParPipeForeach(cc,func,inds) => freqNormal(cc) ::: freqNormal(func)
-    case ParPipeReduce(cc,accum,func,rFunc,inds,acc,rV) => freqNormal(cc) ::: freqNormal(accum) ::: freqNormal(func) ::: freqNormal(rFunc)
+    case ParPipeForeach(cc,func,inds) => freqNormal(cc) ::: freqCold(func)
+    case ParPipeReduce(cc,accum,func,rFunc,inds,acc,rV) => freqNormal(cc) ::: freqNormal(accum) ::: freqCold(func) ::: freqNormal(rFunc)
     case _ => super.symsFreq(e)
   }
   override def boundSyms(e: Any): List[Sym[Any]] = e match {

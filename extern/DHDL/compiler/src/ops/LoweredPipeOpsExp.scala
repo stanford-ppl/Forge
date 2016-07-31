@@ -52,8 +52,8 @@ trait LoweredPipeOpsExp extends ExternPrimitiveTypesExp with MemoryTemplateOpsEx
     case _ => super.readSyms(e)
   }
   override def symsFreq(e: Any): List[(Sym[Any], Double)] = e match {
-    case ParPipeForeach(cc,func,inds) => freqNormal(cc) ::: freqNormal(func)
-    case ParPipeReduce(cc,accum,func,rFunc,inds,acc,rV) => freqNormal(cc) ::: freqNormal(accum) ::: freqNormal(func) ::: freqNormal(rFunc)
+    case ParPipeForeach(cc,func,inds) => freqNormal(cc) ::: freqCold(func)
+    case ParPipeReduce(cc,accum,func,rFunc,inds,acc,rV) => freqNormal(cc) ::: freqNormal(accum) ::: freqCold(func) ::: freqNormal(rFunc)
     case _ => super.symsFreq(e)
   }
   override def boundSyms(e: Any): List[Sym[Any]] = e match {
@@ -100,7 +100,7 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
   import IR._
 
   def emitParallelizedLoop(iters: List[List[Sym[FixPt[Signed,B32,B0]]]], cchain: Exp[CounterChain]) = {
-    val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
+    val Def(EatReflect(Counterchain_new(counters))) = cchain
 
     iters.zipWithIndex.foreach{ case (is, i) =>
       if (is.size == 1) { // This level is not parallelized, so assign the iter as-is

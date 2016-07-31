@@ -353,7 +353,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
   }
 
 	def emitNestedIdx(cchain:Exp[CounterChain], inds:List[Sym[FixPt[Signed,B32,B0]]]) = {
-    val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
+    val Deff(Counterchain_new(counters)) = cchain
 	  inds.zipWithIndex.foreach {case (iter, idx) => emitValDef(iter, counters(idx)) }
   }
 
@@ -435,7 +435,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
 			inHwScope = false
       controlNodeStack.pop
 
-    case e@Counterchain_new(counters,nIters) =>
+    case e@Counterchain_new(counters) =>
 
     case e@Pipe_foreach(cchain, func, inds) =>
       controlNodeStack.push(sym)
@@ -522,7 +522,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
     styleOf(sym) match {
       case InnerPipe =>
         val numCounters = if (cchain.isDefined) {
-          val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
+          val Def(EatReflect(Counterchain_new(counters))) = cchain.get
           counters.size
         } else {
           1
@@ -546,8 +546,8 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
         emit(s"""${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
         emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
         if (cchain.isDefined) {
-          val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
-          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)}.cast(dfeUInt(32)));""")
+          val Def(EatReflect(Counterchain_new(counters))) = cchain.get
+          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", nIter_TODO.cast(dfeUInt(32)));""")
         } else {
           emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", constant.var(dfeUInt(32), 1));""")
         }
@@ -557,12 +557,8 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
         emit(s"""${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
         emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
         if (cchain.isDefined) {
-          val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain.get
-//          emitBlock(nIters, "nIters")
-//          val Def(d) = getBlockResult(nIters)
-//          emit(s"""// ${quote(getBlockResult(nIters))} = $d""")
-//          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(getBlockResult(nIters))});""")
-          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(nIters)}.cast(dfeUInt(32)));""")
+          val Def(EatReflect(Counterchain_new(counters))) = cchain.get
+          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", nIter_TODO.cast(dfeUInt(32)));""")
         } else {
           emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", constant.var(dfeUInt(32), 1));""")
         }
@@ -593,24 +589,12 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
         emit(s"""DFEVar ${quote(sym)}_ctr_en = ${quote(sym)}_datapath_en;""")
       }
     }
-// HEAD
-// =======
-//    if (isInnerPipe(sym)) {
-//      emit(s"""DFEVar ${quote(sym)}_rst_done = dfeBool().newInstance(this);""")
-//      emit(s"""${quote(sym)}_sm.connectInput("rst_done", ${quote(sym)}_rst_done);""")
-//      emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
-//
-//      emit(s"""OffsetExpr ${quote(sym)}_offset = stream.makeOffsetAutoLoop("${quote(sym)}_offset");""")
-//      emit(s"""${quote(sym)}_rst_done <== stream.offset(${quote(sym)}_rst_en, -${quote(sym)}_offset-1);""")
-//
-//    }
-// dhdl-transform
 
     emitComment(s"""} ${smStr} ${quote(sym)}""")
   }
 
   def emitCChainCtrl(sym: Sym[Any], cchain: Exp[CounterChain]) {
-		val Def(EatReflect(Counterchain_new(counters, nIters))) = cchain
+		val Deff(Counterchain_new(counters)) = cchain
 
     /* Reset CounterChain */
     //TODO: support reset of counterchain to sequential and metapipe in templete
@@ -741,7 +725,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
 
     // For Pipes, max must be derived from PipeSM
     // For everyone else, max is as mentioned in the ctr
-		val Def(EatReflect(Counterchain_new(counters, nIter))) = cchain
+		val Deff(Counterchain_new(counters)) = cchain
 		counters.zipWithIndex.map {case (ctr,i) =>
 			val Def(EatReflect(Counter_new(start, end, step, _))) = ctr
 			val max = parentOf(cchain.asInstanceOf[Rep[CounterChain]]) match {

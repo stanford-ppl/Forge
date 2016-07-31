@@ -13,7 +13,7 @@ import dhdl.compiler.ops._
 import java.io.PrintWriter
 import ppl.delite.framework.Config
 
-trait PIRGen extends Traversal with QuotingExp {
+trait PIRGen extends Traversal with SubstQuotingExp {
   val IR: DHDLExp with PIRScheduleAnalysisExp
   import IR._
 
@@ -25,12 +25,13 @@ trait PIRGen extends Traversal with QuotingExp {
   val app = Config.degFilename.take(Config.degFilename.length - 4)
   val filename = app + ".scala"
 
-  lazy val scheduler = new PIRScheduleAnalyzer{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
+  lazy val prescheduler = new PIRScheduleAnalyzer{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
+  lazy val scheduler = new PIRScheduler{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
   lazy val collector = new SymbolCollector{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
   lazy val constants = collector.constants
-  lazy val globals   = scheduler.globals
-  lazy val top       = scheduler.top
-  lazy val cus       = scheduler.cuMapping
+  lazy val globals   = prescheduler.globals
+  lazy val top       = prescheduler.top
+  lazy val cus       = prescheduler.cuMapping
 
   var stream: PrintWriter = null
   var indent = 0
@@ -65,6 +66,10 @@ trait PIRGen extends Traversal with QuotingExp {
 
   def emitPIR(b: Block[Any]) {
     collector.run(b)
+    prescheduler.run(b)
+    subst ++= prescheduler.subst.toList
+    scheduler.subst ++= subst.toList
+    scheduler.cus ++= cus.toList
     scheduler.run(b)
 
     debug("Scheduling complete. Generating...")
@@ -116,15 +121,6 @@ trait PIRGen extends Traversal with QuotingExp {
     if (isControlNode(lhs) && cus.contains(lhs))
       generateCU(lhs, cus(lhs))
   }
-
-  /*def generateCompute(top: Exp[Any]) {
-    var frontier = List(top)
-    while (frontier.nonEmpty) {
-      for (pipe <- frontier) generateCU(pipe, cus(pipe))
-
-      frontier = frontier.flatMap{case pipe => childrenOfHack(pipe) }
-    }
-  }*/
 
   def cuDeclaration(cu: ComputeUnit) = cu match {
     case cu: BasicComputeUnit =>
@@ -197,7 +193,7 @@ trait PIRGen extends Traversal with QuotingExp {
     case VectorIn(name, mem)  => emit(s"val $name = VecIn(${mem.name})")
     case VectorOut(name, mem) => emit(s"val $name = VecOut(${mem.name})")
 
-    case MemCtrl(name,region,mode) => emit(s"val $name = MemoryController(${region.name}, $mode)")
+    case MemCtrl(name,region,mode) => emit(s"val $name = MemoryController($mode, ${region.name})")
     case Offchip(name) => emit(s"val $name = Offchip()")
     case InputArg(name) => emit(s"val $name = ArgIn()")
     case OutputArg(name) => emit(s"val $name = ArgOut()")

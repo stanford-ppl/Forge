@@ -23,6 +23,7 @@ trait UnrolledControlSignalAnalysisExp extends ControlSignalAnalysisExp {this: D
 // (3)  Sets children control nodes of controllers
 // (4)  Sets reader control nodes of locally read memories
 // (5)  Sets writer control nodes of locally written memories
+// (5.5) Sets top writer control nodes of locally written memories
 // (6)  Flags accumulators
 // (7)  Records list of local memories
 // (8)  Records set of metapipes
@@ -40,7 +41,7 @@ trait ControlSignalAnalyzer extends Traversal {
   var level = 0
   var indsOwners: Map[Exp[Any], (Exp[Any], Boolean, Int)] = Map.empty // Used to identify the top-most controller for a given address
   var controller: Option[(Exp[Any], Boolean)] = None                  // Parent controller for the current scope
-  var pendingReads: Map[Exp[Any],Exp[Any]] = Map.empty                // Memory reads outside of inner pipes
+  var pendingReads: Map[Exp[Any],List[Exp[Any]]] = Map.empty          // Memory reads outside of inner pipes
   var unrollFactors = List[Exp[Int]]()                                // Unrolling factors for the current scope
 
   // --- Output (to DSE)
@@ -59,6 +60,7 @@ trait ControlSignalAnalyzer extends Traversal {
       if (meta[MWritten](s).isDefined) writtenIn(s) = Nil
       if (meta[MWriters](s).isDefined) writersOf(s) = Nil
       if (meta[MChildren](s).isDefined) childrenOf(s) = Nil
+      if (meta[MTopWriters](s).isDefined) topWritersOf(s) = Nil
     }
     super.preprocess(b)
   }
@@ -128,8 +130,7 @@ trait ControlSignalAnalyzer extends Traversal {
   def appendReader(ctrl: Exp[Any], isReduce: Boolean, reader: Exp[Any]) = reader match {
     case LocalReader(reads) => reads.foreach{ case (mem,addr) =>
       checkMultipleReaders(mem, reader)
-      val top = addr.map{a => getTopController(ctrl, isReduce, a)}.getOrElse( (ctrl,isReduce) )
-      readersOf(mem) = readersOf(mem) :+ (top._1, top._2, reader)
+      readersOf(mem) = readersOf(mem) :+ (ctrl, isReduce, reader)
     }
   }
 
@@ -137,7 +138,7 @@ trait ControlSignalAnalyzer extends Traversal {
     if (isInnerPipe((ctrl,isReduce)))
       appendReader(ctrl, isReduce, reader)
     else {
-      pendingReads += reader -> reader
+      pendingReads += reader -> List(reader)
       debug(s"Added pending reader: $reader")
     }
   }
@@ -159,7 +160,9 @@ trait ControlSignalAnalyzer extends Traversal {
     case LocalWriter(writes) => writes.foreach{ case (mem,value,addr) =>
       checkMultipleWriters(mem, writer)
       val top = addr.map{a => getTopController(ctrl, isReduce, a)}.getOrElse( (ctrl, isReduce) )
-      writersOf(mem) = writersOf(mem) :+ (top._1, top._2, writer)        // (5)
+
+      writersOf(mem) = writersOf(mem) :+ (ctrl, isReduce, writer)        // (5)
+      topWritersOf(mem) = topWritersOf(mem) :+ (top._1, top._2, writer)  // (5.5)
       writtenIn(ctrl) = writtenIn(ctrl) :+ mem                           // (10)
 
       // This memory is set as an accumulator if it's written value depends on the memory (some read node)
@@ -203,20 +206,20 @@ trait ControlSignalAnalyzer extends Traversal {
       val parent = if (isControlNode(lhs)) (lhs,false) else ctrl
 
       val delayedReads = deps.filter(pendingReads.keySet contains _)
+      val readers = delayedReads.flatMap{sym => pendingReads(sym)}
 
-      if (delayedReads.nonEmpty) {
-        debug(s"$lhs = $rhs")
-        debug(deps.mkString(", "))
-      }
-      delayedReads.foreach{sym =>
-        val reader = pendingReads(sym)
+      if (readers.nonEmpty) {
+        debug(s"Checking node for dependencies on pending readers:")
+        debug(s"  $lhs = $rhs")
+        debug("  " + deps.mkString(", "))
+
         if (isAllocation(lhs)) { // TODO: Other propagaters?
-          pendingReads += lhs -> reader
-          debug(s"Found propagating dep on pending reader $reader")
+          debug(s"""  Found propagating dep ($lhs) for pending readers (${readers.mkString(",")})""")
+          pendingReads += lhs -> readers
         }
         else {
-          appendReader(parent._1, parent._2, reader)
-          debug(s"Found true dep on pending reader $reader")
+          debug(s"""  Found true dep ($lhs) of pending readers (${readers.mkString(",")})""")
+          readers.foreach{reader => appendReader(parent._1, parent._2, reader) }
         }
       }
 
@@ -261,6 +264,7 @@ trait ControlSignalAnalyzer extends Traversal {
       checkMultipleReaders(a, lhs)
       readersOf(a) = readersOf(a) :+ (lhs, isOuter, lhs)  // (4)
       writersOf(a) = writersOf(a) :+ (lhs, isOuter, lhs)  // (5)
+      topWritersOf(a) = topWritersOf(a) :+ (lhs, isOuter, lhs)
       isAccum(a) = true                                   // (6)
       writtenIn(lhs) = writtenIn(lhs) :+ a                // (10)
       parentOf(a) = lhs  // Reset accumulator with reduction
@@ -276,6 +280,7 @@ trait ControlSignalAnalyzer extends Traversal {
       checkMultipleReaders(a, lhs)
       readersOf(a) = readersOf(a) :+ (lhs, true, lhs)     // (4)
       writersOf(a) = writersOf(a) :+ (lhs, true, lhs)     // (5)
+      topWritersOf(a) = topWritersOf(a) :+ (lhs, true, lhs)
       isAccum(a) = true                                   // (6)
       writtenIn(lhs) = writtenIn(lhs) :+ a                // (10)
       parentOf(a) = lhs  // Reset accumulator with reduction, not allocation
@@ -316,6 +321,7 @@ trait UnrolledControlSignalAnalyzer extends ControlSignalAnalyzer {
       // rFunc isn't "real" anymore
       readersOf(accum) = readersOf(accum) ++ readersOf(acc) // (4)
       writersOf(accum) = writersOf(accum) ++ writersOf(acc) // (5)
+      topWritersOf(accum) = topWritersOf(accum) ++ topWritersOf(acc) // (5.5)
       isAccum(accum) = true                                 // (6)
       writtenIn(lhs) = writtenIn(lhs) :+ accum              // (10)
       parentOf(accum) = lhs           // Reset accumulator with reduction, not allocation

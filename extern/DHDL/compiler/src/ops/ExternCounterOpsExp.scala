@@ -28,7 +28,7 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
 
   // --- Nodes
   case class Counter_new(start: Rep[Idx], end: Rep[Idx], step: Rep[Idx], par: Param[Int])(implicit val ctx: SourceContext) extends Def[Counter]
-  case class Counterchain_new(counters: List[Rep[Counter]], nIter: Rep[Idx])(implicit val ctx: SourceContext) extends Def[CounterChain]
+  case class Counterchain_new(counters: List[Rep[Counter]])(implicit val ctx: SourceContext) extends Def[CounterChain]
 
   // --- Internal API
   def counter_new(start: Rep[Idx],end: Rep[Idx],step: Rep[Idx], par: Rep[Int])(implicit ctx: SourceContext) = {
@@ -56,7 +56,7 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
     val steps:  List[Rep[Idx]] = ctrSplit.map(_._3)
     val pars:   List[Rep[Idx]] = ctrSplit.map(_._4).map(int_to_fix[Signed,B32](_)) // HACK: Convert Int param to fixed point
 
-    val nIter = {
+    /*val nIter = {
       // TODO: These should be more general rewrite rules
       val lens: List[Rep[Idx]] = starts.zip(ends).map{
         case (ConstFix(x: Int),ConstFix(y: Int)) => (y - x).as[Idx]
@@ -68,27 +68,27 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
         case (len, step, par) => div(len, mul(step, par))
       }
       productTree(total)
-    }
+    }*/
 
     // HACK: Not actually mutable, but isn't being scheduled properly otherwise
-    reflectMutable(Counterchain_new(counters, nIter)(ctx))
+    reflectMutable(Counterchain_new(counters)(ctx))
   }
 
   // --- Analysis tools
   def offsets(cc: Rep[CounterChain]) = cc match {
-    case Deff(Counterchain_new(ctrs,nIter)) => ctrs.map{
+    case Deff(Counterchain_new(ctrs)) => ctrs.map{
       case Deff(Counter_new(start,_,_,par)) => start
     }
   }
 
   def ccMaxes(cc: Rep[CounterChain]) = cc match {
-    case Deff(Counterchain_new(ctrs, nIter)) => ctrs.map{
+    case Deff(Counterchain_new(ctrs)) => ctrs.map{
       case Deff(Counter_new(start,end,_,_)) => end
     }
   }
 
   def isUnitCounterChain(e: Exp[Any]): Boolean = e match {
-    case Deff(Counterchain_new(ctrs,_)) if ctrs.length == 1 => isUnitCounter(ctrs(0))
+    case Deff(Counterchain_new(ctrs)) if ctrs.length == 1 => isUnitCounter(ctrs(0))
     case _ => false
   }
 
@@ -99,7 +99,7 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
 
   // TODO: Default number of iterations if bound can't be computed?
   def nIters(x: Rep[CounterChain]): Long = x match {
-    case Deff(Counterchain_new(_,nIters)) => Math.ceil( bound(nIters).getOrElse(1.0) ).toLong
+    case Deff(Counterchain_new(_)) => 1L //Math.ceil( bound(nIters).getOrElse(1.0) ).toLong
     case _ => 1L
   }
 
@@ -109,8 +109,8 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
     case e@Counter_new(s,end,t,p) => reflectPure( Counter_new(f(s),f(end),f(t),p)(pos) )(mtype(manifest[A]), pos)
     case Reflect(e@Counter_new(s,end,t,p), u, es) => reflectMirrored(Reflect(Counter_new(f(s),f(end),f(t),p)(e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
 
-    case e@Counterchain_new(counters,nIter) => reflectPure(Counterchain_new(f(counters),f(nIter))(e.ctx))(mtype(manifest[A]), pos)
-    case Reflect(e@Counterchain_new(counters,nIter), u, es) => reflectMirrored(Reflect(Counterchain_new(f(counters),f(nIter))(e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+    case e@Counterchain_new(counters) => reflectPure(Counterchain_new(f(counters))(e.ctx))(mtype(manifest[A]), pos)
+    case Reflect(e@Counterchain_new(counters), u, es) => reflectMirrored(Reflect(Counterchain_new(f(counters))(e.ctx), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
 
     case _ => super.mirror(e,f)
   }
@@ -130,7 +130,7 @@ trait ScalaGenExternCounterOps extends ScalaGenEffect {
     case e@Counter_new(start,end,step,par) =>
       stream.println("val "+quote(sym)+" = "+quote(start)+" until "+quote(end)+" by "+quote(step)+" par "+quote(par))
 
-    case e@Counterchain_new(counters, nIter) =>
+    case e@Counterchain_new(counters) =>
       emitValDef(sym, "Array(" + counters.map(quote).mkString(", ") + ")")
 
     case _ => super.emitNode(sym,rhs)
@@ -151,9 +151,8 @@ trait MaxJGenExternCounterOps extends MaxJGenEffect {
     case e@Counter_new(start,end,step,par) =>
 
 
-    case e@Counterchain_new(counters, nIter) =>
+    case e@Counterchain_new(counters) =>
       // See emitMaxJCounterChain() in PipeTemplateOpsExp.scala
-
 
     case _ => super.emitNode(sym,rhs)
   }

@@ -29,7 +29,7 @@ trait PIRScheduler extends Traversal with SubstQuotingExp {
     def apply(x: Exp[Any]) = {
       val in = cu.scalarIn.find(_.name == quote(x))
       if (regs.contains(x)) regs(x)
-      else if (in.isDefined) InputReg(in.get)
+      else if (in.isDefined) InputReg(stageNum, in.get)
       else x match {
         case Exact(c) => ConstReg(s"${c.toLong}l")
         case _ => stageError(s"No register lookup available for $x")
@@ -63,6 +63,7 @@ trait PIRScheduler extends Traversal with SubstQuotingExp {
 
     debug("Generated stages: ")
     ctx.stages.reverse.foreach(stage => debug(s"  $stage"))
+    cu.stages = ctx.stages.reverse
   }
 
   def nodeToStage(lhs: Exp[Any], rhs: Def[Any], ctx: CUContext, isReduce: Boolean) = {
@@ -90,7 +91,13 @@ trait PIRScheduler extends Traversal with SubstQuotingExp {
       if (ctx.cu.scalarOut.exists(_.name == quote(lhs))) {
         val out = ctx.cu.scalarOut.find(_.name == quote(lhs)).get
         ctx.currentStage match {
-          case stage: Stage => stage.out = OutputReg(ctx.stageNum-1, out)
+          case stage: Stage =>
+            stage.out match {
+              case t: TempReg => ctx.cu.tempRegs -= t
+              case _ =>
+            }
+            stage.out = OutputReg(ctx.stageNum-1, out)
+
           case _: ReduceStage =>
             // Can't directly write scalar output from reduction stage
             val stage = Stage(Bypass, List(ctx(value)), OutputReg(ctx.stageNum,out))
@@ -103,16 +110,38 @@ trait PIRScheduler extends Traversal with SubstQuotingExp {
     case _ => nodeToOp(rhs) match {
       case Some(op) =>
         val inputs = syms(rhs).map{sym => ctx(sym) }
-        val stage = Stage(op, inputs, TempReg(ctx.stageNum))
+        val output = ctx.cu.temp(ctx.stageNum)
+        val stage = Stage(op, inputs, output)
+        ctx.regs += lhs -> output
         ctx.addStage(stage)
 
       case None => stageWarn(s"No PIR scheduling rule known for $lhs = $rhs")
     }
   }
 
-  // Seems hacky..
   def reduceNodeToStage(lhs: Exp[Any], rhs: Def[Any], ctx: CUContext) = nodeToOp(rhs) match {
     case Some(op) =>
+      // By convention, the inputs to the reduction tree is the first argument to the node
+      // This input must be in the previous stage's reduction register
+      // Ensure this either by adding a bypass register for raw inputs or changing the output
+      // of the previous stage from a temporary register to the reduction register
+      // FIXME: Rather hacky. Should guarantee ordering to avoid stage error with map stage
+      val input = ctx(syms(rhs).head)
+      input match {
+        case r: ReduceReg => // ok?
+        case _:InputReg | _:InputMem | _:CounterReg =>
+          val output = ReduceReg(ctx.stageNum)
+          val bypass = Stage(Bypass, List(input), output)
+          ctx.addStage(bypass)
+
+        case t: TempReg =>
+          ctx.currentStage match {
+            case stage@Stage(op,inputs,`t`) =>
+              ctx.cu.tempRegs -= t
+              stage.out = ReduceReg(ctx.stageNum-1)
+            case _ => stageError("Input to reduction must be from immediately preceeding map tage")
+          }
+      }
       val stage = ReduceStage(op)
       ctx.regs += lhs -> ReduceReg(ctx.stageNum)
       ctx.addStage(stage)

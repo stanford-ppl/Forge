@@ -10,24 +10,6 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait SymbolCollector extends Traversal {
-  val IR: DHDLExp
-  import IR._
-  override val recurse = Always
-  var constants: List[Exp[Any]] = Nil
-
-  override def traverse(lhs: Sym[Any], rhs: Def[Any]) = {
-    constants :::= (rhs match {
-      case p: Product =>
-        p.productIterator.toList.flatMap{
-          case e: Exp[_] => e match {case Exact(_) => Some(e); case _ => None}
-          case _ => None
-        }
-      case _ => Nil
-    })
-  }
-}
-
 // For bound symbols
 trait SubstQuotingExp extends QuotingExp {
   import IR._
@@ -314,7 +296,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Subs
           }
           else if (isBuffer(mem)) {
             val isLocallyWritten = allocateReadSRAM(reader, mem, addr, cu)
-            if (!isLocallyWritten) remoteStages ::= reader
+            //if (!isLocallyWritten) remoteStages ::= reader
           }
         }
 

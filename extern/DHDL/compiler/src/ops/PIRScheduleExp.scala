@@ -33,10 +33,10 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
 
   // Intra-CU communication
   sealed abstract class LocalMem
-  case class ReduceReg(producer: Int) extends LocalMem
-  case class TempReg(producer: Int) extends LocalMem
-  case class InputReg(in: ScalarIn) extends LocalMem
-  case class OutputReg(producer: Int, out: ScalarOut) extends LocalMem
+  case class ReduceReg(stage: Int) extends LocalMem
+  case class TempReg(stage: Int, id: Int) extends LocalMem
+  case class InputReg(stage: Int, in: ScalarIn) extends LocalMem
+  case class OutputReg(stage: Int, out: ScalarOut) extends LocalMem
   case class InputMem(mem: PIRMemory) extends LocalMem
   case class CounterReg(cchain: PIRCounterChain, idx: Int) extends LocalMem
   case class ConstReg(const: String) extends LocalMem
@@ -70,6 +70,13 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
     var scalarOut: List[ScalarOut] = Nil // locally written, remotely read registers
     var vectorIn: List[VectorIn] = Nil   // locally read, remotely written buffers
     var vectorOut: List[VectorOut] = Nil // locally written, remotely read buffers
+    var tempRegs: Set[TempReg] = Set.empty
+
+    def temp(stage: Int) = {
+      val t = TempReg(stage, tempRegs.size)
+      tempRegs += t
+      t
+    }
 
     def dumpString = s"""  cchains = ${cchains.mkString(", ")}
   iters   = ${iterators.mkString(", ")}

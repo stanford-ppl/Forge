@@ -27,8 +27,6 @@ trait PIRGen extends Traversal with SubstQuotingExp {
 
   lazy val prescheduler = new PIRScheduleAnalyzer{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
   lazy val scheduler = new PIRScheduler{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
-  lazy val collector = new SymbolCollector{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
-  lazy val constants = collector.constants
   lazy val globals   = prescheduler.globals
   lazy val top       = prescheduler.top
   lazy val cus       = prescheduler.cuMapping
@@ -44,6 +42,7 @@ trait PIRGen extends Traversal with SubstQuotingExp {
     case Const(c: Long) => "Const(" + c + "l)"
     case Const(c: Double) => "Const(" + c + ".toLong)"  // TODO
     case Const(c: Float) => "Const(" + c + ".toLong)"   // TODO
+    case Exact(c) => "Const(" + c.toLong + "l)" // TODO
     case Param(p) => "Const(" + p + ".toLong)"  // TODO
     case _ => super.quote(x)
   }
@@ -65,7 +64,6 @@ trait PIRGen extends Traversal with SubstQuotingExp {
   }
 
   def emitPIR(b: Block[Any]) {
-    collector.run(b)
     prescheduler.run(b)
     subst ++= prescheduler.subst.toList
     scheduler.subst ++= subst.toList
@@ -93,10 +91,6 @@ trait PIRGen extends Traversal with SubstQuotingExp {
   }
 
   def generateGlobals() {
-    constants.foreach{
-      case Const(c) =>
-      case c@Exact(d) => emit(s"val ${quote(c)} = Const(${d.toLong}l)") // TODO
-    }
     val (mems, memCtrls) = globals.partition{case MemCtrl(_,_,_) => false; case _ => true}
     mems.foreach(emitComponent(_))
     memCtrls.foreach(emitComponent(_))
@@ -159,7 +153,7 @@ trait PIRGen extends Traversal with SubstQuotingExp {
 
     // TODO: How to communicate a non-iter address to SRAM?
     cu.srams.foreach(emitComponent(_))
-    // TODO: Stages
+    emitStages(cu)
 
     open(s"""CU.updateFields(""")
     emit(s"""cchains = List(${cu.cchains.map(_.name).mkString(", ")}), """)
@@ -199,7 +193,34 @@ trait PIRGen extends Traversal with SubstQuotingExp {
     case OutputArg(name) => emit(s"val $name = ArgOut()")
     case ScalarMem(name) => emit(s"val $name = Scalar()")
     case VectorMem(name) => emit(s"val $name = Vector()")
-
     case _ => stageError(s"Don't know how to generate CGRA component: $x")
+  }
+
+  def quote(x: LocalMem) = x match {
+    case ReduceReg(i) => s"CU.reduce(stage($i))"
+    case TempReg(i,id) => s"t$id"
+    case InputReg(i,in) => s"CU.scalarIn(stage($i), ${in.name})"
+    case OutputReg(i,out) => s"CU.scalarOut(stage($i),${out.name})"
+    case InputMem(mem) => s"${mem.name}.load"
+    case CounterReg(chain, idx) => s"${chain.name}($idx)"
+    case ConstReg(const) => s"Const($const)"
+  }
+
+  def emitStages(cu: ComputeUnit) {
+    emit(s"val stage = Stages(${cu.stages.length})")
+    // Preallocate temporary registers
+    cu.tempRegs.foreach{case TempReg(stage, id) =>
+      emit(s"val t$id = CU.temp(stage($stage))")
+    }
+    cu.stages.zipWithIndex.foreach{
+      case (Stage(op,inputs,out), i) =>
+        val ins = inputs.map(quote(_)).mkString(", ")
+        emit(s"""Stage(stage($i), opds=List($ins), o=$op, r=${quote(out)})""")
+
+      case (ReduceStage(op), i) =>
+        emit(s"""Stage.reduce(stage($i), op=$op)""")
+
+      case (stage,i) => stageError(s"Non-finalized stage found in $cu: $stage")
+    }
   }
 }

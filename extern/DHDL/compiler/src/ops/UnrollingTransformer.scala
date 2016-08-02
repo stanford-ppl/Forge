@@ -8,15 +8,24 @@ import scala.collection.mutable.HashMap
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait UnrollingTransformExp extends NodeMetadataOpsExp with LoweredPipeOpsExp { this: DHDLExp => }
+trait UnrollingTransformExp extends ReductionAnalysisExp with LoweredPipeOpsExp { this: DHDLExp => }
 
 trait UnrollingTransformer extends MultiPassTransformer {
   val IR: UnrollingTransformExp with DHDLExp
   import IR.{infix_until => _, Array => _, assert => _, _}
 
-  debugMode = false
+  debugMode = true
   override val name = "Unrolling Transformer"
 
+  var cloneFuncs: List[Exp[Any] => Unit] = Nil
+  def duringClone[T](func: Exp[Any] => Unit)(blk: => T): T = {
+    val prevCloneFuncs = cloneFuncs
+    cloneFuncs ::= func
+    debug("Adding upon-clone function!")
+    val result = blk
+    cloneFuncs = prevCloneFuncs
+    result
+  }
   /**
    * Helper class for unrolling
    * Tracks multiple substitution contexts in 'laneSubst' array
@@ -205,6 +214,8 @@ trait UnrollingTransformer extends MultiPassTransformer {
       }
     }
     val newPipe = reflectEffect(ParPipeReduce(cchain, accum, blk, rFunc, inds2, acc, rV)(ctx,mT,mC))
+    isInnerAccum(accum) = true
+    isInnerAccum(acc) = true
 
     val Def(d) = newPipe
     debug(s"$newPipe = $d")
@@ -231,7 +242,10 @@ trait UnrollingTransformer extends MultiPassTransformer {
           Pipe {
             val newIdx = inlineBlock(iFunc)
             val loads = mapResults.map{mem => withSubstScope(part -> mem, idx -> newIdx){inlineBlock(ld1)(mT)} }
-            unrollReduce(loads, validsMap, zero, rFunc, newIdx, ld2, st, idx, res, rV)(mT,numT)
+            // Set the final unit pipe reduction as non-reduction stages (as they can't be put in a SIMD tree currently)
+            duringClone{e => if (SpatialConfig.genCGRA) reduceType(e) = None}{
+              unrollReduce(loads, validsMap, zero, rFunc, newIdx, ld2, st, idx, res, rV)(mT,numT)
+            }
           }
         }
       }
@@ -262,14 +276,18 @@ trait UnrollingTransformer extends MultiPassTransformer {
               stageError("Reduction without explicit zero is not yet supported")
             }
             val accRead = inlineBlock(ld2)(mT)
-            val treeResult = reduceTree(validLoads){(x,y) => reduce(x,y) }
-            val newRes = reduce(treeResult, accRead)
+            val newRes = duringClone{e => if (SpatialConfig.genCGRA) reduceType(e) = None}{
+              val treeResult = reduceTree(validLoads){(x,y) => reduce(x,y) }
+              reduce(treeResult, accRead)
+            }
             subst += res -> newRes
           }
           unrollMap(st, reduceLanes)    // Parallel store. Already have substitutions for idx and res
           ()
         }
         val innerPipe = reflectEffect(ParPipeReduce(ccRed, accum, innerBlk, rFunc, indsRed2, acc, rV), summarizeEffects(innerBlk).star andAlso Simple() andAlso Write(List(accum.asInstanceOf[Sym[C[T]]])) )
+        isInnerAccum(accum) = true
+        isInnerAccum(acc) = true
         styleOf(innerPipe) = InnerPipe
       }
     }
@@ -289,6 +307,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
   def self_clone[A](sym: Sym[A], rhs : Def[A]): Exp[A] = {
     val sym2 = clone(rhs)(mtype(sym.tp), mpos(sym.pos))
     setProps(sym2, getProps(sym))
+    cloneFuncs.foreach{func => func(sym2)}
     sym2
   }
 

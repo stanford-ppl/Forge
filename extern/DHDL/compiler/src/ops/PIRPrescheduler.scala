@@ -70,7 +70,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Subs
 
     val ccs = deps(pipe).flatMap {
       case cc@Deff(Counterchain_new(ctrs)) =>
-        val ctrInsts = ctrs.map{case ctr@Deff(Counter_new(start,end,stride,par)) => PIRCounter(quote(ctr),start,end,stride,par) }
+        val ctrInsts = ctrs.map{case ctr@Deff(Counter_new(start,end,stride,par)) => PIRCounter(quote(ctr),start,end,stride) }
         Some(CounterChainInstance(quote(cc),ctrInsts))
       case _ => None
     }
@@ -252,7 +252,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Subs
           }
           else if (isBuffer(mem)) {
             val addrComputation = addr.map{a => getSchedule(stms)(a,false)}.getOrElse(Nil)
-            val addrSyms = addrComputation.map{case TP(s,d) => s}
+            val addrSyms = addrComputation.map{case TP(s,d) => s} :+ writer
             val addrStages = addrSyms.map{s => DefStage(s, isWrite = true) }
 
             val isLocallyRead = allocateWrittenSRAM(writer, mem, addr, cu, addrStages)
@@ -274,9 +274,9 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Subs
               remove the reader from the list of stages to be scheduled
        */
       case reader@LocalReader(reads) if !isControlNode(reader) =>
-        debug(s"local reader: $reader")
         reads.foreach{case (mem,addr) =>
           if (isRegister(mem.tp)) {
+            debug(s"local register read: $reader")
             val writeCtrl = writersOf(mem).headOption.map(_._1) // ASSUMPTION: At least one writer
 
             // Register reads may be used by more than one pipe
@@ -292,9 +292,11 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Subs
             }
             val isLocallyRead = readersOf(mem).exists{case (ctrl,_,read) => read == reader && ctrl == pipe}
             val isLocallyWritten = !isArgIn(mem) && writeCtrl.map(_ == pipe).getOrElse(true)
-            if (!isLocallyWritten || !isLocallyRead) remoteStages ::= reader
+            debug(s"isLocallyRead: $isLocallyRead, isLocallyWritten: $isLocallyWritten")
+            if (!isLocallyWritten || !isLocallyRead || isInnerAccum(mem)) remoteStages ::= reader
           }
           else if (isBuffer(mem)) {
+            debug(s"local buffer read: $reader")
             val isLocallyWritten = allocateReadSRAM(reader, mem, addr, cu)
             //if (!isLocallyWritten) remoteStages ::= reader
           }
@@ -305,7 +307,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with Subs
         traverse(lhs.asInstanceOf[Sym[Any]], rhs)
     }
 
-    val localCompute = stages.filter{s => (isPrimitiveNode(s) || isGlobal(s)) && !remoteStages.contains(s) }
+    val localCompute = stages.filter{s => (isPrimitiveNode(s) || isRegisterRead(s) || isGlobal(s)) && !remoteStages.contains(s) }
 
     // Sanity check
     if (isOuterControl(pipe) && localCompute.nonEmpty) {

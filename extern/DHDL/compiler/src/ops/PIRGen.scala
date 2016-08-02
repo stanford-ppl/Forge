@@ -116,11 +116,14 @@ trait PIRGen extends Traversal with SubstQuotingExp {
       generateCU(lhs, cus(lhs))
   }
 
-  def cuDeclaration(cu: ComputeUnit) = cu match {
-    case cu: BasicComputeUnit =>
-      s"""ComputeUnit(name=Some("${cu.name}"), tpe = ${quoteControl(cu.tpe)})"""
-    case cu: TileTransferUnit =>
-      s"""TileTransfer(name=Some("${cu.name}"), memctrl=${cu.ctrl.name}, mctpe=${cu.mode})"""
+  def cuDeclaration(cu: ComputeUnit) = {
+    val parent = cu.parent.map(_.name).getOrElse("top")
+    cu match {
+      case cu: BasicComputeUnit =>
+        s"""ComputeUnit(name=Some("${cu.name}"), tpe = ${quoteControl(cu.tpe)}, parent=$parent)"""
+      case cu: TileTransferUnit =>
+        s"""TileTransfer(name=Some("${cu.name}"), memctrl=${cu.ctrl.name}, mctpe=${cu.mode}, parent=$parent)"""
+    }
   }
   def quoteControl(tpe: ControlType) = tpe match {
     case InnerPipe => "Pipe"
@@ -133,11 +136,7 @@ trait PIRGen extends Traversal with SubstQuotingExp {
     debug(s"Generating CU for $pipe")
     debug(cu.dumpString)
 
-    val parent = cu.parent.map(_.name).getOrElse("top")
-
-    open(s"val ${cu.name} = {")
-    emit(s"implicit val CU = ${cuDeclaration(cu)}")
-    emit(s"CU.updateParent($parent)")
+    open(s"val ${cu.name} = ${cuDeclaration(cu)} { implicit CU => ")
     // Inputs and outputs
     cu.scalarIn.foreach(emitComponent(_))
     cu.scalarOut.foreach(emitComponent(_))
@@ -155,14 +154,14 @@ trait PIRGen extends Traversal with SubstQuotingExp {
     cu.srams.foreach(emitComponent(_))
     emitStages(cu)
 
-    open(s"""CU.updateFields(""")
+    /*open(s"""CU.updateFields(""")
     emit(s"""cchains = List(${cu.cchains.map(_.name).mkString(", ")}), """)
     emit(s"""srams   = List(${cu.srams.map(_.name).mkString(", ")}), """)
     emit(s"""sins    = List(${cu.scalarIn.map(_.name).mkString(", ")}), """)
     emit(s"""souts   = List(${cu.scalarOut.map(_.name).mkString(", ")}), """)
     emit(s"""vins    = List(${cu.vectorIn.map(_.name).mkString(", ")}), """)
     emit(s"""vouts   = List(${cu.vectorOut.map(_.name).mkString(", ")}) """)
-    close(")")
+    close(")")*/
     close("}")
   }
 
@@ -197,8 +196,10 @@ trait PIRGen extends Traversal with SubstQuotingExp {
   }
 
   def quote(x: LocalMem) = x match {
+    case AccumReg(id) => s"CU.reduce(a$id)"
     case ReduceReg(i) => s"CU.reduce(stage($i))"
     case TempReg(i,id) => s"t$id"
+    case TempAccumReg(i,id,init) => s"acc$id"
     case InputReg(i,in) => s"CU.scalarIn(stage($i), ${in.name})"
     case OutputReg(i,out) => s"CU.scalarOut(stage($i),${out.name})"
     case InputMem(mem) => s"${mem.name}.load"
@@ -207,20 +208,29 @@ trait PIRGen extends Traversal with SubstQuotingExp {
   }
 
   def emitStages(cu: ComputeUnit) {
-    emit(s"val stage = Stages(${cu.stages.length})")
+    val mapStages = cu.stages.filter{_.isInstanceOf[Stage]}.length
+    emit(s"val stage = Stages(${mapStages})")
     // Preallocate temporary registers
     cu.tempRegs.foreach{case TempReg(stage, id) =>
       emit(s"val t$id = CU.temp(stage($stage))")
     }
-    cu.stages.zipWithIndex.foreach{
-      case (Stage(op,inputs,out), i) =>
+    cu.tempAccs.foreach{case TempAccumReg(stage, id, init) =>
+      emit(s"val acc$id = CU.accum(stage($stage), ${quote(init)})")
+    }
+    var i = 0
+    var r = 0
+
+    cu.stages.foreach{
+      case Stage(op,inputs,out) =>
         val ins = inputs.map(quote(_)).mkString(", ")
         emit(s"""Stage(stage($i), opds=List($ins), o=$op, r=${quote(out)})""")
+        i += 1
 
-      case (ReduceStage(op), i) =>
-        emit(s"""Stage.reduce(stage($i), op=$op)""")
+      case ReduceStage(op,init,acc) =>
+        emit(s"""val (r$r, a${acc.id}) = Stage.reduce(op=$op, init=${quote(init)})""")
+        r += 1
 
-      case (stage,i) => stageError(s"Non-finalized stage found in $cu: $stage")
+      case stage => stageError(s"Non-finalized stage found in $cu: $stage")
     }
   }
 }

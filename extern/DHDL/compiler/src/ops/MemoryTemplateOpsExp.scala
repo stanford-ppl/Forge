@@ -529,20 +529,26 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
             ${quote(size0)}, ${quote(size1)}, $ts, ${banks(sym)}, /* stride_TODO */ 1, ${readersOf(sym).size});""")
         } else {
-          if (isDummy(sym)) {
-            val readers = duplicatesOf(sym) 
-            val banks = readers(0).banking.map { a =>
+          val readers = duplicatesOf(sym) 
+          val banks = if (readers.length == 1) {
+            val bnks = readers(0).banking.map { a =>
               a match {
-                case MultiWayBanking(strides, banks) =>
-                  banks
-                case StridedBanking(stride, banks) =>
-                  banks
-                case _ =>
-                  1
-                }}.mkString(",")
-            emit(s"""DummyMemLib ${quote(sym)} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""") // [TODO] Raghu: Stride from metadata            
+                case MultiWayBanking(_, banks) => banks
+                case StridedBanking(_, banks) => banks
+                case _ => 1
+                }}
+            readers(0).banking.length match {
+              case 1 => bnks
+              case 2 => bnks.mkString("new int[] {", ",", "}")
+              case _ => throw new Exception(s"Can't handle ${readers(0).banking.length}-D memory!")
+            }
           } else {
-            emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, ${banks(sym)}, 1 /* [TODO: stride from metadata */);""") // [TODO] Raghu: Stride from metadata
+            throw new Exception(s"More than 1 reader: $sym. Don't know how to handle.")
+          }
+          if (isDummy(sym)) {
+            emit(s"""DummyMemLib ${quote(sym)} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""") 
+          } else {
+            emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, /*banks*/ ${banks}, 1 /* stride */);""") // [TODO] Raghu: Stride from metadata
           }
         }
         emitComment("} Bram_new")

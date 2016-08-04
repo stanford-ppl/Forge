@@ -92,9 +92,9 @@ trait ControlSignalAnalyzer extends Traversal {
     inds.foreach{ind => indsOwners += ind -> (owner, isReduce, level) }
 
     val prevUnrollFactors = unrollFactors
-
     val factors = parFactorsOf(cc)
     inds.zip(factors).foreach{case (i,p) => parFactorOf(i) = p }
+
     // ASSUMPTION: Only parallelize by innermost loop currently
     unrollFactors ++= List(parFactors(cc).last) //unrollFactors ++= factors
 

@@ -227,7 +227,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
           with ExternPrimitiveOpsExp with DHDLCodegenOps with NosynthOpsExp with MemoryAnalysisExp with FIFOOpsExp with VectorOpsExp
           with DeliteTransform
-  import IR._
+  import IR.{println=>_,_}
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
     case "DHDLVector" => "DFEVector<DFEVar>"
@@ -320,16 +320,24 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
         case Def(EatReflect(d)) => d match {
           case d:Pipe_fold[_,_] => d.cchain
           case d:Pipe_foreach => d.cchain
+          case d:ParPipeReduce[_,_] => d.cc
+          case d:ParPipeForeach => d.cc
+          case _ => throw new Exception(s"Unknown parent ${d}!")
         }
         case p => throw new Exception(s"Unknown parent type ${p}!")
       }
-      emit(s"""$bram.connectWport(stream.offset($addr, -$offsetStr),
-        stream.offset($dataStr, -$offsetStr), ${quote(parentPipe)}_datapath_en, start_TODO, stride_TODO);""")
+      emit(s"""${quote(bram)}.connectWport(stream.offset(${quote(addr)}, -$offsetStr),
+        stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr), // Timing hacking to fix BlockReduce1DTest
+        0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
     } else {
       // [TODO] Raghu: Current assumption is that this always returns the parent
       // writing to the BRAM. Is this always true? Confirm
       val writer = quote(writersOf(bram).head._1)
-      emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+      if (isDummy(bram)) {
+        emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(writer)}_datapath_en);""") 
+      } else {
+        emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+      }
     }
     emitComment("} Bram_store")
   }
@@ -464,6 +472,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                                 "constant.var(true)"
                   }
 
+
                   emit(s"""DFEVar ${regname}_en = $enStr & ${quote(writer)}_redLoop_done;""")
                   emit(s"""${regname}_lib.write(${quote(value)}, ${regname}_en, $rstStr);""")
                   emit(s"""${regname}_delayed <== stream.offset(${regname}, -${quote(writer)}_offset);""")
@@ -499,7 +508,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
         //TODO: does templete assume bram has 2 dimension?
         val dims = dimsOf(sym)
         val Def(d0) = dims(0)
-        val Tpes_Int_to_fix(size0) = d0
+        val size0 = bound(d0).get.toInt 
         val size1 = if (dims.size == 1) {
             1
           } else {
@@ -520,7 +529,21 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
             ${quote(size0)}, ${quote(size1)}, $ts, ${banks(sym)}, /* stride_TODO */ 1, ${readersOf(sym).size});""")
         } else {
-          emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, ${banks(sym)}, 1 /* [TODO: stride from metadata */);""") // [TODO] Raghu: Stride from metadata
+          if (isDummy(sym)) {
+            val readers = duplicatesOf(sym) 
+            val banks = readers(0).banking.map { a =>
+              a match {
+                case MultiWayBanking(strides, banks) =>
+                  banks
+                case StridedBanking(stride, banks) =>
+                  banks
+                case _ =>
+                  1
+                }}.mkString(",")
+            emit(s"""DummyMemLib ${quote(sym)} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""") // [TODO] Raghu: Stride from metadata            
+          } else {
+            emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, ${banks(sym)}, 1 /* [TODO: stride from metadata */);""") // [TODO] Raghu: Stride from metadata
+          }
         }
         emitComment("} Bram_new")
       }
@@ -558,6 +581,12 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       val reader = quote(readersOf(fifo).head._1)  // Assuming that each fifo has a unique reader
       emit(s"""${quote(fifo)}_readEn <== ${reader}_ctr_en;""")
       emit(s"""DFEVector<DFEVar> ${quote(sym)} = ${quote(fifo)}_rdata;""")
+
+    case Pop_fifo(fifo) =>
+      emit(s"""// DFEVar ${quote(sym)} = Par_pop_fifo(${quote(fifo)}, 1);""")
+      val reader = quote(readersOf(fifo).head._1)  // Assuming that each fifo has a unique reader
+      emit(s"""${quote(fifo)}_readEn <== ${reader}_ctr_en;""")
+      emit(s"""DFEVar ${quote(sym)} = ${quote(fifo)}_rdata[0];""")
 
     case Vec_apply(vec, idx) =>
       emit(s"""DFEVar ${quote(sym)} = ${quote(vec)}[${quote(idx)}];""")

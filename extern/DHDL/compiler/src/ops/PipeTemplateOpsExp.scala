@@ -289,38 +289,46 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
 	var quoteSuffix = HashMap[Sym[Any],HashMap[Sym[Any], String]]()
   override def quote(x: Exp[Any]) = x match {
 		case s@Sym(n) => {
-			val tstr = s.tp.erasure.getSimpleName()
-                  .replace("DHDL","")
-                  .replace("BlockRAM", "BRAM")
-      val customStr = tstr match {
-        case "Pipeline" => styleOf(s) match {
-          case CoarsePipe => "metapipe"
-          case InnerPipe => "pipe"
-          case SequentialPipe => "seq"
-          case StreamPipe => "strm"
-          case ForkJoin => "parallel"
-        }
-        case "Register" => regType(s) match {
-          case Regular => "reg"
-          case ArgumentIn => "argin"
-          case ArgumentOut => "argout"
-        }
-        case _ => tstr
-      }
-      val suffix = if (controlNodeStack.isEmpty) "" else controlNodeStack.map { c =>
-        if (quoteSuffix.contains(c)) {
-          val suffixMap = quoteSuffix(c)
-          if (suffixMap.contains(x.asInstanceOf[Sym[Any]])) {
-            suffixMap(x.asInstanceOf[Sym[Any]])
-          } else {
-            ""
+      s match {
+        case Def(Argin_new(init)) =>
+          s"argin_" + s.tp.erasure.getSimpleName() + n
+        case Def(ConstFix(value)) =>
+          s"const${value}_" + s.tp.erasure.getSimpleName() + n
+        case _ =>
+    			val tstr = s.tp.erasure.getSimpleName()
+                      .replace("DHDL","")
+                      .replace("BlockRAM", "BRAM")
+          val customStr = tstr match {
+            case "Pipeline" => styleOf(s) match {
+              case CoarsePipe => "metapipe"
+              case InnerPipe => "pipe"
+              case SequentialPipe => "seq"
+              case StreamPipe => "strm"
+              case ForkJoin => "parallel"
+            }
+            case "Register" => regType(s) match {
+              case Regular => "reg"
+              case ArgumentIn => "argin"
+              case ArgumentOut => "argout"
+            }
+
+            case _ => tstr
           }
-        } else {
-          ""
+          val suffix = if (controlNodeStack.isEmpty) "" else controlNodeStack.map { c =>
+            if (quoteSuffix.contains(c)) {
+              val suffixMap = quoteSuffix(c)
+              if (suffixMap.contains(x.asInstanceOf[Sym[Any]])) {
+                suffixMap(x.asInstanceOf[Sym[Any]])
+              } else {
+                ""
+              }
+            } else {
+              ""
+            }
+          }.reduce{_+_}
+			    customStr + n + suffix
         }
-      }.reduce{_+_}
-			customStr + n + suffix
-		}
+		  }
     case _ => super.quote(x)
   }
 
@@ -528,8 +536,8 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
           1
         }
         emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${smStr}(this, $numCounters));""")
-        emit(s"""${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
-        emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
+        emit(s"""    ${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
+        emit(s"""    ${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
 
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
         emitGlobalWire(s"""${quote(sym)}_rst_done""")
@@ -543,30 +551,48 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
         }
       case CoarsePipe =>
         emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${smStr}(this));""")
-        emit(s"""${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
-        emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
+        emit(s"""    ${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
+        emit(s"""    ${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
         if (cchain.isDefined) {
           val Def(EatReflect(Counterchain_new(counters))) = cchain.get
-          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", nIter_TODO.cast(dfeUInt(32)));""")
+          var niter_str = s"" 
+          counters.zipWithIndex.map {case (ctr,i) =>
+            val Def(EatReflect(Counter_new(start, end, step, par))) = ctr
+            if (i > 0) {
+              niter_str += " * "
+            }
+            niter_str += s"((${quote(end)} - ${quote(start)}) / (${quote(step)} * ${quote(par)}))"
+          }
+          emit(s"""DFEVar ${quote(sym)}_niter = ${quote(niter_str)};""")
+          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(sym)}_niter.cast(dfeUInt(32)));""")
         } else {
           emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", constant.var(dfeUInt(32), 1));""")
         }
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case SequentialPipe =>
         emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${smStr}(this));""")
-        emit(s"""${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
-        emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
+        emit(s"""    ${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
+        emit(s"""    ${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
         if (cchain.isDefined) {
           val Def(EatReflect(Counterchain_new(counters))) = cchain.get
-          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", nIter_TODO.cast(dfeUInt(32)));""")
+          var niter_str = s"" 
+          counters.zipWithIndex.map {case (ctr,i) =>
+            val Def(EatReflect(Counter_new(start, end, step, par))) = ctr
+            if (i > 0) {
+              niter_str += " * "
+            }
+            niter_str += s"((${quote(end)} - ${quote(start)}) / (${quote(step)} * ${quote(par)}))"
+          }
+          emit(s"""DFEVar ${quote(sym)}_niter = ${quote(niter_str)};""")
+          emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", ${quote(sym)}_niter.cast(dfeUInt(32)));""")
         } else {
           emit(s"""${quote(sym)}_sm.connectInput("sm_numIter", constant.var(dfeUInt(32), 1));""")
         }
         emit(s"""DFEVar ${quote(sym)}_rst_en = ${quote(sym)}_sm.getOutput("rst_en");""")
       case ForkJoin =>
         emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${smStr}(this));""")
-        emit(s"""${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
-        emit(s"""${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
+        emit(s"""    ${quote(sym)}_sm.connectInput("sm_en", ${quote(sym)}_en);""")
+        emit(s"""    ${quote(sym)}_done <== stream.offset(${quote(sym)}_sm.getOutput("sm_done"),-1);""")
 
     }
 

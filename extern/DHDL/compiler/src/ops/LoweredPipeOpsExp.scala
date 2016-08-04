@@ -96,7 +96,7 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
   val IR: LoweredPipeOpsExp with ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
           with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
           with DHDLCodegenOps with NosynthOpsExp with MemoryAnalysisExp
-          with DeliteTransform
+          with DeliteTransform 
   import IR._
 
   def emitParallelizedLoop(iters: List[List[Sym[FixPt[Signed,B32,B0]]]], cchain: Exp[CounterChain]) = {
@@ -146,13 +146,28 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
       val Def(d) = accum  // CHEATING!
       duplicatesOf(acc) = duplicatesOf(accum)
       readersOf(acc) = readersOf(accum)
+      val Def(EatReflect(writer)) = writersOf(acc).head._3 //(wr controller, accum bool, st node of type bram_store)
       emitNode(acc, d)
 
       emitController(sym, Some(cchain))
       emitParallelizedLoop(inds, cchain)
       emitBlock(func)
-      (0 until duplicatesOf(accum).size) foreach { i =>
-        emit(s"""${quote(accum)}_${i}_lib.write(${quote(acc)}_0, constant.var(true), constant.var(false));""")
+
+      val Def(EatReflect(dp)) = accum
+      dp match {
+        case Bram_new(_,_) =>
+          writer match {
+            case Bram_store(bram, addr, value) =>
+              emitNode(bram.asInstanceOf[Sym[Any]], Bram_store(accum.asInstanceOf[Sym[BRAM[Any]]], addr, value))
+            case Par_bram_store(bram, addr, value) =>
+              emitNode(bram.asInstanceOf[Sym[Any]], Par_bram_store(accum.asInstanceOf[Sym[BRAM[Any]]], addr, value))
+          }
+        case Reg_new(init) =>
+          (0 until duplicatesOf(accum).size) foreach { i =>
+            emit(s"""${quote(accum)}_${i}_lib.write(${quote(acc)}_0, constant.var(true), constant.var(false));""")
+          }
+        case _ =>
+          throw new Exception(s"""Unknown accum in ParPipeReduce on ${dp}!""")          
       }
 
       emitComment(s"""} ParPipeReduce ${quote(sym)}""")

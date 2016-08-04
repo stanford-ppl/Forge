@@ -684,12 +684,12 @@ package engine;
     emit(s"""IF($condStr) {
       resetBitVector();""")
     if (state.size == 1 && state.max == max && !state.contains(0)) {
-      emit("stateFF.next <== States.DONE;")
+      emit("  stateFF.next <== States.DONE;")
     } else {
       if (state.contains(0)) {
-        emit("counterFF.next <== counterFF + 1;")
-        emit("IF (counterFF === sizeFF-1) {")
-        stream.print("stateFF.next <== States.")
+        emit("  counterFF.next <== counterFF + 1;")
+        emit("  IF (counterFF === sizeFF-1) {")
+        stream.print("    stateFF.next <== States.")
         if (state.max == max) {
           if (state.size == 1) {  // Only state 0
             stream.print("DONE")
@@ -700,11 +700,11 @@ package engine;
           stream.print(stateStr(state.drop(1) ++ List(state.max+1)))
         }
           emit(";")
-          emit("} ELSE {")
-        stream.print("stateFF.next <== States.")
+          emit("  } ELSE {")
+        stream.print("    stateFF.next <== States.")
         if (state.max == max) stream.print(stateStr(state)) else stream.print(stateStr(state ++ List(state.max+1)))
           emit(";")
-          emit("}")
+          emit("  }")
       } else {
         stream.print("stateFF.next <== States.")
         if (state.max == max) stream.print(stateStr(state.drop(1))) else stream.print(stateStr(state.drop(1) ++ List(state.max+1)))
@@ -742,7 +742,7 @@ package engine;
     enum States {
       INIT,
       RSET,
-      ${stateNames.reduce(_ + ",\n" + _) + ",\nDONE"}
+      ${stateNames.reduce(_ + ",\n      " + _) + ",\nDONE"}
     }
   """)
 

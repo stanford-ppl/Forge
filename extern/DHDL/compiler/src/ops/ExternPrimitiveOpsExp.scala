@@ -150,7 +150,6 @@ trait ExternPrimitiveOpsExp extends ExternPrimitiveCompilerOps with ExternPrimit
 trait MaxJGenExternPrimitiveOps extends MaxJGenEffect {
   val IR:DHDLExp with MemoryAnalysisExp with DeliteTransform
 
-
   import IR.{infix_until => _, looprange_until => _, println => _, _}
 
 	var traversals: List[Traversal{val IR: MaxJGenExternPrimitiveOps.this.IR.type}] = Nil
@@ -185,19 +184,23 @@ trait MaxJGenExternPrimitiveOps extends MaxJGenEffect {
     super.preProcess(body)
   }
 
+  // var emitted_consts: Set[(Exp[Any], PrintWriter)] = Set.empty
+
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case ConstFixPt(x,_,_,_) =>
+      val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
+      emit(s"""DFEVar ${quote(sym)} = constant.var( $ts, $x );""")
     case Tpes_Int_to_fix(x) =>  // Emit this node in MaxJ only if x is a const
       val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
       x match {
-        case Const(_) =>
-            emit(s"""DFEVar ${quote(sym)} = constant.var($ts, ${quote(x)});""")
-        case Param(_) =>
-            emit(s"""DFEVar ${quote(sym)} = constant.var($ts, ${quote(x)});""")
+        case _:Const[_] | _:Param[_] =>
+          emit(s"""DFEVar ${quote(sym)} = constant.var($ts, ${quote(x)});""")
         case _ =>
             emit(s"""// DFEVar $sym = ${quote(x)}.cast($ts)""")
       }
     case _ => super.emitNode(sym, rhs)
   }
+
 }
 
 

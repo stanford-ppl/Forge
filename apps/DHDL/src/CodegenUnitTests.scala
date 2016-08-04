@@ -2,12 +2,13 @@ import dhdl.compiler._
 import dhdl.library._
 import dhdl.shared._
 
+// 1
 object SimpleSequentialTest extends DHDLApplicationCompiler with SimpleSequential
 trait SimpleSequential extends DHDLApplication {
   type Array[T] = ForgeArray[T]
 
   def simpleseq(xin: Rep[SInt], yin: Rep[SInt]) = {
-    val innerPar = param("innerPar", 1); domainOf(innerPar) = (1, 1, 1)
+    val innerPar = param("innerPar", 8); domainOf(innerPar) = (1, 1, 1)
     val tileSize = param("tileSize", 96); domainOf(tileSize) = (96, 96, 96)
 
     val x = ArgIn[SInt]
@@ -16,7 +17,7 @@ trait SimpleSequential extends DHDLApplication {
     setArg(x, xin)
     setArg(y, yin)
 
-    Accel {
+    Accel {2
       val b1 = BRAM[SInt](tileSize)
 //      Sequential (tileSize by tileSize) { i =>
       Sequential {
@@ -44,6 +45,7 @@ trait SimpleSequential extends DHDLApplication {
   }
 }
 
+// 2
 object ArgInOutTest extends DHDLApplicationCompiler with ArgInOut
 trait ArgInOut extends DHDLApplication {
 
@@ -60,6 +62,7 @@ trait ArgInOut extends DHDLApplication {
   }
 }
 
+// 3
 object DeviceMemcpyTest extends DHDLApplicationCompiler with DeviceMemcpy
 trait DeviceMemcpy extends DHDLApplication {
   type T = SInt
@@ -94,6 +97,7 @@ trait DeviceMemcpy extends DHDLApplication {
 
 }
 
+// 4
 object SimpleTileLoadStoreTest extends DHDLApplicationCompiler with SimpleTileLoadStore
 trait SimpleTileLoadStore extends DHDLApplication {
   type T = SInt
@@ -146,6 +150,7 @@ trait SimpleTileLoadStore extends DHDLApplication {
   }
 }
 
+// 5
 object FifoLoadTest extends DHDLApplicationCompiler with FifoLoad
 trait FifoLoad extends DHDLApplication {
   type T = SInt
@@ -189,6 +194,7 @@ trait FifoLoad extends DHDLApplication {
   }
 }
 
+// 6
 object ParFifoLoadTest extends DHDLApplicationCompiler with ParFifoLoad
 trait ParFifoLoad extends DHDLApplication {
   type T = SInt
@@ -238,6 +244,7 @@ trait ParFifoLoad extends DHDLApplication {
   }
 }
 
+// 7
 object FifoLoadStoreTest extends DHDLApplicationCompiler with FifoLoadStore
 trait FifoLoadStore extends DHDLApplication {
   type T = SInt
@@ -280,13 +287,14 @@ trait FifoLoadStore extends DHDLApplication {
   }
 }
 
+// 8
 object SimpleReduceTest extends DHDLApplicationCompiler with SimpleReduce
 trait SimpleReduce extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
   val constTileSize = 96
   def simplemap(xin: Rep[SInt]) = {
-    val innerPar = param("innerPar", 1); domainOf(innerPar) = (1, 1, 1)
+    val innerPar = param("innerPar", 8); domainOf(innerPar) = (1, 1, 1)
     val tileSize = param("tileSize", constTileSize); domainOf(constTileSize) = (constTileSize, constTileSize, constTileSize)
 
     val x = ArgIn[SInt]
@@ -319,6 +327,7 @@ trait SimpleReduce extends DHDLApplication {
   }
 }
 
+// 9
 object NiterTest extends DHDLApplicationCompiler with Niter
 trait Niter extends DHDLApplication {
   type T = SInt
@@ -326,7 +335,7 @@ trait Niter extends DHDLApplication {
   val constTileSize = 96
 
   def nIterTest(len: Rep[SInt]) = {
-    val innerPar = param("innerPar", 1); domainOf(innerPar) = (1, 1, 1)
+    val innerPar = param("innerPar", 8); domainOf(innerPar) = (1, 1, 1)
     val tileSize = param("tileSize", constTileSize); domainOf(constTileSize) = (constTileSize, constTileSize, constTileSize)
     bound(len) = 9216
 
@@ -338,7 +347,7 @@ trait Niter extends DHDLApplication {
       Sequential {
         Sequential (N by tileSize) { i =>
           val accum = Reduce (tileSize par innerPar)(0.as[T]) { ii =>
-            i * ii
+            i + ii
           } {_+_}
           Pipe { out := accum }
         }
@@ -356,21 +365,22 @@ trait Niter extends DHDLApplication {
 
     val b1 = Array.tabulate[SInt](len) { i => i }
 
-    val gold = b1.reduce {_+_}
+    val gold = b1.reduce {_+_} - ((len-constTileSize) * (len-constTileSize-1))/2
     println("expected: " + gold)
     println("result:   " + result)
     assert(result == gold)
   }
 }
 
+// 10
 object SimpleFoldTest extends DHDLApplicationCompiler with SimpleFold
 trait SimpleFold extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
   val constTileSize = 96
 
-  def nIterTest(src: Rep[Array[T]]) = {
-    val innerPar = param("innerPar", 1); domainOf(innerPar) = (1, 1, 1)
+  def simple_fold(src: Rep[Array[T]]) = {
+    val innerPar = param("innerPar", 8); domainOf(innerPar) = (1, 1, 1)
     val tileSize = param("tileSize", constTileSize); domainOf(constTileSize) = (constTileSize, constTileSize, constTileSize)
     val len = src.length; bound(len) = 9216
 
@@ -403,7 +413,7 @@ trait SimpleFold extends DHDLApplication {
     val len = args(unit(0)).to[T]
 
     val src = Array.tabulate[T](len) { i => i }
-    val result = nIterTest(src)
+    val result = simple_fold(src)
 
     val gold = src.reduce {_+_}
     println("expected: " + gold)
@@ -412,6 +422,7 @@ trait SimpleFold extends DHDLApplication {
   }
 }
 
+// 11
 object Memcpy2DTest extends DHDLApplicationCompiler with Memcpy2D
 trait Memcpy2D extends DHDLApplication {
   type T = SInt
@@ -461,6 +472,7 @@ trait Memcpy2D extends DHDLApplication {
   }
 }
 
+// 12
 object BlockReduce1DTest extends DHDLApplicationCompiler with BlockReduce1D
 trait BlockReduce1D extends DHDLApplication {
   type T = SInt
@@ -471,7 +483,6 @@ trait BlockReduce1D extends DHDLApplication {
   def blockreduce_1d(src: Rep[ForgeArray[T]], size: Rep[SInt]) = {
 
     val sizeIn = ArgIn[SInt]; setArg(sizeIn, size)
-    val colsIn = ArgIn[SInt]
 
     val srcFPGA = OffChipMem[T](size)
     val dstFPGA = OffChipMem[T](tileSize)
@@ -512,3 +523,5 @@ trait BlockReduce1D extends DHDLApplication {
 //    (0 until tileSize) foreach { i => assert(dst(i) == gold(i)) }
   }
 }
+
+

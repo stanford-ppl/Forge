@@ -228,10 +228,10 @@ trait DHDLTypes {
     impl (boolean_to_bit) (codegen(maxj, ${
     		DFEVar $sym = constant.var( $0 );
 		}))
-    impl (const_to_fixpt) (codegen(maxj, ${
-				@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
-				DFEVar $sym = constant.var( $ts, $0 );
-		}))
+  //   impl (const_to_fixpt) (codegen(maxj, ${
+		// 		@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
+		// 		DFEVar $sym = constant.var( $ts, $0 );
+		// }))
     impl (const_to_fltpt) (codegen(maxj, ${
 				@ val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
       	DFEVar $sym = constant.var( $ts, $0 );

@@ -16,6 +16,13 @@ trait DHDLMetadata {
     val Range       = lookupTpe("Range")
     val Idx         = lookupAlias("Index")
 
+    /*val DummyMem = metadata("DummyMem", "isDummy" -> SBoolean)
+    val isDummy = metadata("isDummy")
+    static (isDummy) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, DummyMem($1)) }
+    static (isDummy) ("apply", Nil, (MAny) :: SBoolean) implements
+      composite ${ meta[DummyMem]($0).map(_.isDummy).getOrElse(false) }*/
+
     /**
      * Statically determined length
      * Used for tracking lengths of Vectors and CounterChains.

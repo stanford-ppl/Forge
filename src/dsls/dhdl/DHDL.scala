@@ -289,6 +289,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(GlobalAnalyzer)        // Add "global" annotations for newly created symbols after folding
 
     // --- Post-DSE Estimation
+    schedule(IRPrinterPlus)
     schedule(MemoryAnalyzer)        // Memory analyzer (to finalize banking/buffering)
     schedule(AreaAnalyzer)          // Area estimation
     schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates

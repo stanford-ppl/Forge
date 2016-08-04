@@ -178,7 +178,15 @@ trait BRAMBanking extends BankingBase {
     val allStrides = constDimsToStrides(dimsOf(mem).map{case Exact(d) => d.toInt})
     val strides = if (indices.length == 1) List(allStrides.last) else allStrides
 
+    val Def(d) = access
+    debug(s"access:  $access = $d")
+    debug(s"indices: $indices")
+    debug(s"pattern: $pattern")
+
     val factors = unrollFactorsOf(access) diff unrollFactorsOf(mem) // Parallelization factors relative to this memory
+
+    debug(s"factors: ${factors}")
+
     var used: Map[Exp[Any], Boolean] = Map.empty
     factors.foreach{factor => used += factor -> false}
 

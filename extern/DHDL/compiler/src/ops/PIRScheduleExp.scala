@@ -2,77 +2,10 @@ package dhdl.compiler.ops
 
 import scala.reflect.{Manifest,SourceContext}
 
-import scala.virtualization.lms.internal.QuotingExp
-
 import dhdl.shared._
 import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
-import scala.collection.mutable.{HashSet, HashMap}
-
-// For bound symbols
-trait SubstQuotingExp extends QuotingExp {
-  import IR._
-  val subst = HashMap[Exp[Any], Exp[Any]]()
-  override def quote(x: Exp[Any]) = super.quote(subst.getOrElse(x, x))
-}
-
-trait PIRCommon extends SubstQuotingExp {
-  val IR: PIRScheduleAnalysisExp with DHDLExp
-  import IR._
-
-  val globals = HashSet[GlobalMem]()
-
-  // Create a vector for communication to/from a given memory
-  def allocateGlobal(mem: Exp[Any]) = writersOf(mem).headOption match {
-    case Some((_,_,writer@Deff(_:Offchip_load_cmd[_]))) =>
-      TileTxVector(quote(writer)+".out")
-
-    case writer =>
-      val name = quote(mem) + writer.map{writer => "_"+quote(writer._3)}.getOrElse("")
-      val comm = mem match {
-        case Deff(Offchip_new(_)) => Offchip(name)
-        case Deff(Argin_new(_))   => InputArg(name)
-        case Deff(Argout_new(_))  => OutputArg(name)
-        case Deff(Reg_new(_))     => ScalarMem(name)
-        case _                    => VectorMem(name)
-      }
-      globals += comm
-      comm
-  }
-
-  def allocateConst(x: Exp[Any]) = x match {
-    case Exact(c) => ConstReg(s"${c.toLong}l") // FIXME: Not necessarily an integer
-    case _ => stageError(s"Cannot allocate constant value for $x")
-  }
-
-  def allocateLocal(mem: Exp[Any], pipe: Exp[Any], read: Option[Exp[Any]] = None,  write: Option[Exp[Any]] = None): LocalMem = mem match {
-    case Exact(c) => allocateConst(mem)
-    case reg@Deff(Reg_new(init)) =>
-      val isLocallyRead = isReadInPipe(reg, pipe, read)
-      val isLocallyWritten = isWrittenInPipe(reg, pipe, write)
-      if (isInnerAccum(reg)) ReduceReg(reg)
-      else if (isAccum(reg)) {
-        val rst = allocateConst(resetValue(reg.asInstanceOf[Exp[Reg[Any]]]))
-        AccumReg(reg, rst)
-      }
-      else if (!isLocallyRead) { // Always prefer the local register over ScalarOut, if applicable
-        val global = allocateGlobal(reg)
-        ScalarOut(reg, global)
-      }
-      else if (!isLocallyWritten) {
-        val global = allocateGlobal(reg)
-        ScalarIn(reg, global)
-      }
-      else {
-        TempReg(reg)
-      }
-    case reader@Deff(Reg_read(reg)) =>
-      allocateLocal(reg, pipe, Some(reader), write)
-
-    case _ => TempReg(mem)
-  }
-}
 
 trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisExp {
   this: DHDLExp =>
@@ -93,39 +26,20 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case class VectorMem(override val name: String) extends GlobalMem(name)
   case class TileTxVector(override val name: String) extends GlobalMem(name)
 
+  case class ScalarIn(name: String, mem: GlobalMem)
+  case class ScalarOut(name: String, mem: GlobalMem)
+  case class VectorIn(name: String, mem: GlobalMem)
+  case class VectorOut(name: String, mem: GlobalMem)
+
   // Intra-CU communication
   sealed abstract class LocalMem
-
-  case class ReadAddrReg(x: Exp[Any]) extends LocalMem
-  case class WriteAddrReg(x: Exp[Any]) extends LocalMem
-  case class ReduceReg(x: Exp[Any]) extends LocalMem
-  case class AccumReg(x: Exp[Any], init: ConstReg) extends LocalMem
-  case class TempReg(x: Exp[Any]) extends LocalMem
-
-  case class ScalarIn(x: Exp[Any], mem: GlobalMem) extends LocalMem
-  case class ScalarOut(x: Exp[Any], mem: GlobalMem) extends LocalMem
-
-  case class InputReg(mem: CUMemory) extends LocalMem
-  case class VectorLocal(x: Exp[Any], mem: CUMemory) extends LocalMem
-  case class VectorOut(x: Exp[Any], mem: GlobalMem) extends LocalMem
-
-  case class CounterReg(cchain: CUCounterChain, idx: Int) extends LocalMem
+  case class ReduceReg(producer: Int) extends LocalMem
+  case class TempReg(producer: Int) extends LocalMem
+  case class InputReg(in: ScalarIn) extends LocalMem
+  case class OutputReg(producer: Int, out: ScalarOut) extends LocalMem
+  case class InputMem(mem: PIRMemory) extends LocalMem
+  case class CounterReg(cchain: PIRCounterChain, idx: Int) extends LocalMem
   case class ConstReg(const: String) extends LocalMem
-
-  // Local memory references
-  case class LocalRef(stage: Int, reg: LocalMem)
-
-  def isReadOutsidePipe(x: Exp[Any], pipe: Exp[Any], reader: Option[Exp[Any]] = None) = {
-    readersOf(x).exists{read => reader.map{filt => read._3 == filt}.getOrElse(true) && read._1 != pipe }
-  }
-  // (A) reader exists in this pipe or there are no readers
-  def isReadInPipe(x: Exp[Any], pipe: Exp[Any], reader: Option[Exp[Any]] = None) = {
-    readersOf(x).isEmpty || readersOf(x).exists{read => reader.map{filt => read._3 == filt}.getOrElse(true) && read._1 == pipe }
-  }
-  // Not an input argument, (a) writer exists in this pipe or there are no writers
-  def isWrittenInPipe(x: Exp[Any], pipe: Exp[Any], writer: Option[Exp[Any]] = None) = {
-    !isArgIn(x) && (writersOf(x).isEmpty || writersOf(x).exists{write => writer.map{filt => write._3 == filt}.getOrElse(true) && write._1 == pipe })
-  }
 
   // TODO: This is VERY redundant with PIR
   sealed abstract class PIROp
@@ -140,71 +54,32 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case object FltMul extends PIROp
   case object FltDiv extends PIROp
 
-  // --- Stages prior to scheduling
-  sealed abstract class PseudoStage
-  case class DefStage(op: Exp[Any], isReduce: Boolean = false) extends PseudoStage
-  case class OpStage(op: PIROp, inputs: List[Exp[Any]], out: Exp[Any], isReduce: Boolean) extends PseudoStage
-  case class WriteAddrStage(write: Exp[Any]) extends PseudoStage
+  sealed abstract class PIRStage
+  case class DefStage(op: Exp[Any], isReduce: Boolean = false, isWrite: Boolean = false) extends PIRStage
+  case class PseudoStage(op: PIROp, inputs: List[Exp[Any]], isReduce: Boolean, isWrite: Boolean) extends PIRStage
 
-  // --- Stages after scheduling
-  sealed abstract class Stage { def outputReg: LocalMem }
-  case class MapStage(op: PIROp, var inputs: List[LocalRef], var out: LocalRef) extends Stage { def outputReg = out.reg }
-  case class ReduceStage(op: PIROp, init: LocalMem, var out: ReduceReg) extends Stage { def outputReg = out }
+  case class Stage(op: PIROp, inputs: List[LocalMem], var out: LocalMem) extends PIRStage
+  case class ReduceStage(op: PIROp) extends PIRStage
 
-  // --- Compute units
   sealed abstract class ComputeUnit(val name: String, val parent: Option[ComputeUnit]) {
-    var cchains: Set[CUCounterChain] = Set.empty
-    var srams: Set[CUMemory] = Set.empty
-    var regs: Set[LocalMem] = Set.empty
-    private val regTable = HashMap[Exp[Any], LocalMem]()
-    private val expTable = HashMap[LocalMem, List[Exp[Any]]]()
-
-    def addReg(exp: Exp[Any], reg: LocalMem) {
-      regs += reg
-      regTable += exp -> reg
-      if (expTable.contains(reg)) expTable += reg -> (expTable(reg) :+ exp)
-      else                        expTable += reg -> List(exp)
-    }
-    def iterators = regTable.flatMap{case (exp, reg: CounterReg) => Some((exp,reg)); case _ => None}.toList
-    def get(x: Exp[Any]): Option[LocalMem] = regTable.get(x)
-    def getOrUpdate(x: Exp[Any])(func: => LocalMem) = regTable.getOrElse(x, {
-      val reg = func
-      addReg(x, reg)
-      reg
-    })
-
-    // Override all previous mappings - use with caution
-    def replaceReg(exp: Exp[Any], reg: LocalMem) {
-      if (regTable.contains(exp)) {
-        val prev = regTable(exp)
-        val aliases = expTable(prev)
-        regs -= prev
-        expTable -= prev
-        aliases.foreach{exp => addReg(exp, reg) }
-
-        // This is potentially incorrect - add more option flags later?
-        stages.foreach{
-          case stage@MapStage(_,inputs,out) =>
-            stage.inputs = inputs.map{case LocalRef(i,`prev`) => LocalRef(i,reg); case ref => ref}
-            stage.out = out match {case LocalRef(i, `prev`) => LocalRef(i,reg); case ref => ref}
-
-          case reduce@ReduceStage(_,_,out) =>
-            if (out == prev) stageError(s"Cannot replace reduction output $prev with $reg!")
-        }
-      }
-      else addReg(exp, reg)
-    }
-
-    var writePseudoStages = HashMap[CUMemory, List[PseudoStage]]()
-    var computePseudoStages: List[PseudoStage] = Nil
-    var writeStages = HashMap[CUMemory, List[Stage]]()
-    var stages: List[Stage] = Nil
+    var cchains: Set[PIRCounterChain] = Set.empty
+    var iterators: Map[Exp[Any], (PIRCounterChain, Int)] = Map.empty
+    var srams: List[PIRMemory] = Nil
+    var stages: List[PIRStage] = Nil
+    var scalarIn: List[ScalarIn] = Nil   // locally read, remotely written registers
+    var scalarOut: List[ScalarOut] = Nil // locally written, remotely read registers
+    var vectorIn: List[VectorIn] = Nil   // locally read, remotely written buffers
+    var vectorOut: List[VectorOut] = Nil // locally written, remotely read buffers
 
     def dumpString = s"""  cchains = ${cchains.mkString(", ")}
-  regs    = ${regs.mkString(", ")}
+  iters   = ${iterators.mkString(", ")}
   srams   = ${srams.mkString(", ")}
-  stages  = ${if (stages.isEmpty) "" else stages.mkString("\n    ","\n    ","")}"""
-  }
+  stages  = ${if (stages.isEmpty) "" else stages.mkString("\n    ","\n    ","")}
+  scIns   = ${scalarIn.mkString(", ")}
+  scOuts  = ${scalarOut.mkString(", ")}
+  vecIns  = ${vectorIn.mkString(", ")}
+  vecOuts = ${vectorOut.mkString(", ")}"""
+}
 
   case class BasicComputeUnit(
     override val name: String,
@@ -230,18 +105,18 @@ ${super.dumpString}
   }
 
   // TODO: Parallelism?
-  case class CUCounter(name: String, start: LocalMem, end: LocalMem, stride: LocalMem)
+  case class PIRCounter(name: String, start: Exp[Any], end: Exp[Any], stride: Exp[Any], par: Exp[Any])
 
-  sealed abstract class CUCounterChain(val name: String)
-  case class CounterChainCopy(override val name: String, owner: ComputeUnit) extends CUCounterChain(name)
-  case class CounterChainInstance(override val name: String, ctrs: List[CUCounter]) extends CUCounterChain(name)
+  sealed abstract class PIRCounterChain(val name: String)
+  case class CounterChainCopy(override val name: String, owner: ComputeUnit) extends PIRCounterChain(name)
+  case class CounterChainInstance(override val name: String, ctrs: List[PIRCounter]) extends PIRCounterChain(name)
 
-  case class CUMemory(
+  case class PIRMemory(
     name: String,
     size: Int,
     var vector: Option[GlobalMem] = None,
-    var readAddr: Option[LocalMem] = None,
-    var writeAddr: Option[LocalMem] = None
+    var readAddr: Option[Exp[Any]] = None,
+    var writeAddr: Option[Exp[Any]] = None
   )
 
 }

@@ -112,7 +112,7 @@ trait PIRGen extends Traversal with PIRCommon {
 
   def cuDeclaration(cu: ComputeUnit) = {
     val parent = cu.parent.map(_.name).getOrElse("top")
-    val deps = cu.deps.map(_.name)
+    val deps = cu.deps.map{dep => cus(dep).name }
     cu match {
       case cu: BasicComputeUnit =>
         s"""ComputeUnit(name=Some("${cu.name}"), tpe = ${quoteControl(cu.tpe)}, deps=$deps parent=$parent)"""

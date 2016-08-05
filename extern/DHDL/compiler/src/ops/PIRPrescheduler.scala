@@ -106,7 +106,9 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     case Some(parent) =>
       val childs = childrenOf(parent)
       val idx = childs.indexOf(pipe)
-      if (idx > 0) controllersHack(childs(idx-1)) else Nil
+      val deps = if (idx > 0) controllersHack(childs(idx-1)) else Nil
+      debug(s"Found deps of $pipe: $deps")
+      deps
     case None => Nil
   }
 
@@ -114,7 +116,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
   def allocateBasicCU(pipe: Exp[Any]): BasicComputeUnit = {
     if (cuMapping.contains(pipe)) cuMapping(pipe).asInstanceOf[BasicComputeUnit]
     else {
-      val deps = pipeDependencies(pipe).map(cuMapping(_))
+      val deps = pipeDependencies(pipe)
       val parent = parentOfHack(pipe).map(cuMapping(_))
       val cu = BasicComputeUnit(quote(pipe), parent, deps, styleOf(pipe))
       initCU(cu, pipe)
@@ -136,7 +138,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       val mc = MemCtrl(quote(pipe)+"_mc", region, mode)
       globals += mc
       val parent = parentOfHack(pipe).map(cuMapping(_))
-      val deps = pipeDependencies(pipe).map(cuMapping(_))
+      val deps = pipeDependencies(pipe)
       val cu = TileTransferUnit(quote(pipe), parent, deps, mc, mode)
       initCU(cu, pipe)
     }

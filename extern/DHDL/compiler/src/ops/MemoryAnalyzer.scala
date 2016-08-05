@@ -50,16 +50,6 @@ trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with ControlSignalAnalysis
     def update(e: Exp[Any], m: List[MemInstance]) { setMetadata(e, MemDuplicates(m)) }
     def apply(e: Exp[Any]) = meta[MemDuplicates](e).map(_.insts).getOrElse(Nil)
   }
-
-  /**
-    Metadata for determining which memory instance a reader should correspond to.
-    Needed to preserve mapping after unrolling
-  */
-  case class MemInstanceIndex(inst: Int) extends Metadata
-  object instanceIndexOf {
-    def update(reader: Exp[Any], inst: Int) { setMetadata(reader, MemInstanceIndex(inst)) }
-    def apply(reader: Exp[Any]) = meta[MemInstanceIndex](reader).map(_.inst).get
-  }
 }
 
 // Technically doesn't need a real traversal, but nice to have debugging, etc.
@@ -292,12 +282,14 @@ trait BRAMBanking extends BankingBase {
       case (None, Nil) => Nil
       case (Some(write), Nil) => List(unpairedAccess(mem, write))
       case (None, reads) =>
+        val unallocatedReads = reads.filter{read => !instanceIndexOf.get(read._3).isDefined }
         // What to do here? No writer, so current version will always read garbage...
-        val dups = reads.map(read => unpairedAccess(mem, read))
-        coalesceDuplicates(reads.map(_._3), dups)
+        val dups = unallocatedReads.map(read => unpairedAccess(mem, read))
+        coalesceDuplicates(unallocatedReads.map(_._3), dups)
       case (Some(write), reads) =>
-        val dups = reads.map(read => pairedAccess(mem, write, read))
-        coalesceDuplicates(reads.map(_._3), dups)
+        val unallocatedReads = reads.filter{read => !instanceIndexOf.get(read._3).isDefined }
+        val dups = unallocatedReads.map(read => pairedAccess(mem, write, read))
+        coalesceDuplicates(unallocatedReads.map(_._3), dups)
     }
   } else super.bank(mem)
 }

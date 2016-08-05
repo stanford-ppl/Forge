@@ -303,13 +303,19 @@ trait LiftTest3 extends DHDLApplication {
 object ParLoadCompiler extends DHDLApplicationCompiler with ParLoadTest
 trait ParLoadTest extends DHDLApplication {
   def main() {
-    val P = param(4)
+    val P1 = param(4)
+    val P2 = param(2)
+    val P3 = param(2)
     val mem = OffChipMem[SInt](32,32)
     val out = ArgOut[SInt]
     Accel {
       val bram = BRAM[SInt](32,32)
-      bram := mem(0::32, 0::32, P)
-      out := bram(0, 0)
+      bram := mem(0::32, 0::32, P1) // StridedBanking(32, 1), StridedBanking(32, 4)
+      Fold(32 par P2)(out, 0.as[SInt]){i =>
+        Reduce(32 par P3)(0.as[SInt]){j =>
+          bram(i,j)                 // StridedBanking(32, 2), StridedBanking(32, 2)
+        }{_+_}
+      }{_+_}
     }
   }
 }

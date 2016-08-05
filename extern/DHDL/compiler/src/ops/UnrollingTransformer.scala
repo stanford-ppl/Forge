@@ -8,7 +8,9 @@ import scala.collection.mutable.HashMap
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait UnrollingTransformExp extends NodeMetadataOpsExp with LoweredPipeOpsExp { this: DHDLExp => }
+trait UnrollingTransformExp extends ReductionAnalysisExp with LoweredPipeOpsExp with MemoryAnalysisExp {
+  this: DHDLExp =>
+}
 
 trait UnrollingTransformer extends MultiPassTransformer {
   val IR: UnrollingTransformExp with DHDLExp
@@ -98,6 +100,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
   def unroll[T](s: Sym[T], d: Def[T], lanes: Unroller)(implicit ctx: SourceContext): List[Exp[Any]] = d match {
     // Account for the edge case with FIFO writing
     case EatReflect(e@Push_fifo(fifo, value, en)) if !lanes.isUnrolled(fifo) =>
+      debug(s"Unrolling $s = $d")
       val values  = lanes.vectorize{p => f(value)}
       val valids  = boundChecks(lanes.cchain, lanes.indices)
       val enables = lanes.vectorize{p => f(en) && valids(p) }
@@ -105,8 +108,10 @@ trait UnrollingTransformer extends MultiPassTransformer {
       lanes.unify(s, parPush)
 
     case EatReflect(e@Pop_fifo(fifo)) if !lanes.isUnrolled(fifo) =>
+      debug(s"Unrolling $s = $d")
       val parPop = par_pop_fifo(f(fifo), lanes.length)(e._mT,e.__pos)
       dimsOf(parPop) = List(lanes.length.as[Index])
+      instanceIndexOf(parPop) = instanceIndexOf(s)
       lanes.split(s, parPop)(e._mT)
 
     case EatReflect(e: Cam_load[_,_]) =>
@@ -117,15 +122,18 @@ trait UnrollingTransformer extends MultiPassTransformer {
       lanes.duplicate(s, d)
 
     case EatReflect(e@Bram_store(bram,addr,value)) if !lanes.isUnrolled(bram) =>
+      debug(s"Unrolling $s = $d")
       val values = lanes.vectorize{p => f(value)}
       val addrs  = lanes.vectorize{p => f(addr)}
       val parStore = par_bram_store(f(bram), addrs, values)(e._mT, e.__pos)
       lanes.unify(s, parStore)
 
     case EatReflect(e@Bram_load(bram,addr)) if !lanes.isUnrolled(bram) =>
+      debug(s"Unrolling $s = $d")
       val addrs = lanes.vectorize{p => f(addr)}
       val parLoad = par_bram_load(f(bram), addrs)(e._mT, e.__pos)
       dimsOf(parLoad) = List(lanes.length.as[Index])
+      instanceIndexOf(parLoad) = instanceIndexOf(s)
       lanes.split(s, parLoad)(e._mT)
 
     case d if isControlNode(s) && lanes.length > 1 =>
@@ -134,7 +142,9 @@ trait UnrollingTransformer extends MultiPassTransformer {
       styleOf(parStage) = ForkJoin
       lanes.unify(s, parStage)
 
-    case _ => lanes.duplicate(s, d)
+    case _ =>
+      debug(s"Duplicating $s = $d")
+      lanes.duplicate(s, d)
   }
 
   /*

@@ -529,8 +529,12 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
             ${quote(size0)}, ${quote(size1)}, $ts, ${banks(sym)}, /* stride_TODO */ 1, ${readersOf(sym).size});""")
         } else {
-          val readers = duplicatesOf(sym) 
-          val banks = if (readers.length == 1) {
+          val readers = duplicatesOf(sym)
+          val id = instanceIndexOf(readers)
+          if (readers.length > 2) { throw new Exception(s"More than 1 reader: $sym. Don't know how to handle.") }
+
+
+          val banks = {
             val bnks = readers(0).banking.map { a =>
               a match {
                 case MultiWayBanking(_, banks) => banks
@@ -542,9 +546,8 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
               case 2 => bnks.mkString("new int[] {", ",", "}")
               case _ => throw new Exception(s"Can't handle ${readers(0).banking.length}-D memory!")
             }
-          } else {
-            throw new Exception(s"More than 1 reader: $sym. Don't know how to handle.")
           }
+
           if (isDummy(sym)) {
             emit(s"""DummyMemLib ${quote(sym)} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""") 
           } else {

@@ -95,16 +95,28 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     cu
   }
 
-  /*def pipeDependencies(pipe: Exp[any]) = parentOf(pipe) match {
+  def controllersHack(pipe: Exp[Any]): List[Exp[Any]] = pipe match {
+    case Deff(_:Pipe_parallel) => childrenOf(pipe)
+    case _ => List(pipe)
+  }
+
+  // TODO: This assumes linear stage order. Switch to more general dataflow graph after parallel is removed
+  def pipeDependencies(pipe: Exp[Any]): List[Exp[Any]] = parentOf(pipe) match {
+    case Some(parent@Deff(_:Pipe_parallel)) => pipeDependencies(parent)
     case Some(parent) =>
-  }*/
+      val childs = childrenOf(parent)
+      val idx = childs.indexOf(pipe)
+      if (idx > 0) controllersHack(childs(idx-1)) else Nil
+    case None => Nil
+  }
 
   // Get associated CU (or create a new one if not allocated yet)
   def allocateBasicCU(pipe: Exp[Any]): BasicComputeUnit = {
     if (cuMapping.contains(pipe)) cuMapping(pipe).asInstanceOf[BasicComputeUnit]
     else {
+      val deps = pipeDependencies(pipe).map(cuMapping(_))
       val parent = parentOfHack(pipe).map(cuMapping(_))
-      val cu = BasicComputeUnit(quote(pipe), parent, styleOf(pipe))
+      val cu = BasicComputeUnit(quote(pipe), parent, deps, styleOf(pipe))
       initCU(cu, pipe)
       pipe match {
         case Deff(e:ParPipeForeach)     => addIterators(cu, e.cc, e.inds)
@@ -124,7 +136,8 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       val mc = MemCtrl(quote(pipe)+"_mc", region, mode)
       globals += mc
       val parent = parentOfHack(pipe).map(cuMapping(_))
-      val cu = TileTransferUnit(quote(pipe), parent, mc, mode)
+      val deps = pipeDependencies(pipe).map(cuMapping(_))
+      val cu = TileTransferUnit(quote(pipe), parent, deps, mc, mode)
       initCU(cu, pipe)
     }
   }

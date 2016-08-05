@@ -24,6 +24,19 @@ trait DHDLMetadata {
       composite ${ meta[DummyMem]($0).map(_.isDummy).getOrElse(false) }*/
 
     /**
+      Metadata for determining which memory instance a reader should correspond to.
+      Needed to preserve mapping after unrolling
+    */
+    val MemInstanceIndex = metadata("MemInstanceIndex", "idx" -> SInt)
+    val instIdxOps = metadata("instanceIndexOf")
+    static (instIdxOps) ("update", Nil, (MAny, SInt) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MemInstanceIndex($1)) }
+    static (instIdxOps) ("get", Nil, (MAny) :: SOption(SInt)) implements
+      composite ${ meta[MemInstanceIndex]($0).map(_.idx) }
+    static (instIdxOps) ("apply", Nil, (MAny) :: SInt) implements
+      composite ${ meta[MemInstanceIndex]($0).map(_.idx).get }
+
+    /**
      * Statically determined length
      * Used for tracking lengths of Vectors and CounterChains.
      * User facing: No

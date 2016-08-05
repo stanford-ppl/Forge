@@ -169,7 +169,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
     case _ => stageError(s"Cannot allocate constant value for $x")
   }
 
-  sealed abstract class ComputeUnit(val name: String, val parent: Option[ComputeUnit]) {
+  sealed abstract class ComputeUnit(val name: String, val parent: Option[ComputeUnit], val deps: List[ComputeUnit]) {
     var cchains: Set[CUCounterChain] = Set.empty
     var srams: Set[CUMemory] = Set.empty
     var regs: Set[LocalMem] = Set.empty
@@ -229,8 +229,9 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case class BasicComputeUnit(
     override val name: String,
     override val parent: Option[ComputeUnit],
+    override val deps: List[ComputeUnit],
     val tpe: ControlType
-  ) extends ComputeUnit(name,parent) {
+  ) extends ComputeUnit(name,parent,deps) {
     override def dumpString = s"""BasicComputeUnit($name, $parent, $tpe){
 ${super.dumpString}
 }"""
@@ -240,9 +241,10 @@ ${super.dumpString}
   case class TileTransferUnit(
     override val name: String,
     override val parent: Option[ComputeUnit],
+    override val deps: List[ComputeUnit],
     val ctrl: MemCtrl,
     val mode: MemoryMode
-  ) extends ComputeUnit(name,parent) {
+  ) extends ComputeUnit(name,parent,deps) {
     override def dumpString = s"""TileTransferUnit($name, $parent, $ctrl, $mode){
 ${super.dumpString}
 }"""

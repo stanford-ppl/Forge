@@ -26,7 +26,7 @@ trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with ControlSignalAnalysis
   }
   // Optimization for doing things like diagonal banking for a memory accessed
   // both row- and column-wise.
-  case class MultiWayBanking(strides: List[Int], override val banks: Int) extends Banking(banks)
+  case class DiagonalBanking(strides: List[Int], override val banks: Int) extends Banking(banks)
   // Strided banking scheme. Includes simple, 1D case
   case class StridedBanking(stride: Int, override val banks: Int) extends Banking(banks)
   // No banking
@@ -45,6 +45,15 @@ trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with ControlSignalAnalysis
     def apply(e: Exp[Any]) = meta[MemDuplicates](e).map(_.insts).getOrElse(Nil)
   }
 
+  /**
+    Metadata for determining which memory instance a reader should correspond to.
+    Needed to preserve mapping after unrolling
+  */
+  case class MemInstanceIndex(inst: Int) extends Metadata
+  object instanceIndexOf {
+    def update(reader: Exp[Any], inst: Int) { setMetadata(reader, MemInstanceIndex(inst)) }
+    def apply(reader: Exp[Any]) = meta[MemInstanceIndex](reader).map(_.inst).get
+  }
 }
 
 // Technically doesn't need a real traversal, but nice to have debugging, etc.
@@ -104,7 +113,10 @@ trait BankingBase extends Traversal {
   }
 
   // TODO: How to express "tapped" block FIFO? What information is needed here?
-  def coalesceDuplicates(dups: List[MemInstance]) = dups
+  def coalesceDuplicates(reads: List[Exp[Any]], insts: List[MemInstance]) = {
+    reads.zipWithIndex.foreach{case (read, idx) => instanceIndexOf(read) = idx }
+    insts
+  }
 
   def bank(mem: Exp[Any]): List[MemInstance] = stageError("Don't know how to bank memory of type " + mem.tp)
 }
@@ -136,7 +148,7 @@ trait BankingBase extends Traversal {
       b(i)            (4)         Duplicate(4)
     (b(i), i)        (4,4)        Duplicate(4), Strided(1, 4)
    (b(i), c(i))      (4,4)        Duplicate(4), Duplicate(1)
-   (i,j)&(j,i)    (1,4)&(4,1)    MultiWay((C,1), 4)
+   (i,j)&(j,i)    (1,4)&(4,1)     Diagonal((C,1), 4)
 
     Data (2x2)        Stride 1        Stride 4        Diagonal
                 B  0 | 1 | 2 | 3   0 | 1 | 2 | 3   0 | 1 | 2 | 3
@@ -217,7 +229,7 @@ trait BRAMBanking extends BankingBase {
     val dims = dimsOf(mem)
 
     val writeInstances = bankingFromAccessPattern(mem, write._3)
-    val readInstances  = bankingFromAccessPattern(mem, write._3)
+    val readInstances  = bankingFromAccessPattern(mem, read._3)
 
     debug("  Write " + write + ", read " + read)
     debug("    write banking: " + writeInstances)
@@ -237,10 +249,10 @@ trait BRAMBanking extends BankingBase {
           // Special case for creating diagonally banked memories
           (bankWrite(i),bankWrite(i+1),bankRead(i),bankRead(i+1)) match {
             case (Banking(1),StridedBanking(s1,p), StridedBanking(s2,q),Banking(1)) if p > 1 && q > 1 =>
-              banking ::= MultiWayBanking(List(s2,s1), lcm(p,q))
+              banking ::= DiagonalBanking(List(s2,s1), lcm(p,q))
               i += 2
             case (StridedBanking(s1,p),Banking(1), Banking(1),StridedBanking(s2,q)) if p > 1 && q > 1 =>
-              banking ::= MultiWayBanking(List(s1,s2), lcm(p,q))
+              banking ::= DiagonalBanking(List(s1,s2), lcm(p,q))
               i += 2
 
             case _ =>
@@ -276,10 +288,10 @@ trait BRAMBanking extends BankingBase {
       case (None, reads) =>
         // What to do here? No writer, so current version will always read garbage...
         val dups = reads.map(read => unpairedAccess(mem, read))
-        coalesceDuplicates(dups)
+        coalesceDuplicates(reads.map(_._3), dups)
       case (Some(write), reads) =>
         val dups = reads.map(read => pairedAccess(mem, write, read))
-        coalesceDuplicates(dups)
+        coalesceDuplicates(reads.map(_._3), dups)
     }
   } else super.bank(mem)
 }
@@ -294,7 +306,7 @@ trait RegisterBanking extends BankingBase {
       case (None, reads)        => List(MemInstance(1, 1, List(NoBanking)))
       case (Some(write), reads) =>
         val dups = reads.map{read => MemInstance(1 + distanceBetween( (write._1,write._2), (read._1,read._2) ), 1, List(NoBanking)) }
-        coalesceDuplicates(dups)
+        coalesceDuplicates(reads.map(_._3), dups)
     }
   } else super.bank(mem)
 }
@@ -310,9 +322,12 @@ trait FIFOBanking extends BankingBase {
     (writersOf(mem).headOption, readersOf(mem).headOption) match {
       case (None,None)         => Nil
       case (Some(write), None) => List(MemInstance(1, 1, List(StridedBanking(1, accessPar(mem,write._3))) ))
-      case (None, Some(read))  => List(MemInstance(1, 1, List(StridedBanking(1, accessPar(mem,read._3))) ))
+      case (None, Some(read)) =>
+        instanceIndexOf(read._3) = 0
+        List(MemInstance(1, 1, List(StridedBanking(1, accessPar(mem,read._3))) ))
       case (Some(write),Some(read)) =>
         val banks = Math.max(accessPar(mem,write._3), accessPar(mem,read._3))
+        instanceIndexOf(read._3) = 0
         List(MemInstance(1, 1, List(StridedBanking(1, banks)) ))
     }
   } else super.bank(mem)

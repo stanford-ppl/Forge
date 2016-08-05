@@ -95,6 +95,10 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     cu
   }
 
+  /*def pipeDependencies(pipe: Exp[any]) = parentOf(pipe) match {
+    case Some(parent) =>
+  }*/
+
   // Get associated CU (or create a new one if not allocated yet)
   def allocateBasicCU(pipe: Exp[Any]): BasicComputeUnit = {
     if (cuMapping.contains(pipe)) cuMapping(pipe).asInstanceOf[BasicComputeUnit]
@@ -140,7 +144,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
   def memSize(mem: Exp[Any]) = mem match {
     case Deff(Bram_new(depth,_)) => bound(depth).get.toInt
     case Deff(Fifo_new(depth,_)) => bound(depth).get.toInt
-    case _ => stageError(s"Disallowed local memory $mem")
+    case _ => stageError(s"Unknown local memory type $mem")
   }
   def isBuffer(mem: Exp[Any]) = isFIFO(mem.tp) || isBRAM(mem.tp)
 
@@ -151,11 +155,8 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       val readerCU = allocateCU(ctrl)
       copyIterators(readerCU, writerCU)
 
-      val addrReg = addr.map{a =>
-          val reg = WriteAddrReg(a)
-          readerCU.addReg(a, reg)
-          reg
-      }
+      val addrReg = addr.map{a => readerCU.getOrUpdate(a){ WriteAddrReg(a) } }
+
       val sram = readerCU.srams.find{_.name == quote(mem)} match {
         case Some(readMem) =>
           readMem.writeAddr = addrReg
@@ -168,7 +169,10 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       }
       val writeStages = if (!isControlNode(writer) && addr.isDefined) stages ++ List(WriteAddrStage(writer)) else stages
 
-      readerCU.writePseudoStages += sram -> writeStages
+      if (writeStages.nonEmpty) {
+        debug(s"Added $sram to $readerCU write stages")
+        readerCU.writePseudoStages += sram -> writeStages
+      }
     }
   }
   def allocateReadSRAM(reader: Exp[Any], mem: Exp[Any], addr: Option[Exp[Any]], readerCU: ComputeUnit) {
@@ -176,16 +180,11 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     readerCU.srams.find{_.name == quote(mem)} match {
       case Some(readMem) =>
         if (!readMem.readAddr.isDefined && addr.isDefined) {
-          val addrReg = ReadAddrReg(addr.get)
-          readerCU.addReg(addr.get, addrReg)
-          readMem.readAddr = addrReg
+          val addrReg = readerCU.getOrUpdate(addr.get){ ReadAddrReg(addr.get) }
+          readMem.readAddr = Some(addrReg)
         }
       case None =>
-        val addrReg = addr.map{a =>
-          val reg = ReadAddrReg(a)
-          readerCU.addReg(a, reg)
-          reg
-        }
+        val addrReg = addr.map{a => readerCU.getOrUpdate(a){ ReadAddrReg(a) } }
         readerCU.srams += CUMemory(quote(mem), memSize(mem), readAddr = addrReg)
     }
   }

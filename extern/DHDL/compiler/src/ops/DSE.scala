@@ -320,6 +320,9 @@ trait DSE extends Traversal {
     }
     ppw.close()
 
+    msg("DSE completed. Shutting down compiler.")
+    sys.exit()
+
     // F. Show user results, pick point on pareto curve
     // TODO
 

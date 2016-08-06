@@ -16,6 +16,7 @@ trait DHDLMetadata {
     val Range       = lookupTpe("Range")
     val Idx         = lookupAlias("Index")
 
+<<<<<<< HEAD
     val DummyMem = metadata("DummyMem", "isDummy" -> SBoolean)
     val isDummy = metadata("isDummy")
     static (isDummy) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements
@@ -81,6 +82,12 @@ trait DHDLMetadata {
     internal.static (accumOps) ("apply", Nil, MAny :: SBoolean) implements
       composite ${ meta[MAccum]($0).map(_.isAccum).getOrElse(false) }
 
+    val MInnerAccum = metadata("MInnerAccum", "isInnerAccum" -> SBoolean)
+    val innerAccumOps = metadata("isInnerAccum")
+    internal.static (innerAccumOps) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MInnerAccum($1)) }
+    internal.static (innerAccumOps) ("apply", Nil, (MAny) :: SBoolean) implements
+      composite ${ meta[MInnerAccum]($0).map(_.isInnerAccum).getOrElse(false) }
 
     /* Is inserted metapipe register */
     val MDelayReg = metadata("MDelayReg", "isDelay" -> SBoolean)

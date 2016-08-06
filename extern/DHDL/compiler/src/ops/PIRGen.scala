@@ -13,7 +13,7 @@ import dhdl.compiler.ops._
 import java.io.PrintWriter
 import ppl.delite.framework.Config
 
-trait PIRGen extends Traversal with SubstQuotingExp {
+trait PIRGen extends Traversal with PIRCommon {
   val IR: DHDLExp with PIRScheduleAnalysisExp
   import IR._
 
@@ -27,9 +27,6 @@ trait PIRGen extends Traversal with SubstQuotingExp {
 
   lazy val prescheduler = new PIRScheduleAnalyzer{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
   lazy val scheduler = new PIRScheduler{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
-  lazy val collector = new SymbolCollector{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
-  lazy val constants = collector.constants
-  lazy val globals   = prescheduler.globals
   lazy val top       = prescheduler.top
   lazy val cus       = prescheduler.cuMapping
 
@@ -44,6 +41,7 @@ trait PIRGen extends Traversal with SubstQuotingExp {
     case Const(c: Long) => "Const(" + c + "l)"
     case Const(c: Double) => "Const(" + c + ".toLong)"  // TODO
     case Const(c: Float) => "Const(" + c + ".toLong)"   // TODO
+    case Exact(c) => "Const(" + c.toLong + "l)" // TODO
     case Param(p) => "Const(" + p + ".toLong)"  // TODO
     case _ => super.quote(x)
   }
@@ -65,12 +63,12 @@ trait PIRGen extends Traversal with SubstQuotingExp {
   }
 
   def emitPIR(b: Block[Any]) {
-    collector.run(b)
     prescheduler.run(b)
     subst ++= prescheduler.subst.toList
     scheduler.subst ++= subst.toList
     scheduler.cus ++= cus.toList
     scheduler.run(b)
+    globals ++= (prescheduler.globals ++ scheduler.globals)
 
     debug("Scheduling complete. Generating...")
     generateHeader()
@@ -93,10 +91,6 @@ trait PIRGen extends Traversal with SubstQuotingExp {
   }
 
   def generateGlobals() {
-    constants.foreach{
-      case Const(c) =>
-      case c@Exact(d) => emit(s"val ${quote(c)} = Const(${d.toLong}l)") // TODO
-    }
     val (mems, memCtrls) = globals.partition{case MemCtrl(_,_,_) => false; case _ => true}
     mems.foreach(emitComponent(_))
     memCtrls.foreach(emitComponent(_))
@@ -111,22 +105,19 @@ trait PIRGen extends Traversal with SubstQuotingExp {
     close("}")
   }
 
-  // HACK: Ignore parallels
-  def childrenOfHack(e: Exp[Any]): List[Exp[Any]] = childrenOf(e).flatMap{
-    case child@Deff(Pipe_parallel(_)) => childrenOfHack(child)
-    case child => List(child)
-  }
-
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) {
     if (isControlNode(lhs) && cus.contains(lhs))
       generateCU(lhs, cus(lhs))
   }
 
-  def cuDeclaration(cu: ComputeUnit) = cu match {
-    case cu: BasicComputeUnit =>
-      s"""ComputeUnit(name=Some("${cu.name}"), tpe = ${quoteControl(cu.tpe)})"""
-    case cu: TileTransferUnit =>
-      s"""TileTransfer(name=Some("${cu.name}"), memctrl=${cu.ctrl.name}, mctpe=${cu.mode})"""
+  def cuDeclaration(cu: ComputeUnit) = {
+    val parent = cu.parent.map(_.name).getOrElse("top")
+    cu match {
+      case cu: BasicComputeUnit =>
+        s"""ComputeUnit(name=Some("${cu.name}"), tpe = ${quoteControl(cu.tpe)}, parent=$parent)"""
+      case cu: TileTransferUnit =>
+        s"""TileTransfer(name=Some("${cu.name}"), memctrl=${cu.ctrl.name}, mctpe=${cu.mode}, parent=$parent)"""
+    }
   }
   def quoteControl(tpe: ControlType) = tpe match {
     case InnerPipe => "Pipe"
@@ -139,37 +130,24 @@ trait PIRGen extends Traversal with SubstQuotingExp {
     debug(s"Generating CU for $pipe")
     debug(cu.dumpString)
 
-    val parent = cu.parent.map(_.name).getOrElse("top")
+    open(s"val ${cu.name} = ${cuDeclaration(cu)} { implicit CU => ")
+    preallocateRegisters(cu)                // Includes scalar inputs/outputs, read/write addresses
+    cu.cchains.foreach(emitComponent(_))    // Allocate all counterchains
+    cu.srams.foreach(emitComponent(_))      // Allocate all SRAMs
 
-    open(s"val ${cu.name} = {")
-    emit(s"implicit val CU = ${cuDeclaration(cu)}")
-    emit(s"CU.updateParent($parent)")
-    // Inputs and outputs
-    cu.scalarIn.foreach(emitComponent(_))
-    cu.scalarOut.foreach(emitComponent(_))
-    cu.vectorIn.foreach(emitComponent(_))
-    cu.vectorOut.foreach(emitComponent(_))
+    emitAllStages(cu)
 
-    // Counterchains and iterators
-    cu.cchains.foreach(emitComponent(_))
-
-    for ((iter,ccIdx) <- cu.iterators) {
-      emit(s"val ${quote(iter)} = ${ccIdx._1.name}(${ccIdx._2})")
-    }
-
-    // TODO: How to communicate a non-iter address to SRAM?
-    cu.srams.foreach(emitComponent(_))
-    // TODO: Stages
-
-    open(s"""CU.updateFields(""")
-    emit(s"""cchains = List(${cu.cchains.map(_.name).mkString(", ")}), """)
-    emit(s"""srams   = List(${cu.srams.map(_.name).mkString(", ")}), """)
-    emit(s"""sins    = List(${cu.scalarIn.map(_.name).mkString(", ")}), """)
-    emit(s"""souts   = List(${cu.scalarOut.map(_.name).mkString(", ")}), """)
-    emit(s"""vins    = List(${cu.vectorIn.map(_.name).mkString(", ")}), """)
-    emit(s"""vouts   = List(${cu.vectorOut.map(_.name).mkString(", ")}) """)
-    close(")")
     close("}")
+  }
+
+  def preallocateRegisters(cu: ComputeUnit) = cu.regs.foreach{
+    case ReadAddrReg(x) => emit(s"val ${quote(x)} = CU.rdAddr()")
+    case WriteAddrReg(x) => emit(s"val ${quote(x)} = CU.wtAddr()")
+    case TempReg(x) => emit(s"val ${quote(x)} = CU.temp()")
+    case AccumReg(x,init) => emit(s"val ${quote(x)} = CU.accum(init = Some(${quote(init)}))")
+    case ScalarIn(x,mem) => emit(s"val ${quote(x)} = ScalarIn(${mem.name})")
+    case ScalarOut(x,mem) => emit(s"val ${quote(x)} = ScalarOut(${mem.name})")
+    case _ => // No preallocation
   }
 
   def emitComponent(x: Any) = x match {
@@ -178,20 +156,15 @@ trait PIRGen extends Traversal with SubstQuotingExp {
 
     case CounterChainInstance(name, ctrs) =>
       //for (ctr <- ctrs) emitComponent(ctr)
-      val bnds = ctrs.map{case PIRCounter(name,start,end,stride,par) => s"(${quote(start)}, ${quote(end)}, ${quote(stride)})"}.mkString(", ")
+      val bnds = ctrs.map{case CUCounter(name,start,end,stride) => s"(${quote(start)}, ${quote(end)}, ${quote(stride)})"}.mkString(", ")
       emit(s"""val $name = CounterChain(name = "$name", $bnds)""")
 
-    case PIRCounter(name,start,end,stride,par) =>
+    case CUCounter(name,start,end,stride) =>
       // TODO: Currently unused
       emit(s"""val $name = Counter(${quote(start)}, ${quote(end)}, ${quote(stride)})""")
 
-    case PIRMemory(name, size, Some(writer), Some(readAddr), Some(writeAddr)) =>
-      emit(s"""val $name = SRAM(size = $size, writer = ${writer.name}, readAddr = ${quote(readAddr)}, writeAddr = ${quote(writeAddr)})""")
-
-    case ScalarIn(name, mem)  => emit(s"val $name = ScalarIn(${mem.name})")
-    case ScalarOut(name, mem) => emit(s"val $name = ScalarOut(${mem.name})")
-    case VectorIn(name, mem)  => emit(s"val $name = VecIn(${mem.name})")
-    case VectorOut(name, mem) => emit(s"val $name = VecOut(${mem.name})")
+    case CUMemory(name, size, Some(writer), Some(readAddr), Some(writeAddr)) =>
+      emit(s"""val $name = SRAM(size = $size, vector = ${writer.name}, readAddr = ${quote(readAddr)}, writeAddr = ${quote(writeAddr)})""")
 
     case MemCtrl(name,region,mode) => emit(s"val $name = MemoryController($mode, ${region.name})")
     case Offchip(name) => emit(s"val $name = Offchip()")
@@ -199,7 +172,79 @@ trait PIRGen extends Traversal with SubstQuotingExp {
     case OutputArg(name) => emit(s"val $name = ArgOut()")
     case ScalarMem(name) => emit(s"val $name = Scalar()")
     case VectorMem(name) => emit(s"val $name = Vector()")
-
     case _ => stageError(s"Don't know how to generate CGRA component: $x")
+  }
+
+  def quote(reg: LocalMem): String = reg match {
+    // Always directly quotable
+    case ConstReg(c) => s"Const($c)"                        // Constant
+
+    // Context dependent (sometimes quotable)
+    case CounterReg(cchain, idx) => s"${cchain.name}($idx)" // Counter
+    case ScalarIn(x, mem)        => quote(x)                // Inputs to counterchains
+    case ReduceReg(x)            => quote(x)                // Uses only, not assignments
+    case AccumReg(x, init)       => quote(x)                // After preallocation
+    case InputReg(mem)           => s"${mem.name}.load"     // Local read
+
+    // Other cases require stage context
+    case _ => stageError(s"Cannot quote local memory $reg without context")
+  }
+
+  var allocatedReduce: Set[ReduceReg] = Set.empty
+
+  def quote(ref: LocalRef): String = ref match {
+    // Stage invariant register types
+    case LocalRef(stage, reg: ConstReg) => quote(reg)
+
+    // Delayed or forwarded registers
+    case LocalRef(stage, reg: CounterReg) => if (stage > 0) s"CU.ctr(stage($stage), ${quote(reg)})" else quote(reg)
+    case LocalRef(stage, reg: InputReg)   => if (stage > 0) s"CU.load(stage($stage), ${reg.mem.name})" else quote(reg)
+
+    // Delayed registers
+    case LocalRef(stage, reg: VectorLocal) => s"CU.store(stage($stage), ${reg.mem.name})"
+    case LocalRef(stage, reg: VectorOut)   => s"CU.vecOut(stage($stage), ${reg.mem.name})"
+
+    case LocalRef(stage, reg: ScalarIn)  => s"CU.scalarIn(stage($stage), ${quote(reg.x)})"
+    case LocalRef(stage, reg: ScalarOut) => s"CU.scalarOut(stage($stage), ${quote(reg.x)})"
+    case LocalRef(stage, reg: TempReg)   => s"CU.temp(stage($stage), ${quote(reg.x)})"
+    case LocalRef(stage, reg: AccumReg) => s"CU.accum(stage($stage), ${quote(reg.x)})"
+    case LocalRef(stage, reg: WriteAddrReg) => s"CU.wtAddr(stage($stage), ${quote(reg.x)})"
+    case LocalRef(stage, reg: ReadAddrReg)  => s"CU.rdAddr(stage($stage), ${quote(reg.x)})"
+
+    // Weird cases
+    case LocalRef(stage, reg: ReduceReg) if allocatedReduce.contains(reg) => quote(reg)
+    case LocalRef(stage, reg: ReduceReg) => s"CU.reduce(stage($stage))"
+  }
+
+  def emitAllStages(cu: ComputeUnit) {
+    var i = 0
+    var r = 0
+    def emitStages(stages: List[Stage]) = stages.foreach{
+      case MapStage(op,inputs,out) =>
+        val ins = inputs.map(quote(_)).mkString(", ")
+        emit(s"""Stage(stage($i), opds=List($ins), o=$op, r=${quote(out)})""")
+        i += 1
+
+      case ReduceStage(op,init,acc) =>
+        emit(s"""val (rs$r, ${quote(acc)}) = Stage.reduce(op=$op, init=${quote(init)})""")
+        allocatedReduce += acc
+        r += 1
+    }
+
+    if (cu.stages.nonEmpty || cu.writeStages.nonEmpty) {
+      emit(s"var stage = List[Stage] = Nil")
+
+      for ((mem,stages) <- cu.writeStages) {
+        i = 0
+        val nWrites  = stages.filter{_.isInstanceOf[Stage]}.length
+        emit(s"stage = WAStages(${mem.name}, ${nWrites})")
+        emitStages(stages)
+      }
+
+      i = 0
+      val nCompute = cu.stages.filter{_.isInstanceOf[Stage]}.length
+      emit(s"stage = Stages(${nCompute})")
+      emitStages(cu.stages)
+    }
   }
 }

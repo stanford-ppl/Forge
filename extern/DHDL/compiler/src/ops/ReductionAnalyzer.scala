@@ -20,11 +20,12 @@ trait ReductionAnalysisExp extends NodeMetadataOpsExp {
   case object FixPtMax extends ReduceFunction
   case object OtherReduction extends ReduceFunction
 
-  case class MReduceType(func: ReduceFunction) extends Metadata
+  case class MReduceType(func: Option[ReduceFunction]) extends Metadata
 
   object reduceType {
-    def update(e: Exp[Any], func: ReduceFunction) = setMetadata(e, MReduceType(func))
-    def apply(e: Exp[Any]) = meta[MReduceType](e).map(_.func)
+    def update(e: Exp[Any], func: ReduceFunction) = setMetadata(e, MReduceType(Some(func)))
+    def update(e: Exp[Any], func: Option[ReduceFunction]) = setMetadata(e, MReduceType(func))
+    def apply(e: Exp[Any]) = meta[MReduceType](e).flatMap(_.func)
   }
 
   def identifyReduceFunc(rFunc: Block[Any], a: Exp[Any], b: Exp[Any]) = getBlockResult(rFunc) match {

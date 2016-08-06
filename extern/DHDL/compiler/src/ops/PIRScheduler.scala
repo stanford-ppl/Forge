@@ -52,6 +52,17 @@ trait PIRScheduler extends Traversal with PIRCommon {
       addStage(stage)
     }
 
+    // TODO: Referencing - always use previous stage for BRAM loads
+    // except case where this is last BRAM read address computed
+    // AND we're in the first stage of computation
+    // In that special case, load directly from BRAM (empty stage "0")
+
+    // TODO: Separate out read address computation too (same way as write)
+
+    // TODO: Special case against CSE case where we do bram(i,j) = i*C+j
+
+    // Support list of outputs for stage for ScalarOut, Rd/WrAddr
+
     def ref(reg: LocalMem, out: Boolean, stage: Int = stageNum) = {
       if (reg.isInstanceOf[ScalarIn] || out || isUnreadAccum(reg)) {
         if (isUnreadAccum(reg)) readAccums += reg.asInstanceOf[AccumReg]

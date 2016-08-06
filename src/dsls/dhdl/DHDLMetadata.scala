@@ -491,6 +491,16 @@ trait DHDLMetadata {
       composite ${ meta[MAccessIndices]($0).map(_.indices).getOrElse(Nil) }
 
 
+    /**
+     * Parallelized N-D access indices
+     **/
+    val MParAccessIndices = metadata("MParAccessIndices", "indices" -> SList(SList(Idx)))
+    val parAccessOps = metadata("parIndicesOf")
+    internal.static (parAccessOps) ("update", Nil, (MAny, SList(SList(Idx))) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MParAccessIndices($1)) }
+    internal.static (parAccessOps) ("apply", Nil, (MAny) :: SList(SList(Idx))) implements
+      composite ${ meta[MParAccessIndices]($0).map(_.indices).getOrElse(Nil) }
+
 		/* MaxJ Codegen Helper Functions */
     val maxjgrp = grp("maxjGrp")
 		/* Not real metadata but need to be globally accessable */

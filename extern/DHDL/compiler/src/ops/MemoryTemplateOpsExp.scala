@@ -246,12 +246,12 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
     addr/burstSize
   }
 
-	var emittedSize = Set.empty[Exp[Any]]
+  var emittedSize = Set.empty[Exp[Any]]
   override def initializeGenerator(buildDir:String): Unit = {
-		emittedSize = Set.empty[Exp[Any]]
+    emittedSize = Set.empty[Exp[Any]]
     nextLMemAddr = burstSize * 1024 * 1024
-		super.initializeGenerator(buildDir)
-	}
+    super.initializeGenerator(buildDir)
+  }
 
   val brams = Set[Exp[BRAM[Any]]]()
   val regs = Set[(Exp[Reg[Any]], Int)]()
@@ -295,8 +295,48 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 
   def bramLoad(sym: Sym[Any], bram: Exp[BRAM[Any]], addr: Exp[Any], par: Boolean = false) {
     emitComment("Bram_load {")
-    val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
-    emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
+    if (isDummy(bram)) {
+      val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
+      emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
+    } else {
+      val r = readersOf(bram)
+      val find_id = r.map{case (_, _, s) => s}
+      val i = find_id.indexOf(sym)
+      val inds = accessIndicesOf(r(i)._3) match {
+        case Nil => parIndicesOf(r(i)._3)
+        case _ => accessIndicesOf(r(i)._3)
+      }
+      Console.println(s"$inds, $i, $r, ${r(i)._3}")
+
+      inds.length match { 
+        case 1 =>
+          val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
+          emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
+        case 2 =>
+          val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
+          var addr0 = ""
+          val addr1 = inds match {
+            case l: List[_] => 
+              addr0 = quote(l(0))
+              quote(l(1))
+            case lol:List[List[_]] => inds.map {  // TODO: will have to fix this case later
+                                        case List(row, col) => 
+                                          addr0 = quote(row) // Assume all are from same row?
+                                          quote(col)
+                                      }
+            }
+          Console.println(s"$addr0 $addr1")
+          // addr1 match {
+          //   case _: List[_] =>
+          //     emit(s"""DFEVector<DFEVar> ${addr1(0)}_vectorized = new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")});""")
+          //     emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${addr1(0)}_vectorized);""")
+          //   case _ =>
+          //     emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${addr1});""")
+          //   }
+        case _ => throw new Exception(s"Can't read from more than 2-d array yet!")
+      }      
+    }
+
     if (isDblBuf(bram)) {
       brams += bram
     }
@@ -310,7 +350,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
     emitComment("} Bram_load")
   }
 
-  def bramStore(bram: Exp[BRAM[Any]], addr: Exp[Any], value: Exp[Any]) {
+  def bramStore(sym: Sym[Any], bram: Exp[BRAM[Any]], addr: Exp[Any], value: Exp[Any]) {
     emitComment("Bram_store {")
     val dataStr = quote(value)
     if (isAccum(bram)) {
@@ -336,19 +376,39 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       if (isDummy(bram)) {
         emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(writer)}_datapath_en);""") 
       } else {
-        emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+        val w = writersOf(bram)
+        val find_id = w.map{case (_, _, s) => s}
+        val i = find_id.indexOf(sym)
+        val inds = parIndicesOf(w(i)._3)
+
+        inds.length match { 
+          case 0 =>
+            throw new Exception("No writers?!")
+          case 1 =>
+            emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+          case _ =>
+            var addr0 = ""
+            val addr1 = inds.map { 
+              case List(row, col) => 
+                addr0 = quote(row) // Assume all are from same row?
+                quote(col)
+            }
+            emit(s"""DFEVector<DFEVar> ${addr1(0)}_vectorized = new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")});""")
+            emit(s"""${quote(bram)}.connectWport(${addr0}, ${addr1(0)}_vectorized, ${dataStr}, ${quote(writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+        }
+
       }
     }
     emitComment("} Bram_store")
   }
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-		case Offchip_new(size) =>
+    case Offchip_new(size) =>
         emitComment(s""" Offchip_new(${quote(size)}) {""")
         alwaysGen { emit(s"""int ${quote(sym)} = ${getNextLMemAddr()};""") }
         emitComment(s""" Offchip_new(${quote(size)}) }""")
 
-		case Offchip_load_cmd(mem, fifo, ofs, len, par) =>
+    case Offchip_load_cmd(mem, fifo, ofs, len, par) =>
       emit(s"""// ${quote(sym)}: Offchip_load_cmd(${quote(mem)},${quote(fifo)}, ${quote(ofs)}, ${quote(len)}, ${quote(par)})""")
       emit(s"""MemoryCmdGenLib ${quote(sym)} = new MemoryCmdGenLib(
           this,
@@ -360,7 +420,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       emit(s"""${quote(fifo)}_writeEn <== ${quote(sym)}_en;""")
       emit(s"""${quote(fifo)}_wdata <== ${quote(fifo)}_rdata;""")
 
-		case Offchip_store_cmd(mem, fifo, ofs, len, par) =>
+    case Offchip_store_cmd(mem, fifo, ofs, len, par) =>
       emit(s"""// ${quote(sym)}: Offchip_store_cmd(${quote(mem)},${quote(fifo)}, ${quote(ofs)}, ${quote(len)}, ${quote(par)})""")
       emit(s"""MemoryCmdStLib ${quote(sym)} = new MemoryCmdStLib(
           this,
@@ -373,7 +433,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 
 //      emitComment("Offchip store from fifo")
 
-		case Reg_new(init) =>
+    case Reg_new(init) =>
       withStream(baseStream) {
         emitComment("Reg_new {")
         val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
@@ -401,9 +461,9 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
         emitComment("Reg_new }")
       }
 
-		case Argin_new(init) =>
-			val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
-          	emit(s"""DFEVar ${quote(sym)} = io.scalarInput("${quote(sym)}", $ts );""")
+    case Argin_new(init) =>
+      val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
+            emit(s"""DFEVar ${quote(sym)} = io.scalarInput("${quote(sym)}", $ts );""")
             if (argToExp.contains(sym.asInstanceOf[Sym[Reg[Any]]])) {
               emit(s"""${quote(argToExp(sym.asInstanceOf[Sym[Reg[Any]]]))} <== ${quote(sym)};""")
             }
@@ -431,12 +491,12 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       }
       emit(s"""$pre ${quote(sym)} = $regStr;""")
 
-		case e@Reg_write(reg, value) =>
+    case e@Reg_write(reg, value) =>
       emitComment("Reg_write {")
       if (writersOf(reg).isEmpty)
           throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
       val writer = writersOf(reg).head._1  // Regs have unique writer which also drives reset
-			val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
+      val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
       val duplicates = duplicatesOf(reg)
       val numDuplicates = duplicatesOf(reg).length
       regType(reg) match {
@@ -530,14 +590,13 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
             ${quote(size0)}, ${quote(size1)}, $ts, ${banks(sym)}, /* stride_TODO */ 1, ${readersOf(sym).size});""")
         } else {
           val readers = duplicatesOf(sym)
-          val id = instanceIndexOf(readers)
-          if (readers.length > 2) { throw new Exception(s"More than 1 reader: $sym. Don't know how to handle.") }
 
+          if (readers.length > 1) { throw new Exception(s"More than 1 reader: $sym = ${readers.length} readers. Don't know how to handle.") }
 
           val banks = {
             val bnks = readers(0).banking.map { a =>
               a match {
-                case MultiWayBanking(_, banks) => banks
+                case DiagonalBanking(_, banks) => banks
                 case StridedBanking(_, banks) => banks
                 case _ => 1
                 }}
@@ -547,11 +606,24 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
               case _ => throw new Exception(s"Can't handle ${readers(0).banking.length}-D memory!")
             }
           }
+          val strides = {
+            val strds = readers(0).banking.map { a =>
+              a match {
+                case DiagonalBanking(strides, _) => throw new Exception(s"Can't handle Diagonal banking yet")
+                case StridedBanking(stride, _) => stride
+                case _ => 1
+                }}
+            readers(0).banking.length match {
+              case 1 => strds
+              case 2 => strds.mkString("new int[] {", ",", "}")
+              case _ => throw new Exception(s"Can't handle ${readers(0).banking.length}-D memory!")
+            }
+          }
 
           if (isDummy(sym)) {
             emit(s"""DummyMemLib ${quote(sym)} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""") 
           } else {
-            emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, /*banks*/ ${banks}, 1 /* stride */);""") // [TODO] Raghu: Stride from metadata
+            emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, /*banks*/ ${banks}, /* stride */ ${strides});""") // [TODO] Raghu: Stride from metadata
           }
         }
         emitComment("} Bram_new")
@@ -563,15 +635,18 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
     case Par_bram_load(bram, addr) =>
       bramLoad(sym, bram, addr, true)
 
+    case Bram_store(bram, addr, value) =>
+      bramStore(sym, bram, addr, value)
+
     case Par_bram_store(bram, addr, value) =>
-      bramStore(bram, addr, value)
+      bramStore(sym, bram, addr, value)
 
     case Fifo_new(size, zero) =>  // FIFO is always parallel
       val duplicates = duplicatesOf(sym)
       if (duplicates.size != 1) throw new Exception(s"More than 1 duplicates: $duplicates. Don't know how to handle.")
       if (duplicates.head.banking.size != 1) throw new Exception(s"More than 1 banking dimension: Don't know how to handle.")
       val par = duplicates.head.banking.head.banks
-			val ts = tpstr(1)(sym.tp.typeArguments.head, implicitly[SourceContext])
+      val ts = tpstr(1)(sym.tp.typeArguments.head, implicitly[SourceContext])
       emit(s"""// FIFO ${quote(sym)} = Fifo_new[$ts](${quote(size)}, ${quote(zero)});""")
       emit(s"""DFEVector<DFEVar> ${quote(sym)}_rdata = new DFEVectorType<DFEVar>($ts, $par).newInstance(this);""")
       emit(s"""DFEVector<DFEVar> ${quote(sym)}_wdata = new DFEVectorType<DFEVar>($ts, $par).newInstance(this);""")
@@ -601,7 +676,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       emit(s"""DFEVar ${quote(sym)} = ${quote(vec)}[${quote(idx)}];""")
 
     case Vector_from_list(elems) =>
-			val ts = tpstr(1)(elems(0).tp, implicitly[SourceContext])
+      val ts = tpstr(1)(elems(0).tp, implicitly[SourceContext])
       emit(s"""DFEVector<DFEVar> ${quote(sym)} = new DFEVectorType<DFEVar>($ts, ${elems.size}).newInstance(this, Arrays.asList(${elems.map(quote).mkString(",")}));""")
 
     case _ => super.emitNode(sym, rhs)

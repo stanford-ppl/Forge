@@ -8,7 +8,9 @@ import scala.collection.mutable.HashMap
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait UnrollingTransformExp extends ReductionAnalysisExp with LoweredPipeOpsExp { this: DHDLExp => }
+trait UnrollingTransformExp extends ReductionAnalysisExp with LoweredPipeOpsExp with MemoryAnalysisExp {
+  this: DHDLExp =>
+}
 
 trait UnrollingTransformer extends MultiPassTransformer {
   val IR: UnrollingTransformExp with DHDLExp
@@ -133,6 +135,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
       val values = lanes.vectorize{p => f(value)}
       val addrs  = lanes.vectorize{p => f(addr)}
       val parStore = par_bram_store(f(bram), addrs, values)(e._mT, e.__pos)
+      parIndicesOf(parStore) = lanes.map{i => accessIndicesOf(s).map(f(_)) }
       lanes.unify(s, parStore)
 
     case EatReflect(e@Bram_load(bram,addr)) if !lanes.isUnrolled(bram) =>
@@ -141,7 +144,22 @@ trait UnrollingTransformer extends MultiPassTransformer {
       val parLoad = par_bram_load(f(bram), addrs)(e._mT, e.__pos)
       dimsOf(parLoad) = List(lanes.length.as[Index])
       instanceIndexOf(parLoad) = instanceIndexOf(s)
+      parIndicesOf(parLoad) = lanes.map{i => accessIndicesOf(s).map(f(_)) }
       lanes.split(s, parLoad)(e._mT)
+
+    // FIXME: Shouldn't be necessary to have duplication rules + metadata propagation
+    // for these nodes explicitly. Maybe have two-step mirroring for metadata?
+    case EatReflect(e@Bram_store(bram,addr,value)) =>
+      debug(s"Duplicated bram store $s = $d")
+      val stores = lanes.duplicate(s, d)
+      lanes.foreach{i => parIndicesOf(f(s)) = List(accessIndicesOf(s).map(f(_))) }
+      stores
+
+    case EatReflect(e@Bram_load(bram,addr)) =>
+      debug(s"Duplicated bram load $s = $d")
+      val loads = lanes.duplicate(s, d)
+      loads.foreach{i => parIndicesOf(f(s)) = List(accessIndicesOf(s).map(f(_))) }
+      loads
 
     case d if isControlNode(s) && lanes.length > 1 =>
       val parBlk = reifyBlock { lanes.duplicate(s, d); () }
@@ -312,9 +330,10 @@ trait UnrollingTransformer extends MultiPassTransformer {
   override def self_mirror[A](sym: Sym[A], rhs : Def[A]): Exp[A] = self_clone(sym,rhs)
 
   // Similar to self_mirror, but also duplicates bound vars
+  // Mirror metadata on the fly
   def self_clone[A](sym: Sym[A], rhs : Def[A]): Exp[A] = {
     val sym2 = clone(rhs)(mtype(sym.tp), mpos(sym.pos))
-    setProps(sym2, getProps(sym))
+    setProps(sym2, mirror(getProps(sym), f.asInstanceOf[Transformer]))
     cloneFuncs.foreach{func => func(sym2)}
     sym2
   }

@@ -112,18 +112,19 @@ trait PIRGen extends Traversal with PIRCommon {
 
   def cuDeclaration(cu: ComputeUnit) = {
     val parent = cu.parent.map(_.name).getOrElse("top")
+    val deps = cu.deps.map{dep => cus(dep).name }
     cu match {
       case cu: BasicComputeUnit =>
-        s"""ComputeUnit(name=Some("${cu.name}"), tpe = ${quoteControl(cu.tpe)}, parent=$parent)"""
+        s"""ComputeUnit(name=Some("${cu.name}"), tpe = ${quoteControl(cu.tpe)}, deps=$deps parent=$parent)"""
       case cu: TileTransferUnit =>
-        s"""TileTransfer(name=Some("${cu.name}"), memctrl=${cu.ctrl.name}, mctpe=${cu.mode}, parent=$parent)"""
+        s"""TileTransfer(name=Some("${cu.name}"), memctrl=${cu.ctrl.name}, mctpe=${cu.mode}, deps=$deps, parent=$parent)"""
     }
   }
   def quoteControl(tpe: ControlType) = tpe match {
     case InnerPipe => "Pipe"
     case CoarsePipe => "MetaPipeline"
     case SequentialPipe => "Sequential"
-    case StreamPipe => stageError("Stream pipe not yet supported in PIR")
+    case StreamPipe => throw new Exception("Stream pipe not yet supported in PIR")
   }
 
   def generateCU(pipe: Exp[Any], cu: ComputeUnit, suffix: String = "") {
@@ -172,7 +173,7 @@ trait PIRGen extends Traversal with PIRCommon {
     case OutputArg(name) => emit(s"val $name = ArgOut()")
     case ScalarMem(name) => emit(s"val $name = Scalar()")
     case VectorMem(name) => emit(s"val $name = Vector()")
-    case _ => stageError(s"Don't know how to generate CGRA component: $x")
+    case _ => throw new Exception(s"Don't know how to generate CGRA component: $x")
   }
 
   def quote(reg: LocalMem): String = reg match {
@@ -185,9 +186,11 @@ trait PIRGen extends Traversal with PIRCommon {
     case ReduceReg(x)            => quote(x)                // Uses only, not assignments
     case AccumReg(x, init)       => quote(x)                // After preallocation
     case InputReg(mem)           => s"${mem.name}.load"     // Local read
+    case WriteAddrReg(x)         => quote(x)                // Write address register
+    case ReadAddrReg(x)          => quote(x)                // Read address register
 
     // Other cases require stage context
-    case _ => stageError(s"Cannot quote local memory $reg without context")
+    case _ => throw new Exception(s"Cannot quote local memory $reg without context")
   }
 
   var allocatedReduce: Set[ReduceReg] = Set.empty
@@ -232,7 +235,7 @@ trait PIRGen extends Traversal with PIRCommon {
     }
 
     if (cu.stages.nonEmpty || cu.writeStages.nonEmpty) {
-      emit(s"var stage = List[Stage] = Nil")
+      emit(s"var stage: List[Stage] = Nil")
 
       for ((mem,stages) <- cu.writeStages) {
         i = 0

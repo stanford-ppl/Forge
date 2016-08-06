@@ -16,13 +16,13 @@ trait DHDLMetadata {
     val Range       = lookupTpe("Range")
     val Idx         = lookupAlias("Index")
 
-<<<<<<< HEAD
     val DummyMem = metadata("DummyMem", "isDummy" -> SBoolean)
     val isDummy = metadata("isDummy")
     static (isDummy) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, DummyMem($1)) }
     static (isDummy) ("apply", Nil, (MAny) :: SBoolean) implements
       composite ${ meta[DummyMem]($0).map(_.isDummy).getOrElse(false) }
+
     /**
       Metadata for determining which memory instance a reader should correspond to.
       Needed to preserve mapping after unrolling
@@ -370,8 +370,8 @@ trait DHDLMetadata {
      * Get: parentOf(Rep[Any])   // Returns Option[Rep[Any]]. None if undefined.
      * Get: parentOf((Rep[Any], Boolean)) // Returns Option[(Rep[Any], Boolean)]. None if undefined.
      **/
-	 	/* TODO: Pipe/Metapipe/Sequential/Parallel: every node (includeing primitive nodes) inside the
-		 * controller has the controller as its parent*/ //TODO: is this necessary?
+        /* TODO: Pipe/Metapipe/Sequential/Parallel: every node (includeing primitive nodes) inside the
+         * controller has the controller as its parent*/ //TODO: is this necessary?
     val MParent = metadata("MParent", "parent" -> MAny)
     val parentOps = metadata("parentOf")
     internal.static (parentOps) ("update", Nil, (MAny, MAny) :: MUnit, effect = simple) implements
@@ -407,7 +407,7 @@ trait DHDLMetadata {
       composite ${ meta[MChildren]($0).map(_.children).getOrElse(Nil) }
 
 
-		/**
+        /**
      * List of memories written by given controller
      * User facing: No
      * Set: writtenIn(Rep[Any]) = List[Rep[Any]]
@@ -420,11 +420,11 @@ trait DHDLMetadata {
     internal.static (writtenOps) ("apply", Nil, (MAny) :: SList(MAny)) implements
       composite ${ meta[MWritten]($0).map(_.written).getOrElse(Nil) }
 
-		/**
+        /**
      * List of writers for a given memory and owning controller
      * Tuple is (Controller, IsReduction, Writer)
      * IsReduction is only true for nodes within the inner reduction loop of AccumFold
-		 * User facing: No
+         * User facing: No
      * Set: writersOf(Rep[Any]) = (Rep[Any], Rep[Any])  // Single writer, isReduction is false
      * Set: writersOf(Rep[Any]) = (Rep[Any], Boolean, Rep[Any])
      * Set: writersOf(Rep[Any]) = List[(Rep[Any], Boolean, Rep[Any])]
@@ -460,7 +460,7 @@ trait DHDLMetadata {
     internal.static (topWriterOps) ("apply", Nil, (MAny) :: SList(CTuple3(MAny,SBoolean,MAny))) implements
       composite ${ meta[MTopWriters]($0).map(_.writers).getOrElse(Nil) }
 
-		/**
+        /**
      * List of readers for a given memory
      * Tuple is (Controller, IsReduction, Reader)
      * IsReduction is only true for nodes within the inner reduction loop of AccumFold
@@ -491,9 +491,19 @@ trait DHDLMetadata {
       composite ${ meta[MAccessIndices]($0).map(_.indices).getOrElse(Nil) }
 
 
-		/* MaxJ Codegen Helper Functions */
+    /**
+     * Parallelized N-D access indices
+     **/
+    val MParAccessIndices = metadata("MParAccessIndices", "indices" -> SList(SList(Idx)))
+    val parAccessOps = metadata("parIndicesOf")
+    internal.static (parAccessOps) ("update", Nil, (MAny, SList(SList(Idx))) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MParAccessIndices($1)) }
+    internal.static (parAccessOps) ("apply", Nil, (MAny) :: SList(SList(Idx))) implements
+      composite ${ meta[MParAccessIndices]($0).map(_.indices).getOrElse(Nil) }
+
+        /* MaxJ Codegen Helper Functions */
     val maxjgrp = grp("maxjGrp")
-		/* Not real metadata but need to be globally accessable */
+        /* Not real metadata but need to be globally accessable */
     val maxjmeta = metadata("maxjMeta")
     internal.direct (maxjgrp) ("maxJPreG", Nil, SInt :: SString) implements composite ${
       if ( $0 == 1 ) "DFEVar"
@@ -502,33 +512,31 @@ trait DHDLMetadata {
     internal.direct (maxjmeta) ("maxJPre", T, T :: SString) implements composite ${
       maxJPreG(parOf( $0 ))
     }
-		internal.direct (maxjmeta) ("tpstr", T, SInt :: SString) implements composite ${
-			tpstrG[T]( $0 )
-		}
-		internal.direct (maxjgrp) ("tpstrG", T, SInt :: SString) implements composite ${
-			val scalart = if (isFixPtType(manifest[T])) {
-				val s = sign(manifest[T].typeArguments(0))
-				val d = nbits(manifest[T].typeArguments(1))
-				val f = nbits(manifest[T].typeArguments(2))
-				if (s) "dfeFixOffset( "+ (d+f) + "," + f + ", SignMode.TWOSCOMPLEMENT)"
-				else "dfeFixOffset("+ (d+f) + "," + f + ", SignMode.UNSIGNED)"
-			} else if (manifest[T].erasure.getSimpleName == "DHDLCounter") {  // [TODO] Raghu: There must be a better way to do this
-		    "dfeInt(32)"
-      } else if (isFltPtType(manifest[T])) {
-				val m = nbits(manifest[T].typeArguments(0))
-				val e = nbits(manifest[T].typeArguments(1))
-				"dfeFloat(" + e + "," + m + ")"
-			} else if (isBitType(manifest[T])) {
-			  "dfeFixOffset(1, 0, SignMode.UNSIGNED)"
-			} else {
-				//throw new Exception("Unknown type " + manifest[T])
-				"Unknown type " + manifest[T]
-			}
-			if ( $0 > 1) {
-				"new DFEVectorType<DFEVar>(" + scalart + "," + $0 + ")"
-			} else {
-				scalart
-			}
-		}
-	}
+        internal.direct (maxjmeta) ("tpstr", T, SInt :: SString) implements composite ${
+            tpstrG[T]( $0 )
+        }
+        internal.direct (maxjgrp) ("tpstrG", T, SInt :: SString) implements composite ${
+            val scalart = if (isFixPtType(manifest[T])) {
+                val s = sign(manifest[T].typeArguments(0))
+                val d = nbits(manifest[T].typeArguments(1))
+                val f = nbits(manifest[T].typeArguments(2))
+                if (s) "dfeFixOffset( "+ (d+f) + "," + f + ", SignMode.TWOSCOMPLEMENT)"
+                else "dfeFixOffset("+ (d+f) + "," + f + ", SignMode.UNSIGNED)"
+            } else if (isFltPtType(manifest[T])) {
+                val e = nbits(manifest[T].typeArguments(0))
+                val m = nbits(manifest[T].typeArguments(1))
+                "dfeFloat(" + e + "," + m + ")"
+            } else if (isBitType(manifest[T])) {
+              "dfeFixOffset(1, 0, SignMode.UNSIGNED)"
+            } else {
+                //throw new Exception("Unknown type " + manifest[T])
+                ""
+            }
+            if ( $0 > 1) {
+                "new DFEVectorType<DFEVar>(" + scalart + "," + $0
+            } else {
+                scalart
+            }
+        }
+    }
 }

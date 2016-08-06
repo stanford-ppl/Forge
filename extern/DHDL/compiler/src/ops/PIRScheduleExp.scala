@@ -2,7 +2,7 @@ package dhdl.compiler.ops
 
 import scala.reflect.{Manifest,SourceContext}
 
-import scala.virtualization.lms.internal.QuotingExp
+import scala.virtualization.lms.internal.{Traversal, QuotingExp}
 
 import dhdl.shared._
 import dhdl.shared.ops._
@@ -17,7 +17,7 @@ trait SubstQuotingExp extends QuotingExp {
   override def quote(x: Exp[Any]) = super.quote(subst.getOrElse(x, x))
 }
 
-trait PIRCommon extends SubstQuotingExp {
+trait PIRCommon extends SubstQuotingExp with Traversal {
   val IR: PIRScheduleAnalysisExp with DHDLExp
   import IR._
 
@@ -32,42 +32,53 @@ trait PIRCommon extends SubstQuotingExp {
       val name = quote(mem) + writer.map{writer => "_"+quote(writer._3)}.getOrElse("")
       val comm = mem match {
         case Deff(Offchip_new(_)) => Offchip(name)
-        case Deff(Argin_new(_))   => InputArg(name)
-        case Deff(Argout_new(_))  => OutputArg(name)
-        case Deff(Reg_new(_))     => ScalarMem(name)
+        case Deff(Argin_new(_))   => InputArg(name+"_argin")
+        case Deff(Argout_new(_))  => OutputArg(name+"_argout")
+        case Deff(Reg_new(_))     => ScalarMem(name+"_scalar")
+        case mem if isArgIn(mem)  => InputArg(name+"_argin")
+        case mem if isArgOut(mem) => OutputArg(name+"")
+        case mem if isRegister(mem.tp) => ScalarMem(name)
         case _                    => VectorMem(name)
       }
+      debug(s"Adding global for $mem: $comm")
       globals += comm
       comm
   }
 
-  def allocateConst(x: Exp[Any]) = x match {
-    case Exact(c) => ConstReg(s"${c.toLong}l") // FIXME: Not necessarily an integer
-    case _ => stageError(s"Cannot allocate constant value for $x")
+  private def allocateReg(reg: Exp[Any], pipe: Exp[Any], read: Option[Exp[Any]] = None, write: Option[Exp[Any]] = None) = {
+    val isLocallyRead = isReadInPipe(reg, pipe, read)
+    val isLocallyWritten = isWrittenInPipe(reg, pipe, write)
+    debug(s"allocating register $reg in $pipe (localRead: $isLocallyRead, localWrite: $isLocallyWritten, accum: ${isAccum(reg)}")
+    if (isLocallyRead && isLocallyWritten && isInnerAccum(reg)) {
+      ReduceReg(reg)
+    }
+    else if (isLocallyRead && isLocallyWritten && isAccum(reg)) {
+      val rst = allocateConst(resetValue(reg.asInstanceOf[Exp[Reg[Any]]]))
+      AccumReg(reg, rst)
+    }
+    else if (!isLocallyRead) { // Always prefer the local register over ScalarOut, if applicable
+      val global = allocateGlobal(reg)
+      ScalarOut(reg, global)
+    }
+    else if (!isLocallyWritten) {
+      val global = allocateGlobal(reg)
+      ScalarIn(reg, global)
+    }
+    else {
+      TempReg(reg)
+    }
   }
 
   def allocateLocal(mem: Exp[Any], pipe: Exp[Any], read: Option[Exp[Any]] = None,  write: Option[Exp[Any]] = None): LocalMem = mem match {
     case Exact(c) => allocateConst(mem)
-    case reg@Deff(Reg_new(init)) =>
-      val isLocallyRead = isReadInPipe(reg, pipe, read)
-      val isLocallyWritten = isWrittenInPipe(reg, pipe, write)
-      if (isInnerAccum(reg)) ReduceReg(reg)
-      else if (isAccum(reg)) {
-        val rst = allocateConst(resetValue(reg.asInstanceOf[Exp[Reg[Any]]]))
-        AccumReg(reg, rst)
-      }
-      else if (!isLocallyRead) { // Always prefer the local register over ScalarOut, if applicable
-        val global = allocateGlobal(reg)
-        ScalarOut(reg, global)
-      }
-      else if (!isLocallyWritten) {
-        val global = allocateGlobal(reg)
-        ScalarIn(reg, global)
-      }
-      else {
-        TempReg(reg)
-      }
+    case reg@Deff(Argin_new(init)) =>
+      val global = allocateGlobal(reg)
+      ScalarIn(reg, global)
+    case reg@Deff(Argout_new(init)) => allocateReg(reg, pipe, read, write) // argOuts can be accumulators
+    case reg@Deff(Reg_new(init))    => allocateReg(reg, pipe, read, write)
+
     case reader@Deff(Reg_read(reg)) =>
+      debug(s"allocating reader $reader of $reg in $pipe")
       allocateLocal(reg, pipe, Some(reader), write)
 
     case _ => TempReg(mem)
@@ -108,6 +119,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case class InputReg(mem: CUMemory) extends LocalMem
   case class VectorLocal(x: Exp[Any], mem: CUMemory) extends LocalMem
   case class VectorOut(x: Exp[Any], mem: GlobalMem) extends LocalMem
+  case class OffchipAddr(mem: GlobalMem) extends LocalMem
 
   case class CounterReg(cchain: CUCounterChain, idx: Int) extends LocalMem
   case class ConstReg(const: String) extends LocalMem
@@ -116,7 +128,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case class LocalRef(stage: Int, reg: LocalMem)
 
   def isReadOutsidePipe(x: Exp[Any], pipe: Exp[Any], reader: Option[Exp[Any]] = None) = {
-    readersOf(x).exists{read => reader.map{filt => read._3 == filt}.getOrElse(true) && read._1 != pipe }
+    isArgOut(x) || readersOf(x).exists{read => reader.map{filt => read._3 == filt}.getOrElse(true) && read._1 != pipe }
   }
   // (A) reader exists in this pipe or there are no readers
   def isReadInPipe(x: Exp[Any], pipe: Exp[Any], reader: Option[Exp[Any]] = None) = {
@@ -152,7 +164,12 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case class ReduceStage(op: PIROp, init: LocalMem, var out: ReduceReg) extends Stage { def outputReg = out }
 
   // --- Compute units
-  sealed abstract class ComputeUnit(val name: String, val parent: Option[ComputeUnit]) {
+  def allocateConst(x: Exp[Any]) = x match {
+    case Exact(c) => ConstReg(s"${c.toLong}l") // FIXME: Not necessarily an integer
+    case _ => stageError(s"Cannot allocate constant value for $x")
+  }
+
+  sealed abstract class ComputeUnit(val name: String, val parent: Option[ComputeUnit], val deps: List[Exp[Any]]) {
     var cchains: Set[CUCounterChain] = Set.empty
     var srams: Set[CUMemory] = Set.empty
     var regs: Set[LocalMem] = Set.empty
@@ -166,7 +183,10 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
       else                        expTable += reg -> List(exp)
     }
     def iterators = regTable.flatMap{case (exp, reg: CounterReg) => Some((exp,reg)); case _ => None}.toList
-    def get(x: Exp[Any]): Option[LocalMem] = regTable.get(x)
+    def get(x: Exp[Any]): Option[LocalMem] = x match {
+      case Exact(_) => Some(getOrUpdate(x)(allocateConst(x)))
+      case _ => regTable.get(x)
+    }
     def getOrUpdate(x: Exp[Any])(func: => LocalMem) = regTable.getOrElse(x, {
       val reg = func
       addReg(x, reg)
@@ -209,8 +229,9 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case class BasicComputeUnit(
     override val name: String,
     override val parent: Option[ComputeUnit],
+    override val deps: List[Exp[Any]],
     val tpe: ControlType
-  ) extends ComputeUnit(name,parent) {
+  ) extends ComputeUnit(name,parent,deps) {
     override def dumpString = s"""BasicComputeUnit($name, $parent, $tpe){
 ${super.dumpString}
 }"""
@@ -220,9 +241,10 @@ ${super.dumpString}
   case class TileTransferUnit(
     override val name: String,
     override val parent: Option[ComputeUnit],
+    override val deps: List[Exp[Any]],
     val ctrl: MemCtrl,
     val mode: MemoryMode
-  ) extends ComputeUnit(name,parent) {
+  ) extends ComputeUnit(name,parent,deps) {
     override def dumpString = s"""TileTransferUnit($name, $parent, $ctrl, $mode){
 ${super.dumpString}
 }"""

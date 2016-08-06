@@ -660,13 +660,14 @@ trait DeliteGenOps extends BaseGenOps {
 
   // Hack for dealing with "immediate" DSL types (e.g. Lists of Reps)
   // TODO: Doesn't cover arbitrarily nested cases, e.g. List[List[Rep[Int]]]
-  def makeTransformedArg(idx: Int, tpe: Rep[DSLType], xf: String = "f"): String = tpe.stage match {
-    case `compile` if tpe.name.startsWith("List") || tpe.name.startsWith("Seq") =>
-      val tP = tpe.tpeArgs.head
-      if (tP.name.startsWith("Rep") || tP.name.startsWith("Exp") || tP.stage != compile) opArgPrefix+idx+".map{x => " + xf + "(x)}"
-      else opArgPrefix+idx
-    case `compile` if !tpe.name.startsWith("Rep") && !tpe.name.startsWith("Exp") => opArgPrefix+idx
-    case _ => xf + "(" + opArgPrefix+idx + ")"
+  def makeTransformedArg(idx: Int, tpe: Rep[DSLType], xf: String = "f", argName: Option[String] = None): String = {
+    val arg = argName.getOrElse(opArgPrefix+idx)
+    tpe.stage match {
+      case `compile` if tpe.name.startsWith("List") || tpe.name.startsWith("Seq") || tpe.name.startsWith("Option") =>
+        arg+".map{x => " + makeTransformedArg(idx,tpe.tpeArgs.head,xf,Some("x")) +  " }"
+      case `compile` if !tpe.name.startsWith("Rep") && !tpe.name.startsWith("Exp") => arg
+      case _ => xf + "(" + arg + ")"
+    }
   }
 
   def makeTransformedArgs(o: Rep[DSLOp], xf: String = "f", addParen: Boolean = true) = {

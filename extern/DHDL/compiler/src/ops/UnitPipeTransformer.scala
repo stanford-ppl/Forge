@@ -46,13 +46,15 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
         focusExactScope(blk){ stms =>
 
           // Imperative version (functional version caused ugly scalac crash :( )
-          var globals = List[Stm]()
+          var allocs = List[List[Stm]]()
           var stages = List[List[Stm]]()
           var prevStageIsControl = true
+          allocs = Nil +: allocs
 
           stms foreach { case stm@TP(s,d) =>
             if (isPrimitiveNode(s)) {
               if (prevStageIsControl) {
+                allocs = Nil +: allocs
                 stages = List(stm) +: stages
                 prevStageIsControl = false
               }
@@ -67,35 +69,39 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
             // Could be an issue if an effectful statement is found to be global, but this
             // is currently disallowed
             else if (isAllocation(s) || isConstantExp(s) || isGlobal(s)) {
-              globals = globals :+ stm
+              allocs = (stm +: allocs.head) +: allocs.tail
               // No change to prevStage
             }
             else {
+              allocs = Nil +: allocs
               stages = List(stm) +: stages
               prevStageIsControl = true
             }
           }
 
           stages = stages.map(_.reverse).reverse
+          allocs = allocs.map(_.reverse).reverse
 
-          if (globals.nonEmpty)
-            stages = globals +: stages
-
+          stages = (List(allocs.head) +: List.tabulate(stages.length){i => List(stages(i),allocs(i+1)) }).flatten
 
           val deps = stages.map{stage => stage.flatMap{case TP(s,d) => (syms(d) ++ readSyms(d)).distinct }}
 
           if (debugMode) {
-            stages.zipWithIndex.foreach{case (stage,i) => stage.head match {
-              case TP(s,d) if isPrimitiveNode(s) =>
-                debugs(s"$i. Primitive nodes: ")
+            stages.zipWithIndex.foreach{case (stage,i) => stage.headOption match {
+              case Some(TP(s,d)) if isPrimitiveNode(s) =>
+                debugs(s"$i. Primitives: ")
                 stage.foreach{case TP(s,d) => debugs(s"..$s = $d") }
-              case TP(s,d) => debugs(s"$i. $s = $d")
+              case Some(TP(s,d)) if isAllocation(s) || isConstantExp(s) || isGlobal(s) =>
+                debugs(s"$i. Allocations: ")
+                stage.foreach{case TP(s,d) => debugs(s"..$s = $d") }
+              case Some(TP(s,d)) => debugs(s"$i. $s = $d")
+              case None => debugs(s"$i. [Empty alloc slot]")
             }}
             debug("")
           }
 
-          stages.zipWithIndex.foreach{ case (stage,i) => stage.head match {
-            case TP(s,d) if isPrimitiveNode(s) =>
+          stages.zipWithIndex.foreach{ case (stage,i) => stage.headOption match {
+            case Some(TP(s,d)) if isPrimitiveNode(s) =>
               val calculatedSyms = stage.map{case TP(s,d) => s}
               val neededSyms = deps.drop(i+1).flatten
               // Determine which symbols escape (can be empty)
@@ -125,9 +131,9 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
               // Replace all dependencies on effectful (Unit) symbols with dependencies on newly created Pipe
               escapingUnits.foreach{sym => subst += sym -> pipe}
 
-            case TP(s,d) => stage.foreach{stm => traverseStm(stm) } // Mirror non-primitives to update
+            case Some(TP(s,d)) => stage.foreach{stm => traverseStm(stm) } // Mirror non-primitives to update
+            case None =>
           }}
-
         }
       }
       f(getBlockResult(blk))

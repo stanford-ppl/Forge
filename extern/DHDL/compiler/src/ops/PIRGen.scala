@@ -114,10 +114,12 @@ trait PIRGen extends Traversal with PIRCommon {
     val parent = cu.parent.map(_.name).getOrElse("top")
     val deps = cu.deps.map{dep => cus(dep).name }
     cu match {
+      case cu: BasicComputeUnit if cu.isUnitCompute =>
+        s"""UnitComputeUnit(name = Some("${cu.name}"), parent=$parent, deps=$deps)"""
       case cu: BasicComputeUnit =>
-        s"""ComputeUnit(name=Some("${cu.name}"), tpe = ${quoteControl(cu.tpe)}, deps=$deps parent=$parent)"""
+        s"""ComputeUnit(name=Some("${cu.name}"), parent=$parent, tpe = ${quoteControl(cu.tpe)}, deps=$deps)"""
       case cu: TileTransferUnit =>
-        s"""TileTransfer(name=Some("${cu.name}"), memctrl=${cu.ctrl.name}, mctpe=${cu.mode}, deps=$deps, parent=$parent)"""
+        s"""TileTransfer(name=Some("${cu.name}"), parent=$parent, memctrl=${cu.ctrl.name}, mctpe=${cu.mode}, deps=$deps, vec=${cu.vec.name})"""
     }
   }
   def quoteControl(tpe: ControlType) = tpe match {
@@ -165,7 +167,7 @@ trait PIRGen extends Traversal with PIRCommon {
       emit(s"""val $name = Counter(${quote(start)}, ${quote(end)}, ${quote(stride)})""")
 
     case CUMemory(name, size, Some(writer), Some(readAddr), Some(writeAddr)) =>
-      emit(s"""val $name = SRAM(size = $size, vector = ${writer.name}, readAddr = ${quote(readAddr)}, writeAddr = ${quote(writeAddr)})""")
+      emit(s"""val $name = SRAM(size = $size, vec = ${writer.name}, readAddr = ${quote(readAddr)}, writeAddr = ${quote(writeAddr)})""")
 
     case MemCtrl(name,region,mode) => emit(s"val $name = MemoryController($mode, ${region.name})")
     case Offchip(name) => emit(s"val $name = Offchip()")

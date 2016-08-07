@@ -241,7 +241,9 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
     override def dumpString = s"""BasicComputeUnit($name, $parent, $tpe){
 ${super.dumpString}
 }"""
-  override def toString() = s"BasicComputeUnit($name, ${parent.map(_.name)})"
+    override def toString() = s"BasicComputeUnit($name, ${parent.map(_.name)})"
+
+    def isUnitCompute = (stages.nonEmpty || writeStages.nonEmpty) && !cchains.exists(_.isInstanceOf[CounterChainInstance])
   }
 
   case class TileTransferUnit(

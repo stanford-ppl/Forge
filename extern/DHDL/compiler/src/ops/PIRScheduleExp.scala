@@ -24,25 +24,22 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
   val globals = HashSet[GlobalMem]()
 
   // Create a vector for communication to/from a given memory
-  def allocateGlobal(mem: Exp[Any]) = writersOf(mem).headOption match {
-    case Some((_,_,writer@Deff(_:Offchip_load_cmd[_]))) =>
-      TileTxVector(quote(writer)+".out")
-
-    case writer =>
-      val name = quote(mem) + writer.map{writer => "_"+quote(writer._3)}.getOrElse("")
-      val comm = mem match {
-        case Deff(Offchip_new(_)) => Offchip(name)
-        case Deff(Argin_new(_))   => InputArg(name+"_argin")
-        case Deff(Argout_new(_))  => OutputArg(name+"_argout")
-        case Deff(Reg_new(_))     => ScalarMem(name+"_scalar")
-        case mem if isArgIn(mem)  => InputArg(name+"_argin")
-        case mem if isArgOut(mem) => OutputArg(name+"")
-        case mem if isRegister(mem.tp) => ScalarMem(name)
-        case _                    => VectorMem(name)
-      }
-      debug(s"Adding global for $mem: $comm")
-      globals += comm
-      comm
+  def allocateGlobal(mem: Exp[Any]) = {
+    val writer = writersOf(mem).headOption
+    val name = quote(mem) + writer.map{writer => "_"+quote(writer._3)}.getOrElse("")
+    val global = mem match {
+      case Deff(Offchip_new(_)) => Offchip(name)
+      case Deff(Argin_new(_))   => InputArg(name+"_argin")
+      case Deff(Argout_new(_))  => OutputArg(name+"_argout")
+      case Deff(Reg_new(_))     => ScalarMem(name+"_scalar")
+      case mem if isArgIn(mem)  => InputArg(name+"_argin")
+      case mem if isArgOut(mem) => OutputArg(name+"")
+      case mem if isRegister(mem.tp) => ScalarMem(name)
+      case _                    => VectorMem(name)
+    }
+    debug(s"Adding global for $mem: $global")
+    globals += global
+    global
   }
 
   private def allocateReg(reg: Exp[Any], pipe: Exp[Any], read: Option[Exp[Any]] = None, write: Option[Exp[Any]] = None) = {
@@ -169,7 +166,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   }
   case class ReduceStage(op: PIROp, init: LocalMem, acc: ReduceReg) extends Stage {
     def outputMems = List(acc)
-    def inputMems = Nil // Should really be a reducereg and acc
+    def inputMems = throw new Exception("Inputs on ReduceStage not available") // Should really be a reducereg and acc
   }
 
   // --- Compute units
@@ -244,7 +241,9 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
     override def dumpString = s"""BasicComputeUnit($name, $parent, $tpe){
 ${super.dumpString}
 }"""
-  override def toString() = s"BasicComputeUnit($name, ${parent.map(_.name)})"
+    override def toString() = s"BasicComputeUnit($name, ${parent.map(_.name)})"
+
+    def isUnitCompute = (stages.nonEmpty || writeStages.nonEmpty) && !cchains.exists(_.isInstanceOf[CounterChainInstance])
   }
 
   case class TileTransferUnit(
@@ -252,6 +251,7 @@ ${super.dumpString}
     override val parent: Option[ComputeUnit],
     override val deps: List[Exp[Any]],
     val ctrl: MemCtrl,
+    val vec: VectorMem,
     val mode: MemoryMode
   ) extends ComputeUnit(name,parent,deps) {
     override def dumpString = s"""TileTransferUnit($name, $parent, $ctrl, $mode){

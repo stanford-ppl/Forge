@@ -132,15 +132,16 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     }
   }
 
-  def allocateMemoryCU(pipe: Exp[Any], mem: Exp[Any], mode: MemoryMode): TileTransferUnit = {
+  def allocateMemoryCU(pipe: Exp[Any], mem: Exp[Any], vec: Exp[Any], mode: MemoryMode): TileTransferUnit = {
     if (cuMapping.contains(pipe)) cuMapping(pipe).asInstanceOf[TileTransferUnit]
     else {
       val region = allocateGlobal(mem).asInstanceOf[Offchip]
+      val vector = allocateGlobal(vec).asInstanceOf[VectorMem]
       val mc = MemCtrl(quote(pipe)+"_mc", region, mode)
       globals += mc
       val parent = parentOfHack(pipe).map(cuMapping(_))
       val deps = pipeDependencies(pipe)
-      val cu = TileTransferUnit(quote(pipe), parent, deps, mc, mode)
+      val cu = TileTransferUnit(quote(pipe), parent, deps, mc, vector, mode)
       initCU(cu, pipe)
     }
   }
@@ -153,8 +154,8 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     case Deff(_:ParPipeForeach)       => allocateBasicCU(pipe)
     case Deff(_:ParPipeReduce[_,_])   => allocateBasicCU(pipe)
     case Deff(_:Unit_pipe)            => allocateBasicCU(pipe)
-    case Deff(e:Offchip_load_cmd[_])  => allocateMemoryCU(pipe, e.mem, MemLoad)
-    case Deff(e:Offchip_store_cmd[_]) => allocateMemoryCU(pipe, e.mem, MemStore)
+    case Deff(e:Offchip_load_cmd[_])  => allocateMemoryCU(pipe, e.mem, e.fifo, MemLoad)
+    case Deff(e:Offchip_store_cmd[_]) => allocateMemoryCU(pipe, e.mem, e.fifo, MemStore)
   }
 
   def memSize(mem: Exp[Any]) = mem match {

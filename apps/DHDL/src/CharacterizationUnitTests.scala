@@ -26,7 +26,7 @@ trait CharLoad extends DHDLApplication {
 
     Accel {
       Sequential (N by 1) { ii =>
-        val dummy = List.tabulate(outerPar){i => 
+        val dummy = List.tabulate(outerPar){i =>
           BRAM[SInt](tileSize0, tileSize1)
         }
         dummy.foreach {dum =>
@@ -82,7 +82,7 @@ trait CharStore extends DHDLApplication {
 
     Accel {
       Sequential (N by 1) { ii =>
-        val dummy = List.tabulate(outerPar){i => 
+        val dummy = List.tabulate(outerPar){i =>
           BRAM[SInt](tileSize0, tileSize1)
         }
         dummy.foreach {dum =>

@@ -16,7 +16,7 @@ trait ConstantFolding extends SinglePassTransformer {
   val IR: DHDLExp
   import IR._
 
-  debugMode = false
+  debugMode = true
 
   def convertType[T:Manifest](x: Int)(implicit ctx: SourceContext) = x.as[T]
   def convertType[T:Manifest](x: Long)(implicit ctx: SourceContext) = x.as[T]
@@ -27,12 +27,13 @@ trait ConstantFolding extends SinglePassTransformer {
     foldConstants(lhs,rhs) match {
       case Some(c) if lhs != c =>
         debug(s"Replacing $lhs = $rhs ")
-        c match {
-          case Def(cRhs) => debug(s"with $c = $cRhs")
-          case _ => debug(s"with $c")
+        val lhs2 = f(c)
+        lhs2 match {
+          case Def(rhs2) => debug(s"with $lhs2 = $rhs2")
+          case _ => debug(s"with $lhs2")
         }
-        setProps(c, getProps(lhs))
-        Some(c)
+        setProps(lhs2, getProps(lhs))
+        Some(lhs2)
       case _ => None
     }
   }

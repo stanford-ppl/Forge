@@ -107,8 +107,8 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   // Intra-CU communication
   sealed abstract class LocalMem
 
-  case class ReadAddrReg(x: Exp[Any]) extends LocalMem
-  case class WriteAddrReg(x: Exp[Any]) extends LocalMem
+  case class ReadAddrWire(x: Exp[Any]) extends LocalMem
+  case class WriteAddrWire(x: Exp[Any]) extends LocalMem
   case class ReduceReg(x: Exp[Any]) extends LocalMem
   case class AccumReg(x: Exp[Any], init: ConstReg) extends LocalMem
   case class TempReg(x: Exp[Any]) extends LocalMem
@@ -159,9 +159,18 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case class WriteAddrStage(write: Exp[Any]) extends PseudoStage
 
   // --- Stages after scheduling
-  sealed abstract class Stage { def outputReg: LocalMem }
-  case class MapStage(op: PIROp, var inputs: List[LocalRef], var out: LocalRef) extends Stage { def outputReg = out.reg }
-  case class ReduceStage(op: PIROp, init: LocalMem, var out: ReduceReg) extends Stage { def outputReg = out }
+  sealed abstract class Stage {
+    def outputMems: List[LocalMem]
+    def inputMems: List[LocalMem]
+  }
+  case class MapStage(op: PIROp, var ins: List[LocalRef], var outs: List[LocalRef]) extends Stage {
+    def outputMems = outs.map(_.reg)
+    def inputMems = ins.map(_.reg)
+  }
+  case class ReduceStage(op: PIROp, init: LocalMem, acc: ReduceReg) extends Stage {
+    def outputMems = List(acc)
+    def inputMems = Nil // Should really be a reducereg and acc
+  }
 
   // --- Compute units
   def allocateConst(x: Exp[Any]) = x match {
@@ -194,7 +203,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
     })
 
     // Override all previous mappings - use with caution
-    def replaceReg(exp: Exp[Any], reg: LocalMem) {
+    /*def replaceReg(exp: Exp[Any], reg: LocalMem) {
       if (regTable.contains(exp)) {
         val prev = regTable(exp)
         val aliases = expTable(prev)
@@ -213,7 +222,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
         }
       }
       else addReg(exp, reg)
-    }
+    }*/
 
     var writePseudoStages = HashMap[CUMemory, List[PseudoStage]]()
     var computePseudoStages: List[PseudoStage] = Nil

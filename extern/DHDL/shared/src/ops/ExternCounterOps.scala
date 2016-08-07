@@ -12,6 +12,9 @@ trait ExternCounterTypes {
 
   implicit def counterManifest: Manifest[Counter]
   implicit def counterChainManifest: Manifest[CounterChain]
+
+  def isCounter[T:Manifest]: Boolean
+  def isCounterChain[T:Manifest]: Boolean
 }
 
 trait ExternCounterOps extends ExternCounterTypes with Base {this: DHDL => }

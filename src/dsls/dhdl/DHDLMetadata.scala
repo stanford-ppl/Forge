@@ -512,31 +512,35 @@ trait DHDLMetadata {
     internal.direct (maxjmeta) ("maxJPre", T, T :: SString) implements composite ${
       maxJPreG(parOf( $0 ))
     }
-        internal.direct (maxjmeta) ("tpstr", T, SInt :: SString) implements composite ${
-            tpstrG[T]( $0 )
-        }
-        internal.direct (maxjgrp) ("tpstrG", T, SInt :: SString) implements composite ${
-            val scalart = if (isFixPtType(manifest[T])) {
-                val s = sign(manifest[T].typeArguments(0))
-                val d = nbits(manifest[T].typeArguments(1))
-                val f = nbits(manifest[T].typeArguments(2))
-                if (s) "dfeFixOffset( "+ (d+f) + "," + f + ", SignMode.TWOSCOMPLEMENT)"
-                else "dfeFixOffset("+ (d+f) + "," + f + ", SignMode.UNSIGNED)"
-            } else if (isFltPtType(manifest[T])) {
-                val e = nbits(manifest[T].typeArguments(0))
-                val m = nbits(manifest[T].typeArguments(1))
-                "dfeFloat(" + e + "," + m + ")"
-            } else if (isBitType(manifest[T])) {
-              "dfeFixOffset(1, 0, SignMode.UNSIGNED)"
-            } else {
-                //throw new Exception("Unknown type " + manifest[T])
-                ""
-            }
-            if ( $0 > 1) {
-                "new DFEVectorType<DFEVar>(" + scalart + "," + $0
-            } else {
-                scalart
-            }
-        }
-    }
+
+		internal.direct (maxjmeta) ("tpstr", T, SInt :: SString) implements composite ${
+			tpstrG[T]( $0 )
+		}
+		internal.direct (maxjgrp) ("tpstrG", T, SInt :: SString) implements composite ${
+			val scalart = if (isFixPtType(manifest[T])) {
+				val s = sign(manifest[T].typeArguments(0))
+				val d = nbits(manifest[T].typeArguments(1))
+				val f = nbits(manifest[T].typeArguments(2))
+				if (s) "dfeFixOffset( "+ (d+f) + "," + f + ", SignMode.TWOSCOMPLEMENT)"
+				else "dfeFixOffset("+ (d+f) + "," + f + ", SignMode.UNSIGNED)"
+			} else if (isFltPtType(manifest[T])) {
+				val e = nbits(manifest[T].typeArguments(0))
+				val m = nbits(manifest[T].typeArguments(1))
+				"dfeFloat(" + e + "," + m + ")"
+			} else if (isBitType(manifest[T])) {
+			  "dfeFixOffset(1, 0, SignMode.UNSIGNED)"
+      } else if (isCounter(manifest[T])) {
+        "dfeFixOffset(32,0,SignMode.TWOSCOMPLEMENT)"  // TODO: Is this safe?
+			} else {
+        // Was commented out before, not sure why
+				throw new Exception("Unknown type " + manifest[T])
+			}
+			if ( $0 > 1) {
+				"new DFEVectorType<DFEVar>(" + scalart + "," + $0 + ")"
+			} else {
+				scalart
+			}
+		}
+	}
 }
+

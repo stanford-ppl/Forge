@@ -16,6 +16,8 @@ trait ExternCounterWrapper {
   def counterManifest: Manifest[Counter] = manifest[FixedPointRange[Signed,B32,B0]]
   def counterChainManifest: Manifest[CounterChain] = manifest[Array[FixedPointRange[Signed,B32,B0]]]
 
+  def isCounter[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[FixedPointRange[_,_,_]])
+  def isCounterChain[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[Array[FixedPointRange[_,_,_]]])
 
   def counter_new(start: Rep[FixPt[Signed,B32,B0]],end: Rep[FixPt[Signed,B32,B0]],step: Rep[FixPt[Signed,B32,B0]], par: Rep[Int])(implicit ctx: SourceContext) = {
     start until end by step

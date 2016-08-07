@@ -306,7 +306,6 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
         case Nil => parIndicesOf(r(i)._3)
         case _ => accessIndicesOf(r(i)._3)
       }
-      Console.println(s"$inds, $i, $r, ${r(i)._3}")
 
       inds.length match { 
         case 1 =>
@@ -314,25 +313,22 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
         case 2 =>
           val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
-          var addr0 = ""
-          val addr1 = inds match {
+          inds match {
             case l: List[_] => 
-              addr0 = quote(l(0))
-              quote(l(1))
-            case lol:List[List[_]] => inds.map {  // TODO: will have to fix this case later
-                                        case List(row, col) => 
-                                          addr0 = quote(row) // Assume all are from same row?
-                                          quote(col)
-                                      }
+              val addr0 = quote(l(0))
+              val addr1 = quote(l(1))
+              emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${addr1});""")
+            case lol:List[List[_]] => 
+              var addr0 = ""
+              val addr1 = inds.map {  // TODO: will have to fix this case later
+                            case List(row, col) => 
+                              addr0 = quote(row) // Assume all are from same row?
+                              quote(col)
+                          }
+              emit(s"""DFEVector<DFEVar> ${addr1(0)}_vectorized = new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")});""")
+              emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${addr1(0)}_vectorized);""")
+
             }
-          Console.println(s"$addr0 $addr1")
-          // addr1 match {
-          //   case _: List[_] =>
-          //     emit(s"""DFEVector<DFEVar> ${addr1(0)}_vectorized = new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")});""")
-          //     emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${addr1(0)}_vectorized);""")
-          //   case _ =>
-          //     emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${addr1});""")
-          //   }
         case _ => throw new Exception(s"Can't read from more than 2-d array yet!")
       }      
     }
@@ -393,8 +389,8 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                 addr0 = quote(row) // Assume all are from same row?
                 quote(col)
             }
-            emit(s"""DFEVector<DFEVar> ${addr1(0)}_vectorized = new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")});""")
-            emit(s"""${quote(bram)}.connectWport(${addr0}, ${addr1(0)}_vectorized, ${dataStr}, ${quote(writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+            emit(s"""DFEVector<DFEVar> ${addr1(0)}_vectorized = new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")}));""")
+            emit(s"""${quote(bram)}.connectWport(${addr0}, ${addr1(0)}_vectorized, ${dataStr}, ${quote(writer)}_datapath_en, 0 /* start */, 1 /* stride */, $i); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
         }
 
       }

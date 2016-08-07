@@ -184,21 +184,34 @@ trait MaxJGenExternPrimitiveOps extends MaxJGenEffect {
     super.preProcess(body)
   }
 
-  // var emitted_consts: Set[(Exp[Any], PrintWriter)] = Set.empty
+  var emitted_consts: Set[(Exp[Any], PrintWriter)] = Set.empty
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case ConstFixPt(x,_,_,_) =>
       val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
-      emit(s"""DFEVar ${quote(sym)} = constant.var( $ts, $x );""")
+      if (!emitted_consts.contains((sym,baseStream)) | x == 0) { // TODO: Figure out why 0 doesn't get emitted rather than hacking like this
+        emitted_consts += ((sym, baseStream))
+        withStream(baseStream) {
+          emit(s"""DFEVar ${quote(sym)} = constant.var( $ts, $x );""")
+        }
+      } else {withStream(baseStream) {emit(s"""// Already emitted ${quote(sym)}""")}}
     case Tpes_Int_to_fix(x) =>  // Emit this node in MaxJ only if x is a const
       val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
-      x match {
-        case _:Const[_] | _:Param[_] =>
-          emit(s"""DFEVar ${quote(sym)} = constant.var($ts, ${quote(x)});""")
-        case _ =>
-            emit(s"""// DFEVar $sym = ${quote(x)}.cast($ts)""")
-      }
+      if (!emitted_consts.contains((sym,baseStream))) {
+        emitted_consts += ((sym, baseStream))
+        x match {
+          case _:Const[_] | _:Param[_] =>
+            withStream(baseStream) {
+              emit(s"""DFEVar ${quote(sym)} = constant.var($ts, ${quote(x)});""")          
+            }
+          case _ =>
+            withStream(baseStream) {
+              emit(s"""// DFEVar $sym = ${quote(x)}.cast($ts)""")
+            }
+        }
+      } else {withStream(baseStream) {emit(s"""// Already emitted ${quote(sym)}""")}}
     case _ => super.emitNode(sym, rhs)
+
   }
 
 }

@@ -3,6 +3,7 @@ package dhdl.compiler.ops
 import scala.reflect.{Manifest,SourceContext}
 
 import scala.virtualization.lms.internal.{Traversal, QuotingExp}
+import scala.virtualization.lms.util.GraphUtil
 import scala.collection.mutable.{HashMap,HashSet}
 
 import dhdl.shared._
@@ -170,7 +171,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       val readerCU = allocateCU(ctrl)
       copyIterators(readerCU, writerCU)
 
-      val addrReg = addr.map{a => readerCU.getOrUpdate(a){ WriteAddrReg(a) } }
+      val addrReg = addr.map{a => readerCU.getOrUpdate(a){ WriteAddrWire(a) } }
 
       val sram = readerCU.srams.find{_.name == quote(mem)} match {
         case Some(readMem) =>
@@ -195,11 +196,11 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     readerCU.srams.find{_.name == quote(mem)} match {
       case Some(readMem) =>
         if (!readMem.readAddr.isDefined && addr.isDefined) {
-          val addrReg = readerCU.getOrUpdate(addr.get){ ReadAddrReg(addr.get) }
+          val addrReg = readerCU.getOrUpdate(addr.get){ ReadAddrWire(addr.get) }
           readMem.readAddr = Some(addrReg)
         }
       case None =>
-        val addrReg = addr.map{a => readerCU.getOrUpdate(a){ ReadAddrReg(a) } }
+        val addrReg = addr.map{a => readerCU.getOrUpdate(a){ ReadAddrWire(a) } }
         readerCU.srams += CUMemory(quote(mem), memSize(mem), readAddr = addrReg)
     }
   }
@@ -221,6 +222,28 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     val cu = allocateCU(pipe)
     var remoteStages: List[Exp[Any]] = Nil
 
+    def isUsedInCalculation(exp: Exp[Any]) = {
+
+      // Build a schedule as usual, except for depencies on write addresses
+      def mysyms(rhs: Any) = rhs match {
+        case rhs: Def[_] => rhs match {
+          case LocalWriter(writes) =>
+            val addrs = writes.flatMap{case (mem,value,addr) => addr}
+            syms(rhs) filterNot (addrs contains _)
+          case _ => syms(rhs)
+        }
+        case _ => syms(rhs)
+      }
+      exp match {
+        case sym: Sym[_] =>
+          val scopeIndex = buildScopeIndex(stms)
+          val result = func.res
+          val xx = GraphUtil.stronglyConnectedComponents[Stm](scheduleDepsWithIndex(mysyms(result), scopeIndex), t => scheduleDepsWithIndex(mysyms(t.rhs), scopeIndex))
+          xx.flatten.exists{stm => stm.defines(sym).isDefined}
+        case _ => false
+      }
+    }
+
     stms.foreach{case TP(lhs, rhs) => debug(s"  $lhs = $rhs")}
 
     foreachSymInBlock(func){
@@ -235,7 +258,9 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
             val addrStages = addrSyms.map{s => DefStage(s) }
 
             allocateWrittenSRAM(writer, mem, addr, cu, addrStages)
-            remoteStages :::= addrSyms
+            // Currently have to duplicate if used in both address and compute
+            if (!addr.isDefined || !isUsedInCalculation(addr.get))
+              remoteStages :::= addrSyms
           }
         }
 

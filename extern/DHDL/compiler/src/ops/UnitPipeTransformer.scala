@@ -46,6 +46,7 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
         focusExactScope(blk){ stms =>
 
           // Imperative version (functional version caused ugly scalac crash :( )
+          var globals = List[Stm]()
           var stages = List[List[Stm]]()
           var prevStageIsControl = true
 
@@ -60,6 +61,15 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
                 prevStageIsControl = false
               }
             }
+            // Order doesn't matter for these (just need to be in scope somewhere)
+            // Note that this shouldn't cause effects ordering issues as the allocations
+            // are still in scope and are just being collected at the beginning of the scope
+            // Could be an issue if an effectful statement is found to be global, but this
+            // is currently disallowed
+            else if (isAllocation(s) || isConstantExp(s) || isGlobal(s)) {
+              globals = globals :+ stm
+              // No change to prevStage
+            }
             else {
               stages = List(stm) +: stages
               prevStageIsControl = true
@@ -67,6 +77,10 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
           }
 
           stages = stages.map(_.reverse).reverse
+
+          if (globals.nonEmpty)
+            stages = globals +: stages
+
 
           val deps = stages.map{stage => stage.flatMap{case TP(s,d) => (syms(d) ++ readSyms(d)).distinct }}
 
@@ -92,7 +106,7 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
               // Create registers for escaping symbols
               val regs = escapingValues.map{sym =>
                 val reg = reg_create(zeroHack(sym.tp)(mpos(sym.pos)))(sym.tp, mpos(sym.pos))
-                debugs(s"Created new register $reg for primitive $s = $d")
+                debugs(s"Created new register $reg for escaping primitive $sym")
                 reg
               }
 

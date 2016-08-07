@@ -9,10 +9,10 @@ trait CharLoad extends DHDLApplication {
   type Array[T] = ForgeArray[T]
   val dim0 = 2; 
   val dim1 = 24480; 
-  val outerPar = 2;
+  val outerPar = 4;
 
   def CharLoad(srcHost: Rep[Array[T]], iters: Rep[SInt]) = {
-    val sinnerPar = param("innerPar", 4); 
+    val sinnerPar = param("innerPar", 2); 
     val tileSize0 = param("tileSize0", dim0); 
     val tileSize1 = param("tileSize1", dim1); 
 

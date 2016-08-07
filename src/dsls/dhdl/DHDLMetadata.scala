@@ -528,12 +528,14 @@ trait DHDLMetadata {
 				"dfeFloat(" + e + "," + m + ")"
 			} else if (isBitType(manifest[T])) {
 			  "dfeFixOffset(1, 0, SignMode.UNSIGNED)"
+      } else if (isCounter(manifest[T])) {
+        "dfeFixOffset(32,0,SignMode.TWOSCOMPLEMENT)"  // TODO: Is this safe?
 			} else {
-				//throw new Exception("Unknown type " + manifest[T])
-				""
+        // Was commented out before, not sure why
+				throw new Exception("Unknown type " + manifest[T])
 			}
 			if ( $0 > 1) {
-				"new DFEVectorType<DFEVar>(" + scalart + "," + $0
+				"new DFEVectorType<DFEVar>(" + scalart + "," + $0 + ")"
 			} else {
 				scalart
 			}

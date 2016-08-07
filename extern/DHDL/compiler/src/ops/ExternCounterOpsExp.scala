@@ -1,6 +1,6 @@
 package dhdl.compiler.ops
 
-import scala.virtualization.lms.common.{EffectExp, ScalaGenEffect, DotGenEffect, MaxJGenEffect}
+import scala.virtualization.lms.common.{BaseExp, ScalaGenEffect, DotGenEffect, MaxJGenEffect}
 import scala.virtualization.lms.internal.{Traversal}
 import scala.reflect.{Manifest,SourceContext}
 import scala.collection.mutable.Set
@@ -15,12 +15,15 @@ import dhdl.compiler.ops._
 trait DHDLCounter
 trait DHDLCounterChain
 
-trait ExternCounterTypesExp extends ExternCounterTypes {
+trait ExternCounterTypesExp extends ExternCounterTypes with BaseExp {
   type Counter = DHDLCounter
   type CounterChain = DHDLCounterChain
 
   def counterManifest: Manifest[Counter] = manifest[DHDLCounter]
   def counterChainManifest: Manifest[CounterChain] = manifest[DHDLCounterChain]
+
+  def isCounter[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[DHDLCounter])
+  def isCounterChain[T:Manifest] = isSubtype(manifest[T].runtimeClass, classOf[DHDLCounterChain])
 }
 
 trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with CounterChainOpsExp with NodeMetadataOpsExp {

@@ -315,10 +315,12 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
           inds match {
             case l: List[_] => 
+              Console.println(s"1d read $l = ${quote(l(0))}, ${quote(l(1))}\n\n\n\n")
               val addr0 = quote(l(0))
               val addr1 = quote(l(1))
               emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${addr1});""")
             case lol:List[List[_]] => 
+              Console.println(s"1d read $lol\n\n\n\n")
               var addr0 = ""
               val addr1 = inds.map {  // TODO: will have to fix this case later
                             case List(row, col) => 
@@ -368,20 +370,20 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
     } else {
       // [TODO] Raghu: Current assumption is that this always returns the parent
       // writing to the BRAM. Is this always true? Confirm
-      val writer = quote(writersOf(bram).head._1)
+      val w = writersOf(bram)
+      val find_id = w.map{case (_, _, s) => s}
+      val i = find_id.indexOf(sym)
+      val inds = parIndicesOf(w(i)._3)
+      val this_writer = w(i)._1
       if (isDummy(bram)) {
-        emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(writer)}_datapath_en);""") 
+        emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(this_writer)}_datapath_en);""") 
       } else {
-        val w = writersOf(bram)
-        val find_id = w.map{case (_, _, s) => s}
-        val i = find_id.indexOf(sym)
-        val inds = parIndicesOf(w(i)._3)
 
         inds.length match { 
           case 0 =>
             throw new Exception("No writers?!")
           case 1 =>
-            emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+            emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
           case _ =>
             var addr0 = ""
             val addr1 = inds.map { 
@@ -390,7 +392,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                 quote(col)
             }
             emit(s"""DFEVector<DFEVar> ${addr1(0)}_vectorized = new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")}));""")
-            emit(s"""${quote(bram)}.connectWport(${addr0}, ${addr1(0)}_vectorized, ${dataStr}, ${quote(writer)}_datapath_en, 0 /* start */, 1 /* stride */, $i); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+            emit(s"""${quote(bram)}.connectWport(${addr0}, ${addr1(0)}_vectorized, ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */, $i); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
         }
 
       }

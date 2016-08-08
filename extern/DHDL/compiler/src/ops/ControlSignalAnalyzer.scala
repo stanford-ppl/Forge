@@ -131,14 +131,16 @@ trait ControlSignalAnalyzer extends Traversal {
       readersOf(mem) = readersOf(mem) :+ (ctrl, isReduce, reader)
     }
   }
+  def addPendingReader(reader: Exp[Any]) {
+    pendingReads += reader -> List(reader)
+    debug(s"Added pending reader: $reader")
+  }
 
   def addReader(ctrl: Exp[Any], isReduce: Boolean, reader: Exp[Any]) {
     if (isInnerPipe((ctrl,isReduce)))
       appendReader(ctrl, isReduce, reader)
-    else {
-      pendingReads += reader -> List(reader)
-      debug(s"Added pending reader: $reader")
-    }
+    else
+      addPendingReader(reader)
   }
 
   def checkMultipleWriters(mem: Exp[Any], writer: Exp[Any]) {
@@ -224,6 +226,10 @@ trait ControlSignalAnalyzer extends Traversal {
       if (isAllocation(lhs)) addAllocation(parent._1, lhs)        // (1,7)
       if (isReader(lhs)) addReader(parent._1, parent._2, lhs)     // (4)
       if (isWriter(lhs)) addWriter(parent._1, parent._2, lhs)     // (5,6,10)
+    }
+    else {
+      // For input arguments read outside the hardware block
+      if (isReader(lhs)) addPendingReader(lhs)
     }
 
     if (isControlNode(lhs)) {

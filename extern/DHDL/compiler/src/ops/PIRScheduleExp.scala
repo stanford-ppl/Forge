@@ -150,12 +150,18 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case object FltSub extends PIROp
   case object FltMul extends PIROp
   case object FltDiv extends PIROp
+  case object BitAnd extends PIROp
+  case object BitOr  extends PIROp
+  case object FixLt  extends PIROp
+  case object FixLeq extends PIROp
+  case object FixEql extends PIROp
+  case object FixNeq extends PIROp
 
   // --- Stages prior to scheduling
-  sealed abstract class PseudoStage
-  case class DefStage(op: Exp[Any], isReduce: Boolean = false) extends PseudoStage
-  case class OpStage(op: PIROp, inputs: List[Exp[Any]], out: Exp[Any], isReduce: Boolean = false) extends PseudoStage
-  case class WriteAddrStage(write: Exp[Any]) extends PseudoStage
+  sealed abstract class PseudoStage { def output: Exp[Any] }
+  case class DefStage(op: Exp[Any], isReduce: Boolean = false) extends PseudoStage { def output = op }
+  case class OpStage(op: PIROp, inputs: List[Exp[Any]], out: Exp[Any], isReduce: Boolean = false) extends PseudoStage { def output = out }
+  case class WriteAddrStage(write: Exp[Any]) extends PseudoStage { def output = write }
 
   // --- Stages after scheduling
   sealed abstract class Stage {

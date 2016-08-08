@@ -314,8 +314,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(Unrolling)             // Pipeline unrolling
     schedule(UnrolledControlAnalyzer) // Control signal metadata after unrolling
     schedule(DotIRPrinter)          // Graph after unrolling
-    //schedule(IRPrinterPlus)
-    schedule(IRPrinter)
+    schedule(IRPrinterPlus)
     schedule(PIRGen)
 
     // External groups

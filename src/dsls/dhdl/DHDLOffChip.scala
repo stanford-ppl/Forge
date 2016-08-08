@@ -29,16 +29,19 @@ trait DHDLOffChip {
     val gather  = internal (OffChip) ("gather", T, (("mem", OffChip(T)), ("local", BRAM(T)), ("addrs", BRAM(Idx)), ("len", Idx), ("par", MInt)) :: MUnit, effect = write(1), aliasHint = aliases(Nil))
     val scatter = internal (OffChip) ("scatter", T, (("mem", OffChip(T)), ("local", BRAM(T)), ("addrs", BRAM(Idx)), ("len", Idx), ("par", MInt)) :: MUnit, effect = write(0), aliasHint = aliases(Nil))
 
-    // --- API
-    /** Creates a reference to a multi-dimensional array in main memory with given dimensions
-     * @param dims
-     **/
-    static (OffChip) ("apply", T, (varArgs(Idx)) :: OffChip(T), TNum(T)) implements composite ${
+    // --- Internal
+    val offchip_create = internal (OffChip) ("offchip_create", T, SList(Idx) :: OffChip(T), TNum(T)) implements composite ${
       if ($0.length < 1) stageError("Cannot create an OffChipMem with zero dimensions")
       val offchip = offchip_new[T](productTree($0.toList))
       dimsOf(offchip) = $0.toList
       offchip
     }
+
+    // --- API
+    /** Creates a reference to a multi-dimensional array in main memory with given dimensions
+     * @param dims
+     **/
+    static (OffChip) ("apply", T, (varArgs(Idx)) :: OffChip(T), TNum(T)) implements composite ${ offchip_create[T]($0.toList) }
 
     // Offer multiple versions of tile select since implicit cast from signed int to range isn't working
     val OffChip_API = withTpe(OffChip)

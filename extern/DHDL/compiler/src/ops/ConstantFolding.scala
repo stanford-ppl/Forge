@@ -16,6 +16,7 @@ trait ConstantFolding extends SinglePassTransformer {
   val IR: DHDLExp
   import IR._
 
+  override val name = "Constant Folding"
   debugMode = true
 
   def convertType[T:Manifest](x: Int)(implicit ctx: SourceContext) = x.as[T]
@@ -24,17 +25,21 @@ trait ConstantFolding extends SinglePassTransformer {
   def convertType[T:Manifest](x: Double)(implicit ctx: SourceContext) = x.as[T]
 
   override def transform[A:Manifest](lhs: Sym[A], rhs: Def[A])(implicit ctx: SourceContext) = {
-    foldConstants(lhs,rhs) match {
-      case Some(c) if lhs != c =>
-        debug(s"Replacing $lhs = $rhs ")
-        val lhs2 = f(c)
-        lhs2 match {
-          case Def(rhs2) => debug(s"with $lhs2 = $rhs2")
-          case _ => debug(s"with $lhs2")
-        }
-        setProps(lhs2, getProps(lhs))
-        Some(lhs2)
-      case _ => None
+    self_mirror(lhs, rhs) match {
+      case lhs2@Def(rhs2) => foldConstants(lhs2.asInstanceOf[Sym[A]],rhs2.asInstanceOf[Def[A]]) match {
+        case Some(c) if c != lhs2 =>
+          debug(s"Replacing $lhs = $rhs")
+          c match {
+            case Def(d) => debug(s"with $c = $d")
+            case _ => debug(s"with $c")
+          }
+          scrubSym(lhs2.asInstanceOf[Sym[Any]]) // Remove mirrored version
+          setProps(c, getProps(lhs2))
+          Some(c)
+
+        case _ => Some(lhs2)
+      }
+      case lhs2 => Some(lhs2)
     }
   }
 

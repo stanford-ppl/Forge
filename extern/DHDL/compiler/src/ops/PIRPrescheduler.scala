@@ -68,9 +68,9 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
 
   def allocateCChains(cu: ComputeUnit, pipe: Exp[Any]) = {
     def allocateCounter(ctr: Exp[Counter], start: Exp[Any], end: Exp[Any], stride: Exp[Any]) = {
-      val min = cu.getOrUpdate(start){ allocateLocal(start, pipe) }
-      val max = cu.getOrUpdate(end){ allocateLocal(end, pipe) }
-      val step = cu.getOrUpdate(stride){ allocateLocal(stride, pipe) }
+      val min = cu.getOrAddReg(start){ allocateLocal(start, pipe) }
+      val max = cu.getOrAddReg(end){ allocateLocal(end, pipe) }
+      val step = cu.getOrAddReg(stride){ allocateLocal(stride, pipe) }
       CUCounter(quote(ctr), min, max, step)
     }
 
@@ -117,8 +117,9 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
   def allocateBasicCU(pipe: Exp[Any]): BasicComputeUnit = {
     if (cuMapping.contains(pipe)) cuMapping(pipe).asInstanceOf[BasicComputeUnit]
     else {
+      debug(s"Allocating CU for $pipe")
       val deps = pipeDependencies(pipe)
-      val parent = parentOfHack(pipe).map(cuMapping(_))
+      val parent = parentOfHack(pipe).map(allocateCU(_))
       val cu = BasicComputeUnit(quote(pipe), parent, deps, styleOf(pipe))
       initCU(cu, pipe)
       pipe match {
@@ -135,11 +136,12 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
   def allocateMemoryCU(pipe: Exp[Any], mem: Exp[Any], vec: Exp[Any], mode: MemoryMode): TileTransferUnit = {
     if (cuMapping.contains(pipe)) cuMapping(pipe).asInstanceOf[TileTransferUnit]
     else {
+      debug(s"Allocating CU for $pipe")
       val region = allocateGlobal(mem).asInstanceOf[Offchip]
       val vector = allocateGlobal(vec).asInstanceOf[VectorMem]
       val mc = MemCtrl(quote(pipe)+"_mc", region, mode)
       globals += mc
-      val parent = parentOfHack(pipe).map(cuMapping(_))
+      val parent = parentOfHack(pipe).map(allocateCU(_))
       val deps = pipeDependencies(pipe)
       val cu = TileTransferUnit(quote(pipe), parent, deps, mc, vector, mode)
       initCU(cu, pipe)
@@ -158,32 +160,18 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     case Deff(e:Offchip_store_cmd[_]) => allocateMemoryCU(pipe, e.mem, e.fifo, MemStore)
   }
 
-  def memSize(mem: Exp[Any]) = mem match {
-    case Deff(Bram_new(depth,_)) => bound(depth).get.toInt
-    case Deff(Fifo_new(depth,_)) => bound(depth).get.toInt
-    case _ => stageError(s"Unknown local memory type $mem")
-  }
   def isBuffer(mem: Exp[Any]) = isFIFO(mem.tp) || isBRAM(mem.tp)
 
   def allocateWrittenSRAM(writer: Exp[Any], mem: Exp[Any], addr: Option[Exp[Any]], writerCU: ComputeUnit, stages: List[PseudoStage]) {
-    val vector = allocateGlobal(mem)
-
     readersOf(mem).foreach{case (ctrl,_,_) =>
       val readerCU = allocateCU(ctrl)
       copyIterators(readerCU, writerCU)
 
-      val addrReg = addr.map{a => readerCU.getOrUpdate(a){ WriteAddrWire(a) } }
+      val sram = readerCU.getOrAddMem(mem)
+      val vector = if (readerCU == writerCU) LocalVector else allocateGlobal(mem)
+      sram.vector    = Some(vector)
+      sram.writeAddr = addr.map{case a => readerCU.getOrAddReg(a){ WriteAddrWire(sram) } }
 
-      val sram = readerCU.srams.find{_.name == quote(mem)} match {
-        case Some(readMem) =>
-          readMem.writeAddr = addrReg
-          readMem.vector = Some(vector)
-          readMem
-        case None =>
-          val readMem = CUMemory(quote(mem), memSize(mem), vector = Some(vector), writeAddr = addrReg)
-          readerCU.srams += readMem
-          readMem
-      }
       val writeStages = if (!isControlNode(writer) && addr.isDefined) stages ++ List(WriteAddrStage(writer)) else stages
 
       if (writeStages.nonEmpty) {
@@ -193,17 +181,9 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     }
   }
   def allocateReadSRAM(reader: Exp[Any], mem: Exp[Any], addr: Option[Exp[Any]], readerCU: ComputeUnit) {
-    val vector = allocateGlobal(mem)
-    readerCU.srams.find{_.name == quote(mem)} match {
-      case Some(readMem) =>
-        if (!readMem.readAddr.isDefined && addr.isDefined) {
-          val addrReg = readerCU.getOrUpdate(addr.get){ ReadAddrWire(addr.get) }
-          readMem.readAddr = Some(addrReg)
-        }
-      case None =>
-        val addrReg = addr.map{a => readerCU.getOrUpdate(a){ ReadAddrWire(a) } }
-        readerCU.srams += CUMemory(quote(mem), memSize(mem), readAddr = addrReg)
-    }
+    val sram = readerCU.getOrAddMem(mem)
+    if (!sram.readAddr.isDefined && addr.isDefined)
+      sram.readAddr = addr.map{a => readerCU.getOrAddReg(a){ ReadAddrWire(sram) } }
   }
 
   def foreachSymInBlock(b: Block[Any])(func: Sym[Any] => Unit) {
@@ -224,7 +204,6 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     var remoteStages: List[Exp[Any]] = Nil
 
     def isUsedInCalculation(exp: Exp[Any]) = {
-
       // Build a schedule as usual, except for depencies on write addresses
       def mysyms(rhs: Any) = rhs match {
         case rhs: Def[_] => rhs match {
@@ -327,8 +306,8 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     // NOTE: Need to generate offset calculation as a codegen hack right now.
     case Offchip_load_cmd(mem,stream,ofs,len,p) =>
       debug(s"Traversing $lhs = $rhs")
-      val cu = allocateCU(lhs)
-      val lenIn = cu.getOrUpdate(len){ allocateLocal(len, lhs) }
+      val cu = allocateCU(lhs).asInstanceOf[TileTransferUnit]
+      val lenIn = cu.getOrAddReg(len){ allocateLocal(len, lhs) }
       val ctr = CUCounter(quote(lhs)+"_ctr",ConstReg("0l"),lenIn,ConstReg("1l"))
       val cc = CounterChainInstance(quote(lhs)+"_cc", List(ctr))
       val i = fresh[Index]
@@ -346,15 +325,19 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
         val iters = readerCU.iterators.filter{case (iter,reg) => reg.cchain == chain}
         val iter = iters.reduce{(a,b) => if (a._2.idx < b._2.idx) a else b}
 
-        val readMem = readerCU.srams.find{_.name == quote(stream)}.get
+        val readMem = readerCU.mem(stream)
         readMem.readAddr = Some(iter._2)
       }
       // TODO: Add stages for offset calculation + offset output scalar write
+      val memAddr = fresh[Index]
+      cu.addReg(memAddr, ScalarOut(memAddr, cu.ctrl))
+      val ofsCalc = OpStage(FixAdd, List(ofs, i), memAddr)
+      cu.computePseudoStages = List(ofsCalc)
 
     case Offchip_store_cmd(mem,stream,ofs,len,p) =>
       debug(s"Traversing $lhs = $rhs")
-      val cu = allocateCU(lhs)
-      val lenIn = cu.getOrUpdate(len){ allocateLocal(len, lhs) }
+      val cu = allocateCU(lhs).asInstanceOf[TileTransferUnit]
+      val lenIn = cu.getOrAddReg(len){ allocateLocal(len, lhs) }
       val ctr = CUCounter(quote(lhs)+"_ctr",ConstReg("0l"),lenIn,ConstReg("1l"))
       val cc = CounterChainInstance(quote(lhs)+"_cc", List(ctr))
       val i = fresh[Index]
@@ -362,6 +345,10 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       cu.addReg(i, CounterReg(cc, 0))
       allocateReadSRAM(lhs, stream, Some(i), cu)
       // TODO: Add stages for offset calculation + offset output scalar write
+      val memAddr = fresh[Index]
+      cu.addReg(memAddr, ScalarOut(memAddr, cu.ctrl))
+      val ofsCalc = OpStage(FixAdd, List(ofs, i), memAddr)
+      cu.computePseudoStages = List(ofsCalc)
 
     case _ => super.traverse(lhs, rhs)
   }

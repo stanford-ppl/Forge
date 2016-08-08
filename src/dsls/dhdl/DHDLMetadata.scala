@@ -49,6 +49,15 @@ trait DHDLMetadata {
       composite ${ setMetadata($0, MLength($1)) }
     internal.static (lenOps) ("apply", Nil, MAny :: SInt) implements composite ${ meta[MLength]($0).get.len }
 
+    /**
+     * Software size
+     **/
+    val MSoftDims = metadata("MSoftDims", "dims" -> SList(Idx))
+    val softDimOps = metadata("softDimsOf")
+    internal.static (softDimOps) ("update", Nil, (MAny, SList(Idx)) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MSoftDims($1)) }
+    internal.static (softDimOps) ("apply", Nil, (MAny) :: SList(Idx)) implements
+      composite ${ meta[MSoftDims]($0).map(_.dims).getOrElse(Nil) }
 
     /**
      * Staged N-D memory dimensions
@@ -90,6 +99,7 @@ trait DHDLMetadata {
       composite ${ meta[MInnerAccum]($0).map(_.isInnerAccum).getOrElse(false) }
 
     /* Is inserted metapipe register */
+    // TODO: Remove?
     val MDelayReg = metadata("MDelayReg", "isDelay" -> SBoolean)
     val delayRegOps = metadata("isDelayReg")
     internal.static (delayRegOps) ("update", T, (T, SBoolean) :: MUnit, effect = simple) implements

@@ -125,6 +125,7 @@ trait DeliteGenTraversals extends BaseGenTraversals {
     stream.println("  val IR: " + makeTraversalIRName(az))
     stream.println("  import IR._")
     stream.println("  override val name = \"" + makeTraversalName(az) + "\"")
+    stream.println("  override val eatReflect = true")             // TODO: Should be able to change this
     stream.println("  debugMode = false")                          // TODO: Should be able to change this
     stream.println("  override val autopropagate = true")          // TODO: Should be able to change this
     stream.println("  override def completed(e: Exp[Any]) = true") // TODO: Should be able to change this

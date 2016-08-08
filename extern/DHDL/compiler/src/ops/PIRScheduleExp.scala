@@ -100,12 +100,14 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case class ScalarMem(override val name: String) extends GlobalMem(name)
   case class VectorMem(override val name: String) extends GlobalMem(name)
   case class TileTxVector(override val name: String) extends GlobalMem(name)
+  case object LocalVector extends GlobalMem("local")
+
 
   // Intra-CU communication
   sealed abstract class LocalMem
 
-  case class ReadAddrWire(x: Exp[Any]) extends LocalMem
-  case class WriteAddrWire(x: Exp[Any]) extends LocalMem
+  case class ReadAddrWire(mem: CUMemory) extends LocalMem
+  case class WriteAddrWire(mem: CUMemory) extends LocalMem
   case class ReduceReg(x: Exp[Any]) extends LocalMem
   case class AccumReg(x: Exp[Any], init: ConstReg) extends LocalMem
   case class TempReg(x: Exp[Any]) extends LocalMem
@@ -116,7 +118,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case class InputReg(mem: CUMemory) extends LocalMem
   case class VectorLocal(x: Exp[Any], mem: CUMemory) extends LocalMem
   case class VectorOut(x: Exp[Any], mem: GlobalMem) extends LocalMem
-  case class OffchipAddr(mem: GlobalMem) extends LocalMem
+ // case class OffchipAddr(mem: GlobalMem) extends LocalMem
 
   case class CounterReg(cchain: CUCounterChain, idx: Int) extends LocalMem
   case class ConstReg(const: String) extends LocalMem
@@ -152,7 +154,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   // --- Stages prior to scheduling
   sealed abstract class PseudoStage
   case class DefStage(op: Exp[Any], isReduce: Boolean = false) extends PseudoStage
-  case class OpStage(op: PIROp, inputs: List[Exp[Any]], out: Exp[Any], isReduce: Boolean) extends PseudoStage
+  case class OpStage(op: PIROp, inputs: List[Exp[Any]], out: Exp[Any], isReduce: Boolean = false) extends PseudoStage
   case class WriteAddrStage(write: Exp[Any]) extends PseudoStage
 
   // --- Stages after scheduling
@@ -190,36 +192,25 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
     }
     def iterators = regTable.flatMap{case (exp, reg: CounterReg) => Some((exp,reg)); case _ => None}.toList
     def get(x: Exp[Any]): Option[LocalMem] = x match {
-      case Exact(_) => Some(getOrUpdate(x)(allocateConst(x)))
+      case Exact(_) => Some(getOrAddReg(x)(allocateConst(x)))
       case _ => regTable.get(x)
     }
-    def getOrUpdate(x: Exp[Any])(func: => LocalMem) = regTable.getOrElse(x, {
-      val reg = func
-      addReg(x, reg)
-      reg
-    })
+    def getOrAddReg(x: Exp[Any])(func: => LocalMem) = regTable.get(x) match {
+      case Some(reg) => reg
+      case None =>
+        val reg = x match {case Exact(_) => allocateConst(x); case _ => func }
+        addReg(x, reg)
+        reg
+    }
 
-    // Override all previous mappings - use with caution
-    /*def replaceReg(exp: Exp[Any], reg: LocalMem) {
-      if (regTable.contains(exp)) {
-        val prev = regTable(exp)
-        val aliases = expTable(prev)
-        regs -= prev
-        expTable -= prev
-        aliases.foreach{exp => addReg(exp, reg) }
-
-        // This is potentially incorrect - add more option flags later?
-        stages.foreach{
-          case stage@MapStage(_,inputs,out) =>
-            stage.inputs = inputs.map{case LocalRef(i,`prev`) => LocalRef(i,reg); case ref => ref}
-            stage.out = out match {case LocalRef(i, `prev`) => LocalRef(i,reg); case ref => ref}
-
-          case reduce@ReduceStage(_,_,out) =>
-            if (out == prev) stageError(s"Cannot replace reduction output $prev with $reg!")
-        }
-      }
-      else addReg(exp, reg)
-    }*/
+    def getOrAddMem(mem: Exp[Any]) = srams.find(_.mem == mem) match {
+      case Some(sram) => sram
+      case None =>
+        val sram = CUMemory(mem, memSize(mem))
+        srams += sram
+        sram
+    }
+    def mem(e: Exp[Any]) = srams.find(_.mem == e).get
 
     var writePseudoStages = HashMap[CUMemory, List[PseudoStage]]()
     var computePseudoStages: List[PseudoStage] = Nil
@@ -267,12 +258,14 @@ ${super.dumpString}
   case class CounterChainCopy(override val name: String, owner: ComputeUnit) extends CUCounterChain(name)
   case class CounterChainInstance(override val name: String, ctrs: List[CUCounter]) extends CUCounterChain(name)
 
-  case class CUMemory(
-    name: String,
-    size: Int,
-    var vector: Option[GlobalMem] = None,
-    var readAddr: Option[LocalMem] = None,
+  def memSize(mem: Exp[Any]) = dimsOf(mem).map(dim => bound(dim).get.toInt).fold(1){_*_}
+
+  case class CUMemory(mem: Exp[Any], size: Int) {
+    // These can be recursive... e.g. readAddr = ReadAddrWire(this)
+    // TODO: Does this need to be changed?
+    var vector: Option[GlobalMem] = None
+    var readAddr: Option[LocalMem] = None
     var writeAddr: Option[LocalMem] = None
-  )
+  }
 
 }

@@ -43,6 +43,7 @@ trait RegChainPass extends Traversal  {
 
   def handleQuoteSuffix(children: List[Exp[Any]], inds: List[Sym[Any]]) {
     children.zipWithIndex.foreach { case (c, i) =>
+      Console.println(s"\n\n\n\n$c, ${childrenOf(c)} , $i, $inds")
       val localSuffixMap = HashMap[Sym[Any], String]()
       if (i > 0) {
         inds.foreach { idx =>

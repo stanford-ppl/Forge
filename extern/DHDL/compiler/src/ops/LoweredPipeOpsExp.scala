@@ -117,6 +117,7 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
     case e@ParPipeForeach(cchain, func, inds) =>
       controlNodeStack.push(sym)
       emitComment(s"""ParPipeForeach ${quote(sym)} = ParPipeForeach(${quote(cchain)}) {""")
+      emit("""{""")
       styleOf(sym) match {
         case StreamPipe => emitComment(s"""StrmPipe to be emitted""")
         case CoarsePipe => emitComment(s"""MPSM to be emitted""")
@@ -128,6 +129,7 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
       emitParallelizedLoop(inds, cchain)
       emitRegChains(sym, inds.flatten)
       emitBlock(func)
+      emit("""}""")
       emitComment(s"""} ParPipeForeach ${quote(sym)}""")
       controlNodeStack.pop
 

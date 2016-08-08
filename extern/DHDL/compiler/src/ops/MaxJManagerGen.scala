@@ -255,6 +255,9 @@ trait MaxJManagerGen {
 	    config.setOnCardMemoryFrequency(LMemFrequency.MAX4MAIA_$memClock);
 	    config.setEnableAddressGeneratorsInSlowClock(true);
 
+    // Allow non-multiple transitions for parallel tile loaders: may affect area
+    config.setAllowNonMultipleTransitions(true);
+    
 	    // Setup memory controller clock and config
 	//    MemoryControllerConfig mem_cfg = new MemoryControllerConfig();
 	////    mem_cfg.setBurstSize(4); //MAX3: 4 = 4*384 bits, 8 = 8*384 bits

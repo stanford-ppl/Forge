@@ -184,34 +184,46 @@ trait MaxJGenExternPrimitiveOps extends MaxJGenEffect {
     super.preProcess(body)
   }
 
-  var emitted_consts: Set[(Exp[Any], PrintWriter)] = Set.empty
+  var emitted_consts: Set[(Exp[Any], Def[Any])] = Set.empty
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case ConstFixPt(x,_,_,_) =>
-      val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
-      if (!emitted_consts.contains((sym,baseStream)) | x == 0) { // TODO: Figure out why 0 doesn't get emitted rather than hacking like this
-        emitted_consts += ((sym, baseStream))
-        withStream(baseStream) {
-          emit(s"""DFEVar ${quote(sym)} = constant.var( $ts, $x );""")
-        }
-      } else {withStream(baseStream) {emit(s"""// Already emitted ${quote(sym)}""")}}
+      if (!emitted_consts.contains((sym, rhs))) { // TODO: Figure out why 0 doesn't get emitted rather than hacking like this
+        emitted_consts += ((sym, rhs))
+      }
     case Tpes_Int_to_fix(x) =>  // Emit this node in MaxJ only if x is a const
       val ts = tpstr(parOf(sym)) (sym.tp, implicitly[SourceContext])
-      if (!emitted_consts.contains((sym,baseStream))) {
-        emitted_consts += ((sym, baseStream))
-        x match {
-          case _:Const[_] | _:Param[_] =>
-            withStream(baseStream) {
-              emit(s"""DFEVar ${quote(sym)} = constant.var($ts, ${quote(x)});""")          
-            }
-          case _ =>
-            withStream(baseStream) {
-              emit(s"""// DFEVar $sym = ${quote(x)}.cast($ts)""")
-            }
+      x match {
+        case _:Const[_] | _:Param[_] =>
+          withStream(baseStream) {
+            emit(s"""DFEVar ${quote(sym)} = constant.var($ts, ${quote(x)});""")          
+          }
+        case _ =>
+          withStream(baseStream) {
+            emit(s"""// DFEVar $sym = ${quote(x)}.cast($ts)""")
+          }
         }
-      } else {withStream(baseStream) {emit(s"""// Already emitted ${quote(sym)}""")}}
     case _ => super.emitNode(sym, rhs)
 
+  }
+
+  override def emitFileFooter() = {
+    emit(s"""// Emit consts""")
+    emitted_consts.foreach { 
+      case ((s, d)) => 
+        d match {
+          case ConstFixPt(x,_,_,_) =>
+            val ts = tpstr(parOf(s)) (s.tp, implicitly[SourceContext])
+            withStream(baseStream) {
+              emit(s"""DFEVar ${quote(s)} = constant.var( $ts, $x ); """)
+            }
+          case _ =>
+            throw new Exception(s"Cannot match $d of sym $s!")
+          }
+      case _ =>
+        throw new Exception(s"Cannot match, you did something really wrong")
+    }
+    super.emitFileFooter()
   }
 
 }

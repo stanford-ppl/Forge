@@ -11,28 +11,29 @@ trait GDA extends DHDLApplication {
   val Cmax = 16 //96
 
   def gda(xCPU: Rep[Array[T]], yCPU: Rep[Array[Bit]], mu0CPU: Rep[Array[T]], mu1CPU: Rep[Array[T]]) = {
-    val rTileSize     = param(4);      domainOf(rTileSize) = (96, 19200, 1)
-    val outerPar      = param(2);      domainOf(outerPar)  = (1, 4, 1)
-    val innerPar      = param(2);      domainOf(innerPar)  = (1, 12, 1)
-    val subLoopPar    = param(1);    domainOf(subLoopPar)    = (1, 16, 1)
-    val prodLoopPar   = param(2);   domainOf(prodLoopPar)   = (1, 96, 1)
-    val outerAccumPar = param(1); domainOf(outerAccumPar) = (1, 1, 1)
+    val rTileSize     = param(4);  domainOf(rTileSize) = (96, 19200, 1)
+    val outerPar      = param(1);  domainOf(outerPar)  = (1, 4, 1)
+    val innerPar      = param(1);  domainOf(innerPar)  = (1, 12, 1)
+    val subLoopPar    = param(1);  domainOf(subLoopPar)    = (1, 16, 1)
+    val prodLoopPar   = param(1);  domainOf(prodLoopPar)   = (1, 96, 1)
+    val outerAccumPar = param(1);  domainOf(outerAccumPar) = (1, 1, 1)
 
-    val R = yCPU.length;   bound(R) = 360000
-    val C = mu0CPU.length; bound(C) = Cmax
+    val rows = yCPU.length;   bound(rows) = 360000
+    val cols = mu0CPU.length; bound(cols) = Cmax
 
-    assert(C == Cmax) // TODO: Shouldn't be necessary, but addressing requires it at the moment
+    assert(cols == Cmax) // TODO: Shouldn't be necessary, but addressing requires it at the moment
+
+    val R  = ArgIn[SInt]
+    val C  = ArgIn[SInt]
+    setArg(C, cols)
+    setArg(R, rows)
 
     val x     = OffChipMem[T](R, C)
     val y     = OffChipMem[Bit](R)
     val mu0   = OffChipMem[T](C)
     val mu1   = OffChipMem[T](C)
     val sigma = OffChipMem[T](C, C)
-    val rows  = ArgIn[SInt]
-    val cols  = ArgIn[SInt]
 
-    setArg(rows, R)
-    setArg(cols, C)
     setMem(x, xCPU)
     setMem(y, yCPU)
     setMem(mu0, mu0CPU)
@@ -48,22 +49,22 @@ trait GDA extends DHDLApplication {
 
       val sigmaOut = BRAM[T](Cmax, Cmax)
 
-      Fold(rows by rTileSize par outerPar, outerAccumPar)(sigmaOut, 0.as[T]){ r =>
+      Fold(R by rTileSize par outerPar, outerAccumPar)(sigmaOut, 0.as[T]){ r =>
         val yTile = BRAM[Bit](rTileSize)
         val xTile = BRAM[T](rTileSize, Cmax)
         Parallel {
           yTile := y(r::r+rTileSize, subLoopPar)
-          xTile := x(r::r+rTileSize, 0::cols, subLoopPar)  // Load tile of x
+          xTile := x(r::r+rTileSize, 0::C, subLoopPar)  // Load tile of x
         }
 
         val sigmaBlk = BRAM[T](Cmax, Cmax)
         Fold(rTileSize par innerPar, prodLoopPar)(sigmaBlk, 0.as[Flt]){rr =>
           val subTile = BRAM[T](Cmax)
           val sigmaTile = BRAM[T](Cmax, Cmax)
-          Pipe(cols par subLoopPar){ cc =>
+          Pipe(C par subLoopPar){ cc =>
             subTile(cc) = xTile(rr,cc) - mux(yTile(rr), mu1Tile(cc), mu0Tile(cc))
           }
-          Pipe(cols by 1, cols par prodLoopPar){ (ii,jj) =>
+          Pipe(C by 1, C par prodLoopPar){ (ii,jj) =>
             sigmaTile(ii,jj) = subTile(ii) * subTile(jj)
           }
           sigmaTile

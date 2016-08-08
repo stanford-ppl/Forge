@@ -239,6 +239,10 @@ trait DHDLDSL extends ForgeApplication
     val ReductionAnalyzer = analyzer("Reduction", isExtern=true)
 
     val ConstantFolding = traversal("ConstantFolding", isExtern=true)
+    val RegisterFolding = traversal("RegisterFolding", isExtern=true)
+
+    val OffChipAnalyzer = traversal("OffChipAnalyzer", isExtern=true)
+
     val ParameterAnalyzer = analyzer("Parameter",isExtern=true)
     val MetaPipeRegInsertion = traversal("MetaPipeRegInsertion",isExtern=true)
 
@@ -264,6 +268,8 @@ trait DHDLDSL extends ForgeApplication
     schedule(GlobalAnalyzer)        // Values computed outside of all controllers (TODO: Needed again?)
     schedule(ControlSignalAnalyzer) // Variety of control signal related metadata
 
+    schedule(BoundAnalyzer)
+    schedule(OffChipAnalyzer)       // Check dimensions of offchip memories
     schedule(DHDLAffineAnalysis)    // Access patterns
 
     schedule(DotIRPrinter)          // Graph prior to unrolling
@@ -289,6 +295,9 @@ trait DHDLDSL extends ForgeApplication
     schedule(ConstantFolding)       // Constant folding
     schedule(GlobalAnalyzer)        // Add "global" annotations for newly created symbols after folding
     schedule(IRPrinter)
+
+    //schedule(RegisterFolding) -- TODO: Not sure if register folding is safe yet
+    //schedule(IRPrinter)
 
     // --- Post-DSE Estimation
     //schedule(IRPrinterPlus)

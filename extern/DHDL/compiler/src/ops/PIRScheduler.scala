@@ -40,7 +40,7 @@ trait PIRScheduler extends Traversal with PIRCommon {
     def stageNum = mapStages.length+1
     def prevStage = stages.headOption
 
-    def mem(x: Exp[Any]) = cu.srams.find(_.name == quote(x)).get
+    def mem(x: Exp[Any]) = cu.mem(x)
     def addReg(x: Exp[Any], reg: LocalMem) { cu.addReg(x, reg) }
     //def replaceReg(x: Exp[Any], reg: LocalMem) { cu.replaceReg(x, reg) }
     def addRef(x: Exp[Any], ref: LocalRef) { refs += x -> ref }
@@ -129,16 +129,17 @@ trait PIRScheduler extends Traversal with PIRCommon {
     scheduleContext(compute)
 
     for (mem <- cu.writePseudoStages.keys) {
-      debug(s"Generated write stages (${mem.name}): ")
+      debug(s"Generated write stages ($mem): ")
       cu.writeStages(mem).foreach(stage => debug(s"  $stage"))
     }
     debug("Generated compute stages: ")
     cu.stages.foreach(stage => debug(s"  $stage"))
   }
   def scheduleContext(ctx: CUContext) {
-    ctx.pseudoStages.foreach{
+    ctx.pseudoStages.foreach {
       case DefStage(lhs@Deff(rhs), isReduce) => nodeToStage(lhs, rhs, ctx, isReduce)
-      case WriteAddrStage(lhs@Deff(rhs)) => writeAddrToStage(lhs, rhs, ctx)
+      case WriteAddrStage(lhs@Deff(rhs))     => writeAddrToStage(lhs, rhs, ctx)
+      case OpStage(op, ins, out, isReduce)   => opStageToStage(op, ins, out, ctx, isReduce)
     }
     ctx.finalizeCU
   }
@@ -159,9 +160,6 @@ trait PIRScheduler extends Traversal with PIRCommon {
 
     case (a, b:TempReg) => a
 
-    case (a:WriteAddrWire, b:WriteAddrWire) => a
-    case (a:ReadAddrWire, b:ReadAddrWire) => a
-
     case (_:CounterReg | _:ConstReg, _:WriteAddrWire | _:ReadAddrWire) => a // Ignore prop from counters/consts to write/read addrs
     case (_:ReduceReg | _:AccumReg, _:ReduceReg | _:AccumReg) => a        // No need for prop from reduce to reduce regs
 
@@ -174,20 +172,21 @@ trait PIRScheduler extends Traversal with PIRCommon {
     else          mapNodeToStage(lhs,rhs,ctx)
   }
 
-  def allocateAddrReg(addr: Exp[Any], ctx: CUContext, write: Boolean) = {
-    val reg = if (write) WriteAddrWire(fresh[Any]) else ReadAddrWire(fresh[Any])
+  def allocateAddrReg(mem: CUMemory, addr: Exp[Any], ctx: CUContext, write: Boolean) = {
+    val reg = if (write) WriteAddrWire(mem) else ReadAddrWire(mem)
     val addrReg = ctx.reg(addr)
+    // If addr is a counter or const, just returns that register back. Otherwise returns reg
     propagateReg(addr, addrReg, reg, ctx)
   }
 
   // Addresses only, not values
   def writeAddrToStage(lhs: Exp[Any], rhs: Def[Any], ctx: CUContext) = rhs match {
     case Bram_store(bram, addr, value) =>
-      val mem = ctx.mem(bram)
-      mem.writeAddr = allocateAddrReg(addr, ctx, true)
+      val sram = ctx.mem(bram)
+      sram.writeAddr = allocateAddrReg(sram, addr, ctx, true)
     case Par_bram_store(bram, addrs, values) =>
-      val mem = ctx.mem(bram)
-      mem.writeAddr = allocateAddrReg(addrs, ctx, true)
+      val sram = ctx.mem(bram)
+      sram.writeAddr = allocateAddrReg(sram, addrs, ctx, true)
 
     case _ => stageError(s"Unrecognized write address node $lhs = $rhs")
   }
@@ -215,13 +214,13 @@ trait PIRScheduler extends Traversal with PIRCommon {
     // Create a reference to this BRAM and
     case Bram_load(bram, addr) =>
       ctx.addReg(lhs, InputReg(ctx.mem(bram)))
-      val mem = ctx.mem(bram)
-      mem.readAddr = allocateAddrReg(addr, ctx, false)
+      val sram = ctx.mem(bram)
+      sram.readAddr = allocateAddrReg(sram, addr, ctx, false)
 
     case Par_bram_load(bram, addrs) =>
       ctx.addReg(lhs, InputReg(ctx.mem(bram)))
-      val mem = ctx.mem(bram)
-      mem.readAddr = allocateAddrReg(addrs, ctx, false)
+      val sram = ctx.mem(bram)
+      sram.readAddr = allocateAddrReg(sram, addrs, ctx, false)
 
     case Vector_from_list(elems) =>
       if (elems.length != 1) stageError("Expected parallelization of 1 in inner loop in PIR generation")
@@ -235,7 +234,7 @@ trait PIRScheduler extends Traversal with PIRCommon {
     // True register reads happen at the beginning of ALU operations
     // So just make this node alias with the register
     case Reg_read(reg) =>
-      val input = ctx.cu.getOrUpdate(reg){ allocateLocal(reg, ctx.pipe, read=Some(lhs)) }
+      val input = ctx.cu.getOrAddReg(reg){ allocateLocal(reg, ctx.pipe, read=Some(lhs)) }
       ctx.addReg(lhs, input)
 
     // --- Writes
@@ -263,7 +262,7 @@ trait PIRScheduler extends Traversal with PIRCommon {
       val isRemotelyRead = isReadOutsidePipe(reg, ctx.pipe)
 
       if (isOuterAcc) { // Case 2
-        val out = ctx.cu.getOrUpdate(reg){ allocateLocal(reg, ctx.pipe) }
+        val out = ctx.cu.getOrAddReg(reg){ allocateLocal(reg, ctx.pipe) }
         propagateReg(value, ctx.reg(value), out, ctx)
         //ctx.replaceReg(value, out)
       }
@@ -279,38 +278,19 @@ trait PIRScheduler extends Traversal with PIRCommon {
           propagateReg(reg, ctx.reg(reg), out, ctx)
       }
 
-    case _ => nodeToOp(rhs) match {
-      case Some(op) =>
-        val inputs = syms(rhs).map{sym => ctx.refIn(ctx.reg(sym)) }
-        val output = ctx.cu.getOrUpdate(lhs){ TempReg(lhs) }
-        val stage = MapStage(op, inputs, List(ctx.refOut(output)))
-        ctx.addStage(stage)
+    case _ => lhs match {
+      case Fixed(_) => ctx.cu.getOrAddReg(lhs){ allocateLocal(lhs, ctx.pipe) }
 
-      case None => stageWarn(s"No ALU scheduling rule known for $lhs = $rhs")
+      case _ => nodeToOp(rhs) match {
+        case Some(op) => opStageToStage(op, syms(rhs), lhs, ctx, false)
+        case None => stageWarn(s"No ALU operation known for $lhs = $rhs")
+      }
     }
   }
 
-  // FIXME: Assumes a single node reduction function right now, change to multi-node later
   def reduceNodeToStage(lhs: Exp[Any], rhs: Def[Any], ctx: CUContext) = nodeToOp(rhs) match {
-    case Some(op) =>
-      // By convention, the inputs to the reduction tree is the first argument to the node
-      // This input must be in the previous stage's reduction register
-      // Ensure this either by adding a bypass register for raw inputs or changing the output
-      // of the previous stage from a temporary register to the reduction register
-      val input = syms(rhs).head
-      val inputReg = ctx.reg(input)
-      propagateReg(input, inputReg, ReduceReg(fresh[Any]), ctx)
-      // HACK: Get initial value of accumulator
-      val zero = syms(rhs).last match {
-        case Deff(Reg_read(acc)) => allocateConst(resetValue(acc))
-        case _ => ConstReg("0l")
-      }
-      val acc = ReduceReg(lhs)
-      val stage = ReduceStage(op, zero, acc)
-      ctx.addReg(lhs, acc)
-      ctx.addStage(stage)
-
-    case _ => stageWarn(s"No PIR reduce rule known for $lhs = $rhs")
+    case Some(op) => opStageToStage(op, syms(rhs), lhs, ctx, true)
+    case _ => stageWarn(s"No ALU operation known for $lhs = $rhs")
   }
 
   def nodeToOp(node: Def[Any]): Option[PIROp] = node match {
@@ -324,6 +304,34 @@ trait PIRScheduler extends Traversal with PIRCommon {
     case FltPt_Mul(_,_) => Some(FltMul)
     case FltPt_Div(_,_) => Some(FltDiv)
     case _ => None
+  }
+
+  // FIXME: Assumes a single node reduction function right now, change to allow multi-node later
+  def opStageToStage(op: PIROp, ins: List[Exp[Any]], out: Exp[Any], ctx: CUContext, isReduce: Boolean) = {
+    if (isReduce) {
+      // By convention, the inputs to the reduction tree is the first argument to the node
+      // This input must be in the previous stage's reduction register
+      // Ensure this either by adding a bypass register for raw inputs or changing the output
+      // of the previous stage from a temporary register to the reduction register
+      val input = ins.head
+      val accum = ins.last
+      val inputReg = ctx.reg(input)
+      propagateReg(input, inputReg, ReduceReg(fresh[Any]), ctx)
+      val zero = accum match {
+        case Deff(Reg_read(acc)) => allocateConst(resetValue(acc))
+        case _ => ConstReg("0l")
+      }
+      val acc = ReduceReg(out)
+      val stage = ReduceStage(op, zero, acc)
+      ctx.addReg(out, acc)
+      ctx.addStage(stage)
+    }
+    else {
+      val inputs = ins.map{in => ctx.refIn(ctx.reg(in)) }
+      val output = ctx.cu.getOrAddReg(out){ TempReg(out) }
+      val stage = MapStage(op, inputs, List(ctx.refOut(output)))
+      ctx.addStage(stage)
+    }
   }
 
 }

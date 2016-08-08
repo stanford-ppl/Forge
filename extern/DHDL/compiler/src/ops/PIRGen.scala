@@ -144,8 +144,8 @@ trait PIRGen extends Traversal with PIRCommon {
   }
 
   def preallocateRegisters(cu: ComputeUnit) = cu.regs.foreach{
-    case ReadAddrWire(x) => emit(s"val ${quote(x)} = CU.rdAddr()")
-    case WriteAddrWire(x) => emit(s"val ${quote(x)} = CU.wtAddr()")
+    //case ReadAddrWire(x) => emit(s"val ${quote(x)} = CU.rdAddr()")
+    //case WriteAddrWire(x) => emit(s"val ${quote(x)} = CU.wtAddr()")
     case TempReg(x) => emit(s"val ${quote(x)} = CU.temp()")
     case AccumReg(x,init) => emit(s"val ${quote(x)} = CU.accum(init = Some(${quote(init)}))")
     case ScalarIn(x,mem) => emit(s"val ${quote(x)} = ScalarIn(${mem.name})")
@@ -166,8 +166,23 @@ trait PIRGen extends Traversal with PIRCommon {
       // TODO: Currently unused
       emit(s"""val $name = Counter(${quote(start)}, ${quote(end)}, ${quote(stride)})""")
 
-    case CUMemory(name, size, Some(writer), Some(readAddr), Some(writeAddr)) =>
-      emit(s"""val $name = SRAM(size = $size, vec = ${writer.name}, readAddr = ${quote(readAddr)}, writeAddr = ${quote(writeAddr)})""")
+    case sram@CUMemory(sym, size) =>
+      var decl = s"""val ${quote(sym)} = SRAM(size = $size"""
+      sram.vector match {
+        case Some(vec) => decl += s""", vec = ${vec.name}"""
+        case None => throw new Exception(s"Memory $sram has no vector defined")
+      }
+      sram.readAddr match {
+        case Some(_:CounterReg | _:ConstReg) => decl += s""", readAddr = ${quote(sram.readAddr.get)}"""
+        case Some(_:ReadAddrWire) =>
+        case addr => throw new Exception(s"Disallowed memory read address in $sram: $addr")
+      }
+      sram.writeAddr match {
+        case Some(_:CounterReg | _:ConstReg) => decl += s""", writeAddr = ${quote(sram.writeAddr.get)})"""
+        case Some(_:ReadAddrWire) =>
+        case addr => throw new Exception(s"Disallowed memory write address in $sram: $addr")
+      }
+      emit(decl + ")")
 
     case MemCtrl(name,region,mode) => emit(s"val $name = MemoryController($mode, ${region.name})")
     case Offchip(name) => emit(s"val $name = Offchip()")
@@ -178,18 +193,24 @@ trait PIRGen extends Traversal with PIRCommon {
     case _ => throw new Exception(s"Don't know how to generate CGRA component: $x")
   }
 
+  def quote(sram: CUMemory): String = quote(sram.mem)
+
   def quote(reg: LocalMem): String = reg match {
     // Always directly quotable
     case ConstReg(c) => s"Const($c)"                        // Constant
+    case WriteAddrWire(x) => s"${quote(x)}.writeAddr"
+    case ReadAddrWire(x)  => s"${quote(x)}.readAddr"
 
     // Context dependent (sometimes quotable)
     case CounterReg(cchain, idx) => s"${cchain.name}($idx)" // Counter
     case ScalarIn(x, mem)        => quote(x)                // Inputs to counterchains
     case ReduceReg(x)            => quote(x)                // Uses only, not assignments
     case AccumReg(x, init)       => quote(x)                // After preallocation
-    case InputReg(mem)           => s"${mem.name}.load"     // Local read
-    case WriteAddrWire(x)        => quote(x)                // Write address register
-    case ReadAddrWire(x)         => quote(x)                // Read address register
+    case InputReg(x)             => s"${quote(x.mem)}.load" // Local read
+
+    case ScalarOut(x, out:OutputArg) => quote(x)
+    case ScalarOut(x, mem:ScalarMem) => quote(x)
+    case ScalarOut(x, mem:MemCtrl) => s"${mem.name}.saddr"
 
     // Other cases require stage context
     case _ => throw new Exception(s"Cannot quote local memory $reg without context")
@@ -200,21 +221,21 @@ trait PIRGen extends Traversal with PIRCommon {
   def quote(ref: LocalRef): String = ref match {
     // Stage invariant register types
     case LocalRef(stage, reg: ConstReg) => quote(reg)
+    case LocalRef(stage, wire: WriteAddrWire) => quote(wire)
+    case LocalRef(stage, wire: ReadAddrWire)  => quote(wire)
 
     // Delayed or forwarded registers
     case LocalRef(stage, reg: CounterReg) => if (stage >= 0) s"CU.ctr(stage($stage), ${quote(reg)})" else quote(reg)
-    case LocalRef(stage, reg: InputReg)   => if (stage >= 0) s"CU.load(stage($stage), ${reg.mem.name})" else quote(reg)
+    case LocalRef(stage, reg: InputReg)   => if (stage >= 0) s"CU.load(stage($stage), ${quote(reg.mem)})" else quote(reg)
 
     // Delayed registers
-    case LocalRef(stage, reg: VectorLocal) => s"CU.store(stage($stage), ${reg.mem.name})"
-    case LocalRef(stage, reg: VectorOut)   => s"CU.vecOut(stage($stage), ${reg.mem.name})"
+    case LocalRef(stage, reg: VectorLocal) => s"CU.store(stage($stage), ${quote(reg.mem)})"
+    case LocalRef(stage, reg: VectorOut)   => s"CU.vecOut(stage($stage), ${quote(reg.mem)})"
 
-    case LocalRef(stage, reg: ScalarIn)  => s"CU.scalarIn(stage($stage), ${quote(reg.x)})"
-    case LocalRef(stage, reg: ScalarOut) => s"CU.scalarOut(stage($stage), ${quote(reg.x)})"
+    case LocalRef(stage, reg: ScalarIn)  => s"CU.scalarIn(stage($stage), ${quote(reg)})"
+    case LocalRef(stage, reg: ScalarOut) => s"CU.scalarOut(stage($stage), ${quote(reg)})"
     case LocalRef(stage, reg: TempReg)   => s"CU.temp(stage($stage), ${quote(reg.x)})"
     case LocalRef(stage, reg: AccumReg) => s"CU.accum(stage($stage), ${quote(reg.x)})"
-    case LocalRef(stage, wire: WriteAddrWire) => s"CU.wtAddr(stage($stage), ${quote(wire.x)})"
-    case LocalRef(stage, wire: ReadAddrWire)  => s"CU.rdAddr(stage($stage), ${quote(wire.x)})"
 
     // Weird cases
     case LocalRef(stage, reg: ReduceReg) if allocatedReduce.contains(reg) => quote(reg)
@@ -228,7 +249,7 @@ trait PIRGen extends Traversal with PIRCommon {
       case MapStage(op,inputs,outputs) =>
         val ins = inputs.map(quote(_)).mkString(", ")
         val outs = outputs.map(quote(_)).mkString(", ")
-        emit(s"""Stage(stage($i), opds=List($ins), o=$op, r=List($outs))""")
+        emit(s"""Stage(stage($i), operands=List($ins), op=$op, results=List($outs))""")
         i += 1
 
       case ReduceStage(op,init,acc) =>
@@ -244,7 +265,7 @@ trait PIRGen extends Traversal with PIRCommon {
       for ((mem,stages) <- cu.writeStages) {
         i = 1
         val nWrites  = stages.filter{_.isInstanceOf[MapStage]}.length
-        emit(s"stage = emptyStage +: WAStages(${mem.name}, ${nWrites})")
+        emit(s"stage = emptyStage +: WAStages(${quote(mem)}, ${nWrites})")
         emitStages(stages)
       }
 

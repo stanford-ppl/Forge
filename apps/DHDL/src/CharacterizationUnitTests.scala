@@ -7,10 +7,10 @@ object CharLoadTest extends DHDLApplicationCompiler with CharLoad
 trait CharLoad extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
-  val innerPar = 4;
-  val outerPar = 2;
-  val dim0 = 960;
-  val dim1 = 960;
+  val innerPar = 16;
+  val outerPar = 4;
+  val dim0 = 1536;
+  val dim1 = 1536;
 
   def CharLoad(srcHost: Rep[Array[T]], iters: Rep[SInt]) = {
     val sinnerPar = param("innerPar", innerPar); 
@@ -66,7 +66,7 @@ trait CharLoad extends DHDLApplication {
     val result = CharLoad(src, iters)
 
     val gold = src(0)
-    println("expected " + outerPar + " things in increments of " + dim0 + "*" + dim1 + " : ")
+    println("expected " + outerPar*innerPar + " things in increments of something like " + dim0 + "*" + dim1 + " : ")
     result.map{row => row.foreach{println(_)}}
   }
 }
@@ -75,7 +75,7 @@ object CharStoreTest extends DHDLApplicationCompiler with CharStore
 trait CharStore extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
-  val innerPar = 16;
+  val innerPar = 2;
   val outerPar = 8; 
   val dim0 = 1536; 
   val dim1 = 1536;
@@ -139,10 +139,10 @@ object CharBramTest extends DHDLApplicationCompiler with CharBram
 trait CharBram extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
-  val innerPar = 4;
-  val outerPar = 2;
-  val dim0 = 960;
-  val dim1 = 960;
+  val innerPar = 2;
+  val outerPar = 4;
+  val dim0 = 1536;
+  val dim1 = 1536;
   def CharBram(numin: Rep[T]) = {
     val tileDim0 = param(dim0);
     val tileDim1 = param(dim1);
@@ -152,7 +152,7 @@ trait CharBram extends DHDLApplication {
     val num = ArgIn[SInt]
     setArg(num, numin)
 
-    val out = List.tabulate(innerPar){i => List.tabulate(outerPar) {j => ArgOut[SInt] }}
+    val out = List.tabulate(outerPar){i => List.tabulate(innerPar) {j => ArgOut[SInt] }}
 
     Accel {
       val tile = BRAM[T](tileDim0, tileDim1)

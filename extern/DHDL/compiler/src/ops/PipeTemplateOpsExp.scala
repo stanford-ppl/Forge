@@ -371,7 +371,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
         val stages = childrenOf(controller)
         inds.foreach { idx =>
           emit(s"""DblBufReg[] ${quote(idx)}_chain = spatialUtils.getRegChain(
-              "${quote(controller)}", ${stages.size}, ${quote(idx)},
+              "${quote(controller)}_${quote(idx)}", ${stages.size}, ${quote(idx)},
               new DFEVar[]{${stages.map{s => quote(s)+"_done"}.mkString(",")}});""")
         }
       case _ =>

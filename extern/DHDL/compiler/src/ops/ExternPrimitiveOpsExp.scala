@@ -184,11 +184,9 @@ trait MaxJGenExternPrimitiveOps extends MaxJGenEffect {
     super.preProcess(body)
   }
 
-  var emitted_consts: Set[(Exp[Any], Def[Any])] = Set.empty
-
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
     case ConstFixPt(x,_,_,_) =>
-      if (!emitted_consts.contains((sym, rhs))) { // TODO: Figure out why 0 doesn't get emitted rather than hacking like this
+      if (!emitted_consts.contains((sym, rhs))) {
         emitted_consts += ((sym, rhs))
       }
     case Tpes_Int_to_fix(x) =>  // Emit this node in MaxJ only if x is a const
@@ -218,7 +216,9 @@ trait MaxJGenExternPrimitiveOps extends MaxJGenEffect {
               emit(s"""DFEVar ${quote(s)} = constant.var( $ts, $x ); """)
             }
           case _ =>
-            throw new Exception(s"Cannot match $d of sym $s!")
+            withStream(baseStream) {
+              emit(s"""// Can't emit ${quote(s)}""")
+            }
           }
       case _ =>
         throw new Exception(s"Cannot match, you did something really wrong")

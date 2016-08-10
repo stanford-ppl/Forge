@@ -241,7 +241,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
   val IR: LoweredPipeOpsExp with ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
           with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
           with ExternPrimitiveOpsExp with DHDLCodegenOps with NosynthOpsExp with MemoryAnalysisExp with FIFOOpsExp with VectorOpsExp
-          with DeliteTransform
+          with DeliteTransform 
   import IR.{println=>_,_}
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
@@ -317,36 +317,63 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       val r = readersOf(bram)
       val find_id = r.map{case (_, _, s) => s}
       val i = find_id.indexOf(sym)
-      val inds = accessIndicesOf(r(i)._3) match {
-        case Nil => parIndicesOf(r(i)._3)
-        case _ => accessIndicesOf(r(i)._3)
-      }
+      parIndicesOf(r(i)._3) match {
+        case Nil => 
+          val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
+          val inds = accessIndicesOf(r(i)._3)
+          inds.length match {
+            case 1 =>
+              val addr0 = inds(0)
+              Console.println(s"$addr0, ${quote(addr0)}\n\n\n")
+              addr0 match {
+                case Def(rhs0) =>
+                  if (!emitted_consts.contains((addr0, rhs0))) { 
+                    emitted_consts += ((addr0, rhs0))
+                  }
+                case _ =>
+              }                  
 
-      inds.length match { 
-        case 1 =>
+              emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
+
+            case 2 =>
+              val addr0 = inds(0)
+              val addr1 = inds(1)
+              val Def(rhs0) = addr0
+              val Def(rhs1) = addr1
+              if (!emitted_consts.contains((addr0, rhs0))) { 
+                emitted_consts += ((addr0, rhs0))
+              }
+              if (!emitted_consts.contains((addr1, rhs1))) { 
+                emitted_consts += ((addr1, rhs1))
+              }
+              emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${quote(addr1)});""")
+
+            case _ => throw new Exception("Can't codegen!")
+          }
+        case _ => 
           val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
-          emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
-        case 2 =>
-          val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
-          inds match {
-            case l: List[_] => 
-              Console.println(s"1d read $l = ${quote(l(0))}, ${quote(l(1))}\n\n\n\n")
-              val addr0 = quote(l(0))
-              val addr1 = quote(l(1))
-              emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${addr1});""")
-            case lol:List[List[_]] => 
-              Console.println(s"1d read $lol\n\n\n\n")
+          val inds = parIndicesOf(r(i)._3)
+          inds.length match {
+            case 1 =>
+              val addr0 = inds(0)(0)
+              emit(s"""DFEVector<DFEVar> ${quote(sym)} = new DFEVectorType<DFEVar>(${quote(bram)}.type, 1).newInstance(this, Arrays.asList(${quote(bram)}.connectRport(${quote(addr0)})));""")
+            case _ =>
               var addr0 = ""
-              val addr1 = inds.map {  // TODO: will have to fix this case later
-                            case List(row, col) => 
-                              addr0 = quote(row) // Assume all are from same row?
-                              quote(col)
-                          }
-              emit(s"""DFEVector<DFEVar> ${addr1(0)}_vectorized = new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")});""")
-              emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${addr1(0)}_vectorized);""")
+              val addr1 = inds.map { row => 
+                            row.length match {
+                              case 1 =>
+                                addr0 = quote(1) // Assume all are from same row?
+                                quote(row(0))
+                              case _ =>
+                                addr0 = quote(row(0)) // Assume all are from same row?
+                                quote(row(1))
+                              }
+                        }
+              emit(s"""DFEVector<DFEVar> ${quote(addr1(0))}_vectorized = new DFEVectorType<DFEVar>(${quote(addr1(0))}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.map(quote).mkString(",")}));""")
+              emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${quote(addr1(0))}_vectorized);""")
+          }
+        case _ => throw new Exception(s"Can't generate this reader! $sym")
 
-            }
-        case _ => throw new Exception(s"Can't read from more than 2-d array yet!")
       }      
     }
 
@@ -394,11 +421,11 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
         emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(this_writer)}_datapath_en);""") 
       } else {
 
-        inds.length match { 
+        w.length match { 
           case 0 =>
             throw new Exception("No writers?!")
           case 1 =>
-            emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+            emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */); """) //TODO
           case _ =>
             var addr0 = ""
             val addr1 = inds.map { 
@@ -517,8 +544,8 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"
           emit(s"""io.scalarOutput("${quote(reg)}", ${quote(value)}, $ts, $controlStr);""")
         case _ =>
-          (0 until numDuplicates) foreach { i =>
-            val regname = s"${quote(reg)}_$i"
+          (0 until numDuplicates) foreach { ii =>
+            val regname = s"${quote(reg)}_${ii}"
             if (isAccum(reg)) {
               regType(reg) match {
                 case Regular =>
@@ -560,7 +587,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                 case Regular =>
                   val rstStr = quote(parentOf(reg).get) + "_rst_en"
 //                  emit(s"""${regname}_lib.write(${quote(value)}, constant.var(true), $rstStr);""")
-                  if (duplicates(i).depth > 1) {
+                  if (duplicates(ii).depth > 1) {
                     emit(s"""${regname}_lib.write(${quote(value)}, ${quote(writer)}_done, constant.var(false));""")
                   } else {
                     // Using an enable signal instead of "always true" is causing an illegal loop.
@@ -581,14 +608,15 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
         //TODO: does templete assume bram has 2 dimension?
         val dims = dimsOf(sym)
         val Def(d0) = dims(0)
-        val size0 = bound(d0).get.toInt 
-        val size1 = if (dims.size == 1) {
-            1
-          } else {
-            val Def(d1) = dims(1)
-            val Tpes_Int_to_fix(v) = d1
-            v
-          }
+        val sizes = dims.map { case dim => 
+          bound(dim).get.toInt
+        }
+        val size0 = sizes(0) 
+        val size1 = sizes.size match {
+          case 1 => 1
+          case 2 => sizes(1) 
+          case _ => 1
+        }
         if (isDblBuf(sym)) {
           //readers.foreach { r =>
           //  if (!readerToMemMap.contains(r)) readerToMemMap += r -> Set[MemNode]()
@@ -614,7 +642,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                 case _ => 1
                 }}
             readers(0).banking.length match {
-              case 1 => bnks
+              case 1 => bnks(0)
               case 2 => bnks.mkString("new int[] {", ",", "}")
               case _ => throw new Exception(s"Can't handle ${readers(0).banking.length}-D memory!")
             }
@@ -627,7 +655,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                 case _ => 1
                 }}
             readers(0).banking.length match {
-              case 1 => strds
+              case 1 => strds(0)
               case 2 => strds.mkString("new int[] {", ",", "}")
               case _ => throw new Exception(s"Can't handle ${readers(0).banking.length}-D memory!")
             }

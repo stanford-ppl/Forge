@@ -68,8 +68,8 @@ trait DeviceMemcpy extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
 
+  val N = 192
   def memcpyViaFPGA(srcHost: Rep[Array[T]]) = {
-    val N = srcHost.length
     val fpgamem = OffChipMem[SInt](N)
     setMem(fpgamem, srcHost)
 
@@ -80,8 +80,8 @@ trait DeviceMemcpy extends DHDLApplication {
   }
 
   def main() {
-    val arraySize = args(unit(0)).to[SInt]
-    val c = args(unit(1)).to[SInt]
+    val arraySize = N
+    val c = args(unit(0)).to[SInt]
 
     val src = Array.tabulate[SInt](arraySize) { i => i*c }
     val dst = memcpyViaFPGA(src)
@@ -101,12 +101,12 @@ trait DeviceMemcpy extends DHDLApplication {
 object SimpleTileLoadStoreTest extends DHDLApplicationCompiler with SimpleTileLoadStore
 trait SimpleTileLoadStore extends DHDLApplication {
   type T = SInt
+  val N = 192
   type Array[T] = ForgeArray[T]
   def simpleLoadStore(srcHost: Rep[Array[T]], value: Rep[SInt]) = {
     val loadPar = param("loadPar", 1); domainOf(loadPar) = (1, 1, 1)
     val storePar = param("storePar", 1); domainOf(storePar) = (1, 1, 1)
     val tileSize = param("tileSize", 96); domainOf(tileSize) = (96, 96, 96)
-    val N = srcHost.length; bound(N) = 9216
 
     val srcFPGA = OffChipMem[SInt](N)
     val dstFPGA = OffChipMem[SInt](N)
@@ -134,8 +134,8 @@ trait SimpleTileLoadStore extends DHDLApplication {
   }
 
   def main() {
-    val arraySize = args(unit(0)).to[SInt]
-    val value = args(unit(1)).to[SInt]
+    val arraySize = N
+    val value = args(unit(0)).to[SInt]
 
     val src = Array.tabulate[SInt](arraySize) { i => i }
     val dst = simpleLoadStore(src, value)
@@ -154,10 +154,11 @@ trait SimpleTileLoadStore extends DHDLApplication {
 object FifoLoadTest extends DHDLApplicationCompiler with FifoLoad
 trait FifoLoad extends DHDLApplication {
   type T = SInt
+  val N = 192
+
   type Array[T] = ForgeArray[T]
   def fifoLoad(srcHost: Rep[Array[T]]) = {
     val tileSize = param("tileSize", 96); domainOf(tileSize) = (96, 96, 96)
-    val N = srcHost.length; bound(N) = 9216
 
     val srcFPGA = OffChipMem[SInt](N)
     val dstFPGA = OffChipMem[SInt](N)
@@ -179,7 +180,7 @@ trait FifoLoad extends DHDLApplication {
   }
 
   def main() {
-    val arraySize = args(unit(0)).to[SInt]
+    val arraySize = N
 
     val src = Array.tabulate[SInt](arraySize) { i => i }
     val dst = fifoLoad(src)
@@ -198,10 +199,11 @@ trait FifoLoad extends DHDLApplication {
 object ParFifoLoadTest extends DHDLApplicationCompiler with ParFifoLoad
 trait ParFifoLoad extends DHDLApplication {
   type T = SInt
+  val N = 192
+
   type Array[T] = ForgeArray[T]
   def parFifoLoad(src1: Rep[Array[T]], src2: Rep[Array[T]]) = {
     val tileSize = param("tileSize", 96); domainOf(tileSize) = (96, 96, 96)
-    val N = src1.length; bound(N) = 9216
 
     val src1FPGA = OffChipMem[T](N)
     val src2FPGA = OffChipMem[T](N)
@@ -248,10 +250,11 @@ trait ParFifoLoad extends DHDLApplication {
 object FifoLoadStoreTest extends DHDLApplicationCompiler with FifoLoadStore
 trait FifoLoadStore extends DHDLApplication {
   type T = SInt
+  val N = 192
+
   type Array[T] = ForgeArray[T]
   def fifoLoadStore(srcHost: Rep[Array[T]]) = {
     val tileSize = param("tileSize", 96); domainOf(tileSize) = (96, 96, 96)
-    val N = srcHost.length; bound(N) = 9216
 
     val srcFPGA = OffChipMem[SInt](N)
     val dstFPGA = OffChipMem[SInt](N)
@@ -272,7 +275,7 @@ trait FifoLoadStore extends DHDLApplication {
   }
 
   def main() {
-    val arraySize = args(unit(0)).to[SInt]
+    val arraySize = N
 
     val src = Array.tabulate[SInt](arraySize) { i => i }
     val dst = fifoLoadStore(src)
@@ -334,6 +337,7 @@ trait Niter extends DHDLApplication {
   type Array[T] = ForgeArray[T]
   val constTileSize = 96
 
+
   def nIterTest(len: Rep[SInt]) = {
     val innerPar = param("innerPar", 8); domainOf(innerPar) = (1, 1, 1)
     val tileSize = param("tileSize", constTileSize); domainOf(constTileSize) = (constTileSize, constTileSize, constTileSize)
@@ -378,6 +382,8 @@ trait SimpleFold extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
   val constTileSize = 96
+  val N = 192
+
 
   def simple_fold(src: Rep[Array[T]]) = {
     val innerPar = param("innerPar", 8); domainOf(innerPar) = (1, 1, 1)
@@ -410,7 +416,7 @@ trait SimpleFold extends DHDLApplication {
   }
 
   def main() {
-    val len = args(unit(0)).to[T]
+    val len = N
 
     val src = Array.tabulate[T](len) { i => i }
     val result = simple_fold(src)
@@ -427,20 +433,20 @@ object Memcpy2DTest extends DHDLApplicationCompiler with Memcpy2D
 trait Memcpy2D extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
+  val R = 96
+  val C = 96
 
   def memcpy_2d(src: Rep[ForgeArray[T]], rows: Rep[SInt], cols: Rep[SInt]) = {
     val tileDim1 = param(2);
     val tileDim2 = param(96);  domainOf(tileDim2) = (96, 96, 96)
 
-    val rowsIn = ArgIn[SInt]
-    val colsIn = ArgIn[SInt]
+    val rowsIn = rows
+    val colsIn = cols
 
     val srcFPGA = OffChipMem[T](rows, cols)
     val dstFPGA = OffChipMem[T](rows, cols)
 
     // Transfer data and start accelerator
-    setArg(rowsIn, rows)
-    setArg(colsIn, cols)
     setMem(srcFPGA, src)
 
     Accel {
@@ -460,8 +466,8 @@ trait Memcpy2D extends DHDLApplication {
   }
 
   def main() = {
-    val rows = args(0).to[SInt]
-    val cols = args(1).to[SInt]
+    val rows = R
+    val cols = C
     val src = Array.tabulate(rows*cols) { i => i }
 
     val dst = memcpy_2d(src, rows, cols)
@@ -477,6 +483,7 @@ object BlockReduce1DTest extends DHDLApplicationCompiler with BlockReduce1D
 trait BlockReduce1D extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
+  val N = 192
 
   val tileSize = 96
 
@@ -508,7 +515,7 @@ trait BlockReduce1D extends DHDLApplication {
   }
 
   def main() = {
-    val size = args(0).to[SInt]
+    val size = N
     val src = Array.tabulate(size) { i => i }
 
     val dst = blockreduce_1d(src, size)

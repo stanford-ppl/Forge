@@ -18,6 +18,9 @@ trait MatMult extends DHDLApplication {
   type T = Flt //FixPt[Signed,B16,B16]
   type Array[T] = ForgeArray[T]
 
+  val mm = 192
+  val nn = 384
+  val pp = 96
   def matmult(A: Rep[Array[T]], B: Rep[Array[T]], M: Rep[SInt], N: Rep[SInt], P: Rep[SInt]) = {
     bound(M) = 1536
     bound(N) = 1536
@@ -68,9 +71,9 @@ trait MatMult extends DHDLApplication {
   }
 
   def main() = {
-    val M = args(0).to[SInt]
-    val N = args(1).to[SInt]
-    val P = args(2).to[SInt]
+    val M = mm
+    val N = nn
+    val P = pp
 
     val a = Array.fill(M){ Array.fill(P){random[T](100)} }
     val b = Array.fill(P){ Array.fill(N){random[T](100)} }

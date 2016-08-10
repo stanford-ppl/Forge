@@ -9,8 +9,8 @@ trait CharLoad extends DHDLApplication {
   type Array[T] = ForgeArray[T]
   val innerPar = 16;
   val outerPar = 4;
-  val dim0 = 1536;
-  val dim1 = 1536;
+  val dim0 = 960;
+  val dim1 = 960;
 
   def CharLoad(srcHost: Rep[Array[T]], iters: Rep[SInt]) = {
     val sinnerPar = param("innerPar", innerPar); 
@@ -75,10 +75,10 @@ object CharStoreTest extends DHDLApplicationCompiler with CharStore
 trait CharStore extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
-  val innerPar = 2;
-  val outerPar = 8; 
-  val dim0 = 1536; 
-  val dim1 = 1536;
+  val innerPar = 16;
+  val outerPar = 4; 
+  val dim0 = 960; 
+  val dim1 = 960;
   def CharStore(iters: Rep[T], numin: Rep[T]) = {
     val sinnerPar = param("innerPar", innerPar); 
     val tileSize0 = param("tileSize0", dim0); 
@@ -139,15 +139,15 @@ object CharBramTest extends DHDLApplicationCompiler with CharBram
 trait CharBram extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
-  val innerPar = 2;
+  val innerPar = 16;
   val outerPar = 4;
-  val dim0 = 1536;
-  val dim1 = 1536;
+  val dim0 = 960;
+  val dim1 = 960;
   def CharBram(numin: Rep[T]) = {
     val tileDim0 = param(dim0);
     val tileDim1 = param(dim1);
-    val spar0 = param(innerPar);
-    val spar1 = param(outerPar);
+    val spar0 = param(outerPar);
+    val spar1 = param(innerPar);
 
     val num = ArgIn[SInt]
     setArg(num, numin)

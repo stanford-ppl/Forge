@@ -18,7 +18,8 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
   import IR.{infix_until => _, _}
 
   override val name = "Unit Pipe Insertion Transformer"
-  debugMode = true
+  debugMode = SpatialConfig.debugging
+  verboseMode = SpatialConfig.verbose
 
   var scope = 0
   def debugs(x: => Any) { debug(".."*scope + x) }

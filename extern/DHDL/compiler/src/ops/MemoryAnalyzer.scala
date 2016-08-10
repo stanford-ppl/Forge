@@ -331,7 +331,8 @@ trait MemoryAnalyzer extends BRAMBanking with RegisterBanking with FIFOBanking {
 
   override val name = "Scratchpad Analyzer"
   override val eatReflect = true
-  debugMode = true
+  debugMode = SpatialConfig.verbose
+  verboseMode = SpatialConfig.verbose
 
   // TODO: Also need pointer for each read/write to refer to instance(s) it accesses
   def analyzeMemory(mem: Exp[Any]) {

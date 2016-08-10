@@ -16,7 +16,8 @@ trait OpsAnalyzer extends ModelingTraversal {
   import IR._
 
   override val name = "Ops Analyzer"
-  debugMode = false
+  debugMode = SpatialConfig.debugging || SpatialConfig.loudModels
+  verboseMode = SpatialConfig.verbose
 
   var totalOps = AppStatistics()
   var opScope: List[AppStatistics] = Nil

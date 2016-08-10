@@ -19,7 +19,8 @@ trait PIRGen extends Traversal with PIRCommon {
 
   override val name = "PIR Generation"
   override val recurse = Always
-  debugMode = true
+  debugMode = SpatialConfig.debugging || SpatialConfig.pirdebug
+  verboseMode = SpatialConfig.verbose || SpatialConfig.pirdebug
 
   val dir = sys.env("PIR_HOME") + "/apps/"
   val app = Config.degFilename.take(Config.degFilename.length - 4)
@@ -117,16 +118,10 @@ trait PIRGen extends Traversal with PIRCommon {
       case cu: BasicComputeUnit if cu.isUnitCompute =>
         s"""UnitComputeUnit(name = Some("${cu.name}"), parent=$parent, deps=$deps)"""
       case cu: BasicComputeUnit =>
-        s"""ComputeUnit(name=Some("${cu.name}"), parent=$parent, tpe = ${quoteControl(cu.tpe)}, deps=$deps)"""
+        s"""ComputeUnit(name=Some("${cu.name}"), parent=$parent, tpe = ${quote(cu.tpe)}, deps=$deps)"""
       case cu: TileTransferUnit =>
         s"""TileTransfer(name=Some("${cu.name}"), parent=$parent, memctrl=${cu.ctrl.name}, mctpe=${cu.mode}, deps=$deps, vec=${cu.vec.name})"""
     }
-  }
-  def quoteControl(tpe: ControlType) = tpe match {
-    case InnerPipe => "Pipe"
-    case CoarsePipe => "MetaPipeline"
-    case SequentialPipe => "Sequential"
-    case StreamPipe => throw new Exception("Stream pipe not yet supported in PIR")
   }
 
   def generateCU(pipe: Exp[Any], cu: ComputeUnit, suffix: String = "") {
@@ -143,16 +138,6 @@ trait PIRGen extends Traversal with PIRCommon {
     close("}")
   }
 
-  def preallocateRegisters(cu: ComputeUnit) = cu.regs.foreach{
-    //case ReadAddrWire(x) => emit(s"val ${quote(x)} = CU.rdAddr()")
-    //case WriteAddrWire(x) => emit(s"val ${quote(x)} = CU.wtAddr()")
-    case TempReg(x) => emit(s"val ${quote(x)} = CU.temp()")
-    case AccumReg(x,init) => emit(s"val ${quote(x)} = CU.accum(init = Some(${quote(init)}))")
-    case ScalarIn(x,mem) => emit(s"val ${quote(x)} = ScalarIn(${mem.name})")
-    case ScalarOut(x,mem) => emit(s"val ${quote(x)} = ScalarOut(${mem.name})")
-    case _ => // No preallocation
-  }
-
   def emitComponent(x: Any) = x match {
     case CounterChainCopy(name, owner) =>
       emit(s"""val $name = CounterChain.copy(${owner.name}, "$name")""")
@@ -167,24 +152,25 @@ trait PIRGen extends Traversal with PIRCommon {
       emit(s"""val $name = Counter(${quote(start)}, ${quote(end)}, ${quote(stride)})""")
 
     case sram@CUMemory(sym, size) =>
+      debug(s"Generating ${sram.dumpString}")
       var decl = s"""val ${quote(sym)} = SRAM(size = $size"""
       sram.vector match {
         case Some(vec) => decl += s""", vec = ${vec.name}"""
         case None => throw new Exception(s"Memory $sram has no vector defined")
       }
       sram.readAddr match {
-        case Some(_:CounterReg | _:ConstReg) => decl += s""", readAddr = ${quote(sram.readAddr.get)}"""
+        case Some(_:CounterReg | _:ConstReg | _:LocalWriteReg) => decl += s""", readAddr = ${quote(sram.readAddr.get)}"""
         case Some(_:ReadAddrWire) =>
         case addr => throw new Exception(s"Disallowed memory read address in $sram: $addr")
       }
       sram.writeAddr match {
-        case Some(_:CounterReg | _:ConstReg) => decl += s""", writeAddr = ${quote(sram.writeAddr.get)})"""
-        case Some(_:ReadAddrWire) =>
+        case Some(_:CounterReg | _:ConstReg | _:LocalWriteReg) => decl += s""", writeAddr = ${quote(sram.writeAddr.get)})"""
+        case Some(_:WriteAddrWire) =>
         case addr => throw new Exception(s"Disallowed memory write address in $sram: $addr")
       }
       emit(decl + ")")
 
-    case MemCtrl(name,region,mode) => emit(s"val $name = MemoryController($mode, ${region.name})")
+    case MemCtrl(name,region,mode) => emit(s"val $name = MemoryController($mode, ${quote(region)})")
     case Offchip(name) => emit(s"val $name = Offchip()")
     case InputArg(name) => emit(s"val $name = ArgIn()")
     case OutputArg(name) => emit(s"val $name = ArgOut()")
@@ -193,53 +179,72 @@ trait PIRGen extends Traversal with PIRCommon {
     case _ => throw new Exception(s"Don't know how to generate CGRA component: $x")
   }
 
-  def quote(sram: CUMemory): String = quote(sram.mem)
+  def preallocateRegisters(cu: ComputeUnit) = cu.regs.foreach{
+    case reg@LocalWriteReg(mem) => emit(s"val ${quote(reg)} = CU.wtAddr()")
+    case reg@TempReg(_)         => emit(s"val ${quote(reg)} = CU.temp()")
+    case reg@AccumReg(_,init)   => emit(s"val ${quote(reg)} = CU.accum(init = Some(${quote(init)}))")
+    case reg@ScalarIn(_,mem)    => emit(s"val ${quote(reg)} = ScalarIn(${quote(mem)})")
+    case reg@ScalarOut(_,mem:OutputArg) => emit(s"val ${quote(reg)} = ScalarOut(${quote(mem)})")
+    case reg@ScalarOut(_,mem:ScalarMem) => emit(s"val ${quote(reg)} = ScalarOut(${quote(mem)})")
+    case _ => // No preallocation
+  }
+
+  def quote(sram: CUMemory): String = sram.name
+  def quote(mem: GlobalMem): String = mem.name
+
+  def quote(tpe: ControlType) = tpe match {
+    case InnerPipe => "Pipe"
+    case CoarsePipe => "MetaPipeline"
+    case SequentialPipe => "Sequential"
+    case StreamPipe => throw new Exception("Stream pipe not yet supported in PIR")
+  }
 
   def quote(reg: LocalMem): String = reg match {
-    // Always directly quotable
-    case ConstReg(c) => s"Const($c)"                        // Constant
-    case WriteAddrWire(x) => s"${quote(x)}.writeAddr"
-    case ReadAddrWire(x)  => s"${quote(x)}.readAddr"
+    case ConstReg(c) => s"Const($c)"                          // Constant
+    case CounterReg(cchain, idx) => s"${cchain.name}($idx)"   // Counter
 
-    // Context dependent (sometimes quotable)
-    case CounterReg(cchain, idx) => s"${cchain.name}($idx)" // Counter
-    case ScalarIn(x, mem)        => quote(x)                // Inputs to counterchains
-    case ReduceReg(x)            => quote(x)                // Uses only, not assignments
-    case AccumReg(x, init)       => quote(x)                // After preallocation
-    case InputReg(x)             => s"${quote(x.mem)}.load" // Local read
+    case WriteAddrWire(mem) => s"${quote(mem)}.writeAddr"     // Write address wire
+    case ReadAddrWire(mem)  => s"${quote(mem)}.readAddr"      // Read address wire
+    case LocalWriteReg(mem) => s"wr${reg.id}"                 // Local write address register
 
-    case ScalarOut(x, out:OutputArg) => quote(x)
-    case ScalarOut(x, mem:ScalarMem) => quote(x)
-    case ScalarOut(x, mem:MemCtrl) => s"${mem.name}.saddr"
+    case ReduceReg(_)       => s"rr${reg.id}"                 // Reduction register
+    case AccumReg(_,_)      => s"ar${reg.id}"                 // After preallocation
+    case TempReg(_)         => s"tr${reg.id}"                 // Temporary register
 
-    // Other cases require stage context
-    case _ => throw new Exception(s"Cannot quote local memory $reg without context")
+    case ScalarIn(_, mem:InputArg)   => s"in${reg.id}"        // Scalar inputs from input arg
+    case ScalarIn(_, mem:ScalarMem)  => s"in${reg.id}"        // Scalar inputs from CU
+    case ScalarOut(_, out:OutputArg) => s"out${reg.id}"       // Scalar output to output arg
+    case ScalarOut(_, mem:ScalarMem) => s"out${reg.id}"       // Output to another CU
+    case ScalarOut(_, mc:MemCtrl) => s"${quote(mc)}.saddr"    // Output to memory address
+
+    case InputReg(mem)           => s"${quote(mem)}.load"     // Local vector read
+    case VectorLocal(_, mem)          => quote(mem)           // Local vector write
+    case VectorOut(_, vec: VectorMem) => quote(vec)           // Global vector write
+
+    case _ => throw new Exception(s"Invalid local memory $reg")
   }
 
   var allocatedReduce: Set[ReduceReg] = Set.empty
 
   def quote(ref: LocalRef): String = ref match {
-    // Stage invariant register types
-    case LocalRef(stage, reg: ConstReg) => quote(reg)
+    case LocalRef(stage, reg: ConstReg)   => quote(reg)
+    case LocalRef(stage, reg: CounterReg) => if (stage >= 0) s"CU.ctr(stage($stage), ${quote(reg)})" else quote(reg)
+
     case LocalRef(stage, wire: WriteAddrWire) => quote(wire)
     case LocalRef(stage, wire: ReadAddrWire)  => quote(wire)
+    case LocalRef(stage, reg: LocalWriteReg)  => s"CU.wtAddr(stage($stage), ${quote(reg)})"
 
-    // Delayed or forwarded registers
-    case LocalRef(stage, reg: CounterReg) => if (stage >= 0) s"CU.ctr(stage($stage), ${quote(reg)})" else quote(reg)
-    case LocalRef(stage, reg: InputReg)   => if (stage >= 0) s"CU.load(stage($stage), ${quote(reg.mem)})" else quote(reg)
-
-    // Delayed registers
-    case LocalRef(stage, reg: VectorLocal) => s"CU.store(stage($stage), ${quote(reg.mem)})"
-    case LocalRef(stage, reg: VectorOut)   => s"CU.vecOut(stage($stage), ${quote(reg.mem)})"
+    case LocalRef(stage, reg: ReduceReg) if allocatedReduce.contains(reg) => quote(reg)
+    case LocalRef(stage, reg: ReduceReg) => s"CU.reduce(stage($stage))"
+    case LocalRef(stage, reg: AccumReg)  => s"CU.accum(stage($stage), ${quote(reg)})"
+    case LocalRef(stage, reg: TempReg)   => s"CU.temp(stage($stage), ${quote(reg)})"
 
     case LocalRef(stage, reg: ScalarIn)  => s"CU.scalarIn(stage($stage), ${quote(reg)})"
     case LocalRef(stage, reg: ScalarOut) => s"CU.scalarOut(stage($stage), ${quote(reg)})"
-    case LocalRef(stage, reg: TempReg)   => s"CU.temp(stage($stage), ${quote(reg.x)})"
-    case LocalRef(stage, reg: AccumReg) => s"CU.accum(stage($stage), ${quote(reg.x)})"
 
-    // Weird cases
-    case LocalRef(stage, reg: ReduceReg) if allocatedReduce.contains(reg) => quote(reg)
-    case LocalRef(stage, reg: ReduceReg) => s"CU.reduce(stage($stage))"
+    case LocalRef(stage, reg: InputReg)    => if (stage >= 0) s"CU.load(stage($stage), ${quote(reg)})" else quote(reg)
+    case LocalRef(stage, reg: VectorLocal) => s"CU.store(stage($stage), ${quote(reg)})"
+    case LocalRef(stage, reg: VectorOut)   => s"CU.vecOut(stage($stage), ${quote(reg)})"
   }
 
   def emitAllStages(cu: ComputeUnit) {
@@ -258,17 +263,17 @@ trait PIRGen extends Traversal with PIRCommon {
         r += 1
     }
 
-    if (cu.stages.nonEmpty || cu.writeStages.nonEmpty) {
+    if (cu.stages.nonEmpty || cu.writeStages.exists{case (mem,stages) => stages.nonEmpty}) {
       emit(s"val emptyStage = EmptyStage()")
       emit(s"var stage: List[Stage] = Nil")
-
-      for ((mem,stages) <- cu.writeStages) {
-        i = 1
-        val nWrites  = stages.filter{_.isInstanceOf[MapStage]}.length
-        emit(s"stage = emptyStage +: WAStages(${quote(mem)}, ${nWrites})")
-        emitStages(stages)
-      }
-
+    }
+    for ((srams,stages) <- cu.writeStages if stages.nonEmpty) {
+      i = 1
+      val nWrites  = stages.filter{_.isInstanceOf[MapStage]}.length
+      emit(s"stage = emptyStage +: WAStages(List(${srams.map(quote(_))}), ${nWrites})")
+      emitStages(stages)
+    }
+    if (cu.stages.nonEmpty) {
       i = 1
       val nCompute = cu.stages.filter{_.isInstanceOf[MapStage]}.length
       emit(s"stage = emptyStage +: Stages(${nCompute})")

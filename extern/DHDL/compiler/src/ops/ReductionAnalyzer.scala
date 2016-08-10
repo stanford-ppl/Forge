@@ -44,6 +44,8 @@ trait ReductionAnalyzer extends Traversal with SpatialTraversalTools {
   override val name = "Reduction Analyzer"
   override val recurse = Always    // Always follow default traversal scheme
   override val eatReflect = true   // Ignore reflect wrappers
+  debugMode = false
+  verboseMode = SpatialConfig.verbose
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
     case Pipe_fold(c,a,z,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) =>

@@ -35,7 +35,8 @@ trait ControlSignalAnalyzer extends Traversal {
   import IR._
 
   override val name = "Control Signal Analyzer"
-  debugMode = true
+  debugMode = SpatialConfig.debugging
+  verboseMode = SpatialConfig.verbose
 
   // --- State
   var level = 0
@@ -300,6 +301,8 @@ trait ControlSignalAnalyzer extends Traversal {
 trait UnrolledControlSignalAnalyzer extends ControlSignalAnalyzer {
   val IR: DHDLExp with ControlSignalAnalysisExp
   import IR._
+
+  override val name = "Control Signal Analyzer [Post-Unrolling]"
 
   // All cases of multiple access are ok now (we banked for unrolled accesses already)
   override def checkMultipleWriters(mem: Exp[Any], writer: Exp[Any]) { }

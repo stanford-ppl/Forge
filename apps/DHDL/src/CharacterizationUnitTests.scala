@@ -7,17 +7,18 @@ object CharLoadTest extends DHDLApplicationCompiler with CharLoad
 trait CharLoad extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
-  val dim0 = 2;
-  val dim1 = 24480;
-  val outerPar = 1;
+  val innerPar = 16;
+  val outerPar = 4;
+  val dim0 = 1536;
+  val dim1 = 1536;
 
   def CharLoad(srcHost: Rep[Array[T]], iters: Rep[SInt]) = {
-    val sinnerPar = param("innerPar", 4);
+    val sinnerPar = param("innerPar", innerPar);
     val tileSize0 = param("tileSize0", dim0);
     val tileSize1 = param("tileSize1", dim1);
 
     val N = ArgIn[SInt]
-    val out = List.tabulate(outerPar){i => ArgOut[SInt] }
+    val out = List.tabulate(outerPar){i => List.tabulate(innerPar) {j => ArgOut[SInt] }}
 
     setArg(N, iters)
 
@@ -38,15 +39,23 @@ trait CharLoad extends DHDLApplication {
           }
         }
         Parallel {
-          dummy.zip(out).foreach { case (dum, o) =>
-            Pipe {o := dum(0,0)}
+          out.zip(dummy).zipWithIndex.foreach { case ((row, dum), i) =>
+            row.zipWithIndex.foreach { case (o, j) =>
+              Pipe {
+                val rd = dum(0, j)
+                if (j > 0) {instanceIndexOf(rd) = 0}
+                Pipe {o := rd}
+              }
+            }
           }
         }
       }
       ()
     }
-    out.map { m =>
-      getArg(m)
+    out.map { row =>
+      row.map { m =>
+        getArg(m)
+      }
     }
   }
 
@@ -57,8 +66,8 @@ trait CharLoad extends DHDLApplication {
     val result = CharLoad(src, iters)
 
     val gold = src(0)
-    println("expected 0's followed by dim0*dim1 : ")
-    result.foreach{println(_)}
+    println("expected " + outerPar*innerPar + " things in increments of something like " + dim0 + "*" + dim1 + " : ")
+    result.map{row => row.foreach{println(_)}}
   }
 }
 
@@ -66,11 +75,12 @@ object CharStoreTest extends DHDLApplicationCompiler with CharStore
 trait CharStore extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
-  val dim0 = 8;
+  val innerPar = 2;
+  val outerPar = 8;
+  val dim0 = 1536;
   val dim1 = 1536;
   def CharStore(iters: Rep[T], numin: Rep[T]) = {
-    val sinnerPar = param("innerPar", 1);
-    val outerPar = 1;
+    val sinnerPar = param("innerPar", innerPar);
     val tileSize0 = param("tileSize0", dim0);
     val tileSize1 = param("tileSize1", dim1);
 
@@ -129,18 +139,20 @@ object CharBramTest extends DHDLApplicationCompiler with CharBram
 trait CharBram extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
-  val par0 = 2;
-  val par1 = 4;
+  val innerPar = 2;
+  val outerPar = 4;
+  val dim0 = 1536;
+  val dim1 = 1536;
   def CharBram(numin: Rep[T]) = {
-    val tileDim0 = param(96);
-    val tileDim1 = param(192);
-    val spar0 = param(par0);
-    val spar1 = param(par1);
+    val tileDim0 = param(dim0);
+    val tileDim1 = param(dim1);
+    val spar0 = param(innerPar);
+    val spar1 = param(outerPar);
 
     val num = ArgIn[SInt]
     setArg(num, numin)
 
-    val out = List.tabulate(par0){i => List.tabulate(par1) {j => ArgOut[SInt] }}
+    val out = List.tabulate(outerPar){i => List.tabulate(innerPar) {j => ArgOut[SInt] }}
 
     Accel {
       val tile = BRAM[T](tileDim0, tileDim1)
@@ -153,7 +165,7 @@ trait CharBram extends DHDLApplication {
         out.zipWithIndex.foreach{ case (row, i) =>
           row.zipWithIndex.foreach{ case (o, j) =>
             Pipe {
-              val rd = tile(i, j)
+              val rd = tile(i,j)
               if (i > 0 || j > 0) {instanceIndexOf(rd) = 0}
               Pipe {o := rd}
             }
@@ -167,7 +179,6 @@ trait CharBram extends DHDLApplication {
         getArg(m)
       }
     }
-
   }
 
   def main() {
@@ -175,7 +186,7 @@ trait CharBram extends DHDLApplication {
 
     val result = CharBram(numin)
 
-    println("expected: As many arg1's as par0*par1 (" + par0 + "*" + par1 + "=" + par0*par1 + ") :")
+    println("expected: As many arg1's as innerPar*outerPar (" + innerPar + "*" + outerPar + "=" + innerPar*outerPar + ") :")
     result.map{row =>
       row.foreach{println(_)}
     }

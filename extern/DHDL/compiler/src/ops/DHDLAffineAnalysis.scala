@@ -56,7 +56,8 @@ trait DHDLAffineAnalyzer extends AffineAnalyzer {
   import IR._
 
   override val name = "Affine Analysis"
-  debugMode = true
+  debugMode = SpatialConfig.debugging
+  verboseMode = SpatialConfig.verbose
 
   // TODO: Unused?
   /*private def patternOfVectorizedOp(offsets: List[Exp[FixPt[Signed,B32,B0]]], inds: List[Sym[FixPt[Signed,B32,B0]]]) = {

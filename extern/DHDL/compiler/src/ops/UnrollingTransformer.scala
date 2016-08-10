@@ -16,8 +16,9 @@ trait UnrollingTransformer extends MultiPassTransformer {
   val IR: UnrollingTransformExp with DHDLExp
   import IR.{infix_until => _, Array => _, assert => _, _}
 
-  debugMode = true
   override val name = "Unrolling Transformer"
+  debugMode = SpatialConfig.debugging
+  verboseMode = SpatialConfig.verbose
 
   var cloneFuncs: List[Exp[Any] => Unit] = Nil
   def duringClone[T](func: Exp[Any] => Unit)(blk: => T): T = {
@@ -327,12 +328,12 @@ trait UnrollingTransformer extends MultiPassTransformer {
     newPipe
   }
 
-  override def self_mirror[A](sym: Sym[A], rhs : Def[A]): Exp[A] = self_clone(sym,rhs)
+  override def self_mirror[A](sym: Sym[A], rhs: Def[A]): Exp[A] = self_clone(sym,rhs)
 
   // Similar to self_mirror, but also duplicates bound vars
   // Mirror metadata on the fly
   def self_clone[A](sym: Sym[A], rhs : Def[A]): Exp[A] = {
-    val sym2 = clone(rhs)(mtype(sym.tp), mpos(sym.pos))
+    val sym2 = clone(sym, rhs)(mtype(sym.tp), mpos(sym.pos))
     setProps(sym2, mirror(getProps(sym), f.asInstanceOf[Transformer]))
     cloneFuncs.foreach{func => func(sym2)}
     sym2
@@ -340,7 +341,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
 
   def cloneInds[I:Manifest](inds: List[List[Sym[I]]]) = inds.map{is => is.map{i => fresh[I] }}
 
-  def clone[A:Manifest](rhs: Def[A])(implicit pos: SourceContext): Exp[A] = (rhs match {
+  def clone[A:Manifest](lhs: Sym[A], rhs: Def[A])(implicit pos: SourceContext): Exp[A] = (rhs match {
     case Reflect(e@ParPipeForeach(cc,b,i), u, es) =>
       val i2 = cloneInds(i)
       val b2 = withSubstScope(i.flatten.zip(i2.flatten):_*){ f(b) }
@@ -354,6 +355,16 @@ trait UnrollingTransformer extends MultiPassTransformer {
       val b2 = withSubstScope( (i.flatten.zip(i2.flatten) ++ List(acc -> acc2)):_*) { f(b) }
       val rF2 = withSubstScope(rV._1 -> rV2._1, rV._2 -> rV2._2){ f(rF) }
       reflectMirrored(Reflect(ParPipeReduce(f(cc),a2,b2,rF2,i2,acc2,rV2)(e.ctx,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+
+    case EatReflect(e@Bram_store(bram,addr,value)) =>
+      val store = mirror(rhs, f.asInstanceOf[Transformer])(mtype(manifest[A]), pos)
+      parIndicesOf(store) = List(accessIndicesOf(lhs).map(f(_)))
+      store
+
+    case EatReflect(e@Bram_load(bram,addr)) =>
+      val load = mirror(rhs, f.asInstanceOf[Transformer])(mtype(manifest[A]), pos)
+      parIndicesOf(load) = List(accessIndicesOf(lhs).map(f(_)))
+      load
 
     case _ => mirror(rhs, f.asInstanceOf[Transformer])(mtype(manifest[A]), pos)
   }).asInstanceOf[Exp[A]]

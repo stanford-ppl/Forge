@@ -249,10 +249,12 @@ trait DHDLDSL extends ForgeApplication
     val Unrolling = transformer("Unrolling", isExtern=true)
 
     val DotIRPrinter = traversal("DotIRPrinter", isExtern=true)
+    val Printer = traversal("SpatialPrinter", isExtern=true)
     val NameAnalyzer = traversal("NameAnalyzer", isExtern=true)
 
     val PIRScheduling = analyzer("PIRSchedule", isExtern=true)
     val PIRGen = traversal("PIRGen", isExtern=true)
+
 
     importGlobalAnalysis()
     importBoundAnalysis()
@@ -262,7 +264,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(LevelAnalyzer)         // Sanity checks and pipe style annotation fixes
     schedule(GlobalAnalyzer)        // Values computed outside of all controllers
     schedule(UnitPipeTransformer)   // Wrap primitives in outer pipes
-    schedule(IRPrinter)
+    schedule(Printer)
 
     schedule(StageAnalyzer)         // Get number of stages in each control node
     schedule(GlobalAnalyzer)        // Values computed outside of all controllers (TODO: Needed again?)
@@ -294,17 +296,15 @@ trait DHDLDSL extends ForgeApplication
     schedule(BoundAnalyzer)         // Constant propagation in metadata
     schedule(ConstantFolding)       // Constant folding
     schedule(GlobalAnalyzer)        // Add "global" annotations for newly created symbols after folding
-    schedule(IRPrinter)
+    schedule(Printer)
 
     //schedule(RegisterFolding) -- TODO: Not sure if register folding is safe yet
-    //schedule(IRPrinter)
+    //schedule(Printer)
 
     // --- Post-DSE Estimation
-    //schedule(IRPrinterPlus)
     schedule(MemoryAnalyzer)        // Memory analyzer (to finalize banking/buffering)
     schedule(AreaAnalyzer)          // Area estimation
     schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
-    //schedule(IRPrinterPlus)
 
 // Temporarily disabled until moved to unrolling
 //    schedule(MetaPipeRegInsertion)  // Inserts registers between metapipe stages for counter signals
@@ -314,7 +314,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(Unrolling)             // Pipeline unrolling
     schedule(UnrolledControlAnalyzer) // Control signal metadata after unrolling
     schedule(DotIRPrinter)          // Graph after unrolling
-    schedule(IRPrinterPlus)
+    schedule(Printer)
     schedule(PIRGen)
 
     // External groups

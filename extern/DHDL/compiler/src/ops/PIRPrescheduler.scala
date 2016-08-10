@@ -17,7 +17,8 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
 
   override val name = "PIR Preschedule Analysis"
   override val eatReflect = true
-  debugMode = true
+  debugMode = SpatialConfig.debugging || SpatialConfig.pirdebug
+  verboseMode = SpatialConfig.verbose || SpatialConfig.pirdebug
 
   // --- State
   // TODO: Is there always only one CU per pipe?
@@ -160,30 +161,35 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     case Deff(e:Offchip_store_cmd[_]) => allocateMemoryCU(pipe, e.mem, e.fifo, MemStore)
   }
 
-  def isBuffer(mem: Exp[Any]) = isFIFO(mem.tp) || isBRAM(mem.tp)
-
   def allocateWrittenSRAM(writer: Exp[Any], mem: Exp[Any], addr: Option[Exp[Any]], writerCU: ComputeUnit, stages: List[PseudoStage]) {
-    readersOf(mem).foreach{case (ctrl,_,_) =>
+    val srams = readersOf(mem).map{case (ctrl,_,reader) =>
       val readerCU = allocateCU(ctrl)
       copyIterators(readerCU, writerCU)
+      val isLocallyRead = readerCU == writerCU
 
-      val sram = readerCU.getOrAddMem(mem)
-      val vector = if (readerCU == writerCU) LocalVector else allocateGlobal(mem)
-      sram.vector    = Some(vector)
-      sram.writeAddr = addr.map{case a => readerCU.getOrAddReg(a){ WriteAddrWire(sram) } }
+      val sram = allocateMem(mem, reader, readerCU)
+      val vector = if (isLocallyRead) LocalVector else allocateGlobal(mem)
+      sram.vector = Some(vector)
+      (readerCU, sram)
+    }
 
-      val writeStages = if (!isControlNode(writer) && addr.isDefined) stages ++ List(WriteAddrStage(writer)) else stages
+    val writeStages = if (!isControlNode(writer) && addr.isDefined) {
+      stages ++ List(WriteAddrStage(writer))
+    }
+    else stages
 
-      if (writeStages.nonEmpty) {
-        debug(s"Added $sram to $readerCU write stages")
-        readerCU.writePseudoStages += sram -> writeStages
+    if (writeStages.nonEmpty) {
+      val groups = srams.groupBy(_._1).mapValues(_.map(_._2))
+      for ((readerCU,srams) <- groups if readerCU != writerCU) {
+        debug(s"""Adding write stages to $readerCU for SRAMs: ${srams.mkString(", ")}""")
+        readerCU.writePseudoStages += srams -> writeStages
       }
     }
   }
   def allocateReadSRAM(reader: Exp[Any], mem: Exp[Any], addr: Option[Exp[Any]], readerCU: ComputeUnit) {
-    val sram = readerCU.getOrAddMem(mem)
-    if (!sram.readAddr.isDefined && addr.isDefined)
-      sram.readAddr = addr.map{a => readerCU.getOrAddReg(a){ ReadAddrWire(sram) } }
+    val sram = allocateMem(mem, reader, readerCU)
+    //if (!sram.readAddr.isDefined && addr.isDefined)
+    //sram.readAddr = addr.map{a => readerCU.getOrAddReg(a){ ReadAddrWire(sram) } }
   }
 
   def foreachSymInBlock(b: Block[Any])(func: Sym[Any] => Unit) {
@@ -195,7 +201,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
   }
 
   def prescheduleRegisterRead(reg: Exp[Any], reader: Exp[Any], pipe: Option[Exp[Any]]) = {
-    debug(s"Register read: $reader")
+    debug(s"  Register read: $reader")
     // Register reads may be used by more than one pipe
     readersOf(reg).filter(_._3 == reader).map(_._1).foreach{readCtrl =>
       val isCurrentPipe = pipe.map(_ == readCtrl).getOrElse(false)
@@ -203,7 +209,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
 
       if (!isCurrentPipe || !isLocallyWritten) {
         val readerCU = allocateCU(readCtrl)
-        debug(s"Adding read stage $reader of $reg to remote reader $readerCU")
+        debug(s"  Adding read stage $reader of $reg to remote reader $readerCU")
         readerCU.computePseudoStages ++= List(DefStage(reader))
       }
     }
@@ -211,7 +217,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
 
   def prescheduleStages(pipe: Exp[Any], func: Block[Any]) {
     val Def(d) = pipe
-    debug(s"Traversing $pipe = $d")
+    debug(s"Getting states of $pipe = $d")
     val cu = allocateCU(pipe)
 
     val remotelyAddedStages = cu.computePseudoStages // Stages added prior to traversing this pipe
@@ -224,7 +230,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     val stages = stms.map{case TP(lhs,rhs) => lhs}
     var remoteStages: Set[Exp[Any]] = Set.empty
 
-    def isUsedInCalculation(exp: Exp[Any]) = {
+    def symsOnlyUsedInWriteAddr(exps: List[Exp[Any]]) = {
       // Build a schedule as usual, except for depencies on write addresses
       def mysyms(rhs: Any) = rhs match {
         case rhs: Def[_] => rhs match {
@@ -235,23 +241,24 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
         }
         case _ => syms(rhs)
       }
-      exp match {
-        case sym: Sym[_] =>
-          val scopeIndex = buildScopeIndex(stms)
-          val result = func.res
-          val xx = GraphUtil.stronglyConnectedComponents[Stm](scheduleDepsWithIndex(mysyms(result), scopeIndex), t => scheduleDepsWithIndex(mysyms(t.rhs), scopeIndex))
-          xx.flatten.exists{stm => stm.defines(sym).isDefined}
-        case _ => false
+      val scopeIndex = buildScopeIndex(stms)
+      val result = func.res
+      val xx = GraphUtil.stronglyConnectedComponents[Stm](scheduleDepsWithIndex(mysyms(result), scopeIndex), t => scheduleDepsWithIndex(mysyms(t.rhs), scopeIndex)).flatten
+      debug(s"  Schedule without write addresses:")
+      xx.reverse.foreach{
+        case TP(lhs, rhs) => debug(s"    $lhs = $rhs")
       }
+      exps.filterNot{case sym: Sym[_] => xx.exists(_.defines(sym).isDefined) }
     }
 
     stms.foreach{case TP(lhs, rhs) => debug(s"  $lhs = $rhs")}
+    debug(s"Prescheduling $pipe = $d")
 
     foreachSymInBlock(func){
       // NOTE: Writers always appear to occur in the associated writer controller
       // However, register reads may appear outside their corresponding controller
       case writer@LocalWriter(writes) if !isControlNode(writer) =>
-        debug(s"local writer: $writer")
+        debug(s"  $writer [WRITER]")
         writes.foreach{case (mem, value, addr) =>
           if (isBuffer(mem)) {
             val addrComputation = addr.map{a => getSchedule(stms)(a,false)}.getOrElse(Nil)
@@ -259,38 +266,43 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
             val addrStages = addrSyms.map{s => DefStage(s) }
 
             allocateWrittenSRAM(writer, mem, addr, cu, addrStages)
+            val isLocallyRead = isReadInPipe(mem, pipe)
             // Currently have to duplicate if used in both address and compute
-            if (!addr.isDefined || !isUsedInCalculation(addr.get))
-              remoteStages ++= addrSyms
+            if (addrSyms.nonEmpty && !isLocallyRead) {
+              debug(s"  Checking if symbols calculating ${addr.get} are used in current scope $pipe")
+              remoteStages ++= symsOnlyUsedInWriteAddr(addrSyms)
+            }
           }
         }
 
       case reader@LocalReader(reads) if !isControlNode(reader) =>
+        debug(s"  $reader [READER]")
         reads.foreach{case (mem,addr) =>
           if (isRegister(mem.tp)) {
             prescheduleRegisterRead(mem, reader, Some(pipe))
             val isLocallyRead = isReadInPipe(mem, pipe, Some(reader))
             val isLocallyWritten = isWrittenInPipe(mem, pipe)
-            debug(s"isLocallyRead: $isLocallyRead, isLocallyWritten: $isLocallyWritten")
+            debug(s"  isLocallyRead: $isLocallyRead, isLocallyWritten: $isLocallyWritten")
             if (!isLocallyWritten || !isLocallyRead || isInnerAccum(mem)) remoteStages += reader
           }
           else if (isBuffer(mem)) {
-            debug(s"local buffer read: $reader")
+            debug(s"  Local buffer read: $reader")
             allocateReadSRAM(reader, mem, addr, cu)
           }
         }
 
       case lhs@Def(rhs) =>
-        debug(s"other node: $lhs = $rhs")
+        debug(s"  $lhs = $rhs [OTHER]")
         traverse(lhs.asInstanceOf[Sym[Any]], rhs)
     }
 
     val localCompute = stages.filter{s => (isPrimitiveNode(s) || isRegisterRead(s) || isGlobal(s)) && !remoteStages.contains(s) }
 
     // Sanity check
-    if (isOuterControl(pipe) && localCompute.nonEmpty) {
+    val nonRegReads = localCompute.filterNot(isRegisterRead(_))
+    if (isOuterControl(pipe) && nonRegReads.nonEmpty) {
       stageWarn(s"Outer control $pipe has compute stages: ")
-      localCompute.foreach{case lhs@Def(rhs) => stageWarn(s"  $lhs = $rhs")}
+      nonRegReads.foreach{case lhs@Def(rhs) => stageWarn(s"  $lhs = $rhs")}
     }
 
     cu.computePseudoStages = localCompute.map{s => DefStage(s, isReduce = reduceType(s).isDefined) }
@@ -318,7 +330,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       prescheduleStages(lhs, func)
 
     // NOTE: Need to generate offset calculation as a codegen hack right now.
-    case Offchip_load_cmd(mem,stream,ofs,len,p) =>
+    case Offchip_load_cmd(mem,fifo,ofs,len,p) =>
       debug(s"Traversing $lhs = $rhs")
       val cu = allocateCU(lhs).asInstanceOf[TileTransferUnit]
       val lenIn = cu.getOrAddReg(len){ allocateLocal(len, lhs) }
@@ -327,20 +339,20 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       val i = fresh[Index]
       cu.cchains += cc
       cu.addReg(i, CounterReg(cc, 0))
-      allocateWrittenSRAM(lhs, stream, Some(i), cu, Nil)
+      allocateWrittenSRAM(lhs, fifo, Some(i), cu, Nil)
 
-      // HACK!! Fake a read addresss for the FIFO stream
-      readersOf(stream).foreach{case (ctrl,_,_) =>
+      // HACK!! Fake a read addresss for the fifo
+      readersOf(fifo).foreach{case (ctrl,_,reader) =>
         val readerCU = allocateCU(ctrl)
-        debug(s"HACK: Adding read address to $stream for CU: ")
-        debug(readerCU.dumpString)
+        debug(s"HACK: Adding write and read address to $fifo for reader CU $readerCU")
 
         val chain = readerCU.cchains.filter(_.isInstanceOf[CounterChainInstance]).last
         val iters = readerCU.iterators.filter{case (iter,reg) => reg.cchain == chain}
         val iter = iters.reduce{(a,b) => if (a._2.idx < b._2.idx) a else b}
 
-        val readMem = readerCU.mem(stream)
+        val readMem = allocateMem(fifo, reader, readerCU)
         readMem.readAddr = Some(iter._2)
+        readMem.writeAddr = readerCU.get(i)
       }
       // TODO: Add stages for offset calculation + offset output scalar write
       val memAddr = fresh[Index]
@@ -348,7 +360,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       val ofsCalc = OpStage(FixAdd, List(ofs, i), memAddr)
       cu.computePseudoStages ++= List(ofsCalc)
 
-    case Offchip_store_cmd(mem,stream,ofs,len,p) =>
+    case Offchip_store_cmd(mem,fifo,ofs,len,p) =>
       debug(s"Traversing $lhs = $rhs")
       val cu = allocateCU(lhs).asInstanceOf[TileTransferUnit]
       val lenIn = cu.getOrAddReg(len){ allocateLocal(len, lhs) }
@@ -357,12 +369,17 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       val i = fresh[Index]
       cu.cchains += cc
       cu.addReg(i, CounterReg(cc, 0))
-      allocateReadSRAM(lhs, stream, Some(i), cu)
+      allocateReadSRAM(lhs, fifo, Some(i), cu)
       // TODO: Add stages for offset calculation + offset output scalar write
       val memAddr = fresh[Index]
       cu.addReg(memAddr, ScalarOut(memAddr, cu.ctrl))
       val ofsCalc = OpStage(FixAdd, List(ofs, i), memAddr)
       cu.computePseudoStages ++= List(ofsCalc)
+
+      // HACK: These are not correct - fix
+      val sram = allocateMem(fifo,lhs,cu)
+      sram.readAddr = cu.get(i)
+      sram.writeAddr = cu.get(i)
 
     case _ => super.traverse(lhs, rhs)
   }

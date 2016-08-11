@@ -70,6 +70,12 @@ trait MatMult extends DHDLApplication {
     getMem(c)
   }
 
+  def printArr(a: Rep[Array[T]], str: String = "") {
+    println(str)
+    (0 until a.length) foreach { i => print(a(i) + " ") }
+    println("")
+  }
+
   def main() = {
     val M = mm
     val N = nn
@@ -88,8 +94,9 @@ trait MatMult extends DHDLApplication {
       }
     }.flatten
 
-    println("expected: " + gold.mkString(", "))
-    println("result:   " + result.mkString(", "))
+    printArr(gold, "expected ")
+    printArr(result, "got  ")
+
     assert(gold == result)
   }
 }

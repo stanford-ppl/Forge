@@ -136,11 +136,23 @@ trait MaxJPreCodegen extends Traversal  {
     case _:Offchip_load_cmd[_] => memStreams += sym
 
     case e@EatReflect(Bram_new(size, zero)) =>
-      if (isDblBuf(e)) {
-        withStream(newStream("bram_" + quote(sym))) {
-          emitDblBufSM(quote(sym), readersOf(sym).length)
+      val dups = duplicatesOf(sym)
+      if (isDblBuf(sym)) {
+          withStream(newStream("bram_" + quote(sym))) {
+            emitDblBufSM(quote(sym), readersOf(sym).length)
+          }
+      } else {
+        dups.zipWithIndex.foreach { case (d, i) =>
+          if (d.depth > 1) {
+            val readers = readersOf(sym)
+            val numReaders_for_this_duplicate = readers.map{r => r}.filter{ r => (instanceIndexOf(r._3) == i)}.length
+            withStream(newStream("bram_" + quote(sym) + "_" + i)) {
+              emitDblBufSM(quote(sym) + "_" + i, numReaders_for_this_duplicate)
+            }
+          }
         }
       }
+
     case Reflect(s, u, effects) =>
       preGenNodes(sym, s)
     case Reify(s, u, effects) =>

@@ -536,7 +536,7 @@ trait DHDLMetadata {
 			} else if (isFltPtType(manifest[T])) {
 				val e = nbits(manifest[T].typeArguments(0))
 				val m = nbits(manifest[T].typeArguments(1))
-				"dfeFloat(" + e + "," + m + ")"
+				"dfeFloat(" + m + "," + e + ")"
 			} else if (isBitType(manifest[T])) {
 			  "dfeFixOffset(1, 0, SignMode.UNSIGNED)"
       } else if (isCounter(manifest[T])) {

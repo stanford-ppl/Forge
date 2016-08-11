@@ -136,6 +136,7 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
     case e@ParPipeReduce(cchain, accum, func, rFunc, inds, acc, rV) =>
       controlNodeStack.push(sym)
       emitComment(s"""ParPipeReduce ${quote(sym)} = ParPipeReduce(${quote(cchain)}, ${quote(accum)}) {""")
+      emit("""{""")
       styleOf(sym) match {
         case CoarsePipe => emitComment(s"""MPSM to be emitted""")
         case InnerPipe => emitComment(s"""PipeSM to be emitted""")
@@ -172,6 +173,7 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
           throw new Exception(s"""Unknown accum in ParPipeReduce on ${dp}!""")          
       }
 
+      emit("""}""")
       emitComment(s"""} ParPipeReduce ${quote(sym)}""")
       controlNodeStack.pop
 

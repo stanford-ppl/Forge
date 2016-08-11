@@ -80,7 +80,7 @@ trait ParamRestrictions extends Expressions with NameOpsExp {
     def apply(r: RRange, setter: Int => Unit) = {
       if (r.start % r.step != 0) {
         val start = r.step*(r.start/r.step + 1)
-        new Domain[Int]((start until r.end by r.step).toList :+ r.start, setter)
+        new Domain[Int]((start to r.end by r.step).toList :+ r.start, setter)
       }
       else new Domain[Int](r.toList, setter)
     }
@@ -92,7 +92,7 @@ trait ParamRestrictions extends Expressions with NameOpsExp {
         setter(r.start);
         if (cond()) values += r.start
       }
-      for (i <- start until r.end by r.step) {
+      for (i <- start to r.end by r.step) {
         setter(i)
         if (cond()) values += i
       }
@@ -100,12 +100,12 @@ trait ParamRestrictions extends Expressions with NameOpsExp {
     }
   }
 
-  def prune(params: List[Param[Int]], ranges: HashMap[Param[Int],RRange], restrict: List[Restrict]) = {
+  def prune(params: List[Param[Int]], ranges: HashMap[Param[Int],RRange], restrict: Set[Restrict]) = {
     val pruneSingle = params.map{t =>
       val restricts = restrict.filter(_.dependsOnlyOn(t))
       t -> Domain.restricted(ranges(t), {c: Int => t.setValue(c)}, () => restricts.forall(_.evaluate))
     }
-    // TODO: prune pairs
+    // TODO: prune pairs?
     pruneSingle.map(_._2)
   }
 
@@ -122,7 +122,8 @@ trait ParameterAnalyzer extends Traversal {
   override val name = "Parameter Analyzer"
   override val recurse = Always
   override val eatReflect = true
-  debugMode = true
+  debugMode = SpatialConfig.debugging
+  verboseMode = SpatialConfig.verbose
 
   val MIN_TILE_SIZE  = 96    // words
   val MAX_TILE_SIZE  = 96000 // words
@@ -131,11 +132,11 @@ trait ParameterAnalyzer extends Traversal {
   val MAX_PAR_FACTOR = 192  // duplications
   val MAX_OUTER_PAR  = 15
 
-  var tileSizes = List[Param[Int]]()  // Params used to calculate BRAM size
-  var parParams = List[Param[Int]]()  // Params used as parallelization factors for counters
+  var tileSizes: List[Param[Int]] = Nil  // Params used to calculate BRAM size
+  var parParams: List[Param[Int]] = Nil  // Params used as parallelization factors for counters
   val range     = HashMap[Param[Int],RRange]()
 
-  var restrict   = List[Restrict]()
+  var restrict:  Set[Restrict] = Set.empty   // Restrictions on parameters
   var innerLoop  = false
 
   override def preprocess[A:Manifest](b: Block[A]) = {
@@ -146,6 +147,12 @@ trait ParameterAnalyzer extends Traversal {
       }
     }
     (b)
+  }
+
+  override def postprocess[A:Manifest](b: Block[A]) = {
+    tileSizes = tileSizes.distinct
+    parParams = parParams.distinct
+    super.postprocess(b)
   }
 
   def setRange(p: Param[Int], mn: Int, mx: Int, step: Int) = {
@@ -173,8 +180,8 @@ trait ParameterAnalyzer extends Traversal {
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
     case Fifo_new(ParamFix(p),_) =>
       stageWarn("Paramterized fifo size is not yet supported")
-      tileSizes ::= p
-      setRange(p, 1, MAX_TILE_SIZE, MIN_TILE_SIZE)
+      //tileSizes ::= p
+      //setRange(p, 1, MAX_TILE_SIZE, MIN_TILE_SIZE)
 
     case Bram_new(_,_) =>
       val dims = dimsOf(lhs)
@@ -201,21 +208,21 @@ trait ParameterAnalyzer extends Traversal {
       // Set constraints on par factor
       (start,end,step) match {
         case (Exact(0),ParamFix(p),Exact(1)) =>
-          restrict ::= RLessEqual(par, p)
-          restrict ::= RDivides(par, p)
+          restrict += RLessEqual(par, p)
+          restrict += RDivides(par, p)
 
         case (_,ParamFix(e),ParamFix(p)) => // ???
 
         case (Exact(0),Bound(e),ParamFix(p)) =>
-          restrict ::= RDividesQuotient(par, e.toInt, p)
+          restrict += RDividesQuotient(par, e.toInt, p)
 
         case (Bound(s),Bound(e),ParamFix(p)) =>
-          restrict ::= RDividesQuotient(par, (e-s).toInt, p)
+          restrict += RDividesQuotient(par, (e-s).toInt, p)
 
         case (Bound(s),Bound(e),Bound(t)) =>
           val nIters = (e - s)/t
           if (nIters < max) max = nIters.toInt
-          restrict ::= RDividesConst(par, nIters.toInt)  // HACK: par factor divides bounded loop size (avoid edge case)
+          restrict += RDividesConst(par, nIters.toInt)  // HACK: par factor divides bounded loop size (avoid edge case)
 
         case _ => // No restrictions
       }
@@ -226,17 +233,23 @@ trait ParameterAnalyzer extends Traversal {
         case (ParamFix(s),ParamFix(p),ParamFix(_)) => // ???
 
         case (Exact(0),ParamFix(p),ParamFix(s)) =>
-          restrict ::= RLessEqual(s, p)
-          restrict ::= RDivides(s, p)  // HACK: avoid edge case
+          restrict += RLessEqual(s, p)
+          restrict += RDivides(s, p)  // HACK: avoid edge case
 
         case (Bound(s),Bound(b),ParamFix(p)) =>
           val l = b - s
           setRange(p, 1, l.toInt, MIN_TILE_SIZE)
 
-          restrict ::= RDividesConst(p, l.toInt) // HACK: avoid edge case
+          restrict += RDividesConst(p, l.toInt) // HACK: avoid edge case
 
         case _ => // No restrictions
       }
+
+    case Offchip_store_cmd(mem,stream,ofs,len,p: Param[Int]) =>
+      parParams ::= p
+
+    case Offchip_load_cmd(mem,stream,ofs,len,p: Param[Int]) =>
+      parParams ::= p
 
     // HACK: Parallelize innermost loop only
     case e:Pipe_foreach =>

@@ -19,7 +19,8 @@ trait StageAnalyzer extends Traversal with SpatialTraversalTools {
   override val name = "Stage Analyzer"
   override val recurse = Always    // Always follow default traversal scheme
   override val eatReflect = true   // Ignore reflect wrappers
-  debugMode = true
+  debugMode = SpatialConfig.debugging
+  verboseMode = SpatialConfig.verbose
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
     // Accel block (equivalent to a Sequential unit pipe)

@@ -22,17 +22,18 @@ trait DSE extends Traversal {
   val IR: DHDLCompiler
   import IR.{infix_until => _, _}
 
+  override val name = "Design Space Exploration"
   debugMode = true
 
   lazy val ctrlAnalyzer = new ControlSignalAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val paramAnalyzer = new ParameterAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
-  lazy val printer = new IRPrinterPlus{val IR: DSE.this.IR.type = DSE.this.IR}
+  //lazy val printer = new IRPrinterPlus{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val bndAnalyzer = new BoundAnalyzer with QuickTraversal{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val contention = new ContentionModel{val IR: DSE.this.IR.type = DSE.this.IR}
   lazy val memAnalyzer = new MemoryAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
 
-  lazy val tileSizes = paramAnalyzer.tileSizes.distinct
-  lazy val parParams = paramAnalyzer.parParams.distinct
+  lazy val tileSizes = paramAnalyzer.tileSizes
+  lazy val parParams = paramAnalyzer.parParams
   lazy val localMems = ctrlAnalyzer.localMems
   lazy val metapipes = ctrlAnalyzer.metapipes
   //lazy val accFactors = ctrlAnalyzer.memAccessFactors.toList
@@ -43,7 +44,7 @@ trait DSE extends Traversal {
     ctrlAnalyzer.run(b)
     paramAnalyzer.run(b)
 
-    if (debugMode && SpatialConfig.enableDSE) printer.run(b)
+    //if (debugMode && SpatialConfig.enableDSE) printer.run(b)
 
     debug("Tile Sizes: ")
     tileSizes.foreach{t => val name = nameOf(t).getOrElse(t.toString); debug(s"  $name")}
@@ -89,6 +90,10 @@ trait DSE extends Traversal {
     val cycleAnalyzer = new LatencyAnalyzer{val IR: DSE.this.IR.type = DSE.this.IR}
     cycleAnalyzer.silence()
     areaAnalyzer.silence()
+    paramAnalyzer.silence()
+    bndAnalyzer.silence()
+    memAnalyzer.silence()
+
     bndAnalyzer.run(b)
     areaAnalyzer.run(b)
     cycleAnalyzer.run(b)
@@ -102,7 +107,6 @@ trait DSE extends Traversal {
       val distFactors = factors.distinct
       if (distFactors.length > 1) restrict ::= REqualOrOne(distFactors)
     }*/
-    restrict = restrict.distinct
 
     def isLegalSpace() = restrict.forall(_.evaluate)
 
@@ -119,7 +123,7 @@ trait DSE extends Traversal {
     val initialSpace = prune(numericFactors, ranges, restrict)
 
     val mps = metapipes.map{mp => Domain(List(true,false), {c: Boolean => c match {case true => styleOf(mp) = CoarsePipe; case false => styleOf(mp) = SequentialPipe}; () }) }
-    val space = initialSpace ++ mps
+    val space = (initialSpace ++ mps)
 
     if (debugMode) {
       debug("")
@@ -130,7 +134,7 @@ trait DSE extends Traversal {
     }
 
 
-    val N = space.length
+    val N = space.size
     val indexedSpace = (space, xrange(0,N,1).toList).zipped
 
     // D. DSE

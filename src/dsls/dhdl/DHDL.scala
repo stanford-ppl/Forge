@@ -248,31 +248,34 @@ trait DHDLDSL extends ForgeApplication
 
     val Unrolling = transformer("Unrolling", isExtern=true)
 
-    val DotIRPrinter = traversal("DotIRPrinter", isExtern=true)
+    val DotPrinter = traversal("DotIRPrinter", isExtern=true)
+    val Printer = traversal("SpatialPrinter", isExtern=true)
     val NameAnalyzer = traversal("NameAnalyzer", isExtern=true)
 
     val PIRScheduling = analyzer("PIRSchedule", isExtern=true)
     val PIRGen = traversal("PIRGen", isExtern=true)
 
+
     importGlobalAnalysis()
     importBoundAnalysis()
 
-    // --- Pre-DSE analysis
-    schedule(NameAnalyzer)
-    schedule(LevelAnalyzer)         // Sanity checks and pipe style annotation fixes
+    schedule(NameAnalyzer)          // Symbol names
+    schedule(LevelAnalyzer)         // Initial sanity checks and pipe style annotation fixes
+    schedule(BoundAnalyzer)         //
+    schedule(ConstantFolding)       // Constant folding prior to DSE
     schedule(GlobalAnalyzer)        // Values computed outside of all controllers
+
+    // --- Unit Pipe Insertion
     schedule(UnitPipeTransformer)   // Wrap primitives in outer pipes
-    schedule(IRPrinter)
-
-    schedule(StageAnalyzer)         // Get number of stages in each control node
     schedule(GlobalAnalyzer)        // Values computed outside of all controllers (TODO: Needed again?)
-    schedule(ControlSignalAnalyzer) // Variety of control signal related metadata
+    schedule(Printer)
 
-    schedule(BoundAnalyzer)
+    // --- Pre-DSE analysis
     schedule(OffChipAnalyzer)       // Check dimensions of offchip memories
+    schedule(StageAnalyzer)         // Get number of stages in each control node
+    schedule(ControlSignalAnalyzer) // Variety of control signal related metadata (TODO: Needed here? Run by DSE)
     schedule(DHDLAffineAnalysis)    // Access patterns
-
-    schedule(DotIRPrinter)          // Graph prior to unrolling
+    schedule(DotPrinter)            // Graph prior to unrolling
 
     // --- Design Space Exploration
     schedule(DSE)                   // Design space exploration. Runs a host of other analyses:
@@ -294,17 +297,16 @@ trait DHDLDSL extends ForgeApplication
     schedule(BoundAnalyzer)         // Constant propagation in metadata
     schedule(ConstantFolding)       // Constant folding
     schedule(GlobalAnalyzer)        // Add "global" annotations for newly created symbols after folding
-    schedule(IRPrinter)
 
     //schedule(RegisterFolding) -- TODO: Not sure if register folding is safe yet
-    //schedule(IRPrinter)
+    //schedule(Printer)
 
-    // --- Post-DSE Estimation
-    //schedule(IRPrinterPlus)
+    // --- Post-DSE Analysis
+    schedule(Printer)
     schedule(MemoryAnalyzer)        // Memory analyzer (to finalize banking/buffering)
     schedule(AreaAnalyzer)          // Area estimation
     schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
-    //schedule(IRPrinterPlus)
+    schedule(Printer)
 
 // Temporarily disabled until moved to unrolling
 //    schedule(MetaPipeRegInsertion)  // Inserts registers between metapipe stages for counter signals
@@ -313,9 +315,8 @@ trait DHDLDSL extends ForgeApplication
     schedule(ReductionAnalyzer)     // Reduce/accumulator specialization
     schedule(Unrolling)             // Pipeline unrolling
     schedule(UnrolledControlAnalyzer) // Control signal metadata after unrolling
-    schedule(DotIRPrinter)          // Graph after unrolling
-    //schedule(IRPrinterPlus)
-    schedule(IRPrinter)
+    schedule(DotPrinter)             // Graph after unrolling
+    schedule(Printer)
     schedule(PIRGen)
 
     // External groups

@@ -14,7 +14,8 @@ trait OffChipAnalyzer extends Traversal {
 
   override val name = "OffChip Analyzer"
   override val eatReflect = true   // Ignore reflect wrappers
-  debugMode = true
+  debugMode = SpatialConfig.debugging
+  verboseMode = SpatialConfig.verbose
 
   var softValue: Map[Exp[Reg[Any]], Exp[Any]] = Map.empty
   var offchips: Set[Exp[OffChipMem[Any]]] = Set.empty

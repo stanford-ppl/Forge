@@ -101,9 +101,17 @@ trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with 
   }
 
   // TODO: Default number of iterations if bound can't be computed?
+  // TODO: Warn user if bounds can't be found?
   def nIters(x: Rep[CounterChain]): Long = x match {
-    case Deff(Counterchain_new(_)) => 1L //Math.ceil( bound(nIters).getOrElse(1.0) ).toLong
-    case _ => 1L
+    case Deff(Counterchain_new(ctrs)) =>
+      val loopIters = ctrs.map{ case Deff(Counter_new(start,end,stride,par)) =>
+        val min = bound(start).getOrElse(0.0)
+        val max = bound(end).getOrElse(1.0)
+        val step = bound(stride).getOrElse(1.0)
+        val p = bound(par).getOrElse(1.0)
+        Math.ceil(Math.ceil(max - min/step)/p).toLong
+      }
+      loopIters.fold(1L){_*_}
   }
 
 

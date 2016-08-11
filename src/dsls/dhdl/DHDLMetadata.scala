@@ -29,12 +29,21 @@ trait DHDLMetadata {
     */
     val MemInstanceIndex = metadata("MemInstanceIndex", "idx" -> SInt)
     val instIdxOps = metadata("instanceIndexOf")
-    static (instIdxOps) ("update", Nil, (MAny, SInt) :: MUnit, effect = simple) implements
+    internal.static (instIdxOps) ("update", Nil, (MAny, SInt) :: MUnit, effect = simple) implements
       composite ${ setMetadata($0, MemInstanceIndex($1)) }
-    static (instIdxOps) ("get", Nil, (MAny) :: SOption(SInt)) implements
+    internal.static (instIdxOps) ("get", Nil, (MAny) :: SOption(SInt)) implements
       composite ${ meta[MemInstanceIndex]($0).map(_.idx) }
-    static (instIdxOps) ("apply", Nil, (MAny) :: SInt) implements
+    internal.static (instIdxOps) ("apply", Nil, (MAny) :: SInt) implements
       composite ${ meta[MemInstanceIndex]($0).map(_.idx).get }
+
+    val UserInstanceIndex = metadata("UserInstanceIndex", "idx" -> SInt)
+    val userIdxOps = metadata("memoryIndexOf")
+    static (userIdxOps) ("update", Nil, (MAny, SInt) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, UserInstanceIndex($1)) }
+    static (userIdxOps) ("get", Nil, (MAny) :: SOption(SInt)) implements
+      composite ${ meta[UserInstanceIndex]($0).map(_.idx) }
+    static (userIdxOps) ("apply", Nil, (MAny) :: SInt) implements
+      composite ${ meta[UserInstanceIndex]($0).map(_.idx).get }
 
     /**
      * Statically determined length
@@ -251,7 +260,7 @@ trait DHDLMetadata {
     val MParamRange = metadata("MParamRange", "minv" -> SInt, "maxv" -> SInt, "stepv" -> SInt)
     val prangeOps = metadata("domainOf")
     static (prangeOps) ("update", Nil, (MAny, CTuple3(SInt,SInt,SInt)) :: MUnit, effect = simple) implements
-      composite ${ setMetadata($0, MParamRange($1._1,$1._2+$1._3,$1._3)) }
+      composite ${ setMetadata($0, MParamRange($1._1,$1._2,$1._3)) }
 
     static (prangeOps) ("apply", Nil, MAny :: SOption(CTuple3(SInt,SInt,SInt))) implements composite ${
       meta[MParamRange]($0).map(d => (d.minv, d.maxv, d.stepv))

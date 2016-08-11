@@ -25,19 +25,18 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
 
   // Create a vector for communication to/from a given memory
   def allocateGlobal(mem: Exp[Any]) = {
-    val writer = writersOf(mem).headOption
-    val name = quote(mem) + writer.map{writer => "_"+quote(writer._3)}.getOrElse("")
+    val name = quote(mem)
     val global = mem match {
       case Deff(Offchip_new(_)) => Offchip(name)
-      case Deff(Argin_new(_))   => InputArg(name+"_argin")
-      case Deff(Argout_new(_))  => OutputArg(name+"_argout")
-      case Deff(Reg_new(_))     => ScalarMem(name+"_scalar")
-      case mem if isArgIn(mem)  => InputArg(name+"_argin")
-      case mem if isArgOut(mem) => OutputArg(name+"")
+      case Deff(Argin_new(_))   => InputArg(name)
+      case Deff(Argout_new(_))  => OutputArg(name)
+      case Deff(Reg_new(_))     => ScalarMem(name)
+      case mem if isArgIn(mem)  => InputArg(name)
+      case mem if isArgOut(mem) => OutputArg(name)
       case mem if isRegister(mem.tp) => ScalarMem(name)
       case _                    => VectorMem(name)
     }
-    debug(s"Adding global for $mem: $global")
+    debug(s"### Adding global for $mem: $global")
     globals += global
     global
   }
@@ -45,7 +44,7 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
   private def allocateReg(reg: Exp[Any], pipe: Exp[Any], read: Option[Exp[Any]] = None, write: Option[Exp[Any]] = None) = {
     val isLocallyRead = isReadInPipe(reg, pipe, read)
     val isLocallyWritten = isWrittenInPipe(reg, pipe, write)
-    debug(s"allocating register $reg in $pipe (localRead: $isLocallyRead, localWrite: $isLocallyWritten, accum: ${isAccum(reg)}")
+    debug(s"### Allocating register $reg in $pipe (localRead: $isLocallyRead, localWrite: $isLocallyWritten, accum: ${isAccum(reg)}")
     if (isLocallyRead && isLocallyWritten && isInnerAccum(reg)) {
       ReduceReg(reg)
     }
@@ -75,10 +74,24 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
     case reg@Deff(Reg_new(init))    => allocateReg(reg, pipe, read, write)
 
     case reader@Deff(Reg_read(reg)) =>
-      debug(s"allocating reader $reader of $reg in $pipe")
+      debug(s"### Allocating reader $reader of $reg in $pipe")
       allocateLocal(reg, pipe, Some(reader), write)
 
     case _ => TempReg(mem)
+  }
+
+  def isBuffer(mem: Exp[Any]) = isBRAM(mem.tp) // || isFIFO(mem.tp)
+
+  def allocateMem(mem: Exp[Any], reader: Exp[Any], cu: ComputeUnit) = {
+    if (!isBuffer(mem))
+      throw new Exception(s"Cannot allocate SRAM for non-buffer $mem")
+
+    val name = s"${quote(mem)}_${quote(reader)}"
+    val size = memSize(mem)
+    debug(s"### Looking for mem $name in $cu")
+    val sram = cu.getOrAddMem(name, size)
+    debug(s"### ${sram.dumpString}")
+    sram
   }
 }
 
@@ -92,22 +105,29 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case object MemGather extends MemoryMode { override def toString() = "Gather" }
 
   // Inter-CU communication
-  sealed abstract class GlobalMem(val name: String)
-  case class Offchip(override val name: String) extends GlobalMem(name)
-  case class MemCtrl(override val name: String, region: Offchip, mode: MemoryMode) extends GlobalMem(name)
-  case class InputArg(override val name: String) extends GlobalMem(name)
-  case class OutputArg(override val name: String) extends GlobalMem(name)
-  case class ScalarMem(override val name: String) extends GlobalMem(name)
-  case class VectorMem(override val name: String) extends GlobalMem(name)
-  case class TileTxVector(override val name: String) extends GlobalMem(name)
-  case object LocalVector extends GlobalMem("local")
+  sealed abstract class GlobalMem
+  case class Offchip(name: String) extends GlobalMem
+  case class MemCtrl(name: String, region: Offchip, mode: MemoryMode) extends GlobalMem
+  case class InputArg(name: String) extends GlobalMem
+  case class OutputArg(name: String) extends GlobalMem
+  case class ScalarMem(name: String) extends GlobalMem
+  case class VectorMem(name: String) extends GlobalMem
+  case object LocalVector extends GlobalMem
 
 
   // Intra-CU communication
-  sealed abstract class LocalMem
+  sealed abstract class LocalMem {
+    val id = {LocalMem.id += 1; LocalMem.id}
+  }
+  object LocalMem { var id = 0 }
+
+  case class ConstReg(const: String) extends LocalMem
+  case class CounterReg(cchain: CUCounterChain, idx: Int) extends LocalMem
 
   case class ReadAddrWire(mem: CUMemory) extends LocalMem
   case class WriteAddrWire(mem: CUMemory) extends LocalMem
+  case class LocalWriteReg(mem: CUMemory) extends LocalMem
+
   case class ReduceReg(x: Exp[Any]) extends LocalMem
   case class AccumReg(x: Exp[Any], init: ConstReg) extends LocalMem
   case class TempReg(x: Exp[Any]) extends LocalMem
@@ -115,13 +135,21 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case class ScalarIn(x: Exp[Any], mem: GlobalMem) extends LocalMem
   case class ScalarOut(x: Exp[Any], mem: GlobalMem) extends LocalMem
 
+  case class VectorIn(mem: GlobalMem) extends LocalMem
   case class InputReg(mem: CUMemory) extends LocalMem
   case class VectorLocal(x: Exp[Any], mem: CUMemory) extends LocalMem
   case class VectorOut(x: Exp[Any], mem: GlobalMem) extends LocalMem
- // case class OffchipAddr(mem: GlobalMem) extends LocalMem
 
-  case class CounterReg(cchain: CUCounterChain, idx: Int) extends LocalMem
-  case class ConstReg(const: String) extends LocalMem
+  def isReadable(mem: LocalMem) = mem match {
+    case _:ReadAddrWire | _:WriteAddrWire | _:LocalWriteReg => false
+    case _:ScalarOut | _:VectorLocal | _:VectorOut => false
+    case _ => true
+  }
+  def isWritable(mem: LocalMem) = mem match {
+    case _:ConstReg | _:CounterReg | _:ScalarIn => false
+    case _:VectorIn | _:InputReg => false
+    case _ => true
+  }
 
   // Local memory references
   case class LocalRef(stage: Int, reg: LocalMem)
@@ -150,12 +178,18 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case object FltSub extends PIROp
   case object FltMul extends PIROp
   case object FltDiv extends PIROp
+  case object BitAnd extends PIROp
+  case object BitOr  extends PIROp
+  case object FixLt  extends PIROp
+  case object FixLeq extends PIROp
+  case object FixEql extends PIROp
+  case object FixNeq extends PIROp
 
   // --- Stages prior to scheduling
-  sealed abstract class PseudoStage
-  case class DefStage(op: Exp[Any], isReduce: Boolean = false) extends PseudoStage
-  case class OpStage(op: PIROp, inputs: List[Exp[Any]], out: Exp[Any], isReduce: Boolean = false) extends PseudoStage
-  case class WriteAddrStage(write: Exp[Any]) extends PseudoStage
+  sealed abstract class PseudoStage { def output: Exp[Any] }
+  case class DefStage(op: Exp[Any], isReduce: Boolean = false) extends PseudoStage { def output = op }
+  case class OpStage(op: PIROp, inputs: List[Exp[Any]], out: Exp[Any], isReduce: Boolean = false) extends PseudoStage { def output = out }
+  case class WriteAddrStage(write: Exp[Any]) extends PseudoStage { def output = write }
 
   // --- Stages after scheduling
   sealed abstract class Stage {
@@ -174,7 +208,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   // --- Compute units
   def allocateConst(x: Exp[Any]) = x match {
     case Exact(c) => ConstReg(s"${c.toLong}l") // FIXME: Not necessarily an integer
-    case _ => stageError(s"Cannot allocate constant value for $x")
+    case _ => throw new Exception(s"Cannot allocate constant value for $x")
   }
 
   sealed abstract class ComputeUnit(val name: String, val parent: Option[ComputeUnit], val deps: List[Exp[Any]]) {
@@ -193,28 +227,30 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
     def iterators = regTable.flatMap{case (exp, reg: CounterReg) => Some((exp,reg)); case _ => None}.toList
     def get(x: Exp[Any]): Option[LocalMem] = x match {
       case Exact(_) => Some(getOrAddReg(x)(allocateConst(x)))
-      case _ => regTable.get(x)
+      case _ => regTable.get(x) match {
+        case Some(reg) if regs.contains(reg) => Some(reg)
+        case _ => None
+      }
     }
     def getOrAddReg(x: Exp[Any])(func: => LocalMem) = regTable.get(x) match {
-      case Some(reg) => reg
-      case None =>
+      case Some(reg) if regs.contains(reg) => reg // On return this mapping if it is valid
+      case _ =>
         val reg = x match {case Exact(_) => allocateConst(x); case _ => func }
         addReg(x, reg)
         reg
     }
 
-    def getOrAddMem(mem: Exp[Any]) = srams.find(_.mem == mem) match {
+    def getOrAddMem(name: String, size: Int) = srams.find(_.name == name) match {
       case Some(sram) => sram
       case None =>
-        val sram = CUMemory(mem, memSize(mem))
+        val sram = CUMemory(name, size)
         srams += sram
         sram
     }
-    def mem(e: Exp[Any]) = srams.find(_.mem == e).get
 
-    var writePseudoStages = HashMap[CUMemory, List[PseudoStage]]()
+    var writePseudoStages = HashMap[List[CUMemory], List[PseudoStage]]()
     var computePseudoStages: List[PseudoStage] = Nil
-    var writeStages = HashMap[CUMemory, List[Stage]]()
+    var writeStages = HashMap[List[CUMemory], List[Stage]]()
     var stages: List[Stage] = Nil
 
     def dumpString = s"""  cchains = ${cchains.mkString(", ")}
@@ -242,7 +278,7 @@ ${super.dumpString}
     override val parent: Option[ComputeUnit],
     override val deps: List[Exp[Any]],
     val ctrl: MemCtrl,
-    val vec: VectorMem,
+    var vec: VectorMem,
     val mode: MemoryMode
   ) extends ComputeUnit(name,parent,deps) {
     override def dumpString = s"""TileTransferUnit($name, $parent, $ctrl, $mode){
@@ -260,12 +296,18 @@ ${super.dumpString}
 
   def memSize(mem: Exp[Any]) = dimsOf(mem).map(dim => bound(dim).get.toInt).fold(1){_*_}
 
-  case class CUMemory(mem: Exp[Any], size: Int) {
+  case class CUMemory(name: String, size: Int) {
     // These can be recursive... e.g. readAddr = ReadAddrWire(this)
     // TODO: Does this need to be changed?
     var vector: Option[GlobalMem] = None
     var readAddr: Option[LocalMem] = None
     var writeAddr: Option[LocalMem] = None
+
+    def dumpString = s"""CUMemory($name, $size) {
+  vector = $vector
+  readAddr = $readAddr
+  writeAddr = $writeAddr
+}"""
   }
 
 }

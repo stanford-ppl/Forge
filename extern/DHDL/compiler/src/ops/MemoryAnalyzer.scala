@@ -181,13 +181,13 @@ trait BRAMBanking extends BankingBase {
     val strides = if (indices.length == 1) List(allStrides.last) else allStrides
 
     val Def(d) = access
-    debug(s"access:  $access = $d")
-    debug(s"indices: $indices")
-    debug(s"pattern: $pattern")
+    debug(s"  access:  $access = $d")
+    debug(s"  indices: $indices")
+    debug(s"  pattern: $pattern")
 
     val factors = unrollFactorsOf(access) diff unrollFactorsOf(mem) // Parallelization factors relative to this memory
 
-    debug(s"factors: ${factors}")
+    debug(s"  factors: ${factors}")
 
     var used: Map[Exp[Any], Boolean] = Map.empty
     factors.foreach{factor => used += factor -> false}
@@ -224,10 +224,9 @@ trait BRAMBanking extends BankingBase {
   def pairedAccess(mem: Exp[Any], write: (Exp[Any],Boolean,Exp[Any]), read: (Exp[Any],Boolean,Exp[Any])): MemInstance = {
     val dims = dimsOf(mem)
 
+    debug("  Write " + write + ", read " + read)
     val writeInstances = bankingFromAccessPattern(mem, write._3)
     val readInstances  = bankingFromAccessPattern(mem, read._3)
-
-    debug("  Write " + write + ", read " + read)
     debug("    write banking: " + writeInstances)
     debug("    read banking:  " + readInstances)
     val bankWrite = writeInstances.banking
@@ -287,7 +286,12 @@ trait BRAMBanking extends BankingBase {
         val dups = unallocatedReads.map(read => unpairedAccess(mem, read))
         coalesceDuplicates(unallocatedReads.map(_._3), dups)
       case (Some(write), reads) =>
-        val unallocatedReads = reads.filter{read => !instanceIndexOf.get(read._3).isDefined }
+        val allocatedReads = reads.filter{read => memoryIndexOf.get(read._3).isDefined }
+        val unallocatedReads = reads.filter{read => !memoryIndexOf.get(read._3).isDefined }
+        val allocReads = allocatedReads.map{read => s"$read (${memoryIndexOf(read._3)})"}
+        debug(s"Write: $write, Reads: $unallocatedReads")
+        debug(s"(Leaving out preallocated reads $allocReads)")
+        allocatedReads.foreach{read => instanceIndexOf(read._3) = memoryIndexOf(read._3) }
         val dups = unallocatedReads.map(read => pairedAccess(mem, write, read))
         coalesceDuplicates(unallocatedReads.map(_._3), dups)
     }
@@ -303,6 +307,7 @@ trait RegisterBanking extends BankingBase {
       case (Some(write), Nil)   => List(MemInstance(1, 1, List(NoBanking)))
       case (None, reads)        => List(MemInstance(1, 1, List(NoBanking)))
       case (Some(write), reads) =>
+        debug(s"Write: $write, Reads: $reads")
         val dups = reads.map{read => MemInstance(1 + distanceBetween( (write._1,write._2), (read._1,read._2) ), 1, List(NoBanking)) }
         coalesceDuplicates(reads.map(_._3), dups)
     }
@@ -324,6 +329,7 @@ trait FIFOBanking extends BankingBase {
         instanceIndexOf(read._3) = 0
         List(MemInstance(1, 1, List(StridedBanking(1, accessPar(mem,read._3))) ))
       case (Some(write),Some(read)) =>
+        debug(s"Write: $write, Read: $read")
         val banks = Math.max(accessPar(mem,write._3), accessPar(mem,read._3))
         instanceIndexOf(read._3) = 0
         List(MemInstance(1, 1, List(StridedBanking(1, banks)) ))
@@ -337,7 +343,8 @@ trait MemoryAnalyzer extends BRAMBanking with RegisterBanking with FIFOBanking {
 
   override val name = "Scratchpad Analyzer"
   override val eatReflect = true
-  debugMode = true
+  debugMode = SpatialConfig.verbose
+  verboseMode = SpatialConfig.verbose
 
   // TODO: Also need pointer for each read/write to refer to instance(s) it accesses
   def analyzeMemory(mem: Exp[Any]) {

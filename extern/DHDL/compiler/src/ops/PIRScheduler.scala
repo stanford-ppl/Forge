@@ -16,9 +16,15 @@ trait PIRScheduler extends Traversal with PIRCommon {
 
   override val name = "PIR Scheduler"
   override val recurse = Always
-  debugMode = true
+  debugMode = SpatialConfig.debugging || SpatialConfig.pirdebug
+  verboseMode = SpatialConfig.verbose || SpatialConfig.pirdebug
 
   val cus = HashMap[Exp[Any], ComputeUnit]()
+
+  override def traverse(lhs: Sym[Any], rhs: Def[Any]) {
+    if (isControlNode(lhs) && cus.contains(lhs))
+      scheduleCU(lhs, cus(lhs))
+  }
 
   // TODO: Awkward extension of ComputeUnit. May want to move all this to CU later?
   abstract class CUContext(val pipe: Exp[Any], val cu: ComputeUnit) {
@@ -40,9 +46,12 @@ trait PIRScheduler extends Traversal with PIRCommon {
     def stageNum = mapStages.length+1
     def prevStage = stages.headOption
 
-    def mem(x: Exp[Any]) = cu.mem(x)
+    def mem(mem: Exp[Any], reader: Exp[Any]) = allocateMem(mem, reader, cu)
+
+    // A CU can have multiple SRAMs for a given mem symbol, one for each local read
+    def memories(mem: Exp[Any]) = readersOf(mem).filter(_._1 == pipe).map{read => allocateMem(mem, read._3, cu) }
+
     def addReg(x: Exp[Any], reg: LocalMem) { cu.addReg(x, reg) }
-    //def replaceReg(x: Exp[Any], reg: LocalMem) { cu.replaceReg(x, reg) }
     def addRef(x: Exp[Any], ref: LocalRef) { refs += x -> ref }
     def getReg(x: Exp[Any]) = cu.get(x)
     def reg(x: Exp[Any]) = cu.get(x).getOrElse(throw new Exception(s"No register defined for $x"))
@@ -84,118 +93,131 @@ trait PIRScheduler extends Traversal with PIRCommon {
       if (add) addReg(e, out)
     }
 
-    def finalizeCU() = {
-      // Remove all temporary registers from outputs when they are not used in any input
-      val stages = mapStages
-      val tempIns = stages.flatMap{stage => stage.inputMems.flatMap{case t: TempReg => Some(t); case _ => None}}
-      val tempOuts = stages.flatMap{stage => stage.outputMems.flatMap{case t: TempReg => Some(t); case _ => None}}
-      val unusedTemps = tempOuts.filterNot(tempIns contains _)
-      stages.foreach{stage => stage.outs = stage.outs.filterNot{ref => unusedTemps contains ref.reg}}
-      // Also remove from set of registers
-      cu.regs --= unusedTemps
-    }
+    def finalizeContext() { }
   }
   case class ComputeContext(override val pipe: Exp[Any], override val cu: ComputeUnit) extends CUContext(pipe,cu) {
     def pseudoStages = cu.computePseudoStages
     def stages = cu.stages
     def addStage(stage: Stage) { cu.stages ::= stage }
-    override def finalizeCU() {
-      super.finalizeCU()
-      cu.stages = cu.stages.reverse
-    }
+    override def finalizeContext() { cu.stages = cu.stages.reverse }
     def isWriteContext = false
   }
-  case class WriteContext(override val pipe: Exp[Any], override val cu: ComputeUnit, mem: CUMemory) extends CUContext(pipe,cu) {
-    cu.writeStages += mem -> Nil
+  case class WriteContext(override val pipe: Exp[Any], override val cu: ComputeUnit, srams: List[CUMemory]) extends CUContext(pipe,cu) {
+    cu.writeStages += srams -> Nil
 
-    def pseudoStages = cu.writePseudoStages(mem)
-    def stages = cu.writeStages(mem)
-    def addStage(stage: Stage) { cu.writeStages(mem) = cu.writeStages(mem) :+ stage }
+    def pseudoStages = cu.writePseudoStages(srams)
+    def stages = cu.writeStages(srams)
+    def addStage(stage: Stage) { cu.writeStages(srams) = cu.writeStages(srams) :+ stage }
     def isWriteContext = true
-  }
-
-  override def traverse(lhs: Sym[Any], rhs: Def[Any]) {
-    if (isControlNode(lhs) && cus.contains(lhs))
-      scheduleCU(lhs, cus(lhs))
   }
 
   def scheduleCU(pipe: Exp[Any], cu: ComputeUnit) {
     debug(s"Scheduling $pipe CU: $cu")
-    for (mem <- cu.writePseudoStages.keys) {
-      val writes = WriteContext(pipe, cu, mem)
+    val origRegs = cu.regs
+    var writeStageRegs = cu.regs
+
+    // --- Schedule write contexts
+    for (srams <- cu.writePseudoStages.keys) {
+      val writes = WriteContext(pipe, cu, srams)
       scheduleContext(writes)
+      writeStageRegs ++= cu.regs // Reset view of registers each time
+      cu.regs = origRegs
     }
+    // --- Schedule compute context
     val compute = ComputeContext(pipe, cu)
     scheduleContext(compute)
+    cu.regs ++= writeStageRegs
 
-    for (mem <- cu.writePseudoStages.keys) {
-      debug(s"Generated write stages ($mem): ")
-      cu.writeStages(mem).foreach(stage => debug(s"  $stage"))
+    for (srams <- cu.writePseudoStages.keys) {
+      debug(s"Generated write stages ($srams): ")
+      cu.writeStages(srams).foreach(stage => debug(s"  $stage"))
     }
     debug("Generated compute stages: ")
     cu.stages.foreach(stage => debug(s"  $stage"))
   }
   def scheduleContext(ctx: CUContext) {
-    ctx.pseudoStages.foreach {
-      case DefStage(lhs@Deff(rhs), isReduce) => nodeToStage(lhs, rhs, ctx, isReduce)
-      case WriteAddrStage(lhs@Deff(rhs))     => writeAddrToStage(lhs, rhs, ctx)
-      case OpStage(op, ins, out, isReduce)   => opStageToStage(op, ins, out, ctx, isReduce)
-    }
-    ctx.finalizeCU
+    debug(s"  Scheduling context $ctx")
+    ctx.pseudoStages.foreach {stage => scheduleStage(stage, ctx) }
+    ctx.finalizeContext()
   }
 
   // Given result register type A, reroute to type B as necessary
   def propagateReg(exp: Exp[Any], a: LocalMem, b: LocalMem, ctx: CUContext) = (a,b) match {
-    // TODO: Check if used locally if is temp register?
     case (a:ScalarOut, b:ScalarOut) => a
     case (a:VectorOut, b:VectorOut) => a
     case (a:VectorLocal, b:VectorLocal) => a
-    case (a:ScalarOut, b) => throw new Exception("Cannot propagate from output register")
-    case (a:VectorOut, b) => throw new Exception("Cannot propagate from output register")
-    case (a:VectorLocal, b) => throw new Exception("Cannot propagate from output register")
+    case (_:ReduceReg | _:AccumReg, _:ReduceReg | _:AccumReg) => a
 
+    // Propagating from read addr wire to another read addr wire is ok (but should usually never happen)
+    case (a:ReadAddrWire, b:ReadAddrWire) => ctx.addOutput(exp,a,b); b
+    case (a,b) if !isReadable(a) => throw new Exception(s"Cannot propagate for $exp from output-only $a")
+    case (a,b) if !isWritable(b) => throw new Exception(s"Cannot propagate for $exp to input-only $b")
+
+    // TODO: Are these necessary? Do we ever see multiple writes to the same output?
     case (a, ScalarOut(x,_)) => ctx.addOutput(x,a,b); b
     case (a, VectorOut(x,_)) => ctx.addOutput(x,a,b); b
     case (a, VectorLocal(x,_)) => ctx.addOutput(x,a,b); b
 
     case (a, b:TempReg) => a
 
-    case (_:CounterReg | _:ConstReg, _:WriteAddrWire | _:ReadAddrWire) => a // Ignore prop from counters/consts to write/read addrs
-    case (_:ReduceReg | _:AccumReg, _:ReduceReg | _:AccumReg) => a        // No need for prop from reduce to reduce regs
+    // Special cases: don't propagate to write/read wires from counters or constants
+    case (_:CounterReg | _:ConstReg, _:WriteAddrWire | _:ReadAddrWire) => a
+    // General case for outputs: Don't add mapping for exp to output
+    case (a,b) if !isReadable(b) => ctx.addOutput(exp,a,b,add=false); b
 
     case (a,b) => ctx.addOutput(exp,a,b); b
   }
 
-  def nodeToStage(lhs: Exp[Any], rhs: Def[Any], ctx: CUContext, isReduce: Boolean) {
-    debug(s"  $lhs = $rhs")
-    if (isReduce) reduceNodeToStage(lhs,rhs,ctx)
-    else          mapNodeToStage(lhs,rhs,ctx)
+  // If addr is a counter or const, just returns that register back. Otherwise returns address wire
+  def allocateAddrReg(sram: CUMemory, addr: Exp[Any], ctx: CUContext, write: Boolean, local: Boolean = false) = {
+    val wire = if (write && local) LocalWriteReg(sram)
+               else if (write)     WriteAddrWire(sram)
+               else                ReadAddrWire(sram)
+    val addrReg = ctx.reg(addr)
+    propagateReg(addr, addrReg, wire, ctx)
   }
 
-  def allocateAddrReg(mem: CUMemory, addr: Exp[Any], ctx: CUContext, write: Boolean) = {
-    val reg = if (write) WriteAddrWire(mem) else ReadAddrWire(mem)
-    val addrReg = ctx.reg(addr)
-    // If addr is a counter or const, just returns that register back. Otherwise returns reg
-    propagateReg(addr, addrReg, reg, ctx)
+
+  def scheduleStage(stage: PseudoStage, ctx: CUContext) = stage match {
+    case DefStage(lhs@Deff(rhs), isReduce) =>
+      debug(s"""    $lhs = $rhs ${if (isReduce) "[REDUCE]" else ""}""")
+      if (isReduce) reduceNodeToStage(lhs,rhs,ctx)
+      else          mapNodeToStage(lhs,rhs,ctx)
+
+    case WriteAddrStage(lhs@Deff(rhs)) =>
+      debug(s"""    $lhs = $rhs [WRITE]""")
+      writeAddrToStage(lhs, rhs, ctx)
+
+    case OpStage(op, ins, out, isReduce) =>
+      debug(s"""    $out = $op(${ins.mkString(",")}) [OP]""")
+      opStageToStage(op, ins, out, ctx, isReduce)
   }
+
 
   // Addresses only, not values
   def writeAddrToStage(lhs: Exp[Any], rhs: Def[Any], ctx: CUContext) = rhs match {
     case Bram_store(bram, addr, value) =>
-      val sram = ctx.mem(bram)
-      sram.writeAddr = allocateAddrReg(sram, addr, ctx, true)
+      ctx.memories(bram).foreach{sram =>
+        sram.writeAddr = Some(allocateAddrReg(sram, addr, ctx, write=true))
+      }
+
     case Par_bram_store(bram, addrs, values) =>
-      val sram = ctx.mem(bram)
-      sram.writeAddr = allocateAddrReg(sram, addrs, ctx, true)
+      ctx.memories(bram).foreach{sram =>
+        sram.writeAddr = Some(allocateAddrReg(sram, addrs, ctx, write=true))
+      }
 
     case _ => stageError(s"Unrecognized write address node $lhs = $rhs")
   }
 
-  // TODO: What is syntax for accumulator?
-  def bufferWrite(mem: Exp[Any], value: Exp[Any], ctx: CUContext) {
-    if (isAccum(mem)) {
-      val local = ctx.mem(mem)
-      propagateReg(value, ctx.reg(value), VectorLocal(fresh[Any], local), ctx)
+  def bufferWrite(mem: Exp[Any], value: Exp[Any], addr: Option[Exp[Any]], ctx: CUContext) {
+    if (isReadInPipe(mem, ctx.pipe)) {
+      // TODO: Should we allow multiple versions of local accumulator?
+      ctx.memories(mem).foreach{sram =>
+        propagateReg(value, ctx.reg(value), VectorLocal(fresh[Any], sram), ctx)
+
+        if (addr.isDefined)
+          sram.writeAddr = Some(allocateAddrReg(sram, addr.get, ctx, write=true, local=true))
+      }
     }
     if (isReadOutsidePipe(mem, ctx.pipe)) { // Should always be true?
       val vector = allocateGlobal(mem)
@@ -206,21 +228,23 @@ trait PIRScheduler extends Traversal with PIRCommon {
   def mapNodeToStage(lhs: Exp[Any], rhs: Def[Any], ctx: CUContext) = rhs match {
     // --- Reads
     case Pop_fifo(fifo) =>
-      ctx.addReg(lhs, InputReg(ctx.mem(fifo)))
+      val vector = allocateGlobal(fifo).asInstanceOf[VectorMem]
+      ctx.addReg(lhs, VectorIn(vector))
 
     case Par_pop_fifo(fifo, len) =>
-      ctx.addReg(lhs, InputReg(ctx.mem(fifo)))
+      val vector = allocateGlobal(fifo).asInstanceOf[VectorMem]
+      ctx.addReg(lhs, VectorIn(vector))
 
     // Create a reference to this BRAM and
     case Bram_load(bram, addr) =>
-      ctx.addReg(lhs, InputReg(ctx.mem(bram)))
-      val sram = ctx.mem(bram)
-      sram.readAddr = allocateAddrReg(sram, addr, ctx, false)
+      val sram = ctx.mem(bram,lhs)
+      ctx.addReg(lhs, InputReg(sram))
+      sram.readAddr = Some(allocateAddrReg(sram, addr, ctx, write=false, local=true))
 
     case Par_bram_load(bram, addrs) =>
-      ctx.addReg(lhs, InputReg(ctx.mem(bram)))
-      val sram = ctx.mem(bram)
-      sram.readAddr = allocateAddrReg(sram, addrs, ctx, false)
+      val sram = ctx.mem(bram,lhs)
+      ctx.addReg(lhs, InputReg(sram))
+      sram.readAddr = Some(allocateAddrReg(sram, addrs, ctx, write=false, local=true))
 
     case Vector_from_list(elems) =>
       if (elems.length != 1) stageError("Expected parallelization of 1 in inner loop in PIR generation")
@@ -238,12 +262,12 @@ trait PIRScheduler extends Traversal with PIRCommon {
       ctx.addReg(lhs, input)
 
     // --- Writes
-    // No WriteAddrStage wrapper here, so these are for the values, not the addresses
+    // Only for the values, not the addresses UNLESS these are local accumulators
     // TODO: Filters
-    case Push_fifo(fifo,value,en)            => bufferWrite(fifo,value,ctx)
-    case Par_push_fifo(fifo,values,ens,_)    => bufferWrite(fifo,values,ctx)
-    case Bram_store(bram, addr, value)       => bufferWrite(bram,value,ctx)
-    case Par_bram_store(bram, addrs, values) => bufferWrite(bram,values,ctx)
+    case Push_fifo(fifo,value,en)            => bufferWrite(fifo,value,None,ctx)
+    case Par_push_fifo(fifo,values,ens,_)    => bufferWrite(fifo,values,None,ctx)
+    case Bram_store(bram, addr, value)       => bufferWrite(bram,value,Some(addr),ctx)
+    case Par_bram_store(bram, addrs, values) => bufferWrite(bram,values,Some(addrs),ctx)
 
     // Cases: 1. Inner Accumulator (read -> write)
     //        2. Outer Accumulator (read -> write)
@@ -264,7 +288,6 @@ trait PIRScheduler extends Traversal with PIRCommon {
       if (isOuterAcc) { // Case 2
         val out = ctx.cu.getOrAddReg(reg){ allocateLocal(reg, ctx.pipe) }
         propagateReg(value, ctx.reg(value), out, ctx)
-        //ctx.replaceReg(value, out)
       }
       else if (!isInnerAcc) { // Case 3
         ctx.addReg(reg, ctx.reg(value)) // Forward refs to reg to value
@@ -303,6 +326,12 @@ trait PIRScheduler extends Traversal with PIRCommon {
     case FltPt_Sub(_,_) => Some(FltSub)
     case FltPt_Mul(_,_) => Some(FltMul)
     case FltPt_Div(_,_) => Some(FltDiv)
+    case Bit_And(_,_)   => Some(BitAnd)
+    case Bit_Or(_,_)    => Some(BitOr)
+    case FixPt_Lt(_,_)  => Some(FixLt)
+    case FixPt_Leq(_,_) => Some(FixLeq)
+    case FixPt_Eql(_,_) => Some(FixEql)
+    case FixPt_Neq(_,_) => Some(FixNeq)
     case _ => None
   }
 

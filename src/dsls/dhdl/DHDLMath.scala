@@ -266,6 +266,21 @@ trait DHDLMath {
     infix (Bit) ("^",  Nil, (Bit, Bit) :: Bit) implements redirect ${ xor($0, $1) }
     direct (Bit) ("__equal", Nil, (Bit, Bit) :: Bit) implements redirect ${ xnor($0, $1) }
 
+    // --- Rewrite rules
+    val True = "Def(ConstBit(true))"
+    val False = "Def(ConstBit(false))"
+    val X = "x"
+    rewrite (and_bit) using commutative((True,X) -> X)
+    rewrite (and_bit) using commutative((False,X) -> ${ false.asBit })
+    rewrite (or_bit) using commutative((True,X) -> ${ true.asBit })
+    rewrite (or_bit) using commutative((False,X) -> X)
+    rewrite (not_bit) using pattern((False) -> ${ true.asBit })
+    rewrite (not_bit) using pattern((True) -> ${ false.asBit })
+    rewrite (xor_bit) using commutative((True,X) -> ${ not(x) })
+    rewrite (xor_bit) using commutative((False,X) -> X)
+    rewrite (xnor_bit) using commutative((True,X) -> X)
+    rewrite (xnor_bit) using commutative((False,X) -> ${ not(x) })
+
     // --- Scala Backend
     impl (neg_fix) (codegen($cala, ${ -$0 }))
     impl (add_fix) (codegen($cala, ${ $0 + $1 }))

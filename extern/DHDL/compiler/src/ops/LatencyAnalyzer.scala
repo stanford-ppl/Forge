@@ -24,6 +24,8 @@ trait LatencyAnalyzer extends ModelingTraversal {
   import ReductionTreeAnalysis._
 
   override val name = "Latency Analyzer"
+  debugMode = SpatialConfig.debugging || SpatialConfig.loudModels
+  verboseMode = SpatialConfig.verbose
 
   override def silence() {
     IR.silenceLatencyModel()

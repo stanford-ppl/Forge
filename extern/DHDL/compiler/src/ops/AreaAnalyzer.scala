@@ -34,6 +34,8 @@ trait AreaAnalyzer extends ModelingTraversal {
   import ReductionTreeAnalysis._
 
   override val name = "Area Analyzer"
+  debugMode = SpatialConfig.debugging || SpatialConfig.loudModels
+  verboseMode = SpatialConfig.verbose
 
   override def silence() {
     super.silence()

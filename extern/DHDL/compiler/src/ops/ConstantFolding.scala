@@ -17,7 +17,8 @@ trait ConstantFolding extends SinglePassTransformer {
   import IR._
 
   override val name = "Constant Folding"
-  debugMode = true
+  debugMode = SpatialConfig.debugging
+  verboseMode = SpatialConfig.verbose
 
   def convertType[T:Manifest](x: Int)(implicit ctx: SourceContext) = x.as[T]
   def convertType[T:Manifest](x: Long)(implicit ctx: SourceContext) = x.as[T]

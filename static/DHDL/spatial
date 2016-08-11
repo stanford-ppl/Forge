@@ -1,9 +1,54 @@
-#!/bin/bash
+#!/usr/bin/env python
 
-if [ $# -ne 1 ]; then
-  echo "Usage: $0 <args>"
-  exit -1
-fi
+from argparse import ArgumentParser
+import os, sys, datetime
 
-bin/runDelitec.sh $1
-bin/runDelite.sh $1
+def main():
+  usage = "Usage: %prog <application runner> [staging args] [options]"
+  parser = ArgumentParser(description='SPATIAL')
+  parser.add_argument('--DSE', dest='dse', action='store_true',default=False, help='enables design space exploration')
+  parser.add_argument('--CGRA', dest='cgra', action='store_true', default=False, help='enables PIR generation')
+  parser.add_argument('--debug', dest='debug', action='store_true', default=False, help='enables Spatial debugging output')
+  parser.add_argument('--pdebug', dest='pir_debug', action='store_true', default=False, help='enables PIR debugging output')
+  parser.add_argument('--models', dest='loud_models', action='store_true', default=False, help='enables output from Spatial area and latency models')
+  parser.add_argument('-v', dest='verbose', action='store_true', default=False, help='enables basic status output from Spatial')
+
+  (opts, args) = parser.parse_known_args()
+  if len(args) < 1:
+    parser.error("An application file must be passed to delitec as an argument")
+
+  java_opts = os.getenv("JAVA_OPTS", "")
+
+  if opts.dse == True:
+    java_opts = java_opts + " -Dspatial.dse=true"
+  if opts.cgra == True:
+    java_opts = java_opts + " -Dspatial.cgra=true"
+  if opts.debug == True:
+    java_opts = java_opts + " -Dspatial.debugging=true"
+  if opts.pir_debug == True:
+    java_opts = java_opts + " -Dspatial.pirdebug=true"
+  if opts.loud_models == True:
+    java_opts = java_opts + " -Dspatial.loudmodels=true"
+  if opts.verbose == True:
+    java_opts = java_opts + " -Dspatial.verbose=true"
+
+  ## Should only set for child processes
+  os.environ["JAVA_OPTS"] = java_opts
+
+  deliteArgs = ' '.join(args)
+
+  ## TODO: How to determine publish directory?
+  publish = os.getenv("HYPER_HOME", "") + "/published/DHDL/"
+
+  os.system(publish + 'bin/delitec ' + deliteArgs + ' 2>&1 | tee compile.log')
+  os.system(publish + 'bin/delite ' + deliteArgs + ' 2>&1 | tee run.log')
+
+#if [ $# -ne 1 ]; then
+#  echo "Usage: $0 <args>"
+#  exit -1
+#fi
+
+#bin/runDelitec.sh $1
+#bin/runDelite.sh $1
+if __name__ == "__main__":
+    main()

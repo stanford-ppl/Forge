@@ -16,8 +16,9 @@ trait UnrollingTransformer extends MultiPassTransformer {
   val IR: UnrollingTransformExp with DHDLExp
   import IR.{infix_until => _, Array => _, assert => _, _}
 
-  debugMode = true
   override val name = "Unrolling Transformer"
+  debugMode = SpatialConfig.debugging
+  verboseMode = SpatialConfig.verbose
 
   var cloneFuncs: List[Exp[Any] => Unit] = Nil
   def duringClone[T](func: Exp[Any] => Unit)(blk: => T): T = {
@@ -201,7 +202,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
   }
 
   // TODO: General (more expensive) case for when no zero is given
-  def unrollReduce[A:Manifest:Num](inputs: List[Exp[A]], valids: List[Exp[Bit]], zero: Option[Exp[A]], rFunc: Block[A], newIdx: Exp[Index], ld: Block[A], st: Block[Unit], idx: Exp[Index], res: Exp[A], rV: (Sym[A],Sym[A])) = {
+  def unrollReduce[A:Manifest:Num](node: Exp[Any], inputs: List[Exp[A]], valids: List[Exp[Bit]], zero: Option[Exp[A]], rFunc: Block[A], newIdx: Exp[Index], ld: Block[A], st: Block[Unit], idx: Exp[Index], res: Exp[A], rV: (Sym[A],Sym[A])) = {
     def reduce(x: Exp[A], y: Exp[A]) = withSubstScope(rV._1 -> x, rV._2 -> y){ inlineBlock(rFunc) }
 
     val validInputs = if (zero.isDefined) {
@@ -212,7 +213,9 @@ trait UnrollingTransformer extends MultiPassTransformer {
     }
 
     val treeResult = reduceTree(inputs){(x,y) => reduce(x,y) }
-    val accumLoad = withSubstScope(idx -> newIdx){ inlineBlock(ld) }
+    val accumLoad = duringClone{e => if (instanceIndexOf.get(node).isDefined) instanceIndexOf(e) = instanceIndexOf(node) }{
+      withSubstScope(idx -> newIdx){ inlineBlock(ld) }
+    }
     val newRes = reduce(treeResult, accumLoad)
     withSubstScope(res -> newRes, idx -> newIdx){ inlineBlock(st) }
   }
@@ -236,7 +239,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
 
       PipeIf(isOuterLoop(lhs)){
         val newIdx = inlineBlock(iFunc)
-        unrollReduce(mapResults, valids, zero, rFunc, newIdx, ld, st, idx, res, rV)(mT,numT)
+        unrollReduce(lhs, mapResults, valids, zero, rFunc, newIdx, ld, st, idx, res, rV)(mT,numT)
       }
     }
     val newPipe = reflectEffect(ParPipeReduce(cchain, accum, blk, rFunc, inds2, acc, rV)(ctx,mT,mC))
@@ -267,10 +270,12 @@ trait UnrollingTransformer extends MultiPassTransformer {
         withSubstScope(acc -> accum){
           Pipe {
             val newIdx = inlineBlock(iFunc)
-            val loads = mapResults.map{mem => withSubstScope(part -> mem, idx -> newIdx){inlineBlock(ld1)(mT)} }
+            val loads = duringClone{e => instanceIndexOf(e) = 0 }{
+              mapResults.map{mem => withSubstScope(part -> mem, idx -> newIdx){inlineBlock(ld1)(mT)} }
+            }
             // Set the final unit pipe reduction as non-reduction stages (as they can't be put in a SIMD tree currently)
             duringClone{e => if (SpatialConfig.genCGRA) reduceType(e) = None}{
-              unrollReduce(loads, validsMap, zero, rFunc, newIdx, ld2, st, idx, res, rV)(mT,numT)
+              unrollReduce(lhs, loads, validsMap, zero, rFunc, newIdx, ld2, st, idx, res, rV)(mT,numT)
             }
           }
         }
@@ -286,9 +291,11 @@ trait UnrollingTransformer extends MultiPassTransformer {
             val newIdx = inlineBlock(iFunc)                // Inline index calculation for each parallel lane
             subst += idx -> newIdx                         // Save address substitution rule for this lane
           }
-          val loads = mapResults.map{mem =>                // Calculate list of loaded results for each memory
-            reduceLanes.foreach{p => subst += part -> mem} // Set partial result to be this memory
-            unrollMap(ld1, reduceLanes)(mT)                // Unroll the load of the partial result
+          val loads = duringClone{e=> instanceIndexOf(e) = 0}{
+            mapResults.map{mem =>                // Calculate list of loaded results for each memory
+              reduceLanes.foreach{p => subst += part -> mem} // Set partial result to be this memory
+              unrollMap(ld1, reduceLanes)(mT)                // Unroll the load of the partial result
+            }
           }
           val results = reduceLanes.map{p =>
             val loadsT  = loads.map(_.apply(p))                               // Pth "column" of loads
@@ -301,7 +308,9 @@ trait UnrollingTransformer extends MultiPassTransformer {
             else {
               stageError("Reduction without explicit zero is not yet supported")
             }
-            val accRead = inlineBlock(ld2)(mT)
+            val accRead = duringClone{e => if (instanceIndexOf.get(lhs).isDefined) instanceIndexOf(e) = instanceIndexOf(lhs) }{
+              inlineBlock(ld2)(mT)
+            }
             val newRes = duringClone{e => if (SpatialConfig.genCGRA) reduceType(e) = None}{
               val treeResult = reduceTree(validLoads){(x,y) => reduce(x,y) }
               reduce(treeResult, accRead)
@@ -327,12 +336,12 @@ trait UnrollingTransformer extends MultiPassTransformer {
     newPipe
   }
 
-  override def self_mirror[A](sym: Sym[A], rhs : Def[A]): Exp[A] = self_clone(sym,rhs)
+  override def self_mirror[A](sym: Sym[A], rhs: Def[A]): Exp[A] = self_clone(sym,rhs)
 
   // Similar to self_mirror, but also duplicates bound vars
   // Mirror metadata on the fly
   def self_clone[A](sym: Sym[A], rhs : Def[A]): Exp[A] = {
-    val sym2 = clone(rhs)(mtype(sym.tp), mpos(sym.pos))
+    val sym2 = clone(sym, rhs)(mtype(sym.tp), mpos(sym.pos))
     setProps(sym2, mirror(getProps(sym), f.asInstanceOf[Transformer]))
     cloneFuncs.foreach{func => func(sym2)}
     sym2
@@ -340,7 +349,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
 
   def cloneInds[I:Manifest](inds: List[List[Sym[I]]]) = inds.map{is => is.map{i => fresh[I] }}
 
-  def clone[A:Manifest](rhs: Def[A])(implicit pos: SourceContext): Exp[A] = (rhs match {
+  def clone[A:Manifest](lhs: Sym[A], rhs: Def[A])(implicit pos: SourceContext): Exp[A] = (rhs match {
     case Reflect(e@ParPipeForeach(cc,b,i), u, es) =>
       val i2 = cloneInds(i)
       val b2 = withSubstScope(i.flatten.zip(i2.flatten):_*){ f(b) }
@@ -354,6 +363,16 @@ trait UnrollingTransformer extends MultiPassTransformer {
       val b2 = withSubstScope( (i.flatten.zip(i2.flatten) ++ List(acc -> acc2)):_*) { f(b) }
       val rF2 = withSubstScope(rV._1 -> rV2._1, rV._2 -> rV2._2){ f(rF) }
       reflectMirrored(Reflect(ParPipeReduce(f(cc),a2,b2,rF2,i2,acc2,rV2)(e.ctx,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
+
+    case EatReflect(e@Bram_store(bram,addr,value)) =>
+      val store = mirror(rhs, f.asInstanceOf[Transformer])(mtype(manifest[A]), pos)
+      parIndicesOf(store) = List(accessIndicesOf(lhs).map(f(_)))
+      store
+
+    case EatReflect(e@Bram_load(bram,addr)) =>
+      val load = mirror(rhs, f.asInstanceOf[Transformer])(mtype(manifest[A]), pos)
+      parIndicesOf(load) = List(accessIndicesOf(lhs).map(f(_)))
+      load
 
     case _ => mirror(rhs, f.asInstanceOf[Transformer])(mtype(manifest[A]), pos)
   }).asInstanceOf[Exp[A]]

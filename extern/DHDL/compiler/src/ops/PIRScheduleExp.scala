@@ -278,7 +278,7 @@ ${super.dumpString}
     override val parent: Option[ComputeUnit],
     override val deps: List[Exp[Any]],
     val ctrl: MemCtrl,
-    val vec: VectorMem,
+    var vec: VectorMem,
     val mode: MemoryMode
   ) extends ComputeUnit(name,parent,deps) {
     override def dumpString = s"""TileTransferUnit($name, $parent, $ctrl, $mode){

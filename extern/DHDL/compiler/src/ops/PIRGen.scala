@@ -30,7 +30,7 @@ trait PIRGen extends Traversal with PIRCommon {
   lazy val scheduler = new PIRScheduler{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
   lazy val optimizer = new PIROptimizer{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
   lazy val top       = prescheduler.top
-  lazy val cus       = prescheduler.cuMapping
+  val cus = HashMap[Exp[Any],ComputeUnit]()
 
   var stream: PrintWriter = null
   var indent = 0
@@ -68,14 +68,17 @@ trait PIRGen extends Traversal with PIRCommon {
     // prescheduling
     prescheduler.run(b)
     subst ++= prescheduler.subst.toList
+    val cuMapping = prescheduler.cuMapping
     // scheduling
     scheduler.subst ++= subst.toList
-    scheduler.cus ++= cus.toList
+    scheduler.cus ++= cuMapping.toList
     scheduler.run(b)
     // optimization
     optimizer.subst ++= subst.toList
-    optimizer.cus ++= cus.toList
+    optimizer.cuMapping ++= cuMapping.toList
     optimizer.run(b)
+
+    cus ++= optimizer.cuMapping.toList
 
     globals ++= (prescheduler.globals ++ scheduler.globals ++ optimizer.globals)
 

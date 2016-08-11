@@ -21,6 +21,11 @@ trait PIRScheduler extends Traversal with PIRCommon {
 
   val cus = HashMap[Exp[Any], ComputeUnit]()
 
+  override def traverse(lhs: Sym[Any], rhs: Def[Any]) {
+    if (isControlNode(lhs) && cus.contains(lhs))
+      scheduleCU(lhs, cus(lhs))
+  }
+
   // TODO: Awkward extension of ComputeUnit. May want to move all this to CU later?
   abstract class CUContext(val pipe: Exp[Any], val cu: ComputeUnit) {
     private val refs = HashMap[Exp[Any],LocalRef]()
@@ -47,7 +52,6 @@ trait PIRScheduler extends Traversal with PIRCommon {
     def memories(mem: Exp[Any]) = readersOf(mem).filter(_._1 == pipe).map{read => allocateMem(mem, read._3, cu) }
 
     def addReg(x: Exp[Any], reg: LocalMem) { cu.addReg(x, reg) }
-    //def replaceReg(x: Exp[Any], reg: LocalMem) { cu.replaceReg(x, reg) }
     def addRef(x: Exp[Any], ref: LocalRef) { refs += x -> ref }
     def getReg(x: Exp[Any]) = cu.get(x)
     def reg(x: Exp[Any]) = cu.get(x).getOrElse(throw new Exception(s"No register defined for $x"))
@@ -107,11 +111,6 @@ trait PIRScheduler extends Traversal with PIRCommon {
     def isWriteContext = true
   }
 
-  override def traverse(lhs: Sym[Any], rhs: Def[Any]) {
-    if (isControlNode(lhs) && cus.contains(lhs))
-      scheduleCU(lhs, cus(lhs))
-  }
-
   def scheduleCU(pipe: Exp[Any], cu: ComputeUnit) {
     debug(s"Scheduling $pipe CU: $cu")
     val origRegs = cu.regs
@@ -135,25 +134,6 @@ trait PIRScheduler extends Traversal with PIRCommon {
     }
     debug("Generated compute stages: ")
     cu.stages.foreach(stage => debug(s"  $stage"))
-
-    // --- Finalize CU
-    val stages = cu.stages.flatMap{case stage: MapStage => Some(stage); case _ => None} ++
-                 cu.writeStages.values.flatMap{stages => stages.flatMap{case stage: MapStage => Some(stage); case _ => None}}
-
-    // Remove all temporary registers from outputs when they are not used in any input
-    val tempIns = stages.flatMap{stage => stage.inputMems.filter(_.isInstanceOf[TempReg]) }
-    val tempOuts = stages.flatMap{stage => stage.outputMems.filter(_.isInstanceOf[TempReg]) }
-    val unusedTemps = tempOuts.filterNot(tempIns contains _)
-    stages.foreach{stage => stage.outs = stage.outs.filterNot{ref => unusedTemps contains ref.reg} }
-    // Also remove from set of registers
-    cu.regs --= unusedTemps
-
-    // Remove unused counterchain copies
-    val usedCCs = stages.flatMap{stage => stage.inputMems.flatMap{case CounterReg(cchain,_) => Some(cchain); case _ => None}} ++
-                  cu.srams.flatMap{sram => sram.readAddr match {case Some(CounterReg(cchain,_)) => Some(cchain); case _ => None}} ++
-                  cu.srams.flatMap{sram => sram.writeAddr match {case Some(CounterReg(cchain,_)) => Some(cchain); case _ => None}}
-    val unusedCopies = cu.cchains.filter{cc=> cc.isInstanceOf[CounterChainCopy] && !usedCCs.contains(cc) }
-    cu.cchains --= unusedCopies
   }
   def scheduleContext(ctx: CUContext) {
     debug(s"  Scheduling context $ctx")
@@ -248,10 +228,12 @@ trait PIRScheduler extends Traversal with PIRCommon {
   def mapNodeToStage(lhs: Exp[Any], rhs: Def[Any], ctx: CUContext) = rhs match {
     // --- Reads
     case Pop_fifo(fifo) =>
-      ctx.addReg(lhs, InputReg(ctx.mem(fifo,lhs)))
+      val vector = allocateGlobal(fifo).asInstanceOf[VectorMem]
+      ctx.addReg(lhs, VectorIn(vector))
 
     case Par_pop_fifo(fifo, len) =>
-      ctx.addReg(lhs, InputReg(ctx.mem(fifo,lhs)))
+      val vector = allocateGlobal(fifo).asInstanceOf[VectorMem]
+      ctx.addReg(lhs, VectorIn(vector))
 
     // Create a reference to this BRAM and
     case Bram_load(bram, addr) =>

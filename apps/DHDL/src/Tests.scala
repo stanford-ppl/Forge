@@ -12,34 +12,21 @@ trait Test extends DHDLApplication {
 
     val N = 10
     val T = 5
-    val PN = param(2)
-    val PT = param(2)
     val v1 = OffChipMem[A](N)
     val v2 = OffChipMem[A](N)
-    val out = OffChipMem[A](N, N)
+    //val out = OffChipMem[A](N, N)
 
     val vec1 = Array.fill(N)(random[A](10))
-    val vec2 = Array.fill(N)(random[A](10))
     setMem(v1, vec1)
-    setMem(v2, vec2)
 
     Accel {
-      Pipe(N by T, N by T par PN) { (i,j) =>
+      Pipe(N by T) { i =>
         val b1 = BRAM[A](T)
-        val b2 = BRAM[A](T)
-        val outTile = BRAM[A](T, T)
-        Parallel {
-          b1 := v1(i::i+T)
-          b2 := v2(j::j+T)
-        }
-        Pipe(T by 1, T by 1 par PT) { (ii,jj) => outTile(ii, jj) = b1(ii) * b2(jj) } // 2
-
-        out(i::i+T, j::j+T) := outTile
+        b1 := v1(i::i+T)
+        v2(i::i+T) := b1
       }
-      ()
     }
-    val result = getMem(out)
-    println( result.mkString(", ") )
+
   }
 }
 

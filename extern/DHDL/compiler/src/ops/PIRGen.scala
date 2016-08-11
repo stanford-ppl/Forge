@@ -28,6 +28,7 @@ trait PIRGen extends Traversal with PIRCommon {
 
   lazy val prescheduler = new PIRScheduleAnalyzer{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
   lazy val scheduler = new PIRScheduler{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
+  lazy val optimizer = new PIROptimizer{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
   lazy val top       = prescheduler.top
   lazy val cus       = prescheduler.cuMapping
 
@@ -64,12 +65,19 @@ trait PIRGen extends Traversal with PIRCommon {
   }
 
   def emitPIR(b: Block[Any]) {
+    // prescheduling
     prescheduler.run(b)
     subst ++= prescheduler.subst.toList
+    // scheduling
     scheduler.subst ++= subst.toList
     scheduler.cus ++= cus.toList
     scheduler.run(b)
-    globals ++= (prescheduler.globals ++ scheduler.globals)
+    // optimization
+    optimizer.subst ++= subst.toList
+    optimizer.cus ++= cus.toList
+    optimizer.run(b)
+
+    globals ++= (prescheduler.globals ++ scheduler.globals ++ optimizer.globals)
 
     debug("Scheduling complete. Generating...")
     generateHeader()
@@ -190,7 +198,15 @@ trait PIRGen extends Traversal with PIRCommon {
   }
 
   def quote(sram: CUMemory): String = sram.name
-  def quote(mem: GlobalMem): String = mem.name
+  def quote(mem: GlobalMem): String = mem match {
+    case Offchip(name)     => s"${name}_oc"
+    case MemCtrl(name,_,_) => s"${name}_mc"
+    case InputArg(name)    => s"${name}_argin"
+    case OutputArg(name)   => s"${name}_argout"
+    case ScalarMem(name)   => s"${name}_scalar"
+    case VectorMem(name)   => s"${name}_vector"
+    case LocalVector       => "local"
+  }
 
   def quote(tpe: ControlType) = tpe match {
     case InnerPipe => "Pipe"
@@ -217,6 +233,7 @@ trait PIRGen extends Traversal with PIRCommon {
     case ScalarOut(_, mem:ScalarMem) => s"out${reg.id}"       // Output to another CU
     case ScalarOut(_, mc:MemCtrl) => s"${quote(mc)}.saddr"    // Output to memory address
 
+    case VectorIn(mem)                => quote(mem)           // Global vector read
     case InputReg(mem)           => s"${quote(mem)}.load"     // Local vector read
     case VectorLocal(_, mem)          => quote(mem)           // Local vector write
     case VectorOut(_, vec: VectorMem) => quote(vec)           // Global vector write
@@ -242,6 +259,7 @@ trait PIRGen extends Traversal with PIRCommon {
     case LocalRef(stage, reg: ScalarIn)  => s"CU.scalarIn(stage($stage), ${quote(reg)})"
     case LocalRef(stage, reg: ScalarOut) => s"CU.scalarOut(stage($stage), ${quote(reg)})"
 
+    case LocalRef(stage, reg: VectorIn)  => s"CU.vecIn(stage($stage), ${quote(reg)})"
     case LocalRef(stage, reg: InputReg)    => if (stage >= 0) s"CU.load(stage($stage), ${quote(reg)})" else quote(reg)
     case LocalRef(stage, reg: VectorLocal) => s"CU.store(stage($stage), ${quote(reg)})"
     case LocalRef(stage, reg: VectorOut)   => s"CU.vecOut(stage($stage), ${quote(reg)})"

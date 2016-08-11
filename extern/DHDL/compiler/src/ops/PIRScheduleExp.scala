@@ -25,15 +25,14 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
 
   // Create a vector for communication to/from a given memory
   def allocateGlobal(mem: Exp[Any]) = {
-    val writer = writersOf(mem).headOption
-    val name = quote(mem) + writer.map{writer => "_"+quote(writer._3)}.getOrElse("")
+    val name = quote(mem)
     val global = mem match {
       case Deff(Offchip_new(_)) => Offchip(name)
-      case Deff(Argin_new(_))   => InputArg(name+"_argin")
-      case Deff(Argout_new(_))  => OutputArg(name+"_argout")
-      case Deff(Reg_new(_))     => ScalarMem(name+"_scalar")
-      case mem if isArgIn(mem)  => InputArg(name+"_argin")
-      case mem if isArgOut(mem) => OutputArg(name+"")
+      case Deff(Argin_new(_))   => InputArg(name)
+      case Deff(Argout_new(_))  => OutputArg(name)
+      case Deff(Reg_new(_))     => ScalarMem(name)
+      case mem if isArgIn(mem)  => InputArg(name)
+      case mem if isArgOut(mem) => OutputArg(name)
       case mem if isRegister(mem.tp) => ScalarMem(name)
       case _                    => VectorMem(name)
     }
@@ -81,8 +80,7 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
     case _ => TempReg(mem)
   }
 
-  def isBuffer(mem: Exp[Any]) = isFIFO(mem.tp) || isBRAM(mem.tp)
-
+  def isBuffer(mem: Exp[Any]) = isBRAM(mem.tp) // || isFIFO(mem.tp)
 
   def allocateMem(mem: Exp[Any], reader: Exp[Any], cu: ComputeUnit) = {
     if (!isBuffer(mem))
@@ -107,14 +105,14 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case object MemGather extends MemoryMode { override def toString() = "Gather" }
 
   // Inter-CU communication
-  sealed abstract class GlobalMem(val name: String)
-  case class Offchip(override val name: String) extends GlobalMem(name)
-  case class MemCtrl(override val name: String, region: Offchip, mode: MemoryMode) extends GlobalMem(name)
-  case class InputArg(override val name: String) extends GlobalMem(name)
-  case class OutputArg(override val name: String) extends GlobalMem(name)
-  case class ScalarMem(override val name: String) extends GlobalMem(name)
-  case class VectorMem(override val name: String) extends GlobalMem(name)
-  case object LocalVector extends GlobalMem("local")
+  sealed abstract class GlobalMem
+  case class Offchip(name: String) extends GlobalMem
+  case class MemCtrl(name: String, region: Offchip, mode: MemoryMode) extends GlobalMem
+  case class InputArg(name: String) extends GlobalMem
+  case class OutputArg(name: String) extends GlobalMem
+  case class ScalarMem(name: String) extends GlobalMem
+  case class VectorMem(name: String) extends GlobalMem
+  case object LocalVector extends GlobalMem
 
 
   // Intra-CU communication
@@ -137,6 +135,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case class ScalarIn(x: Exp[Any], mem: GlobalMem) extends LocalMem
   case class ScalarOut(x: Exp[Any], mem: GlobalMem) extends LocalMem
 
+  case class VectorIn(mem: GlobalMem) extends LocalMem
   case class InputReg(mem: CUMemory) extends LocalMem
   case class VectorLocal(x: Exp[Any], mem: CUMemory) extends LocalMem
   case class VectorOut(x: Exp[Any], mem: GlobalMem) extends LocalMem
@@ -147,7 +146,8 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
     case _ => true
   }
   def isWritable(mem: LocalMem) = mem match {
-    case _:ConstReg | _:CounterReg | _:ScalarIn | _:InputReg => false
+    case _:ConstReg | _:CounterReg | _:ScalarIn => false
+    case _:VectorIn | _:InputReg => false
     case _ => true
   }
 

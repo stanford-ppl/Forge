@@ -253,6 +253,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
 
     stms.foreach{case TP(lhs, rhs) => debug(s"  $lhs = $rhs")}
     debug(s"Prescheduling $pipe = $d")
+    cu.computePseudoStages = Nil // Clear stages so we don't duplicate existing stages
 
     foreachSymInBlock(func){
       // NOTE: Writers always appear to occur in the associated writer controller
@@ -299,13 +300,13 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     val localCompute = stages.filter{s => (isPrimitiveNode(s) || isRegisterRead(s) || isGlobal(s)) && !remoteStages.contains(s) }
 
     // Sanity check
-    val nonRegReads = localCompute.filterNot(isRegisterRead(_))
-    if (isOuterControl(pipe) && nonRegReads.nonEmpty) {
+    val trueComputation = localCompute.filterNot{case Exact(_) => true; case s => isRegisterRead(s)}
+    if (isOuterControl(pipe) && trueComputation.nonEmpty) {
       stageWarn(s"Outer control $pipe has compute stages: ")
-      nonRegReads.foreach{case lhs@Def(rhs) => stageWarn(s"  $lhs = $rhs")}
+      trueComputation.foreach{case lhs@Def(rhs) => stageWarn(s"  $lhs = $rhs")}
     }
 
-    cu.computePseudoStages = localCompute.map{s => DefStage(s, isReduce = reduceType(s).isDefined) }
+    cu.computePseudoStages ++= localCompute.map{s => DefStage(s, isReduce = reduceType(s).isDefined) }
   }
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
@@ -339,10 +340,10 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       val i = fresh[Index]
       cu.cchains += cc
       cu.addReg(i, CounterReg(cc, 0))
-      allocateWrittenSRAM(lhs, fifo, Some(i), cu, Nil)
+      //allocateWrittenSRAM(lhs, fifo, Some(i), cu, Nil)
 
       // HACK!! Fake a read addresss for the fifo
-      readersOf(fifo).foreach{case (ctrl,_,reader) =>
+      /*readersOf(fifo).foreach{case (ctrl,_,reader) =>
         val readerCU = allocateCU(ctrl)
         debug(s"HACK: Adding write and read address to $fifo for reader CU $readerCU")
 
@@ -353,8 +354,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
         val readMem = allocateMem(fifo, reader, readerCU)
         readMem.readAddr = Some(iter._2)
         readMem.writeAddr = readerCU.get(i)
-      }
-      // TODO: Add stages for offset calculation + offset output scalar write
+      }*/
       val memAddr = fresh[Index]
       cu.addReg(memAddr, ScalarOut(memAddr, cu.ctrl))
       val ofsCalc = OpStage(FixAdd, List(ofs, i), memAddr)
@@ -369,17 +369,16 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       val i = fresh[Index]
       cu.cchains += cc
       cu.addReg(i, CounterReg(cc, 0))
-      allocateReadSRAM(lhs, fifo, Some(i), cu)
-      // TODO: Add stages for offset calculation + offset output scalar write
+      //allocateReadSRAM(lhs, fifo, Some(i), cu)
       val memAddr = fresh[Index]
       cu.addReg(memAddr, ScalarOut(memAddr, cu.ctrl))
       val ofsCalc = OpStage(FixAdd, List(ofs, i), memAddr)
       cu.computePseudoStages ++= List(ofsCalc)
 
       // HACK: These are not correct - fix
-      val sram = allocateMem(fifo,lhs,cu)
-      sram.readAddr = cu.get(i)
-      sram.writeAddr = cu.get(i)
+      //val sram = allocateMem(fifo,lhs,cu)
+      //sram.readAddr = cu.get(i)
+      //sram.writeAddr = cu.get(i)
 
     case _ => super.traverse(lhs, rhs)
   }

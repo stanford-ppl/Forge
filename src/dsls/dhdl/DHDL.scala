@@ -248,7 +248,7 @@ trait DHDLDSL extends ForgeApplication
 
     val Unrolling = transformer("Unrolling", isExtern=true)
 
-    val DotIRPrinter = traversal("DotIRPrinter", isExtern=true)
+    val DotPrinter = traversal("DotIRPrinter", isExtern=true)
     val Printer = traversal("SpatialPrinter", isExtern=true)
     val NameAnalyzer = traversal("NameAnalyzer", isExtern=true)
 
@@ -259,22 +259,23 @@ trait DHDLDSL extends ForgeApplication
     importGlobalAnalysis()
     importBoundAnalysis()
 
-    // --- Pre-DSE analysis
-    schedule(NameAnalyzer)
-    schedule(LevelAnalyzer)         // Sanity checks and pipe style annotation fixes
+    schedule(NameAnalyzer)          // Symbol names
+    schedule(LevelAnalyzer)         // Initial sanity checks and pipe style annotation fixes
+    schedule(BoundAnalyzer)         //
+    schedule(ConstantFolding)       // Constant folding prior to DSE
     schedule(GlobalAnalyzer)        // Values computed outside of all controllers
+
+    // --- Unit Pipe Insertion
     schedule(UnitPipeTransformer)   // Wrap primitives in outer pipes
+    schedule(GlobalAnalyzer)        // Values computed outside of all controllers (TODO: Needed again?)
     schedule(Printer)
 
-    schedule(StageAnalyzer)         // Get number of stages in each control node
-    schedule(GlobalAnalyzer)        // Values computed outside of all controllers (TODO: Needed again?)
-    schedule(ControlSignalAnalyzer) // Variety of control signal related metadata
-
-    schedule(BoundAnalyzer)
+    // --- Pre-DSE analysis
     schedule(OffChipAnalyzer)       // Check dimensions of offchip memories
+    schedule(StageAnalyzer)         // Get number of stages in each control node
+    schedule(ControlSignalAnalyzer) // Variety of control signal related metadata (TODO: Needed here? Run by DSE)
     schedule(DHDLAffineAnalysis)    // Access patterns
-
-    schedule(DotIRPrinter)          // Graph prior to unrolling
+    schedule(DotPrinter)            // Graph prior to unrolling
 
     // --- Design Space Exploration
     schedule(DSE)                   // Design space exploration. Runs a host of other analyses:
@@ -313,7 +314,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(ReductionAnalyzer)     // Reduce/accumulator specialization
     schedule(Unrolling)             // Pipeline unrolling
     schedule(UnrolledControlAnalyzer) // Control signal metadata after unrolling
-    schedule(DotIRPrinter)          // Graph after unrolling
+    schedule(DotPrinter)             // Graph after unrolling
     schedule(Printer)
     schedule(PIRGen)
 

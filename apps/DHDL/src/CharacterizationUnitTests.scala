@@ -7,10 +7,10 @@ object CharLoadTest extends DHDLApplicationCompiler with CharLoad
 trait CharLoad extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
-  val innerPar = 16;
-  val outerPar = 4;
-  val dim0 = 1536;
-  val dim1 = 1536;
+  val innerPar = 1;
+  val outerPar = 1;
+  val dim0 = 384;
+  val dim1 = 384;
 
   def CharLoad(srcHost: Rep[Array[T]], iters: Rep[SInt]) = {
     val sinnerPar = param("innerPar", innerPar);

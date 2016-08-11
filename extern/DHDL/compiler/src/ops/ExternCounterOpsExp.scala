@@ -29,6 +29,7 @@ trait ExternCounterTypesExp extends ExternCounterTypes with BaseExp {
 trait ExternCounterOpsExp extends ExternCounterTypesExp with CounterOpsExp with CounterChainOpsExp with NodeMetadataOpsExp {
   this: DHDLExp =>
 
+
   // --- Nodes
   case class Counter_new(start: Rep[Idx], end: Rep[Idx], step: Rep[Idx], par: Param[Int])(implicit val ctx: SourceContext) extends Def[Counter]
   case class Counterchain_new(counters: List[Rep[Counter]])(implicit val ctx: SourceContext) extends Def[CounterChain]

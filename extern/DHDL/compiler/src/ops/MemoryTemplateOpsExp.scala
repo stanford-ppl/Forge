@@ -273,42 +273,39 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
   override def emitFileFooter() = {
     emit(s"""// rdone signals for BRAMs go here""")
     brams.foreach { b =>
-      val dups = duplicatesOf(b)
-      if (isDblBuf(b)) {
-        readersOf(b).foreach { r =>
-          val reader = r._1
-          emit(s"""${quote(b)}.connectRdone(${quote(reader)}_done);""")
-        }
-        if (writersOf(b).isEmpty) throw new Exception(s"Bram ${quote(b)} has no writer!")
-        val writer = writersOf(b).head._1
-        emit(s"""${quote(b)}.connectWdone(${quote(writer)}_done);""")
-          //  If writer is a unit Pipe, wait until parent is finished
-        //val doneSig = n.getWriter().getOrElse(throw new Exception(s"BRAM $n has no writer")) match {
-        //  case p: Pipe if p.isUnitPipe =>
-        //    var writer = p.getParent()
-        //    while (!(writer.isInstanceOf[Sequential] || writer.isInstanceOf[MetaPipeline])) {
-        //      writer = writer.getParent()
-        //    }
-        //    s"${quote(writer)}_done"
-        //  case _ =>
-        //    s"${quote(n.getWriter())}_done"
-        //}
-      } else {
-        dups.zipWithIndex.foreach { case (d, i) =>
-          if (d.depth > 1) {
-            readersOf(b).foreach { r =>
-              if (instanceIndexOf(r._3) == i) {
-                val reader = r._1
-                emit(s"""${quote(b)}_${i}.connectRdone(${quote(reader)}_done);""")
+      b match { // Only generate for non-bound syms
+        case Def(exist) => 
+          val dups = duplicatesOf(b)
+          dups.length match {
+            case 1 =>
+              if (isDblBuf(b)) {
+                readersOf(b).foreach { r =>
+                  val reader = r._1
+                  emit(s"""${quote(b)}.connectRdone(${quote(reader)}_done);""")
+                }
+                if (writersOf(b).isEmpty) throw new Exception(s"Bram ${quote(b)} has no writer!")
+                val writer = writersOf(b).head._1
+                emit(s"""${quote(b)}.connectWdone(${quote(writer)}_done);""")
               }
-            }
-            if (writersOf(b).isEmpty) throw new Exception(s"Bram ${quote(b)} has no writer!")
-            val writer = writersOf(b).head._1
-            emit(s"""${quote(b)}_${i}.connectWdone(${quote(writer)}_done);""")
+            case _ =>
+              dups.zipWithIndex.foreach { case (d, i) =>
+                if (d.depth > 1) {
+                  readersOf(b).foreach { r =>
+                    if (instanceIndexOf(r._3) == i) {
+                      val reader = r._1
+                      emit(s"""${quote(b)}_${i}.connectRdone(${quote(reader)}_done);""")
+                    }
+                  }
+                  if (writersOf(b).isEmpty) throw new Exception(s"Bram ${quote(b)} has no writer!")
+                  val writer = writersOf(b).head._1
+                  emit(s"""${quote(b)}_${i}.connectWdone(${quote(writer)}_done);""")
 
+                }
+              }
           }
-        }
+        case _ => //do nothing
       }
+ 
     }
     regs.foreach { case (b, i) =>
       val meminst = duplicatesOf(b)(i)
@@ -332,12 +329,12 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
     } else {
       val dups = duplicatesOf(bram)
       val r = readersOf(bram)
-      val find_id = r.map{case (_, _, s) => s}
-      val choose_from = r.map { 
-        case (_,_,a) => a
-      }
+      val choose_from = r.map { case (_,_,a) => a }
       val i = choose_from.indexOf(sym)
-      val b_i = instanceIndexOf(sym)
+      val b_i = dups.length match {
+        case 1 => 0
+        case _ => instanceIndexOf(sym)
+      }
 
       parIndicesOf(r(i)._3) match {
         case Nil => 
@@ -718,129 +715,101 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           case 2 => sizes(1) 
           case _ => 1
         }
-        if (isDblBuf(sym)) { // Assume only one reader if in this branch
-          //readers.foreach { r =>
-          //  if (!readerToMemMap.contains(r)) readerToMemMap += r -> Set[MemNode]()
-          //  readerToMemMap(r) += n
-          //}
-          //rdoneSet += n -> Set()
-
-          //emit(s"""// ${quote(sym)} has ${readersOf(sym).size} readers - ${readersOf(sym)}""")
-          val readers = duplicatesOf(sym)
-          val r = readers(0) 
-          val banks = {
-            val bnks = r.banking.map { a =>
-              a match {
-                case DiagonalBanking(_, banks) => banks
-                case StridedBanking(_, banks) => banks
-                case _ => 1
-                }}
-            r.banking.length match {
-              case 1 => bnks(0)
-              case 2 => bnks.mkString("new int[] {", ",", "}")
-              case _ => throw new Exception(s"Can't handle ${readers(0).banking.length}-D memory!")
+        val dups = duplicatesOf(sym)
+        dups.length match {
+          case 1 =>
+            val banks = {
+              val bnks = dups(0).banking.map { a =>
+                a match {
+                  case DiagonalBanking(_, banks) => banks
+                  case StridedBanking(_, banks) => banks
+                  case _ => 1
+                  }}
+              dups(0).banking.length match {
+                case 1 => bnks(0)
+                case 2 => bnks.mkString("new int[] {", ",", "}")
+                case _ => throw new Exception(s"Can't handle ${dups(0).banking.length}-D memory!")
+              }
             }
-          }
-          val strides = {
-            val strds = r.banking.map { a =>
-              a match {
-                case DiagonalBanking(strides, _) => throw new Exception(s"Can't handle Diagonal banking yet")
-                case StridedBanking(stride, _) => stride
-                case _ => 1
-                }}
-            r.banking.length match {
-              case 1 => strds(0)
-              case 2 => strds.mkString("new int[] {", ",", "}")
-              case _ => throw new Exception(s"Can't handle ${readers(0).banking.length}-D memory!")
+            val strides = {
+              val strds = dups(0).banking.map { a =>
+                a match {
+                  case DiagonalBanking(strides, _) => throw new Exception(s"Can't handle Diagonal banking yet")
+                  case StridedBanking(stride, _) => stride
+                  case _ => 1
+                  }}
+              dups(0).banking.length match {
+                case 1 => strds(0)
+                case 2 => strds.mkString("new int[] {", ",", "}")
+                case _ => throw new Exception(s"Can't handle ${dups(0).banking.length}-D memory!")
+              }
             }
-          }
-
-
-          emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_DblBufSM(this));""")
-          emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
-            ${quote(size0)}, ${quote(size1)}, $ts, ${banks}, ${strides}, ${readersOf(sym).size});""")
-        } else {
-          val readers = duplicatesOf(sym)
-          readers.length match {
-            case 1 =>
+            if (isDblBuf(sym)) { // TODO: Are these three actually mutually exclusive?
+              sym match {
+                case Def(rhs) => // not a bound
+                  emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_DblBufSM(this));""")
+                  emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
+                    ${quote(size0)}, ${quote(size1)}, $ts, ${banks}, ${strides}, ${readersOf(sym).size});""")
+                case _ => // bound, so map to its counterpart sm
+                  val m1s = fold_in_out_accums.map {case ((arg1,_)) => arg1}.toList
+                  val m2s = fold_in_out_accums.map {case ((_,arg2)) => arg2}.toList
+                  val remap_sm = if (m1s.indexOf(sym) >= 0) {
+                      m2s(m1s.indexOf(sym)) } else if (m2s.indexOf(sym) >= 0) {
+                      m1s(m2s.indexOf(sym)) } else {
+                      sym}  
+                  emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(remap_sm)}_DblBufSM(this));""")
+                  emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
+                    ${quote(size0)}, ${quote(size1)}, $ts, ${banks}, ${strides}, ${readersOf(sym).size});""")
+              }
+            } else if (isDummy(sym)) {
+              emit(s"""DummyMemLib ${quote(sym)} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""") 
+            } else {
+              emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, /*banks*/ ${banks}, /* stride */ ${strides});""") // [TODO] Raghu: Stride from metadata
+            }
+          case _ => // multiple readers
+            dups.zipWithIndex.foreach { case (r, i) =>
               val banks = {
-                val bnks = readers(0).banking.map { a =>
+                val bnks = r.banking.map { a =>
                   a match {
                     case DiagonalBanking(_, banks) => banks
                     case StridedBanking(_, banks) => banks
                     case _ => 1
                     }}
-                readers(0).banking.length match {
+                r.banking.length match {
                   case 1 => bnks(0)
                   case 2 => bnks.mkString("new int[] {", ",", "}")
-                  case _ => throw new Exception(s"Can't handle ${readers(0).banking.length}-D memory!")
+                  case _ => throw new Exception(s"Can't handle ${dups(0).banking.length}-D memory!")
                 }
               }
               val strides = {
-                val strds = readers(0).banking.map { a =>
+                val strds = r.banking.map { a =>
                   a match {
                     case DiagonalBanking(strides, _) => throw new Exception(s"Can't handle Diagonal banking yet")
                     case StridedBanking(stride, _) => stride
                     case _ => 1
                     }}
-                readers(0).banking.length match {
+                r.banking.length match {
                   case 1 => strds(0)
                   case 2 => strds.mkString("new int[] {", ",", "}")
-                  case _ => throw new Exception(s"Can't handle ${readers(0).banking.length}-D memory!")
+                  case _ => throw new Exception(s"Can't handle ${dups(0).banking.length}-D memory!")
                 }
               }
 
               if (isDummy(sym)) {
-                emit(s"""DummyMemLib ${quote(sym)} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""") 
+                emit(s"""DummyMemLib ${quote(sym)}_${i} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""") 
               } else {
-                emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, /*banks*/ ${banks}, /* stride */ ${strides});""") // [TODO] Raghu: Stride from metadata
-              }
-            case _ => // multiple readers
-              readers.zipWithIndex.foreach { case (r, i) =>
-                val banks = {
-                  val bnks = r.banking.map { a =>
-                    a match {
-                      case DiagonalBanking(_, banks) => banks
-                      case StridedBanking(_, banks) => banks
-                      case _ => 1
-                      }}
-                  r.banking.length match {
-                    case 1 => bnks(0)
-                    case 2 => bnks.mkString("new int[] {", ",", "}")
-                    case _ => throw new Exception(s"Can't handle ${readers(0).banking.length}-D memory!")
-                  }
-                }
-                val strides = {
-                  val strds = r.banking.map { a =>
-                    a match {
-                      case DiagonalBanking(strides, _) => throw new Exception(s"Can't handle Diagonal banking yet")
-                      case StridedBanking(stride, _) => stride
-                      case _ => 1
-                      }}
-                  r.banking.length match {
-                    case 1 => strds(0)
-                    case 2 => strds.mkString("new int[] {", ",", "}")
-                    case _ => throw new Exception(s"Can't handle ${readers(0).banking.length}-D memory!")
-                  }
-                }
+                if (r.depth == 1) {
+                  emit(s"""BramLib ${quote(sym)}_${i} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, /*banks*/ ${banks}, /* stride */ ${strides});""") // [TODO] Raghu: Stride from metadata
+                } else if (r.depth == 2) {
+                  val countlist = readersOf(sym)
+                  val numReaders_for_this_duplicate = countlist.map{q => q}.filter{ q => (instanceIndexOf(q._3) == i)}.length
 
-                if (isDummy(sym)) {
-                  emit(s"""DummyMemLib ${quote(sym)}_${i} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""") 
-                } else {
-                  if (r.depth == 1) {
-                    emit(s"""BramLib ${quote(sym)}_${i} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, /*banks*/ ${banks}, /* stride */ ${strides});""") // [TODO] Raghu: Stride from metadata
-                  } else if (r.depth == 2) {
-                    val countlist = readersOf(sym)
-                    val numReaders_for_this_duplicate = countlist.map{q => q}.filter{ q => (instanceIndexOf(q._3) == i)}.length
-
-                    emit(s"""SMIO ${quote(sym)}_${i}_sm = addStateMachine("${quote(sym)}_${i}_sm", new ${quote(sym)}_${i}_DblBufSM(this));""")
-                    emit(s"""DblBufKernelLib ${quote(sym)}_${i} = new DblBufKernelLib(this, ${quote(sym)}_${i}_sm,
-                      ${quote(size0)}, ${quote(size1)}, $ts, ${banks}, ${strides}, ${numReaders_for_this_duplicate});""")
-                  }
+                  emit(s"""SMIO ${quote(sym)}_${i}_sm = addStateMachine("${quote(sym)}_${i}_sm", new ${quote(sym)}_${i}_DblBufSM(this));""")
+                  emit(s"""DblBufKernelLib ${quote(sym)}_${i} = new DblBufKernelLib(this, ${quote(sym)}_${i}_sm,
+                    ${quote(size0)}, ${quote(size1)}, $ts, ${banks}, ${strides}, ${numReaders_for_this_duplicate});""")
                 }
               }
-
-          }
+            }
 
         }
         emitComment("} Bram_new")

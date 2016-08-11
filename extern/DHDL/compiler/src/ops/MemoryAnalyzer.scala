@@ -16,6 +16,8 @@ import dhdl.compiler.ops._
 trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with ControlSignalAnalysisExp {
   this: DHDLExp =>
 
+  var fold_in_out_accums: Set[(Exp[Any], Exp[Any])] = Set.empty // TODO: Put this in the right place in PipeTemplateOps.  Matt couldn't figure out how to mix in without errors....
+
   // TODO
   def isDblBuf(e: Exp[Any]) = duplicatesOf(e).headOption match {
     case Some(meminst) => meminst.depth == 2

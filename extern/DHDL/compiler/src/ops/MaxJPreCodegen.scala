@@ -67,7 +67,8 @@ trait MaxJPreCodegen extends Traversal  {
 			preGenNodes(sym,rhs)
 			super.traverseStm(stm)
 		}
-    case _ => super.traverseStm(stm)
+    case _ => 
+      super.traverseStm(stm)
 	}
 
   def preGenNodes(sym: Sym[Any], rhs: Def[Any]):Unit = rhs match {
@@ -93,6 +94,7 @@ trait MaxJPreCodegen extends Traversal  {
 			}
     case e@Pipe_fold(cchain, accum, zero, foldAccum, iFunc, ldFunc, stFunc, func, rFunc, inds, idx, acc, res, rV) =>
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
+
 				case CoarsePipe =>
 					withStream(newStream("metapipe_" + quote(sym))) {
     				emitMPSM(s"${quote(sym)}", childrenOf(sym).size)
@@ -116,6 +118,10 @@ trait MaxJPreCodegen extends Traversal  {
     				emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
 			}
+    case e@ParPipeReduce(cchain, accum, func, rFunc, inds, acc, rV) =>
+      fold_in_out_accums += ((accum, acc))
+
+
     case e@Unit_pipe(func) =>
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
 				case CoarsePipe =>
@@ -137,20 +143,23 @@ trait MaxJPreCodegen extends Traversal  {
 
     case e@EatReflect(Bram_new(size, zero)) =>
       val dups = duplicatesOf(sym)
-      if (isDblBuf(sym)) {
-          withStream(newStream("bram_" + quote(sym))) {
-            emitDblBufSM(quote(sym), readersOf(sym).length)
-          }
-      } else {
-        dups.zipWithIndex.foreach { case (d, i) =>
-          if (d.depth > 1) {
-            val readers = readersOf(sym)
-            val numReaders_for_this_duplicate = readers.map{r => r}.filter{ r => (instanceIndexOf(r._3) == i)}.length
-            withStream(newStream("bram_" + quote(sym) + "_" + i)) {
-              emitDblBufSM(quote(sym) + "_" + i, numReaders_for_this_duplicate)
+      dups.length match {
+        case 1 =>
+          if (isDblBuf(sym)) {
+              withStream(newStream("bram_" + quote(sym))) {
+                emitDblBufSM(quote(sym), readersOf(sym).length)
+              }
+            }
+        case _ =>
+          dups.zipWithIndex.foreach { case (d, i) =>
+            if (d.depth > 1) {
+              val readers = readersOf(sym)
+              val numReaders_for_this_duplicate = readers.map{r => r}.filter{ r => (instanceIndexOf(r._3) == i)}.length
+              withStream(newStream("bram_" + quote(sym) + "_" + i)) {
+                emitDblBufSM(quote(sym) + "_" + i, numReaders_for_this_duplicate)
+              }
             }
           }
-        }
       }
 
     case Reflect(s, u, effects) =>

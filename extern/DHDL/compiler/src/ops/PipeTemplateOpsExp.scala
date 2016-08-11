@@ -246,9 +246,11 @@ trait ScalaGenControllerTemplateOps extends ScalaGenEffect {
         emitValDef(res, quote(getBlockResult(rFunc)))
         emitBlock(stFunc)           // Write back to accumulator
       }
+
       emitValDef(sym, "()")
 
     case e@Accum_fold(ccOuter, ccInner, accum, zero, fA, iFunc, func, ldPart, ldFunc, rFunc, stFunc, indsOuter, indsInner, idx, part, acc, res, rV) =>
+
       emitValDef(acc, quote(accum)) // Assign bound accumulator to accum
       emitNestedLoop(indsOuter, ccOuter){
         emitBlock(func)
@@ -468,6 +470,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
       emitValDef(res, quote(getBlockResult(rFunc)))
       emitBlock(stFunc, s"${quote(sym)} Store")
       controlNodeStack.pop
+
 
 		case e@Pipe_parallel(func: Block[Unit]) =>
       controlNodeStack.push(sym)
@@ -697,6 +700,7 @@ trait MaxJGenControllerTemplateOps extends MaxJGenEffect with MaxJGenFat {
             val ctrEn = s"${quote(sym)}_datapath_en & ${quote(sym)}_redLoop_done"
             emit(s"""DFEVar ${quote(sym)}_ctr_en = $ctrEn;""")
             emitMaxJCounterChain(cchain, Some(ctrEn))
+
 
           case n:Pipe_fold[_,_] =>
 			      //TODO : what is this? seems like all reduce supported are specialized

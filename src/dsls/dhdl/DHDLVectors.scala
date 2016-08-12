@@ -19,6 +19,7 @@ trait DHDLVectors {
     internal (Vector) ("vector_create_from_list", T, SList(T) :: Vector(T)) implements composite ${
       val vec = vector_from_list($0)
       dimsOf(vec) = List($0.length.as[Index])
+      lenOf(vec) = $0.length
       vec
     }
 

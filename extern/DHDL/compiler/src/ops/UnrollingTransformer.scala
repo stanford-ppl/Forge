@@ -307,7 +307,14 @@ trait UnrollingTransformer extends MultiPassTransformer {
             val valids = validsMap.zip(validsLane).map{case (a,b) => a && b}  // Valid map index & valid reduce index
 
             val validLoads = if (zero.isDefined) {
-              loadsT.zip(valids).map{case (res,v) => mux(v,res,zero.get) }
+              loadsT.zip(valids).map{case (res,v) =>
+                /*val defaultValue = if (isVector(res.tp)) {
+                  vector_create_from_list(List.fill(dimsOf(res).head){zero.get})
+                }
+                else zero.get*/
+                val defaultValue = zero.get
+                mux(v,res,defaultValue) // TODO: Types...
+              }
             }
             else {
               stageError("Reduction without explicit zero is not yet supported")

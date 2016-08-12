@@ -321,7 +321,8 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
     super.emitFileFooter()
   }
 
-  def bramLoad(sym: Sym[Any], bram: Exp[BRAM[Any]], addr: Exp[Any], par: Boolean = false) {
+  def bramLoad(sym: Sym[Any], bram_in: Exp[BRAM[Any]], addr: Exp[Any], par: Boolean = false) {
+    val bram = if (fold_in_out_accums.contains(bram_in)) {fold_in_out_accums(bram_in)} else {bram_in}
     emitComment("Bram_load {")
     val bnd = bram match {
       case Def(rhs) => false
@@ -404,8 +405,8 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                                 }
                           }
 
-                emit(s"""DFEVector<DFEVar> ${quote(addr1(0))}_vectorized = new DFEVectorType<DFEVar>(${quote(bram)}.type, ${inds.length}).newInstance(this, Arrays.asList(${addr1.map(quote).mkString(",")}));""")
-                emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${quote(addr1(0))}_vectorized);""")
+                emit(s"""//DFEVector<DFEVar> ${quote(addr1(0))}_vectorized = new DFEVectorType<DFEVar>(${quote(bram)}.type, ${inds.length}).newInstance(this, Arrays.asList(${addr1.map(quote).mkString(",")}));""")
+                emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, new DFEVectorType<DFEVar>(${quote(bram)}.type, ${inds.length}).newInstance(this, Arrays.asList(${addr1.map(quote).mkString(",")})));""")
               }
             } else {
 
@@ -425,8 +426,8 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                                     quote(row(1))
                                   }
                             }
-                  emit(s"""DFEVector<DFEVar> ${quote(addr1(0))}_vectorized = new DFEVectorType<DFEVar>(${quote(bram)}_${b_i}.type, ${inds.length}).newInstance(this, Arrays.asList(${addr1.map(quote).mkString(",")}));""")
-                  emit(s"""${pre} ${quote(sym)} = ${quote(bram)}_${b_i}.connectRport(${quote(addr0)}, ${quote(addr1(0))}_vectorized);""")
+                  emit(s"""//DFEVector<DFEVar> ${quote(addr1(0))}_vectorized = new DFEVectorType<DFEVar>(${quote(bram)}_${b_i}.type, ${inds.length}).newInstance(this, Arrays.asList(${addr1.map(quote).mkString(",")}));""")
+                  emit(s"""${pre} ${quote(sym)} = ${quote(bram)}_${b_i}.connectRport(${quote(addr0)}, new DFEVectorType<DFEVar>(${quote(bram)}_${b_i}.type, ${inds.length}).newInstance(this, Arrays.asList(${addr1.map(quote).mkString(",")})));""")
                 }
             }
         case _ => throw new Exception(s"Can't generate this reader! $sym")
@@ -434,7 +435,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       }      
     }
 
-    brams += bram
+    brams += bram.asInstanceOf[Sym[BRAM[Any]]]
     // Handle if loading a composite type
     //n.compositeValues.zipWithIndex.map { t =>
     //  val v = t._1
@@ -445,8 +446,9 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
     emitComment("} Bram_load")
   }
 
-  def bramStore(sym: Sym[Any], bram: Exp[BRAM[Any]], addr: Exp[Any], value: Exp[Any]) {
+  def bramStore(sym: Sym[Any], bram_in: Exp[BRAM[Any]], addr: Exp[Any], value: Exp[Any]) {
     emitComment("Bram_store {")
+    val bram = if (fold_in_out_accums.contains(bram_in)) {fold_in_out_accums(bram_in)} else {bram_in}
     val dataStr = quote(value)
     val dups = duplicatesOf(bram)
 
@@ -524,12 +526,14 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                 addr0 = quote(row) // Assume all are from same row?
                 quote(col)
             }
-            emit(s"""DFEVector<DFEVar> ${addr1(0)}_vectorized = new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")}));""")
+            emit(s"""//DFEVector<DFEVar> ${addr1(0)}_vectorized = new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")}));""")
             if (dups.length == 1) {
-              emit(s"""${quote(bram)}.connectWport(${addr0}, ${addr1(0)}_vectorized, ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */, $i); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+              emit(s"""${quote(bram)}.connectWport(${addr0}, new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")})), 
+              ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */, $i); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
             } else {
               dups.zipWithIndex.foreach {case (dd, ii) => 
-                emit(s"""${quote(bram)}_${ii}.connectWport(${addr0}, ${addr1(0)}_vectorized, ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */, $i); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+                emit(s"""${quote(bram)}_${ii}.connectWport(${addr0}, new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")})), 
+                ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */, $i); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
               }
             }
         }
@@ -703,118 +707,108 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 
     case Bram_new(size, zero) =>
       withStream(baseStream) {
-        emitComment("Bram_new {")
-        val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
-        //TODO: does templete assume bram has 2 dimension?
-        val dims = dimsOf(sym)
-        val Def(d0) = dims(0)
-        val sizes = dims.map { case dim => 
-          bound(dim).get.toInt
-        }
-        val size0 = sizes(0) 
-        val size1 = sizes.size match {
-          case 1 => 1
-          case 2 => sizes(1) 
-          case _ => 1
-        }
-        val dups = duplicatesOf(sym)
-        dups.length match {
-          case 1 =>
-            val banks = {
-              val bnks = dups(0).banking.map { a =>
-                a match {
-                  case DiagonalBanking(_, banks) => banks
-                  case StridedBanking(_, banks) => banks
-                  case _ => 1
-                  }}
-              dups(0).banking.length match {
-                case 1 => bnks(0)
-                case 2 => bnks.mkString("new int[] {", ",", "}")
-                case _ => throw new Exception(s"Can't handle ${dups(0).banking.length}-D memory!")
-              }
-            }
-            val strides = {
-              val strds = dups(0).banking.map { a =>
-                a match {
-                  case DiagonalBanking(strides, _) => throw new Exception(s"Can't handle Diagonal banking yet")
-                  case StridedBanking(stride, _) => stride
-                  case _ => 1
-                  }}
-              dups(0).banking.length match {
-                case 1 => strds(0)
-                case 2 => strds.mkString("new int[] {", ",", "}")
-                case _ => throw new Exception(s"Can't handle ${dups(0).banking.length}-D memory!")
-              }
-            }
-            if (isDblBuf(sym)) { // TODO: Are these three actually mutually exclusive?
-              sym match {
-                case Def(rhs) => // not a bound
-                  emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_DblBufSM(this));""")
-                  emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
-                    ${quote(size0)}, ${quote(size1)}, $ts, ${banks}, ${strides}, ${readersOf(sym).size});""")
-                case _ => // bound, so map to its counterpart sm
-                  val m1s = fold_in_out_accums.map {case ((arg1,_)) => arg1}.toList
-                  val m2s = fold_in_out_accums.map {case ((_,arg2)) => arg2}.toList
-                  val remap_sm = if (m1s.indexOf(sym) >= 0) {
-                      m2s(m1s.indexOf(sym)) } else if (m2s.indexOf(sym) >= 0) {
-                      m1s(m2s.indexOf(sym)) } else {
-                      sym}  
-                  emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(remap_sm)}_DblBufSM(this));""")
-                  emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
-                    ${quote(size0)}, ${quote(size1)}, $ts, ${banks}, ${strides}, ${readersOf(sym).size});""")
-              }
-            } else if (isDummy(sym)) {
-              emit(s"""DummyMemLib ${quote(sym)} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""") 
-            } else {
-              emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, /*banks*/ ${banks}, /* stride */ ${strides});""") // [TODO] Raghu: Stride from metadata
-            }
-          case _ => // multiple readers
-            dups.zipWithIndex.foreach { case (r, i) =>
+        Console.println(s"hashmap $fold_in_out_accums contains $sym? ${fold_in_out_accums.contains(sym)}\n")
+        if (!fold_in_out_accums.contains(sym)) { // Only emit for non-bound syms
+          emitComment("Bram_new {")
+          val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
+          //TODO: does templete assume bram has 2 dimension?
+          val dims = dimsOf(sym)
+          val Def(d0) = dims(0)
+          val sizes = dims.map { case dim => 
+            bound(dim).get.toInt
+          }
+          val size0 = sizes(0) 
+          val size1 = sizes.size match {
+            case 1 => 1
+            case 2 => sizes(1) 
+            case _ => 1
+          }
+          val dups = duplicatesOf(sym)
+          dups.length match {
+            case 1 =>
               val banks = {
-                val bnks = r.banking.map { a =>
+                val bnks = dups(0).banking.map { a =>
                   a match {
                     case DiagonalBanking(_, banks) => banks
                     case StridedBanking(_, banks) => banks
                     case _ => 1
                     }}
-                r.banking.length match {
+                dups(0).banking.length match {
                   case 1 => bnks(0)
                   case 2 => bnks.mkString("new int[] {", ",", "}")
                   case _ => throw new Exception(s"Can't handle ${dups(0).banking.length}-D memory!")
                 }
               }
               val strides = {
-                val strds = r.banking.map { a =>
+                val strds = dups(0).banking.map { a =>
                   a match {
                     case DiagonalBanking(strides, _) => throw new Exception(s"Can't handle Diagonal banking yet")
                     case StridedBanking(stride, _) => stride
                     case _ => 1
                     }}
-                r.banking.length match {
+                dups(0).banking.length match {
                   case 1 => strds(0)
                   case 2 => strds.mkString("new int[] {", ",", "}")
                   case _ => throw new Exception(s"Can't handle ${dups(0).banking.length}-D memory!")
                 }
               }
-
-              if (isDummy(sym)) {
-                emit(s"""DummyMemLib ${quote(sym)}_${i} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""") 
+              if (isDblBuf(sym)) { // TODO: Are these three actually mutually exclusive?
+                    emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(sym)}_DblBufSM(this));""")
+                    emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
+                      ${quote(size0)}, ${quote(size1)}, $ts, ${banks}, ${strides}, ${readersOf(sym).size});""")
+              } else if (isDummy(sym)) {
+                emit(s"""DummyMemLib ${quote(sym)} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""") 
               } else {
-                if (r.depth == 1) {
-                  emit(s"""BramLib ${quote(sym)}_${i} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, /*banks*/ ${banks}, /* stride */ ${strides});""") // [TODO] Raghu: Stride from metadata
-                } else if (r.depth == 2) {
-                  val countlist = readersOf(sym)
-                  val numReaders_for_this_duplicate = countlist.map{q => q}.filter{ q => (instanceIndexOf(q._3) == i)}.length
+                emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, /*banks*/ ${banks}, /* stride */ ${strides});""") // [TODO] Raghu: Stride from metadata
+              }
+            case _ => // multiple readers
+              dups.zipWithIndex.foreach { case (r, i) =>
+                val banks = {
+                  val bnks = r.banking.map { a =>
+                    a match {
+                      case DiagonalBanking(_, banks) => banks
+                      case StridedBanking(_, banks) => banks
+                      case _ => 1
+                      }}
+                  r.banking.length match {
+                    case 1 => bnks(0)
+                    case 2 => bnks.mkString("new int[] {", ",", "}")
+                    case _ => throw new Exception(s"Can't handle ${dups(0).banking.length}-D memory!")
+                  }
+                }
+                val strides = {
+                  val strds = r.banking.map { a =>
+                    a match {
+                      case DiagonalBanking(strides, _) => throw new Exception(s"Can't handle Diagonal banking yet")
+                      case StridedBanking(stride, _) => stride
+                      case _ => 1
+                      }}
+                  r.banking.length match {
+                    case 1 => strds(0)
+                    case 2 => strds.mkString("new int[] {", ",", "}")
+                    case _ => throw new Exception(s"Can't handle ${dups(0).banking.length}-D memory!")
+                  }
+                }
 
-                  emit(s"""SMIO ${quote(sym)}_${i}_sm = addStateMachine("${quote(sym)}_${i}_sm", new ${quote(sym)}_${i}_DblBufSM(this));""")
-                  emit(s"""DblBufKernelLib ${quote(sym)}_${i} = new DblBufKernelLib(this, ${quote(sym)}_${i}_sm,
-                    ${quote(size0)}, ${quote(size1)}, $ts, ${banks}, ${strides}, ${numReaders_for_this_duplicate});""")
+                if (isDummy(sym)) {
+                  emit(s"""DummyMemLib ${quote(sym)}_${i} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""") 
+                } else {
+                  if (r.depth == 1) {
+                    emit(s"""BramLib ${quote(sym)}_${i} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, /*banks*/ ${banks}, /* stride */ ${strides});""") // [TODO] Raghu: Stride from metadata
+                  } else if (r.depth == 2) {
+                    val countlist = readersOf(sym)
+                    val numReaders_for_this_duplicate = countlist.map{q => q}.filter{ q => (instanceIndexOf(q._3) == i)}.length
+
+                    emit(s"""SMIO ${quote(sym)}_${i}_sm = addStateMachine("${quote(sym)}_${i}_sm", new ${quote(sym)}_${i}_DblBufSM(this));""")
+                    emit(s"""DblBufKernelLib ${quote(sym)}_${i} = new DblBufKernelLib(this, ${quote(sym)}_${i}_sm,
+                      ${quote(size0)}, ${quote(size1)}, $ts, ${banks}, ${strides}, ${numReaders_for_this_duplicate});""")
+                  }
                 }
               }
-            }
 
+          }
+          emitComment("} Bram_new")
         }
-        emitComment("} Bram_new")
       }
 
     case Bram_load(bram, addr) =>

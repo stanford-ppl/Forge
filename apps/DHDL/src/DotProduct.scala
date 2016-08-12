@@ -10,7 +10,7 @@ trait DotProduct extends DHDLApplication {
   type Array[T] = ForgeArray[T]
 
   def dotproduct(a: Rep[Array[T]], b: Rep[Array[T]]) = {
-    val B = param(4); domainOf(B) = (96, 19200, 96)
+    val B = param(96); domainOf(B) = (96, 19200, 96)
     val P1 = param(1); domainOf(P1) = (1, 6, 1)
     val P2 = param(1); domainOf(P2) = (1, 192, 1)
     val P3 = param(1); domainOf(P3) = (1, 192, 1)
@@ -26,7 +26,8 @@ trait DotProduct extends DHDLApplication {
     setMem(v2, b)
 
     Accel {
-      Fold(N by B par P1)(out, 0.as[T]){ i =>
+      val acc = Reg[T]
+      Fold(N by B par P1)(acc, 0.as[T]){ i =>
         val b1 = FIFO[T](512)
         val b2 = FIFO[T](512)
         Parallel {
@@ -37,6 +38,7 @@ trait DotProduct extends DHDLApplication {
           b1.pop() * b2.pop()
         }{_+_}
       }{_+_}
+      Pipe {out := acc}
     }
     getArg(out)
   }

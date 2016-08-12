@@ -9,10 +9,10 @@ trait TPCHQ6 extends DHDLApplication {
 
   val MIN_DATE = 64
   val MAX_DATE = 80
+  val nn = 192
 
   def tpchq6(datesIn: Rep[Array[UInt]], quantsIn: Rep[Array[UInt]], disctsIn: Rep[Array[Flt]], pricesIn: Rep[Array[Flt]]): Rep[Flt] = {
-    val N = datesIn.length
-    bound(N) = 18720000
+    val N = nn
 
     val dates  = OffChipMem[UInt](N)
     val quants = OffChipMem[UInt](N)
@@ -23,7 +23,7 @@ trait TPCHQ6 extends DHDLApplication {
     val maxDateIn = ArgIn[UInt]
     val out = ArgOut[Flt]
 
-    val tileSize = param(12);   domainOf(tileSize) = (96,192000,96)
+    val tileSize = param(96);   domainOf(tileSize) = (96,192000,96)
     val outerPar = param(2);    domainOf(outerPar) = (1,6,1)
     val innerPar = param(2);    domainOf(innerPar) = (1,384,1)
 
@@ -39,7 +39,8 @@ trait TPCHQ6 extends DHDLApplication {
       val minDate = minDateIn.value
       val maxDate = maxDateIn.value
 
-      Fold(dataSize by tileSize par outerPar)(out, 0.as[Flt]){ i =>
+      val acc = Reg[Flt]
+      Fold(dataSize by tileSize par outerPar)(acc, 0.as[Flt]){ i =>
         val datesTile  = BRAM[UInt](tileSize)
         val quantsTile = BRAM[UInt](tileSize)
         val disctsTile = BRAM[Flt](tileSize)
@@ -59,12 +60,13 @@ trait TPCHQ6 extends DHDLApplication {
           mux(valid, price * disct, 0.0f)
         }{_+_}
       }{_+_}
+      Pipe {out := acc}
     }
     getArg(out)
   }
 
   def main() {
-    val N = args(0).to[SInt]
+    val N = nn
 
     val dates  = Array.fill(N){random[UInt](20) + 65}
     val quants = Array.fill(N){random[UInt](25) }

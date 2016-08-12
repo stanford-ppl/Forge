@@ -241,7 +241,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
   val IR: LoweredPipeOpsExp with ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
           with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
           with ExternPrimitiveOpsExp with DHDLCodegenOps with NosynthOpsExp with MemoryAnalysisExp with FIFOOpsExp with VectorOpsExp
-          with DeliteTransform 
+          with DeliteTransform
   import IR.{println=>_,_}
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
@@ -274,7 +274,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
     emit(s"""// rdone signals for BRAMs go here""")
     brams.foreach { b =>
       b match { // Only generate for non-bound syms
-        case Def(exist) => 
+        case Def(exist) =>
           val dups = duplicatesOf(b)
           dups.length match {
             case 1 =>
@@ -291,7 +291,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
               dups.zipWithIndex.foreach { case (d, i) =>
                 if (d.depth > 1) {
                   readersOf(b).foreach { r =>
-                    if (instanceIndexOf(r._3) == i) {
+                    if (instanceIndexOf(r._3, b) == i) {
                       val reader = r._1
                       emit(s"""${quote(b)}_${i}.connectRdone(${quote(reader)}_done);""")
                     }
@@ -305,7 +305,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           }
         case _ => //do nothing
       }
- 
+
     }
     regs.foreach { case (b, i) =>
       val meminst = duplicatesOf(b)(i)
@@ -327,7 +327,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       case Def(rhs) => false
       case _ => true
     }
-    Console.println(s"cg: generating reader $sym on bram ${bram}x${duplicatesOf(bram).length}(bound ${bnd}) inst ${instanceIndexOf(sym)}")
+    Console.println(s"cg: generating reader $sym on bram ${bram}x${duplicatesOf(bram).length}(bound ${bnd}) inst ${instanceIndexOf(sym, bram)}")
     if (isDummy(bram)) {
       val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
       emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
@@ -336,10 +336,10 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       val r = readersOf(bram)
       val choose_from = r.map { case (_,_,a) => a }
       val i = choose_from.indexOf(sym)
-      val b_i = instanceIndexOf(sym)
+      val b_i = instanceIndexOf(sym, bram)
 
       parIndicesOf(r(i)._3) match {
-        case Nil => 
+        case Nil =>
           val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
           val inds = accessIndicesOf(r(i)._3)
           inds.length match {
@@ -347,11 +347,11 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
               val addr0 = inds(0)
               addr0 match {
                 case Def(rhs0) =>
-                  if (!emitted_consts.contains((addr0, rhs0))) { 
+                  if (!emitted_consts.contains((addr0, rhs0))) {
                     emitted_consts += ((addr0, rhs0))
                   }
                 case _ =>
-              }                  
+              }
 
               if (dups.length == 1) {
                 emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
@@ -363,14 +363,14 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
               val addr1 = inds(1)
               addr0 match {
                 case Def(rhs0) =>
-                  if (!emitted_consts.contains((addr0, rhs0))) { 
+                  if (!emitted_consts.contains((addr0, rhs0))) {
                     emitted_consts += ((addr0, rhs0))
                   }
                 case _ =>
               }
               addr1 match {
-                case Def(rhs1) => 
-                  if (!emitted_consts.contains((addr1, rhs1))) { 
+                case Def(rhs1) =>
+                  if (!emitted_consts.contains((addr1, rhs1))) {
                     emitted_consts += ((addr1, rhs1))
                   }
                 case _ =>
@@ -378,12 +378,12 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
               if (dups.length == 1) {
                 emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${quote(addr1)});""")
               } else {
-                emit(s"""${pre} ${quote(sym)} = ${quote(bram)}_${b_i}.connectRport(${quote(addr0)}, ${quote(addr1)});""")                
+                emit(s"""${pre} ${quote(sym)} = ${quote(bram)}_${b_i}.connectRport(${quote(addr0)}, ${quote(addr1)});""")
               }
 
             case _ => throw new Exception("Can't codegen!")
           }
-        case _ => 
+        case _ =>
           val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
           val inds = parIndicesOf(r(i)._3)
           if (dups.length == 1) {
@@ -393,7 +393,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                 emit(s"""DFEVector<DFEVar> ${quote(sym)} = new DFEVectorType<DFEVar>(${quote(bram)}.type, 1).newInstance(this, Arrays.asList(${quote(bram)}.connectRport(${quote(addr0)})));""")
               case _ =>
                 var addr0 = ""
-                val addr1 = inds.map { row => 
+                val addr1 = inds.map { row =>
                               row.length match {
                                 case 1 =>
                                   addr0 = quote(1) // Assume all are from same row?
@@ -415,7 +415,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                   emit(s"""DFEVector<DFEVar> ${quote(sym)} = new DFEVectorType<DFEVar>(${quote(bram)}_${b_i}.type, 1).newInstance(this, Arrays.asList(${quote(bram)}_${b_i}.connectRport(${quote(addr0)})));""")
                 case _ =>
                   var addr0 = ""
-                  val addr1 = inds.map { row => 
+                  val addr1 = inds.map { row =>
                                 row.length match {
                                   case 1 =>
                                     addr0 = quote(1) // Assume all are from same row?
@@ -431,7 +431,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
             }
         case _ => throw new Exception(s"Can't generate this reader! $sym")
 
-      }      
+      }
     }
 
     brams += bram
@@ -470,7 +470,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           emit(s"""${quote(bram)}.connectWport(stream.offset(${quote(addr)}, -$offsetStr),
             stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr)); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
         } else {
-          val choose_from = writers.map { 
+          val choose_from = writers.map {
             case (_,_,a) => a
           }
           val bank_num = choose_from.indexOf(sym)
@@ -484,7 +484,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
               stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr)); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
           }
         } else {
-          val choose_from = writers.map { 
+          val choose_from = writers.map {
             case (_,_,a) => a
           }
           val bank_num = choose_from.indexOf(sym)
@@ -503,10 +503,10 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       val inds = parIndicesOf(w(i)._3)
       val this_writer = w(i)._1
       if (isDummy(bram)) {
-        emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(this_writer)}_datapath_en);""") 
+        emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(this_writer)}_datapath_en);""")
       } else {
 
-        w.length match { 
+        w.length match {
           case 0 =>
             throw new Exception("No writers?!")
           case 1 =>
@@ -519,8 +519,8 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
             }
           case _ =>
             var addr0 = ""
-            val addr1 = inds.map { 
-              case List(row, col) => 
+            val addr1 = inds.map {
+              case List(row, col) =>
                 addr0 = quote(row) // Assume all are from same row?
                 quote(col)
             }
@@ -528,7 +528,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
             if (dups.length == 1) {
               emit(s"""${quote(bram)}.connectWport(${addr0}, ${addr1(0)}_vectorized, ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */, $i); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
             } else {
-              dups.zipWithIndex.foreach {case (dd, ii) => 
+              dups.zipWithIndex.foreach {case (dd, ii) =>
                 emit(s"""${quote(bram)}_${ii}.connectWport(${addr0}, ${addr1(0)}_vectorized, ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */, $i); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
               }
             }
@@ -708,13 +708,13 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
         //TODO: does templete assume bram has 2 dimension?
         val dims = dimsOf(sym)
         val Def(d0) = dims(0)
-        val sizes = dims.map { case dim => 
+        val sizes = dims.map { case dim =>
           bound(dim).get.toInt
         }
-        val size0 = sizes(0) 
+        val size0 = sizes(0)
         val size1 = sizes.size match {
           case 1 => 1
-          case 2 => sizes(1) 
+          case 2 => sizes(1)
           case _ => 1
         }
         val dups = duplicatesOf(sym)
@@ -758,13 +758,13 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                   val remap_sm = if (m1s.indexOf(sym) >= 0) {
                       m2s(m1s.indexOf(sym)) } else if (m2s.indexOf(sym) >= 0) {
                       m1s(m2s.indexOf(sym)) } else {
-                      sym}  
+                      sym}
                   emit(s"""SMIO ${quote(sym)}_sm = addStateMachine("${quote(sym)}_sm", new ${quote(remap_sm)}_DblBufSM(this));""")
                   emit(s"""DblBufKernelLib ${quote(sym)} = new DblBufKernelLib(this, ${quote(sym)}_sm,
                     ${quote(size0)}, ${quote(size1)}, $ts, ${banks}, ${strides}, ${readersOf(sym).size});""")
               }
             } else if (isDummy(sym)) {
-              emit(s"""DummyMemLib ${quote(sym)} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""") 
+              emit(s"""DummyMemLib ${quote(sym)} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""")
             } else {
               emit(s"""BramLib ${quote(sym)} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, /*banks*/ ${banks}, /* stride */ ${strides});""") // [TODO] Raghu: Stride from metadata
             }
@@ -798,13 +798,13 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
               }
 
               if (isDummy(sym)) {
-                emit(s"""DummyMemLib ${quote(sym)}_${i} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""") 
+                emit(s"""DummyMemLib ${quote(sym)}_${i} = new DummyMemLib(this, ${ts}, ${banks}); //dummymem""")
               } else {
                 if (r.depth == 1) {
                   emit(s"""BramLib ${quote(sym)}_${i} = new BramLib(this, ${quote(size0)}, ${quote(size1)}, ${ts}, /*banks*/ ${banks}, /* stride */ ${strides});""") // [TODO] Raghu: Stride from metadata
                 } else if (r.depth == 2) {
                   val countlist = readersOf(sym)
-                  val numReaders_for_this_duplicate = countlist.map{q => q}.filter{ q => (instanceIndexOf(q._3) == i)}.length
+                  val numReaders_for_this_duplicate = countlist.map{q => q}.filter{ q => (instanceIndexOf(q._3, sym) == i)}.length
 
                   emit(s"""SMIO ${quote(sym)}_${i}_sm = addStateMachine("${quote(sym)}_${i}_sm", new ${quote(sym)}_${i}_DblBufSM(this));""")
                   emit(s"""DblBufKernelLib ${quote(sym)}_${i} = new DblBufKernelLib(this, ${quote(sym)}_${i}_sm,

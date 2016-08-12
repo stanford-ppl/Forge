@@ -52,6 +52,34 @@ trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with ControlSignalAnalysis
     def update(e: Exp[Any], m: List[MemInstance]) { setMetadata(e, MemDuplicates(m)) }
     def apply(e: Exp[Any]) = meta[MemDuplicates](e).map(_.insts).getOrElse(Nil)
   }
+
+
+  /**
+    Metadata for determining which memory instance a reader should correspond to.
+    Needed to preserve mapping after unrolling
+  */
+  case class MemInstanceIndex(mapping: Map[Exp[Any], Int]) extends Metadata
+
+  object instanceIndexOf {
+    def update(reader: Exp[Any], mem: Exp[Any], idx: Int) = instanceIndexOf.get(reader) match {
+      case Some(map) =>
+          val newMap = map.filterKeys(_ != mem) + (mem -> idx)
+          setMetadata(reader, MemInstanceIndex(newMap))
+      case None => setMetadata(reader, MemInstanceIndex(Map(mem -> idx)))
+    }
+    def get(reader: Exp[Any]) = meta[MemInstanceIndex](reader).map(_.mapping)
+    def get(reader: Exp[Any], mem: Exp[Any]) = meta[MemInstanceIndex](reader).flatMap(_.mapping.get(mem))
+
+    def apply(reader: Exp[Any], mem: Exp[Any]) = meta[MemInstanceIndex](reader).get.mapping.apply(mem)
+  }
+
+  override def mirror[T<:Metadata](m: T, f: Transformer): T = m match {
+    case MemInstanceIndex(map) =>
+      MemInstanceIndex(map.map{case (mem,idx) => f(mem) -> idx }).asInstanceOf[T]
+
+    case _ => super.mirror(m,f)
+  }
+
 }
 
 // Technically doesn't need a real traversal, but nice to have debugging, etc.
@@ -111,8 +139,8 @@ trait BankingBase extends Traversal {
   }
 
   // TODO: How to express "tapped" block FIFO? What information is needed here?
-  def coalesceDuplicates(reads: List[Exp[Any]], insts: List[MemInstance]) = {
-    reads.zipWithIndex.foreach{case (read, idx) => instanceIndexOf(read) = idx }
+  def coalesceDuplicates(mem: Exp[Any], reads: List[Exp[Any]], insts: List[MemInstance]) = {
+    reads.zipWithIndex.foreach{case (read, idx) => instanceIndexOf(read, mem) = idx }
     insts
   }
 
@@ -283,19 +311,19 @@ trait BRAMBanking extends BankingBase {
       case (None, Nil) => Nil
       case (Some(write), Nil) => List(unpairedAccess(mem, write))
       case (None, reads) =>
-        val unallocatedReads = reads.filter{read => !instanceIndexOf.get(read._3).isDefined }
+        val unallocatedReads = reads.filter{read => !memoryIndexOf.get(read._3).isDefined }
         // What to do here? No writer, so current version will always read garbage...
         val dups = unallocatedReads.map(read => unpairedAccess(mem, read))
-        coalesceDuplicates(unallocatedReads.map(_._3), dups)
+        coalesceDuplicates(mem, unallocatedReads.map(_._3), dups)
       case (Some(write), reads) =>
         val allocatedReads = reads.filter{read => memoryIndexOf.get(read._3).isDefined }
         val unallocatedReads = reads.filter{read => !memoryIndexOf.get(read._3).isDefined }
         val allocReads = allocatedReads.map{read => s"$read (${memoryIndexOf(read._3)})"}
         debug(s"Write: $write, Reads: $unallocatedReads")
         debug(s"(Leaving out preallocated reads $allocReads)")
-        allocatedReads.foreach{read => instanceIndexOf(read._3) = memoryIndexOf(read._3) }
+        allocatedReads.foreach{read => instanceIndexOf(read._3, mem) = memoryIndexOf(read._3) }
         val dups = unallocatedReads.map(read => pairedAccess(mem, write, read))
-        coalesceDuplicates(unallocatedReads.map(_._3), dups)
+        coalesceDuplicates(mem, unallocatedReads.map(_._3), dups)
     }
   } else super.bank(mem)
 }
@@ -311,7 +339,7 @@ trait RegisterBanking extends BankingBase {
       case (Some(write), reads) =>
         debug(s"Write: $write, Reads: $reads")
         val dups = reads.map{read => MemInstance(1 + distanceBetween( (write._1,write._2), (read._1,read._2) ), 1, List(NoBanking)) }
-        coalesceDuplicates(reads.map(_._3), dups)
+        coalesceDuplicates(mem, reads.map(_._3), dups)
     }
   } else super.bank(mem)
 }
@@ -328,12 +356,12 @@ trait FIFOBanking extends BankingBase {
       case (None,None)         => Nil
       case (Some(write), None) => List(MemInstance(1, 1, List(StridedBanking(1, accessPar(mem,write._3))) ))
       case (None, Some(read)) =>
-        instanceIndexOf(read._3) = 0
+        instanceIndexOf(read._3, mem) = 0
         List(MemInstance(1, 1, List(StridedBanking(1, accessPar(mem,read._3))) ))
       case (Some(write),Some(read)) =>
         debug(s"Write: $write, Read: $read")
         val banks = Math.max(accessPar(mem,write._3), accessPar(mem,read._3))
-        instanceIndexOf(read._3) = 0
+        instanceIndexOf(read._3, mem) = 0
         List(MemInstance(1, 1, List(StridedBanking(1, banks)) ))
     }
   } else super.bank(mem)

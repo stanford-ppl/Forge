@@ -124,7 +124,7 @@ trait PIRGen extends Traversal with PIRCommon {
 
   def cuDeclaration(cu: ComputeUnit) = {
     val parent = cu.parent.map(_.name).getOrElse("top")
-    val deps = cu.deps.map{dep => cus(dep).name }
+    val deps = cu.deps.map{dep => dep.name }
     cu match {
       case cu: BasicComputeUnit if cu.isUnitCompute =>
         s"""UnitComputeUnit(name = Some("${cu.name}"), parent=$parent, deps=$deps)"""
@@ -177,7 +177,7 @@ trait PIRGen extends Traversal with PIRCommon {
       }
       sram.writeAddr match {
         case Some(_:CounterReg | _:ConstReg) => decl += s""", writeAddr = ${quote(sram.writeAddr.get)})"""
-        case Some(_:WriteAddrWire) =>
+        case Some(_:WriteAddrWire | _:LocalWriteReg) =>
         case addr => throw new Exception(s"Disallowed memory write address in $sram: $addr")
       }
       emit(decl + ")")

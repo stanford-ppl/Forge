@@ -16,15 +16,15 @@ trait OuterProduct extends DHDLApplication {
     val M = a.length;  bound(M) = 38400
     val N = b.length;  bound(N) = 38400
 
-    val vec1 = OffChipMem[T](M)
-    val vec2 = OffChipMem[T](N)
-    val out = OffChipMem[T](M, N)
     val sizeA = ArgIn[SInt]
     val sizeB = ArgIn[SInt]
-
-    // Transfer data and start accelerator
     setArg(sizeA, M)
     setArg(sizeB, N)
+
+    val vec1 = OffChipMem[T](sizeA)
+    val vec2 = OffChipMem[T](sizeB)
+    val out = OffChipMem[T](sizeA, sizeB)
+
     setMem(vec1, a)
     setMem(vec2, b)
 

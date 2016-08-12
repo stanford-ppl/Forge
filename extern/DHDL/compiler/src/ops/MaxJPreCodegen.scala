@@ -145,6 +145,7 @@ trait MaxJPreCodegen extends Traversal  {
       val dups = duplicatesOf(sym)
       dups.length match {
         case 1 =>
+          Console.println(s"${sym} has readers ${readersOf(sym)}")
           if (isDblBuf(sym)) {
               withStream(newStream("bram_" + quote(sym))) {
                 emitDblBufSM(quote(sym), readersOf(sym).length)
@@ -152,8 +153,10 @@ trait MaxJPreCodegen extends Traversal  {
             }
         case _ =>
           dups.zipWithIndex.foreach { case (d, i) =>
+            val readers = readersOf(sym)
+            Console.println(s"precg: ${sym}:${d} has readers ${readersOf(sym)} but only touched by ${readers.map{r => r}.filter{ r => (instanceIndexOf(r._3) == i)}} ")
+            readers.foreach {r => Console.println(s"instIndOf each rdr: ${instanceIndexOf(r._3)}")}
             if (d.depth > 1) {
-              val readers = readersOf(sym)
               val numReaders_for_this_duplicate = readers.map{r => r}.filter{ r => (instanceIndexOf(r._3) == i)}.length
               withStream(newStream("bram_" + quote(sym) + "_" + i)) {
                 emitDblBufSM(quote(sym) + "_" + i, numReaders_for_this_duplicate)

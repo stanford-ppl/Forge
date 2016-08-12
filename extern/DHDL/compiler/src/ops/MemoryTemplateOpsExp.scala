@@ -323,6 +323,11 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 
   def bramLoad(sym: Sym[Any], bram: Exp[BRAM[Any]], addr: Exp[Any], par: Boolean = false) {
     emitComment("Bram_load {")
+    val bnd = bram match {
+      case Def(rhs) => false
+      case _ => true
+    }
+    Console.println(s"cg: generating reader $sym on bram ${bram}x${duplicatesOf(bram).length}(bound ${bnd}) inst ${instanceIndexOf(sym)}")
     if (isDummy(bram)) {
       val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
       emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
@@ -331,10 +336,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       val r = readersOf(bram)
       val choose_from = r.map { case (_,_,a) => a }
       val i = choose_from.indexOf(sym)
-      val b_i = dups.length match {
-        case 1 => 0
-        case _ => instanceIndexOf(sym)
-      }
+      val b_i = instanceIndexOf(sym)
 
       parIndicesOf(r(i)._3) match {
         case Nil => 

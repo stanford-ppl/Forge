@@ -10,6 +10,7 @@ trait BlackScholes extends DHDLApplication {
   lazy val outerPar = param(1)
   lazy val innerPar = param(2)
   lazy val numOptions = ArgIn[SInt]
+  val nn = 96
 
   final val inv_sqrt_2xPI = 0.39894228040143270286f
 
@@ -105,7 +106,7 @@ trait BlackScholes extends DHDLApplication {
     println("")
   }
   def main() {
-    val N = args(0).to[SInt]
+    val N = nn
 
     bound(N) = 9995328
     domainOf(tileSize) = (96,19200,96)

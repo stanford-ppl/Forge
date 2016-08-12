@@ -65,6 +65,12 @@ trait TPCHQ6 extends DHDLApplication {
     getArg(out)
   }
 
+  def printArr(a: Rep[Array[T]], str: String = "") {
+    println(str)
+    (0 until a.length) foreach { i => print(a(i) + " ") }
+    println("")
+  }
+
   def main() {
     val N = nn
 
@@ -81,8 +87,8 @@ trait TPCHQ6 extends DHDLApplication {
 
     val gold = Array.tabulate(N){i => if (conds(i)) prices(i) * discts(i) else 0.0f.as[Flt] }.reduce{_+_}
 
-    println("expected: " + gold.mkString)
-    println("result: " + result.mkString)
+    printArr(gold, "expected")
+    printArr(result, "result")
     assert(result == gold)
   }
 }

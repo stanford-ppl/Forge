@@ -67,6 +67,7 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
 
   def allocateLocal(mem: Exp[Any], pipe: Exp[Any], read: Option[Exp[Any]] = None,  write: Option[Exp[Any]] = None): LocalMem = mem match {
     case Exact(c) => allocateConst(mem)
+    case Def(ConstBit(c)) => allocateConst(mem)
     case reg@Deff(Argin_new(init)) =>
       val global = allocateGlobal(reg)
       ScalarIn(reg, global)
@@ -88,9 +89,9 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
 
     val name = s"${quote(mem)}_${quote(reader)}"
     val size = memSize(mem)
-    debug(s"### Looking for mem $name in $cu")
+    //debug(s"### Looking for mem $name in $cu")
     val sram = cu.getOrAddMem(name, size)
-    debug(s"### ${sram.dumpString}")
+    //debug(s"### ${sram.dumpString}")
     sram
   }
 }
@@ -208,6 +209,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   // --- Compute units
   def allocateConst(x: Exp[Any]) = x match {
     case Exact(c) => ConstReg(s"${c.toLong}l") // FIXME: Not necessarily an integer
+    case Def(ConstBit(c)) => if (c) ConstReg("1l") else ConstReg("0l")
     case _ => throw new Exception(s"Cannot allocate constant value for $x")
   }
 
@@ -228,6 +230,7 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
     def iterators = regTable.flatMap{case (exp, reg: CounterReg) => Some((exp,reg)); case _ => None}.toList
     def get(x: Exp[Any]): Option[LocalMem] = x match {
       case Exact(_) => Some(getOrAddReg(x)(allocateConst(x)))
+      case Def(ConstBit(_)) => Some(getOrAddReg(x)(allocateConst(x)))
       case _ => regTable.get(x) match {
         case Some(reg) if regs.contains(reg) => Some(reg)
         case _ => None
@@ -236,7 +239,11 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
     def getOrAddReg(x: Exp[Any])(func: => LocalMem) = regTable.get(x) match {
       case Some(reg) if regs.contains(reg) => reg // On return this mapping if it is valid
       case _ =>
-        val reg = x match {case Exact(_) => allocateConst(x); case _ => func }
+        val reg = x match {
+          case Exact(_) => allocateConst(x)
+          case Def(ConstBit(_)) => allocateConst(x)
+          case _ => func
+        }
         addReg(x, reg)
         reg
     }

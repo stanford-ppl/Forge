@@ -298,7 +298,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     val localCompute = stages.filter{s => (isPrimitiveNode(s) || isRegisterRead(s) || isGlobal(s)) && !remoteStages.contains(s) }
 
     // Sanity check
-    val trueComputation = localCompute.filterNot{case Exact(_) => true; case s => isRegisterRead(s)}
+    val trueComputation = localCompute.filterNot{case Exact(_) => true; case Def(ConstBit(_)) => true; case s => isRegisterRead(s)}
     if (isOuterControl(pipe) && trueComputation.nonEmpty) {
       stageWarn(s"Outer control $pipe has compute stages: ")
       trueComputation.foreach{case lhs@Def(rhs) => stageWarn(s"  $lhs = $rhs")}

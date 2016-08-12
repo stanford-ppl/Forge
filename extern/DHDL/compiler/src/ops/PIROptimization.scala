@@ -88,6 +88,8 @@ trait PIROptimizer extends Traversal with PIRCommon {
         val cchainInsts = cu.cchains.filter(_.isInstanceOf[CounterChainInstance])
         if (cchainInsts.isEmpty || siblingCU.isDefined) {
           debug(s"Removing empty cu $cu")
+          cuMapping.retain{case (pipe,c) => c != cu}
+
           val sibling = siblingCU.get
           sibling.cchains ++= cchainInsts
           cus.foreach{c =>

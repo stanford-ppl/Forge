@@ -231,6 +231,7 @@ trait ControlSignalAnalyzer extends Traversal {
     else {
       // For input arguments read outside the hardware block
       if (isReader(lhs)) addPendingReader(lhs)
+      if (isAllocation(lhs) && isArgOut(lhs)) localMems ::= lhs
     }
 
     if (isControlNode(lhs)) {

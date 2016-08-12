@@ -56,7 +56,7 @@ trait MemoryTemplateTypesExp extends MemoryTemplateTypes with BaseExp {
   def indicesManifest: Manifest[Indices] = manifest[DHDLIndices]
 }
 
-trait MemoryTemplateOpsExp extends MemoryTemplateTypesExp with ExternPrimitiveOpsExp with EffectExp with BRAMOpsExp with OffChipMemOpsExp {
+trait MemoryTemplateOpsExp extends MemoryTemplateTypesExp with ExternPrimitiveOpsExp with EffectExp with BRAMOpsExp {
   this: DHDLExp =>
 
   // --- Nodes
@@ -64,21 +64,6 @@ trait MemoryTemplateOpsExp extends MemoryTemplateTypesExp with ExternPrimitiveOp
 
   // --- Internal API
   def vector_from_list[T:Manifest](elems: List[Rep[T]])(implicit ctx: SourceContext): Rep[Vector[T]] = reflectPure(Vector_from_list(elems))
-
-  /*def isValidOffChipDimension(x: Rep[FixPt[Signed,B32,B0]]) = x match {
-    case Deff(Reg_read(reg)) if isArgIn(reg) => true
-    case ConstFix(_) => true
-    case Def(Tpes_Int_to_fix(_:Param[_] | _:Const[_])) => true
-    case _ => false
-  }*/
-
-  override def offchip_create[T:Manifest](__arg0: List[Rep[FixPt[Signed,B32,B0]]])(implicit __pos: SourceContext,__imp0: Num[T]) = {
-    /*__arg0.zipWithIndex.foreach{case (dim, i) =>
-      if (!isValidOffChipDimension(dim))
-        stageError(s"Disallowed offchip memory dimension for dimension $i.")(__pos)
-    }*/
-    super.offchip_create[T](__arg0)(manifest[T],__pos,__imp0)
-  }
 
   // --- Mirroring
   override def mirror[A:Manifest](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = e match {

@@ -41,7 +41,7 @@ trait RegisterFolding extends MultiPassTransformer {
   def foldRegister(reg: Exp[Reg[Any]], value: Exp[Any], write: Exp[Any]) = {
     if (!isAccum(reg)) {
       debug(s"Replacing references to register $reg with $value")
-      readersOf(reg).foreach{case (_,_,read) => subst += read -> value }
+      readersOf(reg).foreach{case (_,_,read) => register(read -> value) }
       scrubSym(reg.asInstanceOf[Sym[Any]])
       scrubSym(write.asInstanceOf[Sym[Any]])
       Some(value)

@@ -49,17 +49,14 @@ trait UnrollingTransformer extends MultiPassTransformer {
       withSubstScope(inds.zip(inds2):_*){ subst }
     }
 
-    def map[A](block: Int => A): List[A] = {
-      val outerSubst: Map[Exp[Any], Exp[Any]] = subst
-      val out = (0 until P).map{p =>
-        subst = laneSubst(p)
+    def map[A](block: Int => A): List[A] = List.tabulate(P){p =>
+      withSubstRules(laneSubst(p)) {
         val result = block(p)
         laneSubst(p) = subst
         result
       }
-      subst = outerSubst
-      out.toList
     }
+
     def foreach(block: Int => Unit) { map(block) }
 
     def vectorize[T:Manifest](block: Int => Exp[T]): Exp[Vector[T]] = vector_create_from_list(map(block))
@@ -68,7 +65,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
     // 1. Split a given vector as the substitution for the single original symbol
     def duplicate(s: Sym[Any], d: Def[Any]): List[Exp[Any]] = map{p =>
       val s2 = self_clone(s,d)
-      subst += s -> s2
+      register(s -> s2)
       s2
     }
     // 2. Make later stages depend on the given substitution across all lanes
@@ -76,12 +73,12 @@ trait UnrollingTransformer extends MultiPassTransformer {
     // Bad things can happen here if you're not careful!
     def split[T:Manifest](orig: Sym[Any], vec: Exp[Vector[T]]): List[Exp[T]] = map{p =>
       val element = vec_apply[T](vec, p)
-      subst += orig -> element
+      register(orig -> element)
       element
     }
     // 3. Create an unrolled clone of symbol s for each lane
     def unify(orig: Exp[Any], unrolled: Exp[Any]): List[Exp[Any]] = {
-      foreach{p => subst += orig -> unrolled}
+      foreach{p => register(orig -> unrolled) }
       List(unrolled)
     }
 
@@ -296,10 +293,10 @@ trait UnrollingTransformer extends MultiPassTransformer {
 
           reduceLanes.foreach{mem =>
             val newIdx = inlineBlock(iFunc)                // Inline index calculation for each parallel lane
-            subst += idx -> newIdx                         // Save address substitution rule for this lane
+            register(idx -> newIdx)                        // Save address substitution rule for this lane
           }
           val loads = mapResults.map{mem =>                  // Calculate list of loaded results for each memory
-              reduceLanes.foreach{p => subst += part -> mem} // Set partial result to be this memory
+              reduceLanes.foreach{p => register(part -> mem) } // Set partial result to be this memory
               duringClone{e => instanceIndexOf(e, mem) = instanceIndexOf(lhs, partial) }{
                 unrollMap(ld1, reduceLanes)(mT)              // Unroll the load of the partial result
               }
@@ -322,7 +319,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
               val treeResult = reduceTree(validLoads){(x,y) => reduce(x,y) }
               reduce(treeResult, accRead)
             }
-            subst += res -> newRes
+            register(res -> newRes)
           }
           unrollMap(st, reduceLanes)    // Parallel store. Already have substitutions for idx and res
           ()

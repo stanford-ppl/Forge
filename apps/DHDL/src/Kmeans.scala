@@ -83,6 +83,11 @@ trait Kmeans extends DHDLApplication {
     val N = args(0).to[SInt];   bound(N) = 960000
     val K = args(1).to[SInt];   bound(K) = 8
     val D = args(2).to[SInt];   bound(D) = 384
+
+    setArg(numPoints, N)
+    setArg(numCents,  K)
+    setArg(dim, D)
+
     domainOf(tileSize) = (1,9600,1)
     //domainOf(ctLoopPar) = (1,1,1)
     domainOf(dstLoopPar) = (1,96,1)
@@ -92,15 +97,12 @@ trait Kmeans extends DHDLApplication {
     domainOf(ignorePar) = (1,1,1)
     domainOf(loadPar) = (96,96,1)
 
-    val points = OffChipMem[Flt](N, D)      // input points
-    val centroids = OffChipMem[Flt](K, D)   // output centroids
+    val points = OffChipMem[Flt](numPoints, dim)      // input points
+    val centroids = OffChipMem[Flt](numCents, dim)    // output centroids
 
     val pts = Array.tabulate(N){i => Array.tabulate(D){d => random[Flt](10) }}
 
     setMem(points, pts.flatten)
-    setArg(numPoints, N)
-    setArg(numCents,  K)
-    setArg(dim, D)
 
     println("points: ")
     for (i <- 0 until N) { println(i.mkString + ": " + pts(i).mkString(", ")) }

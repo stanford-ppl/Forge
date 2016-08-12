@@ -14,11 +14,13 @@ trait TPCHQ6 extends DHDLApplication {
     val N = datesIn.length
     bound(N) = 18720000
 
-    val dates  = OffChipMem[UInt](N)
-    val quants = OffChipMem[UInt](N)
-    val discts = OffChipMem[Flt](N)
-    val prices = OffChipMem[Flt](N)
     val dataSize = ArgIn[SInt]
+    setArg(dataSize, N)
+
+    val dates  = OffChipMem[UInt](dataSize)
+    val quants = OffChipMem[UInt](dataSize)
+    val discts = OffChipMem[Flt](dataSize)
+    val prices = OffChipMem[Flt](dataSize)
     val minDateIn = ArgIn[UInt]
     val maxDateIn = ArgIn[UInt]
     val out = ArgOut[Flt]
@@ -27,7 +29,6 @@ trait TPCHQ6 extends DHDLApplication {
     val outerPar = param(2);    domainOf(outerPar) = (1,6,1)
     val innerPar = param(2);    domainOf(innerPar) = (1,384,1)
 
-    setArg(dataSize, N)
     setArg(minDateIn, MIN_DATE)
     setArg(maxDateIn, MAX_DATE)
     setMem(dates, datesIn)

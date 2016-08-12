@@ -52,10 +52,10 @@ trait MetaPipeRegInsertion extends SinglePassTransformer with SpatialTraversalTo
               prevDly = dly
               prevStage = Some(stage)
 
-              subst ++= inds.zip(dly)
+              register(inds.zip(dly):_*)
               debug(s"Mirroring stage $owner : $stage")
               val mirroredStage = self_mirror(stage, stageDef)
-              subst += stage -> mirroredStage
+              register(stage -> mirroredStage)
 
               val Def(origDef) = stage
               val Def(newDef) = mirroredStage

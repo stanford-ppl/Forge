@@ -26,12 +26,16 @@ trait MatMult extends DHDLApplication {
     bound(N) = 1536
     bound(P) = 1536
 
-    val a = OffChipMem[T](M, P)
-    val b = OffChipMem[T](P, N)
-    val c = OffChipMem[T](M, N)
     val m = ArgIn[SInt]
     val n = ArgIn[SInt]
     val p = ArgIn[SInt]
+    setArg(m, M)
+    setArg(n, N)
+    setArg(p, P)
+
+    val a = OffChipMem[T](m, p)
+    val b = OffChipMem[T](p, n)
+    val c = OffChipMem[T](m, n)
 
     val bm        = param(4);   domainOf(bm) = (1,1536,1)
     val bn        = param(4);   domainOf(bn) = (96,1536,96)
@@ -42,9 +46,6 @@ trait MatMult extends DHDLApplication {
     val upMidPar  = param(1);   domainOf(upMidPar)  = (1,1,1)
     val stPar     = param(1);   domainOf(stPar)     = (1,1,1)
 
-    setArg(m, M)
-    setArg(n, N)
-    setArg(p, P)
     setMem(a, A)
     setMem(b, B)
 

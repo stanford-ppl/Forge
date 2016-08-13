@@ -119,6 +119,8 @@ trait UnrollingTransformer extends MultiPassTransformer {
       debug(s"Unrolling $s = $d")
       val parPop = par_pop_fifo(f(fifo), lanes.length)(e._mT,e.__pos)
       dimsOf(parPop) = List(lanes.length.as[Index])
+      lenOf(parPop) = lanes.length
+      instanceIndexOf(parPop, f(fifo)) = instanceIndexOf(s, fifo)
       lanes.split(s, parPop)(e._mT)
 
     case EatReflect(e: Cam_load[_,_]) =>
@@ -141,7 +143,9 @@ trait UnrollingTransformer extends MultiPassTransformer {
       val addrs = lanes.vectorize{p => f(addr)}
       val parLoad = par_bram_load(f(bram), addrs)(e._mT, e.__pos)
       dimsOf(parLoad) = List(lanes.length.as[Index])
+      lenOf(parLoad) = lanes.length
       parIndicesOf(parLoad) = lanes.map{i => accessIndicesOf(s).map(f(_)) }
+      instanceIndexOf(parLoad, f(bram)) = instanceIndexOf(s, bram)
       lanes.split(s, parLoad)(e._mT)
 
     // FIXME: Shouldn't be necessary to have duplication rules + metadata propagation

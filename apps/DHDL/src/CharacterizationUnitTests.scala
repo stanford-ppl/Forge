@@ -7,10 +7,10 @@ object CharLoadTest extends DHDLApplicationCompiler with CharLoad
 trait CharLoad extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
-  val innerPar = 1;
-  val outerPar = 1;
-  val dim0 = 384;
-  val dim1 = 384;
+  val innerPar = 16;
+  val outerPar = 4;
+  val dim0 = 1536;
+  val dim1 = 1536;
 
   def CharLoad(srcHost: Rep[Array[T]], iters: Rep[SInt]) = {
     val sinnerPar = param("innerPar", innerPar);
@@ -35,7 +35,7 @@ trait CharLoad extends DHDLApplication {
         }
         Parallel {
           dummy.zipWithIndex.foreach{ case (dum, i) =>
-            Pipe {dum := srcFPGA(i*dim0::(i+1)*dim0, i*dim1::(i+1)*dim1, sinnerPar)}
+            Pipe {dum := srcFPGA(i*dim0/outerPar::(i+1)*dim0/outerPar, i*dim1::(i+1)*dim1, sinnerPar)}
           }
         }
         Parallel {
@@ -75,8 +75,8 @@ object CharStoreTest extends DHDLApplicationCompiler with CharStore
 trait CharStore extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
-  val innerPar = 2;
-  val outerPar = 8;
+  val innerPar = 16;
+  val outerPar = 4;
   val dim0 = 1536;
   val dim1 = 1536;
   def CharStore(iters: Rep[T], numin: Rep[T]) = {
@@ -105,7 +105,7 @@ trait CharStore extends DHDLApplication {
         }
         Parallel {
           dummy.zip(dstFPGA).zipWithIndex.foreach{ case ((dum, dst), i) =>
-            Pipe {dst (i*dim0::(i+1)*dim0, 0::dim1, sinnerPar) := dum}
+            Pipe {dst (i*dim0/outerPar::(i+1)*dim0/outerPar, 0::dim1, sinnerPar) := dum}
           }
         }
       }
@@ -139,7 +139,7 @@ object CharBramTest extends DHDLApplicationCompiler with CharBram
 trait CharBram extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
-  val innerPar = 2;
+  val innerPar = 16;
   val outerPar = 4;
   val dim0 = 1536;
   val dim1 = 1536;

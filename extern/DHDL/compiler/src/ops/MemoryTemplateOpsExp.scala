@@ -308,11 +308,6 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
   }
 
   def bramLoad(sym: Sym[Any], bram_in: Exp[BRAM[Any]], addr: Exp[Any], par: Boolean = false) {
-    val isbnd = bram_in match {
-      case Def(rhs) => false
-      case _ => true
-    }
-    Console.println(s"bram hashmap $fold_in_out_accums, search for $bram_in (isbnd $isbnd)")
     val bram = if (fold_in_out_accums.contains(bram_in)) {fold_in_out_accums(bram_in)} else {bram_in}
     emitComment("Bram_load {")
     val bnd = bram match {
@@ -328,7 +323,6 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       val r = readersOf(bram)
       val choose_from = r.map { case (_,_,a) => a }
       val i = choose_from.indexOf(sym)
-      Console.println(s"about to go to deadly line, $bram is bnd? $isbnd")
       val b_i = instanceIndexOf(sym, bram)
 
       parIndicesOf(r(i)._3) match {
@@ -383,7 +377,11 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
             inds.length match {
               case 1 =>
                 val addr0 = inds(0)(0)
-                emit(s"""DFEVector<DFEVar> ${quote(sym)} = new DFEVectorType<DFEVar>(${quote(bram)}.type, 1).newInstance(this, Arrays.asList(${quote(bram)}.connectRport(${quote(addr0)})));""")
+                if (par) {
+                  emit(s"""$pre ${quote(sym)} = new DFEVectorType<DFEVar>(${quote(bram)}.type, 1).newInstance(this, Arrays.asList(${quote(bram)}.connectRport(${quote(addr0)})));""")
+                } else {
+                  emit(s"""$pre ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)});""")
+                }
               case _ =>
                 var addr0 = ""
                 val addr1 = inds.map { row =>
@@ -405,7 +403,12 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
               inds.length match {
                 case 1 =>
                   val addr0 = inds(0)(0)
-                  emit(s"""DFEVector<DFEVar> ${quote(sym)} = new DFEVectorType<DFEVar>(${quote(bram)}_${b_i}.type, 1).newInstance(this, Arrays.asList(${quote(bram)}_${b_i}.connectRport(${quote(addr0)})));""")
+                  if (par) {
+                    emit(s"""$pre ${quote(sym)} = new DFEVectorType<DFEVar>(${quote(bram)}_${b_i}.type, 1).newInstance(this, Arrays.asList(${quote(bram)}_${b_i}.connectRport(${quote(addr0)})));""")
+                  } else {
+                    emit(s"""$pre ${quote(sym)} = ${quote(bram)}_${b_i}.connectRport(${quote(addr0)});""")
+                  }
+
                 case _ =>
                   var addr0 = ""
                   val addr1 = inds.map { row =>
@@ -441,6 +444,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
   def bramStore(sym: Sym[Any], bram_in: Exp[BRAM[Any]], addr: Exp[Any], value: Exp[Any]) {
     emitComment("Bram_store {")
     val bram = if (fold_in_out_accums.contains(bram_in)) {fold_in_out_accums(bram_in)} else {bram_in}
+    Console.println(s"writer $sym to $bram (originally $bram_in)")
     val dataStr = quote(value)
     val dups = duplicatesOf(bram)
 
@@ -699,7 +703,6 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 
     case Bram_new(size, zero) =>
       withStream(baseStream) {
-        Console.println(s"hashmap $fold_in_out_accums contains $sym? ${fold_in_out_accums.contains(sym)}\n")
         if (!fold_in_out_accums.contains(sym)) { // Only emit for non-bound syms
           emitComment("Bram_new {")
           val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
@@ -804,9 +807,11 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       }
 
     case Bram_load(bram, addr) =>
+      Console.println(s"Load ${sym} from ${bram}")
       bramLoad(sym, bram, addr)
 
     case Par_bram_load(bram, addr) =>
+      Console.println(s"ParLoad ${sym} from ${bram}")
       bramLoad(sym, bram, addr, true)
 
     case Bram_store(bram, addr, value) =>

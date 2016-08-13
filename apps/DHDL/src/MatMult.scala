@@ -18,28 +18,22 @@ trait MatMult extends DHDLApplication {
   type T = Flt //FixPt[Signed,B16,B16]
   type Array[T] = ForgeArray[T]
 
-  val mm = 192
-  val nn = 384
+  val mm = 96
+  val nn = 96
   val pp = 96
   def matmult(A: Rep[Array[T]], B: Rep[Array[T]], M: Rep[SInt], N: Rep[SInt], P: Rep[SInt]) = {
     bound(M) = 1536
     bound(N) = 1536
     bound(P) = 1536
 
-    val m = ArgIn[SInt]
-    val n = ArgIn[SInt]
-    val p = ArgIn[SInt]
-    setArg(m, M)
-    setArg(n, N)
-    setArg(p, P)
 
-    val a = OffChipMem[T](m, p)
-    val b = OffChipMem[T](p, n)
-    val c = OffChipMem[T](m, n)
+    val a = OffChipMem[T](mm, pp)
+    val b = OffChipMem[T](pp, nn)
+    val c = OffChipMem[T](mm, nn)
 
-    val bm        = param(4);   domainOf(bm) = (1,1536,1)
-    val bn        = param(4);   domainOf(bn) = (96,1536,96)
-    val bp        = param(4);   domainOf(bp) = (96,1536,96)
+    val bm        = param(96);   domainOf(bm) = (1,1536,1)
+    val bn        = param(96);   domainOf(bn) = (96,1536,96)
+    val bp        = param(96);   domainOf(bp) = (96,1536,96)
     val outerPar  = param(1);   domainOf(outerPar)  = (1,6,1)
     val middlePar = param(2);   domainOf(middlePar) = (1,96,1)
     val innerPar  = param(2);   domainOf(innerPar)  = (1,96,1)
@@ -50,8 +44,8 @@ trait MatMult extends DHDLApplication {
     setMem(b, B)
 
     Accel {
-      Pipe(m by bm, (n by bn) par outerPar){(i,j) =>
-        Pipe((p by bp) par upMidPar){k =>
+      Pipe(mm by bm, (nn by bn) par outerPar){(i,j) =>
+        Pipe((pp by bp) par upMidPar){k =>
           val tileA = BRAM[T](bm, bp)
           val tileB = BRAM[T](bp, bn)
           val tileC = BRAM[T](bm, bn)

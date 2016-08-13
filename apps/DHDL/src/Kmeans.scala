@@ -6,11 +6,11 @@ object KmeansCompiler extends DHDLApplicationCompiler with Kmeans
 object KmeansInterpreter extends DHDLApplicationInterpreter with Kmeans
 trait Kmeans extends DHDLApplication {
 
-  lazy val dim       = ArgIn[SInt]
-  lazy val numCents  = ArgIn[SInt]
-  lazy val numPoints = ArgIn[SInt]
+  val dim       = 768
+  val numCents  = 96
+  val numPoints = 384
 
-  lazy val tileSize   = param(320)
+  lazy val tileSize   = param(384)
   lazy val dTileSize  = 96
   lazy val ptLoopPar  = param(1)
   //lazy val ctLoopPar  = param(1)
@@ -80,13 +80,10 @@ trait Kmeans extends DHDLApplication {
   }
 
   def main() {
-    val N = args(0).to[SInt];   bound(N) = 960000
-    val K = args(1).to[SInt];   bound(K) = 8
-    val D = args(2).to[SInt];   bound(D) = 384
+    val N = dim;   bound(N) = 960000
+    val K = numCents;   bound(K) = 8
+    val D = numPoints;   bound(D) = 384
 
-    setArg(numPoints, N)
-    setArg(numCents,  K)
-    setArg(dim, D)
 
     domainOf(tileSize) = (1,9600,1)
     //domainOf(ctLoopPar) = (1,1,1)

@@ -75,9 +75,9 @@ trait MatMult extends DHDLApplication {
   }
 
   def main() = {
-    val M = mm
-    val N = nn
-    val P = pp
+    val M = args(0).to[SInt]
+    val N = args(1).to[SInt]
+    val P = args(2).to[SInt]
 
     val a = Array.fill(M){ Array.fill(P){random[T](100)} }
     val b = Array.fill(P){ Array.fill(N){random[T](100)} }

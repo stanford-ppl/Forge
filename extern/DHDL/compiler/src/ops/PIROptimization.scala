@@ -26,6 +26,7 @@ trait PIROptimizer extends Traversal with PIRCommon {
   override def run[A:Manifest](b: Block[A]) = {
     for (cu <- cus) removeUnusedCUComponents(cu)
     for (cu <- cus) removeRouteThruStages(cu)
+    for (cu <- cus) removeDeadStages(cu)
     for (cu <- cus) removeEmptyCUs(cu)
     b
   }
@@ -79,6 +80,16 @@ trait PIROptimizer extends Traversal with PIRCommon {
         cu.stages = stages
       }
     case _ =>
+  }
+
+  def removeDeadStages(cu: ComputeUnit) = {
+    val deadStages = cu.stages.flatMap{case stage: MapStage if stage.outs.isEmpty => Some(stage); case _ => None }
+    if (deadStages.nonEmpty) {
+      val stages = removeStages(cu.stages, deadStages)
+      debug(s"Removing dead stages from $cu")
+      deadStages.foreach{stage => debug(s"  $stage")}
+      cu.stages = stages
+    }
   }
 
   def removeEmptyCUs(cu: ComputeUnit) = cu match {

@@ -199,12 +199,12 @@ trait PIRGen extends Traversal with PIRCommon {
       decl += s""", doubleBuffer = ${sram.isDoubleBuffer}"""
       emit(decl + ")")
 
-    case MemCtrl(name,region,mode) => emit(s"val $name = MemoryController($mode, ${quote(region)})")
-    case Offchip(name) => emit(s"val $name = Offchip()")
-    case InputArg(name) => emit(s"val $name = ArgIn()")
-    case OutputArg(name) => emit(s"val $name = ArgOut()")
-    case ScalarMem(name) => emit(s"val $name = Scalar()")
-    case VectorMem(name) => emit(s"val $name = Vector()")
+    case mem@MemCtrl(_,region,mode) => emit(s"val ${quote(mem)} = MemoryController($mode, ${quote(region)})")
+    case mem: Offchip   => emit(s"val ${quote(mem)} = Offchip()")
+    case mem: InputArg  => emit(s"val ${quote(mem)} = ArgIn()")
+    case mem: OutputArg => emit(s"val ${quote(mem)} = ArgOut()")
+    case mem: ScalarMem => emit(s"val ${quote(mem)} = Scalar()")
+    case mem: VectorMem => emit(s"val ${quote(mem)} = Vector()")
     case _ => throw new Exception(s"Don't know how to generate CGRA component: $x")
   }
 

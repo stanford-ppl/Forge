@@ -95,6 +95,10 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
     val allStrides = constDimsToStrides(dimsOf(mem).map{case Exact(d) => d.toInt})
     val strides = if (indices.length == 1) List(allStrides.last) else allStrides
 
+    debug(s"  access: $access")
+    debug(s"  indices: $indices")
+    debug(s"  pattern: $pattern")
+
     def bankFactor(i: Exp[Any]) = if (iter.isDefined && i == iter.get) 16 else 1
 
     val banking = (pattern, indices, strides).zipped.map{ case (pattern, index, stride) => pattern match {
@@ -105,6 +109,8 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
       case InvariantAccess(b)         => NoBanking // Duplicate in this dimension
       case RandomAccess               => NoBanking // Duplicate in this dimension
     }}
+    debug(s"  banking: $banking")
+
     val form = banking.find(_.banks > 1).getOrElse(NoBanking)
     form match {
       case StridedBanking(stride, banks) => Strided(stride)

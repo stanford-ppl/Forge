@@ -255,6 +255,7 @@ trait DHDLDSL extends ForgeApplication
     val PIRScheduling = analyzer("PIRSchedule", isExtern=true)
     val PIRGen = traversal("PIRGen", isExtern=true)
 
+    val PlasticineLatency = traversal("PlasticineLatencyAnalyzer", isExtern=true)
 
     importGlobalAnalysis()
     importBoundAnalysis()
@@ -305,6 +306,7 @@ trait DHDLDSL extends ForgeApplication
     schedule(MemoryAnalyzer)        // Memory analyzer (to finalize banking/buffering)
     schedule(AreaAnalyzer)          // Area estimation
     schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates
+    schedule(PlasticineLatency)     // Plasticine latency
     schedule(Printer)
 
 // Temporarily disabled until moved to unrolling

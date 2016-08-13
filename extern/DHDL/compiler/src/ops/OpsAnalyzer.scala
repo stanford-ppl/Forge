@@ -127,22 +127,22 @@ trait OpsAnalyzer extends ModelingTraversal {
     val cycleAnalyzer = new LatencyAnalyzer{val IR: OpsAnalyzer.this.IR.type = OpsAnalyzer.this.IR}
     cycleAnalyzer.run(b)
 
-    msg("Instruction statistics:")
-    msg(s"  Instructions: ${total.insts} " + "(%.3f GI)".format(totalInsts))
-    msg(s"  FLOPs: ${total.flops} " + "(%.3f GFLOPs)".format(totalFLOPs))
-    msg(s"  On-chip loads: ${total.onChipOut} bits " + "(%.3f GB)".format(totalOnChipOut))
-    msg(s"  On-chip stores: ${total.onChipIn} bits " + "(%.3f GB)".format(totalOnChipIn))
-    msg(s"  Off-chip loads: ${total.dataIn} bits " + "(%.3f GB)".format(totalOffChipIn))
-    msg(s"  Off-chip stores: ${total.dataOut} bits " + "(%.3f GB)".format(totalOffChipOut))
-    msg("--")
-    msg("  Total on-chip transfers: " + "%.3f GB".format(totalOnChip))
-    msg("  Total off-chip transfers: " + "%.3f GB".format(totalOffChip))
+    report("Instruction statistics:")
+    report(s"  Instructions: ${total.insts} " + "(%.3f GI)".format(totalInsts))
+    report(s"  FLOPs: ${total.flops} " + "(%.3f GFLOPs)".format(totalFLOPs))
+    report(s"  On-chip loads: ${total.onChipOut} bits " + "(%.3f GB)".format(totalOnChipOut))
+    report(s"  On-chip stores: ${total.onChipIn} bits " + "(%.3f GB)".format(totalOnChipIn))
+    report(s"  Off-chip loads: ${total.dataIn} bits " + "(%.3f GB)".format(totalOffChipIn))
+    report(s"  Off-chip stores: ${total.dataOut} bits " + "(%.3f GB)".format(totalOffChipOut))
+    report("--")
+    report("  Total on-chip transfers: " + "%.3f GB".format(totalOnChip))
+    report("  Total off-chip transfers: " + "%.3f GB".format(totalOffChip))
 
     val totalCycles = cycleAnalyzer.totalCycles
     val runtime = totalCycles/(IR.CLK*1000000f)
 
-    msg("")
-    msg("Performance statistics (based on estimated runtime):")
+    report("")
+    report("Performance statistics (based on estimated runtime):")
     val MIPS = totalInsts / runtime
     val FLOPS = totalFLOPs / runtime
     val onChipLdBW = totalOnChipOut / runtime
@@ -153,15 +153,15 @@ trait OpsAnalyzer extends ModelingTraversal {
     val totalOnChipBW = totalOnChip / runtime
     val totalOffChipBW = totalOffChip / runtime
 
-    msg("  Instructions: %.3f GIPS".format(MIPS))
-    msg("  Floating point: %.3f GFLOPS".format(FLOPS))
-    msg("  On-chip load bandwidth: %.3f GB/s".format(onChipLdBW))
-    msg("  On-chip store bandwidth: %.3f GB/s".format(onChipStBW))
-    msg("  Off-chip load bandwidth: %.3f GB/s".format(offChipLdBW))
-    msg("  Off-chip store bandwidth: %.3f GB/s".format(offChipStBW))
-    msg("--")
-    msg("  Total on-chip bandwidth: %.3f GB/s".format(totalOnChipBW))
-    msg("  Total off-chip bandwidth: %.3f GB/s".format(totalOffChipBW))
+    report("  Instructions: %.3f GIPS".format(MIPS))
+    report("  Floating point: %.3f GFLOPS".format(FLOPS))
+    report("  On-chip load bandwidth: %.3f GB/s".format(onChipLdBW))
+    report("  On-chip store bandwidth: %.3f GB/s".format(onChipStBW))
+    report("  Off-chip load bandwidth: %.3f GB/s".format(offChipLdBW))
+    report("  Off-chip store bandwidth: %.3f GB/s".format(offChipStBW))
+    report("--")
+    report("  Total on-chip bandwidth: %.3f GB/s".format(totalOnChipBW))
+    report("  Total off-chip bandwidth: %.3f GB/s".format(totalOffChipBW))
 
     super.postprocess(b)
   }

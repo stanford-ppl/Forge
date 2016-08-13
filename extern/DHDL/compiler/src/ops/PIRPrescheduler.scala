@@ -89,7 +89,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
 
   // --- Compute Units
   def controllersHack(pipe: Exp[Any]): List[Exp[Any]] = pipe match {
-    case Deff(_:Pipe_parallel) => childrenOf(pipe)
+    case Deff(_:Pipe_parallel) => childrenOf(pipe).flatMap{child => controllersHack(child)}
     case _ => List(pipe)
   }
 
@@ -97,9 +97,9 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
   def pipeDependencies(pipe: Exp[Any]): List[Exp[Any]] = parentOf(pipe) match {
     case Some(parent@Deff(_:Pipe_parallel)) => pipeDependencies(parent)
     case Some(parent) =>
-      val childs = childrenOf(parent)
-      val idx = childs.indexOf(pipe)
-      val deps = if (idx > 0) controllersHack(childs(idx-1)) else Nil
+      val childs = childrenOf(parent).map{child => controllersHack(child) }
+      val idx = childs.indexWhere(_ contains pipe )
+      val deps = if (idx > 0) childs(idx-1) else Nil
       debug(s"Found deps of $pipe: $deps")
       deps
     case None => Nil

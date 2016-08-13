@@ -182,8 +182,8 @@ trait LatencyAnalyzer extends ModelingTraversal {
     // Eventually want to be able to support multiple accel scopes
     totalCycles = cycleScope.sum + IR.baseCycles
 
-    msg(s"Estimated cycles: $totalCycles")
-    msg(s"Estimated runtime (at " + "%.2f".format(IR.CLK) +"MHz): " + "%.8f".format(totalCycles/(IR.CLK*1000000f)) + "s")
+    report(s"Estimated cycles: $totalCycles")
+    report(s"Estimated runtime (at " + "%.2f".format(IR.CLK) +"MHz): " + "%.8f".format(totalCycles/(IR.CLK*1000000f)) + "s")
 
     (b)
   }

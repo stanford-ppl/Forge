@@ -18,14 +18,17 @@ trait MatMult extends DHDLApplication {
   type T = Flt //FixPt[Signed,B16,B16]
   type Array[T] = ForgeArray[T]
 
-  val mm = 96
-  val nn = 96
-  val pp = 96
   def matmult(A: Rep[Array[T]], B: Rep[Array[T]], M: Rep[SInt], N: Rep[SInt], P: Rep[SInt]) = {
     bound(M) = 1536
     bound(N) = 1536
     bound(P) = 1536
 
+    val mm = ArgIn[SInt]
+    val nn = ArgIn[SInt]
+    val pp = ArgIn[SInt]
+    setArg(mm, M)
+    setArg(nn, N)
+    setArg(pp, P)
 
     val a = OffChipMem[T](mm, pp)
     val b = OffChipMem[T](pp, nn)

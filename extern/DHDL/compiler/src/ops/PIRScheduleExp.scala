@@ -11,10 +11,10 @@ import dhdl.compiler.ops._
 import scala.collection.mutable.{HashSet, HashMap}
 
 // For bound symbols
-trait SubstQuotingExp extends QuotingExp {
+trait SubstQuotingExp extends QuotingExp  {
+  val IR: DHDLExp
   import IR._
-  val subst = HashMap[Exp[Any], Exp[Any]]()
-  override def quote(x: Exp[Any]) = super.quote(subst.getOrElse(x, x))
+  override def quote(x: Exp[Any]) = super.quote(aliasOf(x))
 }
 
 trait PIRCommon extends SubstQuotingExp with Traversal {
@@ -22,6 +22,8 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
   import IR._
 
   val globals = HashSet[GlobalMem]()
+
+  def allocateCU(pipe: Exp[Any]): ComputeUnit
 
   // Create a vector for communication to/from a given memory
   def allocateGlobal(mem: Exp[Any]) = {
@@ -83,20 +85,111 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
 
   def isBuffer(mem: Exp[Any]) = isBRAM(mem.tp) // || isFIFO(mem.tp)
 
+  /* How much to bank by in Plasticine:
+     - Which dimension (stride) has a predictable, parallelizable access with inner index
+       of reader and writer CUs?
+   */
+  def bank(mem: Exp[Any], access: Exp[Any], iter: Option[Exp[Any]]) = {
+    val indices = accessIndicesOf(access)
+    val pattern = accessPatternOf(access)
+    val allStrides = constDimsToStrides(dimsOf(mem).map{case Exact(d) => d.toInt})
+    val strides = if (indices.length == 1) List(allStrides.last) else allStrides
+
+    def bankFactor(i: Exp[Any]) = if (iter.isDefined && i == iter.get) 16 else 1
+
+    val banking = (pattern, indices, strides).zipped.map{ case (pattern, index, stride) => pattern match {
+      case AffineAccess(Exact(a),i,b) => StridedBanking(a.toInt*stride, bankFactor(i))
+      case StridedAccess(Exact(a),i)  => StridedBanking(a.toInt*stride, bankFactor(i))
+      case OffsetAccess(i,b)          => StridedBanking(stride, bankFactor(i))
+      case LinearAccess(i)            => StridedBanking(stride, bankFactor(i))
+      case InvariantAccess(b)         => NoBanking // Duplicate in this dimension
+      case RandomAccess               => NoBanking // Duplicate in this dimension
+    }}
+    val form = banking.find(_.banks > 1).getOrElse(NoBanking)
+    form match {
+      case StridedBanking(stride, banks) => Strided(stride)
+      case NoBanking if iter.isDefined => Duplicated
+      case NoBanking => NoBanks
+    }
+  }
+  def matchBanking(bank1: SRAMBanking, bank2: SRAMBanking) = (bank1,bank2) match {
+    case (Strided(stride1), Strided(stride2)) if stride1 == stride2 => Strided(stride1)
+    case (Strided(stride1), Strided(stride2)) => Diagonal(stride1, stride2)
+    case (Duplicated, _) => Duplicated
+    case (_, Duplicated) => Duplicated
+    case (NoBanks, bank2) => bank2
+    case (bank1, NoBanks) => bank1
+  }
+
+  private def initializeSRAM(sram: CUMemory, mem_in: Exp[Any], reader: Exp[Any], cu: ComputeUnit) {
+    // TODO: Assumes we see the mapping prior to any uses
+    debug(s"Creating SRAM for memory $mem_in: ")
+    getProps(mem_in).foreach{m => debug(makeString(m)) }
+
+    val mem = aliasOf(mem_in)
+
+    val writer = writersOf(mem).headOption
+    debug(s"Creating SRAM for memory $mem, reader $reader, writer: $writer, cu $cu")
+
+    val writerCU = writer.map{writer => allocateCU(writer._1) }
+    val swapperCU = topWritersOf(mem).headOption.map{writer => allocateCU(writer._1) }
+
+    debug(s"  readerCU: $cu")
+    debug(s"  writerCU: $writerCU")
+
+    // ASSUMPTION: Each CU originally only instantiates only one counterchain
+    val remoteWriteCtrl = writerCU.map{cu => cu.cchains.filter(_.isInstanceOf[CounterChainInstance]).head }
+    val remoteSwapperCtrl = swapperCU.map{cu => cu.cchains.filter(_.isInstanceOf[CounterChainInstance]).head }
+
+    val readCtrl = cu.cchains.filter(_.isInstanceOf[CounterChainInstance]).headOption
+    val writeCtrl = remoteWriteCtrl.flatMap{cc => cu.cchains.find(_.name == cc.name) }
+    val swapCtrl = remoteSwapperCtrl.flatMap{cc => cu.cchains.find(_.name == cc.name) }
+
+    val writeIter = writeCtrl.flatMap{cc => cu.innermostIter(cc) }
+    val readIter = readCtrl.flatMap{cc => cu.innermostIter(cc) }
+
+    debug(s"  readIter: $readIter")
+    debug(s"  writeIter: $writeIter")
+
+    val readBanking = bank(mem, reader, readIter)
+    val writeBanking = writer.map{writer => bank(mem, writer._3, writeIter) }.getOrElse(NoBanks)
+
+    debug(s"  read banking: $readBanking")
+    debug(s"  write banking: $writeBanking")
+
+    val banking = matchBanking(writeBanking, readBanking)
+
+    sram.writeCtrl = writeCtrl
+    sram.swapCtrl = swapCtrl
+    sram.banking = Some(banking)
+
+    val instIndex = instanceIndexOf(reader, mem)
+    val instance = duplicatesOf(mem).apply(instIndex)
+    if (instance.depth == 1) sram.isDoubleBuffer = false
+    else if (instance.depth == 2) sram.isDoubleBuffer = true
+    else
+      throw new Exception("Cannot generate PIR for buffer of depth greater than 2")
+  }
+
   def allocateMem(mem: Exp[Any], reader: Exp[Any], cu: ComputeUnit) = {
     if (!isBuffer(mem))
       throw new Exception(s"Cannot allocate SRAM for non-buffer $mem")
 
     val name = s"${quote(mem)}_${quote(reader)}"
-    val size = memSize(mem)
     //debug(s"### Looking for mem $name in $cu")
-    val sram = cu.getOrAddMem(name, size)
-    //debug(s"### ${sram.dumpString}")
-    sram
+    cu.srams.find(_.name == name) match {
+      case Some(sram) => sram
+      case None =>
+        val size = memSize(mem)
+        val sram = CUMemory(name, size)
+        initializeSRAM(sram, mem, reader, cu)
+        cu.srams += sram
+        sram
+    }
   }
 }
 
-trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisExp {
+trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisExp with MemoryAnalysisExp {
   this: DHDLExp =>
 
   sealed abstract class MemoryMode
@@ -175,16 +268,22 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case object FixSub extends PIROp
   case object FixMul extends PIROp
   case object FixDiv extends PIROp
-  case object FltAdd extends PIROp
-  case object FltSub extends PIROp
-  case object FltMul extends PIROp
-  case object FltDiv extends PIROp
-  case object BitAnd extends PIROp
-  case object BitOr  extends PIROp
   case object FixLt  extends PIROp
   case object FixLeq extends PIROp
   case object FixEql extends PIROp
   case object FixNeq extends PIROp
+
+  case object FltAdd extends PIROp
+  case object FltSub extends PIROp
+  case object FltMul extends PIROp
+  case object FltDiv extends PIROp
+  case object FltLt  extends PIROp
+  case object FltLeq extends PIROp
+  case object FltEql extends PIROp
+  case object FltNeq extends PIROp
+
+  case object BitAnd extends PIROp
+  case object BitOr  extends PIROp
 
   // --- Stages prior to scheduling
   sealed abstract class PseudoStage { def output: Exp[Any] }
@@ -208,8 +307,22 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
 
   // --- Compute units
   def allocateConst(x: Exp[Any]) = x match {
-    case Exact(c) => ConstReg(s"${c.toLong}l") // FIXME: Not necessarily an integer
-    case Def(ConstBit(c)) => if (c) ConstReg("1l") else ConstReg("0l")
+    case Const(c: Int)    => ConstReg(s"$c")
+    case Const(c: Long)   => ConstReg(s"${c}l")
+    case Const(c: Double) => ConstReg(s"${c}d")
+    case Const(c: Float)  => ConstReg(s"${c}f")
+    case Param(c: Int)    => ConstReg(s"$c")
+    case Param(c: Long)   => ConstReg(s"${c}l")
+    case Param(c: Double) => ConstReg(s"${c}d")
+    case Param(c: Float)  => ConstReg(s"${c}f")
+
+    // TODO: Not quite correct since bound is a double
+    case Fixed(c) if (c.toInt == c)  => ConstReg(s"${c.toInt}")
+    case Fixed(c) if (c.toLong == c) => ConstReg(s"${c.toLong}l")
+    case Fixed(c) if (c.toFloat == c) => ConstReg(s"${c.toFloat}f")
+    case Fixed(c) => ConstReg(s"${c.toDouble}d")
+
+    case Def(ConstBit(c)) => if (c) ConstReg("1") else ConstReg("0")
     case _ => throw new Exception(s"Cannot allocate constant value for $x")
   }
 
@@ -228,6 +341,12 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
       else                        expTable += reg -> List(exp)
     }
     def iterators = regTable.flatMap{case (exp, reg: CounterReg) => Some((exp,reg)); case _ => None}.toList
+
+    def innermostIter(cc: CUCounterChain) = {
+      val iters = iterators.flatMap{case (e,CounterReg(`cc`,i)) => Some((e,i)); case _ => None}
+      if (iters.isEmpty) None  else Some(iters.reduce{(a,b) => if (a._2 > b._2) a else b}._1)
+    }
+
     def get(x: Exp[Any]): Option[LocalMem] = x match {
       case Exact(_) => Some(getOrAddReg(x)(allocateConst(x)))
       case Def(ConstBit(_)) => Some(getOrAddReg(x)(allocateConst(x)))
@@ -246,14 +365,6 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
         }
         addReg(x, reg)
         reg
-    }
-
-    def getOrAddMem(name: String, size: Int) = srams.find(_.name == name) match {
-      case Some(sram) => sram
-      case None =>
-        val sram = CUMemory(name, size)
-        srams += sram
-        sram
     }
 
     var writePseudoStages = HashMap[List[CUMemory], List[PseudoStage]]()
@@ -302,12 +413,22 @@ ${super.dumpString}
 
   def memSize(mem: Exp[Any]) = dimsOf(mem).map(dim => bound(dim).get.toInt).fold(1){_*_}
 
+  sealed abstract class SRAMBanking
+  case class Strided(stride: Int) extends SRAMBanking
+  case class Diagonal(stride1: Int, stride2: Int) extends SRAMBanking
+  case object NoBanks extends SRAMBanking { override def toString() = "NoBanking" }
+  case object Duplicated extends SRAMBanking
+
   case class CUMemory(name: String, size: Int) {
     // These can be recursive... e.g. readAddr = ReadAddrWire(this)
     // TODO: Does this need to be changed?
     var vector: Option[GlobalMem] = None
     var readAddr: Option[LocalMem] = None
     var writeAddr: Option[LocalMem] = None
+    var swapCtrl: Option[CUCounterChain] = None
+    var writeCtrl: Option[CUCounterChain] = None
+    var banking: Option[SRAMBanking] = None
+    var isDoubleBuffer = false
 
     def dumpString = s"""CUMemory($name, $size) {
   vector = $vector

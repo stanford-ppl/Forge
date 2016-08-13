@@ -19,6 +19,7 @@ trait PIROptimizer extends Traversal with PIRCommon {
   verboseMode = SpatialConfig.verbose || SpatialConfig.pirdebug
 
   val cuMapping = HashMap[Exp[Any], ComputeUnit]()
+  def allocateCU(pipe: Exp[Any]): ComputeUnit = cuMapping(pipe)
 
   lazy val cus = cuMapping.values
 
@@ -42,7 +43,9 @@ trait PIROptimizer extends Traversal with PIRCommon {
     // Remove unused counterchain copies
     val usedCCs = stages.flatMap{stage => stage.inputMems.flatMap{case CounterReg(cchain,_) => Some(cchain); case _ => None}} ++
                   cu.srams.flatMap{sram => sram.readAddr match {case Some(CounterReg(cchain,_)) => Some(cchain); case _ => None}} ++
-                  cu.srams.flatMap{sram => sram.writeAddr match {case Some(CounterReg(cchain,_)) => Some(cchain); case _ => None}}
+                  cu.srams.flatMap{sram => sram.writeAddr match {case Some(CounterReg(cchain,_)) => Some(cchain); case _ => None}} ++
+                  cu.srams.flatMap{sram => sram.swapCtrl match {case Some(cchain) => Some(cchain); case _ => None}} ++
+                  cu.srams.flatMap{sram => sram.writeCtrl match {case Some(cchain) => Some(cchain); case _ => None}}
     val unusedCopies = cu.cchains.filter{cc=> cc.isInstanceOf[CounterChainCopy] && !usedCCs.contains(cc) }
     cu.cchains --= unusedCopies
   }
@@ -119,7 +122,7 @@ trait PIROptimizer extends Traversal with PIRCommon {
   def vectorOuts(cu: ComputeUnit): List[VectorMem] = cu match {
     case tu: TileTransferUnit if tu.mode == MemLoad => List(tu.vec)
     case cu: BasicComputeUnit =>
-      cu.stages.map(_.outputMems).flatMap{case vec: VectorMem => Some(vec); case _ => None}
+      cu.stages.flatMap(_.outputMems).flatMap{case VectorOut(_, vec: VectorMem) => Some(vec); case _ => None}
 
     case _ => Nil
   }

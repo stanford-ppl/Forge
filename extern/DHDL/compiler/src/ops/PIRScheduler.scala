@@ -21,6 +21,8 @@ trait PIRScheduler extends Traversal with PIRCommon {
 
   val cus = HashMap[Exp[Any], ComputeUnit]()
 
+  def allocateCU(pipe: Exp[Any]): ComputeUnit = cus(pipe)
+
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) {
     if (isControlNode(lhs) && cus.contains(lhs))
       scheduleCU(lhs, cus(lhs))
@@ -228,21 +230,21 @@ trait PIRScheduler extends Traversal with PIRCommon {
 
   def mapNodeToStage(lhs: Exp[Any], rhs: Def[Any], ctx: CUContext) = rhs match {
     // --- Reads
-    case Pop_fifo(fifo) =>
+    case Pop_fifo(EatAlias(fifo)) =>
       val vector = allocateGlobal(fifo).asInstanceOf[VectorMem]
       ctx.addReg(lhs, VectorIn(vector))
 
-    case Par_pop_fifo(fifo, len) =>
+    case Par_pop_fifo(EatAlias(fifo), len) =>
       val vector = allocateGlobal(fifo).asInstanceOf[VectorMem]
       ctx.addReg(lhs, VectorIn(vector))
 
     // Create a reference to this BRAM and
-    case Bram_load(bram, addr) =>
+    case Bram_load(EatAlias(bram), addr) =>
       val sram = ctx.mem(bram,lhs)
       ctx.addReg(lhs, InputReg(sram))
       sram.readAddr = Some(allocateAddrReg(sram, addr, ctx, write=false, local=true))
 
-    case Par_bram_load(bram, addrs) =>
+    case Par_bram_load(EatAlias(bram), addrs) =>
       val sram = ctx.mem(bram,lhs)
       ctx.addReg(lhs, InputReg(sram))
       sram.readAddr = Some(allocateAddrReg(sram, addrs, ctx, write=false, local=true))
@@ -258,17 +260,22 @@ trait PIRScheduler extends Traversal with PIRCommon {
     // Register read is not a "true" node in PIR
     // True register reads happen at the beginning of ALU operations
     // So just make this node alias with the register
-    case Reg_read(reg) =>
+    case Reg_read(EatAlias(reg)) =>
       val input = ctx.cu.getOrAddReg(reg){ allocateLocal(reg, ctx.pipe, read=Some(lhs)) }
       ctx.addReg(lhs, input)
 
     // --- Writes
     // Only for the values, not the addresses UNLESS these are local accumulators
     // TODO: Filters
-    case Push_fifo(fifo,value,en)            => bufferWrite(fifo,value,None,ctx)
-    case Par_push_fifo(fifo,values,ens,_)    => bufferWrite(fifo,values,None,ctx)
-    case Bram_store(bram, addr, value)       => bufferWrite(bram,value,Some(addr),ctx)
-    case Par_bram_store(bram, addrs, values) => bufferWrite(bram,values,Some(addrs),ctx)
+    case Push_fifo(EatAlias(fifo),value,en) =>
+      bufferWrite(fifo,value,None,ctx)
+    case Par_push_fifo(EatAlias(fifo),values,ens,_) =>
+      bufferWrite(fifo,values,None,ctx)
+
+    case Bram_store(EatAlias(bram), addr, value) =>
+      bufferWrite(bram,value,Some(addr),ctx)
+    case Par_bram_store(EatAlias(bram), addrs, values) =>
+      bufferWrite(bram,values,Some(addrs),ctx)
 
     // Cases: 1. Inner Accumulator (read -> write)
     //        2. Outer Accumulator (read -> write)
@@ -279,7 +286,7 @@ trait PIRScheduler extends Traversal with PIRCommon {
     // - 2: Update producer of value to have accumulator as output
     // - 3: Update reg to map to register of value (for later use in reads)
     // - 4: If any of first 3 options, add bypass value to scalar out, otherwise update producer
-    case Reg_write(reg, value) =>
+    case Reg_write(EatAlias(reg), value) =>
       val isLocallyRead = isReadInPipe(reg, ctx.pipe)
       val isLocallyWritten = isWrittenInPipe(reg, ctx.pipe, Some(lhs)) // Always true?
       val isInnerAcc = isInnerAccum(reg) && isLocallyRead && isLocallyWritten
@@ -324,16 +331,23 @@ trait PIRScheduler extends Traversal with PIRCommon {
     case FixPt_Sub(_,_) => Some(FixSub)
     case FixPt_Mul(_,_) => Some(FixMul)
     case FixPt_Div(_,_) => Some(FixDiv)
-    case FltPt_Add(_,_) => Some(FltAdd)
-    case FltPt_Sub(_,_) => Some(FltSub)
-    case FltPt_Mul(_,_) => Some(FltMul)
-    case FltPt_Div(_,_) => Some(FltDiv)
-    case Bit_And(_,_)   => Some(BitAnd)
-    case Bit_Or(_,_)    => Some(BitOr)
     case FixPt_Lt(_,_)  => Some(FixLt)
     case FixPt_Leq(_,_) => Some(FixLeq)
     case FixPt_Eql(_,_) => Some(FixEql)
     case FixPt_Neq(_,_) => Some(FixNeq)
+
+    // Float ops currently assumed to be single op
+    case FltPt_Add(_,_) => Some(FltAdd)
+    case FltPt_Sub(_,_) => Some(FltSub)
+    case FltPt_Mul(_,_) => Some(FltMul)
+    case FltPt_Div(_,_) => Some(FltDiv)
+    case FltPt_Lt(_,_)  => Some(FltLt)
+    case FltPt_Leq(_,_) => Some(FltLeq)
+    case FltPt_Eql(_,_) => Some(FltEql)
+    case FltPt_Neq(_,_) => Some(FltNeq)
+
+    case Bit_And(_,_)   => Some(BitAnd)
+    case Bit_Or(_,_)    => Some(BitOr)
     case _ => None
   }
 

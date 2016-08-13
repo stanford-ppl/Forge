@@ -86,7 +86,7 @@ trait ExternPrimitiveOpsExp extends ExternPrimitiveCompilerOps with ExternPrimit
 
   // --- Rewrite Rules
   // TODO: Allow rewrite rules in forge on metadata helpers
-  private def extractNumericConst[T:Manifest](x: T): Option[Double] = {
+  def extractNumericConst[T:Manifest](x: T): Option[Double] = {
     val mD = manifest[Double]
     val mF = manifest[Float]
     val mI = manifest[Int]
@@ -194,7 +194,7 @@ trait MaxJGenExternPrimitiveOps extends MaxJGenEffect {
       x match {
         case _:Const[_] | _:Param[_] =>
           withStream(baseStream) {
-            emit(s"""DFEVar ${quote(sym)} = constant.var($ts, ${quote(x)});""")          
+            emit(s"""DFEVar ${quote(sym)} = constant.var($ts, ${quote(x)});""")
           }
         case _ =>
           withStream(baseStream) {
@@ -207,8 +207,8 @@ trait MaxJGenExternPrimitiveOps extends MaxJGenEffect {
 
   override def emitFileFooter() = {
     emit(s"""// Emit consts""")
-    emitted_consts.foreach { 
-      case ((s, d)) => 
+    emitted_consts.foreach {
+      case ((s, d)) =>
         d match {
           case ConstFixPt(x,_,_,_) =>
             val ts = tpstr(parOf(s)) (s.tp, implicitly[SourceContext])

@@ -41,7 +41,8 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
   }
 
   // --- CounterChains
-  def deps(x: Exp[Any]) = x match {
+  def inputs(x: Exp[Any]) = x match {
+    case Deff(rhs: Product) => rhs.productIterator.filter(_.isInstanceOf[Exp[_]]).toList
     case Def(rhs) => syms(rhs).distinct
     case _ => Nil
   }
@@ -77,11 +78,15 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
 
     parentOfHack(pipe).foreach{parent => copyIterators(cu, allocateCU(parent)) }
 
-    val ccs = deps(pipe).flatMap {
+    val ccs = inputs(pipe).flatMap {
       case cc@Deff(Counterchain_new(ctrs)) =>
         val ctrInsts = ctrs.map{case ctr@Deff(Counter_new(start,end,stride,par)) => allocateCounter(ctr, start, end, stride) }
         Some(CounterChainInstance(quote(cc),ctrInsts))
       case _ => None
+    }
+    if (ccs.length > 1) {
+      debug(s"Compute unit $cu for $pipe has multiple counter chains: ")
+      ccs.foreach{cc => debug(s"  $cc") }
     }
     cu.cchains ++= ccs
   }
@@ -258,7 +263,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       // However, register reads may appear outside their corresponding controller
       case writer@LocalWriter(writes) if !isControlNode(writer) =>
         debug(s"  $writer [WRITER]")
-        writes.foreach{case (mem, value, addr) =>
+        writes.foreach{case (EatAlias(mem), value, addr) =>
           if (isBuffer(mem)) {
             val addrComputation = addr.map{a => getSchedule(stms)(a,false)}.getOrElse(Nil)
             val addrSyms = addrComputation.map{case TP(s,d) => s}
@@ -276,7 +281,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
 
       case reader@LocalReader(reads) if !isControlNode(reader) =>
         debug(s"  $reader [READER]")
-        reads.foreach{case (mem,addr) =>
+        reads.foreach{case (EatAlias(mem),addr) =>
           if (isRegister(mem.tp)) {
             prescheduleRegisterRead(mem, reader, Some(pipe))
             val isLocallyRead = isReadInPipe(mem, pipe, Some(reader))
@@ -308,7 +313,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
   }
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) = rhs match {
-    case Reg_read(reg) if isArgIn(reg) =>
+    case Reg_read(EatAlias(reg)) if isArgIn(reg) =>
       prescheduleRegisterRead(reg, lhs, None)
 
     case Hwblock(func) =>
@@ -320,7 +325,6 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       prescheduleStages(lhs, func)
 
     case ParPipeReduce(cc, accum, func, rFunc, inds, acc, rV) =>
-      subst += acc -> accum
       val cu = allocateCU(lhs)
       prescheduleStages(lhs, func)
 
@@ -329,7 +333,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       prescheduleStages(lhs, func)
 
     // NOTE: Need to generate offset calculation as a codegen hack right now.
-    case Offchip_load_cmd(mem,fifo,ofs,len,p) =>
+    case Offchip_load_cmd(mem,EatAlias(fifo),ofs,len,p) =>
       debug(s"Traversing $lhs = $rhs")
       val cu = allocateCU(lhs).asInstanceOf[TileTransferUnit]
       val lenIn = cu.getOrAddReg(len){ allocateLocal(len, lhs) }
@@ -358,7 +362,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       val ofsCalc = OpStage(FixAdd, List(ofs, i), memAddr)
       cu.computePseudoStages ++= List(ofsCalc)
 
-    case Offchip_store_cmd(mem,fifo,ofs,len,p) =>
+    case Offchip_store_cmd(mem,EatAlias(fifo),ofs,len,p) =>
       debug(s"Traversing $lhs = $rhs")
       val cu = allocateCU(lhs).asInstanceOf[TileTransferUnit]
       val lenIn = cu.getOrAddReg(len){ allocateLocal(len, lhs) }

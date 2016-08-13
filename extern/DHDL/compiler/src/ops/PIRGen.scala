@@ -32,6 +32,8 @@ trait PIRGen extends Traversal with PIRCommon {
   lazy val top       = prescheduler.top
   val cus = HashMap[Exp[Any],ComputeUnit]()
 
+  def allocateCU(pipe: Exp[Any]): ComputeUnit = throw new Exception("Cannot allocate CUs during generation")
+
   var stream: PrintWriter = null
   var indent = 0
   def emit(x: => Any) { stream.println("  "*indent + x) }
@@ -39,12 +41,10 @@ trait PIRGen extends Traversal with PIRCommon {
   def close(x: => Any) { indent -= 1; emit(x) }
 
   override def quote(x: Exp[Any]) = x match {
-    case Const(c: Int) => "Const(" + c + "l)"
-    case Const(c: Long) => "Const(" + c + "l)"
-    case Const(c: Double) => "Const(" + c + ".toLong)"  // TODO
-    case Const(c: Float) => "Const(" + c + ".toLong)"   // TODO
-    case Exact(c) => "Const(" + c.toLong + "l)" // TODO
-    case Param(p) => "Const(" + p + ".toLong)"  // TODO
+    case Const(_) => quote(allocateConst(x))
+    case Param(_) => quote(allocateConst(x))
+    case Fixed(_) => quote(allocateConst(x))
+    case Def(ConstBit(_)) => quote(allocateConst(x))
     case _ => super.quote(x)
   }
 
@@ -67,14 +67,11 @@ trait PIRGen extends Traversal with PIRCommon {
   def emitPIR(b: Block[Any]) {
     // prescheduling
     prescheduler.run(b)
-    subst ++= prescheduler.subst.toList
     val cuMapping = prescheduler.cuMapping
     // scheduling
-    scheduler.subst ++= subst.toList
     scheduler.cus ++= cuMapping.toList
     scheduler.run(b)
     // optimization
-    optimizer.subst ++= subst.toList
     optimizer.cuMapping ++= cuMapping.toList
     optimizer.run(b)
 
@@ -187,6 +184,19 @@ trait PIRGen extends Traversal with PIRCommon {
         case Some(_:WriteAddrWire | _:LocalWriteReg) =>
         case addr => throw new Exception(s"Disallowed memory write address in $sram: $addr")
       }
+      sram.swapCtrl match {
+        case Some(cchain) => decl += s""", swapCtr = ${cchain.name}"""
+        case None => throw new Exception(s"No swap controller defined for $sram")
+      }
+      sram.writeCtrl match {
+        case Some(cchain) => decl += s""", writeCtr = ${cchain.name}"""
+        case None => throw new Exception(s"No write controller defined for $sram")
+      }
+      sram.banking match {
+        case Some(banking) => decl += s""", banking = $banking"""
+        case None => throw new Exception(s"No banking defined for $sram")
+      }
+      decl += s""", doubleBuffer = ${sram.isDoubleBuffer}"""
       emit(decl + ")")
 
     case MemCtrl(name,region,mode) => emit(s"val $name = MemoryController($mode, ${quote(region)})")
@@ -231,7 +241,7 @@ trait PIRGen extends Traversal with PIRCommon {
   }
 
   def quote(reg: LocalMem): String = reg match {
-    case ConstReg(c) => s"Const($c)"                          // Constant
+    case ConstReg(c) => s"""Const("$c")"""                    // Constant
     case CounterReg(cchain, idx) => s"${cchain.name}($idx)"   // Counter
 
     case WriteAddrWire(mem) => s"${quote(mem)}.writeAddr"     // Write address wire

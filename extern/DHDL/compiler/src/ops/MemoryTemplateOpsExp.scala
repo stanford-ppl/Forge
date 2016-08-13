@@ -807,18 +807,24 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       }
 
     case Bram_load(bram, addr) =>
-      Console.println(s"Load ${sym} from ${bram}")
       bramLoad(sym, bram, addr)
 
     case Par_bram_load(bram, addr) =>
-      Console.println(s"ParLoad ${sym} from ${bram}")
       bramLoad(sym, bram, addr, true)
 
     case Bram_store(bram, addr, value) =>
-      bramStore(sym, bram, addr, value)
+      sym match {
+        case Def(_) => // weed out mysterious Bram bound syms that pretend to be writers 
+          bramStore(sym, bram, addr, value)
+        case _ =>
+      }
 
     case Par_bram_store(bram, addr, value) =>
-      bramStore(sym, bram, addr, value)
+      sym match {
+        case Def(_) => // weed out mysterious Bram bound syms that pretend to be writers  
+          bramStore(sym, bram, addr, value)
+        case _ =>
+      }
 
     case Fifo_new(size, zero) =>  // FIFO is always parallel
       val duplicates = duplicatesOf(sym)

@@ -128,9 +128,11 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
               styleOf(pipe) = InnerPipe
 
               // Replace substitutions of original symbol with register reads
-              escapingValues.zip(regs).foreach{case (sym,reg) => subst += sym -> reg_read(reg)(sym.tp,mpos(sym.pos)) }
+              escapingValues.zip(regs).foreach{case (sym,reg) =>
+                register(sym -> reg_read(reg)(sym.tp,mpos(sym.pos)))
+              }
               // Replace all dependencies on effectful (Unit) symbols with dependencies on newly created Pipe
-              escapingUnits.foreach{sym => subst += sym -> pipe}
+              escapingUnits.foreach{sym => register(sym -> pipe) }
 
             case Some(TP(s,d)) => stage.foreach{stm => traverseStm(stm) } // Mirror non-primitives to update
             case None =>

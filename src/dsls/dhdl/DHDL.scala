@@ -302,7 +302,6 @@ trait DHDLDSL extends ForgeApplication
     //schedule(Printer)
 
     // --- Post-DSE Analysis
-    schedule(Printer)
     schedule(MemoryAnalyzer)        // Memory analyzer (to finalize banking/buffering)
     schedule(AreaAnalyzer)          // Area estimation
     schedule(OpsAnalyzer)           // Instructions, FLOPs, etc. Also runs latency estimates

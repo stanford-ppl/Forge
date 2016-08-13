@@ -86,11 +86,12 @@ trait PIRScheduler extends Traversal with PIRCommon {
     def addOutput(e: Exp[Any], prev: LocalMem, out: LocalMem, add: Boolean = true) {
       mapStages.find{stage => stage.outputMems.contains(prev) } match {
         case Some(stage) =>
-          stage.outs ::= refOut(out, mapStages.indexOf(stage)+1)
+          stage.outs ::= refOut(out, mapStages.length - mapStages.indexOf(stage)) // stage idx + 1
         case None =>
           bypass(prev, out)
       }
       if (add) addReg(e, out)
+      else cu.regs += out // No mapping, only list
     }
 
     def finalizeContext() { }
@@ -303,6 +304,7 @@ trait PIRScheduler extends Traversal with PIRCommon {
 
     case _ => lhs match {
       case Fixed(_) => ctx.cu.getOrAddReg(lhs){ allocateLocal(lhs, ctx.pipe) }
+      case Def(ConstBit(_)) => ctx.cu.getOrAddReg(lhs){ allocateLocal(lhs, ctx.pipe) }
 
       case _ => nodeToOp(rhs) match {
         case Some(op) => opStageToStage(op, syms(rhs), lhs, ctx, false)

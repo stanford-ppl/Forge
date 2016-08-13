@@ -88,15 +88,6 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
 
 
   // --- Compute Units
-
-  def initCU[T<:ComputeUnit](cu: T, pipe: Exp[Any]): T = {
-    cuMapping(pipe) = cu
-    pipes ::= pipe
-    allocateCChains(cu, pipe)
-    debug(s"Allocated CU for control node $pipe: $cu")
-    cu
-  }
-
   def controllersHack(pipe: Exp[Any]): List[Exp[Any]] = pipe match {
     case Deff(_:Pipe_parallel) => childrenOf(pipe)
     case _ => List(pipe)
@@ -114,14 +105,22 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     case None => Nil
   }
 
+  def initCU[T<:ComputeUnit](cu: T, pipe: Exp[Any]): T = {
+    cuMapping(pipe) = cu
+    pipes ::= pipe
+    allocateCChains(cu, pipe)
+    cu.deps ++= pipeDependencies(pipe).map(allocateCU(_))
+    debug(s"Allocated CU for control node $pipe: $cu")
+    cu
+  }
+
   // Get associated CU (or create a new one if not allocated yet)
   def allocateBasicCU(pipe: Exp[Any]): BasicComputeUnit = {
     if (cuMapping.contains(pipe)) cuMapping(pipe).asInstanceOf[BasicComputeUnit]
     else {
       debug(s"Allocating CU for $pipe")
-      val deps = pipeDependencies(pipe)
       val parent = parentOfHack(pipe).map(allocateCU(_))
-      val cu = BasicComputeUnit(quote(pipe), parent, deps, styleOf(pipe))
+      val cu = BasicComputeUnit(quote(pipe), parent, styleOf(pipe))
       initCU(cu, pipe)
       pipe match {
         case Deff(e:ParPipeForeach)     => addIterators(cu, e.cc, e.inds)
@@ -143,8 +142,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       val mc = MemCtrl(quote(pipe)+"_mc", region, mode)
       globals += mc
       val parent = parentOfHack(pipe).map(allocateCU(_))
-      val deps = pipeDependencies(pipe)
-      val cu = TileTransferUnit(quote(pipe), parent, deps, mc, vector, mode)
+      val cu = TileTransferUnit(quote(pipe), parent, mc, vector, mode)
       initCU(cu, pipe)
     }
   }
@@ -300,7 +298,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     val localCompute = stages.filter{s => (isPrimitiveNode(s) || isRegisterRead(s) || isGlobal(s)) && !remoteStages.contains(s) }
 
     // Sanity check
-    val trueComputation = localCompute.filterNot{case Exact(_) => true; case s => isRegisterRead(s)}
+    val trueComputation = localCompute.filterNot{case Exact(_) => true; case Def(ConstBit(_)) => true; case s => isRegisterRead(s)}
     if (isOuterControl(pipe) && trueComputation.nonEmpty) {
       stageWarn(s"Outer control $pipe has compute stages: ")
       trueComputation.foreach{case lhs@Def(rhs) => stageWarn(s"  $lhs = $rhs")}

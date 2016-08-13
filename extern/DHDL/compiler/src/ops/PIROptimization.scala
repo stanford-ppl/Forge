@@ -25,6 +25,7 @@ trait PIROptimizer extends Traversal with PIRCommon {
   override def run[A:Manifest](b: Block[A]) = {
     for (cu <- cus) removeUnusedCUComponents(cu)
     for (cu <- cus) removeRouteThruStages(cu)
+    for (cu <- cus) removeEmptyCUs(cu)
     b
   }
 
@@ -59,17 +60,52 @@ trait PIROptimizer extends Traversal with PIRCommon {
         case bypass@MapStage(Bypass, List(LocalRef(_,VectorIn(in))), List(LocalRef(_,VectorOut(_,out)))) =>
           cus.find{cu => vectorOuts(cu) contains in} match {
             case Some(producer) if producer.parent == cu.parent =>
-
-                swapGlobal(out, in) // Reroute all consumers of this CU to the producer
-                Some(bypass)
+              debug(s"Removing empty stage $bypass from cu $cu")
+              swapGlobal(out, in) // Reroute all consumers of this CU to the producer
+              Some(bypass)
 
             case _ => None
           }
         case _ => None
       }
-      // Remove bypass stages from CU
-      cu.stages = removeStages(cu.stages, bypassStages)
+      if (bypassStages.nonEmpty) {
+        debug(s"CU $cu now has compute stages: ")
+        // Remove bypass stages from CU
+        val stages = removeStages(cu.stages, bypassStages)
+        stages.foreach{stage => debug(s"  $stage") }
+        cu.stages = stages
+      }
+    case _ =>
+  }
 
+  def removeEmptyCUs(cu: ComputeUnit) = cu match {
+    case cu: BasicComputeUnit if cu.tpe == InnerPipe =>
+      // 1. This CU has no children, no write stages, and no compute stages
+      // 2. This CU has a "sibling" (same parent) CU, or has no counter chain instances
+      val children = cus.filter{c => c.parent.contains(cu)}
+      if (cu.writeStages.isEmpty && cu.stages.isEmpty && children.isEmpty) {
+        val siblingCU = cus.find{c => c != cu && c.parent == cu.parent}
+        val cchainInsts = cu.cchains.filter(_.isInstanceOf[CounterChainInstance])
+        if (cchainInsts.isEmpty || siblingCU.isDefined) {
+          debug(s"Removing empty cu $cu")
+          cuMapping.retain{case (pipe,c) => c != cu}
+
+          val sibling = siblingCU.get
+          sibling.cchains ++= cchainInsts
+          cus.foreach{c =>
+            // Swap references to this CU's counter chain to the sibling
+            c.cchains = c.cchains.map{
+              case CounterChainCopy(name, `cu`) => CounterChainCopy(name, sibling)
+              case cc => cc
+            }
+            // Swap dependencies on this CU for dependencies on this CU's dependencies
+            if (c.deps.contains(cu)) {
+              c.deps -= cu
+              c.deps ++= cu.deps
+            }
+          }
+        }
+      }
     case _ =>
   }
 
@@ -89,8 +125,19 @@ trait PIROptimizer extends Traversal with PIRCommon {
   }
 
   // --- Stage removal
-  // TODO
-  def removeStages(stages: List[Stage], remove: List[Stage]) = stages
+  def removeStages(stages: List[Stage], remove: List[Stage]) = {
+    var nRemoved = 0
+    stages.flatMap{
+      case stage@MapStage(op,ins,outs) if !remove.contains(stage) =>
+        stage.ins = ins.map{case LocalRef(i,reg) if i > 0 => LocalRef(i - nRemoved, reg); case ref => ref}
+        stage.outs = outs.map{case LocalRef(i,reg) if i > 0 => LocalRef(i - nRemoved, reg); case ref => ref}
+        Some(stage)
+      case stage@ReduceStage(op,init,acc) => Some(stage)
+      case _ =>
+        nRemoved += 1
+        None
+    }
+  }
 
 
   // --- Swapping helper functions
@@ -100,16 +147,20 @@ trait PIROptimizer extends Traversal with PIRCommon {
     cu.srams.foreach{sram => swapGlobal_SRAM(sram, orig, swap)}
 
     cu match {
-      case tu@TileTransferUnit(name,parent,deps,ctrl,`orig`,mode) => tu.vec = swap
+      case tu@TileTransferUnit(name,parent,ctrl,`orig`,mode) => tu.vec = swap
       case _ =>
     }
   }
   def swapGlobal_Stage(stage: Stage, orig: GlobalMem, swap: GlobalMem) = stage match {
     case stage@MapStage(_,ins,outs) =>
-      stage.ins = ins.map{case LocalRef(i,reg) => LocalRef(i, swapGlobal_Reg(reg,orig,swap)) }
+      stage.ins = ins.map{ref => swapGlobal_Ref(ref, orig, swap) }
       stage.outs = outs.map{case LocalRef(i,reg) => LocalRef(i, swapGlobal_Reg(reg,orig,swap)) }
     case _ =>
   }
+  def swapGlobal_Ref(ref: LocalRef, orig: GlobalMem, swap: GlobalMem) = ref match {
+    case LocalRef(i,reg) => LocalRef(i, swapGlobal_Reg(reg,orig,swap))
+  }
+
   def swapGlobal_Reg(reg: LocalMem, orig: GlobalMem, swap: GlobalMem) = reg match {
     case VectorIn(`orig`) => VectorIn(swap)
     case VectorOut(x, `orig`) => VectorOut(x, swap)

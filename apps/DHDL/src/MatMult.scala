@@ -32,6 +32,12 @@ trait MatMult extends DHDLApplication {
     bound(N) = 1536
     bound(P) = 1536
 
+    val mm = ArgIn[SInt]
+    val nn = ArgIn[SInt]
+    val pp = ArgIn[SInt]
+    setArg(mm, M)
+    setArg(nn, N)
+    setArg(pp, P)
 
     val a = OffChipMem[T](mm, pp)
     val b = OffChipMem[T](pp, nn)
@@ -78,9 +84,9 @@ trait MatMult extends DHDLApplication {
   }
 
   def main() = {
-    val M = mm
-    val N = nn
-    val P = pp
+    val M = args(0).to[SInt]
+    val N = args(1).to[SInt]
+    val P = args(2).to[SInt]
 
     val a = Array.fill(M){ Array.fill(P){random[T](100)} }
     val b = Array.fill(P){ Array.fill(N){random[T](100)} }

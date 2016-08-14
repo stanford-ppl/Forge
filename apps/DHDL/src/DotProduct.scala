@@ -6,10 +6,10 @@ object DotProductCompiler extends DHDLApplicationCompiler with DotProduct
 object DotProductInterpreter extends DHDLApplicationInterpreter with DotProduct
 trait DotProduct extends DHDLApplication {
   type T = SInt
-  val N = 192000
-  val tileSize = 960
-  val innerPar = 1
-  val outerPar = 1
+  val N = 93600000
+  val tileSize = 19200
+  val innerPar = 48
+  val outerPar = 6
   type Array[T] = ForgeArray[T]
 
   def dotproduct(a: Rep[Array[T]], b: Rep[Array[T]]) = {
@@ -54,8 +54,8 @@ trait DotProduct extends DHDLApplication {
     val a = Array.fill(N)(random[T](10))
     val b = Array.fill(N)(random[T](10))
 
-    printArr(a, "a")
-    printArr(b, "b")
+    // printArr(a, "a")
+    // printArr(b, "b")
 
     val result = dotproduct(a, b)
     val gold = a.zip(b){_*_}.reduce{_+_}

@@ -47,6 +47,8 @@ trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with ControlSignalAnalysis
   */
   case class MemInstance(depth: Int, duplicates: Int, banking: List[Banking])
 
+  def SimpleInstance = MemInstance(1, 1, List(NoBanking))
+
   case class MemDuplicates(insts: List[MemInstance]) extends Metadata
   object duplicatesOf {
     def update(e: Exp[Any], m: List[MemInstance]) { setMetadata(e, MemDuplicates(m)) }

@@ -167,6 +167,10 @@ trait PlasticineLatencyAnalyzer extends ModelingTraversal {
     cycleScope ::= cycles
   }
 
+  override def run[A:Manifest](b: Block[A]) = {
+    if (SpatialConfig.genCGRA) super.run(b) else b
+  }
+
   override def preprocess[A:Manifest](b: Block[A]) = {
     cycleScope = Nil
     super.preprocess(b)

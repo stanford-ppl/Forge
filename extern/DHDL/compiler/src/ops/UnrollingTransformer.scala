@@ -113,6 +113,9 @@ trait UnrollingTransformer extends MultiPassTransformer {
       val valids  = boundChecks(lanes.cchain, lanes.indices)
       val enables = lanes.vectorize{p => f(en) && valids(p) }
       val parPush = par_push_fifo(f(fifo), values, enables, true)(e._mT,e.__pos)
+      if (SpatialConfig.genCGRA) {
+        setProps(parPush, mirror(getProps(s), f.asInstanceOf[Transformer]))
+      }
       lanes.unify(s, parPush)
 
     case EatReflect(e@Pop_fifo(fifo)) if !lanes.isUnrolled(fifo) =>
@@ -121,6 +124,9 @@ trait UnrollingTransformer extends MultiPassTransformer {
       dimsOf(parPop) = List(lanes.length.as[Index])
       lenOf(parPop) = lanes.length
       instanceIndexOf(parPop, f(fifo)) = instanceIndexOf(s, fifo)
+      if (SpatialConfig.genCGRA) {
+        setProps(parPop, mirror(getProps(s), f.asInstanceOf[Transformer]))
+      }
       lanes.split(s, parPop)(e._mT)
 
     case EatReflect(e: Cam_load[_,_]) =>
@@ -136,6 +142,9 @@ trait UnrollingTransformer extends MultiPassTransformer {
       val addrs  = lanes.vectorize{p => f(addr)}
       val parStore = par_bram_store(f(bram), addrs, values)(e._mT, e.__pos)
       parIndicesOf(parStore) = lanes.map{i => accessIndicesOf(s).map(f(_)) }
+      if (SpatialConfig.genCGRA) {
+        setProps(parStore, mirror(getProps(s), f.asInstanceOf[Transformer]))
+      }
       lanes.unify(s, parStore)
 
     case EatReflect(e@Bram_load(bram,addr)) if !lanes.isUnrolled(bram) =>
@@ -146,6 +155,9 @@ trait UnrollingTransformer extends MultiPassTransformer {
       lenOf(parLoad) = lanes.length
       parIndicesOf(parLoad) = lanes.map{i => accessIndicesOf(s).map(f(_)) }
       instanceIndexOf(parLoad, f(bram)) = instanceIndexOf(s, bram)
+      if (SpatialConfig.genCGRA) {
+        setProps(parLoad, mirror(getProps(s), f.asInstanceOf[Transformer]))
+      }
       lanes.split(s, parLoad)(e._mT)
 
     // FIXME: Shouldn't be necessary to have duplication rules + metadata propagation
@@ -245,6 +257,8 @@ trait UnrollingTransformer extends MultiPassTransformer {
     val newPipe = reflectEffect(ParPipeReduce(cchain, accum, blk, rFunc, inds2, acc, rV)(ctx,mT,mC))
     isInnerAccum(accum) = true
     isInnerAccum(acc) = true
+    aliasOf(acc) = accum
+    debug(s"Setting alias of $acc to $accum")
 
     val Def(d) = newPipe
     debug(s"$newPipe = $d")
@@ -336,6 +350,8 @@ trait UnrollingTransformer extends MultiPassTransformer {
           ()
         }
         val innerPipe = reflectEffect(ParPipeReduce(ccRed, accum, innerBlk, rFunc, indsRed2, acc, rV), summarizeEffects(innerBlk).star andAlso Simple() andAlso Write(List(accum.asInstanceOf[Sym[C[T]]])) )
+        aliasOf(acc) = accum
+        debug(s"Setting alias of $acc to $accum")
         isInnerAccum(accum) = true
         isInnerAccum(acc) = true
         styleOf(innerPipe) = InnerPipe
@@ -377,6 +393,8 @@ trait UnrollingTransformer extends MultiPassTransformer {
       val rV2 = (fresh(List(e.ctx))(e.mT), fresh(List(e.ctx))(e.mT))
       val b2 = withSubstScope( (i.flatten.zip(i2.flatten) ++ List(acc -> acc2)):_*) { f(b) }
       val rF2 = withSubstScope(rV._1 -> rV2._1, rV._2 -> rV2._2){ f(rF) }
+      aliasOf(acc2) = a2
+      debug(s"Setting alias of $acc2 to $a2")
       reflectMirrored(Reflect(ParPipeReduce(f(cc),a2,b2,rF2,i2,acc2,rV2)(e.ctx,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
 
     case EatReflect(e@Bram_store(bram,addr,value)) =>

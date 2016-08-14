@@ -11,7 +11,7 @@ trait OuterProduct extends DHDLApplication {
     val tileSizeA = param(96);  domainOf(tileSizeA) = (96, 38400, 96)
     val tileSizeB = param(96);  domainOf(tileSizeB) = (96, 38400, 96)
     val outerPar  = param(1);  domainOf(outerPar) = (1, 4, 1)
-    val innerPar  = param(2);  domainOf(innerPar) = (1, 38400, 1)
+    val innerPar  = param(1);  domainOf(innerPar) = (1, 38400, 1)
 
     val M = a.length;  bound(M) = 38400
     val N = b.length;  bound(N) = 38400

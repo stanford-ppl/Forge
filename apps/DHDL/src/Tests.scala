@@ -30,21 +30,6 @@ trait Test extends DHDLApplication {
   }
 }
 
-// Previously reported that hwblock pointer was stale after unrolling
-object Test2Compiler extends DHDLApplicationCompiler with Test2
-trait Test2 extends DHDLApplication {
-  def main() {
-    val T = param(4)
-    val P = param(2)
-
-    val x = ArgIn[SInt]
-    Accel {
-      Reduce(T par P)(0){ii => x.value * ii }{_+_}
-      ()
-    }
-  }
-}
-
 // Reported bug where zero wasn't being propagated for registers
 object Test3Compiler extends DHDLApplicationCompiler with Test3
 trait Test3 extends DHDLApplication {

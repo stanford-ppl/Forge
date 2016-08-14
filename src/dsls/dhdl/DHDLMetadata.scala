@@ -16,6 +16,18 @@ trait DHDLMetadata {
     val Range       = lookupTpe("Range")
     val Idx         = lookupAlias("Index")
 
+    val MAlias = metadata("MAlias", "alias" -> MAny)
+    val aliasOps = metadata("aliasOf")
+    internal.static (aliasOps) ("update", Nil, (MAny, MAny) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MAlias($1)) }
+    internal.static (aliasOps) ("apply", T, (T) :: T) implements composite ${
+      meta[MAlias]($0).map(_.alias).getOrElse($0).asInstanceOf[Rep[T]]
+    }
+
+    val aliasObj = metadata("EatAlias")
+    internal.static (aliasObj) ("unapply", Nil, (MAny) :: SOption(MAny)) implements composite ${ Some(aliasOf($0)) }
+
+
     val DummyMem = metadata("DummyMem", "isDummy" -> SBoolean)
     val isDummy = metadata("isDummy")
     static (isDummy) ("update", Nil, (MAny, SBoolean) :: MUnit, effect = simple) implements

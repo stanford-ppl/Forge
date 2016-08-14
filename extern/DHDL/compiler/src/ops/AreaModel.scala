@@ -73,7 +73,7 @@ object NoArea extends FPGAResources()
 
 // TODO: Should get some of this from loading a file rather than hardcoding
 // All numbers here are from Stratix V profiling
-trait AreaModel extends NodeMetadataOpsExp {
+trait AreaModel extends NodeMetadataOpsExp with MemoryAnalysisExp {
   this: DHDLExp =>
 
   private var silentModel = false
@@ -88,7 +88,7 @@ trait AreaModel extends NodeMetadataOpsExp {
     //System.out.println(s"Delay line: w = $width x l = $length (${width*length}) ")
     val nregs = width*length
     if (nregs < 256) FPGAResources(regs = nregs*par)
-    else             areaOfBRAM(width*par, length, 1, false)
+    else             areaOfBRAM(width*par, List(length), List(SimpleInstance))
   }
   def areaOfDelayLine(width: Int, length: Long, par: Int): FPGAResources = {
     if(length > Int.MaxValue) throw new Exception(s"Casting delay line length to Int would result in overflow")
@@ -110,8 +110,11 @@ trait AreaModel extends NodeMetadataOpsExp {
   /**
    * Area resources required for a BRAM with word size nbits, and with given depth,
    * number of banks, and double buffering
+   *
+   * (NoBanking, Strided(1)) =>
+   * (Strided(1), NoBanking) =>
    **/
-  private def areaOfBRAM(nbits: Int, depth: Int, banks: Int, dblBuf: Boolean) = {
+  private def areaOfMemInstance(nbits: Int, origDims: List[Int], instance: MemInstance) = {
     // Physical depth for given word size for horizontally concatenated RAMs
     val wordDepth = if      (nbits == 1)  16384
                     else if (nbits == 2)  8192
@@ -121,24 +124,48 @@ trait AreaModel extends NodeMetadataOpsExp {
                     else                  512
 
     // Number of horizontally concatenated RAMs required to implement given word
-    val width = if (nbits > 40) Math.ceil( nbits / 40.0 ).toInt else 1
+    val portWidth = if (nbits > 40) Math.ceil( nbits / 40.0 ).toInt else 1
 
-    val bankDepth = Math.ceil(depth.toDouble/banks)       // Word depth per bank
+    val bufferDepth = instance.depth
+    val duplicates = instance.duplicates
+    val banking = instance.banking
 
-    if (bankDepth < REG_RAM_DEPTH) {
-      //System.out.println("RAM can be implemented using registers")
-
-      val regs = width * bankDepth.toInt * banks
-      if (dblBuf) FPGAResources(lut3=2*nbits, regs=2*nbits, mregs = regs*2)
-      else        FPGAResources(mregs = regs)
+    var d = 0
+    // Group dimensions to match diagonal banking groupings
+    val dims = banking.map{
+      case DiagonalBanking(strides, _) =>
+        val dim = origDims.slice(d, d+strides.length).fold(1){_*_}
+        d += strides.length
+        dim
+      case _ =>
+        val dim = origDims(d)
+        d += 1
+        dim
     }
-    else {
-      val ramDepth = Math.ceil(bankDepth/wordDepth).toInt   // Number of rams needed per bank
-      val rams = width * ramDepth * banks
 
-      if (dblBuf) FPGAResources(lut3=2*nbits, regs=2*nbits, bram = rams*2)
-      else        FPGAResources(bram = rams)
+    val banks = banking.map(_.banks)
+
+    val elementsPerBank = dims.zip(banks).map{case (dim,banks) => Math.ceil(dim.toDouble/banks).toInt}.fold(1){_*_}
+
+    val memoryResourcesPerBank = if (elementsPerBank < REG_RAM_DEPTH) FPGAResources(mregs = nbits * elementsPerBank) else {
+      val nRAMs = Math.ceil(elementsPerBank/wordDepth).toInt * portWidth
+      FPGAResources(bram = nRAMs)
     }
+
+    val nBanks = banks.fold(1){_*_} * duplicates
+
+    val memoryResources = memoryResourcesPerBank.replicated(nBanks, false)
+
+    val controlResourcesPerBank = if (bufferDepth == 1) NoArea else {
+      FPGAResources(lut3 = bufferDepth*nbits, regs= bufferDepth*nbits)
+    }
+    val controlResources = controlResourcesPerBank.replicated(nBanks, false)
+
+    memoryResources + controlResources
+  }
+
+  private def areaOfBRAM(nbits: Int, dims: List[Int], instances: List[MemInstance]) = {
+    instances.map{inst => areaOfMemInstance(nbits, dims, inst) }.reduce{_+_}
   }
 
   def areaOfStreamPipe(n: Int) = NoArea // TODO
@@ -232,10 +259,9 @@ trait AreaModel extends NodeMetadataOpsExp {
       //else             FPGAResources(regs = nbits(s))
       FPGAResources(regs = nbits(s))
 
-    // TODO: Number of banks and buffer depth of BRAM
     case e@Bram_new(depth, _) =>
-      val depBound = bound(depth).getOrElse{stageWarn("Cannot resolve bound of BRAM size"); 1.0}.toInt
-      areaOfBRAM(nbits(e._mT), depBound, 1, false) // TODO
+      val dims = dimsOf(s).map{d => bound(d).getOrElse{stageWarn("Cannot resolve bound of BRAM dimension"); 1.0}.toInt}
+      areaOfBRAM(nbits(e._mT), dims, duplicatesOf(s))
 
     case e@Bram_load(ram, _) =>
       val decode = 0 //if (isPow2(banks(ram))) 0 else Math.ceil(Math.log(banks(ram))).toInt

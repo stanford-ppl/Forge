@@ -56,10 +56,10 @@ trait PIROptimizer extends Traversal with PIRCommon {
   }
 
   def removeUnusedGlobals() {
-    val outs = cus.flatMap{cu => scalarOuts(cu) ++ vectorOuts(cu) }.toSet
+    val outs = globals.filter{case _:VectorMem | _:ScalarMem => true; case _ => false}
     val ins = cus.flatMap{cu => scalarIns(cu) ++ vectorIns(cu) }.toSet
 
-    val unusedOuts = outs filterNot (out => ins.contains(out) || out.isInstanceOf[OutputArg])
+    val unusedOuts = outs filterNot (out => ins.contains(out))
 
     def isUnusedReg(reg: LocalMem) = reg match {
       case ScalarOut(_,out) => unusedOuts contains out
@@ -73,6 +73,8 @@ trait PIROptimizer extends Traversal with PIRCommon {
       stages.foreach{stage => stage.outs = stage.outs.filterNot(isUnusedRef(_)) }
       cu.regs = cu.regs.filterNot(isUnusedReg(_))
     }
+
+    globals --= unusedOuts
   }
 
   // Remove route-through CUs from the IR after scheduling
@@ -166,11 +168,10 @@ trait PIROptimizer extends Traversal with PIRCommon {
     cu.writeStages.values.flatMap{stages => stages.flatMap{case stage: MapStage => Some(stage); case _ => None}}
   }
 
-  def scalarIns(cu: ComputeUnit): List[GlobalMem] = cu match {
-    case tu: TileTransferUnit => Nil
-    case cu: BasicComputeUnit =>
-      cu.stages.flatMap(_.outputMems).flatMap{case ScalarIn(_, in) => Some(in); case _ => None}
-    case _ => Nil
+  def scalarIns(cu: ComputeUnit): List[GlobalMem] = {
+    cu.stages.flatMap(_.inputMems).flatMap{case ScalarIn(_, in) => Some(in); case _ => None} ++
+    cu.srams.flatMap{sram => sram.readAddr.flatMap{case ScalarIn(_, in) => Some(in); case _ => None}} ++
+    cu.srams.flatMap{sram => sram.writeAddr.flatMap{case ScalarIn(_, in) => Some(in); case _ => None}}
   }
   def scalarOuts(cu: ComputeUnit): List[GlobalMem] = cu match {
     case tu: TileTransferUnit => Nil
@@ -191,6 +192,7 @@ trait PIROptimizer extends Traversal with PIRCommon {
     case cu: BasicComputeUnit =>
       cu.stages.flatMap(_.inputMems).flatMap{case VectorIn(vec: VectorMem) => Some(vec); case _ => None} ++
       cu.srams.flatMap{sram => sram.vector.flatMap{case vec: VectorMem => Some(vec); case _ => None }}
+    case _ => Nil
   }
 
   // --- Stage removal

@@ -72,12 +72,13 @@ trait PIRGen extends Traversal with PIRCommon {
     scheduler.cus ++= cuMapping.toList
     scheduler.run(b)
     // optimization
+    optimizer.globals ++= (prescheduler.globals ++ scheduler.globals)
     optimizer.cuMapping ++= cuMapping.toList
     optimizer.run(b)
 
     cus ++= optimizer.cuMapping.toList
 
-    globals ++= (prescheduler.globals ++ scheduler.globals ++ optimizer.globals)
+    globals ++= optimizer.globals
 
     debug("Scheduling complete. Generating...")
     generateHeader()
@@ -93,10 +94,12 @@ trait PIRGen extends Traversal with PIRCommon {
     emit("import pir.plasticine.config._")
     emit("import pir.Design")
     emit("import pir.PIRMisc._")
+    emit("import pir.PIRApp")
     emit("")
-    open(s"""object ${app}Design extends Design {""")
+    open(s"""object ${app}Design extends PIRApp {""")
     emit(s"""override val arch = Config0""")
-    emit(s"""top = Top()""")
+    open(s"""def main(args: String*)(top:Top) = {""")
+    //emit(s"""top = Top()""")
   }
 
   def generateGlobals() {
@@ -108,9 +111,9 @@ trait PIRGen extends Traversal with PIRCommon {
   def generateFooter() {
     val args = globals.flatMap{case InputArg(name)=>Some(name); case OutputArg(name)=>Some(name); case _ => None}.mkString(", ")
     val mcs  = globals.flatMap{case MemCtrl(name,_,_)=>Some(name); case _ => None}.mkString(", ")
-    emit(s"top.updateFields(List(${cus(top.get).name}), List($args), List($mcs))")
+    //emit(s"top.updateFields(List(${cus(top.get).name}), List($args), List($mcs))")
     emit(s"")
-    emit("def main(args: Array[String]): Unit = run")
+    close("}")
     close("}")
   }
 
@@ -124,11 +127,11 @@ trait PIRGen extends Traversal with PIRCommon {
     val deps = cu.deps.map{dep => dep.name }.mkString("List(", ", ", ")")
     cu match {
       case cu: BasicComputeUnit if cu.isUnitCompute =>
-        s"""UnitComputeUnit(name = Some("${cu.name}"), parent=$parent, deps=$deps)"""
+        s"""UnitComputeUnit(name ="${cu.name}", parent=$parent, deps=$deps)"""
       case cu: BasicComputeUnit =>
-        s"""ComputeUnit(name=Some("${cu.name}"), parent=$parent, tpe = ${quote(cu.tpe)}, deps=$deps)"""
+        s"""ComputeUnit(name="${cu.name}", parent=$parent, tpe = ${quote(cu.tpe)}, deps=$deps)"""
       case cu: TileTransferUnit =>
-        s"""TileTransfer(name=Some("${cu.name}"), parent=$parent, memctrl=${quote(cu.ctrl)}, mctpe=${cu.mode}, deps=$deps, vec=${quote(cu.vec)})"""
+        s"""TileTransfer(name="${cu.name}", parent=$parent, memctrl=${quote(cu.ctrl)}, mctpe=${cu.mode}, deps=$deps, vec=${quote(cu.vec)})"""
     }
   }
 
@@ -137,7 +140,7 @@ trait PIRGen extends Traversal with PIRCommon {
     debug(cu.dumpString)
 
     open(s"val ${cu.name} = ${cuDeclaration(cu)} { implicit CU => ")
-    emit(s"val stage0 = EmptyStage()")
+    emit(s"val stage0 = CU.emptyStage")
     preallocateRegisters(cu)                // Includes scalar inputs/outputs, temps, accums
     cu.cchains.foreach(emitComponent(_))    // Allocate all counterchains
     cu.srams.foreach(emitComponent(_))      // Allocate all SRAMs
@@ -149,8 +152,8 @@ trait PIRGen extends Traversal with PIRCommon {
   }
 
   def quoteInCounter(reg: LocalMem) = reg match {
-    case reg:ScalarIn => s"cu.scalarIn(stage0, ${quote(reg)})"
-    case reg:ConstReg => quote(reg)
+    case reg:ScalarIn => s"CU.scalarIn(stage0, ${quote(reg)}).out"
+    case reg:ConstReg => s"""${quote(reg)}.out"""
     case _ => throw new Exception(s"Disallowed input to counter: $reg")
   }
 
@@ -163,6 +166,9 @@ trait PIRGen extends Traversal with PIRCommon {
       val ctrList = ctrs.map{_.name}.mkString(", ")
       emit(s"""val $name = CounterChain(name = "$name", $ctrList)""")
 
+    case UnitCounterChain(name) =>
+      emit(s"""val $name = CounterChain(name = "$name", (Const("0i"), Const("1i"), Const("1i")))""")
+
     case CUCounter(name,start,end,stride) =>
       debug(s"Generating counter $x")
       emit(s"""val $name = (${quoteInCounter(start)}, ${quoteInCounter(end)}, ${quoteInCounter(stride)}) // Counter""")
@@ -171,6 +177,7 @@ trait PIRGen extends Traversal with PIRCommon {
       debug(s"Generating ${sram.dumpString}")
       var decl = s"""val ${quote(sym)} = SRAM(size = $size"""
       sram.vector match {
+        case Some(LocalVector) => // Nothing?
         case Some(vec) => decl += s""", vec = ${quote(vec)}"""
         case None => throw new Exception(s"Memory $sram has no vector defined")
       }
@@ -180,16 +187,16 @@ trait PIRGen extends Traversal with PIRCommon {
         case addr => throw new Exception(s"Disallowed memory read address in $sram: $addr")
       }
       sram.writeAddr match {
-        case Some(_:CounterReg | _:ConstReg) => decl += s""", writeAddr = ${quote(sram.writeAddr.get)})"""
+        case Some(_:CounterReg | _:ConstReg) => decl += s""", writeAddr = ${quote(sram.writeAddr.get)}"""
         case Some(_:WriteAddrWire | _:LocalWriteReg) =>
         case addr => throw new Exception(s"Disallowed memory write address in $sram: $addr")
       }
       sram.swapCtrl match {
-        case Some(cchain) => decl += s""", swapCtr = ${cchain.name}"""
+        case Some(cchain) => decl += s""", swapCtr = ${cchain.name}(0)""" // TODO: Always 0?
         case None => throw new Exception(s"No swap controller defined for $sram")
       }
       sram.writeCtrl match {
-        case Some(cchain) => decl += s""", writeCtr = ${cchain.name}"""
+        case Some(cchain) => decl += s""", writeCtr = ${cchain.name}(0)""" // TODO: Always 0?
         case None => throw new Exception(s"No write controller defined for $sram")
       }
       sram.banking match {
@@ -200,7 +207,7 @@ trait PIRGen extends Traversal with PIRCommon {
       emit(decl + ")")
 
     case mem@MemCtrl(_,region,mode) => emit(s"val ${quote(mem)} = MemoryController($mode, ${quote(region)})")
-    case mem: Offchip   => emit(s"val ${quote(mem)} = Offchip()")
+    case mem: Offchip   => emit(s"val ${quote(mem)} = OffChip()")
     case mem: InputArg  => emit(s"val ${quote(mem)} = ArgIn()")
     case mem: OutputArg => emit(s"val ${quote(mem)} = ArgOut()")
     case mem: ScalarMem => emit(s"val ${quote(mem)} = Scalar()")
@@ -209,11 +216,11 @@ trait PIRGen extends Traversal with PIRCommon {
   }
 
   def preallocateRegisters(cu: ComputeUnit) = cu.regs.foreach{
-    case reg@TempReg(_)         => emit(s"val ${quote(reg)} = CU.temp()")
-    case reg@AccumReg(_,init)   => emit(s"val ${quote(reg)} = CU.accum(init = Some(${quote(init)}))")
-    case reg@ScalarIn(_,mem)    => emit(s"val ${quote(reg)} = ScalarIn(${quote(mem)})")
-    case reg@ScalarOut(_,mem:OutputArg) => emit(s"val ${quote(reg)} = ScalarOut(${quote(mem)})")
-    case reg@ScalarOut(_,mem:ScalarMem) => emit(s"val ${quote(reg)} = ScalarOut(${quote(mem)})")
+    case reg@TempReg(_)         => emit(s"val ${quote(reg)} = CU.temp")
+    case reg@AccumReg(_,init)   => emit(s"val ${quote(reg)} = CU.accum(init = ${quote(init)})")
+    //case reg@ScalarIn(_,mem)    => emit(s"val ${quote(reg)} = CU.scalarIn(${quote(mem)})")
+    //case reg@ScalarOut(_,mem:OutputArg) => emit(s"val ${quote(reg)} = CU.scalarOut(${quote(mem)})")
+    //case reg@ScalarOut(_,mem:ScalarMem) => emit(s"val ${quote(reg)} = CU.scalarOut(${quote(mem)})")
     case _ => // No preallocation
   }
 
@@ -252,14 +259,14 @@ trait PIRGen extends Traversal with PIRCommon {
     case AccumReg(_,_)      => s"ar${reg.id}"                 // After preallocation
     case TempReg(_)         => s"tr${reg.id}"                 // Temporary register
 
-    case ScalarIn(_, mem:InputArg)   => s"in${reg.id}"        // Scalar inputs from input arg
-    case ScalarIn(_, mem:ScalarMem)  => s"in${reg.id}"        // Scalar inputs from CU
-    case ScalarOut(_, out:OutputArg) => s"out${reg.id}"       // Scalar output to output arg
-    case ScalarOut(_, mem:ScalarMem) => s"out${reg.id}"       // Output to another CU
+    case ScalarIn(_, mem:InputArg)   => quote(mem)            // Scalar inputs from input arg
+    case ScalarIn(_, mem:ScalarMem)  => quote(mem)            // Scalar inputs from CU
+    case ScalarOut(_, out:OutputArg) => quote(out)            // Scalar output to output arg
+    case ScalarOut(_, mem:ScalarMem) => quote(mem)            // Output to another CU
     case ScalarOut(_, mc:MemCtrl) => s"${quote(mc)}.saddr"    // Output to memory address
 
     case VectorIn(mem)                => quote(mem)           // Global vector read
-    case InputReg(mem)           => s"${quote(mem)}.load"     // Local vector read
+    case InputReg(mem)                => quote(mem)           // Local vector read
     case VectorLocal(_, mem)          => quote(mem)           // Local vector write
     case VectorOut(_, vec: VectorMem) => quote(vec)           // Global vector write
 
@@ -285,7 +292,7 @@ trait PIRGen extends Traversal with PIRCommon {
     case LocalRef(stage, reg: ScalarOut) => s"CU.scalarOut(stage($stage), ${quote(reg)})"
 
     case LocalRef(stage, reg: VectorIn)  => s"CU.vecIn(stage($stage), ${quote(reg)})"
-    case LocalRef(stage, reg: InputReg)    => if (stage >= 0) s"CU.load(stage($stage), ${quote(reg)})" else quote(reg)
+    case LocalRef(stage, reg: InputReg)    => if (stage >= 0) s"CU.load(stage($stage), ${quote(reg)})" else s"${quote(reg)}.load"
     case LocalRef(stage, reg: VectorLocal) => s"CU.store(stage($stage), ${quote(reg)})"
     case LocalRef(stage, reg: VectorOut)   => s"CU.vecOut(stage($stage), ${quote(reg)})"
   }
@@ -312,7 +319,7 @@ trait PIRGen extends Traversal with PIRCommon {
     for ((srams,stages) <- cu.writeStages if stages.nonEmpty) {
       i = 1
       val nWrites  = stages.filter{_.isInstanceOf[MapStage]}.length
-      emit(s"stage = stage0 +: WAStages(${srams.map(quote(_))}, ${nWrites})")
+      emit(s"stage = stage0 +: WAStages(${nWrites}, ${srams.map(quote(_))})")
       emitStages(stages)
     }
     if (cu.stages.nonEmpty) {

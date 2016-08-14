@@ -7,7 +7,6 @@ object KmeansInterpreter extends DHDLApplicationInterpreter with Kmeans
 trait Kmeans extends DHDLApplication {
   type Array[T] = ForgeArray[T]
 
-
   lazy val MAXK = 8
   lazy val MAXD = 384
 
@@ -87,7 +86,10 @@ trait Kmeans extends DHDLApplication {
 
           // Store this point to the set of accumulators
           val localCent = BRAM[Flt](MAXK,MAXD+1)
-          Pipe(DP1 par P6){d => localCent(minCent.value, d) = mux(d == D, 1.as[Flt], pts(pt, d)) }
+          Pipe(K by 1, DP1 par P6){(ct,d) =>
+            val elem = mux(d == D, 1.as[Flt], pts(pt, d))
+            localCent(ct, d) = mux(ct == minCent.value, elem, 0.as[Flt])
+          }
           localCent
         }{_+_} // Add the current point to the accumulators for this centroid
       }{_+_}

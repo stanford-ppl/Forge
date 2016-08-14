@@ -405,22 +405,22 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
 
   // --- Compute units
   def allocateConst(x: Exp[Any]) = x match {
-    case Const(c: Int)    => ConstReg(s"$c")
+    case Const(c: Int)    => ConstReg(s"${c}i")
     case Const(c: Long)   => ConstReg(s"${c}l")
     case Const(c: Double) => ConstReg(s"${c}d")
     case Const(c: Float)  => ConstReg(s"${c}f")
-    case Param(c: Int)    => ConstReg(s"$c")
+    case Param(c: Int)    => ConstReg(s"${c}i")
     case Param(c: Long)   => ConstReg(s"${c}l")
     case Param(c: Double) => ConstReg(s"${c}d")
     case Param(c: Float)  => ConstReg(s"${c}f")
 
     // TODO: Not quite correct since bound is a double
-    case Fixed(c) if (c.toInt == c)  => ConstReg(s"${c.toInt}")
+    case Fixed(c) if (c.toInt == c)  => ConstReg(s"${c.toInt}i")
     case Fixed(c) if (c.toLong == c) => ConstReg(s"${c.toLong}l")
     case Fixed(c) if (c.toFloat == c) => ConstReg(s"${c.toFloat}f")
     case Fixed(c) => ConstReg(s"${c.toDouble}d")
 
-    case Def(ConstBit(c)) => if (c) ConstReg("1") else ConstReg("0")
+    case Def(ConstBit(c)) => if (c) ConstReg("1i") else ConstReg("0i")
     case _ => throw new Exception(s"Cannot allocate constant value for $x")
   }
 
@@ -486,7 +486,7 @@ ${super.dumpString}
 }"""
     override def toString() = s"BasicComputeUnit($name, ${parent.map(_.name)})"
 
-    def isUnitCompute = (stages.nonEmpty || writeStages.nonEmpty) && !cchains.exists(_.isInstanceOf[CounterChainInstance])
+    var isUnitCompute =false
   }
 
   case class TileTransferUnit(
@@ -508,14 +508,15 @@ ${super.dumpString}
   sealed abstract class CUCounterChain(val name: String)
   case class CounterChainCopy(override val name: String, owner: ComputeUnit) extends CUCounterChain(name)
   case class CounterChainInstance(override val name: String, ctrs: List[CUCounter]) extends CUCounterChain(name)
+  case class UnitCounterChain(override val name: String) extends CUCounterChain(name)
 
   def memSize(mem: Exp[Any]) = dimsOf(mem).map(dim => bound(dim).get.toInt).fold(1){_*_}
 
   sealed abstract class SRAMBanking
   case class Strided(stride: Int) extends SRAMBanking
   case class Diagonal(stride1: Int, stride2: Int) extends SRAMBanking
-  case object NoBanks extends SRAMBanking { override def toString() = "NoBanking" }
-  case object Duplicated extends SRAMBanking
+  case object NoBanks extends SRAMBanking { override def toString() = "NoBanking()" }
+  case object Duplicated extends SRAMBanking { override def toString = "Duplicated()" }
 
   case class CUMemory(name: String, size: Int) {
     // These can be recursive... e.g. readAddr = ReadAddrWire(this)

@@ -18,31 +18,37 @@ trait MatMult extends DHDLApplication {
   type T = Flt //FixPt[Signed,B16,B16]
   type Array[T] = ForgeArray[T]
 
-  val mm = 192
-  val nn = 384
-  val pp = 96
+  val mm = 1920
+  val nn = 19200
+  val pp = 19200
+  val tileSizeM = 96
+  val tileSizeN = 192
+  val tileSizeP = 768
+  val innerPar = 1
+  val midPar = 1
+  val outerPar = 1
   def matmult(A: Rep[Array[T]], B: Rep[Array[T]], M: Rep[SInt], N: Rep[SInt], P: Rep[SInt]) = {
     bound(M) = 1536
     bound(N) = 1536
     bound(P) = 1536
 
-    val m = ArgIn[SInt]
-    val n = ArgIn[SInt]
-    val p = ArgIn[SInt]
-    setArg(m, M)
-    setArg(n, N)
-    setArg(p, P)
+    val mm = ArgIn[SInt]
+    val nn = ArgIn[SInt]
+    val pp = ArgIn[SInt]
+    setArg(mm, M)
+    setArg(nn, N)
+    setArg(pp, P)
 
-    val a = OffChipMem[T](m, p)
-    val b = OffChipMem[T](p, n)
-    val c = OffChipMem[T](m, n)
+    val a = OffChipMem[T](mm, pp)
+    val b = OffChipMem[T](pp, nn)
+    val c = OffChipMem[T](mm, nn)
 
-    val bm        = param(4);   domainOf(bm) = (1,1536,1)
-    val bn        = param(4);   domainOf(bn) = (96,1536,96)
-    val bp        = param(4);   domainOf(bp) = (96,1536,96)
-    val outerPar  = param(1);   domainOf(outerPar)  = (1,6,1)
-    val middlePar = param(2);   domainOf(middlePar) = (1,96,1)
-    val innerPar  = param(2);   domainOf(innerPar)  = (1,96,1)
+    val bm        = param(tileSizeM);   domainOf(bm) = (1,1536,1)
+    val bn        = param(tileSizeN);   domainOf(bn) = (96,1536,96)
+    val bp        = param(tileSizeP);   domainOf(bp) = (96,1536,96)
+    val op  = param(outerPar);   domainOf(op)  = (1,6,1)
+    val mp = param(midPar);   domainOf(mp) = (1,96,1)
+    val ip  = param(innerPar);   domainOf(ip)  = (1,96,1)
     val upMidPar  = param(1);   domainOf(upMidPar)  = (1,1,1)
     val stPar     = param(1);   domainOf(stPar)     = (1,1,1)
 
@@ -50,8 +56,8 @@ trait MatMult extends DHDLApplication {
     setMem(b, B)
 
     Accel {
-      Pipe(m by bm, (n by bn) par outerPar){(i,j) =>
-        Pipe((p by bp) par upMidPar){k =>
+      Pipe(mm by bm, (nn by bn) par op){(i,j) =>
+        Pipe((pp by bp) par upMidPar){k =>
           val tileA = BRAM[T](bm, bp)
           val tileB = BRAM[T](bp, bn)
           val tileC = BRAM[T](bm, bn)
@@ -59,8 +65,8 @@ trait MatMult extends DHDLApplication {
             tileA := a(i::i+bm, k::k+bp, param(1))
             tileB := b(k::k+bp, j::j+bn, param(1))
           }
-          Sequential(bm by 1, (bn by 1) par middlePar){ (ii,jj) =>    // MetaPipe?
-            val prod = Reduce((bp by 1) par innerPar)(0.as[T]){ kk => tileA(ii, kk) * tileB(kk, jj) }{_+_}
+          Sequential(bm by 1, (bn by 1) par mp){ (ii,jj) =>    // MetaPipe?
+            val prod = Reduce((bp by 1) par ip)(0.as[T]){ kk => tileA(ii, kk) * tileB(kk, jj) }{_+_}
             val prev = mux(k == 0, 0.as[T], tileC(ii,jj))
             tileC(ii,jj) = prev + prod.value
           }
@@ -78,9 +84,9 @@ trait MatMult extends DHDLApplication {
   }
 
   def main() = {
-    val M = mm
-    val N = nn
-    val P = pp
+    val M = args(0).to[SInt]
+    val N = args(1).to[SInt]
+    val P = args(2).to[SInt]
 
     val a = Array.fill(M){ Array.fill(P){random[T](100)} }
     val b = Array.fill(P){ Array.fill(N){random[T](100)} }

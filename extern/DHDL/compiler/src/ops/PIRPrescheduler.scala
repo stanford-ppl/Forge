@@ -52,6 +52,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       val cchainCopies = srcCU.cchains.map{
         case cc@CounterChainCopy(name, owner) => cc -> cc
         case cc@CounterChainInstance(name, ctrs) => cc -> CounterChainCopy(name, srcCU)
+        case cc@UnitCounterChain(name) => cc -> CounterChainCopy(name, srcCU)
       }
       val cchainMapping = Map[CUCounterChain,CUCounterChain](cchainCopies.toList:_*)
       destCU.cchains ++= cchainCopies.map(_._2)
@@ -68,7 +69,7 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
     }
   }
 
-  def allocateCChains(cu: ComputeUnit, pipe: Exp[Any]) = {
+  def allocateCChains(cu: ComputeUnit, pipe: Exp[Any]) {
     def allocateCounter(ctr: Exp[Counter], start: Exp[Any], end: Exp[Any], stride: Exp[Any]) = {
       val min = cu.getOrAddReg(start){ allocateLocal(start, pipe) }
       val max = cu.getOrAddReg(end){ allocateLocal(end, pipe) }
@@ -130,6 +131,10 @@ trait PIRScheduleAnalyzer extends Traversal with SpatialTraversalTools with PIRC
       pipe match {
         case Deff(e:ParPipeForeach)     => addIterators(cu, e.cc, e.inds)
         case Deff(e:ParPipeReduce[_,_]) => addIterators(cu, e.cc, e.inds)
+        case Deff(_:Unit_pipe | _:Hwblock) =>
+          cu.isUnitCompute = isInnerPipe(pipe)
+          cu.cchains += UnitCounterChain(quote(pipe)+"_unitCC")
+
         case _ =>
       }
       if (top.isEmpty && parent.isEmpty) top = Some(pipe)

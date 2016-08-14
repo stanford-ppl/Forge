@@ -394,7 +394,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
       val b2 = withSubstScope( (i.flatten.zip(i2.flatten) ++ List(acc -> acc2)):_*) { f(b) }
       val rF2 = withSubstScope(rV._1 -> rV2._1, rV._2 -> rV2._2){ f(rF) }
       aliasOf(acc2) = a2
-      debug(s"Setting alias of $acc to $a2")
+      debug(s"Setting alias of $acc2 to $a2")
       reflectMirrored(Reflect(ParPipeReduce(f(cc),a2,b2,rF2,i2,acc2,rV2)(e.ctx,e.mT,e.mC), mapOver(f,u), f(es)))(mtype(manifest[A]), pos)
 
     case EatReflect(e@Bram_store(bram,addr,value)) =>

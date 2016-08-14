@@ -92,15 +92,13 @@ trait LatencyModel extends NodeMetadataOpsExp with MemoryAnalysisExp {
     case Cam_store(cam,key,value) => 1
 
     // TODO: Not a function of number of banks?
-    case Bram_load(ram, _) =>
-      val instIndex = instanceIndexOf(s, ram)
+    case Bram_load(ram, _) => 1
+      // FIXME: Not defined in reduction functions/ ld blocks
+      /*val instIndex = instanceIndexOf(s, ram)
       val instance = duplicatesOf(ram).apply(instIndex)
-      instance.depth // ???
+      instance.depth // ???*/
 
-    case Bram_store(ram, _, _) =>
-      val instIndex = instanceIndexOf(s, ram)
-      val instance = duplicatesOf(ram).apply(instIndex)
-      instance.depth // ???
+    case Bram_store(ram, _, _) => 1 // TODO
 
     case _:Counter_new => 0
     case _:Counterchain_new => 0

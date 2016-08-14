@@ -6,11 +6,14 @@ object BlackScholesCompiler extends DHDLApplicationCompiler with BlackScholes
 object BlackScholesInterpreter extends DHDLApplicationInterpreter with BlackScholes
 trait BlackScholes extends DHDLApplication {
 
-  lazy val tileSize = param(96)
-  lazy val outerPar = param(1)
-  lazy val innerPar = param(2)
+  val tileSize = 7104
+  val outerPar = 1
+  val innerPar = 8
+  lazy val ts = param(tileSize)
+  lazy val op = param(outerPar)
+  lazy val ip = param(innerPar)
   lazy val numOptions = ArgIn[SInt]
-  val nn = 96
+  val nn = 7680000
 
   final val inv_sqrt_2xPI = 0.39894228040143270286f
 
@@ -74,29 +77,29 @@ trait BlackScholes extends DHDLApplication {
     optprice:   Rep[OffChipMem[Flt]]
   ): Rep[Unit] = {
 
-    Pipe((numOptions by tileSize) par outerPar) { i =>
-      val otypeRAM      = BRAM[UInt](tileSize)
-      val sptpriceRAM   = BRAM[Flt](tileSize)
-      val strikeRAM     = BRAM[Flt](tileSize)
-      val rateRAM       = BRAM[Flt](tileSize)
-      val volatilityRAM = BRAM[Flt](tileSize)
-      val otimeRAM      = BRAM[Flt](tileSize)
+    Pipe((numOptions by ts) par op) { i =>
+      val otypeRAM      = BRAM[UInt](ts)
+      val sptpriceRAM   = BRAM[Flt](ts)
+      val strikeRAM     = BRAM[Flt](ts)
+      val rateRAM       = BRAM[Flt](ts)
+      val volatilityRAM = BRAM[Flt](ts)
+      val otimeRAM      = BRAM[Flt](ts)
 
       Parallel {
-        otypeRAM := otype(i::i+tileSize, innerPar)
-        sptpriceRAM := sptprice(i::i+tileSize, innerPar)
-        strikeRAM := strike(i::i+tileSize, innerPar)
-        rateRAM := rate(i::i+tileSize, innerPar)
-        volatilityRAM := volatility(i::i+tileSize, innerPar)
-        otimeRAM := otime(i::i+tileSize, innerPar)
+        otypeRAM := otype(i::i+ts, ip)
+        sptpriceRAM := sptprice(i::i+ts, ip)
+        strikeRAM := strike(i::i+ts, ip)
+        rateRAM := rate(i::i+ts, ip)
+        volatilityRAM := volatility(i::i+ts, ip)
+        otimeRAM := otime(i::i+ts, ip)
       }
 
-      val optpriceRAM = BRAM[Flt](tileSize)
-      Pipe((tileSize by 1) par innerPar){ j =>
+      val optpriceRAM = BRAM[Flt](ts)
+      Pipe((ts by 1) par ip){ j =>
         val price = BlkSchlsEqEuroNoDiv(sptpriceRAM(j), strikeRAM(j), rateRAM(j), volatilityRAM(j), otimeRAM(j), otypeRAM(j))
         optpriceRAM(j) = price
       }
-      optprice(i::i+tileSize, innerPar) := optpriceRAM
+      optprice(i::i+ts, ip) := optpriceRAM
     }
   }
 
@@ -109,9 +112,9 @@ trait BlackScholes extends DHDLApplication {
     val N = nn
 
     bound(N) = 9995328
-    domainOf(tileSize) = (96,19200,96)
-    domainOf(outerPar) = (1,1,1)
-    domainOf(innerPar) = (1,96,1)
+    domainOf(ts) = (96,19200,96)
+    domainOf(op) = (1,1,1)
+    domainOf(ip) = (1,96,1)
 
     setArg(numOptions, N)
     val types  = OffChipMem[UInt](numOptions)
@@ -140,7 +143,7 @@ trait BlackScholes extends DHDLApplication {
 
     val out = getMem(optprice)
 
-    printArr(sstrike, "sstrike:")
-    printArr(out, "result:")
+    // printArr(sstrike, "sstrike:")
+    // printArr(out, "result:")
   }
 }

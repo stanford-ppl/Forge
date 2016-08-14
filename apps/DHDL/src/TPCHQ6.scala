@@ -25,7 +25,7 @@ trait TPCHQ6 extends DHDLApplication {
     val maxDateIn = ArgIn[UInt]
     val out = ArgOut[Flt]
 
-    val tileSize = param(12);   domainOf(tileSize) = (96,192000,96)
+    val tileSize = param(96);   domainOf(tileSize) = (96,192000,96)
     val outerPar = param(1);    domainOf(outerPar) = (1,6,1)
     val innerPar = param(1);    domainOf(innerPar) = (1,384,1)
 

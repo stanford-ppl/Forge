@@ -385,37 +385,42 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
               case _ =>
                 val a = inds(0)
                 val b = inds(1)
-                if (quote(a(1)) == quote(b(1))) { //ugly ass hack
-                  var addr1 = ""
-                  val addr0 = inds.map { row =>
-                                row.length match {
-                                  case 1 =>
-                                    addr1 = quote(1)
-                                    quote(row(0))
-                                  case _ =>
-                                    addr1 = quote(row(0))
-                                    quote(row(0))
-                                  }
-                            }
+                a.length match {
+                  case 1 => 
+                    emit(s"""$pre ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
+                  case _ =>
+                    if (quote(a(1)) == quote(b(1))) { //ugly ass hack
+                      var addr1 = ""
+                      val addr0 = inds.map { row =>
+                                    row.length match {
+                                      case 1 =>
+                                        addr1 = quote(1)
+                                        quote(row(0))
+                                      case _ =>
+                                        addr1 = quote(row(0))
+                                        quote(row(0))
+                                      }
+                                }
 
-                  emit(s"""//all readers share column. vectorized """)
-                  emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(new DFEVectorType<DFEVar>(${addr0(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr0.map(quote).mkString(",")})), ${quote(addr1)});""")
-                } else {
-                  var addr0 = ""
-                  val addr1 = inds.map { row =>
-                                row.length match {
-                                  case 1 =>
-                                    addr0 = quote(1) // Assume all are from same row?
-                                    quote(row(0))
-                                  case _ =>
-                                    addr0 = quote(row(0)) // Assume all are from same row?
-                                    quote(row(1))
-                                  }
-                            }
+                      emit(s"""//all readers share column. vectorized """)
+                      emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(new DFEVectorType<DFEVar>(${addr0(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr0.map(quote).mkString(",")})), ${quote(addr1)});""")
+                    } else {
+                      var addr0 = ""
+                      val addr1 = inds.map { row =>
+                                    row.length match {
+                                      case 1 =>
+                                        addr0 = quote(1) // Assume all are from same row?
+                                        quote(row(0))
+                                      case _ =>
+                                        addr0 = quote(row(0)) // Assume all are from same row?
+                                        quote(row(1))
+                                      }
+                                }
 
-                  emit(s"""//all readers share row. vectorized""")
-                  emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, new DFEVectorType<DFEVar>(${quote(addr1(0))}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.map(quote).mkString(",")})));""")
-                }
+                      emit(s"""//all readers share row. vectorized""")
+                      emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, new DFEVectorType<DFEVar>(${quote(addr1(0))}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.map(quote).mkString(",")})));""")
+                    }
+                  }
 
               }
             } else {
@@ -549,42 +554,48 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           case _ =>
             val a = inds(0)
             val b = inds(1)
-            if (a(1) == b(1)) {
-              var addr1 = ""
-              val addr0 = inds.map {
-                case List(row, col) =>
-                  addr1 = quote(col) 
-                  quote(row)
-              }
-              emit(s"""// all have same column.  """)
-              if (dups.length == 1) {
-                emit(s"""${quote(bram)}.connectWport(new DFEVectorType<DFEVar>(${addr0(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr0.mkString(",")})), ${addr1},
-                ${dataStr}, ${quote(this_writer)}_datapath_en); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
-              } else {
-                dups.zipWithIndex.foreach {case (dd, ii) => 
-                  emit(s"""${quote(bram)}_${ii}.connectWport(new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")})), ${addr1}, 
-                  ${dataStr}, ${quote(this_writer)}_datapath_en); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
-                }
-              }
+            a.length match {
+              case 1 => 
+                emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${quote(value)}, ${quote(this_writer)}_datapath_en);""")
+              case _ =>
+                if (quote(a(1)) == quote(b(1))) { // ugly hack
+                  var addr1 = ""
+                  val addr0 = inds.map {
+                    case List(row, col) =>
+                      addr1 = quote(col) 
+                      quote(row)
+                  }
+                  emit(s"""// all have same column.  """)
+                  if (dups.length == 1) {
+                    emit(s"""${quote(bram)}.connectWport(new DFEVectorType<DFEVar>(${addr0(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr0.mkString(",")})), ${addr1},
+                    ${dataStr}, ${quote(this_writer)}_datapath_en); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+                  } else {
+                    dups.zipWithIndex.foreach {case (dd, ii) => 
+                      emit(s"""${quote(bram)}_${ii}.connectWport(new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")})), ${addr1}, 
+                      ${dataStr}, ${quote(this_writer)}_datapath_en); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+                    }
+                  }
 
-            } else {
-              var addr0 = ""
-              val addr1 = inds.map {
-                case List(row, col) =>
-                  addr0 = quote(row) // Assume all are from same row?
-                  quote(col)
-              }
-              emit(s"""// all have same row.  DFEVector<DFEVar> ${addr1(0)}_vectorized = new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")}));""")
-              if (dups.length == 1) {
-                emit(s"""${quote(bram)}.connectWport(${addr0}, new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")})), 
-                ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
-              } else {
-                dups.zipWithIndex.foreach {case (dd, ii) => 
-                  emit(s"""${quote(bram)}_${ii}.connectWport(${addr0}, new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")})), 
-                  ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+                } else {
+                  var addr0 = ""
+                  val addr1 = inds.map {
+                    case List(row, col) =>
+                      addr0 = quote(row) // Assume all are from same row?
+                      quote(col)
+                  }
+                  emit(s"""// all have same row.  DFEVector<DFEVar> ${addr1(0)}_vectorized = new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")}));""")
+                  if (dups.length == 1) {
+                    emit(s"""${quote(bram)}.connectWport(${addr0}, new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")})), 
+                    ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+                  } else {
+                    dups.zipWithIndex.foreach {case (dd, ii) => 
+                      emit(s"""${quote(bram)}_${ii}.connectWport(${addr0}, new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")})), 
+                      ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+                    }
+                  }
                 }
-              }
             }
+
         }
 
       }

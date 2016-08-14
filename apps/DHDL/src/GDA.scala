@@ -9,7 +9,7 @@ trait GDA extends DHDLApplication {
   type Array[T] = ForgeArray[T]
 
   val innerPar = 8
-  val outerPar = 4
+  val outerPar = 1
   val rr = 384
   val cc = 96 //96
 

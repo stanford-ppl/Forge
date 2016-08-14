@@ -21,23 +21,17 @@ trait MatMult extends DHDLApplication {
   val mm = 1920
   val nn = 19200
   val pp = 19200
-  val tileSizeM = 96
+  val tileSizeM = 192
   val tileSizeN = 192
-  val tileSizeP = 768
-  val innerPar = 16
-  val midPar = 8
+  val tileSizeP = 384
+  val innerPar = 8
+  val midPar = 4
   val outerPar = 2
   def matmult(A: Rep[Array[T]], B: Rep[Array[T]], M: Rep[SInt], N: Rep[SInt], P: Rep[SInt]) = {
     bound(M) = 1536
     bound(N) = 1536
     bound(P) = 1536
 
-    val mm = ArgIn[SInt]
-    val nn = ArgIn[SInt]
-    val pp = ArgIn[SInt]
-    setArg(mm, M)
-    setArg(nn, N)
-    setArg(pp, P)
 
     val a = OffChipMem[T](mm, pp)
     val b = OffChipMem[T](pp, nn)

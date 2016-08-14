@@ -8,14 +8,17 @@ trait LogReg extends DHDLApplication {
   type Elem = Flt
   type T = Flt
 
-  lazy val tileSize = param(96)
-  lazy val outerMpPar = param(1)
+  val tileSizeH = 192
+  val innerParH = 16
+  val outerParH = 1
+  lazy val tileSize = param(tileSizeH)
+  lazy val outerMpPar = param(outerParH)
   lazy val innerMpPar = param(1)
-  lazy val innerPar   = param(1)
+  lazy val innerPar   = param(innerParH)
   lazy val noPar = param(1)
 
-  val N = 192
-  lazy val D = 192.as[SInt]
+  val N = 1152
+  lazy val D = 768.as[SInt]
   val A = 1
 
   def sigmoid(t:Rep[Elem]) = 1.as[Elem]/(exp(-t)+1)

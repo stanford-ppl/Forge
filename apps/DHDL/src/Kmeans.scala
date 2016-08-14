@@ -6,21 +6,26 @@ object KmeansCompiler extends DHDLApplicationCompiler with Kmeans
 object KmeansInterpreter extends DHDLApplicationInterpreter with Kmeans
 trait Kmeans extends DHDLApplication {
 
-  val dim       = 768
+  val dim       = 1152
   val numCents  = 96
   val numPoints = 384
+  val tileSize = 768
+  val ptPar = 1
+  val dstPar = 1
+  val accPar = 1
+  val avgPar = 1
 
-  lazy val tileSize   = param(384)
-  lazy val dTileSize  = 96
-  lazy val ptLoopPar  = param(1)
+  lazy val ts   = param(tileSize)
+  lazy val dts  = dim
+  lazy val ptLoopPar  = param(ptPar)
   //lazy val ctLoopPar  = param(1)
-  lazy val dstLoopPar = param(1)
-  lazy val accLoopPar = param(1)
-  lazy val avgLoopPar = param(1)
+  lazy val dstLoopPar = param(dstPar)
+  lazy val accLoopPar = param(accPar)
+  lazy val avgLoopPar = param(avgPar)
   lazy val ignorePar = param(1)
   lazy val MAXK = 8
 
-  lazy val loadPar = param(96)
+  lazy val loadPar = param(1)
 
   def reduceTree(x: List[(Rep[Flt], Rep[SInt])]): List[(Rep[Flt], Rep[SInt])] = {
     if (x.length == 1) x
@@ -35,21 +40,21 @@ trait Kmeans extends DHDLApplication {
   }
 
   def kmeans(points: Rep[OffChipMem[Flt]], centroids: Rep[OffChipMem[Flt]], K: Rep[SInt], D: Rep[SInt]) = {
-    val oldCents = BRAM[Flt](MAXK, dTileSize)
-    val newCents = BRAM[Flt](MAXK, dTileSize)
+    val oldCents = BRAM[Flt](MAXK, dts)
+    val newCents = BRAM[Flt](MAXK, dts)
     val centCount = BRAM[UInt](MAXK)
-    val centsOut = BRAM[Flt](MAXK, dTileSize)
+    val centsOut = BRAM[Flt](MAXK, dts)
 
     // Runtime is roughly (N*K/(Pc)*(D/Pd + 19 + log2(D))
 
     // Load initial centroids (from points)
-    oldCents := points(0::K,0::dTileSize, dstLoopPar)
+    oldCents := points(0::K,0::dts, dstLoopPar)
 
-    Pipe((numPoints by tileSize) par ignorePar) { i =>
-      val pointsTile = BRAM[Flt](tileSize, dTileSize)
-      pointsTile := points(i::i+tileSize, 0::dTileSize, dstLoopPar)
+    Pipe((numPoints by ts) par ignorePar) { i =>
+      val pointsTile = BRAM[Flt](ts, dts)
+      pointsTile := points(i::i+ts, 0::dts, dstLoopPar)
 
-      Pipe((tileSize by 1) par ptLoopPar){ pt =>
+      Pipe((ts by 1) par ptLoopPar){ pt =>
         Pipe(numCents by 1){ct =>
           val dist = Reg[Flt]
           Pipe.reduce((D by 1) par dstLoopPar)(dist){d => (pointsTile(pt,d) - oldCents(ct,d)) ** 2 }{_+_}
@@ -85,7 +90,7 @@ trait Kmeans extends DHDLApplication {
     val D = numPoints;   bound(D) = 384
 
 
-    domainOf(tileSize) = (1,9600,1)
+    domainOf(ts) = (1,9600,1)
     //domainOf(ctLoopPar) = (1,1,1)
     domainOf(dstLoopPar) = (1,96,1)
     domainOf(accLoopPar) = (1,96,1)

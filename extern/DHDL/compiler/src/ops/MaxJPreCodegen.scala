@@ -155,7 +155,7 @@ trait MaxJPreCodegen extends Traversal  {
           dups.zipWithIndex.foreach { case (d, i) =>
             val readers = readersOf(sym)
             if (d.depth > 1) {
-              val numReaders_for_this_duplicate = readers.map{r => r}.filter{ r => (instanceIndexOf(r._3, sym) == i)}.length
+              val numReaders_for_this_duplicate = readers.map{r => r}.filter{ r => (instanceIndexOf(r._3, e) == i)}.length
               withStream(newStream("bram_" + quote(sym) + "_" + i)) {
                 emitDblBufSM(quote(sym) + "_" + i, numReaders_for_this_duplicate)
               }

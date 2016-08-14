@@ -8,7 +8,7 @@ trait SimpleSequential extends DHDLApplication {
   type Array[T] = ForgeArray[T]
 
   def simpleseq(xin: Rep[SInt], yin: Rep[SInt]) = {
-    val innerPar = param("innerPar", 8); domainOf(innerPar) = (1, 1, 1)
+    val innerPar = param("innerPar", 1); domainOf(innerPar) = (1, 1, 1)
     val tileSize = param("tileSize", 96); domainOf(tileSize) = (96, 96, 96)
 
     val x = ArgIn[SInt]
@@ -17,16 +17,12 @@ trait SimpleSequential extends DHDLApplication {
     setArg(x, xin)
     setArg(y, yin)
 
-    Accel {2
+    Accel {
       val b1 = BRAM[SInt](tileSize)
-//      Sequential (tileSize by tileSize) { i =>
-      Sequential {
-        Pipe.foreach(tileSize par innerPar) { ii =>
-          b1(ii) = x.value * ii
-        }
-        Pipe { out := b1(y) }
+      Pipe(tileSize par innerPar){ ii =>
+        b1(ii) = x.value * ii
       }
-      ()
+      Pipe { out := b1(y) }
     }
     getArg(out)
   }
@@ -295,38 +291,86 @@ object SimpleReduceTest extends DHDLApplicationCompiler with SimpleReduce
 trait SimpleReduce extends DHDLApplication {
   type T = SInt
   type Array[T] = ForgeArray[T]
-  val constTileSize = 96
-  def simplemap(xin: Rep[SInt]) = {
-    val innerPar = param("innerPar", 8); domainOf(innerPar) = (1, 1, 1)
-    val tileSize = param("tileSize", constTileSize); domainOf(constTileSize) = (constTileSize, constTileSize, constTileSize)
+
+  val N = 96.as[SInt]
+
+  def simpleReduce(xin: Rep[SInt]) = {
+    val P = param(8)
 
     val x = ArgIn[SInt]
     val out = ArgOut[SInt]
     setArg(x, xin)
 
     Accel {
-      Sequential {
-        val accum = Reduce (constTileSize par innerPar)(0.as[T]) { ii =>
-          x.value * ii
-        } {_+_}
-        Pipe { out := accum }
-      }
-      ()
+      out := Reduce(N by 1)(0.as[T]) { ii =>
+        x.value * ii
+      }{_+_}
     }
-
     getArg(out)
   }
 
   def main() {
     val x = args(unit(0)).to[SInt]
 
-    val result = simplemap(x)
+    val result = simpleReduce(x)
 
-    val b1 = Array.tabulate[SInt](constTileSize) { i => x * i }
-    val gold = b1.reduce {_+_}
+    val gold = Array.tabulate[SInt](N){i => x * i}.reduce{_+_}
     println("expected: " + gold)
     println("result:   " + result)
     assert(result == gold)
+  }
+}
+
+object SimpleUnitTest extends DHDLApplicationCompiler with SimpleUnit
+trait SimpleUnit extends DHDLApplication {
+  val N = 96.as[SInt]
+
+  final val inv_sqrt_2xPI = 0.39894228040143270286f
+
+  def CNDF(x: Rep[Flt]) = {
+    val ax = abs(x)
+
+    val xNPrimeofX = exp((ax ** 2) * -0.05f) * inv_sqrt_2xPI
+    val xK2 = 1.as[Flt] / ((ax * 0.2316419f) + 1.0f)
+
+    val xK2_2 = xK2 ** 2
+    val xK2_3 = xK2_2 * xK2
+    val xK2_4 = xK2_3 * xK2
+    val xK2_5 = xK2_4 * xK2
+
+    val xLocal_10 = xK2 * 0.319381530f
+    val xLocal_20 = xK2_2 * -0.356563782f
+    val xLocal_30 = xK2_3 * 1.781477937f
+    val xLocal_31 = xK2_4 * -1.821255978f
+    val xLocal_32 = xK2_5 * 1.330274429f
+
+    val xLocal_21 = xLocal_20 + xLocal_30
+    val xLocal_22 = xLocal_21 + xLocal_31
+    val xLocal_23 = xLocal_22 + xLocal_32
+    val xLocal_1 = xLocal_23 + xLocal_10
+
+    val xLocal0 = xLocal_1 * xNPrimeofX
+    val xLocal  = -xLocal0 + 1.0f
+
+    mux(x < 0.0f, xLocal0, xLocal)
+  }
+
+  def simpleUnit(xin: Rep[Flt]) = {
+    val x = ArgIn[Flt]
+    val out = ArgOut[Flt]
+    setArg(x, xin)
+
+    Accel {
+      out := CNDF(x)
+    }
+    getArg(out)
+  }
+
+  def main() {
+    val x = args(unit(0)).to[Flt]
+
+    val result = simpleUnit(x)
+    println(result)
   }
 }
 

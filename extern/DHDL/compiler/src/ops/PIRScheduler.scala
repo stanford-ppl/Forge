@@ -28,92 +28,6 @@ trait PIRScheduler extends Traversal with PIRCommon {
       scheduleCU(lhs, cus(lhs))
   }
 
-  // TODO: Awkward extension of ComputeUnit. May want to move all this to CU later?
-  abstract class CUContext(val pipe: Exp[Any], val cu: ComputeUnit) {
-    private val refs = HashMap[Exp[Any],LocalRef]()
-    private val readAccums = HashSet[AccumReg]()
-
-    // HACK: Keep track of first read of accum reg (otherwise can use the wrong stage)
-    def isUnreadAccum(reg: LocalMem) = reg match {
-      case reg: AccumReg => !readAccums.contains(reg)
-      case _ => false
-    }
-
-    def pseudoStages: List[PseudoStage]
-    def stages: List[Stage]
-    def addStage(stage: Stage): Unit
-    def isWriteContext: Boolean
-
-    def mapStages = stages.flatMap{case stage:MapStage => Some(stage); case _ => None}
-    def stageNum = mapStages.length+1
-    def prevStage = stages.headOption
-
-    def mem(mem: Exp[Any], reader: Exp[Any]) = allocateMem(mem, reader, cu)
-
-    // A CU can have multiple SRAMs for a given mem symbol, one for each local read
-    def memories(mem: Exp[Any]) = readersOf(mem).filter(_._1 == pipe).map{read => allocateMem(mem, read._3, cu) }
-
-    def addReg(x: Exp[Any], reg: LocalMem) { cu.addReg(x, reg) }
-    def addRef(x: Exp[Any], ref: LocalRef) { refs += x -> ref }
-    def getReg(x: Exp[Any]) = cu.get(x)
-    def reg(x: Exp[Any]) = cu.get(x).getOrElse(throw new Exception(s"No register defined for $x"))
-
-    // Add a stage which bypasses x to y
-    def bypass(x: LocalMem, y: LocalMem) {
-      val stage = MapStage(Bypass, List(refIn(x)), List(refOut(y)))
-      addStage(stage)
-    }
-
-    def ref(reg: LocalMem, out: Boolean, stage: Int = stageNum): LocalRef = reg match {
-      // If the previous stage computed the read address for this load, use the registered output
-      // of the memory directly. Otherwise, use the previous stage
-      case InputReg(mem) =>
-        if (!prevStage.isDefined || prevStage.get.outputMems.contains(mem.readAddr))
-          LocalRef(-1, reg)
-        else
-          LocalRef(stage-1, reg)
-
-      case reg: CounterReg if isWriteContext && !prevStage.isDefined =>
-        LocalRef(-1, reg)
-
-      case reg: AccumReg if isUnreadAccum(reg) =>
-        readAccums += reg
-        LocalRef(stage, reg)
-      case _ if out => LocalRef(stage, reg)
-      case _        => LocalRef(stage-1, reg)
-    }
-    def refIn(reg: LocalMem, stage: Int = stageNum) = ref(reg, false, stage)
-    def refOut(reg: LocalMem, stage: Int = stageNum) = ref(reg, true, stage)
-
-    def addOutput(e: Exp[Any], prev: LocalMem, out: LocalMem, add: Boolean = true) {
-      mapStages.find{stage => stage.outputMems.contains(prev) } match {
-        case Some(stage) =>
-          stage.outs ::= refOut(out, mapStages.length - mapStages.indexOf(stage)) // stage idx + 1
-        case None =>
-          bypass(prev, out)
-      }
-      if (add) addReg(e, out)
-      else cu.regs += out // No mapping, only list
-    }
-
-    def finalizeContext() { }
-  }
-  case class ComputeContext(override val pipe: Exp[Any], override val cu: ComputeUnit) extends CUContext(pipe,cu) {
-    def pseudoStages = cu.computePseudoStages
-    def stages = cu.stages
-    def addStage(stage: Stage) { cu.stages ::= stage }
-    override def finalizeContext() { cu.stages = cu.stages.reverse }
-    def isWriteContext = false
-  }
-  case class WriteContext(override val pipe: Exp[Any], override val cu: ComputeUnit, srams: List[CUMemory]) extends CUContext(pipe,cu) {
-    cu.writeStages += srams -> Nil
-
-    def pseudoStages = cu.writePseudoStages(srams)
-    def stages = cu.writeStages(srams)
-    def addStage(stage: Stage) { cu.writeStages(srams) = cu.writeStages(srams) :+ stage }
-    def isWriteContext = true
-  }
-
   def scheduleCU(pipe: Exp[Any], cu: ComputeUnit) {
     debug(s"Scheduling $pipe CU: $cu")
     val origRegs = cu.regs
@@ -345,6 +259,9 @@ trait PIRScheduler extends Traversal with PIRCommon {
     case FltPt_Leq(_,_) => Some(FltLeq)
     case FltPt_Eql(_,_) => Some(FltEql)
     case FltPt_Neq(_,_) => Some(FltNeq)
+
+    case FltPt_Abs(_)   => Some(FltAbs)
+    case FltPt_Exp(_)   => Some(FltExp)
 
     case Bit_And(_,_)   => Some(BitAnd)
     case Bit_Or(_,_)    => Some(BitOr)

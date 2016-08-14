@@ -26,8 +26,7 @@ trait DotProduct extends DHDLApplication {
     setMem(v2, b)
 
     Accel {
-      val acc = Reg[T]
-      Fold(N by B par P1)(acc, 0.as[T]){ i =>
+      Fold(N by B par P1)(out, 0.as[T]){ i =>
         val b1 = FIFO[T](512)
         val b2 = FIFO[T](512)
         Parallel {
@@ -38,7 +37,6 @@ trait DotProduct extends DHDLApplication {
           b1.pop() * b2.pop()
         }{_+_}
       }{_+_}
-      Pipe {out := acc}
     }
     getArg(out)
   }

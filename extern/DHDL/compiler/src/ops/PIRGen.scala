@@ -128,7 +128,7 @@ trait PIRGen extends Traversal with PIRCommon {
       case cu: BasicComputeUnit =>
         s"""ComputeUnit(name=Some("${cu.name}"), parent=$parent, tpe = ${quote(cu.tpe)}, deps=$deps)"""
       case cu: TileTransferUnit =>
-        s"""TileTransfer(name=Some("${cu.name}"), parent=$parent, memctrl=${cu.ctrl.name}, mctpe=${cu.mode}, deps=$deps, vec=${cu.vec.name})"""
+        s"""TileTransfer(name=Some("${cu.name}"), parent=$parent, memctrl=${quote(cu.ctrl)}, mctpe=${cu.mode}, deps=$deps, vec=${quote(cu.vec)})"""
     }
   }
 

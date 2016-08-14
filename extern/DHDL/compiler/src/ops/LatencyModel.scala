@@ -7,7 +7,7 @@ import dhdl.shared.ops._
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
-trait LatencyModel extends NodeMetadataOpsExp {
+trait LatencyModel extends NodeMetadataOpsExp with MemoryAnalysisExp {
   this: DHDLExp =>
 
   lazy val memModel = new TileLoadModel()
@@ -92,8 +92,15 @@ trait LatencyModel extends NodeMetadataOpsExp {
     case Cam_store(cam,key,value) => 1
 
     // TODO: Not a function of number of banks?
-    case Bram_load(ram, _) => 1 //if (isDblBuf(ram)) 2 else 1
-    case Bram_store(ram, _, _) => 1 //if (isDblBuf(ram)) 2 else 1
+    case Bram_load(ram, _) =>
+      val instIndex = instanceIndexOf(s, ram)
+      val instance = duplicatesOf(ram).apply(instIndex)
+      instance.depth // ???
+
+    case Bram_store(ram, _, _) =>
+      val instIndex = instanceIndexOf(s, ram)
+      val instance = duplicatesOf(ram).apply(instIndex)
+      instance.depth // ???
 
     case _:Counter_new => 0
     case _:Counterchain_new => 0

@@ -24,10 +24,14 @@ trait PIROptimizer extends Traversal with PIRCommon {
   lazy val cus = cuMapping.values
 
   override def run[A:Manifest](b: Block[A]) = {
-    for (cu <- cus) removeUnusedCUComponents(cu)
     for (cu <- cus) removeRouteThruStages(cu)
     for (cu <- cus) removeDeadStages(cu)
+    for (cu <- cus) removeUnusedCUComponents(cu)
     for (cu <- cus) removeEmptyCUs(cu)
+    removeUnusedGlobals()
+    for (cu <- cus) removeDeadStages(cu)
+    for (cu <- cus) removeEmptyCUs(cu)
+
     b
   }
 
@@ -51,6 +55,26 @@ trait PIROptimizer extends Traversal with PIRCommon {
     cu.cchains --= unusedCopies
   }
 
+  def removeUnusedGlobals() {
+    val outs = cus.flatMap{cu => scalarOuts(cu) ++ vectorOuts(cu) }.toSet
+    val ins = cus.flatMap{cu => scalarIns(cu) ++ vectorIns(cu) }.toSet
+
+    val unusedOuts = outs filterNot (out => ins.contains(out) || out.isInstanceOf[OutputArg])
+
+    def isUnusedReg(reg: LocalMem) = reg match {
+      case ScalarOut(_,out) => unusedOuts contains out
+      case VectorOut(_,out) => unusedOuts contains out
+      case _ => false
+    }
+    def isUnusedRef(ref: LocalRef) = isUnusedReg(ref.reg)
+
+    for (cu <- cus){
+      val stages = allMapStages(cu)
+      stages.foreach{stage => stage.outs = stage.outs.filterNot(isUnusedRef(_)) }
+      cu.regs = cu.regs.filterNot(isUnusedReg(_))
+    }
+  }
+
   // Remove route-through CUs from the IR after scheduling
   // Rationale (for post scheduling): The Spatial IR has a number of nodes which are
   // effectively no-ops in PIR, which makes detecting route through cases difficult.
@@ -64,11 +88,23 @@ trait PIROptimizer extends Traversal with PIRCommon {
         case bypass@MapStage(Bypass, List(LocalRef(_,VectorIn(in))), List(LocalRef(_,VectorOut(_,out)))) =>
           cus.find{cu => vectorOuts(cu) contains in} match {
             case Some(producer) if producer.parent == cu.parent =>
-              debug(s"Removing empty stage $bypass from cu $cu")
+              debug(s"Removing route-thru stage $bypass from cu $cu")
               swapGlobal(out, in) // Reroute all consumers of this CU to the producer
               Some(bypass)
 
             case _ => None
+          }
+        case bypass@MapStage(Bypass, List(LocalRef(_,ScalarIn(_,in) )), List(LocalRef(_,outReg@ScalarOut(x,out)))) =>
+          cus.find{cu => scalarOuts(cu) contains in} match {
+            case Some(producer) if producer.parent == cu.parent => // TODO: Is common parent necessary here?
+              val pipe = cuMapping.find(_._2 == producer).get._1
+              val ctx = ComputeContext(pipe, producer)
+              val origOut = producer.regs.find{case ScalarOut(_,`in`) => true; case _ => false}.get
+              ctx.addOutput(x, origOut, outReg, false)
+              debug(s"Adding register $outReg to $producer")
+              debug(s"Removing route-thru stage $bypass from cu $cu")
+              Some(bypass)
+            case  _ => None
           }
         case _ => None
       }
@@ -130,12 +166,31 @@ trait PIROptimizer extends Traversal with PIRCommon {
     cu.writeStages.values.flatMap{stages => stages.flatMap{case stage: MapStage => Some(stage); case _ => None}}
   }
 
+  def scalarIns(cu: ComputeUnit): List[GlobalMem] = cu match {
+    case tu: TileTransferUnit => Nil
+    case cu: BasicComputeUnit =>
+      cu.stages.flatMap(_.outputMems).flatMap{case ScalarIn(_, in) => Some(in); case _ => None}
+    case _ => Nil
+  }
+  def scalarOuts(cu: ComputeUnit): List[GlobalMem] = cu match {
+    case tu: TileTransferUnit => Nil
+    case cu: BasicComputeUnit =>
+      cu.stages.flatMap(_.outputMems).flatMap{case ScalarOut(_, out) => Some(out); case _ => None }
+    case _ => Nil
+  }
+
   def vectorOuts(cu: ComputeUnit): List[VectorMem] = cu match {
     case tu: TileTransferUnit if tu.mode == MemLoad => List(tu.vec)
     case cu: BasicComputeUnit =>
       cu.stages.flatMap(_.outputMems).flatMap{case VectorOut(_, vec: VectorMem) => Some(vec); case _ => None}
-
     case _ => Nil
+  }
+
+  def vectorIns(cu: ComputeUnit): List[VectorMem] = cu match {
+    case tu: TileTransferUnit if tu.mode == MemStore => List(tu.vec)
+    case cu: BasicComputeUnit =>
+      cu.stages.flatMap(_.inputMems).flatMap{case VectorIn(vec: VectorMem) => Some(vec); case _ => None} ++
+      cu.srams.flatMap{sram => sram.vector.flatMap{case vec: VectorMem => Some(vec); case _ => None }}
   }
 
   // --- Stage removal
@@ -157,33 +212,34 @@ trait PIROptimizer extends Traversal with PIRCommon {
   // --- Swapping helper functions
 
   def swapGlobal(orig: GlobalMem, swap: GlobalMem) = cus.foreach { cu =>
-    allMapStages(cu).foreach{stage => swapGlobal_Stage(stage, orig, swap)}
-    cu.srams.foreach{sram => swapGlobal_SRAM(sram, orig, swap)}
+    def swapGlobal_Stage(stage: Stage) = stage match {
+      case stage@MapStage(_,ins,outs) =>
+        stage.ins = ins.map{ref => swapGlobal_Ref(ref) }
+        stage.outs = outs.map{case LocalRef(i,reg) => LocalRef(i, swapGlobal_Reg(reg)) }
+      case _ =>
+    }
+    def swapGlobal_Ref(ref: LocalRef) = ref match {
+      case LocalRef(i,reg) => LocalRef(i, swapGlobal_Reg(reg))
+    }
+    def swapGlobal_Reg(reg: LocalMem) = reg match {
+      case VectorIn(`orig`) => VectorIn(swap)
+      case VectorOut(x, `orig`) => VectorOut(x, swap)
+      case ScalarIn(x, `orig`) => ScalarIn(x, swap)
+      case ScalarOut(x, `orig`) => ScalarOut(x, swap)
+      case _ => reg
+    }
+    def swapGlobal_SRAM(sram: CUMemory) {
+      sram.vector = sram.vector match { case Some(`orig`) => Some(swap); case vec => vec}
+    }
+
+
+    allMapStages(cu).foreach{stage => swapGlobal_Stage(stage)}
+    cu.srams.foreach{sram => swapGlobal_SRAM(sram)}
 
     cu match {
       case tu@TileTransferUnit(name,parent,ctrl,`orig`,mode) => tu.vec = swap
       case _ =>
     }
-  }
-  def swapGlobal_Stage(stage: Stage, orig: GlobalMem, swap: GlobalMem) = stage match {
-    case stage@MapStage(_,ins,outs) =>
-      stage.ins = ins.map{ref => swapGlobal_Ref(ref, orig, swap) }
-      stage.outs = outs.map{case LocalRef(i,reg) => LocalRef(i, swapGlobal_Reg(reg,orig,swap)) }
-    case _ =>
-  }
-  def swapGlobal_Ref(ref: LocalRef, orig: GlobalMem, swap: GlobalMem) = ref match {
-    case LocalRef(i,reg) => LocalRef(i, swapGlobal_Reg(reg,orig,swap))
-  }
-
-  def swapGlobal_Reg(reg: LocalMem, orig: GlobalMem, swap: GlobalMem) = reg match {
-    case VectorIn(`orig`) => VectorIn(swap)
-    case VectorOut(x, `orig`) => VectorOut(x, swap)
-    case ScalarIn(x, `orig`) => ScalarIn(x, swap)
-    case ScalarOut(x, `orig`) => ScalarOut(x, swap)
-    case _ => reg
-  }
-  def swapGlobal_SRAM(sram: CUMemory, orig: GlobalMem, swap: GlobalMem) {
-    sram.vector = sram.vector match { case Some(`orig`) => Some(swap); case vec => vec}
   }
 
 }

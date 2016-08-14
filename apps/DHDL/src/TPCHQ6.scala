@@ -10,9 +10,9 @@ trait TPCHQ6 extends DHDLApplication {
   val MIN_DATE = 1
   val MAX_DATE = 8
   val nn = 93600000
-  val tileSize = 9600
+  val tileSize = 2400
   val outerPar = 1
-  val innerPar = 48
+  val innerPar = 20
 
   def tpchq6(datesIn: Rep[Array[UInt]], quantsIn: Rep[Array[UInt]], disctsIn: Rep[Array[Flt]], pricesIn: Rep[Array[Flt]]): Rep[Flt] = {
     val dataSize = nn

@@ -9,8 +9,10 @@ trait Kmeans extends DHDLApplication {
 
   lazy val MAXK = 8
   lazy val MAXD = 384
+  val innerPar = 1
+  val outerPar = 1
 
-  lazy val loadPar = param(96)
+  lazy val loadPar = param(16)
 
   def reduceTree(x: List[(Rep[Flt], Rep[SInt])]): List[(Rep[Flt], Rep[SInt])] = {
     if (x.length == 1) x

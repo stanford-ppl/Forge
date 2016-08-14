@@ -65,9 +65,12 @@ trait MemoryAnalysisExp extends DHDLAffineAnalysisExp with ControlSignalAnalysis
   object instanceIndexOf {
     def update(reader: Exp[Any], mem: Exp[Any], idx: Int) = instanceIndexOf.get(reader) match {
       case Some(map) =>
+          Console.println(s"building map, ${map}")
           val newMap = map.filterKeys(_ != mem) + (mem -> idx)
           setMetadata(reader, MemInstanceIndex(newMap))
-      case None => setMetadata(reader, MemInstanceIndex(Map(mem -> idx)))
+      case None => 
+          Console.println(s"no map, setrdr $reader $mem -> $idx")
+          setMetadata(reader, MemInstanceIndex(Map(mem -> idx)))
     }
     def get(reader: Exp[Any]) = meta[MemInstanceIndex](reader).map(_.mapping)
     def get(reader: Exp[Any], mem: Exp[Any]) = meta[MemInstanceIndex](reader).flatMap(_.mapping.get(mem))

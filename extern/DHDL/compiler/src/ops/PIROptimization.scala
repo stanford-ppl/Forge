@@ -14,7 +14,7 @@ trait PIROptimizer extends Traversal with PIRCommon {
   val IR: DHDLExp with PIRScheduleAnalysisExp
   import IR._
 
-  override val name = "PIR optimization"
+  override val name = "PIR Optimization"
   debugMode = SpatialConfig.debugging || SpatialConfig.pirdebug
   verboseMode = SpatialConfig.verbose || SpatialConfig.pirdebug
 
@@ -170,44 +170,13 @@ trait PIROptimizer extends Traversal with PIRCommon {
 
   // --- Utility functions for optimization
 
-  def allMapStages(cu: ComputeUnit): List[MapStage] = {
-    cu.stages.flatMap{case stage: MapStage => Some(stage); case _ => None} ++
-    cu.writeStages.values.flatMap{stages => stages.flatMap{case stage: MapStage => Some(stage); case _ => None}}
-  }
-
-  def scalarIns(cu: ComputeUnit): List[GlobalMem] = {
-    cu.stages.flatMap(_.inputMems).flatMap{case ScalarIn(_, in) => Some(in); case _ => None} ++
-    cu.srams.flatMap{sram => sram.readAddr.flatMap{case ScalarIn(_, in) => Some(in); case _ => None}} ++
-    cu.srams.flatMap{sram => sram.writeAddr.flatMap{case ScalarIn(_, in) => Some(in); case _ => None}}
-  }
-  def scalarOuts(cu: ComputeUnit): List[GlobalMem] = cu match {
-    case tu: TileTransferUnit => Nil
-    case cu: BasicComputeUnit =>
-      cu.stages.flatMap(_.outputMems).flatMap{case ScalarOut(_, out) => Some(out); case _ => None }
-    case _ => Nil
-  }
-
-  def vectorOuts(cu: ComputeUnit): List[VectorMem] = cu match {
-    case tu: TileTransferUnit if tu.mode == MemLoad => List(tu.vec)
-    case cu: BasicComputeUnit =>
-      cu.stages.flatMap(_.outputMems).flatMap{case VectorOut(_, vec: VectorMem) => Some(vec); case _ => None}
-    case _ => Nil
-  }
-
-  def vectorIns(cu: ComputeUnit): List[VectorMem] = cu match {
-    case tu: TileTransferUnit if tu.mode == MemStore => List(tu.vec)
-    case cu: BasicComputeUnit =>
-      cu.stages.flatMap(_.inputMems).flatMap{case VectorIn(vec: VectorMem) => Some(vec); case _ => None} ++
-      cu.srams.flatMap{sram => sram.vector.flatMap{case vec: VectorMem => Some(vec); case _ => None }}
-    case _ => Nil
-  }
-
   def usedCounterChains(cu: ComputeUnit) = {
     val stages = allMapStages(cu)
     stages.flatMap{stage => stage.inputMems.flatMap{case CounterReg(cchain,_) => Some(cchain); case _ => None}} ++
     cu.srams.flatMap{sram => sram.readAddr match {case Some(CounterReg(cchain,_)) => Some(cchain); case _ => None}} ++
     cu.srams.flatMap{sram => sram.writeAddr match {case Some(CounterReg(cchain,_)) => Some(cchain); case _ => None}} ++
-    cu.srams.flatMap{sram => sram.swapCtrl match {case Some(cchain) => Some(cchain); case _ => None}} ++
+    cu.srams.flatMap{sram => sram.swapRead match {case Some(cchain) => Some(cchain); case _ => None}} ++
+    cu.srams.flatMap{sram => sram.swapWrite match {case Some(cchain) => Some(cchain); case _ => None}} ++
     cu.srams.flatMap{sram => sram.writeCtrl match {case Some(cchain) => Some(cchain); case _ => None}}
   }
 

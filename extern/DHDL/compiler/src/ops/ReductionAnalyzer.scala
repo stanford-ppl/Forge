@@ -51,13 +51,19 @@ trait ReductionAnalyzer extends Traversal with SpatialTraversalTools {
     case Pipe_fold(c,a,z,fA,iFunc,ld,st,func,rFunc,inds,idx,acc,res,rV) =>
       val funcType = identifyReduceFunc(rFunc, rV._1, rV._2)
       getStages(rFunc).foreach{sym => reduceType(sym) = funcType}
+      getStages(ld).foreach{sym => reduceType(sym) = funcType}
+      getStages(st).foreach{sym => reduceType(sym) = funcType}
       reduceType(a) = funcType
       reduceType(acc) = funcType
       reduceType(lhs) = funcType
 
+
     case Accum_fold(c1,c2,a,z,fA,iFunc,func,ld1,ld2,rFunc,st,inds1,inds2,idx,part,acc,res,rV) =>
       val funcType = identifyReduceFunc(rFunc, rV._1, rV._2)
       getStages(rFunc).foreach{sym => reduceType(sym) = funcType}
+      getStages(ld1).foreach{sym => reduceType(sym) = funcType}
+      getStages(ld2).foreach{sym => reduceType(sym) = funcType}
+      getStages(st).foreach{sym => reduceType(sym) = funcType}
       reduceType(a) = funcType
       reduceType(acc) = funcType
       reduceType(lhs) = funcType

@@ -114,6 +114,39 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
     def isWriteContext = true
   }
 
+  // -- Utility functions
+  def allMapStages(cu: ComputeUnit): List[MapStage] = {
+    cu.stages.flatMap{case stage: MapStage => Some(stage); case _ => None} ++
+    cu.writeStages.values.flatMap{stages => stages.flatMap{case stage: MapStage => Some(stage); case _ => None}}
+  }
+
+  def scalarIns(cu: ComputeUnit): List[GlobalMem] = {
+    cu.stages.flatMap(_.inputMems).flatMap{case ScalarIn(_, in) => Some(in); case _ => None} ++
+    cu.srams.flatMap{sram => sram.readAddr.flatMap{case ScalarIn(_, in) => Some(in); case _ => None}} ++
+    cu.srams.flatMap{sram => sram.writeAddr.flatMap{case ScalarIn(_, in) => Some(in); case _ => None}}
+  }
+  def scalarOuts(cu: ComputeUnit): List[GlobalMem] = cu match {
+    case tu: TileTransferUnit => Nil
+    case cu: BasicComputeUnit =>
+      cu.stages.flatMap(_.outputMems).flatMap{case ScalarOut(_, out) => Some(out); case _ => None }
+    case _ => Nil
+  }
+
+  def vectorOuts(cu: ComputeUnit): List[VectorMem] = cu match {
+    case tu: TileTransferUnit if tu.mode == MemLoad => List(tu.vec)
+    case cu: BasicComputeUnit =>
+      cu.stages.flatMap(_.outputMems).flatMap{case VectorOut(_, vec: VectorMem) => Some(vec); case _ => None}
+    case _ => Nil
+  }
+
+  def vectorIns(cu: ComputeUnit): List[VectorMem] = cu match {
+    case tu: TileTransferUnit if tu.mode == MemStore => List(tu.vec)
+    case cu: BasicComputeUnit =>
+      cu.stages.flatMap(_.inputMems).flatMap{case VectorIn(vec: VectorMem) => Some(vec); case _ => None} ++
+      cu.srams.flatMap{sram => sram.vector.flatMap{case vec: VectorMem => Some(vec); case _ => None }}
+    case _ => Nil
+  }
+
 
   // Create a vector for communication to/from a given memory
   def allocateGlobal(mem: Exp[Any]) = {
@@ -228,18 +261,21 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
     debug(s"Creating SRAM for memory $mem, reader $reader, writer: $writer, cu $cu")
 
     val writerCU = writer.map{writer => allocateCU(writer._1) }
-    val swapperCU = topWritersOf(mem).headOption.map{writer => allocateCU(writer._1) }
+    val swapWriteCU = topWritersOf(mem).headOption.map{writer => allocateCU(writer._1) }
+    val swapReadCU = topReadersOf(mem).find(_._3 == reader).map{read => allocateCU(read._1) }
 
     debug(s"  readerCU: $cu")
     debug(s"  writerCU: $writerCU")
 
     // ASSUMPTION: Each CU originally only instantiates only one counterchain
     val remoteWriteCtrl = writerCU.flatMap{cu => cu.cchains.find{case _:UnitCounterChain | _:CounterChainInstance => true; case _ => false }}
-    val remoteSwapperCtrl = swapperCU.flatMap{cu => cu.cchains.find{case _:UnitCounterChain | _:CounterChainInstance => true; case _ => false }}
+    val remoteSwapWriteCtrl = swapWriteCU.flatMap{cu => cu.cchains.find{case _:UnitCounterChain | _:CounterChainInstance => true; case _ => false }}
+    val remoteSwapReadCtrl = swapReadCU.flatMap{cu => cu.cchains.find{case _:UnitCounterChain | _:CounterChainInstance => true; case _ => false }}
 
     val readCtrl = cu.cchains.find{case _:CounterChainCopy => false; case _ => true}
     val writeCtrl = remoteWriteCtrl.flatMap{cc => cu.cchains.find(_.name == cc.name) }
-    val swapCtrl = remoteSwapperCtrl.flatMap{cc => cu.cchains.find(_.name == cc.name) }
+    val swapWrite = remoteSwapWriteCtrl.flatMap{cc => cu.cchains.find(_.name == cc.name) }
+    val swapRead  = remoteSwapReadCtrl.flatMap{cc => cu.cchains.find(_.name == cc.name) }
 
     val writeIter = writeCtrl.flatMap{cc => cu.innermostIter(cc) }
     val readIter = readCtrl.flatMap{cc => cu.innermostIter(cc) }
@@ -256,7 +292,8 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
     val banking = matchBanking(writeBanking, readBanking)
 
     sram.writeCtrl = writeCtrl
-    sram.swapCtrl = swapCtrl
+    sram.swapWrite = swapWrite
+    sram.swapRead = swapRead
     sram.banking = Some(banking)
 
     val instIndex = instanceIndexOf(reader, mem)
@@ -532,7 +569,8 @@ ${super.dumpString}
     var vector: Option[GlobalMem] = None
     var readAddr: Option[LocalMem] = None
     var writeAddr: Option[LocalMem] = None
-    var swapCtrl: Option[CUCounterChain] = None
+    var swapWrite: Option[CUCounterChain] = None
+    var swapRead: Option[CUCounterChain] = None
     var writeCtrl: Option[CUCounterChain] = None
     var banking: Option[SRAMBanking] = None
     var isDoubleBuffer = false

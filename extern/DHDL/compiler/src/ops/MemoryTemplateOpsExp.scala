@@ -707,7 +707,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
     case Argout_new(init) => //emitted in reg_write
 
     case e@Reg_read(reg) =>
-      reduceType(reg) match {
+      reduceType(sym) match {
         case Some(fps: ReduceFunction) => // Optimize for FixPt accum
           emit(s"""// Reduce tree load""")
         case None => // Not a reduce tree
@@ -749,9 +749,47 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 
 
     case e@Reg_write(reg, value) =>
-      reduceType(reg) match {
+      reduceType(sym) match {
         case Some(fps: ReduceFunction) => // Optimize for FixPt accum
-          // emit(s"""Accumulator.Params ${quote(accum)}_accParams = Reductions.accumulator.makeAccumulatorConfig(${tpstr(accum.t)}).withClear($rstSignalStr).withEnable($enSignalStr);""")
+          emitComment("Reg_write, accum specialization {")
+          if (writersOf(reg).isEmpty)
+              throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
+          val writer = writersOf(reg).head._1  // Regs have unique writer which also drives reset
+          val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
+          val duplicates = duplicatesOf(reg)
+          val numDuplicates = duplicatesOf(reg).length
+          duplicates.zipWithIndex.foreach { case (dup, ii) =>
+            val regname = s"${quote(reg)}_${ii}"
+            val rstStr = quote(parentOf(reg).get) + "_rst_en"
+            val enStr = writer match {
+              case p@Def(EatReflect(pipe:Pipe_foreach)) => styleOf(p) match {
+                case InnerPipe => quote(p) + "_datapath_en"
+                case _ => quote(p) + "_en"
+              }
+              case p@Def(EatReflect(pipe:Pipe_fold[_,_])) => styleOf(p) match {
+                case InnerPipe => quote(p) + "_datapath_en"
+                case _ => quote(p) + "_en"
+              }
+              case p@Def(EatReflect(pipe:ParPipeReduce[_,_])) => styleOf(p) match {
+                case InnerPipe => quote(p) + "_datapath_en"
+                case _ => quote(p) + "_en"
+              }
+              case p@Def(EatReflect(Unit_pipe(func))) => styleOf(p) match {
+                case InnerPipe => quote(p) + "_datapath_en"
+                case _ => quote(p) + "_en"
+              }
+              case p@_ =>
+                          emit(s"// Reg ${quote(reg)} is written by non Pipe node ${quote(p)}")
+                          "constant.var(true)"
+            }
+
+
+            emit(s"""DFEVar ${regname}_en = $enStr & ${quote(writer)}_redLoop_done;""")
+            emit(s"""Accumulator.Params ${regname}_accParams = Reductions.accumulator.makeAccumulatorConfig(${ts}).withClear($rstStr).withEnable(${regname}_en);""")
+            emit(s"""DFEVar ${regname}_hold = Reductions.accumulator.makeAccumulator(${quote(value)}, ${quote(regname)}_accParams);""")
+            emit(s"""DFEVar ${quote(regname)} = ${quote(regname)}_hold;""")
+          }
+          emitComment(s"} Reg_write accum specialization // regType ${regType(reg)}, numDuplicates = $numDuplicates")
         case _ =>
           emitComment("Reg_write {")
           if (writersOf(reg).isEmpty)
@@ -821,6 +859,8 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
               }
           }
           emitComment(s"} Reg_write // regType ${regType(reg)}, numDuplicates = $numDuplicates")
+        }
+
 
     case Bram_new(size, zero) =>
       withStream(baseStream) {

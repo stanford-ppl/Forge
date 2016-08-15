@@ -24,6 +24,7 @@ trait UnrolledControlSignalAnalysisExp extends ControlSignalAnalysisExp {this: D
 // (4)  Sets reader control nodes of locally read memories
 // (5)  Sets writer control nodes of locally written memories
 // (5.5) Sets top writer control nodes of locally written memories
+// (5.6) Sets top reader control nodes of locally read memories
 // (6)  Flags accumulators
 // (7)  Records list of local memories
 // (8)  Records set of metapipes
@@ -129,7 +130,10 @@ trait ControlSignalAnalyzer extends Traversal {
   def appendReader(ctrl: Exp[Any], isReduce: Boolean, reader: Exp[Any]) = reader match {
     case LocalReader(reads) => reads.foreach{ case (mem,addr) =>
       checkMultipleReaders(mem, reader)
+
+      val top = addr.map{a => getTopController(ctrl, isReduce, a)}.getOrElse( (ctrl, isReduce) )
       readersOf(mem) = readersOf(mem) :+ (ctrl, isReduce, reader)
+      topReadersOf(mem) = topReadersOf(mem) :+ (top._1, top._2, reader)
     }
   }
   def addPendingReader(reader: Exp[Any]) {
@@ -270,7 +274,8 @@ trait ControlSignalAnalyzer extends Traversal {
       checkMultipleReaders(a, lhs)
       readersOf(a) = readersOf(a) :+ (lhs, isOuter, lhs)  // (4)
       writersOf(a) = writersOf(a) :+ (lhs, isOuter, lhs)  // (5)
-      topWritersOf(a) = topWritersOf(a) :+ (lhs, isOuter, lhs)
+      topWritersOf(a) = topWritersOf(a) :+ (lhs, isOuter, lhs) // (5.5)
+      topReadersOf(a) = topReadersOf(a) :+ (lhs, isOuter, lhs) // (5.6)
       isAccum(a) = true                                   // (6)
       writtenIn(lhs) = writtenIn(lhs) :+ a                // (10)
       parentOf(a) = lhs  // Reset accumulator with reduction
@@ -286,7 +291,8 @@ trait ControlSignalAnalyzer extends Traversal {
       checkMultipleReaders(a, lhs)
       readersOf(a) = readersOf(a) :+ (lhs, true, lhs)     // (4)
       writersOf(a) = writersOf(a) :+ (lhs, true, lhs)     // (5)
-      topWritersOf(a) = topWritersOf(a) :+ (lhs, true, lhs)
+      topWritersOf(a) = topWritersOf(a) :+ (lhs, true, lhs) // (5.5)
+      topReadersOf(a) = topReadersOf(a) :+ (lhs, true, lhs) // (5.6)
       isAccum(a) = true                                   // (6)
       writtenIn(lhs) = writtenIn(lhs) :+ a                // (10)
       parentOf(a) = lhs  // Reset accumulator with reduction, not allocation
@@ -330,6 +336,7 @@ trait UnrolledControlSignalAnalyzer extends ControlSignalAnalyzer {
       readersOf(accum) = readersOf(accum) ++ readersOf(acc) // (4)
       writersOf(accum) = writersOf(accum) ++ writersOf(acc) // (5)
       topWritersOf(accum) = topWritersOf(accum) ++ topWritersOf(acc) // (5.5)
+      topReadersOf(accum) = topReadersOf(accum) ++ topReadersOf(acc) // (5.6)
       isAccum(accum) = true                                 // (6)
       writtenIn(lhs) = writtenIn(lhs) :+ accum              // (10)
       parentOf(accum) = lhs           // Reset accumulator with reduction, not allocation

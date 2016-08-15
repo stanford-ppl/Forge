@@ -118,6 +118,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
       if (SpatialConfig.genCGRA) {
         setProps(parPush, mirror(getProps(s), f.asInstanceOf[Transformer]))
       }
+      cloneFuncs.foreach{func => func(parPush) }
       lanes.unify(s, parPush)
 
     case EatReflect(e@Pop_fifo(fifo)) if !lanes.isUnrolled(fifo) =>
@@ -129,6 +130,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
       if (SpatialConfig.genCGRA) {
         setProps(parPop, mirror(getProps(s), f.asInstanceOf[Transformer]))
       }
+      cloneFuncs.foreach{func => func(parPop) }
       lanes.split(s, parPop)(e._mT)
 
     case EatReflect(e: Cam_load[_,_]) =>
@@ -149,6 +151,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
       if (SpatialConfig.genCGRA) {
         setProps(parStore, mirror(getProps(s), f.asInstanceOf[Transformer]))
       }
+      cloneFuncs.foreach{func => func(parStore) }
       lanes.unify(s, parStore)
 
     case EatReflect(e@Bram_load(bram,addr)) if !lanes.isUnrolled(bram) =>
@@ -164,6 +167,7 @@ trait UnrollingTransformer extends MultiPassTransformer {
       if (SpatialConfig.genCGRA) {
         setProps(parLoad, mirror(getProps(s), f.asInstanceOf[Transformer]))
       }
+      cloneFuncs.foreach{func => func(parLoad) }
       lanes.split(s, parLoad)(e._mT)
 
     // FIXME: Shouldn't be necessary to have duplication rules + metadata propagation
@@ -204,7 +208,9 @@ trait UnrollingTransformer extends MultiPassTransformer {
 
     focusBlock(func){
       focusExactScope(func){ stms =>
-        stms.foreach { case TP(s,d) => unroll(s, d, lanes)(mpos(s.pos)) }
+        stms.foreach { case TP(s,d) =>
+          unroll(s, d, lanes)(mpos(s.pos))
+        }
       }
     }
     // Get the list of duplicates for the original result of this block
@@ -235,11 +241,17 @@ trait UnrollingTransformer extends MultiPassTransformer {
     }
 
     val treeResult = reduceTree(inputs){(x,y) => reduce(x,y) }
-    val accumLoad = duringClone{e => instanceIndexOf(e,accum) = instanceIndexOf(node,accum) }{
+    val accumLoad = duringClone{e =>
+      instanceIndexOf(e,accum) = instanceIndexOf(node,accum)
+      if (SpatialConfig.genCGRA) reduceType(e) = None
+    }{
       withSubstScope(idx -> newIdx){ inlineBlock(ld) }
     }
     val newRes = reduce(treeResult, accumLoad)
-    withSubstScope(res -> newRes, idx -> newIdx){ inlineBlock(st) }
+
+    duringClone{e => if (SpatialConfig.genCGRA) reduceType(e) = None }{
+      withSubstScope(res -> newRes, idx -> newIdx){ inlineBlock(st) }
+    }
   }
 
   object PipeIf {
@@ -301,7 +313,10 @@ trait UnrollingTransformer extends MultiPassTransformer {
           Pipe {
             val newIdx = inlineBlock(iFunc)
             val loads = mapResults.map{mem =>
-              duringClone{e => instanceIndexOf(e, mem) = instanceIndexOf(lhs, partial) }{
+              duringClone{e =>
+                instanceIndexOf(e, mem) = instanceIndexOf(lhs, partial)
+                if (SpatialConfig.genCGRA) reduceType(e) = None
+              }{
                 withSubstScope(part -> mem, idx -> newIdx){inlineBlock(ld1)(mT)}
               }
             }
@@ -329,7 +344,10 @@ trait UnrollingTransformer extends MultiPassTransformer {
           }
           val loads = mapResults.map{mem =>                  // Calculate list of loaded results for each memory
               reduceLanes.foreach{p => register(part -> mem) } // Set partial result to be this memory
-              duringClone{e => instanceIndexOf(e, mem) = instanceIndexOf(lhs, partial) }{
+              duringClone{e =>
+                instanceIndexOf(e, mem) = instanceIndexOf(lhs, partial)
+                if (SpatialConfig.genCGRA) reduceType(e) = None
+              }{
                 unrollMap(ld1, reduceLanes)(mT)              // Unroll the load of the partial result
               }
           }
@@ -354,7 +372,10 @@ trait UnrollingTransformer extends MultiPassTransformer {
             else {
               stageError("Reduction without explicit zero is not yet supported")
             }
-            val accRead = duringClone{e => instanceIndexOf(e,accum) = instanceIndexOf(lhs,accum) }{
+            val accRead = duringClone{e =>
+              instanceIndexOf(e,accum) = instanceIndexOf(lhs,accum)
+              if (SpatialConfig.genCGRA) reduceType(e) = None
+            }{
               inlineBlock(ld2)(mT)
             }
             val newRes = duringClone{e => if (SpatialConfig.genCGRA) reduceType(e) = None}{
@@ -363,7 +384,9 @@ trait UnrollingTransformer extends MultiPassTransformer {
             }
             register(res -> newRes)
           }
-          unrollMap(st, reduceLanes)    // Parallel store. Already have substitutions for idx and res
+          duringClone{e => if (SpatialConfig.genCGRA) reduceType(e) = None}{
+            unrollMap(st, reduceLanes)    // Parallel store. Already have substitutions for idx and res
+          }
           ()
         }
         val innerPipe = reflectEffect(ParPipeReduce(ccRed, accum, innerBlk, rFunc, indsRed2, acc, rV), summarizeEffects(innerBlk).star andAlso Simple() andAlso Write(List(accum.asInstanceOf[Sym[C[T]]])) )

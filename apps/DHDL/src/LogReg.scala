@@ -9,7 +9,7 @@ trait LogReg extends DHDLApplication {
   type Elem = Flt
   type T = Flt
 
-  val N = 1152
+  val N = 960000
   val D = 768
   val A = 1
 

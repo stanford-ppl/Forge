@@ -43,9 +43,11 @@ trait UnrollingTransformer extends MultiPassTransformer {
 
     def length = P // TODO: better term for this
 
+    def parAddr(p: Int) = List.tabulate(N){d => (p / prods(d)) % Ps(d) }
+
     // Substitution for each duplication "lane"
     val laneSubst = Array.tabulate(P){p =>
-      val inds2 = indices.zipWithIndex.map{case (vec,d) => vec((p / prods(d)) % Ps(d)) }
+      val inds2 = indices.zip(parAddr(p)).map{case (vec, i) => vec(i) }
       withSubstScope(inds.zip(inds2):_*){ subst }
     }
 
@@ -303,11 +305,15 @@ trait UnrollingTransformer extends MultiPassTransformer {
         }
       }
       else {
+        debug(s"Unrolling block reduce $lhs")
         val reduceLanes = Unroller(ccRed, indsRed)
         val indsRed2 = reduceLanes.indices
 
+        debug(s"  Reduction indices: $indsRed2")
+
         val innerBlk = reifyBlock {
           val validsReduce = boundChecks2D(ccRed, indsRed2)
+          debug(s"  Reduction valids: $validsReduce")
 
           reduceLanes.foreach{mem =>
             val newIdx = inlineBlock(iFunc)                // Inline index calculation for each parallel lane
@@ -320,9 +326,12 @@ trait UnrollingTransformer extends MultiPassTransformer {
               }
           }
           val results = reduceLanes.map{p =>
-            val loadsT  = loads.map(_.apply(p))                               // Pth "column" of loads
-            val validsLane = validsReduce.map{valids => valids(p) }           // Valids for just this reduce lane
-            val valids = validsMap.zip(validsLane).map{case (a,b) => a && b}  // Valid map index & valid reduce index
+            val addrs = reduceLanes.parAddr(p)
+            debug(s"  Creating reduction lane #$p")
+            debug(s"    Addrs: $addrs")
+            val loadsT  = loads.map(_.apply(p))                                   // Pth "column" of loads
+            val validsLane = validsReduce.zip(addrs).map{case (vec,i) => vec(i) } // Valids for just this reduce lane
+            val valids = validsMap.zip(validsLane).map{case (a,b) => a && b}      // Valid map index & valid reduce index
 
             val validLoads = if (zero.isDefined) {
               loadsT.zip(valids).map{case (res,v) =>

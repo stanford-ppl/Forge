@@ -31,13 +31,14 @@ trait Kmeans extends DHDLApplication {
     bound(numCents) = MAXK
     bound(numDims) = MAXD
 
-    val BN = param(96);  domainOf(BN) = (96, 9600, 96)
+    val BN = param(96);  domainOf(BN) = (96, 960, 96)
     val BD = param(384);  domainOf(BD) = (MAXD, MAXD, MAXD)
     val PX = param(1);    domainOf(PX) = (1,1,1)
-    val P0 = param(32);   domainOf(P0) = (1,96,4)     // Dimensions loaded in parallel
+    val P0 = param(32);   domainOf(P0) = (32,192,96)  // Dimensions loaded in parallel
     val P1 = param(8);    domainOf(P1) = (1,12,2)     // Sets of points calculated in parallel
-    val P2 = param(1);    domainOf(P2) = (1,192,8)   // Dimensions accumulated in parallel (outer)
-    val P3 = param(6);    domainOf(P3) = (1,16,2)     // Points calculated in parallel
+    val P2 = param(1);    domainOf(P2) = (1,96,4)     // Dimensions accumulated in parallel (outer)
+    val P3 = param(6);    domainOf(P3) = (1,16,4)     // Points calculated in parallel
+    val PR = param(4);    domainOf(PR) = (1,96,4)
     /*val P4 = param(1);    domainOf(P4) = (1,MAXD,1)   // Dimensions accumulated in parallel (inner)
     val P5 = param(1);    domainOf(P5) = (1,MAXD,1)   // Dimensions compared in parallel
     val P6 = param(1);    domainOf(P6) = (1,MAXD,1)   // Dimensions saved in parallel
@@ -59,21 +60,20 @@ trait Kmeans extends DHDLApplication {
     Accel {
       val cts = BRAM[Flt](MAXK, MAXD)
 
-      val DP1 = Reg[SInt]
-      Pipe { DP1 := D + 1 }
-
       // Load initial centroids (from points)
       cts := points(0::K,0::D, P0)
 
-      val newCents = BRAM[Flt](MAXK,MAXD+1)
+      val DM1 = D.value - 1
+
+      val newCents = BRAM[Flt](MAXK,MAXD)
       // For each set of points
-      Fold(N by BN par P1, P2)(newCents, 0.as[Flt]){i =>
+      Fold(N by BN par P1, PR)(newCents, 0.as[Flt]){i =>
         val pts = BRAM[Flt](BN, BD)
         pts := points(i::i+BN, 0::BD, P0)
 
-        val centTile = BRAM[Flt](MAXK, MAXD+1)
+        val centTile = BRAM[Flt](MAXK, MAXD)
         // For each point in this set
-        Fold(BN par P3, P2)(centTile, 0.as[Flt]){pt =>
+        Fold(BN par P3, PR)(centTile, 0.as[Flt]){pt =>
           val minCent = Reg[SInt](0)  // Index of closest centroid
           val minDist = Reg[Flt](-1)  // Distance to closest centroid
 
@@ -87,9 +87,9 @@ trait Kmeans extends DHDLApplication {
           }
 
           // Store this point to the set of accumulators
-          val localCent = BRAM[Flt](MAXK,MAXD+1)
-          Pipe(K by 1, DP1 by 1){(ct,d) =>
-            val elem = mux(d == D.value, 1.as[Flt], pts(pt, d))
+          val localCent = BRAM[Flt](MAXK,MAXD)
+          Pipe(K by 1, D par P2){(ct,d) =>
+            val elem = mux(d == DM1, 1.as[Flt], pts(pt, d))
             localCent(ct, d) = mux(ct == minCent.value, elem, 0.as[Flt])
           }
           localCent
@@ -97,7 +97,7 @@ trait Kmeans extends DHDLApplication {
       }{_+_}
 
       val centCount = BRAM[Flt](MAXK)
-      Pipe(K by 1 par PX){ct => centCount(ct) = newCents(ct,D+1) }
+      Pipe(K by 1 par PX){ct => centCount(ct) = newCents(ct,DM1) }
 
       // Average each new centroid
       val centsOut = BRAM[Flt](MAXK, MAXD)

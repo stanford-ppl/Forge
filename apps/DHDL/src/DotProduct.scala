@@ -6,10 +6,9 @@ object DotProductCompiler extends DHDLApplicationCompiler with DotProduct
 object DotProductInterpreter extends DHDLApplicationInterpreter with DotProduct
 trait DotProduct extends DHDLApplication {
   type T = SInt
-  val N = 93600000
-  val tileSize = 19200
-  val innerPar = 48
-  val outerPar = 5
+  val tileSize = 9600
+  val innerPar = 64
+  val outerPar = 1
   type Array[T] = ForgeArray[T]
 
   def dotproduct(a: Rep[Array[T]], b: Rep[Array[T]]) = {
@@ -19,7 +18,9 @@ trait DotProduct extends DHDLApplication {
     val P3 = param(innerPar); domainOf(P3) = (1, 192, 1)
     val dataSize = a.length; bound(dataSize) = 187200000
 
+    val N = ArgIn[T]
     val out = ArgOut[T]
+    setArg(N, a.length)
 
     val v1 = OffChipMem[T](N)
     val v2 = OffChipMem[T](N)
@@ -27,8 +28,7 @@ trait DotProduct extends DHDLApplication {
     setMem(v2, b)
 
     Accel {
-      val reg = Reg[T]
-      Fold(N by B par P1)(reg, 0.as[T]){ i =>
+      Fold(N by B par P1)(out, 0.as[T]){ i =>
         val b1 = FIFO[T](512)
         val b2 = FIFO[T](512)
         Parallel {
@@ -39,7 +39,6 @@ trait DotProduct extends DHDLApplication {
           b1.pop() * b2.pop()
         }{_+_}
       }{_+_}
-      Pipe{ out := reg}
     }
     getArg(out)
   }
@@ -51,6 +50,7 @@ trait DotProduct extends DHDLApplication {
   }
 
   def main() {
+    val N = args(0).to[SInt]
     val a = Array.fill(N)(random[T](10))
     val b = Array.fill(N)(random[T](10))
 

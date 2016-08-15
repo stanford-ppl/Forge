@@ -7,12 +7,11 @@ object KmeansInterpreter extends DHDLApplicationInterpreter with Kmeans
 trait Kmeans extends DHDLApplication {
   type Array[T] = ForgeArray[T]
 
-  lazy val MAXK = 8
+  lazy val MAXK = 96
   lazy val MAXD = 384
-  val innerPar = 1
-  val outerPar = 1
+  val tileSizeN = 96
+  val tileSizeD = 384
 
-  lazy val loadPar = param(16)
 
   def reduceTree(x: List[(Rep[Flt], Rep[SInt])]): List[(Rep[Flt], Rep[SInt])] = {
     if (x.length == 1) x
@@ -31,8 +30,8 @@ trait Kmeans extends DHDLApplication {
     bound(numCents) = MAXK
     bound(numDims) = MAXD
 
-    val BN = param(320);  domainOf(BN) = (96, 9600, 96)
-    val BD = param(384);  domainOf(BD) = (MAXD, MAXD, MAXD)
+    val BN = param(tileSizeN);  domainOf(BN) = (96, 9600, 96)
+    val BD = param(tileSizeD);  domainOf(BD) = (MAXD, MAXD, MAXD)
     val PX = param(1);    domainOf(PX) = (1,1,1)
     val P0 = param(1);    domainOf(P0) = (1,96,1)     // Dimensions loaded in parallel
     val P1 = param(1);    domainOf(P1) = (1,12,1)     // Sets of points calculated in parallel
@@ -118,37 +117,37 @@ trait Kmeans extends DHDLApplication {
 
     val pts = Array.tabulate(N){i => Array.tabulate(D){d => random[Flt](10) }}
 
-    println("points: ")
-    for (i <- 0 until N) { println(i.mkString + ": " + pts(i).mkString(", ")) }
+    // println("points: ")
+    // for (i <- 0 until N) { println(i.mkString + ": " + pts(i).mkString(", ")) }
 
     val result = kmeans(pts.flatten, N, K, D)
 
-    val cts = Array.tabulate(K){i => pts(i) }
+    // val cts = Array.tabulate(K){i => pts(i) }
 
-    val gold = Array.empty[ForgeArray[Flt]](K) // ew
-    val counts = Array.empty[UInt](K)
-    for (i <- 0 until K) {
-      gold(i) = Array.fill(D)(0.as[Flt])  // TODO: Fix
-    }
-    for (i <- 0 until K) { counts(i) = 0.as[UInt] }
-    // Really bad imperative version
-    def dist(p1: Rep[ForgeArray[Flt]], p2: Rep[ForgeArray[Flt]]) = p1.zip(p2){(a,b) => (a - b)**2 }.reduce(_+_)
-    for (i <- 0 until N) {
-      val pt = pts(i)
-      val distWithIndex = cts.map{ct => dist(pt, ct) }.zipWithIndex
-      val minIdx = distWithIndex.reduce{(a,b) => if (a._1 < b._1) a else b }._2
+    // val gold = Array.empty[ForgeArray[Flt]](K) // ew
+    // val counts = Array.empty[UInt](K)
+    // for (i <- 0 until K) {
+    //   gold(i) = Array.fill(D)(0.as[Flt])  // TODO: Fix
+    // }
+    // for (i <- 0 until K) { counts(i) = 0.as[UInt] }
+    // // Really bad imperative version
+    // def dist(p1: Rep[ForgeArray[Flt]], p2: Rep[ForgeArray[Flt]]) = p1.zip(p2){(a,b) => (a - b)**2 }.reduce(_+_)
+    // for (i <- 0 until N) {
+    //   val pt = pts(i)
+    //   val distWithIndex = cts.map{ct => dist(pt, ct) }.zipWithIndex
+    //   val minIdx = distWithIndex.reduce{(a,b) => if (a._1 < b._1) a else b }._2
 
-      counts(minIdx) = counts(minIdx) + 1
-      for (j <- 0 until D) {
-        gold(minIdx)(j) = gold(minIdx).apply(j) + pt(j)
-      }
+    //   counts(minIdx) = counts(minIdx) + 1
+    //   for (j <- 0 until D) {
+    //     gold(minIdx)(j) = gold(minIdx).apply(j) + pt(j)
+    //   }
 
-      println(counts.mkString(", "))
-      for (x <- 0 until K) { println(gold(x).mkString(", ")) }
-    }
-    val actual = gold.zip(counts){(ct,n) => ct.map{p => p / n.to[Flt] }}.flatten
-    println("gold:   " + actual.mkString(", "))
-    println("result: " + result.mkString(", "))
+    //   println(counts.mkString(", "))
+    //   for (x <- 0 until K) { println(gold(x).mkString(", ")) }
+    // }
+    // val actual = gold.zip(counts){(ct,n) => ct.map{p => p / n.to[Flt] }}.flatten
+    // println("gold:   " + actual.mkString(", "))
+    // println("result: " + result.mkString(", "))
     //assert( actual == result )
   }
 

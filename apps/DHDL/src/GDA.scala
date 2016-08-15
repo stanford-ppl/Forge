@@ -10,11 +10,11 @@ trait GDA extends DHDLApplication {
 
   val innerPar = 8
   val outerPar = 1
-  val rr = 384
-  val cc = 96 //96
+  val maxCols = 192
+  val tileSize = 384
 
   def gda(xCPU: Rep[Array[T]], yCPU: Rep[Array[Bit]], mu0CPU: Rep[Array[T]], mu1CPU: Rep[Array[T]]) = {
-    val rTileSize     = param(96);  domainOf(rTileSize) = (96, 19200, 1)
+    val rTileSize     = param(tileSize);  domainOf(rTileSize) = (96, 19200, 1)
     val op      = param(outerPar);  domainOf(op)  = (1, 8, 1)
     val ip      = param(innerPar);  domainOf(ip)  = (1, 12, 1)
     val subLoopPar    = param(1);  domainOf(subLoopPar)    = (1, 16, 1)
@@ -22,12 +22,14 @@ trait GDA extends DHDLApplication {
     val outerAccumPar = param(1);  domainOf(outerAccumPar) = (1, 1, 1)
 
     val rows = yCPU.length;   bound(rows) = 360000
-    val cols = mu0CPU.length; bound(cols) = cc
+    val cols = param(maxCols); bound(cols) = maxCols
 
-    assert(cols == cc) // TODO: Shouldn't be necessary, but addressing requires it at the moment
 
-    val R  = rr
-    val C  = cc
+    val R = ArgIn[SInt]
+    val C = ArgIn[SInt]
+
+    setArg(R, yCPU.length)
+    setArg(C, mu0CPU.length)
 
     val x     = OffChipMem[T](R, C)
     val y     = OffChipMem[Bit](R)
@@ -41,29 +43,29 @@ trait GDA extends DHDLApplication {
     setMem(mu1, mu1CPU)
 
     Accel {
-      val mu0Tile = BRAM[T](cc)
-      val mu1Tile = BRAM[T](cc)
+      val mu0Tile = BRAM[T](cols)
+      val mu1Tile = BRAM[T](cols)
       Parallel {
-        mu0Tile := mu0(0::cc, subLoopPar)  // Load mu0
-        mu1Tile := mu1(0::cc, subLoopPar)  // Load mu1
+        mu0Tile := mu0(0::cols, subLoopPar)  // Load mu0
+        mu1Tile := mu1(0::cols, subLoopPar)  // Load mu1
       }
 
-      val sigmaOut = BRAM[T](cc, cc)
+      val sigmaOut = BRAM[T](cols, cols)
 
       Fold(R by rTileSize par op, outerAccumPar)(sigmaOut, 0.as[T]){ r =>
         val yTile = BRAM[Bit](rTileSize)
-        val xTile = BRAM[T](rTileSize, cc)
+        val xTile = BRAM[T](rTileSize, cols)
         Parallel {
           yTile := y(r::r+rTileSize, subLoopPar)
           xTile := x(r::r+rTileSize, 0::C, subLoopPar)  // Load tile of x
         }
 
-        val sigmaBlk = BRAM[T](cc, cc)
+        val sigmaBlk = BRAM[T](cols, cols)
         Fold(rTileSize par ip, prodLoopPar)(sigmaBlk, 0.as[Flt]){rr =>
-          val subTile = BRAM[T](cc)
-          val sigmaTile = BRAM[T](cc, cc)
-          Pipe(C par subLoopPar){ cc =>
-            subTile(cc) = xTile(rr,cc) - mux(yTile(rr), mu1Tile(cc), mu0Tile(cc))
+          val subTile = BRAM[T](cols)
+          val sigmaTile = BRAM[T](cols, cols)
+          Pipe(C par subLoopPar){ cols =>
+            subTile(cols) = xTile(rr,cols) - mux(yTile(rr), mu1Tile(cols), mu0Tile(cols))
           }
           Pipe(C by 1, C par prodLoopPar){ (ii,jj) =>
             sigmaTile(ii,jj) = subTile(ii) * subTile(jj)
@@ -72,7 +74,7 @@ trait GDA extends DHDLApplication {
         }{_+_}
       }{_+_}
 
-      sigma(0::cc, 0::cc, prodLoopPar) := sigmaOut
+      sigma(0::cols, 0::cols, prodLoopPar) := sigmaOut
     }
 
     getMem(sigma)
@@ -86,8 +88,8 @@ trait GDA extends DHDLApplication {
 
 
   def main() {
-    val R = rr
-    val C = cc //args(1).to[SInt] // TODO: Should be selectable up to maximum
+    val R = args(0).to[SInt]
+    val C = args(1).to[SInt] // TODO: Should be selectable up to maximum
 
     val x  = Array.fill(R){ Array.fill(C){ random[T](10) }}
     val ys = Array.fill(R){ random[Bit] }

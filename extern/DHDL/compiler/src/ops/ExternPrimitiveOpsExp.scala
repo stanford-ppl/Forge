@@ -185,6 +185,10 @@ trait MaxJGenExternPrimitiveOps extends MaxJGenEffect {
   }
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case Min2(a, b) =>
+      emit(s"""DFEVar ${quote(sym)} = KernelMath.min(${quote(a)}, ${quote(b)});""")
+    case Max2(a, b) =>
+      emit(s"""DFEVar ${quote(sym)} = KernelMath.max(${quote(a)}, ${quote(b)});""")
     case ConstFixPt(x,_,_,_) =>
       if (!emitted_consts.contains((sym, rhs))) {
         emitted_consts += ((sym, rhs))
@@ -253,6 +257,14 @@ trait ScalaGenExternPrimitiveOps extends ScalaGenEffect {
     case bx(n) => "B"+n
     case _ => super.remap(m)
   }
+
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case Min2(a, b) =>
+    case Max2(a, b) =>
+    case _ => super.emitNode(sym, rhs)
+
+  }
+
 
 // HACK: Have this entire template as a string right now...
   val emul = s"""

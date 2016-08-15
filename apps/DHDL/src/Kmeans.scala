@@ -34,11 +34,11 @@ trait Kmeans extends DHDLApplication {
     val BN = param(96);  domainOf(BN) = (96, 960, 96)
     val BD = param(384);  domainOf(BD) = (MAXD, MAXD, MAXD)
     val PX = param(1);    domainOf(PX) = (1,1,1)
-    val P0 = param(32);   domainOf(P0) = (32,192,96)  // Dimensions loaded in parallel
-    val P1 = param(8);    domainOf(P1) = (1,12,2)     // Sets of points calculated in parallel
+    val P0 = param(1);    domainOf(P0) = (32,192,96)  // Dimensions loaded in parallel
+    val P1 = param(1);    domainOf(P1) = (1,12,2)     // Sets of points calculated in parallel
     val P2 = param(1);    domainOf(P2) = (1,96,4)     // Dimensions accumulated in parallel (outer)
-    val P3 = param(6);    domainOf(P3) = (1,16,4)     // Points calculated in parallel
-    val PR = param(4);    domainOf(PR) = (1,96,4)
+    val P3 = param(1);    domainOf(P3) = (1,16,4)     // Points calculated in parallel
+    val PR = param(1);    domainOf(PR) = (1,96,4)
     /*val P4 = param(1);    domainOf(P4) = (1,MAXD,1)   // Dimensions accumulated in parallel (inner)
     val P5 = param(1);    domainOf(P5) = (1,MAXD,1)   // Dimensions compared in parallel
     val P6 = param(1);    domainOf(P6) = (1,MAXD,1)   // Dimensions saved in parallel

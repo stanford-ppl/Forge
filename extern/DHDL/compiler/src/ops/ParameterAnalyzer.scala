@@ -204,6 +204,9 @@ trait ParameterAnalyzer extends Traversal {
     case Counter_new(start,end,step,par) =>
       var max = MAX_PAR_FACTOR
       debug(s"Found counter with start=$start, end=$end, step=$step, par=$par")
+      debug(s"  bound($start) = " + bound(start))
+      debug(s"  bound($end) = " + bound(end))
+      debug(s"  bound($step) = " + bound(step))
 
       // Set constraints on par factor
       (start,end,step) match {

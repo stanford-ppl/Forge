@@ -9,8 +9,8 @@ trait LogReg extends DHDLApplication {
   type Elem = Flt
   type T = Flt
 
-  val tileSizeH = 12345
-  val innerParH = 16
+  val tileSizeH = 192
+  val innerParH = 32
   val outerParH = 1
   lazy val tileSize = param(tileSizeH)
   lazy val outerMpPar = param(outerParH)
@@ -18,19 +18,22 @@ trait LogReg extends DHDLApplication {
   lazy val innerPar   = param(innerParH)
   lazy val noPar = param(1)
 
-  val N = 1152
-  val D = 768
   val A = 1
 
   def sigmoid(t:Rep[Elem]) = 1.as[Elem]/(exp(-t)+1)
 
-  def logreg(x_in: Rep[Array[Elem]], y_in: Rep[Array[Elem]], theta_in: Rep[Array[Elem]]) {
+  def logreg(x_in: Rep[Array[Elem]], y_in: Rep[Array[Elem]], tt: Rep[Array[Elem]]) {
 
-    val BN = param(96); domainOf(BN) = (96,9600,96)
+    val N = ArgIn[SInt]
+    val D = 384
+
+    setArg(N, y_in.length)
+
+    val BN = param(tileSizeH); domainOf(BN) = (96,9600,96)
     val PX = param(1);  domainOf(PX) = (1,1,1)
-    val P0 = param(1);  domainOf(P0) = (1,4,1)
-    val P1 = param(1);  domainOf(P1) = (1,D,1)
-    val P2 = param(1);  domainOf(P2) = (1,D,1)
+    val P0 = param(1);  domainOf(P0) = (1,3,1)
+    val P1 = param(1);  domainOf(P1) = (1,2,1)
+    val P2 = param(innerParH);  domainOf(P2) = (1,96,1)
     val P3 = param(1);  domainOf(P3) = (1,96,1)
 
     val x = OffChipMem[Elem](N, D)
@@ -39,7 +42,7 @@ trait LogReg extends DHDLApplication {
 
     setMem(x, x_in)
     setMem(y, y_in)
-    setMem(theta, theta_in)
+    setMem(theta, tt)
 
     Accel {
       val btheta = BRAM[Elem](D)
@@ -73,6 +76,15 @@ trait LogReg extends DHDLApplication {
   }
 
   def main() {
+    val N = args(0).to[SInt]
+    val D = 384
+    /*domainOf(tileSize) = (96,9600,96)
+    domainOf(outerMpPar) = (1,3,1)
+    domainOf(innerMpPar) = (1,1,1)
+    domainOf(innerPar) = (1,192,1)
+    domainOf(noPar) = (1,1,1)*/
+
+
     val sX = Array.fill(N){ Array.fill(D){ random[Elem](10.0)} }
     val sY = Array.fill(N)( random[Elem](10.0) )
     val theta = Array.fill(D) {random[Elem](1.0) }

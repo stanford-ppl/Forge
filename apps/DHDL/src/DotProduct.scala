@@ -7,7 +7,7 @@ object DotProductInterpreter extends DHDLApplicationInterpreter with DotProduct
 trait DotProduct extends DHDLApplication {
   type T = SInt
   val tileSize = 9600
-  val innerPar = 64
+  val innerPar = 96
   val outerPar = 1
   type Array[T] = ForgeArray[T]
 
@@ -30,14 +30,14 @@ trait DotProduct extends DHDLApplication {
     Accel {
       val reg = Reg[T]
       Fold(N by B par P1)(reg, 0.as[T]){ i =>
-        val b1 = FIFO[T](512)
-        val b2 = FIFO[T](512)
+        val b1 = BRAM[T](B)
+        val b2 = BRAM[T](B)
         Parallel {
           b1 := v1(i::i+B, P3)
           b2 := v2(i::i+B, P3)
         }
         Reduce(B par P2)(0.as[T]){ii =>
-          b1.pop() * b2.pop()
+          b1(ii) * b2(ii)
         }{_+_}
       }{_+_}
       Pipe { out := reg }

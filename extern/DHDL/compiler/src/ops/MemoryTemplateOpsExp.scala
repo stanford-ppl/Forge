@@ -515,8 +515,23 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       } else {
         if (writers.length == 1) {
           dups.zipWithIndex.foreach {case (dd, ii) =>
-            emit(s"""${quote(bram)}_${ii}.connectWport(stream.offset(${quote(addr)}, -$offsetStr),
-              stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr)); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+            // I KNOW THERE ARE MORE CASES TO ADD IN THIS ACCUM SECTION!!!!
+            val dimzz = dimsOf(bram)
+            dimzz.length match {
+              case 1 =>
+                emit(s"""${quote(bram)}_${ii}.connectWport(stream.offset(${quote(addr)}, -$offsetStr),
+                  stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr)); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+              case _ =>
+                val w = writersOf(bram)
+                val find_id = writers.map{case (_, _, s) => s}
+                val i = find_id.indexOf(sym)
+                val inds = parIndicesOf(writers(i)._3)
+                val this_writer = writers(i)._1
+                emit(s"""${quote(bram)}_${ii}.connectWport(stream.offset(${quote(inds(0)(0))}, -$offsetStr), stream.offset(${quote(inds(0)(1))}, -$offsetStr),
+                  stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr)); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+
+            }
+
           }
         } else {
           val choose_from = writers.map {

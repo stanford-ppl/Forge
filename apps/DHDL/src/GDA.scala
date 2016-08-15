@@ -8,10 +8,10 @@ trait GDA extends DHDLApplication {
   type T = Flt
   type Array[T] = ForgeArray[T]
 
-  val innerPar = 8
+  val innerPar = 16
   val outerPar = 1
-  val maxCols = 192
-  val tileSize = 384
+  val maxCols = 96
+  val tileSize = 192
 
   def gda(xCPU: Rep[Array[T]], yCPU: Rep[Array[Bit]], mu0CPU: Rep[Array[T]], mu1CPU: Rep[Array[T]]) = {
     val rTileSize     = param(tileSize);  domainOf(rTileSize) = (96, 19200, 1)
@@ -61,7 +61,7 @@ trait GDA extends DHDLApplication {
         }
 
         val sigmaBlk = BRAM[T](cols, cols)
-        Fold(rTileSize par ip, prodLoopPar)(sigmaBlk, 0.as[Flt]){rr =>
+        Fold(rTileSize par ip)(sigmaBlk, 0.as[Flt]){rr =>
           val subTile = BRAM[T](cols)
           val sigmaTile = BRAM[T](cols, cols)
           Pipe(C par subLoopPar){ cols =>

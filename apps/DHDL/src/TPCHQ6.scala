@@ -9,13 +9,13 @@ trait TPCHQ6 extends DHDLApplication {
 
   val MIN_DATE = 1
   val MAX_DATE = 8
-  val nn = 93600000
   val tileSize = 2400
   val outerPar = 1
   val innerPar = 20
 
   def tpchq6(datesIn: Rep[Array[UInt]], quantsIn: Rep[Array[UInt]], disctsIn: Rep[Array[Flt]], pricesIn: Rep[Array[Flt]]): Rep[Flt] = {
-    val dataSize = nn
+    val dataSize = ArgIn[SInt]
+    setArg(dataSize, datesIn.length)
 
 
     val dates  = OffChipMem[UInt](dataSize)
@@ -67,7 +67,7 @@ trait TPCHQ6 extends DHDLApplication {
 
 
   def main() {
-    val N = nn
+    val N = args(0).to[SInt]
 
     val dates  = Array.fill(N){random[UInt](20) + 65}
     val quants = Array.fill(N){random[UInt](25) }

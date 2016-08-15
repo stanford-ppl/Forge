@@ -140,6 +140,8 @@ trait UnrollingTransformer extends MultiPassTransformer {
 
     case EatReflect(e@Bram_store(bram,addr,value)) if !lanes.isUnrolled(bram) =>
       debug(s"Unrolling $s = $d")
+      getProps(s).foreach{m => debug("  " + makeString(m)) }
+
       val values = lanes.vectorize{p => f(value)}
       val addrs  = lanes.vectorize{p => f(addr)}
       val parStore = par_bram_store(f(bram), addrs, values)(e._mT, e.__pos)
@@ -151,6 +153,8 @@ trait UnrollingTransformer extends MultiPassTransformer {
 
     case EatReflect(e@Bram_load(bram,addr)) if !lanes.isUnrolled(bram) =>
       debug(s"Unrolling $s = $d")
+      getProps(s).foreach{m => debug("  " + makeString(m)) }
+
       val addrs = lanes.vectorize{p => f(addr)}
       val parLoad = par_bram_load(f(bram), addrs)(e._mT, e.__pos)
       dimsOf(parLoad) = List(lanes.length.as[Index])
@@ -166,12 +170,16 @@ trait UnrollingTransformer extends MultiPassTransformer {
     // for these nodes explicitly. Maybe have two-step mirroring for metadata?
     case EatReflect(e@Bram_store(bram,addr,value)) =>
       debug(s"Duplicated bram store $s = $d")
+      getProps(s).foreach{m => debug("  " + makeString(m)) }
+
       val stores = lanes.duplicate(s, d)
       lanes.foreach{i => parIndicesOf(f(s)) = List(accessIndicesOf(s).map(f(_))) }
       stores
 
     case EatReflect(e@Bram_load(bram,addr)) =>
       debug(s"Duplicated bram load $s = $d")
+      getProps(s).foreach{m => debug("  " + makeString(m)) }
+
       val loads = lanes.duplicate(s, d)
       loads.foreach{i => parIndicesOf(f(s)) = List(accessIndicesOf(s).map(f(_))) }
       loads

@@ -8,6 +8,8 @@ import scala.collection.mutable.HashMap
 import dhdl.compiler._
 import dhdl.compiler.ops._
 
+import scala.collection.mutable.ArrayBuffer
+
 trait UnitPipeTransformExp extends NodeMetadataOpsExp with LoweredPipeOpsExp { this: DHDLExp => }
 
 /**
@@ -46,67 +48,61 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
       focusBlock(blk){
         focusExactScope(blk){ stms =>
 
+          class Stage(val isControl: Boolean) {
+             val allocs: ArrayBuffer[Stm] = ArrayBuffer.empty
+             val nodes: ArrayBuffer[Stm] = ArrayBuffer.empty
+             val regReads: ArrayBuffer[Stm] = ArrayBuffer.empty
+
+             def deps = nodes.flatMap{case TP(s,d) => (syms(d) ++ readSyms(d)) }.toSet ++
+                        allocs.flatMap{case TP(s,d) => (syms(d) ++ readSyms(d)) }.toSet
+
+             def dumpStage(i: Int) {
+                if (isControl) debugs(s"$i. Control Stage")
+                else           debugs(s"$i. Primitive Stage")
+                debugs(s"Allocations: ")
+                allocs.foreach{case TP(s,d) => debugs(s"..$s = $d") }
+                debugs(s"Nodes:")
+                nodes.foreach{case TP(s,d) => debugs(s"..$s = $d") }
+                debugs(s"Register reads:")
+                regReads.foreach{case TP(s,d) => debugs(s"..$s = $d") }
+             }
+          }
+
           // Imperative version (functional version caused ugly scalac crash :( )
-          var allocs = List[List[Stm]]()
-          var stages = List[List[Stm]]()
-          var prevStageIsControl = true
-          allocs = Nil +: allocs
+          val stages: ArrayBuffer[Stage] = ArrayBuffer.empty
+          def curStage = stages.last
+          stages += new Stage(true)
 
           stms foreach { case stm@TP(s,d) =>
             if (isPrimitiveNode(s)) {
-              if (prevStageIsControl) {
-                allocs = Nil +: allocs
-                stages = List(stm) +: stages
-                prevStageIsControl = false
-              }
-              else {
-                stages = (stm +: stages.head) +: stages.tail
-                prevStageIsControl = false
-              }
+              if (curStage.isControl) stages += new Stage(false)
+              curStage.nodes += stm
             }
-            // Order doesn't matter for these (just need to be in scope somewhere)
-            // Note that this shouldn't cause effects ordering issues as the allocations
-            // are still in scope and are just being collected at the beginning of the scope
-            // Could be an issue if an effectful statement is found to be global, but this
-            // is currently disallowed
+            else if (isRegisterRead(s)) {
+              if (!curStage.isControl) curStage.nodes += stm
+              curStage.regReads += stm
+            }
             else if (isAllocation(s) || isConstantExp(s) || isGlobal(s)) {
-              allocs = (stm +: allocs.head) +: allocs.tail
-              // No change to prevStage
+              curStage.allocs += stm
             }
             else {
-              allocs = Nil +: allocs
-              stages = List(stm) +: stages
-              prevStageIsControl = true
+              stages += new Stage(true)
+              curStage.nodes += stm
             }
           }
-
-          stages = stages.map(_.reverse).reverse
-          allocs = allocs.map(_.reverse).reverse
-
-          stages = (List(allocs.head) +: List.tabulate(stages.length){i => List(stages(i),allocs(i+1)) }).flatten
-
-          val deps = stages.map{stage => stage.flatMap{case TP(s,d) => (syms(d) ++ readSyms(d)).distinct }}
+          val deps = stages.toList.map{stage => stage.deps }
 
           if (debugMode) {
-            stages.zipWithIndex.foreach{case (stage,i) => stage.headOption match {
-              case Some(TP(s,d)) if isPrimitiveNode(s) =>
-                debugs(s"$i. Primitives: ")
-                stage.foreach{case TP(s,d) => debugs(s"..$s = $d") }
-              case Some(TP(s,d)) if isAllocation(s) || isConstantExp(s) || isGlobal(s) =>
-                debugs(s"$i. Allocations: ")
-                stage.foreach{case TP(s,d) => debugs(s"..$s = $d") }
-              case Some(TP(s,d)) => debugs(s"$i. $s = $d")
-              case None => debugs(s"$i. [Empty alloc slot]")
-            }}
+            stages.zipWithIndex.foreach{case (stage,i) => stage.dumpStage(i) }
             debug("")
           }
 
-          stages.zipWithIndex.foreach{ case (stage,i) => stage.headOption match {
-            case Some(TP(s,d)) if isPrimitiveNode(s) =>
-              val calculatedSyms = stage.map{case TP(s,d) => s}
+          stages.zipWithIndex.foreach{
+            case (stage,i) if !stage.isControl =>
+              val calculatedSyms = stage.nodes.map{case TP(s,d) => s}
               val neededSyms = deps.drop(i+1).flatten
               // Determine which symbols escape (can be empty)
-              val escapingSyms = calculatedSyms.filter{sym => neededSyms.contains(sym)}
+              val escapingSyms = calculatedSyms.filter(neededSyms contains _)
               val (escapingUnits, escapingValues) = escapingSyms.partition{sym => sym.tp == manifest[Unit]}
 
               debugs("Escaping symbols: " + escapingValues.mkString(", "))
@@ -116,9 +112,10 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
                 debugs(s"Created new register $reg for escaping primitive $sym")
                 reg
               }
+              stage.allocs.foreach{stm => traverseStm(stm) }
 
               val primBlk = reifyBlock {
-                stage.foreach{stm => traverseStm(stm) } // Mirror each statement
+                stage.nodes.foreach{stm => traverseStm(stm) } // Mirror each statement
 
                 // Write all escaping symbols to newly created registers
                 escapingValues.zip(regs).foreach{case (sym,reg) => reg_write(reg, f(sym))(sym.tp, mpos(sym.pos)) }
@@ -134,9 +131,15 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
               // Replace all dependencies on effectful (Unit) symbols with dependencies on newly created Pipe
               escapingUnits.foreach{sym => register(sym -> pipe) }
 
-            case Some(TP(s,d)) => stage.foreach{stm => traverseStm(stm) } // Mirror non-primitives to update
-            case None =>
-          }}
+              stage.regReads.foreach{case TP(s,EatReflect(Reg_read(reg))) =>
+                register(s -> reg_read(f(reg))(s.tp,mpos(s.pos)) )
+              }
+
+            case (stage,i) =>
+              stage.nodes.foreach{stm => traverseStm(stm) } // Mirror non-primitives to update
+              stage.allocs.foreach{stm => traverseStm(stm) }
+              stage.regReads.foreach{stm => traverseStm(stm) }
+          }
         }
       }
       f(getBlockResult(blk))

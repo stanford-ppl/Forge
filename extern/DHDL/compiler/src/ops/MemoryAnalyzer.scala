@@ -384,7 +384,7 @@ trait MemoryAnalyzer extends BRAMBanking with RegisterBanking with FIFOBanking {
   // TODO: Also need pointer for each read/write to refer to instance(s) it accesses
   def analyzeMemory(mem: Exp[Any]) {
     debug("")
-    debug("Inferring instances for memory " + nameOf(mem).getOrElse(mem.toString))
+    debug(s"Inferring instances for memory $mem " + nameOf(mem).map{n => "(" + n + ")"}.getOrElse(""))
     val instances = bank(mem)
     duplicatesOf(mem) = instances
 

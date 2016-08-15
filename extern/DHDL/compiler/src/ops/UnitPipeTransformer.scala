@@ -103,7 +103,7 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
               val calculatedSyms = stage.nodes.map{case TP(s,d) => s}
               val neededSyms = deps.drop(i+1).flatten
               // Determine which symbols escape (can be empty)
-              val escapingSyms = calculatedSyms.filter(neededSyms contains _)
+              val escapingSyms = calculatedSyms.filter(sym => neededSyms.contains(sym) && !isRegisterRead(sym))
               val (escapingUnits, escapingValues) = escapingSyms.partition{sym => sym.tp == manifest[Unit]}
 
               debugs("Escaping symbols: " + escapingValues.mkString(", "))
@@ -113,8 +113,11 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
                 debugs(s"Created new register $reg for escaping primitive $sym")
                 reg
               }
-              // FIXME: This isn't correct. Fix later
-              stage.allocs.foreach{stm => traverseStm(stm) }
+              stage.allocs.foreach{
+                case stm@TP(s,EatReflect(_:Counter_new)) =>
+                case stm@TP(s,EatReflect(_:Counterchain_new)) =>
+                case stm => traverseStm(stm)
+              }
 
               val primBlk = reifyBlock {
                 stage.nodes.foreach{stm => traverseStm(stm) } // Mirror each statement
@@ -135,6 +138,12 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
 
               stage.regReads.foreach{case TP(s,EatReflect(Reg_read(reg))) =>
                 register(s -> reg_read(f(reg))(s.tp,mpos(s.pos)) )
+              }
+
+              stage.allocs.foreach{
+                case stm@TP(s,EatReflect(_:Counter_new)) => traverseStm(stm)
+                case stm@TP(s,EatReflect(_:Counterchain_new)) => traverseStm(stm)
+                case _ =>
               }
 
             case (stage,i) =>

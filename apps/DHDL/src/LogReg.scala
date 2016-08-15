@@ -19,21 +19,18 @@ trait LogReg extends DHDLApplication {
   lazy val noPar = param(1)
 
   val N = 1152
-  lazy val D = 768.as[SInt]
+  val D = 768
   val A = 1
 
   def sigmoid(t:Rep[Elem]) = 1.as[Elem]/(exp(-t)+1)
 
-  def logreg(x_in: Rep[Array[Elem]], y_in: Rep[Array[Elem]], theta: Rep[Array[Elem]]) {
-
-    val N = 192
-    val D = 192
+  def logreg(x_in: Rep[Array[Elem]], y_in: Rep[Array[Elem]], theta_in: Rep[Array[Elem]]) {
 
     val BN = param(96); domainOf(BN) = (96,9600,96)
     val PX = param(1);  domainOf(PX) = (1,1,1)
-    val P0 = param(1);  domainOf(P0) = (1,3,1)
+    val P0 = param(1);  domainOf(P0) = (1,4,1)
     val P1 = param(1);  domainOf(P1) = (1,D,1)
-    val P2 = param(innerParH);  domainOf(P2) = (1,D,1)
+    val P2 = param(1);  domainOf(P2) = (1,D,1)
     val P3 = param(1);  domainOf(P3) = (1,96,1)
 
     val x = OffChipMem[Elem](N, D)
@@ -42,17 +39,19 @@ trait LogReg extends DHDLApplication {
 
     setMem(x, x_in)
     setMem(y, y_in)
+    setMem(theta, theta_in)
 
     Accel {
+      val btheta = BRAM[Elem](D)
+      btheta := theta(0::D, P2)
+
       val gradAcc = BRAM[Elem](D)
       Fold(N by BN par P0, P1)(gradAcc, 0.as[T]){ i =>
         val xB = BRAM[Elem](BN, D)
         val yB = BRAM[Elem](BN)
-        val btheta = BRAM[Elem](D)
         Parallel {
           xB := x(i::i+BN, 0::D, P2)
           yB := y(i::i+BN, P3)
-          btheta := theta(0::D, P2)
         }
         val gradient = BRAM[Elem](D)
         Fold(BN par P3, P2)(gradient, 0.as[T]){ ii =>
@@ -61,34 +60,24 @@ trait LogReg extends DHDLApplication {
 
           val dotAccum = Reduce(D par P2)(0.as[T]){ j => xB(ii,j) * btheta(j) }{_+_}
           Pipe { pipe2Res := (yB(ii) - sigmoid(dotAccum.value)) }
-          Pipe(D by 1) {j => subRam(j) = xB(ii,j) - pipe2Res.value }
+          Pipe(D par P2) {j => subRam(j) = xB(ii,j) - pipe2Res.value }
           subRam
         }{_+_}
       }{_+_}
 
-      val outerTheta = BRAM[Elem](D)
       val newTheta = BRAM[Elem](D)
-      outerTheta := theta(0::D, innerPar)
-      Pipe ((D by 1) par innerPar) { j => newTheta(j) = gradAcc(j)*A + outerTheta(j) }
-      theta(0::D, innerPar) := newTheta
+      Pipe (D par P2) { j => newTheta(j) = gradAcc(j)*A + btheta(j) }
+      theta(0::D, P2) := newTheta
     }
     getMem(theta)
   }
 
   def main() {
-    val N = 192
-    val D = 192
-
-    /*domainOf(tileSize) = (96,9600,96)
-    domainOf(outerMpPar) = (1,3,1)
-    domainOf(innerMpPar) = (1,1,1)
-    domainOf(innerPar) = (1,192,1)
-    domainOf(noPar) = (1,1,1)*/
-
-
     val sX = Array.fill(N){ Array.fill(D){ random[Elem](10.0)} }
     val sY = Array.fill(N)( random[Elem](10.0) )
     val theta = Array.fill(D) {random[Elem](1.0) }
+
+    val result = logreg(sX.flatten,sY, theta)
 
     // println("x: " + sX.mkString(", "))
     // println("y: " + sY.mkString(", "))
@@ -105,6 +94,5 @@ trait LogReg extends DHDLApplication {
     }
     */
 
-    val result = logreg(sX.flatten,sY, theta)
   }
 }

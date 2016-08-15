@@ -208,21 +208,31 @@ trait ParameterAnalyzer extends Traversal {
       // Set constraints on par factor
       (start,end,step) match {
         case (Exact(0),ParamFix(p),Exact(1)) =>
-          restrict += RLessEqual(par, p)
-          restrict += RDivides(par, p)
+          val r1 = RLessEqual(par, p)
+          val r2 = RDivides(par, p)
+          debug(s"  Case #1: Adding restriction $r1")
+          debug(s"  Case #2: Adding restriction $r2")
+          restrict += r1
+          restrict += r2
 
         case (_,ParamFix(e),ParamFix(p)) => // ???
 
         case (Exact(0),Bound(e),ParamFix(p)) =>
-          restrict += RDividesQuotient(par, e.toInt, p)
+          val r = RDividesQuotient(par, e.toInt, p)
+          debug(s"  Case #3: Adding restriction $r")
+          restrict += r
 
         case (Bound(s),Bound(e),ParamFix(p)) =>
-          restrict += RDividesQuotient(par, (e-s).toInt, p)
+          val r = RDividesQuotient(par, (e-s).toInt, p)
+          debug(s"  Case #4: Adding restriction $r")
+          restrict += r
 
         case (Bound(s),Bound(e),Bound(t)) =>
           val nIters = (e - s)/t
           if (nIters < max) max = nIters.toInt
-          restrict += RDividesConst(par, nIters.toInt)  // HACK: par factor divides bounded loop size (avoid edge case)
+          val r = RDividesConst(par, nIters.toInt)  // HACK: par factor divides bounded loop size (avoid edge case)
+          debug(s"  Case #5: Adding restriction $r")
+          restrict += r
 
         case _ => // No restrictions
       }
@@ -233,14 +243,19 @@ trait ParameterAnalyzer extends Traversal {
         case (ParamFix(s),ParamFix(p),ParamFix(_)) => // ???
 
         case (Exact(0),ParamFix(p),ParamFix(s)) =>
-          restrict += RLessEqual(s, p)
-          restrict += RDivides(s, p)  // HACK: avoid edge case
+          val r1 = RLessEqual(s, p)
+          val r2 = RDivides(s, p)   // HACK: avoid edge case
+          debug(s"  Case #6: Adding restriction $r1")
+          debug(s"  Case #7: Adding restriction $r2")
+          restrict += r1
+          restrict += r2
 
         case (Bound(s),Bound(b),ParamFix(p)) =>
           val l = b - s
           setRange(p, 1, l.toInt, MIN_TILE_SIZE)
-
-          restrict += RDividesConst(p, l.toInt) // HACK: avoid edge case
+          val r = RDividesConst(p, l.toInt) // HACK: avoid edge case
+          debug(s"  Case #8: Adding restriction $r")
+          restrict += r
 
         case _ => // No restrictions
       }
@@ -257,12 +272,14 @@ trait ParameterAnalyzer extends Traversal {
       parParams :::= pars
       if (!isParallelizableLoop(lhs)) pars.foreach{p => domainOf(p) = (1,1,1) }
       else if (!isInnerPipe(lhs)) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
+      else pars.foreach{p => setMax(p, MAX_PAR_FACTOR) }
 
     case e:Pipe_fold[_,_] =>
       val pars = getParams(parFactorsOf(e.cchain))
       parParams :::= pars
       if (!isParallelizableLoop(lhs)) pars.foreach{p => domainOf(p) = (1,1,1) }
       else if (!isInnerPipe(lhs)) pars.foreach{p => setMax(p, MAX_OUTER_PAR) }
+      else pars.foreach{p => setMax(p, MAX_PAR_FACTOR) }
 
     case e:Accum_fold[_,_] =>
       val opars = getParams(parFactorsOf(e.ccOuter))

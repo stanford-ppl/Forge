@@ -95,8 +95,8 @@ trait DSE extends Traversal {
     memAnalyzer.silence()
 
     bndAnalyzer.run(b)
-    areaAnalyzer.run(b)
-    cycleAnalyzer.run(b)
+    //areaAnalyzer.run(b)
+    //cycleAnalyzer.run(b)
 
     // A. Get lists of parameters
     var restrict  = paramAnalyzer.restrict
@@ -122,13 +122,19 @@ trait DSE extends Traversal {
     // Prune single factors
     val initialSpace = prune(numericFactors, ranges, restrict)
 
-    val mps = metapipes.map{mp => Domain(List(true,false), {c: Boolean => c match {case true => styleOf(mp) = CoarsePipe; case false => styleOf(mp) = SequentialPipe}; () }) }
+    // Remove restrictions that have already been pruned for (1 param only)
+    restrict = restrict.filterNot{r => r.deps.length <= 1}
+
+    // Don't sequentialize pipes with tile load/store children
+    val nonTxMetapipes = metapipes.filterNot(pipe => childrenOf(pipe).exists(isOffChipTransfer(_)))
+
+    val mps = nonTxMetapipes.map{mp => Domain(List(true,false), {c: Boolean => c match {case true => styleOf(mp) = CoarsePipe; case false => styleOf(mp) = SequentialPipe}; () }) }
     val space = (initialSpace ++ mps)
 
     if (debugMode) {
       debug("")
       debug("Pruned space:")
-      (numericFactors ++ metapipes).zip(space).foreach{case (p, d) =>
+      (numericFactors ++ nonTxMetapipes).zip(space).foreach{case (p, d) =>
         debug(nameOf(p).getOrElse(p.toString) + ": " + d.toString)
       }
     }
@@ -152,9 +158,18 @@ trait DSE extends Traversal {
 
     val legalStart = System.currentTimeMillis
     debug(s"Enumerating all legal points...")
+    var startTime = System.currentTimeMillis
+    var nextNotify = 0.0; var notifyStep = 20000
     for (i <- 0 until size) {
       indexedSpace.foreach{case (domain,d) => domain.set( ((i / prods(d)) % dims(d)).toInt ) }
       if (isLegalSpace()) legalPoints += i
+
+      if (i > nextNotify) {
+        val time = System.currentTimeMillis - startTime
+        debug("%.4f".format(100*(i/size.toFloat)) + s"% ($i / $size) Complete after ${time/1000} seconds")
+
+        nextNotify += notifyStep
+      }
     }
     val legalCalcTime = System.currentTimeMillis - legalStart
     var legalSize = legalPoints.length
@@ -166,7 +181,7 @@ trait DSE extends Traversal {
 
 
     // --- PROFILING
-    val PROFILING = false
+    val PROFILING = true
     var clockRef = 0L
     def resetClock() { clockRef = System.currentTimeMillis }
 
@@ -232,8 +247,8 @@ trait DSE extends Traversal {
     var nValid = 0
 
     debug("And aaaawaaaay we go!")
-    val startTime = System.currentTimeMillis
-    var nextNotify = 0.0; val notifyStep = 200
+    startTime = System.currentTimeMillis
+    nextNotify = 0.0; notifyStep = 200
     for (p <- 0 until legalSize) {
       if (PROFILING) resetClock() // PROFILING
 

@@ -132,7 +132,7 @@ trait PIROptimizer extends Traversal with PIRCommon {
       // 2. This CU has a "sibling" (same parent) CU, or has no counter chain instances
       val children = cus.filter{c => c.parent.contains(cu)}
       if (cu.writeStages.isEmpty && cu.stages.isEmpty && children.isEmpty) {
-        val siblingCU = cus.find{c => c != cu && c.parent == cu.parent}
+        val siblingCU = cus.find{c => c != cu && c.parent == cu.parent && c.isInstanceOf[TileTransferUnit]}
 
         val globallyUsedCCs = cus.filterNot(_ != cu).flatMap(usedCounterChains(_))
 
@@ -146,6 +146,7 @@ trait PIROptimizer extends Traversal with PIRCommon {
           debug(s"Adding counterchains to $sibling: $usedCCs")
 
           sibling.cchains ++= usedCCs
+          usedCCs.foreach{cc => cc.isStreaming = true }
           cus.foreach{c =>
             // Swap references to this CU's counter chain to the sibling
             c.cchains = c.cchains.map{

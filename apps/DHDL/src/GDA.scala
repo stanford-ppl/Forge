@@ -26,8 +26,10 @@ trait GDA extends DHDLApplication {
 
     assert(cols == cc) // TODO: Shouldn't be necessary, but addressing requires it at the moment
 
-    val R  = rr
-    val C  = cc
+    val R = ArgIn[SInt]
+    val C = ArgIn[SInt]
+    setArg(R, rows)
+    setArg(C, cols)
 
     val x     = OffChipMem[T](R, C)
     val y     = OffChipMem[Bit](R)

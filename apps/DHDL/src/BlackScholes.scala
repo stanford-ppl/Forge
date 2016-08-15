@@ -8,7 +8,7 @@ trait BlackScholes extends DHDLApplication {
 
   val tileSize = 7104
   val outerPar = 1
-  val innerPar = 8
+  val innerPar = 1
   lazy val ts = param(tileSize)
   lazy val op = param(outerPar)
   lazy val ip = param(innerPar)

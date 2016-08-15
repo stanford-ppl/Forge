@@ -53,8 +53,9 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
              val nodes: ArrayBuffer[Stm] = ArrayBuffer.empty
              val regReads: ArrayBuffer[Stm] = ArrayBuffer.empty
 
-             def deps = nodes.flatMap{case TP(s,d) => (syms(d) ++ readSyms(d)) }.toSet ++
-                        allocs.flatMap{case TP(s,d) => (syms(d) ++ readSyms(d)) }.toSet
+             def allocDeps = allocs.flatMap{case TP(s,d) => (syms(d) ++ readSyms(d)) }.toSet
+
+             def deps = nodes.flatMap{case TP(s,d) => (syms(d) ++ readSyms(d)) }.toSet ++ allocDeps
 
              def dumpStage(i: Int) {
                 if (isControl) debugs(s"$i. Control Stage")
@@ -112,6 +113,7 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
                 debugs(s"Created new register $reg for escaping primitive $sym")
                 reg
               }
+              // FIXME: This isn't correct. Fix later
               stage.allocs.foreach{stm => traverseStm(stm) }
 
               val primBlk = reifyBlock {
@@ -137,8 +139,8 @@ trait UnitPipeTransformer extends MultiPassTransformer with SpatialTraversalTool
 
             case (stage,i) =>
               stage.nodes.foreach{stm => traverseStm(stm) } // Mirror non-primitives to update
-              stage.allocs.foreach{stm => traverseStm(stm) }
               stage.regReads.foreach{stm => traverseStm(stm) }
+              stage.allocs.foreach{stm => traverseStm(stm) }
           }
         }
       }

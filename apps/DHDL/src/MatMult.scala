@@ -18,9 +18,9 @@ trait MatMult extends DHDLApplication {
   type T = Flt //FixPt[Signed,B16,B16]
   type Array[T] = ForgeArray[T]
 
-  val mm = 1920
-  val nn = 19200
-  val pp = 19200
+  val mm = 1536
+  val nn = 1536
+  val pp = 1536
   val tileSizeM = 192
   val tileSizeN = 192
   val tileSizeP = 384
@@ -31,6 +31,13 @@ trait MatMult extends DHDLApplication {
     bound(M) = 1536
     bound(N) = 1536
     bound(P) = 1536
+
+    val mm = ArgIn[SInt]
+    val nn = ArgIn[SInt]
+    val pp = ArgIn[SInt]
+    setArg(mm, M)
+    setArg(nn, N)
+    setArg(pp, P)
 
     val a = OffChipMem[T](mm, pp)
     val b = OffChipMem[T](pp, nn)

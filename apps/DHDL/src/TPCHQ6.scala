@@ -12,11 +12,11 @@ trait TPCHQ6 extends DHDLApplication {
   val nn = 93600000
   val tileSize = 2400
   val outerPar = 1
-  val innerPar = 20
+  val innerPar = 1
 
   def tpchq6(datesIn: Rep[Array[UInt]], quantsIn: Rep[Array[UInt]], disctsIn: Rep[Array[Flt]], pricesIn: Rep[Array[Flt]]): Rep[Flt] = {
-    val dataSize = nn
-
+    val dataSize = ArgIn[SInt]
+    setArg(dataSize, nn)
 
     val dates  = OffChipMem[UInt](dataSize)
     val quants = OffChipMem[UInt](dataSize)

@@ -19,6 +19,9 @@ trait DotProduct extends DHDLApplication {
     val P3 = param(innerPar); domainOf(P3) = (1, 192, 1)
     val dataSize = a.length; bound(dataSize) = 187200000
 
+    val N = ArgIn[SInt]
+    setArg(N, dataSize)
+
     val out = ArgOut[T]
 
     val v1 = OffChipMem[T](N)
@@ -28,15 +31,13 @@ trait DotProduct extends DHDLApplication {
 
     Accel {
       Fold(N by B par P1)(out, 0.as[T]){ i =>
-        val b1 = FIFO[T](512)
-        val b2 = FIFO[T](512)
+        val b1 = BRAM[T](B)
+        val b2 = BRAM[T](B)
         Parallel {
           b1 := v1(i::i+B, P3)
           b2 := v2(i::i+B, P3)
         }
-        Reduce(B par P2)(0.as[T]){ii =>
-          b1.pop() * b2.pop()
-        }{_+_}
+        Reduce(B par P2)(0.as[T]){ii => b1(ii) * b2(ii) }{_+_}
       }{_+_}
     }
     getArg(out)

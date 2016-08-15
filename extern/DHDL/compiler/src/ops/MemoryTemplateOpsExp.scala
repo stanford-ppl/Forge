@@ -373,14 +373,26 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
         case _ =>
           val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
           val inds = parIndicesOf(r(i)._3)
+          val dimzz = dimsOf(bram)
           if (dups.length == 1) {
             inds.length match {
               case 1 =>
-                val addr0 = inds(0)(0)
-                if (par) {
-                  emit(s"""$pre ${quote(sym)} = new DFEVectorType<DFEVar>(${quote(bram)}.type, 1).newInstance(this, Arrays.asList(${quote(bram)}.connectRport(${quote(addr0)})));""")
-                } else {
-                  emit(s"""$pre ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)});""")
+                dimzz.length match {
+                  case 1 =>
+                    val addr0 = inds(0)(0)
+                    if (par) {
+                      emit(s"""$pre ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
+                    } else {
+                      emit(s"""$pre ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
+                    }
+                  case _ =>
+                    val addr0 = inds(0)(0)
+                    val addr1 = inds(0)(1)
+                    if (par) {
+                      emit(s"""$pre ${quote(sym)} = new DFEVectorType<DFEVar>(${quote(bram)}.type, 1).newInstance(this, Arrays.asList(${quote(bram)}.connectRport(${quote(addr0)}, ${quote(addr1)})));""")
+                    } else {
+                      emit(s"""$pre ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${quote(addr1)});""")
+                    }  
                 }
               case _ =>
                 val a = inds(0)

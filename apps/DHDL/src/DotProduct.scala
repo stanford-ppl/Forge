@@ -8,8 +8,8 @@ trait DotProduct extends DHDLApplication {
   type T = SInt
   val N = 93600000
   val tileSize = 19200
-  val innerPar = 1
-  val outerPar = 1
+  val innerPar = 48
+  val outerPar = 5
   type Array[T] = ForgeArray[T]
 
   def dotproduct(a: Rep[Array[T]], b: Rep[Array[T]]) = {
@@ -27,7 +27,8 @@ trait DotProduct extends DHDLApplication {
     setMem(v2, b)
 
     Accel {
-      Fold(N by B par P1)(out, 0.as[T]){ i =>
+      val reg = Reg[T]
+      Fold(N by B par P1)(reg, 0.as[T]){ i =>
         val b1 = FIFO[T](512)
         val b2 = FIFO[T](512)
         Parallel {
@@ -38,6 +39,7 @@ trait DotProduct extends DHDLApplication {
           b1.pop() * b2.pop()
         }{_+_}
       }{_+_}
+      Pipe{ out := reg}
     }
     getArg(out)
   }

@@ -161,13 +161,17 @@ trait PIRGen extends Traversal with PIRCommon {
     case CounterChainCopy(name, owner) =>
       emit(s"""val $name = CounterChain.copy(${owner.name}, "$name")""")
 
-    case CounterChainInstance(name, ctrs) =>
+    case cc@CounterChainInstance(name, ctrs) =>
       for (ctr <- ctrs) emitComponent(ctr)
       val ctrList = ctrs.map{_.name}.mkString(", ")
-      emit(s"""val $name = CounterChain(name = "$name", $ctrList)""")
+      var decl = s"""val $name = CounterChain(name = "$name", $ctrList)"""
+      if (cc.isStreaming) decl += ".isStreaming(true)"
+      emit(decl)
 
-    case UnitCounterChain(name) =>
-      emit(s"""val $name = CounterChain(name = "$name", (Const("0i"), Const("1i"), Const("1i")))""")
+    case cc@UnitCounterChain(name) =>
+      var decl = s"""val $name = CounterChain(name = "$name", (Const("0i"), Const("1i"), Const("1i")))"""
+      if (cc.isStreaming) decl += ".isStreaming(true)"
+      emit(decl)
 
     case CUCounter(name,start,end,stride) =>
       debug(s"Generating counter $x")
@@ -176,21 +180,6 @@ trait PIRGen extends Traversal with PIRCommon {
     case sram@CUMemory(sym, size) =>
       debug(s"Generating ${sram.dumpString}")
       var decl = s"""val ${quote(sym)} = SRAM(size = $size"""
-      sram.vector match {
-        case Some(LocalVector) => // Nothing?
-        case Some(vec) => decl += s""", vec = ${quote(vec)}"""
-        case None => throw new Exception(s"Memory $sram has no vector defined")
-      }
-      sram.readAddr match {
-        case Some(_:CounterReg | _:ConstReg) => decl += s""", readAddr = ${quote(sram.readAddr.get)}"""
-        case Some(_:ReadAddrWire) =>
-        case addr => throw new Exception(s"Disallowed memory read address in $sram: $addr")
-      }
-      sram.writeAddr match {
-        case Some(_:CounterReg | _:ConstReg) => decl += s""", writeAddr = ${quote(sram.writeAddr.get)}"""
-        case Some(_:WriteAddrWire | _:LocalWriteReg) =>
-        case addr => throw new Exception(s"Disallowed memory write address in $sram: $addr")
-      }
       sram.swapCtrl match {
         case Some(cchain) => decl += s""", swapCtr = ${cchain.name}(0)""" // TODO: Always 0?
         case None => throw new Exception(s"No swap controller defined for $sram")
@@ -203,8 +192,24 @@ trait PIRGen extends Traversal with PIRCommon {
         case Some(banking) => decl += s""", banking = $banking"""
         case None => throw new Exception(s"No banking defined for $sram")
       }
-      decl += s""", doubleBuffer = ${sram.isDoubleBuffer}"""
-      emit(decl + ")")
+      decl += s""", doubleBuffer = ${sram.isDoubleBuffer})"""
+
+      sram.vector match {
+        case Some(LocalVector) => // Nothing?
+        case Some(vec) => decl += s""".wtPort(${quote(vec)})"""
+        case None => throw new Exception(s"Memory $sram has no vector defined")
+      }
+      sram.readAddr match {
+        case Some(_:CounterReg | _:ConstReg) => decl += s""".rdAddr(${quote(sram.readAddr.get)})"""
+        case Some(_:ReadAddrWire) =>
+        case addr => throw new Exception(s"Disallowed memory read address in $sram: $addr")
+      }
+      sram.writeAddr match {
+        case Some(_:CounterReg | _:ConstReg) => decl += s""".wtAddr(${quote(sram.writeAddr.get)})"""
+        case Some(_:WriteAddrWire | _:LocalWriteReg) =>
+        case addr => throw new Exception(s"Disallowed memory write address in $sram: $addr")
+      }
+      emit(decl)
 
     case mem@MemCtrl(_,region,mode) => emit(s"val ${quote(mem)} = MemoryController($mode, ${quote(region)})")
     case mem: Offchip   => emit(s"val ${quote(mem)} = OffChip()")

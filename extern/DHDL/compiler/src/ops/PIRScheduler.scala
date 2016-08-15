@@ -227,6 +227,21 @@ trait PIRScheduler extends Traversal with PIRCommon {
       case Fixed(_) => ctx.cu.getOrAddReg(lhs){ allocateLocal(lhs, ctx.pipe) }
       case Def(ConstBit(_)) => ctx.cu.getOrAddReg(lhs){ allocateLocal(lhs, ctx.pipe) }
 
+      // Negation isn't an op in the plasticine ISA right now
+      case Def(FltPt_Neg(x)) =>
+        val in = ctx.reg(x)
+        val c = ConstReg("-1f")
+        val out = ctx.cu.getOrAddReg(lhs){ TempReg(lhs) }
+        val stage = MapStage(FltMul, List(ctx.refIn(in), ctx.refIn(c)), List(ctx.refOut(out)))
+        ctx.addStage(stage)
+
+      case Def(FixPt_Neg(x)) =>
+        val in = ctx.reg(x)
+        val c = ConstReg("-1i")
+        val out = ctx.cu.getOrAddReg(lhs){ TempReg(lhs) }
+        val stage = MapStage(FixMul, List(ctx.refIn(in), ctx.refIn(c)) , List(ctx.refOut(out)))
+        ctx.addStage(stage)
+
       case _ => nodeToOp(rhs) match {
         case Some(op) => opStageToStage(op, syms(rhs), lhs, ctx, false)
         case None => stageWarn(s"No ALU operation known for $lhs = $rhs")
@@ -249,6 +264,8 @@ trait PIRScheduler extends Traversal with PIRCommon {
     case FixPt_Leq(_,_) => Some(FixLeq)
     case FixPt_Eql(_,_) => Some(FixEql)
     case FixPt_Neq(_,_) => Some(FixNeq)
+    case e: Min2[_] if isFixPtType(e.mT) => Some(FltMin)
+    case e: Max2[_] if isFixPtType(e.mT) => Some(FltMax)
 
     // Float ops currently assumed to be single op
     case FltPt_Add(_,_) => Some(FltAdd)
@@ -262,6 +279,10 @@ trait PIRScheduler extends Traversal with PIRCommon {
 
     case FltPt_Abs(_)   => Some(FltAbs)
     case FltPt_Exp(_)   => Some(FltExp)
+    case FltPt_Log(_)   => Some(FltLog)
+    case FltPt_Sqrt(_)  => Some(FltSqrt)
+    case e: Min2[_] if isFltPtType(e.mT) => Some(FltMin)
+    case e: Max2[_] if isFltPtType(e.mT) => Some(FltMax)
 
     case Bit_And(_,_)   => Some(BitAnd)
     case Bit_Or(_,_)    => Some(BitOr)

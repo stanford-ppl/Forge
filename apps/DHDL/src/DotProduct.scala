@@ -7,11 +7,9 @@ object DotProductInterpreter extends DHDLApplicationInterpreter with DotProduct
 trait DotProduct extends DHDLApplication {
   type T = SInt
 
-  val nn = 96000
-
   val tileSize = 9600
-  val innerPar = 32
-  val outerPar = 1
+  val innerPar = 4
+  val outerPar = 2
   type Array[T] = ForgeArray[T]
 
   def dotproduct(a: Rep[Array[T]], b: Rep[Array[T]]) = {
@@ -20,7 +18,9 @@ trait DotProduct extends DHDLApplication {
     val P2 = param(innerPar); domainOf(P2) = (1, 192, 1)
     val P3 = param(innerPar); domainOf(P3) = (1, 192, 1)
 
-    val N = nn
+    val N = ArgIn[SInt]
+    setArg(N, a.length)
+
     val out = ArgOut[T]
     // setArg(N, a.length)
 
@@ -54,7 +54,7 @@ trait DotProduct extends DHDLApplication {
   }
 
   def main() {
-    val N = nn
+    val N = args(0).to[SInt]
     val a = Array.fill(N)(random[T](10))
     val b = Array.fill(N)(random[T](10))
 

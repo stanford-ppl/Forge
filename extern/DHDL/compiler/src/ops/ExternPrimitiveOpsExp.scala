@@ -248,6 +248,14 @@ trait ScalaGenExternPrimitiveOps extends ScalaGenEffect {
     super.emitDataStructures(path)
   }
 
+  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
+    case Min2(x,y) =>
+      stream.println(s"val ${quote(sym)} = Math.min(${quote(x)}, ${quote(y)})")
+    case Max2(x,y) =>
+      stream.println(s"val ${quote(sym)} = Math.max(${quote(x)}, ${quote(y)})")
+    case _ => super.emitNode(sym, rhs)
+  }
+
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
     case "DHDLBit" => "Boolean"
     case "Signed" => "Signed"
@@ -258,12 +266,6 @@ trait ScalaGenExternPrimitiveOps extends ScalaGenEffect {
     case _ => super.remap(m)
   }
 
-  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case Min2(a, b) =>
-    case Max2(a, b) =>
-    case _ => super.emitNode(sym, rhs)
-
-  }
 
 
 // HACK: Have this entire template as a string right now...

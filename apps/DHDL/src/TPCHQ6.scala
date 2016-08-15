@@ -7,11 +7,11 @@ object TPCHQ6Interpreter extends DHDLApplicationInterpreter with TPCHQ6
 trait TPCHQ6 extends DHDLApplication {
   type Array[T] = ForgeArray[T]
 
-  val MIN_DATE = 1
-  val MAX_DATE = 8
-  val tileSize = 2400
-  val outerPar = 1
-  val innerPar = 20
+  val MIN_DATE = 70
+  val MAX_DATE = 80
+  val tileSize = 192
+  val outerPar = 2
+  val innerPar = 4
 
   def tpchq6(datesIn: Rep[Array[UInt]], quantsIn: Rep[Array[UInt]], disctsIn: Rep[Array[Flt]], pricesIn: Rep[Array[Flt]]): Rep[Flt] = {
     val dataSize = ArgIn[SInt]
@@ -82,8 +82,8 @@ trait TPCHQ6 extends DHDLApplication {
 
     val gold = Array.tabulate(N){i => if (conds(i)) prices(i) * discts(i) else 0.0f.as[Flt] }.reduce{_+_}
 
-    println("expected" + gold)
-    println("result" + result)
+    println("expected " + gold)
+    println("result " + result)
     assert(result == gold)
   }
 }

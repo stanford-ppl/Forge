@@ -10,7 +10,7 @@ trait Kmeans extends DHDLApplication {
   lazy val MAXK = 96
   lazy val MAXD = 384
   val tileSize = 96
-  val innerPar = 16
+  val innerPar = 1
   val outerPar = 2
 
 
@@ -33,11 +33,11 @@ trait Kmeans extends DHDLApplication {
 
     val BN = param(tileSize);  domainOf(BN) = (96, 9600, 96)
     val BD = param(MAXD);  domainOf(BD) = (MAXD, MAXD, MAXD)
-    val PX = param(1);    domainOf(PX) = (1,1,1)
+    val PX = param(1);    domainOf(PX) = (1,1,1) // Why does this make a diag bram?!
     val P0 = param(outerPar);    domainOf(P0) = (32,192,96)  // Dimensions loaded in parallel
     val P1 = param(outerPar);    domainOf(P1) = (1,12,2)     // Sets of points calculated in parallel
-    val P2 = param(1);    domainOf(P2) = (1,96,4)     // Dimensions accumulated in parallel (outer)
-    val P3 = param(1);    domainOf(P3) = (1,16,4)     // Points calculated in parallel
+    val P2 = param(innerPar);    domainOf(P2) = (1,96,4)     // Dimensions accumulated in parallel (outer)
+    val P3 = param(innerPar);    domainOf(P3) = (1,16,4)     // Points calculated in parallel
     val PR = param(innerPar);    domainOf(PR) = (1,96,4)
     /*val P4 = param(1);    domainOf(P4) = (1,MAXD,1)   // Dimensions accumulated in parallel (inner)
     val P5 = param(1);    domainOf(P5) = (1,MAXD,1)   // Dimensions compared in parallel

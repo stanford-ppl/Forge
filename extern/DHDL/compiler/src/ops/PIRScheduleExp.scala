@@ -368,6 +368,8 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case object FixLeq extends PIROp
   case object FixEql extends PIROp
   case object FixNeq extends PIROp
+  case object FixMin extends PIROp
+  case object FixMax extends PIROp
 
   case object FltAdd extends PIROp
   case object FltSub extends PIROp
@@ -378,7 +380,11 @@ trait PIRScheduleAnalysisExp extends NodeMetadataOpsExp with ReductionAnalysisEx
   case object FltEql extends PIROp
   case object FltNeq extends PIROp
   case object FltExp extends PIROp
+  case object FltLog extends PIROp
+  case object FltSqrt extends PIROp
   case object FltAbs extends PIROp
+  case object FltMin extends PIROp
+  case object FltMax extends PIROp
 
   case object BitAnd extends PIROp
   case object BitOr  extends PIROp
@@ -505,7 +511,9 @@ ${super.dumpString}
   // TODO: Parallelism?
   case class CUCounter(name: String, start: LocalMem, end: LocalMem, stride: LocalMem)
 
-  sealed abstract class CUCounterChain(val name: String)
+  sealed abstract class CUCounterChain(val name: String) {
+    var isStreaming = false
+  }
   case class CounterChainCopy(override val name: String, owner: ComputeUnit) extends CUCounterChain(name)
   case class CounterChainInstance(override val name: String, ctrs: List[CUCounter]) extends CUCounterChain(name)
   case class UnitCounterChain(override val name: String) extends CUCounterChain(name)

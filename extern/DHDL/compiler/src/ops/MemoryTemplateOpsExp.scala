@@ -227,7 +227,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
   val IR: LoweredPipeOpsExp with ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
           with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
           with ExternPrimitiveOpsExp with DHDLCodegenOps with NosynthOpsExp with MemoryAnalysisExp with FIFOOpsExp with VectorOpsExp
-          with DeliteTransform
+          with DeliteTransform with ReductionAnalysisExp
   import IR.{println=>_,_}
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
@@ -317,7 +317,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
     // Console.println(s"cg: generating reader $sym on bram ${bram}x${duplicatesOf(bram).length}(bound ${bnd}) inst ${instanceIndexOf(sym, bram)}")
     if (isDummy(bram)) {
       val pre = if (!par) maxJPre(bram) else "DFEVector<DFEVar>"
-      emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
+      emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)}); //1""")
     } else {
       val dups = duplicatesOf(bram)
       val r = readersOf(bram)
@@ -341,9 +341,9 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
               }
 
               if (dups.length == 1) {
-                emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
+                emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)}); //2""")
               } else {
-                emit(s"""${pre} ${quote(sym)} = ${quote(bram)}_${b_i}.connectRport(${quote(addr)});""")
+                emit(s"""${pre} ${quote(sym)} = ${quote(bram)}_${b_i}.connectRport(${quote(addr)}); //3""")
               }
             case 2 =>
               val addr0 = inds(0)
@@ -363,9 +363,9 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                 case _ =>
               }
               if (dups.length == 1) {
-                emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${quote(addr1)});""")
+                emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${quote(addr1)}); //4""")
               } else {
-                emit(s"""${pre} ${quote(sym)} = ${quote(bram)}_${b_i}.connectRport(${quote(addr0)}, ${quote(addr1)});""")
+                emit(s"""${pre} ${quote(sym)} = ${quote(bram)}_${b_i}.connectRport(${quote(addr0)}, ${quote(addr1)}); //5""")
               }
 
             case _ => throw new Exception("Can't codegen!")
@@ -381,17 +381,17 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                   case 1 =>
                     val addr0 = inds(0)(0)
                     if (par) {
-                      emit(s"""$pre ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
+                      emit(s"""$pre ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)}); //6""")
                     } else {
-                      emit(s"""$pre ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
+                      emit(s"""$pre ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)}); //7""")
                     }
                   case _ =>
                     val addr0 = inds(0)(0)
                     val addr1 = inds(0)(1)
                     if (par) {
-                      emit(s"""$pre ${quote(sym)} = new DFEVectorType<DFEVar>(${quote(bram)}.type, 1).newInstance(this, Arrays.asList(${quote(bram)}.connectRport(${quote(addr0)}, ${quote(addr1)})));""")
+                      emit(s"""$pre ${quote(sym)} = new DFEVectorType<DFEVar>(${quote(bram)}.type, 1).newInstance(this, Arrays.asList(${quote(bram)}.connectRport(${quote(addr0)}, ${quote(addr1)}))); //8""")
                     } else {
-                      emit(s"""$pre ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${quote(addr1)});""")
+                      emit(s"""$pre ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, ${quote(addr1)}); //9""")
                     }  
                 }
               case _ =>
@@ -399,7 +399,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                 val b = inds(1)
                 a.length match {
                   case 1 => 
-                    emit(s"""$pre ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)});""")
+                    emit(s"""$pre ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr)}); //9""")
                   case _ =>
                     if (quote(a(1)) == quote(b(1))) { //ugly ass hack
                       var addr1 = ""
@@ -415,7 +415,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                                 }
 
                       emit(s"""//all readers share column. vectorized """)
-                      emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(new DFEVectorType<DFEVar>(${addr0(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr0.map(quote).mkString(",")})), ${quote(addr1)});""")
+                      emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(new DFEVectorType<DFEVar>(${addr0(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr0.map(quote).mkString(",")})), ${quote(addr1)}); //10""")
                     } else {
                       var addr0 = ""
                       val addr1 = inds.map { row =>
@@ -430,7 +430,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                                 }
 
                       emit(s"""//all readers share row. vectorized""")
-                      emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, new DFEVectorType<DFEVar>(${quote(addr1(0))}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.map(quote).mkString(",")})));""")
+                      emit(s"""${pre} ${quote(sym)} = ${quote(bram)}.connectRport(${quote(addr0)}, new DFEVectorType<DFEVar>(${quote(addr1(0))}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.map(quote).mkString(",")}))); //11""")
                     }
                   }
 
@@ -441,9 +441,9 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                 case 1 =>
                   val addr0 = inds(0)(0)
                   if (par) {
-                    emit(s"""$pre ${quote(sym)} = new DFEVectorType<DFEVar>(${quote(bram)}_${b_i}.type, 1).newInstance(this, Arrays.asList(${quote(bram)}_${b_i}.connectRport(${quote(addr0)})));""")
+                    emit(s"""$pre ${quote(sym)} = new DFEVectorType<DFEVar>(${quote(bram)}_${b_i}.type, 1).newInstance(this, Arrays.asList(${quote(bram)}_${b_i}.connectRport(${quote(addr0)}))); //12""")
                   } else {
-                    emit(s"""$pre ${quote(sym)} = ${quote(bram)}_${b_i}.connectRport(${quote(addr0)});""")
+                    emit(s"""$pre ${quote(sym)} = ${quote(bram)}_${b_i}.connectRport(${quote(addr0)}); //13""")
                   }
 
                 case _ =>
@@ -459,7 +459,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                                   }
                             }
                   emit(s"""//DFEVector<DFEVar> vectorized""")
-                  emit(s"""${pre} ${quote(sym)} = ${quote(bram)}_${b_i}.connectRport(${quote(addr0)}, new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.map(quote).mkString(",")})));""")
+                  emit(s"""${pre} ${quote(sym)} = ${quote(bram)}_${b_i}.connectRport(${quote(addr0)}, new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.map(quote).mkString(",")}))); //14""")
                 }
             }
         case _ => throw new Exception(s"Can't generate this reader! $sym")
@@ -481,7 +481,6 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
   def bramStore(sym: Sym[Any], bram_in: Exp[BRAM[Any]], addr: Exp[Any], value: Exp[Any]) {
     emitComment("Bram_store {")
     val bram = if (fold_in_out_accums.contains(bram_in)) {fold_in_out_accums(bram_in)} else {bram_in}
-    Console.println(s"writer $sym to $bram (originally $bram_in)")
     val dataStr = quote(value)
     val dups = duplicatesOf(bram)
 
@@ -503,14 +502,14 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       if (dups.length == 1) {
         if (writers.length == 1) {
           emit(s"""${quote(bram)}.connectWport(stream.offset(${quote(addr)}, -$offsetStr),
-            stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr)); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+            stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr)); //1""") 
         } else {
           val choose_from = writers.map {
             case (_,_,a) => a
           }
           val bank_num = choose_from.indexOf(sym)
           emit(s"""${quote(bram)}.connectBankWport(${bank_num}, stream.offset(${quote(addr)}, -$offsetStr),
-            stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr)); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+            stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr)); //2""")
         }
       } else {
         if (writers.length == 1) {
@@ -520,7 +519,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
             dimzz.length match {
               case 1 =>
                 emit(s"""${quote(bram)}_${ii}.connectWport(stream.offset(${quote(addr)}, -$offsetStr),
-                  stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr)); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+                  stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr)); //3""")
               case _ =>
                 val w = writersOf(bram)
                 val find_id = writers.map{case (_, _, s) => s}
@@ -528,7 +527,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                 val inds = parIndicesOf(writers(i)._3)
                 val this_writer = writers(i)._1
                 emit(s"""${quote(bram)}_${ii}.connectWport(stream.offset(${quote(inds(0)(0))}, -$offsetStr), stream.offset(${quote(inds(0)(1))}, -$offsetStr),
-                  stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr)); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+                  stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr)); //4""")
 
             }
 
@@ -540,7 +539,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           val bank_num = choose_from.indexOf(sym)
           dups.zipWithIndex.foreach {case (dd, ii) =>
             emit(s"""${quote(bram)}_${ii}.connectBankWport(${bank_num}, stream.offset(${quote(addr)}, -$offsetStr),
-              stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr)); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+              stream.offset($dataStr, -$offsetStr), stream.offset(${quote(parentPipe)}_datapath_en, -1) & stream.offset(${quote(parentPipe)}_datapath_en, -$offsetStr)); //5""") 
           }
         }
       }
@@ -553,7 +552,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
       val inds = parIndicesOf(w(i)._3)
       val this_writer = w(i)._1
       if (isDummy(bram)) {
-        emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(this_writer)}_datapath_en);""")
+        emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(this_writer)}_datapath_en); //6""")
       } else {
         val dimzz = dimsOf(bram)
         inds.length match {
@@ -562,19 +561,19 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           case 1 =>
             if (dimzz.length == 1) {
               if (dups.length == 1) {
-                emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */); """) //TODO
+                emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${dataStr}, ${quote(this_writer)}_datapath_en); //7""") 
               } else {
                 dups.zipWithIndex.foreach {case (dd, ii) =>
-                  emit(s"""${quote(bram)}_${ii}.connectWport(${quote(addr)}, ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */); """) //TODO
+                  emit(s"""${quote(bram)}_${ii}.connectWport(${quote(addr)}, ${dataStr}, ${quote(this_writer)}_datapath_en); //8""")
                 }
               }
             } else {
               val addrs = inds(0)
               if (dups.length == 1) {
-                emit(s"""${quote(bram)}.connectWport(${quote(addrs(0))}, ${quote(addrs(1))}, ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */); """) //TODO
+                emit(s"""${quote(bram)}.connectWport(${quote(addrs(0))}, ${quote(addrs(1))}, ${dataStr}, ${quote(this_writer)}_datapath_en); //9""")
               } else {
                 dups.zipWithIndex.foreach {case (dd, ii) =>
-                  emit(s"""${quote(bram)}_${ii}.connectWport(${quote(addrs(0))}, ${quote(addrs(1))}, ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */); """) //TODO
+                  emit(s"""${quote(bram)}_${ii}.connectWport(${quote(addrs(0))}, ${quote(addrs(1))}, ${dataStr}, ${quote(this_writer)}_datapath_en); //10""")
                 }
               }              
             }
@@ -583,7 +582,13 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
             val b = inds(1)
             a.length match {
               case 1 => 
-                emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${quote(value)}, ${quote(this_writer)}_datapath_en);""")
+              if (dups.length == 1) {
+                emit(s"""${quote(bram)}.connectWport(${quote(addr)}, ${quote(value)}, ${quote(this_writer)}_datapath_en); //11""")                
+              } else {
+                dups.zipWithIndex.foreach {case (dd, ii) => 
+                  emit(s"""${quote(bram)}_${ii}.connectWport(${quote(addr)}, ${quote(value)}, ${quote(this_writer)}_datapath_en); //11""")                
+                }
+              }
               case _ =>
                 if (quote(a(1)) == quote(b(1))) { // ugly hack
                   var addr1 = ""
@@ -595,11 +600,11 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                   emit(s"""// all have same column.  """)
                   if (dups.length == 1) {
                     emit(s"""${quote(bram)}.connectWport(new DFEVectorType<DFEVar>(${addr0(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr0.mkString(",")})), ${addr1},
-                    ${dataStr}, ${quote(this_writer)}_datapath_en); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+                    ${dataStr}, ${quote(this_writer)}_datapath_en); //12""")
                   } else {
                     dups.zipWithIndex.foreach {case (dd, ii) => 
                       emit(s"""${quote(bram)}_${ii}.connectWport(new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")})), ${addr1}, 
-                      ${dataStr}, ${quote(this_writer)}_datapath_en); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+                      ${dataStr}, ${quote(this_writer)}_datapath_en); //13""") 
                     }
                   }
 
@@ -613,11 +618,11 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
                   emit(s"""// all have same row.  DFEVector<DFEVar> ${addr1(0)}_vectorized = new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")}));""")
                   if (dups.length == 1) {
                     emit(s"""${quote(bram)}.connectWport(${addr0}, new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")})), 
-                    ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+                    ${dataStr}, ${quote(this_writer)}_datapath_en); //14""")
                   } else {
                     dups.zipWithIndex.foreach {case (dd, ii) => 
                       emit(s"""${quote(bram)}_${ii}.connectWport(${addr0}, new DFEVectorType<DFEVar>(${addr1(0)}.getType(), ${inds.length}).newInstance(this, Arrays.asList(${addr1.mkString(",")})), 
-                      ${dataStr}, ${quote(this_writer)}_datapath_en, 0 /* start */, 1 /* stride */); // TODO: Hardcoded start and stride! Change after getting proper metadata""") //TODO
+                      ${dataStr}, ${quote(this_writer)}_datapath_en); // 15""") 
                     }
                   }
                 }
@@ -702,105 +707,120 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
     case Argout_new(init) => //emitted in reg_write
 
     case e@Reg_read(reg) =>
-      val pre = maxJPre(sym)
-      val regIdx = readersOf(reg).map{_._3}.indexOf(sym)
-      val regStr = regType(reg) match {
-        case Regular =>
-          val suffix = if (!controlNodeStack.isEmpty) {
-            val Def(EatReflect(curPipe)) = controlNodeStack.top
-            curPipe match {
-                case n: ParPipeReduce[_,_] => if (n.acc == reg) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
-                case Unit_pipe(_) => if (isAccum(reg) && writtenIn(controlNodeStack.top).contains(reg)) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
-                case _ => ""
-            }
+      reduceType(reg) match {
+        case Some(fps: ReduceFunction) => // Optimize for FixPt accum
+          emit(s"""// Reduce tree load""")
+        case None => // Not a reduce tree
+          val pre = maxJPre(sym)
+          val regIdx = if (readersOf(reg).map{_._3}.indexOf(sym) > duplicatesOf(reg).length - 1) {
+            duplicatesOf(reg).length - 1
           } else {
-            ""
+            readersOf(reg).map{_._3}.indexOf(sym)
           }
-          quote(reg) + s"_${regIdx}" + suffix
-        case _ =>
-          quote(reg)
-      }
-      regType(reg) match {
-        case Regular =>
-          regIdx match {
-            case -1 =>
-              emit(s"""//Cannot write ${quote(sym)} = $regStr""")
+          // val regIdx = instanceIndexOf(sym, reg)
+          val regStr = regType(reg) match {
+            case Regular =>
+              val suffix = if (!controlNodeStack.isEmpty) {
+                val Def(EatReflect(curPipe)) = controlNodeStack.top
+                curPipe match {
+                    case n: ParPipeReduce[_,_] => if (n.acc == reg) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
+                    case Unit_pipe(_) => if (isAccum(reg) && writtenIn(controlNodeStack.top).contains(reg)) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
+                    case _ => ""
+                }
+              } else {
+                ""
+              }
+              quote(reg) + s"_${regIdx}" + suffix
             case _ =>
-              emit(s"""$pre ${quote(sym)} = $regStr;""")
+              quote(reg)
           }
-        case _ =>
-          emit(s"""$pre ${quote(sym)} = $regStr;""")        
+          regType(reg) match {
+            case Regular =>
+              regIdx match {
+                case -1 =>
+                  emit(s"""//Cannot write ${quote(sym)} = $regStr""")
+                case _ =>
+                  emit(s"""$pre ${quote(sym)} = $regStr;""")
+              }
+            case _ =>
+              emit(s"""$pre ${quote(sym)} = $regStr;""")        
+          }
       }
+
 
     case e@Reg_write(reg, value) =>
-      emitComment("Reg_write {")
-      if (writersOf(reg).isEmpty)
-          throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
-      val writer = writersOf(reg).head._1  // Regs have unique writer which also drives reset
-      val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
-      val duplicates = duplicatesOf(reg)
-      val numDuplicates = duplicatesOf(reg).length
-      regType(reg) match {
-        case ArgumentOut =>
-          val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"
-          emit(s"""io.scalarOutput("${quote(reg)}", ${quote(value)}, $ts, $controlStr);""")
+      reduceType(reg) match {
+        case Some(fps: ReduceFunction) => // Optimize for FixPt accum
+          // emit(s"""Accumulator.Params ${quote(accum)}_accParams = Reductions.accumulator.makeAccumulatorConfig(${tpstr(accum.t)}).withClear($rstSignalStr).withEnable($enSignalStr);""")
         case _ =>
-          (0 until numDuplicates) foreach { ii =>
-            val regname = s"${quote(reg)}_${ii}"
-            if (isAccum(reg)) {
-              regType(reg) match {
-                case Regular =>
-                  val rstStr = quote(parentOf(reg).get) + "_rst_en"
-                  val enStr = writer match {
-                    case p@Def(EatReflect(pipe:Pipe_foreach)) => styleOf(p) match {
-                      case InnerPipe => quote(p) + "_datapath_en"
-                      case _ => quote(p) + "_en"
-                    }
-                    case p@Def(EatReflect(pipe:Pipe_fold[_,_])) => styleOf(p) match {
-                      case InnerPipe => quote(p) + "_datapath_en"
-                      case _ => quote(p) + "_en"
-                    }
-                    case p@Def(EatReflect(pipe:ParPipeReduce[_,_])) => styleOf(p) match {
-                      case InnerPipe => quote(p) + "_datapath_en"
-                      case _ => quote(p) + "_en"
-                    }
-                    case p@Def(EatReflect(Unit_pipe(func))) => styleOf(p) match {
-                      case InnerPipe => quote(p) + "_datapath_en"
-                      case _ => quote(p) + "_en"
-                    }
-                    case p@_ =>
-                                emit(s"// Reg ${quote(reg)} is written by non Pipe node ${quote(p)}")
-                                "constant.var(true)"
-                  }
+          emitComment("Reg_write {")
+          if (writersOf(reg).isEmpty)
+              throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
+          val writer = writersOf(reg).head._1  // Regs have unique writer which also drives reset
+          val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
+          val duplicates = duplicatesOf(reg)
+          val numDuplicates = duplicatesOf(reg).length
+          regType(reg) match {
+            case ArgumentOut =>
+              val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"
+              emit(s"""io.scalarOutput("${quote(reg)}", ${quote(value)}, $ts, $controlStr);""")
+            case _ =>
+              (0 until numDuplicates) foreach { ii =>
+                val regname = s"${quote(reg)}_${ii}"
+                if (isAccum(reg)) {
+                  regType(reg) match {
+                    case Regular =>
+                      val rstStr = quote(parentOf(reg).get) + "_rst_en"
+                      val enStr = writer match {
+                        case p@Def(EatReflect(pipe:Pipe_foreach)) => styleOf(p) match {
+                          case InnerPipe => quote(p) + "_datapath_en"
+                          case _ => quote(p) + "_en"
+                        }
+                        case p@Def(EatReflect(pipe:Pipe_fold[_,_])) => styleOf(p) match {
+                          case InnerPipe => quote(p) + "_datapath_en"
+                          case _ => quote(p) + "_en"
+                        }
+                        case p@Def(EatReflect(pipe:ParPipeReduce[_,_])) => styleOf(p) match {
+                          case InnerPipe => quote(p) + "_datapath_en"
+                          case _ => quote(p) + "_en"
+                        }
+                        case p@Def(EatReflect(Unit_pipe(func))) => styleOf(p) match {
+                          case InnerPipe => quote(p) + "_datapath_en"
+                          case _ => quote(p) + "_en"
+                        }
+                        case p@_ =>
+                                    emit(s"// Reg ${quote(reg)} is written by non Pipe node ${quote(p)}")
+                                    "constant.var(true)"
+                      }
 
 
-                  emit(s"""DFEVar ${regname}_en = $enStr & ${quote(writer)}_redLoop_done;""")
-                  emit(s"""${regname}_lib.write(${quote(value)}, ${regname}_en, $rstStr);""")
-                  emit(s"""${regname}_delayed <== stream.offset(${regname}, -${quote(writer)}_offset);""")
-                  // If nameOf(sym) is to be used, mix in NameOpsExp. This shouldn't have to be done by hand,
-                  // so disabling using nameOf until it is fixed.
-                case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
-                case ArgumentOut => throw new Exception(s"""ArgOut (${quote(reg)}) cannot be used as an accumulator!""")
-              }
-            } else { // Non-accumulator registers
-              regType(reg) match {
-                case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
-                case Regular =>
-                  val rstStr = quote(parentOf(reg).get) + "_rst_en"
-//                  emit(s"""${regname}_lib.write(${quote(value)}, constant.var(true), $rstStr);""")
-                  if (duplicates(ii).depth > 1) {
-                    emit(s"""${regname}_lib.write(${quote(value)}, ${quote(writer)}_done, constant.var(false));""")
-                  } else {
-                    // Using an enable signal instead of "always true" is causing an illegal loop.
-                    // Using a reset signal instead of "always false" is causing an illegal loop.
-                    // These signals don't matter for pass-through registers anyways.
-                    emit(s"""${regname}_lib.write(${quote(value)}, constant.var(true), constant.var(false));""")
+                      emit(s"""DFEVar ${regname}_en = $enStr & ${quote(writer)}_redLoop_done;""")
+                      emit(s"""${regname}_lib.write(${quote(value)}, ${regname}_en, $rstStr);""")
+                      emit(s"""${regname}_delayed <== stream.offset(${regname}, -${quote(writer)}_offset);""")
+                      // If nameOf(sym) is to be used, mix in NameOpsExp. This shouldn't have to be done by hand,
+                      // so disabling using nameOf until it is fixed.
+                    case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
+                    case ArgumentOut => throw new Exception(s"""ArgOut (${quote(reg)}) cannot be used as an accumulator!""")
                   }
+                } else { // Non-accumulator registers
+                  regType(reg) match {
+                    case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
+                    case Regular =>
+                      val rstStr = quote(parentOf(reg).get) + "_rst_en"
+    //                  emit(s"""${regname}_lib.write(${quote(value)}, constant.var(true), $rstStr);""")
+                      if (duplicates(ii).depth > 1) {
+                        emit(s"""${regname}_lib.write(${quote(value)}, ${quote(writer)}_done, constant.var(false));""")
+                      } else {
+                        // Using an enable signal instead of "always true" is causing an illegal loop.
+                        // Using a reset signal instead of "always false" is causing an illegal loop.
+                        // These signals don't matter for pass-through registers anyways.
+                        emit(s"""${regname}_lib.write(${quote(value)}, constant.var(true), constant.var(false));""")
+                      }
+                  }
+                }
               }
-            }
           }
-      }
-      emitComment(s"} Reg_write // regType ${regType(reg)}, numDuplicates = $numDuplicates")
+          emitComment(s"} Reg_write // regType ${regType(reg)}, numDuplicates = $numDuplicates")
 
     case Bram_new(size, zero) =>
       withStream(baseStream) {

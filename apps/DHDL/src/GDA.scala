@@ -8,18 +8,18 @@ trait GDA extends DHDLApplication {
   type T = Flt
   type Array[T] = ForgeArray[T]
 
-  val innerPar = 16
-  val outerPar = 1
+  val innerPar = 4
+  val outerPar = 2
   val maxCols = 96
-  val tileSize = 192
+  val tileSize = 96
 
   def gda(xCPU: Rep[Array[T]], yCPU: Rep[Array[Bit]], mu0CPU: Rep[Array[T]], mu1CPU: Rep[Array[T]]) = {
     val rTileSize     = param(tileSize);  domainOf(rTileSize) = (96, 19200, 1)
     val op      = param(outerPar);  domainOf(op)  = (1, 8, 1)
     val ip      = param(innerPar);  domainOf(ip)  = (1, 12, 1)
-    val subLoopPar    = param(1);  domainOf(subLoopPar)    = (1, 16, 1)
-    val prodLoopPar   = param(1);  domainOf(prodLoopPar)   = (1, 96, 1)
-    val outerAccumPar = param(1);  domainOf(outerAccumPar) = (1, 1, 1)
+    val subLoopPar    = param(innerPar);  domainOf(subLoopPar)    = (1, 16, 1)
+    val prodLoopPar   = param(innerPar);  domainOf(prodLoopPar)   = (1, 96, 1)
+    val outerAccumPar = param(innerPar);  domainOf(outerAccumPar) = (1, 1, 1)
 
     val rows = yCPU.length;   bound(rows) = 360000
     val cols = param(maxCols); bound(cols) = maxCols

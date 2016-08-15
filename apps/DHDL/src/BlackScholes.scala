@@ -6,14 +6,13 @@ object BlackScholesCompiler extends DHDLApplicationCompiler with BlackScholes
 object BlackScholesInterpreter extends DHDLApplicationInterpreter with BlackScholes
 trait BlackScholes extends DHDLApplication {
 
-  val tileSize = 7104
+  val tileSize = 96
   val outerPar = 1
-  val innerPar = 8
+  val innerPar = 2
   lazy val ts = param(tileSize)
   lazy val op = param(outerPar)
   lazy val ip = param(innerPar)
   lazy val numOptions = ArgIn[SInt]
-  val nn = 7680000
 
   final val inv_sqrt_2xPI = 0.39894228040143270286f
 
@@ -109,7 +108,7 @@ trait BlackScholes extends DHDLApplication {
     println("")
   }
   def main() {
-    val N = nn
+    val N = args(0).to[SInt]
 
     bound(N) = 9995328
     domainOf(ts) = (96,19200,96)

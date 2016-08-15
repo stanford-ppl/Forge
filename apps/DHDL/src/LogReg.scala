@@ -10,7 +10,7 @@ trait LogReg extends DHDLApplication {
   type T = Flt
 
   val tileSizeH = 192
-  val innerParH = 32
+  val innerParH = 16
   val outerParH = 1
   lazy val tileSize = param(tileSizeH)
   lazy val outerMpPar = param(outerParH)

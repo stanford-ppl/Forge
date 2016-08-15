@@ -176,7 +176,7 @@ trait DSE extends Traversal {
     debug(s"Legal space size is $legalSize (elapsed time: ${legalCalcTime/1000} seconds)")
 
     // Take 200,000 legal points at most
-    val points = util.Random.shuffle(legalPoints.toList).take(200000)
+    val points = util.Random.shuffle(legalPoints.toList).take(100000)
     legalSize = points.length // = min(200000, legalSize)
 
 

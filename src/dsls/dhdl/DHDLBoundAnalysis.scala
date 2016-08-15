@@ -25,16 +25,24 @@ trait DHDLBoundAnalysis {
 
       // TODO: These could actually be structs! Handle using normal propagation instead
       //analyze(Reg, "reg_new") using rule ${ bound(lhs) = bound($0).get }
-      analyze(Reg, "argin_new") using rule ${ bound(lhs) = bound($0).get }
-      analyze(Reg, "argout_new") using rule ${ bound(lhs) = bound($0).get }
-      analyze(Reg, "reg_read") using rule ${ bound(lhs) = boundOf($0) }
+      //analyze(Reg, "argin_new") using rule ${ bound(lhs) = bound($0).get }
+      //analyze(Reg, "argout_new") using rule ${ bound(lhs) = bound($0).get }
+      analyze(Reg, "reg_read") using rule ${
+        //debug("Setting bound of " + lhs + " to " + bound($0))
+        bound(lhs) = boundOf($0)
+      }
 
       // FIXME: Not terribly accurate..
       analyze(Reg, "reg_write") using rule ${
-        if (boundOf($0).isDefined && boundOf($1).isDefined)
-          bound($0) = Math.max(bound($0).get,bound($1).get)
-        else
+        if (boundOf($0).isDefined && boundOf($1).isDefined) {
+          val max = Math.max(bound($0).get,bound($1).get)
+          //debug("Setting bound of " + $0 + " to " + max)
+          bound($0) = max
+        }
+        else {
+          //debug("Setting bound of " + $0 + " to " + boundOf($1))
           bound($0) = boundOf($1)
+        }
       }
 
       analyze(Tst, "set_arg") using rule ${

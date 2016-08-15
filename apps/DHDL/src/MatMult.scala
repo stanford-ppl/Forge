@@ -18,23 +18,25 @@ trait MatMult extends DHDLApplication {
   type T = Flt //FixPt[Signed,B16,B16]
   type Array[T] = ForgeArray[T]
 
+  val mmm = 960
+  val nnn = 960
+  val ppp = 960
 
   val tileSizeM = 96
   val tileSizeN = 96
   val tileSizeP = 192
-  val innerPar = 96
+  val innerPar = 32
   val midPar = 2
   val outerPar = 1
   def matmult(A: Rep[Array[T]], B: Rep[Array[T]], mm: Rep[SInt], nn: Rep[SInt], pp: Rep[SInt]) = {
 
-    val M = ArgIn[SInt]
-    val N = ArgIn[SInt]
-    val P = ArgIn[SInt]
+    val M = mmm
+    val N = nnn
+    val P = ppp
 
-    setArg(M, mm)
-    setArg(N, nn)
-    setArg(P, pp)
-
+    
+    
+    
 
     val a = OffChipMem[T](M, P)
     val b = OffChipMem[T](P, N)
@@ -81,9 +83,9 @@ trait MatMult extends DHDLApplication {
   }
 
   def main() = {
-    val M = args(0).to[SInt]
-    val N = args(1).to[SInt]
-    val P = args(2).to[SInt]
+    val M = mmm
+    val N = nnn
+    val P = ppp
 
     val a = Array.fill(M){ Array.fill(P){random[T](100)} }
     val b = Array.fill(P){ Array.fill(N){random[T](100)} }
@@ -98,8 +100,8 @@ trait MatMult extends DHDLApplication {
       }
     }.flatten
 
-    printArr(gold, "expected ")
-    printArr(result, "got  ")
+    println("expected cksum: " + gold.map(_).reduce{_+_})
+    println("result cksum: " + result.map(_).reduce{_+_})
 
     assert(gold == result)
   }

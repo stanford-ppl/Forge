@@ -141,7 +141,7 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
         case CoarsePipe => emitComment(s"""MPSM to be emitted""")
         case InnerPipe => emitComment(s"""PipeSM to be emitted""")
         case SequentialPipe => emitComment(s"""SeqSM to be emitted""")
-        case _ => emitComment(s"""ParPipeForeach style: ${styleOf(sym)}""")
+        case _ => emitComment(s"""ParPipeReduce style: ${styleOf(sym)}""")
       }
 
       // The body of ParPipeReduce uses 'acc' to refer to the accumulator

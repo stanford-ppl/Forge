@@ -10,8 +10,8 @@ trait Kmeans extends DHDLApplication {
   lazy val MAXK = 96
   lazy val MAXD = 384
   val tileSize = 96
-  val innerPar = 4
-  val outerPar = 1
+  val innerPar = 16
+  val outerPar = 2
 
 
   def reduceTree(x: List[(Rep[Flt], Rep[SInt])]): List[(Rep[Flt], Rep[SInt])] = {
@@ -34,17 +34,17 @@ trait Kmeans extends DHDLApplication {
     val BN = param(tileSize);  domainOf(BN) = (96, 9600, 96)
     val BD = param(MAXD);  domainOf(BD) = (MAXD, MAXD, MAXD)
     val PX = param(1);    domainOf(PX) = (1,1,1)
-    val PR = param(innerPar);    domainOf(PR) = (1, 8, 1)
-    val P0 = param(innerPar);    domainOf(P0) = (1,96,1)     // Dimensions loaded in parallel
-    val P1 = param(innerPar);    domainOf(P1) = (1,12,1)     // Sets of points calculated in parallel
-    val P2 = param(1);    domainOf(P2) = (1,MAXD,1)   // Dimensions accumulated in parallel (outer)
-    val P3 = param(1);    domainOf(P3) = (1,16,1)     // Points calculated in parallel
-    val P4 = param(innerPar);    domainOf(P4) = (1,MAXD,1)   // Dimensions accumulated in parallel (inner)
-    val P5 = param(innerPar);    domainOf(P5) = (1,MAXD,1)   // Dimensions compared in parallel
-    val P6 = param(innerPar);    domainOf(P6) = (1,MAXD,1)   // Dimensions saved in parallel
-    val P7 = param(innerPar);    domainOf(P7) = (1,MAXK,1)   // Centroid counts copied in parallel
-    val P8 = param(innerPar);    domainOf(P8) = (1,MAXD,1)   // Dimensions averaged in parallel
-    val P9 = param(innerPar);    domainOf(P9) = (1,MAXD,1)   // Dimensions stored in parallel*/
+    val P0 = param(outerPar);    domainOf(P0) = (32,192,96)  // Dimensions loaded in parallel
+    val P1 = param(outerPar);    domainOf(P1) = (1,12,2)     // Sets of points calculated in parallel
+    val P2 = param(1);    domainOf(P2) = (1,96,4)     // Dimensions accumulated in parallel (outer)
+    val P3 = param(1);    domainOf(P3) = (1,16,4)     // Points calculated in parallel
+    val PR = param(innerPar);    domainOf(PR) = (1,96,4)
+    /*val P4 = param(1);    domainOf(P4) = (1,MAXD,1)   // Dimensions accumulated in parallel (inner)
+    val P5 = param(1);    domainOf(P5) = (1,MAXD,1)   // Dimensions compared in parallel
+    val P6 = param(1);    domainOf(P6) = (1,MAXD,1)   // Dimensions saved in parallel
+    val P7 = param(1);    domainOf(P7) = (1,MAXK,1)   // Centroid counts copied in parallel
+    val P8 = param(1);    domainOf(P8) = (1,MAXD,1)   // Dimensions averaged in parallel
+    val P9 = param(1);    domainOf(P9) = (1,MAXD,1)   // Dimensions stored in parallel*/
 
     val N = ArgIn[SInt]
     val K = ArgIn[SInt]

@@ -703,6 +703,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 
     case e@Reg_read(reg) =>
       val pre = maxJPre(sym)
+      val regIdx = readersOf(reg).map{_._3}.indexOf(sym)
       val regStr = regType(reg) match {
         case Regular =>
           val suffix = if (!controlNodeStack.isEmpty) {
@@ -715,12 +716,21 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
           } else {
             ""
           }
-          val regIdx = readersOf(reg).map{_._3}.indexOf(sym)
           quote(reg) + s"_${regIdx}" + suffix
         case _ =>
           quote(reg)
       }
-      emit(s"""$pre ${quote(sym)} = $regStr;""")
+      regType(reg) match {
+        case Regular =>
+          regIdx match {
+            case -1 =>
+              emit(s"""//Cannot write ${quote(sym)} = $regStr""")
+            case _ =>
+              emit(s"""$pre ${quote(sym)} = $regStr;""")
+          }
+        case _ =>
+          emit(s"""$pre ${quote(sym)} = $regStr;""")        
+      }
 
     case e@Reg_write(reg, value) =>
       emitComment("Reg_write {")

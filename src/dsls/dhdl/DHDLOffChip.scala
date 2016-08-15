@@ -208,8 +208,10 @@ trait DHDLOffChip {
       val p = tilePar($tile).getOrElse(param(1))
       val len = tileDims.last
 
+      val px = param(1); domainOf(px) = (1,1,1)
+
       if (tileDims.length > 1) {
-        Pipe(CounterChain(tileDims.take(tileDims.length - 1).map{d => Counter(max = d) }:_*)){inds =>
+        Pipe(CounterChain(tileDims.take(tileDims.length - 1).map{d => Counter(min = 0, max = d, step = 1, par = px) }:_*)){inds =>
           val indices = inds.toList :+ 0.as[Index]
           val memOfs = calcAddress(offsets.zip(indices).map{case (a,b) => a + b}, dimsOf(mem))
 
@@ -238,8 +240,11 @@ trait DHDLOffChip {
 
       val fifo = FIFO[T](512) // TODO: How to determine FIFO depth?
 
+      val px = param(1); domainOf(px) = (1,1,1)
+
+
       if (tileDims.length > 1) {
-        Pipe(CounterChain(tileDims.take(tileDims.length - 1).map{d => Counter(max = d) }:_*)){inds =>
+        Pipe(CounterChain(tileDims.take(tileDims.length - 1).map{d => Counter(min = 0, max = d, step = 1, par = px) }:_*)){inds =>
           val indices = inds.toList :+ 0.as[Index]
           val localOfs = indices.zip(unitDims).flatMap{case (i,isUnitDim) => if (!isUnitDim) Some(i) else None}
           val memOfs = calcAddress(offsets.zip(indices).map{case (a,b) => a + b}, dimsOf(mem))

@@ -84,6 +84,11 @@ trait NodeMetadataOpsExp extends NodeMetadataTypesExp {
     case EatReflect(_:Scatter[_]) => true
     case _ => false
   }
+  def isOffChipTransfer(e: Exp[Any]): Boolean = e match {
+    case Def(d) => isOffChipTransfer(d)
+    case _ => false
+  }
+
   def isParallel(d: Def[Any]): Boolean = d match {
     case EatReflect(_:Pipe_parallel) => true
     case _ => false
@@ -217,8 +222,9 @@ trait NodeMetadataOpsExp extends NodeMetadataTypesExp {
   def isSequential(s: Exp[Any]): Boolean = isOuterControl(s) && styleOf(s) == SequentialPipe
   def isSequential(s: (Exp[Any],Boolean)): Boolean = !s._2 && isSequential(s._1)
 
-  def isParallelizableLoop(e: Exp[Any]) = isInnerPipe(e) || isMetaPipe(e) || isStreamPipe(e)
-
+  def isParallelizableLoop(e: Exp[Any]) = {
+    (isInnerPipe(e) || isMetaPipe(e) || isStreamPipe(e)) && !childrenOf(e).exists(isOffChipTransfer(_))
+  }
 
   def isAllocation(s: Exp[Any]): Boolean = s match {
     case Def(d) => isAllocation(d)

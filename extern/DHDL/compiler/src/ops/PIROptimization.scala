@@ -46,11 +46,7 @@ trait PIROptimizer extends Traversal with PIRCommon {
     cu.regs --= unusedTemps
 
     // Remove unused counterchain copies
-    val usedCCs = stages.flatMap{stage => stage.inputMems.flatMap{case CounterReg(cchain,_) => Some(cchain); case _ => None}} ++
-                  cu.srams.flatMap{sram => sram.readAddr match {case Some(CounterReg(cchain,_)) => Some(cchain); case _ => None}} ++
-                  cu.srams.flatMap{sram => sram.writeAddr match {case Some(CounterReg(cchain,_)) => Some(cchain); case _ => None}} ++
-                  cu.srams.flatMap{sram => sram.swapCtrl match {case Some(cchain) => Some(cchain); case _ => None}} ++
-                  cu.srams.flatMap{sram => sram.writeCtrl match {case Some(cchain) => Some(cchain); case _ => None}}
+    val usedCCs = usedCounterChains(cu)
     val unusedCopies = cu.cchains.filter{cc=> cc.isInstanceOf[CounterChainCopy] && !usedCCs.contains(cc) }
     cu.cchains --= unusedCopies
   }
@@ -137,13 +133,19 @@ trait PIROptimizer extends Traversal with PIRCommon {
       val children = cus.filter{c => c.parent.contains(cu)}
       if (cu.writeStages.isEmpty && cu.stages.isEmpty && children.isEmpty) {
         val siblingCU = cus.find{c => c != cu && c.parent == cu.parent}
-        val cchainInsts = cu.cchains.filter(_.isInstanceOf[CounterChainInstance])
-        if (cchainInsts.isEmpty || siblingCU.isDefined) {
-          debug(s"Removing empty cu $cu")
-          cuMapping.retain{case (pipe,c) => c != cu}
 
+        val globallyUsedCCs = cus.filterNot(_ != cu).flatMap(usedCounterChains(_))
+
+        val usedCCs = cu.cchains.filter{
+          case _:CounterChainCopy => false
+          case _:CounterChainInstance => true
+          case cc:UnitCounterChain => globallyUsedCCs.exists(_.name == cc.name)
+        }
+        if (siblingCU.isDefined && usedCCs.nonEmpty) {
           val sibling = siblingCU.get
-          sibling.cchains ++= cchainInsts
+          debug(s"Adding counterchains to $sibling: $usedCCs")
+
+          sibling.cchains ++= usedCCs
           cus.foreach{c =>
             // Swap references to this CU's counter chain to the sibling
             c.cchains = c.cchains.map{
@@ -156,6 +158,10 @@ trait PIROptimizer extends Traversal with PIRCommon {
               c.deps ++= cu.deps
             }
           }
+        }
+        if (usedCCs.isEmpty || siblingCU.isDefined) {
+          debug(s"Removing empty cu $cu")
+          cuMapping.retain{case (pipe,c) => c != cu}
         }
       }
     case _ =>
@@ -193,6 +199,15 @@ trait PIROptimizer extends Traversal with PIRCommon {
       cu.stages.flatMap(_.inputMems).flatMap{case VectorIn(vec: VectorMem) => Some(vec); case _ => None} ++
       cu.srams.flatMap{sram => sram.vector.flatMap{case vec: VectorMem => Some(vec); case _ => None }}
     case _ => Nil
+  }
+
+  def usedCounterChains(cu: ComputeUnit) = {
+    val stages = allMapStages(cu)
+    stages.flatMap{stage => stage.inputMems.flatMap{case CounterReg(cchain,_) => Some(cchain); case _ => None}} ++
+    cu.srams.flatMap{sram => sram.readAddr match {case Some(CounterReg(cchain,_)) => Some(cchain); case _ => None}} ++
+    cu.srams.flatMap{sram => sram.writeAddr match {case Some(CounterReg(cchain,_)) => Some(cchain); case _ => None}} ++
+    cu.srams.flatMap{sram => sram.swapCtrl match {case Some(cchain) => Some(cchain); case _ => None}} ++
+    cu.srams.flatMap{sram => sram.writeCtrl match {case Some(cchain) => Some(cchain); case _ => None}}
   }
 
   // --- Stage removal

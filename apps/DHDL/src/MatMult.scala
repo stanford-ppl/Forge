@@ -24,9 +24,9 @@ trait MatMult extends DHDLApplication {
   val tileSizeM = 192
   val tileSizeN = 192
   val tileSizeP = 384
-  val innerPar = 8
-  val midPar = 4
-  val outerPar = 2
+  val innerPar = 1
+  val midPar = 1
+  val outerPar = 1
   def matmult(A: Rep[Array[T]], B: Rep[Array[T]], M: Rep[SInt], N: Rep[SInt], P: Rep[SInt]) = {
     bound(M) = 1536
     bound(N) = 1536

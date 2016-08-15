@@ -234,10 +234,10 @@ trait PIRCommon extends SubstQuotingExp with Traversal {
     debug(s"  writerCU: $writerCU")
 
     // ASSUMPTION: Each CU originally only instantiates only one counterchain
-    val remoteWriteCtrl = writerCU.map{cu => cu.cchains.filter(_.isInstanceOf[CounterChainInstance]).head }
-    val remoteSwapperCtrl = swapperCU.map{cu => cu.cchains.filter(_.isInstanceOf[CounterChainInstance]).head }
+    val remoteWriteCtrl = writerCU.flatMap{cu => cu.cchains.find{case _:UnitCounterChain | _:CounterChainInstance => true; case _ => false }}
+    val remoteSwapperCtrl = swapperCU.flatMap{cu => cu.cchains.find{case _:UnitCounterChain | _:CounterChainInstance => true; case _ => false }}
 
-    val readCtrl = cu.cchains.filter(_.isInstanceOf[CounterChainInstance]).headOption
+    val readCtrl = cu.cchains.find{case _:CounterChainCopy => false; case _ => true}
     val writeCtrl = remoteWriteCtrl.flatMap{cc => cu.cchains.find(_.name == cc.name) }
     val swapCtrl = remoteSwapperCtrl.flatMap{cc => cu.cchains.find(_.name == cc.name) }
 

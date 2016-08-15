@@ -95,8 +95,8 @@ trait DSE extends Traversal {
     memAnalyzer.silence()
 
     bndAnalyzer.run(b)
-    areaAnalyzer.run(b)
-    cycleAnalyzer.run(b)
+    //areaAnalyzer.run(b)
+    //cycleAnalyzer.run(b)
 
     // A. Get lists of parameters
     var restrict  = paramAnalyzer.restrict
@@ -122,13 +122,16 @@ trait DSE extends Traversal {
     // Prune single factors
     val initialSpace = prune(numericFactors, ranges, restrict)
 
-    val mps = metapipes.map{mp => Domain(List(true,false), {c: Boolean => c match {case true => styleOf(mp) = CoarsePipe; case false => styleOf(mp) = SequentialPipe}; () }) }
+    // Don't sequentialize pipes with tile load/store children
+    val nonTxMetapipes = metapipes.filterNot(pipe => childrenOf(pipe).exists(isOffChipTransfer(_)))
+
+    val mps = nonTxMetapipes.map{mp => Domain(List(true,false), {c: Boolean => c match {case true => styleOf(mp) = CoarsePipe; case false => styleOf(mp) = SequentialPipe}; () }) }
     val space = (initialSpace ++ mps)
 
     if (debugMode) {
       debug("")
       debug("Pruned space:")
-      (numericFactors ++ metapipes).zip(space).foreach{case (p, d) =>
+      (numericFactors ++ nonTxMetapipes).zip(space).foreach{case (p, d) =>
         debug(nameOf(p).getOrElse(p.toString) + ": " + d.toString)
       }
     }
@@ -166,7 +169,7 @@ trait DSE extends Traversal {
 
 
     // --- PROFILING
-    val PROFILING = false
+    val PROFILING = true
     var clockRef = 0L
     def resetClock() { clockRef = System.currentTimeMillis }
 

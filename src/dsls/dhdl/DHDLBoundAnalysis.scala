@@ -24,16 +24,19 @@ trait DHDLBoundAnalysis {
       analyze(Tpes, "int_to_fix") using rule ${ bound(lhs) = boundOf($0) }
 
       // TODO: These could actually be structs! Handle using normal propagation instead
-      analyze(Reg, "reg_new") using rule ${ bound(lhs) = bound($0).get }
+      //analyze(Reg, "reg_new") using rule ${ bound(lhs) = bound($0).get }
       analyze(Reg, "argin_new") using rule ${ bound(lhs) = bound($0).get }
       analyze(Reg, "argout_new") using rule ${ bound(lhs) = bound($0).get }
       analyze(Reg, "reg_read") using rule ${ bound(lhs) = boundOf($0) }
-      /*analyze(Reg, "reg_write") using rule ${
+
+      // FIXME: Not terribly accurate..
+      analyze(Reg, "reg_write") using rule ${
         if (boundOf($0).isDefined && boundOf($1).isDefined)
           bound($0) = Math.max(bound($0).get,bound($1).get)
         else
           bound($0) = boundOf($1)
-      }*/
+      }
+
       analyze(Tst, "set_arg") using rule ${
         if (boundOf($0).isDefined && boundOf($1).isDefined)
           bound($0) = Math.max(bound($0).get,bound($1).get)

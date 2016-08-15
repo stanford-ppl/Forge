@@ -478,7 +478,7 @@ trait DHDLMetadata {
     internal.static (topWriterOps) ("apply", Nil, (MAny) :: SList(CTuple3(MAny,SBoolean,MAny))) implements
       composite ${ meta[MTopWriters]($0).map(_.writers).getOrElse(Nil) }
 
-        /**
+    /**
      * List of readers for a given memory
      * Tuple is (Controller, IsReduction, Reader)
      * IsReduction is only true for nodes within the inner reduction loop of AccumFold
@@ -492,6 +492,15 @@ trait DHDLMetadata {
       composite ${ setMetadata($0, MReaders($1)) }
     internal.static (readersOps) ("apply", Nil, (MAny) :: SList(CTuple3(MAny,SBoolean,MAny))) implements
       composite ${ meta[MReaders]($0).map(_.readers).getOrElse(Nil) }
+
+
+    val MTopReaders = metadata("MTopReaders", "readers" -> SList(CTuple3(MAny, SBoolean, MAny)))
+    val topReaderOps = metadata("topReadersOf")
+    internal.static (topReaderOps) ("update", Nil, (MAny, SList(CTuple3(MAny, SBoolean, MAny))) :: MUnit, effect = simple) implements
+      composite ${ setMetadata($0, MTopReaders($1)) }
+
+    internal.static (topReaderOps) ("apply", Nil, (MAny) :: SList(CTuple3(MAny,SBoolean,MAny))) implements
+      composite ${ meta[MTopReaders]($0).map(_.readers).getOrElse(Nil) }
 
 
     /**

@@ -29,8 +29,9 @@ trait PIRGen extends Traversal with PIRCommon {
   lazy val prescheduler = new PIRScheduleAnalyzer{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
   lazy val scheduler = new PIRScheduler{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
   lazy val optimizer = new PIROptimizer{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
+  lazy val splitter  = new PIRSplitter{val IR: PIRGen.this.IR.type = PIRGen.this.IR}
   lazy val top       = prescheduler.top
-  val cus = HashMap[Exp[Any],ComputeUnit]()
+  val cus = HashMap[Exp[Any],List[ComputeUnit]]()
 
   def allocateCU(pipe: Exp[Any]): ComputeUnit = throw new Exception("Cannot allocate CUs during generation")
 
@@ -76,9 +77,12 @@ trait PIRGen extends Traversal with PIRCommon {
     optimizer.cuMapping ++= cuMapping.toList
     optimizer.run(b)
 
-    cus ++= optimizer.cuMapping.toList
+    splitter.globals ++= optimizer.globals
+    splitter.cuMapping ++= optimizer.cuMapping.toList
+    splitter.run(b)
 
-    globals ++= optimizer.globals
+    globals ++= splitter.globals
+    cus ++= splitter.cus.toList
 
     debug("Scheduling complete. Generating...")
     generateHeader()
@@ -119,7 +123,7 @@ trait PIRGen extends Traversal with PIRCommon {
 
   override def traverse(lhs: Sym[Any], rhs: Def[Any]) {
     if (isControlNode(lhs) && cus.contains(lhs))
-      generateCU(lhs, cus(lhs))
+      for (cu <- cus(lhs)) generateCU(lhs, cu)
   }
 
   def cuDeclaration(cu: ComputeUnit) = {
@@ -180,12 +184,16 @@ trait PIRGen extends Traversal with PIRCommon {
     case sram@CUMemory(sym, size) =>
       debug(s"Generating ${sram.dumpString}")
       var decl = s"""val ${quote(sym)} = SRAM(size = $size"""
-      sram.swapCtrl match {
-        case Some(cchain) => decl += s""", swapCtr = ${cchain.name}(0)""" // TODO: Always 0?
-        case None => throw new Exception(s"No swap controller defined for $sram")
+      sram.swapRead match {
+        case Some(cchain) => decl += s""", swapRead = ${cchain.name}(0)"""
+        case None => throw new Exception(s"No swap read controller defined for $sram")
+      }
+      sram.swapWrite match {
+        case Some(cchain) => decl += s""", swapWrite = ${cchain.name}(0)"""
+        case None => throw new Exception(s"No swap write controller defined for $sram")
       }
       sram.writeCtrl match {
-        case Some(cchain) => decl += s""", writeCtr = ${cchain.name}(0)""" // TODO: Always 0?
+        case Some(cchain) => decl += s""", writeCtr = ${cchain.name}(0)"""
         case None => throw new Exception(s"No write controller defined for $sram")
       }
       sram.banking match {

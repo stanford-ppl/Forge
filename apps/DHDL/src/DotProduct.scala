@@ -9,7 +9,7 @@ trait DotProduct extends DHDLApplication {
   val N = 93600000
   val tileSize = 19200
   val innerPar = 1
-  val outerPar = 1
+  val outerPar = 2
   type Array[T] = ForgeArray[T]
 
   def dotproduct(a: Rep[Array[T]], b: Rep[Array[T]]) = {

@@ -51,12 +51,32 @@ trait MatMult extends DHDLApplication {
     val ip  = param(innerPar);   domainOf(ip)  = (1,96,1)
     val upMidPar  = param(1);   domainOf(upMidPar)  = (1,1,1)
     val stPar     = param(1);   domainOf(stPar)     = (1,1,1)
+    val ldPar     = param(1);
 
     setMem(a, A)
     setMem(b, B)
 
     Accel {
-      Pipe(mm by bm, (nn by bn) par op){(i,j) =>
+      Pipe(mm by bm, nn by bn par op){(i,j) =>
+        val tileC = BRAM[T](bm, bn)
+        Fold(pp by bp par upMidPar)(tileC, 0.as[Flt]){k =>
+          val tileA = BRAM[T](bm, bp)
+          val tileB = BRAM[T](bp, bn)
+          val tileC = BRAM[T](bm, bn)
+          Parallel {
+            tileA := a(i::i+bm, k::k+bp, ldPar)
+            tileB := b(k::k+bp, j::j+bn, ldPar)
+          }
+          Pipe(bm by 1, bn par mp){ (ii,jj) =>
+            val prod = Reduce(bp par ip)(0.as[T]){ kk => tileA(ii, kk) * tileB(kk, jj) }{_+_}
+            tileC(ii,jj) = prod.value
+          }
+          tileC
+        }{_+_}
+        c(i::i+bm, j::j+bn, stPar) := tileC
+      }
+    }
+      /*Pipe(mm by bm, (nn by bn) par op){(i,j) =>
         Pipe((pp by bp) par upMidPar){k =>
           val tileA = BRAM[T](bm, bp)
           val tileB = BRAM[T](bp, bn)
@@ -73,7 +93,7 @@ trait MatMult extends DHDLApplication {
           c(i::i+bm, j::j+bn, stPar) := tileC
         }
       }
-    }
+    }*/
     getMem(c)
   }
 

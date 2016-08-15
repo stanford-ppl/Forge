@@ -16,6 +16,8 @@ trait LogReg extends DHDLApplication {
   def sigmoid(t:Rep[Elem]) = 1.as[Elem]/(exp(-t)+1)
 
   def logreg(x_in: Rep[Array[Elem]], y_in: Rep[Array[Elem]], theta_in: Rep[Array[Elem]]) {
+    val rows = y_in.length
+    bound(rows) = 960000
 
     val BN = param(96); domainOf(BN) = (96,9600,96)
     val PX = param(1);  domainOf(PX) = (1,1,1)
@@ -23,6 +25,9 @@ trait LogReg extends DHDLApplication {
     val P1 = param(1);  domainOf(P1) = (1,D,1)
     val P2 = param(1);  domainOf(P2) = (1,D,1)
     val P3 = param(1);  domainOf(P3) = (1,96,1)
+
+    val N = ArgIn[SInt]
+    setArg(N, rows)
 
     val x = OffChipMem[Elem](N, D)
     val y = OffChipMem[Elem](N)

@@ -10,7 +10,7 @@ trait Kmeans extends DHDLApplication {
   lazy val MAXK = 96
   lazy val MAXD = 384
   val tileSize = 96
-  val innerPar = 1
+  val innerPar = 2
   val outerPar = 2
 
 

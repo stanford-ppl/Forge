@@ -707,44 +707,39 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
     case Argout_new(init) => //emitted in reg_write
 
     case e@Reg_read(reg) =>
-      reduceType(sym) match {
-        case Some(fps: ReduceFunction) => // Optimize for FixPt accum
-          emit(s"""// Reduce tree load""")
-        case None => // Not a reduce tree
-          val pre = maxJPre(sym)
-          val regIdx = if (readersOf(reg).map{_._3}.indexOf(sym) > duplicatesOf(reg).length - 1) {
-            duplicatesOf(reg).length - 1
+      val pre = maxJPre(sym)
+      val regIdx = if (readersOf(reg).map{_._3}.indexOf(sym) > duplicatesOf(reg).length - 1) {
+        duplicatesOf(reg).length - 1
+      } else {
+        readersOf(reg).map{_._3}.indexOf(sym)
+      }
+      // val regIdx = instanceIndexOf(sym, reg)
+      val regStr = regType(reg) match {
+        case Regular =>
+          val suffix = if (!controlNodeStack.isEmpty) {
+            val Def(EatReflect(curPipe)) = controlNodeStack.top
+            curPipe match {
+                case n: ParPipeReduce[_,_] => if (n.acc == reg) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
+                case Unit_pipe(_) => if (isAccum(reg) && writtenIn(controlNodeStack.top).contains(reg)) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
+                case _ => ""
+            }
           } else {
-            readersOf(reg).map{_._3}.indexOf(sym)
+            ""
           }
-          // val regIdx = instanceIndexOf(sym, reg)
-          val regStr = regType(reg) match {
-            case Regular =>
-              val suffix = if (!controlNodeStack.isEmpty) {
-                val Def(EatReflect(curPipe)) = controlNodeStack.top
-                curPipe match {
-                    case n: ParPipeReduce[_,_] => if (n.acc == reg) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
-                    case Unit_pipe(_) => if (isAccum(reg) && writtenIn(controlNodeStack.top).contains(reg)) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
-                    case _ => ""
-                }
-              } else {
-                ""
-              }
-              quote(reg) + s"_${regIdx}" + suffix
+          quote(reg) + s"_${regIdx}" + suffix
+        case _ =>
+          quote(reg)
+      }
+      regType(reg) match {
+        case Regular =>
+          regIdx match {
+            case -1 =>
+              emit(s"""//Cannot write ${quote(sym)} = $regStr""")
             case _ =>
-              quote(reg)
+              emit(s"""$pre ${quote(sym)} = $regStr;""")
           }
-          regType(reg) match {
-            case Regular =>
-              regIdx match {
-                case -1 =>
-                  emit(s"""//Cannot write ${quote(sym)} = $regStr""")
-                case _ =>
-                  emit(s"""$pre ${quote(sym)} = $regStr;""")
-              }
-            case _ =>
-              emit(s"""$pre ${quote(sym)} = $regStr;""")        
-          }
+        case _ =>
+          emit(s"""$pre ${quote(sym)} = $regStr;""")        
       }
 
 

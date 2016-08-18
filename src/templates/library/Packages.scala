@@ -28,6 +28,8 @@ trait LibGenPackages extends BaseGenPackages with BaseGenOps {
     stream.println("    main()")
     stream.println("  }")
     stream.println()
+    stream.println("abstract class " + dsl + "AppInterpreter extends " + dsl + "ApplicationInterpreter")
+    stream.println()
 
     emitBlockComment("Dismabiguations for interpreter mode", stream, indent=2)
     for (opsGrp <- opsGrps if !isTpeClass(opsGrp.grp) && !isTpeClassInst(opsGrp.grp)) {

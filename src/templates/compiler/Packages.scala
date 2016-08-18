@@ -18,6 +18,7 @@ trait DeliteGenPackages extends BaseGenPackages with BaseGenTraversals {
   def emitApplicationRunner(stream: PrintWriter) {
     stream.println("trait " + dsl + "ApplicationCompilerTrait extends " + dsl + "Application with DeliteApplication with " + dsl+"Compiler")
     stream.println("abstract class " + dsl + "ApplicationCompiler extends " + dsl + "ApplicationCompilerTrait") //with DeliteApplication with " + dsl+"Compiler")
+    stream.println("abstract class " + dsl + "AppCompiler extends " + dsl + "ApplicationCompiler")
   }
 
   def targetName(g: CodeGenerator) = g match {

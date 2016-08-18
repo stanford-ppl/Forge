@@ -52,6 +52,8 @@ trait BaseGenPackages extends ForgeCodeGenBase {
 
     stream.println("  def main()")
     stream.println("}")
+
+    stream.println("trait " + dsl + "App extends " + dsl + "Application")
   }
 
   def emitDSLPackageDefinitionsBase(opsGrps: List[DSLOps], stream: PrintWriter) {

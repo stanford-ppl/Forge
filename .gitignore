@@ -24,3 +24,8 @@ published
 
 # PDIPSolver specific
 data/PDIPSolver/*.dat
+
+apps/Spatial
+extern/Spatial
+src/dsls/spatial
+static/Spatial

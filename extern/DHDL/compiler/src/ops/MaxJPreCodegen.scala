@@ -106,6 +106,8 @@ trait MaxJPreCodegen extends Traversal  {
     				emitSeqSM(s"${quote(sym)}", childrenOf(sym).size)
 					}
 			}
+      bram_redloop_map += acc -> accum // acc is alias for accum
+
 
     case e@ParPipeForeach(cc, func, inds) =>
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {
@@ -121,8 +123,7 @@ trait MaxJPreCodegen extends Traversal  {
 			}
     case e@ParPipeReduce(cchain, accum, func, rFunc, inds, acc, rV) =>
       // quoteSuffix += c.asInstanceOf[Sym[Any]] -> localSuffixMap
-      fold_in_out_accums += acc -> accum // acc is alias for accum
-      Console.println(s"foldin ${fold_in_out_accums}\n")
+      bram_redloop_map += acc -> accum // acc is alias for accum
 
     case e@Unit_pipe(func) =>
 			styleOf(sym.asInstanceOf[Rep[Pipeline]]) match {

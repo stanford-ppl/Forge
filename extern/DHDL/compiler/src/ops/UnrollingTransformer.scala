@@ -10,6 +10,19 @@ import dhdl.compiler.ops._
 
 trait UnrollingTransformExp extends ReductionAnalysisExp with LoweredPipeOpsExp with MemoryAnalysisExp {
   this: DHDLExp =>
+
+  case class UnrolledResult(isIt: Boolean) extends Metadata
+  object isReduceResult {
+    def update(e: Exp[Any], isIt: Boolean) { setMetadata(e, UnrolledResult(isIt)) }
+    def apply(e: Exp[Any]) = meta[UnrolledResult](e).map(_.isIt).getOrElse(false)
+  }
+
+  case class ReduceStarter(isIt: Boolean) extends Metadata
+  object isReduceStarter {
+    def update(e: Exp[Any], isIt: Boolean) { setMetadata(e, ReduceStarter(isIt)) }
+    def apply(e: Exp[Any]) = meta[UnrolledResult](e).map(_.isIt).getOrElse(false)
+  }
+
 }
 
 trait UnrollingTransformer extends MultiPassTransformer {
@@ -229,6 +242,9 @@ trait UnrollingTransformer extends MultiPassTransformer {
     newPipe
   }
 
+
+
+
   // TODO: General (more expensive) case for when no zero is given
   def unrollReduce[A:Manifest:Num](node: Exp[Any], accum: Exp[Any], inputs: List[Exp[A]], valids: List[Exp[Bit]], zero: Option[Exp[A]], rFunc: Block[A], newIdx: Exp[Index], ld: Block[A], st: Block[Unit], idx: Exp[Index], res: Exp[A], rV: (Sym[A],Sym[A])) = {
     def reduce(x: Exp[A], y: Exp[A]) = withSubstScope(rV._1 -> x, rV._2 -> y){ inlineBlock(rFunc) }
@@ -247,7 +263,12 @@ trait UnrollingTransformer extends MultiPassTransformer {
     }{
       withSubstScope(idx -> newIdx){ inlineBlock(ld) }
     }
+
     val newRes = reduce(treeResult, accumLoad)
+    isReduceResult(newRes) = true
+    isReduceStarter(accumLoad) = true
+    Console.println(s"isStarter $accumLoad ? ${isReduceStarter(accumLoad)}. idx ${idx}")
+
 
     duringClone{e => if (SpatialConfig.genCGRA) reduceType(e) = None }{
       withSubstScope(res -> newRes, idx -> newIdx){ inlineBlock(st) }

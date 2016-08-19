@@ -227,7 +227,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
   val IR: LoweredPipeOpsExp with ControllerTemplateOpsExp with TpesOpsExp with ParallelOpsExp
           with PipeOpsExp with OffChipMemOpsExp with RegOpsExp with ExternCounterOpsExp
           with ExternPrimitiveOpsExp with DHDLCodegenOps with NosynthOpsExp with MemoryAnalysisExp with FIFOOpsExp with VectorOpsExp
-          with DeliteTransform with ReductionAnalysisExp
+          with DeliteTransform with ReductionAnalysisExp with UnrollingTransformExp
   import IR.{println=>_,_}
 
   override def remap[A](m: Manifest[A]): String = m.erasure.getSimpleName match {
@@ -308,7 +308,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
   }
 
   def bramLoad(sym: Sym[Any], bram_in: Exp[BRAM[Any]], addr: Exp[Any], par: Boolean = false) {
-    val bram = if (fold_in_out_accums.contains(bram_in)) {fold_in_out_accums(bram_in)} else {bram_in}
+    val bram = if (bram_redloop_map.contains(bram_in)) {bram_redloop_map(bram_in)} else {bram_in}
     emitComment("Bram_load {")
     val bnd = bram match {
       case Def(rhs) => false
@@ -480,7 +480,7 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 
   def bramStore(sym: Sym[Any], bram_in: Exp[BRAM[Any]], addr: Exp[Any], value: Exp[Any]) {
     emitComment("Bram_store {")
-    val bram = if (fold_in_out_accums.contains(bram_in)) {fold_in_out_accums(bram_in)} else {bram_in}
+    val bram = if (bram_redloop_map.contains(bram_in)) {bram_redloop_map(bram_in)} else {bram_in}
     val dataStr = quote(value)
     val dups = duplicatesOf(bram)
 
@@ -667,34 +667,41 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 //      emitComment("Offchip store from fifo")
 
     case Reg_new(init) =>
-      withStream(baseStream) {
-        emitComment("Reg_new {")
-        val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
-        val duplicates = duplicatesOf(sym)
-        val rstVal = resetValue(sym.asInstanceOf[Sym[Reg[Any]]]) match {
-          case ConstFix(rv) => rv
-          case ConstFlt(rv) => rv
-        }
-        duplicates.zipWithIndex.foreach { case (d, i) =>
-          regType(sym) match {
-            case Regular =>
-              val parent = if (parentOf(sym).isEmpty) "top" else quote(parentOf(sym).get) //TODO
-              if (d.depth > 1) {
-                emit(s"""DblBufReg ${quote(sym)}_${i}_lib = new DblBufReg(this, $ts, "${quote(sym)}_${i}", ${parOf(sym)}, new Bits(${quote(ts)}.getTotalBits(), $rstVal));""")
-                val readstr = if (parOf(sym)>1) "readv" else "read"
-                emit(s"""${maxJPre(sym)} ${quote(sym)}_$i = ${quote(sym)}_${i}_lib.${readstr}();""")
-                emit(s"""${maxJPre(sym)} ${quote(sym)}_${i}_delayed = ${ts}.newInstance(this);""")
-                regs += ((sym.asInstanceOf[Sym[Reg[Any]]], i))
-              } else {
-                emit(s"""DelayLib ${quote(sym)}_${i}_lib = new DelayLib(this, ${quote(ts)}, new Bits(${quote(ts)}.getTotalBits(), $rstVal));""")
-                val readstr = if (parOf(sym) > 1) "readv" else "read"
-                emit(s"""${maxJPre(sym)} ${quote(sym)}_$i = ${quote(sym)}_${i}_lib.${readstr}();""")
-                emit(s"""${maxJPre(sym)} ${quote(sym)}_${i}_delayed = ${ts}.newInstance(this);""")
-              }
-            case _ => throw new Exception(s"""Unknown reg type ${regType(sym)}""")
+      if (!bram_redloop_map.contains(sym)) {
+        withStream(baseStream) {
+          emitComment("Reg_new {")
+          val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
+          val duplicates = duplicatesOf(sym)
+          val rstVal = resetValue(sym.asInstanceOf[Sym[Reg[Any]]]) match {
+            case ConstFix(rv) => rv
+            case ConstFlt(rv) => rv
           }
+          duplicates.zipWithIndex.foreach { case (d, i) =>
+            regType(sym) match {
+              case Regular =>
+                (reduceType(sym), i) match {
+                  case (Some(fps: ReduceFunction), 0) =>
+                    // Assume only duplicate 1 needs reg_lib if this is reducetype
+                  case _ =>
+                    val parent = if (parentOf(sym).isEmpty) "top" else quote(parentOf(sym).get) //TODO
+                    if (d.depth > 1) {
+                      emit(s"""DblBufReg ${quote(sym)}_${i}_lib = new DblBufReg(this, $ts, "${quote(sym)}_${i}", ${parOf(sym)}, new Bits(${quote(ts)}.getTotalBits(), $rstVal));""")
+                      val readstr = if (parOf(sym)>1) "readv" else "read"
+                      emit(s"""${maxJPre(sym)} ${quote(sym)}_$i = ${quote(sym)}_${i}_lib.${readstr}();""")
+                      emit(s"""${maxJPre(sym)} ${quote(sym)}_${i}_delayed = ${ts}.newInstance(this);""")
+                      regs += ((sym.asInstanceOf[Sym[Reg[Any]]], i))
+                    } else {
+                      emit(s"""DelayLib ${quote(sym)}_${i}_lib = new DelayLib(this, ${quote(ts)}, new Bits(${quote(ts)}.getTotalBits(), $rstVal));""")
+                      val readstr = if (parOf(sym) > 1) "readv" else "read"
+                      emit(s"""${maxJPre(sym)} ${quote(sym)}_$i = ${quote(sym)}_${i}_lib.${readstr}();""")
+                      emit(s"""${maxJPre(sym)} ${quote(sym)}_${i}_delayed = ${ts}.newInstance(this);""")
+                    }
+                }
+              case _ => throw new Exception(s"""Unknown reg type ${regType(sym)}""")
+            }
+          }
+          emitComment("Reg_new }")
         }
-        emitComment("Reg_new }")
       }
 
     case Argin_new(init) =>
@@ -707,159 +714,148 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
     case Argout_new(init) => //emitted in reg_write
 
     case e@Reg_read(reg) =>
-      val pre = maxJPre(sym)
-      val regIdx = if (readersOf(reg).map{_._3}.indexOf(sym) > duplicatesOf(reg).length - 1) {
-        duplicatesOf(reg).length - 1
-      } else {
-        readersOf(reg).map{_._3}.indexOf(sym)
-      }
-      // val regIdx = instanceIndexOf(sym, reg)
-      val regStr = regType(reg) match {
-        case Regular =>
-          val suffix = if (!controlNodeStack.isEmpty) {
-            val Def(EatReflect(curPipe)) = controlNodeStack.top
-            curPipe match {
-                case n: ParPipeReduce[_,_] => if (n.acc == reg) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
-                case Unit_pipe(_) => if (isAccum(reg) && writtenIn(controlNodeStack.top).contains(reg)) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
-                case _ => ""
+      if (! bram_redloop_map.contains(reg)) { // Hack to check if this is reduction read
+        val pre = maxJPre(sym)
+        val regIdx = if (readersOf(reg).map{_._3}.indexOf(sym) > duplicatesOf(reg).length - 1) {
+          duplicatesOf(reg).length - 1
+        } else {
+          readersOf(reg).map{_._3}.indexOf(sym)
+        }
+        // val regIdx = instanceIndexOf(sym, reg)
+        val regStr = regType(reg) match {
+          case Regular =>
+            val suffix = if (!controlNodeStack.isEmpty) {
+              val Def(EatReflect(curPipe)) = controlNodeStack.top
+              curPipe match {
+                  case n: ParPipeReduce[_,_] => if (n.acc == reg) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
+                  case Unit_pipe(_) => if (isAccum(reg) && writtenIn(controlNodeStack.top).contains(reg)) "_delayed" else ""   // Use the delayed (stream-offset) version inside reduce
+                  case _ => ""
+              }
+            } else {
+              ""
             }
-          } else {
-            ""
-          }
-          quote(reg) + s"_${regIdx}" + suffix
-        case _ =>
-          quote(reg)
-      }
-      regType(reg) match {
-        case Regular =>
-          regIdx match {
-            case -1 =>
-              emit(s"""//Cannot write ${quote(sym)} = $regStr""")
-            case _ =>
-              emit(s"""$pre ${quote(sym)} = $regStr;""")
-          }
-        case _ =>
-          emit(s"""$pre ${quote(sym)} = $regStr;""")        
-      }
-
-
-    case e@Reg_write(reg, value) =>
-      reduceType(sym) match {
-        case Some(fps: ReduceFunction) => // Optimize for FixPt accum
-          emitComment("Reg_write, accum specialization {")
-          if (writersOf(reg).isEmpty)
-              throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
-          val writer = writersOf(reg).head._1  // Regs have unique writer which also drives reset
-          val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
-          val duplicates = duplicatesOf(reg)
-          val numDuplicates = duplicatesOf(reg).length
-          duplicates.zipWithIndex.foreach { case (dup, ii) =>
-            val regname = s"${quote(reg)}_${ii}"
-            val rstStr = quote(parentOf(reg).get) + "_rst_en"
-            val enStr = writer match {
-              case p@Def(EatReflect(pipe:Pipe_foreach)) => styleOf(p) match {
-                case InnerPipe => quote(p) + "_datapath_en"
-                case _ => quote(p) + "_en"
-              }
-              case p@Def(EatReflect(pipe:Pipe_fold[_,_])) => styleOf(p) match {
-                case InnerPipe => quote(p) + "_datapath_en"
-                case _ => quote(p) + "_en"
-              }
-              case p@Def(EatReflect(pipe:ParPipeReduce[_,_])) => styleOf(p) match {
-                case InnerPipe => quote(p) + "_datapath_en"
-                case _ => quote(p) + "_en"
-              }
-              case p@Def(EatReflect(Unit_pipe(func))) => styleOf(p) match {
-                case InnerPipe => quote(p) + "_datapath_en"
-                case _ => quote(p) + "_en"
-              }
-              case p@_ =>
-                          emit(s"// Reg ${quote(reg)} is written by non Pipe node ${quote(p)}")
-                          "constant.var(true)"
+            quote(reg) + s"_${regIdx}" + suffix
+          case _ =>
+            quote(reg)
+        }
+        regType(reg) match {
+          case Regular =>
+            regIdx match {
+              case -1 =>
+                emit(s"""//Cannot write ${quote(sym)} = $regStr""")
+              case _ =>
+                if (!(isAccum(reg) & instanceIndexOf(sym, reg) == 0)) {emit(s"""$pre ${quote(sym)} = $regStr;""")}
             }
-
-
-            emit(s"""DFEVar ${regname}_en = $enStr & ${quote(writer)}_redLoop_done;""")
-            emit(s"""Accumulator.Params ${regname}_accParams = Reductions.accumulator.makeAccumulatorConfig(${ts}).withClear($rstStr).withEnable(${regname}_en);""")
-            emit(s"""DFEVar ${regname}_hold = Reductions.accumulator.makeAccumulator(${quote(value)}, ${quote(regname)}_accParams);""")
-            emit(s"""DFEVar ${quote(regname)} = ${quote(regname)}_hold;""")
-          }
-          emitComment(s"} Reg_write accum specialization // regType ${regType(reg)}, numDuplicates = $numDuplicates")
-        case _ =>
-          emitComment("Reg_write {")
-          if (writersOf(reg).isEmpty)
-              throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
-          val writer = writersOf(reg).head._1  // Regs have unique writer which also drives reset
-          val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
-          val duplicates = duplicatesOf(reg)
-          val numDuplicates = duplicatesOf(reg).length
-          regType(reg) match {
-            case ArgumentOut =>
-              val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"
-              emit(s"""io.scalarOutput("${quote(reg)}", ${quote(value)}, $ts, $controlStr);""")
-            case _ =>
-              (0 until numDuplicates) foreach { ii =>
-                val regname = s"${quote(reg)}_${ii}"
-                if (isAccum(reg)) {
-                  regType(reg) match {
-                    case Regular =>
-                      val rstStr = quote(parentOf(reg).get) + "_rst_en"
-                      val enStr = writer match {
-                        case p@Def(EatReflect(pipe:Pipe_foreach)) => styleOf(p) match {
-                          case InnerPipe => quote(p) + "_datapath_en"
-                          case _ => quote(p) + "_en"
-                        }
-                        case p@Def(EatReflect(pipe:Pipe_fold[_,_])) => styleOf(p) match {
-                          case InnerPipe => quote(p) + "_datapath_en"
-                          case _ => quote(p) + "_en"
-                        }
-                        case p@Def(EatReflect(pipe:ParPipeReduce[_,_])) => styleOf(p) match {
-                          case InnerPipe => quote(p) + "_datapath_en"
-                          case _ => quote(p) + "_en"
-                        }
-                        case p@Def(EatReflect(Unit_pipe(func))) => styleOf(p) match {
-                          case InnerPipe => quote(p) + "_datapath_en"
-                          case _ => quote(p) + "_en"
-                        }
-                        case p@_ =>
-                                    emit(s"// Reg ${quote(reg)} is written by non Pipe node ${quote(p)}")
-                                    "constant.var(true)"
-                      }
-
-
-                      emit(s"""DFEVar ${regname}_en = $enStr & ${quote(writer)}_redLoop_done;""")
-                      emit(s"""${regname}_lib.write(${quote(value)}, ${regname}_en, $rstStr);""")
-                      emit(s"""${regname}_delayed <== stream.offset(${regname}, -${quote(writer)}_offset);""")
-                      // If nameOf(sym) is to be used, mix in NameOpsExp. This shouldn't have to be done by hand,
-                      // so disabling using nameOf until it is fixed.
-                    case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
-                    case ArgumentOut => throw new Exception(s"""ArgOut (${quote(reg)}) cannot be used as an accumulator!""")
-                  }
-                } else { // Non-accumulator registers
-                  regType(reg) match {
-                    case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
-                    case Regular =>
-                      val rstStr = quote(parentOf(reg).get) + "_rst_en"
-    //                  emit(s"""${regname}_lib.write(${quote(value)}, constant.var(true), $rstStr);""")
-                      if (duplicates(ii).depth > 1) {
-                        emit(s"""${regname}_lib.write(${quote(value)}, ${quote(writer)}_done, constant.var(false));""")
-                      } else {
-                        // Using an enable signal instead of "always true" is causing an illegal loop.
-                        // Using a reset signal instead of "always false" is causing an illegal loop.
-                        // These signals don't matter for pass-through registers anyways.
-                        emit(s"""${regname}_lib.write(${quote(value)}, constant.var(true), constant.var(false));""")
-                      }
-                  }
-                }
-              }
-          }
-          emitComment(s"} Reg_write // regType ${regType(reg)}, numDuplicates = $numDuplicates")
+          case _ =>
+            emit(s"""$pre ${quote(sym)} = $regStr;""")        
+        }
+        } else {
+          emit(s"""// ${quote(sym)} is just a register read""")
         }
 
+    case e@Reg_write(pre_reg, value) =>
+      val reg = aliasOf(pre_reg)
+      if (!bram_redloop_map.contains(reg)) {
+        emitComment("Reg_write {")
+        if (writersOf(reg).isEmpty)
+            throw new Exception(s"Reg ${quote(reg)} is not written by a controller, which is not supported at the moment")
+        val writer = writersOf(reg).head._1  // Regs have unique writer which also drives reset
+        val ts = tpstr(parOf(reg))(reg.tp.typeArguments.head, implicitly[SourceContext])
+        val duplicates = duplicatesOf(reg)
+        val numDuplicates = duplicatesOf(reg).length
+        regType(reg) match {
+          case ArgumentOut =>
+            val controlStr = if (parentOf(reg).isEmpty) s"top_done" else quote(parentOf(reg).get) + "_done"
+            emit(s"""io.scalarOutput("${quote(reg)}", ${quote(value)}, $ts, $controlStr);""")
+          case _ =>
+            if (isAccum(reg)) {
+              regType(reg) match {
+                case Regular =>
+                  val rstStr = quote(parentOf(reg).get) + "_rst_en"
+                  writer match {
+                    case p@Def(EatReflect(pipe:Pipe_foreach)) => 
+                      throw new Exception(s"How do you have a foreach with an accumulator?")
+                    case p@Def(EatReflect(pipe:Pipe_fold[_,_])) => 
+                      val enstr = styleOf(p) match {
+                        case InnerPipe => emit(s"""DFEVar ${quote(reg)}_en = ${quote(p)}_datapath_en & ${quote(writer)}_redLoop_done;""")
+                        case _ => emit(s"""DFEVar ${quote(reg)}_en = ${quote(p)}_en & ${quote(writer)}_redLoop_done;""")
+                      }
+                      reduceType(reg) match {
+                        case Some(fps: ReduceFunction) => fps match {
+                          case FixPtSum =>
+                            emit(s"""Accumulator.Params ${quote(reg)}_accParams = Reductions.accumulator.makeAccumulatorConfig($ts).withClear(${rstStr}).withEnable(${quote(reg)}_en);""")
+                            emit(s"""DFEVar ${quote(reg)}_hold = Reductions.accumulator.makeAccumulator(${quote(value)}, ${quote(reg)}_accParams);""")
+                            emit(s"""DFEVar ${quote(reg)} = ${quote(reg)}_hold;""")
+                          case FltPtSum =>
+                            emit(s"""DFEVar ${reg} = FloatingPointAccumulator.accumulateWithReset(${pipe.rV}, ${quote(reg)}_en, $rstStr);""")
+                        }
+                        emit(s"""${quote(reg)}_1_lib.write(${quote(reg)}, ${quote(writer)}_done, constant.var(false));""")
+                      }
+                    case p@Def(EatReflect(pipe:ParPipeReduce[_,_])) => 
+                      val enstr = styleOf(p) match {
+                        case InnerPipe => emit(s"""DFEVar ${quote(reg)}_en = ${quote(p)}_datapath_en & ${quote(writer)}_redLoop_done;""")
+                        case _ => emit(s"""DFEVar ${quote(reg)}_en = ${quote(p)}_en & ${quote(writer)}_redLoop_done;""")
+                      }
+                      reduceType(reg) match {
+                        case Some(fps: ReduceFunction) => fps match {
+                          case FixPtSum =>
+                            emit(s"""Accumulator.Params ${quote(reg)}_accParams = Reductions.accumulator.makeAccumulatorConfig($ts).withClear(${rstStr}).withEnable(${quote(reg)}_en);""")
+                            emit(s"""DFEVar ${quote(reg)}_hold = Reductions.accumulator.makeAccumulator(${quote(value)}, ${quote(reg)}_accParams);""")
+                            emit(s"""DFEVar ${quote(reg)} = ${quote(reg)}_hold;""")
+                          case FltPtSum =>
+                            emit(s"""DFEVar ${reg} = FloatingPointAccumulator.accumulateWithReset(${pipe.rV}, ${quote(reg)}_en, $rstStr);""")
+                        }
+                        emit(s"""${quote(reg)}_1_lib.write(${quote(reg)}, ${quote(writer)}_done, constant.var(false));""")
+                      }
+                    case p@Def(EatReflect(Unit_pipe(func))) =>
+                      val enstr = styleOf(p) match {
+                        case InnerPipe => emit(s"""DFEVar ${quote(reg)}_en = ${quote(writer)}_rst_en;""")
+                        case _ => emit(s"""DFEVar ${quote(reg)}_en = ${quote(p)}_en & ${quote(writer)}_redLoop_done;""")
+                      }
+                      reduceType(reg) match {
+                        case Some(fps: ReduceFunction) => fps match {
+                          case FixPtSum =>
+                            emit(s"""Accumulator.Params ${quote(reg)}_accParams = Reductions.accumulator.makeAccumulatorConfig($ts).withClear(${rstStr}).withEnable(${quote(reg)}_en);""")
+                            emit(s"""DFEVar ${quote(reg)}_hold = Reductions.accumulator.makeAccumulator(${quote(value)}, ${quote(reg)}_accParams);""")
+                            emit(s"""DFEVar ${quote(reg)} = ${quote(reg)}_hold;""")
+                          case FltPtSum =>
+                            emit(s"""DFEVar ${reg} = FloatingPointAccumulator.accumulateWithReset(${quote(value)}, ${quote(reg)}_en, $rstStr);""")
+                        }
+                        emit(s"""${quote(reg)}_1_lib.write(${quote(reg)}, ${quote(writer)}_done, constant.var(false));""")
+                      }
+
+                    case _ =>
+                        emit(s"DFEVar ${quote(reg)}_en = constant.var(true)")
+                  }
+                case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
+                case ArgumentOut => throw new Exception(s"""ArgOut (${quote(reg)}) cannot be used as an accumulator!""")
+              }
+            } else { // Non-accumulator registers
+              (0 until numDuplicates) foreach { ii =>
+                val regname = s"${quote(reg)}_${ii}"
+                regType(reg) match {
+                  case ArgumentIn => new Exception("Cannot write to ArgIn " + quote(reg) + "!")
+                  case Regular =>
+                    val rstStr = quote(parentOf(reg).get) + "_rst_en"
+  //                  emit(s"""${regname}_lib.write(${quote(value)}, constant.var(true), $rstStr);""")
+                    if (duplicates(ii).depth > 1) {
+                      emit(s"""${regname}_lib.write(${quote(value)}, ${quote(writer)}_done, constant.var(false));""")
+                    } else {
+                      // Using an enable signal instead of "always true" is causing an illegal loop.
+                      // Using a reset signal instead of "always false" is causing an illegal loop.
+                      // These signals don't matter for pass-through registers anyways.
+                      emit(s"""${regname}_lib.write(${quote(value)}, constant.var(true), constant.var(false));""")
+                    }
+                }
+              }
+            }
+        }
+        emitComment(s"} Reg_write // regType ${regType(reg)}, numDuplicates = $numDuplicates")
+      }
 
     case Bram_new(size, zero) =>
       withStream(baseStream) {
-        if (!fold_in_out_accums.contains(sym)) { // Only emit for non-bound syms
+        if (!bram_redloop_map.contains(sym)) { // Only emit for non-bound syms
           emitComment("Bram_new {")
           val ts = tpstr(parOf(sym))(sym.tp.typeArguments.head, implicitly[SourceContext])
           //TODO: does templete assume bram has 2 dimension?
@@ -1022,4 +1018,5 @@ trait MaxJGenMemoryTemplateOps extends MaxJGenEffect with MaxJGenFat with MaxJGe
 
     case _ => super.emitNode(sym, rhs)
   }
+
 }

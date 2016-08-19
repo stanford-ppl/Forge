@@ -165,10 +165,11 @@ trait MaxJGenLoweredPipeOps extends MaxJGenControllerTemplateOps {
             case Par_bram_store(bram, addr, value) =>
               emitNode(bram.asInstanceOf[Sym[Any]], Par_bram_store(accum.asInstanceOf[Sym[BRAM[Any]]], addr, value))
           }
+        /* NOT SURE WHAT THIS SECTION DOES! -Matt*/
         case Reg_new(init) =>
-          (0 until duplicatesOf(accum).size) foreach { i =>
-            emit(s"""${quote(accum)}_${i}_lib.write(${quote(acc)}_0, constant.var(true), constant.var(false));""")
-          }
+        //   (0 until duplicatesOf(accum).size) foreach { i =>
+        //     emit(s"""${quote(accum)}_${i}_lib.write(${quote(acc)}_0, constant.var(true), constant.var(false));""")
+        //   }
         case _ =>
           throw new Exception(s"""Unknown accum in ParPipeReduce on ${dp}!""")          
       }

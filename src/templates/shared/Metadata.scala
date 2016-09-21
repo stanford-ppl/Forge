@@ -88,6 +88,8 @@ trait BaseGenMetadata extends ForgeCodeGenBase {
         stream.println("    }")
       }
 
+      stream.println("    override def isExistential: Boolean = " + impl.existential)
+
       stream.println("  }")
     }
   }

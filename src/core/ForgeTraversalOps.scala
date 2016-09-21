@@ -95,6 +95,7 @@ trait ForgeTraversalOps extends Base {
   def canMeet(meta: Rep[DSLMetadata], alias: MetaMeet = any)(rule: Rep[String]): Rep[Unit] = forge_canMeet(meta,alias,rule)
   def matches(meta: Rep[DSLMetadata])(rule: Rep[String]): Rep[Unit] = forge_matches(meta, rule)
   def isComplete(meta: Rep[DSLMetadata])(rule: Rep[String]): Rep[Unit] = forge_complete(meta, rule)
+  def isExistential(meta: Rep[DSLMetadata], flag: Boolean): Rep[Unit] = forge_existential(meta, flag)
 
   def defaultMetadata(tpe: Rep[DSLType])(rule: Rep[String]): Rep[Unit] = forge_default_metadata(tpe, rule)
 
@@ -128,6 +129,7 @@ trait ForgeTraversalOps extends Base {
   def forge_canMeet(m: Rep[DSLMetadata], func: MetaMeet, rule: Rep[String]): Rep[Unit]
   def forge_matches(m: Rep[DSLMetadata], rule: Rep[String]): Rep[Unit]
   def forge_complete(m: Rep[DSLMetadata], rule: Rep[String]): Rep[Unit]
+  def forge_existential(m: Rep[DSLMetadata], isExistential: Boolean): Rep[Unit]
   def forge_default_metadata(tpe: Rep[DSLType], rule: Rep[String]): Rep[Unit]
 }
 
@@ -369,7 +371,8 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
     val meet: HashMap[MetaMeet,Rep[String]],
     val canMeet: HashMap[MetaMeet,Rep[String]],
     var matches: Option[Rep[String]],
-    var complete: Option[Rep[String]]
+    var complete: Option[Rep[String]],
+    var existential: Boolean = true
   )
   object MetaOps {
     def empty = MetaOps(HashMap[MetaMeet,Rep[String]](), HashMap[MetaMeet,Rep[String]](), None, None)
@@ -425,6 +428,16 @@ trait ForgeTraversalOpsExp extends ForgeTraversalSugar with BaseExp {
       warn("Overwriting isComplete rule on metadata type " + m.name)
 
     MetaImpls(m).complete = Some(rule)
+    ()
+  }
+  def forge_existential(m: Rep[DSLMetadata], isExistential: Boolean): Rep[Unit] = {
+    if (!isMetaType(m))
+      err("isExistential can only be defined on metadata types")
+
+    if (!MetaImpls.contains(m))
+      MetaImpls(m) = MetaOps.empty
+
+    MetaImpls(m).existential = isExistential
     ()
   }
 

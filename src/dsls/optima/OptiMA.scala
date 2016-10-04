@@ -101,6 +101,6 @@ trait OptiMADSL extends ForgeApplication
 
     val Prop = analyzer("TestPropagation") // Default propagation rules
     schedule(Prop)
-    schedule(IRPrinterPlus)
+    schedule(IRPrinter)
   }
 }

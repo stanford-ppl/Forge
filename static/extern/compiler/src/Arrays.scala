@@ -195,4 +195,6 @@ trait DotGenForgeArrayBufferOps
 trait DotGenForgeArrayOps
 trait MaxJGenForgeArrayBufferOps
 trait MaxJGenForgeArrayOps
+trait ChiselGenForgeArrayBufferOps
+trait ChiselGenForgeArrayOps
 

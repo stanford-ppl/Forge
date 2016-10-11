@@ -75,3 +75,4 @@ trait OpenCLGenForgeHashMapOps
 trait CGenForgeHashMapOps extends CGenDeliteMapOps
 trait DotGenForgeHashMapOps
 trait MaxJGenForgeHashMapOps
+trait ChiselGenForgeHashMapOps

@@ -17,6 +17,7 @@ trait OpenCLGenTestsOps
 trait CGenTestsOps
 trait DotGenTestsOps
 trait MaxJGenTestsOps
+trait ChiselGenTestsOps
 
 trait ForgeTestRunnerCompiler extends ForgeTestModule with TestsOpsExp with DeliteTestRunner {
   // everything inherited from DeliteTestRunner

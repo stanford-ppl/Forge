@@ -70,6 +70,7 @@ trait CudaGenInputOutputOps
 trait OpenCLGenInputOutputOps
 trait DotGenInputOutputOps
 trait MaxJGenInputOutputOps
+trait ChiselGenInputOutputOps
 trait CGenInputOutputOps extends CGenDeliteFileReaderOps with CGenDeliteFileWriterOps {
   val IR: InputOutputOpsExp
 }

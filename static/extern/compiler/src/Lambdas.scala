@@ -14,3 +14,4 @@ trait CudaGenLambdaOps extends CudaGenFunctions
 trait OpenCLGenLambdaOps extends OpenCLGenFunctions
 trait DotGenLambdaOps
 trait MaxJGenLambdaOps
+trait ChiselGenLambdaOps

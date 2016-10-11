@@ -11,4 +11,5 @@ trait OpenCLGenForgeMetadataOps
 trait CGenForgeMetadataOps
 trait DotGenForgeMetadataOps
 trait MaxJGenForgeMetadataOps
+trait ChiselGenForgeMetadataOps
 

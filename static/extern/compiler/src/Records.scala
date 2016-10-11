@@ -31,3 +31,4 @@ trait OpenCLGenRecordOps extends OpenCLGenDeliteStruct { val IR: RecordOpsExp wi
 trait CGenRecordOps extends CGenDeliteStruct { val IR: RecordOpsExp with DeliteOpsExp }
 trait DotGenRecordOps
 trait MaxJGenRecordOps
+trait ChiselGenRecordOps

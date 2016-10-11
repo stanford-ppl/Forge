@@ -40,6 +40,7 @@ trait CudaGenProfilingOps
 trait OpenCLGenProfilingOps
 trait DotGenProfilingOps
 trait MaxJGenProfilingOps
+trait ChiselGenProfilingOps
 
 trait CGenProfilingOps extends CGenEffect {
   val IR: ProfilingOpsExp

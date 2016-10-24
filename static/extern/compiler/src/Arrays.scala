@@ -37,6 +37,8 @@ trait ForgeArrayOpsExp extends DeliteArrayFatExp {
     = darray_take(__arg0,__arg1)
   def array_mkstring[A:Manifest](__arg0: Rep[ForgeArray[A]],__arg1: Rep[String])(implicit __imp0: SourceContext): Rep[String]
     = darray_mkstring(__arg0,__arg1)
+  def array_foreach[A:Manifest](__arg0: Rep[ForgeArray[A]], __arg1: Rep[A] => Rep[Unit])(implicit __imp0: SourceContext): Rep[Unit]
+    = darray_foreach(__arg0, __arg1)
   def array_map[T:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]], __arg1: Rep[T] => Rep[R])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]
     = darray_map(__arg0,__arg1)
   def array_flatmap[T:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]], __arg1: Rep[T] => Rep[ForgeArray[R]])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]

@@ -43,25 +43,23 @@ trait InputOutputWrapper extends HUMAN_DSL_NAMEBase {
     out.toArray
   }
 
-  def forge_filereader_readlines_chunk[A:Manifest](path: Rep[String], offset: Rep[Long], numBytes: Rep[Long], f: Rep[String] => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
+  def forge_filereader_readlines_chunk[A:Manifest](stream: Rep[ForgeFileInputStream], offset: Rep[Long], numBytes: Rep[Long], f: (Rep[String], Rep[String]) => Rep[A])(implicit ctx: SourceContext): Rep[ForgeArray[A]] = {
     val out = new ForgeArrayBuffer[A](0)
-    val input = DeliteFileInputStream.apply(Seq(path), offset = offset)
-    input.openAtNewLine(0)
-
-    var curPos = input.position
-    var line = ""
-    while (line != null && (curPos - offset) <= numBytes) {
-      line = forge_fileinputstream_readline(input)
-      if (line != null) array_buffer_append(out, f(line))
-      curPos = input.position
+    val input = stream.withOffset(offset)
+    input.openAtNewLine(0, numBytes)
+    while (!input.isEmpty) {
+      val location = input.getFileLocation
+      val line = input.readLine()
+      array_buffer_append(out, f(line, location))
     }
-
     input.close()
     out.toArray
   }
 
   def forge_fileinputstream_new(path: Rep[String])(implicit ctx: SourceContext): Rep[ForgeFileInputStream] = {
-    DeliteFileInputStream.apply(Seq(path)) //FIXME: leaving off apply causes scalac typer crash
+    val out = DeliteFileInputStream(Seq(path))
+    out.open()
+    out
   }
 
   def forge_fileinputstream_readline(stream: Rep[ForgeFileInputStream])(implicit ctx: SourceContext): Rep[String] = {

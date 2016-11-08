@@ -28,4 +28,4 @@ libraryDependencies += scalaTest
 parallelExecution in Test := false
 
 // disable publishing of main docs
-publishArtifact in (Compile, packageDoc) := false 
+publishArtifact in (Compile, packageDoc) := false

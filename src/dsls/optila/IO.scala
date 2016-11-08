@@ -43,9 +43,10 @@ trait IOOps {
     }
 
     // Lines can also be parsed with a custom delimiter (default whitespace)
-    direct (IO) ("readVectorAndParse", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseVector(Elem))) implements composite ${
+    direct (IO) ("readVectorAndParse", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> Elem),("delim",MString,"unit(\"\\s+\")"),("trim",MBoolean,"unit(true)")), DenseVector(Elem))) implements composite ${
       val a = ForgeFileReader.readLines($path){ line =>
-        val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
+        val input = if (trim) line.trim else line
+        val tokens = input.fsplit(delim, -1) // we preserve trailing empty values
         val tokenVector = densevector_fromarray(tokens, true)
         schemaBldr(tokenVector)
       }
@@ -53,17 +54,19 @@ trait IOOps {
     }
 
     // Simple version allows converting each element consistently
-    direct (IO) ("readMatrix", Elem, MethodSignature(List(("path",MString),("schemaBldr",MString ==> Elem),("delim",MString,"unit(\"\\s+\")")), DenseMatrix(Elem))) implements composite ${
+    direct (IO) ("readMatrix", Elem, MethodSignature(List(("path",MString),("schemaBldr",MString ==> Elem),("delim",MString,"unit(\"\\s+\")"),("trim",MBoolean,"unit(true)")), DenseMatrix(Elem))) implements composite ${
       val a = ForgeFileReader.readLinesFlattened($path){ line:Rep[String] =>
-        val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
+        val input = if (trim) line.trim else line
+        val tokens = input.fsplit(delim, -1) // we preserve trailing empty values
         array_fromfunction(tokens.length, i => schemaBldr(tokens(i)))
       }
-      val numCols = array_length(readFirstLine(path).trim.fsplit(delim, -1))
+      val input = if (trim) readFirstLine(path).trim else readFirstLine(path)
+      val numCols = array_length(input.fsplit(delim, -1))
       densematrix_fromarray(a, array_length(a) / numCols, numCols)
 
       // FIXME: i/o loops get split with this version, but not fused, so we end up with multiple i/o loops.
       // val a = ForgeFileReader.readLines($path) { line: Rep[String] =>
-      //   val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
+      //   val tokens = input.fsplit(delim, -1) // we preserve trailing empty values
       //   (0::array_length(tokens)) { i => schemaBldr(tokens(i)) }
       // }
       // DenseMatrix(densevector_fromarray(a, true))
@@ -71,14 +74,16 @@ trait IOOps {
 
     // This version allows parsing columns differently
     // Bad rows can be ignored by returning an empty vector (unless we get an exception during splitting -- we should handle that here)
-    direct (IO) ("readMatrixAndParse", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> DenseVector(Elem)),("delim",MString,"unit(\"\\s+\")")), DenseMatrix(Elem))) implements composite ${
+    direct (IO) ("readMatrixAndParse", Elem, MethodSignature(List(("path",MString),("schemaBldr",DenseVector(MString) ==> DenseVector(Elem)),("delim",MString,"unit(\"\\s+\")"),("trim",MBoolean,"unit(true)")), DenseMatrix(Elem))) implements composite ${
       val a = ForgeFileReader.readLinesFlattened($path){ line:Rep[String] =>
-        val tokens = line.trim.fsplit(delim, -1) // we preserve trailing empty values
+        val input = if (trim) line.trim else line
+        val tokens = input.fsplit(delim, -1) // we preserve trailing empty values
         val tokenVector = densevector_fromarray(tokens, true)
         val outRow = schemaBldr(tokenVector)
         outRow.toArray
       }
-      val numCols = schemaBldr(densevector_fromarray(readFirstLine(path).trim.fsplit(delim, -1), true)).length
+      val input = if (trim) readFirstLine(path).trim else readFirstLine(path)
+      val numCols = schemaBldr(densevector_fromarray(input.fsplit(delim, -1), true)).length
       densematrix_fromarray(a, array_length(a) / numCols, numCols)
     }
 
@@ -109,6 +114,11 @@ trait IOOps {
 
 
     // -- utility
+
+    direct (IO) ("fileLength", Nil, MString :: MLong, effect = simple) implements codegen($cala, ${
+      val f = new java.io.File($0)
+      f.length
+    })
 
     val deleteFile = direct (IO) ("deleteFile", Nil, MString :: MUnit, effect = simple)
     impl (deleteFile) (codegen($cala, ${

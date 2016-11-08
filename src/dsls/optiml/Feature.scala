@@ -56,10 +56,14 @@ trait FeatureOps {
       }
 
       // convert this feature value into an indicator or dummy variable encoding
+      // note that if the desired string is not one of the allowed values of the discrete feature,
+      // we indicate element 0 (thus possibly overcounting element 0). therefore, element 0 in the
+      // discrete feature should be used as "unknown" if unexpected values are possible, and is
+      // unreliable otherwise if an unexpected value is encountered.
       infix ("indicator") (MString :: DenseVector(MDouble)) implements composite ${
         val featureMap = getFeatures($self)
         val numKeys = fhashmap_size(featureMap)
-        val e = if (featureMap.contains($1)) featureMap($1).toDouble else 0.0
+        val e = if (featureMap.contains($1)) featureMap($1) else 0
         (0::numKeys) { i => if (i == e) 1.0 else 0.0 }
       }
 
@@ -190,13 +194,15 @@ trait FeatureOps {
     val DenseVector = lookupTpe("DenseVector")
     val Tup2 = lookupTpe("Tup2")
 
+    // -- Single-machine unique map. The map is currently stored in an embedded LevelDB.
+
     /* Return a unique integer identifier for a given string */
-    direct (FeatureHelper) ("unique", Nil, MString :: MInt) implements codegen($cala, ${
+    direct (FeatureHelper) ("unique", Nil, MString :: MInt, effect = simple) implements codegen($cala, ${
       MLGlobal.getId($0)
     })
 
     /* Lookup the string corresponding to a given unique integer identifier */
-    direct (FeatureHelper) ("reverseUnique", Nil, MInt :: MString) implements codegen($cala, ${
+    direct (FeatureHelper) ("reverseUnique", Nil, MInt :: MString, effect = simple) implements codegen($cala, ${
       MLGlobal.lookupId($0)
     })
 
@@ -208,11 +214,11 @@ trait FeatureOps {
     //   densevector_fromarray(data, true)
     // }
 
-    direct (FeatureHelper) ("getUniqueIds", Nil, Nil :: MArray(MInt)) implements codegen($cala, ${
+    direct (FeatureHelper) ("getUniqueIds", Nil, Nil :: MArray(MInt), effect = simple) implements codegen($cala, ${
       MLGlobal.getUniqueIds
     })
 
-    direct (FeatureHelper) ("getUniqueNames", Nil, Nil :: MArray(MString)) implements codegen($cala, ${
+    direct (FeatureHelper) ("getUniqueNames", Nil, Nil :: MArray(MString), effect = simple) implements codegen($cala, ${
       MLGlobal.getUniqueNames
     })
 

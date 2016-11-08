@@ -1,0 +1,281 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Misc &mdash; OptiML 0.1 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../genindex.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="OptiML 0.1 documentation" href="../index.html"/>
+        <link rel="up" title="Operations" href="../otherops.html"/>
+        <link rel="next" title="Primitive" href="primitive.html"/>
+        <link rel="prev" title="MLio" href="mlio.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> OptiML
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../typeclasses.html">Type Classes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../datastructs.html">Data Structures</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../objects.html">Objects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../primitives.html">Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../typeparams.html">Generic Methods</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../otherops.html">Operations</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="basicmath.html">BasicMath</a></li>
+<li class="toctree-l2"><a class="reference internal" href="classifier.html">Classifier</a></li>
+<li class="toctree-l2"><a class="reference internal" href="control.html">Control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fstring.html">FString</a></li>
+<li class="toctree-l2"><a class="reference internal" href="featurehelper.html">FeatureHelper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="io.html">IO</a></li>
+<li class="toctree-l2"><a class="reference internal" href="laio.html">LAio</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linalg.html">LinAlg</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlio.html">MLio</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Misc</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#related-methods">Related methods</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="primitive.html">Primitive</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rand.html">Rand</a></li>
+<li class="toctree-l2"><a class="reference internal" href="validate.html">Validate</a></li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../index.html">OptiML</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../otherops.html">Operations</a> &raquo;</li>
+      
+    <li>Misc</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../_sources/ops/misc.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="misc">
+<span id="id1"></span><h1>Misc<a class="headerlink" href="#misc" title="Permalink to this headline">¶</a></h1>
+<p>Miscellaneous operations, including assertions, console printing, and exception throwing.</p>
+<div class="section" id="related-methods">
+<h2>Related methods<a class="headerlink" href="#related-methods" title="Permalink to this headline">¶</a></h2>
+<pre class="literal-block">
+<span class="maroon">def</span> __ifThenElse(x: Rep[<a class="reference internal" href="boolean.html"><span class="doc">Boolean</span></a>], y:  =&gt; Rep[T], z:  =&gt; Rep[T]): Rep[T]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> __whileDo(x:  =&gt; Rep[<a class="reference internal" href="boolean.html"><span class="doc">Boolean</span></a>], y:  =&gt; Rep[Unit]): Rep[Unit]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> exit(x: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]): Rep[Nothing]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> fassert(cond: Rep[<a class="reference internal" href="boolean.html"><span class="doc">Boolean</span></a>], message: Rep[<a class="reference internal" href="string.html"><span class="doc">String</span></a>]): Rep[Unit]
+</pre>
+<p>If the condition is true, does nothing. If it is false, terminates the program with the specified exception message. Assertions are only evaluated in the library backend and during compiler debugging. Otherwise, they are ignored to enable more fusion and code motion opportunities.</p>
+<blockquote>
+<div><ul class="simple">
+<li><strong>cond</strong> - condition to be checked</li>
+<li><strong>message</strong> - exception message to be shown to the user if the assertion fails</li>
+</ul>
+</div></blockquote>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> fatal(x: Rep[<a class="reference internal" href="string.html"><span class="doc">String</span></a>]): Rep[Nothing]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> getMaxHeapSize(): Rep[<a class="reference internal" href="long.html"><span class="doc">Long</span></a>]
+</pre>
+<p>Returns the maximum heap size from the JVM</p>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> print(x: Rep[Any]): Rep[Unit]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> println(value: Rep[Any]): Rep[Unit]
+</pre>
+<p>Prints the specified value to the console <em>with</em> a newline. At runtime, this will attempt to use the toString method to cast the value to string if one exists</p>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> println(): Rep[Unit]
+</pre>
+<p>Prints a newline to the console</p>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="primitive.html" class="btn btn-neutral float-right" title="Primitive" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="mlio.html" class="btn btn-neutral" title="MLio" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016,Stanford PPL.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

@@ -1,0 +1,650 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>DenseMatrixView &mdash; OptiML 0.1 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../genindex.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="OptiML 0.1 documentation" href="../index.html"/>
+        <link rel="up" title="Data Structures" href="../datastructs.html"/>
+        <link rel="next" title="DenseTrainingSet" href="densetrainingset.html"/>
+        <link rel="prev" title="DenseMatrix" href="densematrix.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> OptiML
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../typeclasses.html">Type Classes</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../datastructs.html">Data Structures</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="binaryfeature.html">BinaryFeature</a></li>
+<li class="toctree-l2"><a class="reference internal" href="csrgraph.html">CSRGraph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="csrngbr.html">CSRNgbr</a></li>
+<li class="toctree-l2"><a class="reference internal" href="complex.html">Complex</a></li>
+<li class="toctree-l2"><a class="reference internal" href="computestream.html">ComputeStream</a></li>
+<li class="toctree-l2"><a class="reference internal" href="continuousfeature.html">ContinuousFeature</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ddfgfedge.html">DDFGFEdge</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ddfgffactor.html">DDFGFFactor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ddfgfvariable.html">DDFGFVariable</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ddfgfweight.html">DDFGFWeight</a></li>
+<li class="toctree-l2"><a class="reference internal" href="decisiontree.html">DecisionTree</a></li>
+<li class="toctree-l2"><a class="reference internal" href="densematrix.html">DenseMatrix</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">DenseMatrixView</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#static-methods">Static methods</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#infix-methods">Infix methods</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#implicit-methods">Implicit methods</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#related-methods">Related methods</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="densetrainingset.html">DenseTrainingSet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="densevector.html">DenseVector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="densevectorview.html">DenseVectorView</a></li>
+<li class="toctree-l2"><a class="reference internal" href="discretefeature.html">DiscreteFeature</a></li>
+<li class="toctree-l2"><a class="reference internal" href="factorgraph.html">FactorGraph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filestream.html">FileStream</a></li>
+<li class="toctree-l2"><a class="reference internal" href="grayscaleimage.html">GrayscaleImage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hashstream.html">HashStream</a></li>
+<li class="toctree-l2"><a class="reference internal" href="indexvector.html">IndexVector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="keyvaluestore.html">KeyValueStore</a></li>
+<li class="toctree-l2"><a class="reference internal" href="randomforest.html">RandomForest</a></li>
+<li class="toctree-l2"><a class="reference internal" href="replicated.html">Replicated</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sparsematrix.html">SparseMatrix</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sparsematrixbuildable.html">SparseMatrixBuildable</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sparsetrainingset.html">SparseTrainingSet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sparsevector.html">SparseVector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sparsevectorview.html">SparseVectorView</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tup2.html">Tup2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tup3.html">Tup3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tup4.html">Tup4</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tup5.html">Tup5</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tup6.html">Tup6</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tup7.html">Tup7</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tup8.html">Tup8</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tup9.html">Tup9</a></li>
+<li class="toctree-l2"><a class="reference internal" href="utriangle.html">UTriangle</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../objects.html">Objects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../primitives.html">Primitives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../typeparams.html">Generic Methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../otherops.html">Operations</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../index.html">OptiML</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../datastructs.html">Data Structures</a> &raquo;</li>
+      
+    <li>DenseMatrixView</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../_sources/ops/densematrixview.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="densematrixview">
+<span id="id1"></span><h1>DenseMatrixView<a class="headerlink" href="#densematrixview" title="Permalink to this headline">¶</a></h1>
+<p>&lt;auto-generated stub&gt;</p>
+<div class="section" id="static-methods">
+<h2>Static methods<a class="headerlink" href="#static-methods" title="Permalink to this headline">¶</a></h2>
+<pre class="literal-block">
+<span class="maroon">def</span> apply(x: Rep[<a class="reference internal" href="forgearray.html"><span class="doc">ForgeArray</span></a>[T]], y: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], z: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], v: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], w: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], a: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], b: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]): Rep[<a class="reference internal" href="#"><span class="doc">DenseMatrixView</span></a>\[T\]]
+</pre>
+</div>
+<div class="section" id="infix-methods">
+<h2>Infix methods<a class="headerlink" href="#infix-methods" title="Permalink to this headline">¶</a></h2>
+<pre class="literal-block">
+<span class="maroon">def</span> *(y: Rep[T])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> *(y: Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> *(y: Rep[<a class="reference internal" href="sparsematrix.html"><span class="doc">SparseMatrix</span></a>[T]])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> *(y: Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> *(y: Rep[<a class="reference internal" href="sparsevector.html"><span class="doc">SparseVector</span></a>[T]])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> *:*(y: Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> *:*(y: Rep[<a class="reference internal" href="sparsematrix.html"><span class="doc">SparseMatrix</span></a>[T]])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+ <span class="maroon">def</span> +(y: Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+
+Math
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> +(y: Rep[T])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> +(y: Rep[<a class="reference internal" href="sparsematrix.html"><span class="doc">SparseMatrix</span></a>[T]])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> -(y: Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> -(y: Rep[T])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> -(y: Rep[<a class="reference internal" href="sparsematrix.html"><span class="doc">SparseMatrix</span></a>[T]])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> /(y: Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> /(y: Rep[T])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> /(y: Rep[<a class="reference internal" href="sparsematrix.html"><span class="doc">SparseMatrix</span></a>[T]])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> Clone(): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> abs()(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> apply(y: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], z: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]): Rep[T]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+ <span class="maroon">def</span> apply(y: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]): Rep[<a class="reference internal" href="densevectorview.html"><span class="doc">DenseVectorView</span></a>[T]]
+
+Accessors
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> apply(y: Rep[<a class="reference internal" href="indexvector.html"><span class="doc">IndexVector</span></a>]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> apply(y: Rep[<a class="reference internal" href="indexvector.html"><span class="doc">IndexVector</span></a>], z: IndexWildcard): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> apply(rows: Rep[<a class="reference internal" href="indexvector.html"><span class="doc">IndexVector</span></a>], cols: Rep[<a class="reference internal" href="indexvector.html"><span class="doc">IndexVector</span></a>]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> apply(y: IndexWildcard, z: Rep[<a class="reference internal" href="indexvector.html"><span class="doc">IndexVector</span></a>]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> colIndices(): Rep[<a class="reference internal" href="indexvector.html"><span class="doc">IndexVector</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> count(y: (Rep[T]) =&gt; Rep[<a class="reference internal" href="boolean.html"><span class="doc">Boolean</span></a>]): Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> exp()(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> filterCols(y: (Rep[<a class="reference internal" href="densevectorview.html"><span class="doc">DenseVectorView</span></a>[T]]) =&gt; Rep[<a class="reference internal" href="boolean.html"><span class="doc">Boolean</span></a>]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> filterRows(y: (Rep[<a class="reference internal" href="densevectorview.html"><span class="doc">DenseVectorView</span></a>[T]]) =&gt; Rep[<a class="reference internal" href="boolean.html"><span class="doc">Boolean</span></a>]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> findCols(y: (Rep[<a class="reference internal" href="densevectorview.html"><span class="doc">DenseVectorView</span></a>[T]]) =&gt; Rep[<a class="reference internal" href="boolean.html"><span class="doc">Boolean</span></a>]): Rep[<a class="reference internal" href="indexvector.html"><span class="doc">IndexVector</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> findRows(y: (Rep[<a class="reference internal" href="densevectorview.html"><span class="doc">DenseVectorView</span></a>[T]]) =&gt; Rep[<a class="reference internal" href="boolean.html"><span class="doc">Boolean</span></a>]): Rep[<a class="reference internal" href="indexvector.html"><span class="doc">IndexVector</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> foreach(y: (Rep[T]) =&gt; Rep[Unit]): Rep[Unit]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> foreachCol(y: (Rep[<a class="reference internal" href="densevectorview.html"><span class="doc">DenseVectorView</span></a>[T]]) =&gt; Rep[Unit]): Rep[Unit]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> foreachRow(y: (Rep[<a class="reference internal" href="densevectorview.html"><span class="doc">DenseVectorView</span></a>[T]]) =&gt; Rep[Unit]): Rep[Unit]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> getCol(y: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]): Rep[<a class="reference internal" href="densevectorview.html"><span class="doc">DenseVectorView</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> getCols(y: Rep[<a class="reference internal" href="indexvector.html"><span class="doc">IndexVector</span></a>]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> getRow(y: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]): Rep[<a class="reference internal" href="densevectorview.html"><span class="doc">DenseVectorView</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> getRows(y: Rep[<a class="reference internal" href="indexvector.html"><span class="doc">IndexVector</span></a>]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> indices(): Rep[<a class="reference internal" href="indexvector.html"><span class="doc">IndexVector</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> log()(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> makeDimsStr(): Rep[<a class="reference internal" href="string.html"><span class="doc">String</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> makeString()(<span class="maroon">implicit</span> ev0: Stringable[T]): Rep[<a class="reference internal" href="string.html"><span class="doc">String</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+ <span class="maroon">def</span> map(y: (Rep[T]) =&gt; Rep[R]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[R]]
+
+Bulk
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> mapCols(y: (Rep[<a class="reference internal" href="densevectorview.html"><span class="doc">DenseVectorView</span></a>[T]]) =&gt; Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[R]]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[R]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> mapColsToVector(y: (Rep[<a class="reference internal" href="densevectorview.html"><span class="doc">DenseVectorView</span></a>[T]]) =&gt; Rep[R]): Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[R]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> mapRows(y: (Rep[<a class="reference internal" href="densevectorview.html"><span class="doc">DenseVectorView</span></a>[T]]) =&gt; Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[R]]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[R]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> mapRowsToVector(y: (Rep[<a class="reference internal" href="densevectorview.html"><span class="doc">DenseVectorView</span></a>[T]]) =&gt; Rep[R]): Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[R]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> max()(<span class="maroon">implicit</span> ev0: Ordering[T],ev1: HasMinMax[T]): Rep[T]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> maxCols()(<span class="maroon">implicit</span> ev0: Ordering[T],ev1: HasMinMax[T]): Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> maxIndex()(<span class="maroon">implicit</span> ev0: Ordering[T]): Rep[<a class="reference internal" href="tup2.html"><span class="doc">Tup2</span></a>[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>,:doc:<cite>int</cite>]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> maxRows()(<span class="maroon">implicit</span> ev0: Ordering[T],ev1: HasMinMax[T]): Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> mean()(<span class="maroon">implicit</span> ev0: (Rep[T]) =&gt; Rep[<a class="reference internal" href="double.html"><span class="doc">Double</span></a>]): Rep[<a class="reference internal" href="double.html"><span class="doc">Double</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> min()(<span class="maroon">implicit</span> ev0: Ordering[T],ev1: HasMinMax[T]): Rep[T]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> minCols()(<span class="maroon">implicit</span> ev0: Ordering[T],ev1: HasMinMax[T]): Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> minIndex()(<span class="maroon">implicit</span> ev0: Ordering[T]): Rep[<a class="reference internal" href="tup2.html"><span class="doc">Tup2</span></a>[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>,:doc:<cite>int</cite>]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+ <span class="maroon">def</span> minRows()(<span class="maroon">implicit</span> ev0: Ordering[T],ev1: HasMinMax[T]): Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]]
+
+Ordering
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> mutable(): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> mview(startRow: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], endRow: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], startCol: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], endCol: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]): Rep[<a class="reference internal" href="#"><span class="doc">DenseMatrixView</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> numCols(): Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> numRows(): Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+ <span class="maroon">def</span> pprint()(<span class="maroon">implicit</span> ev0: Stringable[T]): Rep[Unit]
+
+Miscellaneous
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> prod()(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[T]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> reduce(y: (Rep[T],Rep[T]) =&gt; Rep[T])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[T]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> reduceCols(y: (Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]],Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]]) =&gt; Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> reduceRows(y: (Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]],Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]]) =&gt; Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]])(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> replicate(y: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], z: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> rowIndices(): Rep[<a class="reference internal" href="indexvector.html"><span class="doc">IndexVector</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> size(): Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> slice(startRow: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], endRow: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], startCol: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], endCol: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]): Rep[<a class="reference internal" href="#"><span class="doc">DenseMatrixView</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> sliceCols(start: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], end: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]): Rep[<a class="reference internal" href="#"><span class="doc">DenseMatrixView</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> sliceRows(start: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], end: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]): Rep[<a class="reference internal" href="#"><span class="doc">DenseMatrixView</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> stddev()(<span class="maroon">implicit</span> ev0: (Rep[T]) =&gt; Rep[<a class="reference internal" href="double.html"><span class="doc">Double</span></a>]): Rep[<a class="reference internal" href="double.html"><span class="doc">Double</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> sum()(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[T]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> sumCols()(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> sumRows()(<span class="maroon">implicit</span> ev0: Arith[T]): Rep[<a class="reference internal" href="densevector.html"><span class="doc">DenseVector</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> t(): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+ <span class="maroon">def</span> toBoolean()(<span class="maroon">implicit</span> ev0: (Rep[T]) =&gt; Rep[<a class="reference internal" href="boolean.html"><span class="doc">Boolean</span></a>]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[<a class="reference internal" href="boolean.html"><span class="doc">Boolean</span></a>]]
+
+Conversions
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> toDense(): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> toDouble()(<span class="maroon">implicit</span> ev0: (Rep[T]) =&gt; Rep[<a class="reference internal" href="double.html"><span class="doc">Double</span></a>]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[<a class="reference internal" href="double.html"><span class="doc">Double</span></a>]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> toFloat()(<span class="maroon">implicit</span> ev0: (Rep[T]) =&gt; Rep[<a class="reference internal" href="float.html"><span class="doc">Float</span></a>]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[<a class="reference internal" href="float.html"><span class="doc">Float</span></a>]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> toInt()(<span class="maroon">implicit</span> ev0: (Rep[T]) =&gt; Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> toString(): Rep[<a class="reference internal" href="string.html"><span class="doc">String</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> variance()(<span class="maroon">implicit</span> ev0: (Rep[T]) =&gt; Rep[<a class="reference internal" href="double.html"><span class="doc">Double</span></a>]): Rep[<a class="reference internal" href="double.html"><span class="doc">Double</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> vview(start: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], stride: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], length: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>], isRow: Rep[<a class="reference internal" href="boolean.html"><span class="doc">Boolean</span></a>]): Rep[<a class="reference internal" href="densevectorview.html"><span class="doc">DenseVectorView</span></a>[T]]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> zip(y: Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[B]])(z: (Rep[T],Rep[B]) =&gt; Rep[R]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[R]]
+</pre>
+</div>
+<div class="section" id="implicit-methods">
+<h2>Implicit methods<a class="headerlink" href="#implicit-methods" title="Permalink to this headline">¶</a></h2>
+<pre class="literal-block">
+<span class="maroon">def</span> chainViewToDenseOps(self: Rep[<a class="reference internal" href="#"><span class="doc">DenseMatrixView</span></a>\[T\]]): DenseMatrixDenseMatrixOpsCls[T]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> viewToDense(self: Rep[<a class="reference internal" href="#"><span class="doc">DenseMatrixView</span></a>\[T\]]): Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]
+</pre>
+</div>
+<div class="section" id="related-methods">
+<h2>Related methods<a class="headerlink" href="#related-methods" title="Permalink to this headline">¶</a></h2>
+<pre class="literal-block">
+<span class="maroon">def</span> __equal(self: Rep[<a class="reference internal" href="#"><span class="doc">DenseMatrixView</span></a>\[T\]], y: Rep[<a class="reference internal" href="densematrix.html"><span class="doc">DenseMatrix</span></a>[T]]): Rep[<a class="reference internal" href="boolean.html"><span class="doc">Boolean</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> densematrixview_raw_apply(self: Rep[<a class="reference internal" href="#"><span class="doc">DenseMatrixView</span></a>\[T\]], y: Rep[<a class="reference internal" href="int.html"><span class="doc">Int</span></a>]): Rep[T]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> norm(x: Rep[<a class="reference internal" href="#"><span class="doc">DenseMatrixView</span></a>[<a class="reference internal" href="double.html"><span class="doc">Double</span></a>]]): Rep[<a class="reference internal" href="double.html"><span class="doc">Double</span></a>]
+</pre>
+<hr class="docutils" />
+<pre class="literal-block">
+<span class="maroon">def</span> norm(x: Rep[<a class="reference internal" href="#"><span class="doc">DenseMatrixView</span></a>[<a class="reference internal" href="double.html"><span class="doc">Double</span></a>]], y: NormId): Rep[<a class="reference internal" href="double.html"><span class="doc">Double</span></a>]
+</pre>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="densetrainingset.html" class="btn btn-neutral float-right" title="DenseTrainingSet" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="densematrix.html" class="btn btn-neutral" title="DenseMatrix" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016,Stanford PPL.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

@@ -26,6 +26,7 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
   def opsDir = srcDir + File.separator + "ops"
   def fileExt = "rst"
 
+  // Add links to types in method signatures
   override def quote(x: Exp[Any]): String = x match {
     case Def(Tpe(s,args,stage)) if docGroups.contains(x.asInstanceOf[Exp[DSLGroup]]) =>
       docref(relFileName(x.asInstanceOf[Exp[DSLGroup]])) + escapeSpecial(makeTpePars(args))
@@ -35,6 +36,14 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
 
     case Def(TpeClass(s,sig,args)) if docGroups.contains(x.asInstanceOf[Exp[DSLGroup]]) =>
       docref(relFileName(x.asInstanceOf[Exp[DSLGroup]])) + escapeSpecial(makeTpePars(args))
+
+    case Def(TpeAlias(s,t)) if docGroups.contains(extractTpe(t)) =>
+      link(s, relFileName(extractTpe(t).asInstanceOf[Exp[DSLGroup]])) + escapeSpecial(makeTpePars(t.tpePars))
+
+    case Def(FTpe(args,ret,freq)) =>
+      val a = args.map(a => quote(a.tpe)).mkString(", ")
+      val argsWithParens = if (args.length > 1) "(" + a + ")" else a
+      argsWithParens + " => " + quote(ret)
 
     case _ => super.quote(x)
   }
@@ -75,6 +84,15 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
     val conf = new PrintWriter(new FileWriter(srcDir+File.separator+"conf.py"))
     conf.println("import os")
     conf.println("import sys")
+    conf.println("from sphinx.highlighting import PygmentsBridge")
+    conf.println("from pygments.formatters.latex import LatexFormatter")
+    conf.println("class CustomLatexFormatter(LatexFormatter):")
+    conf.println("  def __init__(self, **options):")
+    conf.println("    super(CustomLatexFormatter, self).__init__(**options)")
+    conf.println("    self.verboptions = r\"formatcom=\\footnotesize\" ")
+    conf.println("PygmentsBridge.latex_formatter = CustomLatexFormatter")
+
+    conf.println()
     conf.println("templates_path = ['_templates']")
     conf.println("source_suffix = '.rst'")
     conf.println("master_doc = 'index'")
@@ -99,7 +117,9 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
     conf.println("latex_elements = {")
     conf.println("  'classoptions': ',openany,oneside',")
     conf.println("  'babel': '\\\\usepackage[english]{babel}'") // ??????
+    //conf.println("  'preamble': '\\\\usepackage[dvipsnames]{xcolor}'")
     conf.println("}")
+    //conf.println("latex_additional_files = ['customcolors.sty'] ")
     conf.println()
     conf.println("### Manpage Info ###")
     conf.println("man_pages = [")
@@ -115,9 +135,23 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
     conf.println("]")
     conf.close()
 
+    /*val sty = new PrintWriter(new FileWriter(srcDir+File.separator+"customcolors.sty"))
+    colors.foreach{color =>
+      sty.println(color + ":")
+      sty.println("  parent: bodytext")
+      sty.println("  textColor: " + color)
+      sty.println()
+    }
+    sty.close()*/
+
+    val css = new PrintWriter(new FileWriter(staticDir+File.separator+"colors.css"))
+    colors.foreach{color => css.println("   ."+color+" { color:"+color+"; }" )}
+    css.close()
+
     // --- Index
     val index = new PrintWriter(new FileWriter(srcDir+File.separator+"index.rst"))
     val heading = dsl+" " + dslVersion + " Documentation"
+    index.println()
     index.println(sect(heading))
     index.println()
     index.println("Contents:")
@@ -130,10 +164,10 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
     val intro = new PrintWriter(new FileWriter(srcDir+File.separator+"intro.rst"))
     intro.println(sect("Introduction"))
     intro.println()
-    DSLBloc.getOrElse("<stub>").split(nl).map(_.trim()).foreach{line => intro.println(line) }
+    DSLBloc.getOrElse("<stub>").split(nl).foreach{line => intro.println(line) }
     intro.println()
-    intro.println("This document was auto-generated using the Sphinx markup language. For compliments, thank David Koeplinger.")
-    intro.println("For corrections or complaints, post an issue on `GitHub Issues <https://github.com/stanford-ppl/Forge/issues/>`_ . (Or quit being lazy and fix it yourself.)")
+    intro.println("This document was auto-generated using `Sphinx <http://www.sphinx-doc.org/en/stable/>`_.")
+    intro.println("For corrections, post an issue on `GitHub Issues <https://github.com/stanford-ppl/Forge/issues/>`_ .")
     intro.println()
     intro.close()
 
@@ -144,7 +178,7 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
         pw.println(sect(title))
         pw.println()
         pw.println(".. toctree::")
-        list.map(doc => fileName(doc.grp)).toArray.sorted.foreach{file => pw.println("   ops/"+file)}
+        list.toArray.sortBy(doc => doc.header.title).foreach{doc => pw.println("   ops/"+fileName(doc.grp)) }
         pw.close()
       }
     }
@@ -165,7 +199,10 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
     index.close()
   }
 
-  def emitGroupHeader(grp: String, desc: GrpDescription, stream: PrintWriter): Unit = {
+  def emitGroupHeader(grp: String, desc: GroupHeader, stream: PrintWriter): Unit = {
+    stream.println()
+    colors.foreach{color => stream.println(".. role:: " + color) }
+    stream.println()
     stream.println(label(grp))
     stream.println()
     stream.println(sect(grp))
@@ -183,17 +220,37 @@ trait ForgeCodeGenSphinx extends ForgeCodeGenDocBase with ForgeGenReStructuredTe
   def emitOpFamilyHeader(style: String, stream: PrintWriter): Unit = {
     stream.println(subsect(style))
     stream.println()
-    //stream.println("+-+-+")
   }
 
-  def makeOpRows(desc: OpDescription, signature: String, stream: PrintWriter): Unit = {
-    //tableRow(code("def") + "\\ ", signature) // Signature was already "codified" during creation
-    //tableRow(" ", desc.desc)
+  def emitAliases(aliases: List[Exp[TypeAlias]], stream: PrintWriter): Unit = {
+    stream.println(subsect("Type Aliases"))
+    stream.println()
+    asTable(stream){
+      aliases.foreach{alias =>
+        val desc = GrpDoc.get(alias).map{desc => desc.split(nl).map(_.trim()).mkString(" ")}.getOrElse("")
+        tableRow(bold("type"), alias.name + makeTpePars(alias.tpe.tpePars), quote(alias.tpe), desc)
+        //stream.println("  " + bold("type") + " " + alias.name  + " = " + quote(alias.tpe) + desc)
+        //stream.println()
+      }
+    }
+    stream.println()
+  }
+
+
+  def emitOpDescription(desc: OpDescription, signature: String, stream: PrintWriter): Unit = {
     stream.println(signature)
     stream.println(desc.desc)
     stream.println()
     desc.args.foreach{case (arg,desc) => if (desc != "") stream.println("\t* " + bold(arg) + " \\- " + desc) }
     desc.returns.foreach{desc => stream.println("\t* " + bold("returns") + " " + desc) }
+
+    if (desc.examples.nonEmpty) stream.println()
+    desc.examples.foreach{case (example, expl) =>
+      stream.println(code(example))
+      stream.println()
+      stream.println(expl)
+      stream.println()
+    }
   }
 
   def emitOpFamilyFooter(style: String, stream: PrintWriter): Unit = {

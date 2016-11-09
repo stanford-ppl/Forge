@@ -104,17 +104,23 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
 
   // -- IR helpers
 
-  def isForgePrimitiveType(t: Rep[DSLType]) = t match {
+  def isScalaPrimitiveType(t: Rep[DSLType]) = t match {
     case `MShort` | `MInt` | `MLong` | `MFloat` | `MDouble` | `MBoolean` | `MChar` | `MByte` | `MString` | `MUnit` | `MAny` | `MNothing` | `MLambda` | `MSourceContext` | `byName` => true
     case `CShort` | `CInt` | `CLong` | `CFloat` | `CDouble` | `CBoolean` | `CChar` | `CByte` | `CString` | `CUnit` | `CAny` | `CNothing` => true
-    // case Def(Tpe(_,_,`now`)) => true
+    case `SShort` | `SInt` | `SLong` | `SFloat` | `SDouble` | `SBoolean` | `SChar` | `SByte` | `SString` | `SUnit` | `SAny` | `SList` | `SSeq` => true
+    case `SOption` | `SManifest` => true
     case Def(Tpe(name,_,_)) if name.startsWith("Tuple") => true
+    // case Def(Tpe(_,_,`now`)) => true
     case Def(Tpe(name,_,_)) if primitiveTpePrefix exists { t => name.startsWith(t) } => true
-    case Def(Tpe("ForgeArray",_,_)) | Def(Tpe("ForgeArrayBuffer",_,_)) | Def(Tpe("ForgeHashMap",_,_)) => true
-    case Def(Tpe("ForgeFileInputStream",_,_)) | Def(Tpe("ForgeFileOutputStream",_,_)) => true
     case Def(Tpe("Var",_,_)) => true
     case Def(Tpe("Overloaded",_,_)) => true
     case _ => false
+  }
+
+  def isForgePrimitiveType(t: Rep[DSLType]) = t match {
+    case Def(Tpe("ForgeArray",_,_)) | Def(Tpe("ForgeArrayBuffer",_,_)) | Def(Tpe("ForgeHashMap",_,_)) => true
+    case Def(Tpe("ForgeFileInputStream",_,_)) | Def(Tpe("ForgeFileOutputStream",_,_)) => true
+    case _ => isScalaPrimitiveType(t) || primitiveTypes.contains(t) || primitiveStructs.contains(t)
   }
 
   def opsGrpTpes(opsGrp: DSLOps) = {

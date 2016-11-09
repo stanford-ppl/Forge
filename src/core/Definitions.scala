@@ -21,32 +21,45 @@ trait Definitions extends DerivativeTypes {
 
   /**
    * Built-in types
+   * M - stands for "Meta"    (a staged symbolic expression)
+   * C - stands for "Current" (a staged constant)
+   * S - stands for "Scala"   (always a constant, never staged)
    */
-  // concrete types (M stands for "Meta", C stands for "Current").. these aren't exactly consistent
 
+  // TODO: These aren't exactly consistent
   // FIXME: Need to resolve discrepancy between 'compile' and 'now'. Ideally everything should have 'compile' behavior, but it breaks
   //        string lifting in Scala.scala, for example.
 
   lazy val MAny = tpe("Any")
   lazy val CAny = tpe("Any", stage = now)
+  lazy val SAny = tpe("Any", stage = compile)   // Scala Any (used during compilation)
   lazy val MInt = tpe("Int")
   lazy val CInt = tpe("Int", stage = now)
+  lazy val SInt = tpe("Int", stage = compile)   // Scala integer (used as constant during compilation)
   lazy val MLong = tpe("Long")
   lazy val CLong = tpe("Long", stage = now)
+  lazy val SLong = tpe("Long", stage = compile)
   lazy val MFloat = tpe("Float")
   lazy val CFloat = tpe("Float", stage = now)
+  lazy val SFloat = tpe("Float", stage = compile)
   lazy val MDouble = tpe("Double")
   lazy val CDouble = tpe("Double", stage = now)
+  lazy val SDouble = tpe("Double", stage = compile)
   lazy val MBoolean = tpe("Boolean")
   lazy val CBoolean = tpe("Boolean", stage = now)
+  lazy val SBoolean = tpe("Boolean", stage = compile)
   lazy val MString = tpe("String")
   lazy val CString = tpe("String", stage = now)
+  lazy val SString = tpe("String", stage = compile)
   lazy val MShort = tpe("Short")
   lazy val CShort = tpe("Short", stage = now)
+  lazy val SShort = tpe("Short", stage = compile)
   lazy val MByte = tpe("Byte")
   lazy val CByte = tpe("Byte", stage = now)
+  lazy val SByte = tpe("Byte", stage = compile)
   lazy val MChar = tpe("Char")
   lazy val CChar = tpe("Char", stage = now)
+  lazy val SChar = tpe("Char", stage = compile)
   lazy val CTuple2 = tpe("Tuple2", (tpePar("A"),tpePar("B")), stage = compile)
   lazy val CTuple3 = tpe("Tuple3", (tpePar("A"),tpePar("B"),tpePar("C")), stage = compile)
   lazy val CTuple4 = tpe("Tuple4", (tpePar("A"),tpePar("B"),tpePar("C"),tpePar("D")), stage = compile)
@@ -54,8 +67,10 @@ trait Definitions extends DerivativeTypes {
   lazy val CTuple6 = tpe("Tuple6", List(tpePar("A"),tpePar("B"),tpePar("C"),tpePar("D"),tpePar("E"),tpePar("F")), stage = compile)
   lazy val MUnit = tpe("Unit")
   lazy val CUnit = tpe("Unit", stage = now)
+  lazy val SUnit = tpe("Unit", stage = compile) // Useful?
   lazy val MNothing = tpe("Nothing")
   lazy val CNothing = tpe("Nothing", stage = now)
+  lazy val SNothing = tpe("Nothing", stage = now)
   lazy val byName = tpe("Thunk")
   def MThunk(ret: Rep[DSLType], freq: Frequency = normal) = ftpe(List(forge_arg("", byName, None)),ret,freq) // TODO
   // unstaged (inlined) functions
@@ -74,8 +89,19 @@ trait Definitions extends DerivativeTypes {
   lazy val MInputStream = tpe("ForgeFileInputStream")
   lazy val MOutputStream = tpe("ForgeFileOutputStream")
 
+  lazy val SList = tpe("List", tpePar("A"), stage = compile)
+  lazy val SSeq = tpe("Seq", tpePar("A"), stage = compile)
+  lazy val SManifest = tpe("Manifest", tpePar("A"), stage = compile)
+  lazy val SOption = tpe("Option", tpePar("A"), stage = compile)
+
   /* whitelist for primitive types (i.e. we should not generate a Forge shadow) */
   var primitiveTpePrefix = scala.List("scala","java")
+
+  // Both of these need to be appended to explicitly
+  // Used when we don't want Forge to generate the class definition for this type
+  // (Either because it's a Scala primitive or because the type is defined in the DSL's extern files)
+  var primitiveStructs = List[Rep[DSLType]]() // Staged structs which are defined in extern
+  var primitiveTypes = List[Rep[DSLType]]()   // Primitive types which are defined in extern
 
   /**
    * DSLType placeholders

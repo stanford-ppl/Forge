@@ -135,10 +135,10 @@ then
   #popd
   #popd
   #cp "sphinx/build/$DSL_NAME.pdf" ./Manual.pdf
-  pushd .
-  cd "sphinx"
-  sphinx-build -b html source build
-  popd 
+  #pushd .
+  #cd "sphinx"
+  #sphinx-build -b html source build
+  #popd 
 fi
 
 if [ $SKIP -le 5 ] && [ $INTERACTIVE == true ];

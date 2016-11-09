@@ -30,6 +30,9 @@ trait ForgeOps extends Base {
   def lift(grp: Rep[DSLGroup])(tpe: Rep[DSLType]) = forge_lift(grp, tpe)
   def data(tpe: Rep[DSLType], fields: (String, Rep[DSLType])*) = forge_data(tpe, fields)
 
+  def doc(blk: String): Rep[Unit] = forge_doc(blk)
+  def summary(blk: String): Rep[Unit] = forge_dsl_summary(blk)
+
   implicit def namedTpeToArg(arg: (String, Rep[DSLType])): Rep[DSLArg] = forge_arg(arg._1, arg._2, None)
   implicit def namedTpeWithDefaultToArg(arg: (String, Rep[DSLType], String)): Rep[DSLArg] = forge_arg(arg._1, arg._2, Some(arg._3))
   def anyToArg(a: (Any, Int)): Rep[DSLArg] = forge_anyToArg(a)
@@ -119,6 +122,8 @@ trait ForgeOps extends Base {
   def forge_lookup_grp(grpName: String): Rep[DSLGroup]
   def forge_lookup_op(grp: Rep[DSLGroup], opName: String, overloadedIndex: Int): Rep[DSLOp]
   def forge_label(op: Rep[DSLOp], name: String): Rep[Unit]
+  def forge_doc(blk: String): Rep[Unit]
+  def forge_dsl_summary(blk: String): Rep[Unit]
 }
 
 trait ForgeSugarLowPriority extends ForgeOps {
@@ -245,6 +250,15 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   val Externs = ArrayBuffer[Extern]()
   val Labels = HashMap[Exp[DSLOp],String]()
 
+  /*
+   * Documentation
+   */
+  val OpDoc = HashMap[Exp[DSLOp],String]()
+  val GrpDoc = HashMap[Exp[DSLGroup],String]()
+  val IdDoc = HashMap[Exp[DSLIdentifier],String]()
+  var DocBloc: Option[String] = None
+  var DSLBloc: Option[String] = None
+
   /**
    * Convenience method providing access to defined ops in other modules
    */
@@ -254,17 +268,30 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     if (t.isEmpty) {
       err("lookup failed: no tpe exists with name " + tpeName + " and stage " + stage)
     }
+    if (DocBloc.isDefined) {
+      GrpDoc += t.get -> DocBloc.get
+      DocBloc = None
+    }
     t.get
   }
 
   def forge_lookup_tpe_class(tpeClassName: String): Option[Rep[DSLTypeClass]] = {
-    TpeClasses.find(t => t.signature.name == tpeClassName)
+    val t = TpeClasses.find(t => t.signature.name == tpeClassName)
+    if (t.isDefined && DocBloc.isDefined) {
+      GrpDoc += t.get -> DocBloc.get
+      DocBloc = None
+    }
+    t
   }
 
   def forge_lookup_grp(grpName: String): Rep[DSLGroup] = {
     val t = Tpes.find(_.name == grpName).orElse(OpsGrp.find(t => t._1.name == grpName).map(_._1))
     if (t.isEmpty) {
       err("lookup failed: no grp exists with name " + grpName)
+    }
+    if (DocBloc.isDefined) {
+      GrpDoc += t.get -> DocBloc.get
+      DocBloc = None
     }
     t.get
   }
@@ -296,7 +323,14 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   /* A group represents a collection of ops which become an op trait in the generated DSL */
   case class Grp(name: String) extends Def[DSLGroup]
 
-  def forge_grp(name: String) = Grp(name)
+  def forge_grp(name: String) = {
+    val grp: Rep[DSLGroup] = Grp(name)
+    if (DocBloc.isDefined) {
+      GrpDoc += grp -> DocBloc.get
+      DocBloc = None
+    }
+    grp
+  }
 
   /* TpeAlias is a DSL-time type alias for a DSLType */
   case class TpeAlias(name: String, tpe: Rep[DSLType]) extends Def[TypeAlias]
@@ -323,6 +357,10 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   def forge_tpe(name: String, tpePars: List[Rep[TypePar]], stage: StageTag) = {
     val t: Exp[DSLType] = Tpe(name, tpePars, stage)
     if (!Tpes.contains(t)) Tpes += t
+    if (DocBloc.isDefined) {
+      GrpDoc += t -> DocBloc.get
+      DocBloc = None
+    }
     t
   }
 
@@ -349,6 +387,10 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   def forge_tpeclass(name: String, signature: TypeClassSignature, tpePars: List[Rep[TypePar]]) = {
     val t: Exp[DSLTypeClass] = TpeClass(name, signature, tpePars)
     if (!TpeClasses.contains(t)) TpeClasses += t
+    if (DocBloc.isDefined) {
+      GrpDoc += t -> DocBloc.get
+      DocBloc = None
+    }
     t
   }
 
@@ -393,12 +435,16 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
   case class Identifier(name: String, tpe: Rep[DSLType]) extends Def[DSLIdentifier]
   def forge_identifier(name: String, tpe: Rep[DSLType]): Rep[DSLIdentifier] = {
     if (tpe.tpePars != Nil) err("identifiers cannot have type parameters")
-    val id = Identifier(name,tpe)
+    val id: Exp[DSLIdentifier] = Identifier(name,tpe)
     if (Identifiers.exists(_.name == id.name)) {
       err("identifier " + name + " already exists")
     }
     else {
       Identifiers += id
+    }
+    if (DocBloc.isDefined) {
+      IdDoc += id -> DocBloc.get
+      DocBloc = None
     }
     id
   }
@@ -458,6 +504,12 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     })
     val o = toAtom(Op(_grp, name, style, tpePars, args, curriedArgs, amendedImplicitArgs, retTpe, effect, aliasHint))
     opsGrp.ops :+=  o // append is required for lookups in declaration order
+
+    if (DocBloc.isDefined) {
+      OpDoc += o -> DocBloc.get
+      DocBloc = None
+    }
+
     o
   }
 
@@ -558,6 +610,15 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
     if (Labels.contains(op)) warn("overriding existing label " + Labels(op) + " with new label " + name)
     Labels(op) = name
     ()
+  }
+
+  /* Creates a local documentation to be used on the next op or data structure definition */
+  def forge_doc(blk: String): Rep[Unit] = {
+    //if (DocBloc.isDefined) warn("Already had unused documentation at document block starting with \"" + blk.take(10) + "...\"")
+    DocBloc = Some(blk)
+  }
+  def forge_dsl_summary(blk: String): Rep[Unit] = {
+    DSLBloc = Some(blk)
   }
 }
 

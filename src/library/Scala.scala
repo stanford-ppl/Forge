@@ -576,8 +576,11 @@ trait ScalaOps extends PrimitiveMathGen {
 
     // in order to define lifted operations on an existing Scala type, we must place the lifted ops in a separate group
     // to avoid Forge attempting to use the fully qualified type name in traits
+    /** @nodoc **/
     val SArray = tpe("scala.Array", T)
+    /** @nodoc **/
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
+    /** @nodoc **/
     val HashMapOps = grp("SHashMap")
 
     val hashmap = direct (HashMapOps) ("SHashMap", (K,V), Nil :: SHashMap(K,V), effect = mutable)
@@ -611,8 +614,11 @@ trait ScalaOps extends PrimitiveMathGen {
     val V = tpePar("V")
     val T = tpePar("T")
 
+    /** @nodoc **/
     val SArray = tpe("scala.Array", T)
+    /** @nodoc **/
     val CHashMap = tpe("java.util.concurrent.ConcurrentHashMap", (K,V))
+    /** @nodoc **/
     val HashMapOps = grp("CHashMap")
 
     direct (HashMapOps) ("CHashMap", (K,V), Nil :: CHashMap(K,V), effect = mutable) implements codegen($cala, ${ new java.util.concurrent.ConcurrentHashMap[$t[K],$t[V]]() })
@@ -660,10 +666,14 @@ trait ScalaOps extends PrimitiveMathGen {
   }
 
   def importByteBuffer() = {
+    /** @nodoc **/
     val ByteBuffer = tpe("java.nio.ByteBuffer")
+    /** @nodoc **/
     val IntBuffer = tpe("java.nio.IntBuffer")
+    /** @nodoc **/
     val DoubleBuffer = tpe("java.nio.DoubleBuffer")
 
+    /** @nodoc **/
     val ByteBufferOps = grp("SByteBuffer")
     direct (ByteBufferOps) ("ByteBuffer", Nil, MInt :: ByteBuffer, effect = mutable) implements codegen($cala, ${ java.nio.ByteBuffer.allocate($0) })
     direct (ByteBufferOps) ("ByteBufferWrap", Nil, MArray(MByte) :: ByteBuffer, effect = mutable) implements codegen($cala, ${ java.nio.ByteBuffer.wrap($0) })

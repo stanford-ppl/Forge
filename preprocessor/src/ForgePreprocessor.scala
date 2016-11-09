@@ -13,36 +13,40 @@ trait ForgePreprocessor {
   // investigate: should the preprocessor be implemented using parser combinators or some other strategy?
 
   def preprocess(srcManaged: File, src: File, stream: TaskStreams[_]) = {
-    def err(s: String) =
-      error("[forge preprocessor]: in " + src.getName() + ", " + s)
+    def err(s: String) = error("[forge preprocessor]: in " + src.getName() + ", " + s)
       //stream.log.error("[forge preprocessor]: in " + src.getName() + ", " + s)
     def warn(s: String) = stream.log.warn("[forge preprocessor]: in " + src.getName() + ", " + s)
 
     // -- helpers
 
-    abstract class CommentScope
-    object NoComment extends CommentScope
-    object CommentLine extends CommentScope
-    object CommentBlock extends CommentScope {
-      var nest = 0
+    class Pattern(pattern: String) {
+      assert(pattern.length > 0, "Cannot create pattern of length 0")
+      private val bytes = pattern.getBytes.zipWithIndex
+
+      def unapply(x: (Int, Array[Byte])) = {
+        val (start,input) = x
+        bytes.forall{case (b,i) => (start+i) < input.length && input(start+i) == b}
+      }
+      def length = pattern.length
+    }
+    object Pattern {
+      def apply(x: String) = new Pattern(x)
     }
 
-    // updates the comment scope based on the current characters
-    def scanComment(scope: CommentScope, start: Int, input: Array[Byte]): (Int, CommentScope) = {
-      if (start > input.length-1) (start, scope)
-      else (input(start),input(start+1)) match {
-        case ('/','/') if scope == NoComment => (start+2, CommentLine)
-        case ('\n', _) if scope == CommentLine => (start+1, NoComment)
-        case ('/','*') if scope != CommentLine =>
-          CommentBlock.nest += 1
-          (start+2, CommentBlock)
-        case ('*','/') if scope == CommentBlock =>
-          CommentBlock.nest -= 1
-          if (CommentBlock.nest == 0) (start+2, NoComment)
-          else (start+2, CommentBlock)
-        case _ => (start, scope)
-      }
-    }
+    trait Feature
+    object NoFeature extends Feature
+    object CodeBlock extends Pattern("${") with Feature
+    object DSLAnnotation  extends Pattern("@dsl") with Feature
+
+    trait CommentScope
+    object NoComment extends CommentScope
+    object CommentBlock extends Pattern("/*") with CommentScope { var nest = 0 }
+    object DocumentBlock extends Pattern("/**") with CommentScope with Feature { var in = false }
+    object SummaryBlock extends Pattern("/***") with CommentScope with Feature { var in = false }
+    object CommentLine extends Pattern("//") with CommentScope
+    object EndBlock extends Pattern("*/")
+    object NewLine extends Pattern("\n")
+
 
     def endOfWord(c: Byte): Boolean = c match {
       case ' ' | ',' | '.' | ':' | '+' | '*' | '-' | '/' | ')' | '}' | '(' | '{' | '\n' => true  // fixme: platform-specific line sep
@@ -62,16 +66,45 @@ trait ForgePreprocessor {
       j-i-1
     }
 
-    def scanTo$(start: Int, input: Array[Byte]): Int = {
+    // updates the comment scope based on the current characters
+    def scanComment(scope: CommentScope, start: Int, input: Array[Byte], allowDoc: Boolean): (Int, CommentScope) = {
+      if (start > input.length-1) (start, scope)
+      else ((start,input)) match {
+        case CommentLine()   if scope == NoComment    => (start+2, CommentLine)
+        case NewLine()       if scope == CommentLine  => (start+1, NoComment)
+        case SummaryBlock()  if allowDoc => CommentBlock.nest += 1; SummaryBlock.in = true;  (start, SummaryBlock)
+        case DocumentBlock() if allowDoc => CommentBlock.nest += 1; DocumentBlock.in = true; (start, DocumentBlock)
+        case CommentBlock()  if scope != CommentLine  => CommentBlock.nest += 1; (start+2, CommentBlock)
+        case EndBlock()      if scope == CommentBlock || scope == DocumentBlock || scope == SummaryBlock =>
+          CommentBlock.nest -= 1
+          if (CommentBlock.nest == 0) { SummaryBlock.in = false; DocumentBlock.in = false }
+          val newScope = if (CommentBlock.nest == 0) NoComment
+                         else if (SummaryBlock.in)   SummaryBlock
+                         else if (DocumentBlock.in)  DocumentBlock
+                         else                        CommentBlock
+          (start+2, newScope)
+        case _ => (start, scope)
+      }
+    }
+
+    def scanToFeature(start: Int, input: Array[Byte], isDSLScope: Boolean): (Feature, Int) = {
       var i = start
       var scope: CommentScope = NoComment
-      while (i < input.length-1) {
-        val (nextI, nextScope) = scanComment(scope, i, input)
+      var feature: Feature = NoFeature
+      while (i < input.length && feature == NoFeature) {
+        val (nextI, nextScope) = scanComment(scope, i, input, isDSLScope && scope == NoComment)
         i = nextI; scope = nextScope;
-        if (scope == NoComment && input(i) == '$' && input(i+1) == '{') return i
-        i += 1
+
+        if (scope == NoComment) ((i,input)) match {
+          case CodeBlock() => feature = CodeBlock
+          case DSLAnnotation() => feature = DSLAnnotation
+          case _ => i += 1
+        }
+        else if (scope == DocumentBlock) feature = DocumentBlock
+        else if (scope == SummaryBlock) feature = SummaryBlock
+        else i += 1
       }
-      i+1 // not found
+      (feature, i)
     }
 
     /**
@@ -90,8 +123,11 @@ trait ForgePreprocessor {
       override def toString = "lookupOp("+grp+",\""+name+"\")"
     }
 
+    val opStarters = List("compiler", "infix", "static", "direct")
+
     def scanBackToOp(start: Int, input: Array[Byte]): OpEncoding = {
-      val words = Array("static","infix","direct","compiler","impl") // enclosing op definers
+      val words = "impl" +: opStarters  // enclosing op definers
+      //println("words: " + words.mkString(", "))
       var i = start
       var foundWord = ""
       val maxWordLength = words.map(_.length).max
@@ -104,7 +140,7 @@ trait ForgePreprocessor {
       }
 
       foundWord match {
-        case "static" | "infix" | "direct" | "compiler"  =>
+        case word if opStarters.contains(word) =>
           var inTpeScope = true
           var startGrpIndex = -1
           var endGrpIndex = -1
@@ -149,6 +185,19 @@ trait ForgePreprocessor {
     }
 
     def isBlockArg(arg: String) = arg.startsWith("b[")
+    def isBoundArg(arg: String) = arg.startsWith("a[")
+
+    def endOfBoundArgName(arg: String) = arg.indexOf(']')
+    def parseBoundArguments(start: Int, input: Array[Byte], args: ArrayBuffer[String]): Int = {
+      var j = start
+      while (j < input.length && input(j) != ']') j += 1
+      val arg = new String(input.slice(start,j+1))
+      if (!args.contains(arg)) {
+        args += arg
+      }
+      j
+    }
+
     def endOfBlockArgName(arg: String) = if (arg.contains('(')) arg.indexOf('(') - 1 else arg.indexOf(']')
     def getCapturedArgs(arg: String, argMap: HashMap[String,String]) = {
       if (arg.contains('(')) {
@@ -232,7 +281,7 @@ trait ForgePreprocessor {
       // scan the block forwards, collecting identifiers
       var scope: CommentScope = NoComment
       while (i < input.length-1 && !endBlock) {
-        val (nextI, nextScope) = scanComment(scope, i, input)
+        val (nextI, nextScope) = scanComment(scope, i, input, false)
         if (scope == NoComment && nextScope != NoComment) {
           startCommentIndices += i
         }
@@ -255,6 +304,8 @@ trait ForgePreprocessor {
             val j =
               if (i+2 < input.length && input(i+1) == 't' && input(i+2) == '[')
                 parseTypeArgument(i+1, input, tpeArgs)
+              else if (i+2 < input.length && input(i+1) == 'a' && input(i+2) == '[')
+                parseBoundArguments(i+1,input,args)
               else
                 parseBlockArguments(i+1, input, args)
             i = j-1
@@ -293,6 +344,13 @@ trait ForgePreprocessor {
             val z: String = "arg"+argId // wtf? scala compiler error unless we break up z like this
             argMap += (a -> z)
           }
+          else if (isBoundArg(a)) {
+            val a2 = a.slice(2,endOfBoundArgName(a)).split(',')
+            val i1 = a2(0).toInt
+            val i2 = a2(1).toInt
+            val z: String = "f_" + "__arg" + i1 + "_" + "__arg" + i2
+            argMap += (a -> z)
+          }
           else {
             val i = a.toInt
             val z: String = "arg"+argId
@@ -306,6 +364,15 @@ trait ForgePreprocessor {
               val a2 = a.slice(2,endOfBlockArgName(a))
               argMap += (a -> a2)
             }
+            else if (isBoundArg(a)) {
+              println("Parsing bound arg: " + a)
+
+              val a2 = a.slice(2,endOfBoundArgName(a)).split(',')
+              val i1 = a2(0)
+              val i2 = a2(1).toInt
+              val z: String = "f_" + i1 + "_" + "__arg" + i2
+              argMap += (a -> z)
+            }
             else {
               argMap += (a -> a)
             }
@@ -318,7 +385,7 @@ trait ForgePreprocessor {
           val a2 = a.slice(2,endOfBlockArgName(a))
           output ++= (indentInterior + "val " + argMap(a) + " = quotedBlock("+quoteArgName(a2)+", "+enclosingOp.get+", List("+getCapturedArgs(a,argMap).mkString(",")+"))" + nl).getBytes
         }
-        else {
+        else if (!isBoundArg(a)) {
           output ++= (indentInterior + "val " + argMap(a) + " = quotedArg("+quoteArgName(a)+")" + nl).getBytes
         }
       }
@@ -354,7 +421,10 @@ trait ForgePreprocessor {
       // remap args inside the input block, outside-in
       for (a <- args.reverse) {
         if (argMap.contains(a)) {
-          strBlock = strBlock.replace("$"+a, "$"+argMap(a))
+          if (isBoundArg(a))
+            strBlock = strBlock.replace("$"+a, argMap(a)) // don't include the $ for bound args
+          else
+            strBlock = strBlock.replace("$"+a, "$"+argMap(a))
         }
       }
       // remap tpe args
@@ -377,26 +447,79 @@ trait ForgePreprocessor {
       i
     }
 
+    def writeDocumentBlock(start: Int, input: Array[Byte], output: ArrayBuffer[Byte], startScope: CommentScope, expandComments: Boolean): Int = {
+      var i = start
+      var scope = startScope
+      // Scan to end of comment block
+      while (i < input.length && scope != NoComment) {
+        val (newIndex, newScope) = scanComment(scope, i, input, false)
+        if (newScope != scope) { i = newIndex; scope = newScope }
+        else { i += 1 }
+      }
+      val end = i
+      var trueEnd = end-2
+      while (input(trueEnd) == '*' && trueEnd > start) { trueEnd -= 1 }  // Drop ending *s
+
+      if (trueEnd <= start || !expandComments) {
+        // e.g. /******/ markers
+        output ++= input.slice(start, end)
+      }
+      else {
+        if (startScope == DocumentBlock) output ++= ("doc(s\"\"\"").getBytes
+        else if (startScope == SummaryBlock) output ++= ("summary(s\"\"\"").getBytes
+        i = start
+        var lineStart = start
+        while (i < trueEnd) {
+          lineStart = i
+          // Drop the spaces and first * at the beginning of each line, if one exists
+          while (i < trueEnd && input(i) != '\n') { i += 1 }
+          var j = lineStart
+          while (j < i && input(j) == ' ' || input(j) == '\t') { j += 1 }
+          if (input(j) == '*') { j += 1 }
+          //if (j > i) { j = lineStart }
+
+          if (j <= i) output ++= input.slice(j, i+1) // Add the line to the output
+          i += 1
+        }
+        output ++= ("\"\"\")").getBytes
+      }
+      // return end index
+      end
+    }
+
     def expand(input: Array[Byte]): Option[Array[Byte]] = {
       val output = new ArrayBuffer[Byte]()
 
       var start = 0
-      var i = scanTo$(start, input)
-      val foundBlock = i < input.length
+      var feature: Feature = NoFeature
+      var i = 0
+      var isDSLFile = false    // Is this a DSL file?
+      var isDSLScope = false   // Is this a DSL scope? (requiring preprocessor expansion)
 
       while (i < input.length) {
+        val (nextFeature, nextIndex) = scanToFeature(start, input, isDSLScope)
+        feature = nextFeature; i = nextIndex
         output ++= input.slice(start,i)
-        val blockEnd = writeFormattedBlock(i+2, input, output)
-        start = blockEnd
-        i = scanTo$(start, input)
+
+        start = feature match {
+          case DocumentBlock => writeDocumentBlock(i+3, input, output, DocumentBlock, isDSLScope)
+          case SummaryBlock  => writeDocumentBlock(i+4, input, output, SummaryBlock, isDSLScope)
+          case CodeBlock =>
+            isDSLFile = true
+            isDSLScope = true
+            writeFormattedBlock(i+2, input, output)
+
+          case DSLAnnotation =>
+            //println("Found feature at index ")
+            isDSLFile = true
+            isDSLScope = true
+            i + DSLAnnotation.length
+
+          case _ => i // Shouldn't happen in general
+        }
       }
 
-      if (foundBlock) {
-        // write remaining
-        output ++= input.slice(start, i)
-        Some(output.toArray)
-      }
-      else None
+      if (isDSLFile) Some(output.toArray) else None
     }
 
     // --
@@ -404,6 +527,8 @@ trait ForgePreprocessor {
     // preprocess entry
 
     if (preprocessorEnabled) {
+      //System.out.println("Preprocessing file " + src.getName())
+
       val dest = srcManaged / "preprocess" / src.getName()
       if (!preprocessorDebug && dest.exists() && dest.lastModified() > src.lastModified()) {
         dest

@@ -46,8 +46,12 @@ trait VectorOps {
     val S = if (isTpePar(T)) List(TStringable(asTpePar(T))) else Nil
     val V = if (isTpePar(T)) v(T) else v
 
-    val VectorCommonOps = withTpe(v)
-    VectorCommonOps {
+    //val VectorCommonOps = withTpe(v)
+    //VectorCommonOps {
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(v){
       /**
        * Conversions
        */

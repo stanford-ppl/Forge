@@ -2,7 +2,7 @@ package ppl.dsl.forge
 package core
 
 import java.io.{PrintWriter}
-import scala.reflect.SourceContext
+import org.scala_lang.virtualized.SourceContext
 import scala.virtualization.lms.common._
 import scala.virtualization.lms.internal._
 import scala.virtualization.lms.util.OverloadHack
@@ -27,13 +27,17 @@ trait FieldOps extends Base with OverloadHack {
   // TODO: hide these behind a forge cmd in ForgeOps
 
   // needed for lookup
-  def infix_name(x: Rep[DSLType])(implicit o: Overloaded1): String
-  // needed for is
-  def infix_tpePars(x: Rep[DSLType]): List[Rep[TypePar]]
-  // needed to generate primitive math combinations as type classes
-  def infix_stage(x: Rep[DSLType]): StageTag
-  def infix_tpeArgs(x: Rep[DSLType]): List[Rep[DSLType]]
+  implicit def DSLTypeOpsClsFO(x: Rep[DSLType]): AbsDSLTypeOpsCls
+  abstract class AbsDSLTypeOpsCls {
+    def name(implicit o: Overloaded1): String
+    // needed for is
+    def tpePars: List[Rep[TypePar]]
+    // needed to generate primitive math combinations as type classes
+    def stage: StageTag
+    def tpeArgs: List[Rep[DSLType]]
+  }
 }
+
 
 trait FieldOpsExp extends FieldOps {
   this: ForgeExp =>
@@ -41,158 +45,189 @@ trait FieldOpsExp extends FieldOps {
  /**
   * TypeAlias
   */
-  def infix_name(x: Exp[TypeAlias]): String = x match {
-    case Def(TpeAlias(name,tpe)) => name
-  }
-  def infix_tpe(x: Exp[TypeAlias]): Exp[DSLType] = x match {
-    case Def(TpeAlias(name,tpe)) => tpe
-  }
+ implicit class TypeAliasOpsCls(val x: Exp[TypeAlias]) {
+   def name: String = x match {
+     case Def(TpeAlias(name, tpe)) => name
+   }
+
+   def tpe: Exp[DSLType] = x match {
+     case Def(TpeAlias(name, tpe)) => tpe
+   }
+ }
 
   /**
    * TypePar
    */
-  def infix_ctxBounds(x: Exp[TypePar]): List[TypeClassSignature] = x match {
-    case Def(TpePar(name,ctx,s)) => ctx
-    case Def(HkTpePar(name,tpePars,ctx,s)) => ctx
+  implicit class TypeParOpsClsField(val x: Exp[TypePar]) {
+    def ctxBounds: List[TypeClassSignature] = x match {
+      case Def(TpePar(name,ctx,s)) => ctx
+      case Def(HkTpePar(name,tpePars,ctx,s)) => ctx
+    }
   }
 
   /**
    * DSLType
    */
-  def infix_name(x: Exp[DSLType])(implicit o: Overloaded1): String = x match {
-    case Def(Tpe(name,tpePars,stage)) => name
-    case Def(TpeInst(t,args)) => infix_name(t)(o)
-    case Def(TpeClass(name,sig,tpePars)) => name
-    case Def(TpeClassEvidence(name,sig,tpePars)) => name
-    case Def(TpeClassInst(name,tpePars,t)) => name
-    case Def(FTpe(args,ret,freq)) => "Function"
-    case Def(TpePar(name,ctx,s)) => name
-    case Def(HkTpePar(name,tpePars,ctx,s)) => name
-    case Def(VarArgs(t)) => "*" + infix_name(t)(o)
-  }
-  def infix_tpePars(x: Exp[DSLType]) = x match {
-    case Def(Tpe(s,tpePars,stage)) => tpePars
-    case Def(TpeInst(t,args)) => Nil
-    case Def(TpePar(name,ctx,s)) => Nil
-    case Def(HkTpePar(name,tpePars,ctx,s)) => tpePars
-    case Def(TpeClass(name,sig,tpePars)) => tpePars
-    case Def(TpeClassEvidence(name,sig,tpePars)) => tpePars collect { case t: Exp[TypePar] if t.tp == manifest[TypePar] => t }
-    case Def(TpeClassInst(name,tpePars,t)) => tpePars
-    case Def(FTpe(args,ret,freq)) => Nil
-    case Def(VarArgs(t)) => Nil
-  }
-  def infix_stage(x: Exp[DSLType]) = x match {
-    case Def(Tpe(s,tpePars,stage)) => stage
-    case Def(TpeInst(Def(Tpe(s,tpePars,stage)),args)) => stage
-    case Def(TpePar(name,ctx,stage)) => stage
-    case Def(HkTpePar(name,tpePars,ctx,stage)) => stage
-    case Def(TpeInst(Def(HkTpePar(name,tpePars,ctx,stage)),args)) => stage
-    case Def(TpeClass(name,sig,pars)) => future
-    case Def(TpeClassEvidence(name,sig,tpePars)) => future
-    case Def(TpeClassInst(name,tpePars,t)) => future
-    case Def(FTpe(args,ret,freq)) => future
-    case Def(VarArgs(t)) => future
-  }
-  def infix_tpeArgs(x: Exp[DSLType]) = x match {
-    case Def(TpeInst(t,args)) => args
-    case _ => Nil
+  implicit def DSLTypeOpsClsFO(x: Rep[DSLType]) = new DSLTypeOpsCls(x)
+  class DSLTypeOpsCls(val x: Exp[DSLType]) extends AbsDSLTypeOpsCls {
+    def name(implicit o: Overloaded1): String = x match {
+      case Def(Tpe(name,tpePars,stage)) => name
+      case Def(TpeInst(t,args)) => t.name(o)
+      case Def(TpeClass(name,sig,tpePars)) => name
+      case Def(TpeClassEvidence(name,sig,tpePars)) => name
+      case Def(TpeClassInst(name,tpePars,t)) => name
+      case Def(FTpe(args,ret,freq)) => "Function"
+      case Def(TpePar(name,ctx,s)) => name
+      case Def(HkTpePar(name,tpePars,ctx,s)) => name
+      case Def(VarArgs(t)) => "*" + t.name(o)
+    }
+    def tpePars = x match {
+      case Def(Tpe(s,tpePars,stage)) => tpePars
+      case Def(TpeInst(t,args)) => Nil
+      case Def(TpePar(name,ctx,s)) => Nil
+      case Def(HkTpePar(name,tpePars,ctx,s)) => tpePars
+      case Def(TpeClass(name,sig,tpePars)) => tpePars
+      case Def(TpeClassEvidence(name,sig,tpePars)) => tpePars collect { case t: Exp[TypePar] if t.tp == manifest[TypePar] => t }
+      case Def(TpeClassInst(name,tpePars,t)) => tpePars
+      case Def(FTpe(args,ret,freq)) => Nil
+      case Def(VarArgs(t)) => Nil
+    }
+    def stage = x match {
+      case Def(Tpe(s,tpePars,stage)) => stage
+      case Def(TpeInst(Def(Tpe(s,tpePars,stage)),args)) => stage
+      case Def(TpePar(name,ctx,stage)) => stage
+      case Def(HkTpePar(name,tpePars,ctx,stage)) => stage
+      case Def(TpeInst(Def(HkTpePar(name,tpePars,ctx,stage)),args)) => stage
+      case Def(TpeClass(name,sig,pars)) => future
+      case Def(TpeClassEvidence(name,sig,tpePars)) => future
+      case Def(TpeClassInst(name,tpePars,t)) => future
+      case Def(FTpe(args,ret,freq)) => future
+      case Def(VarArgs(t)) => future
+    }
+    def tpeArgs = x match {
+      case Def(TpeInst(t,args)) => args
+      case _ => Nil
+    }
   }
 
   /**
    * DSLTypeClass
    */
-   def infix_signature(x: Exp[DSLTypeClass]): TypeClassSignature = x match {
-     case Def(TpeClass(name,sig,tpePars)) => sig
-     case Def(TpeClassEvidence(name,sig,tpePars)) => sig
-   }
+  implicit class DSLTypeClassOpsCls(val x: Exp[DSLTypeClass]) {
+    def signature: TypeClassSignature = x match {
+      case Def(TpeClass(name,sig,tpePars)) => sig
+      case Def(TpeClassEvidence(name,sig,tpePars)) => sig
+    }
+  }
 
   /**
    * DSLTypeClassInst
    */
-  def infix_tpe(x: Exp[DSLTypeClassInst])(implicit o: Overloaded1): Exp[DSLType] = x match {
-    case Def(TpeClassInst(name,tpePars,t)) => t
+  implicit class DSLTypeClassInstOpsCls(val x: Exp[DSLTypeClassInst]) {
+    def tpe(implicit o: Overloaded1): Exp[DSLType] = x match {
+      case Def(TpeClassInst(name,tpePars,t)) => t
+    }
   }
 
   /**
   * DSLArg
   */
-  def infix_name(x: Exp[DSLArg])(implicit o: Overloaded3): String = x match  {
-    case Def(Arg(name,tpe,default)) => name
-  }
-  def infix_tpe(x: Exp[DSLArg])(implicit o: Overloaded2): Exp[DSLType] = x match  {
-    case Def(Arg(name,tpe,default)) => tpe
-  }
-  def infix_default(x: Exp[DSLArg]) = x match  {
-    case Def(Arg(name,tpe,default)) => default
+  implicit class DSLArgOpsCls(val x: Exp[DSLArg]) {
+    def name(implicit o: Overloaded3): String = x match  {
+      case Def(Arg(name,tpe,default)) => name
+    }
+    def tpe(implicit o: Overloaded2): Exp[DSLType] = x match  {
+      case Def(Arg(name,tpe,default)) => tpe
+    }
+    def default = x match  {
+      case Def(Arg(name,tpe,default)) => default
+    }
   }
 
   /**
    * DSLGroup
    */
-  def infix_name(x: Exp[DSLGroup])(implicit o: Overloaded4): String = x match {
-    case Def(Grp(name)) => name
-    case _ if grpIsTpe(x) => grpAsTpe(x).name
+  implicit class DSLGroupOpsCls(val x: Exp[DSLGroup]) {
+    def name(implicit o: Overloaded4): String = x match {
+      case Def(Grp(name)) => name
+      case _ if grpIsTpe(x) => grpAsTpe(x).name
+    }
   }
 
   /**
    * DSLOp
    */
-  def infix_args(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,Nil,implArgs,retTpe,eff,alias)) => args
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => args ++ curArgs.flatten
-  }
-  def infix_firstArgs(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => args
-  }
-  def infix_curriedArgs(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => curArgs
-  }
-  def infix_implicitArgs(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => implArgs
-  }
-  def infix_grp(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => grp
-  }
-  def infix_name(x: Exp[DSLOp])(implicit o: Overloaded5) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => name
-  }
-  def infix_style(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => style
-  }
-  def infix_tpePars(x: Exp[DSLOp])(implicit o: Overloaded1) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => tpePars
-  }
-  def infix_retTpe(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => retTpe
-  }
-  def infix_effect(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => eff
-  }
-  def infix_aliasHint(x: Exp[DSLOp]) = x match {
-    case Def(Op(grp,name,style,tpePars,args,curArgs,implArgs,retTpe,eff,alias)) => alias
+  implicit class DSLOpOpsClsField(val x: Exp[DSLOp]) {
+    def args = x match {
+      case Def(Op(grp, name, style, tpePars, args, Nil, implArgs, retTpe, eff, alias)) => args
+      case Def(Op(grp, name, style, tpePars, args, curArgs, implArgs, retTpe, eff, alias)) => args ++ curArgs.flatten
+    }
+
+    def firstArgs = x match {
+      case Def(Op(grp, name, style, tpePars, args, curArgs, implArgs, retTpe, eff, alias)) => args
+    }
+
+    def curriedArgs = x match {
+      case Def(Op(grp, name, style, tpePars, args, curArgs, implArgs, retTpe, eff, alias)) => curArgs
+    }
+
+    def implicitArgs = x match {
+      case Def(Op(grp, name, style, tpePars, args, curArgs, implArgs, retTpe, eff, alias)) => implArgs
+    }
+
+    def grp = x match {
+      case Def(Op(grp, name, style, tpePars, args, curArgs, implArgs, retTpe, eff, alias)) => grp
+    }
+
+    def name(implicit o: Overloaded5) = x match {
+      case Def(Op(grp, name, style, tpePars, args, curArgs, implArgs, retTpe, eff, alias)) => name
+    }
+
+    def style = x match {
+      case Def(Op(grp, name, style, tpePars, args, curArgs, implArgs, retTpe, eff, alias)) => style
+    }
+
+    def tpePars(implicit o: Overloaded1) = x match {
+      case Def(Op(grp, name, style, tpePars, args, curArgs, implArgs, retTpe, eff, alias)) => tpePars
+    }
+
+    def retTpe = x match {
+      case Def(Op(grp, name, style, tpePars, args, curArgs, implArgs, retTpe, eff, alias)) => retTpe
+    }
+
+    def effect = x match {
+      case Def(Op(grp, name, style, tpePars, args, curArgs, implArgs, retTpe, eff, alias)) => eff
+    }
+
+    def aliasHint = x match {
+      case Def(Op(grp, name, style, tpePars, args, curArgs, implArgs, retTpe, eff, alias)) => alias
+    }
   }
 
   /**
    * DSLData
    */
-  def infix_tpe(x: Exp[DSLData])(implicit o: Overloaded3) = x match {
-    case Def(Data(tpe,fields)) => tpe
-  }
-  def infix_fields(x: Exp[DSLData]) = x match {
-    case Def(Data(tpe,fields)) => fields
+  implicit class DSLDataOpsCls(val x: Exp[DSLData]) {
+    def tpe(implicit o: Overloaded3) = x match {
+      case Def(Data(tpe, fields)) => tpe
+    }
+
+    def fields = x match {
+      case Def(Data(tpe, fields)) => fields
+    }
   }
 
  /**
   * Identifier
   */
-  def infix_name(x: Exp[DSLIdentifier])(implicit o: Overloaded6): String = x match {
-    case Def(Identifier(name,tpe)) => name
+  implicit class DSLIdentifierOpsCls(x: Exp[DSLIdentifier]) {
+     def name(implicit o: Overloaded6): String = x match {
+       case Def(Identifier(name,tpe)) => name
+     }
+     def tpe(implicit o: Overloaded4): Exp[DSLType] = x match {
+       case Def(Identifier(name,tpe)) => tpe
+     }
   }
-  def infix_tpe(x: Exp[DSLIdentifier])(implicit o: Overloaded4): Exp[DSLType] = x match {
-    case Def(Identifier(name,tpe)) => tpe
-  }
-
-
 }
 
 

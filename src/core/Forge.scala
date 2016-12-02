@@ -1,9 +1,10 @@
 package ppl.dsl.forge
 package core
+import org.scala_lang.virtualized.SourceContext
 
 import java.io.{File,PrintWriter,FileWriter}
 import scala.tools.nsc.io.{Directory,Path}
-import scala.reflect.SourceContext
+import org.scala_lang.virtualized.SourceContext
 import scala.collection.mutable.{ArrayBuffer,HashSet,HashMap}
 import scala.virtualization.lms.common._
 import scala.virtualization.lms.internal.{GenericFatCodegen, GenericCodegen}
@@ -200,6 +201,7 @@ trait ForgeExp extends Forge with ForgeUtilities with ForgeScalaOpsPkgExp with D
     case _ => false
   }
 
+  //"call-by-name": helper subroutine which calculates the value of the argument whose address is then passed to the original subroutine in place of the original argument
   def isThunk(f: Rep[DSLType]) = f match {
     case Def(FTpe(List(Def(Arg(_,`byName`,_))),ret,freq)) => true
     case _ => false
@@ -213,7 +215,8 @@ trait ForgeUtilities {
 
   def err(s: String)(implicit ctx: SourceContext) = {
     println("[forge error]: " + s)
-    // println("  at " + (ctx.fileName.split("/").last + ":" + ctx.line))
+//    println("  at " + (ctx.fileName.split("/").last + ":" + ctx.line))
+//    println("No SourceContext available")
     println("  at " + quotePos(fresh[Nothing].withPos(List(ctx))))
     sys.exit(1)
   }

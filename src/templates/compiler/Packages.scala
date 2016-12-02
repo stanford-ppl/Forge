@@ -52,6 +52,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("trait " + dsl + "InteractiveRunner[R] extends " + dsl + "ApplicationCompilerTrait with DeliteInteractiveRunner[R]")
     stream.println()
     stream.println("// executes scope immediately")
+    stream.println("@virtualize")
     stream.println("object " + dsl + " {")
     stream.println("  def apply[R](b: => R) = new Scope["+dsl+"Interactive, "+dsl+"InteractiveRunner[R], R](b)")
     stream.println("}")
@@ -60,6 +61,7 @@ trait DeliteGenPackages extends BaseGenPackages {
     stream.println("trait " + dsl + "LowerRunner[R] extends " + dsl + "ApplicationCompilerTrait with DeliteRestageRunner[R]")
     stream.println()
     stream.println("// stages scope and generates re-stageable code")
+    stream.println("@virtualize")
     stream.println("object " + dsl + "_ {")
     stream.println("  def apply[R](b: => R) = new Scope["+dsl+"Lower, "+dsl+"LowerRunner[R], R](b)")
     stream.println("}")
@@ -94,7 +96,7 @@ trait DeliteGenPackages extends BaseGenPackages {
       stream.println("  override def __whileDo(cond: => Exp[Boolean], body: => Rep[Unit])(implicit pos: SourceContext) = delite_while(cond, body)")
       // delite and lms if-then-else don't use by-name-parameter for cond
       stream.println("  override def __ifThenElse[T:Manifest](cond: Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")
-      stream.println("  override def __ifThenElse[T:Manifest](cond: => Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")
+      // stream.println("  override def __ifThenElse[T:Manifest](cond: => Rep[Boolean], thenp: => Rep[T], elsep: => Rep[T])(implicit ctx: SourceContext) = delite_ifThenElse(cond, thenp, elsep, false, true)")
     }
 
     if (OpsGrp.keySet.exists(_.name == "Ordering")) {

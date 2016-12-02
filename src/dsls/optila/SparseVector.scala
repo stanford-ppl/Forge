@@ -15,8 +15,12 @@ trait SparseVectorOps {
     val DenseMatrix = lookupTpe("DenseMatrix")
     val SparseVector = lookupTpe("SparseVector")
 
-    val SparseVectorCommonOps = withTpe(v)
-    SparseVectorCommonOps {
+    //val SparseVectorCommonOps = withTpe(v)
+    //SparseVectorCommonOps {
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(v){
       for (rhs <- List(DenseVector(T), DenseVectorView(T))) {
         infix ("*") (rhs :: SparseVector(T), TArith(T)) implements composite ${
           val out = ($self.indices.zip($self.nz) { (i,e) => e*$1(i) })
@@ -229,8 +233,12 @@ trait SparseVectorOps {
       nnz
     }
 
-    val SparseVectorOps = withTpe (SparseVector)
-    SparseVectorOps {
+    //val SparseVectorOps = withTpe (SparseVector)
+    //SparseVectorOps {
+    import org.scala_lang.virtualized.virtualize
+    magic2()
+    @virtualize
+    def magic2[R]() = withTpee(SparseVector){
       /**
        * Accessors
        */
@@ -642,11 +650,11 @@ trait SparseVectorOps {
         if (max < defaultValue[T]) defaultValue[T] else max
       }
 
-      direct ("__equal") (DenseVector(T) :: MBoolean) implements composite ${ $self.toDense == $1 }
+      direct ("infix_==") (DenseVector(T) :: MBoolean) implements composite ${ $self.toDense == $1 }
 
-      direct ("__equal") (SparseVectorView(T) :: MBoolean) implements composite ${ $1 == $self }
+      direct ("infix_==") (SparseVectorView(T) :: MBoolean) implements composite ${ $1 == $self }
 
-      direct ("__equal") (SparseVector(T) :: MBoolean) implements composite ${
+      direct ("infix_==") (SparseVector(T) :: MBoolean) implements composite ${
         if ($self.length != $1.length || $self.nnz != $1.nnz || $self.isRow != $1.isRow) false
         else {
           val dataEqual = densevector_alloc_raw($self.nnz, true, sparsevector_raw_data($self)) == densevector_alloc_raw($1.nnz, true, sparsevector_raw_data($1))

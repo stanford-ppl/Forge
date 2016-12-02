@@ -3,7 +3,8 @@ package optiql.library.classes
 import optiql.shared.ops._
 import optiql.library._
 import optiql.library.classes._
-import scala.reflect.{Manifest,SourceContext}
+import reflect.Manifest;
+import org.scala_lang.virtualized.SourceContext
 import scala.collection.mutable.HashMap
 
 trait RewriteWrapper {

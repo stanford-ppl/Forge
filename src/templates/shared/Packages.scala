@@ -60,8 +60,12 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     for (opsGrp <- opsGrps) {
       stream.print(" with " + opsGrp.name)
     }
+    //TODO(macrotrans):
     for (e <- Externs) {
-      stream.print(" with " + e.opsGrp.name)
+      if (e.opsGrp.name == "RecordOps")
+        stream.print(" with scala.virtualization.lms.common.RecordOps")
+      else
+        stream.print(" with " + e.opsGrp.name)
     }
     stream.println(" {")
     stream.println("  this: " + dsl + "Application => ")
@@ -83,12 +87,13 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     }
 
     stream.println()
-    emitBlockComment("hacks for Scala-Virtualized", stream, indent=2)
-      // HACK -- bug in scala-virtualized (copied from LMS IfThenElse.scala)
-    stream.println("  override def __ifThenElse[T](cond: => Boolean, thenp: => T, elsep: => T) = cond match {")
-    stream.println("    case true => thenp")
-    stream.println("    case false => elsep")
-    stream.println("  }")
+    //TODO(macrovirt) this is weird
+     // emitBlockComment("hacks for Scala-Virtualized", stream, indent=2)
+       // HACK -- bug in scala-virtualized (copied from LMS IfThenElse.scala)
+     // stream.println("  override def __ifThenElse[T](cond: => Boolean, thenp: => T, elsep: => T) = cond match {")
+     // stream.println("    case true => thenp")
+     // stream.println("    case false => elsep")
+     // stream.println("  }")
 
     stream.println()
     stream.println("}")

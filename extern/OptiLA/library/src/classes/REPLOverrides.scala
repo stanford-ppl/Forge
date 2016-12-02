@@ -1,7 +1,8 @@
 package optila.library.classes
 
 import scala.tools.nsc.io._
-import scala.reflect.{Manifest,SourceContext}
+import reflect.Manifest;
+import org.scala_lang.virtualized.SourceContext
 import scala.math.Ordering.Implicits._
 import scala.math.Numeric.Implicits._
 import scala.virtualization.lms.common.{Base,BaseExp,EffectExp,BaseFatExp}

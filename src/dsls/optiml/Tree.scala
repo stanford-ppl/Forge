@@ -89,41 +89,45 @@ trait TreeOps {
       ${numNodeSamples}
     )
 
-    val TreeOps = withTpe(Tree)
-    TreeOps {
+    //val TreeOps = withTpe(Tree)
+    //TreeOps {
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(Tree){
       // getters and setters
       infix ("numNodes") (Nil :: MInt) implements getter(0, "_numNodes")
-      compiler ("infix_set_num_nodes") (MInt :: MUnit, effect = write(0)) implements setter(0, "_numNodes", ${$1})
+      infix ("set_num_nodes") (MInt :: MUnit, effect = write(0)) implements setter(0, "_numNodes", ${$1})
 
       infix ("capacity") (Nil :: MInt) implements getter(0, "_capacity")
-      compiler ("infix_set_capacity") (MInt :: MUnit, effect = write(0)) implements setter(0, "_capacity", ${$1})
+      infix ("set_capacity") (MInt :: MUnit, effect = write(0)) implements setter(0, "_capacity", ${$1})
 
       infix("isLeaf") (Nil :: MArray(MBoolean)) implements getter(0, "_isLeaf")
-      compiler ("infix_set_is_leaf") (MArray(MBoolean) :: MUnit, effect = write(0)) implements setter(0, "_isLeaf", ${$1})
+      infix ("set_is_leaf") (MArray(MBoolean) :: MUnit, effect = write(0)) implements setter(0, "_isLeaf", ${$1})
 
       infix ("leftChildren") (Nil :: MArray(MInt)) implements getter(0, "_leftChildren")
-      compiler ("infix_set_left_children") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_leftChildren", ${$1})
+      infix ("set_left_children") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_leftChildren", ${$1})
 
       infix ("rightChildren") (Nil :: MArray(MInt)) implements getter(0, "_rightChildren")
-      compiler ("infix_set_right_children") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_rightChildren", ${$1})
+      infix ("set_right_children") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_rightChildren", ${$1})
 
       infix ("feature") (Nil :: MArray(MInt)) implements getter(0, "_feature")
-      compiler ("infix_set_feature") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_feature", ${$1})
+      infix ("set_feature") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_feature", ${$1})
 
       infix ("threshold") (Nil :: MArray(MDouble)) implements getter(0, "_threshold")
-      compiler ("infix_set_threshold") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_threshold", ${$1})
+      infix ("set_threshold") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_threshold", ${$1})
 
       infix ("value") (Nil :: MArray(MDouble)) implements getter(0, "_value")
-      compiler ("infix_set_value") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_value", ${$1})
+      infix ("set_value") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_value", ${$1})
 
       infix ("prob") (Nil :: MArray(MDouble)) implements getter(0, "_prob")
       compiler ("infix_set_prob") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_prob", ${$1})
 
       infix ("impurity") (Nil :: MArray(MDouble)) implements getter(0, "_impurity")
-      compiler ("infix_set_impurity") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_impurity", ${$1})
+      infix ("set_impurity") (MArray(MDouble) :: MUnit, effect = write(0)) implements setter(0, "_impurity", ${$1})
 
       infix ("numNodeSamples") (Nil :: MArray(MInt)) implements getter(0, "_numNodeSamples")
-      compiler ("infix_set_num_node_samples") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_numNodeSamples", ${$1})
+      infix ("set_num_node_samples") (MArray(MInt) :: MUnit, effect = write(0)) implements setter(0, "_numNodeSamples", ${$1})
 
       // Adds a node to the tree. The new node registers itself as the child of its parent.
       infix ("addNode") (MethodSignature(List(

@@ -1,10 +1,13 @@
 import simpleintvector.compiler._
 import simpleintvector.library._
 import simpleintvector.shared._
+import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 
 object HelloSimpleIntCompiler extends SimpleIntVectorApplicationCompiler with HelloSimpleInt
 object HelloSimpleIntInterpreter extends SimpleIntVectorApplicationInterpreter with HelloSimpleInt
 
+@virtualize
 trait HelloSimpleInt extends SimpleIntVectorApplication {
   def main() = {
     println("hello world")

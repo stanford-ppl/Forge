@@ -46,6 +46,7 @@ trait IdentGenOps extends BaseGenOps with BaseGenDataStructures {
       }
       emitWithIndent("val " + opsGrp.name + " = withTpe (" + opsGrp.grp.name + ")", stream, baseIndent)
       emitWithIndent(opsGrp.name + " {", stream, baseIndent)
+
       scope = true
     } else {
       emitWithIndent("val " + opsGrp.grp.name + " = grp (\"" + opsGrp.grp.name + "\")", stream, baseIndent)

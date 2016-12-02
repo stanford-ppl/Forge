@@ -1,7 +1,8 @@
 package LOWERCASE_DSL_NAME.shared
 
 import scala.annotation.unchecked.uncheckedVariance
-import scala.reflect.{Manifest,SourceContext}
+import reflect.Manifest;
+import org.scala_lang.virtualized.SourceContext
 import scala.virtualization.lms.common._
 
 import scala.virtualization.lms.util.OverloadHack
@@ -42,9 +43,11 @@ trait InputOutputCompilerOps extends InputOutputOps with OverloadHack {
     def apply(path: Rep[String])(implicit ctx: SourceContext): Rep[ForgeFileInputStream] = forge_fileinputstream_new(path)
   }
 
-  def infix_readLine(stream: Rep[ForgeFileInputStream])(implicit ctx: SourceContext, o: Overloaded1) = forge_fileinputstream_readline(stream)
-  def infix_size(stream: Rep[ForgeFileInputStream])(implicit ctx: SourceContext, o: Overloaded1) = forge_fileinputstream_size(stream)
-  def infix_close(stream: Rep[ForgeFileInputStream])(implicit ctx: SourceContext, o: Overloaded1) = forge_fileinputstream_close(stream)
+  implicit class ForgeFileInputStreamOpsCls(stream: Rep[ForgeFileInputStream])(implicit ctx: SourceContext) {
+    def readLine(implicit ctx: SourceContext, o: Overloaded1) = forge_fileinputstream_readline(stream)
+    def size(implicit ctx: SourceContext, o: Overloaded1) = forge_fileinputstream_size(stream)
+    def close(implicit ctx: SourceContext, o: Overloaded1) = forge_fileinputstream_close(stream)
+  }
 
   def forge_fileinputstream_new(path: Rep[String])(implicit ctx: SourceContext): Rep[ForgeFileInputStream]
   def forge_fileinputstream_readline(stream: Rep[ForgeFileInputStream])(implicit ctx: SourceContext): Rep[String]
@@ -59,8 +62,10 @@ trait InputOutputCompilerOps extends InputOutputOps with OverloadHack {
     def apply(path: Rep[String], append: Rep[Boolean] = unit(false))(implicit ctx: SourceContext): Rep[ForgeFileOutputStream] = forge_fileoutputstream_new(path, append)
   }
 
-  def infix_writeLine(stream: Rep[ForgeFileOutputStream], line: Rep[String])(implicit ctx: SourceContext, o: Overloaded1) = forge_fileoutputstream_writeline(stream, line)
-  def infix_close(stream: Rep[ForgeFileOutputStream])(implicit ctx: SourceContext, o: Overloaded2) = forge_fileoutputstream_close(stream)
+  implicit class ForgeFileOutputStreamOpsCls(stream: Rep[ForgeFileOutputStream])(implicit ctx: SourceContext) {
+    def writeLine(line: Rep[String])(implicit ctx: SourceContext, o: Overloaded1) = forge_fileoutputstream_writeline(stream, line)
+    def close(implicit ctx: SourceContext, o: Overloaded2) = forge_fileoutputstream_close(stream)
+  }
 
   def forge_fileoutputstream_new(path: Rep[String], append: Rep[Boolean])(implicit ctx: SourceContext): Rep[ForgeFileOutputStream]
   def forge_fileoutputstream_writeline(stream: Rep[ForgeFileOutputStream], line: Rep[String])(implicit ctx: SourceContext): Rep[Unit]

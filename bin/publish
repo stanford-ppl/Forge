@@ -66,13 +66,15 @@ import Tests._
 object ${dslName}Build extends Build {
   if (System.getProperty("showSuppressedErrors") == null) System.setProperty("showSuppressedErrors", "false")
   val virtScala = "${scala_major_vers}.${scala_minor_vers}"
+  val paradiseVersion = "2.0.1"
   val virtBuildSettingsBase = Project.defaultSettings ++ Seq(
     organization := "stanford-ppl",
-    scalaOrganization := "org.scala-lang.virtualized",
+    //scalaOrganization := "org.scala-lang.virtualized",
     scalaVersion := virtScala,
 
     publishArtifact in (Compile, packageDoc) := false,
     // needed for scala.tools, which is apparently not included in sbt's built in version
+    libraryDependencies += "org.scala-lang.virtualized" %% "scala-virtualized" % "1.0.0-macrovirt",
     libraryDependencies += "org.scala-lang" % "scala-library" % virtScala,
     libraryDependencies += "org.scala-lang" % "scala-compiler" % virtScala,
     libraryDependencies += "org.scalatest" % "scalatest_${scala_major_vers}" % "2.2.2",
@@ -88,7 +90,12 @@ object ${dslName}Build extends Build {
     // used in delitec to access jars
     retrieveManaged := true,
     scalacOptions += "-Yno-generic-signatures",
-    scalacOptions += "-Yvirtualize",
+    //scalacOptions += "-Yvirtualize",
+    libraryDependencies ++= (
+      if (scalaVersion.value.startsWith("2.10")) List("org.scalamacros" %% "quasiquotes" % paradiseVersion)
+      else Nil
+    ),
+    addCompilerPlugin("org.scalamacros" % "paradise" % paradiseVersion cross CrossVersion.full),
     initialCommands in console += "import ${dslNameLowerCase}.library._; val ${dslName} = new ${dslName}REPL { def main() = {} }; import ${dslName}._"
   )
 
@@ -131,7 +138,7 @@ def sbtBuildFile(dsl):
     s = Template("""
 ${header}
 
-  val virtualization_lms_core = "EPFL" % "lms_${scala_major_vers}" % "0.3-SNAPSHOT"
+  val virtualization_lms_core = "EPFL" % "macro-lms_${scala_major_vers}" % "1.0.0-wip-macro"
   val delite_framework = "stanford-ppl" % "framework_${scala_major_vers}" % "0.1-SNAPSHOT"
   val delite_runtime = "stanford-ppl" % "runtime_${scala_major_vers}" % "0.1-SNAPSHOT"
   val delite_tests = "stanford-ppl" % "delite-test_${scala_major_vers}" % "0.1-SNAPSHOT"

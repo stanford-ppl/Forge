@@ -19,7 +19,8 @@
  * 
  */
 
-import reflect.{Manifest, SourceContext}
+import reflect.Manifest;
+import org.scala_lang.virtualized.SourceContext
 import scala.virtualization.lms.common.Record
 import optiml.compiler._
 import optiml.library._
@@ -38,9 +39,11 @@ trait TheoData extends OptiMLApplication {
   }
   
   /* syntactic sugar */
-  def infix_x(a: Rep[XYZ]) = a._1
-  def infix_y(a: Rep[XYZ]) = a._2
-  def infix_z(a: Rep[XYZ]) = a._3
+  implicit class XYZOpsCls(val a: Rep[XYZ]) {
+    def x = a._1
+    def y = a._2
+    def z = a._3
+  }
                            
   /* 
    Stores temporary data required during Theobald RMSD calculation.
@@ -77,19 +80,19 @@ trait TheoData extends OptiMLApplication {
     val t2 = x.G
     val t3 = x.numAtoms
     val t4 = x.numAtomsWithPadding
-    new Record {
-      val XYZData = t1(n)
-      val G = t2(n)
-      val numAtoms = t3
-      val numAtomsWithPadding = t4
-    }
+    Record (
+      XYZData = t1(n),
+      G = t2(n),
+      numAtoms = t3,
+      numAtomsWithPadding = t4
+    )
   }
 
   /*
-  def set(x: Rep[Theo], index: Rep[IndexVector], value: Rep[Theo]): Rep[Theo] = new Record {
-    x.XYZData(index) = value.XYZData
+  def set(x: Rep[Theo], index: Rep[IndexVector], value: Rep[Theo]): Rep[Theo] = Record (
+    x.XYZData(index) = value.XYZData,
     x.G(index) = value.G 
-  }
+  )
   */
 
   def len(x: Rep[Theo]) = x.XYZData.numRows

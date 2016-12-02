@@ -37,8 +37,12 @@ trait UndirectedGraphOps{
     static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt))), UndirectedGraph))) implements allocates(UndirectedGraph,${$count},${$exID},${$outNodes},${outEdges},${array_empty[Double](unit(0))})
     static(UndirectedGraph)("apply", Nil, (MethodSignature(List(("count",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("weights",MArray(MDouble))), UndirectedGraph))) implements allocates(UndirectedGraph,${$count},${$exID},${$outNodes},${outEdges},${weights})
 
-    val UndirectedGraphOps = withTpe(UndirectedGraph)     
-    UndirectedGraphOps{
+    //val UndirectedGraphOps = withTpe(UndirectedGraph)     
+    //UndirectedGraphOps{
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(UndirectedGraph){
       infix ("numEdges")(Nil :: MInt) implements composite ${array_length($self.getCSREdges)}
 
       infix ("isDirected") (Nil :: MBoolean) implements composite ${false}

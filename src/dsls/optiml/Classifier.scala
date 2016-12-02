@@ -62,8 +62,12 @@ trait ClassifierOps {
       alloc_forest(trees)
     }
 
-    val ForestOps = withTpe(Forest)
-    ForestOps {
+    //val ForestOps = withTpe(Forest)
+    //ForestOps {
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(Forest){
       infix ("trees") (Nil :: DenseVector(Tree)) implements getter(0, "_trees")
 
       // Return a 2 element vector where v(0) is the probability the label is false,

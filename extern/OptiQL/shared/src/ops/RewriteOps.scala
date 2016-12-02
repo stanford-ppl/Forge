@@ -1,17 +1,19 @@
 package optiql.shared.ops
 
-import scala.virtualization.lms.common.{Base,StructOps}
+import scala.virtualization.lms.common.{Base,StructOps, RecordOps}
 import optiql.shared._
 import optiql.shared.ops._
-import scala.reflect.{RefinedManifest,SourceContext}
+import org.scala_lang.virtualized.{RefinedManifest,SourceContext}
 
 //TODO: this trait is basically a misc. grab bag of features, but most of it should be pushed directly into Forge
 trait RewriteOps extends Base {
   this: OptiQL => 
 
-  def infix_printAsTable[A:Manifest](self: Rep[Table[A]],maxRows: Rep[Int] = unit(100))(implicit __pos: SourceContext) = table_printastable[A](self,maxRows)(implicitly[Manifest[A]],__pos)
-  def infix_writeAsJSON[A:Manifest](self: Rep[Table[A]],path: Rep[String])(implicit __pos: SourceContext) = table_writeasjson[A](self,path)(implicitly[Manifest[A]],__pos)
-  //def infix_writeAsCSV
+  implicit class TableOpsCls[A:Manifest](val self: Rep[Table[A]])(implicit pos: SourceContext) {
+    def printAsTable(maxRows: Rep[Int] = unit(100))(implicit __pos: SourceContext) = table_printastable[A](self,maxRows)(implicitly[Manifest[A]],__pos)
+    def writeAsJSON(path: Rep[String])(implicit __pos: SourceContext) = table_writeasjson[A](self,path)(implicitly[Manifest[A]],__pos)
+    //def writeAsCSV
+  }
 
   def table_printastable[A:Manifest](self: Rep[Table[A]],maxRows: Rep[Int] = unit(100))(implicit __pos: SourceContext): Rep[Unit]
   def table_writeasjson[A:Manifest](self: Rep[Table[A]],path: Rep[String])(implicit __pos: SourceContext): Rep[Unit]
@@ -76,13 +78,12 @@ trait RewriteCompilerOps extends RewriteOps {
         case "Boolean" => (field, false, (r:Rep[T]) => record(unit(i)) == "true")
         case "Int" => (field, false, (r:Rep[T]) => record(unit(i)).toInt)
         case "Long" => (field, false, (r:Rep[T]) => record(unit(i)).toLong)
-        case "Char" => (field, false, (r:Rep[T]) => infix_fcharAt(record(unit(i)), unit(0)))
+        case "Char" => (field, false, (r:Rep[T]) => fstring_fcharat(record(unit(i)), unit(0)))
         case d if d.contains("Date") => (field, false, (r:Rep[T]) => Date(record(unit(i))))
         case _ => throw new RuntimeException("Don't know hot to automatically parse type " + tp.toString + ". Try passing in your own parsing function instead.")
       }
     }
-    
-    if (isRecord) record_new[T](fields)
+    if (isRecord) record_new[T](fields.asInstanceOf[Seq[(String, Boolean, RewriteCompilerOps.this.Rep[T] => RewriteCompilerOps.this.Rep[_])]])
     else fields(0)._3(null.asInstanceOf[Rep[T]]).asInstanceOf[Rep[T]]
   }
 }

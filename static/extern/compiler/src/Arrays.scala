@@ -1,7 +1,9 @@
 package LOWERCASE_DSL_NAME.compiler
 
 import scala.annotation.unchecked.uncheckedVariance
-import scala.reflect.{Manifest,SourceContext}
+import reflect.Manifest
+import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 import scala.virtualization.lms.common._
 import ppl.delite.framework.codegen.delite.overrides._
 import ppl.delite.framework.ops.DeliteOpsExp
@@ -9,6 +11,7 @@ import ppl.delite.framework.datastructures._
 import ppl.delite.framework.Config
 
 // For compiler (Delite) implementation
+@virtualize
 trait ForgeArrayOpsExp extends DeliteArrayFatExp {
   this: DeliteOpsExp with ForgeHashMapOpsExp =>
 

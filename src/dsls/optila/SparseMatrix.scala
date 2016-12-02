@@ -35,8 +35,12 @@ trait SparseMatrixOps {
       ("colIndices", MArray(MInt)),
       ("nnz", MInt)), SparseMatrixBuildable(T))) implements allocates(SparseMatrixBuildable, ${$0}, ${$1}, ${$2}, ${$3}, ${$4}, ${$5})
 
-    val SparseMatrixBuildableOps = withTpe(SparseMatrixBuildable)
-    SparseMatrixBuildableOps {
+    //val SparseMatrixBuildableOps = withTpe(SparseMatrixBuildable)
+    //SparseMatrixBuildableOps {
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(SparseMatrixBuildable){
       /**
        * Accessors
        */
@@ -493,8 +497,12 @@ trait SparseMatrixOps {
     // direct (SparseMatrix) ("triu", T withBound TArith, SparseMatrix(T) :: SparseMatrix(T)) implements redirect ${ $0.triu }
     // direct (SparseMatrix) ("tril", T withBound TArith, SparseMatrix(T) :: SparseMatrix(T)) implements redirect ${ $0.tril }
 
-    val SparseMatrixOps = withTpe (SparseMatrix)
-    SparseMatrixOps {
+    //val SparseMatrixOps = withTpe (SparseMatrix)
+    //SparseMatrixOps {
+    import org.scala_lang.virtualized.virtualize
+    magic2()
+    @virtualize
+    def magic2[R]() = withTpee(SparseMatrix){
       /**
        * Accessors
        */
@@ -503,7 +511,8 @@ trait SparseMatrixOps {
       infix ("size") (Nil :: MInt) implements composite ${ $self.numRows*$self.numCols }
       infix ("nnz") (Nil :: MInt) implements getter(0, "_nnz")
 
-      infix ("nz") (MethodSignature(List(("asRow",MBoolean,"unit(true)")), DenseVector(T))) implements composite ${ densevector_alloc_raw($self.nnz, $1, sparsematrix_csr_data($self)) }
+      // infix ("nz") (Nil :: DenseVector(T), aliasHint = contains(0)) ???
+      infix ("nz") (Nil :: DenseVector(T)) implements composite ${ densevector_alloc_raw($self.nnz, $1, sparsematrix_csr_data($self)) }
 
       compiler ("sparsematrix_csr_find_offset") ((("row",MInt),("col",MInt)) :: MInt) implements composite ${
         val rowPtr = sparsematrix_csr_rowptr($self)
@@ -956,7 +965,7 @@ trait SparseMatrixOps {
       infix ("maxRows") (Nil :: SparseVector(T), (TOrdering(T), THasMinMax(T))) implements composite ${ $self.mapRowsToVector { row => max(row.toSparse) }}
       infix ("maxCols") (Nil :: SparseVector(T), (TOrdering(T), THasMinMax(T))) implements composite ${ $self.mapColsToVector { col => max(col.toSparse) }}
 
-      direct ("__equal") (SparseMatrix(T) :: MBoolean) implements composite ${
+      direct ("infix_==") (SparseMatrix(T) :: MBoolean) implements composite ${
         if ($self.numRows != $1.numRows || $self.numCols != $1.numCols) false
         else {
           val dataEqual = densevector_alloc_raw($self.nnz, true, sparsematrix_csr_data($self)) == densevector_alloc_raw($1.nnz, true, sparsematrix_csr_data($1))
@@ -966,7 +975,7 @@ trait SparseMatrixOps {
         }
       }
 
-      direct ("__equal") (DenseMatrix(T) :: MBoolean) implements composite ${ $self.toDense == $1 }
+      direct ("infix_==") (DenseMatrix(T) :: MBoolean) implements composite ${ $self.toDense == $1 }
 
 
       /**

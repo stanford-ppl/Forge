@@ -132,8 +132,12 @@ trait DenseVectorOps {
     }
 
 
-    val DenseVectorOps = withTpe (DenseVector)
-    DenseVectorOps {
+    //val DenseVectorOps = withTpe (DenseVector)
+    //DenseVectorOps {
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(DenseVector){
       /**
        * Accessors
        */
@@ -356,7 +360,7 @@ trait DenseVectorOps {
       infix (":<") (DenseVector(T) :: DenseVector(MBoolean), TOrdering(T)) implements zip((T,T,MBoolean), (0,1), ${ (a,b) => a < b })
 
       for (rhs <- List(DenseVector(T),DenseVectorView(T),IndexVector)) {
-        direct ("__equal") (rhs :: MBoolean) implements composite ${
+        direct ("infix_==") (rhs :: MBoolean) implements composite ${
           if ($self.length != $1.length || $self.isRow != $1.isRow) false
           else {
             val c = $self.indices.count(i => $self(i) != $1(i))
@@ -365,7 +369,7 @@ trait DenseVectorOps {
         }
       }
 
-      direct ("__equal") (SparseVector(T) :: MBoolean) implements composite ${ $self == $1.toDense }
+      direct ("infix_==") (SparseVector(T) :: MBoolean) implements composite ${ $self == $1.toDense }
 
       /**
        * Bulk

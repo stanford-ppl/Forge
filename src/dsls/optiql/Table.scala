@@ -63,8 +63,12 @@ trait TableOps {
     }
 
 
-    val TableOps = withTpe (Table)
-    TableOps {
+    //val TableOps = withTpe (Table)
+    //TableOps {
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(Table){
 
       // bulk collect ops
       infix ("Select") ("selector" -> (A ==> R) :: Table(R), addTpePars = R) implements map((A,R), 0, ${$selector})

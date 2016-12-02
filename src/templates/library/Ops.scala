@@ -7,6 +7,7 @@ import scala.util.matching._
 import scala.tools.nsc.io._
 import scala.collection.mutable.ArrayBuffer
 import scala.virtualization.lms.common._
+import org.scala_lang.virtualized.SourceContext
 
 import core._
 import shared.{BaseGenOps,BaseGenDataStructures}
@@ -45,6 +46,7 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   def emitImpls(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("SingleTask and Composite Impls", stream)
     stream.println()
+    stream.println("@virtualize")
     stream.println("trait " + opsGrp.grp.name + "WrapperImpl {")
     stream.println("  this: " + dsl + "Application with " + dsl + "CompilerOps => ")
     stream.println()

@@ -1,7 +1,9 @@
 package optila.shared.ops
 
 import scala.tools.nsc.io._
-import scala.reflect.{Manifest,SourceContext}
+import reflect.Manifest
+import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 import scala.virtualization.lms.common.{Base,BaseExp,EffectExp,BaseFatExp}
 import scala.virtualization.lms.common.{ScalaGenBase,ScalaGenEffect,ScalaGenFat}
 import scala.virtualization.lms.util._
@@ -18,6 +20,7 @@ trait LAPACKCompilerOps extends LAPACKOps with LAPACKHelperOps {
   this: OptiLAApplication =>
 }
 
+@virtualize
 trait LAPACKHelperOps {
   this: OptiLAApplication =>
 

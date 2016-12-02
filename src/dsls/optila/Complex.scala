@@ -14,8 +14,12 @@ trait ComplexOps {
 
     static (Complex) ("apply", Nil, (MDouble,MDouble) :: Complex) implements allocates(Complex, ${$0}, ${$1})
 
-    val ComplexOps = withTpe(Complex)
-    ComplexOps {
+    //val ComplexOps = withTpe(Complex)
+    //ComplexOps {
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(Complex){
    	  infix ("real") (Nil :: MDouble) implements getter(0, "_real")
    	  infix ("imag") (Nil :: MDouble) implements getter(0, "_imag")
 
@@ -28,7 +32,7 @@ trait ComplexOps {
    	  infix ("exp") (Nil :: Complex) implements composite ${ Complex(exp($self.real)*cos($self.imag), exp($self.real)*sin($self.imag)) }
    	  infix ("log") (Nil :: Complex) implements composite ${ Complex(log(sqrt(square($self.real)+square($self.imag))), atan2($self.imag, $self.real)) }
 
-   	  direct ("__equal") (Complex :: MBoolean) implements composite ${ $self.real == $1.real && $self.imag == $1.imag }
+   	  direct ("infix_==") (Complex :: MBoolean) implements composite ${ $self.real == $1.real && $self.imag == $1.imag }
     }
 
     // add Complex to Arith

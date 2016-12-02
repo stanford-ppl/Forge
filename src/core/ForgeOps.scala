@@ -2,15 +2,21 @@ package ppl.dsl.forge
 package core
 
 import java.io.{PrintWriter}
-import scala.reflect.SourceContext
+import org.scala_lang.virtualized.virtualize
+import org.scala_lang.virtualized.SourceContext
 import scala.virtualization.lms.common._
 import scala.virtualization.lms.internal._
 import scala.collection.mutable.{ArrayBuffer,HashMap}
+import language.experimental.macros
+import scala.reflect.macros.blackbox.Context
 
 trait ForgeOps extends Base {
   this: Forge =>
 
-  def infix_withBound(a: Rep[TypePar], b: TypeClassSignature) = forge_withbound(a,b)
+  implicit class TypeParOpsClsForge(val a: Rep[TypePar]) {
+    def withBound(b: TypeClassSignature) = forge_withbound(a, b)
+  }
+
   implicit class TpeClassOps(a: TypeClassSignature) {
     def apply(b: Rep[DSLType]*) = forge_typeclasson(a,b.toList)
   }
@@ -46,19 +52,19 @@ trait ForgeOps extends Base {
   case class MethodSignature(args: List[Rep[Any]], retTpe: Rep[DSLType]) extends MethodSignatureType
   case class CurriedMethodSignature(args: List[List[Rep[Any]]], retTpe: Rep[DSLType]) extends MethodSignatureType
 
-  def infix_args(signature: MethodSignatureType) = signature match {
-    case MethodSignature(args, _) => args
-    case CurriedMethodSignature(args, _) => args(0)
-  }
-
-  def infix_allArgs(signature: MethodSignatureType) = signature match {
-    case MethodSignature(_, _) => Nil.asInstanceOf[List[List[Rep[DSLArg]]]]
-    case CurriedMethodSignature(args, _) => args // includes actual args because we need to know the length to get the arg number right in listToCurriedArgs
-  }
-
-  def infix_retTpe(signature: MethodSignatureType) = signature match {
-    case MethodSignature(_, r) => r
-    case CurriedMethodSignature(_, r) => r
+  implicit class MethodSignatureTypeOpsCls(val signature: MethodSignatureType) {
+    def args = signature match {
+      case MethodSignature(args, _) => args
+      case CurriedMethodSignature(args, _) => args(0)
+    }
+    def allArgs = signature match {
+      case MethodSignature(_, _) => Nil.asInstanceOf[List[List[Rep[DSLArg]]]]
+      case CurriedMethodSignature(args, _) => args // includes actual args because we need to know the length to get the arg number right in listToCurriedArgs
+    }
+    def retTpe = signature match {
+      case MethodSignature(_, r) => r
+      case CurriedMethodSignature(_, r) => r
+    }
   }
 
   def static(grp: Rep[DSLGroup])(name: String, tpePars: List[Rep[TypePar]], signature: MethodSignatureType, implicitArgs: List[Rep[Any]] = List(), effect: EffectType = pure, aliasHint: AliasHint = nohint) =
@@ -79,8 +85,10 @@ trait ForgeOps extends Base {
   object parallelize {
     def apply(tpe: Rep[DSLType]) = ParallelizeKey(tpe)
   }
-  def infix_as(p: ParallelizeKey, dc: ParallelCollection) = forge_isparallelcollection(p.tpe, dc)
-  def infix_as(p: ParallelizeKey, dc: ParallelCollectionBuffer) = forge_isparallelcollection_buffer(p.tpe, dc)
+  implicit class ParallelizeKeyOpsCls(val p: ParallelizeKey) {
+    def as(dc: ParallelCollection) = forge_isparallelcollection(p.tpe, dc)
+    def as(dc: ParallelCollectionBuffer) = forge_isparallelcollection_buffer(p.tpe, dc)
+  }
 
   def lookupTpe(tpeName: String, stage: StageTag = future) = forge_lookup_tpe(tpeName,stage)
   def lookupTpeClass(tpeClassName: String) = forge_lookup_tpe_class(tpeClassName)
@@ -153,9 +161,16 @@ trait ForgeSugar extends ForgeSugarLowPriority {
    * Sugar available everywhere inside Forge
    */
 
-  def infix_::(retTpe: Rep[DSLType], args: List[Rep[Any]]) = MethodSignature(args, retTpe)
-  def infix_implements(o: Rep[DSLOp], rule: OpType) = forge_impl(o,rule)
-  def infix_==>(args: List[Rep[Any]], ret: Rep[DSLType]) = MFunction(args,ret)
+  implicit class DSLTypeOpsCls(val retTpe: Rep[DSLType]) {
+    def ::(args: List[Rep[Any]]) = MethodSignature(args, retTpe)
+  }
+
+  implicit class DSLOpOpsClsForge(val o: Rep[DSLOp]) {
+    def implements(rule: OpType) = forge_impl(o, rule)
+  }
+  implicit class ListRepAnyOpsCls[T <% List[Rep[Any]]](val args: T) {
+    def ==>(ret: Rep[DSLType]) = MFunction(args, ret)
+  }
 
   implicit class TpeOps(hkTpe: Rep[DSLType]) {
     def apply(tpeArgs: Rep[DSLType]*) = tpeInst(hkTpe, tpeArgs.toList)
@@ -164,13 +179,17 @@ trait ForgeSugar extends ForgeSugarLowPriority {
   /**
    * Uses Scala-Virtualized scopes to enable sugar for ops scoped on a particular DSLType
    */
+
+  //FIXME: we rather use withTpee, which is captures by macro-virtualized, as we need direct code block injection
   var _tpeScopeBox: Rep[DSLType] = _
   def withTpe(tpe: Rep[DSLType]) = {
     _tpeScopeBox = tpe
     new ChainTpe(tpe)
   }
+
+  @virtualize
   class ChainTpe(tpe: Rep[DSLType]) {
-    def apply[R](block: => R) = new Scope[TpeScope, TpeScopeRunner[R], R](block)
+    //def apply[R](block: => R) = new Scope[TpeScope, TpeScopeRunner[R], R](block)
   }
 
   trait TpeScope {
@@ -220,10 +239,10 @@ trait ForgeSugar extends ForgeSugarLowPriority {
     def lookupOverloaded(grpName: String, opName: String, index: Int) = forge_lookup_op(lookupGrp(grpName),opName,index)
   }
 
-  trait TpeScopeRunner[R] extends TpeScope {
-    def apply: R
+  trait TpeScopeRunner /*[R]*/ extends TpeScope {
+    def apply: Any //List[Any] //: R
     val result = apply
-    _tpeScopeBox = null // reset
+    _tpeScopeBox = _: Rep[DSLType]
   }
 }
 
@@ -294,7 +313,7 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
    */
 
   /* A group represents a collection of ops which become an op trait in the generated DSL */
-  case class Grp(name: String) extends Def[DSLGroup]
+  case class Grp(name: String) extends Def[DSLGroup] //TODO(macrovirt) switch back to original?
 
   def forge_grp(name: String) = Grp(name)
 
@@ -435,7 +454,6 @@ trait ForgeOpsExp extends ForgeSugar with BaseExp {
 
   /* An operator - this represents a method or IR node */
   case class Op(grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], curriedArgs: List[List[Rep[DSLArg]]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint) extends Def[DSLOp]
-
   def forge_op(_grp: Rep[DSLGroup], name: String, style: MethodType, tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], curriedArgs: List[List[Rep[DSLArg]]], implicitArgs: List[Rep[DSLArg]], retTpe: Rep[DSLType], effect: EffectType, aliasHint: AliasHint) = {
     args match {
       case a :: Def(Arg(_, Def(VarArgs(z)), _)) :: b if b != Nil => err("a var args op parameter must be the final one")

@@ -37,8 +37,12 @@ trait DirectedGraphOps{
     data(DirectedGraph,("_numNodes",MInt),("_externalIDs",MArray(MInt)),("_outNodes",MArray(MInt)),("_outEdges",MArray(MInt)),("_inNodes",MArray(MInt)),("_inEdges",MArray(MInt))) 
     static(DirectedGraph)("apply", Nil, (MethodSignature(List(("numNodes",MInt),("exID",MArray(MInt)),("outNodes",MArray(MInt)),("outEdges",MArray(MInt)),("inNodes",MArray(MInt)),("inEdges",MArray(MInt))), DirectedGraph))) implements allocates(DirectedGraph,${$numNodes},${$exID}, ${$outNodes}, ${outEdges},${$inNodes},${$inEdges})
 
-    val DirectedGraphOps = withTpe(DirectedGraph)     
-    DirectedGraphOps{
+    //val DirectedGraphOps = withTpe(DirectedGraph)     
+    //DirectedGraphOps{
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(DirectedGraph){
       infix ("numEdges")(Nil :: MInt) implements composite ${array_length(in_edge_raw_data($self)) + array_length(out_edge_raw_data($self))}
       
       infix ("isDirected") (Nil :: MBoolean) implements composite ${true}

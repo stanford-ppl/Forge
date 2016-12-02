@@ -52,8 +52,12 @@ trait StreamOps {
 
     // --
 
-    val HashStreamOps = withTpe(HashStream)
-    HashStreamOps {
+    //val HashStreamOps = withTpe(HashStream)
+    //HashStreamOps {
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(HashStream){
       compiler ("hash_get_db") (Nil :: KeyValueStore(V)) implements getter(0, "_db")
       //compiler ("hash_set_db") (KeyValueStore(V) :: MUnit, effect = write(0)) implements setter(0, "_db", ${$1})
       compiler ("hash_deserialize") (Nil :: MLambda(Tup2(HashStream(V),MString), V)) implements composite ${
@@ -190,8 +194,12 @@ trait StreamOps {
     }
 
     // We need to read sequentially, but from potentially different data stores, so we use ForgeFileInputStream and ForgeFileOutputStream
-    val FileStreamOps = withTpe(FileStream)
-    FileStreamOps {
+    //val FileStreamOps = withTpe(FileStream)
+    //FileStreamOps {
+    import org.scala_lang.virtualized.virtualize
+    magic2()
+    @virtualize
+    def magic2[R]() = withTpee(FileStream){
       infix ("path") (Nil :: MString) implements getter(0, "_path")
 
       // rows are loaded and executed sequentially
@@ -396,8 +404,12 @@ trait StreamOps {
         ("func", (MInt,MInt) ==> T)
       )), ComputeStream(T)))) implements allocates(ComputeStream, ${$0}, ${$1}, ${doLambda((t: Rep[Tup2[Int,Int]]) => func(t._1, t._2))})
 
-    val ComputeStreamOps = withTpe(ComputeStream)
-    ComputeStreamOps {
+    //val ComputeStreamOps = withTpe(ComputeStream)
+    //ComputeStreamOps {
+    import org.scala_lang.virtualized.virtualize
+    magic3()
+    @virtualize
+    def magic3[R]() = withTpee(ComputeStream){
       infix ("numRows") (Nil :: MInt) implements getter(0, "_numRows")
       infix ("numCols") (Nil :: MInt) implements getter(0, "_numCols")
       compiler ("stream_func") (Nil :: MLambda(Tup2(MInt,MInt), T)) implements getter(0, "_func")

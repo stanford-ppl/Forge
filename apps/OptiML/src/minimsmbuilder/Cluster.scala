@@ -19,7 +19,8 @@
  *
  */
 
-import reflect.{Manifest, SourceContext}
+import reflect.Manifest;
+import org.scala_lang.virtualized.SourceContext
 import scala.virtualization.lms.common.Record
 import optiml.compiler._
 import optiml.library._
@@ -357,19 +358,19 @@ trait Clarans extends OptiMLApplication with TheoData with DirectSolver {
     //   else if (args(1) == "+perftheo") {
     //     println("-- testing RMSD performance with theo values")
     //     val frameNumAtoms = readVector(pathToTheoData + "_benchmark_frames_theo_numAtoms.dat")
-    //     val frameTheoData = new Record {
-    //       val XYZData = readMatrix[XYZ](pathToTheoData + "_benchmark_frames_theo_xyz.dat", line => lineToXYZ(line))
-    //       val G = readVector[Float](pathToTheoData + "_benchmark_frames_theo_G.dat", l => l.toFloat)
-    //       val numAtoms = frameNumAtoms(0).AsInstanceOf[Int]
-    //       val numAtomsWithPadding = frameNumAtoms(1).AsInstanceOf[Int]
-    //     }
+    //     val frameTheoData = Record (
+    //       XYZData = readMatrix[XYZ](pathToTheoData + "_benchmark_frames_theo_xyz.dat", line => lineToXYZ(line)),
+    //       G = readVector[Float](pathToTheoData + "_benchmark_frames_theo_G.dat", l => l.toFloat),
+    //       numAtoms = frameNumAtoms(0).AsInstanceOf[Int],
+    //       numAtomsWithPadding = frameNumAtoms(1).AsInstanceOf[Int]
+    //     )
     //     val trajNumAtoms = readVector(pathToTheoData + "_benchmark_traj_theo_numAtoms.dat")
-    //     val trajTheoData = new Record {
-    //       val XYZData = readMatrix[XYZ](pathToTheoData + "_benchmark_traj_theo_xyz.dat", line => lineToXYZ(line))
-    //       val G = readVector[Float](pathToTheoData + "_benchmark_traj_theo_G.dat", l => l.toFloat)
-    //       val numAtoms = trajNumAtoms(0).AsInstanceOf[Int]
-    //       val numAtomsWithPadding = trajNumAtoms(1).AsInstanceOf[Int]
-    //     }
+    //     val trajTheoData = Record (
+    //       XYZData = readMatrix[XYZ](pathToTheoData + "_benchmark_traj_theo_xyz.dat", line => lineToXYZ(line)),
+    //       G = readVector[Float](pathToTheoData + "_benchmark_traj_theo_G.dat", l => l.toFloat),
+    //       numAtoms = trajNumAtoms(0).AsInstanceOf[Int],
+    //       numAtomsWithPadding = trajNumAtoms(1).AsInstanceOf[Int]
+    //     )
     //     val a = frameTheoData.XYZData
     //     val b = trajTheoData.XYZData.t
     //     val ga = frameTheoData.G
@@ -393,15 +394,15 @@ trait Clarans extends OptiMLApplication with TheoData with DirectSolver {
       val nAtoms = readVector(pathToTheoData + "_numAtoms.dat")
       val pathToXyz = pathToTheoData + "_xyz.dat"
       val pathToG = pathToTheoData + "_G.dat"
-      val theoData = new Record {
+      val theoData = Record (
         // FIXME: erroneous or inaccessible type from string infix_+ inside Record
-        // val XYZData = readMatrix[XYZ](pathToTheoData + "_xyz.dat", line => lineToXYZ(line))
-        // val G = readVectorAndParse[Float](pathToTheoData + "_G.dat"), l => l(0).toFloat)
-        val XYZData = readMatrix[XYZ](pathToXyz, line => lineToXYZ(line))
-        val G = readVector[Float](pathToG, l => l.toFloat)
-        val numAtoms = nAtoms(0).AsInstanceOf[Int]
-        val numAtomsWithPadding = nAtoms(1).AsInstanceOf[Int]
-      }
+        // XYZData = readMatrix[XYZ](pathToTheoData + "_xyz.dat", line => lineToXYZ(line)),
+        // G = readVectorAndParse[Float](pathToTheoData + "_G.dat"), l => l(0).toFloat),
+        XYZData = readMatrix[XYZ](pathToXyz, line => lineToXYZ(line)),
+        G = readVector[Float](pathToG, l => l.toFloat),
+        numAtoms = nAtoms(0).AsInstanceOf[Int],
+        numAtomsWithPadding = nAtoms(1).AsInstanceOf[Int]
+      )
     // }
 
     /*

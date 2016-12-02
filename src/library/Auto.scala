@@ -24,10 +24,7 @@ trait AutoOps {
     val Grp = grp(name)
     lift (Grp) (Tpe)
 
-    //val Ops = withTpe(Grp)
-
     for (m <- tt.tpe.members if m.isMethod) {
-
         println(m + ": takesTypeArgs " + m.asTerm.typeSignature.takesTypeArgs)
 
         val mt0 = m.asTerm.typeSignature

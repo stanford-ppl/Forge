@@ -1,13 +1,16 @@
 import optiql.compiler._
 import optiql.library._
 import optiql.shared._
-import scala.reflect.{Manifest,SourceContext}
+import reflect.Manifest
+import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 import scala.virtualization.lms.common.Record
 
 
 object GeneInterpreter extends OptiQLApplicationInterpreter with GeneApp
 object GeneCompiler extends OptiQLApplicationCompiler with GeneApp
 
+@virtualize
 trait GeneApp extends OptiQLApplication {
 
   type Content = Record {
@@ -19,7 +22,7 @@ trait GeneApp extends OptiQLApplication {
 
   def printUsage() = {
     println("Usage: Gene <input Gene file>")
-    exit(-1)
+    sys.exit(-1)
   }
 
   val g = "AGAT"

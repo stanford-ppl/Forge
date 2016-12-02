@@ -54,27 +54,32 @@ trait ScalaOps extends PrimitiveMathGen {
     infix (Prim) ("unary_-", Nil, MFloat :: MFloat) implements redirect ${ unit(-1f)*$0 }
     infix (Prim) ("unary_-", Nil, MDouble :: MDouble) implements redirect ${ unit(-1)*$0 }
 
+    // val int_bitwise_not = infix (Prim) ("unary_~", Nil, MInt :: MInt)
+    // impl (int_bitwise_not) (codegen(g, ${~$0}))
+
     lift (Prim) (MShort)
     lift (Prim) (MInt)
     lift (Prim) (MLong)
     lift (Prim) (MFloat)
     lift (Prim) (MDouble)
 
-    val toInt = infix (Prim) ("toInt", T withBound TNumeric, T :: MInt)
-    val toFloat = infix (Prim) ("toFloat", T withBound TNumeric, T :: MFloat)
-    val toDouble = infix (Prim) ("toDouble", T withBound TNumeric, T :: MDouble)
-    val toLong = infix (Prim) ("toLong", T withBound TNumeric, T :: MLong)
+    for (MT <- List(MInt, MFloat, MDouble, MLong)) {
+      val toInt = infix (Prim) ("toInt", Nil, MT :: MInt)
+      val toFloat = infix (Prim) ("toFloat", Nil, MT :: MFloat)
+      val toDouble = infix (Prim) ("toDouble", Nil, MT :: MDouble)
+      val toLong = infix (Prim) ("toLong", Nil, MT :: MLong)
 
-    impl (toInt) (codegen($cala, ${ $0.toInt }))
-    impl (toFloat) (codegen($cala, ${ $0.toFloat }))
-    impl (toDouble) (codegen($cala, ${ $0.toDouble }))
-    impl (toLong) (codegen($cala, ${ $0.toLong }))
+      impl (toInt) (codegen($cala, ${ $0.toInt }))
+      impl (toFloat) (codegen($cala, ${ $0.toFloat }))
+      impl (toDouble) (codegen($cala, ${ $0.toDouble }))
+      impl (toLong) (codegen($cala, ${ $0.toLong }))
 
-    for (g <- List(cuda, cpp)) {
-      impl (toInt) (codegen(g, ${ (int32_t) $0 }))
-      impl (toFloat) (codegen(g, ${ (float) $0 }))
-      impl (toDouble) (codegen(g, ${ (double) $0 }))
-      impl (toLong) (codegen(g, ${ (int64_t) $0 }))
+      for (g <- List(cuda, cpp)) {
+        impl (toInt) (codegen(g, ${ (int32_t) $0 }))
+        impl (toFloat) (codegen(g, ${ (float) $0 }))
+        impl (toDouble) (codegen(g, ${ (double) $0 }))
+        impl (toLong) (codegen(g, ${ (int64_t) $0 }))
+      }
     }
 
     fimplicit (Prim) ("repInt2ToRepDouble", Nil, MInt :: MDouble) implements composite ${ $0.toDouble }
@@ -275,6 +280,23 @@ trait ScalaOps extends PrimitiveMathGen {
       impl (times) (codegen(g, quotedArg(0) + " * " + quotedArg(1)))
     }
 
+       // val toInt = infix (Num) ("toInt", T withBound TNumeric, T :: MInt)
+       // val toFloat = infix (Num) ("toFloat", T withBound TNumeric, T :: MFloat)
+       // val toDouble = infix (Num) ("toDouble", T withBound TNumeric, T :: MDouble)
+       // val toLong = infix (Num) ("toLong", T withBound TNumeric, T :: MLong)
+    
+       // impl (toInt) (codegen($cala, ${ $0.toInt }))
+       // impl (toFloat) (codegen($cala, ${ $0.toFloat }))
+       // impl (toDouble) (codegen($cala, ${ $0.toDouble }))
+       // impl (toLong) (codegen($cala, ${ $0.toLong }))
+    
+       // for (g <- List(cuda, cpp)) {
+       //   impl (toInt) (codegen(g, ${ (int32_t) $0 }))
+       //   impl (toFloat) (codegen(g, ${ (float) $0 }))
+       //   impl (toDouble) (codegen(g, ${ (double) $0 }))
+       //   impl (toLong) (codegen(g, ${ (int64_t) $0 }))
+       // }
+
     val Frac = grp("Fractional")
     val R = tpePar("R")
     val div = infix (Frac) ("/", List(T,R withBound TFractional), (T,R) :: R, T ==> R)
@@ -290,19 +312,19 @@ trait ScalaOps extends PrimitiveMathGen {
     val AC = tpePar("A", stage = now)
     val BC = tpePar("B", stage = now)
 
-    val eq = direct (Ord) ("__equal", (A,B), (A,B) :: MBoolean)
+    val eq = direct (Ord) ("infix_==", (A,B), (A,B) :: MBoolean)
     label (eq, "forge_equals")
     impl (eq) (codegen($cala, quotedArg(0) + " == " + quotedArg(1)))
     impl (eq) (codegen(cuda, quotedArg(0) + " == " + quotedArg(1)))
     impl (eq) (codegen(cpp, quotedArg(0) + " == " + quotedArg(1)))
 
-    direct (Ord) ("__equal", (A,B), (MVar(A),B) :: MBoolean) implements redirect ${ forge_equals(readVar($0), $1) }
-    direct (Ord) ("__equal", (A,B), (A,MVar(B)) :: MBoolean) implements redirect ${ forge_equals($0, readVar($1)) }
-    direct (Ord) ("__equal", (A,B), (MVar(A),MVar(B)) :: MBoolean) implements redirect ${ forge_equals(readVar($0), readVar($1)) }
-    direct (Ord) ("__equal", (A,BC), (A,BC) :: MBoolean) implements redirect ${ forge_equals($0, unit($1)) }
-    direct (Ord) ("__equal", (A,BC), (MVar(A),BC) :: MBoolean) implements redirect ${ forge_equals(readVar($0), unit($1)) }
-    direct (Ord) ("__equal", (AC,B), (AC,B) :: MBoolean) implements redirect ${ forge_equals(unit($0), $1) }
-    direct (Ord) ("__equal", (AC,B), (AC,MVar(B)) :: MBoolean) implements redirect ${ forge_equals(unit($0), readVar($1)) }
+    direct (Ord) ("infix_==", (A,B), (MVar(A),B) :: MBoolean) implements redirect ${ forge_equals(readVar($0), $1) }
+    direct (Ord) ("infix_==", (A,B), (A,MVar(B)) :: MBoolean) implements redirect ${ forge_equals($0, readVar($1)) }
+    direct (Ord) ("infix_==", (A,B), (MVar(A),MVar(B)) :: MBoolean) implements redirect ${ forge_equals(readVar($0), readVar($1)) }
+    direct (Ord) ("infix_==", (A,BC), (A,BC) :: MBoolean) implements redirect ${ forge_equals($0, unit($1)) }
+    direct (Ord) ("infix_==", (A,BC), (MVar(A),BC) :: MBoolean) implements redirect ${ forge_equals(readVar($0), unit($1)) }
+    direct (Ord) ("infix_==", (AC,B), (AC,B) :: MBoolean) implements redirect ${ forge_equals(unit($0), $1) }
+    direct (Ord) ("infix_==", (AC,B), (AC,MVar(B)) :: MBoolean) implements redirect ${ forge_equals(unit($0), readVar($1)) }
 
     val neq = infix (Ord) ("!=", (A,B), (A,B) :: MBoolean)
     label (neq, "forge_notequals")
@@ -412,21 +434,23 @@ trait ScalaOps extends PrimitiveMathGen {
 
     // TODO: check these combinations to see if they could be condensed or if there is anything missing
 
-    infix (Str) ("+", T, (CString, T) :: MString) implements redirect ${ forge_string_plus(unit($0), $1) }
+    direct (Str) ("infix_+", T, (CString, T) :: MString) implements redirect ${ forge_string_plus(unit($0), $1) }
     infix (Str) ("+", T, (MString, T) :: MString) implements redirect ${ forge_string_plus($0, $1) }
-    infix (Str) ("+", T, (CString, MVar(T)) :: MString) implements redirect ${ forge_string_plus(unit($0), readVar($1)) }
+    direct (Str) ("infix_+", T, (CString, MVar(T)) :: MString) implements redirect ${ forge_string_plus(unit($0), readVar($1)) }
     infix (Str) ("+", T, (MString, MVar(T)) :: MString) implements redirect ${ forge_string_plus($0, readVar($1)) }
     infix (Str) ("+", T, (MVar(MString), T) :: MString) implements redirect ${ forge_string_plus(readVar($0), $1) }
     infix (Str) ("+", T, (MVar(MString), MVar(T)) :: MString) implements redirect ${ forge_string_plus(readVar($0), readVar($1)) }
 
+    //all operations inside package string, not neceassary on strings!
     infix (Str) ("+", T, (T, CString) :: MString) implements redirect ${ forge_string_plus($0, unit($1)) }
     infix (Str) ("+", T, (T, MString) :: MString) implements redirect ${ forge_string_plus($0, $1) }
     infix (Str) ("+", T, (MVar(T), CString) :: MString) implements redirect ${ forge_string_plus(readVar($0), unit($1)) }
     infix (Str) ("+", T, (MVar(T), MString) :: MString) implements redirect ${ forge_string_plus(readVar($0), $1) }
     infix (Str) ("+", T, (MVar(T), MVar(MString)) :: MString) implements redirect ${ forge_string_plus(readVar($0), readVar($1)) }
 
-    // infix (Str) ("+", Nil, (MString, CString) :: MString) implements redirect ${ forge_string_plus($0, unit($1)) }
-    infix (Str) ("+", Nil, (CString, MString) :: MString) implements redirect ${ forge_string_plus(unit($0), $1) }
+    //check what was the issue with this one
+    infix (Str) ("+", Nil, (MString, CString) :: MString) implements redirect ${ forge_string_plus($0, unit($1)) }
+    direct (Str) ("infix_+", Nil, (CString, MString) :: MString) implements redirect ${ forge_string_plus(unit($0), $1) }
     infix (Str) ("+", Nil, (MString, MString) :: MString) implements redirect ${ forge_string_plus($0, $1) }
     infix (Str) ("+", Nil, (MString, MVar(MString)) :: MString) implements redirect ${ forge_string_plus($0, readVar($1)) }
     infix (Str) ("+", Nil, (MVar(MString), MString) :: MString) implements redirect ${ forge_string_plus(readVar($0), $1) }
@@ -533,12 +557,13 @@ trait ScalaOps extends PrimitiveMathGen {
       val TT = tpe("Tup" + arity, pars)
       data(TT, elems.zip(pars): _*)
 
+      val CT = tpe("Tuple"+arity, pars, stage = compile)
+
       for (i <- 0 until arity) {
         val concrete = pars.zipWithIndex.map(t => if (t._2 == i) t._1 else e)
-        infix (TT) ("_"+(i+1), pars(i), TT(concrete: _*) :: pars(i)) implements getter(0, elems(i))
+        infix (TT) ("_"+(i+1), pars, TT(pars: _*) :: pars(i)) implements getter(0, elems(i))
       }
 
-      val CT = tpe("Tuple"+arity, pars, stage = compile)
       val unpackTupleStr = "(" + elems.zipWithIndex.map(t => "tup"+arity+"__"+(t._2+1)+"(t)").mkString("(",",",")") + ")"
       val parStr = elems.map(e => "t."+e)
 

@@ -26,13 +26,13 @@ trait QPSCD extends OptiMLApplication {
   // workaround for erroneous or inaccessible type error with abstract typed record
   implicit val mBQP: Manifest[BQP]
 
-  def newBQP(_Q: Rep[DenseMatrix[Double]], _p: Rep[DenseVector[Double]], _lbound: Rep[DenseVector[Double]], _ubound: Rep[DenseVector[Double]], _diag: Rep[DenseVector[Double]]): Rep[BQP] = new Record {
-    val Q = _Q
-    val p = _p
-    val lbound = _lbound
-    val ubound = _ubound
-    val diag = _diag
-  }
+  def newBQP(_Q: Rep[DenseMatrix[Double]], _p: Rep[DenseVector[Double]], _lbound: Rep[DenseVector[Double]], _ubound: Rep[DenseVector[Double]], _diag: Rep[DenseVector[Double]]): Rep[BQP] = Record (
+    Q = _Q,
+    p = _p,
+    lbound = _lbound,
+    ubound = _ubound,
+    diag = _diag,
+  )
 
 
   /**

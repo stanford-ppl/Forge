@@ -24,8 +24,12 @@ trait SparseVectorViewOps {
     // static methods
     static (SparseVectorView) ("apply", T, ((SparseMatrix(T), MLong, MInt, MInt, MBoolean) :: SparseVectorView)) implements allocates(SparseVectorView, ${$0}, ${$1}, ${$2}, ${$3}, ${$4})
 
-    val SparseVectorViewOps = withTpe(SparseVectorView)
-    SparseVectorViewOps {
+    //val SparseVectorViewOps = withTpe(SparseVectorView)
+    //SparseVectorViewOps {
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(SparseVectorView){
       compiler ("sparsevectorview_source") (Nil :: SparseMatrix(T)) implements getter(0, "_source")
       compiler ("sparsevectorview_start") (Nil :: MLong) implements getter(0, "_start")
       compiler ("sparsevectorview_stride") (Nil :: MInt) implements getter(0, "_stride")
@@ -137,7 +141,7 @@ trait SparseVectorViewOps {
         sparsevector_alloc_raw($self.length, $self.isRow, outData.unsafeImmutable, outIndices.unsafeImmutable, outNnz)
       }
 
-      direct ("__equal") (SparseVectorView(T) :: MBoolean) implements composite ${
+      direct ("infix_==") (SparseVectorView(T) :: MBoolean) implements composite ${
         $self.length == $1.length &&
         $self.isRow == $1.isRow &&
         sparsevectorview_start($self) == sparsevectorview_start($1) &&
@@ -145,7 +149,7 @@ trait SparseVectorViewOps {
         sparsevectorview_source($self) == sparsevectorview_source($1)
       }
 
-      direct ("__equal") (SparseVector(T) :: MBoolean) implements composite ${
+      direct ("infix_==") (SparseVector(T) :: MBoolean) implements composite ${
         if ($self.length != $1.length || $self.nnz != $1.nnz || $self.isRow != $1.isRow) false
         else {
           val (startOffset, endOffset) = unpack(sparsevectorview_calc_offsets($self))

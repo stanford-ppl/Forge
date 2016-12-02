@@ -13,8 +13,10 @@ trait BaseGenImports extends ForgeCodeGenBase {
     stream.println("import java.io.{BufferedWriter, FileWriter, PrintWriter}")
   }
 
-  def emitScalaReflectImports(stream: PrintWriter) {    
-    stream.println("import scala.reflect.{Manifest,SourceContext}")    
+  def emitScalaReflectImports(stream: PrintWriter) {
+    stream.println("import reflect.Manifest")
+    stream.println("import org.scala_lang.virtualized.SourceContext")
+    stream.println("import org.scala_lang.virtualized.virtualize")
   }
 
   def emitScalaImports(stream: PrintWriter) {
@@ -23,7 +25,7 @@ trait BaseGenImports extends ForgeCodeGenBase {
   }
 
   def emitLMSImports(stream: PrintWriter) {
-    stream.println("import scala.virtualization.lms.common.{Base,BaseExp,EffectExp,BaseFatExp}")
+    stream.println("import scala.virtualization.lms.common.{Base,BaseExp,EffectExp,BaseFatExp,RecordOps}")
     stream.println("import scala.virtualization.lms.common.{ScalaGenBase,ScalaGenEffect,ScalaGenFat,CudaGenFat,CGenFat}")
     stream.println("import scala.virtualization.lms.util._")
     stream.println("import scala.virtualization.lms.internal._")

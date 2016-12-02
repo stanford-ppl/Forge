@@ -1,7 +1,8 @@
 package LOWERCASE_DSL_NAME.shared
 
 import scala.annotation.unchecked.uncheckedVariance
-import scala.reflect.{Manifest,SourceContext}
+import reflect.Manifest;
+import org.scala_lang.virtualized.SourceContext
 import scala.virtualization.lms.common._
 import scala.virtualization.lms.util.OverloadHack
 
@@ -31,11 +32,12 @@ trait ForgeArrayOps extends Base with OverloadHack {
   /* Required for apps to be able use 'args' */
   implicit class ScalaArrayOps[T:Manifest](x: Rep[Array[T]]) {
     def apply(n: Rep[Int])(implicit ctx: SourceContext) = scala_array_apply(x,n)
-    def length = scala_array_length(x)
+    def length(implicit __imp0: SourceContext, o: Overloaded1) = scala_array_length(x)
+    //def length = scala_array_length(x) //TODO(macrovirt): remove this?
   }
   // the implicit class method 'length' is not working for an unknown reason, possibly related to the problem mentioned in ForgeArrayCompilerOps below
   // omitting SourceContext is a hacky way to avoid conflicts with Forge DSLs without using an arbitrary Overloaded parameter
-  def infix_length[T:Manifest](x: Rep[Array[T]])(implicit __imp0: SourceContext, o:Overloaded1) = scala_array_length(x)
+
   def scala_array_apply[T:Manifest](x: Rep[Array[T]], n: Rep[Int])(implicit __imp0: SourceContext): Rep[T]
   def scala_array_length[T:Manifest](x: Rep[Array[T]])(implicit __imp0: SourceContext): Rep[Int]
 }

@@ -1,8 +1,10 @@
 import optiql.compiler._
 import optiql.library._
 import optiql.shared._
-import scala.reflect.{Manifest,SourceContext}
+import reflect.Manifest;
 import scala.virtualization.lms.common.Record
+import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 
 object TPCHQ1Interpreter extends OptiQLApplicationInterpreter with TPCHQ1Trait
 object TPCHQ1Compiler extends OptiQLApplicationCompiler with TPCHQ1Trait
@@ -11,6 +13,7 @@ object TPCHQ6Compiler extends OptiQLApplicationCompiler with TPCHQ6Trait
 object TPCHQ14Interpreter extends OptiQLApplicationInterpreter with TPCHQ14Trait
 object TPCHQ14Compiler extends OptiQLApplicationCompiler with TPCHQ14Trait
 
+@virtualize
 trait TPCHBaseTrait extends OptiQLApplication with Types {
 
   def printUsage = {
@@ -27,7 +30,7 @@ trait TPCHBaseTrait extends OptiQLApplication with Types {
 
   val queryName: String
   
-  var tpchDataPath: Rep[String] = _
+  var tpchDataPath: Rep[String] = unit("")
   val sep = "\\|"
   def loadLineItems() = Table.fromFile[LineItem](tpchDataPath+"/lineitem.tbl", sep)
   def loadCustomers() = Table.fromFile[Customer](tpchDataPath+"/customer.tbl", sep)
@@ -50,7 +53,7 @@ trait TPCHBaseTrait extends OptiQLApplication with Types {
 
 }
 
-
+@virtualize
 trait TPCHQ1Trait extends TPCHBaseTrait {
 
   val queryName = "Q1"  
@@ -59,18 +62,18 @@ trait TPCHQ1Trait extends TPCHBaseTrait {
     val lineItems = loadLineItems()         
     tic(lineItems.size)
 
-    val q = lineItems Where(_.l_shipdate <= Date("1998-12-01")) GroupBy(l => pack(l.l_returnflag,l.l_linestatus)) Select(g => new Record {
-      val returnFlag = g.key._1
-      val lineStatus = g.key._2
-      val sumQty = g.values.Sum(_.l_quantity)
-      val sumBasePrice = g.values.Sum(_.l_extendedprice)
-      val sumDiscountedPrice = g.values.Sum(l => l.l_extendedprice * (1.0 - l.l_discount))
-      val sumCharge = g.values.Sum(l => l.l_extendedprice * (1.0 - l.l_discount) * infix_+(1.0, l.l_tax)) //FIXME: infix_+ fails to resolve automatically
-      val avgQty = g.values.Average(_.l_quantity)
-      val avgPrice = g.values.Average(_.l_extendedprice)
-      val avgDiscount = g.values.Average(_.l_discount)
-      val countOrder = g.values.Count
-    }) OrderBy(asc(_.returnFlag), asc(_.lineStatus))
+    val q = lineItems Where(_.l_shipdate <= Date("1998-12-01")) GroupBy(l => pack(l.l_returnflag,l.l_linestatus)) Select(g => Record (
+      returnFlag = g.key._1,
+      lineStatus = g.key._2,
+      sumQty = g.values.Sum(_.l_quantity),
+      sumBasePrice = g.values.Sum(_.l_extendedprice),
+      sumDiscountedPrice = g.values.Sum(l => l.l_extendedprice * (1.0 - l.l_discount)),
+      sumCharge = g.values.Sum(l => l.l_extendedprice * (1.0 - l.l_discount) * (1.0 + l.l_tax)), //FIXME: infix_+ fails to resolve automatically
+      avgQty = g.values.Average(_.l_quantity),
+      avgPrice = g.values.Average(_.l_extendedprice),
+      avgDiscount = g.values.Average(_.l_discount),
+      countOrder = g.values.Count
+    )) OrderBy(asc(_.returnFlag), asc(_.lineStatus))
     
     toc(q)
     q.printAsTable()
@@ -78,7 +81,7 @@ trait TPCHQ1Trait extends TPCHBaseTrait {
   }    
 }
 
-
+@virtualize
 trait TPCHQ6Trait extends TPCHBaseTrait {
   val queryName = "Q6"
 
@@ -87,7 +90,7 @@ trait TPCHQ6Trait extends TPCHBaseTrait {
     tic(lineItems.size)
 
     //FIXME: infix_&& fails to resolve automatically
-    val q = lineItems Where (l => infix_&&(l.l_shipdate >= Date("1994-01-01"), infix_&&(l.l_shipdate < Date("1995-01-01"), infix_&&(l.l_discount >= 0.05, infix_&&(l.l_discount <= 0.07, l.l_quantity < 24))))) 
+    val q = lineItems Where (l => (l.l_shipdate >= Date("1994-01-01") && (l.l_shipdate < Date("1995-01-01") && (l.l_discount >= 0.05 && (l.l_discount <= 0.07 && l.l_quantity < 24))))) 
     val revenue = q.Sum(l => l.l_extendedprice * l.l_discount)
 
     toc(revenue)
@@ -95,6 +98,7 @@ trait TPCHQ6Trait extends TPCHBaseTrait {
   }
 }
 
+@virtualize
 trait TPCHQ14Trait extends TPCHBaseTrait {
   val queryName = "Q14"
 
@@ -104,11 +108,11 @@ trait TPCHQ14Trait extends TPCHBaseTrait {
 
     val shippedItems = lineItems.Where(li => li.l_shipdate >= Date("1995-09-01") && li.l_shipdate < Date("1995-10-01"))    
     val q = parts.Join(shippedItems)(_.p_partkey, _.l_partkey)(
-      (p,l) => new Record { //this post-Join Select is very boilerplate but we need to get the type right
-        val l_extendedprice = l.l_extendedprice
-        val l_discount = l.l_discount
-        val p_type = p.p_type
-      })
+      (p,l) => Record ( //this post-Join Select is very boilerplate but we need to get the type right
+        l_extendedprice = l.l_extendedprice,
+        l_discount = l.l_discount,
+        p_type = p.p_type
+      ))
 
     val promoRevenue = q.Sum(l => if (l.p_type startsWith "PROMO") l.l_extendedprice * (1.0 - l.l_discount) else 0.0)
     val totalRevenue = q.Sum(l => l.l_extendedprice * (1.0 - l.l_discount))

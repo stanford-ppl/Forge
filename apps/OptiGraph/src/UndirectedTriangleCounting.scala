@@ -1,6 +1,8 @@
 import optigraph.compiler._
 import optigraph.library._
 import optigraph.shared._
+import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 
 // This object lets us run the Delite version of the code
 object UndirectedTriangleCountingCompiler extends OptiGraphApplicationCompiler with UndirectedTriangleCounting
@@ -8,6 +10,7 @@ object UndirectedTriangleCountingCompiler extends OptiGraphApplicationCompiler w
 // This object lets us run the Scala library version of the code
 object UndirectedTriangleCountingInterpreter extends OptiGraphApplicationInterpreter with UndirectedTriangleCounting
 
+@virtualize
 trait UndirectedTriangleCounting extends OptiGraphApplication {
   def main() = {
     println("UndirectedTriangleCounting")

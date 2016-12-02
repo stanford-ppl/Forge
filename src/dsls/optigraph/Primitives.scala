@@ -15,8 +15,12 @@ trait NodeOps {
     val Node = tpe("Node")
     data(Node, ("_id", MInt))
     static (Node) ("apply", Nil, MInt :: Node) implements allocates(Node, ${$0})
-    val NodeOps = withTpe(Node)
-    NodeOps {
+    //val NodeOps = withTpe(Node)
+    //NodeOps {
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(Node){
       infix("id") (Nil :: MInt) implements getter(0,"_id")
       infix(">") (Node :: MBoolean) implements single ${$0.id>$1.id}
       infix("<") (Node :: MBoolean) implements single ${$0.id<$1.id}
@@ -34,8 +38,12 @@ trait EdgeOps {
     val Edge = tpe("Edge")
     data(Edge, ("_nodeFrom", Node),("_nodeTo",Node))
     static (Edge) ("apply", Nil, (Node,Node) :: Edge) implements allocates(Edge, ${$0}, ${$1})
-    val EdgeOps = withTpe(Edge)
-    EdgeOps{
+    //val EdgeOps = withTpe(Edge)
+    //EdgeOps{
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(Edge){
       infix("fromNode") (Nil :: Node) implements getter(0,"_nodeFrom")
       infix("toNode") (Nil :: Node) implements getter(0,"_nodeTo")
     }

@@ -31,8 +31,12 @@ trait GraphOps{
     val V = tpePar("V")
     val SHashMap = tpe("scala.collection.mutable.HashMap", (K,V))
     val Graph = g
-    val GraphCommonOps = withTpe(Graph)
-    GraphCommonOps{
+    //val GraphCommonOps = withTpe(Graph)
+    //GraphCommonOps{
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(Graph){
       infix ("numNodes")(Nil :: MInt) implements getter(0,"_numNodes")
 
       infix ("nodes")(Nil :: NodeIdView) implements composite ${NodeIdView($self.numNodes)}
@@ -40,7 +44,7 @@ trait GraphOps{
       //given an ID return a node
       infix("getNodeFromID")(MInt :: Node) implements composite ${
         val result = NodeIdView($self.numNodes).mapreduce[Int]( i => i, (a,b) => a+b, i => $self.getExternalID(Node(i))==$1)
-        if(result >= $self.numNodes() || result < 0) fatal("ERROR. ID: " + $1 + " does not exist in this UndirectedGraph!")
+        if(result >= $self.numNodes || result < 0) fatal("ERROR. ID: " + $1 + " does not exist in this UndirectedGraph!")
         Node(result)
       }
       

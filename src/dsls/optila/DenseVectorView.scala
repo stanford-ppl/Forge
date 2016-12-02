@@ -19,8 +19,12 @@ trait DenseVectorViewOps {
     // static methods
     static (DenseVectorView) ("apply", T, ((MArray(T), MInt ,MInt, MInt, MBoolean) :: DenseVectorView)) implements allocates(DenseVectorView, ${$0}, ${$1}, ${$2}, ${$3}, ${$4})
 
-    val DenseVectorViewOps = withTpe(DenseVectorView)
-    DenseVectorViewOps {
+    //val DenseVectorViewOps = withTpe(DenseVectorView)
+    //DenseVectorViewOps {
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(DenseVectorView){
       compiler ("densevectorview_data") (Nil :: MArray(T)) implements getter(0, "_data")
       compiler ("densevectorview_start") (Nil :: MInt) implements getter(0, "_start")
       compiler ("densevectorview_stride") (Nil :: MInt) implements getter(0, "_stride")
@@ -42,7 +46,7 @@ trait DenseVectorViewOps {
 
       infix ("toDense") (Nil :: DenseVector(T)) implements composite ${ $self.map(e => e) }
 
-      direct ("__equal") (DenseVector(T) :: MBoolean) implements composite ${ $1 == $self }
+      direct ("infix_==") (DenseVector(T) :: MBoolean) implements composite ${ $1 == $self }
 
       infix ("filter") ((T ==> MBoolean) :: DenseVector(T)) implements composite ${ $self.toDense.filter($1) }
 

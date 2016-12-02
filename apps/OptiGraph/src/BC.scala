@@ -1,6 +1,8 @@
 import optigraph.compiler._
 import optigraph.library._
 import optigraph.shared._
+import org.scala_lang.virtualized.SourceContext
+import org.scala_lang.virtualized.virtualize
 
 // This object lets us run the Delite version of the code
 object BCCompiler extends OptiGraphApplicationCompiler with BC
@@ -8,6 +10,7 @@ object BCCompiler extends OptiGraphApplicationCompiler with BC
 // This object lets us run the Scala library version of the code
 object BCInterpreter extends OptiGraphApplicationInterpreter with BC
 
+@virtualize
 trait BC extends OptiGraphApplication {
   def main() = {
     println("OptiGraph Test 1")

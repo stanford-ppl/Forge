@@ -34,6 +34,8 @@ trait ForgeArrayWrapper extends HUMAN_DSL_NAMEBase with ForgeMetadataWrapper {
     = __arg0.mkString(__arg1)
   def array_map[T:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]], __arg1: Rep[T] => Rep[R])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]
     = __arg0.map(__arg1)
+  def array_foreach[A:Manifest](__arg0: Rep[ForgeArray[A]], __arg1: Rep[A] => Rep[Unit])(implicit __imp0: SourceContext): Rep[Unit]
+    = __arg0.foreach(__arg1)
   def array_flatmap[T:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]], __arg1: Rep[T] => Rep[ForgeArray[R]])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]
     = __arg0.flatMap(e => __arg1(e))
   def array_zip[T:Manifest,B:Manifest,R:Manifest](__arg0: Rep[ForgeArray[T]],__arg1: Rep[ForgeArray[B]], __arg2: (Rep[T],Rep[B]) => Rep[R])(implicit __imp0: SourceContext): Rep[ForgeArray[R]]

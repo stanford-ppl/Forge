@@ -13,3 +13,4 @@ trait OpenCLGenReppableOps
 trait CGenReppableOps
 trait DotGenReppableOps
 trait MaxJGenReppableOps
+trait ChiselGenReppableOps

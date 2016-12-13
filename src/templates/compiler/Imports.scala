@@ -32,6 +32,7 @@ trait DeliteGenImports extends BaseGenImports {
     stream.println("import ppl.delite.framework.codegen.opencl.TargetOpenCL")
     stream.println("import ppl.delite.framework.codegen.dot.TargetDot")
     stream.println("import ppl.delite.framework.codegen.maxj.TargetMaxJ")
+    stream.println("import ppl.delite.framework.codegen.chisel.TargetChisel")
     stream.println("import ppl.delite.framework.ops._")
     stream.println("import ppl.delite.framework.datastructures._")
     stream.println("import ppl.delite.framework.codegen.delite.overrides._")

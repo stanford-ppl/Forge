@@ -4,7 +4,7 @@ import optiql.shared._
 import reflect.Manifest
 import org.scala_lang.virtualized.SourceContext
 import org.scala_lang.virtualized.virtualize
-import scala.virtualization.lms.common.Record
+import org.scala_lang.virtualized.Record
 
 
 object GeneInterpreter extends OptiQLApplicationInterpreter with GeneApp

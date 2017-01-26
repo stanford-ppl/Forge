@@ -44,9 +44,9 @@ trait InputOutputCompilerOps extends InputOutputOps with OverloadHack {
   }
 
   implicit class ForgeFileInputStreamOpsCls(stream: Rep[ForgeFileInputStream])(implicit ctx: SourceContext) {
-    def readLine(implicit ctx: SourceContext, o: Overloaded1) = forge_fileinputstream_readline(stream)
+    def readLine()(implicit ctx: SourceContext, o: Overloaded1) = forge_fileinputstream_readline(stream)
     def size(implicit ctx: SourceContext, o: Overloaded1) = forge_fileinputstream_size(stream)
-    def close(implicit ctx: SourceContext, o: Overloaded1) = forge_fileinputstream_close(stream)
+    def close()(implicit ctx: SourceContext, o: Overloaded1) = forge_fileinputstream_close(stream)
   }
 
   def forge_fileinputstream_new(path: Rep[String])(implicit ctx: SourceContext): Rep[ForgeFileInputStream]

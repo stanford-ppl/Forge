@@ -696,8 +696,9 @@ trait ScalaOps extends PrimitiveMathGen {
     infix (ByteBufferOps) ("rewind", Nil, ByteBuffer :: MUnit, effect = write(0)) implements codegen($cala, ${ $0.rewind(); () })
     infix (ByteBufferOps) ("array", Nil, ByteBuffer :: MArray(MByte)) implements codegen($cala, ${ $0.array })
 
-    infix (ByteBufferOps) ("getInt", Nil, ByteBuffer :: MInt) implements codegen($cala, ${ $0.getInt() })
-    infix (ByteBufferOps) ("getDouble", Nil, ByteBuffer :: MDouble) implements codegen($cala, ${ $0.getDouble() })
+    // [macro-trans] Why didn't getInt and getDouble have effects before?
+    infix (ByteBufferOps) ("getInt", Nil, ByteBuffer :: MInt, effect = write(0)) implements codegen($cala, ${ $0.getInt() })
+    infix (ByteBufferOps) ("getDouble", Nil, ByteBuffer :: MDouble, effect = write(0)) implements codegen($cala, ${ $0.getDouble() })
     infix (ByteBufferOps) ("putInt", Nil, (ByteBuffer, MInt) :: ByteBuffer, effect = write(0)) implements codegen($cala, ${ $0.putInt($1) })
     infix (ByteBufferOps) ("putDouble", Nil, (ByteBuffer, MDouble) :: ByteBuffer, effect = write(0)) implements codegen($cala, ${ $0.putDouble($1) })
 

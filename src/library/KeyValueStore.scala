@@ -138,8 +138,13 @@ trait KeyValueStoreOps {
 
     // --
 
-    val KeyValueStoreOps = withTpe(KeyValueStore)
-    KeyValueStoreOps {
+    //val KeyValueStoreOps = withTpe(KeyValueStore)
+    //KeyValueStoreOps {
+
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(KeyValueStore){
       compiler ("kv_deserialize") (Nil :: MLambda(Tup2(KeyValueStore(V),MString), V)) implements getter(0, "_deserialize")
       compiler ("kv_table_name") (Nil :: MString) implements getter(0, "_table")
       compiler ("kv_get_db") (Nil :: LevelDB) implements getter(0, "_db")

@@ -1,6 +1,6 @@
 package optiql.shared.ops
 
-import scala.virtualization.lms.common.{Base,StructOps, RecordOps}
+import scala.virtualization.lms.common.Base
 import optiql.shared._
 import optiql.shared.ops._
 import org.scala_lang.virtualized.{RefinedManifest,SourceContext}
@@ -72,18 +72,18 @@ trait RewriteCompilerOps extends RewriteOps {
     val fields = Range(0,elems.length) map { i =>
       val (field, tp) = elems(i)
       tp.toString match {
-        case s if s.contains("String") => (field, false, (r:Rep[T]) => record(unit(i)))
-        case "Double" => (field, false, (r:Rep[T]) => record(unit(i)).toDouble)
-        case "Float" => (field, false, (r:Rep[T]) => record(unit(i)).toFloat)
-        case "Boolean" => (field, false, (r:Rep[T]) => record(unit(i)) == "true")
-        case "Int" => (field, false, (r:Rep[T]) => record(unit(i)).toInt)
-        case "Long" => (field, false, (r:Rep[T]) => record(unit(i)).toLong)
-        case "Char" => (field, false, (r:Rep[T]) => fstring_fcharat(record(unit(i)), unit(0)))
-        case d if d.contains("Date") => (field, false, (r:Rep[T]) => Date(record(unit(i))))
+        case s if s.contains("String") => (field, record(unit(i)))
+        case d if d.contains("Date")   => (field, Date(record(unit(i))))
+        case "Double"  => (field, record(unit(i)).toDouble)
+        case "Float"   => (field, record(unit(i)).toFloat)
+        case "Boolean" => (field, record(unit(i)) == "true")
+        case "Int"     => (field, record(unit(i)).toInt)
+        case "Long"    => (field, record(unit(i)).toLong)
+        case "Char"    => (field, fstring_fcharat(record(unit(i)), unit(0)))
         case _ => throw new RuntimeException("Don't know hot to automatically parse type " + tp.toString + ". Try passing in your own parsing function instead.")
       }
     }
-    if (isRecord) record_new[T](fields.asInstanceOf[Seq[(String, Boolean, RewriteCompilerOps.this.Rep[T] => RewriteCompilerOps.this.Rep[_])]])
-    else fields(0)._3(null.asInstanceOf[Rep[T]]).asInstanceOf[Rep[T]]
+    if (isRecord) record_new[T](fields.asInstanceOf[Seq[(String,Rep[_])]]:_*)(manifest[T].asInstanceOf[RefinedManifest[T]]) //.asInstanceOf[Seq[(String, Rep[_])]])
+    else fields(0)._2.asInstanceOf[Rep[T]]
   }
 }

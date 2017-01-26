@@ -1,6 +1,6 @@
 import optiql.shared._
 
-import scala.virtualization.lms.common.Record
+import org.scala_lang.virtualized.Record
 
 trait Types { this: OptiQLApplication =>
 

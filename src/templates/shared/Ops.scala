@@ -252,20 +252,20 @@ trait BaseGenOps extends ForgeCodeGenBase {
     */
 
   // untyped implicit args
-  def makeImplicitCtxBoundsStringList(tpePars: List[Rep[TypePar]]): List[String]  = {
+  def makeImplicitCtxBoundsStringList(tpePars: List[Rep[TypePar]]): List[String] = {
     tpePars.flatMap { a =>
       a.ctxBounds.map(b => "implicitly[" + b.name + "[" + quote(a) + "]]")
-    }.mkString(",")
+    }
   }
 
   def makeImplicitArgs(tpePars: List[Rep[TypePar]], args: List[Rep[DSLArg]], implicitArgs: List[Rep[DSLArg]]) = {
     // val ctxBoundsStringList = makeImplicitCtxBoundsStringList(withoutHkTpePars(tpePars))
     // val implicitArgsStringList = implicitArgs.map(quote)
-    val hkInstantiationsStringList = getHkTpeParInstantiations(tpePars, args, implicitArgs).map(quote)
+    val hkInstantiationsStringList = getHkTpeParInstantiations(tpePars, args, implicitArgs) //.map(quote)
 
     // passing order is: regular ctxBounds, then regular implicits, and finally hkInstantiations context bounds
     val ctxBoundsStr = makeImplicitCtxBoundsStringList(withoutHkTpePars(tpePars))
-    val ctxBounds2 = if (ctxBoundsStr == "") "" else ctxBoundsStr + ","
+    val ctxBounds2 = if (ctxBoundsStr.isEmpty) "" else ctxBoundsStr.mkString(",") + ","
     val allImplicitArgs = implicitArgs ++ hkInstantiationsStringList
     if (allImplicitArgs.length > 0)
       "(" + ctxBounds2 + allImplicitArgs.map(quote).mkString(",") + ")"
@@ -522,7 +522,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     emitBlockComment("Operations", stream)
     stream.println()
 
-    println("")
+    //println("")
 
 
     //to many different implicit classes for primitives to not work!
@@ -586,7 +586,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     //infix ops are only allowed if defined in EmbeddedControls
     val (pimpOps, infixOps) = allOps.partition(noInfix)
 
-    println("ClassName: " + opsGrp.name)
+    /*println("ClassName: " + opsGrp.name)
     println("PIMPS:")
     for (o <- pimpOps)
       println(o.name + " [" + o.tpePars.map(_.name).mkString(",") + "] (" + o.args.map(_.name).mkString(", ") + ")")
@@ -594,7 +594,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     println("INFIXES: ")
     for (o <- infixOps)
       println(o.name + " [" + o.tpePars.map(_.name).mkString(",") + "] (" + o.args.map(_.name).mkString(", ") + ")")
-    println("")
+    println("")*/
 
     if (pimpOps.nonEmpty) {
       // set up a pimp-my-library style promotion
@@ -607,10 +607,8 @@ trait BaseGenOps extends ForgeCodeGenBase {
                 o2.args.apply(0).tpe.stage == future)))
 
       def getTpePars(tpe: Rep[DSLType]):List[Rep[TypePar]] = {
-        println("getTpePars: "+tpe.name)
-        tpe match {
-          case Def(cc) => println("CCP: "+cc)
-        }
+        // println("getTpePars: "+tpe.name)
+        // tpe match { case Def(cc) => println("CCP: "+cc) }
         val ret = tpe match {
           case Def(TpeInst(_, args)) =>
             val (tpes, nontpes) = args.partition(isTpePar)
@@ -618,15 +616,13 @@ trait BaseGenOps extends ForgeCodeGenBase {
           case Def(TpePar(_, _, _)) => List(tpe.asInstanceOf[Rep[TypePar]]) //with name, extends Def[TypePar]
           case _ => tpe.tpePars //Tpe or HkTpe
         }
-        println("ret: "+ret.map(_.name).mkString(", "))
+        //println("ret: "+ret.map(_.name).mkString(", "))
         ret
       }
 
       def getTypeArgs(tpe: Rep[DSLType]) = {
-        println("getTypeArgs: "+tpe.name+ " -> "+tpe.args.map(_.name))
-        tpe match {
-          case Def(cc) => println("CCA: "+cc)
-        }
+        // println("getTypeArgs: "+tpe.name+ " -> "+tpe.args.map(_.name))
+        // tpe match { case Def(cc) => println("CCA: "+cc) }
         val ret = tpe match {
           //only a higher kinded type can have type arguments
           case Def(TpeInst(hk, args)) =>
@@ -637,7 +633,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
           //   tpePars //check if arguments!
           case _ => Nil
         }
-        println("ret: "+ret.map(_.name).mkString(", "))
+        // println("ret: "+ret.map(_.name).mkString(", "))
         ret
       }
 
@@ -663,12 +659,12 @@ trait BaseGenOps extends ForgeCodeGenBase {
       //case class HkTpePar(name: String, tpePars: List[Rep[TypePar]], ctxBounds: List[TypeClassSignature], stage: StageTag) extends Def[TypePar] /* HkTpePar represents a named higher-kinded type parameter for another DSLType */
       //case class TpePar(name: String, ctxBounds: List[TypeClassSignature], stage: StageTag) extends Def[TypePar] /* TpePar represents a named type parameter for another DSLType */
 
-      println("tpes _.name:")
+      /*println("tpes _.name:")
       tpes.foreach { x =>
         print(x.name + " -> ")
         print(x.tpeArgs)
         println(x.tpePars)
-      }
+      }*/
       for (tpe <- tpes) {
         //OpsCls has to be defined for each different Type Instantiation
         val tpePars = getTpePars(tpe) //.filterNot(_.name == "_") //either maps to itself or wrapped type parameters

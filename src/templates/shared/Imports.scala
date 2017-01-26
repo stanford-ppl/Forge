@@ -25,10 +25,11 @@ trait BaseGenImports extends ForgeCodeGenBase {
   }
 
   def emitLMSImports(stream: PrintWriter) {
-    stream.println("import scala.virtualization.lms.common.{Base,BaseExp,EffectExp,BaseFatExp,RecordOps}")
+    stream.println("import scala.virtualization.lms.common.{Base,BaseExp,EffectExp,BaseFatExp}")
     stream.println("import scala.virtualization.lms.common.{ScalaGenBase,ScalaGenEffect,ScalaGenFat,CudaGenFat,CGenFat}")
     stream.println("import scala.virtualization.lms.util._")
     stream.println("import scala.virtualization.lms.internal._")
+    //stream.println("import org.scala_lang.virtualized.RecordOps") // This used to be in LMS
   }
 
   def emitDSLImports(stream: PrintWriter) {

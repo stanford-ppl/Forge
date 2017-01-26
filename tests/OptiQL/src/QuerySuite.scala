@@ -2,8 +2,8 @@ import optiql.compiler._
 import optiql.shared._
 import optiql.library._
 import ppl.tests.scalatest._
-import scala.virtualization.lms.common.Record
-
+import org.scala_lang.virtualized.Record
+import org.scala_lang.virtualized.SourceContext
 
 trait TestRecord extends OptiQLApplication {
 

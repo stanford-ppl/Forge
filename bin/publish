@@ -74,7 +74,7 @@ object ${dslName}Build extends Build {
 
     publishArtifact in (Compile, packageDoc) := false,
     // needed for scala.tools, which is apparently not included in sbt's built in version
-    libraryDependencies += "org.scala-lang.virtualized" %% "scala-virtualized" % "1.0.0-macrovirt",
+    libraryDependencies += "org.scala-lang.virtualized" %% "scala-virtualized" % "0.1",
     libraryDependencies += "org.scala-lang" % "scala-library" % virtScala,
     libraryDependencies += "org.scala-lang" % "scala-compiler" % virtScala,
     libraryDependencies += "org.scalatest" % "scalatest_${scala_major_vers}" % "2.2.2",

@@ -179,8 +179,13 @@ trait NodeDataOps {
       buf.unsafeImmutable.array
     }
     
-    val NodeDataDBOps = withTpe(NodeDataDB)
-    NodeDataDBOps{
+    // val NodeDataDBOps = withTpe(NodeDataDB)
+    // NodeDataDBOps{
+
+    import org.scala_lang.virtualized.virtualize
+    magic()
+    @virtualize
+    def magic[R]() = withTpee(NodeDataDB){
       compiler ("nd_getdb") (Nil :: KeyValueStore(NodeData(MDouble))) implements getter(0, "_db")
 
       infix ("apply") (MString :: NodeData(MDouble)) implements composite ${ nd_getdb($0).apply($1) }

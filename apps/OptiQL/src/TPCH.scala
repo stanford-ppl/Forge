@@ -2,7 +2,7 @@ import optiql.compiler._
 import optiql.library._
 import optiql.shared._
 import reflect.Manifest;
-import scala.virtualization.lms.common.Record
+import org.scala_lang.virtualized.Record
 import org.scala_lang.virtualized.SourceContext
 import org.scala_lang.virtualized.virtualize
 

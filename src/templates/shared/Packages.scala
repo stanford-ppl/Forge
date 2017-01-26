@@ -62,10 +62,10 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     }
     //TODO(macrotrans):
     for (e <- Externs) {
-      if (e.opsGrp.name == "RecordOps")
-        stream.print(" with scala.virtualization.lms.common.RecordOps")
-      else
-        stream.print(" with " + e.opsGrp.name)
+      //if (e.opsGrp.name == "RecordOps")
+      //  stream.print(" with org.scala_lang.virtualized.RecordOps")
+      //else
+      stream.print(" with " + e.opsGrp.name)
     }
     stream.println(" {")
     stream.println("  this: " + dsl + "Application => ")

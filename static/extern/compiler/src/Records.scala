@@ -8,7 +8,7 @@ import ppl.delite.framework.codegen.delite.overrides._
 import ppl.delite.framework.ops.DeliteOpsExp
 import ppl.delite.framework.datastructures._
 
-trait RecordOpsExp extends DeliteStructsExp with RecordOps {
+trait RecordOpsExp extends DeliteStructsExp {
   this: DeliteOpsExp =>
 }
 trait ScalaGenRecordOps extends ScalaGenDeliteStruct { val IR: RecordOpsExp with DeliteOpsExp }

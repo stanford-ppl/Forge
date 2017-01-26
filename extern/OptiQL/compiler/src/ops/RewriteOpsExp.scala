@@ -1,6 +1,6 @@
 package optiql.compiler.ops
 
-import scala.virtualization.lms.common.{StructOps,RecordOps,ScalaGenFat,CGenFat}
+import scala.virtualization.lms.common.{StructOps,ScalaGenFat,CGenFat}
 import org.scala_lang.virtualized.{RefinedManifest,SourceContext}
 import ppl.delite.framework.datastructures._
 import ppl.delite.framework.transform.MultiloopSoATransformWithReduceExp

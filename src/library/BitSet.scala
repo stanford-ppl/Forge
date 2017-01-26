@@ -129,7 +129,7 @@ trait BitSetOps {
       compiler("bs_set")(("bitIndex",MInt) :: MUnit, effect=write(0)) implements single ${
         val wordIndex = bs_word_index(bitIndex)
         val oldValue = bs_get_word($self,wordIndex)
-        val value = oldValue | (1L << bitIndex)
+        val value = oldValue | (unit(1L) << bitIndex)
         if (value != oldValue) bs_set_cardinality($self,$self.cardinality+1)
         bs_set_word($self,wordIndex,value)
       }
@@ -137,7 +137,7 @@ trait BitSetOps {
       compiler("bs_clear")(("bitIndex",MInt) :: MUnit, effect=write(0)) implements single ${
         val wordIndex = bs_word_index(bitIndex)
         val oldValue = bs_get_word($self,wordIndex)
-        val value = bs_get_word($self,wordIndex) & ~(1L << bitIndex)
+        val value = bs_get_word($self,wordIndex) & ~(unit(1L) << bitIndex)
         if (value != oldValue) bs_set_cardinality($self,$self.cardinality-1)
         bs_set_word($self,wordIndex,value)
       }
@@ -176,7 +176,7 @@ trait BitSetOps {
       while (i < array_length(sortedInput)){
         var cur = sortedInput(i)
         var wordIndex = bs_word_index(cur)
-        var setValue = 1L << cur
+        var setValue = unit(1L) << cur
         var sameWord = true
         // Let's set all indices same word at once.
         i += 1
@@ -184,7 +184,7 @@ trait BitSetOps {
           // Are values in the same word?
           if (bs_word_index(sortedInput(i))==wordIndex){
             cur = sortedInput(i)
-            setValue = setValue | (1L << cur)
+            setValue = setValue | (unit(1L) << cur)
             i += 1
           } else sameWord = false
         }
